@@ -1225,6 +1225,8 @@ Si el Step 8 tocó más archivos, añadirlos al `git add`.
 
 ### Task 6: la señal de "caja lista" y el sondeo
 
+> **Corregido en la revisión final (F7):** la señal es la marca de tiempo `cajas.espejo_turno_abierto_at`, no un booleano, y la sella `selloLatido` (`espejo.ts`). Los fragmentos de esta tarea ya muestran lo que quedó en la rama; el smoke vigente es `supabase/scripts/smoke_tienda_caja_lista.sql`.
+
 La tienda solo debe recibir pedidos si una caja de la sucursal consultó hace poco **y** tiene turno abierto. Y una caja que todavía no entiende los pedidos de la tienda (cualquiera anterior a la 0.8.0) no debe recibirlos: su tabla local los rechazaría y se llevaría por delante el espejo entero, Uber incluido.
 
 **Files:**
@@ -1237,7 +1239,7 @@ La tienda solo debe recibir pedidos si una caja de la sucursal consultó hace po
 **Interfaces:**
 - Consumes: `cajas.espejo_apps_at` (0096); `modulos_efectivos().efectivos.tienda` (Task 5); `tienda_sucursales.participa` (Task 4).
 - Produces:
-  - `cajas.espejo_turno_abierto boolean NOT NULL DEFAULT false`
+  - `cajas.espejo_turno_abierto_at timestamptz NULL`
   - `sucursal_recibe_pedidos(p_sucursal uuid, p_segundos integer DEFAULT 90) RETURNS boolean`, solo `service_role`
   - `alcanceEspejo({ efectivos, cuerpo }): { conApps: boolean; conTienda: boolean; canales: ("APP"|"TIENDA")[]; turnoAbierto: boolean }` en `espejo.ts`
   - `cadenciaEspejo({ conexiones, pedidosVivos, tienda })` acepta `tienda?: boolean`
@@ -1258,20 +1260,21 @@ DECLARE
   v_suc  uuid := '99999999-0000-0000-0000-0000000000bb';
   v_caja uuid := '99999999-0000-0000-0000-0000000000cc';
 BEGIN
-  UPDATE cajas SET espejo_apps_at = NULL, espejo_turno_abierto = false WHERE sucursal_id = v_suc;
+  UPDATE cajas SET espejo_apps_at = NULL, espejo_turno_abierto_at = NULL WHERE sucursal_id = v_suc;
 
-  IF sucursal_recibe_pedidos(v_suc) THEN RAISE EXCEPTION '1: sin sondeo no debe recibir'; END IF;
+  IF sucursal_recibe_pedidos(v_suc) THEN RAISE EXCEPTION '1: sin marca de turno abierto no debe recibir'; END IF;
 
-  UPDATE cajas SET espejo_apps_at = now(), espejo_turno_abierto = false WHERE id = v_caja;
-  IF sucursal_recibe_pedidos(v_suc) THEN RAISE EXCEPTION '2: con sondeo pero sin turno abierto no debe recibir'; END IF;
+  UPDATE cajas SET espejo_apps_at = now(), espejo_turno_abierto_at = now() WHERE id = v_caja;
+  IF NOT sucursal_recibe_pedidos(v_suc) THEN RAISE EXCEPTION '2: con una marca reciente debe recibir'; END IF;
 
-  UPDATE cajas SET espejo_turno_abierto = true WHERE id = v_caja;
-  IF NOT sucursal_recibe_pedidos(v_suc) THEN RAISE EXCEPTION '3: con sondeo reciente y turno abierto debe recibir'; END IF;
+  UPDATE cajas SET espejo_apps_at = now() - interval '2 minutes', espejo_turno_abierto_at = now() - interval '2 minutes' WHERE id = v_caja;
+  IF sucursal_recibe_pedidos(v_suc) THEN RAISE EXCEPTION '3: una marca de hace 2 minutos ya no cuenta'; END IF;
 
-  UPDATE cajas SET espejo_apps_at = now() - interval '2 minutes' WHERE id = v_caja;
-  IF sucursal_recibe_pedidos(v_suc) THEN RAISE EXCEPTION '4: un sondeo de hace 2 minutos ya no cuenta'; END IF;
+  -- La caja sigue sondeando pero ya no reporta turno abierto (lo cerró, o dejó de declarar la tienda).
+  UPDATE cajas SET espejo_apps_at = now() WHERE id = v_caja;
+  IF sucursal_recibe_pedidos(v_suc) THEN RAISE EXCEPTION '4: un latido fresco con la marca de turno vieja no debe recibir'; END IF;
 
-  UPDATE cajas SET espejo_apps_at = now(), activa = false WHERE id = v_caja;
+  UPDATE cajas SET espejo_turno_abierto_at = now(), activa = false WHERE id = v_caja;
   IF sucursal_recibe_pedidos(v_suc) THEN RAISE EXCEPTION '5: una caja desactivada no cuenta'; END IF;
 
   RAISE NOTICE 'smoke_tienda_caja_lista OK';
@@ -1282,7 +1285,7 @@ ROLLBACK;
 - [ ] **Step 2: Correrlo y verlo fallar**
 
 Run: `cd desktop && npm run smokes -- smoke_tienda_caja_lista.sql`
-Expected: ❌ con `column "espejo_turno_abierto" of relation "cajas" does not exist`.
+Expected: ❌ con `column "espejo_turno_abierto_at" of relation "cajas" does not exist`.
 
 - [ ] **Step 3: Añadir §6 a la migración**
 
@@ -1291,22 +1294,23 @@ Expected: ❌ con `column "espejo_turno_abierto" of relation "cajas" does not ex
 -- El turno abierto llega a la nube por el push, con hasta 10 minutos de retraso: no sirve para
 -- decidir si la tienda acepta un pedido AHORA. La única señal de segundos es el sondeo del
 -- espejo (0096), así que la caja manda ahí si tiene turno abierto y delivery-espejo lo sella.
--- Una caja vieja no manda el dato, queda en false, y la tienda de esa sucursal no abre.
-ALTER TABLE cajas ADD COLUMN IF NOT EXISTS espejo_turno_abierto boolean NOT NULL DEFAULT false;
-COMMENT ON COLUMN cajas.espejo_turno_abierto IS
-  'Si la caja reportó turno abierto en su último sondeo de espejo (espejo_apps_at). La tienda en línea solo recibe pedidos con esto en true.';
+-- Marca de tiempo y no booleano, para que falle cerrada: quien deja de reportar el turno no
+-- escribe nada, la marca envejece sola y la tienda de esa sucursal no abre.
+ALTER TABLE cajas ADD COLUMN IF NOT EXISTS espejo_turno_abierto_at timestamptz NULL;
+COMMENT ON COLUMN cajas.espejo_turno_abierto_at IS
+  'Última vez que la caja reportó turno abierto en su sondeo de espejo. NULL = nunca. La tienda en línea solo recibe pedidos mientras esta marca es reciente (sucursal_recibe_pedidos).';
 
 CREATE OR REPLACE FUNCTION sucursal_recibe_pedidos(p_sucursal uuid, p_segundos integer DEFAULT 90) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   SELECT EXISTS (
     SELECT 1 FROM cajas c
-    WHERE c.sucursal_id = p_sucursal AND c.activa AND c.espejo_turno_abierto
-      AND c.espejo_apps_at IS NOT NULL AND c.espejo_apps_at > now() - make_interval(secs => p_segundos));
+    WHERE c.sucursal_id = p_sucursal AND c.activa
+      AND c.espejo_turno_abierto_at > now() - make_interval(secs => p_segundos));
 $$;
 REVOKE ALL ON FUNCTION sucursal_recibe_pedidos(uuid, integer) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION sucursal_recibe_pedidos(uuid, integer) TO service_role;
 COMMENT ON FUNCTION sucursal_recibe_pedidos(uuid, integer) IS
-  'TRUE si alguna caja activa de la sucursal sondeó en los últimos p_segundos y reportó turno abierto.';
+  'TRUE si alguna caja activa de la sucursal reportó turno abierto en los últimos p_segundos.';
 ```
 
 - [ ] **Step 4: Correr el smoke**
@@ -1460,9 +1464,10 @@ por:
 por:
 
 ```ts
-    // El turno abierto se sella junto al latido: la tienda en línea solo recibe pedidos con las
-    // dos cosas frescas (sucursal_recibe_pedidos, mig. 0161). Una caja que no manda el dato queda en false.
-    .update({ espejo_apps_at: new Date().toISOString(), espejo_turno_abierto: cuerpo.turno_abierto === true })
+    // La caja que declara la tienda Y reporta turno abierto sella además espejo_turno_abierto_at,
+    // la marca que lee sucursal_recibe_pedidos (mig. 0161). Si deja de reportarlo no se escribe
+    // nada: la marca envejece sola y la tienda de esa sucursal se cierra (ver selloLatido).
+    .update(selloLatido(cuerpo, new Date().toISOString()))
 ```
 
 5. Sustituir desde `const efectivos = …` hasta el final del handler (el `return json({ … })` y su `});`) por:
@@ -1564,12 +1569,14 @@ Si Docker no está disponible, dejar este paso para después del Step 6 y genera
 
 Run: `supabase gen types typescript --linked > packages/db/src/database.types.ts`
 
-En ambos casos, comprobar que el archivo regenerado contiene `tienda_config`, `crear_ticket_desde_tienda` y `espejo_turno_abierto`, y que `pnpm -r exec tsc --noEmit` sigue en verde.
+En ambos casos, comprobar que el archivo regenerado contiene `tienda_config`, `crear_ticket_desde_tienda` y `espejo_turno_abierto_at`, y que `pnpm -r exec tsc --noEmit` sigue en verde.
 
 ```bash
 git add packages/db/src/database.types.ts
 git commit -m "chore(db): tipos regenerados con la base de la tienda en línea"
 ```
+
+Los tipos regenerados se confirman **en el PR, antes del squash** del Step 7: si se generan desde producción (después del Step 6), el commit se sube a la rama y el PR no se mezcla sin él.
 
 - [ ] **Step 4: Releer la migración completa**
 
@@ -1610,8 +1617,18 @@ No ejecutar nada de este paso sin un "sí" explícito de Fermín en el chat. Dec
 Con su visto bueno, y **antes de mezclar el PR** (regla del proyecto: la migración va a producción a mano y antes del merge):
 
 1. Confirmar que no hay otra migración pendiente que estorbe: `supabase migration list --linked`.
-2. Aplicar: `supabase db query --linked < supabase/migrations/0161_tienda_en_linea_base.sql` y luego `supabase migration repair --status applied 0161 --linked`. (Se aplica por stdin y no con `db push` porque `db push` se bloquea cuando la nube tiene migraciones de otras ramas.)
-3. Verificar en producción:
+2. Comprobar que no existe ya un bucket `productos` con otra configuración. La migración lo crea con `ON CONFLICT DO NOTHING`: uno previo se quedaría como está, quizá privado o con otro límite.
+
+```bash
+supabase db query --linked <<'SQL'
+SELECT id, public, file_size_limit, allowed_mime_types FROM storage.buckets WHERE id = 'productos';
+SQL
+```
+
+Expected: cero filas. Si devuelve una, detenerse y decidirlo con Fermín antes de aplicar.
+
+3. Aplicar **fuera del horario de servicio** y con `SET lock_timeout = '5s';` por delante: la migración toma bloqueos exclusivos breves sobre `delivery_pedidos`, `configuracion_tenant` y `cajas` (y bloquea un instante las escrituras en `sucursales`, por el índice único y la llave foránea de `tienda_sucursales`), y con ese tope, si choca con una venta en curso, falla a los 5 s en vez de dejar colgadas las cajas (se reintenta: es idempotente). `(echo "SET lock_timeout = '5s';"; cat supabase/migrations/0161_tienda_en_linea_base.sql) | supabase db query --linked` y luego `supabase migration repair --status applied 0161 --linked`. (Se aplica por stdin y no con `db push` porque `db push` se bloquea cuando la nube tiene migraciones de otras ramas.)
+4. Verificar en producción:
 
 ```bash
 supabase db query --linked <<'SQL'
@@ -1624,8 +1641,8 @@ SQL
 
 Expected: `0 | f | 0 | t`.
 
-4. Desplegar la función: `supabase functions deploy delivery-espejo --use-api`.
-5. Comprobar que las cajas en servicio siguen sondeando sin error: leer los registros de `delivery-espejo` unos minutos después y confirmar que no hay `DB_ERROR`.
+5. Desplegar la función: `supabase functions deploy delivery-espejo --use-api`.
+6. Comprobar que las cajas en servicio siguen sondeando sin error: leer los registros de `delivery-espejo` unos minutos después y confirmar que no hay `DB_ERROR`.
 
 - [ ] **Step 7: Mezclar**
 
@@ -1639,3 +1656,11 @@ Con el CI del PR en verde y el Step 6 hecho, mezclar con squash. Después de mez
 - El agente de la caja no manda todavía `turno_abierto` ni `tienda: true`: hasta la 0.8.0 ninguna sucursal queda "lista" y `delivery-espejo` no reparte pedidos de la tienda. Es lo esperado.
 - El complemento `TIENDA` está inactivo y sin conceder.
 - La evaluación del horario (día, hora de México, cierre pasada la medianoche) se escribe en la entrega 2, dentro de la función `tienda`, donde se usa.
+
+---
+
+## Contrato para la entrega 2
+
+`crear_ticket_desde_tienda` convierte en ticket un pedido que **ya está** en `delivery_pedidos`: no es la frontera con el público. La frontera es la función `tienda` (entrega 2), y **tiene que validar todo antes de insertar el pedido**. Lo que la base comprueba al crear el ticket es la última red, no la primera: un pedido que se rechaza ahí ya se le había confirmado al cliente.
+
+Qué es «todo» lo fijó la revisión final de esta entrega. La lista vive en su informe y no se copia aquí, para que no haya dos versiones: `.superpowers/sdd/2026-10-08-tienda-en-linea-1-base/final-fix-brief.md` (qué se arregló y por qué) y `final-fix-report.md` (cómo quedó). El plan de la entrega 2 empieza por leerlos.

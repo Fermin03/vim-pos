@@ -209,10 +209,12 @@ personal.
 
 ### 5.5 Señal de "caja lista"
 
-- `cajas.espejo_turno_abierto boolean`: lo sella `delivery-espejo` junto con `espejo_apps_at`, con
-  el dato que la caja manda en cada sondeo.
-- `sucursal_recibe_pedidos(p_sucursal uuid) RETURNS boolean`: hay una caja activa con
-  `espejo_apps_at` de hace menos de 90 s y `espejo_turno_abierto`.
+- `cajas.espejo_turno_abierto_at timestamptz`: una marca de tiempo, no un booleano. La sella
+  `delivery-espejo` en el sondeo solo cuando la caja declara la tienda **y** reporta turno abierto.
+  Una caja que cierra el turno o deja de declarar la tienda no escribe nada y la marca envejece
+  sola: la señal falla cerrada (un booleano conservaría un «sí» viejo junto a un latido fresco).
+- `sucursal_recibe_pedidos(p_sucursal uuid) RETURNS boolean`: mira la frescura de esa marca — hay
+  una caja activa con `espejo_turno_abierto_at` de hace menos de 90 s.
 - El servidor ya dicta el ritmo del sondeo (`_shared/delivery/espejo.ts`). Con el módulo de tienda
   efectivo y la sucursal participando, el reposo es de 30 s, no de 300 s, para que la ventana de
   90 s se cumpla.
@@ -225,9 +227,12 @@ Molde de la migración 0113, sin mecanismo nuevo:
 
 - Fila en `addons`: `TIENDA`, $100.
 - `planes.features_incluidos.tienda_incluida = true` en `NEGOCIO` y `CADENA`.
-- `('TIENDA','tienda_incluida')` se suma a la lista de `_sincronizar_addons_del_plan` y a
-  `ADDONS_DEL_PLAN` (`apps/platform/app/lib/cambio-plan.ts`). La migración otorga el complemento a
-  los negocios que ya están en esos planes.
+- La concesión por plan y la activación del complemento van en la **entrega 7** (migración de
+  salida), como hizo lealtad en 0159 y no en su migración base: ahí `('TIENDA','tienda_incluida')`
+  se suma a la lista de `_sincronizar_addons_del_plan` y a `ADDONS_DEL_PLAN`
+  (`apps/platform/app/lib/cambio-plan.ts`), el complemento se activa y se otorga a los negocios que
+  ya están en esos planes. La entrega 1 solo deja la fila inactiva y la bandera en los planes: esa
+  función corre en cada alta de negocio y cada cambio de plan, y detrás todavía no hay nada.
 - `modulos_efectivos`: `tienda` = complemento `TIENDA` activo **y** `modulo_tienda_activo`.
 - `tienda` entra en `packages/db/src/modulos.ts` y en las directivas del latido, que es de donde la
   caja instalada lee los módulos (allí `tenant_addons` no baja).
