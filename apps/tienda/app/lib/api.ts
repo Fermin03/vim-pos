@@ -113,7 +113,7 @@ export const entrar = (negocio: string, email: string, password: string): Promis
 export const salir = (negocio: string): Promise<Resultado<true>> => deCuenta("salir", negocio, {}, okDe);
 /** Siempre `ok`, exista o no la cuenta. `captcha`: acción `tienda_recuperar`. */
 export const recuperarPedir = (negocio: string, email: string, captcha: string): Promise<Resultado<true>> => deCuenta("recuperar_pedir", negocio, { email, captcha }, okDe);
-/** `token` = el `?t=` del enlace del correo. Con `ok` la sesión queda abierta. */
+/** `token` = el `#t=` del enlace del correo (lo lee la pantalla; ver `pasoDelEnlace`). Con `ok` la sesión queda abierta. */
 export const recuperarAplicar = (negocio: string, token: string, password: string): Promise<Resultado<Cuenta>> => deCuenta("recuperar_aplicar", negocio, { token, password }, cuentaDe);
 export const leerCuenta = (negocio: string, signal?: AbortSignal): Promise<Resultado<MiCuenta>> => deCuenta("cuenta", negocio, {}, miCuentaDe, signal);
 export const guardarCuenta = (negocio: string, d: DatosDeCuenta): Promise<Resultado<Cuenta>> => deCuenta("cuenta_guardar", negocio, d, cuentaDe);

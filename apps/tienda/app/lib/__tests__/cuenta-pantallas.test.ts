@@ -5,7 +5,7 @@ import type { Almacen } from "../carrito";
 import { menuDe, pedidosDe, type Menu, type PedidoDeCuenta } from "../contrato";
 import {
   dejarPorRepetir, direccionEnUnaLinea, direccionPorGuardar, enlaceDeAcceso, fechaDeNacimiento, fechaDePedido, formularioDeCuenta,
-  formularioDeDireccion, paraTusDatos, rutaDelMenu, textoDeDescartados, textoDePasswordActual, tokenDelEnlace, tomarPorRepetir,
+  formularioDeDireccion, paraTusDatos, rutaDelMenu, textoDeDescartados, pasoDelEnlace, textoDePasswordActual, tomarPorRepetir,
 } from "../cuenta";
 import { CODIGO, ID, menuCrudo, u } from "./datos";
 
@@ -39,9 +39,14 @@ describe("enlaces de las pantallas de cuenta", () => {
     expect(rutaDelMenu({ slug: "knockout", sucursales: [{ id: u(1) }, { id: u(2) }] }, u(2))).toBe(`/knockout?s=${u(2)}`);
     expect(rutaDelMenu({ slug: "knockout", sucursales: [{ id: u(1) }, { id: u(2) }] }, null)).toBe("/knockout");
   });
-  it("el token del enlace de recuperación solo vale con su forma", () => {
-    expect(tokenDelEnlace(CODIGO)).toBe(CODIGO);
-    for (const malo of ["", "corto", `${CODIGO}x`, [CODIGO], undefined, null, 5]) expect(tokenDelEnlace(malo), String(malo)).toBeNull();
+  it("recuperar: el token llega en el fragmento, y solo vale con su forma", () => {
+    expect(pasoDelEnlace(`#t=${CODIGO}`)).toEqual({ paso: "nueva", token: CODIGO });
+    // Sin `t` no hay enlace: se pide el correo.
+    for (const sin of ["", "#", "#otra-cosa", "#x=1", `#${CODIGO}`, undefined, null, 5, [`#t=${CODIGO}`]]) expect(pasoDelEnlace(sin), String(sin)).toEqual({ paso: "pedir" });
+    // Con un `t` que no es un token, el enlace no sirve (y no se manda nada a la función).
+    for (const roto of ["#t=", "#t=corto", `#t=${CODIGO}x`, `#t=${CODIGO.slice(1)}`, `#t=${CODIGO.slice(0, -1)}%20`, `#t=${CODIGO.slice(0, -1)}.`]) {
+      expect(pasoDelEnlace(roto), roto).toEqual({ paso: "invalido" });
+    }
   });
 });
 

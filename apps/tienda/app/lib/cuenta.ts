@@ -105,6 +105,8 @@ export function datosDeCuenta(f: Record<(typeof FORMULARIOS.datos)[number], stri
  * una frase: «Tu sesión terminó. Entra otra vez.». Los textos viven con los demás, en textos.ts.
  */
 export function textoDeCuenta(codigo: string): string {
+  // Al entrar o registrarse no hay a quién llamar: el «…o llama al restaurante» es del flujo de pedido.
+  if (codigo === "DEMASIADOS_INTENTOS") return "Demasiados intentos. Espera unos minutos y vuelve a intentar.";
   const t = textoDeError(codigo);
   return `${t.texto} ${t.hacer}`;
 }
@@ -163,8 +165,17 @@ export function enlaceDeAcceso(slug: string, pantalla: "entrar" | "registro" | "
 export const rutaDelMenu = (negocio: { slug: string; sucursales: readonly { id: string }[] }, sucursalId: string | null): string =>
   `/${negocio.slug}${negocio.sucursales.length > 1 && sucursalId ? `?s=${sucursalId}` : ""}`;
 
-/** El `?t=` del enlace de recuperación, si tiene forma de token; lo demás es un enlace que no sirve. */
-export const tokenDelEnlace = (t: unknown): string | null => (typeof t === "string" && FORMA_CODIGO.test(t) ? t : null);
+/**
+ * Qué paso de «recuperar» toca según el fragmento de la dirección (`location.hash`). El enlace del
+ * correo es `…/recuperar#t=<token>`: sin `t`, se pide el correo; con un `t` que no tiene forma de
+ * token (cortado al copiarlo, manoseado), el enlace no sirve; con uno bien formado, la contraseña
+ * nueva. Que además esté vigente lo dice la función al aplicarlo.
+ */
+export function pasoDelEnlace(hash: unknown): { paso: "pedir" | "invalido" } | { paso: "nueva"; token: string } {
+  const t = typeof hash === "string" ? new URLSearchParams(hash.replace(/^#/, "")).get("t") : null;
+  if (t === null) return { paso: "pedir" };
+  return FORMA_CODIGO.test(t) ? { paso: "nueva", token: t } : { paso: "invalido" };
+}
 
 /**
  * El error de «cambiar contraseña» y «eliminar cuenta». Ahí `CREDENCIALES_INVALIDAS` es «la actual

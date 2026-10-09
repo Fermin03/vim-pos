@@ -34,7 +34,8 @@ const nextConfig = {
         source: "/:negocio/:pantalla(entrar|registro|recuperar|cuenta)/:path*",
         headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
       },
-      // El enlace de recuperación lleva su token en la dirección: que no salga en ningún Referer.
+      // El token de recuperación va en el fragmento (`#t=`), que no viaja en el Referer ni llega al
+      // servidor; esto es el cinturón por si un día alguien lo pone en la consulta.
       { source: "/:negocio/recuperar/:path*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
     ];
   },

@@ -9,7 +9,7 @@ import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "rea
 import Link from "next/link";
 import { Aviso, Captcha, SITE_KEY_TURNSTILE, botonClases, cn, type AccionCaptcha } from "@vim/ui/styles";
 import { entrar, recuperarAplicar, recuperarPedir, registrar } from "../lib/api";
-import { FORMULARIOS, LIMITES_DE_CUENTA, PASSWORD, datosDeRegistro, enlaceDeAcceso, erroresDeCuenta, textoDeCuenta, tokenDelEnlace } from "../lib/cuenta";
+import { FORMULARIOS, LIMITES_DE_CUENTA, PASSWORD, datosDeRegistro, enlaceDeAcceso, erroresDeCuenta, pasoDelEnlace, textoDeCuenta } from "../lib/cuenta";
 import { CampoDePassword, CampoDeTexto, useAccion, useCampos } from "./campo";
 import { FOCO, PARTE, PRINCIPAL } from "./piezas";
 
@@ -168,23 +168,31 @@ export function Registro({ slug, negocio, volver }: { slug: string; negocio: str
 
 // ── Recuperar la contraseña ──────────────────────────────────────────────────────────────────────
 /**
- * Sin enlace pide el correo; con el enlace del correo (`?t=`) pide la contraseña nueva. El servidor
- * solo dice si el enlace llegó y si tiene forma (`enlace`); el token lo lee aquí el navegador, de su
- * propia barra de direcciones.
+ * Sin enlace pide el correo; con el enlace del correo (`#t=<token>`) pide la contraseña nueva. El
+ * token va en el fragmento, que el servidor nunca ve: qué paso toca se sabe aquí, al montar.
  */
-export function Recuperar({ slug, volver, enlace }: { slug: string; volver: string; enlace: "bueno" | "roto" | null }) {
+export function Recuperar({ slug, volver }: { slug: string; volver: string }) {
   // El token vive solo aquí, en memoria: sale de la barra de direcciones (y de esa entrada del
   // historial) en cuanto se lee, para que no quede en una captura, en un marcador ni en lo que se comparta.
   const token = useRef<string | null>(null);
+  // null = todavía no se sabe si hay enlace (el servidor no lo ve): no se pinta ningún paso, para
+  // no enseñar «pedir enlace» un instante a quien llega con uno.
+  const [paso, setPaso] = useState<"pedir" | "enviado" | "nueva" | "invalido" | null>(null);
   useEffect(() => {
-    if (!enlace) return;
-    // Solo se apunta si está: en desarrollo este efecto corre dos veces, y la segunda ya no lo encuentra.
-    const leido = tokenDelEnlace(new URLSearchParams(location.search).get("t"));
-    if (leido) token.current = leido;
-    history.replaceState(null, "", `/${slug}/recuperar`);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- una sola vez, al llegar
+    const leer = () => {
+      const enlace = pasoDelEnlace(location.hash);
+      // Sin enlace solo se decide la primera vez: en desarrollo este efecto corre dos veces, y la
+      // segunda ya no lo encuentra en la barra.
+      if (enlace.paso === "pedir") { setPaso((p) => p ?? "pedir"); return; }
+      token.current = enlace.paso === "nueva" ? enlace.token : null;
+      history.replaceState(null, "", location.pathname + location.search);
+      setPaso(enlace.paso);
+    };
+    leer();
+    // Abrir el enlace del correo en esta misma pestaña solo cambia el fragmento: la página no se recarga.
+    addEventListener("hashchange", leer);
+    return () => removeEventListener("hashchange", leer);
   }, []);
-  const [paso, setPaso] = useState<"pedir" | "enviado" | "nueva" | "invalido">(enlace === "roto" ? "invalido" : enlace ? "nueva" : "pedir");
 
   const correo = useCampos(FORMULARIOS.recuperar, { email: "" }, (f) => erroresDeCuenta(FORMULARIOS.recuperar, f));
   const nueva = useCampos(FORMULARIOS.nuevaPassword, { password: "" }, (f) => erroresDeCuenta(FORMULARIOS.nuevaPassword, f));
@@ -215,6 +223,7 @@ export function Recuperar({ slug, volver, enlace }: { slug: string; volver: stri
     });
   };
 
+  if (paso === null) return <main aria-busy="true" className="min-h-64 px-4 pb-10" />;
   if (paso === "invalido") {
     return (
       <Pantalla titulo="Este enlace ya no sirve" apoyo="Los enlaces para cambiar la contraseña duran 30 minutos y funcionan una sola vez. Pide uno nuevo.">

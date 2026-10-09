@@ -20,9 +20,9 @@ export async function metadatosDeAcceso(params: PropsDeAcceso["params"], titulo:
  * El negocio de la página y a dónde se vuelve. 404 si el negocio no existe; `negocio: null` si no se
  * pudo leer ahora (la página lo dice y ofrece reintentar). `volver` siempre pasa por `volverSeguro`.
  */
-export async function negocioDeAcceso({ params, searchParams }: PropsDeAcceso): Promise<{ slug: string; negocio: Negocio | null; volver: string; consulta: Record<string, string | string[] | undefined> }> {
+export async function negocioDeAcceso({ params, searchParams }: PropsDeAcceso): Promise<{ slug: string; negocio: Negocio | null; volver: string }> {
   const [{ negocio: slug }, consulta] = await Promise.all([params, searchParams]);
   const leido = await negocioDeLaPeticion(slug);
   if (leido.estado === "no-existe") notFound();
-  return { slug, negocio: leido.estado === "ok" ? leido.datos : null, volver: volverSeguro(slug, consulta.volver), consulta };
+  return { slug, negocio: leido.estado === "ok" ? leido.datos : null, volver: volverSeguro(slug, consulta.volver) };
 }

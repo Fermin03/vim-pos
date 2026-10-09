@@ -11,7 +11,7 @@ import {
   FORMULARIOS, carritoDesdePedido, datosDeCuenta, datosDeRegistro, errorDeCampoDeCuenta, erroresDeCuenta, erroresDeDireccion,
   textoDeCuenta, volverSeguro,
 } from "../cuenta";
-import { CODIGOS_DE_ERROR } from "../textos";
+import { CODIGOS_DE_ERROR, textoDeError } from "../textos";
 import { CODIGO, ID, menuCrudo, u } from "./datos";
 
 const CUENTA = { nombre: "Ana", apellido: "López", email: "ana@example.com", telefono: "4771112233", fecha_nacimiento: "1990-05-17" };
@@ -219,7 +219,9 @@ describe("textos de los errores de cuenta", () => {
     expect(textoDeCuenta("ENLACE_INVALIDO")).toBe("Este enlace ya no sirve. Pide uno nuevo.");
     expect(textoDeCuenta("DIRECCIONES_LLENAS")).toBe("Ya tienes 5 direcciones guardadas. Borra una para guardar otra.");
     expect(textoDeCuenta("CUENTA_INVALIDA_DATOS")).toMatch(/^Revisa tus datos\./);
-    expect(textoDeCuenta("DEMASIADOS_INTENTOS")).toMatch(/demasiados intentos/);
+    // En las pantallas de cuenta no se manda a llamar al restaurante; en el pedido, sí (no cambia).
+    expect(textoDeCuenta("DEMASIADOS_INTENTOS")).toBe("Demasiados intentos. Espera unos minutos y vuelve a intentar.");
+    expect(textoDeError("DEMASIADOS_INTENTOS").hacer).toMatch(/llama al restaurante/);
     expect(textoDeCuenta("ALGO_QUE_NO_EXISTE")).toBe("Algo salió mal de nuestro lado. Vuelve a intentar en unos minutos.");
   });
 });
