@@ -598,3 +598,140 @@ END;
 $$;
 REVOKE ALL ON FUNCTION tienda_cotizar(uuid, uuid, text, uuid, jsonb) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION tienda_cotizar(uuid, uuid, text, uuid, jsonb) TO service_role;
+
+-- ── §4 El alta del pedido ────────────────────────────────────────────────────
+-- La frontera con el público: todo lo que entra a delivery_pedidos por la tienda pasa por aquí, y
+-- nada del cliente se guarda sin validar. La Edge Function ya normaliza; esto es la última red, y
+-- la que no se puede saltar. Los importes y los renglones NO son los del cliente: son los de
+-- tienda_cotizar. Lo que crear_ticket_desde_tienda (0161) exige después de la fila, se cumple aquí.
+-- Devuelve {pedido_id, folio_corto, total_mxn, vence_aceptacion}.
+CREATE OR REPLACE FUNCTION tienda_crear_pedido(
+  p_tenant uuid, p_sucursal uuid, p_modo text, p_zona uuid, p_items jsonb,
+  p_cliente jsonb,          -- {nombre, telefono (10 dígitos), email | null}
+  p_direccion jsonb,        -- NULL al recoger; a domicilio {calle, numero_exterior, numero_interior?, colonia, codigo_postal, ciudad, estado, referencias?}
+  p_pago text,              -- 'EFECTIVO' | 'TARJETA'
+  p_paga_con numeric,       -- NULL salvo EFECTIVO
+  p_nota text,
+  p_seguimiento_hash text,  -- SHA-256 en hex del código que solo conoce el cliente
+  p_cuenta uuid DEFAULT NULL)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_motivo text;
+  v_nombre text := btrim(p_cliente ->> 'nombre');
+  v_tel    text := p_cliente ->> 'telefono';
+  v_email  text := p_cliente ->> 'email';
+  v_cfg    tienda_config%ROWTYPE;
+  v_q      jsonb;
+  v_total  numeric(12,2);
+  v_dir    jsonb := NULLIF(p_direccion, 'null'::jsonb);
+  v_dir_ok boolean;
+  v_id_ext text := replace(gen_random_uuid()::text, '-', '');
+  v_ped    record;
+BEGIN
+  -- 1) La sucursal es del negocio (antes que nada: no se contesta por la tienda de otro) y recibe
+  --    pedidos ahora en ese modo. Un modo que no existe sale por aquí como MODO_NO_DISPONIBLE.
+  IF NOT EXISTS (SELECT 1 FROM sucursales s WHERE s.id = p_sucursal AND s.tenant_id = p_tenant) THEN
+    RAISE EXCEPTION 'SUCURSAL_DE_OTRO_NEGOCIO: la sucursal % no es de este negocio', p_sucursal;
+  END IF;
+  v_motivo := tienda_estado_sucursal(p_sucursal, p_modo);
+  IF v_motivo IS NOT NULL THEN RAISE EXCEPTION 'TIENDA_CERRADA: %', v_motivo; END IF;
+
+  -- 2) El cliente. «IS NOT TRUE»: una clave ausente deja la condición en NULL, y NULL no es válido.
+  IF (char_length(v_nombre) BETWEEN 1 AND 100
+      AND v_tel ~ '^[0-9]{10}$'
+      AND (v_email IS NULL OR (char_length(v_email) <= 254 AND v_email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'))) IS NOT TRUE THEN
+    RAISE EXCEPTION 'CLIENTE_INVALIDO: nombre de 1 a 100 caracteres, teléfono de 10 dígitos y correo válido o ausente';
+  END IF;
+
+  -- 3 y 4) Cliente bloqueado o con 3 pedidos vivos: el MISMO error, letra por letra, para no revelar
+  --    si un teléfono existe o está bloqueado. El candado hace de uno en uno las altas de un mismo
+  --    teléfono: sin él, varias simultáneas contarían lo mismo y pasarían todas el tope.
+  -- ponytail: el conteo no tiene índice propio; recorre los pedidos vivos (índice parcial de 0090),
+  -- que son pocos. Si un día pesa, un índice parcial por (tenant_id, cliente_telefono).
+  PERFORM pg_advisory_xact_lock(hashtextextended('tienda_pedido:' || p_tenant || ':' || v_tel, 0));
+  IF EXISTS (SELECT 1 FROM clientes c
+              WHERE c.id = lealtad_resolver_cliente(p_tenant, NULL, v_tel) AND c.estado = 'BLOQUEADO')
+     OR (SELECT count(*) FROM delivery_pedidos d
+          WHERE d.tenant_id = p_tenant AND d.canal = 'TIENDA' AND d.cliente_telefono = v_tel
+            AND d.estado IN ('RECIBIDO', 'ACEPTADO', 'EN_PREPARACION', 'LISTO')) > 2 THEN
+    RAISE EXCEPTION 'NO_SE_PUDO_CREAR: no se pudo crear el pedido';
+  END IF;
+
+  -- 5) La forma de pago, habilitada por el negocio. (tienda_estado_sucursal ya exigió la fila.)
+  SELECT * INTO v_cfg FROM tienda_config WHERE tenant_id = p_tenant;
+  IF ((p_pago = 'EFECTIVO' AND v_cfg.pago_efectivo) OR (p_pago = 'TARJETA' AND v_cfg.pago_tarjeta)) IS NOT TRUE THEN
+    RAISE EXCEPTION 'PAGO_INVALIDO: esa forma de pago no está disponible';
+  END IF;
+
+  -- 6) La cotización: valida el carrito y la zona, y pone los renglones y los importes. Sus errores
+  --    pasan tal cual.
+  v_q     := tienda_cotizar(p_tenant, p_sucursal, p_modo, p_zona, p_items);
+  v_total := (v_q ->> 'total_mxn')::numeric;
+
+  -- 7) «Paga con»: solo en efectivo, y entre el total y el total + 5000 (el tope también deja
+  --    fuera NaN e infinito, que para numeric son mayores que todo).
+  IF p_paga_con IS NOT NULL AND (p_pago <> 'EFECTIVO' OR p_paga_con < v_total OR p_paga_con > v_total + 5000) THEN
+    RAISE EXCEPTION 'PAGO_INVALIDO: «paga con» va solo en efectivo y entre el total y el total más 5000';
+  END IF;
+
+  -- 8) La dirección: a domicilio, completa y dentro de las longitudes de direcciones_cliente (que
+  --    es donde crear_ticket_desde_tienda la guardará); al recoger, ninguna. Se guarda recortada y
+  --    solo con estas claves: lo demás que mande el cliente no entra.
+  IF p_modo = 'DOMICILIO' THEN
+    SELECT bool_and(char_length(x.valor) BETWEEN k.minimo AND k.maximo),
+           jsonb_object_agg(k.clave, x.valor) FILTER (WHERE x.valor <> '')
+      INTO v_dir_ok, v_dir
+      FROM (VALUES ('calle', 1, 255), ('numero_exterior', 1, 20), ('numero_interior', 0, 20), ('colonia', 1, 150),
+                   ('codigo_postal', 5, 5), ('ciudad', 1, 100), ('estado', 1, 50), ('referencias', 0, 300)) AS k(clave, minimo, maximo)
+     CROSS JOIN LATERAL (SELECT btrim(COALESCE(v_dir ->> k.clave, ''))) AS x(valor);
+    IF (v_dir_ok AND v_dir ->> 'codigo_postal' ~ '^[0-9]{5}$') IS NOT TRUE THEN
+      RAISE EXCEPTION 'DIRECCION_INVALIDA: a domicilio hacen falta calle, número, colonia, código postal de 5 dígitos, ciudad y estado';
+    END IF;
+  ELSIF v_dir IS NOT NULL THEN
+    RAISE EXCEPTION 'DIRECCION_INVALIDA: al recoger no hay dirección';
+  END IF;
+
+  -- 9) La huella del código de seguimiento. Repetida, la rechaza el índice único (0161 §1).
+  IF (p_seguimiento_hash ~ '^[0-9a-f]{64}$') IS NOT TRUE THEN
+    RAISE EXCEPTION 'SEGUIMIENTO_INVALIDO: la huella del seguimiento es un SHA-256 en hexadecimal';
+  END IF;
+
+  -- 10 y 11) La fila. id_externo: 32 hex al azar ('tienda:' || id_externo cabe en el varchar(64) de
+  --    tickets.client_id_local) y único en toda la plataforma, como pide UNIQUE (app, id_externo).
+  INSERT INTO delivery_pedidos (
+    tenant_id, sucursal_id, canal, app, conexion_id, estado, tipo_entrega, id_externo, folio_corto,
+    items, subtotal_mxn, envio_mxn, total_cliente_mxn, total_restaurante_mxn, efectivo_a_cobrar_mxn,
+    cliente_nombre, cliente_telefono, cliente_email, direccion, zona_envio_id,
+    pago_al_recibir, paga_con_mxn, nota_cliente, seguimiento_hash, tienda_cuenta_id,
+    vence_aceptacion, gestion, payload_raw)
+  VALUES (
+    p_tenant, p_sucursal, 'TIENDA',
+    (CASE p_modo WHEN 'DOMICILIO' THEN 'DELIVERY_PROPIO' ELSE 'DRIVE_THRU' END)::modo_servicio,
+    NULL, 'RECIBIDO',
+    CASE p_modo WHEN 'DOMICILIO' THEN 'RESTAURANTE_REPARTE' ELSE 'RECOGE_CLIENTE' END,
+    v_id_ext, 'T' || upper(left(v_id_ext, 5)),
+    v_q -> 'items', (v_q ->> 'subtotal_mxn')::numeric,
+    (v_q ->> 'envio_mxn')::numeric,   -- el costo de la zona, no el total con IVA: así lo espera el ticket
+    v_total, v_total, CASE p_pago WHEN 'EFECTIVO' THEN v_total ELSE 0 END,
+    v_nombre, v_tel, v_email, v_dir, p_zona,
+    p_pago, p_paga_con, NULLIF(left(btrim(p_nota), 300), ''), p_seguimiento_hash, p_cuenta,
+    now() + make_interval(mins => v_cfg.minutos_aceptacion),
+    -- Misma regla que los pedidos de apps (procesar-uber.ts): con una caja instalada viva, el
+    -- ticket lo crea la caja.
+    CASE WHEN sucursal_con_espejo(p_sucursal) THEN 'ESCRITORIO' ELSE 'NUBE' END,
+    '{}'::jsonb)                      -- nada del cuerpo crudo: ni IP, ni token, ni sesión
+  RETURNING id, folio_corto, vence_aceptacion INTO v_ped;
+
+  -- 12)
+  RETURN jsonb_build_object(
+    'pedido_id', v_ped.id,
+    'folio_corto', v_ped.folio_corto,
+    'total_mxn', v_q ->> 'total_mxn',
+    'vence_aceptacion', v_ped.vence_aceptacion);
+END;
+$$;
+REVOKE ALL ON FUNCTION tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid) TO service_role;
