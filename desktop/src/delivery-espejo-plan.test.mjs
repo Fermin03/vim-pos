@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { planificarEspejo, filaLocal, puedeCrear, cursorDe, COLUMNAS_PEDIDO } from "./delivery-espejo-plan.mjs";
+import { planificarEspejo, filaLocal, puedeCrear, cursorDe, COLUMNAS_PEDIDO, estadoAReportar, fallaDeTicket, avisoDeFalla } from "./delivery-espejo-plan.mjs";
 
 const CAJA = "cccccccc-0000-0000-0000-0000000000cc";
 const OTRA = "cccccccc-0000-0000-0000-0000000000c2";
@@ -113,4 +113,140 @@ test("una fila sin updated_at usable no mueve el cursor ni lo rompe", () => {
 test("compara por instante, no por texto: distinta precisión y huso siguen ordenándose bien", () => {
   const filas = [{ updated_at: "2026-09-09T10:05:00.123456+00:00" }];
   assert.equal(cursorDe(filas, "2026-09-09T04:00:00-06:00"), "2026-09-09T10:05:00.123456+00:00");
+});
+
+// ── Tienda en línea (entrega 4) ──────────────────────────────────────────────
+// Un pedido de la tienda es canal TIENDA, sin conexión, y su `app` es el modo de servicio.
+
+const AUTO = { participa: true, aceptacion: "AUTO", pausa_hasta: null };
+const MANUAL = { participa: true, aceptacion: "MANUAL", pausa_hasta: null };
+const pedT = (extra = {}) => ped({
+  canal: "TIENDA", conexion_id: null, app: "DRIVE_THRU", id_externo: "t-1", cliente_email: "a@b.mx", tienda_cuenta_id: "tc1",
+  zona_envio_id: null, direccion: null, pago_al_recibir: "EFECTIVO", paga_con_mxn: "200.00", ...extra,
+});
+const planT = (pedidos, extra = {}) => planificarEspejo({ conexiones: [cx()], pedidos, localPedidos: [], turnoAbierto: true, cajaId: CAJA, tienda: AUTO, ...extra });
+
+test("filaLocal: un pedido de la tienda conserva sus columnas; uno sin canal (nube vieja) es APP", () => {
+  const f = filaLocal(pedT({ app: "DELIVERY_PROPIO", zona_envio_id: "z1", direccion: { calle: "Av. X" } }), undefined);
+  assert.equal(f.canal, "TIENDA");
+  assert.equal(f.cliente_email, "a@b.mx");
+  assert.equal(f.tienda_cuenta_id, "tc1");
+  assert.equal(f.zona_envio_id, "z1");
+  assert.deepEqual(f.direccion, { calle: "Av. X" });
+  assert.equal(f.pago_al_recibir, "EFECTIVO");
+  assert.equal(f.paga_con_mxn, "200.00");
+  const vieja = filaLocal(ped(), undefined);
+  assert.equal(vieja.canal, "APP", "canal es NOT NULL en la base local");
+  assert.equal(vieja.direccion, null);
+});
+
+test("filaLocal: la explicación al cajero de un pedido de la tienda ya cerrado no la borra el siguiente espejo", () => {
+  const local = { id: "p1", ticket_id: null, ultimo_error: "Se canceló solo" };
+  assert.equal(filaLocal(pedT({ estado: "RECHAZADO", ultimo_error: null }), local).ultimo_error, "Se canceló solo");
+  assert.equal(filaLocal(pedT({ estado: "ACEPTADO", ultimo_error: null }), local).ultimo_error, null, "vivo: manda la nube");
+  assert.equal(filaLocal(ped({ estado: "CANCELADO", ultimo_error: null }), local).ultimo_error, null, "APP: como siempre");
+});
+
+test("tienda RECIBIDO: con aceptación MANUAL espera al cajero; con AUTO y turno se crea; AUTO sin turno no", () => {
+  assert.deepEqual(planT([pedT()], { tienda: MANUAL }).aCrear, []);
+  assert.deepEqual(planT([pedT()]).aCrear, ["p1"]);
+  assert.deepEqual(planT([pedT()], { turnoAbierto: false }).aCrear, []);
+  assert.deepEqual(planT([pedT()], { tienda: null }).aCrear, [], "sin el dato de la nube no se acepta nada solo");
+  assert.deepEqual(planT([pedT()], { tienda: undefined, conexiones: [] }).aCrear, []);
+  assert.equal(planT([pedT()], { tienda: MANUAL }).upserts.length, 1, "pero sí se espeja");
+});
+
+test("tienda: el auto-aceptar de Uber no decide sobre un pedido de la tienda, ni al revés", () => {
+  // Conexión de Uber con auto-aceptar y tienda MANUAL: el de Uber se crea, el de la tienda espera.
+  const r = planT([pedT({ id: "t" }), ped({ id: "u" })], { tienda: MANUAL });
+  assert.deepEqual(r.aCrear, ["u"]);
+  // Tienda AUTO y Uber sin auto-aceptar: al revés.
+  const r2 = planT([pedT({ id: "t" }), ped({ id: "u" })], { conexiones: [cx({ auto_aceptar: false })] });
+  assert.deepEqual(r2.aCrear, ["t"]);
+});
+
+test("tienda ACEPTADO sin ticket local (lo aceptó el cajero) → aCrear, aunque sea MANUAL", () => {
+  assert.deepEqual(planT([pedT({ estado: "ACEPTADO" })], { tienda: MANUAL }).aCrear, ["p1"]);
+  const ya = planT([pedT({ estado: "ACEPTADO" })], { localPedidos: [{ id: "p1", ticket_id: "tk" }] });
+  assert.deepEqual(ya.aCrear, [], "con ticket local no se repite");
+});
+
+test("tienda: de otra caja o de gestión NUBE no se crea aquí; RECIBIDO con ticket local → aAceptar", () => {
+  assert.deepEqual(planT([pedT({ gestion_caja_id: OTRA })]).aCrear, []);
+  assert.deepEqual(planT([pedT({ gestion: "NUBE" })]).aCrear, []);
+  const r = planT([pedT({ gestion_caja_id: CAJA })], { localPedidos: [{ id: "p1", ticket_id: "tk" }] });
+  assert.deepEqual(r.aAceptar, ["p1"]);
+  assert.deepEqual(r.aCrear, []);
+});
+
+test("tienda: la nube cerró un pedido con ticket local abierto → aviso para el cajero", () => {
+  const motivo = "El pedido en línea se canceló: cancela el ticket en caja";
+  for (const estado of ["EXPIRADO", "CANCELADO", "RECHAZADO"]) {
+    const r = planT([pedT({ estado })], { localPedidos: [{ id: "p1", ticket_id: "tk", ticket_estado: "ABIERTO" }] });
+    assert.deepEqual(r.avisos, [{ pedidoId: "p1", motivo }], estado);
+    assert.deepEqual(r.aCrear, []);
+  }
+  // Sin ticket local no hay nada que cancelar; con el ticket ya cancelado o cobrado, tampoco.
+  assert.deepEqual(planT([pedT({ estado: "CANCELADO" })]).avisos, []);
+  for (const ticket_estado of ["CANCELADO", "PAGADO", "FACTURADO"]) {
+    const r = planT([pedT({ estado: "CANCELADO" })], { localPedidos: [{ id: "p1", ticket_id: "tk", ticket_estado }] });
+    assert.deepEqual(r.avisos, [], ticket_estado);
+  }
+});
+
+test("estadoAReportar: la tabla del ticket local, de arriba hacia abajo", () => {
+  const t = (extra = {}) => ({ ticket_estado: "ABIERTO", ticket_impreso_at: null, asignado: false, ...extra });
+  assert.equal(estadoAReportar(t({ ticket_estado: "CANCELADO" })), "CANCELADO");
+  assert.equal(estadoAReportar(t({ ticket_estado: "CANCELADO", ticket_impreso_at: "2026-10-09T10:00:00Z", asignado: true })), "CANCELADO", "cancelado gana a todo");
+  assert.equal(estadoAReportar(t({ ticket_estado: "PAGADO" })), "ENTREGADO");
+  assert.equal(estadoAReportar(t({ ticket_estado: "FACTURADO" })), "ENTREGADO");
+  assert.equal(estadoAReportar(t({ ticket_estado: "PAGADO", ticket_impreso_at: "2026-10-09T10:00:00Z" })), "ENTREGADO", "cobrado gana a impreso");
+  assert.equal(estadoAReportar(t({ ticket_impreso_at: "2026-10-09T10:00:00Z" })), "LISTO");
+  assert.equal(estadoAReportar(t({ asignado: true })), "LISTO");
+  assert.equal(estadoAReportar(t()), null, "ni impreso ni asignado: nada que decir");
+  assert.equal(estadoAReportar(t({ ticket_estado: "EN_PREPARACION" })), null);
+});
+
+test("fallaDeTicket: sin turno y unicidad se reintentan", () => {
+  assert.deepEqual(fallaDeTicket("SIN_TURNO_ABIERTO: sucursal 5f0c"), { reintentable: true, codigo: "SIN_TURNO_ABIERTO" });
+  assert.deepEqual(
+    fallaDeTicket('duplicate key value violates unique constraint "clientes_tenant_telefono_uq"', "23505"),
+    { reintentable: true, codigo: "DUPLICADO" },
+  );
+});
+
+test("fallaDeTicket: lo que no se arregla reintentando cancela el pedido, con su código", () => {
+  const casos = [
+    ["TOTAL_NO_COINCIDE: ticket 150.00 vs pedido 140.00", "TOTAL_NO_COINCIDE"],
+    ["ENVIO_NO_COINCIDE: se cotizó un envío de 30.00 y la zona z hoy no cobra", "ENVIO_NO_COINCIDE"],
+    ["DIRECCION_INVALIDA: pedido p a domicilio sin zona de envío o con la dirección incompleta", "DIRECCION_INVALIDA"],
+    ["CLIENTE_BLOQUEADO: 7d1e", "CLIENTE_BLOQUEADO"],
+    ["PRODUCTO_DE_OTRO_NEGOCIO: 7d1e", "PRODUCTO_DE_OTRO_NEGOCIO"],
+    ["OPCION_DE_OTRO_NEGOCIO: el renglón x trae una opción de modificador de otro negocio", "OPCION_DE_OTRO_NEGOCIO"],
+    ["ITEM_SIN_MAPEAR: Hamburguesa (sin producto genérico configurado)", "ITEM_SIN_MAPEAR"],
+    ['COMBO_ELECCION_SIN_MAPEAR: el combo "Combo 1" trae una elección que no es un slot activo', "COMBO_ELECCION_SIN_MAPEAR"],
+    ['COMBO_ELECCION_AMBIGUA: el combo "Combo 1" repite la misma elección', "COMBO_ELECCION_AMBIGUA"],
+    ["SUCURSAL_DE_OTRO_NEGOCIO: sucursal 5f0c", "SUCURSAL_DE_OTRO_NEGOCIO"],
+    ["Producto 7d1e no existe o está eliminado", "PRODUCTO_NO_EXISTE"],
+    ['El combo "Combo 1" no está disponible', "PRODUCTO_NO_DISPONIBLE"],
+  ];
+  for (const [mensaje, codigo] of casos) assert.deepEqual(fallaDeTicket(mensaje), { reintentable: false, codigo }, mensaje);
+  assert.deepEqual(fallaDeTicket("TOTAL_NO_COINCIDE: ticket 1 vs pedido 2", "P0001"), { reintentable: false, codigo: "TOTAL_NO_COINCIDE" });
+});
+
+test("fallaDeTicket: cualquier otro fallo se reintenta; a nadie se le cancela por un error que no conocemos", () => {
+  for (const m of ["canceling statement due to statement timeout", "PEDIDO_NO_ACEPTABLE: estado EXPIRADO", "", 'El producto "Doble" está agotado o pausado']) {
+    assert.deepEqual(fallaDeTicket(m), { reintentable: true, codigo: "RPC_ERROR" }, m);
+  }
+  assert.deepEqual(fallaDeTicket("deadlock detected", "40P01"), { reintentable: true, codigo: "RPC_ERROR" });
+  assert.deepEqual(fallaDeTicket(undefined), { reintentable: true, codigo: "RPC_ERROR" });
+});
+
+test("avisoDeFalla: le dice al cajero por qué se canceló, sin palabras internas", () => {
+  for (const c of ["TOTAL_NO_COINCIDE", "ENVIO_NO_COINCIDE", "DIRECCION_INVALIDA", "CLIENTE_BLOQUEADO", "ITEM_SIN_MAPEAR", "PRODUCTO_NO_EXISTE", "LO_QUE_SEA"]) {
+    const t = avisoDeFalla(c);
+    assert.match(t, /cancel/i, c);
+    assert.doesNotMatch(t, /[A-Z]{3,}_[A-Z]/, `${c}: sin códigos`);
+  }
+  assert.notEqual(avisoDeFalla("TOTAL_NO_COINCIDE"), avisoDeFalla("CLIENTE_BLOQUEADO"));
 });

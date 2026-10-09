@@ -101,8 +101,12 @@ export function estadoDeVersion(directivas, versionActual) {
  * arrancar "por si acaso" es exactamente el sondeo que se vino a quitar. El primer latido decide,
  * y llega en minutos. No bloquea nada de vender (invariante de ADR 0014): lo único que no se hace
  * es preguntar por pedidos de apps.
+ *
+ * La tienda en línea viaja por el mismo sondeo: un cliente que solo tiene la tienda (sin apps de
+ * delivery) también lo necesita, o sus pedidos nunca llegarían a la caja.
  */
-export const debeSondearApps = (directivas) => directivas?.modulos?.delivery_apps === true;
+export const debeSondearApps = (directivas) =>
+  directivas?.modulos?.delivery_apps === true || directivas?.modulos?.tienda === true;
 
 /** Copia deliberada de `updater.esMasNueva`: comparación numérica x.y.z, no alfabética. */
 function esMasNueva(remota, actual) {

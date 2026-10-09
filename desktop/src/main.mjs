@@ -1123,7 +1123,7 @@ function iniciarSync() {
   } else if (!cajaId) {
     console.log("· [espejo] omitido (la caja no está vinculada a la nube)");
   } else if (!debeSondearApps(d)) {
-    console.log("· [espejo] omitido (el cliente no tiene el módulo de apps de delivery)");
+    console.log("· [espejo] omitido (el cliente no tiene apps de delivery ni tienda en línea)");
   }
 }
 
@@ -1139,13 +1139,13 @@ function sincronizarEspejoConModulo(d) {
   if (!activo && espejo) {
     try { espejo.detener(); } catch { /* */ }
     espejo = null;
-    console.log("· [espejo] detenido (el cliente apagó el módulo de apps de delivery)");
+    console.log("· [espejo] detenido (el cliente ya no tiene apps de delivery ni tienda en línea)");
   } else if (activo && !espejo) {
     const cajaId = cajaDeEstaCaja();
     if (backend?.pool && cajaId) {
       espejo = crearEspejo({ pool: poolLocal, nube: tokenDeNubeCacheado, cajaId, log: (m) => console.log("· [espejo]", m) });
       espejo.iniciar();
-      console.log("· [espejo] iniciado (el cliente encendió el módulo de apps de delivery)");
+      console.log("· [espejo] iniciado (el cliente encendió las apps de delivery o la tienda en línea)");
     }
   }
 }
