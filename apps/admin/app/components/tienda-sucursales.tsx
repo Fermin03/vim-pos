@@ -7,7 +7,8 @@ import { Tarjeta } from "./tarjeta";
 import { TiendaHorario } from "./tienda-horario";
 import { LineaMensaje, type MensajeTienda } from "./tienda-mensaje";
 import {
-  errorDeSucursal, erroresPorDia, hayCambiosDeSucursal, type BorradorSucursal, type SucursalTienda,
+  errorDeSucursal, erroresPorDia, hayCambiosDeSucursal, interruptorDeSucursalBloqueado, paraGuardarSucursal,
+  type BorradorSucursal, type SucursalTienda,
 } from "../lib/tienda-reglas";
 
 const casilla = "flex min-h-[44px] cursor-pointer items-center gap-3 text-14 text-ink";
@@ -82,10 +83,10 @@ function TarjetaSucursal({
   /** null = sin tocar: se pinta lo guardado, y lo que llegue de la base lo reemplaza. */
   const [borrador, setBorrador] = useState<BorradorSucursal | null>(null);
   const valor = borrador ?? s;
-  const sinGuardar = borrador !== null && hayCambiosDeSucursal(borrador, s);
+  // Se compara lo que de verdad se mandaría: un horario escondido (no participa) no cuenta como cambio.
+  const sinGuardar = borrador !== null && hayCambiosDeSucursal(paraGuardarSucursal(borrador, s), s);
   const quieto = ocupado || soloLectura;
-  // Una sucursal inactiva no puede empezar a vender; si ya vendía, sí se puede apagar.
-  const inactivaSinVender = !s.activa && !valor.participa;
+  const inactivaSinVender = interruptorDeSucursalBloqueado(s);
   const abierta = valor.participa && s.activa;
 
   const errorModalidad = errorDeSucursal(valor);
@@ -101,7 +102,7 @@ function TarjetaSucursal({
   async function guardar() {
     if (!borrador || !sinGuardar || conError) return;
     // Solo esta tarjeta suelta su borrador, y solo si de verdad se guardó.
-    if (await onGuardar(s.id, borrador)) setBorrador(null);
+    if (await onGuardar(s.id, paraGuardarSucursal(borrador, s))) setBorrador(null);
   }
 
   return (
@@ -110,6 +111,7 @@ function TarjetaSucursal({
         <h3 id={id} className={cn("min-w-0 text-15 font-semibold", inactivaSinVender ? "text-ink-3" : "text-ink")}>{s.nombre}</h3>
         <Interruptor
           etiqueta="Vende en la tienda"
+          nombreAccesible={`Vende en la tienda: ${s.nombre}`}
           encendido={valor.participa}
           deshabilitado={quieto || inactivaSinVender}
           onCambiar={(participa) => cambiar({ participa })}

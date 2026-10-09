@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   BASE_TIENDA, DIAS, DIRECCIONES_RESERVADAS, copiarATodos, cruzaMedianoche, errorDeDireccion,
-  errorDeHorario, errorDeSucursal, erroresPorDia, hayCambiosDeSucursal, leerHorario, mensajeTienda, puedeEncender, revisar, sugerirDireccion,
+  errorDeHorario, errorDeSucursal, erroresPorDia, hayCambiosDeSucursal, horaValida, interruptorDeSucursalBloqueado, leerHorario, notaDeRango, paraGuardarSucursal, mensajeTienda, puedeEncender, revisar, sugerirDireccion,
   type Horario, type SucursalTienda,
 } from "../tienda-reglas";
 
@@ -200,5 +200,39 @@ describe("borrador de una sucursal", () => {
       "1": "Lunes: escribe las horas como 09:00 o 22:30.",
       "7": "Domingo: escribe las horas como 09:00 o 22:30.",
     });
+  });
+});
+
+describe("ajustes de la tarjeta de sucursal", () => {
+  it("interruptorDeSucursalBloqueado: lo decide lo GUARDADO, no el borrador", () => {
+    expect(interruptorDeSucursalBloqueado({ activa: false, participa: false })).toBe(true);
+    // Inactiva que ya vende: se puede apagar y volver a encender mientras no se guarde.
+    expect(interruptorDeSucursalBloqueado({ activa: false, participa: true })).toBe(false);
+    expect(interruptorDeSucursalBloqueado({ activa: true, participa: false })).toBe(false);
+    expect(interruptorDeSucursalBloqueado({ activa: true, participa: true })).toBe(false);
+  });
+  it("paraGuardarSucursal: si no participa manda el horario guardado, no el del borrador", () => {
+    const guardada = { participa: true, recoger: true, domicilio: false, horario: { "1": ["13:00", "22:00"] } as Horario };
+    const roto: Horario = { "1": ["", "22:00"] };
+    expect(paraGuardarSucursal({ ...guardada, participa: false, horario: roto }, guardada))
+      .toEqual({ participa: false, recoger: true, domicilio: false, horario: { "1": ["13:00", "22:00"] } });
+    const nuevo: Horario = { "2": ["09:00", "18:00"] };
+    expect(paraGuardarSucursal({ ...guardada, domicilio: true, horario: nuevo }, guardada))
+      .toEqual({ participa: true, recoger: true, domicilio: true, horario: nuevo });
+  });
+  it("horaValida", () => {
+    expect(horaValida("09:00")).toBe(true);
+    expect(horaValida("23:59")).toBe(true);
+    expect(horaValida("")).toBe(false);
+    expect(horaValida("24:00")).toBe(false);
+    expect(horaValida("9:00")).toBe(false);
+  });
+  it("notaDeRango: solo con las dos horas válidas", () => {
+    expect(notaDeRango(["18:00", "02:00"])).toBe("Cierra al día siguiente");
+    expect(notaDeRango(["09:00", "09:00"])).toBe("Abre todo el día");
+    expect(notaDeRango(["13:00", "22:00"])).toBeNull();
+    expect(notaDeRango(["13:00", ""])).toBeNull();
+    expect(notaDeRango(["", "22:00"])).toBeNull();
+    expect(notaDeRango(["", ""])).toBeNull();
   });
 });

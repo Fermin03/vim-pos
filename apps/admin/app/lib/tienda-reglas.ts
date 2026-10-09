@@ -38,6 +38,10 @@ export const DIAS: readonly { dia: Dia; nombre: string }[] = [
 
 const HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
 
+export function horaValida(h: string): boolean {
+  return HORA.test(h);
+}
+
 /** Lee lo que venga de la base. Lo que no tenga la forma exacta se descarta (ese día queda cerrado). */
 export function leerHorario(x: unknown): Horario {
   const h: Horario = {};
@@ -65,6 +69,13 @@ export function cruzaMedianoche(rango: [string, string]): boolean {
   return rango[1] < rango[0];
 }
 
+/** Lo que se dice junto a un rango que no es el de siempre. Con una hora a medias no se dice nada. */
+export function notaDeRango(rango: [string, string]): string | null {
+  if (!horaValida(rango[0]) || !horaValida(rango[1])) return null;
+  if (rango[0] === rango[1]) return "Abre todo el día";
+  return cruzaMedianoche(rango) ? "Cierra al día siguiente" : null;
+}
+
 /** El rango del día dado a los siete; si ese día está cerrado, cierra todos. */
 export function copiarATodos(h: Horario, desde: Dia): Horario {
   const r = h[desde];
@@ -90,6 +101,19 @@ export function hayCambiosDeSucursal(b: BorradorSucursal, guardada: BorradorSucu
 /** null = se puede guardar. Las horas mal escritas las dice `erroresPorDia`, junto a su renglón. */
 export function errorDeSucursal(b: BorradorSucursal): string | null {
   return b.participa && !b.recoger && !b.domicilio ? "Elige si ofrece recoger, domicilio o ambos." : null;
+}
+
+/**
+ * Una sucursal inactiva no puede empezar a vender; si ya vendía, sí se puede apagar. Lo decide lo
+ * GUARDADO: con el borrador, el interruptor se bloquearía solo en cuanto el dueño lo apaga.
+ */
+export function interruptorDeSucursalBloqueado(guardada: Pick<SucursalTienda, "activa" | "participa">): boolean {
+  return !guardada.activa && !guardada.participa;
+}
+
+/** Lo que se manda a guardar. Si no participa, el horario no se ve: va el guardado, no uno a medias. */
+export function paraGuardarSucursal(b: BorradorSucursal, guardada: BorradorSucursal): BorradorSucursal {
+  return { participa: b.participa, recoger: b.recoger, domicilio: b.domicilio, horario: b.participa ? b.horario : guardada.horario };
 }
 
 /** El error de `errorDeHorario` repartido por día, para pintarlo junto a su renglón. */

@@ -15,6 +15,7 @@ export function Interruptor({
   etiqueta,
   descripcion,
   deshabilitado = false,
+  nombreAccesible,
 }: {
   encendido: boolean;
   onCambiar: (encendido: boolean) => void;
@@ -22,6 +23,8 @@ export function Interruptor({
   /** El estado en palabras, debajo de la etiqueta. */
   descripcion?: ReactNode;
   deshabilitado?: boolean;
+  /** Cuando hay varios con la misma etiqueta: el nombre que oye el lector de pantalla. */
+  nombreAccesible?: string;
 }) {
   const id = useId();
   return (
@@ -31,6 +34,7 @@ export function Interruptor({
         type="button"
         role="switch"
         aria-checked={encendido}
+        aria-label={nombreAccesible}
         aria-describedby={descripcion ? `${id}-d` : undefined}
         disabled={deshabilitado}
         onClick={() => onCambiar(!encendido)}
