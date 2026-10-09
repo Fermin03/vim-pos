@@ -576,22 +576,25 @@ tienda_crear_pedido(
   p_paga_con numeric,       -- NULL salvo EFECTIVO
   p_nota text,
   p_seguimiento_hash text,  -- SHA-256 en hex (64 caracteres) del código que solo conoce el cliente
-  p_cuenta uuid DEFAULT NULL
+  p_cuenta uuid DEFAULT NULL,
+  p_total_esperado numeric DEFAULT NULL   -- el total que el cliente vio al cotizar; NULL = no se compara
 ) RETURNS jsonb             -- {"pedido_id", "folio_corto", "total_mxn", "vence_aceptacion"}
 ```
 
-**Reglas, en este orden:**
+La función tiene **una sola firma** (con dos, PostgREST no sabría a cuál llamar).
+
+**Reglas, en este orden** — salvo el bloqueo y el límite (puntos 3 y 4), que se evalúan **justo antes del INSERT** (punto 11), después de todas las demás validaciones: si fueran antes, una petición inválida a propósito serviría para preguntar por un teléfono sin crear ningún pedido. El candado `pg_advisory_xact_lock` por negocio y teléfono va con ellos.
 
 1. `tienda_estado_sucursal(p_sucursal, p_modo)` debe ser `NULL`; si no, `TIENDA_CERRADA: <motivo>`. Y la sucursal debe ser de `p_tenant` (`SUCURSAL_DE_OTRO_NEGOCIO`).
 2. Cliente: `nombre` de 1 a 100 caracteres tras recortar; `telefono` exactamente 10 dígitos (`^[0-9]{10}$`); `email` `NULL` o con forma de correo y hasta 254 caracteres. Si no: `CLIENTE_INVALIDO`. (La Edge Function ya normaliza; esto es la última red.)
 3. Si `lealtad_resolver_cliente(p_tenant, NULL, telefono)` da un cliente con `estado = 'BLOQUEADO'`: `NO_SE_PUDO_CREAR`. **El mismo código** se usa para el límite del punto 4, para no revelar si un teléfono existe o está bloqueado.
-4. Más de 2 pedidos vivos (`RECIBIDO`, `ACEPTADO`, `EN_PREPARACION`, `LISTO`) del canal `TIENDA` con ese teléfono en ese negocio: `NO_SE_PUDO_CREAR`.
+4. Más de 2 pedidos vivos (`RECIBIDO`, `ACEPTADO`, `EN_PREPARACION`, `LISTO`) del canal `TIENDA` con ese teléfono en ese negocio: `NO_SE_PUDO_CREAR`. El conteo **decae solo**: mira únicamente los pedidos con `recibido_at > now() - interval '6 hours'` y no cuenta los que ya tienen en la nube un ticket `PAGADO`, `FACTURADO` o `CANCELADO` (`tickets.estado_fiscal`, con `tickets.tenant_id = p_tenant`). Con gestión `NUBE` nada mueve `estado` más allá de `ACEPTADO`; sin esto, tres pedidos aceptados dejarían ese teléfono bloqueado para siempre.
 5. `p_pago` debe estar habilitado en `tienda_config` (`pago_efectivo` / `pago_tarjeta`): `PAGO_INVALIDO`.
-6. `tienda_cotizar(...)` (sus errores se propagan tal cual).
+6. `tienda_cotizar(...)` (sus errores se propagan tal cual). Si `p_total_esperado` no es `NULL` y difiere del total cotizado en ese momento: `TOTAL_CAMBIO: <total nuevo con dos decimales>`, sin insertar nada (el cliente paga al recibir: no se le compromete a un total que no vio). Con `NULL` no se compara.
 7. `p_paga_con`: solo con `EFECTIVO`; si viene, `>= total` y `<= total + 5000`. Con `TARJETA` debe ser `NULL`. Si no: `PAGO_INVALIDO`.
 8. `DOMICILIO`: `p_direccion` con `calle`, `numero_exterior`, `colonia`, `ciudad`, `estado` no vacíos y dentro de las longitudes de `direcciones_cliente` (255, 20, 150, 100, 50), `codigo_postal` de 5 dígitos, `numero_interior` hasta 20 y `referencias` hasta 300. Si no: `DIRECCION_INVALIDA`. `RECOGER`: `p_direccion` debe ser `NULL`.
-9. `p_seguimiento_hash` debe cumplir `^[0-9a-f]{64}$`: `SEGUIMIENTO_INVALIDO`.
-10. `p_nota` recortada a 300 caracteres.
+9. `p_seguimiento_hash` debe cumplir `^[0-9a-f]{64}$`: `SEGUIMIENTO_INVALIDO`. Si `p_cuenta` no es `NULL`, debe existir en `tienda_cuentas` con `tenant_id = p_tenant` y `deleted_at IS NULL`: `CUENTA_INVALIDA`.
+10. `p_nota` recortada a 300 caracteres. Aquí, con todo lo demás ya validado, van el candado, el bloqueo (punto 3) y el límite (punto 4).
 11. Insertar en `delivery_pedidos`:
     - `canal = 'TIENDA'`, `app` y `tipo_entrega` según el modo, `conexion_id = NULL`, `estado = 'RECIBIDO'`.
     - `id_externo = replace(gen_random_uuid()::text, '-', '')` (32 caracteres: `'tienda:' || id_externo` cabe en `varchar(64)`; aleatorio y único en toda la plataforma, que es lo que exige `UNIQUE (app, id_externo)`).
@@ -637,6 +640,10 @@ Además:
 | 17 | `DOMICILIO` sin dirección, con código postal de 4 dígitos, sin calle: `DIRECCION_INVALIDA`. `RECOGER` con dirección: `DIRECCION_INVALIDA` |
 | 18 | `p_seguimiento_hash` de 63 caracteres o con mayúsculas: `SEGUIMIENTO_INVALIDO`; repetido: `unique_violation` |
 | 19 | Un error de la cotización (producto agotado) se propaga como `PRODUCTO_NO_DISPONIBLE` y no deja fila |
+| F1 | El límite decae: tres aceptados con el ticket cobrado, facturado y cancelado → entran tres más y el siguiente no; tres vivos de hace 5 h 59 min siguen contando y de hace 7 h ya no |
+| F4 | Con el total esperado correcto entra; con otro, `TOTAL_CAMBIO: <total real>` y sin fila; lo mismo si entre cotizar y pedir cambia el precio de un producto o el costo de la zona. Existe una sola `tienda_crear_pedido` |
+| F6 | Con un teléfono bloqueado o en el tope, una petición inválida (pago, carrito, zona, total, dirección, huella, cuenta) da su propio error, no `NO_SE_PUDO_CREAR` |
+| F7 | `p_cuenta` de otro negocio, borrada o inexistente: `CUENTA_INVALIDA` |
 
 - [ ] **Step 2: Rojo.**
 - [ ] **Step 3: Escribir §4**, con `REVOKE`/`GRANT`.
@@ -676,6 +683,7 @@ Fixture: el de la Task 4. Crear pedidos con `tienda_crear_pedido` y mover su est
 | 6 | `estado = 'RECHAZADO'` con `motivo_cancelacion = 'AGOTADO'` | `CANCELADO`, `motivo = 'AGOTADO'` |
 | 7 | `estado = 'EXPIRADO'` | `CANCELADO`, `motivo = 'SIN_RESPUESTA'` |
 | 8 | `estado = 'CANCELADO'` | `CANCELADO` |
+| 8b | `estado = 'ERROR'` (revisión final; el listado de §5 de más abajo es anterior) | `EN_PROCESO`, `motivo` `NULL`: para 0161 `ERROR` es reintentable, y a quien todavía puede recibir su pedido no se le dice «cancelado» |
 | 9 | gestión `NUBE`, ticket creado con `crear_ticket_desde_tienda` y `ticket_impreso_at = now()` | `EN_CAMINO` / `LISTO_PARA_RECOGER` aunque `estado` siga en `ACEPTADO` |
 | 10 | gestión `NUBE`, con una fila en `delivery_asignaciones` para su ticket | `EN_CAMINO` |
 | 11 | gestión `NUBE`, ticket `PAGADO` | `ENTREGADO` |
@@ -1203,13 +1211,14 @@ git commit -m "feat(tienda): validación del cuerpo, código de seguimiento y co
 | 401 `NO_AUTORIZADO` | falta o no coincide `x-vim-tienda` (o el secreto no está configurado) |
 | 405 `METODO_NO_PERMITIDO` | no es `POST` |
 | 413 `CUERPO_DEMASIADO_GRANDE` | más de 32 KB |
-| 400 `<código de leerCuerpo>` | forma inválida |
+| 400 `<código de leerCuerpo>` | forma inválida. También `CUERPO_INVALIDO` si el cuerpo crudo trae el carácter NUL, literal o como escape (Postgres no lo admite en un `jsonb`) |
 | 404 `TIENDA_NO_DISPONIBLE` | `tienda_negocio` devolvió `NULL` |
 | 404 `PEDIDO_NO_ENCONTRADO` | `tienda_seguimiento` devolvió `NULL` |
 | 409 `<código SQL>` | rechazo de negocio de `tienda_cotizar` o `tienda_crear_pedido`. Si el mensaje es `CODIGO: detalle`, se responde `{error: CODIGO, detalle}` **solo** para `TIENDA_CERRADA`, `PRODUCTO_NO_DISPONIBLE`, `MODIFICADORES_INVALIDOS` y `COMBO_INVALIDO` (el detalle es un motivo o un id de producto del propio carrito); para los demás, solo el código |
-| 403 `CAPTCHA_INVALIDO` | Turnstile no pasó, en `pedir` |
+| 409 `TOTAL_CAMBIO` | en `pedir`, el total ya no es el `total_esperado` que mandó la tienda. `detalle` = el total nuevo, y solo sale si cumple `^\d+\.\d{2}$`. No se creó ningún pedido |
+| 403 `CAPTCHA_INVALIDO` | Turnstile no pasó, en `pedir` (token ausente, rechazado, de otro dominio o de otra acción, o Cloudflare no respondió) |
 | 429 `DEMASIADOS_INTENTOS` | cupo agotado |
-| 503 `SERVICIO_NO_DISPONIBLE` | el control de cupos no respondió en `pedir`, o falló una RPC sin código de negocio |
+| 503 `SERVICIO_NO_DISPONIBLE` | el control de cupos no respondió en `pedir`, falló una RPC sin código de negocio, o el antirobot **no está configurado** (motivo `NO_CONFIGURADO`: es un fallo nuestro, igual que en `signup-tenant`, no un «captcha inválido») |
 | 500 `ERROR_INTERNO` | cualquier excepción. Se registra con `registrarError`; al cliente nunca le llega el mensaje |
 
 Los códigos de negocio se reconocen así: el mensaje del error de PostgREST empieza con `MAYUSCULAS_Y_GUIONES:` o es exactamente uno de esos códigos. Cualquier otro error de la base es un 503 y se registra.
@@ -1219,19 +1228,23 @@ Los códigos de negocio se reconocen así: el mensaje del error de PostgREST emp
 | Acción | Cupos | Si el control falla |
 |---|---|---|
 | `negocio`, `menu`, `cotizar`, `seguimiento` | `tienda:lee:ip:<ip>` 120 cada 600 s | `"abrir"` |
-| `pedir` | `tienda:pide:ip:<ip>` 5 cada 3600 s y `tienda:pide:negocio:<slug>` 60 cada 3600 s | `"cerrar"` |
+| `pedir` | `tienda:pide:ip:<ip>` 5 cada 3600 s **antes** del antirobot; `tienda:pide:negocio:<slug>` 60 cada 3600 s **solo después** de pasarlo | `"cerrar"` |
+
+El orden de `pedir` es: cupo por IP → `tienda_negocio` y sucursal → antirobot → cupo por negocio → `tienda_crear_pedido`. El cupo del negocio no se gasta sin pasar el antirobot: si se gastara al entrar, 60 peticiones basura por hora dejarían sin tienda a un restaurante. Cuando se agota queda una línea en el log (`CUPO_NEGOCIO_AGOTADO` con el slug), y otra (`IP_CLIENTE_DESCONOCIDA`) cuando un `pedir` llega sin una `x-tienda-ip` válida.
+
+En la clave del cupo, `<ip>` es la IPv4 completa o, si es IPv6, su prefijo **/64** (los cuatro primeros grupos tras expandir `::`, p. ej. `2806:2f0:9000:ab::/64`): un cliente recibe un /64 entero. Una IPv4 mapeada (`::ffff:1.2.3.4`) cuenta como IPv4. A Turnstile se le manda la IP completa.
 
 **Flujo del handler:**
 
-1. Método, secreto (`secretoInternoValido(req.headers.get("x-vim-tienda") ?? "", Deno.env.get("VIM_TIENDA_SECRET") ?? "")`), cuerpo acotado a 32 768 bytes, `JSON.parse` con `catch` → `CUERPO_INVALIDO`, `leerCuerpo`.
-2. Cupo de la acción.
+1. Método, secreto (`secretoInternoValido(req.headers.get("x-vim-tienda") ?? "", Deno.env.get("VIM_TIENDA_SECRET") ?? "")`), cuerpo acotado a 32 768 bytes, rechazo del NUL sobre el texto crudo, `JSON.parse` con `catch` → `CUERPO_INVALIDO`, `leerCuerpo` (que además limpia la `nota` de cada renglón con `textoLimpio(nota, 200)` y exige que cada elemento de `items` sea un objeto).
+2. Cupo por IP de la acción.
 3. `tienda_negocio(p_slug)`. `NULL` → 404. Guardar `tenant_id` (no sale nunca en una respuesta) y `publico`.
 4. Por acción:
    - `negocio` → `publico`.
    - `menu`, `cotizar`, `pedir` → la `sucursal_id` debe estar en `publico.sucursales`; si no, 404 `TIENDA_NO_DISPONIBLE`.
    - `menu` → `tienda_menu(p_tenant, p_sucursal)`.
    - `cotizar` → `tienda_cotizar(...)`; responder sin la clave `items` (los renglones normalizados son internos): `renglones`, `subtotal_mxn`, `envio_mxn`, `envio_total_mxn`, `total_mxn`.
-   - `pedir` → Turnstile con `accion: "tienda_pedido"` y la IP; `nuevoCodigo()` y `huellaDe`; `tienda_crear_pedido(...)` con `p_cuenta: null`; si hay correo, `enSegundoPlano(enviarCorreo(...))` con `correoDePedido` (los renglones se sacan de una llamada a `tienda_seguimiento` con la huella, que ya los trae listos) y enlace `${VIM_TIENDA_URL}/${slug}/pedido/${codigo}`; responder `{ codigo, folio_corto, total_mxn, vence_aceptacion }`. **El código solo existe en esta respuesta y en el correo.**
+   - `pedir` → Turnstile con `accion: "tienda_pedido"` y la IP (sin configurar: 503; cualquier otro fallo: 403); cupo por negocio; `nuevoCodigo()` y `huellaDe`; `tienda_crear_pedido(...)` con `p_cuenta: null` y `p_total_esperado` = el `total_esperado` del cuerpo (opcional; importe con la misma regla que `paga_con`, inválido → `PAGO_INVALIDO`); lo que devuelve se valida con `leerPedido` antes de usarlo (si llegara con otra forma el pedido ya existe: se responde 200 con el código y el resto en `null`, y se registra); si hay correo, `enSegundoPlano(enviarCorreo(...))` con `correoDePedido` (los renglones se sacan de una llamada a `tienda_seguimiento` con la huella, que ya los trae listos) y enlace `${VIM_TIENDA_URL}/${slug}/pedido/${codigo}`; responder `{ codigo, folio_corto, total_mxn, vence_aceptacion }`. **El código solo existe en esta respuesta y en el correo.**
    - `seguimiento` → `huellaDe(codigo)` y `tienda_seguimiento(p_tenant, huella)`; `NULL` → 404.
 5. Nada del cuerpo, ni el código de seguimiento, ni el secreto se escriben en el log.
 
@@ -1251,7 +1264,7 @@ verify_jwt = false
 - [ ] **Step 3: Comprobar lo que se puede sin Deno**
 
 Run: `node --experimental-strip-types --check supabase/functions/tienda/index.ts`
-Expected: sin salida (la sintaxis es válida). Luego releer el archivo entero comprobando: cada import existe y exporta ese nombre; cada `rpc` usa los nombres de parámetro reales de su función SQL (`p_tenant`, `p_sucursal`, `p_modo`, `p_zona`, `p_items`, `p_cliente`, `p_direccion`, `p_pago`, `p_paga_con`, `p_nota`, `p_seguimiento_hash`, `p_cuenta`, `p_slug`); ninguna rama devuelve `tenant_id`, `items` ni el mensaje crudo de un error.
+Expected: sin salida (la sintaxis es válida). Luego releer el archivo entero comprobando: cada import existe y exporta ese nombre; cada `rpc` usa los nombres de parámetro reales de su función SQL (`p_tenant`, `p_sucursal`, `p_modo`, `p_zona`, `p_items`, `p_cliente`, `p_direccion`, `p_pago`, `p_paga_con`, `p_nota`, `p_seguimiento_hash`, `p_cuenta`, `p_total_esperado`, `p_slug`); ninguna rama devuelve `tenant_id`, `items` ni el mensaje crudo de un error.
 
 Run: `deno check supabase/functions/tienda/index.ts` si `deno --version` funciona; si no, decirlo en el informe.
 
@@ -1287,7 +1300,7 @@ Nada de esto sin su «sí». Decirle qué se hará: una migración que solo aña
 
 1. `supabase migration list --linked` (el worktree se vincula copiando el **contenido** de `vim-pos/supabase/.temp/` a su `supabase/.temp/`).
 2. Aplicar: `(echo "BEGIN;"; cat supabase/migrations/0162_tienda_funcion.sql; echo; echo "COMMIT;") | supabase db query --linked` y `supabase migration repair --status applied 0162 --linked`.
-3. Verificar: las seis funciones existen, y `has_function_privilege('anon', …)` y `('authenticated', …)` son falsos para todas.
+3. Verificar: las **once** funciones existen —siete para `service_role` (`tienda_horario_abierto`, `tienda_estado_sucursal`, `tienda_negocio`, `tienda_menu`, `tienda_cotizar`, `tienda_crear_pedido`, `tienda_seguimiento`) y cuatro internas sin `GRANT` (`_tienda_grupos_de`, `_tienda_entero`, `_tienda_con_iva`, `_tienda_modificadores`)—, que `has_function_privilege('anon', …)` y `('authenticated', …)` son falsos para **las once**, y que `tienda_crear_pedido` tiene una sola firma (`SELECT count(*) FROM pg_proc WHERE proname = 'tienda_crear_pedido'` = 1).
 4. Secretos: generar `VIM_TIENDA_SECRET` (32 bytes al azar en hex), guardarlo en `C:\Users\Fermi\.vim-pos-llaves\tienda-secret.txt` (la entrega 5 lo pondrá también en Vercel) y cargarlo con `supabase secrets set --env-file`; poner `VIM_TIENDA_URL=https://pedidos.vimpos.com.mx`. **No escribir el secreto en el chat ni en el repo.**
 5. `supabase functions deploy tienda --use-api`.
 6. Probar desde aquí, con el secreto leído del archivo: sin cabecera → 401; con cabecera y `{"accion":"negocio","negocio":"no-existe"}` → 404 `TIENDA_NO_DISPONIBLE`. Eso prueba que arranca, que el secreto funciona y que llega a la base. No hay ninguna tienda encendida, así que no se puede probar más en producción todavía.
@@ -1303,3 +1316,40 @@ Nada de esto sin su «sí». Decirle qué se hará: una migración que solo aña
 - La aceptación automática de un pedido con gestión `NUBE`, el timbre, las comandas, la pausa desde la caja y el reporte de estados: entrega 4.
 - La página de la tienda y su servidor (quien llama a esta función y pone el widget antirobot): entrega 5.
 - Ampliar `TURNSTILE_HOSTNAMES` con `pedidos.vimpos.com.mx`: entrega 5, cuando exista el dominio.
+
+---
+
+## Notas para las siguientes entregas
+
+Lo que la revisión final de esta entrega dejó anotado para las que vienen.
+
+- **Entrega 3 (admin):**
+  - Avisar que cambiar la dirección de la tienda rompe los enlaces de seguimiento vivos, no solo los QR.
+  - Darle a la tienda una fuente de logo (`tienda_negocio` devuelve `tenants.logo_png_url`, que hoy ninguna app escribe).
+  - En la lista de revisión: los productos en una categoría inactiva no se venden, y avisar de combos con dos slots obligatorios que solo admiten el mismo producto (la cotización los rechaza).
+  - Validar la forma del horario al guardar.
+- **Entrega 4 (caja):**
+  - Escribir `estado` de vuelta también en pedidos con gestión `NUBE` (la retención y el límite de vivos dependen de ello).
+  - Convertir `TOTAL_NO_COINCIDE`, `ENVIO_NO_COINCIDE`, un componente de combo no disponible o un producto inexistente en un rechazo explícito con motivo de lista cerrada, no en una expiración silenciosa.
+  - «Agotado» marcado en la caja llega al menú de la nube hasta el siguiente push (hasta 10 minutos).
+  - Las banderas de IVA salen del catálogo de la caja y la cotización usa las de la nube.
+  - Mostrar forma de pago y nota del cliente como campos separados (`nota_general` las concatena y una nota puede imitar la línea de pago).
+  - Decidir qué significa `ERROR` para un pedido de la tienda.
+  - La regla «con repartidor = en camino» no mira el estado de la asignación.
+- **Entrega 5 (tienda y su servidor):**
+  - Mandar siempre la IP real del cliente en `x-tienda-ip`.
+  - Pedir un token antirobot nuevo tras cada `pedir` fallido.
+  - Llamar a `cotizar` justo antes de `pedir` y mandar `total_esperado`.
+  - `cantidad` es obligatoria y entera en opciones y componentes.
+  - Guardar en caché `negocio` y `menu` del lado del servidor (un sondeo de seguimiento cada 10 s gasta solo la mitad de las 120 lecturas por 10 minutos por IP, y las operadoras móviles comparten IPv4).
+  - Dejar el enlace de seguimiento fuera de analítica y de cabeceras `Referer`.
+  - Un reintento tras un tiempo de espera crea un segundo pedido (considerar derivar el código de seguimiento de una llave por compra).
+  - `renglones.detalle` no trae cantidades.
+- **Entrega 7 (salida):**
+  - Añadir `pedidos.vimpos.com.mx` a `TURNSTILE_HOSTNAMES` (añadir, no reemplazar) y al widget de Cloudflare.
+  - Confirmar que `CAPTCHA_OPCIONAL` no está puesto en producción.
+  - La retención debe blanquear también `nota_cliente` y las notas de renglón, y cubrir filas atascadas en `ACEPTADO`.
+  - El aviso de privacidad debe decir que un pedido anónimo crea un cliente y una dirección permanentes en el negocio.
+  - Revisar el cupo de 5 pedidos por hora por IP (se comparte entre negocios y cuentan los intentos fallidos).
+  - Medir `tienda_negocio` y `tienda_cotizar` con un menú real (cada cotización arma el menú completo).
+  - Antes de que la entrega 5 dependa de ella, ejercitar `negocio`, `menu` y `cotizar` en producción contra un negocio interno.
