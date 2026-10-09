@@ -17,6 +17,8 @@ DECLARE
   v_otro   uuid := '64646464-0000-0000-0000-0000000000ab';
   v_suc_o  uuid;
   v_cuenta uuid := '64646464-0000-0000-0000-0000000000c1';
+  v_cuenta_o   uuid := '64646464-0000-0000-0000-0000000000c2';   -- la misma persona, en OTRO negocio
+  v_cuenta_del uuid := '64646464-0000-0000-0000-0000000000c3';   -- de este negocio, borrada
   v_cat uuid;
   v_p120 uuid; v_papas uuid; v_ref uuid; v_agua uuid; v_f33 uuid; v_f100 uuid; v_f8 uuid;
   v_combo uuid; v_combo_f uuid; v_ag uuid;
@@ -53,6 +55,12 @@ BEGIN
   INSERT INTO tenants (id, codigo, nombre_comercial, estado, vertical_principal)
   VALUES (v_otro, 'tenant-0162-ped', 'Otro negocio', 'INTERNO', 'QUICK_SERVICE');
   INSERT INTO sucursales (tenant_id, codigo, nombre) VALUES (v_otro, 'OP', 'Sucursal del otro') RETURNING id INTO v_suc_o;
+
+  -- La cuenta de cliente que usa el carrito 1, y dos que no valen: la de otro negocio y una borrada.
+  INSERT INTO tienda_cuentas (id, tenant_id, email, password_hash, nombre, telefono, deleted_at) VALUES
+    (v_cuenta,     v_t,    'ana.cuenta@example.com', 'x', 'Ana', '4775550101', NULL),
+    (v_cuenta_o,   v_otro, 'ana.cuenta@example.com', 'x', 'Ana', '4775550101', NULL),
+    (v_cuenta_del, v_t,    'ana.borrada@example.com', 'x', 'Ana', '4775550101', now());
 
   -- Los productos de la Task 3 (smoke_tienda_cotizar.sql), los que estos carritos usan.
   INSERT INTO categorias (tenant_id, nombre, orden_visualizacion) VALUES (v_t, 'Pedido smoke', 60) RETURNING id INTO v_cat;
@@ -372,6 +380,19 @@ BEGIN
     END;
     IF v_err IS NULL OR v_err NOT LIKE 'SUCURSAL_DE_OTRO_NEGOCIO:%' THEN
       RAISE EXCEPTION 'E1: esperaba SUCURSAL_DE_OTRO_NEGOCIO, dio %', COALESCE(v_err, 'un pedido');
+    END IF;
+  END LOOP;
+
+  -- F7) La cuenta, si viene, es de ESTE negocio y sigue viva: delivery_pedidos no tiene llave foránea
+  --     a tienda_cuentas (0161 §1), así que nadie más lo comprueba.
+  FOR r IN SELECT * FROM (VALUES ('de otro negocio', v_cuenta_o), ('borrada', v_cuenta_del), ('que no existe', v_cat)) AS x(caso, cuenta) LOOP
+    v_err := NULL;
+    BEGIN
+      PERFORM tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, v_uno, v_cli, NULL, 'EFECTIVO', NULL, NULL, md5('f7a') || md5('f7b'), r.cuenta);
+    EXCEPTION WHEN OTHERS THEN v_err := SQLERRM;
+    END;
+    IF v_err IS NULL OR v_err NOT LIKE 'CUENTA_INVALIDA:%' THEN
+      RAISE EXCEPTION 'F7: cuenta %: esperaba CUENTA_INVALIDA, dio %', r.caso, COALESCE(v_err, 'un pedido');
     END IF;
   END LOOP;
 

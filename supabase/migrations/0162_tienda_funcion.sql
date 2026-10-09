@@ -704,6 +704,13 @@ BEGIN
     RAISE EXCEPTION 'SEGUIMIENTO_INVALIDO: la huella del seguimiento es un SHA-256 en hexadecimal';
   END IF;
 
+  -- La cuenta del cliente, si viene, es de este negocio y sigue viva. delivery_pedidos no tiene
+  -- llave foránea a tienda_cuentas (0161 §1): quien lo comprueba es esta función.
+  IF p_cuenta IS NOT NULL AND NOT EXISTS (SELECT 1 FROM tienda_cuentas c
+                                           WHERE c.id = p_cuenta AND c.tenant_id = p_tenant AND c.deleted_at IS NULL) THEN
+    RAISE EXCEPTION 'CUENTA_INVALIDA: la cuenta no existe en este negocio';
+  END IF;
+
   -- 10 y 11) La fila. id_externo: 32 hex al azar ('tienda:' || id_externo cabe en el varchar(64) de
   --    tickets.client_id_local) y único en toda la plataforma, como pide UNIQUE (app, id_externo).
   INSERT INTO delivery_pedidos (
