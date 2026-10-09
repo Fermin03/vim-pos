@@ -1,12 +1,106 @@
 "use client";
+import { DialogoPeligro } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
+import { useAccesoTenant } from "../../components/admin-shell";
+import { TiendaCompartir } from "../../components/tienda-compartir";
+import { TiendaDatos } from "../../components/tienda-datos";
+import { TiendaEstado } from "../../components/tienda-estado";
+import { TiendaPedidos } from "../../components/tienda-pedidos";
+import { useTienda } from "./use-tienda";
 
-// Provisional: la tarea siguiente reemplaza este archivo con la pantalla real.
+/**
+ * Tienda en línea: una sola página con el interruptor, los datos de la tienda, cómo entran los
+ * pedidos y el enlace para compartir. El layout ya decidió que el negocio tiene el complemento.
+ *
+ * El estado vive en `use-tienda.ts`; los bloques solo pintan lo que reciben.
+ */
 export default function TiendaPage() {
+  const t = useTienda();
+  // Servicio suspendido: el panel queda en solo lectura (ADR 0014).
+  const soloLectura = useAccesoTenant().nivel === "bloqueado";
+  const ocupado = t.ocupado !== null;
+
   return (
     <>
-      <PageHeader titulo="Tienda en línea" />
-      <PageBody><p className="text-13 text-ink-3">Cargando…</p></PageBody>
+      <PageHeader titulo="Tienda en línea" subtitulo="Vende desde el teléfono de tus clientes." />
+      <PageBody>
+        {t.falloLectura ? (
+          <div className="max-w-[720px] rounded-lg border border-line bg-surface p-5" role="alert">
+            <p className="text-sm font-medium text-danger">{t.falloLectura}</p>
+            <p className="mt-1 text-13 text-ink-2">Tu tienda sigue como estaba. Revisa tu conexión y vuelve a intentar.</p>
+            <button type="button" onClick={t.reintentar}
+              className="mt-4 h-11 rounded border border-line-strong px-3 text-13 font-semibold text-ink-2 transition-colors hover:border-ink hover:text-ink active:scale-[.97]">
+              Reintentar
+            </button>
+          </div>
+        ) : t.leido === null ? (
+          <p className="text-sm text-ink-3">Cargando…</p>
+        ) : (
+          <div className="flex flex-col gap-6">
+            <TiendaEstado
+              encendida={t.encendida}
+              enPlan={t.leido.enPlan}
+              revision={t.revision}
+              ocupado={ocupado}
+              soloLectura={soloLectura}
+              mensaje={t.mensajeDe("estado")}
+              onCambiar={t.cambiarEncendido}
+            />
+            <TiendaDatos
+              valores={t.form}
+              logoUrl={t.leido.config?.logoUrl ?? null}
+              guardando={t.ocupado === "datos"}
+              ocupado={ocupado}
+              soloLectura={soloLectura}
+              mensaje={t.mensajeDe("datos")}
+              onCambio={t.cambiar}
+              onGuardar={t.guardarDatos}
+            />
+            <TiendaPedidos
+              valores={t.form}
+              hayDireccion={t.leido.config !== null}
+              guardando={t.ocupado === "pedidos"}
+              ocupado={ocupado}
+              soloLectura={soloLectura}
+              mensaje={t.mensajeDe("pedidos")}
+              onCambio={t.cambiar}
+              onGuardar={t.guardarPedidos}
+            />
+
+            {/* Task 6: sucursales — recibe `t.leido.sucursales` y llama a `t.releer()` después de guardar una. */}
+
+            {t.leido.config && <TiendaCompartir direccion={t.leido.config.direccion} encendida={t.encendida} />}
+          </div>
+        )}
+      </PageBody>
+
+      {t.dialogo === "apagar" && (
+        <DialogoPeligro
+          titulo="¿Apagar tu tienda en línea?"
+          consecuencia="Tus clientes dejarán de poder pedir. Los pedidos que ya entraron se atienden igual."
+          error={t.errorDialogo}
+          boton="Apagar"
+          ocupado={ocupado}
+          textoOcupado="Apagando…"
+          ancho="sm"
+          onConfirmar={t.confirmarApagar}
+          onCerrar={t.cerrarDialogo}
+        />
+      )}
+
+      {t.dialogo === "direccion" && (
+        <DialogoPeligro
+          titulo="¿Cambiar la dirección de tu tienda?"
+          consecuencia="Dejarán de funcionar los códigos QR que ya imprimiste y los enlaces de seguimiento de los pedidos en curso."
+          error={t.errorDialogo}
+          boton="Cambiar dirección"
+          ocupado={ocupado}
+          textoOcupado="Cambiando…"
+          ancho="sm"
+          onConfirmar={t.confirmarDireccion}
+          onCerrar={t.cerrarDialogo}
+        />
+      )}
     </>
   );
 }
