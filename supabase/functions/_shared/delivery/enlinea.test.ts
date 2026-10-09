@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ACCIONES_ENLINEA, MOTIVOS_TIENDA, fallaDeTicket, moduloTiendaActivo, motivoDeTienda, pausaHasta } from "./enlinea.ts";
+import { ACCIONES_ENLINEA, ESTADOS_REPORTABLES, MOTIVOS_TIENDA, fallaDeTicket, moduloTiendaActivo, motivoDeTienda, pausaHasta } from "./enlinea.ts";
 import { accionExigeModulo } from "./modulo.ts";
 
 test("las cuatro acciones de la tienda propia, y ninguna pide el módulo de apps", () => {
@@ -118,4 +118,10 @@ test("fail-closed: sin respuesta, sin la clave, con un 'true' de texto o solo pe
   assert.equal(moduloTiendaActivo({ efectivos: { tienda: "true" } }), false);
   assert.equal(moduloTiendaActivo({ efectivos: { tienda: false } }), false);
   assert.equal(moduloTiendaActivo({ permitidos: { tienda: true }, efectivos: { tienda: false } }), false);
+});
+
+// ── Entrega 7: «ya lo tengo» ─────────────────────────────────────────────────
+test("la caja puede reportar EN_PREPARACION además de los de siempre, y nada más", () => {
+  assert.deepEqual([...ESTADOS_REPORTABLES].sort(), ["CANCELADO", "ENTREGADO", "EN_PREPARACION", "LISTO"].sort());
+  for (const e of ["RECIBIDO", "ACEPTADO", "RECHAZADO", "EXPIRADO", "", "listo"]) assert.equal(ESTADOS_REPORTABLES.includes(e), false, e);
 });

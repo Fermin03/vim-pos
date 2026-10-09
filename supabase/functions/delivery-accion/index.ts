@@ -12,7 +12,7 @@ import { clienteUberDeApp, ENTORNO } from "../_shared/delivery/cliente-uber.ts";
 import { motivoRechazoUber, segundosAReadyTime, type MotivoRechazo } from "../_shared/delivery/uber.ts";
 import { cambiarPrepTienda, consultarEstadoTienda, pausarTienda, reanudarTienda, type ConexionTienda } from "../_shared/delivery/tienda-uber-acciones.ts";
 import { ACCIONES_TIENDA, accionExigeModulo, moduloDeliveryActivo } from "../_shared/delivery/modulo.ts";
-import { ACCIONES_ENLINEA, fallaDeTicket, moduloTiendaActivo, motivoDeTienda, pausaHasta } from "../_shared/delivery/enlinea.ts";
+import { ACCIONES_ENLINEA, ESTADOS_REPORTABLES, fallaDeTicket, moduloTiendaActivo, motivoDeTienda, pausaHasta } from "../_shared/delivery/enlinea.ts";
 import type { DbMinima } from "../_shared/delivery/procesar-uber.ts";
 
 const admin = clienteAdmin();
@@ -34,7 +34,6 @@ type Pedido = {
   canal: string; conexion_id: string | null; gestion: "NUBE" | "ESCRITORIO"; gestion_caja_id: string | null;
 };
 const MOTIVOS: MotivoRechazo[] = ["AGOTADO", "CERRADO", "SATURADO", "POS_OFFLINE", "OTRO"];
-const ESTADOS_REPORTABLES = ["LISTO", "ENTREGADO", "CANCELADO"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 /** Un error de la base en una rama de la tienda no se calla: sube al `catch`, que lo registra y responde INTERNO. */

@@ -376,3 +376,19 @@ test("direccion_guardar y direccion_borrar: lo que no cuadra es DIRECCION_INVALI
   assert.deepEqual(leerCuerpo({ accion: "direccion_borrar", ...N, id: ID }), { ok: true, valor: { accion: "direccion_borrar", negocio: "knockout", id: ID } });
   for (const id of [null, undefined, "x", 5]) assert.deepEqual(leerCuerpo({ accion: "direccion_borrar", ...N, id }), mala);
 });
+
+// ── Entrega 7: la llave del intento de compra (`clave`) ─────────────────────────────────────────
+const claveDe = (cambio: object) => {
+  const r = leerCuerpo({ ...pedir, ...cambio });
+  return r.ok && r.valor.accion === "pedir" ? r.valor.clave : r;
+};
+test("cuerpo: pedir acepta clave opcional con forma de código; ausente o null = sin clave", () => {
+  assert.equal(claveDe({}), null);
+  assert.equal(claveDe({ clave: null }), null);
+  assert.equal(claveDe({ clave: "Ab0_-".repeat(4) + "Zz" }), "Ab0_-".repeat(4) + "Zz");
+});
+test("cuerpo: una clave mal formada es CUERPO_INVALIDO, nunca un pedido sin clave", () => {
+  for (const clave of ["", "corta", "a".repeat(21), "a".repeat(23), "con espacio aaaaaaaaaaaa", "ñ".repeat(22), 5, true, {}, []]) {
+    assert.deepEqual(leerCuerpo({ ...pedir, clave }), { ok: false, error: "CUERPO_INVALIDO" }, JSON.stringify(clave));
+  }
+});

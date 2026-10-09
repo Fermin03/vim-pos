@@ -34,9 +34,10 @@ test("cupos: el seguimiento tiene su bolsa (90 cada 600 s): su sondeo no le quit
   });
   assert.equal(cuposDe("seguimiento", "2806:2f0:9000:ab:1111:2222:3333:4444", "knockout").antes[0]!.clave, "tienda:sigue:ip:2806:2f0:9000:ab::/64");
 });
-test("cupos: pedir gasta 5 por IP antes del antirobot y 60 por negocio solo después; cierra si el control falla", () => {
+// Entrega 7: el cupo por IP de `pedir` es por restaurante (8 por hora); antes era 5 compartido.
+test("cupos: pedir gasta 8 por IP y restaurante antes del antirobot y 60 por negocio solo después; cierra si el control falla", () => {
   assert.deepEqual(cuposDe("pedir", "desconocida", "knockout"), {
-    antes: [{ clave: "tienda:pide:ip:desconocida", ventanaSeg: 3600, max: 5 }],
+    antes: [{ clave: "tienda:pide:ip:desconocida:knockout", ventanaSeg: 3600, max: 8 }],
     despuesDelCaptcha: [{ clave: "tienda:pide:negocio:knockout", ventanaSeg: 3600, max: 60 }],
     alFallar: "cerrar",
   });
@@ -45,10 +46,13 @@ test("cupos: el cupo del negocio nunca va antes del antirobot", () => {
   const { antes } = cuposDe("pedir", "1.2.3.4", "knockout");
   assert.equal(antes.some((c) => c.clave.includes("negocio")), false);
 });
+test("cupos: lo que una red pide en un restaurante no le quita cupo en otro", () => {
+  assert.notEqual(cuposDe("pedir", "1.2.3.4", "knockout").antes[0]!.clave, cuposDe("pedir", "1.2.3.4", "crazy-burgers").antes[0]!.clave);
+});
 test("cupos: con IPv6 la clave es el /64, en leer y en pedir", () => {
   const ip = "2806:2f0:9000:ab:1111:2222:3333:4444";
   assert.equal(cuposDe("menu", ip, "knockout").antes[0]!.clave, "tienda:lee:ip:2806:2f0:9000:ab::/64");
-  assert.equal(cuposDe("pedir", ip, "knockout").antes[0]!.clave, "tienda:pide:ip:2806:2f0:9000:ab::/64");
+  assert.equal(cuposDe("pedir", ip, "knockout").antes[0]!.clave, "tienda:pide:ip:2806:2f0:9000:ab::/64:knockout");
 });
 
 // ── La clave del cupo por IP: IPv4 completa, IPv6 por su /64 ────────────────────────────────────
@@ -195,9 +199,15 @@ test("pedido: NULL o una forma inesperada es null, no una excepción", () => {
 
 // ════ Entrega 6: cuentas ════════════════════════════════════════════════════════════════════════
 const H = "a".repeat(64);
-test("cupos: entrar es 10 cada 10 min por IP y cierra", () => {
+// Entrega 7: además del de la IP, un tope por restaurante. El de la IP va primero: `consumirCupos`
+// se detiene en el que no cabe, así que una sola red agotada no le gasta el cupo al restaurante.
+test("cupos: entrar es 10 cada 10 min por IP y, después, 300 cada 10 min por restaurante; cierra", () => {
   assert.deepEqual(cuposDe("entrar", "1.2.3.4", "knockout"), {
-    antes: [{ clave: "tienda:entra:ip:1.2.3.4", ventanaSeg: 600, max: 10 }], despuesDelCaptcha: [], alFallar: "cerrar",
+    antes: [
+      { clave: "tienda:entra:ip:1.2.3.4", ventanaSeg: 600, max: 10 },
+      { clave: "tienda:entra:negocio:knockout", ventanaSeg: 600, max: 300 },
+    ],
+    despuesDelCaptcha: [], alFallar: "cerrar",
   });
 });
 test("cupos: registrar es 5 por hora por IP y, pasado el antirobot, 3 por hora por huella de correo+negocio; cierra", () => {
@@ -240,7 +250,8 @@ test("cupos: ninguna acción de cuenta cae en la bolsa de lecturas, y con IPv6 l
   for (const accion of ["registrar", "entrar", "salir", "recuperar_pedir", "recuperar_aplicar", "cuenta", "cuenta_guardar",
                         "cuenta_password", "direccion_guardar", "direccion_borrar", "mis_pedidos", "eliminar_cuenta"] as const) {
     const { antes } = cuposDe(accion, "2806:2f0:9000:ab:1111:2222:3333:4444", "knockout", H);
-    assert.equal(antes.length, 1, accion);
+    // `entrar` lleva además el tope del restaurante (entrega 7); el primero sigue siendo el de la IP.
+    assert.equal(antes.length, accion === "entrar" ? 2 : 1, accion);
     assert.doesNotMatch(antes[0]!.clave, /:lee:|:pide:|:sigue:/, accion);
     assert.match(antes[0]!.clave, /:ip:2806:2f0:9000:ab::\/64$/, accion);
   }

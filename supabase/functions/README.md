@@ -146,7 +146,7 @@ Los pedidos con `canal = 'TIENDA'` no pasan por Uber: `delivery-accion` los atie
 - Sobre un pedido (`pedido_id`): `aceptar` y `rechazar` escriben solo si el pedido sigue `RECIBIDO` o
   `ERROR` (si no, `409 ACCION_INVALIDA`; el de `aceptar` lleva siempre el `estado` en que está el
   pedido, releído, para que la caja distinga «lo aceptó otra pantalla» de «se cerró»); `estado`
-  (`estado` = `LISTO` | `ENTREGADO` | `CANCELADO`, y `motivo` de lista cerrada) es **solo de
+  (`estado` = `EN_PREPARACION` | `LISTO` | `ENTREGADO` | `CANCELADO`, y `motivo` de lista cerrada; `EN_PREPARACION` es el «ya lo tengo» de la entrega 7: la caja lo manda al crear la cuenta local, y la base (0167) cancela a los 15 min el `ACEPTADO` que no lo recibió) es **solo de
   dispositivo y solo para pedidos de gestión `ESCRITORIO`** (uno de gestión `NUBE` → `409
   ACCION_INVALIDA`: su estado lo pone la base, ver «Push de expirados») y llama a
   `tienda_reportar_estado` (0164), que solo avanza y devuelve en qué quedó. `listo` no existe en la tienda. `reclamar` es el de siempre.
@@ -163,7 +163,8 @@ Los pedidos con `canal = 'TIENDA'` no pasan por Uber: `delivery-accion` los atie
 - `delivery-espejo`: la caja manda `tienda: true` y `turno_abierto`; la respuesta añade
   `tienda: {participa, aceptacion, pausa_hasta}` (o `null` sin módulo). Una caja anterior no manda
   la clave y recibe lo de siempre. Con un pedido vivo de la tienda en gestión `ESCRITORIO` el sondeo
-  es rápido (10 s).
+  es rápido (10 s), pero solo si el pedido se recibió en las últimas 6 horas (`TIENDA_VIVO_MS`,
+  entrega 7): uno atascado sigue viajando a la caja y ya no la deja a 10 s para siempre.
 
 ### `tienda` — la puerta de la tienda en línea (entregas 2 y 6)
 
@@ -186,6 +187,19 @@ método → secreto → cuerpo (≤ 32 KB, forma) → cupo por IP → negocio �
 `seguimiento`. `pedir` mira la sesión: sin cabecera, invitado; con una sesión válida, el pedido
 queda ligado a la cuenta (`p_cuenta`); con una cabecera que no sirve (mal formada, vencida, cerrada
 o de otro negocio) → `403 SESION_INVALIDA`, no se degrada a invitado.
+
+**`pedir` sin duplicados** (entrega 7; base en la 0167). El cuerpo acepta `clave`, opcional: 22
+caracteres `[A-Za-z0-9_-]` que el navegador genera una vez por intento de compra (ausente o `null` =
+sin clave; mal formada → `400 CUERPO_INVALIDO`). Con `clave`, el código de seguimiento no es al azar:
+es `codigoDeClave(VIM_TIENDA_SECRET, slug, clave)` = base64url de `HMAC-SHA256(secreto,
+"<slug>:<clave>")` recortado a 22 (`_shared/tienda/seguimiento.ts`). El reintento da la misma
+huella y `tienda_crear_pedido` (que recibe además `p_clave`) devuelve el pedido que ya existe en vez
+de crear otro; la respuesta es la de siempre (`{ codigo, folio_corto, total_mxn, vence_aceptacion }`).
+La `clave` no se guarda ni se escribe en el log. Un reintento vuelve a pasar antirobot y cupos, y
+vuelve a mandar el correo de confirmación (mismo pedido, mismo enlace). Sin `clave`, la llamada a la
+base no lleva `p_clave`: es la misma de antes. **Rotar `VIM_TIENDA_SECRET` cambia los códigos
+derivados**: un reintento que cruce la rotación crearía un segundo pedido (los ya creados se siguen
+abriendo con su código: la base solo tiene la huella).
 
 **Cuentas** (entrega 6; funciones SQL de la 0166). `cuenta` = `{ nombre, apellido, email, telefono,
 fecha_nacimiento }`; nunca sale el id de la cuenta ni el `tenant_id`.
@@ -233,8 +247,8 @@ fecha_nacimiento }`; nunca sale el id de la cuenta ni el `tenant_id`.
 |---|---|---|
 | `negocio`, `menu`, `cotizar` | 120 / 10 min por IP (`tienda:lee:ip`) | deja pasar |
 | `seguimiento` | 90 / 10 min por IP (`tienda:sigue:ip`) | deja pasar |
-| `pedir` | 5 / h por IP (`tienda:pide:ip`); tras el antirobot, 60 / h por negocio | cierra |
-| `entrar` | 10 / 10 min por IP (`tienda:entra:ip`) | cierra |
+| `pedir` | 8 / h por IP **y restaurante** (`tienda:pide:ip:<ip>:<slug>`; hasta la entrega 7 eran 5 / h compartidos entre restaurantes); tras el antirobot, 60 / h por negocio (`tienda:pide:negocio:<slug>`) | cierra |
+| `entrar` | 10 / 10 min por IP (`tienda:entra:ip`) y, después, 300 / 10 min por restaurante (`tienda:entra:negocio:<slug>`, entrega 7) | cierra |
 | `registrar` | 5 / h por IP (`tienda:registra:ip`); tras el antirobot, 3 / h por huella de negocio+correo (`tienda:registra:correo`) | cierra |
 | `recuperar_pedir` | 3 / h por IP (`tienda:recupera:ip`); tras el antirobot, 3 / h por huella de negocio+correo (`tienda:recupera:correo`) | cierra |
 | `recuperar_aplicar` | 10 / h por IP (`tienda:aplica:ip`) | cierra |
@@ -244,6 +258,10 @@ fecha_nacimiento }`; nunca sale el id de la cuenta ni el `tenant_id`.
 Los cupos por correo existen porque esas dos acciones mandan un correo a una dirección sin
 verificar; agotados responden `429 DEMASIADOS_INTENTOS` exista o no la cuenta. Los puede agotar un
 tercero con tres captchas: la víctima ve «demasiados intentos» durante una hora.
+
+El tope de `entrar` por restaurante existe porque `entrar` no lleva antirobot y cada intento es un
+bcrypt en la base. Agotado, nadie entra a su cuenta en ese restaurante hasta 10 minutos (`429`);
+pedir como invitado no se afecta. Se gasta después del de la IP, así que una sola red no lo agota.
 
 El handler no tiene arnés (Deno y la base): lo probado es `_shared/tienda/*.ts` con `pnpm test:functions`.
 

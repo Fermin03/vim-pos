@@ -45,6 +45,8 @@ export function claveDeIp(ip: string): string {
  * En `pedir` van en dos tiempos: el de la IP antes del antirobot y el del negocio solo DESPUÉS de
  * pasarlo. Si los dos se gastaran al entrar, 60 peticiones basura por hora (sin token) dejarían a
  * un restaurante sin tienda.
+ * El de la IP en `pedir` es por restaurante (entrega 7): las redes de celular comparten IPv4, y lo
+ * que alguien pidió —o intentó— en un restaurante no debe dejar sin pedir al cliente de otro.
  * El seguimiento lleva su propia bolsa: la página del pedido pregunta cada 10 s (60 lecturas en 10
  * minutos por pestaña) y, compartiendo la de leer, dos pedidos vivos desde la misma red dejaban sin
  * menú ni cotización a los demás de esa red. 90 = una pestaña holgada; con dos, la segunda va lenta.
@@ -56,6 +58,10 @@ export type Cupos = { antes: Cupo[]; despuesDelCaptcha: Cupo[]; alFallar: "abrir
  * nueva no compile hasta que alguien decida su cupo (antes caía sola en la bolsa de lecturas, que
  * abre si el control falla).
  *   · `entrar`, `registrar`, `recuperar_*` escriben (sesiones, cuentas, enlaces, correos): cierran.
+ *   · `entrar` no lleva antirobot, y cada intento es un bcrypt en la base de las cajas: además del
+ *     cupo por IP tiene un tope por restaurante (entrega 7), que frena un ataque de contraseñas
+ *     repartido entre muchas redes. Va DESPUÉS del de la IP (`consumirCupos` se detiene en el
+ *     primero que no cabe): una red que ya agotó el suyo no le gasta el cupo al restaurante.
  *   · En `registrar` y `recuperar_pedir` hay además un cupo por DESTINATARIO (3 por hora): las dos
  *     mandan un correo a una dirección que nadie ha verificado, y sin él cada intento repetido es
  *     otro correo nuestro en el buzón de un tercero. Va DESPUÉS del antirobot, como el del negocio en
@@ -73,8 +79,15 @@ export function cuposDe(accion: Peticion["accion"], ip: string, negocio: string,
   switch (accion) {
     case "seguimiento": return porIp("sigue", 600, 90, "abrir");
     case "negocio": case "menu": case "cotizar": return porIp("lee", 600, 120, "abrir");
-    case "pedir": return porIp("pide", 3600, 5, "cerrar", [{ clave: `tienda:pide:negocio:${negocio}`, ventanaSeg: 3600, max: 60 }]);
-    case "entrar": return porIp("entra", 600, 10, "cerrar");
+    case "pedir": return {
+      antes: [{ clave: `tienda:pide:ip:${quien}:${negocio}`, ventanaSeg: 3600, max: 8 }],
+      despuesDelCaptcha: [{ clave: `tienda:pide:negocio:${negocio}`, ventanaSeg: 3600, max: 60 }],
+      alFallar: "cerrar",
+    };
+    case "entrar": {
+      const c = porIp("entra", 600, 10, "cerrar");
+      return { ...c, antes: [...c.antes, { clave: `tienda:entra:negocio:${negocio}`, ventanaSeg: 600, max: 300 }] };
+    }
     case "registrar": case "recuperar_pedir": {
       if (!/^[0-9a-f]{64}$/.test(huellaCorreo ?? "")) throw new Error(`cuposDe: ${accion} necesita la huella del correo`);
       const bolsa = accion === "registrar" ? "registra" : "recupera";

@@ -16,6 +16,13 @@ export function motivoDeTienda(x: unknown): (typeof MOTIVOS_TIENDA)[number] {
   return MOTIVOS_TIENDA.find((m) => m === x) ?? "OTRO";
 }
 
+/**
+ * Lo que la caja instalada puede reportar de un pedido de la tienda (acción `estado`).
+ * `EN_PREPARACION` es su «ya lo tengo» (entrega 7): lo manda en cuanto crea la cuenta local del
+ * pedido, y con eso el pedido deja de estar entre los `ACEPTADO` que la base cancela a los 15 min.
+ */
+export const ESTADOS_REPORTABLES: readonly string[] = ["EN_PREPARACION", "LISTO", "ENTREGADO", "CANCELADO"];
+
 const PAUSAS_MS: Record<string, number> = { "30m": 30 * 60_000, "1h": 60 * 60_000 };
 
 /**
