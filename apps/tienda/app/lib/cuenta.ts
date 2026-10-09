@@ -33,7 +33,7 @@ export const FORMULARIOS = {
 export const LIMITES_DE_CUENTA = { nombre: 100, apellido: 100, email: 254, telefono: 20, etiqueta: 40 } as const;
 export const PASSWORD = { min: 8, max: 72 } as const;
 
-const SIN_PEDIDO: Contexto = { modo: "DOMICILIO", pago: null, total: null };
+const SIN_PEDIDO: Contexto = { modo: "DOMICILIO" };
 const largo = (v: string, max: number): string | null => (Array.from(v).length > max ? `Usa ${max} caracteres o menos.` : null);
 // ponytail: «hoy» en UTC, igual que la función; por la tarde en México ya es mañana allá, y da igual.
 const hoyUtc = (): string => new Date().toISOString().slice(0, 10);

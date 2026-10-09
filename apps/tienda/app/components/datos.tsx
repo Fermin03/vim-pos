@@ -1,5 +1,5 @@
 "use client";
-// «Tus datos»: quién recibe, a dónde, cómo paga, y enviar. Vive dentro de la hoja del carrito.
+// «Tus datos»: quién recibe (o recoge), a dónde, cómo paga, y enviar. Vive dentro de la hoja del carrito.
 // Aquí solo se pinta: las reglas de los campos están en lib/cliente.ts y qué hacer con cada respuesta
 // de la función, en lib/envio.ts.
 //
@@ -18,7 +18,7 @@ import {
 } from "../lib/cliente";
 import type { Cotizacion, DireccionGuardada, ErrorDeTienda, MiCuenta, Negocio, Pago, Sucursal } from "../lib/contrato";
 import { LIMITES_DE_CUENTA, direccionEnUnaLinea, enlaceDeAcceso, formularioDeDireccion, paraTusDatos } from "../lib/cuenta";
-import { aCentavos, formatoMxn } from "../lib/dinero";
+import { formatoMxn } from "../lib/dinero";
 import { enviarPedido, envioDeLaPagina, intentoDeLaPagina, type Desenlace, type ResultadoDeEnvio } from "../lib/envio";
 import { enlaceTel, formatoTelefono } from "../lib/telefono";
 import { textoDeError } from "../lib/textos";
@@ -161,7 +161,7 @@ export function PasoDeDatos({
     setRechazo((r) => ({ ...r, calle: undefined }));
   };
 
-  const contexto = { modo: carrito.modo, pago, total: aCentavos(totalNuevo ?? totalVisto ?? "") };
+  const contexto = { modo: carrito.modo };
   const errores = erroresDe(f, contexto);
   const errorDe = (campo: Campo) => rechazo[campo] ?? (tocados.has(campo) ? errores[campo] : undefined);
   const enfocar = (campo: Campo | "pago") => {
@@ -172,8 +172,8 @@ export function PasoDeDatos({
 
   const campo = (c: Campo, etiqueta: string, extra: Partial<Parameters<typeof CampoDeTexto>[0]> = {}) => (
     <CampoDeTexto id={`${id}-${c}`} etiqueta={etiqueta} value={f[c]} error={errorDe(c)}
-      maxLength={c === "pagaCon" ? 12 : LIMITES[c]}
-      alCambiar={(v) => { setF((a) => ({ ...a, [c]: v })); setRechazo((r) => ({ ...r, [c]: undefined, ...(c === "pagaCon" && { pago: undefined }) })); }}
+      maxLength={LIMITES[c]}
+      alCambiar={(v) => { setF((a) => ({ ...a, [c]: v })); setRechazo((r) => ({ ...r, [c]: undefined })); }}
       alSalir={() => setTocados((t) => new Set(t).add(c))} {...extra} />
   );
 
@@ -221,7 +221,7 @@ export function PasoDeDatos({
     else if (desenlace.tipo === "total") { setTotalNuevo(desenlace.total); alCambiarElTotal(); }
     else if (desenlace.tipo === "campo") {
       setRechazo({ [desenlace.campo]: desenlace.texto });
-      enfocar(desenlace.campo === "pago" && pago === "EFECTIVO" && f.pagaCon.trim() ? "pagaCon" : desenlace.campo);
+      enfocar(desenlace.campo);
     } else {
       // La sesión terminó: desde aquí es un invitado (el servidor ya borró la cookie). Él decide si
       // entra otra vez o manda el pedido así; no se reenvía solo.
@@ -237,7 +237,7 @@ export function PasoDeDatos({
   const intentar = (total: string | null) => {
     // El candado se pregunta en el acto: el estado de React llega un render tarde para un doble toque.
     if (ocupado || envioDeLaPagina.ocupado() || !pago) return;
-    const conError = CAMPOS.find((c) => erroresDe(f, { ...contexto, total: aCentavos(total ?? "") })[c]);
+    const conError = CAMPOS.find((c) => errores[c]);
     if (conError) { setTocados(new Set(CAMPOS)); enfocar(conError); return; }
     setAviso(null); setRechazo({}); setTotalNuevo(null); setTotalVisto(total);
     // Si el antirobot aún no entrega su comprobación, el botón no se queda muerto: lo dice y espera.
@@ -289,7 +289,7 @@ export function PasoDeDatos({
         )}
 
         <section className="flex flex-col gap-4 px-4 pb-5 pt-2">
-          <h3 ref={titulo} tabIndex={-1} className={cn(TITULO, "outline-none")}>¿Quién recibe?</h3>
+          <h3 ref={titulo} tabIndex={-1} className={cn(TITULO, "outline-none")}>{aDomicilio ? "¿Quién recibe?" : "¿Quién recoge?"}</h3>
           {campo("nombre", "Nombre", { autoComplete: "name", autoCapitalize: "words" })}
           {campo("telefono", "Teléfono", { type: "tel", inputMode: "tel", autoComplete: "tel-national", ayuda: "10 dígitos. El restaurante te llama si hay alguna duda con tu pedido." })}
           {campo("email", "Correo", { type: "email", inputMode: "email", autoComplete: "email", autoCapitalize: "none", spellCheck: false, opcional: true, ayuda: "Para mandarte el enlace de tu pedido." })}
@@ -377,7 +377,6 @@ export function PasoDeDatos({
             </ul>
           )}
           {pago === "TARJETA" && <p className="text-15 text-ink-2">{aDomicilio ? "Paga con tarjeta al recibir: el restaurante lleva la terminal." : "Paga con tarjeta al recoger tu pedido."}</p>}
-          {pago === "EFECTIVO" && campo("pagaCon", "¿Con cuánto pagas?", { inputMode: "decimal", autoComplete: "off", opcional: true, ayuda: "Para llevar tu cambio listo." })}
           {rechazo.pago && <p id={`${id}-pago-error`} role="alert" className="text-14 font-medium text-danger">{rechazo.pago}</p>}
         </section>
 
@@ -395,7 +394,7 @@ export function PasoDeDatos({
             <p>
               Llenamos tus datos con los de tu último pedido, guardados en este teléfono.{" "}
               <button type="button" className={cn("font-medium text-ink underline underline-offset-4", FOCO)}
-                onClick={() => { olvidarCliente(); setF((a) => ({ ...FORMULARIO_VACIO, pagaCon: a.pagaCon })); setTocados(new Set()); setRecordado(false); }}>
+                onClick={() => { olvidarCliente(); setF(FORMULARIO_VACIO); setTocados(new Set()); setRecordado(false); }}>
                 Olvidar mis datos
               </button>
             </p>

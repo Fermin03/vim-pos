@@ -1,7 +1,7 @@
 // Los módulos chicos y sin efectos: dinero, horario, color, imagen, teléfono y textos.
 import { describe, expect, it } from "vitest";
 import type { Horario } from "@vim/fecha";
-import { aCentavos, aTexto, formato, formatoMxn, leerImporte } from "../dinero";
+import { aCentavos, aTexto, formato, formatoMxn } from "../dinero";
 import { aLaHora, abiertoAhora, hora12, momentoMx, proximaApertura, semanaLegible, textoApertura } from "../horario";
 import { colorDeNegocio, variablesDeColor } from "../color";
 import { urlDeFoto, urlDeLogo } from "../imagen";
@@ -43,29 +43,6 @@ describe("dinero", () => {
     expect(formato(-3500)).toBe("-$35.00");
     expect(formatoMxn("1234.50")).toBe("$1,234.50");
     expect(formatoMxn("basura")).toBe("");
-  });
-  it("lo que escribe el cliente en «¿con cuánto pagas?»", () => {
-    expect(leerImporte("500")).toBe(50000);
-    expect(leerImporte(" $1,000.5 ")).toBe(100050);
-    expect(leerImporte("200.00")).toBe(20000);
-    for (const malo of ["", "abc", "12.345", "-5", "1.2.3", "1e3"]) expect(leerImporte(malo), malo).toBeNull();
-  });
-  it("la coma: decimal con una o dos cifras detrás, de miles con tres exactas", () => {
-    // Coma decimal (como escribe mucha gente «cien cincuenta»): antes se leía como $1,005.
-    expect(leerImporte("100,5")).toBe(10050);
-    expect(leerImporte("100,50")).toBe(10050);
-    expect(leerImporte("0,5")).toBe(50);
-    expect(leerImporte("1234,5")).toBe(123450);
-    // Coma de miles: grupos de tres exactos, con o sin centavos tras el punto.
-    expect(leerImporte("1,234")).toBe(123400);
-    expect(leerImporte("1,234.5")).toBe(123450);
-    expect(leerImporte("1,234.50")).toBe(123450);
-    expect(leerImporte("12,345,678")).toBe(1234567800);
-    expect(leerImporte("100,500")).toBe(10050000);
-    // Ni una cosa ni la otra: no se adivina.
-    for (const malo of ["1,2345", "1,23,456", "1234,567", ",5", "5,", "1,,234", "1,234,5", "1,5.5", "100,5.0", "1.234,5", "0100,500.123"]) {
-      expect(leerImporte(malo), malo).toBeNull();
-    }
   });
 });
 

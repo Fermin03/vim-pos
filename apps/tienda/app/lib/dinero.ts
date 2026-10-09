@@ -28,17 +28,3 @@ export function formatoMxn(texto: string): string {
   const c = aCentavos(texto);
   return c === null ? "" : formato(c);
 }
-
-/**
- * Lo que el cliente escribe en «¿Con cuánto pagas?» → centavos, o null si no se entiende.
- * El punto siempre es decimal («500», «500.5», «$1,000.50»). La coma se lee por lo que trae detrás:
- *  · una o dos cifras y nada más («100,5», «100,50») → coma decimal: 100.50;
- *  · grupos de tres exactos («1,234», «12,345,678», «1,234.5») → separador de miles.
- * Lo que no es ninguna de las dos («1,2345», «1.234,5») es null: con dinero no se adivina.
- */
-export function leerImporte(entrada: string): number | null {
-  const t = entrada.replace(/[\s$]/g, "");
-  const limpio = /^\d{1,3}(,\d{3})+(\.\d{1,2})?$/.test(t) ? t.replace(/,/g, "") : /^\d+,\d{1,2}$/.test(t) ? t.replace(",", ".") : t;
-  const m = /^(\d+)(?:\.(\d{1,2}))?$/.exec(limpio);
-  return m ? Number(m[1]) * 100 + Number((m[2] ?? "").padEnd(2, "0")) : null;
-}
