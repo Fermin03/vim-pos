@@ -120,6 +120,15 @@ describe("etiquetaEstadoEnLinea", () => {
       expect(etiquetaEstadoEnLinea(e({ motivo: m }), ahora).texto).toBe("Tienda: apagada");
     }
   });
+  it("con la caja instalada sin actualizar, «sin turno abierto» pasa a decir qué hacer", () => {
+    expect(etiquetaEstadoEnLinea(e({ motivo: "CAJA_NO_LISTA" }), ahora, true))
+      .toEqual({ texto: "Tienda: actualiza la caja de esta sucursal para recibir pedidos en línea.", tono: "aviso" });
+    // Solo cambia ese caso: lo demás se dice igual (una pausa sigue siendo una pausa).
+    expect(etiquetaEstadoEnLinea(e({}), ahora, true).texto).toBe("Tienda: recibiendo pedidos");
+    expect(etiquetaEstadoEnLinea(e({ motivo: "FUERA_DE_HORARIO" }), ahora, true).texto).toBe("Tienda: fuera de horario");
+    expect(etiquetaEstadoEnLinea(e({ motivo: "EN_PAUSA" }), ahora, true).texto).toBe("Tienda: en pausa");
+    expect(etiquetaEstadoEnLinea(e({ motivo: "NO_PARTICIPA" }), ahora, true).texto).toBe("Tienda: apagada");
+  });
 });
 
 describe("mensajeErrorEnLinea", () => {
@@ -175,10 +184,19 @@ describe("llamadas a delivery-accion", () => {
   });
   it("avisarPresente nunca lanza", async () => {
     const f = resp(200, { ok: true, sellado: true }); vi.stubGlobal("fetch", f);
-    await expect(avisarPresente("tok", "s1")).resolves.toBeUndefined();
+    await expect(avisarPresente("tok", "s1")).resolves.toBe(false);
     expect(JSON.parse((f.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)).toEqual({ accion: "enlinea_presente", sucursal_id: "s1" });
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("net"); }));
-    await expect(avisarPresente("tok", "s1")).resolves.toBeUndefined();
+    await expect(avisarPresente("tok", "s1")).resolves.toBe(false);
+  });
+  it("avisarPresente dice si la nube no selló porque la caja instalada de la sucursal está sin actualizar", async () => {
+    vi.stubGlobal("fetch", resp(200, { ok: true, sellado: false, motivo: "CAJA_SIN_ACTUALIZAR" }));
+    expect(await avisarPresente("tok", "s1", "c1")).toBe(true);
+    // Sin turno abierto tampoco sella, pero eso no es una caja vieja.
+    vi.stubGlobal("fetch", resp(200, { ok: true, sellado: false }));
+    expect(await avisarPresente("tok", "s1", "c1")).toBe(false);
+    vi.stubGlobal("fetch", resp(500, { error: "INTERNO" }));
+    expect(await avisarPresente("tok", "s1", "c1")).toBe(false);
   });
   it("avisarPresente manda la caja del turno cuando se conoce", async () => {
     const f = resp(200, { ok: true, sellado: true }); vi.stubGlobal("fetch", f);

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ACCIONES_ENLINEA, ESTADOS_REPORTABLES, MOTIVOS_TIENDA, fallaDeTicket, moduloTiendaActivo, motivoDeTienda, pausaHasta } from "./enlinea.ts";
+import { ACCIONES_ENLINEA, ESTADOS_REPORTABLES, MOTIVOS_TIENDA, cajaSinActualizar, fallaDeTicket, moduloTiendaActivo, motivoDeTienda, pausaHasta, versionAlMenos } from "./enlinea.ts";
 import { accionExigeModulo } from "./modulo.ts";
 
 test("las cuatro acciones de la tienda propia, y ninguna pide el módulo de apps", () => {
@@ -124,4 +124,36 @@ test("fail-closed: sin respuesta, sin la clave, con un 'true' de texto o solo pe
 test("la caja puede reportar EN_PREPARACION además de los de siempre, y nada más", () => {
   assert.deepEqual([...ESTADOS_REPORTABLES].sort(), ["CANCELADO", "ENTREGADO", "EN_PREPARACION", "LISTO"].sort());
   for (const e of ["RECIBIDO", "ACEPTADO", "RECHAZADO", "EXPIRADO", "", "listo"]) assert.equal(ESTADOS_REPORTABLES.includes(e), false, e);
+});
+
+// ── Auditoría (M1): una caja instalada que late pero no entiende la tienda ───
+test("versión: 0.7.0 < 0.8.0 <= 0.10.2, comparando número a número y no como texto", () => {
+  const min = [0, 8, 0] as const;
+  for (const v of ["0.8.0", "0.8.1", "0.10.2", "0.9.0", "1.0.0", " 0.8.0 "]) assert.equal(versionAlMenos(v, min), true, v);
+  for (const v of ["0.7.0", "0.7.99", "0.4.105", "0.0.9"]) assert.equal(versionAlMenos(v, min), false, v);
+});
+
+test("versión: nula o rara es vieja", () => {
+  for (const v of [null, undefined, "", "0.8", "v0.8.0", "0.8.0-beta", "0.8.0.1", "ocho", 8, 0.8, {}, "1e3.0.0", "9999999.0.0"]) {
+    assert.equal(versionAlMenos(v, [0, 8, 0]), false, JSON.stringify(v));
+  }
+});
+
+const T0 = Date.parse("2026-10-09T18:00:00Z");
+const hace = (seg: number) => new Date(T0 - seg * 1000).toISOString();
+
+test("caja sin actualizar: hay caja instalada viva y ninguna de las vivas llega a la 0.8.0", () => {
+  assert.equal(cajaSinActualizar([{ espejo_apps_at: hace(10), version_app: "0.7.0" }], T0), true);
+  assert.equal(cajaSinActualizar([{ espejo_apps_at: hace(10), version_app: null }], T0), true);
+  // Una 0.8.0 apagada no atiende nada: los pedidos seguirían yendo a la 0.7.0 que late.
+  assert.equal(cajaSinActualizar([{ espejo_apps_at: hace(10), version_app: "0.7.0" }, { espejo_apps_at: hace(3600), version_app: "0.8.0" }], T0), true);
+});
+
+test("caja sin actualizar: sin caja viva (sucursal solo web, o caja apagada) o con una viva al día, no", () => {
+  assert.equal(cajaSinActualizar([], T0), false);
+  assert.equal(cajaSinActualizar([{ espejo_apps_at: null, version_app: null }], T0), false);
+  assert.equal(cajaSinActualizar([{ espejo_apps_at: hace(91), version_app: "0.7.0" }], T0), false);   // la misma ventana de 90 s de sucursal_con_espejo
+  assert.equal(cajaSinActualizar([{ espejo_apps_at: "no-es-fecha", version_app: "0.7.0" }], T0), false);
+  assert.equal(cajaSinActualizar([{ espejo_apps_at: hace(10), version_app: "0.8.0" }], T0), false);
+  assert.equal(cajaSinActualizar([{ espejo_apps_at: hace(10), version_app: "0.7.0" }, { espejo_apps_at: hace(20), version_app: "0.10.2" }], T0), false);
 });
