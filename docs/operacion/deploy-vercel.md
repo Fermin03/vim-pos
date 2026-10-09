@@ -1,6 +1,6 @@
 # Deploy a Vercel — VIM POS (monorepo pnpm + turbo)
 
-Una app = **un proyecto Vercel** , todos en la misma cuenta (`fermin03` / team `fermin03s-projects`)
+Una app = **un proyecto Vercel**, todos en la misma cuenta (`fermin03` / team `fermin03s-projects`)
 y desde el mismo repo de GitHub `Fermin03/vim-pos`.
 
 | App | Proyecto Vercel | Dominio | Estado |
