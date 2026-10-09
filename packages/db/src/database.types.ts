@@ -10064,6 +10064,62 @@ export type Database = {
           },
         ]
       }
+      tienda_ocultos: {
+        Row: {
+          categoria_id: string | null
+          created_at: string
+          id: string
+          producto_id: string | null
+          sucursal_id: string
+          tenant_id: string
+        }
+        Insert: {
+          categoria_id?: string | null
+          created_at?: string
+          id?: string
+          producto_id?: string | null
+          sucursal_id: string
+          tenant_id: string
+        }
+        Update: {
+          categoria_id?: string | null
+          created_at?: string
+          id?: string
+          producto_id?: string | null
+          sucursal_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tienda_ocultos_categoria_del_negocio"
+            columns: ["categoria_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "categorias"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "tienda_ocultos_producto_del_negocio"
+            columns: ["producto_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "tienda_ocultos_sucursal_del_negocio"
+            columns: ["sucursal_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "tienda_ocultos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tienda_recuperaciones: {
         Row: {
           created_at: string

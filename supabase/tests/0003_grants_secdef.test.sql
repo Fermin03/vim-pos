@@ -67,7 +67,7 @@ insert into _secdef_solo_service (fn, motivo) values
   ('tienda_horario_abierto',        'pieza de la tienda en línea; solo la Edge Function tienda (0162)'),
   ('tienda_estado_sucursal',        'dice si una sucursal de cualquier negocio recibe pedidos (0162)'),
   ('tienda_negocio',                'resuelve cualquier negocio por la dirección de su tienda (0162, 0163)'),
-  ('tienda_menu',                   'lee el menú de cualquier negocio sin RLS (0162, 0165)'),
+  ('tienda_menu',                   'lee el menú de cualquier negocio sin RLS (0162, 0165, 0168)'),
   ('tienda_cotizar',                'cotiza contra el catálogo de cualquier negocio sin RLS (0162)'),
   ('tienda_crear_pedido',           'crea pedidos en cualquier negocio; la frontera con el público (0162, 0167)'),
   ('tienda_seguimiento',            'lee un pedido de cualquier negocio por la huella de su enlace (0162, 0166)'),

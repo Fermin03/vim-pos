@@ -5,6 +5,7 @@ import { z } from "zod";
 import { supabase } from "./supabase";
 import { tenantId } from "./datos";
 import { combosNoComprables, type ComboNoComprable, type ComboParaRevisar } from "./tienda-combos";
+import { filaOculta, type CambioMenu, type CategoriaCatalogo, type Ocultos, type ProductoCatalogo } from "./tienda-menu";
 import { ofertaTienda, type OfertaTienda } from "./tienda-plan";
 import { errorDeDireccion, errorDeHorario, leerHorario, mensajeTienda, type SucursalTienda } from "./tienda-reglas";
 
@@ -219,6 +220,95 @@ export async function leerCombosNoComprables(): Promise<ComboNoComprable[]> {
     combo.slots.push({ nombre: g.nombre, obligatorio: true, opciones: ids.map((id) => ({ productoId: id, nombre: porId.get(id)?.nombre ?? "" })) });
   }
   return combosNoComprables([...combos.values()]);
+}
+
+// ── Menú de la tienda (0168) ──────────────────────────────────────────────────
+
+export type MenuTiendaLeido = { categorias: CategoriaCatalogo[]; productos: ProductoCatalogo[]; ocultos: Ocultos };
+
+type Respuesta = { data: unknown; error: { message: string; code?: string } | null };
+const NO_SE_GUARDO = "No se pudo guardar el cambio";
+
+/** PostgREST corta en 1000 filas: se pide por páginas hasta que una venga incompleta. */
+async function todasLasFilas<T>(pagina: (desde: number, hasta: number) => PromiseLike<Respuesta>): Promise<T[]> {
+  const filas: T[] = [];
+  for (let desde = 0; ; desde += TOPE_FILAS) {
+    const { data, error } = await pagina(desde, desde + TOPE_FILAS - 1);
+    if (error) throw fallo(error, "No se pudo leer tu catálogo");
+    const lote = (data ?? []) as T[];
+    filas.push(...lote);
+    if (lote.length < TOPE_FILAS) return filas;
+  }
+}
+
+/**
+ * El catálogo como lo ve UNA sucursal y lo que esa sucursal tiene escondido. Trae también los
+ * productos que la tienda no enseña por otra razón (no visibles en el POS, pausados, no se venden
+ * ahí): el bloque los pinta con su nota. Las categorías, solo las activas.
+ */
+export async function leerMenuTienda(sucursalId: string): Promise<MenuTiendaLeido> {
+  const [cats, prods, deSucursal, ocultos] = await Promise.all([
+    supabase.from("categorias").select("id, nombre, orden_visualizacion").is("deleted_at", null).eq("activa", true),
+    todasLasFilas<{ id: string; nombre: string; categoria_id: string; orden_visualizacion: number | null; es_combo: boolean; precio_base_mxn: number | string; visible_en_pos: boolean; estado: string }>(
+      (desde, hasta) => supabase.from("productos")
+        .select("id, nombre, categoria_id, orden_visualizacion, es_combo, precio_base_mxn, visible_en_pos, estado")
+        .is("deleted_at", null).order("id", { ascending: true }).range(desde, hasta)),
+    todasLasFilas<{ producto_id: string; disponible: boolean | null; precio_mxn: number | string | null }>(
+      (desde, hasta) => supabase.from("productos_sucursal")
+        .select("producto_id, disponible, precio_mxn").eq("sucursal_id", sucursalId).order("producto_id", { ascending: true }).range(desde, hasta)),
+    todasLasFilas<{ categoria_id: string | null; producto_id: string | null }>(
+      (desde, hasta) => supabase.from("tienda_ocultos")
+        .select("categoria_id, producto_id").eq("sucursal_id", sucursalId).order("id", { ascending: true }).range(desde, hasta)),
+  ]);
+  if (cats.error) throw fallo(cats.error, "No se pudo leer tu catálogo");
+  const aqui = new Map(deSucursal.map((f) => [f.producto_id, f]));
+  return {
+    categorias: ((cats.data ?? []) as { id: string; nombre: string; orden_visualizacion: number | null }[])
+      .map((c) => ({ id: c.id, nombre: c.nombre, orden: c.orden_visualizacion ?? 0 })),
+    productos: prods.map((p) => {
+      const s = aqui.get(p.id);
+      return {
+        id: p.id, nombre: p.nombre, categoriaId: p.categoria_id, orden: p.orden_visualizacion ?? 0, esCombo: p.es_combo === true,
+        precio: Number(s?.precio_mxn ?? p.precio_base_mxn),
+        visibleEnPos: p.visible_en_pos === true, pausado: p.estado === "PAUSADO", seVendeAqui: s?.disponible !== false,
+      };
+    }),
+    ocultos: {
+      categorias: new Set(ocultos.flatMap((o) => (o.categoria_id ? [o.categoria_id] : []))),
+      productos: new Set(ocultos.flatMap((o) => (o.producto_id ? [o.producto_id] : []))),
+    },
+  };
+}
+
+/**
+ * Vuelve a mostrar: borra las filas de esa columna en la sucursal. La RLS no contesta con error a un
+ * DELETE ajeno, solo no borra nada; tampoco borra nada si otra pestaña ya lo había mostrado. Lo que
+ * distingue los dos casos es si alguna fila sigue ahí.
+ */
+async function borrarOcultos(sucursalId: string, columna: "categoria_id" | "producto_id", ids: string[]): Promise<void> {
+  const { data, error } = await supabase.from("tienda_ocultos").delete().eq("sucursal_id", sucursalId).in(columna, ids).select("id");
+  if (error) throw fallo(error, NO_SE_GUARDO);
+  if (data && data.length > 0) return;
+  const { data: sigue, error: errLectura } = await supabase.from("tienda_ocultos").select("id").eq("sucursal_id", sucursalId).in(columna, ids).limit(1);
+  if (errLectura) throw fallo(errLectura, NO_SE_GUARDO);
+  if (sigue && sigue.length > 0) throw new Error(SOLO_ADMIN);
+}
+
+/**
+ * Esconde (inserta la fila) o vuelve a mostrar (la borra) una categoría o un producto en una
+ * sucursal. Repetir lo ya hecho no es un error: otra pestaña pudo adelantarse.
+ */
+export async function cambiarMenuTienda(sucursalId: string, c: CambioMenu): Promise<void> {
+  if (!c.escondido) return borrarOcultos(sucursalId, c.tipo === "categoria" ? "categoria_id" : "producto_id", [c.id]);
+  const { error } = await supabase.from("tienda_ocultos").insert(filaOculta(await tenantId(), sucursalId, c));
+  // 23505: ya estaba escondido.
+  if (error && error.code !== "23505") throw fallo(error, NO_SE_GUARDO);
+}
+
+/** «Mostrar todos»: borra de un golpe las filas de esos productos en la sucursal. */
+export async function mostrarProductosTienda(sucursalId: string, productoIds: string[]): Promise<void> {
+  // Por tandas: los ids viajan en la dirección de la petición y cientos no caben.
+  for (let i = 0; i < productoIds.length; i += 100) await borrarOcultos(sucursalId, "producto_id", productoIds.slice(i, i + 100));
 }
 
 // ── La invitación (quien todavía no la tiene) ─────────────────────────────────
