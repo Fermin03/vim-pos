@@ -1,8 +1,8 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BotonVolver } from "./boton-volver";
 import { RenglonItem } from "./renglon-item";
-import { Button, DialogoPeligro, LogoVim, Modal } from "@vim/ui/styles";
+import { Aviso, Button, DialogoPeligro, LogoVim, Modal } from "@vim/ui/styles";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
 import { borrarCuentaVacia, leerEntregaCuenta, listarCuentasAbiertas, leerRenglonesCuenta, marcarTicketImpreso, minutosAbierta, reabrirCuentaImpresa, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
 import { leerTotales, type TotalesTicket } from "../lib/cobro";
@@ -19,8 +19,37 @@ import { asignarClienteTicket } from "../lib/clientes-cuenta";
 import { almacenLocal, motivoNoCambiarCliente } from "../lib/lealtad-canje";
 import { IconoAsignarCliente, IconoClienteAsignado, ModalClienteCuenta } from "./modal-cliente-cuenta";
 import { useEscape } from "../lib/use-escape";
+import { esEscritorio } from "../lib/actualizacion";
+import { segundosRestantes, type PedidoApp } from "../lib/pedidos-apps";
+import { avisosDeCanal, cuentaDe, etiquetaEntrega, porAceptarDeCanal, porQueNoSeAtiende, puedeAtender } from "../lib/pedidos-en-linea";
+import { DetallePedidoTienda, esUrgente, mmss, MotivosRechazo, type AccionTienda } from "./pedido-tienda";
 
 const PERMISO_REIMPRIMIR = "venta.reimprimir_ticket";
+
+/**
+ * Avisos de «este pedido se cerró solo» que el cajero ya cerró con la ×. Fuera del componente a
+ * propósito: la lista se vuelve a montar cada vez que cambia una cuenta, y un aviso cerrado no debe
+ * volver a salir por eso.
+ */
+const avisosDeTiendaCerrados = new Set<string>();
+/** El último «Ver orden» ya atendido, por lo mismo: al volver a montarse no debe seleccionarlo otra vez. */
+let verAtendido: object | null = null;
+
+/** Lo de la tienda en línea que esta lista necesita. Lo lee y lo ejecuta `home-pos`; aquí se pinta. */
+export type EnLineaDelCanal = {
+  /** Los pedidos de la tienda de la sucursal, tal como los dejó el último sondeo. */
+  pedidos: PedidoApp[];
+  /** Pedidos aceptados cuya comanda lleva rato sin salir. */
+  sinComanda: ReadonlySet<string>;
+  /** Lo que este dispositivo supo al intentar aceptar un pedido que la nube canceló ahí mismo
+   *  (por pedido): queda dicho en la franja de avisos del canal. */
+  sabidoAqui: ReadonlyMap<string, string>;
+  /** «Ver orden» del aviso grande: el pedido que hay que dejar seleccionado. Un objeto nuevo cada vez. */
+  ver: { pedidoId: string } | null;
+  onAccion: AccionTienda;
+  /** Imprime desde este dispositivo la comanda completa del pedido; dice si salió el papel. */
+  onImprimirComanda: (p: PedidoApp) => Promise<boolean>;
+};
 
 type Copia = {
   titulo: string;
@@ -82,6 +111,8 @@ export function PantallaCuentasModo({
   onComandaCancelacion,
   extraPorCuenta,
   onCanjear,
+  enLinea,
+  alTenerDialogo,
 }: {
   token: string;
   caja: DatosCaja;
@@ -108,12 +139,24 @@ export function PantallaCuentasModo({
   extraPorCuenta?: (c: CuentaAbierta, recargar: () => void) => React.ReactNode;
   /** Lealtad (ADR 0030): abre el canje de esa cuenta. Sin la prop (módulo apagado) no hay botón. */
   onCanjear?: (c: CuentaAbierta) => void;
+  /** Tienda en línea: los pedidos por aceptar de este canal van arriba de las cuentas. Sin la prop
+   *  (módulo apagado, o Comedor) la lista es la de siempre. */
+  enLinea?: EnLineaDelCanal;
+  /** Dice si esta lista tiene un diálogo propio abierto (cancelar, descuento, PIN…). Es trabajo a
+   *  medias que `home-pos` no ve: con uno abierto, «Ver orden» del aviso grande no se lo lleva. */
+  alTenerDialogo?: (abierto: boolean) => void;
 }) {
   const copia = COPIA[modo];
   const esComedor = modo === "COMER_AQUI";
   const [items, setItems] = useState<CuentaAbierta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selId, setSelId] = useState<string | null>(null);
+  // Tienda en línea: el pedido por aceptar que se está viendo (o una cuenta, o un pedido; nunca los dos).
+  const [selPedidoId, setSelPedidoId] = useState<string | null>(null);
+  const [rechazando, setRechazando] = useState(false);
+  const [atendiendo, setAtendiendo] = useState(false);
+  const [imprimiendoComanda, setImprimiendoComanda] = useState(false);
+  const [, repintar] = useState(0);
   const [detalle, setDetalle] = useState<RenglonCuenta[] | null>(null);
   const [totales, setTotales] = useState<TotalesTicket | null>(null);
   const [descontando, setDescontando] = useState(false);
@@ -162,10 +205,83 @@ export function PantallaCuentasModo({
   }, [token, caja.sucursal_id, modo, esComedor]);
 
   useEffect(() => { recargar(); }, [recargar]);
+
+  // ── Tienda en línea ──
+  const canal = modo === "COMER_AQUI" ? null : modo;
+  const pedidosTienda = enLinea && canal ? enLinea.pedidos : [];
+  const porAceptar = canal ? porAceptarDeCanal(pedidosTienda, canal) : [];
+  const cerradosSolos = canal ? avisosDeCanal(pedidosTienda, canal, enLinea?.sabidoAqui).filter((a) => !avisosDeTiendaCerrados.has(a.id)) : [];
+  /** Cuentas (tickets) nacidas de la tienda cuya comanda no salió: se marcan en su tarjeta. */
+  const cuentasSinComanda = new Set(enLinea ? pedidosTienda.filter((p) => enLinea.sinComanda.has(p.id)).map((p) => p.ticketId) : []);
+
+  const dialogoAbierto = rechazando || cancelando != null || clienteDe != null || eligiendoCancelacion || cancelandoItems || borrandoCuenta
+    || cancelandoCuenta || descontando || pidiendoPinReimpresion || pidiendoPinReabrir;
   useEffect(() => {
-    const id = setInterval(() => setAhora(new Date()), 30000);
+    alTenerDialogo?.(dialogoAbierto);
+    return () => alTenerDialogo?.(false);
+  }, [dialogoAbierto, alTenerDialogo]);
+  const atencion = { cajaId: turno.caja_id, enEscritorio: esEscritorio(), ahora: ahora.getTime() };
+  const pedidoSel = selPedidoId ? pedidosTienda.find((p) => p.id === selPedidoId) ?? null : null;
+  const cuentaDelPedido = pedidoSel ? cuentaDe(pedidoSel) : null;
+  const hayCuentaAtras = porAceptar.length > 0;
+  const seAtiende = pedidoSel != null && puedeAtender(pedidoSel, atencion);
+  const segSel = seAtiende ? segundosRestantes(pedidoSel.venceAceptacion, ahora) : null;
+
+  // Con un pedido por aceptar a la vista el reloj va cada segundo (su cuenta atrás); sin ninguno,
+  // cada medio minuto, que es lo que piden los «12 min» de las cuentas.
+  useEffect(() => {
+    const id = setInterval(() => setAhora(new Date()), hayCuentaAtras ? 1000 : 30000);
     return () => clearInterval(id);
-  }, []);
+  }, [hayCuentaAtras]);
+
+  // «Ver orden» del aviso grande: deja ese pedido seleccionado, se llegue de otra pantalla o ya
+  // se esté en esta lista.
+  const ver = enLinea?.ver ?? null;
+  useEffect(() => {
+    if (!ver || ver === verAtendido) return;
+    verAtendido = ver;
+    setSelId(null);
+    setSelPedidoId(ver.pedidoId);
+  }, [ver]);
+
+  // El pedido que se estaba viendo ya tiene su cuenta (se aceptó aquí o en otra pantalla): la lista
+  // se relee y esa cuenta queda seleccionada. Si dejó de existir, se suelta.
+  useEffect(() => {
+    if (!selPedidoId) return;
+    if (!pedidoSel) { setSelPedidoId(null); return; }
+    if (!cuentaDelPedido) return;
+    setSelPedidoId(null);
+    void recargar().then(() => setSelId(cuentaDelPedido));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo cuando el pedido aparece, desaparece o recibe su cuenta
+  }, [selPedidoId, pedidoSel === null, cuentaDelPedido]);
+
+  // Una cuenta de la tienda que nace o se cierra sin que nadie toque esta pantalla (aceptación
+  // automática, otra caja): la lista no sondea por su cuenta, así que se relee cuando eso cambia.
+  const cuentasDeTienda = canal ? pedidosTienda.filter((p) => p.app === canal).map(cuentaDe).filter(Boolean).join(",") : "";
+  // Solo si cambió DE VERDAD: `recargar` también cambia de identidad al refrescarse el token, y esa
+  // lectura ya la hace el efecto de arriba.
+  const cuentasVistas = useRef(cuentasDeTienda);
+  useEffect(() => {
+    if (cuentasVistas.current === cuentasDeTienda) return;
+    cuentasVistas.current = cuentasDeTienda;
+    void recargar();
+  }, [cuentasDeTienda, recargar]);
+
+  const atender = async (p: PedidoApp, accion: "aceptar" | "rechazar", motivo?: Parameters<AccionTienda>[2]) => {
+    if (!enLinea || atendiendo) return;
+    setAtendiendo(true); setError(null);
+    const r = await enLinea.onAccion(p, accion, motivo);
+    setAtendiendo(false); setRechazando(false);
+    if (!r.ok) {
+      // Si el pedido se canceló al aceptarlo, ya quedó dicho en la franja de avisos de la lista.
+      if (r.enCanal) setSelPedidoId(null); else setError(r.mensaje);
+      return;
+    }
+    if (accion === "rechazar") { setSelPedidoId(null); return; }
+    // Aceptado desde el POS web: la cuenta ya existe. Desde la caja instalada la abre la propia caja
+    // en unos segundos; el efecto de arriba la selecciona en cuanto llega.
+    if (r.ticketId) { setSelPedidoId(null); await recargar(); setSelId(r.ticketId); }
+  };
 
   /** Relee el detalle de la cuenta: renglones + totales AUTORITATIVOS de la BD (no del carrito:
    *  el descuento y el IVA los recalcula el servidor y aquí se cobra con esa cifra). */
@@ -198,12 +314,15 @@ export function PantallaCuentasModo({
   );
 
   const sel = (items ?? []).find((c) => c.ticketId === selId) ?? null;
+  /** El pedido de la tienda del que nació la cuenta seleccionada, si lo hay (para su comanda). */
+  const pedidoDeCuenta = sel ? pedidosTienda.find((p) => p.ticketId === sel.ticketId) ?? null : null;
   // "Ya se imprimió" = lo hicimos en esta sesión, o el ticket trae marca de impresión previa.
   const yaSeImprimio = sel != null && (yaImpresas.has(sel.ticketId) || sel.impresaAt != null);
   // null = todavía no se sabe. Solo `true` habilita el borrado.
   // Escape: cierra lo que esté encima; si no hay nada, vuelve al inicio (mismo orden que el POS).
   const alEscapar = useMemo(() => {
     const capas: [boolean, () => void][] = [
+      [rechazando, () => setRechazando(false)],
       [clienteDe != null, () => setClienteDe(null)],
       [eligiendoCancelacion, () => setEligiendoCancelacion(false)],
       [cancelandoItems, () => setCancelandoItems(false)],
@@ -213,10 +332,11 @@ export function PantallaCuentasModo({
       [pidiendoPinReimpresion, () => setPidiendoPinReimpresion(false)],
       [pidiendoPinReabrir, () => setPidiendoPinReabrir(false)],
       [selId != null, () => setSelId(null)],
+      [selPedidoId != null, () => setSelPedidoId(null)],
       [true, onSalir],
     ];
     return capaVisible(capas);
-  }, [clienteDe, eligiendoCancelacion, cancelandoItems, borrandoCuenta, cancelandoCuenta, descontando, pidiendoPinReimpresion, pidiendoPinReabrir, selId, onSalir]);
+  }, [rechazando, selPedidoId, clienteDe, eligiendoCancelacion, cancelandoItems, borrandoCuenta, cancelandoCuenta, descontando, pidiendoPinReimpresion, pidiendoPinReabrir, selId, onSalir]);
   useEscape(alEscapar);
 
   const vacia = detalle === null ? null : detalle.length === 0;
@@ -260,7 +380,11 @@ export function PantallaCuentasModo({
             {/* Cuenta lo mismo que se ve debajo: en domicilio, `items` sin filtrar incluiría lo
                 que ya está en reparto y el número de aquí arriba contradiría a las dos pestañas
                 de abajo (el motivo real por el que se separaron en 3+2, no una cifra suelta). */}
-            <div className="truncate text-12 text-ink-3">{copia.subtitulo((items ?? []).length)}</div>
+            <div className="truncate text-12 text-ink-3">
+              {/* Lo que espera respuesta va primero: «0 órdenes por recolectar» con un pedido esperando sería mentira. */}
+              {porAceptar.length > 0 && <span className="font-semibold text-ink-2">{porAceptar.length} por aceptar · </span>}
+              {copia.subtitulo((items ?? []).length)}
+            </div>
           </div>
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
@@ -290,8 +414,53 @@ export function PantallaCuentasModo({
         {/* ── Lista de cuentas ─────────────────────────────────────────── */}
         <div className="flex w-[clamp(18rem,30vw,24rem)] flex-shrink-0 flex-col border-r border-line">
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            {cerradosSolos.length > 0 && (
+              <div className="mb-3 flex flex-col gap-2">
+                {cerradosSolos.map((a) => (
+                  <Aviso key={a.id} tono="danger" role="status" onCerrar={() => { avisosDeTiendaCerrados.add(a.id); repintar((n) => n + 1); }}>{a.texto}</Aviso>
+                ))}
+              </div>
+            )}
+            {porAceptar.length > 0 && (
+              <section aria-label="Pedidos de tu tienda en línea por aceptar" className="mb-3 flex flex-col gap-2 border-b border-line pb-3">
+                <h2 className="text-12 font-semibold text-ink-2">De tu tienda en línea · por aceptar</h2>
+                {porAceptar.map((p) => {
+                  const activa = p.id === selPedidoId;
+                  const sinBotones = porQueNoSeAtiende(p, atencion);
+                  const seg = sinBotones ? null : segundosRestantes(p.venceAceptacion, ahora);
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => { setSelId(null); setSelPedidoId(p.id); }}
+                      aria-pressed={activa}
+                      className={[
+                        "w-full rounded-lg border-2 p-3 text-left transition active:scale-[.97]",
+                        sinBotones ? "border-line-strong" : esUrgente(seg) ? "border-danger" : "border-accent",
+                        activa ? "bg-sel" : "bg-surface",
+                      ].join(" ")}
+                    >
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="truncate font-display text-15 font-semibold">{p.clienteNombre ?? p.folioCorto ?? "Pedido"}</span>
+                        {p.totalCliente !== null && <span className="flex-shrink-0 font-display text-15 font-bold tabular-nums">{fmtMxn(p.totalCliente)}</span>}
+                      </div>
+                      <div className="mt-0.5 flex items-center justify-between gap-2 text-12">
+                        <span className={["truncate font-semibold", sinBotones ? "text-ink-3" : "text-accent"].join(" ")}>
+                          {sinBotones ?? "Por aceptar"}{p.folioCorto && p.clienteNombre ? ` · ${p.folioCorto}` : ""}
+                        </span>
+                        {seg !== null && (
+                          <span className={["flex-shrink-0 tabular-nums", esUrgente(seg) ? "font-bold text-danger" : "text-ink-2"].join(" ")} aria-label="tiempo para aceptar">
+                            {mmss(seg)}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </section>
+            )}
             {items === null && <p className="p-3 text-sm text-ink-3">Cargando…</p>}
-            {items?.length === 0 && (
+            {items?.length === 0 && porAceptar.length === 0 && (
               <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
                 <p className="text-14 font-semibold text-ink-2">{copia.vacioTitulo}</p>
                 <p className="text-13 text-ink-3">{copia.vacioTexto}</p>
@@ -320,7 +489,7 @@ export function PantallaCuentasModo({
                           : "border-line-strong bg-surface hover:border-ink",
                     ].join(" ")}
                   >
-                    <button type="button" onClick={() => setSelId(c.ticketId)} className="min-w-0 flex-1 p-3 text-left">
+                    <button type="button" onClick={() => { setSelPedidoId(null); setSelId(c.ticketId); }} className="min-w-0 flex-1 p-3 text-left">
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="truncate font-display text-15 font-semibold">{(esComedor && c.mesa ? `Mesa ${c.mesa}` : null) ?? c.cliente ?? c.folio ?? "Cuenta"}</span>
                       <span className="flex-shrink-0 font-display text-15 font-bold tabular-nums">{fmtMxn(c.total)}</span>
@@ -332,6 +501,11 @@ export function PantallaCuentasModo({
                       <div className={["mt-0.5 truncate text-12 font-semibold", salio ? "text-white/85" : "text-ink-2"].join(" ")}>
                         Repartidor: {repartidorPorTicket.get(c.ticketId)}
                       </div>
+                    )}
+                    {/* Cuenta de la tienda cuya comanda no salió: se tiene que notar sin abrirla. En
+                        rojo lleno para leerse igual sobre la tarjeta blanca y sobre la azul. */}
+                    {cuentasSinComanda.has(c.ticketId) && (
+                      <div className="mt-1"><span className="inline-block rounded bg-danger px-1.5 py-0.5 text-12 font-semibold text-white">Comanda sin imprimir</span></div>
                     )}
                     {/* En comedor el título es la mesa: el cliente va debajo, rotulado. En Pick-up
                         el título ya es su nombre y repetirlo sobraría. */}
@@ -369,7 +543,37 @@ export function PantallaCuentasModo({
 
         {/* ── Detalle de la cuenta ─────────────────────────────────────── */}
         <div className="flex min-w-0 flex-1 flex-col">
-          {!sel ? (
+          {pedidoSel ? (
+            <>
+              <div className="flex-shrink-0 border-b border-line px-4 py-3">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  <div className="min-w-0">
+                    <div className="text-13 font-semibold text-ink-2">Tienda en línea · {etiquetaEntrega(pedidoSel)}</div>
+                    <div className="truncate font-display text-24 font-bold leading-tight tracking-tight">{pedidoSel.folioCorto ?? pedidoSel.clienteNombre ?? "Pedido"}</div>
+                  </div>
+                  {segSel !== null && (
+                    <span className={["text-14 tabular-nums", esUrgente(segSel) ? "font-bold text-danger" : "text-ink-2"].join(" ")}>
+                      Quedan {mmss(segSel)} para aceptarlo
+                    </span>
+                  )}
+                </div>
+                {seAtiende ? (
+                  /* Rechazar a la izquierda y Aceptar, la acción principal, a la derecha: lejos una de otra. */
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <Button variant="ghost" disabled={atendiendo} onClick={() => setRechazando(true)}>Rechazar</Button>
+                    <Button className="min-w-[12rem]" disabled={atendiendo} onClick={() => void atender(pedidoSel, "aceptar")}>{atendiendo ? "Un momento…" : "Aceptar"}</Button>
+                  </div>
+                ) : (
+                  <p className="mt-3 rounded bg-sel px-3 py-2 text-14 text-ink-2" role="status">
+                    {pedidoSel.estado === "ACEPTADO" ? "Aceptado. Su cuenta aparece aquí en un momento." : porQueNoSeAtiende(pedidoSel, atencion) ?? "Este pedido ya fue atendido."}
+                  </p>
+                )}
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                <DetallePedidoTienda p={pedidoSel} />
+              </div>
+            </>
+          ) : !sel ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" className="h-10 w-10 text-line-strong"><path d="M6 2h9l3 3v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" /><path d="M9 8h6M9 12h6M9 16h4" /></svg>
               <p className="text-14 font-semibold text-ink-2">Elige una cuenta</p>
@@ -450,6 +654,27 @@ export function PantallaCuentasModo({
                 </p>
               )}
 
+              {/* Cuenta nacida de la tienda cuya comanda no salió sola: la cocina no se ha enterado.
+                  Se manda a mano desde aquí, sin PIN (es la primera impresión, no una reimpresión). */}
+              {enLinea && pedidoDeCuenta && enLinea.sinComanda.has(pedidoDeCuenta.id) && (
+                <div role="alert" className="flex flex-wrap items-center gap-2 border-b border-danger-line bg-danger-soft px-4 py-2.5">
+                  <p className="min-w-0 flex-1 text-14 font-semibold text-danger">La comanda no se imprimió. Revisa la impresora.</p>
+                  <button
+                    type="button"
+                    disabled={imprimiendoComanda}
+                    onClick={async () => {
+                      setImprimiendoComanda(true); setError(null);
+                      const salio = await enLinea.onImprimirComanda(pedidoDeCuenta);
+                      setImprimiendoComanda(false);
+                      if (!salio) setError("No se pudo imprimir la comanda. Revisa la impresora e inténtalo de nuevo.");
+                    }}
+                    className="h-11 flex-shrink-0 rounded border border-danger bg-surface px-3 text-14 font-semibold text-danger transition active:scale-[.97] disabled:opacity-50"
+                  >
+                    {imprimiendoComanda ? "Imprimiendo…" : "Imprimir comanda"}
+                  </button>
+                </div>
+              )}
+
               {/* Lo que se ordenó */}
               <div className="min-h-0 flex-1 overflow-y-auto p-4">
                 {detalle === null && <p className="text-sm text-ink-3">Cargando productos…</p>}
@@ -513,6 +738,13 @@ export function PantallaCuentasModo({
           )}
         </div>
       </div>
+
+      {rechazando && pedidoSel && (
+        <Modal open onClose={() => setRechazando(false)} title="Motivo del rechazo" hideTitle className="w-[min(384px,calc(100vw-2rem))] rounded-lg border border-line bg-surface p-4 shadow-[0_18px_44px_rgba(22,22,26,.18)]">
+          <h2 className="mb-3 text-15 font-semibold text-ink">¿Por qué se rechaza {pedidoSel.folioCorto ?? "el pedido"}?</h2>
+          <MotivosRechazo ocupado={atendiendo} onElegir={(m) => void atender(pedidoSel, "rechazar", m)} onCancelar={() => setRechazando(false)} />
+        </Modal>
+      )}
 
       {cancelando && sel && (
         <ModalCancelarItem

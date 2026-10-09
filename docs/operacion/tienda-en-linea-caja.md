@@ -17,17 +17,23 @@ puede hacer sin tocar la base. El detalle técnico está en
 
 1. El cliente pide en la tienda del negocio (para recoger o a domicilio). La tienda solo acepta
    pedidos si hay una caja **con turno abierto y con internet** en esa sucursal.
-2. El pedido aparece en **Pedidos en línea** en la caja, con un timbre que se repite cada 20
-   segundos hasta que alguien lo acepta o lo rechaza. Si el negocio eligió aceptación automática, la
-   caja lo acepta sola.
-3. Al aceptarlo se crea una cuenta en **Pick-up** (para recoger) o **Domicilio**, y la comanda sale
-   en la impresora de cocina. Se cobra desde ahí, como cualquier cuenta. En cuanto la cuenta
+2. El pedido aparece en la caja **en su canal** —los de recoger en **Pick-up**, los de domicilio en
+   **Domicilio**, arriba de las cuentas, como «por aceptar»— y además sale un **aviso grande** encima
+   de la pantalla que el cajero tenga abierta, con un timbre que se repite cada 20 segundos hasta que
+   alguien lo acepta o lo rechaza. Se puede aceptar o rechazar desde el aviso o desde la lista. Si el
+   negocio eligió aceptación automática, la caja lo acepta sola y solo avisa con una franja breve
+   («Pedido nuevo en Pick-up · T1234»).
+3. Al aceptarlo, su cuenta aparece en esa misma lista (**Pick-up** o **Domicilio**), y la comanda
+   sale en la impresora de cocina. Se cobra desde ahí, como cualquier cuenta. En cuanto la cuenta
    existe, la caja le avisa sola a la tienda que **ya tiene el pedido**; el cajero no hace nada.
 
 El cajero **no marca «listo»**: la tienda le avisa al cliente cuando se imprime el ticket o se asigna
 un repartidor, y cuando se cobra. Los pedidos que se atienden desde el POS en el navegador (sin caja
 instalada) pasan solos a listo, entregado o cancelado en **menos de un minuto** después de imprimir,
-cobrar o cancelar la cuenta, y dejan de salir en Pedidos en línea media hora después de recibidos.
+cobrar o cancelar la cuenta.
+
+La pantalla **Pedidos en línea** del inicio ya no lista los pedidos de la tienda: quedó para los de
+Uber y para **pausar o reanudar** la tienda (la barra de arriba).
 
 ## Un pedido no suena (o no aparece)
 
@@ -40,13 +46,18 @@ Revisa en este orden. Casi siempre es una de las primeras tres.
 3. **¿La caja es la 0.8.0 o posterior?** (El mensaje de Ajustes → Ayuda por WhatsApp ya lleva la
    versión.) Si es anterior, ver la nota del principio.
 4. **¿El sonido del equipo está encendido?** El navegador puede bloquear el timbre; si falla, el
-   contador del mosaico «Pedidos en línea» sigue subiendo. Hay que abrir la pantalla.
-5. **¿El pedido está ahí pero ya no suena?** Entonces ya se aceptó (por el cajero o en automático),
+   aviso grande sale igual y el contador de **Pick-up** o de **Domicilio** en el inicio sube. Hay
+   que abrir esa lista.
+5. **¿El aviso grande no salió, o lo cerraron?** Sale una sola vez por pedido: si el cajero lo cerró
+   con la ×, no vuelve. El pedido sigue arriba de la lista de Pick-up o de Domicilio, y el timbre
+   sigue sonando. Con aceptación automática no sale el aviso grande, solo la franja breve.
+6. **¿El pedido está ahí pero ya no suena?** Entonces ya se aceptó (por el cajero o en automático),
    se rechazó o se venció. El timbre solo se repite mientras haya uno **por aceptar**, y nunca más
    allá de la hora en que vence.
-6. **¿Hay varias cajas en la sucursal?** Cuando una caja toma un pedido, en las demás deja de sonar:
-   es normal. Lo atiende la que lo tomó.
-7. **¿La tarjeta dice «Se atiende desde el POS web.»?** En esa sucursal alguien usa también el POS
+7. **¿Hay varias cajas en la sucursal?** Cuando una caja toma un pedido, en las demás deja de sonar
+   y el pedido se ve sin botones, con «Otra caja ya tomó este pedido.»: es normal. Lo atiende la que
+   lo tomó.
+8. **¿El pedido dice «Se atiende desde el POS web.»?** En esa sucursal alguien usa también el POS
    en el navegador y el pedido le tocó a él. En la caja instalada solo se ve: no suena ni se puede
    aceptar ahí. Hay que aceptarlo en el navegador.
 
@@ -61,8 +72,8 @@ Revisa en este orden. Casi siempre es una de las primeras tres.
 
 ## Un pedido se cancela solo
 
-Hay cuatro razones. Las tres primeras las dice la tarjeta del pedido; la cuarta se reconoce por la
-hora.
+Hay cuatro razones. Las dos primeras las dice una franja roja arriba de la lista de Pick-up o de
+Domicilio (se cierra con la ×, y dura media hora); la cuarta se reconoce por la hora.
 
 - **«Se venció sin aceptar».** Nadie lo aceptó ni lo rechazó a tiempo (el tiempo lo define el dueño,
   entre 3 y 15 minutos, por omisión 5). Si activó las notificaciones, el dueño recibe un aviso en el celular («Tienda en línea:
@@ -123,12 +134,12 @@ abierto** le avisó que sigue ahí. Por eso:
 ## La comanda no se imprimió
 
 La comanda sale sola, **una vez**, al aceptar el pedido. Si la impresora estaba apagada, sin papel o
-desconectada, **no se reintenta sola**, para no mandar la misma comanda dos veces a la cocina. En
-Pedidos en línea, la tarjeta de ese pedido muestra en rojo **«La comanda no se imprimió. Revisa la
-impresora.»** con el botón **Imprimir comanda**.
+desconectada, **no se reintenta sola**, para no mandar la misma comanda dos veces a la cocina. Al
+abrir la cuenta de ese pedido en **Pick-up** o en **Domicilio**, su detalle muestra en rojo **«La
+comanda no se imprimió. Revisa la impresora.»** con el botón **Imprimir comanda**.
 
 1. Arreglar la impresora (encender, papel, cable; Menú → Configurar impresoras y pantallas).
-2. En Pedidos en línea, tocar **Imprimir comanda** en la tarjeta del pedido. No pide PIN. Si vuelve
+2. En Pick-up o Domicilio, tocar la cuenta y luego **Imprimir comanda**. No pide PIN. Si vuelve
    a fallar lo dice ahí mismo y el botón sigue disponible.
 3. Mientras tanto, el pedido sí está aceptado y el cliente ya lo sabe: avisar a la cocina de viva voz.
 
@@ -141,7 +152,7 @@ imprime como siempre.
 ## Qué pedir al cliente antes de escalar
 
 - Folio del pedido y hora aproximada.
-- Qué dice la barra de la tienda y la tarjeta del pedido.
+- Qué dice la barra de la tienda (en Pedidos en línea) y qué dice el pedido en Pick-up o Domicilio.
 - Versión de la caja.
 - Para el equipo técnico: el log `%APPDATA%\vim-pos-desktop\vim-pos.log`, buscando `[espejo]` y el
   folio del pedido.

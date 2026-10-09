@@ -89,7 +89,7 @@ const ERRORES: Record<string, TextoDeError> = {
   TIENDA_CERRADA: { texto: "El restaurante está cerrado en este momento.", hacer: "Tu pedido se queda guardado: envíalo cuando abra." },
   CLIENTE_INVALIDO: { texto: "Revisa tus datos.", hacer: "Escribe tu nombre, un teléfono de 10 dígitos y, si pones correo, que esté completo." },
   DIRECCION_INVALIDA: { texto: "Revisa tu dirección.", hacer: "Faltan datos o el código postal no tiene 5 dígitos." },
-  PAGO_INVALIDO: { texto: "Esa forma de pago no está disponible o el monto no es válido.", hacer: "Elige otra forma de pago o corrige con cuánto pagas." },
+  PAGO_INVALIDO: { texto: "Esa forma de pago no está disponible.", hacer: "Elige otra forma de pago." },
   CAPTCHA_INVALIDO: { texto: "No pudimos comprobar que eres una persona.", hacer: "Vuelve a intentar; si sigue pasando, recarga la página." },
   DEMASIADOS_INTENTOS: { texto: "Hiciste demasiados intentos seguidos.", hacer: "Espera unos minutos antes de volver a intentar, o llama al restaurante." },
   NO_SE_PUDO_CREAR: { texto: "No pudimos tomar tu pedido.", hacer: "Llama al restaurante para hacer tu pedido." },

@@ -39,15 +39,18 @@ El instalador lleva el POS empaquetado (`pos-ui/`) y el agente de la caja, así 
   no el negocio la tienda o las apps. Antes solo se borraban en la nube.
 
 **POS dentro de la caja (`apps/pos`)**
-- «Pedidos en línea» junta Uber y la tienda; tarjeta propia de la tienda; Aceptar y Rechazar con
-  motivo; barra para pausar y reanudar la tienda.
+- Cada pedido de la tienda llega a su canal: los de recoger a **Pick-up** y los de domicilio a
+  **Domicilio**, arriba de las cuentas, con Aceptar y Rechazar con motivo; el contador de cada canal
+  los suma. Un **aviso grande** lo anuncia encima de cualquier pantalla (Aceptar, Rechazar, Ver
+  orden, ×), una vez por pedido. «Pedidos en línea» queda para Uber y para la barra de pausar y
+  reanudar la tienda.
 - Timbre que se repite cada 20 segundos hasta atender el pedido. **Cambia también para Uber**:
   antes sonaba una vez al llegar y callaba al abrir el POS con un pedido ya pendiente.
   De la tienda solo suena lo que esa caja puede aceptar: no un pedido que tomó otra caja ni uno
   que ya venció.
-- Comanda automática al aceptar, una sola vez. Si no salió, la tarjeta del pedido avisa «La comanda
-  no se imprimió» y ofrece el botón **Imprimir comanda**.
-- La nota del pedido (con cuánto paga el cliente) en la cuenta, en el ticket impreso y en la
+- Comanda automática al aceptar, una sola vez. Si no salió, el detalle de esa cuenta en Pick-up o
+  Domicilio avisa «La comanda no se imprimió» y ofrece el botón **Imprimir comanda**.
+- La nota del pedido (forma de pago y lo que escribió el cliente) en la cuenta, en el ticket impreso y en la
   comanda, **solo en cuentas nacidas de un pedido de la tienda**. Una cuenta normal de Pick-up o
   Domicilio se ve y se imprime igual que hoy.
 - Un pedido que se atiende desde el POS en el navegador se ve en la caja como informativo («Se
@@ -91,8 +94,8 @@ a clientes con caja instalada hasta que salga, o hacerlo con la 0.8.0 puesta en 
   (paso 3.2 de la lista de encendido): aceptar un pedido, apagar la caja y ver que a los 15 minutos
   el cliente lo ve cancelado.
 - **Qué ve el cajero si eso pasa:** si la caja vuelve y alcanza a crear la cuenta de un pedido que
-  la nube ya canceló, la tarjeta del pedido dice «El pedido en línea se canceló: cancela el ticket
-  en caja». Hay que cancelar esa cuenta a mano y avisarle al cliente.
+  la nube ya canceló, una franja roja en la lista de su canal dice «El pedido en línea se canceló:
+  cancela el ticket en caja». Hay que cancelar esa cuenta a mano y avisarle al cliente.
 - **Caja 0.7.0 y POS web en la misma sucursal:** la caja vieja no entiende los pedidos de la tienda.
   Ya no se pierden: mientras la caja vieja esté encendida, la nube no abre la tienda de esa sucursal
   y el POS web dice «Tienda: actualiza la caja de esta sucursal para recibir pedidos en línea.»
@@ -106,8 +109,8 @@ Texto para `npm run release-manifest -- "…"` y para el release. Va en **un sol
 lo muestra como texto corrido); aquí está en líneas para leerlo.
 
 ```
-Nuevo: los pedidos de la tienda en línea de tu negocio llegan a la caja. Los aceptas o los rechazas en Pedidos en línea (en el inicio), o la caja los acepta sola si así lo configuraste, y al aceptar se crea la cuenta en Pick-up o Domicilio y sale la comanda en cocina. Desde esa misma pantalla puedes pausar la tienda 30 minutos, 1 hora o hasta que la reanudes.
-Mejoras: el timbre de un pedido nuevo se repite cada 20 segundos, en cualquier pantalla, hasta que lo atiendas. La nota de un pedido de la tienda, con cuánto paga el cliente, se ve en su cuenta y sale en el ticket y en la comanda.
+Nuevo: los pedidos de la tienda en línea de tu negocio llegan a la caja. Los de recoger aparecen en Pick-up y los de domicilio en Domicilio, y un aviso en pantalla te los anuncia estés donde estés: los aceptas o los rechazas ahí mismo, o la caja los acepta sola si así lo configuraste. Al aceptar, la cuenta queda en esa lista y sale la comanda en cocina. Desde Pedidos en línea (en el inicio) puedes pausar la tienda 30 minutos, 1 hora o hasta que la reanudes.
+Mejoras: el timbre de un pedido nuevo se repite cada 20 segundos, en cualquier pantalla, hasta que lo atiendas. La nota de un pedido de la tienda, con su forma de pago, se ve en su cuenta y sale en el ticket y en la comanda.
 ```
 
 Revisada contra las reglas de la §4: sin palabras internas, sin otras versiones, sin relleno,

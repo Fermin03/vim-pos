@@ -61,7 +61,7 @@ Pensada para 360–430 px; en escritorio es la misma columna, centrada (`max-w-2
 | Hoja | `components/hoja.tsx` | Sube desde abajo en el teléfono; diálogo centrado desde 640 px |
 | Producto | `components/producto.tsx` | Foto, opciones con su regla, cantidad, nota y «Agregar» |
 | Carrito | `components/carrito.tsx` | Renglones, nota para el restaurante y la cuenta |
-| Tus datos | `components/datos.tsx` | Quién recibe, a dónde, cómo paga y «Enviar pedido». Va dentro de la hoja del carrito |
+| Tus datos | `components/datos.tsx` | Quién recibe (o recoge), a dónde, cómo paga y «Enviar pedido». Va dentro de la hoja del carrito |
 | Seguimiento | `components/seguimiento.tsx` | El estado en grande, el recorrido, el restaurante, el resumen y «Copiar enlace» |
 | Privacidad | `[negocio]/privacidad/page.tsx` | El aviso (provisional, marcado como tal). Se enlaza desde «Tus datos», desde «Crear cuenta» y desde el pie |
 | Campos | `components/campo.tsx` | El campo de texto y el de contraseña de TODOS los formularios, y cómo se comportan (`useCampos`, `useAccion`) |
@@ -94,9 +94,11 @@ exterior / interior, código postal / ciudad).
 
 - **La etiqueta va arriba y siempre se ve**; nunca un `placeholder` haciendo de etiqueta. Lo opcional
   lo dice a la derecha de la etiqueta («Opcional»); lo demás es obligatorio y no lleva asterisco.
+- **El título de los datos de contacto dice de quién son:** «¿Quién recoge?» cuando el pedido es
+  para recoger y «¿Quién recibe?» a domicilio.
 - Cada campo con su teclado y su autocompletado: `tel` para el teléfono, `numeric` para el código
-  postal, `decimal` para «¿Con cuánto pagas?»; `name`, `tel-national`, `email`, `address-line1`,
-  `postal-code`, `address-level2`, `address-level1`.
+  postal; `name`, `tel-national`, `email`, `address-line1`, `postal-code`, `address-level2`,
+  `address-level1`.
 - **El error va junto al campo**, en `danger`, con el borde del campo en rojo, y dice qué hacer
   («El código postal tiene 5 dígitos.»). Aparece al salir del campo, no mientras se escribe. Al
   enviar con errores, se marcan todos y el foco va al primero. Va enlazado con `aria-describedby` y
@@ -105,6 +107,9 @@ exterior / interior, código postal / ciudad).
   también.
 - Al entrar, el foco va al título de la sección, no a un campo: el teclado no se abre solo.
 - **Forma de pago:** con una sola encendida no se pregunta, se dice. Con dos, radios en `ink`.
+  **No se pregunta con cuánto se paga** (el campo «¿Con cuánto pagas?» se quitó tras probar en
+  producción): el pedido viaja con `paga_con: null`. El servidor y la caja siguen sabiendo
+  mostrarlo si algún día llega.
 - Lo escrito no se pierde por volver al carrito. Al teléfono solo se guarda (nombre, teléfono, correo
   y dirección) cuando el pedido entra; nunca la nota, el pago ni el enlace del pedido. Cuando se
   rellenó solo, lo dice y ofrece «Olvidar mis datos».

@@ -4,14 +4,12 @@
 import type { DireccionDePedido } from "./api";
 import { almacenDelNavegador, type Almacen } from "./carrito";
 import type { Modo, Negocio, Pago } from "./contrato";
-import { aTexto, formato, leerImporte } from "./dinero";
 import { normalizarTelefono } from "./telefono";
 
 /** En el orden en que se ven: el primer error es el primer campo que hay que corregir. */
 export const CAMPOS = [
   "nombre", "telefono", "email",
   "calle", "numeroExterior", "numeroInterior", "colonia", "codigoPostal", "ciudad", "estado", "referencias",
-  "pagaCon",
 ] as const;
 export type Campo = (typeof CAMPOS)[number];
 export type Formulario = Record<Campo, string>;
@@ -21,13 +19,10 @@ export const DE_DIRECCION = ["calle", "numeroExterior", "numeroInterior", "colon
 export const FORMULARIO_VACIO: Formulario = Object.fromEntries(CAMPOS.map((c) => [c, ""])) as Formulario;
 
 /** Lo más que acepta la función en cada texto (caracteres). También es el `maxLength` del campo. */
-export const LIMITES: Record<Exclude<Campo, "pagaCon">, number> = {
+export const LIMITES: Record<Campo, number> = {
   nombre: 100, telefono: 20, email: 254,
   calle: 255, numeroExterior: 20, numeroInterior: 20, colonia: 150, codigoPostal: 5, ciudad: 100, estado: 50, referencias: 300,
 };
-
-/** Lo más que se puede dar de más al pagar en efectivo: el total + $5,000 (centavos). */
-export const CAMBIO_MAXIMO = 500_000;
 
 // El mismo patrón que la función: solo ASCII (el correo acaba en cabeceras de correo).
 const CORREO = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/;
@@ -40,25 +35,12 @@ const OBLIGATORIO: Partial<Record<Campo, string>> = {
   estado: "Escribe tu estado.",
 };
 
-export type Contexto = {
-  modo: Modo; pago: Pago | null;
-  /** El total que ve el cliente, en centavos; null si todavía no se sabe (no se revisa «¿Con cuánto pagas?»). */
-  total: number | null;
-};
+export type Contexto = { modo: Modo };
 
 /** Qué tiene mal un campo, en palabras, o null. Un campo que no toca (dirección al recoger) nunca tiene error. */
 export function errorDeCampo(campo: Campo, valor: string, c: Contexto): string | null {
   const v = valor.trim();
   if ((DE_DIRECCION as readonly string[]).includes(campo) && c.modo !== "DOMICILIO") return null;
-  if (campo === "pagaCon") {
-    if (!v || c.pago !== "EFECTIVO") return null;
-    const n = leerImporte(v);
-    if (n === null) return "Escribe solo la cantidad, por ejemplo 500.";
-    if (c.total === null) return null;
-    if (n < c.total) return `Tiene que alcanzar para el total: ${formato(c.total)}.`;
-    if (n > c.total + CAMBIO_MAXIMO) return `Lo más que podemos recibir es ${formato(c.total + CAMBIO_MAXIMO)}.`;
-    return null;
-  }
   if (!v) return campo === "telefono" ? "Escribe tu teléfono." : campo === "codigoPostal" ? "Escribe tu código postal." : OBLIGATORIO[campo] ?? null;
   if (campo === "telefono") return normalizarTelefono(v) ? null : "Escribe los 10 dígitos de tu teléfono, con lada.";
   if (campo === "email") return v.length <= LIMITES.email && CORREO.test(v) ? null : "Revisa tu correo: le falta algo o tiene un carácter que no se puede usar.";
@@ -83,13 +65,14 @@ export function formasDePago(negocio: Pick<Negocio, "pago_efectivo" | "pago_tarj
 
 export type DatosDelPedido = {
   cliente: { nombre: string; telefono: string; email: string | null };
-  direccion: DireccionDePedido | null; pago: Pago; paga_con: string | null;
+  direccion: DireccionDePedido | null; pago: Pago;
+  /** Siempre null: la tienda ya no pregunta con cuánto se paga. El servidor lo sigue aceptando. */
+  paga_con: null;
 };
 
 /** Un formulario YA validado (`erroresDe` vacío) → la parte del cuerpo de `pedir` que sale de él. */
 export function datosDelPedido(f: Formulario, c: { modo: Modo; pago: Pago }): DatosDelPedido {
   const t = (campo: Campo) => f[campo].trim();
-  const pagaCon = c.pago === "EFECTIVO" ? leerImporte(t("pagaCon")) : null;
   return {
     cliente: { nombre: t("nombre"), telefono: normalizarTelefono(t("telefono")) ?? t("telefono"), email: t("email").toLowerCase() || null },
     // Al recoger DEBE ir null: la función rechaza una dirección que no toca.
@@ -98,13 +81,13 @@ export function datosDelPedido(f: Formulario, c: { modo: Modo; pago: Pago }): Da
       codigo_postal: t("codigoPostal"), ciudad: t("ciudad"), estado: t("estado"), referencias: t("referencias") || null,
     },
     pago: c.pago,
-    paga_con: pagaCon === null ? null : aTexto(pagaCon),
+    paga_con: null,
   };
 }
 
 // ── Lo que se recuerda en el teléfono ────────────────────────────────────────────────────────────
 // Nombre, teléfono, correo y la última dirección. NUNCA el código de seguimiento, la nota, la forma
-// de pago ni con cuánto pagó. Es de todas las tiendas (la clave no lleva el negocio): el cliente es
+// de pago. Es de todas las tiendas (la clave no lleva el negocio): el cliente es
 // el mismo en cualquiera.
 export const CLAVE_DEL_CLIENTE = "vim.tienda.cliente";
 const RECORDADOS = ["nombre", "telefono", "email", ...DE_DIRECCION] as const satisfies readonly Campo[];

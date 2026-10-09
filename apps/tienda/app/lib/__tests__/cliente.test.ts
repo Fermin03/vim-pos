@@ -6,12 +6,11 @@ import {
   type Contexto, type Formulario,
 } from "../cliente";
 
-const aDomicilio: Contexto = { modo: "DOMICILIO", pago: "EFECTIVO", total: 30500 };
-const alRecoger: Contexto = { modo: "RECOGER", pago: "EFECTIVO", total: 30500 };
+const aDomicilio: Contexto = { modo: "DOMICILIO" };
+const alRecoger: Contexto = { modo: "RECOGER" };
 const lleno: Formulario = {
   nombre: " Ana López ", telefono: "477 123 4567", email: " Ana@Correo.com ",
   calle: "Madero", numeroExterior: "12", numeroInterior: "", colonia: "Centro", codigoPostal: "37000", ciudad: "León", estado: "Guanajuato", referencias: "",
-  pagaCon: "",
 };
 
 function almacen(inicial: Record<string, string> = {}) {
@@ -57,19 +56,6 @@ describe("errorDeCampo", () => {
     expect(errorDeCampo("referencias", "😀".repeat(300), aDomicilio)).toBeNull();
     expect(errorDeCampo("referencias", "a".repeat(301), aDomicilio)).toContain("300");
   });
-  it("«¿Con cuánto pagas?»: opcional, entre el total y el total + $5,000", () => {
-    expect(errorDeCampo("pagaCon", "", aDomicilio)).toBeNull();
-    expect(errorDeCampo("pagaCon", "305", aDomicilio)).toBeNull();
-    expect(errorDeCampo("pagaCon", "$5,305.00", aDomicilio)).toBeNull();
-    expect(errorDeCampo("pagaCon", "304.99", aDomicilio)).toContain("$305.00");
-    expect(errorDeCampo("pagaCon", "5305.01", aDomicilio)).toContain("$5,305.00");
-    expect(errorDeCampo("pagaCon", "quinientos", aDomicilio)).toContain("por ejemplo 500");
-  });
-  it("con tarjeta no se revisa con cuánto paga; sin total, solo que sea una cantidad", () => {
-    expect(errorDeCampo("pagaCon", "1", { ...aDomicilio, pago: "TARJETA" })).toBeNull();
-    expect(errorDeCampo("pagaCon", "1", { ...aDomicilio, total: null })).toBeNull();
-    expect(errorDeCampo("pagaCon", "x", { ...aDomicilio, total: null })).not.toBeNull();
-  });
 });
 
 describe("erroresDe", () => {
@@ -94,30 +80,28 @@ describe("formasDePago", () => {
 
 describe("datosDelPedido", () => {
   it("a domicilio: limpio, teléfono en 10 dígitos, correo en minúsculas y vacíos en null", () => {
-    expect(datosDelPedido({ ...lleno, pagaCon: "500" }, { modo: "DOMICILIO", pago: "EFECTIVO" })).toEqual({
+    expect(datosDelPedido(lleno, { modo: "DOMICILIO", pago: "EFECTIVO" })).toEqual({
       cliente: { nombre: "Ana López", telefono: "4771234567", email: "ana@correo.com" },
       direccion: { calle: "Madero", numero_exterior: "12", numero_interior: null, colonia: "Centro", codigo_postal: "37000", ciudad: "León", estado: "Guanajuato", referencias: null },
-      pago: "EFECTIVO", paga_con: "500.00",
+      pago: "EFECTIVO", paga_con: null,
     });
   });
   it("al recoger la dirección va en null aunque haya una escrita de antes", () => {
     expect(datosDelPedido(lleno, { modo: "RECOGER", pago: "EFECTIVO" }).direccion).toBeNull();
   });
-  it("con tarjeta nunca viaja con cuánto paga; sin correo, null", () => {
-    const d = datosDelPedido({ ...lleno, email: "", pagaCon: "500" }, { modo: "RECOGER", pago: "TARJETA" });
+  it("nunca viaja con cuánto paga (ya no se pregunta); sin correo, null", () => {
+    const d = datosDelPedido({ ...lleno, email: "" }, { modo: "RECOGER", pago: "TARJETA" });
     expect(d.paga_con).toBeNull();
     expect(d.cliente.email).toBeNull();
   });
 });
 
 describe("lo que se recuerda en el teléfono", () => {
-  it("guarda nombre, teléfono, correo y dirección; nunca con cuánto paga", () => {
+  it("guarda nombre, teléfono, correo y dirección", () => {
     const a = almacen();
-    guardarCliente({ ...lleno, pagaCon: "500" }, "DOMICILIO", a);
+    guardarCliente(lleno, "DOMICILIO", a);
     const crudo = a.datos.get(CLAVE_DEL_CLIENTE)!;
     expect(CLAVE_DEL_CLIENTE).toBe("vim.tienda.cliente");
-    expect(crudo).not.toContain("500");
-    expect(crudo).not.toContain("pagaCon");
     expect(leerCliente(a)).toEqual({ nombre: "Ana López", telefono: "477 123 4567", email: "Ana@Correo.com", calle: "Madero", numeroExterior: "12", colonia: "Centro", codigoPostal: "37000", ciudad: "León", estado: "Guanajuato" });
   });
   it("un pedido para recoger no borra la dirección de antes ni guarda la que no se usó", () => {

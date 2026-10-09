@@ -1,50 +1,31 @@
 "use client";
-// «Pedidos en línea»: lo que llega de Uber Eats / DiDi / Rappi (ADR 0011) y de la tienda propia
-// (canal TIENDA). Polling cada 10 s como el resto del POS. Cada tarjeta muestra de dónde viene, el
-// folio, el cliente, los ítems y un contador hasta que el pedido se cancele por falta de respuesta.
-// La tarjeta se bifurca por `canal`: un pedido de la tienda nunca pinta acciones de las apps.
+// «Pedidos en línea»: lo que llega de Uber Eats / DiDi / Rappi (ADR 0011), y desde dónde se pausa
+// cada tienda (la de Uber y la propia). Polling cada 10 s como el resto del POS. Cada tarjeta muestra
+// de dónde viene, el folio, el cliente, los ítems y un contador hasta que el pedido se cancele por
+// falta de respuesta.
+// Los pedidos de la tienda propia (canal TIENDA) NO se listan aquí: cada uno llega a su canal,
+// Pick-up o Domicilio (pantalla-cuentas-modo.tsx), y se anuncia con el aviso grande.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DatosCaja } from "../lib/turno";
 import { fmtMxn } from "../lib/turno";
 import {
-  accionPedidoApp, cambiarPrepUber, etiquetaAlergia, etiquetaApp, etiquetaEstado, etiquetaModificadores, etiquetaTienda, leerPedidosApps,
+  accionPedidoApp, cambiarPrepUber, etiquetaApp, etiquetaEstado, etiquetaTienda, leerPedidosApps,
   leerTiendaUber, marcarExpiradosVistos, mensajeErrorTienda, OPCIONES_PAUSA, ordenarPedidos, pausarTiendaUber, pedidoConAlergia,
-  reanudarTiendaUber, segundosRestantes, type DuracionPausa, type EstadoTiendaApp, type PedidoApp, type PedidoAppItem,
+  reanudarTiendaUber, segundosRestantes, type DuracionPausa, type EstadoTiendaApp, type PedidoApp,
 } from "../lib/pedidos-apps";
-import {
-  avisoDeTienda, ErrorEnLinea, etiquetaEntrega, etiquetaEstadoEnLinea, etiquetaOrigen, etiquetaPago, faltaComanda, leerEstadoEnLinea,
-  mensajeErrorEnLinea, pausarEnLinea, reanudarEnLinea, soloInformativo, type EstadoEnLinea,
-} from "../lib/pedidos-en-linea";
-import { esEscritorio } from "../lib/actualizacion";
+import { ErrorEnLinea, etiquetaEstadoEnLinea, leerEstadoEnLinea, mensajeErrorEnLinea, pausarEnLinea, reanudarEnLinea, type EstadoEnLinea } from "../lib/pedidos-en-linea";
 import { BotonVolver } from "./boton-volver";
+import { esUrgente, ListaItems, mmss, MOTIVOS_RECHAZO, type MotivoRechazo } from "./pedido-tienda";
 import { useEscape } from "../lib/use-escape";
 
 const REFRESCO_MS = 10_000;
 const REFRESCO_TIENDA_MS = 60_000;
-/** Margen antes de avisar que falta la comanda: la automática sale en el siguiente sondeo (10 s) y
- *  el sello de la base llega un poco después del papel. Sin él, el aviso parpadearía en cada pedido. */
-const MARGEN_COMANDA_MS = 20_000;
-type MotivoRechazo = "AGOTADO" | "CERRADO" | "SATURADO" | "OTRO";
-const MOTIVOS: { codigo: MotivoRechazo; label: string }[] = [
-  { codigo: "AGOTADO", label: "Producto agotado" },
-  { codigo: "SATURADO", label: "Cocina saturada" },
-  { codigo: "CERRADO", label: "Ya cerramos" },
-  { codigo: "OTRO", label: "Otro motivo" },
-];
 /** Pausa de la tienda propia (decisión 6). */
 const PAUSAS_EN_LINEA: { codigo: "30m" | "1h" | "indefinida"; label: string }[] = [
   { codigo: "30m", label: "30 minutos" },
   { codigo: "1h", label: "1 hora" },
   { codigo: "indefinida", label: "Hasta que la reanude" },
 ];
-/** Estado de un pedido de la tienda ya cerrado, en palabras de quien cobra. */
-const CERRADO_TIENDA: Partial<Record<PedidoApp["estado"], string>> = {
-  ENTREGADO: "Entregado", RECHAZADO: "Rechazado", CANCELADO: "Cancelado", EXPIRADO: "Se venció sin aceptar",
-};
-
-function mmss(seg: number): string {
-  return `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, "0")}`;
-}
 
 function mensajeError(codigo: string, detalle?: string): string {
   switch (codigo) {
@@ -57,117 +38,16 @@ function mensajeError(codigo: string, detalle?: string): string {
   }
 }
 
-function ListaItems({ items }: { items: PedidoAppItem[] }) {
-  return (
-    <ul className="text-14 text-ink">
-      {items.map((it, i) => (
-        <li key={i} className={it.mapeado ? "" : "text-danger"}>
-          {it.cantidad} × {it.nombreApp}{it.mapeado ? "" : " (no está en el catálogo)"}
-          {it.modificadores.length > 0 && (
-            <span className="text-ink-3"> · {etiquetaModificadores(it.modificadores)}</span>
-          )}
-          {it.nota && <span className="text-ink-3"> · “{it.nota}”</span>}
-          {etiquetaAlergia(it) && (
-            <span className="mt-0.5 block rounded border border-danger bg-danger-soft px-1.5 py-0.5 text-13 font-semibold text-danger">{etiquetaAlergia(it)}</span>
-          )}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-/** Cuerpo de la tarjeta de un pedido de la tienda propia. Sin «Marcar listo» (decisión 2): el
- *  estado avanza solo cuando el cajero imprime, asigna repartidor o cobra desde la cuenta. */
-function CuerpoTienda({ p, seg, urgente, informativo, sinComanda, ocupado, onImprimirComanda }: {
-  p: PedidoApp; seg: number | null; urgente: boolean;
-  /** En la caja instalada, un pedido que se atiende desde el POS web: aquí solo se ve. */
-  informativo: boolean;
-  /** Aceptado, con ticket, y la comanda lleva rato sin salir. */
-  sinComanda: boolean; ocupado: boolean; onImprimirComanda: () => void;
-}) {
-  const aDomicilio = p.app === "DELIVERY_PROPIO";
-  const aceptado = p.estado === "ACEPTADO" || p.estado === "EN_PREPARACION" || p.estado === "LISTO";
-  const pago = etiquetaPago(p);
-  const aviso = avisoDeTienda(p);
-  return (
-    <>
-      <div className="flex items-center justify-between">
-        <span className="text-13 font-semibold text-ink-2">{etiquetaOrigen(p)} · {etiquetaEntrega(p)}</span>
-        <span className="text-28 font-bold leading-none text-ink">{p.folioCorto ?? p.idExterno.slice(-6)}</span>
-      </div>
-      <div className="flex items-center justify-between text-14">
-        <span className="font-semibold text-ink">
-          {aceptado ? "Aceptado" : CERRADO_TIENDA[p.estado] ?? "Por aceptar"}{p.ticketFolio && p.estado !== "RECIBIDO" ? ` · Ticket ${p.ticketFolio}` : ""}
-        </span>
-        {seg !== null && (
-          <span className={`font-mono text-15 ${urgente ? "font-bold text-danger" : "text-ink-2"}`} aria-label="tiempo para aceptar">
-            {mmss(seg)}
-          </span>
-        )}
-      </div>
-      {informativo
-        ? (aceptado || p.estado === "RECIBIDO" || p.estado === "ERROR") && (
-          <p className="rounded bg-sel px-2 py-1.5 text-13 text-ink-2">Se atiende desde el POS web.</p>
-        )
-        : aceptado && p.ticketId && (
-          <p className="rounded bg-sel px-2 py-1.5 text-13 text-ink-2">Cóbralo desde {aDomicilio ? "Domicilio" : "Pick-up"}.</p>
-        )}
-      {sinComanda && (
-        <div role="alert" className="flex flex-wrap items-center gap-2 rounded border border-danger bg-danger-soft px-2 py-1.5">
-          <p className="flex-1 text-13 font-semibold text-danger">La comanda no se imprimió. Revisa la impresora.</p>
-          <button type="button" disabled={ocupado} onClick={onImprimirComanda}
-            className="h-11 rounded border border-danger bg-surface px-3 text-14 font-semibold text-danger transition active:scale-[.97] disabled:opacity-50">
-            Imprimir comanda
-          </button>
-        </div>
-      )}
-      {aviso && <p className="text-13 font-semibold text-danger">{aviso}</p>}
-      {(p.clienteNombre || p.clienteTelefono) && (
-        <p className="flex flex-wrap items-baseline gap-x-3 text-14 text-ink">
-          {p.clienteNombre && <span className="font-semibold">{p.clienteNombre}</span>}
-          {/* Dentro de la caja instalada un enlace `tel:` no abre nada: va como texto. */}
-          {p.clienteTelefono && (esEscritorio()
-            ? <span className="font-semibold tabular-nums">{p.clienteTelefono}</span>
-            : <a href={`tel:${p.clienteTelefono}`} className="inline-flex min-h-11 items-center font-semibold tabular-nums text-info underline-offset-2 hover:underline">{p.clienteTelefono}</a>
-          )}
-        </p>
-      )}
-      {p.direccion && (
-        <div className="text-13 leading-snug">
-          <p className="text-ink-2">{p.direccion.texto}</p>
-          {p.direccion.referencias && <p className="text-ink-3">Referencias: {p.direccion.referencias}</p>}
-        </div>
-      )}
-      <ListaItems items={p.items} />
-      {p.notaCliente && <p className="text-13 italic text-ink-2">“{p.notaCliente}”</p>}
-      <dl className="mt-auto border-t border-line pt-2 text-13 text-ink-2">
-        {p.envio !== null && p.envio > 0 && (
-          <div className="flex justify-between"><dt>Envío</dt><dd className="font-display font-bold tabular-nums text-ink">{fmtMxn(p.envio)}</dd></div>
-        )}
-        {p.totalCliente !== null && (
-          <div className="flex items-baseline justify-between text-ink">
-            <dt className="font-semibold">Total</dt>
-            <dd className="font-display text-18 font-bold tabular-nums">{fmtMxn(p.totalCliente)}</dd>
-          </div>
-        )}
-        {pago && <div className="flex justify-between"><dt>Forma de pago</dt><dd className="font-semibold text-ink">{pago}</dd></div>}
-      </dl>
-    </>
-  );
-}
-
-export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, cajaSinActualizar = false, onCambio, onImprimirComanda, onSalir }: {
+export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, cajaSinActualizar = false, onCambio, onSalir }: {
   token: string; caja: DatosCaja;
   /** POS web: la caja instalada de la sucursal aún no atiende la tienda; la barra lo dice. */
   cajaSinActualizar?: boolean;
-  /** Módulo de apps de delivery encendido: pinta la barra de Uber. */
+  /** Módulo de apps de delivery encendido: pinta la barra de Uber y sus pedidos. */
   hayApps: boolean;
   /** Módulo de tienda en línea encendido: pinta la barra de la tienda propia. */
   hayTienda: boolean;
-  /** Se aceptó o rechazó algo: quien sondea desde fuera (timbre, comandas) relee ya. */
+  /** Se aceptó o rechazó algo: quien sondea desde fuera (timbre, contador del inicio) relee ya. */
   onCambio?: () => void;
-  /** Imprime desde este dispositivo la comanda completa del pedido; dice si salió el papel. */
-  onImprimirComanda: (p: PedidoApp) => Promise<boolean>;
   onSalir: () => void;
 }) {
   const [pedidos, setPedidos] = useState<PedidoApp[] | null>(null);
@@ -189,8 +69,6 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, cajaSinAc
   // Los dos diálogos (motivo del rechazo, pausar la tienda) se cierran antes de salir.
   useEscape(rechazando ? () => setRechazando(null) : menuPausa ? () => setMenuPausa(null) : onSalir);
   const montado = useRef(true);
-  /** Desde cuándo se ve cada pedido aceptado sin comanda (para el margen del aviso). */
-  const sinComandaDesde = useRef(new Map<string, number>());
 
   const recargarTienda = useCallback(async (forzar = false) => {
     const r = await leerTiendaUber(token, caja.sucursal_id, forzar);
@@ -265,11 +143,8 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, cajaSinAc
 
   const recargar = useCallback(async () => {
     try {
-      const lista = ordenarPedidos(await leerPedidosApps(token, caja.sucursal_id));
-      const desde = sinComandaDesde.current;
-      const faltan = new Set(lista.filter(faltaComanda).map((p) => p.id));
-      for (const id of desde.keys()) if (!faltan.has(id)) desde.delete(id);
-      for (const id of faltan) if (!desde.has(id)) desde.set(id, Date.now());
+      // Solo las apps: lo de la tienda propia vive en Pick-up y en Domicilio.
+      const lista = ordenarPedidos((await leerPedidosApps(token, caja.sucursal_id)).filter((p) => p.canal === "APP"));
       if (montado.current) setPedidos(lista);
     } catch (e) {
       if (montado.current) setError(e instanceof Error ? e.message : "No se pudieron leer los pedidos");
@@ -278,39 +153,30 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, cajaSinAc
 
   useEffect(() => {
     montado.current = true;
+    // Sin apps no hay tarjetas que leer: la pantalla queda para pausar la tienda.
+    if (!hayApps) return () => { montado.current = false; };
     recargar();
     const id = setInterval(recargar, REFRESCO_MS);
     return () => { montado.current = false; clearInterval(id); };
-  }, [recargar]);
+  }, [recargar, hayApps]);
   useEffect(() => { const id = setInterval(() => setAhora(new Date()), 1000); return () => clearInterval(id); }, []);
 
   const accion = async (p: PedidoApp, a: "aceptar" | "rechazar" | "listo", motivo?: MotivoRechazo) => {
-    // Un pedido de la tienda no tiene «listo» (la nube responde ACCION_INVALIDA): ni se intenta.
-    if (p.canal === "TIENDA" && a === "listo") return;
     setOcupado(p.id); setError(null);
     const r = await accionPedidoApp(token, { pedidoId: p.id, accion: a, motivo });
     if (!montado.current) return;
     setOcupado(null);
     setRechazando(null);
-    if (!r.ok) setError(p.canal === "TIENDA" ? mensajeErrorEnLinea(r.error) : mensajeError(r.error, r.detalle));
+    if (!r.ok) setError(mensajeError(r.error, r.detalle));
     // Con éxito o con error se relee: el pedido pudo cambiar por su cuenta (venció, lo tomó otra caja).
     await recargar();
     onCambio?.();
   };
 
-  const imprimirComanda = async (p: PedidoApp) => {
-    setOcupado(p.id); setError(null);
-    const salio = await onImprimirComanda(p);
-    if (!montado.current) return;
-    setOcupado(null);
-    // Con papel, el sello de la base tarda un instante: el margen empieza de nuevo para no avisar en falso.
-    if (salio) sinComandaDesde.current.set(p.id, Date.now());
-    else setError("No se pudo imprimir la comanda. Revisa la impresora e inténtalo de nuevo.");
-    await recargar();
-  };
-
-  const enCaja = esEscritorio();
-  const pendientes = useMemo(() => (pedidos ?? []).filter((p) => (p.estado === "RECIBIDO" || p.estado === "ERROR") && !soloInformativo(p, enCaja)), [pedidos, enCaja]);
+  const pendientes = useMemo(() => (pedidos ?? []).filter((p) => p.estado === "RECIBIDO" || p.estado === "ERROR"), [pedidos]);
+  /** Esta sucursal vende en su tienda propia: sus pedidos llegan a su canal, y aquí se dice. */
+  const conTiendaPropia = hayTienda && !sinTiendaPropia;
+  const DONDE_LLEGAN = "Tus pedidos en línea llegan a Pick-up y a Domicilio.";
   const estadoEnLinea = enLinea ? etiquetaEstadoEnLinea(enLinea, ahora, cajaSinActualizar) : null;
 
   return (
@@ -326,7 +192,7 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, cajaSinAc
         <span className="ml-auto text-13 text-ink-3">{caja.sucursalNombre}</span>
       </header>
 
-      {hayTienda && !sinTiendaPropia && (
+      {conTiendaPropia && (
         <div className="flex min-h-[60px] flex-shrink-0 flex-wrap items-center gap-2 border-b border-line bg-surface px-3 py-2">
           <span className={`inline-flex items-center gap-1.5 text-14 font-semibold ${estadoEnLinea ? (estadoEnLinea.tono === "ok" ? "text-success" : "text-warning") : "text-ink-3"}`}>
             <span className={`h-2 w-2 rounded-full ${estadoEnLinea ? (estadoEnLinea.tono === "ok" ? "bg-success" : "bg-warning") : "bg-ink-3"}`} />
@@ -378,85 +244,82 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, cajaSinAc
         <p role="alert" className="mx-4 mt-3 rounded border border-danger bg-danger-soft px-3 py-2 text-14 text-danger">{error}</p>
       )}
 
-      {pedidos === null ? (
+      {!hayApps ? (
+        <p className="m-auto max-w-sm px-4 text-center text-15 text-ink-2">{conTiendaPropia ? DONDE_LLEGAN : "Sin pedidos en línea por ahora."}</p>
+      ) : pedidos === null ? (
         <p className="m-auto text-14 text-ink-3">Cargando…</p>
       ) : pedidos.length === 0 ? (
         <p className="m-auto text-center text-15 text-ink-3">
-          Sin pedidos en línea por ahora.<br />Aquí aparecen solos cuando llegan.
+          {/* Sin tienda propia, el texto de siempre: quien solo usa Uber no nota ningún cambio. */}
+          {conTiendaPropia ? "Sin pedidos de apps por ahora." : "Sin pedidos en línea por ahora."}<br />Aquí aparecen solos cuando llegan.
+          {conTiendaPropia && <><br /><span className="text-ink-2">{DONDE_LLEGAN}</span></>}
         </p>
       ) : (
-        <ul className="grid flex-1 auto-rows-min grid-cols-1 content-start gap-3 overflow-y-auto p-4 md:grid-cols-2 xl:grid-cols-3">
-          {pedidos.map((p) => {
-            const seg = p.estado === "RECIBIDO" ? segundosRestantes(p.venceAceptacion, ahora) : null;
-            const urgente = seg !== null && seg < 120;
-            // En la caja, lo que se atiende desde el POS web no se acepta ni se rechaza aquí.
-            const informativo = soloInformativo(p, enCaja);
-            const pendiente = (p.estado === "RECIBIDO" || p.estado === "ERROR") && !informativo;
-            const alergia = pedidoConAlergia(p);
-            const deTienda = p.canal === "TIENDA";
-            return (
-              <li
-                key={p.id}
-                className={`flex flex-col gap-2 rounded border-2 bg-surface p-3 ${pendiente ? (urgente || alergia ? "border-danger" : "border-accent") : "border-line"}`}
-              >
-                {alergia && (
-                  <p className="rounded bg-danger px-2 py-1 text-13 font-bold uppercase tracking-wide text-white">⚠ Pedido con alergia: revisa cada ítem</p>
-                )}
-                {deTienda ? (
-                  <CuerpoTienda p={p} seg={seg} urgente={urgente} informativo={informativo} ocupado={ocupado === p.id} onImprimirComanda={() => imprimirComanda(p)}
-                    sinComanda={!informativo && faltaComanda(p) && ahora.getTime() - (sinComandaDesde.current.get(p.id) ?? Infinity) > MARGEN_COMANDA_MS} />
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-13 font-semibold uppercase tracking-wide text-ink-2">{etiquetaApp(p.app)}</span>
-                      <span className="text-28 font-bold leading-none text-ink">{p.folioCorto ?? p.idExterno.slice(-6)}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-14">
-                      <span className="font-semibold text-ink">{etiquetaEstado(p.estado)}</span>
-                      {seg !== null && (
-                        <span className={`font-mono text-15 ${urgente ? "font-bold text-danger" : "text-ink-2"}`} aria-label="tiempo para aceptar">
-                          {mmss(seg)}
-                        </span>
-                      )}
-                      {p.ticketFolio && <span className="text-ink-3">Ticket {p.ticketFolio}</span>}
-                    </div>
-                    {p.clienteNombre && (
-                      <p className="text-14 text-ink">
-                        {p.clienteNombre}{p.tipoEntrega === "RECOGE_CLIENTE" ? " · recoge en tienda" : ""}
-                      </p>
+        <>
+          {conTiendaPropia && <p className="flex-shrink-0 px-4 pt-3 text-13 text-ink-2">{DONDE_LLEGAN}</p>}
+          <ul className="grid flex-1 auto-rows-min grid-cols-1 content-start gap-3 overflow-y-auto p-4 md:grid-cols-2 xl:grid-cols-3">
+            {pedidos.map((p) => {
+              const seg = p.estado === "RECIBIDO" ? segundosRestantes(p.venceAceptacion, ahora) : null;
+              const urgente = esUrgente(seg);
+              const pendiente = p.estado === "RECIBIDO" || p.estado === "ERROR";
+              const alergia = pedidoConAlergia(p);
+              return (
+                <li
+                  key={p.id}
+                  className={`flex flex-col gap-2 rounded border-2 bg-surface p-3 ${pendiente ? (urgente || alergia ? "border-danger" : "border-accent") : "border-line"}`}
+                >
+                  {alergia && (
+                    <p className="rounded bg-danger px-2 py-1 text-13 font-bold uppercase tracking-wide text-white">⚠ Pedido con alergia: revisa cada ítem</p>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-13 font-semibold uppercase tracking-wide text-ink-2">{etiquetaApp(p.app)}</span>
+                    <span className="text-28 font-bold leading-none text-ink">{p.folioCorto ?? p.idExterno.slice(-6)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-14">
+                    <span className="font-semibold text-ink">{etiquetaEstado(p.estado)}</span>
+                    {seg !== null && (
+                      <span className={`font-mono text-15 ${urgente ? "font-bold text-danger" : "text-ink-2"}`} aria-label="tiempo para aceptar">
+                        {mmss(seg)}
+                      </span>
                     )}
-                    <ListaItems items={p.items} />
-                    {p.notaCliente && <p className="text-13 italic text-ink-2">“{p.notaCliente}”</p>}
-                    {p.totalCliente !== null && <p className="text-13 text-ink-3">Total en la app: {fmtMxn(p.totalCliente)}</p>}
-                    {p.ultimoError && (p.estado === "ERROR" || p.estado === "CANCELADO" || p.estado === "EXPIRADO") && (
-                      <p className="text-12 font-semibold text-danger">{p.ultimoError}</p>
+                    {p.ticketFolio && <span className="text-ink-3">Ticket {p.ticketFolio}</span>}
+                  </div>
+                  {p.clienteNombre && (
+                    <p className="text-14 text-ink">
+                      {p.clienteNombre}{p.tipoEntrega === "RECOGE_CLIENTE" ? " · recoge en tienda" : ""}
+                    </p>
+                  )}
+                  <ListaItems items={p.items} />
+                  {p.notaCliente && <p className="text-13 italic text-ink-2">“{p.notaCliente}”</p>}
+                  {p.totalCliente !== null && <p className="text-13 text-ink-3">Total en la app: {fmtMxn(p.totalCliente)}</p>}
+                  {p.ultimoError && (p.estado === "ERROR" || p.estado === "CANCELADO" || p.estado === "EXPIRADO") && (
+                    <p className="text-12 font-semibold text-danger">{p.ultimoError}</p>
+                  )}
+                  <div className="mt-auto flex gap-2 pt-1">
+                    {pendiente && (
+                      <>
+                        <button type="button" disabled={ocupado === p.id} onClick={() => accion(p, "aceptar")}
+                          className="h-11 flex-1 rounded bg-accent text-14 font-semibold text-white transition hover:bg-accent-hover disabled:opacity-50">
+                          Aceptar
+                        </button>
+                        <button type="button" disabled={ocupado === p.id} onClick={() => setRechazando(p)}
+                          className="h-11 rounded border border-line-strong px-4 text-14 font-semibold text-ink transition hover:border-ink hover:bg-hover disabled:opacity-50">
+                          Rechazar
+                        </button>
+                      </>
                     )}
-                  </>
-                )}
-                <div className={`flex gap-2 pt-1 ${deTienda ? "" : "mt-auto"}`}>
-                  {pendiente && (
-                    <>
-                      <button type="button" disabled={ocupado === p.id} onClick={() => accion(p, "aceptar")}
+                    {(p.estado === "ACEPTADO" || p.estado === "EN_PREPARACION") && (
+                      <button type="button" disabled={ocupado === p.id} onClick={() => accion(p, "listo")}
                         className="h-11 flex-1 rounded bg-accent text-14 font-semibold text-white transition hover:bg-accent-hover disabled:opacity-50">
-                        Aceptar
+                        Marcar listo
                       </button>
-                      <button type="button" disabled={ocupado === p.id} onClick={() => setRechazando(p)}
-                        className="h-11 rounded border border-line-strong px-4 text-14 font-semibold text-ink transition hover:border-ink hover:bg-hover disabled:opacity-50">
-                        Rechazar
-                      </button>
-                    </>
-                  )}
-                  {!deTienda && (p.estado === "ACEPTADO" || p.estado === "EN_PREPARACION") && (
-                    <button type="button" disabled={ocupado === p.id} onClick={() => accion(p, "listo")}
-                      className="h-11 flex-1 rounded bg-accent text-14 font-semibold text-white transition hover:bg-accent-hover disabled:opacity-50">
-                      Marcar listo
-                    </button>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
 
       {menuPausa === "uber" && (
@@ -500,7 +363,7 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, cajaSinAc
           <div className="w-full max-w-sm rounded border border-line bg-surface p-4">
             <h2 className="mb-3 text-15 font-semibold text-ink">¿Por qué se rechaza {rechazando.folioCorto ?? "el pedido"}?</h2>
             <div className="flex flex-col gap-2">
-              {MOTIVOS.map((m) => (
+              {MOTIVOS_RECHAZO.map((m) => (
                 <button key={m.codigo} type="button" disabled={ocupado === rechazando.id} onClick={() => accion(rechazando, "rechazar", m.codigo)}
                   className="h-11 rounded border border-line-strong px-3 text-left text-14 font-semibold text-ink transition hover:border-ink hover:bg-hover disabled:opacity-50">
                   {m.label}
