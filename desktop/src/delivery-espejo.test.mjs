@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { crearEspejo, codigoDeError } from "./delivery-espejo.mjs";
+import { crearEspejo, crearRetencion, codigoDeError, RETENCION_CADA_MS } from "./delivery-espejo.mjs";
 
 const CAJA = "cccccccc-0000-0000-0000-0000000000cc";
 const NUBE = { cloudUrl: "https://nube.test", anonKey: "anon", deviceToken: "DEV" };
@@ -708,4 +708,45 @@ test("ya lo tengo: una nube vieja que responde ESTADO_INVALIDO no se martillea; 
   fila.ticket_impreso_at = "2026-10-09T10:00:00Z";
   await agente.tick();
   assert.deepEqual(acciones(nube).map((b) => b.estado), ["EN_PREPARACION", "EN_PREPARACION", "LISTO"]);
+});
+
+// ── Auditoría (M2): el borrado a 30 días también en la copia local ───────────
+const esRetencion = (q) => q.texto.startsWith("SELECT delivery_anonimizar_pedidos_viejos(30)");
+
+test("retención: al iniciar y luego una vez cada 24 h, la caja anonimiza sus pedidos viejos", async () => {
+  const pool = poolFalso();
+  const timers = [];
+  const r = crearRetencion({
+    pool,
+    setIntervalFn: (fn, ms) => { timers.push({ fn, ms }); return timers.length; },
+    clearIntervalFn: (id) => { timers[id - 1].parado = true; },
+  });
+  r.iniciar();
+  r.iniciar();   // dos veces no arma dos temporizadores ni corre dos pasadas
+  await Promise.resolve();
+  assert.equal(pool.sql.filter(esRetencion).length, 1, "corre al iniciar");
+  assert.deepEqual(timers.map((x) => x.ms), [RETENCION_CADA_MS]);
+  assert.equal(RETENCION_CADA_MS, 24 * 60 * 60 * 1000);
+  await timers[0].fn();
+  assert.equal(pool.sql.filter(esRetencion).length, 2, "y otra vez cuando toca");
+  r.detener();
+  assert.equal(timers[0].parado, true);
+});
+
+test("retención: no va dentro del sondeo (una caja sin apps ni tienda, que no sondea, también limpia)", async () => {
+  const pool = poolFalso();
+  const nube = nubeFalsa({ pedidos: [pedido()] });
+  const agente = crearEspejo({ pool, nube: async () => NUBE, cajaId: CAJA, fetchFn: nube.fetchFn });
+  await agente.tick();
+  assert.equal(pool.sql.filter(esRetencion).length, 0);
+});
+
+test("retención: si la base local no tiene la función, no lanza y queda dicho una sola vez", async () => {
+  const logs = [];
+  const pool = { query: async () => { throw new Error("function delivery_anonimizar_pedidos_viejos(integer) does not exist"); } };
+  const r = crearRetencion({ pool, log: (m) => logs.push(m), setIntervalFn: () => 1, clearIntervalFn: () => {} });
+  await r.pasar();
+  await r.pasar();
+  assert.equal(logs.length, 1);
+  assert.match(logs[0], /^retención: .*does not exist/);
 });

@@ -363,3 +363,42 @@ export function crearEspejo({
     detener() { detenido = true; if (timer) clearTimeoutFn(timer); timer = null; },
   };
 }
+
+// Retención (auditoría, M2): la nube borra a los 30 días los datos personales de los pedidos con su
+// cron diario, pero el espejo solo trae lo que cambió en las últimas 24 h: la copia de esta caja se
+// quedaría con ellos para siempre. La misma función (0167) existe en la base local y no usa nada
+// que la caja no tenga (ni cron ni red); aquí se llama.
+const SQL_RETENCION = `SELECT delivery_anonimizar_pedidos_viejos(30)`;
+export const RETENCION_CADA_MS = 24 * 60 * 60_000;
+
+/**
+ * crearRetencion({ pool, log }) → { iniciar, detener, pasar }
+ * Al iniciar y luego una vez cada 24 h. Va APARTE del agente de espejo a propósito: el agente no
+ * corre si el negocio ya no tiene apps ni tienda, y justo esa caja es la que se queda con pedidos
+ * viejos que nadie más va a limpiar.
+ * Nunca lanza: una base local anterior a la 0095 no tiene la función. El fallo se deja en el log
+ * una sola vez.
+ * ponytail: si una pasada falla, la siguiente es a las 24 h (o al reiniciar la caja).
+ */
+export function crearRetencion({ pool, log = () => {}, setIntervalFn = setInterval, clearIntervalFn = clearInterval }) {
+  let timer = null;
+  let avisado = false;
+  async function pasar() {
+    try {
+      await pool.query(SQL_RETENCION);
+    } catch (e) {
+      if (!avisado) log(`retención: no se pudieron anonimizar los pedidos viejos de esta caja (${e?.message ?? e})`);
+      avisado = true;
+    }
+  }
+  return {
+    pasar,
+    iniciar() {
+      if (timer) return;
+      pasar();
+      timer = setIntervalFn(pasar, RETENCION_CADA_MS);
+      timer?.unref?.(); // no debe impedir que la app cierre
+    },
+    detener() { if (timer) clearIntervalFn(timer); timer = null; },
+  };
+}

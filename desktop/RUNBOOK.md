@@ -538,6 +538,19 @@ y el mismo sondeo que Uber; la rama se decide siempre por `canal`, nunca por `ap
   | `pedido T101: RECLAMADO_POR_OTRA_CAJA (no es de esta caja)` | Otra caja de la sucursal lo tomó; no es un error. |
   | `espejo HTTP 403 CAJA_NO_EXISTE` | Caja desactivada o ya no es de ese negocio. |
   | `· [espejo] omitido (el cliente no tiene apps de delivery ni tienda en línea)` | El agente no arrancó: el negocio no tiene ninguno de los dos módulos. |
+  | `· [espejo] retención: no se pudieron anonimizar los pedidos viejos de esta caja (…)` | Falló el borrado a 30 días de la copia local (abajo). Sale una sola vez por arranque; se reintenta a las 24 h o al reiniciar. |
+- **El borrado a 30 días, en la copia de la caja** (`crearRetencion`, `delivery-espejo.mjs`; desde
+  la 0.8.0). La nube anonimiza los pedidos en línea de más de 30 días con su cron diario, pero el
+  espejo solo trae lo que cambió en las últimas 24 h, así que esa limpieza nunca llegaba a la base
+  local. La caja ejecuta en su Postgres `SELECT delivery_anonimizar_pedidos_viejos(30)` **al
+  arrancar y cada 24 h** (la función es la de la 0167: no usa `cron` ni `net`). No depende del
+  agente de espejo: corre también en un negocio que ya no tiene apps ni tienda, que es justo el que
+  se quedaría con pedidos viejos. Para comprobarlo en una caja:
+  `SELECT count(*) FROM delivery_pedidos WHERE recibido_at < now() - interval '31 days' AND cliente_telefono IS NOT NULL`
+  debe dar 0. **Lo que la función no toca** (igual que en la nube): una copia que se quedó en
+  `RECIBIDO`, y las de Uber en `ACEPTADO` o `EN_PREPARACION`. En la nube esos estados no duran; en
+  una caja que estuvo apagada más de 24 h mientras el pedido se cerraba, la copia local sí puede
+  quedarse así. Pendiente conocido.
 
   Para ver el pedido: `delivery_pedidos` (`estado`, `ultimo_error`, `ticket_id`) en la base de la
   caja y en la nube; el seguimiento del cliente lee `tienda_seguimiento`.

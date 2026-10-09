@@ -34,6 +34,9 @@ El instalador lleva el POS empaquetado (`pos-ui/`) y el agente de la caja, así 
   motivo escrito para el cajero. Espera 3 minutos a que el catálogo local alcance a un producto
   recién creado.
 - Arranca también en un negocio que tiene la tienda pero no apps de delivery.
+- **Borra a los 30 días los datos personales de los pedidos en línea también en la copia de la
+  caja** (nombre, teléfono, correo, dirección y notas): al encender y luego una vez al día, tenga o
+  no el negocio la tienda o las apps. Antes solo se borraban en la nube.
 
 **POS dentro de la caja (`apps/pos`)**
 - «Pedidos en línea» junta Uber y la tienda; tarjeta propia de la tienda; Aceptar y Rechazar con
@@ -91,7 +94,9 @@ a clientes con caja instalada hasta que salga, o hacerlo con la 0.8.0 puesta en 
   la nube ya canceló, la tarjeta del pedido dice «El pedido en línea se canceló: cancela el ticket
   en caja». Hay que cancelar esa cuenta a mano y avisarle al cliente.
 - **Caja 0.7.0 y POS web en la misma sucursal:** la caja vieja no entiende los pedidos de la tienda.
-  No encender la tienda en una sucursal así hasta que su caja tenga la 0.8.0.
+  Ya no se pierden: mientras la caja vieja esté encendida, la nube no abre la tienda de esa sucursal
+  y el POS web dice «Tienda: actualiza la caja de esta sucursal para recibir pedidos en línea.»
+  Para vender en línea ahí, su caja necesita la 0.8.0.
 - **Cambio visible en Uber** (el timbre repetido): es deliberado, pero un cliente que ya usa Uber
   lo va a notar el primer día. Está en la nota.
 
