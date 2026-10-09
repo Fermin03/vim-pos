@@ -147,12 +147,15 @@ el del correo) y se vuelve a donde se iba (`?volver=`, que solo admite rutas de 
   «Bien: tiene 8 caracteres o más.» al cumplirla. No hay medidor de fuerza.
 - **Entrar** tiene un solo error para todo, encima del botón: no dice si falló el correo o la
   contraseña.
-- **Nunca se dice si un correo ya tiene cuenta.** Crear una con un correo ya usado termina en
-  «Revisa tu correo para continuar»; recuperar siempre termina en «Si hay una cuenta con ese
-  correo, te mandamos un enlace.».
-- El enlace de recuperación trae su llave en la dirección: la pantalla la saca de la barra en cuanto
-  carga. Un enlace vencido o ya usado no es un error en rojo: es una pantalla que lo explica y
-  ofrece «Pedir otro enlace».
+- **La pantalla nunca dice con palabras si un correo ya tiene cuenta.** Crear una con un correo ya
+  usado termina en «Revisa tu correo para continuar»; recuperar siempre termina en «Si hay una
+  cuenta con ese correo, te mandamos un enlace.». Entrar y recuperar no dejan averiguarlo; crear
+  cuenta sí (un alta nueva entra de una vez, una repetida no): está aceptado y explicado en el
+  ADR 0032.
+- El enlace de recuperación trae su llave tras `#`, que no viaja al servidor: la pantalla la lee al
+  cargar y la saca de la barra. Hasta saber si hay enlace no pinta ni «pedir enlace» ni «contraseña
+  nueva» (un instante en blanco, sin salto de una a otra). Un enlace vencido o ya usado no es un
+  error en rojo: es una pantalla que lo explica y ofrece «Pedir otro enlace».
 - Entrar y salir recargan la página completa: así el marco cambia «Entrar» por «Mi cuenta».
 
 **Mi cuenta** es una página para leer; **cada cambio se hace en una hoja**, con su botón principal
@@ -241,6 +244,7 @@ De comensal, sin palabras de la caja ni códigos. Todos salen de `app/lib/textos
 | Cuenta creada con un correo ya usado | «Revisa tu correo para continuar» (sin decir por qué) |
 | Se pidió recuperar | «Si hay una cuenta con ese correo, te mandamos un enlace. Revisa también tu correo no deseado.» |
 | Enlace de recuperación vencido o usado | «Este enlace ya no sirve» · «Pedir otro enlace» |
+| Demasiados intentos en una pantalla de cuenta | «Demasiados intentos. Espera unos minutos y vuelve a intentar.» (sin «llama al restaurante», que es del pedido) |
 | La contraseña actual no es (cambiarla, eliminar la cuenta) | «La contraseña actual no coincide.», junto al campo |
 | Tope de direcciones | «Ya tienes 5 direcciones guardadas. Borra una para guardar otra.» |
 | Eliminar la cuenta | «Se borra tu cuenta, tus direcciones guardadas y el acceso a tu historial. {Restaurante} conserva en su sistema los pedidos que ya le hiciste.» |

@@ -34,6 +34,17 @@ Plan 6 de 7.
 | 12 | **La cuenta todavía no se liga a los puntos de lealtad.** Queda lista: lealtad reconoce al cliente por teléfono, y la cuenta guarda el teléfono normalizado igual. | Conectar lealtad es otra función; aquí solo se deja el dato bien puesto. |
 | 13 | **Antirobot al registrarse y al pedir recuperación**, no al entrar. | Entrar ya tiene límite por IP y bloqueo; registrar y recuperar mandan correos. |
 
+> **Nota tras la revisión final (9 oct 2026).** La tabla se deja como se escribió; esto es lo que
+> cambió al construirla, y manda el ADR `docs/decisiones/0032`:
+> - **Decisión 4 no se cumple en `registrar`, y se acepta.** Las decisiones 3 («entra de una vez») y
+>   4 («responde igual») son incompatibles: el alta nueva abre sesión y la repetida no, así que quien
+>   llama a `registrar` deduce si ese correo ya es cliente. Lo acotan el antirobot, 5 por hora por IP
+>   y 3 por hora por correo. `entrar` y `recuperar_pedir` sí la cumplen.
+> - **Decisión 2: el tope es de 72 bytes, no 72 caracteres** (mínimo 8 caracteres). Es lo que mira bcrypt.
+> - **Los correos de cuenta no llevan el nombre** que se tecleó, y `registrar` tiene además un tope
+>   por correo: van a direcciones sin verificar.
+> - **El enlace de recuperación lleva el token tras `#`**, no en `?t=` como dicen las tareas de abajo.
+
 ## Global Constraints
 
 - **Cargar `ponytail` antes de escribir código**; para pantallas, además `frontend-design`, `ui-ux-pro-max`, `emil-design-eng`, y leer `docs/diseno/nucleo.md` y `docs/diseno/tienda.md`.
