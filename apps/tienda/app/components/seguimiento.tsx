@@ -10,12 +10,12 @@ import { Aviso, botonClases, cn } from "@vim/ui/styles";
 import { seguimiento } from "../lib/api";
 import type { Seguimiento } from "../lib/contrato";
 import { formatoMxn } from "../lib/dinero";
-import { hora12, momentoMx } from "../lib/horario";
-import { SONDEO_INICIAL, recorrido, sinConexion, sondear, terminado, type Paso, type Sondeo } from "../lib/seguimiento";
+import { aLaHora, momentoMx } from "../lib/horario";
+import { SONDEO_INICIAL, recorrido, sinConexion, sondear, tardando, terminado, type Paso, type Sondeo } from "../lib/seguimiento";
 import { enlaceTel, enlaceWhatsApp, formatoTelefono } from "../lib/telefono";
 import { textoDeError, textoDeEstado } from "../lib/textos";
 import { Linea } from "./carrito";
-import { FOCO, PRINCIPAL } from "./piezas";
+import { FOCO, PARTE, PRINCIPAL } from "./piezas";
 
 const GHOST = cn(botonClases({ variant: "ghost" }), "h-12");
 
@@ -84,7 +84,7 @@ function Pedido({ slug, pedido, sondeo }: { slug: string; pedido: Seguimiento; s
       <header className="flex flex-col gap-2">
         <p className="text-14 text-ink-2">
           Pedido <span className="font-display font-semibold tabular-nums text-ink">{pedido.folio_corto}</span>
-          {!Number.isNaN(recibido.getTime()) && <>, recibido a las {hora12(momentoMx(recibido).hora)}</>}
+          {!Number.isNaN(recibido.getTime()) && <>, recibido {aLaHora(momentoMx(recibido).hora)}</>}
         </p>
         {/* Lo que cambia solo se anuncia: el estado y su línea de apoyo, juntos. */}
         <div aria-live="polite" aria-atomic="true">
@@ -97,7 +97,7 @@ function Pedido({ slug, pedido, sondeo }: { slug: string; pedido: Seguimiento; s
       {pasos && <Recorrido pasos={pasos} />}
 
       <section aria-label="El restaurante" className="flex flex-col gap-3">
-        <p className="text-15">
+        <p className={cn("text-15", PARTE)}>
           <span className="font-semibold">{pedido.sucursal.nombre}</span>
           <span className="text-ink-2">{cancelado ? ". Si tienes dudas, llama al restaurante." : pedido.modo === "RECOGER" ? ". Aquí recoges tu pedido." : ". De aquí sale tu pedido."}</span>
         </p>
@@ -110,7 +110,7 @@ function Pedido({ slug, pedido, sondeo }: { slug: string; pedido: Seguimiento; s
           {pedido.renglones.map((r, i) => (
             <li key={i} className="flex gap-3 text-16 leading-snug">
               <span className="w-7 flex-shrink-0 font-display font-semibold tabular-nums">{r.cantidad}×</span>
-              <span className="min-w-0">
+              <span className={cn("min-w-0", PARTE)}>
                 {r.nombre}
                 {r.detalle && <span className="mt-0.5 block text-14 text-ink-2">{r.detalle}</span>}
               </span>
@@ -149,7 +149,9 @@ function Pedido({ slug, pedido, sondeo }: { slug: string; pedido: Seguimiento; s
 
 export function SeguimientoDelPedido({ slug, codigo }: { slug: string; codigo: string }) {
   const [sondeo, setSondeo] = useState<Sondeo>(SONDEO_INICIAL);
-  useEffect(() => sondear((senal) => seguimiento(slug, codigo, senal), setSondeo), [slug, codigo]);
+  /** «Reintentar ahora» arranca el sondeo de cero: lee en el acto, sin esperar su turno. */
+  const [turno, setTurno] = useState(0);
+  useEffect(() => sondear((senal) => seguimiento(slug, codigo, senal), setSondeo), [slug, codigo, turno]);
 
   if (sondeo.noEncontrado) {
     const t = textoDeError("PEDIDO_NO_ENCONTRADO");
@@ -165,9 +167,12 @@ export function SeguimientoDelPedido({ slug, codigo }: { slug: string; codigo: s
     return (
       <div className="flex flex-col gap-3 px-4 py-10" aria-live="polite">
         <h1 className="font-display text-24 font-semibold">Tu pedido</h1>
-        {sinConexion(sondeo)
-          ? <Aviso tono="warning" role="status" className="!text-14">Sin conexión. Reintentando…</Aviso>
-          : <p className="text-16 text-ink-2">Buscando tu pedido…</p>}
+        {tardando(sondeo) ? (
+          <>
+            <p className="text-16 leading-relaxed text-ink-2">Estamos tardando en cargar tu pedido. Seguimos intentando…</p>
+            <button type="button" onClick={() => { setSondeo(SONDEO_INICIAL); setTurno((n) => n + 1); }} className={cn(GHOST, "self-start px-5")}>Reintentar ahora</button>
+          </>
+        ) : <p className="text-16 text-ink-2">Buscando tu pedido…</p>}
       </div>
     );
   }

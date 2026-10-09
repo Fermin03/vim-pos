@@ -50,7 +50,14 @@ export function esperaDe(s: Sondeo): number | null {
  */
 export const sinConexion = (s: Sondeo): boolean => !terminado(s) && (s.fallos >= 2 || (s.fallos >= 1 && !s.pedido));
 
-type Documento = Pick<Document, "hidden" | "addEventListener" | "removeEventListener">;
+/**
+ * «Estamos tardando en cargar tu pedido»: ya se intentó leer, no salió (red, servicio, o demasiadas
+ * lecturas desde esta red) y no hay nada que enseñar. Sin esto, un 429 en la primera lectura dejaba
+ * «Buscando tu pedido…» sin explicación durante un minuto o más.
+ */
+export const tardando = (s: Sondeo): boolean => !s.pedido && !s.noEncontrado && (s.lento || s.fallos >= 1);
+
+type Documento =Pick<Document, "hidden" | "addEventListener" | "removeEventListener">;
 
 /**
  * Sondea hasta que el pedido termina. Lee de inmediato; con la pestaña oculta no pregunta (y suelta

@@ -48,14 +48,16 @@ export function hora12(hhmm: string): string {
   return `${n % 12 === 0 ? 12 : n % 12}:${min} ${n < 12 ? "a. m." : "p. m."}`;
 }
 
+/** «13:05» → «a la 1:05 p. m.»; «18:00» → «a las 6:00 p. m.» (la una va en singular). */
+export const aLaHora = (hhmm: string): string => `${/^(01|13):/.test(hhmm) ? "a la" : "a las"} ${hora12(hhmm)}`;
+
 const nombreDe = (dia: Dia): string => DIAS.find((d) => d.dia === dia)!.nombre;
 
-/** «Abre hoy a las 6:00 p. m.» / «Abre el lunes a la 1:00 p. m.» (la una va en singular); null si no abre ningún día. */
+/** «Abre hoy a las 6:00 p. m.» / «Abre el lunes a la 1:00 p. m.»; null si no abre ningún día. */
 export function textoApertura(h: Horario, m: Momento = momentoMx()): string | null {
   const p = proximaApertura(h, m);
   if (!p) return null;
-  const articulo = /^(01|13):/.test(p.hora) ? "a la" : "a las";
-  return `Abre ${p.enDias === 0 ? "hoy" : `el ${nombreDe(p.dia).toLowerCase()}`} ${articulo} ${hora12(p.hora)}`;
+  return `Abre ${p.enDias === 0 ? "hoy" : `el ${nombreDe(p.dia).toLowerCase()}`} ${aLaHora(p.hora)}`;
 }
 
 /** Los siete días, de lunes a domingo, con su horario en palabras. */

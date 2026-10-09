@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Resultado } from "../api";
 import { seguimientoDe, type EstadoDePedido, type Seguimiento } from "../contrato";
-import { SONDEO_INICIAL, alLeer, esperaDe, recorrido, sinConexion, sondear, terminado, type Sondeo } from "../seguimiento";
+import { SONDEO_INICIAL, alLeer, esperaDe, recorrido, sinConexion, sondear, tardando, terminado, type Sondeo } from "../seguimiento";
 import { seguimientoCrudo } from "./datos";
 
 const base = seguimientoDe(seguimientoCrudo()) as Seguimiento;
@@ -55,6 +55,13 @@ describe("alLeer y esperaDe", () => {
     expect(sinConexion(s)).toBe(false);
     expect(s.pedido?.estado).toBe("EN_PROCESO");
     expect(esperaDe(alLeer(s, en("EN_PROCESO")))).toBe(10_000);
+  });
+  it("«Estamos tardando»: la PRIMERA lectura falló (red, servicio o demasiadas lecturas) y no hay nada que enseñar", () => {
+    expect(tardando(SONDEO_INICIAL)).toBe(false);                       // aún no se sabe: «Buscando tu pedido…»
+    for (const codigo of ["DEMASIADOS_INTENTOS", "SIN_CONEXION", "SERVICIO_NO_DISPONIBLE"]) expect(tardando(tras(fallo(codigo))), codigo).toBe(true);
+    expect(tardando(tras(en("EN_PROCESO"), fallo("DEMASIADOS_INTENTOS")))).toBe(false);   // ya hay pedido: se sigue viendo
+    expect(tardando(tras(fallo("PEDIDO_NO_ENCONTRADO")))).toBe(false);                    // eso es «no encontramos»
+    expect(tardando(tras(fallo("SIN_CONEXION"), en("EN_PROCESO")))).toBe(false);
   });
   it("una lectura cancelada no cambia nada", () => {
     const s = tras(en("EN_PROCESO"));

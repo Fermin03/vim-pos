@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import type { Horario } from "@vim/fecha";
 import { aCentavos, aTexto, formato, formatoMxn, leerImporte } from "../dinero";
-import { abiertoAhora, hora12, momentoMx, proximaApertura, semanaLegible, textoApertura } from "../horario";
+import { aLaHora, abiertoAhora, hora12, momentoMx, proximaApertura, semanaLegible, textoApertura } from "../horario";
 import { colorDeNegocio, variablesDeColor } from "../color";
 import { urlDeFoto, urlDeLogo } from "../imagen";
 import { enlaceTel, enlaceWhatsApp, formatoTelefono, normalizarTelefono } from "../telefono";
@@ -132,6 +132,9 @@ describe("horario", () => {
     expect(abre("12:00")).toBe("Abre hoy a las 12:00 p. m.");
     expect(abre("14:00")).toBe("Abre hoy a las 2:00 p. m.");
     expect(abre("21:00")).toBe("Abre hoy a las 9:00 p. m.");
+    // La misma regla donde sea que se diga una hora («recibido a la 1:05 p. m.» en el seguimiento).
+    expect(aLaHora("13:05")).toBe("a la 1:05 p. m.");
+    expect(aLaHora("18:00")).toBe("a las 6:00 p. m.");
   });
   it("la hora en 12 horas", () => {
     expect(hora12("00:00")).toBe("12:00 a. m.");
