@@ -14,11 +14,11 @@
 // día de la baja no es una fila nueva, es **deshacer** la de hoy.
 
 /** Add-ons que van incluidos sin cargo desde el plan Negocio; en Esencial se contratan aparte. */
-const INCLUIDOS_DESDE_NEGOCIO = new Set(["DELIVERY", "LEALTAD"]);
+const INCLUIDOS_DESDE_NEGOCIO = new Set(["DELIVERY", "LEALTAD", "TIENDA"]);
 
 /**
- * Precio con el que el panel pre-llena el alta de un add-on que el plan puede incluir (delivery y
- * lealtad), según el plan del cliente. Cualquier otro add-on entra a su precio de lista.
+ * Precio con el que el panel pre-llena el alta de un add-on que el plan puede incluir (delivery,
+ * lealtad y tienda en línea), según el plan del cliente. Cualquier otro add-on entra a su precio de lista.
  *
  * **Solo Esencial lo paga.** Cualquier otro plan lo lleva incluido sin cargo. Al principio (spec
  * §4) la regla nombraba Negocio y Cadena, y los planes viejos por vertical —`FT`, `QS`, `CB`, `FS`,
@@ -39,8 +39,9 @@ export function precioAltaAddon(codigo: string, planCodigo: string | undefined, 
 }
 
 /**
- * Los planes que traen sin cargo los add-ons de `INCLUIDOS_DESDE_NEGOCIO` (delivery y lealtad): los
- * mismos códigos que la base marca con `delivery_incluido` (0141) y `lealtad_incluido` (0156). Es
+ * Los planes que traen sin cargo los add-ons de `INCLUIDOS_DESDE_NEGOCIO` (delivery, lealtad y tienda
+ * en línea): los mismos códigos que la base marca con `delivery_incluido` (0141), `lealtad_incluido`
+ * (0156) y `tienda_incluida` (0161). Es
  * una lista explícita y no un "todos menos Esencial" para que un plan nuevo no se regale solo:
  * darlo de alta aquí es un gesto deliberado de dos segundos, y mientras tanto el panel cobra, que
  * es el lado recuperable del error.

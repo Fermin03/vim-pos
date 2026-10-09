@@ -63,6 +63,13 @@ describe("precioAltaAddon: lo que el plan ya incluye entra a $0", () => {
     for (const plan of ["FT", "QS", "CB", "FS", "DK", "ENT"]) expect(precioAltaAddon("LEALTAD", plan, 100)).toBe(0);
   });
 
+  it("la tienda en línea sigue la misma regla: $0 desde Negocio y en los heredados, de lista en Esencial", () => {
+    for (const plan of ["NEGOCIO", "CADENA", "FT", "QS", "CB", "FS", "DK", "ENT"]) expect(precioAltaAddon("TIENDA", plan, 100)).toBe(0);
+    expect(precioAltaAddon("TIENDA", "ESENCIAL", 100)).toBe(100);
+    expect(precioAltaAddon("TIENDA", "OTRO", 100)).toBe(100);
+    expect(precioAltaAddon("TIENDA", undefined, 100)).toBe(100);
+  });
+
   it("un plan que no conocemos paga", () => {
     expect(precioAltaAddon("LEALTAD", "OTRO", 100)).toBe(100);
     expect(precioAltaAddon("LEALTAD", undefined, 100)).toBe(100);

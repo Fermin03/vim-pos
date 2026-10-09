@@ -5,6 +5,7 @@ import { z } from "zod";
 import { supabase } from "./supabase";
 import { tenantId } from "./datos";
 import { combosNoComprables, type ComboNoComprable, type ComboParaRevisar } from "./tienda-combos";
+import { ofertaTienda, type OfertaTienda } from "./tienda-plan";
 import { errorDeDireccion, errorDeHorario, leerHorario, mensajeTienda, type SucursalTienda } from "./tienda-reglas";
 
 const SOLO_ADMIN = "Solo el dueño o un administrador puede cambiar esto.";
@@ -218,4 +219,26 @@ export async function leerCombosNoComprables(): Promise<ComboNoComprable[]> {
     combo.slots.push({ nombre: g.nombre, obligatorio: true, opciones: ids.map((id) => ({ productoId: id, nombre: porId.get(id)?.nombre ?? "" })) });
   }
   return combosNoComprables([...combos.values()]);
+}
+
+// ── La invitación (quien todavía no la tiene) ─────────────────────────────────
+
+/**
+ * Lo que la invitación necesita: si VIM ya ofrece el complemento, cuánto cuesta y si el plan del
+ * negocio lo incluye. `addons` y `planes` son catálogo de lectura abierta (0002). Nunca lanza: si algo
+ * falla devuelve null y la invitación se queda con el texto de siempre.
+ */
+export async function leerOfertaTienda(): Promise<OfertaTienda | null> {
+  try {
+    const tid = await tenantId();
+    const [a, t] = await Promise.all([
+      supabase.from("addons").select("activo, precio_mensual_mxn").eq("codigo", "TIENDA").maybeSingle(),
+      supabase.from("tenants").select("plan:planes(features_incluidos)").eq("id", tid).maybeSingle(),
+    ]);
+    if (a.error || t.error) return null;
+    const plan = (t.data as { plan?: { features_incluidos?: unknown } | null } | null)?.plan;
+    return ofertaTienda(a.data, plan?.features_incluidos);
+  } catch {
+    return null;
+  }
 }
