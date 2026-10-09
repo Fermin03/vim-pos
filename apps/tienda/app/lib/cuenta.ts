@@ -2,10 +2,12 @@
 // MISMAS que la función, supabase/functions/_shared/tienda/validar.ts, para decir el error en el
 // campo y no después de enviar), lo que se manda, las palabras de cada error, a dónde se vuelve
 // después de entrar y cómo un pedido viejo se vuelve carrito. Puro: la pantalla solo pinta.
-import type { DatosDeCuenta, DatosDeRegistro } from "./api";
-import { agregar, carritoNuevo, productoDe, type Carrito, type ItemDeCuerpo } from "./carrito";
+import { ZONA_MX } from "@vim/fecha";
+import type { DatosDeCuenta, DatosDeRegistro, DireccionPorGuardar } from "./api";
+import { agregar, almacenDelNavegador, carritoNuevo, productoDe, type Almacen, type Carrito, type ItemDeCuerpo } from "./carrito";
 import { DE_DIRECCION, errorDeCampo, type Contexto } from "./cliente";
-import type { Menu, Modo } from "./contrato";
+import { FORMA_CODIGO, pedidosDe, type Cuenta, type DireccionGuardada, type Menu, type Modo, type PedidoDeCuenta } from "./contrato";
+import { hora12, momentoMx } from "./horario";
 import { normalizarTelefono } from "./telefono";
 import { textoDeError } from "./textos";
 
@@ -148,4 +150,123 @@ export function carritoDesdePedido(items: readonly ItemDeCuerpo[], sucursalId: s
     if (carrito === antes) descartados.push(producto?.nombre ?? null);   // `agregar` devuelve EL MISMO carrito si no entró
   }
   return { carrito, descartados };
+}
+
+// ── Lo que deciden las pantallas (entrar, registro, recuperar, «Mi cuenta», «Tus datos») ─────────
+/** `/<slug>/entrar` (o registro, recuperar) con su `?volver=`, solo si es una ruta de ese negocio distinta del menú. */
+export function enlaceDeAcceso(slug: string, pantalla: "entrar" | "registro" | "recuperar", volver?: unknown): string {
+  const destino = volverSeguro(slug, volver);
+  return `/${slug}/${pantalla}${destino === `/${slug}` ? "" : `?volver=${encodeURIComponent(destino)}`}`;
+}
+
+/** El menú de una sucursal: `?s=` solo cuando el negocio tiene más de una (así lo lee la página). */
+export const rutaDelMenu = (negocio: { slug: string; sucursales: readonly { id: string }[] }, sucursalId: string | null): string =>
+  `/${negocio.slug}${negocio.sucursales.length > 1 && sucursalId ? `?s=${sucursalId}` : ""}`;
+
+/** El `?t=` del enlace de recuperación, si tiene forma de token; lo demás es un enlace que no sirve. */
+export const tokenDelEnlace = (t: unknown): string | null => (typeof t === "string" && FORMA_CODIGO.test(t) ? t : null);
+
+/**
+ * El error de «cambiar contraseña» y «eliminar cuenta». Ahí `CREDENCIALES_INVALIDAS` es «la actual
+ * no es» (o la cuenta quedó bloqueada por intentos: no se distingue, a propósito).
+ */
+export const textoDePasswordActual = (codigo: string): string =>
+  codigo === "CREDENCIALES_INVALIDAS" ? "La contraseña actual no coincide." : textoDeCuenta(codigo);
+
+const enLista = (xs: string[]): string => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} y ${xs[xs.length - 1]}`);
+
+/** Lo que `carritoDesdePedido` no pudo meter, en palabras; null si entró todo. */
+export function textoDeDescartados(descartados: readonly (string | null)[]): string | null {
+  const nombres = [...new Set(descartados.filter((d): d is string => d !== null))];
+  const sinNombre = descartados.filter((d) => d === null).length;
+  const partes = [
+    nombres.length > 0 ? `Ya no se ${nombres.length === 1 ? "puede" : "pueden"} pedir: ${enLista(nombres)}.` : "",
+    sinNombre === 1 ? "Un producto de ese pedido ya no está en el menú." : sinNombre > 1 ? `${sinNombre} productos de ese pedido ya no están en el menú.` : "",
+  ].filter(Boolean);
+  return partes.length > 0 ? partes.join(" ") : null;
+}
+
+/** «Madero 12 int. B, Centro, 37000 León». */
+export const direccionEnUnaLinea = (d: Pick<DireccionGuardada, "calle" | "numero_exterior" | "numero_interior" | "colonia" | "codigo_postal" | "ciudad">): string =>
+  `${d.calle} ${d.numero_exterior}${d.numero_interior ? ` int. ${d.numero_interior}` : ""}, ${d.colonia}, ${d.codigo_postal} ${d.ciudad}`;
+
+// Los meses van escritos: lo que `Intl` abrevia («oct», «oct.») cambia de un navegador a otro.
+const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+const diaMx = new Intl.DateTimeFormat("en-US", { timeZone: ZONA_MX, day: "numeric", month: "numeric" });
+
+/** Cuándo se hizo un pedido, en hora de México: «8 oct, 2:00 p. m.». Vacío si no es una fecha. */
+export function fechaDePedido(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const p = Object.fromEntries(diaMx.formatToParts(d).map((x) => [x.type, x.value]));
+  return `${p.day} ${MESES[Number(p.month) - 1]!.slice(0, 3)}, ${hora12(momentoMx(d).hora)}`;
+}
+
+/** `1990-05-17` → «17 de mayo de 1990». Sin pasar por `Date`: una fecha sin hora no tiene zona que la corra. */
+export function fechaDeNacimiento(fecha: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fecha);
+  const mes = m && MESES[Number(m[2]) - 1];
+  return m && mes ? `${Number(m[3])} de ${mes} de ${m[1]}` : "";
+}
+
+/** La cuenta → el formulario de «Mis datos». */
+export const formularioDeCuenta = (c: Cuenta): Record<(typeof FORMULARIOS.datos)[number], string> =>
+  ({ nombre: c.nombre, apellido: c.apellido ?? "", telefono: c.telefono, fechaNacimiento: c.fecha_nacimiento ?? "" });
+
+/** La cuenta → lo que prellena «Tus datos» de un pedido (ahí el nombre es uno solo). */
+export const paraTusDatos = (c: Cuenta): { nombre: string; telefono: string; email: string } =>
+  ({ nombre: [c.nombre, c.apellido].filter(Boolean).join(" "), telefono: c.telefono, email: c.email });
+
+const DIRECCION_VACIA = Object.fromEntries(["etiqueta", ...DE_DIRECCION].map((c) => [c, ""])) as Record<CampoDeDireccion, string>;
+
+/** Una dirección guardada (o ninguna) → su formulario. */
+export const formularioDeDireccion = (d: DireccionGuardada | null): Record<CampoDeDireccion, string> => (d === null ? DIRECCION_VACIA : {
+  etiqueta: d.etiqueta, calle: d.calle, numeroExterior: d.numero_exterior, numeroInterior: d.numero_interior ?? "", colonia: d.colonia,
+  codigoPostal: d.codigo_postal, ciudad: d.ciudad, estado: d.estado, referencias: d.referencias ?? "",
+});
+
+/** Un formulario YA validado (`erroresDeDireccion` vacío) → lo que manda `guardarDireccion`. `id: null` = nueva. */
+export function direccionPorGuardar(f: Record<CampoDeDireccion, string>, id: string | null): DireccionPorGuardar {
+  const t = (c: CampoDeDireccion) => f[c].trim();
+  return {
+    id, etiqueta: t("etiqueta"), calle: t("calle"), numero_exterior: t("numeroExterior"), numero_interior: t("numeroInterior") || null,
+    colonia: t("colonia"), codigo_postal: t("codigoPostal"), ciudad: t("ciudad"), estado: t("estado"), referencias: t("referencias") || null,
+  };
+}
+
+// ── El relevo de «Pedir de nuevo» ────────────────────────────────────────────────────────────────
+// «Mi cuenta» no tiene el menú; la página del menú sí. La cuenta DEJA el pedido en el teléfono y
+// navega; el menú de esa sucursal lo TOMA (una vez), arma el carrito con `carritoDesdePedido` y
+// avisa lo que ya no está. Lo dejado se lee como lo que es, texto de fuera: pasa por `pedidosDe`.
+export const claveDeRepetir = (slug: string): string => `vim.tienda.${slug}.repetir`;
+/** Lo dejado vale para la navegación que sigue, no para una visita de otro día. */
+const REPETIR_VALE_MS = 2 * 60_000;
+
+/** `false` = no se pudo dejar (sin `items`, sin almacén o almacén lleno): no tiene caso navegar. */
+export function dejarPorRepetir(slug: string, pedido: PedidoDeCuenta, almacen: Almacen | null = almacenDelNavegador(), ahora: number = Date.now()): boolean {
+  if (!pedido.items || !almacen) return false;
+  try {
+    almacen.setItem(claveDeRepetir(slug), JSON.stringify({ cuando: ahora, pedido }));
+    return true;
+  } catch { return false; }
+}
+
+/** Lo dejado para ESA sucursal, ya vuelto carrito; null si no hay. Siempre lo borra: se toma una vez. */
+export function tomarPorRepetir(
+  slug: string, sucursalId: string, menu: Menu, almacen: Almacen | null = almacenDelNavegador(), ahora: number = Date.now(),
+): { carrito: Carrito; descartados: (string | null)[] } | null {
+  try {
+    const crudo = almacen?.getItem(claveDeRepetir(slug));
+    if (!crudo) return null;
+    almacen?.removeItem(claveDeRepetir(slug));
+    const x: unknown = JSON.parse(crudo);
+    if (typeof x !== "object" || x === null) return null;
+    const { cuando, pedido: dejado } = x as { cuando?: unknown; pedido?: unknown };
+    const pedido = pedidosDe({ pedidos: [dejado] })?.[0];
+    if (typeof cuando !== "number" || ahora - cuando > REPETIR_VALE_MS || !pedido?.items || pedido.sucursal_id !== sucursalId) return null;
+    return carritoDesdePedido(pedido.items, sucursalId, pedido.modo, menu);
+  } catch {
+    try { almacen?.removeItem(claveDeRepetir(slug)); } catch { /* sin almacén no hay nada que limpiar */ }
+    return null;
+  }
 }

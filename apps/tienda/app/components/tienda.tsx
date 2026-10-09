@@ -7,12 +7,14 @@
 // `paso === "datos"`; lo que necesita de aquí es `PropsDelPasoDeDatos`.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { botonClases, cn } from "@vim/ui/styles";
+import { Aviso, botonClases, cn } from "@vim/ui/styles";
+import { leerCuenta } from "../lib/api";
 import {
   aCuerpo, agregar, cambiarCantidad, contarPiezas, estimarTotal, guardarCarrito, leerCarrito, quitar, revalidar, vaciar,
   type Carrito, type Seleccion,
 } from "../lib/carrito";
-import type { Menu, Negocio, Producto, Sucursal } from "../lib/contrato";
+import type { Menu, MiCuenta, Negocio, Producto, Sucursal } from "../lib/contrato";
+import { rutaDelMenu, textoDeDescartados, tomarPorRepetir } from "../lib/cuenta";
 import { formato } from "../lib/dinero";
 import { semanaLegible, type Momento } from "../lib/horario";
 import { carritoPara, motivoDeCierre, renglonesDelError } from "../lib/pantalla";
@@ -82,12 +84,31 @@ function Encabezado({ negocio, sucursal, carrito, ahora, alCambiarSucursal, chil
   );
 }
 
-export function Tienda({ negocio, sucursal, menu, ahora }: {
+export function Tienda({ negocio, sucursal, menu, ahora, conSesion }: {
   negocio: Negocio; sucursal: Sucursal; menu: Menu;
   /** El momento (hora de México) con el que el servidor pintó: el navegador usa el mismo para que el HTML coincida. */
   ahora: Momento;
+  /** Hay cookie de cuenta de este negocio (lo vio el servidor). Si sigue viva lo dice la función al usarla. */
+  conSesion: boolean;
 }) {
   const router = useRouter();
+  // La cuenta se pide al llegar, no al abrir «Tus datos»: cuando el cliente llega ahí ya está y el
+  // formulario no cambia bajo sus dedos. Si no llega (sin red), «Tus datos» es el de siempre y el
+  // pedido se liga igual a la cuenta; si la sesión ya no vale, desde aquí es un invitado.
+  const [sesion, setSesion] = useState(conSesion);
+  const [mi, setMi] = useState<MiCuenta | null>(null);
+  useEffect(() => {
+    if (!conSesion) return;
+    const corte = new AbortController();
+    void leerCuenta(negocio.slug, corte.signal).then((r) => {
+      if (corte.signal.aborted) return;
+      if (r.ok) setMi(r.datos);
+      else if (r.error === "SESION_INVALIDA") setSesion(false);
+    });
+    return () => corte.abort();
+  }, [conSesion, negocio.slug]);
+  /** «Pedir de nuevo» desde «Mi cuenta»: lo que ya no entró, para decirlo en el carrito. */
+  const [noEntro, setNoEntro] = useState<string | null>(null);
   // null = todavía no se lee el teléfono. Mientras, se pinta con un carrito vacío de esta sucursal:
   // es lo mismo que pintó el servidor, y la barra del carrito solo aparece cuando ya se sabe.
   const [guardado, setCarrito] = useState<Carrito | null>(null);
@@ -121,6 +142,16 @@ export function Tienda({ negocio, sucursal, menu, ahora }: {
   }, [router]);
 
   useEffect(() => {
+    // «Pedir de nuevo»: «Mi cuenta» dejó un pedido para esta sucursal. Se arma contra el menú de ahora
+    // y, si algo entró, reemplaza al carrito guardado (se guarda ya: en desarrollo este efecto corre
+    // dos veces y lo dejado se toma una sola). Si nada entró, el carrito que hubiera no se toca.
+    const repetido = tomarPorRepetir(negocio.slug, sucursal.id, menu);
+    if (repetido) {
+      const entro = repetido.carrito.renglones.length > 0, falto = textoDeDescartados(repetido.descartados);
+      if (entro) guardarCarrito(negocio.slug, repetido.carrito);
+      setNoEntro(entro ? falto : `No pudimos armar ese pedido. ${falto ?? ""}`.trim());
+      setPaso("carrito");
+    }
     const leido = leerCarrito(negocio.slug);
     const deOtra = leido && leido.sucursalId !== sucursal.id && leido.renglones.length > 0
       && negocio.sucursales.some((s) => s.id === leido.sucursalId);
@@ -208,13 +239,22 @@ export function Tienda({ negocio, sucursal, menu, ahora }: {
             alCambiarElTotal={cotizado.reintentar}
             // Llega con el resultado del envío, antes de que el candado se suelte: por eso no pasa por `pasar`.
             alErrorDeCarrito={(e) => { setErrorDeEnvio(e); setPaso("carrito"); }}
-            alPedidoHecho={() => { setNota(""); cambiar(vaciar); }} />
+            alPedidoHecho={() => { setNota(""); cambiar(vaciar); }}
+            cuenta={sesion ? mi : null} conSesion={sesion} alTerminarLaSesion={() => { setSesion(false); setMi(null); }}
+            deVuelta={rutaDelMenu(negocio, sucursal.id)} />
         ) : (
+          <>
+          {noEntro && (
+            <div className="px-4 pt-3" aria-live="polite">
+              <Aviso tono="warning" className="!text-14" onCerrar={() => setNoEntro(null)}>{noEntro}</Aviso>
+            </div>
+          )}
           <VistaDelCarrito sucursal={sucursal} carrito={carrito} menu={menu} ahora={ahora} avisos={avisos} cotizado={cotizado}
             nota={nota} alCambiarNota={setNota}
             alCambiarCantidad={(id, n) => cambiar((c) => cambiarCantidad(c, id, n))} alQuitar={(id) => cambiar((c) => quitar(c, id))}
             alCambiarModo={(modo) => cambiar((c) => ({ ...c, modo }))} alCambiarZona={(zonaId) => cambiar((c) => ({ ...c, zonaId }))}
             alContinuar={() => pasar("datos")} alCerrar={() => pasar("menu")} />
+          </>
         )}
       </Hoja>
 

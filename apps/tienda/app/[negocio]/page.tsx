@@ -6,11 +6,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Fallo } from "../components/piezas";
 import { Tienda } from "../components/tienda";
 import { momentoMx } from "../lib/horario";
 import { urlDeLogo } from "../lib/imagen";
 import { modosDe, motivoDeCierre, sucursalElegida } from "../lib/pantalla";
 import { leerMenu, negocioDeLaPeticion } from "../lib/servidor/funcion";
+import { haySesion } from "../lib/servidor/sesion";
 import { textoCerrada } from "../lib/textos";
 
 type Props = { params: Promise<{ negocio: string }>; searchParams: Promise<{ s?: string | string[] }> };
@@ -29,19 +31,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     alternates: { canonical: `/${slug}` },
     openGraph: { type: "website", locale: "es_MX", siteName: nombre, title, description, url: `/${slug}`, ...(logo && { images: [{ url: logo, alt: `Logo de ${nombre}` }] }) },
   };
-}
-
-function Fallo({ titulo, hacer, reintentar }: { titulo: string; hacer: string; reintentar?: string }) {
-  return (
-    <main className="px-6 py-16 text-center">
-      <h1 className="font-display text-20 font-semibold">{titulo}</h1>
-      <p className="mt-2 text-16 text-ink-2">{hacer}</p>
-      {reintentar && (
-        // Un enlace normal, no <Link>: tiene que volver a pedir la página entera al servidor.
-        <a href={reintentar} className="mt-6 inline-flex h-12 items-center rounded border border-line-strong px-5 font-display text-15 font-semibold text-ink hover:bg-hover">Volver a intentar</a>
-      )}
-    </main>
-  );
 }
 
 export default async function PaginaDelNegocio({ params, searchParams }: Props) {
@@ -81,5 +70,7 @@ export default async function PaginaDelNegocio({ params, searchParams }: Props) 
     return <Fallo titulo="No pudimos cargar el menú" hacer="Vuelve a intentar en unos minutos." reintentar={`/${negocio.slug}${negocio.sucursales.length > 1 ? `?s=${sucursal.id}` : ""}`} />;
   }
   // La llave: al cambiar de sucursal la tienda arranca de cero (otro menú, otro carrito).
-  return <main><Tienda key={sucursal.id} negocio={negocio} sucursal={sucursal} menu={menu.datos} ahora={ahora} /></main>;
+  // `conSesion` solo dice que hay cookie de cuenta: la tienda lee la cuenta desde el navegador (es del
+  // visitante; el negocio y el menú de arriba siguen saliendo de su caché, que no la conoce).
+  return <main><Tienda key={sucursal.id} negocio={negocio} sucursal={sucursal} menu={menu.datos} ahora={ahora} conSesion={await haySesion(negocio.slug)} /></main>;
 }
