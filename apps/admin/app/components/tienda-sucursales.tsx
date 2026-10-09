@@ -31,7 +31,7 @@ export function TiendaSucursales({
   ocupado: boolean;
   soloLectura: boolean;
   mensajeDe: (id: string) => MensajeTienda | null;
-  /** true = se guardó y ya se volvió a leer. */
+  /** true = se guardó. */
   onGuardar: Guardar;
 }) {
   return (
@@ -100,7 +100,7 @@ function TarjetaSucursal({
 
   async function guardar() {
     if (!borrador || !sinGuardar || conError) return;
-    // Solo esta tarjeta suelta su borrador, y solo si de verdad se guardó y se volvió a leer.
+    // Solo esta tarjeta suelta su borrador, y solo si de verdad se guardó.
     if (await onGuardar(s.id, borrador)) setBorrador(null);
   }
 

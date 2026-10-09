@@ -19,7 +19,9 @@ export default function TiendaPage() {
   const t = useTienda();
   // Servicio suspendido: el panel queda en solo lectura (ADR 0014).
   const soloLectura = useAccesoTenant().nivel === "bloqueado";
-  const ocupado = t.ocupado !== null;
+  const escribiendo = t.ocupado !== null;
+  // Tampoco se guarda nada mientras falte volver a leer después de un guardado.
+  const ocupado = escribiendo || t.sinLeer;
 
   return (
     <>
@@ -77,7 +79,7 @@ export default function TiendaPage() {
               onGuardar={t.guardarSucursal}
             />
 
-            {t.leido.config && <TiendaCompartir direccion={t.leido.config.direccion} encendida={t.encendida} />}
+            {t.leido.config && <TiendaCompartir direccion={t.leido.config.direccion} encendida={t.encendida} enPlan={t.leido.enPlan} />}
           </div>
         )}
       </PageBody>
@@ -88,7 +90,7 @@ export default function TiendaPage() {
           consecuencia="Tus clientes dejarán de poder pedir. Los pedidos que ya entraron se atienden igual."
           error={t.errorDialogo}
           boton="Apagar"
-          ocupado={ocupado}
+          ocupado={escribiendo}
           textoOcupado="Apagando…"
           ancho="sm"
           onConfirmar={t.confirmarApagar}
@@ -102,7 +104,7 @@ export default function TiendaPage() {
           consecuencia="Dejarán de funcionar los códigos QR que ya imprimiste y los enlaces de seguimiento de los pedidos en curso."
           error={t.errorDialogo}
           boton="Cambiar dirección"
-          ocupado={ocupado}
+          ocupado={escribiendo}
           textoOcupado="Cambiando…"
           ancho="sm"
           onConfirmar={t.confirmarDireccion}

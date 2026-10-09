@@ -1,8 +1,10 @@
 "use client";
+import { useState } from "react";
 import { Button, cn } from "@vim/ui/styles";
 import { label } from "./campos";
 import { Tarjeta } from "./tarjeta";
 import { LineaMensaje, type MensajeTienda } from "./tienda-mensaje";
+import { normalizarDireccion } from "../lib/tienda-pagina";
 import { BASE_TIENDA, errorDeDireccion } from "../lib/tienda-reglas";
 
 const ayuda = "mt-1 text-12 text-ink-3";
@@ -31,25 +33,30 @@ export function TiendaDatos({
   onCambio: (cambio: Partial<DatosTienda>) => void;
   onGuardar: () => void;
 }) {
+  // Mientras se escribe no se corrige ni se regaña: el cursor no brinca y «mi tienda» no sale en rojo
+  // por el espacio. Al salir del campo se normaliza (minúsculas, guiones) y entonces sí se valida.
+  const [direccionVista, setDireccionVista] = useState(false);
+  const normal = normalizarDireccion(valores.direccion);
   // Vacía todavía no es un error: es un campo sin llenar. Guardar queda apagado igual.
-  const errorDireccion = valores.direccion === "" ? null : errorDeDireccion(valores.direccion);
-  const sinDireccion = errorDeDireccion(valores.direccion) !== null;
+  const errorDireccion = direccionVista && normal !== "" ? errorDeDireccion(normal) : null;
+  const sinDireccion = errorDeDireccion(normal) !== null;
 
   return (
     <Tarjeta titulo="Tu tienda">
       <div className="grid grid-cols-1 gap-4">
         <div>
           <label className={label} htmlFor="tie-direccion">Dirección</label>
+          {/* En celular el prefijo va arriba y el campo ocupa todo el ancho; desde `sm`, en un renglón. */}
           <div
             className={cn(
-              "flex h-11 items-center rounded border focus-within:shadow-[0_0_0_3px_rgba(22,22,26,.06)]",
+              "flex flex-col rounded border focus-within:shadow-[0_0_0_3px_rgba(22,22,26,.06)] sm:h-11 sm:flex-row sm:items-center",
               errorDireccion ? "border-danger" : "border-line-strong focus-within:border-ink",
             )}
           >
-            <span className="flex-shrink-0 pl-3 text-14 text-ink-3" aria-hidden="true">{BASE_TIENDA}/</span>
+            <span className="flex-shrink-0 px-3 pt-2 text-16 text-ink-3 sm:pr-0 sm:pt-0 lg:text-14" aria-hidden="true">{BASE_TIENDA}/</span>
             <input
               id="tie-direccion"
-              className="h-full min-w-0 flex-1 bg-transparent pr-3 text-sm outline-none disabled:opacity-50"
+              className="h-11 w-full min-w-0 bg-transparent px-3 text-sm lowercase outline-none disabled:opacity-50 sm:h-full sm:flex-1 sm:pl-0"
               value={valores.direccion}
               maxLength={40}
               autoCapitalize="none"
@@ -60,7 +67,8 @@ export function TiendaDatos({
               disabled={soloLectura}
               aria-invalid={errorDireccion ? true : undefined}
               aria-describedby="tie-direccion-ayuda"
-              onChange={(e) => onCambio({ direccion: e.target.value.toLowerCase().replace(/\s+/g, "-") })}
+              onChange={(e) => { setDireccionVista(false); onCambio({ direccion: e.target.value }); }}
+              onBlur={() => { setDireccionVista(true); if (normal !== valores.direccion) onCambio({ direccion: normal }); }}
             />
           </div>
           <p id="tie-direccion-ayuda" className={cn("mt-1 text-12", errorDireccion ? "font-medium text-danger" : "text-ink-3")} role={errorDireccion ? "alert" : undefined}>

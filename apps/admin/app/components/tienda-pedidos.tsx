@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { Button, cn } from "@vim/ui/styles";
 import { label } from "./campos";
 import { Segmentos } from "./controles";
@@ -42,7 +43,9 @@ export function TiendaPedidos({
   onGuardar: () => void;
 }) {
   const n = Number(valores.minutos);
-  const minutosMal = valores.minutos !== "" && (n < 3 || n > 15);
+  // El error sale al dejar el campo, no a media tecla: «1» camino de «12» no es un error.
+  const [minutosVisto, setMinutosVisto] = useState(false);
+  const minutosMal = minutosVisto && (valores.minutos === "" || n < 3 || n > 15);
   // No se pueden desmarcar las dos: la única marcada queda fija.
   const soloEfectivo = valores.pagoEfectivo && !valores.pagoTarjeta;
   const soloTarjeta = valores.pagoTarjeta && !valores.pagoEfectivo;
@@ -56,8 +59,8 @@ export function TiendaPedidos({
             etiqueta="Aceptación"
             opciones={ACEPTACION}
             valor={valores.aceptacion}
-            onCambiar={(v) => { if (!soloLectura) onCambio({ aceptacion: v }); }}
-            className={cn(soloLectura && "pointer-events-none opacity-50")}
+            onCambiar={(v) => onCambio({ aceptacion: v })}
+            deshabilitado={soloLectura}
           />
           <p className={ayuda} aria-live="polite">
             {valores.aceptacion === "MANUAL"
@@ -78,9 +81,11 @@ export function TiendaPedidos({
               value={valores.minutos}
               disabled={soloLectura}
               aria-invalid={minutosMal ? true : undefined}
-              aria-describedby="tie-minutos-ayuda"
+              aria-describedby={minutosMal ? "tie-minutos-error tie-minutos-ayuda" : "tie-minutos-ayuda"}
+              onBlur={() => setMinutosVisto(true)}
               onChange={(e) => onCambio({ minutos: e.target.value.replace(/\D/g, "") })}
             />
+            {minutosMal && <p id="tie-minutos-error" role="alert" className="mt-1 text-12 font-medium text-danger">Los minutos para aceptar van de 3 a 15.</p>}
             <p id="tie-minutos-ayuda" className={ayuda}>
               De 3 a 15. Si nadie responde en ese tiempo, el pedido se cancela solo y el cliente se entera.
             </p>

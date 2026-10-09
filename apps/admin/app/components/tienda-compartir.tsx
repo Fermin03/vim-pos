@@ -7,7 +7,12 @@ import { Tarjeta } from "./tarjeta";
 import { BASE_TIENDA } from "../lib/tienda-reglas";
 
 /** Bloque 5: el enlace y el QR de la tienda. Solo existe con una dirección ya guardada. */
-export function TiendaCompartir({ direccion, encendida }: { direccion: string; encendida: boolean }) {
+export function TiendaCompartir({ direccion, encendida, enPlan }: {
+  direccion: string;
+  encendida: boolean;
+  /** false = el complemento venció: encenderla no está en manos del dueño. */
+  enPlan: boolean;
+}) {
   const lienzo = useRef<HTMLCanvasElement>(null);
   const enlace = `https://${BASE_TIENDA}/${direccion}`;
 
@@ -23,9 +28,13 @@ export function TiendaCompartir({ direccion, encendida }: { direccion: string; e
     <Tarjeta titulo="Compartir">
       <div className="flex items-center gap-3">
         <p className="min-w-0 flex-1 break-all text-14 font-medium text-ink">{enlace}</p>
-        <BotonCopiar valor={enlace} etiqueta="el enlace de tu tienda" />
+        <BotonCopiar valor={enlace} etiqueta="el enlace de tu tienda" alto="h-11" />
       </div>
-      {!encendida && <p className="mt-2 text-13 text-ink-2">El enlace funciona cuando enciendas tu tienda.</p>}
+      {!encendida && (
+        <p className="mt-2 text-13 text-ink-2">
+          {enPlan ? "El enlace funciona cuando enciendas tu tienda." : "Tu plan ya no incluye la tienda en línea."}
+        </p>
+      )}
 
       <div className="mt-5 flex flex-wrap items-end gap-4">
         {/* 512 px por dentro para que el PNG descargado sirva para imprimir; en pantalla, 192.
