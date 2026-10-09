@@ -56,10 +56,13 @@ export type Cupos = { antes: Cupo[]; despuesDelCaptcha: Cupo[]; alFallar: "abrir
  * nueva no compile hasta que alguien decida su cupo (antes caía sola en la bolsa de lecturas, que
  * abre si el control falla).
  *   · `entrar`, `registrar`, `recuperar_*` escriben (sesiones, cuentas, enlaces, correos): cierran.
- *   · En `recuperar_pedir` el cupo por correo va DESPUÉS del antirobot, como el del negocio en
- *     `pedir`: gastado al entrar, tres peticiones sin token dejarían a cualquiera sin poder recuperar
- *     su cuenta durante una hora. `huellaCorreo` es la huella de negocio+correo (64 hex), nunca el
- *     correo: la clave se guarda en la tabla de cupos.
+ *   · En `registrar` y `recuperar_pedir` hay además un cupo por DESTINATARIO (3 por hora): las dos
+ *     mandan un correo a una dirección que nadie ha verificado, y sin él cada intento repetido es
+ *     otro correo nuestro en el buzón de un tercero. Va DESPUÉS del antirobot, como el del negocio en
+ *     `pedir`: gastado al entrar, tres peticiones sin token dejarían a cualquiera sin poder
+ *     registrarse o recuperar su cuenta durante una hora. `huellaCorreo` es la huella de
+ *     negocio+correo (64 hex), nunca el correo: la clave se guarda en la tabla de cupos. Cada acción
+ *     tiene su bolsa: agotar una no cierra la otra.
  *   · «Mi cuenta» tiene su bolsa. Leer y salir dejan pasar si el control falla (si la base no
  *     responde, la RPC tampoco); lo que cambia algo, cierra.
  */
@@ -72,10 +75,11 @@ export function cuposDe(accion: Peticion["accion"], ip: string, negocio: string,
     case "negocio": case "menu": case "cotizar": return porIp("lee", 600, 120, "abrir");
     case "pedir": return porIp("pide", 3600, 5, "cerrar", [{ clave: `tienda:pide:negocio:${negocio}`, ventanaSeg: 3600, max: 60 }]);
     case "entrar": return porIp("entra", 600, 10, "cerrar");
-    case "registrar": return porIp("registra", 3600, 5, "cerrar");
-    case "recuperar_pedir":
-      if (!/^[0-9a-f]{64}$/.test(huellaCorreo ?? "")) throw new Error("cuposDe: recuperar_pedir necesita la huella del correo");
-      return porIp("recupera", 3600, 3, "cerrar", [{ clave: `tienda:recupera:correo:${huellaCorreo}`, ventanaSeg: 3600, max: 3 }]);
+    case "registrar": case "recuperar_pedir": {
+      if (!/^[0-9a-f]{64}$/.test(huellaCorreo ?? "")) throw new Error(`cuposDe: ${accion} necesita la huella del correo`);
+      const bolsa = accion === "registrar" ? "registra" : "recupera";
+      return porIp(bolsa, 3600, accion === "registrar" ? 5 : 3, "cerrar", [{ clave: `tienda:${bolsa}:correo:${huellaCorreo}`, ventanaSeg: 3600, max: 3 }]);
+    }
     case "recuperar_aplicar": return porIp("aplica", 3600, 10, "cerrar");
     case "cuenta": case "mis_pedidos": case "salir": return porIp("cuenta", 600, 60, "abrir");
     case "cuenta_guardar": case "cuenta_password": case "direccion_guardar": case "direccion_borrar": case "eliminar_cuenta":

@@ -200,9 +200,10 @@ test("cupos: entrar es 10 cada 10 min por IP y cierra", () => {
     antes: [{ clave: "tienda:entra:ip:1.2.3.4", ventanaSeg: 600, max: 10 }], despuesDelCaptcha: [], alFallar: "cerrar",
   });
 });
-test("cupos: registrar es 5 por hora por IP y cierra", () => {
-  assert.deepEqual(cuposDe("registrar", "1.2.3.4", "knockout"), {
-    antes: [{ clave: "tienda:registra:ip:1.2.3.4", ventanaSeg: 3600, max: 5 }], despuesDelCaptcha: [], alFallar: "cerrar",
+test("cupos: registrar es 5 por hora por IP y, pasado el antirobot, 3 por hora por huella de correo+negocio; cierra", () => {
+  assert.deepEqual(cuposDe("registrar", "1.2.3.4", "knockout", H), {
+    antes: [{ clave: "tienda:registra:ip:1.2.3.4", ventanaSeg: 3600, max: 5 }],
+    despuesDelCaptcha: [{ clave: `tienda:registra:correo:${H}`, ventanaSeg: 3600, max: 3 }], alFallar: "cerrar",
   });
 });
 test("cupos: pedir recuperación es 3 por hora por IP y, pasado el antirobot, 3 por hora por huella de correo+negocio; cierra", () => {
@@ -212,9 +213,14 @@ test("cupos: pedir recuperación es 3 por hora por IP y, pasado el antirobot, 3 
     alFallar: "cerrar",
   });
 });
-test("cupos: pedir recuperación sin la huella del correo es un error de quien llama, no un cupo de menos", () => {
-  assert.throws(() => cuposDe("recuperar_pedir", "1.2.3.4", "knockout"));
-  assert.throws(() => cuposDe("recuperar_pedir", "1.2.3.4", "knockout", "ana@example.com"), "un correo en claro no es una huella");
+test("cupos: registrar o pedir recuperación sin la huella del correo es un error de quien llama, no un cupo de menos", () => {
+  for (const accion of ["recuperar_pedir", "registrar"] as const) {
+    assert.throws(() => cuposDe(accion, "1.2.3.4", "knockout"), accion);
+    assert.throws(() => cuposDe(accion, "1.2.3.4", "knockout", "ana@example.com"), "un correo en claro no es una huella");
+  }
+});
+test("cupos: el tope por correo de registrar y el de recuperar son bolsas distintas", () => {
+  assert.notEqual(cuposDe("registrar", "1.2.3.4", "knockout", H).despuesDelCaptcha[0]!.clave, cuposDe("recuperar_pedir", "1.2.3.4", "knockout", H).despuesDelCaptcha[0]!.clave);
 });
 test("cupos: aplicar la recuperación es 10 por hora por IP y cierra", () => {
   assert.deepEqual(cuposDe("recuperar_aplicar", "1.2.3.4", "knockout"), {

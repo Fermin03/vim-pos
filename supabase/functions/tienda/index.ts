@@ -40,9 +40,22 @@
 //     cuentas NADA: ni contraseña, ni token de sesión o de recuperación, ni correo. (El slug del
 //     negocio sí puede ir: no es dato personal.)
 //   · El código de seguimiento existe en la respuesta de `pedir` y en el correo. En la base, su huella.
-//   · Si un correo tiene cuenta. `registrar` y `recuperar_pedir` hacen el mismo camino exista o no
-//     (mismos cupos, mismo antirobot, misma RPC, correo en segundo plano) y `entrar` contesta lo
-//     mismo a una contraseña mala, a una cuenta que no existe y a una bloqueada.
+//   · Si un correo tiene cuenta, en `entrar` y `recuperar_pedir`: `entrar` contesta lo mismo a una
+//     contraseña mala, a una cuenta que no existe y a una bloqueada, y `recuperar_pedir` hace el
+//     mismo camino exista o no (mismos cupos, mismo antirobot, misma RPC, correo en segundo plano).
+//
+// LO QUE SÍ SE PUEDE DEDUCIR (aceptado, ADR 0032)
+//   `registrar` deja saber si un correo ya es cliente de ESE restaurante: el alta nueva contesta con
+//   la cuenta y abre sesión; el correo ya usado contesta `{ ok: true }` a secas. Es consecuencia de
+//   entrar de una vez al registrarse, sin confirmar el correo (decisión de producto). Lo acota el
+//   antirobot, 5 intentos por hora por IP y 3 por hora por correo; y quien pregunta por un correo que
+//   NO era cliente deja una cuenta creada y una bienvenida en ese buzón. Los dos caminos tardan lo
+//   mismo (el `crypt()` corre con o sin conflicto), pero la respuesta no es la misma.
+//
+// LOS CORREOS DE CUENTA NO LLEVAN TEXTO DE QUIEN ESCRIBE
+//   Van a una dirección que nadie ha verificado, así que no llevan el nombre que se tecleó en el
+//   formulario (ver _shared/tienda/correo-cuenta.ts), y `registrar` y `recuperar_pedir` tienen un
+//   tope por destinatario además del de la IP.
 //
 // El negocio sale SIEMPRE del slug (`tienda_negocio`), nunca de un id que mande quien llama, y toda
 // RPC va acotada a ese tenant. La lógica (precios, horario, topes, contraseñas, bloqueo) vive en las
@@ -166,8 +179,14 @@ async function cuentas(p: PeticionDeCuenta, c: { admin: Admin; negocio: Negocio;
   if (p.accion === "registrar") {
     const no = await antirobot(p.captcha, "tienda_registro", c.ip);
     if (no) return no;
+    // El cupo por correo, solo después del antirobot (ver cuposDe): cada intento manda un correo a
+    // una dirección sin verificar. Agotado → 429, como los demás cupos, exista o no la cuenta: no se
+    // disfraza de `{ ok: true }` porque esa respuesta ya significa «ese correo tenía cuenta», y la
+    // pantalla diría «revisa tu correo» por un correo que no salió.
+    const cupoCorreo = await consumirCupos(admin, c.cupos.despuesDelCaptcha, c.cupos.alFallar);
+    if (!cupoCorreo.permitido) return sinCupo(cupoCorreo);
     // El token se genera y se resume SIEMPRE, antes de saber si el correo ya tenía cuenta: los dos
-    // caminos hacen lo mismo hasta la respuesta. (El `crypt()` de relleno es cosa del SQL.)
+    // caminos hacen el mismo trabajo. (El hash de la contraseña se calcula en el SQL en los dos.)
     const sesion = nuevoCodigo();
     const r = await admin.rpc("tienda_cuenta_registrar", {
       p_tenant, p_nombre: p.nombre, p_apellido: p.apellido, p_email: p.email, p_telefono: p.telefono,
@@ -176,11 +195,11 @@ async function cuentas(p: PeticionDeCuenta, c: { admin: Admin; negocio: Negocio;
     if (r.error) return rechazo("tienda_cuenta_registrar", r.error);
     const reg = leerRegistro(r.data);
     if (!reg) return inesperada("tienda_cuenta_registrar");
-    const nombre = reg.creada ? reg.cuenta.nombre : null;
-    correoDeCuenta(p.email, "registro", (base) => nombre === null
-      ? correoYaTienesCuenta({ negocio: negocio.nombre, slug, base })
-      : correoDeBienvenida({ negocio: negocio.nombre, slug, base, nombre }));
-    // Correo ya usado: mismo 200, sin sesión y sin decir por qué. El aviso le llega al dueño del correo.
+    // Ninguno de los dos lleva el nombre que se tecleó: la dirección puede ser de otra persona.
+    const { creada } = reg;
+    correoDeCuenta(p.email, "registro", (base) => (creada ? correoDeBienvenida : correoYaTienesCuenta)({ negocio: negocio.nombre, slug, base }));
+    // Correo ya usado: 200 sin sesión ni cuenta. La pantalla dice «revisa tu correo» y el aviso le
+    // llega al dueño de la dirección. Quien mira la respuesta SÍ distingue los dos casos (ver arriba).
     return reg.creada ? json({ ok: true, sesion, cuenta: reg.cuenta }) : json({ ok: true });
   }
 
@@ -205,8 +224,7 @@ async function cuentas(p: PeticionDeCuenta, c: { admin: Admin; negocio: Negocio;
     if (r.error) return rechazo("tienda_recuperar_pedir", r.error);
     // Con datos = la cuenta existe: sale el correo con el enlace. Sin datos, nada. La respuesta es la misma.
     if (r.data !== null && typeof r.data === "object") {
-      const nombre = typeof (r.data as { nombre?: unknown }).nombre === "string" ? (r.data as { nombre: string }).nombre : "";
-      correoDeCuenta(p.email, "recuperación", (base) => correoDeRecuperacion({ negocio: negocio.nombre, slug, base, nombre, token }));
+      correoDeCuenta(p.email, "recuperación", (base) => correoDeRecuperacion({ negocio: negocio.nombre, slug, base, token }));
     }
     return json({ ok: true });
   }
@@ -314,7 +332,8 @@ async function atender(req: Request): Promise<Response> {
   // Sin IP, todos los que piden comparten un contador de 5 por hora: que quede en el log.
   if (p.accion === "pedir" && ip === "desconocida") registrarError("tienda", "IP_CLIENTE_DESCONOCIDA", p.negocio);
   // El correo no va en claro a la tabla de cupos: su huella, atada al negocio.
-  const cupos = cuposDe(p.accion, ip, p.negocio, p.accion === "recuperar_pedir" ? await huellaDe(`${p.negocio}:${p.email}`) : undefined);
+  const conCorreo = p.accion === "registrar" || p.accion === "recuperar_pedir";
+  const cupos = cuposDe(p.accion, ip, p.negocio, conCorreo ? await huellaDe(`${p.negocio}:${p.email}`) : undefined);
   const cupoIp = await consumirCupos(admin, cupos.antes, cupos.alFallar);
   if (!cupoIp.permitido) return sinCupo(cupoIp);
 
