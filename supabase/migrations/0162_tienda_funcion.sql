@@ -735,3 +735,76 @@ END;
 $$;
 REVOKE ALL ON FUNCTION tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid) TO service_role;
+
+-- ── §5 Seguimiento ───────────────────────────────────────────────────────────
+-- Lo que ve el cliente con su enlace. La huella es la única llave: quien la tiene ve ESE pedido y
+-- nada más, y por eso no se devuelve ningún dato personal (ni teléfono, ni correo, ni dirección).
+--
+-- De dónde sale el estado: con caja instalada (gestion ESCRITORIO) el ticket vive en la caja y la
+-- nube solo sabe lo que la caja reporta en delivery_pedidos.estado. Sin caja (NUBE) el ticket está
+-- aquí, y el estado se deriva de él al leer, con la misma regla que usará el agente de la caja
+-- (diseño §8): cancelado > cobrado > impreso o con repartidor.
+CREATE OR REPLACE FUNCTION tienda_seguimiento(p_tenant uuid, p_seguimiento_hash text)
+RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_p      delivery_pedidos%ROWTYPE;
+  v_estado text;
+  v_t      record;
+  v_envio_total numeric(12,2);
+BEGIN
+  IF p_seguimiento_hash IS NULL OR p_seguimiento_hash !~ '^[0-9a-f]{64}$' THEN RETURN NULL; END IF;
+  SELECT * INTO v_p FROM delivery_pedidos
+   WHERE seguimiento_hash = p_seguimiento_hash AND tenant_id = p_tenant AND canal = 'TIENDA';
+  IF NOT FOUND THEN RETURN NULL; END IF;
+
+  v_estado := v_p.estado;
+  IF v_p.gestion = 'NUBE' AND v_p.ticket_id IS NOT NULL AND v_estado IN ('ACEPTADO', 'EN_PREPARACION', 'LISTO') THEN
+    SELECT t.estado_fiscal::text AS fiscal, t.ticket_impreso_at,
+           EXISTS (SELECT 1 FROM delivery_asignaciones a WHERE a.ticket_id = t.id) AS con_repartidor
+      INTO v_t FROM tickets t WHERE t.id = v_p.ticket_id AND t.tenant_id = p_tenant;
+    IF FOUND THEN
+      v_estado := CASE
+        WHEN v_t.fiscal = 'CANCELADO' THEN 'CANCELADO'
+        WHEN v_t.fiscal IN ('PAGADO', 'FACTURADO') THEN 'ENTREGADO'
+        WHEN v_t.ticket_impreso_at IS NOT NULL OR v_t.con_repartidor THEN 'LISTO'
+        ELSE v_estado END;
+    END IF;
+  END IF;
+
+  v_envio_total := v_p.total_cliente_mxn - COALESCE(v_p.subtotal_mxn, v_p.total_cliente_mxn);
+
+  RETURN jsonb_build_object(
+    'folio_corto', v_p.folio_corto,
+    'modo', CASE v_p.app WHEN 'DELIVERY_PROPIO' THEN 'DOMICILIO' ELSE 'RECOGER' END,
+    'estado', CASE
+      WHEN v_estado = 'RECIBIDO' THEN 'EN_PROCESO'
+      WHEN v_estado IN ('ACEPTADO', 'EN_PREPARACION') THEN 'EN_PREPARACION'
+      WHEN v_estado = 'LISTO' AND v_p.app = 'DELIVERY_PROPIO' THEN 'EN_CAMINO'
+      WHEN v_estado = 'LISTO' THEN 'LISTO_PARA_RECOGER'
+      WHEN v_estado = 'ENTREGADO' THEN 'ENTREGADO'
+      ELSE 'CANCELADO' END,
+    'motivo', CASE
+      WHEN v_estado = 'EXPIRADO' THEN 'SIN_RESPUESTA'
+      WHEN v_estado IN ('RECHAZADO', 'CANCELADO', 'ERROR') THEN NULLIF(v_p.motivo_cancelacion, '')
+      END,
+    'renglones', COALESCE((
+      SELECT jsonb_agg(jsonb_build_object(
+               'nombre', i ->> 'nombre_app',
+               'cantidad', (i ->> 'cantidad')::integer,
+               'detalle', (SELECT string_agg(m ->> 'nombre_app', ', ')
+                             FROM jsonb_array_elements(COALESCE(i -> 'modificadores', '[]'::jsonb)) m)))
+        FROM jsonb_array_elements(v_p.items) i), '[]'::jsonb),
+    'subtotal_mxn', to_char(COALESCE(v_p.subtotal_mxn, v_p.total_cliente_mxn), 'FM999999990.00'),
+    'envio_total_mxn', to_char(v_envio_total, 'FM999999990.00'),
+    'total_mxn', to_char(v_p.total_cliente_mxn, 'FM999999990.00'),
+    'pago', v_p.pago_al_recibir,
+    'recibido_at', v_p.recibido_at,
+    'sucursal', (SELECT jsonb_build_object('nombre', s.nombre, 'telefono', s.telefono)
+                   FROM sucursales s WHERE s.id = v_p.sucursal_id));
+END;
+$$;
+REVOKE ALL ON FUNCTION tienda_seguimiento(uuid, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION tienda_seguimiento(uuid, text) TO service_role;
