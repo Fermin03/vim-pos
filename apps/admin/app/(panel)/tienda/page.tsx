@@ -5,6 +5,7 @@ import { useAccesoTenant } from "../../components/admin-shell";
 import { TiendaCombos } from "../../components/tienda-combos";
 import { TiendaCompartir } from "../../components/tienda-compartir";
 import { TiendaDatos } from "../../components/tienda-datos";
+import { TiendaMenu } from "../../components/tienda-menu";
 import { TiendaEstado } from "../../components/tienda-estado";
 import { TiendaPedidos } from "../../components/tienda-pedidos";
 import { TiendaSucursales } from "../../components/tienda-sucursales";
@@ -12,7 +13,7 @@ import { useTienda } from "./use-tienda";
 
 /**
  * Tienda en línea: una sola página con el interruptor, los datos de la tienda, cómo entran los
- * pedidos, las sucursales con su horario y el enlace para compartir. El layout ya decidió que el negocio tiene el complemento.
+ * pedidos, las sucursales con su horario, el menú de cada sucursal y el enlace para compartir. El layout ya decidió que el negocio tiene el complemento.
  *
  * El estado vive en `use-tienda.ts`; los bloques solo pintan lo que reciben.
  */
@@ -84,6 +85,8 @@ export default function TiendaPage() {
               mensajeDe={t.mensajeDeSucursal}
               onGuardar={t.guardarSucursal}
             />
+
+            <TiendaMenu sucursales={t.leido.sucursales} soloLectura={soloLectura} />
 
             {t.leido.enPlan && <TiendaCombos combos={t.leido.combosNoComprables} />}
 
