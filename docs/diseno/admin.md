@@ -218,7 +218,11 @@ sucursales, o algún menú propio; con una sola sucursal, el Catálogo se ve com
 
 Menú principal → **Tienda en línea**: donde el dueño arma la tienda en la que sus clientes piden
 desde el teléfono. Una sola página, sin pestañas, porque son pocos campos y se llenan una vez. Sin
-el complemento concedido, en su lugar va la invitación (`PedirModulo`), sin precios.
+el complemento concedido, en su lugar va la invitación (`PedirModulo`). Su cierre depende de lo que
+VIM ofrece (`invitacionTienda`): mientras el complemento no esté activo en el catálogo, sin precios
+(«Estamos por lanzarla…»); ya activo, «Tu plan incluye la tienda en línea. Escríbenos para
+activarla.» o, si el plan no la incluye, **el precio** («La tienda en línea cuesta $100 al mes en tu
+plan. Escríbenos para contratarla.»). En los tres la acción es escribir por WhatsApp.
 
 Los bloques, en este orden, cada uno en su `Tarjeta`:
 

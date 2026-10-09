@@ -76,7 +76,8 @@ export default async function Privacidad({ params }: Props) {
           cuenta, lo sigues viendo en ella.
         </li>
         <li>
-          Lo que conserva el restaurante: tu nombre, tu teléfono y tu dirección quedan en su lista de clientes, y la cuenta de
+          Lo que conserva el restaurante: tu nombre, tu teléfono, tu correo (si lo dejaste) y tu dirección quedan en su lista de
+          clientes, y la cuenta de
           esa venta guarda tu nombre y la nota del pedido, como cuando pides por teléfono. Ahí se conservan hasta que le pidas al
           restaurante que te quite de su lista.
         </li>
@@ -116,8 +117,8 @@ export default async function Privacidad({ params }: Props) {
         contraseña. Se borra en el momento tu cuenta, tu contraseña, tus direcciones guardadas y el acceso a tu historial.
       </p>
       <p className="mt-2">
-        {nombre} conserva en su sistema las ventas que ya te hizo y, en su lista de clientes, el nombre, el teléfono y la
-        dirección con los que pediste: son registros de sus ventas, como los de un pedido por teléfono. Para que también los
+        {nombre} conserva en su sistema las ventas que ya te hizo y, en su lista de clientes, el nombre, el teléfono, el
+        correo y la dirección con los que pediste: son registros de sus ventas, como los de un pedido por teléfono. Para que también los
         quite, pídeselo como se explica abajo.
       </p>
 

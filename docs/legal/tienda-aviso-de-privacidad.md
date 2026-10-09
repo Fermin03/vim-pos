@@ -106,8 +106,8 @@ pides y no se venden ni se rentan a nadie.
   lo que pediste y su importe, sin nada que lo relacione contigo, y el enlace para seguirlo deja de
   funcionar. Si lo pediste con tu cuenta, lo sigues viendo en «Mi cuenta».
 - **Los registros del restaurante.** Al aceptar tu pedido, el restaurante te registra en su sistema
-  de ventas como a cualquier cliente que pide por teléfono: tu nombre, tu teléfono y, si pediste a
-  domicilio, tu dirección quedan en su lista de clientes; y la cuenta de esa venta conserva tu
+  de ventas como a cualquier cliente que pide por teléfono: tu nombre, tu teléfono, tu correo
+  si lo dejaste y, si pediste a domicilio, tu dirección quedan en su lista de clientes; y la cuenta de esa venta conserva tu
   nombre y la nota de tu pedido. El restaurante los conserva **hasta que le pidas que los dé de
   baja**, salvo lo que la ley fiscal le obligue a guardar.
 - **Tu cuenta.** Hasta que la elimines. La eliminas tú mismo, en «Mi cuenta» → «Eliminar mi

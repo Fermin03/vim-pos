@@ -24,17 +24,26 @@ Documentos que acompañan a esta lista:
 ## El orden, en una línea
 
 Comprobar (0) → publicar la tienda en internet (1) → probarla nosotros con el POS web (2) → caja
-0.8.0 en martes y probarla con una caja (3) → encender el complemento (4) → Knock-Out (5) →
-anunciar (6).
+0.8.0 en martes y probarla con una caja (3) → **Knock-Out, concedido a mano (5)** → **encender el
+complemento para todos (4)** → anunciar (6).
 
-**Se puede parar entre fase y fase el tiempo que haga falta.** Hasta la fase 4, ningún cliente nota
-nada.
+**El orden recomendado es 0, 1, 2, 3, 5, 4, 6: la fase 5 va ANTES que la 4.** Las fases conservan
+su número para que los pasos (4.3, 5.1…) se llamen igual en todos los documentos, pero lo prudente
+es que el primer negocio real sea uno solo, Knock-Out, con el complemento concedido a mano (como a
+VIM Pruebas en el paso 2.1), y que la fase 4 —que se lo da de golpe a todos los que su plan la
+incluye, y desde ese instante cada dueño puede encender su tienda sin avisarte— llegue cuando
+Knock-Out lleve unos días vendiendo bien. No cuesta nada extra. Hacerlo en el orden 4 y luego 5
+también funciona; solo es menos prudente.
+
+**Se puede parar entre fase y fase el tiempo que haga falta.** Hasta la fase 5, ningún cliente nota
+nada; hasta la fase 4, solo Knock-Out.
 
 ---
 
 ## Decisiones que te tocan antes de encender
 
-Estas no las puede tomar Claude por ti. Las cinco primeras conviene cerrarlas antes de la fase 4.
+Estas no las puede tomar Claude por ti. Las cinco primeras y la 8 conviene cerrarlas antes de que
+el primer negocio real encienda su tienda (la fase 5, si sigues el orden recomendado).
 
 - [ ] **1. Precio y planes, confirmados.** Hoy está programado así: la tienda va **incluida sin
       costo** en Negocio, Cadena y los planes anteriores por giro; en **Esencial cuesta $100 al mes**
@@ -57,16 +66,56 @@ Estas no las puede tomar Claude por ti. Las cinco primeras conviene cerrarlas an
       pero el cliente tendría que ir a su correo antes de pedir con cuenta. Está explicado en
       [`decisiones/0032`](../decisiones/0032-la-tienda-es-un-canal-y-sus-clientes-no-viven-en-auth.md).
       Recomendación: salir así y decidirlo con datos de la primera semana.
-- [ ] **5. Caja 0.7.0 y POS web a la vez en una sucursal.** Una caja con versión anterior a la 0.8.0
-      no entiende los pedidos de la tienda. Si en la misma sucursal alguien abre además el POS en el
-      navegador, la tienda se abre y la caja vieja no se entera de lo que llega. Regla propuesta:
-      **ningún negocio enciende su tienda hasta que todas sus cajas tengan la 0.8.0** (se comprueba
-      con la consulta 7 de vigilancia). ¿De acuerdo?
+- [ ] **5. Caja anterior a la 0.8.0 y POS web a la vez en una sucursal.** Una caja con versión
+      anterior a la 0.8.0 no entiende los pedidos de la tienda. Antes, si en esa misma sucursal
+      alguien abría además el POS en el navegador, la tienda se abría y los pedidos se perdían.
+      **Eso ya está cerrado en el código:** mientras en la sucursal haya encendida una caja
+      instalada anterior a la 0.8.0 (y ninguna encendida con la 0.8.0 o posterior), el POS web **no
+      abre la tienda**: el cliente ve «Aún no abrimos» y el cajero lee, en Pedidos en línea,
+      «Tienda: actualiza la caja de esta sucursal para recibir pedidos en línea.» Nadie pierde un
+      pedido; lo que pasa es que esa sucursal no vende en línea hasta actualizar. Por eso la regla
+      se queda, ya no por seguridad sino para que funcione: **antes de que un negocio encienda su
+      tienda, todas sus cajas tienen la 0.8.0** (se comprueba con la consulta 7 de vigilancia).
+      ¿De acuerdo?
 - [ ] **6. Razón social y domicilio del restaurante.** La ley pide que el aviso de privacidad diga
       quién es el responsable y dónde está. Hoy la tienda solo conoce el nombre comercial. Las
       opciones y lo que costaría cada una están en [`docs/legal/LEEME.md`](../legal/LEEME.md).
-- [ ] **7. El día.** La caja 0.8.0 sale en martes antes de las 10:00. La fase 4 puede ser ese mismo
-      martes o después, nunca antes.
+- [ ] **7. El día.** La caja 0.8.0 sale en martes antes de las 10:00. Las fases 5 y 4 pueden ser
+      ese mismo martes o después, nunca antes.
+- [ ] **8. Los riesgos conocidos de abajo, leídos y aceptados** (o dime cuál quieres que se cierre
+      antes de encender).
+
+### Riesgos conocidos que se aceptan
+
+La revisión de seguridad de esta entrega no encontró nada grave: no hay forma de que un restaurante
+vea datos de otro. Encontró cuatro cosas menores que **no se arreglaron en el código**, a
+sabiendas. Aquí están en llano, para que las aceptes o pidas cerrarlas.
+
+- **Un empleado puede hacer que su propia tienda parezca abierta.** Quien tenga una sesión del
+  negocio (un cajero con conocimientos técnicos) puede marcar a mano que «la caja está lista» sin
+  que haya un turno abierto. El efecto es que la tienda **de su propio negocio** reciba pedidos
+  cuando no hay quien los atienda; esos pedidos se vencen solos a los minutos y el cliente lo ve.
+  No alcanza a ningún otro restaurante ni deja ver datos de nadie. Cerrarlo es trabajo nuevo en la
+  base.
+- **Alguien con recursos puede dejar a un restaurante sin pedidos en línea durante una hora.** Cada
+  restaurante tiene un tope de 60 pedidos por hora y de 300 entradas a cuentas cada 10 minutos
+  (decisiones 8 y 9 de la entrega). Existen para proteger la base, pero un atacante que consiga
+  muchos pases del antirobot puede llenarle el tope a un restaurante a propósito, y hasta que el
+  contador se libere ese restaurante no recibe pedidos (o sus clientes no pueden entrar a su
+  cuenta). No roba nada; estorba. Queda registrado (`CUPO_NEGOCIO_AGOTADO` y
+  `CUPO_ENTRADAS_AGOTADO`) y se vigila con la consulta 8 de
+  [`tienda-vigilancia.md`](tienda-vigilancia.md). Si le pasa a alguien, se le sube el tope o se
+  bloquea al atacante.
+- **Una dirección de tienda que un negocio suelta, la puede tomar otro.** Las direcciones
+  (`pedidos.vimpos.com.mx/el-nombre`) son del primero que las pide. Si un negocio cambia la suya o
+  se da de baja, la anterior queda libre, y si otro negocio la toma, **los QR y los enlaces ya
+  impresos del primero llevan a la tienda del segundo**. Por eso el paso 5.3 insiste en elegirla
+  bien. Mientras sean pocos negocios se cuida a mano; reservar las direcciones soltadas es trabajo
+  nuevo.
+- **Falta comprobar una vez, en producción, de qué red dice el servidor que viene cada visitante.**
+  Los topes por red dependen de ese dato. Está bien resuelto para donde se va a publicar la tienda,
+  pero solo se puede confirmar con la tienda ya en internet: es el paso 1.6. Si saliera mal, un
+  atacante podría saltarse los topes por red (los topes por restaurante seguirían funcionando).
 
 ---
 
@@ -109,7 +158,7 @@ Nada de esta fase cambia algo: es mirar.
 - [ ] **0.5 Los dos procesos automáticos corren** (el de cada minuto y el de cada noche).
       · Claude, con tu visto bueno. *Comprobar:* consulta 10 de
       [`tienda-vigilancia.md`](tienda-vigilancia.md).
-- [ ] **0.6 Las decisiones 1 a 5 de arriba están tomadas.** · Fermín.
+- [ ] **0.6 Las decisiones 1 a 5 y la 8 de arriba están tomadas.** · Fermín.
 
 ## Fase 1 — Publicar la tienda en internet
 
@@ -145,6 +194,21 @@ que pida recibe «No pudimos comprobar que eres una persona.»
       *Comprobar:* `https://pedidos.vimpos.com.mx/` carga una página que dice «Pedidos en línea», y
       `https://pedidos.vimpos.com.mx/nadie-existe` dice «No encontramos esta página».
       *Deshacer:* quitar el dominio en Vercel: la tienda sale de internet en minutos.
+- [ ] **1.6 Comprobar qué red ve el servidor (una sola vez).** · Claude, con tu visto bueno, después
+      del paso 2.2 (hace falta una tienda encendida, la de VIM Pruebas). Desde una conexión cuya
+      dirección pública se conoce, se le pide el menú a la tienda mandando a propósito una cabecera
+      `X-Forwarded-For` falsa (por ejemplo `1.2.3.4`), y se mira qué contador se movió:
+
+      ```sql
+      SELECT clave, usos FROM limites_cupo
+       WHERE clave LIKE 'tienda:lee:ip:%' AND expira_en > now()
+       ORDER BY expira_en DESC LIMIT 5;
+      ```
+
+      *Comprobar:* el contador que aparece lleva **la dirección real** de quien hizo la prueba, no
+      `1.2.3.4` ni `desconocida`. Si sale la falsa o `desconocida`, **no se sigue**: avisar a
+      Claude (es un ajuste de la tienda en Vercel, no de la base).
+      *Deshacer:* nada que deshacer; el contador se borra solo.
 
 ## Fase 2 — Probarla nosotros, con un negocio de pruebas y el POS web
 
@@ -162,7 +226,11 @@ navegador, que ya sabe recibir pedidos de la tienda.
       envío. (Paso 6 de la guía.) *Comprobar:* la lista de pendientes de la pantalla queda vacía y
       el interruptor queda encendido. *Deshacer:* apagar el interruptor.
 - [ ] **2.3 Abrir turno en el POS web** (pos.vimpos.com.mx) en esa sucursal. · Fermín.
-      **Sin ninguna caja 0.7.0 abierta en esa misma sucursal.**
+      **Sin ninguna caja 0.7.0 abierta en esa misma sucursal:** con una encendida, la nube no abre
+      la tienda y en Pedidos en línea se lee «Tienda: actualiza la caja de esta sucursal para
+      recibir pedidos en línea.» (Si quieres ver ese aviso, es una buena prueba: abre una caja 0.7.0
+      de VIM Pruebas en esa sucursal, espera un minuto y mira la barra; al cerrarla, en un par de
+      minutos vuelve a «recibiendo pedidos».)
       *Comprobar:* la tienda dice «Abierto» y deja pedir.
 - [ ] **2.4 Prueba de humo del pedido, de punta a punta**, desde tu teléfono. · Fermín (Claude
       puede ir mirando los registros). Son los nueve puntos del paso 7 de la guía: ver el menú,
@@ -216,7 +284,10 @@ Las cajas instaladas no reciben pedidos de la tienda hasta tener la 0.8.0.
       mensaje habla de la tienda; si la fase 4 no va a ser el mismo día, cámbialo por uno que no la
       prometa todavía.
 
-## Fase 4 — Encender el complemento
+## Fase 4 — Encender el complemento para todos
+
+> **Orden recomendado: esta fase va DESPUÉS de la fase 5.** Primero Knock-Out solo, con el
+> complemento concedido a mano (paso 5.2); cuando lleve unos días vendiendo bien, se vuelve aquí.
 
 Este es **el** interruptor. Una sola instrucción en la base:
 
@@ -233,7 +304,8 @@ SELECT tienda_encender_complemento();
 
 **Qué devuelve:** tres datos, por ejemplo `{"activado": true, "concedidos": 12, "ya_tenian": 1}`.
 `activado` dice si el complemento estaba apagado y esta llamada lo prendió; `concedidos`, a cuántos
-negocios se les dio en esta llamada; `ya_tenian`, cuántos ya lo tenían (VIM Pruebas, por la fase 2).
+negocios se les dio en esta llamada; `ya_tenian`, cuántos ya lo tenían (VIM Pruebas, por la fase 2,
+y Knock-Out, por la fase 5).
 
 **Qué NO hace: no abre ninguna tienda.** Cada dueño tiene que entrar a su admin, configurarla y
 encender su propio interruptor. A Esencial no se le concede: lo contrata aparte.
@@ -250,11 +322,8 @@ encender su propio interruptor. A Esencial no se le concede: lo contrata aparte.
 
 Se puede llamar dos veces sin miedo: la segunda no duplica nada y devuelve `concedidos: 0`.
 
-> **Si prefieres ir más despacio:** las fases 4 y 5 se pueden hacer al revés. Se le concede el
-> complemento **solo a Knock-Out**, a mano, igual que a VIM Pruebas en el paso 2.1; se hace toda la
-> fase 5; y cuando Knock-Out lleve unos días vendiendo bien, se hace la fase 4 para los demás. Es
-> el camino más prudente y no cuesta nada extra.
-
+- [ ] **4.0 La fase 5 ya se hizo y Knock-Out lleva unos días vendiendo en línea sin sorpresas.**
+      · Fermín. Si decides encender para todos sin pasar antes por Knock-Out, márcalo a sabiendas.
 - [ ] **4.1 Ver a quién se le va a conceder, antes de hacerlo.** · Claude, con tu visto bueno.
 
       ```sql
@@ -267,7 +336,8 @@ Se puede llamar dos veces sin miedo: la segunda no duplica nada y devuelve `conc
       ```
 
       *Comprobar:* lees la lista y estás de acuerdo con ella. Anota cuántos son.
-- [ ] **4.2 Anotar cuántas tiendas hay encendidas ahora** (debe ser solo VIM Pruebas). · Claude.
+- [ ] **4.2 Anotar cuántas tiendas hay encendidas ahora** (deben ser VIM Pruebas y, si ya se hizo
+      la fase 5, Knock-Out). · Claude.
 
       ```sql
       SELECT count(*) AS tiendas_encendidas FROM configuracion_tenant WHERE modulo_tienda_activo;
@@ -283,7 +353,7 @@ Se puede llamar dos veces sin miedo: la segunda no duplica nada y devuelve `conc
 - [ ] **4.4 Comprobar que no abrió ninguna tienda.** · Claude. La consulta del paso 4.2 da **el
       mismo número** que antes. Y la consulta 5 de [`tienda-vigilancia.md`](tienda-vigilancia.md)
       lista a quién se le concedió: todos con `incluido_en_plan = true`, precio `0.00` y
-      `tienda_encendida = false` (salvo VIM Pruebas).
+      `tienda_encendida = false` (salvo VIM Pruebas y Knock-Out).
 - [ ] **4.5 Verlo con tus ojos.** · Fermín. Entra al admin de un negocio en plan Negocio (VIM
       Pruebas sirve): «Tienda en línea» enseña la configuración. En el panel de VIM, la ficha de un
       cliente en Esencial lista «Tienda en línea» a $100 en «Add-ons».
@@ -310,11 +380,18 @@ Se puede llamar dos veces sin miedo: la segunda no duplica nada y devuelve `conc
 
 ## Fase 5 — Knock-Out, el primer negocio real
 
+> **Orden recomendado: esta fase va ANTES que la fase 4**, justo después de la 3. Con el
+> complemento todavía apagado para todos, se le concede solo a Knock-Out, a mano.
+
 - [ ] **5.1 Todas las cajas de Knock-Out están en 0.8.0.** · Claude, con tu visto bueno (segunda
       consulta del punto 7 de [`tienda-vigilancia.md`](tienda-vigilancia.md)). Si alguna no, se
-      actualiza antes de seguir. *Deshacer:* nada que deshacer.
-- [ ] **5.2 Knock-Out tiene el complemento.** · Claude. Si se hizo la fase 4 y su plan la incluye,
-      ya lo tiene; si no, se le concede a mano. *Comprobar:* consulta 5 de vigilancia.
+      actualiza antes de seguir: con una caja anterior encendida en la sucursal, la tienda de esa
+      sucursal no abre (decisión 5). *Deshacer:* nada que deshacer.
+- [ ] **5.2 Knock-Out tiene el complemento.** · Claude, con tu visto bueno («concede el complemento
+      TIENDA a Knock-Out»): se le concede a mano en la base, igual que a VIM Pruebas en el paso
+      2.1, porque el complemento sigue apagado para los demás. (Si hiciste antes la fase 4 y su plan
+      la incluye, ya lo tiene.) *Comprobar:* consulta 5 de vigilancia. *Deshacer:* darlo de baja
+      (eso además apaga su tienda).
 - [ ] **5.3 Configurar su tienda con el dueño, sin encenderla.** · Fermín, con el dueño, en su
       admin → Tienda en línea: dirección (la que irá en su QR y sus redes: **elegirla bien, porque
       cambiarla después rompe lo impreso**), logo y color, sucursal, horario real, formas de pago,
@@ -408,7 +485,7 @@ paso de la lista se mueve cada una, para que no se quede ninguna sin dueño.
 |---|---|---|
 | 1 | El complemento, apagado en el catálogo | Paso 4.3 |
 | 2 | Que los planes concedan la tienda en altas y cambios de plan | Ya está en la base (0167), pero no actúa hasta el paso 4.3 |
-| 3 | Que cada negocio tenga el complemento | Paso 2.1 (VIM Pruebas), 4.3 (todos), 5.2 (Knock-Out); Esencial, a mano desde el panel |
+| 3 | Que cada negocio tenga el complemento | Paso 2.1 (VIM Pruebas), 5.2 (Knock-Out, a mano) y después 4.3 (todos); Esencial, a mano desde el panel |
 | 4 | Que el panel de VIM sepa que los planes la incluyen | Ya está; se despliega al mezclar y no se ve hasta el paso 4.3 |
 | 5 | El interruptor de cada dueño | Pasos 2.2 y 5.5; cada dueño el suyo |
 | 6 | La configuración mínima de cada tienda | Pasos 2.2 y 5.3; cada dueño la suya |
