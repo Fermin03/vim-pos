@@ -30,7 +30,7 @@ export default async function Privacidad({ params }: Props) {
     <main className="px-4 pb-10 text-16 leading-relaxed">
       <h1 className="font-display text-24 font-semibold">Aviso de privacidad</h1>
       <Aviso tono="warning" role="status" className="mt-4 !text-14">
-        Aviso provisional. El aviso de privacidad definitivo se publicará antes del lanzamiento.
+        Aviso provisional. Explica con palabras sencillas qué pasa hoy con tus datos; el aviso de privacidad definitivo se publicará antes del lanzamiento.
       </Aviso>
 
       <h2 className={TITULO}>Qué datos te pedimos</h2>
@@ -47,19 +47,46 @@ export default async function Privacidad({ params }: Props) {
         seguirlo. No se usan para publicidad ni se venden a nadie.
       </p>
 
-      <h2 className={TITULO}>Quién los guarda</h2>
+      <h2 className={TITULO}>Quién los recibe y los guarda</h2>
       <p className="mt-2">
-        Los guarda {nombre}, que es quien recibe tu pedido. VIM POS es el proveedor del sistema con el que el restaurante toma los
-        pedidos y los resguarda por su cuenta; no los usa para nada más.
-      </p>
-      <p className="mt-2">
-        Esta página no usa herramientas de publicidad ni de seguimiento. Tu teléfono guarda tu pedido a medias y, después de pedir,
-        tu nombre, teléfono, correo y dirección para no escribirlos otra vez: eso no sale de tu teléfono y lo borras con «Olvidar
-        mis datos», al llenar tus datos.
+        Los recibe y los guarda {nombre}: es el restaurante el que decide qué se hace con ellos. VIM POS es su proveedor de
+        tecnología: el sistema con el que el restaurante toma los pedidos. VIM POS almacena los datos por encargo del restaurante
+        y no los usa para nada propio.
       </p>
 
-      <h2 className={TITULO}>Cómo pedir que se borren</h2>
-      <p className="mt-2">Llama al restaurante y pide que borren tus datos{conTelefono.length > 0 ? ":" : "."}</p>
+      <h2 className={TITULO}>Cuánto tiempo se guardan</h2>
+      <ul className="mt-2 list-disc space-y-1 pl-5">
+        <li>
+          Tu nombre, tu teléfono y tu dirección quedan en la lista de clientes del restaurante, como cuando pides por teléfono.
+          Ahí se conservan hasta que le pidas al restaurante que los quite.
+        </li>
+        <li>
+          El detalle de tu pedido en línea (lo que pediste, tus notas y los datos con los que lo hiciste) se anonimiza a los 30
+          días: se le quita lo que lo relaciona contigo.
+        </li>
+      </ul>
+
+      <h2 className={TITULO}>Otros servicios que usa esta página</h2>
+      <ul className="mt-2 list-disc space-y-1 pl-5">
+        <li>Cloudflare Turnstile, para comprobar que el formulario lo llena una persona y no un programa.</li>
+        <li>Google Fonts, de donde se cargan las tipografías.</li>
+      </ul>
+      <p className="mt-2">
+        Los dos reciben tu dirección IP, como cualquier sitio que tu navegador visita. Esta página no tiene publicidad ni
+        herramientas de analítica.
+      </p>
+
+      <h2 className={TITULO}>Lo que guarda tu teléfono</h2>
+      <p className="mt-2">
+        Tu navegador guarda el pedido que estás armando durante un día y, después de pedir, tu nombre, teléfono, correo y
+        dirección para que no los escribas otra vez. Eso se queda en tu teléfono. Lo borras con «Olvidar mis datos», que aparece
+        al llenar tus datos.
+      </p>
+
+      <h2 className={TITULO}>Cómo pedir que se quiten tus datos</h2>
+      <p className="mt-2">
+        Pídeselo al restaurante{conTelefono.length > 0 ? ". Su teléfono:" : ": es quien tiene tus datos y quien puede quitarlos de su lista de clientes."}
+      </p>
       {conTelefono.length > 0 && (
         <ul className="mt-2 space-y-1">
           {conTelefono.map((s) => {
