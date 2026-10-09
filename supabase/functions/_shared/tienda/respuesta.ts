@@ -74,10 +74,16 @@ export function respuestaDeCaptcha(motivo: string):
 // en `error.message`. Un código es MAYUSCULAS_CON_GUION_BAJO, con al menos un guion: así "FATAL: …"
 // o "ERROR" de Postgres no pasan por rechazo de negocio. Todo lo demás es un fallo nuestro.
 const CODIGO = /^([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)(?:: ?([\s\S]*))?$/;
-// Solo en estos el detalle le sirve al cliente, y es un motivo (FUERA_DE_HORARIO…) o el id de un
-// producto de su propio carrito. Se exige esa forma: si un día el SQL pusiera otra cosa, no sale.
-const CON_DETALLE = new Set(["TIENDA_CERRADA", "PRODUCTO_NO_DISPONIBLE", "MODIFICADORES_INVALIDOS", "COMBO_INVALIDO"]);
+// Solo en estos el detalle le sirve al cliente: un motivo (FUERA_DE_HORARIO…), el id de un producto
+// de su propio carrito o, en TOTAL_CAMBIO, el total nuevo. A cada código se le exige SU forma: si un
+// día el SQL pusiera otra cosa, no sale.
 const DETALLE = /^[A-Za-z0-9_-]{1,64}$/;
+/** Un importe como lo escribe el SQL: dígitos, punto y dos decimales. */
+const IMPORTE = /^\d+\.\d{2}$/;
+const CON_DETALLE = new Map<string, RegExp>([
+  ["TIENDA_CERRADA", DETALLE], ["PRODUCTO_NO_DISPONIBLE", DETALLE], ["MODIFICADORES_INVALIDOS", DETALLE],
+  ["COMBO_INVALIDO", DETALLE], ["TOTAL_CAMBIO", IMPORTE],
+]);
 
 export type RespuestaRpc =
   | { status: 409; body: { error: string; detalle?: string } }
@@ -88,7 +94,7 @@ export function respuestaDeRpc(mensaje: unknown): RespuestaRpc {
   const m = typeof mensaje === "string" ? CODIGO.exec(mensaje) : null;
   if (!m) return { status: 503, body: { error: "SERVICIO_NO_DISPONIBLE" } };
   const codigo = m[1]!, detalle = m[2] ?? "";
-  return CON_DETALLE.has(codigo) && DETALLE.test(detalle)
+  return CON_DETALLE.get(codigo)?.test(detalle)
     ? { status: 409, body: { error: codigo, detalle } }
     : { status: 409, body: { error: codigo } };
 }
@@ -113,6 +119,21 @@ export function leerNegocio(x: unknown): Negocio | null {
     nombre: typeof x.publico.nombre === "string" ? x.publico.nombre : "",
     sucursales: sucursales.flatMap((s) => (objeto(s) && typeof s.id === "string" ? [s.id.toLowerCase()] : [])),
   };
+}
+
+export type Pedido = { folio_corto: string; total_mxn: string; vence_aceptacion: string };
+
+/**
+ * Lo que devuelve `tienda_crear_pedido`, sin su `pedido_id` (interno). Cualquier otra forma es null
+ * y NO una excepción: cuando esto se lee el pedido ya existe, y un 500 dejaría al cliente sin su
+ * código de seguimiento.
+ */
+export function leerPedido(x: unknown): Pedido | null {
+  if (!objeto(x)) return null;
+  const { folio_corto, total_mxn, vence_aceptacion } = x;
+  if (typeof folio_corto !== "string" || !folio_corto || typeof total_mxn !== "string" || !IMPORTE.test(total_mxn)
+      || typeof vence_aceptacion !== "string" || !vence_aceptacion) return null;
+  return { folio_corto, total_mxn, vence_aceptacion };
 }
 
 /** La cotización sin `items`: los renglones normalizados son la forma interna del ticket. */

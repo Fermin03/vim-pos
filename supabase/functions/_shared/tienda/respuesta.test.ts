@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { claveDeIp, cotizacionPublica, cuposDe, ipDeConfianza, leerNegocio, respuestaDeCaptcha, respuestaDeRpc } from "./respuesta.ts";
+import { claveDeIp, cotizacionPublica, cuposDe, ipDeConfianza, leerNegocio, leerPedido, respuestaDeCaptcha, respuestaDeRpc } from "./respuesta.ts";
 
 const PROD = "11111111-2222-3333-4444-555555555555";
 const SUC = "99999999-0000-0000-0000-0000000000bb";
@@ -152,4 +152,35 @@ test("cotización: salen los cinco campos públicos y nunca `items`", () => {
 });
 test("cotización: lo que no es un objeto es null", () => {
   for (const x of [null, undefined, "x", 5, []]) assert.equal(cotizacionPublica(x), null);
+});
+
+// ── Revisión final: TOTAL_CAMBIO lleva el total nuevo ───────────────────────────────────────────
+test("rpc: TOTAL_CAMBIO es 409 y su detalle es el total nuevo, con dos decimales", () => {
+  assert.deepEqual(respuestaDeRpc("TOTAL_CAMBIO: 125.50"), { status: 409, body: { error: "TOTAL_CAMBIO", detalle: "125.50" } });
+  assert.deepEqual(respuestaDeRpc("TOTAL_CAMBIO: 0.00"), { status: 409, body: { error: "TOTAL_CAMBIO", detalle: "0.00" } });
+  assert.deepEqual(respuestaDeRpc("TOTAL_CAMBIO: 13500.00"), { status: 409, body: { error: "TOTAL_CAMBIO", detalle: "13500.00" } });
+});
+test("rpc: un detalle de TOTAL_CAMBIO que no es un importe con dos decimales no sale", () => {
+  for (const d of ["125.5", "125", "-1.00", "1,250.00", "NaN", "125.50 MXN", " 125.50", "1.000", "abc", "", "FUERA_DE_HORARIO", PROD, "relation x does not exist"]) {
+    assert.deepEqual(respuestaDeRpc(`TOTAL_CAMBIO: ${d}`), { status: 409, body: { error: "TOTAL_CAMBIO" } }, JSON.stringify(d));
+  }
+});
+test("rpc: un importe no vale como detalle de los otros códigos", () => {
+  for (const codigo of ["TIENDA_CERRADA", "PRODUCTO_NO_DISPONIBLE", "MODIFICADORES_INVALIDOS", "COMBO_INVALIDO", "PAGO_INVALIDO"]) {
+    assert.deepEqual(respuestaDeRpc(`${codigo}: 125.50`), { status: 409, body: { error: codigo } }, codigo);
+  }
+});
+
+// ── Revisión final: lo que devuelve tienda_crear_pedido ─────────────────────────────────────────
+test("pedido: de lo que devuelve el alta salen folio, total y vencimiento; el id interno no", () => {
+  const alta = { pedido_id: "id-interno", folio_corto: "TAB12C", total_mxn: "120.00", vence_aceptacion: "2026-10-08T20:07:00+00:00", otra: 1 };
+  assert.deepEqual(leerPedido(alta), { folio_corto: "TAB12C", total_mxn: "120.00", vence_aceptacion: "2026-10-08T20:07:00+00:00" });
+});
+test("pedido: NULL o una forma inesperada es null, no una excepción", () => {
+  const bueno = { folio_corto: "TAB12C", total_mxn: "120.00", vence_aceptacion: "2026-10-08T20:07:00+00:00" };
+  for (const x of [null, undefined, "x", 5, [], [bueno], {}, { ...bueno, folio_corto: "" }, { ...bueno, folio_corto: 7 }, { ...bueno, total_mxn: 120 },
+                   { ...bueno, total_mxn: "120" }, { ...bueno, total_mxn: null }, { ...bueno, vence_aceptacion: null }, { ...bueno, vence_aceptacion: "" },
+                   { folio_corto: "TAB12C", total_mxn: "120.00" }]) {
+    assert.equal(leerPedido(x), null, JSON.stringify(x));
+  }
 });

@@ -17,7 +17,9 @@ export type Peticion =
   | { accion: "cotizar"; negocio: string; sucursal_id: string; modo: Modo; zona_id: string | null; items: unknown[] }
   | { accion: "pedir"; negocio: string; sucursal_id: string; modo: Modo; zona_id: string | null; items: unknown[];
       cliente: { nombre: string; telefono: string; email: string | null }; direccion: Direccion | null;
-      pago: "EFECTIVO" | "TARJETA"; paga_con: string | null; nota: string | null; captcha: string | null }
+      pago: "EFECTIVO" | "TARJETA"; paga_con: string | null; nota: string | null; captcha: string | null;
+      /** El total que el cliente vio al cotizar: si ya no es ese, el pedido no se crea (TOTAL_CAMBIO). */
+      total_esperado: string | null }
   | { accion: "seguimiento"; negocio: string; codigo: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -133,10 +135,12 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
   if (x.pago !== "EFECTIVO" && x.pago !== "TARJETA") return mal("PAGO_INVALIDO");
   const paga_con = leerImporte(x.paga_con);
   if (paga_con === undefined || (x.pago === "TARJETA" && paga_con !== null)) return mal("PAGO_INVALIDO");
+  const total_esperado = leerImporte(x.total_esperado);
+  if (total_esperado === undefined) return mal("PAGO_INVALIDO");
 
   return { ok: true, valor: {
     accion, negocio, sucursal_id, modo, zona_id, items,
-    cliente: { nombre, telefono, email }, direccion, pago: x.pago, paga_con,
+    cliente: { nombre, telefono, email }, direccion, pago: x.pago, paga_con, total_esperado,
     nota: textoLimpio(x.nota, 300), captcha: typeof x.captcha === "string" && x.captcha.length <= 4096 ? x.captcha : null,
   } };
 }

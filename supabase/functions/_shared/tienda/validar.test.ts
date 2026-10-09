@@ -215,3 +215,26 @@ test("cuerpo crudo: sin NUL pasa, también la barra escapada seguida de u0000 y 
   assert.equal(tieneNul(JSON.stringify({ a: String.raw`\u0000` })), false);
   assert.equal(tieneNul(JSON.stringify(pedir)), false);
 });
+
+// ---- Revisión final: el total que el cliente vio ----
+
+const totalDe = (cambio: object): unknown => {
+  const r = leerCuerpo({ ...pedir, ...cambio });
+  return r.ok && r.valor.accion === "pedir" ? r.valor.total_esperado : r;
+};
+test("cuerpo: pedir acepta total_esperado opcional y lo deja como importe con dos decimales", () => {
+  assert.equal(totalDe({}), null);
+  assert.equal(totalDe({ total_esperado: null }), null);
+  assert.equal(totalDe({ total_esperado: "" }), null);
+  assert.equal(totalDe({ total_esperado: 155 }), "155.00");
+  assert.equal(totalDe({ total_esperado: "155.5" }), "155.50");
+  assert.equal(totalDe({ total_esperado: " 155.00 " }), "155.00");
+  assert.equal(totalDe({ total_esperado: 0 }), "0.00");
+  // No depende de la forma de pago: con tarjeta también se compara el total.
+  assert.equal(totalDe({ pago: "TARJETA", paga_con: null, total_esperado: "155.00" }), "155.00");
+});
+test("cuerpo: un total_esperado que no es un importe es PAGO_INVALIDO", () => {
+  for (const total_esperado of ["mucho", -1, "-1.00", "1e3", 12.345, "12.345", NaN, Infinity, "1,250.00", {}, [], true, 1000000]) {
+    assert.deepEqual(leerCuerpo({ ...pedir, total_esperado }), { ok: false, error: "PAGO_INVALIDO" }, JSON.stringify(total_esperado));
+  }
+});

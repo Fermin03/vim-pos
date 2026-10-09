@@ -42,7 +42,7 @@ import { registrarError } from "../_shared/errores.ts";
 import { leerCuerpo, tieneNul } from "../_shared/tienda/validar.ts";
 import { huellaDe, nuevoCodigo } from "../_shared/tienda/seguimiento.ts";
 import { correoDePedido } from "../_shared/tienda/correo-pedido.ts";
-import { cotizacionPublica, cuposDe, ipDeConfianza, leerNegocio, respuestaDeCaptcha, respuestaDeRpc } from "../_shared/tienda/respuesta.ts";
+import { cotizacionPublica, cuposDe, ipDeConfianza, leerNegocio, leerPedido, respuestaDeCaptcha, respuestaDeRpc } from "../_shared/tienda/respuesta.ts";
 
 const MAX_CUERPO = 32_768;
 
@@ -173,9 +173,15 @@ async function atender(req: Request): Promise<Response> {
     p_nota: p.nota,
     p_seguimiento_hash,
     p_cuenta: null,          // las cuentas de cliente llegan en la entrega 6
+    p_total_esperado: p.total_esperado,   // lo que el cliente vio; si ya no es ese, 409 TOTAL_CAMBIO con el nuevo
   });
   if (alta.error) return rechazo("tienda_crear_pedido", alta.error);
-  const pedido = alta.data as { folio_corto: string; total_mxn: string; vence_aceptacion: string };
+  const pedido = leerPedido(alta.data);
+  if (!pedido) {
+    // El pedido YA existe: el cliente recibe su código (con él lo sigue) aunque falte lo demás.
+    registrarError("tienda", "PEDIDO_FORMA_INESPERADA", "tienda_crear_pedido no devolvió folio, total y vencimiento");
+    return json({ codigo, folio_corto: null, total_mxn: null, vence_aceptacion: null });
+  }
 
   // El correo de confirmación: después de responder, y pase lo que pase el pedido ya está creado.
   const email = p.cliente.email;
@@ -199,7 +205,7 @@ async function atender(req: Request): Promise<Response> {
     console.warn(`[tienda] pedido ${pedido.folio_corto}: sin correo de confirmación (falta VIM_TIENDA_URL o VIM_SMTP_*).`);
   }
 
-  return json({ codigo, folio_corto: pedido.folio_corto, total_mxn: pedido.total_mxn, vence_aceptacion: pedido.vence_aceptacion });
+  return json({ codigo, ...pedido });
 }
 
 Deno.serve(async (req) => {
