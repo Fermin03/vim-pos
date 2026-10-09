@@ -29,7 +29,12 @@ DECLARE
   v_c     time;
 BEGIN
   IF p_horario IS NULL OR jsonb_typeof(p_horario) <> 'object' OR p_ahora IS NULL THEN RETURN false; END IF;
-  v_local := p_ahora AT TIME ZONE COALESCE(NULLIF(p_tz, ''), 'America/Mexico_City');
+  -- sucursales.timezone y tenants.timezone son texto libre: una zona inválida cuenta como cerrado.
+  BEGIN
+    v_local := p_ahora AT TIME ZONE COALESCE(NULLIF(p_tz, ''), 'America/Mexico_City');
+  EXCEPTION WHEN OTHERS THEN
+    RETURN false;
+  END;
   v_hora  := v_local::time;
   v_dow   := EXTRACT(isodow FROM v_local)::integer;
   v_ayer  := CASE WHEN v_dow = 1 THEN 7 ELSE v_dow - 1 END;

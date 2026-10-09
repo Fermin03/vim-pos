@@ -25,11 +25,12 @@ DECLARE
   v_j     jsonb;
   v_p     jsonb;
   v_s     jsonb;
+  v_estado tenant_estado;
 BEGIN
   -- Los días que el smoke da por supuestos.
-  IF EXTRACT(isodow FROM '2026-10-05'::date) <> 1 THEN RAISE EXCEPTION 'fixture: 2026-10-05 no es lunes'; END IF;
-  IF EXTRACT(isodow FROM '2026-10-09'::date) <> 5 THEN RAISE EXCEPTION 'fixture: 2026-10-09 no es viernes'; END IF;
-  IF EXTRACT(isodow FROM '2026-10-11'::date) <> 7 THEN RAISE EXCEPTION 'fixture: 2026-10-11 no es domingo'; END IF;
+  IF EXTRACT(isodow FROM '2026-10-05'::date) IS DISTINCT FROM 1 THEN RAISE EXCEPTION 'fixture: 2026-10-05 no es lunes'; END IF;
+  IF EXTRACT(isodow FROM '2026-10-09'::date) IS DISTINCT FROM 5 THEN RAISE EXCEPTION 'fixture: 2026-10-09 no es viernes'; END IF;
+  IF EXTRACT(isodow FROM '2026-10-11'::date) IS DISTINCT FROM 7 THEN RAISE EXCEPTION 'fixture: 2026-10-11 no es domingo'; END IF;
 
   -- ── tienda_horario_abierto ────────────────────────────────────────────────
   IF tienda_horario_abierto(h_lun, '2026-10-05 14:00'::timestamp AT TIME ZONE v_tz, v_tz) IS NOT TRUE THEN RAISE EXCEPTION '1: lunes 14:00 debe estar abierto'; END IF;
@@ -45,8 +46,11 @@ BEGIN
   IF tienda_horario_abierto('{}', v_lun, v_tz) IS NOT FALSE THEN RAISE EXCEPTION '9: {} = cerrado'; END IF;
   IF tienda_horario_abierto(NULL, v_lun, v_tz) IS NOT FALSE THEN RAISE EXCEPTION '9: NULL = cerrado'; END IF;
   IF tienda_horario_abierto('{"7":["00:00","00:00"]}', '2026-10-11 10:00'::timestamp AT TIME ZONE v_tz, v_tz) IS NOT TRUE THEN RAISE EXCEPTION '10: 00:00-00:00 es todo el día'; END IF;
+  -- 29) Una zona horaria inválida (texto libre en sucursales/tenants) cuenta como cerrado y no revienta.
+  IF tienda_horario_abierto(h_lun, v_lun, 'No/Existe') IS NOT FALSE THEN RAISE EXCEPTION '29: zona inválida = cerrado'; END IF;
 
   -- ── Fixture del negocio de la semilla ─────────────────────────────────────
+  SELECT estado INTO v_estado FROM tenants WHERE id = v_t;
   INSERT INTO configuracion_tenant (tenant_id) VALUES (v_t) ON CONFLICT (tenant_id) DO NOTHING;
   UPDATE configuracion_tenant SET modulo_tienda_activo = true WHERE tenant_id = v_t;
   INSERT INTO tenant_addons (tenant_id, addon_id, fecha_inicio, activo, precio_mensual_mxn)
@@ -122,21 +126,22 @@ BEGIN
   v_j := tienda_negocio('knockout-smoke', v_lun);
   v_p := v_j -> 'publico';
   IF v_p IS NULL THEN RAISE EXCEPTION '23: tienda_negocio devolvió %', v_j; END IF;
-  IF v_p ->> 'nombre' IS NULL OR v_p ->> 'color' <> '#112233' OR (v_p ->> 'pago_efectivo')::boolean IS NOT TRUE THEN
+  IF v_p ->> 'nombre' IS NULL OR v_p ->> 'color' IS DISTINCT FROM '#112233'
+     OR (v_p ->> 'pago_efectivo')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION '23: faltan nombre, color o pago_efectivo: %', v_p;
   END IF;
-  IF jsonb_array_length(v_p -> 'sucursales') <> 1 THEN RAISE EXCEPTION '23: esperaba una sucursal, dio %', v_p -> 'sucursales'; END IF;
+  IF jsonb_array_length(v_p -> 'sucursales') IS DISTINCT FROM 1 THEN RAISE EXCEPTION '23: esperaba una sucursal, dio %', v_p -> 'sucursales'; END IF;
 
   v_s := v_p -> 'sucursales' -> 0;
-  IF NOT (v_s ?& ARRAY['id', 'nombre', 'recoger', 'domicilio', 'horario', 'estado', 'zonas']) THEN RAISE EXCEPTION '24: faltan claves en la sucursal: %', v_s; END IF;
-  IF v_s ->> 'id' <> v_suc::text THEN RAISE EXCEPTION '24: id de sucursal %', v_s ->> 'id'; END IF;
-  IF NOT (v_s -> 'estado' ? 'recoger' AND v_s -> 'estado' ? 'domicilio') THEN RAISE EXCEPTION '24: faltan estado.recoger/domicilio: %', v_s -> 'estado'; END IF;
-  IF jsonb_typeof(v_s -> 'estado' -> 'recoger') <> 'null' THEN RAISE EXCEPTION '24: estado.recoger debía ser null: %', v_s -> 'estado'; END IF;
-  IF jsonb_array_length(v_s -> 'zonas') <> 1
-     OR v_s -> 'zonas' -> 0 ->> 'id' <> v_zona::text
-     OR v_s -> 'zonas' -> 0 ->> 'nombre' <> 'Centro'
-     OR jsonb_typeof(v_s -> 'zonas' -> 0 -> 'costo_mxn') <> 'string'
-     OR v_s -> 'zonas' -> 0 ->> 'costo_mxn' <> '35.00' THEN
+  IF (v_s ?& ARRAY['id', 'nombre', 'recoger', 'domicilio', 'horario', 'estado', 'zonas']) IS NOT TRUE THEN RAISE EXCEPTION '24: faltan claves en la sucursal: %', v_s; END IF;
+  IF v_s ->> 'id' IS DISTINCT FROM v_suc::text THEN RAISE EXCEPTION '24: id de sucursal %', v_s ->> 'id'; END IF;
+  IF (v_s -> 'estado' ? 'recoger' AND v_s -> 'estado' ? 'domicilio') IS NOT TRUE THEN RAISE EXCEPTION '24: faltan estado.recoger/domicilio: %', v_s -> 'estado'; END IF;
+  IF jsonb_typeof(v_s -> 'estado' -> 'recoger') IS DISTINCT FROM 'null' THEN RAISE EXCEPTION '24: estado.recoger debía ser null: %', v_s -> 'estado'; END IF;
+  IF jsonb_array_length(v_s -> 'zonas') IS DISTINCT FROM 1
+     OR v_s -> 'zonas' -> 0 ->> 'id' IS DISTINCT FROM v_zona::text
+     OR v_s -> 'zonas' -> 0 ->> 'nombre' IS DISTINCT FROM 'Centro'
+     OR jsonb_typeof(v_s -> 'zonas' -> 0 -> 'costo_mxn') IS DISTINCT FROM 'string'
+     OR v_s -> 'zonas' -> 0 ->> 'costo_mxn' IS DISTINCT FROM '35.00' THEN
     RAISE EXCEPTION '24: zonas mal: %', v_s -> 'zonas';
   END IF;
 
@@ -150,10 +155,30 @@ BEGIN
   IF tienda_negocio('knockout-smoke') IS NOT NULL THEN RAISE EXCEPTION '27: un negocio dado de baja debe dar NULL'; END IF;
   UPDATE tenants SET deleted_at = NULL WHERE id = v_t;
 
+  -- 30) Negocio suspendido: ni se enseña ni recibe pedidos.
+  UPDATE tenants SET estado = 'SUSPENDIDO' WHERE id = v_t;
+  IF tienda_negocio('knockout-smoke', v_lun) IS NOT NULL THEN RAISE EXCEPTION '30: un negocio SUSPENDIDO debe dar NULL'; END IF;
+  v_r := tienda_estado_sucursal(v_suc, 'RECOGER', v_lun);
+  IF v_r IS DISTINCT FROM 'TIENDA_NO_DISPONIBLE' THEN RAISE EXCEPTION '30: SUSPENDIDO esperaba TIENDA_NO_DISPONIBLE, dio %', v_r; END IF;
+  UPDATE tenants SET estado = v_estado WHERE id = v_t;
+
+  -- 31) Bloqueo ya vigente (en el pasado respecto a p_ahora): igual.
+  UPDATE tenants SET bloqueo_desde = v_lun - interval '1 day' WHERE id = v_t;
+  IF tienda_negocio('knockout-smoke', v_lun) IS NOT NULL THEN RAISE EXCEPTION '31: un negocio bloqueado debe dar NULL'; END IF;
+  v_r := tienda_estado_sucursal(v_suc, 'RECOGER', v_lun);
+  IF v_r IS DISTINCT FROM 'TIENDA_NO_DISPONIBLE' THEN RAISE EXCEPTION '31: bloqueado esperaba TIENDA_NO_DISPONIBLE, dio %', v_r; END IF;
+
+  -- 32) Bloqueo programado a futuro: todavía vende.
+  UPDATE tenants SET bloqueo_desde = v_lun + interval '1 day' WHERE id = v_t;
+  IF tienda_negocio('knockout-smoke', v_lun) IS NULL THEN RAISE EXCEPTION '32: con bloqueo a futuro la tienda sigue disponible'; END IF;
+  v_r := tienda_estado_sucursal(v_suc, 'RECOGER', v_lun);
+  IF v_r IS NOT NULL THEN RAISE EXCEPTION '32: con bloqueo a futuro debía recibir, dio %', v_r; END IF;
+  UPDATE tenants SET bloqueo_desde = NULL WHERE id = v_t;
+
   -- 28) El tenant_id viaja aparte para la función, nunca dentro de lo público.
-  IF v_j -> 'tenant_id' IS NULL OR v_j ->> 'tenant_id' <> v_t::text THEN RAISE EXCEPTION '28: falta tenant_id aparte: %', v_j; END IF;
-  IF v_p ? 'tenant_id' THEN RAISE EXCEPTION '28: lo público no debe llevar tenant_id'; END IF;
-  IF v_s ? 'tenant_id' OR v_p::text LIKE '%' || v_t::text || '%' THEN RAISE EXCEPTION '28: el tenant_id se coló en lo público'; END IF;
+  IF v_j ->> 'tenant_id' IS DISTINCT FROM v_t::text THEN RAISE EXCEPTION '28: falta tenant_id aparte: %', v_j; END IF;
+  IF (v_p ? 'tenant_id') IS NOT FALSE THEN RAISE EXCEPTION '28: lo público no debe llevar tenant_id'; END IF;
+  IF (v_s ? 'tenant_id') IS NOT FALSE OR (v_p::text LIKE '%' || v_t::text || '%') IS NOT FALSE THEN RAISE EXCEPTION '28: el tenant_id se coló en lo público'; END IF;
 
   RAISE NOTICE 'smoke_tienda_estado OK';
 END $$;
