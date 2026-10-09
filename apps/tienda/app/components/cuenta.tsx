@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Aviso, botonClases, cn } from "@vim/ui/styles";
+import { Aviso, StatusChip, botonClases, cn, type TonoEstado } from "@vim/ui/styles";
 import {
   borrarDireccion, cambiarPassword, eliminarCuenta, guardarCuenta, guardarDireccion, leerCuenta, misPedidos, salir,
 } from "../lib/api";
@@ -25,12 +25,14 @@ import { textoDeEstado } from "../lib/textos";
 import { irA } from "./acceso";
 import { CampoDePassword, CampoDeTexto, useAccion, useCampos } from "./campo";
 import { COLUMNA, CUERPO, Hoja, PIE } from "./hoja";
-import { FOCO, PARTE, PRINCIPAL } from "./piezas";
+import { Esqueleto, FOCO, PARTE, PRINCIPAL } from "./piezas";
 
 type Negocio = { slug: string; nombre: string; sucursales: { id: string; nombre: string }[] };
 
 const TOPE_DE_DIRECCIONES = 5;
-const TITULO = "font-display text-18 font-semibold";
+const TITULO = "font-display text-18 font-semibold tracking-tight";
+/** El tono de la etiqueta de cada estado: lo que sigue en curso en azul informativo, lo entregado en verde, lo cancelado en rojo. */
+const tonoDeEstado = (estado: PedidoDeCuenta["estado"]): TonoEstado => (estado === "CANCELADO" ? "danger" : estado === "ENTREGADO" ? "success" : "info");
 const SECCION = "flex flex-col gap-3 border-t border-line py-6";
 const GHOST = cn(botonClases({ variant: "ghost" }), "h-12 w-full");
 const CHICO = cn(botonClases({ variant: "ghost" }), "h-11 flex-shrink-0 px-4");
@@ -199,7 +201,7 @@ function EliminarCuenta({ slug, negocio, alVolver }: { slug: string; negocio: st
       <div className="flex flex-col gap-1">
         <label className="flex min-h-12 cursor-pointer items-center gap-3 text-16">
           <input ref={casilla} type="checkbox" checked={seguro} onChange={(e) => { setSeguro(e.target.checked); setFaltaConfirmar(false); }}
-            aria-invalid={faltaConfirmar} aria-describedby={faltaConfirmar ? "eliminar-falta" : undefined} className="h-5 w-5 flex-shrink-0 accent-ink" />
+            aria-invalid={faltaConfirmar} aria-describedby={faltaConfirmar ? "eliminar-falta" : undefined} className="h-6 w-6 flex-shrink-0 accent-ink" />
           Entiendo que esto no se puede deshacer
         </label>
         {faltaConfirmar && <p id="eliminar-falta" role="alert" className="text-14 font-medium text-danger">Marca la casilla para eliminar tu cuenta.</p>}
@@ -221,9 +223,9 @@ function Pedido({ pedido, sucursal, variasSucursales, alRepetir }: { pedido: Ped
   const cuando = fechaDePedido(pedido.recibido_at);
   return (
     <li className="flex flex-col gap-2 py-4">
-      <div className="flex items-baseline justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         {/* El estado, tal cual lo da el servidor al cargar la página; aquí no se actualiza solo. */}
-        <p className={cn("font-display text-16 font-semibold", pedido.estado === "CANCELADO" && "text-danger")}>{textoDeEstado(pedido.estado, null).titulo}</p>
+        <StatusChip tone={tonoDeEstado(pedido.estado)}>{textoDeEstado(pedido.estado, null).titulo}</StatusChip>
         <p className="flex-shrink-0 font-display text-16 font-semibold tabular-nums">{formatoMxn(pedido.total_mxn)}</p>
       </div>
       <p className={cn("text-14 text-ink-2", PARTE)}>
@@ -286,7 +288,14 @@ export function MiCuentaDelNegocio({ negocio }: { negocio: Negocio }) {
             <Aviso tono="danger" role="alert" className="!text-14">{falla}</Aviso>
             <button type="button" onClick={() => setTurno((n) => n + 1)} className={cn(GHOST, "sm:w-auto sm:self-start sm:px-5")}>Volver a intentar</button>
           </>
-        ) : <p className="text-16 text-ink-2">Cargando tu cuenta…</p>}
+        ) : (
+          <>
+            <p className="text-16 text-ink-2">Cargando tu cuenta…</p>
+            <div className="mt-6 flex flex-col gap-4 border-t border-line pt-6">
+              <Esqueleto className="h-5 w-32" /><Esqueleto className="h-4 w-full" /><Esqueleto className="h-4 w-48" />
+            </div>
+          </>
+        )}
       </main>
     );
   }
@@ -306,7 +315,7 @@ export function MiCuentaDelNegocio({ negocio }: { negocio: Negocio }) {
   return (
     <main className="px-4 pb-10">
       <header className="flex flex-col gap-1 pb-6">
-        <h1 className="font-display text-24 font-semibold leading-tight">Mi cuenta</h1>
+        <h1 className="font-display text-24 font-semibold leading-tight tracking-tight">Mi cuenta</h1>
         <p className={cn("text-15 text-ink-2", PARTE)}>{cuenta.email}</p>
       </header>
 

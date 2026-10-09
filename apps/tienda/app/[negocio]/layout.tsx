@@ -29,7 +29,7 @@ export default async function MarcoDelNegocio({ children, params }: { children: 
                 {Array.from(negocio.nombre.trim())[0]?.toUpperCase() ?? ""}
               </span>
             )}
-            <span className="min-w-0 font-display text-24 font-semibold leading-tight [overflow-wrap:anywhere]">{negocio.nombre}</span>
+            <span className="min-w-0 font-display text-24 font-semibold leading-tight tracking-tight [overflow-wrap:anywhere]">{negocio.nombre}</span>
           </Link>
           {/* Discreto y en `ink`: la marca es la del negocio y la acción principal está en la página.
               Solo mira si hay cookie; si la sesión ya venció, «Mi cuenta» lo descubre y manda a entrar. */}

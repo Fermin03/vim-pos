@@ -1,13 +1,14 @@
 "use client";
 // El menú: las categorías con su barra pegajosa de chips (el activo sigue al desplazamiento) y los
-// productos como una carta — texto a la izquierda, foto a la derecha si hay, sin hueco si no.
+// productos como una carta — texto a la izquierda y, a la derecha, la foto si hay y siempre el «+»
+// que dice que el renglón se toca. Sin foto no queda hueco: el «+» ocupa su lugar.
 import { useEffect, useRef, useState } from "react";
-import { cn } from "@vim/ui/styles";
+import { StatusChip, cn } from "@vim/ui/styles";
 import type { Menu, Producto } from "../lib/contrato";
 import { formatoMxn } from "../lib/dinero";
 import { urlDeFoto } from "../lib/imagen";
 import { categoriaActiva } from "../lib/pantalla";
-import { FOCO, PARTE } from "./piezas";
+import { FOCO, IconoMas, PARTE } from "./piezas";
 
 /** Una foto que, si no carga, desaparece en vez de dejar el icono de imagen rota. */
 export function Foto({ src, alt, lado, className }: { src: string; alt: string; lado: [number, number]; className?: string }) {
@@ -21,22 +22,37 @@ export function Foto({ src, alt, lado, className }: { src: string; alt: string; 
 
 function Tarjeta({ producto, enPedido, alElegir }: { producto: Producto; enPedido: number; alElegir: (p: Producto) => void }) {
   const foto = urlDeFoto(producto.imagen_url);
+  // El «+» es una seña, no otro botón: el renglón entero abre el producto. Responde al presionar junto con él.
+  const mas = !producto.agotado && (
+    <span aria-hidden="true" className={cn(
+      "flex h-8 w-8 items-center justify-center rounded border border-line-strong bg-surface text-ink",
+      "transition-transform duration-150 ease-vim group-active:scale-[.94] group-active:duration-[60ms]",
+      foto && "absolute bottom-1 right-1",
+    )}><IconoMas /></span>
+  );
   return (
-    <li>
+    // La línea entre renglones va metida al margen del texto; lo que responde al toque llega a las orillas.
+    <li className="mx-4 border-t border-line first:border-t-0">
       <button type="button" disabled={producto.agotado}
         // Safari no enfoca un botón al tocarlo: sin esto, al cerrar la hoja el foco no tendría a dónde volver.
         onClick={(e) => { e.currentTarget.focus(); alElegir(producto); }}
-        className={cn("flex w-full items-start gap-3 px-4 py-4 text-left transition-colors duration-150 hover:bg-hover active:bg-hover disabled:pointer-events-none", FOCO, "focus-visible:-outline-offset-2")}>
+        // Al presionar el fondo cambia en el acto (sin transición); al soltar se va en 150 ms.
+        className={cn("group -mx-4 flex w-[calc(100%+2rem)] items-center gap-4 px-4 py-4 text-left transition-colors duration-150 hover:bg-hover active:bg-hover active:duration-0 disabled:pointer-events-none", FOCO, "focus-visible:-outline-offset-2")}>
         <span className={cn("flex min-w-0 flex-1 flex-col gap-1", PARTE, producto.agotado && "opacity-50")}>
           <span className="text-16 font-semibold leading-snug text-ink">{producto.nombre}</span>
           {producto.descripcion && <span className="line-clamp-2 text-14 leading-snug text-ink-2">{producto.descripcion}</span>}
           <span className="mt-1 flex flex-wrap items-center gap-2">
-            <span className="font-display text-15 font-semibold tabular-nums text-ink">{formatoMxn(producto.precio_final_mxn)}</span>
-            {enPedido > 0 && <span className="rounded bg-accent-soft px-1.5 py-0.5 text-12 font-semibold text-ink">{enPedido} en tu pedido</span>}
+            <span className="font-display text-16 font-semibold tabular-nums text-ink">{formatoMxn(producto.precio_final_mxn)}</span>
+            {enPedido > 0 && <span className="rounded-full bg-accent-soft px-2 py-1 text-12 font-semibold leading-none text-ink">{enPedido} en tu pedido</span>}
           </span>
         </span>
-        {producto.agotado && <span className="mt-0.5 flex-shrink-0 rounded border border-line-strong px-2 py-0.5 text-12 font-semibold text-ink-2">Agotado</span>}
-        {foto && <Foto src={foto} alt={`Foto de ${producto.nombre}`} lado={[96, 96]} className={cn("h-24 w-24 flex-shrink-0 rounded-lg", producto.agotado && "opacity-50 grayscale")} />}
+        {producto.agotado && <StatusChip className="flex-shrink-0">Agotado</StatusChip>}
+        {foto ? (
+          <span className="relative flex-shrink-0">
+            <Foto src={foto} alt={`Foto de ${producto.nombre}`} lado={[96, 96]} className={cn("h-24 w-24 rounded-lg", producto.agotado && "opacity-50 grayscale")} />
+            {mas}
+          </span>
+        ) : mas}
       </button>
     </li>
   );
@@ -56,7 +72,10 @@ export function MenuDeLaTienda({ menu, enPedido, alElegir }: {
     const medir = () => {
       cuadro = 0;
       // La línea va un poco por debajo de la barra: el chip cambia cuando el título ya es lo que se lee.
-      const linea = (barra.current?.getBoundingClientRect().bottom ?? 0) + 64;
+      const caja = barra.current?.getBoundingClientRect();
+      const linea = (caja?.bottom ?? 0) + 64;
+      // La línea bajo la barra solo existe mientras está pegada: arriba, en su sitio, no separa nada.
+      barra.current?.toggleAttribute("data-pegada", !!caja && caja.top <= 0 && scrollY > 0);
       const secciones = ids.split(",").filter(Boolean).map((id) => ({ id, top: document.getElementById(`cat-${id}`)?.getBoundingClientRect().top ?? Infinity }));
       const alFinal = scrollY > 0 && innerHeight + scrollY >= document.documentElement.scrollHeight - 2;
       setActiva(categoriaActiva(secciones, linea, alFinal));
@@ -81,15 +100,16 @@ export function MenuDeLaTienda({ menu, enPedido, alElegir }: {
   return (
     <>
       {categorias.length > 1 && (
-        <nav ref={barra} aria-label="Categorías del menú" className="sticky top-0 z-10 border-b border-line bg-surface">
-          <ul className="flex overflow-x-auto scroll-smooth px-2 [scrollbar-width:none] motion-reduce:scroll-auto [&::-webkit-scrollbar]:hidden">
+        <nav ref={barra} aria-label="Categorías del menú" className="sticky top-0 z-10 border-b border-transparent bg-surface transition-colors duration-150 data-[pegada]:border-line">
+          <ul className="flex overflow-x-auto overscroll-x-contain scroll-smooth px-3 [scrollbar-width:none] motion-reduce:scroll-auto [&::-webkit-scrollbar]:hidden">
             {categorias.map((c) => (
               <li key={c.id} className="flex-shrink-0">
-                {/* El botón mide 44 px para el dedo; la pastilla que se ve, 36. */}
+                {/* El botón mide 48 px para el dedo; la pastilla que se ve, 36. Solo la activa va
+                    rellena: las demás son texto, para que la barra no sea una fila de cajas grises. */}
                 <button type="button" aria-current={activa === c.id ? "true" : undefined}
                   onClick={() => document.getElementById(`cat-${c.id}`)?.scrollIntoView({ block: "start" })}
                   className={cn("group flex h-12 items-center px-1", FOCO, "focus-visible:-outline-offset-4")}>
-                  <span className="flex h-9 items-center whitespace-nowrap rounded-full bg-hover px-4 text-14 font-semibold text-ink-2 transition-colors duration-150 group-aria-[current=true]:bg-ink group-aria-[current=true]:text-white">
+                  <span className="flex h-9 items-center whitespace-nowrap rounded-full px-3 text-14 font-semibold text-ink-2 transition-[background-color,color,transform] duration-150 ease-vim group-hover:bg-hover group-active:scale-[.97] group-active:duration-[60ms] group-aria-[current=true]:bg-ink group-aria-[current=true]:text-white">
                     {c.nombre}
                   </span>
                 </button>
@@ -100,8 +120,8 @@ export function MenuDeLaTienda({ menu, enPedido, alElegir }: {
       )}
       {categorias.map((c) => (
         <section key={c.id} id={`cat-${c.id}`} aria-labelledby={`cat-t-${c.id}`} className="scroll-mt-12">
-          <h2 id={`cat-t-${c.id}`} className={cn("px-4 pb-1 pt-6 font-display text-20 font-semibold", PARTE)}>{c.nombre}</h2>
-          <ul className="divide-y divide-line">
+          <h2 id={`cat-t-${c.id}`} className={cn("px-4 pb-1 pt-8 font-display text-20 font-semibold leading-tight tracking-tight", PARTE)}>{c.nombre}</h2>
+          <ul>
             {c.productos.map((p) => <Tarjeta key={p.id} producto={p} enPedido={enPedido.get(p.id) ?? 0} alElegir={alElegir} />)}
           </ul>
         </section>

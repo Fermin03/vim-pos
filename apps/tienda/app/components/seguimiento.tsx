@@ -15,7 +15,7 @@ import { SONDEO_INICIAL, recorrido, sinConexion, sondear, tardando, terminado, t
 import { enlaceTel, enlaceWhatsApp, formatoTelefono } from "../lib/telefono";
 import { textoDeError, textoDeEstado } from "../lib/textos";
 import { Linea } from "./carrito";
-import { FOCO, PARTE, PRINCIPAL } from "./piezas";
+import { Esqueleto, FOCO, PARTE, PRINCIPAL } from "./piezas";
 
 const GHOST = cn(botonClases({ variant: "ghost" }), "h-12");
 
@@ -39,17 +39,19 @@ function Recorrido({ pasos }: { pasos: Paso[] }) {
   return (
     <ol aria-label="Recorrido de tu pedido" className="flex flex-col">
       {pasos.map((p, i) => (
-        <li key={p.estado} aria-current={p.fase === "actual" ? "step" : undefined} className="relative flex items-center gap-3 pb-5 last:pb-0">
+        <li key={p.estado} aria-current={p.fase === "actual" ? "step" : undefined} className="relative flex items-center gap-3 pb-6 last:pb-0">
           {/* La línea que une este paso con el siguiente: llena si ya se pasó por aquí. */}
           {i < pasos.length - 1 && <span aria-hidden="true" className={cn("absolute left-[11px] top-6 h-full w-0.5", p.fase === "hecho" ? "bg-ink" : "bg-line-strong")} />}
           <span aria-hidden="true" className={cn(
             "relative flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border-2 transition-colors duration-200",
             p.fase === "pendiente" ? "border-line-strong bg-surface" : "border-ink bg-ink text-surface",
+            // El paso en curso late (globals.css): la página se mira de reojo y así se ve que sigue viva.
+            p.fase === "actual" && "latido",
           )}>
             {p.fase === "hecho" && <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>}
-            {p.fase === "actual" && <span className="h-2 w-2 rounded-full bg-surface" />}
+            {p.fase === "actual" && <span className="relative h-2 w-2 rounded-full bg-surface" />}
           </span>
-          <span className={cn("text-16", p.fase === "actual" ? "font-semibold text-ink" : p.fase === "hecho" ? "text-ink" : "text-ink-3")}>
+          <span className={cn("text-16 leading-snug", p.fase === "actual" ? "font-semibold text-ink" : p.fase === "hecho" ? "text-ink-2" : "text-ink-3")}>
             {p.titulo}
             <span className="sr-only">{p.fase === "hecho" ? " (listo)" : p.fase === "actual" ? " (ahora)" : " (falta)"}</span>
           </span>
@@ -87,8 +89,9 @@ function Pedido({ slug, pedido, sondeo }: { slug: string; pedido: Seguimiento; s
           {!Number.isNaN(recibido.getTime()) && <>, recibido {aLaHora(momentoMx(recibido).hora)}</>}
         </p>
         {/* Lo que cambia solo se anuncia: el estado y su línea de apoyo, juntos. */}
-        <div aria-live="polite" aria-atomic="true">
-          <h1 className={cn("font-display text-32 font-semibold leading-tight", cancelado && "text-danger")}>{texto.titulo}</h1>
+        {/* La llave hace que el estado nuevo entre con un fundido corto: se nota que cambió sin que brinque. */}
+        <div key={pedido.estado} aria-live="polite" aria-atomic="true" className="animate-vim-fade motion-reduce:animate-none">
+          <h1 className={cn("font-display text-32 font-semibold leading-tight tracking-tight", cancelado && "text-danger")}>{texto.titulo}</h1>
           <p className="mt-2 text-16 leading-relaxed text-ink-2">{texto.apoyo}</p>
         </div>
         {sinConexion(sondeo) && <Aviso tono="warning" role="status" className="mt-2 !text-14">Sin conexión. Reintentando…</Aviso>}
@@ -104,8 +107,8 @@ function Pedido({ slug, pedido, sondeo }: { slug: string; pedido: Seguimiento; s
         <Contacto telefono={pedido.sucursal.telefono} folio={pedido.folio_corto} />
       </section>
 
-      <section aria-label="Tu pedido" className="border-t border-line pt-6">
-        <h2 className="font-display text-18 font-semibold">Tu pedido</h2>
+      <section aria-label="Tu pedido" className="rounded-lg border border-line bg-sel px-4 py-4">
+        <h2 className="font-display text-18 font-semibold tracking-tight">Tu pedido</h2>
         <ul className="mt-3 flex flex-col gap-3">
           {pedido.renglones.map((r, i) => (
             <li key={i} className="flex gap-3 text-16 leading-snug">
@@ -117,7 +120,7 @@ function Pedido({ slug, pedido, sondeo }: { slug: string; pedido: Seguimiento; s
             </li>
           ))}
         </ul>
-        <dl className="mt-5 flex flex-col gap-2">
+        <dl className="mt-4 flex flex-col gap-2 border-t border-line pt-4">
           <Linea concepto="Subtotal" importe={formatoMxn(pedido.subtotal_mxn)} estimado={false} />
           {pedido.modo === "DOMICILIO" && envio && <Linea concepto="Envío" importe={envio} estimado={false} />}
           <Linea concepto="Total" importe={formatoMxn(pedido.total_mxn)} estimado={false} fuerte />
@@ -172,7 +175,19 @@ export function SeguimientoDelPedido({ slug, codigo }: { slug: string; codigo: s
             <p className="text-16 leading-relaxed text-ink-2">Estamos tardando en cargar tu pedido. Seguimos intentando…</p>
             <button type="button" onClick={() => { setSondeo(SONDEO_INICIAL); setTurno((n) => n + 1); }} className={cn(GHOST, "self-start px-5")}>Reintentar ahora</button>
           </>
-        ) : <p className="text-16 text-ink-2">Buscando tu pedido…</p>}
+        ) : (
+          // El hueco del estado y del recorrido, del tamaño que van a tener: al llegar nada brinca.
+          <>
+            <p className="text-16 text-ink-2">Buscando tu pedido…</p>
+            <Esqueleto className="mt-2 h-8 w-48" />
+            <Esqueleto className="h-4 w-64 max-w-full" />
+            <div className="mt-6 flex flex-col gap-6">
+              {["w-32", "w-40", "w-28", "w-24"].map((ancho) => (
+                <div key={ancho} className="flex items-center gap-3"><Esqueleto className="h-6 w-6 flex-shrink-0" /><Esqueleto className={cn("h-4", ancho)} /></div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     );
   }

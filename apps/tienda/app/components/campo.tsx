@@ -4,7 +4,7 @@
 // marcan todos y el foco va al primero, y un segundo toque mientras se envía no hace nada.
 // Las REGLAS de cada campo no viven aquí: llegan como función (lib/cliente.ts, lib/cuenta.ts).
 import { useId, useRef, useState, type InputHTMLAttributes } from "react";
-import { cn } from "@vim/ui/styles";
+import { StatusChip, cn } from "@vim/ui/styles";
 import { FOCO } from "./piezas";
 
 export const CAJA = "block w-full rounded border bg-surface px-3 text-16 text-ink placeholder:text-ink-3 focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink";
@@ -20,9 +20,9 @@ export function CampoDeTexto({ id, etiqueta, opcional, ayuda, error, multilinea,
   const borde = error ? "border-danger" : "border-line-strong";
   return (
     <div className={cn("flex min-w-0 flex-col gap-1", className)}>
-      <label htmlFor={id} className="flex items-baseline justify-between gap-2 text-14 font-medium text-ink">
+      <label htmlFor={id} className="flex items-center justify-between gap-2 text-14 font-medium text-ink">
         {etiqueta}
-        {opcional && <span className="flex-shrink-0 whitespace-nowrap text-13 font-normal text-ink-2">Opcional</span>}
+        {opcional && <StatusChip className="flex-shrink-0">Opcional</StatusChip>}
       </label>
       {multilinea ? (
         <textarea id={id} rows={2} value={resto.value} maxLength={resto.maxLength} autoComplete={resto.autoComplete}

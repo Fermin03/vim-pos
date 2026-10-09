@@ -3,7 +3,7 @@
 // que manda es el de `cotizar`; mientras llega se ve el estimado atenuado. Con la tienda cerrada se
 // puede seguir armando el pedido, pero en lugar de «Continuar» va el aviso.
 import { useEffect, useId, useState } from "react";
-import { Aviso, botonClases, cn, type TonoAviso } from "@vim/ui/styles";
+import { Aviso, StatusChip, botonClases, cn, type TonoAviso } from "@vim/ui/styles";
 import { cotizar, type Resultado } from "../lib/api";
 import { TOPES, estimarRenglon, estimarTotal, type Carrito, type CuerpoCarrito, type RenglonCarrito } from "../lib/carrito";
 import type { Cotizacion, Menu, Modo, Sucursal } from "../lib/contrato";
@@ -75,10 +75,10 @@ export function VistaDelCarrito({
 
   if (carrito.renglones.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-4 px-6 py-16 text-center">
-        <p className="font-display text-18 font-semibold">Tu pedido está vacío</p>
+      <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
+        <p className="font-display text-20 font-semibold tracking-tight">Tu pedido está vacío</p>
         <p className="text-15 text-ink-2">Elige algo del menú y aparecerá aquí.</p>
-        <button type="button" onClick={alCerrar} className={cn(PRINCIPAL, "h-12 px-6 text-15")}>Ver el menú</button>
+        <button type="button" onClick={alCerrar} className={cn(PRINCIPAL, "mt-2 h-14 px-6 text-16")}>Ver el menú</button>
       </div>
     );
   }
@@ -105,17 +105,17 @@ export function VistaDelCarrito({
   return (
     <>
       <div className={CUERPO}>
-        <div className="border-b border-line px-4 py-4">
+        <div className="px-4 pb-4 pt-2">
           <Entrega sucursal={sucursal} modo={carrito.modo} zonaId={carrito.zonaId} alCambiarModo={alCambiarModo} alCambiarZona={alCambiarZona} />
         </div>
-        <ul className="divide-y divide-line px-4">
+        <ul className="divide-y divide-line border-t border-line px-4">
           {carrito.renglones.map((r, i) => {
             const centavos = estimarRenglon(r, menu);
             return (
               <li key={r.id} className="py-4">
                 <div className="flex items-baseline justify-between gap-3">
                   <span className={cn("min-w-0 text-16 font-semibold leading-snug", PARTE)}>{r.nombre}</span>
-                  <span className={cn("flex-shrink-0 font-display text-15 font-semibold tabular-nums transition-opacity duration-150", !porRenglon && "opacity-50")}>
+                  <span className={cn("flex-shrink-0 font-display text-16 font-semibold tabular-nums transition-opacity duration-150", !porRenglon && "opacity-50")}>
                     {porRenglon ? formatoMxn(porRenglon[i]!.total_mxn) : centavos === null ? "" : formato(centavos)}
                   </span>
                 </div>
@@ -130,14 +130,15 @@ export function VistaDelCarrito({
           })}
         </ul>
         <div className="border-t border-line px-4 py-4">
-          <label htmlFor={idNota} className="flex items-baseline justify-between gap-3">
+          <label htmlFor={idNota} className="flex items-center justify-between gap-3">
             <span className="text-15 font-semibold">Nota para el restaurante</span>
-            <span className="text-13 text-ink-2">Opcional</span>
+            <StatusChip className="flex-shrink-0">Opcional</StatusChip>
           </label>
           <textarea id={idNota} value={nota} onChange={(e) => alCambiarNota(e.target.value)} maxLength={TOPES.nota} rows={2}
             className="mt-2 block w-full resize-none rounded border border-line-strong px-3 py-2 text-16 focus:border-ink focus:outline-none" />
         </div>
-        <div className="border-t border-line px-4 py-4">
+        {/* La cuenta, en la tarjeta de resumen de la casa (la misma del portal de factura). */}
+        <div className="mx-4 mb-4 rounded-lg border border-line bg-sel px-4 py-3">
           <dl aria-busy={cotizado.cotizando} className="flex flex-col gap-2">
           <Linea concepto="Subtotal" importe={cot ? formatoMxn(cot.subtotal_mxn) : formato(estimado)} estimado={!cot} />
           {aDomicilio && <Linea concepto="Envío" importe={cot ? formatoMxn(cot.envio_total_mxn) : zona ? formato(envioEstimado) : "Por elegir"} estimado={!cot} />}

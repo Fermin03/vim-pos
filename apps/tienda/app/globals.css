@@ -69,16 +69,19 @@ body {
   overscroll-behavior: contain;
   transform: translateY(100%);
   transition-property: opacity, transform, overlay, display;
+  /* Curva y tiempos del núcleo: entra en 250 ms (el tope de la escala: recorre casi toda la
+     pantalla) y sale en 180, más rápido de lo que entra. Sin curvas propias. */
   transition-duration: 180ms;
-  transition-timing-function: ease;
+  transition-timing-function: var(--ease-out);
   transition-behavior: allow-discrete;
 }
 .hoja[open] {
   display: flex;
   transform: none;
-  transition-duration: 300ms;
-  transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  transition-duration: 250ms;
 }
+/* La línea bajo la cabecera solo existe mientras el cuerpo pasa por debajo (hoja.tsx). */
+.hoja[data-corrida] > header { border-color: rgb(var(--line)); }
 /* El velo va literal (es --ink): ::backdrop no hereda variables en navegadores de hace dos años. */
 .hoja::backdrop {
   background: rgb(22 22 26 / 0);
@@ -86,7 +89,7 @@ body {
   transition-duration: 180ms;
   transition-behavior: allow-discrete;
 }
-.hoja[open]::backdrop { background: rgb(22 22 26 / 0.45); }
+.hoja[open]::backdrop { background: rgb(22 22 26 / 0.4); transition-duration: 250ms; }
 @media (min-width: 640px) {
   .hoja {
     --hoja-desde: translateY(8px) scale(0.98);
@@ -101,7 +104,7 @@ body {
     opacity: 0;
     transform: translateY(8px) scale(0.98);
   }
-  .hoja[open] { opacity: 1; transition-duration: 200ms; transition-timing-function: var(--ease-out); }
+  .hoja[open] { opacity: 1; transition-duration: 200ms; }
 }
 /* Con una hoja abierta, el menú de atrás no se desplaza. En Safari de iOS esto funciona desde la
    16 (antes ignoraba `overflow: hidden` en la raíz); lo demás lo hace `overscroll-behavior` arriba. */
@@ -110,16 +113,32 @@ html:has(dialog.hoja[open]) { overflow: hidden; }
 .hoja [data-sin-anillo]:focus-visible { outline: none; }
 
 /* La barra del carrito aparece una vez, cuando entra el primer producto. */
-.aparece { transition: opacity 200ms ease, transform 200ms var(--ease-out); }
+.aparece { transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out); }
+
+/* El paso en el que va el pedido late despacio: dice «esto sigue vivo» a quien mira de reojo, sin
+   pedir atención. Solo `transform` y `opacity`, con la curva del núcleo. */
+@keyframes tienda-latido {
+  from { transform: scale(1); opacity: 0.35; }
+  to { transform: scale(2.2); opacity: 0; }
+}
+.latido::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: rgb(var(--ink));
+  animation: tienda-latido 1.8s var(--ease-out) infinite;
+}
 
 @media (prefers-reduced-motion: no-preference) {
   html { scroll-behavior: smooth; }
 }
 /* Movimiento reducido: sin desplazamiento; se conserva el fundido, que dice qué apareció. */
 @media (prefers-reduced-motion: reduce) {
-  .hoja, .hoja[open] { --hoja-desde: none; --hoja-opacidad-desde: 0; transform: none; opacity: 0; transition-duration: 150ms; transition-timing-function: ease; }
+  .hoja, .hoja[open] { --hoja-desde: none; --hoja-opacidad-desde: 0; transform: none; opacity: 0; transition-duration: 150ms; }
   .hoja[open] { opacity: 1; }
-  .aparece { --aparece-desde: none; transition: opacity 150ms ease; }
+  .aparece { --aparece-desde: none; transition: opacity 150ms var(--ease-out); }
+  .latido::after { animation: none; opacity: 0; }
 }
 
 /* ── Desde dónde entra cada cosa. SIEMPRE al final (ver la nota de la hoja, arriba). ────────────── */

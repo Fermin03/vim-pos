@@ -304,11 +304,11 @@ export function PasoDeDatos({
               </div>
               {/* Con direcciones guardadas se elige una; los campos solo aparecen para «Otra dirección». */}
               {guardadas.length > 0 && (
-                <ul role="radiogroup" aria-label="Tus direcciones guardadas" className="divide-y divide-line border-y border-line">
+                <ul role="radiogroup" aria-label="Tus direcciones guardadas" className="flex flex-col">
                   {[...guardadas, null].map((d) => (
                     <li key={d?.id ?? OTRA}>
                       <label className="flex min-h-12 cursor-pointer items-center gap-3 py-2 text-16">
-                        <input type="radio" name={`${id}-direccion`} checked={d ? elegida?.id === d.id : !elegida} onChange={() => elegirDireccion(d?.id ?? OTRA)} className="h-5 w-5 flex-shrink-0 accent-ink" />
+                        <input type="radio" name={`${id}-direccion`} checked={d ? elegida?.id === d.id : !elegida} onChange={() => elegirDireccion(d?.id ?? OTRA)} className="h-6 w-6 flex-shrink-0 accent-ink" />
                         {d ? (
                           <span className={cn("min-w-0", PARTE)}>
                             <span className="block font-medium">{d.etiqueta}</span>
@@ -338,7 +338,7 @@ export function PasoDeDatos({
                   {cuenta && guardadas.length < TOPE_DE_DIRECCIONES && (
                     <div className="flex flex-col gap-3">
                       <label className="flex min-h-12 cursor-pointer items-center gap-3 text-16">
-                        <input type="checkbox" checked={guardar} onChange={(e) => setGuardar(e.target.checked)} className="h-5 w-5 flex-shrink-0 accent-ink" />
+                        <input type="checkbox" checked={guardar} onChange={(e) => setGuardar(e.target.checked)} className="h-6 w-6 flex-shrink-0 accent-ink" />
                         Guardar esta dirección en mi cuenta
                       </label>
                       {guardar && (
@@ -365,11 +365,11 @@ export function PasoDeDatos({
           {formas.length === 0 && <Aviso tono="warning" role="status" className="!text-14">Este restaurante no está recibiendo pagos por aquí. Llama para hacer tu pedido.</Aviso>}
           {formas.length === 1 && <p className="text-16 font-medium">{pago === "EFECTIVO" ? "En efectivo" : "Con tarjeta"}</p>}
           {formas.length > 1 && (
-            <ul role="radiogroup" aria-labelledby={`${id}-pago-titulo`} className="divide-y divide-line border-y border-line">
+            <ul role="radiogroup" aria-labelledby={`${id}-pago-titulo`} className="flex flex-col">
               {formas.map((p) => (
                 <li key={p}>
                   <label className="flex min-h-12 cursor-pointer items-center gap-3 py-2 text-16">
-                    <input type="radio" name={`${id}-forma`} checked={pago === p} onChange={() => { setPago(p); setRechazo((r) => ({ ...r, pago: undefined })); }} className="h-5 w-5 flex-shrink-0 accent-ink" />
+                    <input type="radio" name={`${id}-forma`} checked={pago === p} onChange={() => { setPago(p); setRechazo((r) => ({ ...r, pago: undefined })); }} className="h-6 w-6 flex-shrink-0 accent-ink" />
                     {p === "EFECTIVO" ? "En efectivo" : "Con tarjeta"}
                   </label>
                 </li>

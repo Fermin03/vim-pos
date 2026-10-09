@@ -34,7 +34,7 @@ function Pantalla({ titulo, apoyo, children }: { titulo: string; apoyo?: ReactNo
   return (
     <main className="flex flex-col gap-5 px-4 pb-10">
       <header className="flex flex-col gap-2">
-        <h1 ref={h1} tabIndex={-1} className="font-display text-24 font-semibold leading-tight outline-none">{titulo}</h1>
+        <h1 ref={h1} tabIndex={-1} className="font-display text-24 font-semibold leading-tight tracking-tight outline-none">{titulo}</h1>
         {apoyo && <p className={cn("text-16 leading-relaxed text-ink-2", PARTE)}>{apoyo}</p>}
       </header>
       {children}
