@@ -561,6 +561,7 @@ LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = public, extensions, pg_temp
 AS $$
   SELECT COALESCE(jsonb_agg(jsonb_build_object(
+           'sucursal_id', d.sucursal_id,   -- «pedir de nuevo» arma el carrito de ESA sucursal
            'folio_corto', d.folio_corto,
            'recibido_at', d.recibido_at,
            'modo', CASE d.app WHEN 'DELIVERY_PROPIO' THEN 'DOMICILIO' ELSE 'RECOGER' END,

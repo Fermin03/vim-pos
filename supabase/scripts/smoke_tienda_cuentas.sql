@@ -416,12 +416,13 @@ BEGIN
   v_r := tienda_mis_pedidos(v_t, v_a);
   IF jsonb_array_length(v_r) <> 2 THEN RAISE EXCEPTION 'M: Ana debía ver sus 2 pedidos: %', v_r; END IF;
   IF (SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(v_r -> 0) k)
-       IS DISTINCT FROM ARRAY['estado', 'folio_corto', 'items', 'modo', 'recibido_at', 'renglones', 'total_mxn'] THEN
+       IS DISTINCT FROM ARRAY['estado', 'folio_corto', 'items', 'modo', 'recibido_at', 'renglones', 'sucursal_id', 'total_mxn'] THEN
     RAISE EXCEPTION 'M: claves de un pedido: %', v_r -> 0;
   END IF;
   -- El más reciente primero; nada de teléfono, dirección ni seguimiento.
   IF v_r -> 0 ->> 'folio_corto' IS DISTINCT FROM (SELECT folio_corto FROM delivery_pedidos WHERE id = v_ped)
      OR v_r -> 0 ->> 'modo' <> 'RECOGER' OR v_r -> 1 ->> 'modo' <> 'DOMICILIO'
+     OR v_r -> 0 ->> 'sucursal_id' IS DISTINCT FROM v_suc::text   -- para que «pedir de nuevo» sepa de qué sucursal era
      OR v_r -> 0 ->> 'total_mxn' <> '270.00' OR v_r -> 1 ->> 'total_mxn' <> '155.00'
      OR v_r -> 0 -> 'renglones' IS DISTINCT FROM '[{"nombre":"Sencilla cuentas","cantidad":2,"detalle":"Extra queso"}]'::jsonb
      OR (v_r -> 0 ->> 'recibido_at')::timestamptz IS DISTINCT FROM (SELECT recibido_at FROM delivery_pedidos WHERE id = v_ped) THEN

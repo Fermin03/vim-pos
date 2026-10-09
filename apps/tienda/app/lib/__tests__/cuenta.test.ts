@@ -21,7 +21,7 @@ const ITEMS = [
   { producto_id: ID.hamburguesa, cantidad: 2, nota: "sin cebolla", modificadores: [{ opcion_id: ID.medio, cantidad: 1 }, { opcion_id: ID.queso, cantidad: 2 }] },
   { producto_id: ID.combo, cantidad: 1, componentes: [{ grupo_id: ID.slotPapas, producto_id: ID.papasGajo, cantidad: 1, modificadores: [{ opcion_id: ID.ranch, cantidad: 2 }] }] },
 ];
-const PEDIDO = { folio_corto: "TAB12C", recibido_at: "2026-10-08T20:00:00+00:00", modo: "RECOGER", estado: "ENTREGADO", total_mxn: "120.00",
+const PEDIDO = { sucursal_id: ID.sucursal, folio_corto: "TAB12C", recibido_at: "2026-10-08T20:00:00+00:00", modo: "RECOGER", estado: "ENTREGADO", total_mxn: "120.00",
                  renglones: [{ nombre: "Hamburguesa", cantidad: 2, detalle: "Medio" }], items: ITEMS };
 
 describe("contrato de cuentas", () => {
@@ -67,7 +67,8 @@ describe("contrato de cuentas", () => {
     }
     // Lo que el lector no conoce de un item no pasa.
     expect(pedidosDe({ pedidos: [{ ...PEDIDO, items: [{ producto_id: ID.refresco, cantidad: 1, precio_mxn: "0.01" }] }] })![0]!.items).toEqual([{ producto_id: ID.refresco, cantidad: 1 }]);
-    for (const mala of [null, {}, { pedidos: "x" }, { pedidos: [{ ...PEDIDO, estado: "RARO" }] }, { pedidos: [{ ...PEDIDO, total_mxn: 120 }] }, { pedidos: [{ ...PEDIDO, modo: "MESA" }] }]) {
+    for (const mala of [null, {}, { pedidos: "x" }, { pedidos: [{ ...PEDIDO, estado: "RARO" }] }, { pedidos: [{ ...PEDIDO, total_mxn: 120 }] }, { pedidos: [{ ...PEDIDO, modo: "MESA" }] },
+                        { pedidos: [{ ...PEDIDO, sucursal_id: "no-uuid" }] }, { pedidos: [{ ...PEDIDO, sucursal_id: undefined }] }]) {
       expect(pedidosDe(mala), JSON.stringify(mala)).toBeNull();
     }
   });

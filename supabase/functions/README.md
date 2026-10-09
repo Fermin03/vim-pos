@@ -202,7 +202,7 @@ fecha_nacimiento }`; nunca sale el id de la cuenta ni el `tenant_id`.
 | `cuenta_password` | `actual`, `nueva` | sí | `{ ok }` (cierra las demás sesiones) | 403 `SESION_INVALIDA` / `CREDENCIALES_INVALIDAS`, 400 `CUENTA_INVALIDA_DATOS` |
 | `direccion_guardar` | `id` (o `null` = nueva), `etiqueta` (≤ 40), y los campos de dirección de `pedir`, sueltos o bajo `direccion` | sí | `{ direcciones }` | 403 `SESION_INVALIDA`, 409 `DIRECCIONES_LLENAS`, 400 `DIRECCION_INVALIDA` |
 | `direccion_borrar` | `id` | sí | `{ direcciones }` | 403 `SESION_INVALIDA`, 400 `DIRECCION_INVALIDA` |
-| `mis_pedidos` | — | sí | `{ pedidos: [{ folio_corto, recibido_at, modo, estado, total_mxn, renglones, items }] }` | 403 `SESION_INVALIDA` |
+| `mis_pedidos` | — | sí | `{ pedidos: [{ sucursal_id, folio_corto, recibido_at, modo, estado, total_mxn, renglones, items }] }` | 403 `SESION_INVALIDA` |
 | `eliminar_cuenta` | `password` | sí | `{ ok }` | 403 `SESION_INVALIDA` / `CREDENCIALES_INVALIDAS` |
 
 - **Secretos.** La contraseña va de 8 a 72 caracteres tal cual llega (ni se recorta ni se

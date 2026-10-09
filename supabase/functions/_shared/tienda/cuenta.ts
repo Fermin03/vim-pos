@@ -60,7 +60,7 @@ export function direccionesPublicas(x: unknown): Record<string, unknown>[] | nul
   return lista(x, "direcciones")?.map((d) => elegir(d, DE_DIRECCION)) ?? null;
 }
 
-const DE_PEDIDO = ["folio_corto", "recibido_at", "modo", "estado", "total_mxn"] as const;
+const DE_PEDIDO = ["sucursal_id", "folio_corto", "recibido_at", "modo", "estado", "total_mxn"] as const;
 
 /**
  * Los pedidos de la cuenta. `renglones` es lo que se enseña; `items` es el carrito para «pedir de

@@ -86,6 +86,8 @@ export type MiCuenta = { cuenta: Cuenta; direcciones: DireccionGuardada[] };
 /** `cuenta: null` = el correo ya tenía cuenta: no hay sesión (decisión 4: no se dice que ya existía). */
 export type Registro = { cuenta: Cuenta | null };
 export type PedidoDeCuenta = {
+  /** De qué sucursal fue: «pedir de nuevo» arma el carrito de esa. */
+  sucursal_id: string;
   folio_corto: string; recibido_at: string; modo: Modo; estado: EstadoDePedido; total_mxn: string;
   renglones: { nombre: string; cantidad: number; detalle: string | null }[];
   /** Lo que se pidió, con la forma del carrito, para «pedir de nuevo». null = ya no se puede (pedido anonimizado, o no se pudo leer). */
@@ -285,7 +287,7 @@ export const direccionesDe = lector(direcciones);
 export const pedidosDe = lector((x): PedidoDeCuenta[] => lista(obj(x).pedidos, (y) => {
   const p = obj(y);
   return {
-    folio_corto: txt(p.folio_corto), recibido_at: txt(p.recibido_at), modo: uno(p.modo, MODOS), estado: uno(p.estado, ESTADOS_DE_PEDIDO),
+    sucursal_id: uuid(p.sucursal_id), folio_corto: txt(p.folio_corto), recibido_at: txt(p.recibido_at), modo: uno(p.modo, MODOS), estado: uno(p.estado, ESTADOS_DE_PEDIDO),
     total_mxn: importe(p.total_mxn), renglones: lista(p.renglones, renglon), items: itemsDe(p.items),
   };
 }));

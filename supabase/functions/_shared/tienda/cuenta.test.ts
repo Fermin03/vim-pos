@@ -66,9 +66,9 @@ test("direcciones: lo que no es un objeto se descarta; lo que no es una lista es
 });
 
 // ── Mis pedidos ─────────────────────────────────────────────────────────────────────────────────
-const PEDIDO = { folio_corto: "TAB12C", recibido_at: "2026-10-08T20:00:00+00:00", modo: "RECOGER", estado: "ENTREGADO", total_mxn: "120.00",
+const PEDIDO = { sucursal_id: ID, folio_corto: "TAB12C", recibido_at: "2026-10-08T20:00:00+00:00", modo: "RECOGER", estado: "ENTREGADO", total_mxn: "120.00",
                  renglones: [{ nombre: "Clásica", cantidad: 1, detalle: null }], items: [{ producto_id: ID, cantidad: 1 }] };
-test("pedidos: salen los siete campos; ni el id del pedido, ni el negocio, ni datos del cliente", () => {
+test("pedidos: salen los ocho campos; ni el id del pedido, ni el negocio, ni datos del cliente", () => {
   const crudo = { ...PEDIDO, id: ID, tenant_id: ID, tienda_cuenta_id: ID, cliente_telefono: "4771112233",
                   renglones: [{ nombre: "Clásica", cantidad: 1, detalle: null, producto_id: ID }] };
   assert.deepEqual(pedidosPublicos([crudo]), [PEDIDO]);
