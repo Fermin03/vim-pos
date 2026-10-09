@@ -50,6 +50,27 @@ describe("lo guardado después de una escritura que sí entró", () => {
     expect(r.sucursales[1]).toBe(LEIDO.sucursales[1]);
   });
 
+  it("el logo recién subido queda con su ruta y su URL; lo demás de la configuración no cambia", () => {
+    const r = trasEscribir(LEIDO, { tipo: "logo", ruta: "t1/nuevo.webp", url: "https://x/t1/nuevo.webp" });
+    expect(r.config).toEqual({ ...CONFIG, logoRuta: "t1/nuevo.webp", logoUrl: "https://x/t1/nuevo.webp" });
+    expect(r.sucursales).toBe(LEIDO.sucursales);
+  });
+
+  it("al quitar el logo queda sin ruta y sin URL", () => {
+    const r = trasEscribir(LEIDO, { tipo: "logo", ruta: null, url: null });
+    expect(r.config).toEqual({ ...CONFIG, logoRuta: null, logoUrl: null });
+  });
+
+  it("el caso que pisaría el logo: tras subirlo, guardar Datos lo conserva", () => {
+    const trasLogo = trasEscribir(LEIDO, { tipo: "logo", ruta: "t1/nuevo.webp", url: "https://x/t1/nuevo.webp" });
+    expect(trasEscribir(trasLogo, { tipo: "config", datos: DATOS }).config?.logoRuta).toBe("t1/nuevo.webp");
+  });
+
+  it("sin dirección guardada no hay dónde poner el logo: no inventa una configuración", () => {
+    const sin = { ...LEIDO, config: null };
+    expect(trasEscribir(sin, { tipo: "logo", ruta: "t1/nuevo.webp", url: "https://x/t1/nuevo.webp" }).config).toBeNull();
+  });
+
   it("no toca lo demás ni muta lo leído", () => {
     const r = trasEscribir(LEIDO, { tipo: "config", datos: DATOS });
     expect(r.sucursales).toBe(LEIDO.sucursales);

@@ -16,7 +16,9 @@ export type Leido = {
 export type Escritura =
   | { tipo: "config"; datos: DatosConfigTienda }
   | { tipo: "interruptor"; encendida: boolean }
-  | { tipo: "sucursal"; id: string; datos: BorradorSucursal };
+  | { tipo: "sucursal"; id: string; datos: BorradorSucursal }
+  /** El logo se sube y se quita aparte del formulario; `null` = quedó sin logo. */
+  | { tipo: "logo"; ruta: string | null; url: string | null };
 
 /**
  * Lo guardado DESPUÉS de una escritura que sí entró, sin esperar a volver a leer. Si la relectura
@@ -25,6 +27,8 @@ export type Escritura =
  */
 export function trasEscribir(l: Leido, e: Escritura): Leido {
   if (e.tipo === "interruptor") return { ...l, interruptor: e.encendida };
+  // Sin dirección guardada no hay fila que tenga logo: no se inventa una configuración.
+  if (e.tipo === "logo") return l.config ? { ...l, config: { ...l.config, logoRuta: e.ruta, logoUrl: e.url } } : l;
   if (e.tipo === "sucursal") return { ...l, sucursales: l.sucursales.map((s) => (s.id === e.id ? { ...s, ...e.datos } : s)) };
   return {
     ...l,

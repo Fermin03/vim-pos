@@ -34,7 +34,8 @@ const configSchema = z.object({
   pagoTarjeta: z.boolean(),
 }).refine((d) => d.pagoEfectivo || d.pagoTarjeta, { message: "Deja activa al menos una forma de pago.", path: ["pagoEfectivo"] });
 
-const urlDelLogo = (ruta: string | null): string | null =>
+/** La dirección pública del logo a partir de su ruta en el almacén. */
+export const urlDelLogo = (ruta: string | null): string | null =>
   ruta ? supabase.storage.from("productos").getPublicUrl(ruta).data.publicUrl : null;
 
 /** null = todavía no hay tienda configurada. */

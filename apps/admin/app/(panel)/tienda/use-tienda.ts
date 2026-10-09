@@ -3,8 +3,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { leerNegocio } from "../../lib/configuracion";
 import { mensajeError } from "../../lib/errores";
 import { leerModulos } from "../../lib/modulos";
+import { ponerLogoTienda, quitarLogoTienda } from "../../lib/foto-producto";
 import {
-  contarPendientesDeCatalogo, encenderTienda, guardarConfigTienda, leerConfigTienda, guardarSucursalTienda, leerSucursalesTienda, leerTiendaEncendida,
+  contarPendientesDeCatalogo, encenderTienda, guardarConfigTienda, leerConfigTienda, guardarSucursalTienda, leerSucursalesTienda, leerTiendaEncendida, urlDelLogo,
   type DatosConfigTienda,
 } from "../../lib/tienda";
 import { normalizarDireccion, trasEscribir, type Escritura, type Leido } from "../../lib/tienda-pagina";
@@ -14,7 +15,7 @@ import type { MensajeTienda } from "../../components/tienda-mensaje";
 import type { PedidosTienda } from "../../components/tienda-pedidos";
 
 /** Cada sucursal es su propio bloque: su mensaje y su «Guardando…» salen en su tarjeta. */
-export type Bloque = "estado" | "datos" | "pedidos" | `sucursal:${string}`;
+export type Bloque = "estado" | "datos" | "logo" | "pedidos" | `sucursal:${string}`;
 const deSucursal = (id: string): Bloque => `sucursal:${id}`;
 type Formulario = DatosTienda & PedidosTienda;
 
@@ -104,9 +105,10 @@ export function useTienda() {
    * Una escritura. Con `enDialogo`, el error se pinta dentro del diálogo abierto y no detrás de él.
    * Devuelve true si la base la aceptó. Lo guardado se pone en pantalla ANTES de volver a leer: si la
    * relectura falla, ningún bloque manda de vuelta datos viejos ni se ve como sin guardar.
+   * `escritura` puede ser una función cuando lo guardado solo se sabe al terminar (la ruta del logo).
    */
   async function escribir(
-    bloque: Bloque, accion: () => Promise<void>, escritura: Escritura, fallo: string, exito: string | null, enDialogo: boolean,
+    bloque: Bloque, accion: () => Promise<void>, escritura: Escritura | (() => Escritura), fallo: string, exito: string | null, enDialogo: boolean,
   ): Promise<boolean> {
     if (enCurso.current || sinLeer) return false;
     enCurso.current = true;
@@ -123,7 +125,8 @@ export function useTienda() {
       else setMensaje({ bloque, tipo: "error", texto });
     }
     if (guardado) {
-      setLeido((l) => l && trasEscribir(l, escritura));
+      const hecha = typeof escritura === "function" ? escritura() : escritura;
+      setLeido((l) => l && trasEscribir(l, hecha));
       setDialogo(null);
       if (await releer()) {
         if (exito) setMensaje({ bloque, tipo: "ok", texto: exito });
@@ -190,6 +193,24 @@ export function useTienda() {
     return escribir(deSucursal(id), () => guardarSucursalTienda(id, datos), { tipo: "sucursal", id, datos }, "No se pudo guardar la sucursal", GUARDADO, false);
   }
 
+  // El logo pasa por la misma guarda: una escritura a la vez, y lo guardado queda en pantalla antes
+  // de volver a leer (si no, el «Guardar» de al lado seguiría viendo el logo viejo).
+  function subirLogo(archivo: File) {
+    if (!leido?.config) return;
+    const anterior = leido.config.logoRuta;
+    let ruta: string | null = null;
+    void escribir(
+      "logo", async () => { ruta = await ponerLogoTienda(archivo, anterior); },
+      () => ({ tipo: "logo", ruta, url: urlDelLogo(ruta) }), "No se pudo subir el logo", null, false,
+    );
+  }
+
+  function quitarLogo() {
+    const anterior = leido?.config?.logoRuta;
+    if (!anterior) return;
+    void escribir("logo", () => quitarLogoTienda(anterior), { tipo: "logo", ruta: null, url: null }, "No se pudo quitar el logo", null, false);
+  }
+
   function encender(encendida: boolean, enDialogo: boolean) {
     void escribir("estado", () => encenderTienda(encendida), { tipo: "interruptor", encendida }, "No se pudo cambiar", null, enDialogo);
   }
@@ -224,7 +245,7 @@ export function useTienda() {
     mensajeDeSucursal: (id: string): MensajeTienda | null => mensajeDe(deSucursal(id)),
     /** El id de la sucursal que se está guardando, si es una sucursal lo que se guarda. */
     sucursalGuardando: leido?.sucursales.find((s) => ocupado === deSucursal(s.id))?.id ?? null,
-    reintentar, cambiar, guardarDatos, guardarPedidos, guardarSucursal, cambiarEncendido,
+    reintentar, cambiar, guardarDatos, guardarPedidos, guardarSucursal, cambiarEncendido, subirLogo, quitarLogo,
     confirmarDireccion: () => enviarDatos(true),
     confirmarApagar: () => encender(false, true),
     cerrarDialogo: () => setDialogo(null),

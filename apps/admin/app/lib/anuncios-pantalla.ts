@@ -39,16 +39,17 @@ type Tipo = keyof typeof EXT;
 /**
  * El data URI que devuelve `reescalarImagen`, como archivo para subir. PURA.
  *
- * Lanza si no es una imagen permitida o si pasa de `ANUNCIO_MAX_BYTES`. `reescalarImagen` ya
+ * Lanza si no es una imagen permitida o si pasa de `maxBytes` (el de los anuncios, salvo que quien
+ * llama tenga otro tope: las fotos de productos). `reescalarImagen` ya
  * reduce por debajo de ese tope (su `maxBytes` mide el texto en base64, que es 4/3 del archivo);
  * esto es el cinturón: que nunca salga hacia el almacén algo que este vaya a rechazar.
  */
-export function dataUriAArchivo(dataUri: string): { blob: Blob; ext: (typeof EXT)[Tipo]; tipo: Tipo } {
+export function dataUriAArchivo(dataUri: string, maxBytes = ANUNCIO_MAX_BYTES): { blob: Blob; ext: (typeof EXT)[Tipo]; tipo: Tipo } {
   const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUri);
   if (!m) throw new Error("El archivo no es una imagen válida. Usa una imagen JPG, PNG o WebP.");
   const tipo = m[1] as Tipo;
   const binario = atob(m[2]!);
-  if (binario.length > ANUNCIO_MAX_BYTES) throw new Error(MUY_PESADA);
+  if (binario.length > maxBytes) throw new Error(MUY_PESADA);
   const bytes = new Uint8Array(binario.length);
   for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
   return { blob: new Blob([bytes], { type: tipo }), ext: EXT[tipo], tipo };

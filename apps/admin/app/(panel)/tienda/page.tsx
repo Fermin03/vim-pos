@@ -52,12 +52,17 @@ export default function TiendaPage() {
             <TiendaDatos
               valores={t.form}
               logoUrl={t.leido.config?.logoUrl ?? null}
+              hayDireccion={t.leido.config !== null}
+              logoOcupado={t.ocupado === "logo"}
+              mensajeLogo={t.mensajeDe("logo")}
               guardando={t.ocupado === "datos"}
               ocupado={ocupado}
               soloLectura={soloLectura}
               mensaje={t.mensajeDe("datos")}
               onCambio={t.cambiar}
               onGuardar={t.guardarDatos}
+              onSubirLogo={t.subirLogo}
+              onQuitarLogo={t.quitarLogo}
             />
             <TiendaPedidos
               valores={t.form}

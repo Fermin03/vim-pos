@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Button, cn } from "@vim/ui/styles";
 import { label } from "./campos";
+import { CampoImagen } from "./campo-imagen";
 import { Tarjeta } from "./tarjeta";
 import { LineaMensaje, type MensajeTienda } from "./tienda-mensaje";
 import { normalizarDireccion } from "../lib/tienda-pagina";
@@ -16,15 +17,25 @@ export type DatosTienda = { direccion: string; color: string; descripcion: strin
 export function TiendaDatos({
   valores,
   logoUrl,
+  hayDireccion,
+  logoOcupado,
+  mensajeLogo,
   guardando,
   ocupado,
   soloLectura,
   mensaje,
   onCambio,
   onGuardar,
+  onSubirLogo,
+  onQuitarLogo,
 }: {
   valores: DatosTienda;
   logoUrl: string | null;
+  /** El logo se guarda en la fila de la tienda, que solo existe cuando ya hay dirección guardada. */
+  hayDireccion: boolean;
+  /** Se está subiendo o quitando el logo. */
+  logoOcupado: boolean;
+  mensajeLogo: MensajeTienda | null;
   guardando: boolean;
   /** Algo se está guardando en la página: una escritura a la vez. */
   ocupado: boolean;
@@ -32,6 +43,9 @@ export function TiendaDatos({
   mensaje: MensajeTienda | null;
   onCambio: (cambio: Partial<DatosTienda>) => void;
   onGuardar: () => void;
+  /** El logo se sube al momento, aparte del «Guardar» de este bloque. */
+  onSubirLogo: (archivo: File) => void;
+  onQuitarLogo: () => void;
 }) {
   // Mientras se escribe no se corrige ni se regaña: el cursor no brinca y «mi tienda» no sale en rojo
   // por el espacio. Al salir del campo se normaliza (minúsculas, guiones) y entonces sí se valida.
@@ -76,17 +90,23 @@ export function TiendaDatos({
           </p>
         </div>
 
-        {/* Task 7: logo */}
-        <div>
-          <span className={label}>Logo</span>
-          <div className="flex items-center gap-3">
-            {logoUrl && (
-              // eslint-disable-next-line @next/next/no-img-element -- imagen del almacén público
-              <img src={logoUrl} alt="Logo de tu tienda" className="h-16 w-16 flex-shrink-0 rounded border border-line bg-hover object-contain" />
-            )}
-            <p className="text-13 text-ink-3">El logo se sube en el siguiente paso.</p>
-          </div>
-        </div>
+        <CampoImagen
+          titulo="Logo"
+          url={logoUrl}
+          alt="Logo de tu tienda"
+          ajuste="contain"
+          textoSubir="Subir logo"
+          textoVacio="Sin logo"
+          ayuda="Se ve arriba de tu tienda. Mejor si es cuadrado y con fondo transparente."
+          claseAyuda={ayuda}
+          bloqueo={hayDireccion ? undefined : "Primero guarda la dirección de tu tienda."}
+          trabajando={logoOcupado}
+          apagado={ocupado || soloLectura}
+          quitar={{ titulo: "¿Quitar el logo?", mensaje: "Tu tienda se queda sin logo." }}
+          mensaje={<LineaMensaje mensaje={mensajeLogo} className="mt-2" />}
+          onSubir={onSubirLogo}
+          onQuitar={onQuitarLogo}
+        />
 
         <div>
           <label className={label} htmlFor="tie-color">Color</label>
