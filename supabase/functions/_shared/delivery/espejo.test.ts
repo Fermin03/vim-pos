@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { alcanceEspejo, cadenciaEspejo, cursorPedido, respuestaSinModulo, unirPedidos, REPOSO_MS, NORMAL_MS, RAPIDA_MS } from "./espejo.ts";
+import { alcanceEspejo, cadenciaEspejo, cursorPedido, respuestaSinModulo, selloLatido, unirPedidos, REPOSO_MS, NORMAL_MS, RAPIDA_MS } from "./espejo.ts";
 
 test("sin conexiones, la caja sondea en reposo: este cliente no vende por apps", () => {
   assert.equal(cadenciaEspejo({ conexiones: [], pedidosVivos: [] }), REPOSO_MS);
@@ -139,4 +139,34 @@ test("alcance: la caja dice que entiende la tienda pero el negocio no la tiene",
 test("alcance: solo un true estricto cuenta; un cuerpo raro no abre nada", () => {
   assert.deepEqual(alcanceEspejo({ efectivos: { tienda: true }, cuerpo: { tienda: "true", turno_abierto: 1 } }),
     { conApps: false, conTienda: false, canales: [], turnoAbierto: false });
+});
+
+// ── Sello del latido (0161 §6) ───────────────────────────────────────────────
+// El turno abierto se sella como marca de tiempo y solo cuando la caja lo afirma: una caja que deja
+// de afirmarlo no escribe nada, la marca envejece sola y la tienda de esa sucursal se cierra.
+
+const AHORA = "2026-10-08T18:00:00.000Z";
+
+test("sello: un cuerpo vacío solo sella el latido, como las cajas que hoy están en servicio", () => {
+  assert.deepEqual(selloLatido({}, AHORA), { espejo_apps_at: AHORA });
+});
+
+test("sello: declarar la tienda sin turno abierto no sella el turno", () => {
+  assert.deepEqual(selloLatido({ tienda: true }, AHORA), { espejo_apps_at: AHORA });
+  assert.deepEqual(selloLatido({ tienda: true, turno_abierto: false }, AHORA), { espejo_apps_at: AHORA });
+});
+
+test("sello: turno abierto sin declarar la tienda no sella el turno", () => {
+  assert.deepEqual(selloLatido({ turno_abierto: true }, AHORA), { espejo_apps_at: AHORA });
+});
+
+test("sello: con la tienda declarada y el turno abierto se sellan las dos marcas, con la misma hora", () => {
+  assert.deepEqual(selloLatido({ tienda: true, turno_abierto: true }, AHORA),
+    { espejo_apps_at: AHORA, espejo_turno_abierto_at: AHORA });
+});
+
+test("sello: solo un true estricto cuenta", () => {
+  assert.deepEqual(selloLatido({ tienda: "true", turno_abierto: true }, AHORA), { espejo_apps_at: AHORA });
+  assert.deepEqual(selloLatido({ tienda: true, turno_abierto: 1 }, AHORA), { espejo_apps_at: AHORA });
+  assert.deepEqual(selloLatido({ tienda: 1, turno_abierto: "true" }, AHORA), { espejo_apps_at: AHORA });
 });

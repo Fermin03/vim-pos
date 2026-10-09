@@ -766,19 +766,23 @@ GRANT EXECUTE ON FUNCTION modulos_efectivos(uuid) TO authenticated, service_role
 -- El turno abierto llega a la nube por el push, con hasta 10 minutos de retraso: no sirve para
 -- decidir si la tienda acepta un pedido AHORA. La única señal de segundos es el sondeo del
 -- espejo (0096), así que la caja manda ahí si tiene turno abierto y delivery-espejo lo sella.
--- Una caja vieja no manda el dato, queda en false, y la tienda de esa sucursal no abre.
-ALTER TABLE cajas ADD COLUMN IF NOT EXISTS espejo_turno_abierto boolean NOT NULL DEFAULT false;
-COMMENT ON COLUMN cajas.espejo_turno_abierto IS
-  'Si la caja reportó turno abierto en su último sondeo de espejo (espejo_apps_at). La tienda en línea solo recibe pedidos con esto en true.';
+--
+-- Es una MARCA DE TIEMPO y no un booleano para que falle cerrada: delivery-espejo solo la escribe
+-- cuando la caja declara la tienda Y reporta turno abierto. Una caja que cierra el turno, que deja
+-- de declarar la tienda o que es vieja no escribe nada, la marca envejece sola y la tienda de esa
+-- sucursal no abre. Un booleano conservaría un «sí» viejo junto a un latido fresco.
+ALTER TABLE cajas ADD COLUMN IF NOT EXISTS espejo_turno_abierto_at timestamptz NULL;
+COMMENT ON COLUMN cajas.espejo_turno_abierto_at IS
+  'Última vez que la caja reportó turno abierto en su sondeo de espejo. NULL = nunca. La tienda en línea solo recibe pedidos mientras esta marca es reciente (sucursal_recibe_pedidos).';
 
 CREATE OR REPLACE FUNCTION sucursal_recibe_pedidos(p_sucursal uuid, p_segundos integer DEFAULT 90) RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   SELECT EXISTS (
     SELECT 1 FROM cajas c
-    WHERE c.sucursal_id = p_sucursal AND c.activa AND c.espejo_turno_abierto
-      AND c.espejo_apps_at IS NOT NULL AND c.espejo_apps_at > now() - make_interval(secs => p_segundos));
+    WHERE c.sucursal_id = p_sucursal AND c.activa
+      AND c.espejo_turno_abierto_at > now() - make_interval(secs => p_segundos));
 $$;
 REVOKE ALL ON FUNCTION sucursal_recibe_pedidos(uuid, integer) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION sucursal_recibe_pedidos(uuid, integer) TO service_role;
 COMMENT ON FUNCTION sucursal_recibe_pedidos(uuid, integer) IS
-  'TRUE si alguna caja activa de la sucursal sondeó en los últimos p_segundos y reportó turno abierto.';
+  'TRUE si alguna caja activa de la sucursal reportó turno abierto en los últimos p_segundos.';

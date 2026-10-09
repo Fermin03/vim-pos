@@ -66,6 +66,25 @@ export function alcanceEspejo(
   return { conApps, conTienda, canales, turnoAbierto: cuerpo.turno_abierto === true };
 }
 
+/**
+ * Lo que el sondeo escribe en `cajas`: siempre el latido y, solo si la caja declara la tienda Y
+ * reporta turno abierto, la marca `espejo_turno_abierto_at` que lee `sucursal_recibe_pedidos`
+ * (mig. 0161 §6).
+ *
+ * Es una marca de tiempo para que falle cerrada: quien deja de afirmar el turno no escribe nada y
+ * la marca envejece sola. Y una caja que no declara la tienda manda el UPDATE de siempre, así que
+ * las que hoy están en servicio no dependen de que la columna exista.
+ */
+export function selloLatido(
+  cuerpo: { tienda?: unknown; turno_abierto?: unknown },
+  ahora: string,
+): Record<string, string> {
+  return {
+    espejo_apps_at: ahora,
+    ...(cuerpo.tienda === true && cuerpo.turno_abierto === true && { espejo_turno_abierto_at: ahora }),
+  };
+}
+
 /** Tope de filas por respuesta: una ráfaga rara no debe convertirse en un paquete enorme. */
 export const TOPE_PEDIDOS = 200;
 

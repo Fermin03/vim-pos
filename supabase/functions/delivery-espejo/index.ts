@@ -15,7 +15,7 @@ import { clienteAdmin, servir } from "../_shared/http.ts";
 import { bearerDe, claimsDe } from "../_shared/identidad.ts";
 import { registrarError } from "../_shared/errores.ts";
 import { cajaIdDeEmail } from "../_shared/latido.ts";
-import { alcanceEspejo, cadenciaEspejo, cursorPedido, respuestaSinModulo, TOPE_PEDIDOS, unirPedidos } from "../_shared/delivery/espejo.ts";
+import { alcanceEspejo, cadenciaEspejo, cursorPedido, respuestaSinModulo, selloLatido, TOPE_PEDIDOS, unirPedidos } from "../_shared/delivery/espejo.ts";
 
 const admin = clienteAdmin();
 
@@ -61,12 +61,10 @@ servir(async (req, json) => {
     // Una caja que no declara la tienda manda el mismo UPDATE de siempre: así esta función no
     // depende de la migración 0161 para las cajas que hoy están en servicio (si el despliegue
     // llegara antes, un UPDATE con la columna nueva fallaría y toda caja recibiría CAJA_NO_EXISTE).
-    // La que sí la declara sella el turno abierto junto al latido, que es lo que lee
-    // sucursal_recibe_pedidos (mig. 0161): la tienda solo recibe pedidos con las dos cosas frescas.
-    .update({
-      espejo_apps_at: new Date().toISOString(),
-      ...(cuerpo.tienda === true && { espejo_turno_abierto: cuerpo.turno_abierto === true }),
-    })
+    // La que la declara Y reporta turno abierto sella además espejo_turno_abierto_at, la marca de
+    // tiempo que lee sucursal_recibe_pedidos (mig. 0161). Si deja de reportarlo no se escribe
+    // nada: la marca envejece sola y la tienda de esa sucursal se cierra (ver selloLatido).
+    .update(selloLatido(cuerpo, new Date().toISOString()))
     .eq("id", cajaId).eq("tenant_id", tenantId).eq("activa", true).is("deleted_at", null)
     .select("id, sucursal_id").maybeSingle();
   const caja = cajaData as { id: string; sucursal_id: string } | null;
