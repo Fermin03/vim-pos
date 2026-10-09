@@ -3,10 +3,13 @@
 
 export const BASE_TIENDA = "pedidos.vimpos.com.mx";
 
-/** Las mismas del CHECK de `tienda_config_slug_check` (0163); una prueba las compara con el .sql. */
+/** Las mismas del CHECK de `tienda_config_slug_check` (0163, ampliadas en 0165); una prueba las compara con el .sql vigente. */
 export const DIRECCIONES_RESERVADAS: readonly string[] = [
   "api", "admin", "pedido", "cuenta", "privacidad", "terminos", "static", "assets",
   "vim", "vimpos", "soporte", "login", "pago", "ayuda", "www", "tienda",
+  // 0165: rutas que la tienda pública usa o puede usar, y parecidos a VIM.
+  "seguimiento", "carrito", "entrar", "registro", "salir", "icon", "manifest", "robots", "sitemap",
+  "favicon", "menu", "inicio", "app", "legal", "aviso", "contacto", "vim-pos", "soporte-vim", "pedidos",
 ];
 
 const FORMA_DIRECCION = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/;
@@ -28,45 +31,18 @@ export function sugerirDireccion(nombreNegocio: string): string {
   return errorDeDireccion(d) === null ? d : "";
 }
 
-export type Dia = "1" | "2" | "3" | "4" | "5" | "6" | "7"; // 1 = lunes
-export type Horario = Partial<Record<Dia, [string, string]>>;
-export const DIAS: readonly { dia: Dia; nombre: string }[] = [
-  { dia: "1", nombre: "Lunes" }, { dia: "2", nombre: "Martes" }, { dia: "3", nombre: "Miércoles" },
-  { dia: "4", nombre: "Jueves" }, { dia: "5", nombre: "Viernes" }, { dia: "6", nombre: "Sábado" },
-  { dia: "7", nombre: "Domingo" },
-];
-
-const HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
-
-export function horaValida(h: string): boolean {
-  return HORA.test(h);
-}
-
-/** Lee lo que venga de la base. Lo que no tenga la forma exacta se descarta (ese día queda cerrado). */
-export function leerHorario(x: unknown): Horario {
-  const h: Horario = {};
-  if (typeof x !== "object" || x === null || Array.isArray(x)) return h;
-  for (const { dia } of DIAS) {
-    const r = (x as Record<string, unknown>)[dia];
-    if (Array.isArray(r) && r.length === 2 && r.every((v) => typeof v === "string" && HORA.test(v))) {
-      h[dia] = [r[0], r[1]];
-    }
-  }
-  return h;
-}
+// Las reglas del horario que también usa la tienda pública viven en @vim/fecha; aquí se re-exportan
+// para que el admin las siga importando de un solo lugar.
+import { DIAS, cruzaMedianoche, horaValida, type Dia, type Horario } from "@vim/fecha";
+export { DIAS, cruzaMedianoche, horaValida, leerHorario, type Dia, type Horario } from "@vim/fecha";
 
 /** null = válido. Apertura = cierre se permite (abre todo el día). */
 export function errorDeHorario(h: Horario): string | null {
   for (const { dia, nombre } of DIAS) {
     const r = h[dia];
-    if (r && !(HORA.test(r[0]) && HORA.test(r[1]))) return `${nombre}: escribe las horas como 09:00 o 22:30.`;
+    if (r && !(horaValida(r[0]) && horaValida(r[1]))) return `${nombre}: escribe las horas como 09:00 o 22:30.`;
   }
   return null;
-}
-
-/** Cierra antes de abrir: el cierre cae al día siguiente. */
-export function cruzaMedianoche(rango: [string, string]): boolean {
-  return rango[1] < rango[0];
 }
 
 /** Lo que se dice junto a un rango que no es el de siempre. Con una hora a medias no se dice nada. */
