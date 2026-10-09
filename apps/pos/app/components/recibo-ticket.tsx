@@ -75,6 +75,7 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
           </div>
         </>
       )}
+      {datos.notaPedido?.trim() && <div className="mt-1 text-[10.5px] font-bold">Nota del pedido: {datos.notaPedido.trim()}</div>}
 
       <DividerDashed />
 

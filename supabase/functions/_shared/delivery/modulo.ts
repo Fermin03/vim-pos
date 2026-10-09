@@ -16,6 +16,9 @@
  * Acciones de TIENDA (spec A6): estado, pausa, reanudación y tiempo de preparación de la tienda de
  * Uber de una sucursal. Van por sucursal, no por pedido. La lista vive aquí y no en el handler
  * para que el guard y el despacho no puedan discrepar.
+ *
+ * NO son las de la tienda en línea propia: esas se llaman `enlinea_*`, viven en `enlinea.ts` y se
+ * guardan con su propio módulo (`moduloTiendaActivo`), no con el de apps.
  */
 export const ACCIONES_TIENDA = ["tienda_estado", "tienda_pausar", "tienda_reanudar", "tienda_prep"];
 

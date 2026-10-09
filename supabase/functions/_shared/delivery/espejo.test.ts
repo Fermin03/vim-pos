@@ -111,6 +111,30 @@ test("un pedido RECIBIDO manda sobre la tienda: ritmo rápido", () => {
   assert.equal(cadenciaEspejo({ conexiones: [], pedidosVivos: [{ estado: "RECIBIDO" }], tienda: true }), RAPIDA_MS);
 });
 
+// Entrega 4: el cliente de la tienda mira su pedido en vivo. Mientras haya uno vivo —no solo por
+// aceptar— la caja vuelve rápido, para que «listo» y «entregado» le lleguen en segundos.
+
+test("un pedido de la TIENDA ya aceptado mantiene el ritmo rápido", () => {
+  for (const estado of ["ACEPTADO", "EN_PREPARACION", "LISTO"]) {
+    assert.equal(cadenciaEspejo({ conexiones: [], pedidosVivos: [{ estado, canal: "TIENDA", gestion: "ESCRITORIO" }], tienda: true }), RAPIDA_MS, estado);
+  }
+});
+
+test("un pedido de la TIENDA de gestión NUBE ya aceptado NO acelera: nunca sale de ACEPTADO y dejaría a la caja a 10 s para siempre", () => {
+  for (const estado of ["ACEPTADO", "EN_PREPARACION", "LISTO"]) {
+    assert.equal(cadenciaEspejo({ conexiones: [], pedidosVivos: [{ estado, canal: "TIENDA", gestion: "NUBE" }], tienda: true }), NORMAL_MS, estado);
+  }
+  // Por aceptar sí, como cualquier RECIBIDO.
+  assert.equal(cadenciaEspejo({ conexiones: [], pedidosVivos: [{ estado: "RECIBIDO", canal: "TIENDA", gestion: "NUBE" }], tienda: true }), RAPIDA_MS);
+});
+
+test("un pedido de APP ya aceptado sigue como hoy: ritmo normal, con o sin la columna canal", () => {
+  const conexiones = [{ estado: "ACTIVA" }];
+  assert.equal(cadenciaEspejo({ conexiones, pedidosVivos: [{ estado: "ACEPTADO", canal: "APP" }] }), NORMAL_MS);
+  assert.equal(cadenciaEspejo({ conexiones, pedidosVivos: [{ estado: "ACEPTADO" }] }), NORMAL_MS);
+  assert.equal(cadenciaEspejo({ conexiones: [], pedidosVivos: [{ estado: "LISTO", canal: "APP" }] }), REPOSO_MS);
+});
+
 test("alcance: solo apps, como hasta hoy", () => {
   assert.deepEqual(alcanceEspejo({ efectivos: { delivery_apps: true }, cuerpo: {} }),
     { conApps: true, conTienda: false, canales: ["APP"], turnoAbierto: false });

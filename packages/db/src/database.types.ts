@@ -12532,7 +12532,12 @@ export type Database = {
         Returns: number
       }
       delivery_avisar_expirados: {
-        Args: { p_n: number; p_sucursal: string; p_tenant: string }
+        Args: {
+          p_canal: string
+          p_n: number
+          p_sucursal: string
+          p_tenant: string
+        }
         Returns: boolean
       }
       delivery_enlazar_tickets: { Args: { p_tenant: string }; Returns: number }
@@ -13145,10 +13150,20 @@ export type Database = {
         Args: { p_ahora?: string; p_slug: string }
         Returns: Json
       }
+      tienda_reportar_estado: {
+        Args: {
+          p_estado: string
+          p_motivo?: string
+          p_pedido: string
+          p_tenant: string
+        }
+        Returns: string
+      }
       tienda_seguimiento: {
         Args: { p_seguimiento_hash: string; p_tenant: string }
         Returns: Json
       }
+      tienda_sincronizar_estados_nube: { Args: never; Returns: number }
       top_meseros: {
         Args: {
           p_fecha_desde: string

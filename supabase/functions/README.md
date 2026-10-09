@@ -129,9 +129,41 @@ función valida el JWT por sí misma. Receta en `docs/integraciones/facturama/03
 
 `enviar-push` acepta, además del JWT de usuario, el camino interno: cabecera `x-vim-interno`
 igual al secret `VIM_INTERNO_SECRET` y `tenant_id` en el cuerpo. Lo usa la base de datos:
-`delivery_marcar_expirados()` (cron cada minuto) llama a `delivery_avisar_expirados()` que hace
-`net.http_post` a `enviar-push` con el secreto leído de Vault (`vim_interno`) y la URL base de
+`delivery_marcar_expirados()` (cron cada minuto) llama a `delivery_avisar_expirados(tenant, sucursal, n, canal)` (el
+cuarto argumento, `p_canal`, es de la 0164: `'TIENDA'` o `'APP'`; decide el título y la ruta del aviso)
+que hace `net.http_post` a `enviar-push` con el secreto leído de Vault (`vim_interno`) y la URL base de
 funciones (`vim_functions_url`). Sin pg_net o sin secretos, el marcado sigue y el aviso se omite.
+Desde la 0164 la misma pasada llama al final a `tienda_sincronizar_estados_nube()`, en un bloque
+propio (si falla deja un `WARNING` y el marcado no se pierde): pasa a `LISTO`, `ENTREGADO` o
+`CANCELADO` los pedidos de la tienda de gestión `NUBE` mirando su ticket, con la regla de
+`tienda_seguimiento`. Solo `service_role`; mira los pedidos de los últimos 7 días.
+
+### Tienda en línea propia en `delivery-accion` y `delivery-espejo` (entrega 4)
+
+Los pedidos con `canal = 'TIENDA'` no pasan por Uber: `delivery-accion` los atiende en su propia rama
+(sin `uber.*` ni `delivery_eventos`) y `delivery-espejo` se los manda a la caja con la clave `tienda`.
+
+- Sobre un pedido (`pedido_id`): `aceptar` y `rechazar` escriben solo si el pedido sigue `RECIBIDO` o
+  `ERROR` (si no, `409 ACCION_INVALIDA`; el de `aceptar` lleva siempre el `estado` en que está el
+  pedido, releído, para que la caja distinga «lo aceptó otra pantalla» de «se cerró»); `estado`
+  (`estado` = `LISTO` | `ENTREGADO` | `CANCELADO`, y `motivo` de lista cerrada) es **solo de
+  dispositivo y solo para pedidos de gestión `ESCRITORIO`** (uno de gestión `NUBE` → `409
+  ACCION_INVALIDA`: su estado lo pone la base, ver «Push de expirados») y llama a
+  `tienda_reportar_estado` (0164), que solo avanza y devuelve en qué quedó. `listo` no existe en la tienda. `reclamar` es el de siempre.
+  Un `aceptar` de gestión `NUBE` crea el ticket en la nube (`crear_ticket_desde_tienda`); una caja
+  instalada que lo intente recibe `409`. Si el ticket no se puede armar y reintentar no lo arregla
+  (`fallaDeTicket`, `_shared/delivery/enlinea.ts`), el pedido se rechaza y responde
+  `PEDIDO_CANCELADO` con la `causa`; lo reintentable (`SIN_TURNO_ABIERTO`, `DUPLICADO`, `RPC_ERROR`)
+  responde `409` con su código y no toca el pedido.
+- Por sucursal (`sucursal_id`), sin `pedido_id`: `enlinea_estado` → `{participa, aceptacion,
+  pausa_hasta, motivo}`; `enlinea_pausar` (`duracion`: `30m` | `1h` | `indefinida`; otra →
+  `DURACION_INVALIDA`); `enlinea_reanudar`; `enlinea_presente` (solo empleado: el POS web con turno
+  avisa, opcionalmente con su `caja_id`, y sella `cajas.espejo_turno_abierto_at`). Errores:
+  `SIN_MODULO_TIENDA` 403 (no usa el módulo de apps), `SUCURSAL_SIN_TIENDA` 404, `SOLO_EMPLEADO` 403.
+- `delivery-espejo`: la caja manda `tienda: true` y `turno_abierto`; la respuesta añade
+  `tienda: {participa, aceptacion, pausa_hasta}` (o `null` sin módulo). Una caja anterior no manda
+  la clave y recibe lo de siempre. Con un pedido vivo de la tienda en gestión `ESCRITORIO` el sondeo
+  es rápido (10 s).
 
 ### Espejo en la caja de escritorio (spec 2026-09-03)
 

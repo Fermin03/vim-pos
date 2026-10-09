@@ -336,3 +336,18 @@ describe("construirTicketJob — lealtad", () => {
     for (const s of textos) expect(s).toMatch(/^[\x20-\x7e]*$/);
   });
 });
+
+describe("construirTicketJob — nota del pedido", () => {
+  it("la imprime en una línea propia, antes de los productos", () => {
+    const job = construirTicketJob({ ...DATOS, notaPedido: "Efectivo, paga con $500.00 · Sin cebolla" });
+    const i = job.bloques.findIndex((b) => b.t === "texto" && b.valor === "Nota del pedido: Efectivo, paga con $500.00 - Sin cebolla");
+    expect(job.bloques[i]).toEqual({ t: "texto", valor: "Nota del pedido: Efectivo, paga con $500.00 - Sin cebolla", size: 1, bold: true });
+    expect(i).toBeLessThan(job.bloques.findIndex((b) => b.t === "fila" && b.izq === "1x Hamburguesa Clásica"));
+  });
+  it("sin nota, el ticket sale idéntico", () => {
+    const sin = construirTicketJob(DATOS);
+    expect(construirTicketJob({ ...DATOS, notaPedido: null })).toEqual(sin);
+    expect(construirTicketJob({ ...DATOS, notaPedido: "  " })).toEqual(sin);
+    expect(sin.bloques.some((b) => b.t === "texto" && b.valor.startsWith("Nota del pedido"))).toBe(false);
+  });
+});

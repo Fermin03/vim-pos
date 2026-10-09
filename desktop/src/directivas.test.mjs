@@ -227,3 +227,10 @@ test("sin directivas todavía, el espejo de apps NO arranca", () => {
   assert.equal(debeSondearApps(undefined), false);
   assert.equal(debeSondearApps(DIRECTIVAS_VACIAS), false);
 });
+
+test("el espejo también arranca con solo la tienda en línea (sin apps de delivery)", () => {
+  assert.equal(debeSondearApps({ modulos: { tienda: true } }), true);
+  assert.equal(debeSondearApps({ modulos: { tienda: true, delivery_apps: false } }), true);
+  assert.equal(debeSondearApps({ modulos: { tienda: false, delivery_apps: false } }), false);
+  assert.equal(debeSondearApps({ modulos: { tienda: "true" } }), false, "solo un true de verdad");
+});

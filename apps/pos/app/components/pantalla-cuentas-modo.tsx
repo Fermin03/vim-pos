@@ -441,6 +441,15 @@ export function PantallaCuentasModo({
                 </div>
               )}
 
+              {/* Pedido de la tienda en línea: con cuánto paga y lo que escribió el cliente. Sin
+                  esto el repartidor sale sin saber qué cambio llevar. Solo en tickets nacidos de
+                  la tienda (`notaPedido`): una cuenta normal se ve como siempre. */}
+              {sel.notaPedido && (
+                <p className="border-b border-warning-line bg-warning-soft px-4 py-2.5 text-14 leading-snug text-ink">
+                  <span className="font-semibold">Nota del pedido:</span> {sel.notaPedido}
+                </p>
+              )}
+
               {/* Lo que se ordenó */}
               <div className="min-h-0 flex-1 overflow-y-auto p-4">
                 {detalle === null && <p className="text-sm text-ink-3">Cargando productos…</p>}

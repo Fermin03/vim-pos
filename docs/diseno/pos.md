@@ -202,6 +202,69 @@ Por eso el **corte Z** es donde queda escrito:
 La vista en pantalla (`recibo-z.tsx`) y el papel (`reporte-z-builder.ts`) llevan las mismas
 secciones en el mismo orden: lo que se cambia en uno se cambia en el otro.
 
+### Pedidos en línea: Uber y la tienda propia en una sola pantalla
+
+El mosaico **Pedidos en línea** del inicio (con su contador de pedidos por aceptar) y su pantalla
+juntan lo que llega de las apps de delivery y de la tienda del propio negocio. Aparece si el
+negocio tiene cualquiera de los dos módulos; antes solo salía con el de apps.
+
+**La tarjeta de la tienda se distingue de la de Uber en lo que el cajero necesita para cobrar y
+entregar.** Dice «Tienda · Para recoger» o «Tienda · A domicilio», el folio y el estado en palabras
+de caja: «Por aceptar» con la cuenta atrás hasta que vence; «Aceptado · Ticket {folio}» con «Cóbralo
+desde Pick-up» (o «Domicilio»); «Entregado», «Rechazado», «Cancelado» y «Se venció sin aceptar».
+Debajo, el cliente con su teléfono (se toca para llamar), la dirección con sus referencias, los
+productos, la nota que escribió el cliente, el envío, el total y la forma de pago — «Efectivo, paga
+con $500.00» — porque quien sale a repartir tiene que saber con cuánto cambio.
+
+- **Aceptar y Rechazar solo mientras está por aceptar.** Rechazar pide uno de cuatro motivos
+  («Producto agotado», «Cocina saturada», «Ya cerramos», «Otro motivo»): el cliente los ve en su
+  seguimiento, así que la lista es cerrada y no hay texto libre.
+- **No hay «Marcar listo» en la tienda** (decisión 2 de la entrega 4). El estado sale de lo que el
+  cajero ya hace: imprimir el ticket o asignar repartidor es «listo», cobrar es «entregado»,
+  cancelar el ticket es «cancelado». Una tarjeta de Uber sí lo conserva, tal como estaba.
+  En una caja instalada lo reporta la caja; un pedido atendido desde el POS web (sin caja) lo pone
+  al día la nube sola, **cada minuto**, y el POS web lo muestra ya cerrado en cuanto se cobra o se
+  cancela: deja de salir como activo media hora después de recibido, igual que cualquier cerrado.
+- **Dentro de la caja instalada, un pedido que se atiende desde el POS web es solo informativo.**
+  Pasa cuando en una sucursal conviven una caja y el POS en el navegador: la tarjeta dice «Se
+  atiende desde el POS web.», no ofrece Aceptar ni Rechazar, no cuenta en el mosaico y no timbra.
+- **Los errores dicen qué hacer, sin códigos:** «Abre un turno para aceptar pedidos.», «Este pedido
+  ya fue atendido.», «Este pedido ya no coincide con tu menú o tus zonas de envío. Se canceló y tu
+  cliente ya lo sabe.»
+
+**El timbre se repite.** Un pedido nuevo suena al llegar, **desde cualquier pantalla** del POS, y
+vuelve a sonar **cada 20 segundos** mientras quede alguno por aceptar: un pedido que nadie atiende
+no puede depender de que el cajero haya estado mirando justo en ese momento. Al abrir el POS con un
+pedido ya pendiente suena enseguida. Vale para los dos canales (Uber también). Si el navegador
+bloquea el audio, el contador del mosaico sigue ahí; el timbre nunca estorba al cobro.
+**Solo suena por lo que este dispositivo puede aceptar:** no por un pedido que ya tomó otra caja,
+ni por uno cuya hora de aceptar ya pasó (una caja sin internet conserva el pedido «por aceptar»
+hasta que vuelve la red; el timbre calla al vencer la ventana), ni por uno que llega ya cancelado.
+
+**La barra de pausa de la tienda** va arriba de la pantalla, encima de la de Uber si el negocio tiene
+las dos. Dice en una línea cómo está la tienda — «Tienda: recibiendo pedidos» (verde), «en pausa
+hasta las 2:30 p. m.», «fuera de horario», «sin turno abierto» o «apagada» (en ámbar) — y ofrece
+**Pausar…** (30 minutos, 1 hora o «Hasta que la reanude») o **Reanudar**. Los botones solo aparecen
+si la sucursal vende en la tienda; sin datos, la barra lo dice y no ofrece nada. «Sin turno abierto»
+no es un error de la tienda: es que no hay caja con turno que pueda cocinar el pedido.
+
+**La nota del pedido viaja con la cuenta.** El pedido de la tienda trae lo que el cliente pidió por
+escrito y la forma de pago, y eso se guarda en la nota de la cuenta. El panel de detalle de
+**Pick-up** y de **Domicilio** muestra una franja «Nota del pedido: …»; el ticket impreso la lleva
+en negritas, bajo los datos de entrega y antes de los productos, y la comanda de cocina también.
+En el papel, la separación « · » sale como « - »: la impresora cambia lo que no es ASCII por «?».
+**Solo en tickets nacidos de la tienda** (`notaPedidoDe`: creados por la tienda y en modo Pick-up o
+Domicilio), en los tres lugares: pantalla, ticket y comanda. El recado a cocina que teclea el cajero
+en una cuenta normal es la misma columna, y no sale ahí: una cuenta que no es de la tienda se ve y
+se imprime exactamente como antes.
+
+**La comanda sale sola al aceptar**, una vez, por áreas. Si la impresora falla, **no se reintenta
+sola**: una comanda duplicada en la cocina cuesta más que una que el cajero manda a mano. En su
+lugar, la tarjeta del pedido muestra una alerta roja —«La comanda no se imprimió. Revisa la
+impresora.»— con el botón **Imprimir comanda**, que la manda desde ese dispositivo sin pedir PIN
+(es la primera impresión, no una reimpresión). La alerta aparece pasados unos 20 segundos sin
+comanda y se quita cuando sale el papel.
+
 ## Lo que NO se hereda de otras apps
 
 - **La densidad del admin.** Aquí el scroll es tiempo frente a un cliente, pero apretar de más

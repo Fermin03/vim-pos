@@ -10,7 +10,8 @@
 //   · el agente manda `desde` y solo recibe lo que cambió después de ese instante;
 //   · la consulta perdió el `OR` que la obligaba a recorrer la tabla entera. Son tres filtros
 //     simples, cada uno con su índice (migración 0110). Desde la tienda en línea (0161) hay hasta
-//     cuatro consultas por sondeo: la cuarta, la de `tienda_sucursales`, solo si la caja declara la tienda.
+//     cinco consultas por sondeo: la de `tienda_sucursales` y la de `tienda_config` (una fila cada
+//     una, por llave) solo si la caja declara la tienda y el negocio la tiene encendida.
 import { clienteAdmin, servir } from "../_shared/http.ts";
 import { bearerDe, claimsDe } from "../_shared/identidad.ts";
 import { registrarError } from "../_shared/errores.ts";
@@ -78,8 +79,11 @@ servir(async (req, json) => {
   const { data: mod } = await admin.rpc("modulos_efectivos", { p_tenant: tenantId });
   const efectivos = (mod as { efectivos?: Record<string, boolean> } | null)?.efectivos ?? {};
   const alcance = alcanceEspejo({ efectivos, cuerpo });
+  // La clave `tienda` solo existe para la caja que la declara (desde la 0.8.0). Una caja anterior,
+  // que manda solo `{desde}`, recibe byte a byte la respuesta de siempre.
+  const declaraTienda = cuerpo.tienda === true;
   if (alcance.canales.length === 0) {
-    return json(respuestaSinModulo(caja.id, caja.sucursal_id));
+    return json({ ...respuestaSinModulo(caja.id, caja.sucursal_id), ...(declaraTienda && { tienda: null }) });
   }
 
   const pedidosDe = () => admin.from("delivery_pedidos")
@@ -89,7 +93,8 @@ servir(async (req, json) => {
     .order("recibido_at", { ascending: false }).limit(TOPE_PEDIDOS);
   const hace24h = new Date(Date.now() - 24 * 3600_000).toISOString();
 
-  const [cx, viv, dlt, tie] = await Promise.all([
+  const sinFila = Promise.resolve({ data: null, error: null });
+  const [cx, viv, dlt, tie, cfg] = await Promise.all([
     alcance.conApps
       ? admin.from("delivery_conexiones").select(COLS_CONEXION)
           .eq("tenant_id", tenantId).eq("sucursal_id", caja.sucursal_id)
@@ -99,19 +104,24 @@ servir(async (req, json) => {
     pedidosDe().in("estado", ESTADOS_ACTIVOS),
     // Y lo que cambió desde el cursor. Sin cursor (arranque de la caja) va la ventana de 24 h.
     desde ? pedidosDe().gte("updated_at", desde) : pedidosDe().gte("recibido_at", hace24h),
-    // ¿Esta sucursal vende en la tienda? Solo se pregunta si la caja y el negocio la tienen.
+    // ¿Esta sucursal vende en la tienda, y está en pausa? Solo se pregunta si la caja y el negocio la tienen.
     alcance.conTienda
-      ? admin.from("tienda_sucursales").select("participa")
+      ? admin.from("tienda_sucursales").select("participa, pausa_hasta")
           .eq("tenant_id", tenantId).eq("sucursal_id", caja.sucursal_id).maybeSingle()
-      : Promise.resolve({ data: null, error: null }),
+      : sinFila,
+    // Y cómo acepta el negocio (manual o sola): la caja lo necesita para aceptar por su cuenta.
+    alcance.conTienda
+      ? admin.from("tienda_config").select("aceptacion").eq("tenant_id", tenantId).maybeSingle()
+      : sinFila,
   ]);
-  for (const r of [cx, viv, dlt, tie]) {
+  for (const r of [cx, viv, dlt, tie, cfg]) {
     if (r.error) { registrarError("delivery-espejo", "DB_ERROR", r.error); return json({ error: "DB_ERROR" }, 500); }
   }
 
   const conexiones = cx.data ?? [];
   const vivos = viv.data ?? [];
-  const tiendaViva = (tie.data as { participa?: boolean } | null)?.participa === true;
+  const filaTienda = tie.data as { participa?: boolean; pausa_hasta?: string | null } | null;
+  const tiendaViva = filaTienda?.participa === true;
   return json({
     ahora: new Date().toISOString(),
     caja_id: caja.id,
@@ -119,5 +129,15 @@ servir(async (req, json) => {
     conexiones,
     pedidos: unirPedidos(vivos, dlt.data ?? []),
     siguiente_en_ms: cadenciaEspejo({ conexiones, pedidosVivos: vivos, tienda: tiendaViva }),
+    ...(declaraTienda && {
+      tienda: alcance.conTienda
+        ? {
+            participa: tiendaViva,
+            // Sin fila de configuración (o con un valor que no conocemos), manual: nada se acepta solo.
+            aceptacion: (cfg.data as { aceptacion?: string } | null)?.aceptacion === "AUTO" ? "AUTO" : "MANUAL",
+            pausa_hasta: filaTienda?.pausa_hasta ?? null,
+          }
+        : null,
+    }),
   });
 });
