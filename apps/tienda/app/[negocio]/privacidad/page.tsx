@@ -39,6 +39,21 @@ export default async function Privacidad({ params }: Props) {
         <li>Tu correo, solo si quieres que te llegue el enlace de tu pedido.</li>
         <li>Tu dirección, solo si pides a domicilio.</li>
         <li>Lo que pediste, tus notas y cómo vas a pagar. No se pide ni se guarda ningún dato de tu tarjeta: se paga al recibir.</li>
+        <li>
+          Si creas una cuenta: tu nombre, apellido, correo, teléfono y una contraseña. Si quieres, también tu fecha de nacimiento
+          y hasta cinco direcciones. Pedir sin cuenta sigue siendo posible.
+        </li>
+      </ul>
+
+      <h2 className={TITULO}>Si creas una cuenta</h2>
+      <ul className="mt-2 list-disc space-y-1 pl-5">
+        <li>La cuenta es de la tienda de {nombre}: no sirve en la de otro restaurante, y cada una tiene su propia sesión.</li>
+        <li>
+          Tu contraseña se guarda cifrada, de una forma que no se puede revertir: nadie puede leerla, ni el restaurante ni VIM POS.
+          Si la olvidas no se te puede decir cuál era; eliges una nueva con un enlace que llega a tu correo.
+        </li>
+        <li>Tu correo se usa para entrar, para darte la bienvenida y para mandarte ese enlace cuando lo pides.</li>
+        <li>En tu cuenta ves solo los pedidos que hiciste con tu sesión abierta.</li>
       </ul>
 
       <h2 className={TITULO}>Para qué se usan</h2>
@@ -80,7 +95,24 @@ export default async function Privacidad({ params }: Props) {
       <p className="mt-2">
         Tu navegador guarda el pedido que estás armando durante un día y, después de pedir, tu nombre, teléfono, correo y
         dirección para que no los escribas otra vez. Eso se queda en tu teléfono. Lo borras con «Olvidar mis datos», que aparece
-        al llenar tus datos.
+        al llenar tus datos. Si pides con tu cuenta abierta, esos datos no se guardan en el teléfono: salen de tu cuenta.
+      </p>
+      <p className="mt-2">
+        Al entrar a tu cuenta, tu navegador guarda una cookie de sesión de esta página para no pedirte la contraseña en cada
+        visita. Dura 30 días, es propia de esta tienda, las demás páginas no pueden leerla y no se usa para rastrearte ni para
+        publicidad. Se borra al cerrar sesión. Si cambias o recuperas tu contraseña, se cierran las sesiones de tus otros
+        dispositivos.
+      </p>
+
+      <h2 className={TITULO}>Cómo eliminar tu cuenta</h2>
+      <p className="mt-2">
+        Entra a <Link href={`/${slug}/cuenta`} className={ENLACE}>Mi cuenta</Link>, elige «Eliminar mi cuenta» y confirma con tu
+        contraseña. Se borra en el momento tu cuenta, tu contraseña, tus direcciones guardadas y el acceso a tu historial.
+      </p>
+      <p className="mt-2">
+        {nombre} conserva en su sistema los pedidos que ya le hiciste y, en su lista de clientes, el nombre, el teléfono y la
+        dirección con los que pediste: son registros de sus ventas, como los de un pedido por teléfono. Para que también los
+        quite, pídeselo como se explica abajo.
       </p>
 
       <h2 className={TITULO}>Cómo pedir que se quiten tus datos</h2>
