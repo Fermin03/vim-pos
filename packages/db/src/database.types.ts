@@ -9885,6 +9885,7 @@ export type Database = {
           color: string
           created_at: string
           descripcion: string | null
+          logo_ruta: string | null
           minutos_aceptacion: number
           pago_efectivo: boolean
           pago_tarjeta: boolean
@@ -9897,6 +9898,7 @@ export type Database = {
           color?: string
           created_at?: string
           descripcion?: string | null
+          logo_ruta?: string | null
           minutos_aceptacion?: number
           pago_efectivo?: boolean
           pago_tarjeta?: boolean
@@ -9909,6 +9911,7 @@ export type Database = {
           color?: string
           created_at?: string
           descripcion?: string | null
+          logo_ruta?: string | null
           minutos_aceptacion?: number
           pago_efectivo?: boolean
           pago_tarjeta?: boolean
