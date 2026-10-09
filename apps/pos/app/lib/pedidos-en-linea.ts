@@ -118,11 +118,15 @@ export function cuentaDe(p: PedidoApp): string | null {
   return p.canal === "TIENDA" && CON_COMANDA.has(p.estado) ? p.ticketId : null;
 }
 
-/** Lo que se cerró solo en un canal (se venció, o la caja lo canceló y dejó dicho por qué), para decirlo ahí. */
-export function avisosDeCanal(pedidos: PedidoApp[], modo: AppTienda): { id: string; texto: string }[] {
+/**
+ * Lo que se cerró solo en un canal (se venció, o la caja lo canceló y dejó dicho por qué), para
+ * decirlo ahí. `sabidoAqui` = lo que este dispositivo supo al intentar aceptar un pedido (la nube lo
+ * canceló en ese momento): queda dicho igual, aunque la base no traiga la explicación.
+ */
+export function avisosDeCanal(pedidos: PedidoApp[], modo: AppTienda, sabidoAqui?: ReadonlyMap<string, string>): { id: string; texto: string }[] {
   return pedidos.flatMap((p) => {
     if (p.canal !== "TIENDA" || p.app !== modo) return [];
-    const dicho = avisoDeTienda(p);
+    const dicho = sabidoAqui?.get(p.id) ?? avisoDeTienda(p);
     if (dicho) return [{ id: p.id, texto: `${p.folioCorto ? `Pedido ${p.folioCorto}` : "Un pedido"}: ${dicho}` }];
     return p.estado === "EXPIRADO" ? [{ id: p.id, texto: `${p.folioCorto ? `El pedido ${p.folioCorto}` : "Un pedido"} se venció sin aceptar.` }] : [];
   });
@@ -150,8 +154,18 @@ export function contarPorAceptar(pedidos: PedidoApp[], d: Atencion): { pickup: n
  * antiguo al más nuevo, sin los que el cajero ya cerró. Un pedido sale de la fila solo cuando deja
  * de estar por aceptar. Con aceptación automática en el POS web no entra: se acepta solo enseguida
  * (misma regla que `aceptablesSolos`).
+ *
+ * `viendo`: el pedido que el cajero abrió con «Ver orden» y sigue mirando en su canal. Mientras ese
+ * pedido siga por aceptar, el resto de la fila espera: el siguiente aviso no le cae encima del
+ * detalle que acaba de abrir. Quien pinta pasa null en cuanto el cajero sale de ese canal.
  */
-export function colaDeAvisos(pedidos: PedidoApp[], d: Atencion & { aceptacion: "MANUAL" | "AUTO" | null }, cerrados: ReadonlySet<string>): PedidoApp[] {
+export function colaDeAvisos(
+  pedidos: PedidoApp[],
+  d: Atencion & { aceptacion: "MANUAL" | "AUTO" | null; viendo?: string | null },
+  cerrados: ReadonlySet<string>,
+): PedidoApp[] {
+  const visto = d.viendo ? pedidos.find((p) => p.id === d.viendo) : undefined;
+  if (visto && visto.estado === "RECIBIDO" && puedeAtender(visto, d)) return [];
   const seAceptaSolo = (p: PedidoApp) => !d.enEscritorio && d.aceptacion === "AUTO" && p.gestion === "NUBE";
   return pedidos.filter((p) => p.estado === "RECIBIDO" && puedeAtender(p, d) && !seAceptaSolo(p) && !cerrados.has(p.id)).sort(porLlegada);
 }

@@ -347,6 +347,14 @@ describe("avisosDeCanal: lo que se cerró solo, dicho en su canal", () => {
     ]);
     expect(avisosDeCanal(ps, "DELIVERY_PROPIO")).toEqual([{ id: "d", texto: "Un pedido se venció sin aceptar." }]);
   });
+  it("lo que este dispositivo supo al intentar aceptarlo queda dicho ahí, aunque la base no traiga explicación", () => {
+    const dicho = new Map([["c", "Se canceló y tu cliente ya lo sabe."]]);
+    const ps = [ped({ id: "c", estado: "RECHAZADO", folioCorto: "T3" }), ped({ id: "otro", app: "DELIVERY_PROPIO", estado: "RECHAZADO" })];
+    expect(avisosDeCanal(ps, "DRIVE_THRU", dicho)).toEqual([{ id: "c", texto: "Pedido T3: Se canceló y tu cliente ya lo sabe." }]);
+    expect(avisosDeCanal(ps, "DELIVERY_PROPIO", dicho)).toEqual([]);
+    // Uno solo por pedido: si la base también dejó dicho algo, manda lo de aquí.
+    expect(avisosDeCanal([ped({ id: "c", estado: "CANCELADO", folioCorto: "T3", ultimoError: "Otra cosa." })], "DRIVE_THRU", dicho)).toHaveLength(1);
+  });
   it("nada de un pedido vivo, rechazado a mano, cancelado sin explicación o de una app", () => {
     const ps = [ped(), ped({ estado: "ACEPTADO" }), ped({ estado: "RECHAZADO" }), ped({ estado: "CANCELADO" }), ped({ estado: "CANCELADO", ultimoError: "TOTAL_NO_COINCIDE" }), uber({ estado: "EXPIRADO" })];
     expect(avisosDeCanal(ps, "DRIVE_THRU")).toEqual([]);
@@ -403,6 +411,21 @@ describe("colaDeAvisos: el aviso grande, uno por pedido", () => {
     expect(colaDeAvisos([ped({ estado: "ERROR" })], d, nada)).toEqual([]);
     expect(colaDeAvisos([ped()], { ...d, enEscritorio: true }, nada)).toEqual([]);
     expect(colaDeAvisos([ped({ gestion: "ESCRITORIO" })], { ...d, enEscritorio: true }, nada)).toHaveLength(1);
+  });
+  it("tras «Ver orden», el resto de la fila espera mientras ese pedido siga por aceptar", () => {
+    const ps = [ped({ id: "a", recibidoAt: "2026-10-09T10:01:00Z" }), ped({ id: "b", recibidoAt: "2026-10-09T10:03:00Z" })];
+    // «a» se está viendo en su canal (su aviso ya se cerró al tocar «Ver orden»): «b» no le cae encima.
+    expect(colaDeAvisos(ps, { ...d, viendo: "a" }, new Set(["a"]))).toEqual([]);
+  });
+  it("y continúa cuando ese pedido se acepta, se rechaza, vence, desaparece, o el cajero sale del canal", () => {
+    const b = ped({ id: "b", recibidoAt: "2026-10-09T10:03:00Z" });
+    const cerrados = new Set(["a"]);
+    for (const a of [ped({ id: "a", estado: "ACEPTADO" }), ped({ id: "a", estado: "RECHAZADO" }), ped({ id: "a", venceAceptacion: "2026-10-09T10:04:00Z" })]) {
+      expect(colaDeAvisos([a, b], { ...d, viendo: "a" }, cerrados).map((p) => p.id), a.estado).toEqual(["b"]);
+    }
+    expect(colaDeAvisos([b], { ...d, viendo: "a" }, cerrados).map((p) => p.id)).toEqual(["b"]);
+    // Salir del canal es dejar de verlo: quien pinta pasa `viendo: null`.
+    expect(colaDeAvisos([ped({ id: "a" }), b], { ...d, viendo: null }, cerrados).map((p) => p.id)).toEqual(["b"]);
   });
   it("con aceptación automática en el POS web no hay aviso: el pedido se acepta solo", () => {
     expect(colaDeAvisos([ped()], { ...d, aceptacion: "AUTO" }, nada)).toEqual([]);

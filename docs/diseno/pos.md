@@ -217,7 +217,8 @@ que ir a buscarlos a otra pantalla para cobrarlos. Ahora nacen donde se van a co
 
 **En la lista del canal**, lo que está por aceptar va arriba, bajo el rótulo «De tu tienda en línea
 · por aceptar», del más antiguo al más nuevo. Cada tarjeta lleva borde azul (rojo con menos de dos
-minutos), el cliente, el total, «Por aceptar» y la cuenta atrás hasta que vence. Al tocarla, el
+minutos), el cliente, el total, «Por aceptar» y la cuenta atrás hasta que vence. El subtítulo de
+la pantalla los cuenta primero («1 por aceptar · 2 órdenes por recolectar»). Al tocarla, el
 panel derecho muestra el pedido completo: «Tienda en línea · Para recoger» (o «A domicilio»), el
 folio, el cliente con su teléfono (se toca para llamar; dentro de la caja instalada va como texto),
 la dirección con sus referencias, los productos con modificadores y notas, la nota del cliente, el
@@ -241,7 +242,9 @@ envío, el total y la forma de pago.
   al día la nube sola, **cada minuto**.
 - **Lo que se cerró solo se dice en su canal**, en una franja roja arriba de la lista que se cierra
   con la ×: «El pedido T1234 se venció sin aceptar.», o lo que la caja dejó dicho al cancelarlo
-  («Pedido T1234: …»).
+  («Pedido T1234: …»). Ahí queda también el pedido que se canceló **al intentar aceptarlo** («ya no
+  coincide con tu menú o tus zonas de envío…»), se haya aceptado desde la lista o desde el aviso
+  grande: hay que avisarle al cliente, y eso no cabe en un aviso de seis segundos.
 - **Los errores dicen qué hacer, sin códigos:** «Abre un turno para aceptar pedidos.», «Este pedido
   ya fue atendido.», «Este pedido ya no coincide con tu menú o tus zonas de envío. Se canceló y tu
   cliente ya lo sabe.»
@@ -263,9 +266,17 @@ productos más»), el total y la forma de pago. Botones: **Aceptar** (el único 
 - **El foco cae en la ×, nunca en Aceptar ni en Rechazar**, y vuelve a la × al pasar al siguiente
   pedido de la fila. El cajero puede estar tecleando un importe: un Enter que iba para el cobro no
   debe aceptar ni rechazar un pedido.
+- **Mientras está abierto, el teclado es suyo.** El teclado numérico del cobro y el del PIN escuchan
+  las teclas de toda la ventana; con el aviso encima, Enter cobraría por detrás y los dígitos
+  seguirían entrando al importe tapado. El aviso corta las teclas antes de que lleguen a lo de
+  abajo; pasan solo Escape (cerrar) y Tab (recorrer sus botones).
 - **«Ver orden» lleva a Pick-up o a Domicilio con ese pedido seleccionado.** Si hay un cobro, un
   diálogo o un pedido a medias en pantalla, no navega: avisa «Termina lo que tienes abierto. El
-  pedido te espera en Pick-up.» y el pedido se queda en su canal.
+  pedido te espera en Pick-up.» y el pedido se queda en su canal. Cuentan también los diálogos de la
+  propia lista de cuentas (cancelar, descuento, PIN, asignar repartidor, reservaciones).
+- **Tras «Ver orden», el resto de la fila espera.** El siguiente aviso no cae encima del detalle que
+  el cajero acaba de abrir: la fila continúa cuando ese pedido deja de estar por aceptar (se
+  aceptó, se rechazó o venció) o cuando el cajero sale de ese canal.
 - No aparece durante el cierre de turno (quien cuenta la caja ya no atiende pedidos; el timbre sí).
 - Escape lo atiende el propio aviso (`Modal`); `home-pos` lo declara como capa que cede.
 
@@ -312,9 +323,10 @@ pedido lo trae, se sigue mostrando («Efectivo, paga con $500.00»).
 
 **La comanda sale sola al aceptar**, una vez, por áreas. Si la impresora falla, **no se reintenta
 sola**: una comanda duplicada en la cocina cuesta más que una que el cajero manda a mano. En su
-lugar, el detalle de esa cuenta en Pick-up o en Domicilio muestra una alerta roja —«La comanda no se
-imprimió. Revisa la impresora.»— con el botón **Imprimir comanda**, que la manda desde ese
-dispositivo sin pedir PIN (es la primera impresión, no una reimpresión). La alerta aparece pasados
+lugar, la tarjeta de esa cuenta en la lista de Pick-up o de Domicilio lleva la marca roja «Comanda
+sin imprimir» (se nota sin abrirla) y su detalle muestra una alerta —«La comanda no se imprimió.
+Revisa la impresora.»— con el botón **Imprimir comanda**, que la manda desde ese dispositivo sin
+pedir PIN (es la primera impresión, no una reimpresión). La alerta aparece pasados
 unos 20 segundos sin comanda y se quita cuando sale el papel.
 
 ## Lo que NO se hereda de otras apps

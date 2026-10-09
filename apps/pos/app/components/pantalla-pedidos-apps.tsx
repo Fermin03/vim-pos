@@ -15,7 +15,7 @@ import {
 } from "../lib/pedidos-apps";
 import { ErrorEnLinea, etiquetaEstadoEnLinea, leerEstadoEnLinea, mensajeErrorEnLinea, pausarEnLinea, reanudarEnLinea, type EstadoEnLinea } from "../lib/pedidos-en-linea";
 import { BotonVolver } from "./boton-volver";
-import { esUrgente, ListaItems, mmss, MotivosRechazo, type MotivoRechazo } from "./pedido-tienda";
+import { esUrgente, ListaItems, mmss, MOTIVOS_RECHAZO, type MotivoRechazo } from "./pedido-tienda";
 import { useEscape } from "../lib/use-escape";
 
 const REFRESCO_MS = 10_000;
@@ -250,7 +250,8 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, cajaSinAc
         <p className="m-auto text-14 text-ink-3">Cargando…</p>
       ) : pedidos.length === 0 ? (
         <p className="m-auto text-center text-15 text-ink-3">
-          Sin pedidos de apps por ahora.<br />Aquí aparecen solos cuando llegan.
+          {/* Sin tienda propia, el texto de siempre: quien solo usa Uber no nota ningún cambio. */}
+          {conTiendaPropia ? "Sin pedidos de apps por ahora." : "Sin pedidos en línea por ahora."}<br />Aquí aparecen solos cuando llegan.
           {conTiendaPropia && <><br /><span className="text-ink-2">{DONDE_LLEGAN}</span></>}
         </p>
       ) : (
@@ -361,7 +362,15 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, cajaSinAc
         <div role="dialog" aria-modal="true" aria-label="Motivo del rechazo" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-sm rounded border border-line bg-surface p-4">
             <h2 className="mb-3 text-15 font-semibold text-ink">¿Por qué se rechaza {rechazando.folioCorto ?? "el pedido"}?</h2>
-            <MotivosRechazo ocupado={ocupado === rechazando.id} onElegir={(m) => accion(rechazando, "rechazar", m)} onCancelar={() => setRechazando(null)} />
+            <div className="flex flex-col gap-2">
+              {MOTIVOS_RECHAZO.map((m) => (
+                <button key={m.codigo} type="button" disabled={ocupado === rechazando.id} onClick={() => accion(rechazando, "rechazar", m.codigo)}
+                  className="h-11 rounded border border-line-strong px-3 text-left text-14 font-semibold text-ink transition hover:border-ink hover:bg-hover disabled:opacity-50">
+                  {m.label}
+                </button>
+              ))}
+              <button type="button" onClick={() => setRechazando(null)} className="mt-1 h-10 text-14 text-ink-3">Cancelar</button>
+            </div>
           </div>
         </div>
       )}

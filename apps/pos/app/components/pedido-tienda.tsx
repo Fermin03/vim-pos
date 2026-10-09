@@ -19,8 +19,12 @@ export const MOTIVOS_RECHAZO: { codigo: MotivoRechazo; label: string }[] = [
   { codigo: "OTRO", label: "Otro motivo" },
 ];
 
-/** Lo que hace ESTE dispositivo con un pedido de la tienda. `mensaje` ya viene en palabras de caja. */
-export type AccionTienda = (p: PedidoApp, accion: "aceptar" | "rechazar", motivo?: MotivoRechazo) => Promise<{ ok: true; ticketId?: string } | { ok: false; mensaje: string }>;
+/**
+ * Lo que hace ESTE dispositivo con un pedido de la tienda. `mensaje` ya viene en palabras de caja.
+ * `enCanal`: el fallo ya quedó escrito en la franja de avisos de su canal (el pedido se canceló al
+ * intentar aceptarlo): quien esté pintando esa lista no necesita repetirlo.
+ */
+export type AccionTienda = (p: PedidoApp, accion: "aceptar" | "rechazar", motivo?: MotivoRechazo) => Promise<{ ok: true; ticketId?: string } | { ok: false; mensaje: string; enCanal?: boolean }>;
 
 export function mmss(seg: number): string {
   return `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, "0")}`;
@@ -127,6 +131,12 @@ const ITEMS_EN_AVISO = 5;
  * Enter que venía para el cobro no debe aceptar ni rechazar un pedido. Al pasar al siguiente pedido
  * de la fila el foco vuelve a la × por lo mismo. Escape cierra (lo atiende `Modal`, que es quien
  * está más arriba; `home-pos` lo declara como capa que cede).
+ *
+ * Mientras está abierto, el teclado es SUYO. El teclado numérico del cobro y el del PIN escuchan en
+ * `window`: sin esto, con el aviso encima, Enter cobraba por detrás y los dígitos seguían entrando
+ * al importe tapado. Un oyente en fase de CAPTURA corta la tecla antes de que llegue a ellos (mismo
+ * patrón que `modal-combo.tsx`). Pasan Escape y Tab, que son del `Modal` (cerrar y recorrer los
+ * botones). No lleva `preventDefault`: Enter y Espacio siguen activando el botón enfocado.
  */
 function AvisoPedidoTienda({ p, posicion, total, ahora, ocupado, onAceptar, onRechazar, onVerOrden, onCerrar }: {
   p: PedidoApp; posicion: number; total: number; ahora: Date; ocupado: boolean;
@@ -135,6 +145,11 @@ function AvisoPedidoTienda({ p, posicion, total, ahora, ocupado, onAceptar, onRe
   const [rechazando, setRechazando] = useState(false);
   const cerrar = useRef<HTMLButtonElement>(null);
   useEffect(() => { setRechazando(false); cerrar.current?.focus(); }, [p.id]);
+  useEffect(() => {
+    const soloAqui = (e: KeyboardEvent) => { if (e.key !== "Escape" && e.key !== "Tab") e.stopPropagation(); };
+    window.addEventListener("keydown", soloAqui, true);
+    return () => window.removeEventListener("keydown", soloAqui, true);
+  }, []);
   const seg = segundosRestantes(p.venceAceptacion, ahora);
   return (
     <Modal open onClose={rechazando ? () => setRechazando(false) : onCerrar} title="Pedido nuevo de tu tienda en línea" hideTitle
@@ -189,7 +204,7 @@ function AvisoPedidoTienda({ p, posicion, total, ahora, ocupado, onAceptar, onRe
  * por aceptar y el aviso breve (un pedido que entró solo a su canal, o por qué no se pudo atender).
  * Lleva su propio reloj para la cuenta atrás: así `home-pos` no se repinta cada segundo.
  */
-export function CapaPedidosTienda({ pedidos, cajaId, aceptacion, cerrados, breve, onAccion, onVerOrden, onCerrar, onBreve, onVisible }: {
+export function CapaPedidosTienda({ pedidos, cajaId, aceptacion, cerrados, viendo, breve, onAccion, onVerOrden, onCerrar, onBreve, onVisible }: {
   /** Los pedidos de la tienda que ya leyó el sondeo de `home-pos`. */
   pedidos: PedidoApp[];
   /** La caja del turno: un pedido que tomó otra caja no avisa aquí. */
@@ -197,6 +212,9 @@ export function CapaPedidosTienda({ pedidos, cajaId, aceptacion, cerrados, breve
   aceptacion: "MANUAL" | "AUTO" | null;
   /** Avisos que el cajero ya cerró: no vuelven a salir. */
   cerrados: ReadonlySet<string>;
+  /** El pedido abierto con «Ver orden» que el cajero sigue mirando en su canal: mientras siga por
+   *  aceptar, el resto de la fila espera. null al salir de ese canal. */
+  viendo: string | null;
   breve: string | null;
   onAccion: AccionTienda;
   onVerOrden: (p: PedidoApp) => void;
@@ -208,16 +226,18 @@ export function CapaPedidosTienda({ pedidos, cajaId, aceptacion, cerrados, breve
 }) {
   const [ahora, setAhora] = useState(() => new Date());
   const [ocupado, setOcupado] = useState(false);
-  const cola = colaDeAvisos(pedidos, { cajaId, enEscritorio: esEscritorio(), ahora: ahora.getTime(), aceptacion }, cerrados);
+  const cola = colaDeAvisos(pedidos, { cajaId, enEscritorio: esEscritorio(), ahora: ahora.getTime(), aceptacion, viendo }, cerrados);
   const visible = cola.length > 0;
-  // El reloj solo corre con un aviso a la vista. Sin aviso, basta una pasada cada 10 s (cada sondeo
-  // trae pedidos nuevos y repinta) para notar uno que llegó.
+  // El reloj solo corre con un aviso a la vista, o con la fila en espera tras «Ver orden» (el pedido
+  // que se está viendo puede vencer, y entonces la fila continúa). Sin eso, basta una pasada por
+  // cada lectura del sondeo para notar uno que llegó.
+  const enEspera = viendo !== null;
   useEffect(() => {
     setAhora(new Date());
-    if (!visible) return;
+    if (!visible && !enEspera) return;
     const id = setInterval(() => setAhora(new Date()), 1000);
     return () => clearInterval(id);
-  }, [visible, pedidos]);
+  }, [visible, enEspera, pedidos]);
   useEffect(() => { onVisible(visible); return () => onVisible(false); }, [visible, onVisible]);
 
   const p = cola[0];

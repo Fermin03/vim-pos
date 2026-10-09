@@ -41,6 +41,9 @@ export type EnLineaDelCanal = {
   pedidos: PedidoApp[];
   /** Pedidos aceptados cuya comanda lleva rato sin salir. */
   sinComanda: ReadonlySet<string>;
+  /** Lo que este dispositivo supo al intentar aceptar un pedido que la nube canceló ahí mismo
+   *  (por pedido): queda dicho en la franja de avisos del canal. */
+  sabidoAqui: ReadonlyMap<string, string>;
   /** «Ver orden» del aviso grande: el pedido que hay que dejar seleccionado. Un objeto nuevo cada vez. */
   ver: { pedidoId: string } | null;
   onAccion: AccionTienda;
@@ -109,6 +112,7 @@ export function PantallaCuentasModo({
   extraPorCuenta,
   onCanjear,
   enLinea,
+  alTenerDialogo,
 }: {
   token: string;
   caja: DatosCaja;
@@ -138,6 +142,9 @@ export function PantallaCuentasModo({
   /** Tienda en línea: los pedidos por aceptar de este canal van arriba de las cuentas. Sin la prop
    *  (módulo apagado, o Comedor) la lista es la de siempre. */
   enLinea?: EnLineaDelCanal;
+  /** Dice si esta lista tiene un diálogo propio abierto (cancelar, descuento, PIN…). Es trabajo a
+   *  medias que `home-pos` no ve: con uno abierto, «Ver orden» del aviso grande no se lo lleva. */
+  alTenerDialogo?: (abierto: boolean) => void;
 }) {
   const copia = COPIA[modo];
   const esComedor = modo === "COMER_AQUI";
@@ -203,7 +210,16 @@ export function PantallaCuentasModo({
   const canal = modo === "COMER_AQUI" ? null : modo;
   const pedidosTienda = enLinea && canal ? enLinea.pedidos : [];
   const porAceptar = canal ? porAceptarDeCanal(pedidosTienda, canal) : [];
-  const cerradosSolos = canal ? avisosDeCanal(pedidosTienda, canal).filter((a) => !avisosDeTiendaCerrados.has(a.id)) : [];
+  const cerradosSolos = canal ? avisosDeCanal(pedidosTienda, canal, enLinea?.sabidoAqui).filter((a) => !avisosDeTiendaCerrados.has(a.id)) : [];
+  /** Cuentas (tickets) nacidas de la tienda cuya comanda no salió: se marcan en su tarjeta. */
+  const cuentasSinComanda = new Set(enLinea ? pedidosTienda.filter((p) => enLinea.sinComanda.has(p.id)).map((p) => p.ticketId) : []);
+
+  const dialogoAbierto = rechazando || cancelando != null || clienteDe != null || eligiendoCancelacion || cancelandoItems || borrandoCuenta
+    || cancelandoCuenta || descontando || pidiendoPinReimpresion || pidiendoPinReabrir;
+  useEffect(() => {
+    alTenerDialogo?.(dialogoAbierto);
+    return () => alTenerDialogo?.(false);
+  }, [dialogoAbierto, alTenerDialogo]);
   const atencion = { cajaId: turno.caja_id, enEscritorio: esEscritorio(), ahora: ahora.getTime() };
   const pedidoSel = selPedidoId ? pedidosTienda.find((p) => p.id === selPedidoId) ?? null : null;
   const cuentaDelPedido = pedidoSel ? cuentaDe(pedidoSel) : null;
@@ -242,9 +258,12 @@ export function PantallaCuentasModo({
   // Una cuenta de la tienda que nace o se cierra sin que nadie toque esta pantalla (aceptación
   // automática, otra caja): la lista no sondea por su cuenta, así que se relee cuando eso cambia.
   const cuentasDeTienda = canal ? pedidosTienda.filter((p) => p.app === canal).map(cuentaDe).filter(Boolean).join(",") : "";
-  const yaCargo = useRef(false);
+  // Solo si cambió DE VERDAD: `recargar` también cambia de identidad al refrescarse el token, y esa
+  // lectura ya la hace el efecto de arriba.
+  const cuentasVistas = useRef(cuentasDeTienda);
   useEffect(() => {
-    if (!yaCargo.current) { yaCargo.current = true; return; }
+    if (cuentasVistas.current === cuentasDeTienda) return;
+    cuentasVistas.current = cuentasDeTienda;
     void recargar();
   }, [cuentasDeTienda, recargar]);
 
@@ -253,7 +272,11 @@ export function PantallaCuentasModo({
     setAtendiendo(true); setError(null);
     const r = await enLinea.onAccion(p, accion, motivo);
     setAtendiendo(false); setRechazando(false);
-    if (!r.ok) { setError(r.mensaje); return; }
+    if (!r.ok) {
+      // Si el pedido se canceló al aceptarlo, ya quedó dicho en la franja de avisos de la lista.
+      if (r.enCanal) setSelPedidoId(null); else setError(r.mensaje);
+      return;
+    }
     if (accion === "rechazar") { setSelPedidoId(null); return; }
     // Aceptado desde el POS web: la cuenta ya existe. Desde la caja instalada la abre la propia caja
     // en unos segundos; el efecto de arriba la selecciona en cuanto llega.
@@ -357,7 +380,11 @@ export function PantallaCuentasModo({
             {/* Cuenta lo mismo que se ve debajo: en domicilio, `items` sin filtrar incluiría lo
                 que ya está en reparto y el número de aquí arriba contradiría a las dos pestañas
                 de abajo (el motivo real por el que se separaron en 3+2, no una cifra suelta). */}
-            <div className="truncate text-12 text-ink-3">{copia.subtitulo((items ?? []).length)}</div>
+            <div className="truncate text-12 text-ink-3">
+              {/* Lo que espera respuesta va primero: «0 órdenes por recolectar» con un pedido esperando sería mentira. */}
+              {porAceptar.length > 0 && <span className="font-semibold text-ink-2">{porAceptar.length} por aceptar · </span>}
+              {copia.subtitulo((items ?? []).length)}
+            </div>
           </div>
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
@@ -474,6 +501,11 @@ export function PantallaCuentasModo({
                       <div className={["mt-0.5 truncate text-12 font-semibold", salio ? "text-white/85" : "text-ink-2"].join(" ")}>
                         Repartidor: {repartidorPorTicket.get(c.ticketId)}
                       </div>
+                    )}
+                    {/* Cuenta de la tienda cuya comanda no salió: se tiene que notar sin abrirla. En
+                        rojo lleno para leerse igual sobre la tarjeta blanca y sobre la azul. */}
+                    {cuentasSinComanda.has(c.ticketId) && (
+                      <div className="mt-1"><span className="inline-block rounded bg-danger px-1.5 py-0.5 text-12 font-semibold text-white">Comanda sin imprimir</span></div>
                     )}
                     {/* En comedor el título es la mesa: el cliente va debajo, rotulado. En Pick-up
                         el título ya es su nombre y repetirlo sobraría. */}
