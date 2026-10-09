@@ -84,6 +84,7 @@ test("lo que no se arregla reintentando cancela el pedido, con su código", () =
     ['El slot "Bebida" requiere entre 1 y 1 selecciones (recibió 0)', "PRODUCTO_NO_DISPONIBLE"],
     ['El producto "Malteada" está excluido del slot "Bebida"', "PRODUCTO_NO_DISPONIBLE"],
     ['El producto "Malteada" no es opción del slot "Bebida"', "PRODUCTO_NO_DISPONIBLE"],
+    ["El grupo 5f0c1b9e-0000-4000-8000-000000000005 no pertenece al combo", "PRODUCTO_NO_DISPONIBLE"],   // 0152:442
   ];
   for (const [mensaje, codigo] of casos) {
     assert.deepEqual(fallaDeTicket(mensaje), { reintentable: false, codigo }, mensaje);

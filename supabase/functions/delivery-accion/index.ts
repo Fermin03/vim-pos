@@ -235,7 +235,13 @@ servir(async (req, json) => {
           // El ticket lo crea la caja instalada (su agente ve el ACEPTADO en el siguiente sondeo).
           const r = await reclamarParaCaja();   // no hace nada si quien acepta es un empleado
           if (r) return r;
-          if (!(await moverPorAceptar({ estado: "ACEPTADO", aceptado_at: new Date().toISOString() }))) return json({ error: "ACCION_INVALIDA" }, 409);
+          if (!(await moverPorAceptar({ estado: "ACEPTADO", aceptado_at: new Date().toISOString() }))) {
+            // Ya no estaba por aceptar. Se relee en qué quedó: el agente de la caja distingue así
+            // «lo aceptó otra pantalla» (sigue vivo) de «se cerró» (venció o lo rechazaron).
+            const ahora = exigir(await admin.from("delivery_pedidos").select("estado")
+              .eq("id", pedido.id).eq("tenant_id", tenantId).maybeSingle()) as { estado: string } | null;
+            return json({ error: "ACCION_INVALIDA", estado: ahora?.estado ?? pedido.estado }, 409);
+          }
           return json({ ok: true });
         }
         // Gestión NUBE: el ticket se crea aquí, sobre el turno de la nube. Una caja instalada no lo
@@ -265,6 +271,9 @@ servir(async (req, json) => {
         // La caja instalada cuenta en qué va el pedido mirando su ticket local. Solo ella lo sabe.
         if (!esDispositivo || !cajaDispositivo) return json({ error: "SOLO_DISPOSITIVO" }, 403);
         if (!ESTADOS_REPORTABLES.includes(String(body.estado))) return json({ error: "ESTADO_INVALIDO" }, 400);
+        // Solo de un pedido que atiende una caja: el de gestión NUBE lo pone al día la base mirando
+        // su ticket (tienda_sincronizar_estados_nube), y ninguna caja tiene ese ticket.
+        if (pedido.gestion !== "ESCRITORIO") return json({ error: "ACCION_INVALIDA", estado: pedido.estado }, 409);
         const estado = exigir(await admin.rpc("tienda_reportar_estado", {
           p_tenant: tenantId, p_pedido: pedido.id, p_estado: body.estado, p_motivo: motivoDeTienda(body.motivo),
         }));

@@ -497,6 +497,7 @@ test("reporte: la consulta solo mira pedidos de la tienda con ticket y vivos", a
   assert.match(q.texto, /t\.estado_fiscal AS ticket_estado/, "el estado del ticket es estado_fiscal: `tickets.estado` no existe");
   assert.match(q.texto, /delivery_asignaciones/);
   assert.match(q.texto, /p\.canal = 'TIENDA'/);
+  assert.match(q.texto, /p\.gestion = 'ESCRITORIO'/, "los del POS web los pone al día la nube; reportarlos daría 409");
   assert.match(q.texto, /p\.estado IN \('ACEPTADO', 'EN_PREPARACION', 'LISTO'\)/);
 });
 

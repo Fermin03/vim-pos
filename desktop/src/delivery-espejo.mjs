@@ -46,7 +46,7 @@ const SQL_EXTRAS_TIENDA = `SELECT p.id, p.ultimo_error, t.estado_fiscal AS ticke
 const SQL_REPORTE = `SELECT p.id, p.folio_corto, p.estado, t.estado_fiscal AS ticket_estado, t.ticket_impreso_at,
          EXISTS (SELECT 1 FROM delivery_asignaciones a WHERE a.ticket_id = t.id) AS asignado
     FROM delivery_pedidos p JOIN tickets t ON t.id = p.ticket_id
-   WHERE p.canal = 'TIENDA' AND p.estado IN ('ACEPTADO', 'EN_PREPARACION', 'LISTO')
+   WHERE p.canal = 'TIENDA' AND p.gestion = 'ESCRITORIO' AND p.estado IN ('ACEPTADO', 'EN_PREPARACION', 'LISTO')
      AND p.recibido_at > now() - interval '48 hours'`;
 /** Un reporte que la nube no tomó no se repite en cada vuelta: se vuelve a intentar pasado esto. */
 const REPORTE_SIN_EFECTO_MS = 5 * 60_000;

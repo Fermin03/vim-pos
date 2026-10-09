@@ -264,6 +264,7 @@ test("fallaDeTicket: lo que el catálogo ya no vende así cancela, no se reinten
     ['El slot "Bebida" requiere entre 1 y 1 selecciones (recibió 0)', "PRODUCTO_NO_DISPONIBLE"],     // 0152:432
     ['El producto "Papas chicas" está excluido del slot "Guarnición"', "PRODUCTO_NO_DISPONIBLE"],    // 0152:464
     ['El producto "Papas chicas" no es opción del slot "Guarnición"', "PRODUCTO_NO_DISPONIBLE"],     // 0152:470
+    ["El grupo 7d1e0000-0000-0000-0000-000000000002 no pertenece al combo", "PRODUCTO_NO_DISPONIBLE"],               // 0152:442
     ['El combo "Combo 1" no está disponible', "PRODUCTO_NO_DISPONIBLE"],                             // 0152:419
     ["Opción de modificador 7d1e0000-0000-0000-0000-000000000001 no existe", "OPCION_NO_EXISTE"],    // 0152:336
     ["Zona de envío 7d1e0000-0000-0000-0000-000000000001 no existe, está inactiva o no es de esta sucursal", "ZONA_NO_DISPONIBLE"], // 0116:170

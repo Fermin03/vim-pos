@@ -43,7 +43,7 @@ const NO_REINTENTABLES: [texto: string, codigo: string][] = [
   // El resto de lo que lanza el armado de un combo (0152:416-470), igual que en la caja: el menú
   // cambió desde que se cotizó, y el pedido tal como está ya no se puede armar.
   ...["está agotado o pausado", "no es un combo de este negocio", "no es válido como componente",
-    "requiere entre", "está excluido del slot", "no es opción del slot",
+    "requiere entre", "está excluido del slot", "no es opción del slot", "no pertenece al combo",
   ].map((t): [string, string] => [t, "PRODUCTO_NO_DISPONIBLE"]),
   // fijar_envio_ticket (0116): la zona del pedido se borró, se apagó o ya no es de la sucursal.
   ["Zona de envío", "ZONA_NO_DISPONIBLE"],

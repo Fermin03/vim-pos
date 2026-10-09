@@ -147,6 +147,7 @@ const FALLAS_SIN_REMEDIO = [
   ["requiere entre", "PRODUCTO_NO_DISPONIBLE"],                // El slot "%" requiere entre % y % selecciones
   ["está excluido del slot", "PRODUCTO_NO_DISPONIBLE"],
   ["no es opción del slot", "PRODUCTO_NO_DISPONIBLE"],
+  ["no pertenece al combo", "PRODUCTO_NO_DISPONIBLE"],         // El grupo % no pertenece al combo
 ];
 
 /**
