@@ -20,8 +20,8 @@ Cada paso dice **quién lo hace**:
 Cloudflare (1) → Supabase (2) → Vercel: proyecto, variables y dominio (3, 4, 5) → prueba (6 y 7).
 
 El orden importa en un punto: **los pasos 1 y 2 van antes de que el dominio exista** (5). Si la
-tienda sale antes, el primer cliente que intente pedir recibe «no pudimos verificar que eres una
-persona».
+tienda sale antes, el primer cliente que intente pedir recibe «No pudimos comprobar que eres una
+persona.»
 
 ---
 
@@ -29,7 +29,8 @@ persona».
 
 | Qué | Cómo comprobarlo |
 |---|---|
-| La función `tienda` desplegada en Supabase, con su clave `VIM_TIENDA_SECRET` | **[Tú o Claude]** pide «comprueba que la función `tienda` contesta»: sin clave debe responder 401, no 404. |
+| La migración **0165** aplicada en producción | **[Tú o Claude]** «comprueba que la 0165 está aplicada». Sin ella el menú no se puede leer y la tienda dice «No pudimos cargar el menú». Se aplica a mano y **antes** de mezclar la rama, como todas. |
+| La función `tienda` **redesplegada** con el código de esta rama, y con su clave `VIM_TIENDA_SECRET` | **[Tú o Claude]** «redespliega la función `tienda`». Hace falta aunque ya estuviera desplegada: esta entrega le cambió el cupo del seguimiento (ahora va aparte del de ver el menú). Para comprobar que contesta: una petición **POST** sin clave debe responder **401** (no 404). Ojo: con GET responde 405 tenga o no clave, así que un GET no prueba nada. |
 | `TURNSTILE_SECRET_KEY` puesta en Supabase (se puso el 30 sep 2026 para el registro) | **[Tú o Claude]** «lista los secretos de Supabase» (solo muestra los nombres). |
 | La llave pública del captcha (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`) | Está en Vercel, proyecto **admin**, variables de entorno. Se copia tal cual. |
 
@@ -92,12 +93,16 @@ de las demás apps, con el nombre `vim-tienda` y `rootDirectory: apps/tienda`).
 
 ## Paso 4 — Vercel: las tres variables · **[Tú o Claude]**
 
-En el proyecto `vim-tienda` → **Settings → Environment Variables**. Marca Production, Preview y
-Development.
+En el proyecto `vim-tienda` → **Settings → Environment Variables**. Marca **solo Production**.
+
+- **Preview no:** con Preview marcado, cualquier rama que Vercel despliegue tendría la clave real de
+  la tienda. Si un día hace falta probar una rama, se le pone la variable a esa rama y se quita.
+- **Development no:** Vercel no deja guardar una variable «Sensitive» en Development, y en tu
+  máquina la tienda lee sus variables de `apps/tienda/.env.local`, no de Vercel.
 
 | Nombre | Valor | Notas |
 |---|---|---|
-| `VIM_TIENDA_SECRET` | el contenido de `C:\Users\Fermi\.vim-pos-llaves\tienda-secret.txt` | **Sensible: márcala como «Sensitive».** Es la misma que ya tiene Supabase; si no coinciden, toda la tienda contesta «no disponible». Es solo de servidor: sin `NEXT_PUBLIC_`. |
+| `VIM_TIENDA_SECRET` | el contenido de `C:\Users\Fermi\.vim-pos-llaves\tienda-secret.txt` | **Márcala como «Sensitive»** (por eso solo puede ir en Production y Preview). Es la misma que ya tiene Supabase; si no coinciden, toda la tienda dice «No pudimos cargar la tienda». Es solo de servidor: sin `NEXT_PUBLIC_`. |
 | `NEXT_PUBLIC_SUPABASE_URL` | la dirección del proyecto de Supabase (`https://pbiaxzvmssjsxdwqrumb.supabase.co`) | La misma que usan admin y pos. De aquí salen la dirección de la función y las fotos del menú. |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | la misma llave pública del proyecto **admin** | Es pública (se ve en el navegador); no confundir con la llave secreta, que solo vive en Supabase. |
 
@@ -116,9 +121,10 @@ rama de la tienda; el despliegue debe terminar en «Ready».
 3. Espera a que Vercel marque el dominio en verde (minutos; a veces más con el DNS). El certificado
    HTTPS se crea solo.
 
-**Cómo comprobarlo:** abrir `https://pedidos.vimpos.com.mx/` carga una página sencilla (la raíz no
-es una tienda: no hay nada que ver ahí, y está bien). Una dirección que no existe, por ejemplo
-`https://pedidos.vimpos.com.mx/nadie-existe`, dice que la tienda no está disponible.
+**Cómo comprobarlo:** abrir `https://pedidos.vimpos.com.mx/` carga una página sencilla que dice
+«Pedidos en línea» (la raíz no es una tienda: no hay nada más que ver ahí, y está bien). Una
+dirección que no existe, por ejemplo `https://pedidos.vimpos.com.mx/nadie-existe`, dice «No
+encontramos esta página».
 
 > Con *Deployment Protection* activa, las direcciones `.vercel.app` piden iniciar sesión; el dominio
 > propio es público. Pruébalo siempre en el dominio propio, no en la dirección `.vercel.app`.
@@ -143,7 +149,7 @@ cliente. Hace falta:
    - **El POS en el navegador, con turno abierto.** Es lo más fácil y funciona hoy.
    - **Una caja de escritorio con la versión 0.8.0.** Esa versión **todavía no está publicada**
      (la última es la 0.7.0; ver [`instalador-0.8.0-pendiente.md`](instalador-0.8.0-pendiente.md)).
-     Una caja 0.7.0 con turno abierto **no basta**: la tienda diría «sin turno abierto».
+     Una caja 0.7.0 con turno abierto **no basta**: la tienda seguiría diciendo «Aún no abrimos.»
    - Cuidado: no tengas a la vez una caja 0.7.0 y el POS web abiertos en la misma sucursal.
 
 ## Paso 7 — Prueba de humo, de punta a punta · **[Tú]** (Claude puede mirar los registros)
@@ -158,26 +164,33 @@ Hazla desde tu teléfono, con datos tuyos. Marca cada punto:
    admin lo avisa en Tienda en línea → «Combos que tus clientes no pueden pedir».)
 4. Haz el pedido **para recoger, pagando en efectivo**, con tu nombre, teléfono y correo. **Debe:**
    aparecer el captcha, resolverse solo o con un clic, y mostrarte la pantalla del pedido con su
-   número. Si dice «no pudimos verificar que eres una persona», revisa los pasos 1 y 2.
+   número y el estado «En proceso». Si dice «No pudimos comprobar que eres una persona.», revisa
+   los pasos 1 y 2.
 5. En la caja (o el POS web): en **Pedidos en línea** debe sonar y aparecer el pedido. Acéptalo.
-   **Debe:** la pantalla del pedido en tu teléfono pasar a «Aceptado» en unos segundos (se
-   actualiza sola).
-6. Imprime la cuenta o cóbrala. **Debe:** el pedido avanzar a «Listo» y luego a «Entregado».
+   **Debe:** la pantalla del pedido en tu teléfono pasar a «En preparación» en unos segundos (se
+   actualiza sola, cada 10 segundos).
+6. Imprime la cuenta o cóbrala. **Debe:** el pedido avanzar a «Listo para recoger» y luego a
+   «Entregado». (En un pedido a domicilio, en lugar de «Listo para recoger» dice «En camino».)
 7. Revisa tu correo: debe llegar la confirmación del pedido (si pusiste `VIM_TIENDA_URL` y los
    `VIM_SMTP_*`).
-8. Cierra el turno en la caja y recarga la tienda. **Debe:** decir que no está recibiendo pedidos
-   por ahora (y no dejar pedir).
+8. Cierra el turno en la caja y espera un minuto con la tienda abierta (se actualiza sola; también
+   puedes recargar). **Debe:** decir «Aún no abrimos. Vuelve a intentar en unos minutos.» y no
+   dejar pedir: en el carrito ese aviso ocupa el lugar del botón «Continuar».
 9. Repite con **a domicilio** si el negocio lo tiene activo.
 
 **Si algo falla:**
 
 | Se ve | Probable causa |
 |---|---|
-| Todas las pantallas dicen «no pudimos cargar la tienda» | `VIM_TIENDA_SECRET` distinta en Vercel y en Supabase, o falta en Vercel. |
-| «La tienda no está disponible» en una dirección que sí existe | La tienda está apagada, el negocio no tiene el complemento, o ninguna sucursal participa. |
-| «Sin turno abierto» con la caja abierta | Caja 0.7.0 (ver paso 6), o la caja no tiene internet. |
+| Todas las direcciones dicen «No pudimos cargar la tienda» | `VIM_TIENDA_SECRET` distinta en Vercel y en Supabase, o falta en Vercel. |
+| «No pudimos cargar el menú» (el nombre del negocio sí sale) | Falta aplicar la migración 0165. |
+| «No encontramos esta página» en una dirección que sí existe | La tienda está apagada, el negocio no tiene el complemento, o la dirección está mal escrita. |
+| «Esta tienda no está disponible por ahora» | Ninguna sucursal del negocio participa en la tienda. |
+| «Aún no abrimos.» con la caja abierta | Caja 0.7.0 (ver paso 6), o la caja no tiene internet. |
+| «Cerrado ahora. Abre hoy a las…» | La hora de la prueba está fuera del horario que se le puso a la sucursal. |
+| «No estamos tomando pedidos en este momento.» | La tienda está en pausa desde la caja. |
 | Captcha que no aparece | Falta `NEXT_PUBLIC_TURNSTILE_SITE_KEY` en Vercel o el dominio no está en Cloudflare (paso 1). Hace falta redesplegar tras cambiar una variable. |
-| «No pudimos verificar que eres una persona» al enviar | `TURNSTILE_HOSTNAMES` sin `pedidos.vimpos.com.mx` (paso 2). |
+| «No pudimos comprobar que eres una persona.» al enviar | `TURNSTILE_HOSTNAMES` sin `pedidos.vimpos.com.mx` (paso 2). |
 | Las fotos no cargan | `NEXT_PUBLIC_SUPABASE_URL` distinta de la del proyecto real. |
 
 **Para volver atrás sin tirar nada:** apaga el interruptor en el admin del negocio de prueba (la
@@ -200,7 +213,7 @@ pierde nada.
 
 - La entrega 7 activará el complemento en el panel de VIM y lo concederá a los planes que lo
   incluyen; hasta entonces cada negocio nuevo se concede a mano.
-- El aviso de privacidad y los términos de la tienda son texto **provisional** (están marcados como
-  tal en la página); el texto definitivo también es de la entrega 7.
+- El aviso de privacidad de la tienda es texto **provisional** (está marcado como tal en la
+  página); el texto definitivo también es de la entrega 7. La tienda no tiene página de términos.
 - Soporte: [`tienda-en-linea-caja.md`](tienda-en-linea-caja.md) explica qué ve el cajero y qué
   responder cuando un cliente dice «mi tienda no me manda pedidos».

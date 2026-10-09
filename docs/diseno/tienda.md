@@ -184,9 +184,10 @@ Un botón dice lo que hace y lleva su importe a la derecha: «Agregar   $139.20�
 | **Pedido empezado en otra sucursal** | Hoja que pregunta: «Seguir en {otra}» (principal) o «Empezar en {esta}». Cerrarla sin elegir vuelve a la otra: es lo que no borra nada |
 | **No cargó la tienda o el menú** | Título, qué hacer y «Volver a intentar» |
 | **Menú sin productos** | «Este menú todavía no tiene productos.» |
-| **Enviando el pedido** | Botón apagado con lo que está pasando; no hay velo ni se bloquea el formulario |
+| **Enviando el pedido** | Botón apagado con lo que está pasando; no hay velo ni se bloquea el formulario. Mientras dura **no se puede salir de la hoja** («Tu pedido», «Cerrar», el velo, Escape y el arrastre quedan sin efecto): salir a medio envío dejaba mandar el pedido dos veces |
 | **Sin formas de pago** | Aviso (`warning`) en «¿Cómo pagas?» y «Enviar pedido» apagado |
-| **Buscando el pedido** | «Tu pedido» y «Buscando tu pedido…»; si falla, «Sin conexión. Reintentando…» |
+| **Buscando el pedido** | «Tu pedido» y «Buscando tu pedido…»; si la primera lectura falla, «Estamos tardando en cargar tu pedido. Seguimos intentando…» con el botón «Reintentar ahora» |
+| **Tienda abierta / cerrada** | Se vuelve a preguntar sola cada minuto con la pestaña a la vista y al volver a ella (no mientras se llena «Tus datos» ni con un producto abierto) |
 | **Pedido no encontrado** | Título, qué pudo pasar y «Ver el menú» |
 | **Página que no existe** | «No encontramos esta página» y qué hacer, sin la marca de ningún negocio |
 
