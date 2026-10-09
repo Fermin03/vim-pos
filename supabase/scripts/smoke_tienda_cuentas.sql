@@ -78,6 +78,11 @@ BEGIN
     ('teléfono que empieza en 1', 'Ana', 'López', 'ana@example.com', '1775550101', c_pw),
     ('contraseña de 7',        'Ana', 'López', 'ana@example.com', '4775550101', '1234567'),
     ('contraseña de 73',       'Ana', 'López', 'ana@example.com', '4775550101', repeat('a', 73)),
+    -- bcrypt mira BYTES: 37 «ñ» son 37 caracteres y 74 bytes; 19 emojis, 19 y 76. chr() y no la letra,
+    -- para que no dependa de la codificación con que se lea este archivo.
+    ('contraseña de 37 ñ (74 bytes)',     'Ana', 'López', 'ana@example.com', '4775550101', repeat(chr(241), 37)),
+    ('contraseña de 19 emojis (76 bytes)', 'Ana', 'López', 'ana@example.com', '4775550101', repeat(chr(128512), 19)),
+    ('contraseña de 4 emojis (4 caracteres)', 'Ana', 'López', 'ana@example.com', '4775550101', repeat(chr(128512), 4)),
     ('contraseña NULL',        'Ana', 'López', 'ana@example.com', '4775550101', NULL)
   ) AS x(caso, nombre, apellido, email, telefono, pw) LOOP
     v_err := NULL;
@@ -92,6 +97,23 @@ BEGIN
   IF EXISTS (SELECT 1 FROM tienda_cuentas WHERE tenant_id = v_t) OR EXISTS (SELECT 1 FROM tienda_sesiones WHERE tenant_id = v_t) THEN
     RAISE EXCEPTION 'R1: un registro inválido dejó filas';
   END IF;
+
+  -- R1b) El tope es de 72 BYTES justos. 36 «ñ» (72 bytes) entra; esa misma con una letra más (37
+  -- caracteres, 73 bytes) NO abre la cuenta, aunque bcrypt, que corta en el byte 72, las vea iguales.
+  -- Se deshace al final: el resto del smoke cuenta filas.
+  BEGIN
+    v_r := tienda_cuenta_registrar(v_t, 'Bea', 'Bytes', 'bytes@example.com', '4775550199', repeat(chr(241), 36), pg_temp.h('rb'));
+    IF (v_r ->> 'creada') IS DISTINCT FROM 'true' THEN RAISE EXCEPTION 'R1b: una contraseña de 72 bytes debía entrar: %', v_r; END IF;
+    IF tienda_cuenta_entrar(v_t, 'bytes@example.com', repeat(chr(241), 36), pg_temp.h('rb2'), v_t0) IS NULL THEN
+      RAISE EXCEPTION 'R1b: no entró con su contraseña de 72 bytes';
+    END IF;
+    IF tienda_cuenta_entrar(v_t, 'bytes@example.com', repeat(chr(241), 36) || 'x', pg_temp.h('rb3'), v_t0) IS NOT NULL THEN
+      RAISE EXCEPTION 'R1b: entró con una contraseña de 73 bytes cuyo final bcrypt no mira';
+    END IF;
+    RAISE EXCEPTION 'R1B_DESHACER';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'R1B_DESHACER' THEN RAISE; END IF;
+  END;
 
   -- R2) Válido: correo recortado y en minúsculas, teléfono a 10 dígitos, y entra de una vez.
   v_r := tienda_cuenta_registrar(v_t, ' Ana ', ' López ', '  Ana.Cuenta@Example.com ', '+52 (477) 555-0101', c_pw, pg_temp.h('s1'));
@@ -261,6 +283,10 @@ BEGIN
   BEGIN PERFORM tienda_recuperar_aplicar(v_t, pg_temp.h('k2'), 'corta', pg_temp.h('p3'), v_t0);
   EXCEPTION WHEN OTHERS THEN v_err := SQLERRM; END;
   IF v_err IS NULL OR v_err NOT LIKE 'CUENTA_INVALIDA_DATOS:%' THEN RAISE EXCEPTION 'P: contraseña corta: esperaba CUENTA_INVALIDA_DATOS, dio %', v_err; END IF;
+  v_err := NULL;
+  BEGIN PERFORM tienda_recuperar_aplicar(v_t, pg_temp.h('k2'), repeat(chr(241), 37), pg_temp.h('p3'), v_t0);
+  EXCEPTION WHEN OTHERS THEN v_err := SQLERRM; END;
+  IF v_err IS NULL OR v_err NOT LIKE 'CUENTA_INVALIDA_DATOS:%' THEN RAISE EXCEPTION 'P: contraseña de 74 bytes: esperaba CUENTA_INVALIDA_DATOS, dio %', v_err; END IF;
   -- El bueno: cambia la contraseña, cierra TODAS las sesiones, levanta el bloqueo, sella el correo y entra.
   v_r := tienda_recuperar_aplicar(v_t, pg_temp.h('k2'), 'nueva-clave-1', pg_temp.h('p3'), v_t0 + interval '10 minutes');
   IF v_r IS DISTINCT FROM jsonb_build_object('cuenta', c_ana) THEN RAISE EXCEPTION 'P: aplicar: %', v_r; END IF;
@@ -305,6 +331,10 @@ BEGIN
   BEGIN PERFORM tienda_cuenta_password(v_t, v_a, c_pw, 'corta', pg_temp.h('p6'));
   EXCEPTION WHEN OTHERS THEN v_err := SQLERRM; END;
   IF v_err IS NULL OR v_err NOT LIKE 'CUENTA_INVALIDA_DATOS:%' THEN RAISE EXCEPTION 'C: nueva corta: esperaba CUENTA_INVALIDA_DATOS, dio %', v_err; END IF;
+  v_err := NULL;
+  BEGIN PERFORM tienda_cuenta_password(v_t, v_a, c_pw, repeat(chr(241), 37), pg_temp.h('p6'));
+  EXCEPTION WHEN OTHERS THEN v_err := SQLERRM; END;
+  IF v_err IS NULL OR v_err NOT LIKE 'CUENTA_INVALIDA_DATOS:%' THEN RAISE EXCEPTION 'C: nueva de 74 bytes: esperaba CUENTA_INVALIDA_DATOS, dio %', v_err; END IF;
   IF NOT tienda_cuenta_password(v_t, v_a, c_pw, 'cambiada-456', pg_temp.h('p6')) THEN RAISE EXCEPTION 'C: no cambió con la actual buena'; END IF;
   IF (SELECT array_agg(token_hash) FROM tienda_sesiones WHERE cuenta_id = v_a) IS DISTINCT FROM ARRAY[pg_temp.h('p6')] THEN
     RAISE EXCEPTION 'C: debía cerrar las demás sesiones y conservar la presente';

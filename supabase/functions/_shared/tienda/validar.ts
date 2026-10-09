@@ -106,11 +106,12 @@ function leerCorreo(x: unknown): string | null {
 }
 
 /** Una contraseña TAL CUAL llega: ni se recorta ni se normaliza (lo que el cliente escribió es lo
- *  que se cifra y lo que se compara). De `min` a 72 caracteres —el tope de bcrypt—, o null. */
+ *  que se cifra y lo que se compara). Al menos `min` caracteres y como mucho 72 BYTES en UTF-8, o
+ *  null: bcrypt solo mira los primeros 72 bytes, y con acentos o emojis se llega antes que con 72
+ *  letras. Lo que pasara de ahí no contaría, así que no se acepta (igual que la pantalla y el SQL). */
 function leerClave(x: unknown, min: number): string | null {
-  if (typeof x !== "string" || x.length > 144) return null;   // 72 caracteres son, como mucho, 144 unidades UTF-16
-  const n = Array.from(x).length;
-  return n >= min && n <= 72 ? x : null;
+  if (typeof x !== "string" || x.length > 72) return null;   // 72 bytes nunca son más de 72 unidades UTF-16
+  return Array.from(x).length >= min && new TextEncoder().encode(x).length <= 72 ? x : null;
 }
 
 const leerCaptcha = (x: unknown): string | null => (typeof x === "string" && x.length <= 4096 ? x : null);
@@ -130,7 +131,7 @@ export function leerFecha(x: unknown, hoy: Date = new Date()): string | null | u
  * Las acciones de cuenta. La forma que no cuadra es `CUENTA_INVALIDA_DATOS` (o `DIRECCION_INVALIDA`,
  * o `ENLACE_INVALIDO` para un token de recuperación que no tiene forma de token), y nunca depende de
  * si la cuenta existe. Una contraseña que se va a COMPROBAR (entrar, la actual, eliminar) solo se
- * acota a 1–72: si es corta, que la rechace la base como cualquier otra equivocada.
+ * acota a 1 carácter–72 bytes: si es corta, que la rechace la base como cualquier otra equivocada.
  */
 function leerCuenta(accion: Exclude<Peticion["accion"], "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento">,
                     negocio: string, x: Record<string, unknown>): Resultado<Peticion> {

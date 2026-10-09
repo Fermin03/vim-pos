@@ -265,13 +265,17 @@ test("registrar: normaliza nombre, apellido, correo y teléfono; la contraseña 
     telefono: "4771112233", password: "  secreta 1  ", captcha: "tok",
   } });
 });
-test("registrar: la contraseña mide de 8 a 72 caracteres, sin recortar ni normalizar", () => {
+test("registrar: la contraseña lleva al menos 8 caracteres y como mucho 72 BYTES, sin recortar ni normalizar", () => {
   const con = (password: unknown) => leerCuerpo({ ...registrar, password });
   assert.equal(con("12345678").ok, true);
   assert.equal(con("a".repeat(72)).ok, true);
   assert.equal(con("        ").ok, true, "ocho espacios son ocho caracteres");
   assert.equal(con("ñ".repeat(8)).ok, true);
-  assert.equal(con("😀".repeat(72)).ok, true, "se cuentan caracteres, no unidades UTF-16");
+  assert.equal(con("😀".repeat(8)).ok, true, "el mínimo se cuenta en caracteres, no en unidades UTF-16");
+  // bcrypt solo mira 72 bytes: lo que pasa de ahí sin pasar de 72 caracteres tampoco entra.
+  assert.equal(con("ñ".repeat(36)).ok, true, "36 ñ son 72 bytes");
+  assert.equal(con("😀".repeat(18)).ok, true, "18 emojis son 72 bytes");
+  for (const larga of ["ñ".repeat(37), "😀".repeat(19), "a".repeat(71) + "ñ", "😀".repeat(72)]) assert.deepEqual(con(larga), invalido, `${Array.from(larga).length} caracteres`);
   const nfd = "contraseña";
   const r = con(nfd);
   assert.equal(r.ok && r.valor.accion === "registrar" && r.valor.password === nfd, true, "no se normaliza");
@@ -297,7 +301,7 @@ test("entrar: correo normalizado; la contraseña a comprobar va de 1 a 72, tal c
   assert.deepEqual(leerCuerpo({ accion: "entrar", ...N, email: " ANA@Example.com", password: " x " }),
     { ok: true, valor: { accion: "entrar", negocio: "knockout", email: "ana@example.com", password: " x " } });
   assert.equal(leerCuerpo({ accion: "entrar", ...N, email: "a@b.mx", password: "a".repeat(72) }).ok, true);
-  for (const cambio of [{ password: "" }, { password: "a".repeat(73) }, { password: null }, { password: 5 }, { email: "x" }, { email: null }]) {
+  for (const cambio of [{ password: "" }, { password: "a".repeat(73) }, { password: "ñ".repeat(37) }, { password: null }, { password: 5 }, { email: "x" }, { email: null }]) {
     assert.deepEqual(leerCuerpo({ accion: "entrar", ...N, email: "a@b.mx", password: "secreta12", ...cambio }), invalido, JSON.stringify(cambio));
   }
 });
@@ -313,7 +317,7 @@ test("recuperar_aplicar: el token tiene forma de código (si no, ENLACE_INVALIDO
   for (const token of ["corto", TOKEN + "x", null, undefined, 5]) {
     assert.deepEqual(leerCuerpo({ accion: "recuperar_aplicar", ...N, token, password: "nueva clave" }), { ok: false, error: "ENLACE_INVALIDO" });
   }
-  assert.deepEqual(leerCuerpo({ accion: "recuperar_aplicar", ...N, token: TOKEN, password: "corta" }), invalido);
+  for (const password of ["corta", "ñ".repeat(37)]) assert.deepEqual(leerCuerpo({ accion: "recuperar_aplicar", ...N, token: TOKEN, password }), invalido);
 });
 
 test("cuenta_guardar: nombre, apellido, teléfono y fecha de nacimiento (o null)", () => {
@@ -344,7 +348,7 @@ test("fecha: válida, pasada y desde 1900; vacía es null; lo demás undefined",
 test("cuenta_password: la actual 1–72 y la nueva 8–72, las dos tal cual", () => {
   assert.deepEqual(leerCuerpo({ accion: "cuenta_password", ...N, actual: " vieja", nueva: "nueva clave " }),
     { ok: true, valor: { accion: "cuenta_password", negocio: "knockout", actual: " vieja", nueva: "nueva clave " } });
-  for (const cambio of [{ actual: "" }, { actual: null }, { nueva: "corta" }, { nueva: "a".repeat(73) }]) {
+  for (const cambio of [{ actual: "" }, { actual: null }, { actual: "ñ".repeat(37) }, { nueva: "corta" }, { nueva: "a".repeat(73) }, { nueva: "ñ".repeat(37) }]) {
     assert.deepEqual(leerCuerpo({ accion: "cuenta_password", ...N, actual: "vieja", nueva: "nueva clave", ...cambio }), invalido, JSON.stringify(cambio));
   }
 });

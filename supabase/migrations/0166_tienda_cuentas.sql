@@ -11,8 +11,13 @@
 --     enlace o una dirección de otro negocio se comportan como si no existieran.
 --   · Secretos: de la contraseña solo existe su bcrypt (coste 10); de los tokens de sesión y de
 --     recuperación, su SHA-256 en hex, que es lo que llega aquí. Nada de esto sale en un error.
---   · Sin enumeración: «no existe», «contraseña mala» y «bloqueada» devuelven lo mismo y hacen el
---     mismo trabajo (un crypt() de relleno).
+--   · Sin enumeración AL ENTRAR Y AL RECUPERAR: «no existe», «contraseña mala» y «bloqueada»
+--     devuelven lo mismo y hacen el mismo trabajo (un crypt() de relleno). El REGISTRO es la
+--     excepción, aceptada (ADR 0032): tienda_cuenta_registrar dice si el correo ya tenía cuenta
+--     (`creada`), y la función `tienda` abre sesión solo en el alta nueva, así que quien llama lo
+--     distingue. Lo acotan el antirobot y los cupos por IP y por correo de la función.
+--   · La contraseña mide al menos 8 caracteres y como mucho 72 BYTES (octet_length): bcrypt ignora
+--     lo que pase del byte 72, y con acentos o emojis se llega antes que con 72 letras.
 -- search_path lleva `extensions` por crypt()/gen_salt() y por citext, que en la nube viven ahí.
 -- Corre también en el Postgres embebido de la caja: no toca storage.*, cron.* ni net.*.
 -- ============================================================================
@@ -140,7 +145,7 @@ BEGIN
   END IF;
 
   -- bcrypt ignora lo que pase del byte 72: una contraseña más larga que el tope no es la buena.
-  IF (char_length(p_password) <= 72 AND crypt(p_password, v_c.password_hash) = v_c.password_hash) IS NOT TRUE THEN
+  IF (octet_length(p_password) <= 72 AND crypt(p_password, v_c.password_hash) = v_c.password_hash) IS NOT TRUE THEN
     UPDATE tienda_cuentas
        SET intentos_fallidos = CASE WHEN intentos_fallidos >= 4 THEN 0 ELSE intentos_fallidos + 1 END,
            bloqueada_hasta   = CASE WHEN intentos_fallidos >= 4 THEN p_ahora + interval '15 minutes' END
@@ -260,8 +265,9 @@ $$;
 
 -- ── §4 Registro y entrada ────────────────────────────────────────────────────
 -- {creada: true, cuenta} y la sesión abierta; o {creada: false} si el correo ya tiene cuenta EN ESE
--- negocio: no crea ni cambia nada y no dice más (el aviso «ya tienes cuenta» lo manda la función por
--- correo). El hash se calcula antes de saber cuál de los dos casos es: tardan lo mismo.
+-- negocio: no crea ni cambia nada (el aviso «ya tienes cuenta» lo manda la función por correo).
+-- El hash se calcula antes de saber cuál de los dos casos es: tardan lo mismo. Eso NO esconde cuál
+-- fue: la respuesta de la función es distinta en cada uno (ver «Sin enumeración», arriba).
 -- Datos mal formados: CUENTA_INVALIDA_DATOS.
 CREATE OR REPLACE FUNCTION tienda_cuenta_registrar(
   p_tenant uuid, p_nombre text, p_apellido text, p_email text, p_telefono text, p_password text, p_sesion_hash text)
@@ -280,8 +286,8 @@ BEGIN
   IF (char_length(v_nombre) BETWEEN 1 AND 100 AND char_length(v_apellido) BETWEEN 1 AND 100
       AND char_length(v_email) <= 254 AND v_email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
       AND v_tel IS NOT NULL
-      AND char_length(p_password) BETWEEN 8 AND 72) IS NOT TRUE THEN
-    RAISE EXCEPTION 'CUENTA_INVALIDA_DATOS: nombre y apellido de 1 a 100 caracteres, correo válido, teléfono de 10 dígitos y contraseña de 8 a 72 caracteres';
+      AND char_length(p_password) >= 8 AND octet_length(p_password) <= 72) IS NOT TRUE THEN
+    RAISE EXCEPTION 'CUENTA_INVALIDA_DATOS: nombre y apellido de 1 a 100 caracteres, correo válido, teléfono de 10 dígitos y contraseña de 8 caracteres a 72 bytes';
   END IF;
 
   INSERT INTO tienda_cuentas (tenant_id, email, password_hash, nombre, apellido, telefono)
@@ -398,8 +404,8 @@ DECLARE
   v_cuenta uuid;
   v_c      tienda_cuentas%ROWTYPE;
 BEGIN
-  IF (char_length(p_password) BETWEEN 8 AND 72) IS NOT TRUE THEN
-    RAISE EXCEPTION 'CUENTA_INVALIDA_DATOS: la contraseña lleva de 8 a 72 caracteres';
+  IF (char_length(p_password) >= 8 AND octet_length(p_password) <= 72) IS NOT TRUE THEN
+    RAISE EXCEPTION 'CUENTA_INVALIDA_DATOS: la contraseña lleva de 8 caracteres a 72 bytes';
   END IF;
 
   UPDATE tienda_recuperaciones SET usada_at = p_ahora
@@ -470,8 +476,8 @@ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, extensions, pg_temp
 AS $$
 BEGIN
-  IF (char_length(p_nueva) BETWEEN 8 AND 72) IS NOT TRUE THEN
-    RAISE EXCEPTION 'CUENTA_INVALIDA_DATOS: la contraseña lleva de 8 a 72 caracteres';
+  IF (char_length(p_nueva) >= 8 AND octet_length(p_nueva) <= 72) IS NOT TRUE THEN
+    RAISE EXCEPTION 'CUENTA_INVALIDA_DATOS: la contraseña lleva de 8 caracteres a 72 bytes';
   END IF;
   IF NOT _tienda_password_ok(p_tenant, p_cuenta, p_actual, now()) THEN RETURN false; END IF;
 
