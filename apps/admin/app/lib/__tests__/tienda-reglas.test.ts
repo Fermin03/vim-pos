@@ -47,6 +47,18 @@ describe("direcciones", () => {
     }
     for (const r of DIRECCIONES_RESERVADAS) expect(errorDeDireccion(r), r).toEqual(expect.any(String));
   });
+
+  it("las fronteras del largo: 3 y 40 pasan, 2 y 41 no", () => {
+    expect(errorDeDireccion("abc")).toBeNull();
+    expect(errorDeDireccion("a".repeat(40))).toBeNull();
+    expect(errorDeDireccion("ab")).toBe("La dirección debe tener de 3 a 40 caracteres.");
+    expect(errorDeDireccion("a".repeat(41))).toBe("La dirección debe tener de 3 a 40 caracteres.");
+  });
+
+  it("lo que no tiene la forma se explica sin decir «minúsculas» (una ü lo es)", () => {
+    const FORMA = "Usa solo letras, números y guiones, sin acentos y sin guion al inicio ni al final.";
+    for (const mala of ["tacos-el-güero", "Knock", "knock out", "-knock", "knock-"]) expect(errorDeDireccion(mala), mala).toBe(FORMA);
+  });
 });
 
 describe("horario", () => {
@@ -156,6 +168,12 @@ describe("mensajeTienda", () => {
     expect(caso('new row violates row-level security policy for table "tienda_config"')).toBe(solo);
     expect(caso("permission denied for table x")).toBe(solo);
     expect(caso("SOLO_ADMIN")).toBe(solo);
+  });
+  it("el código 42501 también es «solo el dueño o un administrador», diga lo que diga el mensaje", () => {
+    expect(mensajeTienda({ code: "42501", message: "cualquier cosa" }, "por defecto")).toBe("Solo el dueño o un administrador puede cambiar esto.");
+    // Los candados de la tienda salen con ese mismo código: su frase va primero.
+    expect(caso("SIN_ADDON_TIENDA", "42501")).toBe("Tu plan no incluye la tienda en línea.");
+    expect(caso("SIN_TIENDA_CONFIGURADA", "42501")).toBe("Primero guarda la dirección de tu tienda.");
   });
   it("lo demás usa el texto por defecto", () => {
     expect(caso("algo raro")).toBe("por defecto");

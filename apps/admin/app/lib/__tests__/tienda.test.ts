@@ -101,7 +101,7 @@ describe("leer la configuración", () => {
 
 describe("guardar la configuración", () => {
   it("la primera vez inserta con el negocio, sin tocar el logo", async () => {
-    await guardarConfigTienda(CONFIG);
+    await guardarConfigTienda(CONFIG, "datos");
     expect(doble.escrituras).toHaveLength(1);
     expect(doble.escrituras[0]).toMatchObject({
       tabla: "tienda_config", op: "insert",
@@ -112,31 +112,55 @@ describe("guardar la configuración", () => {
 
   it("la segunda vez actualiza solo lo suyo (el logo no se borra)", async () => {
     doble.tablas.tienda_config = [FILA_CONFIG];
-    await guardarConfigTienda({ ...CONFIG, color: "#00aa00" });
+    await guardarConfigTienda({ ...CONFIG, color: "#00aa00" }, "datos");
     expect(doble.escrituras).toHaveLength(1);
     expect(doble.escrituras[0]).toMatchObject({ op: "update", valores: { color: "#00aa00" }, filtros: { tenant_id: "t1" } });
     expect(doble.escrituras[0]!.valores).not.toHaveProperty("logo_ruta");
   });
 
+  // Dos pestañas (o dos administradores): cada bloque manda solo sus columnas, así una memoria vieja
+  // no pisa lo que se guardó en el otro bloque desde otro lado.
+  it("«Tu tienda» actualiza dirección, color y descripción, y no nombra las columnas de «Pedidos»", async () => {
+    doble.tablas.tienda_config = [FILA_CONFIG];
+    await guardarConfigTienda({ ...CONFIG, direccion: "ko-burger", aceptacion: "MANUAL", minutosAceptacion: 3, pagoTarjeta: true }, "datos");
+    expect(doble.escrituras[0]).toMatchObject({ op: "update", valores: { slug: "ko-burger", color: "#aa0000", descripcion: "Hamburguesas" } });
+    expect(Object.keys(doble.escrituras[0]!.valores).sort()).toEqual(["color", "descripcion", "slug", "updated_at"]);
+  });
+
+  it("«Pedidos» actualiza aceptación, minutos y pagos, y no nombra las columnas de «Tu tienda»", async () => {
+    doble.tablas.tienda_config = [FILA_CONFIG];
+    await guardarConfigTienda({ ...CONFIG, direccion: "memoria-vieja", color: "#000000", descripcion: "vieja", aceptacion: "MANUAL", minutosAceptacion: 9, pagoTarjeta: true }, "pedidos");
+    expect(doble.escrituras[0]).toMatchObject({ op: "update", valores: { aceptacion: "MANUAL", minutos_aceptacion: 9, pago_efectivo: true, pago_tarjeta: true } });
+    expect(Object.keys(doble.escrituras[0]!.valores).sort()).toEqual(["aceptacion", "minutos_aceptacion", "pago_efectivo", "pago_tarjeta", "updated_at"]);
+  });
+
+  it("el primer guardado manda todo, sea del bloque que sea: la fila nace completa", async () => {
+    await guardarConfigTienda(CONFIG, "pedidos");
+    expect(doble.escrituras[0]!.op).toBe("insert");
+    expect(Object.keys(doble.escrituras[0]!.valores).sort()).toEqual(
+      ["aceptacion", "color", "descripcion", "minutos_aceptacion", "pago_efectivo", "pago_tarjeta", "slug", "tenant_id"]);
+  });
+
   it("una descripción vacía se guarda como NULL", async () => {
-    await guardarConfigTienda({ ...CONFIG, descripcion: "" });
+    await guardarConfigTienda({ ...CONFIG, descripcion: "" }, "datos");
     expect(doble.escrituras[0]!.valores.descripcion).toBeNull();
   });
 
   it("una dirección tomada dice que la usa otro negocio", async () => {
     doble.errorEscritura = { message: 'duplicate key value violates unique constraint "tienda_config_slug_key"', code: "23505" };
-    await expect(guardarConfigTienda(CONFIG)).rejects.toThrow("Esa dirección ya la usa otro negocio. Prueba con otra.");
+    await expect(guardarConfigTienda(CONFIG, "datos")).rejects.toThrow("Esa dirección ya la usa otro negocio. Prueba con otra.");
   });
 
   it("un rechazo de RLS dice que solo el dueño o un administrador", async () => {
     doble.errorEscritura = { message: 'new row violates row-level security policy for table "tienda_config"', code: "42501" };
-    await expect(guardarConfigTienda(CONFIG)).rejects.toThrow("Solo el dueño o un administrador puede cambiar esto.");
+    await expect(guardarConfigTienda(CONFIG, "datos")).rejects.toThrow("Solo el dueño o un administrador puede cambiar esto.");
   });
 
   it("un UPDATE que afecta cero filas (RLS sin error) también lo dice", async () => {
     doble.tablas.tienda_config = [FILA_CONFIG];
     doble.sinFilas = true;
-    await expect(guardarConfigTienda(CONFIG)).rejects.toThrow("Solo el dueño o un administrador puede cambiar esto.");
+    await expect(guardarConfigTienda(CONFIG, "datos")).rejects.toThrow("Solo el dueño o un administrador puede cambiar esto.");
+    await expect(guardarConfigTienda(CONFIG, "pedidos")).rejects.toThrow("Solo el dueño o un administrador puede cambiar esto.");
   });
 
   it.each([
@@ -145,11 +169,12 @@ describe("guardar la configuración", () => {
     ["minutos con decimales", { minutosAceptacion: 5.5 }, /minutos/i],
     ["sin formas de pago", { pagoEfectivo: false, pagoTarjeta: false }, /forma de pago/i],
     ["dirección reservada", { direccion: "admin" }, /reservada/i],
-    ["dirección con mayúsculas", { direccion: "Knock" }, /minúsculas/i],
+    ["dirección con mayúsculas", { direccion: "Knock" }, /Usa solo letras, números y guiones/],
     ["color sin #", { color: "aa0000" }, /color/i],
     ["descripción de 201 caracteres", { descripcion: "x".repeat(201) }, /200/],
   ])("%s no llega a la base", async (_n, cambio, mensaje) => {
-    await expect(guardarConfigTienda({ ...CONFIG, ...cambio })).rejects.toThrow(mensaje);
+    await expect(guardarConfigTienda({ ...CONFIG, ...cambio }, "datos")).rejects.toThrow(mensaje);
+    await expect(guardarConfigTienda({ ...CONFIG, ...cambio }, "pedidos")).rejects.toThrow(mensaje);
     expect(doble.escrituras).toEqual([]);
     expect(doble.consultas).toEqual([]);
   });

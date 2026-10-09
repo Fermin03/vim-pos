@@ -20,6 +20,8 @@ export type ConfigTienda = {
   aceptacion: "MANUAL" | "AUTO"; minutosAceptacion: number; pagoEfectivo: boolean; pagoTarjeta: boolean;
 };
 export type DatosConfigTienda = Omit<ConfigTienda, "logoRuta" | "logoUrl">;
+/** Los dos bloques de la página que guardan en la fila de la tienda: «Tu tienda» y «Pedidos». */
+export type BloqueConfig = "datos" | "pedidos";
 
 const configSchema = z.object({
   direccion: z.string().superRefine((d, ctx) => {
@@ -59,27 +61,28 @@ export async function leerConfigTienda(): Promise<ConfigTienda | null> {
 }
 
 /**
- * Crea la fila la primera vez; después la actualiza. Nunca escribe `logo_ruta` (lo maneja el logo):
- * con un upsert los campos que faltan no se tocan, pero aquí se separa insert/update para que cada
- * rama diga exactamente qué columnas son suyas y para poder comprobar que el UPDATE sí entró.
+ * Crea la fila la primera vez (con todo, para que nazca completa); después cada bloque actualiza
+ * SOLO sus columnas: la página arma `d` con lo que tiene en memoria, y una pestaña vieja que guarda
+ * «Pedidos» pisaría la dirección que otra pestaña (u otro administrador) acaba de guardar.
+ * Nunca escribe `logo_ruta` (lo maneja el logo).
  */
-export async function guardarConfigTienda(d: DatosConfigTienda): Promise<void> {
+export async function guardarConfigTienda(d: DatosConfigTienda, bloque: BloqueConfig): Promise<void> {
   const v = configSchema.safeParse(d);
   if (!v.success) throw new Error(v.error.issues[0]?.message ?? "Revisa los datos de la tienda.");
   const tid = await tenantId();
   const columnas = {
-    slug: d.direccion, color: d.color, descripcion: d.descripcion.trim() === "" ? null : d.descripcion,
-    aceptacion: d.aceptacion, minutos_aceptacion: d.minutosAceptacion, pago_efectivo: d.pagoEfectivo, pago_tarjeta: d.pagoTarjeta,
+    datos: { slug: d.direccion, color: d.color, descripcion: d.descripcion.trim() === "" ? null : d.descripcion },
+    pedidos: { aceptacion: d.aceptacion, minutos_aceptacion: d.minutosAceptacion, pago_efectivo: d.pagoEfectivo, pago_tarjeta: d.pagoTarjeta },
   };
   const { data: existe, error: errLectura } = await supabase.from("tienda_config").select("tenant_id").eq("tenant_id", tid).maybeSingle();
   if (errLectura) throw fallo(errLectura, "No se pudo guardar la tienda");
   if (!existe) {
-    const { error } = await supabase.from("tienda_config").insert({ tenant_id: tid, ...columnas });
+    const { error } = await supabase.from("tienda_config").insert({ tenant_id: tid, ...columnas.datos, ...columnas.pedidos });
     if (error) throw fallo(error, "No se pudo guardar la tienda");
     return;
   }
   const { data, error } = await supabase
-    .from("tienda_config").update({ ...columnas, updated_at: new Date().toISOString() }).eq("tenant_id", tid).select("tenant_id");
+    .from("tienda_config").update({ ...columnas[bloque], updated_at: new Date().toISOString() }).eq("tenant_id", tid).select("tenant_id");
   if (error) throw fallo(error, "No se pudo guardar la tienda");
   // La RLS no contesta con error a un UPDATE ajeno: simplemente no encuentra la fila.
   if (!data || data.length === 0) throw new Error(SOLO_ADMIN);

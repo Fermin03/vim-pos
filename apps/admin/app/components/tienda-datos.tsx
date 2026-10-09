@@ -48,7 +48,7 @@ export function TiendaDatos({
   onQuitarLogo: () => void;
 }) {
   // Mientras se escribe no se corrige ni se regaña: el cursor no brinca y «mi tienda» no sale en rojo
-  // por el espacio. Al salir del campo se normaliza (minúsculas, guiones) y entonces sí se valida.
+  // por el espacio. Al salir del campo se normaliza (sin acentos, minúsculas, guiones) y entonces sí se valida.
   const [direccionVista, setDireccionVista] = useState(false);
   const normal = normalizarDireccion(valores.direccion);
   // Vacía todavía no es un error: es un campo sin llenar. Guardar queda apagado igual.

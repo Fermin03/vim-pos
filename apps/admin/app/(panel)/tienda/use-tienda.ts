@@ -6,7 +6,7 @@ import { leerModulos } from "../../lib/modulos";
 import { ponerLogoTienda, quitarLogoTienda } from "../../lib/foto-producto";
 import {
   contarPendientesDeCatalogo, encenderTienda, guardarConfigTienda, leerConfigTienda, guardarSucursalTienda, leerSucursalesTienda, leerTiendaEncendida, urlDelLogo,
-  type DatosConfigTienda,
+  type BloqueConfig, type DatosConfigTienda,
 } from "../../lib/tienda";
 import { normalizarDireccion, trasEscribir, type Escritura, type Leido } from "../../lib/tienda-pagina";
 import { revisar, sugerirDireccion, type BorradorSucursal, type Revision } from "../../lib/tienda-reglas";
@@ -157,12 +157,13 @@ export function useTienda() {
     if (!sinLeer) setMensaje(null);
   }
 
-  // Los bloques 2 y 3 guardan la misma fila: cada uno manda la configuración completa, con lo
-  // guardado del otro bloque (no con lo que el dueño tenga a medio escribir allá).
+  // Los bloques 2 y 3 guardan la misma fila, cada uno SOLO sus columnas. Lo del otro bloque va con
+  // lo guardado (no con lo que el dueño tenga a medio escribir allá) y solo viaja a la base la
+  // primera vez, cuando la fila nace completa.
   const guardada: DatosConfigTienda = leido?.config ?? DE_FABRICA;
 
-  function guardarConfig(bloque: Bloque, datos: DatosConfigTienda, enDialogo: boolean) {
-    void escribir(bloque, () => guardarConfigTienda(datos), { tipo: "config", datos }, "No se pudo guardar la tienda", GUARDADO, enDialogo);
+  function guardarConfig(bloque: BloqueConfig, datos: DatosConfigTienda, enDialogo: boolean) {
+    void escribir(bloque, () => guardarConfigTienda(datos, bloque), { tipo: "config", bloque, datos }, "No se pudo guardar la tienda", GUARDADO, enDialogo);
   }
 
   function enviarDatos(enDialogo: boolean) {

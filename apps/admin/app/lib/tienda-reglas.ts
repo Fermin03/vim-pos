@@ -14,7 +14,7 @@ const FORMA_DIRECCION = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/;
 /** null = válida. Si no, el motivo en palabras del dueño. */
 export function errorDeDireccion(d: string): string | null {
   if (d.length < 3 || d.length > 40) return "La dirección debe tener de 3 a 40 caracteres.";
-  if (!FORMA_DIRECCION.test(d)) return "Usa solo letras minúsculas, números y guiones, sin guion al inicio ni al final.";
+  if (!FORMA_DIRECCION.test(d)) return "Usa solo letras, números y guiones, sin acentos y sin guion al inicio ni al final.";
   if (DIRECCIONES_RESERVADAS.includes(d)) return "Esa palabra está reservada. Elige otra.";
   return null;
 }
@@ -172,6 +172,7 @@ export function mensajeTienda(e: { message?: string; code?: string } | null | un
   if (m.includes("tienda_config_algun_pago")) return "Deja activa al menos una forma de pago.";
   if (m.includes("SIN_ADDON_TIENDA")) return "Tu plan no incluye la tienda en línea.";
   if (m.includes("SIN_TIENDA_CONFIGURADA")) return "Primero guarda la dirección de tu tienda.";
-  if (/row-level security|permission denied|SOLO_ADMIN/i.test(m)) return "Solo el dueño o un administrador puede cambiar esto.";
+  // 42501 después de los candados de la tienda: esos salen con el mismo código y tienen su frase.
+  if (e?.code === "42501" || /row-level security|permission denied|SOLO_ADMIN/i.test(m)) return "Solo el dueño o un administrador puede cambiar esto.";
   return porDefecto;
 }
