@@ -24,6 +24,12 @@ describe("puedeVer", () => {
     expect(puedeVer(3, "/lealtad/movimientos")).toBe(false);
   });
 
+  it("la tienda en línea la configura dueño o administrador; un supervisor no la ve", () => {
+    expect(puedeVer(5, "/tienda")).toBe(true);
+    expect(puedeVer(4, "/tienda")).toBe(true);
+    expect(puedeVer(3, "/tienda")).toBe(false);
+  });
+
   it("pero el cajero sí ve el panel", () => {
     expect(puedeVer(CAJERO, "/dashboard")).toBe(true);
   });

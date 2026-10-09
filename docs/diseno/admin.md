@@ -214,6 +214,73 @@ sucursales, o algún menú propio; con una sola sucursal, el Catálogo se ve com
   44 px en táctil y 40 en escritorio, y `aria-disabled` mientras guarda para no perder el foco.
 - **Aviso de cajas viejas** (anteriores a la 0.4.110): se conserva; una caja así no respeta ningún menú.
 
+## Tienda en línea (0161–0163)
+
+Menú principal → **Tienda en línea**: donde el dueño arma la tienda en la que sus clientes piden
+desde el teléfono. Una sola página, sin pestañas, porque son pocos campos y se llenan una vez. Sin
+el complemento concedido, en su lugar va la invitación (`PedirModulo`), sin precios.
+
+Los bloques, en este orden, cada uno en su `Tarjeta`:
+
+1. **Estado** — el interruptor «Tienda en línea» y, debajo, la lista de revisión.
+2. **Tu tienda** — dirección (`pedidos.vimpos.com.mx/` + lo que escriba), logo, color y una
+   descripción de hasta 200 caracteres.
+3. **Pedidos** — aceptación «A mano» o «Automática», minutos de espera (3 a 15, solo en «A mano») y
+   formas de pago al recibir (al menos una).
+4. **Sucursales** — una tarjeta por sucursal: si vende en la tienda, si entrega para recoger o a
+   domicilio, y su horario.
+5. **Compartir** — el enlace con su botón de copiar y el QR para descargar. Solo existe cuando ya
+   hay dirección guardada.
+
+Las reglas:
+
+- **El interruptor dice lo que ve el cliente**: «Encendida: tus clientes ya pueden pedir.» o
+  «Apagada: nadie puede verla.». Encender no pide confirmación; apagar sí (`DialogoPeligro`, con la
+  consecuencia: los pedidos que ya entraron se atienden igual). Apagar siempre se puede.
+- **La lista de revisión manda sobre el interruptor.** Lo que **bloquea** (aviso ámbar) impide
+  encender: falta la dirección, ninguna sucursal vende en la tienda, o una sucursal que vende no
+  tiene horario, no tiene teléfono, no eligió recoger ni domicilio, ofrece domicilio sin zonas de
+  envío, o está inactiva. Lo que **solo avisa** (aviso azul) no impide nada: productos sin foto, sin
+  descripción o en una categoría inactiva. Cada renglón que se arregla en otra pantalla lleva su
+  enlace («Ir a sucursales», «Ir a zonas de envío», «Ir al catálogo»). Sin pendientes dice «Todo
+  listo para recibir pedidos.»
+- **Cada bloque guarda lo suyo, con su propio botón.** «Tu tienda» guarda dirección, color y
+  descripción; «Pedidos», aceptación, minutos y pagos; cada sucursal, su tarjeta. Ninguno pisa lo
+  que otro guardó, aunque la página lleve rato abierta en otra pestaña. El resultado se dice junto
+  al botón del bloque («Cambios guardados.» o el error), sin avisos flotantes.
+- **Una escritura a la vez** en toda la página: mientras algo se guarda, los demás botones no
+  responden y solo el que guarda dice «Guardando…».
+- **Si un guardado entra pero no se puede volver a leer**, lo guardado ya queda en pantalla y el
+  bloque lo dice en ámbar: «Se guardó, pero no se pudo actualizar la pantalla.» con «Reintentar».
+  Hasta que la lectura salga bien no se guarda nada más. Si lo que falla es la primera lectura, no
+  se pinta ningún formulario: solo el motivo y «Reintentar».
+- **«Pedidos» espera a la dirección.** Mientras no haya dirección guardada, sus campos y su botón
+  van apagados y dice «Primero guarda la dirección de tu tienda.» Lo mismo el logo.
+- **La dirección se normaliza al salir del campo**, no mientras se escribe: sin acentos, en
+  minúsculas y con guiones en vez de espacios («Tacos El Güero» queda `tacos-el-guero`). El error
+  sale entonces, junto al campo. La primera vez se propone una a partir del nombre del negocio.
+  **Cambiar una dirección ya guardada pide confirmación** y dice la consecuencia: dejan de
+  funcionar los códigos QR impresos y los enlaces de seguimiento de los pedidos en curso.
+- **Horario por día, un solo rango.** Cada día tiene su casilla «Abre» y, si abre, hora de apertura
+  y de cierre. Un cierre anterior a la apertura se anota «Cierra al día siguiente»; apertura igual
+  al cierre, «Abre todo el día». El primer día abierto lleva «Copiar a todos los días». Una hora
+  mal escrita se señala en su renglón.
+- **Una sucursal inactiva no puede empezar a vender** (su interruptor va apagado y dice «Sucursal
+  inactiva»); si ya vendía, sí se puede apagar. Una tarjeta con cambios dice «Cambios sin guardar».
+- **Logo y foto de producto se suben al momento**, sin esperar al «Guardar» de su formulario
+  (`CampoImagen`). El orden es siempre subir → guardar → borrar la anterior: pase lo que pase a la
+  mitad, lo guardado apunta a una imagen que existe. La imagen se reduce antes de subir (foto 1200 px,
+  logo 800 px, menos de 1 MB). Un error que no se reconoce nunca se enseña crudo: «No se pudo subir
+  la imagen. Inténtalo de nuevo.»
+- **La foto del producto vive en la ficha del producto** (Catálogo) y solo se ofrece a quien tiene
+  la tienda concedida; a los demás la ficha les queda como siempre.
+- A quien no es dueño ni administrador se le dice eso mismo («Solo el dueño o un administrador
+  puede cambiar esto.»), no el rechazo de la base.
+
+Aquí los controles **sí miden 44 px** (`h-11`): el dueño abre esta página desde el celular, con el
+teléfono en una mano y el local enfrente. En celular la dirección se parte en dos renglones (el
+prefijo arriba, el campo abajo a todo el ancho).
+
 ## Piezas que se repiten en el panel
 
 Viven en `apps/admin/app/components` y se usan en vez de volver a escribir el marcado:
@@ -227,6 +294,15 @@ Viven en `apps/admin/app/components` y se usan en vez de volver a escribir el ma
   otra altura o tamaño de letra declara el suyo en su archivo.
 - **`PedirModulo`** (`pedir-modulo.tsx`) — la tarjeta de una sección que el plan no incluye
   (Inventario, Lealtad): qué es, qué trae y un solo botón que abre WhatsApp.
+- **`Tarjeta`** (`tarjeta.tsx`) — el bloque de un formulario: borde, título y, si hace falta, una
+  línea de descripción. Es una sección con nombre (`aria-labelledby`).
+- **`Interruptor`** (`interruptor.tsx`) — encender o apagar UNA cosa. La etiqueta es un `<label>`
+  de verdad y el estado se dice en palabras debajo. La pista mide 24 px y su zona de toque 44.
+  `deshabilitado` es que no se puede cambiar; `ocupado` es que se está guardando: se atenúa y no
+  responde, pero conserva el foco (`aria-disabled`, sin `disabled`).
+- **`CampoImagen`** (`campo-imagen.tsx`) — una imagen que se sube al momento: miniatura de 96 px,
+  «Subir» o «Cambiar», y «Quitar» en rojo con confirmación. Mientras trabaja, sus botones se quedan
+  enfocables y dicen «Subiendo…» o «Quitando…».
 - Los diálogos son siempre `Modal` de `@vim/ui`: cierra con Escape y lleva el foco al primer campo.
 - Los fondos de las etiquetas de estado salen de los tokens (`bg-danger-soft`, `bg-warning-soft`,
   `bg-info-soft`, `bg-hover`), no de un hexadecimal.

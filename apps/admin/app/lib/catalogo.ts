@@ -193,6 +193,8 @@ export type Producto = {
   nombre: string;
   descripcion: string | null;
   codigo_interno: string | null;
+  /** La foto que ve el cliente en la tienda en línea: URL pública completa. La escribe foto-producto.ts, no este formulario. */
+  imagen_url: string | null;
   precio_base_mxn: number;
   categoria_id: string;
   categoriaNombre: string;
@@ -218,7 +220,7 @@ export async function listarProductos(): Promise<Producto[]> {
   const { data, error } = await supabase
     .from("productos")
     .select(
-      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, en_menu_general, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
+      "id, nombre, descripcion, codigo_interno, imagen_url, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, en_menu_general, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
     )
     .is("deleted_at", null)
     .order("orden_visualizacion", { ascending: true });
@@ -228,6 +230,7 @@ export async function listarProductos(): Promise<Producto[]> {
     nombre: f.nombre,
     descripcion: f.descripcion,
     codigo_interno: f.codigo_interno,
+    imagen_url: f.imagen_url || null,
     precio_base_mxn: Number(f.precio_base_mxn),
     categoria_id: f.categoria_id,
     categoriaNombre: f.categoria?.nombre ?? "—",
@@ -249,7 +252,7 @@ export async function obtenerProducto(id: string): Promise<Producto | null> {
   const { data, error } = await supabase
     .from("productos")
     .select(
-      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, en_menu_general, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
+      "id, nombre, descripcion, codigo_interno, imagen_url, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, en_menu_general, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
     )
     .eq("id", id)
     .is("deleted_at", null)
@@ -262,6 +265,7 @@ export async function obtenerProducto(id: string): Promise<Producto | null> {
     nombre: f.nombre,
     descripcion: f.descripcion,
     codigo_interno: f.codigo_interno,
+    imagen_url: f.imagen_url || null,
     precio_base_mxn: Number(f.precio_base_mxn),
     categoria_id: f.categoria_id,
     categoriaNombre: f.categoria?.nombre ?? "—",

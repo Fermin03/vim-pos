@@ -129,7 +129,7 @@ export async function facturarTicket(ticketId: string, receptor: ReceptorInput):
   const token = sess.session?.access_token;
   if (!token) return { ok: false, cfdiId: null, error: "Sesión expirada; vuelve a entrar." };
   const s = await leerSesion();
-  if (!s?.tenantId) return { ok: false, cfdiId: null, error: "Sesión sin tenant." };
+  if (!s?.tenantId) return { ok: false, cfdiId: null, error: "Tu sesión expiró. Vuelve a iniciar sesión." };
   const tid = s.tenantId;
   const [{ data: ten, error: e1 }, { data: emi, error: e2 }] = await Promise.all([
     supabase.from("tenants").select("rfc, razon_social, regimen_fiscal, codigo_postal_fiscal").eq("id", tid).maybeSingle(),

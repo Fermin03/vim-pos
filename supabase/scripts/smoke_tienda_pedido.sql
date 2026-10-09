@@ -43,11 +43,12 @@ BEGIN
 
   -- ── Fixture: la tienda, abierta ahora ─────────────────────────────────────
   INSERT INTO configuracion_tenant (tenant_id) VALUES (v_t) ON CONFLICT (tenant_id) DO NOTHING;
-  UPDATE configuracion_tenant SET modulo_tienda_activo = true WHERE tenant_id = v_t;
   INSERT INTO tenant_addons (tenant_id, addon_id, fecha_inicio, activo, precio_mensual_mxn)
   VALUES (v_t, (SELECT id FROM addons WHERE codigo = 'TIENDA'), (now() AT TIME ZONE 'America/Mexico_City')::date, true, 100.00);
   INSERT INTO tienda_config (tenant_id, slug, minutos_aceptacion, pago_efectivo, pago_tarjeta)
   VALUES (v_t, 'pedido-smoke', 7, true, true);
+  -- Encender va DESPUÉS del complemento y de la configuración: la guarda de la 0163 lo exige.
+  UPDATE configuracion_tenant SET modulo_tienda_activo = true WHERE tenant_id = v_t;
   INSERT INTO tienda_sucursales (sucursal_id, tenant_id, participa, recoger, domicilio, horario)
   VALUES (v_suc, v_t, true, true, true, h_todo);
   -- Turno reportado por el espejo (la tienda abre) y SIN latido de apps (gestión NUBE; el caso 11 lo cambia).

@@ -14,8 +14,12 @@ import {
 } from "../lib/catalogo";
 import { listarAreasCocina, type AreaCocina } from "../lib/areas-cocina";
 import { mensajeError } from "../lib/errores";
+import { ponerFotoProducto, quitarFotoProducto } from "../lib/foto-producto";
+import { ofreceFotoDeProducto } from "../lib/tienda-plan";
 import { limpiarPrecio } from "../lib/numeros";
 import { Plegable } from "./plegable";
+import { CampoImagen } from "./campo-imagen";
+import { useModulos } from "./admin-shell";
 import { AvisoCajasMenu } from "./aviso-cajas-menu";
 import { DisponibilidadSucursales } from "./disponibilidad-sucursales";
 import {
@@ -119,6 +123,26 @@ export function ProductoForm({
   const destino = hrefConMenu(volverA, enMenu ? menuCat.id : null);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  // La foto se sube al momento y solo toca `imagen_url`: no entra en «cambios sin guardar» ni espera
+  // al «Guardar» del formulario, y lo que el dueño tenga a medio escribir se queda como está.
+  // Solo se ofrece a quien tiene la tienda en línea: sin ella, la ficha queda como siempre.
+  const conFoto = ofreceFotoDeProducto(useModulos());
+  const idFoto = producto?.id ?? idCreado;
+  const [fotoUrl, setFotoUrl] = useState(producto?.imagen_url ?? null);
+  const [fotoOcupada, setFotoOcupada] = useState(false);
+  const [errorFoto, setErrorFoto] = useState<string | null>(null);
+
+  async function cambiarFoto(accion: (id: string) => Promise<string | null>, fallo: string) {
+    if (!idFoto || fotoOcupada) return;
+    setErrorFoto(null);
+    setFotoOcupada(true);
+    try {
+      setFotoUrl(await accion(idFoto));
+    } catch (e) {
+      setErrorFoto(mensajeError(e, fallo));
+    }
+    setFotoOcupada(false);
+  }
 
   // ¿Hay cambios sin guardar? Se compara contra lo que había al abrir (o al último guardado). De las
   // sucursales solo cuenta el agotado: su precio y «se vende» los proyecta la base y cambian solos.
@@ -440,6 +464,26 @@ export function ProductoForm({
             </p>
           )}
         </fieldset>
+
+        {conFoto && (
+          <CampoImagen
+            titulo="Foto"
+            url={fotoUrl}
+            alt={`Foto de ${nombre.trim() || "este producto"}`}
+            ajuste="cover"
+            textoSubir="Subir foto"
+            textoVacio="Sin foto"
+            ayuda="La ve tu cliente en la tienda en línea. JPG, PNG o WebP."
+            claseAyuda={ayuda}
+            bloqueo={idFoto ? undefined : "Guarda el producto para poder subirle foto."}
+            trabajando={fotoOcupada}
+            apagado={guardando}
+            quitar={{ titulo: "¿Quitar la foto?", mensaje: "El producto se queda sin foto en tu tienda en línea." }}
+            mensaje={errorFoto && <p className="mt-2 text-sm font-medium text-danger" role="alert">{errorFoto}</p>}
+            onSubir={(archivo) => void cambiarFoto((id) => ponerFotoProducto(id, archivo, fotoUrl), "No se pudo subir la foto")}
+            onQuitar={() => void cambiarFoto(async (id) => { if (fotoUrl) await quitarFotoProducto(id, fotoUrl); return null; }, "No se pudo quitar la foto")}
+          />
+        )}
 
         <Plegable titulo="Más datos" resumen={masDatos.length ? masDatos.join(", ") : "descripción, código, estación"} abierto={masDatos.length > 0 && !editar}>
           <div>

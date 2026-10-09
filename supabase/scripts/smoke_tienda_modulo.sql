@@ -17,8 +17,19 @@ DECLARE
 BEGIN
   INSERT INTO configuracion_tenant (tenant_id) VALUES (v_tenant) ON CONFLICT (tenant_id) DO NOTHING;
 
-  -- 1) Sin complemento: ni permitido ni efectivo, aunque el dueño lo encienda.
+  -- 1) Sin complemento: ni permitido ni efectivo, aunque el interruptor esté encendido. Desde la
+  --    0163 no se puede encender sin complemento ni configuración, así que a ese estado se llega
+  --    como en la vida real: se enciende con todo en regla y el complemento VENCE por fecha (eso no
+  --    pasa por `activo`, y nada apaga el interruptor).
+  INSERT INTO tenant_addons (tenant_id, addon_id, fecha_inicio, activo, precio_mensual_mxn)
+  VALUES (v_tenant, (SELECT id FROM addons WHERE codigo = 'TIENDA'), v_hoy - 10, true, 100.00);
+  INSERT INTO tienda_config (tenant_id, slug) VALUES (v_tenant, 'modulo-smoke');
   UPDATE configuracion_tenant SET modulo_tienda_activo = true WHERE tenant_id = v_tenant;
+  UPDATE tenant_addons SET fecha_fin = v_hoy - 1
+   WHERE tenant_id = v_tenant AND addon_id = (SELECT id FROM addons WHERE codigo = 'TIENDA');
+  IF (SELECT modulo_tienda_activo FROM configuracion_tenant WHERE tenant_id = v_tenant) IS NOT TRUE THEN
+    RAISE EXCEPTION '1: el interruptor debía seguir encendido tras vencer el complemento';
+  END IF;
   SELECT modulos_efectivos(v_tenant) INTO v_m;
   IF v_m IS NULL THEN RAISE EXCEPTION 'modulos_efectivos devolvió NULL: el tenant de prueba necesita un plan'; END IF;
   IF (v_m->'permitidos'->>'tienda')::boolean THEN RAISE EXCEPTION '1: sin complemento no debe estar permitido'; END IF;
@@ -26,8 +37,8 @@ BEGIN
 
   -- 2) Con complemento e interruptor apagado: permitido, no efectivo.
   UPDATE configuracion_tenant SET modulo_tienda_activo = false WHERE tenant_id = v_tenant;
-  INSERT INTO tenant_addons (tenant_id, addon_id, fecha_inicio, activo, precio_mensual_mxn)
-  VALUES (v_tenant, (SELECT id FROM addons WHERE codigo = 'TIENDA'), v_hoy, true, 100.00);
+  UPDATE tenant_addons SET fecha_fin = NULL
+   WHERE tenant_id = v_tenant AND addon_id = (SELECT id FROM addons WHERE codigo = 'TIENDA');
   SELECT modulos_efectivos(v_tenant) INTO v_m;
   IF NOT (v_m->'permitidos'->>'tienda')::boolean THEN RAISE EXCEPTION '2: con complemento debe estar permitido'; END IF;
   IF (v_m->'efectivos'->>'tienda')::boolean THEN RAISE EXCEPTION '2: con el interruptor apagado no debe ser efectivo'; END IF;

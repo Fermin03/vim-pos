@@ -52,10 +52,11 @@ BEGIN
   -- ── Fixture del negocio de la semilla ─────────────────────────────────────
   SELECT estado INTO v_estado FROM tenants WHERE id = v_t;
   INSERT INTO configuracion_tenant (tenant_id) VALUES (v_t) ON CONFLICT (tenant_id) DO NOTHING;
-  UPDATE configuracion_tenant SET modulo_tienda_activo = true WHERE tenant_id = v_t;
   INSERT INTO tenant_addons (tenant_id, addon_id, fecha_inicio, activo, precio_mensual_mxn)
   VALUES (v_t, (SELECT id FROM addons WHERE codigo = 'TIENDA'), v_hoy, true, 100.00);
   INSERT INTO tienda_config (tenant_id, slug, color, descripcion) VALUES (v_t, 'knockout-smoke', '#112233', 'Hamburguesas');
+  -- Encender va DESPUÉS del complemento y de la configuración: la guarda de la 0163 lo exige.
+  UPDATE configuracion_tenant SET modulo_tienda_activo = true WHERE tenant_id = v_t;
   INSERT INTO tienda_sucursales (sucursal_id, tenant_id, participa, recoger, domicilio, horario)
   VALUES (v_suc, v_t, true, true, true, h_fix);
   INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES (v_t, v_suc, 'Centro', 35.00) RETURNING id INTO v_zona;
@@ -115,10 +116,10 @@ BEGIN
   INSERT INTO tenants (id, codigo, nombre_comercial, estado, vertical_principal)
   VALUES (v_otro, 'tenant-0162', 'Otro negocio', 'INTERNO', 'QUICK_SERVICE');
   INSERT INTO sucursales (tenant_id, codigo, nombre) VALUES (v_otro, 'OT', 'Sucursal del otro') RETURNING id INTO v_suc_o;
-  INSERT INTO configuracion_tenant (tenant_id, modulo_tienda_activo) VALUES (v_otro, true);
   INSERT INTO tenant_addons (tenant_id, addon_id, fecha_inicio, activo, precio_mensual_mxn)
   VALUES (v_otro, (SELECT id FROM addons WHERE codigo = 'TIENDA'), v_hoy, true, 100.00);
   INSERT INTO tienda_config (tenant_id, slug) VALUES (v_otro, 'otro-smoke');
+  INSERT INTO configuracion_tenant (tenant_id, modulo_tienda_activo) VALUES (v_otro, true);
   v_r := tienda_estado_sucursal(v_suc_o, 'RECOGER', v_lun);
   IF v_r IS DISTINCT FROM 'NO_PARTICIPA' THEN RAISE EXCEPTION '22: esperaba NO_PARTICIPA, dio %', v_r; END IF;
 

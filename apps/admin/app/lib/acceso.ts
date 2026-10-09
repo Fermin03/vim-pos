@@ -21,6 +21,8 @@ export const MIN_JERARQUIA: { prefijo: string; min: number }[] = [
   { prefijo: "/clientes", min: 4 },
   // El programa de lealtad reparte dinero del negocio: lo configura dueño o administrador.
   { prefijo: "/lealtad", min: 4 },
+  // La tienda en línea recibe pedidos y fija precios y horarios del negocio: dueño o administrador.
+  { prefijo: "/tienda", min: 4 },
   { prefijo: "/reservaciones", min: 3 },
   { prefijo: "/conciliacion", min: 3 },
   { prefijo: "/usuarios", min: 4 },

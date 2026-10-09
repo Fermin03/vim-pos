@@ -13,6 +13,7 @@ export function Segmentos<V extends string | boolean>({
   valor,
   onCambiar,
   grande = false,
+  deshabilitado = false,
   className,
 }: {
   /** Qué se está eligiendo; lo lee el lector de pantalla. */
@@ -21,6 +22,8 @@ export function Segmentos<V extends string | boolean>({
   valor: V;
   onCambiar: (v: V) => void;
   grande?: boolean;
+  /** Solo lectura: las opciones no responden ni reciben el foco. */
+  deshabilitado?: boolean;
   className?: string;
 }) {
   return (
@@ -37,9 +40,10 @@ export function Segmentos<V extends string | boolean>({
           key={String(o.v)}
           type="button"
           aria-pressed={valor === o.v}
+          disabled={deshabilitado}
           onClick={() => onCambiar(o.v)}
           className={cn(
-            "flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 text-13 font-semibold transition-colors",
+            "flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 text-13 font-semibold transition-colors disabled:opacity-50",
             grande ? "min-h-[40px]" : "py-[11px] lg:py-1.5",
             valor === o.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink",
           )}
