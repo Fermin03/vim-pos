@@ -435,7 +435,7 @@ export async function quitarLogoTienda(rutaAnterior: string): Promise<void>;
 - Reporte de ventas en línea, ocultar un producto solo en la tienda, compra mínima, horarios distintos para recoger y domicilio.
 - Refactorizar Lealtad para usar `Interruptor` y `Tarjeta`.
 
-## Dos cosas que conviene que sepas antes de aprobar
+## Decidido por Fermín (8 oct 2026)
 
-1. **Al mezclar, todos los negocios verán «Tienda en línea» en su menú**, con la invitación a contratarla por WhatsApp. Si prefieres que no se vea hasta el lanzamiento, se puede esconder la entrada mientras el negocio no tenga el complemento; hoy Lealtad no lo hace así (siempre se ve). Dime cuál prefieres.
-2. **El aviso de combos que no se pueden comprar en línea** (dos espacios obligatorios que solo admiten el mismo producto, nota de la entrega 2) no lo incluí en la lista de revisión: detectarlo exige leer todos los combos con sus opciones, y hoy ningún cliente tiene un combo así. Queda anotado para la entrega 5, cuando la tienda exista y se vea el caso real.
+1. **La entrada «Tienda en línea» se ve desde ya para todos los negocios**, tengan o no el complemento, con la invitación a contratarla. Igual que Lealtad: no se esconde.
+2. **El aviso de combos que no se pueden comprar en línea** (dos espacios obligatorios que solo admiten el mismo producto) **no entra en la lista de revisión de esta entrega**. Queda para la entrega 5, cuando la tienda exista y se vea el caso real.
