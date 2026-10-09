@@ -214,7 +214,7 @@ sucursales, o algún menú propio; con una sola sucursal, el Catálogo se ve com
   44 px en táctil y 40 en escritorio, y `aria-disabled` mientras guarda para no perder el foco.
 - **Aviso de cajas viejas** (anteriores a la 0.4.110): se conserva; una caja así no respeta ningún menú.
 
-## Tienda en línea (0161–0163)
+## Tienda en línea (0161–0163, 0168)
 
 Menú principal → **Tienda en línea**: donde el dueño arma la tienda en la que sus clientes piden
 desde el teléfono. Una sola página, sin pestañas, porque son pocos campos y se llenan una vez. Sin
@@ -233,8 +233,11 @@ Los bloques, en este orden, cada uno en su `Tarjeta`:
    formas de pago al recibir (al menos una).
 4. **Sucursales** — una tarjeta por sucursal: si vende en la tienda, si entrega para recoger o a
    domicilio, y su horario.
-5. **Compartir** — el enlace con su botón de copiar y el QR para descargar. Solo existe cuando ya
+5. **Menú de la tienda** (0168) — qué categorías y productos enseña cada sucursal. Ver abajo.
+6. **Compartir** — el enlace con su botón de copiar y el QR para descargar. Solo existe cuando ya
    hay dirección guardada.
+
+(Entre el 5 y el 6 puede salir el aviso «Combos que tus clientes no pueden pedir».)
 
 Las reglas:
 
@@ -280,6 +283,35 @@ Las reglas:
   la tienda concedida; a los demás la ficha les queda como siempre.
 - A quien no es dueño ni administrador se le dice eso mismo («Solo el dueño o un administrador
   puede cambiar esto.»), no el rechazo de la base.
+
+### Menú de la tienda (`tienda-menu.tsx`, 0168)
+
+**Todo nace visible.** La tienda enseña el catálogo entero que la sucursal vende; aquí el dueño
+apaga lo que no quiere vender en línea. Se guarda lo escondido (`tienda_ocultos`), así que un
+producto nuevo aparece solo y quien nunca toca el bloque no nota nada.
+
+- **Es por sucursal.** Con más de una sucursal que vende en la tienda hay un selector «Sucursal»;
+  con una sola, no. Sin ninguna dice «Primero elige, en «Sucursales», cuál vende en la tienda.»
+- **Una lista de categorías, cerradas.** Cada una con su `Interruptor` (encendido = se ve) y su
+  resumen («12 de 15 productos visibles»); la flecha la abre y hasta entonces se pintan sus
+  productos, cada uno con su interruptor y su precio en esa sucursal. Solo salen las categorías
+  activas con algo que la tienda pueda enseñar, en el orden del catálogo.
+- **Categoría escondida**: su resumen lo dice («Escondida: ninguno de sus 15 productos aparece en la
+  tienda») y sus productos van apagados y deshabilitados con «Categoría escondida». Lo que cada
+  producto tenía elegido se conserva para cuando la categoría vuelva.
+- **Donde el interruptor no manda**, el producto va atenuado, apagado y con el motivo: «No está
+  visible en el punto de venta», «Está pausado» o «No se vende en esta sucursal». No cuenta en el
+  resumen.
+- **«Mostrar todos»** sale dentro de una categoría abierta cuando tiene productos escondidos uno
+  por uno. No hay «Esconder todos»: eso es el interruptor de la categoría.
+- **Sin botón «Guardar».** Cada toque se pinta al momento y se guarda (una fila que entra o sale).
+  Si la base lo rechaza, el interruptor regresa y arriba de la lista sale el motivo, terminado en
+  «Quedó como estaba.» Mientras un interruptor guarda no responde, pero los demás sí: este bloque
+  **no** entra en la «una escritura a la vez» del resto de la página.
+- **Combos**: si el catálogo tiene combos, al pie dice que esconder un producto no lo quita de los
+  combos que sí se muestran. Esconder el combo sí lo quita.
+- Vacío: «Tu catálogo todavía no tiene productos.» con «Ir al catálogo». Si no se puede leer, el
+  motivo y «Reintentar», solo en este bloque.
 
 Aquí los controles **sí miden 44 px** (`h-11`): el dueño abre esta página desde el celular, con el
 teléfono en una mano y el local enfrente. En celular la dirección se parte en dos renglones (el

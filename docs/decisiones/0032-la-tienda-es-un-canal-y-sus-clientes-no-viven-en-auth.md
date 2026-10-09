@@ -153,3 +153,19 @@ cuenta a la lealtad y el antirobot en `entrar`. Y dos cosas que salieron al escr
 legales ([`../legal/LEEME.md`](../legal/LEEME.md)): no se guarda la fecha en que el comensal aceptó
 el aviso de privacidad (`acepto_privacidad_at` existe y nadie la escribe), y «eliminar» un cliente
 en el admin del restaurante es una baja lógica, no un borrado.
+
+## Qué cambió con el menú por sucursal (migración 0168 · 9 de octubre de 2026)
+
+El dueño decide qué enseña su tienda. Tres decisiones:
+
+- **Se guarda lo escondido, no lo visible** (`tienda_ocultos`): todo nace visible, lo que se
+  agregue al catálogo aparece solo y quien no toca nada no nota el cambio.
+- **Es por sucursal**, como el horario y como el menú de la caja (ADR 0027): una fila esconde una
+  categoría entera o un producto en UNA sucursal.
+- **Esconder es «no se vende suelto en la tienda»**: `tienda_menu` filtra los renglones del menú,
+  no las opciones de los pasos de un combo. Un producto escondido sigue siendo opción de un combo
+  que sí se muestra; un combo escondido no sale. `tienda_cotizar` no se tocó: arma el menú con la
+  misma función y rechaza el producto escondido con `PRODUCTO_NO_DISPONIBLE`.
+
+La tabla vive solo en la nube (no entra al sync, como `tienda_config`) y no afecta a la caja ni a
+las apps de reparto.

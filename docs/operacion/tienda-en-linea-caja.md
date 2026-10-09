@@ -149,6 +149,23 @@ pregunta con cuánto paga el cliente, está ahí. Esa franja sale **solo en cuen
 pedido de la tienda**: una cuenta normal de Pick-up o Domicilio con un recado a cocina se ve y se
 imprime como siempre.
 
+## «Un producto no aparece en mi tienda»
+
+La tienda de una sucursal enseña lo que esa sucursal vende en la caja, menos lo que el dueño
+escondió. Revisar, en este orden:
+
+1. **Admin → Tienda en línea → Menú de la tienda**, con la sucursal correcta elegida: que ni el
+   producto ni **su categoría** estén apagados. Es por sucursal: puede verse en una y no en otra.
+   Si el producto sale atenuado, el renglón dice por qué («No está visible en el punto de venta»,
+   «Está pausado», «No se vende en esta sucursal») y eso se arregla en el Catálogo, no ahí.
+2. **Catálogo**: que el producto esté visible en el punto de venta y no pausado, que se venda en
+   esa sucursal, y que su categoría esté activa.
+3. Si aparece pero no se puede pedir, está **agotado** en esa sucursal.
+
+Un producto escondido **sí** sigue saliendo como opción dentro de los combos que se muestran (la
+bebida de un combo, por ejemplo): esconder es «no se vende suelto en la tienda». Para que no salga
+ni ahí, se quita del combo en Catálogo → Combos. El cambio se ve en la tienda al volver a cargarla.
+
 ## Qué pedir al cliente antes de escalar
 
 - Folio del pedido y hora aproximada.
