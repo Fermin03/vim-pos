@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Estado: PENDIENTE DE REVISIÓN DE FERMÍN. No se ejecuta nada de este plan hasta que él lo apruebe.**
+> **Estado: APROBADO por Fermín el 8 oct 2026, con las dos decisiones del final.**
 
 **Goal:** Que el dueño pueda configurar su tienda en línea desde un apartado propio del admin —dirección, apariencia, aceptación, pagos, sucursales y horarios—, subir fotos a sus productos, ver qué le falta antes de encenderla y encenderla.
 
