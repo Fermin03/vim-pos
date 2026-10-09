@@ -21,7 +21,8 @@ puede hacer sin tocar la base. El detalle técnico está en
    segundos hasta que alguien lo acepta o lo rechaza. Si el negocio eligió aceptación automática, la
    caja lo acepta sola.
 3. Al aceptarlo se crea una cuenta en **Pick-up** (para recoger) o **Domicilio**, y la comanda sale
-   en la impresora de cocina. Se cobra desde ahí, como cualquier cuenta.
+   en la impresora de cocina. Se cobra desde ahí, como cualquier cuenta. En cuanto la cuenta
+   existe, la caja le avisa sola a la tienda que **ya tiene el pedido**; el cajero no hace nada.
 
 El cajero **no marca «listo»**: la tienda le avisa al cliente cuando se imprime el ticket o se asigna
 un repartidor, y cuando se cobra. Los pedidos que se atienden desde el POS en el navegador (sin caja
@@ -60,7 +61,8 @@ Revisa en este orden. Casi siempre es una de las primeras tres.
 
 ## Un pedido se cancela solo
 
-Hay tres razones y la tarjeta del pedido dice cuál.
+Hay cuatro razones. Las tres primeras las dice la tarjeta del pedido; la cuarta se reconoce por la
+hora.
 
 - **«Se venció sin aceptar».** Nadie lo aceptó ni lo rechazó a tiempo (el tiempo lo define el dueño,
   entre 3 y 15 minutos, por omisión 5). Si activó las notificaciones, el dueño recibe un aviso en el celular («Tienda en línea:
@@ -80,10 +82,29 @@ Hay tres razones y la tarjeta del pedido dice cuál.
   «no existe», así que si esto pasa con algo recién creado, repetirlo pasados unos minutos.
 - **«Cancelado» sin explicación.** Alguien canceló la cuenta en la caja (Pick-up o Domicilio) o el
   cajero rechazó el pedido. Cancelar la cuenta cancela el pedido para el cliente.
+- **Se canceló solo a los 15 minutos de aceptado, y no tiene cuenta.** La caja aceptó el pedido
+  pero nunca llegó a crearle su cuenta, así que nunca avisó que ya lo tenía. Pasa cuando la caja
+  **se apaga, se queda sin internet o no tiene turno abierto** justo después de aceptar. A los 15
+  minutos la tienda lo cancela para que el cliente no se quede esperando un pedido que nadie está
+  preparando. El cliente lo ve cancelado; **hay que llamarle**. Si se repite en el mismo negocio,
+  revisar que no cierren el turno ni apaguen la caja con pedidos recién aceptados.
 
 Si el pedido dice **«El pedido en línea se canceló: cancela el ticket en caja»**, el pedido se cerró
-en la nube (rechazado o vencido) justo cuando la caja ya había creado la cuenta. Hay que cancelar esa
-cuenta a mano para que no se prepare ni se cobre.
+en la nube (rechazado, vencido, o cancelado a los 15 minutos porque la caja tardó en volver) justo
+cuando la caja ya había creado la cuenta. Hay que cancelar esa cuenta a mano para que no se prepare
+ni se cobre, y avisarle al cliente.
+
+## El cliente dice que su pedido «no entró» o que lo pidió dos veces
+
+- Si al enviar le salió **«No pudimos confirmar tu pedido.»**, la tienda le ofrece **Reintentar**.
+  Reintentar es seguro: si el primer intento sí había entrado, el segundo no crea otro pedido, lo
+  lleva al mismo. No hace falta que llame antes.
+- Dos pedidos iguales del mismo cliente en la caja son dos pedidos que el cliente armó y envió por
+  separado (volvió al menú y pidió otra vez), no un reintento. Llamarle para confirmar cuál quiere
+  y rechazar o cancelar el otro.
+- **«Demasiados intentos»** al pedir: hay un tope de 8 pedidos por hora desde una misma red en cada
+  restaurante. En una oficina o una escuela con un solo wifi puede alcanzarse; que pidan con los
+  datos del celular, o esperen.
 
 ## La tienda dice «sin turno abierto»
 

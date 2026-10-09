@@ -65,7 +65,7 @@ async function leerCuerpoAcotado(req: Request): Promise<string | null> {
 }
 
 const DE_CARRITO = ["accion", "negocio", "sucursal_id", "modo", "zona_id", "items"] as const;
-const DE_PEDIDO = [...DE_CARRITO, "cliente", "direccion", "pago", "paga_con", "nota", "captcha", "total_esperado"] as const;
+const DE_PEDIDO = [...DE_CARRITO, "cliente", "direccion", "pago", "paga_con", "nota", "captcha", "total_esperado", "clave"] as const;
 const DE_DIRECCION = ["calle", "numero_exterior", "numero_interior", "colonia", "codigo_postal", "ciudad", "estado", "referencias"] as const;
 
 /**
@@ -136,6 +136,9 @@ export async function POST(req: Request): Promise<Response> {
   } else {
     const { items } = cuerpo;
     if (!Array.isArray(items) || items.length < 1 || items.length > MAX_RENGLONES || !items.every(esObj)) return rechazo("CARRITO_INVALIDO");
+    // La clave del intento (la que evita el pedido doble) es opcional —una página vieja no la manda—,
+    // pero si viene tiene que ser un código: de ella sale el enlace de seguimiento.
+    if (accion === "pedir" && "clave" in cuerpo && (typeof cuerpo.clave !== "string" || !FORMA_CODIGO.test(cuerpo.clave))) return rechazo("CUERPO_INVALIDO");
     const base = solo(cuerpo, accion === "pedir" ? DE_PEDIDO : DE_CARRITO) as Obj;
     base.items = items.map(item);
     if ("cliente" in base) base.cliente = solo(base.cliente, ["nombre", "telefono", "email"]);

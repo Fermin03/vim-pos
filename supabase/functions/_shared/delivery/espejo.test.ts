@@ -194,3 +194,34 @@ test("sello: solo un true estricto cuenta", () => {
   assert.deepEqual(selloLatido({ tienda: true, turno_abierto: 1 }, AHORA), { espejo_apps_at: AHORA });
   assert.deepEqual(selloLatido({ tienda: 1, turno_abierto: "true" }, AHORA), { espejo_apps_at: AHORA });
 });
+
+// ── Entrega 7: un pedido de la tienda atascado no deja a la caja a 10 s para siempre ────────────
+const AHORA_MS = Date.parse("2026-10-09T18:00:00Z");
+const SEIS_H = 6 * 3600_000;
+const deTienda = (recibido_at: string, estado = "ACEPTADO") => [{ estado, canal: "TIENDA", gestion: "ESCRITORIO", recibido_at }];
+const ritmo = (pedidosVivos: Parameters<typeof cadenciaEspejo>[0]["pedidosVivos"]) =>
+  cadenciaEspejo({ conexiones: [], pedidosVivos, tienda: true, ahora: AHORA_MS });
+
+test("un pedido de la TIENDA (gestión ESCRITORIO) solo acelera si se recibió en las últimas 6 horas", () => {
+  assert.equal(ritmo(deTienda(new Date(AHORA_MS - 60_000).toISOString())), RAPIDA_MS);
+  // La frontera: a las 6 horas justas todavía cuenta; un milisegundo después, ya no.
+  assert.equal(ritmo(deTienda(new Date(AHORA_MS - SEIS_H).toISOString())), RAPIDA_MS);
+  assert.equal(ritmo(deTienda(new Date(AHORA_MS - SEIS_H - 1).toISOString())), NORMAL_MS);
+  for (const estado of ["RECIBIDO", "ACEPTADO", "EN_PREPARACION", "LISTO"]) {
+    assert.equal(ritmo(deTienda("2026-10-01T00:00:00Z", estado)), NORMAL_MS, estado);
+  }
+});
+test("un atascado viejo no tapa a uno reciente", () => {
+  assert.equal(ritmo([...deTienda("2026-10-01T00:00:00Z"), ...deTienda(new Date(AHORA_MS - 1000).toISOString(), "LISTO")]), RAPIDA_MS);
+});
+test("la ventana de 6 horas es solo de la tienda en gestión ESCRITORIO: un RECIBIDO de APP o de gestión NUBE acelera como siempre", () => {
+  const viejo = "2026-10-01T00:00:00Z";
+  assert.equal(ritmo([{ estado: "RECIBIDO", canal: "APP", gestion: "ESCRITORIO", recibido_at: viejo }]), RAPIDA_MS);
+  assert.equal(ritmo([{ estado: "RECIBIDO", recibido_at: viejo }]), RAPIDA_MS);   // caja 0.7.0: sin columna canal
+  assert.equal(ritmo([{ estado: "RECIBIDO", canal: "TIENDA", gestion: "NUBE", recibido_at: viejo }]), RAPIDA_MS);
+});
+test("sin fecha legible, el pedido de la tienda cuenta como hasta hoy (rápido): nunca se frena a ciegas", () => {
+  for (const recibido_at of [undefined, null, "", "no-es-fecha"]) {
+    assert.equal(ritmo([{ estado: "ACEPTADO", canal: "TIENDA", gestion: "ESCRITORIO", recibido_at }]), RAPIDA_MS, String(recibido_at));
+  }
+});

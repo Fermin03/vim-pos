@@ -156,8 +156,10 @@ function CuerpoTienda({ p, seg, urgente, informativo, sinComanda, ocupado, onImp
   );
 }
 
-export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, onCambio, onImprimirComanda, onSalir }: {
+export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, cajaSinActualizar = false, onCambio, onImprimirComanda, onSalir }: {
   token: string; caja: DatosCaja;
+  /** POS web: la caja instalada de la sucursal aún no atiende la tienda; la barra lo dice. */
+  cajaSinActualizar?: boolean;
   /** Módulo de apps de delivery encendido: pinta la barra de Uber. */
   hayApps: boolean;
   /** Módulo de tienda en línea encendido: pinta la barra de la tienda propia. */
@@ -309,7 +311,7 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, onCambio,
 
   const enCaja = esEscritorio();
   const pendientes = useMemo(() => (pedidos ?? []).filter((p) => (p.estado === "RECIBIDO" || p.estado === "ERROR") && !soloInformativo(p, enCaja)), [pedidos, enCaja]);
-  const estadoEnLinea = enLinea ? etiquetaEstadoEnLinea(enLinea, ahora) : null;
+  const estadoEnLinea = enLinea ? etiquetaEstadoEnLinea(enLinea, ahora, cajaSinActualizar) : null;
 
   return (
     <div className="flex h-screen flex-col">

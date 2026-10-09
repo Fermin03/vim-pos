@@ -40,6 +40,7 @@
 //     cuentas NADA: ni contraseña, ni token de sesión o de recuperación, ni correo. (El slug del
 //     negocio sí puede ir: no es dato personal.)
 //   · El código de seguimiento existe en la respuesta de `pedir` y en el correo. En la base, su huella.
+//     La `clave` de un intento de compra (entrega 7) no se guarda en ningún lado ni se escribe en el log.
 //   · Si un correo tiene cuenta, en `entrar` y `recuperar_pedir`: `entrar` contesta lo mismo a una
 //     contraseña mala, a una cuenta que no existe y a una bloqueada, y `recuperar_pedir` hace el
 //     mismo camino exista o no (mismos cupos, mismo antirobot, misma RPC, correo en segundo plano).
@@ -65,17 +66,17 @@
 // TURNSTILE_HOSTNAMES (tiene que incluir el dominio de la tienda), CAPTCHA_OPCIONAL (solo local),
 // VIM_SMTP_*.
 import { clienteAdmin } from "../_shared/http.ts";
-import { consumirCupos, leerCuerpoAcotado, type ResultadoCupo } from "../_shared/limite.ts";
+import { consumirCupo, consumirCupos, leerCuerpoAcotado, type ResultadoCupo } from "../_shared/limite.ts";
 import { secretoInternoValido } from "../_shared/delivery/interno.ts";
 import { type AccionCaptcha, hostnamesPermitidos, verificarTurnstile } from "../_shared/turnstile.ts";
 import { enSegundoPlano, enviarCorreo } from "../_shared/correo.ts";
 import { registrarError } from "../_shared/errores.ts";
 import { leerCuerpo, type Peticion, tieneNul } from "../_shared/tienda/validar.ts";
-import { huellaDe, nuevoCodigo } from "../_shared/tienda/seguimiento.ts";
+import { codigoDeClave, huellaDe, nuevoCodigo } from "../_shared/tienda/seguimiento.ts";
 import { correoDePedido } from "../_shared/tienda/correo-pedido.ts";
 import { correoDeBienvenida, correoDeRecuperacion, correoYaTienesCuenta } from "../_shared/tienda/correo-cuenta.ts";
 import { CABECERA_SESION, cuentaDe, direccionesPublicas, leerRegistro, leerSesion, pedidosPublicos, type Sesion } from "../_shared/tienda/cuenta.ts";
-import { cotizacionPublica, type Cupos, cuposDe, ipDeConfianza, leerNegocio, leerPedido, type Negocio, respuestaDeCaptcha, respuestaDeRpc } from "../_shared/tienda/respuesta.ts";
+import { cotizacionPublica, type Cupos, cuposDe, esTopeDeEntradas, ipDeConfianza, leerNegocio, leerPedido, type Negocio, respuestaDeCaptcha, respuestaDeRpc, yaExistia } from "../_shared/tienda/respuesta.ts";
 
 const MAX_CUERPO = 32_768;
 
@@ -324,18 +325,25 @@ async function atender(req: Request): Promise<Response> {
   if (!leido.ok) return json({ error: leido.error }, leido.error === "ENLACE_INVALIDO" ? 403 : 400);
   const p = leido.valor;
 
-  // ── 2) Cupo por IP (IPv6: por su /64) ───────────────────────────────────────────────────────
+  // ── 2) Cupo por IP (IPv6: por su /64); en `entrar`, además, el tope del restaurante ──────────
   const admin = clienteAdmin();
   const ip = ipDeConfianza(req.headers.get("x-tienda-ip"));
   // La sesión solo se lee de su cabecera (después del secreto: la pone nuestro servidor), nunca del cuerpo.
   const sesion = leerSesion(req.headers.get(CABECERA_SESION));
-  // Sin IP, todos los que piden comparten un contador de 5 por hora: que quede en el log.
+  // Sin IP, todos los que le piden a ese restaurante comparten un contador de 8 por hora: que quede en el log.
   if (p.accion === "pedir" && ip === "desconocida") registrarError("tienda", "IP_CLIENTE_DESCONOCIDA", p.negocio);
   // El correo no va en claro a la tabla de cupos: su huella, atada al negocio.
   const conCorreo = p.accion === "registrar" || p.accion === "recuperar_pedir";
   const cupos = cuposDe(p.accion, ip, p.negocio, conCorreo ? await huellaDe(`${p.negocio}:${p.email}`) : undefined);
-  const cupoIp = await consumirCupos(admin, cupos.antes, cupos.alFallar);
-  if (!cupoIp.permitido) return sinCupo(cupoIp);
+  // De uno en uno y en orden (lo mismo que `consumirCupos`), para saber CUÁL no dejó pasar: que se
+  // agote el tope de entradas de un restaurante es un ataque o un fallo, y se deja en el log. Solo
+  // el slug, que no es dato personal.
+  for (const cupo of cupos.antes) {
+    const r = await consumirCupo(admin, cupo, cupos.alFallar);
+    if (r.permitido) continue;
+    if (r.motivo === "AGOTADO" && esTopeDeEntradas(cupo.clave)) registrarError("tienda", "CUPO_ENTRADAS_AGOTADO", p.negocio);
+    return sinCupo(r);
+  }
 
   // ── 3) El negocio, por su slug ──────────────────────────────────────────────────────────────
   // No existe, está de baja o bloqueado, o no tiene el módulo: la misma respuesta en los tres.
@@ -377,6 +385,7 @@ async function atender(req: Request): Promise<Response> {
 
   // ── pedir ───────────────────────────────────────────────────────────────────────────────────
   // Orden: cupo por IP (arriba) → negocio y sucursal → sesión (si vino) → antirobot → cupo del negocio → alta.
+  // Un reintento con la misma `clave` recorre el mismo camino: vuelve a pasar el antirobot y los cupos.
   //
   // La cuenta del pedido sale SOLO de la sesión. Sin cabecera, invitado, como siempre. Con una
   // cabecera que no sirve (mal formada, vencida, cerrada, de otro negocio) el pedido se rechaza: el
@@ -401,7 +410,10 @@ async function atender(req: Request): Promise<Response> {
   }
 
   // El código solo lo tendrá el cliente (esta respuesta y su correo). A la base va la huella.
-  const codigo = nuevoCodigo();
+  // Con `clave` el código se deriva de ella: el reintento del mismo intento de compra da la misma
+  // huella, y la base, en vez de crear otro pedido, devuelve el que ya existe (0167). Sin `clave`,
+  // al azar, como siempre.
+  const codigo = p.clave ? await codigoDeClave(secreto, p.negocio, p.clave) : nuevoCodigo();
   const p_seguimiento_hash = await huellaDe(codigo);
   const alta = await admin.rpc("tienda_crear_pedido", {
     ...carrito,
@@ -413,6 +425,8 @@ async function atender(req: Request): Promise<Response> {
     p_seguimiento_hash,
     p_cuenta,                // de la sesión, o null (invitado); nunca del cuerpo
     p_total_esperado: p.total_esperado,   // lo que el cliente vio; si ya no es ese, 409 TOTAL_CAMBIO con el nuevo
+    // Solo si vino: sin `clave` la llamada es, argumento por argumento, la de antes de la 0167.
+    ...(p.clave && { p_clave: p.clave }),
   });
   if (alta.error) return rechazo("tienda_crear_pedido", alta.error);
   const pedido = leerPedido(alta.data);
@@ -423,7 +437,10 @@ async function atender(req: Request): Promise<Response> {
   }
 
   // El correo de confirmación: después de responder, y pase lo que pase el pedido ya está creado.
-  const email = p.cliente.email;
+  // Un reintento con la misma `clave` no lo repite (auditoría, B3): el pedido ya existía y su correo
+  // salió con el primer envío; mandarlo otra vez —a la dirección que traiga el reintento, que puede
+  // ser otra— sería correo nuestro en el buzón de quien no pidió nada.
+  const email = yaExistia(alta.data) ? null : p.cliente.email;
   const base = (Deno.env.get("VIM_TIENDA_URL") ?? "").replace(/\/+$/, "");
   const modo = p.modo, slug = p.negocio;
   if (email && base && Deno.env.get("VIM_SMTP_HOST")) {

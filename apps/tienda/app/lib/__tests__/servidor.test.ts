@@ -352,6 +352,21 @@ describe("POST /api/tienda", () => {
       ],
     });
   });
+  it("pedir deja pasar la clave del intento si tiene forma de código; con otra forma no se reenvía; cotizar no la lleva", async () => {
+    const pedido = { ...cotizar, accion: "pedir", cliente: { nombre: "Ana", telefono: "4771234567", email: null }, direccion: null, pago: "EFECTIVO", paga_con: null, nota: null, captcha: "token", total_esperado: "305.00" };
+    await pedir({ ...pedido, clave: CODIGO });
+    expect(cuerpoEnviado(0)).toEqual({ ...pedido, clave: CODIGO });
+    await pedir(pedido);                                  // una página vieja, sin clave: como siempre
+    expect(cuerpoEnviado(1)).toEqual(pedido);
+    await pedir({ ...cotizar, clave: CODIGO });
+    expect(cuerpoEnviado(2)).toEqual(cotizar);
+    for (const clave of ["corta", `${CODIGO}x`, CODIGO.replace(/.$/, "+"), 7, null, { a: 1 }]) {
+      const r = await pedir({ ...pedido, clave });
+      expect(r.status, JSON.stringify(clave)).toBe(400);
+      expect(await r.json()).toEqual({ error: "CUERPO_INVALIDO" });
+    }
+    expect(llamadas).toHaveLength(3);
+  });
   it("un carrito sin forma no se reenvía", async () => {
     for (const items of [undefined, "muchos", [], Array.from({ length: 41 }, () => item), [5], [null]]) {
       const r = await pedir({ ...cotizar, items });

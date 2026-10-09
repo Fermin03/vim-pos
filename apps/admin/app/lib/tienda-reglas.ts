@@ -139,6 +139,12 @@ export function puedeEncender(r: Revision[]): boolean {
   return !r.some((x) => x.nivel === "bloquea");
 }
 
+/**
+ * Lo que se le dice a quien ya no tiene el complemento vigente. No nombra el plan: también le pasa a
+ * quien la pagaba aparte y se le dio de baja.
+ */
+export const TIENDA_SIN_COMPLEMENTO = "Tu tienda en línea no está activa. Escríbenos para reactivarla.";
+
 /** Traduce un error de la base a palabras del dueño. */
 export function mensajeTienda(e: { message?: string; code?: string } | null | undefined, porDefecto: string): string {
   const m = e?.message ?? "";
@@ -146,7 +152,7 @@ export function mensajeTienda(e: { message?: string; code?: string } | null | un
   if (m.includes("tienda_config_slug_check")) return "La dirección solo puede llevar letras, números y guiones, de 3 a 40 caracteres, y no puede ser una palabra reservada.";
   if (m.includes("tienda_config_color_check")) return "El color no es válido.";
   if (m.includes("tienda_config_algun_pago")) return "Deja activa al menos una forma de pago.";
-  if (m.includes("SIN_ADDON_TIENDA")) return "Tu plan no incluye la tienda en línea.";
+  if (m.includes("SIN_ADDON_TIENDA")) return TIENDA_SIN_COMPLEMENTO;
   if (m.includes("SIN_TIENDA_CONFIGURADA")) return "Primero guarda la dirección de tu tienda.";
   // 42501 después de los candados de la tienda: esos salen con el mismo código y tienen su frase.
   if (e?.code === "42501" || /row-level security|permission denied|SOLO_ADMIN/i.test(m)) return "Solo el dueño o un administrador puede cambiar esto.";

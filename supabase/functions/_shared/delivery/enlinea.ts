@@ -16,6 +16,13 @@ export function motivoDeTienda(x: unknown): (typeof MOTIVOS_TIENDA)[number] {
   return MOTIVOS_TIENDA.find((m) => m === x) ?? "OTRO";
 }
 
+/**
+ * Lo que la caja instalada puede reportar de un pedido de la tienda (acción `estado`).
+ * `EN_PREPARACION` es su «ya lo tengo» (entrega 7): lo manda en cuanto crea la cuenta local del
+ * pedido, y con eso el pedido deja de estar entre los `ACEPTADO` que la base cancela a los 15 min.
+ */
+export const ESTADOS_REPORTABLES: readonly string[] = ["EN_PREPARACION", "LISTO", "ENTREGADO", "CANCELADO"];
+
 const PAUSAS_MS: Record<string, number> = { "30m": 30 * 60_000, "1h": 60 * 60_000 };
 
 /**
@@ -26,6 +33,38 @@ export function pausaHasta(duracion: unknown, ahora: Date): string | null {
   if (duracion === "indefinida") return "2999-12-31T00:00:00Z";
   const ms = typeof duracion === "string" && Object.hasOwn(PAUSAS_MS, duracion) ? PAUSAS_MS[duracion] : undefined;
   return ms === undefined ? null : new Date(ahora.getTime() + ms).toISOString();
+}
+
+/**
+ * ¿`version` (lo que la caja reporta en `cajas.version_app`) es `minima` o posterior? Número a
+ * número, no como texto ("0.10.2" va después de "0.8.0"). Solo vale `n.n.n`: nula, incompleta o con
+ * cualquier añadido cuenta como vieja, que es lo seguro para quien pregunta «¿ya sabe hacer esto?».
+ */
+export function versionAlMenos(version: unknown, minima: readonly [number, number, number]): boolean {
+  const m = typeof version === "string" ? /^(\d{1,6})\.(\d{1,6})\.(\d{1,6})$/.exec(version.trim()) : null;
+  if (!m) return false;
+  for (let i = 0; i < 3; i++) {
+    const d = Number(m[i + 1]) - minima[i]!;
+    if (d !== 0) return d > 0;
+  }
+  return true;
+}
+
+/** La primera caja instalada que atiende pedidos de la tienda en línea. */
+const CAJA_CON_TIENDA = [0, 8, 0] as const;
+/** La ventana de `sucursal_con_espejo` (0096): con un latido más viejo, la caja no cuenta como viva. */
+const ESPEJO_VIVO_MS = 90_000;
+
+/**
+ * ¿La sucursal tiene una caja instalada viva y ninguna de las vivas atiende la tienda? (auditoría, M1)
+ * Con una caja viva, `tienda_crear_pedido` deja el pedido en gestión ESCRITORIO (`sucursal_con_espejo`):
+ * si la que late es una 0.7.0, nadie le crea la cuenta y la base lo cancela a los 15 minutos. Por
+ * eso, en ese caso, el POS web no debe dar fe de que la tienda puede recibir pedidos.
+ * Recibe las cajas ACTIVAS de la sucursal. Solo cuentan las vivas: una 0.8.0 apagada no atiende nada.
+ */
+export function cajaSinActualizar(cajas: { espejo_apps_at: string | null; version_app: string | null }[], ahoraMs: number): boolean {
+  const vivas = cajas.filter((c) => c.espejo_apps_at !== null && ahoraMs - Date.parse(c.espejo_apps_at) < ESPEJO_VIVO_MS);
+  return vivas.length > 0 && !vivas.some((c) => versionAlMenos(c.version_app, CAJA_CON_TIENDA));
 }
 
 /** Lo que reintentar no arregla: el pedido ya no se puede convertir en ticket tal como se cotizó. */

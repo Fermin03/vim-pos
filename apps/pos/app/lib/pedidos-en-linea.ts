@@ -119,9 +119,12 @@ export async function reanudarEnLinea(token: string, sucursalId: string): Promis
 /**
  * Avisa a la nube que hay un POS web con turno abierto. Con `cajaId` (la caja de ese turno) la nube
  * sella solo esa caja. Nunca lanza: es un latido, si falla se repite.
+ * Devuelve true cuando la nube NO lo tomó porque en la sucursal hay una caja instalada encendida que
+ * todavía no atiende la tienda (anterior a la 0.8.0): los pedidos se irían a ella y nadie los vería.
  */
-export async function avisarPresente(token: string, sucursalId: string, cajaId?: string): Promise<void> {
-  await llamar(token, { accion: "enlinea_presente", sucursal_id: sucursalId, ...(cajaId ? { caja_id: cajaId } : {}) });
+export async function avisarPresente(token: string, sucursalId: string, cajaId?: string): Promise<boolean> {
+  const { j } = await llamar(token, { accion: "enlinea_presente", sucursal_id: sucursalId, ...(cajaId ? { caja_id: cajaId } : {}) });
+  return j.motivo === "CAJA_SIN_ACTUALIZAR";
 }
 
 /** "2:30 p. m." en hora de México. */
@@ -133,7 +136,8 @@ function horaMx(iso: string): string | null {
   return `${v("hour")}:${v("minute")} ${v("dayPeriod").toUpperCase() === "AM" ? "a. m." : "p. m."}`;
 }
 
-export function etiquetaEstadoEnLinea(e: EstadoEnLinea, ahora: Date): { texto: string; tono: "ok" | "aviso" } {
+/** `cajaSinActualizar`: lo que contestó el último `avisarPresente` de este POS web. */
+export function etiquetaEstadoEnLinea(e: EstadoEnLinea, ahora: Date, cajaSinActualizar = false): { texto: string; tono: "ok" | "aviso" } {
   switch (e.motivo) {
     case null: return { texto: "Tienda: recibiendo pedidos", tono: "ok" };
     case "EN_PAUSA": {
@@ -144,7 +148,10 @@ export function etiquetaEstadoEnLinea(e: EstadoEnLinea, ahora: Date): { texto: s
       return { texto: h ? `Tienda: en pausa hasta las ${h}` : "Tienda: en pausa", tono: "aviso" };
     }
     case "FUERA_DE_HORARIO": return { texto: "Tienda: fuera de horario", tono: "aviso" };
-    case "CAJA_NO_LISTA": return { texto: "Tienda: sin turno abierto", tono: "aviso" };
+    case "CAJA_NO_LISTA": return {
+      texto: cajaSinActualizar ? "Tienda: actualiza la caja de esta sucursal para recibir pedidos en línea." : "Tienda: sin turno abierto",
+      tono: "aviso",
+    };
     default: return { texto: "Tienda: apagada", tono: "aviso" };
   }
 }

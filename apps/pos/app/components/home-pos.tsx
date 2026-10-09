@@ -199,6 +199,8 @@ export function HomePos({
   const aceptadosSolos = useRef(new Set<string>());
   /** Cómo acepta la tienda (solo se lee en el POS web; en la caja instalada acepta su agente). */
   const aceptacionEnLinea = useRef<"MANUAL" | "AUTO" | null>(null);
+  /** POS web: la nube no abre la tienda porque la caja instalada de la sucursal es anterior a la 0.8.0. */
+  const [cajaSinActualizar, setCajaSinActualizar] = useState(false);
   /** Relee ya los pedidos en línea (tras aceptar en la pantalla, para que la comanda no espere al sondeo). */
   const releerEnLinea = useRef<() => void>(() => {});
   // Lealtad (ADR 0030). Todo lo de abajo queda apagado si el módulo no está efectivo.
@@ -1500,10 +1502,10 @@ export function HomePos({
   // nube que aquí hay un turno abierto —sin eso la tienda no recibe pedidos— y lee cómo acepta.
   // HomePos solo existe con turno abierto; al cerrarlo se desmonta y el aviso deja de salir.
   useEffect(() => {
-    if (!hayTienda || esEscritorio()) { aceptacionEnLinea.current = null; return; }
+    if (!hayTienda || esEscritorio()) { aceptacionEnLinea.current = null; setCajaSinActualizar(false); return; }
     let vivo = true;
     const latir = () => {
-      void avisarPresente(token, caja.sucursal_id, turno.caja_id);
+      void avisarPresente(token, caja.sucursal_id, turno.caja_id).then((sinActualizar) => { if (vivo) setCajaSinActualizar(sinActualizar); });
       leerEstadoEnLinea(token, caja.sucursal_id)
         .then((e) => { if (vivo) aceptacionEnLinea.current = e?.aceptacion ?? null; })
         .catch(() => { /* se queda con lo último que supo; se repite en 30 s */ });
@@ -2273,7 +2275,7 @@ export function HomePos({
   // cajero estaba parado en esta pantalla (el latido llega cada 10 min, `useAcceso` relee cada
   // minuto), no se vuelve a montar y cae al POS normal.
   if (enPedidosApps && hayEnLinea) {
-    return <PantallaPedidosApps token={token} caja={caja} hayApps={hayDelivery} hayTienda={hayTienda} onCambio={() => releerEnLinea.current()}
+    return <PantallaPedidosApps token={token} caja={caja} hayApps={hayDelivery} hayTienda={hayTienda} cajaSinActualizar={cajaSinActualizar} onCambio={() => releerEnLinea.current()}
       // A mano y desde ESTE dispositivo, sea de la caja que sea el ticket. Queda como intentada
       // para que el sondeo no la mande otra vez mientras llega el sello de la base.
       onImprimirComanda={async (p) => {

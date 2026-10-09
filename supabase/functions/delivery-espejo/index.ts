@@ -119,6 +119,7 @@ servir(async (req, json) => {
   }
 
   const conexiones = cx.data ?? [];
+  // `recibido_at` ya viene en COLS_PEDIDO: con él la cadencia deja de contar los pedidos de la tienda atascados.
   const vivos = viv.data ?? [];
   const filaTienda = tie.data as { participa?: boolean; pausa_hasta?: string | null } | null;
   const tiendaViva = filaTienda?.participa === true;

@@ -1,9 +1,9 @@
 // «Enviar»: de cada respuesta a lo que hace la pantalla, la cotización fresca antes de pedir y el
 // candado del doble toque.
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Resultado } from "../api";
-import { cotizacionDe, pedidoDe, type Cotizacion, type PedidoCreado } from "../contrato";
-import { candadoDeEnvio, desenlaceDelError, enviarPedido, type ContextoDeEnvio } from "../envio";
+import { FORMA_CODIGO, cotizacionDe, pedidoDe, type Cotizacion, type PedidoCreado } from "../contrato";
+import { candadoDeEnvio, claveNueva, desenlaceDelError, enviarPedido, intentoDeCompra, type ContextoDeEnvio } from "../envio";
 import { CODIGOS_DE_ERROR } from "../textos";
 import { CODIGO, ID, cotizacionCruda, pedidoCrudo } from "./datos";
 
@@ -14,12 +14,13 @@ const creado: Resultado<PedidoCreado> = { ok: true, datos: pedidoDe(pedidoCrudo(
 const fallo = (error: string, detalle: string | null = null) => ({ ok: false as const, error, detalle });
 
 describe("desenlaceDelError", () => {
-  it("SIN_CONFIRMAR: el pedido pudo entrar → llamar antes, sin reintento inmediato", () => {
-    expect(desenlaceDelError(e("SIN_CONFIRMAR"), c)).toEqual({
-      tipo: "aviso", tono: "danger", sigue: "llamar-antes",
-      texto: "No pudimos confirmar tu pedido. Antes de volver a intentarlo, llama al restaurante: 477 123 4567.",
-    });
-    expect(desenlaceDelError(e("SIN_CONFIRMAR"), { ...c, telefono: null })).toMatchObject({ sigue: "llamar-antes", texto: "No pudimos confirmar tu pedido. Antes de volver a intentarlo, llama al restaurante." });
+  it("SIN_CONFIRMAR: el pedido pudo entrar → reintentar, que con la misma clave no lo duplica (entrega 7)", () => {
+    const esperado = {
+      tipo: "aviso", tono: "warning", sigue: "reintentar-seguro",
+      texto: "No pudimos confirmar tu pedido. Vuelve a intentarlo: si ya había entrado, no se duplica.",
+    };
+    expect(desenlaceDelError(e("SIN_CONFIRMAR"), c)).toEqual(esperado);
+    expect(desenlaceDelError(e("SIN_CONFIRMAR"), { ...c, telefono: null })).toEqual(esperado);
   });
   it("lo que se puede reintentar: sin conexión, antirobot, demasiados intentos, servicio caído", () => {
     for (const codigo of ["SIN_CONEXION", "CAPTCHA_INVALIDO", "DEMASIADOS_INTENTOS", "SERVICIO_NO_DISPONIBLE", "ERROR_INTERNO", "UN_CODIGO_NUEVO"]) {
@@ -101,7 +102,7 @@ describe("enviarPedido", () => {
   it("un rechazo de pedir gasta el antirobot y NUNCA se reintenta solo", async () => {
     const pedir = vi.fn(async () => fallo("SIN_CONFIRMAR"));
     const r = await enviarPedido({ cotizar: async () => cotizada, pedir, totalVisto: "305.00" }, c);
-    expect(r).toMatchObject({ pidio: true, desenlace: { tipo: "aviso", sigue: "llamar-antes" } });
+    expect(r).toMatchObject({ pidio: true, desenlace: { tipo: "aviso", sigue: "reintentar-seguro" } });
     expect(pedir).toHaveBeenCalledTimes(1);
     const cambio = await enviarPedido({ cotizar: async () => cotizada, pedir: async () => fallo("TOTAL_CAMBIO", "310.00"), totalVisto: "305.00" }, c);
     expect(cambio).toEqual({ desenlace: { tipo: "total", total: "310.00" }, pidio: true });
@@ -119,9 +120,56 @@ describe("enviarPedido nunca lanza", () => {
     expect(r).toMatchObject({ pidio: false, desenlace: { tipo: "aviso", sigue: "reintentar" } });
     expect(pedir).not.toHaveBeenCalled();
   });
-  it("si pedir truena, el pedido PUDO haber entrado: llamar antes, y el antirobot se da por gastado", async () => {
+  it("si pedir truena, el pedido PUDO haber entrado: se ofrece reintentar (misma clave), y el antirobot se da por gastado", async () => {
     const r = await enviarPedido({ cotizar: async () => cotizada, pedir: async () => { throw new Error("x"); }, totalVisto: "305.00" }, c);
-    expect(r).toMatchObject({ pidio: true, desenlace: { tipo: "aviso", sigue: "llamar-antes" } });
+    expect(r).toMatchObject({ pidio: true, desenlace: { tipo: "aviso", sigue: "reintentar-seguro" } });
+  });
+});
+
+describe("la clave del intento de compra", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const pedido = { negocio: "knockout", modo: "RECOGER", items: [{ producto_id: ID.refresco, cantidad: 1 }], cliente: { nombre: "Ana", telefono: "4771234567" }, nota: null };
+  /** Claves que se distinguen: «clave-1», «clave-2»… */
+  const contadas = () => { let n = 0; return () => `clave-${++n}`; };
+
+  it("claveNueva: 22 caracteres con la forma de un código, distinta cada vez", () => {
+    const a = claveNueva(), b = claveNueva();
+    expect(a).toMatch(FORMA_CODIGO);
+    expect(b).toMatch(FORMA_CODIGO);
+    expect(a).not.toBe(b);
+  });
+  it("claveNueva: sin `crypto` sigue dando una clave con forma", () => {
+    vi.stubGlobal("crypto", undefined);
+    expect(claveNueva()).toMatch(FORMA_CODIGO);
+    expect(claveNueva()).not.toBe(claveNueva());
+  });
+  it("se conserva mientras el mismo pedido siga sin confirmarse: reintentar manda la MISMA", () => {
+    const intento = intentoDeCompra(contadas());
+    expect(intento.para(pedido)).toBe("clave-1");
+    expect(intento.para(pedido)).toBe("clave-1");
+    expect(intento.para({ ...pedido, items: [{ ...pedido.items[0]! }], cliente: { ...pedido.cliente } })).toBe("clave-1");   // igual por contenido, no por identidad
+  });
+  it("se renueva cuando el pedido entra", () => {
+    const intento = intentoDeCompra(contadas());
+    expect(intento.para(pedido)).toBe("clave-1");
+    intento.cerrar();
+    expect(intento.para(pedido)).toBe("clave-2");   // el mismo carrito otra vez es OTRO pedido
+  });
+  it("se renueva cuando cambia el carrito, el modo o la zona, los datos de entrega, la nota o el negocio", () => {
+    const cambios: object[] = [
+      { items: [{ producto_id: ID.refresco, cantidad: 2 }] },
+      { modo: "DOMICILIO", zona_id: ID.zona },
+      { cliente: { nombre: "Ana", telefono: "4770000000" } },
+      { direccion: { calle: "Madero" } },
+      { nota: "sin hielo" },
+      { negocio: "otro" },
+    ];
+    for (const cambio of cambios) {
+      const intento = intentoDeCompra(contadas());
+      expect(intento.para(pedido)).toBe("clave-1");
+      expect(intento.para({ ...pedido, ...cambio }), JSON.stringify(cambio)).toBe("clave-2");
+      expect(intento.para({ ...pedido, ...cambio }), JSON.stringify(cambio)).toBe("clave-2");
+    }
   });
 });
 

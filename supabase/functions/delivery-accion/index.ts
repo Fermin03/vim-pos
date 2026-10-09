@@ -12,7 +12,7 @@ import { clienteUberDeApp, ENTORNO } from "../_shared/delivery/cliente-uber.ts";
 import { motivoRechazoUber, segundosAReadyTime, type MotivoRechazo } from "../_shared/delivery/uber.ts";
 import { cambiarPrepTienda, consultarEstadoTienda, pausarTienda, reanudarTienda, type ConexionTienda } from "../_shared/delivery/tienda-uber-acciones.ts";
 import { ACCIONES_TIENDA, accionExigeModulo, moduloDeliveryActivo } from "../_shared/delivery/modulo.ts";
-import { ACCIONES_ENLINEA, fallaDeTicket, moduloTiendaActivo, motivoDeTienda, pausaHasta } from "../_shared/delivery/enlinea.ts";
+import { ACCIONES_ENLINEA, ESTADOS_REPORTABLES, cajaSinActualizar, fallaDeTicket, moduloTiendaActivo, motivoDeTienda, pausaHasta } from "../_shared/delivery/enlinea.ts";
 import type { DbMinima } from "../_shared/delivery/procesar-uber.ts";
 
 const admin = clienteAdmin();
@@ -34,7 +34,6 @@ type Pedido = {
   canal: string; conexion_id: string | null; gestion: "NUBE" | "ESCRITORIO"; gestion_caja_id: string | null;
 };
 const MOTIVOS: MotivoRechazo[] = ["AGOTADO", "CERRADO", "SATURADO", "POS_OFFLINE", "OTRO"];
-const ESTADOS_REPORTABLES = ["LISTO", "ENTREGADO", "CANCELADO"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 /** Un error de la base en una rama de la tienda no se calla: sube al `catch`, que lo registra y responde INTERNO. */
@@ -159,6 +158,12 @@ servir(async (req, json) => {
         const turnos = exigir(await (body.caja_id ? abiertos.eq("caja_id", body.caja_id) : abiertos)) as { caja_id: string }[] | null;
         const cajas = [...new Set((turnos ?? []).map((t) => t.caja_id))];
         if (cajas.length === 0) return json({ ok: true, sellado: false });
+        // Auditoría (M1): si en la sucursal late una caja instalada que todavía no atiende la tienda
+        // (anterior a la 0.8.0), los pedidos se irían a ella y nadie los tomaría. No se sella, y el
+        // POS web le dice al cajero que actualice la caja.
+        const instaladas = exigir(await admin.from("cajas").select("espejo_apps_at, version_app")
+          .eq("tenant_id", tenantId).eq("sucursal_id", sucursalId).eq("activa", true)) as { espejo_apps_at: string | null; version_app: string | null }[] | null;
+        if (cajaSinActualizar(instaladas ?? [], Date.now())) return json({ ok: true, sellado: false, motivo: "CAJA_SIN_ACTUALIZAR" });
         const selladas = exigir(await admin.from("cajas").update({ espejo_turno_abierto_at: new Date().toISOString() })
           .eq("tenant_id", tenantId).eq("sucursal_id", sucursalId).in("id", cajas).select("id")) as unknown[] | null;
         return json({ ok: true, sellado: (selladas ?? []).length > 0 });

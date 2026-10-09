@@ -118,7 +118,7 @@ el pulgar, y cada caso deja a la vista solo lo que sí sirve:
 |---|---|
 | Se puede volver a intentar (sin conexión, antirobot, demasiados intentos, tienda cerrada) | El aviso y el mismo botón |
 | El total cambió | Aviso (`warning`) con el total nuevo, «Confirmar y enviar» con ese total y «Volver a tu pedido» |
-| No se supo si el pedido entró | Aviso (`danger`), **«Llamar al …» como acción principal** y, en secundario, «Ya llamé y no les llegó: enviar otra vez». Nunca se reintenta solo |
+| No se supo si el pedido entró (`SIN_CONFIRMAR`) | Aviso (`warning`) «No pudimos confirmar tu pedido. Vuelve a intentarlo: si ya había entrado, no se duplica.», **«Reintentar»** con el total como acción principal y, en secundario, «Llamar al restaurante». Reintentar es seguro (va con la misma llave del intento: si el pedido ya había entrado, lleva a su seguimiento), pero nunca se reintenta solo |
 | Por aquí no se va a poder | Aviso, «Llamar al …» y «Volver a tu pedido» |
 | La sesión de su cuenta terminó | Aviso (`warning`) «Tu sesión terminó. Entra otra vez o envía tu pedido como invitado.», **«Enviar como invitado»** con el total y, en secundario, «Entrar otra vez». Nunca se manda solo como invitado |
 | Se arregla en el carrito (la zona, un producto) | Aviso y «Volver a tu pedido»; si es un producto, regresa solo y lo marca |

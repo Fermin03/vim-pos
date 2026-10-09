@@ -205,6 +205,14 @@ test("estadoAReportar: la tabla del ticket local, de arriba hacia abajo", () => 
   assert.equal(estadoAReportar(t({ asignado: true })), "LISTO");
   assert.equal(estadoAReportar(t()), null, "ni impreso ni asignado: nada que decir");
   assert.equal(estadoAReportar(t({ ticket_estado: "EN_PREPARACION" })), null);
+  // «Ya lo tengo»: ticket abierto, sin imprimir ni repartidor, y el pedido local sigue ACEPTADO.
+  assert.equal(estadoAReportar(t({ estado: "ACEPTADO" })), "EN_PREPARACION");
+  for (const estado of ["RECIBIDO", "EN_PREPARACION", "LISTO", undefined]) assert.equal(estadoAReportar(t({ estado })), null, String(estado));
+  // Las filas de siempre mandan primero.
+  assert.equal(estadoAReportar(t({ estado: "ACEPTADO", ticket_estado: "CANCELADO" })), "CANCELADO");
+  assert.equal(estadoAReportar(t({ estado: "ACEPTADO", ticket_estado: "PAGADO" })), "ENTREGADO");
+  assert.equal(estadoAReportar(t({ estado: "ACEPTADO", ticket_impreso_at: "2026-10-09T10:00:00Z" })), "LISTO");
+  assert.equal(estadoAReportar(t({ estado: "ACEPTADO", asignado: true })), "LISTO");
 });
 
 test("fallaDeTicket: sin turno y unicidad se reintentan", () => {

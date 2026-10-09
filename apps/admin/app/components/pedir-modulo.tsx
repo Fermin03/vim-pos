@@ -8,7 +8,8 @@ import { leerAyuda, type AyudaAdmin } from "../lib/soporte";
  * La tarjeta de una sección que el negocio todavía no tiene (inventario, lealtad).
  *
  * No es un aviso ni un muro: ocupa el lugar de la pantalla y dice qué es y cómo pedirlo. Una sola
- * acción —escribir por WhatsApp, con el mensaje ya hecho— porque lo activa VIM. Sin precios: los
+ * acción —escribir por WhatsApp, con el mensaje ya hecho— porque lo activa VIM. Sin precios (salvo el
+ * de lista de la tienda en línea, que va en su `cierre` cuando el plan no la incluye): los
  * dice quien contesta, que sabe en qué plan y con qué promoción está este cliente.
  */
 export function PedirModulo({ titulo, texto, incluye, cierre, boton, mensaje }: {

@@ -60,7 +60,7 @@ const CAMBIO_EL_MENU: TextoDeError = { texto: "El menú cambió desde que armast
 const ERRORES: Record<string, TextoDeError> = {
   // Los que pone la propia tienda
   SIN_CONEXION: { texto: "No pudimos conectar.", hacer: "Revisa tu conexión a internet y vuelve a intentar." },
-  SIN_CONFIRMAR: { texto: "No supimos si tu pedido llegó al restaurante.", hacer: "Antes de volver a intentar, llama al restaurante para no pedir dos veces." },
+  SIN_CONFIRMAR: { texto: "No pudimos confirmar tu pedido.", hacer: "Vuelve a intentarlo: si ya había entrado, no se duplica." },
   ORIGEN_NO_PERMITIDO: { texto: "No pudimos procesar tu solicitud desde esta página.", hacer: RECARGA },
   // HTTP de la función (anexo §1.3)
   METODO_NO_PERMITIDO: ALGO_FALLO,
@@ -112,7 +112,6 @@ export function textoDeError(codigo: string, contexto: { telefono?: string | nul
   const base = ERRORES[codigo] ?? ALGO_FALLO;
   const tel = contexto.telefono ? formatoTelefono(contexto.telefono) : "";
   if (codigo === "NO_SE_PUDO_CREAR" && tel) return { ...base, hacer: `Llama al restaurante: ${tel}.` };
-  if (codigo === "SIN_CONFIRMAR" && tel) return { ...base, hacer: `Antes de volver a intentar, llama al restaurante (${tel}) para no pedir dos veces.` };
   if (codigo === "TOTAL_CAMBIO") {
     const total = formatoMxn(contexto.detalle ?? "");
     return total ? { ...base, texto: `El total de tu pedido cambió: ahora es ${total}.` } : base;

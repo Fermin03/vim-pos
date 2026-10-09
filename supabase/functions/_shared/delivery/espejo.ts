@@ -17,6 +17,14 @@ export const NORMAL_MS = 30_000;
 /** Hay una ventana de aceptación corriendo: cada segundo cuenta para que la comanda entre a cocina. */
 export const RAPIDA_MS = 10_000;
 
+/**
+ * Hasta cuándo un pedido de la tienda que atiende la caja sigue acelerando el sondeo. Uno más viejo
+ * está atascado (la caja que lo aceptó se apagó, o nunca reportó su final) y, sin este tope, dejaba
+ * a todas las cajas de la sucursal preguntando cada 10 s para siempre. 6 h, como el tope de pedidos
+ * vivos por teléfono de `tienda_crear_pedido`.
+ */
+export const TIENDA_VIVO_MS = 6 * 3600_000;
+
 /** Estados de conexión por los que todavía pueden entrar pedidos (0090). */
 const CONEXION_VIVA = new Set(["ACTIVA", "PENDIENTE"]);
 
@@ -29,19 +37,28 @@ const CONEXION_VIVA = new Set(["ACTIVA", "PENDIENTE"]);
  * @param tienda       La sucursal vende en la tienda en línea y esta caja la entiende. Sin una
  *                     conexión de app nada más la sacaría del reposo, y con sondeos cada 300 s la
  *                     señal de caja lista (ventana de 90 s) no se cumpliría nunca.
+ * @param ahora        El instante contra el que se mide la edad de un pedido (ms). Inyectable para probar.
  */
 export function cadenciaEspejo(
-  { conexiones = [], pedidosVivos = [], tienda = false }: {
+  { conexiones = [], pedidosVivos = [], tienda = false, ahora = Date.now() }: {
     conexiones?: { estado?: string | null }[];
-    pedidosVivos?: { estado?: string | null; canal?: string | null; gestion?: string | null }[];
+    pedidosVivos?: { estado?: string | null; canal?: string | null; gestion?: string | null; recibido_at?: string | null }[];
     tienda?: boolean;
+    ahora?: number;
   },
 ): number {
   // Un pedido vivo de la TIENDA que atiende la caja (gestión ESCRITORIO) acelera en cualquier
   // estado, no solo por aceptar: su cliente mira el seguimiento y «listo» o «entregado» le tienen
   // que llegar en segundos. Los de gestión NUBE no: nadie escribe su estado de vuelta, se quedan
   // en ACEPTADO para siempre y dejarían a la caja sondeando cada 10 s sin fin. Los de APP, como siempre.
-  if (pedidosVivos.some((p) => p.estado === "RECIBIDO" || (p.canal === "TIENDA" && p.gestion === "ESCRITORIO"))) return RAPIDA_MS;
+  // Y solo mientras sea reciente (TIENDA_VIVO_MS): uno atascado deja de contar, esté en el estado que
+  // esté. Sin fecha legible cuenta, como antes de existir el tope: no se frena a ciegas.
+  const acelera = (p: (typeof pedidosVivos)[number]): boolean => {
+    if (p.canal !== "TIENDA" || p.gestion !== "ESCRITORIO") return p.estado === "RECIBIDO";
+    const recibido = Date.parse(p.recibido_at ?? "");
+    return Number.isNaN(recibido) || ahora - recibido <= TIENDA_VIVO_MS;
+  };
+  if (pedidosVivos.some(acelera)) return RAPIDA_MS;
   if (tienda || conexiones.some((c) => CONEXION_VIVA.has(String(c.estado ?? "")))) return NORMAL_MS;
   return REPOSO_MS;
 }

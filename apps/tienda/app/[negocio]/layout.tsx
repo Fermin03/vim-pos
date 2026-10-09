@@ -46,9 +46,13 @@ export default async function MarcoDelNegocio({ children, params }: { children: 
           Pedidos con VIM POS
         </span>
         {negocio && (
-          <Link href={`/${negocio.slug}/privacidad`} className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink">
-            Aviso de privacidad
-          </Link>
+          <nav aria-label="Textos legales" className="flex flex-wrap justify-center gap-x-5">
+            {([["privacidad", "Aviso de privacidad"], ["terminos", "Condiciones para pedir"]] as const).map(([ruta, texto]) => (
+              <Link key={ruta} href={`/${negocio.slug}/${ruta}`} className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink">
+                {texto}
+              </Link>
+            ))}
+          </nav>
         )}
       </footer>
     </div>

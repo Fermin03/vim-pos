@@ -1,12 +1,14 @@
-// Aviso de privacidad PROVISIONAL (decisión 10 del plan): la página existe para que el enlace de
-// «Tus datos» no quede roto y el cliente sepa qué pasa con lo que escribe. El texto definitivo es de
-// la entrega 7 y lo revisa una persona; este no pretende ser un aviso legal completo.
+// Aviso de privacidad PROVISIONAL: la página existe para que el enlace de «Tus datos» no quede roto
+// y el cliente sepa qué pasa con lo que escribe. No pretende ser un aviso legal completo: el borrador
+// del definitivo está en `docs/legal/tienda-aviso-de-privacidad.md` y lo tiene que revisar una
+// persona antes de publicarse. Lo que dice aquí es lo que el sistema hace desde la migración 0167
+// (retención con notas); si cambia la retención, cambia este texto.
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Aviso } from "@vim/ui/styles";
 import { negocioDeLaPeticion } from "../../lib/servidor/funcion";
-import { enlaceTel, formatoTelefono } from "../../lib/telefono";
+import { ENLACE, Telefonos, TITULO } from "../legal";
 
 type Props = { params: Promise<{ negocio: string }> };
 
@@ -14,9 +16,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const leido = await negocioDeLaPeticion((await params).negocio);
   return { title: leido.estado === "ok" ? `Aviso de privacidad · ${leido.datos.nombre}` : "Aviso de privacidad", robots: { index: false, follow: false } };
 }
-
-const TITULO = "mt-8 font-display text-18 font-semibold";
-const ENLACE = "font-medium text-ink underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
 
 export default async function Privacidad({ params }: Props) {
   const { negocio: slug } = await params;
@@ -30,7 +29,7 @@ export default async function Privacidad({ params }: Props) {
     <main className="px-4 pb-10 text-16 leading-relaxed">
       <h1 className="font-display text-24 font-semibold">Aviso de privacidad</h1>
       <Aviso tono="warning" role="status" className="mt-4 !text-14">
-        Aviso provisional. Explica con palabras sencillas qué pasa hoy con tus datos; el aviso de privacidad definitivo se publicará antes del lanzamiento.
+        Aviso provisional. Explica con palabras sencillas qué pasa hoy con tus datos; todavía no es el aviso de privacidad definitivo.
       </Aviso>
 
       <h2 className={TITULO}>Qué datos te pedimos</h2>
@@ -72,13 +71,17 @@ export default async function Privacidad({ params }: Props) {
       <h2 className={TITULO}>Cuánto tiempo se guardan</h2>
       <ul className="mt-2 list-disc space-y-1 pl-5">
         <li>
-          Tu nombre, tu teléfono y tu dirección quedan en la lista de clientes del restaurante, como cuando pides por teléfono.
-          Ahí se conservan hasta que le pidas al restaurante que los quite.
+          Tu pedido en línea: a los 30 días se le borran tu nombre, tu teléfono, tu correo, tu dirección y las notas que
+          escribiste. Queda lo que pediste y cuánto costó, y el enlace para seguirlo deja de funcionar. Si pediste con tu
+          cuenta, lo sigues viendo en ella.
         </li>
         <li>
-          El detalle de tu pedido en línea (lo que pediste, tus notas y los datos con los que lo hiciste) se anonimiza a los 30
-          días: se le quita lo que lo relaciona contigo.
+          Lo que conserva el restaurante: tu nombre, tu teléfono, tu correo (si lo dejaste) y tu dirección quedan en su lista de
+          clientes, y la cuenta de
+          esa venta guarda tu nombre y la nota del pedido, como cuando pides por teléfono. Ahí se conservan hasta que le pidas al
+          restaurante que te quite de su lista.
         </li>
+        <li>Tu cuenta, si creaste una: hasta que la elimines.</li>
       </ul>
 
       <h2 className={TITULO}>Otros servicios que usa esta página</h2>
@@ -89,6 +92,10 @@ export default async function Privacidad({ params }: Props) {
       <p className="mt-2">
         Los dos reciben tu dirección IP, como cualquier sitio que tu navegador visita. Esta página no tiene publicidad ni
         herramientas de analítica.
+      </p>
+      <p className="mt-2">
+        Para frenar abusos, la tienda cuenta cuántas veces se pide, se entra o se crea una cuenta desde una misma conexión. Para
+        eso guarda tu dirección IP por un tiempo corto, alrededor de una hora, y después la borra.
       </p>
 
       <h2 className={TITULO}>Lo que guarda tu teléfono</h2>
@@ -110,8 +117,8 @@ export default async function Privacidad({ params }: Props) {
         contraseña. Se borra en el momento tu cuenta, tu contraseña, tus direcciones guardadas y el acceso a tu historial.
       </p>
       <p className="mt-2">
-        {nombre} conserva en su sistema los pedidos que ya le hiciste y, en su lista de clientes, el nombre, el teléfono y la
-        dirección con los que pediste: son registros de sus ventas, como los de un pedido por teléfono. Para que también los
+        {nombre} conserva en su sistema las ventas que ya te hizo y, en su lista de clientes, el nombre, el teléfono, el
+        correo y la dirección con los que pediste: son registros de sus ventas, como los de un pedido por teléfono. Para que también los
         quite, pídeselo como se explica abajo.
       </p>
 
@@ -119,21 +126,12 @@ export default async function Privacidad({ params }: Props) {
       <p className="mt-2">
         Pídeselo al restaurante{conTelefono.length > 0 ? ". Su teléfono:" : ": es quien tiene tus datos y quien puede quitarlos de su lista de clientes."}
       </p>
-      {conTelefono.length > 0 && (
-        <ul className="mt-2 space-y-1">
-          {conTelefono.map((s) => {
-            const tel = enlaceTel(s.telefono);
-            return (
-              <li key={s.id}>
-                {conTelefono.length > 1 && `${s.nombre}: `}
-                {tel ? <a href={tel} className={ENLACE}>{formatoTelefono(s.telefono ?? "")}</a> : s.telefono}
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      <Telefonos sucursales={conTelefono} />
 
-      <p className="mt-8"><Link href={`/${slug}`} className={ENLACE}>Volver al menú</Link></p>
+      <p className="mt-8">
+        <Link href={`/${slug}/terminos`} className={ENLACE}>Condiciones para pedir</Link>
+      </p>
+      <p className="mt-4"><Link href={`/${slug}`} className={ENLACE}>Volver al menú</Link></p>
     </main>
   );
 }

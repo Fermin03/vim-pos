@@ -4,7 +4,7 @@ import { QRCodeCanvas } from "qrcode.react";
 import { Button, botonClases } from "@vim/ui/styles";
 import { BotonCopiar } from "./boton-copiar";
 import { Tarjeta } from "./tarjeta";
-import { BASE_TIENDA } from "../lib/tienda-reglas";
+import { BASE_TIENDA, TIENDA_SIN_COMPLEMENTO } from "../lib/tienda-reglas";
 
 /** Bloque 5: el enlace y el QR de la tienda. Solo existe con una dirección ya guardada. */
 export function TiendaCompartir({ direccion, encendida, enPlan }: {
@@ -32,7 +32,7 @@ export function TiendaCompartir({ direccion, encendida, enPlan }: {
       </div>
       {!encendida && (
         <p className="mt-2 text-13 text-ink-2">
-          {enPlan ? "El enlace funciona cuando enciendas tu tienda." : "Tu plan ya no incluye la tienda en línea."}
+          {enPlan ? "El enlace funciona cuando enciendas tu tienda." : TIENDA_SIN_COMPLEMENTO}
         </p>
       )}
 

@@ -19,7 +19,9 @@ export type Peticion =
       cliente: { nombre: string; telefono: string; email: string | null }; direccion: Direccion | null;
       pago: "EFECTIVO" | "TARJETA"; paga_con: string | null; nota: string | null; captcha: string | null;
       /** El total que el cliente vio al cotizar: si ya no es ese, el pedido no se crea (TOTAL_CAMBIO). */
-      total_esperado: string | null }
+      total_esperado: string | null;
+      /** La llave del intento de compra (entrega 7): con ella, reintentar devuelve el mismo pedido. null = sin llave. */
+      clave: string | null }
   | { accion: "seguimiento"; negocio: string; codigo: string }
   // ── Cuentas (entrega 6). La sesión NO viene en el cuerpo: llega en la cabecera `x-tienda-sesion`. ──
   | { accion: "registrar"; negocio: string; nombre: string; apellido: string; email: string; telefono: string; password: string; captcha: string | null }
@@ -239,10 +241,14 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
   if (paga_con === undefined || (x.pago === "TARJETA" && paga_con !== null)) return mal("PAGO_INVALIDO");
   const total_esperado = leerImporte(x.total_esperado);
   if (total_esperado === undefined) return mal("PAGO_INVALIDO");
+  // La llave del intento: opcional, pero si viene tiene que tener la forma. Una mal formada no se
+  // degrada a «sin llave»: el cliente creería que puede reintentar sin duplicar y no sería verdad.
+  const clave = x.clave ?? null;
+  if (clave !== null && !esCodigo(clave)) return mal("CUERPO_INVALIDO");
 
   return { ok: true, valor: {
     accion, negocio, sucursal_id, modo, zona_id, items,
-    cliente: { nombre, telefono, email }, direccion, pago: x.pago, paga_con, total_esperado,
+    cliente: { nombre, telefono, email }, direccion, pago: x.pago, paga_con, total_esperado, clave,
     nota: textoLimpio(x.nota, 300), captcha: typeof x.captcha === "string" && x.captcha.length <= 4096 ? x.captcha : null,
   } };
 }

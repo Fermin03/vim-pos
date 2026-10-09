@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Aviso } from "@vim/ui/styles";
 import { Interruptor } from "./interruptor";
 import { Tarjeta } from "./tarjeta";
-import { puedeEncender, type Revision } from "../lib/tienda-reglas";
+import { TIENDA_SIN_COMPLEMENTO, puedeEncender, type Revision } from "../lib/tienda-reglas";
 import { LineaMensaje, type MensajeTienda } from "./tienda-mensaje";
 
 /** Bloque 1: el interruptor de la tienda y lo que falta para poder encenderla. */
@@ -29,7 +29,7 @@ export function TiendaEstado({
   // Apagar siempre se puede; encender, solo sin bloqueos y con el complemento vigente.
   const faltaAlgo = !encendida && !puedeEncender(revision);
   const ayuda = !enPlan
-    ? "Tu plan ya no incluye la tienda en línea."
+    ? TIENDA_SIN_COMPLEMENTO
     : faltaAlgo
       ? "Resuelve lo de abajo para poder encenderla."
       : null;

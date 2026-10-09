@@ -4,6 +4,11 @@ Guía para Fermín. La tienda que verán los comensales (`apps/tienda`) ya está
 pero **no está publicada**: nadie puede abrirla hasta que se hagan los pasos de abajo. Son
 dominios, claves y servicios externos, y por eso no se tocan sin ti.
 
+> **Esta guía es una parte de la lista completa.** El orden de todo —publicar, probar, instalador,
+> encender el complemento, Knock-Out y anunciar— está en
+> [`tienda-encendido.md`](tienda-encendido.md). Lo de aquí son sus fases 1 y 2, con el detalle de
+> cada pantalla. Publicar la tienda no la enciende para ningún cliente.
+
 Cada paso dice **quién lo hace**:
 
 - **[Tú]** solo tú puedes: entras con tu cuenta (Cloudflare, el proveedor del dominio) o es una
@@ -35,6 +40,8 @@ persona.»
 | Los secretos del correo en Supabase: `VIM_SMTP_HOST`, `VIM_SMTP_USER`, `VIM_SMTP_PASS` (y `VIM_SMTP_PORT` si no es 465) | **[Tú o Claude]** «lista los secretos de Supabase». Ya los usa el registro de negocios. Con cuentas dejan de ser opcionales: **sin ellos nadie puede recuperar su contraseña** (ver paso 2). |
 | `TURNSTILE_SECRET_KEY` puesta en Supabase (se puso el 30 sep 2026 para el registro) | **[Tú o Claude]** «lista los secretos de Supabase» (solo muestra los nombres). |
 | La llave pública del captcha (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`) | Está en Vercel, proyecto **admin**, variables de entorno. Se copia tal cual. |
+| La migración **0167** (la de la salida) aplicada en producción | **[Tú o Claude]** «comprueba que la 0167 está aplicada». Trae el pedido que no se duplica al reintentar, la cancelación a los 15 minutos del pedido aceptado que la caja nunca tomó, el borrado de las notas a los 30 días y la función del encendido (que **no se ejecuta sola**: aplicar la 0167 no enciende ni concede nada). Como todas, a mano y **antes** de mezclar. |
+| Las funciones `tienda`, `delivery-accion` y `delivery-espejo` **redesplegadas** con el código de la entrega 7 | **[Tú o Claude]** «redespliega las tres funciones de la tienda». Van **después** de la 0167. Sin `tienda` al día, «Reintentar» podría crear dos pedidos; sin `delivery-accion` al día, la caja 0.8.0 no puede avisar que ya tiene el pedido y **se le cancelaría a los 15 minutos**. |
 
 ---
 
@@ -151,9 +158,10 @@ La prueba de humo se hace con un negocio nuestro (por ejemplo, **VIM Pruebas**),
 cliente. Hace falta:
 
 1. **El complemento «Tienda en línea» concedido a ese negocio.** Todavía no se puede dar desde el
-   panel de VIM: el complemento nace inactivo y no aparece en la lista hasta la entrega 7. Se
-   concede a mano en la base de producción. **[Claude, con tu visto bueno]**: pídeselo así: «concede
-   el complemento TIENDA a VIM Pruebas».
+   panel de VIM: el complemento está apagado en el catálogo y no aparece en la lista hasta que se
+   encienda (fase 4 de [`tienda-encendido.md`](tienda-encendido.md)). Mientras tanto se concede a
+   mano en la base de producción. **[Claude, con tu visto bueno]**: pídeselo así: «concede el
+   complemento TIENDA a VIM Pruebas».
 2. **En su admin → Tienda en línea:** elegir la dirección (por ejemplo `vim-pruebas`), marcar al
    menos una sucursal como participante, ponerle horario que incluya la hora de la prueba, dejar al
    menos una forma de pago, y **encender** la tienda. La lista de pendientes que muestra la propia
@@ -191,6 +199,12 @@ Hazla desde tu teléfono, con datos tuyos. Marca cada punto:
    puedes recargar). **Debe:** decir «Aún no abrimos. Vuelve a intentar en unos minutos.» y no
    dejar pedir: en el carrito ese aviso ocupa el lugar del botón «Continuar».
 9. Repite con **a domicilio** si el negocio lo tiene activo.
+10. **Reintentar no duplica.** Arma otro pedido y, justo al tocar «Enviar pedido», pon el teléfono
+    en modo avión; quítalo a los pocos segundos. **Debe:** decir «No pudimos confirmar tu pedido.»
+    y ofrecer **Reintentar**. Tócalo. En la caja debe haber **un solo** pedido. (Si el pedido
+    alcanzó a entrar a la primera, la prueba no se dio; no pasa nada.)
+11. Al pie de la tienda, los enlaces **«Aviso de privacidad»** y **«Condiciones para pedir»** abren
+    y los dos dicen que son provisionales.
 
 ## Paso 8 — Prueba de humo de las cuentas · **[Tú]** (Claude puede mirar los registros)
 
@@ -247,6 +261,8 @@ mismo tope por correo y 5 por hora desde una misma red.
 | El botón del correo de recuperar abre una dirección que no es la tienda | `VIM_TIENDA_URL` mal escrita (otro dominio, o con una ruta de más). |
 | Entras y parece que no pasó nada (sigue diciendo «Entrar») | Estás probando por `http://` o por la dirección de la red local: la cookie de sesión solo se guarda con `https://` (o en `localhost`). En el dominio propio no pasa. |
 | «Demasiados intentos» al crear cuenta o recuperar | Tope de 3 por hora por correo, o el de la red. Espera, o prueba con otro correo. |
+| «Demasiados intentos» al enviar un pedido | Tope de 8 pedidos por hora desde una misma red **en ese restaurante** (cuenta también los intentos que fallaron), o el de 60 por hora del restaurante entero. Espera, o prueba con datos del celular en lugar del wifi. |
+| Un pedido aceptado en la caja se cancela solo a los 15 minutos | La caja lo aceptó pero no llegó a crearle su cuenta (se apagó, no tenía turno), o las funciones no se redesplegaron después de la 0167 (ver «Antes de empezar»). |
 
 **Para volver atrás sin tirar nada:** apaga el interruptor en el admin del negocio de prueba (la
 tienda deja de recibir pedidos al instante). Quitar el dominio de Vercel la saca de internet; las
@@ -266,13 +282,17 @@ pierde nada.
 
 ## Qué pasa después
 
-- La entrega 7 activará el complemento en el panel de VIM y lo concederá a los planes que lo
-  incluyen; hasta entonces cada negocio nuevo se concede a mano.
+- **Lo que sigue está en [`tienda-encendido.md`](tienda-encendido.md):** la caja 0.8.0, encender
+  el complemento (una sola instrucción, que lo concede a los planes que lo incluyen y no abre
+  ninguna tienda), Knock-Out y el anuncio. Hasta que se encienda, cada negocio se concede a mano.
+- Qué mirar cuando ya haya pedidos de verdad: [`tienda-vigilancia.md`](tienda-vigilancia.md).
 - Las decisiones de fondo de las cuentas, y lo que se aceptó a sabiendas (por ejemplo, que crear
   cuenta deja deducir si un correo ya es cliente, y que `entrar` gasta CPU de la base de las cajas:
   conviene mirar la carga los primeros días), están en
   [`decisiones/0032`](../decisiones/0032-la-tienda-es-un-canal-y-sus-clientes-no-viven-en-auth.md).
-- El aviso de privacidad de la tienda es texto **provisional** (está marcado como tal en la
-  página); el texto definitivo también es de la entrega 7. La tienda no tiene página de términos.
+- El aviso de privacidad y las condiciones para pedir de la tienda son páginas **provisionales**
+  (están marcadas como tales). Los borradores de los textos definitivos están en
+  [`docs/legal/`](../legal/LEEME.md) y **no se publican sin que los revise una persona con criterio
+  legal**.
 - Soporte: [`tienda-en-linea-caja.md`](tienda-en-linea-caja.md) explica qué ve el cajero y qué
   responder cuando un cliente dice «mi tienda no me manda pedidos».

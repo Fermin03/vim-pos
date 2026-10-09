@@ -63,7 +63,7 @@ vi.mock("../supabase", () => ({
 
 import {
   contarPendientesDeCatalogo, encenderTienda, guardarConfigTienda, guardarSucursalTienda, leerConfigTienda,
-  leerCombosNoComprables, leerSucursalesTienda, leerTiendaEncendida,
+  leerCombosNoComprables, leerOfertaTienda, leerSucursalesTienda, leerTiendaEncendida,
 } from "../tienda";
 
 beforeEach(() => {
@@ -317,5 +317,28 @@ describe("combos que la tienda no puede vender", () => {
   it("si la consulta falla, lanza (quien llama decide que el aviso no rompe la página)", async () => {
     doble.errorLectura = { message: "boom" };
     await expect(leerCombosNoComprables()).rejects.toThrow();
+  });
+});
+
+// Entrega 7: lo que la invitación necesita saber. Lectura abierta por RLS (planes y addons, 0002).
+describe("leer la oferta de la tienda (catálogo de VIM + plan del negocio)", () => {
+  const ADDON = { codigo: "TIENDA", activo: true, precio_mensual_mxn: 100 };
+  it("junta el complemento del catálogo con la bandera del plan del negocio", async () => {
+    doble.tablas.addons = [{ codigo: "LEALTAD", activo: true, precio_mensual_mxn: 150 }, ADDON];
+    doble.tablas.tenants = [{ id: "otro", plan: { features_incluidos: { tienda_incluida: true } } }, { id: "t1", plan: { features_incluidos: { tienda_incluida: false } } }];
+    expect(await leerOfertaTienda()).toEqual({ activo: true, planLaIncluye: false, precio: 100 });
+    expect(doble.consultas.map((c) => c.tabla).sort()).toEqual(["addons", "tenants"]);
+  });
+  it("con el complemento inactivo lo dice tal cual", async () => {
+    doble.tablas.addons = [{ ...ADDON, activo: false }];
+    doble.tablas.tenants = [{ id: "t1", plan: { features_incluidos: { tienda_incluida: true } } }];
+    expect(await leerOfertaTienda()).toEqual({ activo: false, planLaIncluye: true, precio: 100 });
+  });
+  it("si la lectura falla o falta la fila, null: la invitación se queda como hoy y el apartado no se rompe", async () => {
+    doble.tablas.tenants = [{ id: "t1", plan: null }];
+    expect(await leerOfertaTienda()).toBeNull();
+    doble.tablas.addons = [ADDON];
+    doble.errorLectura = { message: "se cayó la red" };
+    expect(await leerOfertaTienda()).toBeNull();
   });
 });

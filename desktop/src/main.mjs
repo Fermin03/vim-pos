@@ -27,7 +27,7 @@ import { pantallaDeLaCaja } from "./pantalla.mjs";
 import { crearPantallaCliente } from "./pantalla-cliente.mjs";
 import { sincronizarAnuncios, listarAnuncios, rutaDeAnuncio } from "./anuncios.mjs";
 import { crearCoordinadorDePasadas } from "./pasada-unica.mjs";
-import { crearEspejo } from "./delivery-espejo.mjs";
+import { crearEspejo, crearRetencion } from "./delivery-espejo.mjs";
 import { registrarErrorLocal, subirErrores } from "./sync-errores.mjs";
 import { buscarActualizacion, descargarInstalador, nombreInstaladorTemporal } from "./updater.mjs";
 import { poolVigente } from "./pool-vigente.mjs";
@@ -1094,6 +1094,9 @@ let espejo = null;
 // D6: el espejo vive más que un backend (el perro guardián y "Respaldar ahora" lo reinician y el
 // pool viejo queda cerrado). Se le da un pool que resuelve SIEMPRE el del backend vigente.
 const poolLocal = poolVigente(() => backend?.pool);
+// El borrado a 30 días de los datos personales de los pedidos en línea, en la copia de esta caja.
+// No depende del espejo: corre aunque el negocio ya no tenga apps ni tienda.
+const retencion = crearRetencion({ pool: poolLocal, log: (m) => console.log("· [espejo]", m) });
 let arranqueSondeo = null;  // temporizador del arranque diferido del sondeo del menú
 
 /** Arranca el ciclo: una sincronización completa ya, y de ahí en adelante cada 10 minutos.
@@ -1101,6 +1104,7 @@ let arranqueSondeo = null;  // temporizador del arranque diferido del sondeo del
  *  Y el sondeo del menú cada minuto, para que un producto nuevo no espere a la hora. */
 function iniciarSync() {
   ciclo.iniciar();
+  retencion.iniciar();
   // El sondeo arranca DESPUÉS del primer ciclo a propósito: ese ciclo ya baja el catálogo y deja
   // marcada la versión, así que el primer sondeo no repite el PULL. Un minuto de retraso en
   // arrancarlo no le cuesta nada a nadie y ahorra bajar el menú entero en cada arranque.
@@ -1152,6 +1156,7 @@ function sincronizarEspejoConModulo(d) {
 
 function detenerSync() {
   ciclo.detener();
+  retencion.detener();
   if (arranqueSondeo) { clearTimeout(arranqueSondeo); arranqueSondeo = null; }
   sondeo.detener();
   try { espejo?.detener(); } catch { /* */ }

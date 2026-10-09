@@ -45,6 +45,8 @@ export function claveDeIp(ip: string): string {
  * En `pedir` van en dos tiempos: el de la IP antes del antirobot y el del negocio solo DESPUÉS de
  * pasarlo. Si los dos se gastaran al entrar, 60 peticiones basura por hora (sin token) dejarían a
  * un restaurante sin tienda.
+ * El de la IP en `pedir` es por restaurante (entrega 7): las redes de celular comparten IPv4, y lo
+ * que alguien pidió —o intentó— en un restaurante no debe dejar sin pedir al cliente de otro.
  * El seguimiento lleva su propia bolsa: la página del pedido pregunta cada 10 s (60 lecturas en 10
  * minutos por pestaña) y, compartiendo la de leer, dos pedidos vivos desde la misma red dejaban sin
  * menú ni cotización a los demás de esa red. 90 = una pestaña holgada; con dos, la segunda va lenta.
@@ -56,6 +58,10 @@ export type Cupos = { antes: Cupo[]; despuesDelCaptcha: Cupo[]; alFallar: "abrir
  * nueva no compile hasta que alguien decida su cupo (antes caía sola en la bolsa de lecturas, que
  * abre si el control falla).
  *   · `entrar`, `registrar`, `recuperar_*` escriben (sesiones, cuentas, enlaces, correos): cierran.
+ *   · `entrar` no lleva antirobot, y cada intento es un bcrypt en la base de las cajas: además del
+ *     cupo por IP tiene un tope por restaurante (entrega 7), que frena un ataque de contraseñas
+ *     repartido entre muchas redes. Va DESPUÉS del de la IP (`consumirCupos` se detiene en el
+ *     primero que no cabe): una red que ya agotó el suyo no le gasta el cupo al restaurante.
  *   · En `registrar` y `recuperar_pedir` hay además un cupo por DESTINATARIO (3 por hora): las dos
  *     mandan un correo a una dirección que nadie ha verificado, y sin él cada intento repetido es
  *     otro correo nuestro en el buzón de un tercero. Va DESPUÉS del antirobot, como el del negocio en
@@ -73,8 +79,21 @@ export function cuposDe(accion: Peticion["accion"], ip: string, negocio: string,
   switch (accion) {
     case "seguimiento": return porIp("sigue", 600, 90, "abrir");
     case "negocio": case "menu": case "cotizar": return porIp("lee", 600, 120, "abrir");
-    case "pedir": return porIp("pide", 3600, 5, "cerrar", [{ clave: `tienda:pide:negocio:${negocio}`, ventanaSeg: 3600, max: 60 }]);
-    case "entrar": return porIp("entra", 600, 10, "cerrar");
+    // Auditoría (B1): el slug llega aquí sin validar (el negocio se busca después), así que el cupo
+    // por IP y restaurante solo no basta: cada slug inventado estrenaría un contador. Delante va uno
+    // solo por IP, holgado (5 restaurantes a tope desde una misma red de celular).
+    case "pedir": return {
+      antes: [
+        { clave: `tienda:pide:ip:${quien}`, ventanaSeg: 3600, max: 40 },
+        { clave: `tienda:pide:ip:${quien}:${negocio}`, ventanaSeg: 3600, max: 8 },
+      ],
+      despuesDelCaptcha: [{ clave: `tienda:pide:negocio:${negocio}`, ventanaSeg: 3600, max: 60 }],
+      alFallar: "cerrar",
+    };
+    case "entrar": {
+      const c = porIp("entra", 600, 10, "cerrar");
+      return { ...c, antes: [...c.antes, { clave: `tienda:entra:negocio:${negocio}`, ventanaSeg: 600, max: 300 }] };
+    }
     case "registrar": case "recuperar_pedir": {
       if (!/^[0-9a-f]{64}$/.test(huellaCorreo ?? "")) throw new Error(`cuposDe: ${accion} necesita la huella del correo`);
       const bolsa = accion === "registrar" ? "registra" : "recupera";
@@ -86,6 +105,9 @@ export function cuposDe(accion: Peticion["accion"], ip: string, negocio: string,
       return porIp("cuenta", 600, 60, "cerrar");
   }
 }
+
+/** ¿Esta clave es el tope de entradas de un restaurante (el segundo cupo de `entrar`)? Para el log. */
+export const esTopeDeEntradas = (clave: string): boolean => clave.startsWith("tienda:entra:negocio:");
 
 /**
  * El antirobot no pasó. Sin configurar es un fallo NUESTRO (503, como signup-tenant): decirle
@@ -168,6 +190,12 @@ export function leerPedido(x: unknown): Pedido | null {
       || typeof vence_aceptacion !== "string" || !vence_aceptacion) return null;
   return { folio_corto, total_mxn, vence_aceptacion };
 }
+
+/**
+ * ¿`tienda_crear_pedido` devolvió un pedido que ya existía (un reintento con la misma `clave`)?
+ * Solo sirve para no repetir el correo de confirmación; `leerPedido` no lo deja salir al cliente.
+ */
+export const yaExistia = (x: unknown): boolean => objeto(x) && x.ya_existia === true;
 
 /** La cotización sin `items`: los renglones normalizados son la forma interna del ticket. */
 export function cotizacionPublica(x: unknown): Record<string, unknown> | null {

@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   BASE_TIENDA, DIAS, DIRECCIONES_RESERVADAS, copiarATodos, cruzaMedianoche, errorDeDireccion,
-  errorDeHorario, errorDeSucursal, erroresPorDia, hayCambiosDeSucursal, horaValida, interruptorDeSucursalBloqueado, leerHorario, notaDeRango, paraGuardarSucursal, mensajeTienda, puedeEncender, revisar, sugerirDireccion,
+  errorDeHorario, errorDeSucursal, erroresPorDia, hayCambiosDeSucursal, horaValida, interruptorDeSucursalBloqueado, leerHorario, notaDeRango, paraGuardarSucursal, mensajeTienda, TIENDA_SIN_COMPLEMENTO, puedeEncender, revisar, sugerirDireccion,
   type Horario, type SucursalTienda,
 } from "../tienda-reglas";
 
@@ -159,13 +159,16 @@ describe("revisar", () => {
 });
 
 describe("mensajeTienda", () => {
+  it("sin el complemento vigente, una sola frase: sirve a quien la tenía por su plan y a quien la pagaba aparte", () => {
+    expect(TIENDA_SIN_COMPLEMENTO).toBe("Tu tienda en línea no está activa. Escríbenos para reactivarla.");
+  });
   const caso = (message: string, code?: string) => mensajeTienda({ message, code }, "por defecto");
   it("traduce", () => {
     expect(caso('duplicate key value violates unique constraint "tienda_config_slug_key"', "23505")).toBe("Esa dirección ya la usa otro negocio. Prueba con otra.");
     expect(caso('violates check constraint "tienda_config_slug_check"', "23514")).toBe("La dirección solo puede llevar letras, números y guiones, de 3 a 40 caracteres, y no puede ser una palabra reservada.");
     expect(caso('violates check constraint "tienda_config_color_check"')).toBe("El color no es válido.");
     expect(caso('violates check constraint "tienda_config_algun_pago"')).toBe("Deja activa al menos una forma de pago.");
-    expect(caso("SIN_ADDON_TIENDA")).toBe("Tu plan no incluye la tienda en línea.");
+    expect(caso("SIN_ADDON_TIENDA")).toBe(TIENDA_SIN_COMPLEMENTO);
     expect(caso("SIN_TIENDA_CONFIGURADA")).toBe("Primero guarda la dirección de tu tienda.");
     const solo = "Solo el dueño o un administrador puede cambiar esto.";
     expect(caso('new row violates row-level security policy for table "tienda_config"')).toBe(solo);
@@ -175,7 +178,7 @@ describe("mensajeTienda", () => {
   it("el código 42501 también es «solo el dueño o un administrador», diga lo que diga el mensaje", () => {
     expect(mensajeTienda({ code: "42501", message: "cualquier cosa" }, "por defecto")).toBe("Solo el dueño o un administrador puede cambiar esto.");
     // Los candados de la tienda salen con ese mismo código: su frase va primero.
-    expect(caso("SIN_ADDON_TIENDA", "42501")).toBe("Tu plan no incluye la tienda en línea.");
+    expect(caso("SIN_ADDON_TIENDA", "42501")).toBe(TIENDA_SIN_COMPLEMENTO);
     expect(caso("SIN_TIENDA_CONFIGURADA", "42501")).toBe("Primero guarda la dirección de tu tienda.");
   });
   it("lo demás usa el texto por defecto", () => {
