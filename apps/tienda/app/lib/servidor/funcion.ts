@@ -4,6 +4,7 @@
 // Los secretos se leen al ATENDER, nunca al importar: la app compila sin ellos (el CI construye sin
 // `VIM_TIENDA_SECRET`) y, si faltan en producción, la tienda contesta 503 en vez de no arrancar.
 import "server-only";
+import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { headers } from "next/headers";
 import { FORMA_SLUG, FORMA_UUID, menuDe, negocioDe, type Menu, type Negocio } from "../contrato";
@@ -101,6 +102,12 @@ export async function leerNegocio(slug: string): Promise<Leido<Negocio>> {
   if (!FORMA_SLUG.test(slug)) return { estado: "no-existe" };
   return leer(["tienda-negocio", slug], { accion: "negocio", negocio: slug }, negocioDe);
 }
+
+/**
+ * `leerNegocio` una sola vez por petición: el `layout`, la página y sus metadatos lo piden los tres, y
+ * con la caché de datos fría saldrían tres lecturas del cupo del visitante.
+ */
+export const negocioDeLaPeticion = cache(leerNegocio);
 
 /** El menú de una sucursal del negocio. Solo en componentes de servidor. */
 export async function leerMenu(slug: string, sucursalId: string): Promise<Leido<Menu>> {

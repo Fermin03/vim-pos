@@ -104,7 +104,7 @@ export function validarSeleccion(producto: Producto, s: Seleccion): Falta[] {
 }
 
 /** Lo marcado por omisión en cada grupo, sin agotados y sin pasarse del máximo. */
-function modificadoresIniciales(grupos: Grupo[]): ModificadorElegido[] {
+export function modificadoresIniciales(grupos: Grupo[]): ModificadorElegido[] {
   return grupos.flatMap((g) => g.opciones.filter((o) => o.es_default && !o.agotada).slice(0, g.maximo ?? undefined)
     .map((o) => ({ opcionId: o.id, cantidad: 1 })));
 }
