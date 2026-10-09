@@ -9,7 +9,12 @@ export const metadata: Metadata = {
   description: "Pide en línea para recoger o a domicilio.",
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1 };
+// `viewportFit: "cover"`: sin él, Safari de iOS da 0 en `env(safe-area-inset-*)`, y el pie de la hoja y
+// la barra del pedido no sabrían cuánto subir sobre la franja de inicio. A cambio la página llega a
+// las orillas con el teléfono acostado: `body` devuelve ese margen (globals.css).
+// `interactiveWidget`: en Android el teclado encoge la página y lo pegado abajo queda encima de él.
+// iOS lo ignora; ahí lo resuelve la hoja (components/hoja.tsx).
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", interactiveWidget: "resizes-content" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

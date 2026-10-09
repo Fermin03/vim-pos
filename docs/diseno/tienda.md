@@ -78,6 +78,39 @@ lo que la abrió. Se cierra también tocando afuera, con la ✕ o arrastrando la
 Al abrir, el foco cae en «Cerrar», no en un campo: el teclado no debe taparle el producto a nadie.
 Entra en 300 ms y sale en 180; con movimiento reducido solo funde.
 
+### La regla de altura de la hoja (y por qué)
+
+**La hoja mide lo que mide su contenido, hasta su tope** (92 % del alto visible en el teléfono); al
+llegar al tope el cuerpo se desplaza y el pie —con la acción principal— se queda fijo y a la vista.
+Una hoja corta («Borrar dirección») es corta; no se estira.
+
+Se arma siempre con las tres clases de `components/hoja.tsx`: `COLUMNA` (la envoltura, o el `<form>`
+que la sustituye), `CUERPO` y `PIE`. Tres reglas que no se negocian:
+
+1. **Nunca `flex-1` (ni alturas en porcentaje) entre la hoja y su cuerpo.** `flex-1` es
+   `flex: 1 1 0%`, y Safari resuelve ese `0%` como cero: en octubre de 2026 la hoja salía en el
+   iPhone midiendo solo su cabecera, sin cuerpo ni botón. Chrome lo perdona y por eso no se vio en
+   escritorio. Va `flex-initial` (`0 1 auto`) con `min-h-0`: se encoge, no crece, y no hay porcentaje
+   que un navegador pueda leer distinto.
+2. **`.hoja` lleva `height: auto`**, no el `fit-content` que el navegador le pone a un `<dialog>`
+   (es lo que hace que WebKit crea que la altura ya se conoce). Por eso en escritorio se centra con
+   `translate`, no con `inset: 0; margin: auto`.
+3. **El tope es `dvh`**, con `vh` de respaldo: `vh` cuenta la barra del navegador aunque esté visible.
+
+**En el teléfono, además:**
+
+- El pie respeta la franja de inicio (`env(safe-area-inset-bottom)`); para que ese valor exista la
+  página declara `viewport-fit=cover`, y `body` devuelve el margen lateral con el teléfono acostado.
+- **El teclado no tapa el botón.** iOS no encoge la página al abrir el teclado: mientras hay una hoja
+  abierta, esta se sube lo que el teclado ocupa y se limita a lo que queda visible
+  (`visualViewport`), y el campo con foco se trae a la vista. En Android la página se encoge sola
+  (`interactive-widget=resizes-content`).
+- Con una hoja abierta el menú de atrás no se desplaza (`overflow: hidden` en la raíz, que Safari
+  respeta desde iOS 16) ni se arrastra al llegar al final del cuerpo (`overscroll-behavior`).
+- **El anillo de foco de «Cerrar» solo se ve con teclado.** El foco inicial sigue cayendo ahí, pero
+  Safari pinta el anillo en cualquier foco puesto por código; la hoja lo esconde cuando se abrió con
+  el dedo y lo devuelve en cuanto se usa una tecla.
+
 **Las opciones** dicen su regla en palabras junto al nombre del grupo: «Elige 1», «Opcional»,
 «Opcional · hasta 3», «Elige de 1 a 2». «Elige 1» son radios; lo demás, casillas, y al llegar al
 máximo las que faltan se apagan. Un extra enseña su precio (`+$17.40`); lo agotado se queda en la

@@ -24,7 +24,7 @@ import { formatoTelefono } from "../lib/telefono";
 import { textoDeEstado } from "../lib/textos";
 import { irA } from "./acceso";
 import { CampoDePassword, CampoDeTexto, useAccion, useCampos } from "./campo";
-import { CUERPO, Hoja, PIE } from "./hoja";
+import { COLUMNA, CUERPO, Hoja, PIE } from "./hoja";
 import { FOCO, PARTE, PRINCIPAL } from "./piezas";
 
 type Negocio = { slug: string; nombre: string; sucursales: { id: string; nombre: string }[] };
@@ -44,7 +44,7 @@ const rechazoDe = (slug: string, error: string, texto: (codigo: string) => strin
 /** El contenido de una hoja: lo que se desplaza, y abajo el error (junto al pulgar) y los botones. */
 function Formulario({ alEnviar, error, pie, children }: { alEnviar: () => void; error: string | null; pie: ReactNode; children: ReactNode }) {
   return (
-    <form noValidate className="flex min-h-0 flex-1 flex-col" onSubmit={(e: FormEvent) => { e.preventDefault(); alEnviar(); }}>
+    <form noValidate className={COLUMNA} onSubmit={(e: FormEvent) => { e.preventDefault(); alEnviar(); }}>
       <div className={cn(CUERPO, "flex flex-col gap-4 px-4 py-5")}>{children}</div>
       <div className={cn(PIE, "flex flex-col gap-2")}>
         {error && <Aviso tono="danger" role="alert" className="!text-14">{error}</Aviso>}

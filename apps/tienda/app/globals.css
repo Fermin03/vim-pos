@@ -4,12 +4,19 @@
 @tailwind utilities;
 
 html, body { height: 100%; }
+/* El hueco de la barra de desplazamiento se reserva siempre: al abrir una hoja la página deja de
+   desplazarse y, sin esto, en escritorio todo brincaba el ancho de la barra. */
+html { scrollbar-gutter: stable; }
 body {
   font-family: var(--font);
   background: rgb(var(--bg));
   color: rgb(var(--ink));
   -webkit-font-smoothing: antialiased;
   letter-spacing: -0.01em;
+  /* La página llega a las orillas (`viewport-fit=cover`, layout.tsx): con el teléfono acostado, la
+     muesca queda de un lado. Con el teléfono de pie ambos valen 0. */
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 /* El texto encima del color de marca. Cada negocio pisa --accent y este con su color
@@ -25,15 +32,31 @@ body {
    lo dicen las variables --hoja-desde, --hoja-opacidad-desde y --aparece-desde, que sí cambian por
    ancho y por movimiento reducido. Así ningún minificador tiene que entender un @starting-style
    anidado. Y van AL FINAL del archivo: un @starting-style compite en la cascada como cualquier
-   regla, y un `.hoja[open] { opacity: 1 }` escrito después le ganaría (la hoja entraría sin fundido). */
+   regla, y un `.hoja[open] { opacity: 1 }` escrito después le ganaría (la hoja entraría sin fundido).
+
+   LA ALTURA. La hoja mide lo que mide su contenido, hasta `max-height`; de ahí en adelante el
+   cuerpo se desplaza y el pie se queda (las clases COLUMNA, CUERPO y PIE de hoja.tsx). Dos cosas
+   la sostienen en Safari, y las dos son obligatorias:
+    · `height: auto`, nunca el `fit-content` que el navegador le pone a un <dialog>. WebKit trata a
+      un elemento posicionado con una altura que no es `auto` como de altura conocida, y contra esa
+      altura resuelve los porcentajes de adentro (un `flex-basis: 0%` se vuelve 0 de verdad). Así
+      fue como en el iPhone la hoja medía solo su cabecera. Por lo mismo, en 640 px o más no se
+      centra con `inset: 0; margin: auto` (que necesita `fit-content`): se centra con `translate`.
+    · adentro, nada de `flex-1` ni alturas en porcentaje entre la hoja y el cuerpo.
+   `dvh` y no `vh`: en el teléfono `vh` cuenta la barra del navegador aunque esté a la vista. */
 .hoja {
   --hoja-desde: translateY(100%);
   --hoja-opacidad-desde: 1;
   position: fixed;
   inset: auto 0 0 0;
+  /* Safari saca al <dialog> de la capa superior en cuanto se cierra, antes de que termine de bajar:
+     ese rato tiene que seguir encima de la barra de categorías (10) y de la del pedido (20). */
+  z-index: 30;
   margin: 0 auto;
   width: 100%;
   max-width: 32rem;
+  height: auto;
+  max-height: 92vh;
   max-height: 92dvh;
   padding: 0;
   border: 0;
@@ -42,6 +65,8 @@ body {
   color: rgb(var(--ink));
   flex-direction: column;
   overflow: hidden;
+  /* Lo que se desplaza dentro de la hoja no arrastra al menú de atrás al llegar a su tope. */
+  overscroll-behavior: contain;
   transform: translateY(100%);
   transition-property: opacity, transform, overlay, display;
   transition-duration: 180ms;
@@ -66,8 +91,11 @@ body {
   .hoja {
     --hoja-desde: translateY(8px) scale(0.98);
     --hoja-opacidad-desde: 0;
-    inset: 0;
-    margin: auto;
+    /* Centrada sin `fit-content` (ver LA ALTURA): arriba a la mitad y `translate` la sube media
+       altura. `translate` y `transform` son propiedades distintas: la entrada no lo pisa. */
+    inset: 50% 0 auto 0;
+    translate: 0 -50%;
+    max-height: min(88vh, 46rem);
     max-height: min(88dvh, 46rem);
     border-radius: var(--r-lg);
     opacity: 0;
@@ -75,8 +103,11 @@ body {
   }
   .hoja[open] { opacity: 1; transition-duration: 200ms; transition-timing-function: var(--ease-out); }
 }
-/* Con una hoja abierta, el menú de atrás no se desplaza. */
+/* Con una hoja abierta, el menú de atrás no se desplaza. En Safari de iOS esto funciona desde la
+   16 (antes ignoraba `overflow: hidden` en la raíz); lo demás lo hace `overscroll-behavior` arriba. */
 html:has(dialog.hoja[open]) { overflow: hidden; }
+/* El anillo de «Cerrar» cuando la hoja se abrió con el dedo (hoja.tsx, `conTeclado`). */
+.hoja [data-sin-anillo]:focus-visible { outline: none; }
 
 /* La barra del carrito aparece una vez, cuando entra el primer producto. */
 .aparece { transition: opacity 200ms ease, transform 200ms var(--ease-out); }

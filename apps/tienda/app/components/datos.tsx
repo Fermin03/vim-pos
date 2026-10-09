@@ -23,7 +23,7 @@ import { enviarPedido, envioDeLaPagina, intentoDeLaPagina, type Desenlace, type 
 import { enlaceTel, formatoTelefono } from "../lib/telefono";
 import { textoDeError } from "../lib/textos";
 import { CampoDeTexto } from "./campo";
-import { CUERPO, PIE } from "./hoja";
+import { COLUMNA, CUERPO, PIE } from "./hoja";
 import { FOCO, PARTE, PRINCIPAL } from "./piezas";
 
 export type PropsDelPasoDeDatos = {
@@ -270,7 +270,7 @@ export function PasoDeDatos({
   );
 
   return (
-    <form noValidate className="flex min-h-0 flex-1 flex-col" onSubmit={(e) => { e.preventDefault(); if (seOfreceEnviar) intentar(total); }}>
+    <form noValidate className={COLUMNA} onSubmit={(e) => { e.preventDefault(); if (seOfreceEnviar) intentar(total); }}>
       <div className={CUERPO}>
         <div className="px-4 pt-1">
           <button type="button" onClick={alVolver} disabled={enviando || hecho} className={cn("-ml-2 inline-flex h-11 items-center gap-1 rounded px-2 text-15 font-medium text-ink-2 hover:bg-hover hover:text-ink disabled:pointer-events-none disabled:opacity-40", FOCO)}>
