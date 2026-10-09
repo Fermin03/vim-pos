@@ -8,18 +8,27 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Tienda } from "../components/tienda";
 import { momentoMx } from "../lib/horario";
+import { urlDeLogo } from "../lib/imagen";
 import { modosDe, motivoDeCierre, sucursalElegida } from "../lib/pantalla";
 import { leerMenu, negocioDeLaPeticion } from "../lib/servidor/funcion";
 import { textoCerrada } from "../lib/textos";
 
 type Props = { params: Promise<{ negocio: string }>; searchParams: Promise<{ s?: string | string[] }> };
 
-// Título y descripción del negocio. La imagen para compartir y el resto del SEO los pone la tarea 4.
+// Lo que ve un buscador y lo que sale al compartir el enlace: el negocio, no VIM. La dirección
+// canónica es la del negocio sin sucursal: `?s=` no crea páginas distintas para un buscador.
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const leido = await negocioDeLaPeticion((await params).negocio);
   if (leido.estado !== "ok") return {};
-  const { nombre, descripcion } = leido.datos;
-  return { title: `${nombre} · Pide en línea`, description: descripcion ?? `Pide en línea en ${nombre}, para recoger o a domicilio.` };
+  const { slug, nombre, descripcion, logo_ruta } = leido.datos;
+  const title = `${nombre} · Pide en línea`;
+  const description = descripcion ?? `Pide en línea en ${nombre}, para recoger o a domicilio.`;
+  const logo = urlDeLogo(logo_ruta);
+  return {
+    title, description,
+    alternates: { canonical: `/${slug}` },
+    openGraph: { type: "website", locale: "es_MX", siteName: nombre, title, description, url: `/${slug}`, ...(logo && { images: [{ url: logo, alt: `Logo de ${nombre}` }] }) },
+  };
 }
 
 function Fallo({ titulo, hacer, reintentar }: { titulo: string; hacer: string; reintentar?: string }) {

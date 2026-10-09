@@ -30,9 +30,16 @@ export default async function MarcoDelNegocio({ children, params }: { children: 
         </header>
       )}
       <div className="flex-1">{children}</div>
-      <footer className="flex items-center justify-center gap-2 px-4 py-8 text-12 text-ink-3">
-        <LogoVim className="h-4 w-4" titulo="" />
-        Pedidos con VIM POS
+      <footer className="flex flex-col items-center gap-1 px-4 py-8 text-12 text-ink-3">
+        <span className="flex items-center gap-2">
+          <LogoVim className="h-4 w-4" titulo="" />
+          Pedidos con VIM POS
+        </span>
+        {negocio && (
+          <Link href={`/${negocio.slug}/privacidad`} className="inline-flex min-h-11 items-center underline underline-offset-4 hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink">
+            Aviso de privacidad
+          </Link>
+        )}
       </footer>
     </div>
   );

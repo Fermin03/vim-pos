@@ -3,8 +3,8 @@
 // el render: el servidor no lo tiene y el HTML no coincidiría), lo guarda con cada cambio y lo
 // reparte al menú, a la hoja de producto, a la barra y al carrito.
 //
-// El paso «Tus datos / enviar» es de la tarea 4: aquí solo existe el estado `paso === "datos"` y lo
-// que ese paso necesita (`PropsDelPasoDeDatos`).
+// El paso «Tus datos / enviar» (components/datos.tsx) se pinta dentro de la hoja del carrito cuando
+// `paso === "datos"`; lo que necesita de aquí es `PropsDelPasoDeDatos`.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { botonClases, cn } from "@vim/ui/styles";
@@ -12,13 +12,14 @@ import {
   aCuerpo, agregar, cambiarCantidad, contarPiezas, estimarTotal, guardarCarrito, leerCarrito, quitar, revalidar, vaciar,
   type Carrito, type Seleccion,
 } from "../lib/carrito";
-import type { Cotizacion, Menu, Negocio, Producto, Sucursal } from "../lib/contrato";
+import type { Menu, Negocio, Producto, Sucursal } from "../lib/contrato";
 import { formato } from "../lib/dinero";
 import { semanaLegible, type Momento } from "../lib/horario";
 import { carritoPara, motivoDeCierre, renglonesDelError } from "../lib/pantalla";
 import { enlaceTel, formatoTelefono } from "../lib/telefono";
 import { textoCerrada } from "../lib/textos";
 import { VistaDelCarrito, useCotizacion } from "./carrito";
+import { PasoDeDatos } from "./datos";
 import { Entrega } from "./entrega";
 import { CUERPO, Hoja, PIE } from "./hoja";
 import { MenuDeLaTienda } from "./menu";
@@ -26,31 +27,6 @@ import { FOCO, PRINCIPAL } from "./piezas";
 import { ProductoPorAgregar } from "./producto";
 
 type ErrorDeTienda = { error: string; detalle: string | null };
-
-/** Lo que recibe el paso «Tus datos / enviar» (tarea 4). */
-export type PropsDelPasoDeDatos = {
-  negocio: Negocio; sucursal: Sucursal; carrito: Carrito;
-  /** La nota general para el restaurante (va en `nota` del pedido; vacía = sin nota). */
-  nota: string;
-  /** La última cotización del carrito tal como está, o null si aún no llega. Antes de enviar se cotiza otra vez. */
-  cotizacion: Cotizacion | null;
-  /** De vuelta al carrito. */
-  alVolver: () => void;
-  /** Un rechazo que señala un renglón (o cualquier otro que deba verse en el carrito): lo marca y regresa al carrito. */
-  alErrorDeCarrito: (e: ErrorDeTienda) => void;
-  /** El pedido entró: vacía el carrito (y lo guarda vacío). Después se navega al seguimiento. */
-  alPedidoHecho: () => void;
-};
-
-// TAREA 4: reemplazar por la pantalla de datos, pago y envío. Este marcador solo deja volver.
-function PasoDeDatos({ alVolver }: PropsDelPasoDeDatos) {
-  return (
-    <>
-      <div className={cn(CUERPO, "px-4 py-8")}><p className="text-15 text-ink-2">Este paso todavía no está disponible.</p></div>
-      <div className={PIE}><button type="button" onClick={alVolver} className={cn(botonClases({ variant: "ghost" }), "h-12 w-full")}>Volver a tu pedido</button></div>
-    </>
-  );
-}
 
 function Encabezado({ negocio, sucursal, carrito, ahora, alCambiarSucursal, children }: {
   negocio: Negocio; sucursal: Sucursal; carrito: Carrito; ahora: Momento; alCambiarSucursal: (id: string) => void; children: React.ReactNode;

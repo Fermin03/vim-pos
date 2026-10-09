@@ -61,6 +61,9 @@ Pensada para 360–430 px; en escritorio es la misma columna, centrada (`max-w-2
 | Hoja | `components/hoja.tsx` | Sube desde abajo en el teléfono; diálogo centrado desde 640 px |
 | Producto | `components/producto.tsx` | Foto, opciones con su regla, cantidad, nota y «Agregar» |
 | Carrito | `components/carrito.tsx` | Renglones, nota para el restaurante y la cuenta |
+| Tus datos | `components/datos.tsx` | Quién recibe, a dónde, cómo paga y «Enviar pedido». Va dentro de la hoja del carrito |
+| Seguimiento | `components/seguimiento.tsx` | El estado en grande, el recorrido, el restaurante, el resumen y «Copiar enlace» |
+| Privacidad | `[negocio]/privacidad/page.tsx` | El aviso (provisional, marcado como tal). Se enlaza desde «Tus datos» y desde el pie |
 
 **El menú es una carta, no una rejilla de tarjetas.** Renglones separados por una línea: nombre,
 descripción en dos líneas como máximo y precio a la izquierda; la foto (96 px) a la derecha, si hay.
@@ -81,6 +84,63 @@ lista, apagado y con la palabra «Agotado».
 el que calcula el servidor: mientras llega se ve el estimado **atenuado** y debajo «Calculando el
 total…»; ese renglón de texto siempre ocupa su lugar, para que nada brinque.
 
+## Tus datos
+
+Un formulario de teléfono, no de escritorio: una columna, y solo dos pares lado a lado (número
+exterior / interior, código postal / ciudad).
+
+- **La etiqueta va arriba y siempre se ve**; nunca un `placeholder` haciendo de etiqueta. Lo opcional
+  lo dice a la derecha de la etiqueta («Opcional»); lo demás es obligatorio y no lleva asterisco.
+- Cada campo con su teclado y su autocompletado: `tel` para el teléfono, `numeric` para el código
+  postal, `decimal` para «¿Con cuánto pagas?»; `name`, `tel-national`, `email`, `address-line1`,
+  `postal-code`, `address-level2`, `address-level1`.
+- **El error va junto al campo**, en `danger`, con el borde del campo en rojo, y dice qué hacer
+  («El código postal tiene 5 dígitos.»). Aparece al salir del campo, no mientras se escribe. Al
+  enviar con errores, se marcan todos y el foco va al primero. Va enlazado con `aria-describedby` y
+  `aria-invalid`.
+- Las reglas son las mismas que aplica el servidor (`app/lib/cliente.ts`): lo que aquí pasa, allá
+  también.
+- Al entrar, el foco va al título de la sección, no a un campo: el teclado no se abre solo.
+- **Forma de pago:** con una sola encendida no se pregunta, se dice. Con dos, radios en `ink`.
+- Lo escrito no se pierde por volver al carrito. Al teléfono solo se guarda (nombre, teléfono, correo
+  y dirección) cuando el pedido entra; nunca la nota, el pago ni el enlace del pedido. Cuando se
+  rellenó solo, lo dice y ofrece «Olvidar mis datos».
+
+**Enviar.** El botón del pie es la acción principal: «Enviar pedido» y el total a la derecha.
+Mientras trabaja se apaga y dice qué está pasando («Enviando tu pedido…», «Comprobando que no eres
+un robot…»); un segundo toque no hace nada. Lo que sale mal aparece **encima del botón**, donde está
+el pulgar, y cada caso deja a la vista solo lo que sí sirve:
+
+| Qué pasó | Qué queda en el pie |
+|---|---|
+| Se puede volver a intentar (sin conexión, antirobot, demasiados intentos, tienda cerrada) | El aviso y el mismo botón |
+| El total cambió | Aviso (`warning`) con el total nuevo, «Confirmar y enviar» con ese total y «Volver a tu pedido» |
+| No se supo si el pedido entró | Aviso (`danger`), **«Llamar al …» como acción principal** y, en secundario, «Ya llamé y no les llegó: enviar otra vez». Nunca se reintenta solo |
+| Por aquí no se va a poder | Aviso, «Llamar al …» y «Volver a tu pedido» |
+| Se arregla en el carrito (la zona, un producto) | Aviso y «Volver a tu pedido»; si es un producto, regresa solo y lo marca |
+| Es de un campo o del pago | El texto junto al campo, con el foco ahí |
+
+## Seguimiento
+
+Una página para mirar de reojo varias veces: **el estado es lo más grande de la pantalla**
+(`text-32`, `font-display`) con su línea de apoyo debajo. Arriba, en chico, el folio y la hora.
+
+- **El recorrido** es una lista vertical de los pasos de *su* modo (para recoger no existe «En
+  camino»). Sí es una secuencia, por eso lleva marcas: hecho (relleno con palomita), actual (relleno
+  con punto, texto en negritas) y pendiente (hueco, texto `ink-3`). Todo en `ink`: el color del
+  negocio no entra aquí. El estado no depende del color: cada paso lo dice en texto para lectores
+  de pantalla.
+- **Cancelado rompe el recorrido**: no se pinta la lista; el título va en `danger` con el motivo
+  debajo y los botones para llamar.
+- «Llamar» y «WhatsApp» son secundarios (`ghost`, lado a lado). La única acción principal de la
+  página aparece al final: «Pedir de nuevo», cuando el pedido terminó.
+- El resumen usa la misma cuenta con puntos guía del carrito. Sin importes por renglón (el servidor
+  no los manda).
+- Se actualiza sola; no hay botón de «actualizar» ni indicador girando. Si deja de haber conexión,
+  un aviso (`warning`) «Sin conexión. Reintentando…» **sin borrar lo último que se supo**.
+- **El código del pedido nunca se escribe en la pantalla**, ni en el título de la pestaña: lo que
+  se enseña es el folio. «Copiar enlace» toma la dirección de la barra.
+
 ## Precios
 
 Siempre el precio final (`precio_final_mxn`, `precio_extra_final_mxn`): lo que se va a cobrar. En
@@ -100,6 +160,12 @@ De comensal, sin palabras de la caja ni códigos. Todos salen de `app/lib/textos
 | Renglón que ya no se puede pedir | «Se agotó. Quítalo para continuar.» |
 | Carrito vacío | «Tu pedido está vacío» · «Elige algo del menú y aparecerá aquí.» · botón «Ver el menú» |
 | Cotización lista | «Pagas al recibir tu pedido.» |
+| Enviando | «Enviando tu pedido…» |
+| No se supo si entró | «No pudimos confirmar tu pedido. Antes de volver a intentarlo, llama al restaurante: 477 123 4567.» |
+| El total cambió | «El total de tu pedido cambió: ahora es $310.00. Confirma para enviar tu pedido con ese total.» |
+| Estados del pedido | «En proceso», «En preparación», «En camino», «Listo para recoger», «Entregado», «Cancelado» (con su línea de apoyo; `textoDeEstado`) |
+| Enlace que no lleva a un pedido | «No encontramos este pedido.» · «El enlace puede estar vencido o mal copiado…» |
+| Bajo el seguimiento | «Guarda este enlace para volver a ver tu pedido.» · «Copiar enlace» → «Enlace copiado.» |
 
 Un botón dice lo que hace y lleva su importe a la derecha: «Agregar   $139.20», «Continuar   $278.40».
 
@@ -118,6 +184,11 @@ Un botón dice lo que hace y lleva su importe a la derecha: «Agregar   $139.20�
 | **Pedido empezado en otra sucursal** | Hoja que pregunta: «Seguir en {otra}» (principal) o «Empezar en {esta}». Cerrarla sin elegir vuelve a la otra: es lo que no borra nada |
 | **No cargó la tienda o el menú** | Título, qué hacer y «Volver a intentar» |
 | **Menú sin productos** | «Este menú todavía no tiene productos.» |
+| **Enviando el pedido** | Botón apagado con lo que está pasando; no hay velo ni se bloquea el formulario |
+| **Sin formas de pago** | Aviso (`warning`) en «¿Cómo pagas?» y «Enviar pedido» apagado |
+| **Buscando el pedido** | «Tu pedido» y «Buscando tu pedido…»; si falla, «Sin conexión. Reintentando…» |
+| **Pedido no encontrado** | Título, qué pudo pasar y «Ver el menú» |
+| **Página que no existe** | «No encontramos esta página» y qué hacer, sin la marca de ningún negocio |
 
 ## Accesibilidad
 
@@ -127,6 +198,10 @@ Un botón dice lo que hace y lleva su importe a la derecha: «Agregar   $139.20�
 - Lo que cambia solo se anuncia con `aria-live`: qué falta para agregar, el total, el estado al
   cambiar de modo. Un renglón que hay que quitar es `role="alert"`.
 - El foco por teclado es un contorno `ink` de 2 px en todo lo que se toca.
+- En «Tus datos», el aviso de un envío que falló es `role="alert"`; lo que pasa mientras se envía se
+  anuncia con `aria-live`.
+- En el seguimiento, el estado y su línea de apoyo viven en una región `aria-live="polite"`: el
+  cambio se anuncia sin robar el foco. El paso actual lleva `aria-current="step"`.
 - Fotos con `alt` («Foto de …»), tamaño reservado y carga diferida.
 
 ## Lo que NO se hereda

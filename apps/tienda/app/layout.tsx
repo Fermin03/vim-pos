@@ -1,8 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { BASE_PUBLICA } from "./lib/sitio";
 
 // Cada negocio pone su propio título y descripción en su página; esto es lo que queda si no hay más.
 export const metadata: Metadata = {
+  metadataBase: new URL(BASE_PUBLICA),
   title: "Pedidos en línea · VIM POS",
   description: "Pide en línea para recoger o a domicilio.",
 };

@@ -51,7 +51,7 @@ function Elecciones({ r }: { r: RenglonCarrito }) {
 }
 
 /** Una línea de la cuenta: concepto, puntos guía e importe. */
-function Linea({ concepto, importe, estimado, fuerte }: { concepto: string; importe: string; estimado: boolean; fuerte?: boolean }) {
+export function Linea({ concepto, importe, estimado, fuerte }: { concepto: string; importe: string; estimado: boolean; fuerte?: boolean }) {
   return (
     <div className={cn("flex items-baseline gap-2", fuerte ? "pt-2 font-display text-20 font-semibold" : "text-15")}>
       <dt className="flex flex-1 items-baseline gap-2 after:flex-1 after:border-b after:border-dotted after:border-line-strong after:content-['']">{concepto}</dt>
