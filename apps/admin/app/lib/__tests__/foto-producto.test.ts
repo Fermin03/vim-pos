@@ -23,6 +23,8 @@ const doble = vi.hoisted(() => {
     removeLanza: false,
     reescalar: (async () => "data:image/jpeg;base64,/9j/4AAQ") as (archivo: File, o: { ladoMax?: number; maxBytes?: number }) => Promise<string>,
     reescalados: [] as { ladoMax?: number; maxBytes?: number }[],
+    /** null = la sesión venció. */
+    sesion: { tenantId: "t1" } as { tenantId: string | null } | null,
   };
 });
 
@@ -60,7 +62,7 @@ vi.mock("../supabase", () => ({
       }),
     },
   },
-  leerSesion: async () => ({ email: "d@d.com", userId: "u1", tenantId: "t1", tipoIdentidad: "ADMIN_WEB", autoservicio: false }),
+  leerSesion: async () => doble.sesion,
 }));
 
 // La reducción usa el canvas del navegador; aquí basta un JPG ya reducido.
@@ -68,8 +70,9 @@ vi.mock("../imagen", () => ({
   reescalarImagen: (archivo: File, o: { ladoMax?: number; maxBytes?: number }) => { doble.reescalados.push(o); return doble.reescalar(archivo, o); },
 }));
 
+import { mensajeError } from "../errores";
 import {
-  FOTO_LADO_MAX, FOTO_MAX_BYTES, ponerFotoProducto, ponerLogoTienda, quitarFotoProducto, quitarImagen, quitarLogoTienda, rutaDeUrl, subirImagen,
+  FOTO_LADO_MAX, FOTO_MAX_BYTES, LOGO_LADO_MAX, ponerFotoProducto, ponerLogoTienda, quitarFotoProducto, quitarImagen, quitarLogoTienda, rutaDeUrl, subirImagen,
 } from "../foto-producto";
 
 const BASE = "https://proyecto.test/storage/v1/object/public/productos/";
@@ -93,6 +96,7 @@ beforeEach(() => {
   doble.removeLanza = false;
   doble.reescalar = async () => "data:image/jpeg;base64,/9j/4AAQ";
   doble.reescalados = [];
+  doble.sesion = { tenantId: "t1" };
   aviso = vi.spyOn(console, "warn").mockImplementation(() => {});
 });
 afterEach(() => aviso.mockRestore());
@@ -132,6 +136,18 @@ describe("rutaDeUrl", () => {
     expect(rutaDeUrl(`${BASE}t1/11111111-1111-4111-8111-111111111111.JPG`, "t1")).toBeNull();
     expect(rutaDeUrl(`${BASE}t1/sub/11111111-1111-4111-8111-111111111111.jpg`, "t1")).toBeNull();
     expect(rutaDeUrl(`${BASE}t1/`, "t1")).toBeNull();
+  });
+  // Las dos dan null A PROPÓSITO. La URL la escribió este mismo módulo con `getPublicUrl` y el nombre
+  // con `crypto.randomUUID()` (siempre minúsculas), y en el almacén `A.jpg` y `a.jpg` son archivos
+  // distintos: una variante en mayúsculas no es algo que este módulo haya subido. Lo que no se
+  // reconoce no se borra; lo peor que pasa es un archivo huérfano.
+  it("con el servidor en mayúsculas no se reconoce", () => {
+    expect(rutaDeUrl(`HTTPS://PROYECTO.TEST/storage/v1/object/public/productos/${VIEJA}`, "t1")).toBeNull();
+    expect(rutaDeUrl(`https://Proyecto.Test/storage/v1/object/public/productos/${VIEJA}`, "t1")).toBeNull();
+  });
+  it("con el nombre del archivo en mayúsculas no se reconoce", () => {
+    expect(rutaDeUrl(`${BASE}t1/AAAAAAAA-1111-4111-8111-111111111111.jpg`, "t1")).toBeNull();
+    expect(rutaDeUrl(`${BASE}T1/11111111-1111-4111-8111-111111111111.jpg`, "t1")).toBeNull();
   });
   it("sin negocio en la sesión no reconoce nada", () => {
     expect(rutaDeUrl(`${BASE}/11111111-1111-4111-8111-111111111111.jpg`, "")).toBeNull();
@@ -192,6 +208,25 @@ describe("subirImagen", () => {
     await expect(subirImagen(jpg())).rejects.toThrow(/pesa demasiado/);
     doble.subidaError = { message: "mime type image/gif is not supported" };
     await expect(subirImagen(jpg())).rejects.toThrow("Ese archivo no se puede usar. Sube una imagen JPG, PNG o WebP.");
+  });
+});
+
+describe("con la sesión vencida", () => {
+  const VENCIDA = "Tu sesión expiró. Vuelve a iniciar sesión.";
+  it.each([["sin sesión", null], ["sin negocio en la sesión", { tenantId: null }]])("%s: lo dice con palabras del dueño y no toca nada", async (_c, sesion) => {
+    doble.sesion = sesion;
+    await expect(subirImagen(jpg())).rejects.toThrow(VENCIDA);
+    await expect(ponerFotoProducto("p1", jpg(), BASE + VIEJA)).rejects.toThrow(VENCIDA);
+    await expect(quitarFotoProducto("p1", BASE + VIEJA)).rejects.toThrow(VENCIDA);
+    await expect(ponerLogoTienda(jpg(), VIEJA)).rejects.toThrow(VENCIDA);
+    await expect(quitarLogoTienda(VIEJA)).rejects.toThrow(VENCIDA);
+    expect(doble.pasos).toEqual([]);
+  });
+  it("quitarImagen no lanza: no borra nada y lo deja en la consola", async () => {
+    doble.sesion = null;
+    await expect(quitarImagen(VIEJA)).resolves.toBeUndefined();
+    expect(doble.quitadas).toEqual([]);
+    expect(aviso).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -288,7 +323,7 @@ describe("quitarFotoProducto", () => {
     await expect(quitarFotoProducto("p1", BASE + VIEJA)).rejects.toThrow(SOLO_ADMIN);
     doble.sinFilas = false;
     doble.escrituraError = { message: "permission denied for table productos" };
-    await expect(quitarFotoProducto("p1", BASE + VIEJA)).rejects.toThrow();
+    await expect(quitarFotoProducto("p1", BASE + VIEJA)).rejects.toThrow("permission denied for table productos");
     expect(doble.quitadas).toEqual([]);
   });
   it("una foto externa se quita del producto sin pedirle nada al almacén", async () => {
@@ -321,6 +356,23 @@ describe("ponerLogoTienda", () => {
     doble.escrituraError = { message: 'new row for relation "tienda_config" violates check constraint "tienda_config_logo_ruta_check"' };
     await expect(ponerLogoTienda(jpg(), VIEJA)).rejects.toThrow("No se pudo guardar el logo");
     expect(doble.quitadas).toEqual([doble.subidas[1]!.ruta]);
+  });
+  it("sin internet al escribir la fila, el dueño ve el mismo aviso de conexión que con la foto", async () => {
+    const CONEXION = "No hay conexión con el servidor. Revisa tu internet e inténtalo de nuevo.";
+    doble.escrituraError = { message: "TypeError: Failed to fetch" };
+    // Lo que pinta la página es `mensajeError(e, …)`: aquí se comprueba el texto final, no el crudo.
+    const logo = await ponerLogoTienda(jpg(), VIEJA).catch((e: unknown) => e);
+    expect(mensajeError(logo, "No se pudo subir el logo")).toBe(CONEXION);
+    const quitar = await quitarLogoTienda(VIEJA).catch((e: unknown) => e);
+    expect(mensajeError(quitar, "No se pudo quitar el logo")).toBe(CONEXION);
+    const foto = await ponerFotoProducto("p1", jpg(), null).catch((e: unknown) => e);
+    expect(mensajeError(foto, "No se pudo subir la foto")).toBe(CONEXION);
+  });
+  it("el logo se reduce a 800 px por lado (un PNG transparente así sí cabe); la foto sigue en 1200", async () => {
+    await ponerLogoTienda(jpg(), null);
+    await ponerFotoProducto("p1", jpg(), null);
+    expect(LOGO_LADO_MAX).toBe(800);
+    expect(doble.reescalados.map((o) => o.ladoMax)).toEqual([800, 1200]);
   });
   it("una ruta anterior ajena o mal formada nunca se intenta borrar", async () => {
     await ponerLogoTienda(jpg(), AJENA);

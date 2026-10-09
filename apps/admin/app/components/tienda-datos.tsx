@@ -103,6 +103,7 @@ export function TiendaDatos({
           trabajando={logoOcupado}
           apagado={ocupado || soloLectura}
           quitar={{ titulo: "¿Quitar el logo?", mensaje: "Tu tienda se queda sin logo." }}
+          avisos={{ guardada: "Logo guardado.", quitada: "Logo quitado." }}
           mensaje={<LineaMensaje mensaje={mensajeLogo} className="mt-2" />}
           onSubir={onSubirLogo}
           onQuitar={onQuitarLogo}

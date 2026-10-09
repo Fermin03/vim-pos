@@ -5,13 +5,17 @@
 // El almacén deja subir y borrar, NO reescribir: cada imagen es una ruta nueva y la anterior se borra
 // después. El orden es siempre subir → escribir la fila → borrar la anterior; así, pase lo que pase a
 // la mitad, la fila apunta a un archivo que existe.
-import { supabase } from "./supabase";
-import { tenantId } from "./datos";
+import { leerSesion, supabase } from "./supabase";
 import { reescalarImagen } from "./imagen";
 import { dataUriAArchivo } from "./anuncios-pantalla";
 import { mensajeTienda } from "./tienda-reglas";
 
 export const FOTO_LADO_MAX = 1200;
+/**
+ * El logo va más chico: si un PNG no cabe en el tope, `reescalarImagen` lo pasa a JPEG sobre blanco y
+ * se pierde la transparencia que la pantalla recomienda. A 800 px un logo cabe como PNG en la práctica.
+ */
+export const LOGO_LADO_MAX = 800;
 /** El almacén `productos` acepta hasta 1 MB (1,048,576 bytes); se queda un poco por debajo. */
 export const FOTO_MAX_BYTES = 1_000_000;
 const ALMACEN = "productos";
@@ -33,6 +37,13 @@ function traducir(mensaje: string): string {
   return mensaje;
 }
 
+/** Propia, como en anuncios-pantalla.ts: la de `datos.ts` lanza un texto interno que acabaría en pantalla. */
+async function tenantId(): Promise<string> {
+  const s = await leerSesion();
+  if (!s?.tenantId) throw new Error("Tu sesión expiró. Vuelve a iniciar sesión.");
+  return s.tenantId;
+}
+
 const urlPublica = (ruta: string): string => supabase.storage.from(ALMACEN).getPublicUrl(ruta).data.publicUrl;
 
 /** ¿Es exactamente `<este negocio>/<uuid>.<ext>`? Sin subcarpetas, sin `..`, sin nada después. PURA. */
@@ -46,6 +57,11 @@ function esRutaPropia(ruta: string, tenant: string): boolean {
  * y de la carpeta de `tenant` (el negocio de la sesión), con la forma de nombre que aquí se sube.
  * Cualquier otra cosa —otro negocio, otro almacén, una URL externa, `..`, parámetros— da null, y lo
  * que da null nunca se le pide borrar al almacén.
+ *
+ * Límite conocido: el borrado supone que cada archivo lo usa UNA sola fila. Si dos filas del mismo
+ * negocio apuntaran al mismo archivo, quitar la imagen de una borraría la de la otra. Hoy nada en el
+ * admin copia `imagen_url` ni `logo_ruta` de una fila a otra; quien lo haga (duplicar producto,
+ * importar) tiene que subir una copia o dejar de borrar aquí.
  */
 export function rutaDeUrl(url: string | null, tenant: string): string | null {
   const base = urlPublica("");
@@ -84,13 +100,13 @@ export async function quitarImagen(ruta: string): Promise<void> {
   await quitar(ruta, tid, "a petición");
 }
 
-async function subir(archivo: File, tid: string): Promise<{ ruta: string; url: string }> {
+async function subir(archivo: File, tid: string, ladoMax: number): Promise<{ ruta: string; url: string }> {
   // Antes de leer nada: un PDF o un GIF no llegan ni al reescalado.
   if (!TIPOS.includes(archivo.type)) throw new Error(NO_ES_IMAGEN);
   let dataUri: string;
   try {
     // `maxBytes` es el largo del data URI (base64): 4 caracteres por cada 3 bytes del archivo.
-    dataUri = await reescalarImagen(archivo, { ladoMax: FOTO_LADO_MAX, maxBytes: Math.floor((FOTO_MAX_BYTES * 4) / 3) });
+    dataUri = await reescalarImagen(archivo, { ladoMax, maxBytes: Math.floor((FOTO_MAX_BYTES * 4) / 3) });
   } catch (e) {
     throw new Error(traducir(e instanceof Error ? e.message : ""));
   }
@@ -104,10 +120,13 @@ async function subir(archivo: File, tid: string): Promise<{ ruta: string; url: s
 
 /** Sube la imagen ya reescalada a `<tenant>/<uuid>.<ext>` y devuelve ruta y URL pública. */
 export async function subirImagen(archivo: File): Promise<{ ruta: string; url: string }> {
-  return subir(archivo, await tenantId());
+  return subir(archivo, await tenantId(), FOTO_LADO_MAX);
 }
 
 type Fila = { tabla: "productos"; id: string } | { tabla: "tienda_config" };
+// Un corte de red no es un error de la tienda: sale crudo para que `mensajeError` de la página diga
+// lo mismo que en cualquier otra pantalla («No hay conexión…»), no el texto por defecto.
+const DE_RED = /failed to fetch|networkerror|load failed|err_connection|fetch failed|timeout|timed out/i;
 
 /**
  * Escribe la columna de la imagen y comprueba que el cambio ENTRÓ: a quien no puede, la base no le
@@ -118,14 +137,14 @@ async function escribirFila(f: Fila, valor: string | null, tid: string, porDefec
     ? await supabase.from("productos").update({ imagen_url: valor }).eq("id", f.id).select("id")
     : await supabase.from("tienda_config").update({ logo_ruta: valor, updated_at: new Date().toISOString() }).eq("tenant_id", tid).select("tenant_id");
   // La guarda del catálogo (0133) ya contesta en español con el motivo: ese mensaje pasa tal cual.
-  if (error) throw new Error(f.tabla === "productos" ? error.message || porDefecto : mensajeTienda(error, porDefecto));
+  if (error) throw new Error(f.tabla === "productos" || DE_RED.test(error.message) ? error.message || porDefecto : mensajeTienda(error, porDefecto));
   if (!data || data.length === 0) throw new Error(SOLO_ADMIN);
 }
 
 /** Subir → escribir la fila → borrar la anterior. Si la fila no entra, se borra la recién subida. */
 async function poner(f: Fila, archivo: File, valorDe: (s: { ruta: string; url: string }) => string, rutaAnterior: (tid: string) => string | null, porDefecto: string): Promise<{ ruta: string; url: string }> {
   const tid = await tenantId();
-  const nueva = await subir(archivo, tid);
+  const nueva = await subir(archivo, tid, f.tabla === "tienda_config" ? LOGO_LADO_MAX : FOTO_LADO_MAX);
   try {
     await escribirFila(f, valorDe(nueva), tid, porDefecto);
   } catch (e) {

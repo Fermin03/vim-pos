@@ -472,6 +472,7 @@ export function ProductoForm({
           claseAyuda={ayuda}
           bloqueo={idFoto ? undefined : "Guarda el producto para poder subirle foto."}
           trabajando={fotoOcupada}
+          apagado={guardando}
           quitar={{ titulo: "¿Quitar la foto?", mensaje: "El producto se queda sin foto en tu tienda en línea." }}
           mensaje={errorFoto && <p className="mt-2 text-sm font-medium text-danger" role="alert">{errorFoto}</p>}
           onSubir={(archivo) => void cambiarFoto((id) => ponerFotoProducto(id, archivo, fotoUrl), "No se pudo subir la foto")}
