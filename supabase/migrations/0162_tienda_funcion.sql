@@ -655,41 +655,27 @@ BEGIN
     RAISE EXCEPTION 'CLIENTE_INVALIDO: nombre de 1 a 100 caracteres, teléfono de 10 dígitos y correo válido o ausente';
   END IF;
 
-  -- 3 y 4) Cliente bloqueado o con 3 pedidos vivos: el MISMO error, letra por letra, para no revelar
-  --    si un teléfono existe o está bloqueado. El candado hace de uno en uno las altas de un mismo
-  --    teléfono: sin él, varias simultáneas contarían lo mismo y pasarían todas el tope.
-  -- ponytail: el conteo no tiene índice propio; recorre los pedidos vivos (índice parcial de 0090),
-  -- que son pocos. Si un día pesa, un índice parcial por (tenant_id, cliente_telefono).
-  PERFORM pg_advisory_xact_lock(hashtextextended('tienda_pedido:' || p_tenant || ':' || v_tel, 0));
-  IF EXISTS (SELECT 1 FROM clientes c
-              WHERE c.id = lealtad_resolver_cliente(p_tenant, NULL, v_tel) AND c.estado = 'BLOQUEADO')
-     OR (SELECT count(*) FROM delivery_pedidos d
-          WHERE d.tenant_id = p_tenant AND d.canal = 'TIENDA' AND d.cliente_telefono = v_tel
-            AND d.estado IN ('RECIBIDO', 'ACEPTADO', 'EN_PREPARACION', 'LISTO')) > 2 THEN
-    RAISE EXCEPTION 'NO_SE_PUDO_CREAR: no se pudo crear el pedido';
-  END IF;
-
-  -- 5) La forma de pago, habilitada por el negocio. (tienda_estado_sucursal ya exigió la fila.)
+  -- 3) La forma de pago, habilitada por el negocio. (tienda_estado_sucursal ya exigió la fila.)
   SELECT * INTO v_cfg FROM tienda_config WHERE tenant_id = p_tenant;
   IF ((p_pago = 'EFECTIVO' AND v_cfg.pago_efectivo) OR (p_pago = 'TARJETA' AND v_cfg.pago_tarjeta)) IS NOT TRUE THEN
     RAISE EXCEPTION 'PAGO_INVALIDO: esa forma de pago no está disponible';
   END IF;
 
-  -- 6) La cotización: valida el carrito y la zona, y pone los renglones y los importes. Sus errores
-  --    pasan tal cual.
+  -- 4) La cotización: valida el carrito y la zona, y pone los renglones y los importes. Sus errores
+  --    pasan tal cual. Y el total, si el cliente dijo cuál vio, tiene que seguir siendo ese.
   v_q     := tienda_cotizar(p_tenant, p_sucursal, p_modo, p_zona, p_items);
   v_total := (v_q ->> 'total_mxn')::numeric;
   IF p_total_esperado IS NOT NULL AND p_total_esperado IS DISTINCT FROM v_total THEN
     RAISE EXCEPTION 'TOTAL_CAMBIO: %', v_q ->> 'total_mxn';   -- el total de ahora, con dos decimales
   END IF;
 
-  -- 7) «Paga con»: solo en efectivo, y entre el total y el total + 5000 (el tope también deja
+  -- 5) «Paga con»: solo en efectivo, y entre el total y el total + 5000 (el tope también deja
   --    fuera NaN e infinito, que para numeric son mayores que todo).
   IF p_paga_con IS NOT NULL AND (p_pago <> 'EFECTIVO' OR p_paga_con < v_total OR p_paga_con > v_total + 5000) THEN
     RAISE EXCEPTION 'PAGO_INVALIDO: «paga con» va solo en efectivo y entre el total y el total más 5000';
   END IF;
 
-  -- 8) La dirección: a domicilio, completa y dentro de las longitudes de direcciones_cliente (que
+  -- 6) La dirección: a domicilio, completa y dentro de las longitudes de direcciones_cliente (que
   --    es donde crear_ticket_desde_tienda la guardará); al recoger, ninguna. Se guarda recortada y
   --    solo con estas claves: lo demás que mande el cliente no entra.
   IF p_modo = 'DOMICILIO' THEN
@@ -706,19 +692,36 @@ BEGIN
     RAISE EXCEPTION 'DIRECCION_INVALIDA: al recoger no hay dirección';
   END IF;
 
-  -- 9) La huella del código de seguimiento. Repetida, la rechaza el índice único (0161 §1).
+  -- 7) La huella del código de seguimiento. Repetida, la rechaza el índice único (0161 §1).
   IF (p_seguimiento_hash ~ '^[0-9a-f]{64}$') IS NOT TRUE THEN
     RAISE EXCEPTION 'SEGUIMIENTO_INVALIDO: la huella del seguimiento es un SHA-256 en hexadecimal';
   END IF;
 
-  -- La cuenta del cliente, si viene, es de este negocio y sigue viva. delivery_pedidos no tiene
-  -- llave foránea a tienda_cuentas (0161 §1): quien lo comprueba es esta función.
+  -- 8) La cuenta del cliente, si viene, es de este negocio y sigue viva. delivery_pedidos no tiene
+  --    llave foránea a tienda_cuentas (0161 §1): quien lo comprueba es esta función.
   IF p_cuenta IS NOT NULL AND NOT EXISTS (SELECT 1 FROM tienda_cuentas c
                                            WHERE c.id = p_cuenta AND c.tenant_id = p_tenant AND c.deleted_at IS NULL) THEN
     RAISE EXCEPTION 'CUENTA_INVALIDA: la cuenta no existe en este negocio';
   END IF;
 
-  -- 10 y 11) La fila. id_externo: 32 hex al azar ('tienda:' || id_externo cabe en el varchar(64) de
+  -- 9) Cliente bloqueado o con 3 pedidos vivos: el MISMO error, letra por letra, para no revelar si
+  --    un teléfono existe o está bloqueado. Va AQUÍ, lo último antes de insertar y después de todas
+  --    las demás validaciones: si fuera antes, una petición inválida a propósito serviría para
+  --    preguntar por un teléfono sin llegar a crear nada. Quien llega hasta aquí, o crea un pedido o
+  --    recibe este error. El candado hace de uno en uno las altas de un mismo teléfono: sin él,
+  --    varias simultáneas contarían lo mismo y pasarían todas el tope.
+  -- ponytail: el conteo no tiene índice propio; recorre los pedidos vivos (índice parcial de 0090),
+  -- que son pocos. Si un día pesa, un índice parcial por (tenant_id, cliente_telefono).
+  PERFORM pg_advisory_xact_lock(hashtextextended('tienda_pedido:' || p_tenant || ':' || v_tel, 0));
+  IF EXISTS (SELECT 1 FROM clientes c
+              WHERE c.id = lealtad_resolver_cliente(p_tenant, NULL, v_tel) AND c.estado = 'BLOQUEADO')
+     OR (SELECT count(*) FROM delivery_pedidos d
+          WHERE d.tenant_id = p_tenant AND d.canal = 'TIENDA' AND d.cliente_telefono = v_tel
+            AND d.estado IN ('RECIBIDO', 'ACEPTADO', 'EN_PREPARACION', 'LISTO')) > 2 THEN
+    RAISE EXCEPTION 'NO_SE_PUDO_CREAR: no se pudo crear el pedido';
+  END IF;
+
+  -- 10) La fila. id_externo: 32 hex al azar ('tienda:' || id_externo cabe en el varchar(64) de
   --    tickets.client_id_local) y único en toda la plataforma, como pide UNIQUE (app, id_externo).
   INSERT INTO delivery_pedidos (
     tenant_id, sucursal_id, canal, app, conexion_id, estado, tipo_entrega, id_externo, folio_corto,
@@ -744,7 +747,6 @@ BEGIN
     '{}'::jsonb)                      -- nada del cuerpo crudo: ni IP, ni token, ni sesión
   RETURNING id, folio_corto, vence_aceptacion INTO v_ped;
 
-  -- 12)
   RETURN jsonb_build_object(
     'pedido_id', v_ped.id,
     'folio_corto', v_ped.folio_corto,

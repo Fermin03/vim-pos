@@ -491,6 +491,58 @@ BEGIN
     -- 13 y 14) El bloqueo y el tope responden IGUAL, letra por letra: no se revela cuál de los dos fue.
     IF v_err IS DISTINCT FROM v_err13 THEN RAISE EXCEPTION '14: el tope dice «%» y el bloqueo «%»: deben ser idénticos', v_err, v_err13; END IF;
   END LOOP;
+  -- F6) No se sondea un teléfono sin crear un pedido: el bloqueo y el tope se miran al final, justo
+  --     antes de insertar. Una petición inválida a propósito con un teléfono bloqueado (el del caso
+  --     13) o en el tope (el de este caso) da SU error, el mismo que daría con cualquier otro
+  --     teléfono, y no NO_SE_PUDO_CREAR.
+  SELECT count(*) INTO v_n0 FROM delivery_pedidos;
+  v_n := 0;
+  FOR r IN SELECT f.tel, x.* FROM (VALUES ('4775550913'), ('4775550914')) AS f(tel), (VALUES
+    ('forma de pago que no existe', 'PAGO_INVALIDO',          'RECOGER',   NULL::uuid, v_uno, NULL::jsonb, 'CHEQUE',   NULL::numeric, 'ok', NULL::numeric),
+    ('paga con menos que el total', 'PAGO_INVALIDO',          'RECOGER',   NULL, v_uno, NULL, 'EFECTIVO', 1,    'ok', NULL),
+    ('carrito vacío',               'CARRITO_INVALIDO',       'RECOGER',   NULL, '[]'::jsonb, NULL, 'EFECTIVO', NULL, 'ok', NULL),
+    ('producto agotado',            'PRODUCTO_NO_DISPONIBLE', 'RECOGER',   NULL, format('[{"producto_id":"%s","cantidad":1}]', v_ag)::jsonb, NULL, 'EFECTIVO', NULL, 'ok', NULL),
+    ('domicilio sin zona',          'ZONA_INVALIDA',          'DOMICILIO', NULL, v_uno, v_dir, 'EFECTIVO', NULL, 'ok', NULL),
+    ('total que no es',             'TOTAL_CAMBIO',           'RECOGER',   NULL, v_uno, NULL, 'EFECTIVO', NULL, 'ok', 1),
+    ('domicilio sin dirección',     'DIRECCION_INVALIDA',     'DOMICILIO', v_z35, v_uno, NULL, 'EFECTIVO', NULL, 'ok', NULL),
+    ('huella mal formada',          'SEGUIMIENTO_INVALIDO',   'RECOGER',   NULL, v_uno, NULL, 'EFECTIVO', NULL, 'mala', NULL)
+  ) AS x(caso, codigo, modo, zona, items, direccion, pago, paga_con, hash, total)
+  LOOP
+    v_n := v_n + 1;
+    v_err := NULL;
+    BEGIN
+      PERFORM tienda_crear_pedido(v_t, v_suc, r.modo, r.zona, r.items, jsonb_build_object('nombre', 'Ana', 'telefono', r.tel), r.direccion,
+                r.pago, r.paga_con, NULL, CASE WHEN r.hash = 'ok' THEN md5('f6a') || md5('f6b') ELSE r.hash END,
+                p_total_esperado => r.total);
+    EXCEPTION WHEN OTHERS THEN v_err := SQLERRM;
+    END;
+    IF v_err IS NULL OR v_err NOT LIKE r.codigo || ':%' THEN
+      RAISE EXCEPTION 'F6 (teléfono %, %): esperaba %, dio %', r.tel, r.caso, r.codigo, COALESCE(v_err, 'un pedido');
+    END IF;
+  END LOOP;
+  IF v_n <> 16 THEN RAISE EXCEPTION 'F6: se probaron % de 16', v_n; END IF;
+  -- La cuenta también se valida antes: con un teléfono bloqueado, una cuenta ajena da CUENTA_INVALIDA.
+  v_err := NULL;
+  BEGIN
+    PERFORM tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, v_uno, '{"nombre":"Ana","telefono":"4775550913"}', NULL, 'EFECTIVO', NULL, NULL,
+              md5('f6a') || md5('f6b'), v_cuenta_o);
+  EXCEPTION WHEN OTHERS THEN v_err := SQLERRM;
+  END;
+  IF v_err IS NULL OR v_err NOT LIKE 'CUENTA_INVALIDA:%' THEN RAISE EXCEPTION 'F6 (cuenta ajena con teléfono bloqueado): esperaba CUENTA_INVALIDA, dio %', COALESCE(v_err, 'un pedido'); END IF;
+  -- Y esos dos teléfonos, con una petición VÁLIDA, siguen sin poder pedir (control).
+  FOR r IN SELECT * FROM (VALUES ('4775550913'), ('4775550914')) AS f(tel) LOOP
+    v_err := NULL;
+    BEGIN
+      PERFORM tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, v_uno, jsonb_build_object('nombre', 'Ana', 'telefono', r.tel), NULL, 'EFECTIVO', NULL, NULL,
+                md5('f6a') || md5('f6b'), p_total_esperado => 120);
+    EXCEPTION WHEN OTHERS THEN v_err := SQLERRM;
+    END;
+    IF v_err IS DISTINCT FROM v_err13 THEN RAISE EXCEPTION 'F6 (control, teléfono %): una petición válida debía dar «%», dio %', r.tel, v_err13, COALESCE(v_err, 'un pedido'); END IF;
+  END LOOP;
+  IF (SELECT count(*) FROM delivery_pedidos) <> v_n0 THEN
+    RAISE EXCEPTION 'F6: los rechazos dejaron % fila(s)', (SELECT count(*) FROM delivery_pedidos) - v_n0;
+  END IF;
+
   -- …y con uno de ellos ya ENTREGADO, entra.
   UPDATE delivery_pedidos SET estado = 'ENTREGADO' WHERE id = v_ids[1];
   v_r := tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, v_uno, '{"nombre":"Ana","telefono":"4775550914"}', NULL, 'EFECTIVO', NULL, NULL, md5('14c') || md5('14d'));
