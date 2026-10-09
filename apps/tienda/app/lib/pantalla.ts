@@ -5,6 +5,7 @@ import type { Resultado } from "./api";
 import { carritoNuevo, type Carrito, type CuerpoCarrito } from "./carrito";
 import type { Cotizacion, Modo, Negocio, Sucursal } from "./contrato";
 import { textoDeError } from "./textos";
+import { aCentavos, formato } from "./dinero";
 
 /**
  * La sucursal de la página. Con una sola no se pregunta (decisión 6); con varias viaja en `?s=<id>`
@@ -100,4 +101,15 @@ export function cotizarConEspera(
     alResultado(r);
   }, esperaMs);
   return () => { clearTimeout(reloj); corte.abort(); };
+}
+
+/**
+ * El aviso del costo de envío antes de elegir zona: «El envío puede costar entre $0.00 y $35.00, según
+ * tu zona.» Con una sola zona, o todas al mismo precio, no hay rango que avisar (null): el costo ya se ve.
+ */
+export function rangoDeEnvio(zonas: { costo_mxn: string }[]): string | null {
+  const costos = zonas.map((z) => aCentavos(z.costo_mxn)).filter((c): c is number => c !== null);
+  if (costos.length < 2) return null;
+  const min = Math.min(...costos), max = Math.max(...costos);
+  return min === max ? null : `El envío puede costar entre ${formato(min)} y ${formato(max)}, según tu zona.`;
 }

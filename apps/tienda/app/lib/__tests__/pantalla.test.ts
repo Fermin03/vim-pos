@@ -179,3 +179,20 @@ describe("cotizarConEspera", () => {
     expect(alResultado).toHaveBeenCalledWith(error);
   });
 });
+
+import { rangoDeEnvio } from "../pantalla";
+
+describe("rangoDeEnvio", () => {
+  it("dice el mínimo y el máximo de las zonas", () => {
+    expect(rangoDeEnvio([{ costo_mxn: "35.00" }, { costo_mxn: "0.00" }, { costo_mxn: "20.00" }]))
+      .toBe("El envío puede costar entre $0.00 y $35.00, según tu zona.");
+  });
+  it("sin rango que avisar: una sola zona, ninguna, o todas al mismo precio", () => {
+    expect(rangoDeEnvio([])).toBeNull();
+    expect(rangoDeEnvio([{ costo_mxn: "35.00" }])).toBeNull();
+    expect(rangoDeEnvio([{ costo_mxn: "35.00" }, { costo_mxn: "35.00" }])).toBeNull();
+  });
+  it("un costo ilegible no cuenta", () => {
+    expect(rangoDeEnvio([{ costo_mxn: "x" }, { costo_mxn: "35.00" }])).toBeNull();
+  });
+});
