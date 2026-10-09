@@ -22,11 +22,19 @@ export type PedidoAppItem = {
   alergiaNota: string | null;
   modificadores: PedidoAppModificador[];
 };
+/** En canal TIENDA, `app` es el modo de servicio del pedido: recoger o domicilio. */
+export type AppTienda = "DRIVE_THRU" | "DELIVERY_PROPIO";
 export type PedidoApp = {
-  id: string; app: AppPedido; idExterno: string; folioCorto: string | null; estado: PedidoAppEstado;
+  id: string; app: AppPedido | AppTienda; idExterno: string; folioCorto: string | null; estado: PedidoAppEstado;
   tipoEntrega: string | null; clienteNombre: string | null; notaCliente: string | null; items: PedidoAppItem[];
   totalCliente: number | null; venceAceptacion: string | null; recibidoAt: string; ticketId: string | null;
   ticketFolio: string | null; ultimoError: string | null;
+  canal: "APP" | "TIENDA"; clienteTelefono: string | null;
+  /** Solo la tienda a domicilio: la dirección armada en una línea y sus referencias aparte. */
+  direccion: { texto: string; referencias: string | null } | null;
+  pago: { forma: "EFECTIVO" | "TARJETA"; pagaCon: number | null } | null;
+  envio: number | null; gestion: "NUBE" | "ESCRITORIO" | null;
+  ticketCajaId: string | null; comandaImpresa: boolean;
 };
 
 const ACTIVOS: PedidoAppEstado[] = ["RECIBIDO", "ACEPTADO", "EN_PREPARACION", "LISTO", "ERROR"];
@@ -36,15 +44,32 @@ export async function leerPedidosApps(token: string, sucursalId: string): Promis
   const desde = new Date(Date.now() - 30 * 60_000).toISOString();
   const { data, error } = await employeeClient(token)
     .from("delivery_pedidos")
-    .select("id, app, id_externo, folio_corto, estado, tipo_entrega, cliente_nombre, nota_cliente, items, total_cliente_mxn, vence_aceptacion, recibido_at, ticket_id, ultimo_error, ticket:tickets(folio_completo)")
+    .select("id, app, id_externo, folio_corto, estado, tipo_entrega, cliente_nombre, nota_cliente, items, total_cliente_mxn, vence_aceptacion, recibido_at, ticket_id, ultimo_error, canal, cliente_telefono, direccion, pago_al_recibir, paga_con_mxn, envio_mxn, subtotal_mxn, gestion, ticket:tickets(folio_completo, caja_id, comanda_impresa_at)")
     .eq("sucursal_id", sucursalId)
     .or(`estado.in.(${ACTIVOS.join(",")}),recibido_at.gte.${desde}`)
     .order("recibido_at", { ascending: false })
     .limit(100);
   if (error) throw new Error(error.message);
-  return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map(pedidoDesdeFila);
+}
+
+function direccionDesdeJson(v: unknown): PedidoApp["direccion"] {
+  if (!v || typeof v !== "object") return null;
+  const d = v as Record<string, unknown>;
+  const t = (k: string) => (typeof d[k] === "string" ? (d[k] as string).trim() : "");
+  const calle = [t("calle"), t("numero_exterior")].filter(Boolean).join(" ");
+  const interior = t("numero_interior") ? `int. ${t("numero_interior")}` : "";
+  const cp = t("codigo_postal") ? `C.P. ${t("codigo_postal")}` : "";
+  const texto = [[calle, interior].filter(Boolean).join(", "), t("colonia"), cp, t("ciudad")].filter(Boolean).join(", ");
+  return texto ? { texto, referencias: t("referencias") || null } : null;
+}
+
+export function pedidoDesdeFila(r: Record<string, unknown>): PedidoApp {
+  const ticket = r.ticket as { folio_completo?: string; caja_id?: string | null; comanda_impresa_at?: string | null } | null;
+  const forma = r.pago_al_recibir === "EFECTIVO" || r.pago_al_recibir === "TARJETA" ? r.pago_al_recibir : null;
+  return {
     id: String(r.id),
-    app: r.app as AppPedido,
+    app: r.app as PedidoApp["app"],
     idExterno: String(r.id_externo),
     folioCorto: (r.folio_corto as string | null) ?? null,
     estado: r.estado as PedidoAppEstado,
@@ -56,9 +81,18 @@ export async function leerPedidosApps(token: string, sucursalId: string): Promis
     venceAceptacion: (r.vence_aceptacion as string | null) ?? null,
     recibidoAt: String(r.recibido_at),
     ticketId: (r.ticket_id as string | null) ?? null,
-    ticketFolio: ((r.ticket as { folio_completo?: string } | null)?.folio_completo) ?? null,
+    ticketFolio: ticket?.folio_completo ?? null,
     ultimoError: (r.ultimo_error as string | null) ?? null,
-  }));
+    // Una fila sin `canal` (caja vieja, Uber) es de una app.
+    canal: r.canal === "TIENDA" ? "TIENDA" : "APP",
+    clienteTelefono: (r.cliente_telefono as string | null) ?? null,
+    direccion: direccionDesdeJson(r.direccion),
+    pago: forma ? { forma, pagaCon: r.paga_con_mxn == null ? null : Number(r.paga_con_mxn) } : null,
+    envio: r.envio_mxn == null ? null : Number(r.envio_mxn),
+    gestion: r.gestion === "NUBE" || r.gestion === "ESCRITORIO" ? r.gestion : null,
+    ticketCajaId: ticket?.caja_id ?? null,
+    comandaImpresa: !!ticket?.comanda_impresa_at,
+  };
 }
 
 /** Recursivo: una elección de combo trae a su vez sus propios extras (el término, un extra queso). */
@@ -144,8 +178,8 @@ export function segundosRestantes(venceAceptacion: string | null, ahora: Date): 
   return Math.max(0, Math.round((new Date(venceAceptacion).getTime() - ahora.getTime()) / 1000));
 }
 
-export function etiquetaApp(app: AppPedido): string {
-  return etiquetaAppCompartida(app);
+export function etiquetaApp(app: AppPedido | AppTienda): string {
+  return app === "DRIVE_THRU" || app === "DELIVERY_PROPIO" ? "Tienda" : etiquetaAppCompartida(app);
 }
 
 const ETIQUETA_ESTADO: Record<PedidoAppEstado, string> = {

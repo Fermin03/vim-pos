@@ -1,13 +1,14 @@
 import { describe, it, expect } from "vitest";
 import {
   segundosRestantes, etiquetaApp, etiquetaEstado, ordenarPedidos, etiquetaAlergia, pedidoConAlergia,
-  etiquetaModificadores, itemsDesdeJson, type PedidoApp, type PedidoAppItem,
+  etiquetaModificadores, itemsDesdeJson, pedidoDesdeFila, type PedidoApp, type PedidoAppItem,
 } from "../pedidos-apps";
 
 const base = (extra: Partial<PedidoApp>): PedidoApp => ({
   id: "x", app: "APP_UBEREATS", idExterno: "e", folioCorto: null, estado: "RECIBIDO", tipoEntrega: null, clienteNombre: null,
   notaCliente: null, items: [], totalCliente: null, venceAceptacion: null, recibidoAt: "2026-09-02T10:00:00Z", ticketId: null,
-  ticketFolio: null, ultimoError: null, ...extra,
+  ticketFolio: null, ultimoError: null, canal: "APP", clienteTelefono: null, direccion: null, pago: null, envio: null,
+  gestion: null, ticketCajaId: null, comandaImpresa: false, ...extra,
 });
 const item = (extra: Partial<PedidoAppItem>): PedidoAppItem => ({
   nombreApp: "Hamburguesa", cantidad: 1, precioUnitario: 100, nota: null, mapeado: true, alergenos: [], alergiaNota: null, modificadores: [], ...extra,
@@ -176,5 +177,30 @@ describe("itemsDesdeJson: conserva el segundo nivel al leer el pedido", () => {
     expect(it0.modificadores[0]).toEqual({ nombreApp: "Cheese Burger", cantidad: 1 });
     expect(it0.modificadores[0].modificadores).toBeUndefined();
     expect("modificadores" in it0.modificadores[0]).toBe(false);
+  });
+});
+
+describe("pedidoDesdeFila", () => {
+  const fila = { id: "p", app: "APP_UBEREATS", id_externo: "e", estado: "RECIBIDO", recibido_at: "2026-09-02T10:00:00Z", items: [] };
+  it("una fila de Uber sin las columnas nuevas es canal APP y todo lo nuevo vacío", () => {
+    expect(pedidoDesdeFila(fila)).toMatchObject({
+      canal: "APP", clienteTelefono: null, direccion: null, pago: null, envio: null, gestion: null, ticketCajaId: null, comandaImpresa: false,
+    });
+  });
+  it("una fila de la tienda a domicilio trae dirección en una línea, pago, envío y datos del ticket", () => {
+    const p = pedidoDesdeFila({
+      ...fila, app: "DELIVERY_PROPIO", canal: "TIENDA", cliente_telefono: "4771112233", gestion: "NUBE",
+      direccion: { calle: "Hidalgo", numero_exterior: "12", numero_interior: "3", colonia: "Centro", codigo_postal: "37000", ciudad: "León", estado: "Gto", referencias: "Portón negro" },
+      pago_al_recibir: "EFECTIVO", paga_con_mxn: "500.00", envio_mxn: "30.00",
+      ticket: { folio_completo: "A-1", caja_id: "c1", comanda_impresa_at: "2026-10-09T10:00:00Z" },
+    });
+    expect(p).toMatchObject({
+      canal: "TIENDA", clienteTelefono: "4771112233", gestion: "NUBE", envio: 30, ticketFolio: "A-1", ticketCajaId: "c1", comandaImpresa: true,
+      pago: { forma: "EFECTIVO", pagaCon: 500 },
+      direccion: { texto: "Hidalgo 12, int. 3, Centro, C.P. 37000, León", referencias: "Portón negro" },
+    });
+  });
+  it("etiquetaApp nombra la tienda", () => {
+    expect(etiquetaApp("DRIVE_THRU")).toBe("Tienda");
   });
 });
