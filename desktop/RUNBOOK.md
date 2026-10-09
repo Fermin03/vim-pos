@@ -454,15 +454,20 @@ y el mismo sondeo que Uber; la rama se decide siempre por `canal`, nunca por `ap
   clave `tienda`) nunca: acepta el cajero en la pantalla «Pedidos en línea» y la caja ve el
   `ACEPTADO` en el sondeo siguiente. Los pedidos de gestión `NUBE` no son de la caja: los atiende el
   POS web (`delivery-accion` le contesta `409 ACCION_INVALIDA` a una caja que intente aceptarlos, y
-  el agente ni lo intenta).
+  el agente ni lo intenta). En la pantalla de la caja salen como informativos («Se atiende desde el
+  POS web.»): sin botones, sin timbre y sin contar en el mosaico. Tampoco los reporta: su estado lo
+  pone la nube sola mirando el ticket (`tienda_sincronizar_estados_nube`, 0164, dentro de
+  `delivery_marcar_expirados`, cada minuto, con la misma tabla de abajo), y `estado` sobre un
+  pedido que no es de gestión `ESCRITORIO` responde `409 ACCION_INVALIDA`.
 - **Cómo crea el ticket.** `reclamar` (`delivery-accion`) → `SELECT crear_ticket_desde_tienda($1)`
   en la base local → si el pedido estaba `RECIBIDO`, `aceptar` en la nube **sin** `tiempo_prep_min`.
   Va en ese orden a propósito: primero el ticket (la cocina ya lo tiene), luego el aviso al cliente.
   Si el `aceptar` falla se reintenta cada vuelta (`aAceptar`), igual que con Uber. Si la nube
-  contesta `ACCION_INVALIDA` y el pedido ya no está vivo (se rechazó o venció justo antes), queda en
-  el pedido el aviso «El pedido en línea se canceló: cancela el ticket en caja».
+  contesta `ACCION_INVALIDA` la respuesta trae el `estado` en que quedó el pedido: si sigue vivo
+  (lo aceptó otra pantalla en el mismo instante) se da por aceptado; si ya no (se rechazó o venció
+  justo antes), queda en el pedido el aviso «El pedido en línea se canceló: cancela el ticket en caja».
 - **Qué estados reporta y de dónde los saca.** El cajero no marca nada. En cada vuelta, para los
-  pedidos `TIENDA` de esta caja en `ACEPTADO / EN_PREPARACION / LISTO` (con tope de 48 h desde
+  pedidos `TIENDA` de gestión `ESCRITORIO` con ticket local en `ACEPTADO / EN_PREPARACION / LISTO` (con tope de 48 h desde
   `recibido_at`), se mira el **ticket local** (`estadoAReportar`), de arriba abajo:
 
   | Ticket local | Se reporta (`delivery-accion` → `estado`) |
@@ -489,7 +494,7 @@ y el mismo sondeo que Uber; la rama se decide siempre por `canal`, nunca por `ap
   | «no existe o está eliminado» | `PRODUCTO_NO_EXISTE` | no, con gracia |
   | «Opción de modificador» | `OPCION_NO_EXISTE` | no, con gracia |
   | «Zona de envío» | `ZONA_NO_DISPONIBLE` | no, con gracia |
-  | «no está disponible», «está agotado o pausado», «no se vende en esta sucursal», «no es un combo de este negocio», «no es válido como componente», «requiere entre», «está excluido del slot», «no es opción del slot» | `PRODUCTO_NO_DISPONIBLE` | no |
+  | «no está disponible», «está agotado o pausado», «no se vende en esta sucursal», «no es un combo de este negocio», «no es válido como componente», «requiere entre», «está excluido del slot», «no es opción del slot», «no pertenece al combo» | `PRODUCTO_NO_DISPONIBLE` | no |
   | `SIN_TURNO_ABIERTO` | `SIN_TURNO_ABIERTO` | sí |
   | código de Postgres `23505` (dos cajas crearon al mismo cliente a la vez) | `DUPLICADO` | sí |
   | cualquier otro (turno que se cerró en la carrera, `23503`, timeout, backend reiniciándose) | `RPC_ERROR` | sí |
@@ -525,6 +530,12 @@ y el mismo sondeo que Uber; la rama se decide siempre por `canal`, nunca por `ap
 
   Para ver el pedido: `delivery_pedidos` (`estado`, `ultimo_error`, `ticket_id`) en la base de la
   caja y en la nube; el seguimiento del cliente lee `tienda_seguimiento`.
+- **La comanda y el timbre, en el POS de la caja.** La comanda sale sola una vez; si no salió, la
+  tarjeta del pedido avisa «La comanda no se imprimió» y ofrece **Imprimir comanda** (no se
+  reintenta sola). El timbre solo suena por pedidos que esta caja puede aceptar: no por los que
+  tomó otra caja (`gestion_caja_id` ajeno) ni pasada su `vence_aceptacion`, aunque la copia local
+  siga en `RECIBIDO` por falta de internet. La nota del pedido (pantalla, ticket y comanda) sale solo
+  en tickets nacidos de la tienda (`origen_creacion = 'API_EXTERNA'` en Pick-up o Domicilio).
 - **El latido del POS web.** Sin caja instalada, el POS web con turno abierto avisa cada 30 s
   (`enlinea_presente` con su `caja_id`) y la nube sella la marca de esa caja. Dentro de la caja
   instalada no corre: ahí lo sella el sondeo.

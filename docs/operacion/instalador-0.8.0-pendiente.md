@@ -33,18 +33,25 @@ El instalador lleva el POS empaquetado (`pos-ui/`) y el agente de la caja, así 
   motivo; barra para pausar y reanudar la tienda.
 - Timbre que se repite cada 20 segundos hasta atender el pedido. **Cambia también para Uber**:
   antes sonaba una vez al llegar y callaba al abrir el POS con un pedido ya pendiente.
-- Comanda automática al aceptar, una sola vez.
-- La nota del pedido (con cuánto paga el cliente) en las cuentas de Pick-up y Domicilio y en el
-  ticket impreso. **Cambia para cualquier nota** que se escriba en una cuenta de esos dos modos,
-  sea o no de la tienda.
+  De la tienda solo suena lo que esa caja puede aceptar: no un pedido que tomó otra caja ni uno
+  que ya venció.
+- Comanda automática al aceptar, una sola vez. Si no salió, la tarjeta del pedido avisa «La comanda
+  no se imprimió» y ofrece el botón **Imprimir comanda**.
+- La nota del pedido (con cuánto paga el cliente) en la cuenta, en el ticket impreso y en la
+  comanda, **solo en cuentas nacidas de un pedido de la tienda**. Una cuenta normal de Pick-up o
+  Domicilio se ve y se imprime igual que hoy.
+- Un pedido que se atiende desde el POS en el navegador se ve en la caja como informativo («Se
+  atiende desde el POS web.»): sin botones y sin timbre.
 
 **No cambia:** nada de Comedor ni de Para llevar; la ruta de Uber (aceptar, rechazar, marcar listo)
 queda como estaba.
 
 ## Antes de publicarla (orden de `actualizaciones.md` §3)
 
-1. **Migración 0164** a producción, a mano y antes de mezclar (`tienda_reportar_estado`, y el aviso
-   de vencidos que dice de dónde era el pedido). Respaldo antes.
+1. **Migración 0164** a producción, a mano y antes de mezclar, **en una sola transacción**
+   (`tienda_reportar_estado`; el aviso de vencidos que dice de dónde era el pedido; y
+   `tienda_sincronizar_estados_nube`, que cada minuto pasa a listo, entregado o cancelado los
+   pedidos atendidos desde el POS web). Respaldo antes.
 2. **Funciones:** `delivery-accion` y `delivery-espejo`. Siguen contestando igual a las cajas
    anteriores (la clave nueva solo se manda a quien declara la tienda).
 3. **Web:** el POS web recibe la pantalla nueva al mezclar.
@@ -66,6 +73,8 @@ a clientes con caja instalada hasta que salga, o hacerlo con la 0.8.0 puesta en 
   a punta. Eso se hace en VIM Pruebas el lunes, antes de pasarte la lista final.
 - **Pendiente conocido:** un pedido de la tienda aceptado cuya caja se apagó antes de crear la cuenta
   no caduca solo (la nube no ve la cuenta local). Está anotado para la entrega 7.
+- **Caja 0.7.0 y POS web en la misma sucursal:** la caja vieja no entiende los pedidos de la tienda.
+  No encender la tienda en una sucursal así hasta que su caja tenga la 0.8.0.
 - **Cambio visible en Uber** (el timbre repetido): es deliberado, pero un cliente que ya usa Uber
   lo va a notar el primer día. Está en la nota.
 
@@ -76,7 +85,7 @@ lo muestra como texto corrido); aquí está en líneas para leerlo.
 
 ```
 Nuevo: los pedidos de la tienda en línea de tu negocio llegan a la caja. Los aceptas o los rechazas en Pedidos en línea (en el inicio), o la caja los acepta sola si así lo configuraste, y al aceptar se crea la cuenta en Pick-up o Domicilio y sale la comanda en cocina. Desde esa misma pantalla puedes pausar la tienda 30 minutos, 1 hora o hasta que la reanudes.
-Mejoras: el timbre de un pedido nuevo se repite cada 20 segundos, en cualquier pantalla, hasta que lo atiendas. La nota del pedido, con cuánto paga el cliente, se ve en las cuentas de Pick-up y Domicilio y sale en el ticket impreso.
+Mejoras: el timbre de un pedido nuevo se repite cada 20 segundos, en cualquier pantalla, hasta que lo atiendas. La nota de un pedido de la tienda, con cuánto paga el cliente, se ve en su cuenta y sale en el ticket y en la comanda.
 ```
 
 Revisada contra las reglas de la §4: sin palabras internas, sin otras versiones, sin relleno,

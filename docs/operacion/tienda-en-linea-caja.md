@@ -24,7 +24,9 @@ puede hacer sin tocar la base. El detalle técnico está en
    en la impresora de cocina. Se cobra desde ahí, como cualquier cuenta.
 
 El cajero **no marca «listo»**: la tienda le avisa al cliente cuando se imprime el ticket o se asigna
-un repartidor, y cuando se cobra.
+un repartidor, y cuando se cobra. Los pedidos que se atienden desde el POS en el navegador (sin caja
+instalada) pasan solos a listo, entregado o cancelado en **menos de un minuto** después de imprimir,
+cobrar o cancelar la cuenta, y dejan de salir en Pedidos en línea media hora después de recibidos.
 
 ## Un pedido no suena (o no aparece)
 
@@ -39,7 +41,13 @@ Revisa en este orden. Casi siempre es una de las primeras tres.
 4. **¿El sonido del equipo está encendido?** El navegador puede bloquear el timbre; si falla, el
    contador del mosaico «Pedidos en línea» sigue subiendo. Hay que abrir la pantalla.
 5. **¿El pedido está ahí pero ya no suena?** Entonces ya se aceptó (por el cajero o en automático),
-   se rechazó o se venció. El timbre solo se repite mientras haya uno **por aceptar**.
+   se rechazó o se venció. El timbre solo se repite mientras haya uno **por aceptar**, y nunca más
+   allá de la hora en que vence.
+6. **¿Hay varias cajas en la sucursal?** Cuando una caja toma un pedido, en las demás deja de sonar:
+   es normal. Lo atiende la que lo tomó.
+7. **¿La tarjeta dice «Se atiende desde el POS web.»?** En esa sucursal alguien usa también el POS
+   en el navegador y el pedido le tocó a él. En la caja instalada solo se ve: no suena ni se puede
+   aceptar ahí. Hay que aceptarlo en el navegador.
 
 | Lo que dice la barra | Qué pasa | Qué hacer |
 |---|---|---|
@@ -94,17 +102,20 @@ abierto** le avisó que sigue ahí. Por eso:
 ## La comanda no se imprimió
 
 La comanda sale sola, **una vez**, al aceptar el pedido. Si la impresora estaba apagada, sin papel o
-desconectada, el POS avisa («…no se pudo imprimir la comanda») y **no lo reintenta solo**, para no
-mandar la misma comanda dos veces a la cocina.
+desconectada, **no se reintenta sola**, para no mandar la misma comanda dos veces a la cocina. En
+Pedidos en línea, la tarjeta de ese pedido muestra en rojo **«La comanda no se imprimió. Revisa la
+impresora.»** con el botón **Imprimir comanda**.
 
 1. Arreglar la impresora (encender, papel, cable; Menú → Configurar impresoras y pantallas).
-2. Reimprimir desde la cuenta del pedido en **Pick-up** o **Domicilio**: **Reimprimir comanda**.
-   Pide motivo y PIN de supervisor, como cualquier reimpresión.
+2. En Pedidos en línea, tocar **Imprimir comanda** en la tarjeta del pedido. No pide PIN. Si vuelve
+   a fallar lo dice ahí mismo y el botón sigue disponible.
 3. Mientras tanto, el pedido sí está aceptado y el cliente ya lo sabe: avisar a la cocina de viva voz.
 
-La forma de pago y la nota del cliente salen en el ticket impreso como **«Nota del pedido: …»**,
-bajo los datos de entrega. Si el repartidor pregunta con cuánto paga el cliente, está ahí y también
-en el panel de la cuenta.
+La forma de pago y la nota del cliente salen como **«Nota del pedido: …»** en el ticket impreso
+(bajo los datos de entrega), en la comanda de cocina y en el panel de la cuenta. Si el repartidor
+pregunta con cuánto paga el cliente, está ahí. Esa franja sale **solo en cuentas que nacieron de un
+pedido de la tienda**: una cuenta normal de Pick-up o Domicilio con un recado a cocina se ve y se
+imprime como siempre.
 
 ## Qué pedir al cliente antes de escalar
 

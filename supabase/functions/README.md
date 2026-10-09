@@ -133,6 +133,10 @@ igual al secret `VIM_INTERNO_SECRET` y `tenant_id` en el cuerpo. Lo usa la base 
 cuarto argumento, `p_canal`, es de la 0164: `'TIENDA'` o `'APP'`; decide el título y la ruta del aviso)
 que hace `net.http_post` a `enviar-push` con el secreto leído de Vault (`vim_interno`) y la URL base de
 funciones (`vim_functions_url`). Sin pg_net o sin secretos, el marcado sigue y el aviso se omite.
+Desde la 0164 la misma pasada llama al final a `tienda_sincronizar_estados_nube()`, en un bloque
+propio (si falla deja un `WARNING` y el marcado no se pierde): pasa a `LISTO`, `ENTREGADO` o
+`CANCELADO` los pedidos de la tienda de gestión `NUBE` mirando su ticket, con la regla de
+`tienda_seguimiento`. Solo `service_role`; mira los pedidos de los últimos 7 días.
 
 ### Tienda en línea propia en `delivery-accion` y `delivery-espejo` (entrega 4)
 
@@ -140,9 +144,12 @@ Los pedidos con `canal = 'TIENDA'` no pasan por Uber: `delivery-accion` los atie
 (sin `uber.*` ni `delivery_eventos`) y `delivery-espejo` se los manda a la caja con la clave `tienda`.
 
 - Sobre un pedido (`pedido_id`): `aceptar` y `rechazar` escriben solo si el pedido sigue `RECIBIDO` o
-  `ERROR` (si no, `409 ACCION_INVALIDA`); `estado` (`estado` = `LISTO` | `ENTREGADO` | `CANCELADO`, y
-  `motivo` de lista cerrada) es **solo de dispositivo** y llama a `tienda_reportar_estado` (0164),
-  que solo avanza y devuelve en qué quedó. `listo` no existe en la tienda. `reclamar` es el de siempre.
+  `ERROR` (si no, `409 ACCION_INVALIDA`; el de `aceptar` lleva siempre el `estado` en que está el
+  pedido, releído, para que la caja distinga «lo aceptó otra pantalla» de «se cerró»); `estado`
+  (`estado` = `LISTO` | `ENTREGADO` | `CANCELADO`, y `motivo` de lista cerrada) es **solo de
+  dispositivo y solo para pedidos de gestión `ESCRITORIO`** (uno de gestión `NUBE` → `409
+  ACCION_INVALIDA`: su estado lo pone la base, ver «Push de expirados») y llama a
+  `tienda_reportar_estado` (0164), que solo avanza y devuelve en qué quedó. `listo` no existe en la tienda. `reclamar` es el de siempre.
   Un `aceptar` de gestión `NUBE` crea el ticket en la nube (`crear_ticket_desde_tienda`); una caja
   instalada que lo intente recibe `409`. Si el ticket no se puede armar y reintentar no lo arregla
   (`fallaDeTicket`, `_shared/delivery/enlinea.ts`), el pedido se rechaza y responde
