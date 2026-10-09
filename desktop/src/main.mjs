@@ -816,7 +816,7 @@ async function latir() {
   const j = await r.json();
   if (j?.directivas) {
     directivas.guardar(j.directivas);
-    // El módulo de apps de delivery puede haberse encendido o apagado desde el último latido:
+    // El módulo de apps de delivery o el de la tienda en línea puede haberse encendido o apagado desde el último latido:
     // reacciona en caliente, sin esperar a un reinicio de la caja.
     sincronizarEspejoConModulo(directivas.leer().directivas);
   }
@@ -1078,7 +1078,7 @@ const ciclo = crearCicloSync({
   log: (m) => console.log("· [sync]", m),
 });
 
-// ── Espejo de pedidos de apps (spec 2026-09-03) ────────────────────────────
+// ── Espejo de pedidos de apps y de la tienda en línea (spec 2026-09-03) ────────────────────────────
 // Token de dispositivo con caché corta para el gateway (puente de delivery-accion) y el agente.
 let nubeCache = null;
 async function tokenDeNubeCacheado({ forzar = false } = {}) {
@@ -1097,7 +1097,7 @@ const poolLocal = poolVigente(() => backend?.pool);
 let arranqueSondeo = null;  // temporizador del arranque diferido del sondeo del menú
 
 /** Arranca el ciclo: una sincronización completa ya, y de ahí en adelante cada 10 minutos.
- *  Y el espejo de pedidos de apps cada 10 s (solo si la caja está vinculada a la nube).
+ *  Y el espejo de pedidos de apps y de la tienda en línea, al ritmo que diga la nube (solo si la caja está vinculada a la nube).
  *  Y el sondeo del menú cada minuto, para que un producto nuevo no espere a la hora. */
 function iniciarSync() {
   ciclo.iniciar();
@@ -1128,7 +1128,7 @@ function iniciarSync() {
 }
 
 /**
- * Reacciona a un cambio del módulo de apps de delivery tras un latido (ADR 0014, add-on de
+ * Reacciona a un cambio de los módulos de apps de delivery o de tienda en línea tras un latido (ADR 0014, add-on de
  * delivery): si se apagó y hay espejo vivo, lo detiene; si se encendió y no lo hay, lo arranca.
  * Sin esto, apagar el módulo desde el panel no tendría efecto hasta que alguien reiniciara la
  * caja, y encenderlo tendría que esperar lo mismo — cuando lo que promete la entrega es que el

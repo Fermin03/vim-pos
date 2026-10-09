@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { planificarEspejo, filaLocal, puedeCrear, cursorDe, COLUMNAS_PEDIDO, estadoAReportar, fallaDeTicket, avisoDeFalla } from "./delivery-espejo-plan.mjs";
+import { planificarEspejo, filaLocal, puedeCrear, cursorDe, COLUMNAS_PEDIDO, estadoAReportar, fallaDeTicket, fallaConGracia, GRACIA_CATALOGO_MS, avisoDeFalla } from "./delivery-espejo-plan.mjs";
 
 const CAJA = "cccccccc-0000-0000-0000-0000000000cc";
 const OTRA = "cccccccc-0000-0000-0000-0000000000c2";
@@ -235,7 +235,7 @@ test("fallaDeTicket: lo que no se arregla reintentando cancela el pedido, con su
 });
 
 test("fallaDeTicket: cualquier otro fallo se reintenta; a nadie se le cancela por un error que no conocemos", () => {
-  for (const m of ["canceling statement due to statement timeout", "PEDIDO_NO_ACEPTABLE: estado EXPIRADO", "", 'El producto "Doble" está agotado o pausado']) {
+  for (const m of ["canceling statement due to statement timeout", "PEDIDO_NO_ACEPTABLE: estado EXPIRADO", ""]) {
     assert.deepEqual(fallaDeTicket(m), { reintentable: true, codigo: "RPC_ERROR" }, m);
   }
   assert.deepEqual(fallaDeTicket("deadlock detected", "40P01"), { reintentable: true, codigo: "RPC_ERROR" });
@@ -249,4 +249,65 @@ test("avisoDeFalla: le dice al cajero por qué se canceló, sin palabras interna
     assert.doesNotMatch(t, /[A-Z]{3,}_[A-Z]/, `${c}: sin códigos`);
   }
   assert.notEqual(avisoDeFalla("TOTAL_NO_COINCIDE"), avisoDeFalla("CLIENTE_BLOQUEADO"));
+  assert.equal(avisoDeFalla("ZONA_NO_DISPONIBLE"), avisoDeFalla("DIRECCION_INVALIDA"), "la zona se explica como la dirección");
+  assert.match(avisoDeFalla("constructor"), /un producto del pedido/, "un código raro no saca basura");
+});
+
+// ── Ronda de arreglos: fallos de catálogo (textos literales de los RAISE de las migraciones) ──
+
+test("fallaDeTicket: lo que el catálogo ya no vende así cancela, no se reintenta sin fin", () => {
+  const casos = [
+    ['El producto "Doble" está agotado o pausado', "PRODUCTO_NO_DISPONIBLE"],                        // 0152:457
+    ['El producto "Papas" no se vende en esta sucursal', "PRODUCTO_NO_DISPONIBLE"],                  // 0152:455
+    ["El producto 7d1e0000-0000-0000-0000-000000000001 no es un combo de este negocio", "PRODUCTO_NO_DISPONIBLE"],   // 0152:416
+    ["El producto 7d1e0000-0000-0000-0000-000000000001 no es válido como componente", "PRODUCTO_NO_DISPONIBLE"],     // 0152:449
+    ['El slot "Bebida" requiere entre 1 y 1 selecciones (recibió 0)', "PRODUCTO_NO_DISPONIBLE"],     // 0152:432
+    ['El producto "Papas chicas" está excluido del slot "Guarnición"', "PRODUCTO_NO_DISPONIBLE"],    // 0152:464
+    ['El producto "Papas chicas" no es opción del slot "Guarnición"', "PRODUCTO_NO_DISPONIBLE"],     // 0152:470
+    ['El combo "Combo 1" no está disponible', "PRODUCTO_NO_DISPONIBLE"],                             // 0152:419
+    ["Opción de modificador 7d1e0000-0000-0000-0000-000000000001 no existe", "OPCION_NO_EXISTE"],    // 0152:336
+    ["Zona de envío 7d1e0000-0000-0000-0000-000000000001 no existe, está inactiva o no es de esta sucursal", "ZONA_NO_DISPONIBLE"], // 0116:170
+    ["Producto 7d1e0000-0000-0000-0000-000000000001 no existe o está eliminado", "PRODUCTO_NO_EXISTE"], // 0152:297
+  ];
+  for (const [mensaje, codigo] of casos) assert.deepEqual(fallaDeTicket(mensaje), { reintentable: false, codigo }, mensaje);
+});
+
+test("fallaDeTicket: el código se reconoce en cualquier parte del mensaje, como en la nube", () => {
+  assert.deepEqual(fallaDeTicket("error: TOTAL_NO_COINCIDE: ticket 1 vs pedido 2"), { reintentable: false, codigo: "TOTAL_NO_COINCIDE" });
+  assert.deepEqual(fallaDeTicket("ERROR:  SIN_TURNO_ABIERTO: sucursal s"), { reintentable: true, codigo: "SIN_TURNO_ABIERTO" });
+});
+
+test("fallaDeTicket: siguen reintentables el turno que se cerró en la carrera, 23503, timeouts y el backend reiniciándose", () => {
+  const rpc = { reintentable: true, codigo: "RPC_ERROR" };
+  assert.deepEqual(fallaDeTicket("Turno 5f0c no está abierto o no corresponde a la sucursal/caja indicada"), rpc);  // 0008:1468
+  assert.deepEqual(fallaDeTicket('insert or update on table "tickets" violates foreign key constraint "tickets_cliente_id_fkey"', "23503"), rpc);
+  assert.deepEqual(fallaDeTicket("canceling statement due to statement timeout", "57014"), rpc);
+  assert.deepEqual(fallaDeTicket("el backend local se está reiniciando"), rpc);
+  assert.deepEqual(fallaDeTicket("duplicate key value violates unique constraint", "23505"), { reintentable: true, codigo: "DUPLICADO" });
+});
+
+test("fallaConGracia: «no existe» en un pedido de menos de 3 minutos se reintenta; en la frontera ya no", () => {
+  const recibido = "2026-10-09T10:00:00Z";
+  const t0 = Date.parse(recibido);
+  assert.equal(GRACIA_CATALOGO_MS, 180_000);
+  for (const codigo of ["PRODUCTO_NO_EXISTE", "OPCION_NO_EXISTE", "ZONA_NO_DISPONIBLE"]) {
+    const falla = { reintentable: false, codigo };
+    assert.deepEqual(fallaConGracia(falla, recibido, t0 + 30_000), { reintentable: true, codigo }, `${codigo} a los 30 s`);
+    assert.deepEqual(fallaConGracia(falla, recibido, t0 + 179_999), { reintentable: true, codigo }, `${codigo} un ms antes`);
+    assert.deepEqual(fallaConGracia(falla, recibido, t0 + 180_000), { reintentable: false, codigo }, `${codigo} justo a los 3 min`);
+    assert.deepEqual(fallaConGracia(falla, recibido, t0 + 600_000), { reintentable: false, codigo }, `${codigo} a los 10 min`);
+  }
+});
+
+test("fallaConGracia: lo demás no espera al catálogo; sin fecha legible no hay gracia; lo reintentable no se toca", () => {
+  const recibido = "2026-10-09T10:00:00Z";
+  const t0 = Date.parse(recibido) + 1_000;
+  for (const codigo of ["TOTAL_NO_COINCIDE", "PRODUCTO_NO_DISPONIBLE", "CLIENTE_BLOQUEADO", "ITEM_SIN_MAPEAR"]) {
+    assert.deepEqual(fallaConGracia({ reintentable: false, codigo }, recibido, t0), { reintentable: false, codigo }, codigo);
+  }
+  for (const fecha of [null, undefined, "", "no es fecha"]) {
+    assert.equal(fallaConGracia({ reintentable: false, codigo: "PRODUCTO_NO_EXISTE" }, fecha, t0).reintentable, false, String(fecha));
+  }
+  const sinTurno = { reintentable: true, codigo: "SIN_TURNO_ABIERTO" };
+  assert.equal(fallaConGracia(sinTurno, recibido, t0 + 999_999), sinTurno);
 });

@@ -83,7 +83,7 @@ export function planificarEspejo({ conexiones = [], pedidos = [], localPedidos =
     const esTienda = p.canal === "TIENDA";
     if (esTienda && CERRADOS_DE_TIENDA.has(p.estado)) {
       if (conTicketLocal && !TICKET_CERRADO.has(local.ticket_estado)) {
-        avisos.push({ pedidoId: p.id, motivo: "El pedido en línea se canceló: cancela el ticket en caja" });
+        avisos.push({ pedidoId: p.id, motivo: AVISO_TIENDA_CERRADO });
       }
       continue;
     }
@@ -121,11 +121,32 @@ export function estadoAReportar({ ticket_estado, ticket_impreso_at, asignado } =
   return null;
 }
 
-// Errores de crear_ticket_desde_tienda (0161) que no se arreglan reintentando: lo que el cliente
-// pidió ya no se puede vender tal como se le cotizó. Vienen como prefijo "CODIGO: resto".
+/** Lo que lee el cajero cuando la nube cerró un pedido de la tienda que aquí ya tiene ticket. */
+export const AVISO_TIENDA_CERRADO = "El pedido en línea se canceló: cancela el ticket en caja";
+
+// Errores al crear el ticket de un pedido de la tienda que no se arreglan reintentando: lo que el
+// cliente pidió ya no se puede vender tal como se le cotizó. [texto que trae el mensaje, código].
+// Se reconocen con `includes`, igual que la nube. Los textos son los literales de los RAISE.
 const FALLAS_SIN_REMEDIO = [
-  "TOTAL_NO_COINCIDE", "ENVIO_NO_COINCIDE", "DIRECCION_INVALIDA", "CLIENTE_BLOQUEADO", "PRODUCTO_DE_OTRO_NEGOCIO",
-  "OPCION_DE_OTRO_NEGOCIO", "ITEM_SIN_MAPEAR", "COMBO_ELECCION_SIN_MAPEAR", "COMBO_ELECCION_AMBIGUA", "SUCURSAL_DE_OTRO_NEGOCIO",
+  // crear_ticket_desde_tienda y _delivery_items_a_ticket (0161): traen su código.
+  ...[
+    "TOTAL_NO_COINCIDE", "ENVIO_NO_COINCIDE", "DIRECCION_INVALIDA", "CLIENTE_BLOQUEADO", "PRODUCTO_DE_OTRO_NEGOCIO",
+    "OPCION_DE_OTRO_NEGOCIO", "ITEM_SIN_MAPEAR", "COMBO_ELECCION_SIN_MAPEAR", "COMBO_ELECCION_AMBIGUA", "SUCURSAL_DE_OTRO_NEGOCIO",
+  ].map((c) => [c, c]),
+  // agregar_item_a_ticket (0152): «Producto % no existe o está eliminado», «Opción de modificador % no existe».
+  ["no existe o está eliminado", "PRODUCTO_NO_EXISTE"],
+  ["Opción de modificador", "OPCION_NO_EXISTE"],
+  // fijar_envio_ticket (0116): «Zona de envío % no existe, está inactiva o no es de esta sucursal».
+  ["Zona de envío", "ZONA_NO_DISPONIBLE"],
+  // agregar_combo_a_ticket (0152): el combo o uno de sus componentes ya no se vende así.
+  ["no está disponible", "PRODUCTO_NO_DISPONIBLE"],            // El combo "%" no está disponible
+  ["está agotado o pausado", "PRODUCTO_NO_DISPONIBLE"],        // El producto "%" está agotado o pausado
+  ["no se vende en esta sucursal", "PRODUCTO_NO_DISPONIBLE"],  // El producto "%" no se vende en esta sucursal
+  ["no es un combo de este negocio", "PRODUCTO_NO_DISPONIBLE"],
+  ["no es válido como componente", "PRODUCTO_NO_DISPONIBLE"],
+  ["requiere entre", "PRODUCTO_NO_DISPONIBLE"],                // El slot "%" requiere entre % y % selecciones
+  ["está excluido del slot", "PRODUCTO_NO_DISPONIBLE"],
+  ["no es opción del slot", "PRODUCTO_NO_DISPONIBLE"],
 ];
 
 /**
@@ -133,26 +154,44 @@ const FALLAS_SIN_REMEDIO = [
  * nube (`_shared/delivery/enlinea.ts`, `fallaDeTicket`): si cambia una, cambia la otra.
  *  - no reintentable → el pedido se cancela solo (decisión 3 del plan de la entrega 4);
  *  - sin turno, o el cliente se creó dos veces a la vez (23505) → se reintenta;
- *  - cualquier otra cosa → se reintenta: a nadie se le cancela por un error que no conocemos.
+ *  - cualquier otra cosa (turno que se cerró en la carrera, 23503, timeout, backend local
+ *    reiniciándose) → se reintenta: a nadie se le cancela por un error que no conocemos.
  */
 export function fallaDeTicket(mensaje, codigoPg) {
   const m = String(mensaje ?? "");
-  for (const codigo of FALLAS_SIN_REMEDIO) if (m.startsWith(`${codigo}:`)) return { reintentable: false, codigo };
-  if (m.includes("no existe o está eliminado")) return { reintentable: false, codigo: "PRODUCTO_NO_EXISTE" };
-  if (m.includes("no está disponible")) return { reintentable: false, codigo: "PRODUCTO_NO_DISPONIBLE" };
-  if (m.startsWith("SIN_TURNO_ABIERTO")) return { reintentable: true, codigo: "SIN_TURNO_ABIERTO" };
+  const fatal = FALLAS_SIN_REMEDIO.find(([texto]) => m.includes(texto));
+  if (fatal) return { reintentable: false, codigo: fatal[1] };
+  if (m.includes("SIN_TURNO_ABIERTO")) return { reintentable: true, codigo: "SIN_TURNO_ABIERTO" };
   if (codigoPg === "23505") return { reintentable: true, codigo: "DUPLICADO" };
   return { reintentable: true, codigo: "RPC_ERROR" };
 }
 
+/** Cuánto se le espera al catálogo local antes de creer que algo «no existe». */
+export const GRACIA_CATALOGO_MS = 3 * 60_000;
+const ESPERAN_AL_CATALOGO = new Set(["PRODUCTO_NO_EXISTE", "OPCION_NO_EXISTE", "ZONA_NO_DISPONIBLE"]);
+
+/**
+ * En la caja, «no existe» puede querer decir «todavía no bajó»: el catálogo (productos, opciones,
+ * zonas) llega por su sondeo en un minuto, a veces más. Un producto recién dado de alta y pedido
+ * enseguida no debe cancelarse: mientras el pedido tenga menos de GRACIA_CATALOGO_MS (por su
+ * `recibido_at`) esas tres fallas se reintentan; después, cancelan. Sin fecha legible no hay gracia.
+ */
+export function fallaConGracia(falla, recibidoAt, ahora = Date.now()) {
+  if (falla.reintentable || !ESPERAN_AL_CATALOGO.has(falla.codigo)) return falla;
+  const edad = ahora - Date.parse(recibidoAt);   // NaN si la fecha no sirve → sin gracia
+  return edad < GRACIA_CATALOGO_MS ? { ...falla, reintentable: true } : falla;
+}
+
 /** Lo que lee el cajero en el pedido que la caja canceló sola. Sin palabras internas. */
 export function avisoDeFalla(codigo) {
-  const porque = {
-    TOTAL_NO_COINCIDE: "el precio cambió desde que el cliente lo pidió",
-    ENVIO_NO_COINCIDE: "el costo de envío cambió desde que el cliente lo pidió",
-    DIRECCION_INVALIDA: "la dirección o la zona de envío ya no sirve",
-    CLIENTE_BLOQUEADO: "el cliente está bloqueado",
-  }[codigo] ?? "un producto del pedido ya no está en el menú";
+  const zona = "la dirección o la zona de envío ya no sirve";
+  const porque = new Map([
+    ["TOTAL_NO_COINCIDE", "el precio cambió desde que el cliente lo pidió"],
+    ["ENVIO_NO_COINCIDE", "el costo de envío cambió desde que el cliente lo pidió"],
+    ["DIRECCION_INVALIDA", zona],
+    ["ZONA_NO_DISPONIBLE", zona],
+    ["CLIENTE_BLOQUEADO", "el cliente está bloqueado"],
+  ]).get(codigo) ?? "un producto del pedido ya no está en el menú";
   return `Este pedido se canceló solo: ${porque}. Avísale al cliente.`;
 }
 

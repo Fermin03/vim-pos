@@ -12,7 +12,8 @@
 // la de apps, ni al revés); y en cada vuelta le reporta a la nube en qué va cada pedido mirando su
 // ticket local (impreso o con repartidor → listo; cobrado → entregado; cancelado → cancelado).
 import {
-  planificarEspejo, cursorDe, estadoAReportar, fallaDeTicket, avisoDeFalla, COLUMNAS_PEDIDO, COLUMNAS_CONEXION,
+  planificarEspejo, cursorDe, estadoAReportar, fallaDeTicket, fallaConGracia, avisoDeFalla, AVISO_TIENDA_CERRADO,
+  COLUMNAS_PEDIDO, COLUMNAS_CONEXION,
 } from "./delivery-espejo-plan.mjs";
 import { cadenciaAceptada, esperaEspejo } from "./delivery-espejo-ritmo.mjs";
 
@@ -41,10 +42,12 @@ const SQL_EXTRAS_TIENDA = `SELECT p.id, p.ultimo_error, t.estado_fiscal AS ticke
   FROM delivery_pedidos p LEFT JOIN tickets t ON t.id = p.ticket_id WHERE p.id = ANY($1::uuid[])`;
 // Pedidos de la tienda con ticket en esta caja y todavía vivos, con lo que hace falta de su ticket
 // para saber qué reportar (estadoAReportar). Sale de mirar el ticket: sin red no se pierde nada.
+// Con tope de 48 h: un pedido viejo que la nube ya no toma no se reintenta para siempre.
 const SQL_REPORTE = `SELECT p.id, p.folio_corto, p.estado, t.estado_fiscal AS ticket_estado, t.ticket_impreso_at,
          EXISTS (SELECT 1 FROM delivery_asignaciones a WHERE a.ticket_id = t.id) AS asignado
     FROM delivery_pedidos p JOIN tickets t ON t.id = p.ticket_id
-   WHERE p.canal = 'TIENDA' AND p.estado IN ('ACEPTADO', 'EN_PREPARACION', 'LISTO')`;
+   WHERE p.canal = 'TIENDA' AND p.estado IN ('ACEPTADO', 'EN_PREPARACION', 'LISTO')
+     AND p.recibido_at > now() - interval '48 hours'`;
 /** Un reporte que la nube no tomó no se repite en cada vuelta: se vuelve a intentar pasado esto. */
 const REPORTE_SIN_EFECTO_MS = 5 * 60_000;
 const json = (v) => (v === null || v === undefined ? null : typeof v === "object" ? JSON.stringify(v) : v);
@@ -105,7 +108,7 @@ export function codigoDeError(m) {
  */
 export function crearEspejo({
   pool, nube, cajaId, log = () => {}, cadaMs = ESPEJO_CADA_MS, fetchFn = fetch,
-  setTimeoutFn = setTimeout, clearTimeoutFn = clearTimeout, aleatorio = Math.random,
+  setTimeoutFn = setTimeout, clearTimeoutFn = clearTimeout, aleatorio = Math.random, ahora = Date.now,
 }) {
   let timer = null;
   let corriendo = false;
@@ -153,6 +156,29 @@ export function crearEspejo({
       log(`token rechazado (${body?.detalle ?? "sin detalle"}) · ${resumenToken(opts.deviceToken)}`);
     }
     return { status: r.status, ok: r.ok, body };
+  }
+
+  /**
+   * Acepta en la nube un pedido que ya tiene ticket local. Devuelve "aceptado", "cerrado" o
+   * "reintentar". ACCION_INVALIDA quiere decir que ya no estaba por aceptar: en Uber se da por
+   * aceptado, como siempre. En la tienda puede ser que el cajero lo rechazó o que venció justo
+   * antes (la nube lo cerró y aquí ya hay ticket y comanda): no se cuenta como aceptado y el
+   * cajero lee el aviso YA, sin esperar al siguiente sondeo. Si la nube dice que quedó vivo (lo
+   * aceptó otra pantalla), sí está aceptado.
+   */
+  async function aceptarEnNube(opts, pedido, conexion, id) {
+    const esTienda = pedido?.canal === "TIENDA";
+    const folio = pedido?.folio_corto ?? id;
+    const ac = await llamar(opts, "delivery-accion", { accion: "aceptar", pedido_id: id, tiempo_prep_min: esTienda ? undefined : conexion?.tiempo_prep_min ?? 15 });
+    if (ac.ok) return "aceptado";
+    if (ac.body?.error !== "ACCION_INVALIDA") {
+      log(`pedido ${folio}: accept en ${esTienda ? "la nube" : "Uber"} falló (${ac.body?.error ?? ac.status}); se reintenta`);
+      return "reintentar";
+    }
+    if (!esTienda || ["ACEPTADO", "EN_PREPARACION", "LISTO"].includes(ac.body?.estado)) return "aceptado";
+    await pool.query(`UPDATE delivery_pedidos SET ultimo_error = $2 WHERE id = $1`, [id, AVISO_TIENDA_CERRADO]).catch(() => {});
+    log(`pedido ${folio}: la nube ya lo había cerrado y aquí ya tiene ticket; queda el aviso para cancelarlo en caja`);
+    return "cerrado";
   }
 
   async function tick() {
@@ -218,17 +244,19 @@ export function crearEspejo({
           creados++;
         } catch (e) {
           const m = String(e?.message ?? e);
-          const falla = esTienda ? fallaDeTicket(m, e?.code) : null;
+          // Un «no existe» en un pedido recién llegado puede ser el catálogo local que aún no baja.
+          const falla = esTienda ? fallaConGracia(fallaDeTicket(m, e?.code), pedido.recibido_at, ahora()) : null;
           if (falla && !falla.reintentable) {
             // Lo que el cliente pidió ya no se puede vender como se le cotizó: el pedido se cancela
-            // solo y el cajero lee por qué. Si la nube no toma la baja, la vuelta siguiente vuelve a
-            // pasar por aquí (el pedido sigue sin ticket) y lo reintenta.
-            await pool.query(`UPDATE delivery_pedidos SET ultimo_error = $2 WHERE id = $1`, [id, avisoDeFalla(falla.codigo)]).catch(() => {});
+            // solo y el cajero lee por qué, pero solo cuando la nube confirmó la baja (antes leería
+            // «se canceló» de un pedido que sigue vivo). Si la nube no la toma, la vuelta siguiente
+            // vuelve a pasar por aquí (el pedido sigue sin ticket) y lo reintenta.
             const baja = await llamar(opts, "delivery-accion", pedido.estado === "RECIBIDO"
               ? { accion: "rechazar", pedido_id: id, motivo: "OTRO" }
               : { accion: "estado", pedido_id: id, estado: "CANCELADO", motivo: "OTRO" });
             const hecho = baja.ok || baja.body?.error === "ACCION_INVALIDA";
-            if (!hecho) reintentables++;
+            if (hecho) await pool.query(`UPDATE delivery_pedidos SET ultimo_error = $2 WHERE id = $1`, [id, avisoDeFalla(falla.codigo)]).catch(() => {});
+            else reintentables++;
             log(`pedido ${pedido.folio_corto ?? id}: no se puede pasar a caja (${falla.codigo}); ${hecho ? "se canceló" : `la nube no tomó la cancelación (${baja.body?.error ?? baja.status}); se reintenta`}`);
             continue;
           }
@@ -239,9 +267,9 @@ export function crearEspejo({
           continue;
         }
         if (pedido?.estado === "RECIBIDO") {
-          const ac = await llamar(opts, "delivery-accion", { accion: "aceptar", pedido_id: id, tiempo_prep_min: esTienda ? undefined : conexion?.tiempo_prep_min ?? 15 });
-          if (ac.ok || ac.body?.error === "ACCION_INVALIDA") aceptados++;
-          else { reintentables++; log(`pedido ${pedido?.folio_corto ?? id}: accept en ${esTienda ? "la nube" : "Uber"} falló (${ac.body?.error ?? ac.status}); se reintenta`); }
+          const como = await aceptarEnNube(opts, pedido, conexion, id);
+          if (como === "aceptado") aceptados++;
+          else if (como === "reintentar") reintentables++;
         }
       }
       // Accept pendiente de una vuelta anterior: el ticket local ya existe (la cocina ya lo tiene),
@@ -250,38 +278,44 @@ export function crearEspejo({
       for (const id of plan.aAceptar ?? []) {
         const pedido = pedidos.find((p) => p.id === id);
         const conexion = conexiones.find((c) => c.id === pedido?.conexion_id);
-        const esTienda = pedido?.canal === "TIENDA";
-        const ac = await llamar(opts, "delivery-accion", { accion: "aceptar", pedido_id: id, tiempo_prep_min: esTienda ? undefined : conexion?.tiempo_prep_min ?? 15 });
-        if (ac.ok || ac.body?.error === "ACCION_INVALIDA") aceptados++;
-        else { reintentables++; log(`pedido ${pedido?.folio_corto ?? id}: accept en ${esTienda ? "la nube" : "Uber"} sigue fallando (${ac.body?.error ?? ac.status}); se reintenta`); }
+        const como = await aceptarEnNube(opts, pedido, conexion, id);
+        if (como === "aceptado") aceptados++;
+        else if (como === "reintentar") reintentables++;
       }
 
       // Reporte de estado de los pedidos de la tienda. La nube responde en qué estado QUEDÓ el
       // pedido, y eso es lo que se guarda en la copia local (puede no ser lo reportado: solo avanza).
-      const { rows: porReportar } = await pool.query(SQL_REPORTE);
-      for (const f of porReportar) {
-        const reportar = estadoAReportar(f);
-        if (!reportar || reportar === f.estado) { sinEfecto.delete(f.id); continue; }
-        const previo = sinEfecto.get(f.id);
-        if (previo?.clave === `${reportar}|${f.estado}` && Date.now() - previo.at < REPORTE_SIN_EFECTO_MS) continue;
-        const rep = await llamar(opts, "delivery-accion", { accion: "estado", pedido_id: f.id, estado: reportar });
-        let quedo = f.estado;
-        if (rep.ok && typeof rep.body?.estado === "string") {
-          quedo = rep.body.estado;
-          await pool.query(`UPDATE delivery_pedidos SET estado = $2 WHERE id = $1`, [f.id, quedo]);
+      // Va en su propio try: es código solo de la tienda que corre en todas las cajas, y un fallo
+      // aquí no debe contarle como sondeo fallido (con su backoff) a los pedidos de Uber.
+      try {
+        const { rows: porReportar } = await pool.query(SQL_REPORTE);
+        for (const f of porReportar) {
+          const reportar = estadoAReportar(f);
+          if (!reportar || reportar === f.estado) { sinEfecto.delete(f.id); continue; }
+          const previo = sinEfecto.get(f.id);
+          if (previo?.clave === `${reportar}|${f.estado}` && ahora() - previo.at < REPORTE_SIN_EFECTO_MS) continue;
+          const rep = await llamar(opts, "delivery-accion", { accion: "estado", pedido_id: f.id, estado: reportar });
+          let quedo = f.estado;
+          if (rep.ok && typeof rep.body?.estado === "string") {
+            quedo = rep.body.estado;
+            await pool.query(`UPDATE delivery_pedidos SET estado = $2 WHERE id = $1`, [f.id, quedo]);
+          }
+          if (quedo === reportar) { sinEfecto.delete(f.id); continue; }
+          const porque = rep.ok ? `quedó ${quedo}` : rep.body?.error ?? rep.status;
+          if (rep.status >= 500 || rep.status === 401) {
+            // Nube caída o token vencido: eso sí se arregla volviendo pronto.
+            reintentables++;
+            log(`pedido ${f.folio_corto ?? f.id}: no se pudo reportar ${reportar} (${porque}); se reintenta`);
+          } else {
+            // La nube contestó y no lo tomó. Repetirlo cada 10 s no cambia la respuesta: se anota y
+            // se vuelve a intentar cuando cambie el ticket o el pedido, o pasados unos minutos.
+            sinEfecto.set(f.id, { clave: `${reportar}|${quedo}`, at: ahora() });
+            log(`pedido ${f.folio_corto ?? f.id}: la nube no tomó el estado ${reportar} (${porque}); se reintenta en ${REPORTE_SIN_EFECTO_MS / 60_000} min`);
+          }
         }
-        if (quedo === reportar) { sinEfecto.delete(f.id); continue; }
-        const porque = rep.ok ? `quedó ${quedo}` : rep.body?.error ?? rep.status;
-        if (rep.status >= 500 || rep.status === 401) {
-          // Nube caída o token vencido: eso sí se arregla volviendo pronto.
-          reintentables++;
-          log(`pedido ${f.folio_corto ?? f.id}: no se pudo reportar ${reportar} (${porque}); se reintenta`);
-        } else {
-          // La nube contestó y no lo tomó. Repetirlo cada 10 s no cambia la respuesta: se anota y
-          // se vuelve a intentar cuando cambie el ticket o el pedido, o pasados unos minutos.
-          sinEfecto.set(f.id, { clave: `${reportar}|${quedo}`, at: Date.now() });
-          log(`pedido ${f.folio_corto ?? f.id}: la nube no tomó el estado ${reportar} (${porque}); se reintenta en ${REPORTE_SIN_EFECTO_MS / 60_000} min`);
-        }
+      } catch (e) {
+        reintentables++;
+        log(`reporte de estados de la tienda falló: ${e?.message ?? e}; se reintenta`);
       }
       // Un reclamo que otra caja ganó NO cuenta: ese pedido ya no es de aquí y volver pronto no
       // lo arregla. Solo cuenta lo que este equipo puede reintentar con provecho.

@@ -6,7 +6,7 @@ const CAJA = "cccccccc-0000-0000-0000-0000000000cc";
 const NUBE = { cloudUrl: "https://nube.test", anonKey: "anon", deviceToken: "DEV" };
 
 /** Base local de mentira: registra SQL y responde lo mínimo que usa el agente. */
-function poolFalso({ turnoAbierto = true, locales = [], fallaTicket = null, fallaEspejoLocal = false, fallaTicketTienda = null, extrasTienda = [], reporte = [] } = {}) {
+function poolFalso({ turnoAbierto = true, locales = [], fallaTicket = null, fallaEspejoLocal = false, fallaTicketTienda = null, extrasTienda = [], reporte = [], fallaReporte = null } = {}) {
   const sql = [];
   const query = async (texto, params) => {
     sql.push({ texto, params });
@@ -16,14 +16,14 @@ function poolFalso({ turnoAbierto = true, locales = [], fallaTicket = null, fall
     if (texto.startsWith("SELECT crear_ticket_desde_app")) { if (fallaTicket) throw new Error(fallaTicket); return { rows: [{ crear_ticket_desde_app: "tk-local" }] }; }
     if (texto.startsWith("SELECT crear_ticket_desde_tienda")) { if (fallaTicketTienda) throw fallaTicketTienda; return { rows: [{ crear_ticket_desde_tienda: "tk-tienda" }] }; }
     if (texto.startsWith("SELECT p.id, p.ultimo_error")) return { rows: extrasTienda };
-    if (texto.startsWith("SELECT p.id, p.folio_corto, p.estado")) return { rows: reporte };
+    if (texto.startsWith("SELECT p.id, p.folio_corto, p.estado")) { if (fallaReporte) throw fallaReporte; return { rows: reporte }; }
     return { rows: [] };
   };
   return { sql, query, connect: async () => ({ query, release() {} }) };
 }
 
 /** Nube de mentira: responde delivery-espejo y delivery-accion y registra las llamadas. */
-function nubeFalsa({ pedidos, conexiones = [{ id: "cx1", auto_aceptar: true, tiempo_prep_min: 12, config: {} }], reclamoOk = true, aceptarStatus = 200, siguienteEnMs = 10_000, tienda, alReportar = (b) => [200, { ok: true, estado: b.estado }] }) {
+function nubeFalsa({ pedidos, conexiones = [{ id: "cx1", auto_aceptar: true, tiempo_prep_min: 12, config: {} }], reclamoOk = true, aceptarStatus = 200, siguienteEnMs = 10_000, tienda, alAceptar = null, alReportar = (b) => [200, { ok: true, estado: b.estado }] }) {
   const llamadas = [];
   const fetchFn = async (url, init) => {
     const body = JSON.parse(init.body);
@@ -31,6 +31,7 @@ function nubeFalsa({ pedidos, conexiones = [{ id: "cx1", auto_aceptar: true, tie
     const resp = (status, obj) => new Response(JSON.stringify(obj), { status });
     if (String(url).endsWith("/delivery-espejo")) return resp(200, { ahora: "2026-09-03T10:00:00Z", caja_id: CAJA, sucursal_id: "s", conexiones, pedidos, siguiente_en_ms: siguienteEnMs, ...(tienda === undefined ? {} : { tienda }) });
     if (body.accion === "reclamar") return reclamoOk ? resp(200, { ok: true }) : resp(409, { error: "RECLAMADO_POR_OTRA_CAJA" });
+    if (body.accion === "aceptar" && alAceptar) return resp(...alAceptar(body));
     if (body.accion === "aceptar") return aceptarStatus === 200 ? resp(200, { ok: true, gestion: "ESCRITORIO" }) : resp(aceptarStatus, { error: "UBER_ERROR" });
     if (body.accion === "rechazar") return resp(200, { ok: true });
     if (body.accion === "estado") return resp(...alReportar(body));
@@ -539,4 +540,106 @@ test("reporte: una nube 4xx tampoco se martillea, pero un 401 sí se reintenta e
   const b = agenteCon(poolFalso({ reporte: [filaReporte({ ticket_estado: "PAGADO" })] }), n401);
   await b.tick(); await b.tick();
   assert.equal(acciones(n401).length, 2);
+});
+
+// ── Ronda de arreglos tras la revisión ───────────────────────────────────────
+const avisosAlCajero = (pool) => pool.sql.filter((q) => q.texto.startsWith("UPDATE delivery_pedidos SET ultimo_error")).map((q) => q.params);
+
+test("tienda: un producto agotado en un pedido ya ACEPTADO lo cancela en vez de reintentar sin fin", async () => {
+  for (const m of ['El producto "Doble" está agotado o pausado', 'El producto "Papas" no se vende en esta sucursal', 'El slot "Bebida" requiere entre 1 y 1 selecciones (recibió 0)']) {
+    const pool = poolFalso({ fallaTicketTienda: new Error(m) });
+    const nube = nubeFalsa({ pedidos: [pedidoT({ estado: "ACEPTADO" })], tienda: MANUAL, siguienteEnMs: 300_000 });
+    const reloj = relojFalso();
+    await agenteCon(pool, nube, { aleatorio: centro, ...reloj }).vuelta();
+    assert.deepEqual(acciones(nube).at(-1), { accion: "estado", pedido_id: "t1", estado: "CANCELADO", motivo: "OTRO" }, m);
+    assert.equal(reloj.esperas.at(-1), 300_000, "cancelado: no queda nada pendiente");
+  }
+});
+
+test("tienda: «no existe» en un pedido de menos de 3 minutos espera al catálogo; pasado ese tiempo, cancela", async () => {
+  const recibido = "2026-10-09T10:00:00Z";
+  const t0 = Date.parse(recibido);
+  for (const m of ["Producto 7d1e no existe o está eliminado", "Opción de modificador 7d1e no existe", "Zona de envío 7d1e no existe, está inactiva o no es de esta sucursal"]) {
+    for (const [edad, cancela] of [[30_000, false], [179_999, false], [180_000, true]]) {
+      const pool = poolFalso({ fallaTicketTienda: new Error(m) });
+      const nube = nubeFalsa({ pedidos: [pedidoT({ recibido_at: recibido })], tienda: AUTO });
+      const agente = agenteCon(pool, nube, { ahora: () => t0 + edad });
+      await agente.tick();
+      const bajas = acciones(nube).filter((b) => b.accion === "rechazar");
+      assert.equal(bajas.length, cancela ? 1 : 0, `${m} a los ${edad} ms`);
+      assert.equal(agente.estado().pendiente, !cancela, "mientras espera, vuelve pronto");
+    }
+  }
+  // Lo que no depende del catálogo no espera: un total que no coincide cancela aunque acabe de llegar.
+  const pool = poolFalso({ fallaTicketTienda: new Error("TOTAL_NO_COINCIDE: ticket 1 vs pedido 2") });
+  const nube = nubeFalsa({ pedidos: [pedidoT({ recibido_at: recibido })], tienda: AUTO });
+  await agenteCon(pool, nube, { ahora: () => t0 + 1_000 }).tick();
+  assert.equal(acciones(nube).filter((b) => b.accion === "rechazar").length, 1);
+});
+
+test("tienda: el «se canceló solo» se escribe solo cuando la nube confirmó la baja", async () => {
+  const falla = () => poolFalso({ fallaTicketTienda: new Error("DIRECCION_INVALIDA: pedido t1") });
+  const caida = falla();
+  await agenteCon(caida, nubeFalsa({ pedidos: [pedidoT({ estado: "ACEPTADO" })], tienda: MANUAL, alReportar: () => [502, { error: "RPC_ERROR" }] })).tick();
+  assert.deepEqual(avisosAlCajero(caida), [], "la nube no la tomó: el pedido sigue vivo y no se dice que se canceló");
+  const tomada = falla();
+  await agenteCon(tomada, nubeFalsa({ pedidos: [pedidoT({ estado: "ACEPTADO" })], tienda: MANUAL })).tick();
+  assert.equal(avisosAlCajero(tomada).length, 1);
+  assert.match(avisosAlCajero(tomada)[0][1], /se canceló solo/);
+  // El orden: primero la llamada a la nube, después el texto.
+  const iBaja = tomada.sql.findIndex((q) => q.texto.startsWith("UPDATE delivery_pedidos SET ultimo_error"));
+  const iTicket = tomada.sql.findIndex((q) => q.texto.startsWith("SELECT crear_ticket_desde_tienda"));
+  assert.ok(iBaja > iTicket);
+});
+
+test("tienda: ACCION_INVALIDA al aceptar tras crear el ticket no cuenta como aceptado y deja el aviso ya", async () => {
+  const pool = poolFalso();
+  const nube = nubeFalsa({ pedidos: [pedidoT()], tienda: AUTO, siguienteEnMs: 300_000, alAceptar: () => [409, { error: "ACCION_INVALIDA" }] });
+  const logs = [];
+  const reloj = relojFalso();
+  const agente = agenteCon(pool, nube, { log: (m) => logs.push(m), aleatorio: centro, ...reloj });
+  await agente.vuelta();
+  assert.deepEqual(acciones(nube).map((b) => b.accion), ["reclamar", "aceptar"], "el orden crear → aceptar no cambia");
+  assert.ok(pool.sql.some((q) => q.texto.startsWith("SELECT crear_ticket_desde_tienda")));
+  assert.deepEqual(avisosAlCajero(pool), [["t1", "El pedido en línea se canceló: cancela el ticket en caja"]]);
+  assert.ok(logs.some((m) => /T-014/.test(m) && /cerrado/.test(m)));
+  assert.ok(!logs.some((m) => /1 aceptados/.test(m)), "no se cuenta como aceptado");
+  assert.equal(reloj.esperas.at(-1), 300_000, "no hay nada que reintentar");
+  // Lo mismo si el accept era un reintento de una vuelta anterior (el ticket ya existía).
+  const pool2 = poolFalso({ locales: [{ id: "t1", ticket_id: "tk", estado: "RECIBIDO" }] });
+  const nube2 = nubeFalsa({ pedidos: [pedidoT({ gestion_caja_id: CAJA })], tienda: AUTO, alAceptar: () => [409, { error: "ACCION_INVALIDA", estado: "EXPIRADO" }] });
+  const r2 = await agenteCon(pool2, nube2).tick();
+  assert.equal(r2.aceptados, 0);
+  assert.equal(avisosAlCajero(pool2).length, 1);
+});
+
+test("tienda: si ACCION_INVALIDA dice que el pedido ya está aceptado (lo aceptó otra pantalla), no hay aviso", async () => {
+  const pool = poolFalso();
+  const nube = nubeFalsa({ pedidos: [pedidoT()], tienda: AUTO, alAceptar: () => [409, { error: "ACCION_INVALIDA", estado: "ACEPTADO" }] });
+  const r = await agenteCon(pool, nube).tick();
+  assert.equal(r.aceptados, 1);
+  assert.deepEqual(avisosAlCajero(pool), []);
+});
+
+test("Uber: ACCION_INVALIDA al aceptar se sigue dando por aceptado, sin aviso (como siempre)", async () => {
+  const pool = poolFalso();
+  const nube = nubeFalsa({ pedidos: [pedido()], alAceptar: () => [409, { error: "ACCION_INVALIDA", estado: "CANCELADO" }] });
+  const r = await agenteCon(pool, nube).tick();
+  assert.deepEqual(r, { espejados: 1, creados: 1, aceptados: 1, avisos: 0 });
+  assert.deepEqual(avisosAlCajero(pool), []);
+});
+
+test("reporte: tope de 48 horas, y una excepción ahí no le mete backoff al sondeo", async () => {
+  const pool = poolFalso({ fallaReporte: new Error("el backend local se está reiniciando") });
+  const nube = nubeFalsa({ pedidos: [pedido()], siguienteEnMs: 30_000 });
+  const logs = [];
+  const reloj = relojFalso();
+  const agente = agenteCon(pool, nube, { log: (m) => logs.push(m), aleatorio: centro, ...reloj });
+  await agente.vuelta();
+  assert.equal(agente.estado().fallos, 0, "el sondeo no cuenta como fallido");
+  assert.equal(reloj.esperas.at(-1), 10_000, "pendiente: se reintenta pronto, sin backoff");
+  assert.ok(logs.some((m) => /reporte de estados/.test(m) && /reiniciando/.test(m)), "queda en el log");
+  assert.ok(logs.some((m) => /1 tickets creados · 1 aceptados/.test(m)), "y el pedido de Uber de esa vuelta se atendió");
+  const q = pool.sql.find((x) => x.texto.startsWith("SELECT p.id, p.folio_corto, p.estado"));
+  assert.match(q.texto, /p\.recibido_at > now\(\) - interval '48 hours'/);
 });
