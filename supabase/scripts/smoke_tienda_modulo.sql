@@ -1,7 +1,8 @@
 -- Smoke tienda en línea (mig. 0161 §5): el módulo `tienda` tiene las dos capas de delivery y
--- lealtad —complemento de VIM e interruptor del dueño—, el cambio de plan TODAVÍA NO lo concede
--- (eso llega con la migración de salida, entrega 7, como hizo lealtad en 0159), y la redefinición
--- de modulos_efectivos no perdió los módulos que ya existían.
+-- lealtad —complemento de VIM e interruptor del dueño—, el cambio de plan NO lo concede mientras
+-- el complemento esté inactivo en el catálogo (desde la 0167 la sincronización ya conoce la pareja,
+-- pero solo actúa con addons.activo; el encendido se prueba en smoke_tienda_salida.sql), y la
+-- redefinición de modulos_efectivos no perdió los módulos que ya existían.
 -- Uso: cd desktop && npm run smokes -- smoke_tienda_modulo.sql
 \set ON_ERROR_STOP on
 BEGIN;
@@ -64,19 +65,21 @@ BEGIN
     RAISE EXCEPTION '5: Negocio y Cadena deben incluir la tienda';
   END IF;
 
-  -- 6) El cambio de plan NO la concede todavía, aunque el plan ya lleve la bandera: esta función
-  --    corre en cada alta de negocio y cada cambio de plan, y detrás de la tienda aún no hay nada.
+  -- 6) Con el complemento inactivo, el cambio de plan NO la concede aunque el plan lleve la bandera
+  --    (0167): esta función corre en cada alta de negocio y cada cambio de plan, y la tienda no se
+  --    concede a nadie hasta tienda_encender_complemento().
   DELETE FROM tenant_addons WHERE tenant_id = v_tenant AND addon_id = (SELECT id FROM addons WHERE codigo = 'TIENDA');
   SELECT id INTO v_negocio FROM planes WHERE codigo = 'NEGOCIO';
   v_r := _sincronizar_addons_del_plan(v_tenant, v_negocio, true);
-  IF (v_r->'concedidos') ? 'TIENDA' THEN RAISE EXCEPTION '6: subir a Negocio concedió la tienda antes de la entrega 7: %', v_r; END IF;
+  IF (v_r->'concedidos') ? 'TIENDA' THEN RAISE EXCEPTION '6: subir a Negocio concedió la tienda con el complemento inactivo: %', v_r; END IF;
   IF EXISTS (SELECT 1 FROM tenant_addons ta JOIN addons a ON a.id = ta.addon_id
               WHERE ta.tenant_id = v_tenant AND a.codigo = 'TIENDA') THEN
     RAISE EXCEPTION '6: subir a Negocio dejó una fila del complemento TIENDA';
   END IF;
 
-  -- 7) El complemento nace inactivo: el panel de VIM no debe ofrecerlo hasta la entrega 7.
-  IF (SELECT activo FROM addons WHERE codigo = 'TIENDA') THEN RAISE EXCEPTION '7: el complemento TIENDA no debe nacer activo'; END IF;
+  -- 7) El complemento sigue inactivo: ninguna migración lo enciende (0167); el panel de VIM no lo
+  --    ofrece hasta que alguien ejecute tienda_encender_complemento().
+  IF (SELECT activo FROM addons WHERE codigo = 'TIENDA') THEN RAISE EXCEPTION '7: ninguna migración debe dejar activo el complemento TIENDA'; END IF;
 
   RAISE NOTICE 'smoke_tienda_modulo OK';
 END $$;
