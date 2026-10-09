@@ -5,7 +5,7 @@ import { mensajeError } from "../../lib/errores";
 import { leerModulos } from "../../lib/modulos";
 import { ponerLogoTienda, quitarLogoTienda } from "../../lib/foto-producto";
 import {
-  contarPendientesDeCatalogo, encenderTienda, guardarConfigTienda, leerConfigTienda, guardarSucursalTienda, leerSucursalesTienda, leerTiendaEncendida, urlDelLogo,
+  contarPendientesDeCatalogo, encenderTienda, leerCombosNoComprables, guardarConfigTienda, leerConfigTienda, guardarSucursalTienda, leerSucursalesTienda, leerTiendaEncendida, urlDelLogo,
   type BloqueConfig, type DatosConfigTienda,
 } from "../../lib/tienda";
 import { normalizarDireccion, trasEscribir, type Escritura, type Leido } from "../../lib/tienda-pagina";
@@ -31,11 +31,13 @@ const DE_FABRICA: DatosConfigTienda = {
 // mientras el interruptor sigue en `true`. `leerModulos` lanza el mensaje crudo de la base: aquí se
 // cambia por uno que el dueño entienda.
 async function leerTodo(): Promise<Leido> {
-  const [config, sucursales, interruptor, pendientes, modulos] = await Promise.all([
+  const [config, sucursales, interruptor, pendientes, combosNoComprables, modulos] = await Promise.all([
     leerConfigTienda(), leerSucursalesTienda(), leerTiendaEncendida(), contarPendientesDeCatalogo(),
+    // Solo es un aviso: si no se puede revisar, la página carga igual.
+    leerCombosNoComprables().catch(() => []),
     leerModulos().catch(() => { throw new Error(LECTURA); }),
   ]);
-  return { config, sucursales, interruptor, pendientes, enPlan: modulos.permitidos.tienda === true };
+  return { config, sucursales, interruptor, pendientes, combosNoComprables, enPlan: modulos.permitidos.tienda === true };
 }
 
 function formularioDe(c: DatosConfigTienda): Formulario {

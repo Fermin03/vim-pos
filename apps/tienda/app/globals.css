@@ -1,0 +1,99 @@
+@import "@vim/ui/tokens.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body { height: 100%; }
+body {
+  font-family: var(--font);
+  background: rgb(var(--bg));
+  color: rgb(var(--ink));
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.01em;
+}
+
+/* El texto encima del color de marca. Cada negocio pisa --accent y este con su color
+   (app/lib/color.ts, `variablesDeColor`); sobre el azul de VIM va blanco. */
+:root { --sobre-accent: 255 255 255; }
+
+/* ── La hoja (app/components/hoja.tsx): un <dialog> nativo abierto con showModal() ─────────────────
+   El navegador pone el foco atrapado, Escape, el regreso del foco y la capa superior. Aquí solo va
+   cómo se ve: hoja pegada abajo en el teléfono, diálogo centrado desde 640 px.
+   La entrada usa @starting-style y la salida `allow-discrete`; un navegador que no los conozca la
+   abre y la cierra sin animación, que también está bien. Sale más rápido de lo que entra.
+   Los @starting-style van SIEMPRE sueltos, nunca dentro de un @media: desde dónde entra cada cosa
+   lo dicen las variables --hoja-desde, --hoja-opacidad-desde y --aparece-desde, que sí cambian por
+   ancho y por movimiento reducido. Así ningún minificador tiene que entender un @starting-style
+   anidado. Y van AL FINAL del archivo: un @starting-style compite en la cascada como cualquier
+   regla, y un `.hoja[open] { opacity: 1 }` escrito después le ganaría (la hoja entraría sin fundido). */
+.hoja {
+  --hoja-desde: translateY(100%);
+  --hoja-opacidad-desde: 1;
+  position: fixed;
+  inset: auto 0 0 0;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 32rem;
+  max-height: 92dvh;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  background: rgb(var(--surface));
+  color: rgb(var(--ink));
+  flex-direction: column;
+  overflow: hidden;
+  transform: translateY(100%);
+  transition-property: opacity, transform, overlay, display;
+  transition-duration: 180ms;
+  transition-timing-function: ease;
+  transition-behavior: allow-discrete;
+}
+.hoja[open] {
+  display: flex;
+  transform: none;
+  transition-duration: 300ms;
+  transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+/* El velo va literal (es --ink): ::backdrop no hereda variables en navegadores de hace dos años. */
+.hoja::backdrop {
+  background: rgb(22 22 26 / 0);
+  transition-property: background-color, overlay, display;
+  transition-duration: 180ms;
+  transition-behavior: allow-discrete;
+}
+.hoja[open]::backdrop { background: rgb(22 22 26 / 0.45); }
+@media (min-width: 640px) {
+  .hoja {
+    --hoja-desde: translateY(8px) scale(0.98);
+    --hoja-opacidad-desde: 0;
+    inset: 0;
+    margin: auto;
+    max-height: min(88dvh, 46rem);
+    border-radius: var(--r-lg);
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  .hoja[open] { opacity: 1; transition-duration: 200ms; transition-timing-function: var(--ease-out); }
+}
+/* Con una hoja abierta, el menú de atrás no se desplaza. */
+html:has(dialog.hoja[open]) { overflow: hidden; }
+
+/* La barra del carrito aparece una vez, cuando entra el primer producto. */
+.aparece { transition: opacity 200ms ease, transform 200ms var(--ease-out); }
+
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+/* Movimiento reducido: sin desplazamiento; se conserva el fundido, que dice qué apareció. */
+@media (prefers-reduced-motion: reduce) {
+  .hoja, .hoja[open] { --hoja-desde: none; --hoja-opacidad-desde: 0; transform: none; opacity: 0; transition-duration: 150ms; transition-timing-function: ease; }
+  .hoja[open] { opacity: 1; }
+  .aparece { --aparece-desde: none; transition: opacity 150ms ease; }
+}
+
+/* ── Desde dónde entra cada cosa. SIEMPRE al final (ver la nota de la hoja, arriba). ────────────── */
+@starting-style {
+  .hoja[open] { transform: var(--hoja-desde); opacity: var(--hoja-opacidad-desde); }
+  .hoja[open]::backdrop { background: rgb(22 22 26 / 0); }
+  .aparece { opacity: 0; transform: var(--aparece-desde, translateY(8px)); }
+}

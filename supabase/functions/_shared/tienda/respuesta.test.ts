@@ -18,13 +18,21 @@ test("ip: ausente, vacía, basura o gigante es «desconocida»", () => {
 
 // ── Los cupos de cada acción (diseño §10) ───────────────────────────────────────────────────────
 test("cupos: leer es 120 cada 600 s por IP, sin nada después del antirobot, y deja pasar si el control falla", () => {
-  for (const accion of ["negocio", "menu", "cotizar", "seguimiento"] as const) {
+  for (const accion of ["negocio", "menu", "cotizar"] as const) {
     assert.deepEqual(cuposDe(accion, "1.2.3.4", "knockout"), {
       antes: [{ clave: "tienda:lee:ip:1.2.3.4", ventanaSeg: 600, max: 120 }],
       despuesDelCaptcha: [],
       alFallar: "abrir",
     });
   }
+});
+test("cupos: el seguimiento tiene su bolsa (90 cada 600 s): su sondeo no le quita lecturas al menú ni a cotizar", () => {
+  assert.deepEqual(cuposDe("seguimiento", "1.2.3.4", "knockout"), {
+    antes: [{ clave: "tienda:sigue:ip:1.2.3.4", ventanaSeg: 600, max: 90 }],
+    despuesDelCaptcha: [],
+    alFallar: "abrir",
+  });
+  assert.equal(cuposDe("seguimiento", "2806:2f0:9000:ab:1111:2222:3333:4444", "knockout").antes[0]!.clave, "tienda:sigue:ip:2806:2f0:9000:ab::/64");
 });
 test("cupos: pedir gasta 5 por IP antes del antirobot y 60 por negocio solo después; cierra si el control falla", () => {
   assert.deepEqual(cuposDe("pedir", "desconocida", "knockout"), {

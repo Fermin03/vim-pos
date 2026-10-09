@@ -12,7 +12,7 @@ const SUCURSAL = {
 };
 const LEIDO: Leido = {
   config: CONFIG, sucursales: [SUCURSAL, { ...SUCURSAL, id: "s2", nombre: "Norte" }], interruptor: false, enPlan: true,
-  pendientes: { sinFoto: 1, sinDescripcion: 0, enCategoriaInactiva: 0 },
+  pendientes: { sinFoto: 1, sinDescripcion: 0, enCategoriaInactiva: 0 }, combosNoComprables: [],
 };
 const DATOS = { direccion: "ko-burger", color: "#0078C9", descripcion: "Nueva", aceptacion: "AUTO" as const, minutosAceptacion: 9, pagoEfectivo: false, pagoTarjeta: true };
 

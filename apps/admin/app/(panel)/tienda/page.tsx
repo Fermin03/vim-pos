@@ -2,6 +2,7 @@
 import { DialogoPeligro } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
 import { useAccesoTenant } from "../../components/admin-shell";
+import { TiendaCombos } from "../../components/tienda-combos";
 import { TiendaCompartir } from "../../components/tienda-compartir";
 import { TiendaDatos } from "../../components/tienda-datos";
 import { TiendaEstado } from "../../components/tienda-estado";
@@ -83,6 +84,8 @@ export default function TiendaPage() {
               mensajeDe={t.mensajeDeSucursal}
               onGuardar={t.guardarSucursal}
             />
+
+            {t.leido.enPlan && <TiendaCombos combos={t.leido.combosNoComprables} />}
 
             {t.leido.config && <TiendaCompartir direccion={t.leido.config.direccion} encendida={t.encendida} enPlan={t.leido.enPlan} />}
           </div>

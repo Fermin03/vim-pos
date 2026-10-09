@@ -17,6 +17,7 @@ es quién las usa y en qué condiciones.
 | KDS | [`kds.md`](kds.md) | Cocinero · pantalla a 2 m · sin mouse |
 | Pantalla del cliente | [`pantalla-cliente.md`](pantalla-cliente.md) | Cliente en el mostrador · segundo monitor a 1 m o más · sin tocarla |
 | Factura | [`factura.md`](factura.md) | Cliente final · teléfono · una sola vez |
+| Tienda | [`tienda.md`](tienda.md) | Comensal · teléfono, con una mano · vuelve; la marca es la del restaurante |
 | Platform | [`platform.md`](platform.md) | VIM interno · acciones peligrosas |
 | Sitio | [`sitio.md`](sitio.md) | Visitante · marketing · sin build |
 

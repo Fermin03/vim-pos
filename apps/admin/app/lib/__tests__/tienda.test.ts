@@ -42,6 +42,7 @@ function consulta(tabla: string) {
     update: (v: Fila) => { op = "update"; valores = v; return q; },
     upsert: (v: Fila, o?: Fila) => { op = "upsert"; valores = v; opciones = o; return q; },
     eq: (c: string, v: unknown) => { eqs[c] = v; filtros = [...filtros, (f) => f[c] === v]; return q; },
+    gte: (c: string, v: number) => { filtros = [...filtros, (f) => Number(f[c]) >= v]; return q; },
     neq: (c: string, v: unknown) => { filtros = [...filtros, (f) => f[c] !== v]; return q; },
     is: (c: string, v: unknown) => { filtros = [...filtros, (f) => (f[c] ?? null) === v]; return q; },
     in: (c: string, vs: unknown[]) => { filtros = [...filtros, (f) => vs.includes(f[c])]; return q; },
@@ -62,7 +63,7 @@ vi.mock("../supabase", () => ({
 
 import {
   contarPendientesDeCatalogo, encenderTienda, guardarConfigTienda, guardarSucursalTienda, leerConfigTienda,
-  leerSucursalesTienda, leerTiendaEncendida,
+  leerCombosNoComprables, leerSucursalesTienda, leerTiendaEncendida,
 } from "../tienda";
 
 beforeEach(() => {
@@ -281,5 +282,40 @@ describe("pendientes del catálogo", () => {
     doble.tablas.categorias = [{ id: "c1", activa: true, deleted_at: null }];
     doble.tablas.productos = [{ deleted_at: null, visible_en_pos: true, estado: "ACTIVO", categoria_id: "c1", imagen_url: "x", descripcion: "x" }];
     expect(await contarPendientesDeCatalogo()).toEqual({ sinFoto: 0, sinDescripcion: 0, enCategoriaInactiva: 0 });
+  });
+});
+
+describe("combos que la tienda no puede vender", () => {
+  const prod = (id: string, nombre: string, extra: Fila = {}) => ({ id, nombre, categoria_id: "c1", es_combo: false, visible_en_pos: true, estado: "ACTIVO", deleted_at: null, ...extra });
+  const paso = (id: string, nombre: string, extra: Fila = {}) => ({ id, combo_producto_id: "k1", nombre, categoria_id: null, activo: true, minimo_selecciones: 1, deleted_at: null, ...extra });
+  const opc = (grupo_id: string, producto_id: string, activa = true) => ({ grupo_id, producto_id, activa, deleted_at: null });
+
+  it("dos pasos obligatorios con el mismo único producto salen avisados, con el nombre del combo", async () => {
+    doble.tablas.productos = [prod("k1", "Combo Doble", { es_combo: true }), prod("p1", "Refresco")];
+    doble.tablas.combo_grupos = [paso("g1", "Bebida"), paso("g2", "Extra")];
+    doble.tablas.combo_opciones = [opc("g1", "p1"), opc("g2", "p1")];
+    expect(await leerCombosNoComprables()).toEqual([{ combo: "Combo Doble", producto: "Refresco", pasos: ["Bebida", "Extra"] }]);
+  });
+
+  it("un paso por categoría admite todos los productos de la categoría menos los excluidos y los pausados", async () => {
+    doble.tablas.productos = [
+      prod("k1", "Combo", { es_combo: true }), prod("p1", "Refresco"), prod("p2", "Agua"), prod("p3", "Té", { estado: "PAUSADO" }), prod("p4", "Jugo"),
+    ];
+    doble.tablas.combo_grupos = [paso("g1", "Bebida", { categoria_id: "c1" }), paso("g2", "Extra")];
+    doble.tablas.combo_opciones = [opc("g1", "p2", false), opc("g1", "p4", false), opc("g2", "p1")];
+    // Bebida queda solo con Refresco y Extra también: no se pueden llenar los dos pasos.
+    expect(await leerCombosNoComprables()).toEqual([{ combo: "Combo", producto: "Refresco", pasos: ["Bebida", "Extra"] }]);
+  });
+
+  it("un combo sano, un paso opcional o uno borrado no avisan", async () => {
+    doble.tablas.productos = [prod("k1", "Combo", { es_combo: true }), prod("p1", "Refresco"), prod("p2", "Agua")];
+    doble.tablas.combo_grupos = [paso("g1", "Bebida"), paso("g2", "Extra", { minimo_selecciones: 0 }), paso("g3", "Otro", { deleted_at: "2026-01-01" })];
+    doble.tablas.combo_opciones = [opc("g1", "p1"), opc("g2", "p1"), opc("g3", "p1")];
+    expect(await leerCombosNoComprables()).toEqual([]);
+  });
+
+  it("si la consulta falla, lanza (quien llama decide que el aviso no rompe la página)", async () => {
+    doble.errorLectura = { message: "boom" };
+    await expect(leerCombosNoComprables()).rejects.toThrow();
   });
 });

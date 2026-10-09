@@ -1,7 +1,7 @@
 "use client";
 import { useRef } from "react";
 import { QRCodeCanvas } from "qrcode.react";
-import { Button } from "@vim/ui/styles";
+import { Button, botonClases } from "@vim/ui/styles";
 import { BotonCopiar } from "./boton-copiar";
 import { Tarjeta } from "./tarjeta";
 import { BASE_TIENDA } from "../lib/tienda-reglas";
@@ -51,6 +51,10 @@ export function TiendaCompartir({ direccion, encendida, enPlan }: {
           className="flex-shrink-0 rounded border border-line"
         />
         <Button variant="ghost" onClick={descargar}>Descargar QR</Button>
+        {/* Apagada, la dirección da 404: el enlace aparece cuando ya hay algo que ver. */}
+        {encendida && (
+          <a href={enlace} target="_blank" rel="noopener noreferrer" className={botonClases({ variant: "ghost" })}>Ver mi tienda</a>
+        )}
       </div>
     </Tarjeta>
   );

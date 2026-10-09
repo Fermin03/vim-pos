@@ -4,6 +4,7 @@
 import { z } from "zod";
 import { supabase } from "./supabase";
 import { tenantId } from "./datos";
+import { combosNoComprables, type ComboNoComprable, type ComboParaRevisar } from "./tienda-combos";
 import { errorDeDireccion, errorDeHorario, leerHorario, mensajeTienda, type SucursalTienda } from "./tienda-reglas";
 
 const SOLO_ADMIN = "Solo el dueño o un administrador puede cambiar esto.";
@@ -179,4 +180,42 @@ export async function contarPendientesDeCatalogo(): Promise<{ sinFoto: number; s
     inactivas.length === 0 ? 0 : contar(productos().in("categoria_id", inactivas)),
   ]);
   return { sinFoto, sinDescripcion, enCategoriaInactiva };
+}
+
+// ── Combos que la tienda no puede vender ──────────────────────────────────────
+
+/** PostgREST corta en 1000 filas: con el catálogo cortado las opciones saldrían incompletas y el aviso mentiría. */
+const TOPE_FILAS = 1000;
+
+/**
+ * Los combos que no se pueden comprar en la tienda. Qué es opción de un paso sale de lo mismo que
+ * valida la venta (0165, `slots`): en un paso por categoría, los productos de la categoría menos los
+ * excluidos (fila con `activa = false`); sin categoría, solo las filas activas. Ignora los menús
+ * propios por sucursal (ADR 0029). Si el catálogo no cabe en una consulta, no avisa.
+ */
+export async function leerCombosNoComprables(): Promise<ComboNoComprable[]> {
+  const [prods, pasos, filas] = await Promise.all([
+    supabase.from("productos").select("id, nombre, categoria_id, es_combo").is("deleted_at", null).eq("visible_en_pos", true).neq("estado", "PAUSADO"),
+    supabase.from("combo_grupos").select("id, combo_producto_id, nombre, categoria_id").is("deleted_at", null).eq("activo", true).gte("minimo_selecciones", 1),
+    supabase.from("combo_opciones").select("grupo_id, producto_id, activa").is("deleted_at", null),
+  ]);
+  if (prods.error) throw fallo(prods.error, "No se pudieron revisar los combos");
+  if (pasos.error) throw fallo(pasos.error, "No se pudieron revisar los combos");
+  if (filas.error) throw fallo(filas.error, "No se pudieron revisar los combos");
+  const productos = (prods.data ?? []) as { id: string; nombre: string; categoria_id: string; es_combo: boolean }[];
+  const opciones = (filas.data ?? []) as { grupo_id: string; producto_id: string; activa: boolean }[];
+  if (productos.length >= TOPE_FILAS || opciones.length >= TOPE_FILAS) return [];
+  const porId = new Map(productos.map((p) => [p.id, p]));
+  const combos = new Map<string, ComboParaRevisar>();
+  for (const c of productos.filter((p) => p.es_combo)) combos.set(c.id, { nombre: c.nombre, slots: [] });
+  for (const g of (pasos.data ?? []) as { id: string; combo_producto_id: string; nombre: string; categoria_id: string | null }[]) {
+    const combo = combos.get(g.combo_producto_id);
+    if (!combo) continue;
+    const suyas = opciones.filter((o) => o.grupo_id === g.id);
+    const ids = g.categoria_id
+      ? productos.filter((p) => p.categoria_id === g.categoria_id && !p.es_combo && !suyas.some((o) => o.producto_id === p.id && !o.activa)).map((p) => p.id)
+      : suyas.filter((o) => o.activa && porId.get(o.producto_id)?.es_combo === false).map((o) => o.producto_id);
+    combo.slots.push({ nombre: g.nombre, obligatorio: true, opciones: ids.map((id) => ({ productoId: id, nombre: porId.get(id)?.nombre ?? "" })) });
+  }
+  return combosNoComprables([...combos.values()]);
 }

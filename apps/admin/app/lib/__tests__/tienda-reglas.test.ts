@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -8,11 +8,14 @@ import {
 } from "../tienda-reglas";
 
 describe("direcciones", () => {
-  it("las reservadas son exactamente las de la migración", () => {
-    const sql = readFileSync(resolve(__dirname, "../../../../../supabase/migrations/0163_tienda_admin.sql"), "utf8");
-    const lista = /slug NOT IN \(([^)]*)\)/.exec(sql)?.[1] ?? "";
-    const deSql = [...lista.matchAll(/'([^']+)'/g)].map((m) => m[1]);
-    expect(deSql).toHaveLength(16);
+  it("las reservadas son exactamente las de la migración vigente (la última que define el CHECK)", () => {
+    const dir = resolve(__dirname, "../../../../../supabase/migrations");
+    const listas = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()
+      .map((f) => /slug NOT IN \(([^)]*)\)/.exec(readFileSync(resolve(dir, f), "utf8"))?.[1])
+      .filter((l) => l !== undefined);
+    const deSql = [...(listas.at(-1) ?? "").matchAll(/'([^']+)'/g)].map((m) => m[1]);
+    expect(deSql).toHaveLength(35);
+    expect(new Set(deSql).size).toBe(35);
     expect([...DIRECCIONES_RESERVADAS].sort()).toEqual([...deSql].sort());
   });
 

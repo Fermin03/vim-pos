@@ -18,9 +18,10 @@ const CONNECT_NUBE =
  * @param {string} [o.scriptExtra] Origen adicional para `script-src` (p. ej. el captcha del admin).
  * @param {string} [o.frameSrc] Origen para `frame-src`. Sin él no se emite la directiva.
  * @param {string} [o.connectSrc] Directiva `connect-src` completa, si no es la de la nube.
+ * @param {string[]} [o.imgSrc] Orígenes adicionales para `img-src` (la tienda: las fotos del almacén público).
  * @param {boolean} [o.hsts] `false` quita Strict-Transport-Security (el KDS habla http con su hub).
  */
-export function cabecerasSeguridad({ scriptExtra, frameSrc, connectSrc = CONNECT_NUBE, hsts = true } = {}) {
+export function cabecerasSeguridad({ scriptExtra, frameSrc, connectSrc = CONNECT_NUBE, imgSrc = [], hsts = true } = {}) {
   const isDev = process.env.NODE_ENV !== "production";
   const scriptSrc = ["script-src 'self' 'unsafe-inline'", isDev && "'unsafe-eval'", scriptExtra].filter(Boolean).join(" ");
   return [
@@ -36,7 +37,7 @@ export function cabecerasSeguridad({ scriptExtra, frameSrc, connectSrc = CONNECT
         "frame-ancestors 'none'",
         "base-uri 'self'",
         "form-action 'self'",
-        "img-src 'self' data: blob:",
+        ["img-src 'self' data: blob:", ...imgSrc].join(" "),
         "font-src 'self' data: https://fonts.gstatic.com",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         scriptSrc,

@@ -393,7 +393,8 @@ La foto se sube desde la ficha del producto en el catálogo.
 | `entrar` | 10 cada 10 min por IP; 5 fallos seguidos bloquean la cuenta 15 min |
 | `registrar` | 5 por hora por IP |
 | `recuperar_pedir` | 3 por hora por correo y por IP |
-| Lecturas | 120 cada 10 min por IP |
+| Lecturas (negocio, menú, cotizar) | 120 cada 10 min por IP |
+| Seguimiento | 90 cada 10 min por IP, en bolsa aparte: su sondeo no gasta la de lecturas |
 
 - **Cierre ante falla.** Si el control de cupos no responde, las acciones que escriben se niegan (al
   revés que la autofactura, que deja pasar).
