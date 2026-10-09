@@ -1,6 +1,7 @@
 -- Smoke tienda en línea (mig. 0161 §5): el módulo `tienda` tiene las dos capas de delivery y
--- lealtad —complemento de VIM e interruptor del dueño—, el cambio de plan lo concede y lo retira,
--- y la redefinición de modulos_efectivos no perdió los módulos que ya existían.
+-- lealtad —complemento de VIM e interruptor del dueño—, el cambio de plan TODAVÍA NO lo concede
+-- (eso llega con la migración de salida, entrega 7, como hizo lealtad en 0159), y la redefinición
+-- de modulos_efectivos no perdió los módulos que ya existían.
 -- Uso: cd desktop && npm run smokes -- smoke_tienda_modulo.sql
 \set ON_ERROR_STOP on
 BEGIN;
@@ -9,7 +10,7 @@ DECLARE
   v_tenant uuid := '99999999-0000-0000-0000-0000000000aa';
   v_m      jsonb;
   v_r      jsonb;
-  v_negocio uuid; v_esencial uuid;
+  v_negocio uuid;
   -- OJO: la misma expresión que tenant_addon_activo. Con CURRENT_DATE (UTC en el CI) este smoke
   -- se pondría rojo seis horas al día.
   v_hoy    date := (now() AT TIME ZONE 'America/Mexico_City')::date;
@@ -52,18 +53,16 @@ BEGIN
     RAISE EXCEPTION '5: Negocio y Cadena deben incluir la tienda';
   END IF;
 
-  -- 6) El cambio de plan la concede a $0 y la retira; lo que se paga aparte no se toca.
+  -- 6) El cambio de plan NO la concede todavía, aunque el plan ya lleve la bandera: esta función
+  --    corre en cada alta de negocio y cada cambio de plan, y detrás de la tienda aún no hay nada.
   DELETE FROM tenant_addons WHERE tenant_id = v_tenant AND addon_id = (SELECT id FROM addons WHERE codigo = 'TIENDA');
-  SELECT id INTO v_negocio  FROM planes WHERE codigo = 'NEGOCIO';
-  SELECT id INTO v_esencial FROM planes WHERE codigo = 'ESENCIAL';
+  SELECT id INTO v_negocio FROM planes WHERE codigo = 'NEGOCIO';
   v_r := _sincronizar_addons_del_plan(v_tenant, v_negocio, true);
-  IF NOT (v_r->'concedidos') ? 'TIENDA' THEN RAISE EXCEPTION '6: subir a Negocio no concedió la tienda: %', v_r; END IF;
-  IF NOT EXISTS (SELECT 1 FROM tenant_addons ta JOIN addons a ON a.id = ta.addon_id
-                  WHERE ta.tenant_id = v_tenant AND a.codigo = 'TIENDA' AND ta.activo AND ta.incluido_en_plan AND ta.precio_mensual_mxn = 0) THEN
-    RAISE EXCEPTION '6: la tienda no quedó incluida a $0';
+  IF (v_r->'concedidos') ? 'TIENDA' THEN RAISE EXCEPTION '6: subir a Negocio concedió la tienda antes de la entrega 7: %', v_r; END IF;
+  IF EXISTS (SELECT 1 FROM tenant_addons ta JOIN addons a ON a.id = ta.addon_id
+              WHERE ta.tenant_id = v_tenant AND a.codigo = 'TIENDA') THEN
+    RAISE EXCEPTION '6: subir a Negocio dejó una fila del complemento TIENDA';
   END IF;
-  v_r := _sincronizar_addons_del_plan(v_tenant, v_esencial, true);
-  IF NOT (v_r->'retirados') ? 'TIENDA' THEN RAISE EXCEPTION '6: bajar a Esencial no retiró la tienda: %', v_r; END IF;
 
   -- 7) El complemento nace inactivo: el panel de VIM no debe ofrecerlo hasta la entrega 7.
   IF (SELECT activo FROM addons WHERE codigo = 'TIENDA') THEN RAISE EXCEPTION '7: el complemento TIENDA no debe nacer activo'; END IF;
