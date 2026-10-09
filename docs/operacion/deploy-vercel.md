@@ -1,7 +1,15 @@
 # Deploy a Vercel — VIM POS (monorepo pnpm + turbo)
 
-3 apps = **3 proyectos Vercel** en la misma cuenta (`fermin03` / team `fermin03s-projects`),
-todos desde el mismo repo de GitHub `Fermin03/vim-pos`.
+Una app = **un proyecto Vercel** , todos en la misma cuenta (`fermin03` / team `fermin03s-projects`)
+y desde el mismo repo de GitHub `Fermin03/vim-pos`.
+
+| App | Proyecto Vercel | Dominio | Estado |
+|---|---|---|---|
+| `apps/pos` | `pos` | — | creado |
+| `apps/admin` | `admin` | `admin.vimpos.com.mx` | creado |
+| `apps/platform` | `platform` | `platform.vimpos.com.mx` | creado |
+| `apps/factura` | `vim-factura` | — | creado |
+| `apps/tienda` | `vim-tienda` | `pedidos.vimpos.com.mx` | **PENDIENTE de crear**: pasos en [`tienda-publica-salida.md`](tienda-publica-salida.md) |
 
 ## Gotcha del monorepo (resuelto)
 La CLI `vercel deploy` **desde `apps/pos`** sube SOLO esa carpeta y usa `npm install` → falla
@@ -32,12 +40,23 @@ vercel deploy --prod --yes
 
 ## Env vars por app
 - **pos** y **admin**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+- **tienda** (`vim-tienda`): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (la misma
+  del admin) y `VIM_TIENDA_SECRET` (solo servidor, «Sensitive»; el mismo valor que el secreto de
+  Supabase). **No** lleva `anon key` ni `service_role`. Pasos completos y orden en
+  [`tienda-publica-salida.md`](tienda-publica-salida.md).
 - **platform**: además `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (server, secreta),
   `PLATFORM_PROVISION_KEY`, `VIM_JWT_SECRET`, `ADMIN_APP_URL` (para impersonación),
   `VIM_DELIVERY_INTERNO_SECRET` (autentica el aviso a `delivery-uber-conexion` cuando platform
   pausa Uber al retirarle el add-on de delivery a un tenant; tiene que coincidir con el secreto del
   mismo nombre puesto en Supabase).
 - **Edge Functions** (Supabase, no Vercel): `VIM_CORS_ORIGINS`, `FACTURAMA_API_USER`, etc.
+
+## Límite de 100 despliegues al día
+
+El plan de Vercel permite 100 despliegues diarios en total, y cada app cuenta. Un cambio en un
+paquete compartido (`@vim/ui`, `@vim/fecha`, `@vim/config`) despliega todas las apps que lo usan
+—con `vim-tienda`, seis—. Los cambios en `supabase/migrations`, `sitio-web` y `docs` no despliegan
+ninguna (ver `pnpm-workspace.yaml`).
 
 ## Auto-deploy en cada commit
 Conectar cada proyecto al repo de GitHub (Settings → Git) con Root Directory ya seteado →
