@@ -2,11 +2,14 @@
 -- 0164 — Tienda en línea, entrega 4: lo que la caja y el POS necesitan de la base.
 -- Diseño: docs/superpowers/specs/2026-10-08-tienda-en-linea-design.md (§8, §3)
 --
--- Dos cosas:
+-- Tres cosas:
 --   §1 tienda_reportar_estado: la caja instalada le cuenta a la nube en qué va un pedido de la
 --      tienda (listo, entregado, cancelado) mirando su ticket local. Solo avanza.
 --   §2 El aviso al celular del dueño cuando un pedido vence sin aceptar dice de dónde era:
 --      delivery_avisar_expirados recibe el canal y delivery_marcar_expirados agrupa por él.
+--   §3 tienda_sincronizar_estados_nube: los pedidos que se atienden desde el POS web (gestión NUBE)
+--      no tienen caja que reporte; la nube mira su ticket y los pasa sola a listo, entregado o
+--      cancelado. La llama delivery_marcar_expirados, que ya corre cada minuto.
 -- Corre también en el Postgres embebido de la caja: no toca storage.*, cron.* ni net.* (el aviso
 -- sigue protegido como en la 0097: sin pg_net o sin Vault se omite y marcar sigue funcionando).
 -- ============================================================================
@@ -103,9 +106,64 @@ END $$;
 REVOKE ALL ON FUNCTION delivery_avisar_expirados(uuid, uuid, integer, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION delivery_avisar_expirados(uuid, uuid, integer, text) TO service_role;
 
--- delivery_marcar_expirados: cuerpo copiado ÍNTEGRO de 0097_*.sql; cambia solo el bucle del aviso,
--- que ahora agrupa por sucursal Y canal. El canal se lee del pedido (la tabla temporal conserva su
--- forma: si ya existiera en la sesión con la de la 0097, sigue sirviendo).
+-- ── §3 Los pedidos atendidos desde el POS web avanzan solos ──────────────────
+-- Un pedido de gestión NUBE tiene su ticket en la nube y ninguna caja que reporte su estado: sin
+-- esto se queda ACEPTADO para siempre (el POS lo lista como activo, y la retención de datos
+-- personales —que no toca ACEPTADO— nunca lo alcanza).
+-- MISMA REGLA que tienda_seguimiento (0162) y que estadoAReportar de la caja: ticket CANCELADO →
+-- CANCELADO; PAGADO o FACTURADO → ENTREGADO; ticket impreso o con repartidor → LISTO. Si cambia
+-- una, cambian las tres.
+-- Se aplica con tienda_reportar_estado, que solo avanza: repetir la pasada no cambia nada.
+-- Solo entran los pedidos cuyo estado calculado es distinto del guardado, así que el LIMIT nunca
+-- deja a uno atorado detrás de otros que no tienen nada que decir.
+-- ponytail: recorre delivery_pedidos entera, igual que el marcado de vencidos (la tabla no tiene
+-- índice por estado). Índice parcial (canal, gestion, estado) cuando la tabla pese. Y solo mira
+-- los pedidos de los últimos 7 días: una cuenta abierta más tiempo que eso no se pone al día.
+CREATE OR REPLACE FUNCTION tienda_sincronizar_estados_nube() RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_n integer := 0;
+  r record;
+BEGIN
+  FOR r IN
+    SELECT * FROM (
+      SELECT p.tenant_id, p.id, p.estado, p.recibido_at,
+             CASE
+               WHEN t.estado_fiscal = 'CANCELADO' THEN 'CANCELADO'
+               WHEN t.estado_fiscal IN ('PAGADO', 'FACTURADO') THEN 'ENTREGADO'
+               WHEN t.ticket_impreso_at IS NOT NULL
+                    OR EXISTS (SELECT 1 FROM delivery_asignaciones a WHERE a.ticket_id = t.id) THEN 'LISTO'
+             END AS nuevo
+        FROM delivery_pedidos p
+        JOIN tickets t ON t.id = p.ticket_id AND t.tenant_id = p.tenant_id
+       WHERE p.canal = 'TIENDA' AND p.gestion = 'NUBE'
+         AND p.estado IN ('ACEPTADO', 'EN_PREPARACION', 'LISTO')
+         AND p.recibido_at > now() - interval '7 days'
+    ) x
+    WHERE x.nuevo IS NOT NULL AND x.nuevo <> x.estado
+    ORDER BY x.recibido_at
+    LIMIT 200
+  LOOP
+    IF tienda_reportar_estado(r.tenant_id, r.id, r.nuevo, CASE WHEN r.nuevo = 'CANCELADO' THEN 'OTRO' END)
+       IS DISTINCT FROM r.estado THEN
+      v_n := v_n + 1;
+    END IF;
+  END LOOP;
+  RETURN v_n;
+END;
+$$;
+REVOKE ALL ON FUNCTION tienda_sincronizar_estados_nube() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION tienda_sincronizar_estados_nube() TO service_role;
+COMMENT ON FUNCTION tienda_sincronizar_estados_nube IS
+  'Pasa a LISTO, ENTREGADO o CANCELADO los pedidos de la tienda atendidos desde el POS web (gestión NUBE) mirando su ticket, con la regla de tienda_seguimiento. Idempotente. La llama delivery_marcar_expirados cada minuto. Solo service_role.';
+
+-- delivery_marcar_expirados: cuerpo copiado ÍNTEGRO de 0097_*.sql; cambian el bucle del aviso, que
+-- ahora agrupa por sucursal Y canal (el canal se lee del pedido: la tabla temporal conserva su
+-- forma, y si ya existiera en la sesión con la de la 0097 sigue sirviendo), y el paso final, que
+-- pone al día los pedidos del POS web (§3).
 CREATE OR REPLACE FUNCTION delivery_marcar_expirados() RETURNS integer
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -144,10 +202,18 @@ BEGIN
     PERFORM delivery_avisar_expirados(r.tenant_id, r.sucursal_id, r.n, r.canal);
   END LOOP;
 
+  -- Los pedidos atendidos desde el POS web (§3). En su propio bloque: si falla, lo ya marcado como
+  -- vencido se queda marcado y la siguiente pasada lo reintenta.
+  BEGIN
+    PERFORM tienda_sincronizar_estados_nube();
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'tienda_sincronizar_estados_nube: %', SQLERRM;
+  END;
+
   RETURN v_n;
 END;
 $$;
 REVOKE ALL ON FUNCTION delivery_marcar_expirados() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION delivery_marcar_expirados() TO service_role;
 COMMENT ON FUNCTION delivery_marcar_expirados IS
-  'Marca EXPIRADO los pedidos RECIBIDOS (de apps y de la tienda en línea) cuya ventana venció; deja evento y aviso en la conexión y manda push al dueño diciendo de qué canal eran (pg_net → enviar-push). Cron cada minuto (nube).';
+  'Marca EXPIRADO los pedidos RECIBIDOS (de apps y de la tienda en línea) cuya ventana venció; deja evento y aviso en la conexión y manda push al dueño diciendo de qué canal eran (pg_net → enviar-push). Al final pone al día los pedidos de la tienda atendidos desde el POS web. Cron cada minuto (nube).';

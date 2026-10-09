@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   segundosRestantes, etiquetaApp, etiquetaEstado, ordenarPedidos, etiquetaAlergia, pedidoConAlergia,
-  etiquetaModificadores, itemsDesdeJson, pedidoDesdeFila, type PedidoApp, type PedidoAppItem,
+  etiquetaModificadores, itemsDesdeJson, pedidoDesdeFila, sinCerradosViejos, type PedidoApp, type PedidoAppItem,
 } from "../pedidos-apps";
 
 const base = (extra: Partial<PedidoApp>): PedidoApp => ({
@@ -202,5 +202,37 @@ describe("pedidoDesdeFila", () => {
   });
   it("etiquetaApp nombra la tienda", () => {
     expect(etiquetaApp("DRIVE_THRU")).toBe("Tienda");
+  });
+});
+
+describe("pedido de la tienda atendido desde el POS web (gestión NUBE): el estado sale del ticket", () => {
+  const base = { id: "p", app: "DRIVE_THRU", canal: "TIENDA", gestion: "NUBE", id_externo: "e", estado: "ACEPTADO", recibido_at: "2026-10-09T10:00:00Z", items: [], ticket_id: "t1" };
+  const con = (ticket: Record<string, unknown>, extra: Record<string, unknown> = {}) => pedidoDesdeFila({ ...base, ...extra, ticket: { folio_completo: "A-1", ...ticket } }).estado;
+  it("misma regla que tienda_seguimiento: cancelado, cobrado o facturado, impreso", () => {
+    expect(con({ estado_fiscal: "ABIERTO" })).toBe("ACEPTADO");
+    expect(con({ estado_fiscal: "ABIERTO", ticket_impreso_at: "2026-10-09T10:05:00Z" })).toBe("LISTO");
+    expect(con({ estado_fiscal: "PAGADO" })).toBe("ENTREGADO");
+    expect(con({ estado_fiscal: "FACTURADO", ticket_impreso_at: "2026-10-09T10:05:00Z" })).toBe("ENTREGADO");
+    expect(con({ estado_fiscal: "CANCELADO", ticket_impreso_at: "2026-10-09T10:05:00Z" })).toBe("CANCELADO");
+    expect(con({ estado_fiscal: "PAGADO" }, { estado: "LISTO" })).toBe("ENTREGADO");
+    expect(con({ estado_fiscal: "PAGADO" }, { estado: "EN_PREPARACION" })).toBe("ENTREGADO");
+  });
+  it("no se deriva fuera de eso: sin ticket, por aceptar, ya cerrado, de una caja instalada o de una app", () => {
+    expect(pedidoDesdeFila({ ...base, ticket: null }).estado).toBe("ACEPTADO");
+    expect(con({ estado_fiscal: "PAGADO" }, { estado: "RECIBIDO" })).toBe("RECIBIDO");
+    expect(con({ estado_fiscal: "PAGADO" }, { estado: "EXPIRADO" })).toBe("EXPIRADO");
+    expect(con({ estado_fiscal: "PAGADO" }, { gestion: "ESCRITORIO" })).toBe("ACEPTADO");
+    expect(con({ estado_fiscal: "PAGADO" }, { canal: "APP", app: "APP_UBEREATS" })).toBe("ACEPTADO");
+  });
+  it("uno ya cobrado o cancelado deja de listarse pasada la media hora; los vivos siguen", () => {
+    const desde = "2026-10-09T12:00:00Z";
+    const p = (id: string, ticket: Record<string, unknown>, recibido_at: string) => pedidoDesdeFila({ ...base, id, recibido_at, ticket });
+    const lista = [
+      p("vivo-viejo", { estado_fiscal: "ABIERTO" }, "2026-10-08T09:00:00Z"),
+      p("cobrado-viejo", { estado_fiscal: "PAGADO" }, "2026-10-08T09:00:00Z"),
+      p("cancelado-viejo", { estado_fiscal: "CANCELADO" }, "2026-10-09T11:59:59Z"),
+      p("cobrado-reciente", { estado_fiscal: "PAGADO" }, "2026-10-09T12:10:00Z"),
+    ];
+    expect(sinCerradosViejos(lista, desde).map((x) => x.id)).toEqual(["vivo-viejo", "cobrado-reciente"]);
   });
 });

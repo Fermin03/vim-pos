@@ -203,8 +203,11 @@ BEGIN
   IF (SELECT ultimo_error FROM delivery_conexiones WHERE id = v_conexion) IS DISTINCT FROM 'Pedidos expirados sin aceptar: revisar la caja' THEN
     RAISE EXCEPTION '11: la conexión de Uber no quedó avisada';
   END IF;
-  -- Los pedidos vigentes y los ya aceptados no se tocaron.
-  IF EXISTS (SELECT 1 FROM delivery_pedidos WHERE id_externo LIKE 'tienda-est-%' AND estado = 'EXPIRADO' AND id <> v_id AND cancelado_por IS DISTINCT FROM 'APP') THEN
+  -- Los pedidos vigentes y los ya aceptados no se tocaron: de todos los de este smoke, el único que
+  -- lleva el motivo que escribe el marcado es el que venció aquí (los EXPIRADO del caso 6 nacieron
+  -- así, con otro motivo).
+  IF EXISTS (SELECT 1 FROM delivery_pedidos WHERE id_externo LIKE 'tienda-est-%' AND id <> v_id
+                AND motivo_cancelacion = 'Venció la ventana de aceptación') THEN
     RAISE EXCEPTION '11: venció un pedido que no tocaba';
   END IF;
   -- El aviso, por canal: firma nueva, la de tres argumentos ya no existe, y sin pg_net/Vault no falla.

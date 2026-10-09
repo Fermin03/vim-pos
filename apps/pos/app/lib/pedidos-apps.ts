@@ -46,13 +46,41 @@ export async function leerPedidosApps(token: string, sucursalId: string): Promis
   const desde = new Date(Date.now() - 30 * 60_000).toISOString();
   const { data, error } = await employeeClient(token)
     .from("delivery_pedidos")
-    .select("id, app, id_externo, folio_corto, estado, tipo_entrega, cliente_nombre, nota_cliente, items, total_cliente_mxn, vence_aceptacion, recibido_at, ticket_id, ultimo_error, canal, cliente_telefono, direccion, pago_al_recibir, paga_con_mxn, envio_mxn, subtotal_mxn, gestion, gestion_caja_id, ticket:tickets(folio_completo, caja_id, comanda_impresa_at)")
+    .select("id, app, id_externo, folio_corto, estado, tipo_entrega, cliente_nombre, nota_cliente, items, total_cliente_mxn, vence_aceptacion, recibido_at, ticket_id, ultimo_error, canal, cliente_telefono, direccion, pago_al_recibir, paga_con_mxn, envio_mxn, subtotal_mxn, gestion, gestion_caja_id, ticket:tickets(folio_completo, caja_id, comanda_impresa_at, estado_fiscal, ticket_impreso_at)")
     .eq("sucursal_id", sucursalId)
     .or(`estado.in.(${ACTIVOS.join(",")}),recibido_at.gte.${desde}`)
     .order("recibido_at", { ascending: false })
     .limit(100);
   if (error) throw new Error(error.message);
-  return ((data ?? []) as unknown as Record<string, unknown>[]).map(pedidoDesdeFila);
+  return sinCerradosViejos(((data ?? []) as unknown as Record<string, unknown>[]).map(pedidoDesdeFila), desde);
+}
+
+/**
+ * La consulta trae todo lo que la base tiene por activo. Un pedido atendido desde el POS web puede
+ * seguir ACEPTADO allá un minuto después de cobrado (o más, si la pasada que lo pone al día falla):
+ * ya derivado a cerrado, se le aplica la misma media hora que a los demás cerrados.
+ */
+export function sinCerradosViejos(pedidos: PedidoApp[], desdeIso: string): PedidoApp[] {
+  const desde = Date.parse(desdeIso);
+  return pedidos.filter((p) => ACTIVOS.includes(p.estado) || Date.parse(p.recibidoAt) >= desde);
+}
+
+type TicketDeFila = { folio_completo?: string; caja_id?: string | null; comanda_impresa_at?: string | null; estado_fiscal?: string | null; ticket_impreso_at?: string | null };
+const VIVO_CON_TICKET: unknown[] = ["ACEPTADO", "EN_PREPARACION", "LISTO"];
+/**
+ * Un pedido de la tienda atendido desde el POS web (gestión NUBE) no tiene caja que reporte su
+ * estado: sale de su ticket, con la MISMA regla que tienda_seguimiento y
+ * tienda_sincronizar_estados_nube (0164), que lo escribe en la base cada minuto. Derivarlo aquí
+ * hace que un pedido cobrado o cancelado deje de verse activo al momento.
+ * ponytail: «con repartidor asignado → LISTO» no se deriva aquí (pediría otra tabla en la consulta
+ * y la tarjeta pinta igual ACEPTADO que LISTO); la base lo pone al minuto.
+ */
+function estadoDeFila(r: Record<string, unknown>, ticket: TicketDeFila | null): PedidoAppEstado {
+  const estado = r.estado as PedidoAppEstado;
+  if (r.canal !== "TIENDA" || r.gestion !== "NUBE" || !ticket || !VIVO_CON_TICKET.includes(estado)) return estado;
+  if (ticket.estado_fiscal === "CANCELADO") return "CANCELADO";
+  if (ticket.estado_fiscal === "PAGADO" || ticket.estado_fiscal === "FACTURADO") return "ENTREGADO";
+  return ticket.ticket_impreso_at ? "LISTO" : estado;
 }
 
 function direccionDesdeJson(v: unknown): PedidoApp["direccion"] {
@@ -67,14 +95,14 @@ function direccionDesdeJson(v: unknown): PedidoApp["direccion"] {
 }
 
 export function pedidoDesdeFila(r: Record<string, unknown>): PedidoApp {
-  const ticket = r.ticket as { folio_completo?: string; caja_id?: string | null; comanda_impresa_at?: string | null } | null;
+  const ticket = r.ticket as TicketDeFila | null;
   const forma = r.pago_al_recibir === "EFECTIVO" || r.pago_al_recibir === "TARJETA" ? r.pago_al_recibir : null;
   return {
     id: String(r.id),
     app: r.app as PedidoApp["app"],
     idExterno: String(r.id_externo),
     folioCorto: (r.folio_corto as string | null) ?? null,
-    estado: r.estado as PedidoAppEstado,
+    estado: estadoDeFila(r, ticket),
     tipoEntrega: (r.tipo_entrega as string | null) ?? null,
     clienteNombre: (r.cliente_nombre as string | null) ?? null,
     notaCliente: (r.nota_cliente as string | null) ?? null,
