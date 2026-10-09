@@ -20,8 +20,8 @@ import { POST } from "../../api/tienda/route";
 const TOKEN = "Ab3_-".repeat(4) + "Zz";       // 22 caracteres: la forma de un token de sesión
 const OTRO = "Zz9_-".repeat(4) + "Aa";
 const CUENTA = { nombre: "Ana", apellido: "López", email: "ana@example.com", telefono: "4771112233", fecha_nacimiento: null };
-const PUESTA = `vt_knockout=${TOKEN}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000`;
-const BORRADA = "vt_knockout=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0";
+const PUESTA = `__Host-vt_knockout=${TOKEN}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=2592000`;
+const BORRADA = "__Host-vt_knockout=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0";
 
 type Llamada = { url: string; init: RequestInit };
 let llamadas: Llamada[] = [];
@@ -52,8 +52,12 @@ afterEach(() => {
 });
 
 describe("la cookie de sesión", () => {
-  it("se llama vt_<slug>, y todo slug válido es un nombre de cookie válido", () => {
-    expect(nombreDeCookie("knockout")).toBe("vt_knockout");
+  it("se llama __Host-vt_<slug> (vt_<slug> solo en el localhost de desarrollo), y todo slug válido es un nombre de cookie válido", () => {
+    // El prefijo __Host- hace que el navegador solo la acepte de ESTE host, con Secure y Path=/: otro
+    // subdominio no puede plantarle una sesión al visitante. Exige Secure, así que en http://localhost no va.
+    for (const host of ["pedidos.vimpos.com.mx", "localhost.evil.com", "192.168.1.5:3005", ""]) expect(nombreDeCookie("knockout", host), host).toBe("__Host-vt_knockout");
+    for (const local of ["localhost", "localhost:3005", "127.0.0.1", "127.0.0.1:3005"]) expect(nombreDeCookie("knockout", local), local).toBe("vt_knockout");
+    expect(nombreDeCookie("knockout")).toBe("__Host-vt_knockout");
     // El alfabeto del slug (a-z, 0-9, guion) cabe entero en el de un nombre de cookie (token de RFC 7230).
     const TOKEN_HTTP = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
     for (const slug of ["knockout", "la-casa-de-ana", "a1b", "0-0", "x".repeat(40)]) {
@@ -63,18 +67,36 @@ describe("la cookie de sesión", () => {
   });
   it("lee solo la del negocio pedido", () => {
     const h = (cookie: string) => new Headers({ cookie });
-    expect(sesionDe(h(`a=b; vt_knockout=${TOKEN}; vt_otro=${OTRO}`), "knockout")).toBe(TOKEN);
-    expect(sesionDe(h(`a=b; vt_knockout=${TOKEN}; vt_otro=${OTRO}`), "otro")).toBe(OTRO);
-    expect(sesionDe(h(`vt_otro=${OTRO}`), "knockout")).toBeNull();
+    expect(sesionDe(h(`a=b; __Host-vt_knockout=${TOKEN}; __Host-vt_otro=${OTRO}`), "knockout")).toBe(TOKEN);
+    expect(sesionDe(h(`a=b; __Host-vt_knockout=${TOKEN}; __Host-vt_otro=${OTRO}`), "otro")).toBe(OTRO);
+    expect(sesionDe(h(`__Host-vt_otro=${OTRO}`), "knockout")).toBeNull();
     // Un negocio cuyo slug empieza igual no es el mismo negocio.
-    expect(sesionDe(h(`vt_knockout-2=${OTRO}`), "knockout")).toBeNull();
-    expect(sesionDe(h(`vt_knockout=${TOKEN}`), "knockout-2")).toBeNull();
-    expect(sesionDe(h(`xvt_knockout=${TOKEN}`), "knockout")).toBeNull();
+    expect(sesionDe(h(`__Host-vt_knockout-2=${OTRO}`), "knockout")).toBeNull();
+    expect(sesionDe(h(`__Host-vt_knockout=${TOKEN}`), "knockout-2")).toBeNull();
+    expect(sesionDe(h(`x__Host-vt_knockout=${TOKEN}`), "knockout")).toBeNull();
     expect(sesionDe(new Headers(), "knockout")).toBeNull();
+  });
+  it("lee la que corresponde al host: en producción una sin prefijo no es una sesión, y al revés en localhost", () => {
+    const h = (host: string, cookie: string) => new Headers({ host, cookie });
+    expect(sesionDe(h("pedidos.vimpos.com.mx", `vt_knockout=${OTRO}`), "knockout")).toBeNull();
+    expect(sesionDe(h("pedidos.vimpos.com.mx", `vt_knockout=${OTRO}; __Host-vt_knockout=${TOKEN}`), "knockout")).toBe(TOKEN);
+    expect(sesionDe(h("localhost:3005", `vt_knockout=${TOKEN}`), "knockout")).toBe(TOKEN);
+    expect(sesionDe(h("localhost:3005", `__Host-vt_knockout=${OTRO}`), "knockout")).toBeNull();
+    // El host se puede dar aparte (la ruta ya lo tiene resuelto).
+    expect(sesionDe(new Headers({ cookie: `vt_knockout=${TOKEN}` }), "knockout", "127.0.0.1:3005")).toBe(TOKEN);
+  });
+  it("haySesion también mira la del host de la petición", async () => {
+    cabecerasDeLaPeticion = new Headers({ host: "localhost:3005" });
+    cookiesDeLaPeticion = { "__Host-vt_knockout": TOKEN };
+    expect(await haySesion("knockout")).toBe(false);
+    cookiesDeLaPeticion = { "vt_knockout": TOKEN };
+    expect(await haySesion("knockout")).toBe(true);
+    cabecerasDeLaPeticion = new Headers({ host: "pedidos.vimpos.com.mx" });
+    expect(await haySesion("knockout")).toBe(false);
   });
   it("lo que no tiene forma de token no es una sesión", () => {
     for (const malo of ["", "corto", `${TOKEN}x`, `"${TOKEN}"`, "a b", "x".repeat(5000)]) {
-      expect(sesionDe(new Headers({ cookie: `vt_knockout=${malo}` }), "knockout"), malo.slice(0, 30)).toBeNull();
+      expect(sesionDe(new Headers({ cookie: `__Host-vt_knockout=${malo}` }), "knockout"), malo.slice(0, 30)).toBeNull();
     }
   });
   it("se pone y se borra con sus atributos exactos; Secure solo falta en localhost", () => {
@@ -91,12 +113,12 @@ describe("la cookie de sesión", () => {
   });
   it("haySesion mira solo si existe la cookie de ese negocio", async () => {
     expect(await haySesion("knockout")).toBe(false);
-    cookiesDeLaPeticion = { vt_otro: OTRO };
+    cookiesDeLaPeticion = { "__Host-vt_otro": OTRO };
     expect(await haySesion("knockout")).toBe(false);
-    cookiesDeLaPeticion = { vt_knockout: TOKEN };
+    cookiesDeLaPeticion = { "__Host-vt_knockout": TOKEN };
     expect(await haySesion("knockout")).toBe(true);
     expect(await haySesion("otro")).toBe(false);
-    cookiesDeLaPeticion = { vt_knockout: "basura" };
+    cookiesDeLaPeticion = { "__Host-vt_knockout": "basura" };
     expect(await haySesion("knockout")).toBe(false);
     expect(llamadas).toHaveLength(0);   // sin llamada extra: la validez la decide la función al usarla
   });
@@ -113,8 +135,8 @@ describe("llamarTienda con sesión", () => {
     for (const i of [1, 2]) expect([...cabecerasEnviadas(i).keys()].sort()).toEqual(["content-type", "x-tienda-ip", "x-vim-tienda"]);
   });
   it("la lectura con caché del negocio nunca lleva la sesión del visitante", async () => {
-    cabecerasDeLaPeticion = new Headers({ "x-real-ip": "189.203.11.4", cookie: `vt_knockout=${TOKEN}` });
-    cookiesDeLaPeticion = { vt_knockout: TOKEN };
+    cabecerasDeLaPeticion = new Headers({ "x-real-ip": "189.203.11.4", cookie: `__Host-vt_knockout=${TOKEN}` });
+    cookiesDeLaPeticion = { "__Host-vt_knockout": TOKEN };
     responder = () => json(negocioCrudo());
     expect((await leerNegocio("knockout")).estado).toBe("ok");
     expect(cabecerasEnviadas(0).has("x-tienda-sesion")).toBe(false);
@@ -129,7 +151,7 @@ describe("POST /api/tienda — cuentas", () => {
     POST(new Request("https://pedidos.vimpos.com.mx/api/tienda", {
       method: "POST", headers: soloEsas ? cabeceras : { ...BASE, ...cabeceras }, body: JSON.stringify(cuerpo),
     }));
-  const conSesion = { cookie: `otra=1; vt_knockout=${TOKEN}; vt_otro=${OTRO}` };
+  const conSesion = { cookie: `otra=1; __Host-vt_knockout=${TOKEN}; __Host-vt_otro=${OTRO}` };
   const DIR = { calle: "Madero", numero_exterior: "12", numero_interior: null, colonia: "Centro", codigo_postal: "37000", ciudad: "León", estado: "Guanajuato", referencias: null };
   /** Cada acción con TODO su cuerpo conocido. */
   const ACCIONES: Record<string, Record<string, unknown>> = {
@@ -205,7 +227,7 @@ describe("POST /api/tienda — cuentas", () => {
       await llamar({ accion, negocio: "otro", ...ACCIONES[accion] }, conSesion);
       expect(cabecerasEnviadas(1).get("x-tienda-sesion"), accion).toBe(OTRO);
       // Con sesión solo en OTRO negocio, a este no se le manda ninguna.
-      await llamar({ accion, negocio: "knockout", ...ACCIONES[accion] }, { cookie: `vt_otro=${OTRO}; vt_knockout-2=${OTRO}` });
+      await llamar({ accion, negocio: "knockout", ...ACCIONES[accion] }, { cookie: `__Host-vt_otro=${OTRO}; __Host-vt_knockout-2=${OTRO}` });
       expect(cabecerasEnviadas(2).has("x-tienda-sesion"), accion).toBe(false);
       expect(JSON.stringify(llamadas[2]), accion).not.toContain(OTRO);
     }
@@ -338,7 +360,7 @@ describe("POST /api/tienda — cuentas", () => {
       expect([...cabecerasEnviadas().keys()].sort()).toEqual(["content-type", "x-tienda-ip", "x-vim-tienda"]);
       expect(cuerpoEnviado()).toEqual(pedido);
       // La cookie de otro negocio no lo vuelve un pedido con sesión.
-      await llamar(pedido, { host: "pedidos.vimpos.com.mx", cookie: `vt_otro=${OTRO}` }, true);
+      await llamar(pedido, { host: "pedidos.vimpos.com.mx", cookie: `__Host-vt_otro=${OTRO}` }, true);
       expect(cabecerasEnviadas(1).has("x-tienda-sesion")).toBe(false);
     });
     it("con cookie de sesión exige Origin propio y JSON", async () => {

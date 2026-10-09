@@ -118,7 +118,7 @@ export async function POST(req: Request): Promise<Response> {
   // La cookie del negocio DEL CUERPO, nunca la de otro; y solo para lo que usa sesión (cotizar,
   // seguimiento y las que la abren no la reciben).
   const usaSesion = deCuenta ? !SIN_SESION.has(accion as string) : accion === "pedir";
-  const sesion = usaSesion ? sesionDe(req.headers, negocio) : null;
+  const sesion = usaSesion ? sesionDe(req.headers, negocio, propio) : null;
   // Todo lo que lleva o crea sesión exige ser de ESTA página: `Origin` presente (arriba ya se vio que,
   // si viene, es el propio) y JSON, que un formulario de otro sitio no puede mandar sin permiso.
   // Un `pedir` de invitado (sin cookie) sigue como siempre.
