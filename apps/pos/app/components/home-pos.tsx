@@ -58,7 +58,7 @@ import { PantallaConsultaCuentas } from "./pantalla-consulta-cuentas";
 import { PantallaDevoluciones } from "./pantalla-devoluciones";
 import { PantallaPedidosApps } from "./pantalla-pedidos-apps";
 import { accionPedidoApp, hayExpiradosSinVer, leerExpiradosHoy, leerPedidosApps } from "../lib/pedidos-apps";
-import { aceptablesSolos, avisarPresente, comandasPendientes, debeSonar, leerEstadoEnLinea, timbrarHasta } from "../lib/pedidos-en-linea";
+import { aceptablesSolos, avisarPresente, comandasPendientes, debeSonar, leerEstadoEnLinea, soloInformativo, timbrarHasta } from "../lib/pedidos-en-linea";
 import { esEscritorio } from "../lib/actualizacion";
 import { useAcceso } from "./banda-acceso";
 import { ModalCancelarItem } from "./modal-cancelar-item";
@@ -1442,8 +1442,11 @@ export function HomePos({
     };
     const cargar = () => {
       leerPedidosApps(token, caja.sucursal_id)
-        .then((ps) => {
+        .then((todos) => {
           if (!vivo) return;
+          // En la caja instalada, lo que se atiende desde el POS web no timbra ni cuenta por aceptar.
+          const enCaja = esEscritorio();
+          const ps = todos.filter((p) => !soloInformativo(p, enCaja));
           const pendientes = ps.filter((p) => p.estado === "RECIBIDO" || p.estado === "ERROR");
           setNPedidosApps(pendientes.length);
           timbreHasta.current = timbrarHasta(ps, turno.caja_id);

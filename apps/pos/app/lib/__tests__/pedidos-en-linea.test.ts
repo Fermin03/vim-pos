@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import type { PedidoApp } from "../pedidos-apps";
 import {
   etiquetaOrigen, etiquetaPago, etiquetaEntrega, debeSonar, TIMBRE_CADA_MS, comandasPendientes, aceptablesSolos,
-  etiquetaEstadoEnLinea, mensajeErrorEnLinea, avisoDeTienda, timbrarHasta, faltaComanda, leerEstadoEnLinea, pausarEnLinea, reanudarEnLinea, avisarPresente,
+  etiquetaEstadoEnLinea, mensajeErrorEnLinea, avisoDeTienda, timbrarHasta, faltaComanda, soloInformativo, leerEstadoEnLinea, pausarEnLinea, reanudarEnLinea, avisarPresente,
   type EstadoEnLinea,
 } from "../pedidos-en-linea";
 
@@ -241,5 +241,20 @@ describe("faltaComanda", () => {
     expect(faltaComanda({ ...ok, estado: "RECIBIDO" })).toBe(false);
     expect(faltaComanda({ ...ok, estado: "ENTREGADO" })).toBe(false);
     expect(faltaComanda({ ...ok, canal: "APP" })).toBe(false);
+  });
+});
+
+describe("soloInformativo: en la caja instalada, lo que se atiende desde el POS web", () => {
+  it("solo un pedido de la tienda de gestión NUBE, y solo dentro de la caja", () => {
+    expect(soloInformativo(ped({ gestion: "NUBE" }), true)).toBe(true);
+    expect(soloInformativo(ped({ gestion: "NUBE" }), false)).toBe(false);
+    expect(soloInformativo(ped({ gestion: "ESCRITORIO" }), true)).toBe(false);
+    expect(soloInformativo(ped({ gestion: null }), true)).toBe(false);
+    expect(soloInformativo(uber({ gestion: "NUBE" }), true)).toBe(false);
+  });
+  it("quitados esos, la caja no timbra por ellos ni los cuenta por aceptar", () => {
+    const vence = "2026-10-09T18:05:00Z";
+    const ps = [ped({ gestion: "NUBE", venceAceptacion: vence })].filter((p) => !soloInformativo(p, true));
+    expect(timbrarHasta(ps, "c1")).toBeNull();
   });
 });

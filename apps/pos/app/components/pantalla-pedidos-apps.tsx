@@ -13,7 +13,7 @@ import {
 } from "../lib/pedidos-apps";
 import {
   avisoDeTienda, ErrorEnLinea, etiquetaEntrega, etiquetaEstadoEnLinea, etiquetaOrigen, etiquetaPago, faltaComanda, leerEstadoEnLinea,
-  mensajeErrorEnLinea, pausarEnLinea, reanudarEnLinea, type EstadoEnLinea,
+  mensajeErrorEnLinea, pausarEnLinea, reanudarEnLinea, soloInformativo, type EstadoEnLinea,
 } from "../lib/pedidos-en-linea";
 import { esEscritorio } from "../lib/actualizacion";
 import { BotonVolver } from "./boton-volver";
@@ -78,8 +78,10 @@ function ListaItems({ items }: { items: PedidoAppItem[] }) {
 
 /** Cuerpo de la tarjeta de un pedido de la tienda propia. Sin «Marcar listo» (decisión 2): el
  *  estado avanza solo cuando el cajero imprime, asigna repartidor o cobra desde la cuenta. */
-function CuerpoTienda({ p, seg, urgente, sinComanda, ocupado, onImprimirComanda }: {
+function CuerpoTienda({ p, seg, urgente, informativo, sinComanda, ocupado, onImprimirComanda }: {
   p: PedidoApp; seg: number | null; urgente: boolean;
+  /** En la caja instalada, un pedido que se atiende desde el POS web: aquí solo se ve. */
+  informativo: boolean;
   /** Aceptado, con ticket, y la comanda lleva rato sin salir. */
   sinComanda: boolean; ocupado: boolean; onImprimirComanda: () => void;
 }) {
@@ -103,9 +105,13 @@ function CuerpoTienda({ p, seg, urgente, sinComanda, ocupado, onImprimirComanda 
           </span>
         )}
       </div>
-      {aceptado && p.ticketId && (
-        <p className="rounded bg-sel px-2 py-1.5 text-13 text-ink-2">Cóbralo desde {aDomicilio ? "Domicilio" : "Pick-up"}.</p>
-      )}
+      {informativo
+        ? (aceptado || p.estado === "RECIBIDO" || p.estado === "ERROR") && (
+          <p className="rounded bg-sel px-2 py-1.5 text-13 text-ink-2">Se atiende desde el POS web.</p>
+        )
+        : aceptado && p.ticketId && (
+          <p className="rounded bg-sel px-2 py-1.5 text-13 text-ink-2">Cóbralo desde {aDomicilio ? "Domicilio" : "Pick-up"}.</p>
+        )}
       {sinComanda && (
         <div role="alert" className="flex flex-wrap items-center gap-2 rounded border border-danger bg-danger-soft px-2 py-1.5">
           <p className="flex-1 text-13 font-semibold text-danger">La comanda no se imprimió. Revisa la impresora.</p>
@@ -301,7 +307,8 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, onCambio,
     await recargar();
   };
 
-  const pendientes = useMemo(() => (pedidos ?? []).filter((p) => p.estado === "RECIBIDO" || p.estado === "ERROR"), [pedidos]);
+  const enCaja = esEscritorio();
+  const pendientes = useMemo(() => (pedidos ?? []).filter((p) => (p.estado === "RECIBIDO" || p.estado === "ERROR") && !soloInformativo(p, enCaja)), [pedidos, enCaja]);
   const estadoEnLinea = enLinea ? etiquetaEstadoEnLinea(enLinea, ahora) : null;
 
   return (
@@ -380,7 +387,9 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, onCambio,
           {pedidos.map((p) => {
             const seg = p.estado === "RECIBIDO" ? segundosRestantes(p.venceAceptacion, ahora) : null;
             const urgente = seg !== null && seg < 120;
-            const pendiente = p.estado === "RECIBIDO" || p.estado === "ERROR";
+            // En la caja, lo que se atiende desde el POS web no se acepta ni se rechaza aquí.
+            const informativo = soloInformativo(p, enCaja);
+            const pendiente = (p.estado === "RECIBIDO" || p.estado === "ERROR") && !informativo;
             const alergia = pedidoConAlergia(p);
             const deTienda = p.canal === "TIENDA";
             return (
@@ -392,8 +401,8 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, onCambio,
                   <p className="rounded bg-danger px-2 py-1 text-13 font-bold uppercase tracking-wide text-white">⚠ Pedido con alergia: revisa cada ítem</p>
                 )}
                 {deTienda ? (
-                  <CuerpoTienda p={p} seg={seg} urgente={urgente} ocupado={ocupado === p.id} onImprimirComanda={() => imprimirComanda(p)}
-                    sinComanda={faltaComanda(p) && ahora.getTime() - (sinComandaDesde.current.get(p.id) ?? Infinity) > MARGEN_COMANDA_MS} />
+                  <CuerpoTienda p={p} seg={seg} urgente={urgente} informativo={informativo} ocupado={ocupado === p.id} onImprimirComanda={() => imprimirComanda(p)}
+                    sinComanda={!informativo && faltaComanda(p) && ahora.getTime() - (sinComandaDesde.current.get(p.id) ?? Infinity) > MARGEN_COMANDA_MS} />
                 ) : (
                   <>
                     <div className="flex items-center justify-between">

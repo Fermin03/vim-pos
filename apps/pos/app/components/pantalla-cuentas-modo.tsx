@@ -442,10 +442,11 @@ export function PantallaCuentasModo({
               )}
 
               {/* Pedido de la tienda en línea: con cuánto paga y lo que escribió el cliente. Sin
-                  esto el repartidor sale sin saber qué cambio llevar. */}
-              {!esComedor && sel.notaGeneral && (
+                  esto el repartidor sale sin saber qué cambio llevar. Solo en tickets nacidos de
+                  la tienda (`notaPedido`): una cuenta normal se ve como siempre. */}
+              {sel.notaPedido && (
                 <p className="border-b border-warning-line bg-warning-soft px-4 py-2.5 text-14 leading-snug text-ink">
-                  <span className="font-semibold">Nota del pedido:</span> {sel.notaGeneral}
+                  <span className="font-semibold">Nota del pedido:</span> {sel.notaPedido}
                 </p>
               )}
 

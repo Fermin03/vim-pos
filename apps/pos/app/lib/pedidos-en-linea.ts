@@ -36,6 +36,15 @@ export function timbrarHasta(pedidos: PedidoApp[], cajaId: string): number | nul
   return mios.length ? Math.max(...mios.map((p) => (p.venceAceptacion ? Date.parse(p.venceAceptacion) : Infinity))) : null;
 }
 
+/**
+ * Dentro de la caja instalada, un pedido de la tienda de gestión NUBE se atiende desde el POS web
+ * (su ticket vive en la nube y la nube no deja que una caja lo acepte): aquí solo se informa. Ni
+ * timbra, ni cuenta por aceptar, ni ofrece Aceptar/Rechazar.
+ */
+export function soloInformativo(p: PedidoApp, enEscritorio: boolean): boolean {
+  return enEscritorio && p.canal === "TIENDA" && p.gestion === "NUBE";
+}
+
 /** Lo que la caja le dejó dicho al cajero en un pedido cerrado; nunca un código interno. */
 export function avisoDeTienda(p: PedidoApp): string | null {
   const cerrado = p.estado === "CANCELADO" || p.estado === "RECHAZADO" || p.estado === "EXPIRADO";
