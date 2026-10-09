@@ -80,10 +80,19 @@ BEGIN
     ('5 ENTREGADO a domicilio',         'DOMICILIO', 'ENTREGADO',      NULL,                            'ENTREGADO',          NULL),
     ('6 RECHAZADO por AGOTADO',         'RECOGER',   'RECHAZADO',      'AGOTADO',                       'CANCELADO',          'AGOTADO'),
     ('7 EXPIRADO (el texto interno no sale)', 'RECOGER', 'EXPIRADO',   'Venció la ventana de aceptación', 'CANCELADO',        'SIN_RESPUESTA'),
-    ('8 CANCELADO sin motivo',          'RECOGER',   'CANCELADO',      NULL,                            'CANCELADO',          NULL),
-    ('8 CANCELADO con motivo',          'RECOGER',   'CANCELADO',      'CLIENTE_DESISTIO',              'CANCELADO',          'CLIENTE_DESISTIO'),
-    ('8 CANCELADO con motivo vacío',    'RECOGER',   'CANCELADO',      '',                              'CANCELADO',          NULL),
-    ('8 ERROR sin motivo',              'RECOGER',   'ERROR',          NULL,                            'CANCELADO',          NULL)
+    ('8 CANCELADO sin motivo (NULL)',  'RECOGER',   'CANCELADO',      NULL,                            'CANCELADO',          'OTRO'),
+    ('8 CANCELADO con código de la lista', 'RECOGER', 'CANCELADO',     'CERRADO',                       'CANCELADO',          'CERRADO'),
+    ('8 CANCELADO con motivo vacío',    'RECOGER',   'CANCELADO',      '',                              'CANCELADO',          'OTRO'),
+    ('8 CANCELADO con un código fuera de la lista', 'RECOGER', 'CANCELADO', 'CLIENTE_DESISTIO',          'CANCELADO',          'OTRO'),
+    ('8 ERROR sin motivo',              'RECOGER',   'ERROR',          NULL,                            'CANCELADO',          'OTRO'),
+    ('M RECHAZADO AGOTADO con texto libre y un teléfono', 'RECOGER', 'RECHAZADO', 'AGOTADO: llamó el dueño 4771112233', 'CANCELADO', 'AGOTADO'),
+    ('M RECHAZADO con texto libre sin código', 'RECOGER', 'RECHAZADO', 'texto libre cualquiera',          'CANCELADO',          'OTRO'),
+    ('M RECHAZADO en minúsculas',       'RECOGER',   'RECHAZADO',      'saturado',                      'CANCELADO',          'SATURADO'),
+    ('M RECHAZADO con espacios y minúsculas antes de los dos puntos', 'RECOGER', 'RECHAZADO', '  cerrado : ya cerramos', 'CANCELADO', 'CERRADO'),
+    ('M RECHAZADO OTRO',                'RECOGER',   'RECHAZADO',      'OTRO: lo que sea',              'CANCELADO',          'OTRO'),
+    ('M RECHAZADO POS_OFFLINE',         'RECOGER',   'RECHAZADO',      'POS_OFFLINE',                   'CANCELADO',          'OTRO'),
+    ('M CANCELADO con texto libre antes de cualquier dos puntos', 'RECOGER', 'CANCELADO', 'AGOTADO el pollo: 4771112233', 'CANCELADO', 'OTRO'),
+    ('M EXPIRADO con un código válido no cambia', 'RECOGER', 'EXPIRADO', 'AGOTADO',                      'CANCELADO',          'SIN_RESPUESTA')
   ) AS x(caso, modo, estado, motivo, esperado, motivo_esperado)
   LOOP
     v_n := v_n + 1;
@@ -101,9 +110,12 @@ BEGIN
        OR NOT (v_s ? 'motivo') THEN
       RAISE EXCEPTION '%: esperaba estado % y motivo %, dio %', r.caso, r.esperado, COALESCE(r.motivo_esperado, 'null'), v_s;
     END IF;
+    IF v_s::text LIKE '%4771112233%' IS NOT FALSE OR v_s::text LIKE '%llamó%' IS NOT FALSE OR v_s::text LIKE '%texto libre%' IS NOT FALSE THEN
+      RAISE EXCEPTION '%: el motivo dejó pasar texto libre: %', r.caso, v_s;
+    END IF;
     IF v_s ->> 'modo' IS DISTINCT FROM r.modo THEN RAISE EXCEPTION '%: modo % (esperaba %)', r.caso, v_s ->> 'modo', r.modo; END IF;
   END LOOP;
-  IF v_n <> 15 THEN RAISE EXCEPTION '1–8: se probaron % de 15', v_n; END IF;
+  IF v_n <> 24 THEN RAISE EXCEPTION '1–8: se probaron % de 24', v_n; END IF;
 
   -- ── 9–13) Con un ticket de verdad en la nube ──────────────────────────────
   -- 9) Impreso: de ACEPTADO (EN_PREPARACION) a EN_CAMINO / LISTO_PARA_RECOGER, sin que `estado` cambie.
@@ -151,7 +163,7 @@ BEGIN
     IF (SELECT estado FROM delivery_pedidos WHERE id = v_id) <> 'ACEPTADO' THEN RAISE EXCEPTION '11 (%): el pedido debía seguir ACEPTADO', r.fiscal; END IF;
   END LOOP;
 
-  -- 12) Cancelado gana a todo: ticket CANCELADO (aunque esté impreso y con repartidor) → CANCELADO, sin motivo.
+  -- 12) Cancelado gana a todo: ticket CANCELADO (aunque esté impreso y con repartidor) → CANCELADO, motivo OTRO (el pedido no trae código).
   v_n := v_n + 1;
   v_id := (tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', v_z35, v_dom, jsonb_build_object('nombre', 'Ana Seguimiento', 'telefono', '4775551' || lpad(v_n::text, 3, '0')),
              v_dir, 'EFECTIVO', NULL, NULL, pg_temp.h(v_n)) ->> 'pedido_id')::uuid;
@@ -162,8 +174,8 @@ BEGIN
   IF (tienda_seguimiento(v_t, pg_temp.h(v_n)) ->> 'estado') IS DISTINCT FROM 'EN_CAMINO' THEN RAISE EXCEPTION '12: antes de cancelar esperaba EN_CAMINO'; END IF;
   UPDATE tickets SET estado_fiscal = 'CANCELADO' WHERE id = v_ticket;
   v_s := tienda_seguimiento(v_t, pg_temp.h(v_n));
-  IF v_s ->> 'estado' IS DISTINCT FROM 'CANCELADO' OR v_s ->> 'motivo' IS NOT NULL OR NOT (v_s ? 'motivo') THEN
-    RAISE EXCEPTION '12: ticket CANCELADO: esperaba CANCELADO con motivo null, dio %', v_s;
+  IF v_s ->> 'estado' IS DISTINCT FROM 'CANCELADO' OR v_s ->> 'motivo' IS DISTINCT FROM 'OTRO' THEN
+    RAISE EXCEPTION '12: ticket CANCELADO: esperaba CANCELADO con motivo OTRO, dio %', v_s;
   END IF;
 
   -- 13) ESCRITORIO: manda lo que reporta la caja, no el ticket de la nube (aquí impreso, y pagado en otro pedido).

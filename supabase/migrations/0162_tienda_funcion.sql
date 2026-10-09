@@ -744,6 +744,11 @@ GRANT EXECUTE ON FUNCTION tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jso
 -- nube solo sabe lo que la caja reporta en delivery_pedidos.estado. Sin caja (NUBE) el ticket está
 -- aquí, y el estado se deriva de él al leer, con la misma regla que usará el agente de la caja
 -- (diseño §8): cancelado > cobrado > impreso o con repartidor.
+--
+-- El motivo de una cancelación: delivery_pedidos.motivo_cancelacion guarda `<CODIGO>` o
+-- `<CODIGO>: <texto libre del cajero>` (delivery-accion), y el texto puede traer nombres o teléfonos.
+-- Al público solo llega el código, y solo si es de la lista cerrada (AGOTADO, CERRADO, SATURADO,
+-- OTRO); cualquier otra cosa, o nada, es OTRO. Nunca NULL ni texto libre en un pedido cancelado.
 CREATE OR REPLACE FUNCTION tienda_seguimiento(p_tenant uuid, p_seguimiento_hash text)
 RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER
@@ -788,7 +793,10 @@ BEGIN
       ELSE 'CANCELADO' END,
     'motivo', CASE
       WHEN v_estado = 'EXPIRADO' THEN 'SIN_RESPUESTA'
-      WHEN v_estado IN ('RECHAZADO', 'CANCELADO', 'ERROR') THEN NULLIF(v_p.motivo_cancelacion, '')
+      WHEN v_estado IN ('RECHAZADO', 'CANCELADO', 'ERROR') THEN
+        CASE WHEN upper(btrim(split_part(v_p.motivo_cancelacion, ':', 1))) IN ('AGOTADO', 'CERRADO', 'SATURADO', 'OTRO')
+             THEN upper(btrim(split_part(v_p.motivo_cancelacion, ':', 1)))
+             ELSE 'OTRO' END
       END,
     'renglones', COALESCE((
       SELECT jsonb_agg(jsonb_build_object(
