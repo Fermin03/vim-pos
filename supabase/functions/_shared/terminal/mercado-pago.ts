@@ -111,7 +111,11 @@ export function clienteMp(token: string, pedir: typeof fetch = fetch) {
     /** VERIFICADO. Mercado Pago pide no consultarla seguido: es el respaldo del aviso. */
     consultarOrden: (ordenId: string) => llamar("GET", `/v1/orders/${encodeURIComponent(ordenId)}`),
 
-    /** 200 si estaba en `created`; 202 (no definitivo hasta el aviso) si ya estaba en la terminal. */
+    /**
+     * 200 si estaba en `created`; 202 (no definitivo hasta el aviso) si ya estaba en la terminal.
+     * VERIFICADO: con la terminal virtual responde 403 forbidden_checking_device_owner, así que
+     * cancelar solo se puede probar con una terminal real.
+     */
     cancelarOrden: (ordenId: string) =>
       llamar("POST", `/v1/orders/${encodeURIComponent(ordenId)}/cancel`, undefined,
         { "X-Idempotency-Key": crypto.randomUUID(), "x-allow-cancelable-status": "at_terminal" }),

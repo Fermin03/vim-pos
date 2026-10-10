@@ -125,7 +125,7 @@ servir(async (req, json) => {
 
       // No se creó: el intento queda cerrado y la caja puede volver a intentar con otro id.
       const codigo = r.status === 401 ? "CONEXION_INVALIDA"
-        : r.codigo === "already_queued_order_for_terminal" ? "TERMINAL_OCUPADA"
+        : r.codigo?.startsWith("already_queued_order") ? "TERMINAL_OCUPADA" // real: …_on_terminal; la referencia dice …_for_terminal
         : r.codigo === "forbidden_checking_terminal_owner" ? "TERMINAL_AJENA" : "NO_SE_PUDO_CREAR";
       registrarError("terminal-cobro", codigo, `HTTP ${r.status} ${r.codigo ?? ""}`);
       await admin.from("terminal_cobros").update({ estado: "RECHAZADO", detalle: codigo }).eq("id", b.cobro_id);
@@ -147,6 +147,8 @@ servir(async (req, json) => {
       return json({ ok: true });
     }
 
+    // Al cancelar se dice además qué pasó con la petición: HECHA, PEDIDA (falta el aviso) o FALLO.
+    let cancelacion: "HECHA" | "PEDIDA" | "FALLO" | undefined;
     if (cobro.estado === "EN_TERMINAL" && cobro.orden_id_externo) {
       const cancelar = b.accion === "cancelar";
       if (cancelar || Date.now() - Date.parse(cobro.updated_at) > RESPALDO_MS) {
@@ -155,12 +157,13 @@ servir(async (req, json) => {
           const mp = clienteMp(tokenMp);
           const r = cancelar ? await mp.cancelarOrden(cobro.orden_id_externo) : await mp.consultarOrden(cobro.orden_id_externo);
           // 202 al cancelar = pedido, no hecho: el estado sigue EN_TERMINAL hasta el aviso (o el respaldo).
+          if (cancelar) cancelacion = r.status === 200 ? "HECHA" : r.status === 202 ? "PEDIDA" : "FALLO";
           if (r.status === 200) cobro = await aplicarOrden(cobro, r.cuerpo);
           else if (!cancelar || r.status !== 202) registrarError("terminal-cobro", cancelar ? "CANCELAR" : "CONSULTAR", `HTTP ${r.status} ${r.codigo ?? ""}`);
         }
       }
     }
-    return json({ ok: true, cobro: publico(cobro) });
+    return json({ ok: true, cobro: publico(cobro), ...(cancelacion ? { cancelacion } : {}) });
   } catch (e) {
     registrarError("terminal-cobro", "ERROR_INTERNO", textoDeError(e));
     return json({ error: "ERROR_INTERNO" }, 500);
