@@ -750,3 +750,23 @@ test("retención: si la base local no tiene la función, no lanza y queda dicho 
   assert.equal(logs.length, 1);
   assert.match(logs[0], /^retención: .*does not exist/);
 });
+
+test("sin nube: lo dice una sola vez; despertar olvida los fallos y sondea ya", async () => {
+  const lineas = []; const esperas = [];
+  let hayNube = false;
+  const pool = { query: async () => ({ rows: [] }) };
+  const espejo = crearEspejo({
+    pool, cajaId: "c1", log: (m) => lineas.push(m),
+    nube: async () => (hayNube ? { cloudUrl: "http://nube", anon: "a", token: "t" } : null),
+    fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ conexiones: [], pedidos: [], siguiente_en_ms: 30000 }) }),
+    setTimeoutFn: (fn, ms) => { esperas.push(ms); return { unref() {} }; }, clearTimeoutFn: () => {}, aleatorio: () => 0.5,
+  });
+  assert.deepEqual(await espejo.tick(), { omitido: "sin nube" });
+  assert.deepEqual(await espejo.tick(), { omitido: "sin nube" });
+  assert.equal(lineas.filter((l) => l.includes("sin sesión en la nube")).length, 1);
+  assert.equal(espejo.estado().fallos, 2);
+  hayNube = true;
+  espejo.despertar();
+  assert.equal(espejo.estado().fallos, 0);
+  assert.equal(esperas.at(-1), 0);
+});
