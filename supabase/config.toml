@@ -34,6 +34,10 @@ enabled = true
 [functions.pin-login]
 verify_jwt = false
 
+# Avisos de Mercado Pago Point: sin JWT, la autenticidad la da x-signature (ADR 0033).
+[functions.terminal-webhook-mp]
+verify_jwt = false
+
 [functions.signup-tenant]
 verify_jwt = false
 
