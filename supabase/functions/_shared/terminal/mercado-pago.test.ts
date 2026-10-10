@@ -44,7 +44,7 @@ test("el monto es texto con dos decimales o no es", () => {
 
 test("la firma del aviso se valida contra el manifiesto y falla con cualquier cambio", async () => {
   const secreto = "s3creto";
-  const v1 = await hmacSha256Hex(secreto, "id:ordtst01;request-id:req-1;ts:1700000000;");
+  const v1 = await hmacSha256Hex(secreto, "id:ORDTST01;request-id:req-1;ts:1700000000;");
   const base = { firma: `ts=1700000000,v1=${v1}`, requestId: "req-1", dataId: "ORDTST01", secreto };
   assert.equal(await firmaValida(base), true);
   assert.equal(await firmaValida({ ...base, dataId: "ORDTST02" }), false);

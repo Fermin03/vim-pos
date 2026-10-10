@@ -2,7 +2,7 @@
 // Una sola URL para todos los restaurantes; el cobro se encuentra por `external_reference`, que es
 // el id de terminal_cobros. Aplicar el mismo aviso dos veces deja lo mismo, así que no se deduplica.
 import { clienteAdmin } from "../_shared/http.ts";
-import { leerCuerpoAcotado } from "../_shared/limite.ts";
+import { consumirCupo, leerCuerpoAcotado } from "../_shared/limite.ts";
 import { registrarError } from "../_shared/errores.ts";
 import { aceptaCambio, cambiosDeCobro, datosDeOrden, type EstadoCobro, firmaValida } from "../_shared/terminal/mercado-pago.ts";
 
@@ -23,6 +23,14 @@ Deno.serve(async (req) => {
   for (const secreto of SECRETOS) if (await firmaValida({ ...e, secreto })) { valida = true; break; }
   if (!valida) {
     console.warn(`[terminal-webhook-mp] firma inválida (data.id=${dataId ?? "-"}, ${texto.length} bytes)`);
+    // Rastro mínimo y con tope por hora (como el de Uber): nada del cuerpo de un desconocido llega a la base.
+    const cupo = await consumirCupo(admin, { clave: "mp:firma-invalida", ventanaSeg: 3600, max: 60 }, "cerrar");
+    if (cupo.permitido) {
+      await admin.from("terminal_eventos").insert({
+        orden_id_externo: dataId?.slice(0, 64) ?? null, accion: "firma_invalida", error: "firma inválida",
+        payload: { bytes: texto.length, con_firma: Boolean(e.firma), con_request_id: Boolean(e.requestId), query: [...new URL(req.url).searchParams.keys()].slice(0, 8) },
+      });
+    }
     return new Response("invalid signature", { status: 401 });
   }
 

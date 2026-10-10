@@ -63,16 +63,16 @@ export function datosDeOrden(orden: unknown, idOrden?: string): DatosCobro {
 
 /**
  * Firma de un aviso: `x-signature: ts=…,v1=…`, HMAC-SHA256 de `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`
- * con la clave secreta de la aplicación. `data.id` es el de la query y va en minúsculas.
- * SIN VERIFICAR contra un aviso real (la pestaña «sin SDK» de la guía no se capturó): es la plantilla
- * general de webhooks de Mercado Pago. Confirmar con el primer aviso y quitar esta nota.
+ * con la clave secreta de la aplicación. Misma plantilla que el validador oficial (sdk-nodejs,
+ * src/utils/webhook): `data.id` va tal cual llega en la query y las partes ausentes se omiten.
+ * VERIFICADO que el aviso llega con ambos encabezados y que Supabase no toca `x-request-id`.
  */
 export async function firmaValida(
   e: { firma: string | null; requestId: string | null; dataId: string | null; secreto: string },
 ): Promise<boolean> {
   const partes = Object.fromEntries((e.firma ?? "").split(",").map((x) => x.trim().split("=", 2)));
   if (!partes.ts || !partes.v1 || !e.dataId || !e.secreto) return false;
-  const manifiesto = `id:${e.dataId.toLowerCase()};request-id:${e.requestId ?? ""};ts:${partes.ts};`;
+  const manifiesto = `id:${e.dataId};${e.requestId ? `request-id:${e.requestId};` : ""}ts:${partes.ts};`;
   return igualesEnTiempoConstante(String(partes.v1).toLowerCase(), await hmacSha256Hex(e.secreto, manifiesto));
 }
 
