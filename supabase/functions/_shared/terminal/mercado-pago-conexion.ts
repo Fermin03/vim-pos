@@ -1,6 +1,10 @@
 // Conexión del restaurante con Mercado Pago: OAuth, sucursales, cajas y terminales. ADR 0033.
-// Fuente: docs/integraciones/mercado-pago-point/. Nada de este archivo está verificado todavía
-// contra la API: al probarlo, marcar aquí lo que resulte (como en mercado-pago.ts).
+// Fuente: docs/integraciones/mercado-pago-point/. VERIFICADO con la cuenta real de Knock-Out (9 oct
+// 2026): el canje del OAuth (sin PKCE ni test_token), crear sucursal y caja, listar terminales y que
+// la terminal reporta `external_pos_id` = nuestro id externo. Sin verificar: renovar el token,
+// cambiar de modo por API (el dueño lo dejó en PDV al ligarla) y desconectar.
+// Trampa: al escanear el QR, la app de Mercado Pago puede dejar la terminal en una sucursal y caja
+// PROPIAS en vez de las que creó VIM; entonces «terminales» no la encuentra y hay que moverla en la app.
 
 const API = "https://api.mercadopago.com";
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {});
