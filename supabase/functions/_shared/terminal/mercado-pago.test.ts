@@ -42,9 +42,16 @@ test("el monto es texto con dos decimales o no es", () => {
   for (const malo of ["0", "-5", "1.234", "1e3", "", "abc", null, undefined, "12,50"]) assert.equal(montoTexto(malo), null);
 });
 
+test("la firma de un aviso real valida (data.id en minúsculas)", async () => {
+  // Aviso real de la cuenta de prueba; la clave no está aquí, así que se comprueba el manifiesto.
+  const secreto = "k";
+  const v1 = await hmacSha256Hex(secreto, "id:ordtst01m4hq1sa5rwfh7bf35kj10ngt;request-id:2f763a4a-f42e-4898-9fdb-e372b0650721;ts:1791596021;");
+  assert.equal(await firmaValida({ firma: `ts=1791596021,v1=${v1}`, requestId: "2f763a4a-f42e-4898-9fdb-e372b0650721", dataId: "ORDTST01M4HQ1SA5RWFH7BF35KJ10NGT", secreto }), true);
+});
+
 test("la firma del aviso se valida contra el manifiesto y falla con cualquier cambio", async () => {
   const secreto = "s3creto";
-  const v1 = await hmacSha256Hex(secreto, "id:ORDTST01;request-id:req-1;ts:1700000000;");
+  const v1 = await hmacSha256Hex(secreto, "id:ordtst01;request-id:req-1;ts:1700000000;");
   const base = { firma: `ts=1700000000,v1=${v1}`, requestId: "req-1", dataId: "ORDTST01", secreto };
   assert.equal(await firmaValida(base), true);
   assert.equal(await firmaValida({ ...base, dataId: "ORDTST02" }), false);
