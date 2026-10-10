@@ -29,7 +29,7 @@ aquí van solo las decisiones que no son obvias leyendo el código.
 - **Un estado desconocido es «mira la terminal»**, nunca aprobado ni rechazado. Aceptar a mano un
   cobro dudoso pide PIN de encargado.
 - **Las coordenadas de la sucursal** las pide el admin al conectar (Mercado Pago las exige) y se
-  guardan en `terminal_config_sucursal`, no en `sucursales`, para no tocar lo que sincroniza la caja.
+  guardan en `sucursales.geo_lat` / `geo_lng`, que existían desde la 0003 y nadie usaba.
 - **El registro manual de tarjeta se queda** como segunda opción: sin internet, o sin terminal, el
   ticket nunca se atora.
 
@@ -47,6 +47,7 @@ corresponde a ningún cobro nuestro se guarda y se ignora.
 
 ## Consecuencias
 
+- La `0170` quita de `terminal_config_sucursal` las coordenadas que la `0169` duplicó por error.
 - La migración `0169` corre también en el Postgres de la caja, que no tiene Vault: las funciones de
   tokens fallan ahí con `VAULT_NO_DISPONIBLE` y nunca se llaman.
 - El cobro integrado necesita internet en la caja y en la terminal.
