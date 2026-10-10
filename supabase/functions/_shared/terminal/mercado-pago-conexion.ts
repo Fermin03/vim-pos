@@ -49,6 +49,24 @@ export async function pedirTokens(
   return { tokens: r.ok ? tokensDeRespuesta(json) : null, status: r.status, codigo: txt(obj(json).error) ?? txt(obj(json).message) };
 }
 
+/**
+ * Mercado Pago exige la ciudad y el estado escritos EXACTAMENTE como en su catálogo, mayúsculas
+ * incluidas («San Francisco Del Rincón», no «…del Rincón»). VERIFICADO (9 oct 2026): cuando no
+ * coinciden responde 400 con `location.<campo> was invalid. Valid values are: A, B, …`. De ahí se
+ * saca el valor bueno, comparando sin acentos ni mayúsculas. null si no es ese error o no hay parecido.
+ */
+export function valorDelCatalogo(cuerpoError: unknown, valor: string): { campo: "city_name" | "state_name"; correcto: string } | null {
+  const plano = (t: string) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/s+/g, " ").trim();
+  const causas = obj(cuerpoError).causes;
+  for (const c of Array.isArray(causas) ? causas : []) {
+    const m = /location.(city_name|state_name) was invalid. Valid values are: (.+)/.exec(String(obj(c).description ?? ""));
+    if (!m) continue;
+    const correcto = m[2].replace(/.s*$/, "").split(", ").find((v) => plano(v) === plano(valor));
+    if (correcto) return { campo: m[1] as "city_name" | "state_name", correcto };
+  }
+  return null;
+}
+
 export type DireccionSucursal = { nombre: string; calle: string; numero: string; ciudad: string; estado: string; latitud: number; longitud: number };
 export type TerminalMp = { id: string; pos_id: string | null; modo: string | null };
 
@@ -61,7 +79,7 @@ export function clienteMpConfig(token: string, pedir: typeof fetch = fetch) {
     });
     const json: unknown = await r.json().catch(() => null);
     // El cuerpo de un error de configuración no trae datos del restaurante: va al log para diagnosticar.
-    if (!r.ok) console.error(`[mercado-pago] ${metodo} ${ruta.split("?")[0]} HTTP ${r.status} ${JSON.stringify(json).slice(0, 300)}`);
+    if (!r.ok && r.status !== 404) console.error(`[mercado-pago] ${metodo} ${ruta.split("?")[0]} HTTP ${r.status} ${JSON.stringify(json).slice(0, 300)}`);
     return { ok: r.ok, status: r.status, cuerpo: obj(json) };
   };
 
@@ -78,11 +96,17 @@ export function clienteMpConfig(token: string, pedir: typeof fetch = fetch) {
       const ya = await llamar("GET", `/users/${userId}/stores/search?external_id=${ext}`);
       const previa = Array.isArray(ya.cuerpo.results) ? idDe(obj(ya.cuerpo.results[0]).id) : null;
       if (previa) return previa;
-      const r = await llamar("POST", `/users/${userId}/stores`, {
-        name: d.nombre, external_id: ext,
-        location: { street_name: d.calle, street_number: d.numero, city_name: d.ciudad, state_name: d.estado, latitude: d.latitud, longitude: d.longitud },
-      });
-      return r.ok ? idDe(r.cuerpo.id) : null;
+      const location: Record<string, unknown> = {
+        street_name: d.calle, street_number: d.numero, city_name: d.ciudad, state_name: d.estado, latitude: d.latitud, longitude: d.longitud,
+      };
+      // Hasta dos correcciones: el estado y luego la ciudad, cada uno contra el catálogo que devuelve el error.
+      for (let intento = 0; ; intento++) {
+        const r = await llamar("POST", `/users/${userId}/stores`, { name: d.nombre, external_id: ext, location });
+        if (r.ok) return idDe(r.cuerpo.id);
+        const arreglo = intento < 2 ? (valorDelCatalogo(r.cuerpo, d.estado) ?? valorDelCatalogo(r.cuerpo, d.ciudad)) : null;
+        if (!arreglo || location[arreglo.campo] === arreglo.correcto) return null;
+        location[arreglo.campo] = arreglo.correcto;
+      }
     },
 
     /** Crea la caja («pos») dentro de la sucursal. La llave de idempotencia es el id de la caja. */

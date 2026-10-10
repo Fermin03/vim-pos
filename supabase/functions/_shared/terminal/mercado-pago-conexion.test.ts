@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clienteMpConfig, idExterno, pedirTokens, tokensDeRespuesta, urlAutorizacion } from "./mercado-pago-conexion.ts";
+import { clienteMpConfig, idExterno, pedirTokens, tokensDeRespuesta, urlAutorizacion, valorDelCatalogo } from "./mercado-pago-conexion.ts";
 
 test("los tokens de la respuesta: completos o nada", () => {
   const t = tokensDeRespuesta({ access_token: "a", refresh_token: "r", user_id: 123, expires_in: 60, live_mode: false }, 0);
@@ -39,4 +39,31 @@ test("una sucursal que ya existe en Mercado Pago no se crea dos veces", async ()
     { nombre: "Centro", calle: "Madero", numero: "1", ciudad: "León", estado: "Guanajuato", latitud: 21.1, longitud: -101.6 });
   assert.equal(id, "555");
   assert.deepEqual(llamadas, ["GET https://api.mercadopago.com/users/9/stores/search?external_id=5cafa205f3064941adf4e8af87df079f"]);
+});
+
+// Error real de Mercado Pago al registrar la sucursal de San Francisco del Rincón (9 oct 2026), recortado.
+const ERROR_CIUDAD = { error: "validation_error", message: "location.city_name was invalid.", status: 400, causes: [{ code: 400,
+  description: "location.city_name was invalid. Valid values are: Abasolo, León, Purísima Del Rincón, San Francisco Del Rincón, San Jose Iturbide" }] };
+
+test("la ciudad se corrige contra el catálogo que devuelve Mercado Pago", () => {
+  assert.deepEqual(valorDelCatalogo(ERROR_CIUDAD, "San Francisco del Rincón"), { campo: "city_name", correcto: "San Francisco Del Rincón" });
+  assert.deepEqual(valorDelCatalogo(ERROR_CIUDAD, "san francisco del rincon"), { campo: "city_name", correcto: "San Francisco Del Rincón" });
+  assert.equal(valorDelCatalogo(ERROR_CIUDAD, "Guadalajara"), null);
+  assert.equal(valorDelCatalogo({ error: "otro" }, "León"), null);
+});
+
+test("al registrar la sucursal, una ciudad mal escrita se reintenta con la del catálogo", async () => {
+  const ciudades: string[] = [];
+  const falso = ((url: string, init: RequestInit) => {
+    if (init.method === "GET") return Promise.resolve(new Response(JSON.stringify({ error: "store_not_found" }), { status: 404 }));
+    const ciudad = JSON.parse(String(init.body)).location.city_name;
+    ciudades.push(ciudad);
+    return Promise.resolve(ciudad === "San Francisco Del Rincón"
+      ? new Response(JSON.stringify({ id: 777 }), { status: 201 })
+      : new Response(JSON.stringify(ERROR_CIUDAD), { status: 400 }));
+  }) as unknown as typeof fetch;
+  const id = await clienteMpConfig("tok", falso).sucursal("9", "5cafa205-f306-4941-adf4-e8af87df079f",
+    { nombre: "SFR", calle: "Ignacio Allende 113", numero: "S/N", ciudad: "San Francisco del Rincón", estado: "Guanajuato", latitud: 21.02, longitud: -101.85 });
+  assert.equal(id, "777");
+  assert.deepEqual(ciudades, ["San Francisco del Rincón", "San Francisco Del Rincón"]);
 });
