@@ -187,7 +187,13 @@ export function crearEspejo({
     corriendo = true;
     try {
       const opts = await opcionesNube();
-      if (!opts) { fallos++; return { omitido: "sin nube" }; }
+      if (!opts) {
+        // Se dice UNA vez (al primer fallo): callado, parecía que el agente no existía mientras su
+        // espera crecía hasta 5 minutos (VIM Pruebas, 9 oct 2026).
+        if (fallos === 0) log("sin sesión en la nube (la caja no pudo entrar con su clave); se reintenta");
+        fallos++;
+        return { omitido: "sin nube" };
+      }
       // `desde` es el cursor del delta: la nube manda solo lo que cambió después de ese instante.
       // Sin cursor (arranque) pide la ventana completa, como siempre.
       // El turno se consulta ANTES de llamar y en cada vuelta: con él la nube decide si la tienda
@@ -360,6 +366,12 @@ export function crearEspejo({
     /** Para diagnóstico: a qué ritmo va y por qué. */
     estado() { return { cadencia, fallos, pendiente, cursor, armado: timer !== null }; },
     iniciar() { if (timer) return; detenido = false; vuelta().catch(() => {}); log("agente iniciado"); },
+    /**
+     * La caja acaba de volver a entrar a la nube (se vinculó de nuevo): se olvidan los fallos y se
+     * sondea YA. Sin esto el agente seguía en la espera larga de sus intentos sin sesión y la tienda
+     * tardaba hasta 5 minutos más en abrir.
+     */
+    despertar() { if (detenido) return; fallos = 0; forzarLogin = true; programar(0); },
     detener() { detenido = true; if (timer) clearTimeoutFn(timer); timer = null; },
   };
 }

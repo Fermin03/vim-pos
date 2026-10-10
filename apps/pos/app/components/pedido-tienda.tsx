@@ -144,9 +144,11 @@ function AvisoPedidoTienda({ p, posicion, total, ahora, ocupado, onAceptar, onRe
 }) {
   const [rechazando, setRechazando] = useState(false);
   const cerrar = useRef<HTMLButtonElement>(null);
+  // El foco llega solo a la ×: su anillo se enseña hasta que alguien recorre los botones con Tab.
+  const [anillo, setAnillo] = useState(false);
   useEffect(() => { setRechazando(false); cerrar.current?.focus(); }, [p.id]);
   useEffect(() => {
-    const soloAqui = (e: KeyboardEvent) => { if (e.key !== "Escape" && e.key !== "Tab") e.stopPropagation(); };
+    const soloAqui = (e: KeyboardEvent) => { if (e.key === "Tab") setAnillo(true); else if (e.key !== "Escape") e.stopPropagation(); };
     window.addEventListener("keydown", soloAqui, true);
     return () => window.removeEventListener("keydown", soloAqui, true);
   }, []);
@@ -158,7 +160,7 @@ function AvisoPedidoTienda({ p, posicion, total, ahora, ocupado, onAceptar, onRe
       <div className="flex flex-shrink-0 items-start gap-3 border-b border-line py-3 pl-5 pr-2">
         {/* La × va primero en el documento (y a la derecha en pantalla): es donde cae el foco al abrir. */}
         <button ref={cerrar} type="button" onClick={onCerrar} aria-label="Cerrar aviso"
-          className="order-last flex h-11 w-11 flex-shrink-0 items-center justify-center rounded text-ink-2 transition hover:bg-hover hover:text-ink active:scale-[.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink">
+          className={`order-last flex h-11 w-11 flex-shrink-0 items-center justify-center rounded text-ink-2 transition hover:bg-hover hover:text-ink active:scale-[.97] ${anillo ? "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink" : "outline-none"}`}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-5 w-5" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
         </button>
         <div className="min-w-0 flex-1">

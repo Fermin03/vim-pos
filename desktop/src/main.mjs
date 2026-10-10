@@ -242,6 +242,10 @@ async function vincularConNube({ email, password } = {}) {
     console.log("· [alta] credenciales válidas en la nube; bajando datos del negocio…");
     const r = await pullFromCloud(backend.pool, { cloudUrl: CLOUD_URL, anonKey: CLOUD_ANON, deviceToken: token }, (m) => console.log("· [alta]", m));
     guardarNube({ cloudUrl: CLOUD_URL, anon: CLOUD_ANON, email, pass: password });
+    // La clave cambió: el token guardado ya no vale, y el agente de pedidos en línea no debe
+    // seguir en la espera larga de cuando no podía entrar (ni quedarse sin arrancar).
+    nubeCache = null;
+    if (espejo) espejo.despertar(); else sincronizarEspejoConModulo(directivas.leer().directivas);
     bajarAnuncios().catch(() => {}); // las imágenes de los anuncios, sin esperar
     const tablas = Object.keys(r ?? {}).length;
     console.log(`· [alta] OK: ${tablas} tablas sincronizadas; la caja ya puede vincularse.`);

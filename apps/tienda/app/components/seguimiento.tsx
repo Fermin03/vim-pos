@@ -100,10 +100,13 @@ function Pedido({ slug, pedido, sondeo }: { slug: string; pedido: Seguimiento; s
       {pasos && <Recorrido pasos={pasos} />}
 
       <section aria-label="El restaurante" className="flex flex-col gap-3">
-        <p className={cn("text-15", PARTE)}>
-          <span className="font-semibold">{pedido.sucursal.nombre}</span>
-          <span className="text-ink-2">{cancelado ? ". Si tienes dudas, llama al restaurante." : pedido.modo === "RECOGER" ? ". Aquí recoges tu pedido." : ". De aquí sale tu pedido."}</span>
-        </p>
+        {/* Cancelado: arriba ya está el motivo; aquí solo cómo hablarle al restaurante. */}
+        {!cancelado && (
+          <p className={cn("text-15", PARTE)}>
+            <span className="font-semibold">{pedido.sucursal.nombre}</span>
+            <span className="text-ink-2">{pedido.modo === "RECOGER" ? ". Aquí recoges tu pedido." : ". De aquí sale tu pedido."}</span>
+          </p>
+        )}
         <Contacto telefono={pedido.sucursal.telefono} folio={pedido.folio_corto} />
       </section>
 
