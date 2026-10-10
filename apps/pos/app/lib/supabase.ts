@@ -25,11 +25,6 @@ export const deviceClient: SupabaseClient = createClient(URL, ANON, {
   },
 });
 
-export type SesionDispositivo = {
-  cajaId: string;
-  sucursalNombre: string | null;
-};
-
 /** Inicia la sesión de dispositivo. Lanza Error si las credenciales fallan. Devuelve el correo
  *  con el que entró: si el apuntado es de una cuenta que ya cambió de dominio (vimpos.mx →
  *  vimpos.com.mx), se prueba el otro y se devuelve ése (ver @vim/db/dispositivo). */
@@ -168,13 +163,9 @@ export async function pinLogin(
 ): Promise<PinLoginResult> {
   const { data: sess } = await deviceClient.auth.getSession();
   const deviceToken = sess.session?.access_token ?? ANON;
-  const res = await fetch(`${URL}/functions/v1/pin-login`, {
+  const res = await fetch(urlFuncion("pin-login"), {
     method: "POST",
-    headers: {
-      apikey: ANON,
-      Authorization: `Bearer ${deviceToken}`,
-      "Content-Type": "application/json",
-    },
+    headers: encabezadosFuncion(deviceToken),
     body: JSON.stringify({ usuario_id: usuarioId, pin, caja_id: cajaId }),
   });
   const data = await res.json().catch(() => ({}));

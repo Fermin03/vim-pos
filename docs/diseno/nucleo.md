@@ -17,6 +17,7 @@ es quién las usa y en qué condiciones.
 | KDS | [`kds.md`](kds.md) | Cocinero · pantalla a 2 m · sin mouse |
 | Pantalla del cliente | [`pantalla-cliente.md`](pantalla-cliente.md) | Cliente en el mostrador · segundo monitor a 1 m o más · sin tocarla |
 | Factura | [`factura.md`](factura.md) | Cliente final · teléfono · una sola vez |
+| Tienda | [`tienda.md`](tienda.md) | Comensal · teléfono, con una mano · vuelve; la marca es la del restaurante |
 | Platform | [`platform.md`](platform.md) | VIM interno · acciones peligrosas |
 | Sitio | [`sitio.md`](sitio.md) | Visitante · marketing · sin build |
 
@@ -112,22 +113,24 @@ rojo, el rojo deja de detener a nadie.
 
 ### Paleta funcional (categorías y gráficas)
 
-`cat-blue #2C5AA0` · `cat-green #2E7D52` · `cat-teal #1F7A82` · `cat-violet #6B4FA0` ·
-`cat-amber #B5701A` · `cat-wine #9A3050`
+azul `#2C5AA0` · verde `#2E7D52` · teal `#1F7A82` · violeta `#6B4FA0` · ámbar `#B5701A` ·
+vino `#9A3050`
 
 **Nunca el azul de marca para datos.** Una barra azul de marca en una gráfica compite con el botón
 Cobrar por el mismo significado, y el ojo no puede sostener dos.
 
-> **Deuda:** estos seis tokens están definidos y **no se usan en ninguna parte**. Las categorías
-> del catálogo guardan su propio `color_hex` libre, así que hoy no hay nada que garantice contraste
-> ni coherencia. Al construir la vista de gráficas conviene decidir: o se adopta la paleta, o se
-> borra del preset. Tenerla ahí sin uso solo confunde a quien la lea.
+Son hexadecimales y no tokens: la categoría guarda su `color_hex` en la base, y ahí no cabe una
+variable CSS. Viven, cada uno con su fondo suave, en `COLORES` de `apps/admin/app/lib/catalogo.ts`
+(el selector de color de la categoría) y en `PALETA_FALLBACK` de `apps/pos/app/lib/catalogo.ts`.
+
+Hubo seis tokens `cat-*` en `tokens.css` con estos mismos valores; nadie llegó a usarlos y se
+retiraron el 7 oct 2026. Si la vista de gráficas los quiere como clases, se declaran entonces.
 
 ### Tema oscuro (KDS)
 
-El KDS invierte superficies bajo `[data-theme="kds"]`: fondo `#1A1A1E`, tarjetas `#26262B`, texto
-`#F0F0EC`, y `warning`/`danger` aclarados (`#D4A017`, `#E04040`) porque los originales no
-sobreviven sobre negro.
+El KDS es oscuro: fondo `#1A1A1E`, tarjetas `#26262B`, texto `#F0F0EC`, y `warning`/`danger`
+aclarados (`#D4A017`, `#E04040`) porque los originales no sobreviven sobre negro. Los valores
+viven en `packages/kds-core/src/pantalla-kds.tsx`; el detalle está en [`kds.md`](kds.md).
 
 Es el único tema alternativo. **No se usa para la web ni para el POS de caja**: en cocina la
 pantalla está lejos, con grasa y luz difícil; en la caja no.
@@ -222,8 +225,8 @@ confiar en la pantalla.
 
 ### Movimiento
 
-Curvas en `tokens.css` (`--ease-out`, `--ease-in-out`, `--ease-drawer`) y en Tailwind como
-`ease-vim`, `ease-vim-in-out`, `ease-vim-drawer`. Duraciones de interfaz entre 150 y 250 ms.
+Curvas en `tokens.css` (`--ease-out`, `--ease-in-out`) y en Tailwind como `ease-vim`. Duraciones
+de interfaz entre 150 y 250 ms.
 
 | Frecuencia | Qué hacer |
 |---|---|

@@ -94,6 +94,20 @@ export function estadoDeVersion(directivas, versionActual) {
   };
 }
 
+/**
+ * ¿Esta caja debe sondear pedidos de apps? Solo si el latido dice que el módulo está encendido.
+ *
+ * Sin directivas guardadas todavía NO arranca: es un cliente que puede no tener delivery, y
+ * arrancar "por si acaso" es exactamente el sondeo que se vino a quitar. El primer latido decide,
+ * y llega en minutos. No bloquea nada de vender (invariante de ADR 0014): lo único que no se hace
+ * es preguntar por pedidos de apps.
+ *
+ * La tienda en línea viaja por el mismo sondeo: un cliente que solo tiene la tienda (sin apps de
+ * delivery) también lo necesita, o sus pedidos nunca llegarían a la caja.
+ */
+export const debeSondearApps = (directivas) =>
+  directivas?.modulos?.delivery_apps === true || directivas?.modulos?.tienda === true;
+
 /** Copia deliberada de `updater.esMasNueva`: comparación numérica x.y.z, no alfabética. */
 function esMasNueva(remota, actual) {
   const pr = remota.split(".").map((n) => parseInt(n, 10) || 0);

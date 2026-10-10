@@ -61,22 +61,10 @@
   --hover: 246 246 244;         /* #F6F6F4 */
   --sel: 251 251 250;           /* #FBFBFA */
 
-  /* ── Paleta funcional de categorías y gráficas ─────────────────────────
-     NUNCA el color de marca: el azul de marca significa "esta es la acción", y
-     una barra de una gráfica no es una acción. */
-  --cat-blue: 44 90 160;        /* #2C5AA0 */
-  --cat-green: 46 125 82;       /* #2E7D52 */
-  --cat-teal: 31 122 130;       /* #1F7A82 */
-  --cat-violet: 107 79 160;     /* #6B4FA0 */
-  --cat-amber: 181 112 26;      /* #B5701A */
-  --cat-wine: 154 48 80;        /* #9A3050 */
-
-  /* ── KDS: colores propios del tema de cocina (doc 14) ──────────────── */
+  /* ── KDS: fondo y texto base de la app de cocina (apps/kds/app/globals.css).
+     El resto de su tema vive en packages/kds-core/src/pantalla-kds.tsx; ver docs/diseno/kds.md. */
   --kds-bg: 26 26 30;           /* #1A1A1E */
-  --kds-surface: 38 38 43;      /* #26262B */
   --kds-text: 240 240 236;      /* #F0F0EC */
-  --kds-warning: 212 160 23;    /* #D4A017 */
-  --kds-danger: 224 64 64;      /* #E04040 */
 
   /* ── Tipografía ────────────────────────────────────────────────────── */
   --font: 'Inter Tight', system-ui, sans-serif;
@@ -99,7 +87,6 @@
      anima; responde al presionar y ya. */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
-  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /* Movimiento reducido: menos movimiento, no cero. Se quita el desplazamiento y la sacudida; se
@@ -108,17 +95,4 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-vim-pop { animation-name: vim-fade !important; }
   .animate-vim-shake { animation: none !important; }
-}
-
-/* KDS — tema oscuro (doc 14). Aplicar en el contenedor del KDS con [data-theme="kds"].
-   Redefine los MISMOS tokens: por eso una pantalla del KDS puede reusar cualquier componente
-   compartido y sale con los colores de cocina sin tocar una línea del componente. */
-[data-theme="kds"] {
-  --bg: 26 26 30;               /* #1A1A1E */
-  --surface: 38 38 43;          /* #26262B */
-  --ink: 240 240 236;           /* #F0F0EC */
-  --ink-2: 184 184 180;         /* #B8B8B4 */
-  --ink-3: 110 110 116;         /* #6E6E74 */
-  --warning: 212 160 23;        /* #D4A017 — aclarado: sobre negro el del tema claro se apaga */
-  --danger: 224 64 64;          /* #E04040 */
 }

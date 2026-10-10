@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import {
   listarCategoriasPos,
@@ -10,7 +10,6 @@ import {
 } from "../lib/catalogo";
 import { alCambiarCatalogo } from "../lib/catalogo-eventos";
 import { fmtMxn, contarCuentasAbiertasPorModo, type CuentasAbiertasPorModo, type DatosCaja, type Turno } from "../lib/turno";
-import { useReloj } from "./topbar-pos";
 import { type Empleado } from "../lib/supabase";
 import {
   reducerCarrito,
@@ -58,7 +57,13 @@ import { PantallaReservaciones } from "./pantalla-reservaciones";
 import { PantallaConsultaCuentas } from "./pantalla-consulta-cuentas";
 import { PantallaDevoluciones } from "./pantalla-devoluciones";
 import { PantallaPedidosApps } from "./pantalla-pedidos-apps";
-import { hayExpiradosSinVer, leerExpiradosHoy, leerPedidosApps } from "../lib/pedidos-apps";
+import { accionPedidoApp, hayExpiradosSinVer, leerExpiradosHoy, leerPedidosApps, type PedidoApp, type PedidoAppEstado } from "../lib/pedidos-apps";
+import {
+  aceptablesSolos, avisarPresente, comandasPendientes, conAtendidos, contarPorAceptar, debeSonar, leerEstadoEnLinea, mensajeErrorEnLinea,
+  recienAceptados, sinComanda, soloInformativo, textoPedidoEnCanal, timbrarHasta,
+} from "../lib/pedidos-en-linea";
+import { CapaPedidosTienda, type AccionTienda } from "./pedido-tienda";
+import { esEscritorio } from "../lib/actualizacion";
 import { useAcceso } from "./banda-acceso";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalDescuentoItem } from "./modal-descuento-item";
@@ -81,10 +86,8 @@ import { leerItemsPersistidos, type ItemTicket } from "../lib/cancelacion";
 import { abrirCuentaEnMesa, agregarComboAlTicket, agregarItemAlTicket, reconstruirCarrito, reemplazarItemTicket } from "../lib/cuenta-mesa";
 import { atribuirMesero, contarPendientesCocina, enviarACocina, yaEnviadoACocina } from "../lib/mesero";
 import { useConexion } from "../lib/conexion";
-import { cacheGet, cachePut, contarPendientes } from "../lib/outbox";
+import { cacheGet, cachePut } from "../lib/outbox";
 import { claveCatalogo, esErrorDeRed } from "../lib/catalogo-cache";
-import { sincronizar } from "../lib/sync";
-import { notificarEventoCritico } from "../lib/push-eventos";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
 import { capaVisible, type CapaEscape } from "../lib/escape";
 import { leerTicketImpreso } from "../lib/cuentas-abiertas";
@@ -105,8 +108,28 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
 
 
+/**
+ * Pedidos de la tienda cuyas comandas ya se mandaron a imprimir desde este dispositivo. Vive fuera
+ * del componente a propósito: si la impresora falló, el sello de la base no se pone, y un `useRef`
+ * se vaciaría al cambiar de cajero o bloquear — la comanda saldría sola otra vez, quizá duplicada.
+ */
+const comandasEnLineaIntentadas = new Set<string>();
+
 /** Pantalla desde la que se entró a capturar; a esa regresa el botón "Volver". */
 type Origen = "inicio" | "mesas" | "pickup" | "domicilio";
+
+/** Lo que la comanda toma tal cual del ticket; cada uso le suma lo suyo (agregado, cancelación). */
+const comandaDe = (datos: DatosTicketImpresion, lineas: DatosComanda["lineas"]): DatosComanda => ({
+  folio: datos.meta.folio,
+  modoServicio: datos.meta.modoServicio,
+  cajero: datos.meta.cajero,
+  caja: datos.meta.caja,
+  fechaIso: datos.meta.fechaIso,
+  cliente: datos.entrega?.cliente ?? datos.meta.nombreCliente ?? null,
+  notaPedido: datos.notaPedido ?? null,
+  lineas,
+  ancho: 80,
+});
 
 export function HomePos({
   empleado,
@@ -171,6 +194,60 @@ export function HomePos({
   // vez de abrir una consulta nueva solo para saber si el módulo está prendido.
   const { modulos } = useAcceso();
   const hayDelivery = modulos?.delivery_apps === true;
+  // Tienda en línea propia: comparte pantalla, sondeo y timbre con las apps («Pedidos en línea»).
+  const hayTienda = modulos?.tienda === true;
+  const hayEnLinea = hayDelivery || hayTienda;
+  const ultimoTimbre = useRef<number | null>(null);
+  /** Hasta cuándo timbrar por lo que este dispositivo puede aceptar (`timbrarHasta`); null = nada. */
+  const timbreHasta = useRef<number | null>(null);
+  const aceptadosSolos = useRef(new Set<string>());
+  /** Cómo acepta la tienda (solo se lee en el POS web; en la caja instalada acepta su agente). */
+  const aceptacionEnLinea = useRef<"MANUAL" | "AUTO" | null>(null);
+  /** POS web: la nube no abre la tienda porque la caja instalada de la sucursal es anterior a la 0.8.0. */
+  const [cajaSinActualizar, setCajaSinActualizar] = useState(false);
+  /** Relee ya los pedidos en línea (tras aceptar en la pantalla, para que la comanda no espere al sondeo). */
+  const releerEnLinea = useRef<() => void>(() => {});
+  // Tienda en línea: cada pedido llega a SU canal (Pick-up / Domicilio) y se anuncia con un aviso
+  // grande desde cualquier pantalla. Los pedidos son los que ya lee el sondeo de abajo: aquí solo se
+  // guardan para pintarlos (`CapaPedidosTienda`, `PantallaCuentasModo`), sin abrir otro sondeo.
+  const [pedidosTiendaLeidos, setPedidosTiendaLeidos] = useState<PedidoApp[]>([]);
+  /** Lo que se aceptó o rechazó en este dispositivo (`conAtendidos`). El ref es para el sondeo. */
+  const [atendidosTienda, setAtendidosTienda] = useState<ReadonlyMap<string, "aceptar" | "rechazar">>(new Map());
+  const atendidosTiendaRef = useRef(atendidosTienda);
+  atendidosTiendaRef.current = atendidosTienda;
+  const pedidosTienda = useMemo(() => conAtendidos(pedidosTiendaLeidos, atendidosTienda), [pedidosTiendaLeidos, atendidosTienda]);
+  /** Avisos grandes que el cajero ya cerró: no vuelven a salir. */
+  const [avisosTiendaCerrados, setAvisosTiendaCerrados] = useState<ReadonlySet<string>>(new Set());
+  const cerrarAvisoTienda = useCallback((id: string) => setAvisosTiendaCerrados((v) => new Set(v).add(id)), []);
+  const [avisoTiendaVisible, setAvisoTiendaVisible] = useState(false);
+  /** La misma lectura que `aceptacionEnLinea`, para pintar: con AUTO el aviso grande no aplica. */
+  const [aceptacionTienda, setAceptacionTienda] = useState<"MANUAL" | "AUTO" | null>(null);
+  /** «Ver orden»: el pedido que la lista de su canal debe dejar seleccionado. Mientras el cajero
+   *  siga en ese canal y el pedido siga por aceptar, el resto de la fila de avisos espera. */
+  const [verPedidoTienda, setVerPedidoTienda] = useState<{ pedidoId: string } | null>(null);
+  // Salir del canal (al inicio, a capturar) es dejar de verlo: la fila de avisos continúa.
+  useEffect(() => { if (!enPickup && !enDelivery) setVerPedidoTienda(null); }, [enPickup, enDelivery]);
+  /** La lista de cuentas tiene un diálogo propio abierto (cancelar, descuento, PIN…): es estado
+   *  suyo, así que lo avisa. Un ref basta: solo se consulta al tocar «Ver orden». */
+  const listaConDialogo = useRef(false);
+  const anotarDialogoDeLista = useCallback((abierto: boolean) => { listaConDialogo.current = abierto; }, []);
+  /** Pedidos que la nube canceló al intentar aceptarlos aquí, con lo que se le dijo al cajero:
+   *  queda fijo en la franja de avisos de su canal, se haya aceptado desde la lista o desde el aviso. */
+  const [canceladosAlAceptar, setCanceladosAlAceptar] = useState<ReadonlyMap<string, string>>(new Map());
+  /** Aviso breve y no bloqueante («Pedido nuevo en Pick-up · T1234»). Se quita solo. */
+  const [breveTienda, setBreveTienda] = useState<string | null>(null);
+  const relojBreveTienda = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const avisarBreveTienda = useCallback((texto: string) => {
+    setBreveTienda(texto);
+    clearTimeout(relojBreveTienda.current);
+    relojBreveTienda.current = setTimeout(() => setBreveTienda(null), 6000);
+  }, []);
+  useEffect(() => () => clearTimeout(relojBreveTienda.current), []);
+  /** Estado de cada pedido de la tienda en la lectura anterior (`recienAceptados`); null = aún no hay. */
+  const estadosTienda = useRef<Map<string, PedidoAppEstado> | null>(null);
+  /** Desde cuándo falta la comanda de cada pedido aceptado, y cuáles ya pasaron el margen (`sinComanda`). */
+  const sinComandaDesde = useRef(new Map<string, number>());
+  const [comandasAtrasadas, setComandasAtrasadas] = useState<ReadonlySet<string>>(new Set());
   // Lealtad (ADR 0030). Todo lo de abajo queda apagado si el módulo no está efectivo.
   const lealtadActiva = modulos?.lealtad === true;
   const [programa, setPrograma] = useState<Programa | null>(null);
@@ -188,39 +265,6 @@ export function HomePos({
   // que la conexión parpadea.
   const onlineRef = useRef(online);
   onlineRef.current = online;
-  // Fase 3 — outbox offline: pendientes por sincronizar + auto-sync al reconectar.
-  const [pendientesSync, setPendientesSync] = useState(0);
-  const sincronizando = useRef(false);
-
-  // Empuja el outbox cuando hay red. Idempotente; se reintenta al volver online.
-  useEffect(() => {
-    let vivo = true;
-    async function tick() {
-      if (!vivo) return;
-      const n = await contarPendientes();
-      if (vivo) setPendientesSync(n);
-      if (online && n > 0 && !sincronizando.current) {
-        sincronizando.current = true;
-        try {
-          const r = await sincronizar(token, `caja-${turno.caja_id}`, caja.nombre);
-          if (vivo) setPendientesSync(await contarPendientes());
-          // Evento crítico: el sync detectó conflictos → avisar a los dispositivos del dueño.
-          if (r.conflictos > 0) {
-            notificarEventoCritico(
-              token,
-              "⚠️ Conflictos de sincronización",
-              `${r.conflictos} operación${r.conflictos === 1 ? "" : "es"} de ${caja.nombre} chocaron con el servidor. Resuélvelo en Configuración → Sincronización.`,
-              "/configuracion/sincronizacion",
-            );
-          }
-        } catch { /* se reintenta en el próximo tick / reconexión */ }
-        finally { sincronizando.current = false; }
-      }
-    }
-    tick();
-    const id = setInterval(tick, 10000);
-    return () => { vivo = false; clearInterval(id); };
-  }, [online, token, turno.caja_id, caja.nombre]);
   const [categorias, setCategorias] = useState<Categoria[] | null>(null);
   const [productos, setProductos] = useState<Producto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -289,6 +333,19 @@ export function HomePos({
    */
   const ticketClientIdRef = useRef<string | null>(null);
   const idTicketDelCarrito = (): string => (ticketClientIdRef.current ??= nuevoClientId());
+  /** Guarda el carrito como ticket (abrir, renglones y envío). Reintentable: lleva el mismo id local. */
+  const persistirCarrito = () =>
+    persistirTicket(
+      { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
+      carrito.modoServicio,
+      carrito.lineas,
+      idTicketDelCarrito(),
+      clienteIdParaTicket(carrito),
+      carrito.clienteDomicilio?.direccionId ?? null,
+      carrito.notaOrden ?? null,
+      carrito.nombreCuenta ?? null,
+      carrito.envio?.zonaId ?? null,
+    );
   /**
    * El `ticketBd` adoptado tras un `ErrorTicketParcial` que NO es de envío: el ticket existe pero le
    * falta algo (un renglón, la nota…). Mientras sea `true` el carrito sigue bloqueado —para que el
@@ -322,7 +379,6 @@ export function HomePos({
   const [nombreCuentaAbierto, setNombreCuentaAbierto] = useState(false);
   const [cambiarPinAbierto, setCambiarPinAbierto] = useState(false);
   const [cocinaEnviada, setCocinaEnviada] = useState(false);
-  const [enviandoCocina, setEnviandoCocina] = useState(false);
   const [misPropinasAbierto, setMisPropinasAbierto] = useState(false);
   const [descuentoAbierto, setDescuentoAbierto] = useState(false);
   // Agenda de reservaciones, abierta desde el mapa de Comedor.
@@ -891,8 +947,13 @@ export function HomePos({
     return fallidas;
   }, [token]);
 
-  const imprimirComandaCocina = useCallback(async (ticketId: string, soloItems: string[], esAgregado: boolean) => {
-    if (soloItems.length === 0) return; // nada nuevo que mandar: no se gasta papel
+  /**
+   * `soloItems = null` manda TODAS las líneas del ticket (un pedido de la tienda recién aceptado).
+   * Devuelve qué pasó con el papel: "ok", "sin_papel" (alguna impresora falló) o "sin_leer" (ni
+   * siquiera se pudo leer el ticket: no se intentó imprimir y vale la pena reintentar).
+   */
+  const imprimirComandaCocina = useCallback(async (ticketId: string, soloItems: string[] | null, esAgregado: boolean): Promise<"ok" | "sin_papel" | "sin_leer"> => {
+    if (soloItems?.length === 0) return "ok"; // nada nuevo que mandar: no se gasta papel
     try {
       const datos = await leerTicketParaImpresion(ticketId, {
         token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre, conLealtad: false,
@@ -901,32 +962,39 @@ export function HomePos({
       // envía completo. Si solo llegó el id del padre (o el de un hijo suelto), se completa con
       // `parentId` para que `lineasParaComanda` vea al padre Y a todos sus hijos juntos —si falta
       // alguno, ese renglón se queda sin "Combo #n" y sin el contexto del padre.
-      const seleccion = datos.lineas.filter((l) => soloItems.includes(l.id) || (l.parentId != null && soloItems.includes(l.parentId)));
+      const seleccion = soloItems === null ? datos.lineas : datos.lineas.filter((l) => soloItems.includes(l.id) || (l.parentId != null && soloItems.includes(l.parentId)));
       const lineas = lineasParaComanda(seleccion);
       // Si lo recién enviado no tiene nada para cocina (p. ej. solo cargos), no hay comanda: un
       // papel vacío rotulado AGREGADO hace que la cocina busque un pedido que no existe.
-      if (lineas.length === 0) return;
-      const dc: DatosComanda = {
-        folio: datos.meta.folio,
-        modoServicio: datos.meta.modoServicio,
-        cajero: datos.meta.cajero,
-        caja: datos.meta.caja,
-        fechaIso: datos.meta.fechaIso,
-        cliente: datos.entrega?.cliente ?? datos.meta.nombreCliente ?? null,
-        esAgregado,
-        lineas,
-        ancho: 80,
-      };
+      if (lineas.length === 0) return "ok";
+      const dc: DatosComanda = { ...comandaDe(datos, lineas), esAgregado };
       const fallidas = await imprimirComandaPorAreas(dc, lineas, { ticketId, evento: "IMPRESION_INICIAL" });
       // El pedido YA está en cocina (KDS): un fallo de papel no debe deshacer nada ni bloquear.
       // Pero tampoco se calla: si nadie avisa, la cocina se queda sin comanda y nadie se entera.
       if (fallidas.length > 0) {
         setError(`El pedido se envió a cocina, pero no se pudo imprimir la comanda de ${fallidas.join(" y ")}.`);
+        return "sin_papel";
       }
+      return "ok";
     } catch {
       setError("El pedido se envió a cocina, pero no se pudo imprimir la comanda.");
+      return "sin_leer";
     }
   }, [token, empleado.nombre, caja.nombre, imprimirComandaPorAreas]);
+
+  /**
+   * Comanda completa de un pedido de la tienda. Primero sella los renglones como enviados a cocina
+   * (`crear_ticket_desde_tienda` no lo hace): sin eso, el siguiente «agregar producto» o «Enviar a
+   * cocina» de esa cuenta mandaría otra vez el pedido entero. Si ni eso se pudo, no se imprime y
+   * cuenta como "sin_leer": se reintenta completo.
+   */
+  const imprimirComandaEnLinea = useCallback(async (ticketId: string): Promise<"ok" | "sin_papel" | "sin_leer"> => {
+    try { await enviarACocina(token, ticketId); } catch { return "sin_leer"; }
+    return imprimirComandaCocina(ticketId, null, false);
+  }, [token, imprimirComandaCocina]);
+  // El sondeo de pedidos en línea la llama desde un intervalo: por ref, para no re-suscribirlo.
+  const imprimirComandaRef = useRef(imprimirComandaEnLinea);
+  imprimirComandaRef.current = imprimirComandaEnLinea;
 
   /**
    * Avisa a cocina de productos CANCELADOS.
@@ -944,17 +1012,8 @@ export function HomePos({
       const datos = await leerTicketParaImpresion(ticketId, {
         token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre, conLealtad: false,
       });
-      const dc: DatosComanda = {
-        folio: datos.meta.folio,
-        modoServicio: datos.meta.modoServicio,
-        cajero: datos.meta.cajero,
-        caja: datos.meta.caja,
-        fechaIso: new Date().toISOString(), // la hora de la CANCELACIÓN, no la de la orden
-        cliente: datos.entrega?.cliente ?? datos.meta.nombreCliente ?? null,
-        esCancelacion: true,
-        lineas,
-        ancho: 80,
-      };
+      // La hora es la de la CANCELACIÓN, no la de la orden.
+      const dc: DatosComanda = { ...comandaDe(datos, lineas), fechaIso: new Date().toISOString(), esCancelacion: true };
       // El aviso va a la MISMA estación donde salió el original: si una bebida se preparó en la
       // barra y la cancelación se imprime en cocina, la barra la sigue preparando.
       const areas = await leerAreasDeItems(token, lineas.map((l) => l.ticketItemId));
@@ -971,7 +1030,6 @@ export function HomePos({
   /** B1 — envía la mesa a cocina (KDS) antes de cobrar. */
   const onEnviarCocina = useCallback(async () => {
     if (!ticketBd) return;
-    setEnviandoCocina(true);
     setError(null);
     try {
       const yaEstaba = cocinaEnviada;
@@ -984,8 +1042,6 @@ export function HomePos({
       volverAtras();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo enviar a cocina");
-    } finally {
-      setEnviandoCocina(false);
     }
   }, [token, ticketBd, cocinaEnviada, imprimirComandaCocina, volverAtras]);
 
@@ -1047,17 +1103,7 @@ export function HomePos({
     try {
       let bd = ticketBd;
       if (!bd || ticketIncompleto) {
-        bd = await persistirTicket(
-          { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
-          carrito.modoServicio,
-          carrito.lineas,
-          idTicketDelCarrito(),
-          clienteIdParaTicket(carrito),
-          carrito.clienteDomicilio?.direccionId ?? null,
-          carrito.notaOrden ?? null,
-          carrito.nombreCuenta ?? null,
-          carrito.envio?.zonaId ?? null,
-        );
+        bd = await persistirCarrito();
         setTicketBd(bd);
         setTicketIncompleto(false);
       }
@@ -1082,17 +1128,7 @@ export function HomePos({
     try {
       let bd = ticketBd;
       if (!bd || ticketIncompleto) {
-        bd = await persistirTicket(
-          { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
-          carrito.modoServicio,
-          carrito.lineas,
-          idTicketDelCarrito(),
-          clienteIdParaTicket(carrito),
-          carrito.clienteDomicilio?.direccionId ?? null,
-          carrito.notaOrden ?? null,
-          carrito.nombreCuenta ?? null,
-          carrito.envio?.zonaId ?? null,
-        );
+        bd = await persistirCarrito();
         setTicketBd(bd);
         setTicketIncompleto(false);
       }
@@ -1162,23 +1198,13 @@ export function HomePos({
       setTotalesCobro(cuenta);
       return;
     }
-    // Remediación Fase 3 — el cobro offline por outbox web quedó CONGELADO: el escritorio es el
-    // único camino de operación y siempre habla con su gateway local. El cobro usa siempre la ruta
-    // online (persistirTicket + aplicarPago). Ver cobro-offline.ts / modal-cobro-offline.tsx (@deprecated).
+    // El cobro usa siempre la ruta online (persistirTicket + aplicarPago). El offline lo da el
+    // escritorio, que siempre habla con su gateway local (ADR 0004); el cobro offline por outbox
+    // web se retiró.
     setProcesandoCobro(true);
     setError(null);
     try {
-      const totales = await persistirTicket(
-        { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
-        carrito.modoServicio,
-        carrito.lineas,
-        idTicketDelCarrito(),
-        clienteIdParaTicket(carrito),
-        carrito.clienteDomicilio?.direccionId ?? null,
-        carrito.notaOrden ?? null,
-        carrito.nombreCuenta ?? null,
-        carrito.envio?.zonaId ?? null,
-      );
+      const totales = await persistirCarrito();
       /* EL TICKET YA EXISTE, CON FOLIO. La pantalla tiene que saberlo desde este instante.
 
          Antes solo se guardaba en `totalesCobro` (para el modal), y `ticketBd` se quedaba en
@@ -1249,17 +1275,7 @@ export function HomePos({
     try {
       let bd = ticketBd;
       if (!bd || ticketIncompleto) {
-        bd = await persistirTicket(
-          { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
-          carrito.modoServicio,
-          carrito.lineas,
-          idTicketDelCarrito(),
-          clienteIdParaTicket(carrito),
-          carrito.clienteDomicilio?.direccionId ?? null,
-          carrito.notaOrden ?? null,
-          carrito.nombreCuenta ?? null,
-          carrito.envio?.zonaId ?? null,
-        );
+        bd = await persistirCarrito();
       }
       await ponerTicketEnEspera(token, bd.ticketId, etiqueta);
       // La caja queda libre para la siguiente venta; el pedido vive en BD.
@@ -1286,17 +1302,7 @@ export function HomePos({
     try {
       let bd = ticketBd;
       if (!bd || ticketIncompleto) {
-        bd = await persistirTicket(
-          { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
-          carrito.modoServicio,
-          carrito.lineas,
-          idTicketDelCarrito(),
-          clienteIdParaTicket(carrito),
-          carrito.clienteDomicilio?.direccionId ?? null,
-          carrito.notaOrden ?? null,
-          carrito.nombreCuenta ?? null,
-          carrito.envio?.zonaId ?? null,
-        );
+        bd = await persistirCarrito();
         // Desde aquí el ticket es real. Si lo de abajo falla —la impresora, la red— el error se
         // muestra y el cajero sigue en la pantalla; sin esto la pantalla no sabía que el ticket
         // existía y "Volver" lo abandonaba sin preguntar.
@@ -1335,16 +1341,7 @@ export function HomePos({
       const datos = await leerTicketParaImpresion(ticketId, { token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre, conLealtad: false });
       const lineas = lineasParaComanda(datos.lineas);
       if (lineas.length === 0) return;
-      const dc: DatosComanda = {
-        folio: datos.meta.folio,
-        modoServicio: datos.meta.modoServicio,
-        cajero: datos.meta.cajero,
-        caja: datos.meta.caja,
-        fechaIso: datos.meta.fechaIso,
-        cliente: datos.entrega?.cliente ?? datos.meta.nombreCliente ?? null,
-        lineas,
-        ancho: 80,
-      };
+      const dc = comandaDe(datos, lineas);
       const fallidas = await imprimirComandaPorAreas(dc, lineas, { ticketId, evento: "REIMPRESION_CAJERO", razon: motivo, autorizacionPinId });
       if (fallidas.length > 0) setError(`No se pudo reimprimir la comanda de ${fallidas.join(" y ")}.`);
     } catch {
@@ -1452,37 +1449,100 @@ export function HomePos({
 
   // ADR 0011 — pedidos de apps: se consultan SIEMPRE (no solo en el inicio) porque un pedido de
   // Uber tiene minutos para aceptarse y el cajero puede estar en medio de una venta. Una consulta
-  // ligera cada 10 s; el sonido suena una vez por pedido nuevo pendiente.
+  // ligera cada 10 s. El timbre suena al llegar un pedido y se repite cada 20 s mientras quede
+  // alguno por aceptar (`debeSonar`); un reloj de 1 s lo evalúa entre lecturas.
+  // Tienda en línea: el mismo sondeo manda a imprimir las comandas de lo aceptado cuyo ticket es de
+  // esta caja, y en el POS web acepta solo lo que la tienda tenga en automático.
   // Add-on de delivery: sin el módulo encendido, ni se sondea. Es la misma carga que la caja de
   // escritorio deja de meterle a la nube con su espejo cuando el módulo está apagado.
   useEffect(() => {
-    if (!hayDelivery) {
+    if (!hayEnLinea) {
       // No basta con no pintar la pantalla: si el cajero estaba parado en Pedidos de apps cuando
       // VIM apagó el módulo, `enPedidosApps` se queda en `true` (solo `volverAlInicio` lo baja, y
       // eso exige un toque del cajero). Si el módulo se reenciende después, sin que el cajero
-      // navegue, el render seguiría evaluando `enPedidosApps && hayDelivery` como cierto y la app
+      // navegue, el render seguiría evaluando `enPedidosApps && hayEnLinea` como cierto y la app
       // saltaría sola de vuelta a esa pantalla, quizás encima de una venta en curso.
       setEnPedidosApps(false);
       return;
     }
     let vivo = true;
+    // Dos pestañas de la misma caja imprimirían y aceptarían doble (el `Set` es por pestaña y el
+    // sello de la base llega después del papel). Solo una —la que tiene el candado— lo hace; si se
+    // cierra, la otra lo hereda. Sin `navigator.locks` (contexto no seguro) no hay con quién chocar.
+    let soyLaQueImprime = typeof navigator === "undefined" || !navigator.locks;
+    let soltarCandado = () => {};
+    const sinCandado = new AbortController();
+    if (!soyLaQueImprime) {
+      navigator.locks.request(`vim-en-linea:${turno.caja_id}`, { signal: sinCandado.signal }, () => {
+        if (!vivo) return;
+        soyLaQueImprime = true;
+        return new Promise<void>((soltar) => { soltarCandado = soltar; });
+      }).catch(() => { /* se desmontó antes de obtenerlo */ });
+    }
+    const timbrar = (hayNuevo: boolean) => {
+      const ahora = Date.now();
+      // Solo timbra lo que este dispositivo puede aceptar y no ha vencido.
+      const hayPorAceptar = timbreHasta.current !== null && ahora < timbreHasta.current;
+      if (!debeSonar({ hayNuevoPorAceptar: hayNuevo, hayPorAceptar, ultimoTimbre: ultimoTimbre.current, ahora })) return;
+      ultimoTimbre.current = ahora;
+      try { void new Audio("/sonidos/pedido-app.wav").play().catch(() => {}); } catch { /* sin audio: el badge basta */ }
+    };
     const cargar = () => {
       leerPedidosApps(token, caja.sucursal_id)
-        .then((ps) => {
+        .then((todos) => {
           if (!vivo) return;
-          const pendientes = ps.filter((p) => p.estado === "RECIBIDO" || p.estado === "ERROR");
-          setNPedidosApps(pendientes.length);
+          // En la caja instalada, lo que se atiende desde el POS web no timbra ni cuenta por aceptar.
+          const enCaja = esEscritorio();
+          const ahora = Date.now();
+          // Lo aceptado o rechazado aquí cuenta desde ya, aunque la copia local aún no lo traiga.
+          const leidos = conAtendidos(todos, atendidosTiendaRef.current);
+          const ps = leidos.filter((p) => !soloInformativo(p, enCaja));
+          // El mosaico «Pedidos en línea» cuenta solo lo que se atiende ahí: las apps. Lo de la
+          // tienda suma al contador de su canal (se calcula al pintar el inicio).
+          setNPedidosApps(contarPorAceptar(ps, { cajaId: turno.caja_id, enEscritorio: enCaja, ahora }).apps);
+          timbreHasta.current = timbrarHasta(ps, turno.caja_id);
+
+          // Lo de la tienda, para su canal y para el aviso grande. Solo se guarda si cambió: este
+          // componente es la caja entera y no debe repintarse cada 10 s por una lectura idéntica.
+          const deTienda = todos.filter((p) => p.canal === "TIENDA");
+          setPedidosTiendaLeidos((antes) => (JSON.stringify(antes) === JSON.stringify(deTienda) ? antes : deTienda));
+          const atrasadas = sinComanda(sinComandaDesde.current, ps, ahora, enCaja);
+          setComandasAtrasadas((antes) => (antes.size === atrasadas.size && [...atrasadas].every((id) => antes.has(id)) ? antes : atrasadas));
+          // Un pedido que entró solo a su canal (aceptación automática, o lo aceptó otra pantalla):
+          // aviso breve, sin botones, para que el cajero se entere. Lo que aceptó él aquí no se le anuncia.
+          const entraron = recienAceptados(estadosTienda.current, ps).filter((p) => !atendidosTiendaRef.current.has(p.id));
+          estadosTienda.current = new Map(ps.map((p) => [p.id, p.estado]));
+          if (entraron.length > 0) avisarBreveTienda(textoPedidoEnCanal(entraron[entraron.length - 1]!));
+
+          // Comandas de la tienda: se marcan como intentadas ANTES de imprimir y van en serie, un
+          // ticket tras otro. La base sella `comanda_impresa_at` al primer papel que sale. Si la
+          // impresora falla NO se reintenta sola (la tarjeta del pedido ofrece «Imprimir comanda»);
+          // si ni se pudo leer el ticket (un parpadeo de red) sí: vuelve a ser pendiente en 10 s.
+          const comandas = soyLaQueImprime ? comandasPendientes(ps, turno.caja_id, comandasEnLineaIntentadas) : [];
+          comandas.forEach((c) => comandasEnLineaIntentadas.add(c.pedidoId));
+          void (async () => {
+            for (const c of comandas) {
+              if (await imprimirComandaRef.current(c.ticketId) === "sin_leer") comandasEnLineaIntentadas.delete(c.pedidoId);
+            }
+          })();
+
+          // POS web con la tienda en automático: acepta él (decisión 4), una vez por pedido.
+          for (const id of soyLaQueImprime ? aceptablesSolos(ps, { esEscritorio: esEscritorio(), aceptacion: aceptacionEnLinea.current, hayTurno: true }, aceptadosSolos.current) : []) {
+            aceptadosSolos.current.add(id);
+            void accionPedidoApp(token, { pedidoId: id, accion: "aceptar" }).then(() => { if (vivo) cargar(); });
+          }
+
           const vistos = idsAppsVistos.current;
-          if (vistos === null) {
-            // Primera carga: lo que ya estaba no suena, solo lo que llegue a partir de ahora.
-            idsAppsVistos.current = new Set(ps.map((p) => p.id));
-            return;
-          }
-          const nuevos = ps.filter((p) => !vistos.has(p.id));
-          ps.forEach((p) => vistos.add(p.id));
-          if (nuevos.length > 0) {
-            try { void new Audio("/sonidos/pedido-app.wav").play().catch(() => {}); } catch { /* sin audio: el badge basta */ }
-          }
+          // Primera carga: lo que ya estaba no cuenta como recién llegado (si sigue por aceptar,
+          // el timbre suena igual: nadie lo ha atendido).
+          const nuevos = vistos === null ? [] : ps.filter((p) => !vistos.has(p.id));
+          if (vistos === null) idsAppsVistos.current = new Set(ps.map((p) => p.id));
+          else ps.forEach((p) => vistos.add(p.id));
+          // De una app, cualquier pedido nuevo suena, como siempre. De la tienda, el que llega por
+          // aceptar (y que esta caja puede tomar) o recién aceptado solo; uno que entra ya cancelado,
+          // vencido o reclamado por otra caja no es para timbrar aquí.
+          timbrar(nuevos.some((p) => p.canal === "APP" || p.estado === "ACEPTADO"
+            || (p.estado === "RECIBIDO" && (!p.gestionCajaId || p.gestionCajaId === turno.caja_id))));
         })
         .catch(() => { /* informativo: sin red la caja sigue vendiendo */ });
       leerExpiradosHoy(token, caja.sucursal_id)
@@ -1490,9 +1550,31 @@ export function HomePos({
         .catch(() => { /* informativo */ });
     };
     cargar();
+    releerEnLinea.current = cargar;
     const id = setInterval(cargar, 10000);
+    const reloj = setInterval(() => timbrar(false), 1000);
+    return () => {
+      vivo = false; clearInterval(id); clearInterval(reloj); releerEnLinea.current = () => {};
+      sinCandado.abort(); soltarCandado();
+    };
+  }, [hayEnLinea, token, caja.sucursal_id, turno.caja_id, avisarBreveTienda]);
+
+  // Tienda en línea, solo POS web (en la caja instalada lo hace su agente): cada 30 s avisa a la
+  // nube que aquí hay un turno abierto —sin eso la tienda no recibe pedidos— y lee cómo acepta.
+  // HomePos solo existe con turno abierto; al cerrarlo se desmonta y el aviso deja de salir.
+  useEffect(() => {
+    if (!hayTienda || esEscritorio()) { aceptacionEnLinea.current = null; setAceptacionTienda(null); setCajaSinActualizar(false); return; }
+    let vivo = true;
+    const latir = () => {
+      void avisarPresente(token, caja.sucursal_id, turno.caja_id).then((sinActualizar) => { if (vivo) setCajaSinActualizar(sinActualizar); });
+      leerEstadoEnLinea(token, caja.sucursal_id)
+        .then((e) => { if (vivo) { aceptacionEnLinea.current = e?.aceptacion ?? null; setAceptacionTienda(e?.aceptacion ?? null); } })
+        .catch(() => { /* se queda con lo último que supo; se repite en 30 s */ });
+    };
+    latir();
+    const id = setInterval(latir, 30000);
     return () => { vivo = false; clearInterval(id); };
-  }, [hayDelivery, token, caja.sucursal_id]);
+  }, [hayTienda, token, caja.sucursal_id, turno.caja_id]);
 
   /** Cierra la confirmación/recibo y deja la caja lista para la siguiente venta. */
   const nuevoTicket = useCallback(() => {
@@ -1540,7 +1622,7 @@ export function HomePos({
    * No cierra nada mientras un cobro está en curso: interrumpir a media aplicación de pago es
    * justo lo que no debe poder hacerse por reflejo.
    */
-  const alEscapar = useMemo(() => {
+  const { alEscapar, algoAbierto } = useMemo(() => {
     const capas: CapaEscape[] = [
       // Modificadores y combo: overlays sobre la rejilla de captura, por encima de todo lo demás.
       // El de modificadores va primero porque se pinta encima del de combo cuando ambos aplican.
@@ -1587,14 +1669,21 @@ export function HomePos({
       [confirmandoCierre, () => setConfirmandoCierre(false)],
       [menuGeneralAbierto, () => setMenuGeneralAbierto(false)],
       [cerrando, () => setCerrando(false)],
+    ];
+    const pantallas: CapaEscape[] = [
       // La pantalla de cocina no conoce la pila del POS (vive en su propio paquete).
       [enKds, () => setEnKds(false)],
       // Nada abierto: Escape equivale al botón Volver de la pantalla de captura.
       [!enInicio && !enKds && !enMonitor && !enConsultaCuentas && !enDevoluciones && !enPedidosApps
         && !enDelivery && !enPickup && !enMesas, () => intentarSalirDeCaptura("atras")],
     ];
-    return capaVisible(capas);
-  }, [modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
+    return {
+      // El aviso grande de la tienda va encima de TODO y CEDE: lo cierra su propio `Modal`.
+      alEscapar: capaVisible([[avisoTiendaVisible, null], ...capas, ...pantallas]),
+      // Hay algo abierto encima de la pantalla (un cobro, un modal): «Ver orden» no se lo lleva.
+      algoAbierto: capas.some(([visible]) => visible),
+    };
+  }, [avisoTiendaVisible, modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
       agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto,
       clienteDomAbierto, clienteCuentaAbierto, zonaPedidoAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
@@ -1602,6 +1691,70 @@ export function HomePos({
       enConsultaCuentas, enDevoluciones, enPedidosApps, enDelivery, enPickup, enMesas, nuevoTicket,
       intentarSalirDeCaptura]);
   useEscape(alEscapar);
+
+  /** Aceptar o rechazar un pedido de la tienda desde este dispositivo: siempre por `delivery-accion`. */
+  const atenderPedidoTienda: AccionTienda = async (p, accion, motivo) => {
+    const r = await accionPedidoApp(token, { pedidoId: p.id, accion, motivo });
+    if (r.ok) {
+      setAtendidosTienda((v) => new Map(v).set(p.id, accion));
+      cerrarAvisoTienda(p.id);
+    }
+    // Con éxito o con error se relee: el pedido pudo cambiar por su cuenta (venció, lo tomó otra caja).
+    releerEnLinea.current();
+    if (r.ok) return { ok: true, ticketId: r.ticketId };
+    const mensaje = mensajeErrorEnLinea(r.error);
+    // El pedido se canceló al aceptarlo: hay que avisarle al cliente, y eso no cabe en un aviso de
+    // seis segundos. Queda escrito en su canal hasta que el cajero lo cierre.
+    const enCanal = r.error === "PEDIDO_CANCELADO";
+    if (enCanal) {
+      setCanceladosAlAceptar((v) => new Map(v).set(p.id, mensaje));
+      // Ya no está por aceptar, aunque la copia local de la caja tarde unos segundos en traerlo.
+      setAtendidosTienda((v) => new Map(v).set(p.id, "rechazar"));
+    }
+    return { ok: false, mensaje, enCanal };
+  };
+  /** «Ver orden» del aviso grande: lleva a Pick-up o a Domicilio con ese pedido seleccionado. */
+  const verPedidoTiendaEnSuCanal = (p: PedidoApp) => {
+    cerrarAvisoTienda(p.id);
+    const aDomicilio = p.app === "DELIVERY_PROPIO";
+    // Con un cobro, un modal o un pedido a medias en pantalla no se navega: eso es trabajo que se
+    // perdería. El pedido sigue en su canal (y el timbre sonando) para cuando termine. Cuentan
+    // también los diálogos propios de la lista de cuentas (cancelar, descuento, PIN…) y los dos
+    // que se pintan encima de ella sin pasar por `alEscapar`: sin esto, «Ver orden» dentro del
+    // mismo canal los dejaba abiertos sobre la cuenta recién aceptada.
+    const capturando = !enInicio && !enKds && !enMonitor && !enConsultaCuentas && !enDevoluciones && !enPedidosApps && !enDelivery && !enPickup && !enMesas;
+    const enLista = listaConDialogo.current || asignandoRepartidor != null || viendoReservaciones;
+    if (algoAbierto || enLista || (capturando && (carrito.lineas.length > 0 || ticketBd !== null))) {
+      avisarBreveTienda(`Termina lo que tienes abierto. El pedido te espera en ${aDomicilio ? "Domicilio" : "Pick-up"}.`);
+      return;
+    }
+    volverAlInicio();
+    setEnKds(false);
+    setEnInicio(false);
+    setEnPickup(!aDomicilio);
+    setEnDelivery(aDomicilio);
+    setVerPedidoTienda({ pedidoId: p.id });
+  };
+  /**
+   * Lo de la tienda que se ve desde cualquier pantalla. Va en una constante porque el componente
+   * tiene un `return` por pantalla, y cada uno la incluye (menos el cierre de turno: quien está
+   * contando la caja ya no atiende pedidos; el timbre sigue sonando).
+   */
+  const capaTienda = hayTienda && (
+    <CapaPedidosTienda
+      pedidos={pedidosTienda}
+      cajaId={turno.caja_id}
+      aceptacion={aceptacionTienda}
+      cerrados={avisosTiendaCerrados}
+      viendo={enPickup || enDelivery ? verPedidoTienda?.pedidoId ?? null : null}
+      breve={breveTienda}
+      onAccion={atenderPedidoTienda}
+      onVerOrden={verPedidoTiendaEnSuCanal}
+      onCerrar={cerrarAvisoTienda}
+      onBreve={avisarBreveTienda}
+      onVisible={setAvisoTiendaVisible}
+    />
+  );
 
   if (cerrando) {
     return (
@@ -1998,11 +2151,28 @@ export function HomePos({
   );
 
   if (enKds) {
-    return <PantallaKds token={token} caja={caja} onSalir={() => setEnKds(false)} />;
+    return <><PantallaKds token={token} caja={caja} onSalir={() => setEnKds(false)} />{capaTienda}</>;
   }
+
+  // Retiro / depósito: se abre igual desde la pantalla de inicio que desde la de venta.
+  const modalMovimiento = movimientoAbierto && (
+    <ModalMovimientoCaja
+      token={token}
+      empleado={empleado}
+      caja={caja}
+      turno={turno}
+      onRegistrado={(m) => {
+        setMovimientoAbierto(false);
+        setMovimientoToast({ folio: m.folio, etiqueta: m.etiqueta, monto: m.monto });
+        setTimeout(() => setMovimientoToast(null), 4000);
+      }}
+      onCerrar={() => setMovimientoAbierto(false)}
+    />
+  );
 
   // Pantalla de inicio: punto de entrada del turno. Desde aquí se elige modo u operación.
   if (enInicio) {
+    const porAceptarTienda = contarPorAceptar(pedidosTienda, { cajaId: turno.caja_id, enEscritorio: esEscritorio(), ahora: Date.now() });
     return (
       <>
         <PantallaInicio
@@ -2010,14 +2180,15 @@ export function HomePos({
           turno={turno}
           empleado={empleado}
           nCuentasComedor={cuentasAbiertas.comedor}
-          nCuentasPickup={cuentasAbiertas.pickup}
-          nCuentasDomicilio={cuentasAbiertas.domicilio}
+          // Cada canal suma sus pedidos de la tienda por aceptar.
+          nCuentasPickup={cuentasAbiertas.pickup + porAceptarTienda.pickup}
+          nCuentasDomicilio={cuentasAbiertas.domicilio + porAceptarTienda.domicilio}
           nEnEspera={nEnEspera}
           nPedidosApps={nPedidosApps}
           expiradosApps={expiradosApps}
           // Sin el módulo, `onPedidosApps` queda undefined: PantallaInicio no pinta ni el atajo
           // ni el aviso de vencidos (ambos son condicionales a que venga la función).
-          onPedidosApps={hayDelivery ? () => { setEnInicio(false); setEnPedidosApps(true); } : undefined}
+          onPedidosApps={hayEnLinea ? () => { setEnInicio(false); setEnPedidosApps(true); } : undefined}
           onComedor={() => { setEnInicio(false); setEnMesas(true); }}
           onPickup={() => { setEnInicio(false); setEnPickup(true); }}
           onDomicilio={() => { setEnInicio(false); setEnDelivery(true); }}
@@ -2036,20 +2207,7 @@ export function HomePos({
           onMenu={() => setMenuGeneralAbierto(true)}
           online={online}
         />
-        {movimientoAbierto && (
-          <ModalMovimientoCaja
-            token={token}
-            empleado={empleado}
-            caja={caja}
-            turno={turno}
-            onRegistrado={(m) => {
-              setMovimientoAbierto(false);
-              setMovimientoToast({ folio: m.folio, etiqueta: m.etiqueta, monto: m.monto });
-              setTimeout(() => setMovimientoToast(null), 4000);
-            }}
-            onCerrar={() => setMovimientoAbierto(false)}
-          />
-        )}
+        {modalMovimiento}
         {menuGeneralAbierto && (
           <MenuGeneral
             onCorteX={() => { setEnInicio(false); setEnMonitor(true); }}
@@ -2070,22 +2228,13 @@ export function HomePos({
         )}
         {configImpresoraAbierto && <ModalConfigImpresora token={token} sucursalId={caja.sucursal_id} onCerrar={() => setConfigImpresoraAbierto(false)} />}
         {modalesCompartidos}
-        {cerrando && (
-          <PantallaCierre
-            token={token}
-            empleado={empleado}
-            caja={caja}
-            turno={turno}
-            onCancelar={() => setCerrando(false)}
-            onCerrado={onCerrarTurno}
-          />
-        )}
+        {capaTienda}
       </>
     );
   }
 
   if (enMonitor) {
-    return <PantallaMonitorVentas token={token} caja={caja} turno={turno} onSalir={volverAlInicio} />;
+    return <><PantallaMonitorVentas token={token} caja={caja} turno={turno} onSalir={volverAlInicio} />{capaTienda}</>;
   }
 
   if (enDelivery || enPickup || enMesas) {
@@ -2160,6 +2309,29 @@ export function HomePos({
         }}
         onImprimirTicket={(id, r) => reimprimirCuenta(id, r ? { origen: "CUENTAS", autorizacionPinId: r.autorizacionPinId } : undefined)}
         onComandaCancelacion={imprimirComandaCancelacion}
+        alTenerDialogo={anotarDialogoDeLista}
+        // Tienda en línea: los pedidos por aceptar de Pick-up y de Domicilio viven en su lista.
+        enLinea={hayTienda && modo !== "COMER_AQUI" ? {
+          pedidos: pedidosTienda,
+          sinComanda: comandasAtrasadas,
+          sabidoAqui: canceladosAlAceptar,
+          ver: verPedidoTienda,
+          onAccion: atenderPedidoTienda,
+          // A mano y desde ESTE dispositivo, sea de la caja que sea el ticket. Queda como intentada
+          // para que el sondeo no la mande otra vez mientras llega el sello de la base.
+          onImprimirComanda: async (p) => {
+            if (!p.ticketId) return false;
+            comandasEnLineaIntentadas.add(p.id);
+            const salio = (await imprimirComandaEnLinea(p.ticketId)) === "ok";
+            // Con papel, el sello de la base tarda un instante: el margen empieza de nuevo para no avisar en falso.
+            if (salio) {
+              sinComandaDesde.current.set(p.id, Date.now());
+              setComandasAtrasadas((v) => new Set([...v].filter((id) => id !== p.id)));
+            }
+            releerEnLinea.current();
+            return salio;
+          },
+        } : undefined}
         extraPorCuenta={
           enDelivery
             ? (c, recargar) => (
@@ -2190,6 +2362,7 @@ export function HomePos({
             el componente tiene un return por pantalla. */}
         {modalesCobro}
         {modalCanje}
+        {capaTienda}
         {pidiendoMesa && (
           <ModalNumeroMesa
             token={token}
@@ -2250,18 +2423,24 @@ export function HomePos({
   }
 
   if (enConsultaCuentas) {
-    return <PantallaConsultaCuentas token={token} caja={caja} turno={turno} empleado={empleado} onSalir={volverAlInicio} onReimprimir={(id) => reimprimirCuenta(id, { origen: "CONSULTA" })} />;
+    return <><PantallaConsultaCuentas token={token} caja={caja} turno={turno} empleado={empleado} onSalir={volverAlInicio} onReimprimir={(id) => reimprimirCuenta(id, { origen: "CONSULTA" })} />{capaTienda}</>;
   }
 
   if (enDevoluciones) {
-    return <PantallaDevoluciones token={token} caja={caja} turno={turno} empleado={empleado} onSalir={volverAlInicio} />;
+    return <><PantallaDevoluciones token={token} caja={caja} turno={turno} empleado={empleado} onSalir={volverAlInicio} />{capaTienda}</>;
   }
 
-  // `hayDelivery` manda incluso sobre el estado de navegación: si el módulo se apagó mientras el
+  // `hayEnLinea` manda incluso sobre el estado de navegación: si el módulo se apagó mientras el
   // cajero estaba parado en esta pantalla (el latido llega cada 10 min, `useAcceso` relee cada
   // minuto), no se vuelve a montar y cae al POS normal.
-  if (enPedidosApps && hayDelivery) {
-    return <PantallaPedidosApps token={token} caja={caja} onSalir={volverAlInicio} />;
+  if (enPedidosApps && hayEnLinea) {
+    return (
+      <>
+        <PantallaPedidosApps token={token} caja={caja} hayApps={hayDelivery} hayTienda={hayTienda} cajaSinActualizar={cajaSinActualizar}
+          onCambio={() => releerEnLinea.current()} onSalir={volverAlInicio} />
+        {capaTienda}
+      </>
+    );
   }
 
   return (
@@ -2270,12 +2449,6 @@ export function HomePos({
         <div className="flex flex-shrink-0 items-center justify-center gap-2 bg-[#9A6B12] px-4 py-1.5 text-13 font-semibold text-white" role="status">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" /></svg>
           Sin internet: la caja sigue cobrando igual. Las ventas suben solas cuando vuelva la señal.
-        </div>
-      )}
-      {online && pendientesSync > 0 && (
-        <div className="flex flex-shrink-0 items-center justify-center gap-2 bg-[#2C5AA0] px-4 py-1.5 text-13 font-semibold text-white" role="status">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
-          Sincronizando {pendientesSync} operación{pendientesSync === 1 ? "" : "es"} pendiente{pendientesSync === 1 ? "" : "s"}…
         </div>
       )}
       {/* Barra de captura: aquí no van menú, KDS ni cuentas. El cajero está anotando un pedido y
@@ -2454,7 +2627,6 @@ export function HomePos({
           // abierta y se cobra después desde la lista. Antes entraba por la otra, que pinta
           // "Cobrar" como acción principal y "Enviar a cocina" debajo — invitando a cobrar una
           // mesa que apenas está ordenando, que es justo lo que no se quiere en comedor.
-          onEnviarCocina={undefined}
           onEnviarCocinaAbierto={
             // Un pedido retomado de espera es de mostrador: su acción es Cobrar, no Enviar.
             // Para llevar tampoco: su cuenta abierta se cobra en mostrador, no se manda a cocina.
@@ -2465,8 +2637,6 @@ export function HomePos({
                 : undefined
           }
           folioCuenta={ticketBd?.folio ?? null}
-          cocinaEnviada={cocinaEnviada}
-          enviandoCocina={enviandoCocina}
           onAplicarDescuento={cuentaImpresa ? undefined : onAplicarDescuento}
           descuentoMxn={ticketBd?.descuentos ?? 0}
             promocionMxn={ticketBd?.promociones ?? 0}
@@ -2496,6 +2666,7 @@ export function HomePos({
       {modalesCompartidos}
       {modalesCobro}
       {modalCanje}
+      {capaTienda}
       {modGrupos && (
         <ModalModificadores
           producto={modGrupos.producto}
@@ -2552,20 +2723,7 @@ export function HomePos({
           onCerrar={() => setDescuentoAbierto(false)}
         />
       )}
-      {movimientoAbierto && (
-        <ModalMovimientoCaja
-          token={token}
-          empleado={empleado}
-          caja={caja}
-          turno={turno}
-          onRegistrado={(m) => {
-            setMovimientoAbierto(false);
-            setMovimientoToast({ folio: m.folio, etiqueta: m.etiqueta, monto: m.monto });
-            setTimeout(() => setMovimientoToast(null), 4000);
-          }}
-          onCerrar={() => setMovimientoAbierto(false)}
-        />
-      )}
+      {modalMovimiento}
       {movimientoToast && (
         <div className="fixed left-1/2 top-20 z-[80] -translate-x-1/2 rounded-lg bg-ink px-5 py-3 text-14 font-medium text-white shadow-xl">
           <span className="font-semibold">{movimientoToast.folio}</span> · {movimientoToast.etiqueta} · {fmtMxn(movimientoToast.monto)} registrado

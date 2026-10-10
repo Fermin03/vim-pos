@@ -2,10 +2,8 @@
 import { etiquetaApp as etiquetaAppCompartida } from "@vim/db/metodos-pago";
 // Pedidos que llegan de las apps de delivery (ADR 0011). Lectura bajo RLS (delivery_pedidos) y
 // acciones vía la edge function delivery-accion: el POS nunca habla con Uber/DiDi/Rappi.
-import { employeeClient } from "./supabase";
+import { employeeClient, encabezadosFuncion, urlFuncion } from "./supabase";
 
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export type PedidoAppEstado =
   | "RECIBIDO" | "ACEPTADO" | "RECHAZADO" | "EN_PREPARACION" | "LISTO" | "ENTREGADO" | "CANCELADO" | "EXPIRADO" | "ERROR";
@@ -24,11 +22,21 @@ export type PedidoAppItem = {
   alergiaNota: string | null;
   modificadores: PedidoAppModificador[];
 };
+/** En canal TIENDA, `app` es el modo de servicio del pedido: recoger o domicilio. */
+export type AppTienda = "DRIVE_THRU" | "DELIVERY_PROPIO";
 export type PedidoApp = {
-  id: string; app: AppPedido; idExterno: string; folioCorto: string | null; estado: PedidoAppEstado;
+  id: string; app: AppPedido | AppTienda; idExterno: string; folioCorto: string | null; estado: PedidoAppEstado;
   tipoEntrega: string | null; clienteNombre: string | null; notaCliente: string | null; items: PedidoAppItem[];
   totalCliente: number | null; venceAceptacion: string | null; recibidoAt: string; ticketId: string | null;
   ticketFolio: string | null; ultimoError: string | null;
+  canal: "APP" | "TIENDA"; clienteTelefono: string | null;
+  /** Solo la tienda a domicilio: la dirección armada en una línea y sus referencias aparte. */
+  direccion: { texto: string; referencias: string | null } | null;
+  pago: { forma: "EFECTIVO" | "TARJETA"; pagaCon: number | null } | null;
+  envio: number | null; gestion: "NUBE" | "ESCRITORIO" | null;
+  /** Caja instalada que reclamó el pedido (null = nadie; lo puede atender cualquiera). */
+  gestionCajaId: string | null;
+  ticketCajaId: string | null; comandaImpresa: boolean;
 };
 
 const ACTIVOS: PedidoAppEstado[] = ["RECIBIDO", "ACEPTADO", "EN_PREPARACION", "LISTO", "ERROR"];
@@ -38,18 +46,63 @@ export async function leerPedidosApps(token: string, sucursalId: string): Promis
   const desde = new Date(Date.now() - 30 * 60_000).toISOString();
   const { data, error } = await employeeClient(token)
     .from("delivery_pedidos")
-    .select("id, app, id_externo, folio_corto, estado, tipo_entrega, cliente_nombre, nota_cliente, items, total_cliente_mxn, vence_aceptacion, recibido_at, ticket_id, ultimo_error, ticket:tickets(folio_completo)")
+    .select("id, app, id_externo, folio_corto, estado, tipo_entrega, cliente_nombre, nota_cliente, items, total_cliente_mxn, vence_aceptacion, recibido_at, ticket_id, ultimo_error, canal, cliente_telefono, direccion, pago_al_recibir, paga_con_mxn, envio_mxn, subtotal_mxn, gestion, gestion_caja_id, ticket:tickets(folio_completo, caja_id, comanda_impresa_at, estado_fiscal, ticket_impreso_at)")
     .eq("sucursal_id", sucursalId)
     .or(`estado.in.(${ACTIVOS.join(",")}),recibido_at.gte.${desde}`)
     .order("recibido_at", { ascending: false })
     .limit(100);
   if (error) throw new Error(error.message);
-  return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
+  return sinCerradosViejos(((data ?? []) as unknown as Record<string, unknown>[]).map(pedidoDesdeFila), desde);
+}
+
+/**
+ * La consulta trae todo lo que la base tiene por activo. Un pedido atendido desde el POS web puede
+ * seguir ACEPTADO allá un minuto después de cobrado (o más, si la pasada que lo pone al día falla):
+ * ya derivado a cerrado, se le aplica la misma media hora que a los demás cerrados.
+ */
+export function sinCerradosViejos(pedidos: PedidoApp[], desdeIso: string): PedidoApp[] {
+  const desde = Date.parse(desdeIso);
+  return pedidos.filter((p) => ACTIVOS.includes(p.estado) || Date.parse(p.recibidoAt) >= desde);
+}
+
+type TicketDeFila = { folio_completo?: string; caja_id?: string | null; comanda_impresa_at?: string | null; estado_fiscal?: string | null; ticket_impreso_at?: string | null };
+const VIVO_CON_TICKET: unknown[] = ["ACEPTADO", "EN_PREPARACION", "LISTO"];
+/**
+ * Un pedido de la tienda atendido desde el POS web (gestión NUBE) no tiene caja que reporte su
+ * estado: sale de su ticket, con la MISMA regla que tienda_seguimiento y
+ * tienda_sincronizar_estados_nube (0164), que lo escribe en la base cada minuto. Derivarlo aquí
+ * hace que un pedido cobrado o cancelado deje de verse activo al momento.
+ * ponytail: «con repartidor asignado → LISTO» no se deriva aquí (pediría otra tabla en la consulta
+ * y la tarjeta pinta igual ACEPTADO que LISTO); la base lo pone al minuto.
+ */
+function estadoDeFila(r: Record<string, unknown>, ticket: TicketDeFila | null): PedidoAppEstado {
+  const estado = r.estado as PedidoAppEstado;
+  if (r.canal !== "TIENDA" || r.gestion !== "NUBE" || !ticket || !VIVO_CON_TICKET.includes(estado)) return estado;
+  if (ticket.estado_fiscal === "CANCELADO") return "CANCELADO";
+  if (ticket.estado_fiscal === "PAGADO" || ticket.estado_fiscal === "FACTURADO") return "ENTREGADO";
+  return ticket.ticket_impreso_at ? "LISTO" : estado;
+}
+
+function direccionDesdeJson(v: unknown): PedidoApp["direccion"] {
+  if (!v || typeof v !== "object") return null;
+  const d = v as Record<string, unknown>;
+  const t = (k: string) => (typeof d[k] === "string" ? (d[k] as string).trim() : "");
+  const calle = [t("calle"), t("numero_exterior")].filter(Boolean).join(" ");
+  const interior = t("numero_interior") ? `int. ${t("numero_interior")}` : "";
+  const cp = t("codigo_postal") ? `C.P. ${t("codigo_postal")}` : "";
+  const texto = [[calle, interior].filter(Boolean).join(", "), t("colonia"), cp, t("ciudad")].filter(Boolean).join(", ");
+  return texto ? { texto, referencias: t("referencias") || null } : null;
+}
+
+export function pedidoDesdeFila(r: Record<string, unknown>): PedidoApp {
+  const ticket = r.ticket as TicketDeFila | null;
+  const forma = r.pago_al_recibir === "EFECTIVO" || r.pago_al_recibir === "TARJETA" ? r.pago_al_recibir : null;
+  return {
     id: String(r.id),
-    app: r.app as AppPedido,
+    app: r.app as PedidoApp["app"],
     idExterno: String(r.id_externo),
     folioCorto: (r.folio_corto as string | null) ?? null,
-    estado: r.estado as PedidoAppEstado,
+    estado: estadoDeFila(r, ticket),
     tipoEntrega: (r.tipo_entrega as string | null) ?? null,
     clienteNombre: (r.cliente_nombre as string | null) ?? null,
     notaCliente: (r.nota_cliente as string | null) ?? null,
@@ -58,9 +111,19 @@ export async function leerPedidosApps(token: string, sucursalId: string): Promis
     venceAceptacion: (r.vence_aceptacion as string | null) ?? null,
     recibidoAt: String(r.recibido_at),
     ticketId: (r.ticket_id as string | null) ?? null,
-    ticketFolio: ((r.ticket as { folio_completo?: string } | null)?.folio_completo) ?? null,
+    ticketFolio: ticket?.folio_completo ?? null,
     ultimoError: (r.ultimo_error as string | null) ?? null,
-  }));
+    // Una fila sin `canal` (caja vieja, Uber) es de una app.
+    canal: r.canal === "TIENDA" ? "TIENDA" : "APP",
+    clienteTelefono: (r.cliente_telefono as string | null) ?? null,
+    direccion: direccionDesdeJson(r.direccion),
+    pago: forma ? { forma, pagaCon: r.paga_con_mxn == null ? null : Number(r.paga_con_mxn) } : null,
+    envio: r.envio_mxn == null ? null : Number(r.envio_mxn),
+    gestion: r.gestion === "NUBE" || r.gestion === "ESCRITORIO" ? r.gestion : null,
+    gestionCajaId: (r.gestion_caja_id as string | null) ?? null,
+    ticketCajaId: ticket?.caja_id ?? null,
+    comandaImpresa: !!ticket?.comanda_impresa_at,
+  };
 }
 
 /** Recursivo: una elección de combo trae a su vez sus propios extras (el término, un extra queso). */
@@ -97,9 +160,9 @@ export async function accionPedidoApp(
   args: { pedidoId: string; accion: "aceptar" | "rechazar" | "listo"; motivo?: string; detalle?: string; tiempoPrepMin?: number },
 ): Promise<{ ok: true; ticketId?: string } | { ok: false; error: string; detalle?: string }> {
   try {
-    const r = await fetch(`${URL}/functions/v1/delivery-accion`, {
+    const r = await fetch(urlFuncion("delivery-accion"), {
       method: "POST",
-      headers: { apikey: ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: encabezadosFuncion(token),
       body: JSON.stringify({
         pedido_id: args.pedidoId, accion: args.accion, motivo: args.motivo, detalle: args.detalle, tiempo_prep_min: args.tiempoPrepMin,
       }),
@@ -146,8 +209,8 @@ export function segundosRestantes(venceAceptacion: string | null, ahora: Date): 
   return Math.max(0, Math.round((new Date(venceAceptacion).getTime() - ahora.getTime()) / 1000));
 }
 
-export function etiquetaApp(app: AppPedido): string {
-  return etiquetaAppCompartida(app);
+export function etiquetaApp(app: AppPedido | AppTienda): string {
+  return app === "DRIVE_THRU" || app === "DELIVERY_PROPIO" ? "Tienda" : etiquetaAppCompartida(app);
 }
 
 const ETIQUETA_ESTADO: Record<PedidoAppEstado, string> = {
@@ -171,11 +234,6 @@ export function ordenarPedidos(pedidos: PedidoApp[]): PedidoApp[] {
   });
 }
 
-export function idsNuevos(antes: PedidoApp[], ahora: PedidoApp[]): string[] {
-  const vistos = new Set(antes.map((p) => p.id));
-  return ahora.filter((p) => !vistos.has(p.id)).map((p) => p.id);
-}
-
 // ── Tienda de Uber (spec A6): estado, pausa, reanudar y tiempo de preparación, vía delivery-accion ──
 
 export type EstadoTiendaApp = { estado: "EN_LINEA" | "PAUSADA" | "DESCONOCIDO"; hasta: string | null; motivo: string | null; consultado_at: string };
@@ -184,9 +242,9 @@ type RespTienda = { ok?: boolean; tienda?: EstadoTiendaApp; tiempo_prep_min?: nu
 
 async function llamarAccion(token: string, cuerpo: Record<string, unknown>): Promise<RespTienda & { status: number }> {
   try {
-    const r = await fetch(`${URL}/functions/v1/delivery-accion`, {
+    const r = await fetch(urlFuncion("delivery-accion"), {
       method: "POST",
-      headers: { apikey: ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: encabezadosFuncion(token),
       body: JSON.stringify(cuerpo),
     });
     const j = (await r.json().catch(() => ({}))) as RespTienda;

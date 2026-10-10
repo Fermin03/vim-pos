@@ -8,6 +8,7 @@ import {
 } from "../../lib/conciliacion";
 import { mensajeError } from "../../lib/errores";
 import { rangoLegible } from "@vim/fecha";
+import { Segmentos } from "../../components/controles";
 
 const mxn = (n: number) => n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
 const input = "h-10 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink";
@@ -211,22 +212,17 @@ function ModalDetalle({ liq, items, onCerrar }: { liq: Liquidacion; items: ItemC
             <ResumenCard n={sinMatch.length} titulo="En app, no en POS" pie={`${mxn(montoSinMatch)} a revisar`} tono={sinMatch.length > 0 ? "bad" : "neutro"} />
           </div>
 
-          <div className="mb-3 scroll-x-limpio inline-flex max-w-full gap-0.5 overflow-x-auto rounded border border-line bg-hover p-[3px] lg:max-w-none lg:overflow-x-visible">
-            {([
+          <Segmentos
+            className="mb-3"
+            etiqueta="Qué pedidos ver"
+            opciones={[
               { v: "TODOS", l: `Todos ${items.length}` },
               { v: "CONCILIADOS", l: `Conciliados ${conciliados.length}` },
               { v: "PROBLEMAS", l: `Con problemas ${conDiferencia.length + sinMatch.length}` },
-            ] as { v: FiltroItem; l: string }[]).map((t) => (
-              <button
-                key={t.v}
-                type="button"
-                onClick={() => setFiltro(t.v)}
-                className={["flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-[11px] text-13 font-semibold transition lg:py-1.5", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
-              >
-                {t.l}
-              </button>
-            ))}
-          </div>
+            ]}
+            valor={filtro}
+            onCambiar={setFiltro}
+          />
 
           <div className="tabla-caja tabla-caja-sm max-h-[340px] overflow-y-auto rounded border border-line">
             <table className="w-full text-13">

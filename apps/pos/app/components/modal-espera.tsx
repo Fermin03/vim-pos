@@ -74,34 +74,64 @@ export function ModalListaEspera({
   }, [token, cajaId]);
 
   return (
-    <Modal open onClose={onCerrar} title="Pedidos en espera" className="w-full max-w-lg rounded-lg bg-surface p-6 shadow-xl">
+    <ModalListaTickets
+      titulo="Pedidos en espera"
+      vacio="No hay pedidos en espera en esta caja."
+      verbo="Retomar"
+      filas={tickets?.map((t) => ({ ticketId: t.ticketId, titulo: t.etiqueta, nItems: t.nItems, desdeIso: t.desdeIso, pie: t.folio, total: t.total })) ?? null}
+      error={error}
+      errorCarga={errorCarga}
+      procesando={procesando}
+      onElegir={(f) => onRetomar(f.ticketId, f.titulo)}
+      onCerrar={onCerrar}
+    />
+  );
+}
+
+/** Una fila de las listas de la caja de las que se retoma o se abre una cuenta. */
+export type FilaTicket = { ticketId: string; titulo: string; nItems: number; desdeIso: string | null; pie: string | null; total: number };
+
+/** La lista que comparten "Pedidos en espera" y "Cuentas abiertas · Para llevar". */
+export function ModalListaTickets({ titulo, vacio, verbo, filas, error, errorCarga, procesando, onElegir, onCerrar }: {
+  titulo: string;
+  vacio: string;
+  /** Lo que hace tocar una fila: "Retomar", "Abrir". */
+  verbo: string;
+  /** null mientras carga. */
+  filas: FilaTicket[] | null;
+  error: string | null;
+  errorCarga: string | null;
+  procesando: boolean;
+  onElegir: (f: FilaTicket) => void;
+  onCerrar: () => void;
+}) {
+  return (
+    <Modal open onClose={onCerrar} title={titulo} className="w-full max-w-lg rounded-lg bg-surface p-6 shadow-xl">
       {(error ?? errorCarga) && <p className="mb-3 text-13 font-medium text-danger" role="alert">{error ?? errorCarga}</p>}
-      {tickets === null && !errorCarga && <p className="py-6 text-center text-sm text-ink-3">Cargando…</p>}
-      {tickets !== null && tickets.length === 0 && (
-        <p className="py-6 text-center text-sm text-ink-3">No hay pedidos en espera en esta caja.</p>
-      )}
-      {tickets !== null && tickets.length > 0 && (
+      {filas === null && !errorCarga && <p className="py-6 text-center text-sm text-ink-3">Cargando…</p>}
+      {filas !== null && filas.length === 0 && <p className="py-6 text-center text-sm text-ink-3">{vacio}</p>}
+      {filas !== null && filas.length > 0 && (
         <div className="max-h-[55vh] overflow-y-auto rounded border border-line">
-          {tickets.map((t) => {
-            const min = minutosEnEspera(t.desdeIso);
+          {filas.map((f) => {
+            const min = minutosEnEspera(f.desdeIso);
             return (
               <button
-                key={t.ticketId}
+                key={f.ticketId}
                 type="button"
                 disabled={procesando}
-                onClick={() => onRetomar(t.ticketId, t.etiqueta)}
+                onClick={() => onElegir(f)}
                 className="flex w-full items-center justify-between gap-3 border-b border-line px-4 py-3 text-left transition last:border-b-0 hover:bg-hover disabled:opacity-60"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-15 font-semibold">{t.etiqueta}</div>
+                  <div className="truncate text-15 font-semibold">{f.titulo}</div>
                   <div className="mt-0.5 text-12 text-ink-3">
-                    {t.nItems} art. · {min < 60 ? `hace ${min} min` : `hace ${Math.floor(min / 60)} h ${min % 60} min`}
-                    {t.folio ? ` · ${t.folio}` : ""}
+                    {f.nItems} art. · {min < 60 ? `hace ${min} min` : `hace ${Math.floor(min / 60)} h ${min % 60} min`}
+                    {f.pie ? ` · ${f.pie}` : ""}
                   </div>
                 </div>
                 <div className="flex flex-shrink-0 items-center gap-3">
-                  <span className="font-display text-16 font-bold tabular-nums">{fmtMxn(t.total)}</span>
-                  <span className="rounded bg-ink px-2.5 py-1 text-12 font-semibold text-white">Retomar</span>
+                  <span className="font-display text-16 font-bold tabular-nums">{fmtMxn(f.total)}</span>
+                  <span className="rounded bg-ink px-2.5 py-1 text-12 font-semibold text-white">{verbo}</span>
                 </div>
               </button>
             );

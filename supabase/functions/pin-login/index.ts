@@ -7,9 +7,9 @@
 // Llamada (la hace la sesión de dispositivo; en pruebas, con la anon key):
 //   POST /functions/v1/pin-login  { usuario_id, pin, caja_id }
 
-import { createClient } from "jsr:@supabase/supabase-js@2";
 import { create, getNumericDate } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
-import { corsHeaders } from "../_shared/cors.ts";
+import { clienteAdmin, servir } from "../_shared/http.ts";
+import { bearerDe, claimsDe } from "../_shared/identidad.ts";
 import { registrarError } from "../_shared/errores.ts";
 import { cajaIdDeEmail } from "../_shared/dispositivo.ts";
 
@@ -28,45 +28,24 @@ const key = await crypto.subtle.importKey(
 );
 
 // Cliente service_role: corre server-side, nunca se expone al cliente.
-const admin = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  { auth: { persistSession: false } },
-);
+const admin = clienteAdmin();
 
 // El caja_id va codificado en el email sintético del dispositivo (`caja-{caja_id}@dispositivos…`,
 // 1F §1.1; los dos dominios en `_shared/dispositivo.ts`). El dispositivo ES una caja.
 
-/** Lee los claims de un JWT cuya firma YA validó getUser (no re-verifica). */
-function leerClaims(token: string): Record<string, unknown> {
-  try {
-    const p = token.split(".")[1];
-    return p ? JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/"))) : {};
-  } catch {
-    return {};
-  }
-}
-
-Deno.serve(async (req) => {
-  const cors = corsHeaders(req);
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
-
+servir(async (req, json) => {
   // 0) Autenticación del DISPOSITIVO llamante (CN-005). Espeja autorizar-pin/crear-empleado/
   // resetear-pin. La anon key es un JWT del proyecto pero SIN usuario asociado, así que
   // getUser la rechaza: sin esto, cualquiera con la anon key (pública) podía disparar
   // intentos de PIN y solo el lockout del RPC frenaba la fuerza bruta.
-  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const token = bearerDe(req);
   if (!token) return json({ error: "NO_AUTH" }, 401);
   const { data: u, error: uErr } = await admin.auth.getUser(token);
   if (uErr || !u?.user) return json({ error: "AUTH_INVALIDA" }, 401);
 
   // El llamante debe ser una cuenta de DISPOSITIVO (caja): su JWT porta
   // tipo_identidad='DISPOSITIVO' (hook 0006) y su email codifica el caja_id.
-  const claims = leerClaims(token);
+  const claims = claimsDe(token);
   const cajaDelDispositivo = cajaIdDeEmail(u.user.email);
   if (claims.tipo_identidad !== "DISPOSITIVO" || !cajaDelDispositivo) {
     return json({ error: "NO_ES_DISPOSITIVO" }, 403);

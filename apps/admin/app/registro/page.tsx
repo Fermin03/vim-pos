@@ -1,10 +1,9 @@
 "use client";
 import { useState, type FormEvent } from "react";
-import { Button, LogoVim } from "@vim/ui/styles";
+import { Button, Captcha, LogoVim, SITE_KEY_TURNSTILE } from "@vim/ui/styles";
 import { errorDeRegistro, telefonoMx10 } from "@vim/db/registro";
 import { mensajeError } from "../lib/errores";
 import { ERRORES_REGISTRO, registrarNegocio } from "../lib/registro";
-import { Captcha, SITE_KEY_TURNSTILE } from "../components/captcha";
 import { ReenviarConfirmacion } from "../components/reenviar-confirmacion";
 
 // Registro PÚBLICO desde el sitio (0142, ADR 0022): contacto obligatorio, términos aceptados,

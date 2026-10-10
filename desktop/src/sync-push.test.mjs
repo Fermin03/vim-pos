@@ -14,7 +14,7 @@
 // sin libreta, el cajero daba de alta a un repartidor y la siembra del primer sync lo marcaba como
 // subido. Por eso las pruebas de orden imitan ese calendario: arranque → alta local → push.
 //
-// Vive sin base de datos a propósito (igual que verify-push-lotes): lo que se prueba es la
+// Vive sin base de datos a propósito (igual que sync-push-lotes.test.mjs): lo que se prueba es la
 // política, y provocar un rechazo de la nube a voluntad con el Postgres embebido es lento y
 // difícil de montar. El SQL real lo cubre `npm run verify:push`.
 import { test } from "node:test";
@@ -317,7 +317,7 @@ test("las zonas pendientes son las que la nube aún no confirmó", async () => {
 
 // Ronda de arreglos 1/5: las tres pruebas de arriba solo llaman a `sembrarZonasUnaVez` o a
 // `listarPendientes`, así que nunca ejercitan el camino de PUSH real: el destructuring de `zonas`
-// en `enviarLote`, `marcarZonasSubidas`, `zonasRechazadas` ni la rama `zonas_envio` de
+// en `enviarLote`, `marcarZonasSubidas`, `filasRechazadas` ni la rama `zonas_envio` de
 // `rechazadosPorTicket` tenían ninguna prueba que los pasara. Gemelas exactas de las pruebas de
 // repartidores de arriba ("un repartidor que la nube RECHAZA…" y "un alta hecha SIN CONEXIÓN…"),
 // que sí pasan por `pushToCloud`.
@@ -782,6 +782,143 @@ describe("ventas que cambian después de subir, y el piso de las mesas (Postgres
     const { rows: [n] } = await db.query("SELECT estado::text FROM mesas WHERE id = $1", [nueva.id]);
     assert.equal(n?.estado, "RESERVADA", "una mesa que no existía entra completa");
   });
+
+  // El caso del piloto. Los turnos solo viajaban arrastrados por una venta pendiente; como el
+  // cierre ocurre DESPUÉS de la última venta, el turno se quedaba ABIERTO en la nube para siempre
+  // y el siguiente de esa caja chocaba contra `idx_turno_unico_activo_por_caja`, tumbando el push
+  // entero: 27 ventas retenidas y 16 reintentos. Vivía en verify-cierre-turno.mjs con un esquema
+  // armado a mano, que se quedaba atrás cada vez que el push aprendía una tabla; aquí corre
+  // contra las migraciones de verdad.
+  test("el cierre de un turno viaja aunque no haya ventas nuevas, y solo una vez", async () => {
+    await subir(); // lo que hubiera pendiente, turno incluido, ya está en la nube
+    assert.ok(!(await pend()).turnosCambiados.includes(turno), "subido y sin cambios, no está pendiente");
+
+    await enReplica("UPDATE turnos SET estado = 'CERRADO', fecha_cierre = now(), efectivo_contado_mxn = 1500 WHERE id = $1", [turno]);
+    assert.ok((await pend()).turnosCambiados.includes(turno), "cerrarlo lo deja pendiente");
+
+    const [snap] = await subir();
+    const viajo = (snap?.turnos ?? []).find((t) => t.id === turno);
+    assert.equal(viajo?.estado, "CERRADO", "el cierre SÍ viaja");
+    assert.equal(Number(viajo?.efectivo_contado_mxn), 1500, "con el efectivo contado");
+    assert.equal((snap?.tickets ?? []).length, 0, "sin ninguna venta de por medio");
+    assert.ok(!(await pend()).turnosCambiados.includes(turno), "ya enviado, deja de repetirse");
+  });
+
+  test("un turno sin ventas viaja con sus movimientos de caja, y cualquier cambio suyo vuelve a viajar", async () => {
+    await enReplica("UPDATE turnos SET estado = 'CERRADO', fecha_cierre = now() WHERE caja_id = $1 AND estado = 'ABIERTO'", [CAJA]);
+    const { rows: [{ id: nuevo }] } = await enReplica(
+      `INSERT INTO turnos (tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable, usuario_apertura_id, fondo_inicial_mxn, fondo_modo)
+       VALUES ($1, $2, $3, 'PRUEBA-PC-2', CURRENT_DATE, $4, 0, 'TOTAL') RETURNING id`, [TENANT, SUC, CAJA, MARIA]);
+    await enReplica(
+      `INSERT INTO movimientos_caja (tenant_id, sucursal_id, caja_id, turno_id, folio, tipo, monto_mxn, dia_contable, usuario_solicitante_id, motivo)
+       VALUES ($1, $2, $3, $4, 'SAN-PRUEBA-1', 'SANGRIA', 300, CURRENT_DATE, $5, 'Prueba')`, [TENANT, SUC, CAJA, nuevo, MARIA]);
+
+    const [snap] = await subir();
+    assert.ok((snap?.turnos ?? []).some((t) => t.id === nuevo), "manda el turno");
+    assert.equal((snap?.movimientos_caja ?? []).filter((m) => m.turno_id === nuevo).length, 1, "y su movimiento de caja");
+    assert.ok(!(await pend()).turnosCambiados.includes(nuevo), "confirmado, no se repite");
+
+    await enReplica("UPDATE turnos SET efectivo_contado_mxn = 999 WHERE id = $1", [nuevo]);
+    assert.ok((await pend()).turnosCambiados.includes(nuevo), "la huella es de la fila completa: cualquier cambio lo detecta");
+  });
+});
+
+// ── El arranque sobrevive a un PostgREST que muere al nacer (Postgres real) ───────────────────
+//
+// Cinco veces en el log de una caja (ago–oct 2026): Postgres arranca, PostgREST escribe «Starting»
+// y «API server listening» y deja de existir, sin error. La caja sondeaba 60 s a un proceso muerto,
+// decía «PostgREST no respondió» y se cerraba; abrirla otra vez siempre funcionó. Aquí "algo de
+// fuera" lo mata una vez, igual, y el arranque tiene que darse cuenta y levantarlo solo.
+// La política (cuándo se reintenta y cuándo no) está en arranque-reintentos.test.mjs con dobles;
+// esto prueba el cableado de verdad.
+//
+// Vive en ESTE archivo aunque no sea del push: cada arranque barre los postgres.exe de la
+// instalación por carpeta (`matarPostgresDeEstaInstalacion`), así que dos archivos de pruebas con
+// Postgres real corriendo a la vez se matan la base entre sí. Aquí van todas, y en fila.
+test("si PostgREST muere al arrancar, el backend lo nota en el acto y se levanta solo al segundo intento", {
+  skip: SOLO_WINDOWS,
+  timeout: 180_000,
+}, async () => {
+  const { existsSync, readFileSync } = await import("node:fs");
+  const dataRoot = mkdtempSync(path.join(tmpdir(), "vim-arranque-"));
+  const pidfile = path.join(dataRoot, "bin", ".pids.json");
+  const opciones = (log) => ({ dataRoot, pgPort: 54381, restPort: 54382, log });
+  let backend = null;
+  let vigia = null;
+  try {
+    // Una caja ya instalada: la base existe y se cerró bien.
+    await (await startLocalBackend(opciones(() => {}))).stop();
+
+    // El agente externo: en cuanto aparece un PostgREST nuevo en el pidfile, lo mata. Una vez.
+    let muertes = 0;
+    vigia = setInterval(() => {
+      if (muertes > 0 || !existsSync(pidfile)) return;
+      try {
+        const [, rest] = JSON.parse(readFileSync(pidfile, "utf8")).pids;
+        process.kill(rest, "SIGKILL");
+        muertes++;
+      } catch { /* todavía no está, o ya no */ }
+    }, 20);
+
+    const lineas = [];
+    const t0 = Date.now();
+    backend = await startLocalBackend(opciones((m) => lineas.push(m)));
+    const segundos = (Date.now() - t0) / 1000;
+
+    assert.equal(muertes, 1, "la falla se inyectó");
+    assert.ok(lineas.some((l) => l.includes("intento 1/3") && l.includes("se cerró solo")), `el log dice cómo murió:\n${lineas.join("\n")}`);
+    assert.ok(lineas.some((l) => l.includes("arrancó al intento 2")), "y que el segundo intento abrió");
+    assert.ok(segundos < 50, `sin esperar el minuto del readiness (tardó ${segundos.toFixed(1)} s)`);
+    assert.equal((await fetch("http://127.0.0.1:54382/")).status, 200, "PostgREST contesta");
+    assert.equal((await backend.pool.query("SELECT 1 AS uno")).rows[0].uno, 1, "y Postgres también");
+  } finally {
+    if (vigia) clearInterval(vigia);
+    if (backend) await backend.stop();
+    rmSync(dataRoot, { recursive: true, force: true });
+  }
+});
+
+// Un PostgREST viejo que sigue escuchando (quedó vivo de una sesión anterior, o es de otra copia de
+// la app). En Windows el nuevo enlaza el MISMO puerto sin error —Warp pone SO_REUSEADDR— y no
+// recibe nada: las peticiones se las queda el viejo, que contesta 503 porque su base ya no existe.
+// La caja esperaba el minuto y no abría. Ahora, si el puerto tiene dueño, PostgREST usa otro.
+test("si el puerto de PostgREST ya tiene dueño, el backend arranca en otro en vez de quedarse sin respuesta", {
+  skip: SOLO_WINDOWS,
+  timeout: 180_000,
+}, async () => {
+  const { spawn } = await import("node:child_process");
+  const { writeFileSync, mkdirSync } = await import("node:fs");
+  const { fileURLToPath } = await import("node:url");
+  const desktop = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const dataRoot = mkdtempSync(path.join(tmpdir(), "vim-puerto-"));
+  const PUERTO = 54382;
+  let viejo = null, backend = null;
+  try {
+    // El viejo: un PostgREST de verdad en ese puerto, apuntando a una base que no existe.
+    mkdirSync(path.join(dataRoot, "viejo"), { recursive: true });
+    const conf = path.join(dataRoot, "viejo", "postgrest.conf");
+    writeFileSync(conf, [
+      `db-uri = "postgres://authenticator:x@127.0.0.1:1/vimpos"`, `db-schemas = "public"`, `db-anon-role = "anon"`,
+      `jwt-secret = "${"s".repeat(43)}"`, `server-port = ${PUERTO}`, `server-host = "127.0.0.1"`, "",
+    ].join("\n"));
+    const pgBin = path.join(desktop, "node_modules", "@embedded-postgres", "windows-x64", "native", "bin");
+    viejo = spawn(path.join(desktop, "bin", "postgrest.exe"), [conf], {
+      stdio: "ignore", env: { ...process.env, PATH: `${pgBin}${path.delimiter}${process.env.PATH}` },
+    });
+    for (let i = 0; i < 40; i++) { // hasta que escuche
+      try { await fetch(`http://127.0.0.1:${PUERTO}/`); break; } catch { await new Promise((r) => setTimeout(r, 250)); }
+    }
+
+    const lineas = [];
+    backend = await startLocalBackend({ dataRoot, pgPort: 54381, restPort: PUERTO, log: (m) => lineas.push(m) });
+    assert.notEqual(backend.restPort, PUERTO, "no se queda en el puerto que ya tenía dueño");
+    assert.equal((await fetch(`http://127.0.0.1:${backend.restPort}/`)).status, 200, "y en el suyo contesta");
+    assert.ok(lineas.some((l) => l.includes(String(PUERTO)) && l.includes("ocupado")), `el log lo dice: ${lineas.join(" · ")}`);
+  } finally {
+    if (backend) await backend.stop();
+    try { viejo?.kill(); } catch { /* */ }
+    rmSync(dataRoot, { recursive: true, force: true });
+  }
 });
 
 // ── Lealtad (0156, ADR 0030): movimientos y canjes viajan en el push ──────────────────────────

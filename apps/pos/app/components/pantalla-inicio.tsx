@@ -62,9 +62,9 @@ export function PantallaInicio({
   nCuentasPickup: number;
   nCuentasDomicilio: number;
   nEnEspera: number;
-  /** Pedidos de apps de delivery (Uber/DiDi/Rappi) esperando que el cajero los acepte. ADR 0011. */
+  /** Pedidos en línea (apps de delivery y tienda propia) esperando que el cajero los acepte. ADR 0011. */
   nPedidosApps?: number;
-  /** Pedidos de apps que vencieron sin aceptar y nadie ha visto en este dispositivo (spec A6). */
+  /** Pedidos en línea que vencieron sin aceptar y nadie ha visto en este dispositivo (spec A6). */
   expiradosApps?: number;
   /** Estado de red, para la barra de estado inferior (la caja opera igual sin internet). */
   online?: boolean;
@@ -185,7 +185,7 @@ export function PantallaInicio({
           className="mx-4 mt-3 flex flex-shrink-0 items-center gap-2 rounded border border-danger bg-danger-soft px-3 py-2.5 text-left text-14 font-semibold text-danger"
         >
           <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-danger" />
-          {expiradosApps === 1 ? "Se venció 1 pedido de app sin aceptar." : `Se vencieron ${expiradosApps} pedidos de apps sin aceptar.`} Toca para ver Pedidos de apps.
+          {expiradosApps === 1 ? "Se venció 1 pedido en línea sin aceptar." : `Se vencieron ${expiradosApps} pedidos en línea sin aceptar.`} Toca para ver Pedidos en línea.
         </button>
       )}
 
@@ -203,7 +203,7 @@ export function PantallaInicio({
         <Acceso label="Domicilio" badge={nCuentasDomicilio} onClick={onDomicilio} requiereTurno={sinTurno}
           icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 9h13v8H1z" /><path d="M14 12h4l3 3v2h-7" /><circle cx="5" cy="18" r="2" /><circle cx="17" cy="18" r="2" /></svg>} />
         {onPedidosApps && (
-          <Acceso label="Pedidos de apps" badge={nPedidosApps} onClick={onPedidosApps} requiereTurno={sinTurno}
+          <Acceso label="Pedidos en línea" badge={nPedidosApps} onClick={onPedidosApps} requiereTurno={sinTurno}
             icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M9 6h6M12 18h.01" /></svg>} />
         )}
 

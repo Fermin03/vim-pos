@@ -1,16 +1,11 @@
 "use client";
 import { z } from "zod";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { borrarSuave, tenantId } from "./datos";
 
 // BUG C — Editor de mesas. La pantalla de Mesas del POS dirige aquí ("el dueño las da de alta
 // en el admin"), pero no existía. Tabla `mesas` (RLS mesas_select/insert/update por tenant).
 // Sin política DELETE -> baja lógica vía update deleted_at.
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
 
 const S = (v: unknown) => (v == null ? "" : String(v));
 const N = (v: unknown) => Number(v ?? 0);
@@ -105,13 +100,4 @@ export async function actualizarMesa(id: string, input: MesaInput): Promise<void
   if (error) throw new Error(error.message);
 }
 
-/** Pone/quita la mesa fuera de servicio. No tocar si está OCUPADA (cuenta viva). */
-export async function alternarFueraDeServicio(id: string, fuera: boolean): Promise<void> {
-  const { error } = await supabase.from("mesas").update({ estado: fuera ? "FUERA_DE_SERVICIO" : "LIBRE" }).eq("id", id);
-  if (error) throw new Error(error.message);
-}
-
-export async function eliminarMesa(id: string): Promise<void> {
-  const { error } = await supabase.from("mesas").update({ deleted_at: new Date().toISOString(), activa: false }).eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarMesa = (id: string): Promise<void> => borrarSuave("mesas", id, { activa: false });

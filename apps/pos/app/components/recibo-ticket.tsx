@@ -75,6 +75,7 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
           </div>
         </>
       )}
+      {datos.notaPedido?.trim() && <div className="mt-1 text-[10.5px] font-bold">Nota del pedido: {datos.notaPedido.trim()}</div>}
 
       <DividerDashed />
 
@@ -217,7 +218,7 @@ function ReciboPapel({ children }: { children: React.ReactNode }) {
 }
 
 /** Borde dentado de papel térmico (P-222/P-223). */
-function PaperEdge({ top }: { top?: boolean }) {
+export function PaperEdge({ top }: { top?: boolean }) {
   return (
     <div
       aria-hidden

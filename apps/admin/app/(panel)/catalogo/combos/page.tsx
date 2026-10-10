@@ -27,7 +27,7 @@ import {
 const ESTADO: Record<string, { txt: string; cls: string; dot: string }> = {
   ACTIVO: { txt: "Activo", cls: "bg-success-soft text-success", dot: "bg-success" },
   PAUSADO: { txt: "Pausado", cls: "bg-hover text-ink-3", dot: "bg-ink-3" },
-  AGOTADO: { txt: "Agotado", cls: "bg-[#FBF1EF] text-danger", dot: "bg-danger" },
+  AGOTADO: { txt: "Agotado", cls: "bg-danger-soft text-danger", dot: "bg-danger" },
   NO_SE_VENDE: { txt: "No se vende aquí", cls: "bg-hover text-ink-2", dot: "bg-ink-3" },
 };
 const SIN_FILAS: Map<string, FilaDeMenu> = new Map();

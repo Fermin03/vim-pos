@@ -46,7 +46,7 @@ try {
   if (movimientoIds.length) {
     if (!snapshot.movimientos_inventario?.length) throw new Error("el snapshot no incluye movimientos_inventario");
     if ((res.movimientos_inventario ?? 0) !== 0) throw new Error("la RPC aplicó sobre la propia caja movimientos que ya existían: debía ser 0 (idempotencia por id)");
-    // Espejo de producción (movimientosRechazados en sync-push.mjs): solo se marcan los que la
+    // Espejo de producción (filasRechazadas en sync-push.mjs): solo se marcan los que la
     // nube NO reportó en _errores. Marcar un id rechazado como subido lo perdería para siempre.
     const rechazados = new Set((res._errores ?? []).filter((e) => e?.tabla === "movimientos_inventario" && e.id).map((e) => e.id));
     await marcarMovimientosPushed(pool, movimientoIds.filter((id) => !rechazados.has(id)));
@@ -68,7 +68,7 @@ try {
 
   // 3.bis) El armado POR LOTE contra el esquema real.
   //
-  // El pool falso de verify-push-lotes prueba la política (cuántos, qué se marca, qué pasa si
+  // El pool falso de sync-push-lotes.test.mjs prueba la política (cuántos, qué se marca, qué pasa si
   // uno falla), pero no puede probar el SQL. Esto sí: que pedir un subconjunto de ids devuelva
   // EXACTAMENTE ese subconjunto, que cada lote arrastre los turnos que sus tickets referencian
   // —sin eso la FK los rechaza en la nube— y que juntando los lotes no falte ni sobre una venta.
@@ -153,7 +153,7 @@ try {
   // 6) La guarda de pushToCloud también sabe de repartidores (fix round 1): sin ventas, sin turno
   // cambiado y sin movimiento pendiente, un alta suelta NO debe leerse como "nada pendiente".
   // listarPendientes es el dato que esa guarda consulta; probarlo aquí, contra el esquema real,
-  // complementa a verify-push-lotes (que prueba la guarda en sí con un pool falso).
+  // complementa a sync-push-lotes.test.mjs (que prueba la guarda en sí con un pool falso).
   {
     const antesPend = await listarPendientes(pool);
     await pool.query(

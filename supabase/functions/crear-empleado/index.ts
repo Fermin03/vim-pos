@@ -5,17 +5,12 @@
 // Validación: requiere JWT de un usuario con rol DUENO/ADMIN del tenant destino.
 // Payload: { nombre, email, pin, rol_codigo, sucursal_id? }
 
-import { createClient } from "jsr:@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
+import { clienteAdmin, servir } from "../_shared/http.ts";
 import { registrarError } from "../_shared/errores.ts";
-import { tenantDelToken } from "../_shared/identidad.ts";
+import { bearerDe, tenantDelToken } from "../_shared/identidad.ts";
 
 // Cliente service_role: corre server-side, nunca se expone al cliente.
-const admin = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  { auth: { persistSession: false } },
-);
+const admin = clienteAdmin();
 
 const ROLES_ADMINISTRADORES = ["DUENO", "ADMIN"];
 // REPARTIDOR (migración 0076) comparte jerarquía con CAJERO y tampoco entra al panel. Sin él en
@@ -23,17 +18,9 @@ const ROLES_ADMINISTRADORES = ["DUENO", "ADMIN"];
 // trampa de dos capas que ya bloqueó el PIN del dueño: arreglar una y olvidar la otra.
 const ROLES_ASIGNABLES = ["ADMIN", "SUPERVISOR", "CAJERO", "REPARTIDOR", "PERSONAL", "PERSONALIZADO"]; // DUENO solo vía crear_tenant_con_owner
 
-Deno.serve(async (req) => {
-  const cors = corsHeaders(req);
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
-
+servir(async (req, json) => {
   // 1) Validar JWT del admin que llama
-  const authHeader = req.headers.get("authorization") ?? "";
-  const token = authHeader.replace(/^Bearer\s+/i, "");
+  const token = bearerDe(req);
   if (!token) return json({ error: "NO_AUTH" }, 401);
 
   const { data: userResp, error: userErr } = await admin.auth.getUser(token);

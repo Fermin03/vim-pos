@@ -1,5 +1,6 @@
 "use client";
 import type { DatosReporteZ } from "../lib/print/reporte-z-builder";
+import { PaperEdge } from "./recibo-ticket";
 
 /**
  * Reporte Z (corte de caja) — estilo "Soft Restaurant" (operativo, lo que
@@ -10,12 +11,13 @@ import type { DatosReporteZ } from "../lib/print/reporte-z-builder";
  *   2) Identificación del corte (tipo + rango + turno + caja/estación)
  *   3) CAJA — flujo de efectivo (inicial, +ventas, +tarjeta, etc., -retiros, =saldo)
  *   4) FORMA DE PAGO VENTAS  (con TOTAL)
- *   5) FORMA DE PAGO PROPINA (con TOTAL)
+ *   5) FORMA DE PAGO PROPINA (con TOTAL) + PROPINAS REPARTIDAS (si el turno repartió)
  *   6) POR TIPO DE SERVICIO  (con %)
  *   7) Subtotales fiscales (SUBTOTAL/DESCUENTOS/VENTA NETA + IVA + IMPUESTOS TOTAL)
  *   8) VENTA RAPIDA POR TIPO (para llevar)
  *   9) Estadísticas (cuentas, promedio, comensales, folios)
- *  10) DECLARACION DE CAJERO (por método) + SOBRANTE/FALTANTE
+ *  10) DECLARACION DE CAJERO (por método) + SOBRANTE/FALTANTE + ARQUEO DE EFECTIVO
+ *      (esperado, declarado y diferencia)
  *  11) Firma GERENTE / CAJERO
  *  12) Sello inmutable VIM (SHA + folio Z + "TURNO CERRADO")
  *
@@ -43,11 +45,6 @@ export function ReciboZ({ datos }: { datos: DatosReporteZ }) {
 
   // Estadísticas
   const cuentaPromedio = datos.ticketPromedio;
-
-  // Arqueo
-  const diff = datos.diferenciaTotal;
-  const diffEstado: "ok" | "short" | "over" = diff === 0 ? "ok" : diff < 0 ? "short" : "over";
-  const diffSigno = diff === 0 ? "" : diff > 0 ? "+" : "-";
 
   return (
     <div className="relative mx-auto w-[302px] bg-white px-5 pb-[26px] pt-[22px] font-mono text-[#1A1A1A] text-[10.5px] leading-[1.5] shadow-[0_4px_24px_rgba(0,0,0,.25)]">
@@ -102,6 +99,14 @@ export function ReciboZ({ datos }: { datos: DatosReporteZ }) {
       {/* 5) FORMA DE PAGO PROPINA */}
       <SectionTitle>FORMA DE PAGO PROPINA</SectionTitle>
       <FlujoRow label="TOTAL FORMAS PAGO PROPINA" value={fmt(totalFormasPagoPropina)} bold />
+      {datos.propinasDistribuidas.length > 0 && (
+        <>
+          <div className="mt-1.5"><SectionTitle>PROPINAS REPARTIDAS</SectionTitle></div>
+          {datos.propinasDistribuidas.map((p, i) => (
+            <FlujoRow key={i} label={`${p.nombre}:`} value={fmt(p.monto)} />
+          ))}
+        </>
+      )}
 
       <DividerSolid />
 
@@ -177,15 +182,13 @@ export function ReciboZ({ datos }: { datos: DatosReporteZ }) {
         <FlujoRow key={i} label={`${d.metodo}:`} value={fmt(d.declarado)} />
       ))}
       <FlujoRow label="TOTAL:" value={fmt(datos.totalDeclarado)} bold />
-      <div
-        className={[
-          "mt-0.5 flex items-center justify-between text-[11px] font-bold",
-          diffEstado === "short" ? "text-[#C0392B]" : diffEstado === "over" ? "text-[#9A6B12]" : "text-[#2E7D52]",
-        ].join(" ")}
-      >
-        <span>SOBRANTE(+) O FALTANTE(-):</span>
-        <span className="tabular-nums">{diff === 0 ? fmt(0) : `${diffSigno}${fmt(Math.abs(diff))}`}</span>
-      </div>
+      <FilaDiferencia label="SOBRANTE(+) O FALTANTE(-):" valor={datos.diferenciaTotal} />
+
+      <DividerDashed />
+      <SectionTitle>ARQUEO DE EFECTIVO</SectionTitle>
+      <FlujoRow label="ESPERADO:" value={fmt(datos.efectivoEsperado)} />
+      <FlujoRow label="DECLARADO:" value={fmt(datos.efectivoDeclarado)} />
+      <FilaDiferencia label="DIFERENCIA:" valor={datos.diferenciaEfectivo} />
 
       <hr className="my-4 border-0 border-t border-[#888]" />
 
@@ -225,30 +228,27 @@ function FlujoRow({ label, value, bold }: { label: string; value: string; bold?:
   );
 }
 
+/** Diferencia del arqueo, siempre con signo: faltante en rojo, sobrante en ámbar, cuadrado en verde. */
+function FilaDiferencia({ label, valor }: { label: string; valor: number }) {
+  return (
+    <div
+      className={[
+        "mt-0.5 flex items-center justify-between text-[11px] font-bold",
+        valor < 0 ? "text-[#C0392B]" : valor > 0 ? "text-[#9A6B12]" : "text-[#2E7D52]",
+      ].join(" ")}
+    >
+      <span>{label}</span>
+      <span className="tabular-nums">{valor === 0 ? fmt(0) : `${valor > 0 ? "+" : "-"}${fmt(Math.abs(valor))}`}</span>
+    </div>
+  );
+}
+
 function DividerSolid() {
   return <div className="my-2 text-center tracking-[0.05em] text-[10px] text-[#888]">==============================</div>;
 }
 
 function DividerDashed() {
   return <hr className="my-2.5 border-0 border-t border-dashed border-[#B0B0B0]" />;
-}
-
-function PaperEdge({ top }: { top?: boolean }) {
-  return (
-    <div
-      aria-hidden
-      className="absolute left-0 right-0 h-2"
-      style={{
-        top: top ? "-8px" : undefined,
-        bottom: !top ? "-8px" : undefined,
-        transform: top ? undefined : "rotate(180deg)",
-        backgroundImage:
-          "linear-gradient(45deg, transparent 33.3%, #fff 33.3%, #fff 66.6%, transparent 66.6%), linear-gradient(-45deg, transparent 33.3%, #fff 33.3%, #fff 66.6%, transparent 66.6%)",
-        backgroundSize: "12px 16px",
-        backgroundRepeat: "repeat-x",
-      }}
-    />
-  );
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────

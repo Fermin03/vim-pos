@@ -4,8 +4,6 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./client": "./src/client.browser.ts",
-    "./server": "./src/client.server.ts",
     "./service": "./src/client.service.ts",
     "./types": "./src/database.types.ts",
     "./modulos": "./src/modulos.ts",
@@ -24,7 +22,6 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
-    "@supabase/ssr": "^0.5.0",
     "zod": "^4.6.5"
   }
 }

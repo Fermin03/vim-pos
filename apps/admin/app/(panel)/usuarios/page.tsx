@@ -16,6 +16,7 @@ import {
   type Usuario,
 } from "../../lib/usuarios";
 import { mensajeError } from "../../lib/errores";
+import { Segmentos } from "../../components/controles";
 
 const ROLES_FILTRO = ["all", "DUENO", "ADMIN", "SUPERVISOR", "CAJERO", "PERSONAL"] as const;
 type RolFiltro = (typeof ROLES_FILTRO)[number];
@@ -180,21 +181,12 @@ export default function UsuariosPage() {
               <option key={r} value={r}>{ROL_LABEL[r]}</option>
             ))}
           </select>
-          <div className="scroll-x-limpio inline-flex max-w-full gap-0.5 overflow-x-auto rounded border border-line bg-hover p-[3px] lg:max-w-none lg:overflow-x-visible">
-            {(["all", "activos", "inactivos"] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setEstado(s)}
-                className={[
-                  "flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-2.5 text-13 font-semibold transition lg:py-[7px]",
-                  estado === s ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink",
-                ].join(" ")}
-              >
-                {s === "all" ? "Todos" : s === "activos" ? "Activos" : "Inactivos"}
-              </button>
-            ))}
-          </div>
+          <Segmentos
+            etiqueta="Qué usuarios ver"
+            opciones={[{ v: "all", l: "Todos" }, { v: "activos", l: "Activos" }, { v: "inactivos", l: "Inactivos" }]}
+            valor={estado}
+            onCambiar={setEstado}
+          />
         </div>
 
         {error && (

@@ -6,6 +6,41 @@
 
 ## Octubre de 2026
 
+8 de octubre Caja · 0.7.0
+
+### El corte Z con arqueo de efectivo
+
+#### Nuevo
+
+- **El corte Z incluye el arqueo de efectivo:** lo esperado, lo que contaste y la diferencia. Lo ves al cerrar turno, en **Menú → Cerrar turno**.
+- Si repartes propinas, el corte dice cuánto le tocó a cada persona.
+
+#### Correcciones
+
+- A veces la caja no abría al primer intento y había que abrirla otra vez; ya abre sola.
+
+7 de octubre Caja · 0.6.0
+
+### Cuentas impresas, tecla Escape y apertura de turno
+
+#### Nuevo
+
+- **La cuenta impresa queda cerrada a cambios.** En Comedor, Pick-up y Domicilio, después de imprimir el ticket ya no se le agregan ni se le quitan productos. Para modificarla usa **Reabrir cuenta**, que pide el PIN de un supervisor.
+- La tecla **Escape** cierra o regresa en todas las pantallas de la caja. En el cobro te devuelve al paso anterior en vez de cerrarlo todo.
+
+#### Mejoras
+
+- Abrir turno es una ventana donde solo escribes el efectivo inicial.
+- El menú abre aunque no haya turno: puedes cambiar de cajero, tu PIN o las impresoras antes de empezar.
+- **Mis propinas** muestra las del turno en curso, también en ventas para llevar.
+- Retiro / Depósito ya no muestra cuánto efectivo hay en la caja.
+- «App externa» ya no aparece entre las formas de pago al cobrar.
+
+#### Correcciones
+
+- Después de tocar **Cobrar** o aplicar un descuento puedes seguir agregando productos a la venta.
+- **Cambiar mi PIN** y **Mis propinas** abren desde el menú a la primera.
+
 7 de octubre Caja · 0.5.0
 
 ### Programa de lealtad

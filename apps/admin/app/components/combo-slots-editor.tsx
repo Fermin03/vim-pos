@@ -21,15 +21,13 @@ import { listarCategoriasOpciones, listarProductos, precioMxn, type CategoriaOpc
 import { mensajeError } from "../lib/errores";
 import { estadoGeneral } from "../lib/menu-sucursal";
 import { limpiarPrecio } from "../lib/numeros";
+import { input, label } from "./campos";
 
 // En pantalla, un "slot" es un PASO: lo que la caja va preguntando al vender el combo (qué
 // hamburguesa, qué acompañamiento, qué bebida). En el código y en la base sigue llamándose slot.
 
-const input =
-  "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 const inputSm =
   "h-9 w-24 rounded border border-line-strong px-2 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-13 font-medium text-ink-2";
 
 const MODO_CORTO: Record<ModoPrecio, string> = {
   DELTA: "Incluido en el combo",
@@ -47,7 +45,7 @@ function reglaSlot(min: number, max: number): string {
 // producto agotado hoy sigue siendo parte del combo, así que aquí solo se avisa, no se oculta.
 function BadgeAgotado() {
   return (
-    <span className="ml-2 inline-flex items-center gap-1.5 rounded-full bg-[#FBF1EF] px-2 py-0.5 text-11 font-semibold text-danger">
+    <span className="ml-2 inline-flex items-center gap-1.5 rounded-full bg-danger-soft px-2 py-0.5 text-11 font-semibold text-danger">
       <span className="h-1.5 w-1.5 rounded-full bg-danger" />
       Agotado
     </span>

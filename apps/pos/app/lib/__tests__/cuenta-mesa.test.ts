@@ -5,7 +5,6 @@ import type { ComboDef } from "../combos";
 
 const prod = (id: string, nombre: string, precio: number, esCombo = false): Producto => ({
   id, nombre, descripcion: null, precio_base_mxn: precio, categoria_id: "c", agotado: false, esCombo,
-  sku: null, tasaIva: 16, ivaIncluido: true, claveSat: null, unidadSat: null, categoriaNombre: null,
 });
 const combo = prod("c1", "Combo", 45, true), doble = prod("h1", "Doble", 130), papas = prod("a1", "Papas", 45), brownie = prod("p1", "Brownie", 45);
 const porId = new Map([combo, doble, papas, brownie].map((p) => [p.id, p]));

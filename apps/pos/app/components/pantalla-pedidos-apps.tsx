@@ -1,31 +1,31 @@
 "use client";
-// Panel de pedidos que llegan de Uber Eats / DiDi / Rappi (ADR 0011). Polling cada 10 s como el
-// resto del POS. Cada tarjeta muestra el canal, el folio corto, el cliente, los ítems y un
-// contador hasta que la app cancele por falta de respuesta.
+// «Pedidos en línea»: lo que llega de Uber Eats / DiDi / Rappi (ADR 0011), y desde dónde se pausa
+// cada tienda (la de Uber y la propia). Polling cada 10 s como el resto del POS. Cada tarjeta muestra
+// de dónde viene, el folio, el cliente, los ítems y un contador hasta que el pedido se cancele por
+// falta de respuesta.
+// Los pedidos de la tienda propia (canal TIENDA) NO se listan aquí: cada uno llega a su canal,
+// Pick-up o Domicilio (pantalla-cuentas-modo.tsx), y se anuncia con el aviso grande.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DatosCaja } from "../lib/turno";
 import { fmtMxn } from "../lib/turno";
 import {
-  accionPedidoApp, cambiarPrepUber, etiquetaAlergia, etiquetaApp, etiquetaEstado, etiquetaModificadores, etiquetaTienda, leerPedidosApps,
+  accionPedidoApp, cambiarPrepUber, etiquetaApp, etiquetaEstado, etiquetaTienda, leerPedidosApps,
   leerTiendaUber, marcarExpiradosVistos, mensajeErrorTienda, OPCIONES_PAUSA, ordenarPedidos, pausarTiendaUber, pedidoConAlergia,
   reanudarTiendaUber, segundosRestantes, type DuracionPausa, type EstadoTiendaApp, type PedidoApp,
 } from "../lib/pedidos-apps";
+import { ErrorEnLinea, etiquetaEstadoEnLinea, leerEstadoEnLinea, mensajeErrorEnLinea, pausarEnLinea, reanudarEnLinea, type EstadoEnLinea } from "../lib/pedidos-en-linea";
 import { BotonVolver } from "./boton-volver";
+import { esUrgente, ListaItems, mmss, MOTIVOS_RECHAZO, type MotivoRechazo } from "./pedido-tienda";
 import { useEscape } from "../lib/use-escape";
 
 const REFRESCO_MS = 10_000;
 const REFRESCO_TIENDA_MS = 60_000;
-type MotivoRechazo = "AGOTADO" | "CERRADO" | "SATURADO" | "OTRO";
-const MOTIVOS: { codigo: MotivoRechazo; label: string }[] = [
-  { codigo: "AGOTADO", label: "Producto agotado" },
-  { codigo: "SATURADO", label: "Cocina saturada" },
-  { codigo: "CERRADO", label: "Ya cerramos" },
-  { codigo: "OTRO", label: "Otro motivo" },
+/** Pausa de la tienda propia (decisión 6). */
+const PAUSAS_EN_LINEA: { codigo: "30m" | "1h" | "indefinida"; label: string }[] = [
+  { codigo: "30m", label: "30 minutos" },
+  { codigo: "1h", label: "1 hora" },
+  { codigo: "indefinida", label: "Hasta que la reanude" },
 ];
-
-function mmss(seg: number): string {
-  return `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, "0")}`;
-}
 
 function mensajeError(codigo: string, detalle?: string): string {
   switch (codigo) {
@@ -38,7 +38,18 @@ function mensajeError(codigo: string, detalle?: string): string {
   }
 }
 
-export function PantallaPedidosApps({ token, caja, onSalir }: { token: string; caja: DatosCaja; onSalir: () => void }) {
+export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, cajaSinActualizar = false, onCambio, onSalir }: {
+  token: string; caja: DatosCaja;
+  /** POS web: la caja instalada de la sucursal aún no atiende la tienda; la barra lo dice. */
+  cajaSinActualizar?: boolean;
+  /** Módulo de apps de delivery encendido: pinta la barra de Uber y sus pedidos. */
+  hayApps: boolean;
+  /** Módulo de tienda en línea encendido: pinta la barra de la tienda propia. */
+  hayTienda: boolean;
+  /** Se aceptó o rechazó algo: quien sondea desde fuera (timbre, contador del inicio) relee ya. */
+  onCambio?: () => void;
+  onSalir: () => void;
+}) {
   const [pedidos, setPedidos] = useState<PedidoApp[] | null>(null);
   const [ahora, setAhora] = useState(() => new Date());
   const [ocupado, setOcupado] = useState<string | null>(null);
@@ -49,9 +60,14 @@ export function PantallaPedidosApps({ token, caja, onSalir }: { token: string; c
   const [prep, setPrep] = useState<number | null>(null);
   const [sinConexion, setSinConexion] = useState(false);
   const [ocupadoTienda, setOcupadoTienda] = useState(false);
-  const [menuPausa, setMenuPausa] = useState(false);
+  // Tienda propia. `null` = todavía no se sabe (o no se pudo leer); `sinTiendaPropia` = esta
+  // sucursal no tiene tienda, y entonces la barra no se pinta.
+  const [enLinea, setEnLinea] = useState<EstadoEnLinea | null>(null);
+  const [sinTiendaPropia, setSinTiendaPropia] = useState(false);
+  const [ocupadoEnLinea, setOcupadoEnLinea] = useState(false);
+  const [menuPausa, setMenuPausa] = useState<"uber" | "tienda" | null>(null);
   // Los dos diálogos (motivo del rechazo, pausar la tienda) se cierran antes de salir.
-  useEscape(rechazando ? () => setRechazando(null) : menuPausa ? () => setMenuPausa(false) : onSalir);
+  useEscape(rechazando ? () => setRechazando(null) : menuPausa ? () => setMenuPausa(null) : onSalir);
   const montado = useRef(true);
 
   const recargarTienda = useCallback(async (forzar = false) => {
@@ -66,13 +82,43 @@ export function PantallaPedidosApps({ token, caja, onSalir }: { token: string; c
 
   useEffect(() => {
     marcarExpiradosVistos(null);
+    if (!hayApps) return;
     recargarTienda();
     const id = setInterval(() => { recargarTienda(); }, REFRESCO_TIENDA_MS);
     return () => clearInterval(id);
-  }, [recargarTienda]);
+  }, [recargarTienda, hayApps]);
+
+  const recargarEnLinea = useCallback(async () => {
+    try {
+      const e = await leerEstadoEnLinea(token, caja.sucursal_id);
+      if (!montado.current) return;
+      setSinTiendaPropia(e === null);
+      setEnLinea(e);
+    } catch { /* la barra conserva lo último que supo y se reintenta al minuto */ }
+  }, [token, caja.sucursal_id]);
+
+  useEffect(() => {
+    if (!hayTienda) return;
+    recargarEnLinea();
+    const id = setInterval(recargarEnLinea, REFRESCO_TIENDA_MS);
+    return () => clearInterval(id);
+  }, [recargarEnLinea, hayTienda]);
+
+  const accionEnLinea = async (fn: () => Promise<EstadoEnLinea>) => {
+    setOcupadoEnLinea(true); setError(null); setMenuPausa(null);
+    try {
+      const e = await fn();
+      if (montado.current) setEnLinea(e);
+    } catch (e) {
+      if (montado.current) setError(mensajeErrorEnLinea(e instanceof ErrorEnLinea ? e.codigo : ""));
+      // Tras un fallo no se sabe cómo quedó: se relee en vez de suponer.
+      await recargarEnLinea();
+    }
+    if (montado.current) setOcupadoEnLinea(false);
+  };
 
   const accionTienda = async (fn: () => Promise<{ ok: boolean; error?: string; detalle?: string }>) => {
-    setOcupadoTienda(true); setError(null); setMenuPausa(false);
+    setOcupadoTienda(true); setError(null); setMenuPausa(null);
     const r = await fn();
     if (!montado.current) return;
     setOcupadoTienda(false);
@@ -97,7 +143,8 @@ export function PantallaPedidosApps({ token, caja, onSalir }: { token: string; c
 
   const recargar = useCallback(async () => {
     try {
-      const lista = ordenarPedidos(await leerPedidosApps(token, caja.sucursal_id));
+      // Solo las apps: lo de la tienda propia vive en Pick-up y en Domicilio.
+      const lista = ordenarPedidos((await leerPedidosApps(token, caja.sucursal_id)).filter((p) => p.canal === "APP"));
       if (montado.current) setPedidos(lista);
     } catch (e) {
       if (montado.current) setError(e instanceof Error ? e.message : "No se pudieron leer los pedidos");
@@ -106,10 +153,12 @@ export function PantallaPedidosApps({ token, caja, onSalir }: { token: string; c
 
   useEffect(() => {
     montado.current = true;
+    // Sin apps no hay tarjetas que leer: la pantalla queda para pausar la tienda.
+    if (!hayApps) return () => { montado.current = false; };
     recargar();
     const id = setInterval(recargar, REFRESCO_MS);
     return () => { montado.current = false; clearInterval(id); };
-  }, [recargar]);
+  }, [recargar, hayApps]);
   useEffect(() => { const id = setInterval(() => setAhora(new Date()), 1000); return () => clearInterval(id); }, []);
 
   const accion = async (p: PedidoApp, a: "aceptar" | "rechazar" | "listo", motivo?: MotivoRechazo) => {
@@ -119,16 +168,22 @@ export function PantallaPedidosApps({ token, caja, onSalir }: { token: string; c
     setOcupado(null);
     setRechazando(null);
     if (!r.ok) setError(mensajeError(r.error, r.detalle));
+    // Con éxito o con error se relee: el pedido pudo cambiar por su cuenta (venció, lo tomó otra caja).
     await recargar();
+    onCambio?.();
   };
 
   const pendientes = useMemo(() => (pedidos ?? []).filter((p) => p.estado === "RECIBIDO" || p.estado === "ERROR"), [pedidos]);
+  /** Esta sucursal vende en su tienda propia: sus pedidos llegan a su canal, y aquí se dice. */
+  const conTiendaPropia = hayTienda && !sinTiendaPropia;
+  const DONDE_LLEGAN = "Tus pedidos en línea llegan a Pick-up y a Domicilio.";
+  const estadoEnLinea = enLinea ? etiquetaEstadoEnLinea(enLinea, ahora, cajaSinActualizar) : null;
 
   return (
     <div className="flex h-screen flex-col">
       <header className="flex flex-shrink-0 items-center gap-3 border-b border-line bg-surface px-3 py-3.5">
         <BotonVolver onClick={onSalir} />
-        <h1 className="text-18 font-semibold text-ink">Pedidos de apps</h1>
+        <h1 className="text-18 font-semibold text-ink">Pedidos en línea</h1>
         {pendientes.length > 0 && (
           <span className="rounded-full bg-danger px-2.5 py-0.5 text-13 font-semibold text-white">
             {pendientes.length} por aceptar
@@ -137,7 +192,27 @@ export function PantallaPedidosApps({ token, caja, onSalir }: { token: string; c
         <span className="ml-auto text-13 text-ink-3">{caja.sucursalNombre}</span>
       </header>
 
-      {!sinConexion && (
+      {conTiendaPropia && (
+        <div className="flex min-h-[60px] flex-shrink-0 flex-wrap items-center gap-2 border-b border-line bg-surface px-3 py-2">
+          <span className={`inline-flex items-center gap-1.5 text-14 font-semibold ${estadoEnLinea ? (estadoEnLinea.tono === "ok" ? "text-success" : "text-warning") : "text-ink-3"}`}>
+            <span className={`h-2 w-2 rounded-full ${estadoEnLinea ? (estadoEnLinea.tono === "ok" ? "bg-success" : "bg-warning") : "bg-ink-3"}`} />
+            {estadoEnLinea?.texto ?? "Tienda: sin datos"}
+          </span>
+          {enLinea?.participa && (
+            <span className="ml-auto flex gap-2">
+              {enLinea.motivo === "EN_PAUSA" ? (
+                <button type="button" disabled={ocupadoEnLinea} onClick={() => accionEnLinea(() => reanudarEnLinea(token, caja.sucursal_id))}
+                  className="h-11 rounded bg-accent px-4 text-14 font-semibold text-white transition hover:bg-accent-hover active:scale-[.97] disabled:opacity-50">Reanudar</button>
+              ) : (
+                <button type="button" disabled={ocupadoEnLinea} onClick={() => setMenuPausa("tienda")}
+                  className="h-11 rounded border border-line-strong px-4 text-14 font-semibold text-ink transition hover:border-ink hover:bg-hover active:scale-[.97] disabled:opacity-50">Pausar…</button>
+              )}
+            </span>
+          )}
+        </div>
+      )}
+
+      {hayApps && !sinConexion && (
         <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-line bg-surface px-3 py-2">
           <span className={`inline-flex items-center gap-1.5 text-14 font-semibold ${tienda?.estado === "EN_LINEA" ? "text-success" : tienda?.estado === "PAUSADA" ? "text-warning" : "text-ink-3"}`}>
             <span className={`h-2 w-2 rounded-full ${tienda?.estado === "EN_LINEA" ? "bg-success" : tienda?.estado === "PAUSADA" ? "bg-warning" : "bg-ink-3"}`} />
@@ -158,7 +233,7 @@ export function PantallaPedidosApps({ token, caja, onSalir }: { token: string; c
               <button type="button" disabled={ocupadoTienda} onClick={reanudar}
                 className="h-11 rounded bg-accent px-4 text-14 font-semibold text-white transition hover:bg-accent-hover disabled:opacity-50">Reanudar</button>
             ) : (
-              <button type="button" disabled={ocupadoTienda} onClick={() => setMenuPausa(true)}
+              <button type="button" disabled={ocupadoTienda} onClick={() => setMenuPausa("uber")}
                 className="h-11 rounded border border-line-strong px-4 text-14 font-semibold text-ink transition hover:border-ink hover:bg-hover disabled:opacity-50">Pausar…</button>
             )}
           </span>
@@ -169,91 +244,85 @@ export function PantallaPedidosApps({ token, caja, onSalir }: { token: string; c
         <p role="alert" className="mx-4 mt-3 rounded border border-danger bg-danger-soft px-3 py-2 text-14 text-danger">{error}</p>
       )}
 
-      {pedidos === null ? (
+      {!hayApps ? (
+        <p className="m-auto max-w-sm px-4 text-center text-15 text-ink-2">{conTiendaPropia ? DONDE_LLEGAN : "Sin pedidos en línea por ahora."}</p>
+      ) : pedidos === null ? (
         <p className="m-auto text-14 text-ink-3">Cargando…</p>
       ) : pedidos.length === 0 ? (
         <p className="m-auto text-center text-15 text-ink-3">
-          Sin pedidos de apps por ahora.<br />Aquí aparecen solos cuando llegan.
+          {/* Sin tienda propia, el texto de siempre: quien solo usa Uber no nota ningún cambio. */}
+          {conTiendaPropia ? "Sin pedidos de apps por ahora." : "Sin pedidos en línea por ahora."}<br />Aquí aparecen solos cuando llegan.
+          {conTiendaPropia && <><br /><span className="text-ink-2">{DONDE_LLEGAN}</span></>}
         </p>
       ) : (
-        <ul className="grid flex-1 auto-rows-min grid-cols-1 content-start gap-3 overflow-y-auto p-4 md:grid-cols-2 xl:grid-cols-3">
-          {pedidos.map((p) => {
-            const seg = p.estado === "RECIBIDO" ? segundosRestantes(p.venceAceptacion, ahora) : null;
-            const urgente = seg !== null && seg < 120;
-            const pendiente = p.estado === "RECIBIDO" || p.estado === "ERROR";
-            const alergia = pedidoConAlergia(p);
-            return (
-              <li
-                key={p.id}
-                className={`flex flex-col gap-2 rounded border-2 bg-surface p-3 ${pendiente ? (urgente || alergia ? "border-danger" : "border-accent") : "border-line"}`}
-              >
-                {alergia && (
-                  <p className="rounded bg-danger px-2 py-1 text-13 font-bold uppercase tracking-wide text-white">⚠ Pedido con alergia: revisa cada ítem</p>
-                )}
-                <div className="flex items-center justify-between">
-                  <span className="text-13 font-semibold uppercase tracking-wide text-ink-2">{etiquetaApp(p.app)}</span>
-                  <span className="text-28 font-bold leading-none text-ink">{p.folioCorto ?? p.idExterno.slice(-6)}</span>
-                </div>
-                <div className="flex items-center justify-between text-14">
-                  <span className="font-semibold text-ink">{etiquetaEstado(p.estado)}</span>
-                  {seg !== null && (
-                    <span className={`font-mono text-15 ${urgente ? "font-bold text-danger" : "text-ink-2"}`} aria-label="tiempo para aceptar">
-                      {mmss(seg)}
-                    </span>
+        <>
+          {conTiendaPropia && <p className="flex-shrink-0 px-4 pt-3 text-13 text-ink-2">{DONDE_LLEGAN}</p>}
+          <ul className="grid flex-1 auto-rows-min grid-cols-1 content-start gap-3 overflow-y-auto p-4 md:grid-cols-2 xl:grid-cols-3">
+            {pedidos.map((p) => {
+              const seg = p.estado === "RECIBIDO" ? segundosRestantes(p.venceAceptacion, ahora) : null;
+              const urgente = esUrgente(seg);
+              const pendiente = p.estado === "RECIBIDO" || p.estado === "ERROR";
+              const alergia = pedidoConAlergia(p);
+              return (
+                <li
+                  key={p.id}
+                  className={`flex flex-col gap-2 rounded border-2 bg-surface p-3 ${pendiente ? (urgente || alergia ? "border-danger" : "border-accent") : "border-line"}`}
+                >
+                  {alergia && (
+                    <p className="rounded bg-danger px-2 py-1 text-13 font-bold uppercase tracking-wide text-white">⚠ Pedido con alergia: revisa cada ítem</p>
                   )}
-                  {p.ticketFolio && <span className="text-ink-3">Ticket {p.ticketFolio}</span>}
-                </div>
-                {p.clienteNombre && (
-                  <p className="text-14 text-ink">
-                    {p.clienteNombre}{p.tipoEntrega === "RECOGE_CLIENTE" ? " · recoge en tienda" : ""}
-                  </p>
-                )}
-                <ul className="text-14 text-ink">
-                  {p.items.map((it, i) => (
-                    <li key={i} className={it.mapeado ? "" : "text-danger"}>
-                      {it.cantidad} × {it.nombreApp}{it.mapeado ? "" : " (no está en el catálogo)"}
-                      {it.modificadores.length > 0 && (
-                        <span className="text-ink-3"> · {etiquetaModificadores(it.modificadores)}</span>
-                      )}
-                      {it.nota && <span className="text-ink-3"> · “{it.nota}”</span>}
-                      {etiquetaAlergia(it) && (
-                        <span className="mt-0.5 block rounded border border-danger bg-danger-soft px-1.5 py-0.5 text-13 font-semibold text-danger">{etiquetaAlergia(it)}</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-                {p.notaCliente && <p className="text-13 italic text-ink-2">“{p.notaCliente}”</p>}
-                {p.totalCliente !== null && <p className="text-13 text-ink-3">Total en la app: {fmtMxn(p.totalCliente)}</p>}
-                {p.ultimoError && (p.estado === "ERROR" || p.estado === "CANCELADO" || p.estado === "EXPIRADO") && (
-                  <p className="text-12 font-semibold text-danger">{p.ultimoError}</p>
-                )}
-                <div className="mt-auto flex gap-2 pt-1">
-                  {pendiente && (
-                    <>
-                      <button type="button" disabled={ocupado === p.id} onClick={() => accion(p, "aceptar")}
+                  <div className="flex items-center justify-between">
+                    <span className="text-13 font-semibold uppercase tracking-wide text-ink-2">{etiquetaApp(p.app)}</span>
+                    <span className="text-28 font-bold leading-none text-ink">{p.folioCorto ?? p.idExterno.slice(-6)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-14">
+                    <span className="font-semibold text-ink">{etiquetaEstado(p.estado)}</span>
+                    {seg !== null && (
+                      <span className={`font-mono text-15 ${urgente ? "font-bold text-danger" : "text-ink-2"}`} aria-label="tiempo para aceptar">
+                        {mmss(seg)}
+                      </span>
+                    )}
+                    {p.ticketFolio && <span className="text-ink-3">Ticket {p.ticketFolio}</span>}
+                  </div>
+                  {p.clienteNombre && (
+                    <p className="text-14 text-ink">
+                      {p.clienteNombre}{p.tipoEntrega === "RECOGE_CLIENTE" ? " · recoge en tienda" : ""}
+                    </p>
+                  )}
+                  <ListaItems items={p.items} />
+                  {p.notaCliente && <p className="text-13 italic text-ink-2">“{p.notaCliente}”</p>}
+                  {p.totalCliente !== null && <p className="text-13 text-ink-3">Total en la app: {fmtMxn(p.totalCliente)}</p>}
+                  {p.ultimoError && (p.estado === "ERROR" || p.estado === "CANCELADO" || p.estado === "EXPIRADO") && (
+                    <p className="text-12 font-semibold text-danger">{p.ultimoError}</p>
+                  )}
+                  <div className="mt-auto flex gap-2 pt-1">
+                    {pendiente && (
+                      <>
+                        <button type="button" disabled={ocupado === p.id} onClick={() => accion(p, "aceptar")}
+                          className="h-11 flex-1 rounded bg-accent text-14 font-semibold text-white transition hover:bg-accent-hover disabled:opacity-50">
+                          Aceptar
+                        </button>
+                        <button type="button" disabled={ocupado === p.id} onClick={() => setRechazando(p)}
+                          className="h-11 rounded border border-line-strong px-4 text-14 font-semibold text-ink transition hover:border-ink hover:bg-hover disabled:opacity-50">
+                          Rechazar
+                        </button>
+                      </>
+                    )}
+                    {(p.estado === "ACEPTADO" || p.estado === "EN_PREPARACION") && (
+                      <button type="button" disabled={ocupado === p.id} onClick={() => accion(p, "listo")}
                         className="h-11 flex-1 rounded bg-accent text-14 font-semibold text-white transition hover:bg-accent-hover disabled:opacity-50">
-                        Aceptar
+                        Marcar listo
                       </button>
-                      <button type="button" disabled={ocupado === p.id} onClick={() => setRechazando(p)}
-                        className="h-11 rounded border border-line-strong px-4 text-14 font-semibold text-ink transition hover:border-ink hover:bg-hover disabled:opacity-50">
-                        Rechazar
-                      </button>
-                    </>
-                  )}
-                  {(p.estado === "ACEPTADO" || p.estado === "EN_PREPARACION") && (
-                    <button type="button" disabled={ocupado === p.id} onClick={() => accion(p, "listo")}
-                      className="h-11 flex-1 rounded bg-accent text-14 font-semibold text-white transition hover:bg-accent-hover disabled:opacity-50">
-                      Marcar listo
-                    </button>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
 
-      {menuPausa && (
+      {menuPausa === "uber" && (
         <div role="dialog" aria-modal="true" aria-label="Pausar la tienda en Uber" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-sm rounded border border-line bg-surface p-4">
             <h2 className="mb-1 text-15 font-semibold text-ink">¿Cuánto tiempo pausamos Uber Eats?</h2>
@@ -265,7 +334,25 @@ export function PantallaPedidosApps({ token, caja, onSalir }: { token: string; c
                   {o.label}
                 </button>
               ))}
-              <button type="button" onClick={() => setMenuPausa(false)} className="mt-1 h-10 text-14 text-ink-3">Cancelar</button>
+              <button type="button" onClick={() => setMenuPausa(null)} className="mt-1 h-10 text-14 text-ink-3">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {menuPausa === "tienda" && (
+        <div role="dialog" aria-modal="true" aria-label="Pausar la tienda en línea" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded border border-line bg-surface p-4">
+            <h2 className="mb-1 text-15 font-semibold text-ink">¿Cuánto tiempo pausamos tu tienda?</h2>
+            <p className="mb-3 text-13 text-ink-2">Tus clientes verán que por ahora no se reciben pedidos. Los que ya llegaron se atienden igual.</p>
+            <div className="flex flex-col gap-2">
+              {PAUSAS_EN_LINEA.map((o) => (
+                <button key={o.codigo} type="button" disabled={ocupadoEnLinea} onClick={() => accionEnLinea(() => pausarEnLinea(token, caja.sucursal_id, o.codigo))}
+                  className="h-11 rounded border border-line-strong px-3 text-left text-14 font-semibold text-ink transition hover:border-ink hover:bg-hover active:scale-[.97] disabled:opacity-50">
+                  {o.label}
+                </button>
+              ))}
+              <button type="button" onClick={() => setMenuPausa(null)} className="mt-1 h-11 text-14 text-ink-3">Cancelar</button>
             </div>
           </div>
         </div>
@@ -276,7 +363,7 @@ export function PantallaPedidosApps({ token, caja, onSalir }: { token: string; c
           <div className="w-full max-w-sm rounded border border-line bg-surface p-4">
             <h2 className="mb-3 text-15 font-semibold text-ink">¿Por qué se rechaza {rechazando.folioCorto ?? "el pedido"}?</h2>
             <div className="flex flex-col gap-2">
-              {MOTIVOS.map((m) => (
+              {MOTIVOS_RECHAZO.map((m) => (
                 <button key={m.codigo} type="button" disabled={ocupado === rechazando.id} onClick={() => accion(rechazando, "rechazar", m.codigo)}
                   className="h-11 rounded border border-line-strong px-3 text-left text-14 font-semibold text-ink transition hover:border-ink hover:bg-hover disabled:opacity-50">
                   {m.label}

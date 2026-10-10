@@ -49,6 +49,11 @@ verify_jwt = false
 [functions.autofacturar]
 verify_jwt = false
 
+# La llama el servidor de la tienda en línea, no el navegador: se autentica con el secreto
+# x-vim-tienda, no con un JWT. Sin esto el gateway responde "Invalid JWT" antes de llegar.
+[functions.tienda]
+verify_jwt = false
+
 # Webhook de Uber Eats (ADR 0011): sin JWT, la autenticidad la da X-Uber-Signature.
 [functions.delivery-webhook-uber]
 verify_jwt = false

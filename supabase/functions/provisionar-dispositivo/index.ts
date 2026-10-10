@@ -3,17 +3,12 @@
 // + usuarios_perfil + usuarios_acceso (rol DISPOSITIVO). Devuelve email + password UNA vez.
 // service_role server-side. Requiere JWT de un DUEÑO/ADMIN del tenant dueño de la caja.
 
-import { createClient } from "jsr:@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
+import { clienteAdmin, servir } from "../_shared/http.ts";
 import { registrarError } from "../_shared/errores.ts";
 import { cajaIdDeEmail, correoDispositivo } from "../_shared/dispositivo.ts";
-import { tenantDelToken } from "../_shared/identidad.ts";
+import { bearerDe, tenantDelToken } from "../_shared/identidad.ts";
 
-const admin = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  { auth: { persistSession: false } },
-);
+const admin = clienteAdmin();
 
 const ROLES_ADMINISTRADORES = ["DUENO", "ADMIN"];
 
@@ -51,16 +46,9 @@ function generarPassword(): string {
   return "vim-" + Array.from(arr, (n) => chars[n % chars.length]).join("");
 }
 
-Deno.serve(async (req) => {
-  const cors = corsHeaders(req);
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
-
+servir(async (req, json) => {
   // 1) JWT del admin que llama
-  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const token = bearerDe(req);
   if (!token) return json({ error: "NO_AUTH" }, 401);
   const { data: userResp, error: userErr } = await admin.auth.getUser(token);
   if (userErr || !userResp?.user) return json({ error: "AUTH_INVALIDA" }, 401);

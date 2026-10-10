@@ -6,11 +6,9 @@
     "dev": "next dev --port 3003",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.0",
     "@vim/kds-core": "workspace:*",
     "@vim/ui": "workspace:*",
     "next": "^15.5.25",

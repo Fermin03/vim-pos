@@ -128,7 +128,7 @@ export default function RolesPermisosPage() {
                                     title={activo ? "Quitar este permiso en mi negocio" : "Restaurar el permiso del sistema"}
                                     className={[
                                       "inline-flex h-6 w-6 items-center justify-center rounded transition disabled:opacity-50",
-                                      activo ? "bg-success-soft text-success hover:bg-[#d9eadf]" : "bg-[#FBF1EF] text-danger hover:bg-[#f3dcd7]",
+                                      activo ? "bg-success-soft text-success hover:bg-[#d9eadf]" : "bg-danger-soft text-danger hover:bg-[#f3dcd7]",
                                     ].join(" ")}
                                   >
                                     {activo ? "✓" : "✕"}

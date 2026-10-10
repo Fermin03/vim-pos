@@ -129,9 +129,144 @@ función valida el JWT por sí misma. Receta en `docs/integraciones/facturama/03
 
 `enviar-push` acepta, además del JWT de usuario, el camino interno: cabecera `x-vim-interno`
 igual al secret `VIM_INTERNO_SECRET` y `tenant_id` en el cuerpo. Lo usa la base de datos:
-`delivery_marcar_expirados()` (cron cada minuto) llama a `delivery_avisar_expirados()` que hace
-`net.http_post` a `enviar-push` con el secreto leído de Vault (`vim_interno`) y la URL base de
+`delivery_marcar_expirados()` (cron cada minuto) llama a `delivery_avisar_expirados(tenant, sucursal, n, canal)` (el
+cuarto argumento, `p_canal`, es de la 0164: `'TIENDA'` o `'APP'`; decide el título y la ruta del aviso)
+que hace `net.http_post` a `enviar-push` con el secreto leído de Vault (`vim_interno`) y la URL base de
 funciones (`vim_functions_url`). Sin pg_net o sin secretos, el marcado sigue y el aviso se omite.
+Desde la 0164 la misma pasada llama al final a `tienda_sincronizar_estados_nube()`, en un bloque
+propio (si falla deja un `WARNING` y el marcado no se pierde): pasa a `LISTO`, `ENTREGADO` o
+`CANCELADO` los pedidos de la tienda de gestión `NUBE` mirando su ticket, con la regla de
+`tienda_seguimiento`. Solo `service_role`; mira los pedidos de los últimos 7 días.
+
+### Tienda en línea propia en `delivery-accion` y `delivery-espejo` (entrega 4)
+
+Los pedidos con `canal = 'TIENDA'` no pasan por Uber: `delivery-accion` los atiende en su propia rama
+(sin `uber.*` ni `delivery_eventos`) y `delivery-espejo` se los manda a la caja con la clave `tienda`.
+
+- Sobre un pedido (`pedido_id`): `aceptar` y `rechazar` escriben solo si el pedido sigue `RECIBIDO` o
+  `ERROR` (si no, `409 ACCION_INVALIDA`; el de `aceptar` lleva siempre el `estado` en que está el
+  pedido, releído, para que la caja distinga «lo aceptó otra pantalla» de «se cerró»); `estado`
+  (`estado` = `EN_PREPARACION` | `LISTO` | `ENTREGADO` | `CANCELADO`, y `motivo` de lista cerrada; `EN_PREPARACION` es el «ya lo tengo» de la entrega 7: la caja lo manda al crear la cuenta local, y la base (0167) cancela a los 15 min el `ACEPTADO` que no lo recibió) es **solo de
+  dispositivo y solo para pedidos de gestión `ESCRITORIO`** (uno de gestión `NUBE` → `409
+  ACCION_INVALIDA`: su estado lo pone la base, ver «Push de expirados») y llama a
+  `tienda_reportar_estado` (0164), que solo avanza y devuelve en qué quedó. `listo` no existe en la tienda. `reclamar` es el de siempre.
+  Un `aceptar` de gestión `NUBE` crea el ticket en la nube (`crear_ticket_desde_tienda`); una caja
+  instalada que lo intente recibe `409`. Si el ticket no se puede armar y reintentar no lo arregla
+  (`fallaDeTicket`, `_shared/delivery/enlinea.ts`), el pedido se rechaza y responde
+  `PEDIDO_CANCELADO` con la `causa`; lo reintentable (`SIN_TURNO_ABIERTO`, `DUPLICADO`, `RPC_ERROR`)
+  responde `409` con su código y no toca el pedido.
+- Por sucursal (`sucursal_id`), sin `pedido_id`: `enlinea_estado` → `{participa, aceptacion,
+  pausa_hasta, motivo}`; `enlinea_pausar` (`duracion`: `30m` | `1h` | `indefinida`; otra →
+  `DURACION_INVALIDA`); `enlinea_reanudar`; `enlinea_presente` (solo empleado: el POS web con turno
+  avisa, opcionalmente con su `caja_id`, y sella `cajas.espejo_turno_abierto_at`; si en la sucursal
+  late una caja instalada y ninguna de las que laten es 0.8.0 o posterior, NO sella y responde
+  `{ok: true, sellado: false, motivo: "CAJA_SIN_ACTUALIZAR"}`: los pedidos irían a una caja que no
+  los entiende). Errores:
+  `SIN_MODULO_TIENDA` 403 (no usa el módulo de apps), `SUCURSAL_SIN_TIENDA` 404, `SOLO_EMPLEADO` 403.
+- `delivery-espejo`: la caja manda `tienda: true` y `turno_abierto`; la respuesta añade
+  `tienda: {participa, aceptacion, pausa_hasta}` (o `null` sin módulo). Una caja anterior no manda
+  la clave y recibe lo de siempre. Con un pedido vivo de la tienda en gestión `ESCRITORIO` el sondeo
+  es rápido (10 s), pero solo si el pedido se recibió en las últimas 6 horas (`TIENDA_VIVO_MS`,
+  entrega 7): uno atascado sigue viajando a la caja y ya no la deja a 10 s para siempre.
+
+### `tienda` — la puerta de la tienda en línea (entregas 2 y 6)
+
+La llama **solo el servidor de `apps/tienda`**, nunca un navegador (sin CORS; `OPTIONS` es 405).
+Siempre `POST` con `{ accion, negocio: <slug>, … }` y estas cabeceras:
+
+| Cabecera | Qué es |
+|---|---|
+| `x-vim-tienda` | El secreto `VIM_TIENDA_SECRET`. Sin él (o sin configurar) todo es `401 NO_AUTORIZADO`. |
+| `x-tienda-ip` | La IP del cliente final; de ella salen los cupos y lo que se le dice a Turnstile. |
+| `x-tienda-sesion` | El token de sesión de la cuenta (22 caracteres), que el servidor de la tienda saca de su cookie `HttpOnly`. Opcional. Nunca va en el cuerpo. |
+
+El negocio sale siempre del slug y toda RPC va acotada a ese tenant. Orden de comprobaciones:
+método → secreto → cuerpo (≤ 32 KB, forma) → cupo por IP → negocio → acción. Estados que usa: 200,
+400, 403, 404, 409, 413, 429, 503 (y 401 solo para el secreto). Errores comunes: `CUERPO_INVALIDO`,
+`ACCION_INVALIDA`, `NEGOCIO_INVALIDO` 400 · `TIENDA_NO_DISPONIBLE` 404 · `DEMASIADOS_INTENTOS` 429 ·
+`SERVICIO_NO_DISPONIBLE` 503 · un rechazo de la base (`CODIGO: detalle`) sale como 409 con el código.
+
+**Pedidos** (entrega 2): `negocio`, `menu`, `cotizar`, `pedir` (antirobot `tienda_pedido`),
+`seguimiento`. `pedir` mira la sesión: sin cabecera, invitado; con una sesión válida, el pedido
+queda ligado a la cuenta (`p_cuenta`); con una cabecera que no sirve (mal formada, vencida, cerrada
+o de otro negocio) → `403 SESION_INVALIDA`, no se degrada a invitado.
+
+**`pedir` sin duplicados** (entrega 7; base en la 0167). El cuerpo acepta `clave`, opcional: 22
+caracteres `[A-Za-z0-9_-]` que el navegador genera una vez por intento de compra (ausente o `null` =
+sin clave; mal formada → `400 CUERPO_INVALIDO`). Con `clave`, el código de seguimiento no es al azar:
+es `codigoDeClave(VIM_TIENDA_SECRET, slug, clave)` = base64url de `HMAC-SHA256(secreto,
+"<slug>:<clave>")` recortado a 22 (`_shared/tienda/seguimiento.ts`). El reintento da la misma
+huella y `tienda_crear_pedido` (que recibe además `p_clave`) devuelve el pedido que ya existe en vez
+de crear otro; la respuesta es la de siempre (`{ codigo, folio_corto, total_mxn, vence_aceptacion }`).
+La `clave` no se guarda ni se escribe en el log. Un reintento vuelve a pasar antirobot y cupos, y
+vuelve a mandar el correo de confirmación (mismo pedido, mismo enlace). Sin `clave`, la llamada a la
+base no lleva `p_clave`: es la misma de antes. **Rotar `VIM_TIENDA_SECRET` cambia los códigos
+derivados**: un reintento que cruce la rotación crearía un segundo pedido (los ya creados se siguen
+abriendo con su código: la base solo tiene la huella).
+
+**Cuentas** (entrega 6; funciones SQL de la 0166). `cuenta` = `{ nombre, apellido, email, telefono,
+fecha_nacimiento }`; nunca sale el id de la cuenta ni el `tenant_id`.
+
+| Acción | Cuerpo | Sesión | 200 | Errores propios |
+|---|---|---|---|---|
+| `registrar` | `nombre`, `apellido`, `email`, `telefono`, `password`, `captcha` (`tienda_registro`) | no | correo nuevo: `{ ok, sesion, cuenta }` · ya usado: `{ ok }` (y le llega «ya tienes cuenta») | 400 `CUENTA_INVALIDA_DATOS`, 403 `CAPTCHA_INVALIDO`, 429 `DEMASIADOS_INTENTOS` (también por correo) |
+| `entrar` | `email`, `password` | no | `{ ok, sesion, cuenta }` | 403 `CREDENCIALES_INVALIDAS` (mala, inexistente o bloqueada: indistinguibles), 400 `CUENTA_INVALIDA_DATOS` |
+| `salir` | — | si viene | `{ ok }` siempre | — |
+| `recuperar_pedir` | `email`, `captcha` (`tienda_recuperar`) | no | `{ ok }` siempre | 400 `CUENTA_INVALIDA_DATOS`, 403 `CAPTCHA_INVALIDO`, 429 `DEMASIADOS_INTENTOS` (también por correo) |
+| `recuperar_aplicar` | `token`, `password` | no | `{ ok, sesion, cuenta }` | 403 `ENLACE_INVALIDO`, 400 `CUENTA_INVALIDA_DATOS` |
+| `cuenta` | — | sí | `{ cuenta, direcciones }` | 403 `SESION_INVALIDA` |
+| `cuenta_guardar` | `nombre`, `apellido`, `telefono`, `fecha_nacimiento` (`YYYY-MM-DD` o `null`) | sí | `{ cuenta }` | 403 `SESION_INVALIDA`, 400 `CUENTA_INVALIDA_DATOS` |
+| `cuenta_password` | `actual`, `nueva` | sí | `{ ok }` (cierra las demás sesiones) | 403 `SESION_INVALIDA` / `CREDENCIALES_INVALIDAS`, 400 `CUENTA_INVALIDA_DATOS` |
+| `direccion_guardar` | `id` (o `null` = nueva), `etiqueta` (≤ 40), y los campos de dirección de `pedir`, sueltos o bajo `direccion` | sí | `{ direcciones }` | 403 `SESION_INVALIDA`, 409 `DIRECCIONES_LLENAS`, 400 `DIRECCION_INVALIDA` |
+| `direccion_borrar` | `id` | sí | `{ direcciones }` | 403 `SESION_INVALIDA`, 400 `DIRECCION_INVALIDA` |
+| `mis_pedidos` | — | sí | `{ pedidos: [{ sucursal_id, folio_corto, recibido_at, modo, estado, total_mxn, renglones, items }] }` | 403 `SESION_INVALIDA` |
+| `eliminar_cuenta` | `password` | sí | `{ ok }` | 403 `SESION_INVALIDA` / `CREDENCIALES_INVALIDAS` |
+
+- **Secretos.** La contraseña lleva al menos 8 caracteres y como mucho 72 **bytes** (lo que mira
+  bcrypt: con acentos o emojis se llega antes que con 72 letras), tal cual llega (ni se recorta ni
+  se normaliza), y solo la base la cifra. La función (`validar.ts`), el SQL (`octet_length`) y la
+  pantalla aplican el mismo tope. El token de sesión y el de recuperación nacen aquí
+  (`nuevoCodigo()`); a la base va su huella SHA-256. En claro, el de sesión sale una vez, en el
+  campo `sesion` (el servidor de la tienda lo vuelve cookie y lo quita de la respuesta), y el de
+  recuperación solo en el enlace del correo: `${VIM_TIENDA_URL}/<slug>/recuperar#t=<token>`. Va en
+  el fragmento: el navegador no se lo manda al servidor de la tienda, así que no queda en sus
+  registros de peticiones; lo lee la pantalla. Nada de eso, ni el correo del cliente, se escribe en el log.
+- **Enumeración: dónde no y dónde sí.** `entrar` contesta lo mismo en los tres fallos y
+  `recuperar_pedir` hace el mismo camino exista o no la cuenta (el correo sale después de
+  responder). **`registrar` sí deja deducir si un correo ya es cliente de ese restaurante**: la
+  respuesta trae `cuenta` y `sesion` solo en el alta nueva. Está aceptado (ADR 0032): es lo que
+  cuesta entrar de una vez al registrarse, sin confirmar el correo. Lo acotan el antirobot y los
+  dos cupos de abajo.
+- **Correos** (`_shared/tienda/correo-cuenta.ts`, por `VIM_SMTP_*`, buzón de VIM con el nombre del
+  restaurante): bienvenida, «ya tienes cuenta» y recuperación. Van a direcciones que nadie ha
+  verificado, así que **no llevan el nombre que se tecleó** (saludo neutro) ni ningún otro dato de
+  la cuenta. El asunto va sin acentos a propósito: denomailer rompe el correo si el asunto viaja
+  codificado (ver `solicitar-demo`). Su fallo no cambia la respuesta; sin `VIM_SMTP_*` o sin
+  `VIM_TIENDA_URL` no sale ninguno y solo queda un aviso en el log.
+- **Cupos** (`cuposDe`, tabla de cupos de la 0136; IPv6 por su /64). «Cierra» = si el control de
+  cupos no responde, la acción se niega con 503.
+
+| Acción | Cupo | Si el control falla |
+|---|---|---|
+| `negocio`, `menu`, `cotizar` | 120 / 10 min por IP (`tienda:lee:ip`) | deja pasar |
+| `seguimiento` | 90 / 10 min por IP (`tienda:sigue:ip`) | deja pasar |
+| `pedir` | 40 / h solo por IP (`tienda:pide:ip:<ip>`: el slug llega sin validar y sin este tope cada slug inventado estrenaba contador) y, después, 8 / h por IP **y restaurante** (`tienda:pide:ip:<ip>:<slug>`; hasta la entrega 7 eran 5 / h compartidos entre restaurantes); tras el antirobot, 60 / h por negocio (`tienda:pide:negocio:<slug>`) | cierra |
+| `entrar` | 10 / 10 min por IP (`tienda:entra:ip`) y, después, 300 / 10 min por restaurante (`tienda:entra:negocio:<slug>`, entrega 7) | cierra |
+| `registrar` | 5 / h por IP (`tienda:registra:ip`); tras el antirobot, 3 / h por huella de negocio+correo (`tienda:registra:correo`) | cierra |
+| `recuperar_pedir` | 3 / h por IP (`tienda:recupera:ip`); tras el antirobot, 3 / h por huella de negocio+correo (`tienda:recupera:correo`) | cierra |
+| `recuperar_aplicar` | 10 / h por IP (`tienda:aplica:ip`) | cierra |
+| `cuenta`, `mis_pedidos`, `salir` | 60 / 10 min por IP (`tienda:cuenta:ip`) | deja pasar |
+| `cuenta_guardar`, `cuenta_password`, `direccion_*`, `eliminar_cuenta` | la misma bolsa `tienda:cuenta:ip` | cierra |
+
+Los cupos por correo existen porque esas dos acciones mandan un correo a una dirección sin
+verificar; agotados responden `429 DEMASIADOS_INTENTOS` exista o no la cuenta. Los puede agotar un
+tercero con tres captchas: la víctima ve «demasiados intentos» durante una hora.
+
+El tope de `entrar` por restaurante existe porque `entrar` no lleva antirobot y cada intento es un
+bcrypt en la base. Agotado, nadie entra a su cuenta en ese restaurante hasta 10 minutos (`429`);
+pedir como invitado no se afecta. Se gasta después del de la IP, así que una sola red no lo agota.
+
+El handler no tiene arnés (Deno y la base): lo probado es `_shared/tienda/*.ts` con `pnpm test:functions`.
 
 ### Espejo en la caja de escritorio (spec 2026-09-03)
 

@@ -65,12 +65,9 @@ export function SidebarTicket({
   cambioAnterior = null,
   titulo,
   accionSecundaria,
-  onEnviarCocina,
   onEnviarCocinaAbierto,
   onPonerEnEspera,
   folioCuenta,
-  cocinaEnviada = false,
-  enviandoCocina = false,
   onAplicarDescuento,
   descuentoMxn = 0,
   totalConDescuento,
@@ -119,8 +116,6 @@ export function SidebarTicket({
   titulo?: string;
   /** Botón extra bajo la acción principal del pie (p. ej. "Guardar sin mandar"). */
   accionSecundaria?: { etiqueta: string; onClick: () => void; deshabilitado?: boolean };
-  /** B1 Full Service — enviar la mesa a cocina antes de cobrar (solo en cuenta de mesa). */
-  onEnviarCocina?: () => void;
   /** Pick-up / Domicilio — envía a cocina y deja la cuenta ABIERTA (sin cobrar); se cobra después
    *  desde "Ver cuentas". Cuando se pasa, es la acción principal del pie. */
   onEnviarCocinaAbierto?: () => void;
@@ -128,8 +123,6 @@ export function SidebarTicket({
   onPonerEnEspera?: () => void;
   /** Folio de la cuenta que se está editando. Ausente = ticket nuevo. */
   folioCuenta?: string | null;
-  cocinaEnviada?: boolean;
-  enviandoCocina?: boolean;
   onAplicarDescuento?: () => void;
   /** Monto de descuento ya aplicado en BD (autoritativo). 0 = sin descuento. */
   descuentoMxn?: number;
@@ -168,9 +161,6 @@ export function SidebarTicket({
    * pregunta cuánto cuesta algo en cualquiera de los cuatro modos.
    */
   const seCobraDespues = onEnviarCocinaAbierto != null;
-  // "En espera" vive en la fila secundaria solo en el pie de Cobrar; en el de mesa (Enviar a
-  // cocina) no existe, igual que antes.
-  const enEsperaEnFila = !seCobraDespues && !onEnviarCocina;
   // No depende de `bloqueado`: en cuenta de mesa los renglones que no han salido a cocina sí se
   // editan (0119). Quien pasa `onEditar` decide qué renglón se abre y avisa del que no.
   const editable = onEditar != null && !procesando;
@@ -516,7 +506,8 @@ export function SidebarTicket({
           <span className="truncate">Descuento</span>
         </button>
         )}
-        {enEsperaEnFila && (
+        {/* "En espera" solo existe en el pie de Cobrar, igual que Descuento. */}
+        {!seCobraDespues && (
           <button
             type="button"
             disabled={vacio || procesando || !onPonerEnEspera}
@@ -575,38 +566,17 @@ export function SidebarTicket({
             </>
           )}
         </button>
-        {onEnviarCocina ? (
-          /* B1 Full Service — enviar la mesa a cocina antes de cobrar */
-          <button
-            type="button"
-            disabled={vacio || enviandoCocina || cocinaEnviada}
-            onClick={onEnviarCocina}
-            className={[
-              BOTON_PIE,
-              cocinaEnviada
-                ? "border-success/40 bg-success-soft text-success disabled:opacity-100"
-                : "border-line-strong bg-surface text-ink hover:border-ink disabled:opacity-[.45]",
-            ].join(" ")}
-          >
-            {cocinaEnviada ? (
-              <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4"><path d="M20 6 9 17l-5-5" /></svg> Enviado a cocina</>
-            ) : enviandoCocina ? "Enviando…" : (
-              <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 11l19-9-9 19-2-8-8-2z" /></svg> Enviar a cocina</>
-            )}
-          </button>
-        ) : (
-          /* Efectivo exacto: un toque en vez de cinco (Cobrar → Efectivo → Pago exacto → Cobrar).
-             Es el cobro más común de mostrador. Borde de tinta: es la segunda acción del pie, no
-             una más de las grises. */
-          <button
-            type="button"
-            disabled={vacio || procesando || !onEfectivoExacto}
-            onClick={() => onEfectivoExacto?.()}
-            className="flex h-12 w-full items-center justify-center rounded-lg border border-ink bg-surface text-16 font-bold text-ink transition-[transform,background-color] duration-150 ease-vim hover:bg-hover active:scale-[.98] disabled:cursor-default disabled:border-line-strong disabled:opacity-[.45] disabled:active:scale-100"
-          >
-            Efectivo exacto
-          </button>
-        )}
+        {/* Efectivo exacto: un toque en vez de cinco (Cobrar → Efectivo → Pago exacto → Cobrar).
+            Es el cobro más común de mostrador. Borde de tinta: es la segunda acción del pie, no
+            una más de las grises. */}
+        <button
+          type="button"
+          disabled={vacio || procesando || !onEfectivoExacto}
+          onClick={() => onEfectivoExacto?.()}
+          className="flex h-12 w-full items-center justify-center rounded-lg border border-ink bg-surface text-16 font-bold text-ink transition-[transform,background-color] duration-150 ease-vim hover:bg-hover active:scale-[.98] disabled:cursor-default disabled:border-line-strong disabled:opacity-[.45] disabled:active:scale-100"
+        >
+          Efectivo exacto
+        </button>
         </>
         )}
       </div>

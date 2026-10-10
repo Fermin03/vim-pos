@@ -12,12 +12,6 @@ export type ResultadoAlta =
   | { ok: true; tablas: number }
   | { ok: false; motivo: "CREDENCIALES" | "RED" | "SIN_CONFIG" | "SIN_BACKEND" | "PULL" | "FALTAN_DATOS" | "NO_DISPONIBLE"; error: string };
 
-/** ¿Corre dentro de la app de escritorio? (Electron inyecta la bandera al servir el HTML). */
-export function esEscritorio(): boolean {
-  if (typeof window === "undefined") return false;
-  return (window as unknown as { __VIM_DESKTOP?: boolean }).__VIM_DESKTOP === true;
-}
-
 function texto(v: unknown, fallback: string): string {
   return typeof v === "string" && v.trim() !== "" ? v : fallback;
 }

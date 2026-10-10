@@ -2,7 +2,7 @@
 import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@vim/ui/styles";
-import { employeeClient, type Empleado } from "../lib/supabase";
+import { employeeClient, listarEmpleados, type Empleado } from "../lib/supabase";
 import { fmtMxn, registrarComisionEvento, type DatosCaja, type Turno } from "../lib/turno";
 import { notificarEventoCritico } from "../lib/push-eventos";
 import {
@@ -70,6 +70,8 @@ export function PantallaCierre({
   const [fiscales, setFiscales] = useState<DatosFiscales | null>(null);
   const [stats, setStats] = useState<EstadisticasTurno | null>(null);
   const [movs, setMovs] = useState<MovimientosTurno | null>(null);
+  /** id → nombre de la plantilla, para rotular el reparto de propinas del corte (la base solo da ids). */
+  const [nombres, setNombres] = useState<Map<string, string>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [paso, setPaso] = useState<Paso>("arqueo");
   const [declarado, setDeclarado] = useState<Record<string, string>>({});
@@ -106,9 +108,12 @@ export function PantallaCierre({
       leerEstadisticasTurno(token, turno.id),
       leerMovimientosTurno(token, turno.id),
       contarTicketsAbiertos(token, turno.id),
+      // Si no se pueden leer los nombres, el corte sale igual: el reparto dirá "Empleado".
+      listarEmpleados().catch(() => []),
     ])
-      .then(([x, ten, fis, st, mv, abiertos]) => {
+      .then(([x, ten, fis, st, mv, abiertos, plantilla]) => {
         if (!activo) return;
+        setNombres(new Map(plantilla.map((e) => [e.id, e.nombre])));
         setResumen(x);
         setNegocio(((ten.data as { nombre_comercial?: string } | null)?.nombre_comercial) ?? "Negocio");
         setFiscales(fis);
@@ -270,7 +275,8 @@ export function PantallaCierre({
     const dev = (p.devoluciones ?? {}) as Record<string, unknown>;
     const propinasDist = ((p.propinas_distribuidas ?? []) as Record<string, unknown>[])
       .map((d) => ({
-        nombre: String(d.nombre ?? d.usuario_nombre ?? d.usuario_id ?? "—"),
+        // Nunca el id: en el papel un uuid no le dice nada a nadie.
+        nombre: String(d.nombre ?? d.usuario_nombre ?? nombres.get(String(d.usuario_id)) ?? "Empleado"),
         monto: Number(d.monto_mxn ?? d.monto ?? 0),
       }));
     const sello = cierre.reporteZId.replace(/-/g, "").slice(0, 12);
@@ -566,16 +572,9 @@ export function PantallaCierre({
       {pidiendoPinGenerar && (
         <ModalAutorizacionPin
           token={token}
-          accion="recontar_arqueo"
-          permisoCodigo="turno.recontar_arqueo"
+          payload={{ ...payloadRecuento(), monto: null }}
           descripcion={`Contar de nuevo el arqueo del turno ${turno.codigo_turno}`}
           ejecutaNombre={empleado.nombre}
-          monto={null}
-          entidadTipo="turno"
-          entidadId={turno.id}
-          cajaId={turno.caja_id}
-          turnoId={turno.id}
-          motivo="Volver a contar el arqueo"
           onAutorizado={(a) => { setPidiendoPinGenerar(false); void generarCorte(a.autorizacionPinId); }}
           onCancelar={() => setPidiendoPinGenerar(false)}
         />
@@ -583,16 +582,9 @@ export function PantallaCierre({
       {pidiendoPinRecuento && (
         <ModalAutorizacionPin
           token={token}
-          accion="recontar_arqueo"
-          permisoCodigo="turno.recontar_arqueo"
+          payload={payloadRecuento()}
           descripcion={`Volver a contar el arqueo del turno ${turno.codigo_turno}`}
           ejecutaNombre={empleado.nombre}
-          monto={corte?.diferenciaTotal ?? null}
-          entidadTipo="turno"
-          entidadId={turno.id}
-          cajaId={turno.caja_id}
-          turnoId={turno.id}
-          motivo="Volver a contar el arqueo"
           onAutorizado={volverAContar}
           onCancelar={() => setPidiendoPinRecuento(false)}
         />
@@ -600,16 +592,9 @@ export function PantallaCierre({
       {pidiendoPin && (
         <ModalAutorizacionPin
           token={token}
-          accion="cerrar_turno"
-          permisoCodigo="turno.cerrar_propio"
+          payload={payloadCierre()}
           descripcion={`Cerrar el turno ${turno.codigo_turno}`}
           ejecutaNombre={empleado.nombre}
-          monto={null}
-          entidadTipo="turno"
-          entidadId={turno.id}
-          cajaId={turno.caja_id}
-          turnoId={turno.id}
-          motivo="Cierre de turno"
           onAutorizado={ejecutarCierre}
           onCancelar={() => setPidiendoPin(false)}
         />

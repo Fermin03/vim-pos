@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Captcha, SITE_KEY_TURNSTILE } from "./captcha";
+import { Captcha, SITE_KEY_TURNSTILE } from "@vim/ui/styles";
 import { ERRORES_REGISTRO, reenviarConfirmacion } from "../lib/registro";
 import { mensajeError } from "../lib/errores";
 

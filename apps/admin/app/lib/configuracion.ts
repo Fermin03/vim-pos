@@ -1,12 +1,7 @@
 "use client";
 import { z } from "zod";
-import { supabase, leerSesion } from "./supabase";
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
+import { supabase } from "./supabase";
+import { borrarSuave, tenantId } from "./datos";
 
 // ── Credenciales de dispositivo de una caja (provisionar-dispositivo) ─────────
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -226,13 +221,7 @@ export async function actualizarMarca(id: string, input: MarcaInput): Promise<vo
   if (error) throw new Error(error.message);
 }
 
-export async function eliminarMarca(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("marcas_virtuales")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarMarca = (id: string): Promise<void> => borrarSuave("marcas_virtuales", id);
 
 // ── CFDI / PAC emisor (P-018) ────────────────────────────────────────────────
 // FACTURAMA va primero porque es el PAC del producto (migración 0080). Los demás quedan por
@@ -390,13 +379,6 @@ export async function borrarCsd(): Promise<void> {
   await llamarCargarCsd({ accion: "borrar" });
 }
 
-/** Días que le quedan al sello. Negativo = ya venció. */
-export function diasParaVencer(vigenciaHasta: string, hoy = new Date()): number {
-  const fin = new Date(`${vigenciaHasta}T00:00:00Z`).getTime();
-  const dia = new Date(`${hoy.toISOString().slice(0, 10)}T00:00:00Z`).getTime();
-  return Math.round((fin - dia) / 86_400_000);
-}
-
 // ── Sucursales (P-165/166) ───────────────────────────────────────────────────
 export const sucursalSchema = z.object({
   codigo: z.string().trim().min(1, "Obligatorio").max(10).regex(/^[A-Z0-9]+$/, "Solo mayúsculas y números"),
@@ -441,30 +423,6 @@ export async function listarSucursales(): Promise<Sucursal[]> {
   }));
 }
 
-export async function obtenerSucursal(id: string): Promise<Sucursal | null> {
-  const { data, error } = await supabase
-    .from("sucursales")
-    .select("id, codigo, nombre, direccion_calle, ciudad, estado_geo, telefono, activa, cajas(count), areas_cocina(count)")
-    .eq("id", id)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) return null;
-  const f = data as unknown as FilaSuc;
-  return {
-    id: f.id,
-    codigo: f.codigo,
-    nombre: f.nombre,
-    direccion_calle: f.direccion_calle ?? "",
-    ciudad: f.ciudad ?? "",
-    estado_geo: f.estado_geo ?? "",
-    telefono: f.telefono ?? "",
-    activa: f.activa,
-    nCajas: f.cajas?.[0]?.count ?? 0,
-    nAreas: f.areas_cocina?.[0]?.count ?? 0,
-  };
-}
-
 /** Devuelve el id de la sucursal nueva (la primera caja la crea al vuelo; ver ModalCaja). */
 export async function crearSucursal(input: SucursalInput): Promise<string> {
   const datos = sucursalSchema.parse(input);
@@ -500,13 +458,7 @@ export async function actualizarSucursal(id: string, input: SucursalInput): Prom
   if (error) throw new Error(error.message);
 }
 
-export async function eliminarSucursal(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("sucursales")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarSucursal = (id: string): Promise<void> => borrarSuave("sucursales", id);
 
 // ── Cajas (P-167/168) ─────────────────────────────────────────────────────────
 export const cajaSchema = z.object({
@@ -581,13 +533,7 @@ export async function actualizarCaja(id: string, input: CajaInput): Promise<void
   if (error) throw new Error(error.message);
 }
 
-export async function eliminarCaja(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("cajas")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarCaja = (id: string): Promise<void> => borrarSuave("cajas", id);
 
 // ── Propinas (P-173) ──────────────────────────────────────────────────────────
 export const propinasSchema = z.object({

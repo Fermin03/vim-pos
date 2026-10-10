@@ -1,8 +1,5 @@
 "use client";
-import { employeeClient } from "./supabase";
-
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+import { employeeClient, encabezadosFuncion, urlFuncion } from "./supabase";
 
 export type PayloadAutorizacion = {
   accion: string;
@@ -18,18 +15,23 @@ export type PayloadAutorizacion = {
 /** Resultado uniforme de ambos caminos: id de la autorización + quién autorizó. */
 export type Autorizacion = { autorizacionPinId: string; autorizoId: string };
 
+/** El `sub` (usuario) del token de empleado. Cualquier token ilegible es TOKEN_INVALIDO. */
 export function subDeToken(token: string): string {
-  const payload = token.split(".")[1];
-  if (!payload) throw new Error("TOKEN_INVALIDO");
-  const c = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
-  return c.sub as string;
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) throw new Error();
+    const claims = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+    return claims.sub as string;
+  } catch {
+    throw new Error("TOKEN_INVALIDO");
+  }
 }
 
 /** Autorización por PIN de supervisor (Edge Function). */
 export async function autorizarConPin(token: string, pin: string, p: PayloadAutorizacion): Promise<Autorizacion> {
-  const res = await fetch(`${URL}/functions/v1/autorizar-pin`, {
+  const res = await fetch(urlFuncion("autorizar-pin"), {
     method: "POST",
-    headers: { apikey: ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    headers: encabezadosFuncion(token),
     body: JSON.stringify({
       pin,
       accion: p.accion,

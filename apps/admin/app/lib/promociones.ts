@@ -1,16 +1,11 @@
 "use client";
 import { z } from "zod";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { borrarSuave, tenantId } from "./datos";
 
 // T3 — Promociones. Tabla promociones (RLS promociones_tenant FOR ALL). Alcance este slice:
 // tipos simples (PORCENTAJE, MONTO_FIJO, PRECIO_ESPECIAL, CORTESIA_TOTAL) a nivel TICKET_COMPLETO,
 // con vigencia (happy hour por rango de fecha/hora). Combo y compra-x-lleva-y se difieren.
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
 
 const num = (v: unknown) => Number(v ?? 0);
 const S = (v: unknown) => (v == null ? "" : String(v));
@@ -109,7 +104,4 @@ export async function cambiarEstadoPromo(id: string, estado: EstadoPromo): Promi
   if (error) throw new Error(error.message);
 }
 
-export async function eliminarPromo(id: string): Promise<void> {
-  const { error } = await supabase.from("promociones").update({ deleted_at: new Date().toISOString() }).eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarPromo = (id: string): Promise<void> => borrarSuave("promociones", id);

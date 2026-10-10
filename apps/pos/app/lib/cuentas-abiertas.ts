@@ -2,7 +2,7 @@
 import { employeeClient } from "./supabase";
 import { etiquetaModo } from "@vim/db/modos-servicio";
 import type { ModoServicio } from "./carrito";
-import { leerEntrega } from "./print/ticket-datos";
+import { leerEntrega, notaPedidoDe } from "./print/ticket-datos";
 
 // Cuentas ABIERTAS por modo de servicio: tickets comprometidos (BORRADOR/ABIERTO) que NO están en
 // espera ni pagados. Se usan en "Ver cuentas" de cada pestaña: Pick-up (por recolectar) y Domicilio
@@ -23,6 +23,7 @@ export type CuentaAbierta = {
   cliente: string | null;         // nombre del cliente registrado o, si no hay, el nombre suelto (Pick-up)
   clienteId: string | null;       // cliente registrado de la cuenta (null = sin cliente)
   mesa: string | null;            // número de mesa (comedor), desde tickets_mesas
+  notaPedido: string | null;      // solo en un ticket nacido de la tienda en línea (`notaPedidoDe`): forma de pago y nota del cliente
 };
 
 /** Nombre completo del cliente embebido (`cliente:clientes(nombre, apellido_paterno)`), o null. */
@@ -53,7 +54,7 @@ export async function listarCuentasAbiertas(
     // (`mesa_id` y `mesa_anterior_id`, esta última para transferencias). Sin la pista,
     // PostgREST no sabe cuál seguir y rechaza la consulta entera con "more than one
     // relationship was found" — dejando sin lista a los TRES modos, no solo a comedor.
-    .select("id, folio_completo, total_mxn, monto_pendiente_mxn, fecha_apertura, estado_cocina, ticket_impreso_at, nombre_cliente, cliente_id, cliente:clientes(nombre, apellido_paterno), tickets_mesas(fecha_liberacion, mesas!mesa_id(numero)), ticket_items(cantidad, cancelado)")
+    .select("id, folio_completo, total_mxn, monto_pendiente_mxn, fecha_apertura, estado_cocina, ticket_impreso_at, nombre_cliente, nota_general, modo_servicio, origen_creacion, cliente_id, cliente:clientes(nombre, apellido_paterno), tickets_mesas(fecha_liberacion, mesas!mesa_id(numero)), ticket_items(cantidad, cancelado)")
     .eq("sucursal_id", sucursalId)
     .in("modo_servicio", modos)
     .is("deleted_at", null)
@@ -78,6 +79,8 @@ export async function listarCuentasAbiertas(
     // Solo la asignación viva: una mesa liberada (cuenta transferida) no debe seguir rotulando.
     mesa: (((t.tickets_mesas as { fecha_liberacion: string | null; mesas: { numero: string } | null }[] | null) ?? [])
       .find((m) => m.fecha_liberacion === null)?.mesas?.numero) ?? null,
+    // Misma regla que el papel: el recado a cocina que teclea el cajero no es «nota del pedido».
+    notaPedido: notaPedidoDe((t.modo_servicio as string | null) ?? null, (t.origen_creacion as string | null) ?? null, (t.nota_general as string | null) ?? null),
   }));
 }
 
@@ -109,13 +112,8 @@ export async function reabrirCuentaImpresa(token: string, ticketId: string, auto
   if (error) throw new Error(error.message);
 }
 
-/** Minutos desde que se abrió la cuenta (para la lista). Puro. */
-export function minutosAbierta(desdeIso: string | null, ahora: Date = new Date()): number {
-  if (!desdeIso) return 0;
-  const d = new Date(desdeIso).getTime();
-  if (Number.isNaN(d)) return 0;
-  return Math.max(0, Math.floor((ahora.getTime() - d) / 60000));
-}
+/** Minutos desde que se abrió la cuenta (para la lista): la misma cuenta que una en espera. */
+export { minutosEnEspera as minutosAbierta } from "./espera";
 
 /** Renglón de una cuenta con TODO lo que el cajero necesita ver antes de cobrar. */
 export type RenglonCuenta = {

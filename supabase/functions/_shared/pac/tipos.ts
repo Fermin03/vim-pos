@@ -1,5 +1,5 @@
 // F8 — Contrato del PAC (Proveedor Autorizado de Certificación). Una sola interfaz
-// alimenta tanto el PAC mock (activo en dev/piloto) como Facturapi real (@sin-verificar).
+// alimenta tanto el PAC mock (solo en desarrollo, y pidiéndolo) como Facturama, el real.
 // Mismo patrón que la impresión (doc 16): una fuente lógica, varios adaptadores.
 import type { ConceptoCfdi } from "./conceptos.ts";
 
@@ -76,7 +76,7 @@ export type PacTimbradoError = {
 
 export type PacTimbradoResult = PacTimbradoOk | PacTimbradoError;
 
-/** Adaptador de PAC: implementado por mock (dev) y facturapi (prod, @sin-verificar). */
+/** Adaptador de PAC: implementado por mock (dev) y Facturama (producción). */
 export interface PacAdapter {
   readonly nombre: string;
   timbrar(req: PacTimbradoRequest): Promise<PacTimbradoResult>;

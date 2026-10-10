@@ -14,7 +14,8 @@ test("con credenciales de Facturama, manda Facturama", () => {
   );
 });
 
-test("Facturama gana a Facturapi aunque estén los dos: es el unico multi-tenant", () => {
+test("una llave de Facturapi ya no elige PAC: emitiria con NUESTRO RFC", () => {
+  assert.equal(elegirPac(entorno({ FACTURAPI_API_KEY: "k" })), "NINGUNO");
   assert.equal(
     elegirPac(entorno({ FACTURAMA_API_USER: "u", FACTURAMA_API_PASSWORD: "p", FACTURAPI_API_KEY: "k" })),
     "FACTURAMA",
@@ -22,8 +23,8 @@ test("Facturama gana a Facturapi aunque estén los dos: es el unico multi-tenant
 });
 
 test("con Facturama a medias NO se usa Facturama", () => {
-  // Media credencial no timbra; caer a Facturapi seria peor (emitiria con NUESTRO RFC).
-  assert.equal(elegirPac(entorno({ FACTURAMA_API_USER: "u" })), "NINGUNO");
+  // Media credencial no timbra, aunque haya una llave de Facturapi puesta.
+  assert.equal(elegirPac(entorno({ FACTURAMA_API_USER: "u", FACTURAPI_API_KEY: "k" })), "NINGUNO");
   assert.equal(elegirPac(entorno({ FACTURAMA_API_PASSWORD: "p" })), "NINGUNO");
 });
 
@@ -47,15 +48,10 @@ test("el permiso del mock NO desplaza a un PAC real", () => {
     elegirPac(entorno({ FACTURAMA_API_USER: "u", FACTURAMA_API_PASSWORD: "p", PAC_PERMITIR_MOCK: "1" })),
     "FACTURAMA",
   );
-  assert.equal(
-    elegirPac(entorno({ FACTURAPI_API_KEY: "k", PAC_PERMITIR_MOCK: "1" })),
-    "FACTURAPI",
-  );
 });
 
 test("las credenciales en blanco no cuentan como configuradas", () => {
   assert.equal(elegirPac(entorno({ FACTURAMA_API_USER: "  ", FACTURAMA_API_PASSWORD: "  " })), "NINGUNO");
-  assert.equal(elegirPac(entorno({ FACTURAPI_API_KEY: "   " })), "NINGUNO");
 });
 
 test("el codigo de error es estable: viaja a la BD y al portal", () => {

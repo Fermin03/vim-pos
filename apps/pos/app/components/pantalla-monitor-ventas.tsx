@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { BotonVolver } from "./boton-volver";
 import { useEscape } from "../lib/use-escape";
-import { Button } from "@vim/ui/styles";
 import { etiquetaModo } from "@vim/db/modos-servicio";
 import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";

@@ -6,7 +6,6 @@ import type { ComboDef } from "../combos";
 
 const prod = (id: string, nombre: string, precio: number): Producto => ({
   id, nombre, descripcion: null, precio_base_mxn: precio, categoria_id: "c", agotado: false, esCombo: false, seVendeAqui: true,
-  sku: null, tasaIva: 16, ivaIncluido: true, claveSat: null, unidadSat: null, categoriaNombre: null,
 });
 const combo = { ...prod("c1", "Combo", 45), esCombo: true };
 const def: ComboDef = { producto: combo, slots: [] };

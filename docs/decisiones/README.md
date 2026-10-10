@@ -34,6 +34,8 @@ Cada archivo dice **qué decía el plan, qué hacemos hoy y por qué**. Manda lo
 | [0028](0028-eliminar-a-un-empleado-libera-el-correo-y-conserva-el-historial.md) | Eliminar a un empleado libera su correo y conserva el historial: la cuenta se vacía, no se borra | 04/10/2026 |
 | [0029](0029-el-menu-es-de-quien-administra.md) | El menú es de quien administra; la caja lee lo proyectado | 05/10/2026 |
 | [0030](0030-la-lealtad-viaja-por-movimientos.md) | La lealtad viaja por movimientos y el canje lo autoriza la nube | 05/10/2026 |
+| [0031](0031-facturama-es-el-unico-pac.md) | Facturama es el único PAC: se retira Facturapi y la conmutación | 07/10/2026 |
+| [0032](0032-la-tienda-es-un-canal-y-sus-clientes-no-viven-en-auth.md) | La tienda en línea es un canal de `delivery_pedidos` y sus clientes no viven en Supabase Auth | 09/10/2026 |
 
 ## Pendientes de escribir
 

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Barra, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
 import { leerConsolidadoPorSucursal, type AgruparPor, type FilaConsolidado } from "../../../lib/consolidado";
 import type { Columna } from "../../../lib/reporte-tabla";
+import { Segmentos } from "../../../components/controles";
 
 /** Comparativo de la cadena: cada sucursal (o franquicia) una junto a otra. */
 export default function ConsolidadoPage() {
@@ -34,19 +35,13 @@ export default function ConsolidadoPage() {
   ];
 
   const filtro = (
-    <div role="group" aria-label="Agrupar por" className="inline-flex gap-0.5 rounded border border-line bg-hover p-[3px]">
-      {(["sucursal", "franquicia"] as const).map((a) => (
-        <button
-          key={a}
-          type="button"
-          aria-pressed={agrupar === a}
-          onClick={() => setAgrupar(a)}
-          className={`min-h-[40px] whitespace-nowrap rounded-[4px] px-3 text-13 font-semibold transition-colors ${agrupar === a ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"}`}
-        >
-          {a === "sucursal" ? "Por sucursal" : "Por franquicia"}
-        </button>
-      ))}
-    </div>
+    <Segmentos
+      grande
+      etiqueta="Agrupar por"
+      opciones={[{ v: "sucursal", l: "Por sucursal" }, { v: "franquicia", l: "Por franquicia" }]}
+      valor={agrupar}
+      onCambiar={setAgrupar}
+    />
   );
 
   return (

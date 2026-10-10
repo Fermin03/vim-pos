@@ -22,6 +22,7 @@ import {
   type FilaDeMenu,
   type MenuId,
 } from "../../../lib/menus";
+import { Segmentos } from "../../../components/controles";
 
 type Filtro = "all" | EstadoEnSucursal;
 const SIN_FILAS: Map<string, FilaDeMenu> = new Map();
@@ -29,7 +30,7 @@ const SIN_FILAS: Map<string, FilaDeMenu> = new Map();
 const BADGE: Record<EstadoEnSucursal, { txt: string; cls: string; dot: string }> = {
   ACTIVO: { txt: "Activo", cls: "bg-success-soft text-success", dot: "bg-success" },
   PAUSADO: { txt: "Pausado", cls: "bg-hover text-ink-3", dot: "bg-ink-3" },
-  AGOTADO: { txt: "Agotado", cls: "bg-[#FBF1EF] text-danger", dot: "bg-danger" },
+  AGOTADO: { txt: "Agotado", cls: "bg-danger-soft text-danger", dot: "bg-danger" },
   NO_SE_VENDE: { txt: "No se vende aquí", cls: "bg-hover text-ink-2", dot: "bg-ink-3" },
 };
 const NOMBRE_FILTRO: Record<Filtro, string> = {
@@ -255,21 +256,7 @@ export default function ProductosPage() {
               className="h-10 w-full rounded border border-line-strong pl-[38px] pr-3 text-sm outline-none focus:border-ink"
             />
           </div>
-          <div className="scroll-x-limpio inline-flex max-w-full gap-0.5 overflow-x-auto rounded border border-line bg-hover p-[3px] lg:max-w-none lg:overflow-x-visible">
-            {filtros.map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFiltro(f)}
-                className={[
-                  "flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-2.5 text-13 font-semibold transition lg:py-[7px]",
-                  filtro === f ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink",
-                ].join(" ")}
-              >
-                {NOMBRE_FILTRO[f]}
-              </button>
-            ))}
-          </div>
+          <Segmentos etiqueta="Qué productos ver" opciones={filtros.map((f) => ({ v: f, l: NOMBRE_FILTRO[f] }))} valor={filtro} onCambiar={setFiltro} />
         </div>
 
         {modoMenu && (
