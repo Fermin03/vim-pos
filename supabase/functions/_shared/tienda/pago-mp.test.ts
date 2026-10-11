@@ -1,206 +1,162 @@
+// Los fixtures son las respuestas REALES de Mercado Pago del 11 oct 2026
+// (docs/integraciones/mercado-pago-checkout-pro/04-verificado-orders.md), recortadas como están allá.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clienteMpTienda, cuerpoDeCobro, decidirPago, pagoVivo, MOTIVOS_DE_RECHAZO, motivoDeRechazo, pagoDelAviso, pagosDeBusqueda, respuestaDeCobro, resumenDeFallo } from "./pago-mp.ts";
+import { clienteMpTienda, cuerpoDeOrden, decidirOrden, motivoDeRechazo, ordenesDeBusqueda, ordenViva, respuestaDeCobro, resumenDeFallo, rutaDeBusqueda } from "./pago-mp.ts";
 
 const PAGO = "2cd9e6fa-1acf-47dc-8ba4-cba918d73770";
-const TARJETA = { token: "ff8080814c11e237014c1ff593b57b4d", payment_method_id: "master", issuer_id: "160", dispositivo: "armor.abc123" };
-const DATOS = {
-  pagoId: PAGO, monto: "264.00", folio: "T1A2B3", negocio: "Knock-Out Burger",
-  aviso: `https://x.supabase.co/functions/v1/tienda-webhook-mp?ref=${PAGO}`, email: "ana@example.com", tarjeta: TARJETA,
+const E = { pagoId: PAGO, dePrueba: false };
+const TARJETA = { token: "ff8080814c11e237014c1ff593b57b4d", payment_method_id: "master", type: "credit_card" as const };
+
+/** 201 de un cobro aprobado (titular APRO). */
+const ORDEN_APROBADA = {
+  id: "ORDTST01M4P8JX8C82XV8G7EB2A16YAC", status: "processed", status_detail: "accredited",
+  total_amount: "138.00", total_paid_amount: "138.00", external_reference: PAGO, capture_mode: "automatic_async",
+  transactions: { payments: [{ id: "PAY01M4P8JX8TKPS5B2ECXP875P89", status: "processed", status_detail: "accredited",
+    payment_method: { id: "master", type: "credit_card" } }] },
 };
+/** 402 de un cobro rechazado (titular FUND): sin objeto de orden. */
+const RECHAZO_402 = { errors: [{ code: "failed", message: "The following transactions failed",
+  details: ["PAY01M4P8KB8MM494BGX78592RQMQ: insufficient_amount"] }] };
+/** 201 de un cobro en revisión (titular CONT). */
+const ORDEN_EN_REVISION = { ...ORDEN_APROBADA, id: "ORDTST01M4P8REVISION", status: "processing", status_detail: "in_process", total_paid_amount: "0.00" };
 
-test("cobro: el monto de la base, el token de la tarjeta, nuestra referencia y a dónde avisar", () => {
-  const c = cuerpoDeCobro(DATOS);
-  assert.equal(c.transaction_amount, 264);
-  assert.equal(c.token, TARJETA.token);
-  assert.equal(c.payment_method_id, "master");
-  assert.equal(c.issuer_id, "160");
-  assert.equal(c.external_reference, PAGO);
-  assert.equal(c.notification_url, DATOS.aviso);
-  assert.deepEqual(c.payer, { email: "ana@example.com" });
-});
-
-test("cobro: un solo pago, aprobado o rechazado al instante, sin 3DS y sin comisión de VIM", () => {
-  const c = cuerpoDeCobro(DATOS);
-  assert.equal(c.installments, 1);
-  assert.equal(c.binary_mode, true);
-  assert.equal(c.capture, true);
-  for (const no of ["application_fee", "three_d_secure_mode", "statement_descriptor", "marketplace_fee"]) assert.ok(!(no in c), no);
-});
-
-test("cobro: sin banco emisor no va `issuer_id`; el Device ID no va en el cuerpo (es cabecera)", () => {
-  const c = cuerpoDeCobro({ ...DATOS, tarjeta: { ...TARJETA, issuer_id: null } });
-  assert.ok(!("issuer_id" in c));
-  assert.ok(!JSON.stringify(c).includes("armor.abc123"));
-});
-
-test("cobro: los centavos llegan exactos", () => {
-  for (const [texto, numero] of [["0.10", 0.1], ["19.99", 19.99], ["1234.05", 1234.05], ["100.00", 100]] as const) {
-    assert.equal(cuerpoDeCobro({ ...DATOS, monto: texto }).transaction_amount, numero);
-  }
-});
-
-test("cobro: un monto que no es un importe, o un aviso que no es https, no se manda", () => {
-  for (const monto of ["", "abc", "-5.00", "0"]) assert.throws(() => cuerpoDeCobro({ ...DATOS, monto }), /monto/, monto);
-  assert.throws(() => cuerpoDeCobro({ ...DATOS, aviso: "http://x.test/aviso" }), /https/);
-});
-
-test("rechazo: cada status_detail cae en su familia; lo que no se conoce es OTRO, nunca un motivo inventado", () => {
-  const casos: [string | null, string][] = [
-    ["cc_rejected_insufficient_amount", "FONDOS"], ["cc_amount_rate_limit_exceeded", "FONDOS"],
-    ["cc_rejected_bad_filled_security_code", "CODIGO"], ["cc_rejected_bad_filled_date", "FECHA"],
-    ["cc_rejected_bad_filled_card_number", "NUMERO"], ["cc_rejected_call_for_authorize", "LLAMAR_BANCO"],
-    ["cc_rejected_card_disabled", "TARJETA_DESHABILITADA"], ["cc_rejected_3ds_mandatory", "VERIFICACION"],
-    ["cc_rejected_high_risk", "OTRO"], ["cc_rejected_other_reason", "OTRO"], ["cc_rejected_blacklist", "OTRO"],
-    ["cc_rejected_max_attempts", "OTRO"], ["cc_rejected_duplicated_payment", "OTRO"], ["rejected_by_bank", "OTRO"],
-    ["algo_nuevo", "OTRO"], ["", "OTRO"], [null, "OTRO"], ["constructor", "OTRO"], ["__proto__", "OTRO"],
-  ];
-  for (const [detalle, familia] of casos) assert.equal(motivoDeRechazo(detalle), familia, String(detalle));
-  assert.ok(casos.every(([, f]) => (MOTIVOS_DE_RECHAZO as readonly string[]).includes(f)));
-});
-
-test("respuesta del cobro: solo un 4xx de validación es un no seguro; sin respuesta o 5xx NUNCA es rechazo", () => {
-  for (const s of [200, 201]) assert.equal(respuestaDeCobro(s), "CREADO");
-  assert.equal(respuestaDeCobro(401), "SIN_PERMISO");
-  for (const s of [400, 402, 403, 404, 422]) assert.equal(respuestaDeCobro(s), "NO_ACEPTADO", String(s));
-  for (const s of [0, 409, 423, 429, 500, 502, 503, 504, 302, 204]) assert.equal(respuestaDeCobro(s), "NO_SE_SABE", String(s));
-});
-
-// Con la forma del ejemplo de GET /v1/payments/{id} de la referencia (01-resumen-api.md §5).
-const ESPERADO = { pagoId: PAGO, cuentaVendedora: "202809963", dePrueba: false };
-const APROBADO = {
-  id: 18552260055, status: "approved", status_detail: "accredited", currency_id: "MXN", live_mode: true,
-  collector_id: 202809963, external_reference: PAGO, transaction_amount: 264, payment_type_id: "credit_card", payment_method_id: "master",
-};
-
-test("pago: aprobado, acreditado, nuestro y en pesos es APROBADO, con lo que cobró Mercado Pago", () => {
-  assert.deepEqual(decidirPago(ESPERADO, APROBADO), {
-    tipo: "APROBADO", pagoIdExterno: "18552260055", monto: "264.00", tipoTarjeta: "credit_card", marca: "master", detalle: "accredited",
+test("el cuerpo de la orden es el verificado: online, automático, montos como texto y la tarjeta por su token", () => {
+  assert.deepEqual(cuerpoDeOrden({ pagoId: PAGO, monto: "138", email: "ana@example.com", tarjeta: TARJETA }), {
+    type: "online", processing_mode: "automatic", total_amount: "138.00", external_reference: PAGO,
+    payer: { email: "ana@example.com" },
+    transactions: { payments: [{ amount: "138.00", payment_method: { id: "master", type: "credit_card", token: TARJETA.token, installments: 1 } }] },
   });
+  assert.equal((cuerpoDeOrden({ pagoId: PAGO, monto: "10.5", email: "a@b.mx", tarjeta: { ...TARJETA, type: "debit_card" } }).transactions as { payments: { payment_method: { type: string } }[] }).payments[0]!.payment_method.type, "debit_card");
+  for (const monto of ["0", "-1", "abc", "1.234", ""]) assert.throws(() => cuerpoDeOrden({ pagoId: PAGO, monto, email: "a@b.mx", tarjeta: TARJETA }), /monto/);
+  // Nada de Payments API ni de comisiones: el dinero cae completo en la cuenta del restaurante.
+  const texto = JSON.stringify(cuerpoDeOrden({ pagoId: PAGO, monto: "138.00", email: "a@b.mx", tarjeta: TARJETA }));
+  assert.doesNotMatch(texto, /transaction_amount|binary_mode|notification_url|application_fee|marketplace/);
 });
 
-test("pago: el monto llega como número o como texto y sale siempre con dos decimales", () => {
-  for (const [crudo, esperado] of [["24.50", "24.50"], [24.5, "24.50"], ["264", "264.00"], [0.1, "0.10"]] as const) {
-    const d = decidirPago(ESPERADO, { ...APROBADO, transaction_amount: crudo });
-    assert.equal(d.tipo, "APROBADO");
-    if (d.tipo === "APROBADO") assert.equal(d.monto, esperado);
+test("201 processed/accredited con nuestra referencia: aprobado, con la orden, el pago y lo que se COBRÓ", () => {
+  const r = respuestaDeCobro(E, { status: 201, cuerpo: ORDEN_APROBADA });
+  assert.deepEqual(r, { tipo: "ORDEN", decision: {
+    tipo: "APROBADO", ordenIdExterno: "ORDTST01M4P8JX8C82XV8G7EB2A16YAC", pagoIdExterno: "PAY01M4P8JX8TKPS5B2ECXP875P89",
+    monto: "138.00", tipoTarjeta: "credit_card", marca: "master", detalle: "accredited" } });
+  // El monto es total_paid_amount, no lo que se pidió: que sea el esperado lo decide la base.
+  assert.equal((decidirOrden(E, { ...ORDEN_APROBADA, total_paid_amount: "1.00" }) as { monto: string }).monto, "1.00");
+});
+
+test("402 con errors[].code failed: rechazo seguro, y el motivo sale de details", () => {
+  assert.deepEqual(respuestaDeCobro(E, { status: 402, cuerpo: RECHAZO_402 }), { tipo: "RECHAZADO", detalle: "insufficient_amount" });
+  const con = (motivo: string) => respuestaDeCobro(E, { status: 402, cuerpo: { errors: [{ code: "failed", details: [`PAY01X: ${motivo}`] }] } });
+  // La tabla del documento 04: titular de prueba → motivo → familia.
+  for (const [motivo, familia] of [["insufficient_amount", "FONDOS"], ["bad_filled_card_data", "DATOS"], ["required_call_for_authorize", "LLAMAR_BANCO"],
+                                   ["card_disabled", "TARJETA_DESHABILITADA"], ["rejected_by_issuer", "OTRO"]] as const) {
+    const r = con(motivo);
+    assert.equal(r.tipo, "RECHAZADO");
+    assert.equal(motivoDeRechazo(r.tipo === "RECHAZADO" ? r.detalle : null), familia, motivo);
+  }
+  // Sin details, o con algo que no es un motivo: sigue siendo rechazo, familia OTRO. Nunca un texto libre.
+  assert.deepEqual(respuestaDeCobro(E, { status: 402, cuerpo: { errors: [{ code: "failed" }] } }), { tipo: "RECHAZADO", detalle: null });
+  assert.deepEqual(con("<script>alert(1)</script>"), { tipo: "RECHAZADO", detalle: null });
+  for (const d of [null, undefined, "", "toString", "constructor", "motivo_nuevo"]) assert.equal(motivoDeRechazo(d), "OTRO");
+});
+
+test("un 402 que no dice failed, y todo lo que no es una respuesta clara: no se sabe, nunca rechazo", () => {
+  assert.deepEqual(respuestaDeCobro(E, { status: 402, cuerpo: { errors: [{ code: "otra_cosa" }] } }), { tipo: "NO_SE_SABE" });
+  assert.deepEqual(respuestaDeCobro(E, { status: 402, cuerpo: null }), { tipo: "NO_SE_SABE" });
+  for (const status of [0, 403, 404, 408, 409, 423, 429, 500, 502, 503, 504]) {
+    assert.deepEqual(respuestaDeCobro(E, { status, cuerpo: RECHAZO_402 }), { tipo: "NO_SE_SABE" }, String(status));
   }
 });
 
-test("pago: con otra referencia, de otra cuenta o sin id no es nuestro, diga lo que diga su estado", () => {
-  for (const cambio of [
-    { external_reference: "otra-referencia" }, { external_reference: undefined }, { external_reference: PAGO.toUpperCase() },
-    { collector_id: 999 }, { collector_id: undefined }, { collector_id: "202809963 " + "x" },
-    { id: undefined }, { id: "abc" }, { id: 1.5 },
-  ]) {
-    assert.equal(decidirPago(ESPERADO, { ...APROBADO, ...cambio }).tipo, "AJENO", JSON.stringify(cambio));
+test("401 no es un rechazo de la tarjeta; 400 y 422 son de validación (no se creó nada)", () => {
+  assert.deepEqual(respuestaDeCobro(E, { status: 401, cuerpo: { message: "Unauthorized use of live credentials", code: 7 } }), { tipo: "SIN_PERMISO" });
+  assert.deepEqual(respuestaDeCobro(E, { status: 400, cuerpo: { errors: [{ code: "invalid_token" }] } }), { tipo: "NO_ACEPTADO" });
+  assert.deepEqual(respuestaDeCobro(E, { status: 422, cuerpo: null }), { tipo: "NO_ACEPTADO" });
+});
+
+test("201 processing: en revisión, pendiente y con su orden (no se puede cancelar)", () => {
+  assert.deepEqual(respuestaDeCobro(E, { status: 201, cuerpo: ORDEN_EN_REVISION }),
+    { tipo: "ORDEN", decision: { tipo: "PENDIENTE", motivo: "processing", ordenIdExterno: "ORDTST01M4P8REVISION" } });
+  for (const status of ["created", "action_required"]) assert.equal(decidirOrden(E, { ...ORDEN_APROBADA, status }).tipo, "PENDIENTE");
+});
+
+test("una orden que no es nuestra no se mira: sin id, otra referencia, o el modo que no casa con la conexión", () => {
+  assert.equal(decidirOrden(E, null).tipo, "AJENO");
+  assert.equal(decidirOrden(E, { ...ORDEN_APROBADA, id: 123 }).tipo, "AJENO");
+  assert.equal(decidirOrden(E, { ...ORDEN_APROBADA, id: "ORD con espacio" }).tipo, "AJENO");
+  assert.equal(decidirOrden(E, { ...ORDEN_APROBADA, external_reference: "otra" }).tipo, "AJENO");
+  assert.equal(decidirOrden(E, { ...ORDEN_APROBADA, external_reference: undefined }).tipo, "AJENO");
+  // live_mode, si viene, tiene que ser el de la conexión, en los dos sentidos.
+  assert.deepEqual(decidirOrden(E, { ...ORDEN_APROBADA, live_mode: false }), { tipo: "AJENO", motivo: "orden de prueba en una cuenta real", ordenIdExterno: ORDEN_APROBADA.id });
+  assert.equal(decidirOrden({ ...E, dePrueba: true }, { ...ORDEN_APROBADA, live_mode: true }).tipo, "AJENO");
+  assert.equal(decidirOrden(E, { ...ORDEN_APROBADA, live_mode: true }).tipo, "APROBADO");
+  assert.equal(decidirOrden({ ...E, dePrueba: true }, { ...ORDEN_APROBADA, live_mode: false }).tipo, "APROBADO");
+  // Sin probar que la orden lo traiga: si no viene, no se inventa.
+  assert.equal(decidirOrden(E, ORDEN_APROBADA).tipo, "APROBADO");
+});
+
+test("nunca «aprobado» por un estado que no se conoce, sin acreditar, sin monto, con otra moneda o con el pago sin procesar", () => {
+  const es = (cambios: Record<string, unknown>) => decidirOrden(E, { ...ORDEN_APROBADA, ...cambios });
+  assert.deepEqual(es({ status: "algo_nuevo" }), { tipo: "INCIDENTE", motivo: "estado desconocido: algo_nuevo", ordenIdExterno: ORDEN_APROBADA.id });
+  assert.equal(es({ status: undefined }).tipo, "INCIDENTE");
+  assert.equal(es({ status_detail: "partially_refunded" }).tipo, "INCIDENTE");
+  assert.equal(es({ total_paid_amount: undefined }).tipo, "INCIDENTE");
+  assert.equal(es({ total_paid_amount: "0.00" }).tipo, "INCIDENTE");
+  assert.equal(es({ currency: "USD" }).tipo, "INCIDENTE");
+  assert.equal(es({ currency: "MXN" }).tipo, "APROBADO");
+  assert.equal(es({ transactions: { payments: [{ id: "PAY1", status: "failed" }] } }).tipo, "INCIDENTE");
+  assert.equal(es({ transactions: { payments: [ORDEN_APROBADA.transactions.payments[0], ORDEN_APROBADA.transactions.payments[0]] } }).tipo, "INCIDENTE");
+});
+
+test("una orden fallida, cancelada o vencida es un rechazo; una devuelta, devuelta", () => {
+  for (const status of ["failed", "canceled", "expired"]) {
+    const d = decidirOrden(E, { ...ORDEN_APROBADA, status, status_detail: "failed", total_paid_amount: undefined,
+      transactions: { payments: [{ id: "PAY2", status: "failed", status_detail: "insufficient_amount", payment_method: { id: "master", type: "credit_card" } }] } });
+    assert.equal(d.tipo, "RECHAZADO", status);
+    assert.equal(d.tipo === "RECHAZADO" && d.detalle, "insufficient_amount");
   }
-  for (const basura of [null, undefined, "approved", [], 42]) assert.equal(decidirPago(ESPERADO, basura).tipo, "AJENO");
+  const dev = decidirOrden(E, { ...ORDEN_APROBADA, status: "refunded", status_detail: "refunded" });
+  assert.equal(dev.tipo, "DEVUELTO");
+  assert.equal(dev.tipo === "DEVUELTO" && dev.ordenIdExterno, ORDEN_APROBADA.id);
 });
 
-test("pago: la cuenta vendedora también se lee de `collector.id`", () => {
-  const { collector_id: _c, ...sin } = APROBADO;
-  assert.equal(decidirPago(ESPERADO, { ...sin, collector: { id: 202809963 } }).tipo, "APROBADO");
-  assert.equal(decidirPago(ESPERADO, { ...sin, collector: { id: 1 } }).tipo, "AJENO");
+test("orden viva: todo menos fallida, cancelada, vencida o devuelta (lo desconocido cuenta como vivo)", () => {
+  for (const status of ["processed", "processing", "action_required", "created", "algo_nuevo", undefined]) assert.equal(ordenViva({ status }), true, String(status));
+  for (const status of ["failed", "canceled", "expired", "refunded"]) assert.equal(ordenViva({ status }), false, status);
 });
 
-test("pago: uno de prueba no cuenta en una cuenta real; en la de prueba, sí", () => {
-  assert.equal(decidirPago(ESPERADO, { ...APROBADO, live_mode: false }).tipo, "AJENO");
-  assert.equal(decidirPago(ESPERADO, { ...APROBADO, live_mode: undefined }).tipo, "AJENO");
-  assert.equal(decidirPago({ ...ESPERADO, dePrueba: true }, { ...APROBADO, live_mode: false }).tipo, "APROBADO");
+test("la búsqueda por referencia lleva begin_date y end_date en ISO 8601 UTC (formato sin probar contra Mercado Pago)", () => {
+  const ruta = rutaDeBusqueda(PAGO, new Date("2026-10-11T18:00:00Z"), new Date("2026-10-11T19:00:00Z"));
+  assert.equal(ruta, `/v1/orders?external_reference=${PAGO}&begin_date=2026-10-11T18%3A00%3A00.000Z&end_date=2026-10-11T19%3A00%3A00.000Z`);
+  assert.deepEqual(ordenesDeBusqueda({ data: [ORDEN_APROBADA] }), [ORDEN_APROBADA]);
+  assert.deepEqual(ordenesDeBusqueda({ results: [ORDEN_APROBADA] }), [ORDEN_APROBADA]);
+  for (const c of [null, [], { data: "x" }, "texto"]) assert.deepEqual(ordenesDeBusqueda(c), []);
 });
 
-test("pago: rechazado o cancelado es RECHAZADO con su motivo; devuelto es DEVUELTO", () => {
-  const r = decidirPago(ESPERADO, { ...APROBADO, status: "rejected", status_detail: "cc_rejected_insufficient_amount" });
-  assert.deepEqual([r.tipo, r.tipo === "RECHAZADO" && r.detalle], ["RECHAZADO", "cc_rejected_insufficient_amount"]);
-  assert.equal(decidirPago(ESPERADO, { ...APROBADO, status: "cancelled", status_detail: "expired" }).tipo, "RECHAZADO");
-  assert.equal(decidirPago(ESPERADO, { ...APROBADO, status: "refunded", status_detail: "refunded" }).tipo, "DEVUELTO");
-});
-
-test("pago: lo que todavía no tiene resultado es PENDIENTE", () => {
-  for (const status of ["pending", "in_process", "authorized"]) assert.equal(decidirPago(ESPERADO, { ...APROBADO, status }).tipo, "PENDIENTE");
-});
-
-test("pago: nunca es APROBADO un estado que no conocemos, uno sin acreditar, en otra moneda o sin monto", () => {
-  for (const cambio of [
-    { status: "charged_back" }, { status: "in_mediation" }, { status: "APPROVED" }, { status: "aprobado" }, { status: undefined },
-    { status_detail: "partially_refunded" }, { status_detail: undefined }, { currency_id: "USD" }, { currency_id: undefined },
-    { transaction_amount: undefined }, { transaction_amount: "mucho" }, { transaction_amount: 0 }, { transaction_amount: -264 },
-  ]) {
-    assert.equal(decidirPago(ESPERADO, { ...APROBADO, ...cambio }).tipo, "INCIDENTE", JSON.stringify(cambio));
-  }
-});
-
-test("búsqueda: los pagos van en `results`; otra forma, ninguno", () => {
-  assert.deepEqual(pagosDeBusqueda({ paging: { total: 1 }, results: [APROBADO] }), [APROBADO]);
-  for (const mal of [null, {}, { results: "x" }, [APROBADO]]) assert.deepEqual(pagosDeBusqueda(mal), []);
-});
-
-test("aviso: el id del pago sale de la query o del cuerpo, y solo si el aviso es de un pago", () => {
-  const q = (s: string) => new URLSearchParams(s);
-  assert.equal(pagoDelAviso(q("ref=x&data.id=123456&type=payment"), null), "123456");
-  assert.equal(pagoDelAviso(q("ref=x"), { type: "payment", action: "payment.updated", data: { id: "999999999" } }), "999999999");
-  assert.equal(pagoDelAviso(q("ref=x"), { type: "payment", data: { id: 12345 } }), "12345");
-  assert.equal(pagoDelAviso(q("ref=x&topic=payment&id=777"), null), "777");   // formato viejo
-  // Otros tópicos, o un id que no es un número, no son un pago.
-  assert.equal(pagoDelAviso(q("ref=x&topic=merchant_order&id=777"), null), null);
-  assert.equal(pagoDelAviso(q("ref=x&data.id=123&type=order"), null), null);
-  assert.equal(pagoDelAviso(q("ref=x&data.id=1%20OR%201&type=payment"), null), null);
-  assert.equal(pagoDelAviso(q("ref=x&id=777"), null), null);
-  assert.equal(pagoDelAviso(q("ref=x"), "basura"), null);
-});
-
-test("cliente: cada llamada va a su ruta con el token del restaurante; cobro y devolución llevan llave", async () => {
-  const vistas: { url: string; method: string; auth: string; llave: string | null; sesion: string | null; body: unknown }[] = [];
-  const pedir = (async (url: string | URL | Request, init?: RequestInit) => {
-    const h = new Headers(init?.headers);
-    vistas.push({ url: String(url), method: String(init?.method), auth: h.get("authorization") ?? "", llave: h.get("x-idempotency-key"), sesion: h.get("x-meli-session-id"), body: init?.body ?? null });
-    return new Response(JSON.stringify({ id: 1 }), { status: 201 });
+test("el cliente llama a Orders API con el token del restaurante y la llave de idempotencia; un fallo de red es status 0", async () => {
+  const vistas: { url: string; metodo: string; cabeceras: Record<string, string>; cuerpo: string | undefined }[] = [];
+  const pedir = ((url: string, init: RequestInit) => {
+    vistas.push({ url, metodo: String(init.method), cabeceras: init.headers as Record<string, string>, cuerpo: init.body as string | undefined });
+    return Promise.resolve(new Response(JSON.stringify(ORDEN_APROBADA), { status: 201 }));
   }) as typeof fetch;
   const mp = clienteMpTienda("TOKEN-DEL-RESTAURANTE", pedir);
-  assert.deepEqual(await mp.cobrar({ a: 1 }, `tienda-pago-${PAGO}`, "armor.abc123"), { status: 201, cuerpo: { id: 1 } });
-  await mp.leerPago("18552260055");
-  await mp.buscarPagos(PAGO);
-  await mp.devolver("18552260055", `devolucion-${PAGO}`);
-  assert.deepEqual(vistas.map((v) => `${v.method} ${v.url.replace("https://api.mercadopago.com", "")}`), [
-    "POST /v1/payments",
-    "GET /v1/payments/18552260055",
-    `GET /v1/payments/search?external_reference=${PAGO}&sort=date_created&criteria=desc&limit=20`,
-    "POST /v1/payments/18552260055/refunds",
-  ]);
-  assert.ok(vistas.every((v) => v.auth === "Bearer TOKEN-DEL-RESTAURANTE"));
-  assert.equal(vistas[0]!.body, '{"a":1}');
-  assert.equal(vistas[0]!.llave, `tienda-pago-${PAGO}`);
-  assert.equal(vistas[0]!.sesion, "armor.abc123");
-  assert.equal(vistas[1]!.sesion, null);
-  assert.equal(vistas[3]!.body, null);                       // sin cuerpo = devolución total
-  assert.equal(vistas[3]!.llave, `devolucion-${PAGO}`);
+  assert.deepEqual(await mp.crearOrden({ type: "online" }, "tienda-pago-1"), { status: 201, cuerpo: ORDEN_APROBADA });
+  await mp.leerOrden("ORD/1");
+  await mp.devolver("ORD1", "llave-nueva");
+  await mp.buscarOrdenes(PAGO, new Date(0), new Date(1000));
+  assert.deepEqual(vistas.map((v) => `${v.metodo} ${v.url.replace("https://api.mercadopago.com", "").split("?")[0]}`),
+    ["POST /v1/orders", "GET /v1/orders/ORD%2F1", "POST /v1/orders/ORD1/refund", "GET /v1/orders"]);
+  assert.ok(vistas.every((v) => v.cabeceras.Authorization === "Bearer TOKEN-DEL-RESTAURANTE"));
+  assert.equal(vistas[0]!.cabeceras["X-Idempotency-Key"], "tienda-pago-1");
+  assert.equal(vistas[2]!.cabeceras["X-Idempotency-Key"], "llave-nueva");
+  assert.equal(vistas[2]!.cuerpo, undefined);   // devolución total: sin cuerpo
+  assert.ok(vistas.every((v) => !v.url.includes("/v1/payments")));
+  const roto = clienteMpTienda("T", (() => Promise.reject(new Error("sin red"))) as typeof fetch);
+  assert.deepEqual(await roto.crearOrden({}, "k"), { status: 0, cuerpo: null });
 });
 
-test("cliente: un fallo de red es status 0, no una excepción; un cuerpo que no es JSON, null", async () => {
-  const cae = (() => Promise.reject(new Error("ECONNRESET"))) as unknown as typeof fetch;
-  assert.deepEqual(await clienteMpTienda("t", cae).leerPago("1"), { status: 0, cuerpo: null });
-  const html = (() => Promise.resolve(new Response("<html>502</html>", { status: 502 }))) as unknown as typeof fetch;
-  assert.deepEqual(await clienteMpTienda("t", html).leerPago("1"), { status: 502, cuerpo: null });
-});
-
-test("fallo: al log va el estado y el código, nunca el cuerpo", () => {
-  assert.equal(resumenDeFallo({ status: 401, cuerpo: { message: "invalid access token APP_USR-secreto", error: "invalid_access_token", status: 401 } }), "HTTP 401 invalid_access_token");
-  assert.equal(resumenDeFallo({ status: 400, cuerpo: { message: "x", cause: [{ code: "2063", description: "…" }] } }), "HTTP 400 2063");
+test("del fallo se deja el estado y el código, nunca el cuerpo", () => {
+  assert.equal(resumenDeFallo({ status: 402, cuerpo: RECHAZO_402 }), "HTTP 402 failed");
+  assert.equal(resumenDeFallo({ status: 409, cuerpo: { errors: [{ code: "cannot_cancel_order", message: "must be in 'action_required' or 'created'" }] } }), "HTTP 409 cannot_cancel_order");
   assert.equal(resumenDeFallo({ status: 0, cuerpo: null }), "HTTP 0");
-});
-
-test("pago: su modo tiene que ser el de la conexión que cobró, en los dos sentidos", () => {
-  const dePrueba = { ...ESPERADO, dePrueba: true };
-  assert.equal(decidirPago(ESPERADO, { ...APROBADO, live_mode: true }).tipo, "APROBADO");
-  assert.equal(decidirPago(ESPERADO, { ...APROBADO, live_mode: false }).tipo, "AJENO");
-  assert.equal(decidirPago(dePrueba, { ...APROBADO, live_mode: false }).tipo, "APROBADO");
-  // Un pago REAL en una conexión de prueba tampoco se cree.
-  assert.deepEqual(decidirPago(dePrueba, { ...APROBADO, live_mode: true }), { tipo: "AJENO", motivo: "pago real en una conexión de prueba" });
-  for (const raro of [undefined, null, "true", 1]) assert.equal(decidirPago(ESPERADO, { ...APROBADO, live_mode: raro }).tipo, "AJENO", String(raro));
-});
-
-test("pago vivo: todo lo que no esté rechazado, cancelado o devuelto (también un estado que no se conoce)", () => {
-  for (const status of ["approved", "authorized", "pending", "in_process", "in_mediation", "charged_back", "algo_nuevo", undefined]) assert.equal(pagoVivo({ status }), true, String(status));
-  for (const status of ["rejected", "cancelled", "refunded"]) assert.equal(pagoVivo({ status }), false, status);
+  assert.doesNotMatch(resumenDeFallo({ status: 402, cuerpo: RECHAZO_402 }), /PAY01|insufficient/);
 });

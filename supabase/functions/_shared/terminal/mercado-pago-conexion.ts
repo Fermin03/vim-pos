@@ -25,11 +25,7 @@ export function urlAutorizacion(c: { clientId: string; redirectUri: string; stat
   return u.toString();
 }
 
-export type Tokens = {
-  access_token: string; refresh_token: string; user_id: string; vence_at: string; de_prueba: boolean;
-  /** La public key de la cuenta: no es secreta; la usa la tienda en línea para tokenizar tarjetas. null si no vino. */
-  public_key: string | null;
-};
+export type Tokens = { access_token: string; refresh_token: string; user_id: string; vence_at: string; de_prueba: boolean };
 
 /** Lo que guardamos de la respuesta de /oauth/token; null si le falta algo (sin refresh no se renueva). */
 export function tokensDeRespuesta(cuerpo: unknown, ahora = Date.now()): Tokens | null {
@@ -37,12 +33,7 @@ export function tokensDeRespuesta(cuerpo: unknown, ahora = Date.now()): Tokens |
   const acc = txt(o.access_token), ref = txt(o.refresh_token), uid = idDe(o.user_id);
   const seg = Number(o.expires_in);
   if (!acc || !ref || !uid || !(seg > 0)) return null;
-  // Solo con la forma de una public key (`APP_USR-…` o `TEST-…`): va tal cual al navegador de los clientes.
-  const pk = txt(o.public_key);
-  return {
-    access_token: acc, refresh_token: ref, user_id: uid, vence_at: new Date(ahora + seg * 1000).toISOString(), de_prueba: o.live_mode === false,
-    public_key: pk && /^[A-Za-z0-9_-]{20,100}$/.test(pk) ? pk : null,
-  };
+  return { access_token: acc, refresh_token: ref, user_id: uid, vence_at: new Date(ahora + seg * 1000).toISOString(), de_prueba: o.live_mode === false };
 }
 
 /** Canjea el `code` o renueva con el refresh token. Los parámetros van en el cuerpo, nunca en la query. */

@@ -6,6 +6,7 @@ import { clienteAdmin, servir } from "../_shared/http.ts";
 import { registrarError, textoDeError } from "../_shared/errores.ts";
 import { bearerDe, tenantDelToken } from "../_shared/identidad.ts";
 import { clienteMpConfig, pedirTokens } from "../_shared/terminal/mercado-pago-conexion.ts";
+import { conexionDeTienda, destinoDe } from "../_shared/tienda/conexion-mp.ts";
 
 const admin = clienteAdmin();
 const CLIENT_ID = Deno.env.get("MP_CLIENT_ID") ?? "";
@@ -35,6 +36,12 @@ servir(async (req, json) => {
     let b: Record<string, unknown>;
     try { b = await req.json(); } catch { return json({ error: "BAD_JSON" }, 400); }
 
+    // La tienda en línea tiene su propia aplicación de Mercado Pago y su propia conexión (0172): se
+    // atiende aparte. Sin `destino` (o con "terminal") todo lo de abajo es, línea por línea, lo de siempre.
+    const destino = destinoDe(b.destino);
+    if (!destino) return json({ error: "DESTINO_INVALIDO" }, 400);
+    if (destino === "tienda") return await conexionDeTienda(admin, tenantId, b, json);
+
     // La conexión pedida, siempre de ESTE negocio; con su cliente de Mercado Pago ya armado.
     const conexionDe = async (id: unknown) => {
       const cid = uuid(id);
@@ -62,8 +69,6 @@ servir(async (req, json) => {
       const { data: fila, error } = await admin.from("terminal_conexiones").upsert({
         tenant_id: tenantId, proveedor: "MERCADO_PAGO", cuenta_id_externo: t.user_id, cuenta_nombre: nombre,
         de_prueba: t.de_prueba, estado: "ACTIVA", ultimo_error: null, conectada_at: new Date().toISOString(),
-        // Para el pago en línea de la tienda (0172). No es secreta. Si no vino, se queda la que hubiera.
-        ...(t.public_key && { public_key: t.public_key }),
       }, { onConflict: "tenant_id,proveedor,cuenta_id_externo" }).select("id").single();
       if (error) throw error;
       const conexionId = (fila as { id: string }).id;

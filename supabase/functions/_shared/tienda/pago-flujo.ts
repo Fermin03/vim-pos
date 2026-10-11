@@ -3,38 +3,48 @@
 // pasan por `confirmarPago`, así que los tres deciden lo mismo.
 //
 // Regla de todo el archivo: lo que llega de fuera (un aviso) es solo una pista.
-// La verdad se le pregunta a Mercado Pago con el token del restaurante dueño de ESE pago, y lo que
-// mueve el pedido es la base (0172), que es idempotente.
+// La verdad se le pregunta a Mercado Pago con el token de la conexión de la tienda del restaurante
+// dueño de ESE pago, y lo que mueve el pedido es la base (0172), que es idempotente.
 //
 // No toca la base ni la red directamente: recibe un puerto (pago-puerto.ts lo arma con supabase-js)
 // y el cliente de Mercado Pago. Así se prueba con `node --test` y dobles.
 import { esc, soloAscii } from "../correo.ts";
-import { type ClienteMpTienda, cuerpoDeCobro, type DatosCobro, decidirPago, type MotivoDeRechazo, motivoDeRechazo, pagosDeBusqueda, pagoVivo, respuestaDeCobro, resumenDeFallo } from "./pago-mp.ts";
+import { type ClienteMpTienda, cuerpoDeOrden, type DatosCobro, type Decision, decidirOrden, type MotivoDeRechazo, motivoDeRechazo, ordenesDeBusqueda, ordenViva, respuestaDeCobro, resumenDeFallo } from "./pago-mp.ts";
 
 export type EstadoPago = "CREADO" | "APROBADO" | "RECHAZADO" | "VENCIDO" | "POR_DEVOLVER" | "DEVUELTO" | "DEVOLUCION_FALLIDA";
 
-/** Un renglón de tienda_pagos con lo de su conexión que hace falta para creerle a un pago. */
+/** Un renglón de tienda_pagos con lo de su conexión que hace falta para creerle a una orden. */
 export type FilaPago = {
   id: string; conexion_id: string; estado: EstadoPago;
   /** Total + propina, texto con dos decimales. */
   monto: string;
   /** El cobro ya se le mandó a Mercado Pago (tienda_pagos.cobro_pedido_at). */
   cobro_mandado: boolean;
-  cuenta_vendedora: string; de_prueba: boolean;
+  /** La orden de Mercado Pago, si ya se sabe cuál es. */
+  orden_id_externo: string | null;
+  /** El motivo del rechazo, como lo dijo Mercado Pago (solo con estado RECHAZADO). */
+  detalle: string | null;
+  /** Cuándo nació el renglón (ISO): acota la búsqueda por referencia. */
+  creado: string;
+  /** `tienda_conexiones.de_prueba`. */
+  de_prueba: boolean;
 };
 
 export type Aplicado = { estado: string; pedido_estado: string; recien_aprobado: boolean };
-export type Tarea = { id: string; tarea: "DEVOLVER" | "CONCILIAR"; conexion_id: string; pago_id_externo: string | null };
+export type Tarea = { id: string; tarea: "DEVOLVER" | "CONCILIAR"; conexion_id: string; orden_id_externo: string | null };
+type Resultado = { resultado: "APROBADO" | "RECHAZADO" | "DEVUELTO"; ordenIdExterno: string; pagoIdExterno: string | null; monto: string | null;
+                   tipoTarjeta: string | null; marca: string | null; detalle: string | null };
 
 export type PuertoPagos = {
   leerPago(pagoId: string): Promise<FilaPago | null>;
-  /** El Access Token del restaurante (Vault). null = no hay con qué hablarle a Mercado Pago. */
+  /** El Access Token de la conexión de la tienda (Vault). null = no hay con qué hablarle a Mercado Pago. */
   token(conexionId: string): Promise<string | null>;
   /** ¿Me toca mandar el cobro? Verdadero UNA sola vez por pago. */
   tomarCobro(pagoId: string): Promise<boolean>;
   descartar(pagoId: string): Promise<boolean>;
-  aplicar(pagoId: string, d: { resultado: "APROBADO" | "RECHAZADO" | "DEVUELTO"; pagoIdExterno: string; monto: string;
-                               tipoTarjeta: string | null; marca: string | null; detalle: string | null }): Promise<Aplicado>;
+  aplicar(pagoId: string, d: Resultado): Promise<Aplicado>;
+  /** Deja anotada la orden que aún no tiene resultado, o por qué una orden viva no se pudo aplicar. */
+  anotar(pagoId: string, d: { ordenIdExterno?: string | null; error?: string | null }): Promise<void>;
   tomar(max: number): Promise<Tarea[]>;
   /** Cómo le fue a la devolución. Devuelve el estado en que queda el pago. */
   devolucion(pagoId: string, ok: boolean, error?: string): Promise<string>;
@@ -47,7 +57,15 @@ export type Deps = {
   mp: (token: string) => ClienteMpTienda;
   /** Al log, con un código. Nunca lleva tokens ni el cuerpo de una respuesta. */
   registrar: (codigo: string, detalle: string) => void;
+  /** La llave de idempotencia de una devolución: NUEVA en cada intento (por omisión, un uuid). */
+  llave?: () => string;
+  ahora?: () => Date;
 };
+
+const resultadoDe = (d: Extract<Decision, { tipo: "APROBADO" | "RECHAZADO" | "DEVUELTO" }>): Resultado => ({
+  resultado: d.tipo, ordenIdExterno: d.ordenIdExterno, pagoIdExterno: d.pagoIdExterno, monto: d.monto,
+  tipoTarjeta: d.tipoTarjeta, marca: d.marca, detalle: d.detalle,
+});
 
 // ── Cobrar ───────────────────────────────────────────────────────────────────────────────────────
 
@@ -58,73 +76,85 @@ export type Cobro =
   | { tipo: "RECHAZADO"; motivo: MotivoDeRechazo }
   /** No se sabe si se cobró. El pedido queda POR_PAGAR y lo resuelven el aviso, la página y el barrido. */
   | { tipo: "POR_CONFIRMAR" }
-  /** No hay con qué cobrar (la cuenta del restaurante se desconectó). El pedido se descartó. */
-  | { tipo: "NO_DISPONIBLE" };
+  /**
+   * No se pudo cobrar y se sabe que no se creó nada: no hay token, o Mercado Pago rechazó las
+   * credenciales (`sinPermiso`: toca pausar el pago en esa sucursal y avisar a VIM). El pedido se descartó.
+   */
+  | { tipo: "NO_DISPONIBLE"; sinPermiso: boolean };
 
 /**
- * Cobra el pago de un pedido recién creado y dice cómo quedó. Tres reglas:
+ * Cobra el pago de un pedido recién creado y dice cómo quedó. Reglas:
  *   · un renglón de tienda_pagos se cobra UNA vez. Si esta llamada no es la primera (un reintento
  *     del mismo intento de compra porque la respuesta se perdió), NO vuelve a cobrar: le pregunta a
  *     Mercado Pago qué pasó con el primer cobro;
- *   · «rechazado» solo se dice con un NO seguro de Mercado Pago (un pago `rejected`, o un 4xx de
- *     validación: no creó ningún pago). Sin respuesta, un 5xx o un estado que no es final nunca son
- *     «rechazado»: quedan POR_CONFIRMAR;
- *   · un pago aprobado se cree después de `decidirPago` (referencia, cuenta vendedora, moneda,
- *     modo) y de que la base compruebe el monto.
+ *   · «rechazado» solo se dice con un NO seguro de Mercado Pago: el 402 `failed` (VERIFICADO: no
+ *     crea orden), una orden que nace `failed`, o un 400/422 de validación (no creó nada). Sin
+ *     respuesta, un 5xx, 409, 429 o un estado que no es final nunca son «rechazado»: POR_CONFIRMAR;
+ *   · un 401 no es un rechazo de la tarjeta: PAGO_NO_DISPONIBLE;
+ *   · una orden aprobada se cree después de `decidirOrden` (referencia, modo, acreditada) y de que
+ *     la base compruebe el monto;
+ *   · una orden que queda en revisión (`processing`) NO se puede cancelar (VERIFICADO: 409): se
+ *     anota su id y queda POR_CONFIRMAR.
  */
 export async function cobrarPago(deps: Deps, datos: Omit<DatosCobro, "monto">): Promise<Cobro> {
   const fila = await deps.db.leerPago(datos.pagoId);
   if (!fila) return { tipo: "POR_CONFIRMAR" };
   if (fila.estado === "APROBADO") return { tipo: "APROBADO", recienAprobado: false };
-  if (fila.estado !== "CREADO") return { tipo: "POR_CONFIRMAR" };
 
   /** Un NO seguro: el pedido se va. Si ya no se puede descartar, es que algo lo movió: que lo diga el seguimiento. */
   const descartar = async (resultado: Cobro): Promise<Cobro> => ((await deps.db.descartar(fila.id)) ? resultado : { tipo: "POR_CONFIRMAR" });
+
+  // La carrera: el aviso del rechazo llegó ANTES que esta respuesta (o que este reintento) y la base
+  // ya cerró el pedido «sin pago». Es el mismo no: se descarta y el cliente corrige sin perder el carrito.
+  if (fila.estado === "RECHAZADO") return descartar({ tipo: "RECHAZADO", motivo: motivoDeRechazo(fila.detalle) });
+  if (fila.estado !== "CREADO") return { tipo: "POR_CONFIRMAR" };
 
   // El token, ANTES de marcar el cobro como mandado: sin él no sale ningún cobro, y el renglón no
   // debe quedar como «mandado» (obligaría al cliente a esperar la conciliación de algo que no existió).
   const token = await deps.db.token(fila.conexion_id);
   if (!token && !fila.cobro_mandado) {
     deps.registrar("SIN_TOKEN", `conexión ${fila.conexion_id}`);
-    return descartar({ tipo: "NO_DISPONIBLE" });
+    return descartar({ tipo: "NO_DISPONIBLE", sinPermiso: false });
   }
 
   if (!(await deps.db.tomarCobro(fila.id))) {
     // Ya se mandó antes. Se pregunta, no se cobra.
     const c = await confirmarPago(deps, fila.id);
-    const ahora = c.ok ? await deps.db.leerPago(fila.id) : null;
-    return ahora?.estado === "APROBADO" ? { tipo: "APROBADO", recienAprobado: c.ok && c.recienAprobado } : { tipo: "POR_CONFIRMAR" };
+    const ahora = await deps.db.leerPago(fila.id);
+    if (ahora?.estado === "APROBADO") return { tipo: "APROBADO", recienAprobado: c.ok && c.recienAprobado };
+    if (ahora?.estado === "RECHAZADO") return descartar({ tipo: "RECHAZADO", motivo: motivoDeRechazo(ahora.detalle) });
+    return { tipo: "POR_CONFIRMAR" };
   }
 
   // (Sin token y con el cobro ya mandado no se llega aquí: `tomarCobro` dio falso arriba.)
   if (!token) return { tipo: "POR_CONFIRMAR" };
-  const r = await deps.mp(token).cobrar(cuerpoDeCobro({ ...datos, monto: fila.monto }), `tienda-pago-${fila.id}`, datos.tarjeta.dispositivo);
-  const que = respuestaDeCobro(r.status);
-  if (que === "SIN_PERMISO") {
-    // No se toca la conexión: la comparte la terminal, y un 401 aquí puede ser solo de credenciales de prueba.
+  const r = await deps.mp(token).crearOrden(cuerpoDeOrden({ ...datos, monto: fila.monto }), `tienda-pago-${fila.id}`);
+  const que = respuestaDeCobro({ pagoId: fila.id, dePrueba: fila.de_prueba }, r);
+  if (que.tipo === "SIN_PERMISO") {
     deps.registrar("COBRO_SIN_PERMISO", `conexión ${fila.conexion_id}: ${resumenDeFallo(r)}`);
-    return descartar({ tipo: "NO_DISPONIBLE" });
+    return descartar({ tipo: "NO_DISPONIBLE", sinPermiso: true });
   }
-  if (que === "NO_ACEPTADO") {
-    deps.registrar("COBRO", resumenDeFallo(r));
+  if (que.tipo === "RECHAZADO") return descartar({ tipo: "RECHAZADO", motivo: motivoDeRechazo(que.detalle) });
+  if (que.tipo === "NO_ACEPTADO") {
+    deps.registrar("COBRO_NO_ACEPTADO", resumenDeFallo(r));
     return descartar({ tipo: "RECHAZADO", motivo: "OTRO" });
   }
-  if (que === "NO_SE_SABE") {
+  if (que.tipo === "NO_SE_SABE") {
     deps.registrar("COBRO_SIN_RESPUESTA", `pago ${fila.id}: ${resumenDeFallo(r)}`);
     return { tipo: "POR_CONFIRMAR" };
   }
 
-  const d = decidirPago({ pagoId: fila.id, cuentaVendedora: fila.cuenta_vendedora, dePrueba: fila.de_prueba }, r.cuerpo);
+  const d = que.decision;
   if (d.tipo === "RECHAZADO") return descartar({ tipo: "RECHAZADO", motivo: motivoDeRechazo(d.detalle) });
   if (d.tipo !== "APROBADO") {
-    // Pendiente, ajeno, incidente o ya devuelto: no es un sí ni un no. Lo resuelve la conciliación.
+    // En revisión, ajena, incidente o ya devuelta: no es un sí ni un no. Lo resuelve la conciliación,
+    // que consultará ESTA orden si es nuestra y sigue viva.
     deps.registrar("COBRO_SIN_RESULTADO", `pago ${fila.id}: ${d.tipo}${"motivo" in d ? ` (${d.motivo})` : ""}`);
+    if (d.tipo === "PENDIENTE" && d.ordenIdExterno) await deps.db.anotar(fila.id, { ordenIdExterno: d.ordenIdExterno });
     return { tipo: "POR_CONFIRMAR" };
   }
-  const a = await deps.db.aplicar(fila.id, {
-    resultado: "APROBADO", pagoIdExterno: d.pagoIdExterno, monto: d.monto, tipoTarjeta: d.tipoTarjeta, marca: d.marca, detalle: d.detalle,
-  });
-  // La base no lo tomó como EL pago del pedido (el monto no era el esperado): ya quedó por devolverse.
+  const a = await deps.db.aplicar(fila.id, resultadoDe(d));
+  // La base no la tomó como LA orden del pedido (el monto no era el esperado): ya quedó por devolverse.
   return a.estado === "APROBADO" ? { tipo: "APROBADO", recienAprobado: a.recien_aprobado } : { tipo: "POR_CONFIRMAR" };
 }
 
@@ -134,20 +164,22 @@ export type Confirmacion =
   | { ok: true; aplicados: number; recienAprobado: boolean }
   /**
    * PAGO_DESCONOCIDO y NO_ENCONTRADO: no hay nada que reintentar. SIN_TOKEN y MP_NO_RESPONDE: sí.
-   * PAGO_SIN_APLICAR: Mercado Pago tiene un pago VIVO con nuestra referencia (aprobado o pendiente)
-   * que no se pudo aplicar. No es «sin pago»: puede haber dinero del cliente. La conciliación no
-   * cuenta como buena, el seguimiento sigue «confirmando» y el barrido acaba avisando a VIM.
+   * PAGO_SIN_APLICAR: Mercado Pago tiene una orden VIVA con nuestra referencia (cobrada o en
+   * revisión) que no se pudo aplicar. No es «sin pago»: puede haber dinero del cliente. La
+   * conciliación no cuenta como buena, el seguimiento sigue «confirmando» y el barrido acaba
+   * avisando a VIM, con el id de la orden y el motivo (quedan anotados en el pago).
    */
   | { ok: false; motivo: "PAGO_DESCONOCIDO" | "NO_ENCONTRADO" | "SIN_TOKEN" | "MP_NO_RESPONDE" | "PAGO_SIN_APLICAR" };
 
 /**
- * Le pregunta a Mercado Pago por un pago nuestro y aplica lo que diga. Con `pagoIdExterno` (la
- * pista de un aviso) consulta ESE pago; sin él, busca los que traigan nuestra referencia.
- * Siempre con el token del restaurante dueño del pago, y cada pago pasa por `decidirPago`
- * (referencia, cuenta vendedora, moneda) antes de tocar nada; el monto lo comprueba la base.
+ * Le pregunta a Mercado Pago por un pago nuestro y aplica lo que diga. Por orden de preferencia:
+ *   · la orden que el pago ya tiene anotada (`GET /v1/orders/{id}`);
+ *   · la que dice el aviso (`ordenPista`): solo es una pista, y `decidirOrden` exige nuestra referencia;
+ *   · si no se sabe cuál es (al crearla no hubo respuesta), la búsqueda por referencia.
+ * Siempre con el token de la conexión dueña del pago; el monto lo comprueba la base.
  * Repetirla, o correrla dos veces a la vez, deja lo mismo.
  */
-export async function confirmarPago(deps: Deps, pagoId: string, pagoIdExterno?: string): Promise<Confirmacion> {
+export async function confirmarPago(deps: Deps, pagoId: string, ordenPista?: string): Promise<Confirmacion> {
   const fila = await deps.db.leerPago(pagoId);
   if (!fila) return { ok: false, motivo: "PAGO_DESCONOCIDO" };
   const token = await deps.db.token(fila.conexion_id);
@@ -156,51 +188,55 @@ export async function confirmarPago(deps: Deps, pagoId: string, pagoIdExterno?: 
     return { ok: false, motivo: "SIN_TOKEN" };
   }
   const mp = deps.mp(token);
-  const r = pagoIdExterno ? await mp.leerPago(pagoIdExterno) : await mp.buscarPagos(fila.id);
+  const ordenId = fila.orden_id_externo ?? ordenPista ?? null;
+  const ahora = (deps.ahora ?? (() => new Date()))();
+  const r = ordenId
+    ? await mp.leerOrden(ordenId)
+    // Desde un poco antes de que naciera el renglón (relojes) hasta ahora.
+    : await mp.buscarOrdenes(fila.id, new Date(Date.parse(fila.creado) - 10 * 60_000), new Date(ahora.getTime() + 5 * 60_000));
   if (r.status !== 200) {
-    // 404 a un pago concreto: ese id no es de esta cuenta (o no existe). No es nuestro.
-    if (pagoIdExterno && r.status === 404) return { ok: false, motivo: "NO_ENCONTRADO" };
+    // 404 a una orden concreta: ese id no es de esta cuenta (o no existe). No es nuestra.
+    if (ordenId && r.status === 404) return { ok: false, motivo: "NO_ENCONTRADO" };
     deps.registrar("CONSULTAR", resumenDeFallo(r));
     return { ok: false, motivo: "MP_NO_RESPONDE" };
   }
 
-  const esperado = { pagoId: fila.id, cuentaVendedora: fila.cuenta_vendedora, dePrueba: fila.de_prueba };
+  const esperado = { pagoId: fila.id, dePrueba: fila.de_prueba };
   let aplicados = 0, recienAprobado = false;
-  const pagos = pagoIdExterno ? [r.cuerpo] : pagosDeBusqueda(r.cuerpo);
-  const decisiones = pagos.map((pago) => decidirPago(esperado, pago));
-  // Un pago vivo que trae NUESTRA referencia y que no se puede aplicar (sin cuenta vendedora, otro
-  // modo, sin acreditar, otra moneda, pendiente): se deja dicho con su id y su motivo.
-  let sinAplicar = false;
-  pagos.forEach((pago, i) => {
+  const ordenes = ordenId ? [r.cuerpo] : ordenesDeBusqueda(r.cuerpo);
+  const decisiones = ordenes.map((orden) => decidirOrden(esperado, orden));
+  // Una orden viva que trae NUESTRA referencia y que no se puede aplicar (otro modo, sin acreditar,
+  // otra moneda, en revisión): se deja dicho con su id y su motivo, en el log y en el pago.
+  let sinAplicar: string | null = null;
+  for (const [i, orden] of ordenes.entries()) {
     const d = decisiones[i]!;
-    const nuestro = (pago as { external_reference?: unknown } | null)?.external_reference === fila.id;
-    if ("motivo" in d && nuestro && pagoVivo(pago)) {
-      sinAplicar = true;
-      if (d.tipo !== "PENDIENTE") deps.registrar("PAGO_SIN_APLICAR", `pago ${fila.id}, id en Mercado Pago ${String((pago as { id?: unknown } | null)?.id ?? "?").slice(0, 30)}: ${d.tipo} (${d.motivo})`);
-    }
-  });
+    const nuestra = (orden as { external_reference?: unknown } | null)?.external_reference === fila.id;
+    if (!("motivo" in d) || !nuestra || !ordenViva(orden)) continue;
+    sinAplicar = `orden ${d.ordenIdExterno ?? "?"}: ${d.tipo} (${d.motivo})`;
+    if (d.tipo !== "PENDIENTE") deps.registrar("PAGO_SIN_APLICAR", `pago ${fila.id}, ${sinAplicar}`);
+    // En revisión y aún sin orden anotada (se supo por la búsqueda o por el aviso): se anota.
+    await deps.db.anotar(fila.id, { ordenIdExterno: d.tipo === "PENDIENTE" ? d.ordenIdExterno : null, error: sinAplicar });
+  }
   // El aprobado va primero: un rechazo cierra el pedido que espera, y un aprobado que se aplicara
   // después de él acabaría devuelto.
   for (const d of [...decisiones.filter((x) => x.tipo === "APROBADO"), ...decisiones.filter((x) => x.tipo !== "APROBADO")]) {
-    // Sin resultado que aplicar: pendiente (no hay nada que hacer todavía), ajeno o incidente (al log).
+    // Sin resultado que aplicar: pendiente (no hay nada que hacer todavía), ajena o incidente (al log).
     if ("motivo" in d) {
       if (d.tipo !== "PENDIENTE") deps.registrar(d.tipo, `pago ${fila.id}: ${d.motivo}`);
       continue;
     }
-    const a = await deps.db.aplicar(fila.id, {
-      resultado: d.tipo, pagoIdExterno: d.pagoIdExterno, monto: d.monto, tipoTarjeta: d.tipoTarjeta, marca: d.marca, detalle: d.detalle,
-    });
+    const a = await deps.db.aplicar(fila.id, resultadoDe(d));
     aplicados++;
     recienAprobado ||= a.recien_aprobado;
   }
-  // Con uno aprobado ya aplicado, el pedido tiene su pago: lo demás no cambia eso.
+  // Con una aprobada ya aplicada, el pedido tiene su pago: lo demás no cambia eso.
   if (sinAplicar && !recienAprobado && (await deps.db.leerPago(fila.id))?.estado !== "APROBADO") return { ok: false, motivo: "PAGO_SIN_APLICAR" };
   return { ok: true, aplicados, recienAprobado };
 }
 
 /**
  * Qué se le contesta a Mercado Pago tras un aviso. 200 = entendido, no lo repitas (también cuando
- * la referencia o el pago no son nuestros). 503 = no se pudo consultar: que lo reintente.
+ * la referencia o la orden no son nuestras). 503 = no se pudo consultar: que lo reintente.
  */
 export function respuestaDeConfirmacion(c: Confirmacion): 200 | 503 {
   // PAGO_SIN_APLICAR: repetir el aviso no lo arregla (lo sigue el barrido): 200.
@@ -210,29 +246,41 @@ export function respuestaDeConfirmacion(c: Confirmacion): 200 | 503 {
 // ── Devolver ─────────────────────────────────────────────────────────────────────────────────────
 
 /**
- * Devuelve completo un pago POR_DEVOLVER. La llave de idempotencia es fija por pago: si el intento
- * anterior sí llegó a Mercado Pago y no nos enteramos, este no devuelve dos veces. Si la devolución
- * falla, se mira el pago: puede que ya esté devuelto (lo hizo el restaurante desde su cuenta).
+ * Devuelve completa una orden POR_DEVOLVER (`POST /v1/orders/{id}/refund`, sin cuerpo).
+ * VERIFICADO: la llave de idempotencia tiene que ser NUEVA en cada intento (con la misma, Mercado
+ * Pago repite el error guardado del intento anterior). Lo que evita devolver dos veces es mirar la
+ * orden ANTES de cada intento: si ya está `refunded` (la devolvió un intento anterior del que no nos
+ * enteramos, o el restaurante desde su cuenta), se marca DEVUELTO sin pedir otra. Si no se puede
+ * mirar, no se intenta.
+ * Cuándo se intenta lo decide la base: no antes de un minuto del cobro, y cada fallo espera más.
  * Devuelve el estado en que queda: DEVUELTO, POR_DEVOLVER (se reintentará) o DEVOLUCION_FALLIDA.
  */
-export async function devolverPago(deps: Deps, t: Pick<Tarea, "id" | "conexion_id" | "pago_id_externo">): Promise<string> {
-  if (!t.pago_id_externo) return deps.db.devolucion(t.id, false, "sin id de pago en Mercado Pago");
+export async function devolverPago(deps: Deps, t: Pick<Tarea, "id" | "conexion_id" | "orden_id_externo">): Promise<string> {
+  if (!t.orden_id_externo) return deps.db.devolucion(t.id, false, "sin id de orden en Mercado Pago");
   const token = await deps.db.token(t.conexion_id);
   if (!token) return deps.db.devolucion(t.id, false, "sin token de la cuenta del restaurante");
   const mp = deps.mp(token);
-  const r = await mp.devolver(t.pago_id_externo, `devolucion-${t.id}`);
-  if (r.status === 200 || r.status === 201) return deps.db.devolucion(t.id, true);
-  const ahora = await mp.leerPago(t.pago_id_externo);
-  if (ahora.status === 200 && (ahora.cuerpo as { status?: unknown } | null)?.status === "refunded") return deps.db.devolucion(t.id, true);
+  const antes = await mp.leerOrden(t.orden_id_externo);
+  if (antes.status !== 200) return deps.db.devolucion(t.id, false, `no se pudo consultar la orden: ${resumenDeFallo(antes)}`);
+  const estado = (antes.cuerpo as { status?: unknown } | null)?.status;
+  if (estado === "refunded") return deps.db.devolucion(t.id, true);
+  const r = await mp.devolver(t.orden_id_externo, (deps.llave ?? (() => crypto.randomUUID()))());
+  // VERIFICADO: 201 con la orden ya `refunded`. Si contesta 2xx con otro estado no se da por hecha:
+  // el siguiente intento empieza mirando la orden y la marcará devuelta cuando lo esté.
+  if (r.status === 200 || r.status === 201) {
+    const queda = (r.cuerpo as { status?: unknown } | null)?.status;
+    return queda === "refunded" ? deps.db.devolucion(t.id, true) : deps.db.devolucion(t.id, false, `devolución pedida, orden ${String(queda ?? "sin estado").slice(0, 30)}`);
+  }
   return deps.db.devolucion(t.id, false, resumenDeFallo(r));
 }
 
 /**
  * La pasada de cada minuto: devuelve lo que toca y le pregunta a Mercado Pago una última vez por
  * los pagos que nadie confirmó. Un fallo en una tarea no detiene las demás.
- * `avisar` se llama una vez por cada devolución que se dio por fallida (tercer intento) y una vez
- * por cada pago por el que no se ha podido preguntar tres veces seguidas (cuenta desconectada, token
- * rechazado): ahí puede haber un cobro sin pedido, y nadie más lo va a ver.
+ * `avisar` se llama una vez por cada devolución que se dio por fallida (sexto intento, tras esperar
+ * 1, 5 y 30 minutos, 3 y 12 horas) y una vez por cada pago que lleva tres consultas seguidas sin
+ * poder resolverse (cuenta desconectada, token rechazado, o una orden viva que no se pudo aplicar):
+ * ahí puede haber un cobro sin pedido, y nadie más lo va a ver.
  * ponytail: de una en una y hasta 10 por pasada; con el tope de 10 s por llamada cabe en una
  * invocación. Si un día hay cola, subir el tope o repartir en paralelo por conexión.
  */
@@ -283,14 +331,22 @@ export function topesDelAviso(ref: string, esNuestra: boolean): Tope[] {
  * El correo interno a VIM cuando no se ha podido preguntar tres veces seguidas a Mercado Pago por un
  * pago que nadie confirmó. Puede haber un cobro hecho y el pedido vencido como si no se hubiera pagado.
  */
-export function avisoDeConciliacionFallida(d: { pagoId: string; negocio: string; folio: string; monto: string }): { subject: string; html: string } {
+export function avisoDeConciliacionFallida(d: {
+  pagoId: string; negocio: string; folio: string; monto: string;
+  /** La orden de Mercado Pago, si se sabe cuál es: con ella se encuentra el cobro en la cuenta del restaurante. */
+  ordenIdExterno?: string | null;
+  /** Por qué no se pudo aplicar o consultar (tienda_pagos.ultimo_error). */
+  motivo?: string | null;
+}): { subject: string; html: string } {
   return {
     subject: soloAscii(`Posible cobro sin pedido: ${d.folio} de ${d.negocio}`),
     html: `<div style="font-family:system-ui,sans-serif;color:#111">
-<p>No se ha podido consultar a Mercado Pago tres veces seguidas por un cobro en línea del que no se supo el resultado. <strong>Puede haber un cobro hecho sin pedido.</strong></p>
+<p>Un cobro en línea del que no se supo el resultado lleva tres consultas seguidas a Mercado Pago sin poder resolverse. <strong>Puede haber un cobro hecho sin pedido.</strong></p>
 <ul><li>Negocio: ${esc(d.negocio)}</li><li>Pedido: ${esc(d.folio)}</li><li>Monto esperado: $${esc(d.monto)}</li>
-<li>Pago (tienda_pagos.id): ${esc(d.pagoId)}</li></ul>
-<p>Lo más probable es que el restaurante desconectó su cuenta de Mercado Pago o que su token fue rechazado. Se seguirá intentando una vez por hora durante 48 horas: si reconecta la cuenta, el cobro se encuentra y se devuelve solo. Si no, hay que buscar en su cuenta de Mercado Pago un pago con esa referencia y devolverlo a mano.</p>
+<li>Pago (tienda_pagos.id, es la referencia en Mercado Pago): ${esc(d.pagoId)}</li>
+<li>Orden en Mercado Pago: ${esc(d.ordenIdExterno || "no se sabe (al crearla no hubo respuesta)")}</li>
+<li>Motivo: ${esc(d.motivo || "no se pudo consultar a Mercado Pago (cuenta desconectada o token rechazado)")}</li></ul>
+<p>Si el motivo dice que hay una orden que no se pudo aplicar, el dinero puede estar cobrado: hay que revisarla en la cuenta de Mercado Pago del restaurante y, si está cobrada, devolverla desde ahí. Si no se pudo consultar, lo más probable es que el restaurante desconectó su cuenta o que su token fue rechazado. Se seguirá intentando una vez por hora durante 48 horas: si reconecta la cuenta, el cobro se encuentra y se devuelve solo. Si no, hay que buscar en su cuenta de Mercado Pago una orden con esa referencia y devolverla a mano.</p>
 </div>`,
   };
 }
@@ -299,13 +355,13 @@ export function avisoDeConciliacionFallida(d: { pagoId: string; negocio: string;
  * El correo interno a VIM cuando una devolución falló tres veces. Lleva solo lo nuestro (negocio,
  * folio, monto y el id del pago en tienda_pagos): ni datos del cliente ni de la tarjeta.
  */
-export function avisoDeDevolucionFallida(d: { pagoId: string; negocio: string; folio: string; monto: string; error: string }): { subject: string; html: string } {
+export function avisoDeDevolucionFallida(d: { pagoId: string; negocio: string; folio: string; monto: string; error: string; ordenIdExterno?: string | null }): { subject: string; html: string } {
   return {
     subject: soloAscii(`Devolucion fallida: pedido ${d.folio} de ${d.negocio}`),
     html: `<div style="font-family:system-ui,sans-serif;color:#111">
-<p>La devolución automática de un pago en línea falló tres veces y ya no se reintenta sola.</p>
+<p>La devolución automática de un pago en línea falló seis veces a lo largo de unas 16 horas y ya no se reintenta sola.</p>
 <ul><li>Negocio: ${esc(d.negocio)}</li><li>Pedido: ${esc(d.folio)}</li><li>Monto: $${esc(d.monto)}</li>
-<li>Pago (tienda_pagos.id): ${esc(d.pagoId)}</li><li>Último error: ${esc(d.error)}</li></ul>
+<li>Pago (tienda_pagos.id): ${esc(d.pagoId)}</li><li>Orden en Mercado Pago: ${esc(d.ordenIdExterno || "-")}</li><li>Último error: ${esc(d.error)}</li></ul>
 <p>Lo más probable es que la cuenta de Mercado Pago del restaurante no tenga saldo disponible. Cuando lo tenga, se devuelve desde su cuenta de Mercado Pago, o se vuelve a encolar poniendo el pago en POR_DEVOLVER con intentos en 0.</p>
 </div>`,
   };

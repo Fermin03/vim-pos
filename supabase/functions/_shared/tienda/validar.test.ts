@@ -394,7 +394,7 @@ test("cuerpo: una clave mal formada es CUERPO_INVALIDO, nunca un pedido sin clav
 });
 
 // ── Pago en línea (0172) ──────────────────────────────────────────────────────────────────────────
-const TARJETA = { token: "ff8080814c11e237014c1ff593b57b4d", payment_method_id: "master", issuer_id: "160" };
+const TARJETA = { token: "ff8080814c11e237014c1ff593b57b4d", payment_method_id: "master", type: "credit_card" };
 const enLinea = { ...pedir, pago: "EN_LINEA", paga_con: null, tarjeta: TARJETA, cliente: { ...(pedir.cliente as Record<string, unknown>), email: "ana@example.com" } };
 test("cuerpo: pedir en línea lleva su propina, que es un porcentaje de la lista; sin ella, null", () => {
   for (const pct of [0, 10, 15, 20]) {
@@ -432,20 +432,19 @@ test("cuerpo: confirmar_pago lleva solo el código del pedido; lo demás que man
   assert.deepEqual(leerCuerpo({ accion: "confirmar_pago", negocio: "knockout" }), { ok: false, error: "CODIGO_INVALIDO" });
 });
 
-test("pedir en línea: la tarjeta es obligatoria, y solo su token, marca y banco; nunca más de lo acotado", () => {
+test("pedir en línea: la tarjeta es obligatoria, y solo su token, su marca y si es crédito o débito (lista cerrada)", () => {
   const ok = leerCuerpo(enLinea);
   assert.ok(ok.ok && ok.valor.accion === "pedir");
-  if (ok.ok && ok.valor.accion === "pedir") assert.deepEqual(ok.valor.tarjeta, { ...TARJETA, dispositivo: null });
-  // El banco puede venir como número; el Device ID con forma se conserva y sin forma se ignora (no rechaza).
-  const r = leerCuerpo({ ...enLinea, tarjeta: { ...TARJETA, issuer_id: 160, dispositivo: "armor.1a2b3c4d" } });
-  if (r.ok && r.valor.accion === "pedir") assert.deepEqual(r.valor.tarjeta, { ...TARJETA, issuer_id: "160", dispositivo: "armor.1a2b3c4d" });
-  else assert.fail("debía valer");
-  const raro = leerCuerpo({ ...enLinea, tarjeta: { ...TARJETA, issuer_id: null, dispositivo: "<script>" } });
-  if (raro.ok && raro.valor.accion === "pedir") assert.deepEqual(raro.valor.tarjeta, { ...TARJETA, issuer_id: null, dispositivo: null });
+  if (ok.ok && ok.valor.accion === "pedir") assert.deepEqual(ok.valor.tarjeta, TARJETA);
+  const debito = leerCuerpo({ ...enLinea, tarjeta: { ...TARJETA, type: "debit_card" } });
+  assert.ok(debito.ok && debito.valor.accion === "pedir" && debito.valor.tarjeta?.type === "debit_card");
+  // Lo demás que mande quien llama (el banco, un Device ID, un número de tarjeta) no pasa de aquí.
+  const conExtras = leerCuerpo({ ...enLinea, tarjeta: { ...TARJETA, issuer_id: 160, dispositivo: "armor.1a2b3c4d", numero: "4111111111111111" } });
+  if (conExtras.ok && conExtras.valor.accion === "pedir") assert.deepEqual(conExtras.valor.tarjeta, TARJETA);
   else assert.fail("debía valer");
   for (const mal of [undefined, null, "tok", [], {}, { ...TARJETA, token: "corto" }, { ...TARJETA, token: "x".repeat(65) }, { ...TARJETA, token: "con espacio 0123456789" },
                      { ...TARJETA, token: 4111111111111111 }, { ...TARJETA, payment_method_id: "" }, { ...TARJETA, payment_method_id: "VISA!" }, { ...TARJETA, payment_method_id: "x".repeat(31) },
-                     { ...TARJETA, issuer_id: "abc" }, { ...TARJETA, issuer_id: "1".repeat(21) }, { ...TARJETA, issuer_id: 1.5 }]) {
+                     { ...TARJETA, type: undefined }, { ...TARJETA, type: "prepaid_card" }, { ...TARJETA, type: "account_money" }, { ...TARJETA, type: "CREDIT_CARD" }, { ...TARJETA, type: 1 }]) {
     assert.deepEqual(leerCuerpo({ ...enLinea, tarjeta: mal }), { ok: false, error: "PAGO_INVALIDO" }, JSON.stringify(mal));
   }
 });

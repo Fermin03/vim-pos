@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { coordenadasDe, iniciarConexionMp, mensajeErrorTerminal, regresoTrasConectar, validarStateMp, REGRESO_MP } from "../terminal";
+import { coordenadasDe, iniciarConexionMp, mensajeErrorTerminal, validarStateMp, REGRESO_MP } from "../terminal";
 
 beforeAll(() => {
   const mapa = new Map<string, string>();
@@ -47,23 +47,5 @@ describe("conexión con Mercado Pago", () => {
   it("un código desconocido no se le enseña al dueño", () => {
     expect(mensajeErrorTerminal(new Error("ERROR_INTERNO"))).toBe("Algo salió mal con la terminal. Inténtalo de nuevo.");
     expect(mensajeErrorTerminal(new Error("SIN_PERMISO"))).toContain("administrador");
-  });
-});
-
-describe("a dónde vuelve el dueño después de conectar Mercado Pago", () => {
-  it("por omisión, a Terminal de tarjetas", () => {
-    iniciarConexionMp();
-    expect(regresoTrasConectar()).toBe("/configuracion/terminal?conectada=1");
-  });
-  it("si pulsó «Conectar» en la tienda, a la tienda; y solo esa vez", () => {
-    const u = new URL(iniciarConexionMp("tienda"));
-    // La dirección registrada en Mercado Pago no cambia: el regreso se decide en el panel.
-    expect(u.searchParams.get("redirect_uri")).toBe(REGRESO_MP);
-    expect(regresoTrasConectar()).toBe("/tienda?conectada=1");
-    expect(regresoTrasConectar()).toBe("/configuracion/terminal?conectada=1");
-  });
-  it("lo guardado no decide la ruta: cualquier otra cosa manda a Terminal de tarjetas", () => {
-    sessionStorage.setItem("vimpos.mp.regreso", "https://malo.example/robo");
-    expect(regresoTrasConectar()).toBe("/configuracion/terminal?conectada=1");
   });
 });

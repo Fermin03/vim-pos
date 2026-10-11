@@ -4,12 +4,12 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../../components/page-header";
-import { accionTerminal, mensajeErrorTerminal, regresoTrasConectar, validarStateMp } from "../../../../lib/terminal";
+import { accionTerminal, mensajeErrorTerminal, validarStateMp } from "../../../../lib/terminal";
 
 /**
  * Regreso del OAuth de Mercado Pago (ADR 0033). Llega con ?code&state (o ?error). La ruta es la
  * registrada en Mercado Pago y no se puede mover sin cambiarla allá. Valida el state, canjea el
- * code en terminal-mp-conexion y manda de vuelta a donde se pulsó «Conectar» (Terminal de tarjetas o Tienda en línea).
+ * code en terminal-mp-conexion y manda a Terminal de tarjetas.
  */
 export default function RegresoMercadoPagoPage() {
   return (
@@ -30,7 +30,7 @@ function Regreso() {
     if (!validarStateMp(params.get("state"))) return setError("La sesión de conexión no es válida. Vuelve a empezar desde Terminal de tarjetas.");
     if (!code) return setError("Mercado Pago no devolvió la autorización. Vuelve a intentarlo.");
     accionTerminal({ accion: "canjear", code })
-      .then(() => router.replace(regresoTrasConectar()))
+      .then(() => router.replace("/configuracion/terminal?conectada=1"))
       .catch((e) => setError(mensajeErrorTerminal(e)));
     // Solo al montar: el code vale una vez.
     // eslint-disable-next-line react-hooks/exhaustive-deps

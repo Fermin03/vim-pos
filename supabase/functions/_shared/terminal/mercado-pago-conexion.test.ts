@@ -4,7 +4,7 @@ import { clienteMpConfig, idExterno, pedirTokens, tokensDeRespuesta, urlAutoriza
 
 test("los tokens de la respuesta: completos o nada", () => {
   const t = tokensDeRespuesta({ access_token: "a", refresh_token: "r", user_id: 123, expires_in: 60, live_mode: false }, 0);
-  assert.deepEqual(t, { access_token: "a", refresh_token: "r", user_id: "123", vence_at: "1970-01-01T00:01:00.000Z", de_prueba: true, public_key: null });
+  assert.deepEqual(t, { access_token: "a", refresh_token: "r", user_id: "123", vence_at: "1970-01-01T00:01:00.000Z", de_prueba: true });
   assert.equal(tokensDeRespuesta({ access_token: "a", user_id: 1, expires_in: 60 }), null); // sin refresh no se puede renovar
   assert.equal(tokensDeRespuesta(null), null);
 });
@@ -66,16 +66,4 @@ test("al registrar la sucursal, una ciudad mal escrita se reintenta con la del c
     { nombre: "SFR", calle: "Ignacio Allende 113", numero: "S/N", ciudad: "San Francisco del Rincón", estado: "Guanajuato", latitud: 21.02, longitud: -101.85 });
   assert.equal(id, "777");
   assert.deepEqual(ciudades, ["San Francisco del Rincón", "San Francisco Del Rincón"]);
-});
-
-test("tokensDeRespuesta guarda la public key de la cuenta (para el pago en línea de la tienda), solo si tiene su forma", () => {
-  const base = { access_token: "a", refresh_token: "r", user_id: 123, expires_in: 60, live_mode: true };
-  assert.equal(tokensDeRespuesta({ ...base, public_key: "APP_USR-d0a26210-1111-2222-3333-479f0400869e" }, 0)?.public_key, "APP_USR-d0a26210-1111-2222-3333-479f0400869e");
-  assert.equal(tokensDeRespuesta({ ...base, public_key: "TEST-d0a26210-1111-2222-3333-479f0400869e" }, 0)?.public_key, "TEST-d0a26210-1111-2222-3333-479f0400869e");
-  // Sin public key la conexión sirve igual para la terminal; lo que no tiene la forma no se guarda.
-  for (const pk of [undefined, null, "", "corta", "con espacios y <script>", 12345, "x".repeat(101)]) {
-    const t = tokensDeRespuesta({ ...base, public_key: pk }, 0);
-    assert.ok(t, String(pk));
-    assert.equal(t.public_key, null, String(pk));
-  }
 });

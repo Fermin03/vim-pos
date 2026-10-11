@@ -62,27 +62,33 @@
 // RPC va acotada a ese tenant. La lógica (precios, horario, topes, contraseñas, bloqueo) vive en las
 // funciones SQL de 0162 y 0166.
 //
-// PAGO EN LÍNEA (Checkout API de Mercado Pago; 0172 y _shared/tienda/pago-*.ts)
+// PAGO EN LÍNEA (Orders API de Mercado Pago; 0172 y _shared/tienda/pago-*.ts)
 //   `pedir` con `pago: "EN_LINEA"` (`propina_pct`: 0, 10, 15 o 20; `tarjeta`: el TOKEN que dio
-//   MercadoPago.js, su marca y su banco; y correo obligatorio) crea el pedido POR_PAGAR, que no
-//   existe para la caja, y lo cobra en la misma petición con el token del restaurante (Payments API).
-//   El monto lo pone la base; del cliente solo se acepta el porcentaje de propina. Tres finales:
+//   MercadoPago.js, su marca y si es crédito o débito; y correo obligatorio) crea el pedido
+//   POR_PAGAR, que no existe para la caja, y lo cobra en la misma petición con el token de la
+//   conexión de la tienda del restaurante (`POST /v1/orders`). El monto lo pone la base; del
+//   cliente solo se acepta el porcentaje de propina. Finales:
 //     · aprobado y verificado → el pedido queda RECIBIDO, sale el correo y se contesta lo de
 //       siempre más `propina_mxn`, `total_a_pagar_mxn` y `pago: { estado: "PAGADO" }`;
-//     · rechazado → 409 PAGO_RECHAZADO con `detalle`: la familia del motivo (FONDOS, CODIGO, FECHA,
-//       NUMERO, LLAMAR_BANCO, TARJETA_DESHABILITADA, VERIFICACION u OTRO). El pedido se descartó;
-//     · no se supo (Mercado Pago no contestó) → 200 con `pago: { estado: "POR_CONFIRMAR" }`: el
-//       pedido sigue POR_PAGAR y lo resuelven el aviso, `confirmar_pago` y el barrido. Nunca se
-//       contesta «rechazado» sin un no seguro de Mercado Pago.
-//   409 PAGO_NO_DISPONIBLE: la cuenta del restaurante ya no deja cobrar (pedido descartado).
+//     · rechazado → 409 PAGO_RECHAZADO con `detalle`: la familia del motivo (FONDOS, DATOS,
+//       LLAMAR_BANCO, TARJETA_DESHABILITADA u OTRO). El pedido se descartó;
+//     · no se supo (Mercado Pago no contestó, o dejó el cobro en revisión) → 200 con
+//       `pago: { estado: "POR_CONFIRMAR" }`: el pedido sigue POR_PAGAR y lo resuelven el aviso,
+//       `confirmar_pago` y el barrido. Nunca se contesta «rechazado» sin un no seguro de Mercado Pago;
+//     · 409 PAGO_NO_DISPONIBLE: la cuenta del restaurante no deja cobrar (pedido descartado). Si fue
+//       un 401 de Mercado Pago, el pago en línea de esa sucursal queda en pausa una hora y se avisa a VIM.
+//   Contra la prueba masiva de tarjetas (rechazos.ts): una IP con 5 rechazos en la hora recibe 429
+//   DEMASIADOS_INTENTOS al intentar otro pago en línea; desde el 4.º rechazo su `detalle` es OTRO;
+//   y con 12 rechazos en una hora el pago en línea del negocio se pausa una hora (aviso a VIM).
 //   `confirmar_pago` ({negocio, codigo}) es el respaldo del aviso desde la página del pedido: le
 //   pregunta a Mercado Pago y contesta el seguimiento.
 //   De la tarjeta aquí solo pasa el token, que es de un solo uso y no se escribe en ningún log.
 //
-// SECRETOS: VIM_TIENDA_SECRET, VIM_TIENDA_URL (base de los enlaces del correo; antes también del regreso de
-// Mercado Pago; https), TURNSTILE_SECRET_KEY, TURNSTILE_HOSTNAMES (tiene que incluir el dominio de
-// la tienda), CAPTCHA_OPCIONAL (solo local), VIM_SMTP_*. Los tokens de Mercado Pago no son secretos
-// de la función: son de cada restaurante y viven en Vault (0169).
+// SECRETOS: VIM_TIENDA_SECRET, VIM_TIENDA_URL (base de los enlaces del correo; https),
+// TURNSTILE_SECRET_KEY, TURNSTILE_HOSTNAMES (tiene que incluir el dominio de la tienda),
+// CAPTCHA_OPCIONAL (solo local), VIM_SMTP_*, VIM_AVISOS_A (a dónde van los avisos internos). Los
+// tokens de Mercado Pago no son secretos de la función: son de cada restaurante y viven en Vault
+// (`tienda:<conexion>:access`, 0172).
 import { clienteAdmin } from "../_shared/http.ts";
 import { consumirCupo, consumirCupos, leerCuerpoAcotado, type ResultadoCupo } from "../_shared/limite.ts";
 import { secretoInternoValido } from "../_shared/delivery/interno.ts";
@@ -97,6 +103,7 @@ import { CABECERA_SESION, cuentaDe, direccionesPublicas, leerRegistro, leerSesio
 import { cotizacionPublica, type Cupos, cuposDe, esTopeDeEntradas, ipDeConfianza, leerNegocio, leerPedido, leerPedidoEnLinea, type Negocio, respuestaDeCaptcha, respuestaDeRpc, yaExistia } from "../_shared/tienda/respuesta.ts";
 import { cobrarPago, confirmarPago } from "../_shared/tienda/pago-flujo.ts";
 import { depsDePagos } from "../_shared/tienda/pago-puerto.ts";
+import { anotarRechazo, avisoDePagoPausado, ipSinPagoEnLinea } from "../_shared/tienda/rechazos.ts";
 
 const MAX_CUERPO = 32_768;
 
@@ -210,6 +217,27 @@ async function correoDePagado(admin: Admin, pagoId: string, d: { p_tenant: strin
   const turno = await admin.rpc("tienda_pago_tomar_correo", { p_pago: pagoId });
   if (turno.error) registrarError("tienda", "CORREO_PEDIDO", turno.error);
   else if (turno.data === true) correoDeConfirmacion(admin, { ...d, pagado: true });
+}
+
+/**
+ * Pone en pausa una hora el pago en línea (de una sucursal, o de todo el negocio con `sucursal`
+ * null) y avisa a VIM. El aviso sale una vez por pausa: `tienda_pago_pausar` solo da verdadero a
+ * quien la pone. Nada de esto cambia lo que se le contesta al cliente.
+ */
+async function pausarPagoEnLinea(admin: Admin, d: { p_tenant: string; sucursal: string | null; negocio: string; slug: string; por: "RECHAZOS" | "SIN_PERMISO" }): Promise<void> {
+  const r = await admin.rpc("tienda_pago_pausar", { p_tenant: d.p_tenant, p_sucursal: d.sucursal, p_minutos: 60 });
+  if (r.error) return registrarError("tienda", "PAUSAR_PAGO", r.error);
+  if (r.data !== true) return;
+  registrarError("tienda", d.por === "RECHAZOS" ? "PAGO_PAUSADO_POR_RECHAZOS" : "PAGO_PAUSADO_SIN_PERMISO", d.slug);
+  enSegundoPlano((async () => {
+    let sucursal: string | null = null;
+    if (d.sucursal) {
+      const s = await admin.from("sucursales").select("nombre").eq("id", d.sucursal).eq("tenant_id", d.p_tenant).maybeSingle();
+      sucursal = (s.data as { nombre: string } | null)?.nombre ?? null;
+    }
+    const c = await enviarCorreo({ to: Deno.env.get("VIM_AVISOS_A") ?? "hola@vimpos.com.mx", ...avisoDePagoPausado({ negocio: d.negocio, slug: d.slug, sucursal, por: d.por }) });
+    if (!c.enviado) registrarError("tienda", "AVISO_NO_SALIO", `pago en pausa: ${d.slug}`);
+  })().catch((e) => registrarError("tienda", "AVISO_NO_SALIO", e)));
 }
 
 /**
@@ -395,7 +423,10 @@ async function atender(req: Request): Promise<Response> {
   if (p.accion === "pedir" && ip === "desconocida") registrarError("tienda", "IP_CLIENTE_DESCONOCIDA", p.negocio);
   // El correo no va en claro a la tabla de cupos: su huella, atada al negocio.
   const conCorreo = p.accion === "registrar" || p.accion === "recuperar_pedir";
-  const cupos = cuposDe(p.accion, ip, p.negocio, conCorreo ? await huellaDe(`${p.negocio}:${p.email}`) : undefined);
+  // Un pedido que se paga en línea gasta de sus propias bolsas: sus intentos rechazados no le quitan
+  // cupo a los pedidos al recibir.
+  const cupos = cuposDe(p.accion, ip, p.negocio, conCorreo ? await huellaDe(`${p.negocio}:${p.email}`) : undefined,
+                        p.accion === "pedir" && p.pago === "EN_LINEA");
   // De uno en uno y en orden (lo mismo que `consumirCupos`), para saber CUÁL no dejó pasar: que se
   // agote el tope de entradas de un restaurante es un ataque o un fallo, y se deja en el log. Solo
   // el slug, que no es dato personal.
@@ -496,6 +527,11 @@ async function atender(req: Request): Promise<Response> {
     p_cuenta = s.p_cuenta;
   }
 
+  // Una IP que ya juntó sus tarjetas rechazadas de la hora no intenta otro pago en línea (puede
+  // seguir pidiendo para pagar al recibir). Antes del antirobot: no le gasta el token ni el cupo.
+  const enLinea = p.pago === "EN_LINEA";
+  if (enLinea && await ipSinPagoEnLinea(admin, ip, p.negocio)) return json({ error: "DEMASIADOS_INTENTOS" }, 429);
+
   const no = await antirobot(p.captcha, "tienda_pedido", ip);
   if (no) return no;
 
@@ -505,16 +541,6 @@ async function atender(req: Request): Promise<Response> {
   if (!cupoNegocio.permitido) {
     if (cupoNegocio.motivo === "AGOTADO") registrarError("tienda", "CUPO_NEGOCIO_AGOTADO", p.negocio);
     return sinCupo(cupoNegocio);
-  }
-
-  // Pago en línea: sin a dónde avise Mercado Pago no se cobra (tiene que ser https: Mercado Pago
-  // descarta en silencio las que no). Se comprueba ANTES de crear nada.
-  const enLinea = p.pago === "EN_LINEA";
-  const baseFunciones = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
-  const sePuedeCobrar = baseFunciones.startsWith("https://");
-  if (enLinea && !sePuedeCobrar) {
-    registrarError("tienda", "PAGO_SIN_CONFIGURAR", "SUPABASE_URL tiene que ser https para cobrar en línea");
-    return json({ error: "SERVICIO_NO_DISPONIBLE" }, 503);
   }
 
   // El código solo lo tendrá el cliente (esta respuesta y su correo). A la base va la huella.
@@ -548,14 +574,22 @@ async function atender(req: Request): Promise<Response> {
   if (porPagar) {
     // Sin tarjeta o sin correo en ESTA petición (el pedido existía de un intento en línea y este
     // reintento vino de otra forma): no se cobra nada; el seguimiento dirá cómo va.
-    const cobro = !sePuedeCobrar || !p.tarjeta || !p.cliente.email ? { tipo: "POR_CONFIRMAR" as const } : await cobrarPago(depsDePagos(admin, "tienda"), {
-      pagoId: porPagar.pagoId, folio: porPagar.publico.folio_corto, negocio: negocio.nombre,
-      // La referencia va en la query: así el aviso llega diciendo de qué pago habla.
-      aviso: `${baseFunciones}/functions/v1/tienda-webhook-mp?ref=${porPagar.pagoId}`,
-      email: p.cliente.email, tarjeta: p.tarjeta,
+    const cobro = !p.tarjeta || !p.cliente.email ? { tipo: "POR_CONFIRMAR" as const } : await cobrarPago(depsDePagos(admin, "tienda"), {
+      pagoId: porPagar.pagoId, email: p.cliente.email, tarjeta: p.tarjeta,
     });
-    if (cobro.tipo === "RECHAZADO") return json({ error: "PAGO_RECHAZADO", detalle: cobro.motivo }, 409);
-    if (cobro.tipo === "NO_DISPONIBLE") return json({ error: "PAGO_NO_DISPONIBLE" }, 409);
+    if (cobro.tipo === "RECHAZADO") {
+      // El rechazo se cuenta (aunque el pedido ya se borró): por IP decide qué motivo se dice, y por
+      // negocio, si hay que pausar su pago en línea.
+      const r = await anotarRechazo(admin, ip, p.negocio, cobro.motivo);
+      if (r.pausar) await pausarPagoEnLinea(admin, { p_tenant, sucursal: null, negocio: negocio.nombre, slug: p.negocio, por: "RECHAZOS" });
+      return json({ error: "PAGO_RECHAZADO", detalle: r.detalle }, 409);
+    }
+    if (cobro.tipo === "NO_DISPONIBLE") {
+      // Mercado Pago rechazó las credenciales de la cuenta: seguir ofreciendo el pago ahí solo junta
+      // clientes que no pueden pagar. Se pausa esa sucursal y se avisa a VIM.
+      if (cobro.sinPermiso) await pausarPagoEnLinea(admin, { p_tenant, sucursal: p_sucursal, negocio: negocio.nombre, slug: p.negocio, por: "SIN_PERMISO" });
+      return json({ error: "PAGO_NO_DISPONIBLE" }, 409);
+    }
     if (cobro.tipo === "POR_CONFIRMAR") return json({ codigo, ...porPagar.publico, pago: { estado: "POR_CONFIRMAR" } });
     // Aprobado: el pedido ya está con el restaurante y su ventana de aceptación ya corre.
     const ya = await admin.from("delivery_pedidos").select("vence_aceptacion").eq("seguimiento_hash", p_seguimiento_hash).eq("tenant_id", p_tenant).maybeSingle();

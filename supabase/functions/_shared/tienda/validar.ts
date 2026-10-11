@@ -271,16 +271,14 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
 }
 
 /** Lo que la tienda manda de la tarjeta. El número, el vencimiento y el código nunca llegan aquí. */
-export type TarjetaDePedido = { token: string; payment_method_id: string; issuer_id: string | null; dispositivo: string | null };
+export type TarjetaDePedido = { token: string; payment_method_id: string; type: "credit_card" | "debit_card" };
 
 /**
  * `tarjeta` del cuerpo de `pedir`. undefined = no vino; null = vino y no tiene la forma.
  *   · `token`: el de un solo uso que da MercadoPago.js (letras y números);
  *   · `payment_method_id`: la marca (`visa`, `master`, `debvisa`…);
- *   · `issuer_id`: el banco, si MercadoPago.js lo dio (número, o como texto de dígitos);
- *   · `dispositivo`: el Device ID de MercadoPago.js. Es solo una ayuda contra el fraude: si no
- *     tiene la forma se ignora, no se rechaza el pedido por él.
- * Longitudes acotadas: esto viaja tal cual a Mercado Pago.
+ *   · `type`: crédito o débito, de una lista cerrada (Orders API lo exige y viaja tal cual).
+ * Longitudes acotadas: esto viaja tal cual a Mercado Pago. Cualquier otra clave se ignora.
  */
 export function leerTarjeta(v: unknown): TarjetaDePedido | null | undefined {
   if (v === undefined || v === null) return undefined;
@@ -288,8 +286,7 @@ export function leerTarjeta(v: unknown): TarjetaDePedido | null | undefined {
   const t = v as Record<string, unknown>;
   const token = typeof t.token === "string" && /^[A-Za-z0-9]{16,64}$/.test(t.token) ? t.token : null;
   const payment_method_id = typeof t.payment_method_id === "string" && /^[a-z0-9_]{2,30}$/.test(t.payment_method_id) ? t.payment_method_id : null;
-  const emisor = typeof t.issuer_id === "number" && Number.isSafeInteger(t.issuer_id) ? String(t.issuer_id) : t.issuer_id ?? null;
-  if (!token || !payment_method_id || (emisor !== null && !(typeof emisor === "string" && /^[0-9]{1,20}$/.test(emisor)))) return null;
-  const dispositivo = typeof t.dispositivo === "string" && /^[A-Za-z0-9_.:-]{8,120}$/.test(t.dispositivo) ? t.dispositivo : null;
-  return { token, payment_method_id, issuer_id: emisor as string | null, dispositivo };
+  const type = t.type === "credit_card" || t.type === "debit_card" ? t.type : null;
+  if (!token || !payment_method_id || !type) return null;
+  return { token, payment_method_id, type };
 }
