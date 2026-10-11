@@ -53,11 +53,7 @@ export function puertoDePagos(admin: Admin): PuertoPagos {
     tomar: async (max) => (await rpc("tienda_pagos_tomar", { p_max: max }) as Tarea[] | null) ?? [],
     devolucion: async (pagoId, ok, error) =>
       String(await rpc("tienda_pago_devolucion", { p_pago: pagoId, p_ok: ok, p_error: error ?? null })),
-    async conciliado(pagoId) {
-      // Solo el que ya venció: mientras el pedido siga esperando pago se le vuelve a preguntar.
-      exigir(await admin.from("tienda_pagos").update({ conciliado_at: new Date().toISOString() })
-        .eq("id", pagoId).eq("estado", "VENCIDO"));
-    },
+    conciliacion: async (pagoId, ok) => (await rpc("tienda_pago_conciliacion", { p_pago: pagoId, p_ok: ok })) === true,
   };
 }
 

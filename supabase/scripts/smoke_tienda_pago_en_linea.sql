@@ -503,7 +503,7 @@ BEGIN
   IF (SELECT estado FROM delivery_pedidos WHERE id = (v_r2 ->> 'pedido_id')::uuid) <> 'POR_PAGAR' THEN RAISE EXCEPTION 'G1: venció un pedido recién creado'; END IF;
   IF (SELECT count(*) FROM delivery_eventos) <> v_n THEN RAISE EXCEPTION 'G1: vencer un pedido sin pagar dejó un evento'; END IF;
   v_seg := tienda_seguimiento(v_t, md5('pl-a61') || md5('pl-b61'));
-  IF v_seg ->> 'estado' <> 'CANCELADO' OR v_seg ->> 'motivo' <> 'SIN_PAGO' OR v_seg ->> 'pago_estado' <> 'SIN_PAGO' THEN RAISE EXCEPTION 'G1: seguimiento de un pedido que venció sin pagarse: %', v_seg - 'renglones'; END IF;
+  IF v_seg ->> 'estado' <> 'CANCELADO' OR v_seg ->> 'motivo' <> 'POR_CONFIRMAR' OR v_seg ->> 'pago_estado' <> 'POR_CONFIRMAR' THEN RAISE EXCEPTION 'G1: seguimiento de un pedido recién vencido, antes de consultar a Mercado Pago: %', v_seg - 'renglones'; END IF;
   -- Sigue sin existir para quien atiende, ni en la lista ni en el contador de vencidos del día: la
   -- vista que alimenta la alerta del POS y del admin cuenta, sin política, uno más (este) que con ella.
   SELECT COALESCE(sum(n_expirados), 0) INTO v_n FROM vw_delivery_expirados_hoy WHERE sucursal_id = v_suc;
@@ -539,12 +539,130 @@ BEGIN
   IF v_a ->> 'estado' <> 'POR_DEVOLVER' OR v_a ->> 'pedido_estado' <> 'EXPIRADO' OR v_a -> 'recien_aprobado' <> 'false'::jsonb THEN RAISE EXCEPTION 'G2: un pago tardío: %', v_a; END IF;
   IF (tienda_seguimiento(v_t, md5('pl-a61') || md5('pl-b61')) ->> 'pago_estado') <> 'DEVOLUCION_EN_PROCESO' THEN RAISE EXCEPTION 'G2: el seguimiento no dice que se le devuelve'; END IF;
 
+  -- ── I) Revisión de la entrega 1 ─────────────────────────────────────────────────────────────
+  -- I1) Venció y no se ha podido preguntar a Mercado Pago (la cuenta perdió el token): el seguimiento
+  --     NO afirma «sin pago», se cuentan los fallos, el TERCERO avisa (una sola vez) y deja de
+  --     preguntarse cada minuto: una vez por hora.
+  v_r := pg_temp.pedir('4776660081', 81);
+  v_pago := (v_r ->> 'pago_id')::uuid;
+  UPDATE delivery_pedidos SET created_at = now() - interval '18 minutes' WHERE id = (v_r ->> 'pedido_id')::uuid;
+  UPDATE tienda_pagos SET created_at = now() - interval '18 minutes', vence_at = now() - interval '3 minutes', preferencia_id = 'pref-81' WHERE id = v_pago;
+  PERFORM tienda_pagos_barrer();
+  v_seg := tienda_seguimiento(v_t, md5('pl-a81') || md5('pl-b81'));
+  IF v_seg ->> 'estado' <> 'CANCELADO' OR v_seg ->> 'pago_estado' <> 'POR_CONFIRMAR' OR v_seg ->> 'motivo' <> 'POR_CONFIRMAR' THEN
+    RAISE EXCEPTION 'I1: vencido y sin poder consultar, el seguimiento debía decir POR_CONFIRMAR: %', v_seg - 'renglones';
+  END IF;
+  IF tienda_pago_conciliacion(v_pago, false) OR tienda_pago_conciliacion(v_pago, false) THEN RAISE EXCEPTION 'I1: avisó antes del tercer fallo'; END IF;
+  IF NOT tienda_pago_conciliacion(v_pago, false) THEN RAISE EXCEPTION 'I1: el tercer fallo debía avisar'; END IF;
+  IF tienda_pago_conciliacion(v_pago, false) THEN RAISE EXCEPTION 'I1: el cuarto fallo volvió a avisar'; END IF;
+  UPDATE tienda_pagos SET consultado_at = now() - interval '10 minutes' WHERE id = v_pago;
+  IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'I1: con tres fallos se siguió preguntando antes de una hora'; END IF;
+  UPDATE tienda_pagos SET consultado_at = now() - interval '61 minutes' WHERE id = v_pago;
+  IF NOT EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago AND t.tarea = 'CONCILIAR') THEN RAISE EXCEPTION 'I1: pasada una hora debía volver a preguntarse'; END IF;
+  IF (tienda_seguimiento(v_t, md5('pl-a81') || md5('pl-b81')) ->> 'pago_estado') <> 'POR_CONFIRMAR' THEN RAISE EXCEPTION 'I1: con fallos, sigue sin poder afirmarse nada'; END IF;
+
+  -- I1b/I5) Mercado Pago por fin contesta que no hay pago: ahora sí «sin pago». Pero no se da por
+  --     cerrado: falta la segunda pasada, alrededor de una hora después del plazo.
+  IF tienda_pago_conciliacion(v_pago, true) THEN RAISE EXCEPTION 'I5: una consulta que salió bien avisó'; END IF;
+  v_seg := tienda_seguimiento(v_t, md5('pl-a81') || md5('pl-b81'));
+  IF v_seg ->> 'pago_estado' <> 'SIN_PAGO' OR v_seg ->> 'motivo' <> 'SIN_PAGO' THEN RAISE EXCEPTION 'I5: consultado y sin pago: %', v_seg - 'renglones'; END IF;
+  SELECT * INTO v_g FROM tienda_pagos WHERE id = v_pago;
+  IF v_g.conciliaciones <> 1 OR v_g.conciliacion_fallos <> 0 OR v_g.conciliado_at IS NOT NULL THEN RAISE EXCEPTION 'I5: tras la primera respuesta: %', to_jsonb(v_g); END IF;
+  UPDATE tienda_pagos SET consultado_at = now() - interval '30 minutes' WHERE id = v_pago;
+  IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'I5: la segunda pasada salió antes de la hora'; END IF;
+  UPDATE tienda_pagos SET vence_at = now() - interval '61 minutes' WHERE id = v_pago;
+  IF NOT EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago AND t.tarea = 'CONCILIAR') THEN RAISE EXCEPTION 'I5: una hora después del plazo debía preguntarse otra vez'; END IF;
+  PERFORM tienda_pago_conciliacion(v_pago, true);
+  UPDATE tienda_pagos SET consultado_at = now() - interval '5 hours' WHERE id = v_pago;
+  IF (SELECT conciliado_at FROM tienda_pagos WHERE id = v_pago) IS NULL OR EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN
+    RAISE EXCEPTION 'I5: tras la segunda respuesta debía darse por conciliado y no volver a salir';
+  END IF;
+  -- Y si en esa segunda pasada sí aparece el cobro, se devuelve (tienda_pago_aplicar lo acepta de un VENCIDO).
+  v_a := tienda_pago_aplicar(v_pago, 'APROBADO', '1081', 264.00);
+  IF v_a ->> 'estado' <> 'POR_DEVOLVER' THEN RAISE EXCEPTION 'I5: un aprobado que aparece en la segunda pasada no quedó para devolver: %', v_a; END IF;
+  -- Nunca pasadas 48 horas del plazo.
+  v_r := pg_temp.pedir('4776660082', 82);
+  UPDATE delivery_pedidos SET estado = 'EXPIRADO' WHERE id = (v_r ->> 'pedido_id')::uuid;
+  UPDATE tienda_pagos SET estado = 'VENCIDO', created_at = now() - interval '50 hours', vence_at = now() - interval '49 hours', preferencia_id = 'pref-82' WHERE id = (v_r ->> 'pago_id')::uuid;
+  IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = (v_r ->> 'pago_id')::uuid) THEN RAISE EXCEPTION 'I1: se sigue preguntando por un pago 48 horas después de su plazo'; END IF;
+
+  -- I3) No se espera al vencimiento: un pago que todavía se puede pagar se concilia desde los 2
+  --     minutos, y a lo sumo cada 2 minutos (el aviso se perdió y el cliente no volvió a la página).
+  v_r := pg_temp.pedir('4776660083', 83);
+  v_pago := (v_r ->> 'pago_id')::uuid;
+  UPDATE tienda_pagos SET preferencia_id = 'pref-83', created_at = now() - interval '1 minute' WHERE id = v_pago;
+  IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'I3: se concilió un pago de un minuto'; END IF;
+  UPDATE tienda_pagos SET created_at = now() - interval '3 minutes' WHERE id = v_pago;
+  IF NOT EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago AND t.tarea = 'CONCILIAR') THEN RAISE EXCEPTION 'I3: un pago vivo de 3 minutos debía salir para conciliar'; END IF;
+  IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'I3: se consultó dos veces seguidas el mismo pago'; END IF;
+  UPDATE tienda_pagos SET consultado_at = now() - interval '1 minute' WHERE id = v_pago;
+  IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'I3: se volvió a consultar antes de 2 minutos'; END IF;
+  -- La página del pedido comparte ese reloj: si ella acaba de preguntar, el barrido no repite.
+  UPDATE tienda_pagos SET consultado_at = now() - interval '3 minutes' WHERE id = v_pago;
+  IF NOT tienda_pago_tomar_consulta(v_pago, 10) OR EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'I3: el barrido repitió la consulta que acababa de hacer la página'; END IF;
+  -- Una respuesta con el pago aún vivo no cuenta como conciliación final.
+  PERFORM tienda_pago_conciliacion(v_pago, true);
+  IF (SELECT conciliaciones FROM tienda_pagos WHERE id = v_pago) <> 0 THEN RAISE EXCEPTION 'I3: una consulta con el pago vivo contó como conciliación final'; END IF;
+
+  -- I1c) El turno: va primero quien lleva más sin consultarse (el nunca consultado, antes que nadie),
+  --      no el más viejo. Un pago atascado no le quita el turno a los demás.
+  UPDATE tienda_pagos SET created_at = now() - interval '14 minutes', consultado_at = now() - interval '3 minutes' WHERE id = v_pago;   -- el más viejo, ya consultado
+  v_r2 := pg_temp.pedir('4776660084', 84);
+  UPDATE tienda_pagos SET preferencia_id = 'pref-84', created_at = now() - interval '3 minutes' WHERE id = (v_r2 ->> 'pago_id')::uuid;   -- más nuevo, nunca consultado
+  IF (SELECT t.id FROM tienda_pagos_tomar(1) t WHERE t.tarea = 'CONCILIAR') IS DISTINCT FROM (v_r2 ->> 'pago_id')::uuid THEN
+    RAISE EXCEPTION 'I1c: con un solo turno debía tocarle al que nunca se ha consultado';
+  END IF;
+
+  -- I4) Al pagarse, el pedido va a una caja solo si late una que sepa de pedidos pagados (0.9.0).
+  --     (Se pide sin caja viva y la caja aparece mientras el cliente paga.)
+  FOR r IN SELECT * FROM (VALUES (85, '0.8.0', 'NUBE'), (86, '0.9.0', 'ESCRITORIO'), (87, NULL, 'NUBE')) AS x(n, version, gestion) LOOP
+    UPDATE cajas SET espejo_apps_at = NULL, version_app = NULL WHERE id = v_caja;
+    v_r := pg_temp.pedir('47766600' || r.n, r.n);
+    UPDATE cajas SET espejo_apps_at = now(), version_app = r.version WHERE id = v_caja;
+    PERFORM tienda_pago_aplicar((v_r ->> 'pago_id')::uuid, 'APROBADO', (900000 + r.n)::text, 264.00);
+    SELECT gestion INTO v_txt FROM delivery_pedidos WHERE id = (v_r ->> 'pedido_id')::uuid;
+    IF v_txt <> r.gestion THEN RAISE EXCEPTION 'I4: pagado con una caja viva en la versión %, la gestión fue % (esperaba %)', COALESCE(r.version, 'NULL'), v_txt, r.gestion; END IF;
+  END LOOP;
+  UPDATE cajas SET espejo_apps_at = NULL, version_app = NULL WHERE id = v_caja;
+
+  -- I7) Cancelar la cuenta de un pedido pagado en línea YA ENTREGADO devuelve el pago.
+  --     En la nube (POS web): la pasada lo ve por el ticket cancelado.
+  v_id := pg_temp.pagado('4776660091', 91);
+  v_ticket := crear_ticket_desde_tienda(v_id);
+  IF tienda_reportar_estado(v_t, v_id, 'ENTREGADO') <> 'ENTREGADO' THEN RAISE EXCEPTION 'I7 (fixture): no se pudo entregar'; END IF;
+  UPDATE tickets SET estado_fiscal = 'CANCELADO' WHERE id = v_ticket;
+  PERFORM tienda_sincronizar_estados_nube();
+  IF (SELECT estado FROM delivery_pedidos WHERE id = v_id) <> 'CANCELADO' OR pg_temp.pago_de(v_id) <> 'POR_DEVOLVER' THEN
+    RAISE EXCEPTION 'I7: cuenta cancelada tras entregar (nube): pedido %, pago %', (SELECT estado FROM delivery_pedidos WHERE id = v_id), pg_temp.pago_de(v_id);
+  END IF;
+  -- Sin doble devolución: ya devuelto, otra pasada y otro reporte no lo vuelven a encolar.
+  PERFORM tienda_pago_devolucion((SELECT id FROM tienda_pagos WHERE pedido_id = v_id AND NOT extra), true);
+  PERFORM tienda_sincronizar_estados_nube();
+  IF tienda_reportar_estado(v_t, v_id, 'CANCELADO') <> 'CANCELADO' THEN RAISE EXCEPTION 'I7: repetir el cancelado debía devolver el estado actual'; END IF;
+  IF pg_temp.pago_de(v_id) <> 'DEVUELTO' THEN RAISE EXCEPTION 'I7: un pago ya devuelto volvió a %', pg_temp.pago_de(v_id); END IF;
+  --     Por el camino de la caja: reporta CANCELADO de un pedido que ya había reportado ENTREGADO.
+  v_id := pg_temp.pagado('4776660092', 92);
+  UPDATE delivery_pedidos SET estado = 'ENTREGADO', entregado_at = now(), gestion = 'ESCRITORIO' WHERE id = v_id;
+  IF tienda_reportar_estado(v_t, v_id, 'CANCELADO', 'OTRO') <> 'CANCELADO' THEN RAISE EXCEPTION 'I7: la caja no pudo cancelar un pedido en línea ya entregado'; END IF;
+  IF pg_temp.pago_de(v_id) <> 'POR_DEVOLVER' THEN RAISE EXCEPTION 'I7: cancelado tras entregar (caja), el pago quedó %', pg_temp.pago_de(v_id); END IF;
+  --     Un pedido AL RECIBIR ya entregado sigue como antes: ni la caja ni la nube lo cancelan.
+  v_r := tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, (SELECT format('[{"producto_id":"%s","cantidad":1}]', id)::jsonb FROM productos WHERE tenant_id = v_t AND nombre = 'Sencilla en línea'),
+           '{"nombre":"Ana","telefono":"4776660093"}', NULL, 'EFECTIVO', NULL, NULL, md5('pl-efe-c') || md5('pl-efe-d'));
+  v_id := (v_r ->> 'pedido_id')::uuid;
+  v_ticket := crear_ticket_desde_tienda(v_id);
+  UPDATE delivery_pedidos SET estado = 'ENTREGADO' WHERE id = v_id;
+  IF tienda_reportar_estado(v_t, v_id, 'CANCELADO') <> 'ENTREGADO' THEN RAISE EXCEPTION 'I7: se canceló un pedido al recibir ya entregado'; END IF;
+  UPDATE tickets SET estado_fiscal = 'CANCELADO' WHERE id = v_ticket;
+  PERFORM tienda_sincronizar_estados_nube();
+  IF (SELECT estado FROM delivery_pedidos WHERE id = v_id) <> 'ENTREGADO' THEN RAISE EXCEPTION 'I7: la nube canceló un pedido al recibir ya entregado'; END IF;
+
   -- ── H) Permisos ─────────────────────────────────────────────────────────────────────────────
   FOR r IN SELECT p.oid::regprocedure AS firma, p.proname FROM pg_proc p
             WHERE p.pronamespace = 'public'::regnamespace
               AND p.proname IN ('tienda_conexion_cobro', 'tienda_crear_pedido', 'tienda_pago_tomar_preferencia', 'tienda_pago_descartar',
                                 'tienda_pago_tomar_consulta', 'tienda_pago_aplicar', 'tienda_pago_tomar_correo', 'tienda_pagos_tomar',
-                                'tienda_pago_devolucion', 'tienda_pagos_barrer', '_tienda_pedido_creado', '_tienda_version_al_menos',
+                                'tienda_pago_devolucion', 'tienda_pago_conciliacion', 'tienda_reportar_estado', 'tienda_pagos_barrer', '_tienda_pedido_creado',
+                                '_tienda_version_al_menos', '_tienda_caja_en_linea_viva',
                                 'delivery_pedidos_devolver_pago') LOOP
     IF has_function_privilege('anon', r.firma, 'EXECUTE') OR has_function_privilege('authenticated', r.firma, 'EXECUTE') THEN
       RAISE EXCEPTION 'H: % la puede ejecutar el público o el personal', r.firma;

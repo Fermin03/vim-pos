@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { avisoDeDevolucionFallida, barrer, confirmarPago, type Deps, devolverPago, type FilaPago, prepararPago, type PuertoPagos, respuestaDeConfirmacion, type Tarea } from "./pago-flujo.ts";
+import { avisoDeConciliacionFallida, avisoDeDevolucionFallida, topesDelAviso, barrer, confirmarPago, type Deps, devolverPago, type FilaPago, prepararPago, type PuertoPagos, respuestaDeConfirmacion, type Tarea } from "./pago-flujo.ts";
 import type { ClienteMpTienda, RespuestaMp } from "./pago-mp.ts";
 
 const PAGO = "2cd9e6fa-1acf-47dc-8ba4-cba918d73770";
@@ -22,6 +22,8 @@ function doble(o: {
   fila?: FilaPago | null; token?: string | null; toma?: boolean; tareas?: Tarea[];
   mp?: Partial<Record<keyof ClienteMpTienda, RespuestaMp>>; devolucion?: (ok: boolean) => string;
   aplicar?: (pagoIdExterno: string) => { estado: string; pedido_estado: string; recien_aprobado: boolean };
+  /** Lo que contesta la base a una consulta fallida: ¿es el tercer fallo? */
+  tercerFallo?: (id: string) => boolean;
 } = {}) {
   const llamadas: string[] = [];
   const tokens: string[] = [];
@@ -38,7 +40,7 @@ function doble(o: {
     },
     tomar: async () => o.tareas ?? [],
     devolucion: async (id, ok, error) => { llamadas.push(`devolucion ${id} ${ok}${error ? ` ${error}` : ""}`); return o.devolucion?.(ok) ?? (ok ? "DEVUELTO" : "POR_DEVOLVER"); },
-    conciliado: async (id) => { llamadas.push(`conciliado ${id}`); },
+    conciliacion: async (id, ok) => { llamadas.push(`conciliacion ${id} ${ok}`); return !ok && (o.tercerFallo?.(id) ?? false); },
   };
   const responder = (cual: keyof ClienteMpTienda, ...args: unknown[]): Promise<RespuestaMp> => {
     llamadas.push(`mp.${cual} ${args.map((a) => (typeof a === "string" ? a : "{…}")).join(" ")}`.trim());
@@ -225,22 +227,22 @@ test("barrer: devuelve, concilia, y avisa solo de la devolución que se dio por 
     devolucion: () => (++n === 2 ? "DEVOLUCION_FALLIDA" : "POR_DEVOLVER"),
   });
   const avisados: string[] = [];
-  assert.deepEqual(await barrer(d.deps, async (t) => { avisados.push(t.id); }), { devueltos: 0, fallidos: 1, conciliados: 1 });
-  assert.deepEqual(avisados, ["pago-2"]);
-  assert.ok(d.llamadas.includes("conciliado pago-3"));
+  assert.deepEqual(await barrer(d.deps, async (t, de) => { avisados.push(`${t.id} ${de}`); }), { devueltos: 0, fallidos: 1, conciliados: 1, sinConsultar: 0 });
+  assert.deepEqual(avisados, ["pago-2 DEVOLUCION"]);
+  assert.ok(d.llamadas.includes("conciliacion pago-3 true"));
 });
 
-test("barrer: si Mercado Pago no contesta, el pago NO se da por conciliado (se le vuelve a preguntar)", async () => {
+test("barrer: si Mercado Pago no contesta, el pago NO se da por conciliado: se le dice a la base que falló", async () => {
   const d = doble({ tareas: [{ id: "pago-3", tarea: "CONCILIAR", conexion_id: "cx-1", pago_id_externo: null }], mp: { buscarPagos: { status: 0, cuerpo: null } } });
-  assert.deepEqual(await barrer(d.deps, async () => {}), { devueltos: 0, fallidos: 0, conciliados: 0 });
-  assert.ok(!d.llamadas.some((l) => l.startsWith("conciliado")));
+  assert.deepEqual(await barrer(d.deps, async () => {}), { devueltos: 0, fallidos: 0, conciliados: 0, sinConsultar: 1 });
+  assert.ok(d.llamadas.includes("conciliacion pago-3 false") && !d.llamadas.includes("conciliacion pago-3 true"));
 });
 
 test("barrer: una tarea que revienta no detiene las demás", async () => {
   const d = doble({ tareas: [DEV, { ...DEV, id: "pago-2" }], mp: { devolver: { status: 201, cuerpo: {} } } });
   let primera = true;
   d.deps.db.devolucion = async () => { if (primera) { primera = false; throw new Error("la base no respondió"); } return "DEVUELTO"; };
-  assert.deepEqual(await barrer(d.deps, async () => {}), { devueltos: 1, fallidos: 0, conciliados: 0 });
+  assert.deepEqual(await barrer(d.deps, async () => {}), { devueltos: 1, fallidos: 0, conciliados: 0, sinConsultar: 0 });
   assert.ok(d.llamadas.includes("registrar BARRIDO"));
 });
 
@@ -249,4 +251,55 @@ test("aviso interno: lleva negocio, folio, monto y nuestro id, escapados; el asu
   assert.equal(a.subject, "Devolucion fallida: pedido T1A2B3 de Tacos <b>El Guero</b>");
   assert.ok(a.html.includes("Tacos &lt;b&gt;El Güero&lt;/b&gt;") && a.html.includes("$264.00") && a.html.includes(PAGO) && a.html.includes("HTTP 400 &lt;script&gt;"));
   assert.ok(!a.html.includes("<script>"));
+});
+
+// ── Revisión de la entrega 1 ─────────────────────────────────────────────────────────────────────
+
+const CON: Tarea = { id: "pago-3", tarea: "CONCILIAR", conexion_id: "cx-1", pago_id_externo: null };
+
+test("barrer: la cuenta perdió el token con un checkout abierto: no se calla, se cuenta el fallo y al tercero se avisa", async () => {
+  // Sin token (el restaurante desconectó Mercado Pago) y con el token rechazado (401): los dos casos.
+  for (const o of [{ token: null }, { mp: { buscarPagos: { status: 401, cuerpo: null } } }]) {
+    const avisados: string[] = [];
+    const primeras = doble({ ...o, tareas: [CON] });
+    await barrer(primeras.deps, async (t, de) => { avisados.push(`${t.id} ${de}`); });
+    assert.ok(primeras.llamadas.includes("conciliacion pago-3 false"));
+    assert.deepEqual(avisados, []);                       // primer y segundo fallo: todavía no
+    const tercera = doble({ ...o, tareas: [CON], tercerFallo: () => true });
+    await barrer(tercera.deps, async (t, de) => { avisados.push(`${t.id} ${de}`); });
+    assert.deepEqual(avisados, ["pago-3 CONCILIACION"]);
+  }
+});
+
+test("barrer: cuando Mercado Pago sí contesta no se avisa, aunque la base viniera contando fallos", async () => {
+  const d = doble({ tareas: [CON], mp: { buscarPagos: { status: 200, cuerpo: { results: [] } } }, tercerFallo: () => true });
+  const avisados: string[] = [];
+  await barrer(d.deps, async (t) => { avisados.push(t.id); });
+  assert.deepEqual(avisados, []);
+  assert.ok(d.llamadas.includes("conciliacion pago-3 true"));
+});
+
+test("aviso de conciliación: dice que puede haber un cobro sin pedido y en qué negocio, escapado", () => {
+  const a = avisoDeConciliacionFallida({ pagoId: PAGO, negocio: "Tacos <b>El Güero</b>", folio: "T1A2B3", monto: "264.00" });
+  assert.equal(a.subject, "Posible cobro sin pedido: T1A2B3 de Tacos <b>El Guero</b>");
+  assert.ok(a.html.includes("Puede haber un cobro hecho sin pedido") && a.html.includes("Tacos &lt;b&gt;El Güero&lt;/b&gt;"));
+  assert.ok(a.html.includes("$264.00") && a.html.includes(PAGO) && !a.html.includes("<b>El"));
+});
+
+test("topes del aviso: una referencia que no es nuestra no gasta ningún tope de los avisos de verdad", () => {
+  const ajena = topesDelAviso("00000000-0000-4000-8000-000000000000", false);
+  const nuestra = topesDelAviso(PAGO.toUpperCase(), true);
+  assert.deepEqual(ajena, [{ clave: "mp-tienda:ref-desconocida", ventanaSeg: 3600, max: 600 }]);
+  const clavesNuestras = nuestra.map((t) => t.clave);
+  assert.ok(!ajena.some((t) => clavesNuestras.includes(t.clave)));
+  // La inventada tampoco estrena una bolsa por referencia: son infinitas, y cada una sería una fila.
+  assert.ok(!ajena.some((t) => t.clave.includes("00000000")));
+});
+
+test("topes del aviso: lo que un comprador puede forzar con SU referencia son 40 consultas por hora, y no gasta el global", () => {
+  const t = topesDelAviso(PAGO.toUpperCase(), true);
+  // El de la referencia va PRIMERO: consumirCupo se detiene en el que no cabe, así que agotado este no se toca el global.
+  assert.deepEqual(t[0], { clave: `mp-tienda:aviso:${PAGO}`, ventanaSeg: 3600, max: 40 });
+  assert.deepEqual(t[1], { clave: "mp-tienda:avisos", ventanaSeg: 3600, max: 3000 });
+  assert.equal(t.length, 2);
 });

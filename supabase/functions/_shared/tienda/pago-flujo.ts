@@ -39,7 +39,8 @@ export type PuertoPagos = {
   tomar(max: number): Promise<Tarea[]>;
   /** Cómo le fue a la devolución. Devuelve el estado en que queda el pago. */
   devolucion(pagoId: string, ok: boolean, error?: string): Promise<string>;
-  conciliado(pagoId: string): Promise<void>;
+  /** Cómo le fue a una consulta del barrido. TRUE = es el tercer fallo seguido: hay que avisar a VIM. */
+  conciliacion(pagoId: string, ok: boolean): Promise<boolean>;
 };
 
 export type Deps = {
@@ -172,28 +173,69 @@ export async function devolverPago(deps: Deps, t: Pick<Tarea, "id" | "conexion_i
 /**
  * La pasada de cada minuto: devuelve lo que toca y le pregunta a Mercado Pago una última vez por
  * los pagos que nadie confirmó. Un fallo en una tarea no detiene las demás.
- * `avisar` se llama una vez por cada devolución que se dio por fallida (tercer intento).
+ * `avisar` se llama una vez por cada devolución que se dio por fallida (tercer intento) y una vez
+ * por cada pago por el que no se ha podido preguntar tres veces seguidas (cuenta desconectada, token
+ * rechazado): ahí puede haber un cobro sin pedido, y nadie más lo va a ver.
  * ponytail: de una en una y hasta 10 por pasada; con el tope de 10 s por llamada cabe en una
  * invocación. Si un día hay cola, subir el tope o repartir en paralelo por conexión.
  */
-export async function barrer(deps: Deps, avisar: (t: Tarea) => Promise<void>): Promise<{ devueltos: number; fallidos: number; conciliados: number }> {
-  const cuenta = { devueltos: 0, fallidos: 0, conciliados: 0 };
+export async function barrer(deps: Deps, avisar: (t: Tarea, de: "DEVOLUCION" | "CONCILIACION") => Promise<void>): Promise<{ devueltos: number; fallidos: number; conciliados: number; sinConsultar: number }> {
+  const cuenta = { devueltos: 0, fallidos: 0, conciliados: 0, sinConsultar: 0 };
   for (const t of await deps.db.tomar(10)) {
     try {
       if (t.tarea === "DEVOLVER") {
         const estado = await devolverPago(deps, t);
         if (estado === "DEVUELTO") cuenta.devueltos++;
-        if (estado === "DEVOLUCION_FALLIDA") { cuenta.fallidos++; await avisar(t); }
+        if (estado === "DEVOLUCION_FALLIDA") { cuenta.fallidos++; await avisar(t, "DEVOLUCION"); }
       } else {
-        // Solo si Mercado Pago contestó se da por conciliado; si no, la siguiente pasada vuelve a preguntar.
+        // Solo cuenta si Mercado Pago contestó. Si no, la base lleva la cuenta de los fallos, espacia
+        // las consultas y dice cuándo avisar; el seguimiento, mientras, no afirma «sin pago».
         const c = await confirmarPago(deps, t.id);
-        if (c.ok) { await deps.db.conciliado(t.id); cuenta.conciliados++; }
+        if (c.ok) cuenta.conciliados++; else cuenta.sinConsultar++;
+        if (await deps.db.conciliacion(t.id, c.ok)) await avisar(t, "CONCILIACION");
       }
     } catch (e) {
       deps.registrar("BARRIDO", `pago ${t.id}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
   return cuenta;
+}
+
+/** Un tope de `consumirCupo` (misma forma que `Cupo` de _shared/limite.ts). */
+type Tope = { clave: string; ventanaSeg: number; max: number };
+
+/**
+ * Los topes de un aviso de Mercado Pago, que llega sin autenticar (la firma puede faltar).
+ *   · Con una referencia que NO es nuestra: una bolsa aparte. No cuesta ninguna consulta a Mercado
+ *     Pago, y agotarla no le quita ni un aviso a los pagos de verdad.
+ *   · Con una referencia nuestra: el tope de ESA referencia primero, y solo después el global. La
+ *     referencia no es secreta (el comprador la ve en la URL con que Mercado Pago lo regresa), así
+ *     que su tope es lo que acota lo que un comprador puede forzar: 40 consultas por hora con el
+ *     token de ese restaurante. Como va antes, quien insiste con una referencia agota la suya y
+ *     deja de gastar el global.
+ */
+export function topesDelAviso(ref: string, esNuestra: boolean): Tope[] {
+  if (!esNuestra) return [{ clave: "mp-tienda:ref-desconocida", ventanaSeg: 3600, max: 600 }];
+  return [
+    { clave: `mp-tienda:aviso:${ref.toLowerCase()}`, ventanaSeg: 3600, max: 40 },
+    { clave: "mp-tienda:avisos", ventanaSeg: 3600, max: 3000 },
+  ];
+}
+
+/**
+ * El correo interno a VIM cuando no se ha podido preguntar tres veces seguidas a Mercado Pago por un
+ * pago que nadie confirmó. Puede haber un cobro hecho y el pedido vencido como si no se hubiera pagado.
+ */
+export function avisoDeConciliacionFallida(d: { pagoId: string; negocio: string; folio: string; monto: string }): { subject: string; html: string } {
+  return {
+    subject: soloAscii(`Posible cobro sin pedido: ${d.folio} de ${d.negocio}`),
+    html: `<div style="font-family:system-ui,sans-serif;color:#111">
+<p>No se ha podido consultar a Mercado Pago tres veces seguidas por un pago en línea que nadie confirmó. <strong>Puede haber un cobro hecho sin pedido.</strong></p>
+<ul><li>Negocio: ${esc(d.negocio)}</li><li>Pedido: ${esc(d.folio)}</li><li>Monto esperado: $${esc(d.monto)}</li>
+<li>Pago (tienda_pagos.id): ${esc(d.pagoId)}</li></ul>
+<p>Lo más probable es que el restaurante desconectó su cuenta de Mercado Pago o que su token fue rechazado. Se seguirá intentando una vez por hora durante 48 horas: si reconecta la cuenta, el cobro se encuentra y se devuelve solo. Si no, hay que buscar en su cuenta de Mercado Pago un pago con esa referencia y devolverlo a mano.</p>
+</div>`,
+  };
 }
 
 /**

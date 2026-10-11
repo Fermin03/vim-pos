@@ -80,8 +80,10 @@ CREATE TABLE IF NOT EXISTS tienda_pagos (
   aprobado_at           timestamptz NULL,
   devuelto_at           timestamptz NULL,
   consultado_at         timestamptz NULL,          -- última consulta a Mercado Pago (para no preguntar seguido)
-  conciliado_at         timestamptz NULL,          -- ya vencido, se le preguntó una última vez a Mercado Pago
-  correo_at             timestamptz NULL,          -- ya salió el correo de confirmación
+  conciliaciones        integer NOT NULL DEFAULT 0,   -- veces que Mercado Pago contestó por él ya VENCIDO
+  conciliacion_fallos   integer NOT NULL DEFAULT 0,   -- consultas seguidas del barrido que no se pudieron hacer
+  conciliado_at         timestamptz NULL,          -- se dejó de preguntar: dos respuestas ya vencido, o 48 h
+  correo_at            timestamptz NULL,          -- ya salió el correo de confirmación
   intentos              integer NOT NULL DEFAULT 0,   -- devoluciones fallidas
   proximo_intento_at    timestamptz NULL,
   ultimo_error          text NULL,
@@ -132,6 +134,19 @@ AS $$
               ELSE false END;
 $$;
 
+-- ¿Late en la sucursal una caja instalada que sabe atender un pedido ya pagado (0.9.0 o posterior)?
+-- Misma ventana que sucursal_con_espejo (0096). La usan quien decide si se ofrece el pago en línea
+-- y quien decide, al pagarse, si el pedido lo atiende una caja (tienda_pago_aplicar).
+CREATE OR REPLACE FUNCTION _tienda_caja_en_linea_viva(p_sucursal uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT EXISTS (SELECT 1 FROM cajas c WHERE c.sucursal_id = p_sucursal AND c.activa
+                  AND c.espejo_apps_at > now() - interval '90 seconds'
+                  AND _tienda_version_al_menos(c.version_app, ARRAY[0, 9, 0]));
+$$;
+
 -- La conexión de Mercado Pago que cobra los pedidos en línea de una sucursal, o NULL si ahí no se
 -- puede pagar en línea. Tres condiciones:
 --   · el dueño lo ofrece (tienda_config.pago_en_linea);
@@ -151,13 +166,7 @@ DECLARE
 BEGIN
   IF NOT COALESCE((SELECT c.pago_en_linea FROM tienda_config c WHERE c.tenant_id = p_tenant), false) THEN RETURN NULL; END IF;
 
-  IF EXISTS (SELECT 1 FROM cajas c WHERE c.sucursal_id = p_sucursal AND c.activa
-              AND c.espejo_apps_at > now() - interval '90 seconds')
-     AND NOT EXISTS (SELECT 1 FROM cajas c WHERE c.sucursal_id = p_sucursal AND c.activa
-                      AND c.espejo_apps_at > now() - interval '90 seconds'
-                      AND _tienda_version_al_menos(c.version_app, ARRAY[0, 9, 0])) THEN
-    RETURN NULL;
-  END IF;
+  IF sucursal_con_espejo(p_sucursal) AND NOT _tienda_caja_en_linea_viva(p_sucursal) THEN RETURN NULL; END IF;
 
   SELECT ts.conexion_id INTO v_elegida FROM tienda_sucursales ts
    WHERE ts.sucursal_id = p_sucursal AND ts.tenant_id = p_tenant;
@@ -592,11 +601,13 @@ BEGIN
            marca = left(p_marca, 30), aprobado_at = now(), detalle = NULL
      WHERE id = p_pago;
     -- Para el restaurante el pedido llega AHORA: desde aquí corre su ventana, y aquí se decide quién
-    -- lo atiende (la caja pudo encenderse o apagarse mientras el cliente pagaba).
+    -- lo atiende (la caja pudo encenderse o apagarse mientras el cliente pagaba). A una caja solo si
+    -- late una que sepa de pedidos pagados: a una anterior el espejo no se lo baja, y se quedaría
+    -- sin nadie que lo atienda hasta vencer.
     UPDATE delivery_pedidos
        SET estado = 'RECIBIDO', pagado_at = now(), recibido_at = now(),
            vence_aceptacion = now() + make_interval(mins => COALESCE(v_min, 5)),
-           gestion = CASE WHEN sucursal_con_espejo(sucursal_id) THEN 'ESCRITORIO' ELSE 'NUBE' END,
+           gestion = CASE WHEN _tienda_caja_en_linea_viva(sucursal_id) THEN 'ESCRITORIO' ELSE 'NUBE' END,
            gestion_caja_id = NULL
      WHERE id = v_pedido;
     v_aprobado := true;
@@ -664,9 +675,19 @@ CREATE TRIGGER trg_delivery_pedidos_devolver_pago
 -- Lo que el barrido tiene que hacer contra Mercado Pago, tomado para que dos pasadas a la vez no
 -- hagan lo mismo. Dos tareas:
 --   DEVOLVER   pagos POR_DEVOLVER a los que ya les toca (un intento cada 2 minutos);
---   CONCILIAR  pagos que nadie confirmó y cuyo plazo ya pasó: se le pregunta a Mercado Pago una
---              última vez. Sin esto, si el aviso no llega y el cliente cerró la pestaña, un pago
---              cobrado se quedaría sin pedido y sin devolución.
+--   CONCILIAR  pagos que nadie ha confirmado: se le pregunta a Mercado Pago. Sin esto, si el aviso
+--              no llega y el cliente cerró la pestaña, un pago cobrado se quedaría sin pedido (o
+--              llegaría a la caja al vencer) y sin devolución. Cuándo toca:
+--                · mientras se puede pagar, desde los 2 minutos de creado y a lo sumo cada 2
+--                  minutos por pago (la página del pedido, si está abierta, ya pregunta ella y
+--                  comparte ese reloj: consultado_at);
+--                · ya VENCIDO, hasta que Mercado Pago conteste una vez (conciliaciones = 1), y otra
+--                  alrededor de una hora después del plazo, para cazar un aprobado tardío;
+--                · si la consulta falla tres veces seguidas (cuenta desconectada, token rechazado),
+--                  solo una vez por hora: el tercer fallo avisa a VIM (tienda_pago_conciliacion);
+--                · nunca pasadas 48 horas del plazo.
+--              Van primero los que llevan más sin consultarse (los nunca consultados, antes): diez
+--              pagos atascados no le quitan el turno a los demás.
 -- ponytail: recorre tienda_pagos entera; índice parcial por estado cuando la tabla pese.
 CREATE OR REPLACE FUNCTION tienda_pagos_tomar(p_max integer DEFAULT 10)
 RETURNS TABLE (id uuid, tarea text, conexion_id uuid, pago_id_externo text)
@@ -690,9 +711,14 @@ BEGIN
   WITH toca AS (
     SELECT g.id FROM tienda_pagos g
      WHERE NOT g.extra AND g.conciliado_at IS NULL AND g.preferencia_id IS NOT NULL
-       AND g.estado IN ('CREADO', 'RECHAZADO', 'VENCIDO') AND g.vence_at < now()
-       AND (g.consultado_at IS NULL OR g.consultado_at < now() - interval '45 seconds')
-     ORDER BY g.created_at LIMIT GREATEST(p_max, 1) FOR UPDATE SKIP LOCKED
+       AND g.vence_at > now() - interval '48 hours'
+       AND ((g.estado IN ('CREADO', 'RECHAZADO') AND g.created_at < now() - interval '2 minutes')
+            OR (g.estado = 'VENCIDO' AND (g.conciliaciones = 0 OR g.vence_at < now() - interval '1 hour')))
+       AND (g.consultado_at IS NULL OR g.consultado_at < now() - CASE
+              WHEN g.conciliacion_fallos >= 3 THEN interval '1 hour'
+              WHEN g.estado = 'VENCIDO' THEN interval '45 seconds'
+              ELSE interval '2 minutes' END)
+     ORDER BY g.consultado_at NULLS FIRST, g.created_at LIMIT GREATEST(p_max, 1) FOR UPDATE SKIP LOCKED
   ), tomados AS (
     UPDATE tienda_pagos g SET consultado_at = now()
       FROM toca WHERE g.id = toca.id
@@ -724,6 +750,34 @@ BEGIN
     RETURNING estado INTO v_estado;
   END IF;
   RETURN COALESCE(v_estado, (SELECT g.estado FROM tienda_pagos g WHERE g.id = p_pago));
+END;
+$$;
+
+-- Cómo le fue a una consulta del barrido (CONCILIAR). Devuelve TRUE cuando hay que avisar a VIM: es
+-- el tercer fallo seguido, y puede haber un cobro que no se ha podido ver.
+--   · Mercado Pago contestó: los fallos vuelven a cero. Si el pago ya está VENCIDO cuenta una
+--     conciliación; a la segunda (la de una hora después) se deja de preguntar.
+--   · No se pudo consultar: suma un fallo. No se deja de preguntar (tienda_pagos_tomar lo espacia a
+--     una vez por hora y lo corta a las 48 horas), y el seguimiento no afirma «sin pago».
+CREATE OR REPLACE FUNCTION tienda_pago_conciliacion(p_pago uuid, p_ok boolean)
+RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_fallos integer;
+BEGIN
+  IF p_ok THEN
+    UPDATE tienda_pagos
+       SET conciliacion_fallos = 0,
+           conciliaciones = conciliaciones + CASE WHEN estado = 'VENCIDO' THEN 1 ELSE 0 END,
+           conciliado_at = CASE WHEN estado = 'VENCIDO' AND conciliaciones >= 1 THEN now() ELSE conciliado_at END
+     WHERE id = p_pago;
+    RETURN false;
+  END IF;
+  UPDATE tienda_pagos SET conciliacion_fallos = conciliacion_fallos + 1
+   WHERE id = p_pago RETURNING conciliacion_fallos INTO v_fallos;
+  RETURN COALESCE(v_fallos = 3, false);
 END;
 $$;
 
@@ -962,7 +1016,8 @@ $$;
 -- sin ningún identificador de Mercado Pago ni dato de la tarjeta:
 --   · `pago` puede ser EN_LINEA, y `estado`, POR_PAGAR;
 --   · `pago_estado`: ESPERANDO_PAGO | RECHAZADO (el último intento no pasó; puede reintentar) |
---     PAGADO | DEVOLUCION_EN_PROCESO | DEVUELTO | SIN_PAGO (venció sin pagarse);
+--     PAGADO | DEVOLUCION_EN_PROCESO | DEVUELTO | SIN_PAGO (venció y Mercado Pago confirmó que no
+--     se cobró) | POR_CONFIRMAR (venció y todavía no se ha podido preguntar: puede haber un cobro);
 --   · `propina_mxn`, `total_a_pagar_mxn` (total + propina) y `vence_pago`;
 --   · esas cuatro claves van SOLO en el pedido en línea: el de pago al recibir devuelve, clave por
 --     clave, lo de siempre;
@@ -997,6 +1052,7 @@ BEGIN
     'modo', CASE v_p.app WHEN 'DELIVERY_PROPIO' THEN 'DOMICILIO' ELSE 'RECOGER' END,
     'estado', _tienda_estado_publico(v_estado, v_p.app::text),
     'motivo', CASE
+      WHEN v_estado = 'EXPIRADO' AND v_en_linea AND v_p.pagado_at IS NULL AND v_g.estado = 'VENCIDO' AND v_g.conciliaciones = 0 THEN 'POR_CONFIRMAR'
       WHEN v_estado = 'EXPIRADO' AND v_en_linea AND v_p.pagado_at IS NULL THEN 'SIN_PAGO'
       WHEN v_estado = 'EXPIRADO' THEN 'SIN_RESPUESTA'
       WHEN v_estado IN ('RECHAZADO', 'CANCELADO') THEN
@@ -1019,6 +1075,8 @@ BEGIN
         WHEN v_g.estado = 'DEVUELTO' THEN 'DEVUELTO'
         WHEN v_p.estado = 'POR_PAGAR' AND v_g.estado = 'RECHAZADO' THEN 'RECHAZADO'
         WHEN v_p.estado = 'POR_PAGAR' THEN 'ESPERANDO_PAGO'
+        -- Venció, pero todavía no se le ha podido preguntar a Mercado Pago si se cobró: no se afirma nada.
+        WHEN v_g.estado = 'VENCIDO' AND v_g.conciliaciones = 0 THEN 'POR_CONFIRMAR'
         ELSE 'SIN_PAGO' END,
       'propina_mxn', to_char(COALESCE(v_p.propina_mxn, 0), 'FM999999990.00'),
       'total_a_pagar_mxn', to_char(v_p.total_cliente_mxn + COALESCE(v_p.propina_mxn, 0), 'FM999999990.00'),
@@ -1026,8 +1084,9 @@ BEGIN
 END;
 $$;
 
--- tienda_sincronizar_estados_nube: cuerpo copiado ÍNTEGRO de 0164_tienda_caja.sql §3; cambia solo la
--- línea de PAGADO/FACTURADO (la misma que en _tienda_estado_real: si cambia una, cambian las dos).
+-- tienda_sincronizar_estados_nube: cuerpo copiado ÍNTEGRO de 0164_tienda_caja.sql §3. Dos cambios:
+-- la línea de PAGADO/FACTURADO (la misma que en _tienda_estado_real: si cambia una, cambian las
+-- dos), y que el pedido pagado en línea se sigue mirando ya ENTREGADO, solo por si le cancelan la cuenta.
 CREATE OR REPLACE FUNCTION tienda_sincronizar_estados_nube() RETURNS integer
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -1042,6 +1101,7 @@ BEGIN
       SELECT p.tenant_id, p.id, p.estado, p.recibido_at,
              CASE
                WHEN t.estado_fiscal = 'CANCELADO' THEN 'CANCELADO'
+               WHEN p.estado = 'ENTREGADO' THEN NULL   -- entregado solo se mira por si se canceló su cuenta
                WHEN t.estado_fiscal IN ('PAGADO', 'FACTURADO') AND p.pago_al_recibir IS DISTINCT FROM 'EN_LINEA' THEN 'ENTREGADO'
                WHEN t.ticket_impreso_at IS NOT NULL
                     OR EXISTS (SELECT 1 FROM delivery_asignaciones a WHERE a.ticket_id = t.id) THEN 'LISTO'
@@ -1049,7 +1109,10 @@ BEGIN
         FROM delivery_pedidos p
         JOIN tickets t ON t.id = p.ticket_id AND t.tenant_id = p.tenant_id
        WHERE p.canal = 'TIENDA' AND p.gestion = 'NUBE'
-         AND p.estado IN ('ACEPTADO', 'EN_PREPARACION', 'LISTO')
+         -- El pagado en línea se sigue mirando ya ENTREGADO: si después le cancelan la cuenta, se
+         -- cancela y su pago se devuelve (tienda_reportar_estado, abajo). Los demás, como siempre.
+         AND (p.estado IN ('ACEPTADO', 'EN_PREPARACION', 'LISTO')
+              OR (p.estado = 'ENTREGADO' AND p.pago_al_recibir = 'EN_LINEA'))
          AND p.recibido_at > now() - interval '7 days'
     ) x
     WHERE x.nuevo IS NOT NULL AND x.nuevo <> x.estado
@@ -1064,6 +1127,60 @@ BEGIN
   RETURN v_n;
 END;
 $$;
+
+-- tienda_reportar_estado: cuerpo copiado ÍNTEGRO de 0167_tienda_salida.sql §3. Un cambio: un pedido
+-- PAGADO EN LÍNEA se puede cancelar también ya ENTREGADO. El diseño dice que cancelar la cuenta en
+-- la caja devuelve el pago, y la cuenta se puede cancelar después de entregar; al pasar a CANCELADO
+-- el disparador de §6 deja su pago POR_DEVOLVER. Sin doble devolución: el disparador solo mueve un
+-- pago APROBADO, y repetir el reporte ya no avanza (CANCELADO no es un estado vivo).
+-- Un pedido al recibir ya ENTREGADO sigue sin poder cancelarse por aquí, como antes; los de Uber no
+-- pasan por esta función (exige canal TIENDA).
+CREATE OR REPLACE FUNCTION tienda_reportar_estado(p_tenant uuid, p_pedido uuid, p_estado text, p_motivo text DEFAULT NULL)
+RETURNS text
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_actual text;
+  v_pago   text;
+BEGIN
+  IF p_estado IS NULL OR p_estado NOT IN ('EN_PREPARACION', 'LISTO', 'ENTREGADO', 'CANCELADO') THEN
+    RAISE EXCEPTION 'ESTADO_INVALIDO: %', COALESCE(p_estado, 'NULL');
+  END IF;
+
+  SELECT estado, pago_al_recibir INTO v_actual, v_pago FROM delivery_pedidos
+   WHERE id = p_pedido AND tenant_id = p_tenant AND canal = 'TIENDA'
+     FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'PEDIDO_NO_EXISTE: %', COALESCE(p_pedido::text, 'NULL'); END IF;
+
+  -- Entre paréntesis: sin ellos plpgsql corta el IF en el primer THEN del CASE.
+  IF NOT (CASE p_estado
+       WHEN 'EN_PREPARACION' THEN v_actual = 'ACEPTADO'
+       WHEN 'LISTO'     THEN v_actual IN ('ACEPTADO', 'EN_PREPARACION')
+       WHEN 'ENTREGADO' THEN v_actual IN ('ACEPTADO', 'EN_PREPARACION', 'LISTO')
+       ELSE                  v_actual IN ('RECIBIDO', 'ACEPTADO', 'EN_PREPARACION', 'LISTO')
+                             OR (v_actual = 'ENTREGADO' AND v_pago IS NOT DISTINCT FROM 'EN_LINEA')
+     END) THEN
+    RETURN v_actual;
+  END IF;
+
+  UPDATE delivery_pedidos
+     SET estado       = p_estado,
+         listo_at     = CASE WHEN p_estado = 'LISTO' THEN now() ELSE listo_at END,
+         entregado_at = CASE WHEN p_estado = 'ENTREGADO' THEN now() ELSE entregado_at END,
+         cancelado_at = CASE WHEN p_estado = 'CANCELADO' THEN now() ELSE cancelado_at END,
+         cancelado_por = CASE WHEN p_estado = 'CANCELADO' THEN 'RESTAURANTE' ELSE cancelado_por END,
+         motivo_cancelacion = CASE
+           WHEN p_estado <> 'CANCELADO' THEN motivo_cancelacion
+           WHEN p_motivo IN ('AGOTADO', 'SATURADO', 'CERRADO', 'OTRO') THEN p_motivo
+           ELSE 'OTRO' END
+   WHERE id = p_pedido;
+  RETURN p_estado;
+END;
+$$;
+COMMENT ON FUNCTION tienda_reportar_estado IS
+  'La caja reporta EN_PREPARACION («ya lo tengo»), LISTO, ENTREGADO o CANCELADO de un pedido de la tienda en línea. Solo avanza; la excepción es cancelar un pedido pagado en línea ya entregado, que devuelve su pago. Solo service_role.';
 
 -- ── §9 El barrido de cada minuto ─────────────────────────────────────────────
 -- Dos cosas, y ninguna avisa a nadie (ni correo, ni push, ni evento):
@@ -1100,8 +1217,12 @@ BEGIN
   BEGIN
     IF EXISTS (SELECT 1 FROM tienda_pagos g
                 WHERE (g.estado = 'POR_DEVOLVER' AND (g.proximo_intento_at IS NULL OR g.proximo_intento_at <= now()))
+                   -- Más ancho que tienda_pagos_tomar a propósito: quién toca de verdad lo decide ella.
                    OR (NOT g.extra AND g.conciliado_at IS NULL AND g.preferencia_id IS NOT NULL
-                       AND g.estado IN ('CREADO', 'RECHAZADO', 'VENCIDO') AND g.vence_at < now())) THEN
+                       AND g.estado IN ('CREADO', 'RECHAZADO', 'VENCIDO')
+                       AND g.created_at < now() - interval '2 minutes' AND g.vence_at > now() - interval '48 hours'
+                       AND (g.estado <> 'VENCIDO' OR g.conciliaciones = 0 OR g.vence_at < now() - interval '1 hour')
+                       AND (g.conciliacion_fallos < 3 OR g.consultado_at IS NULL OR g.consultado_at < now() - interval '1 hour'))) THEN
       v_secreto := _vim_secreto('vim_interno');
       v_base    := _vim_secreto('vim_functions_url');
       IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_net') OR v_secreto IS NULL OR v_base IS NULL THEN
@@ -1135,9 +1256,9 @@ BEGIN
             WHERE p.pronamespace = 'public'::regnamespace
               AND p.proname IN ('tienda_conexion_cobro', 'tienda_negocio', 'tienda_crear_pedido', 'tienda_pago_tomar_preferencia',
                                 'tienda_pago_descartar', 'tienda_pago_tomar_consulta', 'tienda_pago_aplicar', 'tienda_pago_tomar_correo',
-                                'tienda_pagos_tomar', 'tienda_pago_devolucion', 'crear_ticket_desde_tienda', 'tienda_seguimiento',
-                                'tienda_sincronizar_estados_nube', 'tienda_pagos_barrer',
-                                '_tienda_version_al_menos', '_tienda_pedido_creado', '_tienda_estado_real', '_tienda_estado_publico',
+                                'tienda_pagos_tomar', 'tienda_pago_devolucion', 'tienda_pago_conciliacion', 'crear_ticket_desde_tienda',
+                                'tienda_seguimiento', 'tienda_sincronizar_estados_nube', 'tienda_reportar_estado', 'tienda_pagos_barrer',
+                                '_tienda_version_al_menos', '_tienda_caja_en_linea_viva', '_tienda_pedido_creado', '_tienda_estado_real', '_tienda_estado_publico',
                                 'delivery_pedidos_devolver_pago')
   LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC, anon, authenticated', f.firma);
