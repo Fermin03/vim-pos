@@ -225,3 +225,18 @@ test("sin fecha legible, el pedido de la tienda cuenta como hasta hoy (rápido):
     assert.equal(ritmo([{ estado: "ACEPTADO", canal: "TIENDA", gestion: "ESCRITORIO", recibido_at }]), RAPIDA_MS, String(recibido_at));
   }
 });
+
+// ── Pago en línea (0172) ──────────────────────────────────────────────────────────────────────────
+import { filtroPagoEnLinea } from "./espejo.ts";
+
+test("pago en línea: la caja que no lo declara no recibe NINGÚN pedido en línea, pagado o no", () => {
+  for (const cuerpo of [{}, { tienda: true }, { pago_en_linea: "true" }, { pago_en_linea: 1 }, { pago_en_linea: false }, { pago_en_linea: null }]) {
+    assert.equal(filtroPagoEnLinea(cuerpo), "pago_al_recibir.is.null,pago_al_recibir.neq.EN_LINEA", JSON.stringify(cuerpo));
+  }
+});
+test("pago en línea: la que lo declara recibe solo los ya pagados; los de apps y los de pago al recibir, siempre", () => {
+  assert.equal(filtroPagoEnLinea({ pago_en_linea: true }), "pago_al_recibir.is.null,pago_al_recibir.neq.EN_LINEA,pagado_at.not.is.null");
+});
+test("pago en línea: sin declararlo el filtro no nombra pagado_at (se puede desplegar antes que la 0172)", () => {
+  assert.doesNotMatch(filtroPagoEnLinea({}), /pagado_at/);
+});

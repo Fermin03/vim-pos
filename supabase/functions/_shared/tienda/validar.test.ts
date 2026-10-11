@@ -392,3 +392,41 @@ test("cuerpo: una clave mal formada es CUERPO_INVALIDO, nunca un pedido sin clav
     assert.deepEqual(leerCuerpo({ ...pedir, clave }), { ok: false, error: "CUERPO_INVALIDO" }, JSON.stringify(clave));
   }
 });
+
+// ── Pago en línea (0172) ──────────────────────────────────────────────────────────────────────────
+const enLinea = { ...pedir, pago: "EN_LINEA", paga_con: null };
+test("cuerpo: pedir en línea lleva su propina, que es un porcentaje de la lista; sin ella, null", () => {
+  for (const pct of [0, 10, 15, 20]) {
+    const r = leerCuerpo({ ...enLinea, propina_pct: pct });
+    assert.equal(r.ok, true);
+    if (r.ok && r.valor.accion === "pedir") { assert.equal(r.valor.pago, "EN_LINEA"); assert.equal(r.valor.propina_pct, pct); }
+  }
+  const sin = leerCuerpo(enLinea);
+  assert.equal(sin.ok && sin.valor.accion === "pedir" && sin.valor.propina_pct, null);
+});
+test("cuerpo: la propina nunca es un monto ni un porcentaje fuera de la lista", () => {
+  for (const mal of [12, 25, 100, -10, 10.5, "10", "15%", true, {}, [10]]) {
+    assert.deepEqual(leerCuerpo({ ...enLinea, propina_pct: mal }), { ok: false, error: "PAGO_INVALIDO" }, JSON.stringify(mal));
+  }
+});
+test("cuerpo: la propina va solo con el pago en línea, y en línea no hay «paga con»", () => {
+  assert.deepEqual(leerCuerpo({ ...pedir, propina_pct: 10 }), { ok: false, error: "PAGO_INVALIDO" });
+  assert.deepEqual(leerCuerpo({ ...pedir, pago: "TARJETA", paga_con: null, propina_pct: 0 }), { ok: false, error: "PAGO_INVALIDO" });
+  assert.deepEqual(leerCuerpo({ ...enLinea, paga_con: 500 }), { ok: false, error: "PAGO_INVALIDO" });
+  // Un pedido al recibir sigue saliendo sin propina, como siempre.
+  const efectivo = leerCuerpo(pedir);
+  assert.equal(efectivo.ok && efectivo.valor.accion === "pedir" && efectivo.valor.propina_pct, null);
+});
+test("cuerpo: una forma de pago que no existe se rechaza", () => {
+  for (const pago of ["en_linea", "ONLINE", "MERCADO_PAGO", "", null, undefined]) {
+    assert.deepEqual(leerCuerpo({ ...pedir, pago }), { ok: false, error: "PAGO_INVALIDO" });
+  }
+});
+test("cuerpo: confirmar_pago lleva solo el código del pedido; lo demás que mande quien llama no sale", () => {
+  const codigo = "AAAAAAAAAAAAAAAAAAAAAA";
+  // Los parámetros con los que Mercado Pago regresa al cliente NO se leen: cualquiera puede escribirlos.
+  assert.deepEqual(leerCuerpo({ accion: "confirmar_pago", negocio: "knockout", codigo, status: "approved", payment_id: "1", collection_status: "approved" }),
+    { ok: true, valor: { accion: "confirmar_pago", negocio: "knockout", codigo } });
+  assert.deepEqual(leerCuerpo({ accion: "confirmar_pago", negocio: "knockout", codigo: "corto" }), { ok: false, error: "CODIGO_INVALIDO" });
+  assert.deepEqual(leerCuerpo({ accion: "confirmar_pago", negocio: "knockout" }), { ok: false, error: "CODIGO_INVALIDO" });
+});

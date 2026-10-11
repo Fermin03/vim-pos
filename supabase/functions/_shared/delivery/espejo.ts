@@ -64,6 +64,23 @@ export function cadenciaEspejo(
 }
 
 /**
+ * El filtro (`or` de PostgREST) que deja fuera de lo que baja a una caja los pedidos de la tienda
+ * que se pagan en línea y ella no debe ver (migración 0172):
+ *   · NINGUNA caja recibe uno que no se ha pagado (`pagado_at` nulo): ni el que espera su pago ni
+ *     el que venció sin pagarse existen para quien atiende;
+ *   · y solo los recibe, ya pagados, la caja que declara `pago_en_linea: true` (desde la 0.9.0).
+ *     Una anterior no admite `EN_LINEA` en su tabla local —el espejo ENTERO fallaría en cada
+ *     vuelta, pedidos de Uber incluidos— y le crearía la cuenta sin el pago.
+ * Solo un `true` estricto cuenta. `pago_al_recibir` es nulo en los pedidos de apps: pasan siempre.
+ * La rama de la caja que NO lo declara no nombra `pagado_at`: así esta función se puede desplegar
+ * antes de aplicar la 0172 sin romperle el espejo a las cajas que hoy están en servicio.
+ */
+export function filtroPagoEnLinea(cuerpo: { pago_en_linea?: unknown }): string {
+  const sinEnLinea = "pago_al_recibir.is.null,pago_al_recibir.neq.EN_LINEA";
+  return cuerpo.pago_en_linea === true ? `${sinEnLinea},pagado_at.not.is.null` : sinEnLinea;
+}
+
+/**
  * Qué le toca a esta caja en este sondeo.
  *
  * `conTienda` exige las dos cosas: que el negocio tenga la tienda encendida Y que la caja diga que

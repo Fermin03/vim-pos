@@ -157,3 +157,31 @@ test("caja sin actualizar: sin caja viva (sucursal solo web, o caja apagada) o c
   assert.equal(cajaSinActualizar([{ espejo_apps_at: hace(10), version_app: "0.8.0" }], T0), false);
   assert.equal(cajaSinActualizar([{ espejo_apps_at: hace(10), version_app: "0.7.0" }, { espejo_apps_at: hace(20), version_app: "0.10.2" }], T0), false);
 });
+
+// ── Pago en línea (0172): quién puede reportar el estado de un pedido ─────────────────────────────
+import { negativaDeReporte } from "./enlinea.ts";
+
+test("reporte: la caja instalada reporta lo de siempre, de un pedido que atiende una caja", () => {
+  for (const estado of ESTADOS_REPORTABLES) {
+    for (const pago of ["EFECTIVO", "TARJETA", "EN_LINEA", null]) {
+      assert.equal(negativaDeReporte({ esDispositivo: true, gestion: "ESCRITORIO", pago, estado }), null);
+    }
+  }
+  assert.deepEqual(negativaDeReporte({ esDispositivo: true, gestion: "ESCRITORIO", pago: "EFECTIVO", estado: "RECIBIDO" }), { error: "ESTADO_INVALIDO", status: 400 });
+  assert.deepEqual(negativaDeReporte({ esDispositivo: true, gestion: "NUBE", pago: "EN_LINEA", estado: "ENTREGADO" }), { error: "ACCION_INVALIDA", status: 409 });
+});
+test("reporte: desde el POS web solo «ENTREGADO», y solo de un pedido pagado en línea que atiende la nube", () => {
+  assert.equal(negativaDeReporte({ esDispositivo: false, gestion: "NUBE", pago: "EN_LINEA", estado: "ENTREGADO" }), null);
+  const no = { error: "SOLO_DISPOSITIVO", status: 403 };
+  for (const caso of [
+    { gestion: "NUBE", pago: "EN_LINEA", estado: "CANCELADO" },      // cancelar no: eso devolvería el dinero
+    { gestion: "NUBE", pago: "EN_LINEA", estado: "LISTO" },
+    { gestion: "NUBE", pago: "EFECTIVO", estado: "ENTREGADO" },      // al recibir, la entrega sale del cobro
+    { gestion: "NUBE", pago: "TARJETA", estado: "ENTREGADO" },
+    { gestion: "NUBE", pago: null, estado: "ENTREGADO" },
+    { gestion: "ESCRITORIO", pago: "EN_LINEA", estado: "ENTREGADO" }, // ese lo reporta su caja
+    { gestion: "NUBE", pago: "EN_LINEA", estado: undefined },
+  ]) {
+    assert.deepEqual(negativaDeReporte({ esDispositivo: false, ...caso }), no, JSON.stringify(caso));
+  }
+});

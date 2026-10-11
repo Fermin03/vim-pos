@@ -12,7 +12,7 @@ import { clienteUberDeApp, ENTORNO } from "../_shared/delivery/cliente-uber.ts";
 import { motivoRechazoUber, segundosAReadyTime, type MotivoRechazo } from "../_shared/delivery/uber.ts";
 import { cambiarPrepTienda, consultarEstadoTienda, pausarTienda, reanudarTienda, type ConexionTienda } from "../_shared/delivery/tienda-uber-acciones.ts";
 import { ACCIONES_TIENDA, accionExigeModulo, moduloDeliveryActivo } from "../_shared/delivery/modulo.ts";
-import { ACCIONES_ENLINEA, ESTADOS_REPORTABLES, cajaSinActualizar, fallaDeTicket, moduloTiendaActivo, motivoDeTienda, pausaHasta } from "../_shared/delivery/enlinea.ts";
+import { ACCIONES_ENLINEA, cajaSinActualizar, fallaDeTicket, moduloTiendaActivo, motivoDeTienda, negativaDeReporte, pausaHasta } from "../_shared/delivery/enlinea.ts";
 import type { DbMinima } from "../_shared/delivery/procesar-uber.ts";
 
 const admin = clienteAdmin();
@@ -32,6 +32,8 @@ type Pedido = {
   id: string; tenant_id: string; sucursal_id: string; app: string; id_externo: string; estado: string; folio_corto: string | null;
   // En un pedido de la tienda en línea (canal TIENDA) no hay conexión de app.
   canal: string; conexion_id: string | null; gestion: "NUBE" | "ESCRITORIO"; gestion_caja_id: string | null;
+  /** Canal TIENDA: EFECTIVO, TARJETA o EN_LINEA (ya pagado). */
+  pago_al_recibir: string | null;
 };
 const MOTIVOS: MotivoRechazo[] = ["AGOTADO", "CERRADO", "SATURADO", "POS_OFFLINE", "OTRO"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -191,7 +193,7 @@ servir(async (req, json) => {
   if (!body.pedido_id) return json({ error: "FALTAN_CAMPOS" }, 400);
 
   const { data: pData } = await admin.from("delivery_pedidos")
-    .select("id, tenant_id, sucursal_id, app, canal, id_externo, estado, folio_corto, conexion_id, gestion, gestion_caja_id").eq("id", body.pedido_id).maybeSingle();
+    .select("id, tenant_id, sucursal_id, app, canal, id_externo, estado, folio_corto, conexion_id, gestion, gestion_caja_id, pago_al_recibir").eq("id", body.pedido_id).maybeSingle();
   const pedido = pData as Pedido | null;
   if (!pedido || pedido.tenant_id !== tenantId) return json({ error: "PEDIDO_NO_EXISTE" }, 404);
   const esDeTienda = pedido.canal === "TIENDA";
@@ -274,11 +276,9 @@ servir(async (req, json) => {
       }
       case "estado": {
         // La caja instalada cuenta en qué va el pedido mirando su ticket local. Solo ella lo sabe.
-        if (!esDispositivo || !cajaDispositivo) return json({ error: "SOLO_DISPOSITIVO" }, 403);
-        if (!ESTADOS_REPORTABLES.includes(String(body.estado))) return json({ error: "ESTADO_INVALIDO" }, 400);
-        // Solo de un pedido que atiende una caja: el de gestión NUBE lo pone al día la base mirando
-        // su ticket (tienda_sincronizar_estados_nube), y ninguna caja tiene ese ticket.
-        if (pedido.gestion !== "ESCRITORIO") return json({ error: "ACCION_INVALIDA", estado: pedido.estado }, 409);
+        // La excepción es el «Listo» del POS web sobre un pedido pagado en línea (negativaDeReporte).
+        const no = negativaDeReporte({ esDispositivo: esDispositivo && cajaDispositivo !== null, gestion: pedido.gestion, pago: pedido.pago_al_recibir, estado: body.estado });
+        if (no) return json(no.status === 409 ? { error: no.error, estado: pedido.estado } : { error: no.error }, no.status);
         const estado = exigir(await admin.rpc("tienda_reportar_estado", {
           p_tenant: tenantId, p_pedido: pedido.id, p_estado: body.estado, p_motivo: motivoDeTienda(body.motivo),
         }));

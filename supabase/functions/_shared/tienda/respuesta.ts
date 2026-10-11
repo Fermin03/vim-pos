@@ -78,6 +78,10 @@ export function cuposDe(accion: Peticion["accion"], ip: string, negocio: string,
     ({ antes: [{ clave: `tienda:${bolsa}:ip:${quien}`, ventanaSeg, max }], despuesDelCaptcha, alFallar });
   switch (accion) {
     case "seguimiento": return porIp("sigue", 600, 90, "abrir");
+    // La página del pedido la llama en vez de `seguimiento` mientras espera el pago: mismo ritmo y
+    // su propia bolsa. Escribe (puede mover el pedido y cuesta una consulta a Mercado Pago, que ya
+    // va espaciada por pago en la base): si el control falla, cierra.
+    case "confirmar_pago": return porIp("confirma", 600, 90, "cerrar");
     case "negocio": case "menu": case "cotizar": return porIp("lee", 600, 120, "abrir");
     // Auditoría (B1): el slug llega aquí sin validar (el negocio se busca después), así que el cupo
     // por IP y restaurante solo no basta: cada slug inventado estrenaría un contador. Delante va uno
@@ -189,6 +193,29 @@ export function leerPedido(x: unknown): Pedido | null {
   if (typeof folio_corto !== "string" || !folio_corto || typeof total_mxn !== "string" || !IMPORTE.test(total_mxn)
       || typeof vence_aceptacion !== "string" || !vence_aceptacion) return null;
   return { folio_corto, total_mxn, vence_aceptacion };
+}
+
+export type PedidoEnLinea = {
+  /** Interno: el renglón de tienda_pagos. NUNCA sale en una respuesta. */
+  pagoId: string;
+  publico: { folio_corto: string; total_mxn: string; vence_aceptacion: null; propina_mxn: string; total_a_pagar_mxn: string; vence_pago: string };
+};
+
+/**
+ * Lo que devuelve `tienda_crear_pedido` para un pedido que se paga en línea: no tiene ventana de
+ * aceptación (empieza cuando se paga) y trae su pago. null si la forma no es esa, como `leerPedido`.
+ */
+export function leerPedidoEnLinea(x: unknown): PedidoEnLinea | null {
+  if (!objeto(x)) return null;
+  const { folio_corto, total_mxn, pago_id, propina_mxn, total_a_pagar_mxn, vence_pago } = x;
+  if (typeof folio_corto !== "string" || !folio_corto || typeof pago_id !== "string" || !pago_id
+      || typeof vence_pago !== "string" || !vence_pago
+      || ![total_mxn, propina_mxn, total_a_pagar_mxn].every((v) => typeof v === "string" && IMPORTE.test(v))) return null;
+  return {
+    pagoId: pago_id,
+    publico: { folio_corto, total_mxn: total_mxn as string, vence_aceptacion: null, propina_mxn: propina_mxn as string,
+               total_a_pagar_mxn: total_a_pagar_mxn as string, vence_pago },
+  };
 }
 
 /**

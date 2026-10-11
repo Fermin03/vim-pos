@@ -16,7 +16,7 @@ import { clienteAdmin, servir } from "../_shared/http.ts";
 import { bearerDe, claimsDe } from "../_shared/identidad.ts";
 import { registrarError } from "../_shared/errores.ts";
 import { cajaIdDeEmail } from "../_shared/latido.ts";
-import { alcanceEspejo, cadenciaEspejo, cursorPedido, respuestaSinModulo, selloLatido, TOPE_PEDIDOS, unirPedidos } from "../_shared/delivery/espejo.ts";
+import { alcanceEspejo, cadenciaEspejo, cursorPedido, filtroPagoEnLinea, respuestaSinModulo, selloLatido, TOPE_PEDIDOS, unirPedidos } from "../_shared/delivery/espejo.ts";
 
 const admin = clienteAdmin();
 
@@ -53,7 +53,7 @@ servir(async (req, json) => {
   const cajaId = cajaIdDeEmail(userResp.user.email);
   if (!tenantId || !cajaId) return json({ error: "DISPOSITIVO_SIN_CAJA" }, 403);
 
-  const cuerpo = (await req.json().catch(() => ({})) ?? {}) as { desde?: unknown; turno_abierto?: unknown; tienda?: unknown };
+  const cuerpo = (await req.json().catch(() => ({})) ?? {}) as { desde?: unknown; turno_abierto?: unknown; tienda?: unknown; pago_en_linea?: unknown };
   const desde = cursorPedido(cuerpo.desde);
 
   // Latido y verificación de la caja en un solo viaje: si no vuelve fila, la caja no existe, no es
@@ -86,11 +86,16 @@ servir(async (req, json) => {
     return json({ ...respuestaSinModulo(caja.id, caja.sucursal_id), ...(declaraTienda && { tienda: null }) });
   }
 
-  const pedidosDe = () => admin.from("delivery_pedidos")
-    .select(alcance.conTienda ? COLS_PEDIDO_TIENDA : COLS_PEDIDO)
-    .eq("tenant_id", tenantId).eq("sucursal_id", caja.sucursal_id)
-    .in("canal", alcance.canales)
-    .order("recibido_at", { ascending: false }).limit(TOPE_PEDIDOS);
+  const pedidosDe = () => {
+    const q = admin.from("delivery_pedidos")
+      .select(alcance.conTienda ? COLS_PEDIDO_TIENDA : COLS_PEDIDO)
+      .eq("tenant_id", tenantId).eq("sucursal_id", caja.sucursal_id)
+      .in("canal", alcance.canales);
+    // Los pedidos que se pagan en línea solo bajan ya pagados y solo a la caja que los entiende
+    // (ver filtroPagoEnLinea). Sin el canal Tienda no hay ninguno: la consulta queda como estaba.
+    return (alcance.conTienda ? q.or(filtroPagoEnLinea(cuerpo)) : q)
+      .order("recibido_at", { ascending: false }).limit(TOPE_PEDIDOS);
+  };
   const hace24h = new Date(Date.now() - 24 * 3600_000).toISOString();
 
   const sinFila = Promise.resolve({ data: null, error: null });

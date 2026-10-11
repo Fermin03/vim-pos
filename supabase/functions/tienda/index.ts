@@ -2,7 +2,7 @@
 //
 //   POST /functions/v1/tienda     x-vim-tienda: <VIM_TIENDA_SECRET>     x-tienda-ip: <IP del cliente>
 //                                 x-tienda-sesion: <token de sesión>    (opcional; solo cuentas y `pedir`)
-//   { accion: "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento"
+//   { accion: "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago"
 //           | "registrar" | "entrar" | "salir" | "recuperar_pedir" | "recuperar_aplicar" | "cuenta"
 //           | "cuenta_guardar" | "cuenta_password" | "direccion_guardar" | "direccion_borrar"
 //           | "mis_pedidos" | "eliminar_cuenta", negocio: <slug>, … }
@@ -62,9 +62,22 @@
 // RPC va acotada a ese tenant. La lógica (precios, horario, topes, contraseñas, bloqueo) vive en las
 // funciones SQL de 0162 y 0166.
 //
-// SECRETOS: VIM_TIENDA_SECRET, VIM_TIENDA_URL (base de los enlaces del correo), TURNSTILE_SECRET_KEY,
-// TURNSTILE_HOSTNAMES (tiene que incluir el dominio de la tienda), CAPTCHA_OPCIONAL (solo local),
-// VIM_SMTP_*.
+// PAGO EN LÍNEA (Checkout Pro de Mercado Pago; 0172 y _shared/tienda/pago-*.ts)
+//   `pedir` con `pago: "EN_LINEA"` (y `propina_pct`: 0, 10, 15 o 20) crea el pedido POR_PAGAR, que no
+//   existe para la caja ni manda correo, y la preferencia en Mercado Pago con el token del
+//   restaurante. Contesta lo de siempre más `propina_mxn`, `total_a_pagar_mxn`, `vence_pago` y
+//   `pago: { estado, init_point }`: el navegador se manda a `init_point`. El monto lo pone la base;
+//   del cliente solo se acepta el porcentaje. Errores propios: 409 PAGO_EN_PROCESO (otra petición
+//   del mismo intento está creando la preferencia: reintentar), 502 PAGO_NO_DISPONIBLE (Mercado Pago
+//   no la creó: el pedido se descartó, no existe).
+//   `confirmar_pago` es el respaldo del aviso (`tienda-webhook-mp`): misma consulta autenticada,
+//   mismo camino. Nunca se cree nada de la URL con que Mercado Pago regresa al cliente.
+//   De Mercado Pago solo sale `init_point`: ni ids de pago ni datos de la tarjeta.
+//
+// SECRETOS: VIM_TIENDA_SECRET, VIM_TIENDA_URL (base de los enlaces del correo y del regreso de
+// Mercado Pago; https), TURNSTILE_SECRET_KEY, TURNSTILE_HOSTNAMES (tiene que incluir el dominio de
+// la tienda), CAPTCHA_OPCIONAL (solo local), VIM_SMTP_*. Los tokens de Mercado Pago no son secretos
+// de la función: son de cada restaurante y viven en Vault (0169).
 import { clienteAdmin } from "../_shared/http.ts";
 import { consumirCupo, consumirCupos, leerCuerpoAcotado, type ResultadoCupo } from "../_shared/limite.ts";
 import { secretoInternoValido } from "../_shared/delivery/interno.ts";
@@ -76,12 +89,45 @@ import { codigoDeClave, huellaDe, nuevoCodigo } from "../_shared/tienda/seguimie
 import { correoDePedido } from "../_shared/tienda/correo-pedido.ts";
 import { correoDeBienvenida, correoDeRecuperacion, correoYaTienesCuenta } from "../_shared/tienda/correo-cuenta.ts";
 import { CABECERA_SESION, cuentaDe, direccionesPublicas, leerRegistro, leerSesion, pedidosPublicos, type Sesion } from "../_shared/tienda/cuenta.ts";
-import { cotizacionPublica, type Cupos, cuposDe, esTopeDeEntradas, ipDeConfianza, leerNegocio, leerPedido, type Negocio, respuestaDeCaptcha, respuestaDeRpc, yaExistia } from "../_shared/tienda/respuesta.ts";
+import { cotizacionPublica, type Cupos, cuposDe, esTopeDeEntradas, ipDeConfianza, leerNegocio, leerPedido, leerPedidoEnLinea, type Negocio, respuestaDeCaptcha, respuestaDeRpc, yaExistia } from "../_shared/tienda/respuesta.ts";
+import { confirmarPago, prepararPago } from "../_shared/tienda/pago-flujo.ts";
+import { depsDePagos } from "../_shared/tienda/pago-puerto.ts";
 
 const MAX_CUERPO = 32_768;
 
 type Admin = ReturnType<typeof clienteAdmin>;
-type PeticionDeCuenta = Exclude<Peticion, { accion: "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento" }>;
+type PeticionDeCuenta = Exclude<Peticion, { accion: "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" }>;
+
+/**
+ * El correo que confirma un pedido: después de responder, y pase lo que pase el pedido ya existe.
+ * Los renglones, ya listos para enseñar, los trae el seguimiento del propio pedido.
+ */
+function correoDeConfirmacion(admin: Admin, d: {
+  p_tenant: string; p_seguimiento_hash: string; email: string | null; negocio: string; slug: string; codigo: string; pagado: boolean;
+}): void {
+  const base = (Deno.env.get("VIM_TIENDA_URL") ?? "").replace(/\/+$/, "");
+  if (!d.email) return;
+  if (!base || !Deno.env.get("VIM_SMTP_HOST")) {
+    console.warn("[tienda] sin correo de confirmación (falta VIM_TIENDA_URL o VIM_SMTP_*).");
+    return;
+  }
+  const to = d.email;
+  enSegundoPlano((async () => {
+    const seg = await admin.rpc("tienda_seguimiento", { p_tenant: d.p_tenant, p_seguimiento_hash: d.p_seguimiento_hash });
+    if (seg.error) return registrarError("tienda", "CORREO_PEDIDO", seg.error);
+    const s = seg.data as { folio_corto?: string; modo?: "RECOGER" | "DOMICILIO"; total_mxn?: string; total_a_pagar_mxn?: string;
+                            renglones?: { nombre: string; cantidad: number; detalle: string | null }[] } | null;
+    if (!s?.folio_corto || !s.total_mxn) return;
+    const { subject, html } = correoDePedido({
+      negocio: d.negocio, folio: s.folio_corto, total: (d.pagado ? s.total_a_pagar_mxn : null) ?? s.total_mxn,
+      modo: s.modo === "DOMICILIO" ? "DOMICILIO" : "RECOGER", renglones: s.renglones ?? [],
+      enlace: `${base}/${d.slug}/pedido/${d.codigo}`, pagado: d.pagado,
+    });
+    const r = await enviarCorreo({ to, subject, html });
+    // Sin el motivo de SMTP: puede traer la dirección del cliente.
+    if (!r.enviado) console.warn(`[tienda] pedido ${s.folio_corto}: el correo de confirmación no salió.`);
+  })().catch((e) => registrarError("tienda", "CORREO_PEDIDO", e)));
+}
 
 // Propio, y no el de `servir()`: aquel lleva las cabeceras CORS. `no-store`: la respuesta de
 // `pedir` trae el código de seguimiento, y las de cuentas el token de sesión; ningún intermediario
@@ -362,6 +408,53 @@ async function atender(req: Request): Promise<Response> {
     return seg.data ? json(seg.data) : json({ error: "PEDIDO_NO_ENCONTRADO" }, 404);
   }
 
+  // ── confirmar_pago ──────────────────────────────────────────────────────────────────────────
+  // El respaldo del aviso de Mercado Pago, desde la página del pedido: el cliente volvió de pagar y
+  // el aviso tarda o no llega. Hace lo MISMO que el aviso (pago-flujo.ts): le pregunta a Mercado
+  // Pago con el token del restaurante y aplica lo que diga. De quien llama solo se usa el código
+  // del pedido: los parámetros con los que Mercado Pago lo regresó (`status=approved`…) ni se leen.
+  // Contesta el seguimiento; mientras siga esperando el pago, además `init_point` para reintentar.
+  if (p.accion === "confirmar_pago") {
+    const p_seguimiento_hash = await huellaDe(p.codigo);
+    const ped = await admin.from("delivery_pedidos").select("id, cliente_email, pago_al_recibir")
+      .eq("seguimiento_hash", p_seguimiento_hash).eq("tenant_id", p_tenant).eq("canal", "TIENDA").maybeSingle();
+    if (ped.error) return rechazo("confirmar_pago", ped.error);
+    const pedido = ped.data as { id: string; cliente_email: string | null; pago_al_recibir: string | null } | null;
+    if (!pedido) return json({ error: "PEDIDO_NO_ENCONTRADO" }, 404);
+
+    let initPoint: string | null = null;
+    if (pedido.pago_al_recibir === "EN_LINEA") {
+      const pg = await admin.from("tienda_pagos").select("id, estado, init_point, conciliado_at")
+        .eq("pedido_id", pedido.id).eq("extra", false).maybeSingle();
+      if (pg.error) return rechazo("confirmar_pago", pg.error);
+      const pago = pg.data as { id: string; estado: string; init_point: string | null; conciliado_at: string | null } | null;
+      if (pago) {
+        initPoint = pago.init_point;
+        const esperaPago = pago.estado === "CREADO" || pago.estado === "RECHAZADO" || (pago.estado === "VENCIDO" && !pago.conciliado_at);
+        // A lo sumo una consulta a Mercado Pago cada 10 s por pago, por mucho que insista la página.
+        if (esperaPago) {
+          const turno = await admin.rpc("tienda_pago_tomar_consulta", { p_pago: pago.id, p_segundos: 10 });
+          if (turno.error) return rechazo("tienda_pago_tomar_consulta", turno.error);
+          // Si Mercado Pago no contesta no es un error para el cliente: ve su pedido como está y la página reintenta.
+          if (turno.data === true) await confirmarPago(depsDePagos(admin, "tienda"), pago.id);
+        }
+        // El correo de confirmación de un pedido pagado sale aquí (es quien tiene el código del
+        // enlace; el aviso de Mercado Pago no lo conoce), una sola vez.
+        const correo = await admin.rpc("tienda_pago_tomar_correo", { p_pago: pago.id });
+        if (correo.error) registrarError("tienda", "CORREO_PEDIDO", correo.error);
+        else if (correo.data === true) {
+          correoDeConfirmacion(admin, { p_tenant, p_seguimiento_hash, email: pedido.cliente_email, negocio: negocio.nombre, slug: p.negocio, codigo: p.codigo, pagado: true });
+        }
+      }
+    }
+    const seg = await admin.rpc("tienda_seguimiento", { p_tenant, p_seguimiento_hash });
+    if (seg.error) return rechazo("tienda_seguimiento", seg.error);
+    const s = seg.data as Record<string, unknown> | null;
+    if (!s) return json({ error: "PEDIDO_NO_ENCONTRADO" }, 404);
+    const puedePagar = s.pago_estado === "ESPERANDO_PAGO" || s.pago_estado === "RECHAZADO";
+    return json(puedePagar && initPoint ? { ...s, init_point: initPoint } : s);
+  }
+
   if (p.accion !== "menu" && p.accion !== "cotizar" && p.accion !== "pedir") return cuentas(p, { admin, negocio, ip, sesion, cupos });
 
   // menu, cotizar y pedir: la sucursal tiene que ser una de las que la tienda enseña.
@@ -409,6 +502,17 @@ async function atender(req: Request): Promise<Response> {
     return sinCupo(cupoNegocio);
   }
 
+  // Pago en línea: sin a dónde regresar al cliente ni a dónde avise Mercado Pago no se puede cobrar.
+  // Se comprueba ANTES de crear nada (las dos direcciones tienen que ser https: Mercado Pago
+  // descarta en silencio las que no).
+  const enLinea = p.pago === "EN_LINEA";
+  const baseTienda = (Deno.env.get("VIM_TIENDA_URL") ?? "").replace(/\/+$/, "");
+  const baseFunciones = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
+  if (enLinea && !(baseTienda.startsWith("https://") && baseFunciones.startsWith("https://"))) {
+    registrarError("tienda", "PAGO_SIN_CONFIGURAR", "VIM_TIENDA_URL y SUPABASE_URL tienen que ser https para cobrar en línea");
+    return json({ error: "SERVICIO_NO_DISPONIBLE" }, 503);
+  }
+
   // El código solo lo tendrá el cliente (esta respuesta y su correo). A la base va la huella.
   // Con `clave` el código se deriva de ella: el reintento del mismo intento de compra da la misma
   // huella, y la base, en vez de crear otro pedido, devuelve el que ya existe (0167). Sin `clave`,
@@ -427,8 +531,32 @@ async function atender(req: Request): Promise<Response> {
     p_total_esperado: p.total_esperado,   // lo que el cliente vio; si ya no es ese, 409 TOTAL_CAMBIO con el nuevo
     // Solo si vino: sin `clave` la llamada es, argumento por argumento, la de antes de la 0167.
     ...(p.clave && { p_clave: p.clave }),
+    // Solo en línea: un pedido al recibir llama, argumento por argumento, como antes de la 0172.
+    ...(enLinea && { p_propina_pct: p.propina_pct ?? 0 }),
   });
   if (alta.error) return rechazo("tienda_crear_pedido", alta.error);
+
+  // ── Pago en línea: el pedido nació POR_PAGAR; falta a dónde mandar al cliente a pagar ─────────
+  // Sin correo todavía: nadie ha pagado nada. El de confirmación sale cuando el pago se confirma.
+  if (enLinea) {
+    const porPagar = leerPedidoEnLinea(alta.data);
+    if (!porPagar) {
+      registrarError("tienda", "PEDIDO_FORMA_INESPERADA", "tienda_crear_pedido no devolvió el pago de un pedido en línea");
+      return json({ error: "SERVICIO_NO_DISPONIBLE" }, 503);
+    }
+    // Un reintento con la misma `clave` trae el mismo pago: prepararPago devuelve su MISMO
+    // init_point sin crear otra preferencia. Si Mercado Pago no deja crearla, descarta el pedido.
+    const pago = await prepararPago(depsDePagos(admin, "tienda"), {
+      pagoId: porPagar.pagoId, folio: porPagar.publico.folio_corto, negocio: negocio.nombre,
+      regreso: `${baseTienda}/${p.negocio}/pedido/${codigo}`,
+      // La referencia va en la query: así el aviso llega diciendo de qué pago habla.
+      aviso: `${baseFunciones}/functions/v1/tienda-webhook-mp?ref=${porPagar.pagoId}`,
+      ahora: new Date(), email: p.cliente.email,
+    });
+    if (!pago.ok) return json({ error: pago.error }, pago.error === "PAGO_EN_PROCESO" ? 409 : 502);
+    return json({ codigo, ...porPagar.publico, pago: { estado: pago.init_point ? "ESPERANDO_PAGO" : "CERRADO", init_point: pago.init_point } });
+  }
+
   const pedido = leerPedido(alta.data);
   if (!pedido) {
     // El pedido YA existe: el cliente recibe su código (con él lo sigue) aunque falte lo demás.
@@ -440,26 +568,10 @@ async function atender(req: Request): Promise<Response> {
   // Un reintento con la misma `clave` no lo repite (auditoría, B3): el pedido ya existía y su correo
   // salió con el primer envío; mandarlo otra vez —a la dirección que traiga el reintento, que puede
   // ser otra— sería correo nuestro en el buzón de quien no pidió nada.
-  const email = yaExistia(alta.data) ? null : p.cliente.email;
-  const base = (Deno.env.get("VIM_TIENDA_URL") ?? "").replace(/\/+$/, "");
-  const modo = p.modo, slug = p.negocio;
-  if (email && base && Deno.env.get("VIM_SMTP_HOST")) {
-    enSegundoPlano((async () => {
-      // Los renglones, ya listos para enseñar, los trae el seguimiento del propio pedido.
-      const seg = await admin.rpc("tienda_seguimiento", { p_tenant, p_seguimiento_hash });
-      if (seg.error) return registrarError("tienda", "CORREO_PEDIDO", seg.error);
-      const renglones = (seg.data as { renglones?: { nombre: string; cantidad: number; detalle: string | null }[] } | null)?.renglones ?? [];
-      const { subject, html } = correoDePedido({
-        negocio: negocio.nombre, folio: pedido.folio_corto, total: pedido.total_mxn, modo, renglones,
-        enlace: `${base}/${slug}/pedido/${codigo}`,
-      });
-      const r = await enviarCorreo({ to: email, subject, html });
-      // Sin el motivo de SMTP: puede traer la dirección del cliente.
-      if (!r.enviado) console.warn(`[tienda] pedido ${pedido.folio_corto}: el correo de confirmación no salió.`);
-    })().catch((e) => registrarError("tienda", "CORREO_PEDIDO", e)));
-  } else if (email) {
-    console.warn(`[tienda] pedido ${pedido.folio_corto}: sin correo de confirmación (falta VIM_TIENDA_URL o VIM_SMTP_*).`);
-  }
+  correoDeConfirmacion(admin, {
+    p_tenant, p_seguimiento_hash, email: yaExistia(alta.data) ? null : p.cliente.email,
+    negocio: negocio.nombre, slug: p.negocio, codigo, pagado: false,
+  });
 
   return json({ codigo, ...pedido });
 }

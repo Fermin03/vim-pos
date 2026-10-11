@@ -57,3 +57,10 @@ test("la cantidad se imprime como número", () => {
   assert.doesNotMatch(html, /<b>/);
 });
 
+test("un pedido al recibir dice «Pagas al recibir»; uno ya pagado en línea, no", () => {
+  assert.match(correoDePedido(base).html, /Pagas al recibir\./);
+  assert.match(correoDePedido({ ...base, pagado: false }).html, /Pagas al recibir\./);
+  const pagado = correoDePedido({ ...base, pagado: true }).html;
+  assert.doesNotMatch(pagado, /al recibir/i);
+  assert.match(pagado, /Recibimos tu pedido <strong>TAB12C<\/strong>\. Te lo llevamos a domicilio\.<\/p>/);
+});

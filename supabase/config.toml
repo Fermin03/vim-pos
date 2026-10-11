@@ -38,6 +38,11 @@ verify_jwt = false
 [functions.terminal-webhook-mp]
 verify_jwt = false
 
+# Avisos de Checkout Pro (pago en línea de la tienda) y la puerta interna de su barrido: sin JWT.
+# El aviso es solo una pista: la función consulta el pago con el token del restaurante.
+[functions.tienda-webhook-mp]
+verify_jwt = false
+
 [functions.signup-tenant]
 verify_jwt = false
 
