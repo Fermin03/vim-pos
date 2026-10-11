@@ -26,8 +26,8 @@ export type FilaPago = {
   detalle: string | null;
   /** Cuándo nació el renglón (ISO): acota la búsqueda por referencia. */
   creado: string;
-  /** `tienda_conexiones.de_prueba`. */
-  de_prueba: boolean;
+  /** `tienda_conexiones.cuenta_id_externo`: el user_id de Mercado Pago que tiene que traer la orden. */
+  cuenta_vendedora: string;
 };
 
 export type Aplicado = { estado: string; pedido_estado: string; recien_aprobado: boolean };
@@ -91,8 +91,8 @@ export type Cobro =
  *     crea orden), una orden que nace `failed`, o un 400/422 de validación (no creó nada). Sin
  *     respuesta, un 5xx, 409, 429 o un estado que no es final nunca son «rechazado»: POR_CONFIRMAR;
  *   · un 401 no es un rechazo de la tarjeta: PAGO_NO_DISPONIBLE;
- *   · una orden aprobada se cree después de `decidirOrden` (referencia, modo, acreditada) y de que
- *     la base compruebe el monto;
+ *   · una orden aprobada se cree después de `decidirOrden` (referencia, cuenta vendedora, moneda,
+ *     acreditada) y de que la base compruebe el monto;
  *   · una orden que queda en revisión (`processing`) NO se puede cancelar (VERIFICADO: 409): se
  *     anota su id y queda POR_CONFIRMAR.
  */
@@ -129,7 +129,7 @@ export async function cobrarPago(deps: Deps, datos: Omit<DatosCobro, "monto">): 
   // (Sin token y con el cobro ya mandado no se llega aquí: `tomarCobro` dio falso arriba.)
   if (!token) return { tipo: "POR_CONFIRMAR" };
   const r = await deps.mp(token).crearOrden(cuerpoDeOrden({ ...datos, monto: fila.monto }), `tienda-pago-${fila.id}`);
-  const que = respuestaDeCobro({ pagoId: fila.id, dePrueba: fila.de_prueba }, r);
+  const que = respuestaDeCobro({ pagoId: fila.id, cuentaVendedora: fila.cuenta_vendedora }, r);
   if (que.tipo === "SIN_PERMISO") {
     deps.registrar("COBRO_SIN_PERMISO", `conexión ${fila.conexion_id}: ${resumenDeFallo(r)}`);
     return descartar({ tipo: "NO_DISPONIBLE", sinPermiso: true });
@@ -201,12 +201,12 @@ export async function confirmarPago(deps: Deps, pagoId: string, ordenPista?: str
     return { ok: false, motivo: "MP_NO_RESPONDE" };
   }
 
-  const esperado = { pagoId: fila.id, dePrueba: fila.de_prueba };
+  const esperado = { pagoId: fila.id, cuentaVendedora: fila.cuenta_vendedora };
   let aplicados = 0, recienAprobado = false;
   const ordenes = ordenId ? [r.cuerpo] : ordenesDeBusqueda(r.cuerpo);
   const decisiones = ordenes.map((orden) => decidirOrden(esperado, orden));
-  // Una orden viva que trae NUESTRA referencia y que no se puede aplicar (otro modo, sin acreditar,
-  // otra moneda, en revisión): se deja dicho con su id y su motivo, en el log y en el pago.
+  // Una orden viva que trae NUESTRA referencia y que no se puede aplicar (otra cuenta vendedora, sin
+  // acreditar, otra moneda, en revisión): se deja dicho con su id y su motivo, en el log y en el pago.
   let sinAplicar: string | null = null;
   for (const [i, orden] of ordenes.entries()) {
     const d = decisiones[i]!;

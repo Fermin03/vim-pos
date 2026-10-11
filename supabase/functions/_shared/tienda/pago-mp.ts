@@ -95,8 +95,8 @@ function detalleDeRechazo(error: Record<string, unknown>): string | null {
 export type Esperado = {
   /** El id de tienda_pagos: la referencia que tiene que traer la orden. */
   pagoId: string;
-  /** `tienda_conexiones.de_prueba`: la conexión con la que se consultó es de prueba. */
-  dePrueba: boolean;
+  /** `tienda_conexiones.cuenta_id_externo`: el user_id de Mercado Pago de la cuenta que cobra. */
+  cuentaVendedora: string;
 };
 
 type DatosDeOrden = { ordenIdExterno: string; pagoIdExterno: string | null; monto: string;
@@ -108,18 +108,19 @@ export type Decision =
   | { tipo: "PENDIENTE" | "AJENO" | "INCIDENTE"; motivo: string; ordenIdExterno: string | null };
 
 /**
- * Qué significa una orden de Mercado Pago (la respuesta de crearla o de `GET /v1/orders/{id}`) para
- * el pago que esperamos.
+ * Qué significa una orden de Mercado Pago (la respuesta de crearla, de `GET /v1/orders/{id}` o de
+ * la búsqueda) para el pago que esperamos.
  *
- * QUÉ GARANTIZA QUE EL DINERO CAYÓ DONDE DEBE. No está probado que la orden traiga un campo que
- * identifique a la cuenta vendedora (documento 04, «sin probar»), así que aquí no se compara ninguno.
- * La garantía es otra: la orden se creó o se consultó con el access token de ESA conexión (Mercado
- * Pago solo deja ver las órdenes de la cuenta dueña del token), trae NUESTRA referencia —el id de
- * tienda_pagos, que nace ligado a esa conexión— y el monto es el esperado (lo comprueba la base, en
- * la misma transacción que mueve el pedido). Una orden de otra cuenta contestaría 404 a ese token.
+ * QUÉ GARANTIZA QUE EL DINERO CAYÓ DONDE DEBE (VERIFICADO, documento 04): la orden trae `user_id`,
+ * el id de la cuenta vendedora, como texto. Antes de mirar su estado tiene que ser NUESTRA:
+ *   · `external_reference` es el id de tienda_pagos que esperamos;
+ *   · `user_id` es la cuenta de la conexión que cobra ese pago (se compara como texto);
+ * y para darla por cobrada, además: `currency` es `MXN`, está `processed`/`accredited`, y el monto
+ * es el esperado (eso lo comprueba la base, en la misma transacción que mueve el pedido).
+ * Además se creó o se consultó con el access token de esa misma conexión.
  *
- * El modo: si la orden trae `live_mode` (tampoco está probado que lo traiga), tiene que casar con el
- * de la conexión, en los dos sentidos: ni una orden de prueba en una cuenta real, ni al revés.
+ * La orden NO trae `live_mode` (verificado): aquí no se mira. Que una conexión de prueba no cobre
+ * en un negocio real lo decide solo la marca de la conexión (`tienda_conexion_cobro`, 0173).
  * Un estado que no conocemos nunca es «aprobado».
  */
 export function decidirOrden(e: Esperado, orden: unknown): Decision {
@@ -127,9 +128,9 @@ export function decidirOrden(e: Esperado, orden: unknown): Decision {
   const ordenIdExterno = idDe(o.id);
   if (!ordenIdExterno) return { tipo: "AJENO", motivo: "sin id de orden", ordenIdExterno: null };
   if (o.external_reference !== e.pagoId) return { tipo: "AJENO", motivo: "otra referencia", ordenIdExterno };
-  if (typeof o.live_mode === "boolean" && o.live_mode !== !e.dePrueba) {
-    return { tipo: "AJENO", motivo: e.dePrueba ? "orden real en una conexión de prueba" : "orden de prueba en una cuenta real", ordenIdExterno };
-  }
+  // Como texto: Mercado Pago lo manda así ("3754297554"); si un día llegara como número, vale igual.
+  const vendedor = typeof o.user_id === "string" ? o.user_id : typeof o.user_id === "number" && Number.isSafeInteger(o.user_id) ? String(o.user_id) : "";
+  if (vendedor === "" || vendedor !== e.cuentaVendedora) return { tipo: "AJENO", motivo: "otra cuenta vendedora", ordenIdExterno };
 
   const d = datosDeOrden(o);
   const estado = String(o.status ?? ""), detalle = txt(o.status_detail);
@@ -145,7 +146,8 @@ export function decidirOrden(e: Esperado, orden: unknown): Decision {
   // El monto que manda es lo que Mercado Pago COBRÓ, no lo que se le pidió.
   const monto = montoTexto(o.total_paid_amount);
   if (estado === "refunded") {
-    const devuelto = monto ?? montoTexto(o.total_amount);
+    // VERIFICADO: `refunded` / `refunded`, y el pago trae `refunded_amount`.
+    const devuelto = monto ?? montoTexto(pago.refunded_amount) ?? montoTexto(o.total_amount);
     return devuelto ? { tipo: "DEVUELTO", ...comunes, monto: devuelto, detalle } : { tipo: "INCIDENTE", motivo: "monto ilegible", ordenIdExterno };
   }
   if (estado !== "processed") return { tipo: "INCIDENTE", motivo: `estado desconocido: ${estado.slice(0, 30)}`, ordenIdExterno };
@@ -153,9 +155,8 @@ export function decidirOrden(e: Esperado, orden: unknown): Decision {
   if (!monto) return { tipo: "INCIDENTE", motivo: "monto ilegible", ordenIdExterno };
   if (Array.isArray(pagos) && pagos.length !== 1) return { tipo: "INCIDENTE", motivo: `${pagos.length} pagos en la orden`, ordenIdExterno };
   if (pago.status !== undefined && pago.status !== "processed") return { tipo: "INCIDENTE", motivo: `pago ${String(pago.status).slice(0, 30)}`, ordenIdExterno };
-  // Si la orden dice su moneda, es pesos. (La cuenta es mexicana y el cobro no la elige.)
-  const moneda = o.currency ?? o.currency_id;
-  if (moneda !== undefined && moneda !== "MXN") return { tipo: "INCIDENTE", motivo: "moneda distinta de MXN", ordenIdExterno };
+  // VERIFICADO: la orden trae `currency`. Sin ella, o con otra, no se da por cobrada en pesos.
+  if (o.currency !== "MXN") return { tipo: "INCIDENTE", motivo: "moneda distinta de MXN", ordenIdExterno };
   return { tipo: "APROBADO", ...comunes, monto, detalle };
 }
 
@@ -193,18 +194,16 @@ export function respuestaDeCobro(e: Esperado, r: RespuestaMp): RespuestaDeCobro 
   return { tipo: "NO_SE_SABE" };
 }
 
-/** Las órdenes de `GET /v1/orders?…` (la búsqueda). Cualquier otra forma, ninguna. */
+/** Las órdenes de la búsqueda. VERIFICADO: `{ data: [orden…], paging: {…} }`. Cualquier otra forma, ninguna. */
 export function ordenesDeBusqueda(cuerpo: unknown): unknown[] {
-  const c = obj(cuerpo);
-  const r = c.data ?? c.results ?? c.elements ?? c.orders;
+  const r = obj(cuerpo).data;
   return Array.isArray(r) ? r : [];
 }
 
 /**
- * La ruta de la búsqueda por referencia. Mercado Pago exige `begin_date` y `end_date`
- * (VERIFICADO: sin ellas, 400 `missing_required_params`). SIN PROBAR: el formato de esas fechas; se
- * usa ISO 8601 en UTC con milisegundos (`2026-10-11T18:00:00.000Z`), que es el de la referencia
- * oficial de la API. Solo se usa cuando al crear la orden no hubo respuesta y no se sabe su id.
+ * La ruta de la búsqueda por referencia. VERIFICADO (documento 04): Mercado Pago exige `begin_date`
+ * y `end_date` en RFC 3339, con o sin milisegundos (`2026-10-11T18:00:00.000Z`); solo la fecha da
+ * 400 `invalid_search_params`. Solo se usa cuando al crear la orden no hubo respuesta y no se sabe su id.
  */
 export function rutaDeBusqueda(pagoId: string, desde: Date, hasta: Date): string {
   const q = new URLSearchParams({ external_reference: pagoId, begin_date: desde.toISOString(), end_date: hasta.toISOString() });
@@ -239,7 +238,7 @@ export function clienteMpTienda(token: string, pedir: typeof fetch = fetch) {
     crearOrden: (cuerpo: Record<string, unknown>, llave: string) => llamar("POST", "/v1/orders", cuerpo, llave),
     /** VERIFICADO. Solo ve las órdenes de la cuenta dueña del token. */
     leerOrden: (ordenIdExterno: string) => llamar("GET", `/v1/orders/${encodeURIComponent(ordenIdExterno)}`),
-    /** Las órdenes con nuestra referencia. Formato de las fechas SIN PROBAR (ver `rutaDeBusqueda`). */
+    /** Las órdenes con nuestra referencia, en una ventana de fechas (VERIFICADO: 200 `{ data: […] }`). */
     buscarOrdenes: (pagoId: string, desde: Date, hasta: Date) => llamar("GET", rutaDeBusqueda(pagoId, desde, hasta)),
     /**
      * Devolución TOTAL (sin cuerpo). VERIFICADO: repetir con la MISMA llave devuelve el mismo error

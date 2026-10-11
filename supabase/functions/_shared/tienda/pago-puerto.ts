@@ -19,16 +19,16 @@ export function puertoDePagos(admin: Admin): PuertoPagos {
   return {
     async leerPago(pagoId) {
       const f = exigir(await admin.from("tienda_pagos")
-        .select("id, conexion_id, estado, monto_mxn, cobro_pedido_at, orden_id_externo, detalle, created_at, conexion:tienda_conexiones(de_prueba)")
+        .select("id, conexion_id, estado, monto_mxn, cobro_pedido_at, orden_id_externo, detalle, created_at, conexion:tienda_conexiones(cuenta_id_externo)")
         .eq("id", pagoId).eq("extra", false).maybeSingle()) as
         | { id: string; conexion_id: string; estado: EstadoPago; monto_mxn: number | string; cobro_pedido_at: string | null;
-            orden_id_externo: string | null; detalle: string | null; created_at: string; conexion: { de_prueba: boolean } | null }
+            orden_id_externo: string | null; detalle: string | null; created_at: string; conexion: { cuenta_id_externo: string } | null }
         | null;
       const monto = f ? montoTexto(f.monto_mxn) : null;
       if (!f || !f.conexion || !monto) return null;
       const fila: FilaPago = {
         id: f.id, conexion_id: f.conexion_id, estado: f.estado, monto, cobro_mandado: f.cobro_pedido_at !== null,
-        orden_id_externo: f.orden_id_externo, detalle: f.detalle, creado: f.created_at, de_prueba: f.conexion.de_prueba === true,
+        orden_id_externo: f.orden_id_externo, detalle: f.detalle, creado: f.created_at, cuenta_vendedora: String(f.conexion.cuenta_id_externo),
       };
       return fila;
     },

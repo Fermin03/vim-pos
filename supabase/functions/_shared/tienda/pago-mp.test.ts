@@ -5,13 +5,15 @@ import assert from "node:assert/strict";
 import { clienteMpTienda, cuerpoDeOrden, decidirOrden, motivoDeRechazo, ordenesDeBusqueda, ordenViva, respuestaDeCobro, resumenDeFallo, rutaDeBusqueda } from "./pago-mp.ts";
 
 const PAGO = "2cd9e6fa-1acf-47dc-8ba4-cba918d73770";
-const E = { pagoId: PAGO, dePrueba: false };
+const E = { pagoId: PAGO, cuentaVendedora: "3754297554" };
 const TARJETA = { token: "ff8080814c11e237014c1ff593b57b4d", payment_method_id: "master", type: "credit_card" as const };
 
 /** 201 de un cobro aprobado (titular APRO). */
 const ORDEN_APROBADA = {
-  id: "ORDTST01M4P8JX8C82XV8G7EB2A16YAC", status: "processed", status_detail: "accredited",
+  id: "ORDTST01M4P8JX8C82XV8G7EB2A16YAC", type: "online", processing_mode: "automatic", status: "processed", status_detail: "accredited",
   total_amount: "138.00", total_paid_amount: "138.00", external_reference: PAGO, capture_mode: "automatic_async",
+  // Claves reales de una orden (documento 04): el vendedor como texto, la moneda y el país. No trae live_mode.
+  user_id: "3754297554", currency: "MXN", country_code: "MEX", integration_data: { application_id: "1234567890" },
   transactions: { payments: [{ id: "PAY01M4P8JX8TKPS5B2ECXP875P89", status: "processed", status_detail: "accredited",
     payment_method: { id: "master", type: "credit_card" } }] },
 };
@@ -79,18 +81,24 @@ test("201 processing: en revisión, pendiente y con su orden (no se puede cancel
   for (const status of ["created", "action_required"]) assert.equal(decidirOrden(E, { ...ORDEN_APROBADA, status }).tipo, "PENDIENTE");
 });
 
-test("una orden que no es nuestra no se mira: sin id, otra referencia, o el modo que no casa con la conexión", () => {
+test("una orden que no es nuestra no se mira: sin id, otra referencia, o de otra cuenta vendedora", () => {
   assert.equal(decidirOrden(E, null).tipo, "AJENO");
   assert.equal(decidirOrden(E, { ...ORDEN_APROBADA, id: 123 }).tipo, "AJENO");
   assert.equal(decidirOrden(E, { ...ORDEN_APROBADA, id: "ORD con espacio" }).tipo, "AJENO");
   assert.equal(decidirOrden(E, { ...ORDEN_APROBADA, external_reference: "otra" }).tipo, "AJENO");
   assert.equal(decidirOrden(E, { ...ORDEN_APROBADA, external_reference: undefined }).tipo, "AJENO");
-  // live_mode, si viene, tiene que ser el de la conexión, en los dos sentidos.
-  assert.deepEqual(decidirOrden(E, { ...ORDEN_APROBADA, live_mode: false }), { tipo: "AJENO", motivo: "orden de prueba en una cuenta real", ordenIdExterno: ORDEN_APROBADA.id });
-  assert.equal(decidirOrden({ ...E, dePrueba: true }, { ...ORDEN_APROBADA, live_mode: true }).tipo, "AJENO");
-  assert.equal(decidirOrden(E, { ...ORDEN_APROBADA, live_mode: true }).tipo, "APROBADO");
-  assert.equal(decidirOrden({ ...E, dePrueba: true }, { ...ORDEN_APROBADA, live_mode: false }).tipo, "APROBADO");
-  // Sin probar que la orden lo traiga: si no viene, no se inventa.
+  // La cuenta vendedora (VERIFICADO: `user_id`, como texto) tiene que ser la de la conexión que cobra.
+  assert.deepEqual(decidirOrden(E, { ...ORDEN_APROBADA, user_id: "999" }), { tipo: "AJENO", motivo: "otra cuenta vendedora", ordenIdExterno: ORDEN_APROBADA.id });
+  for (const user_id of [undefined, null, "", "37542975540", " 3754297554", 3754297554.5, {}]) {
+    assert.equal(decidirOrden(E, { ...ORDEN_APROBADA, user_id }).tipo, "AJENO", JSON.stringify(user_id));
+  }
+  // Se compara como texto: si un día llegara como número, es la misma cuenta.
+  assert.equal(decidirOrden(E, { ...ORDEN_APROBADA, user_id: 3754297554 }).tipo, "APROBADO");
+  // Y vale para cualquier estado: una orden en revisión o fallida de OTRA cuenta tampoco es nuestra.
+  assert.equal(decidirOrden(E, { ...ORDEN_EN_REVISION, user_id: "999" }).tipo, "AJENO");
+  assert.equal(decidirOrden(E, { ...ORDEN_APROBADA, status: "failed", user_id: "999" }).tipo, "AJENO");
+  // La orden no trae `live_mode` (verificado): si viniera, no decide nada.
+  assert.equal(decidirOrden(E, { ...ORDEN_APROBADA, live_mode: false }).tipo, "APROBADO");
   assert.equal(decidirOrden(E, ORDEN_APROBADA).tipo, "APROBADO");
 });
 
@@ -102,6 +110,7 @@ test("nunca «aprobado» por un estado que no se conoce, sin acreditar, sin mont
   assert.equal(es({ total_paid_amount: undefined }).tipo, "INCIDENTE");
   assert.equal(es({ total_paid_amount: "0.00" }).tipo, "INCIDENTE");
   assert.equal(es({ currency: "USD" }).tipo, "INCIDENTE");
+  assert.equal(es({ currency: undefined }).tipo, "INCIDENTE");   // la orden real la trae: sin ella no se da por cobrada
   assert.equal(es({ currency: "MXN" }).tipo, "APROBADO");
   assert.equal(es({ transactions: { payments: [{ id: "PAY1", status: "failed" }] } }).tipo, "INCIDENTE");
   assert.equal(es({ transactions: { payments: [ORDEN_APROBADA.transactions.payments[0], ORDEN_APROBADA.transactions.payments[0]] } }).tipo, "INCIDENTE");
@@ -114,7 +123,9 @@ test("una orden fallida, cancelada o vencida es un rechazo; una devuelta, devuel
     assert.equal(d.tipo, "RECHAZADO", status);
     assert.equal(d.tipo === "RECHAZADO" && d.detalle, "insufficient_amount");
   }
-  const dev = decidirOrden(E, { ...ORDEN_APROBADA, status: "refunded", status_detail: "refunded" });
+  // VERIFICADO: una orden devuelta queda refunded / refunded y su pago trae refunded_amount.
+  const dev = decidirOrden(E, { ...ORDEN_APROBADA, status: "refunded", status_detail: "refunded",
+    transactions: { payments: [{ ...ORDEN_APROBADA.transactions.payments[0], refunded_amount: "138.00", paid_amount: "138.00", reference_id: "REF1" }] } });
   assert.equal(dev.tipo, "DEVUELTO");
   assert.equal(dev.tipo === "DEVUELTO" && dev.ordenIdExterno, ORDEN_APROBADA.id);
 });
@@ -124,12 +135,12 @@ test("orden viva: todo menos fallida, cancelada, vencida o devuelta (lo desconoc
   for (const status of ["failed", "canceled", "expired", "refunded"]) assert.equal(ordenViva({ status }), false, status);
 });
 
-test("la búsqueda por referencia lleva begin_date y end_date en ISO 8601 UTC (formato sin probar contra Mercado Pago)", () => {
+test("la búsqueda por referencia lleva begin_date y end_date en RFC 3339 (verificado), y la lista viene solo en data", () => {
   const ruta = rutaDeBusqueda(PAGO, new Date("2026-10-11T18:00:00Z"), new Date("2026-10-11T19:00:00Z"));
   assert.equal(ruta, `/v1/orders?external_reference=${PAGO}&begin_date=2026-10-11T18%3A00%3A00.000Z&end_date=2026-10-11T19%3A00%3A00.000Z`);
   assert.deepEqual(ordenesDeBusqueda({ data: [ORDEN_APROBADA] }), [ORDEN_APROBADA]);
-  assert.deepEqual(ordenesDeBusqueda({ results: [ORDEN_APROBADA] }), [ORDEN_APROBADA]);
-  for (const c of [null, [], { data: "x" }, "texto"]) assert.deepEqual(ordenesDeBusqueda(c), []);
+  assert.deepEqual(ordenesDeBusqueda({ data: [ORDEN_APROBADA], paging: { total: 1 } }), [ORDEN_APROBADA]);
+  for (const c of [null, [], { data: "x" }, "texto", { results: [ORDEN_APROBADA] }, { elements: [ORDEN_APROBADA] }, { orders: [ORDEN_APROBADA] }]) assert.deepEqual(ordenesDeBusqueda(c), []);
 });
 
 test("el cliente llama a Orders API con el token del restaurante y la llave de idempotencia; un fallo de red es status 0", async () => {

@@ -40,10 +40,11 @@ pedido `POR_PAGAR` (invisible para la caja) y cobra en la misma petición, con
 `detalle` ∈ `FONDOS` (`insufficient_amount`), `DATOS` (`bad_filled_card_data`: código y fecha no se
 distinguen), `LLAMAR_BANCO`, `TARJETA_DESHABILITADA`, `OTRO`.
 
-**Cuenta vendedora.** No está probado que la orden traiga un campo que la identifique. La garantía
-es que la orden se creó o se consultó con el token de ESA conexión, trae nuestra referencia y el
-monto es el esperado (lo comprueba la base). Si la orden trae `live_mode`, tiene que casar con la
-conexión. Una conexión de prueba (`live_mode: false` al conectarla) nunca cobra.
+**Cuenta vendedora (verificado).** La orden trae `user_id`, el id de la cuenta vendedora, como
+texto: tiene que ser el de la conexión que cobra ese pago. Además `currency` es `MXN`, la
+referencia es la nuestra y el monto es el esperado (lo comprueba la base). La orden no trae
+`live_mode`: que una conexión de prueba (`live_mode: false` al conectarla) no cobre lo decide solo
+la marca de la conexión.
 
 ## Conciliar, devolver, avisos
 
@@ -82,6 +83,14 @@ Contadores en `limites_cupo` (cuentan aunque el pedido rechazado se borre):
 
 ## Sin confirmar (solo se resuelve con una prueba real)
 
-Ver «Sin probar» en el documento 04. Además: el formato de `begin_date`/`end_date`; que
-`/oauth/token` de la aplicación nueva entregue `public_key`; qué `live_mode` da un vendedor de prueba
-conectado por OAuth; y que nada renueva todavía los tokens de la tienda (vencen a los 180 días).
+Ver «Sin probar» en el documento 04. Además: que `/oauth/token` de la aplicación nueva entregue
+`public_key`, y qué `live_mode` da un vendedor de prueba conectado por OAuth.
+
+## Renovación de los tokens
+
+El access token dura 180 días. Una vez al día (10:50 UTC) la base llama a `tienda-mp-renovar`
+(pg_cron → pg_net, `x-vim-interno`), que renueva las conexiones ACTIVAS que vencen en menos de 30
+días con `MP_TIENDA_CLIENT_ID` / `MP_TIENDA_CLIENT_SECRET`, guarda el par nuevo en Vault (los dos
+o ninguno) y actualiza la `public_key` si viene. Un fallo pasajero se reintenta al día siguiente
+sin tocar la conexión. Si Mercado Pago rechaza el refresh token, o si el par nuevo no se pudo
+guardar, la conexión queda en ERROR (el admin pide reconectar) y se avisa a VIM.

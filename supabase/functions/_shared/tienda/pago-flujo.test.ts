@@ -9,11 +9,11 @@ const PAGO = "2cd9e6fa-1acf-47dc-8ba4-cba918d73770";
 const ORDEN = "ORDTST01M4P8JX8C82XV8G7EB2A16YAC";
 const FILA: FilaPago = {
   id: PAGO, conexion_id: "cx-1", estado: "CREADO", monto: "138.00", cobro_mandado: false,
-  orden_id_externo: null, detalle: null, creado: "2026-10-11T18:00:00.000Z", de_prueba: false,
+  orden_id_externo: null, detalle: null, creado: "2026-10-11T18:00:00.000Z", cuenta_vendedora: "3754297554",
 };
 const APROBADA = {
   id: ORDEN, status: "processed", status_detail: "accredited", total_amount: "138.00", total_paid_amount: "138.00",
-  external_reference: PAGO, capture_mode: "automatic_async",
+  external_reference: PAGO, capture_mode: "automatic_async", user_id: "3754297554", currency: "MXN", country_code: "MEX",
   transactions: { payments: [{ id: "PAY01M4P8JX8TKPS5B2ECXP875P89", status: "processed", status_detail: "accredited", payment_method: { id: "master", type: "credit_card" } }] },
 };
 const EN_REVISION = { ...APROBADA, id: "ORDTSTREVISION", status: "processing", status_detail: "in_process", total_paid_amount: "0.00" };
@@ -227,8 +227,8 @@ test("confirmar: una orden viva con nuestra referencia que no se puede aplicar N
   const revision = doble({ mp: { buscarOrdenes: { status: 200, cuerpo: { data: [EN_REVISION] } } } });
   assert.deepEqual(await confirmarPago(revision.deps, PAGO), { ok: false, motivo: "PAGO_SIN_APLICAR" });
   assert.ok(revision.llamadas.includes("anotar ORDTSTREVISION orden ORDTSTREVISION: PENDIENTE (processing)"));
-  // Una orden de prueba en una cuenta real: viva, nuestra y sin aplicar.
-  const modo = doble({ mp: { buscarOrdenes: { status: 200, cuerpo: { data: [{ ...APROBADA, live_mode: false }] } } } });
+  // Con nuestra referencia pero de OTRA cuenta vendedora: viva y sin aplicar. Nunca paga el pedido.
+  const modo = doble({ mp: { buscarOrdenes: { status: 200, cuerpo: { data: [{ ...APROBADA, user_id: "999" }] } } } });
   assert.deepEqual(await confirmarPago(modo.deps, PAGO), { ok: false, motivo: "PAGO_SIN_APLICAR" });
   // Si además hay una aprobada que sí se aplica, el pedido tiene su pago: cuenta como buena.
   const conBuena = doble({ mp: { buscarOrdenes: { status: 200, cuerpo: { data: [sinAcreditar, { ...APROBADA, id: "ORDBUENA" }] } } } });

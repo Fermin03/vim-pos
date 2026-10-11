@@ -66,8 +66,27 @@ in 'action_required' or 'created'»): una orden `processing` no se puede cancela
 ## Consultar
 
 - `GET /v1/orders/{id}`: funciona.
-- `GET /v1/orders?external_reference=…` → **400 `missing_required_params: begin_date and end_date`**.
-  El formato de esas fechas no está probado.
+- `GET /v1/orders?external_reference=…` sin fechas → **400 `missing_required_params: begin_date and end_date`**.
+- **Búsqueda por referencia (confirmada):**
+  `GET /v1/orders?external_reference=<uuid>&begin_date=2026-10-11T00:00:00.000Z&end_date=2026-10-12T23:59:59.000Z`
+  → **200** `{ "data": [ { …orden… } ], "paging": { … } }`. Las fechas van en RFC 3339, con o sin
+  milisegundos; solo la fecha (`2026-10-11`) → 400 `invalid_search_params` («must be in RFC3339
+  format (e.g., '2024-01-01T00:00:00Z')»). La lista viene **solo en `data`**.
+
+## Qué trae una orden
+
+Claves reales: `id, type, processing_mode, external_reference, total_amount, total_paid_amount,
+country_code, user_id, status, status_detail, capture_mode, currency, created_date,
+last_updated_date, integration_data, config, transactions`.
+
+- **`user_id` identifica a la cuenta vendedora**, y llega **como texto** (`"3754297554"`).
+- `currency: "MXN"`, `country_code: "MEX"`.
+- `integration_data.application_id`: el id de la aplicación que la creó.
+- **No trae `live_mode`.**
+
+Por eso `decidirOrden` exige `user_id` igual a la cuenta de la conexión (como texto) y
+`currency === "MXN"`, además de la referencia y el monto. Que una conexión de prueba no cobre en un
+negocio real depende solo de la marca de la conexión.
 
 ## Devolver
 
@@ -78,11 +97,13 @@ in 'action_required' or 'created'»): una orden `processing` no se puede cancela
   primer intento con `status: "failed"` y el segundo `processed`.
 - Repetir con la **misma** llave de idempotencia devolvió el **mismo 422 guardado**: la llave tiene
   que ser nueva en cada intento.
+- Una orden devuelta queda `status: "refunded"`, `status_detail: "refunded"`, y el pago de dentro
+  trae `refunded_amount: "138.00"`, `paid_amount` y `reference_id`.
 
 ## Sin probar
 
 - Avisos (webhook) de órdenes online y su firma con la clave de la aplicación nueva.
 - El mismo flujo con el token OAuth de un restaurante real.
 - Tarjetas de débito (`type: "debit_card"`, supuesto).
-- Qué campo de la orden identifica a la cuenta vendedora y si trae `live_mode`.
+- Renovar el token de la tienda con su refresh token, y si esa respuesta trae `public_key`.
 - Nombre exacto del tópico de órdenes en «Webhooks» del panel.
