@@ -117,12 +117,14 @@ BEGIN
     RAISE EXCEPTION 'A2: otro negocio pausó una sucursal que no es suya';
   END IF;
   UPDATE tienda_config SET pago_pausado_hasta = NULL WHERE tenant_id = v_t;
-  -- Los tokens van a Vault y aquí (como en la caja) no hay: guardar y leer lo dicen; borrar no revienta.
+  -- Los tokens van a Vault. En la caja (y en `npm run smokes`) no hay: guardar lo dice. En la nube y
+  -- en el Supabase local del CI sí hay: guarda. En los dos casos, borrar no revienta.
   BEGIN
     PERFORM tienda_guardar_tokens(v_cx1, 'a', 'r', now());
-    RAISE EXCEPTION 'A2: guardó tokens sin Vault';
+    IF to_regnamespace('vault') IS NULL THEN RAISE EXCEPTION 'A2: guardó tokens sin Vault'; END IF;
   EXCEPTION WHEN OTHERS THEN
     IF SQLERRM NOT LIKE 'VAULT_NO_DISPONIBLE%' THEN RAISE; END IF;
+    IF to_regnamespace('vault') IS NOT NULL THEN RAISE EXCEPTION 'A2: con Vault debía guardar los tokens'; END IF;
   END;
   PERFORM tienda_borrar_tokens(v_cx1);
   -- Y un par a medias no se guarda nunca (ni con Vault): al renovar, el refresh viejo ya no sirve.
