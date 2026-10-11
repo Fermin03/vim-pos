@@ -9,12 +9,18 @@ export type Cuerpo =
   | { accion: "estado" | "cancelar"; cobro_id: string; caja_id: string | null }
   // `autorizo_id`: quién dio su PIN para aceptar a mano un cobro que quedó en REVISAR.
   | { accion: "confirmar"; cobro_id: string; caja_id: string | null; autorizo_id: string | null }
-  | { accion: "pendientes" | "disponible"; caja_id: string | null };
+  | { accion: "pendientes" | "disponible"; caja_id: string | null }
+  // Devuelve a la tarjeta todo lo que ese ticket se cobró en la terminal.
+  | { accion: "reembolsar"; ticket_id: string; caja_id: string | null };
 
 export function validarCuerpo(crudo: unknown): { ok: true; cuerpo: Cuerpo } | { ok: false; error: string } {
   const b = (crudo && typeof crudo === "object" ? crudo : {}) as Record<string, unknown>;
   const caja_id = uuid(b.caja_id);
   if (b.accion === "pendientes" || b.accion === "disponible") return { ok: true, cuerpo: { accion: b.accion, caja_id } };
+  if (b.accion === "reembolsar") {
+    const ticket = uuid(b.ticket_id);
+    return ticket ? { ok: true, cuerpo: { accion: "reembolsar", ticket_id: ticket, caja_id } } : { ok: false, error: "TICKET_ID_INVALIDO" };
+  }
   const cobro_id = uuid(b.cobro_id);
   if (!cobro_id) return { ok: false, error: "COBRO_ID_INVALIDO" };
   if (b.accion === "estado" || b.accion === "cancelar") return { ok: true, cuerpo: { accion: b.accion, cobro_id, caja_id } };

@@ -18,6 +18,7 @@ import {
 } from "../lib/devoluciones";
 import { autorizacionPropia, type Autorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
+import { motivoReembolso, reembolsarTicket } from "../lib/terminal";
 import { AvisoAutorizacion, MotivoChips, etiquetaMotivo } from "./motivo-y-autorizacion";
 import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
 import { obtenerImpresora } from "../lib/print/adapter";
@@ -165,8 +166,23 @@ function ModalDevolucion({
   const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
   const [pidiendoPin, setPidiendoPin] = useState(false);
+  // La devolución ya quedó en VIM pero Mercado Pago no devolvió el dinero: se reintenta solo eso.
+  const [reembolsoFallo, setReembolsoFallo] = useState<{ motivo: string; recibo?: DatosDevolucion } | null>(null);
 
   const tienePermiso = ROLES_DEVOLUCION.includes(empleado.rol);
+
+  /** Regresa el dinero a la tarjeta si ese ticket se cobró en la terminal (ADR 0033). */
+  async function reembolsar(recibo?: DatosDevolucion) {
+    setProcesando(true);
+    try {
+      await reembolsarTicket(token, turno.caja_id, venta.ticketId);
+      onHecho(recibo);
+    } catch (e) {
+      setReembolsoFallo({ motivo: motivoReembolso(e), recibo });
+      setProcesando(false);
+      setPidiendoPin(false);
+    }
+  }
 
   useEffect(() => {
     leerItemsVenta(token, venta.ticketId).then(setItems).catch(() => setError("No se pudieron leer los ítems"));
@@ -210,7 +226,8 @@ function ModalDevolucion({
           ancho: 80,
         };
       } catch { /* recibo opcional */ }
-      onHecho(dDev);
+      if (medio === "MISMO_METODO_PAGO") await reembolsar(dDev);
+      else onHecho(dDev);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo devolver");
       setProcesando(false);
@@ -245,6 +262,21 @@ function ModalDevolucion({
       setError(e instanceof Error ? e.message : "No se pudo autorizar");
       setProcesando(false);
     }
+  }
+
+  if (reembolsoFallo) {
+    return (
+      <DialogoPeligro
+        titulo="El dinero no regresó a la tarjeta"
+        contexto={`${venta.folio} · ${fmtMxn(venta.total)}`}
+        consecuencia={`La devolución ya quedó registrada, pero el dinero no regresó a la tarjeta: ${reembolsoFallo.motivo}. Vuelve a intentar, o devuélvelo desde la app de Mercado Pago.`}
+        boton="Volver a intentar"
+        ocupado={procesando}
+        textoOcupado="Devolviendo…"
+        onConfirmar={() => void reembolsar(reembolsoFallo.recibo)}
+        onCerrar={() => onHecho(reembolsoFallo.recibo)}
+      />
+    );
   }
 
   if (pidiendoPin) {

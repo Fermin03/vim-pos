@@ -352,5 +352,9 @@ unos 20 segundos sin comanda y se quita cuando sale el papel.
 - **Sin internet o sin terminal ligada** el selector queda como antes, con Débito y Crédito.
 - **Caja apagada a medio cobro:** al volver a abrir el cobro de esa cuenta, el pago aprobado se
   registra solo.
+- **Devolución «Mismo método»:** si la cuenta se cobró en la terminal desde la caja, al confirmar la
+  devolución el dinero regresa solo a la tarjeta. Si Mercado Pago no lo devuelve, la devolución ya
+  quedó registrada y la caja lo dice: «El dinero no regresó a la tarjeta», con «Volver a intentar».
+  Lo que se cobró en otra terminal se sigue devolviendo en esa terminal.
 - **Pago dividido** sigue registrando la tarjeta a mano. Para combinar, se cobra primero la otra
   parte y el resto con «Tarjeta».
