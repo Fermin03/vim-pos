@@ -68,8 +68,9 @@
 //   restaurante. Contesta lo de siempre más `propina_mxn`, `total_a_pagar_mxn`, `vence_pago` y
 //   `pago: { estado, init_point }`: el navegador se manda a `init_point`. El monto lo pone la base;
 //   del cliente solo se acepta el porcentaje. Errores propios: 409 PAGO_EN_PROCESO (otra petición
-//   del mismo intento está creando la preferencia: reintentar), 502 PAGO_NO_DISPONIBLE (Mercado Pago
-//   no la creó: el pedido se descartó, no existe).
+//   del mismo intento está creando la preferencia: reintentar), 409 PAGO_NO_DISPONIBLE (Mercado Pago
+//   no la creó: el pedido se descartó, no existe). Los dos son 409 a propósito: el servidor de la
+//   tienda lee cualquier 5xx que no sea 503 como «no se supo si el pedido entró», y aquí sí se sabe.
 //   `confirmar_pago` es el respaldo del aviso (`tienda-webhook-mp`): misma consulta autenticada,
 //   mismo camino. Nunca se cree nada de la URL con que Mercado Pago regresa al cliente.
 //   De Mercado Pago solo sale `init_point`: ni ids de pago ni datos de la tarjeta.
@@ -554,7 +555,7 @@ async function atender(req: Request): Promise<Response> {
       aviso: `${baseFunciones}/functions/v1/tienda-webhook-mp?ref=${porPagar.pagoId}`,
       ahora: new Date(), email: p.cliente.email,
     });
-    if (!pago.ok) return json({ error: pago.error }, pago.error === "PAGO_EN_PROCESO" ? 409 : 502);
+    if (!pago.ok) return json({ error: pago.error }, 409);
     return json({ codigo, ...porPagar.publico, pago: { estado: pago.init_point ? "ESPERANDO_PAGO" : "CERRADO", init_point: pago.init_point } });
   }
 

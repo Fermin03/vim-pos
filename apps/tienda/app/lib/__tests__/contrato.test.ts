@@ -117,19 +117,19 @@ describe("cotizar, pedir y seguimiento", () => {
     expect(cotizacionDe(roto(cotizacionCruda(), (o) => { (o.renglones as Obj[])[0]!.cantidad = "2"; }))).toBeNull();
   });
   it("pedido creado", () => {
-    expect(pedidoDe(pedidoCrudo())).toEqual(pedidoCrudo());
+    expect(pedidoDe(pedidoCrudo())).toEqual({ ...(pedidoCrudo() as object), pago: null });
     for (const b of BASURA) expect(pedidoDe(b)).toBeNull();
     expect(pedidoDe(roto(pedidoCrudo(), (o) => { o.codigo = "corto"; }))).toBeNull();
   });
   it("pedido creado, caso degradado: con el código basta — el pedido existe", () => {
     expect(pedidoDe({ codigo: CODIGO, folio_corto: null, total_mxn: null, vence_aceptacion: null }))
-      .toEqual({ codigo: CODIGO, folio_corto: null, total_mxn: null, vence_aceptacion: null });
+      .toEqual({ codigo: CODIGO, folio_corto: null, total_mxn: null, vence_aceptacion: null, pago: null });
     // Lo demás, si viene raro, se lee como ausente: perder el código sería perder el pedido.
     expect(pedidoDe({ codigo: CODIGO, folio_corto: 7, total_mxn: "mucho" }))
-      .toEqual({ codigo: CODIGO, folio_corto: null, total_mxn: null, vence_aceptacion: null });
+      .toEqual({ codigo: CODIGO, folio_corto: null, total_mxn: null, vence_aceptacion: null, pago: null });
   });
   it("seguimiento", () => {
-    expect(seguimientoDe(seguimientoCrudo())).toEqual(seguimientoCrudo());
+    expect(seguimientoDe(seguimientoCrudo())).toEqual({ ...(seguimientoCrudo() as object), enLinea: null });
     for (const b of BASURA) expect(seguimientoDe(b)).toBeNull();
     expect(seguimientoDe(roto(seguimientoCrudo(), (o) => { o.estado = "RECIBIDO"; }))).toBeNull();
     expect(seguimientoDe(roto(seguimientoCrudo(), (o) => { o.modo = "MESA"; }))).toBeNull();

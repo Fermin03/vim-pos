@@ -19,6 +19,23 @@ export type Sondeo = {
 export const SONDEO_INICIAL: Sondeo = { pedido: null, fallos: 0, lento: false, noEncontrado: false };
 
 const FINALES: readonly EstadoDePedido[] = ["ENTREGADO", "CANCELADO"];
+/** El pedido ya no va a avanzar: entregado o cancelado. Es cuando se ofrece «Pedir de nuevo». */
+export const cerrado = (p: Pick<Seguimiento, "estado">): boolean => FINALES.includes(p.estado);
+/**
+ * Cancelado, pero su pago en línea todavía se está resolviendo (confirmándose con Mercado Pago, o
+ * devolviéndose): la página sigue preguntando, despacio, para decir cómo acabó.
+ */
+const pagoPorResolver = (p: Seguimiento): boolean => p.enLinea?.estado === "POR_CONFIRMAR" || p.enLinea?.estado === "DEVOLUCION_EN_PROCESO";
+/**
+ * ¿La lectura debe pedir que se confirme el pago (`confirmar_pago`) en vez de solo leer?
+ * La PRIMERA siempre: es la que hace que salga el correo de un pedido recién pagado, y todavía no
+ * se sabe si el pedido es en línea. Después, solo mientras el pago siga sin resolverse.
+ */
+export function debeConfirmar(p: Seguimiento | null): boolean {
+  if (!p) return true;
+  const e = p.enLinea?.estado;
+  return e === "ESPERANDO_PAGO" || e === "RECHAZADO" || e === "POR_CONFIRMAR";
+}
 // Respuestas que no van a cambiar por insistir.
 const NO_EXISTE = new Set(["PEDIDO_NO_ENCONTRADO", "CODIGO_INVALIDO", "NEGOCIO_INVALIDO", "TIENDA_NO_DISPONIBLE"]);
 const ESPERAS_MS = [10_000, 10_000, 20_000, 40_000, 60_000];
@@ -33,7 +50,7 @@ export function alLeer(s: Sondeo, r: Resultado<Seguimiento>): Sondeo {
   return { ...s, fallos: s.fallos + 1 };
 }
 
-export const terminado = (s: Sondeo): boolean => s.noEncontrado || (!!s.pedido && FINALES.includes(s.pedido.estado));
+export const terminado = (s: Sondeo): boolean => s.noEncontrado || (!!s.pedido && cerrado(s.pedido) && !pagoPorResolver(s.pedido));
 
 /**
  * Cuánto falta para la siguiente lectura, o null si ya no hay que leer. 10 s con todo bien; tras
@@ -41,7 +58,9 @@ export const terminado = (s: Sondeo): boolean => s.noEncontrado || (!!s.pedido &
  */
 export function esperaDe(s: Sondeo): number | null {
   if (terminado(s)) return null;
-  return s.lento ? TOPE_MS : ESPERAS_MS[Math.min(s.fallos, ESPERAS_MS.length - 1)]!;
+  // Un cancelado que espera su devolución (o su confirmación) no tiene prisa: una vez por minuto.
+  if (s.lento || (s.pedido && cerrado(s.pedido))) return TOPE_MS;
+  return ESPERAS_MS[Math.min(s.fallos, ESPERAS_MS.length - 1)]!;
 }
 
 /**
@@ -64,7 +83,8 @@ type Documento =Pick<Document, "hidden" | "addEventListener" | "removeEventListe
  * la lectura en vuelo) y al volver relee sin esperar. Devuelve cómo detenerlo.
  */
 export function sondear(
-  leer: (signal: AbortSignal) => Promise<Resultado<Seguimiento>>,
+  /** Recibe lo último que se supo del pedido (null en la primera lectura): con eso decide qué pedir (`debeConfirmar`). */
+  leer: (signal: AbortSignal, ultimo: Seguimiento | null) => Promise<Resultado<Seguimiento>>,
   alCambiar: (s: Sondeo) => void,
   doc: Documento = document,
 ): () => void {
@@ -75,7 +95,7 @@ export function sondear(
     soltar();
     if (detenido || doc.hidden || terminado(s)) return;
     const mio = (corte = new AbortController());
-    const r = await leer(mio.signal);
+    const r = await leer(mio.signal, s.pedido);
     if (mio.signal.aborted) return;   // se ocultó la pestaña o se detuvo: esta respuesta ya no cuenta
     corte = null;
     s = alLeer(s, r);
@@ -91,7 +111,7 @@ export function sondear(
 }
 
 // ── El recorrido ─────────────────────────────────────────────────────────────────────────────────
-const PASOS: Record<Modo, readonly Exclude<EstadoDePedido, "CANCELADO">[]> = {
+const PASOS: Record<Modo, readonly Exclude<EstadoDePedido, "CANCELADO" | "POR_PAGAR">[]> = {
   RECOGER: ["EN_PROCESO", "EN_PREPARACION", "LISTO_PARA_RECOGER", "ENTREGADO"],
   DOMICILIO: ["EN_PROCESO", "EN_PREPARACION", "EN_CAMINO", "ENTREGADO"],
 };
@@ -103,7 +123,8 @@ export type Paso = { estado: EstadoDePedido; titulo: string; fase: "hecho" | "ac
  * una fila de pasos que ya no van a pasar). Entregado deja todos hechos.
  */
 export function recorrido(modo: Modo, estado: EstadoDePedido): Paso[] | null {
-  if (estado === "CANCELADO") return null;
+  // Sin pagar todavía no hay recorrido: el restaurante ni lo ha recibido.
+  if (estado === "CANCELADO" || estado === "POR_PAGAR") return null;
   const pasos = PASOS[modo];
   // Un estado del otro modo (no debería llegar) se lee como «en preparación»: nunca adelanta de más.
   const i0 = pasos.indexOf(estado);

@@ -25,6 +25,8 @@ export type CuerpoPedido = CuerpoCarrito & {
   /** Obligatoria a domicilio; al recoger debe ser null. */
   direccion: DireccionDePedido | null;
   pago: Pago;
+  /** Solo con EN_LINEA: 0, 10, 15 o 20. El monto lo calcula el servidor. */
+  propina_pct?: number;
   /** Solo con EFECTIVO: texto con dos decimales (`aTexto`), entre el total y el total + 5000. */
   paga_con: string | null;
   nota: string | null;
@@ -76,6 +78,15 @@ export function cotizar(negocio: string, carrito: CuerpoCarrito, signal?: AbortS
 /** El estado del pedido. `PEDIDO_NO_ENCONTRADO` = enlace vencido o mal copiado. */
 export function seguimiento(negocio: string, codigo: string, signal?: AbortSignal): Promise<Resultado<Seguimiento>> {
   return llamar({ accion: "seguimiento", negocio, codigo }, seguimientoDe, LECTURA, signal);
+}
+
+/**
+ * El seguimiento de un pedido que se paga en línea, pidiéndole antes al servidor que confirme el
+ * pago con Mercado Pago (el respaldo del aviso). Solo viaja el código: lo que Mercado Pago le puso
+ * a la URL al regresar no se manda ni se cree. Sirve igual para un pedido al recibir.
+ */
+export function confirmarPago(negocio: string, codigo: string, signal?: AbortSignal): Promise<Resultado<Seguimiento>> {
+  return llamar({ accion: "confirmar_pago", negocio, codigo }, seguimientoDe, LECTURA, signal);
 }
 
 /**

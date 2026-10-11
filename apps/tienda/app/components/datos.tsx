@@ -13,16 +13,18 @@ import { Aviso, Captcha, SITE_KEY_TURNSTILE, botonClases, cn } from "@vim/ui/sty
 import { cotizar, guardarDireccion, pedir } from "../lib/api";
 import { aCuerpo, type Carrito } from "../lib/carrito";
 import {
-  CAMPOS, DE_DIRECCION, FORMULARIO_VACIO, LIMITES, datosDelPedido, erroresDe, formasDePago, guardarCliente, leerCliente, olvidarCliente,
+  CAMPOS, DE_DIRECCION, FORMULARIO_VACIO, LIMITES, datosDelPedido, erroresDe, guardarCliente, leerCliente, olvidarCliente,
   type Campo, type Formulario,
 } from "../lib/cliente";
 import type { Cotizacion, DireccionGuardada, ErrorDeTienda, MiCuenta, Negocio, Pago, Sucursal } from "../lib/contrato";
 import { LIMITES_DE_CUENTA, direccionEnUnaLinea, enlaceDeAcceso, formularioDeDireccion, paraTusDatos } from "../lib/cuenta";
 import { formatoMxn } from "../lib/dinero";
 import { enviarPedido, envioDeLaPagina, intentoDeLaPagina, type Desenlace, type ResultadoDeEnvio } from "../lib/envio";
+import { PROPINAS, anotarPorPagar, formasDePago, propinaDe, totalAPagar, type Propina } from "../lib/pago";
 import { enlaceTel, formatoTelefono } from "../lib/telefono";
-import { textoDeError } from "../lib/textos";
+import { apoyoDePago, nombreDePago, textoDeError } from "../lib/textos";
 import { CampoDeTexto } from "./campo";
+import { Linea } from "./carrito";
 import { COLUMNA, CUERPO, PIE } from "./hoja";
 import { FOCO, PARTE, PRINCIPAL } from "./piezas";
 
@@ -51,6 +53,8 @@ export type PropsDelPasoDeDatos = {
 };
 
 type AvisoDeEnvio = Extract<Desenlace, { tipo: "aviso" }>;
+/** «Estamos preparando tu pago»: cada cuánto se reintenta solo, y cuántas veces antes de devolverle el botón. */
+const ESPERA_DEL_PAGO_MS = 3_000, REINTENTOS_DEL_PAGO = 3;
 /** Si el antirobot no entrega su comprobación en este tiempo, se deja de esperar y se dice. */
 const ESPERA_DEL_ANTIROBOT_MS = 20_000;
 
@@ -95,7 +99,7 @@ export function PasoDeDatos({
 }: PropsDelPasoDeDatos) {
   const router = useRouter();
   const id = useId();
-  const formas = formasDePago(negocio);
+  const formas = formasDePago(negocio, sucursal);
   const aDomicilio = carrito.modo === "DOMICILIO";
   const zona = sucursal.zonas.find((z) => z.id === carrito.zonaId);
   const tel = enlaceTel(sucursal.telefono);
@@ -115,6 +119,14 @@ export function PasoDeDatos({
   const [recordado, setRecordado] = useState(false);
   const [tocados, setTocados] = useState<ReadonlySet<Campo>>(new Set());
   const [pago, setPago] = useState<Pago | null>(formas[0] ?? null);
+  const enLinea = pago === "EN_LINEA";
+  /** La propina, solo al pagar en línea. Por omisión, sin propina: la decide el cliente. */
+  const [propina, setPropina] = useState<Propina>(0);
+  /** El pedido está creado y el navegador va camino a Mercado Pago. */
+  const [saliendo, setSaliendo] = useState(false);
+  /** Otra petición del mismo intento está preparando el pago: se reintenta solo en unos segundos. */
+  const [esperando, setEsperando] = useState(false);
+  const reintentos = useRef(0);
   /** Lo que la función rechazó de un campo; se quita en cuanto el cliente lo cambia. */
   const [rechazo, setRechazo] = useState<Partial<Record<Campo | "pago", string>>>({});
   const [aviso, setAviso] = useState<AvisoDeEnvio | null>(null);
@@ -184,19 +196,29 @@ export function PasoDeDatos({
    */
   const mandar = (total: string | null) => {
     if (!pago) return;
-    const cuerpo = aCuerpo(carrito), datos = f, modo = carrito.modo, delPedido = datosDelPedido(datos, { modo, pago });
+    const cuerpo = aCuerpo(carrito), datos = f, modo = carrito.modo, delPedido = datosDelPedido(datos, { modo, pago, propina });
     // La dirección nueva que pidió guardar en su cuenta (solo con sesión, a domicilio y escrita a mano).
     const porGuardar = conSesion && guardar && !elegida && delPedido.direccion
       ? { ...delPedido.direccion, id: null, etiqueta: etiqueta.trim() || "Casa" } : null;
     const elPedido = { ...cuerpo, ...delPedido, nota: nota || null };
-    // La misma clave mientras se reintente ESTE pedido; otra si algo de él cambió.
+    // La misma clave mientras se reintente ESTE pedido; otra si algo de él cambió (también la forma
+    // de pago o la propina, que van dentro de `delPedido`).
     const clave = intentoDeLaPagina.para({ negocio: negocio.slug, ...elPedido });
     envioDeLaPagina.lanzar(async () => {
       const r = await enviarPedido({
         cotizar: () => cotizar(negocio.slug, cuerpo),
         pedir: (totalEsperado) => pedir(negocio.slug, { ...elPedido, clave, captcha: tokenAhora.current, total_esperado: totalEsperado }),
         totalVisto: total,
-      }, { telefono: sucursal.telefono, horario: sucursal.horario });
+      }, { telefono: sucursal.telefono, horario: sucursal.horario, otrasFormas: formas.length > 1 });
+      if (r.desenlace.tipo === "pagar") {
+        // El pedido existe y falta pagarlo. El carrito NO se vacía ni se cierra el intento: si vuelve
+        // atrás desde Mercado Pago, su pedido sigue aquí y «Pagar» lo lleva al mismo pago. Se vacía
+        // cuando el seguimiento de ESE pedido diga «pagado» (`vaciarSiPagado`).
+        if (!conSesion) guardarCliente(datos, modo);
+        else if (porGuardar) void guardarDireccion(negocio.slug, porGuardar);
+        anotarPorPagar(negocio.slug, r.desenlace.folio);
+        window.location.assign(r.desenlace.url);
+      }
       if (r.desenlace.tipo === "hecho") {
         intentoDeLaPagina.cerrar();
         // Con sesión el teléfono no recuerda nada: los datos viven en la cuenta. Guardar la dirección
@@ -217,6 +239,16 @@ export function PasoDeDatos({
     // El token del antirobot sirve una vez: si se usó, se pide otro para el siguiente intento.
     if (pidio) { setToken(""); setReinicio((n) => n + 1); }
     if (desenlace.tipo === "hecho") setHecho(true);
+    else if (desenlace.tipo === "pagar") setSaliendo(true);
+    else if (desenlace.tipo === "esperar") {
+      // No se creó otro pedido: el primero sigue preparándose. Se reintenta solo unas veces; después
+      // se le devuelve el botón, que con la misma clave lleva al mismo pedido.
+      if (reintentos.current < REINTENTOS_DEL_PAGO) { reintentos.current += 1; setEsperando(true); }
+      else {
+        const t = textoDeError("PAGO_EN_PROCESO");
+        setAviso({ tipo: "aviso", tono: "warning", texto: `${t.texto} Vuelve a intentar.`, sigue: "reintentar" });
+      }
+    }
     else if (desenlace.tipo === "carrito") alErrorDeCarrito(desenlace.error);
     else if (desenlace.tipo === "total") { setTotalNuevo(desenlace.total); alCambiarElTotal(); }
     else if (desenlace.tipo === "campo") {
@@ -231,7 +263,7 @@ export function PasoDeDatos({
   };
   useEffect(() => envioDeLaPagina.recibir((r) => alResultado.current(r)), []);
 
-  const ocupado = robot || enviando || hecho;
+  const ocupado = robot || enviando || hecho || saliendo || esperando;
 
   /** El toque en «Enviar» (o en «Confirmar», con el total nuevo). */
   const intentar = (total: string | null) => {
@@ -240,6 +272,7 @@ export function PasoDeDatos({
     const conError = CAMPOS.find((c) => errores[c]);
     if (conError) { setTocados(new Set(CAMPOS)); enfocar(conError); return; }
     setAviso(null); setRechazo({}); setTotalNuevo(null); setTotalVisto(total);
+    reintentos.current = 0;
     // Si el antirobot aún no entrega su comprobación, el botón no se queda muerto: lo dice y espera.
     if (SITE_KEY_TURNSTILE && !token) setRobot(true);
     else mandar(total);
@@ -257,11 +290,40 @@ export function PasoDeDatos({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo reacciona a la espera y a la llegada del token
   }, [robot, token]);
 
+  // «Estamos preparando tu pago»: a los pocos segundos se manda otra vez, con un antirobot nuevo (el
+  // anterior ya se gastó). Lo último que hay en pantalla, no lo de cuando empezó la espera.
+  const ultimo = useRef({ mandar, totalVisto });
+  ultimo.current = { mandar, totalVisto };
+  useEffect(() => {
+    if (!esperando) return;
+    const reloj = setTimeout(() => {
+      setEsperando(false);
+      if (SITE_KEY_TURNSTILE && !tokenAhora.current) setRobot(true);
+      else ultimo.current.mandar(ultimo.current.totalVisto);
+    }, ESPERA_DEL_PAGO_MS);
+    return () => clearTimeout(reloj);
+  }, [esperando]);
+
+  // Volvió atrás desde Mercado Pago y el navegador restauró esta página tal como la dejó (con el
+  // botón apagado): se le devuelve. Su pedido y lo que escribió siguen aquí.
+  useEffect(() => {
+    const alVolverAVerse = (e: PageTransitionEvent) => { if (e.persisted) setSaliendo(false); };
+    window.addEventListener("pageshow", alVolverAVerse);
+    return () => window.removeEventListener("pageshow", alVolverAVerse);
+  }, []);
+
   // Enter en un campo solo envía cuando lo que se ofrece es enviar. Con «llama al restaurante» o
   // «vuelve a tu pedido» en pantalla, Enter no manda nada.
   const seOfreceEnviar = !!totalNuevo || !aviso || aviso.sigue === "reintentar" || aviso.sigue === "reintentar-seguro" || aviso.sigue === "sesion";
   const total = totalNuevo ?? totalVisto;
-  const estado = enviando || hecho ? "Enviando tu pedido…" : robot ? "Comprobando que no eres un robot…" : "";
+  // La propina que se ENSEÑA sale del subtotal de productos de la última cotización; la que se cobra
+  // la calcula el servidor con la misma cuenta. Sin cotización a la mano, solo los porcentajes.
+  const subtotal = cotizacion?.subtotal_mxn ?? null;
+  const montoDe = (pct: Propina): string | null => (subtotal ? propinaDe(subtotal, pct) : null);
+  const aPagar = enLinea && total ? totalAPagar(total, montoDe(propina)) : total;
+  const estado = saliendo ? "Abriendo Mercado Pago…"
+    : esperando || ((enviando || hecho) && enLinea) ? "Preparando tu pago…"
+    : enviando || hecho ? "Enviando tu pedido…" : robot ? "Comprobando que no eres un robot…" : "";
   const botonDeEnviar = (etiqueta: string, importe: string | null) => (
     <button type="submit" disabled={ocupado || formas.length === 0} aria-busy={ocupado}
       className={cn(PRINCIPAL, "h-14 w-full px-5 text-16", ocupado ? "justify-center" : "justify-between")}>
@@ -273,7 +335,7 @@ export function PasoDeDatos({
     <form noValidate className={COLUMNA} onSubmit={(e) => { e.preventDefault(); if (seOfreceEnviar) intentar(total); }}>
       <div className={CUERPO}>
         <div className="px-4 pt-1">
-          <button type="button" onClick={alVolver} disabled={enviando || hecho} className={cn("-ml-2 inline-flex h-11 items-center gap-1 rounded px-2 text-15 font-medium text-ink-2 hover:bg-hover hover:text-ink disabled:pointer-events-none disabled:opacity-40", FOCO)}>
+          <button type="button" onClick={alVolver} disabled={enviando || hecho || saliendo || esperando} className={cn("-ml-2 inline-flex h-11 items-center gap-1 rounded px-2 text-15 font-medium text-ink-2 hover:bg-hover hover:text-ink disabled:pointer-events-none disabled:opacity-40", FOCO)}>
             <IconoAtras />Tu pedido
           </button>
         </div>
@@ -361,16 +423,16 @@ export function PasoDeDatos({
         <section id={`${id}-pago`} role="group" tabIndex={-1} aria-labelledby={`${id}-pago-titulo`} aria-describedby={rechazo.pago ? `${id}-pago-error` : undefined}
           className="flex min-w-0 flex-col gap-3 border-t border-line px-4 py-5 outline-none">
           <h3 id={`${id}-pago-titulo`} className={TITULO}>¿Cómo pagas?</h3>
-          <p className="text-14 text-ink-2">Pagas al recibir tu pedido.</p>
+          <p className="text-14 text-ink-2">{apoyoDePago(pago)}</p>
           {formas.length === 0 && <Aviso tono="warning" role="status" className="!text-14">Este restaurante no está recibiendo pagos por aquí. Llama para hacer tu pedido.</Aviso>}
-          {formas.length === 1 && <p className="text-16 font-medium">{pago === "EFECTIVO" ? "En efectivo" : "Con tarjeta"}</p>}
+          {formas.length === 1 && pago && <p className="text-16 font-medium">{nombreDePago(pago, false)}</p>}
           {formas.length > 1 && (
             <ul role="radiogroup" aria-labelledby={`${id}-pago-titulo`} className="flex flex-col">
               {formas.map((p) => (
                 <li key={p}>
                   <label className="flex min-h-12 cursor-pointer items-center gap-3 py-2 text-16">
                     <input type="radio" name={`${id}-forma`} checked={pago === p} onChange={() => { setPago(p); setRechazo((r) => ({ ...r, pago: undefined })); }} className="h-6 w-6 flex-shrink-0 accent-ink" />
-                    {p === "EFECTIVO" ? "En efectivo" : "Con tarjeta"}
+                    {nombreDePago(p, formas.includes("EN_LINEA"))}
                   </label>
                 </li>
               ))}
@@ -378,6 +440,41 @@ export function PasoDeDatos({
           )}
           {pago === "TARJETA" && <p className="text-15 text-ink-2">{aDomicilio ? "Paga con tarjeta al recibir: el restaurante lleva la terminal." : "Paga con tarjeta al recoger tu pedido."}</p>}
           {rechazo.pago && <p id={`${id}-pago-error`} role="alert" className="text-14 font-medium text-danger">{rechazo.pago}</p>}
+          {/* La propina: solo al pagar en línea. El mismo selector de «Para recoger / A domicilio». */}
+          {enLinea && (
+            <>
+              <fieldset role="radiogroup" aria-describedby={`${id}-propina-apoyo`} className="mt-2 min-w-0">
+                <legend className="text-15 font-semibold">Propina</legend>
+                <p id={`${id}-propina-apoyo`} className="mt-1 text-14 text-ink-2">Opcional. Se calcula sobre tus productos{aDomicilio ? ", sin el envío" : ""}.</p>
+                <div className="mt-3 grid grid-cols-4 gap-1 rounded-lg bg-hover p-1">
+                  {PROPINAS.map((pct) => {
+                    const monto = pct > 0 ? montoDe(pct) : null;
+                    return (
+                      <label key={pct} className="cursor-pointer">
+                        <input type="radio" name={`${id}-propina`} checked={propina === pct} onChange={() => setPropina(pct)} className="peer sr-only" />
+                        <span className={cn(
+                          "flex h-14 flex-col items-center justify-center rounded px-1 text-center leading-tight text-ink-2 transition-colors duration-150",
+                          "peer-checked:bg-surface peer-checked:text-ink peer-checked:shadow-sm",
+                          "peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-ink",
+                        )}>
+                          <span className="text-14 font-semibold">{pct === 0 ? "Sin propina" : `${pct} %`}</span>
+                          {monto && <span className="mt-0.5 text-13 tabular-nums">{formatoMxn(monto)}</span>}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+              {/* La cuenta de lo que se va a cobrar, en la tarjeta de resumen de la casa. */}
+              {total && aPagar && (
+                <dl aria-live="polite" className="flex flex-col gap-2 rounded-lg border border-line bg-sel px-4 py-3">
+                  <Linea concepto="Tu pedido" importe={formatoMxn(total)} estimado={false} />
+                  <Linea concepto="Propina" importe={formatoMxn(montoDe(propina) ?? "0.00")} estimado={false} />
+                  <Linea concepto="Total a pagar" importe={formatoMxn(aPagar)} estimado={false} fuerte />
+                </dl>
+              )}
+            </>
+          )}
         </section>
 
         <div className="flex flex-col gap-2 border-t border-line px-4 py-5 text-13 leading-relaxed text-ink-2">
@@ -408,7 +505,7 @@ export function PasoDeDatos({
         {totalNuevo ? (
           <>
             <Aviso tono="warning" role="alert" className="!text-14">{textoDeError("TOTAL_CAMBIO", { detalle: totalNuevo }).texto} Confirma para enviar tu pedido con ese total.</Aviso>
-            {botonDeEnviar("Confirmar y enviar", totalNuevo)}
+            {botonDeEnviar(enLinea ? "Confirmar y pagar" : "Confirmar y enviar", aPagar)}
             {!ocupado && <button type="button" onClick={alVolver} className={GHOST}>Volver a tu pedido</button>}
           </>
         ) : (
@@ -425,7 +522,7 @@ export function PasoDeDatos({
               // No se supo si entró. Reintentar va con la misma clave (y un antirobot nuevo): si ya
               // había entrado, el servidor devuelve ese pedido y lo lleva a su seguimiento.
               <>
-                {botonDeEnviar("Reintentar", total)}
+                {botonDeEnviar("Reintentar", aPagar)}
                 {!ocupado && (tel
                   ? <a href={tel} className={GHOST}>Llamar al restaurante</a>
                   : sucursal.telefono && <p className="text-center text-14 text-ink-2">Restaurante: {sucursal.telefono}</p>)}
@@ -436,10 +533,10 @@ export function PasoDeDatos({
               // Dos salidas, y ninguna se toma sola: mandarlo ya como invitado (con un antirobot nuevo;
               // el anterior se gastó) o entrar otra vez. El carrito y lo escrito siguen aquí.
               <>
-                {botonDeEnviar("Enviar como invitado", total)}
+                {botonDeEnviar(enLinea ? "Pagar como invitado" : "Enviar como invitado", aPagar)}
                 {!ocupado && <Link href={enlaceDeAcceso(negocio.slug, "entrar", deVuelta)} className={GHOST}>Entrar otra vez</Link>}
               </>
-            ) : botonDeEnviar("Enviar pedido", total)}
+            ) : botonDeEnviar(enLinea ? "Pagar" : "Enviar pedido", aPagar)}
           </>
         )}
       </div>

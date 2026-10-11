@@ -32,10 +32,10 @@ describe("api del navegador", () => {
   });
   it("seguimiento y pedir", async () => {
     responder = () => json(seguimientoCrudo());
-    expect(await seguimiento("knockout", CODIGO)).toEqual({ ok: true, datos: seguimientoCrudo() });
+    expect(await seguimiento("knockout", CODIGO)).toEqual({ ok: true, datos: { ...(seguimientoCrudo() as object), enLinea: null } });
     expect(JSON.parse(llamadas[0]!.init.body as string)).toEqual({ accion: "seguimiento", negocio: "knockout", codigo: CODIGO });
     responder = () => json(pedidoCrudo());
-    expect(await pedir("knockout", pedido)).toEqual({ ok: true, datos: pedidoCrudo() });
+    expect(await pedir("knockout", pedido)).toEqual({ ok: true, datos: { ...(pedidoCrudo() as object), pago: null } });
     expect(JSON.parse(llamadas[1]!.init.body as string)).toEqual({ accion: "pedir", negocio: "knockout", ...pedido });
   });
   it("un rechazo trae su código y su detalle", async () => {
@@ -82,7 +82,7 @@ describe("api del navegador", () => {
   });
   it("pedir, caso degradado: con el código basta", async () => {
     responder = () => json({ codigo: CODIGO, folio_corto: null, total_mxn: null, vence_aceptacion: null });
-    expect(await pedir("knockout", pedido)).toEqual({ ok: true, datos: { codigo: CODIGO, folio_corto: null, total_mxn: null, vence_aceptacion: null } });
+    expect(await pedir("knockout", pedido)).toEqual({ ok: true, datos: { codigo: CODIGO, folio_corto: null, total_mxn: null, vence_aceptacion: null, pago: null } });
   });
   it("se puede cancelar una cotización que ya no interesa", async () => {
     const corte = new AbortController();

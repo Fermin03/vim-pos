@@ -64,6 +64,7 @@ describe("desenlaceDelError", () => {
   it("ningún código conocido se queda sin texto ni enseña el código", () => {
     for (const codigo of CODIGOS_DE_ERROR) {
       const d = desenlaceDelError(e(codigo), c);
+      if (d.tipo === "esperar") continue;   // «estamos preparando tu pago» no se enseña: se reintenta solo
       const texto = d.tipo === "aviso" || d.tipo === "campo" ? d.texto : "";
       expect(texto.length, codigo).toBeGreaterThan(10);
       expect(texto, codigo).not.toMatch(/[A-Z]{3,}_[A-Z]/);
@@ -80,7 +81,7 @@ describe("enviarPedido", () => {
     expect(pedir).toHaveBeenCalledWith("305.00");
   });
   it("el caso degradado (sin folio ni total) también es un pedido hecho", async () => {
-    const degradado: Resultado<PedidoCreado> = { ok: true, datos: { codigo: CODIGO, folio_corto: null, total_mxn: null, vence_aceptacion: null } };
+    const degradado: Resultado<PedidoCreado> = { ok: true, datos: { codigo: CODIGO, folio_corto: null, total_mxn: null, vence_aceptacion: null, pago: null } };
     const r = await enviarPedido({ cotizar: async () => cotizada, pedir: async () => degradado, totalVisto: "305.00" }, c);
     expect(r.desenlace).toEqual({ tipo: "hecho", codigo: CODIGO });
   });

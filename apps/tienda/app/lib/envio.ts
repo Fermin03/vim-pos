@@ -12,6 +12,14 @@ import { textoCerrada, textoDeError } from "./textos";
 export type Desenlace =
   /** El pedido existe (también si vino sin folio ni total): vaciar el carrito e ir al seguimiento. */
   | { tipo: "hecho"; codigo: string }
+  /**
+   * El pedido existe y falta pagarlo: mandar al cliente a `url` (Mercado Pago). El carrito NO se
+   * vacía: si vuelve atrás, su pedido sigue ahí, y tocar «Pagar» otra vez devuelve el mismo pedido
+   * y el mismo enlace (va con la misma clave).
+   */
+  | { tipo: "pagar"; url: string; folio: string | null }
+  /** Otra petición del mismo intento está preparando el pago: reintentar solo en unos segundos. No se creó otro pedido. */
+  | { tipo: "esperar" }
   /** Un renglón ya no se puede pedir: de vuelta al carrito, que lo marca. */
   | { tipo: "carrito"; error: ErrorDeTienda }
   /** El total ya no es el que vio: se enseña el nuevo y se pide confirmar antes de enviar con él. */
@@ -33,7 +41,11 @@ export type Desenlace =
     sigue: "reintentar" | "volver" | "llamar" | "reintentar-seguro" | "sesion";
   };
 
-export type ContextoDeEnvio = { telefono: string | null; horario: Horario; ahora?: Momento };
+export type ContextoDeEnvio = {
+  telefono: string | null; horario: Horario; ahora?: Momento;
+  /** Hay otra forma de pago además de la elegida: si el pago en línea no se pudo abrir, se ofrece. */
+  otrasFormas?: boolean;
+};
 
 const DE_RENGLON = new Set(["PRODUCTO_NO_DISPONIBLE", "MODIFICADORES_INVALIDOS", "COMBO_INVALIDO"]);
 const DE_CAMPO: Record<string, Campo | "pago"> = { CLIENTE_INVALIDO: "nombre", DIRECCION_INVALIDA: "calle", PAGO_INVALIDO: "pago" };
@@ -44,9 +56,11 @@ const SOLO_LLAMAR = new Set(["NO_SE_PUDO_CREAR", "TIENDA_NO_DISPONIBLE"]);
 export function desenlaceDelError(e: ErrorDeTienda, c: ContextoDeEnvio): Desenlace {
   if (DE_RENGLON.has(e.error) && e.detalle) return { tipo: "carrito", error: e };
   if (e.error === "TOTAL_CAMBIO" && e.detalle && /^\d+\.\d{2}$/.test(e.detalle)) return { tipo: "total", total: e.detalle };
-  const t = textoDeError(e.error, { telefono: c.telefono, detalle: e.detalle });
+  if (e.error === "PAGO_EN_PROCESO") return { tipo: "esperar" };
+  const t = textoDeError(e.error, { telefono: c.telefono, detalle: e.detalle, otrasFormas: c.otrasFormas });
   const texto = `${t.texto} ${t.hacer}`;
-  const campo = DE_CAMPO[e.error];
+  // El pago en línea no se pudo abrir y hay otra forma de pagar: se dice junto a «¿Cómo pagas?».
+  const campo = DE_CAMPO[e.error] ?? (e.error === "PAGO_NO_DISPONIBLE" && c.otrasFormas ? "pago" : undefined);
   if (campo) return { tipo: "campo", campo, texto };
   if (e.error === "TIENDA_CERRADA") return { tipo: "aviso", tono: "warning", texto: textoCerrada(e.detalle ?? "", c.horario, c.ahora), sigue: "reintentar" };
   // No se degrada a invitado en silencio: el pedido no quedaría en su cuenta, y eso lo decide él.
@@ -79,7 +93,9 @@ export async function enviarPedido(d: {
     if (cot.datos.total_mxn !== d.totalVisto) return { desenlace: { tipo: "total", total: cot.datos.total_mxn }, pidio };
     pidio = true;
     const r = await d.pedir(cot.datos.total_mxn);
-    return { desenlace: r.ok ? { tipo: "hecho", codigo: r.datos.codigo } : desenlaceDelError(r, c), pidio };
+    if (!r.ok) return { desenlace: desenlaceDelError(r, c), pidio };
+    const url = r.datos.pago?.init_point;
+    return { desenlace: url ? { tipo: "pagar", url, folio: r.datos.folio_corto } : { tipo: "hecho", codigo: r.datos.codigo }, pidio };
   } catch {
     return { desenlace: desenlaceDelError({ error: pidio ? "SIN_CONFIRMAR" : "ERROR_INTERNO", detalle: null }, c), pidio };
   }
@@ -153,7 +169,7 @@ export function claveNueva(): string {
 /**
  * La clave del intento de compra: la MISMA mientras se reintente el mismo pedido sin saber si entró
  * (así el servidor devuelve el que ya existe en vez de crear otro), y una nueva en cuanto el pedido
- * es otro —cambió el carrito, el modo o la zona, los datos de entrega, el pago o la nota— o el
+ * es otro —cambió el carrito, el modo o la zona, los datos de entrega, el pago, la propina o la nota— o el
  * anterior ya entró (`cerrar`). «El mismo pedido» se decide por contenido: lo que se manda en
  * `pedir`, sin el antirobot ni el total esperado, que cambian en cada intento.
  * Vive en memoria, junto al candado: recargar la página empieza un intento nuevo.

@@ -65,7 +65,7 @@ async function leerCuerpoAcotado(req: Request): Promise<string | null> {
 }
 
 const DE_CARRITO = ["accion", "negocio", "sucursal_id", "modo", "zona_id", "items"] as const;
-const DE_PEDIDO = [...DE_CARRITO, "cliente", "direccion", "pago", "paga_con", "nota", "captcha", "total_esperado", "clave"] as const;
+const DE_PEDIDO = [...DE_CARRITO, "cliente", "direccion", "pago", "paga_con", "propina_pct", "nota", "captcha", "total_esperado", "clave"] as const;
 const DE_DIRECCION = ["calle", "numero_exterior", "numero_interior", "colonia", "codigo_postal", "ciudad", "estado", "referencias"] as const;
 
 /**
@@ -112,7 +112,10 @@ export async function POST(req: Request): Promise<Response> {
   // `negocio` y `menu` no pasan por aquí: los leen los componentes de servidor, con caché.
   const { accion, negocio } = cuerpo;
   const deCuenta = typeof accion === "string" ? DE_CUENTA.get(accion) : undefined;
-  if (!deCuenta && accion !== "cotizar" && accion !== "pedir" && accion !== "seguimiento") return rechazo("ACCION_INVALIDA");
+  // `confirmar_pago` es el seguimiento de un pedido que se paga en línea: lleva lo mismo (el código) y nada más.
+  // Lo que Mercado Pago le puso a la URL al regresar al cliente (`status`, `payment_id`…) no pasa de aquí.
+  const deSeguimiento = accion === "seguimiento" || accion === "confirmar_pago";
+  if (!deCuenta && accion !== "cotizar" && accion !== "pedir" && !deSeguimiento) return rechazo("ACCION_INVALIDA");
   if (typeof negocio !== "string" || !FORMA_SLUG.test(negocio)) return rechazo("NEGOCIO_INVALIDO");
 
   // La cookie del negocio DEL CUERPO, nunca la de otro; y solo para lo que usa sesión (cotizar,
@@ -130,7 +133,7 @@ export async function POST(req: Request): Promise<Response> {
   let limpio: unknown;
   if (deCuenta) {
     limpio = { accion, negocio, ...(solo(cuerpo, deCuenta) as Obj) };
-  } else if (accion === "seguimiento") {
+  } else if (deSeguimiento) {
     if (typeof cuerpo.codigo !== "string" || !FORMA_CODIGO.test(cuerpo.codigo)) return rechazo("CODIGO_INVALIDO");
     limpio = { accion, negocio, codigo: cuerpo.codigo };
   } else {

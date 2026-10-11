@@ -6,9 +6,11 @@
 // copian solo los campos que conocen: lo que la función añada mañana no llega a la pantalla solo.
 import { leerHorario, type Horario } from "@vim/fecha";
 import type { ItemDeCuerpo } from "./carrito";
+import { enlaceDePago } from "./pago";
 
 export type Modo = "RECOGER" | "DOMICILIO";
-export type Pago = "EFECTIVO" | "TARJETA";
+/** EFECTIVO y TARJETA se pagan al recibir; EN_LINEA, antes, en la página de Mercado Pago. */
+export type Pago = "EFECTIVO" | "TARJETA" | "EN_LINEA";
 
 export type Zona = { id: string; nombre: string; /** Sin el IVA que el ticket pueda sumarle: el envío exacto lo da `cotizar`. */ costo_mxn: string };
 export type Sucursal = {
@@ -17,10 +19,15 @@ export type Sucursal = {
   /** null = recibe pedidos ahora en ese modo; si no, el motivo (FUERA_DE_HORARIO, EN_PAUSA, CAJA_NO_LISTA…). */
   estado: { recoger: string | null; domicilio: string | null };
   zonas: Zona[];
+  /** En ESTA sucursal se puede pagar en línea ahora. Falso si la función aún no lo dice. */
+  pago_en_linea: boolean;
 };
 export type Negocio = {
   slug: string; nombre: string; logo_ruta: string | null; color: string; descripcion: string | null;
-  pago_efectivo: boolean; pago_tarjeta: boolean; sucursales: Sucursal[];
+  pago_efectivo: boolean; pago_tarjeta: boolean;
+  /** El negocio ofrece pagar en línea. Se ofrece solo en las sucursales que también lo digan. */
+  pago_en_linea: boolean;
+  sucursales: Sucursal[];
 };
 
 /** Ojo: las opciones de modificador dicen `agotada`; los productos y las opciones de slot, `agotado`. */
@@ -63,14 +70,36 @@ export type Cotizacion = {
 };
 
 /** Con 200 el pedido EXISTE aunque lo demás venga en null (caso degradado): se va al seguimiento. */
-export type PedidoCreado = { codigo: string; folio_corto: string | null; total_mxn: string | null; vence_aceptacion: string | null };
+export type PedidoCreado = {
+  codigo: string; folio_corto: string | null; total_mxn: string | null; vence_aceptacion: string | null;
+  /**
+   * Solo en un pedido que se paga en línea. `init_point` es a dónde mandar al cliente a pagar (ya
+   * comprobado: https de Mercado Pago); null = ese pedido ya no espera pago: se va a su seguimiento.
+   */
+  pago: { init_point: string | null } | null;
+};
 
-export const ESTADOS_DE_PEDIDO = ["EN_PROCESO", "EN_PREPARACION", "EN_CAMINO", "LISTO_PARA_RECOGER", "ENTREGADO", "CANCELADO"] as const;
+export const ESTADOS_DE_PEDIDO = ["POR_PAGAR", "EN_PROCESO", "EN_PREPARACION", "EN_CAMINO", "LISTO_PARA_RECOGER", "ENTREGADO", "CANCELADO"] as const;
 export type EstadoDePedido = (typeof ESTADOS_DE_PEDIDO)[number];
+/**
+ * Cómo va el pago de un pedido en línea: falta pagar; el último intento no pasó (puede reintentar);
+ * pagado; devolviéndose; devuelto; venció sin pagarse (confirmado con Mercado Pago); o venció y
+ * todavía no se ha podido confirmar si se cobró.
+ */
+export const ESTADOS_DE_PAGO = ["ESPERANDO_PAGO", "RECHAZADO", "PAGADO", "DEVOLUCION_EN_PROCESO", "DEVUELTO", "SIN_PAGO", "POR_CONFIRMAR"] as const;
+export type EstadoDePago = (typeof ESTADOS_DE_PAGO)[number];
 export type Seguimiento = {
   folio_corto: string; modo: Modo; estado: EstadoDePedido;
-  /** Solo si está cancelado: SIN_RESPUESTA, AGOTADO, CERRADO, SATURADO u OTRO. */
+  /** Solo si está cancelado: SIN_RESPUESTA, AGOTADO, CERRADO, SATURADO, OTRO, SIN_PAGO o POR_CONFIRMAR. */
   motivo: string | null;
+  /** Lo del pago en línea; null en un pedido que se paga al recibir. */
+  enLinea: {
+    estado: EstadoDePago; propina_mxn: string; total_a_pagar_mxn: string;
+    /** Hasta cuándo se puede pagar. */
+    vence_pago: string | null;
+    /** A dónde ir a pagar, mientras se pueda (solo lo trae `confirmar_pago`; ya comprobado). */
+    init_point: string | null;
+  } | null;
   renglones: { nombre: string; cantidad: number; detalle: string | null }[];
   subtotal_mxn: string; envio_total_mxn: string; total_mxn: string; pago: Pago;
   recibido_at: string; sucursal: { nombre: string; telefono: string | null };
@@ -123,7 +152,7 @@ const lector = <T>(f: (x: unknown) => T) => (x: unknown): T | null => {
     throw e;
   }
 };
-const MODOS = ["RECOGER", "DOMICILIO"] as const, PAGOS = ["EFECTIVO", "TARJETA"] as const;
+const MODOS = ["RECOGER", "DOMICILIO"] as const, PAGOS = ["EFECTIVO", "TARJETA", "EN_LINEA"] as const;
 
 function grupo(x: unknown): Grupo {
   const g = obj(x);
@@ -156,6 +185,8 @@ export const negocioDe = lector((x): Negocio => {
     slug: con(FORMA_SLUG)(n.slug), nombre: txt(n.nombre), logo_ruta: txtONull(n.logo_ruta),
     color: con(/^#[0-9a-fA-F]{6}$/)(n.color), descripcion: txtONull(n.descripcion),
     pago_efectivo: bool(n.pago_efectivo), pago_tarjeta: bool(n.pago_tarjeta),
+    // Solo un `true` cuenta: una función anterior al pago en línea no manda la clave.
+    pago_en_linea: n.pago_en_linea === true,
     sucursales: lista(n.sucursales, (y) => {
       const s = obj(y), e = obj(s.estado);
       return {
@@ -168,6 +199,7 @@ export const negocioDe = lector((x): Negocio => {
           const zona = obj(z);
           return { id: uuid(zona.id), nombre: txt(zona.nombre), costo_mxn: importe(zona.costo_mxn) };
         }),
+        pago_en_linea: s.pago_en_linea === true,
       };
     }),
   };
@@ -211,6 +243,8 @@ export const pedidoDe = lector((x): PedidoCreado => {
   return {
     codigo: con(FORMA_CODIGO)(p.codigo), folio_corto: oNull(p.folio_corto, /^[A-Za-z0-9-]{1,20}$/),
     total_mxn: oNull(p.total_mxn, /^\d+\.\d{2}$/), vence_aceptacion: oNull(p.vence_aceptacion, /^[0-9T:.+Z -]{10,40}$/),
+    // Un `pago` raro no tumba la respuesta: el pedido existe. Sin enlace válido se va a su seguimiento.
+    pago: typeof p.pago === "object" && p.pago !== null ? { init_point: enlaceDePago((p.pago as Obj).init_point) } : null,
   };
 });
 
@@ -222,6 +256,11 @@ export const seguimientoDe = lector((x): Seguimiento => {
     subtotal_mxn: importe(s.subtotal_mxn), envio_total_mxn: importe(s.envio_total_mxn), total_mxn: importe(s.total_mxn),
     pago: uno(s.pago, PAGOS), recibido_at: txt(s.recibido_at),
     sucursal: { nombre: txt(suc.nombre), telefono: txtONull(suc.telefono) },
+    // Un pedido en línea SIN el estado de su pago no se pinta a medias: es una respuesta ilegible.
+    enLinea: s.pago !== "EN_LINEA" ? null : {
+      estado: uno(s.pago_estado, ESTADOS_DE_PAGO), propina_mxn: importe(s.propina_mxn), total_a_pagar_mxn: importe(s.total_a_pagar_mxn),
+      vence_pago: txtONull(s.vence_pago), init_point: enlaceDePago(s.init_point),
+    },
   };
 });
 
