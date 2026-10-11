@@ -329,6 +329,23 @@ Revisa la impresora.»— con el botón **Imprimir comanda**, que la manda desde
 pedir PIN (es la primera impresión, no una reimpresión). La alerta aparece pasados
 unos 20 segundos sin comanda y se quita cuando sale el papel.
 
+### Pedido pagado en línea: una marca, y «Listo» en vez de «Cobrar» (0172)
+
+Un pedido de la tienda que el cliente ya pagó lleva **una sola marca, siempre igual**: «PAGADO EN
+LÍNEA, no cobrar», en verde lleno (`bg-success`, texto blanco; el mismo molde que «Comanda sin
+imprimir» en rojo). Sale en el aviso grande (arriba del detalle, tamaño 15), en la tarjeta del
+pedido por aceptar y en la tarjeta de su cuenta (tamaño 12), y como franja `success-soft` bajo el
+encabezado de la cuenta, con «Cuando lo entregues, toca «Listo».». No se inventa otro color ni
+otro texto para lo mismo.
+
+- La cuenta nace cobrada y **se queda en la lista** de Pick-up o Domicilio hasta «Listo».
+- Su fila de acciones es otra: Imprimir ticket · (Asignar repartidor) · **Cancelar cuenta** ·
+  **Listo** (la principal, a la derecha, donde iría «Cobrar»). No hay Agregar producto,
+  Descuento, Canjear ni «Eliminar» por renglón: el cliente pagó exactamente eso.
+- «Cancelar cuenta» abre directo el diálogo de peligro, y la consecuencia dice **antes de
+  confirmar** que el pago se le devuelve completo al cliente y que de la caja no sale efectivo.
+- En Consultar cuentas, una cuenta pagada en línea no ofrece «Cambiar pago» ni «Reabrir».
+
 ## Lo que NO se hereda de otras apps
 
 - **La densidad del admin.** Aquí el scroll es tiempo frente a un cliente, pero apretar de más

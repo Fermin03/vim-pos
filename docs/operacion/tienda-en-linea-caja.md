@@ -35,6 +35,33 @@ cobrar o cancelar la cuenta.
 La pantalla **Pedidos en línea** del inicio ya no lista los pedidos de la tienda: quedó para los de
 Uber y para **pausar o reanudar** la tienda (la barra de arriba).
 
+## Pedidos pagados en línea
+
+Si el negocio ofrece **pago en línea** (Admin → Tienda en línea), el cliente paga con Mercado Pago
+antes de que el pedido llegue a la caja. Ese pedido se reconoce por la marca verde **«PAGADO EN
+LÍNEA, no cobrar»**: sale en el aviso grande, en la lista de Pick-up o de Domicilio, en el detalle
+de la cuenta, y en la comanda y el ticket (en «Nota del pedido»).
+
+- **No se cobra.** Al aceptarlo, su cuenta nace ya cobrada, con «Pago en línea» como forma de pago
+  y con la propina que el cliente eligió. No tiene botón «Cobrar».
+- **Se entrega con «Listo».** La cuenta se queda en la lista de Pick-up o de Domicilio hasta que
+  alguien toca **Listo**; entonces sale de la lista y el cliente ve «Entregado». Imprimir el ticket
+  o asignar repartidor sigue avisándole al cliente que su pedido está listo o en camino.
+- **Cancelar la cuenta devuelve el pago**, completo y con propina, por Mercado Pago; de la caja no
+  sale efectivo. Vale también después de «Listo» (desde Consultar cuentas → Cancelar folio). El
+  cliente ve la devolución en su seguimiento; el banco puede tardar unos días en reflejarla.
+- **No se le hace devolución de caja, ni se le cambia la forma de pago, ni se reabre.** Si alguien
+  lo intenta, la caja dice por qué y manda a cancelar la cuenta.
+- **En el corte** sale en su propio renglón, «Pago en línea»: no cuenta como efectivo ni como
+  tarjeta de la terminal. Ese dinero está en la cuenta de Mercado Pago del negocio.
+- **Solo llega a cajas actualizadas.** Una caja instalada anterior no recibe pedidos pagados en
+  línea (la tienda ni siquiera ofrece esa forma de pago en esa sucursal). El admin avisa en qué
+  sucursal falta actualizar.
+
+Si el cliente dice que pagó y el pedido no aparece: revisar en Admin → Tienda en línea → «Últimos
+pagos en línea». «Pagado» sin pedido en la caja = revisar internet y turno de la caja; «No
+completado» = el pago no pasó y no se le cobró.
+
 ## Un pedido no suena (o no aparece)
 
 Revisa en este orden. Casi siempre es una de las primeras tres.
