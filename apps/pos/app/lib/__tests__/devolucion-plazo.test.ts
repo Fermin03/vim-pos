@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { avisoDeTienda, devolucionFueraDePlazo, HORAS_PARA_DEVOLVER_EN_LINEA } from "../pedidos-en-linea";
+import { avisoDeTienda, cuentaPorCancelar, cuentasPagadasEnLinea, devolucionFueraDePlazo, HORAS_PARA_DEVOLVER_EN_LINEA } from "../pedidos-en-linea";
 import type { PedidoApp } from "../pedidos-apps";
 
 const AHORA = Date.parse("2026-10-13T12:00:00Z");
@@ -31,5 +31,19 @@ describe("la nube canceló un pedido pagado en línea que aquí ya tenía cuenta
   it("el cajero lee, tal cual, que el pago ya se devolvió y que cancele la cuenta", () => {
     const texto = "El pedido en línea se canceló y el pago ya se le devolvió al cliente: cancela esta cuenta. Si ya lo entregaste, cóbralo de otra forma";
     expect(avisoDeTienda({ canal: "TIENDA", estado: "CANCELADO", ultimoError: texto } as PedidoApp)).toBe(texto);
+  });
+});
+
+describe("la cuenta cobrada de un pedido pagado en línea que la nube canceló sigue a la vista, para cancelarla", () => {
+  const texto = "El pedido en línea se canceló y el pago ya se le devolvió al cliente: cancela esta cuenta. Si ya lo entregaste, cóbralo de otra forma";
+  const p = (extra: Partial<PedidoApp>) => ({ id: "p", app: "DRIVE_THRU", canal: "TIENDA", estado: "CANCELADO", ticketId: "tk", ultimoError: texto, pago: { forma: "EN_LINEA", pagaCon: null }, ...extra }) as PedidoApp;
+  it("con el aviso de la caja, su cuenta se sigue listando; sin aviso (lo canceló esta caja) o al recibir, no", () => {
+    expect(cuentaPorCancelar(p({}))).toBe("tk");
+    expect(cuentasPagadasEnLinea([p({})], "DRIVE_THRU")).toEqual(["tk"]);
+    expect(cuentasPagadasEnLinea([p({})], "DELIVERY_PROPIO")).toEqual([]);
+    expect(cuentasPagadasEnLinea([p({ ultimoError: null })], "DRIVE_THRU")).toEqual([]);
+    expect(cuentasPagadasEnLinea([p({ pago: { forma: "EFECTIVO", pagaCon: null } })], "DRIVE_THRU")).toEqual([]);
+    // Un pedido vivo no es «por cancelar»: se entrega con «Listo».
+    expect(cuentaPorCancelar(p({ estado: "ACEPTADO", ultimoError: null }))).toBeNull();
   });
 });

@@ -147,10 +147,19 @@ export type HechoAqui = "aceptar" | "rechazar" | "entregar";
 /**
  * Las cuentas (tickets) de un canal que nacieron cobradas y siguen ahí: pedidos pagados en línea,
  * aceptados y todavía sin entregar. Una cuenta cobrada normal sale de la lista de Pick-up o de
- * Domicilio; estas se quedan hasta que alguien toca «Listo».
+ * Domicilio; estas se quedan hasta que alguien toca «Listo». También se queda la que hay que
+ * CANCELAR (`cuentaPorCancelar`): si desapareciera, el cajero leería el aviso sin tener dónde hacerlo.
  */
 export function cuentasPagadasEnLinea(pedidos: PedidoApp[], modo: AppTienda): string[] {
-  return pedidos.flatMap((p) => (p.app === modo && pagadoEnLinea(p) ? cuentaDe(p) ?? [] : []));
+  return pedidos.flatMap((p) => (p.app === modo && pagadoEnLinea(p) ? cuentaDe(p) ?? cuentaPorCancelar(p) ?? [] : []));
+}
+
+/**
+ * La cuenta, ya cobrada, de un pedido pagado en línea que la nube canceló (y cuyo pago ya se
+ * devolvió): la caja dejó dicho que hay que cancelarla. Sigue en la lista hasta que se cancela.
+ */
+export function cuentaPorCancelar(p: PedidoApp): string | null {
+  return pagadoEnLinea(p) && avisoDeTienda(p) ? p.ticketId : null;
 }
 
 /** La cuenta (ticket) de un pedido de la tienda ya aceptado y todavía vivo; null si no la tiene. */

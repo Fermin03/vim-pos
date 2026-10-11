@@ -21,7 +21,7 @@ import { IconoAsignarCliente, IconoClienteAsignado, ModalClienteCuenta } from ".
 import { useEscape } from "../lib/use-escape";
 import { esEscritorio } from "../lib/actualizacion";
 import { segundosRestantes, type PedidoApp } from "../lib/pedidos-apps";
-import { avisosDeCanal, cuentaDe, cuentasPagadasEnLinea, etiquetaEntrega, pagadoEnLinea, PAGADO_EN_LINEA, porAceptarDeCanal, porQueNoSeAtiende, puedeAtender } from "../lib/pedidos-en-linea";
+import { avisosDeCanal, cuentaDe, cuentaPorCancelar, cuentasPagadasEnLinea, etiquetaEntrega, pagadoEnLinea, PAGADO_EN_LINEA, porAceptarDeCanal, porQueNoSeAtiende, puedeAtender } from "../lib/pedidos-en-linea";
 import { DetallePedidoTienda, esUrgente, MarcaPagadoEnLinea, mmss, MotivosRechazo, type AccionTienda, type ListoTienda } from "./pedido-tienda";
 
 const PERMISO_REIMPRIMIR = "venta.reimprimir_ticket";
@@ -324,6 +324,8 @@ export function PantallaCuentasModo({
   const sel = (items ?? []).find((c) => c.ticketId === selId) ?? null;
   /** El pedido de la tienda del que nació la cuenta seleccionada, si lo hay (para su comanda). */
   const pedidoDeCuenta = sel ? pedidosTienda.find((p) => p.ticketId === sel.ticketId) ?? null : null;
+  /** La nube canceló el pedido de esta cuenta pagada en línea: no se entrega, se cancela. */
+  const porCancelar = pedidoDeCuenta !== null && cuentaPorCancelar(pedidoDeCuenta) !== null;
   // "Ya se imprimió" = lo hicimos en esta sesión, o el ticket trae marca de impresión previa.
   const yaSeImprimio = sel != null && (yaImpresas.has(sel.ticketId) || sel.impresaAt != null);
   // null = todavía no se sabe. Solo `true` habilita el borrado.
@@ -616,11 +618,11 @@ export function PantallaCuentasModo({
                       <Accion
                         label="Listo"
                         destacado
-                        inactivo={!pedidoDeCuenta}
+                        inactivo={!pedidoDeCuenta || porCancelar}
                         ocupado={entregando}
                         textoOcupado="Un momento…"
                         onClick={async () => {
-                          if (!enLinea || !pedidoDeCuenta) return;
+                          if (!enLinea || !pedidoDeCuenta || porCancelar) return;
                           setEntregando(true); setError(null);
                           const r = await enLinea.onListo(pedidoDeCuenta, sel.total);
                           setEntregando(false);
@@ -661,7 +663,15 @@ export function PantallaCuentasModo({
                 )}
               </div>
 
-              {sel.pagadaEnLinea && (
+              {/* La nube canceló este pedido y ya devolvió su pago: aquí queda una cuenta cobrada sin dinero
+                  detrás. Texto provisional (James). */}
+              {porCancelar && (
+                <p className="border-b border-danger-line bg-danger-soft px-4 py-2.5 text-15 font-bold text-danger" role="alert">
+                  Este pedido se canceló y el pago ya se le devolvió al cliente.
+                  <span className="ml-2 font-medium text-ink-2">Cancela esta cuenta. Si ya lo entregaste, cóbralo de otra forma.</span>
+                </p>
+              )}
+              {sel.pagadaEnLinea && !porCancelar && (
                 <p className="border-b border-success-line bg-success-soft px-4 py-2.5 text-15 font-bold text-success" role="status">
                   {PAGADO_EN_LINEA}
                   <span className="ml-2 font-medium text-ink-2">Cuando lo entregues, toca «Listo».</span>
