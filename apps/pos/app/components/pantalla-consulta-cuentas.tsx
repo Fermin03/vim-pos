@@ -65,7 +65,7 @@ export function PantallaConsultaCuentas({
   // enum para prellenar/filtrar el modal de cambio de pago (null si no está en la lista conocida).
   const etiquetaPago = detalle?.pagos[0]?.metodo ?? null;
   const metodoActual = METODOS_PAGO.find((m) => m.label === etiquetaPago)?.codigo ?? null;
-  // Pagada en línea (tienda): ni se le cambia el pago ni se reabre; la base tampoco lo deja (0172).
+  // Pagada en línea (tienda): ni se le cambia el pago ni se reabre; la base tampoco lo deja (0173).
   const pagadaEnLinea = (detalle?.pagos ?? []).some((p) => p.metodo === etiquetaMetodoPago("PAGO_EN_LINEA"));
 
   const recargar = useCallback(async () => {

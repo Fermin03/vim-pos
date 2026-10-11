@@ -31,7 +31,7 @@ const COLS_PEDIDO = "id, tenant_id, sucursal_id, conexion_id, app, id_externo, f
 // Las columnas del canal Tienda solo viajan a las cajas que lo entienden (ver alcanceEspejo).
 const COLS_PEDIDO_TIENDA = `${COLS_PEDIDO}, canal, cliente_email, tienda_cuenta_id, zona_envio_id, direccion, pago_al_recibir, paga_con_mxn`;
 // `pagado_at` solo viaja a la caja que declara el pago en línea (desde la 0.9.0), y TIENE que espejarlo:
-// su propia política de lectura (0172 §2) le esconde a su POS el pedido en línea sin `pagado_at`.
+// su propia política de lectura (0173 §2) le esconde a su POS el pedido en línea sin `pagado_at`.
 const COLS_PEDIDO_EN_LINEA = `${COLS_PEDIDO_TIENDA}, pagado_at`;
 
 servir(async (req, json) => {

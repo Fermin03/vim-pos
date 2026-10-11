@@ -393,7 +393,7 @@ test("cuerpo: una clave mal formada es CUERPO_INVALIDO, nunca un pedido sin clav
   }
 });
 
-// ── Pago en línea (0172) ──────────────────────────────────────────────────────────────────────────
+// ── Pago en línea (0173) ──────────────────────────────────────────────────────────────────────────
 const TARJETA = { token: "ff8080814c11e237014c1ff593b57b4d", payment_method_id: "master", type: "credit_card" };
 const enLinea = { ...pedir, pago: "EN_LINEA", paga_con: null, tarjeta: TARJETA, cliente: { ...(pedir.cliente as Record<string, unknown>), email: "ana@example.com" } };
 test("cuerpo: pedir en línea lleva su propina, que es un porcentaje de la lista; sin ella, null", () => {

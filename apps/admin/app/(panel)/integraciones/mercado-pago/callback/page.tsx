@@ -10,7 +10,7 @@ import { accionConexionTienda, esStateDeTienda, mensajeErrorConexionTienda, REGR
 /**
  * Regreso del OAuth de Mercado Pago. Llega con ?code&state (o ?error). La ruta es la registrada en
  * Mercado Pago —en las DOS aplicaciones, la de la terminal (ADR 0033) y la de la tienda en línea
- * (0172)— y no se puede mover sin cambiarla allá. A cuál pertenece la autorización lo dice el
+ * (0173)— y no se puede mover sin cambiarla allá. A cuál pertenece la autorización lo dice el
  * `state` que generó este mismo panel: el de la tienda empieza por «tienda.». Cada una valida SU
  * state, canjea contra SU aplicación y vuelve a SU pantalla; no comparten conexión.
  */

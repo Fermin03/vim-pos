@@ -1,6 +1,6 @@
 // El puerto de pago-flujo.ts sobre supabase-js (service_role). Solo corre en Deno: importa el
 // cliente, así que no se prueba con Node; por eso aquí no hay ninguna decisión, solo las llamadas.
-// Las funciones SQL son las de la migración 0172. Un error de la base se lanza: quien llama decide.
+// Las funciones SQL son las de la migración 0173. Un error de la base se lanza: quien llama decide.
 import type { clienteAdmin } from "../http.ts";
 import { registrarError } from "../errores.ts";
 import { montoTexto } from "../terminal/mercado-pago.ts";

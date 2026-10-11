@@ -62,7 +62,7 @@
 // RPC va acotada a ese tenant. La lógica (precios, horario, topes, contraseñas, bloqueo) vive en las
 // funciones SQL de 0162 y 0166.
 //
-// PAGO EN LÍNEA (Orders API de Mercado Pago; 0172 y _shared/tienda/pago-*.ts)
+// PAGO EN LÍNEA (Orders API de Mercado Pago; 0173 y _shared/tienda/pago-*.ts)
 //   `pedir` con `pago: "EN_LINEA"` (`propina_pct`: 0, 10, 15 o 20; `tarjeta`: el TOKEN que dio
 //   MercadoPago.js, su marca y si es crédito o débito; y correo obligatorio) crea el pedido
 //   POR_PAGAR, que no existe para la caja, y lo cobra en la misma petición con el token de la
@@ -88,7 +88,7 @@
 // TURNSTILE_SECRET_KEY, TURNSTILE_HOSTNAMES (tiene que incluir el dominio de la tienda),
 // CAPTCHA_OPCIONAL (solo local), VIM_SMTP_*, VIM_AVISOS_A (a dónde van los avisos internos). Los
 // tokens de Mercado Pago no son secretos de la función: son de cada restaurante y viven en Vault
-// (`tienda:<conexion>:access`, 0172).
+// (`tienda:<conexion>:access`, 0173).
 import { clienteAdmin } from "../_shared/http.ts";
 import { consumirCupo, consumirCupos, leerCuerpoAcotado, type ResultadoCupo } from "../_shared/limite.ts";
 import { secretoInternoValido } from "../_shared/delivery/interno.ts";
@@ -561,7 +561,7 @@ async function atender(req: Request): Promise<Response> {
     p_total_esperado: p.total_esperado,   // lo que el cliente vio; si ya no es ese, 409 TOTAL_CAMBIO con el nuevo
     // Solo si vino: sin `clave` la llamada es, argumento por argumento, la de antes de la 0167.
     ...(p.clave && { p_clave: p.clave }),
-    // Solo en línea: un pedido al recibir llama, argumento por argumento, como antes de la 0172.
+    // Solo en línea: un pedido al recibir llama, argumento por argumento, como antes de la 0173.
     ...(enLinea && { p_propina_pct: p.propina_pct ?? 0 }),
   });
   if (alta.error) return rechazo("tienda_crear_pedido", alta.error);

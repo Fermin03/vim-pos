@@ -6,7 +6,7 @@
 //     servirle para saber si falló el código, la fecha o el saldo;
 //   · tras 5, esa IP no puede intentar pagar en línea esa hora (los pedidos al recibir, sí);
 //   · si en un negocio se juntan 12 rechazos en una hora, su pago en línea se pausa una hora
-//     (tienda_pago_pausar, 0172) y se avisa a VIM. Los pedidos al recibir siguen.
+//     (tienda_pago_pausar, 0173) y se avisa a VIM. Los pedidos al recibir siguen.
 // Puro salvo por el cliente que se le pasa: se prueba con `node --test`.
 import { esc, soloAscii } from "../correo.ts";
 import { type ClienteRpc, consumirCupo } from "../limite.ts";

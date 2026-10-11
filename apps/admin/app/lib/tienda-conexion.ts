@@ -3,7 +3,7 @@ import { supabase } from "./supabase";
 import { generarState } from "./integraciones";
 import { REGRESO_MP } from "./terminal";
 
-// La cuenta de Mercado Pago de la TIENDA EN LÍNEA (0172). Es otra aplicación de Mercado Pago que la
+// La cuenta de Mercado Pago de la TIENDA EN LÍNEA (0173). Es otra aplicación de Mercado Pago que la
 // de la terminal («VIM POS Tienda», Pagos online): otra conexión, otra tabla (`tienda_conexiones`) y
 // otros tokens. Lo único compartido es la URL de regreso, registrada en las dos aplicaciones, y la
 // función que canjea (`terminal-mp-conexion`, que la atiende aparte por `destino`). De la terminal

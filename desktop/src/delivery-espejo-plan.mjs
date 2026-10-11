@@ -3,7 +3,7 @@
 
 /**
  * Columnas de delivery_pedidos que se espejan (0090 + 0096, las de la tienda en línea de la
- * 0161 y `pagado_at` del pago en línea, 0172). ticket_id y payload_raw se tratan aparte.
+ * 0161 y `pagado_at` del pago en línea, 0173). ticket_id y payload_raw se tratan aparte.
  */
 export const COLUMNAS_PEDIDO = [
   "id", "tenant_id", "sucursal_id", "conexion_id", "app", "id_externo", "folio_corto", "estado", "estado_app",
@@ -122,7 +122,7 @@ export function planificarEspejo({ conexiones = [], pedidos = [], localPedidos =
  * Y «ya lo tengo» (entrega 7): el ticket existe y sigue abierto, y el pedido local (`estado`) sigue
  * en ACEPTADO → «en preparación». Sin ese aviso la nube cancela el pedido a los 15 minutos.
  *
- * Pagado en línea (0172): su cuenta nace cobrada, así que «cobrada» NO es «entregado». Lo entrega
+ * Pagado en línea (0173): su cuenta nace cobrada, así que «cobrada» NO es «entregado». Lo entrega
  * el cajero con «Listo», que sella `entregado_at` en la copia local. Y su cuenta se puede cancelar
  * ya entregada (eso devuelve el pago): cancelado se reporta siempre.
  */

@@ -6,7 +6,7 @@
 // son los fixtures de pago-mp.test.ts. Lo que ahí figura como «sin probar» está marcado aquí.
 //
 // Puro: arma la orden y decide qué significa lo que contesta Mercado Pago. Lo que mueve el pedido es
-// la base (tienda_pago_aplicar, 0172). Se prueba con `node --test`.
+// la base (tienda_pago_aplicar, 0173). Se prueba con `node --test`.
 //
 // El token de la tarjeta es de un solo uso y no se escribe en ningún log.
 //

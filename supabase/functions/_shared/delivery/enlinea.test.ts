@@ -158,7 +158,7 @@ test("caja sin actualizar: sin caja viva (sucursal solo web, o caja apagada) o c
   assert.equal(cajaSinActualizar([{ espejo_apps_at: hace(10), version_app: "0.7.0" }, { espejo_apps_at: hace(20), version_app: "0.10.2" }], T0), false);
 });
 
-// ── Pago en línea (0172): quién puede reportar el estado de un pedido ─────────────────────────────
+// ── Pago en línea (0173): quién puede reportar el estado de un pedido ─────────────────────────────
 import { negativaDeReporte } from "./enlinea.ts";
 
 test("reporte: la caja instalada reporta lo de siempre, de un pedido que atiende una caja", () => {

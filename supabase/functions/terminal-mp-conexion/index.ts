@@ -36,7 +36,7 @@ servir(async (req, json) => {
     let b: Record<string, unknown>;
     try { b = await req.json(); } catch { return json({ error: "BAD_JSON" }, 400); }
 
-    // La tienda en línea tiene su propia aplicación de Mercado Pago y su propia conexión (0172): se
+    // La tienda en línea tiene su propia aplicación de Mercado Pago y su propia conexión (0173): se
     // atiende aparte. Sin `destino` (o con "terminal") todo lo de abajo es, línea por línea, lo de siempre.
     const destino = destinoDe(b.destino);
     if (!destino) return json({ error: "DESTINO_INVALIDO" }, 400);

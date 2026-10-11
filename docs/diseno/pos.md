@@ -329,7 +329,7 @@ Revisa la impresora.»— con el botón **Imprimir comanda**, que la manda desde
 pedir PIN (es la primera impresión, no una reimpresión). La alerta aparece pasados
 unos 20 segundos sin comanda y se quita cuando sale el papel.
 
-### Pedido pagado en línea: una marca, y «Listo» en vez de «Cobrar» (0172)
+### Pedido pagado en línea: una marca, y «Listo» en vez de «Cobrar» (0173)
 
 Un pedido de la tienda que el cliente ya pagó lleva **una sola marca, siempre igual**: «PAGADO EN
 LÍNEA, no cobrar», en verde lleno (`bg-success`, texto blanco; el mismo molde que «Comanda sin

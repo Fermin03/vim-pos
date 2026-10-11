@@ -4,7 +4,7 @@
 //
 // Regla de todo el archivo: lo que llega de fuera (un aviso) es solo una pista.
 // La verdad se le pregunta a Mercado Pago con el token de la conexión de la tienda del restaurante
-// dueño de ESE pago, y lo que mueve el pedido es la base (0172), que es idempotente.
+// dueño de ESE pago, y lo que mueve el pedido es la base (0173), que es idempotente.
 //
 // No toca la base ni la red directamente: recibe un puerto (pago-puerto.ts lo arma con supabase-js)
 // y el cliente de Mercado Pago. Así se prueba con `node --test` y dobles.

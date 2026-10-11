@@ -1,6 +1,6 @@
 // Reglas puras del pago en línea de la tienda en el admin: qué cuenta de Mercado Pago cobra en cada
 // sucursal, cuándo hay que avisar y cómo se le dice al dueño el estado de un pago. Sin supabase ni
-// efectos. Quien decide de verdad es la base (`tienda_conexion_cobro`, 0172); esto solo lo enseña.
+// efectos. Quien decide de verdad es la base (`tienda_conexion_cobro`, 0173); esto solo lo enseña.
 //
 // TEXTOS PROVISIONALES: todo lo que aquí lee el dueño lo revisa James antes de publicar.
 import type { Caja } from "./configuracion";
@@ -12,7 +12,7 @@ import type { SucursalTienda } from "./tienda-reglas";
 type Cuenta = Pick<ConexionTienda, "id" | "cuenta_nombre" | "estado"> & { de_prueba?: boolean };
 type Sucursal = Pick<SucursalTienda, "nombre" | "participa" | "conexionId">;
 
-/** La primera versión de la caja instalada que atiende un pedido ya pagado. La misma de `_tienda_caja_en_linea_viva` (0172): si cambia allá, cambia aquí. */
+/** La primera versión de la caja instalada que atiende un pedido ya pagado. La misma de `_tienda_caja_en_linea_viva` (0173): si cambia allá, cambia aquí. */
 export const CAJA_CON_PAGO_EN_LINEA = "0.9.0";
 
 /**

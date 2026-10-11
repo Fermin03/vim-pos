@@ -233,7 +233,7 @@ Los bloques, en este orden, cada uno en su `Tarjeta`:
    formas de pago: «Pago en línea», «Efectivo al recibir» y «Tarjeta al recibir» (al menos una; la
    única marcada queda fija). «Pago en línea» no se puede encender sin una cuenta de Mercado Pago
    activa.
-   - **Pago en línea** (0172) — tarjeta aparte, justo debajo de Pedidos. Sin cuenta: una línea y
+   - **Pago en línea** (0173) — tarjeta aparte, justo debajo de Pedidos. Sin cuenta: una línea y
      «Conectar Mercado Pago» (la cuenta de la TIENDA: es otra conexión que la de Terminal de
      tarjetas y no se comparten; al terminar vuelve a esta página). Con cuentas: la lista con sus
      píldoras («De prueba: no cobra pedidos reales», «Hay que volver a conectarla»), «Desconectar»

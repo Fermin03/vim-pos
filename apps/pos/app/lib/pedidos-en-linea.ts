@@ -300,7 +300,7 @@ export async function avisarPresente(token: string, sucursalId: string, cajaId?:
 /**
  * «Listo» de una cuenta pagada en línea: el pedido queda entregado y el cliente lo ve así.
  * Desde el POS web se le dice a la nube (delivery-accion). En la caja instalada se sella en la base
- * local y la caja lo reporta sola, con o sin internet en ese momento (tienda_marcar_entregado, 0172).
+ * local y la caja lo reporta sola, con o sin internet en ese momento (tienda_marcar_entregado, 0173).
  */
 export async function entregarPedido(token: string, p: Pick<PedidoApp, "id" | "gestion">): Promise<{ ok: true } | { ok: false; error: string }> {
   if (p.gestion === "ESCRITORIO") {

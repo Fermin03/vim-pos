@@ -1,6 +1,6 @@
 // La conexión de la TIENDA EN LÍNEA con Mercado Pago: la aplicación «VIM POS Tienda» (Pagos online
 // → Checkout API → API de Orders), que es OTRA que la de la terminal Point. Otro client id y secret,
-// otros tokens (Vault `tienda:<id>:access`), otra public key, otra tabla (tienda_conexiones, 0172).
+// otros tokens (Vault `tienda:<id>:access`), otra public key, otra tabla (tienda_conexiones, 0173).
 // Por qué otra: docs/integraciones/mercado-pago-checkout-pro/04-verificado-orders.md.
 //
 // El OAuth es el mismo flujo que el de la terminal (el dueño autoriza, se canjea el `code`), entra

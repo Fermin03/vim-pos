@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0172 — Pago en línea de la tienda (Orders API de Mercado Pago: tarjeta dentro de la tienda): la base.
+-- 0173 — Pago en línea de la tienda (Orders API de Mercado Pago: tarjeta dentro de la tienda): la base.
 -- El cobro se hace en la misma petición que crea el pedido (POST /v1/orders con el token de la
 -- tarjeta). No hay preferencia, ni redirección, ni un pedido «esperando pago» a la vista del cliente.
 -- Diseño: docs/integraciones/mercado-pago-checkout-pro/02-diseno.md; lo verificado contra Mercado

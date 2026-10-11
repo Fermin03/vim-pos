@@ -78,7 +78,7 @@ const VIVO_CON_TICKET: unknown[] = ["ACEPTADO", "EN_PREPARACION", "LISTO"];
  * ponytail: «con repartidor asignado → LISTO» no se deriva aquí (pediría otra tabla en la consulta
  * y la tarjeta pinta igual ACEPTADO que LISTO); la base lo pone al minuto.
  *
- * Pagado en línea (0172): su cuenta nace cobrada, así que «cobrada» NO es «entregado»; se entrega
+ * Pagado en línea (0173): su cuenta nace cobrada, así que «cobrada» NO es «entregado»; se entrega
  * con el «Listo» del cajero. En la caja instalada ese «Listo» queda en `entregado_at` de la copia
  * local unos segundos antes de que la nube cambie el estado: aquí ya cuenta.
  */

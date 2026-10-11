@@ -141,7 +141,7 @@ export async function guardarSucursalTienda(
 }
 
 /**
- * Qué cuenta de Mercado Pago cobra los pedidos en línea de una sucursal (0172); null = la única
+ * Qué cuenta de Mercado Pago cobra los pedidos en línea de una sucursal (0173); null = la única
  * activa del negocio. Solo en una sucursal que ya está en la tienda: no crea la fila.
  */
 export async function guardarCuentaDeSucursal(sucursalId: string, conexionId: string | null): Promise<void> {

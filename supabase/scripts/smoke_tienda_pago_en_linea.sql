@@ -1,4 +1,4 @@
--- Smoke pago en línea de la tienda (mig. 0171 y 0172): quién cobra, el pedido que nace POR_PAGAR y
+-- Smoke pago en línea de la tienda (mig. 0172 y 0173): quién cobra, el pedido que nace POR_PAGAR y
 -- no existe para quien atiende, aplicar lo que dice Mercado Pago (aprobado, rechazado, repetido,
 -- tardío, de más), la cuenta que nace cobrada, las devoluciones por cada camino y el barrido.
 -- Aquí no hay Mercado Pago: se prueba lo que la base decide con lo que las funciones le traen.
@@ -67,7 +67,7 @@ BEGIN
   INSERT INTO turnos (tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable, usuario_apertura_id, fondo_inicial_mxn, fondo_modo)
   VALUES (v_t, v_suc, v_caja, 'SMOKE-LINEA', (now() AT TIME ZONE 'America/Mexico_City')::date, v_cajero, 500, 'TOTAL');
   INSERT INTO tenants (id, codigo, nombre_comercial, estado, vertical_principal)
-  VALUES (v_otro, 'tenant-0172', 'Otro negocio', 'INTERNO', 'QUICK_SERVICE');
+  VALUES (v_otro, 'tenant-0173', 'Otro negocio', 'INTERNO', 'QUICK_SERVICE');
   INSERT INTO tienda_conexiones (tenant_id, cuenta_id_externo, public_key) VALUES (v_otro, '700', 'APP_USR-smoke-otro-negocio-0000') RETURNING id INTO v_cx_o;
   IF tienda_estado_sucursal(v_suc, 'RECOGER') IS NOT NULL THEN RAISE EXCEPTION 'fixture: la tienda debía estar abierta: %', tienda_estado_sucursal(v_suc, 'RECOGER'); END IF;
 

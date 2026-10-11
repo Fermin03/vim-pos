@@ -296,7 +296,7 @@ test("rpc: datos de cuenta que la base rechaza son 400, sin su detalle; direccio
   assert.deepEqual(respuestaDeRpc("CUENTA_INVALIDA: la cuenta no existe en este negocio"), { status: 409, body: { error: "CUENTA_INVALIDA" } });
 });
 
-// ── Pago en línea (0172) ──────────────────────────────────────────────────────────────────────────
+// ── Pago en línea (0173) ──────────────────────────────────────────────────────────────────────────
 import { leerPedidoEnLinea } from "./respuesta.ts";
 
 test("cupos: confirmar_pago tiene su bolsa (90 cada 600 s por IP) y cierra si el control falla", () => {

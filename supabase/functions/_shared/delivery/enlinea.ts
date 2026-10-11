@@ -28,7 +28,7 @@ export const ESTADOS_REPORTABLES: readonly string[] = ["EN_PREPARACION", "LISTO"
  *   · La caja instalada, de un pedido que atiende una caja (gestión ESCRITORIO): como siempre.
  *   · Un empleado desde el POS web, SOLO «ENTREGADO» y SOLO de un pedido pagado en línea de
  *     gestión NUBE: es su botón «Listo». Ese pedido tiene la cuenta cobrada desde que se aceptó,
- *     así que la base ya no puede deducir la entrega mirando el ticket (0172 §8); alguien lo dice.
+ *     así que la base ya no puede deducir la entrega mirando el ticket (0173 §8); alguien lo dice.
  * Devuelve null si puede, o el error con su estado HTTP, en el mismo orden de siempre.
  */
 export function negativaDeReporte(d: { esDispositivo: boolean; gestion: string; pago: string | null; estado: unknown }):

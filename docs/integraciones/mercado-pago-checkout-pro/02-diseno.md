@@ -13,7 +13,7 @@ cae en la cuenta de Mercado Pago del restaurante; VIM no cobra comisión.
 
 - **Aplicación propia: «VIM POS Tienda»** (Pagos online → Checkout API → API de Orders). No es la
   de la terminal Point: Mercado Pago admite un solo producto por aplicación.
-- **Conexión propia por restaurante**: tabla `tienda_conexiones` (0172), tokens en Vault
+- **Conexión propia por restaurante**: tabla `tienda_conexiones` (0173), tokens en Vault
   (`tienda:<conexion>:access` / `:refresh`), su public key y si es de prueba. Nada de la tienda lee
   ni escribe `terminal_conexiones`, ni al revés. Se conecta y se desconecta desde **Tienda en línea**
   en el admin; el OAuth entra por `terminal-mp-conexion` con `destino: "tienda"` (lista cerrada) y
