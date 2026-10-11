@@ -6,6 +6,16 @@
 
 ## Octubre de 2026
 
+11 de octubre Caja · 0.9.0
+
+### Cobro con tarjeta desde la caja
+
+#### Nuevo
+
+- **La caja le manda el cobro a tu terminal de Mercado Pago.** Al cobrar eliges **Tarjeta**, el monto aparece solo en la terminal y, cuando el cliente paga, el pago queda registrado en la cuenta como débito o crédito. Ya no se teclea el monto dos veces.
+- La terminal se conecta una sola vez desde el panel de administración, en **Configuración → Terminal de tarjetas**, con tu cuenta de Mercado Pago. El dinero cae directo en tu cuenta.
+- Si se va el internet o la terminal falla, puedes seguir cobrando como antes: **La cobré en otra terminal**, en la misma pantalla de cobro.
+
 8 de octubre Caja · 0.7.0
 
 ### El corte Z con arqueo de efectivo
