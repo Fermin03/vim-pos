@@ -6,7 +6,7 @@
 
 ## Octubre de 2026
 
-13 de octubre Caja · 0.9.0
+11 de octubre Caja · 0.9.0
 
 ### Cobro con tarjeta desde la caja
 
