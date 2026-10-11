@@ -7,7 +7,7 @@ import { tenantId } from "./datos";
 import { combosNoComprables, type ComboNoComprable, type ComboParaRevisar } from "./tienda-combos";
 import { filaOculta, type CambioMenu, type CategoriaCatalogo, type Ocultos, type ProductoCatalogo } from "./tienda-menu";
 import { ofertaTienda, type OfertaTienda } from "./tienda-plan";
-import { estadoDePago } from "./tienda-cobro";
+import { estadoDePago, type CajaDeTienda } from "./tienda-cobro";
 import { errorDeDireccion, errorDeHorario, leerHorario, mensajeTienda, type SucursalTienda } from "./tienda-reglas";
 
 const SOLO_ADMIN = "Solo el dueño o un administrador puede cambiar esto.";
@@ -152,6 +152,21 @@ export async function guardarCuentaDeSucursal(sucursalId: string, conexionId: st
 }
 
 // ── Pagos en línea ────────────────────────────────────────────────────────────
+
+/**
+ * Las cajas del negocio con lo que la tienda necesita saber de ellas: si están en uso y si DECLARAN
+ * que atienden pedidos pagados en línea (`cajas.espejo_pago_en_linea_at`, 0173). Lectura propia y
+ * no `listarCajas`: esa columna nace con la 0173, y así un admin desplegado antes no rompe otras pantallas.
+ */
+export async function leerCajasDeTienda(): Promise<CajaDeTienda[]> {
+  const { data, error } = await supabase.from("cajas").select("sucursal_id, activa, ultimo_latido, espejo_pago_en_linea_at");
+  if (error) throw fallo(error, "No se pudieron leer las cajas");
+  return ((data ?? []) as Record<string, unknown>[]).map((f) => ({
+    sucursal_id: String(f.sucursal_id), activa: f.activa === true,
+    ultimoLatido: typeof f.ultimo_latido === "string" ? f.ultimo_latido : null,
+    declaraPagoEnLinea: typeof f.espejo_pago_en_linea_at === "string",
+  }));
+}
 
 /** Un pago en línea como lo ve el dueño. `folio` null = el pedido nunca se pagó (la base no lo enseña). */
 export type PagoTienda = {

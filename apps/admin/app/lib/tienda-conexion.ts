@@ -71,7 +71,8 @@ export async function accionConexionTienda(cuerpo: Accion): Promise<Record<strin
     });
   } catch { throw new Error("SIN_RED"); }
   const j = (await r.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!r.ok) throw new Error(typeof j.error === "string" ? j.error : `HTTP_${r.status}`);
+  // PAGOS_RECIENTES trae hasta cuándo: viaja pegado al código para que el mensaje pueda decirlo.
+  if (!r.ok) throw new Error(typeof j.error === "string" ? (j.error === "PAGOS_RECIENTES" && typeof j.hasta === "string" ? `PAGOS_RECIENTES:${j.hasta}` : j.error) : `HTTP_${r.status}`);
   return j;
 }
 
@@ -84,11 +85,17 @@ const MENSAJES: Record<string, string> = {
   CANJE_RECHAZADO: "Mercado Pago no aceptó la autorización. Vuelve a pulsar «Conectar Mercado Pago».",
   SIN_PUBLIC_KEY: "Mercado Pago no entregó lo necesario para cobrar con tarjeta en tu tienda. Vuelve a intentarlo; si se repite, escríbenos a soporte.",
   CONEXION_NO_EXISTE: "Esa cuenta de Mercado Pago ya no está conectada.",
-  PAGOS_PENDIENTES: "Todavía hay un pago en línea por confirmar o una devolución en proceso con esta cuenta. Espera a que terminen y vuelve a intentarlo.",
+  PAGOS_PENDIENTES: "No se puede desconectar todavía: hay un pago en línea por confirmar o una devolución sin terminar con esta cuenta, y sin ella ese dinero no se le puede regresar al cliente. Podrás desconectarla cuando terminen; si una devolución lleva más de un día, escríbenos a soporte.",
+  PAGOS_RECIENTES: "No se puede desconectar todavía: esta cuenta cobró pedidos en las últimas 48 horas y, si alguno se cancela, la devolución sale de aquí.",
   MP_NO_CONFIGURADO: "La conexión con Mercado Pago no está disponible por ahora. Escríbenos a soporte.",
 };
 
 export function mensajeErrorConexionTienda(e: unknown): string {
-  const codigo = e instanceof Error ? e.message : String(e);
-  return MENSAJES[codigo] ?? "Algo salió mal con Mercado Pago. Inténtalo de nuevo.";
+  const [codigo = "", ...resto] = (e instanceof Error ? e.message : String(e)).split(":");
+  const base = MENSAJES[codigo] ?? "Algo salió mal con Mercado Pago. Inténtalo de nuevo.";
+  if (codigo !== "PAGOS_RECIENTES") return base;
+  // Cuándo sí: 48 horas después del último cobro, en la hora del centro de México.
+  const hasta = new Date(resto.join(":"));
+  return Number.isNaN(hasta.getTime()) ? base
+    : `${base} Podrás desconectarla a partir del ${hasta.toLocaleString("es-MX", { timeZone: "America/Mexico_City", day: "numeric", month: "long", hour: "numeric", minute: "2-digit", hour12: true })}.`;
 }

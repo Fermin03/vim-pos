@@ -34,7 +34,8 @@ pedido `POR_PAGAR` (invisible para la caja) y cobra en la misma petición, con
 | **402** con `errors[].code === "failed"` (no hay orden) | el pedido se borra | 409 `PAGO_RECHAZADO` + `detalle` |
 | 201 `processing` (en revisión; **no se puede cancelar**) | se anota la orden; conciliación | 200 `pago: { estado: "POR_CONFIRMAR" }` |
 | 401 | el pedido se borra; pausa de la sucursal 1 h y aviso a VIM | 409 `PAGO_NO_DISPONIBLE` |
-| 400 / 422 (validación: no se creó nada) | el pedido se borra | 409 `PAGO_RECHAZADO`, `detalle: "OTRO"` |
+| 402 `failed` con motivo `invalid_card_token` (token inventado o usado) | el pedido se borra; cuenta para el tope de la IP, no del negocio | 409 `PAGO_NO_PROCESADO` |
+| 400 / 422 (validación) | se busca la orden por referencia: si Mercado Pago confirma que no hay, el pedido se borra; si no se puede comprobar, se conserva | 409 `PAGO_NO_PROCESADO`, o 200 `POR_CONFIRMAR` |
 | sin respuesta, 5xx, 409, 429, otro | nada: conciliación | 200 `pago: { estado: "POR_CONFIRMAR" }` |
 
 `detalle` ∈ `FONDOS` (`insufficient_amount`), `DATOS` (`bad_filled_card_data`: código y fecha no se
@@ -69,9 +70,28 @@ Contadores en `limites_cupo` (cuentan aunque el pedido rechazado se borre):
 
 - 3 rechazos de una IP en una hora → del siguiente en adelante su `detalle` es `OTRO`;
 - 5 → esa IP recibe 429 `DEMASIADOS_INTENTOS` al intentar otro pago en línea esa hora;
-- 12 rechazos en un negocio en una hora → su pago en línea se pausa una hora
-  (`tienda_config.pago_pausado_hasta`) y se avisa a VIM. Los pedidos al recibir siguen.
+- 20 rechazos de tarjetas reales en un negocio en una hora, **desde al menos 8 IP distintas** → su
+  pago en línea se pausa una hora (`tienda_config.pago_pausado_hasta`) y se avisa a VIM. Los pedidos
+  al recibir siguen. Un atacante con pocas IP no lo puede provocar: cada IP aporta a lo sumo 5 por
+  hora, y lo que no es una tarjeta (token inventado, petición no aceptada) no cuenta para el negocio.
 - Los pedidos en línea gastan bolsas de cupo propias (`tienda:paga:*`), no las de `pedir` al recibir.
+
+## Lo que el cliente nunca lee sin estar comprobado
+
+- **«No se te cobró nada»** (`SIN_PAGO`) solo tras la SEGUNDA conciliación sin orden (la de una
+  hora después del plazo) o cuando el cobro nunca se mandó. Hasta entonces el pedido vencido sigue
+  «Confirmando tu pago», en el seguimiento y en «Mis pedidos» (`_tienda_pago_sin_confirmar`).
+- **Otro intento de pago**: desde que sale un cobro y hasta saber qué pasó, la tienda no emite otra
+  clave de intento (cambie lo que cambie el cliente, y aunque recargue). Le pregunta al servidor por
+  esa clave (acción `intento`, que no crea ni cobra nada) y solo un «no existe» libera el formulario.
+
+## Otras reglas
+
+- **La caja declara que atiende pedidos pagados** (`pago_en_linea: true` en su sondeo →
+  `cajas.espejo_pago_en_linea_at`). De esa marca, y no del número de versión, depende que la tienda
+  ofrezca el pago en línea en la sucursal y que un pedido pagado se le encargue a una caja.
+- **Desconectar la cuenta** se niega mientras haya un cobro sin resolver, una devolución por hacer o
+  fallida, o un cobro de las últimas 48 horas (`tienda_conexion_ocupada`); dice por qué y hasta cuándo.
 
 ## En la caja
 
@@ -92,5 +112,5 @@ El access token dura 180 días. Una vez al día (10:50 UTC) la base llama a `tie
 (pg_cron → pg_net, `x-vim-interno`), que renueva las conexiones ACTIVAS que vencen en menos de 30
 días con `MP_TIENDA_CLIENT_ID` / `MP_TIENDA_CLIENT_SECRET`, guarda el par nuevo en Vault (los dos
 o ninguno) y actualiza la `public_key` si viene. Un fallo pasajero se reintenta al día siguiente
-sin tocar la conexión. Si Mercado Pago rechaza el refresh token, o si el par nuevo no se pudo
+sin tocar la conexión. Solo si Mercado Pago dice `invalid_grant`, o si el par nuevo no se pudo
 guardar, la conexión queda en ERROR (el admin pide reconectar) y se avisa a VIM.

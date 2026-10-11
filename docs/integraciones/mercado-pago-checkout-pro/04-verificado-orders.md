@@ -59,6 +59,22 @@ y un token de tarjeta creado con la public key de esa aplicación. Lo que no est
 | LOCK | `card_disabled` |
 | OTHE | `rejected_by_issuer` |
 
+**Más comprobado sobre el cobro (segunda tanda, 11 oct 2026):**
+
+- **Débito funciona**: tarjeta de prueba `5579 0534 6148 2647` con
+  `payment_method: { id: "debmaster", type: "debit_card" }` → 201 `processed` / `accredited`.
+- **El 201 trae `user_id` (texto) y `currency: "MXN"`**: el aprobado se verifica en la misma respuesta.
+- **La respuesta devuelve el token de la tarjeta** en `transactions.payments[0].payment_method.token`
+  (más `installment_amount` y `transaction_security: { validation: "never" }`). Ninguna respuesta
+  cruda de Mercado Pago se guarda ni se registra: solo los campos que extrae `decidirOrden`
+  (hay una prueba que lo comprueba en `pago-flujo.test.ts`).
+- **Token de tarjeta inventado o ya usado → 402 `failed` con motivo `invalid_card_token`** (no es
+  un 400). No es un rechazo del banco: la tienda contesta `PAGO_NO_PROCESADO`.
+- **`type` que no corresponde al `id`** (p. ej. `debmaster` con `credit_card`) → **400**
+  `{"errors":[{"code":"property_value","message":"Invalid value for property","details":["'$.transactions.payments[0].payment_method.id' - value must be one of 'amex', 'master', 'visa'"]}]}`.
+  Ids de crédito válidos en México: `amex`, `master`, `visa`. Débito visto: `debmaster` (`debvisa`
+  existe en el catálogo de medios).
+
 **En revisión → 201** con `status: "processing"`, `status_detail: "in_process"` (titular CONT). No
 existe `binary_mode`. `POST /v1/orders/{id}/cancel` contesta **409 `cannot_cancel_order`** («must be
 in 'action_required' or 'created'»): una orden `processing` no se puede cancelar.
@@ -104,6 +120,5 @@ negocio real depende solo de la marca de la conexión.
 
 - Avisos (webhook) de órdenes online y su firma con la clave de la aplicación nueva.
 - El mismo flujo con el token OAuth de un restaurante real.
-- Tarjetas de débito (`type: "debit_card"`, supuesto).
 - Renovar el token de la tienda con su refresh token, y si esa respuesta trae `public_key`.
 - Nombre exacto del tópico de órdenes en «Webhooks» del panel.

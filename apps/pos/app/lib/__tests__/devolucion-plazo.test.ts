@@ -47,3 +47,12 @@ describe("la cuenta cobrada de un pedido pagado en línea que la nube canceló s
     expect(cuentaPorCancelar(p({ estado: "ACEPTADO", ultimoError: null }))).toBeNull();
   });
 });
+
+describe("la misma ventana decide cuándo se puede desconectar Mercado Pago de la tienda", () => {
+  it("tienda_conexion_ocupada (0173) usa las mismas horas: mientras una cancelación aún devolvería el pago, no se desconecta", () => {
+    const sql = readFileSync(resolve(__dirname, "../../../../../supabase/migrations/0173_tienda_pago_en_linea.sql"), "utf8");
+    const funcion = /CREATE OR REPLACE FUNCTION tienda_conexion_ocupada[\s\S]*?END \$\$;/.exec(sql)?.[0] ?? "";
+    expect(funcion).toContain(`g.aprobado_at > now() - interval '${HORAS_PARA_DEVOLVER_EN_LINEA} hours'`);
+    expect(funcion).toContain(`max(g.aprobado_at) + interval '${HORAS_PARA_DEVOLVER_EN_LINEA} hours'`);
+  });
+});

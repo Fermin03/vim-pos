@@ -38,7 +38,14 @@ describe("conectar Mercado Pago para la tienda en línea", () => {
     expect(validarStateMp(deTerminal)).toBe(true);
   });
   it("los errores se dicen en palabras del dueño, nunca el código", () => {
-    expect(mensajeErrorConexionTienda(new Error("PAGOS_PENDIENTES"))).toContain("devolución en proceso");
+    expect(mensajeErrorConexionTienda(new Error("PAGOS_PENDIENTES"))).toContain("devolución sin terminar");
+    // Cobró hace poco: dice por qué y desde cuándo se podrá (hora del centro de México).
+    const reciente = mensajeErrorConexionTienda(new Error("PAGOS_RECIENTES:2026-10-13T18:30:00+00:00"));
+    expect(reciente).toContain("últimas 48 horas");
+    expect(reciente).toMatch(/a partir del 13 de octubre.{1,12}12:30/);
+    // Sin fecha legible no se inventa ninguna.
+    expect(mensajeErrorConexionTienda(new Error("PAGOS_RECIENTES"))).not.toMatch(/a partir del/);
+    expect(mensajeErrorConexionTienda(new Error("PAGOS_RECIENTES:no-es-fecha"))).not.toMatch(/a partir del|Invalid/);
     expect(mensajeErrorConexionTienda(new Error("SIN_PUBLIC_KEY"))).not.toMatch(/public|key/i);
     expect(mensajeErrorConexionTienda(new Error("ALGO_NUEVO"))).toBe("Algo salió mal con Mercado Pago. Inténtalo de nuevo.");
   });

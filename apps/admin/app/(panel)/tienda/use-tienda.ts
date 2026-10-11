@@ -1,12 +1,12 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { leerNegocio, listarCajas } from "../../lib/configuracion";
+import { leerNegocio } from "../../lib/configuracion";
 import { mensajeError } from "../../lib/errores";
 import { leerModulos } from "../../lib/modulos";
 import { ponerLogoTienda, quitarLogoTienda } from "../../lib/foto-producto";
 import { accionConexionTienda, conexionTiendaDisponible, iniciarConexionTienda, leerConexionesTienda, mensajeErrorConexionTienda, type ConexionTienda } from "../../lib/tienda-conexion";
 import {
-  contarPendientesDeCatalogo, encenderTienda, leerCombosNoComprables, guardarConfigTienda, leerConfigTienda, guardarCuentaDeSucursal, guardarSucursalTienda, leerPagosTienda, leerSucursalesTienda, leerTiendaEncendida, urlDelLogo,
+  contarPendientesDeCatalogo, encenderTienda, leerCajasDeTienda, leerCombosNoComprables, guardarConfigTienda, leerConfigTienda, guardarCuentaDeSucursal, guardarSucursalTienda, leerPagosTienda, leerSucursalesTienda, leerTiendaEncendida, urlDelLogo,
   type BloqueConfig, type DatosConfigTienda,
 } from "../../lib/tienda";
 import { normalizarDireccion, trasEscribir, type Escritura, type Leido } from "../../lib/tienda-pagina";
@@ -43,7 +43,7 @@ async function leerTodo(): Promise<Leido> {
     // La lista de pagos es solo consulta: si falla, lo demás carga igual.
     leerPagosTienda().catch(() => null),
     // Solo es un aviso: si no se puede revisar, no se avisa.
-    listarCajas().catch(() => []),
+    leerCajasDeTienda().catch(() => []),
   ]);
   return { config, sucursales, interruptor, pendientes, combosNoComprables, cuentas, pagos, cajasSinActualizar: sucursalesConCajaSinActualizar(sucursales, cajas), enPlan: modulos.permitidos.tienda === true };
 }

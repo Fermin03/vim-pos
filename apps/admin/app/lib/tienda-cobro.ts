@@ -3,8 +3,6 @@
 // efectos. Quien decide de verdad es la base (`tienda_conexion_cobro`, 0173); esto solo lo enseña.
 //
 // TEXTOS PROVISIONALES: todo lo que aquí lee el dueño lo revisa James antes de publicar.
-import type { Caja } from "./configuracion";
-import { versionMenor } from "./menu-sucursal";
 import type { ConexionTienda } from "./tienda-conexion";
 import type { SucursalTienda } from "./tienda-reglas";
 
@@ -12,22 +10,27 @@ import type { SucursalTienda } from "./tienda-reglas";
 type Cuenta = Pick<ConexionTienda, "id" | "cuenta_nombre" | "estado"> & { de_prueba?: boolean };
 type Sucursal = Pick<SucursalTienda, "nombre" | "participa" | "conexionId">;
 
-/** La primera versión de la caja instalada que atiende un pedido ya pagado. La misma de `_tienda_caja_en_linea_viva` (0173): si cambia allá, cambia aquí. */
-export const CAJA_CON_PAGO_EN_LINEA = "0.9.0";
+/**
+ * Una caja instalada, con lo que hace falta para saber si atiende pedidos pagados en línea.
+ * `declaraPagoEnLinea`: la caja lo declara en su sondeo y la base sella `cajas.espejo_pago_en_linea_at`
+ * (0173). Es una capacidad, no un número de versión: da igual qué versión lleve el instalador.
+ */
+export type CajaDeTienda = { sucursal_id: string; activa: boolean; ultimoLatido: string | null; declaraPagoEnLinea: boolean };
 
 /**
  * Las sucursales que venden en la tienda donde el pago en línea no aparece porque su caja instalada
- * no está actualizada: tienen cajas en uso (activas, con latido) y ninguna llega a la versión.
+ * no está actualizada: tienen cajas en uso (activas, con latido) y ninguna declara que atiende
+ * pedidos pagados en línea. La misma marca que mira la base (`_tienda_caja_en_linea_viva`).
  * Una sucursal sin caja instalada (solo POS web) no sale: ahí no hay nada que actualizar.
- * ponytail: mira «alguna vez mandó latido», como el aviso de menús; la base mira los últimos 90 s.
+ * ponytail: mira «alguna vez lo declaró», como el aviso de menús; la base mira los últimos 90 s.
  */
 export function sucursalesConCajaSinActualizar(
   sucursales: Pick<SucursalTienda, "id" | "nombre" | "participa">[],
-  cajas: Pick<Caja, "sucursal_id" | "activa" | "ultimoLatido" | "versionApp">[],
+  cajas: CajaDeTienda[],
 ): string[] {
   return sucursales.filter((s) => {
     const enUso = cajas.filter((c) => c.sucursal_id === s.id && c.activa && c.ultimoLatido !== null);
-    return s.participa && enUso.length > 0 && enUso.every((c) => c.versionApp === null || versionMenor(c.versionApp, CAJA_CON_PAGO_EN_LINEA));
+    return s.participa && enUso.length > 0 && enUso.every((c) => !c.declaraPagoEnLinea);
   }).map((s) => s.nombre);
 }
 
