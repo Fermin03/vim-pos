@@ -6,6 +6,7 @@ import {
   type Cotizacion, type Cuenta, type DireccionGuardada, type MiCuenta, type Pago, type PedidoCreado, type PedidoDeCuenta, type Registro, type Seguimiento,
 } from "./contrato";
 import type { CuerpoCarrito } from "./carrito";
+import type { TarjetaDePedido } from "./tarjeta";
 
 /**
  * `error` es un código de la función (anexo §1.3) o uno de la tienda:
@@ -27,6 +28,8 @@ export type CuerpoPedido = CuerpoCarrito & {
   pago: Pago;
   /** Solo con EN_LINEA: 0, 10, 15 o 20. El monto lo calcula el servidor. */
   propina_pct?: number;
+  /** Solo con EN_LINEA: el token de un solo uso de la tarjeta (nunca el número), su marca y su banco. */
+  tarjeta?: TarjetaDePedido;
   /** Solo con EFECTIVO: texto con dos decimales (`aTexto`), entre el total y el total + 5000. */
   paga_con: string | null;
   nota: string | null;

@@ -243,7 +243,7 @@ function Pedido({ pedido, sucursal, variasSucursales, alRepetir }: { pedido: Ped
         ))}
       </ul>
       {/* Aquí no hay enlace a su seguimiento: ese enlace solo lo tiene quien hizo el pedido (y su correo). */}
-      {pedido.estado === "POR_PAGAR" && <p className="text-14 text-ink-2">Abre el enlace de tu pedido para pagarlo. Si no lo pagas, se cancela solo y no se te cobra nada.</p>}
+      {pedido.estado === "POR_PAGAR" && <p className="text-14 text-ink-2">Estamos confirmando tu pago. Esto puede tardar unos minutos.</p>}
       {alRepetir && <button type="button" onClick={alRepetir} className={cn(CHICO, "mt-1 self-start")} aria-label={`Pedir de nuevo el pedido ${pedido.folio_corto}`}>Pedir de nuevo</button>}
     </li>
   );

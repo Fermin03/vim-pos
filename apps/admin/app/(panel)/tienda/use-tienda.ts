@@ -10,7 +10,7 @@ import {
   type BloqueConfig, type DatosConfigTienda,
 } from "../../lib/tienda";
 import { normalizarDireccion, trasEscribir, type Escritura, type Leido } from "../../lib/tienda-pagina";
-import { avisoDeCobro, cuentasActivas, sucursalesConCajaSinActualizar } from "../../lib/tienda-cobro";
+import { avisoDeCobro, cuentasActivas, cuentasParaLaTienda, sucursalesConCajaSinActualizar } from "../../lib/tienda-cobro";
 import { revisar, sugerirDireccion, type BorradorSucursal, type Revision } from "../../lib/tienda-reglas";
 import type { DatosTienda } from "../../components/tienda-datos";
 import type { MensajeTienda } from "../../components/tienda-mensaje";
@@ -39,7 +39,7 @@ async function leerTodo(): Promise<Leido> {
     leerCombosNoComprables().catch(() => []),
     leerModulos().catch(() => { throw new Error(LECTURA); }),
     // Sin saber qué cuentas hay no se puede decir si el pago en línea se ofrece: esto sí detiene la página.
-    leerTerminal().then((t) => t.conexiones, () => { throw new Error(LECTURA); }),
+    leerTerminal().then((t) => cuentasParaLaTienda(t.conexiones), () => { throw new Error(LECTURA); }),
     // La lista de pagos es solo consulta: si falla, lo demás carga igual.
     leerPagosTienda().catch(() => null),
     // Solo es un aviso: si no se puede revisar, no se avisa.

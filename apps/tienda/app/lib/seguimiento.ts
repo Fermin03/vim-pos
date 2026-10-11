@@ -34,7 +34,7 @@ const pagoPorResolver = (p: Seguimiento): boolean => p.enLinea?.estado === "POR_
 export function debeConfirmar(p: Seguimiento | null): boolean {
   if (!p) return true;
   const e = p.enLinea?.estado;
-  return e === "ESPERANDO_PAGO" || e === "RECHAZADO" || e === "POR_CONFIRMAR";
+  return e === "POR_CONFIRMAR";
 }
 // Respuestas que no van a cambiar por insistir.
 const NO_EXISTE = new Set(["PEDIDO_NO_ENCONTRADO", "CODIGO_INVALIDO", "NEGOCIO_INVALIDO", "TIENDA_NO_DISPONIBLE"]);

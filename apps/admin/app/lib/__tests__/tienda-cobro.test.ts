@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { avisoDeCobro, cuentaQueCobra, estadoDePago, hayQueElegir, sucursalesConCajaSinActualizar, textoDeAviso } from "../tienda-cobro";
+import { avisoDeCobro, cuentaQueCobra, cuentasParaLaTienda, estadoDePago, hayQueElegir, sucursalesConCajaSinActualizar, textoDeAviso } from "../tienda-cobro";
 
 const A = { id: "a", cuenta_nombre: "Knock-Out León", estado: "ACTIVA" as const };
 const B = { id: "b", cuenta_nombre: "Knock-Out Norte", estado: "ACTIVA" as const };
@@ -88,5 +88,21 @@ describe("sucursales con la caja sin actualizar", () => {
   it("no avisa de la que no vende en la tienda, ni de la que no tiene caja instalada en uso", () => {
     const cajas = [caja("fuera", "0.8.0"), caja("web", "0.8.0", { ultimoLatido: null }), caja("apagada", "0.8.0", { activa: false })];
     expect(sucursalesConCajaSinActualizar([s("fuera", false), s("web"), s("apagada"), s("sin-cajas")], cajas)).toEqual([]);
+  });
+});
+
+describe("una cuenta conectada antes de guardar su public key", () => {
+  const vieja = { id: "v", cuenta_nombre: "Conectada antes", estado: "ACTIVA" as const, public_key: null };
+  const nueva = { id: "n", cuenta_nombre: "Con clave", estado: "ACTIVA" as const, public_key: "APP_USR-00000000-0000-4000-8000-000000000000" };
+  it("para la tienda cuenta como «hay que volver a conectarla»: no cobra en línea y el aviso lo dice", () => {
+    const cuentas = cuentasParaLaTienda([vieja]);
+    expect(cuentas[0]!.estado).toBe("ERROR");
+    expect(cuentaQueCobra(cuentas, null)).toBeNull();
+    expect(avisoDeCobro(true, cuentas, [suc("Centro")])).toEqual({ tipo: "RECONECTAR", sucursales: [] });
+  });
+  it("la que sí la tiene sigue activa; una en error o sin el dato leído (undefined) no cambia de más", () => {
+    expect(cuentasParaLaTienda([nueva, vieja]).map((c) => c.estado)).toEqual(["ACTIVA", "ERROR"]);
+    expect(cuentasParaLaTienda([{ ...ROTA, public_key: "x" }])[0]!.estado).toBe("ERROR");
+    expect(cuentasParaLaTienda([{ id: "s", cuenta_nombre: null, estado: "ACTIVA" as const }])[0]!.estado).toBe("ERROR");
   });
 });

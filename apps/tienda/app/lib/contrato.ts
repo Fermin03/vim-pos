@@ -6,7 +6,6 @@
 // copian solo los campos que conocen: lo que la función añada mañana no llega a la pantalla solo.
 import { leerHorario, type Horario } from "@vim/fecha";
 import type { ItemDeCuerpo } from "./carrito";
-import { enlaceDePago } from "./pago";
 
 export type Modo = "RECOGER" | "DOMICILIO";
 /** EFECTIVO y TARJETA se pagan al recibir; EN_LINEA, antes, en la página de Mercado Pago. */
@@ -21,6 +20,8 @@ export type Sucursal = {
   zonas: Zona[];
   /** En ESTA sucursal se puede pagar en línea ahora. Falso si la función aún no lo dice. */
   pago_en_linea: boolean;
+  /** La public key de la cuenta de Mercado Pago que cobra ahí (pública): con ella se lee la tarjeta. */
+  public_key: string | null;
 };
 export type Negocio = {
   slug: string; nombre: string; logo_ruta: string | null; color: string; descripcion: string | null;
@@ -73,20 +74,19 @@ export type Cotizacion = {
 export type PedidoCreado = {
   codigo: string; folio_corto: string | null; total_mxn: string | null; vence_aceptacion: string | null;
   /**
-   * Solo en un pedido que se paga en línea. `init_point` es a dónde mandar al cliente a pagar (ya
-   * comprobado: https de Mercado Pago); null = ese pedido ya no espera pago: se va a su seguimiento.
+   * Solo en un pedido que se paga en línea: PAGADO (el cobro pasó) o POR_CONFIRMAR (no se supo: el
+   * seguimiento lo dirá). Un cobro rechazado no llega aquí: es un error (`PAGO_RECHAZADO`).
    */
-  pago: { init_point: string | null } | null;
+  pago: { estado: "PAGADO" | "POR_CONFIRMAR" } | null;
 };
 
 export const ESTADOS_DE_PEDIDO = ["POR_PAGAR", "EN_PROCESO", "EN_PREPARACION", "EN_CAMINO", "LISTO_PARA_RECOGER", "ENTREGADO", "CANCELADO"] as const;
 export type EstadoDePedido = (typeof ESTADOS_DE_PEDIDO)[number];
 /**
- * Cómo va el pago de un pedido en línea: falta pagar; el último intento no pasó (puede reintentar);
- * pagado; devolviéndose; devuelto; venció sin pagarse (confirmado con Mercado Pago); o venció y
- * todavía no se ha podido confirmar si se cobró.
+ * Cómo va el pago de un pedido en línea: pagado; devolviéndose; devuelto; no se cobró; o todavía no
+ * se sabe si el cobro pasó (se está confirmando con Mercado Pago).
  */
-export const ESTADOS_DE_PAGO = ["ESPERANDO_PAGO", "RECHAZADO", "PAGADO", "DEVOLUCION_EN_PROCESO", "DEVUELTO", "SIN_PAGO", "POR_CONFIRMAR"] as const;
+export const ESTADOS_DE_PAGO = ["PAGADO", "DEVOLUCION_EN_PROCESO", "DEVUELTO", "SIN_PAGO", "POR_CONFIRMAR"] as const;
 export type EstadoDePago = (typeof ESTADOS_DE_PAGO)[number];
 export type Seguimiento = {
   folio_corto: string; modo: Modo; estado: EstadoDePedido;
@@ -95,10 +95,6 @@ export type Seguimiento = {
   /** Lo del pago en línea; null en un pedido que se paga al recibir. */
   enLinea: {
     estado: EstadoDePago; propina_mxn: string; total_a_pagar_mxn: string;
-    /** Hasta cuándo se puede pagar. */
-    vence_pago: string | null;
-    /** A dónde ir a pagar, mientras se pueda (solo lo trae `confirmar_pago`; ya comprobado). */
-    init_point: string | null;
   } | null;
   renglones: { nombre: string; cantidad: number; detalle: string | null }[];
   subtotal_mxn: string; envio_total_mxn: string; total_mxn: string; pago: Pago;
@@ -200,6 +196,8 @@ export const negocioDe = lector((x): Negocio => {
           return { id: uuid(zona.id), nombre: txt(zona.nombre), costo_mxn: importe(zona.costo_mxn) };
         }),
         pago_en_linea: s.pago_en_linea === true,
+        // Solo con la forma de una public key de Mercado Pago: se le pasa tal cual a su librería.
+        public_key: typeof s.public_key === "string" && /^[A-Za-z0-9_-]{20,100}$/.test(s.public_key) ? s.public_key : null,
       };
     }),
   };
@@ -243,8 +241,8 @@ export const pedidoDe = lector((x): PedidoCreado => {
   return {
     codigo: con(FORMA_CODIGO)(p.codigo), folio_corto: oNull(p.folio_corto, /^[A-Za-z0-9-]{1,20}$/),
     total_mxn: oNull(p.total_mxn, /^\d+\.\d{2}$/), vence_aceptacion: oNull(p.vence_aceptacion, /^[0-9T:.+Z -]{10,40}$/),
-    // Un `pago` raro no tumba la respuesta: el pedido existe. Sin enlace válido se va a su seguimiento.
-    pago: typeof p.pago === "object" && p.pago !== null ? { init_point: enlaceDePago((p.pago as Obj).init_point) } : null,
+    // Un `pago` raro no tumba la respuesta: el pedido existe. Lo que no sea «pagado» se confirma en su seguimiento.
+    pago: typeof p.pago === "object" && p.pago !== null ? { estado: (p.pago as Obj).estado === "PAGADO" ? "PAGADO" : "POR_CONFIRMAR" } : null,
   };
 });
 
@@ -259,7 +257,6 @@ export const seguimientoDe = lector((x): Seguimiento => {
     // Un pedido en línea SIN el estado de su pago no se pinta a medias: es una respuesta ilegible.
     enLinea: s.pago !== "EN_LINEA" ? null : {
       estado: uno(s.pago_estado, ESTADOS_DE_PAGO), propina_mxn: importe(s.propina_mxn), total_a_pagar_mxn: importe(s.total_a_pagar_mxn),
-      vence_pago: txtONull(s.vence_pago), init_point: enlaceDePago(s.init_point),
     },
   };
 });

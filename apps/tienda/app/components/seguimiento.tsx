@@ -11,8 +11,6 @@ import { confirmarPago, seguimiento } from "../lib/api";
 import type { Seguimiento } from "../lib/contrato";
 import { formatoMxn } from "../lib/dinero";
 import { aLaHora, momentoMx } from "../lib/horario";
-import { intentoDeLaPagina } from "../lib/envio";
-import { vaciarSiPagado } from "../lib/pago";
 import { SONDEO_INICIAL, cerrado, debeConfirmar, recorrido, sinConexion, sondear, tardando, type Paso, type Sondeo } from "../lib/seguimiento";
 import { enlaceTel, enlaceWhatsApp, formatoTelefono } from "../lib/telefono";
 import { textoDeError, textoDeSeguimiento } from "../lib/textos";
@@ -79,11 +77,7 @@ function Pedido({ slug, pedido, sondeo }: { slug: string; pedido: Seguimiento; s
   const [copiado, setCopiado] = useState<boolean | null>(null);
   const texto = textoDeSeguimiento(pedido);
   const pago = pedido.enLinea;
-  const faltaPagar = pedido.estado === "POR_PAGAR";
-  // El pago quedó aprobado: ahora sí se vacía el carrito del que salió este pedido (y solo ese).
   const pagado = pago?.estado === "PAGADO";
-  // Y se cierra el intento de compra: el siguiente pedido, aunque sea idéntico, es otro.
-  useEffect(() => { if (pagado && vaciarSiPagado(slug, pedido.folio_corto)) intentoDeLaPagina.cerrar(); }, [pagado, slug, pedido.folio_corto]);
   const pasos = recorrido(pedido.modo, pedido.estado);
   const cancelado = pedido.estado === "CANCELADO";
   const recibido = new Date(pedido.recibido_at);
@@ -103,13 +97,6 @@ function Pedido({ slug, pedido, sondeo }: { slug: string; pedido: Seguimiento; s
           <p className="mt-2 text-16 leading-relaxed text-ink-2">{texto.apoyo}</p>
         </div>
         {sinConexion(sondeo) && <Aviso tono="warning" role="status" className="mt-2 !text-14">Sin conexión. Reintentando…</Aviso>}
-        {/* Falta pagar: la única acción principal de la página, con lo que se va a cobrar. */}
-        {faltaPagar && pago?.init_point && (
-          <a href={pago.init_point} className={cn(PRINCIPAL, "mt-3 h-14 w-full justify-between px-5 text-16")}>
-            <span>{pago.estado === "RECHAZADO" ? "Intentar de nuevo" : "Pagar"}</span>
-            <span className="tabular-nums">{formatoMxn(pago.total_a_pagar_mxn)}</span>
-          </a>
-        )}
       </header>
 
       {pasos && <Recorrido pasos={pasos} />}

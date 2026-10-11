@@ -64,8 +64,7 @@ describe("desenlaceDelError", () => {
   it("ningún código conocido se queda sin texto ni enseña el código", () => {
     for (const codigo of CODIGOS_DE_ERROR) {
       const d = desenlaceDelError(e(codigo), c);
-      if (d.tipo === "esperar") continue;   // «estamos preparando tu pago» no se enseña: se reintenta solo
-      const texto = d.tipo === "aviso" || d.tipo === "campo" ? d.texto : "";
+      const texto = d.tipo === "aviso" || d.tipo === "campo" || d.tipo === "tarjeta" ? d.texto : "";
       expect(texto.length, codigo).toBeGreaterThan(10);
       expect(texto, codigo).not.toMatch(/[A-Z]{3,}_[A-Z]/);
     }

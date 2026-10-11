@@ -15,7 +15,11 @@ const CLAVE_REGRESO = "vimpos.mp.regreso";
 /** A dónde vuelve el dueño después de autorizar, según desde dónde pulsó «Conectar». */
 const REGRESOS = { terminal: "/configuracion/terminal?conectada=1", tienda: "/tienda?conectada=1" } as const;
 
-export type ConexionTerminal = { id: string; cuenta_nombre: string | null; de_prueba: boolean; estado: "ACTIVA" | "ERROR" | "DESCONECTADA"; ultimo_error: string | null };
+export type ConexionTerminal = {
+  id: string; cuenta_nombre: string | null; de_prueba: boolean; estado: "ACTIVA" | "ERROR" | "DESCONECTADA"; ultimo_error: string | null;
+  /** La public key de la cuenta (pública). Sin ella la tienda en línea no puede cobrar con esa cuenta (0172). */
+  public_key?: string | null;
+};
 export type ConfigSucursal = { sucursal_id: string; conexion_id: string; sucursal_id_externo: string | null; imprime_terminal: boolean; espera_segundos: number; propina_en_terminal: boolean };
 export type DispositivoTerminal = { caja_id: string; sucursal_id: string; terminal_id_externo: string | null; modo: string | null; activa: boolean };
 export type EstadoTerminal = { conexiones: ConexionTerminal[]; config: ConfigSucursal[]; dispositivos: DispositivoTerminal[] };
@@ -23,7 +27,7 @@ export type EstadoTerminal = { conexiones: ConexionTerminal[]; config: ConfigSuc
 /** Lo que el negocio tiene conectado (RLS). Las cuentas desconectadas no se muestran. */
 export async function leerTerminal(): Promise<EstadoTerminal> {
   const [c, g, d] = await Promise.all([
-    supabase.from("terminal_conexiones").select("id, cuenta_nombre, de_prueba, estado, ultimo_error").neq("estado", "DESCONECTADA").order("conectada_at"),
+    supabase.from("terminal_conexiones").select("id, cuenta_nombre, de_prueba, estado, ultimo_error, public_key").neq("estado", "DESCONECTADA").order("conectada_at"),
     supabase.from("terminal_config_sucursal").select("sucursal_id, conexion_id, sucursal_id_externo, imprime_terminal, espera_segundos, propina_en_terminal"),
     supabase.from("terminal_dispositivos").select("caja_id, sucursal_id, terminal_id_externo, modo, activa"),
   ]);

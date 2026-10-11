@@ -32,6 +32,14 @@ export function sucursalesConCajaSinActualizar(
 
 export const cuentasActivas = <C extends Cuenta>(cuentas: C[]): C[] => cuentas.filter((c) => c.estado === "ACTIVA");
 
+/**
+ * Las cuentas como las ve la tienda en línea. Una cuenta conectada antes de que se guardara su
+ * public key sirve para la terminal, pero no para cobrar en línea (sin esa clave la tienda no puede
+ * leer la tarjeta): aquí cuenta como «hay que volver a conectarla», que es justo lo que la arregla.
+ */
+export const cuentasParaLaTienda = <C extends Cuenta & { public_key?: string | null }>(cuentas: C[]): C[] =>
+  cuentas.map((c) => (c.estado === "ACTIVA" && !c.public_key ? { ...c, estado: "ERROR" as const } : c));
+
 export const nombreDeCuenta = (c: Pick<Cuenta, "cuenta_nombre">): string => c.cuenta_nombre ?? "Cuenta de Mercado Pago";
 
 /**

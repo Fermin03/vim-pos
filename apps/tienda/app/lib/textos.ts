@@ -9,7 +9,8 @@ import { formatoTelefono } from "./telefono";
 
 // ── Seguimiento (textos decididos por Fermín; sin tiempo estimado) ───────────────────────────────
 const ESTADOS: Record<Exclude<EstadoDePedido, "CANCELADO">, { titulo: string; apoyo: string }> = {
-  POR_PAGAR: { titulo: "Falta pagar", apoyo: "Tu pedido se envía al restaurante en cuanto pagues." },
+  // El cobro se mandó y todavía no se sabe si pasó. Nunca «no se te cobró» ni «rechazado».
+  POR_PAGAR: { titulo: "Confirmando tu pago", apoyo: "Esto puede tardar unos minutos." },
   EN_PROCESO: { titulo: "En proceso", apoyo: "Le avisamos al restaurante. En un momento confirma tu pedido." },
   EN_PREPARACION: { titulo: "En preparación", apoyo: "El restaurante ya está preparando tu pedido." },
   EN_CAMINO: { titulo: "En camino", apoyo: "Tu pedido va hacia ti." },
@@ -47,7 +48,7 @@ export type TextoDeSeguimiento = {
 
 /**
  * El título grande y su línea de apoyo de la página del pedido. En un pedido al recibir es
- * `textoDeEstado`. En uno que se paga en línea manda cómo va el pago: mientras falte pagar, cuando
+ * `textoDeEstado`. En uno que se paga en línea manda cómo va el pago: mientras se confirma, cuando
  * no se completó, y cuando se canceló un pedido ya pagado (que dice que el dinero se devuelve y
  * nunca «no se te cobró»). Venció sin que se haya podido confirmar con Mercado Pago: se dice que
  * se está confirmando, NUNCA que no hubo pago.
@@ -55,18 +56,11 @@ export type TextoDeSeguimiento = {
 export function textoDeSeguimiento(p: Pick<Seguimiento, "estado" | "motivo" | "enLinea">): TextoDeSeguimiento {
   const pago = p.enLinea;
   if (!pago) return { ...textoDeEstado(p.estado, p.motivo), alerta: p.estado === "CANCELADO" };
-  if (p.estado === "POR_PAGAR") {
-    const antes = antesDe(pago.vence_pago);
-    return pago.estado === "RECHAZADO"
-      // La hora ya cierra con punto («p. m.»): no se le pone otro.
-      ? { titulo: "El pago no pasó", apoyo: `No se te cobró. Puedes intentar con otra tarjeta${antes || "."}`, alerta: false }
-      : { titulo: "Falta pagar", apoyo: `Paga${antes} para que el restaurante reciba tu pedido.`, alerta: false };
-  }
   if (p.estado !== "CANCELADO") return { ...ESTADOS[p.estado], alerta: false };
   if (pago.estado === "POR_CONFIRMAR") {
     return { titulo: "Confirmando tu pago", apoyo: "Esto puede tardar unos minutos.", alerta: false };
   }
-  if (pago.estado === "SIN_PAGO" || pago.estado === "ESPERANDO_PAGO" || pago.estado === "RECHAZADO") {
+  if (pago.estado === "SIN_PAGO") {
     return { titulo: "No se completó el pago", apoyo: "Tu pedido no se envió al restaurante y no se te cobró nada.", alerta: false };
   }
   // Cancelado con el pago hecho: el motivo de siempre, sin «no se te cobró», y qué pasa con el dinero.
@@ -87,7 +81,7 @@ export function nombreDePago(pago: Pago, conEnLinea: boolean): string {
 }
 /** La línea bajo «¿Cómo pagas?»: cuándo y dónde se paga con la forma elegida. Sin prometer medios que Mercado Pago no documenta. */
 export const apoyoDePago = (pago: Pago | null): string =>
-  pago === "EN_LINEA" ? "Pagas con tarjeta de crédito o débito en la página de Mercado Pago." : "Pagas al recibir tu pedido.";
+  pago === "EN_LINEA" ? "Pagas ahora, aquí mismo, con tarjeta de crédito o débito." : "Pagas al recibir tu pedido.";
 
 // ── Tienda cerrada: el motivo de `sucursal.estado.<modo>` (o el detalle de TIENDA_CERRADA) ────────
 const CERRADA: Record<string, { texto: string; hacer: string }> = {
@@ -152,8 +146,7 @@ const ERRORES: Record<string, TextoDeError> = {
   DIRECCION_INVALIDA: { texto: "Revisa tu dirección.", hacer: "Faltan datos o el código postal no tiene 5 dígitos." },
   PAGO_INVALIDO: { texto: "Esa forma de pago no está disponible.", hacer: "Elige otra forma de pago." },
   // Pago en línea (textos provisionales, como los de arriba).
-  PAGO_EN_PROCESO: { texto: "Estamos preparando tu pago.", hacer: "Espera unos segundos." },
-  PAGO_NO_DISPONIBLE: { texto: "No pudimos abrir el pago en línea. Tu pedido no se envió y no se te cobró nada.", hacer: REINTENTA },
+  PAGO_NO_DISPONIBLE: { texto: "El restaurante no puede recibir pagos en línea en este momento. Tu pedido no se envió y no se te cobró nada.", hacer: REINTENTA },
   CAPTCHA_INVALIDO: { texto: "No pudimos comprobar que eres una persona.", hacer: "Vuelve a intentar; si sigue pasando, recarga la página." },
   DEMASIADOS_INTENTOS: { texto: "Hiciste demasiados intentos seguidos.", hacer: "Espera unos minutos antes de volver a intentar, o llama al restaurante." },
   NO_SE_PUDO_CREAR: { texto: "No pudimos tomar tu pedido.", hacer: "Llama al restaurante para hacer tu pedido." },

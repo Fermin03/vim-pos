@@ -36,12 +36,14 @@ const OBLIGATORIO: Partial<Record<Campo, string>> = {
   estado: "Escribe tu estado.",
 };
 
-export type Contexto = { modo: Modo };
+/** `enLinea`: se paga en línea, y entonces el correo es obligatorio (Mercado Pago lo pide con el cobro). */
+export type Contexto = { modo: Modo; enLinea?: boolean };
 
 /** Qué tiene mal un campo, en palabras, o null. Un campo que no toca (dirección al recoger) nunca tiene error. */
 export function errorDeCampo(campo: Campo, valor: string, c: Contexto): string | null {
   const v = valor.trim();
   if ((DE_DIRECCION as readonly string[]).includes(campo) && c.modo !== "DOMICILIO") return null;
+  if (!v && campo === "email" && c.enLinea) return "Escribe tu correo: ahí te llega la confirmación de tu pago.";
   if (!v) return campo === "telefono" ? "Escribe tu teléfono." : campo === "codigoPostal" ? "Escribe tu código postal." : OBLIGATORIO[campo] ?? null;
   if (campo === "telefono") return normalizarTelefono(v) ? null : "Escribe los 10 dígitos de tu teléfono, con lada.";
   if (campo === "email") return v.length <= LIMITES.email && CORREO.test(v) ? null : "Revisa tu correo: le falta algo o tiene un carácter que no se puede usar.";

@@ -8,19 +8,18 @@ import type { Cotizacion, ErrorDeTienda, PedidoCreado } from "./contrato";
 import type { Horario } from "@vim/fecha";
 import type { Momento } from "./horario";
 import { almacenDelNavegador, type Almacen } from "./carrito";
+import { textoDeRechazo, type CampoDeTarjeta } from "./tarjeta";
 import { textoCerrada, textoDeError } from "./textos";
 
 export type Desenlace =
   /** El pedido existe (también si vino sin folio ni total): vaciar el carrito e ir al seguimiento. */
   | { tipo: "hecho"; codigo: string }
   /**
-   * El pedido existe y falta pagarlo: mandar al cliente a `url` (Mercado Pago). El carrito NO se
-   * vacía: si vuelve atrás, su pedido sigue ahí, y tocar «Pagar» otra vez devuelve el mismo pedido
-   * y el mismo enlace (va con la misma clave).
+   * La tarjeta: un dato que no cuadra o el banco no aprobó el cobro. No se creó ningún pedido y no
+   * se cobró nada: se dice junto a la tarjeta (en su campo, si el motivo es de uno) y se puede
+   * reintentar con la misma o con otra.
    */
-  | { tipo: "pagar"; url: string; folio: string | null }
-  /** Otra petición del mismo intento está preparando el pago: reintentar solo en unos segundos. No se creó otro pedido. */
-  | { tipo: "esperar" }
+  | { tipo: "tarjeta"; campo: CampoDeTarjeta | null; texto: string }
   /** Un renglón ya no se puede pedir: de vuelta al carrito, que lo marca. */
   | { tipo: "carrito"; error: ErrorDeTienda }
   /** El total ya no es el que vio: se enseña el nuevo y se pide confirmar antes de enviar con él. */
@@ -44,7 +43,7 @@ export type Desenlace =
 
 export type ContextoDeEnvio = {
   telefono: string | null; horario: Horario; ahora?: Momento;
-  /** Hay otra forma de pago además de la elegida: si el pago en línea no se pudo abrir, se ofrece. */
+  /** Hay otra forma de pago además de la elegida: si el pago en línea no pasa, se ofrece. */
   otrasFormas?: boolean;
 };
 
@@ -57,10 +56,10 @@ const SOLO_LLAMAR = new Set(["NO_SE_PUDO_CREAR", "TIENDA_NO_DISPONIBLE"]);
 export function desenlaceDelError(e: ErrorDeTienda, c: ContextoDeEnvio): Desenlace {
   if (DE_RENGLON.has(e.error) && e.detalle) return { tipo: "carrito", error: e };
   if (e.error === "TOTAL_CAMBIO" && e.detalle && /^\d+\.\d{2}$/.test(e.detalle)) return { tipo: "total", total: e.detalle };
-  if (e.error === "PAGO_EN_PROCESO") return { tipo: "esperar" };
+  if (e.error === "PAGO_RECHAZADO") return { tipo: "tarjeta", ...textoDeRechazo(e.detalle, c.otrasFormas === true) };
   const t = textoDeError(e.error, { telefono: c.telefono, detalle: e.detalle, otrasFormas: c.otrasFormas });
   const texto = `${t.texto} ${t.hacer}`;
-  // El pago en línea no se pudo abrir y hay otra forma de pagar: se dice junto a «¿Cómo pagas?».
+  // El restaurante no puede cobrar en línea ahora y hay otra forma de pagar: se dice junto a «¿Cómo pagas?».
   const campo = DE_CAMPO[e.error] ?? (e.error === "PAGO_NO_DISPONIBLE" && c.otrasFormas ? "pago" : undefined);
   if (campo) return { tipo: "campo", campo, texto };
   if (e.error === "TIENDA_CERRADA") return { tipo: "aviso", tono: "warning", texto: textoCerrada(e.detalle ?? "", c.horario, c.ahora), sigue: "reintentar" };
@@ -95,8 +94,8 @@ export async function enviarPedido(d: {
     pidio = true;
     const r = await d.pedir(cot.datos.total_mxn);
     if (!r.ok) return { desenlace: desenlaceDelError(r, c), pidio };
-    const url = r.datos.pago?.init_point;
-    return { desenlace: url ? { tipo: "pagar", url, folio: r.datos.folio_corto } : { tipo: "hecho", codigo: r.datos.codigo }, pidio };
+    // Pagado, o «no se supo si el cobro pasó»: en los dos casos el pedido existe y su página dice cómo va.
+    return { desenlace: { tipo: "hecho", codigo: r.datos.codigo }, pidio };
   } catch {
     return { desenlace: desenlaceDelError({ error: pidio ? "SIN_CONFIRMAR" : "ERROR_INTERNO", detalle: null }, c), pidio };
   }
@@ -196,9 +195,8 @@ function huellaDe(texto: string): string {
  * anterior ya entró (`cerrar`). «El mismo pedido» se decide por contenido: lo que se manda en
  * `pedir`, sin el antirobot ni el total esperado, que cambian en cada intento.
  *
- * Se guarda en el teléfono, donde vive el carrito: recargar la página antes de pagar NO crea otro
- * pedido (sin esto, quien volvía de Mercado Pago y recargaba dejaba un pedido esperando pago por
- * cada recarga). Se guarda la clave y la HUELLA del pedido, nunca el pedido. Con el almacén
+ * Se guarda en el teléfono, donde vive el carrito: recargar la página y volver a enviar NO crea otro
+ * pedido. Se guarda la clave y la HUELLA del pedido, nunca el pedido. Con el almacén
  * bloqueado (modo privado) vive en memoria, como antes. Y caduca a los 15 minutos.
  */
 export function intentoDeCompra(nueva: () => string = claveNueva, almacen: () => Almacen | null = almacenDelNavegador, ahora: () => number = Date.now) {
