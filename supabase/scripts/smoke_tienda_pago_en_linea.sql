@@ -516,6 +516,21 @@ BEGIN
   EXECUTE 'RESET ROLE';
   PERFORM set_config('request.jwt.claims', NULL, true);
 
+  -- G1b) Lo que NO es en línea se ve como siempre: el de pago al recibir, y el que no tiene forma de
+  --      pago (así son todos los de Uber: pago_al_recibir nulo). Es lo que la política no debe tocar.
+  INSERT INTO delivery_pedidos (tenant_id, sucursal_id, canal, app, id_externo, estado, items, payload_raw, total_cliente_mxn)
+  VALUES (v_t, v_suc, 'TIENDA', 'DRIVE_THRU', 'linea-smoke-sin-pago', 'RECIBIDO', '[]'::jsonb, '{}'::jsonb, 0);
+  SELECT count(*) INTO v_n FROM delivery_pedidos WHERE tenant_id = v_t AND pago_al_recibir IS DISTINCT FROM 'EN_LINEA';
+  EXECUTE 'SET LOCAL ROLE authenticated';
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_cajero, 'role', 'authenticated', 'tenant_id', v_t)::text, true);
+  IF (SELECT count(*) FROM delivery_pedidos WHERE pago_al_recibir IS DISTINCT FROM 'EN_LINEA') <> v_n
+     OR NOT EXISTS (SELECT 1 FROM delivery_pedidos WHERE id_externo = 'linea-smoke-sin-pago')
+     OR NOT EXISTS (SELECT 1 FROM delivery_pedidos WHERE pago_al_recibir = 'EFECTIVO') THEN
+    RAISE EXCEPTION 'G1b: la política esconde pedidos que no son en línea (sin política %)', v_n;
+  END IF;
+  EXECUTE 'RESET ROLE';
+  PERFORM set_config('request.jwt.claims', NULL, true);
+
   -- G2) Ya vencido, se le pregunta a Mercado Pago una última vez (CONCILIAR)…
   IF NOT EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.tarea = 'CONCILIAR' AND t.id = (v_r ->> 'pago_id')::uuid) THEN RAISE EXCEPTION 'G2: el pago vencido no salió para conciliar'; END IF;
   IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.tarea = 'CONCILIAR' AND t.id = (v_r2 ->> 'pago_id')::uuid) THEN RAISE EXCEPTION 'G2: salió para conciliar un pago que aún puede pagarse'; END IF;
