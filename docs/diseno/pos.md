@@ -334,3 +334,23 @@ unos 20 segundos sin comanda y se quita cuando sale el papel.
 - **La densidad del admin.** Aquí el scroll es tiempo frente a un cliente, pero apretar de más
   produce toques equivocados. Prefiere menos elementos antes que elementos más chicos.
 - **El tema oscuro del KDS.** Está calibrado para una pantalla lejana en una cocina.
+
+## Cobro con terminal (ADR 0033)
+
+- **Un solo botón «Tarjeta»** cuando la caja tiene terminal ligada: sustituye a Débito y Crédito. La
+  cajera no elige el tipo; lo dice Mercado Pago y así se registra el pago.
+- **La propina se captura antes, en la caja.** En modo integrado la terminal no la pregunta: se le
+  manda el total ya con propina.
+- **«Cobra en la terminal»** muestra el monto y la instrucción («toca Tarjeta y acerca o inserta la
+  tarjeta»). De ahí no se sale con Escape: se sale con «Cancelar cobro».
+- **Si no pasa** (rechazo, tiempo agotado, cancelado): el motivo en rojo, «Volver a intentar» y
+  «Cambiar forma de pago».
+- **Si no se sabe si pasó**: «¿Dice que el pago fue aprobado?». Aceptarlo pide PIN de supervisor o
+  admin (permiso `venta.editar_post_cobro`) y queda escrito quién lo autorizó.
+- **«La cobré en otra terminal»**, al pie del selector, destapa «Débito · a mano» y «Crédito · a
+  mano»: el registro de siempre, para cuando no hay internet o la terminal falla.
+- **Sin internet o sin terminal ligada** el selector queda como antes, con Débito y Crédito.
+- **Caja apagada a medio cobro:** al volver a abrir el cobro de esa cuenta, el pago aprobado se
+  registra solo.
+- **Pago dividido** sigue registrando la tarjeta a mano. Para combinar, se cobra primero la otra
+  parte y el resto con «Tarjeta».

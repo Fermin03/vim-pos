@@ -2,6 +2,14 @@
 // Fuente: docs/integraciones/mercado-pago-point/. Lo marcado VERIFICADO se probó el 9 oct 2026 contra
 // la cuenta de prueba y la terminal virtual (`…__SBX0000001`); lo demás es lo que dice la documentación.
 //
+// Con terminal real (Point Smart 2 de Knock-Out, 9 oct 2026, cobro de $10 devuelto):
+//   · El cobro aparece en la terminal ~15 s después de crearlo y hay que tocar «Tarjeta» para avanzar.
+//   · En modo PDV la terminal NO pregunta propina: `total_paid_amount` = `amount`. La propina se
+//     captura en VIM y se manda el total.
+//   · El aviso real llega ~2 s después del pago, firmado con la clave de la aplicación de VIM.
+//   · La devolución total (POST /v1/orders/{id}/refund sin cuerpo) responde 201 con `refunded` al instante.
+//   · La consulta de la order trae además `card.last_digits` y `card.first_digits`: no se guardan.
+//
 // No hay interfaz de «proveedor»: hoy solo existe este. Cuando llegue Clip se extrae de aquí.
 import { hmacSha256Hex, igualesEnTiempoConstante } from "../delivery/firma.ts";
 

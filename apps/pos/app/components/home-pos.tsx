@@ -1830,6 +1830,9 @@ export function HomePos({
         <ModalCobro
           token={token}
           sucursalId={caja.sucursal_id}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          ejecutaNombre={empleado.nombre}
           totalesIniciales={totalesCobro}
           atajo={atajoCobro}
           onMontoACobrar={setMontoCobro}
