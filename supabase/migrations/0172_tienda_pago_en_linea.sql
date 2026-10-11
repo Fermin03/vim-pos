@@ -919,7 +919,8 @@ BEGIN
   v_pago := CASE v_pedido.pago_al_recibir
               WHEN 'EFECTIVO' THEN 'Efectivo' || COALESCE(', paga con $' || to_char(v_pedido.paga_con_mxn, 'FM999999990.00'), '')
               WHEN 'TARJETA'  THEN 'Tarjeta al recibir'
-              WHEN 'EN_LINEA' THEN 'Pagado en línea'
+              -- Va a la nota de la cuenta, que es lo que se lee en el panel, en la comanda y en el ticket.
+              WHEN 'EN_LINEA' THEN 'PAGADO EN LÍNEA, no cobrar'
             END;
   UPDATE tickets
   SET folio_externo_app = v_pedido.id_externo,
@@ -1245,6 +1246,82 @@ $$;
 COMMENT ON FUNCTION tienda_pagos_barrer IS
   'Vence los pedidos de la tienda que llevan más de 17 minutos sin pagarse y, si hay devoluciones o pagos por conciliar, llama a tienda-webhook-mp (pg_net). No avisa a nadie. Cron cada minuto (nube). Devuelve cuántos pedidos venció.';
 
+-- ── §10 La cuenta pagada en línea, en la caja ────────────────────────────────
+-- (a) «Listo» en la caja instalada. El POS de la caja escribe en su base local; quien le avisa a
+-- la nube es el agente del espejo, que reporta ENTREGADO cuando ve `entregado_at` (y el espejo no
+-- lo pisa con lo que traiga la nube). El estado no se toca aquí: lo pone la nube al tomar el
+-- reporte. En el POS web este botón va por delivery-accion (acción `estado`), no por aquí.
+CREATE OR REPLACE FUNCTION tienda_marcar_entregado(p_pedido uuid)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  UPDATE delivery_pedidos p
+     SET entregado_at = COALESCE(p.entregado_at, now())
+   WHERE p.id = p_pedido AND p.tenant_id = current_tenant_id() AND p.canal = 'TIENDA'
+     AND p.pago_al_recibir = 'EN_LINEA' AND p.gestion = 'ESCRITORIO' AND p.ticket_id IS NOT NULL
+     AND p.estado IN ('ACEPTADO', 'EN_PREPARACION', 'LISTO');
+  IF NOT FOUND THEN RAISE EXCEPTION 'ACCION_INVALIDA: el pedido % no es una cuenta pagada en línea de esta caja', COALESCE(p_pedido::text, 'NULL'); END IF;
+END;
+$$;
+COMMENT ON FUNCTION tienda_marcar_entregado IS
+  'Caja instalada: el cajero tocó «Listo» en una cuenta pagada en línea. Sella entregado_at en la copia local; el agente del espejo lo reporta a la nube.';
+REVOKE ALL ON FUNCTION tienda_marcar_entregado(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION tienda_marcar_entregado(uuid) TO authenticated, service_role;
+
+-- (b) El pago en línea no se edita en caja. Cambiar la forma de pago (cambiar_forma_pago_ticket) y
+-- reabrir la cuenta (reabrir_ticket_pagado) escriben en `pagos`: aquí se detienen las dos, sin
+-- copiar esas funciones. El dinero está en Mercado Pago; lo único que lo regresa es cancelar la
+-- cuenta. El mensaje es el que lee el cajero (el POS enseña el texto del error tal cual).
+CREATE OR REPLACE FUNCTION pagos_en_linea_no_se_editan()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF NEW.metodo_pago IS DISTINCT FROM OLD.metodo_pago
+     OR (NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS NULL)
+     OR (NEW.estado IS DISTINCT FROM OLD.estado AND NEW.estado::text NOT IN ('APLICADO', 'CONCILIADO')) THEN
+    RAISE EXCEPTION 'Esta cuenta se pagó en línea: no se le puede cambiar la forma de pago ni reabrirla. Si hay que regresar el dinero, cancela la cuenta y el pago se le devuelve completo al cliente.'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_pagos_en_linea_no_se_editan ON pagos;
+CREATE TRIGGER trg_pagos_en_linea_no_se_editan
+  BEFORE UPDATE ON pagos
+  FOR EACH ROW WHEN (OLD.metodo_pago = 'PAGO_EN_LINEA' OR NEW.metodo_pago = 'PAGO_EN_LINEA')
+  EXECUTE FUNCTION pagos_en_linea_no_se_editan();
+
+-- (c) Devolución de caja sobre una cuenta pagada en línea: no existe. Entregar efectivo por un pago
+-- con tarjeta descuadra el cajón y deja el cobro vivo en Mercado Pago. La única que pasa es la que
+-- arma cancelar_ticket_pagado (total, por cancelación), y esa nunca sale del cajón: se registra
+-- como «mismo método», porque quien devuelve es Mercado Pago (disparador de §6).
+CREATE OR REPLACE FUNCTION devoluciones_de_pago_en_linea()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pagos g
+              WHERE g.ticket_id = NEW.ticket_original_id AND g.metodo_pago = 'PAGO_EN_LINEA'
+                AND g.estado::text IN ('APLICADO', 'CONCILIADO') AND g.deleted_at IS NULL) THEN
+    IF NEW.alcance <> 'TOTAL' OR NEW.motivo <> 'CANCELACION_PEDIDO' THEN
+      RAISE EXCEPTION 'Esta cuenta se pagó en línea: no se le hace devolución en caja. Para regresar el dinero, cancela la cuenta y el pago se le devuelve completo al cliente.'
+        USING ERRCODE = 'check_violation';
+    END IF;
+    NEW.medio_devolucion := 'MISMO_METODO_PAGO';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_devoluciones_de_pago_en_linea ON devoluciones;
+CREATE TRIGGER trg_devoluciones_de_pago_en_linea
+  BEFORE INSERT ON devoluciones
+  FOR EACH ROW EXECUTE FUNCTION devoluciones_de_pago_en_linea();
+
 -- ── Privilegios ──────────────────────────────────────────────────────────────
 -- Nada para el público ni para el personal. Las internas (_tienda_*) y la del disparador no se le
 -- dan ni a service_role. Ningún nombre de la lista tiene sobrecargas.
@@ -1259,10 +1336,10 @@ BEGIN
                                 'tienda_pagos_tomar', 'tienda_pago_devolucion', 'tienda_pago_conciliacion', 'crear_ticket_desde_tienda',
                                 'tienda_seguimiento', 'tienda_sincronizar_estados_nube', 'tienda_reportar_estado', 'tienda_pagos_barrer',
                                 '_tienda_version_al_menos', '_tienda_caja_en_linea_viva', '_tienda_pedido_creado', '_tienda_estado_real', '_tienda_estado_publico',
-                                'delivery_pedidos_devolver_pago')
+                                'delivery_pedidos_devolver_pago', 'pagos_en_linea_no_se_editan', 'devoluciones_de_pago_en_linea')
   LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC, anon, authenticated', f.firma);
-    IF f.proname NOT LIKE '\_%' AND f.proname <> 'delivery_pedidos_devolver_pago' THEN
+    IF f.proname NOT LIKE '\_%' AND f.proname NOT IN ('delivery_pedidos_devolver_pago', 'pagos_en_linea_no_se_editan', 'devoluciones_de_pago_en_linea') THEN
       EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO service_role', f.firma);
     ELSE
       EXECUTE format('REVOKE ALL ON FUNCTION %s FROM service_role', f.firma);

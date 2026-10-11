@@ -259,7 +259,8 @@ DECLARE
   v_r jsonb; v_r2 jsonb; v_a jsonb; v_seg jsonb;
   v_ped uuid; v_pago uuid; v_ticket uuid; v_id uuid; v_turno uuid;
   v_p delivery_pedidos%ROWTYPE; v_g tienda_pagos%ROWTYPE;
-  v_n integer; v_txt text;
+  v_n integer; v_txt text; v_num numeric; v_ped2 uuid;
+  v_otro   uuid := '71717171-0000-0000-0000-0000000000aa';
   r record;
 BEGIN
   PERFORM set_config('request.jwt.claims', NULL, true);
@@ -368,7 +369,7 @@ BEGIN
      OR (SELECT monto_pagado_mxn FROM tickets WHERE id = v_ticket) <> 264.00 THEN
     RAISE EXCEPTION 'E1: total, propina o pagado de la cuenta: %', (SELECT jsonb_build_object('total', total_mxn, 'propina', propina_mxn, 'pagado', monto_pagado_mxn) FROM tickets WHERE id = v_ticket);
   END IF;
-  IF (SELECT nota_general FROM tickets WHERE id = v_ticket) NOT LIKE 'Pagado en línea%' THEN RAISE EXCEPTION 'E1: la nota de la cuenta no dice que está pagada'; END IF;
+  IF (SELECT nota_general FROM tickets WHERE id = v_ticket) NOT LIKE 'PAGADO EN LÍNEA, no cobrar%' THEN RAISE EXCEPTION 'E1: la nota de la cuenta no dice que está pagada y que no se cobra'; END IF;
   SELECT count(*) INTO v_n FROM pagos WHERE ticket_id = v_ticket AND metodo_pago = 'PAGO_EN_LINEA' AND monto_mxn = 264.00 AND estado = 'APLICADO';
   IF v_n <> 1 THEN RAISE EXCEPTION 'E1: debía haber UN pago PAGO_EN_LINEA de 264.00 y hay %', v_n; END IF;
   IF (SELECT estado FROM delivery_pedidos WHERE id = v_ped) <> 'ACEPTADO' THEN RAISE EXCEPTION 'E1: el pedido no quedó ACEPTADO'; END IF;
@@ -405,6 +406,77 @@ BEGIN
      OR (SELECT count(*) FROM pagos WHERE ticket_id = v_ticket AND metodo_pago = 'PAGO_EN_LINEA' AND monto_mxn = 264.00) <> 1 THEN
     RAISE EXCEPTION 'E4: sin tienda_pagos (la caja) la cuenta no nació cobrada';
   END IF;
+  -- E5) El pago en línea no se edita en caja: ni cambiar la forma de pago, ni reabrir, ni devolución.
+  BEGIN
+    UPDATE pagos SET metodo_pago = 'EFECTIVO' WHERE ticket_id = v_ticket;
+    RAISE EXCEPTION 'E5: se cambió la forma de pago de una cuenta pagada en línea';
+  EXCEPTION WHEN check_violation THEN
+    IF SQLERRM NOT LIKE 'Esta cuenta se pagó en línea%' THEN RAISE; END IF;
+  END;
+  BEGIN
+    UPDATE pagos SET estado = 'CANCELADO', deleted_at = now() WHERE ticket_id = v_ticket;   -- lo que hace reabrir_ticket_pagado
+    RAISE EXCEPTION 'E5: se anuló el pago de una cuenta pagada en línea (reabrir)';
+  EXCEPTION WHEN check_violation THEN
+    IF SQLERRM NOT LIKE 'Esta cuenta se pagó en línea%' THEN RAISE; END IF;
+  END;
+  BEGIN
+    UPDATE pagos SET metodo_pago = 'PAGO_EN_LINEA' WHERE ticket_id = (SELECT id FROM tickets WHERE tenant_id = v_t AND id <> v_ticket LIMIT 1) AND metodo_pago <> 'PAGO_EN_LINEA';
+    IF FOUND THEN RAISE EXCEPTION 'E5: un cobro de caja se pudo convertir en pago en línea'; END IF;
+  EXCEPTION WHEN check_violation THEN
+    IF SQLERRM NOT LIKE 'Esta cuenta se pagó en línea%' THEN RAISE; END IF;
+  END;
+  IF (SELECT count(*) FROM pagos WHERE ticket_id = v_ticket AND metodo_pago = 'PAGO_EN_LINEA' AND estado = 'APLICADO' AND deleted_at IS NULL) <> 1 THEN
+    RAISE EXCEPTION 'E5: el pago en línea no quedó intacto';
+  END IF;
+  -- Devolución suelta (la pantalla Devoluciones): el disparador corre antes que cualquier otra validación.
+  BEGIN
+    INSERT INTO devoluciones (tenant_id, ticket_original_id, alcance, motivo, medio_devolucion)
+    VALUES (v_t, v_ticket, 'TOTAL', 'CLIENTE_NO_SATISFECHO', 'EFECTIVO');
+    RAISE EXCEPTION 'E5: se registró una devolución de caja sobre una cuenta pagada en línea';
+  EXCEPTION WHEN check_violation THEN
+    IF SQLERRM NOT LIKE 'Esta cuenta se pagó en línea: no se le hace devolución en caja%' THEN RAISE; END IF;
+  END;
+
+  -- E6) «Listo» en la caja instalada: sella entregado_at en la copia local y no toca el estado.
+  UPDATE delivery_pedidos SET gestion = 'ESCRITORIO' WHERE id = v_id;
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_cajero, 'role', 'authenticated', 'tenant_id', v_t)::text, true);
+  PERFORM tienda_marcar_entregado(v_id);
+  SELECT * INTO v_p FROM delivery_pedidos WHERE id = v_id;
+  IF v_p.entregado_at IS NULL OR v_p.estado <> 'ACEPTADO' THEN RAISE EXCEPTION 'E6: «Listo» debía sellar entregado_at sin tocar el estado: % / %', v_p.entregado_at, v_p.estado; END IF;
+  PERFORM tienda_marcar_entregado(v_id);   -- dos toques no cambian la hora
+  IF (SELECT entregado_at FROM delivery_pedidos WHERE id = v_id) <> v_p.entregado_at THEN RAISE EXCEPTION 'E6: el segundo «Listo» movió la hora'; END IF;
+  -- Ni de otro negocio, ni un pedido que atiende el POS web (ese va por delivery-accion).
+  BEGIN
+    PERFORM tienda_marcar_entregado(v_ped);
+    RAISE EXCEPTION 'E6: se marcó por aquí un pedido que no atiende una caja instalada';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'ACCION_INVALIDA:%' THEN RAISE; END IF;
+  END;
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_cajero, 'role', 'authenticated', 'tenant_id', v_otro)::text, true);
+  BEGIN
+    PERFORM tienda_marcar_entregado(v_id);
+    RAISE EXCEPTION 'E6: otro negocio marcó entregado un pedido ajeno';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'ACCION_INVALIDA:%' THEN RAISE; END IF;
+  END;
+  PERFORM set_config('request.jwt.claims', NULL, true);
+
+  -- E7) Cancelar la cuenta pagada en línea: aunque la caja pida «en efectivo», del cajón no sale nada.
+  v_num := calcular_efectivo_esperado(v_turno);
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+    accion, permiso_codigo, entidad_tipo, entidad_id, monto_mxn, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_cajero, v_cajero, 'cancelar_ticket', 'venta.cancelar_pagada', 'ticket', v_ticket, 264.00, 'Cliente desistió')
+  RETURNING id INTO v_ped2;
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_cajero, 'role', 'authenticated', 'tenant_id', v_t)::text, true);
+  PERFORM cancelar_ticket_pagado(v_ticket, v_caja, v_turno, 'CLIENTE_DESISTIO'::cancelacion_motivo, NULL, v_ped2, v_cajero, v_cajero,
+    true, false, true, 'EFECTIVO'::devolucion_medio, NULL, 'smoke-pl-cancel');
+  PERFORM set_config('request.jwt.claims', NULL, true);
+  IF (SELECT estado_fiscal::text FROM tickets WHERE id = v_ticket) <> 'CANCELADO' THEN RAISE EXCEPTION 'E7: la cuenta no quedó cancelada'; END IF;
+  IF (SELECT medio_devolucion::text FROM devoluciones WHERE ticket_original_id = v_ticket) <> 'MISMO_METODO_PAGO' THEN
+    RAISE EXCEPTION 'E7: la devolución de una cuenta pagada en línea salió como %', (SELECT medio_devolucion FROM devoluciones WHERE ticket_original_id = v_ticket);
+  END IF;
+  IF calcular_efectivo_esperado(v_turno) <> v_num THEN RAISE EXCEPTION 'E7: cancelar movió el efectivo esperado de % a %', v_num, calcular_efectivo_esperado(v_turno); END IF;
+
   -- Y en la nube, con el pago sin aprobar, no hay cuenta.
   v_id := pg_temp.pagado('4776660042', 42);
   UPDATE tienda_pagos SET estado = 'CREADO' WHERE pedido_id = v_id;

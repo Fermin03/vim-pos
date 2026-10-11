@@ -215,6 +215,32 @@ test("estadoAReportar: la tabla del ticket local, de arriba hacia abajo", () => 
   assert.equal(estadoAReportar(t({ estado: "ACEPTADO", asignado: true })), "LISTO");
 });
 
+test("estadoAReportar: una cuenta pagada en línea nace cobrada y NO por eso está entregada", () => {
+  const t = (extra = {}) => ({ pago_al_recibir: "EN_LINEA", ticket_estado: "PAGADO", ticket_impreso_at: null, asignado: false, entregado_at: null, estado: "ACEPTADO", ...extra });
+  assert.equal(estadoAReportar(t()), "EN_PREPARACION", "recién creada: «ya lo tengo», no entregado");
+  assert.equal(estadoAReportar(t({ estado: "EN_PREPARACION" })), null);
+  assert.equal(estadoAReportar(t({ ticket_impreso_at: "2026-10-11T10:00:00Z" })), "LISTO");
+  assert.equal(estadoAReportar(t({ ticket_estado: "FACTURADO", asignado: true })), "LISTO", "facturada tampoco es entregada");
+  // «Listo» del cajero.
+  assert.equal(estadoAReportar(t({ entregado_at: "2026-10-11T10:05:00Z" })), "ENTREGADO");
+  assert.equal(estadoAReportar(t({ entregado_at: "2026-10-11T10:05:00Z", ticket_impreso_at: "2026-10-11T10:00:00Z" })), "ENTREGADO", "listo gana a impreso");
+  // Cancelar la cuenta se reporta siempre, también ya entregada: es lo que devuelve el pago.
+  assert.equal(estadoAReportar(t({ ticket_estado: "CANCELADO" })), "CANCELADO");
+  assert.equal(estadoAReportar(t({ ticket_estado: "CANCELADO", estado: "ENTREGADO", entregado_at: "2026-10-11T10:05:00Z" })), "CANCELADO");
+  assert.equal(estadoAReportar(t({ estado: "ENTREGADO", entregado_at: "2026-10-11T10:05:00Z" })), null, "entregado y sin cancelar: nada más que decir");
+  // Al recibir, como siempre: cobrar es entregar.
+  assert.equal(estadoAReportar(t({ pago_al_recibir: "EFECTIVO" })), "ENTREGADO");
+  assert.equal(estadoAReportar(t({ pago_al_recibir: "TARJETA", ticket_estado: "ABIERTO", entregado_at: "2026-10-11T10:05:00Z" })), "EN_PREPARACION", "entregado_at solo cuenta en el pagado en línea");
+});
+
+test("la caja espeja pagado_at: sin él no puede crear la cuenta ya cobrada", () => {
+  for (const c of ["pagado_at", "propina_mxn", "pago_al_recibir", "entregado_at"]) assert.ok(COLUMNAS_PEDIDO.includes(c), c);
+  const f = filaLocal(ped({ canal: "TIENDA", pago_al_recibir: "EN_LINEA", pagado_at: "2026-10-11T09:59:00Z", propina_mxn: "24.00" }), undefined);
+  assert.equal(f.pagado_at, "2026-10-11T09:59:00Z");
+  assert.equal(f.propina_mxn, "24.00");
+  assert.equal(f.pago_al_recibir, "EN_LINEA");
+});
+
 test("fallaDeTicket: sin turno y unicidad se reintentan", () => {
   assert.deepEqual(fallaDeTicket("SIN_TURNO_ABIERTO: sucursal 5f0c"), { reintentable: true, codigo: "SIN_TURNO_ABIERTO" });
   assert.deepEqual(

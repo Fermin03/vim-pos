@@ -2,8 +2,8 @@
 // qué tickets crear en la caja y qué avisos dejar. Sin I/O, se prueba con node --test.
 
 /**
- * Columnas de delivery_pedidos que se espejan (0090 + 0096, y las de la tienda en línea de la
- * 0161). ticket_id y payload_raw se tratan aparte.
+ * Columnas de delivery_pedidos que se espejan (0090 + 0096, las de la tienda en línea de la
+ * 0161 y `pagado_at` del pago en línea, 0172). ticket_id y payload_raw se tratan aparte.
  */
 export const COLUMNAS_PEDIDO = [
   "id", "tenant_id", "sucursal_id", "conexion_id", "app", "id_externo", "folio_corto", "estado", "estado_app",
@@ -14,6 +14,8 @@ export const COLUMNAS_PEDIDO = [
   "aceptado_at", "listo_at", "entregado_at", "cancelado_at", "motivo_cancelacion", "cancelado_por", "ultimo_error",
   "created_at", "gestion", "gestion_caja_id",
   "canal", "cliente_email", "tienda_cuenta_id", "zona_envio_id", "direccion", "pago_al_recibir", "paga_con_mxn",
+  // Sin `pagado_at` la caja no puede crear la cuenta ya cobrada (crear_ticket_desde_tienda lo exige).
+  "pagado_at",
 ];
 
 /** Columnas de delivery_conexiones que se espejan (sin credenciales). */
@@ -115,10 +117,16 @@ export function planificarEspejo({ conexiones = [], pedidos = [], localPedidos =
  * «entregado», cancelar es «cancelado».
  * Y «ya lo tengo» (entrega 7): el ticket existe y sigue abierto, y el pedido local (`estado`) sigue
  * en ACEPTADO → «en preparación». Sin ese aviso la nube cancela el pedido a los 15 minutos.
+ *
+ * Pagado en línea (0172): su cuenta nace cobrada, así que «cobrada» NO es «entregado». Lo entrega
+ * el cajero con «Listo», que sella `entregado_at` en la copia local. Y su cuenta se puede cancelar
+ * ya entregada (eso devuelve el pago): cancelado se reporta siempre.
  */
-export function estadoAReportar({ ticket_estado, ticket_impreso_at, asignado, estado } = {}) {
+export function estadoAReportar({ ticket_estado, ticket_impreso_at, asignado, estado, pago_al_recibir, entregado_at } = {}) {
   if (ticket_estado === "CANCELADO") return "CANCELADO";
-  if (ticket_estado === "PAGADO" || ticket_estado === "FACTURADO") return "ENTREGADO";
+  const enLinea = pago_al_recibir === "EN_LINEA";
+  if (enLinea && estado === "ENTREGADO") return null;   // ya entregado: solo quedaba mirar si se canceló
+  if (enLinea ? Boolean(entregado_at) : ticket_estado === "PAGADO" || ticket_estado === "FACTURADO") return "ENTREGADO";
   if (ticket_impreso_at || asignado === true) return "LISTO";
   if (estado === "ACEPTADO") return "EN_PREPARACION";
   return null;
