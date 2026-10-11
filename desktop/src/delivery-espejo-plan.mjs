@@ -84,8 +84,12 @@ export function planificarEspejo({ conexiones = [], pedidos = [], localPedidos =
     const conTicketLocal = Boolean(local?.ticket_id);
     const esTienda = p.canal === "TIENDA";
     if (esTienda && CERRADOS_DE_TIENDA.has(p.estado)) {
-      if (conTicketLocal && !TICKET_CERRADO.has(local.ticket_estado)) {
-        avisos.push({ pedidoId: p.id, motivo: AVISO_TIENDA_CERRADO });
+      // El pagado en línea tiene la cuenta PAGADA desde que nace: para él «cerrada» es solo cancelada.
+      // Si la nube lo cerró (p. ej. la caja estuvo 15 minutos sin internet tras aceptarlo), el pago ya
+      // se le está devolviendo al cliente y aquí queda una cuenta cobrada que hay que cancelar.
+      const enLinea = p.pago_al_recibir === "EN_LINEA";
+      if (conTicketLocal && (enLinea ? local.ticket_estado !== "CANCELADO" : !TICKET_CERRADO.has(local.ticket_estado))) {
+        avisos.push({ pedidoId: p.id, motivo: avisoDeCierre(p) });
       }
       continue;
     }
@@ -134,6 +138,15 @@ export function estadoAReportar({ ticket_estado, ticket_impreso_at, asignado, es
 
 /** Lo que lee el cajero cuando la nube cerró un pedido de la tienda que aquí ya tiene ticket. */
 export const AVISO_TIENDA_CERRADO = "El pedido en línea se canceló: cancela el ticket en caja";
+/**
+ * Lo mismo cuando el pedido se había PAGADO EN LÍNEA: la nube ya dejó su pago por devolver, así que
+ * el cajero tiene que saber dos cosas: que el dinero ya no está, y qué hacer con la cuenta. Cancelar
+ * esa cuenta aquí no devuelve nada otra vez (la nube solo devuelve un pago aprobado, una vez).
+ * Texto provisional (James).
+ */
+export const AVISO_TIENDA_CERRADO_PAGADO = "El pedido en línea se canceló y el pago ya se le devolvió al cliente: cancela esta cuenta. Si ya lo entregaste, cóbralo de otra forma";
+/** El aviso que le toca a un pedido de la tienda que la nube cerró y aquí tiene cuenta. */
+export const avisoDeCierre = (pedido) => (pedido?.pago_al_recibir === "EN_LINEA" ? AVISO_TIENDA_CERRADO_PAGADO : AVISO_TIENDA_CERRADO);
 
 // Errores al crear el ticket de un pedido de la tienda que no se arreglan reintentando: lo que el
 // cliente pidió ya no se puede vender tal como se le cotizó. [texto que trae el mensaje, código].

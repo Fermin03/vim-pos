@@ -907,6 +907,7 @@ export function PantallaCuentasModo({
           turnoId={turno.id}
           pagada={sel.pagadaEnLinea}
           enLinea={sel.pagadaEnLinea}
+          cuentaDesde={sel.desdeIso}
           onCancelado={async () => {
             setCancelandoCuenta(false);
             setSelId(null); // la cuenta ya no existe: no dejar el detalle colgado

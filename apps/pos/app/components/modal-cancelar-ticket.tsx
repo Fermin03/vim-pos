@@ -7,6 +7,7 @@ import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from 
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
 import { AvisoAutorizacion, MotivoChips, etiquetaMotivo } from "./motivo-y-autorizacion";
 import { fmtMxn } from "../lib/turno";
+import { devolucionFueraDePlazo, HORAS_PARA_DEVOLVER_EN_LINEA } from "../lib/pedidos-en-linea";
 
 /** Roles con `venta.cancelar_abierta` por defecto (matriz §2.2). */
 const ROLES_CANCELAR = ["CAJERO", "SUPERVISOR", "ADMIN", "DUENO"];
@@ -27,6 +28,7 @@ export function ModalCancelarTicket({
   turnoId,
   pagada = false,
   enLinea = false,
+  cuentaDesde,
   onCancelado,
   onCerrar,
 }: {
@@ -43,6 +45,8 @@ export function ModalCancelarTicket({
   /** La cuenta se pagó en línea (tienda): quien devuelve el dinero es Mercado Pago, no el cajón.
    *  Texto provisional (James). */
   enLinea?: boolean;
+  /** Con `enLinea`: cuándo nació la cuenta (ya cobrada). Pasado el plazo, cancelar ya no devuelve el pago: no se cancela aquí. */
+  cuentaDesde?: string | null;
   onCancelado: () => void;
   onCerrar: () => void;
 }) {
@@ -124,6 +128,22 @@ export function ModalCancelarTicket({
         ejecutaNombre={empleado.nombre}
         onAutorizado={(a) => ejecutarConAutorizacion(a)}
         onCancelar={() => setPidiendoPin(false)}
+      />
+    );
+  }
+
+  // Pagada en línea y fuera del plazo: el sistema ya no reporta esa cancelación, así que el pago NO
+  // se devolvería. No se promete: aquí no se cancela. Texto provisional (James).
+  if (enLinea && devolucionFueraDePlazo(cuentaDesde)) {
+    return (
+      <DialogoPeligro
+        titulo="Esta cuenta ya no se cancela aquí"
+        contexto={`${folio ? `${folio} · ` : ""}${fmtMxn(totalActual)}`}
+        consecuencia={<>Esta cuenta <b className="text-ink">se pagó en línea hace más de {HORAS_PARA_DEVOLVER_EN_LINEA} horas</b> y el sistema ya no puede devolverle el pago al cliente. Si hay que regresar el dinero, <b className="text-ink">devuélvelo desde la cuenta de Mercado Pago del negocio</b>.</>}
+        boton="Cancelar folio"
+        deshabilitado
+        onConfirmar={() => {}}
+        onCerrar={onCerrar}
       />
     );
   }

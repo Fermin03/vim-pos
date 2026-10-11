@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { planificarEspejo, filaLocal, puedeCrear, cursorDe, COLUMNAS_PEDIDO, estadoAReportar, fallaDeTicket, fallaConGracia, GRACIA_CATALOGO_MS, avisoDeFalla } from "./delivery-espejo-plan.mjs";
+import { planificarEspejo, filaLocal, puedeCrear, cursorDe, COLUMNAS_PEDIDO, estadoAReportar, fallaDeTicket, fallaConGracia, GRACIA_CATALOGO_MS, avisoDeFalla, avisoDeCierre } from "./delivery-espejo-plan.mjs";
 
 const CAJA = "cccccccc-0000-0000-0000-0000000000cc";
 const OTRA = "cccccccc-0000-0000-0000-0000000000c2";
@@ -345,4 +345,22 @@ test("fallaConGracia: lo demás no espera al catálogo; sin fecha legible no hay
   }
   const sinTurno = { reintentable: true, codigo: "SIN_TURNO_ABIERTO" };
   assert.equal(fallaConGracia(sinTurno, recibido, t0 + 999_999), sinTurno);
+});
+
+test("tienda: la nube cerró un pedido PAGADO EN LÍNEA con cuenta local (la caja estuvo sin internet) → el aviso dice que el pago ya se devolvió", () => {
+  const motivo = "El pedido en línea se canceló y el pago ya se le devolvió al cliente: cancela esta cuenta. Si ya lo entregaste, cóbralo de otra forma";
+  // La cuenta de un pagado en línea está PAGADA desde que nace: eso no la hace «ya cerrada».
+  for (const ticket_estado of ["PAGADO", "FACTURADO"]) {
+    for (const estado of ["CANCELADO", "EXPIRADO"]) {
+      const r = planT([pedT({ estado, pago_al_recibir: "EN_LINEA", paga_con_mxn: null })], { localPedidos: [{ id: "p1", ticket_id: "tk", ticket_estado }] });
+      assert.deepEqual(r.avisos, [{ pedidoId: "p1", motivo }], `${estado} / ${ticket_estado}`);
+      assert.deepEqual(r.aCrear, []);
+    }
+  }
+  // Con la cuenta ya cancelada (lo hizo esta caja) no hay nada que avisar; sin cuenta local, tampoco.
+  assert.deepEqual(planT([pedT({ estado: "CANCELADO", pago_al_recibir: "EN_LINEA" })], { localPedidos: [{ id: "p1", ticket_id: "tk", ticket_estado: "CANCELADO" }] }).avisos, []);
+  assert.deepEqual(planT([pedT({ estado: "CANCELADO", pago_al_recibir: "EN_LINEA" })]).avisos, []);
+  // El de pago al recibir sigue como antes: con la cuenta ya cobrada no se avisa, y su texto no habla de devoluciones.
+  assert.deepEqual(planT([pedT({ estado: "CANCELADO" })], { localPedidos: [{ id: "p1", ticket_id: "tk", ticket_estado: "PAGADO" }] }).avisos, []);
+  assert.equal(avisoDeCierre({ pago_al_recibir: "EFECTIVO" }), "El pedido en línea se canceló: cancela el ticket en caja");
 });

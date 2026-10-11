@@ -284,6 +284,7 @@ export function PantallaConsultaCuentas({
           turnoId={turno.id}
           pagada
           enLinea={pagadaEnLinea}
+          cuentaDesde={cancelando.fechaIso}
           onCancelado={() => { setCancelando(null); setSel(null); setDetalle(null); recargar(); }}
           onCerrar={() => setCancelando(null)}
         />

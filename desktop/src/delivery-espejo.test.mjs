@@ -798,3 +798,11 @@ test("sin nube: lo dice una sola vez; despertar olvida los fallos y sondea ya", 
   assert.equal(espejo.estado().fallos, 0);
   assert.equal(esperas.at(-1), 0);
 });
+
+test("pagado en línea: si al reportar la nube ya lo había cancelado, el cajero lee que el pago ya se devolvió y que cancele la cuenta", async () => {
+  const pool = poolFalso({ reporte: [filaReporte({ pago_al_recibir: "EN_LINEA", ticket_estado: "PAGADO", ticket_impreso_at: "2026-10-11T10:00:00Z" })] });
+  const nube = nubeFalsa({ pedidos: [], alReportar: () => [200, { ok: true, estado: "CANCELADO" }] });
+  await agenteCon(pool, nube).tick();
+  assert.deepEqual(estadosLocales(pool), [["t1", "CANCELADO"]]);
+  assert.deepEqual(avisosAlCajero(pool), [["t1", "El pedido en línea se canceló y el pago ya se le devolvió al cliente: cancela esta cuenta. Si ya lo entregaste, cóbralo de otra forma"]]);
+});

@@ -868,6 +868,33 @@ BEGIN
   PERFORM tienda_sincronizar_estados_nube();
   IF (SELECT estado FROM delivery_pedidos WHERE id = v_id) <> 'ENTREGADO' THEN RAISE EXCEPTION 'I7: la nube canceló un pedido al recibir ya entregado'; END IF;
 
+  -- I8) La caja estuvo sin internet y la nube canceló un pedido pagado que la caja ya había aceptado:
+  --     el pago se devuelve UNA vez. Cuando la caja vuelve, el cajero cancela esa cuenta (se lo pide
+  --     el aviso): ni falla, ni dispara otra devolución, ni saca efectivo del cajón.
+  v_id := pg_temp.pagado('4776660097', 97);
+  v_ticket := crear_ticket_desde_tienda(v_id);
+  UPDATE delivery_pedidos SET estado = 'CANCELADO', cancelado_at = now(), cancelado_por = 'TIMEOUT' WHERE id = v_id;   -- lo que hace la nube al vencer
+  IF pg_temp.pago_de(v_id) <> 'POR_DEVOLVER' THEN RAISE EXCEPTION 'I8: cancelado por la nube, el pago quedó %', pg_temp.pago_de(v_id); END IF;
+  PERFORM tienda_pago_devolucion((SELECT id FROM tienda_pagos WHERE pedido_id = v_id AND NOT extra), true);
+  v_num := calcular_efectivo_esperado(v_turno);
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+    accion, permiso_codigo, entidad_tipo, entidad_id, monto_mxn, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_cajero, v_cajero, 'cancelar_ticket', 'venta.cancelar_pagada', 'ticket', v_ticket, 264.00, 'La nube canceló el pedido')
+  RETURNING id INTO v_ped2;
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_cajero, 'role', 'authenticated', 'tenant_id', v_t)::text, true);
+  PERFORM cancelar_ticket_pagado(v_ticket, v_caja, v_turno, 'CLIENTE_DESISTIO'::cancelacion_motivo, NULL, v_ped2, v_cajero, v_cajero,
+    true, false, true, 'EFECTIVO'::devolucion_medio, NULL, 'smoke-pl-cancel-i8');
+  PERFORM set_config('request.jwt.claims', NULL, true);
+  IF (SELECT estado_fiscal::text FROM tickets WHERE id = v_ticket) <> 'CANCELADO' THEN RAISE EXCEPTION 'I8: la cuenta de un pedido que la nube canceló no se pudo cancelar en caja'; END IF;
+  IF calcular_efectivo_esperado(v_turno) <> v_num THEN RAISE EXCEPTION 'I8: cancelar esa cuenta movió el efectivo esperado'; END IF;
+  -- La caja lo reporta y la nube lo vuelve a mirar: el pago sigue devuelto una sola vez.
+  IF tienda_reportar_estado(v_t, v_id, 'CANCELADO', 'OTRO') <> 'CANCELADO' THEN RAISE EXCEPTION 'I8: el reporte de la caja debía devolver el estado que ya tenía'; END IF;
+  PERFORM tienda_sincronizar_estados_nube();
+  IF pg_temp.pago_de(v_id) <> 'DEVUELTO' OR (SELECT count(*) FROM tienda_pagos WHERE pedido_id = v_id) <> 1
+     OR EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t JOIN tienda_pagos g ON g.id = t.id WHERE g.pedido_id = v_id) THEN
+    RAISE EXCEPTION 'I8: cancelar en caja una cuenta cuyo pago ya se devolvió volvió a encolar una devolución (pago %)', pg_temp.pago_de(v_id);
+  END IF;
+
   -- ── H) Permisos ─────────────────────────────────────────────────────────────────────────────
   FOR r IN SELECT p.oid::regprocedure AS firma, p.proname FROM pg_proc p
             WHERE p.pronamespace = 'public'::regnamespace

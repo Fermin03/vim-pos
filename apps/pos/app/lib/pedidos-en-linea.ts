@@ -56,6 +56,25 @@ export function soloInformativo(p: PedidoApp, enEscritorio: boolean): boolean {
   return enEscritorio && p.canal === "TIENDA" && p.gestion === "NUBE";
 }
 
+/**
+ * Cuántas horas después de pagarse en línea cancelar la cuenta TODAVÍA devuelve el pago solo. Es la
+ * ventana en la que la caja le reporta la cancelación a la nube (`SQL_REPORTE` de
+ * desktop/src/delivery-espejo.mjs: `interval '48 hours'`; la prueba de este archivo lee ese SQL y
+ * falla si los dos números dejan de coincidir). La nube mira más tiempo (7 días), pero lo que se le
+ * promete al cajero es lo que se cumple en los dos lados.
+ */
+export const HORAS_PARA_DEVOLVER_EN_LINEA = 48;
+
+/**
+ * ¿Ya es tarde para que cancelar esta cuenta devuelva su pago en línea? `cuentaDesdeIso` es cuándo
+ * nació la cuenta (nace ya cobrada, al aceptarse el pedido). La ventana corre desde que el pedido se
+ * pagó, que es un poco antes: por eso se corta una hora antes. Sin fecha no se promete nada.
+ */
+export function devolucionFueraDePlazo(cuentaDesdeIso: string | null | undefined, ahora: number = Date.now()): boolean {
+  const desde = cuentaDesdeIso ? Date.parse(cuentaDesdeIso) : NaN;
+  return !Number.isFinite(desde) || ahora - desde >= (HORAS_PARA_DEVOLVER_EN_LINEA - 1) * 3_600_000;
+}
+
 /** Lo que la caja le dejó dicho al cajero en un pedido cerrado; nunca un código interno. */
 export function avisoDeTienda(p: PedidoApp): string | null {
   const cerrado = p.estado === "CANCELADO" || p.estado === "RECHAZADO" || p.estado === "EXPIRADO";

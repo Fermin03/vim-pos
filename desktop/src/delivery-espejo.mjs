@@ -13,7 +13,7 @@
 // ticket local (recién creado → en preparación, el «ya lo tengo»; impreso o con repartidor → listo;
 // cobrado → entregado; cancelado → cancelado).
 import {
-  planificarEspejo, cursorDe, estadoAReportar, fallaDeTicket, fallaConGracia, avisoDeFalla, AVISO_TIENDA_CERRADO,
+  planificarEspejo, cursorDe, estadoAReportar, fallaDeTicket, fallaConGracia, avisoDeFalla, avisoDeCierre,
   COLUMNAS_PEDIDO, COLUMNAS_CONEXION,
 } from "./delivery-espejo-plan.mjs";
 import { cadenciaAceptada, esperaEspejo } from "./delivery-espejo-ritmo.mjs";
@@ -183,7 +183,7 @@ export function crearEspejo({
       return "reintentar";
     }
     if (!esTienda || ["ACEPTADO", "EN_PREPARACION", "LISTO"].includes(ac.body?.estado)) return "aceptado";
-    await pool.query(`UPDATE delivery_pedidos SET ultimo_error = $2 WHERE id = $1`, [id, AVISO_TIENDA_CERRADO]).catch(() => {});
+    await pool.query(`UPDATE delivery_pedidos SET ultimo_error = $2 WHERE id = $1`, [id, avisoDeCierre(pedido)]).catch(() => {});
     log(`pedido ${folio}: la nube ya lo había cerrado y aquí ya tiene ticket; queda el aviso para cancelarlo en caja`);
     return "cerrado";
   }
@@ -319,7 +319,7 @@ export function crearEspejo({
             // (Un pagado en línea sí: «Listo» sobre un pedido que la nube canceló deja una cuenta cobrada
             // cuyo pago ya se está devolviendo.)
             if (quedo === "CANCELADO" && reportar !== "CANCELADO" && (reportar !== "ENTREGADO" || f.pago_al_recibir === "EN_LINEA")) {
-              await pool.query(`UPDATE delivery_pedidos SET ultimo_error = $2 WHERE id = $1`, [f.id, AVISO_TIENDA_CERRADO]);
+              await pool.query(`UPDATE delivery_pedidos SET ultimo_error = $2 WHERE id = $1`, [f.id, avisoDeCierre(f)]);
             }
           }
           if (quedo === reportar) { sinEfecto.delete(f.id); continue; }
