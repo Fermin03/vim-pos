@@ -1,7 +1,7 @@
 "use client";
 // TEXTOS PROVISIONALES: todo lo que aquí lee el dueño lo revisa James antes de publicar.
 import Link from "next/link";
-import { Button } from "@vim/ui/styles";
+import { Aviso, Button } from "@vim/ui/styles";
 import { input, label } from "./campos";
 import { Tarjeta } from "./tarjeta";
 import { LineaMensaje, type MensajeTienda } from "./tienda-mensaje";
@@ -9,7 +9,7 @@ import { precioMxn } from "../lib/catalogo";
 import { fechaHoraMx } from "../lib/reportes-inventario";
 import type { ConexionTerminal } from "../lib/terminal";
 import { PAGOS_A_LA_VISTA, type PagoTienda } from "../lib/tienda";
-import { cuentaQueCobra, cuentasActivas, hayQueElegir, nombreDeCuenta } from "../lib/tienda-cobro";
+import { cuentaQueCobra, cuentasActivas, hayQueElegir, lista, nombreDeCuenta } from "../lib/tienda-cobro";
 import type { SucursalTienda } from "../lib/tienda-reglas";
 
 const enlace = "whitespace-nowrap font-semibold underline underline-offset-2";
@@ -26,6 +26,7 @@ export function TiendaCobro({
   cuentas,
   sucursales,
   pagos,
+  cajasSinActualizar,
   ocupado,
   soloLectura,
   mensaje,
@@ -36,6 +37,8 @@ export function TiendaCobro({
   sucursales: SucursalTienda[];
   /** null = no se pudieron leer. */
   pagos: PagoTienda[] | null;
+  /** Sucursales que venden en la tienda y cuya caja instalada no está actualizada. */
+  cajasSinActualizar: string[];
   /** Algo se está guardando en la página: una escritura a la vez. */
   ocupado: boolean;
   soloLectura: boolean;
@@ -106,6 +109,11 @@ export function TiendaCobro({
         </div>
       )}
       <LineaMensaje mensaje={mensaje} className="mt-3" />
+      {activas.length > 0 && cajasSinActualizar.length > 0 && (
+        <Aviso tono="warning" className="mt-3">
+          En {lista(cajasSinActualizar)} el pago en línea no aparece: actualiza tu caja ahí.
+        </Aviso>
+      )}
 
       <div className="mt-5 border-t border-line pt-4">
         <h3 className={subtitulo}>Lo que debes saber</h3>

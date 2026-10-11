@@ -18,6 +18,8 @@ export type Leido = {
   cuentas: ConexionTerminal[];
   /** Los últimos pagos en línea; null = no se pudieron leer (la página carga igual). */
   pagos: PagoTienda[] | null;
+  /** Sucursales donde el pago en línea no aparece porque su caja instalada no está actualizada. Vacío si no se pudo revisar. */
+  cajasSinActualizar: string[];
 };
 
 /** Una escritura que la base ya aceptó, con lo que se le mandó. */

@@ -32,7 +32,10 @@ export type PedidoApp = {
   canal: "APP" | "TIENDA"; clienteTelefono: string | null;
   /** Solo la tienda a domicilio: la dirección armada en una línea y sus referencias aparte. */
   direccion: { texto: string; referencias: string | null } | null;
-  pago: { forma: "EFECTIVO" | "TARJETA"; pagaCon: number | null } | null;
+  /** `EN_LINEA`: ya pagado con Mercado Pago; su cuenta nace cobrada y NO se le cobra nada. */
+  pago: { forma: "EFECTIVO" | "TARJETA" | "EN_LINEA"; pagaCon: number | null } | null;
+  /** Propina que el cliente pagó en línea (va aparte del total). 0 en todo lo demás. */
+  propina: number;
   envio: number | null; gestion: "NUBE" | "ESCRITORIO" | null;
   /** Caja instalada que reclamó el pedido (null = nadie; lo puede atender cualquiera). */
   gestionCajaId: string | null;
@@ -46,7 +49,7 @@ export async function leerPedidosApps(token: string, sucursalId: string): Promis
   const desde = new Date(Date.now() - 30 * 60_000).toISOString();
   const { data, error } = await employeeClient(token)
     .from("delivery_pedidos")
-    .select("id, app, id_externo, folio_corto, estado, tipo_entrega, cliente_nombre, nota_cliente, items, total_cliente_mxn, vence_aceptacion, recibido_at, ticket_id, ultimo_error, canal, cliente_telefono, direccion, pago_al_recibir, paga_con_mxn, envio_mxn, subtotal_mxn, gestion, gestion_caja_id, ticket:tickets(folio_completo, caja_id, comanda_impresa_at, estado_fiscal, ticket_impreso_at)")
+    .select("id, app, id_externo, folio_corto, estado, tipo_entrega, cliente_nombre, nota_cliente, items, total_cliente_mxn, vence_aceptacion, recibido_at, ticket_id, ultimo_error, canal, cliente_telefono, direccion, pago_al_recibir, paga_con_mxn, envio_mxn, subtotal_mxn, gestion, gestion_caja_id, propina_mxn, entregado_at, ticket:tickets(folio_completo, caja_id, comanda_impresa_at, estado_fiscal, ticket_impreso_at)")
     .eq("sucursal_id", sucursalId)
     .or(`estado.in.(${ACTIVOS.join(",")}),recibido_at.gte.${desde}`)
     .order("recibido_at", { ascending: false })
@@ -74,12 +77,19 @@ const VIVO_CON_TICKET: unknown[] = ["ACEPTADO", "EN_PREPARACION", "LISTO"];
  * hace que un pedido cobrado o cancelado deje de verse activo al momento.
  * ponytail: «con repartidor asignado → LISTO» no se deriva aquí (pediría otra tabla en la consulta
  * y la tarjeta pinta igual ACEPTADO que LISTO); la base lo pone al minuto.
+ *
+ * Pagado en línea (0172): su cuenta nace cobrada, así que «cobrada» NO es «entregado»; se entrega
+ * con el «Listo» del cajero. En la caja instalada ese «Listo» queda en `entregado_at` de la copia
+ * local unos segundos antes de que la nube cambie el estado: aquí ya cuenta.
  */
 function estadoDeFila(r: Record<string, unknown>, ticket: TicketDeFila | null): PedidoAppEstado {
   const estado = r.estado as PedidoAppEstado;
-  if (r.canal !== "TIENDA" || r.gestion !== "NUBE" || !ticket || !VIVO_CON_TICKET.includes(estado)) return estado;
+  if (r.canal !== "TIENDA" || !ticket || !VIVO_CON_TICKET.includes(estado)) return estado;
+  const enLinea = r.pago_al_recibir === "EN_LINEA";
+  if (enLinea && r.entregado_at) return "ENTREGADO";
+  if (r.gestion !== "NUBE") return estado;
   if (ticket.estado_fiscal === "CANCELADO") return "CANCELADO";
-  if (ticket.estado_fiscal === "PAGADO" || ticket.estado_fiscal === "FACTURADO") return "ENTREGADO";
+  if (!enLinea && (ticket.estado_fiscal === "PAGADO" || ticket.estado_fiscal === "FACTURADO")) return "ENTREGADO";
   return ticket.ticket_impreso_at ? "LISTO" : estado;
 }
 
@@ -96,7 +106,7 @@ function direccionDesdeJson(v: unknown): PedidoApp["direccion"] {
 
 export function pedidoDesdeFila(r: Record<string, unknown>): PedidoApp {
   const ticket = r.ticket as TicketDeFila | null;
-  const forma = r.pago_al_recibir === "EFECTIVO" || r.pago_al_recibir === "TARJETA" ? r.pago_al_recibir : null;
+  const forma = r.pago_al_recibir === "EFECTIVO" || r.pago_al_recibir === "TARJETA" || r.pago_al_recibir === "EN_LINEA" ? r.pago_al_recibir : null;
   return {
     id: String(r.id),
     app: r.app as PedidoApp["app"],
@@ -118,6 +128,7 @@ export function pedidoDesdeFila(r: Record<string, unknown>): PedidoApp {
     clienteTelefono: (r.cliente_telefono as string | null) ?? null,
     direccion: direccionDesdeJson(r.direccion),
     pago: forma ? { forma, pagaCon: r.paga_con_mxn == null ? null : Number(r.paga_con_mxn) } : null,
+    propina: Number(r.propina_mxn ?? 0),
     envio: r.envio_mxn == null ? null : Number(r.envio_mxn),
     gestion: r.gestion === "NUBE" || r.gestion === "ESCRITORIO" ? r.gestion : null,
     gestionCajaId: (r.gestion_caja_id as string | null) ?? null,

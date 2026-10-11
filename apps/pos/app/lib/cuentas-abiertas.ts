@@ -24,6 +24,8 @@ export type CuentaAbierta = {
   clienteId: string | null;       // cliente registrado de la cuenta (null = sin cliente)
   mesa: string | null;            // número de mesa (comedor), desde tickets_mesas
   notaPedido: string | null;      // solo en un ticket nacido de la tienda en línea (`notaPedidoDe`): forma de pago y nota del cliente
+  /** Nació cobrada: es de un pedido de la tienda pagado en línea. No se cobra; se entrega con «Listo». */
+  pagadaEnLinea: boolean;
 };
 
 /** Nombre completo del cliente embebido (`cliente:clientes(nombre, apellido_paterno)`), o null. */
@@ -41,12 +43,19 @@ function nombreClienteFila(c: unknown): string | null {
  * Comedor pasa DOS modos: los tickets nacen como `MESA` cuando se abren desde una mesa, pero
  * hay `COMER_AQUI` de la ruta de mostrador. Filtrar por uno solo escondería cuentas abiertas
  * —y una cuenta que no se ve es una que no se cobra.
+ *
+ * `pagadasEnLinea`: tickets de pedidos de la tienda pagados en línea que siguen sin entregar
+ * (`cuentasPagadasEnLinea`). Ya están cobrados, pero se listan hasta que alguien toca «Listo».
  */
 export async function listarCuentasAbiertas(
   token: string,
   sucursalId: string,
   modo: ModoServicio | readonly string[],
+  pagadasEnLinea: readonly string[] = [],
 ): Promise<CuentaAbierta[]> {
+  const abiertas = "estado_fiscal.in.(BORRADOR,ABIERTO)";
+  // Solo ids con forma de uuid entran al filtro: viajan en la dirección de la consulta.
+  const ids = pagadasEnLinea.filter((id) => /^[0-9a-f-]{36}$/i.test(id));
   const modos = typeof modo === "string" ? [modo] : [...modo];
   const { data, error } = await employeeClient(token)
     .from("tickets")
@@ -54,12 +63,12 @@ export async function listarCuentasAbiertas(
     // (`mesa_id` y `mesa_anterior_id`, esta última para transferencias). Sin la pista,
     // PostgREST no sabe cuál seguir y rechaza la consulta entera con "more than one
     // relationship was found" — dejando sin lista a los TRES modos, no solo a comedor.
-    .select("id, folio_completo, total_mxn, monto_pendiente_mxn, fecha_apertura, estado_cocina, ticket_impreso_at, nombre_cliente, nota_general, modo_servicio, origen_creacion, cliente_id, cliente:clientes(nombre, apellido_paterno), tickets_mesas(fecha_liberacion, mesas!mesa_id(numero)), ticket_items(cantidad, cancelado)")
+    .select("id, folio_completo, total_mxn, monto_pendiente_mxn, fecha_apertura, estado_cocina, ticket_impreso_at, nombre_cliente, nota_general, modo_servicio, origen_creacion, estado_fiscal, cliente_id, cliente:clientes(nombre, apellido_paterno), tickets_mesas(fecha_liberacion, mesas!mesa_id(numero)), ticket_items(cantidad, cancelado)")
     .eq("sucursal_id", sucursalId)
     .in("modo_servicio", modos)
     .is("deleted_at", null)
     .eq("en_espera", false)
-    .in("estado_fiscal", ["BORRADOR", "ABIERTO"])
+    .or(ids.length ? `${abiertas},and(estado_fiscal.in.(PAGADO,FACTURADO),id.in.(${ids.join(",")}))` : abiertas)
     .order("fecha_apertura", { ascending: true });
   if (error) throw new Error(error.message);
   return ((data ?? []) as unknown as Record<string, unknown>[]).map((t) => ({
@@ -81,6 +90,7 @@ export async function listarCuentasAbiertas(
       .find((m) => m.fecha_liberacion === null)?.mesas?.numero) ?? null,
     // Misma regla que el papel: el recado a cocina que teclea el cajero no es «nota del pedido».
     notaPedido: notaPedidoDe((t.modo_servicio as string | null) ?? null, (t.origen_creacion as string | null) ?? null, (t.nota_general as string | null) ?? null),
+    pagadaEnLinea: t.estado_fiscal === "PAGADO" || t.estado_fiscal === "FACTURADO",
   }));
 }
 

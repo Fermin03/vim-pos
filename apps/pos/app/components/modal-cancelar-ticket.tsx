@@ -26,6 +26,7 @@ export function ModalCancelarTicket({
   cajaId,
   turnoId,
   pagada = false,
+  enLinea = false,
   onCancelado,
   onCerrar,
 }: {
@@ -39,6 +40,9 @@ export function ModalCancelarTicket({
   /** El ticket ya está PAGADO (Consulta de cuentas): cancelar devuelve el dinero (devolución total)
    *  y requiere permiso venta.cancelar_pagada (más restringido). */
   pagada?: boolean;
+  /** La cuenta se pagó en línea (tienda): quien devuelve el dinero es Mercado Pago, no el cajón.
+   *  Texto provisional (James). */
+  enLinea?: boolean;
   onCancelado: () => void;
   onCerrar: () => void;
 }) {
@@ -128,7 +132,9 @@ export function ModalCancelarTicket({
     <DialogoPeligro
       titulo={pagada ? "Cancelar folio" : "Cancelar ticket"}
       contexto={`${folio ? `${folio} · ` : ""}${fmtMxn(totalActual)}`}
-      consecuencia={pagada
+      consecuencia={enLinea
+        ? <>Esta cuenta <b className="text-ink">se pagó en línea</b>. Al cancelarla, <b className="text-ink">el pago se le devuelve completo al cliente</b> por Mercado Pago, con todo y propina. De la caja no sale efectivo. <b className="text-ink">No se puede deshacer.</b> El inventario regresa al stock.</>
+        : pagada
         ? <>Se registra una <b className="text-ink">devolución total</b> (el dinero se devuelve) y la cuenta queda cancelada. <b className="text-ink">No se puede deshacer.</b> El inventario regresa al stock.</>
         : <>Se cancela el ticket completo. <b className="text-ink">No se puede deshacer.</b> El inventario regresa al stock.</>}
       error={error}

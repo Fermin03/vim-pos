@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { avisoDeCobro, cuentaQueCobra, estadoDePago, hayQueElegir, textoDeAviso } from "../tienda-cobro";
+import { avisoDeCobro, cuentaQueCobra, estadoDePago, hayQueElegir, sucursalesConCajaSinActualizar, textoDeAviso } from "../tienda-cobro";
 
 const A = { id: "a", cuenta_nombre: "Knock-Out León", estado: "ACTIVA" as const };
 const B = { id: "b", cuenta_nombre: "Knock-Out Norte", estado: "ACTIVA" as const };
@@ -74,5 +74,19 @@ describe("el estado de un pago en palabras", () => {
     // Una devolución que falló se sigue reintentando: para el dueño sigue en proceso.
     expect(estadoDePago("DEVOLUCION_FALLIDA")).toBe("Devolución en proceso");
     for (const e of ["CREADO", "RECHAZADO", "VENCIDO", "ALGO_NUEVO"]) expect(estadoDePago(e)).toBe("No completado");
+  });
+});
+
+describe("sucursales con la caja sin actualizar", () => {
+  const s = (id: string, participa = true) => ({ id, nombre: id.toUpperCase(), participa });
+  const caja = (sucursal_id: string, versionApp: string | null, extra: { activa?: boolean; ultimoLatido?: string | null } = {}) =>
+    ({ sucursal_id, versionApp, activa: true, ultimoLatido: "2026-10-11T10:00:00Z", ...extra });
+  it("avisa de la sucursal cuyas cajas en uso son todas anteriores; basta una al día para no avisar", () => {
+    const cajas = [caja("centro", "0.8.0"), caja("norte", "0.8.0"), caja("norte", "0.9.0"), caja("sur", null), caja("este", "0.10.1")];
+    expect(sucursalesConCajaSinActualizar([s("centro"), s("norte"), s("sur"), s("este")], cajas)).toEqual(["CENTRO", "SUR"]);
+  });
+  it("no avisa de la que no vende en la tienda, ni de la que no tiene caja instalada en uso", () => {
+    const cajas = [caja("fuera", "0.8.0"), caja("web", "0.8.0", { ultimoLatido: null }), caja("apagada", "0.8.0", { activa: false })];
+    expect(sucursalesConCajaSinActualizar([s("fuera", false), s("web"), s("apagada"), s("sin-cajas")], cajas)).toEqual([]);
   });
 });

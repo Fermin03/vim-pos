@@ -59,10 +59,10 @@ import { PantallaDevoluciones } from "./pantalla-devoluciones";
 import { PantallaPedidosApps } from "./pantalla-pedidos-apps";
 import { accionPedidoApp, hayExpiradosSinVer, leerExpiradosHoy, leerPedidosApps, type PedidoApp, type PedidoAppEstado } from "../lib/pedidos-apps";
 import {
-  aceptablesSolos, avisarPresente, comandasPendientes, conAtendidos, contarPorAceptar, debeSonar, leerEstadoEnLinea, mensajeErrorEnLinea,
+  aceptablesSolos, avisarPresente, comandasPendientes, conAtendidos, contarPorAceptar, cuentasPagadasEnLinea, debeSonar, entregarPedido, leerEstadoEnLinea, mensajeErrorEnLinea, type HechoAqui,
   recienAceptados, sinComanda, soloInformativo, textoPedidoEnCanal, timbrarHasta,
 } from "../lib/pedidos-en-linea";
-import { CapaPedidosTienda, type AccionTienda } from "./pedido-tienda";
+import { CapaPedidosTienda, type AccionTienda, type ListoTienda } from "./pedido-tienda";
 import { esEscritorio } from "../lib/actualizacion";
 import { useAcceso } from "./banda-acceso";
 import { ModalCancelarItem } from "./modal-cancelar-item";
@@ -212,7 +212,7 @@ export function HomePos({
   // guardan para pintarlos (`CapaPedidosTienda`, `PantallaCuentasModo`), sin abrir otro sondeo.
   const [pedidosTiendaLeidos, setPedidosTiendaLeidos] = useState<PedidoApp[]>([]);
   /** Lo que se aceptó o rechazó en este dispositivo (`conAtendidos`). El ref es para el sondeo. */
-  const [atendidosTienda, setAtendidosTienda] = useState<ReadonlyMap<string, "aceptar" | "rechazar">>(new Map());
+  const [atendidosTienda, setAtendidosTienda] = useState<ReadonlyMap<string, HechoAqui>>(new Map());
   const atendidosTiendaRef = useRef(atendidosTienda);
   atendidosTiendaRef.current = atendidosTienda;
   const pedidosTienda = useMemo(() => conAtendidos(pedidosTiendaLeidos, atendidosTienda), [pedidosTiendaLeidos, atendidosTienda]);
@@ -1713,6 +1713,19 @@ export function HomePos({
     }
     return { ok: false, mensaje, enCanal };
   };
+  /**
+   * «Listo» de una cuenta pagada en línea: el pedido queda entregado y sale de la lista. Si tenía
+   * repartidor, su reparto se cierra como cobrado con tarjeta: el repartidor no trae dinero de vuelta
+   * (igual que al cobrar, y best-effort por lo mismo).
+   */
+  const entregarPedidoTienda: ListoTienda = async (p, total) => {
+    const r = await entregarPedido(token, p);
+    releerEnLinea.current();
+    if (!r.ok) return { ok: false, mensaje: mensajeErrorEnLinea(r.error) };
+    setAtendidosTienda((v) => new Map(v).set(p.id, "entregar"));
+    if (p.app === "DELIVERY_PROPIO" && p.ticketId) void cerrarRepartoAlCobrar(token, { ticketId: p.ticketId, efectivo: 0, tarjeta: total, liquidadoPorId: empleado.id });
+    return { ok: true };
+  };
   /** «Ver orden» del aviso grande: lleva a Pick-up o a Domicilio con ese pedido seleccionado. */
   const verPedidoTiendaEnSuCanal = (p: PedidoApp) => {
     cerrarAvisoTienda(p.id);
@@ -2184,8 +2197,9 @@ export function HomePos({
           empleado={empleado}
           nCuentasComedor={cuentasAbiertas.comedor}
           // Cada canal suma sus pedidos de la tienda por aceptar.
-          nCuentasPickup={cuentasAbiertas.pickup + porAceptarTienda.pickup}
-          nCuentasDomicilio={cuentasAbiertas.domicilio + porAceptarTienda.domicilio}
+          // Y las pagadas en línea que siguen sin entregar: ya están cobradas, pero ahí siguen.
+          nCuentasPickup={cuentasAbiertas.pickup + porAceptarTienda.pickup + cuentasPagadasEnLinea(pedidosTienda, "DRIVE_THRU").length}
+          nCuentasDomicilio={cuentasAbiertas.domicilio + porAceptarTienda.domicilio + cuentasPagadasEnLinea(pedidosTienda, "DELIVERY_PROPIO").length}
           nEnEspera={nEnEspera}
           nPedidosApps={nPedidosApps}
           expiradosApps={expiradosApps}
@@ -2320,6 +2334,7 @@ export function HomePos({
           sabidoAqui: canceladosAlAceptar,
           ver: verPedidoTienda,
           onAccion: atenderPedidoTienda,
+          onListo: entregarPedidoTienda,
           // A mano y desde ESTE dispositivo, sea de la caja que sea el ticket. Queda como intentada
           // para que el sondeo no la mande otra vez mientras llega el sello de la base.
           onImprimirComanda: async (p) => {

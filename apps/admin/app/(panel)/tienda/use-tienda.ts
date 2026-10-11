@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { leerNegocio } from "../../lib/configuracion";
+import { leerNegocio, listarCajas } from "../../lib/configuracion";
 import { mensajeError } from "../../lib/errores";
 import { leerModulos } from "../../lib/modulos";
 import { ponerLogoTienda, quitarLogoTienda } from "../../lib/foto-producto";
@@ -10,7 +10,7 @@ import {
   type BloqueConfig, type DatosConfigTienda,
 } from "../../lib/tienda";
 import { normalizarDireccion, trasEscribir, type Escritura, type Leido } from "../../lib/tienda-pagina";
-import { avisoDeCobro, cuentasActivas } from "../../lib/tienda-cobro";
+import { avisoDeCobro, cuentasActivas, sucursalesConCajaSinActualizar } from "../../lib/tienda-cobro";
 import { revisar, sugerirDireccion, type BorradorSucursal, type Revision } from "../../lib/tienda-reglas";
 import type { DatosTienda } from "../../components/tienda-datos";
 import type { MensajeTienda } from "../../components/tienda-mensaje";
@@ -33,7 +33,7 @@ const DE_FABRICA: DatosConfigTienda = {
 // mientras el interruptor sigue en `true`. `leerModulos` lanza el mensaje crudo de la base: aquí se
 // cambia por uno que el dueño entienda.
 async function leerTodo(): Promise<Leido> {
-  const [config, sucursales, interruptor, pendientes, combosNoComprables, modulos, cuentas, pagos] = await Promise.all([
+  const [config, sucursales, interruptor, pendientes, combosNoComprables, modulos, cuentas, pagos, cajas] = await Promise.all([
     leerConfigTienda(), leerSucursalesTienda(), leerTiendaEncendida(), contarPendientesDeCatalogo(),
     // Solo es un aviso: si no se puede revisar, la página carga igual.
     leerCombosNoComprables().catch(() => []),
@@ -42,8 +42,10 @@ async function leerTodo(): Promise<Leido> {
     leerTerminal().then((t) => t.conexiones, () => { throw new Error(LECTURA); }),
     // La lista de pagos es solo consulta: si falla, lo demás carga igual.
     leerPagosTienda().catch(() => null),
+    // Solo es un aviso: si no se puede revisar, no se avisa.
+    listarCajas().catch(() => []),
   ]);
-  return { config, sucursales, interruptor, pendientes, combosNoComprables, cuentas, pagos, enPlan: modulos.permitidos.tienda === true };
+  return { config, sucursales, interruptor, pendientes, combosNoComprables, cuentas, pagos, cajasSinActualizar: sucursalesConCajaSinActualizar(sucursales, cajas), enPlan: modulos.permitidos.tienda === true };
 }
 
 function formularioDe(c: DatosConfigTienda): Formulario {

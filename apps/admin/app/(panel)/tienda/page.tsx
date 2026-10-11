@@ -103,6 +103,7 @@ export default function TiendaPage() {
               cuentas={t.leido.cuentas}
               sucursales={t.leido.sucursales}
               pagos={t.leido.pagos}
+              cajasSinActualizar={t.leido.config?.pagoEnLinea ? t.leido.cajasSinActualizar : []}
               ocupado={ocupado}
               soloLectura={soloLectura}
               mensaje={t.mensajeDe("cobro")}

@@ -3,11 +3,32 @@
 // efectos. Quien decide de verdad es la base (`tienda_conexion_cobro`, 0172); esto solo lo enseña.
 //
 // TEXTOS PROVISIONALES: todo lo que aquí lee el dueño lo revisa James antes de publicar.
+import type { Caja } from "./configuracion";
+import { versionMenor } from "./menu-sucursal";
 import type { ConexionTerminal } from "./terminal";
 import type { SucursalTienda } from "./tienda-reglas";
 
 type Cuenta = Pick<ConexionTerminal, "id" | "cuenta_nombre" | "estado">;
 type Sucursal = Pick<SucursalTienda, "nombre" | "participa" | "conexionId">;
+
+/** La primera versión de la caja instalada que atiende un pedido ya pagado. La misma de `_tienda_caja_en_linea_viva` (0172): si cambia allá, cambia aquí. */
+export const CAJA_CON_PAGO_EN_LINEA = "0.9.0";
+
+/**
+ * Las sucursales que venden en la tienda donde el pago en línea no aparece porque su caja instalada
+ * no está actualizada: tienen cajas en uso (activas, con latido) y ninguna llega a la versión.
+ * Una sucursal sin caja instalada (solo POS web) no sale: ahí no hay nada que actualizar.
+ * ponytail: mira «alguna vez mandó latido», como el aviso de menús; la base mira los últimos 90 s.
+ */
+export function sucursalesConCajaSinActualizar(
+  sucursales: Pick<SucursalTienda, "id" | "nombre" | "participa">[],
+  cajas: Pick<Caja, "sucursal_id" | "activa" | "ultimoLatido" | "versionApp">[],
+): string[] {
+  return sucursales.filter((s) => {
+    const enUso = cajas.filter((c) => c.sucursal_id === s.id && c.activa && c.ultimoLatido !== null);
+    return s.participa && enUso.length > 0 && enUso.every((c) => c.versionApp === null || versionMenor(c.versionApp, CAJA_CON_PAGO_EN_LINEA));
+  }).map((s) => s.nombre);
+}
 
 export const cuentasActivas = <C extends Cuenta>(cuentas: C[]): C[] => cuentas.filter((c) => c.estado === "ACTIVA");
 
@@ -49,7 +70,7 @@ export function avisoDeCobro(pagoEnLinea: boolean, cuentas: Cuenta[], sucursales
     : { tipo: "ELEGIR", sucursales: sin.map((s) => s.nombre) };
 }
 
-const lista = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} y ${xs[xs.length - 1]}`);
+export const lista = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} y ${xs[xs.length - 1]}`);
 
 export function textoDeAviso(a: AvisoCobro): string {
   const donde = a.sucursales.length > 0 ? `En ${lista(a.sucursales)} tu` : "Tu";

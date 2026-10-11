@@ -224,6 +224,22 @@ describe("pedido de la tienda atendido desde el POS web (gestión NUBE): el esta
     expect(con({ estado_fiscal: "PAGADO" }, { gestion: "ESCRITORIO" })).toBe("ACEPTADO");
     expect(con({ estado_fiscal: "PAGADO" }, { canal: "APP", app: "APP_UBEREATS" })).toBe("ACEPTADO");
   });
+  it("pagado en línea: la cuenta cobrada NO es entregado; se entrega con «Listo» (entregado_at), y cancelada sigue siendo cancelado", () => {
+    const linea = { pago_al_recibir: "EN_LINEA", propina_mxn: "24.00" };
+    expect(con({ estado_fiscal: "PAGADO" }, linea)).toBe("ACEPTADO");
+    expect(con({ estado_fiscal: "FACTURADO" }, { ...linea, estado: "EN_PREPARACION" })).toBe("EN_PREPARACION");
+    expect(con({ estado_fiscal: "PAGADO", ticket_impreso_at: "2026-10-09T10:05:00Z" }, linea)).toBe("LISTO");
+    expect(con({ estado_fiscal: "CANCELADO" }, linea)).toBe("CANCELADO");
+    // En la caja instalada el «Listo» vive en la copia local antes de que la nube cambie el estado.
+    expect(con({ estado_fiscal: "PAGADO" }, { ...linea, gestion: "ESCRITORIO" })).toBe("ACEPTADO");
+    expect(con({ estado_fiscal: "PAGADO" }, { ...linea, gestion: "ESCRITORIO", entregado_at: "2026-10-09T10:20:00Z" })).toBe("ENTREGADO");
+    // entregado_at no cuenta en un pedido al recibir de una caja.
+    expect(con({ estado_fiscal: "ABIERTO" }, { gestion: "ESCRITORIO", pago_al_recibir: "EFECTIVO", entregado_at: "2026-10-09T10:20:00Z" })).toBe("ACEPTADO");
+    const p = pedidoDesdeFila({ ...base, ...linea, ticket: { estado_fiscal: "PAGADO" } });
+    expect(p.pago).toEqual({ forma: "EN_LINEA", pagaCon: null });
+    expect(p.propina).toBe(24);
+    expect(pedidoDesdeFila({ ...base, ticket: null }).propina).toBe(0);
+  });
   it("uno ya cobrado o cancelado deja de listarse pasada la media hora; los vivos siguen", () => {
     const desde = "2026-10-09T12:00:00Z";
     const p = (id: string, ticket: Record<string, unknown>, recibido_at: string) => pedidoDesdeFila({ ...base, id, recibido_at, ticket });
