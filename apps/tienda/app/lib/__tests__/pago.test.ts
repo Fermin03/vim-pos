@@ -225,6 +225,9 @@ describe("lo que ve el cliente en cada estado del pago", () => {
   it("venció y todavía no se ha podido confirmar: NUNCA dice que no hubo pago ni que no se cobró", () => {
     const t = textoDeSeguimiento(seg("CANCELADO", "POR_CONFIRMAR", { motivo: "POR_CONFIRMAR" }));
     expect(t.titulo).toBe("Confirmando tu pago");
+    expect(t.apoyo).toBe("Esto puede tardar unos minutos.");
+    // No promete devolver: el pago puede ser de un pedido válido.
+    expect(t.apoyo).not.toMatch(/devolv/i);
     expect(`${t.titulo} ${t.apoyo}`).not.toMatch(/sin pago|no se te cobr|no se complet/i);
     expect(t.alerta).toBe(false);
   });

@@ -64,7 +64,7 @@ export function textoDeSeguimiento(p: Pick<Seguimiento, "estado" | "motivo" | "e
   }
   if (p.estado !== "CANCELADO") return { ...ESTADOS[p.estado], alerta: false };
   if (pago.estado === "POR_CONFIRMAR") {
-    return { titulo: "Confirmando tu pago", apoyo: "Estamos revisando con Mercado Pago si tu pago pasó. Si se cobró, te lo devolvemos completo.", alerta: false };
+    return { titulo: "Confirmando tu pago", apoyo: "Esto puede tardar unos minutos.", alerta: false };
   }
   if (pago.estado === "SIN_PAGO" || pago.estado === "ESPERANDO_PAGO" || pago.estado === "RECHAZADO") {
     return { titulo: "No se completó el pago", apoyo: "Tu pedido no se envió al restaurante y no se te cobró nada.", alerta: false };
