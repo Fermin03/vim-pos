@@ -1,123 +1,87 @@
-# Pago en línea de la tienda — diseño vigente (Checkout API, formulario propio)
+# Pago en línea de la tienda — diseño vigente (Orders API, formulario propio, conexión propia)
 
-Actualizado el 11 de octubre de 2026. Sustituye al diseño con Checkout Pro (redirección), que se
-retiró por completo: ya no hay preferencias, `init_point`, `back_urls`, ni un pedido «falta pagar»
-a la vista del cliente. La carpeta conserva el nombre por los enlaces; el estudio de la API vigente
-es [`03-resumen-checkout-api.md`](03-resumen-checkout-api.md) y lo verificado antes (firma del
-aviso, reembolsos, tarjetas de prueba) sigue en [`01-resumen-api.md`](01-resumen-api.md).
+Actualizado el 11 de octubre de 2026. Sustituye al diseño con Payments API y conexión compartida con
+la terminal, que a su vez sustituyó a Checkout Pro. Lo probado contra Mercado Pago está en
+[`04-verificado-orders.md`](04-verificado-orders.md) y **manda sobre este documento**. Firma del
+aviso, OAuth y tarjetas de prueba: [`01-resumen-api.md`](01-resumen-api.md) y
+[`03-resumen-checkout-api.md`](03-resumen-checkout-api.md). La carpeta conserva el nombre por los enlaces.
 
 ## Qué es
 
 El cliente paga con tarjeta de crédito o débito **dentro de la tienda**, en «Tus datos». El dinero
-cae en la cuenta de Mercado Pago del restaurante (su token de OAuth); VIM no cobra comisión.
+cae en la cuenta de Mercado Pago del restaurante; VIM no cobra comisión.
 
-- **Formulario propio con Secure Fields** de MercadoPago.js: número, vencimiento y código son
-  iframes de Mercado Pago dentro de cajas nuestras; el nombre del titular es un campo nuestro.
-  Etiquetas, errores, foco y acomodo son de la tienda (`apps/tienda/app/components/tarjeta.tsx`,
-  lo puro en `lib/tarjeta.ts`). La librería se carga solo al elegir «Pagar en línea».
-- **Payments API** (`POST /v1/payments`) con el access token del restaurante: `binary_mode: true`,
-  `installments: 1`, `capture: true`, sin 3DS, sin `application_fee`, sin `statement_descriptor`,
-  `external_reference` = id de `tienda_pagos`, `notification_url` = `tienda-webhook-mp?ref=<id>`,
-  `payer.email` (el correo es obligatorio al pagar en línea), `X-Idempotency-Key: tienda-pago-<id>`
-  y, si la librería lo dio, `X-meli-session-id` (Device ID).
-- **Los datos de la tarjeta nunca tocan nuestro servidor ni nuestros logs**: solo viaja el token
-  (un solo uso), la marca (`payment_method_id`) y el banco (`issuer_id`).
-- **Public key del vendedor**: se guarda en `terminal_conexiones.public_key` al conectar la cuenta
-  (respuesta de `/oauth/token`). `tienda_negocio` la entrega por sucursal. Una cuenta sin public key
-  guardada no cobra en línea: el admin pide volver a conectarla.
+- **Aplicación propia: «VIM POS Tienda»** (Pagos online → Checkout API → API de Orders). No es la
+  de la terminal Point: Mercado Pago admite un solo producto por aplicación.
+- **Conexión propia por restaurante**: tabla `tienda_conexiones` (0172), tokens en Vault
+  (`tienda:<conexion>:access` / `:refresh`), su public key y si es de prueba. Nada de la tienda lee
+  ni escribe `terminal_conexiones`, ni al revés. Se conecta y se desconecta desde **Tienda en línea**
+  en el admin; el OAuth entra por `terminal-mp-conexion` con `destino: "tienda"` (lista cerrada) y
+  vuelve a la misma URL registrada (`/integraciones/mercado-pago/callback`), que distingue por el
+  `state` (el de la tienda empieza por `tienda.`).
+- **Formulario propio con Secure Fields** de MercadoPago.js. De la tarjeta solo sale el token (un
+  solo uso), la marca (`payment_method_id`) y el tipo (`credit_card` | `debit_card`).
 
-## Flujo
+## Cobrar (`POST /v1/orders`)
 
-1. «Pagar $X»: el navegador tokeniza con la public key del restaurante y manda `pedir` con
-   `pago: "EN_LINEA"`, `propina_pct` y `tarjeta: { token, payment_method_id, issuer_id?, dispositivo? }`.
-2. La función `tienda` valida como siempre, crea el pedido `POR_PAGAR` (invisible para la caja y el
-   POS: política de lectura de `delivery_pedidos`) con su renglón en `tienda_pagos`, y **cobra en la
-   misma petición** (`cobrarPago`, `_shared/tienda/pago-flujo.ts`):
-   - **aprobado y verificado** (referencia, cuenta vendedora, moneda, modo; el monto lo comprueba la
-     base) → pedido `RECIBIDO` con su ventana de aceptación, correo de confirmación, respuesta con
-     el código y `pago: { estado: "PAGADO" }`;
-   - **rechazado** (un pago `rejected`, o un 4xx de validación: Mercado Pago no creó pago) → el
-     pedido se **borra** (no queda vivo ni cuenta contra el tope) y se contesta
-     `409 { error: "PAGO_RECHAZADO", detalle: <familia> }`;
-   - **no se supo** (sin respuesta, 5xx, 409, 429, o un estado que no es final) → **nunca** se dice
-     «rechazado»: el pedido sigue `POR_PAGAR`, se contesta 200 con `pago: { estado: "POR_CONFIRMAR" }`
-     y la tienda va al seguimiento («Confirmando tu pago»).
-3. **Un renglón de `tienda_pagos` se cobra una sola vez** (`tienda_pago_tomar_cobro`). El reintento
-   del mismo intento de compra (misma `clave`) no vuelve a cobrar: le pregunta a Mercado Pago qué
-   pasó con el primero. Tras un rechazo el pedido ya no existe, así que la misma clave crea un
-   intento nuevo, con token nuevo.
-4. **Conciliación** de lo que quedó sin saberse (igual que antes, con otros plazos): el aviso
-   `payment`, `confirmar_pago` desde la página del pedido, y el barrido de cada minuto (desde los
-   20 s de mandado el cobro, cada 45 s). Aprobado → `RECIBIDO`. Rechazado → el pedido se cierra como
-   «sin pago». A los **5 minutos** sin confirmarse, el pedido vence; si el cobro aparece aprobado
-   después, se devuelve solo. Si no se puede preguntar tres veces, correo interno «posible cobro sin
-   pedido».
-5. Devoluciones automáticas, cancelación tras entregado, la lectura del admin y todo lo de la caja
-   (cuenta que nace cobrada, «Listo», corte) no cambian.
+`pedir` con `pago: "EN_LINEA"`, `propina_pct` y `tarjeta: { token, payment_method_id, type }` crea el
+pedido `POR_PAGAR` (invisible para la caja) y cobra en la misma petición, con
+`X-Idempotency-Key: tienda-pago-<id de tienda_pagos>` y `external_reference` = ese id.
 
-## Contrato de `pedir` (pago en línea)
-
-Petición: lo de siempre más `pago: "EN_LINEA"`, `propina_pct` (0, 10, 15, 20), `cliente.email`
-obligatorio y
-
-```json
-"tarjeta": { "token": "<16–64 letras o números>", "payment_method_id": "master", "issuer_id": "158", "dispositivo": "<Device ID, opcional>" }
-```
-
-Respuestas:
-
-| Caso | HTTP | Cuerpo |
+| Mercado Pago contesta | Qué se hace | `pedir` contesta |
 |---|---|---|
-| Cobro aprobado | 200 | `{ codigo, folio_corto, total_mxn, vence_aceptacion, propina_mxn, total_a_pagar_mxn, pago: { estado: "PAGADO" } }` |
-| No se supo | 200 | lo mismo con `vence_aceptacion: null` y `pago: { estado: "POR_CONFIRMAR" }` |
-| Rechazado | 409 | `{ error: "PAGO_RECHAZADO", detalle }` con `detalle` ∈ `FONDOS`, `CODIGO`, `FECHA`, `NUMERO`, `LLAMAR_BANCO`, `TARJETA_DESHABILITADA`, `VERIFICACION`, `OTRO` |
-| La cuenta ya no cobra | 409 | `{ error: "PAGO_NO_DISPONIBLE" }` (pedido descartado; token rechazado → conexión en ERROR) |
-| Cuerpo mal | 400 | `PAGO_INVALIDO` (falta `tarjeta` o no tiene la forma, o viene sin ser en línea), `CLIENTE_INVALIDO` (sin correo) |
+| 201 `processed` / `accredited`, con nuestra referencia y el monto esperado | pedido `RECIBIDO`, correo | 200 `pago: { estado: "PAGADO" }` |
+| **402** con `errors[].code === "failed"` (no hay orden) | el pedido se borra | 409 `PAGO_RECHAZADO` + `detalle` |
+| 201 `processing` (en revisión; **no se puede cancelar**) | se anota la orden; conciliación | 200 `pago: { estado: "POR_CONFIRMAR" }` |
+| 401 | el pedido se borra; pausa de la sucursal 1 h y aviso a VIM | 409 `PAGO_NO_DISPONIBLE` |
+| 400 / 422 (validación: no se creó nada) | el pedido se borra | 409 `PAGO_RECHAZADO`, `detalle: "OTRO"` |
+| sin respuesta, 5xx, 409, 429, otro | nada: conciliación | 200 `pago: { estado: "POR_CONFIRMAR" }` |
 
-Seguimiento de un pedido en línea: `pago_estado` ∈ `PAGADO`, `POR_CONFIRMAR`,
-`DEVOLUCION_EN_PROCESO`, `DEVUELTO`, `SIN_PAGO`; más `propina_mxn` y `total_a_pagar_mxn`. Se
-retiraron `ESPERANDO_PAGO`, `RECHAZADO`, `vence_pago` e `init_point`.
+`detalle` ∈ `FONDOS` (`insufficient_amount`), `DATOS` (`bad_filled_card_data`: código y fecha no se
+distinguen), `LLAMAR_BANCO`, `TARJETA_DESHABILITADA`, `OTRO`.
 
-## Content-Security-Policy de la tienda
+**Cuenta vendedora.** No está probado que la orden traiga un campo que la identifique. La garantía
+es que la orden se creó o se consultó con el token de ESA conexión, trae nuestra referencia y el
+monto es el esperado (lo comprueba la base). Si la orden trae `live_mode`, tiene que casar con la
+conexión. Una conexión de prueba (`live_mode: false` al conectarla) nunca cobra.
 
-`apps/tienda/next.config.mjs`. Mercado Pago no publica la lista; es lo observado en el navegador al
-montar los campos y crear un token con una public key de prueba (11 oct 2026):
+## Conciliar, devolver, avisos
 
-| Directiva | Orígenes |
-|---|---|
-| `script-src` | `https://sdk.mercadopago.com` |
-| `frame-src` | `https://api.mercadopago.com`, `https://api-static.mercadopago.com`, `https://secure-fields.mercadopago.com` |
-| `connect-src` | los tres anteriores y `https://www.mercadolibre.com` (huella del dispositivo) |
-| `img-src` | `https://www.mercadolibre.com` |
+- **Consultar**: `GET /v1/orders/{id}` cuando se sabe la orden (quedó anotada, o la dice un aviso).
+  Solo si al crearla no hubo respuesta se busca por referencia (`begin_date`/`end_date`).
+- **Devolver**: `POST /v1/orders/{id}/refund` sin cuerpo. Llave de idempotencia **nueva en cada
+  intento**; antes de cada intento se mira la orden y, si ya está `refunded`, se marca devuelto sin
+  pedir otra. Primer intento no antes de 1 minuto del cobro; esperas de 1, 5 y 30 minutos, 3 y 12
+  horas; al sexto fallo, `DEVOLUCION_FALLIDA` y correo a VIM.
+- **Avisos**: llegan a la URL configurada en la aplicación (`tienda-webhook-mp`), con **firma
+  obligatoria** (`MP_TIENDA_WEBHOOK_SECRET`, `MP_TIENDA_WEBHOOK_SECRET_PRUEBA`). Siguen siendo solo
+  una pista: la verdad sale de consultar la orden con el token de la conexión.
+- El barrido de cada minuto, el plazo de 5 minutos y la página del pedido (`confirmar_pago`) no cambian.
+  Si el barrido no puede correr (faltan `vim_interno` / `vim_functions_url` en Vault) deja un renglón
+  por hora en `tienda_eventos` (`accion = 'barrido:sin_configurar'`).
+- Una orden viva con nuestra referencia que no se puede aplicar no cuenta como conciliada; al tercer
+  intento sale el correo «posible cobro sin pedido», con el id de la orden y el motivo.
 
-Se dejan bloqueados a propósito `https://api.mercadolibre.com/tracks` (telemetría) y
-`https://www.mercadolivre.com` (imagen de huella): con ellos bloqueados los campos montan y el token
-se crea.
+## Contra la prueba masiva de tarjetas
 
-## Sin confirmar (solo se resuelve con un pago de prueba real)
+Contadores en `limites_cupo` (cuentan aunque el pedido rechazado se borre):
 
-1. Que `POST /v1/payments` acepte el token OAuth de un vendedor con un token de tarjeta creado con
-   la public key de esa cuenta, sin habilitar nada más en la aplicación.
-2. Que la `public_key` de `/oauth/token` sea la del vendedor (y si viene también al renovar).
-3. Qué contesta Mercado Pago al repetir la misma `X-Idempotency-Key` (no se depende de ello: cada
-   renglón se cobra una vez).
-4. Con `binary_mode: true`, que el titular de prueba `CONT` termine rechazado y no pendiente.
-5. Los `status_detail` reales de cada rechazo de prueba (`FUND`, `SECU`, `EXPI`, `CALL`, `LOCK`).
-6. Que el aviso `payment` llegue a la `notification_url` del cobro (los pagos de prueba no avisan).
-7. El Device ID: en local `window.MP_DEVICE_SESSION_ID` no apareció; el cobro va sin esa cabecera.
-8. Cuántos pagos rechaza el banco por pedir 3DS (`VERIFICACION`).
-9. El banco emisor cuando la librería devuelve varios (`issuer_id` va vacío en ese caso).
+- 3 rechazos de una IP en una hora → del siguiente en adelante su `detalle` es `OTRO`;
+- 5 → esa IP recibe 429 `DEMASIADOS_INTENTOS` al intentar otro pago en línea esa hora;
+- 12 rechazos en un negocio en una hora → su pago en línea se pausa una hora
+  (`tienda_config.pago_pausado_hasta`) y se avisa a VIM. Los pedidos al recibir siguen.
+- Los pedidos en línea gastan bolsas de cupo propias (`tienda:paga:*`), no las de `pedir` al recibir.
 
-## Cómo probar el cobro real (lo corre quien tiene el access token de prueba)
+## En la caja
 
-1. Aplicar 0171 y 0172 en un entorno de prueba y desplegar `tienda`, `tienda-webhook-mp` y
-   `terminal-mp-conexion`.
-2. Conectar la cuenta de prueba desde el admin (Tienda en línea → Conectar Mercado Pago): guarda
-   tokens y `public_key`. Encender «Pago en línea» en Pedidos.
-3. En la tienda: carrito → Tus datos → Pagar en línea, correo `test@testuser.com`, tarjeta
-   `5474 9254 3267 0366`, `11/30`, `123`, titular `APRO` → debe quedar «En proceso» y el pedido
-   aparecer en la caja como «PAGADO EN LÍNEA, no cobrar».
-4. Repetir con titular `FUND`, `SECU`, `EXPI`, `CALL`, `LOCK`, `OTHE` y `CONT`: cada uno debe
-   dejar su mensaje junto a la tarjeta, sin pedido en la caja y sin renglón vivo en `tienda_pagos`.
-5. Revisar en Admin → «Últimos pagos en línea» y en la cuenta de prueba de Mercado Pago que hay un
-   cobro por intento aprobado y ninguno duplicado.
+- Si la nube cancela un pedido pagado que la caja ya aceptó (15 minutos sin internet), el pago se
+  devuelve y la caja avisa en rojo que el pago ya se devolvió y que hay que cancelar esa cuenta (y
+  cobrarla de otra forma si ya se entregó). Cancelarla no devuelve otra vez.
+- Cancelar una cuenta pagada en línea devuelve el pago solo dentro de las 48 horas en que la caja lo
+  reporta. Después, el POS no la cancela: manda a devolver desde Mercado Pago.
+
+## Sin confirmar (solo se resuelve con una prueba real)
+
+Ver «Sin probar» en el documento 04. Además: el formato de `begin_date`/`end_date`; que
+`/oauth/token` de la aplicación nueva entregue `public_key`; qué `live_mode` da un vendedor de prueba
+conectado por OAuth; y que nada renueva todavía los tokens de la tienda (vencen a los 180 días).

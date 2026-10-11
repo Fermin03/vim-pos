@@ -8,7 +8,7 @@ import { leerHorario, type Horario } from "@vim/fecha";
 import type { ItemDeCuerpo } from "./carrito";
 
 export type Modo = "RECOGER" | "DOMICILIO";
-/** EFECTIVO y TARJETA se pagan al recibir; EN_LINEA, antes, en la página de Mercado Pago. */
+/** EFECTIVO y TARJETA se pagan al recibir; EN_LINEA, al pedir, con tarjeta, dentro de la tienda. */
 export type Pago = "EFECTIVO" | "TARJETA" | "EN_LINEA";
 
 export type Zona = { id: string; nombre: string; /** Sin el IVA que el ticket pueda sumarle: el envío exacto lo da `cotizar`. */ costo_mxn: string };

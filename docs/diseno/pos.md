@@ -345,6 +345,15 @@ otro texto para lo mismo.
 - «Cancelar cuenta» abre directo el diálogo de peligro, y la consecuencia dice **antes de
   confirmar** que el pago se le devuelve completo al cliente y que de la caja no sale efectivo.
 - En Consultar cuentas, una cuenta pagada en línea no ofrece «Cambiar pago» ni «Reabrir».
+- **Cancelar tarde.** Pasadas 48 horas (la ventana en la que la caja reporta la cancelación y el
+  pago se devuelve solo), el mismo diálogo ya no cancela: se titula «Esta cuenta ya no se cancela
+  aquí», dice que el sistema ya no puede devolver ese pago y manda a devolverlo desde la cuenta de
+  Mercado Pago del negocio; el botón queda apagado. Nunca se promete una devolución que no va a pasar.
+- **La nube canceló el pedido** (la caja estuvo sin internet tras aceptarlo): el pago ya se devolvió
+  y aquí queda una cuenta cobrada. El aviso rojo del canal lo dice («…el pago ya se le devolvió al
+  cliente: cancela esta cuenta. Si ya lo entregaste, cóbralo de otra forma»), la cuenta **sigue en
+  la lista** hasta que se cancela, su franja pasa de verde a `danger-soft` con ese mismo mensaje y
+  «Listo» queda apagado.
 
 ## Lo que NO se hereda de otras apps
 

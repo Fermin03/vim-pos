@@ -196,9 +196,12 @@ El cliente paga con tarjeta **dentro de «Tus datos»**; no se le manda a otra p
 - **Errores por campo**, bajo cada caja, con el molde de siempre (`text-14 text-danger`). Mientras
   escribe solo se reclama lo que la librería marca mal en un campo ya tocado; al tocar «Pagar»,
   también lo vacío, y el foco va al primer campo con error.
-- **El banco no aprobó**: el motivo se dice junto a la tarjeta (en su campo, si es del código, la
-  fecha o el número; si no, en un `Aviso` rojo arriba de los campos) y siempre termina en «No se te
-  cobró nada.» Con otra forma de pago disponible, se ofrece. Lo escrito no se borra.
+- **El banco no aprobó**: el motivo se dice en un `Aviso` rojo arriba de los campos y siempre
+  termina en «No se te cobró nada.» Con otra forma de pago disponible, se ofrece. Lo escrito no se
+  borra. Los datos mal escritos llevan **un solo mensaje** («Revisa los datos de tu tarjeta: el
+  número, la fecha de vencimiento y el código de seguridad.»), sin señalar un campo: Mercado Pago no
+  dice si falló el código o la fecha. Tras varios rechazos seguidos el mensaje es siempre el
+  general, y después la tienda pide esperar («Hiciste demasiados intentos seguidos.»).
 - **No se supo si el cobro pasó**: la tienda va a la página del pedido, que dice «Confirmando tu
   pago» / «Esto puede tardar unos minutos.». Nunca «rechazado» ni «no se te cobró» sin saberlo.
 - **Si el formulario no carga**: `Aviso` ámbar («No pudimos cargar el pago con tarjeta…») con
