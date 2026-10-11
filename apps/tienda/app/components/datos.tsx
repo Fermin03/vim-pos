@@ -10,7 +10,7 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react"
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Aviso, Captcha, SITE_KEY_TURNSTILE, botonClases, cn } from "@vim/ui/styles";
-import { cotizar, guardarDireccion, pedir } from "../lib/api";
+import { cotizar, guardarDireccion, intento, pedir } from "../lib/api";
 import { aCuerpo, type Carrito } from "../lib/carrito";
 import {
   CAMPOS, DE_DIRECCION, FORMULARIO_VACIO, LIMITES, datosDelPedido, erroresDe, guardarCliente, leerCliente, olvidarCliente,
@@ -19,7 +19,7 @@ import {
 import type { Cotizacion, DireccionGuardada, ErrorDeTienda, MiCuenta, Negocio, Pago, Sucursal } from "../lib/contrato";
 import { LIMITES_DE_CUENTA, direccionEnUnaLinea, enlaceDeAcceso, formularioDeDireccion, paraTusDatos } from "../lib/cuenta";
 import { formatoMxn } from "../lib/dinero";
-import { enviarPedido, envioDeLaPagina, intentoDeLaPagina, type Desenlace, type ResultadoDeEnvio } from "../lib/envio";
+import { enviarPedido, envioDeLaPagina, intentoDeLaPagina, pruebaQueNoHuboCobro, resolverDuda, type Desenlace, type ResultadoDeEnvio } from "../lib/envio";
 import { PROPINAS, formasDePago, propinaDe, totalAPagar, type Propina } from "../lib/pago";
 import type { CampoDeTarjeta } from "../lib/tarjeta";
 import { enlaceTel, formatoTelefono } from "../lib/telefono";
@@ -114,6 +114,11 @@ export function PasoDeDatos({
   const [etiqueta, setEtiqueta] = useState("Casa");
   /** El pedido entró: la pantalla se queda en «Enviando…» hasta que llega la página del pedido. */
   const [hecho, setHecho] = useState(false);
+  /**
+   * Se mandó un pago en línea y no se sabe qué pasó con él. Mientras sea así NO se manda otro (sería
+   * otro pedido y otro cobro): se le pregunta al servidor por ese intento. `sin-respuesta`: no contestó.
+   */
+  const [duda, setDuda] = useState<"comprobando" | "sin-respuesta" | null>(null);
   useEffect(() => { borrador = hecho ? null : { f, direccion }; }, [f, direccion, hecho]);
   const enviando = useEnviando();
   const guardadas = cuenta?.direcciones ?? [];
@@ -210,10 +215,14 @@ export function PasoDeDatos({
       // La tarjeta se convierte en un token AQUÍ, en cada intento: es de un solo uso. Si un dato no
       // cuadra no se llama a nadie: no se creó ningún pedido.
       const t = pago === "EN_LINEA" ? await (manejo?.tokenizar() ?? Promise.resolve({ ok: false as const, campo: null, texto: textoDeError("PAGO_NO_DISPONIBLE").texto })) : null;
-      if (t && !t.ok) return { desenlace: { tipo: "tarjeta" as const, campo: t.campo, texto: t.texto }, pidio: false };
+      if (t && !t.ok) return { desenlace: { tipo: "tarjeta" as const, campo: t.campo, texto: t.texto }, pidio: false, error: null };
       const r = await enviarPedido({
         cotizar: () => cotizar(negocio.slug, cuerpo),
-        pedir: (totalEsperado) => pedir(negocio.slug, { ...elPedido, ...(t && { tarjeta: t.tarjeta }), clave, captcha: tokenAhora.current, total_esperado: totalEsperado }),
+        pedir: (totalEsperado) => {
+          // Va a salir un cobro: desde AHORA (y aunque se recargue la página) la clave no cambia hasta saber qué pasó.
+          if (pago === "EN_LINEA") intentoDeLaPagina.dudar();
+          return pedir(negocio.slug, { ...elPedido, ...(t && { tarjeta: t.tarjeta }), clave, captcha: tokenAhora.current, total_esperado: totalEsperado });
+        },
         totalVisto: total,
       }, { telefono: sucursal.telefono, horario: sucursal.horario, otrasFormas: formas.length > 1 });
       if (r.desenlace.tipo === "hecho") {
@@ -225,6 +234,9 @@ export function PasoDeDatos({
         borrador = null;
         alPedidoHecho();
         router.replace(`/${negocio.slug}/pedido/${r.desenlace.codigo}`);
+      } else if (r.error && pruebaQueNoHuboCobro(r.error)) {
+        // El servidor dijo que ese cobro no pasó y que el pedido se descartó: ya no hay nada en duda.
+        intentoDeLaPagina.aclarar();
       }
       return r;
     });
@@ -236,6 +248,9 @@ export function PasoDeDatos({
     // El token del antirobot sirve una vez: si se usó, se pide otro para el siguiente intento.
     if (pidio) { setToken(""); setReinicio((n) => n + 1); }
     if (desenlace.tipo === "hecho") setHecho(true);
+    // Salió un cobro y no se sabe qué pasó (sin respuesta, o un error que no lo aclara): no se ofrece
+    // «reintentar». Se pregunta por ese intento, y hasta saberlo el formulario queda bloqueado.
+    else if (intentoDeLaPagina.enDuda()) void comprobar.current();
     else if (desenlace.tipo === "tarjeta") {
       // No se creó ningún pedido ni se cobró nada: se dice junto a la tarjeta y el foco va ahí.
       setRechazoDeTarjeta({ campo: desenlace.campo, texto: desenlace.texto });
@@ -255,7 +270,25 @@ export function PasoDeDatos({
   };
   useEffect(() => envioDeLaPagina.recibir((r) => alResultado.current(r)), []);
 
-  const ocupado = robot || enviando || hecho;
+  /** Pregunta por el intento en duda. Libera el formulario solo si el servidor dice que no hay pedido ni cobro. */
+  const comprobar = useRef<() => Promise<void>>(async () => {});
+  comprobar.current = async () => {
+    setDuda("comprobando"); setAviso(null);
+    const d = await resolverDuda(intentoDeLaPagina, (clave) => intento(negocio.slug, clave));
+    if (d.tipo === "hecho") {
+      // El pedido sí había entrado: a su página, que dice cómo va el pago.
+      setHecho(true); setDuda(null);
+      borrador = null;
+      alPedidoHecho();
+      router.replace(`/${negocio.slug}/pedido/${d.codigo}`);
+    } else setDuda(d.tipo === "libre" ? null : "sin-respuesta");
+  };
+  // Al abrir (o recargar) la pantalla con un intento de pago en duda: lo primero es preguntar por él.
+  useEffect(() => {
+    if (intentoDeLaPagina.enDuda() && !envioDeLaPagina.ocupado()) void comprobar.current();
+  }, []);
+
+  const ocupado = robot || enviando || hecho || duda !== null;
 
   /** El toque en «Enviar» (o en «Confirmar», con el total nuevo). */
   const intentar = (total: string | null) => {
@@ -290,7 +323,7 @@ export function PasoDeDatos({
   const subtotal = cotizacion?.subtotal_mxn ?? null;
   const montoDe = (pct: Propina): string | null => (subtotal ? propinaDe(subtotal, pct) : null);
   const aPagar = enLinea && total ? totalAPagar(total, montoDe(propina)) : total;
-  const estado = (enviando || hecho) && enLinea ? "Procesando tu pago…"
+  const estado = duda ? "Confirmando tu pago…" : (enviando || hecho) && enLinea ? "Procesando tu pago…"
     : enviando || hecho ? "Enviando tu pedido…" : robot ? "Comprobando que no eres un robot…" : "";
   const botonDeEnviar = (etiqueta: string, importe: string | null) => (
     <button type="submit" disabled={ocupado || formas.length === 0} aria-busy={ocupado}
@@ -483,6 +516,14 @@ export function PasoDeDatos({
           </>
         ) : (
           <>
+            {/* TEXTO PROVISIONAL (James). Un pago en línea del que no se sabe el resultado: no se deja pagar otra vez. */}
+            {duda && (
+              <Aviso tono="warning" role="status" className="!text-14">
+                Estamos confirmando tu pago. No vuelvas a pagar todavía: en un momento te decimos qué pasó.
+                {duda === "sin-respuesta" && " No pudimos comprobarlo; revisa tu conexión."}
+              </Aviso>
+            )}
+            {duda === "sin-respuesta" && <button type="button" onClick={() => void comprobar.current()} className={GHOST}>Volver a comprobar</button>}
             {aviso && <Aviso tono={aviso.tono} role="alert" className="!text-14">{aviso.texto}</Aviso>}
             {aviso?.sigue === "llamar" ? (
               <>

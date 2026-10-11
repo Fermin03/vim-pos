@@ -2,7 +2,7 @@
 //
 //   POST /functions/v1/tienda     x-vim-tienda: <VIM_TIENDA_SECRET>     x-tienda-ip: <IP del cliente>
 //                                 x-tienda-sesion: <token de sesión>    (opcional; solo cuentas y `pedir`)
-//   { accion: "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago"
+//   { accion: "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" | "intento"
 //           | "registrar" | "entrar" | "salir" | "recuperar_pedir" | "recuperar_aplicar" | "cuenta"
 //           | "cuenta_guardar" | "cuenta_password" | "direccion_guardar" | "direccion_borrar"
 //           | "mis_pedidos" | "eliminar_cuenta", negocio: <slug>, … }
@@ -112,7 +112,7 @@ import { anotarRechazo, avisoDePagoPausado, ipSinPagoEnLinea } from "../_shared/
 const MAX_CUERPO = 32_768;
 
 type Admin = ReturnType<typeof clienteAdmin>;
-type PeticionDeCuenta = Exclude<Peticion, { accion: "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" }>;
+type PeticionDeCuenta = Exclude<Peticion, { accion: "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" | "intento" }>;
 
 /**
  * El correo que confirma un pedido: después de responder, y pase lo que pase el pedido ya existe.
@@ -457,6 +457,19 @@ async function atender(req: Request): Promise<Response> {
     const seg = await admin.rpc("tienda_seguimiento", { p_tenant, p_seguimiento_hash: await huellaDe(p.codigo) });
     if (seg.error) return rechazo("tienda_seguimiento", seg.error);
     return seg.data ? json(seg.data) : json({ error: "PEDIDO_NO_ENCONTRADO" }, 404);
+  }
+
+  // ── intento ─────────────────────────────────────────────────────────────────────────────────
+  // ¿Hay ya un pedido para esta clave de intento? No crea ni cobra nada: deriva el código igual que
+  // `pedir` y mira si existe. La tienda lo pregunta cuando mandó un pago en línea y no supo qué pasó;
+  // mientras no lo sepa, no emite otra clave (otra clave sería otro pedido y otro cobro). El código
+  // solo se le da a quien trae la clave, que es quien hizo el intento.
+  if (p.accion === "intento") {
+    const codigo = await codigoDeClave(secreto, p.negocio, p.clave);
+    const r = await admin.from("delivery_pedidos").select("id")
+      .eq("seguimiento_hash", await huellaDe(codigo)).eq("tenant_id", p_tenant).eq("canal", "TIENDA").maybeSingle();
+    if (r.error) return rechazo("intento", r.error);
+    return json(r.data ? { existe: true, codigo } : { existe: false });
   }
 
   // ── confirmar_pago ──────────────────────────────────────────────────────────────────────────

@@ -32,6 +32,11 @@ export type Peticion =
   | { accion: "seguimiento"; negocio: string; codigo: string }
   /** El respaldo del aviso de Mercado Pago: la página del pedido pide que se confirme su pago. */
   | { accion: "confirmar_pago"; negocio: string; codigo: string }
+  /**
+   * ¿Existe ya un pedido para esta clave de intento? No crea ni cobra nada. La tienda lo pregunta
+   * cuando mandó un pago en línea y no supo qué pasó: mientras no lo sepa, no emite otra clave.
+   */
+  | { accion: "intento"; negocio: string; clave: string }
   // ── Cuentas (entrega 6). La sesión NO viene en el cuerpo: llega en la cabecera `x-tienda-sesion`. ──
   | { accion: "registrar"; negocio: string; nombre: string; apellido: string; email: string; telefono: string; password: string; captcha: string | null }
   | { accion: "entrar"; negocio: string; email: string; password: string }
@@ -45,7 +50,7 @@ export type Peticion =
   | { accion: "eliminar_cuenta"; negocio: string; password: string };
 
 const ACCIONES: ReadonlySet<string> = new Set<Peticion["accion"]>([
-  "negocio", "menu", "cotizar", "pedir", "seguimiento", "confirmar_pago", "registrar", "entrar", "salir", "recuperar_pedir", "recuperar_aplicar",
+  "negocio", "menu", "cotizar", "pedir", "seguimiento", "confirmar_pago", "intento", "registrar", "entrar", "salir", "recuperar_pedir", "recuperar_aplicar",
   "cuenta", "cuenta_guardar", "cuenta_password", "direccion_guardar", "direccion_borrar", "mis_pedidos", "eliminar_cuenta",
 ]);
 
@@ -144,7 +149,7 @@ export function leerFecha(x: unknown, hoy: Date = new Date()): string | null | u
  * si la cuenta existe. Una contraseña que se va a COMPROBAR (entrar, la actual, eliminar) solo se
  * acota a 1 carácter–72 bytes: si es corta, que la rechace la base como cualquier otra equivocada.
  */
-function leerCuenta(accion: Exclude<Peticion["accion"], "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago">,
+function leerCuenta(accion: Exclude<Peticion["accion"], "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" | "intento">,
                     negocio: string, x: Record<string, unknown>): Resultado<Peticion> {
   const invalida = mal("CUENTA_INVALIDA_DATOS");
   switch (accion) {
@@ -202,10 +207,13 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
   const negocio = typeof x.negocio === "string" ? x.negocio.trim().toLowerCase() : "";
   if (!SLUG.test(negocio)) return mal("NEGOCIO_INVALIDO");
 
-  if (accion !== "negocio" && accion !== "menu" && accion !== "cotizar" && accion !== "pedir" && accion !== "seguimiento" && accion !== "confirmar_pago") {
+  if (accion !== "negocio" && accion !== "menu" && accion !== "cotizar" && accion !== "pedir" && accion !== "seguimiento" && accion !== "confirmar_pago" && accion !== "intento") {
     return leerCuenta(accion, negocio, x);
   }
   if (accion === "negocio") return { ok: true, valor: { accion, negocio } };
+  if (accion === "intento") {
+    return esCodigo(x.clave) ? { ok: true, valor: { accion, negocio, clave: x.clave } } : mal("CUERPO_INVALIDO");
+  }
   if (accion === "seguimiento" || accion === "confirmar_pago") {
     return esCodigo(x.codigo) ? { ok: true, valor: { accion, negocio, codigo: x.codigo } } : mal("CODIGO_INVALIDO");
   }

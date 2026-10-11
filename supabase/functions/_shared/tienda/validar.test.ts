@@ -457,3 +457,14 @@ test("pedir en línea: el correo es obligatorio; al recibir sigue siendo opciona
   assert.ok(efectivo.ok && efectivo.valor.accion === "pedir" && efectivo.valor.tarjeta === null);
   assert.deepEqual(leerCuerpo({ ...pedir, tarjeta: TARJETA }), { ok: false, error: "PAGO_INVALIDO" });
 });
+
+test("cuerpo: `intento` lleva solo la clave del intento, con su forma; no crea nada y tiene su propia bolsa de cupo", async () => {
+  const clave = "AAAAAAAAAAAAAAAAAAAAAA";
+  assert.deepEqual(leerCuerpo({ accion: "intento", negocio: "knockout", clave, tarjeta: { token: "x" }, pago: "EN_LINEA" }),
+    { ok: true, valor: { accion: "intento", negocio: "knockout", clave } });
+  for (const mal of [undefined, null, "", "corta", "x".repeat(23), 123, "con espacio aaaaaaaaaaaa"]) {
+    assert.deepEqual(leerCuerpo({ accion: "intento", negocio: "knockout", clave: mal }), { ok: false, error: "CUERPO_INVALIDO" }, String(mal));
+  }
+  const { cuposDe } = await import("./respuesta.ts");
+  assert.deepEqual(cuposDe("intento", "1.2.3.4", "knockout"), { antes: [{ clave: "tienda:intento:ip:1.2.3.4", ventanaSeg: 600, max: 30 }], despuesDelCaptcha: [], alFallar: "cerrar" });
+});

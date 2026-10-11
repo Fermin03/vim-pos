@@ -2,7 +2,7 @@
 // Nunca lanza: cada llamada devuelve `ok` con los datos ya validados, o `error` con un código (para
 // `textoDeError`) y su detalle. Un 200 que no tiene la forma del contrato es un error, no datos.
 import {
-  cotizacionDe, cuentaDe, direccionesDe, errorDe, miCuentaDe, okDe, pedidoDe, pedidosDe, registroDe, seguimientoDe,
+  cotizacionDe, cuentaDe, direccionesDe, errorDe, FORMA_CODIGO, miCuentaDe, okDe, pedidoDe, pedidosDe, registroDe, seguimientoDe,
   type Cotizacion, type Cuenta, type DireccionGuardada, type MiCuenta, type Pago, type PedidoCreado, type PedidoDeCuenta, type Registro, type Seguimiento,
 } from "./contrato";
 import type { CuerpoCarrito } from "./carrito";
@@ -90,6 +90,21 @@ export function seguimiento(negocio: string, codigo: string, signal?: AbortSigna
  */
 export function confirmarPago(negocio: string, codigo: string, signal?: AbortSignal): Promise<Resultado<Seguimiento>> {
   return llamar({ accion: "confirmar_pago", negocio, codigo }, seguimientoDe, LECTURA, signal);
+}
+
+/** Lo que el servidor sabe de una clave de intento: si ya hay pedido para ella y, si lo hay, su código de seguimiento. */
+export type EstadoDeIntento = { existe: false } | { existe: true; codigo: string };
+function intentoDe(x: unknown): EstadoDeIntento | null {
+  const o = typeof x === "object" && x !== null ? (x as Record<string, unknown>) : {};
+  if (o.existe === false) return { existe: false };
+  return o.existe === true && typeof o.codigo === "string" && FORMA_CODIGO.test(o.codigo) ? { existe: true, codigo: o.codigo } : null;
+}
+/**
+ * ¿Ya hay un pedido para esta clave de intento? No crea ni cobra nada. Se pregunta tras un pago en
+ * línea del que no se supo el resultado, antes de dejar que el cliente intente otro.
+ */
+export function intento(negocio: string, clave: string, signal?: AbortSignal): Promise<Resultado<EstadoDeIntento>> {
+  return llamar({ accion: "intento", negocio, clave }, intentoDe, LECTURA, signal);
 }
 
 /**

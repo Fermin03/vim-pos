@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Resultado } from "../api";
 import { FORMA_CODIGO, cotizacionDe, pedidoDe, type Cotizacion, type PedidoCreado } from "../contrato";
-import { candadoDeEnvio, claveNueva, desenlaceDelError, enviarPedido, intentoDeCompra, type ContextoDeEnvio } from "../envio";
+import { candadoDeEnvio, claveNueva, desenlaceDelError, enviarPedido, intentoDeCompra, pruebaQueNoHuboCobro, resolverDuda, type ContextoDeEnvio } from "../envio";
 import { CODIGOS_DE_ERROR } from "../textos";
 import { CODIGO, ID, cotizacionCruda, pedidoCrudo } from "./datos";
 
@@ -74,7 +74,7 @@ describe("desenlaceDelError", () => {
 describe("enviarPedido", () => {
   it("cotiza, y con el total que el cliente vio pide con ese total", async () => {
     const cotizar = vi.fn(async () => cotizada), pedir = vi.fn(async (_total: string) => creado);
-    expect(await enviarPedido({ cotizar, pedir, totalVisto: "305.00" }, c)).toEqual({ desenlace: { tipo: "hecho", codigo: CODIGO }, pidio: true });
+    expect(await enviarPedido({ cotizar, pedir, totalVisto: "305.00" }, c)).toEqual({ desenlace: { tipo: "hecho", codigo: CODIGO }, pidio: true, error: null });
     expect(cotizar).toHaveBeenCalledTimes(1);
     expect(pedir).toHaveBeenCalledTimes(1);
     expect(pedir).toHaveBeenCalledWith("305.00");
@@ -87,7 +87,7 @@ describe("enviarPedido", () => {
   it("si la cotización fresca trae otro total, NO pide: enseña el nuevo para confirmar", async () => {
     const pedir = vi.fn(async () => creado);
     for (const totalVisto of ["300.00", null]) {
-      expect(await enviarPedido({ cotizar: async () => cotizada, pedir, totalVisto }, c)).toEqual({ desenlace: { tipo: "total", total: "305.00" }, pidio: false });
+      expect(await enviarPedido({ cotizar: async () => cotizada, pedir, totalVisto }, c)).toEqual({ desenlace: { tipo: "total", total: "305.00" }, pidio: false, error: null });
     }
     expect(pedir).not.toHaveBeenCalled();
   });
@@ -105,7 +105,7 @@ describe("enviarPedido", () => {
     expect(r).toMatchObject({ pidio: true, desenlace: { tipo: "aviso", sigue: "reintentar-seguro" } });
     expect(pedir).toHaveBeenCalledTimes(1);
     const cambio = await enviarPedido({ cotizar: async () => cotizada, pedir: async () => fallo("TOTAL_CAMBIO", "310.00"), totalVisto: "305.00" }, c);
-    expect(cambio).toEqual({ desenlace: { tipo: "total", total: "310.00" }, pidio: true });
+    expect(cambio).toEqual({ desenlace: { tipo: "total", total: "310.00" }, pidio: true, error: "TOTAL_CAMBIO" });
     // La sesión se acabó: el antirobot se gastó (hay que pedir otro token) y no se reenvía solo como invitado.
     const sinSesion = vi.fn(async () => fallo("SESION_INVALIDA"));
     expect(await enviarPedido({ cotizar: async () => cotizada, pedir: sinSesion, totalVisto: "305.00" }, c)).toMatchObject({ pidio: true, desenlace: { tipo: "aviso", sigue: "sesion" } });
@@ -274,5 +274,94 @@ describe("candadoDeEnvio: un solo envío en vuelo, viva o no la pantalla que lo 
     a.soltar("listo");
     await unTick();
     expect(orden).toEqual(["candado:true", "resultado:true", "candado:false"]);
+  });
+});
+
+// Tercera revisión, punto 4: si un pago en línea se manda y no se sabe qué pasó, cambiar la propina,
+// la nota o el teléfono (o esperar 15 minutos) hacía nacer otra clave: otro pedido y OTRO COBRO.
+describe("un pago en línea del que no se supo el resultado: no hay clave nueva hasta saber qué pasó", () => {
+  const pedido = { negocio: "knockout", pago: "EN_LINEA", propina_pct: 10, nota: null, cliente: { nombre: "Ana", telefono: "4771234567" } };
+  const contadas = () => { let n = 0; return () => `clave-${++n}`; };
+  const telefono = () => { const m = new Map<string, string>(); return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) }; };
+
+  it("en duda, la clave es la MISMA aunque cambie la propina, la nota o el teléfono, y aunque pasen 15 minutos", () => {
+    let t = 1_000_000;
+    const intento = intentoDeCompra(contadas(), () => null, () => t);
+    expect(intento.para(pedido)).toBe("clave-1");
+    intento.dudar();
+    expect(intento.enDuda()).toBe("clave-1");
+    expect(intento.para({ ...pedido, propina_pct: 20 })).toBe("clave-1");
+    expect(intento.para({ ...pedido, nota: "sin cebolla" })).toBe("clave-1");
+    expect(intento.para({ ...pedido, cliente: { nombre: "Ana", telefono: "4770000000" } })).toBe("clave-1");
+    t += 16 * 60_000;
+    expect(intento.para(pedido)).toBe("clave-1");
+    t += 24 * 3_600_000;
+    expect(intento.para({ ...pedido, propina_pct: 0 })).toBe("clave-1");
+  });
+  it("sin duda (pago al recibir, o todavía no se mandó nada) sigue como siempre: otro pedido, otra clave", () => {
+    const intento = intentoDeCompra(contadas(), () => null);
+    expect(intento.para(pedido)).toBe("clave-1");
+    expect(intento.enDuda()).toBeNull();
+    expect(intento.para({ ...pedido, propina_pct: 20 })).toBe("clave-2");
+  });
+  it("la duda sobrevive a recargar la página", () => {
+    const almacen = telefono();
+    // (Lo guardado solo se lee de vuelta con la forma de una clave de verdad: 22 caracteres.)
+    const antes = intentoDeCompra(() => CODIGO, () => almacen);
+    antes.para(pedido);
+    antes.dudar();
+    // Otra «página»: mismo teléfono, memoria nueva.
+    const despues = intentoDeCompra(() => "otra-clave", () => almacen);
+    expect(despues.enDuda()).toBe(CODIGO);
+    expect(despues.para({ ...pedido, propina_pct: 20 })).toBe(CODIGO);
+    // Y una página que no llegó a mandar el cobro (sin duda) no hereda ninguna.
+    const limpio = telefono();
+    intentoDeCompra(() => CODIGO, () => limpio).para(pedido);
+    expect(intentoDeCompra(() => "otra-clave", () => limpio).enDuda()).toBeNull();
+  });
+  it("solo se libera cuando el SERVIDOR dice que no hay pedido ni cobro para esa clave", async () => {
+    const intento = intentoDeCompra(contadas(), () => null);
+    intento.para(pedido);
+    intento.dudar();
+    const preguntadas: string[] = [];
+    // El servidor no contesta, contesta mal, o la llamada revienta: sigue la duda y la misma clave.
+    expect(await resolverDuda(intento, async (c) => { preguntadas.push(c); return { ok: false }; })).toEqual({ tipo: "duda" });
+    expect(await resolverDuda(intento, async () => { throw new Error("sin red"); })).toEqual({ tipo: "duda" });
+    expect(intento.para({ ...pedido, propina_pct: 20 })).toBe("clave-1");
+    expect(preguntadas).toEqual(["clave-1"]);
+    // «No existe»: ahora sí, el siguiente intento estrena clave.
+    expect(await resolverDuda(intento, async () => ({ ok: true, datos: { existe: false } }))).toEqual({ tipo: "libre" });
+    expect(intento.enDuda()).toBeNull();
+    expect(intento.para({ ...pedido, propina_pct: 20 })).toBe("clave-2");
+  });
+  it("si el pedido SÍ había entrado, no se intenta otro: se va a su página", async () => {
+    const intento = intentoDeCompra(contadas(), () => null);
+    intento.para(pedido);
+    intento.dudar();
+    expect(await resolverDuda(intento, async () => ({ ok: true, datos: { existe: true, codigo: CODIGO } }))).toEqual({ tipo: "hecho", codigo: CODIGO });
+    expect(intento.enDuda()).toBeNull();
+    // Sin duda no se pregunta nada.
+    let llamado = false;
+    expect(await resolverDuda(intento, async () => { llamado = true; return { ok: false }; })).toEqual({ tipo: "libre" });
+    expect(llamado).toBe(false);
+  });
+  it("qué respuestas de `pedir` prueban por sí solas que no hubo cobro, y cuáles no", () => {
+    for (const e of ["PAGO_RECHAZADO", "PAGO_NO_PROCESADO", "PAGO_NO_DISPONIBLE"]) expect(pruebaQueNoHuboCobro(e), e).toBe(true);
+    // Estos pueden salir ANTES de que el servidor mire si un intento anterior con esa clave ya entró.
+    for (const e of ["SIN_CONFIRMAR", "CAPTCHA_INVALIDO", "DEMASIADOS_INTENTOS", "SERVICIO_NO_DISPONIBLE", "ERROR_INTERNO", "PAGO_INVALIDO", "CLIENTE_INVALIDO", "TOTAL_CAMBIO", "ALGO_NUEVO"]) {
+      expect(pruebaQueNoHuboCobro(e), e).toBe(false);
+    }
+  });
+  it("enviarPedido dice con qué código contestó `pedir`; sin respuesta, SIN_CONFIRMAR", async () => {
+    const c: ContextoDeEnvio = { telefono: null, horario: {} as ContextoDeEnvio["horario"] };
+    const cotizar = async () => ({ ok: true as const, datos: cotizacionDe(cotizacionCruda())! });
+    const total = cotizacionDe(cotizacionCruda())!.total_mxn;
+    expect((await enviarPedido({ cotizar, pedir: async () => ({ ok: false, error: "PAGO_NO_PROCESADO", detalle: null }), totalVisto: total }, c)).error).toBe("PAGO_NO_PROCESADO");
+    expect((await enviarPedido({ cotizar, pedir: async () => { throw new Error("red"); }, totalVisto: total }, c)).error).toBe("SIN_CONFIRMAR");
+    expect((await enviarPedido({ cotizar, pedir: async () => ({ ok: false, error: "SIN_CONFIRMAR", detalle: null }), totalVisto: total }, c)).error).toBe("SIN_CONFIRMAR");
+  });
+  it("PAGO_NO_PROCESADO: junto a la tarjeta, sin culpar al banco", () => {
+    const d = desenlaceDelError({ error: "PAGO_NO_PROCESADO", detalle: null }, { telefono: null, horario: {} as ContextoDeEnvio["horario"] });
+    expect(d).toEqual({ tipo: "tarjeta", campo: null, texto: "No pudimos procesar el pago. Vuelve a intentar." });
   });
 });

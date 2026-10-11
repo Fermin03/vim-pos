@@ -82,6 +82,9 @@ export function cuposDe(accion: Peticion["accion"], ip: string, negocio: string,
     // su propia bolsa. Escribe (puede mover el pedido y cuesta una consulta a Mercado Pago, que ya
     // va espaciada por pago en la base): si el control falla, cierra.
     case "confirmar_pago": return porIp("confirma", 600, 90, "cerrar");
+    // La tienda pregunta si una clave de intento ya tiene pedido (tras un pago en línea del que no
+    // supo el resultado). Solo lee, por llave; pocas veces por intento. Su propia bolsa.
+    case "intento": return porIp("intento", 600, 30, "cerrar");
     case "negocio": case "menu": case "cotizar": return porIp("lee", 600, 120, "abrir");
     // Auditoría (B1): el slug llega aquí sin validar (el negocio se busca después), así que el cupo
     // por IP y restaurante solo no basta: cada slug inventado estrenaría un contador. Delante va uno

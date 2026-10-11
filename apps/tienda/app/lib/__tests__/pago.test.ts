@@ -106,7 +106,7 @@ describe("qué hace «Tus datos» con cada respuesta de `pedir`", () => {
 
   it("pagado: el pedido está hecho y se va a su página", async () => {
     const r = await enviarPedido({ cotizar: async () => cotizada, pedir: async () => creado({ estado: "PAGADO" }), totalVisto: cotizada.datos.total_mxn }, c);
-    expect(r).toEqual({ desenlace: { tipo: "hecho", codigo: CODIGO }, pidio: true });
+    expect(r).toEqual({ desenlace: { tipo: "hecho", codigo: CODIGO }, pidio: true, error: null });
   });
   it("no se supo si el cobro pasó: también va a la página del pedido, que dirá «Confirmando tu pago»; NUNCA un error de rechazo", async () => {
     const r = await enviarPedido({ cotizar: async () => cotizada, pedir: async () => creado({ estado: "POR_CONFIRMAR" }), totalVisto: cotizada.datos.total_mxn }, c);
@@ -326,7 +326,7 @@ describe("recargar antes de pagar no crea otro pedido", () => {
     pagina(a).para(pedido(1, "EN_LINEA", 10));
     const guardado = a.getItem(CLAVE_DEL_INTENTO)!;
     expect(guardado).not.toMatch(/Ana|4771112233|cebolla|EN_LINEA|producto/);
-    expect(Object.keys(JSON.parse(guardado)).sort()).toEqual(["clave", "cuando", "de"]);
+    expect(Object.keys(JSON.parse(guardado)).sort()).toEqual(["clave", "cuando", "de", "duda"]);
   });
   it("sin almacén, con uno que lanza o con basura guardada, sigue funcionando en memoria", () => {
     const roto: Almacen = { getItem: () => { throw new Error("bloqueado"); }, setItem: () => { throw new Error("bloqueado"); }, removeItem: () => { throw new Error("bloqueado"); } };
