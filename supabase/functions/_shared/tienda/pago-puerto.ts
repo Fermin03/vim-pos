@@ -19,15 +19,15 @@ export function puertoDePagos(admin: Admin): PuertoPagos {
   return {
     async leerPago(pagoId) {
       const f = exigir(await admin.from("tienda_pagos")
-        .select("id, conexion_id, estado, monto_mxn, conexion:terminal_conexiones(cuenta_id_externo, de_prueba)")
+        .select("id, conexion_id, estado, monto_mxn, cobro_pedido_at, conexion:terminal_conexiones(cuenta_id_externo, de_prueba)")
         .eq("id", pagoId).eq("extra", false).maybeSingle()) as
-        | { id: string; conexion_id: string; estado: EstadoPago; monto_mxn: number | string;
+        | { id: string; conexion_id: string; estado: EstadoPago; monto_mxn: number | string; cobro_pedido_at: string | null;
             conexion: { cuenta_id_externo: string; de_prueba: boolean } | null }
         | null;
       const monto = f ? montoTexto(f.monto_mxn) : null;
       if (!f || !f.conexion || !monto) return null;
       const fila: FilaPago = {
-        id: f.id, conexion_id: f.conexion_id, estado: f.estado, monto,
+        id: f.id, conexion_id: f.conexion_id, estado: f.estado, monto, cobro_mandado: f.cobro_pedido_at !== null,
         cuenta_vendedora: f.conexion.cuenta_id_externo, de_prueba: f.conexion.de_prueba === true,
       };
       return fila;
@@ -35,10 +35,6 @@ export function puertoDePagos(admin: Admin): PuertoPagos {
     async token(conexionId) {
       const filas = await rpc("terminal_leer_tokens", { p_conexion: conexionId }) as { access_token: string | null }[] | null;
       return filas?.[0]?.access_token ?? null;
-    },
-    async conexionEnError(conexionId) {
-      exigir(await admin.from("terminal_conexiones").update({ estado: "ERROR", ultimo_error: "Mercado Pago rechazó el token" })
-        .eq("id", conexionId).eq("estado", "ACTIVA"));
     },
     tomarCobro: async (pagoId) => (await rpc("tienda_pago_tomar_cobro", { p_pago: pagoId })) === true,
     descartar: async (pagoId) => (await rpc("tienda_pago_descartar", { p_pago: pagoId })) === true,

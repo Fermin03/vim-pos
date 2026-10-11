@@ -5,7 +5,7 @@ import type { ClienteMpTienda, RespuestaMp } from "./pago-mp.ts";
 
 const PAGO = "2cd9e6fa-1acf-47dc-8ba4-cba918d73770";
 const FILA: FilaPago = {
-  id: PAGO, conexion_id: "cx-1", estado: "CREADO", monto: "264.00", cuenta_vendedora: "202809963", de_prueba: false,
+  id: PAGO, conexion_id: "cx-1", estado: "CREADO", monto: "264.00", cobro_mandado: false, cuenta_vendedora: "202809963", de_prueba: false,
 };
 const APROBADO = {
   id: 18552260055, status: "approved", status_detail: "accredited", currency_id: "MXN", live_mode: true,
@@ -33,7 +33,6 @@ function doble(o: {
   const db: PuertoPagos = {
     leerPago: async () => (lecturas++ > 0 && o.filaDespues !== undefined ? o.filaDespues : o.fila === undefined ? FILA : o.fila),
     token: async () => (o.token === undefined ? "TOKEN" : o.token),
-    conexionEnError: async (id) => { llamadas.push(`conexionEnError ${id}`); },
     tomarCobro: async () => { llamadas.push("tomarCobro"); return o.toma ?? true; },
     descartar: async () => { llamadas.push("descartar"); return o.descarta ?? true; },
     aplicar: async (_id, d) => {
@@ -108,13 +107,68 @@ test("cobrar: Mercado Pago no aceptó el cobro (4xx de validación: token usado,
   }
 });
 
-test("cobrar: token del restaurante rechazado o ausente → conexión con error, pedido descartado, no disponible", async () => {
-  const d = doble({ mp: { cobrar: { status: 401, cuerpo: null } } });
+test("cobrar: un 401 de Mercado Pago no es un rechazo de la tarjeta ni rompe la conexión (la comparte la terminal): no disponible, pedido descartado", async () => {
+  // Dato real (11 oct 2026): 401 «Unauthorized use of live credentials» con un token válido.
+  const d = doble({ mp: { cobrar: { status: 401, cuerpo: { message: "Unauthorized use of live credentials", cause: [{ code: 7 }] } } } });
   assert.deepEqual(await cobrarPago(d.deps, DATOS), { tipo: "NO_DISPONIBLE" });
-  assert.deepEqual(d.llamadas, ["tomarCobro", `mp.cobrar {…} ${LLAVE}`, "conexionEnError cx-1", "registrar COBRO", "descartar"]);
+  assert.deepEqual(d.llamadas, ["tomarCobro", `mp.cobrar {…} ${LLAVE}`, "registrar COBRO_SIN_PERMISO", "descartar"]);
+});
+
+test("cobrar: sin token no se marca el cobro como mandado (nunca salió): no disponible y descartado, sin esperar conciliación", async () => {
   const sin = doble({ token: null });
   assert.deepEqual(await cobrarPago(sin.deps, DATOS), { tipo: "NO_DISPONIBLE" });
-  assert.deepEqual(sin.llamadas, ["tomarCobro", "conexionEnError cx-1", "registrar SIN_TOKEN", "descartar"]);
+  assert.deepEqual(sin.llamadas, ["registrar SIN_TOKEN", "descartar"]);
+  // Pero si el cobro YA se había mandado (un reintento) y ahora no hay token, el pedido NO se descarta: puede estar cobrado.
+  const mandado = doble({ token: null, toma: false, fila: { ...FILA, cobro_mandado: true } });
+  assert.deepEqual(await cobrarPago(mandado.deps, DATOS), { tipo: "POR_CONFIRMAR" });
+  assert.ok(!mandado.llamadas.includes("descartar"));
+});
+
+test("la tienda nunca cambia el estado de la conexión de Mercado Pago, pase lo que pase", async () => {
+  // El puerto ya no tiene con qué: si alguien lo vuelve a añadir, esta prueba deja de compilar o falla.
+  const d = doble();
+  assert.ok(!("conexionEnError" in d.deps.db));
+  for (const status of [401, 403]) {
+    const c = doble({ mp: { cobrar: { status, cuerpo: null }, buscarPagos: { status, cuerpo: null }, devolver: { status, cuerpo: null }, leerPago: { status, cuerpo: null } } });
+    await cobrarPago(c.deps, DATOS);
+    await confirmarPago(c.deps, PAGO);
+    await devolverPago(c.deps, { id: PAGO, conexion_id: "cx-1", pago_id_externo: "1" });
+    assert.ok(!c.llamadas.some((l) => l.includes("conexionEnError")));
+  }
+});
+
+test("confirmar: un pago APROBADO con nuestra referencia que no se puede aplicar NO es una conciliación buena", async () => {
+  const { collector_id: _c, ...sinCuenta } = APROBADO;
+  const casos: Record<string, unknown>[] = [
+    sinCuenta,                                         // sin cuenta vendedora
+    { ...APROBADO, live_mode: false },                 // otro modo
+    { ...APROBADO, status_detail: "partially_refunded" },   // aprobado sin acreditar
+    { ...APROBADO, currency_id: "USD" },               // otra moneda
+    { ...APROBADO, status: "in_process" },             // todavía pendiente
+    { ...APROBADO, status: "algo_nuevo" },             // un estado que no conocemos
+  ];
+  for (const pago of casos) {
+    const d = doble({ mp: { buscarPagos: { status: 200, cuerpo: { results: [pago] } } } });
+    assert.deepEqual(await confirmarPago(d.deps, PAGO), { ok: false, motivo: "PAGO_SIN_APLICAR" }, JSON.stringify(pago));
+    assert.ok(!d.llamadas.some((l) => l.startsWith("aplicar")));
+  }
+  // Y el barrido no lo da por conciliado: le dice a la base que falló (al tercero avisa a VIM).
+  const b = doble({ tareas: [{ id: PAGO, tarea: "CONCILIAR", conexion_id: "cx-1", pago_id_externo: null }], mp: { buscarPagos: { status: 200, cuerpo: { results: [sinCuenta] } } } });
+  assert.deepEqual(await barrer(b.deps, async () => {}), { devueltos: 0, fallidos: 0, conciliados: 0, sinConsultar: 1 });
+  assert.ok(b.llamadas.includes(`conciliacion ${PAGO} false`));
+  assert.ok(b.llamadas.includes("registrar PAGO_SIN_APLICAR"));
+});
+
+test("confirmar: «sin pago» solo cuando no hay ningún pago vivo: sin resultados, o solo rechazados o cancelados", async () => {
+  for (const results of [[], [{ ...APROBADO, status: "rejected", status_detail: "cc_rejected_other_reason" }], [{ ...APROBADO, status: "cancelled" }]]) {
+    const d = doble({ mp: { buscarPagos: { status: 200, cuerpo: { results } } } });
+    assert.equal((await confirmarPago(d.deps, PAGO)).ok, true, JSON.stringify(results));
+  }
+  // Un pago vivo de OTRA referencia no es asunto nuestro; y si el nuestro ya quedó aprobado, lo demás no estorba.
+  const ajeno = doble({ mp: { leerPago: { status: 200, cuerpo: { ...APROBADO, external_reference: "otra" } } } });
+  assert.equal((await confirmarPago(ajeno.deps, PAGO, "18552260055")).ok, true);
+  const conAprobado = doble({ mp: { buscarPagos: { status: 200, cuerpo: { results: [APROBADO, { ...APROBADO, id: 9, status: "in_process" }] } } } });
+  assert.deepEqual(await confirmarPago(conAprobado.deps, PAGO), { ok: true, aplicados: 1, recienAprobado: true });
 });
 
 test("cobrar: un renglón se cobra UNA vez. El reintento del mismo intento no cobra: pregunta qué pasó con el primero", async () => {
@@ -140,6 +194,8 @@ test("cobrar: un pago ya aprobado contesta aprobado sin tocar nada; uno que ya n
     assert.deepEqual(await cobrarPago(d.deps, DATOS), { tipo: "POR_CONFIRMAR" }, estado);
     assert.deepEqual(d.llamadas, [], estado);
   }
+  // La respuesta 200 para Mercado Pago ante un aviso de un pago sin aplicar: repetirlo no lo arregla.
+  assert.equal(respuestaDeConfirmacion({ ok: false, motivo: "PAGO_SIN_APLICAR" }), 200);
   assert.deepEqual(await cobrarPago(doble({ fila: null }).deps, DATOS), { tipo: "POR_CONFIRMAR" });
 });
 
@@ -192,18 +248,20 @@ test("confirmar: un pago por OTRO monto se le pasa a la base tal cual lo cobró 
 test("confirmar: lo que no es nuestro no toca la base, aunque diga «approved»", async () => {
   for (const ajeno of [{ ...APROBADO, external_reference: "otra" }, { ...APROBADO, collector_id: 5 }, { ...APROBADO, live_mode: false }]) {
     const d = doble({ mp: { leerPago: { status: 200, cuerpo: ajeno } } });
-    assert.deepEqual(await confirmarPago(d.deps, PAGO, "18552260055"), { ok: true, aplicados: 0, recienAprobado: false });
-    assert.deepEqual(d.llamadas, ["mp.leerPago 18552260055", "registrar AJENO"]);
+    await confirmarPago(d.deps, PAGO, "18552260055");
+    assert.ok(!d.llamadas.some((l) => l.startsWith("aplicar")), JSON.stringify(ajeno));
+    assert.ok(d.llamadas.includes("registrar AJENO"));
   }
 });
 
 test("confirmar: pendiente no hace nada; un contracargo se deja en el log", async () => {
   const pend = doble({ mp: { buscarPagos: { status: 200, cuerpo: { results: [{ ...APROBADO, status: "in_process" }] } } } });
-  assert.deepEqual(await confirmarPago(pend.deps, PAGO), { ok: true, aplicados: 0, recienAprobado: false });
-  assert.deepEqual(pend.llamadas, [`mp.buscarPagos ${PAGO}`]);
+  // Pendiente: no se aplica nada, y tampoco es «sin pago» (hay un pago vivo).
+  assert.deepEqual(await confirmarPago(pend.deps, PAGO), { ok: false, motivo: "PAGO_SIN_APLICAR" });
+  assert.ok(!pend.llamadas.some((l) => l.startsWith("aplicar")));
   const cb = doble({ mp: { leerPago: { status: 200, cuerpo: { ...APROBADO, status: "charged_back" } } } });
   await confirmarPago(cb.deps, PAGO, "18552260055");
-  assert.deepEqual(cb.llamadas, ["mp.leerPago 18552260055", "registrar INCIDENTE"]);
+  assert.ok(cb.llamadas.includes("registrar INCIDENTE") && !cb.llamadas.some((l) => l.startsWith("aplicar")));
 });
 
 test("confirmar: una referencia que no es nuestra no llega a Mercado Pago", async () => {
@@ -224,7 +282,6 @@ test("confirmar: sin token, o si Mercado Pago no contesta, no se aplica nada y s
   }
   const rechazado = doble({ mp: { buscarPagos: { status: 401, cuerpo: null } } });
   assert.deepEqual(await confirmarPago(rechazado.deps, PAGO), { ok: false, motivo: "MP_NO_RESPONDE" });
-  assert.ok(rechazado.llamadas.includes("conexionEnError cx-1"));
 });
 
 test("confirmar: un pago que esa cuenta no tiene (404) no es nuestro: nada que reintentar", async () => {

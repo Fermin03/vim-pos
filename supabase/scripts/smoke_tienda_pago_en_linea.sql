@@ -89,6 +89,13 @@ BEGIN
   UPDATE terminal_conexiones SET public_key = NULL WHERE id = v_cx1;
   IF tienda_conexion_cobro(v_t, v_suc) IS NOT NULL THEN RAISE EXCEPTION 'A2: cobra en línea una cuenta sin public key'; END IF;
   UPDATE terminal_conexiones SET public_key = 'APP_USR-smoke-cuenta-uno-0000001' WHERE id = v_cx1;
+  -- Una conexión de PRUEBA nunca cobra en la tienda (ni siendo la única, ni elegida a mano).
+  UPDATE terminal_conexiones SET de_prueba = true WHERE id = v_cx1;
+  IF tienda_conexion_cobro(v_t, v_suc) IS NOT NULL THEN RAISE EXCEPTION 'A2: cobra en línea una conexión de prueba'; END IF;
+  UPDATE tienda_sucursales SET conexion_id = v_cx1 WHERE sucursal_id = v_suc;
+  IF tienda_conexion_cobro(v_t, v_suc) IS NOT NULL THEN RAISE EXCEPTION 'A2: cobra en línea una conexión de prueba elegida a mano'; END IF;
+  UPDATE tienda_sucursales SET conexion_id = NULL WHERE sucursal_id = v_suc;
+  UPDATE terminal_conexiones SET de_prueba = false WHERE id = v_cx1;
   INSERT INTO terminal_conexiones (tenant_id, cuenta_id_externo, cuenta_nombre, public_key) VALUES (v_t, '502', 'Cuenta dos', 'APP_USR-smoke-cuenta-dos-0000002') RETURNING id INTO v_cx2;
   IF tienda_conexion_cobro(v_t, v_suc) IS NOT NULL THEN RAISE EXCEPTION 'A2: con dos cuentas y sin elegir no debe adivinar'; END IF;
   UPDATE tienda_sucursales SET conexion_id = v_cx2 WHERE sucursal_id = v_suc;

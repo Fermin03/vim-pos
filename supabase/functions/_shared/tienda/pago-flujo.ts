@@ -9,7 +9,7 @@
 // No toca la base ni la red directamente: recibe un puerto (pago-puerto.ts lo arma con supabase-js)
 // y el cliente de Mercado Pago. Así se prueba con `node --test` y dobles.
 import { esc, soloAscii } from "../correo.ts";
-import { type ClienteMpTienda, cuerpoDeCobro, type DatosCobro, decidirPago, type MotivoDeRechazo, motivoDeRechazo, pagosDeBusqueda, respuestaDeCobro, resumenDeFallo } from "./pago-mp.ts";
+import { type ClienteMpTienda, cuerpoDeCobro, type DatosCobro, decidirPago, type MotivoDeRechazo, motivoDeRechazo, pagosDeBusqueda, pagoVivo, respuestaDeCobro, resumenDeFallo } from "./pago-mp.ts";
 
 export type EstadoPago = "CREADO" | "APROBADO" | "RECHAZADO" | "VENCIDO" | "POR_DEVOLVER" | "DEVUELTO" | "DEVOLUCION_FALLIDA";
 
@@ -18,6 +18,8 @@ export type FilaPago = {
   id: string; conexion_id: string; estado: EstadoPago;
   /** Total + propina, texto con dos decimales. */
   monto: string;
+  /** El cobro ya se le mandó a Mercado Pago (tienda_pagos.cobro_pedido_at). */
+  cobro_mandado: boolean;
   cuenta_vendedora: string; de_prueba: boolean;
 };
 
@@ -28,7 +30,6 @@ export type PuertoPagos = {
   leerPago(pagoId: string): Promise<FilaPago | null>;
   /** El Access Token del restaurante (Vault). null = no hay con qué hablarle a Mercado Pago. */
   token(conexionId: string): Promise<string | null>;
-  conexionEnError(conexionId: string): Promise<void>;
   /** ¿Me toca mandar el cobro? Verdadero UNA sola vez por pago. */
   tomarCobro(pagoId: string): Promise<boolean>;
   descartar(pagoId: string): Promise<boolean>;
@@ -77,6 +78,17 @@ export async function cobrarPago(deps: Deps, datos: Omit<DatosCobro, "monto">): 
   if (fila.estado === "APROBADO") return { tipo: "APROBADO", recienAprobado: false };
   if (fila.estado !== "CREADO") return { tipo: "POR_CONFIRMAR" };
 
+  /** Un NO seguro: el pedido se va. Si ya no se puede descartar, es que algo lo movió: que lo diga el seguimiento. */
+  const descartar = async (resultado: Cobro): Promise<Cobro> => ((await deps.db.descartar(fila.id)) ? resultado : { tipo: "POR_CONFIRMAR" });
+
+  // El token, ANTES de marcar el cobro como mandado: sin él no sale ningún cobro, y el renglón no
+  // debe quedar como «mandado» (obligaría al cliente a esperar la conciliación de algo que no existió).
+  const token = await deps.db.token(fila.conexion_id);
+  if (!token && !fila.cobro_mandado) {
+    deps.registrar("SIN_TOKEN", `conexión ${fila.conexion_id}`);
+    return descartar({ tipo: "NO_DISPONIBLE" });
+  }
+
   if (!(await deps.db.tomarCobro(fila.id))) {
     // Ya se mandó antes. Se pregunta, no se cobra.
     const c = await confirmarPago(deps, fila.id);
@@ -84,20 +96,13 @@ export async function cobrarPago(deps: Deps, datos: Omit<DatosCobro, "monto">): 
     return ahora?.estado === "APROBADO" ? { tipo: "APROBADO", recienAprobado: c.ok && c.recienAprobado } : { tipo: "POR_CONFIRMAR" };
   }
 
-  /** Un NO seguro: el pedido se va. Si ya no se puede descartar, es que algo lo movió: que lo diga el seguimiento. */
-  const descartar = async (resultado: Cobro): Promise<Cobro> => ((await deps.db.descartar(fila.id)) ? resultado : { tipo: "POR_CONFIRMAR" });
-
-  const token = await deps.db.token(fila.conexion_id);
-  if (!token) {
-    await deps.db.conexionEnError(fila.conexion_id);
-    deps.registrar("SIN_TOKEN", `conexión ${fila.conexion_id}`);
-    return descartar({ tipo: "NO_DISPONIBLE" });
-  }
+  // (Sin token y con el cobro ya mandado no se llega aquí: `tomarCobro` dio falso arriba.)
+  if (!token) return { tipo: "POR_CONFIRMAR" };
   const r = await deps.mp(token).cobrar(cuerpoDeCobro({ ...datos, monto: fila.monto }), `tienda-pago-${fila.id}`, datos.tarjeta.dispositivo);
   const que = respuestaDeCobro(r.status);
   if (que === "SIN_PERMISO") {
-    await deps.db.conexionEnError(fila.conexion_id);
-    deps.registrar("COBRO", resumenDeFallo(r));
+    // No se toca la conexión: la comparte la terminal, y un 401 aquí puede ser solo de credenciales de prueba.
+    deps.registrar("COBRO_SIN_PERMISO", `conexión ${fila.conexion_id}: ${resumenDeFallo(r)}`);
     return descartar({ tipo: "NO_DISPONIBLE" });
   }
   if (que === "NO_ACEPTADO") {
@@ -127,8 +132,13 @@ export async function cobrarPago(deps: Deps, datos: Omit<DatosCobro, "monto">): 
 
 export type Confirmacion =
   | { ok: true; aplicados: number; recienAprobado: boolean }
-  /** PAGO_DESCONOCIDO y NO_ENCONTRADO: no hay nada que reintentar. Los otros dos, sí. */
-  | { ok: false; motivo: "PAGO_DESCONOCIDO" | "NO_ENCONTRADO" | "SIN_TOKEN" | "MP_NO_RESPONDE" };
+  /**
+   * PAGO_DESCONOCIDO y NO_ENCONTRADO: no hay nada que reintentar. SIN_TOKEN y MP_NO_RESPONDE: sí.
+   * PAGO_SIN_APLICAR: Mercado Pago tiene un pago VIVO con nuestra referencia (aprobado o pendiente)
+   * que no se pudo aplicar. No es «sin pago»: puede haber dinero del cliente. La conciliación no
+   * cuenta como buena, el seguimiento sigue «confirmando» y el barrido acaba avisando a VIM.
+   */
+  | { ok: false; motivo: "PAGO_DESCONOCIDO" | "NO_ENCONTRADO" | "SIN_TOKEN" | "MP_NO_RESPONDE" | "PAGO_SIN_APLICAR" };
 
 /**
  * Le pregunta a Mercado Pago por un pago nuestro y aplica lo que diga. Con `pagoIdExterno` (la
@@ -150,14 +160,25 @@ export async function confirmarPago(deps: Deps, pagoId: string, pagoIdExterno?: 
   if (r.status !== 200) {
     // 404 a un pago concreto: ese id no es de esta cuenta (o no existe). No es nuestro.
     if (pagoIdExterno && r.status === 404) return { ok: false, motivo: "NO_ENCONTRADO" };
-    if (r.status === 401) await deps.db.conexionEnError(fila.conexion_id);
     deps.registrar("CONSULTAR", resumenDeFallo(r));
     return { ok: false, motivo: "MP_NO_RESPONDE" };
   }
 
   const esperado = { pagoId: fila.id, cuentaVendedora: fila.cuenta_vendedora, dePrueba: fila.de_prueba };
   let aplicados = 0, recienAprobado = false;
-  const decisiones = (pagoIdExterno ? [r.cuerpo] : pagosDeBusqueda(r.cuerpo)).map((pago) => decidirPago(esperado, pago));
+  const pagos = pagoIdExterno ? [r.cuerpo] : pagosDeBusqueda(r.cuerpo);
+  const decisiones = pagos.map((pago) => decidirPago(esperado, pago));
+  // Un pago vivo que trae NUESTRA referencia y que no se puede aplicar (sin cuenta vendedora, otro
+  // modo, sin acreditar, otra moneda, pendiente): se deja dicho con su id y su motivo.
+  let sinAplicar = false;
+  pagos.forEach((pago, i) => {
+    const d = decisiones[i]!;
+    const nuestro = (pago as { external_reference?: unknown } | null)?.external_reference === fila.id;
+    if ("motivo" in d && nuestro && pagoVivo(pago)) {
+      sinAplicar = true;
+      if (d.tipo !== "PENDIENTE") deps.registrar("PAGO_SIN_APLICAR", `pago ${fila.id}, id en Mercado Pago ${String((pago as { id?: unknown } | null)?.id ?? "?").slice(0, 30)}: ${d.tipo} (${d.motivo})`);
+    }
+  });
   // El aprobado va primero: un rechazo cierra el pedido que espera, y un aprobado que se aplicara
   // después de él acabaría devuelto.
   for (const d of [...decisiones.filter((x) => x.tipo === "APROBADO"), ...decisiones.filter((x) => x.tipo !== "APROBADO")]) {
@@ -172,6 +193,8 @@ export async function confirmarPago(deps: Deps, pagoId: string, pagoIdExterno?: 
     aplicados++;
     recienAprobado ||= a.recien_aprobado;
   }
+  // Con uno aprobado ya aplicado, el pedido tiene su pago: lo demás no cambia eso.
+  if (sinAplicar && !recienAprobado && (await deps.db.leerPago(fila.id))?.estado !== "APROBADO") return { ok: false, motivo: "PAGO_SIN_APLICAR" };
   return { ok: true, aplicados, recienAprobado };
 }
 
@@ -180,7 +203,8 @@ export async function confirmarPago(deps: Deps, pagoId: string, pagoIdExterno?: 
  * la referencia o el pago no son nuestros). 503 = no se pudo consultar: que lo reintente.
  */
 export function respuestaDeConfirmacion(c: Confirmacion): 200 | 503 {
-  return c.ok || c.motivo === "PAGO_DESCONOCIDO" || c.motivo === "NO_ENCONTRADO" ? 200 : 503;
+  // PAGO_SIN_APLICAR: repetir el aviso no lo arregla (lo sigue el barrido): 200.
+  return c.ok || c.motivo === "PAGO_DESCONOCIDO" || c.motivo === "NO_ENCONTRADO" || c.motivo === "PAGO_SIN_APLICAR" ? 200 : 503;
 }
 
 // ── Devolver ─────────────────────────────────────────────────────────────────────────────────────
@@ -200,7 +224,6 @@ export async function devolverPago(deps: Deps, t: Pick<Tarea, "id" | "conexion_i
   if (r.status === 200 || r.status === 201) return deps.db.devolucion(t.id, true);
   const ahora = await mp.leerPago(t.pago_id_externo);
   if (ahora.status === 200 && (ahora.cuerpo as { status?: unknown } | null)?.status === "refunded") return deps.db.devolucion(t.id, true);
-  if (r.status === 401) await deps.db.conexionEnError(t.conexion_id);
   return deps.db.devolucion(t.id, false, resumenDeFallo(r));
 }
 

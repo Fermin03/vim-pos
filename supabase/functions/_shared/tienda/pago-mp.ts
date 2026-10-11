@@ -95,7 +95,9 @@ export function motivoDeRechazo(detalle: string | null | undefined): MotivoDeRec
 /**
  * Qué significa el estado HTTP con que Mercado Pago contestó al crear el cobro, antes de leer el pago:
  *   · CREADO      contestó con un pago (200/201): hay que leerlo (`decidirPago`);
- *   · SIN_PERMISO 401: el token del restaurante ya no sirve. No se cobró;
+ *   · SIN_PERMISO 401: Mercado Pago no dejó usar esas credenciales (token vencido, o credenciales de
+ *                 prueba donde no valen: «Unauthorized use of live credentials»). No creó ningún pago.
+ *                 NO es un rechazo de la tarjeta, ni prueba de que la conexión esté rota;
  *   · NO_ACEPTADO un 4xx de validación (token de tarjeta inválido o usado, datos que no cuadran):
  *                 Mercado Pago no creó ningún pago. No se cobró;
  *   · NO_SE_SABE  sin respuesta, 5xx, 409, 423, 429: pudo o no cobrarse. NUNCA se trata como rechazo.
@@ -137,7 +139,9 @@ export function decidirPago(e: Esperado, pago: unknown): Decision {
   if (p.external_reference !== e.pagoId) return { tipo: "AJENO", motivo: "otra referencia" };
   const cuenta = idDe(p.collector_id) ?? idDe(obj(p.collector).id);
   if (!cuenta || cuenta !== e.cuentaVendedora) return { tipo: "AJENO", motivo: "otra cuenta vendedora" };
-  if (!e.dePrueba && p.live_mode !== true) return { tipo: "AJENO", motivo: "pago de prueba en una cuenta real" };
+  // El modo del pago es el de la conexión que cobró, en los dos sentidos: ni un pago de prueba en una
+  // cuenta real, ni uno real en una conexión de prueba.
+  if (p.live_mode !== !e.dePrueba) return { tipo: "AJENO", motivo: e.dePrueba ? "pago real en una conexión de prueba" : "pago de prueba en una cuenta real" };
 
   const estado = String(p.status ?? ""), detalle = txt(p.status_detail);
   if (estado === "pending" || estado === "in_process" || estado === "authorized") return { tipo: "PENDIENTE", motivo: estado };
@@ -216,4 +220,15 @@ export function resumenDeFallo(r: RespuestaMp): string {
   const c = obj(r.cuerpo);
   const codigo = txt(c.error) ?? txt(c.code) ?? txt(obj(Array.isArray(c.cause) ? c.cause[0] : null).code) ?? (typeof c.status === "number" ? String(c.status) : "");
   return `HTTP ${r.status}${codigo ? ` ${codigo.slice(0, 60)}` : ""}`;
+}
+
+/**
+ * ¿Ese pago de Mercado Pago está «vivo»: cobrado o por cobrarse? Sirve para no dar por conciliado
+ * un pago con nuestra referencia que no se pudo aplicar (`decidirPago` lo dejó como ajeno,
+ * incidente o pendiente): ahí puede haber dinero del cliente, y nadie debe leer «sin pago».
+ * Un estado que no se conoce cuenta como vivo.
+ */
+export function pagoVivo(pago: unknown): boolean {
+  const estado = String(obj(pago).status ?? "");
+  return estado !== "rejected" && estado !== "cancelled" && estado !== "refunded";
 }

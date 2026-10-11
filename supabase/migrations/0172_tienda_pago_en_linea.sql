@@ -179,7 +179,10 @@ BEGIN
   IF v_elegida IS NOT NULL THEN
     SELECT x.id INTO v_id FROM terminal_conexiones x
      WHERE x.id = v_elegida AND x.tenant_id = p_tenant AND x.proveedor = 'MERCADO_PAGO' AND x.estado = 'ACTIVA'
-       AND x.public_key IS NOT NULL;   -- sin public key la tienda no puede tokenizar la tarjeta
+       AND x.public_key IS NOT NULL    -- sin public key la tienda no puede tokenizar la tarjeta
+       -- Una conexión de PRUEBA nunca cobra en la tienda: el cliente vería «pagado» sin haber pagado.
+       -- (`tenants` no tiene una marca fiable de «negocio de pruebas»: INTERNO incluye a un restaurante real.)
+       AND NOT x.de_prueba;
     RETURN v_id;
   END IF;
 
@@ -187,7 +190,7 @@ BEGIN
        WHERE x.tenant_id = p_tenant AND x.proveedor = 'MERCADO_PAGO' AND x.estado = 'ACTIVA') = 1 THEN
     SELECT x.id INTO v_id FROM terminal_conexiones x
      WHERE x.tenant_id = p_tenant AND x.proveedor = 'MERCADO_PAGO' AND x.estado = 'ACTIVA'
-       AND x.public_key IS NOT NULL;
+       AND x.public_key IS NOT NULL AND NOT x.de_prueba;
   END IF;
   RETURN v_id;
 END;

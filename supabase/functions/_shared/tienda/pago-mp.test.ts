@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clienteMpTienda, cuerpoDeCobro, decidirPago, MOTIVOS_DE_RECHAZO, motivoDeRechazo, pagoDelAviso, pagosDeBusqueda, respuestaDeCobro, resumenDeFallo } from "./pago-mp.ts";
+import { clienteMpTienda, cuerpoDeCobro, decidirPago, pagoVivo, MOTIVOS_DE_RECHAZO, motivoDeRechazo, pagoDelAviso, pagosDeBusqueda, respuestaDeCobro, resumenDeFallo } from "./pago-mp.ts";
 
 const PAGO = "2cd9e6fa-1acf-47dc-8ba4-cba918d73770";
 const TARJETA = { token: "ff8080814c11e237014c1ff593b57b4d", payment_method_id: "master", issuer_id: "160", dispositivo: "armor.abc123" };
@@ -188,4 +188,19 @@ test("fallo: al log va el estado y el código, nunca el cuerpo", () => {
   assert.equal(resumenDeFallo({ status: 401, cuerpo: { message: "invalid access token APP_USR-secreto", error: "invalid_access_token", status: 401 } }), "HTTP 401 invalid_access_token");
   assert.equal(resumenDeFallo({ status: 400, cuerpo: { message: "x", cause: [{ code: "2063", description: "…" }] } }), "HTTP 400 2063");
   assert.equal(resumenDeFallo({ status: 0, cuerpo: null }), "HTTP 0");
+});
+
+test("pago: su modo tiene que ser el de la conexión que cobró, en los dos sentidos", () => {
+  const dePrueba = { ...ESPERADO, dePrueba: true };
+  assert.equal(decidirPago(ESPERADO, { ...APROBADO, live_mode: true }).tipo, "APROBADO");
+  assert.equal(decidirPago(ESPERADO, { ...APROBADO, live_mode: false }).tipo, "AJENO");
+  assert.equal(decidirPago(dePrueba, { ...APROBADO, live_mode: false }).tipo, "APROBADO");
+  // Un pago REAL en una conexión de prueba tampoco se cree.
+  assert.deepEqual(decidirPago(dePrueba, { ...APROBADO, live_mode: true }), { tipo: "AJENO", motivo: "pago real en una conexión de prueba" });
+  for (const raro of [undefined, null, "true", 1]) assert.equal(decidirPago(ESPERADO, { ...APROBADO, live_mode: raro }).tipo, "AJENO", String(raro));
+});
+
+test("pago vivo: todo lo que no esté rechazado, cancelado o devuelto (también un estado que no se conoce)", () => {
+  for (const status of ["approved", "authorized", "pending", "in_process", "in_mediation", "charged_back", "algo_nuevo", undefined]) assert.equal(pagoVivo({ status }), true, String(status));
+  for (const status of ["rejected", "cancelled", "refunded"]) assert.equal(pagoVivo({ status }), false, status);
 });
