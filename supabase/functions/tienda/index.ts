@@ -508,7 +508,8 @@ async function atender(req: Request): Promise<Response> {
   const enLinea = p.pago === "EN_LINEA";
   const baseTienda = (Deno.env.get("VIM_TIENDA_URL") ?? "").replace(/\/+$/, "");
   const baseFunciones = (Deno.env.get("SUPABASE_URL") ?? "").replace(/\/+$/, "");
-  if (enLinea && !(baseTienda.startsWith("https://") && baseFunciones.startsWith("https://"))) {
+  const sePuedeCobrar = baseTienda.startsWith("https://") && baseFunciones.startsWith("https://");
+  if (enLinea && !sePuedeCobrar) {
     registrarError("tienda", "PAGO_SIN_CONFIGURAR", "VIM_TIENDA_URL y SUPABASE_URL tienen que ser https para cobrar en línea");
     return json({ error: "SERVICIO_NO_DISPONIBLE" }, 503);
   }
@@ -538,12 +539,12 @@ async function atender(req: Request): Promise<Response> {
 
   // ── Pago en línea: el pedido nació POR_PAGAR; falta a dónde mandar al cliente a pagar ─────────
   // Sin correo todavía: nadie ha pagado nada. El de confirmación sale cuando el pago se confirma.
-  if (enLinea) {
-    const porPagar = leerPedidoEnLinea(alta.data);
-    if (!porPagar) {
-      registrarError("tienda", "PEDIDO_FORMA_INESPERADA", "tienda_crear_pedido no devolvió el pago de un pedido en línea");
-      return json({ error: "SERVICIO_NO_DISPONIBLE" }, 503);
-    }
+  // Lo decide lo que devolvió la base y no lo que pidió quien llama: un reintento con la misma
+  // `clave` devuelve el pedido que YA existe, se haya pedido ahora con la forma de pago que sea.
+  // (Si el pedido que existe es de pago al recibir, sigue por el camino de siempre, más abajo.)
+  const porPagar = leerPedidoEnLinea(alta.data);
+  if (porPagar) {
+    if (!sePuedeCobrar) return json({ error: "SERVICIO_NO_DISPONIBLE" }, 503);
     // Un reintento con la misma `clave` trae el mismo pago: prepararPago devuelve su MISMO
     // init_point sin crear otra preferencia. Si Mercado Pago no deja crearla, descarta el pedido.
     const pago = await prepararPago(depsDePagos(admin, "tienda"), {

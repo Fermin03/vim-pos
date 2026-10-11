@@ -30,6 +30,9 @@ const COLS_CONEXION = "id, tenant_id, sucursal_id, marca_virtual_id, app, estado
 const COLS_PEDIDO = "id, tenant_id, sucursal_id, conexion_id, app, id_externo, folio_corto, estado, estado_app, tipo_entrega, programado_para, vence_aceptacion, cliente_nombre, cliente_telefono, cliente_telefono_pin, direccion_texto, nota_cliente, items, items_sin_mapear, subtotal_mxn, descuento_app_mxn, descuento_tienda_mxn, envio_mxn, propina_mxn, total_cliente_mxn, total_restaurante_mxn, efectivo_a_cobrar_mxn, ticket_id, repartidor_nombre, repartidor_telefono, repartidor_estado, recibido_at, aceptado_at, listo_at, entregado_at, cancelado_at, motivo_cancelacion, cancelado_por, ultimo_error, created_at, gestion, gestion_caja_id, updated_at";
 // Las columnas del canal Tienda solo viajan a las cajas que lo entienden (ver alcanceEspejo).
 const COLS_PEDIDO_TIENDA = `${COLS_PEDIDO}, canal, cliente_email, tienda_cuenta_id, zona_envio_id, direccion, pago_al_recibir, paga_con_mxn`;
+// `pagado_at` solo viaja a la caja que declara el pago en línea (desde la 0.9.0), y TIENE que espejarlo:
+// su propia política de lectura (0172 §2) le esconde a su POS el pedido en línea sin `pagado_at`.
+const COLS_PEDIDO_EN_LINEA = `${COLS_PEDIDO_TIENDA}, pagado_at`;
 
 servir(async (req, json) => {
   const token = bearerDe(req);
@@ -88,7 +91,7 @@ servir(async (req, json) => {
 
   const pedidosDe = () => {
     const q = admin.from("delivery_pedidos")
-      .select(alcance.conTienda ? COLS_PEDIDO_TIENDA : COLS_PEDIDO)
+      .select(!alcance.conTienda ? COLS_PEDIDO : cuerpo.pago_en_linea === true ? COLS_PEDIDO_EN_LINEA : COLS_PEDIDO_TIENDA)
       .eq("tenant_id", tenantId).eq("sucursal_id", caja.sucursal_id)
       .in("canal", alcance.canales);
     // Los pedidos que se pagan en línea solo bajan ya pagados y solo a la caja que los entiende

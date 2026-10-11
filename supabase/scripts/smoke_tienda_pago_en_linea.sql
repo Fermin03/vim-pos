@@ -504,10 +504,15 @@ BEGIN
   IF (SELECT count(*) FROM delivery_eventos) <> v_n THEN RAISE EXCEPTION 'G1: vencer un pedido sin pagar dejó un evento'; END IF;
   v_seg := tienda_seguimiento(v_t, md5('pl-a61') || md5('pl-b61'));
   IF v_seg ->> 'estado' <> 'CANCELADO' OR v_seg ->> 'motivo' <> 'SIN_PAGO' OR v_seg ->> 'pago_estado' <> 'SIN_PAGO' THEN RAISE EXCEPTION 'G1: seguimiento de un pedido que venció sin pagarse: %', v_seg - 'renglones'; END IF;
-  -- Sigue sin existir para quien atiende, ni en la lista ni en el contador de vencidos del día.
+  -- Sigue sin existir para quien atiende, ni en la lista ni en el contador de vencidos del día: la
+  -- vista que alimenta la alerta del POS y del admin cuenta, sin política, uno más (este) que con ella.
+  SELECT COALESCE(sum(n_expirados), 0) INTO v_n FROM vw_delivery_expirados_hoy WHERE sucursal_id = v_suc;
   EXECUTE 'SET LOCAL ROLE authenticated';
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_cajero, 'role', 'authenticated', 'tenant_id', v_t)::text, true);
   IF EXISTS (SELECT 1 FROM delivery_pedidos WHERE id = (v_r ->> 'pedido_id')::uuid) THEN RAISE EXCEPTION 'G1: el cajero ve un pedido que venció sin pagarse'; END IF;
+  IF v_n - (SELECT COALESCE(sum(n_expirados), 0) FROM vw_delivery_expirados_hoy WHERE sucursal_id = v_suc) <> 1 THEN
+    RAISE EXCEPTION 'G1: el contador de vencidos del día cuenta el pedido que venció sin pagarse (sin política %)', v_n;
+  END IF;
   EXECUTE 'RESET ROLE';
   PERFORM set_config('request.jwt.claims', NULL, true);
 
