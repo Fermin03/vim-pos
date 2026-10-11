@@ -15,6 +15,8 @@ import {
 } from "../lib/cobro";
 import { nuevoClientId } from "../lib/carrito";
 import { aplicarPagosEnOrden, pagoEntroPeseAlError, ventaQuedoPagada, type PagoPorAplicar } from "../lib/cobro-pagos";
+import { cajaTieneTerminal, metodoDeTarjeta, pedirCobro, type CobroTerminal } from "../lib/terminal";
+import { VistaTerminal } from "./vista-terminal";
 
 // ─── Íconos SVG inline (calcan los mockups) ────────────────────────────────
 
@@ -170,7 +172,7 @@ function metodoCfg(v: MetodoPago): MetodoConfig {
 
 // ─── Sub-vistas ──────────────────────────────────────────────────────────────
 
-type Vista = "propina" | "selector" | "efectivo" | "otro" | "dividido" | "atajo";
+type Vista = "propina" | "selector" | "efectivo" | "otro" | "dividido" | "atajo" | "terminal";
 
 // ─── Tipos locales ───────────────────────────────────────────────────────────
 
@@ -253,13 +255,34 @@ function Numpad({
 
 function VistaSelector({
   totales,
+  conTerminal,
+  error,
   onElegir,
   onCerrar,
 }: {
   totales: TotalesTicket;
-  onElegir: (m: MetodoPago | "dividido") => void;
+  /** La caja tiene terminal ligada: Débito y Crédito se vuelven un solo «Tarjeta» que cobra en ella. */
+  conTerminal: boolean;
+  error: string | null;
+  onElegir: (m: MetodoPago | "dividido" | "terminal") => void;
   onCerrar: () => void;
 }) {
+  // El registro a mano se queda como salida (sin internet, terminal descompuesta), pero escondido.
+  const [aMano, setAMano] = useState(false);
+  const filas: { cfg: MetodoConfig; elegir: () => void; clave: string }[] = [];
+  for (const m of METODOS) {
+    const esTarjeta = m.valor === "TARJETA_DEBITO" || m.valor === "TARJETA_CREDITO";
+    if (!conTerminal || !esTarjeta) { filas.push({ cfg: m, elegir: () => onElegir(m.valor), clave: m.valor }); continue; }
+    if (m.valor === "TARJETA_DEBITO") {
+      filas.push({
+        cfg: { ...metodoCfg("TARJETA_CREDITO"), etiqueta: "Tarjeta", sub: "Débito o crédito · se cobra en la terminal" },
+        elegir: () => onElegir("terminal"), clave: "terminal",
+      });
+    }
+    if (aMano) {
+      filas.push({ cfg: { ...m, etiqueta: `${m.etiqueta} · a mano`, sub: "Ya se cobró en otra terminal" }, elegir: () => onElegir(m.valor), clave: m.valor });
+    }
+  }
   return (
     <div className="flex flex-col h-full">
       {/* Total a cobrar */}
@@ -270,18 +293,19 @@ function VistaSelector({
         </div>
       </div>
 
+      {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
       <div className="text-15 font-semibold text-ink-2 mb-3">¿Cómo paga el cliente?</div>
 
       {/* Lista de métodos */}
       <div className="border border-line rounded-lg overflow-hidden">
-        {METODOS.map((m, i) => (
+        {filas.map(({ cfg: m, elegir, clave }, i) => (
           <button
-            key={m.valor}
+            key={clave}
             type="button"
-            onClick={() => onElegir(m.valor)}
+            onClick={elegir}
             className={[
               "w-full flex items-center gap-4 px-[18px] py-[15px] cursor-pointer transition-colors hover:bg-hover text-left",
-              i < METODOS.length - 1 ? "border-b border-line" : "",
+              i < filas.length - 1 ? "border-b border-line" : "",
             ].join(" ")}
           >
             <span
@@ -332,7 +356,13 @@ function VistaSelector({
           <IcoBack cls="w-4 h-4" />
           Volver al ticket
         </button>
-        <span className="text-13 text-ink-3">Efectivo es el más usado</span>
+        {conTerminal && !aMano ? (
+          <button type="button" onClick={() => setAMano(true)} className="min-h-[44px] px-2 text-13 font-semibold text-ink-2 underline underline-offset-2 hover:text-ink">
+            La cobré en otra terminal
+          </button>
+        ) : (
+          <span className="text-13 text-ink-3">Efectivo es el más usado</span>
+        )}
       </div>
     </div>
   );
@@ -981,6 +1011,9 @@ function VistaPropina({
 export function ModalCobro({
   token,
   sucursalId,
+  cajaId,
+  turnoId,
+  ejecutaNombre,
   totalesIniciales,
   atajo = null,
   onPagado,
@@ -989,6 +1022,10 @@ export function ModalCobro({
 }: {
   token: string;
   sucursalId: string;
+  /** Para el cobro con terminal: de qué caja es y quién cobra (lo pide la autorización con PIN). */
+  cajaId: string;
+  turnoId: string;
+  ejecutaNombre: string;
   totalesIniciales: TotalesTicket;
   /**
    * Avisa el monto que la cajera tiene a la vista como pendiente de cobrar (con propina y pagos
@@ -1121,6 +1158,61 @@ export function ModalCobro({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vista]);
 
+  // ── Cobro con terminal (ADR 0033) ──────────────────────────────────────────────────────────
+  // Lo último que se supo de esta caja evita que el selector cambie de botones al abrir.
+  const [conTerminal, setConTerminal] = useState(() => {
+    try { return sessionStorage.getItem("vimpos.terminal") === "1"; } catch { return false; }
+  });
+
+  /**
+   * La terminal ya cobró: el pago entra al ticket como débito o crédito, con su referencia. El id del
+   * cobro es el `client_id_local`, así que repetirlo (caja apagada a medias, doble aviso) no duplica.
+   */
+  async function aplicarCobroTerminal(c: CobroTerminal, autorizoId?: string) {
+    setError(null);
+    setProcesando(true);
+    try {
+      const t = await aplicarPago(
+        token, totales.ticketId,
+        { metodo: metodoDeTarjeta(c.tipo_tarjeta), monto: Number(c.monto_mxn), referencia: c.referencia ?? undefined },
+        c.id,
+      );
+      // Si este aviso no llega, el cobro sigue «sin aplicar» en la nube y se reintenta al abrir el
+      // cobro otra vez; aplicar_pago ya lo tiene, así que no pasa nada.
+      await pedirCobro(token, cajaId, { accion: "confirmar", cobro_id: c.id, autorizo_id: autorizoId }).catch(() => {});
+      setTotales(t);
+      if (t.estadoFiscal === "PAGADO") onPagado(t.folio, t.cambio, t.total);
+      else setVista("selector");
+    } catch (e) {
+      const t = await trasFalloDeCobro(e);
+      if (!ventaQuedoPagada(t)) {
+        setError("El cobro sí pasó en la terminal, pero no se pudo registrar en el ticket. Cierra el cobro y vuelve a abrirlo: se registra solo.");
+        setVista("selector");
+      }
+    } finally {
+      setProcesando(false);
+    }
+  }
+
+  // Al abrir: ¿la caja tiene terminal?, y si quedó un cobro aprobado de ESTE ticket sin registrar
+  // (la caja se apagó o perdió la red a medio cobro), se registra ahora.
+  useEffect(() => {
+    let activo = true;
+    (async () => {
+      const tiene = await cajaTieneTerminal(token, cajaId);
+      if (!activo) return;
+      setConTerminal(tiene);
+      try { sessionStorage.setItem("vimpos.terminal", tiene ? "1" : "0"); } catch { /* sin almacén no hay recuerdo */ }
+      if (!tiene) return;
+      const r = await pedirCobro(token, cajaId, { accion: "pendientes" }).catch(() => null);
+      const suyo = r?.cobros?.find((c) => c.ticket_id === totales.ticketId);
+      if (activo && suyo) void aplicarCobroTerminal(suyo);
+    })();
+    return () => { activo = false; };
+    // Solo al abrir el cobro.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /** Aplica una lista de pagos divididos SECUENCIALMENTE (no en paralelo). Navega solo al final. */
   async function aplicarPagosDivididos(lista: PagoPorAplicar[]): Promise<string[]> {
     setError(null);
@@ -1145,9 +1237,11 @@ export function ModalCobro({
     }
   }
 
-  function elegirMetodo(m: MetodoPago | "dividido") {
+  function elegirMetodo(m: MetodoPago | "dividido" | "terminal") {
     setError(null);
-    if (m === "dividido") {
+    if (m === "terminal") {
+      setVista("terminal");
+    } else if (m === "dividido") {
       setVista("dividido");
     } else if (m === "EFECTIVO") {
       setMetodo(m);
@@ -1166,7 +1260,8 @@ export function ModalCobro({
   cerrarRef.current = onCerrar;
   const alEscapar = useMemo(
     () => capaVisible([
-      [procesando || vista === "atajo", () => {}],
+      // Con el cobro en la terminal tampoco: de ahí se sale cancelándolo, no por reflejo.
+      [procesando || vista === "atajo" || vista === "terminal", () => {}],
       [vista === "efectivo" || vista === "otro" || vista === "dividido", () => { setError(null); setVista("selector"); }],
       [true, () => cerrarRef.current()],
     ]),
@@ -1218,8 +1313,23 @@ export function ModalCobro({
         {vista === "selector" && (
           <VistaSelector
             totales={totalesEf}
+            conTerminal={conTerminal}
+            error={error}
             onElegir={elegirMetodo}
             onCerrar={onCerrar}
+          />
+        )}
+        {vista === "terminal" && (
+          <VistaTerminal
+            token={token}
+            cajaId={cajaId}
+            turnoId={turnoId}
+            ejecutaNombre={ejecutaNombre}
+            ticketId={totales.ticketId}
+            folio={totales.folio}
+            monto={totalesEf.pendiente}
+            onAprobado={aplicarCobroTerminal}
+            onVolver={() => { setError(null); setVista("selector"); }}
           />
         )}
         {vista === "efectivo" && (

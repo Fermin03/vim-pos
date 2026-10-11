@@ -19,6 +19,8 @@ test("un folio con algo que no es folio no viaja a Mercado Pago", () => {
 
 test("las demás acciones", () => {
   assert.equal(validarCuerpo({ accion: "pendientes" }).ok, true);
+  assert.deepEqual(validarCuerpo({ accion: "disponible", caja_id: ID }), { ok: true, cuerpo: { accion: "disponible", caja_id: ID } });
+  assert.deepEqual(validarCuerpo({ accion: "confirmar", cobro_id: ID, autorizo_id: "no-es-uuid" }), { ok: true, cuerpo: { accion: "confirmar", cobro_id: ID, caja_id: null, autorizo_id: null } });
   assert.equal(validarCuerpo({ accion: "estado", cobro_id: ID }).ok, true);
   assert.deepEqual(validarCuerpo({ accion: "borrar", cobro_id: ID }), { ok: false, error: "ACCION_INVALIDA" });
   assert.deepEqual(validarCuerpo(null), { ok: false, error: "COBRO_ID_INVALIDO" });

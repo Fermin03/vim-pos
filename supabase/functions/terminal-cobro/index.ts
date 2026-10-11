@@ -72,6 +72,14 @@ servir(async (req, json) => {
     if (!caja) return json({ error: "CAJA_NO_VALIDA" }, 403);
     const { id: cajaId, sucursal_id: sucursalId } = caja as { id: string; sucursal_id: string };
 
+    if (b.accion === "disponible") {
+      // ¿Esta caja le puede mandar cobros a una terminal? La caja instalada no tiene estas tablas
+      // con datos (viven en la nube), así que lo pregunta aquí al abrir el cobro.
+      const { data } = await admin.from("terminal_dispositivos").select("caja_id")
+        .eq("caja_id", cajaId).eq("tenant_id", tenantId).eq("activa", true).not("terminal_id_externo", "is", null).maybeSingle();
+      return json({ ok: true, terminal: Boolean(data) });
+    }
+
     if (b.accion === "pendientes") {
       const { data, error } = await admin.from("terminal_cobros").select(CAMPOS)
         .eq("tenant_id", tenantId).eq("caja_id", cajaId).eq("estado", "APROBADO").is("aplicado_at", null);
@@ -114,6 +122,12 @@ servir(async (req, json) => {
         id: b.cobro_id, tenant_id: tenantId, sucursal_id: sucursalId, caja_id: cajaId, conexion_id: d.conexion_id,
         ticket_id: b.ticket_id, folio: b.folio, monto_mxn: b.monto, empleado_id: empleadoId,
       }).select(CAMPOS).single();
+      // Dos «crear» con el mismo id casi a la vez: el segundo choca con la fila del primero. No es un
+      // error: se contesta ese cobro (quizá aún sin orden) y la caja sigue preguntando por él.
+      if (eIns && String((eIns as { code?: string }).code) === "23505") {
+        const gemelo = await leer();
+        if (gemelo) return json({ ok: true, cobro: publico(gemelo) });
+      }
       if (eIns) throw eIns;
 
       const r = await clienteMp(tokenMp).crearOrden({
@@ -139,9 +153,18 @@ servir(async (req, json) => {
     if (!cobro) return json({ ok: false, error: "COBRO_NO_ENCONTRADO" }, 404);
 
     if (b.accion === "confirmar") {
-      if (cobro.estado !== "APROBADO") return json({ ok: false, error: "COBRO_NO_APROBADO" }, 409);
+      // Un cobro en REVISAR solo se da por bueno a mano, y queda escrito quién lo autorizó con su PIN
+      // (la caja ya validó el PIN; aquí se comprueba que esa persona es de este negocio).
+      let aMano: string | null = null;
+      if (cobro.estado === "REVISAR" && b.autorizo_id) {
+        const { data: quien } = await admin.from("usuarios_acceso").select("usuario_id")
+          .eq("usuario_id", b.autorizo_id).eq("tenant_id", tenantId).eq("activo", true).limit(1).maybeSingle();
+        if (quien) aMano = b.autorizo_id;
+      }
+      if (cobro.estado !== "APROBADO" && !aMano) return json({ ok: false, error: "COBRO_NO_APROBADO" }, 409);
       if (!cobro.aplicado_at) {
-        const { error } = await admin.from("terminal_cobros").update({ aplicado_at: new Date().toISOString() }).eq("id", cobro.id);
+        const { error } = await admin.from("terminal_cobros")
+          .update({ aplicado_at: new Date().toISOString(), ...(aMano ? { confirmado_a_mano_por: aMano } : {}) }).eq("id", cobro.id);
         if (error) throw error;
       }
       return json({ ok: true });
