@@ -28,7 +28,7 @@ export type CuerpoPedido = CuerpoCarrito & {
   pago: Pago;
   /** Solo con EN_LINEA: 0, 10, 15 o 20. El monto lo calcula el servidor. */
   propina_pct?: number;
-  /** Solo con EN_LINEA: el token de un solo uso de la tarjeta (nunca el número), su marca y su banco. */
+  /** Solo con EN_LINEA: el token de un solo uso de la tarjeta (nunca el número), su marca y si es de crédito o de débito. */
   tarjeta?: TarjetaDePedido;
   /** Solo con EFECTIVO: texto con dos decimales (`aTexto`), entre el total y el total + 5000. */
   paga_con: string | null;

@@ -119,28 +119,32 @@ describe("qué hace «Tus datos» con cada respuesta de `pedir`", () => {
     expect(con(undefined)).toBeNull();
     expect(con(null)).toBeNull();
   });
-  it("PAGO_RECHAZADO: se dice junto a la tarjeta, con el motivo y que no se cobró; en su campo si el motivo es de uno", () => {
+  it("PAGO_RECHAZADO: se dice junto a la tarjeta, con el motivo y que no se cobró", () => {
     expect(desenlaceDelError(e("PAGO_RECHAZADO", "FONDOS"), c)).toEqual({ tipo: "tarjeta", campo: null, texto: "Tu tarjeta no tiene fondos suficientes. Prueba con otra tarjeta. No se te cobró nada." });
-    expect(desenlaceDelError(e("PAGO_RECHAZADO", "CODIGO"), c)).toMatchObject({ tipo: "tarjeta", campo: "codigo" });
-    expect(desenlaceDelError(e("PAGO_RECHAZADO", "FECHA"), c)).toMatchObject({ tipo: "tarjeta", campo: "vence" });
-    expect(desenlaceDelError(e("PAGO_RECHAZADO", "NUMERO"), c)).toMatchObject({ tipo: "tarjeta", campo: "numero" });
     // Sin motivo o con uno que no se conoce: el general. Nunca el código en crudo.
-    for (const raro of [null, "", "ALGO_NUEVO", "constructor"]) {
+    for (const raro of [null, "", "ALGO_NUEVO", "constructor", "CODIGO", "FECHA", "NUMERO", "VERIFICACION"]) {
       const d = desenlaceDelError(e("PAGO_RECHAZADO", raro), c);
       expect(d).toEqual({ tipo: "tarjeta", campo: null, texto: "Tu banco no aprobó el pago. Prueba con otra tarjeta. No se te cobró nada." });
     }
   });
+  it("los datos mal escritos: UN solo mensaje, sin señalar un campo (Mercado Pago no dice si fue el código o la fecha)", () => {
+    expect(desenlaceDelError(e("PAGO_RECHAZADO", "DATOS"), c)).toEqual({
+      tipo: "tarjeta", campo: null,
+      texto: "Revisa los datos de tu tarjeta: el número, la fecha de vencimiento y el código de seguridad. No se te cobró nada.",
+    });
+  });
   it("cada familia de rechazo tiene su texto, dice que no se cobró y no enseña códigos", () => {
-    for (const motivo of ["FONDOS", "CODIGO", "FECHA", "NUMERO", "LLAMAR_BANCO", "TARJETA_DESHABILITADA", "VERIFICACION", "OTRO"]) {
+    const familias = ["FONDOS", "DATOS", "LLAMAR_BANCO", "TARJETA_DESHABILITADA", "OTRO"];
+    for (const motivo of familias) {
       const t = textoDeRechazo(motivo, false).texto;
       expect(t, motivo).toMatch(/No se te cobró nada\.$/);
-      expect(t, motivo).not.toMatch(/[A-Z]{3,}_[A-Z]|cc_rejected|Apple Pay|Google Pay/);
+      expect(t, motivo).not.toMatch(/[A-Z]{3,}_[A-Z]|bad_filled|insufficient|Apple Pay|Google Pay/);
     }
-    expect(new Set(["FONDOS", "LLAMAR_BANCO", "TARJETA_DESHABILITADA", "VERIFICACION", "OTRO"].map((m) => textoDeRechazo(m, false).texto)).size).toBe(5);
+    expect(new Set(familias.map((m) => textoDeRechazo(m, false).texto)).size).toBe(5);
   });
-  it("con otra forma de pago, el rechazo que no es de un campo la ofrece; el de un campo, no (se corrige y ya)", () => {
+  it("con otra forma de pago, el rechazo la ofrece; el de los datos, no (se corrige y ya)", () => {
     expect(textoDeRechazo("FONDOS", true).texto).toMatch(/también puedes elegir otra forma de pago\.$/);
-    expect(textoDeRechazo("CODIGO", true).texto).not.toMatch(/otra forma de pago/);
+    expect(textoDeRechazo("DATOS", true).texto).not.toMatch(/otra forma de pago/);
   });
   it("PAGO_NO_DISPONIBLE con otra forma de pago: se dice junto a «¿Cómo pagas?» y se ofrece elegir otra", () => {
     const d = desenlaceDelError(e("PAGO_NO_DISPONIBLE"), { ...c, otrasFormas: true });

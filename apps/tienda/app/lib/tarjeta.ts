@@ -1,6 +1,6 @@
 // La tarjeta al pagar en línea. El número, el vencimiento y el código viven en iframes de Mercado
 // Pago (Secure Fields de MercadoPago.js): esta página nunca los ve. De aquí solo sale el TOKEN de
-// la tarjeta, que es de un solo uso, con su marca y su banco.
+// la tarjeta, que es de un solo uso, con su marca y si es de crédito o de débito.
 //
 // Lo puro (qué decirle al cliente, qué se acepta, qué forma tiene lo que devuelve la librería) está
 // aquí y se prueba solo. Montar los campos es de `components/tarjeta.tsx`.
@@ -10,19 +10,18 @@
 export const SDK_DE_MERCADO_PAGO = "https://sdk.mercadopago.com/js/v2";
 
 /** Lo que viaja en `pedir` de la tarjeta. Nunca el número. */
-export type TarjetaDePedido = { token: string; payment_method_id: string; issuer_id: string | null; dispositivo: string | null };
+export type TarjetaDePedido = { token: string; payment_method_id: string; type: TipoDeTarjeta };
+
+/** Crédito o débito: lo que Mercado Pago (Orders API) pide con el cobro. Lista cerrada; el servidor la valida igual. */
+export type TipoDeTarjeta = "credit_card" | "debit_card";
 
 export type CampoDeTarjeta = "numero" | "vence" | "codigo" | "titular";
 export const CAMPOS_DE_TARJETA: readonly CampoDeTarjeta[] = ["numero", "vence", "codigo", "titular"];
 
 /** Lo que la tienda sabe de la tarjeta que se está escribiendo. Nunca sus dígitos. */
-export type MarcaDeTarjeta = { payment_method_id: string; issuer_id: string | null; tipo: string; nombre: string | null; pideBanco: boolean };
+export type MarcaDeTarjeta = { payment_method_id: string; tipo: string; nombre: string | null };
 
 const obj = (v: unknown): Record<string, unknown> => (typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
-const idDe = (v: unknown): string | null => {
-  const s = typeof v === "number" && Number.isSafeInteger(v) ? String(v) : typeof v === "string" ? v : "";
-  return /^[0-9]{1,20}$/.test(s) ? s : null;
-};
 
 /**
  * De lo que contesta `mp.getPaymentMethods({ bin })`, la marca de la tarjeta. null = la librería no
@@ -33,30 +32,19 @@ export function marcaDe(respuesta: unknown): MarcaDeTarjeta | null {
   const m = obj(Array.isArray(r) ? r[0] : null);
   const id = typeof m.id === "string" && /^[a-z0-9_]{2,30}$/.test(m.id) ? m.id : null;
   if (!id) return null;
-  const pide = Array.isArray(m.additional_info_needed) && m.additional_info_needed.includes("issuer_id");
   return {
-    payment_method_id: id, issuer_id: idDe(obj(m.issuer).id), tipo: typeof m.payment_type_id === "string" ? m.payment_type_id : "",
-    nombre: typeof m.name === "string" && m.name.length <= 40 ? m.name : null, pideBanco: pide,
+    payment_method_id: id, tipo: typeof m.payment_type_id === "string" ? m.payment_type_id : "",
+    nombre: typeof m.name === "string" && m.name.length <= 40 ? m.name : null,
   };
 }
 
-/** De `mp.getIssuers(...)`, el banco: solo si hay uno. Con varios no se adivina. */
-export function bancoDe(respuesta: unknown): string | null {
-  return Array.isArray(respuesta) && respuesta.length === 1 ? idDe(obj(respuesta[0]).id) : null;
-}
-
 /** Solo crédito y débito. Prepago, vales y lo demás no se aceptan (así lo decidió el dueño). */
-export const tipoAceptado = (tipo: string): boolean => tipo === "credit_card" || tipo === "debit_card";
+export const tipoAceptado = (tipo: string): tipo is TipoDeTarjeta => tipo === "credit_card" || tipo === "debit_card";
 
 /** El token que devuelve `mp.fields.createCardToken`. null si no tiene la forma. */
 export function tokenDe(respuesta: unknown): string | null {
   const id = obj(respuesta).id;
   return typeof id === "string" && /^[A-Za-z0-9]{16,64}$/.test(id) ? id : null;
-}
-
-/** El Device ID que deja MercadoPago.js en la página (ayuda a que el banco apruebe). null si no tiene la forma. */
-export function dispositivoDe(v: unknown): string | null {
-  return typeof v === "string" && /^[A-Za-z0-9_.:-]{8,120}$/.test(v) ? v : null;
 }
 
 /** Lo que se sabe de cada campo mientras el cliente escribe. `vacio`: todavía no lo toca. */
@@ -122,25 +110,23 @@ export function errorDeToken(error: unknown): { campo: CampoDeTarjeta | null; te
   return { campo: null, texto: "No pudimos leer tu tarjeta. Revisa los datos y vuelve a intentar." };
 }
 
-const RECHAZOS: Record<string, { campo: CampoDeTarjeta | null; texto: string }> = {
+const RECHAZOS: Record<string, { campo: CampoDeTarjeta | null; texto: string; corrige?: true }> = {
   FONDOS: { campo: null, texto: "Tu tarjeta no tiene fondos suficientes. Prueba con otra tarjeta." },
-  CODIGO: { campo: "codigo", texto: "El código de seguridad no coincide. Revísalo y vuelve a intentar." },
-  FECHA: { campo: "vence", texto: "La fecha de vencimiento no coincide. Revísala y vuelve a intentar." },
-  NUMERO: { campo: "numero", texto: "El número de tarjeta no es correcto. Revísalo y vuelve a intentar." },
+  // Mercado Pago no distingue si falló el código o la fecha (VERIFICADO): se dice una sola cosa, sin señalar un campo.
+  DATOS: { campo: null, corrige: true, texto: "Revisa los datos de tu tarjeta: el número, la fecha de vencimiento y el código de seguridad." },
   LLAMAR_BANCO: { campo: null, texto: "Tu banco pide que autorices este pago. Llámale y vuelve a intentar, o usa otra tarjeta." },
   TARJETA_DESHABILITADA: { campo: null, texto: "Tu tarjeta no está activa para compras en línea. Llama a tu banco o usa otra tarjeta." },
-  VERIFICACION: { campo: null, texto: "Tu banco pide una verificación que aquí no se puede hacer. Usa otra tarjeta." },
   OTRO: { campo: null, texto: "Tu banco no aprobó el pago. Prueba con otra tarjeta." },
 };
 
 /**
  * Lo que se le dice al cliente cuando el banco rechazó el cobro (`PAGO_RECHAZADO` y su familia).
  * Siempre termina diciendo que no se cobró: es lo primero que quiere saber. Con otra forma de pago
- * disponible, se ofrece.
+ * disponible, se ofrece; salvo cuando lo que toca es corregir los datos (se corrige y ya).
  */
 export function textoDeRechazo(motivo: string | null, otrasFormas: boolean): { campo: CampoDeTarjeta | null; texto: string } {
   const r = (motivo && Object.hasOwn(RECHAZOS, motivo) ? RECHAZOS[motivo] : undefined) ?? RECHAZOS.OTRO!;
-  return { campo: r.campo, texto: `${r.texto} No se te cobró nada${otrasFormas && !r.campo ? "; también puedes elegir otra forma de pago" : ""}.` };
+  return { campo: r.campo, texto: `${r.texto} No se te cobró nada${otrasFormas && !r.corrige ? "; también puedes elegir otra forma de pago" : ""}.` };
 }
 
 /** Lo que se dice cuando el formulario de la tarjeta no se pudo cargar. Nunca un formulario muerto. */
@@ -158,9 +144,8 @@ export type CampoSeguro = {
 export type MercadoPagoJs = {
   fields: { create(tipo: string, opciones?: Record<string, unknown>): CampoSeguro; createCardToken(d: { cardholderName: string }): Promise<unknown> };
   getPaymentMethods(d: { bin: string }): Promise<unknown>;
-  getIssuers(d: { paymentMethodId: string; bin: string }): Promise<unknown>;
 };
-type Ventana = { MercadoPago?: new (clave: string, o?: { locale?: string }) => MercadoPagoJs; MP_DEVICE_SESSION_ID?: unknown };
+type Ventana = { MercadoPago?: new (clave: string, o?: { locale?: string }) => MercadoPagoJs };
 
 let carga: Promise<void> | null = null;
 
@@ -185,5 +170,3 @@ export function cargarMercadoPago(clave: string, doc: Document = document, esper
     return new w.MercadoPago(clave, { locale: "es-MX" });
   }).catch((e) => { carga = null; throw e; });
 }
-
-export const dispositivoDeLaPagina = (): string | null => dispositivoDe((globalThis as unknown as Ventana).MP_DEVICE_SESSION_ID);

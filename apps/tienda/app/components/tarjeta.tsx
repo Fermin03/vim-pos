@@ -9,7 +9,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import { Aviso, botonClases, cn } from "@vim/ui/styles";
 import { CampoDeTexto } from "./campo";
 import {
-  bancoDe, CAMPOS_SIN_TOCAR, cargarMercadoPago, dispositivoDeLaPagina, errorDeToken, erroresDeTarjeta, marcaDe, primerError, textoSinFormulario, tokenDe,
+  CAMPOS_SIN_TOCAR, cargarMercadoPago, errorDeToken, erroresDeTarjeta, marcaDe, primerError, textoSinFormulario, tipoAceptado, tokenDe,
   type CampoDeTarjeta, type CampoSeguro, type EstadoDeCampos, type MarcaDeTarjeta, type MercadoPagoJs, type TarjetaDePedido,
 } from "../lib/tarjeta";
 
@@ -89,14 +89,13 @@ export const CamposDeTarjeta = forwardRef<ManejoDeTarjeta, {
         seguros.current[campo] = el;
         montados.push(el);
       }
-      // Con los primeros dígitos se sabe la marca y el banco: hacen falta para cobrar.
+      // Con los primeros dígitos se sabe la marca y si es de crédito o de débito: hacen falta para cobrar.
       seguros.current.numero?.on("binChange", (d) => {
         const bin = obj(d).bin;
         if (typeof bin !== "string" || bin.length < 6) { setMarca(null); return; }
         void (async () => {
           try {
             const m = marcaDe(await lib.getPaymentMethods({ bin }));
-            if (m && m.pideBanco && !m.issuer_id) m.issuer_id = bancoDe(await lib.getIssuers({ paymentMethodId: m.payment_method_id, bin }));
             if (vivo) setMarca(m);
           } catch { if (vivo) setMarca(null); }
         })();
@@ -129,11 +128,12 @@ export const CamposDeTarjeta = forwardRef<ManejoDeTarjeta, {
       const e = erroresDeTarjeta({ campos, titular, marca, alEnviar: true });
       const primero = primerError(e);
       if (primero) { enfocar(primero); return { ok: false, campo: primero, texto: e[primero]! }; }
-      if (!marca) { enfocar("numero"); return { ok: false, campo: "numero", texto: "Revisa el número de tu tarjeta." }; }
+      // (Un tipo que no es crédito ni débito ya salió arriba como error del número.)
+      if (!marca || !tipoAceptado(marca.tipo)) { enfocar("numero"); return { ok: false, campo: "numero", texto: "Revisa el número de tu tarjeta." }; }
       try {
         const token = tokenDe(await mp.current.fields.createCardToken({ cardholderName: titular.trim() }));
         if (!token) return { ok: false, ...errorDeToken(null) };
-        return { ok: true, tarjeta: { token, payment_method_id: marca.payment_method_id, issuer_id: marca.issuer_id, dispositivo: dispositivoDeLaPagina() } };
+        return { ok: true, tarjeta: { token, payment_method_id: marca.payment_method_id, type: marca.tipo } };
       } catch (err) {
         const t = errorDeToken(err);
         enfocar(t.campo);
