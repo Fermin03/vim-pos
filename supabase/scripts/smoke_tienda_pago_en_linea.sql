@@ -111,8 +111,11 @@ BEGIN
   IF tienda_conexion_cobro(v_t, v_suc) IS DISTINCT FROM v_cx1 THEN RAISE EXCEPTION 'A2: la pausa del negocio no se levantó sola'; END IF;
   IF NOT tienda_pago_pausar(v_t, v_suc, 60) OR tienda_pago_pausar(v_t, v_suc, 60) THEN RAISE EXCEPTION 'A2: pausar la sucursal debía dar verdadero una sola vez'; END IF;
   IF tienda_conexion_cobro(v_t, v_suc) IS NOT NULL THEN RAISE EXCEPTION 'A2: cobra en línea con la sucursal en pausa'; END IF;
-  IF tienda_pago_pausar(v_otro, v_suc, 60) THEN RAISE EXCEPTION 'A2: otro negocio pausó una sucursal que no es suya'; END IF;
   UPDATE tienda_sucursales SET pago_pausado_hasta = NULL WHERE sucursal_id = v_suc;
+  -- (Con la sucursal ya sin pausa: si no, daría falso por estar pausada y no por ser de otro.)
+  IF tienda_pago_pausar(v_otro, v_suc, 60) OR (SELECT pago_pausado_hasta FROM tienda_sucursales WHERE sucursal_id = v_suc) IS NOT NULL THEN
+    RAISE EXCEPTION 'A2: otro negocio pausó una sucursal que no es suya';
+  END IF;
   UPDATE tienda_config SET pago_pausado_hasta = NULL WHERE tenant_id = v_t;
   -- Los tokens van a Vault y aquí (como en la caja) no hay: guardar y leer lo dicen; borrar no revienta.
   BEGIN

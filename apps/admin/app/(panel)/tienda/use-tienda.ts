@@ -282,8 +282,8 @@ export function useTienda() {
     sinLeer,
     /** Lo que se le dice al dueño: el interruptor Y el complemento vigente. */
     encendida: leido !== null && leido.interruptor && leido.enPlan,
-    /** Con una cuenta activa se puede ofrecer el pago en línea. */
-    hayCuentaActiva: leido !== null && cuentasActivas(leido.cuentas).length > 0,
+    /** Con una cuenta activa que cobre de verdad (no de prueba) se puede ofrecer el pago en línea. */
+    hayCuentaActiva: leido !== null && cuentasActivas(leido.cuentas).some((c) => !c.de_prueba),
     /** El dueño ofrece pago en línea (lo GUARDADO) y la tienda no lo está ofreciendo: qué pasa y dónde. */
     avisoCobro: leido ? avisoDeCobro(leido.config?.pagoEnLinea === true, leido.cuentas, leido.sucursales) : null,
     mensajeDe,
