@@ -1,18 +1,17 @@
 "use client";
 // TEXTOS PROVISIONALES: todo lo que aquí lee el dueño lo revisa James antes de publicar.
-import Link from "next/link";
 import { Aviso, Button } from "@vim/ui/styles";
 import { input, label } from "./campos";
+import { AccionFila } from "./controles";
 import { Tarjeta } from "./tarjeta";
 import { LineaMensaje, type MensajeTienda } from "./tienda-mensaje";
 import { precioMxn } from "../lib/catalogo";
 import { fechaHoraMx } from "../lib/reportes-inventario";
-import type { ConexionTerminal } from "../lib/terminal";
+import type { ConexionTienda } from "../lib/tienda-conexion";
 import { PAGOS_A_LA_VISTA, type PagoTienda } from "../lib/tienda";
 import { cuentaQueCobra, cuentasActivas, hayQueElegir, lista, nombreDeCuenta } from "../lib/tienda-cobro";
 import type { SucursalTienda } from "../lib/tienda-reglas";
 
-const enlace = "whitespace-nowrap font-semibold underline underline-offset-2";
 const subtitulo = "mb-2 text-13 font-semibold text-ink";
 const TONO_ESTADO: Record<PagoTienda["estado"], string> = {
   "Pagado": "bg-success-soft text-success",
@@ -31,9 +30,11 @@ export function TiendaCobro({
   soloLectura,
   mensaje,
   onConectar,
+  onDesconectar,
   onElegir,
 }: {
-  cuentas: ConexionTerminal[];
+  /** Las cuentas conectadas PARA LA TIENDA (no las de la terminal de tarjetas). */
+  cuentas: ConexionTienda[];
   sucursales: SucursalTienda[];
   /** null = no se pudieron leer. */
   pagos: PagoTienda[] | null;
@@ -44,6 +45,7 @@ export function TiendaCobro({
   soloLectura: boolean;
   mensaje: MensajeTienda | null;
   onConectar: () => void;
+  onDesconectar: (cuenta: ConexionTienda) => void;
   onElegir: (sucursalId: string, conexionId: string) => void;
 }) {
   const activas = cuentasActivas(cuentas);
@@ -67,17 +69,14 @@ export function TiendaCobro({
             {cuentas.map((c) => (
               <li key={c.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5">
                 <span className="min-w-0 break-words text-15 font-semibold">{nombreDeCuenta(c)}</span>
-                {c.de_prueba && <span className="rounded-full bg-info-soft px-2.5 py-0.5 text-12 font-semibold text-info">De prueba</span>}
+                {c.de_prueba && <span className="rounded-full bg-info-soft px-2.5 py-0.5 text-12 font-semibold text-info">De prueba: no cobra pedidos reales</span>}
                 {c.estado === "ERROR" && <span className="rounded-full bg-danger-soft px-2.5 py-0.5 text-12 font-semibold text-danger">Hay que volver a conectarla</span>}
+                <AccionFila peligro className="ml-auto" disabled={ocupado || soloLectura} onClick={() => onDesconectar(c)}>Desconectar</AccionFila>
               </li>
             ))}
           </ul>
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-            {enError && <Button variant="ghost" onClick={onConectar} disabled={ocupado || soloLectura}>Reconectar Mercado Pago</Button>}
-            <p className="text-12 text-ink-3">
-              Para conectar otra cuenta o desconectar una, ve a{" "}
-              <Link href="/configuracion/terminal" className={enlace}>Terminal de tarjetas</Link>.
-            </p>
+            <Button variant="ghost" onClick={onConectar} disabled={ocupado || soloLectura}>{enError ? "Reconectar Mercado Pago" : "Conectar otra cuenta"}</Button>
           </div>
 
           {hayQueElegir(cuentas, sucursales) && enTienda.length > 0 && (

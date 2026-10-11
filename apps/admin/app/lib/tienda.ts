@@ -157,7 +157,7 @@ export async function guardarCuentaDeSucursal(sucursalId: string, conexionId: st
 export type PagoTienda = {
   id: string; fecha: string; folio: string | null; monto: number; propina: number;
   estado: ReturnType<typeof estadoDePago>;
-  /** El número del pago en Mercado Pago, para buscarlo allá; null si nadie llegó a pagar. */
+  /** El número de la orden en Mercado Pago, para buscarla allá; null si nadie llegó a pagar. */
   pagoMp: string | null;
 };
 export const PAGOS_A_LA_VISTA = 30;
@@ -166,7 +166,7 @@ export const PAGOS_A_LA_VISTA = 30;
 export async function leerPagosTienda(): Promise<PagoTienda[]> {
   const { data, error } = await supabase
     .from("tienda_pagos")
-    .select("id, created_at, monto_mxn, propina_mxn, estado, pago_id_externo, pedido:delivery_pedidos(folio_corto)")
+    .select("id, created_at, monto_mxn, propina_mxn, estado, orden_id_externo, pedido:delivery_pedidos(folio_corto)")
     .order("created_at", { ascending: false })
     .limit(PAGOS_A_LA_VISTA);
   if (error) throw fallo(error, "No se pudieron leer los pagos");
@@ -175,7 +175,7 @@ export async function leerPagosTienda(): Promise<PagoTienda[]> {
     return {
       id: String(f.id), fecha: String(f.created_at), folio: typeof folio === "string" ? folio : null,
       monto: Number(f.monto_mxn), propina: Number(f.propina_mxn), estado: estadoDePago(String(f.estado)),
-      pagoMp: typeof f.pago_id_externo === "string" ? f.pago_id_externo : null,
+      pagoMp: typeof f.orden_id_externo === "string" ? f.orden_id_externo : null,
     };
   });
 }

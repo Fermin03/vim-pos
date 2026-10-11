@@ -4,13 +4,13 @@ import { leerNegocio, listarCajas } from "../../lib/configuracion";
 import { mensajeError } from "../../lib/errores";
 import { leerModulos } from "../../lib/modulos";
 import { ponerLogoTienda, quitarLogoTienda } from "../../lib/foto-producto";
-import { iniciarConexionMp, leerTerminal } from "../../lib/terminal";
+import { accionConexionTienda, conexionTiendaDisponible, iniciarConexionTienda, leerConexionesTienda, mensajeErrorConexionTienda, type ConexionTienda } from "../../lib/tienda-conexion";
 import {
   contarPendientesDeCatalogo, encenderTienda, leerCombosNoComprables, guardarConfigTienda, leerConfigTienda, guardarCuentaDeSucursal, guardarSucursalTienda, leerPagosTienda, leerSucursalesTienda, leerTiendaEncendida, urlDelLogo,
   type BloqueConfig, type DatosConfigTienda,
 } from "../../lib/tienda";
 import { normalizarDireccion, trasEscribir, type Escritura, type Leido } from "../../lib/tienda-pagina";
-import { avisoDeCobro, cuentasActivas, cuentasParaLaTienda, sucursalesConCajaSinActualizar } from "../../lib/tienda-cobro";
+import { avisoDeCobro, cuentasActivas, sucursalesConCajaSinActualizar } from "../../lib/tienda-cobro";
 import { revisar, sugerirDireccion, type BorradorSucursal, type Revision } from "../../lib/tienda-reglas";
 import type { DatosTienda } from "../../components/tienda-datos";
 import type { MensajeTienda } from "../../components/tienda-mensaje";
@@ -39,7 +39,7 @@ async function leerTodo(): Promise<Leido> {
     leerCombosNoComprables().catch(() => []),
     leerModulos().catch(() => { throw new Error(LECTURA); }),
     // Sin saber qué cuentas hay no se puede decir si el pago en línea se ofrece: esto sí detiene la página.
-    leerTerminal().then((t) => cuentasParaLaTienda(t.conexiones), () => { throw new Error(LECTURA); }),
+    leerConexionesTienda().catch(() => { throw new Error(LECTURA); }),
     // La lista de pagos es solo consulta: si falla, lo demás carga igual.
     leerPagosTienda().catch(() => null),
     // Solo es un aviso: si no se puede revisar, no se avisa.
@@ -76,6 +76,8 @@ export function useTienda() {
   const [sinLeer, setSinLeer] = useState(false);
   const [dialogo, setDialogo] = useState<"apagar" | "direccion" | null>(null);
   const [errorDialogo, setErrorDialogo] = useState<string | null>(null);
+  /** La cuenta de Mercado Pago que el dueño pidió desconectar (diálogo de confirmación abierto). */
+  const [porDesconectar, setPorDesconectar] = useState<ConexionTienda | null>(null);
   const enCurso = useRef(false);
 
   useEffect(() => {
@@ -209,9 +211,27 @@ export function useTienda() {
     void escribir("cobro", () => guardarCuentaDeSucursal(id, conexionId), { tipo: "cuenta", id, conexionId }, "No se pudo guardar la cuenta", GUARDADO, false);
   }
 
-  /** El mismo flujo de autorización que Terminal de tarjetas; al terminar vuelve aquí. */
+  /** Manda al dueño a autorizar en Mercado Pago, contra la aplicación de la tienda; al terminar vuelve aquí. */
   function conectarMercadoPago() {
-    window.location.href = iniciarConexionMp("tienda");
+    // Sin el id de la aplicación de la tienda no hay a dónde mandarlo: se dice aquí, no en una página de error de Mercado Pago.
+    if (!conexionTiendaDisponible()) return setMensaje({ bloque: "cobro", tipo: "error", texto: mensajeErrorConexionTienda(new Error("MP_NO_CONFIGURADO")) });
+    window.location.href = iniciarConexionTienda();
+  }
+
+  /** Desconectar pide confirmación: el diálogo se cierra solo si la base lo aceptó. */
+  function pedirDesconectar(c: ConexionTienda) {
+    setErrorDialogo(null);
+    setPorDesconectar(c);
+  }
+  async function confirmarDesconectar() {
+    const c = porDesconectar;
+    if (!c) return;
+    const hecho = await escribir(
+      "cobro",
+      () => accionConexionTienda({ accion: "desconectar", conexion_id: c.id }).then(() => undefined, (e) => { throw new Error(mensajeErrorConexionTienda(e)); }),
+      { tipo: "desconexion", conexionId: c.id }, "No se pudo desconectar la cuenta", "Cuenta desconectada.", true,
+    );
+    if (hecho) setPorDesconectar(null);
   }
 
   // El logo pasa por la misma guarda: una escritura a la vez, y lo guardado queda en pantalla antes
@@ -257,7 +277,7 @@ export function useTienda() {
   }
 
   return {
-    leido, form, falloLectura, ocupado, dialogo, errorDialogo, revision,
+    leido, form, falloLectura, ocupado, dialogo, errorDialogo, revision, porDesconectar,
     /** Un guardado entró pero falta volver a leer: nada más se guarda hasta entonces. */
     sinLeer,
     /** Lo que se le dice al dueño: el interruptor Y el complemento vigente. */
@@ -270,7 +290,8 @@ export function useTienda() {
     mensajeDeSucursal: (id: string): MensajeTienda | null => mensajeDe(deSucursal(id)),
     /** El id de la sucursal que se está guardando, si es una sucursal lo que se guarda. */
     sucursalGuardando: leido?.sucursales.find((s) => ocupado === deSucursal(s.id))?.id ?? null,
-    reintentar, cambiar, guardarDatos, guardarPedidos, guardarSucursal, cambiarEncendido, subirLogo, quitarLogo, elegirCuenta, conectarMercadoPago,
+    reintentar, cambiar, guardarDatos, guardarPedidos, guardarSucursal, cambiarEncendido, subirLogo, quitarLogo, elegirCuenta, conectarMercadoPago, pedirDesconectar, confirmarDesconectar,
+    cerrarDesconectar: () => setPorDesconectar(null),
     confirmarDireccion: () => enviarDatos(true),
     confirmarApagar: () => encender(false, true),
     cerrarDialogo: () => setDialogo(null),

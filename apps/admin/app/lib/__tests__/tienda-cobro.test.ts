@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { avisoDeCobro, cuentaQueCobra, cuentasParaLaTienda, estadoDePago, hayQueElegir, sucursalesConCajaSinActualizar, textoDeAviso } from "../tienda-cobro";
+import { avisoDeCobro, cuentaQueCobra, estadoDePago, hayQueElegir, sucursalesConCajaSinActualizar, textoDeAviso } from "../tienda-cobro";
 
 const A = { id: "a", cuenta_nombre: "Knock-Out León", estado: "ACTIVA" as const };
 const B = { id: "b", cuenta_nombre: "Knock-Out Norte", estado: "ACTIVA" as const };
@@ -91,18 +91,15 @@ describe("sucursales con la caja sin actualizar", () => {
   });
 });
 
-describe("una cuenta conectada antes de guardar su public key", () => {
-  const vieja = { id: "v", cuenta_nombre: "Conectada antes", estado: "ACTIVA" as const, public_key: null };
-  const nueva = { id: "n", cuenta_nombre: "Con clave", estado: "ACTIVA" as const, public_key: "APP_USR-00000000-0000-4000-8000-000000000000" };
-  it("para la tienda cuenta como «hay que volver a conectarla»: no cobra en línea y el aviso lo dice", () => {
-    const cuentas = cuentasParaLaTienda([vieja]);
-    expect(cuentas[0]!.estado).toBe("ERROR");
-    expect(cuentaQueCobra(cuentas, null)).toBeNull();
-    expect(avisoDeCobro(true, cuentas, [suc("Centro")])).toEqual({ tipo: "RECONECTAR", sucursales: [] });
+describe("una cuenta de prueba (espejo de tienda_conexion_cobro: nunca cobra pedidos reales)", () => {
+  const PRUEBA = { id: "p", cuenta_nombre: "Vendedor de prueba", estado: "ACTIVA" as const, de_prueba: true };
+  it("no cobra ni siendo la única ni elegida a mano, y el aviso lo dice", () => {
+    expect(cuentaQueCobra([PRUEBA], null)).toBeNull();
+    expect(cuentaQueCobra([PRUEBA, A], "p")).toBeNull();
+    expect(avisoDeCobro(true, [PRUEBA], [suc("Centro")])).toEqual({ tipo: "ELEGIR", sucursales: ["Centro"] });
   });
-  it("la que sí la tiene sigue activa; una en error o sin el dato leído (undefined) no cambia de más", () => {
-    expect(cuentasParaLaTienda([nueva, vieja]).map((c) => c.estado)).toEqual(["ACTIVA", "ERROR"]);
-    expect(cuentasParaLaTienda([{ ...ROTA, public_key: "x" }])[0]!.estado).toBe("ERROR");
-    expect(cuentasParaLaTienda([{ id: "s", cuenta_nombre: null, estado: "ACTIVA" as const }])[0]!.estado).toBe("ERROR");
+  it("con una real y una de prueba, sin elegir: ninguna (la base cuenta las dos como activas); eligiendo la real, esa", () => {
+    expect(cuentaQueCobra([A, PRUEBA], null)).toBeNull();
+    expect(cuentaQueCobra([A, PRUEBA], "a")).toBe(A);
   });
 });

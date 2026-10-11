@@ -5,10 +5,11 @@
 // TEXTOS PROVISIONALES: todo lo que aquí lee el dueño lo revisa James antes de publicar.
 import type { Caja } from "./configuracion";
 import { versionMenor } from "./menu-sucursal";
-import type { ConexionTerminal } from "./terminal";
+import type { ConexionTienda } from "./tienda-conexion";
 import type { SucursalTienda } from "./tienda-reglas";
 
-type Cuenta = Pick<ConexionTerminal, "id" | "cuenta_nombre" | "estado">;
+/** Una cuenta de Mercado Pago conectada PARA LA TIENDA (`tienda_conexiones`); nada que ver con la de la terminal. */
+type Cuenta = Pick<ConexionTienda, "id" | "cuenta_nombre" | "estado"> & { de_prueba?: boolean };
 type Sucursal = Pick<SucursalTienda, "nombre" | "participa" | "conexionId">;
 
 /** La primera versión de la caja instalada que atiende un pedido ya pagado. La misma de `_tienda_caja_en_linea_viva` (0172): si cambia allá, cambia aquí. */
@@ -32,25 +33,18 @@ export function sucursalesConCajaSinActualizar(
 
 export const cuentasActivas = <C extends Cuenta>(cuentas: C[]): C[] => cuentas.filter((c) => c.estado === "ACTIVA");
 
-/**
- * Las cuentas como las ve la tienda en línea. Una cuenta conectada antes de que se guardara su
- * public key sirve para la terminal, pero no para cobrar en línea (sin esa clave la tienda no puede
- * leer la tarjeta): aquí cuenta como «hay que volver a conectarla», que es justo lo que la arregla.
- */
-export const cuentasParaLaTienda = <C extends Cuenta & { public_key?: string | null }>(cuentas: C[]): C[] =>
-  cuentas.map((c) => (c.estado === "ACTIVA" && !c.public_key ? { ...c, estado: "ERROR" as const } : c));
-
 export const nombreDeCuenta = (c: Pick<Cuenta, "cuenta_nombre">): string => c.cuenta_nombre ?? "Cuenta de Mercado Pago";
 
 /**
  * La cuenta que cobra en una sucursal, igual que `tienda_conexion_cobro`: la elegida si sigue
  * activa; sin elegir, la única activa. Con varias y sin elegir, ninguna (no se adivina a quién le
- * cae el dinero); si la elegida dejó de servir tampoco se usa otra.
+ * cae el dinero); si la elegida dejó de servir tampoco se usa otra. Una cuenta de prueba nunca
+ * cobra pedidos reales (el cliente vería «pagado» sin haber pagado).
  */
 export function cuentaQueCobra<C extends Cuenta>(cuentas: C[], elegida: string | null): C | null {
   const vivas = cuentasActivas(cuentas);
-  if (elegida) return vivas.find((c) => c.id === elegida) ?? null;
-  return vivas.length === 1 ? vivas[0]! : null;
+  const cobra = elegida ? vivas.find((c) => c.id === elegida) : vivas.length === 1 ? vivas[0] : undefined;
+  return cobra && !cobra.de_prueba ? cobra : null;
 }
 
 /** ¿Hay que enseñar el selector por sucursal? Con varias cuentas, o si alguna sucursal apunta a otra que la única. */

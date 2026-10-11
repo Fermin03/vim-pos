@@ -27,7 +27,7 @@ export default function TiendaPage() {
   const escribiendo = t.ocupado !== null;
   // Tampoco se guarda nada mientras falte volver a leer después de un guardado.
   const ocupado = escribiendo || t.sinLeer;
-  // Regreso de Mercado Pago (mismo aviso que Terminal de tarjetas). Se lee al montar: sin useSearchParams no hace falta Suspense.
+  // Regreso de Mercado Pago, ya con la cuenta de la tienda conectada. Se lee al montar: sin useSearchParams no hace falta Suspense.
   const [conectada, setConectada] = useState(false);
   useEffect(() => { setConectada(new URLSearchParams(window.location.search).has("conectada")); }, []);
 
@@ -108,6 +108,7 @@ export default function TiendaPage() {
               soloLectura={soloLectura}
               mensaje={t.mensajeDe("cobro")}
               onConectar={t.conectarMercadoPago}
+              onDesconectar={t.pedirDesconectar}
               onElegir={t.elegirCuenta}
             />
 
@@ -129,6 +130,25 @@ export default function TiendaPage() {
         )}
       </PageBody>
 
+      {/* TEXTO PROVISIONAL (lo revisa James). */}
+      {t.porDesconectar && (
+        <DialogoPeligro
+          titulo="¿Desconectar Mercado Pago de tu tienda?"
+          consecuencia={
+            <>
+              Tu tienda dejará de ofrecer el pago en línea donde cobra <b className="text-ink">{t.porDesconectar.cuenta_nombre ?? "esta cuenta"}</b>.
+              Tus clientes podrán seguir pidiendo y pagar al recibir. Tu terminal de tarjetas no cambia.
+            </>
+          }
+          error={t.errorDialogo}
+          boton="Desconectar"
+          ocupado={escribiendo}
+          textoOcupado="Desconectando…"
+          ancho="sm"
+          onConfirmar={() => void t.confirmarDesconectar()}
+          onCerrar={t.cerrarDesconectar}
+        />
+      )}
       {t.dialogo === "apagar" && (
         <DialogoPeligro
           titulo="¿Apagar tu tienda en línea?"
