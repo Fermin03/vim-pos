@@ -112,14 +112,20 @@ export function alcanceEspejo(
  * Es una marca de tiempo para que falle cerrada: quien deja de afirmar el turno no escribe nada y
  * la marca envejece sola. Y una caja que no declara la tienda manda el UPDATE de siempre, así que
  * las que hoy están en servicio no dependen de que la columna exista.
+ *
+ * Y la caja que declara `pago_en_linea: true` (sabe atender un pedido ya pagado: la cuenta nace
+ * cobrada) sella `espejo_pago_en_linea_at` (0173). De esa marca —no del número de versión del
+ * instalador— depende que la tienda ofrezca el pago en línea en su sucursal y que un pedido pagado
+ * se le encargue a una caja. Misma idea: quien deja de declararlo no escribe nada y la marca envejece.
  */
 export function selloLatido(
-  cuerpo: { tienda?: unknown; turno_abierto?: unknown },
+  cuerpo: { tienda?: unknown; turno_abierto?: unknown; pago_en_linea?: unknown },
   ahora: string,
 ): Record<string, string> {
   return {
     espejo_apps_at: ahora,
     ...(cuerpo.tienda === true && cuerpo.turno_abierto === true && { espejo_turno_abierto_at: ahora }),
+    ...(cuerpo.pago_en_linea === true && { espejo_pago_en_linea_at: ahora }),
   };
 }
 

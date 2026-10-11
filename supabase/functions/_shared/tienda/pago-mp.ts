@@ -43,7 +43,10 @@ export type DatosCobro = {
  * TEXTO con dos decimales. Sin `application_fee` ni `marketplace`: VIM no cobra comisión y el dinero
  * cae en la cuenta del restaurante (el token es el suyo). No lleva dirección de avisos: con Orders
  * llegan a la URL configurada en la aplicación.
- * Sin probar: `type: "debit_card"` (supuesto del documento 04).
+ * VERIFICADO también con débito (`{ id: "debmaster", type: "debit_card" }`). Si `type` no corresponde
+ * al `id`, Mercado Pago contesta 400 `property_value` (no crea nada).
+ * OJO: la respuesta devuelve el token de la tarjeta en `transactions.payments[0].payment_method.token`.
+ * De una orden solo se sacan los campos de `decidirOrden`; la respuesta cruda no se guarda ni se registra.
  */
 export function cuerpoDeOrden(d: DatosCobro): Record<string, unknown> {
   const monto = montoTexto(d.monto);
@@ -81,6 +84,13 @@ const FAMILIAS: Record<string, MotivoDeRechazo> = {
 export function motivoDeRechazo(detalle: string | null | undefined): MotivoDeRechazo {
   return (detalle && Object.hasOwn(FAMILIAS, detalle) ? FAMILIAS[detalle] : undefined) ?? "OTRO";
 }
+
+/**
+ * VERIFICADO: un token de tarjeta inventado o ya usado contesta 402 `failed` con este motivo (no un
+ * 400). No hay tarjeta ni banco de por medio: no es «tu banco no lo aprobó», y no cuenta como una
+ * tarjeta rechazada del negocio (sí para el tope de la IP, que es quien lo manda).
+ */
+export const esTokenInvalido = (detalle: string | null | undefined): boolean => detalle === "invalid_card_token";
 
 /**
  * El motivo de un rechazo que llegó como 402: `errors[].details[]` trae `"<id del pago>: <motivo>"`.

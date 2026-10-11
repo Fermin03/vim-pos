@@ -33,6 +33,8 @@ function doble(o: {
   const llamadas: string[] = [];
   const tokens: string[] = [];
   const cuerpos: unknown[] = [];
+  /** Todo lo que se le manda a la base, tal cual (para comprobar que no lleva nada crudo de Mercado Pago). */
+  const aLaBase: unknown[] = [];
   const veces: Partial<Record<Metodo, number>> = {};
   let lecturas = 0, llaves = 0;
   const filas = o.filas ?? [FILA];
@@ -42,12 +44,13 @@ function doble(o: {
     tomarCobro: async () => { llamadas.push("tomarCobro"); return o.toma ?? true; },
     descartar: async () => { llamadas.push("descartar"); return o.descarta ?? true; },
     aplicar: async (_id, d) => {
+      aLaBase.push(d);
       llamadas.push(`aplicar ${d.resultado} ${d.ordenIdExterno} ${d.monto}`);
       return o.aplicar?.(d.ordenIdExterno) ?? { estado: "APROBADO", pedido_estado: "RECIBIDO", recien_aprobado: d.resultado === "APROBADO" };
     },
-    anotar: async (_id, d) => { llamadas.push(`anotar ${d.ordenIdExterno ?? "-"} ${d.error ?? "-"}`); },
+    anotar: async (_id, d) => { aLaBase.push(d); llamadas.push(`anotar ${d.ordenIdExterno ?? "-"} ${d.error ?? "-"}`); },
     tomar: async () => o.tareas ?? [],
-    devolucion: async (id, ok, error) => { llamadas.push(`devolucion ${id} ${ok}${error ? ` ${error}` : ""}`); return o.devolucion?.(ok) ?? (ok ? "DEVUELTO" : "POR_DEVOLVER"); },
+    devolucion: async (id, ok, error) => { aLaBase.push({ ok, error }); llamadas.push(`devolucion ${id} ${ok}${error ? ` ${error}` : ""}`); return o.devolucion?.(ok) ?? (ok ? "DEVUELTO" : "POR_DEVOLVER"); },
     conciliacion: async (id, ok) => { llamadas.push(`conciliacion ${id} ${ok}`); return !ok && (o.tercerFallo?.(id) ?? false); },
   };
   const responder = (cual: Metodo, ...args: unknown[]): Promise<RespuestaMp> => {
@@ -72,7 +75,7 @@ function doble(o: {
     llave: () => `llave-${++llaves}`,
     ahora: () => new Date("2026-10-11T18:03:00.000Z"),
   };
-  return { deps, llamadas, tokens, cuerpos };
+  return { deps, llamadas, tokens, cuerpos, aLaBase };
 }
 const sin = (llamadas: string[], prefijo: string) => llamadas.every((l) => !l.startsWith(prefijo));
 
@@ -119,11 +122,64 @@ test("sin respuesta, 5xx, 409 o 429: POR_CONFIRMAR; nunca se descarta ni se dice
   }
 });
 
-test("400 o 422 de validación (no se creó nada): el pedido se descarta y la tienda dice OTRO", async () => {
+// Respuesta real (documento 04) cuando `type` no corresponde al `id` de la tarjeta.
+const VALIDACION_400 = { errors: [{ code: "property_value", message: "Invalid value for property",
+  details: ["'$.transactions.payments[0].payment_method.id' - value must be one of 'amex', 'master', 'visa'"] }] };
+
+test("400 o 422 de validación: NO es «tu banco no aprobó», y «no se creó nada» se comprueba antes de descartar", async () => {
   for (const status of [400, 422]) {
-    const { deps } = doble({ mp: { crearOrden: { status, cuerpo: { errors: [{ code: "invalid_card_token" }] } } } });
-    assert.deepEqual(await cobrarPago(deps, DATOS), { tipo: "RECHAZADO", motivo: "OTRO" });
+    // Mercado Pago confirma que no hay ninguna orden con nuestra referencia: el pedido se descarta.
+    const limpio = doble({ mp: { crearOrden: { status, cuerpo: VALIDACION_400 }, buscarOrdenes: { status: 200, cuerpo: { data: [], paging: { total: 0 } } } } });
+    assert.deepEqual(await cobrarPago(limpio.deps, DATOS), { tipo: "NO_PROCESADO", contarIp: false }, String(status));
+    assert.deepEqual(limpio.llamadas.slice(-2).map((l) => l.split(" ")[0]), ["mp.buscarOrdenes", "descartar"]);
+    // No se pudo comprobar: el renglón se CONSERVA y lo resuelve la conciliación. Nada de «no se cobró».
+    const sinSaber = doble({ mp: { crearOrden: { status, cuerpo: VALIDACION_400 } } });
+    assert.deepEqual(await cobrarPago(sinSaber.deps, DATOS), { tipo: "POR_CONFIRMAR" }, String(status));
+    assert.ok(sin(sinSaber.llamadas, "descartar"));
+    // Y si resulta que sí había una orden cobrada, se aplica: nunca se borra un pedido con cobro.
+    const habia = doble({ mp: { crearOrden: { status, cuerpo: VALIDACION_400 }, buscarOrdenes: { status: 200, cuerpo: { data: [APROBADA] } } } });
+    assert.deepEqual(await cobrarPago(habia.deps, DATOS), { tipo: "POR_CONFIRMAR" }, String(status));
+    assert.ok(sin(habia.llamadas, "descartar") && habia.llamadas.includes(`aplicar APROBADO ${ORDEN} 138.00`));
   }
+});
+
+test("token de tarjeta inventado o ya usado (402 failed, invalid_card_token): no es un rechazo del banco; cuenta para la IP y no para el negocio", async () => {
+  const cuerpo = { errors: [{ code: "failed", message: "The following transactions failed", details: ["PAY01M4PXXXX: invalid_card_token"] }] };
+  const { deps, llamadas } = doble({ mp: { crearOrden: { status: 402, cuerpo } } });
+  assert.deepEqual(await cobrarPago(deps, DATOS), { tipo: "NO_PROCESADO", contarIp: true });
+  assert.ok(llamadas.includes("descartar") && sin(llamadas, "aplicar"));
+  // Una tarjeta de verdad rechazada sigue siendo un rechazo, con su motivo.
+  const real = doble({ mp: { crearOrden: { status: 402, cuerpo: RECHAZO_402 } } });
+  assert.deepEqual(await cobrarPago(real.deps, DATOS), { tipo: "RECHAZADO", motivo: "FONDOS" });
+});
+
+test("el token de la tarjeta que Mercado Pago DEVUELVE en la orden no llega a la base, al log ni a los correos", async () => {
+  const TOKEN = "ff8080814c11e237014c1ff593b57b4d";
+  // La forma real del 201: el pago trae el token, installment_amount y transaction_security.
+  const conToken = (orden: typeof APROBADA) => ({ ...orden, transactions: { payments: [{ ...orden.transactions.payments[0],
+    payment_method: { id: "debmaster", type: "debit_card", token: TOKEN, installments: 1, installment_amount: "138.00", transaction_security: { validation: "never" } } }] } });
+  const casos = [
+    doble({ mp: { crearOrden: { status: 201, cuerpo: conToken(APROBADA) } } }),
+    doble({ mp: { crearOrden: { status: 201, cuerpo: conToken(EN_REVISION) } } }),
+    doble({ mp: { crearOrden: { status: 201, cuerpo: conToken({ ...APROBADA, status_detail: "in_review" }) } } }),
+    doble({ mp: { crearOrden: { status: 201, cuerpo: conToken({ ...APROBADA, user_id: "999" }) } } }),
+    doble({ mp: { crearOrden: { status: 201, cuerpo: conToken({ ...APROBADA, status: "failed" }) } } }),
+  ];
+  for (const c of casos) await cobrarPago(c.deps, DATOS);
+  const consulta = doble({ filas: [{ ...FILA, orden_id_externo: ORDEN }], mp: { leerOrden: { status: 200, cuerpo: conToken({ ...APROBADA, currency: "USD" }) } } });
+  await confirmarPago(consulta.deps, PAGO);
+  const busca = doble({ mp: { buscarOrdenes: { status: 200, cuerpo: { data: [conToken({ ...APROBADA, status_detail: "in_review" }), conToken(APROBADA)] } } } });
+  await confirmarPago(busca.deps, PAGO);
+  const devuelve = doble({ mp: { leerOrden: { status: 200, cuerpo: conToken(APROBADA) }, devolver: { status: 422, cuerpo: conToken(APROBADA) } } });
+  await devolverPago(devuelve.deps, TAREA);
+  for (const c of [...casos, consulta, busca, devuelve]) {
+    // `llamadas` anota todo lo que se le pasó a la base (aplicar, anotar, devolución) y al log (registrar).
+    assert.ok(c.llamadas.length > 0);
+    assert.ok(!c.llamadas.join("\n").includes(TOKEN), c.llamadas.join("\n"));
+    assert.ok(!JSON.stringify(c.aLaBase).includes(TOKEN) && !JSON.stringify(c.aLaBase).includes("transaction_security"));
+  }
+  // El débito aprobado (VERIFICADO: debmaster / debit_card) se aplica con su marca y su tipo, nada más.
+  assert.deepEqual(casos[0]!.aLaBase[0], { resultado: "APROBADO", ordenIdExterno: ORDEN, pagoIdExterno: "PAY01M4P8JX8TKPS5B2ECXP875P89", monto: "138.00", tipoTarjeta: "debit_card", marca: "debmaster", detalle: "accredited" });
 });
 
 test("una orden con otra referencia, o por otro monto, no deja el pedido pagado", async () => {

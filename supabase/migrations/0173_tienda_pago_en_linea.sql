@@ -117,7 +117,8 @@ BEGIN
     END IF;
   END LOOP;
   UPDATE tienda_conexiones
-     SET vence_at = p_vence, estado = 'ACTIVA', ultimo_error = NULL, public_key = COALESCE(p_public_key, public_key)
+     SET vence_at = p_vence, estado = 'ACTIVA', ultimo_error = NULL, public_key = COALESCE(p_public_key, public_key),
+         renovando_hasta = NULL
    WHERE id = p_conexion;
 END $$;
 
@@ -187,6 +188,73 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'tienda_pedir_renovacion: %', SQLERRM;
   RETURN false;
+END $$;
+
+-- Una pasada de renovación TOMA la conexión antes de pedirle a Mercado Pago el par nuevo: cada
+-- renovación invalida el refresh token anterior, así que dos pasadas a la vez sobre la misma
+-- conexión dejarían a una de las dos guardando un par muerto. Quien la toma la aparta 5 minutos (por
+-- si la función muere a medias) y recibe el `vence_at` que vio: con él se comprueba después que
+-- nadie más la renovó. NULL = no se tomó (otra pasada la tiene, o ya no está ACTIVA).
+ALTER TABLE tienda_conexiones ADD COLUMN IF NOT EXISTS renovando_hasta timestamptz NULL;
+CREATE OR REPLACE FUNCTION tienda_conexion_tomar_renovacion(p_conexion uuid)
+RETURNS timestamptz
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_vence timestamptz;
+BEGIN
+  UPDATE tienda_conexiones SET renovando_hasta = now() + interval '5 minutes'
+   WHERE id = p_conexion AND estado = 'ACTIVA' AND vence_at IS NOT NULL
+     AND (renovando_hasta IS NULL OR renovando_hasta <= now())
+  RETURNING vence_at INTO v_vence;
+  RETURN v_vence;
+END $$;
+
+-- Cómo terminó una renovación que NO guardó un par nuevo. Siempre suelta la toma y deja dicho el
+-- motivo. Con p_definitiva (Mercado Pago dijo que ese refresh token ya no sirve, o el par nuevo no se
+-- pudo guardar) la conexión pasa a ERROR, pero SOLO si sigue como se leyó: mismo `vence_at` y aún
+-- ACTIVA. Si otra pasada la renovó entre tanto, está sana y no se toca. Devuelve TRUE si quedó en
+-- ERROR (es la señal para avisar a VIM, una vez).
+CREATE OR REPLACE FUNCTION tienda_conexion_renovacion_fallida(p_conexion uuid, p_vence timestamptz, p_motivo text, p_definitiva boolean)
+RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_error boolean := false;
+BEGIN
+  UPDATE tienda_conexiones
+     SET renovando_hasta = NULL,
+         ultimo_error = left(p_motivo, 300),
+         estado = CASE WHEN p_definitiva THEN 'ERROR' ELSE estado END
+   WHERE id = p_conexion AND estado = 'ACTIVA' AND vence_at IS NOT DISTINCT FROM p_vence
+  RETURNING estado = 'ERROR' INTO v_error;
+  IF NOT FOUND THEN
+    UPDATE tienda_conexiones SET renovando_hasta = NULL WHERE id = p_conexion AND vence_at IS NOT DISTINCT FROM p_vence;
+  END IF;
+  RETURN COALESCE(v_error, false);
+END $$;
+
+-- ¿Se puede desconectar esta cuenta? Con sus tokens se van las devoluciones, así que NO mientras
+-- haya dinero de un cliente que dependa de ellos. Devuelve NULL si se puede, o por qué no:
+--   {"motivo": "PENDIENTES"}             un cobro sin resolver (CREADO, o VENCIDO sin conciliar) o una
+--                                         devolución por hacer o que falló (POR_DEVOLVER, DEVOLUCION_FALLIDA);
+--   {"motivo": "RECIENTES", "hasta": …}  cobró pedidos hace menos de 48 horas: es la ventana en la que
+--                                         cancelar una cuenta todavía devuelve el pago (la misma de
+--                                         HORAS_PARA_DEVOLVER_EN_LINEA del POS y de SQL_REPORTE de la
+--                                         caja; una prueba del POS las ata). `hasta` = cuándo se podrá.
+CREATE OR REPLACE FUNCTION tienda_conexion_ocupada(p_conexion uuid)
+RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_hasta timestamptz;
+BEGIN
+  IF EXISTS (SELECT 1 FROM tienda_pagos g
+              WHERE g.conexion_id = p_conexion
+                AND (g.estado IN ('CREADO', 'POR_DEVOLVER', 'DEVOLUCION_FALLIDA')
+                     OR (g.estado = 'VENCIDO' AND g.cobro_pedido_at IS NOT NULL AND g.conciliado_at IS NULL
+                         AND g.vence_at > now() - interval '48 hours'))) THEN
+    RETURN jsonb_build_object('motivo', 'PENDIENTES');
+  END IF;
+  SELECT max(g.aprobado_at) + interval '48 hours' INTO v_hasta
+    FROM tienda_pagos g
+   WHERE g.conexion_id = p_conexion AND g.estado = 'APROBADO' AND g.aprobado_at > now() - interval '48 hours';
+  IF v_hasta IS NOT NULL THEN RETURN jsonb_build_object('motivo', 'RECIENTES', 'hasta', v_hasta); END IF;
+  RETURN NULL;
 END $$;
 
 -- Qué cuenta de Mercado Pago cobra en esta sucursal. NULL = la única conexión activa del negocio.
@@ -281,19 +349,17 @@ CREATE POLICY delivery_pedidos_select ON delivery_pedidos FOR SELECT
   USING (tenant_id = current_tenant_id() AND (pago_al_recibir IS DISTINCT FROM 'EN_LINEA' OR pagado_at IS NOT NULL));
 
 -- ── §3 Qué cuenta cobra ──────────────────────────────────────────────────────
--- ¿`p_version` (cajas.version_app) es `p_minima` o posterior? Número a número. Lo que no sea
--- `n.n.n` cuenta como viejo (misma regla que versionAlMenos en _shared/delivery/enlinea.ts).
-CREATE OR REPLACE FUNCTION _tienda_version_al_menos(p_version text, p_minima integer[])
-RETURNS boolean
-LANGUAGE sql IMMUTABLE
-SET search_path = public, pg_temp
-AS $$
-  SELECT CASE WHEN btrim(p_version) ~ '^[0-9]{1,6}\.[0-9]{1,6}\.[0-9]{1,6}$'
-              THEN string_to_array(btrim(p_version), '.')::integer[] >= p_minima
-              ELSE false END;
-$$;
+-- La caja instalada DECLARA que sabe atender un pedido ya pagado: lo manda en cada sondeo del
+-- espejo (`pago_en_linea: true`) y `delivery-espejo` sella aquí la hora. Es una capacidad, no un
+-- número de versión: da igual qué número lleve el instalador que la traiga. Y es una marca de
+-- tiempo, como `espejo_turno_abierto_at` (0161), para que falle cerrada: la caja que deja de
+-- declararlo (o se apaga) no escribe nada y la marca envejece sola.
+ALTER TABLE cajas ADD COLUMN IF NOT EXISTS espejo_pago_en_linea_at timestamptz NULL;
+COMMENT ON COLUMN cajas.espejo_pago_en_linea_at IS 'Último sondeo del espejo en que la caja declaró que atiende pedidos pagados en línea (cuenta que nace cobrada). La sella delivery-espejo.';
+-- (De versiones anteriores de esta migración, nunca aplicadas: la regla por número de versión.)
+DROP FUNCTION IF EXISTS _tienda_version_al_menos(text, integer[]);
 
--- ¿Late en la sucursal una caja instalada que sabe atender un pedido ya pagado (0.9.0 o posterior)?
+-- ¿Late en la sucursal una caja instalada que declara atender un pedido ya pagado?
 -- Misma ventana que sucursal_con_espejo (0096). La usan quien decide si se ofrece el pago en línea
 -- y quien decide, al pagarse, si el pedido lo atiende una caja (tienda_pago_aplicar).
 CREATE OR REPLACE FUNCTION _tienda_caja_en_linea_viva(p_sucursal uuid)
@@ -303,7 +369,7 @@ SET search_path = public, pg_temp
 AS $$
   SELECT EXISTS (SELECT 1 FROM cajas c WHERE c.sucursal_id = p_sucursal AND c.activa
                   AND c.espejo_apps_at > now() - interval '90 seconds'
-                  AND _tienda_version_al_menos(c.version_app, ARRAY[0, 9, 0]));
+                  AND c.espejo_pago_en_linea_at > now() - interval '90 seconds');
 $$;
 
 -- La conexión de Mercado Pago que cobra los pedidos en línea de una sucursal, o NULL si ahí no se
@@ -317,7 +383,7 @@ $$;
 --     marca fiable de «negocio de pruebas»: INTERNO incluye a un restaurante real.) Es de prueba la
 --     que Mercado Pago entregó con live_mode = false al conectarla;
 --   · si en la sucursal late una caja instalada, alguna de las que laten sabe atender un pedido ya
---     pagado (0.9.0). Una anterior le crearía la cuenta SIN el pago y el cajero cobraría otra vez.
+--     pagado (lo declara en su sondeo). Otra le crearía la cuenta SIN el pago y el cajero cobraría otra vez.
 CREATE OR REPLACE FUNCTION tienda_conexion_cobro(p_tenant uuid, p_sucursal uuid)
 RETURNS uuid
 LANGUAGE plpgsql STABLE SECURITY DEFINER
@@ -1047,7 +1113,7 @@ $$;
 --     pago por total + propina con el método PAGO_EN_LINEA (aplicar_pago, que cierra la cuenta
 --     como PAGADA). Es el patrón de crear_ticket_desde_app con el pago de Uber: mismo turno, mismo
 --     usuario, misma idempotencia por client_id_local. El corte suma el pago en su propio renglón
---     (obtener_resumen_turno agrupa por método) y la propina entra al reparto del turno.
+--     (reporte_x agrupa por método) y la propina entra al reparto del turno.
 -- En la nube comprueba además que el pago esté APROBADO. En la caja tienda_pagos está vacía y no
 -- hay qué comprobar: a la caja solo le llega el pedido que ya se pagó (delivery-espejo).
 CREATE OR REPLACE FUNCTION crear_ticket_desde_tienda(p_pedido_id uuid)
@@ -1227,6 +1293,22 @@ COMMENT ON FUNCTION crear_ticket_desde_tienda(uuid) IS
 -- (estadoAReportar, estadoDeFila) y va en su entrega.
 
 -- Cuerpo copiado ÍNTEGRO de 0166_tienda_cuentas.sql §3; cambia solo la línea de PAGADO/FACTURADO.
+-- ¿El cobro de este pedido se mandó, el pedido venció sin saberse el resultado, y Mercado Pago
+-- todavía NO ha confirmado dos veces que no hay orden? Mientras sea así no se le dice al cliente
+-- «no se te cobró nada»: una sola búsqueda vacía no basta (la orden puede tardar en aparecer). Se
+-- deja de esperar con la segunda conciliación buena, la de una hora después (`conciliado_at`), o a
+-- las 48 horas, que es cuando el barrido deja de preguntar (y para entonces VIM ya fue avisado).
+CREATE OR REPLACE FUNCTION _tienda_pago_sin_confirmar(p_pedido uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT EXISTS (SELECT 1 FROM tienda_pagos g
+                  WHERE g.pedido_id = p_pedido AND NOT g.extra AND g.estado = 'VENCIDO'
+                    AND g.cobro_pedido_at IS NOT NULL AND g.conciliado_at IS NULL
+                    AND g.vence_at > now() - interval '48 hours');
+$$;
+
 CREATE OR REPLACE FUNCTION _tienda_estado_real(p_pedido delivery_pedidos)
 RETURNS text
 LANGUAGE plpgsql STABLE SECURITY DEFINER
@@ -1236,6 +1318,12 @@ DECLARE
   v_estado text := p_pedido.estado;
   v_t      record;
 BEGIN
+  -- Venció sin que se supiera si el cobro pasó: para el cliente sigue «confirmando su pago», en el
+  -- seguimiento y en «Mis pedidos», hasta que Mercado Pago lo confirme (ver _tienda_pago_sin_confirmar).
+  IF v_estado = 'EXPIRADO' AND p_pedido.pago_al_recibir IS NOT DISTINCT FROM 'EN_LINEA' AND p_pedido.pagado_at IS NULL
+     AND _tienda_pago_sin_confirmar(p_pedido.id) THEN
+    RETURN 'POR_PAGAR';
+  END IF;
   IF p_pedido.gestion = 'NUBE' AND p_pedido.ticket_id IS NOT NULL AND v_estado IN ('ACEPTADO', 'EN_PREPARACION', 'LISTO') THEN
     SELECT t.estado_fiscal::text AS fiscal, t.ticket_impreso_at,
            EXISTS (SELECT 1 FROM delivery_asignaciones a WHERE a.ticket_id = t.id) AS con_repartidor
@@ -1311,7 +1399,6 @@ BEGIN
     'modo', CASE v_p.app WHEN 'DELIVERY_PROPIO' THEN 'DOMICILIO' ELSE 'RECOGER' END,
     'estado', _tienda_estado_publico(v_estado, v_p.app::text),
     'motivo', CASE
-      WHEN v_estado = 'EXPIRADO' AND v_en_linea AND v_p.pagado_at IS NULL AND v_g.estado = 'VENCIDO' AND v_g.conciliaciones = 0 AND v_g.cobro_pedido_at IS NOT NULL THEN 'POR_CONFIRMAR'
       WHEN v_estado = 'EXPIRADO' AND v_en_linea AND v_p.pagado_at IS NULL THEN 'SIN_PAGO'
       WHEN v_estado = 'EXPIRADO' THEN 'SIN_RESPUESTA'
       WHEN v_estado IN ('RECHAZADO', 'CANCELADO') THEN
@@ -1335,7 +1422,7 @@ BEGIN
         -- El cobro se mandó y no se sabe qué pasó (o venció y todavía no se le ha podido preguntar a
         -- Mercado Pago): no se afirma nada.
         WHEN v_p.estado = 'POR_PAGAR' THEN 'POR_CONFIRMAR'
-        WHEN v_g.estado = 'VENCIDO' AND v_g.conciliaciones = 0 AND v_g.cobro_pedido_at IS NOT NULL THEN 'POR_CONFIRMAR'
+        WHEN _tienda_pago_sin_confirmar(v_p.id) THEN 'POR_CONFIRMAR'
         ELSE 'SIN_PAGO' END,
       'propina_mxn', to_char(COALESCE(v_p.propina_mxn, 0), 'FM999999990.00'),
       'total_a_pagar_mxn', to_char(v_p.total_cliente_mxn + COALESCE(v_p.propina_mxn, 0), 'FM999999990.00')) END;
@@ -1599,12 +1686,13 @@ BEGIN
              FROM pg_proc p
             WHERE p.pronamespace = 'public'::regnamespace
               AND p.proname IN ('tienda_guardar_tokens', 'tienda_leer_tokens', 'tienda_borrar_tokens', 'tienda_pago_pausar', 'tienda_pago_anotar',
-                                'tienda_conexiones_por_renovar', 'tienda_pedir_renovacion',
+                                'tienda_conexiones_por_renovar', 'tienda_pedir_renovacion', 'tienda_conexion_tomar_renovacion',
+                                'tienda_conexion_renovacion_fallida', 'tienda_conexion_ocupada',
                                 'tienda_conexion_cobro', 'tienda_negocio', 'tienda_crear_pedido', 'tienda_pago_tomar_cobro',
                                 'tienda_pago_descartar', 'tienda_pago_tomar_consulta', 'tienda_pago_aplicar', 'tienda_pago_tomar_correo',
                                 'tienda_pagos_tomar', 'tienda_pago_devolucion', 'tienda_pago_conciliacion', 'crear_ticket_desde_tienda',
                                 'tienda_seguimiento', 'tienda_sincronizar_estados_nube', 'tienda_reportar_estado', 'tienda_pagos_barrer',
-                                '_tienda_version_al_menos', '_tienda_caja_en_linea_viva', '_tienda_pedido_creado', '_tienda_estado_real', '_tienda_estado_publico',
+                                '_tienda_caja_en_linea_viva', '_tienda_pago_sin_confirmar', '_tienda_pedido_creado', '_tienda_estado_real', '_tienda_estado_publico',
                                 'delivery_pedidos_devolver_pago', 'pagos_en_linea_no_se_editan', 'devoluciones_de_pago_en_linea')
   LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC, anon, authenticated', f.firma);

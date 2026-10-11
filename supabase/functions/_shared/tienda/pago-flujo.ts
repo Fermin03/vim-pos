@@ -9,7 +9,7 @@
 // No toca la base ni la red directamente: recibe un puerto (pago-puerto.ts lo arma con supabase-js)
 // y el cliente de Mercado Pago. Así se prueba con `node --test` y dobles.
 import { esc, soloAscii } from "../correo.ts";
-import { type ClienteMpTienda, cuerpoDeOrden, type DatosCobro, type Decision, decidirOrden, type MotivoDeRechazo, motivoDeRechazo, ordenesDeBusqueda, ordenViva, respuestaDeCobro, resumenDeFallo } from "./pago-mp.ts";
+import { type ClienteMpTienda, cuerpoDeOrden, type DatosCobro, type Decision, decidirOrden, esTokenInvalido, type MotivoDeRechazo, motivoDeRechazo, ordenesDeBusqueda, ordenViva, respuestaDeCobro, resumenDeFallo } from "./pago-mp.ts";
 
 export type EstadoPago = "CREADO" | "APROBADO" | "RECHAZADO" | "VENCIDO" | "POR_DEVOLVER" | "DEVUELTO" | "DEVOLUCION_FALLIDA";
 
@@ -74,6 +74,13 @@ export type Cobro =
   | { tipo: "APROBADO"; recienAprobado: boolean }
   /** Mercado Pago dijo que no, seguro. El pedido se descartó: no existe y no se cobró nada. */
   | { tipo: "RECHAZADO"; motivo: MotivoDeRechazo }
+  /**
+   * El cobro no se pudo procesar y NO es cosa del banco ni de la tarjeta: Mercado Pago no aceptó la
+   * petición (400/422) o el token de la tarjeta no existe o ya se usó (402 `invalid_card_token`). El
+   * pedido se descartó y no se cobró nada. No cuenta como tarjeta rechazada del negocio;
+   * `contarIp`: sí cuenta para el tope de quien lo mandó (un token inventado es de quien abusa).
+   */
+  | { tipo: "NO_PROCESADO"; contarIp: boolean }
   /** No se sabe si se cobró. El pedido queda POR_PAGAR y lo resuelven el aviso, la página y el barrido. */
   | { tipo: "POR_CONFIRMAR" }
   /**
@@ -87,9 +94,14 @@ export type Cobro =
  *   · un renglón de tienda_pagos se cobra UNA vez. Si esta llamada no es la primera (un reintento
  *     del mismo intento de compra porque la respuesta se perdió), NO vuelve a cobrar: le pregunta a
  *     Mercado Pago qué pasó con el primer cobro;
- *   · «rechazado» solo se dice con un NO seguro de Mercado Pago: el 402 `failed` (VERIFICADO: no
- *     crea orden), una orden que nace `failed`, o un 400/422 de validación (no creó nada). Sin
- *     respuesta, un 5xx, 409, 429 o un estado que no es final nunca son «rechazado»: POR_CONFIRMAR;
+ *   · «rechazado» solo se dice con un NO seguro de Mercado Pago sobre una tarjeta de verdad: el 402
+ *     `failed` (VERIFICADO: no crea orden) o una orden que nace `failed`. Sin respuesta, un 5xx,
+ *     409, 429 o un estado que no es final nunca son «rechazado»: POR_CONFIRMAR;
+ *   · un 400/422 (validación) dice que no se creó nada, pero no se le cree sin comprobarlo: se
+ *     busca la orden por nuestra referencia y solo si Mercado Pago confirma que no hay ninguna se
+ *     descarta el pedido (NO_PROCESADO). Si no se puede comprobar, el renglón se conserva: POR_CONFIRMAR;
+ *   · un token de tarjeta inventado o usado (402 `invalid_card_token`) tampoco es un rechazo del
+ *     banco: NO_PROCESADO;
  *   · un 401 no es un rechazo de la tarjeta: PAGO_NO_DISPONIBLE;
  *   · una orden aprobada se cree después de `decidirOrden` (referencia, cuenta vendedora, moneda,
  *     acreditada) y de que la base compruebe el monto;
@@ -134,10 +146,14 @@ export async function cobrarPago(deps: Deps, datos: Omit<DatosCobro, "monto">): 
     deps.registrar("COBRO_SIN_PERMISO", `conexión ${fila.conexion_id}: ${resumenDeFallo(r)}`);
     return descartar({ tipo: "NO_DISPONIBLE", sinPermiso: true });
   }
-  if (que.tipo === "RECHAZADO") return descartar({ tipo: "RECHAZADO", motivo: motivoDeRechazo(que.detalle) });
+  if (que.tipo === "RECHAZADO") {
+    return descartar(esTokenInvalido(que.detalle) ? { tipo: "NO_PROCESADO", contarIp: true } : { tipo: "RECHAZADO", motivo: motivoDeRechazo(que.detalle) });
+  }
   if (que.tipo === "NO_ACEPTADO") {
     deps.registrar("COBRO_NO_ACEPTADO", resumenDeFallo(r));
-    return descartar({ tipo: "RECHAZADO", motivo: "OTRO" });
+    // «No se creó nada» lo dice un 400, pero se comprueba: ¿hay alguna orden con nuestra referencia?
+    const c = await confirmarPago(deps, fila.id);
+    return c.ok && c.aplicados === 0 ? descartar({ tipo: "NO_PROCESADO", contarIp: false }) : { tipo: "POR_CONFIRMAR" };
   }
   if (que.tipo === "NO_SE_SABE") {
     deps.registrar("COBRO_SIN_RESPUESTA", `pago ${fila.id}: ${resumenDeFallo(r)}`);

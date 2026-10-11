@@ -75,11 +75,15 @@
 //     · no se supo (Mercado Pago no contestó, o dejó el cobro en revisión) → 200 con
 //       `pago: { estado: "POR_CONFIRMAR" }`: el pedido sigue POR_PAGAR y lo resuelven el aviso,
 //       `confirmar_pago` y el barrido. Nunca se contesta «rechazado» sin un no seguro de Mercado Pago;
+//     · 409 PAGO_NO_PROCESADO: el cobro no se pudo procesar y no fue cosa del banco (Mercado Pago no
+//       aceptó la petición y se comprobó que no hay orden, o el token de la tarjeta no existe o ya se
+//       usó). El pedido se descartó y no se cobró nada; no cuenta como tarjeta rechazada del negocio;
 //     · 409 PAGO_NO_DISPONIBLE: la cuenta del restaurante no deja cobrar (pedido descartado). Si fue
 //       un 401 de Mercado Pago, el pago en línea de esa sucursal queda en pausa una hora y se avisa a VIM.
 //   Contra la prueba masiva de tarjetas (rechazos.ts): una IP con 5 rechazos en la hora recibe 429
 //   DEMASIADOS_INTENTOS al intentar otro pago en línea; desde el 4.º rechazo su `detalle` es OTRO;
-//   y con 12 rechazos en una hora el pago en línea del negocio se pausa una hora (aviso a VIM).
+//   y con 20 rechazos de tarjetas reales en una hora, desde al menos 8 IP distintas, el pago en línea
+//   del negocio se pausa una hora (aviso a VIM).
 //   `confirmar_pago` ({negocio, codigo}) es el respaldo del aviso desde la página del pedido: le
 //   pregunta a Mercado Pago y contesta el seguimiento.
 //   De la tarjeta aquí solo pasa el token, que es de un solo uso y no se escribe en ningún log.
@@ -127,13 +131,14 @@ function correoDeConfirmacion(admin: Admin, d: {
   enSegundoPlano((async () => {
     const seg = await admin.rpc("tienda_seguimiento", { p_tenant: d.p_tenant, p_seguimiento_hash: d.p_seguimiento_hash });
     if (seg.error) return registrarError("tienda", "CORREO_PEDIDO", seg.error);
-    const s = seg.data as { folio_corto?: string; modo?: "RECOGER" | "DOMICILIO"; total_mxn?: string; total_a_pagar_mxn?: string;
+    const s = seg.data as { folio_corto?: string; modo?: "RECOGER" | "DOMICILIO"; total_mxn?: string; total_a_pagar_mxn?: string; propina_mxn?: string;
                             renglones?: { nombre: string; cantidad: number; detalle: string | null }[] } | null;
     if (!s?.folio_corto || !s.total_mxn) return;
     const { subject, html } = correoDePedido({
       negocio: d.negocio, folio: s.folio_corto, total: (d.pagado ? s.total_a_pagar_mxn : null) ?? s.total_mxn,
       modo: s.modo === "DOMICILIO" ? "DOMICILIO" : "RECOGER", renglones: s.renglones ?? [],
       enlace: `${base}/${d.slug}/pedido/${d.codigo}`, pagado: d.pagado,
+      ...(d.pagado && { totalPedido: s.total_mxn, propina: s.propina_mxn ?? null }),
     });
     const r = await enviarCorreo({ to, subject, html });
     // Sin el motivo de SMTP: puede traer la dirección del cliente.
@@ -475,8 +480,9 @@ async function atender(req: Request): Promise<Response> {
       if (pago) {
         const sinResolver = pago.estado === "CREADO" || (pago.estado === "VENCIDO" && !pago.conciliado_at);
         // A lo sumo una consulta a Mercado Pago cada 10 s por pago, por mucho que insista la página.
+        // Ya vencido (se espera la segunda conciliación, que tarda una hora), cada 5 minutos.
         if (sinResolver) {
-          const turno = await admin.rpc("tienda_pago_tomar_consulta", { p_pago: pago.id, p_segundos: 10 });
+          const turno = await admin.rpc("tienda_pago_tomar_consulta", { p_pago: pago.id, p_segundos: pago.estado === "VENCIDO" ? 300 : 10 });
           if (turno.error) return rechazo("tienda_pago_tomar_consulta", turno.error);
           // Si Mercado Pago no contesta no es un error para el cliente: ve su pedido como está y la página reintenta.
           if (turno.data === true) await confirmarPago(depsDePagos(admin, "tienda"), pago.id);
@@ -583,6 +589,12 @@ async function atender(req: Request): Promise<Response> {
       const r = await anotarRechazo(admin, ip, p.negocio, cobro.motivo);
       if (r.pausar) await pausarPagoEnLinea(admin, { p_tenant, sucursal: null, negocio: negocio.nombre, slug: p.negocio, por: "RECHAZOS" });
       return json({ error: "PAGO_RECHAZADO", detalle: r.detalle }, 409);
+    }
+    if (cobro.tipo === "NO_PROCESADO") {
+      // No fue el banco ni una tarjeta: no cuenta como tarjeta rechazada del negocio. Un token
+      // inventado o usado sí cuenta para la IP que lo mandó (y solo para ella).
+      if (cobro.contarIp) await anotarRechazo(admin, ip, p.negocio, "OTRO", true);
+      return json({ error: "PAGO_NO_PROCESADO" }, 409);
     }
     if (cobro.tipo === "NO_DISPONIBLE") {
       // Mercado Pago rechazó las credenciales de la cuenta: seguir ofreciendo el pago ahí solo junta

@@ -13,7 +13,7 @@ import { registrarError, textoDeError } from "../_shared/errores.ts";
 import { enviarCorreo } from "../_shared/correo.ts";
 import { secretoInternoValido } from "../_shared/delivery/interno.ts";
 import { pedirTokensDeTienda } from "../_shared/tienda/conexion-mp.ts";
-import { avisoDeRenovacionFallida, type PuertoRenovacion, renovarConexiones } from "../_shared/tienda/renovar-mp.ts";
+import { avisoDeCredencialesDeLaAplicacion, avisoDeRenovacionFallida, type PuertoRenovacion, renovarConexiones } from "../_shared/tienda/renovar-mp.ts";
 
 const FN = "tienda-mp-renovar";
 const admin = clienteAdmin();
@@ -22,7 +22,14 @@ const CLIENT_ID = Deno.env.get("MP_TIENDA_CLIENT_ID") ?? "";
 const CLIENT_SECRET = Deno.env.get("MP_TIENDA_CLIENT_SECRET") ?? "";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const AVISOS = () => Deno.env.get("VIM_AVISOS_A") ?? "hola@vimpos.com.mx";
+
 const puerto: PuertoRenovacion = {
+  async tomar(id) {
+    const { data, error } = await admin.rpc("tienda_conexion_tomar_renovacion", { p_conexion: id });
+    if (error) throw new Error(textoDeError(error));
+    return typeof data === "string" ? data : null;
+  },
   async leerRefresh(id) {
     const { data, error } = await admin.rpc("tienda_leer_tokens", { p_conexion: id });
     if (error) throw new Error(textoDeError(error));
@@ -35,17 +42,21 @@ const puerto: PuertoRenovacion = {
     });
     return error ? textoDeError(error) : null;
   },
-  async anotar(id, motivo, definitiva) {
-    const { error } = await admin.from("tienda_conexiones")
-      .update({ ultimo_error: motivo.slice(0, 300), ...(definitiva && { estado: "ERROR" }) }).eq("id", id);
+  async fallida(id, vence, motivo, definitiva) {
+    const { data, error } = await admin.rpc("tienda_conexion_renovacion_fallida", { p_conexion: id, p_vence: vence, p_motivo: motivo, p_definitiva: definitiva });
     if (error) throw new Error(textoDeError(error));
+    return data === true;
   },
-  async avisar(id, motivo) {
+  async avisarNuestro(motivo) {
+    const r = await enviarCorreo({ to: AVISOS(), ...avisoDeCredencialesDeLaAplicacion(motivo) });
+    if (!r.enviado) throw new Error("el correo no salió");
+  },
+  async avisar(id, motivo, definitiva) {
     const { data } = await admin.from("tienda_conexiones").select("cuenta_nombre, vence_at, negocio:tenants(nombre_comercial)").eq("id", id).maybeSingle();
     const f = data as { cuenta_nombre?: string | null; vence_at?: string | null; negocio?: { nombre_comercial?: string | null } | null } | null;
     const r = await enviarCorreo({
-      to: Deno.env.get("VIM_AVISOS_A") ?? "hola@vimpos.com.mx",
-      ...avisoDeRenovacionFallida({ negocio: f?.negocio?.nombre_comercial ?? "", cuenta: f?.cuenta_nombre ?? "Cuenta de Mercado Pago", conexionId: id, motivo, vence: f?.vence_at ?? null }),
+      to: AVISOS(),
+      ...avisoDeRenovacionFallida({ negocio: f?.negocio?.nombre_comercial ?? "", cuenta: f?.cuenta_nombre ?? "Cuenta de Mercado Pago", conexionId: id, motivo, vence: f?.vence_at ?? null, definitiva }),
     });
     if (!r.enviado) throw new Error("el correo no salió");
   },

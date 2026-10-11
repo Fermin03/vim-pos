@@ -7,21 +7,26 @@ import type { Modo } from "./validar.ts";
 export function correoDePedido(d: {
   negocio: string; folio: string; total: string; modo: Modo;
   renglones: { nombre: string; cantidad: number; detalle: string | null }[]; enlace: string;
-  /** El pedido ya se pagó en línea: no se le dice «Pagas al recibir». (El texto propio de un pedido
-   *  pagado es de redacción; mientras no llegue, la frase solo se quita.) */
+  /** El pedido ya se pagó en línea: se dice, con lo que se pagó. `total` es entonces lo cobrado (pedido + propina). TEXTO PROVISIONAL (James). */
   pagado?: boolean;
+  /** Solo con `pagado`: el total del pedido sin propina y la propina, para desglosar lo cobrado. */
+  totalPedido?: string | null;
+  propina?: string | null;
 }): { subject: string; html: string } {
   const filas = d.renglones.map((r) =>
     `<tr><td style="padding:6px 0">${Number(r.cantidad)} × ${esc(r.nombre)}${r.detalle ? `<br><span style="color:#666;font-size:13px">${esc(r.detalle)}</span>` : ""}</td></tr>`
   ).join("");
+  // La propina se desglosa solo si la hubo.
+  const conPropina = Boolean(d.propina) && Number(d.propina) > 0;
   const como = d.modo === "DOMICILIO" ? "Te lo llevamos a domicilio." : "Pasas a recogerlo a la sucursal.";
   return {
     subject: soloAscii(`Recibimos tu pedido ${d.folio} - ${d.negocio}`).replace(/[\s-]+$/, ""),
     html: `<div style="font-family:system-ui,sans-serif;max-width:480px;margin:0 auto;color:#111">
 <h1 style="font-size:20px;margin:0 0 4px">${esc(d.negocio)}</h1>
-<p style="margin:0 0 16px">Recibimos tu pedido <strong>${esc(d.folio)}</strong>. ${como}${d.pagado ? "" : " Pagas al recibir."}</p>
+<p style="margin:0 0 16px">Recibimos tu pedido <strong>${esc(d.folio)}</strong>. ${como}${d.pagado ? " Ya está pagado: no tienes que pagar nada más." : " Pagas al recibir."}</p>
 <table style="width:100%;border-collapse:collapse;border-top:1px solid #ddd;border-bottom:1px solid #ddd">${filas}</table>
-<p style="font-size:18px;margin:16px 0"><strong>Total: $${esc(d.total)}</strong></p>
+${d.pagado && d.totalPedido && conPropina ? `<p style="margin:16px 0 0;color:#444">Pedido: $${esc(d.totalPedido)}<br>Propina: $${esc(d.propina!)}</p>` : ""}
+<p style="font-size:18px;margin:${d.pagado && d.totalPedido && conPropina ? "6px" : "16px"} 0 16px"><strong>${d.pagado ? "Pagado con tarjeta" : "Total"}: $${esc(d.total)}</strong></p>
 <p style="margin:0 0 24px"><a href="${esc(d.enlace)}" style="background:#111;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;display:inline-block">Ver cómo va mi pedido</a></p>
 <p style="color:#666;font-size:13px;margin:0">Si no hiciste este pedido, ignora este correo.</p>
 </div>`,

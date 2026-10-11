@@ -99,12 +99,18 @@ export async function conexionDeTienda(admin: Admin, tenantId: string, b: Record
     const { data } = await admin.from("tienda_conexiones").select("id, estado").eq("id", id).eq("tenant_id", tenantId).maybeSingle();
     const cx = data as { id: string; estado: string } | null;
     if (!cx || cx.estado === "DESCONECTADA") return json({ error: "CONEXION_NO_EXISTE" }, 404);
-    // Con los tokens se van las devoluciones: mientras haya un cobro sin resolver o una devolución
-    // pendiente con esta cuenta, no se desconecta (el dinero de un cliente depende de ese token).
-    const { count, error: ePend } = await admin.from("tienda_pagos").select("id", { count: "exact", head: true })
-      .eq("conexion_id", cx.id).in("estado", ["CREADO", "POR_DEVOLVER"]);
-    if (ePend) throw ePend;
-    if ((count ?? 0) > 0) return json({ error: "PAGOS_PENDIENTES" }, 409);
+    // Con los tokens se van las devoluciones: no se desconecta mientras el dinero de un cliente
+    // dependa de ellos. La regla vive en la base (`tienda_conexion_ocupada`, 0173): un cobro sin
+    // resolver, una devolución por hacer o fallida, o un cobro de las últimas 48 horas (la ventana
+    // en la que cancelar la cuenta todavía devuelve el pago). Se le dice al dueño por qué y hasta cuándo.
+    const { data: ocupada, error: eOcu } = await admin.rpc("tienda_conexion_ocupada", { p_conexion: cx.id });
+    if (eOcu) throw eOcu;
+    const o = ocupada as { motivo?: unknown; hasta?: unknown } | null;
+    if (o) {
+      return o.motivo === "RECIENTES" && typeof o.hasta === "string"
+        ? json({ error: "PAGOS_RECIENTES", hasta: o.hasta }, 409)
+        : json({ error: "PAGOS_PENDIENTES" }, 409);
+    }
     const { error: eTok } = await admin.rpc("tienda_borrar_tokens", { p_conexion: cx.id });
     if (eTok) throw eTok;
     const { error } = await admin.from("tienda_conexiones").update({ estado: "DESCONECTADA" }).eq("id", cx.id).eq("tenant_id", tenantId);

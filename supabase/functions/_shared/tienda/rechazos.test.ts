@@ -43,14 +43,40 @@ test("tras 5 rechazos esa IP ya no puede intentar pago en línea; antes sí, y o
   assert.equal(await ipSinPagoEnLinea(db, "2806:2f0:9000:ab:ffff::1", "knockout"), true);
 });
 
-test("12 rechazos en un negocio en una hora, vengan de las IP que vengan: hay que pausar su pago en línea; otro negocio no se entera", async () => {
+test("la pausa del negocio pide 20 rechazos de tarjetas reales repartidos en al menos 8 IP distintas; otro negocio no se entera", async () => {
   const db = contadores();
   const pausas: boolean[] = [];
-  for (let i = 1; i <= RECHAZOS.negocioPausa + 1; i++) pausas.push((await anotarRechazo(db, `10.0.0.${i}`, "knockout", "FONDOS")).pausar);
+  // 10 IP distintas, 2 rechazos cada una: al vigésimo, con 10 IP, se pausa.
+  for (let i = 0; i < RECHAZOS.negocioPausa + 1; i++) pausas.push((await anotarRechazo(db, `10.0.0.${(i % 10) + 1}`, "knockout", "FONDOS")).pausar);
   assert.deepEqual(pausas, [...Array(RECHAZOS.negocioPausa - 1).fill(false), true, true]);
   assert.equal((await anotarRechazo(db, "10.0.0.1", "otro-negocio", "FONDOS")).pausar, false);
 });
 
+test("un atacante con pocas IP no le apaga el pago en línea a un restaurante, por muchas peticiones que mande", async () => {
+  // 3 IP (lo que antes bastaba con 12 peticiones): 100 rechazos cada una, y nada.
+  const db = contadores();
+  for (let i = 0; i < 300; i++) assert.equal((await anotarRechazo(db, `10.0.0.${(i % 3) + 1}`, "knockout", "FONDOS")).pausar, false, `petición ${i + 1}`);
+  // 7 IP tampoco, aunque el total pase de 20 de sobra.
+  const siete = contadores();
+  for (let i = 0; i < 140; i++) assert.equal((await anotarRechazo(siete, `10.0.1.${(i % 7) + 1}`, "knockout", "FONDOS")).pausar, false);
+  // Y 8 IP con pocos rechazos (menos de 20 en total), tampoco: hacen falta las dos cosas.
+  const pocos = contadores();
+  for (let i = 0; i < 19; i++) assert.equal((await anotarRechazo(pocos, `10.0.2.${(i % 8) + 1}`, "knockout", "FONDOS")).pausar, false);
+  assert.equal((await anotarRechazo(pocos, "10.0.2.1", "knockout", "FONDOS")).pausar, true);   // el vigésimo, con 8 IP
+  // IPv6: mil direcciones de un mismo /64 son UNA IP.
+  const v6 = contadores();
+  for (let i = 0; i < 200; i++) assert.equal((await anotarRechazo(v6, `2806:2f0:9000:ab::${(i + 1).toString(16)}`, "knockout", "FONDOS")).pausar, false);
+});
+
+test("un token de tarjeta inventado (soloIp) cuenta para la IP que lo manda y NUNCA para pausar al negocio", async () => {
+  const db = contadores();
+  // Antes: 12 peticiones desde 3 IP pausaban al restaurante sin una sola tarjeta. Ahora, ni 500 desde 50.
+  for (let i = 0; i < 500; i++) assert.equal((await anotarRechazo(db, `10.1.${i % 50}.7`, "knockout", "OTRO", true)).pausar, false);
+  assert.equal([...db.usos.keys()].some((k) => k.startsWith("tienda:pago-rechazo:negocio")), false);
+  // Pero a esa IP sí se le acaba: tras 5, no puede intentar otro pago en línea.
+  assert.equal(await ipSinPagoEnLinea(db, "10.1.0.7", "knockout"), true);
+  assert.equal(await ipSinPagoEnLinea(db, "10.9.9.9", "knockout"), false);
+});
 test("si el contador no responde: el motivo es OTRO, nada se pausa y la IP no queda bloqueada", async () => {
   const db = contadores({ roto: true });
   assert.deepEqual(await anotarRechazo(db, "1.2.3.4", "knockout", "FONDOS"), { detalle: "OTRO", pausar: false });
@@ -69,7 +95,7 @@ test("bolsas separadas: los intentos de pago en línea no gastan el cupo de pedi
 
 test("el correo de la pausa dice a quién y por qué, sin datos de clientes ni de tarjetas", () => {
   const r = avisoDePagoPausado({ negocio: "Knock-Out <b>", slug: "knockout", por: "RECHAZOS" });
-  assert.ok(r.html.includes("Knock-Out &lt;b&gt;") && r.html.includes("12 cobros con tarjeta rechazados"));
+  assert.ok(r.html.includes("Knock-Out &lt;b&gt;") && r.html.includes("20 cobros con tarjeta rechazados") && r.html.includes("8 redes distintas"));
   assert.match(r.subject, /^[\x20-\x7e]+$/);
   const s = avisoDePagoPausado({ negocio: "Knock-Out", slug: "knockout", sucursal: "Centro", por: "SIN_PERMISO" });
   assert.ok(s.html.includes("la sucursal Centro de Knock-Out") && s.html.includes("401") && s.html.includes("volver a conectar"));

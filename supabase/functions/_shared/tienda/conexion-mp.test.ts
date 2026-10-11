@@ -48,7 +48,7 @@ test("el canje va con las credenciales de la aplicación de la TIENDA y devuelve
 
 // ── Desconectar: contra una base de mentira ────────────────────────────────────────────────────
 type Fila = Record<string, unknown>;
-function baseDeMentira(o: { conexion: Fila | null; pendientes: number }) {
+function baseDeMentira(o: { conexion: Fila | null; ocupada: Fila | null | Error }) {
   const hechos: string[] = [];
   const filtros: Record<string, unknown>[] = [];
   const admin = {
@@ -61,41 +61,54 @@ function baseDeMentira(o: { conexion: Fila | null; pendientes: number }) {
         in: (k: string, v: unknown) => { f[k] = v; return q; },
         update: (v: Fila) => { hechos.push(`update ${tabla} ${JSON.stringify(v)}`); return q; },
         maybeSingle: async () => ({ data: tabla === "tienda_conexiones" && f.id === o.conexion?.id && f.tenant_id === o.conexion?.tenant_id ? o.conexion : null, error: null }),
-        then: (ok: (r: { count: number; error: null }) => unknown) => ok({ count: o.pendientes, error: null }),
       };
       return q;
     },
-    rpc: async (fn: string, args: Fila) => { hechos.push(`rpc ${fn} ${JSON.stringify(args)}`); return { data: null, error: null }; },
+    rpc: async (fn: string, args: Fila) => {
+      hechos.push(`rpc ${fn} ${JSON.stringify(args)}`);
+      if (fn !== "tienda_conexion_ocupada") return { data: null, error: null };
+      return o.ocupada instanceof Error ? { data: null, error: { message: o.ocupada.message } } : { data: o.ocupada, error: null };
+    },
   };
   return { admin: admin as unknown as Parameters<typeof conexionDeTienda>[0], hechos, filtros };
 }
 const json = (cuerpo: unknown, status = 200) => new Response(JSON.stringify(cuerpo), { status });
 const CX = "11111111-2222-3333-4444-555555555555", NEGOCIO = "aaaaaaaa-0000-0000-0000-000000000001";
-
 test("desconectar: borra los tokens de la TIENDA y deja la conexión desconectada; solo la del negocio de la sesión", async () => {
-  const { admin, hechos, filtros } = baseDeMentira({ conexion: { id: CX, tenant_id: NEGOCIO, estado: "ACTIVA" }, pendientes: 0 });
+  const { admin, hechos, filtros } = baseDeMentira({ conexion: { id: CX, tenant_id: NEGOCIO, estado: "ACTIVA" }, ocupada: null });
   const r = await conexionDeTienda(admin, NEGOCIO, { accion: "desconectar", conexion_id: CX.toUpperCase() }, json);
   assert.equal(r.status, 200);
-  assert.deepEqual(hechos, [`rpc tienda_borrar_tokens {"p_conexion":"${CX}"}`, 'update tienda_conexiones {"estado":"DESCONECTADA"}']);
+  // Antes de borrar nada se le pregunta a la base si algún dinero depende de esos tokens.
+  assert.deepEqual(hechos, [`rpc tienda_conexion_ocupada {"p_conexion":"${CX}"}`, `rpc tienda_borrar_tokens {"p_conexion":"${CX}"}`, 'update tienda_conexiones {"estado":"DESCONECTADA"}']);
   // Nunca toca nada de la terminal.
   assert.ok(filtros.every((f) => !String(f.tabla).startsWith("terminal_")) && hechos.every((h) => !h.includes("terminal_")));
   // La conexión de OTRO negocio no existe para esta sesión.
-  const ajena = baseDeMentira({ conexion: { id: CX, tenant_id: "otro", estado: "ACTIVA" }, pendientes: 0 });
+  const ajena = baseDeMentira({ conexion: { id: CX, tenant_id: "otro", estado: "ACTIVA" }, ocupada: null });
   assert.equal((await conexionDeTienda(ajena.admin, NEGOCIO, { accion: "desconectar", conexion_id: CX }, json)).status, 404);
   assert.deepEqual(ajena.hechos, []);
 });
 
-test("desconectar: con un cobro sin resolver o una devolución pendiente NO se desconecta (el token hace falta para devolver)", async () => {
-  const { admin, hechos, filtros } = baseDeMentira({ conexion: { id: CX, tenant_id: NEGOCIO, estado: "ACTIVA" }, pendientes: 1 });
-  const r = await conexionDeTienda(admin, NEGOCIO, { accion: "desconectar", conexion_id: CX }, json);
+test("desconectar: NO mientras haya un cobro sin resolver, una devolución por hacer o fallida, o un cobro de las últimas 48 horas; y dice por qué y hasta cuándo", async () => {
+  // Cobro sin resolver o devolución pendiente o fallida: no, sin fecha.
+  const pend = baseDeMentira({ conexion: { id: CX, tenant_id: NEGOCIO, estado: "ACTIVA" }, ocupada: { motivo: "PENDIENTES" } });
+  const r = await conexionDeTienda(pend.admin, NEGOCIO, { accion: "desconectar", conexion_id: CX }, json);
   assert.equal(r.status, 409);
   assert.deepEqual(await r.json(), { error: "PAGOS_PENDIENTES" });
-  assert.deepEqual(hechos, []);
-  assert.deepEqual(filtros.find((f) => f.tabla === "tienda_pagos"), { tabla: "tienda_pagos", cuenta: true, conexion_id: CX, estado: ["CREADO", "POR_DEVOLVER"] });
+  // Cobró hace poco (una cancelación todavía devolvería ese pago): no, y cuándo sí.
+  const rec = baseDeMentira({ conexion: { id: CX, tenant_id: NEGOCIO, estado: "ACTIVA" }, ocupada: { motivo: "RECIENTES", hasta: "2026-10-13T18:00:00+00:00" } });
+  const r2 = await conexionDeTienda(rec.admin, NEGOCIO, { accion: "desconectar", conexion_id: CX }, json);
+  assert.equal(r2.status, 409);
+  assert.deepEqual(await r2.json(), { error: "PAGOS_RECIENTES", hasta: "2026-10-13T18:00:00+00:00" });
+  // En ninguno de los dos casos se borró un token ni se tocó la conexión.
+  for (const b of [pend, rec]) assert.deepEqual(b.hechos, [`rpc tienda_conexion_ocupada {"p_conexion":"${CX}"}`]);
+  // Y si la base no contesta a esa pregunta, tampoco se desconecta: se lanza.
+  const rota = baseDeMentira({ conexion: { id: CX, tenant_id: NEGOCIO, estado: "ACTIVA" }, ocupada: new Error("la base no responde") });
+  await assert.rejects(() => conexionDeTienda(rota.admin, NEGOCIO, { accion: "desconectar", conexion_id: CX }, json));
+  assert.ok(rota.hechos.every((h) => !h.includes("tienda_borrar_tokens")));
 });
 
 test("la conexión de la tienda: lo que no es canjear ni desconectar, o viene mal, no hace nada", async () => {
-  const { admin, hechos } = baseDeMentira({ conexion: null, pendientes: 0 });
+  const { admin, hechos } = baseDeMentira({ conexion: null, ocupada: null });
   assert.equal((await conexionDeTienda(admin, NEGOCIO, { accion: "sucursal" }, json)).status, 400);
   assert.equal((await conexionDeTienda(admin, NEGOCIO, { accion: "desconectar", conexion_id: "no-es-uuid" }, json)).status, 400);
   // Sin las credenciales de la aplicación de la tienda no se canjea nada (aquí no hay Deno ni secretos).

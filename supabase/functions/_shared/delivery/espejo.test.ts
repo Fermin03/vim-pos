@@ -240,3 +240,13 @@ test("pago en línea: la que lo declara recibe solo los ya pagados; los de apps 
 test("pago en línea: sin declararlo el filtro no nombra pagado_at (se puede desplegar antes que la 0173)", () => {
   assert.doesNotMatch(filtroPagoEnLinea({}), /pagado_at/);
 });
+
+test("latido: la caja que declara pago_en_linea sella su marca; la que no, manda el UPDATE de siempre", () => {
+  const AHORA = "2026-10-11T18:00:00.000Z";
+  assert.deepEqual(selloLatido({ tienda: true, turno_abierto: true, pago_en_linea: true }, AHORA),
+    { espejo_apps_at: AHORA, espejo_turno_abierto_at: AHORA, espejo_pago_en_linea_at: AHORA });
+  // No depende de nada más: es lo que la caja SABE hacer, con o sin turno abierto.
+  assert.deepEqual(selloLatido({ pago_en_linea: true }, AHORA), { espejo_apps_at: AHORA, espejo_pago_en_linea_at: AHORA });
+  // Solo un `true` la sella: una caja anterior (o una que dejó de declararlo) no escribe la columna.
+  for (const v of [undefined, false, "true", 1, null]) assert.deepEqual(selloLatido({ tienda: true, pago_en_linea: v }, AHORA), { espejo_apps_at: AHORA }, String(v));
+});
