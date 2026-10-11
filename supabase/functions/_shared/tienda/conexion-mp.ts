@@ -33,12 +33,14 @@ export function publicKeyDe(cuerpo: unknown): string | null {
 }
 
 /**
- * Canjea el `code` con las credenciales de la aplicación de la tienda y devuelve los tokens y la
- * public key. Reutiliza `pedirTokens` de la terminal tal cual; la public key se lee de la misma
- * respuesta (aquel no la devuelve, y no se le cambia nada).
+ * Canjea el `code` (al conectar) o el refresh token (al renovar) con las credenciales de la
+ * aplicación de la tienda, y devuelve los tokens y la public key si la respuesta la trae. Reutiliza
+ * `pedirTokens` de la terminal tal cual; la public key se lee de la misma respuesta (aquel no la
+ * devuelve, y no se le cambia nada). Una respuesta a medias (sin access, sin refresh o sin
+ * vencimiento) no es un par: `tokens` es null y no hay nada que guardar.
  */
-export async function canjearCodigo(
-  c: { clientId: string; clientSecret: string; code: string; redirectUri: string },
+export async function pedirTokensDeTienda(
+  c: Parameters<typeof pedirTokens>[0],
   pedir: typeof fetch = fetch,
 ): Promise<{ tokens: Tokens; publicKey: string | null } | { tokens: null; status: number; codigo: string | null }> {
   let publicKey: string | null = null;
@@ -66,7 +68,7 @@ export async function conexionDeTienda(admin: Admin, tenantId: string, b: Record
     if (typeof b.code !== "string" || b.code === "" || b.code.length > 200) return json({ error: "FALTAN_CAMPOS" }, 400);
     // La misma URL de regreso que la terminal: es la que está registrada en la aplicación de la tienda.
     const redirectUri = env("MP_REDIRECT_URI") || "https://admin.vimpos.com.mx/integraciones/mercado-pago/callback";
-    const r = await canjearCodigo({ clientId, clientSecret, code: b.code, redirectUri });
+    const r = await pedirTokensDeTienda({ clientId, clientSecret, code: b.code, redirectUri });
     if (!r.tokens) {
       registrarError("terminal-mp-conexion", "TIENDA_CANJE_RECHAZADO", `HTTP ${r.status} ${r.codigo ?? ""}`);
       return json({ error: "CANJE_RECHAZADO" }, 409);

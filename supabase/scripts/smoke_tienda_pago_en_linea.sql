@@ -125,6 +125,36 @@ BEGIN
     IF SQLERRM NOT LIKE 'VAULT_NO_DISPONIBLE%' THEN RAISE; END IF;
   END;
   PERFORM tienda_borrar_tokens(v_cx1);
+  -- Y un par a medias no se guarda nunca (ni con Vault): al renovar, el refresh viejo ya no sirve.
+  IF (SELECT count(*) FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname = 'tienda_guardar_tokens') <> 1 THEN
+    RAISE EXCEPTION 'A2: tienda_guardar_tokens tiene más de una firma';
+  END IF;
+
+  -- A2b) La renovación de los permisos: solo las cuentas ACTIVAS que vencen en menos de 30 días,
+  --      primero la que vence antes. Ni las que tienen tiempo, ni las que están en error o
+  --      desconectadas (esas hay que volver a autorizarlas), ni las que no tienen fecha.
+  UPDATE tienda_conexiones SET vence_at = now() + interval '31 days' WHERE id = v_cx1;
+  IF EXISTS (SELECT 1 FROM tienda_conexiones_por_renovar()) OR tienda_pedir_renovacion() THEN RAISE EXCEPTION 'A2b: quiso renovar un permiso al que le faltan 31 días'; END IF;
+  IF EXISTS (SELECT 1 FROM tienda_eventos WHERE accion = 'renovacion:sin_configurar') THEN RAISE EXCEPTION 'A2b: dejó rastro sin tener nada que renovar'; END IF;
+  UPDATE tienda_conexiones SET vence_at = now() + interval '29 days' WHERE id = v_cx1;
+  UPDATE tienda_conexiones SET vence_at = now() + interval '5 days' WHERE id = v_cx_o;
+  IF (SELECT array_agg(x) FROM tienda_conexiones_por_renovar() x) IS DISTINCT FROM ARRAY[v_cx_o, v_cx1] THEN
+    RAISE EXCEPTION 'A2b: debían salir las dos que vencen pronto, primero la que vence antes: %', (SELECT array_agg(x) FROM tienda_conexiones_por_renovar() x);
+  END IF;
+  IF (SELECT array_agg(x) FROM tienda_conexiones_por_renovar(30, 1) x) IS DISTINCT FROM ARRAY[v_cx_o] THEN RAISE EXCEPTION 'A2b: el tope no se respeta'; END IF;
+  IF (SELECT count(*) FROM tienda_conexiones_por_renovar(3)) <> 0 OR (SELECT count(*) FROM tienda_conexiones_por_renovar(10)) <> 1 THEN RAISE EXCEPTION 'A2b: los días de margen no se respetan'; END IF;
+  FOR r IN SELECT * FROM (VALUES ('ERROR'), ('DESCONECTADA')) AS x(estado) LOOP
+    UPDATE tienda_conexiones SET estado = r.estado WHERE id = v_cx_o;
+    IF (SELECT array_agg(x) FROM tienda_conexiones_por_renovar() x) IS DISTINCT FROM ARRAY[v_cx1] THEN RAISE EXCEPTION 'A2b: quiso renovar una conexión %', r.estado; END IF;
+  END LOOP;
+  UPDATE tienda_conexiones SET estado = 'ACTIVA', vence_at = NULL WHERE id = v_cx_o;
+  IF (SELECT array_agg(x) FROM tienda_conexiones_por_renovar() x) IS DISTINCT FROM ARRAY[v_cx1] THEN RAISE EXCEPTION 'A2b: quiso renovar una conexión sin fecha de vencimiento'; END IF;
+  -- Aquí no hay pg_net ni Vault (como en la caja): no se encola nada, no revienta, y queda UN rastro al día.
+  IF tienda_pedir_renovacion() OR tienda_pedir_renovacion() THEN RAISE EXCEPTION 'A2b: dijo que encoló la renovación sin pg_net'; END IF;
+  IF (SELECT count(*) FROM tienda_eventos WHERE accion = 'renovacion:sin_configurar') <> 1 THEN
+    RAISE EXCEPTION 'A2b: con permisos por vencer y sin poder renovar debía quedar UN rastro y quedaron %', (SELECT count(*) FROM tienda_eventos WHERE accion = 'renovacion:sin_configurar');
+  END IF;
+  UPDATE tienda_conexiones SET vence_at = NULL WHERE id = v_cx1;
   -- Una conexión de PRUEBA nunca cobra en la tienda (ni siendo la única, ni elegida a mano).
   UPDATE tienda_conexiones SET de_prueba = true WHERE id = v_cx1;
   IF tienda_conexion_cobro(v_t, v_suc) IS NOT NULL THEN RAISE EXCEPTION 'A2: cobra en línea una conexión de prueba'; END IF;
@@ -902,6 +932,7 @@ BEGIN
   FOR r IN SELECT p.oid::regprocedure AS firma, p.proname FROM pg_proc p
             WHERE p.pronamespace = 'public'::regnamespace
               AND p.proname IN ('tienda_guardar_tokens', 'tienda_leer_tokens', 'tienda_borrar_tokens', 'tienda_pago_pausar', 'tienda_pago_anotar',
+                                'tienda_conexiones_por_renovar', 'tienda_pedir_renovacion',
                                 'tienda_conexion_cobro', 'tienda_crear_pedido', 'tienda_pago_tomar_cobro', 'tienda_pago_descartar',
                                 'tienda_pago_tomar_consulta', 'tienda_pago_aplicar', 'tienda_pago_tomar_correo', 'tienda_pagos_tomar',
                                 'tienda_pago_devolucion', 'tienda_pago_conciliacion', 'tienda_reportar_estado', 'tienda_pagos_barrer', '_tienda_pedido_creado',

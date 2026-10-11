@@ -98,12 +98,16 @@ CREATE TRIGGER trg_tienda_conexiones_updated_at BEFORE UPDATE ON tienda_conexion
 -- Los tokens del restaurante, en Vault. Mismo patrón que la terminal (0169), con nombre propio:
 -- `tienda:<conexion_id>:access` / `:refresh`. Todo lo de Vault va con EXECUTE dinámico porque esta
 -- migración también corre en el Postgres de la caja, que no tiene Vault (ahí no se usan).
-CREATE OR REPLACE FUNCTION tienda_guardar_tokens(p_conexion uuid, p_access text, p_refresh text, p_vence timestamptz)
+-- Guarda el par (access y refresh) en UNA transacción: los dos o ninguno. Al renovar, Mercado Pago
+-- invalida el refresh token viejo, así que un par a medias dejaría la conexión sin forma de renovarse.
+-- `p_public_key`: si la respuesta de Mercado Pago la trajo, se actualiza con el mismo guardado.
+CREATE OR REPLACE FUNCTION tienda_guardar_tokens(p_conexion uuid, p_access text, p_refresh text, p_vence timestamptz, p_public_key text DEFAULT NULL)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE par record; v_id uuid;
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'vault') THEN RAISE EXCEPTION 'VAULT_NO_DISPONIBLE'; END IF;
   IF NOT EXISTS (SELECT 1 FROM tienda_conexiones WHERE id = p_conexion) THEN RAISE EXCEPTION 'CONEXION_NO_EXISTE'; END IF;
+  IF COALESCE(p_access, '') = '' OR COALESCE(p_refresh, '') = '' OR p_vence IS NULL THEN RAISE EXCEPTION 'TOKENS_INCOMPLETOS'; END IF;
   FOR par IN SELECT * FROM (VALUES ('access', p_access), ('refresh', p_refresh)) AS t(cual, valor) LOOP
     EXECUTE 'SELECT id FROM vault.secrets WHERE name = $1' INTO v_id USING format('tienda:%s:%s', p_conexion, par.cual);
     IF v_id IS NULL THEN
@@ -112,7 +116,9 @@ BEGIN
       EXECUTE 'SELECT vault.update_secret($1, $2)' USING v_id, par.valor;
     END IF;
   END LOOP;
-  UPDATE tienda_conexiones SET vence_at = p_vence, estado = 'ACTIVA', ultimo_error = NULL WHERE id = p_conexion;
+  UPDATE tienda_conexiones
+     SET vence_at = p_vence, estado = 'ACTIVA', ultimo_error = NULL, public_key = COALESCE(p_public_key, public_key)
+   WHERE id = p_conexion;
 END $$;
 
 CREATE OR REPLACE FUNCTION tienda_leer_tokens(p_conexion uuid)
@@ -131,6 +137,56 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'vault') THEN RETURN; END IF;
   EXECUTE 'DELETE FROM vault.secrets WHERE name IN ($1, $2)'
     USING format('tienda:%s:access', p_conexion), format('tienda:%s:refresh', p_conexion);
+END $$;
+
+-- ── La renovación de los permisos de la tienda ───────────────────────────────
+-- El access token de cada restaurante dura 180 días. Mismo camino que el de la terminal
+-- (0171_terminal_renovar_tokens): una vez al día la base le pide a una función, aquí
+-- `tienda-mp-renovar`, que renueve los que vencen pronto (pg_cron → pg_net, con `vim_interno` y
+-- `vim_functions_url` de Vault). La programación va al final del archivo.
+--
+-- Qué conexiones toca renovar: las ACTIVAS que vencen en menos de p_dias (30), primero la que vence
+-- antes. Una en ERROR o DESCONECTADA no se renueva: hay que volver a autorizarla. La regla vive
+-- AQUÍ y la usan los dos: quien decide si se despierta a la función y la función misma.
+CREATE OR REPLACE FUNCTION tienda_conexiones_por_renovar(p_dias integer DEFAULT 30, p_max integer DEFAULT 50)
+RETURNS SETOF uuid
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT x.id FROM tienda_conexiones x
+   WHERE x.estado = 'ACTIVA'
+     AND x.vence_at < now() + make_interval(days => LEAST(GREATEST(COALESCE(p_dias, 30), 1), 365))
+   ORDER BY x.vence_at
+   LIMIT LEAST(GREATEST(COALESCE(p_max, 50), 1), 200);
+$$;
+
+-- Sin pg_net o sin secretos no hace nada (es lo que pasa en el Postgres de la caja), y sin nada
+-- que renovar no despierta a la función. Devuelve true si se encoló la llamada.
+CREATE OR REPLACE FUNCTION tienda_pedir_renovacion() RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_secreto text := _vim_secreto('vim_interno');
+  v_base    text := _vim_secreto('vim_functions_url');
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM tienda_conexiones_por_renovar(30, 1)) THEN RETURN false; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_net') OR v_secreto IS NULL OR v_base IS NULL THEN
+    -- Hay permisos por vencer y nadie los va a renovar: que quede a la vista (como el barrido de pagos).
+    IF NOT EXISTS (SELECT 1 FROM tienda_eventos e WHERE e.accion = 'renovacion:sin_configurar' AND e.created_at > now() - interval '1 day') THEN
+      INSERT INTO tienda_eventos (accion, error)
+      VALUES ('renovacion:sin_configurar', 'hay permisos de Mercado Pago de la tienda por vencer y la renovación no puede correr');
+    END IF;
+    RAISE WARNING 'tienda_pedir_renovacion: sin pg_net o sin los secretos vim_interno / vim_functions_url en Vault';
+    RETURN false;
+  END IF;
+  EXECUTE format(
+    'SELECT net.http_post(url := %L, body := %L::jsonb, headers := %L::jsonb, timeout_milliseconds := 60000)',
+    rtrim(v_base, '/') || '/tienda-mp-renovar', '{}',
+    jsonb_build_object('Content-Type', 'application/json', 'x-vim-interno', v_secreto)::text
+  );
+  RETURN true;
+EXCEPTION WHEN OTHERS THEN
+  RAISE WARNING 'tienda_pedir_renovacion: %', SQLERRM;
+  RETURN false;
 END $$;
 
 -- Qué cuenta de Mercado Pago cobra en esta sucursal. NULL = la única conexión activa del negocio.
@@ -1543,6 +1599,7 @@ BEGIN
              FROM pg_proc p
             WHERE p.pronamespace = 'public'::regnamespace
               AND p.proname IN ('tienda_guardar_tokens', 'tienda_leer_tokens', 'tienda_borrar_tokens', 'tienda_pago_pausar', 'tienda_pago_anotar',
+                                'tienda_conexiones_por_renovar', 'tienda_pedir_renovacion',
                                 'tienda_conexion_cobro', 'tienda_negocio', 'tienda_crear_pedido', 'tienda_pago_tomar_cobro',
                                 'tienda_pago_descartar', 'tienda_pago_tomar_consulta', 'tienda_pago_aplicar', 'tienda_pago_tomar_correo',
                                 'tienda_pagos_tomar', 'tienda_pago_devolucion', 'tienda_pago_conciliacion', 'crear_ticket_desde_tienda',
@@ -1568,5 +1625,11 @@ BEGIN
       PERFORM cron.unschedule('tienda-pagos');
     END IF;
     PERFORM cron.schedule('tienda-pagos', '* * * * *', 'SELECT public.tienda_pagos_barrer()');
+    -- La renovación de los permisos de la tienda: todos los días a las 10:50 UTC (4:50 de la mañana
+    -- en el centro de México), diez minutos después de la de la terminal (0171).
+    IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'tienda-renovar-tokens') THEN
+      PERFORM cron.unschedule('tienda-renovar-tokens');
+    END IF;
+    PERFORM cron.schedule('tienda-renovar-tokens', '50 10 * * *', 'SELECT public.tienda_pedir_renovacion()');
   END IF;
 END $$;

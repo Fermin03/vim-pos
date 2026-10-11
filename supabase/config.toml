@@ -47,6 +47,10 @@ verify_jwt = false
 [functions.terminal-mp-renovar]
 verify_jwt = false
 
+# Lo mismo para los permisos de la tienda en línea (0173): la llama la base con x-vim-interno.
+[functions.tienda-mp-renovar]
+verify_jwt = false
+
 [functions.signup-tenant]
 verify_jwt = false
 

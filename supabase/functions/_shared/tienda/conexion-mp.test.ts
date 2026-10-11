@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { canjearCodigo, conexionDeTienda, destinoDe, publicKeyDe } from "./conexion-mp.ts";
+import { pedirTokensDeTienda, conexionDeTienda, destinoDe, publicKeyDe } from "./conexion-mp.ts";
 
 const RESPUESTA = { access_token: "APP_USR-acceso", refresh_token: "TG-refresco", user_id: 3754297554, expires_in: 15552000, live_mode: true,
                     public_key: "APP_USR-d0a26210-1111-2222-3333-479f0400869e" };
@@ -26,7 +26,7 @@ test("el canje va con las credenciales de la aplicación de la TIENDA y devuelve
     visto = { url, cuerpo: JSON.parse(String(init.body)) };
     return Promise.resolve(new Response(JSON.stringify(RESPUESTA), { status: 200 }));
   }) as typeof fetch;
-  const r = await canjearCodigo(CREDENCIALES, pedir);
+  const r = await pedirTokensDeTienda(CREDENCIALES, pedir);
   assert.ok(r.tokens);
   assert.equal(r.tokens.access_token, "APP_USR-acceso");
   assert.equal(r.tokens.user_id, "3754297554");
@@ -36,13 +36,13 @@ test("el canje va con las credenciales de la aplicación de la TIENDA y devuelve
   assert.deepEqual(visto!.cuerpo, { client_id: "ID-TIENDA", client_secret: "SECRETO-TIENDA", grant_type: "authorization_code", code: "CODIGO", redirect_uri: CREDENCIALES.redirectUri });
 
   // live_mode = false: la conexión es de prueba (y entonces no cobra: tienda_conexion_cobro).
-  const prueba = await canjearCodigo(CREDENCIALES, (() => Promise.resolve(new Response(JSON.stringify({ ...RESPUESTA, live_mode: false }), { status: 200 }))) as typeof fetch);
+  const prueba = await pedirTokensDeTienda(CREDENCIALES, (() => Promise.resolve(new Response(JSON.stringify({ ...RESPUESTA, live_mode: false }), { status: 200 }))) as typeof fetch);
   assert.equal(prueba.tokens?.de_prueba, true);
   // Sin public key en la respuesta: hay tokens pero no hay con qué tokenizar; lo decide quien llama.
-  const sinPk = await canjearCodigo(CREDENCIALES, (() => Promise.resolve(new Response(JSON.stringify({ ...RESPUESTA, public_key: undefined }), { status: 200 }))) as typeof fetch);
+  const sinPk = await pedirTokensDeTienda(CREDENCIALES, (() => Promise.resolve(new Response(JSON.stringify({ ...RESPUESTA, public_key: undefined }), { status: 200 }))) as typeof fetch);
   assert.ok(sinPk.tokens && sinPk.publicKey === null);
   // Mercado Pago rechaza el código: nada, con su estado.
-  const no = await canjearCodigo(CREDENCIALES, (() => Promise.resolve(new Response(JSON.stringify({ error: "invalid_grant", public_key: RESPUESTA.public_key }), { status: 400 }))) as typeof fetch);
+  const no = await pedirTokensDeTienda(CREDENCIALES, (() => Promise.resolve(new Response(JSON.stringify({ error: "invalid_grant", public_key: RESPUESTA.public_key }), { status: 400 }))) as typeof fetch);
   assert.deepEqual(no, { tokens: null, status: 400, codigo: "invalid_grant" });
 });
 
