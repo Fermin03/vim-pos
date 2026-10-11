@@ -67,3 +67,20 @@ test("al registrar la sucursal, una ciudad mal escrita se reintenta con la del c
   assert.equal(id, "777");
   assert.deepEqual(ciudades, ["San Francisco del Rincón", "San Francisco Del Rincón"]);
 });
+
+test("renovar manda el refresh token y devuelve el par nuevo, que reemplaza al viejo", async () => {
+  let cuerpo: Record<string, unknown> = {};
+  const falso = ((_url: string, init: RequestInit) => {
+    cuerpo = JSON.parse(String(init.body));
+    return Promise.resolve(new Response(JSON.stringify({ access_token: "a2", refresh_token: "r2", user_id: 9, expires_in: 15552000 }), { status: 200 }));
+  }) as unknown as typeof fetch;
+  const r = await pedirTokens({ clientId: "id", clientSecret: "sec", refreshToken: "r1" }, falso);
+  assert.deepEqual(cuerpo, { client_id: "id", client_secret: "sec", grant_type: "refresh_token", refresh_token: "r1" });
+  assert.equal(r.tokens?.refresh_token, "r2");
+});
+
+test("una renovación rechazada no inventa tokens", async () => {
+  const falso = (() => Promise.resolve(new Response(JSON.stringify({ error: "invalid_grant", message: "x" }), { status: 400 }))) as unknown as typeof fetch;
+  const r = await pedirTokens({ clientId: "id", clientSecret: "sec", refreshToken: "viejo" }, falso);
+  assert.deepEqual([r.tokens, r.status, r.codigo], [null, 400, "invalid_grant"]);
+});

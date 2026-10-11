@@ -38,6 +38,10 @@ verify_jwt = false
 [functions.terminal-webhook-mp]
 verify_jwt = false
 
+# La llama la base (pg_cron → pg_net, 0171) con x-vim-interno: no hay usuario ni JWT.
+[functions.terminal-mp-renovar]
+verify_jwt = false
+
 [functions.signup-tenant]
 verify_jwt = false
 
