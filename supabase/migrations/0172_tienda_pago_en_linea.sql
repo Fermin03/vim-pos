@@ -110,8 +110,8 @@ CREATE TRIGGER trg_tienda_pagos_updated_at BEFORE UPDATE ON tienda_pagos
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ── §2 Un pedido sin pagar no existe para quien atiende ──────────────────────
--- El POS web lee delivery_pedidos bajo RLS (lista, timbre, contadores, realtime) y la vista de
--- vencidos del día hereda esta política. Se esconde aquí, y no en cada consulta, lo que nunca se
+-- El POS web lee delivery_pedidos bajo RLS (de esa lectura salen la lista, el timbre y los
+-- contadores) y la vista de vencidos del día hereda esta política. Se esconde aquí, y no en cada consulta, lo que nunca se
 -- pagó: el que espera su pago y el que venció sin pagarse. Todo lo demás se ve como siempre
 -- («IS DISTINCT FROM»: en un pedido de app pago_al_recibir es NULL, y NULL tiene que pasar).
 -- La caja instalada no lee esta tabla de la nube: se lo filtra delivery-espejo.
