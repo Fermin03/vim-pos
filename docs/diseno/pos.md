@@ -356,5 +356,7 @@ unos 20 segundos sin comanda y se quita cuando sale el papel.
   devolución el dinero regresa solo a la tarjeta. Si Mercado Pago no lo devuelve, la devolución ya
   quedó registrada y la caja lo dice: «El dinero no regresó a la tarjeta», con «Volver a intentar».
   Lo que se cobró en otra terminal se sigue devolviendo en esa terminal.
-- **Pago dividido** sigue registrando la tarjeta a mano. Para combinar, se cobra primero la otra
-  parte y el resto con «Tarjeta».
+- **Pago dividido:** en «Agregar pago», «Tarjeta» cobra en la terminal y «Débito · a mano» /
+  «Crédito · a mano» solo registran. Al completar el cobro los pagos entran uno por uno; al llegar a
+  uno de terminal se abre «Cobra en la terminal» encima, por ese monto. Si ese cobro no se completa,
+  lo ya cobrado se queda y la lista conserva lo que falta.

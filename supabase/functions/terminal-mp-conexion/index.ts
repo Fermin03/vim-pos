@@ -58,10 +58,10 @@ servir(async (req, json) => {
         return json({ error: "CANJE_RECHAZADO" }, 409);
       }
       const t = r.tokens;
-      const nombre = await clienteMpConfig(t.access_token).nombre();
+      const { nombre, dePrueba } = await clienteMpConfig(t.access_token).cuenta();
       const { data: fila, error } = await admin.from("terminal_conexiones").upsert({
         tenant_id: tenantId, proveedor: "MERCADO_PAGO", cuenta_id_externo: t.user_id, cuenta_nombre: nombre,
-        de_prueba: t.de_prueba, estado: "ACTIVA", ultimo_error: null, conectada_at: new Date().toISOString(),
+        de_prueba: dePrueba, estado: "ACTIVA", ultimo_error: null, conectada_at: new Date().toISOString(),
       }, { onConflict: "tenant_id,proveedor,cuenta_id_externo" }).select("id").single();
       if (error) throw error;
       const conexionId = (fila as { id: string }).id;
@@ -69,7 +69,7 @@ servir(async (req, json) => {
         p_conexion: conexionId, p_access: t.access_token, p_refresh: t.refresh_token, p_vence: t.vence_at,
       });
       if (eTok) throw eTok;
-      return json({ ok: true, conexion_id: conexionId, cuenta_nombre: nombre, de_prueba: t.de_prueba });
+      return json({ ok: true, conexion_id: conexionId, cuenta_nombre: nombre, de_prueba: dePrueba });
     }
 
     if (b.accion === "sucursal") {

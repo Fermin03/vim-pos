@@ -597,14 +597,26 @@ function VistaOtro({
 
 function ModalAgregarPago({
   pendiente,
+  conTerminal,
   onAgregar,
   onCerrar,
 }: {
   pendiente: number;
-  onAgregar: (metodo: MetodoPago, monto: number) => void;
+  conTerminal: boolean;
+  onAgregar: (metodo: MetodoPago, monto: number, terminal: boolean) => void;
   onCerrar: () => void;
 }) {
   const [metodo, setMetodo] = useState<MetodoPago>("EFECTIVO");
+  const [terminal, setTerminal] = useState(false);
+  // Con terminal: «Tarjeta» (se cobra en ella) y, aparte, Débito y Crédito a mano.
+  const opciones: { cfg: MetodoConfig; terminal: boolean; clave: string }[] = METODOS.flatMap((m) => {
+    const esTarjeta = m.valor === "TARJETA_DEBITO" || m.valor === "TARJETA_CREDITO";
+    if (!conTerminal || !esTarjeta) return [{ cfg: m, terminal: false, clave: m.valor }];
+    const aMano = { cfg: { ...m, etiqueta: `${m.etiqueta} · a mano` }, terminal: false, clave: m.valor };
+    return m.valor === "TARJETA_DEBITO"
+      ? [{ cfg: { ...metodoCfg("TARJETA_CREDITO"), etiqueta: "Tarjeta" }, terminal: true, clave: "terminal" }, aMano]
+      : [aMano];
+  });
   const [buffer, setBuffer] = useState<string>("");
   // Se monta encima del cobro, así que queda arriba en la pila: Escape cierra solo este diálogo.
   useEscape(onCerrar);
@@ -613,7 +625,7 @@ function ModalAgregarPago({
 
   function handleAgregar() {
     if (monto <= 0) return;
-    onAgregar(metodo, Math.min(monto, pendiente));
+    onAgregar(metodo, Math.min(monto, pendiente), terminal);
   }
 
   return (
@@ -634,14 +646,14 @@ function ModalAgregarPago({
           {/* Método */}
           <div className="text-13 font-bold uppercase tracking-widest text-ink-2 mb-3">Método</div>
           <div className="grid grid-cols-2 gap-2 mb-5">
-            {METODOS.map((m) => (
+            {opciones.map(({ cfg: m, terminal: enTerminal, clave }) => (
               <button
-                key={m.valor}
+                key={clave}
                 type="button"
-                onClick={() => setMetodo(m.valor)}
+                onClick={() => { setMetodo(m.valor); setTerminal(enTerminal); }}
                 className={[
                   "flex items-center gap-[10px] px-[13px] py-[12px] border rounded cursor-pointer transition-all",
-                  metodo === m.valor
+                  metodo === m.valor && terminal === enTerminal
                     ? "border-ink bg-sel shadow-[inset_0_0_0_1.5px_#16161A]"
                     : "border-line bg-surface hover:border-line-strong",
                 ].join(" ")}
@@ -692,12 +704,14 @@ function ModalAgregarPago({
 
 function VistaDividida({
   totales,
+  conTerminal,
   procesando,
   error,
   onAplicarPagos,
   onVolver,
 }: {
   totales: TotalesTicket;
+  conTerminal: boolean;
   procesando: boolean;
   error: string | null;
   /** Aplica TODOS los pagos divididos de una (secuencial en el padre, no en paralelo) y devuelve
@@ -714,9 +728,9 @@ function VistaDividida({
   const cubierto = restante <= 0 && pagos.length > 0;
   const pct = Math.min(100, pendiente > 0 ? (pagado / pendiente) * 100 : 0);
 
-  function agregarPago(metodo: MetodoPago, monto: number) {
+  function agregarPago(metodo: MetodoPago, monto: number, terminal: boolean) {
     // El id de idempotencia nace AQUÍ y no cambia entre reintentos (B2-2).
-    setPagos((prev) => [...prev, { clientId: nuevoClientId(), metodo, monto }]);
+    setPagos((prev) => [...prev, { clientId: nuevoClientId(), metodo, monto, ...(terminal ? { terminal } : {}) }]);
     setMostrarModal(false);
   }
 
@@ -795,7 +809,7 @@ function VistaDividida({
                   <span className="w-9 h-9 rounded-[9px] flex items-center justify-center flex-shrink-0" style={{ background: cfg.icoBg, color: cfg.icoColor }}>
                     <cfg.icoFn cls="w-[19px] h-[19px]" />
                   </span>
-                  <span className="flex-1 text-15 font-semibold text-ink">{cfg.etiqueta}</span>
+                  <span className="flex-1 text-15 font-semibold text-ink">{p.terminal ? "Tarjeta · en la terminal" : cfg.etiqueta}</span>
                   <span className="font-display text-16 font-semibold text-ink tabular-nums">{fmtMxn(p.monto)}</span>
                   <button
                     type="button"
@@ -849,6 +863,7 @@ function VistaDividida({
       {mostrarModal && (
         <ModalAgregarPago
           pendiente={restante}
+          conTerminal={conTerminal}
           onAgregar={agregarPago}
           onCerrar={() => setMostrarModal(false)}
         />
@@ -1213,6 +1228,30 @@ export function ModalCobro({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** El pago dividido que está esperando a la terminal; al aprobarse o abandonarse se resuelve. */
+  const [esperaDividido, setEsperaDividido] = useState<{
+    clave: string; monto: number; aprobado: (c: CobroTerminal, autorizoId?: string) => void; abandonar: () => void;
+  } | null>(null);
+
+  /** Cobra en la terminal una parte del pago dividido y la registra. Rechaza si la cajera la abandona. */
+  function cobrarParteEnTerminal(p: PagoPorAplicar): Promise<TotalesTicket> {
+    return new Promise<TotalesTicket>((resolver, rechazar) => {
+      setEsperaDividido({
+        clave: p.clientId, monto: p.monto,
+        abandonar: () => rechazar(new Error("El cobro con tarjeta no se completó. Quita ese pago o vuelve a intentar.")),
+        aprobado: (c, autorizoId) => {
+          aplicarPago(token, totales.ticketId,
+            { metodo: metodoDeTarjeta(c.tipo_tarjeta), monto: Number(c.monto_mxn), referencia: c.referencia ?? undefined }, c.id)
+            .then(async (t) => {
+              await pedirCobro(token, cajaId, { accion: "confirmar", cobro_id: c.id, autorizo_id: autorizoId }).catch(() => {});
+              resolver(t);
+            })
+            .catch(rechazar);
+        },
+      });
+    }).finally(() => setEsperaDividido(null));
+  }
+
   /** Aplica una lista de pagos divididos SECUENCIALMENTE (no en paralelo). Navega solo al final. */
   async function aplicarPagosDivididos(lista: PagoPorAplicar[]): Promise<string[]> {
     setError(null);
@@ -1222,7 +1261,7 @@ export function ModalCobro({
       const ticketId = totales.ticketId;
       const r = await aplicarPagosEnOrden(
         lista,
-        (p) => aplicarPago(token, ticketId, { metodo: p.metodo, monto: p.monto }, p.clientId),
+        (p) => (p.terminal ? cobrarParteEnTerminal(p) : aplicarPago(token, ticketId, { metodo: p.metodo, monto: p.monto }, p.clientId)),
         () => leerTotales(token, ticketId),
       );
       if (r.totales) setTotales(r.totales);
@@ -1354,6 +1393,7 @@ export function ModalCobro({
         {vista === "dividido" && (
           <VistaDividida
             totales={totalesEf}
+            conTerminal={conTerminal}
             procesando={procesando}
             error={error}
             onAplicarPagos={aplicarPagosDivididos}
@@ -1361,6 +1401,24 @@ export function ModalCobro({
           />
         )}
       </div>
+      {esperaDividido && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/40 p-4">
+          <div className="w-full max-w-[560px] rounded-lg bg-surface p-6 shadow-xl">
+            <VistaTerminal
+              key={esperaDividido.clave}
+              token={token}
+              cajaId={cajaId}
+              turnoId={turnoId}
+              ejecutaNombre={ejecutaNombre}
+              ticketId={totales.ticketId}
+              folio={totales.folio}
+              monto={esperaDividido.monto}
+              onAprobado={esperaDividido.aprobado}
+              onVolver={esperaDividido.abandonar}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
