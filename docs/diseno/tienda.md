@@ -177,6 +177,36 @@ el pulgar, y cada caso deja a la vista solo lo que sí sirve:
 | Se arregla en el carrito (la zona, un producto) | Aviso y «Volver a tu pedido»; si es un producto, regresa solo y lo marca |
 | Es de un campo o del pago | El texto junto al campo, con el foco ahí |
 
+## Pagar en línea
+
+Diseño de producto: [`integraciones/mercado-pago-checkout-pro/02-diseno.md`](../integraciones/mercado-pago-checkout-pro/02-diseno.md).
+Aquí, solo cómo se ve. No hay piezas nuevas: todo sale de lo que ya había.
+
+- **«¿Cómo pagas?»** gana la opción «Pagar en línea» donde el negocio la ofrece y la sucursal puede
+  cobrar (`formasDePago`, `app/lib/pago.ts`). Al haberla, las otras dos dicen «…, al recibir». La
+  línea de apoyo cambia con lo elegido; la de en línea dice dónde se paga y con qué (tarjeta de
+  crédito o débito, en la página de Mercado Pago) y **no promete** Apple Pay ni Google Pay.
+- **Propina**, solo en línea: el mismo selector partido de «Para recoger / A domicilio», con cuatro
+  celdas de 56 px (sin propina, 10, 15 y 20 %) y el importe de cada una debajo. Por omisión, sin
+  propina. Abajo, la tarjeta de resumen de siempre con «Tu pedido», «Propina» y «Total a pagar»
+  (`aria-live`). Lo que se enseña se calcula igual que en el servidor; el que cobra es el servidor.
+- **El botón** dice «Pagar» y lleva el total con propina. Mientras trabaja: «Preparando tu pago…» y,
+  ya con el pedido creado, «Abriendo Mercado Pago…». Se va con una redirección normal.
+- **El carrito no se vacía al salir a pagar.** Si vuelve atrás, su pedido y lo que escribió siguen
+  ahí, y «Pagar» lo lleva al mismo pago. Se vacía cuando el seguimiento de ese pedido dice pagado.
+- **Si el pago en línea no se pudo abrir**, se dice junto a «¿Cómo pagas?» (hay otra forma que
+  elegir) o encima del botón (es la única). Nunca «no supimos si tu pedido entró»: no entró.
+- **Seguimiento.** Falta pagar: título, la hora límite y la única acción principal, «Pagar» con su
+  importe (o «Intentar de nuevo» si el último intento no pasó); sin recorrido. Pagado: el recorrido
+  normal, y en el resumen la propina, «Total pagado» y «Pagado en línea.». Un pago que no se completó
+  no es una cancelación del restaurante: el título va en `ink`, no en `danger`. Cancelado ya pagado:
+  `danger`, el motivo y qué pasa con el dinero, sin prometer un plazo.
+- **Mis pedidos**: «Falta pagar» en `warning`. No enlaza al seguimiento (ese enlace solo lo tiene
+  quien hizo el pedido); lo dice en una línea.
+
+Los textos de estos estados están en `app/lib/textos.ts` marcados como provisionales: falta la hoja
+de redacción.
+
 ## Cuentas
 
 La cuenta es opcional y nunca estorba: se puede pedir sin ella de principio a fin. Es de la tienda
