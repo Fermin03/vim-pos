@@ -7,6 +7,7 @@ import { tenantId } from "./datos";
 import { combosNoComprables, type ComboNoComprable, type ComboParaRevisar } from "./tienda-combos";
 import { filaOculta, type CambioMenu, type CategoriaCatalogo, type Ocultos, type ProductoCatalogo } from "./tienda-menu";
 import { ofertaTienda, type OfertaTienda } from "./tienda-plan";
+import { estadoDePago } from "./tienda-cobro";
 import { errorDeDireccion, errorDeHorario, leerHorario, mensajeTienda, type SucursalTienda } from "./tienda-reglas";
 
 const SOLO_ADMIN = "Solo el dueño o un administrador puede cambiar esto.";
@@ -21,6 +22,8 @@ export type ConfigTienda = {
   /** Ruta dentro del almacén público `productos`; la base guarda la ruta, no la URL. */
   logoRuta: string | null; logoUrl: string | null;
   aceptacion: "MANUAL" | "AUTO"; minutosAceptacion: number; pagoEfectivo: boolean; pagoTarjeta: boolean;
+  /** El dueño ofrece pagar en línea. Que de verdad se ofrezca en una sucursal lo decide la base (cuenta activa y caja al día). */
+  pagoEnLinea: boolean;
 };
 export type DatosConfigTienda = Omit<ConfigTienda, "logoRuta" | "logoUrl">;
 /** Los dos bloques de la página que guardan en la fila de la tienda: «Tu tienda» y «Pedidos». */
@@ -37,7 +40,8 @@ const configSchema = z.object({
   minutosAceptacion: z.number().int("Los minutos van en números enteros.").min(3, "Los minutos para aceptar van de 3 a 15.").max(15, "Los minutos para aceptar van de 3 a 15."),
   pagoEfectivo: z.boolean(),
   pagoTarjeta: z.boolean(),
-}).refine((d) => d.pagoEfectivo || d.pagoTarjeta, { message: "Deja activa al menos una forma de pago.", path: ["pagoEfectivo"] });
+  pagoEnLinea: z.boolean(),
+}).refine((d) => d.pagoEfectivo || d.pagoTarjeta || d.pagoEnLinea, { message: "Deja activa al menos una forma de pago.", path: ["pagoEfectivo"] });
 
 /** La dirección pública del logo a partir de su ruta en el almacén. */
 export const urlDelLogo = (ruta: string | null): string | null =>
@@ -48,7 +52,7 @@ export async function leerConfigTienda(): Promise<ConfigTienda | null> {
   const tid = await tenantId();
   const { data, error } = await supabase
     .from("tienda_config")
-    .select("slug, color, descripcion, logo_ruta, aceptacion, minutos_aceptacion, pago_efectivo, pago_tarjeta")
+    .select("slug, color, descripcion, logo_ruta, aceptacion, minutos_aceptacion, pago_efectivo, pago_tarjeta, pago_en_linea")
     .eq("tenant_id", tid)
     .maybeSingle();
   if (error) throw fallo(error, "No se pudo leer la tienda");
@@ -59,7 +63,7 @@ export async function leerConfigTienda(): Promise<ConfigTienda | null> {
     direccion: String(c.slug), color: String(c.color), descripcion: String(c.descripcion ?? ""),
     logoRuta, logoUrl: urlDelLogo(logoRuta),
     aceptacion: c.aceptacion === "AUTO" ? "AUTO" : "MANUAL", minutosAceptacion: Number(c.minutos_aceptacion),
-    pagoEfectivo: c.pago_efectivo === true, pagoTarjeta: c.pago_tarjeta === true,
+    pagoEfectivo: c.pago_efectivo === true, pagoTarjeta: c.pago_tarjeta === true, pagoEnLinea: c.pago_en_linea === true,
   };
 }
 
@@ -75,7 +79,7 @@ export async function guardarConfigTienda(d: DatosConfigTienda, bloque: BloqueCo
   const tid = await tenantId();
   const columnas = {
     datos: { slug: d.direccion, color: d.color, descripcion: d.descripcion.trim() === "" ? null : d.descripcion },
-    pedidos: { aceptacion: d.aceptacion, minutos_aceptacion: d.minutosAceptacion, pago_efectivo: d.pagoEfectivo, pago_tarjeta: d.pagoTarjeta },
+    pedidos: { aceptacion: d.aceptacion, minutos_aceptacion: d.minutosAceptacion, pago_efectivo: d.pagoEfectivo, pago_tarjeta: d.pagoTarjeta, pago_en_linea: d.pagoEnLinea },
   };
   const { data: existe, error: errLectura } = await supabase.from("tienda_config").select("tenant_id").eq("tenant_id", tid).maybeSingle();
   if (errLectura) throw fallo(errLectura, "No se pudo guardar la tienda");
@@ -97,7 +101,7 @@ export async function guardarConfigTienda(d: DatosConfigTienda, bloque: BloqueCo
 export async function leerSucursalesTienda(): Promise<SucursalTienda[]> {
   const [suc, tienda, zonas] = await Promise.all([
     supabase.from("sucursales").select("id, nombre, telefono, activa").is("deleted_at", null).order("nombre", { ascending: true }),
-    supabase.from("tienda_sucursales").select("sucursal_id, participa, recoger, domicilio, horario"),
+    supabase.from("tienda_sucursales").select("sucursal_id, participa, recoger, domicilio, horario, conexion_id"),
     supabase.from("zonas_envio").select("sucursal_id").eq("activa", true).is("deleted_at", null),
   ]);
   if (suc.error) throw fallo(suc.error, "No se pudieron leer las sucursales");
@@ -112,6 +116,7 @@ export async function leerSucursalesTienda(): Promise<SucursalTienda[]> {
       id: s.id, nombre: s.nombre, telefono: s.telefono ?? "", activa: s.activa,
       participa: t?.participa === true, recoger: t ? t.recoger === true : true, domicilio: t?.domicilio === true,
       horario: leerHorario(t?.horario), zonasActivas: nZonas.get(s.id) ?? 0,
+      conexionId: typeof t?.conexion_id === "string" ? t.conexion_id : null,
     };
   });
 }
@@ -133,6 +138,46 @@ export async function guardarSucursalTienda(
     .select("sucursal_id");
   if (error) throw fallo(error, "No se pudo guardar la sucursal");
   if (!data || data.length === 0) throw new Error(SOLO_ADMIN);
+}
+
+/**
+ * Qué cuenta de Mercado Pago cobra los pedidos en línea de una sucursal (0172); null = la única
+ * activa del negocio. Solo en una sucursal que ya está en la tienda: no crea la fila.
+ */
+export async function guardarCuentaDeSucursal(sucursalId: string, conexionId: string | null): Promise<void> {
+  const { data, error } = await supabase
+    .from("tienda_sucursales").update({ conexion_id: conexionId, updated_at: new Date().toISOString() }).eq("sucursal_id", sucursalId).select("sucursal_id");
+  if (error) throw fallo(error, "No se pudo guardar la cuenta");
+  if (!data || data.length === 0) throw new Error(SOLO_ADMIN);
+}
+
+// ── Pagos en línea ────────────────────────────────────────────────────────────
+
+/** Un pago en línea como lo ve el dueño. `folio` null = el pedido nunca se pagó (la base no lo enseña). */
+export type PagoTienda = {
+  id: string; fecha: string; folio: string | null; monto: number; propina: number;
+  estado: ReturnType<typeof estadoDePago>;
+  /** El número del pago en Mercado Pago, para buscarlo allá; null si nadie llegó a pagar. */
+  pagoMp: string | null;
+};
+export const PAGOS_A_LA_VISTA = 30;
+
+/** Los últimos pagos en línea del negocio, solo lectura (RLS: dueño o administrador). */
+export async function leerPagosTienda(): Promise<PagoTienda[]> {
+  const { data, error } = await supabase
+    .from("tienda_pagos")
+    .select("id, created_at, monto_mxn, propina_mxn, estado, pago_id_externo, pedido:delivery_pedidos(folio_corto)")
+    .order("created_at", { ascending: false })
+    .limit(PAGOS_A_LA_VISTA);
+  if (error) throw fallo(error, "No se pudieron leer los pagos");
+  return ((data ?? []) as Record<string, unknown>[]).map((f) => {
+    const folio = (f.pedido as { folio_corto?: unknown } | null)?.folio_corto;
+    return {
+      id: String(f.id), fecha: String(f.created_at), folio: typeof folio === "string" ? folio : null,
+      monto: Number(f.monto_mxn), propina: Number(f.propina_mxn), estado: estadoDePago(String(f.estado)),
+      pagoMp: typeof f.pago_id_externo === "string" ? f.pago_id_externo : null,
+    };
+  });
 }
 
 // ── Interruptor ───────────────────────────────────────────────────────────────

@@ -11,6 +11,9 @@ const CLIENT_ID = "763906729621235";
 // Tiene que coincidir letra por letra con la registrada en Mercado Pago y con la de la función.
 export const REGRESO_MP = "https://admin.vimpos.com.mx/integraciones/mercado-pago/callback";
 const CLAVE_STATE = "vimpos.mp.state";
+const CLAVE_REGRESO = "vimpos.mp.regreso";
+/** A dónde vuelve el dueño después de autorizar, según desde dónde pulsó «Conectar». */
+const REGRESOS = { terminal: "/configuracion/terminal?conectada=1", tienda: "/tienda?conectada=1" } as const;
 
 export type ConexionTerminal = { id: string; cuenta_nombre: string | null; de_prueba: boolean; estado: "ACTIVA" | "ERROR" | "DESCONECTADA"; ultimo_error: string | null };
 export type ConfigSucursal = { sucursal_id: string; conexion_id: string; sucursal_id_externo: string | null; imprime_terminal: boolean; espera_segundos: number; propina_en_terminal: boolean };
@@ -35,10 +38,14 @@ export async function leerTerminal(): Promise<EstadoTerminal> {
   };
 }
 
-/** Guarda un state nuevo y devuelve la URL de Mercado Pago a la que hay que mandar al dueño. */
-export function iniciarConexionMp(): string {
+/**
+ * Guarda un state nuevo y devuelve la URL de Mercado Pago a la que hay que mandar al dueño.
+ * `desde` = la pantalla a la que vuelve al terminar (la conexión es la misma para las dos).
+ */
+export function iniciarConexionMp(desde: keyof typeof REGRESOS = "terminal"): string {
   const state = generarState();
   sessionStorage.setItem(CLAVE_STATE, state);
+  sessionStorage.setItem(CLAVE_REGRESO, desde);
   const u = new URL("https://auth.mercadopago.com/authorization");
   u.searchParams.set("client_id", CLIENT_ID);
   u.searchParams.set("response_type", "code");
@@ -53,6 +60,13 @@ export function validarStateMp(recibido: string | null): boolean {
   const guardado = sessionStorage.getItem(CLAVE_STATE);
   sessionStorage.removeItem(CLAVE_STATE);
   return Boolean(recibido) && guardado !== null && recibido === guardado;
+}
+
+/** La ruta del panel a la que se vuelve tras conectar; se consume. Lo guardado solo elige entre las dos conocidas. */
+export function regresoTrasConectar(): string {
+  const desde = sessionStorage.getItem(CLAVE_REGRESO);
+  sessionStorage.removeItem(CLAVE_REGRESO);
+  return desde === "tienda" ? REGRESOS.tienda : REGRESOS.terminal;
 }
 
 type Accion =

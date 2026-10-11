@@ -4,18 +4,20 @@ import { leerNegocio } from "../../lib/configuracion";
 import { mensajeError } from "../../lib/errores";
 import { leerModulos } from "../../lib/modulos";
 import { ponerLogoTienda, quitarLogoTienda } from "../../lib/foto-producto";
+import { iniciarConexionMp, leerTerminal } from "../../lib/terminal";
 import {
-  contarPendientesDeCatalogo, encenderTienda, leerCombosNoComprables, guardarConfigTienda, leerConfigTienda, guardarSucursalTienda, leerSucursalesTienda, leerTiendaEncendida, urlDelLogo,
+  contarPendientesDeCatalogo, encenderTienda, leerCombosNoComprables, guardarConfigTienda, leerConfigTienda, guardarCuentaDeSucursal, guardarSucursalTienda, leerPagosTienda, leerSucursalesTienda, leerTiendaEncendida, urlDelLogo,
   type BloqueConfig, type DatosConfigTienda,
 } from "../../lib/tienda";
 import { normalizarDireccion, trasEscribir, type Escritura, type Leido } from "../../lib/tienda-pagina";
+import { avisoDeCobro, cuentasActivas } from "../../lib/tienda-cobro";
 import { revisar, sugerirDireccion, type BorradorSucursal, type Revision } from "../../lib/tienda-reglas";
 import type { DatosTienda } from "../../components/tienda-datos";
 import type { MensajeTienda } from "../../components/tienda-mensaje";
 import type { PedidosTienda } from "../../components/tienda-pedidos";
 
 /** Cada sucursal es su propio bloque: su mensaje y su «Guardando…» salen en su tarjeta. */
-export type Bloque = "estado" | "datos" | "logo" | "pedidos" | `sucursal:${string}`;
+export type Bloque = "estado" | "datos" | "logo" | "pedidos" | "cobro" | `sucursal:${string}`;
 const deSucursal = (id: string): Bloque => `sucursal:${id}`;
 type Formulario = DatosTienda & PedidosTienda;
 
@@ -24,26 +26,30 @@ const GUARDADO = "Cambios guardados.";
 
 /** Los mismos valores de fábrica que la tabla `tienda_config` (0161). */
 const DE_FABRICA: DatosConfigTienda = {
-  direccion: "", color: "#111111", descripcion: "", aceptacion: "MANUAL", minutosAceptacion: 5, pagoEfectivo: true, pagoTarjeta: false,
+  direccion: "", color: "#111111", descripcion: "", aceptacion: "MANUAL", minutosAceptacion: 5, pagoEfectivo: true, pagoTarjeta: false, pagoEnLinea: false,
 };
 
 // Los módulos se leen frescos: el shell los lee una vez por sesión y un complemento puede vencer
 // mientras el interruptor sigue en `true`. `leerModulos` lanza el mensaje crudo de la base: aquí se
 // cambia por uno que el dueño entienda.
 async function leerTodo(): Promise<Leido> {
-  const [config, sucursales, interruptor, pendientes, combosNoComprables, modulos] = await Promise.all([
+  const [config, sucursales, interruptor, pendientes, combosNoComprables, modulos, cuentas, pagos] = await Promise.all([
     leerConfigTienda(), leerSucursalesTienda(), leerTiendaEncendida(), contarPendientesDeCatalogo(),
     // Solo es un aviso: si no se puede revisar, la página carga igual.
     leerCombosNoComprables().catch(() => []),
     leerModulos().catch(() => { throw new Error(LECTURA); }),
+    // Sin saber qué cuentas hay no se puede decir si el pago en línea se ofrece: esto sí detiene la página.
+    leerTerminal().then((t) => t.conexiones, () => { throw new Error(LECTURA); }),
+    // La lista de pagos es solo consulta: si falla, lo demás carga igual.
+    leerPagosTienda().catch(() => null),
   ]);
-  return { config, sucursales, interruptor, pendientes, combosNoComprables, enPlan: modulos.permitidos.tienda === true };
+  return { config, sucursales, interruptor, pendientes, combosNoComprables, cuentas, pagos, enPlan: modulos.permitidos.tienda === true };
 }
 
 function formularioDe(c: DatosConfigTienda): Formulario {
   return {
     direccion: c.direccion, color: c.color, descripcion: c.descripcion,
-    aceptacion: c.aceptacion, minutos: String(c.minutosAceptacion), pagoEfectivo: c.pagoEfectivo, pagoTarjeta: c.pagoTarjeta,
+    aceptacion: c.aceptacion, minutos: String(c.minutosAceptacion), pagoEfectivo: c.pagoEfectivo, pagoTarjeta: c.pagoTarjeta, pagoEnLinea: c.pagoEnLinea,
   };
 }
 
@@ -187,13 +193,23 @@ export function useTienda() {
       ...guardada, aceptacion: form.aceptacion,
       // En «Automática» el campo no se ve: se conserva el valor guardado.
       minutosAceptacion: form.aceptacion === "MANUAL" ? Number(form.minutos) : guardada.minutosAceptacion,
-      pagoEfectivo: form.pagoEfectivo, pagoTarjeta: form.pagoTarjeta,
+      pagoEfectivo: form.pagoEfectivo, pagoTarjeta: form.pagoTarjeta, pagoEnLinea: form.pagoEnLinea,
     }, false);
   }
 
   /** Pasa por la misma guarda que todo lo demás; al releer se recalcula la lista de revisión. true = se guardó. */
   function guardarSucursal(id: string, datos: BorradorSucursal): Promise<boolean> {
     return escribir(deSucursal(id), () => guardarSucursalTienda(id, datos), { tipo: "sucursal", id, datos }, "No se pudo guardar la sucursal", GUARDADO, false);
+  }
+
+  /** Qué cuenta de Mercado Pago cobra en una sucursal: se guarda al elegirla. */
+  function elegirCuenta(id: string, conexionId: string) {
+    void escribir("cobro", () => guardarCuentaDeSucursal(id, conexionId), { tipo: "cuenta", id, conexionId }, "No se pudo guardar la cuenta", GUARDADO, false);
+  }
+
+  /** El mismo flujo de autorización que Terminal de tarjetas; al terminar vuelve aquí. */
+  function conectarMercadoPago() {
+    window.location.href = iniciarConexionMp("tienda");
   }
 
   // El logo pasa por la misma guarda: una escritura a la vez, y lo guardado queda en pantalla antes
@@ -244,11 +260,15 @@ export function useTienda() {
     sinLeer,
     /** Lo que se le dice al dueño: el interruptor Y el complemento vigente. */
     encendida: leido !== null && leido.interruptor && leido.enPlan,
+    /** Con una cuenta activa se puede ofrecer el pago en línea. */
+    hayCuentaActiva: leido !== null && cuentasActivas(leido.cuentas).length > 0,
+    /** El dueño ofrece pago en línea (lo GUARDADO) y la tienda no lo está ofreciendo: qué pasa y dónde. */
+    avisoCobro: leido ? avisoDeCobro(leido.config?.pagoEnLinea === true, leido.cuentas, leido.sucursales) : null,
     mensajeDe,
     mensajeDeSucursal: (id: string): MensajeTienda | null => mensajeDe(deSucursal(id)),
     /** El id de la sucursal que se está guardando, si es una sucursal lo que se guarda. */
     sucursalGuardando: leido?.sucursales.find((s) => ocupado === deSucursal(s.id))?.id ?? null,
-    reintentar, cambiar, guardarDatos, guardarPedidos, guardarSucursal, cambiarEncendido, subirLogo, quitarLogo,
+    reintentar, cambiar, guardarDatos, guardarPedidos, guardarSucursal, cambiarEncendido, subirLogo, quitarLogo, elegirCuenta, conectarMercadoPago,
     confirmarDireccion: () => enviarDatos(true),
     confirmarApagar: () => encender(false, true),
     cerrarDialogo: () => setDialogo(null),

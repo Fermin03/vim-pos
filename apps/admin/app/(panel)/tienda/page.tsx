@@ -1,7 +1,9 @@
 "use client";
-import { DialogoPeligro } from "@vim/ui/styles";
+import { useEffect, useState } from "react";
+import { Aviso, Button, DialogoPeligro } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
 import { useAccesoTenant } from "../../components/admin-shell";
+import { TiendaCobro } from "../../components/tienda-cobro";
 import { TiendaCombos } from "../../components/tienda-combos";
 import { TiendaCompartir } from "../../components/tienda-compartir";
 import { TiendaDatos } from "../../components/tienda-datos";
@@ -9,6 +11,7 @@ import { TiendaMenu } from "../../components/tienda-menu";
 import { TiendaEstado } from "../../components/tienda-estado";
 import { TiendaPedidos } from "../../components/tienda-pedidos";
 import { TiendaSucursales } from "../../components/tienda-sucursales";
+import { textoDeAviso } from "../../lib/tienda-cobro";
 import { useTienda } from "./use-tienda";
 
 /**
@@ -24,6 +27,9 @@ export default function TiendaPage() {
   const escribiendo = t.ocupado !== null;
   // Tampoco se guarda nada mientras falte volver a leer después de un guardado.
   const ocupado = escribiendo || t.sinLeer;
+  // Regreso de Mercado Pago (mismo aviso que Terminal de tarjetas). Se lee al montar: sin useSearchParams no hace falta Suspense.
+  const [conectada, setConectada] = useState(false);
+  useEffect(() => { setConectada(new URLSearchParams(window.location.search).has("conectada")); }, []);
 
   return (
     <>
@@ -42,6 +48,22 @@ export default function TiendaPage() {
           <p className="text-sm text-ink-3">Cargando…</p>
         ) : (
           <div className="flex flex-col gap-6">
+            {/* TEXTOS PROVISIONALES (los revisa James). */}
+            {t.avisoCobro && (
+              <Aviso tono="warning" role="alert" className="flex max-w-[720px] flex-wrap items-center gap-x-4 gap-y-2">
+                <span className="min-w-0 flex-1 basis-64">{textoDeAviso(t.avisoCobro)}</span>
+                {t.avisoCobro.tipo !== "ELEGIR" && (
+                  <Button variant="ghost" onClick={t.conectarMercadoPago} disabled={ocupado || soloLectura}>
+                    {t.avisoCobro.tipo === "RECONECTAR" ? "Reconectar Mercado Pago" : "Conectar Mercado Pago"}
+                  </Button>
+                )}
+              </Aviso>
+            )}
+            {conectada && !t.avisoCobro && t.hayCuentaActiva && (
+              <Aviso tono="success" role="status" className="max-w-[720px]" onCerrar={() => setConectada(false)}>
+                Cuenta de Mercado Pago conectada.{t.leido.config?.pagoEnLinea ? "" : " Ahora marca «Pago en línea» en Pedidos y guarda."}
+              </Aviso>
+            )}
             <TiendaEstado
               encendida={t.encendida}
               enPlan={t.leido.enPlan}
@@ -69,12 +91,23 @@ export default function TiendaPage() {
             <TiendaPedidos
               valores={t.form}
               hayDireccion={t.leido.config !== null}
+              hayCuentaActiva={t.hayCuentaActiva}
               guardando={t.ocupado === "pedidos"}
               ocupado={ocupado}
               soloLectura={soloLectura}
               mensaje={t.mensajeDe("pedidos")}
               onCambio={t.cambiar}
               onGuardar={t.guardarPedidos}
+            />
+            <TiendaCobro
+              cuentas={t.leido.cuentas}
+              sucursales={t.leido.sucursales}
+              pagos={t.leido.pagos}
+              ocupado={ocupado}
+              soloLectura={soloLectura}
+              mensaje={t.mensajeDe("cobro")}
+              onConectar={t.conectarMercadoPago}
+              onElegir={t.elegirCuenta}
             />
 
             <TiendaSucursales

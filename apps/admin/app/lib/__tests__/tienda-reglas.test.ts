@@ -101,7 +101,7 @@ describe("horario", () => {
 
 const suc = (o: Partial<SucursalTienda> = {}): SucursalTienda => ({
   id: "s1", nombre: "Centro", telefono: "477 123 4567", activa: true, participa: true,
-  recoger: true, domicilio: false, horario: { "1": ["10:00", "22:00"] }, zonasActivas: 0, ...o,
+  recoger: true, domicilio: false, horario: { "1": ["10:00", "22:00"] }, zonasActivas: 0, conexionId: null, ...o,
 });
 const base = { hayDireccion: true, sucursales: [suc()], productosSinFoto: 0, productosSinDescripcion: 0, productosEnCategoriaInactiva: 0 };
 
@@ -197,7 +197,7 @@ describe("borrador de una sucursal", () => {
     expect(hayCambiosDeSucursal({ ...guardada, horario: a }, { ...guardada, horario: b })).toBe(false);
   });
   it("ignora lo que no es del borrador (nombre, zonas)", () => {
-    const s: SucursalTienda = { id: "s1", nombre: "Centro", telefono: "", activa: true, zonasActivas: 3, ...guardada };
+    const s: SucursalTienda = { id: "s1", nombre: "Centro", telefono: "", activa: true, zonasActivas: 3, conexionId: null, ...guardada };
     expect(hayCambiosDeSucursal(guardada, s)).toBe(false);
   });
   it("cambia con cada casilla", () => {

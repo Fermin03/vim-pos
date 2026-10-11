@@ -47,6 +47,7 @@ function consulta(tabla: string) {
     is: (c: string, v: unknown) => { filtros = [...filtros, (f) => (f[c] ?? null) === v]; return q; },
     in: (c: string, vs: unknown[]) => { filtros = [...filtros, (f) => vs.includes(f[c])]; return q; },
     order: () => q,
+    limit: () => q,
     maybeSingle: async () => { const r = resolver(); return { data: (r.data as Fila[] | null)?.[0] ?? null, error: r.error }; },
     then: (ok: (r: unknown) => unknown, no?: (e: unknown) => unknown) => Promise.resolve(resolver()).then(ok, no),
   };
@@ -62,8 +63,8 @@ vi.mock("../supabase", () => ({
 }));
 
 import {
-  contarPendientesDeCatalogo, encenderTienda, guardarConfigTienda, guardarSucursalTienda, leerConfigTienda,
-  leerCombosNoComprables, leerOfertaTienda, leerSucursalesTienda, leerTiendaEncendida,
+  contarPendientesDeCatalogo, encenderTienda, guardarConfigTienda, guardarCuentaDeSucursal, guardarSucursalTienda, leerConfigTienda,
+  leerCombosNoComprables, leerPagosTienda, leerOfertaTienda, leerSucursalesTienda, leerTiendaEncendida,
 } from "../tienda";
 
 beforeEach(() => {
@@ -77,11 +78,11 @@ beforeEach(() => {
 
 const CONFIG = {
   direccion: "knock-out", color: "#aa0000", descripcion: "Hamburguesas", aceptacion: "AUTO" as const,
-  minutosAceptacion: 7, pagoEfectivo: true, pagoTarjeta: false,
+  minutosAceptacion: 7, pagoEfectivo: true, pagoTarjeta: false, pagoEnLinea: false,
 };
 const FILA_CONFIG = {
   tenant_id: "t1", slug: "knock-out", color: "#aa0000", descripcion: "Hamburguesas", logo_ruta: "t1/tienda/logo.png",
-  aceptacion: "AUTO", minutos_aceptacion: 7, pago_efectivo: true, pago_tarjeta: false,
+  aceptacion: "AUTO", minutos_aceptacion: 7, pago_efectivo: true, pago_tarjeta: false, pago_en_linea: false,
 };
 
 describe("leer la configuración", () => {
@@ -132,14 +133,14 @@ describe("guardar la configuración", () => {
     doble.tablas.tienda_config = [FILA_CONFIG];
     await guardarConfigTienda({ ...CONFIG, direccion: "memoria-vieja", color: "#000000", descripcion: "vieja", aceptacion: "MANUAL", minutosAceptacion: 9, pagoTarjeta: true }, "pedidos");
     expect(doble.escrituras[0]).toMatchObject({ op: "update", valores: { aceptacion: "MANUAL", minutos_aceptacion: 9, pago_efectivo: true, pago_tarjeta: true } });
-    expect(Object.keys(doble.escrituras[0]!.valores).sort()).toEqual(["aceptacion", "minutos_aceptacion", "pago_efectivo", "pago_tarjeta", "updated_at"]);
+    expect(Object.keys(doble.escrituras[0]!.valores).sort()).toEqual(["aceptacion", "minutos_aceptacion", "pago_efectivo", "pago_en_linea", "pago_tarjeta", "updated_at"]);
   });
 
   it("el primer guardado manda todo, sea del bloque que sea: la fila nace completa", async () => {
     await guardarConfigTienda(CONFIG, "pedidos");
     expect(doble.escrituras[0]!.op).toBe("insert");
     expect(Object.keys(doble.escrituras[0]!.valores).sort()).toEqual(
-      ["aceptacion", "color", "descripcion", "minutos_aceptacion", "pago_efectivo", "pago_tarjeta", "slug", "tenant_id"]);
+      ["aceptacion", "color", "descripcion", "minutos_aceptacion", "pago_efectivo", "pago_en_linea", "pago_tarjeta", "slug", "tenant_id"]);
   });
 
   it("una descripción vacía se guarda como NULL", async () => {
@@ -202,8 +203,8 @@ describe("sucursales de la tienda", () => {
 
   it("lista las sucursales vivas; sin fila de tienda salen los valores por omisión", async () => {
     expect(await leerSucursalesTienda()).toEqual([
-      { id: "s1", nombre: "Centro", telefono: "477 111", activa: true, participa: true, recoger: false, domicilio: true, horario: { "1": ["09:00", "22:00"] }, zonasActivas: 2 },
-      { id: "s2", nombre: "Norte", telefono: "", activa: false, participa: false, recoger: true, domicilio: false, horario: {}, zonasActivas: 1 },
+      { id: "s1", nombre: "Centro", telefono: "477 111", activa: true, participa: true, recoger: false, domicilio: true, horario: { "1": ["09:00", "22:00"] }, zonasActivas: 2, conexionId: null },
+      { id: "s2", nombre: "Norte", telefono: "", activa: false, participa: false, recoger: true, domicilio: false, horario: {}, zonasActivas: 1, conexionId: null },
     ]);
   });
 
@@ -340,5 +341,72 @@ describe("leer la oferta de la tienda (catálogo de VIM + plan del negocio)", ()
     doble.tablas.addons = [ADDON];
     doble.errorLectura = { message: "se cayó la red" };
     expect(await leerOfertaTienda()).toBeNull();
+  });
+});
+
+describe("pago en línea", () => {
+  it("la configuración lee y guarda «Pago en línea» con el bloque de Pedidos, no con el de Tu tienda", async () => {
+    doble.tablas.tienda_config = [{ ...FILA_CONFIG, pago_en_linea: true }];
+    expect(await leerConfigTienda()).toMatchObject({ pagoEnLinea: true });
+    await guardarConfigTienda({ ...CONFIG, pagoEnLinea: true }, "pedidos");
+    expect(doble.escrituras[0]).toMatchObject({ op: "update", valores: { pago_en_linea: true, pago_efectivo: true, pago_tarjeta: false } });
+    doble.escrituras = [];
+    await guardarConfigTienda({ ...CONFIG, pagoEnLinea: true }, "datos");
+    expect(doble.escrituras[0]!.valores).not.toHaveProperty("pago_en_linea");
+  });
+
+  it("solo pago en línea es una forma de pago válida; ninguna de las tres no se manda a la base", async () => {
+    doble.tablas.tienda_config = [FILA_CONFIG];
+    await guardarConfigTienda({ ...CONFIG, pagoEfectivo: false, pagoTarjeta: false, pagoEnLinea: true }, "pedidos");
+    expect(doble.escrituras).toHaveLength(1);
+    doble.escrituras = [];
+    await expect(guardarConfigTienda({ ...CONFIG, pagoEfectivo: false, pagoTarjeta: false, pagoEnLinea: false }, "pedidos"))
+      .rejects.toThrow("Deja activa al menos una forma de pago.");
+    expect(doble.escrituras).toHaveLength(0);
+  });
+
+  it("si la base rechaza por su candado, se dice en palabras del dueño", async () => {
+    doble.tablas.tienda_config = [FILA_CONFIG];
+    doble.errorEscritura = { message: 'new row for relation "tienda_config" violates check constraint "tienda_config_algun_pago"', code: "23514" };
+    await expect(guardarConfigTienda({ ...CONFIG, pagoEnLinea: true }, "pedidos")).rejects.toThrow("Deja activa al menos una forma de pago.");
+  });
+
+  it("las sucursales traen la cuenta elegida; sin fila o sin elegir es null", async () => {
+    doble.tablas.sucursales = [{ id: "s1", nombre: "Centro", telefono: null, activa: true }, { id: "s2", nombre: "Norte", telefono: null, activa: true }];
+    doble.tablas.tienda_sucursales = [{ sucursal_id: "s1", participa: true, recoger: true, domicilio: false, horario: {}, conexion_id: "cx1" }];
+    expect((await leerSucursalesTienda()).map((s) => s.conexionId)).toEqual(["cx1", null]);
+  });
+
+  it("elegir la cuenta de una sucursal escribe solo `conexion_id` en su fila", async () => {
+    doble.tablas.tienda_sucursales = [{ sucursal_id: "s1" }];
+    await guardarCuentaDeSucursal("s1", "cx2");
+    expect(doble.escrituras).toHaveLength(1);
+    expect(doble.escrituras[0]).toMatchObject({ tabla: "tienda_sucursales", op: "update", filtros: { sucursal_id: "s1" } });
+    expect(Object.keys(doble.escrituras[0]!.valores).sort()).toEqual(["conexion_id", "updated_at"]);
+    expect(doble.escrituras[0]!.valores.conexion_id).toBe("cx2");
+  });
+
+  it("si la RLS no deja (cero filas), elegir la cuenta lo dice en vez de darlo por guardado", async () => {
+    doble.sinFilas = true;
+    await expect(guardarCuentaDeSucursal("s1", "cx2")).rejects.toThrow("Solo el dueño o un administrador puede cambiar esto.");
+  });
+
+  it("los pagos salen con folio, montos y el estado en palabras; el pedido que la base esconde sale sin folio", async () => {
+    doble.tablas.tienda_pagos = [
+      { id: "g1", created_at: "2026-10-10T18:00:00Z", monto_mxn: 230.5, propina_mxn: 20.5, estado: "APROBADO", pago_id_externo: "123456789", pedido: { folio_corto: "A7K2" } },
+      { id: "g2", created_at: "2026-10-10T17:00:00Z", monto_mxn: 99, propina_mxn: 0, estado: "VENCIDO", pago_id_externo: null, pedido: null },
+      { id: "g3", created_at: "2026-10-10T16:00:00Z", monto_mxn: 99, propina_mxn: 0, estado: "DEVOLUCION_FALLIDA", pago_id_externo: "55", pedido: { folio_corto: "B1" } },
+    ];
+    expect(await leerPagosTienda()).toEqual([
+      { id: "g1", fecha: "2026-10-10T18:00:00Z", folio: "A7K2", monto: 230.5, propina: 20.5, estado: "Pagado", pagoMp: "123456789" },
+      { id: "g2", fecha: "2026-10-10T17:00:00Z", folio: null, monto: 99, propina: 0, estado: "No completado", pagoMp: null },
+      { id: "g3", fecha: "2026-10-10T16:00:00Z", folio: "B1", monto: 99, propina: 0, estado: "Devolución en proceso", pagoMp: "55" },
+    ]);
+  });
+
+  it("de un pago solo se pide lo que se enseña: ni el enlace de pago ni errores internos", async () => {
+    await leerPagosTienda();
+    const columnas = doble.consultas.find((c) => c.tabla === "tienda_pagos")!.columnas;
+    expect(columnas).not.toMatch(/init_point|preferencia|ultimo_error|detalle|\*/);
   });
 });

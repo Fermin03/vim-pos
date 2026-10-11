@@ -4,17 +4,17 @@ import { errorDeDireccion } from "../tienda-reglas";
 
 const CONFIG = {
   direccion: "knockout", color: "#111111", descripcion: "Hamburguesas", logoRuta: "t1/logo.png", logoUrl: "https://x/t1/logo.png",
-  aceptacion: "MANUAL" as const, minutosAceptacion: 5, pagoEfectivo: true, pagoTarjeta: false,
+  aceptacion: "MANUAL" as const, minutosAceptacion: 5, pagoEfectivo: true, pagoTarjeta: false, pagoEnLinea: false,
 };
 const SUCURSAL = {
   id: "s1", nombre: "Centro", telefono: "4771234567", activa: true,
-  participa: false, recoger: true, domicilio: false, horario: {}, zonasActivas: 2,
+  participa: false, recoger: true, domicilio: false, horario: {}, zonasActivas: 2, conexionId: null,
 };
 const LEIDO: Leido = {
   config: CONFIG, sucursales: [SUCURSAL, { ...SUCURSAL, id: "s2", nombre: "Norte" }], interruptor: false, enPlan: true,
-  pendientes: { sinFoto: 1, sinDescripcion: 0, enCategoriaInactiva: 0 }, combosNoComprables: [],
+  pendientes: { sinFoto: 1, sinDescripcion: 0, enCategoriaInactiva: 0 }, combosNoComprables: [], cuentas: [], pagos: [],
 };
-const DATOS = { direccion: "ko-burger", color: "#0078C9", descripcion: "Nueva", aceptacion: "AUTO" as const, minutosAceptacion: 9, pagoEfectivo: false, pagoTarjeta: true };
+const DATOS = { direccion: "ko-burger", color: "#0078C9", descripcion: "Nueva", aceptacion: "AUTO" as const, minutosAceptacion: 9, pagoEfectivo: false, pagoTarjeta: true, pagoEnLinea: true };
 
 describe("lo guardado después de una escritura que sí entró", () => {
   it("«Tu tienda» deja en memoria solo lo suyo: dirección, color y descripción; lo de Pedidos y el logo siguen", () => {
@@ -24,7 +24,7 @@ describe("lo guardado después de una escritura que sí entró", () => {
 
   it("«Pedidos» deja en memoria solo lo suyo: la dirección que viajaba en la memoria vieja no se pinta", () => {
     const r = trasEscribir(LEIDO, { tipo: "config", bloque: "pedidos", datos: DATOS });
-    expect(r.config).toEqual({ ...CONFIG, aceptacion: "AUTO", minutosAceptacion: 9, pagoEfectivo: false, pagoTarjeta: true });
+    expect(r.config).toEqual({ ...CONFIG, aceptacion: "AUTO", minutosAceptacion: 9, pagoEfectivo: false, pagoTarjeta: true, pagoEnLinea: true });
   });
 
   it("el primer guardado crea la configuración (sin logo): Pedidos se abre y Compartir aparece", () => {
@@ -103,5 +103,13 @@ describe("la dirección como se escribe", () => {
   it("no inventa: lo que sigue mal, sigue mal", () => {
     expect(errorDeDireccion(normalizarDireccion("ñandú!"))).not.toBeNull();
     expect(normalizarDireccion("")).toBe("");
+  });
+});
+
+describe("elegir la cuenta que cobra en una sucursal", () => {
+  it("deja en memoria la cuenta de esa sucursal y no toca las demás", () => {
+    const r = trasEscribir(LEIDO, { tipo: "cuenta", id: "s2", conexionId: "cx9" });
+    expect(r.sucursales.map((s) => s.conexionId)).toEqual([null, "cx9"]);
+    expect(r.config).toBe(LEIDO.config);
   });
 });
