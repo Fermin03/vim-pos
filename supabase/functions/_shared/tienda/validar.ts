@@ -23,6 +23,8 @@ export type Peticion =
       pago: "EFECTIVO" | "TARJETA" | "EN_LINEA"; paga_con: string | null; nota: string | null; captcha: string | null;
       /** Solo con pago EN_LINEA: el porcentaje de propina que eligió el cliente. El monto lo calcula el servidor. */
       propina_pct: Propina | null;
+      /** Solo con pago EN_LINEA (y entonces obligatoria): el token de la tarjeta. Nunca el número. */
+      tarjeta: TarjetaDePedido | null;
       /** El total que el cliente vio al cotizar: si ya no es ese, el pedido no se crea (TOTAL_CAMBIO). */
       total_esperado: string | null;
       /** La llave del intento de compra (entrega 7): con ella, reintentar devuelve el mismo pedido. null = sin llave. */
@@ -249,6 +251,11 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
   // La propina: un porcentaje de la lista, y solo al pagar en línea. Nunca un monto: ese lo pone el servidor.
   const propina_pct = (x.propina_pct ?? null) as Propina | null;
   if (propina_pct !== null && (x.pago !== "EN_LINEA" || !PROPINAS.includes(propina_pct))) return mal("PAGO_INVALIDO");
+  // En línea: hace falta el correo (lo pide Mercado Pago con el cobro) y el token de la tarjeta.
+  // Al recibir, `tarjeta` no viaja: si viene, el cuerpo no es el de esa forma de pago.
+  const tarjeta = leerTarjeta(x.tarjeta);
+  if (x.pago === "EN_LINEA" ? tarjeta === null || tarjeta === undefined : tarjeta !== undefined) return mal("PAGO_INVALIDO");
+  if (x.pago === "EN_LINEA" && email === null) return mal("CLIENTE_INVALIDO");
   const total_esperado = leerImporte(x.total_esperado);
   if (total_esperado === undefined) return mal("PAGO_INVALIDO");
   // La llave del intento: opcional, pero si viene tiene que tener la forma. Una mal formada no se
@@ -258,7 +265,31 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
 
   return { ok: true, valor: {
     accion, negocio, sucursal_id, modo, zona_id, items,
-    cliente: { nombre, telefono, email }, direccion, pago: x.pago, paga_con, propina_pct, total_esperado, clave,
+    cliente: { nombre, telefono, email }, direccion, pago: x.pago, paga_con, propina_pct, tarjeta: tarjeta ?? null, total_esperado, clave,
     nota: textoLimpio(x.nota, 300), captcha: typeof x.captcha === "string" && x.captcha.length <= 4096 ? x.captcha : null,
   } };
+}
+
+/** Lo que la tienda manda de la tarjeta. El número, el vencimiento y el código nunca llegan aquí. */
+export type TarjetaDePedido = { token: string; payment_method_id: string; issuer_id: string | null; dispositivo: string | null };
+
+/**
+ * `tarjeta` del cuerpo de `pedir`. undefined = no vino; null = vino y no tiene la forma.
+ *   · `token`: el de un solo uso que da MercadoPago.js (letras y números);
+ *   · `payment_method_id`: la marca (`visa`, `master`, `debvisa`…);
+ *   · `issuer_id`: el banco, si MercadoPago.js lo dio (número, o como texto de dígitos);
+ *   · `dispositivo`: el Device ID de MercadoPago.js. Es solo una ayuda contra el fraude: si no
+ *     tiene la forma se ignora, no se rechaza el pedido por él.
+ * Longitudes acotadas: esto viaja tal cual a Mercado Pago.
+ */
+export function leerTarjeta(v: unknown): TarjetaDePedido | null | undefined {
+  if (v === undefined || v === null) return undefined;
+  if (typeof v !== "object" || Array.isArray(v)) return null;
+  const t = v as Record<string, unknown>;
+  const token = typeof t.token === "string" && /^[A-Za-z0-9]{16,64}$/.test(t.token) ? t.token : null;
+  const payment_method_id = typeof t.payment_method_id === "string" && /^[a-z0-9_]{2,30}$/.test(t.payment_method_id) ? t.payment_method_id : null;
+  const emisor = typeof t.issuer_id === "number" && Number.isSafeInteger(t.issuer_id) ? String(t.issuer_id) : t.issuer_id ?? null;
+  if (!token || !payment_method_id || (emisor !== null && !(typeof emisor === "string" && /^[0-9]{1,20}$/.test(emisor)))) return null;
+  const dispositivo = typeof t.dispositivo === "string" && /^[A-Za-z0-9_.:-]{8,120}$/.test(t.dispositivo) ? t.dispositivo : null;
+  return { token, payment_method_id, issuer_id: emisor as string | null, dispositivo };
 }

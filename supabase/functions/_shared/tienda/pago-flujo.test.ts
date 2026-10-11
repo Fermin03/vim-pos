@@ -1,25 +1,27 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { avisoDeConciliacionFallida, avisoDeDevolucionFallida, topesDelAviso, barrer, confirmarPago, type Deps, devolverPago, type FilaPago, prepararPago, type PuertoPagos, respuestaDeConfirmacion, type Tarea } from "./pago-flujo.ts";
+import { avisoDeConciliacionFallida, avisoDeDevolucionFallida, topesDelAviso, barrer, cobrarPago, confirmarPago, type Deps, devolverPago, type FilaPago, type PuertoPagos, respuestaDeConfirmacion, type Tarea } from "./pago-flujo.ts";
 import type { ClienteMpTienda, RespuestaMp } from "./pago-mp.ts";
 
 const PAGO = "2cd9e6fa-1acf-47dc-8ba4-cba918d73770";
 const FILA: FilaPago = {
-  id: PAGO, conexion_id: "cx-1", estado: "CREADO", monto: "264.00", init_point: null,
-  vence_at: "2026-10-11T18:15:00.000Z", cuenta_vendedora: "202809963", de_prueba: false,
+  id: PAGO, conexion_id: "cx-1", estado: "CREADO", monto: "264.00", cuenta_vendedora: "202809963", de_prueba: false,
 };
 const APROBADO = {
   id: 18552260055, status: "approved", status_detail: "accredited", currency_id: "MXN", live_mode: true,
   collector_id: 202809963, external_reference: PAGO, transaction_amount: 264, payment_type_id: "credit_card", payment_method_id: "master",
 };
 const DATOS = {
-  pagoId: PAGO, folio: "T1A2B3", negocio: "Knock-Out", regreso: "https://pedidos.vimpos.com.mx/knockout/pedido/abc",
-  aviso: `https://x.supabase.co/functions/v1/tienda-webhook-mp?ref=${PAGO}`, ahora: new Date("2026-10-11T18:00:00Z"), email: null,
+  pagoId: PAGO, folio: "T1A2B3", negocio: "Knock-Out",
+  aviso: `https://x.supabase.co/functions/v1/tienda-webhook-mp?ref=${PAGO}`, email: "ana@example.com",
+  tarjeta: { token: "ff8080814c11e237014c1ff593b57b4d", payment_method_id: "master", issuer_id: null, dispositivo: null },
 };
 
 /** La base y Mercado Pago de mentira: se anota cada llamada y se contesta lo que diga cada prueba. */
 function doble(o: {
-  fila?: FilaPago | null; token?: string | null; toma?: boolean; tareas?: Tarea[];
+  fila?: FilaPago | null; token?: string | null; toma?: boolean; tareas?: Tarea[]; descarta?: boolean;
+  /** Lo que la base devuelve en las lecturas siguientes a la primera (después de confirmar). */
+  filaDespues?: FilaPago | null;
   mp?: Partial<Record<keyof ClienteMpTienda, RespuestaMp>>; devolucion?: (ok: boolean) => string;
   aplicar?: (pagoIdExterno: string) => { estado: string; pedido_estado: string; recien_aprobado: boolean };
   /** Lo que contesta la base a una consulta fallida: ¿es el tercer fallo? */
@@ -27,13 +29,13 @@ function doble(o: {
 } = {}) {
   const llamadas: string[] = [];
   const tokens: string[] = [];
+  let lecturas = 0;
   const db: PuertoPagos = {
-    leerPago: async () => (o.fila === undefined ? FILA : o.fila),
+    leerPago: async () => (lecturas++ > 0 && o.filaDespues !== undefined ? o.filaDespues : o.fila === undefined ? FILA : o.fila),
     token: async () => (o.token === undefined ? "TOKEN" : o.token),
     conexionEnError: async (id) => { llamadas.push(`conexionEnError ${id}`); },
-    tomarPreferencia: async () => { llamadas.push("tomarPreferencia"); return o.toma ?? true; },
-    guardarPreferencia: async (_id, pref, init) => { llamadas.push(`guardarPreferencia ${pref} ${init}`); },
-    descartar: async () => { llamadas.push("descartar"); return true; },
+    tomarCobro: async () => { llamadas.push("tomarCobro"); return o.toma ?? true; },
+    descartar: async () => { llamadas.push("descartar"); return o.descarta ?? true; },
     aplicar: async (_id, d) => {
       llamadas.push(`aplicar ${d.resultado} ${d.pagoIdExterno} ${d.monto}`);
       return o.aplicar?.(d.pagoIdExterno) ?? { estado: "APROBADO", pedido_estado: "RECIBIDO", recien_aprobado: d.resultado === "APROBADO" };
@@ -51,7 +53,7 @@ function doble(o: {
     mp: (token) => {
       tokens.push(token);
       return {
-        crearPreferencia: (c) => responder("crearPreferencia", c), leerPago: (id) => responder("leerPago", id),
+        cobrar: (c, llave) => responder("cobrar", c, llave), leerPago: (id) => responder("leerPago", id),
         buscarPagos: (id) => responder("buscarPagos", id), devolver: (id, llave) => responder("devolver", id, llave),
       };
     },
@@ -59,59 +61,113 @@ function doble(o: {
   };
   return { deps, llamadas, tokens };
 }
-const PREF = { status: 201, cuerpo: { id: "pref-1", init_point: "https://www.mercadopago.com.mx/checkout/v1/redirect?pref_id=pref-1" } };
+const LLAVE = `tienda-pago-${PAGO}`;
+const RECHAZADO = { ...APROBADO, status: "rejected", status_detail: "cc_rejected_insufficient_amount" };
 
-// ── prepararPago ─────────────────────────────────────────────────────────────────────────────────
+// ── cobrarPago ───────────────────────────────────────────────────────────────────────────────────
 
-test("preparar: crea la preferencia con el token del restaurante y el monto de la base, y la guarda", async () => {
-  const d = doble({ mp: { crearPreferencia: PREF } });
-  assert.deepEqual(await prepararPago(d.deps, DATOS), { ok: true, init_point: PREF.cuerpo.init_point });
-  assert.deepEqual(d.llamadas, ["tomarPreferencia", "mp.crearPreferencia {…}", `guardarPreferencia pref-1 ${PREF.cuerpo.init_point}`]);
+test("cobrar: aprobado y nuestro → se aplica con lo que cobró Mercado Pago y el pedido queda recibido", async () => {
+  const d = doble({ mp: { cobrar: { status: 201, cuerpo: APROBADO } } });
+  assert.deepEqual(await cobrarPago(d.deps, DATOS), { tipo: "APROBADO", recienAprobado: true });
+  assert.deepEqual(d.llamadas, ["tomarCobro", `mp.cobrar {…} ${LLAVE}`, "aplicar APROBADO 18552260055 264.00"]);
   assert.deepEqual(d.tokens, ["TOKEN"]);
 });
 
-test("preparar: el reintento devuelve el MISMO init_point sin tomar nada ni crear otra preferencia", async () => {
-  const d = doble({ fila: { ...FILA, init_point: "https://mp/ya-creada" }, mp: { crearPreferencia: PREF } });
-  assert.deepEqual(await prepararPago(d.deps, DATOS), { ok: true, init_point: "https://mp/ya-creada" });
-  assert.deepEqual(d.llamadas, []);
-  assert.deepEqual(d.tokens, []);
-});
-
-test("preparar: un pago que ya no espera al cliente (pagado, vencido) no tiene a dónde mandarlo", async () => {
-  for (const estado of ["APROBADO", "VENCIDO", "POR_DEVOLVER", "DEVUELTO"] as const) {
-    for (const init_point of [null, "https://mp/ya-creada"]) {
-      const d = doble({ fila: { ...FILA, estado, init_point } });
-      assert.deepEqual(await prepararPago(d.deps, DATOS), { ok: true, init_point: null });
-      assert.deepEqual(d.llamadas, []);
-    }
+test("cobrar: rechazado → el pedido se descarta y se dice la familia del motivo", async () => {
+  const casos: [string, string][] = [["cc_rejected_insufficient_amount", "FONDOS"], ["cc_rejected_bad_filled_security_code", "CODIGO"], ["cc_rejected_high_risk", "OTRO"]];
+  for (const [detalle, motivo] of casos) {
+    const d = doble({ mp: { cobrar: { status: 201, cuerpo: { ...RECHAZADO, status_detail: detalle } } } });
+    assert.deepEqual(await cobrarPago(d.deps, DATOS), { tipo: "RECHAZADO", motivo }, detalle);
+    assert.deepEqual(d.llamadas, ["tomarCobro", `mp.cobrar {…} ${LLAVE}`, "descartar"]);
   }
 });
 
-test("preparar: si otra petición del mismo intento la está creando, esta no crea otra", async () => {
-  const d = doble({ toma: false, mp: { crearPreferencia: PREF } });
-  assert.deepEqual(await prepararPago(d.deps, DATOS), { ok: false, error: "PAGO_EN_PROCESO" });
-  assert.deepEqual(d.llamadas, ["tomarPreferencia"]);
-});
-
-test("preparar: si Mercado Pago no la crea, el pedido se descarta y no queda vivo", async () => {
-  for (const r of [{ status: 500, cuerpo: null }, { status: 0, cuerpo: null }, { status: 400, cuerpo: { error: "invalid_back_urls" } },
-                   { status: 201, cuerpo: { id: "sin-init-point" } }, { status: 201, cuerpo: { id: "x", init_point: "http://sin-tls" } }]) {
-    const d = doble({ mp: { crearPreferencia: r } });
-    assert.deepEqual(await prepararPago(d.deps, DATOS), { ok: false, error: "PAGO_NO_DISPONIBLE" });
-    assert.deepEqual(d.llamadas, ["tomarPreferencia", "mp.crearPreferencia {…}", "registrar PREFERENCIA", "descartar"]);
+test("cobrar: sin respuesta, 5xx, 409 o 429 NUNCA es «rechazado»: queda por confirmar y el pedido NO se descarta", async () => {
+  for (const status of [0, 500, 502, 503, 409, 429]) {
+    const d = doble({ mp: { cobrar: { status, cuerpo: null } } });
+    assert.deepEqual(await cobrarPago(d.deps, DATOS), { tipo: "POR_CONFIRMAR" }, String(status));
+    assert.ok(!d.llamadas.includes("descartar"), String(status));
+    assert.ok(!d.llamadas.some((l) => l.startsWith("aplicar")), String(status));
   }
 });
 
-test("preparar: token rechazado o ausente marca la conexión con error, y también descarta", async () => {
-  const rechazado = doble({ mp: { crearPreferencia: { status: 401, cuerpo: { error: "invalid_access_token" } } } });
-  assert.deepEqual(await prepararPago(rechazado.deps, DATOS), { ok: false, error: "PAGO_NO_DISPONIBLE" });
-  assert.deepEqual(rechazado.llamadas, ["tomarPreferencia", "mp.crearPreferencia {…}", "conexionEnError cx-1", "registrar PREFERENCIA", "descartar"]);
+test("cobrar: un estado que no es final (pendiente, en proceso) o un pago que no es nuestro tampoco es rechazo", async () => {
+  for (const cuerpo of [{ ...APROBADO, status: "in_process", status_detail: "pending_contingency" }, { ...APROBADO, status: "pending", status_detail: "pending_challenge" },
+                        { ...APROBADO, external_reference: "otra" }, { ...APROBADO, collector_id: 999 }, { ...APROBADO, status_detail: "otra_cosa" }, { ...APROBADO, live_mode: false }, null]) {
+    const d = doble({ mp: { cobrar: { status: 201, cuerpo } } });
+    assert.deepEqual(await cobrarPago(d.deps, DATOS), { tipo: "POR_CONFIRMAR" }, JSON.stringify(cuerpo));
+    assert.ok(!d.llamadas.includes("descartar") && !d.llamadas.some((l) => l.startsWith("aplicar")), JSON.stringify(cuerpo));
+  }
+});
+
+test("cobrar: Mercado Pago no aceptó el cobro (4xx de validación: token usado, datos que no cuadran) → descartado, motivo OTRO", async () => {
+  for (const status of [400, 402, 403, 404, 422]) {
+    const d = doble({ mp: { cobrar: { status, cuerpo: { message: "Invalid card token", cause: [{ code: 2006 }] } } } });
+    assert.deepEqual(await cobrarPago(d.deps, DATOS), { tipo: "RECHAZADO", motivo: "OTRO" }, String(status));
+    assert.deepEqual(d.llamadas, ["tomarCobro", `mp.cobrar {…} ${LLAVE}`, "registrar COBRO", "descartar"]);
+  }
+});
+
+test("cobrar: token del restaurante rechazado o ausente → conexión con error, pedido descartado, no disponible", async () => {
+  const d = doble({ mp: { cobrar: { status: 401, cuerpo: null } } });
+  assert.deepEqual(await cobrarPago(d.deps, DATOS), { tipo: "NO_DISPONIBLE" });
+  assert.deepEqual(d.llamadas, ["tomarCobro", `mp.cobrar {…} ${LLAVE}`, "conexionEnError cx-1", "registrar COBRO", "descartar"]);
   const sin = doble({ token: null });
-  assert.deepEqual(await prepararPago(sin.deps, DATOS), { ok: false, error: "PAGO_NO_DISPONIBLE" });
-  assert.deepEqual(sin.llamadas, ["tomarPreferencia", "conexionEnError cx-1", "registrar SIN_TOKEN", "descartar"]);
+  assert.deepEqual(await cobrarPago(sin.deps, DATOS), { tipo: "NO_DISPONIBLE" });
+  assert.deepEqual(sin.llamadas, ["tomarCobro", "conexionEnError cx-1", "registrar SIN_TOKEN", "descartar"]);
 });
 
-// ── confirmarPago ────────────────────────────────────────────────────────────────────────────────
+test("cobrar: un renglón se cobra UNA vez. El reintento del mismo intento no cobra: pregunta qué pasó con el primero", async () => {
+  // La respuesta del primer cobro se perdió; Mercado Pago sí cobró.
+  const d = doble({ toma: false, filaDespues: { ...FILA, estado: "APROBADO" }, mp: { buscarPagos: { status: 200, cuerpo: { results: [APROBADO] } } } });
+  assert.deepEqual(await cobrarPago(d.deps, DATOS), { tipo: "APROBADO", recienAprobado: true });
+  assert.ok(!d.llamadas.some((l) => l.startsWith("mp.cobrar")), "no se cobra otra vez");
+  assert.deepEqual(d.llamadas, ["tomarCobro", `mp.buscarPagos ${PAGO}`, "aplicar APROBADO 18552260055 264.00"]);
+  // Mercado Pago todavía no tiene nada con esa referencia, o no contesta: por confirmar, sin cobrar y sin descartar.
+  for (const buscarPagos of [{ status: 200, cuerpo: { results: [] } }, { status: 500, cuerpo: null }]) {
+    const e = doble({ toma: false, mp: { buscarPagos } });
+    assert.deepEqual(await cobrarPago(e.deps, DATOS), { tipo: "POR_CONFIRMAR" });
+    assert.ok(!e.llamadas.some((l) => l.startsWith("mp.cobrar")) && !e.llamadas.includes("descartar"));
+  }
+});
+
+test("cobrar: un pago ya aprobado contesta aprobado sin tocar nada; uno que ya no espera, por confirmar", async () => {
+  const ya = doble({ fila: { ...FILA, estado: "APROBADO" } });
+  assert.deepEqual(await cobrarPago(ya.deps, DATOS), { tipo: "APROBADO", recienAprobado: false });
+  assert.deepEqual(ya.llamadas, []);
+  for (const estado of ["VENCIDO", "RECHAZADO", "POR_DEVOLVER", "DEVUELTO"] as const) {
+    const d = doble({ fila: { ...FILA, estado } });
+    assert.deepEqual(await cobrarPago(d.deps, DATOS), { tipo: "POR_CONFIRMAR" }, estado);
+    assert.deepEqual(d.llamadas, [], estado);
+  }
+  assert.deepEqual(await cobrarPago(doble({ fila: null }).deps, DATOS), { tipo: "POR_CONFIRMAR" });
+});
+
+test("cobrar: aprobado por OTRO monto no se cree: la base lo deja por devolver y el pedido queda por confirmar", async () => {
+  const d = doble({ mp: { cobrar: { status: 201, cuerpo: { ...APROBADO, transaction_amount: 1 } } }, aplicar: () => ({ estado: "CREADO", pedido_estado: "POR_PAGAR", recien_aprobado: false }) });
+  assert.deepEqual(await cobrarPago(d.deps, DATOS), { tipo: "POR_CONFIRMAR" });
+  assert.ok(d.llamadas.includes("aplicar APROBADO 18552260055 1.00"));
+});
+
+test("cobrar: si el pedido ya no se puede descartar (algo lo movió), no se dice «rechazado»", async () => {
+  const d = doble({ descarta: false, mp: { cobrar: { status: 201, cuerpo: RECHAZADO } } });
+  assert.deepEqual(await cobrarPago(d.deps, DATOS), { tipo: "POR_CONFIRMAR" });
+});
+
+test("cobrar: el token de la tarjeta no llega a ningún log", async () => {
+  for (const cobrar of [{ status: 400, cuerpo: { message: DATOS.tarjeta.token } }, { status: 500, cuerpo: null }, { status: 201, cuerpo: RECHAZADO }]) {
+    const vistos: string[] = [];
+    const d = doble({ mp: { cobrar } });
+    await cobrarPago({ ...d.deps, registrar: (codigo, detalle) => { vistos.push(`${codigo} ${detalle}`); } }, DATOS);
+    assert.ok(!vistos.join(" ").includes(DATOS.tarjeta.token), vistos.join(" | "));
+  }
+});
+
+test("confirmar: si la búsqueda trae un rechazado y un aprobado, el aprobado se aplica primero", async () => {
+  const d = doble({ mp: { buscarPagos: { status: 200, cuerpo: { results: [{ ...RECHAZADO, id: 7 }, APROBADO] } } } });
+  await confirmarPago(d.deps, PAGO);
+  assert.deepEqual(d.llamadas.filter((l) => l.startsWith("aplicar")), ["aplicar APROBADO 18552260055 264.00", "aplicar RECHAZADO 7 264.00"]);
+});
 
 test("confirmar: con la pista de un aviso consulta ESE pago con el token del restaurante y lo aplica", async () => {
   const d = doble({ mp: { leerPago: { status: 200, cuerpo: APROBADO } } });

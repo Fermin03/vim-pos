@@ -1,5 +1,7 @@
 -- ============================================================================
--- 0172 — Pago en línea de la tienda (Checkout Pro de Mercado Pago), entrega 1: la base.
+-- 0172 — Pago en línea de la tienda (Checkout API de Mercado Pago: tarjeta dentro de la tienda): la base.
+-- El cobro se hace en la misma petición que crea el pedido (POST /v1/payments con el token de la
+-- tarjeta). No hay preferencia, ni redirección, ni un pedido «esperando pago» a la vista del cliente.
 -- Diseño: docs/integraciones/mercado-pago-checkout-pro/02-diseno.md
 --
 -- REGLA DE ORO: aplicar esta migración no cambia nada de lo que hoy funciona. Ningún negocio tiene
@@ -57,9 +59,15 @@ ALTER TABLE tienda_sucursales
   ADD COLUMN IF NOT EXISTS conexion_id uuid NULL REFERENCES terminal_conexiones(id) ON DELETE SET NULL;
 COMMENT ON COLUMN tienda_sucursales.conexion_id IS 'Cuenta de Mercado Pago (terminal_conexiones) que cobra los pedidos en línea de la sucursal. NULL = la única activa del negocio.';
 
--- Un intento de pago. Su id ES la external_reference de la preferencia en Mercado Pago.
--- `extra`: un pago aprobado que llegó con nuestra referencia y NO es el del pedido (un segundo
--- cobro de la misma preferencia, o uno por otro monto). No se honra: se registra para devolverlo.
+-- La public key de la cuenta de Mercado Pago del restaurante (viene en la respuesta de OAuth). No
+-- es secreta: con ella el navegador del cliente convierte su tarjeta en un token. Sin ella no se
+-- puede cobrar en línea con esa cuenta (hay que volver a conectarla).
+ALTER TABLE terminal_conexiones ADD COLUMN IF NOT EXISTS public_key text NULL;
+COMMENT ON COLUMN terminal_conexiones.public_key IS 'Public key de la cuenta (respuesta de /oauth/token). Pública: la usa la tienda para tokenizar la tarjeta. NULL = conectada antes de guardarla; no cobra en línea hasta reconectar.';
+
+-- Un intento de pago. Su id ES la external_reference del cobro en Mercado Pago.
+-- `extra`: un pago aprobado que llegó con nuestra referencia y NO es el del pedido (por otro
+-- monto, o un segundo cobro). No se honra: se registra para devolverlo.
 CREATE TABLE IF NOT EXISTS tienda_pagos (
   id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id             uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
@@ -69,14 +77,12 @@ CREATE TABLE IF NOT EXISTS tienda_pagos (
   propina_mxn           numeric(12,2) NOT NULL DEFAULT 0 CHECK (propina_mxn >= 0),
   estado                varchar(20) NOT NULL DEFAULT 'CREADO',
   extra                 boolean NOT NULL DEFAULT false,
-  preferencia_id        text NULL,
-  init_point            text NULL,                 -- a dónde va el cliente a pagar
-  preferencia_pedida_at timestamptz NULL,          -- quién está creando la preferencia (reintentos a la vez)
+  cobro_pedido_at       timestamptz NULL,          -- cuándo se le mandó el cobro a Mercado Pago. UNA sola vez por renglón
   pago_id_externo       text NULL,                 -- id del pago en Mercado Pago
   tipo_tarjeta          varchar(20) NULL,          -- credit_card | debit_card | account_money
   marca                 varchar(30) NULL,
   detalle               text NULL,                 -- status_detail del último rechazo
-  vence_at              timestamptz NOT NULL,      -- hasta cuándo se puede pagar
+  vence_at              timestamptz NOT NULL,      -- hasta cuándo se espera que el cobro se confirme
   aprobado_at           timestamptz NULL,
   devuelto_at           timestamptz NULL,
   consultado_at         timestamptz NULL,          -- última consulta a Mercado Pago (para no preguntar seguido)
@@ -172,14 +178,16 @@ BEGIN
    WHERE ts.sucursal_id = p_sucursal AND ts.tenant_id = p_tenant;
   IF v_elegida IS NOT NULL THEN
     SELECT x.id INTO v_id FROM terminal_conexiones x
-     WHERE x.id = v_elegida AND x.tenant_id = p_tenant AND x.proveedor = 'MERCADO_PAGO' AND x.estado = 'ACTIVA';
+     WHERE x.id = v_elegida AND x.tenant_id = p_tenant AND x.proveedor = 'MERCADO_PAGO' AND x.estado = 'ACTIVA'
+       AND x.public_key IS NOT NULL;   -- sin public key la tienda no puede tokenizar la tarjeta
     RETURN v_id;
   END IF;
 
   IF (SELECT count(*) FROM terminal_conexiones x
        WHERE x.tenant_id = p_tenant AND x.proveedor = 'MERCADO_PAGO' AND x.estado = 'ACTIVA') = 1 THEN
     SELECT x.id INTO v_id FROM terminal_conexiones x
-     WHERE x.tenant_id = p_tenant AND x.proveedor = 'MERCADO_PAGO' AND x.estado = 'ACTIVA';
+     WHERE x.tenant_id = p_tenant AND x.proveedor = 'MERCADO_PAGO' AND x.estado = 'ACTIVA'
+       AND x.public_key IS NOT NULL;
   END IF;
   RETURN v_id;
 END;
@@ -221,6 +229,8 @@ BEGIN
            'domicilio', ts.domicilio,
            'horario', ts.horario,
            'pago_en_linea', tienda_conexion_cobro(v_c.tenant_id, s.id) IS NOT NULL,
+           -- La public key de la cuenta que cobra ahí (no es secreta): con ella se tokeniza la tarjeta.
+           'public_key', (SELECT x.public_key FROM terminal_conexiones x WHERE x.id = tienda_conexion_cobro(v_c.tenant_id, s.id)),
            'estado', jsonb_build_object(
              'recoger',   tienda_estado_sucursal(s.id, 'RECOGER', p_ahora),
              'domicilio', tienda_estado_sucursal(s.id, 'DOMICILIO', p_ahora)),
@@ -269,8 +279,7 @@ AS $$
            SELECT jsonb_build_object(
                     'pago_id', g.id,
                     'propina_mxn', to_char(g.propina_mxn, 'FM999999990.00'),
-                    'total_a_pagar_mxn', to_char(g.monto_mxn, 'FM999999990.00'),
-                    'vence_pago', g.vence_at)
+                    'total_a_pagar_mxn', to_char(g.monto_mxn, 'FM999999990.00'))
              FROM tienda_pagos g WHERE g.pedido_id = (p_pedido).id AND NOT g.extra), '{}'::jsonb);
 $$;
 
@@ -352,6 +361,10 @@ BEGIN
       OR (v_en_linea AND v_conexion IS NOT NULL)) IS NOT TRUE THEN
     RAISE EXCEPTION 'PAGO_INVALIDO: esa forma de pago no está disponible';
   END IF;
+  -- En línea el correo es obligatorio: Mercado Pago lo pide con el cobro, y ahí llega la confirmación.
+  IF v_en_linea AND v_email IS NULL THEN
+    RAISE EXCEPTION 'CLIENTE_INVALIDO: para pagar en línea hace falta el correo';
+  END IF;
   IF p_propina_pct IS NOT NULL AND (NOT v_en_linea OR p_propina_pct NOT IN (0, 10, 15, 20)) THEN
     RAISE EXCEPTION 'PAGO_INVALIDO: la propina va solo con el pago en línea y es de 0, 10, 15 o 20 por ciento';
   END IF;
@@ -415,7 +428,7 @@ BEGIN
   --    seguimiento lo deriva del ticket al leer, §5), así que sin esto tres pedidos aceptados
   --    dejarían ese teléfono sin poder pedir para siempre. No cuenta el pedido de hace más de 6
   --    horas ni el que ya tiene en la nube un ticket cobrado, facturado o cancelado.
-  --    El que espera su pago (POR_PAGAR) cuenta: cada uno es una preferencia creada en Mercado Pago.
+  --    El que espera la confirmación de su cobro (POR_PAGAR) cuenta: puede acabar siendo un pedido.
   -- ponytail: el conteo no tiene índice propio; recorre los pedidos vivos (índice parcial de 0090),
   -- que son pocos. Si un día pesa, un índice parcial por (tenant_id, cliente_telefono).
   PERFORM pg_advisory_xact_lock(hashtextextended('tienda_pedido:' || p_tenant || ':' || v_tel, 0));
@@ -459,7 +472,7 @@ BEGIN
       -- En línea no corre ninguna ventana hasta que se paga.
       CASE WHEN v_en_linea THEN NULL ELSE now() + make_interval(mins => v_cfg.minutos_aceptacion) END,
       -- Misma regla que los pedidos de apps (procesar-uber.ts): con una caja instalada viva, el
-      -- ticket lo crea la caja. (En línea se vuelve a decidir al pagarse: pueden pasar 15 minutos.)
+      -- ticket lo crea la caja. (En línea se vuelve a decidir al aprobarse el cobro.)
       CASE WHEN sucursal_con_espejo(p_sucursal) THEN 'ESCRITORIO' ELSE 'NUBE' END,
       '{}'::jsonb)                      -- nada del cuerpo crudo: ni IP, ni token, ni sesión
     RETURNING * INTO v_ped;
@@ -472,10 +485,11 @@ BEGIN
     RAISE;
   END;
 
-  -- El pago que se espera: total + propina, a la cuenta que cobra, con 15 minutos para pagarse.
+  -- El cobro que se va a hacer enseguida: total + propina, a la cuenta que cobra. `vence_at` es
+  -- hasta cuándo se espera su resultado si Mercado Pago no contestó (lo normal es saberlo al instante).
   IF v_en_linea THEN
     INSERT INTO tienda_pagos (tenant_id, pedido_id, conexion_id, monto_mxn, propina_mxn, vence_at)
-    VALUES (p_tenant, v_ped.id, v_conexion, v_total + v_propina, v_propina, now() + interval '15 minutes');
+    VALUES (p_tenant, v_ped.id, v_conexion, v_total + v_propina, v_propina, now() + interval '5 minutes');
   END IF;
 
   RETURN _tienda_pedido_creado(v_ped, false);
@@ -483,26 +497,25 @@ END;
 $$;
 
 -- ── §5 El pago ───────────────────────────────────────────────────────────────
--- ¿Me toca crear la preferencia de este pago? Dos envíos del mismo intento de compra llegan a la
--- vez: solo uno la crea. Quien no la toma contesta «en proceso» y el cliente reintenta. Si quien la
--- tomó se cayó, a los 30 segundos se puede volver a tomar.
-CREATE OR REPLACE FUNCTION tienda_pago_tomar_preferencia(p_pago uuid)
+-- ¿Me toca mandar el cobro de este pago a Mercado Pago? UNA sola vez por renglón, pase lo que
+-- pase: dos envíos del mismo intento de compra (o un reintento porque el primero no contestó) nunca
+-- cobran dos veces. Quien no lo toma no cobra: le pregunta a Mercado Pago qué pasó con el primero.
+CREATE OR REPLACE FUNCTION tienda_pago_tomar_cobro(p_pago uuid)
 RETURNS boolean
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 BEGIN
-  UPDATE tienda_pagos SET preferencia_pedida_at = now()
-   WHERE id = p_pago AND NOT extra AND estado = 'CREADO' AND init_point IS NULL
-     AND (preferencia_pedida_at IS NULL OR preferencia_pedida_at < now() - interval '30 seconds');
+  UPDATE tienda_pagos SET cobro_pedido_at = now()
+   WHERE id = p_pago AND NOT extra AND estado = 'CREADO' AND cobro_pedido_at IS NULL AND pago_id_externo IS NULL;
   RETURN FOUND;
 END;
 $$;
 
--- Mercado Pago no dejó crear la preferencia: el pedido no puede pagarse, así que no queda vivo ni
--- cuenta contra el tope del cliente. Se BORRA (con su pago, en cascada): nadie lo vio, y así un
--- reintento con la misma clave crea uno nuevo en vez de encontrarse uno muerto.
--- Solo si de verdad no hay con qué pagarlo. Falso = ya no se podía descartar y no se tocó nada.
+-- Mercado Pago RECHAZÓ el cobro (o no lo aceptó): el pedido no se pagó, así que no queda vivo ni
+-- cuenta contra el tope del cliente. Se BORRA (con su pago, en cascada): nadie lo vio, y así el
+-- cliente puede reintentar con la misma tarjeta o con otra y nace un pedido nuevo.
+-- Solo se llama con un NO seguro de Mercado Pago. Falso = ya no se podía descartar y no se tocó nada.
 CREATE OR REPLACE FUNCTION tienda_pago_descartar(p_pago uuid)
 RETURNS boolean
 LANGUAGE plpgsql SECURITY DEFINER
@@ -517,7 +530,7 @@ BEGIN
   PERFORM 1 FROM delivery_pedidos WHERE id = v_pedido AND estado = 'POR_PAGAR' FOR UPDATE;
   IF NOT FOUND THEN RETURN false; END IF;
   PERFORM 1 FROM tienda_pagos
-    WHERE id = p_pago AND estado = 'CREADO' AND init_point IS NULL AND pago_id_externo IS NULL FOR UPDATE;
+    WHERE id = p_pago AND estado = 'CREADO' AND pago_id_externo IS NULL FOR UPDATE;
   IF NOT FOUND THEN RETURN false; END IF;
   DELETE FROM delivery_pedidos WHERE id = v_pedido;
   RETURN true;
@@ -550,8 +563,8 @@ $$;
 --   · sobra (el pedido ya tenía otro pago, o el monto no es el esperado): un renglón `extra`,
 --     POR_DEVOLVER por lo que se cobró.
 -- Idempotente: el mismo aviso dos veces, o dos a la vez, dejan lo mismo (candados sobre el pedido y
--- el pago, y un renglón por pago de Mercado Pago). Un rechazo no cierra nada: el cliente puede
--- reintentar con otra tarjeta mientras la preferencia siga viva.
+-- el pago, y un renglón por pago de Mercado Pago). Un rechazo que se conoce DESPUÉS (por el aviso o
+-- por el barrido: la respuesta del cobro no llegó) cierra el pedido que esperaba: no se cobró.
 -- Devuelve {estado, pedido_estado, recien_aprobado}.
 CREATE OR REPLACE FUNCTION tienda_pago_aplicar(
   p_pago uuid, p_resultado text, p_pago_id_externo text, p_monto numeric,
@@ -586,6 +599,12 @@ BEGIN
 
   ELSIF p_resultado = 'RECHAZADO' THEN
     UPDATE tienda_pagos SET estado = 'RECHAZADO', detalle = left(p_detalle, 80) WHERE id = p_pago AND estado = 'CREADO';
+    -- Ya no hay nada que esperar: el pedido se cierra como «sin pago» (nunca existió para la caja).
+    IF FOUND AND v_p.estado = 'POR_PAGAR' THEN
+      UPDATE delivery_pedidos
+         SET estado = 'EXPIRADO', cancelado_at = now(), cancelado_por = 'TIMEOUT', motivo_cancelacion = 'Sin pago'
+       WHERE id = v_pedido;
+    END IF;
 
   ELSIF EXISTS (SELECT 1 FROM tienda_pagos WHERE pago_id_externo = p_pago_id_externo) THEN
     NULL;   -- ese pago ya está aplicado: aviso repetido
@@ -678,9 +697,9 @@ CREATE TRIGGER trg_delivery_pedidos_devolver_pago
 --   CONCILIAR  pagos que nadie ha confirmado: se le pregunta a Mercado Pago. Sin esto, si el aviso
 --              no llega y el cliente cerró la pestaña, un pago cobrado se quedaría sin pedido (o
 --              llegaría a la caja al vencer) y sin devolución. Cuándo toca:
---                · mientras se puede pagar, desde los 2 minutos de creado y a lo sumo cada 2
---                  minutos por pago (la página del pedido, si está abierta, ya pregunta ella y
---                  comparte ese reloj: consultado_at);
+--                · mientras el pedido espera (el cobro se mandó y no se supo el resultado), desde
+--                  los 20 segundos y a lo sumo cada 45 por pago (la página del pedido, si está
+--                  abierta, ya pregunta ella y comparte ese reloj: consultado_at);
 --                · ya VENCIDO, hasta que Mercado Pago conteste una vez (conciliaciones = 1), y otra
 --                  alrededor de una hora después del plazo, para cazar un aprobado tardío;
 --                · si la consulta falla tres veces seguidas (cuenta desconectada, token rechazado),
@@ -710,14 +729,14 @@ BEGIN
   RETURN QUERY
   WITH toca AS (
     SELECT g.id FROM tienda_pagos g
-     WHERE NOT g.extra AND g.conciliado_at IS NULL AND g.preferencia_id IS NOT NULL
+     -- Solo si el cobro llegó a mandarse: sin eso no hay nada que buscar en Mercado Pago.
+     WHERE NOT g.extra AND g.conciliado_at IS NULL AND g.cobro_pedido_at IS NOT NULL
        AND g.vence_at > now() - interval '48 hours'
-       AND ((g.estado IN ('CREADO', 'RECHAZADO') AND g.created_at < now() - interval '2 minutes')
+       AND ((g.estado = 'CREADO' AND g.cobro_pedido_at < now() - interval '20 seconds')
             OR (g.estado = 'VENCIDO' AND (g.conciliaciones = 0 OR g.vence_at < now() - interval '1 hour')))
        AND (g.consultado_at IS NULL OR g.consultado_at < now() - CASE
               WHEN g.conciliacion_fallos >= 3 THEN interval '1 hour'
-              WHEN g.estado = 'VENCIDO' THEN interval '45 seconds'
-              ELSE interval '2 minutes' END)
+              ELSE interval '45 seconds' END)
      ORDER BY g.consultado_at NULLS FIRST, g.created_at LIMIT GREATEST(p_max, 1) FOR UPDATE SKIP LOCKED
   ), tomados AS (
     UPDATE tienda_pagos g SET consultado_at = now()
@@ -1016,11 +1035,11 @@ $$;
 -- tienda_seguimiento: cuerpo copiado de 0166_tienda_cuentas.sql §3. Se añade lo del pago en línea,
 -- sin ningún identificador de Mercado Pago ni dato de la tarjeta:
 --   · `pago` puede ser EN_LINEA, y `estado`, POR_PAGAR;
---   · `pago_estado`: ESPERANDO_PAGO | RECHAZADO (el último intento no pasó; puede reintentar) |
---     PAGADO | DEVOLUCION_EN_PROCESO | DEVUELTO | SIN_PAGO (venció y Mercado Pago confirmó que no
---     se cobró) | POR_CONFIRMAR (venció y todavía no se ha podido preguntar: puede haber un cobro);
---   · `propina_mxn`, `total_a_pagar_mxn` (total + propina) y `vence_pago`;
---   · esas cuatro claves van SOLO en el pedido en línea: el de pago al recibir devuelve, clave por
+--   · `pago_estado`: PAGADO | DEVOLUCION_EN_PROCESO | DEVUELTO | SIN_PAGO (no se cobró: Mercado
+--     Pago lo confirmó, o el cobro nunca llegó a mandarse) | POR_CONFIRMAR (el cobro se mandó y
+--     todavía no se sabe qué pasó: puede haber un cobro; nunca se dice «no se te cobró»);
+--   · `propina_mxn` y `total_a_pagar_mxn` (total + propina);
+--   · esas tres claves van SOLO en el pedido en línea: el de pago al recibir devuelve, clave por
 --     clave, lo de siempre;
 --   · `motivo` SIN_PAGO en el pedido que venció sin pagarse (antes habría dicho SIN_RESPUESTA,
 --     que es «el restaurante no contestó»).
@@ -1053,7 +1072,7 @@ BEGIN
     'modo', CASE v_p.app WHEN 'DELIVERY_PROPIO' THEN 'DOMICILIO' ELSE 'RECOGER' END,
     'estado', _tienda_estado_publico(v_estado, v_p.app::text),
     'motivo', CASE
-      WHEN v_estado = 'EXPIRADO' AND v_en_linea AND v_p.pagado_at IS NULL AND v_g.estado = 'VENCIDO' AND v_g.conciliaciones = 0 THEN 'POR_CONFIRMAR'
+      WHEN v_estado = 'EXPIRADO' AND v_en_linea AND v_p.pagado_at IS NULL AND v_g.estado = 'VENCIDO' AND v_g.conciliaciones = 0 AND v_g.cobro_pedido_at IS NOT NULL THEN 'POR_CONFIRMAR'
       WHEN v_estado = 'EXPIRADO' AND v_en_linea AND v_p.pagado_at IS NULL THEN 'SIN_PAGO'
       WHEN v_estado = 'EXPIRADO' THEN 'SIN_RESPUESTA'
       WHEN v_estado IN ('RECHAZADO', 'CANCELADO') THEN
@@ -1074,14 +1093,13 @@ BEGIN
         WHEN v_g.estado = 'APROBADO' THEN 'PAGADO'
         WHEN v_g.estado IN ('POR_DEVOLVER', 'DEVOLUCION_FALLIDA') THEN 'DEVOLUCION_EN_PROCESO'
         WHEN v_g.estado = 'DEVUELTO' THEN 'DEVUELTO'
-        WHEN v_p.estado = 'POR_PAGAR' AND v_g.estado = 'RECHAZADO' THEN 'RECHAZADO'
-        WHEN v_p.estado = 'POR_PAGAR' THEN 'ESPERANDO_PAGO'
-        -- Venció, pero todavía no se le ha podido preguntar a Mercado Pago si se cobró: no se afirma nada.
-        WHEN v_g.estado = 'VENCIDO' AND v_g.conciliaciones = 0 THEN 'POR_CONFIRMAR'
+        -- El cobro se mandó y no se sabe qué pasó (o venció y todavía no se le ha podido preguntar a
+        -- Mercado Pago): no se afirma nada.
+        WHEN v_p.estado = 'POR_PAGAR' THEN 'POR_CONFIRMAR'
+        WHEN v_g.estado = 'VENCIDO' AND v_g.conciliaciones = 0 AND v_g.cobro_pedido_at IS NOT NULL THEN 'POR_CONFIRMAR'
         ELSE 'SIN_PAGO' END,
       'propina_mxn', to_char(COALESCE(v_p.propina_mxn, 0), 'FM999999990.00'),
-      'total_a_pagar_mxn', to_char(v_p.total_cliente_mxn + COALESCE(v_p.propina_mxn, 0), 'FM999999990.00'),
-      'vence_pago', v_g.vence_at) END;
+      'total_a_pagar_mxn', to_char(v_p.total_cliente_mxn + COALESCE(v_p.propina_mxn, 0), 'FM999999990.00')) END;
 END;
 $$;
 
@@ -1185,10 +1203,10 @@ COMMENT ON FUNCTION tienda_reportar_estado IS
 
 -- ── §9 El barrido de cada minuto ─────────────────────────────────────────────
 -- Dos cosas, y ninguna avisa a nadie (ni correo, ni push, ni evento):
---   1) El pedido que lleva más de 17 minutos esperando su pago pasa a EXPIRADO y su pago a VENCIDO.
---      La preferencia de Mercado Pago vence a los 15; los 2 de más son para que un pago hecho en el
---      último momento alcance a confirmarse antes de vencer el pedido (si aun así llega tarde, se
---      devuelve: tienda_pago_aplicar).
+--   1) El pedido que lleva más de 5 minutos esperando la confirmación de su cobro pasa a EXPIRADO y
+--      su pago a VENCIDO. Lo normal es saber al instante si el cobro pasó; aquí solo llega el que
+--      Mercado Pago no contestó. En esos 5 minutos el barrido ya preguntó varias veces; si el cobro
+--      aparece aprobado después, se devuelve (tienda_pago_aplicar).
 --   2) Si hay algo que hacer contra Mercado Pago (devolver, o preguntar una última vez por un pago
 --      que nadie confirmó), llama a la función `tienda-webhook-mp` por su puerta interna, con el
 --      mismo mecanismo que el aviso de vencidos (0097): pg_net y los secretos de Vault. Sin pg_net
@@ -1208,20 +1226,20 @@ BEGIN
   WITH vencidos AS (
     UPDATE delivery_pedidos
        SET estado = 'EXPIRADO', cancelado_at = now(), cancelado_por = 'TIMEOUT', motivo_cancelacion = 'Sin pago'
-     WHERE estado = 'POR_PAGAR' AND created_at < now() - interval '17 minutes'
+     WHERE estado = 'POR_PAGAR' AND created_at < now() - interval '5 minutes'
     RETURNING id
   )
   SELECT array_agg(id) INTO v_ids FROM vencidos;
   UPDATE tienda_pagos SET estado = 'VENCIDO'
-   WHERE pedido_id = ANY (v_ids) AND NOT extra AND estado IN ('CREADO', 'RECHAZADO');
+   WHERE pedido_id = ANY (v_ids) AND NOT extra AND estado = 'CREADO';
 
   BEGIN
     IF EXISTS (SELECT 1 FROM tienda_pagos g
                 WHERE (g.estado = 'POR_DEVOLVER' AND (g.proximo_intento_at IS NULL OR g.proximo_intento_at <= now()))
                    -- Más ancho que tienda_pagos_tomar a propósito: quién toca de verdad lo decide ella.
-                   OR (NOT g.extra AND g.conciliado_at IS NULL AND g.preferencia_id IS NOT NULL
-                       AND g.estado IN ('CREADO', 'RECHAZADO', 'VENCIDO')
-                       AND g.created_at < now() - interval '2 minutes' AND g.vence_at > now() - interval '48 hours'
+                   OR (NOT g.extra AND g.conciliado_at IS NULL AND g.cobro_pedido_at IS NOT NULL
+                       AND g.estado IN ('CREADO', 'VENCIDO')
+                       AND g.cobro_pedido_at < now() - interval '20 seconds' AND g.vence_at > now() - interval '48 hours'
                        AND (g.estado <> 'VENCIDO' OR g.conciliaciones = 0 OR g.vence_at < now() - interval '1 hour')
                        AND (g.conciliacion_fallos < 3 OR g.consultado_at IS NULL OR g.consultado_at < now() - interval '1 hour'))) THEN
       v_secreto := _vim_secreto('vim_interno');
@@ -1244,7 +1262,7 @@ BEGIN
 END;
 $$;
 COMMENT ON FUNCTION tienda_pagos_barrer IS
-  'Vence los pedidos de la tienda que llevan más de 17 minutos sin pagarse y, si hay devoluciones o pagos por conciliar, llama a tienda-webhook-mp (pg_net). No avisa a nadie. Cron cada minuto (nube). Devuelve cuántos pedidos venció.';
+  'Vence los pedidos de la tienda que llevan más de 5 minutos sin que su cobro se confirme y, si hay devoluciones o pagos por conciliar, llama a tienda-webhook-mp (pg_net). No avisa a nadie. Cron cada minuto (nube). Devuelve cuántos pedidos venció.';
 
 -- ── §10 La cuenta pagada en línea, en la caja ────────────────────────────────
 -- (a) «Listo» en la caja instalada. El POS de la caja escribe en su base local; quien le avisa a
@@ -1331,7 +1349,7 @@ BEGIN
   FOR f IN SELECT p.oid::regprocedure AS firma, p.proname
              FROM pg_proc p
             WHERE p.pronamespace = 'public'::regnamespace
-              AND p.proname IN ('tienda_conexion_cobro', 'tienda_negocio', 'tienda_crear_pedido', 'tienda_pago_tomar_preferencia',
+              AND p.proname IN ('tienda_conexion_cobro', 'tienda_negocio', 'tienda_crear_pedido', 'tienda_pago_tomar_cobro',
                                 'tienda_pago_descartar', 'tienda_pago_tomar_consulta', 'tienda_pago_aplicar', 'tienda_pago_tomar_correo',
                                 'tienda_pagos_tomar', 'tienda_pago_devolucion', 'tienda_pago_conciliacion', 'crear_ticket_desde_tienda',
                                 'tienda_seguimiento', 'tienda_sincronizar_estados_nube', 'tienda_reportar_estado', 'tienda_pagos_barrer',

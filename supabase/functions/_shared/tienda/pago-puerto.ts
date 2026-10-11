@@ -19,15 +19,15 @@ export function puertoDePagos(admin: Admin): PuertoPagos {
   return {
     async leerPago(pagoId) {
       const f = exigir(await admin.from("tienda_pagos")
-        .select("id, conexion_id, estado, monto_mxn, init_point, vence_at, conexion:terminal_conexiones(cuenta_id_externo, de_prueba)")
+        .select("id, conexion_id, estado, monto_mxn, conexion:terminal_conexiones(cuenta_id_externo, de_prueba)")
         .eq("id", pagoId).eq("extra", false).maybeSingle()) as
-        | { id: string; conexion_id: string; estado: EstadoPago; monto_mxn: number | string; init_point: string | null; vence_at: string;
+        | { id: string; conexion_id: string; estado: EstadoPago; monto_mxn: number | string;
             conexion: { cuenta_id_externo: string; de_prueba: boolean } | null }
         | null;
       const monto = f ? montoTexto(f.monto_mxn) : null;
       if (!f || !f.conexion || !monto) return null;
       const fila: FilaPago = {
-        id: f.id, conexion_id: f.conexion_id, estado: f.estado, monto, init_point: f.init_point, vence_at: f.vence_at,
+        id: f.id, conexion_id: f.conexion_id, estado: f.estado, monto,
         cuenta_vendedora: f.conexion.cuenta_id_externo, de_prueba: f.conexion.de_prueba === true,
       };
       return fila;
@@ -40,11 +40,7 @@ export function puertoDePagos(admin: Admin): PuertoPagos {
       exigir(await admin.from("terminal_conexiones").update({ estado: "ERROR", ultimo_error: "Mercado Pago rechazó el token" })
         .eq("id", conexionId).eq("estado", "ACTIVA"));
     },
-    tomarPreferencia: async (pagoId) => (await rpc("tienda_pago_tomar_preferencia", { p_pago: pagoId })) === true,
-    async guardarPreferencia(pagoId, preferenciaId, initPoint) {
-      exigir(await admin.from("tienda_pagos").update({ preferencia_id: preferenciaId, init_point: initPoint })
-        .eq("id", pagoId).is("init_point", null));
-    },
+    tomarCobro: async (pagoId) => (await rpc("tienda_pago_tomar_cobro", { p_pago: pagoId })) === true,
     descartar: async (pagoId) => (await rpc("tienda_pago_descartar", { p_pago: pagoId })) === true,
     aplicar: async (pagoId, d) => await rpc("tienda_pago_aplicar", {
       p_pago: pagoId, p_resultado: d.resultado, p_pago_id_externo: d.pagoIdExterno, p_monto: d.monto,

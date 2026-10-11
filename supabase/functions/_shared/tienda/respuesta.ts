@@ -198,23 +198,22 @@ export function leerPedido(x: unknown): Pedido | null {
 export type PedidoEnLinea = {
   /** Interno: el renglón de tienda_pagos. NUNCA sale en una respuesta. */
   pagoId: string;
-  publico: { folio_corto: string; total_mxn: string; vence_aceptacion: null; propina_mxn: string; total_a_pagar_mxn: string; vence_pago: string };
+  publico: { folio_corto: string; total_mxn: string; vence_aceptacion: null; propina_mxn: string; total_a_pagar_mxn: string };
 };
 
 /**
  * Lo que devuelve `tienda_crear_pedido` para un pedido que se paga en línea: no tiene ventana de
- * aceptación (empieza cuando se paga) y trae su pago. null si la forma no es esa, como `leerPedido`.
+ * aceptación (empieza cuando el cobro se aprueba) y trae su pago. null si la forma no es esa, como `leerPedido`.
  */
 export function leerPedidoEnLinea(x: unknown): PedidoEnLinea | null {
   if (!objeto(x)) return null;
-  const { folio_corto, total_mxn, pago_id, propina_mxn, total_a_pagar_mxn, vence_pago } = x;
+  const { folio_corto, total_mxn, pago_id, propina_mxn, total_a_pagar_mxn } = x;
   if (typeof folio_corto !== "string" || !folio_corto || typeof pago_id !== "string" || !pago_id
-      || typeof vence_pago !== "string" || !vence_pago
       || ![total_mxn, propina_mxn, total_a_pagar_mxn].every((v) => typeof v === "string" && IMPORTE.test(v))) return null;
   return {
     pagoId: pago_id,
     publico: { folio_corto, total_mxn: total_mxn as string, vence_aceptacion: null, propina_mxn: propina_mxn as string,
-               total_a_pagar_mxn: total_a_pagar_mxn as string, vence_pago },
+               total_a_pagar_mxn: total_a_pagar_mxn as string },
   };
 }
 

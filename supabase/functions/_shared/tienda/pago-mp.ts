@@ -1,12 +1,15 @@
-// Checkout Pro de Mercado Pago (Preferences API) para el pago en línea de la tienda.
-// Fuente: docs/integraciones/mercado-pago-checkout-pro/01-resumen-api.md. Diseño: 02-diseno.md.
+// Checkout API de Mercado Pago (Payments API, `POST /v1/payments`) para el pago en línea de la
+// tienda: la tarjeta se captura en la tienda (Secure Fields) y aquí solo llega su TOKEN.
+// Fuente: docs/integraciones/mercado-pago-checkout-pro/03-resumen-checkout-api.md. Diseño: 02-diseno.md.
 //
-// Puro: arma la preferencia y decide qué significa un pago. Lo que mueve el pedido es la base
+// Puro: arma el cobro y decide qué significa un pago. Lo que mueve el pedido es la base
 // (tienda_pago_aplicar, 0172); aquí solo se lee lo que dice Mercado Pago y se descarta lo que no es
 // nuestro. Se prueba con `node --test`.
 //
-// NADA DE ESTO ESTÁ PROBADO CONTRA MERCADO PAGO todavía (ver «Prueba corta» en el diseño): los
+// NADA DE ESTO ESTÁ PROBADO CONTRA MERCADO PAGO todavía (ver «Sin confirmar» en el diseño): los
 // campos son los de la documentación.
+//
+// El token de la tarjeta es de un solo uso y no se escribe en ningún log.
 //
 // El cliente HTTP es propio y no el de _shared/terminal/mercado-pago.ts: aquel solo expone las
 // llamadas de Point, y ese archivo lo está tocando el trabajo de la terminal. De allá se reutiliza
@@ -23,67 +26,85 @@ const idDe = (v: unknown): string | null => {
   return /^\d{1,30}$/.test(s) ? s : null;
 };
 
-/** ISO 8601 con zona explícita, como lo pide la referencia (`2022-11-17T09:37:52.000-04:00`). */
-const fechaMp = (d: Date): string => d.toISOString().replace("Z", "+00:00");
+/** Lo que la tienda manda de la tarjeta: nunca el número, solo su token y de qué marca y banco es. */
+export type Tarjeta = { token: string; payment_method_id: string; issuer_id: string | null; dispositivo: string | null };
 
-export type DatosPreferencia = {
+export type DatosCobro = {
   /** El id de tienda_pagos: es la `external_reference`. */
   pagoId: string;
   /** Total + propina, como texto con dos decimales. Lo calculó la base, nunca el cliente. */
   monto: string;
   folio: string;
   negocio: string;
-  /** La página de seguimiento del pedido en la tienda (https). */
-  regreso: string;
   /** La función que recibe los avisos, con la referencia en la query (https). */
   aviso: string;
-  ahora: Date;
-  /** Hasta cuándo se puede pagar (tienda_pagos.vence_at). */
-  vence: Date;
-  email: string | null;
+  email: string;
+  tarjeta: Tarjeta;
 };
 
 /**
- * El cuerpo de `POST /checkout/preferences`. Un solo renglón por el total: no hay campo de monto
- * total, sale de `unit_price × quantity`. Sin `marketplace_fee`: VIM no cobra comisión y el dinero
- * cae en la cuenta del restaurante (el token es el suyo).
- * Solo medios que se aprueban al instante: fuera efectivo, cajero, transferencia y billeteras; sin
- * meses; y `binary_mode`, para que nada quede «pendiente».
+ * El cuerpo de `POST /v1/payments`. Un solo pago, sin meses, y `binary_mode`: aprobado o rechazado
+ * en la misma respuesta, nada «pendiente». Sin 3DS (es el valor por omisión). Sin `application_fee`:
+ * VIM no cobra comisión y el dinero cae en la cuenta del restaurante (el token es el suyo).
+ * Sin `statement_descriptor`: el estudio no dice que haga falta, y lo que sale en el estado de
+ * cuenta ya es el nombre de la cuenta del restaurante.
  */
-export function cuerpoDePreferencia(d: DatosPreferencia): Record<string, unknown> {
+export function cuerpoDeCobro(d: DatosCobro): Record<string, unknown> {
   const monto = montoTexto(d.monto);
-  if (!monto) throw new Error("cuerpoDePreferencia: monto inválido");
-  for (const u of [d.regreso, d.aviso]) if (!u.startsWith("https://")) throw new Error("cuerpoDePreferencia: las URL van en https");
+  if (!monto) throw new Error("cuerpoDeCobro: monto inválido");
+  if (!d.aviso.startsWith("https://")) throw new Error("cuerpoDeCobro: el aviso va en https");
   return {
-    items: [{
-      id: d.folio,
-      title: `Pedido ${d.folio} en ${d.negocio}`.slice(0, 250),
-      quantity: 1,
-      currency_id: "MXN",
-      // La API pide un número. Sale del texto con dos decimales en el último momento y no se opera con él.
-      unit_price: Number(monto),
-    }],
-    external_reference: d.pagoId,
-    back_urls: { success: d.regreso, pending: d.regreso, failure: d.regreso },
-    auto_return: "approved",
-    notification_url: d.aviso,
+    // La API pide un número. Sale del texto con dos decimales en el último momento y no se opera con él.
+    transaction_amount: Number(monto),
+    token: d.tarjeta.token,
+    payment_method_id: d.tarjeta.payment_method_id,
+    ...(d.tarjeta.issuer_id && { issuer_id: d.tarjeta.issuer_id }),
+    installments: 1,
     binary_mode: true,
-    expires: true,
-    expiration_date_from: fechaMp(d.ahora),
-    expiration_date_to: fechaMp(d.vence),
-    payment_methods: {
-      excluded_payment_types: [{ id: "ticket" }, { id: "atm" }, { id: "bank_transfer" }, { id: "digital_currency" }],
-      installments: 1,
-    },
-    ...(d.email && { payer: { email: d.email } }),
+    capture: true,
+    description: `Pedido ${d.folio} en ${d.negocio}`.slice(0, 250),
+    external_reference: d.pagoId,
+    notification_url: d.aviso,
+    payer: { email: d.email },
   };
 }
 
-/** De la respuesta de crear la preferencia, lo que se guarda. `init_point` tiene que ser https. */
-export function leerPreferencia(cuerpo: unknown): { id: string; init_point: string } | null {
-  const c = obj(cuerpo);
-  const id = txt(c.id), init_point = txt(c.init_point);
-  return id && init_point && init_point.startsWith("https://") ? { id, init_point } : null;
+/** Por qué no pasó un cobro, en familias: lo que la tienda le puede decir al cliente. */
+export const MOTIVOS_DE_RECHAZO = ["FONDOS", "CODIGO", "FECHA", "NUMERO", "LLAMAR_BANCO", "TARJETA_DESHABILITADA", "VERIFICACION", "OTRO"] as const;
+export type MotivoDeRechazo = (typeof MOTIVOS_DE_RECHAZO)[number];
+
+const FAMILIAS: Record<string, MotivoDeRechazo> = {
+  cc_rejected_insufficient_amount: "FONDOS",
+  cc_amount_rate_limit_exceeded: "FONDOS",
+  cc_rejected_bad_filled_security_code: "CODIGO",
+  cc_rejected_bad_filled_date: "FECHA",
+  cc_rejected_bad_filled_card_number: "NUMERO",
+  cc_rejected_call_for_authorize: "LLAMAR_BANCO",
+  cc_rejected_card_disabled: "TARJETA_DESHABILITADA",
+  cc_rejected_3ds_mandatory: "VERIFICACION",
+};
+/**
+ * La familia de un `status_detail` de rechazo. Todo lo que no se reconoce —riesgo, lista negra,
+ * intentos, «otro motivo» del banco, un código nuevo— es OTRO: el cliente lee «tu banco no lo
+ * aprobó», que siempre es verdad, y no un motivo inventado.
+ */
+export function motivoDeRechazo(detalle: string | null | undefined): MotivoDeRechazo {
+  return (detalle && Object.hasOwn(FAMILIAS, detalle) ? FAMILIAS[detalle] : undefined) ?? "OTRO";
+}
+
+/**
+ * Qué significa el estado HTTP con que Mercado Pago contestó al crear el cobro, antes de leer el pago:
+ *   · CREADO      contestó con un pago (200/201): hay que leerlo (`decidirPago`);
+ *   · SIN_PERMISO 401: el token del restaurante ya no sirve. No se cobró;
+ *   · NO_ACEPTADO un 4xx de validación (token de tarjeta inválido o usado, datos que no cuadran):
+ *                 Mercado Pago no creó ningún pago. No se cobró;
+ *   · NO_SE_SABE  sin respuesta, 5xx, 409, 423, 429: pudo o no cobrarse. NUNCA se trata como rechazo.
+ */
+export function respuestaDeCobro(status: number): "CREADO" | "SIN_PERMISO" | "NO_ACEPTADO" | "NO_SE_SABE" {
+  if (status === 200 || status === 201) return "CREADO";
+  if (status === 401) return "SIN_PERMISO";
+  if (status === 400 || status === 402 || status === 403 || status === 404 || status === 422) return "NO_ACEPTADO";
+  return "NO_SE_SABE";
 }
 
 export type Esperado = {
@@ -173,7 +194,13 @@ export function clienteMpTienda(token: string, pedir: typeof fetch = fetch) {
     }
   };
   return {
-    crearPreferencia: (cuerpo: Record<string, unknown>) => llamar("POST", "/checkout/preferences", cuerpo),
+    /**
+     * El cobro. La llave de idempotencia es fija por renglón de tienda_pagos, y cada renglón se cobra
+     * UNA vez (tienda_pago_tomar_cobro): si la petición se repite en la red, Mercado Pago no cobra dos veces.
+     * `dispositivo` es el Device ID que genera MercadoPago.js en el navegador (ayuda a la aprobación).
+     */
+    cobrar: (cuerpo: Record<string, unknown>, llave: string, dispositivo?: string | null) =>
+      llamar("POST", "/v1/payments", cuerpo, { "X-Idempotency-Key": llave, ...(dispositivo && { "X-meli-session-id": dispositivo }) }),
     leerPago: (pagoIdExterno: string) => llamar("GET", `/v1/payments/${encodeURIComponent(pagoIdExterno)}`),
     /** Los pagos hechos con nuestra referencia: el respaldo cuando el aviso no llegó. */
     buscarPagos: (pagoId: string) =>

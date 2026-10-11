@@ -1,63 +1,69 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clienteMpTienda, cuerpoDePreferencia, decidirPago, leerPreferencia, pagoDelAviso, pagosDeBusqueda, resumenDeFallo } from "./pago-mp.ts";
+import { clienteMpTienda, cuerpoDeCobro, decidirPago, MOTIVOS_DE_RECHAZO, motivoDeRechazo, pagoDelAviso, pagosDeBusqueda, respuestaDeCobro, resumenDeFallo } from "./pago-mp.ts";
 
 const PAGO = "2cd9e6fa-1acf-47dc-8ba4-cba918d73770";
+const TARJETA = { token: "ff8080814c11e237014c1ff593b57b4d", payment_method_id: "master", issuer_id: "160", dispositivo: "armor.abc123" };
 const DATOS = {
   pagoId: PAGO, monto: "264.00", folio: "T1A2B3", negocio: "Knock-Out Burger",
-  regreso: "https://pedidos.vimpos.com.mx/knockout/pedido/abcdefghijklmnopqrstuv",
-  aviso: `https://x.supabase.co/functions/v1/tienda-webhook-mp?ref=${PAGO}`,
-  ahora: new Date("2026-10-11T18:00:00.000Z"), vence: new Date("2026-10-11T18:15:00.000Z"), email: "ana@example.com",
+  aviso: `https://x.supabase.co/functions/v1/tienda-webhook-mp?ref=${PAGO}`, email: "ana@example.com", tarjeta: TARJETA,
 };
 
-test("preferencia: un renglón por el total, nuestra referencia, regreso y aviso", () => {
-  const c = cuerpoDePreferencia(DATOS);
-  assert.deepEqual(c.items, [{ id: "T1A2B3", title: "Pedido T1A2B3 en Knock-Out Burger", quantity: 1, currency_id: "MXN", unit_price: 264 }]);
+test("cobro: el monto de la base, el token de la tarjeta, nuestra referencia y a dónde avisar", () => {
+  const c = cuerpoDeCobro(DATOS);
+  assert.equal(c.transaction_amount, 264);
+  assert.equal(c.token, TARJETA.token);
+  assert.equal(c.payment_method_id, "master");
+  assert.equal(c.issuer_id, "160");
   assert.equal(c.external_reference, PAGO);
-  assert.deepEqual(c.back_urls, { success: DATOS.regreso, pending: DATOS.regreso, failure: DATOS.regreso });
-  assert.equal(c.auto_return, "approved");
   assert.equal(c.notification_url, DATOS.aviso);
   assert.deepEqual(c.payer, { email: "ana@example.com" });
 });
 
-test("preferencia: solo medios que se aprueban al instante, sin meses, y vence a los 15 minutos", () => {
-  const c = cuerpoDePreferencia(DATOS);
-  assert.deepEqual(c.payment_methods, {
-    excluded_payment_types: [{ id: "ticket" }, { id: "atm" }, { id: "bank_transfer" }, { id: "digital_currency" }],
-    installments: 1,
-  });
+test("cobro: un solo pago, aprobado o rechazado al instante, sin 3DS y sin comisión de VIM", () => {
+  const c = cuerpoDeCobro(DATOS);
+  assert.equal(c.installments, 1);
   assert.equal(c.binary_mode, true);
-  assert.equal(c.expires, true);
-  assert.equal(c.expiration_date_from, "2026-10-11T18:00:00.000+00:00");
-  assert.equal(c.expiration_date_to, "2026-10-11T18:15:00.000+00:00");
+  assert.equal(c.capture, true);
+  for (const no of ["application_fee", "three_d_secure_mode", "statement_descriptor", "marketplace_fee"]) assert.ok(!(no in c), no);
 });
 
-test("preferencia: VIM no cobra comisión, y sin correo no va `payer`", () => {
-  const c = cuerpoDePreferencia({ ...DATOS, email: null });
-  assert.equal("marketplace_fee" in c, false);
-  assert.equal("payer" in c, false);
+test("cobro: sin banco emisor no va `issuer_id`; el Device ID no va en el cuerpo (es cabecera)", () => {
+  const c = cuerpoDeCobro({ ...DATOS, tarjeta: { ...TARJETA, issuer_id: null } });
+  assert.ok(!("issuer_id" in c));
+  assert.ok(!JSON.stringify(c).includes("armor.abc123"));
 });
 
-test("preferencia: los centavos llegan exactos", () => {
-  for (const [texto, numero] of [["0.10", 0.1], ["245.50", 245.5], ["1999.99", 1999.99], ["33.33", 33.33]] as const) {
-    const [item] = cuerpoDePreferencia({ ...DATOS, monto: texto }).items as { unit_price: number }[];
-    assert.equal(item!.unit_price, numero);
-    assert.equal(JSON.stringify(item!.unit_price), String(numero));
+test("cobro: los centavos llegan exactos", () => {
+  for (const [texto, numero] of [["0.10", 0.1], ["19.99", 19.99], ["1234.05", 1234.05], ["100.00", 100]] as const) {
+    assert.equal(cuerpoDeCobro({ ...DATOS, monto: texto }).transaction_amount, numero);
   }
 });
 
-test("preferencia: un monto que no es un importe, o una URL que no es https, no se manda", () => {
-  for (const monto of ["0", "0.00", "-5", "abc", "", "12.345"]) assert.throws(() => cuerpoDePreferencia({ ...DATOS, monto }));
-  assert.throws(() => cuerpoDePreferencia({ ...DATOS, regreso: "http://pedidos.vimpos.com.mx/x" }));
-  assert.throws(() => cuerpoDePreferencia({ ...DATOS, aviso: "http://localhost:54321/functions/v1/tienda-webhook-mp" }));
+test("cobro: un monto que no es un importe, o un aviso que no es https, no se manda", () => {
+  for (const monto of ["", "abc", "-5.00", "0"]) assert.throws(() => cuerpoDeCobro({ ...DATOS, monto }), /monto/, monto);
+  assert.throws(() => cuerpoDeCobro({ ...DATOS, aviso: "http://x.test/aviso" }), /https/);
 });
 
-test("preferencia creada: se guardan su id y un init_point https; otra cosa es null", () => {
-  assert.deepEqual(leerPreferencia({ id: "202809963-920c", init_point: "https://www.mercadopago.com.mx/checkout/v1/redirect?pref_id=202809963-920c", sandbox_init_point: "https://sandbox…" }),
-    { id: "202809963-920c", init_point: "https://www.mercadopago.com.mx/checkout/v1/redirect?pref_id=202809963-920c" });
-  for (const mal of [null, {}, { id: "x" }, { init_point: "https://x" }, { id: "x", init_point: "javascript:alert(1)" }, { id: 5, init_point: "https://x" }, "texto"]) {
-    assert.equal(leerPreferencia(mal), null);
-  }
+test("rechazo: cada status_detail cae en su familia; lo que no se conoce es OTRO, nunca un motivo inventado", () => {
+  const casos: [string | null, string][] = [
+    ["cc_rejected_insufficient_amount", "FONDOS"], ["cc_amount_rate_limit_exceeded", "FONDOS"],
+    ["cc_rejected_bad_filled_security_code", "CODIGO"], ["cc_rejected_bad_filled_date", "FECHA"],
+    ["cc_rejected_bad_filled_card_number", "NUMERO"], ["cc_rejected_call_for_authorize", "LLAMAR_BANCO"],
+    ["cc_rejected_card_disabled", "TARJETA_DESHABILITADA"], ["cc_rejected_3ds_mandatory", "VERIFICACION"],
+    ["cc_rejected_high_risk", "OTRO"], ["cc_rejected_other_reason", "OTRO"], ["cc_rejected_blacklist", "OTRO"],
+    ["cc_rejected_max_attempts", "OTRO"], ["cc_rejected_duplicated_payment", "OTRO"], ["rejected_by_bank", "OTRO"],
+    ["algo_nuevo", "OTRO"], ["", "OTRO"], [null, "OTRO"], ["constructor", "OTRO"], ["__proto__", "OTRO"],
+  ];
+  for (const [detalle, familia] of casos) assert.equal(motivoDeRechazo(detalle), familia, String(detalle));
+  assert.ok(casos.every(([, f]) => (MOTIVOS_DE_RECHAZO as readonly string[]).includes(f)));
+});
+
+test("respuesta del cobro: solo un 4xx de validación es un no seguro; sin respuesta o 5xx NUNCA es rechazo", () => {
+  for (const s of [200, 201]) assert.equal(respuestaDeCobro(s), "CREADO");
+  assert.equal(respuestaDeCobro(401), "SIN_PERMISO");
+  for (const s of [400, 402, 403, 404, 422]) assert.equal(respuestaDeCobro(s), "NO_ACEPTADO", String(s));
+  for (const s of [0, 409, 423, 429, 500, 502, 503, 504, 302, 204]) assert.equal(respuestaDeCobro(s), "NO_SE_SABE", String(s));
 });
 
 // Con la forma del ejemplo de GET /v1/payments/{id} de la referencia (01-resumen-api.md §5).
@@ -144,26 +150,29 @@ test("aviso: el id del pago sale de la query o del cuerpo, y solo si el aviso es
   assert.equal(pagoDelAviso(q("ref=x"), "basura"), null);
 });
 
-test("cliente: cada llamada va a su ruta con el token del restaurante; la devolución es total y con llave", async () => {
-  const vistas: { url: string; method: string; auth: string; llave: string | null; body: unknown }[] = [];
+test("cliente: cada llamada va a su ruta con el token del restaurante; cobro y devolución llevan llave", async () => {
+  const vistas: { url: string; method: string; auth: string; llave: string | null; sesion: string | null; body: unknown }[] = [];
   const pedir = (async (url: string | URL | Request, init?: RequestInit) => {
     const h = new Headers(init?.headers);
-    vistas.push({ url: String(url), method: String(init?.method), auth: h.get("authorization") ?? "", llave: h.get("x-idempotency-key"), body: init?.body ?? null });
+    vistas.push({ url: String(url), method: String(init?.method), auth: h.get("authorization") ?? "", llave: h.get("x-idempotency-key"), sesion: h.get("x-meli-session-id"), body: init?.body ?? null });
     return new Response(JSON.stringify({ id: 1 }), { status: 201 });
   }) as typeof fetch;
   const mp = clienteMpTienda("TOKEN-DEL-RESTAURANTE", pedir);
-  assert.deepEqual(await mp.crearPreferencia({ a: 1 }), { status: 201, cuerpo: { id: 1 } });
+  assert.deepEqual(await mp.cobrar({ a: 1 }, `tienda-pago-${PAGO}`, "armor.abc123"), { status: 201, cuerpo: { id: 1 } });
   await mp.leerPago("18552260055");
   await mp.buscarPagos(PAGO);
   await mp.devolver("18552260055", `devolucion-${PAGO}`);
   assert.deepEqual(vistas.map((v) => `${v.method} ${v.url.replace("https://api.mercadopago.com", "")}`), [
-    "POST /checkout/preferences",
+    "POST /v1/payments",
     "GET /v1/payments/18552260055",
     `GET /v1/payments/search?external_reference=${PAGO}&sort=date_created&criteria=desc&limit=20`,
     "POST /v1/payments/18552260055/refunds",
   ]);
   assert.ok(vistas.every((v) => v.auth === "Bearer TOKEN-DEL-RESTAURANTE"));
   assert.equal(vistas[0]!.body, '{"a":1}');
+  assert.equal(vistas[0]!.llave, `tienda-pago-${PAGO}`);
+  assert.equal(vistas[0]!.sesion, "armor.abc123");
+  assert.equal(vistas[1]!.sesion, null);
   assert.equal(vistas[3]!.body, null);                       // sin cuerpo = devolución total
   assert.equal(vistas[3]!.llave, `devolucion-${PAGO}`);
 });

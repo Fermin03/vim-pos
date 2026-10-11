@@ -1,9 +1,9 @@
-// Avisos de Mercado Pago de los pagos en línea de la tienda (Checkout Pro), y la puerta interna del
+// Avisos de Mercado Pago de los pagos en línea de la tienda (Checkout API), y la puerta interna del
 // barrido de cada minuto. Diseño: docs/integraciones/mercado-pago-checkout-pro/02-diseno.md.
 //
 //   POST /functions/v1/tienda-webhook-mp?ref=<id de tienda_pagos>&data.id=<pago>&type=payment
 //
-// Pública y sin JWT (config.toml). Es la `notification_url` de cada preferencia, con nuestra
+// Pública y sin JWT (config.toml). Es la `notification_url` de cada cobro, con nuestra
 // referencia en la query; Mercado Pago le añade el id del pago.
 //
 // EL AVISO ES SOLO UNA PISTA. Nada de lo que trae se cree: se consulta el pago con el token del
@@ -13,7 +13,7 @@
 //     que el aviso de la terminal;
 //   · si no viene, se sigue: la documentación no confirma que los avisos a una `notification_url`
 //     vayan firmados, y la verdad sale de la consulta autenticada.
-// La referencia NO es un secreto: Mercado Pago se la devuelve al comprador en la URL de regreso
+// La referencia NO es un secreto: viaja en la `notification_url` y quien cobra la conoce
 // (`external_reference`). Quien la tenga puede mandar avisos falsos de SU pago, y lo único que
 // consigue es que se consulte ese pago: 40 veces por hora como mucho (el tope de la referencia va
 // antes que el global, así que no lo gasta), y cada consulta dice lo mismo que diría sin él.

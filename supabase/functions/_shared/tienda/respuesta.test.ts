@@ -308,19 +308,19 @@ test("cupos: confirmar_pago tiene su bolsa (90 cada 600 s por IP) y cierra si el
 
 const ALTA_EN_LINEA = {
   pedido_id: "99999999-0000-0000-0000-000000000001", folio_corto: "T1A2B3", total_mxn: "240.00", vence_aceptacion: null, ya_existia: false,
-  pago_id: "2cd9e6fa-1acf-47dc-8ba4-cba918d73770", propina_mxn: "24.00", total_a_pagar_mxn: "264.00", vence_pago: "2026-10-11T18:15:00+00:00",
+  pago_id: "2cd9e6fa-1acf-47dc-8ba4-cba918d73770", propina_mxn: "24.00", total_a_pagar_mxn: "264.00",
 };
 test("pedido en línea: el pago se separa (interno) de lo que se le responde al cliente", () => {
   const p = leerPedidoEnLinea(ALTA_EN_LINEA);
   assert.deepEqual(p, {
     pagoId: ALTA_EN_LINEA.pago_id,
-    publico: { folio_corto: "T1A2B3", total_mxn: "240.00", vence_aceptacion: null, propina_mxn: "24.00", total_a_pagar_mxn: "264.00", vence_pago: ALTA_EN_LINEA.vence_pago },
+    publico: { folio_corto: "T1A2B3", total_mxn: "240.00", vence_aceptacion: null, propina_mxn: "24.00", total_a_pagar_mxn: "264.00" },
   });
   // Ni el id del pedido ni el del pago salen en lo público.
   assert.doesNotMatch(JSON.stringify(p!.publico), /99999999|2cd9e6fa|pago_id|pedido_id|ya_existia/);
 });
 test("pedido en línea: sin su pago, o con un importe que no es un importe, es null", () => {
-  for (const cambio of [{ pago_id: undefined }, { pago_id: "" }, { propina_mxn: 24 }, { total_a_pagar_mxn: "264" }, { total_mxn: null }, { vence_pago: null }, { folio_corto: "" }]) {
+  for (const cambio of [{ pago_id: undefined }, { pago_id: "" }, { propina_mxn: 24 }, { total_a_pagar_mxn: "264" }, { total_mxn: null }, { folio_corto: "" }]) {
     assert.equal(leerPedidoEnLinea({ ...ALTA_EN_LINEA, ...cambio }), null, JSON.stringify(cambio));
   }
   for (const mal of [null, "x", [], {}]) assert.equal(leerPedidoEnLinea(mal), null);

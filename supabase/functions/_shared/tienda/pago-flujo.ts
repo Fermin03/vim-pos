@@ -1,16 +1,15 @@
-// Lo que se hace con un pago en línea de la tienda, paso a paso: crear su preferencia, confirmarlo,
-// devolverlo. Es EL camino compartido: el aviso de Mercado Pago (`tienda-webhook-mp`), el respaldo
+// Lo que se hace con un pago en línea de la tienda, paso a paso: cobrarlo, confirmarlo, devolverlo. Es EL camino compartido: el aviso de Mercado Pago (`tienda-webhook-mp`), el respaldo
 // desde la página de seguimiento (`tienda`, acción `confirmar_pago`) y el barrido de cada minuto
 // pasan por `confirmarPago`, así que los tres deciden lo mismo.
 //
-// Regla de todo el archivo: lo que llega de fuera (un aviso, la URL de regreso) es solo una pista.
+// Regla de todo el archivo: lo que llega de fuera (un aviso) es solo una pista.
 // La verdad se le pregunta a Mercado Pago con el token del restaurante dueño de ESE pago, y lo que
 // mueve el pedido es la base (0172), que es idempotente.
 //
 // No toca la base ni la red directamente: recibe un puerto (pago-puerto.ts lo arma con supabase-js)
 // y el cliente de Mercado Pago. Así se prueba con `node --test` y dobles.
 import { esc, soloAscii } from "../correo.ts";
-import { type ClienteMpTienda, cuerpoDePreferencia, type DatosPreferencia, decidirPago, leerPreferencia, pagosDeBusqueda, resumenDeFallo } from "./pago-mp.ts";
+import { type ClienteMpTienda, cuerpoDeCobro, type DatosCobro, decidirPago, type MotivoDeRechazo, motivoDeRechazo, pagosDeBusqueda, respuestaDeCobro, resumenDeFallo } from "./pago-mp.ts";
 
 export type EstadoPago = "CREADO" | "APROBADO" | "RECHAZADO" | "VENCIDO" | "POR_DEVOLVER" | "DEVUELTO" | "DEVOLUCION_FALLIDA";
 
@@ -19,7 +18,6 @@ export type FilaPago = {
   id: string; conexion_id: string; estado: EstadoPago;
   /** Total + propina, texto con dos decimales. */
   monto: string;
-  init_point: string | null; vence_at: string;
   cuenta_vendedora: string; de_prueba: boolean;
 };
 
@@ -31,8 +29,8 @@ export type PuertoPagos = {
   /** El Access Token del restaurante (Vault). null = no hay con qué hablarle a Mercado Pago. */
   token(conexionId: string): Promise<string | null>;
   conexionEnError(conexionId: string): Promise<void>;
-  tomarPreferencia(pagoId: string): Promise<boolean>;
-  guardarPreferencia(pagoId: string, preferenciaId: string, initPoint: string): Promise<void>;
+  /** ¿Me toca mandar el cobro? Verdadero UNA sola vez por pago. */
+  tomarCobro(pagoId: string): Promise<boolean>;
   descartar(pagoId: string): Promise<boolean>;
   aplicar(pagoId: string, d: { resultado: "APROBADO" | "RECHAZADO" | "DEVUELTO"; pagoIdExterno: string; monto: string;
                                tipoTarjeta: string | null; marca: string | null; detalle: string | null }): Promise<Aplicado>;
@@ -50,45 +48,79 @@ export type Deps = {
   registrar: (codigo: string, detalle: string) => void;
 };
 
-// ── Crear la preferencia ─────────────────────────────────────────────────────────────────────────
+// ── Cobrar ───────────────────────────────────────────────────────────────────────────────────────
 
-export type PagoPreparado =
-  /** `init_point` null = el pago ya no espera al cliente (se pagó, venció): no hay a dónde mandarlo. */
-  | { ok: true; init_point: string | null }
-  /** EN_PROCESO: otra petición del mismo intento la está creando; reintentar en un momento.
-   *  NO_DISPONIBLE: Mercado Pago no dejó crearla; el pedido se descartó y no se creó nada. */
-  | { ok: false; error: "PAGO_EN_PROCESO" | "PAGO_NO_DISPONIBLE" };
+export type Cobro =
+  /** El pedido ya está RECIBIDO. `recienAprobado`: se aprobó en esta llamada (toca mandar el correo). */
+  | { tipo: "APROBADO"; recienAprobado: boolean }
+  /** Mercado Pago dijo que no, seguro. El pedido se descartó: no existe y no se cobró nada. */
+  | { tipo: "RECHAZADO"; motivo: MotivoDeRechazo }
+  /** No se sabe si se cobró. El pedido queda POR_PAGAR y lo resuelven el aviso, la página y el barrido. */
+  | { tipo: "POR_CONFIRMAR" }
+  /** No hay con qué cobrar (la cuenta del restaurante se desconectó). El pedido se descartó. */
+  | { tipo: "NO_DISPONIBLE" };
 
 /**
- * Deja el pago listo para cobrarse y devuelve a dónde mandar al cliente. Si ya tenía preferencia
- * (un reintento con la misma clave), devuelve la MISMA sin crear otra. Si Mercado Pago no la crea,
- * el pedido se descarta: no queda vivo ni cuenta contra el tope del cliente.
+ * Cobra el pago de un pedido recién creado y dice cómo quedó. Tres reglas:
+ *   · un renglón de tienda_pagos se cobra UNA vez. Si esta llamada no es la primera (un reintento
+ *     del mismo intento de compra porque la respuesta se perdió), NO vuelve a cobrar: le pregunta a
+ *     Mercado Pago qué pasó con el primer cobro;
+ *   · «rechazado» solo se dice con un NO seguro de Mercado Pago (un pago `rejected`, o un 4xx de
+ *     validación: no creó ningún pago). Sin respuesta, un 5xx o un estado que no es final nunca son
+ *     «rechazado»: quedan POR_CONFIRMAR;
+ *   · un pago aprobado se cree después de `decidirPago` (referencia, cuenta vendedora, moneda,
+ *     modo) y de que la base compruebe el monto.
  */
-export async function prepararPago(deps: Deps, datos: Omit<DatosPreferencia, "monto" | "vence">): Promise<PagoPreparado> {
+export async function cobrarPago(deps: Deps, datos: Omit<DatosCobro, "monto">): Promise<Cobro> {
   const fila = await deps.db.leerPago(datos.pagoId);
-  if (!fila) return { ok: false, error: "PAGO_NO_DISPONIBLE" };
-  if (fila.init_point) return { ok: true, init_point: fila.estado === "CREADO" || fila.estado === "RECHAZADO" ? fila.init_point : null };
-  if (fila.estado !== "CREADO") return { ok: true, init_point: null };
-  if (!(await deps.db.tomarPreferencia(fila.id))) return { ok: false, error: "PAGO_EN_PROCESO" };
+  if (!fila) return { tipo: "POR_CONFIRMAR" };
+  if (fila.estado === "APROBADO") return { tipo: "APROBADO", recienAprobado: false };
+  if (fila.estado !== "CREADO") return { tipo: "POR_CONFIRMAR" };
 
-  const fallo = async (codigo: string, detalle: string): Promise<PagoPreparado> => {
-    deps.registrar(codigo, detalle);
-    await deps.db.descartar(fila.id);
-    return { ok: false, error: "PAGO_NO_DISPONIBLE" };
-  };
+  if (!(await deps.db.tomarCobro(fila.id))) {
+    // Ya se mandó antes. Se pregunta, no se cobra.
+    const c = await confirmarPago(deps, fila.id);
+    const ahora = c.ok ? await deps.db.leerPago(fila.id) : null;
+    return ahora?.estado === "APROBADO" ? { tipo: "APROBADO", recienAprobado: c.ok && c.recienAprobado } : { tipo: "POR_CONFIRMAR" };
+  }
+
+  /** Un NO seguro: el pedido se va. Si ya no se puede descartar, es que algo lo movió: que lo diga el seguimiento. */
+  const descartar = async (resultado: Cobro): Promise<Cobro> => ((await deps.db.descartar(fila.id)) ? resultado : { tipo: "POR_CONFIRMAR" });
+
   const token = await deps.db.token(fila.conexion_id);
   if (!token) {
     await deps.db.conexionEnError(fila.conexion_id);
-    return fallo("SIN_TOKEN", `conexión ${fila.conexion_id}`);
+    deps.registrar("SIN_TOKEN", `conexión ${fila.conexion_id}`);
+    return descartar({ tipo: "NO_DISPONIBLE" });
   }
-  const r = await deps.mp(token).crearPreferencia(cuerpoDePreferencia({ ...datos, monto: fila.monto, vence: new Date(fila.vence_at) }));
-  const pref = r.status === 200 || r.status === 201 ? leerPreferencia(r.cuerpo) : null;
-  if (!pref) {
-    if (r.status === 401) await deps.db.conexionEnError(fila.conexion_id);
-    return fallo("PREFERENCIA", resumenDeFallo(r));
+  const r = await deps.mp(token).cobrar(cuerpoDeCobro({ ...datos, monto: fila.monto }), `tienda-pago-${fila.id}`, datos.tarjeta.dispositivo);
+  const que = respuestaDeCobro(r.status);
+  if (que === "SIN_PERMISO") {
+    await deps.db.conexionEnError(fila.conexion_id);
+    deps.registrar("COBRO", resumenDeFallo(r));
+    return descartar({ tipo: "NO_DISPONIBLE" });
   }
-  await deps.db.guardarPreferencia(fila.id, pref.id, pref.init_point);
-  return { ok: true, init_point: pref.init_point };
+  if (que === "NO_ACEPTADO") {
+    deps.registrar("COBRO", resumenDeFallo(r));
+    return descartar({ tipo: "RECHAZADO", motivo: "OTRO" });
+  }
+  if (que === "NO_SE_SABE") {
+    deps.registrar("COBRO_SIN_RESPUESTA", `pago ${fila.id}: ${resumenDeFallo(r)}`);
+    return { tipo: "POR_CONFIRMAR" };
+  }
+
+  const d = decidirPago({ pagoId: fila.id, cuentaVendedora: fila.cuenta_vendedora, dePrueba: fila.de_prueba }, r.cuerpo);
+  if (d.tipo === "RECHAZADO") return descartar({ tipo: "RECHAZADO", motivo: motivoDeRechazo(d.detalle) });
+  if (d.tipo !== "APROBADO") {
+    // Pendiente, ajeno, incidente o ya devuelto: no es un sí ni un no. Lo resuelve la conciliación.
+    deps.registrar("COBRO_SIN_RESULTADO", `pago ${fila.id}: ${d.tipo}${"motivo" in d ? ` (${d.motivo})` : ""}`);
+    return { tipo: "POR_CONFIRMAR" };
+  }
+  const a = await deps.db.aplicar(fila.id, {
+    resultado: "APROBADO", pagoIdExterno: d.pagoIdExterno, monto: d.monto, tipoTarjeta: d.tipoTarjeta, marca: d.marca, detalle: d.detalle,
+  });
+  // La base no lo tomó como EL pago del pedido (el monto no era el esperado): ya quedó por devolverse.
+  return a.estado === "APROBADO" ? { tipo: "APROBADO", recienAprobado: a.recien_aprobado } : { tipo: "POR_CONFIRMAR" };
 }
 
 // ── Confirmar ────────────────────────────────────────────────────────────────────────────────────
@@ -125,8 +157,10 @@ export async function confirmarPago(deps: Deps, pagoId: string, pagoIdExterno?: 
 
   const esperado = { pagoId: fila.id, cuentaVendedora: fila.cuenta_vendedora, dePrueba: fila.de_prueba };
   let aplicados = 0, recienAprobado = false;
-  for (const pago of pagoIdExterno ? [r.cuerpo] : pagosDeBusqueda(r.cuerpo)) {
-    const d = decidirPago(esperado, pago);
+  const decisiones = (pagoIdExterno ? [r.cuerpo] : pagosDeBusqueda(r.cuerpo)).map((pago) => decidirPago(esperado, pago));
+  // El aprobado va primero: un rechazo cierra el pedido que espera, y un aprobado que se aplicara
+  // después de él acabaría devuelto.
+  for (const d of [...decisiones.filter((x) => x.tipo === "APROBADO"), ...decisiones.filter((x) => x.tipo !== "APROBADO")]) {
     // Sin resultado que aplicar: pendiente (no hay nada que hacer todavía), ajeno o incidente (al log).
     if ("motivo" in d) {
       if (d.tipo !== "PENDIENTE") deps.registrar(d.tipo, `pago ${fila.id}: ${d.motivo}`);
@@ -230,7 +264,7 @@ export function avisoDeConciliacionFallida(d: { pagoId: string; negocio: string;
   return {
     subject: soloAscii(`Posible cobro sin pedido: ${d.folio} de ${d.negocio}`),
     html: `<div style="font-family:system-ui,sans-serif;color:#111">
-<p>No se ha podido consultar a Mercado Pago tres veces seguidas por un pago en línea que nadie confirmó. <strong>Puede haber un cobro hecho sin pedido.</strong></p>
+<p>No se ha podido consultar a Mercado Pago tres veces seguidas por un cobro en línea del que no se supo el resultado. <strong>Puede haber un cobro hecho sin pedido.</strong></p>
 <ul><li>Negocio: ${esc(d.negocio)}</li><li>Pedido: ${esc(d.folio)}</li><li>Monto esperado: $${esc(d.monto)}</li>
 <li>Pago (tienda_pagos.id): ${esc(d.pagoId)}</li></ul>
 <p>Lo más probable es que el restaurante desconectó su cuenta de Mercado Pago o que su token fue rechazado. Se seguirá intentando una vez por hora durante 48 horas: si reconecta la cuenta, el cobro se encuentra y se devuelve solo. Si no, hay que buscar en su cuenta de Mercado Pago un pago con esa referencia y devolverlo a mano.</p>

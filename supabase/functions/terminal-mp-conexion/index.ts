@@ -62,6 +62,8 @@ servir(async (req, json) => {
       const { data: fila, error } = await admin.from("terminal_conexiones").upsert({
         tenant_id: tenantId, proveedor: "MERCADO_PAGO", cuenta_id_externo: t.user_id, cuenta_nombre: nombre,
         de_prueba: t.de_prueba, estado: "ACTIVA", ultimo_error: null, conectada_at: new Date().toISOString(),
+        // Para el pago en línea de la tienda (0172). No es secreta. Si no vino, se queda la que hubiera.
+        ...(t.public_key && { public_key: t.public_key }),
       }, { onConflict: "tenant_id,proveedor,cuenta_id_externo" }).select("id").single();
       if (error) throw error;
       const conexionId = (fila as { id: string }).id;

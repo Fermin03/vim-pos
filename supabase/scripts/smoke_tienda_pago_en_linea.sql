@@ -68,12 +68,12 @@ BEGIN
   VALUES (v_t, v_suc, v_caja, 'SMOKE-LINEA', (now() AT TIME ZONE 'America/Mexico_City')::date, v_cajero, 500, 'TOTAL');
   INSERT INTO tenants (id, codigo, nombre_comercial, estado, vertical_principal)
   VALUES (v_otro, 'tenant-0172', 'Otro negocio', 'INTERNO', 'QUICK_SERVICE');
-  INSERT INTO terminal_conexiones (tenant_id, cuenta_id_externo) VALUES (v_otro, '700') RETURNING id INTO v_cx_o;
+  INSERT INTO terminal_conexiones (tenant_id, cuenta_id_externo, public_key) VALUES (v_otro, '700', 'APP_USR-smoke-otro-negocio-0000') RETURNING id INTO v_cx_o;
   IF tienda_estado_sucursal(v_suc, 'RECOGER') IS NOT NULL THEN RAISE EXCEPTION 'fixture: la tienda debía estar abierta: %', tienda_estado_sucursal(v_suc, 'RECOGER'); END IF;
 
   -- ── A) Quién cobra ──────────────────────────────────────────────────────────────────────────
   -- A1) La casilla apagada: no se cobra en línea aunque haya cuenta. Y sigue valiendo «al menos una forma de pago».
-  INSERT INTO terminal_conexiones (tenant_id, cuenta_id_externo, cuenta_nombre) VALUES (v_t, '501', 'Cuenta uno') RETURNING id INTO v_cx1;
+  INSERT INTO terminal_conexiones (tenant_id, cuenta_id_externo, cuenta_nombre, public_key) VALUES (v_t, '501', 'Cuenta uno', 'APP_USR-smoke-cuenta-uno-0000001') RETURNING id INTO v_cx1;
   IF tienda_conexion_cobro(v_t, v_suc) IS NOT NULL THEN RAISE EXCEPTION 'A1: cobra en línea con la casilla apagada'; END IF;
   BEGIN
     UPDATE tienda_config SET pago_efectivo = false WHERE tenant_id = v_t;
@@ -85,7 +85,11 @@ BEGIN
 
   -- A2) Una sola cuenta activa: esa. Dos sin elegir: ninguna. Elegida: la elegida. Elegida y desconectada: ninguna.
   IF tienda_conexion_cobro(v_t, v_suc) IS DISTINCT FROM v_cx1 THEN RAISE EXCEPTION 'A2: con una sola cuenta activa debía cobrar esa'; END IF;
-  INSERT INTO terminal_conexiones (tenant_id, cuenta_id_externo, cuenta_nombre) VALUES (v_t, '502', 'Cuenta dos') RETURNING id INTO v_cx2;
+  -- Una cuenta conectada antes de guardar su public key no cobra en línea: la tienda no podría tokenizar la tarjeta.
+  UPDATE terminal_conexiones SET public_key = NULL WHERE id = v_cx1;
+  IF tienda_conexion_cobro(v_t, v_suc) IS NOT NULL THEN RAISE EXCEPTION 'A2: cobra en línea una cuenta sin public key'; END IF;
+  UPDATE terminal_conexiones SET public_key = 'APP_USR-smoke-cuenta-uno-0000001' WHERE id = v_cx1;
+  INSERT INTO terminal_conexiones (tenant_id, cuenta_id_externo, cuenta_nombre, public_key) VALUES (v_t, '502', 'Cuenta dos', 'APP_USR-smoke-cuenta-dos-0000002') RETURNING id INTO v_cx2;
   IF tienda_conexion_cobro(v_t, v_suc) IS NOT NULL THEN RAISE EXCEPTION 'A2: con dos cuentas y sin elegir no debe adivinar'; END IF;
   UPDATE tienda_sucursales SET conexion_id = v_cx2 WHERE sucursal_id = v_suc;
   IF tienda_conexion_cobro(v_t, v_suc) IS DISTINCT FROM v_cx2 THEN RAISE EXCEPTION 'A2: debía cobrar la cuenta elegida'; END IF;
@@ -115,11 +119,16 @@ BEGIN
   IF v_neg -> 'pago_en_linea' <> 'true'::jsonb OR v_neg -> 'sucursales' -> 0 -> 'pago_en_linea' <> 'true'::jsonb THEN
     RAISE EXCEPTION 'A4: tienda_negocio no anuncia el pago en línea: %', v_neg - 'sucursales';
   END IF;
+  -- Y la public key de la cuenta que cobra ahí (es pública). Nada más de la conexión.
+  IF v_neg -> 'sucursales' -> 0 ->> 'public_key' IS DISTINCT FROM (SELECT public_key FROM terminal_conexiones WHERE id = tienda_conexion_cobro(v_t, v_suc))
+     OR v_neg -> 'sucursales' -> 0 ->> 'public_key' IS NULL OR v_neg::text ~ 'cuenta_id_externo|access|refresh' THEN
+    RAISE EXCEPTION 'A4: la public key de la sucursal: %', v_neg -> 'sucursales' -> 0;
+  END IF;
 
   -- ── B) El pedido nace POR_PAGAR ─────────────────────────────────────────────────────────────
   v_r := pg_temp.pedir('4776660001', 1, 'clave-uno');
-  IF NOT (v_r ?& ARRAY['pedido_id', 'folio_corto', 'total_mxn', 'vence_aceptacion', 'ya_existia', 'pago_id', 'propina_mxn', 'total_a_pagar_mxn', 'vence_pago'])
-     OR (SELECT count(*) FROM jsonb_object_keys(v_r)) <> 9 THEN
+  IF NOT (v_r ?& ARRAY['pedido_id', 'folio_corto', 'total_mxn', 'vence_aceptacion', 'ya_existia', 'pago_id', 'propina_mxn', 'total_a_pagar_mxn'])
+     OR (SELECT count(*) FROM jsonb_object_keys(v_r)) <> 8 THEN
     RAISE EXCEPTION 'B1: lo que devuelve un pedido en línea: %', v_r;
   END IF;
   IF v_r ->> 'total_mxn' <> '240.00' OR v_r ->> 'propina_mxn' <> '24.00' OR v_r ->> 'total_a_pagar_mxn' <> '264.00'
@@ -134,13 +143,13 @@ BEGIN
   END IF;
   SELECT * INTO v_g FROM tienda_pagos WHERE id = v_pago;
   IF v_g.estado <> 'CREADO' OR v_g.monto_mxn <> 264.00 OR v_g.propina_mxn <> 24.00 OR v_g.conexion_id <> v_cx1 OR v_g.extra
-     OR v_g.pedido_id <> v_ped OR v_g.vence_at NOT BETWEEN now() + interval '14 minutes' AND now() + interval '16 minutes' THEN
+     OR v_g.pedido_id <> v_ped OR v_g.vence_at NOT BETWEEN now() + interval '4 minutes' AND now() + interval '6 minutes' OR v_g.cobro_pedido_at IS NOT NULL THEN
     RAISE EXCEPTION 'B1: el renglón del pago: %', to_jsonb(v_g);
   END IF;
 
   -- B2) La propina es sobre los productos, sin el envío: a domicilio (240 + 35 de envío), 20 % = 48.00.
   v_r2 := tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', v_zona, format('[{"producto_id":"%s","cantidad":2}]', v_prod)::jsonb,
-            '{"nombre":"Ana Línea","telefono":"4776660002"}',
+            '{"nombre":"Ana Línea","telefono":"4776660002","email":"ana.linea@example.com"}',
             '{"calle":"Av. Línea","numero_exterior":"1","colonia":"Centro","codigo_postal":"37000","ciudad":"León","estado":"Guanajuato"}',
             'EN_LINEA', NULL, NULL, md5('pl-dom-a') || md5('pl-dom-b'), p_propina_pct => 20);
   IF v_r2 ->> 'total_mxn' <> '275.00' OR v_r2 ->> 'propina_mxn' <> '48.00' OR v_r2 ->> 'total_a_pagar_mxn' <> '323.00' THEN
@@ -158,7 +167,7 @@ BEGIN
       ('«paga con» en línea',      'EN_LINEA', 500, 0)) AS x(caso, pago, paga_con, propina) LOOP
     BEGIN
       PERFORM tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, format('[{"producto_id":"%s","cantidad":1}]', v_prod)::jsonb,
-                '{"nombre":"Ana","telefono":"4776660004"}', NULL, r.pago, r.paga_con, NULL, md5('pl-mal') || md5(r.caso),
+                '{"nombre":"Ana","telefono":"4776660004","email":"ana@example.com"}', NULL, r.pago, r.paga_con, NULL, md5('pl-mal') || md5(r.caso),
                 p_propina_pct => r.propina);
       RAISE EXCEPTION 'B3 (%): debió rechazarse', r.caso;
     EXCEPTION WHEN OTHERS THEN
@@ -224,8 +233,8 @@ BEGIN
   END;
   IF tienda_reportar_estado(v_t, v_ped, 'CANCELADO') <> 'POR_PAGAR' THEN RAISE EXCEPTION 'B6: se pudo cancelar desde la caja un pedido sin pagar'; END IF;
   v_seg := tienda_seguimiento(v_t, md5('pl-a1') || md5('pl-b1'));
-  IF v_seg ->> 'estado' <> 'POR_PAGAR' OR v_seg ->> 'pago' <> 'EN_LINEA' OR v_seg ->> 'pago_estado' <> 'ESPERANDO_PAGO'
-     OR v_seg ->> 'propina_mxn' <> '24.00' OR v_seg ->> 'total_a_pagar_mxn' <> '264.00' OR v_seg -> 'vence_pago' = 'null'::jsonb THEN
+  IF v_seg ->> 'estado' <> 'POR_PAGAR' OR v_seg ->> 'pago' <> 'EN_LINEA' OR v_seg ->> 'pago_estado' <> 'POR_CONFIRMAR'
+     OR v_seg ->> 'propina_mxn' <> '24.00' OR v_seg ->> 'total_a_pagar_mxn' <> '264.00' OR v_seg ? 'vence_pago' THEN
     RAISE EXCEPTION 'B6: el seguimiento de un pedido que espera pago: %', v_seg - 'renglones';
   END IF;
   -- Ningún id de Mercado Pago ni de la base sale en el seguimiento.
@@ -242,11 +251,20 @@ BEGIN
     IF SQLERRM NOT LIKE 'NO_SE_PUDO_CREAR:%' THEN RAISE; END IF;
   END;
 
-  -- ── C) La preferencia: quién la crea, y qué pasa si Mercado Pago no deja ─────────────────────
-  IF NOT tienda_pago_tomar_preferencia(v_pago) THEN RAISE EXCEPTION 'C1: el primero debía tomar la preferencia'; END IF;
-  IF tienda_pago_tomar_preferencia(v_pago) THEN RAISE EXCEPTION 'C1: dos a la vez tomaron la misma preferencia'; END IF;
-  UPDATE tienda_pagos SET preferencia_pedida_at = now() - interval '31 seconds' WHERE id = v_pago;
-  IF NOT tienda_pago_tomar_preferencia(v_pago) THEN RAISE EXCEPTION 'C1: a los 30 s debía poder tomarse de nuevo'; END IF;
+  -- B8) En línea el correo es obligatorio (Mercado Pago lo pide con el cobro).
+  BEGIN
+    PERFORM tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, format('[{"producto_id":"%s","cantidad":1}]', v_prod)::jsonb,
+      '{"nombre":"Sin Correo","telefono":"4776660008"}', NULL, 'EN_LINEA', NULL, NULL, md5('pl-sc-a') || md5('pl-sc-b'), p_propina_pct => 0);
+    RAISE EXCEPTION 'B8: entró un pedido en línea sin correo';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'CLIENTE_INVALIDO:%' THEN RAISE; END IF;
+  END;
+
+  -- ── C) El cobro: se manda UNA vez por pago, pase lo que pase ─────────────────────────────────
+  IF NOT tienda_pago_tomar_cobro(v_pago) THEN RAISE EXCEPTION 'C1: el primero debía tomar el cobro'; END IF;
+  IF tienda_pago_tomar_cobro(v_pago) THEN RAISE EXCEPTION 'C1: el mismo pago se pudo cobrar dos veces'; END IF;
+  UPDATE tienda_pagos SET cobro_pedido_at = now() - interval '1 hour' WHERE id = v_pago;
+  IF tienda_pago_tomar_cobro(v_pago) THEN RAISE EXCEPTION 'C1: pasado el tiempo se pudo cobrar otra vez (nunca: se pregunta, no se cobra)'; END IF;
 END $$;
 
 -- Segunda mitad, en su propio bloque solo para no pasar de las variables que caben a la vista.
@@ -267,19 +285,33 @@ BEGIN
   SELECT pedido_id, id INTO v_ped, v_pago FROM tienda_pagos g
    WHERE g.pedido_id = (SELECT id FROM delivery_pedidos WHERE cliente_telefono = '4776660001');
 
-  -- C2) Descartar (Mercado Pago no dejó crear la preferencia): se van el pedido y su pago, el
-  --     teléfono deja de cargar con él y la misma clave crea uno NUEVO.
+  -- C2) Descartar (Mercado Pago rechazó el cobro): se van el pedido y su pago, el teléfono deja de
+  --     cargar con él y la misma clave crea uno NUEVO (el cliente reintenta con la misma tarjeta o con otra).
   v_id := (SELECT id FROM delivery_pedidos WHERE seguimiento_hash = md5('pl-a71') || md5('pl-b71'));
+  IF NOT tienda_pago_tomar_cobro((SELECT id FROM tienda_pagos WHERE pedido_id = v_id)) THEN RAISE EXCEPTION 'C2: debía tomarse el cobro'; END IF;
   IF NOT tienda_pago_descartar((SELECT id FROM tienda_pagos WHERE pedido_id = v_id)) THEN RAISE EXCEPTION 'C2: debía descartarse'; END IF;
   IF EXISTS (SELECT 1 FROM delivery_pedidos WHERE id = v_id) OR EXISTS (SELECT 1 FROM tienda_pagos WHERE pedido_id = v_id) THEN
     RAISE EXCEPTION 'C2: el descarte dejó el pedido o su pago';
   END IF;
   v_r := pg_temp.pedir('4776660007', 71, 'clave-descartada');     -- vuelve a caber: quedaban dos vivos
   IF v_r -> 'ya_existia' <> 'false'::jsonb THEN RAISE EXCEPTION 'C2: tras descartar debía crearse uno nuevo: %', v_r; END IF;
-  -- Con la preferencia ya creada (hay con qué pagarlo) NO se descarta.
-  UPDATE tienda_pagos SET preferencia_id = 'pref-1', init_point = 'https://www.mercadopago.com.mx/checkout/v1/redirect?pref_id=pref-1' WHERE id = v_pago;
-  IF tienda_pago_descartar(v_pago) THEN RAISE EXCEPTION 'C2: descartó un pedido que ya se puede pagar'; END IF;
-  IF tienda_pago_tomar_preferencia(v_pago) THEN RAISE EXCEPTION 'C2: con la preferencia creada nadie la vuelve a tomar'; END IF;
+  IF NOT tienda_pago_tomar_cobro((v_r ->> 'pago_id')::uuid) THEN RAISE EXCEPTION 'C2: el pedido nuevo trae su propio cobro, sin mandar'; END IF;
+  -- Un pago que ya tiene su id de Mercado Pago NO se descarta.
+  UPDATE tienda_pagos SET pago_id_externo = '777' WHERE id = v_pago;
+  IF tienda_pago_descartar(v_pago) THEN RAISE EXCEPTION 'C2: descartó un pedido cuyo cobro ya tiene pago en Mercado Pago'; END IF;
+  UPDATE tienda_pagos SET pago_id_externo = NULL WHERE id = v_pago;
+
+  -- C2b) Un rechazo que se conoce DESPUÉS (la respuesta del cobro se perdió; lo dicen el aviso o el
+  --      barrido): el pedido que esperaba se cierra como «sin pago», sin haber existido para la caja.
+  v_r := pg_temp.pedir('4776660009', 91);
+  v_a := tienda_pago_aplicar((v_r ->> 'pago_id')::uuid, 'RECHAZADO', '9091', 264.00, 'credit_card', 'visa', 'cc_rejected_insufficient_amount');
+  IF v_a ->> 'estado' <> 'RECHAZADO' OR v_a ->> 'pedido_estado' <> 'EXPIRADO' THEN RAISE EXCEPTION 'C2b: un rechazo tardío debía cerrar el pedido: %', v_a; END IF;
+  v_seg := tienda_seguimiento(v_t, md5('pl-a91') || md5('pl-b91'));
+  IF v_seg ->> 'estado' <> 'CANCELADO' OR v_seg ->> 'motivo' <> 'SIN_PAGO' OR v_seg ->> 'pago_estado' <> 'SIN_PAGO' THEN RAISE EXCEPTION 'C2b: seguimiento de un cobro rechazado: %', v_seg - 'renglones'; END IF;
+  -- Y si ese mismo cobro apareciera aprobado después, no revive el pedido: se devuelve.
+  v_a := tienda_pago_aplicar((v_r ->> 'pago_id')::uuid, 'APROBADO', '9092', 264.00, 'credit_card', 'visa');
+  IF v_a ->> 'estado' <> 'POR_DEVOLVER' OR v_a ->> 'pedido_estado' <> 'EXPIRADO' THEN RAISE EXCEPTION 'C2b: un aprobado tras cerrar debía devolverse: %', v_a; END IF;
+  DELETE FROM delivery_pedidos WHERE id = (v_r ->> 'pedido_id')::uuid;   -- para no mover las cuentas de las secciones de abajo
 
   -- C3) Preguntarle a Mercado Pago: a lo sumo una vez cada tantos segundos.
   IF NOT tienda_pago_tomar_consulta(v_pago, 10) THEN RAISE EXCEPTION 'C3: la primera consulta debía pasar'; END IF;
@@ -288,16 +320,9 @@ BEGIN
   IF NOT tienda_pago_tomar_consulta(v_pago, 10) THEN RAISE EXCEPTION 'C3: a los 10 s debía poder consultarse otra vez'; END IF;
 
   -- ── D) Aplicar lo que dice Mercado Pago ─────────────────────────────────────────────────────
-  -- D1) Rechazado: no cierra nada; el cliente puede reintentar.
-  v_a := tienda_pago_aplicar(v_pago, 'RECHAZADO', '1001', 264.00, 'credit_card', 'visa', 'cc_rejected_insufficient_amount');
-  IF v_a ->> 'estado' <> 'RECHAZADO' OR v_a ->> 'pedido_estado' <> 'POR_PAGAR' OR v_a -> 'recien_aprobado' <> 'false'::jsonb THEN
-    RAISE EXCEPTION 'D1: un rechazo: %', v_a;
-  END IF;
-  IF (tienda_seguimiento(v_t, md5('pl-a1') || md5('pl-b1')) ->> 'pago_estado') <> 'RECHAZADO' THEN RAISE EXCEPTION 'D1: el seguimiento no dice que el pago se rechazó'; END IF;
-
   -- D2) Aprobado por OTRO monto: no es el pago del pedido. Se registra aparte para devolverlo.
   v_a := tienda_pago_aplicar(v_pago, 'APROBADO', '1002', 1.00, 'credit_card', 'visa');
-  IF v_a ->> 'estado' <> 'RECHAZADO' OR v_a ->> 'pedido_estado' <> 'POR_PAGAR' OR v_a -> 'recien_aprobado' <> 'false'::jsonb THEN
+  IF v_a ->> 'estado' <> 'CREADO' OR v_a ->> 'pedido_estado' <> 'POR_PAGAR' OR v_a -> 'recien_aprobado' <> 'false'::jsonb THEN
     RAISE EXCEPTION 'D2: un pago por otro monto movió el pedido: %', v_a;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM tienda_pagos WHERE pedido_id = v_ped AND extra AND pago_id_externo = '1002' AND estado = 'POR_DEVOLVER' AND monto_mxn = 1.00) THEN
@@ -564,15 +589,22 @@ BEGIN
 
   -- ── G) El barrido: lo que nadie pagó ────────────────────────────────────────────────────────
   v_r := pg_temp.pedir('4776660061', 61);    -- viejo: 18 minutos
-  v_r2 := pg_temp.pedir('4776660062', 62);   -- reciente
-  UPDATE delivery_pedidos SET created_at = now() - interval '18 minutes' WHERE id = (v_r ->> 'pedido_id')::uuid;
-  UPDATE tienda_pagos SET vence_at = now() - interval '3 minutes', preferencia_id = 'pref-61' WHERE id = (v_r ->> 'pago_id')::uuid;
+  v_r2 := pg_temp.pedir('4776660062', 62);   -- reciente: 4 minutos, todavía dentro del plazo
+  UPDATE delivery_pedidos SET created_at = now() - interval '4 minutes' WHERE id = (v_r2 ->> 'pedido_id')::uuid;
+  v_a := pg_temp.pedir('4776660063', 63);    -- vencido y su cobro NUNCA se mandó (la función se cayó antes)
+  UPDATE delivery_pedidos SET created_at = now() - interval '6 minutes' WHERE id = (v_a ->> 'pedido_id')::uuid;
+  UPDATE delivery_pedidos SET created_at = now() - interval '6 minutes' WHERE id = (v_r ->> 'pedido_id')::uuid;
+  UPDATE tienda_pagos SET vence_at = now() - interval '3 minutes', cobro_pedido_at = now() - interval '10 minutes' WHERE id = (v_r ->> 'pago_id')::uuid;
   SELECT count(*) INTO v_n FROM delivery_eventos;
   PERFORM tienda_pagos_barrer();   -- sin pg_net ni Vault aquí: la llamada se omite y lo demás funciona
   IF (SELECT estado FROM delivery_pedidos WHERE id = (v_r ->> 'pedido_id')::uuid) <> 'EXPIRADO' OR (SELECT estado FROM tienda_pagos WHERE id = (v_r ->> 'pago_id')::uuid) <> 'VENCIDO' THEN
-    RAISE EXCEPTION 'G1: un pedido de 18 minutos sin pagar debía vencer';
+    RAISE EXCEPTION 'G1: un pedido de 6 minutos sin cobro confirmado debía vencer';
   END IF;
-  IF (SELECT estado FROM delivery_pedidos WHERE id = (v_r2 ->> 'pedido_id')::uuid) <> 'POR_PAGAR' THEN RAISE EXCEPTION 'G1: venció un pedido recién creado'; END IF;
+  IF (SELECT estado FROM delivery_pedidos WHERE id = (v_r2 ->> 'pedido_id')::uuid) <> 'POR_PAGAR' THEN RAISE EXCEPTION 'G1: venció un pedido de 4 minutos'; END IF;
+  -- Sin cobro mandado no hay nada que confirmar: se dice «sin pago» desde ya, no «confirmando».
+  v_seg := tienda_seguimiento(v_t, md5('pl-a63') || md5('pl-b63'));
+  IF v_seg ->> 'motivo' <> 'SIN_PAGO' OR v_seg ->> 'pago_estado' <> 'SIN_PAGO' THEN RAISE EXCEPTION 'G1: vencido sin haber mandado el cobro: %', v_seg - 'renglones'; END IF;
+  DELETE FROM delivery_pedidos WHERE id = (v_a ->> 'pedido_id')::uuid;
   IF (SELECT count(*) FROM delivery_eventos) <> v_n THEN RAISE EXCEPTION 'G1: vencer un pedido sin pagar dejó un evento'; END IF;
   v_seg := tienda_seguimiento(v_t, md5('pl-a61') || md5('pl-b61'));
   IF v_seg ->> 'estado' <> 'CANCELADO' OR v_seg ->> 'motivo' <> 'POR_CONFIRMAR' OR v_seg ->> 'pago_estado' <> 'POR_CONFIRMAR' THEN RAISE EXCEPTION 'G1: seguimiento de un pedido recién vencido, antes de consultar a Mercado Pago: %', v_seg - 'renglones'; END IF;
@@ -617,8 +649,8 @@ BEGIN
   --     preguntarse cada minuto: una vez por hora.
   v_r := pg_temp.pedir('4776660081', 81);
   v_pago := (v_r ->> 'pago_id')::uuid;
-  UPDATE delivery_pedidos SET created_at = now() - interval '18 minutes' WHERE id = (v_r ->> 'pedido_id')::uuid;
-  UPDATE tienda_pagos SET created_at = now() - interval '18 minutes', vence_at = now() - interval '3 minutes', preferencia_id = 'pref-81' WHERE id = v_pago;
+  UPDATE delivery_pedidos SET created_at = now() - interval '6 minutes' WHERE id = (v_r ->> 'pedido_id')::uuid;
+  UPDATE tienda_pagos SET created_at = now() - interval '18 minutes', vence_at = now() - interval '3 minutes', cobro_pedido_at = now() - interval '10 minutes' WHERE id = v_pago;
   PERFORM tienda_pagos_barrer();
   v_seg := tienda_seguimiento(v_t, md5('pl-a81') || md5('pl-b81'));
   IF v_seg ->> 'estado' <> 'CANCELADO' OR v_seg ->> 'pago_estado' <> 'POR_CONFIRMAR' OR v_seg ->> 'motivo' <> 'POR_CONFIRMAR' THEN
@@ -655,20 +687,21 @@ BEGIN
   -- Nunca pasadas 48 horas del plazo.
   v_r := pg_temp.pedir('4776660082', 82);
   UPDATE delivery_pedidos SET estado = 'EXPIRADO' WHERE id = (v_r ->> 'pedido_id')::uuid;
-  UPDATE tienda_pagos SET estado = 'VENCIDO', created_at = now() - interval '50 hours', vence_at = now() - interval '49 hours', preferencia_id = 'pref-82' WHERE id = (v_r ->> 'pago_id')::uuid;
+  UPDATE tienda_pagos SET estado = 'VENCIDO', created_at = now() - interval '50 hours', vence_at = now() - interval '49 hours', cobro_pedido_at = now() - interval '10 minutes' WHERE id = (v_r ->> 'pago_id')::uuid;
   IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = (v_r ->> 'pago_id')::uuid) THEN RAISE EXCEPTION 'I1: se sigue preguntando por un pago 48 horas después de su plazo'; END IF;
 
-  -- I3) No se espera al vencimiento: un pago que todavía se puede pagar se concilia desde los 2
-  --     minutos, y a lo sumo cada 2 minutos (el aviso se perdió y el cliente no volvió a la página).
+  -- I3) No se espera al vencimiento: un cobro del que no se supo el resultado se concilia desde los 20
+  --     segundos de mandado, y a lo sumo cada 45 (el aviso se perdió y el cliente no está en la página).
   v_r := pg_temp.pedir('4776660083', 83);
   v_pago := (v_r ->> 'pago_id')::uuid;
-  UPDATE tienda_pagos SET preferencia_id = 'pref-83', created_at = now() - interval '1 minute' WHERE id = v_pago;
-  IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'I3: se concilió un pago de un minuto'; END IF;
-  UPDATE tienda_pagos SET created_at = now() - interval '3 minutes' WHERE id = v_pago;
-  IF NOT EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago AND t.tarea = 'CONCILIAR') THEN RAISE EXCEPTION 'I3: un pago vivo de 3 minutos debía salir para conciliar'; END IF;
+  IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'I3: se concilió un pago cuyo cobro nunca se mandó'; END IF;
+  UPDATE tienda_pagos SET cobro_pedido_at = now() - interval '5 seconds' WHERE id = v_pago;
+  IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'I3: se concilió un cobro mandado hace 5 segundos'; END IF;
+  UPDATE tienda_pagos SET cobro_pedido_at = now() - interval '30 seconds' WHERE id = v_pago;
+  IF NOT EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago AND t.tarea = 'CONCILIAR') THEN RAISE EXCEPTION 'I3: un cobro mandado hace 30 segundos debía salir para conciliar'; END IF;
   IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'I3: se consultó dos veces seguidas el mismo pago'; END IF;
-  UPDATE tienda_pagos SET consultado_at = now() - interval '1 minute' WHERE id = v_pago;
-  IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'I3: se volvió a consultar antes de 2 minutos'; END IF;
+  UPDATE tienda_pagos SET consultado_at = now() - interval '20 seconds' WHERE id = v_pago;
+  IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'I3: se volvió a consultar antes de 45 segundos'; END IF;
   -- La página del pedido comparte ese reloj: si ella acaba de preguntar, el barrido no repite.
   UPDATE tienda_pagos SET consultado_at = now() - interval '3 minutes' WHERE id = v_pago;
   IF NOT tienda_pago_tomar_consulta(v_pago, 10) OR EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'I3: el barrido repitió la consulta que acababa de hacer la página'; END IF;
@@ -680,7 +713,7 @@ BEGIN
   --      no el más viejo. Un pago atascado no le quita el turno a los demás.
   UPDATE tienda_pagos SET created_at = now() - interval '14 minutes', consultado_at = now() - interval '3 minutes' WHERE id = v_pago;   -- el más viejo, ya consultado
   v_r2 := pg_temp.pedir('4776660084', 84);
-  UPDATE tienda_pagos SET preferencia_id = 'pref-84', created_at = now() - interval '3 minutes' WHERE id = (v_r2 ->> 'pago_id')::uuid;   -- más nuevo, nunca consultado
+  UPDATE tienda_pagos SET cobro_pedido_at = now() - interval '10 minutes', created_at = now() - interval '3 minutes' WHERE id = (v_r2 ->> 'pago_id')::uuid;   -- más nuevo, nunca consultado
   IF (SELECT t.id FROM tienda_pagos_tomar(1) t WHERE t.tarea = 'CONCILIAR') IS DISTINCT FROM (v_r2 ->> 'pago_id')::uuid THEN
     RAISE EXCEPTION 'I1c: con un solo turno debía tocarle al que nunca se ha consultado';
   END IF;
@@ -731,7 +764,7 @@ BEGIN
   -- ── H) Permisos ─────────────────────────────────────────────────────────────────────────────
   FOR r IN SELECT p.oid::regprocedure AS firma, p.proname FROM pg_proc p
             WHERE p.pronamespace = 'public'::regnamespace
-              AND p.proname IN ('tienda_conexion_cobro', 'tienda_crear_pedido', 'tienda_pago_tomar_preferencia', 'tienda_pago_descartar',
+              AND p.proname IN ('tienda_conexion_cobro', 'tienda_crear_pedido', 'tienda_pago_tomar_cobro', 'tienda_pago_descartar',
                                 'tienda_pago_tomar_consulta', 'tienda_pago_aplicar', 'tienda_pago_tomar_correo', 'tienda_pagos_tomar',
                                 'tienda_pago_devolucion', 'tienda_pago_conciliacion', 'tienda_reportar_estado', 'tienda_pagos_barrer', '_tienda_pedido_creado',
                                 '_tienda_version_al_menos', '_tienda_caja_en_linea_viva',
