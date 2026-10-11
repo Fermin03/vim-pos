@@ -5,7 +5,7 @@ import type { Resultado } from "../api";
 import { guardarCarrito, leerCarrito, carritoNuevo, type Almacen } from "../carrito";
 import { FORMULARIO_VACIO, datosDelPedido } from "../cliente";
 import { negocioDe, pedidoDe, pedidosDe, seguimientoDe, type EstadoDePago, type PedidoCreado, type Seguimiento } from "../contrato";
-import { desenlaceDelError, enviarPedido, intentoDeCompra } from "../envio";
+import { CLAVE_DEL_INTENTO, desenlaceDelError, enviarPedido, intentoDeCompra } from "../envio";
 import { PROPINAS, anotarPorPagar, enlaceDePago, formasDePago, propinaDe, totalAPagar, vaciarSiPagado } from "../pago";
 import { SONDEO_INICIAL, alLeer, cerrado, debeConfirmar, esperaDe, recorrido, terminado } from "../seguimiento";
 import { CODIGOS_DE_ERROR, apoyoDePago, nombreDePago, textoDeError, textoDeSeguimiento } from "../textos";
@@ -291,5 +291,74 @@ describe("el carrito de un pedido que salió a pagarse", () => {
     expect(vaciarSiPagado("knockout", "TAB12C", null)).toBe(false);
     const roto: Almacen = { getItem: () => { throw new Error("bloqueado"); }, setItem: vi.fn(), removeItem: vi.fn() };
     expect(vaciarSiPagado("knockout", "TAB12C", roto)).toBe(false);
+  });
+});
+
+describe("recargar antes de pagar no crea otro pedido", () => {
+  const almacen = (): Almacen => {
+    const m = new Map<string, string>();
+    return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => { m.set(k, v); }, removeItem: (k) => { m.delete(k); } };
+  };
+  const f = { ...FORMULARIO_VACIO, nombre: "Ana Privada", telefono: "4771112233" };
+  const pedido = (items: number, pago: "EFECTIVO" | "EN_LINEA", propina?: 0 | 10 | 15 | 20) =>
+    ({ negocio: "knockout", items: [{ producto_id: ID.hamburguesa, cantidad: items }], nota: "sin cebolla", ...datosDelPedido(f, { modo: "RECOGER", pago, propina }) });
+  /** Una página recién cargada: memoria en blanco, el mismo teléfono. */
+  const pagina = (a: Almacen | null, reloj = { t: 1_000_000 }) => {
+    let n = 0;
+    const id = Math.random().toString(36).slice(2, 8).padEnd(6, "0");
+    return intentoDeCompra(() => `${id}${String(++n).padStart(16, "0")}`, () => a, () => reloj.t);
+  };
+  it("la página recargada reutiliza la clave del mismo carrito, forma de pago y propina", () => {
+    const a = almacen();
+    const clave = pagina(a).para(pedido(1, "EN_LINEA", 10));
+    expect(pagina(a).para(pedido(1, "EN_LINEA", 10))).toBe(clave);
+  });
+  it("si cambia el carrito, la forma de pago o la propina, la clave guardada se sustituye", () => {
+    const a = almacen();
+    const clave = pagina(a).para(pedido(1, "EN_LINEA", 10));
+    for (const otro of [pedido(2, "EN_LINEA", 10), pedido(1, "EFECTIVO"), pedido(1, "EN_LINEA", 15)]) {
+      const b = almacen();
+      pagina(b).para(pedido(1, "EN_LINEA", 10));
+      const nueva = pagina(b).para(otro);
+      expect(nueva).not.toBe(clave);
+      expect(pagina(b).para(otro)).toBe(nueva);                       // y la que queda guardada es la nueva
+      expect(pagina(b).para(pedido(1, "EN_LINEA", 10))).not.toBe(nueva);
+    }
+  });
+  it("al quedar aprobado el pago (o entrar el pedido) se borra: el siguiente pedido idéntico es otro", () => {
+    const a = almacen();
+    const p1 = pagina(a), clave = p1.para(pedido(1, "EN_LINEA", 10));
+    p1.cerrar();
+    expect(a.getItem(CLAVE_DEL_INTENTO)).toBeNull();
+    expect(pagina(a).para(pedido(1, "EN_LINEA", 10))).not.toBe(clave);
+  });
+  it("caduca a los 15 minutos: no se reutiliza la clave de un pedido que ya venció", () => {
+    const a = almacen(), reloj = { t: 1_000_000 };
+    const clave = pagina(a, reloj).para(pedido(1, "EN_LINEA", 10));
+    reloj.t += 14 * 60_000;
+    expect(pagina(a, reloj).para(pedido(1, "EN_LINEA", 10))).toBe(clave);
+    reloj.t += 2 * 60_000;
+    expect(pagina(a, reloj).para(pedido(1, "EN_LINEA", 10))).not.toBe(clave);
+  });
+  it("en el teléfono queda la clave y una huella: ni el nombre, ni el teléfono, ni la nota", () => {
+    const a = almacen();
+    pagina(a).para(pedido(1, "EN_LINEA", 10));
+    const guardado = a.getItem(CLAVE_DEL_INTENTO)!;
+    expect(guardado).not.toMatch(/Ana|4771112233|cebolla|EN_LINEA|producto/);
+    expect(Object.keys(JSON.parse(guardado)).sort()).toEqual(["clave", "cuando", "de"]);
+  });
+  it("sin almacén, con uno que lanza o con basura guardada, sigue funcionando en memoria", () => {
+    const roto: Almacen = { getItem: () => { throw new Error("bloqueado"); }, setItem: () => { throw new Error("bloqueado"); }, removeItem: () => { throw new Error("bloqueado"); } };
+    for (const a of [null, roto]) {
+      const p = pagina(a);
+      const clave = p.para(pedido(1, "EN_LINEA", 10));
+      expect(p.para(pedido(1, "EN_LINEA", 10))).toBe(clave);
+      expect(() => p.cerrar()).not.toThrow();
+    }
+    for (const basura of ["{no es json", "null", "[]", JSON.stringify({ de: "x", clave: "corta", cuando: 1 }), JSON.stringify({ de: 5, clave: "a".repeat(22), cuando: "ayer" })]) {
+      const a = almacen();
+      a.setItem(CLAVE_DEL_INTENTO, basura);
+      expect(pagina(a).para(pedido(1, "EN_LINEA", 10))).toMatch(/^[A-Za-z0-9_-]{22}$/);
+    }
   });
 });

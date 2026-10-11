@@ -7,6 +7,7 @@ import type { Campo } from "./cliente";
 import type { Cotizacion, ErrorDeTienda, PedidoCreado } from "./contrato";
 import type { Horario } from "@vim/fecha";
 import type { Momento } from "./horario";
+import { almacenDelNavegador, type Almacen } from "./carrito";
 import { textoCerrada, textoDeError } from "./textos";
 
 export type Desenlace =
@@ -166,24 +167,73 @@ export function claveNueva(): string {
   return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").slice(0, 22);
 }
 
+/** Dónde se guarda el intento en el teléfono, junto al carrito. */
+export const CLAVE_DEL_INTENTO = "vim.tienda.intento";
+/** Un intento de más de 15 minutos ya no se reutiliza: su pedido, si esperaba pago, ya venció. */
+const VIDA_DEL_INTENTO_MS = 15 * 60_000;
+
+/**
+ * La huella de un texto (cyrb53, 53 bits): lo que se guarda del pedido para reconocerlo después. No
+ * es el pedido ni se puede leer de vuelta: en el teléfono no queda ni el nombre, ni el teléfono, ni
+ * la dirección, ni la nota. Dos pedidos distintos con la misma huella es, para esto, imposible.
+ */
+function huellaDe(texto: string): string {
+  let a = 0xdeadbeef, b = 0x41c6ce57;
+  for (let i = 0; i < texto.length; i++) {
+    const c = texto.charCodeAt(i);
+    a = Math.imul(a ^ c, 2654435761);
+    b = Math.imul(b ^ c, 1597334677);
+  }
+  a = Math.imul(a ^ (a >>> 16), 2246822507) ^ Math.imul(b ^ (b >>> 13), 3266489909);
+  b = Math.imul(b ^ (b >>> 16), 2246822507) ^ Math.imul(a ^ (a >>> 13), 3266489909);
+  return (4294967296 * (2097151 & b) + (a >>> 0)).toString(36);
+}
+
 /**
  * La clave del intento de compra: la MISMA mientras se reintente el mismo pedido sin saber si entró
  * (así el servidor devuelve el que ya existe en vez de crear otro), y una nueva en cuanto el pedido
  * es otro —cambió el carrito, el modo o la zona, los datos de entrega, el pago, la propina o la nota— o el
  * anterior ya entró (`cerrar`). «El mismo pedido» se decide por contenido: lo que se manda en
  * `pedir`, sin el antirobot ni el total esperado, que cambian en cada intento.
- * Vive en memoria, junto al candado: recargar la página empieza un intento nuevo.
+ *
+ * Se guarda en el teléfono, donde vive el carrito: recargar la página antes de pagar NO crea otro
+ * pedido (sin esto, quien volvía de Mercado Pago y recargaba dejaba un pedido esperando pago por
+ * cada recarga). Se guarda la clave y la HUELLA del pedido, nunca el pedido. Con el almacén
+ * bloqueado (modo privado) vive en memoria, como antes. Y caduca a los 15 minutos.
  */
-export function intentoDeCompra(nueva: () => string = claveNueva) {
-  let actual: { de: string; clave: string } | null = null;
+export function intentoDeCompra(nueva: () => string = claveNueva, almacen: () => Almacen | null = almacenDelNavegador, ahora: () => number = Date.now) {
+  type Intento = { de: string; clave: string; cuando: number };
+  /** undefined = todavía no se ha mirado el teléfono (se mira al primer uso: al importar no hay navegador). */
+  let actual: Intento | null | undefined;
+  const leer = (): Intento | null => {
+    if (actual !== undefined) return actual;
+    try {
+      const x: unknown = JSON.parse(almacen()?.getItem(CLAVE_DEL_INTENTO) ?? "null");
+      const o = typeof x === "object" && x !== null ? (x as Record<string, unknown>) : {};
+      // Lo guardado es texto de fuera: solo vale con su forma exacta.
+      actual = typeof o.de === "string" && typeof o.clave === "string" && /^[A-Za-z0-9_-]{22}$/.test(o.clave) && typeof o.cuando === "number"
+        ? { de: o.de, clave: o.clave, cuando: o.cuando } : null;
+    } catch {
+      actual = null;
+    }
+    return actual;
+  };
+  const guardar = (): void => {
+    try {
+      if (actual) almacen()?.setItem(CLAVE_DEL_INTENTO, JSON.stringify(actual));
+      else almacen()?.removeItem(CLAVE_DEL_INTENTO);
+    } catch { /* cuota llena o modo privado: se queda en memoria */ }
+  };
   return {
     para(pedido: unknown): string {
-      const de = JSON.stringify(pedido);
-      if (actual?.de !== de) actual = { de, clave: nueva() };
+      const previo = leer(), de = huellaDe(JSON.stringify(pedido)), t = ahora();
+      if (previo && previo.de === de && t - previo.cuando >= 0 && t - previo.cuando <= VIDA_DEL_INTENTO_MS) return previo.clave;
+      actual = { de, clave: nueva(), cuando: t };
+      guardar();
       return actual.clave;
     },
-    /** El pedido entró: el siguiente, aunque sea idéntico, es otro. */
-    cerrar(): void { actual = null; },
+    /** El pedido entró (o su pago quedó aprobado): el siguiente, aunque sea idéntico, es otro. */
+    cerrar(): void { actual = null; guardar(); },
   };
 }
 

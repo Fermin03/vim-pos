@@ -11,6 +11,7 @@ import { confirmarPago, seguimiento } from "../lib/api";
 import type { Seguimiento } from "../lib/contrato";
 import { formatoMxn } from "../lib/dinero";
 import { aLaHora, momentoMx } from "../lib/horario";
+import { intentoDeLaPagina } from "../lib/envio";
 import { vaciarSiPagado } from "../lib/pago";
 import { SONDEO_INICIAL, cerrado, debeConfirmar, recorrido, sinConexion, sondear, tardando, type Paso, type Sondeo } from "../lib/seguimiento";
 import { enlaceTel, enlaceWhatsApp, formatoTelefono } from "../lib/telefono";
@@ -81,7 +82,8 @@ function Pedido({ slug, pedido, sondeo }: { slug: string; pedido: Seguimiento; s
   const faltaPagar = pedido.estado === "POR_PAGAR";
   // El pago quedó aprobado: ahora sí se vacía el carrito del que salió este pedido (y solo ese).
   const pagado = pago?.estado === "PAGADO";
-  useEffect(() => { if (pagado) vaciarSiPagado(slug, pedido.folio_corto); }, [pagado, slug, pedido.folio_corto]);
+  // Y se cierra el intento de compra: el siguiente pedido, aunque sea idéntico, es otro.
+  useEffect(() => { if (pagado && vaciarSiPagado(slug, pedido.folio_corto)) intentoDeLaPagina.cerrar(); }, [pagado, slug, pedido.folio_corto]);
   const pasos = recorrido(pedido.modo, pedido.estado);
   const cancelado = pedido.estado === "CANCELADO";
   const recibido = new Date(pedido.recibido_at);
