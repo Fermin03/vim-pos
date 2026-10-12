@@ -134,13 +134,19 @@ describe("qué hace «Tus datos» con cada respuesta de `pedir`", () => {
     });
   });
   it("cada familia de rechazo tiene su texto, dice que no se cobró y no enseña códigos", () => {
-    const familias = ["FONDOS", "DATOS", "LLAMAR_BANCO", "TARJETA_DESHABILITADA", "OTRO"];
+    const familias = ["FONDOS", "DATOS", "LLAMAR_BANCO", "TARJETA_DESHABILITADA", "RIESGO", "OTRO"];
     for (const motivo of familias) {
       const t = textoDeRechazo(motivo, false).texto;
       expect(t, motivo).toMatch(/No se te cobró nada\.$/);
       expect(t, motivo).not.toMatch(/[A-Z]{3,}_[A-Z]|bad_filled|insufficient|Apple Pay|Google Pay/);
     }
-    expect(new Set(familias.map((m) => textoDeRechazo(m, false).texto)).size).toBe(5);
+    expect(new Set(familias.map((m) => textoDeRechazo(m, false).texto)).size).toBe(6);
+  });
+  it("el antifraude de Mercado Pago (RIESGO) no le echa la culpa al banco, y ofrece otra forma de pago solo si la hay", () => {
+    expect(textoDeRechazo("RIESGO", false)).toEqual({ campo: null, texto: "Mercado Pago no pudo aprobar este pago. Prueba con otra tarjeta. No se te cobró nada." });
+    expect(textoDeRechazo("RIESGO", true).texto).toBe("Mercado Pago no pudo aprobar este pago. Prueba con otra tarjeta. No se te cobró nada; también puedes elegir otra forma de pago.");
+    expect(textoDeRechazo("RIESGO", false).texto).not.toMatch(/banco/i);
+    expect(desenlaceDelError(e("PAGO_RECHAZADO", "RIESGO"), c)).toMatchObject({ tipo: "tarjeta", campo: null });
   });
   it("con otra forma de pago, el rechazo la ofrece; el de los datos, no (se corrige y ya)", () => {
     expect(textoDeRechazo("FONDOS", true).texto).toMatch(/también puedes elegir otra forma de pago\.$/);

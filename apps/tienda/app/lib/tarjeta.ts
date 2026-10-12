@@ -10,7 +10,11 @@
 export const SDK_DE_MERCADO_PAGO = "https://sdk.mercadopago.com/js/v2";
 
 /** Lo que viaja en `pedir` de la tarjeta. Nunca el número. */
-export type TarjetaDePedido = { token: string; payment_method_id: string; type: TipoDeTarjeta };
+export type TarjetaDePedido = {
+  token: string; payment_method_id: string; type: TipoDeTarjeta;
+  /** La huella del dispositivo que deja MercadoPago.js, si la hay: ayuda a su antifraude. El servidor la reenvía en una cabecera. */
+  dispositivo?: string;
+};
 
 /** Crédito o débito: lo que Mercado Pago (Orders API) pide con el cobro. Lista cerrada; el servidor la valida igual. */
 export type TipoDeTarjeta = "credit_card" | "debit_card";
@@ -42,6 +46,16 @@ export function marcaDe(respuesta: unknown): MarcaDeTarjeta | null {
 export const tipoAceptado = (tipo: string): tipo is TipoDeTarjeta => tipo === "credit_card" || tipo === "debit_card";
 
 /** El token que devuelve `mp.fields.createCardToken`. null si no tiene la forma. */
+/**
+ * La huella del dispositivo que el script de seguridad de Mercado Pago deja en
+ * `window.MP_DEVICE_SESSION_ID` (su antifraude la usa para puntuar el cobro). VISTO (12 oct 2026):
+ * `armor.` y hexadecimales, 231 caracteres. Solo con la forma que el servidor acepta; si no está, no se inventa.
+ */
+export function dispositivoDe(ventana: unknown): string | undefined {
+  const v = obj(ventana).MP_DEVICE_SESSION_ID;
+  return typeof v === "string" && /^[A-Za-z0-9._:-]{8,300}$/.test(v) ? v : undefined;
+}
+
 export function tokenDe(respuesta: unknown): string | null {
   const id = obj(respuesta).id;
   return typeof id === "string" && /^[A-Za-z0-9]{16,64}$/.test(id) ? id : null;
@@ -116,6 +130,8 @@ const RECHAZOS: Record<string, { campo: CampoDeTarjeta | null; texto: string; co
   DATOS: { campo: null, corrige: true, texto: "Revisa los datos de tu tarjeta: el número, la fecha de vencimiento y el código de seguridad." },
   LLAMAR_BANCO: { campo: null, texto: "Tu banco pide que autorices este pago. Llámale y vuelve a intentar, o usa otra tarjeta." },
   TARJETA_DESHABILITADA: { campo: null, texto: "Tu tarjeta no está activa para compras en línea. Llama a tu banco o usa otra tarjeta." },
+  // No fue el banco: el antifraude de Mercado Pago (`high_risk`). TEXTO PROVISIONAL (James).
+  RIESGO: { campo: null, texto: "Mercado Pago no pudo aprobar este pago. Prueba con otra tarjeta." },
   OTRO: { campo: null, texto: "Tu banco no aprobó el pago. Prueba con otra tarjeta." },
 };
 
@@ -169,4 +185,25 @@ export function cargarMercadoPago(clave: string, doc: Document = document, esper
     if (!w.MercadoPago) throw new Error("sin MercadoPago");
     return new w.MercadoPago(clave, { locale: "es-MX" });
   }).catch((e) => { carga = null; throw e; });
+}
+
+/** El script de seguridad de Mercado Pago: calcula la huella del dispositivo y la deja en `window.MP_DEVICE_SESSION_ID`. */
+export const SEGURIDAD_DE_MERCADO_PAGO = "https://www.mercadopago.com/v2/security.js";
+
+/**
+ * Pide la huella del dispositivo, UNA vez y solo en la pantalla de la tarjeta. VISTO (12 oct 2026):
+ * MercadoPago.js por sí solo NO deja `MP_DEVICE_SESSION_ID` (aunque su documentación lo diga); con
+ * este script, sí. No se espera ni se reintenta: si no carga (sin red, un bloqueador), el pago sigue
+ * igual, solo sin esa señal para el antifraude.
+ */
+export function cargarHuellaDeDispositivo(doc: Document = document): void {
+  if (doc.querySelector(`script[src="${SEGURIDAD_DE_MERCADO_PAGO}"]`)) return;
+  const s = doc.createElement("script");
+  s.src = SEGURIDAD_DE_MERCADO_PAGO;
+  s.async = true;
+  // Mercado Pago pide decir en qué página se está; «checkout» es la del pago.
+  s.setAttribute("view", "checkout");
+  // Si falla se quita: la siguiente vez que se abra la pantalla de la tarjeta se intenta otra vez.
+  s.onerror = () => s.remove();
+  doc.head.appendChild(s);
 }

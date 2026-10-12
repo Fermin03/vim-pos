@@ -304,6 +304,6 @@ export function leerTarjeta(v: unknown): TarjetaDePedido | null | undefined {
   if (!token || !payment_method_id || !type) return null;
   // Opcional (ayuda al antifraude de Mercado Pago): acaba en una cabecera HTTP, así que solo letras,
   // números y `._:-`. Si no tiene esa forma no se manda, y el pago sigue.
-  const dispositivo = typeof t.dispositivo === "string" && /^[A-Za-z0-9._:-]{8,128}$/.test(t.dispositivo) ? t.dispositivo : null;
+  const dispositivo = typeof t.dispositivo === "string" && /^[A-Za-z0-9._:-]{8,300}$/.test(t.dispositivo) ? t.dispositivo : null;
   return { token, payment_method_id, type, dispositivo };
 }

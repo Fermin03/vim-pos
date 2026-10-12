@@ -502,7 +502,7 @@ test("pedir en línea: la huella del dispositivo es opcional; con forma pasa, si
     assert.ok(r.ok && r.valor.accion === "pedir", JSON.stringify(dispositivo));
     return r.ok && r.valor.accion === "pedir" ? r.valor.tarjeta?.dispositivo : undefined;
   };
-  for (const vale of ["armor.1a2b3c4d5e6f", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "x".repeat(128)]) assert.equal(con(vale), vale);
+  for (const vale of ["armor.1a2b3c4d5e6f", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "armor." + "0af3".repeat(56) + "9"]) assert.equal(con(vale), vale);
   // Acaba en una cabecera HTTP: nada de espacios, saltos de línea ni caracteres raros. Tampoco se rechaza el pedido por ella.
-  for (const mal of ["", "corto", "x".repeat(129), "con espacio 12345", "salto\r\nX-Otra: 1", "ñandú-12345678", 12345678, null, undefined, {}, ["armor.1a2b3c4d"]]) assert.equal(con(mal), null);
+  for (const mal of ["", "corto", "x".repeat(301), "con espacio 12345", "salto\r\nX-Otra: 1", "ñandú-12345678", 12345678, null, undefined, {}, ["armor.1a2b3c4d"]]) assert.equal(con(mal), null);
 });

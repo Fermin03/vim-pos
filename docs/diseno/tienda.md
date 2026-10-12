@@ -235,6 +235,8 @@ El cliente paga con tarjeta **dentro de «Tus datos»**; no se le manda a otra p
 - **Errores por campo**, bajo cada caja, con el molde de siempre (`text-14 text-danger`). Mientras
   escribe solo se reclama lo que la librería marca mal en un campo ya tocado; al tocar «Pagar»,
   también lo vacío, y el foco va al primer campo con error.
+- **No fue el banco, fue el antifraude de Mercado Pago** (`high_risk`): tiene su propio texto,
+  «Mercado Pago no pudo aprobar este pago. Prueba con otra tarjeta.», con el mismo final.
 - **El banco no aprobó**: el motivo se dice en un `Aviso` rojo arriba de los campos y siempre
   termina en «No se te cobró nada.» Con otra forma de pago disponible, se ofrece. Lo escrito no se
   borra. Los datos mal escritos llevan **un solo mensaje** («Revisa los datos de tu tarjeta: el

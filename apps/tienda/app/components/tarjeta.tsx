@@ -11,7 +11,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import { Aviso, botonClases, cn } from "@vim/ui/styles";
 import { CampoDeTexto } from "./campo";
 import {
-  CAMPOS_SIN_TOCAR, cargarMercadoPago, errorDeToken, erroresDeTarjeta, marcaDe, primerError, textoSinFormulario, tipoAceptado, tokenDe,
+  CAMPOS_SIN_TOCAR, cargarHuellaDeDispositivo, cargarMercadoPago, dispositivoDe, errorDeToken, erroresDeTarjeta, marcaDe, primerError, textoSinFormulario, tipoAceptado, tokenDe,
   type CampoDeTarjeta, type CampoSeguro, type EstadoDeCampos, type MarcaDeTarjeta, type MercadoPagoJs, type TarjetaDePedido,
 } from "../lib/tarjeta";
 
@@ -69,6 +69,8 @@ export const CamposDeTarjeta = forwardRef<ManejoDeTarjeta, {
     cargarMercadoPago(clavePublica).then((lib) => {
       if (!vivo) return;
       mp.current = lib;
+      // La huella del dispositivo para el antifraude de Mercado Pago: aparte y sin esperar.
+      cargarHuellaDeDispositivo();
       // El texto de dentro del iframe copia el de un campo de la casa: mismo color, tamaño y letra.
       const muestra = document.getElementById(`${id}-titular`);
       const cs = muestra ? getComputedStyle(muestra) : null;
@@ -141,7 +143,8 @@ export const CamposDeTarjeta = forwardRef<ManejoDeTarjeta, {
       try {
         const token = tokenDe(await mp.current.fields.createCardToken({ cardholderName: titular.trim() }));
         if (!token) return { ok: false, ...errorDeToken(null) };
-        return { ok: true, tarjeta: { token, payment_method_id: marca.payment_method_id, type: marca.tipo } };
+        const dispositivo = dispositivoDe(window);
+        return { ok: true, tarjeta: { token, payment_method_id: marca.payment_method_id, type: marca.tipo, ...(dispositivo && { dispositivo }) } };
       } catch (err) {
         const t = errorDeToken(err);
         enfocar(t.campo);
