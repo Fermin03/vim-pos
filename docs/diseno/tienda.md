@@ -255,10 +255,10 @@ El cliente paga con tarjeta **dentro de «Tus datos»**; no se le manda a otra p
 La cuenta es opcional y nunca estorba: se puede pedir sin ella de principio a fin. Es de la tienda
 de **ese** restaurante (entrar en una no abre sesión en otra).
 
-**Dónde aparece.** En el marco, arriba a la derecha, un enlace de texto en `ink`: «Entrar» o
+**Dónde aparece.** En el marco, arriba a la derecha, un enlace de texto en `ink`: «Iniciar sesión» o
 «Mi cuenta» (44 px de alto, nunca del color del negocio: no compite con la acción principal). Y en
 «Tus datos», solo para quien no tiene sesión, una franja tenue (`bg-hover`) antes del primer campo:
-«¿Ya tienes cuenta? **Entrar** **Crear cuenta**». Quien sale a entrar vuelve al menú de su sucursal
+«¿Ya tienes cuenta? **Iniciar sesión** **Crear cuenta**». Quien sale a entrar vuelve al menú de su sucursal
 y su pedido lo espera (vive en el teléfono).
 
 **Entrar, crear cuenta y recuperar** son páginas, no hojas: se llega a ellas por un enlace (también
@@ -282,20 +282,23 @@ el del correo) y se vuelve a donde se iba (`?volver=`, que solo admite rutas de 
   cargar y la saca de la barra. Hasta saber si hay enlace no pinta ni «pedir enlace» ni «contraseña
   nueva» (un instante en blanco, sin salto de una a otra). Un enlace vencido o ya usado no es un
   error en rojo: es una pantalla que lo explica y ofrece «Pedir otro enlace».
-- Entrar y salir recargan la página completa: así el marco cambia «Entrar» por «Mi cuenta».
+- Entrar y salir recargan la página completa: así el marco cambia «Iniciar sesión» por «Mi cuenta».
 
 **Mi cuenta** es una página para leer; **cada cambio se hace en una hoja**, con su botón principal
 en el pie. Así la página no tiene acción principal propia y ningún formulario abre el teclado sin
 que se pida. De arriba abajo, por lo que más se usa:
 
-1. **Mis pedidos** — por pedido: el estado (en negritas; «Cancelado» en `danger`) y el total a la
+1. **Mis pedidos** — se ven los **últimos tres**; si hay más, debajo va «Mostrar más» (secundario),
+   que despliega el resto: el foco pasa al primero recién mostrado y se anuncia cuántos salieron.
+   Por pedido: el estado (en negritas; «Cancelado» en `danger`) y el total a la
    derecha, una línea con folio, fecha y modo, lo que se pidió y «Pedir de nuevo» (secundario). El
    estado es el del momento de abrir la página: no se actualiza solo ni enlaza al seguimiento (ese
    enlace solo lo tiene quien hizo el pedido). Un pedido de hace más de 30 días ya no trae con qué
    repetirlo: no lleva botón.
 2. **Tus datos** — nombre, teléfono y cumpleaños si lo dio; «Editar» a la derecha del título. El
    correo se ve pero no se cambia.
-3. **Direcciones** — nombre de la dirección en negritas y la dirección en una línea; «Editar» y
+3. **Direcciones** — igual que los pedidos: las **tres últimas guardadas** (la más nueva arriba) y
+   «Mostrar más» (la misma pieza, `ListaCorta`). Nombre de la dirección en negritas y la dirección en una línea; «Editar» y
    «Borrar» (en `danger`) como enlaces de texto. Con 5, «Agregar dirección» se cambia por el texto
    del tope.
 4. **Contraseña y sesión** — «Cambiar contraseña» y «Cerrar sesión», secundarios.

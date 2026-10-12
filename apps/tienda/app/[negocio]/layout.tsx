@@ -35,7 +35,7 @@ export default async function MarcoDelNegocio({ children, params }: { children: 
               Solo mira si hay cookie; si la sesión ya venció, «Mi cuenta» lo descubre y manda a entrar. */}
           <Link href={`/${negocio.slug}/${conSesion ? "cuenta" : "entrar"}`}
             className="inline-flex min-h-11 flex-shrink-0 items-center whitespace-nowrap rounded text-14 font-medium text-ink underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink">
-            {conSesion ? "Mi cuenta" : "Entrar"}
+            {conSesion ? "Mi cuenta" : "Iniciar sesión"}
           </Link>
         </header>
       )}

@@ -196,3 +196,27 @@ describe("rangoDeEnvio", () => {
     expect(rangoDeEnvio([{ costo_mxn: "x" }, { costo_mxn: "35.00" }])).toBeNull();
   });
 });
+
+describe("listaCorta: las listas de «Mi cuenta» empiezan con tres", () => {
+  const de = (n: number) => Array.from({ length: n }, (_, i) => i + 1);
+  it("con tres o menos se ven todos y no hay «Mostrar más»", async () => {
+    const { listaCorta } = await import("../pantalla");
+    for (const n of [0, 1, 2, 3]) expect(listaCorta(de(n), false)).toEqual({ visibles: de(n), restantes: 0 });
+  });
+  it("con más de tres se ven los tres primeros y se dice cuántos faltan", async () => {
+    const { listaCorta, TOPE_DE_LISTA } = await import("../pantalla");
+    expect(TOPE_DE_LISTA).toBe(3);
+    expect(listaCorta(de(4), false)).toEqual({ visibles: [1, 2, 3], restantes: 1 });
+    expect(listaCorta(de(20), false)).toEqual({ visibles: [1, 2, 3], restantes: 17 });
+  });
+  it("tras «Mostrar más» se ven todos, en su orden, y ya no hay botón", async () => {
+    const { listaCorta } = await import("../pantalla");
+    expect(listaCorta(de(5), true)).toEqual({ visibles: [1, 2, 3, 4, 5], restantes: 0 });
+  });
+  it("no toca la lista que recibe", async () => {
+    const { listaCorta } = await import("../pantalla");
+    const lista = de(5);
+    listaCorta(lista, false).visibles.push(99);
+    expect(lista).toEqual([1, 2, 3, 4, 5]);
+  });
+});

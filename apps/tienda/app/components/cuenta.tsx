@@ -5,7 +5,7 @@
 //
 // La sesión es una cookie que este código no ve. Si la función dice que ya no vale
 // (`SESION_INVALIDA`, el servidor ya la borró), se va a «Entrar» y de ahí se vuelve aquí.
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type Key, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Aviso, StatusChip, botonClases, cn, type TonoEstado } from "@vim/ui/styles";
@@ -20,6 +20,7 @@ import {
   textoDeCuenta, textoDePasswordActual, type CampoDeDireccion,
 } from "../lib/cuenta";
 import { formatoMxn } from "../lib/dinero";
+import { listaCorta } from "../lib/pantalla";
 import { formatoTelefono } from "../lib/telefono";
 import { textoDeEstado } from "../lib/textos";
 import { irA } from "./acceso";
@@ -220,10 +221,45 @@ const TITULO_DE_HOJA = (h: HojaAbierta): string =>
   h.tipo === "datos" ? "Tus datos" : h.tipo === "password" ? "Cambiar contraseña" : h.tipo === "eliminar" ? "Eliminar cuenta"
     : h.tipo === "borrar" ? "Borrar dirección" : h.direccion ? "Editar dirección" : "Agregar dirección";
 
+/**
+ * Una lista que empieza corta (pedidos, direcciones): los primeros tres y, si hay más, «Mostrar más»,
+ * que enseña el resto (ya vienen todos del servidor: no se pide nada). Al desplegar, el foco pasa al
+ * primer renglón recién mostrado (el botón desaparece: no puede quedarse ahí) y se anuncia cuántos
+ * salieron. Cuántos se ven lo decide `listaCorta` (lib/pantalla.ts).
+ */
+function ListaCorta<T>({ items, llave, renglon, clase, uno, varios }: {
+  items: readonly T[]; llave: (item: T, i: number) => Key; renglon: (item: T) => ReactNode;
+  /** Las clases de cada renglón. */
+  clase: string;
+  /** Cómo se llama lo que se lista, para el anuncio: «pedido» / «pedidos». */
+  uno: string; varios: string;
+}) {
+  const [todos, setTodos] = useState(false);
+  /** Cuántos salieron con «Mostrar más» (0 = no se ha tocado): de ahí el anuncio y a quién va el foco. */
+  const [nuevos, setNuevos] = useState(0);
+  const primeroNuevo = useRef<HTMLLIElement>(null);
+  const { visibles, restantes } = listaCorta(items, todos);
+  const desde = visibles.length - nuevos;
+  useEffect(() => { if (nuevos > 0) primeroNuevo.current?.focus(); }, [nuevos]);
+  return (
+    <>
+      <ul className="-my-1 divide-y divide-line">
+        {visibles.map((item, i) => (
+          <li key={llave(item, i)} ref={nuevos > 0 && i === desde ? primeroNuevo : undefined} tabIndex={nuevos > 0 && i === desde ? -1 : undefined} className={cn(clase, "outline-none")}>
+            {renglon(item)}
+          </li>
+        ))}
+      </ul>
+      {restantes > 0 && <button type="button" onClick={() => { setNuevos(restantes); setTodos(true); }} className={cn(CHICO, "self-start")}>Mostrar más</button>}
+      <p aria-live="polite" className="sr-only">{nuevos > 0 ? `Se ${nuevos === 1 ? "muestra" : "muestran"} ${nuevos} ${nuevos === 1 ? uno : varios} más.` : ""}</p>
+    </>
+  );
+}
+
 function Pedido({ pedido, sucursal, variasSucursales, alRepetir }: { pedido: PedidoDeCuenta; sucursal: string | null; variasSucursales: boolean; alRepetir: (() => void) | null }) {
   const cuando = fechaDePedido(pedido.recibido_at);
   return (
-    <li className="flex flex-col gap-2 py-4">
+    <>
       <div className="flex items-center justify-between gap-3">
         {/* El estado, tal cual lo da el servidor al cargar la página; aquí no se actualiza solo. */}
         <StatusChip tone={tonoDeEstado(pedido.estado)}>{textoDeEstado(pedido.estado, null).titulo}</StatusChip>
@@ -245,7 +281,7 @@ function Pedido({ pedido, sucursal, variasSucursales, alRepetir }: { pedido: Ped
       {/* Aquí no hay enlace a su seguimiento: ese enlace solo lo tiene quien hizo el pedido (y su correo). */}
       {pedido.estado === "POR_PAGAR" && <p className="text-14 text-ink-2">Estamos confirmando tu pago. Esto puede tardar unos minutos.</p>}
       {alRepetir && <button type="button" onClick={alRepetir} className={cn(CHICO, "mt-1 self-start")} aria-label={`Pedir de nuevo el pedido ${pedido.folio_corto}`}>Pedir de nuevo</button>}
-    </li>
+    </>
   );
 }
 
@@ -343,14 +379,13 @@ export function MiCuentaDelNegocio({ negocio }: { negocio: Negocio }) {
           </>
         )}
         {Array.isArray(pedidos) && pedidos.length > 0 && (
-          <ul className="-my-1 divide-y divide-line">
-            {pedidos.map((p, i) => {
-              const sucursal = negocio.sucursales.find((s) => s.id === p.sucursal_id);
-              // Sin `items` (pedido ya anonimizado) o si la sucursal ya no está, no hay qué repetir.
-              return <Pedido key={`${p.folio_corto}-${i}`} pedido={p} sucursal={sucursal?.nombre ?? null} variasSucursales={negocio.sucursales.length > 1}
-                alRepetir={p.items && sucursal ? () => repetir(p) : null} />;
-            })}
-          </ul>
+          // Vienen del más reciente al más viejo: se ven los últimos tres y el resto con «Mostrar más».
+          <ListaCorta items={pedidos} llave={(p, i) => `${p.folio_corto}-${i}`} clase="flex flex-col gap-2 py-4" uno="pedido" varios="pedidos" renglon={(p) => {
+            const sucursal = negocio.sucursales.find((s) => s.id === p.sucursal_id);
+            // Sin `items` (pedido ya anonimizado) o si la sucursal ya no está, no hay qué repetir.
+            return <Pedido pedido={p} sucursal={sucursal?.nombre ?? null} variasSucursales={negocio.sucursales.length > 1}
+              alRepetir={p.items && sucursal ? () => repetir(p) : null} />;
+          }} />
         )}
       </section>
 
@@ -371,18 +406,18 @@ export function MiCuentaDelNegocio({ negocio }: { negocio: Negocio }) {
         {direcciones.length === 0
           ? <p className="text-15 leading-relaxed text-ink-2">No tienes direcciones guardadas. Guarda una y al pedir a domicilio solo la eliges.</p>
           : (
-            <ul className="-my-1 divide-y divide-line">
-              {direcciones.map((d) => (
-                <li key={d.id} className="flex flex-col gap-1 py-3">
+            // El servidor las da de la más vieja a la más nueva: aquí van al revés, para que las tres
+            // que se ven sean las últimas guardadas (y la que se acaba de agregar no quede escondida).
+            <ListaCorta items={[...direcciones].reverse()} llave={(d) => d.id} clase="flex flex-col gap-1 py-3" uno="dirección" varios="direcciones" renglon={(d) => (
+                <>
                   <p className={cn("text-16 font-semibold", PARTE)}>{d.etiqueta}</p>
                   <p className={cn("text-15 text-ink-2", PARTE)}>{direccionEnUnaLinea(d)}</p>
                   <div className="flex gap-5">
                     <button type="button" onClick={() => abrir({ tipo: "direccion", direccion: d })} className={DE_TEXTO} aria-label={`Editar la dirección ${d.etiqueta}`}>Editar</button>
                     <button type="button" onClick={() => abrir({ tipo: "borrar", direccion: d })} className={cn(DE_TEXTO, "!text-danger")} aria-label={`Borrar la dirección ${d.etiqueta}`}>Borrar</button>
                   </div>
-                </li>
-              ))}
-            </ul>
+                </>
+            )} />
           )}
         {llenas
           ? <p className="text-14 text-ink-2">{textoDeCuenta("DIRECCIONES_LLENAS")}</p>

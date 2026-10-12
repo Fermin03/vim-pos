@@ -185,7 +185,6 @@ export const CamposDeTarjeta = forwardRef<ManejoDeTarjeta, {
 
   return (
     <div ref={bloque} id={`${id}-tarjeta`} role="group" tabIndex={-1} aria-labelledby={tituloId} aria-busy={fase === "cargando"} className="flex min-w-0 flex-col gap-3 outline-none">
-      <p className="text-14 text-ink-2">Crédito o débito. Los datos de tu tarjeta van directo a Mercado Pago: el restaurante no los ve ni los guarda.</p>
       {general && <Aviso tono="danger" role="alert" className="!text-14">{general}</Aviso>}
       <div className="grid grid-cols-2 gap-3">
         {SEGUROS.map(caja)}
