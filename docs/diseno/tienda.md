@@ -177,6 +177,40 @@ el pulgar, y cada caso deja a la vista solo lo que sí sirve:
 | Se arregla en el carrito (la zona, un producto) | Aviso y «Volver a tu pedido»; si es un producto, regresa solo y lo marca |
 | Es de un campo o del pago | El texto junto al campo, con el foco ahí |
 
+## Pagar en línea
+
+El cliente paga con tarjeta **dentro de «Tus datos»**; no se le manda a otra página. (Hasta el 11 oct
+2026 se redirigía a Mercado Pago: eso se retiró, con su «Falta pagar», su botón y su hora límite.)
+
+- **«¿Cómo pagas?»** gana la opción «Pagar en línea» donde el negocio la ofrece, la sucursal puede
+  cobrar y viene la public key de su cuenta. Línea de apoyo: «Pagas ahora, aquí mismo, con tarjeta
+  de crédito o débito.» No se nombran Apple Pay ni Google Pay.
+- Al elegirla aparecen, en este orden: **Propina** (el selector de siempre), **Tu tarjeta** y la
+  cuenta de lo que se va a cobrar. La librería de Mercado Pago se carga en ese momento, no antes.
+- **Tu tarjeta**: número (a todo el ancho; a la derecha de su etiqueta, la marca que se reconoció),
+  vencimiento y código de seguridad (dos columnas) y nombre del titular. Los tres primeros son
+  iframes de Mercado Pago dentro de **la misma caja de `CampoDeTexto`** (48 px de alto, borde
+  `line-strong`, radio de la casa); el foco y el error se pintan en la caja desde el estado
+  (`border-ink` + `ring-1`, `border-danger`), porque un iframe no tiene `:focus` nuestro. El texto
+  de dentro copia color, tamaño y familia de un campo de la casa.
+- **Errores por campo**, bajo cada caja, con el molde de siempre (`text-14 text-danger`). Mientras
+  escribe solo se reclama lo que la librería marca mal en un campo ya tocado; al tocar «Pagar»,
+  también lo vacío, y el foco va al primer campo con error.
+- **El banco no aprobó**: el motivo se dice en un `Aviso` rojo arriba de los campos y siempre
+  termina en «No se te cobró nada.» Con otra forma de pago disponible, se ofrece. Lo escrito no se
+  borra. Los datos mal escritos llevan **un solo mensaje** («Revisa los datos de tu tarjeta: el
+  número, la fecha de vencimiento y el código de seguridad.»), sin señalar un campo: Mercado Pago no
+  dice si falló el código o la fecha. Tras varios rechazos seguidos el mensaje es siempre el
+  general, y después la tienda pide esperar («Hiciste demasiados intentos seguidos.»).
+- **No se supo si el cobro pasó**: la tienda va a la página del pedido, que dice «Confirmando tu
+  pago» / «Esto puede tardar unos minutos.». Nunca «rechazado» ni «no se te cobró» sin saberlo.
+- **Si el formulario no carga**: `Aviso` ámbar («No pudimos cargar el pago con tarjeta…») con
+  «Volver a intentar», y la otra forma de pago si existe. Nunca campos muertos.
+- **El correo** deja de ser opcional al pagar en línea (se quita la píldora «Opcional» y cambia su
+  ayuda).
+- **El botón** dice «Pagar» con el total a pagar; mientras cobra, «Procesando tu pago…».
+- **Página del pedido**: sin botón de pagar. Con el pago hecho, «Total pagado» y «Pagado en línea.».
+
 ## Cuentas
 
 La cuenta es opcional y nunca estorba: se puede pedir sin ella de principio a fin. Es de la tienda

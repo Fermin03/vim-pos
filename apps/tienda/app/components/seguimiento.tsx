@@ -7,13 +7,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Aviso, botonClases, cn } from "@vim/ui/styles";
-import { seguimiento } from "../lib/api";
+import { confirmarPago, seguimiento } from "../lib/api";
 import type { Seguimiento } from "../lib/contrato";
 import { formatoMxn } from "../lib/dinero";
 import { aLaHora, momentoMx } from "../lib/horario";
-import { SONDEO_INICIAL, recorrido, sinConexion, sondear, tardando, terminado, type Paso, type Sondeo } from "../lib/seguimiento";
+import { SONDEO_INICIAL, cerrado, debeConfirmar, recorrido, sinConexion, sondear, tardando, type Paso, type Sondeo } from "../lib/seguimiento";
 import { enlaceTel, enlaceWhatsApp, formatoTelefono } from "../lib/telefono";
-import { textoDeError, textoDeEstado } from "../lib/textos";
+import { textoDeError, textoDeSeguimiento } from "../lib/textos";
 import { Linea } from "./carrito";
 import { Esqueleto, FOCO, PARTE, PRINCIPAL } from "./piezas";
 
@@ -75,7 +75,9 @@ function Contacto({ telefono, folio }: { telefono: string | null; folio: string 
 
 function Pedido({ slug, pedido, sondeo }: { slug: string; pedido: Seguimiento; sondeo: Sondeo }) {
   const [copiado, setCopiado] = useState<boolean | null>(null);
-  const texto = textoDeEstado(pedido.estado, pedido.motivo);
+  const texto = textoDeSeguimiento(pedido);
+  const pago = pedido.enLinea;
+  const pagado = pago?.estado === "PAGADO";
   const pasos = recorrido(pedido.modo, pedido.estado);
   const cancelado = pedido.estado === "CANCELADO";
   const recibido = new Date(pedido.recibido_at);
@@ -90,8 +92,8 @@ function Pedido({ slug, pedido, sondeo }: { slug: string; pedido: Seguimiento; s
         </p>
         {/* Lo que cambia solo se anuncia: el estado y su línea de apoyo, juntos. */}
         {/* La llave hace que el estado nuevo entre con un fundido corto: se nota que cambió sin que brinque. */}
-        <div key={pedido.estado} aria-live="polite" aria-atomic="true" className="animate-vim-fade motion-reduce:animate-none">
-          <h1 className={cn("font-display text-32 font-semibold leading-tight tracking-tight", cancelado && "text-danger")}>{texto.titulo}</h1>
+        <div key={`${pedido.estado} ${pago?.estado ?? ""}`} aria-live="polite" aria-atomic="true" className="animate-vim-fade motion-reduce:animate-none">
+          <h1 className={cn("font-display text-32 font-semibold leading-tight tracking-tight", texto.alerta && "text-danger")}>{texto.titulo}</h1>
           <p className="mt-2 text-16 leading-relaxed text-ink-2">{texto.apoyo}</p>
         </div>
         {sinConexion(sondeo) && <Aviso tono="warning" role="status" className="mt-2 !text-14">Sin conexión. Reintentando…</Aviso>}
@@ -126,16 +128,18 @@ function Pedido({ slug, pedido, sondeo }: { slug: string; pedido: Seguimiento; s
         <dl className="mt-4 flex flex-col gap-2 border-t border-line pt-4">
           <Linea concepto="Subtotal" importe={formatoMxn(pedido.subtotal_mxn)} estimado={false} />
           {pedido.modo === "DOMICILIO" && envio && <Linea concepto="Envío" importe={envio} estimado={false} />}
-          <Linea concepto="Total" importe={formatoMxn(pedido.total_mxn)} estimado={false} fuerte />
+          {pago && pago.propina_mxn !== "0.00" && <Linea concepto="Propina" importe={formatoMxn(pago.propina_mxn)} estimado={false} />}
+          <Linea concepto={pagado ? "Total pagado" : "Total"} importe={formatoMxn(pago ? pago.total_a_pagar_mxn : pedido.total_mxn)} estimado={false} fuerte />
         </dl>
-        {!cancelado && (
+        {pagado && !cancelado && <p className="mt-2 text-14 text-ink-2">Pagado en línea.</p>}
+        {!pago && !cancelado && (
           <p className="mt-2 text-14 text-ink-2">
             {pedido.estado === "ENTREGADO" ? "Pagaste" : "Pagas"} {pedido.pago === "EFECTIVO" ? "en efectivo" : "con tarjeta"} al {pedido.modo === "RECOGER" ? "recoger" : "recibir"}.
           </p>
         )}
       </section>
 
-      {terminado(sondeo) ? (
+      {cerrado(pedido) ? (
         <Link href={`/${slug}`} className={cn(PRINCIPAL, "h-14 w-full px-5 text-16")}>Pedir de nuevo</Link>
       ) : (
         <div className="flex flex-col items-start gap-1 border-t border-line pt-6">
@@ -157,7 +161,9 @@ export function SeguimientoDelPedido({ slug, codigo }: { slug: string; codigo: s
   const [sondeo, setSondeo] = useState<Sondeo>(SONDEO_INICIAL);
   /** «Reintentar ahora» arranca el sondeo de cero: lee en el acto, sin esperar su turno. */
   const [turno, setTurno] = useState(0);
-  useEffect(() => sondear((senal) => seguimiento(slug, codigo, senal), setSondeo), [slug, codigo, turno]);
+  // La primera lectura, y las siguientes mientras el pago no se resuelva, piden además que se
+  // confirme el pago con Mercado Pago (el respaldo del aviso). Solo viaja el código del pedido.
+  useEffect(() => sondear((senal, ultimo) => (debeConfirmar(ultimo) ? confirmarPago : seguimiento)(slug, codigo, senal), setSondeo), [slug, codigo, turno]);
 
   if (sondeo.noEncontrado) {
     const t = textoDeError("PEDIDO_NO_ENCONTRADO");

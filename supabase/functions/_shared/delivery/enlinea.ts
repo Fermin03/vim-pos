@@ -23,6 +23,25 @@ export function motivoDeTienda(x: unknown): (typeof MOTIVOS_TIENDA)[number] {
  */
 export const ESTADOS_REPORTABLES: readonly string[] = ["EN_PREPARACION", "LISTO", "ENTREGADO", "CANCELADO"];
 
+/**
+ * ¿Puede quien llama reportar ese estado de un pedido de la tienda (acción `estado`)?
+ *   · La caja instalada, de un pedido que atiende una caja (gestión ESCRITORIO): como siempre.
+ *   · Un empleado desde el POS web, SOLO «ENTREGADO» y SOLO de un pedido pagado en línea de
+ *     gestión NUBE: es su botón «Listo». Ese pedido tiene la cuenta cobrada desde que se aceptó,
+ *     así que la base ya no puede deducir la entrega mirando el ticket (0173 §8); alguien lo dice.
+ * Devuelve null si puede, o el error con su estado HTTP, en el mismo orden de siempre.
+ */
+export function negativaDeReporte(d: { esDispositivo: boolean; gestion: string; pago: string | null; estado: unknown }):
+  { error: "SOLO_DISPOSITIVO" | "ESTADO_INVALIDO" | "ACCION_INVALIDA"; status: 400 | 403 | 409 } | null {
+  const listoDelPosWeb = !d.esDispositivo && d.gestion === "NUBE" && d.pago === "EN_LINEA" && d.estado === "ENTREGADO";
+  if (!d.esDispositivo && !listoDelPosWeb) return { error: "SOLO_DISPOSITIVO", status: 403 };
+  if (!ESTADOS_REPORTABLES.includes(String(d.estado))) return { error: "ESTADO_INVALIDO", status: 400 };
+  // Solo de un pedido que atiende una caja: el de gestión NUBE lo pone al día la base mirando su
+  // ticket (tienda_sincronizar_estados_nube), y ninguna caja tiene ese ticket.
+  if (d.esDispositivo && d.gestion !== "ESCRITORIO") return { error: "ACCION_INVALIDA", status: 409 };
+  return null;
+}
+
 const PAUSAS_MS: Record<string, number> = { "30m": 30 * 60_000, "1h": 60 * 60_000 };
 
 /**

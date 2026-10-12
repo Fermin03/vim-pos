@@ -295,3 +295,35 @@ test("rpc: datos de cuenta que la base rechaza son 400, sin su detalle; direccio
   assert.deepEqual(respuestaDeRpc("DIRECCION_INVALIDA: al recoger no hay dirección"), { status: 409, body: { error: "DIRECCION_INVALIDA" } });
   assert.deepEqual(respuestaDeRpc("CUENTA_INVALIDA: la cuenta no existe en este negocio"), { status: 409, body: { error: "CUENTA_INVALIDA" } });
 });
+
+// ── Pago en línea (0173) ──────────────────────────────────────────────────────────────────────────
+import { leerPedidoEnLinea } from "./respuesta.ts";
+
+test("cupos: confirmar_pago tiene su bolsa (90 cada 600 s por IP) y cierra si el control falla", () => {
+  const c = cuposDe("confirmar_pago", "1.2.3.4", "knockout");
+  assert.deepEqual(c, { antes: [{ clave: "tienda:confirma:ip:1.2.3.4", ventanaSeg: 600, max: 90 }], despuesDelCaptcha: [], alFallar: "cerrar" });
+  // No comparte bolsa con el seguimiento ni con leer el menú.
+  assert.notEqual(c.antes[0]!.clave, cuposDe("seguimiento", "1.2.3.4", "knockout").antes[0]!.clave);
+});
+
+const ALTA_EN_LINEA = {
+  pedido_id: "99999999-0000-0000-0000-000000000001", folio_corto: "T1A2B3", total_mxn: "240.00", vence_aceptacion: null, ya_existia: false,
+  pago_id: "2cd9e6fa-1acf-47dc-8ba4-cba918d73770", propina_mxn: "24.00", total_a_pagar_mxn: "264.00",
+};
+test("pedido en línea: el pago se separa (interno) de lo que se le responde al cliente", () => {
+  const p = leerPedidoEnLinea(ALTA_EN_LINEA);
+  assert.deepEqual(p, {
+    pagoId: ALTA_EN_LINEA.pago_id,
+    publico: { folio_corto: "T1A2B3", total_mxn: "240.00", vence_aceptacion: null, propina_mxn: "24.00", total_a_pagar_mxn: "264.00" },
+  });
+  // Ni el id del pedido ni el del pago salen en lo público.
+  assert.doesNotMatch(JSON.stringify(p!.publico), /99999999|2cd9e6fa|pago_id|pedido_id|ya_existia/);
+});
+test("pedido en línea: sin su pago, o con un importe que no es un importe, es null", () => {
+  for (const cambio of [{ pago_id: undefined }, { pago_id: "" }, { propina_mxn: 24 }, { total_a_pagar_mxn: "264" }, { total_mxn: null }, { folio_corto: "" }]) {
+    assert.equal(leerPedidoEnLinea({ ...ALTA_EN_LINEA, ...cambio }), null, JSON.stringify(cambio));
+  }
+  for (const mal of [null, "x", [], {}]) assert.equal(leerPedidoEnLinea(mal), null);
+  // Y un pedido en línea NO pasa por el lector de los de pago al recibir (no tiene ventana de aceptación).
+  assert.equal(leerPedido(ALTA_EN_LINEA), null);
+});

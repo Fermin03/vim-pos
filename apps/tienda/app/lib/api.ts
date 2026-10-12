@@ -2,10 +2,11 @@
 // Nunca lanza: cada llamada devuelve `ok` con los datos ya validados, o `error` con un código (para
 // `textoDeError`) y su detalle. Un 200 que no tiene la forma del contrato es un error, no datos.
 import {
-  cotizacionDe, cuentaDe, direccionesDe, errorDe, miCuentaDe, okDe, pedidoDe, pedidosDe, registroDe, seguimientoDe,
+  cotizacionDe, cuentaDe, direccionesDe, errorDe, FORMA_CODIGO, miCuentaDe, okDe, pedidoDe, pedidosDe, registroDe, seguimientoDe,
   type Cotizacion, type Cuenta, type DireccionGuardada, type MiCuenta, type Pago, type PedidoCreado, type PedidoDeCuenta, type Registro, type Seguimiento,
 } from "./contrato";
 import type { CuerpoCarrito } from "./carrito";
+import type { TarjetaDePedido } from "./tarjeta";
 
 /**
  * `error` es un código de la función (anexo §1.3) o uno de la tienda:
@@ -25,6 +26,10 @@ export type CuerpoPedido = CuerpoCarrito & {
   /** Obligatoria a domicilio; al recoger debe ser null. */
   direccion: DireccionDePedido | null;
   pago: Pago;
+  /** Solo con EN_LINEA: 0, 10, 15 o 20. El monto lo calcula el servidor. */
+  propina_pct?: number;
+  /** Solo con EN_LINEA: el token de un solo uso de la tarjeta (nunca el número), su marca y si es de crédito o de débito. */
+  tarjeta?: TarjetaDePedido;
   /** Solo con EFECTIVO: texto con dos decimales (`aTexto`), entre el total y el total + 5000. */
   paga_con: string | null;
   nota: string | null;
@@ -76,6 +81,30 @@ export function cotizar(negocio: string, carrito: CuerpoCarrito, signal?: AbortS
 /** El estado del pedido. `PEDIDO_NO_ENCONTRADO` = enlace vencido o mal copiado. */
 export function seguimiento(negocio: string, codigo: string, signal?: AbortSignal): Promise<Resultado<Seguimiento>> {
   return llamar({ accion: "seguimiento", negocio, codigo }, seguimientoDe, LECTURA, signal);
+}
+
+/**
+ * El seguimiento de un pedido que se paga en línea, pidiéndole antes al servidor que confirme el
+ * pago con Mercado Pago (el respaldo del aviso). Solo viaja el código: lo que Mercado Pago le puso
+ * a la URL al regresar no se manda ni se cree. Sirve igual para un pedido al recibir.
+ */
+export function confirmarPago(negocio: string, codigo: string, signal?: AbortSignal): Promise<Resultado<Seguimiento>> {
+  return llamar({ accion: "confirmar_pago", negocio, codigo }, seguimientoDe, LECTURA, signal);
+}
+
+/** Lo que el servidor sabe de una clave de intento: si ya hay pedido para ella y, si lo hay, su código de seguimiento. */
+export type EstadoDeIntento = { existe: false } | { existe: true; codigo: string };
+function intentoDe(x: unknown): EstadoDeIntento | null {
+  const o = typeof x === "object" && x !== null ? (x as Record<string, unknown>) : {};
+  if (o.existe === false) return { existe: false };
+  return o.existe === true && typeof o.codigo === "string" && FORMA_CODIGO.test(o.codigo) ? { existe: true, codigo: o.codigo } : null;
+}
+/**
+ * ¿Ya hay un pedido para esta clave de intento? No crea ni cobra nada. Se pregunta tras un pago en
+ * línea del que no se supo el resultado, antes de dejar que el cliente intente otro.
+ */
+export function intento(negocio: string, clave: string, signal?: AbortSignal): Promise<Resultado<EstadoDeIntento>> {
+  return llamar({ accion: "intento", negocio, clave }, intentoDe, LECTURA, signal);
 }
 
 /**

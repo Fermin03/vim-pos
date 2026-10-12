@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button, Modal } from "@vim/ui/styles";
 import { esEscritorio } from "../lib/actualizacion";
 import { etiquetaAlergia, etiquetaModificadores, pedidoConAlergia, segundosRestantes, type PedidoApp, type PedidoAppItem } from "../lib/pedidos-apps";
-import { colaDeAvisos, etiquetaEntrega, etiquetaPago } from "../lib/pedidos-en-linea";
+import { colaDeAvisos, etiquetaEntrega, etiquetaPago, PAGADO_EN_LINEA, pagadoEnLinea } from "../lib/pedidos-en-linea";
 import { fmtMxn } from "../lib/turno";
 
 export type MotivoRechazo = "AGOTADO" | "CERRADO" | "SATURADO" | "OTRO";
@@ -25,6 +25,17 @@ export const MOTIVOS_RECHAZO: { codigo: MotivoRechazo; label: string }[] = [
  * intentar aceptarlo): quien esté pintando esa lista no necesita repetirlo.
  */
 export type AccionTienda = (p: PedidoApp, accion: "aceptar" | "rechazar", motivo?: MotivoRechazo) => Promise<{ ok: true; ticketId?: string } | { ok: false; mensaje: string; enCanal?: boolean }>;
+/** «Listo» de una cuenta pagada en línea: el pedido queda entregado. `total` = el de la cuenta, para cerrar su reparto. */
+export type ListoTienda = (p: PedidoApp, total: number) => Promise<{ ok: true } | { ok: false; mensaje: string }>;
+
+/** La marca de «ya pagó, no le cobres»: la misma en el aviso grande, en la lista del canal y en el detalle. */
+export function MarcaPagadoEnLinea({ grande = false }: { grande?: boolean }) {
+  return (
+    <span className={`inline-block rounded bg-success font-bold text-white ${grande ? "px-2.5 py-1.5 text-15" : "px-1.5 py-0.5 text-12"}`}>
+      {PAGADO_EN_LINEA}
+    </span>
+  );
+}
 
 export function mmss(seg: number): string {
   return `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, "0")}`;
@@ -83,6 +94,7 @@ export function DetallePedidoTienda({ p, maxItems }: { p: PedidoApp; maxItems?: 
       {pedidoConAlergia(p) && (
         <p className="rounded bg-danger px-2 py-1 text-13 font-bold text-white">Pedido con alergia: revisa cada producto</p>
       )}
+      {pagadoEnLinea(p) && <p><MarcaPagadoEnLinea grande /></p>}
       {(p.clienteNombre || p.clienteTelefono) && (
         <p className="flex flex-wrap items-baseline gap-x-3 text-15 text-ink">
           {p.clienteNombre && <span className="font-semibold">{p.clienteNombre}</span>}
@@ -114,6 +126,9 @@ export function DetallePedidoTienda({ p, maxItems }: { p: PedidoApp; maxItems?: 
             <dt className="font-semibold">Total</dt>
             <dd className="font-display text-24 font-bold tabular-nums">{fmtMxn(p.totalCliente)}</dd>
           </div>
+        )}
+        {pagadoEnLinea(p) && p.propina > 0 && (
+          <div className="flex justify-between"><dt>Propina, ya pagada</dt><dd className="font-display font-bold tabular-nums text-ink">{fmtMxn(p.propina)}</dd></div>
         )}
         {pago && <div className="flex justify-between"><dt>Forma de pago</dt><dd className="font-semibold text-ink">{pago}</dd></div>}
       </dl>

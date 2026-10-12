@@ -7,6 +7,9 @@ import { esCodigo } from "./seguimiento.ts";
 
 export type Resultado<T> = { ok: true; valor: T } | { ok: false; error: string };
 export type Modo = "RECOGER" | "DOMICILIO";
+/** Las propinas que se ofrecen al pagar en línea, en por ciento de los productos. */
+export const PROPINAS = [0, 10, 15, 20] as const;
+export type Propina = (typeof PROPINAS)[number];
 export type Direccion = {
   calle: string; numero_exterior: string; numero_interior: string | null; colonia: string;
   codigo_postal: string; ciudad: string; estado: string; referencias: string | null;
@@ -17,12 +20,23 @@ export type Peticion =
   | { accion: "cotizar"; negocio: string; sucursal_id: string; modo: Modo; zona_id: string | null; items: unknown[] }
   | { accion: "pedir"; negocio: string; sucursal_id: string; modo: Modo; zona_id: string | null; items: unknown[];
       cliente: { nombre: string; telefono: string; email: string | null }; direccion: Direccion | null;
-      pago: "EFECTIVO" | "TARJETA"; paga_con: string | null; nota: string | null; captcha: string | null;
+      pago: "EFECTIVO" | "TARJETA" | "EN_LINEA"; paga_con: string | null; nota: string | null; captcha: string | null;
+      /** Solo con pago EN_LINEA: el porcentaje de propina que eligió el cliente. El monto lo calcula el servidor. */
+      propina_pct: Propina | null;
+      /** Solo con pago EN_LINEA (y entonces obligatoria): el token de la tarjeta. Nunca el número. */
+      tarjeta: TarjetaDePedido | null;
       /** El total que el cliente vio al cotizar: si ya no es ese, el pedido no se crea (TOTAL_CAMBIO). */
       total_esperado: string | null;
       /** La llave del intento de compra (entrega 7): con ella, reintentar devuelve el mismo pedido. null = sin llave. */
       clave: string | null }
   | { accion: "seguimiento"; negocio: string; codigo: string }
+  /** El respaldo del aviso de Mercado Pago: la página del pedido pide que se confirme su pago. */
+  | { accion: "confirmar_pago"; negocio: string; codigo: string }
+  /**
+   * ¿Existe ya un pedido para esta clave de intento? No crea ni cobra nada. La tienda lo pregunta
+   * cuando mandó un pago en línea y no supo qué pasó: mientras no lo sepa, no emite otra clave.
+   */
+  | { accion: "intento"; negocio: string; clave: string }
   // ── Cuentas (entrega 6). La sesión NO viene en el cuerpo: llega en la cabecera `x-tienda-sesion`. ──
   | { accion: "registrar"; negocio: string; nombre: string; apellido: string; email: string; telefono: string; password: string; captcha: string | null }
   | { accion: "entrar"; negocio: string; email: string; password: string }
@@ -36,7 +50,7 @@ export type Peticion =
   | { accion: "eliminar_cuenta"; negocio: string; password: string };
 
 const ACCIONES: ReadonlySet<string> = new Set<Peticion["accion"]>([
-  "negocio", "menu", "cotizar", "pedir", "seguimiento", "registrar", "entrar", "salir", "recuperar_pedir", "recuperar_aplicar",
+  "negocio", "menu", "cotizar", "pedir", "seguimiento", "confirmar_pago", "intento", "registrar", "entrar", "salir", "recuperar_pedir", "recuperar_aplicar",
   "cuenta", "cuenta_guardar", "cuenta_password", "direccion_guardar", "direccion_borrar", "mis_pedidos", "eliminar_cuenta",
 ]);
 
@@ -135,7 +149,7 @@ export function leerFecha(x: unknown, hoy: Date = new Date()): string | null | u
  * si la cuenta existe. Una contraseña que se va a COMPROBAR (entrar, la actual, eliminar) solo se
  * acota a 1 carácter–72 bytes: si es corta, que la rechace la base como cualquier otra equivocada.
  */
-function leerCuenta(accion: Exclude<Peticion["accion"], "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento">,
+function leerCuenta(accion: Exclude<Peticion["accion"], "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" | "intento">,
                     negocio: string, x: Record<string, unknown>): Resultado<Peticion> {
   const invalida = mal("CUENTA_INVALIDA_DATOS");
   switch (accion) {
@@ -193,11 +207,14 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
   const negocio = typeof x.negocio === "string" ? x.negocio.trim().toLowerCase() : "";
   if (!SLUG.test(negocio)) return mal("NEGOCIO_INVALIDO");
 
-  if (accion !== "negocio" && accion !== "menu" && accion !== "cotizar" && accion !== "pedir" && accion !== "seguimiento") {
+  if (accion !== "negocio" && accion !== "menu" && accion !== "cotizar" && accion !== "pedir" && accion !== "seguimiento" && accion !== "confirmar_pago" && accion !== "intento") {
     return leerCuenta(accion, negocio, x);
   }
   if (accion === "negocio") return { ok: true, valor: { accion, negocio } };
-  if (accion === "seguimiento") {
+  if (accion === "intento") {
+    return esCodigo(x.clave) ? { ok: true, valor: { accion, negocio, clave: x.clave } } : mal("CUERPO_INVALIDO");
+  }
+  if (accion === "seguimiento" || accion === "confirmar_pago") {
     return esCodigo(x.codigo) ? { ok: true, valor: { accion, negocio, codigo: x.codigo } } : mal("CODIGO_INVALIDO");
   }
 
@@ -236,9 +253,17 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
     return mal("DIRECCION_INVALIDA");
   }
 
-  if (x.pago !== "EFECTIVO" && x.pago !== "TARJETA") return mal("PAGO_INVALIDO");
+  if (x.pago !== "EFECTIVO" && x.pago !== "TARJETA" && x.pago !== "EN_LINEA") return mal("PAGO_INVALIDO");
   const paga_con = leerImporte(x.paga_con);
-  if (paga_con === undefined || (x.pago === "TARJETA" && paga_con !== null)) return mal("PAGO_INVALIDO");
+  if (paga_con === undefined || (x.pago !== "EFECTIVO" && paga_con !== null)) return mal("PAGO_INVALIDO");
+  // La propina: un porcentaje de la lista, y solo al pagar en línea. Nunca un monto: ese lo pone el servidor.
+  const propina_pct = (x.propina_pct ?? null) as Propina | null;
+  if (propina_pct !== null && (x.pago !== "EN_LINEA" || !PROPINAS.includes(propina_pct))) return mal("PAGO_INVALIDO");
+  // En línea: hace falta el correo (lo pide Mercado Pago con el cobro) y el token de la tarjeta.
+  // Al recibir, `tarjeta` no viaja: si viene, el cuerpo no es el de esa forma de pago.
+  const tarjeta = leerTarjeta(x.tarjeta);
+  if (x.pago === "EN_LINEA" ? tarjeta === null || tarjeta === undefined : tarjeta !== undefined) return mal("PAGO_INVALIDO");
+  if (x.pago === "EN_LINEA" && email === null) return mal("CLIENTE_INVALIDO");
   const total_esperado = leerImporte(x.total_esperado);
   if (total_esperado === undefined) return mal("PAGO_INVALIDO");
   // La llave del intento: opcional, pero si viene tiene que tener la forma. Una mal formada no se
@@ -248,7 +273,28 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
 
   return { ok: true, valor: {
     accion, negocio, sucursal_id, modo, zona_id, items,
-    cliente: { nombre, telefono, email }, direccion, pago: x.pago, paga_con, total_esperado, clave,
+    cliente: { nombre, telefono, email }, direccion, pago: x.pago, paga_con, propina_pct, tarjeta: tarjeta ?? null, total_esperado, clave,
     nota: textoLimpio(x.nota, 300), captcha: typeof x.captcha === "string" && x.captcha.length <= 4096 ? x.captcha : null,
   } };
+}
+
+/** Lo que la tienda manda de la tarjeta. El número, el vencimiento y el código nunca llegan aquí. */
+export type TarjetaDePedido = { token: string; payment_method_id: string; type: "credit_card" | "debit_card" };
+
+/**
+ * `tarjeta` del cuerpo de `pedir`. undefined = no vino; null = vino y no tiene la forma.
+ *   · `token`: el de un solo uso que da MercadoPago.js (letras y números);
+ *   · `payment_method_id`: la marca (`visa`, `master`, `debvisa`…);
+ *   · `type`: crédito o débito, de una lista cerrada (Orders API lo exige y viaja tal cual).
+ * Longitudes acotadas: esto viaja tal cual a Mercado Pago. Cualquier otra clave se ignora.
+ */
+export function leerTarjeta(v: unknown): TarjetaDePedido | null | undefined {
+  if (v === undefined || v === null) return undefined;
+  if (typeof v !== "object" || Array.isArray(v)) return null;
+  const t = v as Record<string, unknown>;
+  const token = typeof t.token === "string" && /^[A-Za-z0-9]{16,64}$/.test(t.token) ? t.token : null;
+  const payment_method_id = typeof t.payment_method_id === "string" && /^[a-z0-9_]{2,30}$/.test(t.payment_method_id) ? t.payment_method_id : null;
+  const type = t.type === "credit_card" || t.type === "debit_card" ? t.type : null;
+  if (!token || !payment_method_id || !type) return null;
+  return { token, payment_method_id, type };
 }

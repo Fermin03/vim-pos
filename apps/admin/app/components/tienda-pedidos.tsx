@@ -18,12 +18,13 @@ const ACEPTACION = [
 ] as const;
 
 /** `minutos` va como texto: un campo a medio escribir no se convierte en 0. */
-export type PedidosTienda = { aceptacion: "MANUAL" | "AUTO"; minutos: string; pagoEfectivo: boolean; pagoTarjeta: boolean };
+export type PedidosTienda = { aceptacion: "MANUAL" | "AUTO"; minutos: string; pagoEfectivo: boolean; pagoTarjeta: boolean; pagoEnLinea: boolean };
 
-/** Bloque 3: cómo entran los pedidos y cómo se pagan al recibir. */
+/** Bloque 3: cómo entran los pedidos y cómo se pagan. TEXTOS PROVISIONALES de las formas de pago: los revisa James. */
 export function TiendaPedidos({
   valores,
   hayDireccion,
+  hayCuentaActiva,
   guardando,
   ocupado,
   soloLectura,
@@ -34,6 +35,8 @@ export function TiendaPedidos({
   valores: PedidosTienda;
   /** Sin dirección guardada todavía no existe la tienda: no hay dónde guardar esto. */
   hayDireccion: boolean;
+  /** Hay una cuenta de Mercado Pago activa: sin ella no se puede ofrecer el pago en línea. */
+  hayCuentaActiva: boolean;
   guardando: boolean;
   /** Algo se está guardando en la página: una escritura a la vez. */
   ocupado: boolean;
@@ -46,9 +49,10 @@ export function TiendaPedidos({
   // El error sale al dejar el campo, no a media tecla: «1» camino de «12» no es un error.
   const [minutosVisto, setMinutosVisto] = useState(false);
   const minutosMal = minutosVisto && (valores.minutos === "" || n < 3 || n > 15);
-  // No se pueden desmarcar las dos: la única marcada queda fija.
-  const soloEfectivo = valores.pagoEfectivo && !valores.pagoTarjeta;
-  const soloTarjeta = valores.pagoTarjeta && !valores.pagoEfectivo;
+  // No se pueden desmarcar todas: la única marcada queda fija.
+  // Ya encendido y sin cuenta, lo que hay que hacer lo dice el aviso de arriba de la página.
+  const sinCuenta = !hayCuentaActiva && !valores.pagoEnLinea;
+  const unica = [valores.pagoEnLinea, valores.pagoEfectivo, valores.pagoTarjeta].filter(Boolean).length === 1;
   // Sin dirección guardada no hay fila: lo que se eligiera aquí no se guardaría con «Tu tienda»
   // (la fila nace con lo guardado) y la pantalla enseñaría algo que la base no tiene.
   const quieto = soloLectura || !hayDireccion;
@@ -96,26 +100,43 @@ export function TiendaPedidos({
         )}
 
         <fieldset>
-          <legend className={label}>Formas de pago al recibir</legend>
+          <legend className={label}>Formas de pago</legend>
+          <label className={cn(casilla, sinCuenta && "cursor-default text-ink-3")}>
+            <input
+              type="checkbox"
+              className="h-5 w-5 flex-shrink-0 accent-ink"
+              checked={valores.pagoEnLinea}
+              // Sin cuenta activa no se puede encender; apagarlo siempre se puede (salvo que sea la única).
+              disabled={quieto || (valores.pagoEnLinea ? unica : !hayCuentaActiva)}
+              aria-describedby={sinCuenta ? "tie-pago-linea-ayuda" : undefined}
+              onChange={(e) => onCambio({ pagoEnLinea: e.target.checked })}
+            />
+            Pago en línea
+          </label>
+          {sinCuenta && (
+            <p id="tie-pago-linea-ayuda" className="-mt-1 mb-1 pl-8 text-12 text-ink-3">
+              Para ofrecerlo, conecta tu cuenta de Mercado Pago abajo, en «Pago en línea».
+            </p>
+          )}
           <label className={casilla}>
             <input
               type="checkbox"
               className="h-5 w-5 flex-shrink-0 accent-ink"
               checked={valores.pagoEfectivo}
-              disabled={quieto || soloEfectivo}
+              disabled={quieto || (valores.pagoEfectivo && unica)}
               onChange={(e) => onCambio({ pagoEfectivo: e.target.checked })}
             />
-            Efectivo
+            Efectivo al recibir
           </label>
           <label className={casilla}>
             <input
               type="checkbox"
               className="h-5 w-5 flex-shrink-0 accent-ink"
               checked={valores.pagoTarjeta}
-              disabled={quieto || soloTarjeta}
+              disabled={quieto || (valores.pagoTarjeta && unica)}
               onChange={(e) => onCambio({ pagoTarjeta: e.target.checked })}
             />
-            Tarjeta (con terminal al entregar)
+            Tarjeta al recibir
           </label>
           <p className={ayuda}>Deja activa al menos una forma de pago.</p>
         </fieldset>

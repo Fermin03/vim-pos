@@ -63,6 +63,8 @@ export function copiarATodos(h: Horario, desde: Dia): Horario {
 export type SucursalTienda = {
   id: string; nombre: string; telefono: string; activa: boolean;
   participa: boolean; recoger: boolean; domicilio: boolean; horario: Horario; zonasActivas: number;
+  /** La cuenta de Mercado Pago elegida para cobrar aquí en línea; null = la única activa del negocio. */
+  conexionId: string | null;
 };
 
 /** Lo que el dueño edita de una sucursal en la tarjeta, antes de guardarlo. */

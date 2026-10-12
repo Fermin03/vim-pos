@@ -38,6 +38,7 @@ import { armarConceptos, ConceptosIncoherentes, filaALinea, type LineaTicket } f
 import { archivarCfdi, bytesABase64, objetoArchivoCfdi, subidorSupabase } from "../_shared/pac/archivo.ts";
 import { aCentavos, accesoAlTicket, normalizarToken } from "../_shared/pac/acceso-ticket.ts";
 import { resolverEmisorVerificado } from "../_shared/pac/emisor.ts";
+import { formaPagoDeAutofactura } from "../_shared/pac/forma-pago.ts";
 import { consumirCupo, ipDeLaPeticion } from "../_shared/limite.ts";
 import {
   campoDelRechazo,
@@ -175,12 +176,12 @@ servir(async (req, json) => {
   // ── El ticket ───────────────────────────────────────────────────────────────────────────────
   const { data: ticketRaw } = await sb
     .from("tickets")
-    .select("id, folio_completo, dia_contable, total_mxn, estado_fiscal")
+    .select("id, folio_completo, dia_contable, total_mxn, estado_fiscal, folio_externo_app")
     .eq("tenant_id", tenant.id)          // SIEMPRE acotado al negocio de la URL
     .eq("folio_completo", folio)
     .maybeSingle();
   const ticket = ticketRaw as {
-    id: string; folio_completo: string; dia_contable: string; total_mxn: number; estado_fiscal: string;
+    id: string; folio_completo: string; dia_contable: string; total_mxn: number; estado_fiscal: string; folio_externo_app: string | null;
   } | null;
 
   let tokenEsperado: string | null = null;
@@ -349,6 +350,23 @@ servir(async (req, json) => {
     throw e;
   }
 
+  // Forma de pago. Un ticket de la tienda pagado en línea no fue en efectivo: sale del pago de
+  // Mercado Pago. El ticket (también el de una caja instalada) lleva en `folio_externo_app` el
+  // identificador del pedido; el pedido y su pago viven aquí, en la nube.
+  let pagadoEnLinea = false;
+  let tipoDePago: string | null = null;
+  if (ticket.folio_externo_app) {
+    const { data: pedidoRaw } = await sb.from("delivery_pedidos").select("id, pago_al_recibir")
+      .eq("tenant_id", tenant.id).eq("canal", "TIENDA").eq("id_externo", ticket.folio_externo_app).maybeSingle();
+    const pedido = pedidoRaw as { id: string; pago_al_recibir: string | null } | null;
+    if (pedido?.pago_al_recibir === "EN_LINEA") {
+      pagadoEnLinea = true;
+      const { data: pagoRaw } = await sb.from("tienda_pagos").select("tipo_tarjeta").eq("pedido_id", pedido.id).eq("extra", false).maybeSingle();
+      tipoDePago = (pagoRaw as { tipo_tarjeta: string | null } | null)?.tipo_tarjeta ?? null;
+    }
+  }
+  const formaPagoSat = formaPagoDeAutofactura(pagadoEnLinea, tipoDePago);
+
   const { data: draftRaw, error: dErr } = await sb
     .from("tickets_cfdi")
     .insert({
@@ -370,7 +388,7 @@ servir(async (req, json) => {
       iva_mxn: armado.iva,
       total_mxn: armado.total,
       metodo_pago_sat: "PUE",
-      forma_pago_sat: "01",
+      forma_pago_sat: formaPagoSat,
       estado_sat: "BORRADOR",
       pac_proveedor: "FACTURAMA",
     })
@@ -411,7 +429,7 @@ servir(async (req, json) => {
     },
     receptor: { rfc, razonSocial, usoCfdi, codigoPostal, regimenFiscal, email: email || null },
     metodoPagoSat: "PUE",
-    formaPagoSat: "01",
+    formaPagoSat,
     folio: ticket.folio_completo,
     logoUrl: tenant.logo_png_url,
     conceptos: armado.conceptos,

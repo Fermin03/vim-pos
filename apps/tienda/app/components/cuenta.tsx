@@ -32,7 +32,8 @@ type Negocio = { slug: string; nombre: string; sucursales: { id: string; nombre:
 const TOPE_DE_DIRECCIONES = 5;
 const TITULO = "font-display text-18 font-semibold tracking-tight";
 /** El tono de la etiqueta de cada estado: lo que sigue en curso en azul informativo, lo entregado en verde, lo cancelado en rojo. */
-const tonoDeEstado = (estado: PedidoDeCuenta["estado"]): TonoEstado => (estado === "CANCELADO" ? "danger" : estado === "ENTREGADO" ? "success" : "info");
+const tonoDeEstado = (estado: PedidoDeCuenta["estado"]): TonoEstado =>
+  estado === "CANCELADO" ? "danger" : estado === "ENTREGADO" ? "success" : estado === "POR_PAGAR" ? "warning" : "info";
 const SECCION = "flex flex-col gap-3 border-t border-line py-6";
 const GHOST = cn(botonClases({ variant: "ghost" }), "h-12 w-full");
 const CHICO = cn(botonClases({ variant: "ghost" }), "h-11 flex-shrink-0 px-4");
@@ -241,6 +242,8 @@ function Pedido({ pedido, sucursal, variasSucursales, alRepetir }: { pedido: Ped
           </li>
         ))}
       </ul>
+      {/* Aquí no hay enlace a su seguimiento: ese enlace solo lo tiene quien hizo el pedido (y su correo). */}
+      {pedido.estado === "POR_PAGAR" && <p className="text-14 text-ink-2">Estamos confirmando tu pago. Esto puede tardar unos minutos.</p>}
       {alRepetir && <button type="button" onClick={alRepetir} className={cn(CHICO, "mt-1 self-start")} aria-label={`Pedir de nuevo el pedido ${pedido.folio_corto}`}>Pedir de nuevo</button>}
     </li>
   );

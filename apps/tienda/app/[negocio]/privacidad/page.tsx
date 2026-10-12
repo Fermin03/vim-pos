@@ -37,7 +37,7 @@ export default async function Privacidad({ params }: Props) {
         <li>Tu nombre y tu teléfono.</li>
         <li>Tu correo, solo si quieres que te llegue el enlace de tu pedido.</li>
         <li>Tu dirección, solo si pides a domicilio.</li>
-        <li>Lo que pediste, tus notas y cómo vas a pagar. No se pide ni se guarda ningún dato de tu tarjeta: se paga al recibir.</li>
+        <li>Lo que pediste, tus notas y cómo vas a pagar. Si pagas en línea, los datos de tu tarjeta van directo a Mercado Pago: esta tienda y el restaurante no los ven ni los guardan.</li>
         <li>
           Si creas una cuenta: tu nombre, apellido, correo, teléfono y una contraseña. Si quieres, también tu fecha de nacimiento
           y hasta cinco direcciones. Pedir sin cuenta sigue siendo posible.

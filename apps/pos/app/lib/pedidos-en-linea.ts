@@ -1,7 +1,7 @@
 // Pedidos de la tienda en línea (canal TIENDA de delivery_pedidos): etiquetas, timbre, comandas, aceptación
 // automática y la pausa de la tienda. Lógica pura salvo las cuatro llamadas a delivery-accion.
 import { etiquetaApp, type AppTienda, type PedidoApp, type PedidoAppEstado } from "./pedidos-apps";
-import { encabezadosFuncion, urlFuncion } from "./supabase";
+import { employeeClient, encabezadosFuncion, urlFuncion } from "./supabase";
 
 export function etiquetaOrigen(p: PedidoApp): string {
   return etiquetaApp(p.app);
@@ -9,8 +9,16 @@ export function etiquetaOrigen(p: PedidoApp): string {
 
 export function etiquetaPago(p: PedidoApp): string | null {
   if (!p.pago) return null;
+  if (p.pago.forma === "EN_LINEA") return "Pagado en línea";
   if (p.pago.forma === "TARJETA") return "Tarjeta";
   return p.pago.pagaCon == null ? "Efectivo" : `Efectivo, paga con $${p.pago.pagaCon.toFixed(2)}`;
+}
+
+/** Lo que se le dice al cajero, bien visible, de un pedido que ya pagó el cliente. Texto provisional (James). */
+export const PAGADO_EN_LINEA = "PAGADO EN LÍNEA, no cobrar";
+/** El pedido ya está pagado con Mercado Pago: su cuenta nace cobrada y en la caja no se cobra nada. */
+export function pagadoEnLinea(p: Pick<PedidoApp, "pago">): boolean {
+  return p.pago?.forma === "EN_LINEA";
 }
 
 export function etiquetaEntrega(p: PedidoApp): string {
@@ -46,6 +54,25 @@ export function timbrarHasta(pedidos: PedidoApp[], cajaId: string): number | nul
  */
 export function soloInformativo(p: PedidoApp, enEscritorio: boolean): boolean {
   return enEscritorio && p.canal === "TIENDA" && p.gestion === "NUBE";
+}
+
+/**
+ * Cuántas horas después de pagarse en línea cancelar la cuenta TODAVÍA devuelve el pago solo. Es la
+ * ventana en la que la caja le reporta la cancelación a la nube (`SQL_REPORTE` de
+ * desktop/src/delivery-espejo.mjs: `interval '48 hours'`; la prueba de este archivo lee ese SQL y
+ * falla si los dos números dejan de coincidir). La nube mira más tiempo (7 días), pero lo que se le
+ * promete al cajero es lo que se cumple en los dos lados.
+ */
+export const HORAS_PARA_DEVOLVER_EN_LINEA = 48;
+
+/**
+ * ¿Ya es tarde para que cancelar esta cuenta devuelva su pago en línea? `cuentaDesdeIso` es cuándo
+ * nació la cuenta (nace ya cobrada, al aceptarse el pedido). La ventana corre desde que el pedido se
+ * pagó, que es un poco antes: por eso se corta una hora antes. Sin fecha no se promete nada.
+ */
+export function devolucionFueraDePlazo(cuentaDesdeIso: string | null | undefined, ahora: number = Date.now()): boolean {
+  const desde = cuentaDesdeIso ? Date.parse(cuentaDesdeIso) : NaN;
+  return !Number.isFinite(desde) || ahora - desde >= (HORAS_PARA_DEVOLVER_EN_LINEA - 1) * 3_600_000;
 }
 
 /** Lo que la caja le dejó dicho al cajero en un pedido cerrado; nunca un código interno. */
@@ -106,11 +133,33 @@ export function puedeAtender(p: PedidoApp, d: Atencion): boolean {
  * local, que tarda unos segundos en traer el cambio de la nube: sin esto el pedido seguiría
  * ofreciendo «Aceptar» y timbrando. En cuanto la base dice otra cosa, manda la base.
  */
-export function conAtendidos(pedidos: PedidoApp[], hechos: ReadonlyMap<string, "aceptar" | "rechazar">): PedidoApp[] {
+export function conAtendidos(pedidos: PedidoApp[], hechos: ReadonlyMap<string, HechoAqui>): PedidoApp[] {
   return pedidos.map((p) => {
-    const hecho = esperaRespuesta(p) ? hechos.get(p.id) : undefined;
-    return hecho ? { ...p, estado: hecho === "aceptar" ? "ACEPTADO" as const : "RECHAZADO" as const } : p;
+    const hecho = hechos.get(p.id);
+    // «Listo» de una cuenta pagada en línea: sale de la lista desde ya.
+    if (hecho === "entregar") return CON_COMANDA.has(p.estado) ? { ...p, estado: "ENTREGADO" as const } : p;
+    return hecho && esperaRespuesta(p) ? { ...p, estado: hecho === "aceptar" ? "ACEPTADO" as const : "RECHAZADO" as const } : p;
   });
+}
+/** Lo que se hizo con un pedido en ESTE dispositivo y la base todavía puede no traer. */
+export type HechoAqui = "aceptar" | "rechazar" | "entregar";
+
+/**
+ * Las cuentas (tickets) de un canal que nacieron cobradas y siguen ahí: pedidos pagados en línea,
+ * aceptados y todavía sin entregar. Una cuenta cobrada normal sale de la lista de Pick-up o de
+ * Domicilio; estas se quedan hasta que alguien toca «Listo». También se queda la que hay que
+ * CANCELAR (`cuentaPorCancelar`): si desapareciera, el cajero leería el aviso sin tener dónde hacerlo.
+ */
+export function cuentasPagadasEnLinea(pedidos: PedidoApp[], modo: AppTienda): string[] {
+  return pedidos.flatMap((p) => (p.app === modo && pagadoEnLinea(p) ? cuentaDe(p) ?? cuentaPorCancelar(p) ?? [] : []));
+}
+
+/**
+ * La cuenta, ya cobrada, de un pedido pagado en línea que la nube canceló (y cuyo pago ya se
+ * devolvió): la caja dejó dicho que hay que cancelarla. Sigue en la lista hasta que se cancela.
+ */
+export function cuentaPorCancelar(p: PedidoApp): string | null {
+  return pagadoEnLinea(p) && avisoDeTienda(p) ? p.ticketId : null;
 }
 
 /** La cuenta (ticket) de un pedido de la tienda ya aceptado y todavía vivo; null si no la tiene. */
@@ -207,7 +256,7 @@ export class ErrorEnLinea extends Error {
   constructor(readonly codigo: string, readonly causa?: string) { super(codigo); }
 }
 
-type RespEstado = { participa?: boolean; aceptacion?: "MANUAL" | "AUTO"; pausa_hasta?: string | null; motivo?: string | null; error?: string; causa?: string };
+type RespEstado = { estado?: string; participa?: boolean; aceptacion?: "MANUAL" | "AUTO"; pausa_hasta?: string | null; motivo?: string | null; error?: string; causa?: string };
 
 async function llamar(token: string, cuerpo: Record<string, unknown>): Promise<{ status: number; j: RespEstado }> {
   try {
@@ -246,6 +295,23 @@ export async function reanudarEnLinea(token: string, sucursalId: string): Promis
 export async function avisarPresente(token: string, sucursalId: string, cajaId?: string): Promise<boolean> {
   const { j } = await llamar(token, { accion: "enlinea_presente", sucursal_id: sucursalId, ...(cajaId ? { caja_id: cajaId } : {}) });
   return j.motivo === "CAJA_SIN_ACTUALIZAR";
+}
+
+/**
+ * «Listo» de una cuenta pagada en línea: el pedido queda entregado y el cliente lo ve así.
+ * Desde el POS web se le dice a la nube (delivery-accion). En la caja instalada se sella en la base
+ * local y la caja lo reporta sola, con o sin internet en ese momento (tienda_marcar_entregado, 0173).
+ */
+export async function entregarPedido(token: string, p: Pick<PedidoApp, "id" | "gestion">): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (p.gestion === "ESCRITORIO") {
+    const { error } = await employeeClient(token).rpc("tienda_marcar_entregado", { p_pedido: p.id });
+    if (!error) return { ok: true };
+    return { ok: false, error: error.message.includes("ACCION_INVALIDA") ? "ACCION_INVALIDA" : "RPC_ERROR" };
+  }
+  const { status, j } = await llamar(token, { accion: "estado", pedido_id: p.id, estado: "ENTREGADO" });
+  if (status >= 200 && status < 300 && j.estado === "ENTREGADO") return { ok: true };
+  // La nube contestó en qué quedó y no fue entregado (lo cancelaron, ya estaba cerrado).
+  return { ok: false, error: j.error ?? (j.estado ? "ACCION_INVALIDA" : `HTTP_${status}`) };
 }
 
 /** "2:30 p. m." en hora de México. */

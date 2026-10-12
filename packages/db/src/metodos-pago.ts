@@ -13,7 +13,9 @@
 import type { Database } from "./database.types";
 import { ETIQUETA_MODO } from "./modos-servicio";
 
-export type MetodoPago = Database["public"]["Enums"]["metodo_pago"];
+// ponytail: `PAGO_EN_LINEA` entró al enum en la migración 0172 y `database.types.ts` todavía no lo
+// trae (se regenera con `pnpm db:types` cuando la 0172 esté aplicada). Ese día la unión sobra: quitarla.
+export type MetodoPago = Database["public"]["Enums"]["metodo_pago"] | "PAGO_EN_LINEA";
 
 export const ETIQUETA_METODO_PAGO: Record<MetodoPago, string> = {
   EFECTIVO: "Efectivo",
@@ -29,6 +31,8 @@ export const ETIQUETA_METODO_PAGO: Record<MetodoPago, string> = {
   APP_IFOOD: ETIQUETA_MODO.APP_IFOOD,
   APP_OTRO: ETIQUETA_MODO.APP_OTRO,
   PAGO_AL_RECIBIR: "Pago al recibir",
+  /** Pedido de la tienda en línea que el cliente pagó con Mercado Pago antes de llegar a la caja. */
+  PAGO_EN_LINEA: "Pago en línea",
   OTRO: "Otro",
 };
 

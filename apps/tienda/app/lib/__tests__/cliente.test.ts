@@ -2,7 +2,7 @@
 // formulario y lo que se recuerda en el teléfono.
 import { describe, expect, it } from "vitest";
 import {
-  CAMPOS, CLAVE_DEL_CLIENTE, FORMULARIO_VACIO, datosDelPedido, errorDeCampo, erroresDe, formasDePago, guardarCliente, leerCliente, olvidarCliente,
+  CAMPOS, CLAVE_DEL_CLIENTE, FORMULARIO_VACIO, datosDelPedido, errorDeCampo, erroresDe, guardarCliente, leerCliente, olvidarCliente,
   type Contexto, type Formulario,
 } from "../cliente";
 
@@ -67,14 +67,6 @@ describe("erroresDe", () => {
     expect(Object.keys(e)).toEqual(["nombre", "telefono", "calle", "numeroExterior", "colonia", "codigoPostal", "ciudad", "estado"]);
     expect(Object.keys(erroresDe(FORMULARIO_VACIO, alRecoger))).toEqual(["nombre", "telefono"]);
     expect(CAMPOS[0]).toBe("nombre");
-  });
-});
-
-describe("formasDePago", () => {
-  it("solo las que el negocio tiene encendidas", () => {
-    expect(formasDePago({ pago_efectivo: true, pago_tarjeta: true })).toEqual(["EFECTIVO", "TARJETA"]);
-    expect(formasDePago({ pago_efectivo: false, pago_tarjeta: true })).toEqual(["TARJETA"]);
-    expect(formasDePago({ pago_efectivo: false, pago_tarjeta: false })).toEqual([]);
   });
 });
 

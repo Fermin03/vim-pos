@@ -21,8 +21,8 @@ import { IconoAsignarCliente, IconoClienteAsignado, ModalClienteCuenta } from ".
 import { useEscape } from "../lib/use-escape";
 import { esEscritorio } from "../lib/actualizacion";
 import { segundosRestantes, type PedidoApp } from "../lib/pedidos-apps";
-import { avisosDeCanal, cuentaDe, etiquetaEntrega, porAceptarDeCanal, porQueNoSeAtiende, puedeAtender } from "../lib/pedidos-en-linea";
-import { DetallePedidoTienda, esUrgente, mmss, MotivosRechazo, type AccionTienda } from "./pedido-tienda";
+import { avisosDeCanal, cuentaDe, cuentaPorCancelar, cuentasPagadasEnLinea, etiquetaEntrega, pagadoEnLinea, PAGADO_EN_LINEA, porAceptarDeCanal, porQueNoSeAtiende, puedeAtender } from "../lib/pedidos-en-linea";
+import { DetallePedidoTienda, esUrgente, MarcaPagadoEnLinea, mmss, MotivosRechazo, type AccionTienda, type ListoTienda } from "./pedido-tienda";
 
 const PERMISO_REIMPRIMIR = "venta.reimprimir_ticket";
 
@@ -47,6 +47,8 @@ export type EnLineaDelCanal = {
   /** «Ver orden» del aviso grande: el pedido que hay que dejar seleccionado. Un objeto nuevo cada vez. */
   ver: { pedidoId: string } | null;
   onAccion: AccionTienda;
+  /** «Listo» de una cuenta pagada en línea: sale de la lista y el cliente ve «Entregado». */
+  onListo: ListoTienda;
   /** Imprime desde este dispositivo la comanda completa del pedido; dice si salió el papel. */
   onImprimirComanda: (p: PedidoApp) => Promise<boolean>;
 };
@@ -156,6 +158,7 @@ export function PantallaCuentasModo({
   const [rechazando, setRechazando] = useState(false);
   const [atendiendo, setAtendiendo] = useState(false);
   const [imprimiendoComanda, setImprimiendoComanda] = useState(false);
+  const [entregando, setEntregando] = useState(false);
   const [, repintar] = useState(0);
   const [detalle, setDetalle] = useState<RenglonCuenta[] | null>(null);
   const [totales, setTotales] = useState<TotalesTicket | null>(null);
@@ -183,10 +186,15 @@ export function PantallaCuentasModo({
   // a una pestaña aparte y el cajero acababa buscándolo en dos listas para cobrarlo.
   const [asignacionesVivas, setAsignacionesVivas] = useState<Awaited<ReturnType<typeof leerDeliveries>>>([]);
 
+  // Las cuentas pagadas en línea de este canal que siguen sin entregar: ya están cobradas, pero se
+  // listan hasta el «Listo». Va en un ref para que `recargar` no cambie de identidad en cada sondeo.
+  const pagadasEnLinea = useRef<string[]>([]);
+  pagadasEnLinea.current = enLinea && modo !== "COMER_AQUI" ? cuentasPagadasEnLinea(enLinea.pedidos, modo) : [];
+
   const recargar = useCallback(async () => {
     setError(null);
     try {
-      setItems(await listarCuentasAbiertas(token, caja.sucursal_id, esComedor ? ["MESA", "COMER_AQUI"] : modo));
+      setItems(await listarCuentasAbiertas(token, caja.sucursal_id, esComedor ? ["MESA", "COMER_AQUI"] : modo, pagadasEnLinea.current));
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudieron cargar las cuentas");
       setItems([]);
@@ -316,6 +324,8 @@ export function PantallaCuentasModo({
   const sel = (items ?? []).find((c) => c.ticketId === selId) ?? null;
   /** El pedido de la tienda del que nació la cuenta seleccionada, si lo hay (para su comanda). */
   const pedidoDeCuenta = sel ? pedidosTienda.find((p) => p.ticketId === sel.ticketId) ?? null : null;
+  /** La nube canceló el pedido de esta cuenta pagada en línea: no se entrega, se cancela. */
+  const porCancelar = pedidoDeCuenta !== null && cuentaPorCancelar(pedidoDeCuenta) !== null;
   // "Ya se imprimió" = lo hicimos en esta sesión, o el ticket trae marca de impresión previa.
   const yaSeImprimio = sel != null && (yaImpresas.has(sel.ticketId) || sel.impresaAt != null);
   // null = todavía no se sabe. Solo `true` habilita el borrado.
@@ -444,6 +454,7 @@ export function PantallaCuentasModo({
                         <span className="truncate font-display text-15 font-semibold">{p.clienteNombre ?? p.folioCorto ?? "Pedido"}</span>
                         {p.totalCliente !== null && <span className="flex-shrink-0 font-display text-15 font-bold tabular-nums">{fmtMxn(p.totalCliente)}</span>}
                       </div>
+                      {pagadoEnLinea(p) && <div className="mt-1"><MarcaPagadoEnLinea /></div>}
                       <div className="mt-0.5 flex items-center justify-between gap-2 text-12">
                         <span className={["truncate font-semibold", sinBotones ? "text-ink-3" : "text-accent"].join(" ")}>
                           {sinBotones ?? "Por aceptar"}{p.folioCorto && p.clienteNombre ? ` · ${p.folioCorto}` : ""}
@@ -504,6 +515,8 @@ export function PantallaCuentasModo({
                     )}
                     {/* Cuenta de la tienda cuya comanda no salió: se tiene que notar sin abrirla. En
                         rojo lleno para leerse igual sobre la tarjeta blanca y sobre la azul. */}
+                    {/* Nació cobrada (pedido de la tienda pagado en línea): que nadie la cobre otra vez. */}
+                    {c.pagadaEnLinea && <div className="mt-1"><MarcaPagadoEnLinea /></div>}
                     {cuentasSinComanda.has(c.ticketId) && (
                       <div className="mt-1"><span className="inline-block rounded bg-danger px-1.5 py-0.5 text-12 font-semibold text-white">Comanda sin imprimir</span></div>
                     )}
@@ -593,6 +606,33 @@ export function PantallaCuentasModo({
                     {esComedor && sel.mesa && sel.clienteId && sel.cliente ? `${sel.cliente} · ` : ""}{sel.folio ? `${sel.folio} · ` : ""}{fmtMxn(sel.total)}
                   </div>
                 </div>
+                {sel.pagadaEnLinea ? (
+                  /* Cuenta pagada en línea: ya está cobrada. No se le agrega, descuenta ni canjea nada
+                     (el cliente pagó exactamente esto) y no se cobra: se entrega con «Listo». Cancelarla
+                     es toda la cuenta, y eso le devuelve el pago al cliente. */
+                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                    <Accion label={yaSeImprimio ? "Reimprimir" : "Imprimir ticket"} onClick={() => (yaSeImprimio ? setPidiendoPinReimpresion(true) : imprimir(sel.ticketId))} ocupado={imprimiendo} />
+                    {extraPorCuenta?.(sel, recargar)}
+                    <Accion label="Cancelar cuenta" onClick={() => setCancelandoCuenta(true)} peligro />
+                    <span className="ml-auto">
+                      <Accion
+                        label="Listo"
+                        destacado
+                        inactivo={!pedidoDeCuenta || porCancelar}
+                        ocupado={entregando}
+                        textoOcupado="Un momento…"
+                        onClick={async () => {
+                          if (!enLinea || !pedidoDeCuenta || porCancelar) return;
+                          setEntregando(true); setError(null);
+                          const r = await enLinea.onListo(pedidoDeCuenta, sel.total);
+                          setEntregando(false);
+                          if (!r.ok) { setError(r.mensaje); return; }
+                          setSelId(null);
+                        }}
+                      />
+                    </span>
+                  </div>
+                ) : (
                 <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                 {/* Ticket impreso = cuenta cerrada a cambios: lo que el cliente tiene en la mano es
                     lo que se le cobra. Agregar, descontar, canjear y cancelar quedan apagados hasta
@@ -620,7 +660,23 @@ export function PantallaCuentasModo({
                   <Accion label={`Cobrar ${fmtMxn(totales?.total ?? sel.total)}`} onClick={() => onCobrar(sel.ticketId)} destacado />
                 </span>
                 </div>
+                )}
               </div>
+
+              {/* La nube canceló este pedido y ya devolvió su pago: aquí queda una cuenta cobrada sin dinero
+                  detrás. Texto provisional (James). */}
+              {porCancelar && (
+                <p className="border-b border-danger-line bg-danger-soft px-4 py-2.5 text-15 font-bold text-danger" role="alert">
+                  Este pedido se canceló y el pago ya se le devolvió al cliente.
+                  <span className="ml-2 font-medium text-ink-2">Cancela esta cuenta. Si ya lo entregaste, cóbralo de otra forma.</span>
+                </p>
+              )}
+              {sel.pagadaEnLinea && !porCancelar && (
+                <p className="border-b border-success-line bg-success-soft px-4 py-2.5 text-15 font-bold text-success" role="status">
+                  {PAGADO_EN_LINEA}
+                  <span className="ml-2 font-medium text-ink-2">Cuando lo entregues, toca «Listo».</span>
+                </p>
+              )}
 
               {/* A quién y dónde se entrega. Va ARRIBA de los productos porque es lo que se
                   consulta con el cliente al teléfono o al dictarle la dirección al repartidor;
@@ -698,8 +754,8 @@ export function PantallaCuentasModo({
                         type="button"
                         onClick={() => setCancelando(it)}
                         title="Eliminar producto"
-                        // Con el ticket impreso no se quita nada hasta reabrir la cuenta.
-                        disabled={yaSeImprimio}
+                        // Con el ticket impreso no se quita nada hasta reabrir la cuenta; a la pagada en línea, nunca.
+                        disabled={yaSeImprimio || sel.pagadaEnLinea}
                         className="flex-shrink-0 rounded px-2 py-1 text-13 font-semibold text-ink-3 transition hover:bg-hover hover:text-danger disabled:cursor-default disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-ink-3"
                       >
                         Eliminar
@@ -859,6 +915,9 @@ export function PantallaCuentasModo({
           totalActual={totales?.total ?? sel.total}
           cajaId={turno.caja_id}
           turnoId={turno.id}
+          pagada={sel.pagadaEnLinea}
+          enLinea={sel.pagadaEnLinea}
+          cuentaDesde={sel.desdeIso}
           onCancelado={async () => {
             setCancelandoCuenta(false);
             setSelId(null); // la cuenta ya no existe: no dejar el detalle colgado

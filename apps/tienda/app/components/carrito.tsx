@@ -146,7 +146,8 @@ export function VistaDelCarrito({
           </dl>
           {/* Siempre ocupa su renglón: así la cuenta no brinca cuando llega el total. */}
           <p aria-live="polite" className="mt-2 min-h-5 text-13 text-ink-2">
-            {cot ? "Pagas al recibir tu pedido." : cotizado.cotizando ? "Calculando el total…" : "Total estimado."}
+            {/* Donde se puede pagar en línea, cuándo se paga se dice en «¿Cómo pagas?», al elegirlo. */}
+            {cot ? (sucursal.pago_en_linea ? "" : "Pagas al recibir tu pedido.") : cotizado.cotizando ? "Calculando el total…" : "Total estimado."}
           </p>
         </div>
       </div>

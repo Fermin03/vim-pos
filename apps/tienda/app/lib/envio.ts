@@ -7,11 +7,19 @@ import type { Campo } from "./cliente";
 import type { Cotizacion, ErrorDeTienda, PedidoCreado } from "./contrato";
 import type { Horario } from "@vim/fecha";
 import type { Momento } from "./horario";
+import { almacenDelNavegador, type Almacen } from "./carrito";
+import { textoDeRechazo, type CampoDeTarjeta } from "./tarjeta";
 import { textoCerrada, textoDeError } from "./textos";
 
 export type Desenlace =
   /** El pedido existe (también si vino sin folio ni total): vaciar el carrito e ir al seguimiento. */
   | { tipo: "hecho"; codigo: string }
+  /**
+   * La tarjeta: un dato que no cuadra o el banco no aprobó el cobro. No se creó ningún pedido y no
+   * se cobró nada: se dice junto a la tarjeta (en su campo, si el motivo es de uno) y se puede
+   * reintentar con la misma o con otra.
+   */
+  | { tipo: "tarjeta"; campo: CampoDeTarjeta | null; texto: string }
   /** Un renglón ya no se puede pedir: de vuelta al carrito, que lo marca. */
   | { tipo: "carrito"; error: ErrorDeTienda }
   /** El total ya no es el que vio: se enseña el nuevo y se pide confirmar antes de enviar con él. */
@@ -33,7 +41,11 @@ export type Desenlace =
     sigue: "reintentar" | "volver" | "llamar" | "reintentar-seguro" | "sesion";
   };
 
-export type ContextoDeEnvio = { telefono: string | null; horario: Horario; ahora?: Momento };
+export type ContextoDeEnvio = {
+  telefono: string | null; horario: Horario; ahora?: Momento;
+  /** Hay otra forma de pago además de la elegida: si el pago en línea no pasa, se ofrece. */
+  otrasFormas?: boolean;
+};
 
 const DE_RENGLON = new Set(["PRODUCTO_NO_DISPONIBLE", "MODIFICADORES_INVALIDOS", "COMBO_INVALIDO"]);
 const DE_CAMPO: Record<string, Campo | "pago"> = { CLIENTE_INVALIDO: "nombre", DIRECCION_INVALIDA: "calle", PAGO_INVALIDO: "pago" };
@@ -44,9 +56,16 @@ const SOLO_LLAMAR = new Set(["NO_SE_PUDO_CREAR", "TIENDA_NO_DISPONIBLE"]);
 export function desenlaceDelError(e: ErrorDeTienda, c: ContextoDeEnvio): Desenlace {
   if (DE_RENGLON.has(e.error) && e.detalle) return { tipo: "carrito", error: e };
   if (e.error === "TOTAL_CAMBIO" && e.detalle && /^\d+\.\d{2}$/.test(e.detalle)) return { tipo: "total", total: e.detalle };
-  const t = textoDeError(e.error, { telefono: c.telefono, detalle: e.detalle });
+  if (e.error === "PAGO_RECHAZADO") return { tipo: "tarjeta", ...textoDeRechazo(e.detalle, c.otrasFormas === true) };
+  // No fue el banco: Mercado Pago no pudo procesar ese cobro (y no se cobró). Junto a la tarjeta, sin culpar a nadie.
+  if (e.error === "PAGO_NO_PROCESADO") {
+    const t = textoDeError("PAGO_NO_PROCESADO");
+    return { tipo: "tarjeta", campo: null, texto: `${t.texto} ${t.hacer}` };
+  }
+  const t = textoDeError(e.error, { telefono: c.telefono, detalle: e.detalle, otrasFormas: c.otrasFormas });
   const texto = `${t.texto} ${t.hacer}`;
-  const campo = DE_CAMPO[e.error];
+  // El restaurante no puede cobrar en línea ahora y hay otra forma de pagar: se dice junto a «¿Cómo pagas?».
+  const campo = DE_CAMPO[e.error] ?? (e.error === "PAGO_NO_DISPONIBLE" && c.otrasFormas ? "pago" : undefined);
   if (campo) return { tipo: "campo", campo, texto };
   if (e.error === "TIENDA_CERRADA") return { tipo: "aviso", tono: "warning", texto: textoCerrada(e.detalle ?? "", c.horario, c.ahora), sigue: "reintentar" };
   // No se degrada a invitado en silencio: el pedido no quedaría en su cuenta, y eso lo decide él.
@@ -75,17 +94,21 @@ export async function enviarPedido(d: {
   let pidio = false;
   try {
     const cot = await d.cotizar();
-    if (!cot.ok) return { desenlace: desenlaceDelError(cot, c), pidio };
-    if (cot.datos.total_mxn !== d.totalVisto) return { desenlace: { tipo: "total", total: cot.datos.total_mxn }, pidio };
+    if (!cot.ok) return { desenlace: desenlaceDelError(cot, c), pidio, error: null };
+    if (cot.datos.total_mxn !== d.totalVisto) return { desenlace: { tipo: "total", total: cot.datos.total_mxn }, pidio, error: null };
     pidio = true;
     const r = await d.pedir(cot.datos.total_mxn);
-    return { desenlace: r.ok ? { tipo: "hecho", codigo: r.datos.codigo } : desenlaceDelError(r, c), pidio };
+    if (!r.ok) return { desenlace: desenlaceDelError(r, c), pidio, error: r.error };
+    // Pagado, o «no se supo si el cobro pasó»: en los dos casos el pedido existe y su página dice cómo va.
+    return { desenlace: { tipo: "hecho", codigo: r.datos.codigo }, pidio, error: null };
   } catch {
-    return { desenlace: desenlaceDelError({ error: pidio ? "SIN_CONFIRMAR" : "ERROR_INTERNO", detalle: null }, c), pidio };
+    const error = pidio ? "SIN_CONFIRMAR" : "ERROR_INTERNO";
+    return { desenlace: desenlaceDelError({ error, detalle: null }, c), pidio, error: pidio ? error : null };
   }
 }
 
-export type ResultadoDeEnvio = { desenlace: Desenlace; pidio: boolean };
+/** `error`: el código con que contestó `pedir`, si se llegó a pedir y no entró (para saber si prueba que no hubo cobro). */
+export type ResultadoDeEnvio = { desenlace: Desenlace; pidio: boolean; error: string | null };
 
 /**
  * El candado del envío. Vive FUERA de la pantalla (uno por página): un candado dentro del componente
@@ -150,26 +173,129 @@ export function claveNueva(): string {
   return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").slice(0, 22);
 }
 
+/** Dónde se guarda el intento en el teléfono, junto al carrito. */
+export const CLAVE_DEL_INTENTO = "vim.tienda.intento";
+/** Un intento de más de 15 minutos ya no se reutiliza: su pedido, si esperaba pago, ya venció. */
+const VIDA_DEL_INTENTO_MS = 15 * 60_000;
+
+/**
+ * La huella de un texto (cyrb53, 53 bits): lo que se guarda del pedido para reconocerlo después. No
+ * es el pedido ni se puede leer de vuelta: en el teléfono no queda ni el nombre, ni el teléfono, ni
+ * la dirección, ni la nota. Dos pedidos distintos con la misma huella es, para esto, imposible.
+ */
+function huellaDe(texto: string): string {
+  let a = 0xdeadbeef, b = 0x41c6ce57;
+  for (let i = 0; i < texto.length; i++) {
+    const c = texto.charCodeAt(i);
+    a = Math.imul(a ^ c, 2654435761);
+    b = Math.imul(b ^ c, 1597334677);
+  }
+  a = Math.imul(a ^ (a >>> 16), 2246822507) ^ Math.imul(b ^ (b >>> 13), 3266489909);
+  b = Math.imul(b ^ (b >>> 16), 2246822507) ^ Math.imul(a ^ (a >>> 13), 3266489909);
+  return (4294967296 * (2097151 & b) + (a >>> 0)).toString(36);
+}
+
 /**
  * La clave del intento de compra: la MISMA mientras se reintente el mismo pedido sin saber si entró
  * (así el servidor devuelve el que ya existe en vez de crear otro), y una nueva en cuanto el pedido
- * es otro —cambió el carrito, el modo o la zona, los datos de entrega, el pago o la nota— o el
+ * es otro —cambió el carrito, el modo o la zona, los datos de entrega, el pago, la propina o la nota— o el
  * anterior ya entró (`cerrar`). «El mismo pedido» se decide por contenido: lo que se manda en
  * `pedir`, sin el antirobot ni el total esperado, que cambian en cada intento.
- * Vive en memoria, junto al candado: recargar la página empieza un intento nuevo.
+ *
+ * EN DUDA (pago en línea). Desde que se manda un `pedir` que cobra (`dudar`) y hasta que el servidor
+ * diga qué pasó con él, la clave NO cambia por nada: ni porque el cliente toque la propina, la nota o
+ * el teléfono, ni porque pasen 15 minutos. Otra clave sería otro pedido y OTRO COBRO. La duda se
+ * quita solo de dos formas: el pedido entró (`cerrar`), o el servidor confirmó que para esa clave
+ * no hay pedido ni cobro (`aclarar`). Ver `resolverDuda`.
+ *
+ * Se guarda en el teléfono, donde vive el carrito: recargar la página y volver a enviar NO crea otro
+ * pedido, y la duda sobrevive a la recarga. Se guarda la clave y la HUELLA del pedido, nunca el pedido. Con el almacén
+ * bloqueado (modo privado) vive en memoria, como antes. Sin duda, caduca a los 15 minutos.
  */
-export function intentoDeCompra(nueva: () => string = claveNueva) {
-  let actual: { de: string; clave: string } | null = null;
+export function intentoDeCompra(nueva: () => string = claveNueva, almacen: () => Almacen | null = almacenDelNavegador, ahora: () => number = Date.now) {
+  type Intento = { de: string; clave: string; cuando: number; duda: boolean };
+  /** undefined = todavía no se ha mirado el teléfono (se mira al primer uso: al importar no hay navegador). */
+  let actual: Intento | null | undefined;
+  const leer = (): Intento | null => {
+    if (actual !== undefined) return actual;
+    try {
+      const x: unknown = JSON.parse(almacen()?.getItem(CLAVE_DEL_INTENTO) ?? "null");
+      const o = typeof x === "object" && x !== null ? (x as Record<string, unknown>) : {};
+      // Lo guardado es texto de fuera: solo vale con su forma exacta.
+      actual = typeof o.de === "string" && typeof o.clave === "string" && /^[A-Za-z0-9_-]{22}$/.test(o.clave) && typeof o.cuando === "number"
+        ? { de: o.de, clave: o.clave, cuando: o.cuando, duda: o.duda === true } : null;
+    } catch {
+      actual = null;
+    }
+    return actual;
+  };
+  const guardar = (): void => {
+    try {
+      if (actual) almacen()?.setItem(CLAVE_DEL_INTENTO, JSON.stringify(actual));
+      else almacen()?.removeItem(CLAVE_DEL_INTENTO);
+    } catch { /* cuota llena o modo privado: se queda en memoria */ }
+  };
   return {
     para(pedido: unknown): string {
-      const de = JSON.stringify(pedido);
-      if (actual?.de !== de) actual = { de, clave: nueva() };
+      const previo = leer(), de = huellaDe(JSON.stringify(pedido)), t = ahora();
+      // En duda, la misma clave pase lo que pase (ver arriba).
+      if (previo?.duda) return previo.clave;
+      if (previo && previo.de === de && t - previo.cuando >= 0 && t - previo.cuando <= VIDA_DEL_INTENTO_MS) return previo.clave;
+      actual = { de, clave: nueva(), cuando: t, duda: false };
+      guardar();
       return actual.clave;
     },
-    /** El pedido entró: el siguiente, aunque sea idéntico, es otro. */
-    cerrar(): void { actual = null; },
+    /** Se va a mandar un `pedir` que cobra: hasta saber qué pasó con él, la clave no cambia. Se guarda ANTES de mandar. */
+    dudar(): void {
+      const previo = leer();
+      if (previo && !previo.duda) { actual = { ...previo, duda: true }; guardar(); }
+    },
+    /** La clave de un intento de pago del que todavía no se sabe el resultado, o null. */
+    enDuda(): string | null {
+      const previo = leer();
+      return previo?.duda ? previo.clave : null;
+    },
+    /** El servidor confirmó que para esa clave no hay pedido ni cobro: el siguiente intento es libre. */
+    aclarar(): void { actual = null; guardar(); },
+    /** El pedido entró (o su pago quedó aprobado): el siguiente, aunque sea idéntico, es otro. */
+    cerrar(): void { actual = null; guardar(); },
   };
 }
 
 /** El de la página. */
 export const intentoDeLaPagina = intentoDeCompra();
+
+/**
+ * Los rechazos de `pedir` que, por sí solos, prueban que para esa clave NO quedó pedido ni cobro: el
+ * servidor los contesta después de intentar el cobro y de descartar el pedido. Cualquier otro error
+ * (sin respuesta, el antirobot, un tope, un fallo del servidor) pudo salir ANTES de mirar si un
+ * intento anterior con esa clave ya había entrado: no prueba nada, y hay que preguntar.
+ */
+const SIN_PEDIDO_NI_COBRO = new Set(["PAGO_RECHAZADO", "PAGO_NO_PROCESADO", "PAGO_NO_DISPONIBLE"]);
+export const pruebaQueNoHuboCobro = (error: string): boolean => SIN_PEDIDO_NI_COBRO.has(error);
+
+export type Duda =
+  /** No había duda, o el servidor confirmó que no hay pedido ni cobro: se puede intentar de nuevo. */
+  | { tipo: "libre" }
+  /** El pedido sí había entrado: a su página, que dice cómo va el pago. */
+  | { tipo: "hecho"; codigo: string }
+  /** No se pudo preguntar: sigue sin saberse. El formulario sigue bloqueado. */
+  | { tipo: "duda" };
+
+/**
+ * Resuelve un intento de pago en duda preguntándole al servidor por su clave (`intento`, que no crea
+ * ni cobra nada). Solo libera el formulario con un «no existe» del servidor; si no contesta, la duda sigue.
+ */
+export async function resolverDuda(
+  intento: Pick<ReturnType<typeof intentoDeCompra>, "enDuda" | "aclarar" | "cerrar">,
+  preguntar: (clave: string) => Promise<{ ok: true; datos: { existe: false } | { existe: true; codigo: string } } | { ok: false }>,
+): Promise<Duda> {
+  const clave = intento.enDuda();
+  if (!clave) return { tipo: "libre" };
+  let r: Awaited<ReturnType<typeof preguntar>>;
+  try { r = await preguntar(clave); } catch { return { tipo: "duda" }; }
+  if (!r.ok) return { tipo: "duda" };
+  if (r.datos.existe) { intento.cerrar(); return { tipo: "hecho", codigo: r.datos.codigo }; }
+  intento.aclarar();
+  return { tipo: "libre" };
+}
