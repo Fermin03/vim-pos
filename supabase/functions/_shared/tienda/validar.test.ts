@@ -506,3 +506,18 @@ test("pedir en línea: la huella del dispositivo es opcional; con forma pasa, si
   // Acaba en una cabecera HTTP: nada de espacios, saltos de línea ni caracteres raros. Tampoco se rechaza el pedido por ella.
   for (const mal of ["", "corto", "x".repeat(301), "con espacio 12345", "salto\r\nX-Otra: 1", "ñandú-12345678", 12345678, null, undefined, {}, ["armor.1a2b3c4d"]]) assert.equal(con(mal), null);
 });
+
+test("cuerpo: verificacion lleva el código del pedido y, solo si viene escrito tal cual, la intención de cancelar", () => {
+  const codigo = "AAAAAAAAAAAAAAAAAAAAAA";
+  assert.deepEqual(leerCuerpo({ accion: "verificacion", negocio: "knockout", codigo, url: "https://evil.example", status: "COMPLETE" }),
+    { ok: true, valor: { accion: "verificacion", negocio: "knockout", codigo, cancelar: false } });
+  assert.deepEqual(leerCuerpo({ accion: "verificacion", negocio: "knockout", codigo, cancelar: true }),
+    { ok: true, valor: { accion: "verificacion", negocio: "knockout", codigo, cancelar: true } });
+  // Cancelar una orden no se decide con un valor «parecido» a verdadero.
+  for (const cancelar of ["true", 1, "si", {}, [], null]) {
+    assert.deepEqual(leerCuerpo({ accion: "verificacion", negocio: "knockout", codigo, cancelar }),
+      { ok: true, valor: { accion: "verificacion", negocio: "knockout", codigo, cancelar: false } });
+  }
+  assert.deepEqual(leerCuerpo({ accion: "verificacion", negocio: "knockout", codigo: "corto", cancelar: true }), { ok: false, error: "CODIGO_INVALIDO" });
+  assert.deepEqual(leerCuerpo({ accion: "verificacion", negocio: "knockout" }), { ok: false, error: "CODIGO_INVALIDO" });
+});
