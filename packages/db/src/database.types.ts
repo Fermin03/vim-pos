@@ -13818,6 +13818,7 @@ export type Database = {
           p_nota: string
           p_paga_con: number
           p_pago: string
+          p_propina_mxn?: number
           p_propina_pct?: number
           p_seguimiento_hash: string
           p_sucursal: string
