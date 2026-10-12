@@ -3,6 +3,8 @@
 // Mercado Pago (Secure Fields): se pintan dentro de cajas nuestras, con el borde, el radio y el foco
 // de los demás campos de «Tus datos», y esta página nunca ve lo que se escribe en ellos. El nombre
 // del titular sí es un campo nuestro. La maqueta, las etiquetas y los errores son de la tienda.
+// Es la tercera pantalla de «Tus datos» (datos.tsx), que pone el título «Tu tarjeta» y la monta al
+// llegar a ella: la librería de Mercado Pago no se carga antes.
 //
 // TEXTOS PROVISIONALES: los revisa James.
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
@@ -33,6 +35,8 @@ const obj = (v: unknown): Record<string, unknown> => (typeof v === "object" && v
 
 export const CamposDeTarjeta = forwardRef<ManejoDeTarjeta, {
   id: string;
+  /** El título de la pantalla («Tu tarjeta»), que nombra a este bloque. */
+  tituloId: string;
   /** La public key de la cuenta del restaurante: con ella Mercado Pago crea el token. No es secreta. */
   clavePublica: string;
   /** Hay otra forma de pago: si esto no carga, se ofrece. */
@@ -41,7 +45,7 @@ export const CamposDeTarjeta = forwardRef<ManejoDeTarjeta, {
   rechazo: { campo: CampoDeTarjeta | null; texto: string } | null;
   alCambiar: () => void;
   deshabilitado: boolean;
-}>(function CamposDeTarjeta({ id, clavePublica, otrasFormas, rechazo, alCambiar, deshabilitado }, ref) {
+}>(function CamposDeTarjeta({ id, tituloId, clavePublica, otrasFormas, rechazo, alCambiar, deshabilitado }, ref) {
   const [fase, setFase] = useState<"cargando" | "lista" | "fallo">("cargando");
   const [intento, setIntento] = useState(0);
   const [campos, setCampos] = useState<EstadoDeCampos>(CAMPOS_SIN_TOCAR);
@@ -176,11 +180,8 @@ export const CamposDeTarjeta = forwardRef<ManejoDeTarjeta, {
   };
 
   return (
-    <div ref={bloque} id={`${id}-tarjeta`} role="group" tabIndex={-1} aria-labelledby={`${id}-tarjeta-titulo`} aria-busy={fase === "cargando"} className="flex min-w-0 flex-col gap-3 outline-none">
-      <div>
-        <h4 id={`${id}-tarjeta-titulo`} className="text-15 font-semibold">Tu tarjeta</h4>
-        <p className="mt-1 text-14 text-ink-2">Crédito o débito. Los datos de tu tarjeta van directo a Mercado Pago: el restaurante no los ve ni los guarda.</p>
-      </div>
+    <div ref={bloque} id={`${id}-tarjeta`} role="group" tabIndex={-1} aria-labelledby={tituloId} aria-busy={fase === "cargando"} className="flex min-w-0 flex-col gap-3 outline-none">
+      <p className="text-14 text-ink-2">Crédito o débito. Los datos de tu tarjeta van directo a Mercado Pago: el restaurante no los ve ni los guarda.</p>
       {general && <Aviso tono="danger" role="alert" className="!text-14">{general}</Aviso>}
       <div className="grid grid-cols-2 gap-3">
         {SEGUROS.map(caja)}

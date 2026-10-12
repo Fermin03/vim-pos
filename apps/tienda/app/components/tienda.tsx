@@ -245,7 +245,7 @@ export function Tienda({ negocio, sucursal, menu, ahora, conSesion }: {
 
       <Hoja abierta={paso !== "menu" && !ajeno} fija={enviando} alCerrar={() => pasar("menu")} titulo={paso === "datos" ? "Tus datos" : "Tu pedido"}>
         {paso === "datos" ? (
-          <PasoDeDatos negocio={negocio} sucursal={sucursal} carrito={carrito} nota={nota.trim()}
+          <PasoDeDatos negocio={negocio} sucursal={sucursal} carrito={carrito} nota={nota} alCambiarNota={setNota}
             cotizacion={cotizado.resultado?.ok ? cotizado.resultado.datos : null}
             alVolver={() => pasar("carrito")}
             alCambiarElTotal={cotizado.reintentar}
@@ -262,7 +262,6 @@ export function Tienda({ negocio, sucursal, menu, ahora, conSesion }: {
             </div>
           )}
           <VistaDelCarrito sucursal={sucursal} carrito={carrito} menu={menu} ahora={ahora} avisos={avisos} cotizado={cotizado}
-            nota={nota} alCambiarNota={setNota}
             alCambiarCantidad={(id, n) => cambiar((c) => cambiarCantidad(c, id, n))} alQuitar={(id) => cambiar((c) => quitar(c, id))}
             alCambiarModo={(modo) => cambiar((c) => ({ ...c, modo }))} alCambiarZona={(zonaId) => cambiar((c) => ({ ...c, zonaId }))}
             alContinuar={() => pasar("datos")} alCerrar={() => pasar("menu")} />

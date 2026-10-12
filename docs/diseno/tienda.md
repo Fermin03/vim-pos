@@ -60,8 +60,9 @@ Pensada para 360–430 px; en escritorio es la misma columna, centrada (`max-w-2
 | Menú | `components/menu.tsx` | Chips de categoría pegajosos (el activo sigue al desplazamiento) y los productos como una carta |
 | Hoja | `components/hoja.tsx` | Sube desde abajo en el teléfono; diálogo centrado desde 640 px |
 | Producto | `components/producto.tsx` | Foto, opciones con su regla, cantidad, nota y «Agregar» |
-| Carrito | `components/carrito.tsx` | Renglones, nota para el restaurante y la cuenta |
-| Tus datos | `components/datos.tsx` | Quién recibe (o recoge), a dónde, cómo paga y «Enviar pedido». Va dentro de la hoja del carrito |
+| Carrito | `components/carrito.tsx` | Renglones y la cuenta |
+| Tus datos | `components/datos.tsx` | En pantallas: quién recibe (o recoge), a dónde y la nota; cómo paga; la tarjeta. Va dentro de la hoja del carrito. Qué pantallas hay lo decide `lib/pasos.ts` |
+| Propina | `components/propina.tsx` | El selector de propina y «Otro monto», en «¿Cómo pagas?» y en la pregunta antes de pagar |
 | Seguimiento | `components/seguimiento.tsx` | El estado en grande, el recorrido, el restaurante, el resumen y «Copiar enlace» |
 | Privacidad | `[negocio]/privacidad/page.tsx` | El aviso (provisional, marcado como tal). Se enlaza desde «Tus datos», desde «Crear cuenta» y desde el pie |
 | Campos | `components/campo.tsx` | El campo de texto y el de contraseña de TODOS los formularios, y cómo se comportan (`useCampos`, `useAccion`) |
@@ -140,6 +141,34 @@ total…»; ese renglón de texto siempre ocupa su lugar, para que nada brinque.
 Un formulario de teléfono, no de escritorio: una columna, y solo dos pares lado a lado (número
 exterior / interior, código postal / ciudad).
 
+### Por pantallas
+
+Ya no es una hoja larga: son hasta tres pantallas dentro de la misma hoja, una pregunta cada una.
+
+| Pantalla | Título | Qué lleva | Botón |
+|---|---|---|---|
+| 1 | «¿Quién recoge?» / «¿Quién recibe?» | Nombre, teléfono, correo, la dirección a domicilio y la nota para el restaurante | «Continuar» |
+| 2 | «¿Cómo pagas?» | Las formas de pago del negocio y, al pagar en línea, la propina | «Enviar pedido» (al recibir) o «Ir a pagar» (en línea) |
+| 3 | «Tu tarjeta» | La cuenta de lo que se cobra (pedido, propina, total), los campos de la tarjeta | «Pagar» con el total |
+
+- **Las pantallas son las reales de ese pedido**: tres si paga en línea, dos si paga al recibir, y
+  **una sola** si el negocio acepta una única forma de pago y es al recibir (ahí la primera dice
+  cómo se paga y su botón es «Enviar pedido»). Si la única forma es en línea, la segunda enseña solo
+  la propina.
+- Arriba, a la izquierda, la flecha para regresar («Tu pedido» en la primera, «Regresar» en las
+  demás) y, a la derecha, «Paso 2 de 3» (`text-13`, `ink-2`); no aparece si solo hay una pantalla.
+- **Regresar no pierde nada**: lo escrito vive fuera de las pantallas. La tarjeta se queda montada
+  (oculta) al regresar de la tercera. Volver hasta el carrito sí la desmonta.
+- **Al cambiar de pantalla el foco va a su título** y el cuerpo empieza arriba. Si se llegó por un
+  dato que corregir, el foco va a ese dato.
+- **Lo que el servidor rechaza regresa a su pantalla**: los datos del cliente y la dirección, a la
+  primera; la forma de pago, a la segunda; lo que dijo el banco, a la tercera. Los avisos que no
+  son de un dato salen encima del botón, en la pantalla en la que se está.
+- Con un pago del que no se sabe el resultado («Estamos confirmando tu pago») no se navega: ni la
+  flecha ni el botón.
+- **Sin animación entre pantallas.** Es un cambio de contenido dentro de la hoja; solo responde el botón al presionar.
+- El botón sigue llevando su importe a la derecha: el total y, en línea, el total con la propina.
+
 - **La etiqueta va arriba y siempre se ve**; nunca un `placeholder` haciendo de etiqueta. Lo opcional
   lo dice a la derecha de la etiqueta («Opcional»); lo demás es obligatorio y no lleva asterisco.
 - **El título de los datos de contacto dice de quién son:** «¿Quién recoge?» cuando el pedido es
@@ -185,8 +214,16 @@ El cliente paga con tarjeta **dentro de «Tus datos»**; no se le manda a otra p
 - **«¿Cómo pagas?»** gana la opción «Pagar en línea» donde el negocio la ofrece, la sucursal puede
   cobrar y viene la public key de su cuenta. Línea de apoyo: «Pagas ahora, aquí mismo, con tarjeta
   de crédito o débito.» No se nombran Apple Pay ni Google Pay.
-- Al elegirla aparecen, en este orden: **Propina** (el selector de siempre), **Tu tarjeta** y la
-  cuenta de lo que se va a cobrar. La librería de Mercado Pago se carga en ese momento, no antes.
+- Al elegirla aparece la **propina**, en la misma pantalla: el selector de siempre («Sin propina»,
+  10, 15 y 20 %, cada uno con su importe) y, debajo y a todo el ancho, **«Otro monto»**, que abre
+  un campo en pesos (teclado decimal). Vale mayor que cero y hasta el subtotal de los productos, sin
+  el envío; el error va junto al campo. **Nace sin nada elegido**: «Sin propina» también se elige.
+- **«¿Gustas dejar una propina?»** Quien toca «Ir a pagar» sin haber elegido nada ve esa pregunta
+  en lugar de la pantalla: 10, 15 y 20 % como botones secundarios, «Otro monto» a todo el ancho y,
+  en el pie, «Ahora no». Lo que toque lo lleva a la tarjeta. Sale **una vez por pedido**: si la
+  cierra con «Regresar», la siguiente vez sigue sin propina.
+- **Tu tarjeta** y la cuenta de lo que se va a cobrar van en la tercera pantalla. La librería de
+  Mercado Pago se carga al llegar ahí, no antes.
 - **Tu tarjeta**: número (a todo el ancho; a la derecha de su etiqueta, la marca que se reconoció),
   vencimiento y código de seguridad (dos columnas) y nombre del titular. Los tres primeros son
   iframes de Mercado Pago dentro de **la misma caja de `CampoDeTexto`** (48 px de alto, borde
@@ -401,7 +438,7 @@ Un botón dice lo que hace y lleva su importe a la derecha: «Agregar   $139.20�
 | **No cargó la tienda o el menú** | Título, qué hacer y «Volver a intentar» |
 | **Menú sin productos** | «Este menú todavía no tiene productos.» |
 | **Enviando el pedido** | Botón apagado con lo que está pasando; no hay velo ni se bloquea el formulario. Mientras dura **no se puede salir de la hoja** («Tu pedido», «Cerrar», el velo, Escape y el arrastre quedan sin efecto): salir a medio envío dejaba mandar el pedido dos veces |
-| **Sin formas de pago** | Aviso (`warning`) en «¿Cómo pagas?» y «Enviar pedido» apagado |
+| **Sin formas de pago** | Una sola pantalla: aviso (`warning`) en «¿Cómo pagas?» y «Enviar pedido» apagado |
 | **Buscando el pedido** | «Tu pedido» y «Buscando tu pedido…»; si la primera lectura falla, «Estamos tardando en cargar tu pedido. Seguimos intentando…» con el botón «Reintentar ahora» |
 | **Tienda abierta / cerrada** | Se vuelve a preguntar sola cada minuto con la pestaña a la vista y al volver a ella (no mientras se llena «Tus datos» ni con un producto abierto) |
 | **Pedido no encontrado** | Título, qué pudo pasar y «Ver el menú» |
