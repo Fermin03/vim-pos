@@ -260,6 +260,17 @@ export function clienteMpTienda(token: string, pedir: typeof fetch = fetch) {
 }
 
 /** Lo que se deja en el log de un fallo de Mercado Pago: el estado HTTP y su código, nunca el cuerpo. */
+/**
+ * Qué campo no le gustó a Mercado Pago en un 400/422 (`errors[0].message` y sus `details`, que nombran
+ * la propiedad, no su valor). Solo para el rastro de un cobro que no se aceptó: sin esto no se puede
+ * arreglar. No es el cuerpo: una orden creada (la que devuelve el token de tarjeta) nunca pasa por aquí.
+ */
+export function motivoDeNoAceptado(r: RespuestaMp): string {
+  const e0 = obj(Array.isArray(obj(r.cuerpo).errors) ? (obj(r.cuerpo).errors as unknown[])[0] : null);
+  const detalles = Array.isArray(e0.details) ? e0.details.filter((d): d is string => typeof d === "string").join(" | ") : "";
+  return [txt(e0.message) ?? txt(obj(r.cuerpo).message), detalles].filter(Boolean).join(": ").slice(0, 220);
+}
+
 export function resumenDeFallo(r: RespuestaMp): string {
   const c = obj(r.cuerpo);
   const codigo = txt(obj(Array.isArray(c.errors) ? c.errors[0] : null).code) ?? txt(c.error) ?? txt(c.code);
