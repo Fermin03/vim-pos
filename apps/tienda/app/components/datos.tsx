@@ -418,7 +418,7 @@ export function PasoDeDatos({
     <h3 id={`${id}-titulo-${cual}`} tabIndex={-1} aria-describedby={pasos.length > 1 ? `${id}-paso` : undefined} className={cn(TITULO, "outline-none")}>{texto}</h3>
   );
   const propinaDeLaPantalla = (modo: "elegir" | "preguntar") => (
-    <Propina id={id} modo={modo} propina={propina} alElegir={elegirPropina} montoDe={montoDe} tope={subtotal} deshabilitado={ocupado}
+    <Propina id={id} modo={modo} propina={propina} alElegir={elegirPropina} montoDe={montoDe} tope={subtotal} montoDeOtro={libre?.ok ? libre.monto : null} deshabilitado={ocupado}
       otro={otro} alCambiarOtro={setOtro} alSalirDeOtro={() => setOtroTocado(true)}
       errorDeOtro={otroTocado && libre && !libre.ok ? libre.error : undefined} />
   );
@@ -564,7 +564,7 @@ export function PasoDeDatos({
 
         {paso === "pago" && !preguntando && (
           <section id={`${id}-pago`} role="group" tabIndex={-1} aria-labelledby={`${id}-titulo-pago`} aria-describedby={rechazo.pago ? `${id}-pago-error` : undefined}
-            className="flex min-w-0 flex-col gap-3 px-4 pb-4 pt-2 outline-none">
+            className="flex min-w-0 flex-col gap-3 px-4 pb-3 pt-2 outline-none">
             {titulo("¿Cómo pagas?", "pago")}
             {formas.length > 1 ? (
               <>

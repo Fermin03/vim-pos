@@ -72,9 +72,13 @@ export const CamposDeTarjeta = forwardRef<ManejoDeTarjeta, {
       // El texto de dentro del iframe copia el de un campo de la casa: mismo color, tamaño y letra.
       const muestra = document.getElementById(`${id}-titular`);
       const cs = muestra ? getComputedStyle(muestra) : null;
+      // El ejemplo de cada campo va en la tinta atenuada de los demás campos (`placeholder:text-ink-3`),
+      // leída del token: `getComputedStyle(campo, "::placeholder")` no sirve, devuelve el color del
+      // texto y el ejemplo salía tan oscuro como un valor escrito.
+      const tinta3 = getComputedStyle(document.documentElement).getPropertyValue("--ink-3").trim().split(/s+/).join(", ");
       const style = {
         "font-size": cs?.fontSize ?? "16px", color: cs?.color ?? "#16161A", "font-family": cs?.fontFamily ?? "system-ui, sans-serif",
-        "font-weight": cs?.fontWeight ?? "400", "placeholder-color": muestra ? getComputedStyle(muestra, "::placeholder").color : "#8A8A93",
+        "font-weight": cs?.fontWeight ?? "400", "placeholder-color": tinta3 ? `rgb(${tinta3})` : "#6E6E74",
       };
       let listos = 0;
       for (const { campo, tipo, placeholder } of SEGUROS) {

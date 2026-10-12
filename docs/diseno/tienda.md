@@ -215,8 +215,9 @@ El cliente paga con tarjeta **dentro de «Tus datos»**; no se le manda a otra p
   cobrar y viene la public key de su cuenta. Línea de apoyo: «Pagas ahora, aquí mismo, con tarjeta
   de crédito o débito.» No se nombran Apple Pay ni Google Pay.
 - Al elegirla aparece la **propina**, en la misma pantalla: el selector de siempre («Sin propina»,
-  10, 15 y 20 %, cada uno con su importe) y, debajo y a todo el ancho, **«Otro monto»**, que abre
-  un campo en pesos (teclado decimal). Vale mayor que cero y hasta el subtotal de los productos, sin
+  10, 15 y 20 %, cada uno con su importe) y, debajo y a todo el ancho, el botón **«Otro monto»**
+  (secundario, con borde; elegido lleva el borde en `ink` y dice el monto: «Otro monto · $25.50»),
+  que abre un campo en pesos (teclado decimal). Vale mayor que cero y hasta el subtotal de los productos, sin
   el envío; el error va junto al campo. **Nace sin nada elegido**: «Sin propina» también se elige.
 - **«¿Gustas dejar una propina?»** Quien toca «Ir a pagar» sin haber elegido nada ve esa pregunta
   en lugar de la pantalla: 10, 15 y 20 % como botones secundarios, «Otro monto» a todo el ancho y,
@@ -229,7 +230,8 @@ El cliente paga con tarjeta **dentro de «Tus datos»**; no se le manda a otra p
   iframes de Mercado Pago dentro de **la misma caja de `CampoDeTexto`** (48 px de alto, borde
   `line-strong`, radio de la casa); el foco y el error se pintan en la caja desde el estado
   (`border-ink` + `ring-1`, `border-danger`), porque un iframe no tiene `:focus` nuestro. El texto
-  de dentro copia color, tamaño y familia de un campo de la casa.
+  de dentro copia color, tamaño y familia de un campo de la casa, y el ejemplo de cada campo va en
+  `ink-3`, como los demás (se lee del token y se pasa como `placeholder-color`).
 - **Errores por campo**, bajo cada caja, con el molde de siempre (`text-14 text-danger`). Mientras
   escribe solo se reclama lo que la librería marca mal en un campo ya tocado; al tocar «Pagar»,
   también lo vacío, y el foco va al primer campo con error.

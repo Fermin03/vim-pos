@@ -1,6 +1,7 @@
 "use client";
 // La propina al pagar en línea: «Sin propina», 10, 15 o 20 % (cada una con su importe) y, debajo y a
-// todo el ancho, «Otro monto», que abre un campo para escribirlo. Se pinta de dos maneras:
+// todo el ancho, el botón «Otro monto», que abre un campo para escribirlo (el mismo botón en los dos
+// lugares; elegido, lleva el borde en tinta y dice el monto). Se pinta de dos maneras:
 //  · `elegir`    — en «¿Cómo pagas?»: el selector de «Para recoger / A domicilio»; lo elegido queda marcado;
 //  · `preguntar` — en «¿Gustas dejar una propina?»: botones secundarios; un toque en un porcentaje
 //                  contesta y sigue. (Ahí «Sin propina» es el «Ahora no» del pie.)
@@ -18,8 +19,10 @@ const SEGMENTO = cn(
   "peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-ink",
 );
 const SECUNDARIO = botonClases({ variant: "ghost" });
+// Lo elegido va en `ink` (nunca en el color del negocio). Con `!`: `cn` no resuelve choques de clases.
+const ELEGIDO = "!border-ink !text-ink";
 
-export function Propina({ id, modo, propina, alElegir, montoDe, otro, alCambiarOtro, alSalirDeOtro, errorDeOtro, tope, deshabilitado }: {
+export function Propina({ id, modo, propina, alElegir, montoDe, otro, alCambiarOtro, alSalirDeOtro, errorDeOtro, tope, montoDeOtro, deshabilitado }: {
   /** El campo del monto es `${id}-otro`: quien usa esto le manda el foco. */
   id: string; modo: "elegir" | "preguntar";
   propina: PropinaElegida; alElegir: (p: Propina | "otro") => void;
@@ -28,10 +31,12 @@ export function Propina({ id, modo, propina, alElegir, montoDe, otro, alCambiarO
   otro: string; alCambiarOtro: (v: string) => void; alSalirDeOtro: () => void; errorDeOtro?: string;
   /** Lo más que puede ser el monto (el subtotal de los productos), para decirlo junto al campo. */
   tope: string | null;
+  /** El monto libre ya escrito y válido, para decirlo en el botón; null si no lo hay. */
+  montoDeOtro: string | null;
   deshabilitado: boolean;
 }) {
   return (
-    <div className={cn("flex min-w-0 flex-col gap-3", deshabilitado && "pointer-events-none opacity-60")}>
+    <div className={cn("flex min-w-0 flex-col gap-2", deshabilitado && "pointer-events-none opacity-60")}>
       {modo === "elegir" ? (
         <div className="grid grid-cols-4 gap-1 rounded-lg bg-hover p-1">
           {PROPINAS.map((pct) => {
@@ -46,10 +51,6 @@ export function Propina({ id, modo, propina, alElegir, montoDe, otro, alCambiarO
               </label>
             );
           })}
-          <label className="col-span-4 cursor-pointer">
-            <input type="radio" name={`${id}-propina`} checked={propina === "otro"} onChange={() => alElegir("otro")} disabled={deshabilitado} className="peer sr-only" />
-            <span className={cn(SEGMENTO, "h-11 text-14 font-semibold")}>Otro monto</span>
-          </label>
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-2">
@@ -62,12 +63,12 @@ export function Propina({ id, modo, propina, alElegir, montoDe, otro, alCambiarO
               </button>
             );
           })}
-          <button type="button" onClick={() => alElegir("otro")} disabled={deshabilitado} aria-expanded={propina === "otro"}
-            className={cn(SECUNDARIO, "col-span-3 h-12", propina === "otro" && "border-ink")}>
-            Otro monto
-          </button>
         </div>
       )}
+      <button type="button" onClick={() => alElegir("otro")} disabled={deshabilitado} aria-pressed={propina === "otro"}
+        className={cn(SECUNDARIO, "h-11 w-full tabular-nums", propina === "otro" && ELEGIDO)}>
+        {propina === "otro" && montoDeOtro ? `Otro monto · ${formatoMxn(montoDeOtro)}` : "Otro monto"}
+      </button>
       {propina === "otro" && (
         <CampoDeTexto id={`${id}-otro`} etiqueta="¿Cuánto quieres dejar?" value={otro} error={errorDeOtro} maxLength={9}
           inputMode="decimal" autoComplete="off" placeholder="0.00" disabled={deshabilitado}
