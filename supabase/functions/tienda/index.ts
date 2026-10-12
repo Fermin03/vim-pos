@@ -107,6 +107,7 @@ import { correoDeBienvenida, correoDeRecuperacion, correoYaTienesCuenta } from "
 import { CABECERA_SESION, cuentaDe, direccionesPublicas, leerRegistro, leerSesion, pedidosPublicos, type Sesion } from "../_shared/tienda/cuenta.ts";
 import { cotizacionPublica, type Cupos, cuposDe, esTopeDeEntradas, ipDeConfianza, leerNegocio, leerPedido, leerPedidoEnLinea, type Negocio, respuestaDeCaptcha, respuestaDeRpc, yaExistia } from "../_shared/tienda/respuesta.ts";
 import { cobrarPago, confirmarPago } from "../_shared/tienda/pago-flujo.ts";
+import { partesDeCotizacion } from "../_shared/tienda/pago-mp.ts";
 import { depsDePagos } from "../_shared/tienda/pago-puerto.ts";
 import { anotarRechazo, avisoDePagoPausado, ipSinPagoEnLinea } from "../_shared/tienda/rechazos.ts";
 
@@ -595,8 +596,21 @@ async function atender(req: Request): Promise<Response> {
   if (porPagar) {
     // Sin tarjeta o sin correo en ESTA petición (el pedido existía de un intento en línea y este
     // reintento vino de otra forma): no se cobra nada; el seguimiento dirá cómo va.
+    // Lo que se le cuenta a Mercado Pago del pedido (su antifraude lo pide, y su correo al comprador
+    // deja de decir «Producto sin nombre»). Los renglones salen de cotizar ESTE carrito otra vez: si
+    // no se puede, o si ya no suman lo que se cobra (un reintento con otro carrito), va un solo
+    // artículo con el total (`articulosDeOrden`). Son datos del cliente: no van a ningún log.
     const cobro = !p.tarjeta || !p.cliente.email ? { tipo: "POR_CONFIRMAR" as const } : await cobrarPago(depsDePagos(admin, "tienda"), {
       pagoId: porPagar.pagoId, email: p.cliente.email, tarjeta: p.tarjeta,
+      detalle: {
+        descripcion: `Pedido ${porPagar.publico.folio_corto} en ${negocio.nombre}`,
+        ...partesDeCotizacion((await admin.rpc("tienda_cotizar", carrito)).data),
+        propina: porPagar.publico.propina_mxn,
+        pagador: {
+          nombre: p.cliente.nombre, telefono: p.cliente.telefono,
+          direccion: p.direccion && { calle: p.direccion.calle, numero_exterior: p.direccion.numero_exterior, codigo_postal: p.direccion.codigo_postal, ciudad: p.direccion.ciudad, estado: p.direccion.estado },
+        },
+      },
     });
     if (cobro.tipo === "RECHAZADO") {
       // El rechazo se cuenta (aunque el pedido ya se borró): por IP decide qué motivo se dice, y por

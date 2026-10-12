@@ -285,7 +285,7 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
 }
 
 /** Lo que la tienda manda de la tarjeta. El número, el vencimiento y el código nunca llegan aquí. */
-export type TarjetaDePedido = { token: string; payment_method_id: string; type: "credit_card" | "debit_card" };
+export type TarjetaDePedido = { token: string; payment_method_id: string; type: "credit_card" | "debit_card"; /** La huella del dispositivo que da MercadoPago.js, si vino y tiene forma. */ dispositivo: string | null };
 
 /**
  * `tarjeta` del cuerpo de `pedir`. undefined = no vino; null = vino y no tiene la forma.
@@ -302,5 +302,8 @@ export function leerTarjeta(v: unknown): TarjetaDePedido | null | undefined {
   const payment_method_id = typeof t.payment_method_id === "string" && /^[a-z0-9_]{2,30}$/.test(t.payment_method_id) ? t.payment_method_id : null;
   const type = t.type === "credit_card" || t.type === "debit_card" ? t.type : null;
   if (!token || !payment_method_id || !type) return null;
-  return { token, payment_method_id, type };
+  // Opcional (ayuda al antifraude de Mercado Pago): acaba en una cabecera HTTP, así que solo letras,
+  // números y `._:-`. Si no tiene esa forma no se manda, y el pago sigue.
+  const dispositivo = typeof t.dispositivo === "string" && /^[A-Za-z0-9._:-]{8,128}$/.test(t.dispositivo) ? t.dispositivo : null;
+  return { token, payment_method_id, type, dispositivo };
 }

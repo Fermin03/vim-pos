@@ -33,6 +33,8 @@ function doble(o: {
   const llamadas: string[] = [];
   const tokens: string[] = [];
   const cuerpos: unknown[] = [];
+  /** La huella del dispositivo con que se pidió cada cobro (la cabecera X-Meli-Session-Id), o null. */
+  const huellas: (string | null)[] = [];
   /** Todo lo que se le manda a la base, tal cual (para comprobar que no lleva nada crudo de Mercado Pago). */
   const aLaBase: unknown[] = [];
   const veces: Partial<Record<Metodo, number>> = {};
@@ -65,7 +67,7 @@ function doble(o: {
     mp: (token) => {
       tokens.push(token);
       return {
-        crearOrden: (c, llave) => { cuerpos.push(c); return responder("crearOrden", c, llave); },
+        crearOrden: (c, llave, huella) => { cuerpos.push(c); huellas.push(huella ?? null); return responder("crearOrden", c, llave); },
         leerOrden: (id) => responder("leerOrden", id),
         buscarOrdenes: (id, desde, hasta) => responder("buscarOrdenes", id, desde, hasta),
         devolver: (id, llave) => responder("devolver", id, llave),
@@ -76,7 +78,7 @@ function doble(o: {
     llave: () => `llave-${++llaves}`,
     ahora: () => new Date("2026-10-11T18:03:00.000Z"),
   };
-  return { deps, llamadas, tokens, cuerpos, aLaBase };
+  return { deps, llamadas, tokens, cuerpos, aLaBase, huellas };
 }
 const sin = (llamadas: string[], prefijo: string) => llamadas.every((l) => !l.startsWith(prefijo));
 
@@ -422,4 +424,80 @@ test("422 que deja la orden abierta en created: se cancela allá y el pedido se 
   const revision = doble({ mp: { buscarOrdenes: { status: 200, cuerpo: { data: [{ ...EN_REVISION, created_date: "2026-10-11T17:00:00.000Z" }] } } } });
   await confirmarPago(revision.deps, FILA.id);
   assert.ok(sin(revision.llamadas, "mp.cancelarOrden"));
+});
+
+// ── Antifraude (12 oct 2026): in_review, el detalle del pedido y la huella del dispositivo ─────────
+const EN_ANTIFRAUDE = { ...APROBADA, id: "ORDTSTANTIFRAUDE", status: "in_review", status_detail: "in_review", total_paid_amount: "0.00" };
+const DETALLE = {
+  descripcion: "Pedido T1A2B3 en Knock-Out Burger",
+  renglones: [{ nombre: "Clásica", cantidad: 1, total_mxn: "120.00" }], envio: null, propina: "18.00",
+  pagador: { nombre: "Anastasia Villalpando", telefono: "4779876543",
+             direccion: { calle: "Privada Jacarandas", numero_exterior: "1482", codigo_postal: "37123", ciudad: "Leonardo Bravo", estado: "Guanajuato" } },
+};
+const CON_DETALLE = { ...DATOS, tarjeta: { ...DATOS.tarjeta, dispositivo: "armor.1a2b3c4d5e6f" }, detalle: DETALLE };
+const PERSONALES = ["Anastasia", "Villalpando", "4779876543", "9876543", "Jacarandas", "1482", "37123", "Leonardo", "ana@example.com", "armor.1a2b3c4d5e6f", DATOS.tarjeta.token];
+
+test("201 in_review: POR_CONFIRMAR con la orden anotada; no se descarta, no se cancela y no es un incidente", async () => {
+  const { deps, llamadas } = doble({ mp: { crearOrden: { status: 201, cuerpo: EN_ANTIFRAUDE } } });
+  assert.deepEqual(await cobrarPago(deps, DATOS), { tipo: "POR_CONFIRMAR" });
+  assert.ok(llamadas.includes("anotar ORDTSTANTIFRAUDE -"));
+  assert.ok(llamadas.includes(`registrar COBRO_SIN_RESULTADO pago ${PAGO}: PENDIENTE (in_review)`));
+  assert.equal(llamadas.some((l) => l.startsWith("descartar") || l.startsWith("mp.cancelarOrden") || l.includes("INCIDENTE")), false);
+});
+test("confirmar con la orden todavía in_review: sigue pendiente (no cuenta como conciliación buena) y no se cancela aunque lleve una hora", async () => {
+  const vieja = { ...EN_ANTIFRAUDE, created_date: "2026-10-11T17:00:00.000Z" };
+  const { deps, llamadas } = doble({ filas: [{ ...FILA, cobro_mandado: true, orden_id_externo: "ORDTSTANTIFRAUDE" }], mp: { leerOrden: { status: 200, cuerpo: vieja } } });
+  assert.deepEqual(await confirmarPago(deps, PAGO), { ok: false, motivo: "PAGO_SIN_APLICAR" });
+  assert.equal(llamadas.some((l) => l.startsWith("mp.cancelarOrden") || l.startsWith("aplicar") || l.startsWith("registrar")), false);
+  assert.ok(llamadas.includes("anotar ORDTSTANTIFRAUDE orden ORDTSTANTIFRAUDE: PENDIENTE (in_review)"));
+});
+test("in_review que acaba en failed (el aviso order.failed): se aplica el rechazo y el pedido se cierra", async () => {
+  const fallida = { ...EN_ANTIFRAUDE, status: "failed", status_detail: "failed", transactions: { payments: [{ id: "PAY01", status: "failed", status_detail: "high_risk", payment_method: { id: "master", type: "credit_card" } }] } };
+  const { deps, llamadas } = doble({ filas: [{ ...FILA, cobro_mandado: true, orden_id_externo: "ORDTSTANTIFRAUDE" }], mp: { leerOrden: { status: 200, cuerpo: fallida } } });
+  assert.deepEqual(await confirmarPago(deps, PAGO, "ORDTSTANTIFRAUDE"), { ok: true, aplicados: 1, recienAprobado: false });
+  assert.ok(llamadas.some((l) => l.startsWith("aplicar RECHAZADO ORDTSTANTIFRAUDE")));
+});
+test("402 high_risk: rechazado con su propio motivo (RIESGO), y el pedido se descarta", async () => {
+  const { deps } = doble({ mp: { crearOrden: { status: 402, cuerpo: { errors: [{ code: "failed", details: ["PAY01M4P8KB8MM494BGX78592RQMQ: high_risk"] }] } } } });
+  assert.deepEqual(await cobrarPago(deps, DATOS), { tipo: "RECHAZADO", motivo: "RIESGO" });
+});
+test("el cobro lleva el detalle del pedido y la huella del dispositivo; la llave y la verificación son las de siempre", async () => {
+  const { deps, llamadas, cuerpos, huellas } = doble({ mp: { crearOrden: { status: 201, cuerpo: APROBADA } } });
+  assert.deepEqual(await cobrarPago(deps, CON_DETALLE), { tipo: "APROBADO", recienAprobado: true });
+  const c = cuerpos[0] as { description: string; items: { unit_price: string; quantity: number }[]; payer: Record<string, unknown>; total_amount: string };
+  assert.equal(c.description, "Pedido T1A2B3 en Knock-Out Burger");
+  assert.deepEqual(c.items, [{ title: "Clásica", unit_price: "120.00", quantity: 1 }, { title: "Propina", unit_price: "18.00", quantity: 1 }]);
+  assert.equal(c.total_amount, "138.00");
+  assert.deepEqual(c.payer.phone, { area_code: "477", number: "9876543" });
+  assert.deepEqual(huellas, ["armor.1a2b3c4d5e6f"]);
+  // La misma llave y los mismos pasos que un cobro sin detalle.
+  assert.deepEqual(llamadas, ["tomarCobro", `mp.crearOrden {…} tienda-pago-${PAGO}`, `aplicar APROBADO ${ORDEN} 138.00`]);
+  // Sin huella, sin cabecera.
+  const sin = doble({ mp: { crearOrden: { status: 201, cuerpo: APROBADA } } });
+  await cobrarPago(sin.deps, DATOS);
+  assert.deepEqual(sin.huellas, [null]);
+});
+test("NADA del cliente llega a un log ni a la base: ni aprobado, ni rechazado, ni en revisión, ni sin respuesta, ni cuando Mercado Pago repite los datos en su error", async () => {
+  // Un 400 que repite, en su mensaje y en sus detalles, cada dato personal que se le mandó.
+  const eco = { errors: [{ code: "bad_request", message: `payer.first_name Anastasia Villalpando no vale`,
+    details: ["payer.phone.number: 9876543", "payer.phone: 4779876543", "payer.address.street_name: Privada Jacarandas 1482, 37123 Leonardo Bravo", "payer.email: ana@example.com", `token ${DATOS.tarjeta.token}`, "session armor.1a2b3c4d5e6f"] }] };
+  const escenas: Parameters<typeof doble>[0][] = [
+    { mp: { crearOrden: { status: 201, cuerpo: APROBADA } } },
+    { mp: { crearOrden: { status: 402, cuerpo: RECHAZO_402 } } },
+    { mp: { crearOrden: { status: 201, cuerpo: EN_ANTIFRAUDE } } },
+    { mp: { crearOrden: { status: 0, cuerpo: null } } },
+    { mp: { crearOrden: { status: 401, cuerpo: { message: "Anastasia Villalpando" } } } },
+    { mp: { crearOrden: { status: 400, cuerpo: eco }, buscarOrdenes: { status: 200, cuerpo: { data: [] } } } },
+    { mp: { crearOrden: { status: 422, cuerpo: eco }, buscarOrdenes: { status: 500, cuerpo: eco } } },
+  ];
+  for (const [i, escena] of escenas.entries()) {
+    const { deps, llamadas, aLaBase } = doble(escena);
+    await cobrarPago(deps, CON_DETALLE);
+    const escrito = JSON.stringify([llamadas, aLaBase]);
+    for (const dato of PERSONALES) assert.equal(escrito.toLowerCase().includes(dato.toLowerCase()), false, `escena ${i}: «${dato}» llegó a un log o a la base`);
+  }
+  // Y lo que sí queda del 400 sirve para arreglarlo: el nombre de la propiedad.
+  const { deps, llamadas } = doble(escenas[5]);
+  await cobrarPago(deps, CON_DETALLE);
+  assert.ok(llamadas.some((l) => l.startsWith("registrar COBRO_NO_ACEPTADO") && l.includes("payer.phone.number") && l.includes("payer.address.street_name")));
 });
