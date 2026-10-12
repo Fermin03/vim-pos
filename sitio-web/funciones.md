@@ -206,7 +206,7 @@ _Si ya usas otro_
 
 Descargas tu menú del sistema que usas hoy y lo pegas aquí, sin recapturar nada a mano.
 
-![Importador de menú mostrando lo que se va a dar de alta antes de confirmar.](https://vimpos.com.mx/assets/img/capturas/admin-importador.webp?v=3)
+![Importador de menú mostrando lo que se va a dar de alta antes de confirmar.](https://vimpos.com.mx/assets/img/capturas/admin-importador.webp?v=4)
 
 _Ves lo que se va a crear antes de confirmar. Nada se guarda hasta que lo aceptas._
 

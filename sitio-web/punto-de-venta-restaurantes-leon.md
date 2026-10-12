@@ -54,7 +54,7 @@ _Preguntas_
 
 ### ¿Ya hay restaurantes de León usándolo?
 
-Sí. VIM POS está en operación diaria en un restaurante de León. Conoce [quién está detrás](https://vimpos.com.mx/nosotros).
+Sí. +10 restaurantes ya se administran con VIM POS. Conoce [quién está detrás](https://vimpos.com.mx/nosotros).
 
 ### ¿Atienden fuera de León?
 
