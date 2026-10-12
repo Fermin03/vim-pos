@@ -177,6 +177,35 @@ test("terminal-cobro: va a la nube como el dispositivo y con el empleado de la s
   }
 });
 
+test("terminal-cobro: el reembolso solo sale de la caja si la devolución de ese ticket ya está confirmada", async () => {
+  let llegaron = 0;
+  const nube = http.createServer((req, res) => { req.resume(); req.on("end", () => { llegaron++; res.writeHead(200); res.end('{"ok":true,"n_cobros":1}'); }); });
+  await new Promise((r) => nube.listen(0, "127.0.0.1", r));
+  const usuario = { id: "u1", email: "maria@x", tenant_id: "t", rol: "CAJERO" };
+  // La base local: contesta la sesión, y la devolución confirmada solo del ticket «con-devolucion».
+  const pool = { query: async (sql, params) => ({ rows: /FROM devoluciones/.test(sql) ? (params[0] === "con-devolucion" ? [{}] : []) : [usuario] }) };
+  const vivo = { restPort: 1, secret: SECRET, pool };
+  vivo.nube = async () => ({ cloudUrl: `http://127.0.0.1:${nube.address().port}`, anonKey: "anon", deviceToken: "DEV" });
+  const server = crearGateway(opcionesGateway(vivo, {}));
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  const tok = jwt.sign({ sub: "u1", role: "authenticated" }, SECRET, { algorithm: "HS256", expiresIn: 60 });
+  const reembolsar = (ticket) => pedir(server.address().port, {
+    method: "POST", path: "/functions/v1/terminal-cobro", headers: { Authorization: `Bearer ${tok}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ accion: "reembolsar", ticket_id: ticket }),
+  });
+  try {
+    const sin = await reembolsar("sin-devolucion");
+    assert.equal(sin.status, 409);
+    assert.match(sin.text, /SIN_DEVOLUCION/);
+    assert.equal(llegaron, 0, "sin devolución confirmada, a la nube no llega nada");
+    assert.equal((await reembolsar("con-devolucion")).status, 200);
+    assert.equal(llegaron, 1);
+  } finally {
+    await new Promise((r) => server.close(r));
+    await new Promise((r) => nube.close(r));
+  }
+});
+
 test("respaldo diario: el gateway avisa cuando alguien OPERA la caja, no cuando el POS sondea", async () => {
   let avisos = 0;
   const vivo = { restPort: 1, secret: SECRET, pool: poolFalso() };

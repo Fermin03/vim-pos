@@ -84,3 +84,9 @@ test("una renovación rechazada no inventa tokens", async () => {
   const r = await pedirTokens({ clientId: "id", clientSecret: "sec", refreshToken: "viejo" }, falso);
   assert.deepEqual([r.tokens, r.status, r.codigo], [null, 400, "invalid_grant"]);
 });
+
+test("una cuenta de prueba se reconoce por su etiqueta, no por el token", async () => {
+  const con = (tags: string[]) => ((() => Promise.resolve(new Response(JSON.stringify({ nickname: "TIENDA", tags }), { status: 200 }))) as unknown as typeof fetch);
+  assert.deepEqual(await clienteMpConfig("tok", con(["normal", "test_user"])).cuenta(), { nombre: "TIENDA", dePrueba: true });
+  assert.deepEqual(await clienteMpConfig("tok", con(["normal"])).cuenta(), { nombre: "TIENDA", dePrueba: false });
+});

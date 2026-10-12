@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { cajaTieneTerminal, mensajeErrorCobro, mensajeFinal, metodoDeTarjeta, montoTexto, pedirCobro } from "../terminal";
+import { cajaTieneTerminal, mensajeErrorCobro, mensajeFinal, metodoDeTarjeta, montoTexto, motivoReembolso, pedirCobro, reembolsarTicket } from "../terminal";
 
 afterEach(() => vi.unstubAllGlobals());
 const responde = (status: number, cuerpo: unknown) =>
@@ -31,6 +31,17 @@ describe("cobro con terminal", () => {
     await expect(pedirCobro("tok", "caja-1", { accion: "estado", cobro_id: "c" })).rejects.toThrow("TERMINAL_OCUPADA");
     const [, init] = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit];
     expect(JSON.parse(String(init.body))).toEqual({ accion: "estado", cobro_id: "c", caja_id: "caja-1" });
+  });
+
+  it("el reembolso dice cuánto regresó, o cero cobros si el ticket no pasó por la terminal", async () => {
+    responde(200, { ok: true, n_cobros: 1, devuelto_mxn: "110.00" });
+    expect(await reembolsarTicket("tok", "caja-1", "t-1")).toEqual({ cobros: 1, devuelto: 110 });
+    responde(200, { ok: true, n_cobros: 0, devuelto_mxn: "0.00" });
+    expect(await reembolsarTicket("tok", "caja-1", "t-1")).toEqual({ cobros: 0, devuelto: 0 });
+    responde(409, { ok: false, n_cobros: 1, devuelto_mxn: "0.00", error: "CONEXION_INVALIDA" });
+    await expect(reembolsarTicket("tok", "caja-1", "t-1")).rejects.toThrow("CONEXION_INVALIDA");
+    expect(motivoReembolso(new Error("SIN_RED"))).toBe("no hay internet");
+    expect(motivoReembolso(new Error("algo_nuevo"))).toBe("Mercado Pago no aceptó la devolución");
   });
 
   it("sin internet o sin nube, la caja no ofrece terminal", async () => {

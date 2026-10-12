@@ -127,6 +127,16 @@ export function clienteMp(token: string, pedir: typeof fetch = fetch) {
     cancelarOrden: (ordenId: string) =>
       llamar("POST", `/v1/orders/${encodeURIComponent(ordenId)}/cancel`, undefined,
         { "X-Idempotency-Key": crypto.randomUUID(), "x-allow-cancelable-status": "at_terminal" }),
+
+    /**
+     * Devolución TOTAL (sin cuerpo). VERIFICADO con dinero real: 201 con `status: refunded` al
+     * instante. Hasta 90 días después del pago. La llave de idempotencia es la order: pedirla dos
+     * veces no devuelve dos veces. Un pago SIMULADO no se puede devolver
+     * (`refund_not_possible_simulation_payment`), y una order creada con el token de otra aplicación
+     * no se ve (`order_not_found`): la devolución solo se prueba con un pago real.
+     */
+    reembolsarOrden: (ordenId: string) =>
+      llamar("POST", `/v1/orders/${encodeURIComponent(ordenId)}/refund`, undefined, { "X-Idempotency-Key": `reembolso-${ordenId}` }),
   };
 }
 
