@@ -86,7 +86,7 @@ export async function conexionDeTienda(admin: Admin, tenantId: string, b: Record
       return json({ error: "SIN_PUBLIC_KEY" }, 409);
     }
     const t = r.tokens;
-    const nombre = await clienteMpConfig(t.access_token).nombre();
+    const { nombre } = await clienteMpConfig(t.access_token).cuenta();
     const { data: fila, error } = await admin.from("tienda_conexiones").upsert({
       tenant_id: tenantId, cuenta_id_externo: t.user_id, cuenta_nombre: nombre, public_key: r.publicKey,
       de_prueba: t.de_prueba, estado: "ACTIVA", ultimo_error: null, conectada_at: new Date().toISOString(),
