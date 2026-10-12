@@ -113,3 +113,15 @@ export function rangoDeEnvio(zonas: { costo_mxn: string }[]): string | null {
   const min = Math.min(...costos), max = Math.max(...costos);
   return min === max ? null : `El envío puede costar entre ${formato(min)} y ${formato(max)}, según tu zona.`;
 }
+
+/** Cuántos renglones de una lista larga de «Mi cuenta» (pedidos, direcciones) se ven antes de «Mostrar más». */
+export const TOPE_DE_LISTA = 3;
+/**
+ * Una lista que empieza corta: los primeros `tope` y cuántos quedan por enseñar («Mostrar más» solo
+ * existe si queda alguno). Con `todos`, la lista entera. Quien la usa la pasa ya en el orden en que
+ * se lee (lo más reciente primero).
+ */
+export function listaCorta<T>(lista: readonly T[], todos: boolean, tope: number = TOPE_DE_LISTA): { visibles: T[]; restantes: number } {
+  const visibles = todos ? [...lista] : lista.slice(0, tope);
+  return { visibles, restantes: lista.length - visibles.length };
+}

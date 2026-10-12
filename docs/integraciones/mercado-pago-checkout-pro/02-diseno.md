@@ -24,7 +24,8 @@ cae en la cuenta de Mercado Pago del restaurante; VIM no cobra comisión.
 
 ## Cobrar (`POST /v1/orders`)
 
-`pedir` con `pago: "EN_LINEA"`, `propina_pct` y `tarjeta: { token, payment_method_id, type }` crea el
+`pedir` con `pago: "EN_LINEA"`, `propina_pct` (o, en su lugar, `propina_mxn`: «otro monto» en pesos, de hasta el
+subtotal de los productos; migración 0174) y `tarjeta: { token, payment_method_id, type }` crea el
 pedido `POR_PAGAR` (invisible para la caja) y cobra en la misma petición, con
 `X-Idempotency-Key: tienda-pago-<id de tienda_pagos>` y `external_reference` = ese id.
 

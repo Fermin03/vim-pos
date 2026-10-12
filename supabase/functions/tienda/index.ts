@@ -63,11 +63,12 @@
 // funciones SQL de 0162 y 0166.
 //
 // PAGO EN LÍNEA (Orders API de Mercado Pago; 0173 y _shared/tienda/pago-*.ts)
-//   `pedir` con `pago: "EN_LINEA"` (`propina_pct`: 0, 10, 15 o 20; `tarjeta`: el TOKEN que dio
+//   `pedir` con `pago: "EN_LINEA"` (`propina_pct`: 0, 10, 15 o 20, o en su lugar `propina_mxn`: «otro
+//   monto» en pesos, de hasta el subtotal de los productos; `tarjeta`: el TOKEN que dio
 //   MercadoPago.js, su marca y si es crédito o débito; y correo obligatorio) crea el pedido
 //   POR_PAGAR, que no existe para la caja, y lo cobra en la misma petición con el token de la
 //   conexión de la tienda del restaurante (`POST /v1/orders`). El monto lo pone la base; del
-//   cliente solo se acepta el porcentaje de propina. Finales:
+//   cliente solo se acepta la propina (el porcentaje o el monto). Finales:
 //     · aprobado y verificado → el pedido queda RECIBIDO, sale el correo y se contesta lo de
 //       siempre más `propina_mxn`, `total_a_pagar_mxn` y `pago: { estado: "PAGADO" }`;
 //     · rechazado → 409 PAGO_RECHAZADO con `detalle`: la familia del motivo (FONDOS, DATOS,
@@ -581,7 +582,8 @@ async function atender(req: Request): Promise<Response> {
     // Solo si vino: sin `clave` la llamada es, argumento por argumento, la de antes de la 0167.
     ...(p.clave && { p_clave: p.clave }),
     // Solo en línea: un pedido al recibir llama, argumento por argumento, como antes de la 0173.
-    ...(enLinea && { p_propina_pct: p.propina_pct ?? 0 }),
+    // «Otro monto» (0174) va EN LUGAR del porcentaje: sin él la llamada es, argumento por argumento, la de la 0173.
+    ...(enLinea && (p.propina_mxn !== null ? { p_propina_mxn: p.propina_mxn } : { p_propina_pct: p.propina_pct ?? 0 })),
   });
   if (alta.error) return rechazo("tienda_crear_pedido", alta.error);
 
