@@ -750,8 +750,10 @@ test('ningún dato personal vuelve al sitio', () => {
     [/\b[A-ZÑ&]{4}\d{6}[A-Z0-9]{3}\b/, 'algo con forma de RFC'],
     // Diez dígitos con o sin separadores: un móvil mexicano.
     [/(?<!\d)\d{3}[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)/, 'algo con forma de teléfono'],
-    // Un enlace de WhatsApp lleva el número dentro de la propia dirección.
-    [/wa\.me\//, 'un enlace de WhatsApp'],
+    // Un enlace de WhatsApp lleva el número dentro de la propia dirección. Solo
+    // pasa el de atención de la empresa (NEGOCIO.whatsapp): es público, así
+    // que nombrarlo aquí no guarda ningún secreto.
+    [new RegExp('wa\\.me\\/(?!' + NEGOCIO.whatsapp.split('wa.me/')[1] + '(?:\\D|$))'), 'un enlace de WhatsApp que no es el de atención'],
     [/tel:\+?\d/, 'un enlace de teléfono'],
     // «domicilio en Tal 341»: una calle con número. La ciudad sola no es
     // identificable; la calle con número es la puerta de la casa.

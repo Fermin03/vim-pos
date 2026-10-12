@@ -12,7 +12,7 @@ VIM POS es un sistema de punto de venta para restaurantes en México: caja, coci
 
 Desde **$699 al mes**, más IVA · sin contrato forzoso · [ver los tres planes](https://vimpos.com.mx/precios)
 
-Ya cobra todos los días en una hamburguesería de León, Guanajuato
++10 restaurantes ya se administran con VIM POS
 
 ![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=3)
 
@@ -30,25 +30,25 @@ _Lo que hace_
 
 ### Vender
 
-Catálogo por categorías, modificadores con precio —queso extra, sin cebolla, término de la carne— y cobro en efectivo, tarjeta o transferencia. Con propina y con cambio calculado.
-
-![Un producto abierto con sus opciones: término de la carne y extras con su precio.](https://vimpos.com.mx/assets/img/capturas/pos-catalogo.webp?v=3)
+Toma la orden y cobra.
 
 ### Mandar a cocina
 
-La comanda sale impresa donde tiene que salir: las bebidas en la barra y la comida en cocina, cada papel con el rótulo de su estación. O en una pantalla, si prefieres no imprimir.
-
-![Pantalla de cocina con las comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
+La comanda se manda directo a cocina, ya sea impresa o en pantalla con VIM POS KDS.
 
 ### Cerrar el turno
 
-Arqueo contra lo que dice el sistema, con sobrante y faltante a la vista, y corte Z sellado. Con el mismo formato de siempre, para que nadie tenga que reaprender a leerlo.
-
-![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp?v=3)
+Confirma que las ventas del día cuadren.
 
 ### Ver tu negocio
 
-Desde el celular: cuánto llevas hoy contra ayer, qué se vende y qué no, inventario con costo, y quince reportes. Con aviso si tu caja lleva días sin subir las ventas.
+Revisa las operaciones de tu negocio desde tu celular, donde quiera que estés.
+
+![Un producto abierto con sus opciones: término de la carne y extras con su precio.](https://vimpos.com.mx/assets/img/capturas/pos-catalogo.webp?v=3)
+
+![Pantalla de cocina con las comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
+
+![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp?v=3)
 
 ![Panel del dueño con las ventas del día y el estado de las cajas.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
 
@@ -93,51 +93,53 @@ _Para tu giro_
 
 ## Seis formas de vender comida, seis configuraciones
 
-El sistema se configura según tu giro: cambian los modos de servicio, las pantallas y lo que se imprime. Donde hay un límite, está escrito.
+Cambian los modos de servicio, las pantallas y lo que se imprime.
 
 ### Comida rápida o de mostrador
 
-Mostrador y pickup. Cola rápida, comanda directa a cocina y modos de servicio para separar lo que se come aquí de lo que se lleva. Así se ve en una [hamburguesería](https://vimpos.com.mx/punto-de-venta-hamburgueserias).
+Excelente para los días con prisas.
 
 ### Food truck
 
-Turno por evento y operación sin señal en la calle, que es donde el argumento del producto deja de ser teórico. Una sola caja, un solo turno, cierre al terminar.
+Turno por evento, para un mejor control.
 
 ### Cafetería o bar
 
-Cuentas abiertas en barra, modificadores con precio y cierres por turno. La cuenta se queda abierta hasta que el cliente pide, no hasta que se cierra el sistema.
+Cuentas abiertas en barra y mesas, modificadores, propinas y cortes por turno.
 
 ### Restaurante con meseros
 
 Mapa de mesas, meseros y propinas.
 
-**El límite:** no hay app de mesero en tableta. Se opera desde la caja.
-
 ### Solo reparto (dark kitchen)
 
-Varias marcas virtuales desde una cocina, y conciliación de lo que te liquidan Rappi, Uber y DiDi contra lo que registró tu caja.
-
-**El límite:** la liquidación se pega a mano; todavía no se sube el archivo.
+Integra apps de reparto o usa tu propio servicio de repartidores.
 
 ### Cadena o franquicia
 
-Varias sucursales con catálogo propio o compartido, franquicias, y un consolidado que suma todo sin tener que abrir cada una.
+Administra todas tus sucursales desde un solo panel.
 
 _Por qué existe_
 
-## Lo que hay hoy para un restaurante mexicano
+## VIM POS está pensado para ese emprendedor que quiere saber cómo administrar su restaurante de verdad.
 
-### Los de fuera
+_Ventas_
 
-Caros, en dólares, y con el SAT como una idea vaga. Pagas por funciones pensadas para otro país y luego resuelves la factura por tu cuenta.
+### ¿Cuánto vendí hoy?
 
-### Los de siempre
+Tus ventas del día y lo que más se vende, desde tu celular.
 
-Sistemas que llevan quince años funcionando y lo hacen bien, pero viven en una sola computadora: sin respaldo, sin ver tus números desde el celular y sin nada que hacer si se moja el disco duro.
+_Costos_
 
-### El cuaderno
+### ¿Cuánto me cuesta cada platillo?
 
-Funciona hasta que hay dos cajas, o un socio, o alguien pregunta cuánto se vendió el martes pasado. Entonces deja de funcionar de golpe.
+Inventario con recetas: sabes qué insumo se fue y cuánto costó.
+
+_Caja_
+
+### ¿Cuadra mi caja?
+
+Corte por turno: lo que debe haber contra lo que hay en el cajón.
 
 _Si ya usas otro_
 
@@ -145,25 +147,25 @@ _Si ya usas otro_
 
 ![Importador de menú mostrando lo que se va a dar de alta antes de confirmar.](https://vimpos.com.mx/assets/img/capturas/admin-importador.webp?v=3)
 
-_Pegas el menú del sistema que usas hoy y lo ves antes de aceptarlo: qué producto entra, con qué precio y en qué categoría. Nada se guarda hasta que tú lo confirmas._
+_Pegas tu menú y lo ves antes de aceptarlo. Nada se guarda hasta que tú lo confirmas._
 
 ### Tu menú se pega y ya
 
-Descargas tu menú del sistema que usas hoy (Square, Toast, Loyverse, Clip o una hoja de cálculo) y lo pegas aquí tal cual. No hay que recapturar trescientos productos a mano ni pagar por la mudanza.
+Descargas tu menú del sistema que usas hoy y lo pegas aquí, sin recapturar nada a mano.
 
 ### Tu corte se ve igual
 
-El formato del corte Z está calcado del que ya conoces, a propósito. Quien lo lee cada noche no tiene que reaprender dónde mirar.
+El corte Z tiene el formato que ya conoces.
 
 ### La comanda se parte
 
-Bebidas en la barra, comida en cocina, cada una en su impresora. Es lo mismo que ya hacías, y ya opera así en el piloto.
+Bebidas en la barra y comida en cocina, cada una en su impresora.
 
 _Precios_
 
-## Precio de lista, sin cotización
+## Precios flexibles para cada tipo de restaurante
 
-Mensual, en pesos, más IVA. Sin cotización ni «contáctanos para conocer el precio».
+Precio mensual, más IVA. Si tienes dudas o necesitas una cotización personalizada, [contacta a soporte por WhatsApp](https://wa.me/525665083346?text=Hola%2C%20quiero%20una%20cotizaci%C3%B3n%20de%20VIM%20POS).
 
 ### [Esencial](https://vimpos.com.mx/precios)
 
@@ -211,11 +213,11 @@ Sí. Descargas tu menú del sistema que usas hoy y lo pegas tal cual. Si el form
 
 ### ¿Emite facturas?
 
-Sí. Factura global del periodo (la emites con un botón desde el panel), timbrado individual de cualquier ticket y portal de autofacturación por QR, con CFDI 4.0 timbrado por un proveedor autorizado por el SAT. Cada plan trae folios al mes para tus facturas —10 en Esencial con el extra de facturación, 20 en Negocio y 40 en Cadena— y, si se acaban, compras un paquete. Los precios están en la página de precios.
+Sí. Tu cliente puede emitir su factura desde nuestro portal de autofacturación, escaneando el QR impreso en su ticket.
 
 ### ¿Cuánto tarda la implementación?
 
-Alrededor de un día. Desde Negocio lo hacemos nosotros: cargamos tu menú, lo dejamos configurado y capacitamos a tu equipo tres horas. En Esencial lo haces tú con nuestra guía y te ayudamos por WhatsApp.
+Alrededor de un día, contemplando instalación y capacitación. Puede variar según el plan contratado.
 
 ### ¿Y si se va la luz o alguien cierra el programa?
 
@@ -227,7 +229,7 @@ Sí. Cada sucursal opera con su propia caja y su propio turno, y el panel suma t
 
 ### ¿Puedo cobrar con tarjeta desde el sistema?
 
-No. La tarjeta se registra como forma de pago para que el corte cuadre, pero el cobro lo haces con tu terminal bancaria de siempre. No hay terminal integrada y preferimos decirlo antes de que lo descubras instalando.
+Sí, y te ayudamos con el proceso de vinculación. Actualmente funciona solo con la terminal Mercado Pago Point Smart 2.
 
 ## Te lo enseñamos en media hora, con tu menú.
 

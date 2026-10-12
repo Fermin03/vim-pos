@@ -801,6 +801,9 @@ body[data-menu-abierto="true"] { overflow: hidden; }
   transition: height var(--v-media) var(--sal);
 }
 .acordeon-panel > div { padding-bottom: var(--sp-5); }
+/* Una fila que llega abierta desde el HTML: su alto es el de su contenido.
+   Cuando vim.js la abre o la cierra escribe el alto en línea, que gana a esto. */
+.acordeon-item[data-abierto="true"] > .acordeon-panel { height: auto; }
 
 @media (prefers-reduced-motion: reduce) {
   .acordeon-signo, .acordeon-panel { transition: none; }
@@ -1581,63 +1584,43 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 /* ==========================================================================
    Cuatro cosas, con una sola captura (portada)
 
-   En zigzag eran 2,000 px para cuatro ideas. En pantalla ancha, las cuatro van
-   en lista a la izquierda y las capturas se apilan en la misma celda de la
-   derecha; se ve la de la fila activa. El HTML es el mismo de antes: cada
-   `.alterna` trae su texto y su marco, y `display: contents` los reparte.
+   A la izquierda, el acordeón de siempre con las cuatro funciones; a la
+   derecha, la captura de la fila abierta. Se emparejan por posición con
+   `:has()`: la fila 2 abierta enseña la captura 2. No hay JavaScript propio.
 
-   Solo cuando vim.js marcó `data-listo`. Sin script —y en el teléfono— queda el
-   zigzag, que no esconde nada.
-
-   La fila activa se marca con tinta, no con azul: el azul es de la acción.
+   En pantalla ancha las cuatro capturas ocupan la misma celda y se relevan con
+   un fundido: miden lo mismo, así que deslizarlas sería mover la misma caja
+   para nada. En el teléfono miden distinto —dos van recortadas a 4:5—, y
+   apiladas dejarían un hueco bajo las cortas; ahí se enseña una y las demás no
+   ocupan sitio.
    ========================================================================== */
 
+.cosas { display: grid; gap: var(--sp-6); align-items: start; }
+
+.cosas-capturas > .monitor { display: none; }
+.cosas:has(.acordeon-item:nth-child(1)[data-abierto="true"]) .cosas-capturas > :nth-child(1),
+.cosas:has(.acordeon-item:nth-child(2)[data-abierto="true"]) .cosas-capturas > :nth-child(2),
+.cosas:has(.acordeon-item:nth-child(3)[data-abierto="true"]) .cosas-capturas > :nth-child(3),
+.cosas:has(.acordeon-item:nth-child(4)[data-abierto="true"]) .cosas-capturas > :nth-child(4) { display: block; }
+
 @media (min-width: 900px) {
-  .cosas[data-listo] {
-    display: grid;
-    grid-template-columns: 5fr 7fr;
-    gap: 0 var(--sp-10);                   /* sin hueco entre filas: ya no son bloques sueltos */
-    align-items: start;
-  }
-  .cosas[data-listo] .alterna { display: contents; }
-
-  .cosas[data-listo] .alterna-texto {
-    grid-column: 1;
-    order: 0;                              /* `.invertido` lo mandaba a la derecha */
-    padding: var(--sp-4) 0 var(--sp-4) var(--sp-5);
-    border-left: 2px solid var(--line);
-    cursor: pointer;
-    transition: border-color var(--v-corta) ease;
-  }
-  .cosas[data-listo] .alterna:nth-child(1) .alterna-texto { grid-row: 1; }
-  .cosas[data-listo] .alterna:nth-child(2) .alterna-texto { grid-row: 2; }
-  .cosas[data-listo] .alterna:nth-child(3) .alterna-texto { grid-row: 3; }
-  .cosas[data-listo] .alterna:nth-child(4) .alterna-texto { grid-row: 4; }
-
-  .cosas[data-listo] .alterna-texto h3 { color: var(--ink-3); transition: color var(--v-corta) ease; }
-  .cosas[data-listo] .alterna[data-activa] .alterna-texto { border-left-color: var(--ink); }
-  .cosas[data-listo] .alterna[data-activa] .alterna-texto h3 { color: var(--ink); }
-  .cosas[data-listo] [data-cosa-control]:focus-visible { outline-offset: 4px; }
-
-  /* Fundido cruzado y nada más: las cuatro miden lo mismo, así que deslizar
-     una por otra sería mover la misma caja para nada. */
-  .cosas[data-listo] .monitor {
-    grid-column: 2;
-    grid-row: 1 / span 4;
-    align-self: center;                    /* la lista es más alta que la captura */
+  .cosas { grid-template-columns: 5fr 7fr; gap: var(--sp-10); }
+  .cosas-capturas { display: grid; }
+  .cosas-capturas > .monitor {
+    display: block;
+    grid-area: 1 / 1;
     opacity: 0;
     visibility: hidden;
     transition: opacity var(--v-corta) ease, visibility 0s linear var(--v-corta);
   }
-  .cosas[data-listo] .alterna[data-activa] .monitor {
+  .cosas:has(.acordeon-item:nth-child(1)[data-abierto="true"]) .cosas-capturas > :nth-child(1),
+  .cosas:has(.acordeon-item:nth-child(2)[data-abierto="true"]) .cosas-capturas > :nth-child(2),
+  .cosas:has(.acordeon-item:nth-child(3)[data-abierto="true"]) .cosas-capturas > :nth-child(3),
+  .cosas:has(.acordeon-item:nth-child(4)[data-abierto="true"]) .cosas-capturas > :nth-child(4) {
     opacity: 1;
     visibility: visible;
     transition: opacity var(--v-corta) ease, visibility 0s;
   }
-}
-@media (min-width: 900px) and (prefers-reduced-motion: reduce) {
-  .cosas[data-listo] .monitor,
-  .cosas[data-listo] .alterna[data-activa] .monitor { transition: none; }
 }
 
 /* Lo que el producto ya hace y la portada no enseñaba. Lista y no tarjetas: son
@@ -1657,9 +1640,6 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 }
 @media (hover: hover) and (pointer: fine) { .ademas a:hover { color: var(--accent); } }
 .ademas p { font-size: var(--t-15); }
-
-/* El límite de un giro: se dice dentro de su tarjeta, en letra de apoyo. */
-.tarjeta-limite { font-size: var(--t-13); margin-top: auto; }
 
 /* ==========================================================================
    Tarjeta que es enlace

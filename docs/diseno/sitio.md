@@ -65,6 +65,22 @@ así que aquí sí cabe — con las mismas curvas y los mismos límites:
 Lo que no va: texto que se escribe solo, video de fondo, parallax, secciones atadas al scroll y
 contadores de cifras.
 
+## Los textos son cortos
+
+Regla de Fermín (12 de octubre de 2026): **«solo mencionar lo esencial y ya»**. Una frase corta
+por idea, dos como máximo, que diga el beneficio. Fuera los incisos, las justificaciones y las
+comparaciones con otros sistemas; fuera también los nombres de otros puntos de venta.
+
+Las tres guías (`como-elegir…`, `cuanto-cuesta…`, `factura-global…`) son la excepción: son
+artículos y su largo es su contenido. Los textos legales tampoco se recortan.
+
+Los datos sí se conservan exactos: precios, planes, folios, horarios y plazos.
+
+## Las cuatro funciones de la portada son un acordeón
+
+El mismo acordeón de las preguntas frecuentes, con una sola captura al lado: la de la fila
+abierta. Filas y capturas se emparejan por posición, así que van en el mismo orden.
+
 ## La captura del hero va sobre un escenario
 
 Un bloque de `accent-soft` detrás del marco. No es un tema oscuro ni un degradado: es el mismo azul

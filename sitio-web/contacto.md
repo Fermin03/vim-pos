@@ -4,7 +4,7 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/contacto
 
-Te contestamos el mismo día hábil. Sin centro de llamadas y sin vendedor.
+Te contestamos el mismo día hábil.
 
 [Escríbenos por correo](mailto:hola@vimpos.com.mx)
 
@@ -12,31 +12,31 @@ Te contestamos el mismo día hábil. Sin centro de llamadas y sin vendedor.
 
 ## Las tres formas de llegar a nosotros
 
-- **Correo: [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx).** Es el canal principal. Sirve para preguntar precios, agendar una demostración, el soporte si ya eres cliente, y para lo que necesita quedar por escrito: cotizaciones de varias sucursales, datos de facturación, solicitudes de derechos ARCO y prensa. Contestamos el mismo día hábil.
-- **WhatsApp, en cuanto nos escribas.** Si prefieres seguir la conversación por ahí, dilo en el correo y te pasamos el número. Ya no lo publicamos en el sitio.
-- **El [formulario de demostración](https://vimpos.com.mx/demo).** Si prefieres que te busquemos nosotros. Pide cuántas cajas y cuántas sucursales tienes, que es lo que decide qué plan te toca y qué te enseñamos.
+- **Correo: [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx).** El canal principal: dudas, demos, soporte y todo lo que deba quedar por escrito.
+- **WhatsApp de soporte.** [Escríbenos por WhatsApp](https://wa.me/525665083346) y te atendemos ahí.
+- **El [formulario de demostración](https://vimpos.com.mx/demo).** Lo llenas y te buscamos nosotros.
 
-Contestamos **el mismo día hábil** y en español. Por WhatsApp atendemos de lunes a sábado, de 9:00 a 18:00; domingo no hay servicio. No hay número 800 ni menú de opciones: escribes y contesta una persona.
+Contestamos **el mismo día hábil**. Por WhatsApp atendemos de lunes a sábado, de 9:00 a 18:00; domingo no hay servicio.
 
 ![Panel del dueño con las ventas del día, el ticket promedio y el top de productos.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
 
-_El panel que te enseñamos en la demostración: cómo va el día, la venta por hora y qué se vende más, desde el celular o la computadora._
+_El panel que te enseñamos en la demo: cómo va tu día, desde el celular o la computadora._
 
 ## Quién responde
 
-**VIM POS**, persona física con actividad empresarial. Es el mismo responsable que aparece en el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) y en los [términos del servicio](https://vimpos.com.mx/terminos).
+**VIM POS**, persona física con actividad empresarial. Es el mismo responsable del [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) y de los [términos del servicio](https://vimpos.com.mx/terminos).
 
-**Dónde estamos:** Guanajuato, México. No hay tienda ni mostrador al público, así que no publicamos la dirección: si quieres que nos veamos en persona, se agenda antes por correo. El domicilio fiscal completo va en el contrato y se entrega a quien lo pida.
+**Dónde estamos:** Guanajuato, México. No hay mostrador al público: si quieres vernos en persona, agéndalo por correo. El domicilio fiscal va en el contrato.
 
-**Zona de servicio:** atendemos restaurantes de toda la República Mexicana. La demostración es en persona, en tu local, en la [zona de León](https://vimpos.com.mx/punto-de-venta-restaurantes-leon) y alrededores; si estás fuera, puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro). La visita presencial el día del arranque va incluida en el plan Cadena.
+**Zona de servicio:** toda la República Mexicana. La demo es en tu local, en la [zona de León](https://vimpos.com.mx/punto-de-venta-restaurantes-leon) y alrededores; fuera de ahí, puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro). La visita el día del arranque va incluida en el plan Cadena.
 
 ## Qué te sirve más según lo que busques
 
-- **Saber cuánto cuesta.** No hace falta escribirnos: los tres planes, los extras y los paquetes de folios están en la [página de precios](https://vimpos.com.mx/precios).
-- **Saber si hace lo que necesitas.** Lo que hace el sistema y lo que no, módulo por módulo, está en [funciones](https://vimpos.com.mx/funciones).
-- **Verlo funcionando.** [Pide una demo](https://vimpos.com.mx/demo): media hora, con tus productos y tus precios cargados, sin presentación y sin compromiso.
-- **Soporte, si ya eres cliente.** Al mismo correo y por WhatsApp, de lunes a sábado, de 9:00 a 18:00; domingo no hay servicio. También el día del arranque en los planes con acompañamiento.
-- **Derechos ARCO o privacidad.** Por correo, con lo que pide el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad). Se contesta en un máximo de 20 días hábiles y no cuesta nada.
+- **Saber cuánto cuesta.** Todo está en la [página de precios](https://vimpos.com.mx/precios).
+- **Saber si hace lo que necesitas.** Lo que hace y lo que no está en [funciones](https://vimpos.com.mx/funciones).
+- **Verlo funcionando.** [Pide una demo](https://vimpos.com.mx/demo): media hora, con tus productos y tus precios.
+- **Soporte, si ya eres cliente.** Al mismo correo y por WhatsApp, de lunes a sábado, de 9:00 a 18:00; domingo no hay servicio.
+- **Derechos ARCO o privacidad.** Por correo, con lo que pide el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad). Respondemos en un máximo de 20 días hábiles, sin costo.
 
 Para agentes y herramientas automáticas
 

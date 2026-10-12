@@ -239,6 +239,16 @@
      debajo de donde estás leyendo y pierdes el sitio. */
   var items = document.querySelectorAll("[data-acordeon-item]");
 
+  /* Cerrar va en dos pasos. Un panel que llega abierto desde el HTML mide
+     `auto`, y de `auto` a 0 no hay transición: primero se le escribe su alto
+     en pixeles, se obliga al navegador a aplicarlo y entonces se baja a 0. */
+  function plegar(panel) {
+    panel.style.height = panel.scrollHeight + "px";
+    void panel.offsetHeight;
+    panel.style.height = "0px";
+    panel.inert = true;
+  }
+
   /* Un panel cerrado mide 0 px pero sus enlaces seguían en el orden de tabulación: el foco se
      metía en texto invisible. `inert` lo saca del foco y del lector de pantalla mientras está
      cerrado. */
@@ -248,24 +258,29 @@
     if (!boton || !panel) return;
     if (item.getAttribute("data-abierto") !== "true") panel.inert = true;
 
+    /* `data-acordeon-siempre` marca un grupo aparte (las cuatro funciones de
+       la portada): siempre tiene una fila abierta —de ella sale la captura de
+       al lado— y abrir una pregunta más abajo no se la cierra. Los demás
+       acordeones de la página siguen siendo un solo grupo. */
+    var grupo = item.closest("[data-acordeon-siempre]");
+
     boton.addEventListener("click", function () {
       var abierto = item.getAttribute("data-abierto") === "true";
+      if (abierto && grupo) return;
 
       /* Cerrar el resto antes de abrir éste. */
       if (!abierto) {
         items.forEach(function (otro) {
           if (otro === item || otro.getAttribute("data-abierto") !== "true") return;
-          var p = otro.querySelector("[data-acordeon-panel]");
-          var b = otro.querySelector("[data-acordeon-boton]");
-          p.style.height = "0px";
-          p.inert = true;
+          if (otro.closest("[data-acordeon-siempre]") !== grupo) return;
+          plegar(otro.querySelector("[data-acordeon-panel]"));
           otro.setAttribute("data-abierto", "false");
-          b.setAttribute("aria-expanded", "false");
+          otro.querySelector("[data-acordeon-boton]").setAttribute("aria-expanded", "false");
         });
       }
 
-      panel.style.height = abierto ? "0px" : panel.scrollHeight + "px";
-      panel.inert = abierto;
+      if (abierto) plegar(panel);
+      else { panel.style.height = panel.scrollHeight + "px"; panel.inert = false; }
       item.setAttribute("data-abierto", String(!abierto));
       boton.setAttribute("aria-expanded", String(!abierto));
       if (!abierto) medir("acordeon", { titulo: boton.textContent.trim().slice(0, 80), pagina: location.pathname });
@@ -313,57 +328,6 @@
       }, { threshold: 0.6 });
       diagramas.forEach(function (d) { vigia.observe(d); });
     }
-  }
-
-  /* ---- Cuatro cosas, una sola captura (portada) ----------------------------
-     En pantalla ancha las cuatro capturas ocupan la misma celda y se ve la de
-     la fila activa (vim.css). Aquí solo se elige cuál: con el mouse encima, con
-     un clic o al llegar con el teclado.
-
-     El título de cada fila se vuelve botón SOLO en pantalla ancha. En el
-     teléfono las cuatro capturas se ven una debajo de otra, no hay nada que
-     elegir, y un botón que no hace nada es peor que no tenerlo. */
-  var cosas = document.querySelector("[data-cosas]");
-
-  if (cosas) {
-    var partes = Array.prototype.slice.call(cosas.querySelectorAll(".alterna"));
-    var ancha = window.matchMedia("(min-width: 900px)");
-
-    var vestir = function () {
-      partes.forEach(function (p) {
-        var c = p.querySelector("[data-cosa-control]");
-        if (ancha.matches) {
-          c.setAttribute("role", "button");
-          c.setAttribute("tabindex", "0");
-          c.setAttribute("aria-pressed", String(p.hasAttribute("data-activa")));
-        } else {
-          c.removeAttribute("role");
-          c.removeAttribute("tabindex");
-          c.removeAttribute("aria-pressed");
-        }
-      });
-    };
-
-    var activar = function (parte) {
-      partes.forEach(function (p) { p.toggleAttribute("data-activa", p === parte); });
-      vestir();
-    };
-
-    partes.forEach(function (p) {
-      var texto = p.querySelector(".alterna-texto");
-      ["click", "mouseenter", "focusin"].forEach(function (evento) {
-        texto.addEventListener(evento, function () { activar(p); });
-      });
-      /* Ya se activó al recibir el foco; esto solo evita que la barra
-         espaciadora desplace la página, que es lo que haría sobre un <span>. */
-      texto.addEventListener("keydown", function (e) {
-        if (e.key === " " && e.target.hasAttribute("data-cosa-control")) e.preventDefault();
-      });
-    });
-
-    cosas.setAttribute("data-listo", "");
-    activar(partes[0]);
-    ancha.addEventListener("change", vestir);
   }
 
   /* ---- Mensual / anual en la página de precios ----------------------------

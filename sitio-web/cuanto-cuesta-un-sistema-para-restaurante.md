@@ -38,7 +38,7 @@ Eso _no_ es malo por sí solo: comisión de tarjeta vas a pagar igual, la cobre 
 
 ![Pantalla de cobro con las formas de pago: efectivo, débito, crédito, transferencia, app externa y pago dividido.](https://vimpos.com.mx/assets/img/capturas/pos-pago.webp?v=3)
 
-_Las formas de pago en la caja de VIM POS. La tarjeta se registra para que el corte cuadre, pero el cobro va por tu terminal bancaria: por eso el precio del sistema no crece con tu venta._
+_Las formas de pago en la caja de VIM POS. La tarjeta se cobra desde la caja con la terminal Mercado Pago Point Smart 2, o en cualquier otra terminal y se registra para que el corte cuadre. En los dos casos no cobramos comisión por venta: el precio del sistema no crece con tu venta._
 
 ### La aritmética, con tus números
 
@@ -59,9 +59,9 @@ _Dónde queda VIM POS_
 
 ## Licencia fija, cero comisión, y lo que no incluye
 
-Somos el primer modelo. El precio está [a la vista](https://vimpos.com.mx/precios); no hay pago inicial, y desde Negocio la carga de tu menú y la capacitación van incluidas; y no nos llevamos ni un peso de tus ventas: la tarjeta se cobra en tu terminal de siempre y en el sistema se registra como forma de pago para que el corte cuadre.
+Somos el primer modelo. El precio está [a la vista](https://vimpos.com.mx/precios); no hay pago inicial, y desde Negocio la carga de tu menú y la capacitación van incluidas; y no nos llevamos ni un peso de tus ventas, porque el dinero no pasa por nosotros: cobras con tarjeta desde la caja con la terminal Mercado Pago Point Smart 2, o en cualquier otra terminal y registras el pago en la caja para que el corte cuadre.
 
-**Y dónde no conviene.** Si tienes una sola caja, sin inventario y sin empleados que controlar, el modelo gratuito te sale más barato y no vamos a fingir lo contrario. Tampoco somos la opción si necesitas que el mesero capture en tableta o que la tarjeta se cobre desde el mismo sistema: eso y el resto de los límites están en [la guía de compra](https://vimpos.com.mx/como-elegir-sistema-restaurante).
+**Y dónde no conviene.** Si tienes una sola caja, sin inventario y sin empleados que controlar, el modelo gratuito te sale más barato y no vamos a fingir lo contrario. Tampoco somos la opción si necesitas que el mesero capture en tableta o cobrar la tarjeta desde la caja con una terminal distinta de la Mercado Pago Point Smart 2: eso y el resto de los límites están en [la guía de compra](https://vimpos.com.mx/como-elegir-sistema-restaurante).
 
 ## Haz la cuenta con tus números
 

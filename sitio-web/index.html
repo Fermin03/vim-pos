@@ -55,7 +55,7 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="/assets/css/vim.css?v=23">
+<link rel="stylesheet" href="/assets/css/vim.css?v=24">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
@@ -240,10 +240,9 @@
           <!-- El precio en el primer pantallazo: en el teléfono estaba a ocho pantallas de
                distancia, y «sin letra chica» no se sostiene si hay que buscarlo. -->
           <p class="hero-precio">Desde <strong>$699 al mes</strong>, más IVA · sin contrato forzoso · <a href="/precios">ver los tres planes</a></p>
-          <!-- Un hecho, sin nombre y sin cifra: el sitio no nombra al restaurante
-               piloto ni publica números de clientes. Si un día hay permiso para
-               nombrarlo, es esta línea la que cambia. -->
-          <p class="prueba-social">Ya cobra todos los días en una hamburguesería de León, Guanajuato</p>
+          <!-- La cifra es de VIM —cuántos restaurantes lo usan—, no un dato de la
+               operación de ningún cliente. La pone y la actualiza Fermín. -->
+          <p class="prueba-social">+10 restaurantes ya se administran con VIM POS</p>
         </div>
 
         <div class="monitor-envoltura hero-escenario">
@@ -281,36 +280,59 @@
         <h2>Cuatro cosas, bien</h2>
       </div>
 
-      <!-- Las cuatro en zigzag medían 2,000 px. En pantalla ancha van en lista
-           y las capturas comparten la celda de la derecha: se ve la de la fila
-           activa (vim.css, «Cuatro cosas»; la elección la hace vim.js). El
-           marcado es el mismo zigzag, que es lo que queda en el teléfono y
-           cuando el script no carga. -->
-      <div class="cosas pila pila-8" data-cosas>
-        <div class="alterna">
-          <div class="alterna-texto pila pila-3">
-            <h3><span data-cosa-control>Vender</span></h3>
-            <p>
-              Catálogo por categorías, modificadores con precio —queso extra, sin cebolla, término de
-              la carne— y cobro en efectivo, tarjeta o transferencia. Con propina y con cambio
-              calculado.
-            </p>
+      <!-- En zigzag eran 2,000 px y cuatro párrafos. Ahora es un acordeón —el
+           mismo de las preguntas frecuentes— con una frase por función y una
+           sola captura al lado: la de la fila abierta (vim.css, «Cuatro
+           cosas»). `data-acordeon-siempre` hace que siempre quede una abierta
+           y que este grupo no cierre a los demás acordeones (vim.js).
+
+           Las capturas van en el MISMO orden que las filas: se emparejan por
+           posición, así que mover una fila es mover también su captura. -->
+      <div class="cosas" data-acordeon-siempre>
+        <div class="acordeon">
+          <div class="acordeon-item" data-acordeon-item data-abierto="true">
+            <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="true">
+              Vender
+              <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <div class="acordeon-panel" data-acordeon-panel><div>
+              <p>Toma la orden y cobra.</p>
+            </div></div>
           </div>
-          <div class="monitor">
-            <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
-            <img src="/assets/img/capturas/pos-catalogo.webp?v=3" alt="Un producto abierto con sus opciones: término de la carne y extras con su precio."
-                   width="1600" height="1000" loading="lazy" decoding="async">
+          <div class="acordeon-item" data-acordeon-item data-abierto="false">
+            <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+              Mandar a cocina
+              <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <div class="acordeon-panel" data-acordeon-panel><div>
+              <p>La comanda se manda directo a cocina, ya sea impresa o en pantalla con VIM POS KDS.</p>
+            </div></div>
+          </div>
+          <div class="acordeon-item" data-acordeon-item data-abierto="false">
+            <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+              Cerrar el turno
+              <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <div class="acordeon-panel" data-acordeon-panel><div>
+              <p>Confirma que las ventas del día cuadren.</p>
+            </div></div>
+          </div>
+          <div class="acordeon-item" data-acordeon-item data-abierto="false">
+            <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+              Ver tu negocio
+              <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <div class="acordeon-panel" data-acordeon-panel><div>
+              <p>Revisa las operaciones de tu negocio desde tu celular, donde quiera que estés.</p>
+            </div></div>
           </div>
         </div>
 
-        <div class="alterna invertido">
-          <div class="alterna-texto pila pila-3">
-            <h3><span data-cosa-control>Mandar a cocina</span></h3>
-            <p>
-              La comanda sale impresa donde tiene que salir: las bebidas en la barra y la comida en
-              cocina, cada papel con el rótulo de su estación. O en una pantalla, si prefieres no
-              imprimir.
-            </p>
+        <div class="cosas-capturas">
+          <div class="monitor">
+            <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
+            <img src="/assets/img/capturas/pos-catalogo.webp?v=3" alt="Un producto abierto con sus opciones: término de la carne y extras con su precio."
+                 width="1600" height="1000" loading="lazy" decoding="async">
           </div>
           <div class="monitor">
             <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
@@ -319,30 +341,10 @@
               <img src="/assets/img/capturas/kds.webp?v=3" alt="Pantalla de cocina con las comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas." width="1600" height="1000" loading="lazy" decoding="async">
             </picture>
           </div>
-        </div>
-
-        <div class="alterna">
-          <div class="alterna-texto pila pila-3">
-            <h3><span data-cosa-control>Cerrar el turno</span></h3>
-            <p>
-              Arqueo contra lo que dice el sistema, con sobrante y faltante a la vista, y corte Z
-              sellado. Con el mismo formato de siempre, para que nadie tenga que reaprender a leerlo.
-            </p>
-          </div>
           <div class="monitor">
             <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
             <img src="/assets/img/capturas/pos-arqueo.webp?v=3" alt="Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón."
-                   width="1600" height="1000" loading="lazy" decoding="async">
-          </div>
-        </div>
-
-        <div class="alterna invertido">
-          <div class="alterna-texto pila pila-3">
-            <h3><span data-cosa-control>Ver tu negocio</span></h3>
-            <p>
-              Desde el celular: cuánto llevas hoy contra ayer, qué se vende y qué no, inventario con
-              costo, y quince reportes. Con aviso si tu caja lleva días sin subir las ventas.
-            </p>
+                 width="1600" height="1000" loading="lazy" decoding="async">
           </div>
           <div class="monitor">
             <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
@@ -549,10 +551,8 @@
   </section>
 
   <!-- ═══ 6 · Para tu giro ═══════════════════════════════════════════════
-       Eran seis renglones de acordeón cerrados: la sección con menos que ver de
-       toda la portada. Ahora son tarjetas con el texto a la vista, y el límite
-       de cada giro se dice dentro de la suya. Sin capturas a propósito: las que
-       hay pesan 100 KB cada una y aquí irían de miniatura.
+       Eran seis renglones de acordeón cerrados. Ahora son tarjetas con una
+       sola frase cada una (textos de Fermín, 12-oct-2026).
 
        El `id` lo usa el menú («Los seis giros»). -->
   <section class="seccion" id="giros">
@@ -560,72 +560,65 @@
       <div class="pila pila-4">
         <p class="eyebrow">Para tu giro</p>
         <h2>Seis formas de vender comida, seis configuraciones</h2>
-        <p>
-          El sistema se configura según tu giro: cambian los modos de servicio, las pantallas y lo
-          que se imprime. Donde hay un límite, está escrito.
-        </p>
+        <p>Cambian los modos de servicio, las pantallas y lo que se imprime.</p>
       </div>
 
       <div class="tres">
         <div class="tarjeta pila pila-3">
           <h3>Comida rápida o de mostrador</h3>
-          <p>Mostrador y pickup. Cola rápida, comanda directa a cocina y modos de servicio para separar lo que se come aquí de lo que se lleva. Así se ve en una <a href="/punto-de-venta-hamburgueserias">hamburguesería</a>.</p>
+          <p>Excelente para los días con prisas.</p>
         </div>
         <div class="tarjeta pila pila-3">
           <h3>Food truck</h3>
-          <p>Turno por evento y operación sin señal en la calle, que es donde el argumento del producto deja de ser teórico. Una sola caja, un solo turno, cierre al terminar.</p>
+          <p>Turno por evento, para un mejor control.</p>
         </div>
         <div class="tarjeta pila pila-3">
           <h3>Cafetería o bar</h3>
-          <p>Cuentas abiertas en barra, modificadores con precio y cierres por turno. La cuenta se queda abierta hasta que el cliente pide, no hasta que se cierra el sistema.</p>
+          <p>Cuentas abiertas en barra y mesas, modificadores, propinas y cortes por turno.</p>
         </div>
         <div class="tarjeta pila pila-3">
           <h3>Restaurante con meseros</h3>
           <p>Mapa de mesas, meseros y propinas.</p>
-          <p class="tarjeta-limite"><b>El límite:</b> no hay app de mesero en tableta. Se opera desde la caja.</p>
         </div>
         <div class="tarjeta pila pila-3">
           <h3>Solo reparto (dark kitchen)</h3>
-          <p>Varias marcas virtuales desde una cocina, y conciliación de lo que te liquidan Rappi, Uber y DiDi contra lo que registró tu caja.</p>
-          <p class="tarjeta-limite"><b>El límite:</b> la liquidación se pega a mano; todavía no se sube el archivo.</p>
+          <p>Integra apps de reparto o usa tu propio servicio de repartidores.</p>
         </div>
         <div class="tarjeta pila pila-3">
           <h3>Cadena o franquicia</h3>
-          <p>Varias sucursales con catálogo propio o compartido, franquicias, y un consolidado que suma todo sin tener que abrir cada una.</p>
+          <p>Administra todas tus sucursales desde un solo panel.</p>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ═══ 7 · El problema ════════════════════════════════════════════════ -->
+  <!-- ═══ 7 · Por qué existe ═════════════════════════════════════════════
+       Describía a los demás —los de fuera, los de siempre, el cuaderno—. Desde
+       el 12-oct-2026 dice para quién es VIM POS (frase de Fermín) y lo baja a
+       las tres preguntas que se hace quien administra un restaurante. Cada
+       respuesta es algo que el sistema ya hace y que /funciones enseña. -->
   <section class="seccion destacada-suave">
     <div class="contenedor pila pila-8">
       <div class="pila pila-4">
         <p class="eyebrow">Por qué existe</p>
-        <h2>Lo que hay hoy para un restaurante mexicano</h2>
+        <h2 style="max-width:22em">VIM POS está pensado para ese emprendedor que quiere saber cómo administrar su restaurante de verdad.</h2>
       </div>
+
       <div class="tres">
         <div class="tarjeta pila pila-3">
-          <h3>Los de fuera</h3>
-          <p>
-            Caros, en dólares, y con el SAT como una idea vaga. Pagas por funciones pensadas para
-            otro país y luego resuelves la factura por tu cuenta.
-          </p>
+          <p class="eyebrow">Ventas</p>
+          <h3>¿Cuánto vendí hoy?</h3>
+          <p>Tus ventas del día y lo que más se vende, desde tu celular.</p>
         </div>
         <div class="tarjeta pila pila-3">
-          <h3>Los de siempre</h3>
-          <p>
-            Sistemas que llevan quince años funcionando y lo hacen bien, pero viven en una sola
-            computadora: sin respaldo, sin ver tus números desde el celular y sin nada que hacer si
-            se moja el disco duro.
-          </p>
+          <p class="eyebrow">Costos</p>
+          <h3>¿Cuánto me cuesta cada platillo?</h3>
+          <p>Inventario con recetas: sabes qué insumo se fue y cuánto costó.</p>
         </div>
         <div class="tarjeta pila pila-3">
-          <h3>El cuaderno</h3>
-          <p>
-            Funciona hasta que hay dos cajas, o un socio, o alguien pregunta cuánto se vendió el
-            martes pasado. Entonces deja de funcionar de golpe.
-          </p>
+          <p class="eyebrow">Caja</p>
+          <h3>¿Cuadra mi caja?</h3>
+          <p>Corte por turno: lo que debe haber contra lo que hay en el cajón.</p>
         </div>
       </div>
     </div>
@@ -659,33 +652,22 @@
                  width="1600" height="1000" loading="lazy" decoding="async">
         </div>
         <figcaption>
-          Pegas el menú del sistema que usas hoy y lo ves antes de aceptarlo: qué producto entra,
-          con qué precio y en qué categoría. Nada se guarda hasta que tú lo confirmas.
+          Pegas tu menú y lo ves antes de aceptarlo. Nada se guarda hasta que tú lo confirmas.
         </figcaption>
       </figure>
 
       <div class="tres">
         <div class="tarjeta pila pila-3">
           <h3>Tu menú se pega y ya</h3>
-          <p>
-            Descargas tu menú del sistema que usas hoy (Square, Toast, Loyverse, Clip o una hoja
-            de cálculo) y lo pegas aquí tal cual. No hay que
-            recapturar trescientos productos a mano ni pagar por la mudanza.
-          </p>
+          <p>Descargas tu menú del sistema que usas hoy y lo pegas aquí, sin recapturar nada a mano.</p>
         </div>
         <div class="tarjeta pila pila-3">
           <h3>Tu corte se ve igual</h3>
-          <p>
-            El formato del corte Z está calcado del que ya conoces, a propósito. Quien lo lee cada
-            noche no tiene que reaprender dónde mirar.
-          </p>
+          <p>El corte Z tiene el formato que ya conoces.</p>
         </div>
         <div class="tarjeta pila pila-3">
           <h3>La comanda se parte</h3>
-          <p>
-            Bebidas en la barra, comida en cocina, cada una en su impresora. Es lo mismo que ya
-            hacías, y ya opera así en el piloto.
-          </p>
+          <p>Bebidas en la barra y comida en cocina, cada una en su impresora.</p>
         </div>
       </div>
     </div>
@@ -696,8 +678,8 @@
     <div class="contenedor pila pila-8">
       <div class="pila pila-4">
         <p class="eyebrow">Precios</p>
-        <h2>Precio de lista, sin cotización</h2>
-        <p>Mensual, en pesos, más IVA. Sin cotización ni «contáctanos para conocer el precio».</p>
+        <h2>Precios flexibles para cada tipo de restaurante</h2>
+        <p>Precio mensual, más IVA. Si tienes dudas o necesitas una cotización personalizada, <a href="https://wa.me/525665083346?text=Hola%2C%20quiero%20una%20cotizaci%C3%B3n%20de%20VIM%20POS">contacta a soporte por WhatsApp</a>.</p>
       </div>
 
       <div class="planes">
@@ -790,7 +772,7 @@
             <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
           </button>
           <div class="acordeon-panel" data-acordeon-panel><div>
-            <p>Sí. Factura global del periodo (la emites con un botón desde el panel), timbrado individual de cualquier ticket y portal de autofacturación por QR, con CFDI 4.0 timbrado por un proveedor autorizado por el SAT. Cada plan trae folios al mes para tus facturas —10 en Esencial con el extra de facturación, 20 en Negocio y 40 en Cadena— y, si se acaban, compras un paquete. Los precios están en la página de precios.</p>
+            <p>Sí. Tu cliente puede emitir su factura desde nuestro portal de autofacturación, escaneando el QR impreso en su ticket.</p>
           </div></div>
         </div>
 
@@ -800,7 +782,7 @@
             <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
           </button>
           <div class="acordeon-panel" data-acordeon-panel><div>
-            <p>Alrededor de un día. Desde Negocio lo hacemos nosotros: cargamos tu menú, lo dejamos configurado y capacitamos a tu equipo tres horas. En Esencial lo haces tú con nuestra guía y te ayudamos por WhatsApp.</p>
+            <p>Alrededor de un día, contemplando instalación y capacitación. Puede variar según el plan contratado.</p>
           </div></div>
         </div>
 
@@ -830,7 +812,7 @@
             <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
           </button>
           <div class="acordeon-panel" data-acordeon-panel><div>
-            <p>No. La tarjeta se registra como forma de pago para que el corte cuadre, pero el cobro lo haces con tu terminal bancaria de siempre. No hay terminal integrada y preferimos decirlo antes de que lo descubras instalando.</p>
+            <p>Sí, y te ayudamos con el proceso de vinculación. Actualmente funciona solo con la terminal Mercado Pago Point Smart 2.</p>
           </div></div>
         </div>
       </div>
@@ -1089,18 +1071,18 @@
         { "@type": "Question", "name": "¿De verdad funciona sin internet?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. El programa se instala en la computadora de tu caja y trabaja ahí, así que cobrar, imprimir y mandar a cocina no pasan por internet en ningún momento." } },
         { "@type": "Question", "name": "¿Qué necesito comprar?", "acceptedAnswer": { "@type": "Answer", "text": "Una computadora con Windows 10 u 11, una impresora térmica de tickets de 80 mm compatible con ESC/POS, conectada a tu red (cable Ethernet o Wi-Fi) o por USB e instalada en Windows, un cajón de dinero y el módem que ya tienes. VIM no vende equipo." } },
         { "@type": "Question", "name": "¿Puedo traer mi menú de otro sistema?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. Descargas tu menú del sistema que usas hoy y lo pegas tal cual." } },
-        { "@type": "Question", "name": "¿Emite facturas?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. Factura global del periodo (la emites con un botón desde el panel), timbrado individual de cualquier ticket y portal de autofacturación por QR, con CFDI 4.0 timbrado por un proveedor autorizado por el SAT. Cada plan trae folios al mes para tus facturas: 10 en Esencial con el extra de facturación, 20 en Negocio y 40 en Cadena." } },
-        { "@type": "Question", "name": "¿Cuánto tarda la implementación?", "acceptedAnswer": { "@type": "Answer", "text": "Alrededor de un día. Desde Negocio cargamos el menú, lo configuramos y capacitamos al equipo tres horas; en Esencial se hace con una guía y ayuda por WhatsApp." } },
+        { "@type": "Question", "name": "¿Emite facturas?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. Tu cliente puede emitir su factura desde nuestro portal de autofacturación, escaneando el QR impreso en su ticket." } },
+        { "@type": "Question", "name": "¿Cuánto tarda la implementación?", "acceptedAnswer": { "@type": "Answer", "text": "Alrededor de un día, contemplando instalación y capacitación. Puede variar según el plan contratado." } },
         { "@type": "Question", "name": "¿Y si se va la luz o alguien cierra el programa?", "acceptedAnswer": { "@type": "Answer", "text": "El programa se queda junto al reloj de Windows y sigue trabajando aunque alguien cierre la ventana. Guarda sola una copia diaria en la misma computadora, y las ventas que no alcanzaron a subir suben en cuanto vuelve la señal." } },
         { "@type": "Question", "name": "¿Funciona con varias sucursales?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. Cada sucursal opera con su propia caja y su propio turno, y el panel suma todo en un reporte consolidado." } },
-        { "@type": "Question", "name": "¿Puedo cobrar con tarjeta desde el sistema?", "acceptedAnswer": { "@type": "Answer", "text": "No. La tarjeta se registra como forma de pago para que el corte cuadre, pero el cobro se hace con la terminal bancaria del negocio." } }
+        { "@type": "Question", "name": "¿Puedo cobrar con tarjeta desde el sistema?", "acceptedAnswer": { "@type": "Answer", "text": "Sí, y te ayudamos con el proceso de vinculación. Actualmente funciona solo con la terminal Mercado Pago Point Smart 2." } }
       ]
     }
   ]
 }
 </script>
 
-<script src="/assets/js/vim.js?v=16" defer></script>
+<script src="/assets/js/vim.js?v=17" defer></script>
 <!-- Medición sin cookies (Vercel Web Analytics). Se sirve desde este dominio y
      solo existe si está encendida en el proyecto de Vercel; si no, es un 404
      inofensivo. Los eventos se mandan desde vim.js. -->

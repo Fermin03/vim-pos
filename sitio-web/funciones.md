@@ -14,189 +14,189 @@ _La caja_
 
 ## Cobrar rápido y sin equivocarse
 
-Es la pantalla donde tu cajero pasa el turno entero. Empieza eligiendo cómo se va el pedido —comedor, para llevar, pick-up o domicilio— porque de eso dependen el ticket, la comanda y el reporte.
+Toma la orden y cobra, en comedor, para llevar o a domicilio.
 
 ![Un producto abierto con sus opciones: el término de la carne y los extras con su precio.](https://vimpos.com.mx/assets/img/capturas/pos-catalogo.webp?v=3)
 
-_Los modificadores del producto. El término es obligatorio y el sistema no deja agregarlo al ticket sin elegir uno; los extras suman su precio a la vista._
+_Los modificadores del producto: término obligatorio y extras con su precio._
 
 ![Pantalla de cobro con las formas de pago: efectivo, débito, crédito, transferencia, app externa y pago dividido.](https://vimpos.com.mx/assets/img/capturas/pos-pago.webp?v=3)
 
-_Las formas de pago. La tarjeta se registra para que el corte cuadre; el cobro va por tu terminal de siempre, así que no hay comisión por venta de por medio._
+_Las formas de pago al cobrar._
 
 ### Modificadores que obligan
 
-Si una hamburguesa necesita término, no se manda a cocina sin él. El error se evita antes de llegar a la plancha, no después.
+Si la hamburguesa lleva término, no se manda a cocina sin él.
 
 ### Notas para la cocina
 
-Por producto —«sin cebolla»— o para toda la orden. Salen en la comanda, junto a lo que hay que preparar, no en un papel aparte.
+Por producto o para toda la orden. Salen en la comanda.
 
 ### Descuentos con motivo
 
-Quedan registrados y salen en el reporte de descuentos del panel, para que se puedan revisar al cierre en vez de descubrirlos al cuadrar.
+Quedan registrados y los revisas en el reporte de descuentos.
 
 ### Pedidos en espera
 
-El cliente se lo piensa y no bloquea la caja: el pedido se aparta y se retoma después sin volver a capturarlo.
+Apartas el pedido y lo retomas después, sin volver a capturarlo.
 
 ### Las formas de pago de verdad
 
-Efectivo, débito, crédito, transferencia, vales y las apps de reparto. La tarjeta se registra para que el corte cuadre; el cobro va por tu terminal de siempre.
+Efectivo, débito, crédito, transferencia, vales y apps de reparto. La tarjeta se cobra desde la caja solo con la terminal Mercado Pago Point Smart 2, y te ayudamos a vincularla. Con cualquier otra, cobras en ella y registras el pago en la caja para que el corte cuadre.
 
 ### Se puede dividir
 
-Una parte en efectivo y otra con tarjeta en el mismo ticket, sin tener que inventar dos ventas para que cuadre.
+Una parte en efectivo y otra con tarjeta, en el mismo ticket.
 
 ### Combos
 
-Un paquete con sus opciones a un solo precio. Cada producto del combo llega a cocina, descuenta inventario, cuenta en los reportes y acepta sus propios modificadores.
+Un paquete a un solo precio. Cada producto llega a cocina, descuenta inventario y acepta modificadores.
 
 ### Pantalla del cliente
 
-Con un segundo monitor en la caja, tu cliente ve la cuenta, el total y el cambio. Cuando no se está cobrando, muestra las imágenes que tú subas.
+Con un segundo monitor, tu cliente ve la cuenta, el total y el cambio. Si no estás cobrando, muestra tus imágenes.
 
 ### Un menú por sucursal
 
-Cada sucursal vende sus productos, a su precio, y agota lo suyo sin afectar a las demás.
+Cada sucursal con sus productos, sus precios y sus agotados.
 
 _La cocina_
 
 ## La comanda llega sola, y a la estación correcta
 
-Cada producto sabe de qué estación sale. Las bebidas se imprimen en la barra y la comida en cocina, en lugar de un papel largo que hay que leer entero para encontrar lo tuyo.
+Cada producto sale en su estación: las bebidas en la barra y la comida en cocina.
 
 ![Pantalla de cocina con las comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
 
-_La pantalla de cocina: cada comanda con su tiempo, el término, los extras y la nota del cajero, y la más vieja en rojo. Si tu cocina prefiere papel, la misma comanda sale por la impresora de cada área; las dos cosas conviven._
+_La pantalla de cocina: cada comanda con su tiempo, y la más vieja en rojo._
 
 ### Pantalla o papel
 
-Lo que le funcione a tu cocina, y no es una decisión de por vida: se cambia en la configuración cuando quieras.
+Lo que le funcione a tu cocina, o las dos. Lo cambias cuando quieras.
 
 ### Por estación
 
-La categoría decide a dónde va cada cosa por omisión, y un producto puede llevar la contraria cuando es la excepción.
+Cada categoría va a su estación. Un producto puede ir a otra.
 
 ### Sin pasar por internet
 
-La comanda viaja de la caja a la cocina por la red de tu local, igual que [todo lo demás cuando se cae el internet](https://vimpos.com.mx/sin-internet). No sale afuera ni siquiera cuando hay señal.
+La comanda va de la caja a la cocina por la red de tu local, [aunque se caiga el internet](https://vimpos.com.mx/sin-internet).
 
 _Comedor_
 
 ## Mesas, con la cuenta abierta
 
-Para el restaurante con meseros: el mapa del comedor, la cuenta que crece mientras la mesa sigue ahí, y el pedido que sale a cocina cuando se toma y no cuando se paga.
+El mapa de tu comedor, con la cuenta abierta de cada mesa.
 
 ![Las mesas abiertas del comedor con su consumo y su tiempo, y la cuenta de la mesa elegida con todo lo que pidió.](https://vimpos.com.mx/assets/img/capturas/pos-mesas.webp?v=3)
 
-_Las mesas abiertas del comedor: cuánto lleva cada una, cuánto va consumido, y la cuenta de la mesa elegida con todo lo que pidió, lista para cobrar o para seguir agregando._
+_Las mesas abiertas, con su tiempo y su consumo._
 
 ### A cocina antes de cobrar
 
-El pedido de la mesa sale en cuanto se toma. Es como funciona un comedor de verdad, y es donde fallan los sistemas pensados para mostrador.
+El pedido de la mesa sale a cocina en cuanto se toma.
 
 ### Quién atendió
 
-El ticket guarda su mesero, y de ahí salen el reporte de ventas por mesero y el de propinas del turno.
+Cada ticket guarda su mesero, para el reporte de ventas y el de propinas.
 
 ### Tiempos de cocina
 
-Cuánto tardó cada comanda desde que entró hasta que salió, en su propio reporte. Sirve para discutir con datos en vez de con impresiones.
+Cuánto tardó cada comanda en salir, en su propio reporte.
 
 _Inventario_
 
 ## Cuánto insumo se fue de verdad
 
-Cada producto tiene su receta, así que al vender una hamburguesa bajan la carne, el pan y el queso. Lo que no cuadra al contar es merma — y ahí es donde se ve el dinero que se va sin que nadie lo apunte. Va incluido desde el plan Negocio.
+Cada producto tiene su receta: vendes una hamburguesa y bajan la carne, el pan y el queso. Va incluido desde el plan Negocio.
 
 ![Listado de insumos con sus existencias.](https://vimpos.com.mx/assets/img/capturas/admin-inventario.webp?v=3)
 
-_Los insumos con su existencia. Lo que se descuenta sale de la receta del producto, no de un conteo a mano._
+_Los insumos con su existencia._
 
 ### Receta por producto
 
-Y también por modificador: si el queso extra se cobra, el queso extra también se descuenta.
+Y por modificador: si cobras el queso extra, también se descuenta.
 
 ### Mermas aparte
 
-Con su motivo y separadas de las ventas. Una cosa es lo que vendiste y otra lo que se te echó a perder.
+Con su motivo y separadas de las ventas.
 
 ### Avisos de existencia baja
 
-Antes de quedarte sin algo en plena hora pico, no cuando ya te quedaste.
+Te avisa antes de que te quedes sin un insumo.
 
 _Reportes y corte_
 
 ## El corte que ya conoces, y quince reportes más
 
-El corte Z está calcado del formato que tu equipo ya lee cada noche, a propósito: quien lo revisa no tiene que reaprender dónde mirar. Y el panel suma quince reportes para cuando quieras entender algo concreto.
+Cierra el turno con el corte Z y confirma que las ventas del día cuadren. En el panel tienes quince reportes más.
 
 ![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp?v=3)
 
-_El arqueo al cerrar el turno: lo que el sistema espera por cada forma de pago, lo que el cajero contó, y la diferencia a la vista. Los 40 pesos que faltan en efectivo no se esconden en el total._
+_El arqueo al cerrar el turno: lo esperado, lo contado y la diferencia. Aquí faltan 40 pesos en efectivo._
 
 ![Panel del dueño con las ventas del día, el ticket promedio y el top de productos.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
 
-_El panel, desde el celular o la computadora. Sin tener que ir al local a preguntar cómo va el día._
+_El panel, desde el celular o la computadora._
 
 ### Arqueo con sobrante y faltante
 
-Cuentas el cajón, el sistema dice lo que debería haber, y la diferencia queda registrada junto con quién cerró el turno. Con el corte ciego, el cajero cuenta sin ver cuánto debería haber.
+La diferencia queda registrada con quién cerró el turno. Con el corte ciego, el cajero cuenta sin ver cuánto debería haber.
 
 ### Quince reportes
 
-Ventas por producto, categoría, mesero, área, marca, tipo de servicio y app de reparto; costo de ventas, tiempos de cocina, descuentos, reimpresiones, eventos, no-shows, el histórico de cortes y el consolidado de sucursales.
+Ventas por producto, categoría, mesero y app de reparto; costo de ventas, tiempos de cocina y descuentos, entre otros.
 
 ### Todas tus sucursales, sumadas
 
-Tickets, venta, ticket promedio, propinas, descuentos y devoluciones de cada sucursal en una sola pantalla. Es el reporte del plan Cadena.
+La venta de cada sucursal, en una sola pantalla. Es el reporte del plan Cadena.
 
 _Apps de reparto_
 
 ## Revisa lo que la app te depositó
 
-Rappi, DiDi y Uber Eats te mandan un reporte de liquidación. Pegas aquí sus renglones —folio, monto y lo que te depositaron— y el sistema los cruza pedido por pedido contra lo que vendiste, y te marca aquéllos en los que el depósito no coincide.
+Pegas el reporte de liquidación de Rappi, DiDi o Uber Eats y el sistema marca los pedidos donde el depósito no coincide.
 
 ![Pantalla de conciliación de apps con la diferencia por pedido.](https://vimpos.com.mx/assets/img/capturas/admin-conciliacion.webp?v=3)
 
-_Cada renglón del reporte de la app, cruzado con su ticket. Los que no cuadran salen marcados: ésos son los que se reclaman._
+_Los renglones que no cuadran con su ticket salen marcados._
 
 ### Cruce por folio y monto
 
-Y sin doble asignación: un ticket no se puede casar con dos renglones distintos del reporte.
+Un ticket no se puede asignar a dos renglones del reporte.
 
 ### Lo que falta, a la vista
 
-Pedidos sin depósito, depósitos sin pedido y diferencias de monto, cada grupo por separado.
+Pedidos sin depósito, depósitos sin pedido y diferencias de monto, por separado.
 
 ### La comisión, en el reporte
 
-El reporte de ventas por app trae la venta, la comisión y lo que queda, así que la venta por apps se ve neta y no bruta.
+Ves la venta, la comisión y lo que te queda por cada app.
 
 _A domicilio_
 
 ## Pedidos a domicilio, con repartidor y zona de envío
 
-El pedido se captura en la caja con su cliente y su dirección, y sale con repartidor asignado. Los de Uber Eats entran solos.
+Capturas el pedido con cliente y dirección, y sale con repartidor asignado. Los de Uber Eats entran solos.
 
 ### Repartidores
 
-Asignas el pedido a un repartidor y con eso sale. Puedes mandar varios pedidos en un mismo viaje.
+Asignas el pedido a un repartidor. Puedes mandar varios en un mismo viaje.
 
 ### Zonas de envío
 
-El envío se cobra según la zona del cliente. Cada sucursal define las suyas y se eligen al capturar el pedido.
+El envío se cobra según la zona del cliente. Cada sucursal define las suyas.
 
 ### Uber Eats, directo a la caja
 
-Cada pedido entra como un ticket y su comanda sale a cocina. Incluido desde Negocio; en Esencial, $100 al mes ([precios](https://vimpos.com.mx/precios)). La tableta de Uber se queda en tu local, y DiDi y Rappi aún no están conectados.
+Cada pedido entra como ticket y su comanda sale a cocina. Incluido desde Negocio; en Esencial, $100 al mes ([precios](https://vimpos.com.mx/precios)). La tableta de Uber se queda en tu local.
 
 _Lealtad_
 
 ## Que tus clientes vuelvan, con puntos o sellos
 
-**Programa de lealtad.** Puntos que valen dinero, sellos por visita o puntos por premios: tú eliges. El cliente gana al pagar y canjea en su siguiente visita, en cualquiera de tus sucursales. Todo canje queda registrado con quién lo hizo.
+**Programa de lealtad.** Puntos que valen dinero, sellos por visita o puntos por premios: tú eliges. Tu cliente gana al pagar y canjea en cualquiera de tus sucursales.
 
 Incluido desde Negocio; en Esencial, $100 al mes ([precios](https://vimpos.com.mx/precios)).
 
@@ -204,19 +204,19 @@ _Si ya usas otro_
 
 ## Tu menú se pega y ya
 
-Descargas el menú del sistema que usas hoy (Square, Toast, Loyverse, Clip o una hoja de cálculo) y lo pegas aquí tal cual. No hay que recapturar trescientos productos a mano ni pagar por la mudanza.
+Descargas tu menú del sistema que usas hoy y lo pegas aquí, sin recapturar nada a mano.
 
 ![Importador de menú mostrando lo que se va a dar de alta antes de confirmar.](https://vimpos.com.mx/assets/img/capturas/admin-importador.webp?v=3)
 
-_Lo que se va a crear, a la vista antes de confirmar: qué producto, con qué precio y en qué categoría. Nada se guarda hasta que tú lo aceptas._
+_Ves lo que se va a crear antes de confirmar. Nada se guarda hasta que lo aceptas._
 
 _Facturación_
 
 ## Tus clientes se facturan solos, desde el ticket
 
-El comensal escanea el código del ticket, pone sus datos y recibe su **CFDI 4.0** por correo. Nadie en el mostrador captura un RFC ni abre otro programa. Va incluida desde el plan Negocio.
+Tu cliente escanea el código del ticket, pone sus datos y recibe su **CFDI 4.0** por correo. Va incluida desde el plan Negocio.
 
-El módulo cubre las tres cosas que un restaurante necesita ante el SAT: el **timbrado** de cada ticket que pida factura, la **factura global** con el resto de las ventas del periodo, que emites con un botón desde el panel, y el portal de **autofacturación** por QR donde el cliente hace el trámite solo. Ya está disponible: cada comprobante se timbra con un proveedor autorizado por el SAT y se archiva con su XML y su PDF.
+Incluye **timbrado**, **autofacturación** por QR y **factura global**, que emites con un botón desde el panel.
 
 [Cómo funciona la facturación](https://vimpos.com.mx/facturacion-cfdi)
 
@@ -227,7 +227,7 @@ _Los límites_
 ## Lo que VIM POS no hace
 
 - **No hay app de mesero en tableta.** El comedor se opera desde la caja.
-- **No cobra tarjetas.** La tarjeta se cobra en tu terminal bancaria y en la caja se registra como forma de pago.
+- **La tarjeta desde la caja solo funciona con la terminal Mercado Pago Point Smart 2.** Con otra terminal, cobras en ella y registras el pago en la caja.
 - **La liquidación de las apps se pega a mano.** Todavía no se sube el archivo.
 - **DiDi y Rappi no entran solos a la caja.** Hoy solo Uber Eats.
 - **No vendemos equipo.** Te decimos qué comprar y lo compras donde te salga mejor.
