@@ -255,11 +255,27 @@ export function clienteMpTienda(token: string, pedir: typeof fetch = fetch) {
      * guardado, así que la llave tiene que ser NUEVA en cada intento. Quien llama mira antes si la
      * orden ya está devuelta: eso, y no la llave, es lo que evita devolver dos veces.
      */
+    /**
+     * Cancela una orden que Mercado Pago abrió y no procesó. VERIFICADO (11 oct 2026): solo se deja en
+     * `created` o `action_required`; con `processing` contesta 409 `cannot_cancel_order`.
+     */
+    cancelarOrden: (ordenIdExterno: string, llave: string) => llamar("POST", `/v1/orders/${encodeURIComponent(ordenIdExterno)}/cancel`, undefined, llave),
     devolver: (ordenIdExterno: string, llave: string) => llamar("POST", `/v1/orders/${encodeURIComponent(ordenIdExterno)}/refund`, undefined, llave),
   };
 }
 
 /** Lo que se deja en el log de un fallo de Mercado Pago: el estado HTTP y su código, nunca el cuerpo. */
+/**
+ * Qué campo no le gustó a Mercado Pago en un 400/422 (`errors[0].message` y sus `details`, que nombran
+ * la propiedad, no su valor). Solo para el rastro de un cobro que no se aceptó: sin esto no se puede
+ * arreglar. No es el cuerpo: una orden creada (la que devuelve el token de tarjeta) nunca pasa por aquí.
+ */
+export function motivoDeNoAceptado(r: RespuestaMp): string {
+  const e0 = obj(Array.isArray(obj(r.cuerpo).errors) ? (obj(r.cuerpo).errors as unknown[])[0] : null);
+  const detalles = Array.isArray(e0.details) ? e0.details.filter((d): d is string => typeof d === "string").join(" | ") : "";
+  return [txt(e0.message) ?? txt(obj(r.cuerpo).message), detalles].filter(Boolean).join(": ").slice(0, 220);
+}
+
 export function resumenDeFallo(r: RespuestaMp): string {
   const c = obj(r.cuerpo);
   const codigo = txt(obj(Array.isArray(c.errors) ? c.errors[0] : null).code) ?? txt(c.error) ?? txt(c.code);
@@ -272,6 +288,18 @@ export function resumenDeFallo(r: RespuestaMp): string {
  * como ajena, incidente o pendiente): ahí puede haber dinero del cliente, y nadie debe leer «sin
  * pago». Un estado que no se conoce cuenta como vivo.
  */
+/**
+ * ¿Mercado Pago abrió la orden y la dejó sin procesar? VERIFICADO (11 oct 2026, en producción): un
+ * cobro que contesta 422 `unprocessable_content` deja la orden en `created`, sin `status_detail` y
+ * sin cobrar; ahí se queda para siempre. Se da un minuto de margen: una orden recién nacida puede
+ * estar todavía procesándose en la petición que la creó.
+ */
+export function ordenAtascada(orden: unknown, ahora: Date): boolean {
+  const o = obj(orden);
+  const nacio = Date.parse(String(o.created_date ?? ""));
+  return o.status === "created" && Number.isFinite(nacio) && ahora.getTime() - nacio > 60_000;
+}
+
 export function ordenViva(orden: unknown): boolean {
   const estado = String(obj(orden).status ?? "");
   return estado !== "failed" && estado !== "canceled" && estado !== "expired" && estado !== "refunded";

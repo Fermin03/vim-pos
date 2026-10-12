@@ -20,7 +20,7 @@ const EN_REVISION = { ...APROBADA, id: "ORDTSTREVISION", status: "processing", s
 const RECHAZO_402 = { errors: [{ code: "failed", message: "The following transactions failed", details: ["PAY01M4P8KB8MM494BGX78592RQMQ: insufficient_amount"] }] };
 const DATOS = { pagoId: PAGO, email: "ana@example.com", tarjeta: { token: "ff8080814c11e237014c1ff593b57b4d", payment_method_id: "master", type: "credit_card" as const } };
 
-type Metodo = keyof ClienteMpTienda;
+type Metodo = keyof ClienteMpTienda | "cancelarOrden";
 /** La base y Mercado Pago de mentira: se anota cada llamada y se contesta lo que diga cada prueba. */
 function doble(o: {
   /** Lo que la base devuelve en cada lectura del pago, en orden; la última se repite. */
@@ -69,6 +69,7 @@ function doble(o: {
         leerOrden: (id) => responder("leerOrden", id),
         buscarOrdenes: (id, desde, hasta) => responder("buscarOrdenes", id, desde, hasta),
         devolver: (id, llave) => responder("devolver", id, llave),
+        cancelarOrden: (id) => responder("cancelarOrden", id),
       };
     },
     registrar: (codigo, detalle) => { llamadas.push(`registrar ${codigo} ${detalle}`); },
@@ -391,4 +392,34 @@ test("el correo de «posible cobro sin pedido» lleva el id de la orden y el mot
   const d = avisoDeDevolucionFallida({ pagoId: PAGO, negocio: "N", folio: "T1", monto: "1.00", error: "HTTP 422 unprocessable_entity", ordenIdExterno: ORDEN });
   assert.ok(d.html.includes(ORDEN) && d.html.includes("HTTP 422 unprocessable_entity"));
   for (const html of [c.html, sinDatos.html, d.html]) assert.doesNotMatch(html, /@|card|APP_USR|\d{4} ?\d{4} ?\d{4}/i);
+});
+
+// VERIFICADO en producción (11 oct 2026): cobrar con una aplicación real a un vendedor de prueba contesta
+// 422 `unprocessable_content` y deja la orden en `created`, sin cobrar, para siempre.
+test("422 que deja la orden abierta en created: se cancela allá y el pedido se descarta; nadie se queda «confirmando»", async () => {
+  const ABIERTA = { ...APROBADA, status: "created", status_detail: undefined, total_paid_amount: undefined, created_date: "2026-10-11T18:02:59.000Z" };
+  const CANCELADA = { ...ABIERTA, status: "canceled", status_detail: "canceled" };
+  const e422 = { status: 422, cuerpo: { errors: [{ code: "unprocessable_content", message: "Unprocessable Entity" }] } };
+  const { deps, llamadas } = doble({
+    filas: [FILA, FILA, { ...FILA, estado: "RECHAZADO" }],
+    mp: { crearOrden: e422, buscarOrdenes: { status: 200, cuerpo: { data: [ABIERTA] } }, cancelarOrden: { status: 200, cuerpo: CANCELADA }, leerOrden: { status: 200, cuerpo: CANCELADA } },
+    aplicar: () => ({ estado: "RECHAZADO", pedido_estado: "EXPIRADO", recien_aprobado: false }),
+  });
+  assert.deepEqual(await cobrarPago(deps, DATOS), { tipo: "NO_PROCESADO", contarIp: false });
+  assert.ok(llamadas.some((l) => l.startsWith("mp.cancelarOrden ")), "debía cancelar la orden abierta");
+  assert.ok(llamadas.some((l) => l.startsWith("aplicar RECHAZADO ")), "la orden cancelada cierra el pago");
+  assert.ok(llamadas.includes("descartar"));
+
+  // En el barrido, una orden recién nacida (menos de un minuto) puede estar procesándose: no se toca.
+  const joven = doble({ mp: { buscarOrdenes: { status: 200, cuerpo: { data: [ABIERTA] } } } });
+  await confirmarPago(joven.deps, FILA.id);
+  assert.ok(sin(joven.llamadas, "mp.cancelarOrden"), "con menos de un minuto no se cancela");
+  // Pasado el minuto, sí.
+  const vieja = doble({ mp: { buscarOrdenes: { status: 200, cuerpo: { data: [{ ...ABIERTA, created_date: "2026-10-11T18:00:00.000Z" }] } }, cancelarOrden: { status: 200, cuerpo: CANCELADA }, leerOrden: { status: 200, cuerpo: CANCELADA } } });
+  await confirmarPago(vieja.deps, FILA.id);
+  assert.ok(vieja.llamadas.some((l) => l.startsWith("mp.cancelarOrden ")));
+  // Y una que está EN REVISIÓN (processing) nunca: Mercado Pago no deja y puede acabar cobrada.
+  const revision = doble({ mp: { buscarOrdenes: { status: 200, cuerpo: { data: [{ ...EN_REVISION, created_date: "2026-10-11T17:00:00.000Z" }] } } } });
+  await confirmarPago(revision.deps, FILA.id);
+  assert.ok(sin(revision.llamadas, "mp.cancelarOrden"));
 });

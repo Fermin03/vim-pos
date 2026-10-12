@@ -57,5 +57,10 @@ export function puertoDePagos(admin: Admin): PuertoPagos {
 export const depsDePagos = (admin: Admin, funcion: string): Deps => ({
   db: puertoDePagos(admin),
   mp: (token) => clienteMpTienda(token),
-  registrar: (codigo, detalle) => registrarError(funcion, codigo, detalle),
+  // Al log de la función y, para poder leerlo sin entrar al panel, a tienda_eventos. Nunca tokens ni
+  // datos de tarjeta: quien llama solo pasa ids nuestros y el motivo que da Mercado Pago.
+  registrar: (codigo, detalle) => {
+    registrarError(funcion, codigo, detalle);
+    void admin.from("tienda_eventos").insert({ accion: `cobro:${codigo}`.slice(0, 80), error: String(detalle).slice(0, 300) }).then(() => {}, () => {});
+  },
 });
