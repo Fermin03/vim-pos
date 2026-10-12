@@ -502,6 +502,11 @@ palabras. Con Bricks o Secure Fields el dato nunca pasa por nosotros; lo único 
 Flujo para nosotros: el navegador lee `window.MP_DEVICE_SESSION_ID` y lo manda junto con el token a la
 Edge Function, que lo reenvía en esa cabecera.
 
+> **Corregido el 12 oct 2026 con lo visto en el navegador** (`04-verificado-orders.md`, «Señales para
+> el antifraude»): con el SDK JS solo, la variable **no aparece**. Hace falta el script de seguridad
+> `https://www.mercadopago.com/v2/security.js` con `view="checkout"`; la tienda lo carga en la
+> pantalla de la tarjeta.
+
 ### Content-Security-Policy
 
 **No confirmado en la documentación.** Ni el sitio de documentación ni el repositorio del SDK publican una
@@ -519,6 +524,13 @@ lista de dominios para CSP.
 Es una lista de arranque, no una garantía: hay que cargar el formulario con la CSP en modo
 `Report-Only` y completar con lo que reporte el navegador. El script de huella de dispositivo puede pedir
 más dominios. Recordar que la CSP de la tienda puede vivir en más de una copia.
+
+> **Lista vigente (12 oct 2026), vista en el navegador hasta no tener ninguna violación** (vive en
+> `apps/tienda/next.config.mjs`, una sola copia): `script-src` `sdk.mercadopago.com` y
+> `www.mercadopago.com`; `frame-src` `api.mercadopago.com`, `api-static.mercadopago.com` y
+> `secure-fields.mercadopago.com`; `connect-src` esos tres más `www.mercadolibre.com` y
+> `api.mercadolibre.com`; `img-src` `www.mercadolibre.com` y `www.mercadolivre.com`. Los dos últimos
+> de `connect` e `img` son la huella de dispositivo: bloquearlos empeora la aprobación.
 
 ---
 

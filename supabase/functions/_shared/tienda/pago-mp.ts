@@ -27,7 +27,29 @@ export const TIPOS_DE_TARJETA = ["credit_card", "debit_card"] as const;
 export type TipoDeTarjeta = (typeof TIPOS_DE_TARJETA)[number];
 
 /** Lo que la tienda manda de la tarjeta: nunca el número, solo su token, su marca y si es crédito o débito. */
-export type Tarjeta = { token: string; payment_method_id: string; type: TipoDeTarjeta };
+export type Tarjeta = {
+  token: string; payment_method_id: string; type: TipoDeTarjeta;
+  /** La huella del dispositivo que da MercadoPago.js (`MP_DEVICE_SESSION_ID`). No va en el cuerpo: viaja en la cabecera `X-Meli-Session-Id`. */
+  dispositivo?: string | null;
+};
+
+/** Un renglón de la cotización del pedido: lo que el cliente pidió y lo que cuesta ese renglón entero. */
+export type RenglonDePedido = { nombre: string; cantidad: number; total_mxn: string };
+/** La dirección de entrega, con lo que Mercado Pago admite en `payer.address`. */
+export type DireccionDePagador = { calle: string; numero_exterior: string; codigo_postal: string; ciudad: string; estado: string };
+/**
+ * Lo que se le cuenta a Mercado Pago del pedido, además del cobro: sirve a su antifraude («envía la
+ * mayor cantidad posible de datos del comprador y del producto») y al correo que le manda al
+ * comprador. Son DATOS PERSONALES: solo viajan a Mercado Pago, nunca a un log ni a tienda_eventos.
+ */
+export type DetalleDePedido = {
+  /** «Pedido T1A2B3 en Knock-Out Burger». */
+  descripcion: string;
+  renglones: RenglonDePedido[];
+  /** Lo que el envío le cuesta al cliente, y la propina; null o «0.00» = no hay. */
+  envio: string | null; propina: string | null;
+  pagador: { nombre: string; /** 10 dígitos. */ telefono: string | null; /** Solo a domicilio. */ direccion: DireccionDePagador | null };
+};
 
 export type DatosCobro = {
   /** El id de tienda_pagos: es la `external_reference`. */
@@ -36,6 +58,8 @@ export type DatosCobro = {
   monto: string;
   email: string;
   tarjeta: Tarjeta;
+  /** Opcional: sin él, el cobro es el de siempre (solo el correo y la tarjeta). */
+  detalle?: DetalleDePedido;
 };
 
 /**
@@ -51,12 +75,22 @@ export type DatosCobro = {
 export function cuerpoDeOrden(d: DatosCobro): Record<string, unknown> {
   const monto = montoTexto(d.monto);
   if (!monto) throw new Error("cuerpoDeOrden: monto inválido");
+  const x = d.detalle;
+  const telefono = x ? telefonoDePagador(x.pagador.telefono) : null, dir = x?.pagador.direccion;
   return {
     type: "online",
     processing_mode: "automatic",
     total_amount: monto,
     external_reference: d.pagoId,
-    payer: { email: d.email },
+    // VERIFICADO (12 oct 2026, cuenta de prueba): la orden acepta `description`, `items` y estos datos
+    // del pagador, y contesta 201 `processed`.
+    ...(x && { description: corto(x.descripcion, 150), items: articulosDeOrden({ ...x, total: monto }) }),
+    payer: {
+      email: d.email,
+      ...(x && nombreDePagador(x.pagador.nombre)),
+      ...(telefono && { phone: telefono }),
+      ...(dir && { address: { street_name: corto(dir.calle, 100), street_number: corto(dir.numero_exterior, 20), zip_code: dir.codigo_postal, city: corto(dir.ciudad, 100), state: corto(dir.estado, 50) } }),
+    },
     transactions: { payments: [{
       amount: monto,
       payment_method: { id: d.tarjeta.payment_method_id, type: d.tarjeta.type, token: d.tarjeta.token, installments: 1 },
@@ -64,8 +98,110 @@ export function cuerpoDeOrden(d: DatosCobro): Record<string, unknown> {
   };
 }
 
+const corto = (s: string, n: number): string => Array.from(s.trim()).slice(0, n).join("");
+const aCentavos = (s: string | null | undefined): number | null => {
+  const m = typeof s === "string" ? /^(\d+)\.(\d{2})$/.exec(s) : null;
+  return m ? Number(m[1]) * 100 + Number(m[2]) : null;
+};
+const dePesos = (c: number): string => `${Math.floor(c / 100)}.${String(c % 100).padStart(2, "0")}`;
+
+export type Articulo = { title: string; unit_price: string; quantity: number };
+
+/**
+ * Los `items` de la orden: los renglones del pedido, el envío y la propina, cada uno como artículo.
+ * REGLA: la suma de `unit_price × quantity` es EXACTAMENTE el total que se cobra, en centavos
+ * enteros. Si no lo es (un renglón que no se lee, un pedido que ya no es el de esta cotización, un
+ * redondeo), va UN solo artículo con la descripción y el total: nunca una lista que no cuadra.
+ *   · un renglón cuyo total se reparte exacto entre su cantidad va con su precio unitario;
+ *     si no (el IVA se redondea por renglón), va como una pieza: «3 × Clásica» por el total;
+ *   · los modificadores ya están dentro del total de su renglón (así lo cotiza la base);
+ *   · un renglón de $0 no se manda (no cambia la suma).
+ */
+export function articulosDeOrden(d: Pick<DetalleDePedido, "descripcion" | "renglones" | "envio" | "propina"> & { total: string }): Articulo[] {
+  const uno: Articulo[] = [{ title: corto(d.descripcion, 150), unit_price: d.total, quantity: 1 }];
+  const total = aCentavos(d.total);
+  if (total === null) return uno;
+  const articulos: Articulo[] = [];
+  let suma = 0;
+  for (const r of d.renglones) {
+    const c = aCentavos(r.total_mxn);
+    if (c === null || !Number.isInteger(r.cantidad) || r.cantidad < 1 || !r.nombre.trim()) return uno;
+    if (c === 0) continue;
+    suma += c;
+    articulos.push(c % r.cantidad === 0
+      ? { title: corto(r.nombre, 120), unit_price: dePesos(c / r.cantidad), quantity: r.cantidad }
+      : { title: corto(`${r.cantidad} × ${r.nombre}`, 120), unit_price: r.total_mxn, quantity: 1 });
+  }
+  for (const [title, importe] of [["Envío", d.envio], ["Propina", d.propina]] as const) {
+    if (importe === null) continue;
+    const c = aCentavos(importe);
+    if (c === null) return uno;
+    if (c === 0) continue;
+    suma += c;
+    articulos.push({ title, unit_price: importe, quantity: 1 });
+  }
+  return articulos.length > 0 && suma === total ? articulos : uno;
+}
+
+/**
+ * De lo que devuelve `tienda_cotizar`, lo que hace falta para los artículos: los renglones (nombre,
+ * cantidad y total de cada uno) y lo que el envío le cuesta al cliente. Lo que no se pueda leer sale
+ * vacío, y entonces `articulosDeOrden` manda un solo artículo con el total.
+ */
+export function partesDeCotizacion(x: unknown): Pick<DetalleDePedido, "renglones" | "envio"> {
+  const q = obj(x);
+  const renglones = (Array.isArray(q.renglones) ? q.renglones : []).map(obj).map((r) => ({
+    nombre: typeof r.nombre === "string" ? r.nombre : "", cantidad: typeof r.cantidad === "number" ? r.cantidad : 0,
+    total_mxn: typeof r.total_mxn === "string" ? r.total_mxn : "",
+  }));
+  return { renglones, envio: txt(q.envio_total_mxn) };
+}
+
+/**
+ * El nombre que escribió el cliente, partido para Mercado Pago: la primera palabra es el nombre y el
+ * resto, el apellido. Con una sola palabra todo va en `first_name` y no se manda apellido.
+ */
+export function nombreDePagador(nombre: string): { first_name?: string; last_name?: string } {
+  const [primero, ...resto] = nombre.trim().split(/\s+/).filter(Boolean);
+  if (!primero) return {};
+  return { first_name: corto(primero, 60), ...(resto.length > 0 && { last_name: corto(resto.join(" "), 100) }) };
+}
+
+/**
+ * El teléfono (10 dígitos de México) partido en lada y número. Las ladas de DOS dígitos son solo
+ * las de Ciudad de México (55 y 56), Guadalajara (33) y Monterrey (81); todas las demás son de
+ * tres. Lo que no sean 10 dígitos no se manda.
+ */
+export function telefonoDePagador(telefono: string | null): { area_code: string; number: string } | null {
+  if (!telefono || !/^\d{10}$/.test(telefono)) return null;
+  const n = /^(55|56|33|81)/.test(telefono) ? 2 : 3;
+  return { area_code: telefono.slice(0, n), number: telefono.slice(n) };
+}
+
+/**
+ * Un texto que va a un log, sin los datos personales de ese cobro: si Mercado Pago, al no aceptar una
+ * orden, repite en su mensaje un valor que se le mandó (un nombre, el teléfono, la calle), no se
+ * escribe. Los nombres de las propiedades sí quedan: son lo que hace falta para arreglarlo.
+ */
+export function sinDatosPersonales(texto: string, d: Pick<DatosCobro, "email" | "tarjeta" | "detalle">): string {
+  const p = d.detalle?.pagador, tel = telefonoDePagador(p?.telefono ?? null);
+  const valores = [d.email, d.tarjeta.token, d.tarjeta.dispositivo, p?.telefono, tel?.number, ...(p?.nombre.trim().split(/\s+/) ?? []),
+                   p?.direccion?.calle, p?.direccion?.numero_exterior, p?.direccion?.codigo_postal, p?.direccion?.ciudad, p?.direccion?.estado]
+    .filter((v): v is string => typeof v === "string" && v.trim().length >= 3)
+    .sort((a, b) => b.length - a.length);
+  let limpio = texto;
+  // Sin expresiones regulares: lo que escribió el cliente se busca tal cual, sin distinguir mayúsculas.
+  for (const v of valores) {
+    const aguja = v.trim().toLowerCase();
+    for (let i = limpio.toLowerCase().indexOf(aguja); i !== -1; i = limpio.toLowerCase().indexOf(aguja, i + 3)) {
+      limpio = limpio.slice(0, i) + "•••" + limpio.slice(i + aguja.length);
+    }
+  }
+  return limpio;
+}
+
 /** Por qué no pasó un cobro, en familias: lo que la tienda le puede decir al cliente. */
-export const MOTIVOS_DE_RECHAZO = ["FONDOS", "DATOS", "LLAMAR_BANCO", "TARJETA_DESHABILITADA", "OTRO"] as const;
+export const MOTIVOS_DE_RECHAZO = ["FONDOS", "DATOS", "LLAMAR_BANCO", "TARJETA_DESHABILITADA", "RIESGO", "OTRO"] as const;
 export type MotivoDeRechazo = (typeof MOTIVOS_DE_RECHAZO)[number];
 
 // VERIFICADO con los titulares de prueba (FUND, SECU, EXPI, CALL, LOCK). El código y la fecha mal
@@ -75,9 +211,12 @@ const FAMILIAS: Record<string, MotivoDeRechazo> = {
   bad_filled_card_data: "DATOS",
   required_call_for_authorize: "LLAMAR_BANCO",
   card_disabled: "TARJETA_DESHABILITADA",
+  // VISTO EN PRODUCCIÓN (12 oct 2026): el antifraude de Mercado Pago, no el banco. Mercado Pago pide
+  // sugerir otro medio de pago y no reintentar enseguida con los mismos datos.
+  high_risk: "RIESGO",
 };
 /**
- * La familia de un motivo de rechazo. Todo lo que no se reconoce —`rejected_by_issuer`, riesgo, un
+ * La familia de un motivo de rechazo. Todo lo que no se reconoce —`rejected_by_issuer`, un
  * código nuevo, o ninguno— es OTRO: el cliente lee «tu banco no lo aprobó», que siempre es verdad,
  * y no un motivo inventado.
  */
@@ -145,7 +284,9 @@ export function decidirOrden(e: Esperado, orden: unknown): Decision {
   const d = datosDeOrden(o);
   const estado = String(o.status ?? ""), detalle = txt(o.status_detail);
   // VERIFICADO: en revisión contesta `processing` / `in_process`, y no se puede cancelar.
-  if (estado === "processing" || estado === "created" || estado === "action_required") return { tipo: "PENDIENTE", motivo: estado, ordenIdExterno };
+  // VISTO EN PRODUCCIÓN (12 oct 2026): también `in_review` (el antifraude la está mirando); segundos
+  // después llegó el aviso con su final (`order.failed`). Es una orden viva y sin resultado todavía.
+  if (estado === "processing" || estado === "in_review" || estado === "created" || estado === "action_required") return { tipo: "PENDIENTE", motivo: estado, ordenIdExterno };
 
   const pagos = obj(o.transactions).payments;
   const pago = obj(Array.isArray(pagos) ? pagos[0] : null);
@@ -224,11 +365,13 @@ export type ClienteMpTienda = ReturnType<typeof clienteMpTienda>;
 
 /** Cliente mínimo. `token` es el Access Token de la conexión de la tienda del restaurante. Un fallo de red es `status: 0`, no una excepción. */
 export function clienteMpTienda(token: string, pedir: typeof fetch = fetch) {
-  const llamar = async (metodo: string, ruta: string, cuerpo?: unknown, llave?: string): Promise<RespuestaMp> => {
+  const llamar = async (metodo: string, ruta: string, cuerpo?: unknown, llave?: string, dispositivo?: string | null): Promise<RespuestaMp> => {
     try {
       const r = await pedir(API + ruta, {
         method: metodo,
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(llave && { "X-Idempotency-Key": llave }) },
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(llave && { "X-Idempotency-Key": llave }),
+                   // La huella del dispositivo del comprador, para el antifraude de Mercado Pago (VERIFICADO: la acepta).
+                   ...(dispositivo && { "X-Meli-Session-Id": dispositivo }) },
         body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
         signal: AbortSignal.timeout(10_000),
       });
@@ -245,7 +388,7 @@ export function clienteMpTienda(token: string, pedir: typeof fetch = fetch) {
      * El cobro. La llave de idempotencia es fija por renglón de tienda_pagos, y cada renglón se cobra
      * UNA vez (tienda_pago_tomar_cobro): si la petición se repite en la red, Mercado Pago no cobra dos veces.
      */
-    crearOrden: (cuerpo: Record<string, unknown>, llave: string) => llamar("POST", "/v1/orders", cuerpo, llave),
+    crearOrden: (cuerpo: Record<string, unknown>, llave: string, dispositivo?: string | null) => llamar("POST", "/v1/orders", cuerpo, llave, dispositivo),
     /** VERIFICADO. Solo ve las órdenes de la cuenta dueña del token. */
     leerOrden: (ordenIdExterno: string) => llamar("GET", `/v1/orders/${encodeURIComponent(ordenIdExterno)}`),
     /** Las órdenes con nuestra referencia, en una ventana de fechas (VERIFICADO: 200 `{ data: […] }`). */

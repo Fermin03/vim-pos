@@ -9,7 +9,7 @@
 // No toca la base ni la red directamente: recibe un puerto (pago-puerto.ts lo arma con supabase-js)
 // y el cliente de Mercado Pago. Así se prueba con `node --test` y dobles.
 import { esc, soloAscii } from "../correo.ts";
-import { type ClienteMpTienda, cuerpoDeOrden, type DatosCobro, type Decision, decidirOrden, esTokenInvalido, type MotivoDeRechazo, motivoDeRechazo, ordenAtascada, ordenesDeBusqueda, ordenViva, respuestaDeCobro, motivoDeNoAceptado, resumenDeFallo } from "./pago-mp.ts";
+import { type ClienteMpTienda, cuerpoDeOrden, type DatosCobro, type Decision, decidirOrden, esTokenInvalido, type MotivoDeRechazo, motivoDeRechazo, ordenAtascada, ordenesDeBusqueda, ordenViva, respuestaDeCobro, motivoDeNoAceptado, resumenDeFallo, sinDatosPersonales } from "./pago-mp.ts";
 
 export type EstadoPago = "CREADO" | "APROBADO" | "RECHAZADO" | "VENCIDO" | "POR_DEVOLVER" | "DEVUELTO" | "DEVOLUCION_FALLIDA";
 
@@ -105,7 +105,7 @@ export type Cobro =
  *   · un 401 no es un rechazo de la tarjeta: PAGO_NO_DISPONIBLE;
  *   · una orden aprobada se cree después de `decidirOrden` (referencia, cuenta vendedora, moneda,
  *     acreditada) y de que la base compruebe el monto;
- *   · una orden que queda en revisión (`processing`) NO se puede cancelar (VERIFICADO: 409): se
+ *   · una orden que queda en revisión (`processing` o `in_review`) NO se puede cancelar (VERIFICADO: 409): se
  *     anota su id y queda POR_CONFIRMAR.
  */
 export async function cobrarPago(deps: Deps, datos: Omit<DatosCobro, "monto">): Promise<Cobro> {
@@ -140,7 +140,8 @@ export async function cobrarPago(deps: Deps, datos: Omit<DatosCobro, "monto">): 
 
   // (Sin token y con el cobro ya mandado no se llega aquí: `tomarCobro` dio falso arriba.)
   if (!token) return { tipo: "POR_CONFIRMAR" };
-  const r = await deps.mp(token).crearOrden(cuerpoDeOrden({ ...datos, monto: fila.monto }), `tienda-pago-${fila.id}`);
+  // El cuerpo lleva además lo del pedido y del pagador (para el antifraude); la llave es la de siempre.
+  const r = await deps.mp(token).crearOrden(cuerpoDeOrden({ ...datos, monto: fila.monto }), `tienda-pago-${fila.id}`, datos.tarjeta.dispositivo);
   const que = respuestaDeCobro({ pagoId: fila.id, cuentaVendedora: fila.cuenta_vendedora }, r);
   if (que.tipo === "SIN_PERMISO") {
     deps.registrar("COBRO_SIN_PERMISO", `conexión ${fila.conexion_id}: ${resumenDeFallo(r)}`);
@@ -151,7 +152,8 @@ export async function cobrarPago(deps: Deps, datos: Omit<DatosCobro, "monto">): 
     return descartar(esTokenInvalido(que.detalle) ? { tipo: "NO_PROCESADO", contarIp: true } : { tipo: "RECHAZADO", motivo: motivoDeRechazo(que.detalle) });
   }
   if (que.tipo === "NO_ACEPTADO") {
-    deps.registrar("COBRO_NO_ACEPTADO", `${resumenDeFallo(r)} — ${motivoDeNoAceptado(r)}`);
+    // El mensaje de Mercado Pago nombra la propiedad que no le gustó; por si repite su VALOR, se le quitan los datos del cliente.
+    deps.registrar("COBRO_NO_ACEPTADO", `${resumenDeFallo(r)} — ${sinDatosPersonales(motivoDeNoAceptado(r), datos)}`);
     // «No se creó nada» lo dice un 400, pero se comprueba: ¿hay alguna orden con nuestra referencia?
     // El cobro ya contestó (con un no): si dejó una orden abierta no hay que esperarla, se cancela ya.
     const c = await confirmarPago(deps, fila.id, undefined, true);

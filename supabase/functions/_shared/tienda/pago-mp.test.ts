@@ -2,7 +2,7 @@
 // (docs/integraciones/mercado-pago-checkout-pro/04-verificado-orders.md), recortadas como están allá.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { clienteMpTienda, cuerpoDeOrden, decidirOrden, motivoDeRechazo, ordenesDeBusqueda, ordenViva, respuestaDeCobro, resumenDeFallo, rutaDeBusqueda } from "./pago-mp.ts";
+import { articulosDeOrden, clienteMpTienda, cuerpoDeOrden, decidirOrden, type DetalleDePedido, motivoDeRechazo, nombreDePagador, ordenAtascada, ordenesDeBusqueda, ordenViva, partesDeCotizacion, respuestaDeCobro, resumenDeFallo, rutaDeBusqueda, sinDatosPersonales, telefonoDePagador } from "./pago-mp.ts";
 
 const PAGO = "2cd9e6fa-1acf-47dc-8ba4-cba918d73770";
 const E = { pagoId: PAGO, cuentaVendedora: "3754297554" };
@@ -170,4 +170,150 @@ test("del fallo se deja el estado y el código, nunca el cuerpo", () => {
   assert.equal(resumenDeFallo({ status: 409, cuerpo: { errors: [{ code: "cannot_cancel_order", message: "must be in 'action_required' or 'created'" }] } }), "HTTP 409 cannot_cancel_order");
   assert.equal(resumenDeFallo({ status: 0, cuerpo: null }), "HTTP 0");
   assert.doesNotMatch(resumenDeFallo({ status: 402, cuerpo: RECHAZO_402 }), /PAY01|insufficient/);
+});
+
+// ── `in_review` (visto en producción el 12 oct 2026) ──────────────────────────────────────────────
+// La forma real: la de una orden creada, con `status: "in_review"`; ~5 s después llegó `order.failed`.
+const ORDEN_EN_ANTIFRAUDE = { ...ORDEN_APROBADA, id: "ORDTST01M4P8ANTIFRAUDE", status: "in_review", status_detail: "in_review", total_paid_amount: "0.00" };
+test("201 in_review: el antifraude la está mirando; pendiente y con su orden, nunca un incidente ni un rechazo", () => {
+  assert.deepEqual(respuestaDeCobro(E, { status: 201, cuerpo: ORDEN_EN_ANTIFRAUDE }),
+    { tipo: "ORDEN", decision: { tipo: "PENDIENTE", motivo: "in_review", ordenIdExterno: "ORDTST01M4P8ANTIFRAUDE" } });
+  // Con cualquier detalle (no se conoce cuál manda): lo que decide es el estado.
+  for (const status_detail of ["in_review", "pending_review_manual", undefined]) {
+    assert.equal(decidirOrden(E, { ...ORDEN_EN_ANTIFRAUDE, status_detail }).tipo, "PENDIENTE", String(status_detail));
+  }
+});
+test("in_review es una orden viva y no es una orden atascada: ni se da por «sin pago» ni se cancela", () => {
+  assert.equal(ordenViva(ORDEN_EN_ANTIFRAUDE), true);
+  assert.equal(ordenAtascada({ ...ORDEN_EN_ANTIFRAUDE, created_date: "2026-10-12T18:00:00.000Z" }, new Date("2026-10-12T19:00:00.000Z")), false);
+});
+test("de ajena no pasa: in_review con otra referencia u otra cuenta sigue siendo AJENO", () => {
+  assert.equal(decidirOrden(E, { ...ORDEN_EN_ANTIFRAUDE, external_reference: "otra" }).tipo, "AJENO");
+  assert.equal(decidirOrden(E, { ...ORDEN_EN_ANTIFRAUDE, user_id: "1" }).tipo, "AJENO");
+});
+
+// ── high_risk ─────────────────────────────────────────────────────────────────────────────────────
+test("high_risk es el antifraude de Mercado Pago, no el banco: su propia familia", () => {
+  assert.equal(motivoDeRechazo("high_risk"), "RIESGO");
+  assert.deepEqual(respuestaDeCobro(E, { status: 402, cuerpo: { errors: [{ code: "failed", details: ["PAY01M4P8KB8MM494BGX78592RQMQ: high_risk"] }] } }),
+    { tipo: "RECHAZADO", detalle: "high_risk" });
+  // Los demás, como antes.
+  assert.equal(motivoDeRechazo("rejected_by_issuer"), "OTRO");
+  assert.equal(motivoDeRechazo("insufficient_amount"), "FONDOS");
+});
+
+// ── Lo que se le cuenta a Mercado Pago del pedido ─────────────────────────────────────────────────
+const suma = (articulos: { unit_price: string; quantity: number }[]): number =>
+  articulos.reduce((s, a) => s + Math.round(Number(a.unit_price) * 100) * a.quantity, 0);
+const DETALLE: DetalleDePedido = {
+  descripcion: "Pedido T1A2B3 en Knock-Out Burger",
+  renglones: [{ nombre: "Clásica", cantidad: 2, total_mxn: "278.40" }, { nombre: "Refresco", cantidad: 1, total_mxn: "30.00" }],
+  envio: "40.60", propina: "25.50",
+  pagador: { nombre: "Ana María Torres López", telefono: "4771234567",
+             direccion: { calle: "Av. Madero", numero_exterior: "12", codigo_postal: "37000", ciudad: "León", estado: "Guanajuato" } },
+};
+test("artículos: los renglones, el envío y la propina; la suma es EXACTAMENTE el total", () => {
+  const a = articulosDeOrden({ ...DETALLE, total: "374.50" });
+  assert.deepEqual(a, [
+    { title: "Clásica", unit_price: "139.20", quantity: 2 },
+    { title: "Refresco", unit_price: "30.00", quantity: 1 },
+    { title: "Envío", unit_price: "40.60", quantity: 1 },
+    { title: "Propina", unit_price: "25.50", quantity: 1 },
+  ]);
+  assert.equal(suma(a), 37450);
+});
+test("artículos: un renglón que no se reparte exacto entre su cantidad va como una pieza por su total", () => {
+  // 3 hamburguesas con modificadores e IVA redondeado por renglón: 100.00 entre 3 no da centavos enteros.
+  const a = articulosDeOrden({ descripcion: "Pedido", renglones: [{ nombre: "Doble con tocino", cantidad: 3, total_mxn: "100.00" }], envio: "0.00", propina: null, total: "100.00" });
+  assert.deepEqual(a, [{ title: "3 × Doble con tocino", unit_price: "100.00", quantity: 1 }]);
+  assert.equal(suma(a), 10000);
+});
+test("artículos: sin envío ni propina no hay esos renglones; un renglón de $0 no se manda", () => {
+  const a = articulosDeOrden({ descripcion: "Pedido", renglones: [{ nombre: "Clásica", cantidad: 1, total_mxn: "120.00" }, { nombre: "Salsa", cantidad: 2, total_mxn: "0.00" }], envio: null, propina: "0.00", total: "120.00" });
+  assert.deepEqual(a, [{ title: "Clásica", unit_price: "120.00", quantity: 1 }]);
+});
+test("artículos: si la suma no es el total (o algo no se lee), UN solo artículo con la descripción y el total", () => {
+  const uno = (total: string) => [{ title: "Pedido T1A2B3 en Knock-Out Burger", unit_price: total, quantity: 1 }];
+  // Un reintento con otro carrito: la cotización de ahora no es la del pedido que se cobra.
+  assert.deepEqual(articulosDeOrden({ ...DETALLE, total: "374.51" }), uno("374.51"));
+  assert.deepEqual(articulosDeOrden({ ...DETALLE, total: "100.00" }), uno("100.00"));
+  // No se pudo cotizar: sin renglones.
+  assert.deepEqual(articulosDeOrden({ ...DETALLE, renglones: [], envio: null, propina: null, total: "374.50" }), uno("374.50"));
+  // Algo que no se lee.
+  for (const roto of [{ nombre: "Clásica", cantidad: 2, total_mxn: "278.4" }, { nombre: "Clásica", cantidad: 0, total_mxn: "278.40" }, { nombre: "Clásica", cantidad: 1.5, total_mxn: "278.40" }, { nombre: " ", cantidad: 2, total_mxn: "278.40" }]) {
+    assert.deepEqual(articulosDeOrden({ ...DETALLE, renglones: [roto, DETALLE.renglones[1]!], total: "374.50" }), uno("374.50"), JSON.stringify(roto));
+  }
+  assert.deepEqual(articulosDeOrden({ ...DETALLE, envio: "cuarenta", total: "374.50" }), uno("374.50"));
+});
+test("artículos: en cualquier combinación, la suma siempre es el total (centavos enteros)", () => {
+  // Totales que el flotante da mal y cantidades que no dividen: nunca una lista que no cuadra.
+  for (const [r1, n1, r2, n2, envio, propina] of [["19.99", 1, "0.10", 3, "0.20", "0.01"], ["100.00", 3, "33.33", 2, "35.00", "24.00"], ["1392.00", 10, "17.40", 1, null, "139.20"], ["0.01", 1, "0.02", 2, "0.03", null]] as const) {
+    const c = (s: string | null) => (s ? Math.round(Number(s) * 100) : 0);
+    const total = ((c(r1) + c(r2) + c(envio) + c(propina)) / 100).toFixed(2);
+    const a = articulosDeOrden({ descripcion: "Pedido", renglones: [{ nombre: "A", cantidad: n1, total_mxn: r1 }, { nombre: "B", cantidad: n2, total_mxn: r2 }], envio, propina, total });
+    assert.equal(suma(a), c(total), JSON.stringify(a));
+    assert.ok(a.length > 1, "debía ir desglosado");
+    for (const x of a) assert.match(x.unit_price, /^\d+\.\d{2}$/);
+  }
+});
+test("partesDeCotizacion: lee lo de tienda_cotizar; lo ilegible sale vacío (y entonces va un solo artículo)", () => {
+  assert.deepEqual(partesDeCotizacion({ items: [{ x: 1 }], renglones: [{ nombre: "Clásica", cantidad: 2, detalle: "Sin cebolla", total_mxn: "278.40" }], subtotal_mxn: "278.40", envio_mxn: "35.00", envio_total_mxn: "40.60", total_mxn: "319.00" }),
+    { renglones: [{ nombre: "Clásica", cantidad: 2, total_mxn: "278.40" }], envio: "40.60" });
+  for (const mal of [null, undefined, "x", [], { renglones: "no" }]) assert.deepEqual(partesDeCotizacion(mal), { renglones: [], envio: null });
+});
+test("el nombre: la primera palabra es el nombre y el resto el apellido; una sola palabra, todo en first_name", () => {
+  assert.deepEqual(nombreDePagador("Ana Torres"), { first_name: "Ana", last_name: "Torres" });
+  assert.deepEqual(nombreDePagador("  Ana   María  Torres López "), { first_name: "Ana", last_name: "María Torres López" });
+  assert.deepEqual(nombreDePagador("Ana"), { first_name: "Ana" });
+  assert.deepEqual(nombreDePagador("   "), {});
+});
+test("el teléfono: lada de 2 dígitos solo en CDMX (55, 56), Guadalajara (33) y Monterrey (81); las demás, de 3", () => {
+  assert.deepEqual(telefonoDePagador("4771234567"), { area_code: "477", number: "1234567" });
+  assert.deepEqual(telefonoDePagador("5512345678"), { area_code: "55", number: "12345678" });
+  assert.deepEqual(telefonoDePagador("5612345678"), { area_code: "56", number: "12345678" });
+  assert.deepEqual(telefonoDePagador("3312345678"), { area_code: "33", number: "12345678" });
+  assert.deepEqual(telefonoDePagador("8112345678"), { area_code: "81", number: "12345678" });
+  // 551… no existe como lada de 3: empieza por 55, es CDMX. 818 tampoco: es Monterrey.
+  assert.deepEqual(telefonoDePagador("8181234567"), { area_code: "81", number: "81234567" });
+  for (const mal of [null, "", "477123456", "47712345678", "477-123-4567", "+524771234567"]) assert.equal(telefonoDePagador(mal), null);
+});
+test("el cuerpo con el detalle del pedido: descripción, artículos y pagador; el dispositivo NO va en el cuerpo", () => {
+  const c = cuerpoDeOrden({ pagoId: PAGO, monto: "374.50", email: "ana@example.com", tarjeta: { ...TARJETA, dispositivo: "armor.1a2b3c4d5e6f" }, detalle: DETALLE });
+  assert.deepEqual(c, {
+    type: "online", processing_mode: "automatic", total_amount: "374.50", external_reference: PAGO,
+    description: "Pedido T1A2B3 en Knock-Out Burger",
+    items: [{ title: "Clásica", unit_price: "139.20", quantity: 2 }, { title: "Refresco", unit_price: "30.00", quantity: 1 },
+            { title: "Envío", unit_price: "40.60", quantity: 1 }, { title: "Propina", unit_price: "25.50", quantity: 1 }],
+    payer: { email: "ana@example.com", first_name: "Ana", last_name: "María Torres López", phone: { area_code: "477", number: "1234567" },
+             address: { street_name: "Av. Madero", street_number: "12", zip_code: "37000", city: "León", state: "Guanajuato" } },
+    transactions: { payments: [{ amount: "374.50", payment_method: { id: "master", type: "credit_card", token: TARJETA.token, installments: 1 } }] },
+  });
+  assert.doesNotMatch(JSON.stringify(c), /armor|dispositivo/);
+  // Para recoger no hay dirección; sin teléfono legible no hay `phone`.
+  const recoger = cuerpoDeOrden({ pagoId: PAGO, monto: "374.50", email: "a@b.mx", tarjeta: TARJETA, detalle: { ...DETALLE, pagador: { nombre: "Ana", telefono: null, direccion: null } } });
+  assert.deepEqual(recoger.payer, { email: "a@b.mx", first_name: "Ana" });
+  // Los artículos se suman contra el monto QUE SE COBRA (el de la base), no contra otro.
+  const otroMonto = cuerpoDeOrden({ pagoId: PAGO, monto: "400.00", email: "a@b.mx", tarjeta: TARJETA, detalle: DETALLE });
+  assert.deepEqual(otroMonto.items, [{ title: "Pedido T1A2B3 en Knock-Out Burger", unit_price: "400.00", quantity: 1 }]);
+});
+test("el cliente HTTP manda la huella en X-Meli-Session-Id, y solo si la hay; la llave de idempotencia no cambia", async () => {
+  const vistas: Record<string, string>[] = [];
+  const pedir = (async (_url: unknown, init?: RequestInit) => { vistas.push(init?.headers as Record<string, string>); return new Response("{}", { status: 201 }); }) as typeof fetch;
+  const mp = clienteMpTienda("TOKEN", pedir);
+  await mp.crearOrden({}, "tienda-pago-1", "armor.1a2b3c4d5e6f");
+  await mp.crearOrden({}, "tienda-pago-1");
+  await mp.crearOrden({}, "tienda-pago-1", null);
+  assert.equal(vistas[0]!["X-Meli-Session-Id"], "armor.1a2b3c4d5e6f");
+  assert.equal(vistas[0]!["X-Idempotency-Key"], "tienda-pago-1");
+  assert.equal("X-Meli-Session-Id" in vistas[1]!, false);
+  assert.equal("X-Meli-Session-Id" in vistas[2]!, false);
+});
+test("sinDatosPersonales: lo que Mercado Pago repita de lo que se le mandó no se escribe; el nombre de la propiedad sí", () => {
+  const d = { email: "ana@example.com", tarjeta: { ...TARJETA, dispositivo: "armor.1a2b3c4d5e6f" }, detalle: DETALLE };
+  const sucio = "payer.phone.number: '1234567' is not valid | payer.first_name ANA | payer.address.street_name 'Av. Madero' 37000 León | 4771234567 | ana@example.com | armor.1a2b3c4d5e6f | " + TARJETA.token;
+  const limpio = sinDatosPersonales(sucio, d);
+  for (const dato of ["1234567", "ANA", "Ana", "Madero", "37000", "León", "4771234567", "ana@example.com", "armor", TARJETA.token]) assert.equal(limpio.includes(dato), false, dato);
+  for (const propiedad of ["payer.phone.number", "payer.first_name", "payer.address.street_name", "is not valid"]) assert.ok(limpio.includes(propiedad), propiedad);
+  // Sin detalle (el cobro de antes) sigue sirviendo.
+  assert.equal(sinDatosPersonales("invalid token", { email: "a@b.mx", tarjeta: TARJETA }), "invalid token");
 });

@@ -461,12 +461,12 @@ test("cuerpo: confirmar_pago lleva solo el código del pedido; lo demás que man
 test("pedir en línea: la tarjeta es obligatoria, y solo su token, su marca y si es crédito o débito (lista cerrada)", () => {
   const ok = leerCuerpo(enLinea);
   assert.ok(ok.ok && ok.valor.accion === "pedir");
-  if (ok.ok && ok.valor.accion === "pedir") assert.deepEqual(ok.valor.tarjeta, TARJETA);
+  if (ok.ok && ok.valor.accion === "pedir") assert.deepEqual(ok.valor.tarjeta, { ...TARJETA, dispositivo: null });
   const debito = leerCuerpo({ ...enLinea, tarjeta: { ...TARJETA, type: "debit_card" } });
   assert.ok(debito.ok && debito.valor.accion === "pedir" && debito.valor.tarjeta?.type === "debit_card");
-  // Lo demás que mande quien llama (el banco, un Device ID, un número de tarjeta) no pasa de aquí.
-  const conExtras = leerCuerpo({ ...enLinea, tarjeta: { ...TARJETA, issuer_id: 160, dispositivo: "armor.1a2b3c4d", numero: "4111111111111111" } });
-  if (conExtras.ok && conExtras.valor.accion === "pedir") assert.deepEqual(conExtras.valor.tarjeta, TARJETA);
+  // Lo demás que mande quien llama (el banco, un número de tarjeta) no pasa de aquí.
+  const conExtras = leerCuerpo({ ...enLinea, tarjeta: { ...TARJETA, issuer_id: 160, numero: "4111111111111111" } });
+  if (conExtras.ok && conExtras.valor.accion === "pedir") assert.deepEqual(conExtras.valor.tarjeta, { ...TARJETA, dispositivo: null });
   else assert.fail("debía valer");
   for (const mal of [undefined, null, "tok", [], {}, { ...TARJETA, token: "corto" }, { ...TARJETA, token: "x".repeat(65) }, { ...TARJETA, token: "con espacio 0123456789" },
                      { ...TARJETA, token: 4111111111111111 }, { ...TARJETA, payment_method_id: "" }, { ...TARJETA, payment_method_id: "VISA!" }, { ...TARJETA, payment_method_id: "x".repeat(31) },
@@ -493,4 +493,16 @@ test("cuerpo: `intento` lleva solo la clave del intento, con su forma; no crea n
   }
   const { cuposDe } = await import("./respuesta.ts");
   assert.deepEqual(cuposDe("intento", "1.2.3.4", "knockout"), { antes: [{ clave: "tienda:intento:ip:1.2.3.4", ventanaSeg: 600, max: 30 }], despuesDelCaptcha: [], alFallar: "cerrar" });
+});
+
+// ── La huella del dispositivo (antifraude de Mercado Pago) ────────────────────────────────────────
+test("pedir en línea: la huella del dispositivo es opcional; con forma pasa, sin forma se ignora y el pago sigue", () => {
+  const con = (dispositivo: unknown) => {
+    const r = leerCuerpo({ ...enLinea, tarjeta: { ...TARJETA, dispositivo } });
+    assert.ok(r.ok && r.valor.accion === "pedir", JSON.stringify(dispositivo));
+    return r.ok && r.valor.accion === "pedir" ? r.valor.tarjeta?.dispositivo : undefined;
+  };
+  for (const vale of ["armor.1a2b3c4d5e6f", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "armor." + "0af3".repeat(56) + "9"]) assert.equal(con(vale), vale);
+  // Acaba en una cabecera HTTP: nada de espacios, saltos de línea ni caracteres raros. Tampoco se rechaza el pedido por ella.
+  for (const mal of ["", "corto", "x".repeat(301), "con espacio 12345", "salto\r\nX-Otra: 1", "ñandú-12345678", 12345678, null, undefined, {}, ["armor.1a2b3c4d"]]) assert.equal(con(mal), null);
 });

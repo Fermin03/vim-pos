@@ -79,6 +79,52 @@ y un token de tarjeta creado con la public key de esa aplicación. Lo que no est
 existe `binary_mode`. `POST /v1/orders/{id}/cancel` contesta **409 `cannot_cancel_order`** («must be
 in 'action_required' or 'created'»): una orden `processing` no se puede cancelar.
 
+**En revisión del antifraude → 201 con `status: "in_review"`** (VISTO EN PRODUCCIÓN el 12 oct 2026,
+cobro real con tarjeta real; no se ha reproducido en la cuenta de prueba). `POST /v1/orders`
+devolvió una orden `in_review` y **~5 s después llegó el aviso `order.failed`**, con el que el
+pedido se cerró bien. Se trata igual que `processing`: pendiente, viva, no se cancela; la resuelven
+el aviso, `confirmar_pago` y el barrido. (Hasta ese día el código no conocía el estado y lo
+registraba como `INCIDENTE (estado desconocido: in_review)`.) El `status_detail` que acompaña a
+ese estado no se anotó: el código decide solo por `status`.
+
+**`high_risk`** (VISTO EN PRODUCCIÓN el 12 oct 2026): tres cobros reales seguidos se rechazaron con
+ese motivo. No es el banco: es el antifraude de Mercado Pago. La tienda lo dice con su propio motivo
+(`RIESGO`). Ese día la tienda bloqueaba en su CSP la huella de dispositivo de Mercado Pago y no
+mandaba ni Device ID, ni datos del pagador, ni artículos (ver «Señales para el antifraude»).
+
+## Señales para el antifraude (12 oct 2026)
+
+**Aceptado por `POST /v1/orders` (verificado ese día contra la cuenta de prueba: 201 `processed`),
+todo junto:** `description` (texto); `items: [{ title, unit_price: "25.00", quantity: 1 }]` (también
+admite `external_code` y `category_id`); `payer.first_name`, `payer.last_name`,
+`payer.phone: { area_code, number }`, `payer.address: { street_name, street_number, zip_code, city,
+state }`; y la cabecera **`X-Meli-Session-Id`**.
+
+Lo que manda la tienda (`cuerpoDeOrden`, `pago-mp.ts`):
+
+- `description`: «Pedido <folio> en <negocio>».
+- `items`: un artículo por renglón del pedido, más «Envío» y «Propina» si los hay. **La suma es
+  exactamente `total_amount`**; si no cuadra, un solo artículo con la descripción y el total.
+- `payer`: nombre partido (primera palabra / resto), teléfono con su lada (2 dígitos solo en 55, 56,
+  33 y 81; 3 en las demás) y, a domicilio, la dirección.
+- `X-Meli-Session-Id`: la huella del dispositivo que el navegador leyó de `MP_DEVICE_SESSION_ID`.
+
+**SIN VERIFICAR contra Mercado Pago** (se armó con lo de arriba, pero estas combinaciones exactas no
+se han mandado): varios artículos con `quantity` mayor que 1; una lada de 2 dígitos con número de 8;
+un pagador sin `last_name`; `payer.address` sin `neighborhood`; y una huella real de 231 caracteres
+en la cabecera.
+
+**La huella del dispositivo, en el navegador (VISTO el 12 oct 2026, Chromium, public key de prueba):**
+
+- MercadoPago.js (`sdk.mercadopago.com/js/v2`) **por sí solo NO deja `window.MP_DEVICE_SESSION_ID`**
+  (la documentación dice que sí). Lo que hace es registrar el dispositivo: `POST
+  api.mercadopago.com/v1/devices`, `api.mercadolibre.com/tracks` y dos balizas (`www.mercadolibre.com/jms/lgz`
+  y `www.mercadolivre.com/jms/mlb`).
+- Con el script de seguridad `https://www.mercadopago.com/v2/security.js` (atributo `view="checkout"`)
+  sí aparece: un texto `armor.` + hexadecimales, de **231 caracteres**. Pide `POST
+  api.mercadopago.com/v1/device_sessions`.
+- La tienda carga ese script solo en la pantalla de la tarjeta.
+
 ## Consultar
 
 - `GET /v1/orders/{id}`: funciona.

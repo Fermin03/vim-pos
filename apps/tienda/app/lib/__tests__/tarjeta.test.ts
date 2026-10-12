@@ -89,3 +89,35 @@ describe("cuando la librería no pudo crear el token", () => {
     expect(textoSinFormulario(false)).toBe("No pudimos cargar el pago con tarjeta. Revisa tu conexión y vuelve a intentar.");
   });
 });
+
+describe("la huella del dispositivo (antifraude de Mercado Pago)", () => {
+  it("se lee de MP_DEVICE_SESSION_ID solo si tiene forma; si no está, no se inventa", async () => {
+    const { dispositivoDe } = await import("../tarjeta");
+    const real = "armor." + "0af3".repeat(56) + "9";   // la forma vista: 231 caracteres
+    expect(real).toHaveLength(231);
+    expect(dispositivoDe({ MP_DEVICE_SESSION_ID: real })).toBe(real);
+    for (const mal of [{}, null, undefined, { MP_DEVICE_SESSION_ID: "" }, { MP_DEVICE_SESSION_ID: "corto" }, { MP_DEVICE_SESSION_ID: 123456789 },
+                       { MP_DEVICE_SESSION_ID: "con espacio 123456" }, { MP_DEVICE_SESSION_ID: "salto\r\nX-Otra: 1" }, { MP_DEVICE_SESSION_ID: "x".repeat(301) }]) {
+      expect(dispositivoDe(mal), JSON.stringify(mal)).toBeUndefined();
+    }
+  });
+  it("el script de seguridad se pide una sola vez, con view=checkout, y si falla se quita para reintentar", async () => {
+    const { cargarHuellaDeDispositivo, SEGURIDAD_DE_MERCADO_PAGO } = await import("../tarjeta");
+    type Guion = { src: string; async: boolean; atributos: Record<string, string>; onerror: (() => void) | null; setAttribute(k: string, v: string): void; remove(): void };
+    const puestos: Guion[] = [];
+    const doc = {
+      querySelector: (sel: string) => puestos.find((s) => sel.includes(s.src)) ?? null,
+      createElement: (): Guion => { const s: Guion = { src: "", async: false, atributos: {}, onerror: null, setAttribute(k, v) { s.atributos[k] = v; }, remove() { puestos.splice(puestos.indexOf(s), 1); } }; return s; },
+      head: { appendChild: (s: Guion) => { puestos.push(s); } },
+    } as unknown as Document;
+    cargarHuellaDeDispositivo(doc);
+    cargarHuellaDeDispositivo(doc);
+    expect(puestos).toHaveLength(1);
+    expect(puestos[0]).toMatchObject({ src: SEGURIDAD_DE_MERCADO_PAGO, async: true, atributos: { view: "checkout" } });
+    expect(SEGURIDAD_DE_MERCADO_PAGO).toBe("https://www.mercadopago.com/v2/security.js");
+    puestos[0]!.onerror?.();
+    expect(puestos).toHaveLength(0);
+    cargarHuellaDeDispositivo(doc);
+    expect(puestos).toHaveLength(1);
+  });
+});
