@@ -14,24 +14,24 @@ Montamos un par de productos tuyos y cobras una venta de prueba en el sistema de
 
 1. ### Te escribimos por WhatsApp
 
-   El mismo día hábil. No un correo automático a las tres semanas.
+   El mismo día hábil.
 2. ### Media hora, cuando puedas
 
-   En tu local, si estás en León y alrededores. La agendamos a tu hora floja, no a la nuestra. Si estás fuera, [pruébalo 30 días gratis](https://admin.vimpos.com.mx/registro).
+   En tu local, si estás en León y alrededores. Si estás fuera, [pruébalo 30 días gratis](https://admin.vimpos.com.mx/registro).
 3. ### Lo usas tú
 
-   Con tus productos y tus precios, no con una demostración de juguete. Ahí es donde se ve si te sirve.
+   Con tus productos y tus precios. Ahí se ve si te sirve.
 4. ### Te decimos qué plan te toca
 
-   Con el precio de la página, sin cotización inflada. Si no te sirve, te lo decimos y no insistimos.
+   Con el precio de la página. Si no te sirve, te lo decimos y no insistimos.
 
 ![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=3)
 
-_Esto es lo que vas a ver en la demostración, con tus productos y tus precios cargados._
+_Lo que vas a ver en la demo, con tus productos y tus precios._
 
-**No te va a llamar un vendedor.** Y si prefieres hablar ahora, [escríbenos](mailto:hola@vimpos.com.mx) y te contestamos el mismo día hábil.
+**No te va a llamar un vendedor.** Si prefieres hablar ahora, [escríbenos](mailto:hola@vimpos.com.mx).
 
-Tus datos son solo para contactarte por esto. No los vendemos, no los compartimos y no te vamos a meter a una lista de correos.
+Tus datos son solo para contactarte por esto. No los vendemos ni los compartimos.
 
 ---
 

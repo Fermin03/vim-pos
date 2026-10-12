@@ -165,4 +165,8 @@ export const NEGOCIO = {
   estado: 'Guanajuato',
   pais: 'MX',
   instagram: 'https://www.instagram.com/vimpos_mx/',
+  // El WhatsApp de atención de la empresa (desde el 12-oct-2026). NO es el
+  // móvil personal que salió del sitio el 6 de septiembre: es la línea de
+  // soporte, y es el único número que la prueba de datos personales deja pasar.
+  whatsapp: 'https://wa.me/525665083346',
 };

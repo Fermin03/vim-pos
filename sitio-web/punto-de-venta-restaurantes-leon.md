@@ -4,7 +4,7 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-restaurantes-leon
 
-VIM POS se hace aquí. Si tu restaurante está en León o cerca, la demo es en tu mostrador y con tu menú.
+VIM POS se hace aquí: la demo es en tu mostrador y con tu menú.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
@@ -16,11 +16,11 @@ _Estar cerca_
 
 ### La demo, en tu local
 
-Vamos a enseñártelo donde vas a usarlo, en León y alrededores. Fuera de la zona, puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro).
+Vamos a tu local, en León y alrededores. Fuera de la zona, puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro).
 
 ### Contesta quien lo hace
 
-No hay distribuidores ni centro de llamadas. Escribes y te contestamos el mismo día hábil.
+Escribes y te contestamos el mismo día hábil.
 
 ### Arranque acompañado
 
@@ -30,7 +30,7 @@ _El sistema_
 
 ## Caja, cocina, mesas, inventario y facturación
 
-Es el mismo sistema para cualquier restaurante de México: lo que cambia en León es que nos tienes a la mano. Todo lo que hace está en [funciones](https://vimpos.com.mx/funciones).
+Todo lo que hace el sistema está en [funciones](https://vimpos.com.mx/funciones).
 
 ![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=3)
 
@@ -38,7 +38,7 @@ _La caja, tal como la ve quien cobra._
 
 ### Cobra sin internet
 
-El sistema vive en la computadora de tu caja. Si se va la señal, sigues cobrando, imprimiendo y mandando a cocina. [Cómo funciona](https://vimpos.com.mx/sin-internet).
+Si se va la señal, sigues cobrando, imprimiendo y mandando a cocina. [Cómo funciona](https://vimpos.com.mx/sin-internet).
 
 ### Factura sin parar la fila
 
@@ -54,11 +54,11 @@ _Preguntas_
 
 ### ¿Ya hay restaurantes de León usándolo?
 
-Sí. VIM POS está en operación diaria en un restaurante de León. Es un producto joven y lo decimos tal cual en [quién está detrás](https://vimpos.com.mx/nosotros).
+Sí. +10 restaurantes ya se administran con VIM POS. Conoce [quién está detrás](https://vimpos.com.mx/nosotros).
 
 ### ¿Atienden fuera de León?
 
-Sí, atendemos restaurantes de toda la República. La demo es en persona y solo en León y alrededores; fuera de ahí puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro).
+Sí, en toda la República. La demo en persona es solo en León y alrededores; fuera de ahí puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro).
 
 ### ¿Venden la computadora y la impresora?
 

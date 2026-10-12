@@ -9,9 +9,9 @@
 
   <style>
     .a-t-titulo { font: 600 15px 'Inter Tight', system-ui, sans-serif; fill: var(--ink, #16161A); }
-    .a-t-sub    { font: 400 12.5px 'Inter Tight', system-ui, sans-serif; fill: var(--ink-3, #8E8E94); }
+    .a-t-sub    { font: 400 12.5px 'Inter Tight', system-ui, sans-serif; fill: var(--ink-3, #6E6E74); }
     .a-t-etq    { font: 600 10px 'JetBrains Mono', ui-monospace, monospace;
-                  letter-spacing: .12em; fill: var(--ink-3, #8E8E94); }
+                  letter-spacing: .12em; fill: var(--ink-3, #6E6E74); }
 
     /* La frontera del local es la pieza que carga el argumento: lo de dentro no
        depende de lo de fuera. Por eso es lo único con relleno propio. */
@@ -23,7 +23,7 @@
     /* Lo de fuera: gris, sin relleno y unido por puntos. Se lee como "opcional"
        antes de leer ninguna palabra. */
     .a-fuera   { fill: none; stroke: var(--line-strong, #DDDDD9); stroke-width: 1; }
-    .a-enlace  { stroke: var(--ink-3, #8E8E94); stroke-width: 1.25; stroke-dasharray: 4 4; fill: none; }
+    .a-enlace  { stroke: var(--ink-3, #6E6E74); stroke-width: 1.25; stroke-dasharray: 4 4; fill: none; }
 
     .a-corte { opacity: 0; }
     .a-nube-grupo, .a-enlace, .a-corte { transition: opacity 240ms cubic-bezier(0.23, 1, 0.32, 1); }

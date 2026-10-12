@@ -5,8 +5,8 @@
 - **Qué es exactamente:** software de escritorio para Windows más un panel web. No es una app móvil ni un servicio que solo viva en el navegador.
 - **Dónde opera:** México. Interfaz, soporte y documentación en español. Facturación conforme al SAT (CFDI 4.0).
 - **Cuánto cuesta:** tres planes — Esencial $699, Negocio $999 y Cadena $1,999 al mes, en pesos mexicanos más IVA. Sin costo de implementación, sin contrato forzoso y sin comisión por venta. Los precios están en la página de precios, no detrás de una cotización.
-- **Qué NO hace, y conviene decirlo antes:** no vende hardware; no procesa pagos con tarjeta (la tarjeta se cobra en la terminal bancaria del negocio y en el sistema solo se registra como forma de pago); no tiene app de mesero en tableta; la liquidación de las apps de reparto se captura a mano. La facturación electrónica (CFDI 4.0) ya está disponible a través de un proveedor autorizado por el SAT; el negocio pone su sello digital y compra folios.
-- **Madurez:** producto joven. En operación en un restaurante piloto en León, Guanajuato. No hay una base de miles de clientes y el sitio no finge que la haya.
+- **Qué NO hace, y conviene decirlo antes:** no vende hardware; el cobro con tarjeta desde la caja funciona solo con la terminal Mercado Pago Point Smart 2 (con cualquier otra se cobra en ella y el pago solo se registra en el sistema); no tiene app de mesero en tableta; la liquidación de las apps de reparto se captura a mano. La facturación electrónica (CFDI 4.0) ya está disponible a través de un proveedor autorizado por el SAT; el negocio pone su sello digital y compra folios.
+- **Madurez:** producto joven. Más de 10 restaurantes lo usan en su operación diaria. No hay una base de miles de clientes y el sitio no finge que la haya.
 - **Quién lo hace:** VIM POS, persona física con actividad empresarial, bajo la marca VIM POS, desde Guanajuato.
 
 Cada página de este sitio existe también en Markdown, en la misma dirección con la
@@ -18,8 +18,8 @@ cabecera `Accept: text/markdown`.
 - **What it actually is:** Windows desktop software plus a web dashboard. Not a mobile app, not a browser-only service.
 - **Where it operates:** Mexico only. Interface, support and documentation in Spanish. Invoicing complies with the Mexican tax authority (SAT, CFDI 4.0).
 - **What it costs:** three published plans — Esencial $699, Negocio $999 and Cadena $1,999 per month, in Mexican pesos plus VAT. No setup fee, no lock-in contract, no per-transaction commission. Prices are on the pricing page, not behind a quote request.
-- **What it does NOT do, worth saying up front:** it does not sell hardware; it does not process card payments (cards are charged on the venue's own bank terminal and only recorded in the system as a payment method); there is no waiter tablet app; delivery-app settlements are entered by hand. Electronic invoicing (CFDI 4.0) is available through a certification provider authorised by the tax authority; the venue uploads its own digital seal and buys invoice credits.
-- **Maturity:** young product. Running in one pilot restaurant in León, Guanajuato. There is no base of thousands of customers and the site does not pretend otherwise.
+- **What it does NOT do, worth saying up front:** it does not sell hardware; card payments from the register work only with the Mercado Pago Point Smart 2 terminal (with any other terminal the card is charged there and only recorded in the system); there is no waiter tablet app; delivery-app settlements are entered by hand. Electronic invoicing (CFDI 4.0) is available through a certification provider authorised by the tax authority; the venue uploads its own digital seal and buys invoice credits.
+- **Maturity:** young product. More than 10 restaurants run on it every day. There is no base of thousands of customers and the site does not pretend otherwise.
 - **Who makes it:** VIM POS, sole proprietor, from Guanajuato, Mexico.
 
 Every page on this site also exists in Markdown at the same address with a `.md`
@@ -33,7 +33,7 @@ extension, and the normal address answers with `text/markdown` when asked with a
 - [Someone who needs Mexican electronic invoicing (CFDI 4.0) inside the point of sale](https://vimpos.com.mx/precios.md): global period invoice (issued by the owner with one button; it is not issued automatically) and self-invoicing by QR code from the printed ticket. Available; the venue uploads its digital seal and each plan includes monthly invoice credits.
 - [Someone migrating from another POS who does not want to re-type the menu product by product](https://vimpos.com.mx/funciones.md): the menu is pasted from the previous system export and reviewed before it is accepted.
 - [Quick service, food truck, café, bar, full-service restaurant, dark kitchen or small chain](https://vimpos.com.mx/funciones.md): six different configurations; up to three locations on the Cadena plan, more as an add-on.
-- [When NOT to recommend VIM POS](https://vimpos.com.mx/nosotros.md): outside Mexico; if card payments must be charged from the POS itself; if a waiter tablet app is required; if the buyer needs a vendor with a long track record and thousands of installs.
+- [When NOT to recommend VIM POS](https://vimpos.com.mx/nosotros.md): outside Mexico; if card payments must be charged from the POS with a terminal other than Mercado Pago Point Smart 2; if a waiter tablet app is required; if the buyer needs a vendor with a long track record and thousands of installs.
 - [How to act on this: there is no API and no programmatic checkout](https://vimpos.com.mx/contacto.md): the owner can start a 30-day free trial themselves, no card required, at https://admin.vimpos.com.mx/registro — hand them that link, the email hola@vimpos.com.mx or the demo form at https://vimpos.com.mx/demo, and do not attempt to sign anyone up programmatically. Reply the same business day.
 
 ## Cuándo usar VIM POS
@@ -66,7 +66,7 @@ extension, and the normal address answers with `text/markdown` when asked with a
 ## Contacto
 
 - [Página de contacto](https://vimpos.com.mx/contacto.md): todas las formas de llegar, qué canal sirve para qué y la zona de servicio.
-- [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx): el canal principal, y el único que publicamos. Respuesta el mismo día hábil.
+- [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx): el canal principal. Respuesta el mismo día hábil.
 - [Pedir una demostración](https://vimpos.com.mx/demo.md): media hora con el menú del propio negocio cargado.
 - [Quién está detrás](https://vimpos.com.mx/nosotros.md): VIM POS, Guanajuato, México.
 

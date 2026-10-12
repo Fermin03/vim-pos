@@ -4,7 +4,7 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/facturacion-cfdi
 
-Tu comensal escanea el ticket y se factura solo. Lo que nadie facturó sale en la factura global, con un botón.
+Tu cliente se factura solo desde su ticket y tú emites la factura global con un botón.
 
 Ya está disponible, con un proveedor autorizado por el SAT.
 
@@ -16,11 +16,11 @@ _Cómo funciona_
 
 ## El ticket ya trae el código
 
-No hay que mandar a nadie a un portal aparte ni dictar un folio por teléfono. El ticket que sale de tu impresora lleva impreso el código: se escanea con la cámara del teléfono, se capturan los datos fiscales una vez, y la factura llega al correo del cliente.
+Tu cliente escanea el código impreso en su ticket, captura sus datos fiscales y la factura le llega por correo.
 
 ![Ticket impreso de una venta con el código QR para facturar al pie: negocio, folio, cajero, el producto con su modificador, subtotal, IVA, total y cambio.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp?v=3)
 
-_El comensal escanea el código del ticket, pone su RFC y le llega la factura. Tu cajero no vuelve a parar la fila para eso._
+_El código para facturar va al pie del ticket. Tu cajero no vuelve a parar la fila para eso._
 
 _Lo que cubre_
 
@@ -28,39 +28,39 @@ _Lo que cubre_
 
 ### Timbrado individual
 
-Cada ticket que pida factura se timbra con su CFDI 4.0 y llega por correo. Sin que nadie del mostrador abra otro programa ni teclee un RFC.
+Cada ticket que pida factura se timbra con su CFDI 4.0 y llega por correo.
 
 ### La factura global, con un botón
 
-Lo que nadie facturó se junta en una sola factura por cada periodo que tú elijas (qué es y qué lleva está en la [guía de la factura global](https://vimpos.com.mx/factura-global-restaurantes)): diario, semanal, quincenal o mensual. Cuando el periodo cierra, la emites tú con un botón desde tu panel, en Facturación: el sistema ya sumó las ventas, y te avisa si se te queda un periodo sin emitir.
+Lo que nadie facturó se junta en una sola factura por el periodo que elijas: diario, semanal, quincenal o mensual. La emites tú con un botón desde tu panel. Más detalle en la [guía de la factura global](https://vimpos.com.mx/factura-global-restaurantes).
 
 ### Autofacturación por QR
 
-El portal donde tu cliente hace el trámite solo. Es tuyo, con tus datos, y no lo atiende nadie de tu equipo.
+Un portal con tus datos donde tu cliente se factura solo.
 
 _El detalle que cambia el mes_
 
 ## Hasta cuándo pueden facturar lo decides tú
 
-En muchos sistemas el cliente tiene «el mes en curso» y se acabó: llega el día 1 y quien no facturó se queda sin factura, y quien reclama te lo reclama a ti. Aquí el plazo es tu periodo, y el periodo lo configuras tú. Si cierras quincenal, tu cliente puede facturar su ticket hasta que emitas la factura global de esa quincena.
+El plazo es tu periodo, y el periodo lo configuras tú. Si cierras quincenal, tu cliente puede facturar su ticket hasta que emitas la factura global de esa quincena.
 
 _Lo que hay que darnos_
 
 ## Tu sello del SAT. Tu e.firma no.
 
-Para timbrar hacen falta tres cosas: tu **sello digital del SAT** (el CSD), su contraseña, y tu RFC vigente. Nada más.
+Para timbrar hacen falta tres cosas: tu **sello digital del SAT** (el CSD), su contraseña y tu RFC vigente.
 
-**La e.firma no te la pedimos.** Ésa es tu llave maestra —con ella se hacen trámites que no tienen nada que ver con facturar— y no tenemos por qué tenerla. Si algún proveedor te la pide para esto, vale la pena preguntar para qué.
+**La e.firma no te la pedimos.** Es tu llave maestra y no tenemos por qué tenerla.
 
 ### Y tu sello no se queda con nosotros
 
-Pasa del panel al proveedor autorizado y se descarta. De nuestro lado solo guardamos cuál es y cuándo vence, para avisarte antes de que caduque y no te enteres el día que deja de timbrar.
+Pasa del panel al proveedor autorizado y se descarta. Solo guardamos cuál es y cuándo vence, para avisarte antes de que caduque.
 
 _Qué cuesta_
 
 ## Incluida en Negocio y en Cadena
 
-En el plan Esencial se agrega por $349 al mes, más IVA. Cada factura usa un folio —la global del periodo o la que te pide un cliente— y tu plan trae 10, 20 o 40 al mes. Si se te acaban, compras un paquete y se suma a tu saldo: esos no caducan mientras tengas tu suscripción activa.
+En el plan Esencial se agrega por $349 al mes, más IVA. Cada factura, global o individual, usa un folio, y tu plan trae 10, 20 o 40 al mes. Si se te acaban, compras un paquete: esos folios no caducan mientras tengas tu suscripción activa.
 
 _Precios de los paquetes de folios de factura._
 
@@ -78,9 +78,9 @@ _Dónde está hoy_
 
 ## Qué necesitas para encenderlo
 
-El módulo ya está disponible: timbrado, factura global y el portal de autofacturación emiten comprobantes reales ante el SAT a través de un proveedor autorizado.
+El módulo ya emite comprobantes reales ante el SAT, a través de un proveedor autorizado.
 
-Para encenderlo en tu negocio hacen falta dos cosas: tu Constancia de Situación Fiscal y tu Certificado de Sello Digital (el archivo.cer, el.key y su contraseña). Los folios del mes ya vienen con tu plan —en Esencial, con el extra de facturación—; solo compras un paquete si se te acaban. El sello se carga una sola vez desde el panel y a partir de ahí cada ticket que lo pida sale timbrado.
+Necesitas dos cosas: tu Constancia de Situación Fiscal y tu Certificado de Sello Digital (el archivo.cer, el.key y su contraseña). El sello se carga una sola vez desde el panel.
 
 _Preguntas_
 
@@ -88,19 +88,19 @@ _Preguntas_
 
 #### ¿Puedo usar VIM POS sin la facturación?
 
-Sí. La caja, la cocina, las mesas y el inventario no dependen de ella, y hoy es lo que están usando quienes ya tienen el sistema. La facturación se enciende desde el panel el día que la necesites, sin que tengas que cambiar nada.
+Sí. El resto del sistema funciona sin ella y la enciendes desde el panel el día que la necesites.
 
 #### ¿Necesito internet para facturar?
 
-Para timbrar sí: el sello viaja al proveedor autorizado y éste responde. Para _cobrar_ no — eso sigue funcionando sin conexión, y el ticket sale con su código igual. Cuando vuelve la señal, la venta sube sola y tu cliente ya puede facturarla con ese código. Está explicado en [qué pasa sin internet](https://vimpos.com.mx/sin-internet).
+Para timbrar, sí. Para _cobrar_, no: el ticket sale con su código y tu cliente puede facturarlo cuando vuelva la señal. Más en [qué pasa sin internet](https://vimpos.com.mx/sin-internet).
 
 #### ¿Y si mi sello está por vencer?
 
-Te avisamos antes: tu panel lo dice desde 30 días antes de que venza. De tu sello guardamos cuál es y cuándo vence precisamente para eso: enterarte el día que deja de timbrar es enterarte tarde.
+Tu panel te avisa desde 30 días antes de que venza.
 
 ## Te lo enseñamos funcionando
 
-Media hora con tus productos y tus precios cargados, y la facturación en modo de prueba para que veas exactamente cómo va a quedar. Sin presentación y sin compromiso.
+Media hora con tus productos, tus precios y la facturación en modo de prueba. Sin compromiso.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
