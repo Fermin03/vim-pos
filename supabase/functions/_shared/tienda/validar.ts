@@ -23,6 +23,8 @@ export type Peticion =
       pago: "EFECTIVO" | "TARJETA" | "EN_LINEA"; paga_con: string | null; nota: string | null; captcha: string | null;
       /** Solo con pago EN_LINEA: el porcentaje de propina que eligió el cliente. El monto lo calcula el servidor. */
       propina_pct: Propina | null;
+      /** Solo con pago EN_LINEA y en lugar de `propina_pct`: la propina de «otro monto», en pesos, con dos decimales y mayor que cero. El tope (el subtotal de los productos) lo pone la base. */
+      propina_mxn: string | null;
       /** Solo con pago EN_LINEA (y entonces obligatoria): el token de la tarjeta. Nunca el número. */
       tarjeta: TarjetaDePedido | null;
       /** El total que el cliente vio al cotizar: si ya no es ese, el pedido no se crea (TOTAL_CAMBIO). */
@@ -256,9 +258,13 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
   if (x.pago !== "EFECTIVO" && x.pago !== "TARJETA" && x.pago !== "EN_LINEA") return mal("PAGO_INVALIDO");
   const paga_con = leerImporte(x.paga_con);
   if (paga_con === undefined || (x.pago !== "EFECTIVO" && paga_con !== null)) return mal("PAGO_INVALIDO");
-  // La propina: un porcentaje de la lista, y solo al pagar en línea. Nunca un monto: ese lo pone el servidor.
+  // La propina: un porcentaje de la lista (el monto lo pone el servidor) o, en su lugar, «otro monto»
+  // en pesos. Solo al pagar en línea, y nunca los dos.
   const propina_pct = (x.propina_pct ?? null) as Propina | null;
   if (propina_pct !== null && (x.pago !== "EN_LINEA" || !PROPINAS.includes(propina_pct))) return mal("PAGO_INVALIDO");
+  // Aquí solo la forma (texto con hasta dos decimales, mayor que cero); que no pase del subtotal lo decide la base.
+  const propina_mxn = typeof x.propina_mxn === "number" ? undefined : leerImporte(x.propina_mxn);
+  if (propina_mxn === undefined || (propina_mxn !== null && (x.pago !== "EN_LINEA" || propina_pct !== null || propina_mxn === "0.00"))) return mal("PAGO_INVALIDO");
   // En línea: hace falta el correo (lo pide Mercado Pago con el cobro) y el token de la tarjeta.
   // Al recibir, `tarjeta` no viaja: si viene, el cuerpo no es el de esa forma de pago.
   const tarjeta = leerTarjeta(x.tarjeta);
@@ -273,7 +279,7 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
 
   return { ok: true, valor: {
     accion, negocio, sucursal_id, modo, zona_id, items,
-    cliente: { nombre, telefono, email }, direccion, pago: x.pago, paga_con, propina_pct, tarjeta: tarjeta ?? null, total_esperado, clave,
+    cliente: { nombre, telefono, email }, direccion, pago: x.pago, paga_con, propina_pct, propina_mxn, tarjeta: tarjeta ?? null, total_esperado, clave,
     nota: textoLimpio(x.nota, 300), captcha: typeof x.captcha === "string" && x.captcha.length <= 4096 ? x.captcha : null,
   } };
 }

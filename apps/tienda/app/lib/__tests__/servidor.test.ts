@@ -250,13 +250,15 @@ describe("POST /api/tienda", () => {
     expect(cuerpoEnviado()).toEqual({ accion: "confirmar_pago", negocio: "knockout", codigo: CODIGO });
     expect((await pedir({ accion: "confirmar_pago", negocio: "knockout", codigo: "corto" })).status).toBe(400);
   });
-  it("pedir en línea: pasa la propina como porcentaje, y nada que parezca un monto de propina", async () => {
+  it("pedir en línea: pasa la propina (el porcentaje o «otro monto»), y nada que parezca un total a cobrar", async () => {
     responder = () => json({ ok: true });
-    await pedir({ ...cotizar, accion: "pedir", pago: "EN_LINEA", propina_pct: 15, propina_mxn: "9999.00", total_a_pagar_mxn: "1.00", cliente: { nombre: "Ana", telefono: "4771112233" } });
+    await pedir({ ...cotizar, accion: "pedir", pago: "EN_LINEA", propina_pct: 15, propina_mxn: "25.00", total_a_pagar_mxn: "1.00", cliente: { nombre: "Ana", telefono: "4771112233" } });
     const enviado = cuerpoEnviado() as Record<string, unknown>;
     expect(enviado.propina_pct).toBe(15);
     expect(enviado.pago).toBe("EN_LINEA");
-    expect("propina_mxn" in enviado || "total_a_pagar_mxn" in enviado).toBe(false);
+    // Los dos pasan tal cual: que sean excluyentes y el tope del monto los decide la función, no este paso.
+    expect(enviado.propina_mxn).toBe("25.00");
+    expect("total_a_pagar_mxn" in enviado).toBe(false);
   });
   it("un rechazo del pago en línea (409) llega tal cual: nunca como «no se supo si el pedido entró»", async () => {
     for (const error of ["PAGO_NO_DISPONIBLE", "PAGO_EN_PROCESO"]) {

@@ -262,6 +262,70 @@ BEGIN
   v_r2 := pg_temp.pedir('4776660003', 3, NULL, NULL);
   IF v_r2 ->> 'propina_mxn' <> '0.00' OR v_r2 ->> 'total_a_pagar_mxn' <> '240.00' THEN RAISE EXCEPTION 'B2: sin propina: %', v_r2; END IF;
 
+  -- B2b) «Otro monto» (0174): la propina es la que escribió el cliente, tal cual. A domicilio
+  --      (240 de productos + 35 de envío): 33.50 de propina → se cobran 308.50.
+  v_r2 := tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', v_zona, format('[{"producto_id":"%s","cantidad":2}]', v_prod)::jsonb,
+            '{"nombre":"Ana Libre","telefono":"4776660011","email":"ana.libre@example.com"}',
+            '{"calle":"Av. Línea","numero_exterior":"1","colonia":"Centro","codigo_postal":"37000","ciudad":"León","estado":"Guanajuato"}',
+            'EN_LINEA', NULL, NULL, md5('pl-libre-a') || md5('pl-libre-b'), p_propina_mxn => 33.50);
+  IF v_r2 ->> 'total_mxn' <> '275.00' OR v_r2 ->> 'propina_mxn' <> '33.50' OR v_r2 ->> 'total_a_pagar_mxn' <> '308.50' THEN
+    RAISE EXCEPTION 'B2b: la propina de otro monto debía ser 33.50 sobre 275.00: %', v_r2;
+  END IF;
+  IF (SELECT propina_mxn FROM delivery_pedidos WHERE id = (v_r2 ->> 'pedido_id')::uuid) <> 33.50
+     OR (SELECT monto_mxn FROM tienda_pagos WHERE id = (v_r2 ->> 'pago_id')::uuid) <> 308.50
+     OR (SELECT propina_mxn FROM tienda_pagos WHERE id = (v_r2 ->> 'pago_id')::uuid) <> 33.50 THEN
+    RAISE EXCEPTION 'B2b: el pedido o su pago no guardaron la propina de otro monto';
+  END IF;
+  -- El tope es el subtotal de los PRODUCTOS (240.00), no el total con envío (275.00): justo el
+  -- subtotal pasa; un centavo más, no (aunque siga por debajo del total).
+  v_r2 := tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', v_zona, format('[{"producto_id":"%s","cantidad":2}]', v_prod)::jsonb,
+            '{"nombre":"Ana Tope","telefono":"4776660012","email":"ana.tope@example.com"}',
+            '{"calle":"Av. Línea","numero_exterior":"1","colonia":"Centro","codigo_postal":"37000","ciudad":"León","estado":"Guanajuato"}',
+            'EN_LINEA', NULL, NULL, md5('pl-tope-a') || md5('pl-tope-b'), p_propina_mxn => 240.00);
+  IF v_r2 ->> 'propina_mxn' <> '240.00' OR v_r2 ->> 'total_a_pagar_mxn' <> '515.00' THEN RAISE EXCEPTION 'B2b: la propina igual al subtotal debía pasar: %', v_r2; END IF;
+  BEGIN
+    PERFORM tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', v_zona, format('[{"producto_id":"%s","cantidad":2}]', v_prod)::jsonb,
+              '{"nombre":"Ana Tope","telefono":"4776660013","email":"ana.tope@example.com"}',
+              '{"calle":"Av. Línea","numero_exterior":"1","colonia":"Centro","codigo_postal":"37000","ciudad":"León","estado":"Guanajuato"}',
+              'EN_LINEA', NULL, NULL, md5('pl-tope-c') || md5('pl-tope-d'), p_propina_mxn => 240.01);
+    RAISE EXCEPTION 'B2b: aceptó una propina mayor que el subtotal de los productos';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'PAGO_INVALIDO:%' THEN RAISE EXCEPTION 'B2b: esperaba PAGO_INVALIDO y salió: %', SQLERRM; END IF;
+  END;
+  -- Lo que no vale de «otro monto» (un producto de 120.00 para recoger): cero, negativo, con más de
+  -- dos decimales, que no es un número, junto con un porcentaje (aunque sea 0), o sin pagar en línea.
+  FOR r IN SELECT * FROM (VALUES
+      ('otro monto en cero',           'EN_LINEA', 0::numeric,        NULL::integer),
+      ('otro monto negativo',          'EN_LINEA', -5,                NULL),
+      ('otro monto con tres decimales','EN_LINEA', 10.005,            NULL),
+      ('otro monto que no es número',  'EN_LINEA', 'NaN'::numeric,    NULL),
+      ('otro monto sin tope',          'EN_LINEA', 1000000,           NULL),
+      ('otro monto mayor que el subtotal', 'EN_LINEA', 120.01,        NULL),
+      ('otro monto con porcentaje',    'EN_LINEA', 10,                10),
+      ('otro monto con porcentaje 0',  'EN_LINEA', 10,                0),
+      ('otro monto con efectivo',      'EFECTIVO', 10,                NULL),
+      ('otro monto con tarjeta',       'TARJETA',  10,                NULL)) AS x(caso, pago, monto, pct) LOOP
+    BEGIN
+      PERFORM tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, format('[{"producto_id":"%s","cantidad":1}]', v_prod)::jsonb,
+                '{"nombre":"Ana","telefono":"4776660004","email":"ana@example.com"}', NULL, r.pago, NULL, NULL, md5('pl-mal') || md5(r.caso),
+                p_propina_pct => r.pct, p_propina_mxn => r.monto);
+      RAISE EXCEPTION 'B2b (%): debió rechazarse', r.caso;
+    EXCEPTION WHEN OTHERS THEN
+      IF SQLERRM NOT LIKE 'PAGO_INVALIDO:%' THEN RAISE EXCEPTION 'B2b (%): esperaba PAGO_INVALIDO y salió: %', r.caso, SQLERRM; END IF;
+    END;
+  END LOOP;
+  -- Y la llamada de antes de la 0174 (la de la función desplegada hoy: sin p_propina_mxn) sigue igual.
+  IF (SELECT count(*) FROM pg_proc WHERE proname = 'tienda_crear_pedido' AND pronamespace = 'public'::regnamespace) <> 1 THEN
+    RAISE EXCEPTION 'B2b: tienda_crear_pedido tiene más de una firma: PostgREST no sabría a cuál llamar';
+  END IF;
+  IF has_function_privilege('anon', 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric)', 'EXECUTE')
+     OR NOT has_function_privilege('service_role', 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'B2b: los permisos de tienda_crear_pedido no son los de antes (solo service_role)';
+  END IF;
+  -- Los dos pedidos de este bloque se van (con su pago, en cascada): lo que sigue cuenta pagos y pedidos.
+  DELETE FROM delivery_pedidos WHERE tenant_id = v_t AND cliente_telefono IN ('4776660011', '4776660012');
+
   -- B3) Lo que no vale: propina fuera de la lista, propina o «paga con» fuera de lugar, y en línea sin quién cobre.
   FOR r IN SELECT * FROM (VALUES
       ('propina de 12',            'EN_LINEA', NULL::numeric, 12),

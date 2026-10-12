@@ -65,7 +65,7 @@ async function leerCuerpoAcotado(req: Request): Promise<string | null> {
 }
 
 const DE_CARRITO = ["accion", "negocio", "sucursal_id", "modo", "zona_id", "items"] as const;
-const DE_PEDIDO = [...DE_CARRITO, "cliente", "direccion", "pago", "paga_con", "propina_pct", "tarjeta", "nota", "captcha", "total_esperado", "clave"] as const;
+const DE_PEDIDO = [...DE_CARRITO, "cliente", "direccion", "pago", "paga_con", "propina_pct", "propina_mxn", "tarjeta", "nota", "captcha", "total_esperado", "clave"] as const;
 const DE_DIRECCION = ["calle", "numero_exterior", "numero_interior", "colonia", "codigo_postal", "ciudad", "estado", "referencias"] as const;
 
 /**

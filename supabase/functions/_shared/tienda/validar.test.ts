@@ -405,7 +405,7 @@ test("cuerpo: pedir en línea lleva su propina, que es un porcentaje de la lista
   const sin = leerCuerpo(enLinea);
   assert.equal(sin.ok && sin.valor.accion === "pedir" && sin.valor.propina_pct, null);
 });
-test("cuerpo: la propina nunca es un monto ni un porcentaje fuera de la lista", () => {
+test("cuerpo: la propina nunca es un porcentaje fuera de la lista", () => {
   for (const mal of [12, 25, 100, -10, 10.5, "10", "15%", true, {}, [10]]) {
     assert.deepEqual(leerCuerpo({ ...enLinea, propina_pct: mal }), { ok: false, error: "PAGO_INVALIDO" }, JSON.stringify(mal));
   }
@@ -417,6 +417,32 @@ test("cuerpo: la propina va solo con el pago en línea, y en línea no hay «pag
   // Un pedido al recibir sigue saliendo sin propina, como siempre.
   const efectivo = leerCuerpo(pedir);
   assert.equal(efectivo.ok && efectivo.valor.accion === "pedir" && efectivo.valor.propina_pct, null);
+});
+// ── Propina de «otro monto» (0174) ───────────────────────────────────────────────────────────────
+test("cuerpo: «otro monto» es un texto en pesos con hasta dos decimales, y sale con dos", () => {
+  for (const [entra, sale] of [["25", "25.00"], ["25.5", "25.50"], ["0.01", "0.01"], [" 120.00 ", "120.00"]]) {
+    const r = leerCuerpo({ ...enLinea, propina_mxn: entra });
+    assert.equal(r.ok, true, entra);
+    if (r.ok && r.valor.accion === "pedir") { assert.equal(r.valor.propina_mxn, sale); assert.equal(r.valor.propina_pct, null); }
+  }
+  // Ausente, null o vacío: sin monto libre, como antes de la 0174.
+  for (const sin of [undefined, null, ""]) {
+    const r = leerCuerpo({ ...enLinea, propina_mxn: sin, propina_pct: 10 });
+    assert.equal(r.ok && r.valor.accion === "pedir" && r.valor.propina_mxn, null);
+  }
+});
+test("cuerpo: «otro monto» mal formado, en cero, de más de dos decimales o que no es texto se rechaza", () => {
+  for (const mal of ["0", "0.00", "-5", "5.123", "1e3", "12,50", "$20", "abc", "1000000", 25, 25.5, true, {}, ["25"]]) {
+    assert.deepEqual(leerCuerpo({ ...enLinea, propina_mxn: mal }), { ok: false, error: "PAGO_INVALIDO" }, JSON.stringify(mal));
+  }
+});
+test("cuerpo: «otro monto» y porcentaje son excluyentes, y el monto va solo con el pago en línea", () => {
+  assert.deepEqual(leerCuerpo({ ...enLinea, propina_mxn: "25.00", propina_pct: 10 }), { ok: false, error: "PAGO_INVALIDO" });
+  assert.deepEqual(leerCuerpo({ ...enLinea, propina_mxn: "25.00", propina_pct: 0 }), { ok: false, error: "PAGO_INVALIDO" });
+  assert.deepEqual(leerCuerpo({ ...pedir, propina_mxn: "25.00" }), { ok: false, error: "PAGO_INVALIDO" });
+  assert.deepEqual(leerCuerpo({ ...pedir, pago: "TARJETA", paga_con: null, propina_mxn: "25.00" }), { ok: false, error: "PAGO_INVALIDO" });
+  const efectivo = leerCuerpo(pedir);
+  assert.equal(efectivo.ok && efectivo.valor.accion === "pedir" && efectivo.valor.propina_mxn, null);
 });
 test("cuerpo: una forma de pago que no existe se rechaza", () => {
   for (const pago of ["en_linea", "ONLINE", "MERCADO_PAGO", "", null, undefined]) {
