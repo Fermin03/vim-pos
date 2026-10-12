@@ -68,10 +68,12 @@ export type DatosDelPedido = {
   paga_con: null;
   /** Solo al pagar en línea: el porcentaje elegido. En un pedido al recibir la clave ni viaja. */
   propina_pct?: Propina;
+  /** Solo al pagar en línea y EN LUGAR del porcentaje: «otro monto», en pesos con dos decimales. */
+  propina_mxn?: string;
 };
 
 /** Un formulario YA validado (`erroresDe` vacío) → la parte del cuerpo de `pedir` que sale de él. */
-export function datosDelPedido(f: Formulario, c: { modo: Modo; pago: Pago; propina?: Propina }): DatosDelPedido {
+export function datosDelPedido(f: Formulario, c: { modo: Modo; pago: Pago; propina?: Propina; /** «Otro monto» ya validado (`leerOtroMonto`): gana al porcentaje. */ propinaMxn?: string }): DatosDelPedido {
   const t = (campo: Campo) => f[campo].trim();
   return {
     cliente: { nombre: t("nombre"), telefono: normalizarTelefono(t("telefono")) ?? t("telefono"), email: t("email").toLowerCase() || null },
@@ -82,7 +84,8 @@ export function datosDelPedido(f: Formulario, c: { modo: Modo; pago: Pago; propi
     },
     pago: c.pago,
     paga_con: null,
-    ...(c.pago === "EN_LINEA" && { propina_pct: c.propina ?? 0 }),
+    // Uno u otro, nunca los dos: la función rechaza un pedido con porcentaje y monto.
+    ...(c.pago === "EN_LINEA" && (c.propinaMxn ? { propina_mxn: c.propinaMxn } : { propina_pct: c.propina ?? 0 })),
   };
 }
 
