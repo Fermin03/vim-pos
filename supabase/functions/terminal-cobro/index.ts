@@ -72,6 +72,42 @@ servir(async (req, json) => {
     if (!caja) return json({ error: "CAJA_NO_VALIDA" }, 403);
     const { id: cajaId, sucursal_id: sucursalId } = caja as { id: string; sucursal_id: string };
 
+    if (b.accion === "reembolsar") {
+      // El dinero solo regresa si VIM ya tiene la devolución CONFIRMADA de ese ticket «al mismo
+      // método» (que es la que pide el PIN). Una caja instalada lo comprueba en su propia base antes
+      // de reenviar (gateway.mjs): su ticket puede no haber subido. El POS web se comprueba aquí.
+      if (!esDispositivo) {
+        const { data: dev } = await admin.from("devoluciones").select("id")
+          .eq("tenant_id", tenantId).eq("ticket_original_id", b.ticket_id)
+          .eq("estado", "CONFIRMADA").eq("medio_devolucion", "MISMO_METODO_PAGO").limit(1).maybeSingle();
+        if (!dev) return json({ ok: false, error: "SIN_DEVOLUCION" }, 409);
+      }
+      const { data: lista, error: eL } = await admin.from("terminal_cobros").select(CAMPOS)
+        .eq("tenant_id", tenantId).eq("sucursal_id", sucursalId).eq("ticket_id", b.ticket_id)
+        .in("estado", ["APROBADO", "DEVUELTO"]).not("orden_id_externo", "is", null);
+      if (eL) throw eL;
+      let devuelto = 0;
+      const fallos: string[] = [];
+      for (const c of (lista ?? []) as Cobro[]) {
+        if (c.estado === "DEVUELTO") { devuelto += Number(c.monto_mxn); continue; } // ya estaba: repetir no devuelve dos veces
+        const tokenMp = await tokenDe(c.conexion_id);
+        const r = tokenMp ? await clienteMp(tokenMp).reembolsarOrden(c.orden_id_externo!) : null;
+        if (r && (r.status === 201 || r.status === 200)) {
+          const { error } = await admin.from("terminal_cobros")
+            .update({ estado: "DEVUELTO", detalle: "refunded", reembolsado_mxn: c.monto_mxn }).eq("id", c.id);
+          if (error) throw error;
+          devuelto += Number(c.monto_mxn);
+        } else {
+          const motivo = !r ? "CONEXION_INVALIDA" : r.status === 401 ? "CONEXION_INVALIDA" : (r.codigo ?? `HTTP_${r.status}`);
+          registrarError("terminal-cobro", "REEMBOLSO", `${c.id}: ${motivo}`);
+          fallos.push(motivo);
+        }
+      }
+      // `n_cobros`: cuántos pagos de ese ticket pasaron por la terminal. Cero = no hay nada que devolver aquí.
+      return json({ ok: fallos.length === 0, n_cobros: (lista ?? []).length, devuelto_mxn: devuelto.toFixed(2), ...(fallos.length ? { error: fallos[0] } : {}) },
+        fallos.length ? 409 : 200);
+    }
+
     if (b.accion === "disponible") {
       // ¿Esta caja le puede mandar cobros a una terminal? La caja instalada no tiene estas tablas
       // con datos (viven en la nube), así que lo pregunta aquí al abrir el cobro.

@@ -17,11 +17,14 @@ type Peticion =
   | { accion: "disponible" | "pendientes" }
   | { accion: "crear"; cobro_id: string; ticket_id: string; folio: string | null; monto: string }
   | { accion: "estado" | "cancelar"; cobro_id: string }
-  | { accion: "confirmar"; cobro_id: string; autorizo_id?: string };
+  | { accion: "confirmar"; cobro_id: string; autorizo_id?: string }
+  | { accion: "reembolsar"; ticket_id: string };
 
 type Respuesta = {
   ok?: boolean; error?: string; terminal?: boolean; cobro?: CobroTerminal; cobros?: CobroTerminal[];
   cancelacion?: "HECHA" | "PEDIDA" | "FALLO";
+  /** De `reembolsar`: cuántos pagos de ese ticket pasaron por la terminal y cuánto regresó. */
+  n_cobros?: number; devuelto_mxn?: string;
 };
 
 /**
@@ -72,6 +75,30 @@ export function mensajeFinal(c: Pick<CobroTerminal, "estado" | "detalle">): stri
   if (c.estado === "VENCIDO") return "Se acabó el tiempo para pagar en la terminal.";
   if (c.estado === "CANCELADO") return "El cobro se canceló.";
   return "El cobro no se completó.";
+}
+
+/**
+ * Devuelve a la tarjeta lo que ese ticket se cobró en la terminal. `cobros: 0` = nada pasó por la
+ * terminal (se cobró en otra, o a mano): el reembolso se hace como siempre, fuera de VIM.
+ * Lanza Error con el código si Mercado Pago no devolvió el dinero.
+ */
+export async function reembolsarTicket(token: string, cajaId: string, ticketId: string): Promise<{ cobros: number; devuelto: number }> {
+  const r = await pedirCobro(token, cajaId, { accion: "reembolsar", ticket_id: ticketId });
+  return { cobros: r.n_cobros ?? 0, devuelto: Number(r.devuelto_mxn ?? 0) };
+}
+
+const REEMBOLSOS: Record<string, string> = {
+  SIN_RED: "no hay internet",
+  FUNCION_REQUIERE_NUBE: "no hay internet",
+  CONEXION_INVALIDA: "Mercado Pago ya no reconoce la conexión del negocio",
+  refund_amount_exceeds: "ese cobro ya se había devuelto",
+  SIN_DEVOLUCION: "la devolución no quedó registrada en la caja",
+};
+
+/** Por qué no regresó el dinero a la tarjeta, para completar «…no regresó a la tarjeta: ___». */
+export function motivoReembolso(e: unknown): string {
+  const codigo = e instanceof Error ? e.message : String(e);
+  return REEMBOLSOS[codigo] ?? "Mercado Pago no aceptó la devolución";
 }
 
 const ERRORES: Record<string, string> = {

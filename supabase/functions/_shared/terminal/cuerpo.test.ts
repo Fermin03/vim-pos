@@ -24,4 +24,6 @@ test("las demás acciones", () => {
   assert.equal(validarCuerpo({ accion: "estado", cobro_id: ID }).ok, true);
   assert.deepEqual(validarCuerpo({ accion: "borrar", cobro_id: ID }), { ok: false, error: "ACCION_INVALIDA" });
   assert.deepEqual(validarCuerpo(null), { ok: false, error: "COBRO_ID_INVALIDO" });
+  assert.deepEqual(validarCuerpo({ accion: "reembolsar", ticket_id: ID }), { ok: true, cuerpo: { accion: "reembolsar", ticket_id: ID, caja_id: null } });
+  assert.deepEqual(validarCuerpo({ accion: "reembolsar" }), { ok: false, error: "TICKET_ID_INVALIDO" });
 });

@@ -343,6 +343,16 @@ export function crearGateway(backend) {
         let cuerpo;
         try { cuerpo = JSON.parse(crudo); } catch { return send(400, { error: "BAD_JSON" }); }
         if (!cuerpo || typeof cuerpo !== "object" || Array.isArray(cuerpo)) return send(400, { error: "BAD_JSON" });
+        if (cuerpo.accion === "reembolsar") {
+          // El dinero solo regresa a la tarjeta si esta caja ya tiene la devolución CONFIRMADA de ese
+          // ticket «al mismo método» (la que pidió PIN). La nube no puede comprobarlo: el ticket
+          // puede no haber subido. Sin esto, cualquier sesión abierta podría pedir un reembolso.
+          const { rows } = await pool.query(
+            "SELECT 1 FROM devoluciones WHERE ticket_original_id::text = $1 AND estado = 'CONFIRMADA' AND medio_devolucion = 'MISMO_METODO_PAGO' LIMIT 1",
+            [String(cuerpo.ticket_id ?? "")],
+          );
+          if (rows.length === 0) return send(409, { ok: false, error: "SIN_DEVOLUCION" });
+        }
         const nube = typeof backend.nube === "function" ? await backend.nube().catch(() => null) : null;
         if (!nube) return send(503, { error: "FUNCION_REQUIERE_NUBE", funcion: "terminal-cobro" });
         let up;

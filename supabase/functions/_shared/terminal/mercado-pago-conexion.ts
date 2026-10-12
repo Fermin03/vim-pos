@@ -88,10 +88,15 @@ export function clienteMpConfig(token: string, pedir: typeof fetch = fetch) {
   };
 
   return {
-    /** El nombre de la cuenta, para que el dueño la reconozca en el admin. */
-    async nombre(): Promise<string | null> {
+    /**
+     * Nombre de la cuenta y si es de prueba. VERIFICADO: el permiso que da el OAuth a un usuario de
+     * prueba trae `live_mode: true`, así que el token no sirve para saberlo; la cuenta sí lo dice,
+     * con la etiqueta `test_user`.
+     */
+    async cuenta(): Promise<{ nombre: string | null; dePrueba: boolean }> {
       const r = await llamar("GET", "/users/me");
-      return txt(r.cuerpo.nickname) ?? txt(r.cuerpo.email);
+      const tags = Array.isArray(r.cuerpo.tags) ? r.cuerpo.tags : [];
+      return { nombre: txt(r.cuerpo.nickname) ?? txt(r.cuerpo.email), dePrueba: tags.includes("test_user") };
     },
 
     /** Crea la sucursal o, si ya existía con ese id externo (reconexión), devuelve la que hay. */
