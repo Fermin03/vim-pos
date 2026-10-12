@@ -12,7 +12,7 @@
 // SIN PROBAR contra Mercado Pago (documento 04): este flujo con el OAuth de un restaurante real, y
 // que `/oauth/token` de la aplicación nueva traiga `public_key` (la de Point la trae).
 import type { clienteAdmin, Json } from "../http.ts";
-import { registrarError } from "../errores.ts";
+import { registrarError, textoDeError } from "../errores.ts";
 import { clienteMpConfig, pedirTokens, type Tokens } from "../terminal/mercado-pago-conexion.ts";
 
 type Admin = ReturnType<typeof clienteAdmin>;
@@ -62,6 +62,11 @@ export async function pedirTokensDeTienda(
 export async function conexionDeTienda(admin: Admin, tenantId: string, b: Record<string, unknown>, json: Json): Promise<Response> {
   const env = (k: string) => (globalThis as { Deno?: { env: { get(k: string): string | undefined } } }).Deno?.env.get(k) ?? "";
 
+  // Por qué no se pudo conectar, a la vista en tienda_eventos (el log de la función no se lee a mano).
+  // Nunca el código ni los tokens: solo el estado HTTP y el motivo que da Mercado Pago.
+  const rastro = (motivo: string, detalle: string) =>
+    admin.from("tienda_eventos").insert({ accion: `conexion:${motivo}`, error: detalle.slice(0, 300), payload: { tenant_id: tenantId } });
+
   if (b.accion === "canjear") {
     const clientId = env("MP_TIENDA_CLIENT_ID"), clientSecret = env("MP_TIENDA_CLIENT_SECRET");
     if (!clientId || !clientSecret) return json({ error: "MP_NO_CONFIGURADO" }, 503);
@@ -71,11 +76,13 @@ export async function conexionDeTienda(admin: Admin, tenantId: string, b: Record
     const r = await pedirTokensDeTienda({ clientId, clientSecret, code: b.code, redirectUri });
     if (!r.tokens) {
       registrarError("terminal-mp-conexion", "TIENDA_CANJE_RECHAZADO", `HTTP ${r.status} ${r.codigo ?? ""}`);
+      await rastro("canje_rechazado", `HTTP ${r.status} ${r.codigo ?? ""}`);
       return json({ error: "CANJE_RECHAZADO" }, 409);
     }
     // Sin public key la tienda no puede convertir la tarjeta en token: no hay conexión que guardar.
     if (!r.publicKey) {
       registrarError("terminal-mp-conexion", "TIENDA_SIN_PUBLIC_KEY", `cuenta ${r.tokens.user_id}`);
+      await rastro("sin_public_key", `cuenta ${r.tokens.user_id}`);
       return json({ error: "SIN_PUBLIC_KEY" }, 409);
     }
     const t = r.tokens;
@@ -84,12 +91,12 @@ export async function conexionDeTienda(admin: Admin, tenantId: string, b: Record
       tenant_id: tenantId, cuenta_id_externo: t.user_id, cuenta_nombre: nombre, public_key: r.publicKey,
       de_prueba: t.de_prueba, estado: "ACTIVA", ultimo_error: null, conectada_at: new Date().toISOString(),
     }, { onConflict: "tenant_id,cuenta_id_externo" }).select("id").single();
-    if (error) throw error;
+    if (error) { await rastro("no_se_guardo", textoDeError(error)); throw error; }
     const conexionId = (fila as { id: string }).id;
     const { error: eTok } = await admin.rpc("tienda_guardar_tokens", {
       p_conexion: conexionId, p_access: t.access_token, p_refresh: t.refresh_token, p_vence: t.vence_at,
     });
-    if (eTok) throw eTok;
+    if (eTok) { await rastro("tokens_no_guardados", textoDeError(eTok)); throw eTok; }
     return json({ ok: true, conexion_id: conexionId, cuenta_nombre: nombre, de_prueba: t.de_prueba });
   }
 
