@@ -9,7 +9,7 @@
 // No toca la base ni la red directamente: recibe un puerto (pago-puerto.ts lo arma con supabase-js)
 // y el cliente de Mercado Pago. Así se prueba con `node --test` y dobles.
 import { esc, soloAscii } from "../correo.ts";
-import { type ClienteMpTienda, cuerpoDeOrden, type DatosCobro, type Decision, decidirOrden, esTokenInvalido, type MotivoDeRechazo, motivoDeRechazo, ordenesDeBusqueda, ordenViva, respuestaDeCobro, motivoDeNoAceptado, resumenDeFallo } from "./pago-mp.ts";
+import { type ClienteMpTienda, cuerpoDeOrden, type DatosCobro, type Decision, decidirOrden, esTokenInvalido, type MotivoDeRechazo, motivoDeRechazo, ordenAtascada, ordenesDeBusqueda, ordenViva, respuestaDeCobro, motivoDeNoAceptado, resumenDeFallo } from "./pago-mp.ts";
 
 export type EstadoPago = "CREADO" | "APROBADO" | "RECHAZADO" | "VENCIDO" | "POR_DEVOLVER" | "DEVUELTO" | "DEVOLUCION_FALLIDA";
 
@@ -153,8 +153,11 @@ export async function cobrarPago(deps: Deps, datos: Omit<DatosCobro, "monto">): 
   if (que.tipo === "NO_ACEPTADO") {
     deps.registrar("COBRO_NO_ACEPTADO", `${resumenDeFallo(r)} — ${motivoDeNoAceptado(r)}`);
     // «No se creó nada» lo dice un 400, pero se comprueba: ¿hay alguna orden con nuestra referencia?
-    const c = await confirmarPago(deps, fila.id);
-    return c.ok && c.aplicados === 0 ? descartar({ tipo: "NO_PROCESADO", contarIp: false }) : { tipo: "POR_CONFIRMAR" };
+    // El cobro ya contestó (con un no): si dejó una orden abierta no hay que esperarla, se cancela ya.
+    const c = await confirmarPago(deps, fila.id, undefined, true);
+    if (c.ok && c.aplicados === 0) return descartar({ tipo: "NO_PROCESADO", contarIp: false });
+    // La orden que quedó abierta se pudo cancelar: tampoco hay cobro.
+    return (await deps.db.leerPago(fila.id))?.estado === "RECHAZADO" ? descartar({ tipo: "NO_PROCESADO", contarIp: false }) : { tipo: "POR_CONFIRMAR" };
   }
   if (que.tipo === "NO_SE_SABE") {
     deps.registrar("COBRO_SIN_RESPUESTA", `pago ${fila.id}: ${resumenDeFallo(r)}`);
@@ -196,7 +199,7 @@ export type Confirmacion =
  * Siempre con el token de la conexión dueña del pago; el monto lo comprueba la base.
  * Repetirla, o correrla dos veces a la vez, deja lo mismo.
  */
-export async function confirmarPago(deps: Deps, pagoId: string, ordenPista?: string): Promise<Confirmacion> {
+export async function confirmarPago(deps: Deps, pagoId: string, ordenPista?: string, cobroYaContesto = false): Promise<Confirmacion> {
   const fila = await deps.db.leerPago(pagoId);
   if (!fila) return { ok: false, motivo: "PAGO_DESCONOCIDO" };
   const token = await deps.db.token(fila.conexion_id);
@@ -221,6 +224,19 @@ export async function confirmarPago(deps: Deps, pagoId: string, ordenPista?: str
   const esperado = { pagoId: fila.id, cuentaVendedora: fila.cuenta_vendedora };
   let aplicados = 0, recienAprobado = false;
   const ordenes = ordenId ? [r.cuerpo] : ordenesDeBusqueda(r.cuerpo);
+  // Una orden NUESTRA que Mercado Pago abrió y no procesó (422 al cobrar) no se va a cobrar nunca:
+  // se cancela allá para que no quede abierta, y con eso el pedido se cierra como «sin pago» en vez
+  // de dejar al cliente en «Confirmando tu pago». Si no se deja cancelar, sigue pendiente.
+  for (const [i, orden] of ordenes.entries()) {
+    const o = orden as { id?: unknown; external_reference?: unknown } | null;
+    if (o?.external_reference !== fila.id || typeof o.id !== "string" || !ordenAtascada(orden, cobroYaContesto ? new Date(8.64e15) : ahora)) continue;
+    const c = await mp.cancelarOrden(o.id, `tienda-cancelar-${fila.id}-${ahora.getTime()}`);
+    if (c.status === 200 || c.status === 201) {
+      const leida = await mp.leerOrden(o.id);
+      if (leida.status === 200) ordenes[i] = leida.cuerpo;
+      deps.registrar("ORDEN_SIN_PROCESAR_CANCELADA", `pago ${fila.id}, orden ${o.id}`);
+    } else deps.registrar("ORDEN_SIN_PROCESAR", `pago ${fila.id}, orden ${o.id}: no se dejó cancelar (${resumenDeFallo(c)})`);
+  }
   const decisiones = ordenes.map((orden) => decidirOrden(esperado, orden));
   // Una orden viva que trae NUESTRA referencia y que no se puede aplicar (otra cuenta vendedora, sin
   // acreditar, otra moneda, en revisión): se deja dicho con su id y su motivo, en el log y en el pago.

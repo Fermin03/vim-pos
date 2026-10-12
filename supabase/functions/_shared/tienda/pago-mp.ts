@@ -255,6 +255,11 @@ export function clienteMpTienda(token: string, pedir: typeof fetch = fetch) {
      * guardado, así que la llave tiene que ser NUEVA en cada intento. Quien llama mira antes si la
      * orden ya está devuelta: eso, y no la llave, es lo que evita devolver dos veces.
      */
+    /**
+     * Cancela una orden que Mercado Pago abrió y no procesó. VERIFICADO (11 oct 2026): solo se deja en
+     * `created` o `action_required`; con `processing` contesta 409 `cannot_cancel_order`.
+     */
+    cancelarOrden: (ordenIdExterno: string, llave: string) => llamar("POST", `/v1/orders/${encodeURIComponent(ordenIdExterno)}/cancel`, undefined, llave),
     devolver: (ordenIdExterno: string, llave: string) => llamar("POST", `/v1/orders/${encodeURIComponent(ordenIdExterno)}/refund`, undefined, llave),
   };
 }
@@ -283,6 +288,18 @@ export function resumenDeFallo(r: RespuestaMp): string {
  * como ajena, incidente o pendiente): ahí puede haber dinero del cliente, y nadie debe leer «sin
  * pago». Un estado que no se conoce cuenta como vivo.
  */
+/**
+ * ¿Mercado Pago abrió la orden y la dejó sin procesar? VERIFICADO (11 oct 2026, en producción): un
+ * cobro que contesta 422 `unprocessable_content` deja la orden en `created`, sin `status_detail` y
+ * sin cobrar; ahí se queda para siempre. Se da un minuto de margen: una orden recién nacida puede
+ * estar todavía procesándose en la petición que la creó.
+ */
+export function ordenAtascada(orden: unknown, ahora: Date): boolean {
+  const o = obj(orden);
+  const nacio = Date.parse(String(o.created_date ?? ""));
+  return o.status === "created" && Number.isFinite(nacio) && ahora.getTime() - nacio > 60_000;
+}
+
 export function ordenViva(orden: unknown): boolean {
   const estado = String(obj(orden).status ?? "");
   return estado !== "failed" && estado !== "canceled" && estado !== "expired" && estado !== "refunded";
