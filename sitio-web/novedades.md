@@ -6,6 +6,15 @@
 
 ## Octubre de 2026
 
+13 de octubre Caja · 0.10.0
+
+### Devoluciones a la tarjeta y pago dividido con terminal
+
+#### Nuevo
+
+- **La devolución regresa el dinero a la tarjeta.** Si la cuenta se cobró en tu terminal de Mercado Pago desde la caja, al devolverla con **Mismo método** el dinero vuelve solo a la tarjeta del cliente. La encuentras en **Menú → Devoluciones**.
+- **Pago dividido con la terminal.** En **Pago dividido → Agregar pago** puedes elegir **Tarjeta**: esa parte se cobra en la terminal y el resto como tú decidas.
+
 11 de octubre Caja · 0.9.0
 
 ### Cobro con tarjeta desde la caja
