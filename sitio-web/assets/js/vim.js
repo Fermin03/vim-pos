@@ -99,9 +99,11 @@
       boton.setAttribute("aria-expanded", "true");
       document.body.setAttribute("data-menu-abierto", "true");
 
-      /* Al primer enlace, no al botón de cerrar: quien abre el menú quiere ir
-         a algún sitio, no cerrarlo. */
-      var primero = menu.querySelector(".nav-movil-lista a");
+      /* A la primera entrada, no al botón de cerrar: quien abre el menú quiere
+         ir a algún sitio, no cerrarlo. La primera puede ser un grupo plegado,
+         así que se busca su `summary`: un enlace dentro de un <details>
+         cerrado no acepta el foco. */
+      var primero = menu.querySelector(".nav-movil-lista summary, .nav-movil-lista > a");
       if (primero) primero.focus();
     }
 
@@ -168,6 +170,67 @@
     });
   }
 
+  /* ---- Paneles del menú de escritorio --------------------------------------
+     Sin este bloque abren igual, con el mouse encima o el foco dentro (CSS). Lo
+     que se añade es lo que CSS no puede: abrir con un toque en una tableta,
+     cerrar con Escape y decirle al lector de pantalla si está abierto.
+
+     Con mouse el panel se abre al pasar por encima, así que el clic NO lo
+     alterna: lo abriría el paso y lo cerraría el clic de quien venía a
+     abrirlo. `e.detail === 0` es un clic hecho con el teclado, y ése sí
+     alterna. */
+  var enlaces = document.querySelector(".nav-enlaces");
+  var grupos = document.querySelectorAll("[data-nav-grupo]");
+
+  if (enlaces && grupos.length) {
+    var fino = window.matchMedia("(hover: hover) and (pointer: fine)");
+    var cierrePendiente = null;
+
+    var grupoAbierto = function () { return enlaces.querySelector('[data-nav-grupo][data-abierto="true"]'); };
+
+    /* `null` los cierra todos. */
+    var ponerPanel = function (grupo) {
+      clearTimeout(cierrePendiente);
+      var previo = grupoAbierto();
+      if (previo === grupo) return;
+      /* De un panel al de al lado no hay animación: ya había uno abierto. */
+      enlaces.toggleAttribute("data-instante", !!(previo && grupo));
+      grupos.forEach(function (g) {
+        g.setAttribute("data-abierto", String(g === grupo));
+        g.querySelector("button").setAttribute("aria-expanded", String(g === grupo));
+      });
+    };
+
+    enlaces.setAttribute("data-js", "");
+
+    grupos.forEach(function (g) {
+      g.querySelector("button").addEventListener("click", function (e) {
+        var abierto = g.getAttribute("data-abierto") === "true";
+        ponerPanel(fino.matches && e.detail !== 0 ? g : (abierto ? null : g));
+      });
+      g.addEventListener("mouseenter", function () { if (fino.matches) ponerPanel(g); });
+      /* 120 ms de gracia: salirse un pixel camino al panel no lo cierra. */
+      g.addEventListener("mouseleave", function () {
+        if (fino.matches) cierrePendiente = setTimeout(function () { ponerPanel(null); }, 120);
+      });
+      g.addEventListener("focusout", function (e) {
+        if (!g.contains(e.relatedTarget)) ponerPanel(null);
+      });
+    });
+
+    document.addEventListener("click", function (e) {
+      var g = grupoAbierto();
+      if (g && !g.contains(e.target)) ponerPanel(null);
+    });
+
+    document.addEventListener("keydown", function (e) {
+      var g = grupoAbierto();
+      if (e.key !== "Escape" || !g) return;
+      ponerPanel(null);
+      g.querySelector("button").focus();
+    });
+  }
+
   /* ---- Acordeón: giros y preguntas frecuentes ------------------------------
      Mismo mecanismo que el menú y por la misma razón: `height: auto` no
      interpola, así que el alto se mide y se escribe.
@@ -220,12 +283,87 @@
   var interruptor = document.querySelector("[data-diagrama-boton]");
 
   if (diagramas.length && interruptor) {
-    interruptor.addEventListener("click", function () {
-      var caido = interruptor.getAttribute("aria-pressed") !== "true";
+    var cortar = function (caido) {
       diagramas.forEach(function (d) { d.classList.toggle("sin-red", caido); });
       interruptor.setAttribute("aria-pressed", String(caido));
       interruptor.textContent = caido ? "Devolver el internet" : "Cortar el internet";
+    };
+
+    /* Se enseña solo UNA vez, al entrar en pantalla: se corta, se ve que el
+       local sigue entero y vuelve. Es el argumento del sitio y dependía de que
+       alguien encontrara el botón. Dura tres segundos y no se repite; con
+       movimiento reducido no arranca, y un clic en el botón lo cancela. */
+    var demostracion = null;
+    var vigia = null;
+
+    interruptor.addEventListener("click", function () {
+      clearTimeout(demostracion);
+      if (vigia) vigia.disconnect();
+      cortar(interruptor.getAttribute("aria-pressed") !== "true");
     });
+
+    if ("IntersectionObserver" in window && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      vigia = new IntersectionObserver(function (entradas) {
+        if (!entradas.some(function (e) { return e.isIntersecting; })) return;
+        vigia.disconnect();
+        demostracion = setTimeout(function () {
+          cortar(true);
+          demostracion = setTimeout(function () { cortar(false); }, 2400);
+        }, 700);
+      }, { threshold: 0.6 });
+      diagramas.forEach(function (d) { vigia.observe(d); });
+    }
+  }
+
+  /* ---- Cuatro cosas, una sola captura (portada) ----------------------------
+     En pantalla ancha las cuatro capturas ocupan la misma celda y se ve la de
+     la fila activa (vim.css). Aquí solo se elige cuál: con el mouse encima, con
+     un clic o al llegar con el teclado.
+
+     El título de cada fila se vuelve botón SOLO en pantalla ancha. En el
+     teléfono las cuatro capturas se ven una debajo de otra, no hay nada que
+     elegir, y un botón que no hace nada es peor que no tenerlo. */
+  var cosas = document.querySelector("[data-cosas]");
+
+  if (cosas) {
+    var partes = Array.prototype.slice.call(cosas.querySelectorAll(".alterna"));
+    var ancha = window.matchMedia("(min-width: 900px)");
+
+    var vestir = function () {
+      partes.forEach(function (p) {
+        var c = p.querySelector("[data-cosa-control]");
+        if (ancha.matches) {
+          c.setAttribute("role", "button");
+          c.setAttribute("tabindex", "0");
+          c.setAttribute("aria-pressed", String(p.hasAttribute("data-activa")));
+        } else {
+          c.removeAttribute("role");
+          c.removeAttribute("tabindex");
+          c.removeAttribute("aria-pressed");
+        }
+      });
+    };
+
+    var activar = function (parte) {
+      partes.forEach(function (p) { p.toggleAttribute("data-activa", p === parte); });
+      vestir();
+    };
+
+    partes.forEach(function (p) {
+      var texto = p.querySelector(".alterna-texto");
+      ["click", "mouseenter", "focusin"].forEach(function (evento) {
+        texto.addEventListener(evento, function () { activar(p); });
+      });
+      /* Ya se activó al recibir el foco; esto solo evita que la barra
+         espaciadora desplace la página, que es lo que haría sobre un <span>. */
+      texto.addEventListener("keydown", function (e) {
+        if (e.key === " " && e.target.hasAttribute("data-cosa-control")) e.preventDefault();
+      });
+    });
+
+    cosas.setAttribute("data-listo", "");
+    activar(partes[0]);
+    ancha.addEventListener("change", vestir);
   }
 
   /* ---- Mensual / anual en la página de precios ----------------------------
@@ -482,8 +620,44 @@
      es exactamente el tipo de cosa que se olvida en la quinta página. */
   function ruta(p) { return p.replace(/\.html$/, "").replace(/\/+$/, "").replace(/^\/?index$/, "") || "/"; }
   var aqui = ruta(location.pathname);
-  document.querySelectorAll(".nav-enlace, .nav-movil-lista a").forEach(function (a) {
+  document.querySelectorAll(".nav-enlace, .nav-panel a, .nav-movil-lista a").forEach(function (a) {
     var destino = a.getAttribute("href");
-    if (destino && destino.charAt(0) === "/" && ruta(destino) === aqui) a.setAttribute("aria-current", "page");
+    if (!destino || destino.charAt(0) !== "/" || ruta(destino) !== aqui) return;
+    a.setAttribute("aria-current", "page");
+    /* Si la página vive dentro de un panel o de un grupo del cajón, se nota
+       desde fuera: la entrada del menú queda en tinta y el grupo, abierto. */
+    var grupo = a.closest("[data-nav-grupo]");
+    if (grupo) grupo.setAttribute("data-actual", "");
+    var plegado = a.closest("details");
+    if (plegado) plegado.open = true;
   });
+
+  /* ---- Entrada al bajar ----------------------------------------------------
+     Cada bloque de una sección aparece una vez al entrar en pantalla; el cómo
+     está en vim.css. Aquí se decide a QUÉ: solo a lo que al cargar queda por
+     debajo de la pantalla. Lo que ya se ve no se esconde para volver a
+     enseñarlo, y si este archivo no carga no se esconde nada.
+
+     Las rejillas de tarjetas se marcan como grupo para que entren escalonadas.
+     Se observa la rejilla y no cada tarjeta: en el teléfono es un carrusel, y
+     las tarjetas que quedan a la derecha no «entrarían» nunca. */
+  if ("IntersectionObserver" in window) {
+    var entrada = new IntersectionObserver(function (entradas) {
+      entradas.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        var bloque = e.target;
+        entrada.unobserve(bloque);
+        bloque.classList.add("entro");
+        /* Fuera las clases al terminar (240 ms + 300 del último escalón): si
+           se quedan, su `transition` le gana al de cada tarjeta. */
+        setTimeout(function () { bloque.classList.remove("por-entrar", "por-entrar-grupo", "entro"); }, 700);
+      });
+    }, { rootMargin: "0px 0px -8% 0px" });
+
+    document.querySelectorAll(".seccion > .contenedor > *").forEach(function (bloque) {
+      if (bloque.getBoundingClientRect().top < window.innerHeight) return;
+      bloque.classList.add(bloque.matches(".tres, .dos, .tira, .planes") ? "por-entrar-grupo" : "por-entrar");
+      entrada.observe(bloque);
+    });
+  }
 })();

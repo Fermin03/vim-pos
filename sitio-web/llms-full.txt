@@ -24,6 +24,8 @@ VIM POS es un sistema de punto de venta para restaurantes en México: caja, coci
 
 Desde **$699 al mes**, más IVA · sin contrato forzoso · [ver los tres planes](https://vimpos.com.mx/precios)
 
+Ya cobra todos los días en una hamburguesería de León, Guanajuato
+
 ![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=3)
 
 Todo tu sistema vive en tu caja, no en internet
@@ -33,36 +35,6 @@ Imprime en impresoras térmicas de tickets, de red o de USB
 El corte de caja cuadra contra lo que hay en el cajón
 
 Ves la venta del día desde tu celular
-
-_Por qué existe_
-
-## Lo que hay hoy para un restaurante mexicano
-
-### Los de fuera
-
-Caros, en dólares, y con el SAT como una idea vaga. Pagas por funciones pensadas para otro país y luego resuelves la factura por tu cuenta.
-
-### Los de siempre
-
-Sistemas que llevan quince años funcionando y lo hacen bien, pero viven en una sola computadora: sin respaldo, sin ver tus números desde el celular y sin nada que hacer si se moja el disco duro.
-
-### El cuaderno
-
-Funciona hasta que hay dos cajas, o un socio, o alguien pregunta cuánto se vendió el martes pasado. Entonces deja de funcionar de golpe.
-
-_Cómo funciona_
-
-## Tu caja es el centro. La nube es el respaldo, no el motor.
-
-Casi todos los puntos de venta de hoy viven en internet: si se cae la señal, se cae tu negocio. Aquí es al revés — el sistema entero está en la computadora de tu mostrador, y lo que está fuera cuelga de un hilo que se puede cortar sin que pase nada.
-
-**Pruébalo:** se apaga la nube y el local sigue entero.
-
-### No es un «modo offline». Es que no depende del internet.
-
-Los sistemas que se anuncian con «modo sin conexión» guardan tus ventas a medias en el navegador y esperan a que suban después. Aquí no hay modo ni versión reducida: el sistema completo está en tu caja y hace exactamente lo mismo haya señal o no. Cuando vuelve, lo del día sube solo y conserva los folios que ya imprimiste.
-
-[Cómo funciona por dentro](https://vimpos.com.mx/sin-internet)
 
 _Lo que hace_
 
@@ -91,6 +63,43 @@ Arqueo contra lo que dice el sistema, con sobrante y faltante a la vista, y cort
 Desde el celular: cuánto llevas hoy contra ayer, qué se vende y qué no, inventario con costo, y quince reportes. Con aviso si tu caja lleva días sin subir las ventas.
 
 ![Panel del dueño con las ventas del día y el estado de las cajas.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
+
+### Y además
+
+- [Inventario con recetas](https://vimpos.com.mx/funciones#inventario)
+
+  Vendes una hamburguesa y bajan la carne, el pan y lo demás.
+- [Pedidos a domicilio](https://vimpos.com.mx/funciones#domicilio)
+
+  Con repartidor asignado y el envío cobrado por zona.
+- [Uber Eats, directo a la caja](https://vimpos.com.mx/funciones#domicilio)
+
+  Cada pedido entra como un ticket y su comanda sale a cocina.
+- [Lealtad](https://vimpos.com.mx/funciones#lealtad)
+
+  Puntos o sellos: tu cliente gana al pagar y canjea en su siguiente visita.
+- [Combos](https://vimpos.com.mx/funciones#caja)
+
+  Un paquete con sus opciones a un solo precio.
+- [Pantalla del cliente](https://vimpos.com.mx/funciones#caja)
+
+  En un segundo monitor, tu cliente ve la cuenta, el total y el cambio.
+
+[Ver todas las funciones](https://vimpos.com.mx/funciones)
+
+_Cómo funciona_
+
+## Tu caja es el centro. La nube es el respaldo, no el motor.
+
+Casi todos los puntos de venta de hoy viven en internet: si se cae la señal, se cae tu negocio. Aquí es al revés — el sistema entero está en la computadora de tu mostrador, y lo que está fuera cuelga de un hilo que se puede cortar sin que pase nada.
+
+**Pruébalo:** se apaga la nube y el local sigue entero.
+
+### No es un «modo offline». Es que no depende del internet.
+
+Los sistemas que se anuncian con «modo sin conexión» guardan tus ventas a medias en el navegador y esperan a que suban después. Aquí no hay modo ni versión reducida: el sistema completo está en tu caja y hace exactamente lo mismo haya señal o no. Cuando vuelve, lo del día sube solo y conserva los folios que ya imprimiste.
+
+[Cómo funciona por dentro](https://vimpos.com.mx/sin-internet)
 
 _Para tu giro_
 
@@ -126,6 +135,22 @@ Varias marcas virtuales desde una cocina, y conciliación de lo que te liquidan 
 
 Varias sucursales con catálogo propio o compartido, franquicias, y un consolidado que suma todo sin tener que abrir cada una.
 
+_Por qué existe_
+
+## Lo que hay hoy para un restaurante mexicano
+
+### Los de fuera
+
+Caros, en dólares, y con el SAT como una idea vaga. Pagas por funciones pensadas para otro país y luego resuelves la factura por tu cuenta.
+
+### Los de siempre
+
+Sistemas que llevan quince años funcionando y lo hacen bien, pero viven en una sola computadora: sin respaldo, sin ver tus números desde el celular y sin nada que hacer si se moja el disco duro.
+
+### El cuaderno
+
+Funciona hasta que hay dos cajas, o un socio, o alguien pregunta cuánto se vendió el martes pasado. Entonces deja de funcionar de golpe.
+
 _Si ya usas otro_
 
 ## Cambiar de punto de venta sin volver a capturar tu menú
@@ -152,7 +177,7 @@ _Precios_
 
 Mensual, en pesos, más IVA. Sin cotización ni «contáctanos para conocer el precio».
 
-### Esencial
+### [Esencial](https://vimpos.com.mx/precios)
 
 $699
 
@@ -162,7 +187,7 @@ $699
 
 _El que recomendamos_
 
-### Negocio
+### [Negocio](https://vimpos.com.mx/precios)
 
 $999
 
@@ -170,7 +195,7 @@ $999
 - Facturación incluida · 20 folios al mes
 - Cargamos tu menú y capacitamos a tu equipo
 
-### Cadena
+### [Cadena](https://vimpos.com.mx/precios)
 
 $1,999
 

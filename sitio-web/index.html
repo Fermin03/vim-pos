@@ -55,7 +55,7 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="/assets/css/vim.css?v=22">
+<link rel="stylesheet" href="/assets/css/vim.css?v=23">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
@@ -81,9 +81,77 @@
         <span>VIM POS</span>
       </a>
       <nav class="nav-enlaces" aria-label="Principal">
-        <a class="nav-enlace" href="/funciones">Funciones</a>
+        <div class="nav-grupo" data-nav-grupo data-abierto="false">
+          <button class="nav-enlace" type="button" aria-expanded="false" aria-controls="panel-producto">
+            Producto
+            <svg class="nav-flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="nav-panel" id="panel-producto">
+            <div class="contenedor nav-panel-rejilla">
+              <div>
+                <p class="nav-panel-titulo">Lo de todos los días</p>
+                <ul class="nav-panel-lista">
+                  <li><a href="/funciones#caja"><b>Caja y cobro</b><span>Vender, cobrar y dar cambio</span></a></li>
+                  <li><a href="/funciones#cocina"><b>Cocina</b><span>Comandas impresas o en pantalla</span></a></li>
+                  <li><a href="/funciones#mesas"><b>Mesas</b><span>Mapa, cuentas abiertas y propinas</span></a></li>
+                  <li><a href="/funciones#domicilio"><b>A domicilio</b><span>Repartidor, zona de envío y Uber Eats</span></a></li>
+                </ul>
+              </div>
+              <div>
+                <p class="nav-panel-titulo">Lo del dueño</p>
+                <ul class="nav-panel-lista">
+                  <li><a href="/funciones#inventario"><b>Inventario</b><span>Cuánto insumo se fue de verdad</span></a></li>
+                  <li><a href="/funciones#reportes"><b>Corte y reportes</b><span>El corte que ya conoces y quince reportes</span></a></li>
+                  <li><a href="/funciones#lealtad"><b>Lealtad</b><span>Puntos o sellos para que vuelvan</span></a></li>
+                  <li><a href="/funciones#migracion"><b>Cambiar de sistema</b><span>Tu menú se pega y ya</span></a></li>
+                </ul>
+              </div>
+              <div class="nav-panel-destacado">
+                <p class="nav-panel-titulo">Por qué es distinto</p>
+                <ul class="nav-panel-lista">
+                  <li><a href="/sin-internet"><b>Sin internet</b><span>Se cae la señal y sigues cobrando</span></a></li>
+                  <li><a href="/funciones"><b>Todas las funciones</b><span>Sección por sección, con capturas</span></a></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
         <a class="nav-enlace" href="/facturacion-cfdi">Facturación</a>
         <a class="nav-enlace" href="/precios">Precios</a>
+        <div class="nav-grupo" data-nav-grupo data-abierto="false">
+          <button class="nav-enlace" type="button" aria-expanded="false" aria-controls="panel-recursos">
+            Recursos
+            <svg class="nav-flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="nav-panel" id="panel-recursos">
+            <div class="contenedor nav-panel-rejilla">
+              <div>
+                <p class="nav-panel-titulo">Guías</p>
+                <ul class="nav-panel-lista">
+                  <li><a href="/como-elegir-sistema-restaurante"><b>Cómo elegir sistema</b><span>Nueve preguntas antes de firmar</span></a></li>
+                  <li><a href="/cuanto-cuesta-un-sistema-para-restaurante"><b>Cuánto cuesta</b><span>Las tres formas de cobrarte, con cuentas</span></a></li>
+                  <li><a href="/factura-global-restaurantes"><b>Factura global</b><span>Qué es y cómo se emite</span></a></li>
+                </ul>
+              </div>
+              <div>
+                <p class="nav-panel-titulo">Por giro y ciudad</p>
+                <ul class="nav-panel-lista">
+                  <li><a href="/punto-de-venta-hamburgueserias"><b>Hamburgueserías</b><span>Término, extras, combo y para llevar</span></a></li>
+                  <li><a href="/punto-de-venta-restaurantes-leon"><b>Restaurantes en León</b><span>La demo es en tu mostrador</span></a></li>
+                  <li><a href="/#giros"><b>Los seis giros</b><span>Del food truck a la cadena</span></a></li>
+                </ul>
+              </div>
+              <div>
+                <p class="nav-panel-titulo">VIM POS</p>
+                <ul class="nav-panel-lista">
+                  <li><a href="/novedades"><b>Novedades</b><span>Qué cambió y cuándo</span></a></li>
+                  <li><a href="/nosotros"><b>Nosotros</b><span>Quién está detrás</span></a></li>
+                  <li><a href="/contacto"><b>Contacto</b><span>Contesta una persona</span></a></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
       </nav>
       <div class="nav-acciones">
         <a class="btn btn-fantasma nav-prueba" href="https://admin.vimpos.com.mx/registro">Pruébalo 30 días gratis</a>
@@ -109,9 +177,31 @@
     </button>
     <nav aria-label="Menú">
       <div class="nav-movil-lista">
-          <a href="/funciones">Funciones</a>
+          <details>
+            <summary>Producto</summary>
+            <a href="/funciones">Todas las funciones</a>
+            <a href="/funciones#caja">Caja y cobro</a>
+            <a href="/funciones#cocina">Cocina</a>
+            <a href="/funciones#mesas">Mesas</a>
+            <a href="/funciones#domicilio">A domicilio</a>
+            <a href="/funciones#inventario">Inventario</a>
+            <a href="/funciones#reportes">Corte y reportes</a>
+            <a href="/funciones#lealtad">Lealtad</a>
+            <a href="/sin-internet">Sin internet</a>
+          </details>
           <a href="/facturacion-cfdi">Facturación</a>
           <a href="/precios">Precios</a>
+          <details>
+            <summary>Recursos</summary>
+            <a href="/como-elegir-sistema-restaurante">Cómo elegir sistema</a>
+            <a href="/cuanto-cuesta-un-sistema-para-restaurante">Cuánto cuesta</a>
+            <a href="/factura-global-restaurantes">Factura global</a>
+            <a href="/punto-de-venta-hamburgueserias">Hamburgueserías</a>
+            <a href="/punto-de-venta-restaurantes-leon">Restaurantes en León</a>
+            <a href="/novedades">Novedades</a>
+            <a href="/nosotros">Nosotros</a>
+            <a href="/contacto">Contacto</a>
+          </details>
           <a href="/demo">Pide una demo</a>
           <a href="https://admin.vimpos.com.mx/registro">Pruébalo 30 días gratis</a>
       </div>
@@ -150,9 +240,13 @@
           <!-- El precio en el primer pantallazo: en el teléfono estaba a ocho pantallas de
                distancia, y «sin letra chica» no se sostiene si hay que buscarlo. -->
           <p class="hero-precio">Desde <strong>$699 al mes</strong>, más IVA · sin contrato forzoso · <a href="/precios">ver los tres planes</a></p>
+          <!-- Un hecho, sin nombre y sin cifra: el sitio no nombra al restaurante
+               piloto ni publica números de clientes. Si un día hay permiso para
+               nombrarlo, es esta línea la que cambia. -->
+          <p class="prueba-social">Ya cobra todos los días en una hamburguesería de León, Guanajuato</p>
         </div>
 
-        <div class="monitor-envoltura">
+        <div class="monitor-envoltura hero-escenario">
           <div class="monitor">
             <div class="monitor-barra" aria-hidden="true">
               <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
@@ -179,36 +273,101 @@
     <div class="hecho"><p>Ves la venta del día desde tu celular</p></div>
   </section>
 
-  <!-- ═══ 4 · El problema ════════════════════════════════════════════════ -->
+  <!-- ═══ 4 · Lo que hace ════════════════════════════════════════════════ -->
   <section class="seccion">
     <div class="contenedor pila pila-8">
       <div class="pila pila-4">
-        <p class="eyebrow">Por qué existe</p>
-        <h2>Lo que hay hoy para un restaurante mexicano</h2>
+        <p class="eyebrow">Lo que hace</p>
+        <h2>Cuatro cosas, bien</h2>
       </div>
-      <div class="tres">
-        <div class="tarjeta pila pila-3">
-          <h3>Los de fuera</h3>
-          <p>
-            Caros, en dólares, y con el SAT como una idea vaga. Pagas por funciones pensadas para
-            otro país y luego resuelves la factura por tu cuenta.
-          </p>
+
+      <!-- Las cuatro en zigzag medían 2,000 px. En pantalla ancha van en lista
+           y las capturas comparten la celda de la derecha: se ve la de la fila
+           activa (vim.css, «Cuatro cosas»; la elección la hace vim.js). El
+           marcado es el mismo zigzag, que es lo que queda en el teléfono y
+           cuando el script no carga. -->
+      <div class="cosas pila pila-8" data-cosas>
+        <div class="alterna">
+          <div class="alterna-texto pila pila-3">
+            <h3><span data-cosa-control>Vender</span></h3>
+            <p>
+              Catálogo por categorías, modificadores con precio —queso extra, sin cebolla, término de
+              la carne— y cobro en efectivo, tarjeta o transferencia. Con propina y con cambio
+              calculado.
+            </p>
+          </div>
+          <div class="monitor">
+            <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
+            <img src="/assets/img/capturas/pos-catalogo.webp?v=3" alt="Un producto abierto con sus opciones: término de la carne y extras con su precio."
+                   width="1600" height="1000" loading="lazy" decoding="async">
+          </div>
         </div>
-        <div class="tarjeta pila pila-3">
-          <h3>Los de siempre</h3>
-          <p>
-            Sistemas que llevan quince años funcionando y lo hacen bien, pero viven en una sola
-            computadora: sin respaldo, sin ver tus números desde el celular y sin nada que hacer si
-            se moja el disco duro.
-          </p>
+
+        <div class="alterna invertido">
+          <div class="alterna-texto pila pila-3">
+            <h3><span data-cosa-control>Mandar a cocina</span></h3>
+            <p>
+              La comanda sale impresa donde tiene que salir: las bebidas en la barra y la comida en
+              cocina, cada papel con el rótulo de su estación. O en una pantalla, si prefieres no
+              imprimir.
+            </p>
+          </div>
+          <div class="monitor">
+            <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
+            <picture>
+              <source media="(max-width: 619px)" srcset="/assets/img/capturas/kds-movil.webp?v=3" width="1400" height="920">
+              <img src="/assets/img/capturas/kds.webp?v=3" alt="Pantalla de cocina con las comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas." width="1600" height="1000" loading="lazy" decoding="async">
+            </picture>
+          </div>
         </div>
-        <div class="tarjeta pila pila-3">
-          <h3>El cuaderno</h3>
-          <p>
-            Funciona hasta que hay dos cajas, o un socio, o alguien pregunta cuánto se vendió el
-            martes pasado. Entonces deja de funcionar de golpe.
-          </p>
+
+        <div class="alterna">
+          <div class="alterna-texto pila pila-3">
+            <h3><span data-cosa-control>Cerrar el turno</span></h3>
+            <p>
+              Arqueo contra lo que dice el sistema, con sobrante y faltante a la vista, y corte Z
+              sellado. Con el mismo formato de siempre, para que nadie tenga que reaprender a leerlo.
+            </p>
+          </div>
+          <div class="monitor">
+            <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
+            <img src="/assets/img/capturas/pos-arqueo.webp?v=3" alt="Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón."
+                   width="1600" height="1000" loading="lazy" decoding="async">
+          </div>
         </div>
+
+        <div class="alterna invertido">
+          <div class="alterna-texto pila pila-3">
+            <h3><span data-cosa-control>Ver tu negocio</span></h3>
+            <p>
+              Desde el celular: cuánto llevas hoy contra ayer, qué se vende y qué no, inventario con
+              costo, y quince reportes. Con aviso si tu caja lleva días sin subir las ventas.
+            </p>
+          </div>
+          <div class="monitor">
+            <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
+            <picture>
+              <source media="(max-width: 619px)" srcset="/assets/img/capturas/admin-dashboard-movil.webp?v=3" width="780" height="1688">
+              <img src="/assets/img/capturas/admin-dashboard.webp?v=3" alt="Panel del dueño con las ventas del día y el estado de las cajas." width="1600" height="1000" loading="lazy" decoding="async">
+            </picture>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lo que el producto ya hace y la portada no enseñaba. Cada renglón
+           repite lo que /funciones ya afirma, con sus mismas palabras: aquí no
+           se promete nada nuevo. Sin capturas todavía. -->
+      <div class="pila pila-5">
+        <h3>Y además</h3>
+        <ul class="ademas">
+          <li><a href="/funciones#inventario">Inventario con recetas</a><p>Vendes una hamburguesa y bajan la carne, el pan y lo demás.</p></li>
+          <li><a href="/funciones#domicilio">Pedidos a domicilio</a><p>Con repartidor asignado y el envío cobrado por zona.</p></li>
+          <li><a href="/funciones#domicilio">Uber Eats, directo a la caja</a><p>Cada pedido entra como un ticket y su comanda sale a cocina.</p></li>
+          <li><a href="/funciones#lealtad">Lealtad</a><p>Puntos o sellos: tu cliente gana al pagar y canjea en su siguiente visita.</p></li>
+          <li><a href="/funciones#caja">Combos</a><p>Un paquete con sus opciones a un solo precio.</p></li>
+          <li><a href="/funciones#caja">Pantalla del cliente</a><p>En un segundo monitor, tu cliente ve la cuenta, el total y el cambio.</p></li>
+        </ul>
+        <p><a href="/funciones">Ver todas las funciones</a></p>
       </div>
     </div>
   </section>
@@ -245,9 +404,9 @@
 
           <style>
             .a-t-titulo { font: 600 15px 'Inter Tight', system-ui, sans-serif; fill: var(--ink, #16161A); }
-            .a-t-sub    { font: 400 12.5px 'Inter Tight', system-ui, sans-serif; fill: var(--ink-3, #8E8E94); }
+            .a-t-sub    { font: 400 12.5px 'Inter Tight', system-ui, sans-serif; fill: var(--ink-3, #6E6E74); }
             .a-t-etq    { font: 600 10px 'JetBrains Mono', ui-monospace, monospace;
-                          letter-spacing: .12em; fill: var(--ink-3, #8E8E94); }
+                          letter-spacing: .12em; fill: var(--ink-3, #6E6E74); }
 
             /* La frontera del local es la pieza que carga el argumento: lo de dentro no
                depende de lo de fuera. Por eso es lo único con relleno propio. */
@@ -259,7 +418,7 @@
             /* Lo de fuera: gris, sin relleno y unido por puntos. Se lee como "opcional"
                antes de leer ninguna palabra. */
             .a-fuera   { fill: none; stroke: var(--line-strong, #DDDDD9); stroke-width: 1; }
-            .a-enlace  { stroke: var(--ink-3, #8E8E94); stroke-width: 1.25; stroke-dasharray: 4 4; fill: none; }
+            .a-enlace  { stroke: var(--ink-3, #6E6E74); stroke-width: 1.25; stroke-dasharray: 4 4; fill: none; }
 
             .a-corte { opacity: 0; }
             .a-nube-grupo, .a-enlace, .a-corte { transition: opacity 240ms cubic-bezier(0.23, 1, 0.32, 1); }
@@ -389,84 +548,14 @@
     </div>
   </section>
 
-  <!-- ═══ 6 · Lo que hace ════════════════════════════════════════════════ -->
-  <section class="seccion">
-    <div class="contenedor pila pila-8">
-      <div class="pila pila-4">
-        <p class="eyebrow">Lo que hace</p>
-        <h2>Cuatro cosas, bien</h2>
-      </div>
+  <!-- ═══ 6 · Para tu giro ═══════════════════════════════════════════════
+       Eran seis renglones de acordeón cerrados: la sección con menos que ver de
+       toda la portada. Ahora son tarjetas con el texto a la vista, y el límite
+       de cada giro se dice dentro de la suya. Sin capturas a propósito: las que
+       hay pesan 100 KB cada una y aquí irían de miniatura.
 
-      <div class="alterna">
-        <div class="alterna-texto pila pila-3">
-          <h3>Vender</h3>
-          <p>
-            Catálogo por categorías, modificadores con precio —queso extra, sin cebolla, término de
-            la carne— y cobro en efectivo, tarjeta o transferencia. Con propina y con cambio
-            calculado.
-          </p>
-        </div>
-        <div class="monitor">
-          <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
-          <img src="/assets/img/capturas/pos-catalogo.webp?v=3" alt="Un producto abierto con sus opciones: término de la carne y extras con su precio."
-                 width="1600" height="1000" loading="lazy" decoding="async">
-        </div>
-      </div>
-
-      <div class="alterna invertido">
-        <div class="alterna-texto pila pila-3">
-          <h3>Mandar a cocina</h3>
-          <p>
-            La comanda sale impresa donde tiene que salir: las bebidas en la barra y la comida en
-            cocina, cada papel con el rótulo de su estación. O en una pantalla, si prefieres no
-            imprimir.
-          </p>
-        </div>
-        <div class="monitor">
-          <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
-          <picture>
-            <source media="(max-width: 619px)" srcset="/assets/img/capturas/kds-movil.webp?v=3" width="1400" height="920">
-            <img src="/assets/img/capturas/kds.webp?v=3" alt="Pantalla de cocina con las comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas." width="1600" height="1000" loading="lazy" decoding="async">
-          </picture>
-        </div>
-      </div>
-
-      <div class="alterna">
-        <div class="alterna-texto pila pila-3">
-          <h3>Cerrar el turno</h3>
-          <p>
-            Arqueo contra lo que dice el sistema, con sobrante y faltante a la vista, y corte Z
-            sellado. Con el mismo formato de siempre, para que nadie tenga que reaprender a leerlo.
-          </p>
-        </div>
-        <div class="monitor">
-          <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
-          <img src="/assets/img/capturas/pos-arqueo.webp?v=3" alt="Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón."
-                 width="1600" height="1000" loading="lazy" decoding="async">
-        </div>
-      </div>
-
-      <div class="alterna invertido">
-        <div class="alterna-texto pila pila-3">
-          <h3>Ver tu negocio</h3>
-          <p>
-            Desde el celular: cuánto llevas hoy contra ayer, qué se vende y qué no, inventario con
-            costo, y quince reportes. Con aviso si tu caja lleva días sin subir las ventas.
-          </p>
-        </div>
-        <div class="monitor">
-          <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
-          <picture>
-            <source media="(max-width: 619px)" srcset="/assets/img/capturas/admin-dashboard-movil.webp?v=3" width="780" height="1688">
-            <img src="/assets/img/capturas/admin-dashboard.webp?v=3" alt="Panel del dueño con las ventas del día y el estado de las cajas." width="1600" height="1000" loading="lazy" decoding="async">
-          </picture>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ 8 · Para tu giro ═══════════════════════════════════════════════ -->
-  <section class="seccion destacada-suave">
+       El `id` lo usa el menú («Los seis giros»). -->
+  <section class="seccion" id="giros">
     <div class="contenedor pila pila-8">
       <div class="pila pila-4">
         <p class="eyebrow">Para tu giro</p>
@@ -477,73 +566,72 @@
         </p>
       </div>
 
-      <div class="acordeon">
-        <div class="acordeon-item" data-acordeon-item data-abierto="false">
-          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
-            Comida rápida o de mostrador
-            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="acordeon-panel" data-acordeon-panel><div>
-            <p>Mostrador y pickup. Cola rápida, comanda directa a cocina y modos de servicio para separar lo que se come aquí de lo que se lleva. Así se ve en una <a href="/punto-de-venta-hamburgueserias">hamburguesería</a>.</p>
-          </div></div>
+      <div class="tres">
+        <div class="tarjeta pila pila-3">
+          <h3>Comida rápida o de mostrador</h3>
+          <p>Mostrador y pickup. Cola rápida, comanda directa a cocina y modos de servicio para separar lo que se come aquí de lo que se lleva. Así se ve en una <a href="/punto-de-venta-hamburgueserias">hamburguesería</a>.</p>
         </div>
-
-        <div class="acordeon-item" data-acordeon-item data-abierto="false">
-          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
-            Food truck
-            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="acordeon-panel" data-acordeon-panel><div>
-            <p>Turno por evento y operación sin señal en la calle, que es donde el argumento del producto deja de ser teórico. Una sola caja, un solo turno, cierre al terminar.</p>
-          </div></div>
+        <div class="tarjeta pila pila-3">
+          <h3>Food truck</h3>
+          <p>Turno por evento y operación sin señal en la calle, que es donde el argumento del producto deja de ser teórico. Una sola caja, un solo turno, cierre al terminar.</p>
         </div>
-
-        <div class="acordeon-item" data-acordeon-item data-abierto="false">
-          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
-            Cafetería o bar
-            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="acordeon-panel" data-acordeon-panel><div>
-            <p>Cuentas abiertas en barra, modificadores con precio y cierres por turno. La cuenta se queda abierta hasta que el cliente pide, no hasta que se cierra el sistema.</p>
-          </div></div>
+        <div class="tarjeta pila pila-3">
+          <h3>Cafetería o bar</h3>
+          <p>Cuentas abiertas en barra, modificadores con precio y cierres por turno. La cuenta se queda abierta hasta que el cliente pide, no hasta que se cierra el sistema.</p>
         </div>
-
-        <div class="acordeon-item" data-acordeon-item data-abierto="false">
-          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
-            Restaurante con meseros
-            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="acordeon-panel" data-acordeon-panel><div>
-            <p>Mapa de mesas, meseros y propinas.</p>
-            <p style="margin-top:var(--sp-3);font-size:var(--t-13)"><b>El límite:</b> no hay app de mesero en tableta. Se opera desde la caja.</p>
-          </div></div>
+        <div class="tarjeta pila pila-3">
+          <h3>Restaurante con meseros</h3>
+          <p>Mapa de mesas, meseros y propinas.</p>
+          <p class="tarjeta-limite"><b>El límite:</b> no hay app de mesero en tableta. Se opera desde la caja.</p>
         </div>
-
-        <div class="acordeon-item" data-acordeon-item data-abierto="false">
-          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
-            Solo reparto (dark kitchen)
-            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="acordeon-panel" data-acordeon-panel><div>
-            <p>Varias marcas virtuales desde una cocina, y conciliación de lo que te liquidan Rappi, Uber y DiDi contra lo que registró tu caja.</p>
-            <p style="margin-top:var(--sp-3);font-size:var(--t-13)"><b>El límite:</b> la liquidación se pega a mano; todavía no se sube el archivo.</p>
-          </div></div>
+        <div class="tarjeta pila pila-3">
+          <h3>Solo reparto (dark kitchen)</h3>
+          <p>Varias marcas virtuales desde una cocina, y conciliación de lo que te liquidan Rappi, Uber y DiDi contra lo que registró tu caja.</p>
+          <p class="tarjeta-limite"><b>El límite:</b> la liquidación se pega a mano; todavía no se sube el archivo.</p>
         </div>
-
-        <div class="acordeon-item" data-acordeon-item data-abierto="false">
-          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
-            Cadena o franquicia
-            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-          </button>
-          <div class="acordeon-panel" data-acordeon-panel><div>
-            <p>Varias sucursales con catálogo propio o compartido, franquicias, y un consolidado que suma todo sin tener que abrir cada una.</p>
-          </div></div>
+        <div class="tarjeta pila pila-3">
+          <h3>Cadena o franquicia</h3>
+          <p>Varias sucursales con catálogo propio o compartido, franquicias, y un consolidado que suma todo sin tener que abrir cada una.</p>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ═══ 9 · Migración ══════════════════════════════════════════════════
+  <!-- ═══ 7 · El problema ════════════════════════════════════════════════ -->
+  <section class="seccion destacada-suave">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Por qué existe</p>
+        <h2>Lo que hay hoy para un restaurante mexicano</h2>
+      </div>
+      <div class="tres">
+        <div class="tarjeta pila pila-3">
+          <h3>Los de fuera</h3>
+          <p>
+            Caros, en dólares, y con el SAT como una idea vaga. Pagas por funciones pensadas para
+            otro país y luego resuelves la factura por tu cuenta.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Los de siempre</h3>
+          <p>
+            Sistemas que llevan quince años funcionando y lo hacen bien, pero viven en una sola
+            computadora: sin respaldo, sin ver tus números desde el celular y sin nada que hacer si
+            se moja el disco duro.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>El cuaderno</h3>
+          <p>
+            Funciona hasta que hay dos cajas, o un socio, o alguien pregunta cuánto se vendió el
+            martes pasado. Entonces deja de funcionar de golpe.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 8 · Migración ══════════════════════════════════════════════════
        Los dos argumentos están verificados en el código: el parser de los
        cuatro formatos y el formato del corte Z. No se escribe nada aquí que no
        se pueda enseñar. -->
@@ -603,7 +691,7 @@
     </div>
   </section>
 
-  <!-- ═══ 10 · Precios ═══════════════════════════════════════════════════ -->
+  <!-- ═══ 9 · Precios ═══════════════════════════════════════════════════ -->
   <section class="seccion destacada-suave">
     <div class="contenedor pila pila-8">
       <div class="pila pila-4">
@@ -615,7 +703,7 @@
       <div class="planes">
         <div class="plan pila">
           <div>
-            <h3>Esencial</h3>
+            <h3><a class="enlace-tarjeta" href="/precios">Esencial</a></h3>
             <div class="plan-precio">$699</div>
           </div>
           <ul class="plan-lista">
@@ -628,7 +716,7 @@
         <div class="plan destacado pila">
           <div>
             <p class="eyebrow" style="color:var(--accent-hover)">El que recomendamos</p>
-            <h3>Negocio</h3>
+            <h3><a class="enlace-tarjeta" href="/precios">Negocio</a></h3>
             <div class="plan-precio">$999</div>
           </div>
           <ul class="plan-lista">
@@ -640,7 +728,7 @@
 
         <div class="plan pila">
           <div>
-            <h3>Cadena</h3>
+            <h3><a class="enlace-tarjeta" href="/precios">Cadena</a></h3>
             <div class="plan-precio">$1,999</div>
           </div>
           <ul class="plan-lista">
@@ -657,7 +745,7 @@
     </div>
   </section>
 
-  <!-- ═══ 11 · Preguntas frecuentes ══════════════════════════════════════ -->
+  <!-- ═══ 10 · Preguntas frecuentes ══════════════════════════════════════ -->
   <section class="seccion">
     <div class="contenedor pila pila-8">
       <div class="pila pila-4">
@@ -749,7 +837,7 @@
     </div>
   </section>
 
-  <!-- ═══ 12 · Cierre ════════════════════════════════════════════════════ -->
+  <!-- ═══ 11 · Cierre ════════════════════════════════════════════════════ -->
   <section class="seccion">
     <div class="contenedor">
       <div class="cierre pila pila-5" style="align-items:center">
@@ -1012,7 +1100,7 @@
 }
 </script>
 
-<script src="/assets/js/vim.js?v=15" defer></script>
+<script src="/assets/js/vim.js?v=16" defer></script>
 <!-- Medición sin cookies (Vercel Web Analytics). Se sirve desde este dominio y
      solo existe si está encendida en el proyecto de Vercel; si no, es un 404
      inofensivo. Los eventos se mandan desde vim.js. -->

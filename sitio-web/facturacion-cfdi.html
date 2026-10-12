@@ -37,7 +37,7 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="/assets/css/vim.css?v=22">
+<link rel="stylesheet" href="/assets/css/vim.css?v=23">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
@@ -63,9 +63,77 @@
         <span>VIM POS</span>
       </a>
       <nav class="nav-enlaces" aria-label="Principal">
-        <a class="nav-enlace" href="/funciones">Funciones</a>
-        <a class="nav-enlace" href="/facturacion-cfdi" aria-current="page">Facturación</a>
+        <div class="nav-grupo" data-nav-grupo data-abierto="false">
+          <button class="nav-enlace" type="button" aria-expanded="false" aria-controls="panel-producto">
+            Producto
+            <svg class="nav-flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="nav-panel" id="panel-producto">
+            <div class="contenedor nav-panel-rejilla">
+              <div>
+                <p class="nav-panel-titulo">Lo de todos los días</p>
+                <ul class="nav-panel-lista">
+                  <li><a href="/funciones#caja"><b>Caja y cobro</b><span>Vender, cobrar y dar cambio</span></a></li>
+                  <li><a href="/funciones#cocina"><b>Cocina</b><span>Comandas impresas o en pantalla</span></a></li>
+                  <li><a href="/funciones#mesas"><b>Mesas</b><span>Mapa, cuentas abiertas y propinas</span></a></li>
+                  <li><a href="/funciones#domicilio"><b>A domicilio</b><span>Repartidor, zona de envío y Uber Eats</span></a></li>
+                </ul>
+              </div>
+              <div>
+                <p class="nav-panel-titulo">Lo del dueño</p>
+                <ul class="nav-panel-lista">
+                  <li><a href="/funciones#inventario"><b>Inventario</b><span>Cuánto insumo se fue de verdad</span></a></li>
+                  <li><a href="/funciones#reportes"><b>Corte y reportes</b><span>El corte que ya conoces y quince reportes</span></a></li>
+                  <li><a href="/funciones#lealtad"><b>Lealtad</b><span>Puntos o sellos para que vuelvan</span></a></li>
+                  <li><a href="/funciones#migracion"><b>Cambiar de sistema</b><span>Tu menú se pega y ya</span></a></li>
+                </ul>
+              </div>
+              <div class="nav-panel-destacado">
+                <p class="nav-panel-titulo">Por qué es distinto</p>
+                <ul class="nav-panel-lista">
+                  <li><a href="/sin-internet"><b>Sin internet</b><span>Se cae la señal y sigues cobrando</span></a></li>
+                  <li><a href="/funciones"><b>Todas las funciones</b><span>Sección por sección, con capturas</span></a></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+        <a class="nav-enlace" href="/facturacion-cfdi">Facturación</a>
         <a class="nav-enlace" href="/precios">Precios</a>
+        <div class="nav-grupo" data-nav-grupo data-abierto="false">
+          <button class="nav-enlace" type="button" aria-expanded="false" aria-controls="panel-recursos">
+            Recursos
+            <svg class="nav-flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="nav-panel" id="panel-recursos">
+            <div class="contenedor nav-panel-rejilla">
+              <div>
+                <p class="nav-panel-titulo">Guías</p>
+                <ul class="nav-panel-lista">
+                  <li><a href="/como-elegir-sistema-restaurante"><b>Cómo elegir sistema</b><span>Nueve preguntas antes de firmar</span></a></li>
+                  <li><a href="/cuanto-cuesta-un-sistema-para-restaurante"><b>Cuánto cuesta</b><span>Las tres formas de cobrarte, con cuentas</span></a></li>
+                  <li><a href="/factura-global-restaurantes"><b>Factura global</b><span>Qué es y cómo se emite</span></a></li>
+                </ul>
+              </div>
+              <div>
+                <p class="nav-panel-titulo">Por giro y ciudad</p>
+                <ul class="nav-panel-lista">
+                  <li><a href="/punto-de-venta-hamburgueserias"><b>Hamburgueserías</b><span>Término, extras, combo y para llevar</span></a></li>
+                  <li><a href="/punto-de-venta-restaurantes-leon"><b>Restaurantes en León</b><span>La demo es en tu mostrador</span></a></li>
+                  <li><a href="/#giros"><b>Los seis giros</b><span>Del food truck a la cadena</span></a></li>
+                </ul>
+              </div>
+              <div>
+                <p class="nav-panel-titulo">VIM POS</p>
+                <ul class="nav-panel-lista">
+                  <li><a href="/novedades"><b>Novedades</b><span>Qué cambió y cuándo</span></a></li>
+                  <li><a href="/nosotros"><b>Nosotros</b><span>Quién está detrás</span></a></li>
+                  <li><a href="/contacto"><b>Contacto</b><span>Contesta una persona</span></a></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
       </nav>
       <div class="nav-acciones">
         <a class="btn btn-fantasma nav-prueba" href="https://admin.vimpos.com.mx/registro">Pruébalo 30 días gratis</a>
@@ -91,9 +159,31 @@
     </button>
     <nav aria-label="Menú">
       <div class="nav-movil-lista">
-          <a href="/funciones">Funciones</a>
+          <details>
+            <summary>Producto</summary>
+            <a href="/funciones">Todas las funciones</a>
+            <a href="/funciones#caja">Caja y cobro</a>
+            <a href="/funciones#cocina">Cocina</a>
+            <a href="/funciones#mesas">Mesas</a>
+            <a href="/funciones#domicilio">A domicilio</a>
+            <a href="/funciones#inventario">Inventario</a>
+            <a href="/funciones#reportes">Corte y reportes</a>
+            <a href="/funciones#lealtad">Lealtad</a>
+            <a href="/sin-internet">Sin internet</a>
+          </details>
           <a href="/facturacion-cfdi">Facturación</a>
           <a href="/precios">Precios</a>
+          <details>
+            <summary>Recursos</summary>
+            <a href="/como-elegir-sistema-restaurante">Cómo elegir sistema</a>
+            <a href="/cuanto-cuesta-un-sistema-para-restaurante">Cuánto cuesta</a>
+            <a href="/factura-global-restaurantes">Factura global</a>
+            <a href="/punto-de-venta-hamburgueserias">Hamburgueserías</a>
+            <a href="/punto-de-venta-restaurantes-leon">Restaurantes en León</a>
+            <a href="/novedades">Novedades</a>
+            <a href="/nosotros">Nosotros</a>
+            <a href="/contacto">Contacto</a>
+          </details>
           <a href="/demo">Pide una demo</a>
           <a href="https://admin.vimpos.com.mx/registro">Pruébalo 30 días gratis</a>
       </div>
@@ -424,7 +514,7 @@
   </div>
 </footer>
 
-<script src="/assets/js/vim.js?v=15" defer></script>
+<script src="/assets/js/vim.js?v=16" defer></script>
 <!-- Medición sin cookies (Vercel Web Analytics). Se sirve desde este dominio y
      solo existe si está encendida en el proyecto de Vercel; si no, es un 404
      inofensivo. Los eventos se mandan desde vim.js. -->
