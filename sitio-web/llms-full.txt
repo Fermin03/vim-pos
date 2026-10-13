@@ -1015,6 +1015,16 @@ Dinos cuántas cajas y sucursales tienes y te decimos tu plan. Contestamos el mi
 
 ## Octubre de 2026
 
+13 de octubre Caja · 0.10.0
+
+### Devoluciones a la tarjeta, pago dividido con terminal y pedidos ya pagados
+
+#### Nuevo
+
+- **La devolución regresa el dinero a la tarjeta.** Si la cuenta se cobró en tu terminal de Mercado Pago desde la caja, al devolverla con **Mismo método** el dinero vuelve solo a la tarjeta del cliente. La encuentras en **Menú → Devoluciones**.
+- **Pago dividido con la terminal.** En **Pago dividido → Agregar pago** puedes elegir **Tarjeta**: esa parte se cobra en la terminal y el resto como tú decidas.
+- **Pedidos de la tienda en línea ya pagados.** Si el cliente pagó con tarjeta en tu tienda en línea, el pedido llega a la caja ya cobrado: al entregarlo tocas **Listo**.
+
 11 de octubre Caja · 0.9.0
 
 ### Cobro con tarjeta desde la caja
