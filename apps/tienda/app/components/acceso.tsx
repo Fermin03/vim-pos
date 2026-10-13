@@ -131,7 +131,7 @@ export function Registro({ slug, negocio, volver }: { slug: string; negocio: str
     return (
       <Pantalla titulo="Revisa tu correo para continuar" apoyo={<>Te escribimos a <strong className="font-semibold text-ink">{porCorreo}</strong> con lo que sigue. Si no lo ves en unos minutos, revisa también tu correo no deseado.</>}>
         <div className="flex flex-col gap-2">
-          <Link href={enlaceDeAcceso(slug, "entrar", volver)} className={GHOST}>Entrar</Link>
+          <Link href={enlaceDeAcceso(slug, "entrar", volver)} className={GHOST}>Iniciar sesión</Link>
           <Link href={sinCuenta(slug, volver)} className={cn(ENLACE, "self-center text-15")}>Seguir sin cuenta</Link>
         </div>
       </Pantalla>

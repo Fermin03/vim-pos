@@ -230,7 +230,24 @@ Los bloques, en este orden, cada uno en su `Tarjeta`:
 2. **Tu tienda** — dirección (`pedidos.vimpos.com.mx/` + lo que escriba), logo, color y una
    descripción de hasta 200 caracteres.
 3. **Pedidos** — aceptación «A mano» o «Automática», minutos de espera (3 a 15, solo en «A mano») y
-   formas de pago al recibir (al menos una).
+   formas de pago: «Pago en línea», «Efectivo al recibir» y «Tarjeta al recibir» (al menos una; la
+   única marcada queda fija). «Pago en línea» no se puede encender sin una cuenta de Mercado Pago
+   activa.
+   - **Pago en línea** (0173) — tarjeta aparte, justo debajo de Pedidos. Sin cuenta: una línea y
+     «Conectar Mercado Pago» (la cuenta de la TIENDA: es otra conexión que la de Terminal de
+     tarjetas y no se comparten; al terminar vuelve a esta página). Con cuentas: la lista con sus
+     píldoras («De prueba: no cobra pedidos reales», «Hay que volver a conectarla»), «Desconectar»
+     en cada una (`DialogoPeligro`: dice que la tienda deja de ofrecer el pago en línea y que la
+     terminal no cambia; no se puede con un pago por confirmar o una devolución en proceso) y
+     «Conectar otra cuenta». Y,
+     si hay varias activas, un selector por sucursal que vende en la tienda («¿Qué cuenta cobra en
+     …?») que se guarda al elegir. Debajo, «Lo que debes saber» (comisión de Mercado Pago sin
+     porcentaje, VIM no cobra por pedido, la devolución es sola y completa, hace falta la caja
+     actualizada) y «Últimos pagos en línea»: 30 renglones de solo lectura, sin paginar, con el
+     estado en palabras (Pagado, Devuelto, Devolución en proceso, No completado).
+   - Si el dueño ofrece pago en línea y la tienda no lo está ofreciendo (cuenta en error o
+     desconectada, o sucursal sin cuenta elegida), sale un `Aviso` ámbar **arriba de todo**, con su
+     botón «Reconectar Mercado Pago» / «Conectar Mercado Pago» cuando eso lo arregla.
 4. **Sucursales** — una tarjeta por sucursal: si vende en la tienda, si entrega para recoger o a
    domicilio, y su horario.
 5. **Menú de la tienda** (0168) — qué categorías y productos enseña cada sucursal. Ver abajo.

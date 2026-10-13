@@ -2,13 +2,15 @@
 // motivos, tienda cerrada y errores. La función solo manda códigos; aquí se vuelven palabras de
 // comensal, sin términos internos, y cada error dice qué pasó y qué puede hacer.
 import type { Horario } from "@vim/fecha";
-import type { EstadoDePedido } from "./contrato";
+import type { EstadoDePedido, Pago, Seguimiento } from "./contrato";
 import { formatoMxn } from "./dinero";
-import { momentoMx, textoApertura, type Momento } from "./horario";
+import { aLaHora, momentoMx, textoApertura, type Momento } from "./horario";
 import { formatoTelefono } from "./telefono";
 
 // ── Seguimiento (textos decididos por Fermín; sin tiempo estimado) ───────────────────────────────
 const ESTADOS: Record<Exclude<EstadoDePedido, "CANCELADO">, { titulo: string; apoyo: string }> = {
+  // El cobro se mandó y todavía no se sabe si pasó. Nunca «no se te cobró» ni «rechazado».
+  POR_PAGAR: { titulo: "Confirmando tu pago", apoyo: "Esto puede tardar unos minutos." },
   EN_PROCESO: { titulo: "En proceso", apoyo: "Le avisamos al restaurante. En un momento confirma tu pedido." },
   EN_PREPARACION: { titulo: "En preparación", apoyo: "El restaurante ya está preparando tu pedido." },
   EN_CAMINO: { titulo: "En camino", apoyo: "Tu pedido va hacia ti." },
@@ -27,6 +29,84 @@ export function textoDeEstado(estado: EstadoDePedido, motivo: string | null): { 
   if (estado !== "CANCELADO") return ESTADOS[estado];
   return { titulo: "Cancelado", apoyo: MOTIVOS[motivo ?? ""] ?? "El restaurante no pudo tomar tu pedido." };
 }
+
+// ── Seguimiento de un pedido que se paga en línea ────────────────────────────────────────────────
+// TEXTOS PROVISIONALES: los escribió quien programó; falta la hoja de redacción y el visto bueno.
+/** La documentación de Mercado Pago no da un plazo para ver una devolución: no se promete ninguno. */
+const PLAZO_DE_DEVOLUCION = "Cuándo lo ves reflejado depende de tu banco.";
+/** «antes de las 3:45 p. m.», o nada si la hora no se puede leer. */
+function antesDe(vence: string | null): string {
+  const d = vence ? new Date(vence) : null;
+  return d && !Number.isNaN(d.getTime()) ? ` ${aLaHora(momentoMx(d).hora).replace(/^a /, "antes de ")}` : "";
+}
+
+export type TextoDeSeguimiento = {
+  titulo: string; apoyo: string;
+  /** El restaurante canceló: el título va en rojo. Un pago que no se completó no es eso. */
+  alerta: boolean;
+};
+
+/**
+ * El título grande y su línea de apoyo de la página del pedido. En un pedido al recibir es
+ * `textoDeEstado`. En uno que se paga en línea manda cómo va el pago: mientras se confirma, cuando
+ * no se completó, y cuando se canceló un pedido ya pagado (que dice que el dinero se devuelve y
+ * nunca «no se te cobró»). Venció sin que se haya podido confirmar con Mercado Pago: se dice que
+ * se está confirmando, NUNCA que no hubo pago.
+ */
+export function textoDeSeguimiento(p: Pick<Seguimiento, "estado" | "motivo" | "enLinea">): TextoDeSeguimiento {
+  const pago = p.enLinea;
+  if (!pago) return { ...textoDeEstado(p.estado, p.motivo), alerta: p.estado === "CANCELADO" };
+  if (p.estado !== "CANCELADO") return { ...ESTADOS[p.estado], alerta: false };
+  if (pago.estado === "POR_CONFIRMAR") {
+    return { titulo: "Confirmando tu pago", apoyo: "Esto puede tardar unos minutos.", alerta: false };
+  }
+  // El banco pidió confirmar el pago y el reto se dejó (se canceló o pasó el tiempo). TEXTO PROVISIONAL (James).
+  if (pago.estado === "SIN_PAGO" && p.motivo === "SIN_VERIFICAR") {
+    return { titulo: "No se completó el pago", apoyo: "No se completó la verificación con tu banco. Tu pedido no se envió al restaurante y no se te cobró nada.", alerta: false };
+  }
+  if (pago.estado === "SIN_PAGO") {
+    return { titulo: "No se completó el pago", apoyo: "Tu pedido no se envió al restaurante y no se te cobró nada.", alerta: false };
+  }
+  // Cancelado con el pago hecho: el motivo de siempre, sin «no se te cobró», y qué pasa con el dinero.
+  // El pedido se había cerrado sin pago y el cobro pasó después (p. ej. el reto del banco se contestó
+  // tarde): no fue el restaurante. TEXTO PROVISIONAL (James).
+  const tardio = p.motivo === "SIN_PAGO" || p.motivo === "SIN_VERIFICAR";
+  const motivo = tardio ? "Tu pago se confirmó cuando tu pedido ya se había cerrado, así que no se envió al restaurante."
+    : (MOTIVOS[p.motivo ?? ""] ?? "El restaurante no pudo tomar tu pedido.").replace(" No se te cobró nada.", "");
+  const dinero = pago.estado === "DEVUELTO" ? "Te devolvimos tu pago completo." : "Estamos devolviendo tu pago completo.";
+  return { titulo: "Cancelado", apoyo: `${motivo} ${dinero} ${PLAZO_DE_DEVOLUCION}`, alerta: !tardio };
+}
+
+// ── La verificación del banco (3D Secure), en la pantalla de la tarjeta ──────────────────────────
+// TEXTOS PROVISIONALES (James). No prometen tiempos. Lo que pasa si el banco no lo confirma, si se
+// cancela o si vence está con los demás rechazos de la tarjeta (`textoDeRechazo`, tarjeta.ts).
+export const RETO = {
+  titulo: "Confirma el pago con tu banco",
+  apoyo: "Tu banco quiere comprobar que eres tú. Sigue los pasos de aquí abajo para terminar tu pago.",
+  /** El nombre del marco, para quien no ve la pantalla. */
+  marco: "Verificación de tu banco",
+  cargando: "Cargando la verificación de tu banco…",
+  cancelar: "Cancelar",
+  /** El reto ya terminó (o se pidió cancelarlo) y falta que Mercado Pago diga cómo quedó. */
+  confirmando: "Confirmando tu pago",
+  noPagues: "Estamos confirmando tu pago. No vuelvas a pagar todavía: en un momento te decimos qué pasó.",
+  /** Se tocó «Cancelar» y falta la respuesta del servidor (un instante). */
+  cancelando: "Cancelando la verificación",
+} as const;
+
+// ── Formas de pago («¿Cómo pagas?») ──────────────────────────────────────────────────────────────
+/**
+ * El nombre de una forma de pago. Cuando también se ofrece pagar en línea, las otras dos dicen que
+ * son al recibir: «Con tarjeta» a secas ya no distinguiría la terminal del repartidor del pago en línea.
+ */
+export function nombreDePago(pago: Pago, conEnLinea: boolean): string {
+  if (pago === "EN_LINEA") return "Pagar en línea";
+  const nombre = pago === "EFECTIVO" ? "En efectivo" : "Con tarjeta";
+  return conEnLinea ? `${nombre}, al recibir` : nombre;
+}
+/** La línea bajo «¿Cómo pagas?»: cuándo y dónde se paga con la forma elegida. Sin prometer medios que Mercado Pago no documenta. */
+export const apoyoDePago = (pago: Pago | null): string =>
+  pago === "EN_LINEA" ? "Pagas ahora, aquí mismo, con tarjeta de crédito o débito." : "Pagas al recibir tu pedido.";
 
 // ── Tienda cerrada: el motivo de `sucursal.estado.<modo>` (o el detalle de TIENDA_CERRADA) ────────
 const CERRADA: Record<string, { texto: string; hacer: string }> = {
@@ -90,6 +170,9 @@ const ERRORES: Record<string, TextoDeError> = {
   CLIENTE_INVALIDO: { texto: "Revisa tus datos.", hacer: "Escribe tu nombre, un teléfono de 10 dígitos y, si pones correo, que esté completo." },
   DIRECCION_INVALIDA: { texto: "Revisa tu dirección.", hacer: "Faltan datos o el código postal no tiene 5 dígitos." },
   PAGO_INVALIDO: { texto: "Esa forma de pago no está disponible.", hacer: "Elige otra forma de pago." },
+  // Pago en línea (textos provisionales, como los de arriba).
+  PAGO_NO_PROCESADO: { texto: "No pudimos procesar el pago.", hacer: "Vuelve a intentar." },
+  PAGO_NO_DISPONIBLE: { texto: "El restaurante no puede recibir pagos en línea en este momento. Tu pedido no se envió y no se te cobró nada.", hacer: REINTENTA },
   CAPTCHA_INVALIDO: { texto: "No pudimos comprobar que eres una persona.", hacer: "Vuelve a intentar; si sigue pasando, recarga la página." },
   DEMASIADOS_INTENTOS: { texto: "Hiciste demasiados intentos seguidos.", hacer: "Espera unos minutos antes de volver a intentar, o llama al restaurante." },
   NO_SE_PUDO_CREAR: { texto: "No pudimos tomar tu pedido.", hacer: "Llama al restaurante para hacer tu pedido." },
@@ -108,7 +191,7 @@ export const CODIGOS_DE_ERROR: readonly string[] = Object.keys(ERRORES);
  * El texto de un error. `telefono` (el de la sucursal) y `detalle` (el de la respuesta) afinan los
  * que lo admiten. Un código que no se conoce sale como un fallo nuestro, nunca como el código.
  */
-export function textoDeError(codigo: string, contexto: { telefono?: string | null; detalle?: string | null } = {}): TextoDeError {
+export function textoDeError(codigo: string, contexto: { telefono?: string | null; detalle?: string | null; otrasFormas?: boolean } = {}): TextoDeError {
   const base = ERRORES[codigo] ?? ALGO_FALLO;
   const tel = contexto.telefono ? formatoTelefono(contexto.telefono) : "";
   if (codigo === "NO_SE_PUDO_CREAR" && tel) return { ...base, hacer: `Llama al restaurante: ${tel}.` };
@@ -117,6 +200,7 @@ export function textoDeError(codigo: string, contexto: { telefono?: string | nul
     return total ? { ...base, texto: `El total de tu pedido cambió: ahora es ${total}.` } : base;
   }
   if (codigo === "TIENDA_CERRADA") return CERRADA[contexto.detalle ?? ""] ?? base;
+  if (codigo === "PAGO_NO_DISPONIBLE" && contexto.otrasFormas) return { ...base, hacer: "Elige otra forma de pago o vuelve a intentar." };
   return base;
 }
 

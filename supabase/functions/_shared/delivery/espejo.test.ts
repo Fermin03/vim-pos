@@ -225,3 +225,28 @@ test("sin fecha legible, el pedido de la tienda cuenta como hasta hoy (rápido):
     assert.equal(ritmo([{ estado: "ACEPTADO", canal: "TIENDA", gestion: "ESCRITORIO", recibido_at }]), RAPIDA_MS, String(recibido_at));
   }
 });
+
+// ── Pago en línea (0173) ──────────────────────────────────────────────────────────────────────────
+import { filtroPagoEnLinea } from "./espejo.ts";
+
+test("pago en línea: la caja que no lo declara no recibe NINGÚN pedido en línea, pagado o no", () => {
+  for (const cuerpo of [{}, { tienda: true }, { pago_en_linea: "true" }, { pago_en_linea: 1 }, { pago_en_linea: false }, { pago_en_linea: null }]) {
+    assert.equal(filtroPagoEnLinea(cuerpo), "pago_al_recibir.is.null,pago_al_recibir.neq.EN_LINEA", JSON.stringify(cuerpo));
+  }
+});
+test("pago en línea: la que lo declara recibe solo los ya pagados; los de apps y los de pago al recibir, siempre", () => {
+  assert.equal(filtroPagoEnLinea({ pago_en_linea: true }), "pago_al_recibir.is.null,pago_al_recibir.neq.EN_LINEA,pagado_at.not.is.null");
+});
+test("pago en línea: sin declararlo el filtro no nombra pagado_at (se puede desplegar antes que la 0173)", () => {
+  assert.doesNotMatch(filtroPagoEnLinea({}), /pagado_at/);
+});
+
+test("latido: la caja que declara pago_en_linea sella su marca; la que no, manda el UPDATE de siempre", () => {
+  const AHORA = "2026-10-11T18:00:00.000Z";
+  assert.deepEqual(selloLatido({ tienda: true, turno_abierto: true, pago_en_linea: true }, AHORA),
+    { espejo_apps_at: AHORA, espejo_turno_abierto_at: AHORA, espejo_pago_en_linea_at: AHORA });
+  // No depende de nada más: es lo que la caja SABE hacer, con o sin turno abierto.
+  assert.deepEqual(selloLatido({ pago_en_linea: true }, AHORA), { espejo_apps_at: AHORA, espejo_pago_en_linea_at: AHORA });
+  // Solo un `true` la sella: una caja anterior (o una que dejó de declararlo) no escribe la columna.
+  for (const v of [undefined, false, "true", 1, null]) assert.deepEqual(selloLatido({ tienda: true, pago_en_linea: v }, AHORA), { espejo_apps_at: AHORA }, String(v));
+});

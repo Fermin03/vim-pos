@@ -72,24 +72,39 @@ export type Cupos = { antes: Cupo[]; despuesDelCaptcha: Cupo[]; alFallar: "abrir
  *   · «Mi cuenta» tiene su bolsa. Leer y salir dejan pasar si el control falla (si la base no
  *     responde, la RPC tampoco); lo que cambia algo, cierra.
  */
-export function cuposDe(accion: Peticion["accion"], ip: string, negocio: string, huellaCorreo?: string): Cupos {
+export function cuposDe(accion: Peticion["accion"], ip: string, negocio: string, huellaCorreo?: string, enLinea = false): Cupos {
   const quien = claveDeIp(ip);
   const porIp = (bolsa: string, ventanaSeg: number, max: number, alFallar: Cupos["alFallar"], despuesDelCaptcha: Cupo[] = []): Cupos =>
     ({ antes: [{ clave: `tienda:${bolsa}:ip:${quien}`, ventanaSeg, max }], despuesDelCaptcha, alFallar });
   switch (accion) {
     case "seguimiento": return porIp("sigue", 600, 90, "abrir");
+    // La página del pedido la llama en vez de `seguimiento` mientras espera el pago: mismo ritmo y
+    // su propia bolsa. Escribe (puede mover el pedido y cuesta una consulta a Mercado Pago, que ya
+    // va espaciada por pago en la base): si el control falla, cierra.
+    // `verificacion` es lo mismo visto desde la pantalla de la tarjeta, mientras el cliente contesta
+    // el reto de su banco: misma bolsa (las dos pantallas no sondean a la vez por el mismo pedido).
+    case "confirmar_pago": case "verificacion": return porIp("confirma", 600, 90, "cerrar");
+    // La tienda pregunta si una clave de intento ya tiene pedido (tras un pago en línea del que no
+    // supo el resultado). Solo lee, por llave; pocas veces por intento. Su propia bolsa.
+    case "intento": return porIp("intento", 600, 30, "cerrar");
     case "negocio": case "menu": case "cotizar": return porIp("lee", 600, 120, "abrir");
     // Auditoría (B1): el slug llega aquí sin validar (el negocio se busca después), así que el cupo
     // por IP y restaurante solo no basta: cada slug inventado estrenaría un contador. Delante va uno
     // solo por IP, holgado (5 restaurantes a tope desde una misma red de celular).
-    case "pedir": return {
-      antes: [
-        { clave: `tienda:pide:ip:${quien}`, ventanaSeg: 3600, max: 40 },
-        { clave: `tienda:pide:ip:${quien}:${negocio}`, ventanaSeg: 3600, max: 8 },
-      ],
-      despuesDelCaptcha: [{ clave: `tienda:pide:negocio:${negocio}`, ventanaSeg: 3600, max: 60 }],
-      alFallar: "cerrar",
-    };
+    // `enLinea`: un pedido que se paga con tarjeta gasta de bolsas PROPIAS (`paga`), las tres. Quien
+    // prueba tarjetas robadas hace muchos intentos que acaban rechazados; con las bolsas de `pide`
+    // agotaría el tope del negocio y dejaría sin poder pedir a quien paga al recibir.
+    case "pedir": {
+      const bolsa = enLinea ? "paga" : "pide";
+      return {
+        antes: [
+          { clave: `tienda:${bolsa}:ip:${quien}`, ventanaSeg: 3600, max: 40 },
+          { clave: `tienda:${bolsa}:ip:${quien}:${negocio}`, ventanaSeg: 3600, max: 8 },
+        ],
+        despuesDelCaptcha: [{ clave: `tienda:${bolsa}:negocio:${negocio}`, ventanaSeg: 3600, max: 60 }],
+        alFallar: "cerrar",
+      };
+    }
     case "entrar": {
       const c = porIp("entra", 600, 10, "cerrar");
       return { ...c, antes: [...c.antes, { clave: `tienda:entra:negocio:${negocio}`, ventanaSeg: 600, max: 300 }] };
@@ -189,6 +204,28 @@ export function leerPedido(x: unknown): Pedido | null {
   if (typeof folio_corto !== "string" || !folio_corto || typeof total_mxn !== "string" || !IMPORTE.test(total_mxn)
       || typeof vence_aceptacion !== "string" || !vence_aceptacion) return null;
   return { folio_corto, total_mxn, vence_aceptacion };
+}
+
+export type PedidoEnLinea = {
+  /** Interno: el renglón de tienda_pagos. NUNCA sale en una respuesta. */
+  pagoId: string;
+  publico: { folio_corto: string; total_mxn: string; vence_aceptacion: null; propina_mxn: string; total_a_pagar_mxn: string };
+};
+
+/**
+ * Lo que devuelve `tienda_crear_pedido` para un pedido que se paga en línea: no tiene ventana de
+ * aceptación (empieza cuando el cobro se aprueba) y trae su pago. null si la forma no es esa, como `leerPedido`.
+ */
+export function leerPedidoEnLinea(x: unknown): PedidoEnLinea | null {
+  if (!objeto(x)) return null;
+  const { folio_corto, total_mxn, pago_id, propina_mxn, total_a_pagar_mxn } = x;
+  if (typeof folio_corto !== "string" || !folio_corto || typeof pago_id !== "string" || !pago_id
+      || ![total_mxn, propina_mxn, total_a_pagar_mxn].every((v) => typeof v === "string" && IMPORTE.test(v))) return null;
+  return {
+    pagoId: pago_id,
+    publico: { folio_corto, total_mxn: total_mxn as string, vence_aceptacion: null, propina_mxn: propina_mxn as string,
+               total_a_pagar_mxn: total_a_pagar_mxn as string },
+  };
 }
 
 /**

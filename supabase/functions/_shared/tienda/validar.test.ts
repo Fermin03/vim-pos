@@ -392,3 +392,132 @@ test("cuerpo: una clave mal formada es CUERPO_INVALIDO, nunca un pedido sin clav
     assert.deepEqual(leerCuerpo({ ...pedir, clave }), { ok: false, error: "CUERPO_INVALIDO" }, JSON.stringify(clave));
   }
 });
+
+// ── Pago en línea (0173) ──────────────────────────────────────────────────────────────────────────
+const TARJETA = { token: "ff8080814c11e237014c1ff593b57b4d", payment_method_id: "master", type: "credit_card" };
+const enLinea = { ...pedir, pago: "EN_LINEA", paga_con: null, tarjeta: TARJETA, cliente: { ...(pedir.cliente as Record<string, unknown>), email: "ana@example.com" } };
+test("cuerpo: pedir en línea lleva su propina, que es un porcentaje de la lista; sin ella, null", () => {
+  for (const pct of [0, 10, 15, 20]) {
+    const r = leerCuerpo({ ...enLinea, propina_pct: pct });
+    assert.equal(r.ok, true);
+    if (r.ok && r.valor.accion === "pedir") { assert.equal(r.valor.pago, "EN_LINEA"); assert.equal(r.valor.propina_pct, pct); }
+  }
+  const sin = leerCuerpo(enLinea);
+  assert.equal(sin.ok && sin.valor.accion === "pedir" && sin.valor.propina_pct, null);
+});
+test("cuerpo: la propina nunca es un porcentaje fuera de la lista", () => {
+  for (const mal of [12, 25, 100, -10, 10.5, "10", "15%", true, {}, [10]]) {
+    assert.deepEqual(leerCuerpo({ ...enLinea, propina_pct: mal }), { ok: false, error: "PAGO_INVALIDO" }, JSON.stringify(mal));
+  }
+});
+test("cuerpo: la propina va solo con el pago en línea, y en línea no hay «paga con»", () => {
+  assert.deepEqual(leerCuerpo({ ...pedir, propina_pct: 10 }), { ok: false, error: "PAGO_INVALIDO" });
+  assert.deepEqual(leerCuerpo({ ...pedir, pago: "TARJETA", paga_con: null, propina_pct: 0 }), { ok: false, error: "PAGO_INVALIDO" });
+  assert.deepEqual(leerCuerpo({ ...enLinea, paga_con: 500 }), { ok: false, error: "PAGO_INVALIDO" });
+  // Un pedido al recibir sigue saliendo sin propina, como siempre.
+  const efectivo = leerCuerpo(pedir);
+  assert.equal(efectivo.ok && efectivo.valor.accion === "pedir" && efectivo.valor.propina_pct, null);
+});
+// ── Propina de «otro monto» (0174) ───────────────────────────────────────────────────────────────
+test("cuerpo: «otro monto» es un texto en pesos con hasta dos decimales, y sale con dos", () => {
+  for (const [entra, sale] of [["25", "25.00"], ["25.5", "25.50"], ["0.01", "0.01"], [" 120.00 ", "120.00"]]) {
+    const r = leerCuerpo({ ...enLinea, propina_mxn: entra });
+    assert.equal(r.ok, true, entra);
+    if (r.ok && r.valor.accion === "pedir") { assert.equal(r.valor.propina_mxn, sale); assert.equal(r.valor.propina_pct, null); }
+  }
+  // Ausente, null o vacío: sin monto libre, como antes de la 0174.
+  for (const sin of [undefined, null, ""]) {
+    const r = leerCuerpo({ ...enLinea, propina_mxn: sin, propina_pct: 10 });
+    assert.equal(r.ok && r.valor.accion === "pedir" && r.valor.propina_mxn, null);
+  }
+});
+test("cuerpo: «otro monto» mal formado, en cero, de más de dos decimales o que no es texto se rechaza", () => {
+  for (const mal of ["0", "0.00", "-5", "5.123", "1e3", "12,50", "$20", "abc", "1000000", 25, 25.5, true, {}, ["25"]]) {
+    assert.deepEqual(leerCuerpo({ ...enLinea, propina_mxn: mal }), { ok: false, error: "PAGO_INVALIDO" }, JSON.stringify(mal));
+  }
+});
+test("cuerpo: «otro monto» y porcentaje son excluyentes, y el monto va solo con el pago en línea", () => {
+  assert.deepEqual(leerCuerpo({ ...enLinea, propina_mxn: "25.00", propina_pct: 10 }), { ok: false, error: "PAGO_INVALIDO" });
+  assert.deepEqual(leerCuerpo({ ...enLinea, propina_mxn: "25.00", propina_pct: 0 }), { ok: false, error: "PAGO_INVALIDO" });
+  assert.deepEqual(leerCuerpo({ ...pedir, propina_mxn: "25.00" }), { ok: false, error: "PAGO_INVALIDO" });
+  assert.deepEqual(leerCuerpo({ ...pedir, pago: "TARJETA", paga_con: null, propina_mxn: "25.00" }), { ok: false, error: "PAGO_INVALIDO" });
+  const efectivo = leerCuerpo(pedir);
+  assert.equal(efectivo.ok && efectivo.valor.accion === "pedir" && efectivo.valor.propina_mxn, null);
+});
+test("cuerpo: una forma de pago que no existe se rechaza", () => {
+  for (const pago of ["en_linea", "ONLINE", "MERCADO_PAGO", "", null, undefined]) {
+    assert.deepEqual(leerCuerpo({ ...pedir, pago }), { ok: false, error: "PAGO_INVALIDO" });
+  }
+});
+test("cuerpo: confirmar_pago lleva solo el código del pedido; lo demás que mande quien llama no sale", () => {
+  const codigo = "AAAAAAAAAAAAAAAAAAAAAA";
+  // Los parámetros con los que Mercado Pago regresa al cliente NO se leen: cualquiera puede escribirlos.
+  assert.deepEqual(leerCuerpo({ accion: "confirmar_pago", negocio: "knockout", codigo, status: "approved", payment_id: "1", collection_status: "approved" }),
+    { ok: true, valor: { accion: "confirmar_pago", negocio: "knockout", codigo } });
+  assert.deepEqual(leerCuerpo({ accion: "confirmar_pago", negocio: "knockout", codigo: "corto" }), { ok: false, error: "CODIGO_INVALIDO" });
+  assert.deepEqual(leerCuerpo({ accion: "confirmar_pago", negocio: "knockout" }), { ok: false, error: "CODIGO_INVALIDO" });
+});
+
+test("pedir en línea: la tarjeta es obligatoria, y solo su token, su marca y si es crédito o débito (lista cerrada)", () => {
+  const ok = leerCuerpo(enLinea);
+  assert.ok(ok.ok && ok.valor.accion === "pedir");
+  if (ok.ok && ok.valor.accion === "pedir") assert.deepEqual(ok.valor.tarjeta, { ...TARJETA, dispositivo: null });
+  const debito = leerCuerpo({ ...enLinea, tarjeta: { ...TARJETA, type: "debit_card" } });
+  assert.ok(debito.ok && debito.valor.accion === "pedir" && debito.valor.tarjeta?.type === "debit_card");
+  // Lo demás que mande quien llama (el banco, un número de tarjeta) no pasa de aquí.
+  const conExtras = leerCuerpo({ ...enLinea, tarjeta: { ...TARJETA, issuer_id: 160, numero: "4111111111111111" } });
+  if (conExtras.ok && conExtras.valor.accion === "pedir") assert.deepEqual(conExtras.valor.tarjeta, { ...TARJETA, dispositivo: null });
+  else assert.fail("debía valer");
+  for (const mal of [undefined, null, "tok", [], {}, { ...TARJETA, token: "corto" }, { ...TARJETA, token: "x".repeat(65) }, { ...TARJETA, token: "con espacio 0123456789" },
+                     { ...TARJETA, token: 4111111111111111 }, { ...TARJETA, payment_method_id: "" }, { ...TARJETA, payment_method_id: "VISA!" }, { ...TARJETA, payment_method_id: "x".repeat(31) },
+                     { ...TARJETA, type: undefined }, { ...TARJETA, type: "prepaid_card" }, { ...TARJETA, type: "account_money" }, { ...TARJETA, type: "CREDIT_CARD" }, { ...TARJETA, type: 1 }]) {
+    assert.deepEqual(leerCuerpo({ ...enLinea, tarjeta: mal }), { ok: false, error: "PAGO_INVALIDO" }, JSON.stringify(mal));
+  }
+});
+
+test("pedir en línea: el correo es obligatorio; al recibir sigue siendo opcional y `tarjeta` no viaja", () => {
+  for (const email of [null, "", undefined]) {
+    assert.deepEqual(leerCuerpo({ ...enLinea, cliente: { ...(pedir.cliente as Record<string, unknown>), email } }), { ok: false, error: "CLIENTE_INVALIDO" }, String(email));
+  }
+  const efectivo = leerCuerpo({ ...pedir, cliente: { ...(pedir.cliente as Record<string, unknown>), email: null } });
+  assert.ok(efectivo.ok && efectivo.valor.accion === "pedir" && efectivo.valor.tarjeta === null);
+  assert.deepEqual(leerCuerpo({ ...pedir, tarjeta: TARJETA }), { ok: false, error: "PAGO_INVALIDO" });
+});
+
+test("cuerpo: `intento` lleva solo la clave del intento, con su forma; no crea nada y tiene su propia bolsa de cupo", async () => {
+  const clave = "AAAAAAAAAAAAAAAAAAAAAA";
+  assert.deepEqual(leerCuerpo({ accion: "intento", negocio: "knockout", clave, tarjeta: { token: "x" }, pago: "EN_LINEA" }),
+    { ok: true, valor: { accion: "intento", negocio: "knockout", clave } });
+  for (const mal of [undefined, null, "", "corta", "x".repeat(23), 123, "con espacio aaaaaaaaaaaa"]) {
+    assert.deepEqual(leerCuerpo({ accion: "intento", negocio: "knockout", clave: mal }), { ok: false, error: "CUERPO_INVALIDO" }, String(mal));
+  }
+  const { cuposDe } = await import("./respuesta.ts");
+  assert.deepEqual(cuposDe("intento", "1.2.3.4", "knockout"), { antes: [{ clave: "tienda:intento:ip:1.2.3.4", ventanaSeg: 600, max: 30 }], despuesDelCaptcha: [], alFallar: "cerrar" });
+});
+
+// ── La huella del dispositivo (antifraude de Mercado Pago) ────────────────────────────────────────
+test("pedir en línea: la huella del dispositivo es opcional; con forma pasa, sin forma se ignora y el pago sigue", () => {
+  const con = (dispositivo: unknown) => {
+    const r = leerCuerpo({ ...enLinea, tarjeta: { ...TARJETA, dispositivo } });
+    assert.ok(r.ok && r.valor.accion === "pedir", JSON.stringify(dispositivo));
+    return r.ok && r.valor.accion === "pedir" ? r.valor.tarjeta?.dispositivo : undefined;
+  };
+  for (const vale of ["armor.1a2b3c4d5e6f", "a1b2c3d4-e5f6-7890-abcd-ef1234567890", "armor." + "0af3".repeat(56) + "9"]) assert.equal(con(vale), vale);
+  // Acaba en una cabecera HTTP: nada de espacios, saltos de línea ni caracteres raros. Tampoco se rechaza el pedido por ella.
+  for (const mal of ["", "corto", "x".repeat(301), "con espacio 12345", "salto\r\nX-Otra: 1", "ñandú-12345678", 12345678, null, undefined, {}, ["armor.1a2b3c4d"]]) assert.equal(con(mal), null);
+});
+
+test("cuerpo: verificacion lleva el código del pedido y, solo si viene escrito tal cual, la intención de cancelar", () => {
+  const codigo = "AAAAAAAAAAAAAAAAAAAAAA";
+  assert.deepEqual(leerCuerpo({ accion: "verificacion", negocio: "knockout", codigo, url: "https://evil.example", status: "COMPLETE" }),
+    { ok: true, valor: { accion: "verificacion", negocio: "knockout", codigo, cancelar: false } });
+  assert.deepEqual(leerCuerpo({ accion: "verificacion", negocio: "knockout", codigo, cancelar: true }),
+    { ok: true, valor: { accion: "verificacion", negocio: "knockout", codigo, cancelar: true } });
+  // Cancelar una orden no se decide con un valor «parecido» a verdadero.
+  for (const cancelar of ["true", 1, "si", {}, [], null]) {
+    assert.deepEqual(leerCuerpo({ accion: "verificacion", negocio: "knockout", codigo, cancelar }),
+      { ok: true, valor: { accion: "verificacion", negocio: "knockout", codigo, cancelar: false } });
+  }
+  assert.deepEqual(leerCuerpo({ accion: "verificacion", negocio: "knockout", codigo: "corto", cancelar: true }), { ok: false, error: "CODIGO_INVALIDO" });
+  assert.deepEqual(leerCuerpo({ accion: "verificacion", negocio: "knockout" }), { ok: false, error: "CODIGO_INVALIDO" });
+});

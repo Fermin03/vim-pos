@@ -243,6 +243,43 @@ describe("POST /api/tienda", () => {
     expect(r2.status).toBe(409);
     expect(await r2.json()).toEqual({ error: "TOTAL_CAMBIO", detalle: "310.00" });
   });
+  it("confirmar_pago: pasa solo el código; lo que Mercado Pago puso en la URL de regreso no sale de aquí", async () => {
+    responder = () => json({ ok: true });
+    const r = await pedir({ accion: "confirmar_pago", negocio: "knockout", codigo: CODIGO, status: "approved", payment_id: "123", collection_status: "approved", external_reference: "x" });
+    expect(r.status).toBe(200);
+    expect(cuerpoEnviado()).toEqual({ accion: "confirmar_pago", negocio: "knockout", codigo: CODIGO });
+    expect((await pedir({ accion: "confirmar_pago", negocio: "knockout", codigo: "corto" })).status).toBe(400);
+  });
+  it("verificacion: pasa el código y, solo si viene escrito tal cual, cancelar; nada de lo que diga la página del reto", async () => {
+    responder = () => json({ pago: { estado: "VERIFICACION" } });
+    await pedir({ accion: "verificacion", negocio: "knockout", codigo: CODIGO, status: "COMPLETE", url: "https://evil.example", pago: { estado: "PAGADO" } });
+    expect(cuerpoEnviado()).toEqual({ accion: "verificacion", negocio: "knockout", codigo: CODIGO });
+    await pedir({ accion: "verificacion", negocio: "knockout", codigo: CODIGO, cancelar: true });
+    expect(cuerpoEnviado(1)).toEqual({ accion: "verificacion", negocio: "knockout", codigo: CODIGO, cancelar: true });
+    for (const [i, cancelar] of ["true", 1, {}, null].entries()) {
+      await pedir({ accion: "verificacion", negocio: "knockout", codigo: CODIGO, cancelar });
+      expect(cuerpoEnviado(2 + i)).toEqual({ accion: "verificacion", negocio: "knockout", codigo: CODIGO });
+    }
+    expect((await pedir({ accion: "verificacion", negocio: "knockout", codigo: "corto", cancelar: true })).status).toBe(400);
+  });
+  it("pedir en línea: pasa la propina (el porcentaje o «otro monto»), y nada que parezca un total a cobrar", async () => {
+    responder = () => json({ ok: true });
+    await pedir({ ...cotizar, accion: "pedir", pago: "EN_LINEA", propina_pct: 15, propina_mxn: "25.00", total_a_pagar_mxn: "1.00", cliente: { nombre: "Ana", telefono: "4771112233" } });
+    const enviado = cuerpoEnviado() as Record<string, unknown>;
+    expect(enviado.propina_pct).toBe(15);
+    expect(enviado.pago).toBe("EN_LINEA");
+    // Los dos pasan tal cual: que sean excluyentes y el tope del monto los decide la función, no este paso.
+    expect(enviado.propina_mxn).toBe("25.00");
+    expect("total_a_pagar_mxn" in enviado).toBe(false);
+  });
+  it("un rechazo del pago en línea (409) llega tal cual: nunca como «no se supo si el pedido entró»", async () => {
+    for (const error of ["PAGO_NO_DISPONIBLE", "PAGO_EN_PROCESO"]) {
+      responder = () => json({ error }, 409);
+      const r = await pedir({ ...cotizar, accion: "pedir", pago: "EN_LINEA" });
+      expect(r.status).toBe(409);
+      expect(await r.json()).toEqual({ error });
+    }
+  });
   it("reenvía la IP real del cliente y nunca sus cabeceras", async () => {
     await pedir(seguimiento, { "x-vercel-forwarded-for": "200.1.2.3", "x-forwarded-for": "6.6.6.6", "x-tienda-ip": "6.6.6.6", "x-vim-tienda": "inventado", cookie: "a=b", authorization: "Bearer x" });
     const h = cabecerasEnviadas();

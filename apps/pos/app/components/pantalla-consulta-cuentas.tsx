@@ -13,6 +13,7 @@ import { ModalCambiarPago } from "./modal-cambiar-pago";
 import { ModalReabrirCuenta } from "./modal-reabrir-cuenta";
 import { METODOS_PAGO } from "../lib/cuentas-acciones";
 import { hoyMx } from "@vim/fecha";
+import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
 
 function fechaCorta(iso: string | null): string {
   if (!iso) return "—";
@@ -64,6 +65,8 @@ export function PantallaConsultaCuentas({
   // enum para prellenar/filtrar el modal de cambio de pago (null si no está en la lista conocida).
   const etiquetaPago = detalle?.pagos[0]?.metodo ?? null;
   const metodoActual = METODOS_PAGO.find((m) => m.label === etiquetaPago)?.codigo ?? null;
+  // Pagada en línea (tienda): ni se le cambia el pago ni se reabre; la base tampoco lo deja (0173).
+  const pagadaEnLinea = (detalle?.pagos ?? []).some((p) => p.metodo === etiquetaMetodoPago("PAGO_EN_LINEA"));
 
   const recargar = useCallback(async () => {
     try {
@@ -189,6 +192,7 @@ export function PantallaConsultaCuentas({
                   </button>
                   {cuentaSel?.estado === "PAGADO" && (
                     <>
+                      {!pagadaEnLinea && <>
                       <button
                         type="button"
                         onClick={() => setCambiandoPago(cuentaSel)}
@@ -205,6 +209,7 @@ export function PantallaConsultaCuentas({
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5" /></svg>
                         Reabrir
                       </button>
+                      </>}
                       <button
                         type="button"
                         onClick={() => setCancelando(cuentaSel)}
@@ -278,6 +283,8 @@ export function PantallaConsultaCuentas({
           cajaId={turno.caja_id}
           turnoId={turno.id}
           pagada
+          enLinea={pagadaEnLinea}
+          cuentaDesde={cancelando.fechaIso}
           onCancelado={() => { setCancelando(null); setSel(null); setDetalle(null); recargar(); }}
           onCerrar={() => setCancelando(null)}
         />

@@ -10,7 +10,7 @@
 BEGIN;
 DO $$
 DECLARE
-  c_firma  CONSTANT text := 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text)';   -- 0167: gana p_clave al final
+  c_firma  CONSTANT text := 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric)';   -- 0167 ganó p_clave; 0173, p_propina_pct; 0174, p_propina_mxn
   v_t      uuid := '99999999-0000-0000-0000-0000000000aa';
   v_suc    uuid := '99999999-0000-0000-0000-0000000000bb';
   v_maria  uuid := '99999999-0000-0000-0000-000000000001';

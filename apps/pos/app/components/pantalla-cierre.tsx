@@ -35,6 +35,7 @@ const METODO_LABEL_SOFT_MAP: Record<string, string> = {
   TARJETA_DEBITO: "TARJETA",
   TRANSFERENCIA: "TRANSFERENCIA",
   APP_RAPPI: "RAPPI", APP_UBEREATS: "UBER EATS", APP_DIDI: "DIDI", APP_IFOOD: "IFOOD", APP_OTRO: "APP EXTERNA",
+  PAGO_EN_LINEA: "PAGO EN LINEA",
 };
 const labelSoft = (m: string) => METODO_LABEL_SOFT_MAP[m] ?? m.toUpperCase();
 
@@ -417,7 +418,10 @@ export function PantallaCierre({
                         <div className="text-15 font-semibold">{label(f.metodo)}</div>
                         {f.metodo === "EFECTIVO"
                           ? <div className="text-12 text-ink-3">Cuenta todo lo que hay en el cajón, fondo incluido</div>
-                          : <div className="text-12 text-ink-3">Del sistema: confírmalo con el cierre de tu terminal</div>}
+                          : f.metodo === "PAGO_EN_LINEA"
+                            // Ni cajón ni terminal: lo cobró Mercado Pago en la tienda en línea. No se cuenta. (Texto provisional, James.)
+                            ? <div className="text-12 text-ink-3">Ya cobrado en tu tienda en línea. Está en tu cuenta de Mercado Pago, no en el cajón ni en la terminal</div>
+                            : <div className="text-12 text-ink-3">Del sistema: confírmalo con el cierre de tu terminal</div>}
                       </td>
                       <td className="py-4 text-right">
                         <input
@@ -425,6 +429,7 @@ export function PantallaCierre({
                           inputMode="decimal"
                           placeholder="$0.00"
                           value={declarado[f.metodo] ?? ""}
+                          readOnly={f.metodo === "PAGO_EN_LINEA"}
                           onChange={(e) => setDeclarado((s) => ({ ...s, [f.metodo]: e.target.value.replace(/[^0-9.]/g, "") }))}
                         />
                       </td>

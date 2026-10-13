@@ -322,6 +322,7 @@ test("cada sondeo declara la tienda y dice si hay turno abierto, consultado ante
     await agenteCon(pool, nube).tick();
     const sondeo = nube.llamadas.find((l) => l.url.endsWith("/delivery-espejo"));
     assert.equal(sondeo.body.tienda, true);
+    assert.equal(sondeo.body.pago_en_linea, true, "sin declararlo la nube no manda los pedidos pagados en línea");
     assert.equal(sondeo.body.turno_abierto, turnoAbierto);
     const turno = pool.sql.find((q) => q.texto.startsWith("SELECT 1 FROM turnos"));
     assert.deepEqual(turno.params, [CAJA], "la sucursal sale de la fila local de esta caja");
@@ -500,6 +501,33 @@ test("reporte: la consulta solo mira pedidos de la tienda con ticket y vivos", a
   assert.match(q.texto, /p\.canal = 'TIENDA'/);
   assert.match(q.texto, /p\.gestion = 'ESCRITORIO'/, "los del POS web los pone al día la nube; reportarlos daría 409");
   assert.match(q.texto, /p\.estado IN \('ACEPTADO', 'EN_PREPARACION', 'LISTO'\)/);
+  assert.match(q.texto, /p\.estado = 'ENTREGADO' AND p\.pago_al_recibir = 'EN_LINEA'/, "el pagado en línea se sigue mirando ya entregado, por si le cancelan la cuenta");
+  assert.match(q.texto, /p\.pago_al_recibir, p\.entregado_at/);
+});
+
+test("pago en línea: la cuenta cobrada no se reporta entregada; el «Listo» sí, y cancelar después también", async () => {
+  const enLinea = (extra = {}) => filaReporte({ pago_al_recibir: "EN_LINEA", ticket_estado: "PAGADO", entregado_at: null, ...extra });
+  const casos = [
+    [enLinea({ estado: "EN_PREPARACION" }), []],                                                            // cobrada, sin más: nada
+    [enLinea({ estado: "EN_PREPARACION", ticket_impreso_at: "2026-10-11T10:00:00Z" }), ["LISTO"]],
+    [enLinea({ estado: "LISTO", entregado_at: "2026-10-11T10:05:00Z" }), ["ENTREGADO"]],                     // «Listo»
+    [enLinea({ estado: "ENTREGADO", entregado_at: "2026-10-11T10:05:00Z" }), []],
+    [enLinea({ estado: "ENTREGADO", entregado_at: "2026-10-11T10:05:00Z", ticket_estado: "CANCELADO" }), ["CANCELADO"]],   // cancelar tras «Listo»
+  ];
+  for (const [fila, esperado] of casos) {
+    const pool = poolFalso({ reporte: [fila] });
+    const nube = nubeFalsa({ pedidos: [] });
+    await agenteCon(pool, nube).tick();
+    assert.deepEqual(acciones(nube).map((a) => a.estado), esperado, JSON.stringify(fila));
+  }
+});
+
+test("pago en línea: el espejo no pisa el «Listo» local con el vacío de la nube", async () => {
+  const pool = poolFalso();
+  await agenteCon(pool, nubeFalsa({ pedidos: [pedido({ canal: "TIENDA", app: "DRIVE_THRU", conexion_id: null, estado: "LISTO", pago_al_recibir: "EN_LINEA", pagado_at: "2026-10-11T09:59:00Z", entregado_at: null })], tienda: { aceptacion: "MANUAL" } })).tick();
+  const q = pool.sql.find((x) => x.texto.startsWith("INSERT INTO delivery_pedidos"));
+  assert.match(q.texto, /"entregado_at" = COALESCE\(delivery_pedidos\."entregado_at", EXCLUDED\."entregado_at"\)/);
+  assert.match(q.texto, /"pagado_at" = EXCLUDED\."pagado_at"/);
 });
 
 test("reporte: si la nube lo rechaza o se cae, el estado local no cambia", async () => {
@@ -769,4 +797,12 @@ test("sin nube: lo dice una sola vez; despertar olvida los fallos y sondea ya", 
   espejo.despertar();
   assert.equal(espejo.estado().fallos, 0);
   assert.equal(esperas.at(-1), 0);
+});
+
+test("pagado en línea: si al reportar la nube ya lo había cancelado, el cajero lee que el pago ya se devolvió y que cancele la cuenta", async () => {
+  const pool = poolFalso({ reporte: [filaReporte({ pago_al_recibir: "EN_LINEA", ticket_estado: "PAGADO", ticket_impreso_at: "2026-10-11T10:00:00Z" })] });
+  const nube = nubeFalsa({ pedidos: [], alReportar: () => [200, { ok: true, estado: "CANCELADO" }] });
+  await agenteCon(pool, nube).tick();
+  assert.deepEqual(estadosLocales(pool), [["t1", "CANCELADO"]]);
+  assert.deepEqual(avisosAlCajero(pool), [["t1", "El pedido en línea se canceló y el pago ya se le devolvió al cliente: cancela esta cuenta. Si ya lo entregaste, cóbralo de otra forma"]]);
 });

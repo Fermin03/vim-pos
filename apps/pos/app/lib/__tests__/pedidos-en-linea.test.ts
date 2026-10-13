@@ -4,8 +4,10 @@ import {
   etiquetaOrigen, etiquetaPago, etiquetaEntrega, debeSonar, TIMBRE_CADA_MS, comandasPendientes, aceptablesSolos,
   etiquetaEstadoEnLinea, mensajeErrorEnLinea, avisoDeTienda, timbrarHasta, faltaComanda, soloInformativo, leerEstadoEnLinea, pausarEnLinea, reanudarEnLinea, avisarPresente,
   puedeAtender, porQueNoSeAtiende, conAtendidos, cuentaDe, avisosDeCanal, porAceptarDeCanal, contarPorAceptar, colaDeAvisos, recienAceptados, textoPedidoEnCanal, sinComanda, MARGEN_COMANDA_MS,
+  cuentasPagadasEnLinea, entregarPedido, pagadoEnLinea, PAGADO_EN_LINEA,
   type EstadoEnLinea,
 } from "../pedidos-en-linea";
+import { employeeClient } from "../supabase";
 
 vi.mock("../supabase", () => ({
   employeeClient: vi.fn(),
@@ -17,7 +19,7 @@ const ped = (extra: Partial<PedidoApp> = {}): PedidoApp => ({
   id: "p1", app: "DRIVE_THRU", canal: "TIENDA", idExterno: "e", folioCorto: null, estado: "RECIBIDO", tipoEntrega: null,
   clienteNombre: "Ana", clienteTelefono: "4771112233", notaCliente: null, items: [], totalCliente: 100, venceAceptacion: null,
   recibidoAt: "2026-10-09T10:00:00Z", ticketId: null, ticketFolio: null, ultimoError: null, direccion: null, pago: null,
-  envio: null, gestion: "NUBE", gestionCajaId: null, ticketCajaId: null, comandaImpresa: false, ...extra,
+  envio: null, propina: 0, gestion: "NUBE", gestionCajaId: null, ticketCajaId: null, comandaImpresa: false, ...extra,
 });
 const uber = (extra: Partial<PedidoApp> = {}) => ped({ app: "APP_UBEREATS", canal: "APP", gestion: null, ...extra });
 
@@ -467,5 +469,68 @@ describe("sinComanda: avisar de la comanda que no salió, con margen", () => {
   });
   it("dentro de la caja no avisa de lo que se atiende desde el POS web", () => {
     expect(sinComanda(new Map([["p1", 0]]), [{ ...aceptado, gestion: "NUBE" }], 99_999, true).size).toBe(0);
+  });
+});
+
+describe("pedido pagado en línea: ya está cobrado, se entrega con «Listo»", () => {
+  const pagado = (extra: Partial<PedidoApp> = {}) => ped({ pago: { forma: "EN_LINEA", pagaCon: null }, propina: 24, estado: "ACEPTADO", ticketId: "t1", ...extra });
+  afterEach(() => { vi.unstubAllGlobals(); vi.mocked(employeeClient).mockReset(); });
+
+  it("se dice bien claro que no se cobra, y solo de ese", () => {
+    expect(PAGADO_EN_LINEA).toBe("PAGADO EN LÍNEA, no cobrar");
+    expect(pagadoEnLinea(pagado())).toBe(true);
+    expect(etiquetaPago(pagado())).toBe("Pagado en línea");
+    for (const p of [ped(), ped({ pago: { forma: "EFECTIVO", pagaCon: null } }), ped({ pago: { forma: "TARJETA", pagaCon: null } }), uber()]) expect(pagadoEnLinea(p)).toBe(false);
+  });
+
+  it("su cuenta sigue en la lista de su canal aunque esté cobrada, hasta que se entrega o se cierra", () => {
+    const ps = [
+      pagado({ id: "a", ticketId: "ta" }), pagado({ id: "b", ticketId: "tb", estado: "LISTO" }),
+      pagado({ id: "dom", ticketId: "td", app: "DELIVERY_PROPIO" }),
+      pagado({ id: "por-aceptar", ticketId: null, estado: "RECIBIDO" }),
+      pagado({ id: "entregado", ticketId: "te", estado: "ENTREGADO" }), pagado({ id: "cancelado", ticketId: "tc", estado: "CANCELADO" }),
+      ped({ id: "efectivo", estado: "ACEPTADO", ticketId: "tf", pago: { forma: "EFECTIVO", pagaCon: null } }),
+    ];
+    expect(cuentasPagadasEnLinea(ps, "DRIVE_THRU")).toEqual(["ta", "tb"]);
+    expect(cuentasPagadasEnLinea(ps, "DELIVERY_PROPIO")).toEqual(["td"]);
+  });
+
+  it("«Listo» aquí se ve desde ya: el pedido deja de tener cuenta en la lista", () => {
+    const hecho = new Map([["a", "entregar" as const]]);
+    const r = conAtendidos([pagado({ id: "a" }), pagado({ id: "b" })], hecho);
+    expect(r.map((p) => p.estado)).toEqual(["ENTREGADO", "ACEPTADO"]);
+    expect(cuentasPagadasEnLinea(r, "DRIVE_THRU")).toEqual(["t1"]);
+    // Si la base ya dice otra cosa (lo cancelaron), manda la base.
+    expect(conAtendidos([pagado({ id: "a", estado: "CANCELADO" })], hecho)[0]!.estado).toBe("CANCELADO");
+  });
+
+  it("desde el POS web, «Listo» le dice a la nube que quedó ENTREGADO", async () => {
+    const f = vi.fn(async () => new Response(JSON.stringify({ ok: true, estado: "ENTREGADO" }), { status: 200 }));
+    vi.stubGlobal("fetch", f);
+    expect(await entregarPedido("tok", pagado({ id: "p9" }))).toEqual({ ok: true });
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toContain("delivery-accion");
+    expect(JSON.parse(String(init.body))).toEqual({ accion: "estado", pedido_id: "p9", estado: "ENTREGADO" });
+    expect(employeeClient).not.toHaveBeenCalled();
+  });
+
+  it("si la nube contesta que quedó en otro estado (lo cancelaron), no se da por entregado", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ ok: true, estado: "CANCELADO" }), { status: 200 })));
+    expect(await entregarPedido("tok", pagado())).toEqual({ ok: false, error: "ACCION_INVALIDA" });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "SOLO_DISPOSITIVO" }), { status: 403 })));
+    expect(await entregarPedido("tok", pagado())).toEqual({ ok: false, error: "SOLO_DISPOSITIVO" });
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("net"); }));
+    expect(await entregarPedido("tok", pagado())).toEqual({ ok: false, error: "SIN_RED" });
+  });
+
+  it("en la caja instalada, «Listo» se sella en la base local y no llama a la nube", async () => {
+    const rpc = vi.fn(async () => ({ error: null as { message: string } | null }));
+    vi.mocked(employeeClient).mockReturnValue({ rpc } as never);
+    const f = vi.fn(); vi.stubGlobal("fetch", f);
+    expect(await entregarPedido("tok", pagado({ id: "p7", gestion: "ESCRITORIO" }))).toEqual({ ok: true });
+    expect(rpc).toHaveBeenCalledWith("tienda_marcar_entregado", { p_pedido: "p7" });
+    expect(f).not.toHaveBeenCalled();
+    rpc.mockResolvedValueOnce({ error: { message: "ACCION_INVALIDA: el pedido p7 no es una cuenta pagada en línea de esta caja" } });
+    expect(await entregarPedido("tok", pagado({ id: "p7", gestion: "ESCRITORIO" }))).toEqual({ ok: false, error: "ACCION_INVALIDA" });
   });
 });

@@ -811,6 +811,7 @@ export type Database = {
           deleted_at: string | null
           descripcion: string | null
           espejo_apps_at: string | null
+          espejo_pago_en_linea_at: string | null
           espejo_turno_abierto_at: string | null
           id: string
           identificador_dispositivo: string | null
@@ -839,6 +840,7 @@ export type Database = {
           deleted_at?: string | null
           descripcion?: string | null
           espejo_apps_at?: string | null
+          espejo_pago_en_linea_at?: string | null
           espejo_turno_abierto_at?: string | null
           id?: string
           identificador_dispositivo?: string | null
@@ -867,6 +869,7 @@ export type Database = {
           deleted_at?: string | null
           descripcion?: string | null
           espejo_apps_at?: string | null
+          espejo_pago_en_linea_at?: string | null
           espejo_turno_abierto_at?: string | null
           id?: string
           identificador_dispositivo?: string | null
@@ -3227,6 +3230,7 @@ export type Database = {
           motivo_cancelacion: string | null
           nota_cliente: string | null
           paga_con_mxn: number | null
+          pagado_at: string | null
           pago_al_recibir: string | null
           payload_raw: Json
           programado_para: string | null
@@ -3281,6 +3285,7 @@ export type Database = {
           motivo_cancelacion?: string | null
           nota_cliente?: string | null
           paga_con_mxn?: number | null
+          pagado_at?: string | null
           pago_al_recibir?: string | null
           payload_raw?: Json
           programado_para?: string | null
@@ -3335,6 +3340,7 @@ export type Database = {
           motivo_cancelacion?: string | null
           nota_cliente?: string | null
           paga_con_mxn?: number | null
+          pagado_at?: string | null
           pago_al_recibir?: string | null
           payload_raw?: Json
           programado_para?: string | null
@@ -8544,6 +8550,316 @@ export type Database = {
         }
         Relationships: []
       }
+      terminal_cobros: {
+        Row: {
+          aplicado_at: string | null
+          caja_id: string
+          conexion_id: string
+          confirmado_a_mano_por: string | null
+          created_at: string
+          detalle: string | null
+          empleado_id: string | null
+          estado: string
+          folio: string | null
+          id: string
+          marca: string | null
+          mensualidades: number | null
+          monto_mxn: number
+          orden_id_externo: string | null
+          pagado_mxn: number | null
+          pago_id_externo: string | null
+          reembolsado_mxn: number
+          referencia: string | null
+          sucursal_id: string
+          tenant_id: string
+          ticket_id: string
+          tipo_tarjeta: string | null
+          updated_at: string
+        }
+        Insert: {
+          aplicado_at?: string | null
+          caja_id: string
+          conexion_id: string
+          confirmado_a_mano_por?: string | null
+          created_at?: string
+          detalle?: string | null
+          empleado_id?: string | null
+          estado?: string
+          folio?: string | null
+          id: string
+          marca?: string | null
+          mensualidades?: number | null
+          monto_mxn: number
+          orden_id_externo?: string | null
+          pagado_mxn?: number | null
+          pago_id_externo?: string | null
+          reembolsado_mxn?: number
+          referencia?: string | null
+          sucursal_id: string
+          tenant_id: string
+          ticket_id: string
+          tipo_tarjeta?: string | null
+          updated_at?: string
+        }
+        Update: {
+          aplicado_at?: string | null
+          caja_id?: string
+          conexion_id?: string
+          confirmado_a_mano_por?: string | null
+          created_at?: string
+          detalle?: string | null
+          empleado_id?: string | null
+          estado?: string
+          folio?: string | null
+          id?: string
+          marca?: string | null
+          mensualidades?: number | null
+          monto_mxn?: number
+          orden_id_externo?: string | null
+          pagado_mxn?: number | null
+          pago_id_externo?: string | null
+          reembolsado_mxn?: number
+          referencia?: string | null
+          sucursal_id?: string
+          tenant_id?: string
+          ticket_id?: string
+          tipo_tarjeta?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "terminal_cobros_caja_id_fkey"
+            columns: ["caja_id"]
+            isOneToOne: false
+            referencedRelation: "cajas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "terminal_cobros_conexion_id_fkey"
+            columns: ["conexion_id"]
+            isOneToOne: false
+            referencedRelation: "terminal_conexiones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "terminal_cobros_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "terminal_cobros_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      terminal_conexiones: {
+        Row: {
+          conectada_at: string
+          cuenta_id_externo: string
+          cuenta_nombre: string | null
+          de_prueba: boolean
+          estado: string
+          id: string
+          proveedor: string
+          tenant_id: string
+          ultimo_error: string | null
+          updated_at: string
+          vence_at: string | null
+        }
+        Insert: {
+          conectada_at?: string
+          cuenta_id_externo: string
+          cuenta_nombre?: string | null
+          de_prueba?: boolean
+          estado?: string
+          id?: string
+          proveedor?: string
+          tenant_id: string
+          ultimo_error?: string | null
+          updated_at?: string
+          vence_at?: string | null
+        }
+        Update: {
+          conectada_at?: string
+          cuenta_id_externo?: string
+          cuenta_nombre?: string | null
+          de_prueba?: boolean
+          estado?: string
+          id?: string
+          proveedor?: string
+          tenant_id?: string
+          ultimo_error?: string | null
+          updated_at?: string
+          vence_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "terminal_conexiones_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      terminal_config_sucursal: {
+        Row: {
+          conexion_id: string
+          espera_segundos: number
+          imprime_terminal: boolean
+          propina_en_terminal: boolean
+          sucursal_id: string
+          sucursal_id_externo: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          conexion_id: string
+          espera_segundos?: number
+          imprime_terminal?: boolean
+          propina_en_terminal?: boolean
+          sucursal_id: string
+          sucursal_id_externo?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          conexion_id?: string
+          espera_segundos?: number
+          imprime_terminal?: boolean
+          propina_en_terminal?: boolean
+          sucursal_id?: string
+          sucursal_id_externo?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "terminal_config_sucursal_conexion_id_fkey"
+            columns: ["conexion_id"]
+            isOneToOne: false
+            referencedRelation: "terminal_conexiones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "terminal_config_sucursal_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: true
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "terminal_config_sucursal_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      terminal_dispositivos: {
+        Row: {
+          activa: boolean
+          caja_id: string
+          caja_id_externo: string
+          conexion_id: string
+          modo: string | null
+          sucursal_id: string
+          tenant_id: string
+          terminal_id_externo: string | null
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          caja_id: string
+          caja_id_externo: string
+          conexion_id: string
+          modo?: string | null
+          sucursal_id: string
+          tenant_id: string
+          terminal_id_externo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          caja_id?: string
+          caja_id_externo?: string
+          conexion_id?: string
+          modo?: string | null
+          sucursal_id?: string
+          tenant_id?: string
+          terminal_id_externo?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "terminal_dispositivos_caja_id_fkey"
+            columns: ["caja_id"]
+            isOneToOne: true
+            referencedRelation: "cajas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "terminal_dispositivos_conexion_id_fkey"
+            columns: ["conexion_id"]
+            isOneToOne: false
+            referencedRelation: "terminal_conexiones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "terminal_dispositivos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "terminal_dispositivos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      terminal_eventos: {
+        Row: {
+          accion: string
+          cobro_id: string | null
+          created_at: string
+          error: string | null
+          id: number
+          orden_id_externo: string | null
+          payload: Json
+          procesado_at: string | null
+        }
+        Insert: {
+          accion: string
+          cobro_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: number
+          orden_id_externo?: string | null
+          payload: Json
+          procesado_at?: string | null
+        }
+        Update: {
+          accion?: string
+          cobro_id?: string | null
+          created_at?: string
+          error?: string | null
+          id?: number
+          orden_id_externo?: string | null
+          payload?: Json
+          procesado_at?: string | null
+        }
+        Relationships: []
+      }
       ticket_canjes_lealtad: {
         Row: {
           cliente_id: string
@@ -9879,6 +10195,59 @@ export type Database = {
           },
         ]
       }
+      tienda_conexiones: {
+        Row: {
+          conectada_at: string
+          cuenta_id_externo: string
+          cuenta_nombre: string | null
+          de_prueba: boolean
+          estado: string
+          id: string
+          public_key: string
+          renovando_hasta: string | null
+          tenant_id: string
+          ultimo_error: string | null
+          updated_at: string
+          vence_at: string | null
+        }
+        Insert: {
+          conectada_at?: string
+          cuenta_id_externo: string
+          cuenta_nombre?: string | null
+          de_prueba?: boolean
+          estado?: string
+          id?: string
+          public_key: string
+          renovando_hasta?: string | null
+          tenant_id: string
+          ultimo_error?: string | null
+          updated_at?: string
+          vence_at?: string | null
+        }
+        Update: {
+          conectada_at?: string
+          cuenta_id_externo?: string
+          cuenta_nombre?: string | null
+          de_prueba?: boolean
+          estado?: string
+          id?: string
+          public_key?: string
+          renovando_hasta?: string | null
+          tenant_id?: string
+          ultimo_error?: string | null
+          updated_at?: string
+          vence_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tienda_conexiones_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tienda_config: {
         Row: {
           aceptacion: string
@@ -9888,6 +10257,8 @@ export type Database = {
           logo_ruta: string | null
           minutos_aceptacion: number
           pago_efectivo: boolean
+          pago_en_linea: boolean
+          pago_pausado_hasta: string | null
           pago_tarjeta: boolean
           slug: string
           tenant_id: string
@@ -9901,6 +10272,8 @@ export type Database = {
           logo_ruta?: string | null
           minutos_aceptacion?: number
           pago_efectivo?: boolean
+          pago_en_linea?: boolean
+          pago_pausado_hasta?: string | null
           pago_tarjeta?: boolean
           slug: string
           tenant_id: string
@@ -9914,6 +10287,8 @@ export type Database = {
           logo_ruta?: string | null
           minutos_aceptacion?: number
           pago_efectivo?: boolean
+          pago_en_linea?: boolean
+          pago_pausado_hasta?: string | null
           pago_tarjeta?: boolean
           slug?: string
           tenant_id?: string
@@ -10064,6 +10439,36 @@ export type Database = {
           },
         ]
       }
+      tienda_eventos: {
+        Row: {
+          accion: string
+          created_at: string
+          error: string | null
+          id: number
+          orden_id_externo: string | null
+          pago_id: string | null
+          payload: Json
+        }
+        Insert: {
+          accion: string
+          created_at?: string
+          error?: string | null
+          id?: number
+          orden_id_externo?: string | null
+          pago_id?: string | null
+          payload?: Json
+        }
+        Update: {
+          accion?: string
+          created_at?: string
+          error?: string | null
+          id?: number
+          orden_id_externo?: string | null
+          pago_id?: string | null
+          payload?: Json
+        }
+        Relationships: []
+      }
       tienda_ocultos: {
         Row: {
           categoria_id: string | null
@@ -10113,6 +10518,118 @@ export type Database = {
           },
           {
             foreignKeyName: "tienda_ocultos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tienda_pagos: {
+        Row: {
+          aprobado_at: string | null
+          cobro_pedido_at: string | null
+          conciliacion_fallos: number
+          conciliaciones: number
+          conciliado_at: string | null
+          conexion_id: string
+          consultado_at: string | null
+          correo_at: string | null
+          created_at: string
+          detalle: string | null
+          devuelto_at: string | null
+          estado: string
+          extra: boolean
+          id: string
+          intentos: number
+          marca: string | null
+          monto_mxn: number
+          orden_id_externo: string | null
+          pago_id_externo: string | null
+          pedido_id: string
+          propina_mxn: number
+          proximo_intento_at: string | null
+          tenant_id: string
+          tipo_tarjeta: string | null
+          ultimo_error: string | null
+          updated_at: string
+          vence_at: string
+        }
+        Insert: {
+          aprobado_at?: string | null
+          cobro_pedido_at?: string | null
+          conciliacion_fallos?: number
+          conciliaciones?: number
+          conciliado_at?: string | null
+          conexion_id: string
+          consultado_at?: string | null
+          correo_at?: string | null
+          created_at?: string
+          detalle?: string | null
+          devuelto_at?: string | null
+          estado?: string
+          extra?: boolean
+          id?: string
+          intentos?: number
+          marca?: string | null
+          monto_mxn: number
+          orden_id_externo?: string | null
+          pago_id_externo?: string | null
+          pedido_id: string
+          propina_mxn?: number
+          proximo_intento_at?: string | null
+          tenant_id: string
+          tipo_tarjeta?: string | null
+          ultimo_error?: string | null
+          updated_at?: string
+          vence_at: string
+        }
+        Update: {
+          aprobado_at?: string | null
+          cobro_pedido_at?: string | null
+          conciliacion_fallos?: number
+          conciliaciones?: number
+          conciliado_at?: string | null
+          conexion_id?: string
+          consultado_at?: string | null
+          correo_at?: string | null
+          created_at?: string
+          detalle?: string | null
+          devuelto_at?: string | null
+          estado?: string
+          extra?: boolean
+          id?: string
+          intentos?: number
+          marca?: string | null
+          monto_mxn?: number
+          orden_id_externo?: string | null
+          pago_id_externo?: string | null
+          pedido_id?: string
+          propina_mxn?: number
+          proximo_intento_at?: string | null
+          tenant_id?: string
+          tipo_tarjeta?: string | null
+          ultimo_error?: string | null
+          updated_at?: string
+          vence_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tienda_pagos_conexion_id_fkey"
+            columns: ["conexion_id"]
+            isOneToOne: false
+            referencedRelation: "tienda_conexiones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tienda_pagos_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tienda_pagos_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -10206,9 +10723,11 @@ export type Database = {
       }
       tienda_sucursales: {
         Row: {
+          conexion_id: string | null
           created_at: string
           domicilio: boolean
           horario: Json
+          pago_pausado_hasta: string | null
           participa: boolean
           pausa_hasta: string | null
           recoger: boolean
@@ -10217,9 +10736,11 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          conexion_id?: string | null
           created_at?: string
           domicilio?: boolean
           horario?: Json
+          pago_pausado_hasta?: string | null
           participa?: boolean
           pausa_hasta?: string | null
           recoger?: boolean
@@ -10228,9 +10749,11 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          conexion_id?: string | null
           created_at?: string
           domicilio?: boolean
           horario?: Json
+          pago_pausado_hasta?: string | null
           participa?: boolean
           pausa_hasta?: string | null
           recoger?: boolean
@@ -10239,6 +10762,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "tienda_sucursales_conexion_id_fkey"
+            columns: ["conexion_id"]
+            isOneToOne: false
+            referencedRelation: "tienda_conexiones"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tienda_sucursales_sucursal_del_negocio"
             columns: ["sucursal_id", "tenant_id"]
@@ -11989,6 +12519,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      _tienda_caja_en_linea_viva: {
+        Args: { p_sucursal: string }
+        Returns: boolean
+      }
       _tienda_con_iva: {
         Args: { p_neto: number; p_producto: string; p_tenant: string }
         Returns: number
@@ -12025,6 +12559,10 @@ export type Database = {
         Args: { p_cantidad: number; p_grupos: Json; p_mods: Json }
         Returns: Json
       }
+      _tienda_pago_sin_confirmar: {
+        Args: { p_pedido: string }
+        Returns: boolean
+      }
       _tienda_password_ok: {
         Args: {
           p_ahora: string
@@ -12033,6 +12571,13 @@ export type Database = {
           p_tenant: string
         }
         Returns: boolean
+      }
+      _tienda_pedido_creado: {
+        Args: {
+          p_pedido: Database["public"]["Tables"]["delivery_pedidos"]["Row"]
+          p_ya_existia: boolean
+        }
+        Returns: Json
       }
       _tienda_renglones: { Args: { p_items: Json }; Returns: Json }
       _tienda_telefono: { Args: { p_telefono: string }; Returns: string }
@@ -13198,6 +13743,27 @@ export type Database = {
         Args: { p_codigo: string; p_tenant_id: string }
         Returns: boolean
       }
+      terminal_borrar_tokens: {
+        Args: { p_conexion: string }
+        Returns: undefined
+      }
+      terminal_guardar_tokens: {
+        Args: {
+          p_access: string
+          p_conexion: string
+          p_refresh: string
+          p_vence: string
+        }
+        Returns: undefined
+      }
+      terminal_leer_tokens: {
+        Args: { p_conexion: string }
+        Returns: {
+          access_token: string
+          refresh_token: string
+        }[]
+      }
+      terminal_pedir_renovacion: { Args: never; Returns: boolean }
       ticket_autofacturable: { Args: { p_ticket_id: string }; Returns: boolean }
       ticket_lleva_premio: { Args: { p_ticket_id: string }; Returns: boolean }
       tickets_de_periodo_global: {
@@ -13207,6 +13773,29 @@ export type Database = {
           ticket_id: string
           total_mxn: number
         }[]
+      }
+      tienda_borrar_tokens: { Args: { p_conexion: string }; Returns: undefined }
+      tienda_conexion_cobro: {
+        Args: { p_sucursal: string; p_tenant: string }
+        Returns: string
+      }
+      tienda_conexion_ocupada: { Args: { p_conexion: string }; Returns: Json }
+      tienda_conexion_renovacion_fallida: {
+        Args: {
+          p_conexion: string
+          p_definitiva: boolean
+          p_motivo: string
+          p_vence: string
+        }
+        Returns: boolean
+      }
+      tienda_conexion_tomar_renovacion: {
+        Args: { p_conexion: string }
+        Returns: string
+      }
+      tienda_conexiones_por_renovar: {
+        Args: { p_dias?: number; p_max?: number }
+        Returns: string[]
       }
       tienda_cotizar: {
         Args: {
@@ -13229,6 +13818,7 @@ export type Database = {
           p_nota: string
           p_paga_con: number
           p_pago: string
+          p_propina_pct?: number
           p_seguimiento_hash: string
           p_sucursal: string
           p_tenant: string
@@ -13311,9 +13901,30 @@ export type Database = {
         Args: { p_ahora?: string; p_modo: string; p_sucursal: string }
         Returns: string
       }
+      tienda_guardar_tokens: {
+        Args: {
+          p_access: string
+          p_conexion: string
+          p_public_key?: string
+          p_refresh: string
+          p_vence: string
+        }
+        Returns: undefined
+      }
       tienda_horario_abierto: {
         Args: { p_ahora: string; p_horario: Json; p_tz: string }
         Returns: boolean
+      }
+      tienda_leer_tokens: {
+        Args: { p_conexion: string }
+        Returns: {
+          access_token: string
+          refresh_token: string
+        }[]
+      }
+      tienda_marcar_entregado: {
+        Args: { p_pedido: string }
+        Returns: undefined
       }
       tienda_menu: {
         Args: { p_sucursal: string; p_tenant: string }
@@ -13327,6 +13938,53 @@ export type Database = {
         Args: { p_ahora?: string; p_slug: string }
         Returns: Json
       }
+      tienda_pago_anotar: {
+        Args: { p_error?: string; p_orden?: string; p_pago: string }
+        Returns: undefined
+      }
+      tienda_pago_aplicar: {
+        Args: {
+          p_detalle?: string
+          p_marca?: string
+          p_monto: number
+          p_orden_id_externo: string
+          p_pago: string
+          p_pago_id_externo?: string
+          p_resultado: string
+          p_tipo?: string
+        }
+        Returns: Json
+      }
+      tienda_pago_conciliacion: {
+        Args: { p_ok: boolean; p_pago: string }
+        Returns: boolean
+      }
+      tienda_pago_descartar: { Args: { p_pago: string }; Returns: boolean }
+      tienda_pago_devolucion: {
+        Args: { p_error?: string; p_ok: boolean; p_pago: string }
+        Returns: string
+      }
+      tienda_pago_pausar: {
+        Args: { p_minutos?: number; p_sucursal: string; p_tenant: string }
+        Returns: boolean
+      }
+      tienda_pago_tomar_cobro: { Args: { p_pago: string }; Returns: boolean }
+      tienda_pago_tomar_consulta: {
+        Args: { p_pago: string; p_segundos?: number }
+        Returns: boolean
+      }
+      tienda_pago_tomar_correo: { Args: { p_pago: string }; Returns: boolean }
+      tienda_pagos_barrer: { Args: never; Returns: number }
+      tienda_pagos_tomar: {
+        Args: { p_max?: number }
+        Returns: {
+          conexion_id: string
+          id: string
+          orden_id_externo: string
+          tarea: string
+        }[]
+      }
+      tienda_pedir_renovacion: { Args: never; Returns: boolean }
       tienda_recuperar_aplicar: {
         Args: {
           p_ahora?: string
@@ -13609,6 +14267,7 @@ export type Database = {
         | "APP_OTRO"
         | "PAGO_AL_RECIBIR"
         | "OTRO"
+        | "PAGO_EN_LINEA"
       modificador_naturaleza:
         | "EXTRA"
         | "SUSTITUCION"
@@ -14053,6 +14712,7 @@ export const Constants = {
         "APP_OTRO",
         "PAGO_AL_RECIBIR",
         "OTRO",
+        "PAGO_EN_LINEA",
       ],
       modificador_naturaleza: [
         "EXTRA",

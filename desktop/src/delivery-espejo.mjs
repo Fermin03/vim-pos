@@ -13,7 +13,7 @@
 // ticket local (recién creado → en preparación, el «ya lo tengo»; impreso o con repartidor → listo;
 // cobrado → entregado; cancelado → cancelado).
 import {
-  planificarEspejo, cursorDe, estadoAReportar, fallaDeTicket, fallaConGracia, avisoDeFalla, AVISO_TIENDA_CERRADO,
+  planificarEspejo, cursorDe, estadoAReportar, fallaDeTicket, fallaConGracia, avisoDeFalla, avisoDeCierre,
   COLUMNAS_PEDIDO, COLUMNAS_CONEXION,
 } from "./delivery-espejo-plan.mjs";
 import { cadenciaAceptada, esperaEspejo } from "./delivery-espejo-ritmo.mjs";
@@ -34,7 +34,9 @@ function upsertSql(tabla, columnas, conservar = []) {
 
 const SQL_CONEXION = upsertSql("delivery_conexiones", COLUMNAS_CONEXION);
 const COLS_PEDIDO_LOCAL = [...COLUMNAS_PEDIDO, "payload_raw", "ticket_id"];
-const SQL_PEDIDO = upsertSql("delivery_pedidos", COLS_PEDIDO_LOCAL, ["ticket_id"]);
+// `entregado_at` local manda: es el «Listo» del cajero en una cuenta pagada en línea, y la nube
+// lo manda vacío hasta que toma el reporte.
+const SQL_PEDIDO = upsertSql("delivery_pedidos", COLS_PEDIDO_LOCAL, ["ticket_id", "entregado_at"]);
 // ¿Hay turno abierto en la sucursal de ESTA caja? La sucursal sale de la fila local de `cajas`.
 const SQL_TURNO = `SELECT 1 FROM turnos t JOIN cajas c ON c.sucursal_id = t.sucursal_id WHERE c.id = $1 AND t.estado = 'ABIERTO' LIMIT 1`;
 // Lo que el plan necesita saber de la copia local de un pedido de la tienda y no trae la consulta
@@ -44,10 +46,14 @@ const SQL_EXTRAS_TIENDA = `SELECT p.id, p.ultimo_error, t.estado_fiscal AS ticke
 // Pedidos de la tienda con ticket en esta caja y todavía vivos, con lo que hace falta de su ticket
 // para saber qué reportar (estadoAReportar). Sale de mirar el ticket: sin red no se pierde nada.
 // Con tope de 48 h: un pedido viejo que la nube ya no toma no se reintenta para siempre.
+// El pagado en línea se sigue mirando ya ENTREGADO: si después le cancelan la cuenta, hay que
+// decírselo a la nube, que es quien devuelve el pago.
 const SQL_REPORTE = `SELECT p.id, p.folio_corto, p.estado, t.estado_fiscal AS ticket_estado, t.ticket_impreso_at,
-         EXISTS (SELECT 1 FROM delivery_asignaciones a WHERE a.ticket_id = t.id) AS asignado
+         EXISTS (SELECT 1 FROM delivery_asignaciones a WHERE a.ticket_id = t.id) AS asignado,
+         p.pago_al_recibir, p.entregado_at
     FROM delivery_pedidos p JOIN tickets t ON t.id = p.ticket_id
-   WHERE p.canal = 'TIENDA' AND p.gestion = 'ESCRITORIO' AND p.estado IN ('ACEPTADO', 'EN_PREPARACION', 'LISTO')
+   WHERE p.canal = 'TIENDA' AND p.gestion = 'ESCRITORIO'
+     AND (p.estado IN ('ACEPTADO', 'EN_PREPARACION', 'LISTO') OR (p.estado = 'ENTREGADO' AND p.pago_al_recibir = 'EN_LINEA'))
      AND p.recibido_at > now() - interval '48 hours'`;
 /** Un reporte que la nube no tomó no se repite en cada vuelta: se vuelve a intentar pasado esto. */
 const REPORTE_SIN_EFECTO_MS = 5 * 60_000;
@@ -177,7 +183,7 @@ export function crearEspejo({
       return "reintentar";
     }
     if (!esTienda || ["ACEPTADO", "EN_PREPARACION", "LISTO"].includes(ac.body?.estado)) return "aceptado";
-    await pool.query(`UPDATE delivery_pedidos SET ultimo_error = $2 WHERE id = $1`, [id, AVISO_TIENDA_CERRADO]).catch(() => {});
+    await pool.query(`UPDATE delivery_pedidos SET ultimo_error = $2 WHERE id = $1`, [id, avisoDeCierre(pedido)]).catch(() => {});
     log(`pedido ${folio}: la nube ya lo había cerrado y aquí ya tiene ticket; queda el aviso para cancelarlo en caja`);
     return "cerrado";
   }
@@ -199,7 +205,9 @@ export function crearEspejo({
       // El turno se consulta ANTES de llamar y en cada vuelta: con él la nube decide si la tienda
       // de esta sucursal recibe pedidos ahora mismo.
       const turnoAbierto = (await pool.query(SQL_TURNO, [cajaId])).rows.length > 0;
-      const r = await llamar(opts, "delivery-espejo", { desde: cursor ?? undefined, tienda: true, turno_abierto: turnoAbierto });
+      // `pago_en_linea`: esta caja sabe atender un pedido ya pagado (crea su cuenta cobrada y no lo da
+      // por entregado hasta el «Listo»). Sin declararlo la nube no se los manda.
+      const r = await llamar(opts, "delivery-espejo", { desde: cursor ?? undefined, tienda: true, turno_abierto: turnoAbierto, pago_en_linea: true });
       if (!r.ok) { fallos++; log(`espejo HTTP ${r.status} ${r.body?.error ?? ""}`); return { error: r.status }; }
       fallos = 0;
       // `tienda` solo viene de una nube que ya conoce la tienda en línea, y solo si el cliente la tiene.
@@ -308,8 +316,10 @@ export function crearEspejo({
             await pool.query(`UPDATE delivery_pedidos SET estado = $2 WHERE id = $1`, [f.id, quedo]);
             // La nube ya lo había cancelado (p. ej. pasó 15 min sin el «ya lo tengo») y aquí el ticket
             // sigue abierto: el cajero lo lee YA, igual que cuando el cierre llega por el sondeo.
-            if (quedo === "CANCELADO" && reportar !== "CANCELADO" && reportar !== "ENTREGADO") {
-              await pool.query(`UPDATE delivery_pedidos SET ultimo_error = $2 WHERE id = $1`, [f.id, AVISO_TIENDA_CERRADO]);
+            // (Un pagado en línea sí: «Listo» sobre un pedido que la nube canceló deja una cuenta cobrada
+            // cuyo pago ya se está devolviendo.)
+            if (quedo === "CANCELADO" && reportar !== "CANCELADO" && (reportar !== "ENTREGADO" || f.pago_al_recibir === "EN_LINEA")) {
+              await pool.query(`UPDATE delivery_pedidos SET ultimo_error = $2 WHERE id = $1`, [f.id, avisoDeCierre(f)]);
             }
           }
           if (quedo === reportar) { sinEfecto.delete(f.id); continue; }

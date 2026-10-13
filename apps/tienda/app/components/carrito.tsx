@@ -1,9 +1,10 @@
 "use client";
-// El carrito: los renglones con sus elecciones, la nota para el restaurante y la cuenta. El total
+// El carrito: los renglones con sus elecciones y la cuenta (la nota para el restaurante se escribe
+// en «Tus datos», en su primera pantalla). El total
 // que manda es el de `cotizar`; mientras llega se ve el estimado atenuado. Con la tienda cerrada se
 // puede seguir armando el pedido, pero en lugar de «Continuar» va el aviso.
-import { useEffect, useId, useState } from "react";
-import { Aviso, StatusChip, botonClases, cn, type TonoAviso } from "@vim/ui/styles";
+import { useEffect, useState } from "react";
+import { Aviso, botonClases, cn, type TonoAviso } from "@vim/ui/styles";
 import { cotizar, type Resultado } from "../lib/api";
 import { TOPES, estimarRenglon, estimarTotal, type Carrito, type CuerpoCarrito, type RenglonCarrito } from "../lib/carrito";
 import type { Cotizacion, Menu, Modo, Sucursal } from "../lib/contrato";
@@ -61,18 +62,16 @@ export function Linea({ concepto, importe, estimado, fuerte }: { concepto: strin
 }
 
 export function VistaDelCarrito({
-  sucursal, carrito, menu, ahora, avisos, cotizado, nota, alCambiarNota, alCambiarCantidad, alQuitar, alCambiarModo, alCambiarZona, alContinuar, alCerrar,
+  sucursal, carrito, menu, ahora, avisos, cotizado, alCambiarCantidad, alQuitar, alCambiarModo, alCambiarZona, alContinuar, alCerrar,
 }: {
   sucursal: Sucursal; carrito: Carrito; menu: Menu; ahora: Momento;
   /** Renglones que hay que quitar, con su porqué: `{ [renglon.id]: texto }`. */
   avisos: Record<string, string>;
-  cotizado: Cotizado; nota: string; alCambiarNota: (n: string) => void;
+  cotizado: Cotizado;
   alCambiarCantidad: (id: string, n: number) => void; alQuitar: (id: string) => void;
   alCambiarModo: (m: Modo) => void; alCambiarZona: (id: string | null) => void;
   alContinuar: () => void; alCerrar: () => void;
 }) {
-  const idNota = useId();
-
   if (carrito.renglones.length === 0) {
     return (
       <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
@@ -129,14 +128,6 @@ export function VistaDelCarrito({
             );
           })}
         </ul>
-        <div className="border-t border-line px-4 py-4">
-          <label htmlFor={idNota} className="flex items-center justify-between gap-3">
-            <span className="text-15 font-semibold">Nota para el restaurante</span>
-            <StatusChip className="flex-shrink-0">Opcional</StatusChip>
-          </label>
-          <textarea id={idNota} value={nota} onChange={(e) => alCambiarNota(e.target.value)} maxLength={TOPES.nota} rows={2}
-            className="mt-2 block w-full resize-none rounded border border-line-strong px-3 py-2 text-16 focus:border-ink focus:outline-none" />
-        </div>
         {/* La cuenta, en la tarjeta de resumen de la casa (la misma del portal de factura). */}
         <div className="mx-4 mb-4 rounded-lg border border-line bg-sel px-4 py-3">
           <dl aria-busy={cotizado.cotizando} className="flex flex-col gap-2">
@@ -146,7 +137,8 @@ export function VistaDelCarrito({
           </dl>
           {/* Siempre ocupa su renglón: así la cuenta no brinca cuando llega el total. */}
           <p aria-live="polite" className="mt-2 min-h-5 text-13 text-ink-2">
-            {cot ? "Pagas al recibir tu pedido." : cotizado.cotizando ? "Calculando el total…" : "Total estimado."}
+            {/* Donde se puede pagar en línea, cuándo se paga se dice en «¿Cómo pagas?», al elegirlo. */}
+            {cot ? (sucursal.pago_en_linea ? "" : "Pagas al recibir tu pedido.") : cotizado.cotizando ? "Calculando el total…" : "Total estimado."}
           </p>
         </div>
       </div>

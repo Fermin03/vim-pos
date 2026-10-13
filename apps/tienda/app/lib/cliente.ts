@@ -3,7 +3,8 @@
 // y lo que se recuerda en su teléfono para la próxima vez. Puro: la pantalla solo pinta.
 import type { DireccionDePedido } from "./api";
 import { almacenDelNavegador, type Almacen } from "./carrito";
-import type { Modo, Negocio, Pago } from "./contrato";
+import type { Modo, Pago } from "./contrato";
+import type { Propina } from "./pago";
 import { normalizarTelefono } from "./telefono";
 
 /** En el orden en que se ven: el primer error es el primer campo que hay que corregir. */
@@ -35,12 +36,14 @@ const OBLIGATORIO: Partial<Record<Campo, string>> = {
   estado: "Escribe tu estado.",
 };
 
-export type Contexto = { modo: Modo };
+/** `enLinea`: se paga en línea, y entonces el correo es obligatorio (Mercado Pago lo pide con el cobro). */
+export type Contexto = { modo: Modo; enLinea?: boolean };
 
 /** Qué tiene mal un campo, en palabras, o null. Un campo que no toca (dirección al recoger) nunca tiene error. */
 export function errorDeCampo(campo: Campo, valor: string, c: Contexto): string | null {
   const v = valor.trim();
   if ((DE_DIRECCION as readonly string[]).includes(campo) && c.modo !== "DOMICILIO") return null;
+  if (!v && campo === "email" && c.enLinea) return "Escribe tu correo: ahí te llega la confirmación de tu pago.";
   if (!v) return campo === "telefono" ? "Escribe tu teléfono." : campo === "codigoPostal" ? "Escribe tu código postal." : OBLIGATORIO[campo] ?? null;
   if (campo === "telefono") return normalizarTelefono(v) ? null : "Escribe los 10 dígitos de tu teléfono, con lada.";
   if (campo === "email") return v.length <= LIMITES.email && CORREO.test(v) ? null : "Revisa tu correo: le falta algo o tiene un carácter que no se puede usar.";
@@ -58,20 +61,19 @@ export function erroresDe(f: Formulario, c: Contexto): Partial<Record<Campo, str
   return e;
 }
 
-/** Las formas de pago que el negocio tiene encendidas. Con una sola no se pregunta: se informa. */
-export function formasDePago(negocio: Pick<Negocio, "pago_efectivo" | "pago_tarjeta">): Pago[] {
-  return [...(negocio.pago_efectivo ? ["EFECTIVO" as const] : []), ...(negocio.pago_tarjeta ? ["TARJETA" as const] : [])];
-}
-
 export type DatosDelPedido = {
   cliente: { nombre: string; telefono: string; email: string | null };
   direccion: DireccionDePedido | null; pago: Pago;
   /** Siempre null: la tienda ya no pregunta con cuánto se paga. El servidor lo sigue aceptando. */
   paga_con: null;
+  /** Solo al pagar en línea: el porcentaje elegido. En un pedido al recibir la clave ni viaja. */
+  propina_pct?: Propina;
+  /** Solo al pagar en línea y EN LUGAR del porcentaje: «otro monto», en pesos con dos decimales. */
+  propina_mxn?: string;
 };
 
 /** Un formulario YA validado (`erroresDe` vacío) → la parte del cuerpo de `pedir` que sale de él. */
-export function datosDelPedido(f: Formulario, c: { modo: Modo; pago: Pago }): DatosDelPedido {
+export function datosDelPedido(f: Formulario, c: { modo: Modo; pago: Pago; propina?: Propina; /** «Otro monto» ya validado (`leerOtroMonto`): gana al porcentaje. */ propinaMxn?: string }): DatosDelPedido {
   const t = (campo: Campo) => f[campo].trim();
   return {
     cliente: { nombre: t("nombre"), telefono: normalizarTelefono(t("telefono")) ?? t("telefono"), email: t("email").toLowerCase() || null },
@@ -82,6 +84,8 @@ export function datosDelPedido(f: Formulario, c: { modo: Modo; pago: Pago }): Da
     },
     pago: c.pago,
     paga_con: null,
+    // Uno u otro, nunca los dos: la función rechaza un pedido con porcentaje y monto.
+    ...(c.pago === "EN_LINEA" && (c.propinaMxn ? { propina_mxn: c.propinaMxn } : { propina_pct: c.propina ?? 0 })),
   };
 }
 
