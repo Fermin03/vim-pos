@@ -68,10 +68,17 @@ liability_shift: "required" }`: cuando el antifraude de Mercado Pago duda, en ve
   siempre): `processed` / `accredited` verificado → `RECIBIDO` y correo; `failed` → rechazo.
 - **Un reto pendiente NO se puede cancelar en Mercado Pago (422) y sigue vivo al menos 45 minutos**
   (documento 04). Todo lo de «dejar el reto» se hace de NUESTRO lado y no depende de Mercado Pago:
-  - **«Cancelar»** (`verificacion` con `cancelar: true`): antes se mira la orden (si el cliente ya
-    la había contestado, está cobrada y se le da su pedido); si sigue pendiente, el pedido se
-    cierra «sin pago» y se contesta 409 `SIN_VERIFICAR` **en el acto**: el cliente paga otra vez
-    enseguida, con otra clave, otro pedido y otra orden. No hay espera ni «Confirmando tu pago».
+  - **«Cancelar»** (`verificacion` con `cancelar: true`): se decide con la orden a la vista. Si
+    sigue en el reto, el pedido se cierra «sin pago» y se contesta 409 `SIN_VERIFICAR` **en el
+    acto**: el cliente paga otra vez enseguida, con otra clave, otro pedido y otra orden (vale
+    aunque nadie hubiera anotado la verificación: se anota ahí). Si el cliente ya la había
+    contestado: cobrada → se le da su pedido; cobrándose (`processing`, `in_review`) → **no se
+    deja**, `POR_CONFIRMAR`. Si Mercado Pago no contesta, tampoco se deja a ciegas (la tienda
+    vuelve a pedirlo). Y la tienda **no ofrece «Cancelar» desde que la página del reto avisa que
+    terminó**: el pago puede estar aprobándose.
+  - **El aviso de «terminó» puede llegar antes de tiempo** (solo está verificado en el ambiente de
+    prueba): la tienda quita el marco y pregunta seguido; si tras esas vueltas el servidor sigue
+    diciendo `VERIFICACION`, el marco vuelve (con la dirección de esa respuesta) y con él «Cancelar».
   - **Plazo: 10 minutos desde que se mandó el cobro** (los 5 de siempre son para un cobro que
     Mercado Pago no contestó, donde el cliente no tiene que hacer nada; aquí tiene que abrir la
     aplicación de su banco). Al pasar, el barrido de la base hace lo mismo que «Cancelar», solo.
@@ -84,8 +91,11 @@ liability_shift: "required" }`: cuando el antifraude de Mercado Pago duda, en ve
     pago que llegó tarde: **se devuelve entero**, con la regla y las esperas de siempre. Si acaba
     `failed`, `canceled` o `expired`, se da por conciliado. Mientras siga pendiente **no** es
     «posible cobro sin pedido» (no hay cobro): no suma fallos ni manda correos. Si a las 48 horas
-    sigue pendiente, un único correo a VIM («Verificación del banco sin cerrar», con el id de la
-    orden) y se deja de consultar; un aviso posterior de Mercado Pago se aplica igual.
+    sigue pendiente, un correo a VIM («Verificación del banco sin cerrar», con el id de la orden)
+    y se deja de consultar; un aviso posterior de Mercado Pago se aplica igual. Se da por cerrado
+    solo DESPUÉS de avisar, y se avisa aunque el último vistazo falle: si la función muere a
+    medias vuelve a salir a la hora (puede repetirse el correo; no perderse). El barrido de la
+    base llama a la función con ese mismo ritmo, no cada minuto.
   - Se **intenta** cancelar la orden una vez por pago (al dejarla el cliente, o en la primera
     consulta ya abandonada), por si en producción se deja: si contesta 2xx se vuelve a leer y se
     aplica como quedó. El 422 es lo normal: no es un fallo y no se registra.
@@ -106,6 +116,24 @@ liability_shift: "required" }`: cuando el antifraude de Mercado Pago duda, en ve
   no confirmó (`VERIFICACION`) cuenta para la IP y no para pausar al negocio (`cuentaComoRechazo`).
 - **Una orden `action_required` nunca se da por pagada**, y nunca es una orden «sin aplicar»: el
   barrido la cuenta como consulta buena.
+
+**Orden de despliegue, obligado: migración 0175 → web de la tienda → funciones `tienda` y
+`tienda-webhook-mp`.** La migración primero porque las funciones nuevas leen
+`tienda_pagos.verificacion_at` en cada pago: sin la columna se cae todo el pago en línea. La web
+antes que las funciones porque una pestaña con la web vieja lee `VERIFICACION` como «por
+confirmar» y ese cliente nunca vería el reto; la web nueva con la función vieja se porta como hoy
+(la función vieja nunca contesta `VERIFICACION`, y a la acción `verificacion` le contesta
+`ACCION_INVALIDA`, que la tienda trata como «sin respuesta»: manda a la página del pedido, igual
+que antes).
+
+**Pendiente del marco:** no lleva `sandbox` ni `allow`. Sin poder probarlo con un banco real,
+cualquiera de los dos podría romper el reto (un banco que pida biometría del navegador podría
+necesitar `allow`). Revisarlo con el primer reto real.
+
+**La clave del intento en duda** se guarda por negocio (`vim.tienda.intento.<slug>`). La de antes
+(`vim.tienda.intento`, una para todo el dominio) se lee una vez: la primera tienda que la encuentra
+la toma como suya —no se puede saber de cuál era—, la pasa a su clave y borra la vieja, para que
+nadie que recargue con un cobro en vuelo pueda pagar dos veces.
 
 Para probarlo en la cuenta de prueba: titular `APRO-CHOK` (reto que aprueba), `APRO` a secas
 (reto que falla) y `APRO-AUTH` (aprobado sin reto). **`APRO` ya no da un aprobado**, y `FUND`,

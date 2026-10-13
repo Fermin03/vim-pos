@@ -10,7 +10,7 @@ import { CLAVE_DEL_INTENTO, desenlaceDelError, dondeDelIntento, enviarPedido, in
 import { textoDeSeguimiento } from "../textos";
 import { pasoDelDesenlace } from "../pasos";
 import { textoDeRechazo } from "../tarjeta";
-import { HOSTS_DEL_RETO, esFinDelReto, pasoDelReto, urlDeReto, vigilarReto, type PasoDelReto } from "../verificacion";
+import { HOSTS_DEL_RETO, esFinDelReto, pasoDelReto, retoQueSigue, seOfreceCancelar, urlDeReto, vigilarReto, type PasoDelReto, type Reto } from "../verificacion";
 import { CODIGO, cotizacionCruda, pedidoCrudo } from "./datos";
 
 // La dirección REAL que devolvió Mercado Pago (12 oct 2026), con los identificadores cambiados.
@@ -187,7 +187,7 @@ describe("vigilar el reto", () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(e.pedidas).toEqual([false]);
     await vi.advanceTimersByTimeAsync(10_000);
-    expect(e.pasos).toEqual([{ tipo: "sigue", url: URL_RETO }, { tipo: "pedido" }]);
+    expect(e.pasos).toEqual([{ tipo: "sigue", url: URL_RETO, conPrisa: false }, { tipo: "pedido" }]);
     await vi.advanceTimersByTimeAsync(60_000);
     expect(e.pedidas).toEqual([false, false]);
     expect(e.oye()).toBe(false);
@@ -209,6 +209,17 @@ describe("vigilar el reto", () => {
     await vi.advanceTimersByTimeAsync(3_000);
     expect(e.pasos.at(-1)).toEqual({ tipo: "rechazado", detalle: "VERIFICACION" });
     expect(e.pedidas).toHaveLength(3);
+  });
+  it("cada «sigue» dice si todavía se pregunta con prisa: al acabarse las vueltas seguidas, ya no", async () => {
+    const e = escena([]);
+    e.v.ahora();
+    await vi.advanceTimersByTimeAsync(0);
+    for (let i = 0; i < 4; i++) await vi.advanceTimersByTimeAsync(3_000);
+    // Cinco vueltas seguidas: las cuatro primeras con prisa; la quinta ya no (es la que decide si el aviso llegó antes de tiempo).
+    expect(e.pasos.map((p) => p.tipo === "sigue" && p.conPrisa)).toEqual([true, true, true, true, false]);
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(e.pasos).toHaveLength(5);   // la siguiente ya va a los 10 s
+    e.v.detener();
   });
   it("cancelar: desde ahí TODAS las preguntas piden cancelar, hasta que el servidor confirma; sin respuesta no se da nada por cancelado", async () => {
     const e = escena([fallo("SIN_CONEXION"), ok({ estado: "VERIFICACION", url: null }), fallo("PAGO_RECHAZADO", "SIN_VERIFICAR")]);
@@ -297,10 +308,38 @@ describe("el intento en duda es de UN negocio (todas las tiendas viven en el mis
     expect(deVuelta.enDuda()).toBe(clave);
     expect(deVuelta.para({ ...pedido, propina_pct: 20 })).toBe(clave);
   });
-  it("lo guardado con la clave de antes (sin negocio) no es de nadie: no se lee como duda de este", () => {
+  it("el cambio de nombre no suelta una duda en vuelo: lo guardado con la clave de antes se pasa a la de este negocio y la vieja se borra", () => {
     const a = telefono();
+    const vieja = "v".repeat(22);
+    a.setItem(CLAVE_DEL_INTENTO, JSON.stringify({ de: "x", clave: vieja, cuando: Date.now(), duda: true }));
+    const ko = de(a, "knockout", "ko");
+    // Quien recarga con la tienda nueva sigue en duda, con la MISMA clave: no puede pagar otra vez.
+    expect(ko.enDuda()).toBe(vieja);
+    expect(ko.para(pedido)).toBe(vieja);
+    expect(a.claves()).toEqual([dondeDelIntento("knockout")]);
+    expect(JSON.parse(a.getItem(dondeDelIntento("knockout"))!)).toMatchObject({ clave: vieja, duda: true });
+    // Otra recarga (ya sin la clave vieja) la sigue viendo; y otra tienda, no.
+    expect(de(a, "knockout", "otra").enDuda()).toBe(vieja);
+    expect(de(a, "tacos-don-beto", "td").enDuda()).toBeNull();
+  });
+  it("si este negocio ya tiene su intento, el de la clave de antes no lo pisa (y se borra); basura en la clave vieja no es una duda", () => {
+    const a = telefono();
+    const ko = de(a, "knockout", "ko");
+    const clave = ko.para(pedido);
+    ko.dudar();
     a.setItem(CLAVE_DEL_INTENTO, JSON.stringify({ de: "x", clave: "v".repeat(22), cuando: Date.now(), duda: true }));
-    expect(de(a, "knockout", "ko").enDuda()).toBeNull();
+    expect(de(a, "knockout", "nueva").enDuda()).toBe(clave);
+    expect(a.claves()).toEqual([dondeDelIntento("knockout")]);
+    const b = telefono();
+    b.setItem(CLAVE_DEL_INTENTO, "{ni json");
+    expect(de(b, "knockout", "ko").enDuda()).toBeNull();
+    expect(b.claves()).toEqual([]);
+  });
+  it("si el teléfono no deja guardar la copia, la clave vieja NO se borra (la duda no se pierde por el camino)", () => {
+    const m = new Map<string, string>([[CLAVE_DEL_INTENTO, JSON.stringify({ de: "x", clave: "v".repeat(22), cuando: Date.now(), duda: true })]]);
+    const soloLectura: Almacen = { getItem: (k) => m.get(k) ?? null, setItem: () => { throw new Error("cuota"); }, removeItem: (k) => { m.delete(k); } };
+    expect(de(soloLectura, "knockout", "ko").enDuda()).toBe("v".repeat(22));
+    expect(m.has(CLAVE_DEL_INTENTO)).toBe(true);
   });
   it("en la página hay uno por negocio, siempre el mismo", () => {
     expect(intentoDelNegocio("knockout")).toBe(intentoDelNegocio("knockout"));
@@ -330,5 +369,34 @@ describe("la página del pedido cuyo reto se dejó", () => {
     const agotado = textoDeSeguimiento({ estado: "CANCELADO", motivo: "AGOTADO", enLinea: enLinea("DEVOLUCION_EN_PROCESO") });
     expect(agotado.apoyo).toMatch(/^Se agotó algo de tu pedido\./);
     expect(agotado.alerta).toBe(true);
+  });
+});
+
+describe("el reto a la vista: cuándo se quita el marco, cuándo vuelve y cuándo se ofrece «Cancelar»", () => {
+  const URL2 = URL_RETO.replace("9a8b7c6d", "0b0b0b0b");
+  const vivo: Reto = { codigo: CODIGO, url: URL_RETO, esperando: false, cancelado: false };
+  it("«Cancelar» solo con el marco a la vista: tras el aviso de que el reto terminó NO se ofrece (el pago puede estar aprobándose)", () => {
+    expect(seOfreceCancelar(vivo)).toBe(true);
+    expect(seOfreceCancelar({ ...vivo, url: null })).toBe(true);
+    expect(seOfreceCancelar({ ...vivo, esperando: true })).toBe(false);
+    expect(seOfreceCancelar({ ...vivo, esperando: true, cancelado: true })).toBe(false);
+  });
+  it("el servidor dice «sigue» con el marco a la vista: nada cambia (recargar el marco reiniciaría el reto); si faltaba la dirección, llega", () => {
+    expect(retoQueSigue(vivo, { url: URL2, conPrisa: false })).toBe(vivo);
+    expect(retoQueSigue(vivo, { url: null })).toBe(vivo);
+    expect(retoQueSigue({ ...vivo, url: null }, { url: URL2, conPrisa: true })).toEqual({ ...vivo, url: URL2 });
+  });
+  it("aviso de «terminó» antes de tiempo: mientras se pregunta seguido se espera; si al acabar el servidor sigue diciendo que no, el marco VUELVE (y con él «Cancelar»)", () => {
+    const trasElAviso: Reto = { ...vivo, esperando: true };
+    expect(retoQueSigue(trasElAviso, { url: URL2, conPrisa: true })).toBe(trasElAviso);
+    const deVuelta = retoQueSigue(trasElAviso, { url: URL2, conPrisa: false });
+    expect(deVuelta).toEqual({ ...vivo, url: URL2 });
+    expect(seOfreceCancelar(deVuelta)).toBe(true);
+    // Sin dirección en esa respuesta, la que ya se tenía.
+    expect(retoQueSigue(trasElAviso, { url: null, conPrisa: false })).toEqual(vivo);
+  });
+  it("si lo dejó el cliente, el marco no vuelve aunque el servidor aún no lo confirme", () => {
+    const dejado: Reto = { ...vivo, esperando: true, cancelado: true };
+    expect(retoQueSigue(dejado, { url: URL2, conPrisa: false })).toBe(dejado);
   });
 });

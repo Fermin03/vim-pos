@@ -264,11 +264,15 @@ export type Confirmacion =
  *   · Mientras el pago espera (CREADO) y nadie pide dejarlo: no se toca; su dirección se entrega
  *     por `alReto` (a quien la pida; nunca se guarda). Si se supo de ella aquí (la respuesta del
  *     cobro se perdió), se anota y se le da su plazo.
- *   · Dejarlo —el cliente tocó «Cancelar», o pasó el plazo— es cosa de la BASE (tienda_pago_abandonar
- *     y el barrido): el pedido se cierra sin pago y el pago queda ABANDONADO. Esta función solo
- *     acompaña: intenta cancelar la orden UNA vez por pago (al pedirlo el cliente, o en la primera
- *     consulta ya abandonado), por si se deja; el 422 es lo normal y no se registra. Si se dejó, se
- *     vuelve a leer y se aplica como quedó.
+ *   · Dejarlo es cerrar el pedido sin pago y dejar el pago ABANDONADO (la base: tienda_pago_abandonar,
+ *     y el barrido cuando pasa el plazo). Si lo pide el cliente (`cancelar`) se hace AQUÍ, y solo con
+ *     la orden a la vista y todavía esperando el reto: si ya salió de él (`processing`, `in_review`:
+ *     el cliente lo contestó y se está cobrando) NO se deja, y si Mercado Pago no contesta tampoco;
+ *     abandonar a ciegas un pago que se está aprobando acabaría en cobro y devolución. Vale también
+ *     si nadie había anotado la verificación: se anota en ese momento.
+ *   · Se intenta cancelar la orden UNA vez por pago (al pedirlo el cliente, o en la primera consulta
+ *     ya abandonado), por si se deja; el 422 es lo normal y no se registra. Si se dejó, se vuelve a
+ *     leer y se aplica como quedó.
  *   · Ya ABANDONADO se sigue consultando (el barrido, espaciado): si la orden acaba cobrada —el
  *     cliente contestó tarde— se aplica y la base la manda a devolver; si acaba rechazada, cancelada
  *     o vencida, se da por conciliada.
@@ -329,10 +333,14 @@ export async function confirmarPago(deps: Deps, pagoId: string, ordenPista?: str
     // El intento de cancelar, una vez por pago. VERIFICADO: lo normal es un 422 y la orden sigue igual.
     if (!opciones.cancelar && !(fila.estado === "ABANDONADO" && fila.conciliaciones === 0)) continue;
     const c = await mp.cancelarOrden(d.ordenIdExterno, `tienda-cancelar-${fila.id}-${ahora.getTime()}`);
-    if (c.status !== 200 && c.status !== 201) continue;
-    const leida = await mp.leerOrden(d.ordenIdExterno);
-    if (leida.status === 200) ordenes[i] = leida.cuerpo;
-    deps.registrar("RETO_CANCELADO", `pago ${fila.id}, orden ${d.ordenIdExterno}`);
+    if (c.status === 200 || c.status === 201) {
+      const leida = await mp.leerOrden(d.ordenIdExterno);
+      if (leida.status === 200) ordenes[i] = leida.cuerpo;
+      deps.registrar("RETO_CANCELADO", `pago ${fila.id}, orden ${d.ordenIdExterno}`);
+    }
+    // El cliente lo deja y la orden SIGUE esperando el reto (lo normal: no se dejó cancelar): se
+    // abandona de nuestro lado, con esta orden (la anote quien la anote).
+    if (opciones.cancelar && fila.estado === "CREADO" && enReto(ordenes[i])) await deps.db.abandonar(fila.id, d.ordenIdExterno);
   }
   const decisiones = ordenes.map((orden) => decidirOrden(esperado, orden));
   /** Una orden nuestra sigue esperando el reto (tal como quedó tras el intento de cancelar). */
@@ -427,8 +435,14 @@ export async function barrer(deps: Deps, avisar: (t: Tarea, de: "DEVOLUCION" | "
         // 48 horas con el reto abandonado y la orden sin cerrar: la base ya dejó de vigilarlo. Un
         // último vistazo (si ya se cobró o se cerró, se aplica) y, si sigue pendiente o no se pudo
         // mirar, un aviso a VIM con el id de la orden. Uno solo: esta tarea sale una vez por pago.
-        const c = await confirmarPago(deps, t.id);
-        if (!c.ok || c.enVerificacion) await avisar(t, "RETO");
+        // Si el vistazo revienta, se avisa igual: es justo cuando nadie más lo va a ver. Y solo
+        // DESPUÉS de avisar se da por cerrado (la base lo vuelve a sacar cada hora hasta entonces):
+        // un correo repetido es mejor que uno perdido.
+        let c: Confirmacion | null = null;
+        try { c = await confirmarPago(deps, t.id); }
+        catch (e) { deps.registrar("BARRIDO", `pago ${t.id}: ${e instanceof Error ? e.message : String(e)}`); }
+        if (!c || !c.ok || c.enVerificacion) await avisar(t, "RETO");
+        await deps.db.conciliacion(t.id, true);
       } else if (t.tarea === "DEVOLVER") {
         const estado = await devolverPago(deps, t);
         if (estado === "DEVUELTO") cuenta.devueltos++;

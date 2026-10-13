@@ -1209,13 +1209,22 @@ BEGIN
   IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'J5: pasada la media hora se siguió tomando cada 5 minutos'; END IF;
   UPDATE tienda_pagos SET consultado_at = now() - interval '61 minutes' WHERE id = v_pago;
   IF NOT EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.tarea = 'CONCILIAR' AND t.id = v_pago) THEN RAISE EXCEPTION 'J5: a la hora tocaba'; END IF;
-  --     Y el barrido llama a la función cuando a un reto abandonado le toca (aquí no hay pg_net: deja su rastro).
-  DELETE FROM tienda_eventos WHERE accion = 'barrido:sin_configurar';
+  --     Y el barrido llama a la función SOLO cuando a un reto abandonado le toca, con ese mismo ritmo
+  --     (no cada minuto durante 48 horas). Aquí no hay pg_net: cuando quiere llamar deja su rastro.
   UPDATE tienda_pagos SET proximo_intento_at = now() + interval '1 day' WHERE estado = 'POR_DEVOLVER';
   UPDATE tienda_pagos SET conciliado_at = now() WHERE estado IN ('CREADO', 'VENCIDO') AND id <> v_pago;
-  UPDATE tienda_pagos SET consultado_at = now() - interval '6 minutes' WHERE id = v_pago;
-  PERFORM tienda_pagos_barrer();
-  IF NOT EXISTS (SELECT 1 FROM tienda_eventos WHERE accion = 'barrido:sin_configurar') THEN RAISE EXCEPTION 'J5: con un reto abandonado por vigilar, el barrido no quiso llamar a la función'; END IF;
+  FOR r IN SELECT * FROM (VALUES (interval '1 minute', interval '4 minutes', false), (interval '1 minute', interval '6 minutes', true),
+                                 (interval '31 minutes', interval '6 minutes', false), (interval '31 minutes', interval '59 minutes', false),
+                                 (interval '31 minutes', interval '61 minutes', true), (interval '49 hours', interval '59 minutes', false),
+                                 (interval '49 hours', interval '61 minutes', true)) AS x(vencio_hace, consultado_hace, llama) LOOP
+    DELETE FROM tienda_eventos WHERE accion = 'barrido:sin_configurar';
+    UPDATE tienda_pagos SET vence_at = now() - r.vencio_hace, consultado_at = now() - r.consultado_hace WHERE id = v_pago;
+    PERFORM tienda_pagos_barrer();
+    IF EXISTS (SELECT 1 FROM tienda_eventos WHERE accion = 'barrido:sin_configurar') <> r.llama THEN
+      RAISE EXCEPTION 'J5: reto abandonado hace %, consultado hace %: ¿el barrido llama a la función? debía ser %', r.vencio_hace, r.consultado_hace, r.llama;
+    END IF;
+  END LOOP;
+  UPDATE tienda_pagos SET vence_at = now() - interval '31 minutes', consultado_at = now() - interval '61 minutes' WHERE id = v_pago;
 
   -- J6) Dos pagos a la vez: el cliente dejó el reto y pagó de nuevo; después contesta el reto viejo.
   --     El pedido válido es el del segundo intento; el primero llegó tarde y se devuelve. Un solo pedido.
@@ -1272,8 +1281,9 @@ BEGIN
   IF v_a ->> 'estado' <> 'POR_DEVOLVER' THEN RAISE EXCEPTION 'J8: un cobro que aparece después de cerrarse debía devolverse: %', v_a; END IF;
   DELETE FROM delivery_pedidos WHERE id = (v_r ->> 'pedido_id')::uuid;
 
-  -- J9) A las 48 horas con la orden todavía pendiente: sale UNA vez como RETO_VIEJO (para el aviso a
-  --     VIM) y deja de vigilarse; ya no ocupa la cuenta.
+  -- J9) A las 48 horas con la orden todavía pendiente: sale como RETO_VIEJO (para el aviso a VIM). NO
+  --     se da por cerrado al tomarlo: lo cierra la función después de avisar. Si la función muere a
+  --     medias, vuelve a salir a la hora (no cada minuto): el aviso no se pierde.
   v_r := pg_temp.pedir('4776660027', 27);
   v_pago := (v_r ->> 'pago_id')::uuid;
   PERFORM tienda_pago_tomar_cobro(v_pago);
@@ -1283,8 +1293,18 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.tarea = 'CONCILIAR' AND t.id = v_pago) THEN RAISE EXCEPTION 'J9: a las 47 horas se seguía vigilando'; END IF;
   UPDATE tienda_pagos SET vence_at = now() - interval '49 hours', consultado_at = now() - interval '2 hours' WHERE id = v_pago;
   IF (SELECT count(*) FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago AND t.tarea = 'RETO_VIEJO' AND t.orden_id_externo = 'ORDRETO27') <> 1 THEN RAISE EXCEPTION 'J9: a las 49 horas debía salir como RETO_VIEJO'; END IF;
-  IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'J9: el aviso de las 48 horas salió dos veces'; END IF;
-  IF (SELECT conciliado_at FROM tienda_pagos WHERE id = v_pago) IS NULL OR (SELECT estado FROM tienda_pagos WHERE id = v_pago) <> 'ABANDONADO' THEN RAISE EXCEPTION 'J9: tras las 48 horas debía darse por conciliado'; END IF;
+  IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'J9: el RETO_VIEJO salió dos veces seguidas'; END IF;
+  IF (SELECT conciliado_at FROM tienda_pagos WHERE id = v_pago) IS NOT NULL THEN RAISE EXCEPTION 'J9: se dio por cerrado al tomarlo, antes de avisar'; END IF;
+  --     La función murió antes de avisar: a la hora sale otra vez.
+  UPDATE tienda_pagos SET consultado_at = now() - interval '59 minutes' WHERE id = v_pago;
+  IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'J9: el RETO_VIEJO volvió a salir antes de la hora'; END IF;
+  UPDATE tienda_pagos SET consultado_at = now() - interval '61 minutes' WHERE id = v_pago;
+  IF (SELECT count(*) FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago AND t.tarea = 'RETO_VIEJO') <> 1 THEN RAISE EXCEPTION 'J9: sin cerrarse, el RETO_VIEJO debía volver a salir a la hora'; END IF;
+  --     Ya avisado, la función lo cierra: deja de salir.
+  IF tienda_pago_conciliacion(v_pago, true) THEN RAISE EXCEPTION 'J9: cerrar el RETO_VIEJO no avisa otra vez'; END IF;
+  IF (SELECT conciliado_at FROM tienda_pagos WHERE id = v_pago) IS NULL OR (SELECT estado FROM tienda_pagos WHERE id = v_pago) <> 'ABANDONADO' THEN RAISE EXCEPTION 'J9: avisado y cerrado, debía quedar conciliado'; END IF;
+  UPDATE tienda_pagos SET consultado_at = now() - interval '2 hours' WHERE id = v_pago;
+  IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'J9: ya cerrado, siguió saliendo'; END IF;
   DELETE FROM delivery_pedidos WHERE id = (v_r ->> 'pedido_id')::uuid;
 
   -- J10) Un pago que VENCIÓ sin que nadie anotara que su orden esperaba un reto: al descubrirlo pasa a

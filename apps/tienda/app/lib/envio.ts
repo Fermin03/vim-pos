@@ -235,16 +235,33 @@ export function intentoDeCompra(nueva: () => string = claveNueva, almacen: () =>
   const donde = dondeDelIntento(negocio);
   /** undefined = todavía no se ha mirado el teléfono (se mira al primer uso: al importar no hay navegador). */
   let actual: Intento | null | undefined;
-  const leer = (): Intento | null => {
-    if (actual !== undefined) return actual;
+  /** Lo guardado es texto de fuera: solo vale con su forma exacta. */
+  const deTexto = (crudo: string | null | undefined): Intento | null => {
     try {
-      const x: unknown = JSON.parse(almacen()?.getItem(donde) ?? "null");
+      const x: unknown = JSON.parse(crudo ?? "null");
       const o = typeof x === "object" && x !== null ? (x as Record<string, unknown>) : {};
-      // Lo guardado es texto de fuera: solo vale con su forma exacta.
-      actual = typeof o.de === "string" && typeof o.clave === "string" && /^[A-Za-z0-9_-]{22}$/.test(o.clave) && typeof o.cuando === "number"
+      return typeof o.de === "string" && typeof o.clave === "string" && /^[A-Za-z0-9_-]{22}$/.test(o.clave) && typeof o.cuando === "number"
         ? { de: o.de, clave: o.clave, cuando: o.cuando, duda: o.duda === true } : null;
     } catch {
-      actual = null;
+      return null;
+    }
+  };
+  const leer = (): Intento | null => {
+    if (actual !== undefined) return actual;
+    try { actual = deTexto(almacen()?.getItem(donde)); } catch { actual = null; }
+    // EL CAMBIO DE NOMBRE (oct 2026). Antes había una sola clave para todo el dominio, sin negocio.
+    // Quien tenga ahí un intento —quizá EN DUDA, con un cobro en vuelo— no puede perderlo al
+    // actualizarse la tienda: recargar y pagar otra vez sería un segundo cobro. De quién era no se
+    // puede saber (no lo guardaba), así que la primera tienda que lo lee lo toma como suyo: lo pasa
+    // a su clave y borra el viejo. Si no era de aquí, el servidor dirá que no existe y se suelta.
+    if (negocio) {
+      try {
+        const viejo = deTexto(almacen()?.getItem(CLAVE_DEL_INTENTO));
+        const adoptado = viejo !== null && !actual;
+        if (adoptado) { actual = viejo; guardar(); }
+        // El viejo se borra solo si su copia quedó guardada (o si no se adoptó): nunca se pierde por el camino.
+        if (!adoptado || almacen()?.getItem(donde) != null) almacen()?.removeItem(CLAVE_DEL_INTENTO);
+      } catch { /* almacén bloqueado: se queda como estaba */ }
     }
     return actual;
   };

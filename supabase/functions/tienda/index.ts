@@ -104,7 +104,9 @@
 //   Con `cancelar: true` el cliente deja el reto. Mercado Pago NO deja cancelar una orden que espera
 //   el reto (VERIFICADO: 422), así que se deja de NUESTRO lado: el pedido se cierra sin pago, se
 //   contesta 409 SIN_VERIFICAR en el acto, y el pago queda ABANDONADO y vigilado; si su orden acaba
-//   cobrada (el cliente lo contestó después), se devuelve sola. Pasado el plazo (10 minutos) el
+//   cobrada (el cliente lo contestó después), se devuelve sola. Solo se deja con la orden a la vista
+//   y todavía en el reto: si ya salió de él y se está cobrando, se contesta POR_CONFIRMAR; y si
+//   Mercado Pago no contesta, VERIFICACION (la tienda vuelve a pedirlo). Pasado el plazo (10 minutos) el
 //   barrido de la base hace lo mismo. Ese pedido NO se descarta: su renglón es el que vigila la orden.
 //   De la tarjeta aquí solo pasa el token, que es de un solo uso y no se escribe en ningún log.
 //
@@ -575,16 +577,11 @@ async function atender(req: Request): Promise<Response> {
       const turno = p.cancelar ? { data: true, error: null } : await admin.rpc("tienda_pago_tomar_consulta", { p_pago: pago.id, p_segundos: 3 });
       if (turno.error) return rechazo("tienda_pago_tomar_consulta", turno.error);
       if (turno.data === true) {
-        // Antes de dejarlo se mira la orden: si el cliente ya había contestado el reto, está cobrada
-        // y lo que toca es darle su pedido, no cerrarlo.
+        // Con `cancelar`, dejar el reto lo decide ESTA consulta, con la orden a la vista
+        // (pago-flujo.ts): se abandona solo si sigue esperando el reto. Si el cliente ya lo había
+        // contestado está cobrada (se le da su pedido) o cobrándose (`processing`, `in_review`: no se
+        // deja; lo dirá la página del pedido). Si Mercado Pago no contesta, tampoco se deja a ciegas.
         consulta = await confirmarPago(deps, pago.id, undefined, false, { cancelar: p.cancelar, alReto: (url) => { reto.url = url; } });
-        pago = await leerPago() ?? pago;
-      }
-      // El cliente deja el reto y su pago sigue esperando: se deja de NUESTRO lado, se haya podido
-      // mirar la orden o no (si resultara cobrada, llegó tarde y se devuelve). Solo un pago del que
-      // se sabe que espera un reto: de un cobro en revisión no se sale así.
-      if (p.cancelar && pago.estado === "CREADO" && pago.verificacion_at !== null && pago.orden_id_externo !== null) {
-        await deps.db.abandonar(pago.id, null);
         pago = await leerPago() ?? pago;
       }
     }

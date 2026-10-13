@@ -45,8 +45,11 @@ export function esFinDelReto(origen: string, datos: unknown): boolean {
 }
 
 export type PasoDelReto =
-  /** El reto sigue vivo. `url`: su dirección, si el servidor la consultó en esta vuelta. */
-  | { tipo: "sigue"; url: string | null }
+  /**
+   * El reto sigue vivo. `url`: su dirección, si el servidor la consultó en esta vuelta. `conPrisa`:
+   * todavía se está preguntando seguido (tras el aviso de que terminó, o buscando la dirección).
+   */
+  | { tipo: "sigue"; url: string | null; conPrisa?: boolean }
   /** Ya no es de esta pantalla: se pagó, o ya no espera el reto y falta saber el resultado. A la página del pedido. */
   | { tipo: "pedido" }
   /** No se cobró nada y el pedido se descartó: se puede pagar otra vez. `detalle`: la familia del motivo. */
@@ -63,6 +66,33 @@ export function pasoDelReto(r: Resultado<Verificacion>): PasoDelReto {
   if (r.error === "PEDIDO_NO_ENCONTRADO") return { tipo: "rechazado", detalle: "SIN_VERIFICAR" };
   return { tipo: "sin-respuesta" };
 }
+
+/**
+ * El reto a la vista en «Tu tarjeta». `url`: su página (null mientras el servidor la dice).
+ * `esperando`: el marco se quitó —la página avisó que terminó, o el cliente tocó «Cancelar»— y falta
+ * lo que diga el servidor. `cancelado`: fue el cliente quien lo dejó.
+ */
+export type Reto = { codigo: string; url: string | null; esperando: boolean; cancelado: boolean };
+
+/**
+ * El servidor dice que el reto SIGUE. Lo normal: nada cambia (la dirección no se toca una vez
+ * abierta: volver a cargar el marco reiniciaría el reto), salvo que faltara la dirección.
+ * Pero si el marco se había quitado porque la página avisó que terminó, y pasadas las vueltas
+ * seguidas el servidor sigue diciendo que no, ese aviso llegó ANTES DE TIEMPO (solo está verificado
+ * en el ambiente de prueba; un banco real puede mandarlo a medio camino): el marco vuelve, con la
+ * dirección de esa respuesta, para que el cliente pueda terminar. Si lo dejó el cliente, no vuelve.
+ */
+export function retoQueSigue(r: Reto, p: { url: string | null; conPrisa?: boolean }): Reto {
+  if (r.esperando && !r.cancelado && !p.conPrisa) return { ...r, esperando: false, url: p.url ?? r.url };
+  return !r.url && p.url ? { ...r, url: p.url } : r;
+}
+
+/**
+ * ¿Se ofrece «Cancelar»? Solo con el marco a la vista. Desde que la página del reto avisa que
+ * terminó, NO: el pago puede estar aprobándose, y dejarlo ahí acabaría en un cobro que se devuelve
+ * con el cliente leyendo «Cancelaste». Si el marco vuelve (`retoQueSigue`), vuelve el botón.
+ */
+export const seOfreceCancelar = (r: Reto): boolean => !r.esperando;
 
 /** El ritmo del seguimiento (10 s). Tras el aviso de que el reto terminó, unas vueltas más seguidas. */
 const ESPERA_MS = 10_000, CON_PRISA_MS = 3_000, VUELTAS_CON_PRISA = 5;
@@ -105,7 +135,7 @@ export function vigilarReto(d: {
     if (prisa > 0) prisa--;
     const paso = pasoDelReto(r);
     if (paso.tipo === "pedido" || paso.tipo === "rechazado") { detener(); d.alPaso(paso); return; }
-    d.alPaso(paso);
+    d.alPaso(paso.tipo === "sigue" ? { ...paso, conPrisa: prisa > 0 } : paso);
     if (otra) { otra = false; void preguntar(); } else programar();
   };
   const alVolver = () => { if (!doc.hidden) void preguntar(); };

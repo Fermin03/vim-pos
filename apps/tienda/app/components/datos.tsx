@@ -36,7 +36,7 @@ import { accionDe, avanzar, pasoDelDesenlace, pasosDe, type Paso } from "../lib/
 import { textoDeRechazo, type CampoDeTarjeta } from "../lib/tarjeta";
 import { enlaceTel, formatoTelefono } from "../lib/telefono";
 import { RETO, apoyoDePago, nombreDePago, textoDeError } from "../lib/textos";
-import { esFinDelReto, vigilarReto, type PasoDelReto } from "../lib/verificacion";
+import { esFinDelReto, retoQueSigue, seOfreceCancelar, vigilarReto, type PasoDelReto, type Reto } from "../lib/verificacion";
 import { CampoDeTexto } from "./campo";
 import { CamposDeTarjeta, type ManejoDeTarjeta } from "./tarjeta";
 import { Linea } from "./carrito";
@@ -144,7 +144,7 @@ export function PasoDeDatos({
    * ha cobrado nada y el intento sigue en duda. `url`: la página del reto (null mientras el servidor
    * la dice). `esperando`: el reto terminó, o el cliente lo canceló, y falta que el servidor diga cómo quedó.
    */
-  const [reto, setReto] = useState<{ codigo: string; url: string | null; esperando: boolean; cancelado: boolean } | null>(null);
+  const [reto, setReto] = useState<Reto | null>(null);
   const enviando = useEnviando();
   const guardadas = cuenta?.direcciones ?? [];
   const elegida = guardadas.find((d) => d.id === direccion);
@@ -395,8 +395,9 @@ export function PasoDeDatos({
   const alPasoDelReto = useRef<(codigo: string, p: PasoDelReto) => void>(() => {});
   alPasoDelReto.current = (codigo, p) => {
     if (p.tipo === "sigue") {
-      // La dirección no se cambia una vez abierta: volver a cargar el marco reiniciaría el reto.
-      if (p.url) setReto((r) => (r && r.codigo === codigo && !r.url ? { ...r, url: p.url } : r));
+      // Sigue: nada cambia, salvo que faltara la dirección o que el aviso de «terminó» hubiera llegado
+      // antes de tiempo (entonces el marco vuelve). Lo decide `retoQueSigue` (lib/verificacion.ts).
+      setReto((r) => (r && r.codigo === codigo ? retoQueSigue(r, p) : r));
     } else if (p.tipo === "pedido") {
       // Pagado, o ya no espera el reto: el pedido entró y su página dice cómo va.
       intentoDeLaPagina.cerrar();
@@ -765,8 +766,8 @@ export function PasoDeDatos({
           // una vez que terminó o se canceló, esperar: no se ofrece pagar otra vez hasta saber cómo quedó.
           <>
             {reto.esperando && !reto.cancelado && <Aviso tono="warning" role="status" className="!text-14">{RETO.noPagues}</Aviso>}
-            {/* Cancelar sigue a la mano mientras no se haya pedido: si el reto no avanza, es la salida. */}
-            {!reto.cancelado && <button key="cancelar-reto" type="button" onClick={cancelarReto} className={GHOST}>{RETO.cancelar}</button>}
+            {/* «Cancelar» solo con el marco a la vista: tras el aviso de que el reto terminó, el pago puede estar aprobándose. */}
+            {seOfreceCancelar(reto) && <button key="cancelar-reto" type="button" onClick={cancelarReto} className={GHOST}>{RETO.cancelar}</button>}
           </>
         ) : preguntando ? (
           <>

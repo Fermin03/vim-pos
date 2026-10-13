@@ -257,7 +257,9 @@ El cliente paga con tarjeta **dentro de «Tus datos»**; no se le manda a otra p
   la vista la hoja no se cierra.
 - **Al terminar el reto**, el marco se quita y queda «Confirmando tu pago» con el aviso ámbar del
   pie («Estamos confirmando tu pago. No vuelvas a pagar todavía…»): no se ofrece pagar otra vez
-  hasta que el servidor diga cómo quedó. Aprobado → la página del pedido. Si no pasó → de vuelta a
+  hasta que el servidor diga cómo quedó, **ni «Cancelar»** (el pago puede estar aprobándose). Si
+  pasados unos segundos el servidor dice que el reto sigue, el marco vuelve y «Cancelar» con él.
+  **Pendiente:** el marco no lleva `sandbox` ni `allow`; revisarlo con el primer reto de un banco real. Aprobado → la página del pedido. Si no pasó → de vuelta a
   «Tu tarjeta», con lo escrito intacto y el `Aviso` rojo de siempre: «Tu banco no confirmó el pago.
   Intenta de nuevo o usa otra tarjeta.», con «No se te cobró nada.»
 - **«Cancelar» y el plazo** no esperan a nadie: el reto se deja y se vuelve a «Tu tarjeta» en el

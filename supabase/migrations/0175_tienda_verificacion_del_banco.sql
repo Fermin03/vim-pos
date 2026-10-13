@@ -18,8 +18,8 @@
 --   · si en ese tiempo aparece cobrada (el cliente contestó tarde), es un pago que llegó tarde: se
 --     DEVUELVE entero, con la regla y el barrido de siempre. Si acaba rechazada, cancelada o
 --     vencida, se da por conciliado. Mientras siga pendiente no es «posible cobro sin pedido» (no
---     hay cobro): no suma fallos ni manda correos. Si a las 48 horas sigue pendiente, sale una vez
---     como RETO_VIEJO y la función avisa a VIM;
+--     hay cobro): no suma fallos ni manda correos. Si a las 48 horas sigue pendiente, sale como
+--     RETO_VIEJO: la función avisa a VIM y entonces lo cierra;
 --   · mientras se vigila, la cuenta de Mercado Pago no se puede desconectar: si se aprueba tarde
 --     hay que poder devolverlo.
 --
@@ -35,9 +35,17 @@
 --      tienda_pago_abandonar (deja el reto: cierra el pedido sin pago y el pago queda vigilado);
 --   3) seis funciones de la 0173 con su cuerpo copiado ÍNTEGRO y los cambios que se dicen en cada una.
 --
--- Compatibilidad: la función `tienda` desplegada hoy no crea órdenes con verificación ni llama a las
--- funciones nuevas, así que nada cambia hasta desplegar la nueva; esta migración va ANTES. No usa
--- Vault ni pg_net de forma nueva: corre igual en el Postgres de la caja, donde tienda_pagos está vacía.
+-- ORDEN DE DESPLIEGUE, OBLIGADO:  1) esta migración  →  2) la web de la tienda  →  3) las funciones
+-- `tienda` y `tienda-webhook-mp`.
+--   · La migración va PRIMERO: las funciones nuevas leen tienda_pagos.verificacion_at en cada pago
+--     (pago-puerto.ts); sin la columna se cae TODO el pago en línea, no solo la verificación.
+--   · La web va ANTES que las funciones: una pestaña con la web vieja lee `VERIFICACION` como «por
+--     confirmar» y ese cliente nunca vería el reto. La web nueva con la función vieja se porta como
+--     hoy (la función vieja nunca contesta `VERIFICACION`).
+--   · Con la migración aplicada y las funciones viejas nada cambia: no crean órdenes con
+--     verificación ni llaman a las funciones nuevas, y lo reemplazado se porta igual sin pagos
+--     ABANDONADOS.
+-- No usa Vault ni pg_net de forma nueva: corre igual en el Postgres de la caja, donde tienda_pagos está vacía.
 
 ALTER TABLE tienda_pagos ADD COLUMN IF NOT EXISTS verificacion_at timestamptz NULL;
 COMMENT ON COLUMN tienda_pagos.verificacion_at IS 'Cuándo se supo que la orden de este pago espera la verificación del banco (3D Secure). Con ella, vence_at es el plazo de la verificación y el pedido no vence antes.';
@@ -316,16 +324,19 @@ BEGIN
   )
   SELECT t.id, 'CONCILIAR'::text, t.conexion_id, t.orden_id_externo FROM tomados t;
 
-  -- A las 48 horas se deja de vigilar. Sale UNA vez (se da por conciliado al tomarlo) para que la
-  -- función lo mire por última vez y, si la orden sigue pendiente, avise a VIM.
+  -- A las 48 horas se deja de vigilar: sale como RETO_VIEJO para que la función lo mire por última
+  -- vez y, si la orden sigue pendiente, avise a VIM. NO se da por cerrado aquí: lo cierra la función
+  -- DESPUÉS de avisar (tienda_pago_conciliacion). Si la función muere a medias vuelve a salir a la
+  -- hora: un aviso repetido es mejor que uno perdido.
   RETURN QUERY
   WITH toca AS (
     SELECT g.id FROM tienda_pagos g
      WHERE NOT g.extra AND g.estado = 'ABANDONADO' AND g.conciliado_at IS NULL
        AND g.vence_at <= now() - interval '48 hours'
+       AND (g.consultado_at IS NULL OR g.consultado_at < now() - interval '1 hour')
      ORDER BY g.vence_at LIMIT GREATEST(p_max, 1) FOR UPDATE SKIP LOCKED
   ), tomados AS (
-    UPDATE tienda_pagos g SET conciliado_at = now(), consultado_at = now()
+    UPDATE tienda_pagos g SET consultado_at = now()
       FROM toca WHERE g.id = toca.id
     RETURNING g.id, g.conexion_id, g.orden_id_externo
   )
@@ -334,8 +345,9 @@ END;
 $$;
 
 -- tienda_pago_conciliacion: una consulta buena de un pago ABANDONADO también se cuenta (con la
--- primera, la función sabe que ya intentó cancelar la orden). No lo da por conciliado: eso lo hace
--- el final de su orden (tienda_pago_aplicar) o las 48 horas (tienda_pagos_tomar).
+-- primera, la función sabe que ya intentó cancelar la orden). Mientras se vigila no lo da por
+-- conciliado (eso lo hace el final de su orden, tienda_pago_aplicar); pasadas las 48 horas sí: es
+-- como la función cierra el RETO_VIEJO, después de avisar.
 CREATE OR REPLACE FUNCTION tienda_pago_conciliacion(p_pago uuid, p_ok boolean)
 RETURNS boolean
 LANGUAGE plpgsql SECURITY DEFINER
@@ -348,7 +360,10 @@ BEGIN
     UPDATE tienda_pagos
        SET conciliacion_fallos = 0,
            conciliaciones = conciliaciones + CASE WHEN estado IN ('VENCIDO', 'ABANDONADO') THEN 1 ELSE 0 END,
-           conciliado_at = CASE WHEN estado = 'VENCIDO' AND conciliaciones >= 1 THEN now() ELSE conciliado_at END
+           conciliado_at = CASE WHEN estado = 'VENCIDO' AND conciliaciones >= 1 THEN now()
+                                -- El último vistazo de un reto abandonado (RETO_VIEJO), ya con su aviso hecho.
+                                WHEN estado = 'ABANDONADO' AND vence_at <= now() - interval '48 hours' THEN now()
+                                ELSE conciliado_at END
      WHERE id = p_pago;
     RETURN false;
   END IF;
@@ -461,9 +476,12 @@ BEGIN
                        AND g.cobro_pedido_at < now() - interval '20 seconds' AND g.vence_at > now() - interval '48 hours'
                        AND (g.estado <> 'VENCIDO' OR g.conciliaciones = 0 OR g.vence_at < now() - interval '1 hour')
                        AND (g.conciliacion_fallos < 3 OR g.consultado_at IS NULL OR g.consultado_at < now() - interval '1 hour'))
-                   -- Un reto abandonado que se sigue vigilando (o al que le toca su último vistazo).
+                   -- Un reto abandonado al que le toca consulta (o su último vistazo): el MISMO ritmo
+                   -- de tienda_pagos_tomar, para no llamar a la función en balde cada minuto durante 48 horas.
                    OR (NOT g.extra AND g.estado = 'ABANDONADO' AND g.conciliado_at IS NULL
-                       AND (g.consultado_at IS NULL OR g.consultado_at < now() - interval '5 minutes'))) THEN
+                       AND (g.consultado_at IS NULL OR g.consultado_at < now() - CASE
+                              WHEN g.conciliacion_fallos >= 3 OR g.vence_at < now() - interval '30 minutes' THEN interval '1 hour'
+                              ELSE interval '5 minutes' END))) THEN
       v_secreto := _vim_secreto('vim_interno');
       v_base    := _vim_secreto('vim_functions_url');
       IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_net') OR v_secreto IS NULL OR v_base IS NULL THEN
