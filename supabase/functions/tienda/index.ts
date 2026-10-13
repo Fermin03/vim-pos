@@ -99,10 +99,13 @@
 //     · 200 `pago: { estado: "POR_CONFIRMAR" }`: ya no espera el reto y todavía no hay resultado: lo
 //       dice la página del pedido;
 //     · 409 PAGO_RECHAZADO con `detalle` (VERIFICACION: el banco no lo confirmó; SIN_VERIFICAR: el
-//       reto no se contestó —se canceló o venció—; o la familia de siempre): el pedido se descartó y
-//       no se cobró nada, igual que un rechazo directo.
-//   Con `cancelar: true` cancela antes la orden en Mercado Pago; solo contesta 409 (se puede pagar
-//   otra vez) cuando Mercado Pago confirma que quedó cancelada. Pasado el plazo se cancela sola.
+//       reto se dejó —lo canceló el cliente o pasó el plazo—; o la familia de siempre): no se cobró
+//       nada y el cliente puede pagar otra vez, igual que tras un rechazo directo.
+//   Con `cancelar: true` el cliente deja el reto. Mercado Pago NO deja cancelar una orden que espera
+//   el reto (VERIFICADO: 422), así que se deja de NUESTRO lado: el pedido se cierra sin pago, se
+//   contesta 409 SIN_VERIFICAR en el acto, y el pago queda ABANDONADO y vigilado; si su orden acaba
+//   cobrada (el cliente lo contestó después), se devuelve sola. Pasado el plazo (10 minutos) el
+//   barrido de la base hace lo mismo. Ese pedido NO se descarta: su renglón es el que vigila la orden.
 //   De la tarjeta aquí solo pasa el token, que es de un solo uso y no se escribe en ningún log.
 //
 // SECRETOS: VIM_TIENDA_SECRET, VIM_TIENDA_URL (base de los enlaces del correo; https),
@@ -555,15 +558,16 @@ async function atender(req: Request): Promise<Response> {
     const pedido = ped.data as { id: string; cliente_email: string | null; pago_al_recibir: string | null } | null;
     if (!pedido) return json({ error: "PEDIDO_NO_ENCONTRADO" }, 404);
     const leerPago = async () => {
-      const g = await admin.from("tienda_pagos").select("id, estado, detalle, verificacion_at").eq("pedido_id", pedido.id).eq("extra", false).maybeSingle();
+      const g = await admin.from("tienda_pagos").select("id, estado, detalle, verificacion_at, orden_id_externo").eq("pedido_id", pedido.id).eq("extra", false).maybeSingle();
       if (g.error) throw new Error(g.error.message);
-      return g.data as { id: string; estado: string; detalle: string | null; verificacion_at: string | null } | null;
+      return g.data as { id: string; estado: string; detalle: string | null; verificacion_at: string | null; orden_id_externo: string | null } | null;
     };
     let pago = pedido.pago_al_recibir === "EN_LINEA" ? await leerPago() : null;
     // Sin pago en línea no hay nada que verificar: la página del pedido dice cómo va.
     if (!pago) return json({ pago: { estado: "POR_CONFIRMAR" } });
 
     const reto: { url: string | null } = { url: null };
+    const deps = depsDePagos(admin, "tienda");
     let consulta: Awaited<ReturnType<typeof confirmarPago>> | null = null;
     if (pago.estado === "CREADO") {
       // A lo sumo una consulta a Mercado Pago cada 3 s por pago (la pantalla pregunta cada 10 s, y en
@@ -571,7 +575,16 @@ async function atender(req: Request): Promise<Response> {
       const turno = p.cancelar ? { data: true, error: null } : await admin.rpc("tienda_pago_tomar_consulta", { p_pago: pago.id, p_segundos: 3 });
       if (turno.error) return rechazo("tienda_pago_tomar_consulta", turno.error);
       if (turno.data === true) {
-        consulta = await confirmarPago(depsDePagos(admin, "tienda"), pago.id, undefined, false, { cancelar: p.cancelar, alReto: (url) => { reto.url = url; } });
+        // Antes de dejarlo se mira la orden: si el cliente ya había contestado el reto, está cobrada
+        // y lo que toca es darle su pedido, no cerrarlo.
+        consulta = await confirmarPago(deps, pago.id, undefined, false, { cancelar: p.cancelar, alReto: (url) => { reto.url = url; } });
+        pago = await leerPago() ?? pago;
+      }
+      // El cliente deja el reto y su pago sigue esperando: se deja de NUESTRO lado, se haya podido
+      // mirar la orden o no (si resultara cobrada, llegó tarde y se devuelve). Solo un pago del que
+      // se sabe que espera un reto: de un cobro en revisión no se sale así.
+      if (p.cancelar && pago.estado === "CREADO" && pago.verificacion_at !== null && pago.orden_id_externo !== null) {
+        await deps.db.abandonar(pago.id, null);
         pago = await leerPago() ?? pago;
       }
     }
@@ -584,9 +597,12 @@ async function atender(req: Request): Promise<Response> {
       // El pedido se descarta y el cliente puede pagar otra vez sin perder su carrito. Si ya no se
       // puede descartar es que algo lo movió: que lo diga la página del pedido.
       const motivo = motivoDeRechazo(pago.detalle);
-      if (!await depsDePagos(admin, "tienda").db.descartar(pago.id)) return json({ pago: { estado: "POR_CONFIRMAR" } });
+      if (!await deps.db.descartar(pago.id)) return json({ pago: { estado: "POR_CONFIRMAR" } });
       return rechazoDePago(admin, { p_tenant, ip, negocio: negocio.nombre, slug: p.negocio, motivo });
     }
+    // El reto se dejó (lo canceló el cliente, o pasó el plazo): el pedido ya está cerrado sin pago y
+    // se puede pagar otra vez. No se descarta ni cuenta como tarjeta rechazada.
+    if (pago.estado === "ABANDONADO") return rechazoDePago(admin, { p_tenant, ip, negocio: negocio.nombre, slug: p.negocio, motivo: "SIN_VERIFICAR" });
     // Sigue esperando el reto: lo dijo Mercado Pago ahora, o (sin turno para preguntar, o sin
     // respuesta) es lo último que se supo. Cualquier otra cosa ya no es de esta pantalla.
     const sigue = pago.estado === "CREADO" && (consulta?.ok ? consulta.enVerificacion : consulta === null || consulta.motivo === "MP_NO_RESPONDE" || consulta.motivo === "SIN_TOKEN" ? pago.verificacion_at !== null : false);

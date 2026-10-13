@@ -1116,94 +1116,198 @@ BEGIN
   EXCEPTION WHEN OTHERS THEN
     IF SQLERRM NOT LIKE 'PAGO_RESULTADO_INVALIDO%' THEN RAISE; END IF;
   END;
+  --     Una orden que ya es de otro pago no se le anota a este (un renglón por orden).
+  v_r2 := pg_temp.pedir('4776660022', 22);
+  PERFORM tienda_pago_tomar_cobro((v_r2 ->> 'pago_id')::uuid);
+  PERFORM tienda_pago_verificacion((v_r2 ->> 'pago_id')::uuid, 'ORDRETO21');
+  IF (SELECT orden_id_externo FROM tienda_pagos WHERE id = (v_r2 ->> 'pago_id')::uuid) IS NOT NULL OR (SELECT verificacion_at FROM tienda_pagos WHERE id = (v_r2 ->> 'pago_id')::uuid) IS NOT NULL THEN
+    RAISE EXCEPTION 'J1: se anotó en un pago la orden de otro';
+  END IF;
+  --     …ni se le puede «abandonar» con ella, ni sin ninguna (no habría qué vigilar).
+  IF tienda_pago_abandonar((v_r2 ->> 'pago_id')::uuid, 'ORDRETO21') OR tienda_pago_abandonar((v_r2 ->> 'pago_id')::uuid) THEN
+    RAISE EXCEPTION 'J1: se abandonó un pago sin orden propia';
+  END IF;
 
   -- J2) Ese pedido NO vence a los 5 minutos de nacer: espera al plazo de su pago…
   UPDATE delivery_pedidos SET created_at = now() - interval '8 minutes' WHERE id = v_g.pedido_id;
   UPDATE tienda_pagos SET cobro_pedido_at = now() - interval '8 minutes', vence_at = now() + interval '2 minutes' WHERE id = v_pago;
+  --     …mientras uno igual de viejo SIN verificación vence como siempre (la excepción es solo del reto).
+  UPDATE delivery_pedidos SET created_at = now() - interval '8 minutes' WHERE id = (v_r2 ->> 'pedido_id')::uuid;
+  UPDATE tienda_pagos SET vence_at = now() + interval '2 minutes' WHERE id = (v_r2 ->> 'pago_id')::uuid;
   PERFORM tienda_pagos_barrer();
   IF (SELECT estado FROM delivery_pedidos WHERE id = v_g.pedido_id) <> 'POR_PAGAR' OR pg_temp.pago_de(v_g.pedido_id) <> 'CREADO' THEN
     RAISE EXCEPTION 'J2: venció un pedido de 8 minutos cuyo pago está en verificación y en plazo';
   END IF;
-  --     …mientras, el barrido lo sigue tomando para consultar (así la función cancela la orden al pasar el plazo)…
+  IF (SELECT estado FROM delivery_pedidos WHERE id = (v_r2 ->> 'pedido_id')::uuid) <> 'EXPIRADO' OR pg_temp.pago_de((v_r2 ->> 'pedido_id')::uuid) <> 'VENCIDO' THEN
+    RAISE EXCEPTION 'J2: un pedido de 8 minutos sin verificación debía vencer, y su pago quedar VENCIDO';
+  END IF;
+  DELETE FROM delivery_pedidos WHERE id = (v_r2 ->> 'pedido_id')::uuid;
+  --     Mientras espera, el barrido lo sigue tomando para consultar (así se sabe si ya lo contestó).
   UPDATE tienda_pagos SET consultado_at = now() - interval '50 seconds' WHERE id = v_pago;
   IF NOT EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.tarea = 'CONCILIAR' AND t.id = v_pago AND t.orden_id_externo = 'ORDRETO21') THEN
     RAISE EXCEPTION 'J2: el pago en verificación no salió para consultarse';
   END IF;
-  --     …y con el plazo recién pasado todavía no: el margen es de la función, que cancela la orden y aplica el resultado.
-  UPDATE tienda_pagos SET vence_at = now() - interval '1 minute' WHERE id = v_pago;
-  PERFORM tienda_pagos_barrer();
-  IF (SELECT estado FROM delivery_pedidos WHERE id = v_g.pedido_id) <> 'POR_PAGAR' THEN RAISE EXCEPTION 'J2: venció dentro del margen de 2 minutos'; END IF;
 
-  -- J3) Un pedido igual de viejo SIN verificación vence como siempre (la excepción es solo para el reto).
-  v_r2 := pg_temp.pedir('4776660022', 22);
-  PERFORM tienda_pago_tomar_cobro((v_r2 ->> 'pago_id')::uuid);
-  UPDATE delivery_pedidos SET created_at = now() - interval '8 minutes' WHERE id = (v_r2 ->> 'pedido_id')::uuid;
-  UPDATE tienda_pagos SET vence_at = now() + interval '2 minutes' WHERE id = (v_r2 ->> 'pago_id')::uuid;
-  PERFORM tienda_pagos_barrer();
-  IF (SELECT estado FROM delivery_pedidos WHERE id = (v_r2 ->> 'pedido_id')::uuid) <> 'EXPIRADO' THEN RAISE EXCEPTION 'J3: un pedido de 8 minutos sin verificación no venció'; END IF;
-  IF (SELECT estado FROM delivery_pedidos WHERE id = v_g.pedido_id) <> 'POR_PAGAR' THEN RAISE EXCEPTION 'J3: el de la verificación venció con el otro'; END IF;
-  DELETE FROM delivery_pedidos WHERE id = (v_r2 ->> 'pedido_id')::uuid;
-
-  -- J4) El cliente contesta el reto dentro del plazo (minuto 8): el pago se aprueba y el pedido entra.
-  UPDATE tienda_pagos SET vence_at = now() + interval '2 minutes' WHERE id = v_pago;
+  -- J3) El cliente contesta el reto dentro del plazo (minuto 8): el pago se aprueba y el pedido entra.
   v_a := tienda_pago_aplicar(v_pago, 'APROBADO', 'ORDRETO21', 264.00, 'credit_card', 'master');
-  IF v_a ->> 'estado' <> 'APROBADO' OR v_a ->> 'pedido_estado' <> 'RECIBIDO' OR v_a -> 'recien_aprobado' <> 'true'::jsonb THEN RAISE EXCEPTION 'J4: aprobado tras el reto: %', v_a; END IF;
-  --     Ya aprobado, «verificación» no le hace nada.
+  IF v_a ->> 'estado' <> 'APROBADO' OR v_a ->> 'pedido_estado' <> 'RECIBIDO' OR v_a -> 'recien_aprobado' <> 'true'::jsonb THEN RAISE EXCEPTION 'J3: aprobado tras el reto: %', v_a; END IF;
+  --     Ya aprobado, ni «verificación» ni «abandonar» le hacen nada.
   v_ts := (SELECT vence_at FROM tienda_pagos WHERE id = v_pago);
   UPDATE tienda_pagos SET verificacion_at = NULL WHERE id = v_pago;
   PERFORM tienda_pago_verificacion(v_pago, 'ORDRETO21');
-  IF (SELECT verificacion_at FROM tienda_pagos WHERE id = v_pago) IS NOT NULL OR (SELECT vence_at FROM tienda_pagos WHERE id = v_pago) IS DISTINCT FROM v_ts THEN
-    RAISE EXCEPTION 'J4: la verificación tocó un pago que ya no espera';
+  IF tienda_pago_abandonar(v_pago) THEN RAISE EXCEPTION 'J3: se abandonó un pago aprobado'; END IF;
+  IF (SELECT verificacion_at FROM tienda_pagos WHERE id = v_pago) IS NOT NULL OR (SELECT vence_at FROM tienda_pagos WHERE id = v_pago) IS DISTINCT FROM v_ts
+     OR pg_temp.pago_de(v_g.pedido_id) <> 'APROBADO' OR (SELECT estado FROM delivery_pedidos WHERE id = v_g.pedido_id) <> 'RECIBIDO' THEN
+    RAISE EXCEPTION 'J3: algo tocó un pago que ya no espera';
   END IF;
 
-  -- J5) Reto abandonado: la función cancela la orden y aplica el rechazo → «sin pago» de inmediato
-  --     (no «confirmando»), y el pedido se puede descartar para que el cliente pague otra vez.
+  -- J4) Pasó NUESTRO plazo sin que nadie contestara: el barrido cierra el pedido sin pago y el pago
+  --     queda ABANDONADO (no VENCIDO): no se cobró nada, pero su orden sigue viva en Mercado Pago.
   v_r := pg_temp.pedir('4776660023', 23);
   v_pago := (v_r ->> 'pago_id')::uuid;
   PERFORM tienda_pago_tomar_cobro(v_pago);
   PERFORM tienda_pago_verificacion(v_pago, 'ORDRETO23');
-  --     Una orden que ya es de otro pago no se le anota a este (un renglón por orden)…
-  v_r2 := pg_temp.pedir('4776660024', 24);
-  PERFORM tienda_pago_tomar_cobro((v_r2 ->> 'pago_id')::uuid);
-  PERFORM tienda_pago_verificacion((v_r2 ->> 'pago_id')::uuid, 'ORDRETO23');
-  IF (SELECT orden_id_externo FROM tienda_pagos WHERE id = (v_r2 ->> 'pago_id')::uuid) IS NOT NULL OR (SELECT verificacion_at FROM tienda_pagos WHERE id = (v_r2 ->> 'pago_id')::uuid) IS NOT NULL THEN
-    RAISE EXCEPTION 'J5: se anotó en un pago la orden de otro';
+  UPDATE delivery_pedidos SET created_at = now() - interval '11 minutes' WHERE id = (v_r ->> 'pedido_id')::uuid;
+  UPDATE tienda_pagos SET cobro_pedido_at = now() - interval '11 minutes', vence_at = now() - interval '1 second' WHERE id = v_pago;
+  PERFORM tienda_pagos_barrer();
+  IF (SELECT estado FROM delivery_pedidos WHERE id = (v_r ->> 'pedido_id')::uuid) <> 'EXPIRADO' OR (SELECT estado FROM tienda_pagos WHERE id = v_pago) <> 'ABANDONADO' THEN
+    RAISE EXCEPTION 'J4: pasado el plazo, el pedido debía cerrarse y su pago quedar ABANDONADO (quedó % / %)',
+      (SELECT estado FROM delivery_pedidos WHERE id = (v_r ->> 'pedido_id')::uuid), (SELECT estado FROM tienda_pagos WHERE id = v_pago);
   END IF;
-  DELETE FROM delivery_pedidos WHERE id = (v_r2 ->> 'pedido_id')::uuid;
-  --     …y con la orden anotada el pedido ya no se descarta como «nunca hubo orden».
-  IF tienda_pago_descartar(v_pago) THEN RAISE EXCEPTION 'J5: se descartó un pedido con una orden viva esperando el reto'; END IF;
-  v_a := tienda_pago_aplicar(v_pago, 'RECHAZADO', 'ORDRETO23', 264.00, 'credit_card', 'master', 'canceled');
-  IF v_a ->> 'estado' <> 'RECHAZADO' OR v_a ->> 'pedido_estado' <> 'EXPIRADO' THEN RAISE EXCEPTION 'J5: reto cancelado: %', v_a; END IF;
+  --     Al cliente se le dice la verdad de hoy: no se completó la verificación y no se le cobró.
   v_seg := tienda_seguimiento(v_t, md5('pl-a23') || md5('pl-b23'));
-  IF v_seg ->> 'motivo' <> 'SIN_PAGO' OR v_seg ->> 'pago_estado' <> 'SIN_PAGO' THEN RAISE EXCEPTION 'J5: seguimiento de un reto cancelado: %', v_seg - 'renglones'; END IF;
-  IF (SELECT detalle FROM tienda_pagos WHERE id = v_pago) <> 'canceled' THEN RAISE EXCEPTION 'J5: no quedó el motivo del rechazo'; END IF;
-  IF NOT tienda_pago_descartar(v_pago) THEN RAISE EXCEPTION 'J5: el pedido de un reto cancelado no se pudo descartar'; END IF;
-  IF EXISTS (SELECT 1 FROM delivery_pedidos WHERE id = (v_r ->> 'pedido_id')::uuid) THEN RAISE EXCEPTION 'J5: descartado, pero el pedido sigue ahí'; END IF;
+  IF v_seg ->> 'estado' <> 'CANCELADO' OR v_seg ->> 'motivo' <> 'SIN_VERIFICAR' OR v_seg ->> 'pago_estado' <> 'SIN_PAGO' THEN RAISE EXCEPTION 'J4: seguimiento de un reto abandonado: %', v_seg - 'renglones'; END IF;
+  --     El pedido NO se descarta: su renglón es el que vigila la orden.
+  IF tienda_pago_descartar(v_pago) THEN RAISE EXCEPTION 'J4: se descartó un pedido con el reto abandonado y la orden viva'; END IF;
+  --     Y la cuenta de Mercado Pago no se puede desconectar mientras se vigila.
+  --     (En una cuenta aparte, para que no la ocupe otro pago del fixture.)
+  INSERT INTO tienda_conexiones (tenant_id, cuenta_id_externo, public_key, estado) VALUES (v_t, '910', 'APP_USR-smoke-reto-abandonado', 'ERROR') RETURNING id INTO v_cx;
+  UPDATE tienda_pagos SET conexion_id = v_cx WHERE id = v_pago;
+  IF tienda_conexion_ocupada(v_cx) IS DISTINCT FROM '{"motivo": "PENDIENTES"}'::jsonb THEN RAISE EXCEPTION 'J4: un reto abandonado y vivo debía ocupar la cuenta: %', tienda_conexion_ocupada(v_cx); END IF;
+  --     Ya sin vigilancia (su orden llegó a un final, o pasaron las 48 horas) deja de ocuparla.
+  UPDATE tienda_pagos SET conciliado_at = now() WHERE id = v_pago;
+  IF tienda_conexion_ocupada(v_cx) IS NOT NULL THEN RAISE EXCEPTION 'J4: un reto abandonado que ya no se vigila no debía ocupar la cuenta'; END IF;
+  UPDATE tienda_pagos SET conciliado_at = NULL WHERE id = v_pago;
 
-  -- J6) El respaldo: la función no pudo cancelar (Mercado Pago caído). Pasado plazo + margen el pedido
-  --     vence como cualquier otro, su pago queda VENCIDO, sale a conciliar y el cliente sigue
-  --     «confirmando» (nunca «no se te cobró» sin saberlo). Si acaba cobrado, llegó tarde: se devuelve.
+  -- J5) La vigilancia: cada 5 minutos la primera media hora, luego cada hora; nunca «sin aplicar».
+  UPDATE tienda_pagos SET consultado_at = NULL WHERE id = v_pago;
+  IF NOT EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.tarea = 'CONCILIAR' AND t.id = v_pago AND t.orden_id_externo = 'ORDRETO23') THEN RAISE EXCEPTION 'J5: el reto abandonado no salió para vigilarse'; END IF;
+  IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'J5: se volvió a tomar enseguida'; END IF;
+  UPDATE tienda_pagos SET consultado_at = now() - interval '4 minutes' WHERE id = v_pago;
+  IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'J5: se tomó a los 4 minutos'; END IF;
+  UPDATE tienda_pagos SET consultado_at = now() - interval '6 minutes' WHERE id = v_pago;
+  IF NOT EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'J5: a los 6 minutos tocaba'; END IF;
+  --     Mercado Pago contestó «sigue pendiente»: se cuenta, pero NO se da por conciliado ni suma fallos.
+  IF tienda_pago_conciliacion(v_pago, true) THEN RAISE EXCEPTION 'J5: una consulta buena no avisa'; END IF;
+  IF tienda_pago_conciliacion(v_pago, true) THEN RAISE EXCEPTION 'J5: una consulta buena no avisa'; END IF;
+  SELECT * INTO v_g FROM tienda_pagos WHERE id = v_pago;
+  IF v_g.conciliaciones <> 2 OR v_g.conciliado_at IS NOT NULL OR v_g.conciliacion_fallos <> 0 OR v_g.estado <> 'ABANDONADO' THEN
+    RAISE EXCEPTION 'J5: tras dos consultas buenas quedó conciliaciones %, conciliado %, fallos %, estado %', v_g.conciliaciones, v_g.conciliado_at, v_g.conciliacion_fallos, v_g.estado;
+  END IF;
+  --     Pasada la media hora, una vez por hora.
+  UPDATE tienda_pagos SET vence_at = now() - interval '31 minutes', consultado_at = now() - interval '6 minutes' WHERE id = v_pago;
+  IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'J5: pasada la media hora se siguió tomando cada 5 minutos'; END IF;
+  UPDATE tienda_pagos SET consultado_at = now() - interval '61 minutes' WHERE id = v_pago;
+  IF NOT EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.tarea = 'CONCILIAR' AND t.id = v_pago) THEN RAISE EXCEPTION 'J5: a la hora tocaba'; END IF;
+  --     Y el barrido llama a la función cuando a un reto abandonado le toca (aquí no hay pg_net: deja su rastro).
+  DELETE FROM tienda_eventos WHERE accion = 'barrido:sin_configurar';
+  UPDATE tienda_pagos SET proximo_intento_at = now() + interval '1 day' WHERE estado = 'POR_DEVOLVER';
+  UPDATE tienda_pagos SET conciliado_at = now() WHERE estado IN ('CREADO', 'VENCIDO') AND id <> v_pago;
+  UPDATE tienda_pagos SET consultado_at = now() - interval '6 minutes' WHERE id = v_pago;
+  PERFORM tienda_pagos_barrer();
+  IF NOT EXISTS (SELECT 1 FROM tienda_eventos WHERE accion = 'barrido:sin_configurar') THEN RAISE EXCEPTION 'J5: con un reto abandonado por vigilar, el barrido no quiso llamar a la función'; END IF;
+
+  -- J6) Dos pagos a la vez: el cliente dejó el reto y pagó de nuevo; después contesta el reto viejo.
+  --     El pedido válido es el del segundo intento; el primero llegó tarde y se devuelve. Un solo pedido.
+  v_r2 := pg_temp.pedir('4776660023', 24);
+  IF (v_r2 ->> 'pedido_id') = (v_r ->> 'pedido_id') THEN RAISE EXCEPTION 'J6: el segundo intento no creó su propio pedido'; END IF;
+  PERFORM tienda_pago_tomar_cobro((v_r2 ->> 'pago_id')::uuid);
+  v_a := tienda_pago_aplicar((v_r2 ->> 'pago_id')::uuid, 'APROBADO', 'ORDNUEVA24', 264.00, 'credit_card', 'master');
+  IF v_a ->> 'estado' <> 'APROBADO' OR v_a ->> 'pedido_estado' <> 'RECIBIDO' THEN RAISE EXCEPTION 'J6: el segundo intento no quedó pagado: %', v_a; END IF;
+  v_a := tienda_pago_aplicar(v_pago, 'APROBADO', 'ORDRETO23', 264.00, 'credit_card', 'master');
+  IF v_a ->> 'estado' <> 'POR_DEVOLVER' OR v_a ->> 'pedido_estado' <> 'EXPIRADO' OR v_a -> 'recien_aprobado' <> 'false'::jsonb THEN RAISE EXCEPTION 'J6: el reto contestado tarde debía ir a devolverse: %', v_a; END IF;
+  IF (SELECT count(*) FROM delivery_pedidos WHERE id IN ((v_r ->> 'pedido_id')::uuid, (v_r2 ->> 'pedido_id')::uuid) AND pagado_at IS NOT NULL) <> 1
+     OR (SELECT estado FROM delivery_pedidos WHERE id = (v_r2 ->> 'pedido_id')::uuid) <> 'RECIBIDO'
+     OR pg_temp.pago_de((v_r2 ->> 'pedido_id')::uuid) <> 'APROBADO' THEN
+    RAISE EXCEPTION 'J6: con dos pagos, tiene que quedar UN pedido pagado: el del segundo intento';
+  END IF;
+  --     El cliente lee que se le devuelve, y el barrido lo toma para devolver (pasado el minuto).
+  v_seg := tienda_seguimiento(v_t, md5('pl-a23') || md5('pl-b23'));
+  IF v_seg ->> 'pago_estado' <> 'DEVOLUCION_EN_PROCESO' OR v_seg ->> 'motivo' <> 'SIN_PAGO' THEN RAISE EXCEPTION 'J6: seguimiento del reto contestado tarde: %', v_seg - 'renglones'; END IF;
+  UPDATE tienda_pagos SET aprobado_at = now() - interval '61 seconds' WHERE id = v_pago;
+  IF NOT EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.tarea = 'DEVOLVER' AND t.id = v_pago AND t.orden_id_externo = 'ORDRETO23') THEN RAISE EXCEPTION 'J6: el pago tardío no salió para devolverse'; END IF;
+  DELETE FROM delivery_pedidos WHERE id IN ((v_r ->> 'pedido_id')::uuid, (v_r2 ->> 'pedido_id')::uuid);
+
+  -- J7) «Cancelar»: el cliente deja el reto dentro del plazo. Mismo final, en el acto y sin Mercado Pago.
   v_r := pg_temp.pedir('4776660025', 25);
   v_pago := (v_r ->> 'pago_id')::uuid;
   PERFORM tienda_pago_tomar_cobro(v_pago);
   PERFORM tienda_pago_verificacion(v_pago, 'ORDRETO25');
-  UPDATE delivery_pedidos SET created_at = now() - interval '13 minutes' WHERE id = (v_r ->> 'pedido_id')::uuid;
-  UPDATE tienda_pagos SET cobro_pedido_at = now() - interval '13 minutes', vence_at = now() - interval '3 minutes' WHERE id = v_pago;
-  PERFORM tienda_pagos_barrer();
-  IF (SELECT estado FROM delivery_pedidos WHERE id = (v_r ->> 'pedido_id')::uuid) <> 'EXPIRADO' OR (SELECT estado FROM tienda_pagos WHERE id = v_pago) <> 'VENCIDO' THEN
-    RAISE EXCEPTION 'J6: pasado el plazo y el margen, el pedido en verificación debía vencer';
+  UPDATE tienda_pagos SET conciliaciones = 3, consultado_at = now() WHERE id = v_pago;
+  IF NOT tienda_pago_abandonar(v_pago) THEN RAISE EXCEPTION 'J7: no se pudo dejar un reto vivo'; END IF;
+  SELECT * INTO v_g FROM tienda_pagos WHERE id = v_pago;
+  IF v_g.estado <> 'ABANDONADO' OR v_g.orden_id_externo <> 'ORDRETO25' OR v_g.vence_at <> now() OR v_g.conciliaciones <> 0 OR v_g.consultado_at IS NOT NULL OR v_g.conciliado_at IS NOT NULL
+     OR (SELECT estado FROM delivery_pedidos WHERE id = v_g.pedido_id) <> 'EXPIRADO' OR (SELECT motivo_cancelacion FROM delivery_pedidos WHERE id = v_g.pedido_id) <> 'Sin pago' THEN
+    RAISE EXCEPTION 'J7: el reto que dejó el cliente quedó % (vence %, conciliaciones %)', v_g.estado, v_g.vence_at, v_g.conciliaciones;
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.tarea = 'CONCILIAR' AND t.id = v_pago) THEN RAISE EXCEPTION 'J6: el pago vencido en verificación no salió para conciliar'; END IF;
-  v_seg := tienda_seguimiento(v_t, md5('pl-a25') || md5('pl-b25'));
-  IF v_seg ->> 'pago_estado' <> 'POR_CONFIRMAR' THEN RAISE EXCEPTION 'J6: vencido con la orden sin cancelar, el seguimiento dijo %', v_seg ->> 'pago_estado'; END IF;
+  IF tienda_pago_abandonar(v_pago) THEN RAISE EXCEPTION 'J7: se abandonó dos veces'; END IF;
+  IF (tienda_seguimiento(v_t, md5('pl-a25') || md5('pl-b25')) ->> 'motivo') <> 'SIN_VERIFICAR' THEN RAISE EXCEPTION 'J7: el seguimiento no dice que no se completó la verificación'; END IF;
+  --     Puede pagar otra vez enseguida: el pedido cerrado no le estorba.
+  v_r2 := pg_temp.pedir('4776660025', 26);
+  IF (v_r2 ->> 'pedido_id') = (v_r ->> 'pedido_id') OR (SELECT estado FROM delivery_pedidos WHERE id = (v_r2 ->> 'pedido_id')::uuid) <> 'POR_PAGAR' THEN RAISE EXCEPTION 'J7: tras dejar el reto no pudo pedir de nuevo'; END IF;
+  DELETE FROM delivery_pedidos WHERE id = (v_r2 ->> 'pedido_id')::uuid;
+
+  -- J8) La orden del reto abandonado acaba SIN cobrarse (fallida, cancelada o vencida allá): se da por
+  --     conciliado y deja de vigilarse. El pedido ya estaba cerrado.
+  v_a := tienda_pago_aplicar(v_pago, 'RECHAZADO', 'ORDRETO25', 264.00, 'credit_card', 'master', 'expired');
+  SELECT * INTO v_g FROM tienda_pagos WHERE id = v_pago;
+  IF v_g.estado <> 'ABANDONADO' OR v_g.conciliado_at IS NULL OR v_g.detalle <> 'expired' OR v_a ->> 'pedido_estado' <> 'EXPIRADO' THEN
+    RAISE EXCEPTION 'J8: el final sin cobro de un reto abandonado: estado %, conciliado %, detalle %', v_g.estado, v_g.conciliado_at, v_g.detalle;
+  END IF;
+  UPDATE tienda_pagos SET consultado_at = NULL WHERE id = v_pago;
+  IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'J8: se siguió vigilando un reto ya cerrado'; END IF;
+  IF (tienda_seguimiento(v_t, md5('pl-a25') || md5('pl-b25')) ->> 'pago_estado') <> 'SIN_PAGO' THEN RAISE EXCEPTION 'J8: el seguimiento dejó de decir que no se cobró'; END IF;
+  --     …pero si Mercado Pago avisara después que SÍ se cobró, se devuelve igual.
   v_a := tienda_pago_aplicar(v_pago, 'APROBADO', 'ORDRETO25', 264.00, 'credit_card', 'master');
-  IF v_a ->> 'estado' <> 'POR_DEVOLVER' OR v_a ->> 'pedido_estado' <> 'EXPIRADO' THEN RAISE EXCEPTION 'J6: un reto contestado después de vencer: %', v_a; END IF;
+  IF v_a ->> 'estado' <> 'POR_DEVOLVER' THEN RAISE EXCEPTION 'J8: un cobro que aparece después de cerrarse debía devolverse: %', v_a; END IF;
+  DELETE FROM delivery_pedidos WHERE id = (v_r ->> 'pedido_id')::uuid;
+
+  -- J9) A las 48 horas con la orden todavía pendiente: sale UNA vez como RETO_VIEJO (para el aviso a
+  --     VIM) y deja de vigilarse; ya no ocupa la cuenta.
+  v_r := pg_temp.pedir('4776660027', 27);
+  v_pago := (v_r ->> 'pago_id')::uuid;
+  PERFORM tienda_pago_tomar_cobro(v_pago);
+  PERFORM tienda_pago_verificacion(v_pago, 'ORDRETO27');
+  PERFORM tienda_pago_abandonar(v_pago);
+  UPDATE tienda_pagos SET vence_at = now() - interval '47 hours', consultado_at = now() - interval '2 hours' WHERE id = v_pago;
+  IF NOT EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.tarea = 'CONCILIAR' AND t.id = v_pago) THEN RAISE EXCEPTION 'J9: a las 47 horas se seguía vigilando'; END IF;
+  UPDATE tienda_pagos SET vence_at = now() - interval '49 hours', consultado_at = now() - interval '2 hours' WHERE id = v_pago;
+  IF (SELECT count(*) FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago AND t.tarea = 'RETO_VIEJO' AND t.orden_id_externo = 'ORDRETO27') <> 1 THEN RAISE EXCEPTION 'J9: a las 49 horas debía salir como RETO_VIEJO'; END IF;
+  IF EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = v_pago) THEN RAISE EXCEPTION 'J9: el aviso de las 48 horas salió dos veces'; END IF;
+  IF (SELECT conciliado_at FROM tienda_pagos WHERE id = v_pago) IS NULL OR (SELECT estado FROM tienda_pagos WHERE id = v_pago) <> 'ABANDONADO' THEN RAISE EXCEPTION 'J9: tras las 48 horas debía darse por conciliado'; END IF;
+  DELETE FROM delivery_pedidos WHERE id = (v_r ->> 'pedido_id')::uuid;
+
+  -- J10) Un pago que VENCIÓ sin que nadie anotara que su orden esperaba un reto: al descubrirlo pasa a
+  --      vigilarse como abandonado (con la orden que se le encontró), en vez de conciliarse a la hora.
+  v_r := pg_temp.pedir('4776660028', 28);
+  v_pago := (v_r ->> 'pago_id')::uuid;
+  PERFORM tienda_pago_tomar_cobro(v_pago);
+  UPDATE delivery_pedidos SET created_at = now() - interval '6 minutes' WHERE id = (v_r ->> 'pedido_id')::uuid;
+  PERFORM tienda_pagos_barrer();
+  IF (SELECT estado FROM tienda_pagos WHERE id = v_pago) <> 'VENCIDO' THEN RAISE EXCEPTION 'J10 (fixture): debía vencer'; END IF;
+  UPDATE tienda_pagos SET conciliaciones = 1 WHERE id = v_pago;
+  v_ts := (SELECT vence_at FROM tienda_pagos WHERE id = v_pago);
+  IF NOT tienda_pago_abandonar(v_pago, 'ORDRETO28') THEN RAISE EXCEPTION 'J10: un vencido con su orden esperando un reto debía poder vigilarse'; END IF;
+  SELECT * INTO v_g FROM tienda_pagos WHERE id = v_pago;
+  IF v_g.estado <> 'ABANDONADO' OR v_g.orden_id_externo <> 'ORDRETO28' OR v_g.conciliaciones <> 0 OR v_g.vence_at IS DISTINCT FROM v_ts OR v_g.verificacion_at IS NULL THEN
+    RAISE EXCEPTION 'J10: el vencido que pasó a abandonado quedó %, orden %, conciliaciones %', v_g.estado, v_g.orden_id_externo, v_g.conciliaciones;
+  END IF;
   DELETE FROM delivery_pedidos WHERE id = (v_r ->> 'pedido_id')::uuid;
 
   -- ── H) Permisos ─────────────────────────────────────────────────────────────────────────────
   FOR r IN SELECT p.oid::regprocedure AS firma, p.proname FROM pg_proc p
             WHERE p.pronamespace = 'public'::regnamespace
-              AND p.proname IN ('tienda_guardar_tokens', 'tienda_leer_tokens', 'tienda_borrar_tokens', 'tienda_pago_pausar', 'tienda_pago_anotar', 'tienda_pago_verificacion',
+              AND p.proname IN ('tienda_guardar_tokens', 'tienda_leer_tokens', 'tienda_borrar_tokens', 'tienda_pago_pausar', 'tienda_pago_anotar', 'tienda_pago_verificacion', 'tienda_pago_abandonar',
                                 'tienda_conexiones_por_renovar', 'tienda_pedir_renovacion', 'tienda_conexion_tomar_renovacion',
                                 'tienda_conexion_renovacion_fallida', 'tienda_conexion_ocupada',
                                 'tienda_conexion_cobro', 'tienda_crear_pedido', 'tienda_pago_tomar_cobro', 'tienda_pago_descartar',

@@ -222,15 +222,15 @@ const FAMILIAS: Record<string, MotivoDeRechazo> = {
   // VERIFICADO (12 oct 2026, titular de prueba APRO con 3DS encendido): el cliente contestó el reto
   // de su banco y el banco no lo autenticó. La orden queda `failed` y el pago trae este motivo.
   "3ds_challenge_failed": "VERIFICACION",
-  // No son motivos de Mercado Pago: es el ESTADO de una orden que no se llegó a cobrar porque el
-  // reto no se contestó (la cancelamos al pasar el plazo, la canceló el cliente, o venció allá).
-  // `decidirOrden` los pone como detalle. No es un rechazo de la tarjeta: no cuenta para ningún tope.
+  // No son motivos de Mercado Pago: es el ESTADO de una orden que acabó sin cobrarse porque el reto
+  // no se contestó (venció allá, o se dejó cancelar). `decidirOrden` los pone como detalle. No es un
+  // rechazo de la tarjeta: no cuenta para ningún tope.
   canceled: "SIN_VERIFICAR",
   expired: "SIN_VERIFICAR",
 };
 /**
  * ¿Ese motivo cuenta como una tarjeta rechazada para los topes contra la prueba masiva de tarjetas?
- *   · SIN_VERIFICAR (reto abandonado, cancelado o vencido): no. Nadie dijo que no a esa tarjeta.
+ *   · SIN_VERIFICAR (el reto se dejó: lo canceló el cliente o pasó el plazo): no. Nadie dijo que no a esa tarjeta.
  *   · VERIFICACION (el banco no autenticó al cliente en el reto): para la IP que lo intentó, sí; para
  *     pausar el pago del negocio, no (`soloIp`). Quien prueba tarjetas robadas no pasa un reto, así que
  *     se frena solo con el tope de su IP; y a un comensal que se equivoca con el código de su banco no
@@ -426,8 +426,11 @@ export function clienteMpTienda(token: string, pedir: typeof fetch = fetch) {
      * orden ya está devuelta: eso, y no la llave, es lo que evita devolver dos veces.
      */
     /**
-     * Cancela una orden que Mercado Pago abrió y no procesó. VERIFICADO (11 oct 2026): solo se deja en
-     * `created` o `action_required`; con `processing` contesta 409 `cannot_cancel_order`.
+     * Cancela una orden que Mercado Pago abrió y no procesó. VERIFICADO: una `created` se deja (11 oct
+     * 2026); con `processing` o `processed` contesta 409 `cannot_cancel_order`; y una que espera el
+     * reto del banco (`action_required` / `pending_challenge`) NO se deja, diga lo que diga el
+     * mensaje de ese 409: contesta 422 `unprocessable_content` recién creada y a los 40 minutos (12 y
+     * 13 oct 2026). Para un reto, cancelar es un intento que casi nunca sale, no un camino.
      */
     cancelarOrden: (ordenIdExterno: string, llave: string) => llamar("POST", `/v1/orders/${encodeURIComponent(ordenIdExterno)}/cancel`, undefined, llave),
     devolver: (ordenIdExterno: string, llave: string) => llamar("POST", `/v1/orders/${encodeURIComponent(ordenIdExterno)}/refund`, undefined, llave),
