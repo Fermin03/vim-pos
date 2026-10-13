@@ -2,8 +2,8 @@
 // Nunca lanza: cada llamada devuelve `ok` con los datos ya validados, o `error` con un código (para
 // `textoDeError`) y su detalle. Un 200 que no tiene la forma del contrato es un error, no datos.
 import {
-  cotizacionDe, cuentaDe, direccionesDe, errorDe, FORMA_CODIGO, miCuentaDe, okDe, pedidoDe, pedidosDe, registroDe, seguimientoDe,
-  type Cotizacion, type Cuenta, type DireccionGuardada, type MiCuenta, type Pago, type PedidoCreado, type PedidoDeCuenta, type Registro, type Seguimiento,
+  cotizacionDe, cuentaDe, direccionesDe, errorDe, FORMA_CODIGO, miCuentaDe, okDe, pedidoDe, pedidosDe, registroDe, seguimientoDe, verificacionDe,
+  type Cotizacion, type Cuenta, type DireccionGuardada, type MiCuenta, type Pago, type PedidoCreado, type PedidoDeCuenta, type Registro, type Seguimiento, type Verificacion,
 } from "./contrato";
 import type { CuerpoCarrito } from "./carrito";
 import type { TarjetaDePedido } from "./tarjeta";
@@ -92,6 +92,15 @@ export function seguimiento(negocio: string, codigo: string, signal?: AbortSigna
  */
 export function confirmarPago(negocio: string, codigo: string, signal?: AbortSignal): Promise<Resultado<Seguimiento>> {
   return llamar({ accion: "confirmar_pago", negocio, codigo }, seguimientoDe, LECTURA, signal);
+}
+
+/**
+ * Cómo va la verificación del banco (3D Secure) del pago de ese pedido: el servidor le pregunta a
+ * Mercado Pago. `cancelar`: el cliente abandona el reto y pide que la orden se cancele. Con
+ * `PAGO_RECHAZADO` (y su `detalle`) no se cobró nada y el pedido se descartó.
+ */
+export function verificacion(negocio: string, codigo: string, cancelar: boolean, signal?: AbortSignal): Promise<Resultado<Verificacion>> {
+  return llamar({ accion: "verificacion", negocio, codigo, ...(cancelar && { cancelar: true }) }, verificacionDe, LECTURA, signal);
 }
 
 /** Lo que el servidor sabe de una clave de intento: si ya hay pedido para ella y, si lo hay, su código de seguimiento. */

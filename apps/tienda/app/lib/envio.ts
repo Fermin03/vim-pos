@@ -4,16 +4,23 @@
 // si el pedido ya había entrado, el servidor devuelve ese mismo en vez de crear otro.
 import type { Resultado } from "./api";
 import type { Campo } from "./cliente";
-import type { Cotizacion, ErrorDeTienda, PedidoCreado } from "./contrato";
+import type { Cotizacion, ErrorDeTienda, PedidoCreado, Verificacion } from "./contrato";
 import type { Horario } from "@vim/fecha";
 import type { Momento } from "./horario";
 import { almacenDelNavegador, type Almacen } from "./carrito";
 import { textoDeRechazo, type CampoDeTarjeta } from "./tarjeta";
 import { textoCerrada, textoDeError } from "./textos";
+import { pasoDelReto } from "./verificacion";
 
 export type Desenlace =
   /** El pedido existe (también si vino sin folio ni total): vaciar el carrito e ir al seguimiento. */
   | { tipo: "hecho"; codigo: string }
+  /**
+   * El banco quiere confirmar el pago con el cliente (3D Secure) antes de cobrar. El pedido existe,
+   * pero NO está pagado ni rechazado: la pantalla de la tarjeta abre el reto (`url`, o lo que diga el
+   * servidor si no vino) y el intento sigue en duda hasta saber cómo acabó.
+   */
+  | { tipo: "verificar"; codigo: string; url: string | null }
   /**
    * La tarjeta: un dato que no cuadra o el banco no aprobó el cobro. No se creó ningún pedido y no
    * se cobró nada: se dice junto a la tarjeta (en su campo, si el motivo es de uno) y se puede
@@ -99,6 +106,8 @@ export async function enviarPedido(d: {
     pidio = true;
     const r = await d.pedir(cot.datos.total_mxn);
     if (!r.ok) return { desenlace: desenlaceDelError(r, c), pidio, error: r.error };
+    // El banco pide confirmar: todavía no hay cobro ni pedido para el restaurante. No es «hecho».
+    if (r.datos.pago?.estado === "VERIFICACION") return { desenlace: { tipo: "verificar", codigo: r.datos.codigo, url: r.datos.pago.url }, pidio, error: null };
     // Pagado, o «no se supo si el cobro pasó»: en los dos casos el pedido existe y su página dice cómo va.
     return { desenlace: { tipo: "hecho", codigo: r.datos.codigo }, pidio, error: null };
   } catch {
@@ -275,27 +284,45 @@ const SIN_PEDIDO_NI_COBRO = new Set(["PAGO_RECHAZADO", "PAGO_NO_PROCESADO", "PAG
 export const pruebaQueNoHuboCobro = (error: string): boolean => SIN_PEDIDO_NI_COBRO.has(error);
 
 export type Duda =
-  /** No había duda, o el servidor confirmó que no hay pedido ni cobro: se puede intentar de nuevo. */
-  | { tipo: "libre" }
+  /**
+   * No había duda, o el servidor confirmó que no hay pedido ni cobro: se puede intentar de nuevo.
+   * `rechazo`: el pedido existía esperando el reto del banco y el pago no pasó; la familia del motivo.
+   */
+  | { tipo: "libre"; rechazo?: string | null }
   /** El pedido sí había entrado: a su página, que dice cómo va el pago. */
   | { tipo: "hecho"; codigo: string }
+  /** El pedido existe y su pago sigue esperando el reto del banco: se continúa ese reto (la duda sigue). */
+  | { tipo: "verificar"; codigo: string; url: string | null }
   /** No se pudo preguntar: sigue sin saberse. El formulario sigue bloqueado. */
   | { tipo: "duda" };
 
 /**
  * Resuelve un intento de pago en duda preguntándole al servidor por su clave (`intento`, que no crea
  * ni cobra nada). Solo libera el formulario con un «no existe» del servidor; si no contesta, la duda sigue.
+ * Si el pedido existe y se puede preguntar por su verificación (`verificar`): con el reto del banco
+ * todavía vivo se continúa ese reto, en vez de mandar al cliente a esperar en la página del pedido; y
+ * si ese pago ya no pasó (el servidor descartó el pedido), el formulario queda libre.
  */
 export async function resolverDuda(
   intento: Pick<ReturnType<typeof intentoDeCompra>, "enDuda" | "aclarar" | "cerrar">,
   preguntar: (clave: string) => Promise<{ ok: true; datos: { existe: false } | { existe: true; codigo: string } } | { ok: false }>,
+  verificar?: (codigo: string) => Promise<Resultado<Verificacion>>,
 ): Promise<Duda> {
   const clave = intento.enDuda();
   if (!clave) return { tipo: "libre" };
   let r: Awaited<ReturnType<typeof preguntar>>;
   try { r = await preguntar(clave); } catch { return { tipo: "duda" }; }
   if (!r.ok) return { tipo: "duda" };
-  if (r.datos.existe) { intento.cerrar(); return { tipo: "hecho", codigo: r.datos.codigo }; }
+  if (r.datos.existe) {
+    const { codigo } = r.datos;
+    let paso: ReturnType<typeof pasoDelReto> = { tipo: "pedido" };
+    // Si no se puede preguntar, lo de siempre: a la página del pedido, que dice cómo va.
+    if (verificar) { try { paso = pasoDelReto(await verificar(codigo)); } catch { /* como si no hubiera contestado */ } }
+    if (paso.tipo === "sigue") return { tipo: "verificar", codigo, url: paso.url };
+    if (paso.tipo === "rechazado") { intento.aclarar(); return { tipo: "libre", rechazo: paso.detalle }; }
+    intento.cerrar();
+    return { tipo: "hecho", codigo };
+  }
   intento.aclarar();
   return { tipo: "libre" };
 }

@@ -114,7 +114,9 @@ export async function POST(req: Request): Promise<Response> {
   const deCuenta = typeof accion === "string" ? DE_CUENTA.get(accion) : undefined;
   // `confirmar_pago` es el seguimiento de un pedido que se paga en línea: lleva lo mismo (el código) y nada más.
   // Lo que Mercado Pago le puso a la URL al regresar al cliente (`status`, `payment_id`…) no pasa de aquí.
-  const deSeguimiento = accion === "seguimiento" || accion === "confirmar_pago";
+  // `verificacion` es lo mismo durante el reto del banco (3D Secure): el código y, si el cliente
+  // abandona el reto, `cancelar: true` escrito tal cual. Lo que diga la página del reto no pasa de aquí.
+  const deSeguimiento = accion === "seguimiento" || accion === "confirmar_pago" || accion === "verificacion";
   if (!deCuenta && accion !== "cotizar" && accion !== "pedir" && accion !== "intento" && !deSeguimiento) return rechazo("ACCION_INVALIDA");
   if (typeof negocio !== "string" || !FORMA_SLUG.test(negocio)) return rechazo("NEGOCIO_INVALIDO");
 
@@ -139,7 +141,7 @@ export async function POST(req: Request): Promise<Response> {
     limpio = { accion, negocio, clave: cuerpo.clave };
   } else if (deSeguimiento) {
     if (typeof cuerpo.codigo !== "string" || !FORMA_CODIGO.test(cuerpo.codigo)) return rechazo("CODIGO_INVALIDO");
-    limpio = { accion, negocio, codigo: cuerpo.codigo };
+    limpio = { accion, negocio, codigo: cuerpo.codigo, ...(accion === "verificacion" && cuerpo.cancelar === true && { cancelar: true }) };
   } else {
     const { items } = cuerpo;
     if (!Array.isArray(items) || items.length < 1 || items.length > MAX_RENGLONES || !items.every(esObj)) return rechazo("CARRITO_INVALIDO");

@@ -250,6 +250,18 @@ describe("POST /api/tienda", () => {
     expect(cuerpoEnviado()).toEqual({ accion: "confirmar_pago", negocio: "knockout", codigo: CODIGO });
     expect((await pedir({ accion: "confirmar_pago", negocio: "knockout", codigo: "corto" })).status).toBe(400);
   });
+  it("verificacion: pasa el código y, solo si viene escrito tal cual, cancelar; nada de lo que diga la página del reto", async () => {
+    responder = () => json({ pago: { estado: "VERIFICACION" } });
+    await pedir({ accion: "verificacion", negocio: "knockout", codigo: CODIGO, status: "COMPLETE", url: "https://evil.example", pago: { estado: "PAGADO" } });
+    expect(cuerpoEnviado()).toEqual({ accion: "verificacion", negocio: "knockout", codigo: CODIGO });
+    await pedir({ accion: "verificacion", negocio: "knockout", codigo: CODIGO, cancelar: true });
+    expect(cuerpoEnviado(1)).toEqual({ accion: "verificacion", negocio: "knockout", codigo: CODIGO, cancelar: true });
+    for (const [i, cancelar] of ["true", 1, {}, null].entries()) {
+      await pedir({ accion: "verificacion", negocio: "knockout", codigo: CODIGO, cancelar });
+      expect(cuerpoEnviado(2 + i)).toEqual({ accion: "verificacion", negocio: "knockout", codigo: CODIGO });
+    }
+    expect((await pedir({ accion: "verificacion", negocio: "knockout", codigo: "corto", cancelar: true })).status).toBe(400);
+  });
   it("pedir en línea: pasa la propina (el porcentaje o «otro monto»), y nada que parezca un total a cobrar", async () => {
     responder = () => json({ ok: true });
     await pedir({ ...cotizar, accion: "pedir", pago: "EN_LINEA", propina_pct: 15, propina_mxn: "25.00", total_a_pagar_mxn: "1.00", cliente: { nombre: "Ana", telefono: "4771112233" } });

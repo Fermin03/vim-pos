@@ -69,6 +69,21 @@ export function textoDeSeguimiento(p: Pick<Seguimiento, "estado" | "motivo" | "e
   return { titulo: "Cancelado", apoyo: `${motivo} ${dinero} ${PLAZO_DE_DEVOLUCION}`, alerta: true };
 }
 
+// ── La verificación del banco (3D Secure), en la pantalla de la tarjeta ──────────────────────────
+// TEXTOS PROVISIONALES (James). No prometen tiempos. Lo que pasa si el banco no lo confirma, si se
+// cancela o si vence está con los demás rechazos de la tarjeta (`textoDeRechazo`, tarjeta.ts).
+export const RETO = {
+  titulo: "Confirma el pago con tu banco",
+  apoyo: "Tu banco quiere comprobar que eres tú. Sigue los pasos de aquí abajo para terminar tu pago.",
+  /** El nombre del marco, para quien no ve la pantalla. */
+  marco: "Verificación de tu banco",
+  cargando: "Cargando la verificación de tu banco…",
+  cancelar: "Cancelar",
+  /** El reto ya terminó (o se pidió cancelarlo) y falta que Mercado Pago diga cómo quedó. */
+  confirmando: "Confirmando tu pago",
+  noPagues: "Estamos confirmando tu pago. No vuelvas a pagar todavía: en un momento te decimos qué pasó.",
+} as const;
+
 // ── Formas de pago («¿Cómo pagas?») ──────────────────────────────────────────────────────────────
 /**
  * El nombre de una forma de pago. Cuando también se ofrece pagar en línea, las otras dos dicen que

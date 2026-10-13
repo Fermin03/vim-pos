@@ -16,8 +16,12 @@ const MERCADO_PAGO = {
   // sdk: MercadoPago.js. www.mercadopago.com: su script de seguridad (`/v2/security.js`), que calcula la
   // huella del dispositivo; sin él no hay `MP_DEVICE_SESSION_ID` que mandar con el cobro.
   script: ["https://sdk.mercadopago.com", "https://www.mercadopago.com"],
-  // Los tres campos de tarjeta son iframes servidos desde aquí.
-  frame: ["https://api.mercadopago.com", "https://api-static.mercadopago.com", "https://secure-fields.mercadopago.com"],
+  // Los tres campos de tarjeta son iframes servidos desde aquí. www.mercadopago.com.mx: la página del
+  // reto del banco (3D Secure), que se abre en un marco en la pantalla de la tarjeta. VERIFICADO (12
+  // oct 2026): Mercado Pago la sirve desde ese origen y es el único que hace falta aquí; lo que esa
+  // página carga por dentro (el marco anidado del banco, sus scripts) lo gobierna SU política, no la
+  // nuestra. Es la misma lista cerrada de `HOSTS_DEL_RETO` (app/lib/verificacion.ts): si cambia una, cambia la otra.
+  frame: ["https://api.mercadopago.com", "https://api-static.mercadopago.com", "https://secure-fields.mercadopago.com", "https://www.mercadopago.com.mx"],
   // api.mercadopago: marca y banco de la tarjeta, el token y el registro del dispositivo (`/v1/devices`,
   // `/v1/device_sessions`). secure-fields: los campos. www.mercadolibre y api.mercadolibre (`/tracks`):
   // la huella del dispositivo que Mercado Pago usa contra el fraude.
