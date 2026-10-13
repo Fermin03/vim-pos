@@ -42,8 +42,8 @@ pedido `POR_PAGAR` (invisible para la caja) y cobra en la misma petición, con
 
 `detalle` ∈ `FONDOS` (`insufficient_amount`), `DATOS` (`bad_filled_card_data`: código y fecha no se
 distinguen), `LLAMAR_BANCO`, `TARJETA_DESHABILITADA`, `RIESGO` (`high_risk`), `VERIFICACION`
-(`3ds_challenge_failed`: el banco no confirmó el reto), `SIN_VERIFICAR` (el reto no se contestó: se
-canceló o venció), `OTRO`.
+(`3ds_challenge_failed`: el banco no confirmó el reto), `SIN_VERIFICAR` (el reto se dejó: lo canceló
+el cliente o pasó el plazo), `OTRO`.
 
 ## La verificación del banco (3D Secure)
 
@@ -66,26 +66,51 @@ liability_shift: "required" }`: cuando el antifraude de Mercado Pago duda, en ve
   gasta de la bolsa de cupo de `confirmar_pago`.
 - **El resultado lo dicen el aviso de órdenes y la consulta** (`confirmarPago`, el camino de
   siempre): `processed` / `accredited` verificado → `RECIBIDO` y correo; `failed` → rechazo.
-- **Plazo: 10 minutos desde que se mandó el cobro** (migración 0175; los 5 de siempre son para un
-  cobro que Mercado Pago no contestó, donde el cliente no tiene que hacer nada; aquí tiene que
-  abrir la aplicación de su banco). Al pasar, quien consulte la orden —el barrido, la página o el
-  aviso— la **cancela** en Mercado Pago y aplica lo que quede: cancelada → el pedido se cierra «sin
-  pago» de inmediato; cobrada en el último segundo → pagado. Si no se deja cancelar, cuenta como
-  consulta fallida (al tercer fallo, correo a VIM) y a los 12 minutos la base vence el pedido como
-  cualquier otro. No depende del plazo de Mercado Pago, que no vence pronto un reto abandonado.
-- **«Cancelar»** (`verificacion` con `cancelar: true`) cancela la orden en el acto. La tienda solo
-  deja pagar otra vez cuando el servidor confirma que quedó cancelada; mientras, «Confirmando tu
-  pago».
+- **Un reto pendiente NO se puede cancelar en Mercado Pago (422) y sigue vivo al menos 45 minutos**
+  (documento 04). Todo lo de «dejar el reto» se hace de NUESTRO lado y no depende de Mercado Pago:
+  - **«Cancelar»** (`verificacion` con `cancelar: true`): antes se mira la orden (si el cliente ya
+    la había contestado, está cobrada y se le da su pedido); si sigue pendiente, el pedido se
+    cierra «sin pago» y se contesta 409 `SIN_VERIFICAR` **en el acto**: el cliente paga otra vez
+    enseguida, con otra clave, otro pedido y otra orden. No hay espera ni «Confirmando tu pago».
+  - **Plazo: 10 minutos desde que se mandó el cobro** (los 5 de siempre son para un cobro que
+    Mercado Pago no contestó, donde el cliente no tiene que hacer nada; aquí tiene que abrir la
+    aplicación de su banco). Al pasar, el barrido de la base hace lo mismo que «Cancelar», solo.
+  - **El pago de ese intento queda `ABANDONADO`** (estado nuevo, migración 0175): «el reto se dejó
+    y su orden sigue viva en Mercado Pago». El pedido **no se borra**: ese renglón es el que sabe
+    qué orden vigilar.
+  - **Se vigila hasta que la orden llegue a un final**: el barrido la consulta cada 5 minutos la
+    primera media hora y después cada hora, hasta 48 horas (y el aviso de órdenes entra por el
+    mismo camino). Si aparece **cobrada** —el cliente contestó tarde, quizá en otra pestaña— es un
+    pago que llegó tarde: **se devuelve entero**, con la regla y las esperas de siempre. Si acaba
+    `failed`, `canceled` o `expired`, se da por conciliado. Mientras siga pendiente **no** es
+    «posible cobro sin pedido» (no hay cobro): no suma fallos ni manda correos. Si a las 48 horas
+    sigue pendiente, un único correo a VIM («Verificación del banco sin cerrar», con el id de la
+    orden) y se deja de consultar; un aviso posterior de Mercado Pago se aplica igual.
+  - Se **intenta** cancelar la orden una vez por pago (al dejarla el cliente, o en la primera
+    consulta ya abandonada), por si en producción se deja: si contesta 2xx se vuelve a leer y se
+    aplica como quedó. El 422 es lo normal: no es un fallo y no se registra.
+  - **Dos pagos a la vez**: si el cliente deja un reto, paga de nuevo y después contesta el reto
+    viejo, el pedido válido es el del segundo intento; el primero se devuelve. Nunca dos pedidos
+    por un carrito.
+  - Mientras se vigila un reto abandonado, **la cuenta de Mercado Pago no se puede desconectar**
+    (`tienda_conexion_ocupada`): si se aprueba tarde hay que poder devolverlo.
+  - **La página de ese pedido** dice «No se completó el pago» / «No se completó la verificación con
+    tu banco. Tu pedido no se envió al restaurante y no se te cobró nada.» (motivo
+    `SIN_VERIFICAR`); si después se aprueba tarde, pasa a los textos de devolución.
+  - Un reto que llega **sin una dirección que se pueda abrir** se deja en el acto (nadie puede
+    contestarlo), con el mismo final.
 - **Un reintento con el reto vivo** (misma clave) no crea otra orden ni otro cobro: consulta la
   misma y devuelve su `url`. **Recargar la página** a medio reto abre «Tus datos» sola, pregunta
   por el intento en duda y continúa el reto.
-- **Topes:** un reto que nadie contestó (`SIN_VERIFICAR`) no cuenta como rechazo; el que el banco
+- **Topes:** un reto que se dejó (`SIN_VERIFICAR`) no cuenta como rechazo; el que el banco
   no confirmó (`VERIFICACION`) cuenta para la IP y no para pausar al negocio (`cuentaComoRechazo`).
-- **Una orden `action_required` nunca se da por pagada**, y dentro de su plazo no es una orden
-  «sin aplicar»: el barrido la cuenta como consulta buena (no suma fallos ni avisa a VIM).
+- **Una orden `action_required` nunca se da por pagada**, y nunca es una orden «sin aplicar»: el
+  barrido la cuenta como consulta buena.
 
 Para probarlo en la cuenta de prueba: titular `APRO-CHOK` (reto que aprueba), `APRO` a secas
-(reto que falla) y `APRO-AUTH` (aprobado sin reto). **`APRO` ya no da un aprobado.**
+(reto que falla) y `APRO-AUTH` (aprobado sin reto). **`APRO` ya no da un aprobado**, y `FUND`,
+`OTHE` y `CALL` ya no dan un rechazo directo (piden reto): con la verificación encendida no hay
+titular verificado para un 402.
 
 **Cuenta vendedora (verificado).** La orden trae `user_id`, el id de la cuenta vendedora, como
 texto: tiene que ser el de la conexión que cobra ese pago. Además `currency` es `MXN`, la

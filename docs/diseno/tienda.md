@@ -255,13 +255,21 @@ El cliente paga con tarjeta **dentro de «Tus datos»**; no se le manda a otra p
   y no se toca. La franja «Regresar / Paso 3 de 3» se quita: no hay a dónde regresar. En el pie, un
   solo botón secundario, **«Cancelar»** (la acción principal está dentro del marco). Con el reto a
   la vista la hoja no se cierra.
-- **Al terminar el reto, o al cancelarlo**, el marco se quita y queda «Confirmando tu pago» con el
-  aviso ámbar del pie («Estamos confirmando tu pago. No vuelvas a pagar todavía…»): no se ofrece
-  pagar otra vez hasta que el servidor diga cómo quedó. Aprobado → la página del pedido. Si no pasó
-  → de vuelta a «Tu tarjeta», con lo escrito intacto y el `Aviso` rojo de siempre: «Tu banco no
-  confirmó el pago. Intenta de nuevo o usa otra tarjeta.», «No se completó la verificación con tu
-  banco. Intenta de nuevo o usa otra tarjeta.» (venció) o «Cancelaste la verificación con tu
-  banco.», todos con «No se te cobró nada.» Ninguno promete tiempos.
+- **Al terminar el reto**, el marco se quita y queda «Confirmando tu pago» con el aviso ámbar del
+  pie («Estamos confirmando tu pago. No vuelvas a pagar todavía…»): no se ofrece pagar otra vez
+  hasta que el servidor diga cómo quedó. Aprobado → la página del pedido. Si no pasó → de vuelta a
+  «Tu tarjeta», con lo escrito intacto y el `Aviso` rojo de siempre: «Tu banco no confirmó el pago.
+  Intenta de nuevo o usa otra tarjeta.», con «No se te cobró nada.»
+- **«Cancelar» y el plazo** no esperan a nadie: el reto se deja y se vuelve a «Tu tarjeta» en el
+  acto, lista para pagar otra vez, con «Cancelaste la verificación con tu banco.» o «No se completó
+  la verificación con tu banco. Intenta de nuevo o usa otra tarjeta.» (pasó el tiempo), los dos
+  con «No se te cobró nada.» Ninguno promete tiempos. (El instante entre el toque y la respuesta
+  dice «Cancelando la verificación».)
+- **La página de un pedido cuyo reto se dejó**: «No se completó el pago» / «No se completó la
+  verificación con tu banco. Tu pedido no se envió al restaurante y no se te cobró nada.», sin
+  rojo. Si el cliente lo contesta después y el pago se devuelve: «Cancelado» / «Tu pago se confirmó
+  cuando tu pedido ya se había cerrado, así que no se envió al restaurante. Estamos devolviendo tu
+  pago completo…», también sin rojo (no fue el restaurante).
 - **Recargar a medio reto** abre «Tus datos» sola y lo continúa.
 - **No se supo si el cobro pasó**: la tienda va a la página del pedido, que dice «Confirmando tu
   pago» / «Esto puede tardar unos minutos.». Nunca «rechazado» ni «no se te cobró» sin saberlo.

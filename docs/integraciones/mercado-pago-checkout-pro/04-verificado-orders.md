@@ -1,4 +1,4 @@
-# Orders API para el pago en línea — verificado el 11 y el 12 oct 2026
+# Orders API para el pago en línea — verificado del 11 al 13 oct 2026
 
 Hechos comprobados con llamadas reales contra la cuenta de prueba (vendedor de prueba `3754297554`,
 aplicación gemela de «VIM POS Tienda»), con la Mastercard de prueba `5474 9254 3267 0366`, 11/30, 123
@@ -79,7 +79,9 @@ y un token de tarjeta creado con la public key de esa aplicación. Lo que no est
 
 **En revisión → 201** con `status: "processing"`, `status_detail: "in_process"` (titular CONT). No
 existe `binary_mode`. `POST /v1/orders/{id}/cancel` contesta **409 `cannot_cancel_order`** («must be
-in 'action_required' or 'created'»): una orden `processing` no se puede cancelar.
+in 'action_required' or 'created'»): una orden `processing` no se puede cancelar. (Ese mensaje no
+es de fiar para `action_required`: una orden que espera el reto del banco tampoco se deja; ver
+«La verificación del banco».)
 
 **En revisión del antifraude → 201 con `status: "in_review"`** (VISTO EN PRODUCCIÓN el 12 oct 2026,
 cobro real con tarjeta real; no se ha reproducido en la cuenta de prueba). `POST /v1/orders`
@@ -127,10 +129,10 @@ en la cabecera.
   api.mercadopago.com/v1/device_sessions`.
 - La tienda carga ese script solo en la pantalla de la tarjeta.
 
-## La verificación del banco, 3D Secure (12 oct 2026)
+## La verificación del banco, 3D Secure (12 y 13 oct 2026)
 
-Todo lo de esta sección se comprobó ese día con llamadas reales contra la cuenta de prueba y con la
-página del reto abierta en un navegador.
+Todo lo de esta sección se comprobó esos días con llamadas reales contra la cuenta de prueba y con
+la página del reto abierta en un navegador.
 
 **Pedirla.** El cuerpo de siempre más
 
@@ -169,7 +171,12 @@ duda, solo puede rechazar (`high_risk`). Con `validation: "always"` la respuesta
 
 > **OJO:** con la verificación encendida, en la cuenta de prueba el titular `APRO` **ya no sirve
 > para un aprobado**. Para un cobro aprobado: `APRO-AUTH` (sin reto) o `APRO-CHOK` (con reto).
-> Los demás titulares de la tabla de arriba (FUND, SECU, CALL…) no se repitieron con el `config`.
+>
+> **Y tampoco hay rechazos directos (solo en la cuenta de prueba):** con `on_fraud_risk`, los
+> titulares `FUND`, `OTHE` y `CALL` ya NO dan 402: devuelven 201 `action_required` /
+> `pending_challenge`, como `APRO` a secas. Es cosa del ambiente de prueba (todo titular sin sufijo
+> de 3DS pide reto), no una regla de producción. Para un rechazo directo con la verificación
+> encendida **no hay titular verificado**; el 402 de la tabla de arriba se comprobó sin ella.
 
 **La página del reto** (`https://www.mercadopago.com.mx`, la misma dirección que da la API):
 
@@ -188,17 +195,33 @@ duda, solo puede rechazar (`high_risk`). Con `validation: "always"` la respuesta
   tienda le basta `frame-src https://www.mercadopago.com.mx`. En un reto real el banco pone su
   propia página en ese marco anidado; tampoco es nuestra CSP.
 
-**Abandono.** Una orden dejada en `pending_challenge` seguía igual 8 minutos después (misma
-`last_updated_date`, con su `url`). No se resuelve sola pronto: la tienda no espera a que Mercado
-Pago la venza; al pasar SU plazo la cancela (`POST /v1/orders/{id}/cancel`, que con
-`action_required` sí se deja).
+- **El marco SÍ carga embebido** en una página de otro origen (probado con un marco de 375×500: se
+  pinta la pantalla del reto). Y **la misma `url` se puede abrir más de una vez** mientras el reto
+  siga pendiente (una recarga de la tienda la vuelve a abrir).
 
-**Sin verificar de la verificación:** cuánto tarda Mercado Pago en vencer por su cuenta un reto
-abandonado y con qué estado y `status_detail` lo deja; el `status_detail` de una orden
-`action_required` que se cancela; qué aviso (`action`) llega al resolverse el reto; si la página del
-reto se deja volver a cargar con la misma `url` (una recarga de la tienda la abre otra vez); cómo se
-ve un reto real de un banco dentro del marco, y si necesita permisos del marco (`allow`); y si un
-cobro real que antes salía `high_risk` ahora pide el reto.
+**Una orden que espera el reto NO se puede cancelar.** `POST /v1/orders/{id}/cancel` (sin cuerpo y
+con `{}`) sobre una orden `action_required` / `pending_challenge` contesta
+
+```json
+{ "errors": [ { "code": "unprocessable_content", "message": "Unprocessable Entity" } ] }
+```
+
+con **422**, recién creada (segundos) y con 40 minutos. La orden sigue igual. El mensaje del 409 de
+más arriba («must be in 'action_required' or 'created'») **no se cumple** para un reto pendiente.
+Cancelar una orden ya `processed` → 409 `cannot_cancel_order`.
+
+**Abandono.** Un reto que nadie contesta **sigue `pending_challenge` al menos 45 minutos** (misma
+`last_updated_date`, con su `url`). No se sabe cuándo lo vence Mercado Pago: hay que asumir que
+puede tardar horas y que **el cliente puede completarlo tarde** si conserva la página. Por eso la
+tienda deja un reto de SU lado (cierra el pedido sin pago), no cancela nada allá, y sigue mirando
+esa orden hasta su final: si acaba cobrada, la devuelve (ver `02-diseno.md`).
+
+**Sin verificar de la verificación:** cuándo vence Mercado Pago por su cuenta un reto abandonado y
+con qué estado y `status_detail` lo deja (el código acepta `failed`, `canceled` y `expired`); si en
+producción la cancelación de un reto pendiente también da 422; qué aviso (`action`) llega al
+resolverse el reto, y si llega alguno cuando se aprueba tarde; cómo se ve un reto real de un banco
+dentro del marco, y si necesita permisos del marco (`allow`); un rechazo directo (402) con la
+verificación encendida; y si un cobro real que antes salía `high_risk` ahora pide el reto.
 
 ## Consultar
 
