@@ -1,6 +1,6 @@
 # Pago en línea de la tienda — diseño vigente (Orders API, formulario propio, conexión propia)
 
-Actualizado el 11 de octubre de 2026. Sustituye al diseño con Payments API y conexión compartida con
+Actualizado el 12 de octubre de 2026 (verificación del banco). Sustituye al diseño con Payments API y conexión compartida con
 la terminal, que a su vez sustituyó a Checkout Pro. Lo probado contra Mercado Pago está en
 [`04-verificado-orders.md`](04-verificado-orders.md) y **manda sobre este documento**. Firma del
 aviso, OAuth y tarjetas de prueba: [`01-resumen-api.md`](01-resumen-api.md) y
@@ -34,13 +34,58 @@ pedido `POR_PAGAR` (invisible para la caja) y cobra en la misma petición, con
 | 201 `processed` / `accredited`, con nuestra referencia y el monto esperado | pedido `RECIBIDO`, correo | 200 `pago: { estado: "PAGADO" }` |
 | **402** con `errors[].code === "failed"` (no hay orden) | el pedido se borra | 409 `PAGO_RECHAZADO` + `detalle` |
 | 201 `processing` (en revisión; **no se puede cancelar**) | se anota la orden; conciliación | 200 `pago: { estado: "POR_CONFIRMAR" }` |
+| 201 `action_required` / `pending_challenge` (el banco pide confirmar: 3D Secure) | se anota la orden y el pago recibe su plazo de verificación; nada cobrado | 200 `pago: { estado: "VERIFICACION", url }` |
 | 401 | el pedido se borra; pausa de la sucursal 1 h y aviso a VIM | 409 `PAGO_NO_DISPONIBLE` |
 | 402 `failed` con motivo `invalid_card_token` (token inventado o usado) | el pedido se borra; cuenta para el tope de la IP, no del negocio | 409 `PAGO_NO_PROCESADO` |
 | 400 / 422 (validación) | se busca la orden por referencia: si Mercado Pago confirma que no hay, el pedido se borra; si no se puede comprobar, se conserva | 409 `PAGO_NO_PROCESADO`, o 200 `POR_CONFIRMAR` |
 | sin respuesta, 5xx, 409, 429, otro | nada: conciliación | 200 `pago: { estado: "POR_CONFIRMAR" }` |
 
 `detalle` ∈ `FONDOS` (`insufficient_amount`), `DATOS` (`bad_filled_card_data`: código y fecha no se
-distinguen), `LLAMAR_BANCO`, `TARJETA_DESHABILITADA`, `OTRO`.
+distinguen), `LLAMAR_BANCO`, `TARJETA_DESHABILITADA`, `RIESGO` (`high_risk`), `VERIFICACION`
+(`3ds_challenge_failed`: el banco no confirmó el reto), `SIN_VERIFICAR` (el reto no se contestó: se
+canceló o venció), `OTRO`.
+
+## La verificación del banco (3D Secure)
+
+La orden se crea con `config.online.transaction_security: { validation: "on_fraud_risk",
+liability_shift: "required" }`: cuando el antifraude de Mercado Pago duda, en vez de rechazar
+(`high_risk`) le pide al cliente confirmar con su banco.
+
+- **`pedir` contesta `VERIFICACION` con la `url` del reto.** El pedido sigue `POR_PAGAR` (invisible
+  para la caja, el POS y el admin, como siempre hasta `RECIBIDO`), con su orden anotada. La `url` se
+  valida —https y host de una lista cerrada, hoy solo `www.mercadopago.com.mx`
+  (`HOSTS_DEL_RETO`)— y **no se guarda en ningún lado**: lleva un token del cliente y Mercado Pago
+  la vuelve a dar al consultar la orden.
+- **La tienda abre el reto en un marco**, en la pantalla de la tarjeta, y pregunta cómo va con la
+  acción **`verificacion`** (`{ negocio, codigo, cancelar? }`): cada 10 s, al volver a la pestaña y
+  en cuanto la página del reto avisa que terminó (`postMessage` `{"status":"COMPLETE"}`, que solo
+  sirve para preguntar antes: nunca como verdad). Contesta `VERIFICACION` (sigue; con la `url` si
+  se consultó), `PAGADO`, `POR_CONFIRMAR` (ya no espera el reto y falta el resultado: lo dice la
+  página del pedido) o 409 `PAGO_RECHAZADO` con su `detalle` (el pedido se descartó: se puede pagar
+  otra vez, como tras un rechazo directo). A lo sumo una consulta a Mercado Pago cada 3 s por pago;
+  gasta de la bolsa de cupo de `confirmar_pago`.
+- **El resultado lo dicen el aviso de órdenes y la consulta** (`confirmarPago`, el camino de
+  siempre): `processed` / `accredited` verificado → `RECIBIDO` y correo; `failed` → rechazo.
+- **Plazo: 10 minutos desde que se mandó el cobro** (migración 0175; los 5 de siempre son para un
+  cobro que Mercado Pago no contestó, donde el cliente no tiene que hacer nada; aquí tiene que
+  abrir la aplicación de su banco). Al pasar, quien consulte la orden —el barrido, la página o el
+  aviso— la **cancela** en Mercado Pago y aplica lo que quede: cancelada → el pedido se cierra «sin
+  pago» de inmediato; cobrada en el último segundo → pagado. Si no se deja cancelar, cuenta como
+  consulta fallida (al tercer fallo, correo a VIM) y a los 12 minutos la base vence el pedido como
+  cualquier otro. No depende del plazo de Mercado Pago, que no vence pronto un reto abandonado.
+- **«Cancelar»** (`verificacion` con `cancelar: true`) cancela la orden en el acto. La tienda solo
+  deja pagar otra vez cuando el servidor confirma que quedó cancelada; mientras, «Confirmando tu
+  pago».
+- **Un reintento con el reto vivo** (misma clave) no crea otra orden ni otro cobro: consulta la
+  misma y devuelve su `url`. **Recargar la página** a medio reto abre «Tus datos» sola, pregunta
+  por el intento en duda y continúa el reto.
+- **Topes:** un reto que nadie contestó (`SIN_VERIFICAR`) no cuenta como rechazo; el que el banco
+  no confirmó (`VERIFICACION`) cuenta para la IP y no para pausar al negocio (`cuentaComoRechazo`).
+- **Una orden `action_required` nunca se da por pagada**, y dentro de su plazo no es una orden
+  «sin aplicar»: el barrido la cuenta como consulta buena (no suma fallos ni avisa a VIM).
+
+Para probarlo en la cuenta de prueba: titular `APRO-CHOK` (reto que aprueba), `APRO` a secas
+(reto que falla) y `APRO-AUTH` (aprobado sin reto). **`APRO` ya no da un aprobado.**
 
 **Cuenta vendedora (verificado).** La orden trae `user_id`, el id de la cuenta vendedora, como
 texto: tiene que ser el de la conexión que cobra ese pago. Además `currency` es `MXN`, la
@@ -59,7 +104,8 @@ la marca de la conexión.
 - **Avisos**: llegan a la URL configurada en la aplicación (`tienda-webhook-mp`), con **firma
   obligatoria** (`MP_TIENDA_WEBHOOK_SECRET`, `MP_TIENDA_WEBHOOK_SECRET_PRUEBA`). Siguen siendo solo
   una pista: la verdad sale de consultar la orden con el token de la conexión.
-- El barrido de cada minuto, el plazo de 5 minutos y la página del pedido (`confirmar_pago`) no cambian.
+- El barrido de cada minuto, el plazo de 5 minutos y la página del pedido (`confirmar_pago`) no cambian
+  (el pago que espera la verificación del banco tiene su plazo propio: ver arriba).
   Si el barrido no puede correr (faltan `vim_interno` / `vim_functions_url` en Vault) deja un renglón
   por hora en `tienda_eventos` (`accion = 'barrido:sin_configurar'`).
 - Una orden viva con nuestra referencia que no se puede aplicar no cuenta como conciliada; al tercer
