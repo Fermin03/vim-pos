@@ -135,7 +135,7 @@ const RECHAZOS: Record<string, { campo: CampoDeTarjeta | null; texto: string; co
   // La verificación del banco (3D Secure). TEXTOS PROVISIONALES (James). No prometen tiempos.
   // El cliente contestó el reto y su banco no lo confirmó (VERIFICADO: `3ds_challenge_failed`).
   VERIFICACION: { campo: null, texto: "Tu banco no confirmó el pago. Intenta de nuevo o usa otra tarjeta." },
-  // Nadie contestó el reto a tiempo (venció), o el pedido ya no estaba.
+  // El reto se dejó: pasó el tiempo sin contestarlo (o el pedido ya no estaba).
   SIN_VERIFICAR: { campo: null, texto: "No se completó la verificación con tu banco. Intenta de nuevo o usa otra tarjeta." },
   // El cliente tocó «Cancelar» en el reto. Este motivo lo pone la tienda, no el servidor.
   CANCELADO: { campo: null, texto: "Cancelaste la verificación con tu banco." },

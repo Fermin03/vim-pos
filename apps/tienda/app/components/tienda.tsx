@@ -20,7 +20,7 @@ import { semanaLegible, type Momento } from "../lib/horario";
 import { carritoPara, motivoDeCierre, renglonesDelError } from "../lib/pantalla";
 import { enlaceTel, formatoTelefono } from "../lib/telefono";
 import { textoCerrada } from "../lib/textos";
-import { envioDeLaPagina, intentoDeLaPagina } from "../lib/envio";
+import { envioDeLaPagina, intentoDelNegocio } from "../lib/envio";
 import { VistaDelCarrito, useCotizacion } from "./carrito";
 import { PasoDeDatos, useEnviando } from "./datos";
 import { Entrega } from "./entrega";
@@ -174,7 +174,7 @@ export function Tienda({ negocio, sucursal, menu, ahora, conSesion }: {
     setCarrito(inicial);
     // Se recargó la página con un pago en línea del que no se sabe el resultado (o a medio reto del
     // banco): «Tus datos» se abre sola. Ahí se pregunta por ese intento y, si el reto sigue vivo, se continúa.
-    if (!repetido && !deOtra && inicial.renglones.length > 0 && intentoDeLaPagina.enDuda()) setPaso("datos");
+    if (!repetido && !deOtra && inicial.renglones.length > 0 && intentoDelNegocio(negocio.slug).enDuda()) setPaso("datos");
     // Solo al llegar a esta sucursal. `negocio` y `sucursal` son objetos nuevos en cada refresco de la
     // página: releer ahí pisaría el carrito en memoria (y lo vaciaría si el teléfono no deja guardar).
     // eslint-disable-next-line react-hooks/exhaustive-deps

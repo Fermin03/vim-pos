@@ -5,7 +5,9 @@ import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Resultado } from "../api";
 import { pedidoDe, verificacionDe, type PedidoCreado, type Verificacion } from "../contrato";
-import { desenlaceDelError, enviarPedido, intentoDeCompra, resolverDuda } from "../envio";
+import type { Almacen } from "../carrito";
+import { CLAVE_DEL_INTENTO, desenlaceDelError, dondeDelIntento, enviarPedido, intentoDeCompra, intentoDelNegocio, resolverDuda } from "../envio";
+import { textoDeSeguimiento } from "../textos";
 import { pasoDelDesenlace } from "../pasos";
 import { textoDeRechazo } from "../tarjeta";
 import { HOSTS_DEL_RETO, esFinDelReto, pasoDelReto, urlDeReto, vigilarReto, type PasoDelReto } from "../verificacion";
@@ -250,5 +252,83 @@ describe("vigilar el reto", () => {
     await vi.advanceTimersByTimeAsync(30_000);
     expect(e.pasos).toEqual([]);
     expect(e.oye()).toBe(false);
+  });
+});
+
+describe("el intento en duda es de UN negocio (todas las tiendas viven en el mismo dominio)", () => {
+  /** Un teléfono de mentira, compartido por las dos tiendas. */
+  function telefono(): Almacen & { claves(): string[] } {
+    const m = new Map<string, string>();
+    return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => { m.set(k, v); }, removeItem: (k) => { m.delete(k); }, claves: () => [...m.keys()] };
+  }
+  const pedido = { negocio: "knockout", pago: "EN_LINEA", propina_pct: 10 };
+  const de = (a: Almacen, negocio: string, prefijo: string) => {
+    let n = 0;
+    return intentoDeCompra(() => `${prefijo}-${++n}`.padEnd(22, "x"), () => a, Date.now, negocio);
+  };
+
+  it("se guarda con el nombre del negocio; el de otro restaurante ni se ve", () => {
+    const a = telefono();
+    const ko = de(a, "knockout", "ko"), otro = de(a, "tacos-don-beto", "td");
+    const clave = ko.para(pedido);
+    ko.dudar();
+    expect(a.claves()).toEqual([dondeDelIntento("knockout")]);
+    expect(dondeDelIntento("knockout")).toBe(`${CLAVE_DEL_INTENTO}.knockout`);
+    expect(otro.enDuda()).toBeNull();
+    // El otro restaurante tiene su propio intento, con su propia clave.
+    expect(otro.para({ ...pedido, negocio: "tacos-don-beto" })).not.toBe(clave);
+    expect(ko.enDuda()).toBe(clave);
+  });
+  it("desde otro restaurante NO se consulta ni se suelta la duda del primero (era el camino a pagar dos veces)", async () => {
+    const a = telefono();
+    const ko = de(a, "knockout", "ko");
+    const clave = ko.para(pedido);
+    ko.dudar();
+    // «Tus datos» se abre en otra tienda: resuelve SU duda (ninguna). El servidor ni se entera.
+    const otro = de(a, "tacos-don-beto", "td");
+    let preguntas = 0;
+    expect(await resolverDuda(otro, async () => { preguntas++; return { ok: true, datos: { existe: false } }; })).toEqual({ tipo: "libre" });
+    expect(preguntas).toBe(0);
+    // Aunque en la otra tienda se pida, se dude y se aclare, o entre un pedido.
+    otro.para({ negocio: "tacos-don-beto" }); otro.dudar(); otro.aclarar();
+    otro.para({ negocio: "tacos-don-beto" }); otro.cerrar();
+    // De vuelta en la primera (página recargada: se lee del teléfono): la duda sigue, con la MISMA clave.
+    const deVuelta = de(a, "knockout", "nueva");
+    expect(deVuelta.enDuda()).toBe(clave);
+    expect(deVuelta.para({ ...pedido, propina_pct: 20 })).toBe(clave);
+  });
+  it("lo guardado con la clave de antes (sin negocio) no es de nadie: no se lee como duda de este", () => {
+    const a = telefono();
+    a.setItem(CLAVE_DEL_INTENTO, JSON.stringify({ de: "x", clave: "v".repeat(22), cuando: Date.now(), duda: true }));
+    expect(de(a, "knockout", "ko").enDuda()).toBeNull();
+  });
+  it("en la página hay uno por negocio, siempre el mismo", () => {
+    expect(intentoDelNegocio("knockout")).toBe(intentoDelNegocio("knockout"));
+    expect(intentoDelNegocio("knockout")).not.toBe(intentoDelNegocio("tacos-don-beto"));
+  });
+});
+
+describe("la página del pedido cuyo reto se dejó", () => {
+  const enLinea = (estado: "SIN_PAGO" | "DEVOLUCION_EN_PROCESO" | "DEVUELTO") => ({ estado, propina_mxn: "0.00", total_a_pagar_mxn: "240.00" });
+  it("dice que no se completó la verificación y que no se cobró (hoy es verdad); no es una alerta del restaurante", () => {
+    expect(textoDeSeguimiento({ estado: "CANCELADO", motivo: "SIN_VERIFICAR", enLinea: enLinea("SIN_PAGO") })).toEqual({
+      titulo: "No se completó el pago", alerta: false,
+      apoyo: "No se completó la verificación con tu banco. Tu pedido no se envió al restaurante y no se te cobró nada.",
+    });
+    // El de siempre (venció sin pagarse) no cambia.
+    expect(textoDeSeguimiento({ estado: "CANCELADO", motivo: "SIN_PAGO", enLinea: enLinea("SIN_PAGO") }).apoyo).toBe("Tu pedido no se envió al restaurante y no se te cobró nada.");
+  });
+  it("si el reto se contesta tarde y el pago se devuelve: lo dice con los textos de devolución, sin «no se te cobró» y sin culpar al restaurante", () => {
+    for (const motivo of ["SIN_PAGO", "SIN_VERIFICAR"]) {
+      const enProceso = textoDeSeguimiento({ estado: "CANCELADO", motivo, enLinea: enLinea("DEVOLUCION_EN_PROCESO") });
+      expect(enProceso.apoyo).toMatch(/Estamos devolviendo tu pago completo\./);
+      expect(enProceso.apoyo).not.toMatch(/No se te cobró|El restaurante no pudo/);
+      expect(enProceso.alerta).toBe(false);
+      expect(textoDeSeguimiento({ estado: "CANCELADO", motivo, enLinea: enLinea("DEVUELTO") }).apoyo).toMatch(/Te devolvimos tu pago completo\./);
+    }
+    // Un pedido que canceló el restaurante sigue diciendo lo suyo, en rojo.
+    const agotado = textoDeSeguimiento({ estado: "CANCELADO", motivo: "AGOTADO", enLinea: enLinea("DEVOLUCION_EN_PROCESO") });
+    expect(agotado.apoyo).toMatch(/^Se agotó algo de tu pedido\./);
+    expect(agotado.alerta).toBe(true);
   });
 });

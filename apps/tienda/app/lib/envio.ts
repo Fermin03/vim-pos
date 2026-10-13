@@ -182,8 +182,14 @@ export function claveNueva(): string {
   return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").slice(0, 22);
 }
 
-/** Dónde se guarda el intento en el teléfono, junto al carrito. */
+/**
+ * Dónde se guarda el intento en el teléfono, junto al carrito: UNO POR NEGOCIO (`dondeDelIntento`).
+ * Todas las tiendas viven en el mismo dominio; con una sola clave para todas, abrir «Tus datos» en
+ * otro restaurante preguntaba por un intento en duda que no era suyo, el servidor contestaba «no
+ * existe» y la duda del primero se soltaba: se podía pagar dos veces allá.
+ */
 export const CLAVE_DEL_INTENTO = "vim.tienda.intento";
+export const dondeDelIntento = (negocio: string): string => (negocio ? `${CLAVE_DEL_INTENTO}.${negocio}` : CLAVE_DEL_INTENTO);
 /** Un intento de más de 15 minutos ya no se reutiliza: su pedido, si esperaba pago, ya venció. */
 const VIDA_DEL_INTENTO_MS = 15 * 60_000;
 
@@ -217,18 +223,22 @@ function huellaDe(texto: string): string {
  * quita solo de dos formas: el pedido entró (`cerrar`), o el servidor confirmó que para esa clave
  * no hay pedido ni cobro (`aclarar`). Ver `resolverDuda`.
  *
+ * ES DE UN NEGOCIO (`negocio`, su slug): se guarda con su nombre, y el intento en duda de otro
+ * restaurante ni se lee, ni se consulta, ni se suelta desde este.
+ *
  * Se guarda en el teléfono, donde vive el carrito: recargar la página y volver a enviar NO crea otro
  * pedido, y la duda sobrevive a la recarga. Se guarda la clave y la HUELLA del pedido, nunca el pedido. Con el almacén
  * bloqueado (modo privado) vive en memoria, como antes. Sin duda, caduca a los 15 minutos.
  */
-export function intentoDeCompra(nueva: () => string = claveNueva, almacen: () => Almacen | null = almacenDelNavegador, ahora: () => number = Date.now) {
+export function intentoDeCompra(nueva: () => string = claveNueva, almacen: () => Almacen | null = almacenDelNavegador, ahora: () => number = Date.now, negocio = "") {
   type Intento = { de: string; clave: string; cuando: number; duda: boolean };
+  const donde = dondeDelIntento(negocio);
   /** undefined = todavía no se ha mirado el teléfono (se mira al primer uso: al importar no hay navegador). */
   let actual: Intento | null | undefined;
   const leer = (): Intento | null => {
     if (actual !== undefined) return actual;
     try {
-      const x: unknown = JSON.parse(almacen()?.getItem(CLAVE_DEL_INTENTO) ?? "null");
+      const x: unknown = JSON.parse(almacen()?.getItem(donde) ?? "null");
       const o = typeof x === "object" && x !== null ? (x as Record<string, unknown>) : {};
       // Lo guardado es texto de fuera: solo vale con su forma exacta.
       actual = typeof o.de === "string" && typeof o.clave === "string" && /^[A-Za-z0-9_-]{22}$/.test(o.clave) && typeof o.cuando === "number"
@@ -240,8 +250,8 @@ export function intentoDeCompra(nueva: () => string = claveNueva, almacen: () =>
   };
   const guardar = (): void => {
     try {
-      if (actual) almacen()?.setItem(CLAVE_DEL_INTENTO, JSON.stringify(actual));
-      else almacen()?.removeItem(CLAVE_DEL_INTENTO);
+      if (actual) almacen()?.setItem(donde, JSON.stringify(actual));
+      else almacen()?.removeItem(donde);
     } catch { /* cuota llena o modo privado: se queda en memoria */ }
   };
   return {
@@ -271,8 +281,13 @@ export function intentoDeCompra(nueva: () => string = claveNueva, almacen: () =>
   };
 }
 
-/** El de la página. */
-export const intentoDeLaPagina = intentoDeCompra();
+const delNegocio = new Map<string, ReturnType<typeof intentoDeCompra>>();
+/** El de ESTE negocio en esta página (uno por slug: recuerda en memoria si el teléfono no deja guardar). */
+export function intentoDelNegocio(negocio: string): ReturnType<typeof intentoDeCompra> {
+  let i = delNegocio.get(negocio);
+  if (!i) delNegocio.set(negocio, (i = intentoDeCompra(claveNueva, almacenDelNavegador, Date.now, negocio)));
+  return i;
+}
 
 /**
  * Los rechazos de `pedir` que, por sí solos, prueban que para esa clave NO quedó pedido ni cobro: el

@@ -60,13 +60,21 @@ export function textoDeSeguimiento(p: Pick<Seguimiento, "estado" | "motivo" | "e
   if (pago.estado === "POR_CONFIRMAR") {
     return { titulo: "Confirmando tu pago", apoyo: "Esto puede tardar unos minutos.", alerta: false };
   }
+  // El banco pidió confirmar el pago y el reto se dejó (se canceló o pasó el tiempo). TEXTO PROVISIONAL (James).
+  if (pago.estado === "SIN_PAGO" && p.motivo === "SIN_VERIFICAR") {
+    return { titulo: "No se completó el pago", apoyo: "No se completó la verificación con tu banco. Tu pedido no se envió al restaurante y no se te cobró nada.", alerta: false };
+  }
   if (pago.estado === "SIN_PAGO") {
     return { titulo: "No se completó el pago", apoyo: "Tu pedido no se envió al restaurante y no se te cobró nada.", alerta: false };
   }
   // Cancelado con el pago hecho: el motivo de siempre, sin «no se te cobró», y qué pasa con el dinero.
-  const motivo = (MOTIVOS[p.motivo ?? ""] ?? "El restaurante no pudo tomar tu pedido.").replace(" No se te cobró nada.", "");
+  // El pedido se había cerrado sin pago y el cobro pasó después (p. ej. el reto del banco se contestó
+  // tarde): no fue el restaurante. TEXTO PROVISIONAL (James).
+  const tardio = p.motivo === "SIN_PAGO" || p.motivo === "SIN_VERIFICAR";
+  const motivo = tardio ? "Tu pago se confirmó cuando tu pedido ya se había cerrado, así que no se envió al restaurante."
+    : (MOTIVOS[p.motivo ?? ""] ?? "El restaurante no pudo tomar tu pedido.").replace(" No se te cobró nada.", "");
   const dinero = pago.estado === "DEVUELTO" ? "Te devolvimos tu pago completo." : "Estamos devolviendo tu pago completo.";
-  return { titulo: "Cancelado", apoyo: `${motivo} ${dinero} ${PLAZO_DE_DEVOLUCION}`, alerta: true };
+  return { titulo: "Cancelado", apoyo: `${motivo} ${dinero} ${PLAZO_DE_DEVOLUCION}`, alerta: !tardio };
 }
 
 // ── La verificación del banco (3D Secure), en la pantalla de la tarjeta ──────────────────────────
@@ -82,6 +90,8 @@ export const RETO = {
   /** El reto ya terminó (o se pidió cancelarlo) y falta que Mercado Pago diga cómo quedó. */
   confirmando: "Confirmando tu pago",
   noPagues: "Estamos confirmando tu pago. No vuelvas a pagar todavía: en un momento te decimos qué pasó.",
+  /** Se tocó «Cancelar» y falta la respuesta del servidor (un instante). */
+  cancelando: "Cancelando la verificación",
 } as const;
 
 // ── Formas de pago («¿Cómo pagas?») ──────────────────────────────────────────────────────────────

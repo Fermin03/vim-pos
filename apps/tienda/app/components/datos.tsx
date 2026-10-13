@@ -30,7 +30,7 @@ import {
 import type { Cotizacion, DireccionGuardada, ErrorDeTienda, MiCuenta, Negocio, Pago, Sucursal } from "../lib/contrato";
 import { LIMITES_DE_CUENTA, direccionEnUnaLinea, enlaceDeAcceso, formularioDeDireccion, paraTusDatos } from "../lib/cuenta";
 import { formatoMxn } from "../lib/dinero";
-import { enviarPedido, envioDeLaPagina, intentoDeLaPagina, pruebaQueNoHuboCobro, resolverDuda, type Desenlace, type ResultadoDeEnvio } from "../lib/envio";
+import { enviarPedido, envioDeLaPagina, intentoDelNegocio, pruebaQueNoHuboCobro, resolverDuda, type Desenlace, type ResultadoDeEnvio } from "../lib/envio";
 import { formasDePago, leerOtroMonto, propinaDe, totalAPagar, type Propina as Porcentaje, type PropinaElegida } from "../lib/pago";
 import { accionDe, avanzar, pasoDelDesenlace, pasosDe, type Paso } from "../lib/pasos";
 import { textoDeRechazo, type CampoDeTarjeta } from "../lib/tarjeta";
@@ -118,6 +118,8 @@ export function PasoDeDatos({
 }: PropsDelPasoDeDatos) {
   const router = useRouter();
   const id = useId();
+  /** El intento de compra de ESTE negocio: el de otro restaurante no se mira ni se suelta desde aquí. */
+  const intentoDeLaPagina = intentoDelNegocio(negocio.slug);
   const formas = formasDePago(negocio, sucursal);
   const aDomicilio = carrito.modo === "DOMICILIO";
   const zona = sucursal.zonas.find((z) => z.id === carrito.zonaId);
@@ -433,7 +435,11 @@ export function PasoDeDatos({
     return () => { v.detener(); vigia.current = null; window.removeEventListener("message", alMensaje); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- un vigía por reto: la dirección que llega después no lo reinicia
   }, [codigoDelReto, negocio.slug]);
-  /** «Cancelar»: el marco se quita y se le pide al servidor cancelar la orden. Solo él dice si quedó cancelada. */
+  /**
+   * «Cancelar»: el marco se quita y se le dice al servidor que el cliente deja el reto. El servidor
+   * cierra ese pedido sin pago en el acto (Mercado Pago no deja cancelar una orden que espera el
+   * reto: la sigue vigilando él) y contesta que ya se puede pagar otra vez.
+   */
   const cancelarReto = () => {
     setReto((r) => (r ? { ...r, esperando: true, cancelado: true } : r));
     vigia.current?.cancelar();
@@ -503,7 +509,7 @@ export function PasoDeDatos({
   const seOfreceEnviar = !!totalNuevo || !aviso || aviso.sigue === "reintentar" || aviso.sigue === "reintentar-seguro" || aviso.sigue === "sesion";
   const total = totalNuevo ?? totalVisto;
   const aPagar = enLinea && total ? totalAPagar(total, montoDePropina) : total;
-  const estado = reto ? (reto.esperando ? RETO.confirmando : "") : duda ? "Confirmando tu pago…" : (enviando || hecho) && enLinea ? "Procesando tu pago…"
+  const estado = reto ? (reto.cancelado ? RETO.cancelando : reto.esperando ? RETO.confirmando : "") : duda ? "Confirmando tu pago…" : (enviando || hecho) && enLinea ? "Procesando tu pago…"
     : enviando || hecho ? "Enviando tu pedido…" : robot ? "Comprobando que no eres un robot…" : "";
   // Con `key`: React no debe reciclar para este botón el nodo de otro que ocupaba su lugar. Sin ella,
   // el toque en «Ahora no» (que al pintarse de nuevo dejaba su sitio a «Pagar») terminaba, en el mismo
@@ -550,7 +556,7 @@ export function PasoDeDatos({
           <section className={cn("flex min-w-0 flex-col gap-3 pt-3", reto.esperando && "pb-5")}>
             <div className="flex flex-col gap-1 px-4">
               {/* Terminó o se canceló: el marco se quita (se queda en blanco) y lo que sigue es esperar; el aviso del pie dice qué hacer. */}
-              {titulo(reto.esperando ? RETO.confirmando : RETO.titulo, "reto")}
+              {titulo(reto.cancelado ? RETO.cancelando : reto.esperando ? RETO.confirmando : RETO.titulo, "reto")}
               {!reto.esperando && <p className="text-14 text-ink-2">{RETO.apoyo}</p>}
             </div>
             {!reto.esperando && <MarcoDelReto url={reto.url} />}
@@ -758,7 +764,7 @@ export function PasoDeDatos({
           // La acción de esta pantalla está dentro del marco (la del banco). Aquí, solo salir de él; y
           // una vez que terminó o se canceló, esperar: no se ofrece pagar otra vez hasta saber cómo quedó.
           <>
-            {reto.esperando && <Aviso tono="warning" role="status" className="!text-14">{RETO.noPagues}</Aviso>}
+            {reto.esperando && !reto.cancelado && <Aviso tono="warning" role="status" className="!text-14">{RETO.noPagues}</Aviso>}
             {/* Cancelar sigue a la mano mientras no se haya pedido: si el reto no avanza, es la salida. */}
             {!reto.cancelado && <button key="cancelar-reto" type="button" onClick={cancelarReto} className={GHOST}>{RETO.cancelar}</button>}
           </>
