@@ -9,9 +9,13 @@
 // No toca la base ni la red directamente: recibe un puerto (pago-puerto.ts lo arma con supabase-js)
 // y el cliente de Mercado Pago. Así se prueba con `node --test` y dobles.
 import { esc, soloAscii } from "../correo.ts";
-import { type ClienteMpTienda, cuerpoDeOrden, type DatosCobro, type Decision, decidirOrden, esTokenInvalido, type MotivoDeRechazo, motivoDeRechazo, ordenAtascada, ordenesDeBusqueda, ordenViva, respuestaDeCobro, motivoDeNoAceptado, resumenDeFallo, sinDatosPersonales } from "./pago-mp.ts";
+import { type ClienteMpTienda, cuerpoDeOrden, type DatosCobro, type Decision, decidirOrden, enReto, esTokenInvalido, type MotivoDeRechazo, motivoDeRechazo, ordenAtascada, ordenesDeBusqueda, ordenViva, respuestaDeCobro, motivoDeNoAceptado, resumenDeFallo, sinDatosPersonales, urlDeReto } from "./pago-mp.ts";
 
-export type EstadoPago = "CREADO" | "APROBADO" | "RECHAZADO" | "VENCIDO" | "POR_DEVOLVER" | "DEVUELTO" | "DEVOLUCION_FALLIDA";
+/**
+ * ABANDONADO: el cliente dejó el reto del banco (lo canceló o pasó el plazo). El pedido se cerró sin
+ * pago, pero la orden sigue viva en Mercado Pago, que no la deja cancelar: se vigila hasta su final.
+ */
+export type EstadoPago = "CREADO" | "APROBADO" | "RECHAZADO" | "VENCIDO" | "ABANDONADO" | "POR_DEVOLVER" | "DEVUELTO" | "DEVOLUCION_FALLIDA";
 
 /** Un renglón de tienda_pagos con lo de su conexión que hace falta para creerle a una orden. */
 export type FilaPago = {
@@ -26,12 +30,17 @@ export type FilaPago = {
   detalle: string | null;
   /** Cuándo nació el renglón (ISO): acota la búsqueda por referencia. */
   creado: string;
+  /** Ya quedó anotado que el pago espera el reto del banco (tienda_pagos.verificacion_at), con su plazo propio. */
+  en_verificacion: boolean;
+  /** Consultas buenas del barrido con el pago ya vencido o abandonado (tienda_pagos.conciliaciones). */
+  conciliaciones: number;
   /** `tienda_conexiones.cuenta_id_externo`: el user_id de Mercado Pago que tiene que traer la orden. */
   cuenta_vendedora: string;
 };
 
 export type Aplicado = { estado: string; pedido_estado: string; recien_aprobado: boolean };
-export type Tarea = { id: string; tarea: "DEVOLVER" | "CONCILIAR"; conexion_id: string; orden_id_externo: string | null };
+/** RETO_VIEJO: un reto abandonado cumplió 48 horas con su orden todavía pendiente; último vistazo y aviso. */
+export type Tarea = { id: string; tarea: "DEVOLVER" | "CONCILIAR" | "RETO_VIEJO"; conexion_id: string; orden_id_externo: string | null };
 type Resultado = { resultado: "APROBADO" | "RECHAZADO" | "DEVUELTO"; ordenIdExterno: string; pagoIdExterno: string | null; monto: string | null;
                    tipoTarjeta: string | null; marca: string | null; detalle: string | null };
 
@@ -45,6 +54,17 @@ export type PuertoPagos = {
   aplicar(pagoId: string, d: Resultado): Promise<Aplicado>;
   /** Deja anotada la orden que aún no tiene resultado, o por qué una orden viva no se pudo aplicar. */
   anotar(pagoId: string, d: { ordenIdExterno?: string | null; error?: string | null }): Promise<void>;
+  /**
+   * El pago espera el reto del banco (3D Secure): anota la orden y le da al pedido el plazo de un
+   * pago en verificación (tienda_pago_verificacion, 0175). Repetirla no vuelve a alargar el plazo.
+   */
+  verificar(pagoId: string, ordenIdExterno: string): Promise<void>;
+  /**
+   * Deja el reto del banco: cierra el pedido sin pago y el pago queda ABANDONADO, vigilado
+   * (tienda_pago_abandonar, 0175). `ordenIdExterno`: la orden, si el pago aún no la tiene anotada.
+   * Falso = no era un pago que se pudiera dejar, y no se tocó nada.
+   */
+  abandonar(pagoId: string, ordenIdExterno: string | null): Promise<boolean>;
   tomar(max: number): Promise<Tarea[]>;
   /** Cómo le fue a la devolución. Devuelve el estado en que queda el pago. */
   devolucion(pagoId: string, ok: boolean, error?: string): Promise<string>;
@@ -84,6 +104,12 @@ export type Cobro =
   /** No se sabe si se cobró. El pedido queda POR_PAGAR y lo resuelven el aviso, la página y el barrido. */
   | { tipo: "POR_CONFIRMAR" }
   /**
+   * Mercado Pago pide que el cliente confirme el pago con su banco (3D Secure) antes de cobrar. No
+   * se ha cobrado nada: el pedido queda POR_PAGAR, con la orden anotada y su plazo de verificación.
+   * `url` es la página del reto, ya validada (`urlDeReto`): viaja SOLO en la respuesta a ese cliente.
+   */
+  | { tipo: "VERIFICACION"; url: string }
+  /**
    * No se pudo cobrar y se sabe que no se creó nada: no hay token, o Mercado Pago rechazó las
    * credenciales (`sinPermiso`: toca pausar el pago en esa sucursal y avisar a VIM). El pedido se descartó.
    */
@@ -106,7 +132,13 @@ export type Cobro =
  *   · una orden aprobada se cree después de `decidirOrden` (referencia, cuenta vendedora, moneda,
  *     acreditada) y de que la base compruebe el monto;
  *   · una orden que queda en revisión (`processing` o `in_review`) NO se puede cancelar (VERIFICADO: 409): se
- *     anota su id y queda POR_CONFIRMAR.
+ *     anota su id y queda POR_CONFIRMAR;
+ *   · una orden que espera el reto del banco (`action_required`, VERIFICADO) no está cobrada ni
+ *     rechazada: VERIFICACION, con la dirección del reto. Un reintento con el reto vivo no crea otra
+ *     orden: consulta la misma y devuelve su dirección, que Mercado Pago sigue dando (VERIFICADO);
+ *   · un reto que ya se dejó (ABANDONADO), o que llega sin una dirección que se pueda abrir, es
+ *     RECHAZADO con motivo SIN_VERIFICAR: no se cobró nada y el cliente puede pagar otra vez. Ese
+ *     pedido NO se descarta: su renglón es lo que permite vigilar la orden, que sigue viva.
  */
 export async function cobrarPago(deps: Deps, datos: Omit<DatosCobro, "monto">): Promise<Cobro> {
   const fila = await deps.db.leerPago(datos.pagoId);
@@ -119,6 +151,8 @@ export async function cobrarPago(deps: Deps, datos: Omit<DatosCobro, "monto">): 
   // La carrera: el aviso del rechazo llegó ANTES que esta respuesta (o que este reintento) y la base
   // ya cerró el pedido «sin pago». Es el mismo no: se descarta y el cliente corrige sin perder el carrito.
   if (fila.estado === "RECHAZADO") return descartar({ tipo: "RECHAZADO", motivo: motivoDeRechazo(fila.detalle) });
+  // El reto de ese intento ya se dejó: el pedido está cerrado sin pago (y se queda: se vigila su orden).
+  if (fila.estado === "ABANDONADO") return { tipo: "RECHAZADO", motivo: "SIN_VERIFICAR" };
   if (fila.estado !== "CREADO") return { tipo: "POR_CONFIRMAR" };
 
   // El token, ANTES de marcar el cobro como mandado: sin él no sale ningún cobro, y el renglón no
@@ -131,11 +165,14 @@ export async function cobrarPago(deps: Deps, datos: Omit<DatosCobro, "monto">): 
 
   if (!(await deps.db.tomarCobro(fila.id))) {
     // Ya se mandó antes. Se pregunta, no se cobra.
-    const c = await confirmarPago(deps, fila.id);
+    const reto: { url: string | null } = { url: null };
+    const c = await confirmarPago(deps, fila.id, undefined, false, { alReto: (url) => { reto.url = url; } });
     const ahora = await deps.db.leerPago(fila.id);
     if (ahora?.estado === "APROBADO") return { tipo: "APROBADO", recienAprobado: c.ok && c.recienAprobado };
     if (ahora?.estado === "RECHAZADO") return descartar({ tipo: "RECHAZADO", motivo: motivoDeRechazo(ahora.detalle) });
-    return { tipo: "POR_CONFIRMAR" };
+    if (ahora?.estado === "ABANDONADO") return { tipo: "RECHAZADO", motivo: "SIN_VERIFICAR" };
+    // El reto del primer intento sigue vivo: se continúa ese, no se abre otro.
+    return reto.url && ahora?.estado === "CREADO" ? { tipo: "VERIFICACION", url: reto.url } : { tipo: "POR_CONFIRMAR" };
   }
 
   // (Sin token y con el cobro ya mandado no se llega aquí: `tomarCobro` dio falso arriba.)
@@ -157,7 +194,7 @@ export async function cobrarPago(deps: Deps, datos: Omit<DatosCobro, "monto">): 
     // «No se creó nada» lo dice un 400, pero se comprueba: ¿hay alguna orden con nuestra referencia?
     // El cobro ya contestó (con un no): si dejó una orden abierta no hay que esperarla, se cancela ya.
     const c = await confirmarPago(deps, fila.id, undefined, true);
-    if (c.ok && c.aplicados === 0) return descartar({ tipo: "NO_PROCESADO", contarIp: false });
+    if (c.ok && c.aplicados === 0 && !c.enVerificacion) return descartar({ tipo: "NO_PROCESADO", contarIp: false });
     // La orden que quedó abierta se pudo cancelar: tampoco hay cobro.
     return (await deps.db.leerPago(fila.id))?.estado === "RECHAZADO" ? descartar({ tipo: "NO_PROCESADO", contarIp: false }) : { tipo: "POR_CONFIRMAR" };
   }
@@ -168,6 +205,20 @@ export async function cobrarPago(deps: Deps, datos: Omit<DatosCobro, "monto">): 
 
   const d = que.decision;
   if (d.tipo === "RECHAZADO") return descartar({ tipo: "RECHAZADO", motivo: motivoDeRechazo(d.detalle) });
+  if (d.tipo === "PENDIENTE" && d.ordenIdExterno && enReto(r.cuerpo)) {
+    const url = urlDeReto(r.cuerpo);
+    // Sin una dirección que se pueda abrir el cliente no tiene cómo contestar el reto: se deja ya,
+    // en vez de tenerlo esperando. La orden queda vigilada, como cualquier reto abandonado.
+    // (Al log va solo que no sirvió: la dirección lleva un token del cliente.)
+    if (!url) {
+      deps.registrar("RETO_SIN_DIRECCION", `pago ${fila.id}, orden ${d.ordenIdExterno}`);
+      if (await deps.db.abandonar(fila.id, d.ordenIdExterno)) return { tipo: "RECHAZADO", motivo: "SIN_VERIFICAR" };
+      await deps.db.anotar(fila.id, { ordenIdExterno: d.ordenIdExterno });
+      return { tipo: "POR_CONFIRMAR" };
+    }
+    await deps.db.verificar(fila.id, d.ordenIdExterno);
+    return { tipo: "VERIFICACION", url };
+  }
   if (d.tipo !== "APROBADO") {
     // En revisión, ajena, incidente o ya devuelta: no es un sí ni un no. Lo resuelve la conciliación,
     // que consultará ESTA orden si es nuestra y sigue viva.
@@ -183,7 +234,13 @@ export async function cobrarPago(deps: Deps, datos: Omit<DatosCobro, "monto">): 
 // ── Confirmar ────────────────────────────────────────────────────────────────────────────────────
 
 export type Confirmacion =
-  | { ok: true; aplicados: number; recienAprobado: boolean }
+  /**
+   * `enVerificacion`: hay una orden nuestra que sigue esperando el reto del banco (el cliente lo
+   * está contestando, o lo dejó y Mercado Pago aún no la cierra). No hay cobro: no es un fallo ni
+   * «no hay orden», todavía no hay nada que aplicar. (La dirección del reto NO va aquí: este
+   * resultado se guarda en tienda_eventos. Quien la necesite la pide con `alReto`.)
+   */
+  | { ok: true; aplicados: number; recienAprobado: boolean; enVerificacion: boolean }
   /**
    * PAGO_DESCONOCIDO y NO_ENCONTRADO: no hay nada que reintentar. SIN_TOKEN y MP_NO_RESPONDE: sí.
    * PAGO_SIN_APLICAR: Mercado Pago tiene una orden VIVA con nuestra referencia (cobrada o en
@@ -200,8 +257,30 @@ export type Confirmacion =
  *   · si no se sabe cuál es (al crearla no hubo respuesta), la búsqueda por referencia.
  * Siempre con el token de la conexión dueña del pago; el monto lo comprueba la base.
  * Repetirla, o correrla dos veces a la vez, deja lo mismo.
+ *
+ * EL RETO DEL BANCO (3D Secure). Una orden nuestra en `action_required` no está cobrada ni
+ * rechazada, y Mercado Pago NO la deja cancelar (VERIFICADO: 422) ni la cierra pronto (seguía igual
+ * a los 45 minutos). Aquí nunca es un fallo: `enVerificacion`.
+ *   · Mientras el pago espera (CREADO) y nadie pide dejarlo: no se toca; su dirección se entrega
+ *     por `alReto` (a quien la pida; nunca se guarda). Si se supo de ella aquí (la respuesta del
+ *     cobro se perdió), se anota y se le da su plazo.
+ *   · Dejarlo es cerrar el pedido sin pago y dejar el pago ABANDONADO (la base: tienda_pago_abandonar,
+ *     y el barrido cuando pasa el plazo). Si lo pide el cliente (`cancelar`) se hace AQUÍ, y solo con
+ *     la orden a la vista y todavía esperando el reto: si ya salió de él (`processing`, `in_review`:
+ *     el cliente lo contestó y se está cobrando) NO se deja, y si Mercado Pago no contesta tampoco;
+ *     abandonar a ciegas un pago que se está aprobando acabaría en cobro y devolución. Vale también
+ *     si nadie había anotado la verificación: se anota en ese momento.
+ *   · Se intenta cancelar la orden UNA vez por pago (al pedirlo el cliente, o en la primera consulta
+ *     ya abandonado), por si se deja; el 422 es lo normal y no se registra. Si se dejó, se vuelve a
+ *     leer y se aplica como quedó.
+ *   · Ya ABANDONADO se sigue consultando (el barrido, espaciado): si la orden acaba cobrada —el
+ *     cliente contestó tarde— se aplica y la base la manda a devolver; si acaba rechazada, cancelada
+ *     o vencida, se da por conciliada.
+ *   · Un pago VENCIDO cuya orden resulta estar esperando un reto (nadie lo anotó a tiempo) pasa a
+ *     ABANDONADO para que se vigile como lo que es.
  */
-export async function confirmarPago(deps: Deps, pagoId: string, ordenPista?: string, cobroYaContesto = false): Promise<Confirmacion> {
+export async function confirmarPago(deps: Deps, pagoId: string, ordenPista?: string, cobroYaContesto = false,
+                                    opciones: { /** El cliente abandonó el reto: que la orden se cancele ya. */ cancelar?: boolean; alReto?: (url: string) => void } = {}): Promise<Confirmacion> {
   const fila = await deps.db.leerPago(pagoId);
   if (!fila) return { ok: false, motivo: "PAGO_DESCONOCIDO" };
   const token = await deps.db.token(fila.conexion_id);
@@ -239,7 +318,34 @@ export async function confirmarPago(deps: Deps, pagoId: string, ordenPista?: str
       deps.registrar("ORDEN_SIN_PROCESAR_CANCELADA", `pago ${fila.id}, orden ${o.id}`);
     } else deps.registrar("ORDEN_SIN_PROCESAR", `pago ${fila.id}, orden ${o.id}: no se dejó cancelar (${resumenDeFallo(c)})`);
   }
+  // Una orden NUESTRA que espera el reto del banco (ver arriba): nunca es un fallo.
+  for (const [i, orden] of ordenes.entries()) {
+    const d = decidirOrden(esperado, orden);
+    if (d.tipo !== "PENDIENTE" || !d.ordenIdExterno || !enReto(orden)) continue;
+    if (fila.estado === "CREADO" && !opciones.cancelar) {
+      if (!fila.en_verificacion) await deps.db.verificar(fila.id, d.ordenIdExterno);
+      const url = urlDeReto(orden);
+      if (url) opciones.alReto?.(url);
+      continue;
+    }
+    // Venció sin que nadie anotara que esperaba un reto: que se vigile como reto abandonado.
+    if (fila.estado === "VENCIDO") await deps.db.abandonar(fila.id, d.ordenIdExterno);
+    // El intento de cancelar, una vez por pago. VERIFICADO: lo normal es un 422 y la orden sigue igual.
+    if (!opciones.cancelar && !(fila.estado === "ABANDONADO" && fila.conciliaciones === 0)) continue;
+    const c = await mp.cancelarOrden(d.ordenIdExterno, `tienda-cancelar-${fila.id}-${ahora.getTime()}`);
+    if (c.status === 200 || c.status === 201) {
+      const leida = await mp.leerOrden(d.ordenIdExterno);
+      if (leida.status === 200) ordenes[i] = leida.cuerpo;
+      deps.registrar("RETO_CANCELADO", `pago ${fila.id}, orden ${d.ordenIdExterno}`);
+    }
+    // El cliente lo deja y la orden SIGUE esperando el reto (lo normal: no se dejó cancelar): se
+    // abandona de nuestro lado, con esta orden (la anote quien la anote).
+    if (opciones.cancelar && fila.estado === "CREADO" && enReto(ordenes[i])) await deps.db.abandonar(fila.id, d.ordenIdExterno);
+  }
   const decisiones = ordenes.map((orden) => decidirOrden(esperado, orden));
+  /** Una orden nuestra sigue esperando el reto (tal como quedó tras el intento de cancelar). */
+  const esReto = (i: number): boolean => decisiones[i]!.tipo === "PENDIENTE" && enReto(ordenes[i]);
+  const enVerificacion = ordenes.some((_, i) => esReto(i));
   // Una orden viva que trae NUESTRA referencia y que no se puede aplicar (otra cuenta vendedora, sin
   // acreditar, otra moneda, en revisión): se deja dicho con su id y su motivo, en el log y en el pago.
   let sinAplicar: string | null = null;
@@ -247,6 +353,8 @@ export async function confirmarPago(deps: Deps, pagoId: string, ordenPista?: str
     const d = decisiones[i]!;
     const nuestra = (orden as { external_reference?: unknown } | null)?.external_reference === fila.id;
     if (!("motivo" in d) || !nuestra || !ordenViva(orden)) continue;
+    // El reto de arriba: no es una orden «sin aplicar» (no hay cobro), es una que todavía no tiene resultado.
+    if (esReto(i)) continue;
     sinAplicar = `orden ${d.ordenIdExterno ?? "?"}: ${d.tipo} (${d.motivo})`;
     if (d.tipo !== "PENDIENTE") deps.registrar("PAGO_SIN_APLICAR", `pago ${fila.id}, ${sinAplicar}`);
     // En revisión y aún sin orden anotada (se supo por la búsqueda o por el aviso): se anota.
@@ -266,7 +374,7 @@ export async function confirmarPago(deps: Deps, pagoId: string, ordenPista?: str
   }
   // Con una aprobada ya aplicada, el pedido tiene su pago: lo demás no cambia eso.
   if (sinAplicar && !recienAprobado && (await deps.db.leerPago(fila.id))?.estado !== "APROBADO") return { ok: false, motivo: "PAGO_SIN_APLICAR" };
-  return { ok: true, aplicados, recienAprobado };
+  return { ok: true, aplicados, recienAprobado, enVerificacion };
 }
 
 /**
@@ -319,11 +427,23 @@ export async function devolverPago(deps: Deps, t: Pick<Tarea, "id" | "conexion_i
  * ponytail: de una en una y hasta 10 por pasada; con el tope de 10 s por llamada cabe en una
  * invocación. Si un día hay cola, subir el tope o repartir en paralelo por conexión.
  */
-export async function barrer(deps: Deps, avisar: (t: Tarea, de: "DEVOLUCION" | "CONCILIACION") => Promise<void>): Promise<{ devueltos: number; fallidos: number; conciliados: number; sinConsultar: number }> {
+export async function barrer(deps: Deps, avisar: (t: Tarea, de: "DEVOLUCION" | "CONCILIACION" | "RETO") => Promise<void>): Promise<{ devueltos: number; fallidos: number; conciliados: number; sinConsultar: number }> {
   const cuenta = { devueltos: 0, fallidos: 0, conciliados: 0, sinConsultar: 0 };
   for (const t of await deps.db.tomar(10)) {
     try {
-      if (t.tarea === "DEVOLVER") {
+      if (t.tarea === "RETO_VIEJO") {
+        // 48 horas con el reto abandonado y la orden sin cerrar: la base ya dejó de vigilarlo. Un
+        // último vistazo (si ya se cobró o se cerró, se aplica) y, si sigue pendiente o no se pudo
+        // mirar, un aviso a VIM con el id de la orden. Uno solo: esta tarea sale una vez por pago.
+        // Si el vistazo revienta, se avisa igual: es justo cuando nadie más lo va a ver. Y solo
+        // DESPUÉS de avisar se da por cerrado (la base lo vuelve a sacar cada hora hasta entonces):
+        // un correo repetido es mejor que uno perdido.
+        let c: Confirmacion | null = null;
+        try { c = await confirmarPago(deps, t.id); }
+        catch (e) { deps.registrar("BARRIDO", `pago ${t.id}: ${e instanceof Error ? e.message : String(e)}`); }
+        if (!c || !c.ok || c.enVerificacion) await avisar(t, "RETO");
+        await deps.db.conciliacion(t.id, true);
+      } else if (t.tarea === "DEVOLVER") {
         const estado = await devolverPago(deps, t);
         if (estado === "DEVUELTO") cuenta.devueltos++;
         if (estado === "DEVOLUCION_FALLIDA") { cuenta.fallidos++; await avisar(t, "DEVOLUCION"); }
@@ -382,6 +502,24 @@ export function avisoDeConciliacionFallida(d: {
 <li>Orden en Mercado Pago: ${esc(d.ordenIdExterno || "no se sabe (al crearla no hubo respuesta)")}</li>
 <li>Motivo: ${esc(d.motivo || "no se pudo consultar a Mercado Pago (cuenta desconectada o token rechazado)")}</li></ul>
 <p>Si el motivo dice que hay una orden que no se pudo aplicar, el dinero puede estar cobrado: hay que revisarla en la cuenta de Mercado Pago del restaurante y, si está cobrada, devolverla desde ahí. Si no se pudo consultar, lo más probable es que el restaurante desconectó su cuenta o que su token fue rechazado. Se seguirá intentando una vez por hora durante 48 horas: si reconecta la cuenta, el cobro se encuentra y se devuelve solo. Si no, hay que buscar en su cuenta de Mercado Pago una orden con esa referencia y devolverla a mano.</p>
+</div>`,
+  };
+}
+
+/**
+ * El correo interno a VIM cuando un reto del banco que el cliente dejó lleva 48 horas sin que Mercado
+ * Pago cierre su orden. No hay cobro (por eso no es «posible cobro sin pedido»), pero ya nadie la
+ * vigila: si se aprobara después, la devolución solo saldría si llega el aviso de Mercado Pago.
+ */
+export function avisoDeRetoSinCerrar(d: { pagoId: string; negocio: string; folio: string; monto: string; ordenIdExterno?: string | null }): { subject: string; html: string } {
+  return {
+    subject: soloAscii(`Verificacion del banco sin cerrar: ${d.folio} de ${d.negocio}`),
+    html: `<div style="font-family:system-ui,sans-serif;color:#111">
+<p>Un cliente dejó sin contestar la verificación de su banco hace 48 horas y Mercado Pago todavía tiene esa orden pendiente. <strong>No se ha cobrado nada</strong> y el pedido se cerró sin pago en su momento.</p>
+<ul><li>Negocio: ${esc(d.negocio)}</li><li>Pedido: ${esc(d.folio)}</li><li>Monto: $${esc(d.monto)}</li>
+<li>Pago (tienda_pagos.id, es la referencia en Mercado Pago): ${esc(d.pagoId)}</li>
+<li>Orden en Mercado Pago: ${esc(d.ordenIdExterno || "-")}</li></ul>
+<p>Desde ahora ya no se consulta sola. Si Mercado Pago avisa de un cambio, se aplica igual (y si resulta cobrada, se devuelve). Conviene mirar esa orden en la cuenta de Mercado Pago del restaurante: si aparece cobrada sin devolución, hay que devolverla desde ahí.</p>
 </div>`,
   };
 }

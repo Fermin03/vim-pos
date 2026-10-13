@@ -1,4 +1,4 @@
-# Orders API para el pago en línea — verificado el 11 oct 2026
+# Orders API para el pago en línea — verificado del 11 al 13 oct 2026
 
 Hechos comprobados con llamadas reales contra la cuenta de prueba (vendedor de prueba `3754297554`,
 aplicación gemela de «VIM POS Tienda»), con la Mastercard de prueba `5474 9254 3267 0366`, 11/30, 123
@@ -50,6 +50,8 @@ y un token de tarjeta creado con la public key de esa aplicación. Lo que no est
   "details": [ "PAY01M4P8KB8MM494BGX78592RQMQ: insufficient_amount" ] } ] }
 ```
 
+(Titulares SIN la verificación del banco; con ella encendida `APRO` deja de aprobar: ver más abajo.)
+
 | Titular de prueba | Motivo en `details` (tras «: ») |
 |---|---|
 | FUND | `insufficient_amount` |
@@ -77,7 +79,9 @@ y un token de tarjeta creado con la public key de esa aplicación. Lo que no est
 
 **En revisión → 201** con `status: "processing"`, `status_detail: "in_process"` (titular CONT). No
 existe `binary_mode`. `POST /v1/orders/{id}/cancel` contesta **409 `cannot_cancel_order`** («must be
-in 'action_required' or 'created'»): una orden `processing` no se puede cancelar.
+in 'action_required' or 'created'»): una orden `processing` no se puede cancelar. (Ese mensaje no
+es de fiar para `action_required`: una orden que espera el reto del banco tampoco se deja; ver
+«La verificación del banco».)
 
 **En revisión del antifraude → 201 con `status: "in_review"`** (VISTO EN PRODUCCIÓN el 12 oct 2026,
 cobro real con tarjeta real; no se ha reproducido en la cuenta de prueba). `POST /v1/orders`
@@ -124,6 +128,100 @@ en la cabecera.
   sí aparece: un texto `armor.` + hexadecimales, de **231 caracteres**. Pide `POST
   api.mercadopago.com/v1/device_sessions`.
 - La tienda carga ese script solo en la pantalla de la tarjeta.
+
+## La verificación del banco, 3D Secure (12 y 13 oct 2026)
+
+Todo lo de esta sección se comprobó esos días con llamadas reales contra la cuenta de prueba y con
+la página del reto abierta en un navegador.
+
+**Pedirla.** El cuerpo de siempre más
+
+```json
+"config": { "online": { "transaction_security": { "validation": "on_fraud_risk", "liability_shift": "required" } } }
+```
+
+Sin ese `config` la orden nace con `transaction_security.validation: "never"`: cuando el antifraude
+duda, solo puede rechazar (`high_risk`). Con `validation: "always"` la respuesta es igual que con
+`on_fraud_risk`.
+
+**Con reto → 201**, y la orden NO está cobrada ni rechazada:
+
+```json
+{ "id": "ORD…", "status": "action_required", "status_detail": "pending_challenge",
+  "transactions": { "payments": [ { "status": "action_required", "status_detail": "pending_challenge",
+    "payment_method": { "id": "master", "type": "credit_card", "transaction_security": {
+      "id": "<uuid>", "validation": "on_fraud_risk", "liability_shift": "required",
+      "url": "https://www.mercadopago.com.mx/auth/card/validation/pages/remedies/<uuid>?display_mode=self_hosted&guest_token=<uuid>" } } } ] } }
+```
+
+- **`GET /v1/orders/{id}` sigue devolviendo esa `url`** (con `id`, `validation` y `liability_shift`)
+  mientras la orden siga en `pending_challenge`, también minutos después. Por eso la dirección no se
+  guarda: quien la necesita otra vez (un reintento, una recarga) la saca de consultar la orden.
+- La `url` lleva un `guest_token`: es del cliente dueño de ese pago. No va a la base, ni a
+  `tienda_eventos`, ni a ningún log; solo en la respuesta a ese cliente.
+
+**Titulares de prueba con la verificación encendida** (cualquier tarjeta de prueba):
+
+| Titular | Qué pasa |
+|---|---|
+| `APRO-AUTH` | 201 `processed` / `accredited` directo, **sin reto** (sin `url`) |
+| `APRO-CHOK` | 201 `action_required` / `pending_challenge` con `url`; al pulsar «Confirmar» la orden queda **`processed` / `accredited`** y `transaction_security` pasa a `{ id, type: "threeds", status: "authenticated", validation, liability_shift }`, ya **sin `url`** |
+| `APRO` a secas | **También devuelve el reto**, y al confirmarlo la orden queda **`failed` / `failed`**: el pago `status: "failed"`, `status_detail: "3ds_challenge_failed"`, y `transaction_security.status: "not_authenticated"` |
+| `OTHE-CHNO` | Según la documentación muestra el reto y falla. **Sin probar.** |
+
+> **OJO:** con la verificación encendida, en la cuenta de prueba el titular `APRO` **ya no sirve
+> para un aprobado**. Para un cobro aprobado: `APRO-AUTH` (sin reto) o `APRO-CHOK` (con reto).
+>
+> **Y tampoco hay rechazos directos (solo en la cuenta de prueba):** con `on_fraud_risk`, los
+> titulares `FUND`, `OTHE` y `CALL` ya NO dan 402: devuelven 201 `action_required` /
+> `pending_challenge`, como `APRO` a secas. Es cosa del ambiente de prueba (todo titular sin sufijo
+> de 3DS pide reto), no una regla de producción. Para un rechazo directo con la verificación
+> encendida **no hay titular verificado**; el 402 de la tabla de arriba se comprobó sin ella.
+
+**La página del reto** (`https://www.mercadopago.com.mx`, la misma dirección que da la API):
+
+- En el ambiente de prueba: título del documento «Remedies»; el aviso «Ambiente de pruebas. Esta es
+  una pantalla de prueba de validación 3DS.»; «Validación de seguridad», un campo «Código de
+  verificación» que ya trae un código, y el botón «Confirmar». Unos 370×300 px de contenido, más la
+  franja de cookies de Mercado Pago abajo («Aceptar cookies» / «Configurar cookies»), que dentro de
+  un marco también sale.
+- **Al terminar (aprobado O fallido) le manda a su ventana padre un `postMessage`** con `origin`
+  `https://www.mercadopago.com.mx` y `data` = **el TEXTO `{"status":"COMPLETE"}`** (una cadena
+  JSON, no un objeto). Después la página queda en blanco. `COMPLETE` no dice si se aprobó.
+- El resultado se refleja en `GET /v1/orders/{id}` en menos de ~10 segundos tras el `COMPLETE`.
+- El contenido del reto vive en un marco anidado dentro de esa página. Lo que la página carga por
+  dentro: `http2.mlstatic.com`, `matt.mercadopago.com.mx`, `api.mercadolibre.com`,
+  `o11y-proxy-otel-frontend.meli.com`. Eso lo gobierna SU política, no la nuestra: a la CSP de la
+  tienda le basta `frame-src https://www.mercadopago.com.mx`. En un reto real el banco pone su
+  propia página en ese marco anidado; tampoco es nuestra CSP.
+
+- **El marco SÍ carga embebido** en una página de otro origen (probado con un marco de 375×500: se
+  pinta la pantalla del reto). Y **la misma `url` se puede abrir más de una vez** mientras el reto
+  siga pendiente (una recarga de la tienda la vuelve a abrir).
+
+**Una orden que espera el reto NO se puede cancelar.** `POST /v1/orders/{id}/cancel` (sin cuerpo y
+con `{}`) sobre una orden `action_required` / `pending_challenge` contesta
+
+```json
+{ "errors": [ { "code": "unprocessable_content", "message": "Unprocessable Entity" } ] }
+```
+
+con **422**, recién creada (segundos) y con 40 minutos. La orden sigue igual. El mensaje del 409 de
+más arriba («must be in 'action_required' or 'created'») **no se cumple** para un reto pendiente.
+Cancelar una orden ya `processed` → 409 `cannot_cancel_order`.
+
+**Abandono.** Un reto que nadie contesta **sigue `pending_challenge` al menos 45 minutos** (misma
+`last_updated_date`, con su `url`). No se sabe cuándo lo vence Mercado Pago: hay que asumir que
+puede tardar horas y que **el cliente puede completarlo tarde** si conserva la página. Por eso la
+tienda deja un reto de SU lado (cierra el pedido sin pago), no cancela nada allá, y sigue mirando
+esa orden hasta su final: si acaba cobrada, la devuelve (ver `02-diseno.md`).
+
+**Sin verificar de la verificación:** cuándo vence Mercado Pago por su cuenta un reto abandonado y
+con qué estado y `status_detail` lo deja (el código acepta `failed`, `canceled` y `expired`); si en
+producción la cancelación de un reto pendiente también da 422; qué aviso (`action`) llega al
+resolverse el reto, y si llega alguno cuando se aprueba tarde; cómo se ve un reto real de un banco
+dentro del marco, y si necesita permisos del marco (`allow`); un rechazo directo (402) con la
+verificación encendida; y si un cobro real que antes salía `high_risk` ahora pide el reto.
 
 ## Consultar
 

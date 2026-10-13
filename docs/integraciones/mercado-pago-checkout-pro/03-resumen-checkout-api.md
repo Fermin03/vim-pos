@@ -531,6 +531,7 @@ más dominios. Recordar que la CSP de la tienda puede vivir en más de una copia
 > `secure-fields.mercadopago.com`; `connect-src` esos tres más `www.mercadolibre.com` y
 > `api.mercadolibre.com`; `img-src` `www.mercadolibre.com` y `www.mercadolivre.com`. Los dos últimos
 > de `connect` e `img` son la huella de dispositivo: bloquearlos empeora la aprobación.
+> Desde la verificación del banco, `frame-src` lleva además `www.mercadopago.com.mx` (la página del reto).
 
 ---
 
@@ -629,6 +630,11 @@ Con `binary_mode: false` reaparecen los estados `in_process` (`pending_contingen
 `pending_review_manual`), que pueden tardar «hasta 2 días hábiles» en resolverse
 (`DOCS-AP/response-handling/collection-results`). Un pedido de comida no puede esperar eso: habría que
 cancelar ese pago en cuanto aparezca.
+
+> **Superado el 12 oct 2026.** Con tarjetas reales Mercado Pago rechazaba casi todo con `high_risk`:
+> la verificación se encendió («solo si hay riesgo») con Orders API. Lo comprobado está en
+> `04-verificado-orders.md` y el diseño en `02-diseno.md`. De esta sección, **sin confirmar**: los 40
+> minutos de vida del reto (una orden abandonada seguía igual a los 8 minutos).
 
 **Recomendación:** lanzar **sin 3DS** y con `binary_mode: true`. Encender 3DS solo si el piloto muestra
 contracargos o rechazos `cc_rejected_3ds_mandatory`, y entonces diseñar el estado «esperando al banco».

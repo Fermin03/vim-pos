@@ -327,3 +327,8 @@ test("pedido en línea: sin su pago, o con un importe que no es un importe, es n
   // Y un pedido en línea NO pasa por el lector de los de pago al recibir (no tiene ventana de aceptación).
   assert.equal(leerPedido(ALTA_EN_LINEA), null);
 });
+
+test("cupos: verificacion (la pantalla de la tarjeta durante el reto del banco) gasta de la bolsa de confirmar_pago y cierra si el control falla", () => {
+  assert.deepEqual(cuposDe("verificacion", "1.2.3.4", "knockout"), cuposDe("confirmar_pago", "1.2.3.4", "knockout"));
+  assert.equal(cuposDe("verificacion", "1.2.3.4", "knockout").alFallar, "cerrar");
+});

@@ -35,6 +35,12 @@ export type Peticion =
   /** El respaldo del aviso de Mercado Pago: la página del pedido pide que se confirme su pago. */
   | { accion: "confirmar_pago"; negocio: string; codigo: string }
   /**
+   * Cómo va la verificación del banco (3D Secure) del pago de ese pedido: le pregunta a Mercado Pago
+   * y contesta si sigue, si ya se pagó o si no pasó. Con `cancelar`, el cliente abandona el reto: se
+   * cancela la orden en Mercado Pago antes de dejarle intentar otro pago.
+   */
+  | { accion: "verificacion"; negocio: string; codigo: string; cancelar: boolean }
+  /**
    * ¿Existe ya un pedido para esta clave de intento? No crea ni cobra nada. La tienda lo pregunta
    * cuando mandó un pago en línea y no supo qué pasó: mientras no lo sepa, no emite otra clave.
    */
@@ -52,7 +58,7 @@ export type Peticion =
   | { accion: "eliminar_cuenta"; negocio: string; password: string };
 
 const ACCIONES: ReadonlySet<string> = new Set<Peticion["accion"]>([
-  "negocio", "menu", "cotizar", "pedir", "seguimiento", "confirmar_pago", "intento", "registrar", "entrar", "salir", "recuperar_pedir", "recuperar_aplicar",
+  "negocio", "menu", "cotizar", "pedir", "seguimiento", "confirmar_pago", "verificacion", "intento", "registrar", "entrar", "salir", "recuperar_pedir", "recuperar_aplicar",
   "cuenta", "cuenta_guardar", "cuenta_password", "direccion_guardar", "direccion_borrar", "mis_pedidos", "eliminar_cuenta",
 ]);
 
@@ -151,7 +157,7 @@ export function leerFecha(x: unknown, hoy: Date = new Date()): string | null | u
  * si la cuenta existe. Una contraseña que se va a COMPROBAR (entrar, la actual, eliminar) solo se
  * acota a 1 carácter–72 bytes: si es corta, que la rechace la base como cualquier otra equivocada.
  */
-function leerCuenta(accion: Exclude<Peticion["accion"], "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" | "intento">,
+function leerCuenta(accion: Exclude<Peticion["accion"], "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" | "verificacion" | "intento">,
                     negocio: string, x: Record<string, unknown>): Resultado<Peticion> {
   const invalida = mal("CUENTA_INVALIDA_DATOS");
   switch (accion) {
@@ -209,12 +215,16 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
   const negocio = typeof x.negocio === "string" ? x.negocio.trim().toLowerCase() : "";
   if (!SLUG.test(negocio)) return mal("NEGOCIO_INVALIDO");
 
-  if (accion !== "negocio" && accion !== "menu" && accion !== "cotizar" && accion !== "pedir" && accion !== "seguimiento" && accion !== "confirmar_pago" && accion !== "intento") {
+  if (accion !== "negocio" && accion !== "menu" && accion !== "cotizar" && accion !== "pedir" && accion !== "seguimiento" && accion !== "confirmar_pago" && accion !== "verificacion" && accion !== "intento") {
     return leerCuenta(accion, negocio, x);
   }
   if (accion === "negocio") return { ok: true, valor: { accion, negocio } };
   if (accion === "intento") {
     return esCodigo(x.clave) ? { ok: true, valor: { accion, negocio, clave: x.clave } } : mal("CUERPO_INVALIDO");
+  }
+  if (accion === "verificacion") {
+    // `cancelar` solo vale escrito tal cual: cualquier otra cosa es «no cancelar».
+    return esCodigo(x.codigo) ? { ok: true, valor: { accion, negocio, codigo: x.codigo, cancelar: x.cancelar === true } } : mal("CODIGO_INVALIDO");
   }
   if (accion === "seguimiento" || accion === "confirmar_pago") {
     return esCodigo(x.codigo) ? { ok: true, valor: { accion, negocio, codigo: x.codigo } } : mal("CODIGO_INVALIDO");

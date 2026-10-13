@@ -4,16 +4,23 @@
 // si el pedido ya había entrado, el servidor devuelve ese mismo en vez de crear otro.
 import type { Resultado } from "./api";
 import type { Campo } from "./cliente";
-import type { Cotizacion, ErrorDeTienda, PedidoCreado } from "./contrato";
+import type { Cotizacion, ErrorDeTienda, PedidoCreado, Verificacion } from "./contrato";
 import type { Horario } from "@vim/fecha";
 import type { Momento } from "./horario";
 import { almacenDelNavegador, type Almacen } from "./carrito";
 import { textoDeRechazo, type CampoDeTarjeta } from "./tarjeta";
 import { textoCerrada, textoDeError } from "./textos";
+import { pasoDelReto } from "./verificacion";
 
 export type Desenlace =
   /** El pedido existe (también si vino sin folio ni total): vaciar el carrito e ir al seguimiento. */
   | { tipo: "hecho"; codigo: string }
+  /**
+   * El banco quiere confirmar el pago con el cliente (3D Secure) antes de cobrar. El pedido existe,
+   * pero NO está pagado ni rechazado: la pantalla de la tarjeta abre el reto (`url`, o lo que diga el
+   * servidor si no vino) y el intento sigue en duda hasta saber cómo acabó.
+   */
+  | { tipo: "verificar"; codigo: string; url: string | null }
   /**
    * La tarjeta: un dato que no cuadra o el banco no aprobó el cobro. No se creó ningún pedido y no
    * se cobró nada: se dice junto a la tarjeta (en su campo, si el motivo es de uno) y se puede
@@ -99,6 +106,8 @@ export async function enviarPedido(d: {
     pidio = true;
     const r = await d.pedir(cot.datos.total_mxn);
     if (!r.ok) return { desenlace: desenlaceDelError(r, c), pidio, error: r.error };
+    // El banco pide confirmar: todavía no hay cobro ni pedido para el restaurante. No es «hecho».
+    if (r.datos.pago?.estado === "VERIFICACION") return { desenlace: { tipo: "verificar", codigo: r.datos.codigo, url: r.datos.pago.url }, pidio, error: null };
     // Pagado, o «no se supo si el cobro pasó»: en los dos casos el pedido existe y su página dice cómo va.
     return { desenlace: { tipo: "hecho", codigo: r.datos.codigo }, pidio, error: null };
   } catch {
@@ -173,8 +182,14 @@ export function claveNueva(): string {
   return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").slice(0, 22);
 }
 
-/** Dónde se guarda el intento en el teléfono, junto al carrito. */
+/**
+ * Dónde se guarda el intento en el teléfono, junto al carrito: UNO POR NEGOCIO (`dondeDelIntento`).
+ * Todas las tiendas viven en el mismo dominio; con una sola clave para todas, abrir «Tus datos» en
+ * otro restaurante preguntaba por un intento en duda que no era suyo, el servidor contestaba «no
+ * existe» y la duda del primero se soltaba: se podía pagar dos veces allá.
+ */
 export const CLAVE_DEL_INTENTO = "vim.tienda.intento";
+export const dondeDelIntento = (negocio: string): string => (negocio ? `${CLAVE_DEL_INTENTO}.${negocio}` : CLAVE_DEL_INTENTO);
 /** Un intento de más de 15 minutos ya no se reutiliza: su pedido, si esperaba pago, ya venció. */
 const VIDA_DEL_INTENTO_MS = 15 * 60_000;
 
@@ -208,31 +223,52 @@ function huellaDe(texto: string): string {
  * quita solo de dos formas: el pedido entró (`cerrar`), o el servidor confirmó que para esa clave
  * no hay pedido ni cobro (`aclarar`). Ver `resolverDuda`.
  *
+ * ES DE UN NEGOCIO (`negocio`, su slug): se guarda con su nombre, y el intento en duda de otro
+ * restaurante ni se lee, ni se consulta, ni se suelta desde este.
+ *
  * Se guarda en el teléfono, donde vive el carrito: recargar la página y volver a enviar NO crea otro
  * pedido, y la duda sobrevive a la recarga. Se guarda la clave y la HUELLA del pedido, nunca el pedido. Con el almacén
  * bloqueado (modo privado) vive en memoria, como antes. Sin duda, caduca a los 15 minutos.
  */
-export function intentoDeCompra(nueva: () => string = claveNueva, almacen: () => Almacen | null = almacenDelNavegador, ahora: () => number = Date.now) {
+export function intentoDeCompra(nueva: () => string = claveNueva, almacen: () => Almacen | null = almacenDelNavegador, ahora: () => number = Date.now, negocio = "") {
   type Intento = { de: string; clave: string; cuando: number; duda: boolean };
+  const donde = dondeDelIntento(negocio);
   /** undefined = todavía no se ha mirado el teléfono (se mira al primer uso: al importar no hay navegador). */
   let actual: Intento | null | undefined;
-  const leer = (): Intento | null => {
-    if (actual !== undefined) return actual;
+  /** Lo guardado es texto de fuera: solo vale con su forma exacta. */
+  const deTexto = (crudo: string | null | undefined): Intento | null => {
     try {
-      const x: unknown = JSON.parse(almacen()?.getItem(CLAVE_DEL_INTENTO) ?? "null");
+      const x: unknown = JSON.parse(crudo ?? "null");
       const o = typeof x === "object" && x !== null ? (x as Record<string, unknown>) : {};
-      // Lo guardado es texto de fuera: solo vale con su forma exacta.
-      actual = typeof o.de === "string" && typeof o.clave === "string" && /^[A-Za-z0-9_-]{22}$/.test(o.clave) && typeof o.cuando === "number"
+      return typeof o.de === "string" && typeof o.clave === "string" && /^[A-Za-z0-9_-]{22}$/.test(o.clave) && typeof o.cuando === "number"
         ? { de: o.de, clave: o.clave, cuando: o.cuando, duda: o.duda === true } : null;
     } catch {
-      actual = null;
+      return null;
+    }
+  };
+  const leer = (): Intento | null => {
+    if (actual !== undefined) return actual;
+    try { actual = deTexto(almacen()?.getItem(donde)); } catch { actual = null; }
+    // EL CAMBIO DE NOMBRE (oct 2026). Antes había una sola clave para todo el dominio, sin negocio.
+    // Quien tenga ahí un intento —quizá EN DUDA, con un cobro en vuelo— no puede perderlo al
+    // actualizarse la tienda: recargar y pagar otra vez sería un segundo cobro. De quién era no se
+    // puede saber (no lo guardaba), así que la primera tienda que lo lee lo toma como suyo: lo pasa
+    // a su clave y borra el viejo. Si no era de aquí, el servidor dirá que no existe y se suelta.
+    if (negocio) {
+      try {
+        const viejo = deTexto(almacen()?.getItem(CLAVE_DEL_INTENTO));
+        const adoptado = viejo !== null && !actual;
+        if (adoptado) { actual = viejo; guardar(); }
+        // El viejo se borra solo si su copia quedó guardada (o si no se adoptó): nunca se pierde por el camino.
+        if (!adoptado || almacen()?.getItem(donde) != null) almacen()?.removeItem(CLAVE_DEL_INTENTO);
+      } catch { /* almacén bloqueado: se queda como estaba */ }
     }
     return actual;
   };
   const guardar = (): void => {
     try {
-      if (actual) almacen()?.setItem(CLAVE_DEL_INTENTO, JSON.stringify(actual));
-      else almacen()?.removeItem(CLAVE_DEL_INTENTO);
+      if (actual) almacen()?.setItem(donde, JSON.stringify(actual));
+      else almacen()?.removeItem(donde);
     } catch { /* cuota llena o modo privado: se queda en memoria */ }
   };
   return {
@@ -262,8 +298,13 @@ export function intentoDeCompra(nueva: () => string = claveNueva, almacen: () =>
   };
 }
 
-/** El de la página. */
-export const intentoDeLaPagina = intentoDeCompra();
+const delNegocio = new Map<string, ReturnType<typeof intentoDeCompra>>();
+/** El de ESTE negocio en esta página (uno por slug: recuerda en memoria si el teléfono no deja guardar). */
+export function intentoDelNegocio(negocio: string): ReturnType<typeof intentoDeCompra> {
+  let i = delNegocio.get(negocio);
+  if (!i) delNegocio.set(negocio, (i = intentoDeCompra(claveNueva, almacenDelNavegador, Date.now, negocio)));
+  return i;
+}
 
 /**
  * Los rechazos de `pedir` que, por sí solos, prueban que para esa clave NO quedó pedido ni cobro: el
@@ -275,27 +316,45 @@ const SIN_PEDIDO_NI_COBRO = new Set(["PAGO_RECHAZADO", "PAGO_NO_PROCESADO", "PAG
 export const pruebaQueNoHuboCobro = (error: string): boolean => SIN_PEDIDO_NI_COBRO.has(error);
 
 export type Duda =
-  /** No había duda, o el servidor confirmó que no hay pedido ni cobro: se puede intentar de nuevo. */
-  | { tipo: "libre" }
+  /**
+   * No había duda, o el servidor confirmó que no hay pedido ni cobro: se puede intentar de nuevo.
+   * `rechazo`: el pedido existía esperando el reto del banco y el pago no pasó; la familia del motivo.
+   */
+  | { tipo: "libre"; rechazo?: string | null }
   /** El pedido sí había entrado: a su página, que dice cómo va el pago. */
   | { tipo: "hecho"; codigo: string }
+  /** El pedido existe y su pago sigue esperando el reto del banco: se continúa ese reto (la duda sigue). */
+  | { tipo: "verificar"; codigo: string; url: string | null }
   /** No se pudo preguntar: sigue sin saberse. El formulario sigue bloqueado. */
   | { tipo: "duda" };
 
 /**
  * Resuelve un intento de pago en duda preguntándole al servidor por su clave (`intento`, que no crea
  * ni cobra nada). Solo libera el formulario con un «no existe» del servidor; si no contesta, la duda sigue.
+ * Si el pedido existe y se puede preguntar por su verificación (`verificar`): con el reto del banco
+ * todavía vivo se continúa ese reto, en vez de mandar al cliente a esperar en la página del pedido; y
+ * si ese pago ya no pasó (el servidor descartó el pedido), el formulario queda libre.
  */
 export async function resolverDuda(
   intento: Pick<ReturnType<typeof intentoDeCompra>, "enDuda" | "aclarar" | "cerrar">,
   preguntar: (clave: string) => Promise<{ ok: true; datos: { existe: false } | { existe: true; codigo: string } } | { ok: false }>,
+  verificar?: (codigo: string) => Promise<Resultado<Verificacion>>,
 ): Promise<Duda> {
   const clave = intento.enDuda();
   if (!clave) return { tipo: "libre" };
   let r: Awaited<ReturnType<typeof preguntar>>;
   try { r = await preguntar(clave); } catch { return { tipo: "duda" }; }
   if (!r.ok) return { tipo: "duda" };
-  if (r.datos.existe) { intento.cerrar(); return { tipo: "hecho", codigo: r.datos.codigo }; }
+  if (r.datos.existe) {
+    const { codigo } = r.datos;
+    let paso: ReturnType<typeof pasoDelReto> = { tipo: "pedido" };
+    // Si no se puede preguntar, lo de siempre: a la página del pedido, que dice cómo va.
+    if (verificar) { try { paso = pasoDelReto(await verificar(codigo)); } catch { /* como si no hubiera contestado */ } }
+    if (paso.tipo === "sigue") return { tipo: "verificar", codigo, url: paso.url };
+    if (paso.tipo === "rechazado") { intento.aclarar(); return { tipo: "libre", rechazo: paso.detalle }; }
+    intento.cerrar();
+    return { tipo: "hecho", codigo };
+  }
   intento.aclarar();
   return { tipo: "libre" };
 }

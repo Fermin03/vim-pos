@@ -62,6 +62,7 @@ Pensada para 360–430 px; en escritorio es la misma columna, centrada (`max-w-2
 | Producto | `components/producto.tsx` | Foto, opciones con su regla, cantidad, nota y «Agregar» |
 | Carrito | `components/carrito.tsx` | Renglones y la cuenta |
 | Tus datos | `components/datos.tsx` | En pantallas: quién recibe (o recoge), a dónde y la nota; cómo paga; la tarjeta. Va dentro de la hoja del carrito. Qué pantallas hay lo decide `lib/pasos.ts` |
+| Reto del banco | `components/reto.tsx` | El marco con la verificación del banco (3D Secure), en lugar de la tarjeta. Qué dirección se abre y qué pasó lo decide `lib/verificacion.ts` |
 | Propina | `components/propina.tsx` | El selector de propina y «Otro monto», en «¿Cómo pagas?» y en la pregunta antes de pagar |
 | Seguimiento | `components/seguimiento.tsx` | El estado en grande, el recorrido, el restaurante, el resumen y «Copiar enlace» |
 | Privacidad | `[negocio]/privacidad/page.tsx` | El aviso (provisional, marcado como tal). Se enlaza desde «Tus datos», desde «Crear cuenta» y desde el pie |
@@ -243,6 +244,35 @@ El cliente paga con tarjeta **dentro de «Tus datos»**; no se le manda a otra p
   número, la fecha de vencimiento y el código de seguridad.»), sin señalar un campo: Mercado Pago no
   dice si falló el código o la fecha. Tras varios rechazos seguidos el mensaje es siempre el
   general, y después la tienda pide esperar («Hiciste demasiados intentos seguidos.»).
+- **El banco pide confirmar el pago** (3D Secure): el reto se abre **en la misma pantalla, en lugar
+  de la tarjeta** (que se queda montada, oculta). Título «Confirma el pago con tu banco»
+  (`text-16`, el de las demás pantallas) con el foco, una línea de apoyo (`text-14`, `ink-2`) y,
+  debajo, la página de Mercado Pago en un marco **a todo el ancho de la hoja** (sin el margen de los
+  textos: en un teléfono la página del banco necesita cada pixel), de 500 px de alto, con una línea
+  arriba (`line`) y pegado al pie; si su contenido es más alto, se desplaza por dentro. Mientras
+  carga dice «Cargando la verificación de tu banco…» y el marco entra con un fundido de 200 ms.
+  Lo de dentro del marco (el código del banco, la franja de cookies de Mercado Pago) no es nuestro
+  y no se toca. La franja «Regresar / Paso 3 de 3» se quita: no hay a dónde regresar. En el pie, un
+  solo botón secundario, **«Cancelar»** (la acción principal está dentro del marco). Con el reto a
+  la vista la hoja no se cierra.
+- **Al terminar el reto**, el marco se quita y queda «Confirmando tu pago» con el aviso ámbar del
+  pie («Estamos confirmando tu pago. No vuelvas a pagar todavía…»): no se ofrece pagar otra vez
+  hasta que el servidor diga cómo quedó, **ni «Cancelar»** (el pago puede estar aprobándose). Si
+  pasados unos segundos el servidor dice que el reto sigue, el marco vuelve y «Cancelar» con él.
+  **Pendiente:** el marco no lleva `sandbox` ni `allow`; revisarlo con el primer reto de un banco real. Aprobado → la página del pedido. Si no pasó → de vuelta a
+  «Tu tarjeta», con lo escrito intacto y el `Aviso` rojo de siempre: «Tu banco no confirmó el pago.
+  Intenta de nuevo o usa otra tarjeta.», con «No se te cobró nada.»
+- **«Cancelar» y el plazo** no esperan a nadie: el reto se deja y se vuelve a «Tu tarjeta» en el
+  acto, lista para pagar otra vez, con «Cancelaste la verificación con tu banco.» o «No se completó
+  la verificación con tu banco. Intenta de nuevo o usa otra tarjeta.» (pasó el tiempo), los dos
+  con «No se te cobró nada.» Ninguno promete tiempos. (El instante entre el toque y la respuesta
+  dice «Cancelando la verificación».)
+- **La página de un pedido cuyo reto se dejó**: «No se completó el pago» / «No se completó la
+  verificación con tu banco. Tu pedido no se envió al restaurante y no se te cobró nada.», sin
+  rojo. Si el cliente lo contesta después y el pago se devuelve: «Cancelado» / «Tu pago se confirmó
+  cuando tu pedido ya se había cerrado, así que no se envió al restaurante. Estamos devolviendo tu
+  pago completo…», también sin rojo (no fue el restaurante).
+- **Recargar a medio reto** abre «Tus datos» sola y lo continúa.
 - **No se supo si el cobro pasó**: la tienda va a la página del pedido, que dice «Confirmando tu
   pago» / «Esto puede tardar unos minutos.». Nunca «rechazado» ni «no se te cobró» sin saberlo.
 - **Si el formulario no carga**: `Aviso` ámbar («No pudimos cargar el pago con tarjeta…») con

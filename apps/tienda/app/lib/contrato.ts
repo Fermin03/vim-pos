@@ -6,6 +6,7 @@
 // copian solo los campos que conocen: lo que la función añada mañana no llega a la pantalla solo.
 import { leerHorario, type Horario } from "@vim/fecha";
 import type { ItemDeCuerpo } from "./carrito";
+import { urlDeReto } from "./verificacion";
 
 export type Modo = "RECOGER" | "DOMICILIO";
 /** EFECTIVO y TARJETA se pagan al recibir; EN_LINEA, al pedir, con tarjeta, dentro de la tienda. */
@@ -74,11 +75,19 @@ export type Cotizacion = {
 export type PedidoCreado = {
   codigo: string; folio_corto: string | null; total_mxn: string | null; vence_aceptacion: string | null;
   /**
-   * Solo en un pedido que se paga en línea: PAGADO (el cobro pasó) o POR_CONFIRMAR (no se supo: el
-   * seguimiento lo dirá). Un cobro rechazado no llega aquí: es un error (`PAGO_RECHAZADO`).
+   * Solo en un pedido que se paga en línea: PAGADO (el cobro pasó), POR_CONFIRMAR (no se supo: el
+   * seguimiento lo dirá) o VERIFICACION (el banco quiere confirmar con el cliente antes de cobrar:
+   * todavía no se cobró nada). Un cobro rechazado no llega aquí: es un error (`PAGO_RECHAZADO`).
    */
-  pago: { estado: "PAGADO" | "POR_CONFIRMAR" } | null;
+  pago: { estado: "PAGADO" | "POR_CONFIRMAR" } | PagoEnVerificacion | null;
 };
+/**
+ * El banco pide confirmar el pago (3D Secure). `url`: la página del reto, ya comprobada (https y de
+ * Mercado Pago: `urlDeReto`); null si no vino o no era de ahí, y entonces se le pregunta al servidor.
+ */
+export type PagoEnVerificacion = { estado: "VERIFICACION"; url: string | null };
+/** Lo que contesta `verificacion`: cómo va el reto del banco de ese pedido. Un rechazo es un error (`PAGO_RECHAZADO`). */
+export type Verificacion = { estado: "PAGADO" | "POR_CONFIRMAR" } | PagoEnVerificacion;
 
 export const ESTADOS_DE_PEDIDO = ["POR_PAGAR", "EN_PROCESO", "EN_PREPARACION", "EN_CAMINO", "LISTO_PARA_RECOGER", "ENTREGADO", "CANCELADO"] as const;
 export type EstadoDePedido = (typeof ESTADOS_DE_PEDIDO)[number];
@@ -242,9 +251,20 @@ export const pedidoDe = lector((x): PedidoCreado => {
     codigo: con(FORMA_CODIGO)(p.codigo), folio_corto: oNull(p.folio_corto, /^[A-Za-z0-9-]{1,20}$/),
     total_mxn: oNull(p.total_mxn, /^\d+\.\d{2}$/), vence_aceptacion: oNull(p.vence_aceptacion, /^[0-9T:.+Z -]{10,40}$/),
     // Un `pago` raro no tumba la respuesta: el pedido existe. Lo que no sea «pagado» se confirma en su seguimiento.
-    pago: typeof p.pago === "object" && p.pago !== null ? { estado: (p.pago as Obj).estado === "PAGADO" ? "PAGADO" : "POR_CONFIRMAR" } : null,
+    pago: typeof p.pago === "object" && p.pago !== null ? pagoDe(p.pago as Obj) : null,
   };
 });
+/**
+ * El estado de un pago en línea, de una lista cerrada. Lo que no se reconoce es POR_CONFIRMAR (lo
+ * dirá la página del pedido), nunca «pagado». De la dirección del reto solo pasa la que es de
+ * Mercado Pago; cualquier otra clave (y cualquier otra dirección) se queda fuera.
+ */
+function pagoDe(p: Obj): Verificacion {
+  if (p.estado === "VERIFICACION") return { estado: "VERIFICACION", url: urlDeReto(p.url) };
+  return { estado: p.estado === "PAGADO" ? "PAGADO" : "POR_CONFIRMAR" };
+}
+/** `verificacion`: sin `pago` no hay respuesta válida. */
+export const verificacionDe = lector((x): Verificacion => pagoDe(obj(obj(x).pago)));
 
 export const seguimientoDe = lector((x): Seguimiento => {
   const s = obj(x), suc = obj(s.sucursal);

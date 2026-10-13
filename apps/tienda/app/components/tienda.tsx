@@ -20,7 +20,7 @@ import { semanaLegible, type Momento } from "../lib/horario";
 import { carritoPara, motivoDeCierre, renglonesDelError } from "../lib/pantalla";
 import { enlaceTel, formatoTelefono } from "../lib/telefono";
 import { textoCerrada } from "../lib/textos";
-import { envioDeLaPagina } from "../lib/envio";
+import { envioDeLaPagina, intentoDelNegocio } from "../lib/envio";
 import { VistaDelCarrito, useCotizacion } from "./carrito";
 import { PasoDeDatos, useEnviando } from "./datos";
 import { Entrega } from "./entrega";
@@ -128,7 +128,9 @@ export function Tienda({ negocio, sucursal, menu, ahora, conSesion }: {
   const [ajeno, setAjeno] = useState<Carrito | null>(null);
   const [paso, setPaso] = useState<"menu" | "carrito" | "datos">("menu");
   /** Cambiar de paso por un toque del cliente: con un pedido enviándose no se mueve nada. Se pregunta al candado en el acto, no al estado. */
-  const pasar = (p: typeof paso) => { if (!envioDeLaPagina.ocupado()) setPaso(p); };
+  const pasar = (p: typeof paso) => { if (!envioDeLaPagina.ocupado() && !retenida) setPaso(p); };
+  /** El reto del banco (3D Secure) está a la vista en «Tus datos»: mientras, tampoco se sale de la hoja. */
+  const [retenida, setRetenida] = useState(false);
   const [producto, setProducto] = useState<{ p: Producto; turno: number } | null>(null);
   const [verProducto, setVerProducto] = useState(false);
   const [nota, setNota] = useState("");
@@ -170,6 +172,9 @@ export function Tienda({ negocio, sucursal, menu, ahora, conSesion }: {
     sinCambios.current = inicial;
     setAjeno(deOtra ? leido : null);
     setCarrito(inicial);
+    // Se recargó la página con un pago en línea del que no se sabe el resultado (o a medio reto del
+    // banco): «Tus datos» se abre sola. Ahí se pregunta por ese intento y, si el reto sigue vivo, se continúa.
+    if (!repetido && !deOtra && inicial.renglones.length > 0 && intentoDelNegocio(negocio.slug).enDuda()) setPaso("datos");
     // Solo al llegar a esta sucursal. `negocio` y `sucursal` son objetos nuevos en cada refresco de la
     // página: releer ahí pisaría el carrito en memoria (y lo vaciaría si el teléfono no deja guardar).
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -243,7 +248,7 @@ export function Tienda({ negocio, sucursal, menu, ahora, conSesion }: {
         {producto && <ProductoPorAgregar key={producto.turno} producto={producto.p} alAgregar={alAgregar} />}
       </Hoja>
 
-      <Hoja abierta={paso !== "menu" && !ajeno} fija={enviando} alCerrar={() => pasar("menu")} titulo={paso === "datos" ? "Tus datos" : "Tu pedido"}>
+      <Hoja abierta={paso !== "menu" && !ajeno} fija={enviando || retenida} alCerrar={() => pasar("menu")} titulo={paso === "datos" ? "Tus datos" : "Tu pedido"}>
         {paso === "datos" ? (
           <PasoDeDatos negocio={negocio} sucursal={sucursal} carrito={carrito} nota={nota} alCambiarNota={setNota}
             cotizacion={cotizado.resultado?.ok ? cotizado.resultado.datos : null}
@@ -253,7 +258,7 @@ export function Tienda({ negocio, sucursal, menu, ahora, conSesion }: {
             alErrorDeCarrito={(e) => { setErrorDeEnvio(e); setPaso("carrito"); }}
             alPedidoHecho={() => { setNota(""); cambiar(vaciar); }}
             cuenta={sesion ? mi : null} conSesion={sesion} alTerminarLaSesion={() => { setSesion(false); setMi(null); }}
-            deVuelta={rutaDelMenu(negocio, sucursal.id)} />
+            deVuelta={rutaDelMenu(negocio, sucursal.id)} alRetener={setRetenida} />
         ) : (
           <>
           {noEntro && (

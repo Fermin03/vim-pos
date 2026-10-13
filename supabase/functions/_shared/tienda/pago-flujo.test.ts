@@ -2,14 +2,14 @@
 // (docs/integraciones/mercado-pago-checkout-pro/04-verificado-orders.md).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { avisoDeConciliacionFallida, avisoDeDevolucionFallida, barrer, cobrarPago, confirmarPago, type Deps, devolverPago, type FilaPago, type PuertoPagos, respuestaDeConfirmacion, type Tarea, topesDelAviso } from "./pago-flujo.ts";
+import { avisoDeConciliacionFallida, avisoDeDevolucionFallida, avisoDeRetoSinCerrar, barrer, cobrarPago, confirmarPago, type Deps, devolverPago, type FilaPago, type PuertoPagos, respuestaDeConfirmacion, type Tarea, topesDelAviso } from "./pago-flujo.ts";
 import type { ClienteMpTienda, RespuestaMp } from "./pago-mp.ts";
 
 const PAGO = "2cd9e6fa-1acf-47dc-8ba4-cba918d73770";
 const ORDEN = "ORDTST01M4P8JX8C82XV8G7EB2A16YAC";
 const FILA: FilaPago = {
   id: PAGO, conexion_id: "cx-1", estado: "CREADO", monto: "138.00", cobro_mandado: false,
-  orden_id_externo: null, detalle: null, creado: "2026-10-11T18:00:00.000Z", cuenta_vendedora: "3754297554",
+  orden_id_externo: null, detalle: null, creado: "2026-10-11T18:00:00.000Z", en_verificacion: false, conciliaciones: 0, cuenta_vendedora: "3754297554",
 };
 const APROBADA = {
   id: ORDEN, status: "processed", status_detail: "accredited", total_amount: "138.00", total_paid_amount: "138.00",
@@ -24,7 +24,7 @@ type Metodo = keyof ClienteMpTienda | "cancelarOrden";
 /** La base y Mercado Pago de mentira: se anota cada llamada y se contesta lo que diga cada prueba. */
 function doble(o: {
   /** Lo que la base devuelve en cada lectura del pago, en orden; la última se repite. */
-  filas?: (FilaPago | null)[]; token?: string | null; toma?: boolean; tareas?: Tarea[]; descarta?: boolean;
+  filas?: (FilaPago | null)[]; token?: string | null; toma?: boolean; tareas?: Tarea[]; descarta?: boolean; abandona?: boolean;
   /** Lo que contesta Mercado Pago: una respuesta por método, o una lista (una por llamada; la última se repite). */
   mp?: Partial<Record<Metodo, RespuestaMp | RespuestaMp[]>>; devolucion?: (ok: boolean) => string;
   aplicar?: (ordenIdExterno: string) => { estado: string; pedido_estado: string; recien_aprobado: boolean };
@@ -51,6 +51,8 @@ function doble(o: {
       return o.aplicar?.(d.ordenIdExterno) ?? { estado: "APROBADO", pedido_estado: "RECIBIDO", recien_aprobado: d.resultado === "APROBADO" };
     },
     anotar: async (_id, d) => { aLaBase.push(d); llamadas.push(`anotar ${d.ordenIdExterno ?? "-"} ${d.error ?? "-"}`); },
+    verificar: async (_id, orden) => { aLaBase.push({ verificar: orden }); llamadas.push(`verificar ${orden}`); },
+    abandonar: async (_id, orden) => { aLaBase.push({ abandonar: orden }); llamadas.push(`abandonar ${orden ?? "-"}`); return o.abandona ?? true; },
     tomar: async () => o.tareas ?? [],
     devolucion: async (id, ok, error) => { aLaBase.push({ ok, error }); llamadas.push(`devolucion ${id} ${ok}${error ? ` ${error}` : ""}`); return o.devolucion?.(ok) ?? (ok ? "DEVUELTO" : "POR_DEVOLVER"); },
     conciliacion: async (id, ok) => { llamadas.push(`conciliacion ${id} ${ok}`); return !ok && (o.tercerFallo?.(id) ?? false); },
@@ -246,17 +248,17 @@ test("un pago que ya está aprobado no se vuelve a cobrar", async () => {
 
 test("confirmar: la orden anotada manda sobre la pista del aviso; sin ninguna, se busca por referencia", async () => {
   const anotada = doble({ filas: [{ ...FILA, orden_id_externo: ORDEN }], mp: { leerOrden: { status: 200, cuerpo: APROBADA } } });
-  assert.deepEqual(await confirmarPago(anotada.deps, PAGO, "ORDDEOTRO"), { ok: true, aplicados: 1, recienAprobado: true });
+  assert.deepEqual(await confirmarPago(anotada.deps, PAGO, "ORDDEOTRO"), { ok: true, aplicados: 1, recienAprobado: true, enVerificacion: false });
   assert.ok(anotada.llamadas.includes(`mp.leerOrden ${ORDEN}`));
   const pista = doble({ mp: { leerOrden: { status: 200, cuerpo: APROBADA } } });
-  assert.deepEqual(await confirmarPago(pista.deps, PAGO, ORDEN), { ok: true, aplicados: 1, recienAprobado: true });
+  assert.deepEqual(await confirmarPago(pista.deps, PAGO, ORDEN), { ok: true, aplicados: 1, recienAprobado: true, enVerificacion: false });
   const busca = doble({ mp: { buscarOrdenes: { status: 200, cuerpo: { data: [] } } } });
-  assert.deepEqual(await confirmarPago(busca.deps, PAGO), { ok: true, aplicados: 0, recienAprobado: false });
+  assert.deepEqual(await confirmarPago(busca.deps, PAGO), { ok: true, aplicados: 0, recienAprobado: false, enVerificacion: false });
 });
 
 test("confirmar: la pista de un aviso con una orden de OTRO pago no mueve nada", async () => {
   const { deps, llamadas } = doble({ mp: { leerOrden: { status: 200, cuerpo: { ...APROBADA, external_reference: "otro-pago" } } } });
-  assert.deepEqual(await confirmarPago(deps, PAGO, "ORDAJENA"), { ok: true, aplicados: 0, recienAprobado: false });
+  assert.deepEqual(await confirmarPago(deps, PAGO, "ORDAJENA"), { ok: true, aplicados: 0, recienAprobado: false, enVerificacion: false });
   assert.ok(sin(llamadas, "aplicar") && sin(llamadas, "anotar"));
   // Y una orden que ese token no ve (es de otra cuenta): 404, nada que reintentar.
   const otra = doble({ mp: { leerOrden: { status: 404, cuerpo: null } } });
@@ -269,7 +271,7 @@ test("confirmar: sin pago, sin token o sin respuesta, lo dice; y cada caso conte
   assert.deepEqual(await confirmarPago(doble().deps, PAGO), { ok: false, motivo: "MP_NO_RESPONDE" });
   // La búsqueda con un formato de fechas que Mercado Pago no acepte (sin probar) cae aquí: no es «sin pago».
   assert.deepEqual(await confirmarPago(doble({ mp: { buscarOrdenes: { status: 400, cuerpo: { errors: [{ code: "invalid_params" }] } } } }).deps, PAGO), { ok: false, motivo: "MP_NO_RESPONDE" });
-  assert.equal(respuestaDeConfirmacion({ ok: true, aplicados: 0, recienAprobado: false }), 200);
+  assert.equal(respuestaDeConfirmacion({ ok: true, aplicados: 0, recienAprobado: false, enVerificacion: false }), 200);
   for (const motivo of ["PAGO_DESCONOCIDO", "NO_ENCONTRADO", "PAGO_SIN_APLICAR"] as const) assert.equal(respuestaDeConfirmacion({ ok: false, motivo }), 200);
   for (const motivo of ["SIN_TOKEN", "MP_NO_RESPONDE"] as const) assert.equal(respuestaDeConfirmacion({ ok: false, motivo }), 503);
 });
@@ -291,13 +293,13 @@ test("confirmar: una orden viva con nuestra referencia que no se puede aplicar N
   assert.deepEqual(await confirmarPago(modo.deps, PAGO), { ok: false, motivo: "PAGO_SIN_APLICAR" });
   // Si además hay una aprobada que sí se aplica, el pedido tiene su pago: cuenta como buena.
   const conBuena = doble({ mp: { buscarOrdenes: { status: 200, cuerpo: { data: [sinAcreditar, { ...APROBADA, id: "ORDBUENA" }] } } } });
-  assert.deepEqual(await confirmarPago(conBuena.deps, PAGO), { ok: true, aplicados: 1, recienAprobado: true });
+  assert.deepEqual(await confirmarPago(conBuena.deps, PAGO), { ok: true, aplicados: 1, recienAprobado: true, enVerificacion: false });
 });
 
 test("confirmar: con varias órdenes, la aprobada se aplica antes que la rechazada", async () => {
   const fallida = { ...APROBADA, id: "ORDFALLIDA", status: "failed", status_detail: "failed", total_paid_amount: undefined };
   const { deps, llamadas } = doble({ mp: { buscarOrdenes: { status: 200, cuerpo: { data: [fallida, APROBADA] } } } });
-  assert.deepEqual(await confirmarPago(deps, PAGO), { ok: true, aplicados: 2, recienAprobado: true });
+  assert.deepEqual(await confirmarPago(deps, PAGO), { ok: true, aplicados: 2, recienAprobado: true, enVerificacion: false });
   assert.deepEqual(llamadas.filter((l) => l.startsWith("aplicar")), [`aplicar APROBADO ${ORDEN} 138.00`, "aplicar RECHAZADO ORDFALLIDA 138.00"]);
 });
 
@@ -454,7 +456,7 @@ test("confirmar con la orden todavía in_review: sigue pendiente (no cuenta como
 test("in_review que acaba en failed (el aviso order.failed): se aplica el rechazo y el pedido se cierra", async () => {
   const fallida = { ...EN_ANTIFRAUDE, status: "failed", status_detail: "failed", transactions: { payments: [{ id: "PAY01", status: "failed", status_detail: "high_risk", payment_method: { id: "master", type: "credit_card" } }] } };
   const { deps, llamadas } = doble({ filas: [{ ...FILA, cobro_mandado: true, orden_id_externo: "ORDTSTANTIFRAUDE" }], mp: { leerOrden: { status: 200, cuerpo: fallida } } });
-  assert.deepEqual(await confirmarPago(deps, PAGO, "ORDTSTANTIFRAUDE"), { ok: true, aplicados: 1, recienAprobado: false });
+  assert.deepEqual(await confirmarPago(deps, PAGO, "ORDTSTANTIFRAUDE"), { ok: true, aplicados: 1, recienAprobado: false, enVerificacion: false });
   assert.ok(llamadas.some((l) => l.startsWith("aplicar RECHAZADO ORDTSTANTIFRAUDE")));
 });
 test("402 high_risk: rechazado con su propio motivo (RIESGO), y el pedido se descarta", async () => {
@@ -500,4 +502,275 @@ test("NADA del cliente llega a un log ni a la base: ni aprobado, ni rechazado, n
   const { deps, llamadas } = doble(escenas[5]);
   await cobrarPago(deps, CON_DETALLE);
   assert.ok(llamadas.some((l) => l.startsWith("registrar COBRO_NO_ACEPTADO") && l.includes("payer.phone.number") && l.includes("payer.address.street_name")));
+});
+
+// ── La verificación del banco (3D Secure). Respuestas REALES del 12 y 13 oct 2026 (documento 04) ──
+const ORDEN_RETO = "ORDTST01M4P8RETO";
+const URL_RETO = "https://www.mercadopago.com.mx/auth/card/validation/pages/remedies/5f0c3c6e-1111-4222-8333-444455556666?display_mode=self_hosted&guest_token=9a8b7c6d-aaaa-4bbb-8ccc-ddddeeeeffff";
+/** Lo que NUNCA debe llegar a la base ni a un log: la dirección, su identificador y su token de invitado. */
+const DEL_RETO = [URL_RETO, "remedies", "guest_token", "9a8b7c6d-aaaa-4bbb-8ccc-ddddeeeeffff", "5f0c3c6e-1111-4222-8333-444455556666", "mercadopago.com.mx"];
+const seguridad = (extra: Record<string, unknown>) => ({ id: "5f0c3c6e-1111-4222-8333-444455556666", validation: "on_fraud_risk", liability_shift: "required", ...extra });
+const pagoDeReto = (status: string, status_detail: string, ts: Record<string, unknown>) =>
+  ({ transactions: { payments: [{ id: "PAY01M4P8RETO", status, status_detail, payment_method: { id: "master", type: "credit_card", token: DATOS.tarjeta.token, installments: 1, transaction_security: seguridad(ts) } }] } });
+// 201 de POST /v1/orders con verificación «on_fraud_risk»: el banco quiere confirmar con el cliente.
+const EN_RETO = { ...APROBADA, id: ORDEN_RETO, status: "action_required", status_detail: "pending_challenge", total_paid_amount: "0.00", ...pagoDeReto("action_required", "pending_challenge", { url: URL_RETO }) };
+// Titular APRO-CHOK tras «Confirmar»: processed / accredited, autenticada y ya sin dirección.
+const RETO_APROBADO = { ...APROBADA, id: ORDEN_RETO, ...pagoDeReto("processed", "accredited", { type: "threeds", status: "authenticated" }) };
+// Titular APRO tras «Confirmar»: failed / failed, y el pago 3ds_challenge_failed.
+const RETO_FALLIDO = { ...EN_RETO, status: "failed", status_detail: "failed", ...pagoDeReto("failed", "3ds_challenge_failed", { type: "threeds", status: "not_authenticated" }) };
+// VERIFICADO (12 y 13 oct 2026): cancelar una orden que espera el reto → 422, recién creada y a los 40 minutos. La orden sigue igual.
+const NO_SE_CANCELA = { status: 422, cuerpo: { errors: [{ code: "unprocessable_content", message: "Unprocessable Entity" }] } };
+// SIN VERIFICAR: cómo queda una orden si un día Mercado Pago SÍ la deja cancelar, o la vence él. El código solo mira `status`.
+const RETO_CANCELADO = { ...EN_RETO, status: "canceled", status_detail: "canceled", ...pagoDeReto("canceled", "canceled", {}) };
+const FILA_EN_RETO: FilaPago = { ...FILA, cobro_mandado: true, orden_id_externo: ORDEN_RETO, en_verificacion: true };
+const FILA_ABANDONADA: FilaPago = { ...FILA_EN_RETO, estado: "ABANDONADO" };
+const CERRADO = () => ({ estado: "ABANDONADO", pedido_estado: "EXPIRADO", recien_aprobado: false });
+const sinRastroDelReto = (d: { llamadas: string[]; aLaBase: unknown[] }, extra: unknown = null) => {
+  const escrito = JSON.stringify([d.llamadas, d.aLaBase, extra]);
+  for (const dato of DEL_RETO) assert.equal(escrito.includes(dato), false, `«${dato}» llegó a la base, a un log o a un resultado que se guarda`);
+};
+
+test("el cobro se pide con verificación «solo si hay riesgo»", async () => {
+  const { deps, cuerpos } = doble({ mp: { crearOrden: { status: 201, cuerpo: APROBADA } } });
+  await cobrarPago(deps, DATOS);
+  assert.deepEqual((cuerpos[0] as { config: unknown }).config, { online: { transaction_security: { validation: "on_fraud_risk", liability_shift: "required" } } });
+});
+
+test("reto: 201 action_required / pending_challenge → VERIFICACION con la dirección; la orden queda anotada con su plazo y nada se cobra, se descarta ni se cancela", async () => {
+  const d = doble({ mp: { crearOrden: { status: 201, cuerpo: EN_RETO } } });
+  assert.deepEqual(await cobrarPago(d.deps, DATOS), { tipo: "VERIFICACION", url: URL_RETO });
+  assert.ok(d.llamadas.includes(`verificar ${ORDEN_RETO}`));
+  assert.ok(sin(d.llamadas, "aplicar") && sin(d.llamadas, "descartar") && sin(d.llamadas, "mp.cancelarOrden") && sin(d.llamadas, "anotar") && sin(d.llamadas, "abandonar"));
+  // La dirección viaja solo en lo que se le contesta a ese cliente.
+  sinRastroDelReto(d);
+});
+
+test("reto con una dirección que no es de Mercado Pago (o sin ella): no se abre; el reto se deja en el acto (nadie puede contestarlo) y el pedido NO se descarta", async () => {
+  for (const url of ["https://evil.example/reto?guest_token=9a8b7c6d-aaaa-4bbb-8ccc-ddddeeeeffff", "http://www.mercadopago.com.mx/x", undefined]) {
+    const d = doble({ mp: { crearOrden: { status: 201, cuerpo: { ...EN_RETO, ...pagoDeReto("action_required", "pending_challenge", { url }) } } } });
+    assert.deepEqual(await cobrarPago(d.deps, DATOS), { tipo: "RECHAZADO", motivo: "SIN_VERIFICAR" });
+    assert.ok(d.llamadas.includes(`abandonar ${ORDEN_RETO}`) && sin(d.llamadas, "verificar") && sin(d.llamadas, "descartar"));
+    assert.ok(d.llamadas.some((l) => l.startsWith("registrar RETO_SIN_DIRECCION")));
+    assert.equal(JSON.stringify([d.llamadas, d.aLaBase]).includes("evil.example"), false);
+    assert.equal(JSON.stringify([d.llamadas, d.aLaBase]).includes("guest_token"), false);
+  }
+  // Si la base no lo deja abandonar (algo lo movió), no se afirma nada: POR_CONFIRMAR.
+  const raro = doble({ abandona: false, mp: { crearOrden: { status: 201, cuerpo: { ...EN_RETO, ...pagoDeReto("action_required", "pending_challenge", {}) } } } });
+  assert.deepEqual(await cobrarPago(raro.deps, DATOS), { tipo: "POR_CONFIRMAR" });
+});
+
+test("reto vivo: no es un fallo ni «no hay orden»; no se cancela, no se anota como error, y la dirección solo sale por alReto", async () => {
+  const d = doble({ filas: [FILA_EN_RETO], mp: { leerOrden: { status: 200, cuerpo: EN_RETO } } });
+  const vistas: string[] = [];
+  const c = await confirmarPago(d.deps, PAGO, undefined, false, { alReto: (u) => vistas.push(u) });
+  assert.deepEqual(c, { ok: true, aplicados: 0, recienAprobado: false, enVerificacion: true });
+  assert.deepEqual(vistas, [URL_RETO]);
+  assert.ok(sin(d.llamadas, "mp.cancelarOrden") && sin(d.llamadas, "aplicar") && sin(d.llamadas, "anotar") && sin(d.llamadas, "verificar") && sin(d.llamadas, "abandonar") && sin(d.llamadas, "registrar"));
+  // El resultado de confirmar se guarda en tienda_eventos (el aviso): no puede llevar la dirección.
+  sinRastroDelReto(d, c);
+  assert.equal(respuestaDeConfirmacion(c), 200);
+
+  // Si se supo de la orden aquí (la respuesta del cobro se perdió): se anota y se le da su plazo.
+  const perdida = doble({ filas: [{ ...FILA, cobro_mandado: true }], mp: { buscarOrdenes: { status: 200, cuerpo: { data: [EN_RETO] } } } });
+  assert.deepEqual(await confirmarPago(perdida.deps, PAGO), { ok: true, aplicados: 0, recienAprobado: false, enVerificacion: true });
+  assert.ok(perdida.llamadas.includes(`verificar ${ORDEN_RETO}`) && sin(perdida.llamadas, "mp.cancelarOrden"));
+  sinRastroDelReto(perdida);
+});
+
+test("aprobado tras el reto: la consulta lo aplica y el pedido queda pagado", async () => {
+  const d = doble({ filas: [FILA_EN_RETO], mp: { leerOrden: { status: 200, cuerpo: RETO_APROBADO } } });
+  assert.deepEqual(await confirmarPago(d.deps, PAGO, ORDEN_RETO), { ok: true, aplicados: 1, recienAprobado: true, enVerificacion: false });
+  assert.ok(d.llamadas.includes(`aplicar APROBADO ${ORDEN_RETO} 138.00`) && sin(d.llamadas, "mp.cancelarOrden"));
+  sinRastroDelReto(d);
+});
+
+test("el banco no confirmó el reto (3ds_challenge_failed): rechazo con su motivo; el reintento del cliente lo lee como VERIFICACION y el pedido se descarta", async () => {
+  const d = doble({ filas: [FILA_EN_RETO], mp: { leerOrden: { status: 200, cuerpo: RETO_FALLIDO } },
+                    aplicar: () => ({ estado: "RECHAZADO", pedido_estado: "EXPIRADO", recien_aprobado: false }) });
+  assert.deepEqual(await confirmarPago(d.deps, PAGO), { ok: true, aplicados: 1, recienAprobado: false, enVerificacion: false });
+  assert.deepEqual(d.aLaBase[0], { resultado: "RECHAZADO", ordenIdExterno: ORDEN_RETO, pagoIdExterno: "PAY01M4P8RETO", monto: "138.00", tipoTarjeta: "credit_card", marca: "master", detalle: "3ds_challenge_failed" });
+  assert.ok(sin(d.llamadas, "mp.cancelarOrden"));
+  sinRastroDelReto(d);
+
+  const reintento = doble({ toma: false, filas: [FILA_EN_RETO, FILA_EN_RETO, { ...FILA_EN_RETO, estado: "RECHAZADO", detalle: "3ds_challenge_failed" }],
+                            mp: { leerOrden: { status: 200, cuerpo: RETO_FALLIDO } }, aplicar: () => ({ estado: "RECHAZADO", pedido_estado: "EXPIRADO", recien_aprobado: false }) });
+  assert.deepEqual(await cobrarPago(reintento.deps, DATOS), { tipo: "RECHAZADO", motivo: "VERIFICACION" });
+  assert.ok(reintento.llamadas.includes("descartar") && sin(reintento.llamadas, "mp.crearOrden"));
+});
+
+test("el cliente deja el reto: se intenta cancelar UNA vez; el 422 (lo normal) no es un fallo ni se registra, y el pago se abandona CON la orden que se vio", async () => {
+  const d = doble({ filas: [FILA_EN_RETO], mp: { leerOrden: { status: 200, cuerpo: EN_RETO }, cancelarOrden: NO_SE_CANCELA } });
+  const vistas: string[] = [];
+  const c = await confirmarPago(d.deps, PAGO, undefined, false, { cancelar: true, alReto: (u) => vistas.push(u) });
+  assert.deepEqual(c, { ok: true, aplicados: 0, recienAprobado: false, enVerificacion: true });
+  assert.equal(d.llamadas.filter((l) => l.startsWith("mp.cancelarOrden")).length, 1);
+  assert.deepEqual(d.llamadas.filter((l) => l.startsWith("abandonar")), [`abandonar ${ORDEN_RETO}`]);
+  assert.ok(sin(d.llamadas, "aplicar") && sin(d.llamadas, "registrar") && sin(d.llamadas, "anotar") && sin(d.llamadas, "conciliacion"));
+  assert.deepEqual(vistas, [], "a quien deja el reto no se le devuelve su dirección");
+  sinRastroDelReto(d, c);
+  // Lo mismo si Mercado Pago ni contesta a la cancelación: la orden se vio y sigue en el reto.
+  const sinRed = doble({ filas: [FILA_EN_RETO], mp: { leerOrden: { status: 200, cuerpo: EN_RETO }, cancelarOrden: { status: 0, cuerpo: null } } });
+  assert.deepEqual(await confirmarPago(sinRed.deps, PAGO, undefined, false, { cancelar: true }), { ok: true, aplicados: 0, recienAprobado: false, enVerificacion: true });
+  assert.ok(sin(sinRed.llamadas, "registrar") && sinRed.llamadas.includes(`abandonar ${ORDEN_RETO}`));
+});
+
+test("«Cancelar» cuando la orden YA SALIÓ del reto y se está cobrando (processing, in_review): NO se abandona; ni tampoco a ciegas si Mercado Pago no contesta", async () => {
+  // El cliente contestó el reto y toca «Cancelar» mientras Mercado Pago cobra: abandonar aquí acabaría en cobro y devolución.
+  for (const cobrandose of [{ ...EN_REVISION, id: ORDEN_RETO }, { ...EN_ANTIFRAUDE, id: ORDEN_RETO }]) {
+    const d = doble({ filas: [FILA_EN_RETO], mp: { leerOrden: { status: 200, cuerpo: cobrandose } } });
+    assert.deepEqual(await confirmarPago(d.deps, PAGO, undefined, false, { cancelar: true }), { ok: false, motivo: "PAGO_SIN_APLICAR" });
+    assert.ok(sin(d.llamadas, "abandonar") && sin(d.llamadas, "mp.cancelarOrden") && sin(d.llamadas, "aplicar"), d.llamadas.join("\n"));
+  }
+  const sinRespuesta = doble({ filas: [FILA_EN_RETO], mp: { leerOrden: { status: 0, cuerpo: null } } });
+  assert.deepEqual(await confirmarPago(sinRespuesta.deps, PAGO, undefined, false, { cancelar: true }), { ok: false, motivo: "MP_NO_RESPONDE" });
+  assert.ok(sin(sinRespuesta.llamadas, "abandonar") && sin(sinRespuesta.llamadas, "mp.cancelarOrden"));
+  // Y sin que el cliente lo pida, una consulta nunca abandona un pago que espera.
+  const consulta = doble({ filas: [FILA_EN_RETO], mp: { leerOrden: { status: 200, cuerpo: EN_RETO } } });
+  await confirmarPago(consulta.deps, PAGO);
+  assert.ok(sin(consulta.llamadas, "abandonar"));
+});
+
+test("«Cancelar» sin que nadie hubiera anotado la verificación (la respuesta del cobro se perdió): si la orden está en el reto se abandona igual, con esa orden", async () => {
+  const d = doble({ filas: [{ ...FILA, cobro_mandado: true }], mp: { buscarOrdenes: { status: 200, cuerpo: { data: [EN_RETO] } }, cancelarOrden: NO_SE_CANCELA } });
+  assert.deepEqual(await confirmarPago(d.deps, PAGO, undefined, false, { cancelar: true }), { ok: true, aplicados: 0, recienAprobado: false, enVerificacion: true });
+  assert.ok(d.llamadas.includes(`abandonar ${ORDEN_RETO}`), d.llamadas.join("\n"));
+  sinRastroDelReto(d);
+});
+
+test("el cliente deja el reto y Mercado Pago SÍ deja cancelar (por si en producción funciona): se vuelve a leer y se aplica el rechazo", async () => {
+  const d = doble({ filas: [FILA_EN_RETO], aplicar: () => ({ estado: "RECHAZADO", pedido_estado: "EXPIRADO", recien_aprobado: false }),
+                    mp: { leerOrden: [{ status: 200, cuerpo: EN_RETO }, { status: 200, cuerpo: RETO_CANCELADO }], cancelarOrden: { status: 200, cuerpo: RETO_CANCELADO } } });
+  assert.deepEqual(await confirmarPago(d.deps, PAGO, undefined, false, { cancelar: true }), { ok: true, aplicados: 1, recienAprobado: false, enVerificacion: false });
+  assert.ok(d.llamadas.includes(`aplicar RECHAZADO ${ORDEN_RETO} 138.00`));
+  assert.equal((d.aLaBase[0] as { detalle: string }).detalle, "canceled");
+});
+
+test("el cliente toca «Cancelar» cuando ya había contestado el reto: la orden está cobrada y se le da su pedido, no se cierra", async () => {
+  const d = doble({ filas: [FILA_EN_RETO], mp: { leerOrden: { status: 200, cuerpo: RETO_APROBADO } } });
+  assert.deepEqual(await confirmarPago(d.deps, PAGO, undefined, false, { cancelar: true }), { ok: true, aplicados: 1, recienAprobado: true, enVerificacion: false });
+  assert.ok(d.llamadas.includes(`aplicar APROBADO ${ORDEN_RETO} 138.00`) && sin(d.llamadas, "mp.cancelarOrden"));
+});
+
+test("reto abandonado y vigilado: mientras Mercado Pago lo tenga pendiente NO es un fallo, ni «posible cobro sin pedido»; cancelar se intenta solo en la primera consulta", async () => {
+  // VERIFICADO: una orden abandonada seguía pending_challenge, con su dirección, a los 45 minutos.
+  const primera = doble({ filas: [FILA_ABANDONADA], mp: { leerOrden: { status: 200, cuerpo: EN_RETO }, cancelarOrden: NO_SE_CANCELA } });
+  const vistas: string[] = [];
+  const c = await confirmarPago(primera.deps, PAGO, undefined, false, { alReto: (u) => vistas.push(u) });
+  assert.deepEqual(c, { ok: true, aplicados: 0, recienAprobado: false, enVerificacion: true });
+  assert.equal(primera.llamadas.filter((l) => l.startsWith("mp.cancelarOrden")).length, 1);
+  assert.ok(sin(primera.llamadas, "aplicar") && sin(primera.llamadas, "registrar") && sin(primera.llamadas, "anotar") && sin(primera.llamadas, "verificar"));
+  assert.deepEqual(vistas, [], "de un reto que ya se dejó no se vuelve a entregar la dirección");
+  sinRastroDelReto(primera, c);
+  // De la segunda consulta en adelante ya no se intenta cancelar: solo se mira.
+  const despues = doble({ filas: [{ ...FILA_ABANDONADA, conciliaciones: 1 }], mp: { leerOrden: { status: 200, cuerpo: EN_RETO } } });
+  assert.deepEqual(await confirmarPago(despues.deps, PAGO), { ok: true, aplicados: 0, recienAprobado: false, enVerificacion: true });
+  assert.ok(sin(despues.llamadas, "mp.cancelarOrden") && sin(despues.llamadas, "registrar"));
+});
+
+test("reto abandonado que el cliente contesta TARDE: aparece cobrado y se aplica (la base lo manda a devolver: el pedido ya estaba cerrado)", async () => {
+  const d = doble({ filas: [{ ...FILA_ABANDONADA, conciliaciones: 3 }], mp: { leerOrden: { status: 200, cuerpo: RETO_APROBADO } },
+                    aplicar: () => ({ estado: "POR_DEVOLVER", pedido_estado: "EXPIRADO", recien_aprobado: false }) });
+  // Llega igual por el aviso de Mercado Pago que por el barrido: es el mismo camino.
+  assert.deepEqual(await confirmarPago(d.deps, PAGO, ORDEN_RETO), { ok: true, aplicados: 1, recienAprobado: false, enVerificacion: false });
+  assert.ok(d.llamadas.includes(`aplicar APROBADO ${ORDEN_RETO} 138.00`) && sin(d.llamadas, "mp.cancelarOrden"));
+  sinRastroDelReto(d);
+});
+
+test("reto abandonado cuya orden acaba fallida, cancelada o vencida: se aplica el rechazo (la base lo da por conciliado)", async () => {
+  for (const [final, detalle] of [[RETO_FALLIDO, "3ds_challenge_failed"], [RETO_CANCELADO, "canceled"], [{ ...RETO_CANCELADO, status: "expired" }, "expired"]] as const) {
+    const d = doble({ filas: [{ ...FILA_ABANDONADA, conciliaciones: 2 }], mp: { leerOrden: { status: 200, cuerpo: final } }, aplicar: CERRADO });
+    assert.deepEqual(await confirmarPago(d.deps, PAGO), { ok: true, aplicados: 1, recienAprobado: false, enVerificacion: false });
+    assert.equal((d.aLaBase[0] as { resultado: string; detalle: string }).resultado, "RECHAZADO");
+    assert.equal((d.aLaBase[0] as { detalle: string }).detalle, detalle);
+  }
+});
+
+test("un pago VENCIDO cuya orden resulta estar esperando un reto pasa a vigilarse como abandonado, en vez de darse por conciliado a la hora", async () => {
+  const d = doble({ filas: [{ ...FILA, estado: "VENCIDO", cobro_mandado: true }], mp: { buscarOrdenes: { status: 200, cuerpo: { data: [EN_RETO] } } } });
+  assert.deepEqual(await confirmarPago(d.deps, PAGO), { ok: true, aplicados: 0, recienAprobado: false, enVerificacion: true });
+  assert.ok(d.llamadas.includes(`abandonar ${ORDEN_RETO}`) && sin(d.llamadas, "anotar") && sin(d.llamadas, "registrar"));
+});
+
+test("un reintento con el reto vivo NO crea otra orden ni otro cobro: consulta la misma y devuelve su dirección para continuar", async () => {
+  const d = doble({ toma: false, filas: [FILA_EN_RETO], mp: { leerOrden: { status: 200, cuerpo: EN_RETO } } });
+  assert.deepEqual(await cobrarPago(d.deps, DATOS), { tipo: "VERIFICACION", url: URL_RETO });
+  assert.ok(sin(d.llamadas, "mp.crearOrden") && sin(d.llamadas, "mp.cancelarOrden") && sin(d.llamadas, "descartar"));
+  assert.ok(d.llamadas.includes(`mp.leerOrden ${ORDEN_RETO}`));
+  sinRastroDelReto(d);
+  // Y si mientras tanto se aprobó, el reintento lo dice.
+  const ya = doble({ toma: false, filas: [FILA_EN_RETO, FILA_EN_RETO, { ...FILA_EN_RETO, estado: "APROBADO" }], mp: { leerOrden: { status: 200, cuerpo: RETO_APROBADO } } });
+  assert.deepEqual(await cobrarPago(ya.deps, DATOS), { tipo: "APROBADO", recienAprobado: true });
+});
+
+test("un reintento del intento cuyo reto ya se dejó: SIN_VERIFICAR, sin cobrar, sin consultar y SIN descartar (ese renglón vigila la orden)", async () => {
+  const d = doble({ filas: [FILA_ABANDONADA] });
+  assert.deepEqual(await cobrarPago(d.deps, DATOS), { tipo: "RECHAZADO", motivo: "SIN_VERIFICAR" });
+  assert.deepEqual(d.llamadas, []);
+  // Y si se deja justo mientras este reintento preguntaba.
+  const carrera = doble({ toma: false, filas: [FILA_EN_RETO, FILA_EN_RETO, FILA_ABANDONADA], mp: { leerOrden: { status: 200, cuerpo: EN_RETO } } });
+  assert.deepEqual(await cobrarPago(carrera.deps, DATOS), { tipo: "RECHAZADO", motivo: "SIN_VERIFICAR" });
+  assert.ok(sin(carrera.llamadas, "descartar") && sin(carrera.llamadas, "mp.crearOrden"));
+});
+
+test("un 422 que dejó la orden esperando el reto no descarta el pedido: hay una orden viva", async () => {
+  const d = doble({ filas: [FILA, { ...FILA, cobro_mandado: true }], mp: { crearOrden: { status: 422, cuerpo: { errors: [{ code: "unprocessable_content" }] } }, buscarOrdenes: { status: 200, cuerpo: { data: [EN_RETO] } } } });
+  assert.deepEqual(await cobrarPago(d.deps, DATOS), { tipo: "POR_CONFIRMAR" });
+  assert.ok(sin(d.llamadas, "descartar") && sin(d.llamadas, "mp.cancelarOrden"));
+});
+
+test("barrer: un reto pendiente (vivo o abandonado) cuenta como consulta buena: no suma fallos ni avisa a VIM", async () => {
+  for (const fila of [FILA_EN_RETO, FILA_ABANDONADA, { ...FILA_ABANDONADA, conciliaciones: 20 }]) {
+    const avisos: string[] = [];
+    const d = doble({ tareas: [{ id: PAGO, tarea: "CONCILIAR", conexion_id: "cx-1", orden_id_externo: ORDEN_RETO }], filas: [fila],
+                      mp: { leerOrden: { status: 200, cuerpo: EN_RETO }, cancelarOrden: NO_SE_CANCELA }, tercerFallo: () => true });
+    assert.deepEqual(await barrer(d.deps, async (t, de) => { avisos.push(`${de} ${t.id}`); }), { devueltos: 0, fallidos: 0, conciliados: 1, sinConsultar: 0 });
+    assert.ok(d.llamadas.includes(`conciliacion ${PAGO} true`) && sin(d.llamadas, "aplicar"));
+    assert.deepEqual(avisos, []);
+    sinRastroDelReto(d);
+  }
+});
+
+test("barrer, RETO_VIEJO (48 horas): un último vistazo; si la orden sigue pendiente o no se pudo mirar, UN aviso a VIM con su id; si ya se cerró o se cobró, se aplica y no se avisa", async () => {
+  const tarea: Tarea = { id: PAGO, tarea: "RETO_VIEJO", conexion_id: "cx-1", orden_id_externo: ORDEN_RETO };
+  const correr = async (mp: Parameters<typeof doble>[0]["mp"], aplicar = CERRADO) => {
+    const avisos: string[] = [];
+    const d = doble({ tareas: [tarea], filas: [{ ...FILA_ABANDONADA, conciliaciones: 50 }], mp, aplicar });
+    await barrer(d.deps, async (t, de) => { avisos.push(`${de} ${t.orden_id_externo}`); });
+    return { avisos, d };
+  };
+  const pendiente = await correr({ leerOrden: { status: 200, cuerpo: EN_RETO } });
+  assert.deepEqual(pendiente.avisos, [`RETO ${ORDEN_RETO}`]);
+  // No suma fallos de conciliación (no es «posible cobro sin pedido»): solo se cierra, como consulta buena.
+  assert.ok(sin(pendiente.d.llamadas, `conciliacion ${PAGO} false`) && sin(pendiente.d.llamadas, "mp.cancelarOrden"));
+  assert.deepEqual((await correr({ leerOrden: { status: 0, cuerpo: null } })).avisos, [`RETO ${ORDEN_RETO}`]);
+  assert.deepEqual((await correr({ leerOrden: { status: 200, cuerpo: RETO_CANCELADO } })).avisos, []);
+  const cobrada = await correr({ leerOrden: { status: 200, cuerpo: RETO_APROBADO } }, () => ({ estado: "POR_DEVOLVER", pedido_estado: "EXPIRADO", recien_aprobado: false }));
+  assert.deepEqual(cobrada.avisos, []);
+  assert.ok(cobrada.d.llamadas.includes(`aplicar APROBADO ${ORDEN_RETO} 138.00`));
+});
+
+test("barrer, RETO_VIEJO: si el último vistazo REVIENTA se avisa igual; y solo después de avisar se da por cerrado (si el aviso falla, no se cierra: vuelve a salir)", async () => {
+  const tarea: Tarea = { id: PAGO, tarea: "RETO_VIEJO", conexion_id: "cx-1", orden_id_externo: ORDEN_RETO };
+  // La consulta lanza (la base se cayó al leer el pago).
+  const roto = doble({ tareas: [tarea] });
+  roto.deps.db.leerPago = async () => { throw new Error("la base no responde"); };
+  const avisos: string[] = [];
+  await barrer(roto.deps, async (t, de) => { avisos.push(`${de} ${t.orden_id_externo}`); roto.llamadas.push("avisar"); });
+  assert.deepEqual(avisos, [`RETO ${ORDEN_RETO}`]);
+  assert.ok(roto.llamadas.indexOf("avisar") < roto.llamadas.indexOf(`conciliacion ${PAGO} true`) && roto.llamadas.indexOf("avisar") !== -1, roto.llamadas.join("\n"));
+  // El aviso no sale (el correo falla): NO se cierra; la base lo vuelve a sacar a la hora.
+  const sinCorreo = doble({ tareas: [tarea], filas: [{ ...FILA_ABANDONADA, conciliaciones: 50 }], mp: { leerOrden: { status: 200, cuerpo: EN_RETO } } });
+  await barrer(sinCorreo.deps, async () => { throw new Error("SMTP"); });
+  assert.ok(sin(sinCorreo.llamadas, "conciliacion"));
+  // Lo normal: avisado, y cerrado.
+  const bien = doble({ tareas: [tarea], filas: [{ ...FILA_ABANDONADA, conciliaciones: 50 }], mp: { leerOrden: { status: 200, cuerpo: EN_RETO } } });
+  await barrer(bien.deps, async () => {});
+  assert.ok(bien.llamadas.includes(`conciliacion ${PAGO} true`));
+});
+
+test("el correo del reto sin cerrar dice que NO hay cobro y lleva la orden; sin datos del cliente", () => {
+  const c = avisoDeRetoSinCerrar({ pagoId: PAGO, negocio: "Knock-Out <Burger>", folio: "T1A2B3", monto: "138.00", ordenIdExterno: ORDEN_RETO });
+  assert.ok(c.html.includes(ORDEN_RETO) && c.html.includes(PAGO) && c.html.includes("No se ha cobrado nada") && c.html.includes("Knock-Out &lt;Burger&gt;"));
+  assert.ok(!c.html.includes("Posible cobro") && !/[^\x00-\x7F]/.test(c.subject));
+  for (const dato of DEL_RETO) assert.equal(c.html.includes(dato), false);
 });

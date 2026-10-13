@@ -81,7 +81,9 @@ export function cuposDe(accion: Peticion["accion"], ip: string, negocio: string,
     // La página del pedido la llama en vez de `seguimiento` mientras espera el pago: mismo ritmo y
     // su propia bolsa. Escribe (puede mover el pedido y cuesta una consulta a Mercado Pago, que ya
     // va espaciada por pago en la base): si el control falla, cierra.
-    case "confirmar_pago": return porIp("confirma", 600, 90, "cerrar");
+    // `verificacion` es lo mismo visto desde la pantalla de la tarjeta, mientras el cliente contesta
+    // el reto de su banco: misma bolsa (las dos pantallas no sondean a la vez por el mismo pedido).
+    case "confirmar_pago": case "verificacion": return porIp("confirma", 600, 90, "cerrar");
     // La tienda pregunta si una clave de intento ya tiene pedido (tras un pago en línea del que no
     // supo el resultado). Solo lee, por llave; pocas veces por intento. Su propia bolsa.
     case "intento": return porIp("intento", 600, 30, "cerrar");

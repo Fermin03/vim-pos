@@ -1,6 +1,6 @@
 // El puerto de pago-flujo.ts sobre supabase-js (service_role). Solo corre en Deno: importa el
 // cliente, así que no se prueba con Node; por eso aquí no hay ninguna decisión, solo las llamadas.
-// Las funciones SQL son las de la migración 0173. Un error de la base se lanza: quien llama decide.
+// Las funciones SQL son las de la migración 0173 (y la 0175: la verificación del banco). Un error de la base se lanza: quien llama decide.
 import type { clienteAdmin } from "../http.ts";
 import { registrarError } from "../errores.ts";
 import { montoTexto } from "../terminal/mercado-pago.ts";
@@ -19,16 +19,16 @@ export function puertoDePagos(admin: Admin): PuertoPagos {
   return {
     async leerPago(pagoId) {
       const f = exigir(await admin.from("tienda_pagos")
-        .select("id, conexion_id, estado, monto_mxn, cobro_pedido_at, orden_id_externo, detalle, created_at, conexion:tienda_conexiones(cuenta_id_externo)")
+        .select("id, conexion_id, estado, monto_mxn, cobro_pedido_at, orden_id_externo, detalle, created_at, verificacion_at, conciliaciones, conexion:tienda_conexiones(cuenta_id_externo)")
         .eq("id", pagoId).eq("extra", false).maybeSingle()) as
         | { id: string; conexion_id: string; estado: EstadoPago; monto_mxn: number | string; cobro_pedido_at: string | null;
-            orden_id_externo: string | null; detalle: string | null; created_at: string; conexion: { cuenta_id_externo: string } | null }
+            orden_id_externo: string | null; detalle: string | null; created_at: string; verificacion_at: string | null; conciliaciones: number; conexion: { cuenta_id_externo: string } | null }
         | null;
       const monto = f ? montoTexto(f.monto_mxn) : null;
       if (!f || !f.conexion || !monto) return null;
       const fila: FilaPago = {
         id: f.id, conexion_id: f.conexion_id, estado: f.estado, monto, cobro_mandado: f.cobro_pedido_at !== null,
-        orden_id_externo: f.orden_id_externo, detalle: f.detalle, creado: f.created_at, cuenta_vendedora: String(f.conexion.cuenta_id_externo),
+        orden_id_externo: f.orden_id_externo, detalle: f.detalle, creado: f.created_at, en_verificacion: f.verificacion_at !== null, conciliaciones: Number(f.conciliaciones) || 0, cuenta_vendedora: String(f.conexion.cuenta_id_externo),
       };
       return fila;
     },
@@ -46,6 +46,8 @@ export function puertoDePagos(admin: Admin): PuertoPagos {
     anotar: async (pagoId, d) => {
       if (d.ordenIdExterno || d.error) await rpc("tienda_pago_anotar", { p_pago: pagoId, p_orden: d.ordenIdExterno ?? null, p_error: d.error ?? null });
     },
+    verificar: async (pagoId, ordenIdExterno) => { await rpc("tienda_pago_verificacion", { p_pago: pagoId, p_orden: ordenIdExterno }); },
+    abandonar: async (pagoId, ordenIdExterno) => (await rpc("tienda_pago_abandonar", { p_pago: pagoId, p_orden: ordenIdExterno })) === true,
     tomar: async (max) => (await rpc("tienda_pagos_tomar", { p_max: max }) as Tarea[] | null) ?? [],
     devolucion: async (pagoId, ok, error) =>
       String(await rpc("tienda_pago_devolucion", { p_pago: pagoId, p_ok: ok, p_error: error ?? null })),

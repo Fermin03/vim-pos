@@ -4,6 +4,9 @@
 // hay y a cuál se va está en lib/pasos.ts, las reglas de los campos en lib/cliente.ts, la propina en
 // lib/pago.ts y qué hacer con cada respuesta de la función en lib/envio.ts.
 //
+// Si el banco pide confirmar el pago (3D Secure), el reto se abre aquí mismo, en lugar de la pantalla
+// de la tarjeta (components/reto.tsx): no se navega ni se manda otro pago hasta saber cómo acabó.
+//
 // Todo lo escrito vive en ESTE componente, no en cada pantalla: ir y venir entre ellas no pierde
 // nada. La tarjeta (iframes de Mercado Pago) se monta al llegar a la tercera pantalla, no antes, y
 // desde ahí se queda montada aunque se regrese: así tampoco se pierde lo escrito en ella.
@@ -18,7 +21,7 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react"
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Aviso, Captcha, SITE_KEY_TURNSTILE, botonClases, cn } from "@vim/ui/styles";
-import { cotizar, guardarDireccion, intento, pedir } from "../lib/api";
+import { cotizar, guardarDireccion, intento, pedir, verificacion } from "../lib/api";
 import { TOPES, aCuerpo, type Carrito } from "../lib/carrito";
 import {
   CAMPOS, DE_DIRECCION, FORMULARIO_VACIO, LIMITES, datosDelPedido, erroresDe, guardarCliente, leerCliente, olvidarCliente,
@@ -27,18 +30,20 @@ import {
 import type { Cotizacion, DireccionGuardada, ErrorDeTienda, MiCuenta, Negocio, Pago, Sucursal } from "../lib/contrato";
 import { LIMITES_DE_CUENTA, direccionEnUnaLinea, enlaceDeAcceso, formularioDeDireccion, paraTusDatos } from "../lib/cuenta";
 import { formatoMxn } from "../lib/dinero";
-import { enviarPedido, envioDeLaPagina, intentoDeLaPagina, pruebaQueNoHuboCobro, resolverDuda, type Desenlace, type ResultadoDeEnvio } from "../lib/envio";
+import { enviarPedido, envioDeLaPagina, intentoDelNegocio, pruebaQueNoHuboCobro, resolverDuda, type Desenlace, type ResultadoDeEnvio } from "../lib/envio";
 import { formasDePago, leerOtroMonto, propinaDe, totalAPagar, type Propina as Porcentaje, type PropinaElegida } from "../lib/pago";
 import { accionDe, avanzar, pasoDelDesenlace, pasosDe, type Paso } from "../lib/pasos";
-import type { CampoDeTarjeta } from "../lib/tarjeta";
+import { textoDeRechazo, type CampoDeTarjeta } from "../lib/tarjeta";
 import { enlaceTel, formatoTelefono } from "../lib/telefono";
-import { apoyoDePago, nombreDePago, textoDeError } from "../lib/textos";
+import { RETO, apoyoDePago, nombreDePago, textoDeError } from "../lib/textos";
+import { esFinDelReto, retoQueSigue, seOfreceCancelar, vigilarReto, type PasoDelReto, type Reto } from "../lib/verificacion";
 import { CampoDeTexto } from "./campo";
 import { CamposDeTarjeta, type ManejoDeTarjeta } from "./tarjeta";
 import { Linea } from "./carrito";
 import { COLUMNA, CUERPO, PIE } from "./hoja";
 import { FOCO, PARTE, PRINCIPAL } from "./piezas";
 import { Propina } from "./propina";
+import { MarcoDelReto } from "./reto";
 
 export type PropsDelPasoDeDatos = {
   negocio: Negocio; sucursal: Sucursal; carrito: Carrito;
@@ -63,6 +68,8 @@ export type PropsDelPasoDeDatos = {
   alTerminarLaSesion: () => void;
   /** A dónde vuelve quien sale a entrar o a crear su cuenta: el menú de esta sucursal. El carrito lo espera en el teléfono. */
   deVuelta: string;
+  /** El reto del banco está a la vista (o dejó de estarlo): mientras, la hoja no se cierra. */
+  alRetener?: (retenida: boolean) => void;
 };
 
 type AvisoDeEnvio = Extract<Desenlace, { tipo: "aviso" }>;
@@ -107,10 +114,12 @@ const IconoAtras = () => (
 
 export function PasoDeDatos({
   negocio, sucursal, carrito, nota, alCambiarNota, cotizacion, alVolver, alCambiarElTotal, alErrorDeCarrito, alPedidoHecho,
-  conSesion, cuenta, alTerminarLaSesion, deVuelta,
+  conSesion, cuenta, alTerminarLaSesion, deVuelta, alRetener,
 }: PropsDelPasoDeDatos) {
   const router = useRouter();
   const id = useId();
+  /** El intento de compra de ESTE negocio: el de otro restaurante no se mira ni se suelta desde aquí. */
+  const intentoDeLaPagina = intentoDelNegocio(negocio.slug);
   const formas = formasDePago(negocio, sucursal);
   const aDomicilio = carrito.modo === "DOMICILIO";
   const zona = sucursal.zonas.find((z) => z.id === carrito.zonaId);
@@ -130,6 +139,12 @@ export function PasoDeDatos({
    * `sin-respuesta`: no contestó.
    */
   const [duda, setDuda] = useState<"comprobando" | "sin-respuesta" | null>(null);
+  /**
+   * El banco pide confirmar el pago (3D Secure): el reto está a la vista en lugar de la tarjeta. No se
+   * ha cobrado nada y el intento sigue en duda. `url`: la página del reto (null mientras el servidor
+   * la dice). `esperando`: el reto terminó, o el cliente lo canceló, y falta que el servidor diga cómo quedó.
+   */
+  const [reto, setReto] = useState<Reto | null>(null);
   const enviando = useEnviando();
   const guardadas = cuenta?.direcciones ?? [];
   const elegida = guardadas.find((d) => d.id === direccion);
@@ -174,7 +189,7 @@ export function PasoDeDatos({
   const paso: Paso = pasos.includes(vista.paso) ? vista.paso : pasos[pasos.length - 1]!;
   const accion = accionDe(pasos, paso, pago);
   const enLaUltima = accion === "enviar" || accion === "pagar";
-  const idDelTitulo = `${id}-titulo-${preguntando ? "propina" : paso}`;
+  const idDelTitulo = `${id}-titulo-${reto ? "reto" : preguntando ? "propina" : paso}`;
 
   const irA = (p: Paso, foco: string | null = null) => {
     if (p === "tarjeta") setConTarjeta(true);
@@ -191,7 +206,9 @@ export function PasoDeDatos({
     if (cuerpo.current) cuerpo.current.scrollTop = 0;
     document.getElementById(idDelTitulo)?.focus({ preventScroll: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al cambiar de pantalla (o al pedir el foco otra vez)
-  }, [vista, preguntando]);
+  // (También cuando el marco del reto se quita —terminó o se canceló—: el foco estaba dentro de él
+  // o en «Cancelar», y sin esto se perdería fuera de la hoja.)
+  }, [vista, preguntando, reto === null, reto?.esperando]);
 
   // Sin sesión: lo recordado en el teléfono (se lee después de hidratar: el servidor no lo tiene).
   // Con sesión no se toca. Si la sesión termina a medio pedido, desde ahí es un invitado más.
@@ -265,6 +282,13 @@ export function PasoDeDatos({
     // de pago o la propina —el porcentaje o el otro monto—, que van dentro de `delPedido`).
     const clave = intentoDeLaPagina.para({ negocio: negocio.slug, ...elPedido });
     const manejo = tarjeta.current;
+    // Lo que se guarda cuando ESTE pedido entra, sea ahora o al terminar el reto del banco. Con sesión
+    // el teléfono no recuerda nada: los datos viven en la cuenta. Guardar la dirección va aparte y sin
+    // esperar: si falla, el pedido ya entró y no se le estorba (la agrega en «Mi cuenta»).
+    alEntrar.current = () => {
+      if (!conSesion) guardarCliente(datos, modo);
+      else if (porGuardar) void guardarDireccion(negocio.slug, porGuardar);
+    };
     envioDeLaPagina.lanzar(async () => {
       // La tarjeta se convierte en un token AQUÍ, en cada intento: es de un solo uso. Si un dato no
       // cuadra no se llama a nadie: no se creó ningún pedido.
@@ -281,10 +305,8 @@ export function PasoDeDatos({
       }, { telefono: sucursal.telefono, horario: sucursal.horario, otrasFormas: formas.length > 1 });
       if (r.desenlace.tipo === "hecho") {
         intentoDeLaPagina.cerrar();
-        // Con sesión el teléfono no recuerda nada: los datos viven en la cuenta. Guardar la dirección
-        // va aparte y sin esperar: si falla, el pedido ya entró y no se le estorba (la agrega en «Mi cuenta»).
-        if (!conSesion) guardarCliente(datos, modo);
-        else if (porGuardar) void guardarDireccion(negocio.slug, porGuardar);
+        alEntrar.current?.();
+        alEntrar.current = null;
         borrador = null;
         alPedidoHecho();
         router.replace(`/${negocio.slug}/pedido/${r.desenlace.codigo}`);
@@ -296,6 +318,9 @@ export function PasoDeDatos({
     });
   };
 
+  /** Lo que hay que guardar cuando el pedido en curso entre (ver `mandar`). null = nada (se llegó recargando). */
+  const alEntrar = useRef<(() => void) | null>(null);
+
   /** Lo que esta pantalla hace con el resultado de un envío (el suyo o uno que la alcanzó al montarse). */
   const alResultado = useRef<(r: ResultadoDeEnvio) => void>(() => {});
   alResultado.current = ({ desenlace, pidio }) => {
@@ -304,6 +329,8 @@ export function PasoDeDatos({
     // A dónde vive el dato que hay que corregir (lib/pasos.ts); null = el aviso sale aquí mismo.
     const destino = pasoDelDesenlace(desenlace, pasos);
     if (desenlace.tipo === "hecho") setHecho(true);
+    // El banco pide confirmar: se abre el reto aquí mismo. No hay cobro todavía y la duda sigue.
+    else if (desenlace.tipo === "verificar") setReto({ codigo: desenlace.codigo, url: desenlace.url, esperando: false, cancelado: false });
     // Salió un cobro y no se sabe qué pasó (sin respuesta, o un error que no lo aclara): no se ofrece
     // «reintentar». Se pregunta por ese intento, y hasta saberlo el formulario queda bloqueado.
     else if (intentoDeLaPagina.enDuda()) void comprobar.current();
@@ -332,8 +359,16 @@ export function PasoDeDatos({
   const comprobar = useRef<() => Promise<void>>(async () => {});
   comprobar.current = async () => {
     setDuda("comprobando"); setAviso(null);
-    const d = await resolverDuda(intentoDeLaPagina, (clave) => intento(negocio.slug, clave));
-    if (d.tipo === "hecho") {
+    const d = await resolverDuda(intentoDeLaPagina, (clave) => intento(negocio.slug, clave), (codigo) => verificacion(negocio.slug, codigo, false));
+    if (d.tipo === "verificar") {
+      // El pedido espera el reto del banco (se recargó la página a medias, o la respuesta se perdió): se continúa ese.
+      setDuda(null);
+      setReto({ codigo: d.codigo, url: d.url, esperando: false, cancelado: false });
+    } else if (d.tipo === "libre" && d.rechazo !== undefined) {
+      // Ese pago no pasó y el pedido se descartó: se dice, y se puede pagar otra vez.
+      setDuda(null);
+      decirRechazo.current(d.rechazo);
+    } else if (d.tipo === "hecho") {
       // El pedido sí había entrado: a su página, que dice cómo va el pago.
       setHecho(true); setDuda(null);
       borrador = null;
@@ -346,8 +381,80 @@ export function PasoDeDatos({
     if (intentoDeLaPagina.enDuda() && !envioDeLaPagina.ocupado()) void comprobar.current();
   }, []);
 
-  // Con un intento en duda (o enviando) no se navega: ni adelante ni atrás.
-  const ocupado = robot || enviando || hecho || duda !== null;
+  /** Un pago que no pasó (y no se cobró): junto a la tarjeta, con el foco ahí; sin pantalla de tarjeta a la vista, encima del botón. */
+  const decirRechazo = useRef<(detalle: string | null) => void>(() => {});
+  decirRechazo.current = (detalle) => {
+    const t = textoDeRechazo(detalle, formas.length > 1);
+    if (!pasos.includes("tarjeta")) { setAviso({ tipo: "aviso", tono: "danger", texto: t.texto, sigue: "reintentar" }); return; }
+    setRechazoDeTarjeta(t);
+    irA("tarjeta");
+    setTimeout(() => tarjeta.current?.enfocar(t.campo), 0);
+  };
+
+  /** Lo que el servidor dijo del reto (lib/verificacion.ts). Solo él dice cómo acabó. */
+  const alPasoDelReto = useRef<(codigo: string, p: PasoDelReto) => void>(() => {});
+  alPasoDelReto.current = (codigo, p) => {
+    if (p.tipo === "sigue") {
+      // Sigue: nada cambia, salvo que faltara la dirección o que el aviso de «terminó» hubiera llegado
+      // antes de tiempo (entonces el marco vuelve). Lo decide `retoQueSigue` (lib/verificacion.ts).
+      setReto((r) => (r && r.codigo === codigo ? retoQueSigue(r, p) : r));
+    } else if (p.tipo === "pedido") {
+      // Pagado, o ya no espera el reto: el pedido entró y su página dice cómo va.
+      intentoDeLaPagina.cerrar();
+      alEntrar.current?.();
+      alEntrar.current = null;
+      borrador = null;
+      setHecho(true); setReto(null);
+      alPedidoHecho();
+      router.replace(`/${negocio.slug}/pedido/${codigo}`);
+    } else if (p.tipo === "rechazado") {
+      // El servidor confirmó que no hay cobro y descartó el pedido: ya no hay nada en duda.
+      intentoDeLaPagina.aclarar();
+      const cancelado = reto?.cancelado ?? false;
+      setReto(null);
+      decirRechazo.current(cancelado ? "CANCELADO" : p.detalle);
+    }
+  };
+  const vigia = useRef<ReturnType<typeof vigilarReto> | null>(null);
+  const codigoDelReto = reto?.codigo ?? null, sinDireccion = reto !== null && reto.url === null;
+  useEffect(() => {
+    if (!codigoDelReto) return;
+    const v = vigilarReto({
+      preguntar: (cancelar, signal) => verificacion(negocio.slug, codigoDelReto, cancelar, signal),
+      alPaso: (p) => alPasoDelReto.current(codigoDelReto, p),
+      yaMismo: sinDireccion,
+    });
+    vigia.current = v;
+    // La página del reto avisa que terminó (no dice cómo): el marco se quita —se queda en blanco— y
+    // se le pregunta ya al servidor. Solo se oye a Mercado Pago, y solo ese mensaje.
+    const alMensaje = (e: MessageEvent) => {
+      if (!esFinDelReto(e.origin, e.data)) return;
+      setReto((r) => (r && r.codigo === codigoDelReto ? { ...r, esperando: true } : r));
+      v.ahora();
+    };
+    window.addEventListener("message", alMensaje);
+    return () => { v.detener(); vigia.current = null; window.removeEventListener("message", alMensaje); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- un vigía por reto: la dirección que llega después no lo reinicia
+  }, [codigoDelReto, negocio.slug]);
+  /**
+   * «Cancelar»: el marco se quita y se le dice al servidor que el cliente deja el reto. El servidor
+   * cierra ese pedido sin pago en el acto (Mercado Pago no deja cancelar una orden que espera el
+   * reto: la sigue vigilando él) y contesta que ya se puede pagar otra vez.
+   */
+  const cancelarReto = () => {
+    setReto((r) => (r ? { ...r, esperando: true, cancelado: true } : r));
+    vigia.current?.cancelar();
+  };
+  // Con el reto a la vista la hoja no se cierra: cerrarla dejaría el reto vivo y sin pantalla.
+  const enReto = reto !== null;
+  useEffect(() => {
+    alRetener?.(enReto);
+    return () => alRetener?.(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo cuando el reto aparece o se va
+  }, [enReto]);
+
+  // Con un intento en duda (o enviando, o con el reto del banco a la vista) no se navega: ni adelante ni atrás.
+  const ocupado = robot || enviando || hecho || duda !== null || enReto;
 
   /** Manda el pedido con ese total (el del botón, o el nuevo que confirmó). */
   const intentar = (total: string | null) => {
@@ -403,7 +510,7 @@ export function PasoDeDatos({
   const seOfreceEnviar = !!totalNuevo || !aviso || aviso.sigue === "reintentar" || aviso.sigue === "reintentar-seguro" || aviso.sigue === "sesion";
   const total = totalNuevo ?? totalVisto;
   const aPagar = enLinea && total ? totalAPagar(total, montoDePropina) : total;
-  const estado = duda ? "Confirmando tu pago…" : (enviando || hecho) && enLinea ? "Procesando tu pago…"
+  const estado = reto ? (reto.cancelado ? RETO.cancelando : reto.esperando ? RETO.confirmando : "") : duda ? "Confirmando tu pago…" : (enviando || hecho) && enLinea ? "Procesando tu pago…"
     : enviando || hecho ? "Enviando tu pedido…" : robot ? "Comprobando que no eres un robot…" : "";
   // Con `key`: React no debe reciclar para este botón el nodo de otro que ocupaba su lugar. Sin ella,
   // el toque en «Ahora no» (que al pintarse de nuevo dejaba su sitio a «Pagar») terminaba, en el mismo
@@ -414,8 +521,8 @@ export function PasoDeDatos({
       {ocupado ? estado : <><span>{etiqueta}</span><span className="tabular-nums">{importe ? formatoMxn(importe) : ""}</span></>}
     </button>
   );
-  const titulo = (texto: string, cual: Paso | "propina") => (
-    <h3 id={`${id}-titulo-${cual}`} tabIndex={-1} aria-describedby={pasos.length > 1 ? `${id}-paso` : undefined} className={cn(TITULO, "outline-none")}>{texto}</h3>
+  const titulo = (texto: string, cual: Paso | "propina" | "reto") => (
+    <h3 id={`${id}-titulo-${cual}`} tabIndex={-1} aria-describedby={pasos.length > 1 && cual !== "reto" ? `${id}-paso` : undefined} className={cn(TITULO, "outline-none")}>{texto}</h3>
   );
   const propinaDeLaPantalla = (modo: "elegir" | "preguntar") => (
     <Propina id={id} modo={modo} propina={propina} alElegir={elegirPropina} montoDe={montoDe} tope={subtotal} montoDeOtro={libre?.ok ? libre.monto : null} deshabilitado={ocupado}
@@ -435,16 +542,29 @@ export function PasoDeDatos({
   const errorDePago = rechazo.pago && <p id={`${id}-pago-error`} role="alert" className="text-14 font-medium text-danger">{rechazo.pago}</p>;
 
   return (
-    <form noValidate className={COLUMNA} onSubmit={(e) => { e.preventDefault(); if (!enLaUltima || preguntando || seOfreceEnviar) alBoton(total); }}>
+    <form noValidate className={COLUMNA} onSubmit={(e) => { e.preventDefault(); if (!enReto && (!enLaUltima || preguntando || seOfreceEnviar)) alBoton(total); }}>
       <div ref={cuerpo} className={CUERPO}>
-        <div className="flex items-center justify-between gap-3 px-4 pt-1">
+        {/* Con el reto del banco a la vista no hay a dónde regresar (se sale con «Cancelar»): la franja se quita y el banco gana ese lugar. */}
+        {!enReto && <div className="flex items-center justify-between gap-3 px-4 pt-1">
           <button type="button" onClick={regresar} disabled={ocupado} className={cn("-ml-2 inline-flex h-11 items-center gap-1 rounded px-2 text-15 font-medium text-ink-2 hover:bg-hover hover:text-ink disabled:pointer-events-none disabled:opacity-40", FOCO)}>
             <IconoAtras />{paso === "datos" ? "Tu pedido" : "Regresar"}
           </button>
           {pasos.length > 1 && <p id={`${id}-paso`} className="text-13 tabular-nums text-ink-2">Paso {pasos.indexOf(paso) + 1} de {pasos.length}</p>}
-        </div>
+        </div>}
 
-        {paso === "datos" && (
+        {/* El reto del banco ocupa el lugar de la pantalla en la que se estaba; la tarjeta sigue montada, oculta. */}
+        {reto && (
+          <section className={cn("flex min-w-0 flex-col gap-3 pt-3", reto.esperando && "pb-5")}>
+            <div className="flex flex-col gap-1 px-4">
+              {/* Terminó o se canceló: el marco se quita (se queda en blanco) y lo que sigue es esperar; el aviso del pie dice qué hacer. */}
+              {titulo(reto.cancelado ? RETO.cancelando : reto.esperando ? RETO.confirmando : RETO.titulo, "reto")}
+              {!reto.esperando && <p className="text-14 text-ink-2">{RETO.apoyo}</p>}
+            </div>
+            {!reto.esperando && <MarcoDelReto url={reto.url} />}
+          </section>
+        )}
+
+        {paso === "datos" && !enReto && (
           <>
             {/* Para quien ya tiene cuenta (o la quiere): una franja que no estorba al invitado. El carrito
                 vive en el teléfono, así que lo espera a la vuelta. Mientras se envía no se sale de aquí. */}
@@ -562,7 +682,7 @@ export function PasoDeDatos({
           </>
         )}
 
-        {paso === "pago" && !preguntando && (
+        {paso === "pago" && !preguntando && !enReto && (
           <section id={`${id}-pago`} role="group" tabIndex={-1} aria-labelledby={`${id}-titulo-pago`} aria-describedby={rechazo.pago ? `${id}-pago-error` : undefined}
             className="flex min-w-0 flex-col gap-3 px-4 pb-3 pt-2 outline-none">
             {titulo("¿Cómo pagas?", "pago")}
@@ -600,7 +720,7 @@ export function PasoDeDatos({
         )}
 
         {/* La pregunta, una vez por pedido, a quien va a pagar en línea sin haber elegido propina. */}
-        {preguntando && (
+        {preguntando && !enReto && (
           <section className="flex min-w-0 flex-col gap-3 px-4 pb-5 pt-2">
             {titulo("¿Gustas dejar una propina?", "propina")}
             <p className="text-14 text-ink-2">{apoyoDePropina}</p>
@@ -612,7 +732,7 @@ export function PasoDeDatos({
             antes) y se queda montada, oculta, si se regresa: lo escrito en ella no se pierde. La
             envoltura no lleva clases de `display`: le ganarían al atributo `hidden`. */}
         {enLinea && conTarjeta && sucursal.public_key && (
-          <div hidden={paso !== "tarjeta"}>
+          <div hidden={paso !== "tarjeta" || enReto}>
             <section className="flex min-w-0 flex-col gap-4 px-4 pb-5 pt-2">
               {titulo("Tu tarjeta", "tarjeta")}
               {/* La cuenta de lo que se va a cobrar, en la tarjeta de resumen de la casa. */}
@@ -641,7 +761,15 @@ export function PasoDeDatos({
           </Aviso>
         )}
         {duda === "sin-respuesta" && <button type="button" onClick={() => void comprobar.current()} className={GHOST}>Volver a comprobar</button>}
-        {preguntando ? (
+        {reto ? (
+          // La acción de esta pantalla está dentro del marco (la del banco). Aquí, solo salir de él; y
+          // una vez que terminó o se canceló, esperar: no se ofrece pagar otra vez hasta saber cómo quedó.
+          <>
+            {reto.esperando && !reto.cancelado && <Aviso tono="warning" role="status" className="!text-14">{RETO.noPagues}</Aviso>}
+            {/* «Cancelar» solo con el marco a la vista: tras el aviso de que el reto terminó, el pago puede estar aprobándose. */}
+            {seOfreceCancelar(reto) && <button key="cancelar-reto" type="button" onClick={cancelarReto} className={GHOST}>{RETO.cancelar}</button>}
+          </>
+        ) : preguntando ? (
           <>
             {propina === "otro" && boton("Ir a pagar", aPagar)}
             <button key="ahora-no" type="button" onClick={() => elegirPropina(0)} disabled={ocupado} className={GHOST}>Ahora no</button>

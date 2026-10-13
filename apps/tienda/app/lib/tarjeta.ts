@@ -132,6 +132,13 @@ const RECHAZOS: Record<string, { campo: CampoDeTarjeta | null; texto: string; co
   TARJETA_DESHABILITADA: { campo: null, texto: "Tu tarjeta no está activa para compras en línea. Llama a tu banco o usa otra tarjeta." },
   // No fue el banco: el antifraude de Mercado Pago (`high_risk`). TEXTO PROVISIONAL (James).
   RIESGO: { campo: null, texto: "Mercado Pago no pudo aprobar este pago. Prueba con otra tarjeta." },
+  // La verificación del banco (3D Secure). TEXTOS PROVISIONALES (James). No prometen tiempos.
+  // El cliente contestó el reto y su banco no lo confirmó (VERIFICADO: `3ds_challenge_failed`).
+  VERIFICACION: { campo: null, texto: "Tu banco no confirmó el pago. Intenta de nuevo o usa otra tarjeta." },
+  // El reto se dejó: pasó el tiempo sin contestarlo (o el pedido ya no estaba).
+  SIN_VERIFICAR: { campo: null, texto: "No se completó la verificación con tu banco. Intenta de nuevo o usa otra tarjeta." },
+  // El cliente tocó «Cancelar» en el reto. Este motivo lo pone la tienda, no el servidor.
+  CANCELADO: { campo: null, texto: "Cancelaste la verificación con tu banco." },
   OTRO: { campo: null, texto: "Tu banco no aprobó el pago. Prueba con otra tarjeta." },
 };
 

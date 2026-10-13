@@ -80,6 +80,11 @@ export function cuerpoDeOrden(d: DatosCobro): Record<string, unknown> {
   return {
     type: "online",
     processing_mode: "automatic",
+    // VERIFICADO (12 oct 2026): sin esto la orden nace con `validation: "never"` y el antifraude, si
+    // duda, solo puede rechazar (`high_risk`). Con «solo si hay riesgo» le pide al cliente confirmar
+    // con su banco (3D Secure): la orden vuelve `action_required` / `pending_challenge` con la URL del
+    // reto. `liability_shift: "required"` es el único valor que admite.
+    config: { online: { transaction_security: { validation: "on_fraud_risk", liability_shift: "required" } } },
     total_amount: monto,
     external_reference: d.pagoId,
     // VERIFICADO (12 oct 2026, cuenta de prueba): la orden acepta `description`, `items` y estos datos
@@ -201,7 +206,7 @@ export function sinDatosPersonales(texto: string, d: Pick<DatosCobro, "email" | 
 }
 
 /** Por qué no pasó un cobro, en familias: lo que la tienda le puede decir al cliente. */
-export const MOTIVOS_DE_RECHAZO = ["FONDOS", "DATOS", "LLAMAR_BANCO", "TARJETA_DESHABILITADA", "RIESGO", "OTRO"] as const;
+export const MOTIVOS_DE_RECHAZO = ["FONDOS", "DATOS", "LLAMAR_BANCO", "TARJETA_DESHABILITADA", "RIESGO", "VERIFICACION", "SIN_VERIFICAR", "OTRO"] as const;
 export type MotivoDeRechazo = (typeof MOTIVOS_DE_RECHAZO)[number];
 
 // VERIFICADO con los titulares de prueba (FUND, SECU, EXPI, CALL, LOCK). El código y la fecha mal
@@ -214,7 +219,27 @@ const FAMILIAS: Record<string, MotivoDeRechazo> = {
   // VISTO EN PRODUCCIÓN (12 oct 2026): el antifraude de Mercado Pago, no el banco. Mercado Pago pide
   // sugerir otro medio de pago y no reintentar enseguida con los mismos datos.
   high_risk: "RIESGO",
+  // VERIFICADO (12 oct 2026, titular de prueba APRO con 3DS encendido): el cliente contestó el reto
+  // de su banco y el banco no lo autenticó. La orden queda `failed` y el pago trae este motivo.
+  "3ds_challenge_failed": "VERIFICACION",
+  // No son motivos de Mercado Pago: es el ESTADO de una orden que acabó sin cobrarse porque el reto
+  // no se contestó (venció allá, o se dejó cancelar). `decidirOrden` los pone como detalle. No es un
+  // rechazo de la tarjeta: no cuenta para ningún tope.
+  canceled: "SIN_VERIFICAR",
+  expired: "SIN_VERIFICAR",
 };
+/**
+ * ¿Ese motivo cuenta como una tarjeta rechazada para los topes contra la prueba masiva de tarjetas?
+ *   · SIN_VERIFICAR (el reto se dejó: lo canceló el cliente o pasó el plazo): no. Nadie dijo que no a esa tarjeta.
+ *   · VERIFICACION (el banco no autenticó al cliente en el reto): para la IP que lo intentó, sí; para
+ *     pausar el pago del negocio, no (`soloIp`). Quien prueba tarjetas robadas no pasa un reto, así que
+ *     se frena solo con el tope de su IP; y a un comensal que se equivoca con el código de su banco no
+ *     se le suma a la cuenta que apaga el pago en línea de todo el restaurante.
+ *   · lo demás: como siempre, para la IP y para el negocio.
+ */
+export function cuentaComoRechazo(motivo: MotivoDeRechazo): { cuenta: boolean; soloIp: boolean } {
+  return { cuenta: motivo !== "SIN_VERIFICAR", soloIp: motivo === "VERIFICACION" };
+}
 /**
  * La familia de un motivo de rechazo. Todo lo que no se reconoce —`rejected_by_issuer`, un
  * código nuevo, o ninguno— es OTRO: el cliente lee «tu banco no lo aprobó», que siempre es verdad,
@@ -292,7 +317,9 @@ export function decidirOrden(e: Esperado, orden: unknown): Decision {
   const pago = obj(Array.isArray(pagos) ? pagos[0] : null);
   const comunes = { ordenIdExterno, pagoIdExterno: idDe(d.pago_id_externo), tipoTarjeta: d.tipo_tarjeta, marca: d.marca };
   if (estado === "failed" || estado === "canceled" || estado === "expired") {
-    return { tipo: "RECHAZADO", ...comunes, monto: montoTexto(o.total_amount), detalle: txt(pago.status_detail) ?? detalle };
+    // Solo `failed` trae un motivo del banco o de Mercado Pago. Una orden cancelada o vencida no se
+    // cobró porque nadie contestó el reto (o porque se quedó abierta): su «motivo» es ese estado.
+    return { tipo: "RECHAZADO", ...comunes, monto: montoTexto(o.total_amount), detalle: estado === "failed" ? txt(pago.status_detail) ?? detalle : estado };
   }
   // El monto que manda es lo que Mercado Pago COBRÓ, no lo que se le pidió.
   const monto = montoTexto(o.total_paid_amount);
@@ -399,8 +426,11 @@ export function clienteMpTienda(token: string, pedir: typeof fetch = fetch) {
      * orden ya está devuelta: eso, y no la llave, es lo que evita devolver dos veces.
      */
     /**
-     * Cancela una orden que Mercado Pago abrió y no procesó. VERIFICADO (11 oct 2026): solo se deja en
-     * `created` o `action_required`; con `processing` contesta 409 `cannot_cancel_order`.
+     * Cancela una orden que Mercado Pago abrió y no procesó. VERIFICADO: una `created` se deja (11 oct
+     * 2026); con `processing` o `processed` contesta 409 `cannot_cancel_order`; y una que espera el
+     * reto del banco (`action_required` / `pending_challenge`) NO se deja, diga lo que diga el
+     * mensaje de ese 409: contesta 422 `unprocessable_content` recién creada y a los 40 minutos (12 y
+     * 13 oct 2026). Para un reto, cancelar es un intento que casi nunca sale, no un camino.
      */
     cancelarOrden: (ordenIdExterno: string, llave: string) => llamar("POST", `/v1/orders/${encodeURIComponent(ordenIdExterno)}/cancel`, undefined, llave),
     devolver: (ordenIdExterno: string, llave: string) => llamar("POST", `/v1/orders/${encodeURIComponent(ordenIdExterno)}/refund`, undefined, llave),
@@ -441,6 +471,37 @@ export function ordenAtascada(orden: unknown, ahora: Date): boolean {
   const o = obj(orden);
   const nacio = Date.parse(String(o.created_date ?? ""));
   return o.status === "created" && Number.isFinite(nacio) && ahora.getTime() - nacio > 60_000;
+}
+
+/**
+ * Dónde vive la página del reto del banco (3D Secure). Lista CERRADA: es lo que Mercado Pago devolvió
+ * de verdad (VERIFICADO, 12 oct 2026). La tienda abre esa dirección en un marco: nunca una que no
+ * sea de aquí, la mande quien la mande.
+ */
+export const HOSTS_DEL_RETO: readonly string[] = ["www.mercadopago.com.mx"];
+
+/** ¿La orden espera a que el cliente conteste el reto de su banco? VERIFICADO: `action_required` / `pending_challenge`. */
+export const enReto = (orden: unknown): boolean => obj(orden).status === "action_required";
+
+/**
+ * La dirección del reto de una orden que lo espera, o null. VERIFICADO: viene en
+ * `transactions.payments[0].payment_method.transaction_security.url`, al crear la orden y también al
+ * consultarla (`GET /v1/orders/{id}`) mientras siga en `pending_challenge`; al resolverse desaparece.
+ * Solo vale si es https, sin usuario ni puerto, y de un host de la lista.
+ * OJO: es de un solo pago y lleva un `guest_token`. Viaja al cliente dueño del pedido y a nadie más:
+ * no se guarda en la base, ni en tienda_eventos, ni se escribe en ningún log.
+ */
+export function urlDeReto(orden: unknown): string | null {
+  if (!enReto(orden)) return null;
+  const pagos = obj(obj(orden).transactions).payments;
+  const url = obj(obj(obj(Array.isArray(pagos) ? pagos[0] : null).payment_method).transaction_security).url;
+  if (typeof url !== "string" || url.length > 600) return null;
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && HOSTS_DEL_RETO.includes(u.hostname) && u.port === "" && u.username === "" && u.password === "" ? u.href : null;
+  } catch {
+    return null;
+  }
 }
 
 export function ordenViva(orden: unknown): boolean {

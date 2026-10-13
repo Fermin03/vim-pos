@@ -2,7 +2,7 @@
 // (docs/integraciones/mercado-pago-checkout-pro/04-verificado-orders.md), recortadas como están allá.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { articulosDeOrden, clienteMpTienda, cuerpoDeOrden, decidirOrden, type DetalleDePedido, motivoDeRechazo, nombreDePagador, ordenAtascada, ordenesDeBusqueda, ordenViva, partesDeCotizacion, respuestaDeCobro, resumenDeFallo, rutaDeBusqueda, sinDatosPersonales, telefonoDePagador } from "./pago-mp.ts";
+import { articulosDeOrden, clienteMpTienda, cuentaComoRechazo, cuerpoDeOrden, decidirOrden, type DetalleDePedido, enReto, motivoDeRechazo, nombreDePagador, ordenAtascada, ordenesDeBusqueda, ordenViva, partesDeCotizacion, respuestaDeCobro, resumenDeFallo, rutaDeBusqueda, sinDatosPersonales, telefonoDePagador, urlDeReto } from "./pago-mp.ts";
 
 const PAGO = "2cd9e6fa-1acf-47dc-8ba4-cba918d73770";
 const E = { pagoId: PAGO, cuentaVendedora: "3754297554" };
@@ -25,7 +25,7 @@ const ORDEN_EN_REVISION = { ...ORDEN_APROBADA, id: "ORDTST01M4P8REVISION", statu
 
 test("el cuerpo de la orden es el verificado: online, automático, montos como texto y la tarjeta por su token", () => {
   assert.deepEqual(cuerpoDeOrden({ pagoId: PAGO, monto: "138", email: "ana@example.com", tarjeta: TARJETA }), {
-    type: "online", processing_mode: "automatic", total_amount: "138.00", external_reference: PAGO,
+    type: "online", processing_mode: "automatic", config: { online: { transaction_security: { validation: "on_fraud_risk", liability_shift: "required" } } }, total_amount: "138.00", external_reference: PAGO,
     payer: { email: "ana@example.com" },
     transactions: { payments: [{ amount: "138.00", payment_method: { id: "master", type: "credit_card", token: TARJETA.token, installments: 1 } }] },
   });
@@ -121,7 +121,8 @@ test("una orden fallida, cancelada o vencida es un rechazo; una devuelta, devuel
     const d = decidirOrden(E, { ...ORDEN_APROBADA, status, status_detail: "failed", total_paid_amount: undefined,
       transactions: { payments: [{ id: "PAY2", status: "failed", status_detail: "insufficient_amount", payment_method: { id: "master", type: "credit_card" } }] } });
     assert.equal(d.tipo, "RECHAZADO", status);
-    assert.equal(d.tipo === "RECHAZADO" && d.detalle, "insufficient_amount");
+    // Solo `failed` trae un motivo; una orden cancelada o vencida no se cobró y su «motivo» es ese estado.
+    assert.equal(d.tipo === "RECHAZADO" && d.detalle, status === "failed" ? "insufficient_amount" : status);
   }
   // VERIFICADO: una orden devuelta queda refunded / refunded y su pago trae refunded_amount.
   const dev = decidirOrden(E, { ...ORDEN_APROBADA, status: "refunded", status_detail: "refunded",
@@ -280,7 +281,7 @@ test("el teléfono: lada de 2 dígitos solo en CDMX (55, 56), Guadalajara (33) y
 test("el cuerpo con el detalle del pedido: descripción, artículos y pagador; el dispositivo NO va en el cuerpo", () => {
   const c = cuerpoDeOrden({ pagoId: PAGO, monto: "374.50", email: "ana@example.com", tarjeta: { ...TARJETA, dispositivo: "armor.1a2b3c4d5e6f" }, detalle: DETALLE });
   assert.deepEqual(c, {
-    type: "online", processing_mode: "automatic", total_amount: "374.50", external_reference: PAGO,
+    type: "online", processing_mode: "automatic", config: { online: { transaction_security: { validation: "on_fraud_risk", liability_shift: "required" } } }, total_amount: "374.50", external_reference: PAGO,
     description: "Pedido T1A2B3 en Knock-Out Burger",
     items: [{ title: "Clásica", unit_price: "139.20", quantity: 2 }, { title: "Refresco", unit_price: "30.00", quantity: 1 },
             { title: "Envío", unit_price: "40.60", quantity: 1 }, { title: "Propina", unit_price: "25.50", quantity: 1 }],
@@ -316,4 +317,62 @@ test("sinDatosPersonales: lo que Mercado Pago repita de lo que se le mandó no s
   for (const propiedad of ["payer.phone.number", "payer.first_name", "payer.address.street_name", "is not valid"]) assert.ok(limpio.includes(propiedad), propiedad);
   // Sin detalle (el cobro de antes) sigue sirviendo.
   assert.equal(sinDatosPersonales("invalid token", { email: "a@b.mx", tarjeta: TARJETA }), "invalid token");
+});
+
+// ── La verificación del banco (3D Secure). Respuestas REALES del 12 oct 2026 (documento 04) ───────
+const URL_RETO = "https://www.mercadopago.com.mx/auth/card/validation/pages/remedies/5f0c3c6e-1111-4222-8333-444455556666?display_mode=self_hosted&guest_token=9a8b7c6d-aaaa-4bbb-8ccc-ddddeeeeffff";
+const conReto = (url: unknown) => ({ ...ORDEN_APROBADA, id: "ORDTST01M4P8RETO", status: "action_required", status_detail: "pending_challenge", total_paid_amount: "0.00",
+  transactions: { payments: [{ id: "PAY01M4P8RETO", status: "action_required", status_detail: "pending_challenge",
+    payment_method: { id: "master", type: "credit_card", token: TARJETA.token, installments: 1,
+                      transaction_security: { id: "5f0c3c6e-1111-4222-8333-444455556666", url, validation: "on_fraud_risk", liability_shift: "required" } } }] } });
+
+test("la orden que espera el reto del banco es PENDIENTE y viva; nunca aprobada ni rechazada", () => {
+  const d = decidirOrden(E, conReto(URL_RETO));
+  assert.deepEqual(d, { tipo: "PENDIENTE", motivo: "action_required", ordenIdExterno: "ORDTST01M4P8RETO" });
+  assert.equal(enReto(conReto(URL_RETO)), true);
+  assert.equal(ordenViva(conReto(URL_RETO)), true);
+  // No es una orden «atascada» (esas son las `created`): por vieja que sea, esa regla no la cancela.
+  assert.equal(ordenAtascada({ ...conReto(URL_RETO), created_date: "2026-10-11T10:00:00.000Z" }, new Date("2026-10-11T18:00:00.000Z")), false);
+  for (const o of [ORDEN_APROBADA, ORDEN_EN_REVISION, ORDEN_EN_ANTIFRAUDE, { status: "created" }, null]) assert.equal(enReto(o), false);
+});
+
+test("la dirección del reto: solo https y de Mercado Pago; cualquier otra cosa no se abre", () => {
+  assert.equal(urlDeReto(conReto(URL_RETO)), URL_RETO);
+  for (const mala of [
+    "http://www.mercadopago.com.mx/auth/card/validation/pages/remedies/x",          // sin cifrar
+    "https://www.mercadopago.com.mx.evil.example/auth/card",                        // otro host que empieza igual
+    "https://evil.example/?u=https://www.mercadopago.com.mx/",                      // el host bueno, de adorno
+    "https://www.mercadopago.com.mx@evil.example/reto",                             // el host bueno como usuario
+    "https://usuario:clave@www.mercadopago.com.mx/reto",                            // con credenciales
+    "https://www.mercadopago.com.mx:8443/reto",                                     // otro puerto
+    "https://mercadopago.com.mx/reto", "https://www.mercadopago.com/reto",          // parientes que nadie verificó
+    "javascript:alert(1)", "data:text/html,<script>1</script>", "//www.mercadopago.com.mx/reto", "", "   ", null, undefined, 7, { href: URL_RETO },
+    `https://www.mercadopago.com.mx/${"a".repeat(700)}`,
+  ]) assert.equal(urlDeReto(conReto(mala)), null, String(mala).slice(0, 60));
+  // La dirección solo se entrega de una orden que SIGUE esperando el reto.
+  assert.equal(urlDeReto({ ...conReto(URL_RETO), status: "processed" }), null);
+  assert.equal(urlDeReto({ ...conReto(URL_RETO), status: "canceled" }), null);
+  assert.equal(urlDeReto({ status: "action_required" }), null);
+  assert.equal(urlDeReto(null), null);
+});
+
+test("el motivo de un reto: el banco no lo confirmó (VERIFICACION) o nadie lo contestó (SIN_VERIFICAR), y qué cuenta para los topes", () => {
+  // VERIFICADO: titular de prueba APRO con 3DS → la orden queda failed y el pago 3ds_challenge_failed.
+  const fallida = decidirOrden(E, { ...conReto(undefined), status: "failed", status_detail: "failed",
+    transactions: { payments: [{ id: "PAY01M4P8RETO", status: "failed", status_detail: "3ds_challenge_failed",
+      payment_method: { id: "master", type: "credit_card", transaction_security: { id: "x", type: "threeds", status: "not_authenticated" } } }] } });
+  assert.equal(fallida.tipo === "RECHAZADO" && fallida.detalle, "3ds_challenge_failed");
+  assert.equal(motivoDeRechazo("3ds_challenge_failed"), "VERIFICACION");
+  assert.equal(motivoDeRechazo("canceled"), "SIN_VERIFICAR");
+  assert.equal(motivoDeRechazo("expired"), "SIN_VERIFICAR");
+  // Un reto que nadie contestó no es una tarjeta rechazada; el que el banco no confirmó cuenta solo para la IP.
+  assert.deepEqual(cuentaComoRechazo("SIN_VERIFICAR"), { cuenta: false, soloIp: false });
+  assert.deepEqual(cuentaComoRechazo("VERIFICACION"), { cuenta: true, soloIp: true });
+  for (const m of ["FONDOS", "DATOS", "LLAMAR_BANCO", "TARJETA_DESHABILITADA", "RIESGO", "OTRO"] as const) assert.deepEqual(cuentaComoRechazo(m), { cuenta: true, soloIp: false }, m);
+});
+
+test("aprobada tras el reto (VERIFICADO: authenticated y ya sin dirección): se aprueba como cualquier otra", () => {
+  const d = decidirOrden(E, { ...ORDEN_APROBADA, transactions: { payments: [{ ...ORDEN_APROBADA.transactions.payments[0],
+    payment_method: { id: "master", type: "credit_card", transaction_security: { id: "x", type: "threeds", status: "authenticated", validation: "on_fraud_risk", liability_shift: "required" } } }] } });
+  assert.equal(d.tipo, "APROBADO");
 });

@@ -2,7 +2,7 @@
 //
 //   POST /functions/v1/tienda     x-vim-tienda: <VIM_TIENDA_SECRET>     x-tienda-ip: <IP del cliente>
 //                                 x-tienda-sesion: <token de sesión>    (opcional; solo cuentas y `pedir`)
-//   { accion: "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" | "intento"
+//   { accion: "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" | "verificacion" | "intento"
 //           | "registrar" | "entrar" | "salir" | "recuperar_pedir" | "recuperar_aplicar" | "cuenta"
 //           | "cuenta_guardar" | "cuenta_password" | "direccion_guardar" | "direccion_borrar"
 //           | "mis_pedidos" | "eliminar_cuenta", negocio: <slug>, … }
@@ -73,6 +73,11 @@
 //       siempre más `propina_mxn`, `total_a_pagar_mxn` y `pago: { estado: "PAGADO" }`;
 //     · rechazado → 409 PAGO_RECHAZADO con `detalle`: la familia del motivo (FONDOS, DATOS,
 //       LLAMAR_BANCO, TARJETA_DESHABILITADA u OTRO). El pedido se descartó;
+//     · Mercado Pago pide que el cliente confirme con su banco (3D Secure) → 200 con
+//       `pago: { estado: "VERIFICACION", url }`: no se ha cobrado nada, el pedido sigue POR_PAGAR con
+//       10 minutos de plazo, y `url` es la página del reto (de Mercado Pago, ya validada), que la
+//       tienda abre en un marco. Esa dirección lleva un token del cliente: viaja en ESTA respuesta
+//       y en la de `verificacion`, y no se guarda ni se escribe en ningún lado;
 //     · no se supo (Mercado Pago no contestó, o dejó el cobro en revisión) → 200 con
 //       `pago: { estado: "POR_CONFIRMAR" }`: el pedido sigue POR_PAGAR y lo resuelven el aviso,
 //       `confirmar_pago` y el barrido. Nunca se contesta «rechazado» sin un no seguro de Mercado Pago;
@@ -87,6 +92,22 @@
 //   del negocio se pausa una hora (aviso a VIM).
 //   `confirmar_pago` ({negocio, codigo}) es el respaldo del aviso desde la página del pedido: le
 //   pregunta a Mercado Pago y contesta el seguimiento.
+//   `verificacion` ({negocio, codigo, cancelar?}) es lo que la pantalla de la tarjeta pregunta mientras
+//   el cliente contesta el reto de su banco. Consulta la orden (a lo sumo cada 3 s por pago) y contesta:
+//     · 200 `pago: { estado: "VERIFICACION", url? }`: el reto sigue vivo (con su dirección, si se consultó);
+//     · 200 `pago: { estado: "PAGADO" }`: aprobado y verificado; el pedido ya está RECIBIDO (y sale el correo);
+//     · 200 `pago: { estado: "POR_CONFIRMAR" }`: ya no espera el reto y todavía no hay resultado: lo
+//       dice la página del pedido;
+//     · 409 PAGO_RECHAZADO con `detalle` (VERIFICACION: el banco no lo confirmó; SIN_VERIFICAR: el
+//       reto se dejó —lo canceló el cliente o pasó el plazo—; o la familia de siempre): no se cobró
+//       nada y el cliente puede pagar otra vez, igual que tras un rechazo directo.
+//   Con `cancelar: true` el cliente deja el reto. Mercado Pago NO deja cancelar una orden que espera
+//   el reto (VERIFICADO: 422), así que se deja de NUESTRO lado: el pedido se cierra sin pago, se
+//   contesta 409 SIN_VERIFICAR en el acto, y el pago queda ABANDONADO y vigilado; si su orden acaba
+//   cobrada (el cliente lo contestó después), se devuelve sola. Solo se deja con la orden a la vista
+//   y todavía en el reto: si ya salió de él y se está cobrando, se contesta POR_CONFIRMAR; y si
+//   Mercado Pago no contesta, VERIFICACION (la tienda vuelve a pedirlo). Pasado el plazo (10 minutos) el
+//   barrido de la base hace lo mismo. Ese pedido NO se descarta: su renglón es el que vigila la orden.
 //   De la tarjeta aquí solo pasa el token, que es de un solo uso y no se escribe en ningún log.
 //
 // SECRETOS: VIM_TIENDA_SECRET, VIM_TIENDA_URL (base de los enlaces del correo; https),
@@ -107,14 +128,14 @@ import { correoDeBienvenida, correoDeRecuperacion, correoYaTienesCuenta } from "
 import { CABECERA_SESION, cuentaDe, direccionesPublicas, leerRegistro, leerSesion, pedidosPublicos, type Sesion } from "../_shared/tienda/cuenta.ts";
 import { cotizacionPublica, type Cupos, cuposDe, esTopeDeEntradas, ipDeConfianza, leerNegocio, leerPedido, leerPedidoEnLinea, type Negocio, respuestaDeCaptcha, respuestaDeRpc, yaExistia } from "../_shared/tienda/respuesta.ts";
 import { cobrarPago, confirmarPago } from "../_shared/tienda/pago-flujo.ts";
-import { partesDeCotizacion } from "../_shared/tienda/pago-mp.ts";
+import { cuentaComoRechazo, type MotivoDeRechazo, motivoDeRechazo, partesDeCotizacion } from "../_shared/tienda/pago-mp.ts";
 import { depsDePagos } from "../_shared/tienda/pago-puerto.ts";
 import { anotarRechazo, avisoDePagoPausado, ipSinPagoEnLinea } from "../_shared/tienda/rechazos.ts";
 
 const MAX_CUERPO = 32_768;
 
 type Admin = ReturnType<typeof clienteAdmin>;
-type PeticionDeCuenta = Exclude<Peticion, { accion: "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" | "intento" }>;
+type PeticionDeCuenta = Exclude<Peticion, { accion: "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" | "verificacion" | "intento" }>;
 
 /**
  * El correo que confirma un pedido: después de responder, y pase lo que pase el pedido ya existe.
@@ -245,6 +266,20 @@ async function pausarPagoEnLinea(admin: Admin, d: { p_tenant: string; sucursal: 
     const c = await enviarCorreo({ to: Deno.env.get("VIM_AVISOS_A") ?? "hola@vimpos.com.mx", ...avisoDePagoPausado({ negocio: d.negocio, slug: d.slug, sucursal, por: d.por }) });
     if (!c.enviado) registrarError("tienda", "AVISO_NO_SALIO", `pago en pausa: ${d.slug}`);
   })().catch((e) => registrarError("tienda", "AVISO_NO_SALIO", e)));
+}
+
+/**
+ * Un cobro que no pasó, ya con su motivo: se cuenta (aunque el pedido ya se borró) y se contesta
+ * 409 PAGO_RECHAZADO. Por IP decide qué motivo se dice; por negocio, si hay que pausar su pago en
+ * línea. Qué cuenta y para quién lo dice `cuentaComoRechazo`: un reto del banco que nadie contestó
+ * no es una tarjeta rechazada.
+ */
+async function rechazoDePago(admin: Admin, d: { p_tenant: string; ip: string; negocio: string; slug: string; motivo: MotivoDeRechazo }): Promise<Response> {
+  const como = cuentaComoRechazo(d.motivo);
+  if (!como.cuenta) return json({ error: "PAGO_RECHAZADO", detalle: d.motivo }, 409);
+  const r = await anotarRechazo(admin, d.ip, d.slug, d.motivo, como.soloIp);
+  if (r.pausar) await pausarPagoEnLinea(admin, { p_tenant: d.p_tenant, sucursal: null, negocio: d.negocio, slug: d.slug, por: "RECHAZOS" });
+  return json({ error: "PAGO_RECHAZADO", detalle: r.detalle }, 409);
 }
 
 /**
@@ -512,6 +547,65 @@ async function atender(req: Request): Promise<Response> {
     return seg.data ? json(seg.data) : json({ error: "PEDIDO_NO_ENCONTRADO" }, 404);
   }
 
+  // ── verificacion ────────────────────────────────────────────────────────────────────────────
+  // La pantalla de la tarjeta, mientras el cliente contesta el reto de su banco (3D Secure). Es el
+  // mismo camino que el aviso y que `confirmar_pago` (pago-flujo.ts): la verdad sale de consultar la
+  // orden con el token del restaurante. De quien llama solo se usa el código del pedido y si quiere
+  // cancelar. La dirección del reto sale de esa consulta y viaja solo en esta respuesta.
+  if (p.accion === "verificacion") {
+    const p_seguimiento_hash = await huellaDe(p.codigo);
+    const ped = await admin.from("delivery_pedidos").select("id, cliente_email, pago_al_recibir")
+      .eq("seguimiento_hash", p_seguimiento_hash).eq("tenant_id", p_tenant).eq("canal", "TIENDA").maybeSingle();
+    if (ped.error) return rechazo("verificacion", ped.error);
+    const pedido = ped.data as { id: string; cliente_email: string | null; pago_al_recibir: string | null } | null;
+    if (!pedido) return json({ error: "PEDIDO_NO_ENCONTRADO" }, 404);
+    const leerPago = async () => {
+      const g = await admin.from("tienda_pagos").select("id, estado, detalle, verificacion_at, orden_id_externo").eq("pedido_id", pedido.id).eq("extra", false).maybeSingle();
+      if (g.error) throw new Error(g.error.message);
+      return g.data as { id: string; estado: string; detalle: string | null; verificacion_at: string | null; orden_id_externo: string | null } | null;
+    };
+    let pago = pedido.pago_al_recibir === "EN_LINEA" ? await leerPago() : null;
+    // Sin pago en línea no hay nada que verificar: la página del pedido dice cómo va.
+    if (!pago) return json({ pago: { estado: "POR_CONFIRMAR" } });
+
+    const reto: { url: string | null } = { url: null };
+    const deps = depsDePagos(admin, "tienda");
+    let consulta: Awaited<ReturnType<typeof confirmarPago>> | null = null;
+    if (pago.estado === "CREADO") {
+      // A lo sumo una consulta a Mercado Pago cada 3 s por pago (la pantalla pregunta cada 10 s, y en
+      // cuanto la página del reto avisa que terminó). Cancelar no espera turno: lo pidió el cliente, una vez.
+      const turno = p.cancelar ? { data: true, error: null } : await admin.rpc("tienda_pago_tomar_consulta", { p_pago: pago.id, p_segundos: 3 });
+      if (turno.error) return rechazo("tienda_pago_tomar_consulta", turno.error);
+      if (turno.data === true) {
+        // Con `cancelar`, dejar el reto lo decide ESTA consulta, con la orden a la vista
+        // (pago-flujo.ts): se abandona solo si sigue esperando el reto. Si el cliente ya lo había
+        // contestado está cobrada (se le da su pedido) o cobrándose (`processing`, `in_review`: no se
+        // deja; lo dirá la página del pedido). Si Mercado Pago no contesta, tampoco se deja a ciegas.
+        consulta = await confirmarPago(deps, pago.id, undefined, false, { cancelar: p.cancelar, alReto: (url) => { reto.url = url; } });
+        pago = await leerPago() ?? pago;
+      }
+    }
+    if (pago.estado === "APROBADO") {
+      await correoDePagado(admin, pago.id, { p_tenant, p_seguimiento_hash, email: pedido.cliente_email, negocio: negocio.nombre, slug: p.negocio, codigo: p.codigo });
+      return json({ pago: { estado: "PAGADO" } });
+    }
+    if (pago.estado === "RECHAZADO") {
+      // Mercado Pago dijo que no (o la orden quedó cancelada): es el mismo no que un rechazo directo.
+      // El pedido se descarta y el cliente puede pagar otra vez sin perder su carrito. Si ya no se
+      // puede descartar es que algo lo movió: que lo diga la página del pedido.
+      const motivo = motivoDeRechazo(pago.detalle);
+      if (!await deps.db.descartar(pago.id)) return json({ pago: { estado: "POR_CONFIRMAR" } });
+      return rechazoDePago(admin, { p_tenant, ip, negocio: negocio.nombre, slug: p.negocio, motivo });
+    }
+    // El reto se dejó (lo canceló el cliente, o pasó el plazo): el pedido ya está cerrado sin pago y
+    // se puede pagar otra vez. No se descarta ni cuenta como tarjeta rechazada.
+    if (pago.estado === "ABANDONADO") return rechazoDePago(admin, { p_tenant, ip, negocio: negocio.nombre, slug: p.negocio, motivo: "SIN_VERIFICAR" });
+    // Sigue esperando el reto: lo dijo Mercado Pago ahora, o (sin turno para preguntar, o sin
+    // respuesta) es lo último que se supo. Cualquier otra cosa ya no es de esta pantalla.
+    const sigue = pago.estado === "CREADO" && (consulta?.ok ? consulta.enVerificacion : consulta === null || consulta.motivo === "MP_NO_RESPONDE" || consulta.motivo === "SIN_TOKEN" ? pago.verificacion_at !== null : false);
+    return json({ pago: sigue ? { estado: "VERIFICACION", ...(reto.url && { url: reto.url }) } : { estado: "POR_CONFIRMAR" } });
+  }
+
   if (p.accion !== "menu" && p.accion !== "cotizar" && p.accion !== "pedir") return cuentas(p, { admin, negocio, ip, sesion, cupos });
 
   // menu, cotizar y pedir: la sucursal tiene que ser una de las que la tienda enseña.
@@ -612,13 +706,7 @@ async function atender(req: Request): Promise<Response> {
         },
       },
     });
-    if (cobro.tipo === "RECHAZADO") {
-      // El rechazo se cuenta (aunque el pedido ya se borró): por IP decide qué motivo se dice, y por
-      // negocio, si hay que pausar su pago en línea.
-      const r = await anotarRechazo(admin, ip, p.negocio, cobro.motivo);
-      if (r.pausar) await pausarPagoEnLinea(admin, { p_tenant, sucursal: null, negocio: negocio.nombre, slug: p.negocio, por: "RECHAZOS" });
-      return json({ error: "PAGO_RECHAZADO", detalle: r.detalle }, 409);
-    }
+    if (cobro.tipo === "RECHAZADO") return rechazoDePago(admin, { p_tenant, ip, negocio: negocio.nombre, slug: p.negocio, motivo: cobro.motivo });
     if (cobro.tipo === "NO_PROCESADO") {
       // No fue el banco ni una tarjeta: no cuenta como tarjeta rechazada del negocio. Un token
       // inventado o usado sí cuenta para la IP que lo mandó (y solo para ella).
@@ -632,6 +720,8 @@ async function atender(req: Request): Promise<Response> {
       return json({ error: "PAGO_NO_DISPONIBLE" }, 409);
     }
     if (cobro.tipo === "POR_CONFIRMAR") return json({ codigo, ...porPagar.publico, pago: { estado: "POR_CONFIRMAR" } });
+    // El banco quiere confirmar con el cliente: nada cobrado todavía. La dirección del reto va solo aquí.
+    if (cobro.tipo === "VERIFICACION") return json({ codigo, ...porPagar.publico, pago: { estado: "VERIFICACION", url: cobro.url } });
     // Aprobado: el pedido ya está con el restaurante y su ventana de aceptación ya corre.
     const ya = await admin.from("delivery_pedidos").select("vence_aceptacion").eq("seguimiento_hash", p_seguimiento_hash).eq("tenant_id", p_tenant).maybeSingle();
     await correoDePagado(admin, porPagar.pagoId, { p_tenant, p_seguimiento_hash, email: p.cliente.email, negocio: negocio.nombre, slug: p.negocio, codigo });

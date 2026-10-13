@@ -33,7 +33,7 @@ import { enSegundoPlano, enviarCorreo } from "../_shared/correo.ts";
 import { secretoInternoValido } from "../_shared/delivery/interno.ts";
 import { firmaValida } from "../_shared/terminal/mercado-pago.ts";
 import { ordenDelAviso } from "../_shared/tienda/aviso-mp.ts";
-import { avisoDeConciliacionFallida, avisoDeDevolucionFallida, barrer, confirmarPago, respuestaDeConfirmacion, type Tarea, topesDelAviso } from "../_shared/tienda/pago-flujo.ts";
+import { avisoDeConciliacionFallida, avisoDeDevolucionFallida, avisoDeRetoSinCerrar, barrer, confirmarPago, respuestaDeConfirmacion, type Tarea, topesDelAviso } from "../_shared/tienda/pago-flujo.ts";
 import { depsDePagos } from "../_shared/tienda/pago-puerto.ts";
 
 const FN = "tienda-webhook-mp";
@@ -47,8 +47,8 @@ const texto = (cuerpo: string, status: number): Response => new Response(cuerpo,
  * Correo a VIM: una devolución se rindió, o un pago lleva tres consultas sin poder resolverse (puede
  * haber un cobro sin pedido). Solo ids nuestros y de Mercado Pago; ni el cliente ni la tarjeta.
  */
-async function avisar(t: Tarea, de: "DEVOLUCION" | "CONCILIACION"): Promise<void> {
-  registrarError(FN, de === "DEVOLUCION" ? "DEVOLUCION_FALLIDA" : "CONCILIACION_FALLIDA", `pago ${t.id}`);
+async function avisar(t: Tarea, de: "DEVOLUCION" | "CONCILIACION" | "RETO"): Promise<void> {
+  registrarError(FN, de === "DEVOLUCION" ? "DEVOLUCION_FALLIDA" : de === "RETO" ? "RETO_SIN_CERRAR" : "CONCILIACION_FALLIDA", `pago ${t.id}`);
   const { data } = await admin.from("tienda_pagos")
     .select("monto_mxn, ultimo_error, orden_id_externo, pedido:delivery_pedidos(folio_corto), negocio:tenants(nombre_comercial)")
     .eq("id", t.id).maybeSingle();
@@ -61,7 +61,7 @@ async function avisar(t: Tarea, de: "DEVOLUCION" | "CONCILIACION"): Promise<void
   };
   const r = await enviarCorreo({
     to: Deno.env.get("VIM_AVISOS_A") ?? "hola@vimpos.com.mx",
-    ...(de === "DEVOLUCION" ? avisoDeDevolucionFallida({ ...d, error: f?.ultimo_error ?? "" }) : avisoDeConciliacionFallida({ ...d, motivo: f?.ultimo_error })),
+    ...(de === "DEVOLUCION" ? avisoDeDevolucionFallida({ ...d, error: f?.ultimo_error ?? "" }) : de === "RETO" ? avisoDeRetoSinCerrar(d) : avisoDeConciliacionFallida({ ...d, motivo: f?.ultimo_error })),
   });
   if (!r.enviado) registrarError(FN, "AVISO_NO_SALIO", `pago ${t.id}`);
 }

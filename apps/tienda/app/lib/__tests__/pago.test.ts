@@ -122,7 +122,7 @@ describe("qué hace «Tus datos» con cada respuesta de `pedir`", () => {
   it("PAGO_RECHAZADO: se dice junto a la tarjeta, con el motivo y que no se cobró", () => {
     expect(desenlaceDelError(e("PAGO_RECHAZADO", "FONDOS"), c)).toEqual({ tipo: "tarjeta", campo: null, texto: "Tu tarjeta no tiene fondos suficientes. Prueba con otra tarjeta. No se te cobró nada." });
     // Sin motivo o con uno que no se conoce: el general. Nunca el código en crudo.
-    for (const raro of [null, "", "ALGO_NUEVO", "constructor", "CODIGO", "FECHA", "NUMERO", "VERIFICACION"]) {
+    for (const raro of [null, "", "ALGO_NUEVO", "constructor", "CODIGO", "FECHA", "NUMERO", "VERIFICADO"]) {
       const d = desenlaceDelError(e("PAGO_RECHAZADO", raro), c);
       expect(d).toEqual({ tipo: "tarjeta", campo: null, texto: "Tu banco no aprobó el pago. Prueba con otra tarjeta. No se te cobró nada." });
     }
