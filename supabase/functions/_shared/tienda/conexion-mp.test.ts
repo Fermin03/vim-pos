@@ -48,7 +48,7 @@ test("el canje va con las credenciales de la aplicación de la TIENDA y devuelve
 
 // ── Desconectar: contra una base de mentira ────────────────────────────────────────────────────
 type Fila = Record<string, unknown>;
-function baseDeMentira(o: { conexion: Fila | null; ocupada: Fila | null | Error }) {
+function baseDeMentira(o: { conexion: Fila | null; ocupada: Fila | null | Error; /** La fila de tienda_config del negocio (la marca del modo de prueba). */ config?: Fila | null }) {
   const hechos: string[] = [];
   const filtros: Record<string, unknown>[] = [];
   const admin = {
@@ -60,7 +60,8 @@ function baseDeMentira(o: { conexion: Fila | null; ocupada: Fila | null | Error 
         eq: (k: string, v: unknown) => { f[k] = v; return q; },
         in: (k: string, v: unknown) => { f[k] = v; return q; },
         update: (v: Fila) => { hechos.push(`update ${tabla} ${JSON.stringify(v)}`); return q; },
-        maybeSingle: async () => ({ data: tabla === "tienda_conexiones" && f.id === o.conexion?.id && f.tenant_id === o.conexion?.tenant_id ? o.conexion : null, error: null }),
+        maybeSingle: async () => ({ data: tabla === "tienda_config" ? (f.tenant_id === o.config?.tenant_id ? o.config : null)
+          : tabla === "tienda_conexiones" && f.id === o.conexion?.id && f.tenant_id === o.conexion?.tenant_id ? o.conexion : null, error: null }),
       };
       return q;
     },
@@ -114,4 +115,43 @@ test("la conexión de la tienda: lo que no es canjear ni desconectar, o viene ma
   // Sin las credenciales de la aplicación de la tienda no se canjea nada (aquí no hay Deno ni secretos).
   assert.equal((await conexionDeTienda(admin, NEGOCIO, { accion: "canjear", code: "X" }, json)).status, 503);
   assert.deepEqual(hechos, []);
+});
+
+// ── La conexión de prueba no es del dueño (modo de prueba, 0177) ───────────────────────────────
+test("desconectar: una conexión de PRUEBA no se desconecta desde el admin; ni se pregunta si está ocupada ni se toca un token", async () => {
+  const b = baseDeMentira({ conexion: { id: CX, tenant_id: NEGOCIO, estado: "ACTIVA", de_prueba: true }, ocupada: null });
+  const r = await conexionDeTienda(b.admin, NEGOCIO, { accion: "desconectar", conexion_id: CX }, json);
+  assert.equal(r.status, 409);
+  assert.deepEqual(await r.json(), { error: "CONEXION_DE_PRUEBA" });
+  assert.deepEqual(b.hechos, []);
+  // Solo un `true` es de prueba: una real se desconecta como siempre.
+  for (const de_prueba of [false, null, undefined]) {
+    const real = baseDeMentira({ conexion: { id: CX, tenant_id: NEGOCIO, estado: "ACTIVA", de_prueba }, ocupada: null });
+    assert.equal((await conexionDeTienda(real.admin, NEGOCIO, { accion: "desconectar", conexion_id: CX }, json)).status, 200, String(de_prueba));
+  }
+});
+
+test("canjear: con el negocio en modo de prueba no se conecta nada (ni se llega a hablar con Mercado Pago)", async () => {
+  const b = baseDeMentira({ conexion: null, ocupada: null, config: { tenant_id: NEGOCIO, pago_de_prueba: true } });
+  const r = await conexionDeTienda(b.admin, NEGOCIO, { accion: "canjear", code: "CODIGO" }, json);
+  assert.equal(r.status, 409);
+  assert.deepEqual(await r.json(), { error: "MODO_DE_PRUEBA" });
+  assert.deepEqual(b.hechos, []);
+  // Sin la marca (o con otra cosa que no sea `true`) sigue su camino: aquí, hasta que faltan las credenciales.
+  for (const pago_de_prueba of [false, null, "true"]) {
+    const normal = baseDeMentira({ conexion: null, ocupada: null, config: { tenant_id: NEGOCIO, pago_de_prueba } });
+    assert.equal((await conexionDeTienda(normal.admin, NEGOCIO, { accion: "canjear", code: "CODIGO" }, json)).status, 503, String(pago_de_prueba));
+  }
+});
+
+test("canjear: una conexión de prueba que ya existe para esa cuenta no se pisa", async () => {
+  // El canje completo necesita Deno y a Mercado Pago; aquí se comprueba que la guarda está, y dónde:
+  // después de saber qué cuenta autorizó el dueño y ANTES de escribir la conexión o sus tokens.
+  const { readFileSync } = await import("node:fs");
+  const fuente = readFileSync(new URL("./conexion-mp.ts", import.meta.url), "utf8");
+  const canje = fuente.slice(fuente.indexOf('if (b.accion === "canjear")'), fuente.indexOf('if (b.accion === "desconectar")'));
+  const orden = ["const t = r.tokens;", '.eq("cuenta_id_externo", t.user_id).maybeSingle()', "(previa.data as", 'json({ error: "CUENTA_DE_PRUEBA" }, 409)',
+                 '.from("tienda_conexiones").upsert(', 'admin.rpc("tienda_guardar_tokens"'].map((t) => canje.indexOf(t));
+  assert.ok(orden.every((i) => i > 0), JSON.stringify(orden));
+  assert.deepEqual(orden, [...orden].sort((a, b) => a - b));
 });

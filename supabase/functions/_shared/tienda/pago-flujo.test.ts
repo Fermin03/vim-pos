@@ -9,7 +9,7 @@ const PAGO = "2cd9e6fa-1acf-47dc-8ba4-cba918d73770";
 const ORDEN = "ORDTST01M4P8JX8C82XV8G7EB2A16YAC";
 const FILA: FilaPago = {
   id: PAGO, conexion_id: "cx-1", estado: "CREADO", monto: "138.00", cobro_mandado: false,
-  orden_id_externo: null, detalle: null, creado: "2026-10-11T18:00:00.000Z", en_verificacion: false, conciliaciones: 0, cuenta_vendedora: "3754297554", de_prueba: false,
+  orden_id_externo: null, detalle: null, creado: "2026-10-11T18:00:00.000Z", en_verificacion: false, conciliaciones: 0, cuenta_vendedora: "3754297554", de_prueba: false, freno_clave: null,
 };
 const APROBADA = {
   id: ORDEN, status: "processed", status_detail: "accredited", total_amount: "138.00", total_paid_amount: "138.00",
@@ -838,4 +838,18 @@ test("un aviso (de la clave que sea) sobre un pago se resuelve con el token de l
   const cruzado = doble({ filas: [{ ...FILA, conexion_id: "cx-real", cuenta_vendedora: "111222333" }], mp: { leerOrden: { status: 200, cuerpo: APROBADA } } });
   await confirmarPago(cruzado.deps, PAGO, ORDEN);
   assert.ok(sin(cruzado.llamadas, "aplicar"));
+});
+
+test("pago de prueba: si Mercado Pago no acepta la orden y repite el correo del pagador de prueba, tampoco llega al rastro", async () => {
+  // El 400 nombra la propiedad y a veces repite su VALOR. El valor que se mandó aquí es el del usuario de prueba, no el del cliente.
+  const eco = { errors: [{ code: "property_value", message: "Invalid value for property", details: [`'$.payer.email' - ${PAGADOR} is not a valid user; ${DATOS.email}`] }] };
+  const { deps, llamadas, aLaBase } = doble({ filas: [{ ...FILA, de_prueba: true }], pagadorDePrueba: PAGADOR,
+                                              mp: { crearOrden: { status: 400, cuerpo: eco }, buscarOrdenes: { status: 200, cuerpo: { data: [] } } } });
+  assert.deepEqual(await cobrarPago(deps, DATOS), { tipo: "NO_PROCESADO", contarIp: false });
+  const escrito = JSON.stringify([llamadas, aLaBase]);
+  assert.equal(escrito.includes(PAGADOR), false);
+  assert.equal(escrito.includes("test_user_3753760462"), false);
+  assert.equal(escrito.includes(DATOS.email), false);
+  // Lo que sirve para arreglarlo sí queda: qué propiedad fue.
+  assert.ok(llamadas.some((l) => l.startsWith("registrar COBRO_NO_ACEPTADO") && l.includes("payer.email")));
 });

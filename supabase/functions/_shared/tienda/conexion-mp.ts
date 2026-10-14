@@ -58,6 +58,9 @@ export async function pedirTokensDeTienda(
  * sesión, el negocio del token y que es Dueño o Administrador. Solo corre en Deno.
  *   · `canjear` {code}: guarda la cuenta, su public key y si es de prueba; los tokens, en Vault;
  *   · `desconectar` {conexion_id}: borra los tokens y la deja DESCONECTADA.
+ * LA CONEXIÓN DE PRUEBA NO ES DEL DUEÑO (modo de prueba, 0177): la pone VIM. Desde aquí no se puede
+ * conectar nada con el negocio en modo de prueba (`MODO_DE_PRUEBA`), ni pisar con un canje una fila
+ * `de_prueba` que ya existe (`CUENTA_DE_PRUEBA`), ni desconectarla (`CONEXION_DE_PRUEBA`).
  */
 export async function conexionDeTienda(admin: Admin, tenantId: string, b: Record<string, unknown>, json: Json): Promise<Response> {
   const env = (k: string) => (globalThis as { Deno?: { env: { get(k: string): string | undefined } } }).Deno?.env.get(k) ?? "";
@@ -68,6 +71,10 @@ export async function conexionDeTienda(admin: Admin, tenantId: string, b: Record
     admin.from("tienda_eventos").insert({ accion: `conexion:${motivo}`, error: detalle.slice(0, 300), payload: { tenant_id: tenantId } });
 
   if (b.accion === "canjear") {
+    // En modo de prueba la conexión real no se usa y la de prueba la pone VIM: no se conecta nada.
+    const modo = await admin.from("tienda_config").select("pago_de_prueba").eq("tenant_id", tenantId).maybeSingle();
+    if (modo.error) throw modo.error;
+    if ((modo.data as { pago_de_prueba?: unknown } | null)?.pago_de_prueba === true) return json({ error: "MODO_DE_PRUEBA" }, 409);
     const clientId = env("MP_TIENDA_CLIENT_ID"), clientSecret = env("MP_TIENDA_CLIENT_SECRET");
     if (!clientId || !clientSecret) return json({ error: "MP_NO_CONFIGURADO" }, 503);
     if (typeof b.code !== "string" || b.code === "" || b.code.length > 200) return json({ error: "FALTAN_CAMPOS" }, 400);
@@ -86,6 +93,14 @@ export async function conexionDeTienda(admin: Admin, tenantId: string, b: Record
       return json({ error: "SIN_PUBLIC_KEY" }, 409);
     }
     const t = r.tokens;
+    // Una conexión de prueba que ya existe para esa cuenta no se pisa (su token de Vault es el de
+    // prueba que puso VIM, o es la marca `de_prueba` lo que se cambiaría): se dice, y no se toca.
+    const previa = await admin.from("tienda_conexiones").select("id, de_prueba").eq("tenant_id", tenantId).eq("cuenta_id_externo", t.user_id).maybeSingle();
+    if (previa.error) throw previa.error;
+    if ((previa.data as { de_prueba?: unknown } | null)?.de_prueba === true) {
+      await rastro("cuenta_de_prueba", `cuenta ${t.user_id}`);
+      return json({ error: "CUENTA_DE_PRUEBA" }, 409);
+    }
     const { nombre } = await clienteMpConfig(t.access_token).cuenta();
     const { data: fila, error } = await admin.from("tienda_conexiones").upsert({
       tenant_id: tenantId, cuenta_id_externo: t.user_id, cuenta_nombre: nombre, public_key: r.publicKey,
@@ -103,9 +118,11 @@ export async function conexionDeTienda(admin: Admin, tenantId: string, b: Record
   if (b.accion === "desconectar") {
     const id = typeof b.conexion_id === "string" && UUID.test(b.conexion_id) ? b.conexion_id.toLowerCase() : null;
     if (!id) return json({ error: "FALTAN_CAMPOS" }, 400);
-    const { data } = await admin.from("tienda_conexiones").select("id, estado").eq("id", id).eq("tenant_id", tenantId).maybeSingle();
-    const cx = data as { id: string; estado: string } | null;
+    const { data } = await admin.from("tienda_conexiones").select("id, estado, de_prueba").eq("id", id).eq("tenant_id", tenantId).maybeSingle();
+    const cx = data as { id: string; estado: string; de_prueba?: boolean } | null;
     if (!cx || cx.estado === "DESCONECTADA") return json({ error: "CONEXION_NO_EXISTE" }, 404);
+    // La conexión de prueba la pone y la quita VIM: el dueño no la desconecta.
+    if (cx.de_prueba === true) return json({ error: "CONEXION_DE_PRUEBA" }, 409);
     // Con los tokens se van las devoluciones: no se desconecta mientras el dinero de un cliente
     // dependa de ellos. La regla vive en la base (`tienda_conexion_ocupada`, 0173): un cobro sin
     // resolver, una devolución por hacer o fallida, o un cobro de las últimas 48 horas (la ventana

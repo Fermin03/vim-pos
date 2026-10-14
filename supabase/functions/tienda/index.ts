@@ -111,10 +111,13 @@
 //   De la tarjeta aquí solo pasa el token, que es de un solo uso y no se escribe en ningún log.
 //
 //   EL FRENO TRAS UN RECHAZO POR RIESGO (0177; rechazos.ts). Cuando el motivo es RIESGO (`high_risk`: el
-//   antifraude de Mercado Pago, no el banco), ese cliente —su teléfono y su IP— no puede repetir el cobro
-//   en línea en ese negocio durante 30 minutos: el 409 PAGO_RECHAZADO trae `hasta`, y mientras dure,
-//   `pedir` con pago en línea contesta 409 PAGO_EN_PAUSA con `hasta` SIN crear el pedido ni llamar a
-//   Mercado Pago (y sin contar como rechazo). Puede seguir pidiendo para pagar al recibir.
+//   antifraude de Mercado Pago, no el banco), ese cliente —su teléfono Y su IP a la vez— no puede repetir
+//   el cobro en línea en ese negocio durante 30 minutos: el 409 PAGO_RECHAZADO trae `hasta`, y mientras
+//   dure, `pedir` con pago en línea contesta 409 PAGO_EN_PAUSA con `hasta` SIN crear el pedido ni llamar a
+//   Mercado Pago (y sin contar como rechazo). Se mira DESPUÉS del antirobot: no sirve para preguntar si
+//   un teléfono tuvo un rechazo. Sin IP conocida no hay freno. Puede seguir pidiendo para pagar al recibir.
+//   La clave del freno es un HMAC (llave derivada de VIM_TIENDA_SECRET) y es lo único que llega a la base;
+//   el pago la guarda al nacer para que un rechazo que llega tarde frene al mismo cliente.
 //
 //   MODO DE PRUEBA (0177). Un negocio con `tienda_config.pago_de_prueba` cobra contra el ambiente de
 //   prueba de Mercado Pago, con su conexión de prueba, por este mismo código. Lo único distinto:
@@ -146,7 +149,7 @@ import { cotizacionPublica, type Cupos, cuposDe, esTopeDeEntradas, ipDeConfianza
 import { cobrarPago, confirmarPago } from "../_shared/tienda/pago-flujo.ts";
 import { type MotivoDeRechazo, motivoDeRechazo, partesDeCotizacion } from "../_shared/tienda/pago-mp.ts";
 import { depsDePagos } from "../_shared/tienda/pago-puerto.ts";
-import { anotarRechazo, avisoDePagoPausado, ipSinPagoEnLinea, pagoFrenado, respuestaDeRechazo } from "../_shared/tienda/rechazos.ts";
+import { anotarRechazo, avisoDePagoPausado, claveDeFreno, ipSinPagoEnLinea, pagoFrenado, respuestaDeRechazo } from "../_shared/tienda/rechazos.ts";
 
 const MAX_CUERPO = 32_768;
 
@@ -289,9 +292,9 @@ async function pausarPagoEnLinea(admin: Admin, d: { p_tenant: string; sucursal: 
  * se dice, el freno tras un rechazo por riesgo y lo que cambia en modo de prueba lo decide
  * `respuestaDeRechazo` (rechazos.ts, que sí se prueba); aquí solo se pausa al negocio si lo pide.
  */
-async function rechazoDePago(admin: Admin, d: { negocio: Negocio; ip: string; slug: string; motivo: MotivoDeRechazo; telefono: string | null }): Promise<Response> {
+async function rechazoDePago(admin: Admin, d: { negocio: Negocio; ip: string; slug: string; motivo: MotivoDeRechazo; /** La clave de freno de ese cliente, o null. */ frenoClave: string | null }): Promise<Response> {
   const p_tenant = d.negocio.tenantId;
-  const r = await respuestaDeRechazo(admin, { tenantId: p_tenant, slug: d.slug, ip: d.ip, motivo: d.motivo, telefono: d.telefono, dePrueba: d.negocio.dePrueba });
+  const r = await respuestaDeRechazo(admin, { slug: d.slug, ip: d.ip, motivo: d.motivo, frenoClave: d.frenoClave, dePrueba: d.negocio.dePrueba });
   if (r.pausar) await pausarPagoEnLinea(admin, { p_tenant, sucursal: null, negocio: d.negocio.nombre, slug: d.slug, por: "RECHAZOS" });
   return json(r.cuerpo, 409);
 }
@@ -576,16 +579,17 @@ async function atender(req: Request): Promise<Response> {
   // cancelar. La dirección del reto sale de esa consulta y viaja solo en esta respuesta.
   if (p.accion === "verificacion") {
     const p_seguimiento_hash = await huellaDe(p.codigo);
-    // El teléfono: si el pago acaba rechazado por riesgo, es a quien se frena (el pedido se descarta antes).
-    const ped = await admin.from("delivery_pedidos").select("id, cliente_email, cliente_telefono, pago_al_recibir")
+    const ped = await admin.from("delivery_pedidos").select("id, cliente_email, pago_al_recibir")
       .eq("seguimiento_hash", p_seguimiento_hash).eq("tenant_id", p_tenant).eq("canal", "TIENDA").maybeSingle();
     if (ped.error) return rechazo("verificacion", ped.error);
-    const pedido = ped.data as { id: string; cliente_email: string | null; cliente_telefono: string | null; pago_al_recibir: string | null } | null;
+    const pedido = ped.data as { id: string; cliente_email: string | null; pago_al_recibir: string | null } | null;
     if (!pedido) return json({ error: "PEDIDO_NO_ENCONTRADO" }, 404);
     const leerPago = async () => {
-      const g = await admin.from("tienda_pagos").select("id, estado, detalle, verificacion_at, orden_id_externo").eq("pedido_id", pedido.id).eq("extra", false).maybeSingle();
+      // `freno_clave`: si el pago acaba rechazado por riesgo, es la clave de a quién se frena (la del
+      // cliente que hizo ESE pedido: su teléfono y la IP con la que pidió), no la de quien pregunta ahora.
+      const g = await admin.from("tienda_pagos").select("id, estado, detalle, verificacion_at, orden_id_externo, freno_clave").eq("pedido_id", pedido.id).eq("extra", false).maybeSingle();
       if (g.error) throw new Error(g.error.message);
-      return g.data as { id: string; estado: string; detalle: string | null; verificacion_at: string | null; orden_id_externo: string | null } | null;
+      return g.data as { id: string; estado: string; detalle: string | null; verificacion_at: string | null; orden_id_externo: string | null; freno_clave: string | null } | null;
     };
     let pago = pedido.pago_al_recibir === "EN_LINEA" ? await leerPago() : null;
     // Sin pago en línea no hay nada que verificar: la página del pedido dice cómo va.
@@ -618,11 +622,11 @@ async function atender(req: Request): Promise<Response> {
       // puede descartar es que algo lo movió: que lo diga la página del pedido.
       const motivo = motivoDeRechazo(pago.detalle);
       if (!await deps.db.descartar(pago.id)) return json({ pago: { estado: "POR_CONFIRMAR" } });
-      return rechazoDePago(admin, { negocio, ip, slug: p.negocio, motivo, telefono: pedido.cliente_telefono });
+      return rechazoDePago(admin, { negocio, ip, slug: p.negocio, motivo, frenoClave: pago.freno_clave });
     }
     // El reto se dejó (lo canceló el cliente, o pasó el plazo): el pedido ya está cerrado sin pago y
     // se puede pagar otra vez. No se descarta ni cuenta como tarjeta rechazada.
-    if (pago.estado === "ABANDONADO") return rechazoDePago(admin, { negocio, ip, slug: p.negocio, motivo: "SIN_VERIFICAR", telefono: pedido.cliente_telefono });
+    if (pago.estado === "ABANDONADO") return rechazoDePago(admin, { negocio, ip, slug: p.negocio, motivo: "SIN_VERIFICAR", frenoClave: pago.freno_clave });
     // Sigue esperando el reto: lo dijo Mercado Pago ahora, o (sin turno para preguntar, o sin
     // respuesta) es lo último que se supo. Cualquier otra cosa ya no es de esta pantalla.
     const sigue = pago.estado === "CREADO" && (consulta?.ok ? consulta.enVerificacion : consulta === null || consulta.motivo === "MP_NO_RESPONDE" || consulta.motivo === "SIN_TOKEN" ? pago.verificacion_at !== null : false);
@@ -665,23 +669,25 @@ async function atender(req: Request): Promise<Response> {
     p_cuenta = s.p_cuenta;
   }
 
+  // Una IP que ya juntó sus tarjetas rechazadas de la hora no intenta otro pago en línea (puede
+  // seguir pidiendo para pagar al recibir). Antes del antirobot: no le gasta el token ni el cupo.
+  // En modo de prueba los rechazos no se cuentan, así que tampoco hay nada que mirar.
   const enLinea = p.pago === "EN_LINEA";
-  if (enLinea) {
-    // EL FRENO (0177): a este cliente —su teléfono o su IP— el antifraude de Mercado Pago le rechazó
-    // un cobro por riesgo aquí hace menos de 30 minutos. No se crea el pedido ni se llama a Mercado
-    // Pago: repetirlo enseguida empeora la puntuación del restaurante. No cuenta como rechazo, y no
-    // gasta el antirobot ni el cupo del negocio. Puede pedir para pagar al recibir. La tienda, si
-    // tenía un intento en duda con esta clave, pregunta por él (`intento`): esto no dice nada de aquel.
-    const hasta = await pagoFrenado(admin, p_tenant, p.cliente.telefono, ip);
-    if (hasta) return json({ error: "PAGO_EN_PAUSA", hasta }, 409);
-    // Una IP que ya juntó sus tarjetas rechazadas de la hora no intenta otro pago en línea (puede
-    // seguir pidiendo para pagar al recibir). Antes del antirobot: no le gasta el token ni el cupo.
-    // En modo de prueba los rechazos no se cuentan, así que tampoco hay nada que mirar.
-    if (!pagoDePrueba && await ipSinPagoEnLinea(admin, ip, p.negocio)) return json({ error: "DEMASIADOS_INTENTOS" }, 429);
-  }
+  if (enLinea && !pagoDePrueba && await ipSinPagoEnLinea(admin, ip, p.negocio)) return json({ error: "DEMASIADOS_INTENTOS" }, 429);
 
   const no = await antirobot(p.captcha, "tienda_pedido", ip);
   if (no) return no;
+
+  // EL FRENO (0177): a este MISMO cliente —este teléfono desde esta IP— el antifraude de Mercado Pago
+  // le rechazó un cobro por riesgo aquí hace menos de 30 minutos. No se crea el pedido ni se llama a
+  // Mercado Pago: repetirlo enseguida empeora la puntuación del restaurante. No cuenta como rechazo
+  // ni gasta el cupo del negocio. Va DESPUÉS del antirobot: antes serviría para preguntar, sin
+  // costo, si un teléfono tuvo un rechazo. Sin IP conocida no hay clave ni freno. Puede pedir para
+  // pagar al recibir. La tienda, si tenía un intento en duda con esta clave de intento, pregunta por
+  // él (`intento`): esta respuesta no dice nada de aquel.
+  const frenoClave = enLinea ? await claveDeFreno(secreto, p_tenant, p.cliente.telefono, ip) : null;
+  const frenadoHasta = await pagoFrenado(admin, frenoClave);
+  if (frenadoHasta) return json({ error: "PAGO_EN_PAUSA", hasta: frenadoHasta }, 409);
 
   // El cupo del negocio se gasta solo DESPUÉS del antirobot: sin un token válido nadie le agota la
   // tienda a un restaurante. El slug no es dato personal.
@@ -731,6 +737,13 @@ async function atender(req: Request): Promise<Response> {
   // (Si el pedido que existe es de pago al recibir, sigue por el camino de siempre, más abajo.)
   const porPagar = leerPedidoEnLinea(alta.data);
   if (porPagar) {
+    // El pago guarda la clave de freno de su cliente (nunca el teléfono ni la IP): si el rechazo por
+    // riesgo llega tarde —por el aviso, la página del pedido o el barrido—, la base frena con ella.
+    // Solo la primera vez (un reintento no la cambia). Si falla, el pedido sigue: ese pago no frenará tarde.
+    if (frenoClave) {
+      const g = await admin.from("tienda_pagos").update({ freno_clave: frenoClave }).eq("id", porPagar.pagoId).is("freno_clave", null);
+      if (g.error) registrarError("tienda", "FRENO_CLAVE", g.error);
+    }
     // Sin tarjeta o sin correo en ESTA petición (el pedido existía de un intento en línea y este
     // reintento vino de otra forma): no se cobra nada; el seguimiento dirá cómo va.
     // Lo que se le cuenta a Mercado Pago del pedido (su antifraude lo pide, y su correo al comprador
@@ -749,7 +762,7 @@ async function atender(req: Request): Promise<Response> {
         },
       },
     });
-    if (cobro.tipo === "RECHAZADO") return rechazoDePago(admin, { negocio, ip, slug: p.negocio, motivo: cobro.motivo, telefono: p.cliente.telefono });
+    if (cobro.tipo === "RECHAZADO") return rechazoDePago(admin, { negocio, ip, slug: p.negocio, motivo: cobro.motivo, frenoClave });
     if (cobro.tipo === "NO_PROCESADO") {
       // No fue el banco ni una tarjeta: no cuenta como tarjeta rechazada del negocio. Un token
       // inventado o usado sí cuenta para la IP que lo mandó (y solo para ella). En modo de prueba, nada.

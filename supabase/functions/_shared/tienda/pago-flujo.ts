@@ -41,6 +41,11 @@ export type FilaPago = {
    * (un negocio en modo de prueba, 0177). Todo lo demás es igual: mismas comprobaciones, mismo camino.
    */
   de_prueba: boolean;
+  /**
+   * `tienda_pagos.freno_clave`: la clave del freno por riesgo del cliente de este pago (rechazos.ts),
+   * guardada al crear el pedido. null = no se conocía su IP: ese pago no frena a nadie.
+   */
+  freno_clave: string | null;
 };
 
 export type Aplicado = { estado: string; pedido_estado: string; recien_aprobado: boolean };
@@ -205,7 +210,8 @@ export async function cobrarPago(deps: Deps, datos: Omit<DatosCobro, "monto">): 
   }
   if (que.tipo === "NO_ACEPTADO") {
     // El mensaje de Mercado Pago nombra la propiedad que no le gustó; por si repite su VALOR, se le quitan los datos del cliente.
-    deps.registrar("COBRO_NO_ACEPTADO", `${resumenDeFallo(r)} — ${sinDatosPersonales(motivoDeNoAceptado(r), datos)}`);
+    // (Y el correo que de verdad se mandó como pagador, si es el de prueba: tampoco va al rastro.)
+    deps.registrar("COBRO_NO_ACEPTADO", `${resumenDeFallo(r)} — ${sinDatosPersonales(sinDatosPersonales(motivoDeNoAceptado(r), datos), { ...datos, email })}`);
     // «No se creó nada» lo dice un 400, pero se comprueba: ¿hay alguna orden con nuestra referencia?
     // El cobro ya contestó (con un no): si dejó una orden abierta no hay que esperarla, se cancela ya.
     const c = await confirmarPago(deps, fila.id, undefined, true);
