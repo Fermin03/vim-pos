@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filtrarSecciones, rutasOcultas } from "../operacion";
+import { filtrarSecciones, mensajeCambiarModulos, rutasOcultas } from "../operacion";
 import { disponiblesDe } from "../reportes";
 
 const con = (efectivos: Record<string, boolean>) => ({ permitidos: {}, efectivos });
@@ -39,5 +39,13 @@ describe("disponiblesDe — ventas por mesero", () => {
   it("apagado y sin historial, no se ve; con historial sí (no se le esconde a nadie su historia)", () => {
     expect(disponiblesDe({ meseros: false }, hay).meseros).toBe(false);
     expect(disponiblesDe({ meseros: false }, { ...hay, meseros: true }).meseros).toBe(true);
+  });
+});
+
+describe("mensajeCambiarModulos", () => {
+  it("dice quién es y qué pide", () => {
+    const t = mensajeCambiarModulos({ usuario: "Ana", negocio: "Tacos Ana", codigo: "tacos-ana" });
+    expect(t).toMatch(/Tacos Ana/);
+    expect(t).toMatch(/Quiero cambiar lo que mi negocio usa en VIM POS\.$/);
   });
 });
