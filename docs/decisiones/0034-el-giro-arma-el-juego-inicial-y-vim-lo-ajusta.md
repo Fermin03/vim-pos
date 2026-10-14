@@ -1,6 +1,6 @@
 # 0034 — El giro arma el juego inicial de módulos, y después solo VIM lo ajusta
 
-**Fecha:** 14 de octubre de 2026 · **Estado:** vigente (entregas 1 y 2 de 3)
+**Fecha:** 14 de octubre de 2026 · **Estado:** vigente (entregas 1, 2 y 3)
 
 ## Qué había antes
 
@@ -38,12 +38,15 @@ el producto", pero nadie lo había hecho.
   el bloque de evento de golpe.
 - **La 0182 ensancha el CHECK de `prospectos.giro`** (0084) para que `solicitar-demo` acepte `BAR`,
   `CAFETERIA` y `TAQUERIA` además de los seis giros de antes.
-- **Antes del merge se aplican a mano la 0179, la 0180, la 0181 y la 0182**, cada una en su propia
+- **La 0183 apaga `cuentas_barra` a los negocios existentes que no son BAR** y cambia el valor por
+  defecto a "todo encendido salvo `eventos` y `cuentas_barra`". También crea el índice único de
+  nombres de barra y las tres RPC de cuentas de barra.
+- **Antes del merge se aplican a mano la 0179, la 0180, la 0181, la 0182 y la 0183**, cada una en su propia
   transacción. La 0179 y la 0180 no pueden ir juntas: Postgres responde "unsafe use of new value".
 
 **Orden de lanzamiento:**
 
-1. Migraciones 0179 → 0180 → 0181 → 0182, a mano, cada una en su propia transacción.
+1. Migraciones 0179 → 0180 → 0181 → 0182 → 0183, a mano, cada una en su propia transacción.
 2. Publicar como la más reciente el instalador de la caja que ya las trae. Un negocio que nace
    `BAR`, `CAFETERIA` o `TAQUERIA` baja ese instalador; si no conoce la 0179, su primer pull falla.
 3. Desplegar las funciones: `provisionar-tenant`, `signup-tenant` (usa `_shared/alta.ts`) y

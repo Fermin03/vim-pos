@@ -172,7 +172,7 @@ Por el camino que ya existe: `modulos_efectivos` → `resolver_directivas` → l
 | Admin, **Configuración → Cómo vende tu negocio** (nueva, solo lectura) | Muestra el giro y qué módulos tiene encendidos, con una línea que explica cada uno. Abajo: "¿Necesitas otro? Escríbenos" con el WhatsApp de soporte. Es de solo consulta: cada módulo sale como "En uso" o "Apagado", sin controles, y el botón de WhatsApp es la única acción. Reemplaza el giro de solo lectura de `configuracion/negocio` |
 | Registro (`apps/admin/app/registro/page.tsx`, `_shared/alta.ts`) | Ofrece los 7 giros con sus nombres; `PLAN_DE_VERTICAL` y `GIRO_ETIQUETA` se actualizan. "Cadena" sale de la lista de giros y se cambia por la casilla "Tengo más de una sucursal" |
 | Primera vez (#47) | Sin cambios: no tiene un paso de mesas |
-| Panel de VIM (`apps/platform`), ficha del cliente | Nueva sección **Cómo vende**, junto a Módulos y límites (`modulos-limites.tsx`): nueve interruptores sin importar el giro (`cuentas_barra` llega en la entrega 3), con las dependencias a la vista, el aviso de cuentas abiertas cuando algo no se puede apagar y el botón "Cambiar giro". Antes de confirmar, el diálogo solo dice si los módulos vuelven a los del giro nuevo o se quedan como están; no lista cuáles se encienden o se apagan, y los `avisos` y `ajustes` de la respuesta no se muestran. Los rechazos de la base (409/400) se traducen a texto llano. El cambio llega a la caja en el siguiente latido |
+| Panel de VIM (`apps/platform`), ficha del cliente | Nueva sección **Cómo vende**, junto a Módulos y límites (`modulos-limites.tsx`): diez interruptores sin importar el giro, con las dependencias a la vista, el aviso de cuentas abiertas cuando algo no se puede apagar y el botón "Cambiar giro". Antes de confirmar, el diálogo solo dice si los módulos vuelven a los del giro nuevo o se quedan como están; no lista cuáles se encienden o se apagan, y los `avisos` y `ajustes` de la respuesta no se muestran. Los rechazos de la base (409/400) se traducen a texto llano. El cambio llega a la caja en el siguiente latido |
 | `solicitar-demo` | Acepta los giros nuevos. La migración 0182 ensancha el CHECK de `prospectos.giro` (0084) para aceptar `BAR`, `CAFETERIA` y `TAQUERIA` además de los seis de antes |
 | Admin, "Estaciones de preparación" | No se esconde: las comandas impresas la usan aunque no haya pantalla de cocina |
 
@@ -183,20 +183,32 @@ ya usan Lealtad y Tienda.
 
 En un bar, la cuenta se abre a nombre de una persona ("Luis, camisa azul") y no a una mesa.
 
-- **Datos:** `tickets` gana `nombre_cuenta varchar(60) NULL`. Una cuenta de barra es un ticket
-  abierto con `modo_servicio = 'BARRA'` (el valor ya existe en el tipo), con `nombre_cuenta` y sin
-  fila en `tickets_mesas`.
-- **Caja:** un acceso **Barra** en el inicio muestra las cuentas abiertas como tarjetas con el
-  nombre, el total y el tiempo abierta; un botón **Abrir cuenta** pide el nombre. Dentro, la cuenta
-  funciona igual que una de mesa: agregar, mandar a cocina, dividir, cobrar.
-- **Reglas:** nombre obligatorio; no puede haber dos cuentas abiertas con el mismo nombre en la misma
-  sucursal (si se repite, la caja propone "Luis 2"). Una cuenta de barra se puede pasar a una mesa y
-  al revés, si `comedor` está encendido.
-- **Ticket impreso y comanda:** muestran el nombre de la cuenta donde hoy va la mesa.
-- **Sync:** `nombre_cuenta` viaja con el ticket por el camino de sync que ya existe; hay que
-  agregarlo a la lista de columnas del push y del pull del escritorio.
-- **Reportes:** las ventas de barra se cuentan aparte (`modo_servicio = 'BARRA'`), igual que hoy
-  Para llevar.
+- **Datos:** el nombre vive en `tickets.nombre_cliente`, la columna que ya usa Pick-up (0068), y no en
+  una columna nueva `nombre_cuenta`. Así la impresión, la comanda, el KDS ("Barra · Luis") y la
+  sincronización funcionan sin cambios, y no se vuelven a subir ~60 días de ventas de cada caja. Una
+  cuenta de barra es un ticket abierto con `modo_servicio = 'BARRA'`, con ese nombre y sin fila en
+  `tickets_mesas`.
+- **Caja:** el acceso **Barra** (ícono de vaso) aparece cuando el módulo está encendido o hay
+  cuentas abiertas. Muestra las cuentas como tarjetas, igual que Pick-up; **Abrir cuenta** pide el
+  nombre. Dentro, la cuenta funciona igual que una de mesa: agregar, mandar a cocina, dividir, cobrar.
+  Al cobrar se conserva el modo BARRA y el nombre.
+- **Reglas:** nombre obligatorio. No puede haber dos cuentas de barra abiertas con el mismo nombre en
+  la misma sucursal: lo garantiza un índice único parcial (`idx_tickets_barra_nombre_abierto`, sobre
+  sucursal y nombre sin mayúsculas ni espacios sobrantes). Si se repite, la caja propone "Luis 2",
+  también cuando otra caja se adelanta.
+- **Pasar entre barra y mesa:** los botones **Pasar a mesa** y **Pasar a barra** están en la fila de
+  acciones de cada cuenta de la lista; cada uno aparece solo si el módulo de destino está encendido,
+  y **Pasar a barra** solo en cuentas de comedor con mesa. Después de mover, la pantalla cambia a la
+  lista de destino.
+- **Atomicidad:** abrir una cuenta y pasarla entre barra y mesa son RPC atómicas (`abrir_cuenta_barra`,
+  `mover_cuenta_a_mesa`, `mover_cuenta_a_barra`; `SECURITY INVOKER`, bajo RLS).
+- **Ticket impreso y comanda:** el ticket dice "Servicio: Barra" y "Cliente: Luis"; la comanda lleva
+  el banner BARRA y el nombre. El número de mesa no se imprime, ni antes ni ahora.
+- **Sync:** sin cambios. `nombre_cliente` ya viaja con el ticket por el camino de sync que existe.
+- **Reportes:** "Ventas por tipo de servicio" muestra Barra sola. No hay contador nuevo en el estado
+  de resultados.
+- **Negocios existentes:** la 0183 apaga `cuentas_barra` a los que no son BAR y cambia el valor por
+  defecto de la columna a "todo encendido salvo `eventos` y `cuentas_barra`".
 
 Requiere instalador nuevo de la caja (ver la regla de empaquetado y la lista antes de publicar).
 
@@ -209,17 +221,18 @@ Requiere instalador nuevo de la caja (ver la regla de empaquetado y la lista ant
   - Las dependencias del disparador (apagar comedor apaga meseros, etc.).
   - No se puede apagar comedor ni barra con cuentas abiertas.
   - `modulos_efectivos` trae las diez llaves y `kds` es plan Y interruptor.
-  - `nombre_cuenta` único entre cuentas abiertas de la sucursal.
+  - El nombre de una cuenta de barra es único entre las abiertas de la sucursal, y abrir y pasar entre
+    barra y mesa son atómicos (`smoke_cuentas_barra.sql`).
   - Un usuario `authenticated` (dueño incluido) no puede cambiar `tenants.operacion` ni ejecutar
     `operacion_cambiar` ni `cambiar_giro`; `service_role` sí.
   - Nada de `CURRENT_DATE` contra fechas de negocio.
-- **Caja (Playwright):** el inicio con el juego de cada giro (7 capturas), abrir, dividir y cobrar
-  una cuenta de barra, y una caja con llaves desconocidas que muestra todo.
+- **Caja (verificación visual del controlador):** el inicio con el juego de cada giro (7 capturas),
+  abrir, dividir y cobrar una cuenta de barra, y una caja con llaves desconocidas que muestra todo.
 - **/platform:** la sección Cómo vende enciende y apaga módulos en cualquier giro (por ejemplo,
   Domicilio en un food truck), respeta las dependencias, muestra el aviso de cuentas abiertas, y la
   caja lo refleja después del latido.
 - **Admin:** la página nueva muestra lo encendido y no tiene controles.
-- **Sync de barra:** una cuenta de barra creada sin internet sube con su nombre.
+- **Sync de barra:** una cuenta de barra creada sin internet sube con su nombre (`nombre_cliente`).
 
 ## 10. Riesgos
 
