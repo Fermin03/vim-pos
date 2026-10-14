@@ -179,8 +179,21 @@ test("cotización: salen los cinco campos públicos y nunca `items`", () => {
     subtotal_mxn: "120.00", envio_mxn: "30.00", envio_total_mxn: "34.80", total_mxn: "154.80", otra_cosa: "interna",
   };
   assert.deepEqual(cotizacionPublica(q), {
-    renglones: q.renglones, subtotal_mxn: "120.00", envio_mxn: "30.00", envio_total_mxn: "34.80", total_mxn: "154.80",
+    renglones: q.renglones, subtotal_mxn: "120.00", envio_mxn: "30.00", envio_total_mxn: "34.80", total_mxn: "154.80", distancia_km: null,
   });
+});
+test("cotización por distancia (0179): sale la distancia y nunca la zona del tramo", () => {
+  const q = { renglones: [], subtotal_mxn: "120.00", envio_mxn: "35.00", envio_total_mxn: "35.00", total_mxn: "155.00",
+              cobro: "DISTANCIA", distancia_km: "3.2", zona_id: SUC };
+  const p = cotizacionPublica(q);
+  assert.equal(p?.distancia_km, "3.2");
+  assert.equal(JSON.stringify(p).includes(SUC), false);
+  assert.equal("cobro" in (p ?? {}), false);
+});
+test("rpc: FUERA_DE_AREA es 409 y lleva la distancia; otra cosa no sale", () => {
+  assert.deepEqual(respuestaDeRpc("FUERA_DE_AREA: 8.2"), { status: 409, body: { error: "FUERA_DE_AREA", detalle: "8.2" } });
+  for (const d of ["8", "8.25", "-1.0", "abc", PROD]) assert.deepEqual(respuestaDeRpc(`FUERA_DE_AREA: ${d}`), { status: 409, body: { error: "FUERA_DE_AREA" } }, d);
+  assert.deepEqual(respuestaDeRpc("UBICACION_INVALIDA: la ubicación no es válida"), { status: 409, body: { error: "UBICACION_INVALIDA" } });
 });
 test("cotización: lo que no es un objeto es null", () => {
   for (const x of [null, undefined, "x", 5, []]) assert.equal(cotizacionPublica(x), null);

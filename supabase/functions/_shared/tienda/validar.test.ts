@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { esUuid, leerCuerpo, leerFecha, normalizarTelefono, textoLimpio, tieneNul } from "./validar.ts";
+import { esUuid, leerCuerpo, leerFecha, leerPunto, normalizarTelefono, textoLimpio, tieneNul } from "./validar.ts";
 
 const SUC = "99999999-0000-0000-0000-0000000000bb";
 
@@ -520,4 +520,30 @@ test("cuerpo: verificacion lleva el código del pedido y, solo si viene escrito 
   }
   assert.deepEqual(leerCuerpo({ accion: "verificacion", negocio: "knockout", codigo: "corto", cancelar: true }), { ok: false, error: "CODIGO_INVALIDO" });
   assert.deepEqual(leerCuerpo({ accion: "verificacion", negocio: "knockout" }), { ok: false, error: "CODIGO_INVALIDO" });
+});
+
+// ── El pin del cliente (0179) ───────────────────────────────────────────────────────────────────
+test("punto: dos números en rango, redondeados a 6 decimales; ausente es null", () => {
+  assert.deepEqual(leerPunto({ lat: 21.12345678, lng: -101.6824, otra: 1 }), { lat: 21.123457, lng: -101.6824 });
+  assert.equal(leerPunto(undefined), null);
+  assert.equal(leerPunto(null), null);
+  for (const x of [{ lat: "21.1", lng: -101 }, { lat: 91, lng: 0 }, { lat: 0, lng: 180.1 }, { lat: Infinity, lng: 0 }, { lat: NaN, lng: 0 },
+                   { lat: 21 }, [21, -101], "21,-101", 5]) {
+    assert.equal(leerPunto(x), undefined, JSON.stringify(x));
+  }
+});
+test("punto: viaja en cotizar y pedir a domicilio; al recoger no se manda; mal formado es UBICACION_INVALIDA", () => {
+  const p = { lat: 21.1365, lng: -101.6824 };
+  const dom = { ...cotizar, modo: "DOMICILIO", punto: p };
+  const r = leerCuerpo(dom);
+  assert.ok(r.ok && r.valor.accion === "cotizar" && r.valor.punto?.lat === 21.1365);
+  const rec = leerCuerpo({ ...cotizar, punto: p });
+  assert.ok(rec.ok && rec.valor.accion === "cotizar" && rec.valor.punto === null);
+  assert.deepEqual(leerCuerpo({ ...dom, punto: { lat: "x", lng: 0 } }), { ok: false, error: "UBICACION_INVALIDA" });
+  const ped = leerCuerpo({ ...pedir, zona_id: null, punto: p });
+  assert.ok(ped.ok && ped.valor.accion === "pedir" && ped.valor.punto?.lng === -101.6824);
+  assert.deepEqual(leerCuerpo({ ...pedir, punto: [1, 2] }), { ok: false, error: "UBICACION_INVALIDA" });
+  // Ni el envío ni la distancia que mande el cliente llegan a la petición: no hay dónde ponerlos.
+  const conEnvio = leerCuerpo({ ...pedir, punto: p, envio_mxn: "0.00", distancia_km: "0.1" });
+  assert.ok(conEnvio.ok && !("envio_mxn" in conEnvio.valor) && !("distancia_km" in conEnvio.valor));
 });
