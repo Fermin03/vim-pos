@@ -213,6 +213,12 @@ test("PULL_ORDER baja el menú por sucursal después de productos y de sucursale
   assert.ok(t.indexOf("productos_sucursal") > t.indexOf("sucursales"), "va después de sucursales (FK)");
 });
 
+test("PULL_ORDER baja la configuración de propinas después de sucursales (0184)", () => {
+  const t = PULL_ORDER.map((x) => x.t);
+  assert.ok(t.includes("sucursal_propinas_config"), "sucursal_propinas_config está en PULL_ORDER");
+  assert.ok(t.indexOf("sucursal_propinas_config") > t.indexOf("sucursales"), "va después de sucursales (FK)");
+});
+
 // Lealtad (0156, ADR 0030, tarea 8).
 test("lealtad: deltaLealtadPendiente suma por cliente solo lo de la versión vigente", () => {
   const d = deltaLealtadPendiente([
