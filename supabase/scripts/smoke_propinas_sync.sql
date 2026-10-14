@@ -36,10 +36,13 @@ BEGIN
   RAISE NOTICE 'b aislamiento OK';
 
   -- c) catalogo_version() mira las propinas: un cambio llega en el sondeo de cada minuto, no en el
-  --    pull completo de cada hora. Se revisa la definición porque dentro de una transacción now() no
-  --    avanza y el disparador de updated_at no deja mover la hora a mano.
-  IF pg_get_functiondef('catalogo_version()'::regprocedure) NOT LIKE '%sucursal_propinas_config%' THEN
-    RAISE EXCEPTION 'c: catalogo_version no mira sucursal_propinas_config';
+  --    pull completo de cada hora. El disparador de updated_at es solo BEFORE UPDATE, así que un
+  --    INSERT conserva una fecha puesta a mano: una configuración "del futuro" debe mandar.
+  DELETE FROM sucursal_propinas_config WHERE sucursal_id = v_suc;
+  INSERT INTO sucursal_propinas_config (tenant_id, sucursal_id, updated_at)
+  VALUES (v_tenant, v_suc, '2999-01-01T00:00:00Z');
+  IF catalogo_version() IS DISTINCT FROM '2999-01-01T00:00:00Z'::timestamptz THEN
+    RAISE EXCEPTION 'c: catalogo_version no mira sucursal_propinas_config (da %)', catalogo_version();
   END IF;
   RAISE NOTICE 'c catalogo_version OK';
 END $$;

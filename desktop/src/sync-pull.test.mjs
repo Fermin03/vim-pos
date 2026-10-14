@@ -219,6 +219,13 @@ test("PULL_ORDER baja la configuración de propinas después de sucursales (0184
   assert.ok(t.indexOf("sucursal_propinas_config") > t.indexOf("sucursales"), "va después de sucursales (FK)");
 });
 
+test("propinas: una configuración que llega con otro id para la misma sucursal reemplaza a la local", async () => {
+  const { client, pool } = clienteFalso();
+  await pullSnapshot(pool, { sucursal_propinas_config: [{ id: "pc2", tenant_id: "t", sucursal_id: "s1", capturar_propina: false }] });
+  const busca = client.consultas.find((c) => c.sql.includes("FROM sucursal_propinas_config WHERE") && c.sql.includes('"sucursal_id" IS NOT DISTINCT FROM'));
+  assert.ok(busca, "debía buscar la configuración local de la misma sucursal");
+});
+
 // Lealtad (0156, ADR 0030, tarea 8).
 test("lealtad: deltaLealtadPendiente suma por cliente solo lo de la versión vigente", () => {
   const d = deltaLealtadPendiente([

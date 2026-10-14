@@ -253,6 +253,9 @@ const CLAVES_NATURALES = {
   lealtad_premios: { porPadre: "tenant_id" },
   // Un programa por negocio (UNIQUE tenant_id): si llega con otro id, choca con lealtad_programa_tenant_id_key.
   lealtad_programa: { claves: ["tenant_id"], dependientes: [] },
+  // Una configuración de propinas por sucursal (UNIQUE sucursal_id, 0184): si llega con otro id,
+  // chocaría con propinas_config_sucursal_unica y tumbaría el pull entero. Nadie apunta a su id.
+  sucursal_propinas_config: { claves: ["sucursal_id"], dependientes: [] },
 };
 
 const fkCache = new Map();
