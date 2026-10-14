@@ -41,7 +41,8 @@ export function ModalAbrirTurno({
   const [sugerenciasEvento, setSugerenciasEvento] = useState<string[]>([]);
 
   /* El bloque de evento lo enciende VIM con el módulo `eventos` (ADR 0034): un camión que hoy
-     vende en una feria y mañana en otra. Mientras carga cuenta como apagado: no aparece y desaparece. */
+     vende en una feria y mañana en otra. Arranca de lo último que se supo en esta carga de la app;
+     la primera vez, hasta leer las directivas cuenta como apagado y al food truck le aparece al cargar. */
   const { modulos } = useAcceso();
   const ofreceEvento = moduloActivo(modulos, "eventos");
 
