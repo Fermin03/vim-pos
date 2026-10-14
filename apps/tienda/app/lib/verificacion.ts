@@ -52,15 +52,18 @@ export type PasoDelReto =
   | { tipo: "sigue"; url: string | null; conPrisa?: boolean }
   /** Ya no es de esta pantalla: se pagó, o ya no espera el reto y falta saber el resultado. A la página del pedido. */
   | { tipo: "pedido" }
-  /** No se cobró nada y el pedido se descartó: se puede pagar otra vez. `detalle`: la familia del motivo. */
-  | { tipo: "rechazado"; detalle: string | null }
+  /**
+   * No se cobró nada y el pedido se descartó: se puede pagar otra vez. `detalle`: la familia del
+   * motivo. `hasta`: solo con RIESGO, hasta cuándo queda en pausa el pago en línea.
+   */
+  | { tipo: "rechazado"; detalle: string | null; hasta?: string | null }
   /** No se pudo preguntar (sin red, demasiadas preguntas, el servidor): se vuelve a preguntar. */
   | { tipo: "sin-respuesta" };
 
 /** Lo que contestó `verificacion` → qué hace la pantalla. */
 export function pasoDelReto(r: Resultado<Verificacion>): PasoDelReto {
   if (r.ok) return r.datos.estado === "VERIFICACION" ? { tipo: "sigue", url: r.datos.url } : { tipo: "pedido" };
-  if (r.error === "PAGO_RECHAZADO") return { tipo: "rechazado", detalle: r.detalle };
+  if (r.error === "PAGO_RECHAZADO") return { tipo: "rechazado", detalle: r.detalle, ...(r.hasta && { hasta: r.hasta }) };
   // El pedido ya no existe: solo se borra cuando el cobro no pasó (lo descartó otra respuesta, que
   // no llegó). Es lo mismo que le contesta `intento` a quien pregunta por esa clave.
   if (r.error === "PEDIDO_NO_ENCONTRADO") return { tipo: "rechazado", detalle: "SIN_VERIFICAR" };

@@ -14,7 +14,7 @@ import type { TarjetaDePedido } from "./tarjeta";
  *  · `SIN_CONFIRMAR` — solo en `pedir`: no se supo si el pedido entró. Reintentar con la MISMA `clave` es seguro.
  *  · `CANCELADA`     — quien llamó abortó con su `signal`. No se enseña nada.
  */
-export type Resultado<T> = { ok: true; datos: T } | { ok: false; error: string; detalle: string | null };
+export type Resultado<T> = { ok: true; datos: T } | { ok: false; error: string; detalle: string | null; /** Ver `ErrorDeTienda`. */ hasta?: string | null };
 
 export type DireccionDePedido = {
   calle: string; numero_exterior: string; numero_interior: string | null; colonia: string;
@@ -44,7 +44,7 @@ export type CuerpoPedido = CuerpoCarrito & {
 };
 
 const LIMITE_MS = 20_000;   // el servidor corta a los 10 s; esto es por si la red del teléfono se cuelga
-const fallo = (error: string, detalle: string | null = null) => ({ ok: false as const, error, detalle });
+const fallo = (error: string, detalle: string | null = null, hasta?: string | null) => ({ ok: false as const, error, detalle, ...(hasta && { hasta }) });
 
 /** `sinRespuesta`: el código cuando no se sabe qué pasó (sin red, o una respuesta que no es del contrato). */
 async function llamar<T>(cuerpo: unknown, lector: (x: unknown) => T | null, sinRespuesta: { red: string; ilegible: string }, signal?: AbortSignal): Promise<Resultado<T>> {
@@ -61,7 +61,7 @@ async function llamar<T>(cuerpo: unknown, lector: (x: unknown) => T | null, sinR
     const json: unknown = await r.json().catch(() => null);
     if (r.status !== 200) {
       const e = errorDe(json, sinRespuesta.ilegible);
-      return fallo(e.error, e.detalle);
+      return fallo(e.error, e.detalle, e.hasta);
     }
     const datos = lector(json);
     return datos === null ? fallo(sinRespuesta.ilegible) : { ok: true, datos };

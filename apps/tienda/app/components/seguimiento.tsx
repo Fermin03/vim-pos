@@ -13,7 +13,7 @@ import { formatoMxn } from "../lib/dinero";
 import { aLaHora, momentoMx } from "../lib/horario";
 import { SONDEO_INICIAL, cerrado, debeConfirmar, recorrido, sinConexion, sondear, tardando, type Paso, type Sondeo } from "../lib/seguimiento";
 import { enlaceTel, enlaceWhatsApp, formatoTelefono } from "../lib/telefono";
-import { textoDeError, textoDeSeguimiento } from "../lib/textos";
+import { MODO_DE_PRUEBA, textoDeError, textoDeSeguimiento } from "../lib/textos";
 import { Linea } from "./carrito";
 import { Esqueleto, FOCO, PARTE, PRINCIPAL } from "./piezas";
 
@@ -86,6 +86,8 @@ function Pedido({ slug, pedido, sondeo }: { slug: string; pedido: Seguimiento; s
   return (
     <div className="flex flex-col gap-8 px-4 pb-10">
       <header className="flex flex-col gap-2">
+        {/* El pago de este pedido se hizo en modo de prueba: se dice arriba de todo, y no se cierra. */}
+        {pago?.dePrueba && <Aviso tono="info" className="mb-2 !text-14"><strong className="font-semibold">{MODO_DE_PRUEBA.titulo}</strong></Aviso>}
         <p className="text-14 text-ink-2">
           Pedido <span className="font-display font-semibold tabular-nums text-ink">{pedido.folio_corto}</span>
           {!Number.isNaN(recibido.getTime()) && <>, recibido {aLaHora(momentoMx(recibido).hora)}</>}

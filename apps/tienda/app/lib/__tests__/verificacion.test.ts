@@ -348,7 +348,7 @@ describe("el intento en duda es de UN negocio (todas las tiendas viven en el mis
 });
 
 describe("la página del pedido cuyo reto se dejó", () => {
-  const enLinea = (estado: "SIN_PAGO" | "DEVOLUCION_EN_PROCESO" | "DEVUELTO") => ({ estado, propina_mxn: "0.00", total_a_pagar_mxn: "240.00" });
+  const enLinea = (estado: "SIN_PAGO" | "DEVOLUCION_EN_PROCESO" | "DEVUELTO") => ({ estado, propina_mxn: "0.00", total_a_pagar_mxn: "240.00", dePrueba: false });
   it("dice que no se completó la verificación y que no se cobró (hoy es verdad); no es una alerta del restaurante", () => {
     expect(textoDeSeguimiento({ estado: "CANCELADO", motivo: "SIN_VERIFICAR", enLinea: enLinea("SIN_PAGO") })).toEqual({
       titulo: "No se completó el pago", alerta: false,

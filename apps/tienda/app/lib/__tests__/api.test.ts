@@ -119,3 +119,17 @@ describe("cabeceras de seguridad compartidas", () => {
     expect(csp({ imgSrc: [] })).toBe(csp());
   });
 });
+
+describe("la pausa del pago en línea llega a la pantalla con su hora", () => {
+  const HASTA = "2026-10-13T20:30:00.000Z";
+  it("pedir: PAGO_EN_PAUSA y el rechazo por RIESGO traen `hasta`; los demás errores no la llevan", async () => {
+    responder = () => json({ error: "PAGO_EN_PAUSA", hasta: HASTA }, 409);
+    expect(await pedir("knockout", pedido)).toEqual({ ok: false, error: "PAGO_EN_PAUSA", detalle: null, hasta: HASTA });
+    responder = () => json({ error: "PAGO_RECHAZADO", detalle: "RIESGO", hasta: HASTA }, 409);
+    expect(await pedir("knockout", pedido)).toEqual({ ok: false, error: "PAGO_RECHAZADO", detalle: "RIESGO", hasta: HASTA });
+    responder = () => json({ error: "PAGO_RECHAZADO", detalle: "FONDOS" }, 409);
+    expect(await pedir("knockout", pedido)).toEqual({ ok: false, error: "PAGO_RECHAZADO", detalle: "FONDOS" });
+    responder = () => json({ error: "PAGO_EN_PAUSA", hasta: "pronto" }, 409);
+    expect(await pedir("knockout", pedido)).toEqual({ ok: false, error: "PAGO_EN_PAUSA", detalle: null });
+  });
+});
