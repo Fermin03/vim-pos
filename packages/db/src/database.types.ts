@@ -12643,6 +12643,17 @@ export type Database = {
         }
         Returns: string
       }
+      abrir_cuenta_barra: {
+        Args: {
+          p_caja_id: string
+          p_client_id_local: string
+          p_nombre: string
+          p_sucursal_id: string
+          p_turno_id: string
+          p_usuario_id?: string
+        }
+        Returns: string
+      }
       abrir_ticket: {
         Args: {
           p_caja_id: string
@@ -13497,6 +13508,18 @@ export type Database = {
       motivo_no_disponible_en_sucursal: {
         Args: { p_producto: string; p_sucursal: string }
         Returns: string
+      }
+      mover_cuenta_a_barra: {
+        Args: { p_nombre: string; p_ticket_id: string }
+        Returns: undefined
+      }
+      mover_cuenta_a_mesa: {
+        Args: {
+          p_client_id_local: string
+          p_mesa_id: string
+          p_ticket_id: string
+        }
+        Returns: undefined
       }
       obtener_reporte_z: { Args: { p_turno_id: string }; Returns: Json }
       onboarding_actualizar_fase: {

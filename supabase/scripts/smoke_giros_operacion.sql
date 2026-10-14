@@ -48,7 +48,7 @@ BEGIN
   -- Cliente existente (semilla, QUICK_SERVICE): lo mismo que veía antes. Todo encendido salvo
   -- eventos, que antes solo salía a FOODTRUCK (0181).
   SELECT operacion INTO v_op FROM tenants WHERE id = '99999999-0000-0000-0000-0000000000aa';
-  IF v_op IS DISTINCT FROM v_todo || '{"eventos":false}'::jsonb THEN
+  IF v_op IS DISTINCT FROM v_todo || '{"eventos":false,"cuentas_barra":false}'::jsonb THEN
     RAISE EXCEPTION '2c: el cliente existente debía ver lo de siempre: %', v_op;
   END IF;
   RAISE NOTICE '2c cliente existente intacto OK';
