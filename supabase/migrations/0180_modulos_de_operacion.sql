@@ -84,3 +84,110 @@ CREATE TRIGGER tenants_operacion_normalizar
 -- CAFE_BAR se separa en BAR y CAFETERIA; quien lo tuviera pasa a BAR (el más parecido: cuentas
 -- abiertas). Su `operacion` no se toca: sigue todo encendido, como cualquier cliente existente.
 UPDATE tenants SET vertical_principal = 'BAR' WHERE vertical_principal = 'CAFE_BAR';
+
+-- ── §3 Lo que mueve /platform ────────────────────────────────────────────────
+-- Cuentas que impiden apagar un módulo. BORRADOR también cuenta: una mesa con la cuenta abierta y
+-- sin productos todavía es una mesa ocupada.
+CREATE OR REPLACE FUNCTION operacion_cuentas_abiertas(p_tenant uuid)
+RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+  SELECT jsonb_build_object(
+    'comedor', (SELECT count(DISTINCT tm.ticket_id)
+                  FROM tickets_mesas tm JOIN tickets t ON t.id = tm.ticket_id
+                 WHERE tm.tenant_id = p_tenant AND tm.fecha_liberacion IS NULL
+                   AND t.estado_fiscal IN ('BORRADOR', 'ABIERTO')),
+    'cuentas_barra', (SELECT count(*) FROM tickets t
+                       WHERE t.tenant_id = p_tenant AND t.modo_servicio = 'BARRA'
+                         AND t.estado_fiscal IN ('BORRADOR', 'ABIERTO')));
+$$;
+
+CREATE OR REPLACE FUNCTION operacion_cambiar(p_tenant uuid, p_cambios jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_antes    jsonb;
+  v_pedido   jsonb;
+  v_despues  jsonb;
+  v_abiertas jsonb;
+  v_ajustes  text[];
+BEGIN
+  IF p_cambios IS NULL OR jsonb_typeof(p_cambios) <> 'object' THEN
+    RAISE EXCEPTION 'CAMBIOS_INVALIDOS' USING ERRCODE = '22023';
+  END IF;
+  SELECT operacion INTO v_antes FROM tenants WHERE id = p_tenant FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'TENANT_NO_EXISTE' USING ERRCODE = 'P0002'; END IF;
+
+  v_pedido  := v_antes || p_cambios;
+  v_despues := operacion_normalizar(v_pedido);   -- valida llaves y tipos antes de leer valores
+
+  IF (p_cambios->>'meseros')::boolean AND NOT (v_despues->>'comedor')::boolean THEN
+    RAISE EXCEPTION 'MESEROS_REQUIERE_COMEDOR' USING ERRCODE = '22023';
+  END IF;
+  IF (p_cambios->>'repartidores')::boolean AND NOT (v_despues->>'domicilio')::boolean THEN
+    RAISE EXCEPTION 'REPARTIDORES_REQUIERE_DOMICILIO' USING ERRCODE = '22023';
+  END IF;
+
+  v_abiertas := operacion_cuentas_abiertas(p_tenant);
+  IF (v_antes->>'comedor')::boolean AND NOT (v_despues->>'comedor')::boolean
+     AND (v_abiertas->>'comedor')::int > 0 THEN
+    RAISE EXCEPTION 'CUENTAS_ABIERTAS_COMEDOR: %', v_abiertas->>'comedor' USING ERRCODE = '55006';
+  END IF;
+  IF (v_antes->>'cuentas_barra')::boolean AND NOT (v_despues->>'cuentas_barra')::boolean
+     AND (v_abiertas->>'cuentas_barra')::int > 0 THEN
+    RAISE EXCEPTION 'CUENTAS_ABIERTAS_BARRA: %', v_abiertas->>'cuentas_barra' USING ERRCODE = '55006';
+  END IF;
+
+  SELECT COALESCE(array_agg(k ORDER BY k), '{}') INTO v_ajustes
+    FROM jsonb_object_keys(v_despues) k
+   WHERE v_despues->k IS DISTINCT FROM v_pedido->k;
+
+  UPDATE tenants SET operacion = v_despues WHERE id = p_tenant;
+  RETURN jsonb_build_object('operacion', v_despues, 'ajustes', to_jsonb(v_ajustes));
+END;
+$$;
+COMMENT ON FUNCTION operacion_cambiar(uuid, jsonb) IS
+  'Panel de plataforma: enciende/apaga módulos de operación. Apaga dependientes (los reporta en ajustes), rechaza dependencias faltantes y apagar comedor/barra con cuentas abiertas. Solo service_role (0180).';
+
+CREATE OR REPLACE FUNCTION cambiar_giro(p_tenant uuid, p_giro vertical_tipo, p_reaplicar boolean)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_antes    jsonb;
+  v_nuevo    jsonb;
+  v_abiertas jsonb;
+  v_avisos   text[] := '{}';
+BEGIN
+  IF p_giro IS NULL OR p_giro::text IN ('CAFE_BAR', 'ENTERPRISE') THEN
+    RAISE EXCEPTION 'GIRO_RETIRADO: %', p_giro USING ERRCODE = '22023';
+  END IF;
+  SELECT operacion INTO v_antes FROM tenants WHERE id = p_tenant FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'TENANT_NO_EXISTE' USING ERRCODE = 'P0002'; END IF;
+
+  UPDATE tenants SET vertical_principal = p_giro WHERE id = p_tenant;
+  IF NOT COALESCE(p_reaplicar, false) THEN
+    RETURN jsonb_build_object('operacion', v_antes, 'avisos', '[]'::jsonb);
+  END IF;
+
+  v_nuevo    := juego_inicial_de_giro(p_giro);
+  v_abiertas := operacion_cuentas_abiertas(p_tenant);
+  IF (v_antes->>'comedor')::boolean AND NOT (v_nuevo->>'comedor')::boolean
+     AND (v_abiertas->>'comedor')::int > 0 THEN
+    v_nuevo  := v_nuevo || jsonb_build_object('comedor', true, 'meseros', v_antes->'meseros');
+    v_avisos := v_avisos || format('El comedor sigue encendido porque tiene %s cuentas abiertas.', v_abiertas->>'comedor');
+  END IF;
+  IF (v_antes->>'cuentas_barra')::boolean AND NOT (v_nuevo->>'cuentas_barra')::boolean
+     AND (v_abiertas->>'cuentas_barra')::int > 0 THEN
+    v_nuevo  := v_nuevo || '{"cuentas_barra":true}'::jsonb;
+    v_avisos := v_avisos || format('Las cuentas en barra siguen encendidas porque hay %s abiertas.', v_abiertas->>'cuentas_barra');
+  END IF;
+
+  UPDATE tenants SET operacion = v_nuevo WHERE id = p_tenant RETURNING operacion INTO v_nuevo;
+  RETURN jsonb_build_object('operacion', v_nuevo, 'avisos', to_jsonb(v_avisos));
+END;
+$$;
+COMMENT ON FUNCTION cambiar_giro(uuid, vertical_tipo, boolean) IS
+  'Panel de plataforma: cambia el giro y, si p_reaplicar, vuelve a aplicar su juego inicial sin apagar comedor/barra con cuentas abiertas (lo dice en avisos). Rechaza giros retirados. Solo service_role (0180).';
+
+REVOKE ALL ON FUNCTION operacion_cuentas_abiertas(uuid)            FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION operacion_cambiar(uuid, jsonb)              FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION cambiar_giro(uuid, vertical_tipo, boolean)  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION operacion_cuentas_abiertas(uuid)           TO service_role;
+GRANT EXECUTE ON FUNCTION operacion_cambiar(uuid, jsonb)             TO service_role;
+GRANT EXECUTE ON FUNCTION cambiar_giro(uuid, vertical_tipo, boolean) TO service_role;
