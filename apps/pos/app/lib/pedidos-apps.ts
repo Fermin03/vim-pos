@@ -31,7 +31,11 @@ export type PedidoApp = {
   ticketFolio: string | null; ultimoError: string | null;
   canal: "APP" | "TIENDA"; clienteTelefono: string | null;
   /** Solo la tienda a domicilio: la dirección armada en una línea y sus referencias aparte. */
-  direccion: { texto: string; referencias: string | null } | null;
+  direccion: {
+    texto: string; referencias: string | null;
+    /** Envío por distancia (0179): el punto que puso el cliente, como enlace a OpenStreetMap. Ausente si no hay. */
+    mapa?: string;
+  } | null;
   /** `EN_LINEA`: ya pagado con Mercado Pago; su cuenta nace cobrada y NO se le cobra nada. */
   pago: { forma: "EFECTIVO" | "TARJETA" | "EN_LINEA"; pagaCon: number | null } | null;
   /** Propina que el cliente pagó en línea (va aparte del total). 0 en todo lo demás. */
@@ -101,7 +105,11 @@ function direccionDesdeJson(v: unknown): PedidoApp["direccion"] {
   const interior = t("numero_interior") ? `int. ${t("numero_interior")}` : "";
   const cp = t("codigo_postal") ? `C.P. ${t("codigo_postal")}` : "";
   const texto = [[calle, interior].filter(Boolean).join(", "), t("colonia"), cp, t("ciudad")].filter(Boolean).join(", ");
-  return texto ? { texto, referencias: t("referencias") || null } : null;
+  // El punto lo pone la base, ya validado (0179); de todas formas solo entran dos números en rango.
+  const lat = d.lat, lng = d.lng;
+  const mapa = typeof lat === "number" && typeof lng === "number" && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+    ? `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}` : null;
+  return texto ? { texto, referencias: t("referencias") || null, ...(mapa && { mapa }) } : null;
 }
 
 export function pedidoDesdeFila(r: Record<string, unknown>): PedidoApp {

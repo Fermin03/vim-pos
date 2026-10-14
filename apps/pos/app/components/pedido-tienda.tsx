@@ -109,6 +109,11 @@ export function DetallePedidoTienda({ p, maxItems }: { p: PedidoApp; maxItems?: 
         <div className="text-14 leading-snug">
           <p className="text-ink-2">{p.direccion.texto}</p>
           {p.direccion.referencias && <p className="text-ink-3">Referencias: {p.direccion.referencias}</p>}
+          {/* Envío por distancia: el punto del cliente. En la caja instalada no se abre un navegador: solo en el POS web. TEXTO PROVISIONAL (James). */}
+          {p.direccion.mapa && !esEscritorio() && (
+            <a href={p.direccion.mapa} target="_blank" rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center font-semibold text-info underline-offset-2 hover:underline">Ver en el mapa</a>
+          )}
         </div>
       )}
       <ListaItems items={p.items} max={maxItems} />
