@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BotonVolver } from "./boton-volver";
 import { RenglonItem } from "./renglon-item";
-import { Aviso, Button, DialogoPeligro, LogoVim, Modal } from "@vim/ui/styles";
+import { Aviso, Button, DialogoPeligro, LogoVim, Modal, Icono } from "@vim/ui/styles";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
 import { borrarCuentaVacia, leerEntregaCuenta, listarCuentasAbiertas, leerRenglonesCuenta, marcarTicketImpreso, minutosAbierta, reabrirCuentaImpresa, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
 import { leerTotales, type TotalesTicket } from "../lib/cobro";
@@ -404,15 +404,12 @@ export function PantallaCuentasModo({
               onClick={onVerReservaciones}
               className="flex h-10 items-center gap-2 rounded border border-line-strong bg-surface px-3.5 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-[17px] w-[17px]">
-                <rect x="3" y="4" width="18" height="17" rx="2" />
-                <path d="M3 10h18M8 2v4M16 2v4" />
-              </svg>
+              <Icono nombre="calendario" className="h-[17px] w-[17px]" />
               Reservaciones
             </button>
           )}
           <Button onClick={onAbrirCuenta}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-[17px] w-[17px]"><path d="M12 5v14M5 12h14" /></svg>
+            <Icono nombre="mas" className="h-[17px] w-[17px]" />
             {copia.nuevaCuenta}
           </Button>
         </div>
@@ -588,7 +585,7 @@ export function PantallaCuentasModo({
             </>
           ) : !sel ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" className="h-10 w-10 text-line-strong"><path d="M6 2h9l3 3v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" /><path d="M9 8h6M9 12h6M9 16h4" /></svg>
+              <Icono nombre="recibo" className="h-10 w-10 text-line-strong" />
               <p className="text-14 font-semibold text-ink-2">Elige una cuenta</p>
               <p className="text-13 text-ink-3">Verás lo que se ordenó y podrás cobrarla o modificarla.</p>
             </div>

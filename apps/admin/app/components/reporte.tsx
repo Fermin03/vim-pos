@@ -7,7 +7,7 @@
  * volvía a 30 días al cambiar de reporte y ninguna forma de exportar ni de ordenar.
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Button } from "@vim/ui/styles";
+import { Button, Icono } from "@vim/ui/styles";
 import { hoyMx } from "@vim/fecha";
 import { PageBody, PageHeader, TablaScroll, type Miga } from "./page-header";
 import { RangoFechas } from "./rango-fechas";
@@ -151,9 +151,7 @@ const esNumerica = <T,>(c: Columna<T>) => NUMERICOS.has(c.tipo ?? "texto");
 function Flecha({ dir }: { dir: "asc" | "desc" | null }) {
   // Siempre ocupa su lugar: que aparezca no mueve el encabezado.
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={`h-3.5 w-3.5 flex-shrink-0 ${dir ? "" : "opacity-0"}`}>
-      {dir === "asc" ? <path d="M12 19V5M5 12l7-7 7 7" /> : <path d="M12 5v14M19 12l-7 7-7-7" />}
-    </svg>
+    <Icono nombre={dir === "asc" ? "flecha-arriba" : "flecha-abajo"} className={`h-3.5 w-3.5 flex-shrink-0 ${dir ? "" : "opacity-0"}`} strokeWidth={2.5} />
   );
 }
 
@@ -335,9 +333,7 @@ export function ReporteMarco<D, T>({
         right={
           tabla ? (
             <Button variant="ghost" onClick={() => void exportar()} disabled={!puedeExportar}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-                <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
-              </svg>
+              <Icono nombre="descargar" className="h-4 w-4" />
               {exportando ? "Preparando Excel…" : "Descargar Excel"}
             </Button>
           ) : undefined

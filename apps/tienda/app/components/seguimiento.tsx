@@ -6,7 +6,7 @@
 // El código nunca se escribe en la pantalla: «Copiar enlace» lo toma de la barra de direcciones.
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Aviso, botonClases, cn } from "@vim/ui/styles";
+import { Aviso, botonClases, cn, Icono } from "@vim/ui/styles";
 import { confirmarPago, seguimiento } from "../lib/api";
 import type { Seguimiento } from "../lib/contrato";
 import { formatoMxn } from "../lib/dinero";
@@ -48,7 +48,7 @@ function Recorrido({ pasos }: { pasos: Paso[] }) {
             // El paso en curso late (globals.css): la página se mira de reojo y así se ve que sigue viva.
             p.fase === "actual" && "latido",
           )}>
-            {p.fase === "hecho" && <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>}
+            {p.fase === "hecho" && <Icono nombre="palomita" className="h-3.5 w-3.5" strokeWidth={2.5} />}
             {p.fase === "actual" && <span className="relative h-2 w-2 rounded-full bg-surface" />}
           </span>
           <span className={cn("text-16 leading-snug", p.fase === "actual" ? "font-semibold text-ink" : p.fase === "hecho" ? "text-ink-2" : "text-ink-3")}>

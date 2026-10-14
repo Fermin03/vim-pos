@@ -1,5 +1,5 @@
 "use client";
-import { Button, LogoVim, Modal } from "@vim/ui/styles";
+import { Button, LogoVim, Modal, Icono } from "@vim/ui/styles";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useReloj } from "./topbar-pos";
 import { evaluarSync, leerEstadoSync, type NivelSync } from "../lib/estado-sync";
@@ -171,7 +171,7 @@ export function PantallaInicio({
             onClick={onMenu}
             className="flex h-8 items-center gap-1.5 rounded border border-line-strong px-2.5 text-13 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+            <Icono nombre="menu" className="h-4 w-4" />
             Menú
           </button>
         </div>
@@ -195,35 +195,35 @@ export function PantallaInicio({
         className="flex flex-shrink-0 items-stretch gap-px overflow-hidden border-b border-line bg-line"
       >
         <Acceso label="Comedor" badge={nCuentasComedor} onClick={onComedor} requiereTurno={sinTurno}
-          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11h18M5 11V8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3M6 11v7M18 11v7M9 6V4M15 6V4" /></svg>} />
+          icon={<Icono nombre="mesa" />} />
         <Acceso label="Para llevar" onClick={onParaLlevar} requiereTurno={sinTurno} destacado
-          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2h12l1.5 5H4.5L6 2z" /><path d="M4.5 7h15l-1 13a2 2 0 0 1-2 2H7.5a2 2 0 0 1-2-2L4.5 7z" /><path d="M9 12h6" /></svg>} />
+          icon={<Icono nombre="para-llevar" />} />
         <Acceso label="Pick-up" badge={nCuentasPickup} onClick={onPickup} requiereTurno={sinTurno}
-          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7H4a1 1 0 0 0-1 1v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a1 1 0 0 0-1-1z" /><path d="M8 7V5a4 4 0 0 1 8 0v2" /></svg>} />
+          icon={<Icono nombre="bolsa" />} />
         <Acceso label="Domicilio" badge={nCuentasDomicilio} onClick={onDomicilio} requiereTurno={sinTurno}
-          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 9h13v8H1z" /><path d="M14 12h4l3 3v2h-7" /><circle cx="5" cy="18" r="2" /><circle cx="17" cy="18" r="2" /></svg>} />
+          icon={<Icono nombre="moto" />} />
         {onPedidosApps && (
           <Acceso label="Pedidos en línea" badge={nPedidosApps} onClick={onPedidosApps} requiereTurno={sinTurno}
-            icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M9 6h6M12 18h.01" /></svg>} />
+            icon={<Icono nombre="celular" />} />
         )}
 
         <span className="w-px flex-shrink-0 bg-line-strong" aria-hidden="true" />
 
         <Acceso label="Retiro / Depósito" onClick={onMovimientoCaja} requiereTurno={sinTurno}
-          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /><path d="M6 12h.01M18 12h.01" /></svg>} />
+          icon={<Icono nombre="billete" />} />
         <Acceso label="Consultar ctas." badge={nEnEspera} onClick={onConsultarCuentas} requiereTurno={sinTurno}
-          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2h9l3 3v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" /><path d="M9 8h6M9 12h6M9 16h4" /></svg>} />
+          icon={<Icono nombre="recibo" />} />
         <Acceso label="Monitor ventas" onClick={onMonitorVentas} requiereTurno={sinTurno}
-          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18" /><path d="M7 15l4-5 3 3 5-7" /></svg>} />
+          icon={<Icono nombre="grafica" />} />
 
         <span className="w-px flex-shrink-0 bg-line-strong" aria-hidden="true" />
 
         {sinTurno ? (
           <Acceso label="Abrir turno" onClick={onAbrirTurno} resaltado
-            icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="8" width="18" height="12" rx="2" /><path d="M7 8V6a5 5 0 0 1 10 0v2" /></svg>} />
+            icon={<Icono nombre="candado" />} />
         ) : (
           <Acceso label="Cerrar turno" onClick={onCerrarTurno} peligro
-            icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>} />
+            icon={<Icono nombre="casilla" />} />
         )}
 
         {/* Salir de la caja. Al final de todo y detrás de su propio separador: es la única acción
@@ -235,7 +235,7 @@ export function PantallaInicio({
           <>
             <span className="w-px flex-shrink-0 bg-line-strong" aria-hidden="true" />
             <Acceso label="Salir" onClick={() => setConfirmandoSalir(true)} peligro
-              icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" /></svg>} />
+              icon={<Icono nombre="salir" />} />
           </>
         )}
       </nav>
@@ -249,7 +249,7 @@ export function PantallaInicio({
             className="flex items-center gap-3 rounded-xl border border-warning-line bg-warning-soft px-5 py-3 text-left transition hover:border-warning"
           >
             <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-warning/15 text-warning">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+              <Icono nombre="reloj" className="h-5 w-5" />
             </span>
             <span>
               <span className="block font-display text-15 font-semibold tracking-tight">Abre el turno para empezar a vender</span>

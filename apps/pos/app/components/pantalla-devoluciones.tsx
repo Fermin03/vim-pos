@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BotonVolver } from "./boton-volver";
 import { useEscape } from "../lib/use-escape";
-import { Button, DialogoPeligro, LogoVim } from "@vim/ui/styles";
+import { Button, DialogoPeligro, LogoVim, Icono } from "@vim/ui/styles";
 import { type DatosCaja, type Turno, fmtMxn } from "../lib/turno";
 import { type Empleado } from "../lib/supabase";
 import {
@@ -87,7 +87,7 @@ export function PantallaDevoluciones({
         {ventas === null && <p className="text-center text-ink-3">Cargando ventas…</p>}
         {ventas !== null && ventas.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-ink-3">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-12 w-12"><path d="M9 14l-4-4 4-4M5 10h11a4 4 0 0 1 0 8h-1" /></svg>
+            <Icono nombre="devolver" className="h-12 w-12" />
             <p className="text-18 font-semibold text-ink-2">No hay ventas en el turno</p>
             <p className="text-13">Las ventas cobradas aparecerán aquí para poder devolverlas.</p>
           </div>

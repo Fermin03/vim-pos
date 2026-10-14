@@ -1,7 +1,7 @@
 "use client";
 import { useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { LogoVim } from "@vim/ui/styles";
+import { LogoVim, Icono } from "@vim/ui/styles";
 import { SesionProvider } from "../lib/sesion";
 import { BarraLateral, InsigniaEntorno } from "./barra-lateral";
 
@@ -27,9 +27,7 @@ export function Shell({ children }: { children: ReactNode }) {
               aria-expanded={menu}
               className="btn flex h-11 w-11 items-center justify-center rounded border border-line-strong bg-surface"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-5 w-5" aria-hidden="true">
-                <path d="M4 7h16M4 12h16M4 17h16" />
-              </svg>
+              <Icono nombre="menu" className="h-5 w-5" />
             </button>
             <LogoVim className="h-7 w-7" />
             <span className="font-display text-15 font-bold tracking-tight">VIM Plataforma</span>

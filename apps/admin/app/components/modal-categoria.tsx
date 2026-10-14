@@ -1,9 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, Modal } from "@vim/ui/styles";
+import { Button, Modal, ICONOS_CATEGORIA, IconoCategoria } from "@vim/ui/styles";
 import {
   COLORES,
-  ICONOS,
   bgDe,
   categoriaSchema,
   crearCategoria,
@@ -12,14 +11,6 @@ import {
 } from "../lib/catalogo";
 import { listarAreasCocina, type AreaCocina } from "../lib/areas-cocina";
 import { mensajeError } from "../lib/errores";
-
-function IconoSvg({ name, className }: { name: string; className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
-      <path d={ICONOS[name] ?? ICONOS.tag} />
-    </svg>
-  );
-}
 
 export function ModalCategoria({
   cat,
@@ -129,7 +120,7 @@ export function ModalCategoria({
                     color === c.hex ? "ring-2 ring-ink ring-offset-1" : "",
                   ].join(" ")}
                 >
-                  <IconoSvg name={icono} className="h-4 w-4" />
+                  <IconoCategoria icono={icono} className="h-4 w-4" />
                 </button>
               ))}
             </div>
@@ -138,7 +129,7 @@ export function ModalCategoria({
           <div className="flex flex-1 flex-col gap-1.5">
             <span className="text-13 font-medium text-ink-2">Icono</span>
             <div className="flex flex-wrap gap-2">
-              {Object.keys(ICONOS).map((name) => (
+              {Object.keys(ICONOS_CATEGORIA).map((name) => (
                 <button
                   key={name}
                   type="button"
@@ -150,7 +141,7 @@ export function ModalCategoria({
                     icono === name ? "border-ink bg-hover text-ink" : "border-line-strong hover:bg-hover",
                   ].join(" ")}
                 >
-                  <IconoSvg name={name} className="h-[18px] w-[18px]" />
+                  <IconoCategoria icono={name} className="h-[18px] w-[18px]" />
                 </button>
               ))}
             </div>
@@ -214,7 +205,7 @@ export function ModalCategoria({
           className="flex h-7 w-7 items-center justify-center rounded"
           style={{ background: bgDe(color), color: color ?? "#5A5A60" }}
         >
-          <IconoSvg name={icono} className="h-4 w-4" />
+          <IconoCategoria icono={icono} className="h-4 w-4" />
         </span>
         <span className="font-medium text-ink-2">{nombre || "Nombre"}</span>
       </div>

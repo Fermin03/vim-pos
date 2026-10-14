@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Modal, PinKeypad } from "@vim/ui/styles";
+import { Modal, PinKeypad, Icono } from "@vim/ui/styles";
 import { pinLogin, type Empleado, type PinLoginResult } from "../lib/supabase";
 import { iniciales, ROL_LABEL } from "./selector-empleados";
 
@@ -63,9 +63,7 @@ export function ModalPin({
         aria-label="Cambiar usuario"
         className="absolute left-4 top-4 flex h-8 w-8 items-center justify-center rounded text-ink-3 transition-colors hover:bg-hover hover:text-ink"
       >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">
-          <path d="M15 18l-6-6 6-6" />
-        </svg>
+        <Icono nombre="chevron-izquierda" className="h-[18px] w-[18px]" />
       </button>
 
       <div className="mb-5 flex flex-col items-center gap-3">

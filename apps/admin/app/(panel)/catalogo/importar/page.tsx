@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { Button, botonClases } from "@vim/ui/styles";
+import { Button, botonClases, Icono } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { FORMATOS_ORIGEN, importarMenu, parsearConFormato, type FormatoOrigen, type ResultadoImport, type ResultadoParse } from "../../../lib/importar-menu";
 import { mensajeError } from "../../../lib/errores";
@@ -95,7 +95,7 @@ export default function ImportarMenuPage() {
                   onChange={(e) => void subirArchivo(e.target.files?.[0])}
                 />
                 <label htmlFor="archivo" className={`${botonClases({ variant: "ghost" })} cursor-pointer`}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5M5 21h14" /></svg>
+                  <Icono nombre="subir" className="h-4 w-4" />
                   Subir archivo
                 </label>
                 <span className="text-13 text-ink-2">{archivo ? `Leído: ${archivo}` : "Excel (.xlsx) o CSV"}</span>
@@ -196,7 +196,7 @@ export default function ImportarMenuPage() {
         {resultado && (
           <div className="max-w-[520px] rounded-lg border border-line bg-surface p-6">
             <div className="mb-2 flex items-center gap-2">
-              <svg viewBox="0 0 24 24" fill="none" stroke="#2E7D52" strokeWidth="2.5" className="h-6 w-6"><path d="M20 6L9 17l-5-5" /></svg>
+              <Icono nombre="palomita" className="h-6 w-6" />
               <h2 className="font-display text-lg font-semibold">Importación completada</h2>
             </div>
             <p className="text-14 text-ink-2">

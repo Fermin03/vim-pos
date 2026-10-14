@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { Button } from "@vim/ui/styles";
+import { Button, Icono } from "@vim/ui/styles";
 import {
   listarCategoriasPos,
   listarProductosPos,
@@ -2042,7 +2042,7 @@ export function HomePos({
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/50 p-4" role="alertdialog" aria-modal="true">
           <div className="w-full max-w-md rounded-xl bg-surface p-6 text-center shadow-xl">
             <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-danger/10 text-danger">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-8 w-8"><path d="M12 9v4" /><path d="M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /></svg>
+              <Icono nombre="alerta" className="h-8 w-8" />
             </div>
             <div className="font-display text-24 font-semibold">{avisoReparto.titulo}</div>
             <p className="mt-2 text-14 leading-relaxed text-ink-2">{avisoReparto.texto}</p>
@@ -2465,7 +2465,7 @@ export function HomePos({
     <div className="flex h-screen flex-col">
       {!online && (
         <div className="flex flex-shrink-0 items-center justify-center gap-2 bg-[#9A6B12] px-4 py-1.5 text-13 font-semibold text-white" role="status">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" /></svg>
+          <Icono nombre="sin-conexion" className="h-4 w-4" />
           Sin internet: la caja sigue cobrando igual. Las ventas suben solas cuando vuelva la señal.
         </div>
       )}
@@ -2507,9 +2507,7 @@ export function HomePos({
             onClick={() => { setLlevarError(null); setLlevarListaAbierta(true); }}
             className="flex h-10 flex-shrink-0 items-center gap-2 rounded border border-line-strong px-3 text-14 font-semibold text-ink transition hover:border-ink hover:bg-hover"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-              <path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" /><path d="M9 8h6M9 12h6" />
-            </svg>
+            <Icono nombre="recibo" className="h-4 w-4" />
             Cuentas abiertas
             {nAbiertasLlevar > 0 && (
               <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-ink px-1.5 text-12 font-bold tabular-nums text-white">
@@ -2524,9 +2522,7 @@ export function HomePos({
             onClick={() => { setEsperaError(null); setEsperaListaAbierta(true); }}
             className="flex h-10 flex-shrink-0 items-center gap-2 rounded border border-line-strong px-3 text-14 font-semibold text-ink transition hover:border-ink hover:bg-hover"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
-              <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
-            </svg>
+            <Icono nombre="reloj" className="h-4 w-4" />
             Cuentas en espera
             {nEnEspera > 0 && (
               <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-ink px-1.5 text-12 font-bold tabular-nums text-white">
@@ -2602,9 +2598,7 @@ export function HomePos({
             aria-label="Cerrar aviso"
             className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded text-danger transition hover:bg-danger/10"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4" aria-hidden="true">
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
+            <Icono nombre="cerrar" className="h-4 w-4" />
           </button>
         </div>
       )}

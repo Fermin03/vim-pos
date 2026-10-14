@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button } from "@vim/ui/styles";
+import { Button, Icono } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { listarConflictosPendientes, resolverConflicto, type ConflictoSync } from "../../../lib/sync-conflictos";
 import { mensajeError } from "../../../lib/errores";
@@ -72,7 +72,7 @@ export default function SincronizacionPage() {
           {conflictos !== null && conflictos.length === 0 && (
             <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-line bg-surface py-16 text-center">
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-success-soft text-success">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-6 w-6"><path d="M20 6 9 17l-5-5" /></svg>
+                <Icono nombre="palomita" className="h-6 w-6" />
               </div>
               <p className="text-15 font-semibold">Todo sincronizado</p>
               <p className="max-w-sm text-13 text-ink-3">No hay conflictos pendientes. Si dos dispositivos editan los mismos datos sin conexión, aparecerán aquí para que elijas qué versión conservar.</p>

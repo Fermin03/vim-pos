@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { DialogoPeligro } from "@vim/ui/styles";
+import { DialogoPeligro, Icono } from "@vim/ui/styles";
 import { type Empleado } from "../lib/supabase";
 import { cancelarItem, MOTIVOS_CANCELACION, type MotivoCancelacion } from "../lib/cancelacion";
 import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
@@ -218,9 +218,7 @@ export function ModalCancelarItems({
                   ].join(" ")}
                 >
                   {marcado && (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="h-3.5 w-3.5">
-                      <path d="M20 6 9 17l-5-5" />
-                    </svg>
+                    <Icono nombre="palomita" className="h-3.5 w-3.5" strokeWidth={2.5} />
                   )}
                 </span>
                 <span className="min-w-0 flex-1">

@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { capaVisible } from "../lib/escape";
 import { useEscape } from "../lib/use-escape";
-import { Button } from "@vim/ui/styles";
+import { Button, Icono } from "@vim/ui/styles";
 import { fmtMxn } from "../lib/turno";
 import {
   aplicarPago,
@@ -22,100 +22,67 @@ import { VistaTerminal } from "./vista-terminal";
 
 function IcoEfectivo({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="6" width="20" height="12" rx="2"/>
-      <circle cx="12" cy="12" r="2.5"/>
-      <path d="M6 12h.01M18 12h.01"/>
-    </svg>
+    <Icono nombre="billete" className={cls} />
   );
 }
 
 function IcoDebito({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="5" width="20" height="14" rx="2"/>
-      <path d="M2 10h20"/>
-      <path d="M7 15h2M14 15h3"/>
-    </svg>
+    <Icono nombre="tarjeta" className={cls} />
   );
 }
 
 function IcoCredito({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="5" width="20" height="14" rx="2"/>
-      <path d="M2 10h20"/>
-    </svg>
+    <Icono nombre="tarjeta" className={cls} />
   );
 }
 
 function IcoTransferencia({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 8h14l-3-3M21 16H7l3 3"/>
-    </svg>
+    <Icono nombre="transferencia" className={cls} />
   );
 }
 
 function IcoDividido({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 3v18"/>
-      <path d="M7 7H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2M17 7h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/>
-    </svg>
+    <Icono nombre="pago-dividido" className={cls} />
   );
 }
 
 function IcoBack({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="19" y1="12" x2="5" y2="12"/>
-      <polyline points="12 19 5 12 12 5"/>
-    </svg>
+    <Icono nombre="flecha-izquierda" className={cls} />
   );
 }
 
 function IcoChevron({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="9 18 15 12 9 6"/>
-    </svg>
+    <Icono nombre="chevron-derecha" className={cls} />
   );
 }
 
 function IcoBackspace({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 5H8l-5 7 5 7h13a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1Z"/>
-      <path d="m15 9-4 4M11 9l4 4"/>
-    </svg>
+    <Icono nombre="retroceso" className={cls} />
   );
 }
 
 function IcoTrash({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="3 6 5 6 21 6"/>
-      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
-    </svg>
+    <Icono nombre="eliminar" className={cls} />
   );
 }
 
 function IcoPlus({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="5" x2="12" y2="19"/>
-      <line x1="5" y1="12" x2="19" y2="12"/>
-    </svg>
+    <Icono nombre="mas" className={cls} />
   );
 }
 
 function IcoClose({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="18" y1="6" x2="6" y2="18"/>
-      <line x1="6" y1="6" x2="18" y2="18"/>
-    </svg>
+    <Icono nombre="cerrar" className={cls} />
   );
 }
 
@@ -958,9 +925,7 @@ function VistaPropina({
               onClick={() => setMode("none")}
               className={[altBase, mode === "none" ? altOn : altOff].join(" ")}
             >
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
+              <Icono nombre="menos" className="h-4 w-4" />
               Sin propina
             </button>
           )}

@@ -1,4 +1,5 @@
 "use client";
+import { Icono, type NombreIcono } from "@vim/ui/styles";
 
 /**
  * Paginador de las cuadrículas que no scrollean.
@@ -33,12 +34,8 @@ export function Paginador({
       <span className="mr-1 text-13 font-semibold tabular-nums text-ink-3">
         {pagina} / {paginas}
       </span>
-      <Boton etiqueta="Página anterior" onClick={() => onIr(pagina - 1)} disabled={pagina === 1} compacto={compacto}>
-        <path d="M15 18l-6-6 6-6" />
-      </Boton>
-      <Boton etiqueta="Página siguiente" onClick={() => onIr(pagina + 1)} disabled={pagina === paginas} compacto={compacto}>
-        <path d="M9 18l6-6-6-6" />
-      </Boton>
+      <Boton etiqueta="Página anterior" onClick={() => onIr(pagina - 1)} disabled={pagina === 1} compacto={compacto} icono="chevron-izquierda" />
+      <Boton etiqueta="Página siguiente" onClick={() => onIr(pagina + 1)} disabled={pagina === paginas} compacto={compacto} icono="chevron-derecha" />
     </div>
   );
 }
@@ -48,13 +45,13 @@ function Boton({
   onClick,
   disabled,
   compacto,
-  children,
+  icono,
 }: {
   etiqueta: string;
   onClick: () => void;
   disabled: boolean;
   compacto: boolean;
-  children: React.ReactNode;
+  icono: NombreIcono;
 }) {
   return (
     <button
@@ -67,9 +64,7 @@ function Boton({
         compacto ? "h-[44px] w-[52px]" : "h-[46px] w-[58px]",
       ].join(" ")}
     >
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden="true">
-        {children}
-      </svg>
+      <Icono nombre={icono} className="h-5 w-5" />
     </button>
   );
 }

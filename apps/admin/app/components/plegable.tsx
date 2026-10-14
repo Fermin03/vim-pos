@@ -1,4 +1,5 @@
 "use client";
+import { Icono } from "@vim/ui/styles";
 import type { ReactNode } from "react";
 
 /**
@@ -20,9 +21,7 @@ export function Plegable({
   return (
     <details open={abierto} className="group rounded-lg border border-line bg-surface">
       <summary className="flex min-h-[48px] cursor-pointer list-none items-center gap-3 rounded-lg px-4 py-2.5 [&::-webkit-details-marker]:hidden">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true" className="h-4 w-4 flex-shrink-0 text-ink-2 transition-transform duration-150 ease-vim group-open:rotate-90 motion-reduce:transition-none">
-          <path d="M9 6l6 6-6 6" />
-        </svg>
+        <Icono nombre="chevron-derecha" className="h-4 w-4 flex-shrink-0 text-ink-2 transition-transform duration-150 ease-vim group-open:rotate-90 motion-reduce:transition-none" />
         <span className="text-14 font-semibold">{titulo}</span>
         {resumen && <span className="ml-auto truncate text-13 text-ink-2 group-open:hidden">{resumen}</span>}
       </summary>

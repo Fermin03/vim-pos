@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Button, botonClases } from "@vim/ui/styles";
+import { Button, botonClases, Icono } from "@vim/ui/styles";
 import { usePerfil } from "../../components/admin-shell";
 import {
   actualizarFase,
@@ -13,7 +13,7 @@ import { mensajeError } from "../../lib/errores";
 
 function IconCheck() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="h-3.5 w-3.5"><path d="M20 6L9 17l-5-5" /></svg>
+    <Icono nombre="palomita" className="h-3.5 w-3.5" strokeWidth={2.5} />
   );
 }
 

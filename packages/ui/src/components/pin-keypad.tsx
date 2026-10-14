@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "../cn";
+import { Icono } from "./icono";
 
 export interface PinKeypadProps {
   /** Longitud del PIN (4–6). */
@@ -141,19 +142,7 @@ export function PinKeypad({
               )}
             >
               {k === "del" ? (
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-[22px] w-[22px] text-ink-2"
-                  aria-hidden="true"
-                >
-                  <path d="M21 5H8l-5 7 5 7h13a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1Z" />
-                  <path d="m15 9-4 4M11 9l4 4" />
-                </svg>
+                <Icono nombre="retroceso" className="h-[22px] w-[22px] text-ink-2" />
               ) : (
                 k
               )}
