@@ -236,8 +236,20 @@ El cliente paga con tarjeta **dentro de «Tus datos»**; no se le manda a otra p
 - **Errores por campo**, bajo cada caja, con el molde de siempre (`text-14 text-danger`). Mientras
   escribe solo se reclama lo que la librería marca mal en un campo ya tocado; al tocar «Pagar»,
   también lo vacío, y el foco va al primer campo con error.
-- **No fue el banco, fue el antifraude de Mercado Pago** (`high_risk`): tiene su propio texto,
-  «Mercado Pago no pudo aprobar este pago. Prueba con otra tarjeta.», con el mismo final.
+- **No fue el banco, fue el antifraude de Mercado Pago** (`high_risk`): el pago en línea queda
+  **en pausa** para ese cliente (30 minutos; lo hace valer el servidor) y **no se ofrece repetir el
+  cobro**. En el pie, en lugar de «Pagar»: un `Aviso` rojo («No pudimos aprobar este pago en línea.
+  No fue tu banco y no se te cobró nada.» y qué puede hacer, con la hora) y el botón principal
+  «Elegir otra forma de pago», que lleva a «¿Cómo pagas?» con la primera forma al recibir ya
+  elegida; ahí «Pagar en línea» sale apagada (`ink-3`), con «Disponible otra vez a partir de las
+  3:45 p. m.» debajo. Si en línea es la única forma: el mismo aviso con «Intenta otra vez a partir
+  de las… o llama al restaurante.», «Llamar al …» y «Volver a tu pedido». Si ya estaba en pausa y
+  lo intenta otra vez (o recarga), el aviso es ámbar: «El pago en línea está en pausa para ti por
+  ahora. No se te cobró nada.». Enter tampoco manda otro cobro. La pausa se levanta sola a su hora.
+- **Modo de prueba** (la tienda de un negocio interno de VIM): arriba de la pantalla de la tarjeta
+  —y del reto del banco, que la reemplaza— un `Aviso` azul (`info`) que no se cierra: «**Modo de
+  prueba: los pagos no son reales.** Usa una tarjeta de prueba. Una tarjeta real no pasa.». La misma
+  primera frase encabeza la página de cada pedido pagado así.
 - **El banco no aprobó**: el motivo se dice en un `Aviso` rojo arriba de los campos y siempre
   termina en «No se te cobró nada.» Con otra forma de pago disponible, se ofrece. Lo escrito no se
   borra. Los datos mal escritos llevan **un solo mensaje** («Revisa los datos de tu tarjeta: el
@@ -476,6 +488,8 @@ Un botón dice lo que hace y lleva su importe a la derecha: «Agregar   $139.20�
 | **Menú sin productos** | «Este menú todavía no tiene productos.» |
 | **Enviando el pedido** | Botón apagado con lo que está pasando; no hay velo ni se bloquea el formulario. Mientras dura **no se puede salir de la hoja** («Tu pedido», «Cerrar», el velo, Escape y el arrastre quedan sin efecto): salir a medio envío dejaba mandar el pedido dos veces |
 | **Sin formas de pago** | Una sola pantalla: aviso (`warning`) en «¿Cómo pagas?» y «Enviar pedido» apagado |
+| **Pago en línea en pausa** (rechazo por riesgo) | «Pagar» no se ofrece: aviso con la hora y «Elegir otra forma de pago», o «Llamar al …» si en línea es la única. En «¿Cómo pagas?», la opción en línea apagada con hasta cuándo |
+| **Tienda en modo de prueba** | Aviso azul fijo arriba de la tarjeta y de la página del pedido: «Modo de prueba: los pagos no son reales.» |
 | **Buscando el pedido** | «Tu pedido» y «Buscando tu pedido…»; si la primera lectura falla, «Estamos tardando en cargar tu pedido. Seguimos intentando…» con el botón «Reintentar ahora» |
 | **Tienda abierta / cerrada** | Se vuelve a preguntar sola cada minuto con la pestaña a la vista y al volver a ella (no mientras se llena «Tus datos» ni con un producto abierto) |
 | **Pedido no encontrado** | Título, qué pudo pasar y «Ver el menú» |
