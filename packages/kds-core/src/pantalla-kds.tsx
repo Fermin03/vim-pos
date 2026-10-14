@@ -538,8 +538,8 @@ export function PantallaKds({
       {error && (
         <div className="mx-5 mt-3 flex flex-shrink-0 items-center gap-3 rounded-lg border border-[#5A2E2E] bg-[#2A1A1A] px-4 py-3 text-18 font-semibold text-[#FF8A80]" role="alert">
           <span className="min-w-0 flex-1">{error}</span>
-          <button type="button" onClick={() => setError(null)} aria-label="Cerrar aviso" className="h-11 rounded-md px-3 text-18 font-bold">
-            ✕
+          <button type="button" onClick={() => setError(null)} aria-label="Cerrar aviso" className="h-11 rounded-md px-3">
+            <Icono nombre="cerrar" className="h-5 w-5" />
           </button>
         </div>
       )}
@@ -837,7 +837,7 @@ function Renglon({ it, enCombo, tema }: { it: ItemComanda; enCombo: boolean; tem
       )}
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className={`text-24 font-bold leading-tight ${it.listo ? "line-through" : ""}`}>{it.nombre}</div>
-        {it.listo && <div className="text-18 font-bold text-[#8FE0AE]">✓ Listo · {it.area ?? SIN_AREA}</div>}
+        {it.listo && <div className="flex items-center gap-1.5 text-18 font-bold text-[#8FE0AE]"><Icono nombre="palomita" className="h-5 w-5 flex-shrink-0" />Listo · {it.area ?? SIN_AREA}</div>}
         {/* Lo que se QUITA, en negritas y primero: confundirlo con un extra es el error caro. */}
         {it.sin.map((s) => (
           <div key={`sin-${s}`} className="text-20 font-extrabold leading-snug" style={{ color: tema.text }}>{textoSin(s)}</div>
