@@ -232,7 +232,7 @@ BEGIN
         v_q ->> 'subtotal_mxn', v_q ->> 'envio_mxn', v_q ->> 'envio_total_mxn', v_q ->> 'total_mxn';
     END IF;
     -- La salida es la de siempre, y los campos nuevos del menú no se cuelan en lo que va al ticket.
-    IF (SELECT count(*) FROM jsonb_object_keys(v_q)) <> 6
+    IF (SELECT count(*) FROM jsonb_object_keys(v_q)) <> 9   -- 0179: más cobro, distancia_km y zona_id
        OR jsonb_path_exists(v_q, '$.**.precio_final_mxn') OR jsonb_path_exists(v_q, '$.**.precio_extra_final_mxn') THEN
       RAISE EXCEPTION '7: carrito %: la salida de cotizar cambió de forma: %', v_c ->> 'n', v_q;
     END IF;
