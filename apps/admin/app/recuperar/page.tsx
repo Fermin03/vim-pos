@@ -107,7 +107,7 @@ export default function RecuperarPage() {
             <p className="mt-3 text-13 text-ink-3">¿No lo ves? Revisa tu carpeta de spam o correo no deseado.</p>
             {error && <p className="mt-4 text-sm font-medium text-danger" role="alert">{error}</p>}
             <Button variant="ghost" className="mt-6 w-full" onClick={reenviar} disabled={cargando}>
-              {cargando ? "Reenviando…" : reenviado ? "Enlace reenviado ✓" : "Reenviar enlace"}
+              {cargando ? "Reenviando…" : reenviado ? <>Enlace reenviado <Icono nombre="palomita" className="ml-1.5 inline h-4 w-4" /></> : "Reenviar enlace"}
             </Button>
           </div>
         )}

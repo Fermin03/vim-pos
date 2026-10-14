@@ -245,7 +245,8 @@ export function SidebarTicket({
                 estado.notaOrden ? "border-warning/50 text-warning" : "border-line-strong text-ink-2 hover:border-ink hover:text-ink",
               ].join(" ")}
             >
-              {estado.notaOrden ? "✎ Nota de la orden" : "+ Nota de la orden"}
+              <Icono nombre={estado.notaOrden ? "editar" : "mas"} className="mr-1.5 h-4 w-4 flex-shrink-0" />
+              Nota de la orden
             </button>
           )}
           {/* Nota de cocina de TODA la orden (va a tickets.nota_general → KDS y comanda) */}
@@ -329,7 +330,7 @@ export function SidebarTicket({
                       onClick={() => onCantidad(l.clientId, l.cantidad - 1)}
                       className={BOTON_STEPPER}
                     >
-                      −
+                      <Icono nombre="menos" className="h-4 w-4" />
                     </button>
                     <span className="min-w-[28px] text-center font-display text-16 font-bold tabular-nums">
                       {l.cantidad}
@@ -341,7 +342,7 @@ export function SidebarTicket({
                       onClick={() => onCantidad(l.clientId, l.cantidad + 1)}
                       className={BOTON_STEPPER}
                     >
-                      +
+                      <Icono nombre="mas" className="h-4 w-4" />
                     </button>
                   </span>
                   {bloqueado && onDescuentoItem && (

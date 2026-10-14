@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@vim/ui/styles";
+import { Button, Icono } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import {
   asignarPermisosUsuario, leerMatriz, permisosDeUsuario, quitarPermiso, restaurarPermiso,
@@ -131,7 +131,7 @@ export default function RolesPermisosPage() {
                                       activo ? "bg-success-soft text-success hover:bg-[#d9eadf]" : "bg-danger-soft text-danger hover:bg-[#f3dcd7]",
                                     ].join(" ")}
                                   >
-                                    {activo ? "✓" : "✕"}
+                                    <Icono nombre={activo ? "palomita" : "cerrar"} className="h-3.5 w-3.5" strokeWidth={2.5} />
                                   </button>
                                 </td>
                               );
