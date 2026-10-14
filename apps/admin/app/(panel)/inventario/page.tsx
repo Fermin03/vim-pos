@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Button, Modal, useConfirmar } from "@vim/ui/styles";
+import { Button, Modal, useConfirmar, Icono } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
 import {
   activarModuloInventario,
@@ -340,11 +340,11 @@ export default function InventarioPage() {
               <span className="text-13 text-ink-3">Mostrando {visibles.length} de {filtrados.length} insumos</span>
               {totalPaginas > 1 && (
                 <div className="flex items-center gap-1">
-                  <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={paginaActual === 1}
-                    className="rounded border border-line-strong px-2.5 py-1 text-13 font-semibold text-ink-2 transition hover:border-ink disabled:opacity-40 disabled:hover:border-line-strong">‹</button>
+                  <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={paginaActual === 1} aria-label="Página anterior"
+                    className="rounded border border-line-strong px-2.5 py-1 text-13 font-semibold text-ink-2 transition hover:border-ink disabled:opacity-40 disabled:hover:border-line-strong"><Icono nombre="chevron-izquierda" className="h-4 w-4" /></button>
                   <span className="px-2 text-13 font-semibold tabular-nums">{paginaActual} / {totalPaginas}</span>
-                  <button type="button" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={paginaActual === totalPaginas}
-                    className="rounded border border-line-strong px-2.5 py-1 text-13 font-semibold text-ink-2 transition hover:border-ink disabled:opacity-40 disabled:hover:border-line-strong">›</button>
+                  <button type="button" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={paginaActual === totalPaginas} aria-label="Página siguiente"
+                    className="rounded border border-line-strong px-2.5 py-1 text-13 font-semibold text-ink-2 transition hover:border-ink disabled:opacity-40 disabled:hover:border-line-strong"><Icono nombre="chevron-derecha" className="h-4 w-4" /></button>
                 </div>
               )}
             </div>

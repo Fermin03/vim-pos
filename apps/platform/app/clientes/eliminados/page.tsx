@@ -1,4 +1,5 @@
 "use client";
+import { Icono } from "@vim/ui/styles";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useSesion } from "../../lib/sesion";
@@ -57,7 +58,7 @@ export default function ClientesEliminados() {
 
   return (
     <div>
-      <Link href="/clientes" className="text-13 font-semibold text-ink-2 hover:text-ink">← Clientes</Link>
+      <Link href="/clientes" className="inline-flex items-center gap-1 text-13 font-semibold text-ink-2 hover:text-ink"><Icono nombre="flecha-izquierda" className="h-4 w-4 flex-shrink-0" />Clientes</Link>
       <h1 className="mt-1 font-display text-18 font-semibold tracking-tight">Clientes eliminados</h1>
       <p className="mb-4 mt-0.5 max-w-prose text-13 text-ink-3">
         Negocios que se borraron por completo. De cada uno queda esta ficha y lo que ya estaba en la bitácora; sus datos

@@ -241,8 +241,8 @@ function FranjaCaja({ caja, cancelados, descuentos, lealtad, devoluciones }: {
           <dd className="font-display text-16 font-semibold tabular-nums">{fmt(devoluciones)}</dd>
         </div>
       </dl>
-      <Link href="/reportes/z-historico" className="text-14 font-semibold text-accent transition-colors hover:text-accent-hover lg:flex-shrink-0">
-        Ver cortes →
+      <Link href="/reportes/z-historico" className="inline-flex items-center gap-1 text-14 font-semibold text-accent transition-colors hover:text-accent-hover lg:flex-shrink-0">
+        Ver cortes <Icono nombre="flecha-derecha" className="h-4 w-4 flex-shrink-0" />
       </Link>
     </section>
   );
@@ -432,7 +432,7 @@ export default function DashboardPage() {
                   : `${onb.obligatoriosHechos} de ${onb.obligatoriosTotal} pasos · ${faltanOnb === 1 ? "te falta 1" : `te faltan ${faltanOnb}`} para empezar a vender.`}
               </div>
             </div>
-            <span className="text-13 font-semibold text-accent">Continuar →</span>
+            <span className="inline-flex items-center gap-1 text-13 font-semibold text-accent">Continuar <Icono nombre="flecha-derecha" className="h-4 w-4 flex-shrink-0" /></span>
           </Link>
         )}
 
