@@ -15,6 +15,9 @@ describe("moduloActivo", () => {
   it("salvo eventos: ausente es apagado, como antes de los giros (solo food truck lo veía)", () => {
     expect(moduloActivo({}, "eventos")).toBe(false);
     expect(moduloActivo(null, "eventos")).toBe(false);
+    expect(moduloActivo({}, "cuentas_barra")).toBe(false);
+    expect(moduloActivo(null, "cuentas_barra")).toBe(false);
+    expect(moduloActivo({ cuentas_barra: true }, "cuentas_barra")).toBe(true);
   });
 });
 
@@ -27,9 +30,9 @@ describe("catálogo", () => {
     expect(nombreGiro("NUEVO_RARO")).toBe("NUEVO_RARO");
     expect(nombreGiro(null)).toBe("—");
   });
-  it("nueve módulos visibles; cuentas en barra llega en la entrega 3", () => {
+  it("diez módulos visibles", () => {
     expect(OPERACION.map((m) => m.codigo)).toEqual(
-      ["mostrador", "comedor", "meseros", "domicilio", "repartidores", "kds", "reservaciones", "marcas", "eventos"]);
+      ["mostrador", "comedor", "meseros", "domicilio", "repartidores", "kds", "reservaciones", "marcas", "eventos", "cuentas_barra"]);
     expect(OPERACION.find((m) => m.codigo === "meseros")?.requiere).toBe("comedor");
     expect(OPERACION.find((m) => m.codigo === "repartidores")?.requiere).toBe("domicilio");
   });

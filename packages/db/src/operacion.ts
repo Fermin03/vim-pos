@@ -27,7 +27,7 @@ export type CodigoOperacion =
   | "mostrador" | "comedor" | "meseros" | "domicilio" | "repartidores"
   | "kds" | "reservaciones" | "marcas" | "eventos" | "cuentas_barra";
 
-/** Lo que se enseña en el admin y en /platform. `cuentas_barra` entra con la entrega 3. */
+/** Lo que se enseña en el admin y en /platform. */
 export const OPERACION: readonly { codigo: CodigoOperacion; nombre: string; descripcion: string; requiere?: CodigoOperacion }[] = [
   { codigo: "mostrador", nombre: "Mostrador", descripcion: "Para llevar y Pick-up en la caja." },
   { codigo: "comedor", nombre: "Comedor", descripcion: "Mesas, mapa y cuentas abiertas por mesa." },
@@ -38,14 +38,15 @@ export const OPERACION: readonly { codigo: CodigoOperacion; nombre: string; desc
   { codigo: "reservaciones", nombre: "Reservaciones", descripcion: "Mesas reservadas visibles desde la caja." },
   { codigo: "marcas", nombre: "Marcas virtuales", descripcion: "Varias marcas desde la misma cocina." },
   { codigo: "eventos", nombre: "Eventos", descripcion: "Abrir el turno en una feria o un evento." },
+  { codigo: "cuentas_barra", nombre: "Cuentas en barra", descripcion: "Cuentas a nombre de una persona, sin mesa." },
 ];
 
 /**
  * ¿Está encendido? Lo que diga la base manda. Si la llave no llegó (caja con directivas viejas,
- * todavía cargando) se enseña lo de siempre: todo, menos el bloque de evento, que antes de los
- * giros solo veía un food truck.
+ * todavía cargando) se enseña lo de siempre: todo, menos eventos y cuentas en barra, que antes de
+ * los giros nadie veía (eventos solo un food truck).
  */
 export function moduloActivo(modulos: Record<string, boolean> | null | undefined, codigo: CodigoOperacion): boolean {
   const v = modulos?.[codigo];
-  return typeof v === "boolean" ? v : codigo !== "eventos";
+  return typeof v === "boolean" ? v : codigo !== "eventos" && codigo !== "cuentas_barra";
 }
