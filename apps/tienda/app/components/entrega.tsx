@@ -44,7 +44,7 @@ export function Entrega({ sucursal, modo, zonaId, alCambiarModo, alCambiarZona }
       {modo === "DOMICILIO" && distancia && (
         // TEXTO PROVISIONAL (James).
         <p className="text-15 text-ink-2">
-          El envío depende de la distancia: entregamos hasta {distancia.tramos.at(-1)!.hasta_km.replace(/\.0$/, "")} km.
+          Entregamos hasta {distancia.tramos.at(-1)!.hasta_km.replace(/\.0$/, "")} km.
           {" "}{rangoDeEnvio(distancia.tramos, "distancia") ?? `Envío ${formatoMxn(distancia.tramos[0]!.costo_mxn)}.`}
         </p>
       )}

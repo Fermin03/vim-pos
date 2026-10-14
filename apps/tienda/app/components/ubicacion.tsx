@@ -59,7 +59,8 @@ export function UbicacionDeEntrega({ id, sucursal, tramos, punto, alCambiar, cot
       (pos) => { setBuscando(false); setMapa(true); soltar({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
       // Sin permiso, sin señal o tardó: el mapa abre en el restaurante y el pin se pone a mano.
       () => { setBuscando(false); setSinPermiso(true); setMapa(true); },
-      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
+      // maximumAge 0: quien toca el botón quiere dónde está AHORA, no la de hace un minuto.
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 0 },
     );
   };
 
@@ -90,7 +91,7 @@ export function UbicacionDeEntrega({ id, sucursal, tramos, punto, alCambiar, cot
           textoFallo={UBICACION.sinMapa} textoReintentar={UBICACION.reintentarMapa} />
       )}
       {/* Siempre ocupa su renglón cuando hay pin: el precio cambia en su lugar, sin brincar. */}
-      <p aria-live="polite" className={cn("min-h-6 text-15 font-medium tabular-nums", estado?.fuera ? "text-danger" : "text-ink")}>
+      <p aria-live="polite" className={cn("text-15 font-medium tabular-nums", mapa && "min-h-6", estado?.fuera ? "text-danger" : "text-ink")}>
         {estado?.texto ?? ""}
       </p>
       {estado?.fuera && puedeRecoger && (

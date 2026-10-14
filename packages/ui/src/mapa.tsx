@@ -149,7 +149,8 @@ export function MapaConPin({
   return (
     <div className={cn("flex flex-col gap-2", className)}>
       <div className="relative h-60 w-full overflow-hidden rounded-lg border border-line bg-hover">
-        <div ref={caja} className="absolute inset-0" />
+        {/* La altura va en el contenedor mismo: MapLibre le pone `position: relative` (su hoja de estilos), así que no puede colgar de `inset`. */}
+        <div ref={caja} className="h-full w-full" />
         {estado === "fallo" && (
           <div role="alert" className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center text-14 text-ink-2">
             {textoFallo}

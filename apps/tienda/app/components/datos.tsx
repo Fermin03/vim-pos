@@ -594,7 +594,8 @@ export function PasoDeDatos({
   // ofrece es enviar: con «llama al restaurante» o «vuelve a tu pedido» a la vista, Enter no manda nada.
   const seOfreceEnviar = !!totalNuevo || !aviso || aviso.sigue === "reintentar" || aviso.sigue === "reintentar-seguro" || aviso.sigue === "sesion";
   const total = totalNuevo ?? totalVisto;
-  const aPagar = enLinea && total ? totalAPagar(total, montoDePropina) : total;
+  // Por distancia sin un pin dentro del área todavía no hay total (falta el envío): el botón no enseña uno.
+  const aPagar = faltaUbicacion ? null : enLinea && total ? totalAPagar(total, montoDePropina) : total;
   const estado = reto ? (reto.cancelado ? RETO.cancelando : reto.esperando ? RETO.confirmando : "") : duda ? "Confirmando tu pago…" : (enviando || hecho) && enLinea ? "Procesando tu pago…"
     : enviando || hecho ? "Enviando tu pedido…" : robot ? "Comprobando que no eres un robot…" : "";
   // Con `key`: React no debe reciclar para este botón el nodo de otro que ocupaba su lugar. Sin ella,

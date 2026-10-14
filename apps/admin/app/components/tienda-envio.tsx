@@ -8,12 +8,13 @@ import Link from "next/link";
 import { Button, cn } from "@vim/ui/styles";
 import { MapaConPin } from "@vim/ui/mapa";
 import { AccionFila } from "./controles";
-import { input } from "./campos";
 import { LineaMensaje, type MensajeTienda } from "./tienda-mensaje";
 import { MAX_TRAMOS, erroresDeEnvio, hayCambiosDeEnvio, type EnvioSucursal, type SucursalTienda } from "../lib/tienda-reglas";
 
 /** Sin punto todavía, el mapa abre sobre el país: el dueño se acerca y toca su sucursal. */
 const MEXICO = { lat: 23.6345, lng: -102.5528 };
+/** El campo del panel (campos.ts), sin el ancho completo: en un renglón «hasta [3] km cuesta $[35]». */
+const corto = "h-10 rounded border border-line-strong px-3 text-sm tabular-nums outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)] disabled:opacity-60";
 const radio = "h-5 w-5 flex-shrink-0 accent-ink";
 const casilla = "flex min-h-[44px] cursor-pointer items-center gap-3 text-14 text-ink";
 
@@ -94,18 +95,19 @@ export function EnvioDeSucursal({ sucursal: s, guardando, ocupado, soloLectura, 
           <ol aria-labelledby={`${id}-tramos`} className="flex flex-col gap-2">
             {valor.tramos.map((t, i) => (
               <li key={i} className="flex flex-col gap-1">
-                <div className="flex flex-wrap items-center gap-2 text-14 text-ink">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-14 text-ink">
                   <label htmlFor={`${id}-km-${i}`}>Hasta</label>
                   <input id={`${id}-km-${i}`} inputMode="decimal" value={t.hastaKm} disabled={quieto} maxLength={4}
                     aria-invalid={tocado && errores.porTramo[i] ? true : undefined} aria-describedby={errores.porTramo[i] ? `${id}-error-${i}` : undefined}
                     onChange={(e) => cambiarTramo(i, { hastaKm: e.target.value })}
-                    className={cn(input, "w-20 tabular-nums")} />
+                    className={cn(corto, "w-16")} />
                   <span>km</span>
-                  <label htmlFor={`${id}-costo-${i}`} className="ml-2">cuesta $</label>
+                  <span aria-hidden="true">→</span>
+                  <label htmlFor={`${id}-costo-${i}`}>$<span className="sr-only"> de envío</span></label>
                   <input id={`${id}-costo-${i}`} inputMode="decimal" value={t.costo} disabled={quieto} maxLength={7}
                     aria-invalid={tocado && errores.porTramo[i] ? true : undefined}
                     onChange={(e) => cambiarTramo(i, { costo: e.target.value })}
-                    className={cn(input, "w-28 tabular-nums")} />
+                    className={cn(corto, "w-24")} />
                   <AccionFila peligro disabled={quieto} onClick={() => cambiar({ tramos: valor.tramos.filter((_, j) => j !== i) })}
                     className="ml-auto min-h-[44px] px-1" aria-label={`Quitar el tramo ${i + 1}`}>Quitar</AccionFila>
                 </div>
