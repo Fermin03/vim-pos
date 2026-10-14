@@ -1,4 +1,5 @@
 "use client";
+import { Icono } from "@vim/ui/styles";
 // «Pedidos en línea»: lo que llega de Uber Eats / DiDi / Rappi (ADR 0011), y desde dónde se pausa
 // cada tienda (la de Uber y la propia). Polling cada 10 s como el resto del POS. Cada tarjeta muestra
 // de dónde viene, el folio, el cliente, los ítems y un contador hasta que el pedido se cancele por
@@ -269,7 +270,7 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, cajaSinAc
                   className={`flex flex-col gap-2 rounded border-2 bg-surface p-3 ${pendiente ? (urgente || alergia ? "border-danger" : "border-accent") : "border-line"}`}
                 >
                   {alergia && (
-                    <p className="rounded bg-danger px-2 py-1 text-13 font-bold uppercase tracking-wide text-white">⚠ Pedido con alergia: revisa cada ítem</p>
+                    <p className="flex items-center gap-1.5 rounded bg-danger px-2 py-1 text-13 font-bold uppercase tracking-wide text-white"><Icono nombre="alerta" className="h-4 w-4 flex-shrink-0" />Pedido con alergia: revisa cada ítem</p>
                   )}
                   <div className="flex items-center justify-between">
                     <span className="text-13 font-semibold uppercase tracking-wide text-ink-2">{etiquetaApp(p.app)}</span>

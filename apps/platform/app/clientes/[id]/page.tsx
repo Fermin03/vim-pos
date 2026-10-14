@@ -1,4 +1,5 @@
 "use client";
+import { Icono } from "@vim/ui/styles";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useState } from "react";
@@ -112,7 +113,7 @@ export default function FichaCliente() {
   return (
     <>
       <div className="sticky top-0 z-10 -mx-4 -mt-5 mb-6 border-b border-line bg-bg/95 px-4 pb-3 pt-4 backdrop-blur lg:-mx-8 lg:-mt-7 lg:px-8">
-        <Link href="/clientes" className="text-13 font-semibold text-ink-2 hover:text-ink">← Clientes</Link>
+        <Link href="/clientes" className="inline-flex items-center gap-1 text-13 font-semibold text-ink-2 hover:text-ink"><Icono nombre="flecha-izquierda" className="h-4 w-4 flex-shrink-0" />Clientes</Link>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="font-display text-24 font-bold tracking-tight">{nombre}</h1>

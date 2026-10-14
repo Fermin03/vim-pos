@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
-import { Button } from "@vim/ui/styles";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { Button, Icono } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import {
   asignarPermisosUsuario, leerMatriz, permisosDeUsuario, quitarPermiso, restaurarPermiso,
@@ -106,8 +106,8 @@ export default function RolesPermisosPage() {
                   </thead>
                   <tbody>
                     {categorias.map(([cat, permisos]) => (
-                      <>
-                        <tr key={cat} className="border-b border-line bg-hover">
+                      <Fragment key={cat}>
+                        <tr className="border-b border-line bg-hover">
                           <td colSpan={1 + matriz.roles.length} className="px-4 py-1.5 text-11 font-bold uppercase tracking-wide text-ink-3">{cat}</td>
                         </tr>
                         {permisos.map((p) => (
@@ -131,14 +131,14 @@ export default function RolesPermisosPage() {
                                       activo ? "bg-success-soft text-success hover:bg-[#d9eadf]" : "bg-danger-soft text-danger hover:bg-[#f3dcd7]",
                                     ].join(" ")}
                                   >
-                                    {activo ? "✓" : "✕"}
+                                    <Icono nombre={activo ? "palomita" : "cerrar"} className="h-3.5 w-3.5" strokeWidth={2.5} />
                                   </button>
                                 </td>
                               );
                             })}
                           </tr>
                         ))}
-                      </>
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>

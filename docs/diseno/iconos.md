@@ -172,7 +172,11 @@ import { Icono, IconoCategoria } from "@vim/ui/styles";
 - Las tres de actualización (15, 16, 17) se quedan separadas.
 - Edificio (57) y casa (58) se quedan separados.
 - Signo de pesos (36) y moneda (37) se quedan separados: Ventas y Propinas salen juntas en el panel.
-- Los caracteres `✎ × ✓ ✗ ⚠` de la interfaz pasan a usar el icono real. **Pendiente:** hoy siguen
-  como texto; el reemplazo va en un cambio aparte. `↳` y `✶` se quedan como
-  texto porque van al papel de la impresora.
+- Los caracteres `✎ ✓ ✗ ✕ ⚠` y el `−`/`+` de los botones de cantidad ya usan el icono real. Se
+  quedan como texto: el `×` de cantidad ("2× Papas") y de medidas, los signos de un importe
+  ("+$20", "−15") y `↳` y `✶`, que van al papel de la impresora.
+- Flechas: la que invita a ir a algún lado o separa dos controles es icono ("Ver cortes", "Clientes"
+  de regreso, el paginador, el "de → a" entre dos fechas). La que es notación dentro de una frase se
+  queda como `→`: la ruta por los menús ("Configuración → Cajas") y el antes y después de un valor
+  ("$499 → $599"). Muchas de esas viven en mensajes de `lib/`, donde no cabe un componente.
 - Los logos de Google y Microsoft del acceso son marcas ajenas y no entran aquí.

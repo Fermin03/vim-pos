@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, Modal } from "@vim/ui/styles";
+import { Button, Modal, Icono } from "@vim/ui/styles";
 import { EpsonEposAdapter } from "../lib/print/epson-epos-adapter";
 import { RawSocketAdapter } from "../lib/print/raw-socket-adapter";
 import { ColaWindowsAdapter, listarImpresorasWindows, type ImpresoraWindows } from "../lib/print/cola-windows-adapter";
@@ -53,7 +53,8 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
     // no es motivo para impedir configurar la impresora.
     listarAreasCocina(token, sucursalId).then(setAreas).catch(() => setAreas([]));
   }, [token, sucursalId]);
-  const [prueba, setPrueba] = useState<string | null>(null);
+  /** `ok: null` = aviso sin veredicto (falta un dato, estado desconocido): sin icono. */
+  const [prueba, setPrueba] = useState<{ ok: boolean | null; texto: string } | null>(null);
   const [probando, setProbando] = useState(false);
 
   const actual = cfg.estaciones[estacionActiva];
@@ -89,25 +90,25 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
   async function probar() {
     const ip = (actual.ip ?? "").trim();
     const ancho = actual.ancho ?? 80;
-    if (esRed && !ip) { setPrueba("Indica la IP de la impresora."); return; }
-    if (esWindows && !actual.nombre) { setPrueba("Elige una impresora de la lista."); return; }
+    if (esRed && !ip) { setPrueba({ ok: null, texto: "Indica la IP de la impresora." }); return; }
+    if (esWindows && !actual.nombre) { setPrueba({ ok: null, texto: "Elige una impresora de la lista." }); return; }
     setProbando(true); setPrueba(null);
     try {
       if (actual.tipo === "windows" && actual.nombre) {
         // "Enviado" y no "impreso": Windows acepta el trabajo aunque la impresora esté apagada.
         const r = await new ColaWindowsAdapter(actual.nombre, ancho).imprimir(jobPrueba(ancho, NOMBRE_ESTACION[estacionActiva]));
-        setPrueba(r.ok ? "✓ Enviado a Windows. Revisa que haya salido el ticket de prueba." : r.motivo === "OFFLINE" ? "✗ Windows no encontró esa impresora. Elígela de nuevo en la lista." : "✗ Windows no pudo imprimir. Revisa la impresora en el panel de Windows.");
+        setPrueba({ ok: r.ok, texto: r.ok ? "Enviado a Windows. Revisa que haya salido el ticket de prueba." : r.motivo === "OFFLINE" ? "Windows no encontró esa impresora. Elígela de nuevo en la lista." : "Windows no pudo imprimir. Revisa la impresora en el panel de Windows." });
       } else if (actual.tipo === "generica") {
         // Prueba real: imprime un ticket. Es la única forma fiable de saber si el 9100 responde.
         const imp = new RawSocketAdapter(ip, actual.puerto ?? PUERTO_RAW, ancho);
         const r = await imp.imprimir(jobPrueba(ancho, NOMBRE_ESTACION[estacionActiva]));
-        setPrueba(r.ok ? "✓ Enviado. Revisa que haya salido el ticket de prueba." : r.motivo === "OFFLINE" ? "✗ No se pudo conectar (revisa IP, puerto y que esté en la misma red)." : "✗ Error al imprimir.");
+        setPrueba({ ok: r.ok, texto: r.ok ? "Enviado. Revisa que haya salido el ticket de prueba." : r.motivo === "OFFLINE" ? "No se pudo conectar (revisa IP, puerto y que esté en la misma red)." : "Error al imprimir." });
       } else if (actual.tipo === "epson") {
         const estado = await new EpsonEposAdapter(ip, ancho).estado();
-        setPrueba(estado === "LISTO" ? "✓ Impresora lista." : estado === "OFFLINE" ? "✗ Sin conexión (revisa IP/red)." : `Estado: ${estado}`);
+        setPrueba(estado === "LISTO" ? { ok: true, texto: "Impresora lista." } : estado === "OFFLINE" ? { ok: false, texto: "Sin conexión (revisa IP/red)." } : { ok: null, texto: `Estado: ${estado}` });
       }
     } catch {
-      setPrueba("✗ No se pudo contactar la impresora.");
+      setPrueba({ ok: false, texto: "No se pudo contactar la impresora." });
     } finally { setProbando(false); }
   }
 
@@ -201,7 +202,12 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
               </div>
             </div>
             <Button variant="ghost" onClick={probar} disabled={probando}>{probando ? "Probando…" : actual.tipo === "epson" ? "Probar conexión" : "Imprimir prueba"}</Button>
-            {prueba && <p className={`text-13 font-medium ${prueba.startsWith("✓") ? "text-success" : "text-danger"}`}>{prueba}</p>}
+            {prueba && (
+              <p className={`flex items-center gap-1.5 text-13 font-medium ${prueba.ok ? "text-success" : "text-danger"}`}>
+                {prueba.ok !== null && <Icono nombre={prueba.ok ? "palomita" : "cerrar"} className="h-4 w-4 flex-shrink-0" />}
+                {prueba.texto}
+              </p>
+            )}
           </>
         )}
 
