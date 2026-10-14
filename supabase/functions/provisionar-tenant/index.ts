@@ -84,7 +84,7 @@ servir(async (req, json) => {
     return json({ error: "FALTAN_CAMPOS" }, 400);
   }
   if (!/^[a-z0-9-]+$/.test(codigo)) return json({ error: "CODIGO_INVALIDO", detalle: "minúsculas, números y guiones" }, 400);
-  if (!VERTICALES.includes(vertical)) return json({ error: "VERTICAL_INVALIDA" }, 400);
+  if (!VERTICALES.includes(vertical)) return json({ error: "VERTICAL_INVALIDA", detalle: "Elige un giro de la lista." }, 400);
 
   // 1) Invitar al dueño por correo: crea la cuenta y envía un email con un link para que
   //    el dueño fije SU contraseña (página /establecer-acceso del admin). No viaja ninguna

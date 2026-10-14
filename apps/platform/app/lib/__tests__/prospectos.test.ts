@@ -113,4 +113,11 @@ describe("prefijoNuevoCliente", () => {
     // Sin giro se queda el del formulario.
     expect(prefijoNuevoCliente({ ...base, cajas: 1, sucursales: 1 }).vertical).toBeNull();
   });
+
+  it("solo pre-llena un giro que se ofrece: el retirado lo rechazaría provisionar-tenant", () => {
+    const base = { nombre: "Ana", negocio: "X y Z", whatsapp: "4771234567", cajas: 1, sucursales: 1 };
+    expect(prefijoNuevoCliente({ ...base, giro: "CAFE_BAR" }).vertical).toBeNull();
+    expect(prefijoNuevoCliente({ ...base, giro: "ENTERPRISE" }).vertical).toBeNull();
+    expect(prefijoNuevoCliente({ ...base, giro: "BAR" }).vertical).toBe("BAR");
+  });
 });
