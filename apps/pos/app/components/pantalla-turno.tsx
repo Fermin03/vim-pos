@@ -140,7 +140,6 @@ export function PantallaTurno({
             token={token}
             cajaId={cajaId}
             cajaNumero={caja.numero}
-            vertical={caja.vertical}
             onTurnoAbierto={(t) => { setAbriendoTurno(false); setTurno(t); }}
             onCerrar={() => setAbriendoTurno(false)}
           />

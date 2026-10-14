@@ -65,6 +65,7 @@ import {
 import { CapaPedidosTienda, type AccionTienda, type ListoTienda } from "./pedido-tienda";
 import { esEscritorio } from "../lib/actualizacion";
 import { useAcceso } from "./banda-acceso";
+import { moduloActivo } from "@vim/db/operacion";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalDescuentoItem } from "./modal-descuento-item";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
@@ -2267,7 +2268,7 @@ export function HomePos({
         modo={modo}
         onSalir={volverAlInicio}
         // Solo Comedor: pick-up y domicilio no apartan mesa, y un botón muerto ahí sería ruido.
-        onVerReservaciones={modo === "COMER_AQUI" ? () => setViendoReservaciones(true) : undefined}
+        onVerReservaciones={modo === "COMER_AQUI" && moduloActivo(modulos, "reservaciones") ? () => setViendoReservaciones(true) : undefined}
         onAbrirCuenta={() => {
           // Cuenta nueva: se fija el modo y se entra al catálogo con el carrito limpio.
           dispatch({ tipo: "limpiar" });
@@ -2404,7 +2405,7 @@ export function HomePos({
               onSalir={() => { setViendoMapaMesas(false); setPidiendoMesa(true); }}
               onAbrirCuenta={async (mesaId: string) => { setViendoMapaMesas(false); await onAbrirCuentaMesa(mesaId); }}
               onRetomar={(ticketId: string) => { setViendoMapaMesas(false); entrarCuenta(ticketId, "mesas"); }}
-              onVerReservaciones={() => setViendoReservaciones(true)}
+              onVerReservaciones={moduloActivo(modulos, "reservaciones") ? () => setViendoReservaciones(true) : undefined}
             />
           </div>
         )}
