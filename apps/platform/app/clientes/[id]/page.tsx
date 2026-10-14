@@ -19,6 +19,7 @@ import { AccesoDueno } from "../../components/acceso-dueno";
 import { FichaPagos } from "../../components/ficha-pagos";
 import { FichaFacturacion } from "../../components/ficha-facturacion";
 import { ModulosLimites } from "../../components/modulos-limites";
+import { OperacionGiro } from "../../components/operacion-giro";
 import { ZonaPeligrosa } from "../../components/zona-peligrosa";
 import { DialogoConfirmar } from "../../components/dialogo-confirmar";
 
@@ -172,6 +173,7 @@ export default function FichaCliente() {
           <FichaContrato d={d} planes={planes} accion={accion} busy={busy} accesoDueno={<AccesoDueno api={api} tenantId={id} dueno={d.dueno} onCambio={recargar} />} />
           <FichaPagos api={api} tenantId={id} suscripcion={suscripcion} addonsAlMes={totalAddons(d.addons, hoyMx())} onCambio={recargar} />
           <ModulosLimites d={d} nombre={nombre} accion={accion} busy={busy} />
+          <OperacionGiro d={d} nombre={nombre} accion={accion} busy={busy} />
         </Seccion>
 
         <Seccion id="facturacion" titulo="Facturación" descripcion="Datos fiscales y folios CFDI.">
