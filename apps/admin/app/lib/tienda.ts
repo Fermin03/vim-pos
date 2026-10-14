@@ -8,7 +8,7 @@ import { combosNoComprables, type ComboNoComprable, type ComboParaRevisar } from
 import { filaOculta, type CambioMenu, type CategoriaCatalogo, type Ocultos, type ProductoCatalogo } from "./tienda-menu";
 import { ofertaTienda, type OfertaTienda } from "./tienda-plan";
 import { estadoDePago, type CajaDeTienda } from "./tienda-cobro";
-import { errorDeDireccion, errorDeHorario, leerHorario, mensajeTienda, type SucursalTienda } from "./tienda-reglas";
+import { errorDeDireccion, errorDeHorario, leerHorario, mensajeTienda, type EnvioSucursal, type SucursalTienda, type TramoTienda } from "./tienda-reglas";
 
 const SOLO_ADMIN = "Solo el dueño o un administrador puede cambiar esto.";
 
@@ -108,25 +108,49 @@ export async function guardarConfigTienda(d: DatosConfigTienda, bloque: BloqueCo
 
 // ── Sucursales ────────────────────────────────────────────────────────────────
 
-/** Todas las sucursales vivas, participen o no, con sus zonas activas contadas en una sola consulta. */
+/**
+ * Todas las sucursales vivas, participen o no, con sus zonas activas contadas en una sola consulta y
+ * su envío (0179). Las zonas de los tramos por distancia no cuentan como zonas: no las elige el
+ * cliente. Su precio sí sale de ellas (un tramo es una zona); un tramo cuya zona ya no existe no se pinta.
+ */
 export async function leerSucursalesTienda(): Promise<SucursalTienda[]> {
   const [suc, tienda, zonas] = await Promise.all([
-    supabase.from("sucursales").select("id, nombre, telefono, activa").is("deleted_at", null).order("nombre", { ascending: true }),
-    supabase.from("tienda_sucursales").select("sucursal_id, participa, recoger, domicilio, horario, conexion_id"),
-    supabase.from("zonas_envio").select("sucursal_id").eq("activa", true).is("deleted_at", null),
+    supabase.from("sucursales").select("id, nombre, telefono, activa, geo_lat, geo_lng").is("deleted_at", null).order("nombre", { ascending: true }),
+    supabase.from("tienda_sucursales").select("sucursal_id, participa, recoger, domicilio, horario, conexion_id, cobro_envio, tramos_envio"),
+    supabase.from("zonas_envio").select("id, sucursal_id, costo_mxn, activa").is("deleted_at", null),
   ]);
   if (suc.error) throw fallo(suc.error, "No se pudieron leer las sucursales");
   if (tienda.error) throw fallo(tienda.error, "No se pudieron leer las sucursales de la tienda");
   if (zonas.error) throw fallo(zonas.error, "No se pudieron leer las zonas de envío");
   const deTienda = new Map(((tienda.data ?? []) as Record<string, unknown>[]).map((f) => [String(f.sucursal_id), f]));
+  const filasDeZonas = (zonas.data ?? []) as { id: string; sucursal_id: string; costo_mxn: number | string; activa: boolean }[];
+  const costoDe = new Map(filasDeZonas.map((z) => [z.id, Number(z.costo_mxn).toFixed(2)]));
+  const deTramos = new Set<string>();
+  const tramosDe = (crudo: unknown): TramoTienda[] => (Array.isArray(crudo) ? crudo : []).flatMap((x) => {
+    const o = (typeof x === "object" && x !== null ? x : {}) as Record<string, unknown>;
+    const zona = typeof o.zona_id === "string" ? o.zona_id : "";
+    const costo = costoDe.get(zona);
+    if (zona) deTramos.add(zona);
+    return typeof o.hasta_km === "string" && costo !== undefined ? [{ hastaKm: o.hasta_km.replace(/\.0$/, ""), costo }] : [];
+  });
+  const envios = new Map<string, EnvioSucursal>();
+  for (const s of (suc.data ?? []) as { id: string; geo_lat: number | string | null; geo_lng: number | string | null }[]) {
+    const t = deTienda.get(s.id);
+    envios.set(s.id, {
+      cobro: t?.cobro_envio === "DISTANCIA" ? "DISTANCIA" : "ZONAS",
+      tramos: tramosDe(t?.tramos_envio),
+      punto: s.geo_lat != null && s.geo_lng != null ? { lat: Number(s.geo_lat), lng: Number(s.geo_lng) } : null,
+    });
+  }
   const nZonas = new Map<string, number>();
-  for (const z of (zonas.data ?? []) as { sucursal_id: string }[]) nZonas.set(z.sucursal_id, (nZonas.get(z.sucursal_id) ?? 0) + 1);
+  for (const z of filasDeZonas) if (z.activa && !deTramos.has(z.id)) nZonas.set(z.sucursal_id, (nZonas.get(z.sucursal_id) ?? 0) + 1);
   return ((suc.data ?? []) as { id: string; nombre: string; telefono: string | null; activa: boolean }[]).map((s) => {
     const t = deTienda.get(s.id);
     return {
       id: s.id, nombre: s.nombre, telefono: s.telefono ?? "", activa: s.activa,
       participa: t?.participa === true, recoger: t ? t.recoger === true : true, domicilio: t?.domicilio === true,
       horario: leerHorario(t?.horario), zonasActivas: nZonas.get(s.id) ?? 0,
+      envio: envios.get(s.id) ?? { cobro: "ZONAS", tramos: [], punto: null },
       conexionId: typeof t?.conexion_id === "string" ? t.conexion_id : null,
     };
   });
@@ -149,6 +173,24 @@ export async function guardarSucursalTienda(
     .select("sucursal_id");
   if (error) throw fallo(error, "No se pudo guardar la sucursal");
   if (!data || data.length === 0) throw new Error(SOLO_ADMIN);
+}
+
+/**
+ * «Envío a domicilio» de una sucursal (0179): cómo cobra la tienda, los tramos y el punto de la
+ * sucursal, en una sola llamada (`tienda_guardar_envio`, que valida todo otra vez y crea, cambia o da
+ * de baja las zonas de los tramos). Su error trae ya la frase para el dueño, después del código.
+ */
+export async function guardarEnvioSucursal(sucursalId: string, e: EnvioSucursal): Promise<void> {
+  const { error } = await supabase.rpc("tienda_guardar_envio", {
+    p_sucursal: sucursalId, p_cobro: e.cobro,
+    p_tramos: e.tramos.map((t) => ({ hasta_km: t.hastaKm.trim(), costo_mxn: t.costo.trim() })),
+    p_punto: e.punto,
+  });
+  if (!error) return;
+  const propio = /^(TRAMOS_INVALIDOS|DISTANCIA_INCOMPLETA|ZONA_OCUPADA|UBICACION_INVALIDA|COBRO_INVALIDO|SUCURSAL_INVALIDA): (.+)$/.exec(error.message);
+  if (propio) throw new Error(propio[2]!.charAt(0).toUpperCase() + propio[2]!.slice(1) + ".");
+  if (error.message.startsWith("NO_AUTORIZADO")) throw new Error(SOLO_ADMIN);
+  throw fallo(error, "No se pudo guardar el envío");
 }
 
 /**

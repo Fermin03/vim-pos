@@ -120,6 +120,7 @@ export default function TiendaPage() {
               soloLectura={soloLectura}
               mensajeDe={t.mensajeDeSucursal}
               onGuardar={t.guardarSucursal}
+              envio={{ guardando: t.envioGuardando, mensajeDe: t.mensajeDeEnvio, onGuardar: t.guardarEnvio }}
             />
 
             <TiendaMenu sucursales={t.leido.sucursales} soloLectura={soloLectura} />

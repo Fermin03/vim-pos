@@ -6,15 +6,22 @@ import { Interruptor } from "./interruptor";
 import { Tarjeta } from "./tarjeta";
 import { TiendaHorario } from "./tienda-horario";
 import { LineaMensaje, type MensajeTienda } from "./tienda-mensaje";
+import { EnvioDeSucursal } from "./tienda-envio";
 import {
   errorDeSucursal, erroresPorDia, hayCambiosDeSucursal, interruptorDeSucursalBloqueado, paraGuardarSucursal,
-  type BorradorSucursal, type SucursalTienda,
+  type BorradorSucursal, type EnvioSucursal, type SucursalTienda,
 } from "../lib/tienda-reglas";
 
 const casilla = "flex min-h-[44px] cursor-pointer items-center gap-3 text-14 text-ink";
 const enlace = "whitespace-nowrap font-semibold underline underline-offset-2";
 
 type Guardar = (id: string, datos: BorradorSucursal) => Promise<boolean>;
+/** «Envío a domicilio» de cada sucursal (0179): guarda aparte de la tarjeta. */
+export type EnvioDeTarjetas = {
+  guardando: string | null;
+  mensajeDe: (id: string) => MensajeTienda | null;
+  onGuardar: (id: string, envio: EnvioSucursal) => Promise<boolean>;
+};
 
 /** Bloque 4: qué sucursales venden en la tienda, cómo entregan y a qué horas. */
 export function TiendaSucursales({
@@ -24,7 +31,9 @@ export function TiendaSucursales({
   soloLectura,
   mensajeDe,
   onGuardar,
+  envio,
 }: {
+  envio: EnvioDeTarjetas;
   sucursales: SucursalTienda[];
   /** La sucursal que se está guardando ahora, si alguna. */
   guardando: string | null;
@@ -55,6 +64,7 @@ export function TiendaSucursales({
                 soloLectura={soloLectura}
                 mensaje={mensajeDe(s.id)}
                 onGuardar={onGuardar}
+                envio={envio}
               />
             </li>
           ))}
@@ -71,7 +81,9 @@ function TarjetaSucursal({
   soloLectura,
   mensaje,
   onGuardar,
+  envio,
 }: {
+  envio: EnvioDeTarjetas;
   sucursal: SucursalTienda;
   guardando: boolean;
   ocupado: boolean;
@@ -88,6 +100,8 @@ function TarjetaSucursal({
   const quieto = ocupado || soloLectura;
   const inactivaSinVender = interruptorDeSucursalBloqueado(s);
   const abierta = valor.participa && s.activa;
+  // El envío se configura sobre lo GUARDADO: necesita la fila de la sucursal en la tienda, con domicilio.
+  const conEnvio = abierta && s.participa && s.domicilio && valor.domicilio;
 
   const errorModalidad = errorDeSucursal(valor);
   const erroresHorario = valor.participa ? erroresPorDia(valor.horario) : {};
@@ -143,13 +157,21 @@ function TarjetaSucursal({
               />
               A domicilio
             </label>
-            <p className={cn("pl-8 text-13", valor.domicilio && s.zonasActivas === 0 ? "font-medium text-warning" : "text-ink-2")}>
-              {s.zonasActivas === 1 ? "1 zona de envío" : `${s.zonasActivas} zonas de envío`}
-              {valor.domicilio && s.zonasActivas === 0 && ". Para domicilio necesita al menos una zona de envío."}{" "}
-              <Link href="/configuracion/envios" className={enlace}>Administrar zonas</Link>
-            </p>
+            {/* Con domicilio guardado, cómo se cobra el envío se dice (y se cambia) en su propio bloque, abajo. */}
+            {!conEnvio && (
+              <p className={cn("pl-8 text-13", valor.domicilio && s.zonasActivas === 0 ? "font-medium text-warning" : "text-ink-2")}>
+                {s.zonasActivas === 1 ? "1 zona de envío" : `${s.zonasActivas} zonas de envío`}
+                {valor.domicilio && s.zonasActivas === 0 && ". Para domicilio necesita al menos una zona de envío."}{" "}
+                <Link href="/configuracion/envios" className={enlace}>Administrar zonas</Link>
+              </p>
+            )}
             {errorModalidad && <p role="alert" className="mt-2 text-13 font-medium text-danger">{errorModalidad}</p>}
           </fieldset>
+
+          {conEnvio && (
+            <EnvioDeSucursal sucursal={s} guardando={envio.guardando === s.id} ocupado={ocupado} soloLectura={soloLectura}
+              mensaje={envio.mensajeDe(s.id)} onGuardar={envio.onGuardar} />
+          )}
 
           <TiendaHorario
             valor={valor.horario}

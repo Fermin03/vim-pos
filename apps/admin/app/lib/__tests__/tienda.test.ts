@@ -203,9 +203,19 @@ describe("sucursales de la tienda", () => {
 
   it("lista las sucursales vivas; sin fila de tienda salen los valores por omisión", async () => {
     expect(await leerSucursalesTienda()).toEqual([
-      { id: "s1", nombre: "Centro", telefono: "477 111", activa: true, participa: true, recoger: false, domicilio: true, horario: { "1": ["09:00", "22:00"] }, zonasActivas: 2, conexionId: null },
-      { id: "s2", nombre: "Norte", telefono: "", activa: false, participa: false, recoger: true, domicilio: false, horario: {}, zonasActivas: 1, conexionId: null },
+      { id: "s1", nombre: "Centro", telefono: "477 111", activa: true, participa: true, recoger: false, domicilio: true, horario: { "1": ["09:00", "22:00"] }, zonasActivas: 2, conexionId: null, envio: { cobro: "ZONAS", tramos: [], punto: null } },
+      { id: "s2", nombre: "Norte", telefono: "", activa: false, participa: false, recoger: true, domicilio: false, horario: {}, zonasActivas: 1, conexionId: null, envio: { cobro: "ZONAS", tramos: [], punto: null } },
     ]);
+  });
+
+  it("por distancia (0179): los tramos con el precio de su zona, el punto, y sus zonas no cuentan como zonas", async () => {
+    doble.tablas.sucursales![0] = { ...doble.tablas.sucursales![0], geo_lat: 21.1223, geo_lng: -101.6824 };
+    doble.tablas.tienda_sucursales![0] = { ...doble.tablas.tienda_sucursales![0], cobro_envio: "DISTANCIA",
+      tramos_envio: [{ hasta_km: "2.0", zona_id: "z2" }, { hasta_km: "5.5", zona_id: "z5" }, { hasta_km: "9.0", zona_id: "borrada" }] };
+    doble.tablas.zonas_envio!.push({ id: "z2", sucursal_id: "s1", costo_mxn: 0, activa: true, deleted_at: null }, { id: "z5", sucursal_id: "s1", costo_mxn: 35.5, activa: true, deleted_at: null });
+    const [s1] = await leerSucursalesTienda();
+    expect(s1!.envio).toEqual({ cobro: "DISTANCIA", tramos: [{ hastaKm: "2", costo: "0.00" }, { hastaKm: "5.5", costo: "35.50" }], punto: { lat: 21.1223, lng: -101.6824 } });
+    expect(s1!.zonasActivas).toBe(2);
   });
 
   it("cuenta las zonas con UNA sola consulta, no una por sucursal", async () => {

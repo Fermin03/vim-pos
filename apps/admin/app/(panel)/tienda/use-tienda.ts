@@ -6,19 +6,21 @@ import { leerModulos } from "../../lib/modulos";
 import { ponerLogoTienda, quitarLogoTienda } from "../../lib/foto-producto";
 import { accionConexionTienda, conexionTiendaDisponible, iniciarConexionTienda, leerConexionesTienda, mensajeErrorConexionTienda, type ConexionTienda } from "../../lib/tienda-conexion";
 import {
-  contarPendientesDeCatalogo, encenderTienda, leerCajasDeTienda, leerCombosNoComprables, guardarConfigTienda, leerConfigTienda, guardarCuentaDeSucursal, guardarSucursalTienda, leerModoDePrueba, leerPagosTienda, leerSucursalesTienda, leerTiendaEncendida, urlDelLogo,
+  contarPendientesDeCatalogo, encenderTienda, guardarEnvioSucursal, leerCajasDeTienda, leerCombosNoComprables, guardarConfigTienda, leerConfigTienda, guardarCuentaDeSucursal, guardarSucursalTienda, leerModoDePrueba, leerPagosTienda, leerSucursalesTienda, leerTiendaEncendida, urlDelLogo,
   type BloqueConfig, type DatosConfigTienda,
 } from "../../lib/tienda";
 import { normalizarDireccion, trasEscribir, type Escritura, type Leido } from "../../lib/tienda-pagina";
 import { avisoDeCobro, cuentasActivas, sucursalesConCajaSinActualizar } from "../../lib/tienda-cobro";
-import { revisar, sugerirDireccion, type BorradorSucursal, type Revision } from "../../lib/tienda-reglas";
+import { revisar, sugerirDireccion, type BorradorSucursal, type EnvioSucursal, type Revision } from "../../lib/tienda-reglas";
 import type { DatosTienda } from "../../components/tienda-datos";
 import type { MensajeTienda } from "../../components/tienda-mensaje";
 import type { PedidosTienda } from "../../components/tienda-pedidos";
 
 /** Cada sucursal es su propio bloque: su mensaje y su «Guardando…» salen en su tarjeta. */
-export type Bloque = "estado" | "datos" | "logo" | "pedidos" | "cobro" | `sucursal:${string}`;
+export type Bloque = "estado" | "datos" | "logo" | "pedidos" | "cobro" | `sucursal:${string}` | `envio:${string}`;
 const deSucursal = (id: string): Bloque => `sucursal:${id}`;
+/** El envío de una sucursal (0179) guarda aparte de su tarjeta: su mensaje va junto a su botón. */
+const deEnvio = (id: string): Bloque => `envio:${id}`;
 type Formulario = DatosTienda & PedidosTienda;
 
 const LECTURA = "No se pudo leer tu tienda.";
@@ -208,6 +210,11 @@ export function useTienda() {
     return escribir(deSucursal(id), () => guardarSucursalTienda(id, datos), { tipo: "sucursal", id, datos }, "No se pudo guardar la sucursal", GUARDADO, false);
   }
 
+  /** «Envío a domicilio» de una sucursal: modo, tramos y punto, juntos. true = se guardó. */
+  function guardarEnvio(id: string, envio: EnvioSucursal): Promise<boolean> {
+    return escribir(deEnvio(id), () => guardarEnvioSucursal(id, envio), { tipo: "envio", id, envio }, "No se pudo guardar el envío", GUARDADO, false);
+  }
+
   /** Qué cuenta de Mercado Pago cobra en una sucursal: se guarda al elegirla. */
   function elegirCuenta(id: string, conexionId: string) {
     void escribir("cobro", () => guardarCuentaDeSucursal(id, conexionId), { tipo: "cuenta", id, conexionId }, "No se pudo guardar la cuenta", GUARDADO, false);
@@ -290,9 +297,12 @@ export function useTienda() {
     avisoCobro: leido ? avisoDeCobro(leido.config?.pagoEnLinea === true, leido.cuentas, leido.sucursales, leido.dePrueba === true) : null,
     mensajeDe,
     mensajeDeSucursal: (id: string): MensajeTienda | null => mensajeDe(deSucursal(id)),
+    mensajeDeEnvio: (id: string): MensajeTienda | null => mensajeDe(deEnvio(id)),
+    /** El id de la sucursal cuyo envío se está guardando. */
+    envioGuardando: leido?.sucursales.find((s) => ocupado === deEnvio(s.id))?.id ?? null,
     /** El id de la sucursal que se está guardando, si es una sucursal lo que se guarda. */
     sucursalGuardando: leido?.sucursales.find((s) => ocupado === deSucursal(s.id))?.id ?? null,
-    reintentar, cambiar, guardarDatos, guardarPedidos, guardarSucursal, cambiarEncendido, subirLogo, quitarLogo, elegirCuenta, conectarMercadoPago, pedirDesconectar, confirmarDesconectar,
+    reintentar, cambiar, guardarDatos, guardarPedidos, guardarSucursal, guardarEnvio, cambiarEncendido, subirLogo, quitarLogo, elegirCuenta, conectarMercadoPago, pedirDesconectar, confirmarDesconectar,
     cerrarDesconectar: () => setPorDesconectar(null),
     confirmarDireccion: () => enviarDatos(true),
     confirmarApagar: () => encender(false, true),

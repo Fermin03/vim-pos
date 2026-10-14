@@ -2,7 +2,7 @@
 import type { ConexionTienda } from "./tienda-conexion";
 import type { BloqueConfig, ConfigTienda, DatosConfigTienda, PagoTienda } from "./tienda";
 import type { ComboNoComprable } from "./tienda-combos";
-import type { BorradorSucursal, SucursalTienda } from "./tienda-reglas";
+import type { BorradorSucursal, EnvioSucursal, SucursalTienda } from "./tienda-reglas";
 
 /** Lo que hay en la base. `config` null = el dueño todavía no elige dirección. */
 export type Leido = {
@@ -30,6 +30,8 @@ export type Escritura =
   | { tipo: "config"; bloque: BloqueConfig; datos: DatosConfigTienda }
   | { tipo: "interruptor"; encendida: boolean }
   | { tipo: "sucursal"; id: string; datos: BorradorSucursal }
+  /** «Envío a domicilio» de una sucursal (0179). */
+  | { tipo: "envio"; id: string; envio: EnvioSucursal }
   | { tipo: "cuenta"; id: string; conexionId: string | null }
   /** Se desconectó una cuenta de Mercado Pago de la tienda. */
   | { tipo: "desconexion"; conexionId: string }
@@ -48,6 +50,7 @@ export function trasEscribir(l: Leido, e: Escritura): Leido {
   if (e.tipo === "desconexion") return { ...l, cuentas: l.cuentas.filter((c) => c.id !== e.conexionId) };
   if (e.tipo === "cuenta") return { ...l, sucursales: l.sucursales.map((s) => (s.id === e.id ? { ...s, conexionId: e.conexionId } : s)) };
   if (e.tipo === "sucursal") return { ...l, sucursales: l.sucursales.map((s) => (s.id === e.id ? { ...s, ...e.datos } : s)) };
+  if (e.tipo === "envio") return { ...l, sucursales: l.sucursales.map((s) => (s.id === e.id ? { ...s, envio: e.envio } : s)) };
   const d = e.datos;
   // Igual que `guardarConfigTienda`: en blanco se guarda vacía.
   const deDatos = { direccion: d.direccion, color: d.color, descripcion: d.descripcion.trim() === "" ? "" : d.descripcion };
