@@ -191,3 +191,107 @@ REVOKE ALL ON FUNCTION cambiar_giro(uuid, vertical_tipo, boolean)  FROM PUBLIC, 
 GRANT EXECUTE ON FUNCTION operacion_cuentas_abiertas(uuid)           TO service_role;
 GRANT EXECUTE ON FUNCTION operacion_cambiar(uuid, jsonb)             TO service_role;
 GRANT EXECUTE ON FUNCTION cambiar_giro(uuid, vertical_tipo, boolean) TO service_role;
+
+-- ── §4 modulos_efectivos con los módulos de operación ────────────────────────
+-- Cuerpo de la 0161 con tres cambios (marcados 0180): lee tenants.operacion junto con el plan; kds
+-- y reservaciones pasan a ser plan Y interruptor; y se agregan las ocho llaves de operación
+-- (permitidas siempre: no se cobran). Con todo encendido —el default— el resultado de kds y
+-- reservaciones es el mismo de antes.
+CREATE OR REPLACE FUNCTION modulos_efectivos(p_tenant uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_plan       jsonb;
+  v_op         jsonb;   -- 0180
+  v_inv        boolean;
+  v_del        boolean;
+  v_lea        boolean;
+  v_tie        boolean;
+  v_permitidos jsonb := '{}'::jsonb;
+  v_efectivos  jsonb := '{}'::jsonb;
+  v_codigo     text;
+  v_perm       boolean;
+  v_enc        boolean;
+  v_flag       boolean;
+BEGIN
+  IF p_tenant IS NULL THEN RETURN NULL; END IF;
+  -- Un usuario autenticado solo puede preguntar por su propio tenant. Se decide por el ROL del
+  -- JWT y no por la ausencia del claim: el hook de acceso (0006) emite tokens SIN tenant_id a
+  -- empleados dados de baja, y un token así seguiría siendo `authenticated`. Sin JWT (sesión
+  -- directa a la base: pruebas, semillas) o con service_role, pasa.
+  IF auth.jwt() IS NOT NULL
+     AND (auth.jwt() ->> 'role') IS DISTINCT FROM 'service_role'
+     AND current_tenant_id() IS DISTINCT FROM p_tenant THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT COALESCE(p.features_incluidos->'modulos', '{}'::jsonb), t.operacion   -- 0180
+    INTO v_plan, v_op
+    FROM tenants t LEFT JOIN planes p ON p.id = t.plan_actual_id
+   WHERE t.id = p_tenant;
+  IF NOT FOUND THEN RETURN NULL; END IF;
+
+  SELECT COALESCE(c.modulo_inventario_activo, false) INTO v_inv
+    FROM configuracion_tenant c WHERE c.tenant_id = p_tenant;
+
+  FOREACH v_codigo IN ARRAY ARRAY['kds', 'recetas', 'reservaciones', 'promociones'] LOOP
+    v_flag := NULL;
+    SELECT f.activado INTO v_flag
+      FROM tenant_feature_flags f
+     WHERE f.tenant_id = p_tenant AND f.flag_codigo = v_codigo
+       AND f.fecha_inicio <= now() AND (f.fecha_fin IS NULL OR f.fecha_fin > now());
+    v_perm := COALESCE(v_flag, (v_plan->>v_codigo)::boolean, false);
+    v_enc  := CASE v_codigo
+                WHEN 'recetas' THEN COALESCE(v_inv, false)
+                WHEN 'kds' THEN COALESCE((v_op->>'kds')::boolean, true)                      -- 0180
+                WHEN 'reservaciones' THEN COALESCE((v_op->>'reservaciones')::boolean, true)  -- 0180
+                ELSE true END;
+    v_permitidos := v_permitidos || jsonb_build_object(v_codigo, v_perm);
+    v_efectivos  := v_efectivos  || jsonb_build_object(v_codigo, (v_perm AND v_enc));
+  END LOOP;
+
+  -- 0180: módulos de operación. Siempre permitidos (no se cobran); el interruptor lo mueve VIM.
+  FOREACH v_codigo IN ARRAY ARRAY['mostrador', 'comedor', 'meseros', 'domicilio', 'repartidores',
+                                  'marcas', 'eventos', 'cuentas_barra'] LOOP
+    v_permitidos := v_permitidos || jsonb_build_object(v_codigo, true);
+    v_efectivos  := v_efectivos  || jsonb_build_object(v_codigo, COALESCE((v_op->>v_codigo)::boolean, true));
+  END LOOP;
+
+  v_perm := tenant_addon_activo(p_tenant, 'CFDI');
+  v_permitidos := v_permitidos || jsonb_build_object('cfdi', v_perm);
+  v_efectivos  := v_efectivos  || jsonb_build_object('cfdi', v_perm);
+
+  SELECT COALESCE(c.modulo_delivery_activo, false) INTO v_del
+    FROM configuracion_tenant c WHERE c.tenant_id = p_tenant;
+
+  -- Delivery es el único módulo con las DOS capas a la vez: add-on de pago (como el CFDI) e
+  -- interruptor del dueño (como recetas). El add-on dice si puede; el interruptor, si quiere.
+  v_perm := tenant_addon_activo(p_tenant, 'DELIVERY');
+  v_permitidos := v_permitidos || jsonb_build_object('delivery_apps', v_perm);
+  v_efectivos  := v_efectivos  || jsonb_build_object('delivery_apps', (v_perm AND COALESCE(v_del, false)));
+
+  -- Lealtad: mismas dos capas que delivery. El add-on dice si puede; el interruptor, si quiere.
+  SELECT COALESCE(c.modulo_lealtad_activo, false) INTO v_lea
+    FROM configuracion_tenant c WHERE c.tenant_id = p_tenant;
+  v_perm := tenant_addon_activo(p_tenant, 'LEALTAD');
+  v_permitidos := v_permitidos || jsonb_build_object('lealtad', v_perm);
+  v_efectivos  := v_efectivos  || jsonb_build_object('lealtad', (v_perm AND COALESCE(v_lea, false)));
+
+  -- Tienda en línea: mismas dos capas que delivery y lealtad.
+  SELECT COALESCE(c.modulo_tienda_activo, false) INTO v_tie
+    FROM configuracion_tenant c WHERE c.tenant_id = p_tenant;
+  v_perm := tenant_addon_activo(p_tenant, 'TIENDA');
+  v_permitidos := v_permitidos || jsonb_build_object('tienda', v_perm);
+  v_efectivos  := v_efectivos  || jsonb_build_object('tienda', (v_perm AND COALESCE(v_tie, false)));
+
+  RETURN jsonb_build_object('permitidos', v_permitidos, 'efectivos', v_efectivos);
+END;
+$$;
+COMMENT ON FUNCTION modulos_efectivos(uuid) IS
+  'Módulos por cliente: permitidos (plan + flags; los de operación siempre) y efectivos (AND encendido por el dueño o, en los de operación, por VIM). Única lectura autorizada (ADR 0014, 0180).';
+REVOKE EXECUTE ON FUNCTION modulos_efectivos(uuid) FROM public, anon;
+GRANT EXECUTE ON FUNCTION modulos_efectivos(uuid) TO authenticated, service_role;

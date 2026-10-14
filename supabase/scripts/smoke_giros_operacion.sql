@@ -196,4 +196,48 @@ BEGIN
   RAISE NOTICE '3h permisos OK';
 END $$;
 
+-- 4) modulos_efectivos: las diez llaves, kds = plan Y interruptor, nada perdido.
+DO $$
+DECLARE
+  v_tenant uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_m jsonb; v_kds_antes boolean; k text;
+BEGIN
+  PERFORM set_config('request.jwt.claims', '', true);
+  UPDATE tenants SET operacion = juego_inicial_de_giro(NULL) WHERE id = v_tenant;
+  v_m := modulos_efectivos(v_tenant);
+  v_kds_antes := (v_m->'permitidos'->>'kds')::boolean;   -- con todo encendido, efectivo = plan, como antes
+  IF (v_m->'efectivos'->>'kds')::boolean IS DISTINCT FROM v_kds_antes THEN
+    RAISE EXCEPTION '4a: con todo encendido kds efectivo debía ser igual al plan: %', v_m;
+  END IF;
+  FOREACH k IN ARRAY ARRAY['mostrador','comedor','meseros','domicilio','repartidores','marcas','eventos','cuentas_barra'] LOOP
+    IF (v_m->'permitidos'->>k)::boolean IS DISTINCT FROM true OR (v_m->'efectivos'->>k)::boolean IS DISTINCT FROM true THEN
+      RAISE EXCEPTION '4a: % debía estar permitido y efectivo con todo encendido: %', k, v_m;
+    END IF;
+  END LOOP;
+  FOREACH k IN ARRAY ARRAY['recetas','promociones','cfdi','delivery_apps','lealtad','tienda','reservaciones'] LOOP
+    IF NOT (v_m->'permitidos' ? k AND v_m->'efectivos' ? k) THEN
+      RAISE EXCEPTION '4b: la redefinición perdió %: %', k, v_m;
+    END IF;
+  END LOOP;
+  RAISE NOTICE '4a-4b llaves OK';
+
+  PERFORM operacion_cambiar(v_tenant, '{"kds":false,"domicilio":false}');
+  v_m := modulos_efectivos(v_tenant);
+  IF (v_m->'efectivos'->>'kds')::boolean OR (v_m->'efectivos'->>'domicilio')::boolean
+     OR (v_m->'efectivos'->>'repartidores')::boolean THEN
+    RAISE EXCEPTION '4c: apagado debía no ser efectivo: %', v_m;
+  END IF;
+  IF (v_m->'permitidos'->>'kds')::boolean IS DISTINCT FROM v_kds_antes THEN
+    RAISE EXCEPTION '4c: apagar el interruptor no debe cambiar lo que el plan permite';
+  END IF;
+  RAISE NOTICE '4c apagados OK';
+
+  -- Otro negocio sigue sin poder preguntar por este.
+  PERFORM set_config('request.jwt.claims',
+    json_build_object('sub', gen_random_uuid(), 'role', 'authenticated', 'tenant_id', gen_random_uuid())::text, true);
+  IF modulos_efectivos(v_tenant) IS NOT NULL THEN RAISE EXCEPTION '4d: otro negocio leyó estos módulos'; END IF;
+  PERFORM set_config('request.jwt.claims', '', true);
+  RAISE NOTICE '4d aislamiento OK';
+END $$;
+
 ROLLBACK;
