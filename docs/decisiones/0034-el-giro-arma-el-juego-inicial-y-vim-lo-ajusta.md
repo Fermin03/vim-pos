@@ -41,6 +41,16 @@ el producto", pero nadie lo había hecho.
 - **Antes del merge se aplican a mano la 0179, la 0180, la 0181 y la 0182**, cada una en su propia
   transacción. La 0179 y la 0180 no pueden ir juntas: Postgres responde "unsafe use of new value".
 
+**Orden de lanzamiento:**
+
+1. Migraciones 0179 → 0180 → 0181 → 0182, a mano, cada una en su propia transacción.
+2. Publicar como la más reciente el instalador de la caja que ya las trae. Un negocio que nace
+   `BAR`, `CAFETERIA` o `TAQUERIA` baja ese instalador; si no conoce la 0179, su primer pull falla.
+3. Desplegar las funciones: `provisionar-tenant`, `signup-tenant` (usa `_shared/alta.ts`) y
+   `solicitar-demo`. Son las que dan de alta con los giros nuevos, y deben hacerlo cuando ya hay
+   una caja que los entiende.
+4. Mezclar. Vercel despliega admin, platform y pos.
+
 ## Por qué
 
 Precio por giro ya se probó y se retiró (0002). Un molde fijo por giro no sirve para los negocios
