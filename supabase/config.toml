@@ -51,6 +51,10 @@ verify_jwt = false
 [functions.tienda-mp-renovar]
 verify_jwt = false
 
+# Los correos de estado de los pedidos de la tienda (0176): la llama la base con x-vim-interno.
+[functions.tienda-correos]
+verify_jwt = false
+
 [functions.signup-tenant]
 verify_jwt = false
 
