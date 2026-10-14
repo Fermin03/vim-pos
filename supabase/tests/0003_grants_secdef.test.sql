@@ -90,7 +90,12 @@ insert into _secdef_solo_service (fn, motivo) values
   ('_tienda_password_ok',           'compara contraseñas y mueve el contador de bloqueo; solo la llaman funciones definer (0166)'),
   ('_tienda_abrir_sesion',          'abre una sesión para cualquier cuenta de cliente; solo la llaman funciones definer (0166)'),
   ('_tienda_direcciones',           'lee las direcciones de cualquier cuenta de cliente; solo la llaman funciones definer (0166)'),
-  ('_tienda_estado_real',           'lee el ticket de un pedido sin RLS; solo la llaman funciones definer (0166)');
+  ('_tienda_estado_real',           'lee el ticket de un pedido sin RLS; solo la llaman funciones definer (0166)'),
+  ('tienda_conexion_cobro',         'dice qué cuenta de Mercado Pago cobra en una sucursal de cualquier negocio (0173, 0177)'),
+  ('tienda_conexion_de_prueba',     'crea la conexión de PRUEBA de Mercado Pago de un negocio y guarda su token en Vault; solo VIM (0177)'),
+  ('tienda_pago_frenar',            'frena el pago en línea de un teléfono y una IP en cualquier negocio (0177)'),
+  ('tienda_pago_frenado',           'dice si un teléfono o una IP tienen frenado el pago en línea en cualquier negocio (0177)'),
+  ('tienda_pagos_frenar_por_riesgo', 'función de disparador: frena al cliente de un pago rechazado por riesgo (0177)');
 
 -- #2 — CRÍTICA: ninguna de ellas es ejecutable por `authenticated`.
 select is_empty($$
