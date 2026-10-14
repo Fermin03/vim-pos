@@ -29,7 +29,7 @@ ninguna app las respeta.
 | Giros que se ofrecen | Comida rápida, Restaurante con meseros, Food truck, Dark kitchen, **Bar**, **Cafetería** (separada de Bar) y **Taquería / cocina económica** |
 | Enfoque | **A:** módulos de operación con interruptor; el giro solo es un juego inicial. Ninguna pantalla pregunta por el giro |
 | Cuentas por nombre en barra | **Entran en la fase 1** |
-| Clientes existentes | Conservan **todo encendido**, como hoy |
+| Clientes existentes | Conservan lo que ven hoy: todo encendido salvo `eventos` (que solo veía food truck) |
 
 ## 3. Alcance
 
@@ -57,7 +57,7 @@ los cambia.
 | Llave | Qué controla | Requiere |
 |---|---|---|
 | `mostrador` | Para llevar y Pick-up en la caja | — |
-| `comedor` | Mesas, mapa, cuentas abiertas por mesa, dividir cuenta, configuración de mesas | — |
+| `comedor` | Mesas, mapa, cuentas abiertas por mesa, configuración de mesas | — |
 | `meseros` | Asignar mesero, propinas por mesero, reporte "Ventas por mesero" | `comedor` |
 | `domicilio` | Pedidos a domicilio propios y zonas de envío | — |
 | `repartidores` | Asignación de repartidores (ADR 0016) | `domicilio` |
@@ -108,8 +108,9 @@ encendido**.
   0179 esté en todas las cajas: la caja baja la fila de `tenants` y un valor que no conoce le tumba
   el pull entero (ADR 0034, "Cómo se despliega").
 - **Interruptores.** Nueva columna `tenants.operacion jsonb NOT NULL` con las diez llaves de §4.
-  Su valor por defecto es **todo encendido**: así los clientes existentes no cambian sin que nadie
-  haga nada. Se guarda en `tenants` y no en `configuracion_tenant` porque esta última la puede
+  La 0180 lo dejó por defecto en todo encendido y la 0181 lo cambió a **todo encendido salvo
+  `eventos`**. La 0181 también apaga `eventos` a los negocios existentes que no son food truck. Así
+  los clientes existentes ven lo mismo que antes y ninguno ve un bloque nuevo. Se guarda en `tenants` y no en `configuracion_tenant` porque esta última la puede
   escribir el dueño (política `config_tenant FOR ALL`, 0003), mientras que en `tenants` las apps
   solo leen (`REVOKE UPDATE`, 0132). Así, que "solo VIM" decida lo garantiza la base y no solo la
   pantalla.
@@ -204,7 +205,7 @@ Requiere instalador nuevo de la caja (ver la regla de empaquetado y la lista ant
 - **Smokes SQL** (`npm run smokes`, bloquean el merge):
   - `juego_inicial_de_giro` devuelve la tabla §5 para cada giro y todo encendido para
     `ENTERPRISE`/desconocido.
-  - Un cliente existente queda con todo encendido después de la migración.
+  - Un cliente existente ve lo mismo que antes: todo encendido salvo `eventos` (food truck lo conserva).
   - Las dependencias del disparador (apagar comedor apaga meseros, etc.).
   - No se puede apagar comedor ni barra con cuentas abiertas.
   - `modulos_efectivos` trae las diez llaves y `kds` es plan Y interruptor.
@@ -214,7 +215,7 @@ Requiere instalador nuevo de la caja (ver la regla de empaquetado y la lista ant
   - Nada de `CURRENT_DATE` contra fechas de negocio.
 - **Caja (Playwright):** el inicio con el juego de cada giro (7 capturas), abrir, dividir y cobrar
   una cuenta de barra, y una caja con llaves desconocidas que muestra todo.
-- **/platform:** la sección Operación enciende y apaga módulos en cualquier giro (por ejemplo,
+- **/platform:** la sección Cómo vende enciende y apaga módulos en cualquier giro (por ejemplo,
   Domicilio en un food truck), respeta las dependencias, muestra el aviso de cuentas abiertas, y la
   caja lo refleja después del latido.
 - **Admin:** la página nueva muestra lo encendido y no tiene controles.
@@ -222,7 +223,7 @@ Requiere instalador nuevo de la caja (ver la regla de empaquetado y la lista ant
 
 ## 10. Riesgos
 
-- **Knock-Out** opera a diario: con todo encendido por defecto no ve ningún cambio hasta que alguien
+- **Knock-Out** opera a diario: con lo que ve hoy conservado no ve ningún cambio hasta que alguien
   ajuste sus módulos. No se le aplica el juego de su giro sin avisar.
 - **El enum de Postgres** no permite usar un valor nuevo en la misma transacción en que se agrega:
   agregar los valores en una migración y usarlos en la siguiente.

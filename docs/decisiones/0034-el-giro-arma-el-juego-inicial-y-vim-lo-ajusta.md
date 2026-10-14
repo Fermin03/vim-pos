@@ -21,7 +21,8 @@ el producto", pero nadie lo había hecho.
   la 0132 ya le cerró el UPDATE salvo una lista de columnas.
 - **El candado de cuentas abiertas vive en `operacion_cambiar`, no en un disparador:** la caja baja
   `tenants` en el pull y ahí nada puede fallar.
-- **Los clientes que ya existían quedan con todo encendido.**
+- **Los clientes que ya existían conservan lo que veían:** todo encendido salvo `eventos`, que
+  solo veía food truck.
 
 ## Cómo se despliega (no es obvio)
 
