@@ -1,10 +1,12 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { filtrarSecciones } from "../lib/operacion";
 
 const SECCIONES_BASE = [
   { titulo: "Negocio", items: [
     { label: "Datos del negocio", href: "/configuracion/negocio" },
+    { label: "Cómo vende tu negocio", href: "/configuracion/operacion" },
     { label: "Plan y pagos", href: "/configuracion/plan" },
     { label: "Facturación", href: "/configuracion/facturacion" },
   ]},
@@ -30,27 +32,16 @@ const SECCIONES_BASE = [
 ];
 
 /**
- * "Apps de delivery" es la única entrada gobernada por un módulo (ADR 0014, §8 del diseño del
- * add-on): si VIM no se lo concedió al tenant, la sección no existe — ni en el menú ni en la ruta.
- * El resto de items no depende de módulos, así que se quedan siempre.
- */
-function seccionesPara(permitidoDelivery: boolean): typeof SECCIONES_BASE {
-  if (permitidoDelivery) return SECCIONES_BASE;
-  return SECCIONES_BASE.map((sec) => ({ ...sec, items: sec.items.filter((it) => it.href !== "/configuracion/integraciones") }));
-}
-
-/**
  * Sub-navegación del módulo Configuración (mockups P-162+).
  * Escritorio (`lg+`): columna lateral, idéntica al mockup.
  * Móvil: tira horizontal deslizable debajo del encabezado.
  *
- * `permitidoDelivery` llega por prop desde el layout de Configuración: este componente es
- * puramente de presentación (no consulta sesión ni Supabase) y el layout ya sabe leer los módulos
- * del tenant para el resto de la sección.
+ * `ocultas` (rutas que este negocio no usa, ADR 0034, y "Apps de delivery" sin add-on, ADR 0014)
+ * llega por prop desde el layout: este componente es puramente de presentación.
  */
-export function ConfigSideNav({ permitidoDelivery }: { permitidoDelivery: boolean }) {
+export function ConfigSideNav({ ocultas }: { ocultas: ReadonlySet<string> }) {
   const pathname = usePathname();
-  const secciones = seccionesPara(permitidoDelivery);
+  const secciones = filtrarSecciones(SECCIONES_BASE, ocultas);
   const todos = secciones.flatMap((s) => s.items);
   return (
     <>

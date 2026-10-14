@@ -17,6 +17,8 @@ import {
 } from "../../lib/usuarios";
 import { mensajeError } from "../../lib/errores";
 import { Segmentos } from "../../components/controles";
+import { useModulos } from "../../components/admin-shell";
+import { rutasOcultas } from "../../lib/operacion";
 
 const ROLES_FILTRO = ["all", "DUENO", "ADMIN", "SUPERVISOR", "CAJERO", "PERSONAL"] as const;
 type RolFiltro = (typeof ROLES_FILTRO)[number];
@@ -31,6 +33,7 @@ function iniciales(nombre: string): string {
 }
 
 export default function UsuariosPage() {
+  const modulos = useModulos();
   const [usuarios, setUsuarios] = useState<Usuario[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -115,12 +118,14 @@ export default function UsuariosPage() {
         migas={[{ label: "Administración" }, { label: "Usuarios" }]}
         right={
           <>
-            <Link
-              href="/usuarios/repartidores"
-              className="flex h-11 items-center rounded border border-line-strong px-3.5 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
-            >
-              Repartidores
-            </Link>
+            {!rutasOcultas(modulos).has("/usuarios/repartidores") && (
+              <Link
+                href="/usuarios/repartidores"
+                className="flex h-11 items-center rounded border border-line-strong px-3.5 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+              >
+                Repartidores
+              </Link>
+            )}
             <Button onClick={() => setNuevo(true)}>
               <Icono nombre="mas" className="h-[17px] w-[17px]" />
               Nuevo usuario

@@ -4,6 +4,7 @@ import { hoyMx, sumarDias } from "@vim/fecha";
 import { LABEL_APP, type AppExterna } from "./conciliacion";
 import { resumirCaja, serieHoraria, type ResumenCaja, type TurnoDia } from "./dashboard-calculos";
 import { leerModulos } from "./modulos";
+import { moduloActivo } from "@vim/db/operacion";
 
 // F13 — Reportes y analítica. Las vistas SQL ya existen (0011/0012); el admin solo las
 // consume bajo RLS (heredan del tenant_id de las tablas base). Rangos por día_contable.
@@ -765,7 +766,7 @@ export async function leerNoShows(desde: string, hasta: string, sucursalId: stri
 }
 
 // ── Qué reportes le sirven a este negocio ──────────────────────────────────────────────────
-export type ReportesDisponibles = { marcas: boolean; eventos: boolean; reservaciones: boolean; apps: boolean; variasSucursales: boolean; inventario: boolean };
+export type ReportesDisponibles = { marcas: boolean; eventos: boolean; reservaciones: boolean; apps: boolean; variasSucursales: boolean; inventario: boolean; meseros: boolean };
 
 /**
  * Los reportes de módulos que el negocio no usa se esconden del índice: antes aparecían
@@ -779,7 +780,7 @@ export async function leerReportesDisponibles(): Promise<ReportesDisponibles> {
     return !!error || (count ?? 0) > 0;
   };
   const modulos = await leerModulos().catch(() => null);
-  const [marcas, eventos, reservas, apps, sucursales, movimientos] = await Promise.all([
+  const [marcas, eventos, reservas, apps, sucursales, movimientos, meseroDatos] = await Promise.all([
     hay(supabase.from("marcas_virtuales").select("id", { count: "exact", head: true })),
     hay(supabase.from("turnos").select("id", { count: "exact", head: true }).not("evento_nombre", "is", null)),
     hay(supabase.from("reservaciones").select("id", { count: "exact", head: true })),
@@ -788,14 +789,23 @@ export async function leerReportesDisponibles(): Promise<ReportesDisponibles> {
     // Basta con que exista uno (una compra capturada ya es historial), y contarlos todos sería
     // recorrer miles de filas: cada venta escribe un movimiento por insumo.
     supabase.from("movimientos_inventario").select("id").limit(1).then(({ data, error }) => !!error || (data ?? []).length > 0),
+    hay(supabase.from("vw_ventas_por_mesero").select("mesero_id", { count: "exact", head: true })),
   ]);
-  const ef = modulos?.efectivos ?? {};
+  return disponiblesDe(modulos?.efectivos ?? {}, { marcas, eventos, reservas, apps, sucursales: !!sucursales.error || (sucursales.count ?? 0) > 1, movimientos, meseros: meseroDatos });
+}
+
+/** Qué reportes se enseñan: el módulo encendido O que ya haya datos. Pura para poder probarla. */
+export function disponiblesDe(
+  ef: Record<string, boolean>,
+  hay: { marcas: boolean; eventos: boolean; reservas: boolean; apps: boolean; sucursales: boolean; movimientos: boolean; meseros: boolean },
+): ReportesDisponibles {
   return {
-    marcas,
-    eventos,
-    reservaciones: reservas || !!ef.reservaciones,
-    apps: apps || !!ef.delivery_apps,
-    variasSucursales: !!sucursales.error || (sucursales.count ?? 0) > 1,
-    inventario: movimientos || !!ef.recetas,
+    marcas: hay.marcas,
+    eventos: hay.eventos,
+    reservaciones: hay.reservas || !!ef.reservaciones,
+    apps: hay.apps || !!ef.delivery_apps,
+    variasSucursales: hay.sucursales,
+    inventario: hay.movimientos || !!ef.recetas,
+    meseros: hay.meseros || moduloActivo(ef, "meseros"),
   };
 }

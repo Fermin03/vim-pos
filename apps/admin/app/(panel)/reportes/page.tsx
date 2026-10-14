@@ -42,7 +42,7 @@ const GRUPOS: Grupo[] = [
     ayuda: "Cierres de caja, el equipo y los tiempos de cocina.",
     reportes: [
       { href: "/reportes/z-historico", titulo: "Cortes de turno", descripcion: "Cada cierre de caja: lo vendido, el efectivo esperado contra el contado y quién cerró." },
-      { href: "/reportes/ventas-mesero", titulo: "Ventas por mesero", descripcion: "Tickets, venta y propinas de cada mesero." },
+      { href: "/reportes/ventas-mesero", titulo: "Ventas por mesero", descripcion: "Tickets, venta y propinas de cada mesero.", modulo: "meseros" },
       { href: "/reportes/ventas-area", titulo: "Ventas por estación", descripcion: "Cuánto prepara y cuánto vende cada estación de la cocina." },
       { href: "/reportes/tiempos-cocina", titulo: "Tiempos de cocina", descripcion: "Cuánto tarda en salir la comida contra tu objetivo." },
     ],
@@ -82,7 +82,7 @@ export default function ReportesHub() {
     leerReportesDisponibles()
       .then(setDisponibles)
       // Sin respuesta se muestran todos: esconder un reporte que sí usa confunde más.
-      .catch(() => setDisponibles({ marcas: true, eventos: true, reservaciones: true, apps: true, variasSucursales: true, inventario: true }));
+      .catch(() => setDisponibles({ marcas: true, eventos: true, reservaciones: true, apps: true, variasSucursales: true, inventario: true, meseros: true }));
   }, []);
 
   // Sin perfil todavía se muestran todas: el guardián de rutas es quien decide al entrar.

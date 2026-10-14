@@ -12,6 +12,7 @@ import { leerAcceso, ACCESO_OK, type Acceso } from "../lib/acceso-tenant";
 import { enlaceWhatsapp, mensajeAyudaAdmin, SOPORTE_POR_DEFECTO, textoHorario } from "@vim/db/soporte";
 import { leerAyuda, type AyudaAdmin } from "../lib/soporte";
 import { leerModulos } from "../lib/modulos";
+import { filtrarSecciones, rutasOcultas } from "../lib/operacion";
 import { estadoInventario, rutaEsDeInventario, type ModulosLeidos } from "../lib/inventario-plan";
 
 const PerfilCtx = createContext<Perfil | null>(null);
@@ -256,6 +257,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const horarioAyuda = textoHorario(ayuda.soporte);
   // Inventario sigue en el menú aunque el plan no lo incluya: se marca, no se esconde (0148).
   const sinInventario = estadoInventario(modulos) === "no_incluido";
+  const navVisible = filtrarSecciones(NAV, rutasOcultas(modulos));
 
   return (
     <PerfilCtx.Provider value={perfil}>
@@ -308,7 +310,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </div>
 
           <nav className="flex flex-1 flex-col gap-px overflow-y-auto px-3 pb-4 pt-3">
-            {NAV.map((sec) => {
+            {navVisible.map((sec) => {
               const items = sec.items.filter((it) => puedeVer(jer, it.href));
               if (items.length === 0) return null;
               return (
