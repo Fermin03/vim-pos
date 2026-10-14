@@ -164,7 +164,7 @@ la marca de la conexión.
 - Una orden viva con nuestra referencia que no se puede aplicar no cuenta como conciliada; al tercer
   intento sale el correo «posible cobro sin pedido», con el id de la orden y el motivo.
 
-## El freno tras un rechazo por riesgo (0177)
+## El freno tras un rechazo por riesgo (0178)
 
 `high_risk` no lo dice el banco: lo dice el antifraude de Mercado Pago. Su soporte pide «evitar
 reintentos inmediatos con los mismos datos»: repetir el cobro idéntico empeora la puntuación del
@@ -205,7 +205,7 @@ restaurante. Por eso, tras un rechazo con motivo `RIESGO`:
 **Sin verificar:** si 30 minutos es lo que Mercado Pago considera «no inmediato» (su soporte no dio
 un número), y si en producción un cobro repetido tras ese tiempo deja de salir `high_risk`.
 
-## Modo de prueba (0177)
+## Modo de prueba (0178)
 
 Para probar el pago de punta a punta sin dinero real: operación y pasos en
 [`docs/operacion/tienda-pago-modo-de-prueba.md`](../../operacion/tienda-pago-modo-de-prueba.md).

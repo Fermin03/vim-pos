@@ -378,7 +378,7 @@ test("aprobada tras el reto (VERIFICADO: authenticated y ya sin dirección): se 
   assert.equal(d.tipo, "APROBADO");
 });
 
-// ── Modo de prueba y freno (0177) ───────────────────────────────────────────────────────────────
+// ── Modo de prueba y freno (0178) ───────────────────────────────────────────────────────────────
 test("el pagador de prueba solo vale si es un usuario de prueba de Mercado Pago (…@testuser.com)", () => {
   assert.equal(pagadorDePrueba("test_user_3753760462@testuser.com"), "test_user_3753760462@testuser.com");
   assert.equal(pagadorDePrueba("  Test_User_3753760462@TestUser.com \n"), "test_user_3753760462@testuser.com");
@@ -388,10 +388,10 @@ test("el pagador de prueba solo vale si es un usuario de prueba de Mercado Pago 
   }
 });
 
-test("el motivo que frena desde la base (0177) es el mismo que aquí es RIESGO", () => {
-  // El disparador de la 0177 mira el motivo tal como lo guarda tienda_pago_aplicar; si un día cambia
+test("el motivo que frena desde la base (0178) es el mismo que aquí es RIESGO", () => {
+  // El disparador de la 0178 mira el motivo tal como lo guarda tienda_pago_aplicar; si un día cambia
   // el nombre aquí o allá, el freno del rechazo tardío dejaría de ponerse sin que nada lo diga.
-  const sql = readFileSync(new URL("../../../migrations/0177_tienda_modo_de_prueba_y_freno.sql", import.meta.url), "utf8");
+  const sql = readFileSync(new URL("../../../migrations/0178_tienda_modo_de_prueba_y_freno.sql", import.meta.url), "utf8");
   const motivo = /NEW\.detalle = '([a-z_0-9]+)'/.exec(sql)?.[1];
   assert.equal(motivo, "high_risk");
   assert.equal(motivoDeRechazo(motivo), "RIESGO");

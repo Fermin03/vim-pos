@@ -62,7 +62,7 @@ export function puertoDePagos(admin: Admin): PuertoPagos {
 export const depsDePagos = (admin: Admin, funcion: string): Deps => ({
   db: puertoDePagos(admin),
   mp: (token) => clienteMpTienda(token),
-  // Solo se usa en un pago de prueba (modo de prueba, 0177). No es secreto de nadie: es un usuario de prueba.
+  // Solo se usa en un pago de prueba (modo de prueba, 0178). No es secreto de nadie: es un usuario de prueba.
   pagadorDePrueba: pagadorDePrueba((globalThis as { Deno?: { env: { get(k: string): string | undefined } } }).Deno?.env.get("MP_TIENDA_PAGADOR_DE_PRUEBA")),
   // Al log de la función y, para poder leerlo sin entrar al panel, a tienda_eventos. Nunca tokens ni
   // datos de tarjeta: quien llama solo pasa ids nuestros y el motivo que da Mercado Pago.

@@ -778,7 +778,7 @@ test("el correo del reto sin cerrar dice que NO hay cobro y lleva la orden; sin 
   for (const dato of DEL_RETO) assert.equal(c.html.includes(dato), false);
 });
 
-// ── Modo de prueba (0177) ───────────────────────────────────────────────────────────────────────
+// ── Modo de prueba (0178) ───────────────────────────────────────────────────────────────────────
 const PAGADOR = "test_user_3753760462@testuser.com";
 const pagadorDe = (cuerpo: unknown): unknown => (cuerpo as { payer: { email: unknown } }).payer.email;
 

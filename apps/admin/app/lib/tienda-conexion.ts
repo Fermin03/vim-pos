@@ -87,7 +87,7 @@ const MENSAJES: Record<string, string> = {
   CONEXION_NO_EXISTE: "Esa cuenta de Mercado Pago ya no está conectada.",
   PAGOS_PENDIENTES: "No se puede desconectar todavía: hay un pago en línea por confirmar o una devolución sin terminar con esta cuenta, y sin ella ese dinero no se le puede regresar al cliente. Podrás desconectarla cuando terminen; si una devolución lleva más de un día, escríbenos a soporte.",
   PAGOS_RECIENTES: "No se puede desconectar todavía: esta cuenta cobró pedidos en las últimas 48 horas y, si alguno se cancela, la devolución sale de aquí.",
-  // Modo de prueba (lo pone VIM, 0177). TEXTOS PROVISIONALES (James).
+  // Modo de prueba (lo pone VIM, 0178). TEXTOS PROVISIONALES (James).
   CONEXION_DE_PRUEBA: "Esa es la cuenta de prueba de tu tienda: la configura VIM y no se desconecta desde aquí.",
   MODO_DE_PRUEBA: "Tu tienda está en modo de prueba: por ahora no se conecta ninguna cuenta de Mercado Pago desde aquí.",
   CUENTA_DE_PRUEBA: "Esa cuenta de Mercado Pago ya está en tu tienda como cuenta de prueba y no se puede conectar encima. Escríbenos a soporte.",

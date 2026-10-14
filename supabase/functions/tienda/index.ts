@@ -110,7 +110,7 @@
 //   barrido de la base hace lo mismo. Ese pedido NO se descarta: su renglón es el que vigila la orden.
 //   De la tarjeta aquí solo pasa el token, que es de un solo uso y no se escribe en ningún log.
 //
-//   EL FRENO TRAS UN RECHAZO POR RIESGO (0177; rechazos.ts). Cuando el motivo es RIESGO (`high_risk`: el
+//   EL FRENO TRAS UN RECHAZO POR RIESGO (0178; rechazos.ts). Cuando el motivo es RIESGO (`high_risk`: el
 //   antifraude de Mercado Pago, no el banco), ese cliente —su teléfono Y su IP a la vez— no puede repetir
 //   el cobro en línea en ese negocio durante 30 minutos: el 409 PAGO_RECHAZADO trae `hasta`, y mientras
 //   dure, `pedir` con pago en línea contesta 409 PAGO_EN_PAUSA con `hasta` SIN crear el pedido ni llamar a
@@ -119,7 +119,7 @@
 //   La clave del freno es un HMAC (llave derivada de VIM_TIENDA_SECRET) y es lo único que llega a la base;
 //   el pago la guarda al nacer para que un rechazo que llega tarde frene al mismo cliente.
 //
-//   MODO DE PRUEBA (0177). Un negocio con `tienda_config.pago_de_prueba` cobra contra el ambiente de
+//   MODO DE PRUEBA (0178). Un negocio con `tienda_config.pago_de_prueba` cobra contra el ambiente de
 //   prueba de Mercado Pago, con su conexión de prueba, por este mismo código. Lo único distinto:
 //     · a Mercado Pago se le manda como pagador el usuario de prueba (MP_TIENDA_PAGADOR_DE_PRUEBA); el
 //       correo que escribió el cliente sigue siendo el de nuestros correos;
@@ -503,7 +503,7 @@ async function atender(req: Request): Promise<Response> {
   const negocio = leerNegocio(neg.data);
   if (!negocio) return json({ error: "TIENDA_NO_DISPONIBLE" }, 404);
   const p_tenant = negocio.tenantId;   // solo para las RPC: no va en ninguna respuesta
-  // Un pago en línea en un negocio en MODO DE PRUEBA (0177): ahí se prueba el pago una y otra vez.
+  // Un pago en línea en un negocio en MODO DE PRUEBA (0178): ahí se prueba el pago una y otra vez.
   const pagoDePrueba = negocio.dePrueba && p.accion === "pedir" && p.pago === "EN_LINEA";
   // El cupo por IP y restaurante de un pago en línea (ver cuposDe): el de siempre, pero ya se sabe
   // qué negocio es, y uno en modo de prueba no lo gasta.
@@ -678,7 +678,7 @@ async function atender(req: Request): Promise<Response> {
   const no = await antirobot(p.captcha, "tienda_pedido", ip);
   if (no) return no;
 
-  // EL FRENO (0177): a este MISMO cliente —este teléfono desde esta IP— el antifraude de Mercado Pago
+  // EL FRENO (0178): a este MISMO cliente —este teléfono desde esta IP— el antifraude de Mercado Pago
   // le rechazó un cobro por riesgo aquí hace menos de 30 minutos. No se crea el pedido ni se llama a
   // Mercado Pago: repetirlo enseguida empeora la puntuación del restaurante. No cuenta como rechazo
   // ni gasta el cupo del negocio. Va DESPUÉS del antirobot: antes serviría para preguntar, sin

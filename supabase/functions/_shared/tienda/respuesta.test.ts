@@ -333,7 +333,7 @@ test("cupos: verificacion (la pantalla de la tarjeta durante el reto del banco) 
   assert.equal(cuposDe("verificacion", "1.2.3.4", "knockout").alFallar, "cerrar");
 });
 
-// ── Modo de prueba (0177) ───────────────────────────────────────────────────────────────────────
+// ── Modo de prueba (0178) ───────────────────────────────────────────────────────────────────────
 test("negocio: está en modo de prueba solo si la base dice `pago_de_prueba: true`", () => {
   assert.equal(leerNegocio({ tenant_id: "t-1", publico: { pago_de_prueba: true } })!.dePrueba, true);
   for (const v of [false, null, undefined, "true", 1, "t", {}]) {

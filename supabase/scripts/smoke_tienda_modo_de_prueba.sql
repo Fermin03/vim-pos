@@ -1,4 +1,4 @@
--- Smoke del modo de prueba del pago en línea y del freno tras un rechazo por riesgo (mig. 0177):
+-- Smoke del modo de prueba del pago en línea y del freno tras un rechazo por riesgo (mig. 0178):
 --   M) la marca tienda_config.pago_de_prueba: el dueño no la puede poner ni quitar, por ningún camino;
 --   C) qué conexión cobra: un negocio normal nunca con una de prueba, uno en modo de prueba nunca
 --      con una real; la conexión de prueba no se renueva; cada pago conserva su conexión;
@@ -55,7 +55,7 @@ BEGIN
   INSERT INTO turnos (tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable, usuario_apertura_id, fondo_inicial_mxn, fondo_modo)
   VALUES (v_t, v_suc, v_caja, 'SMOKE-PRUEBA', (now() AT TIME ZONE 'America/Mexico_City')::date, v_cajero, 500, 'TOTAL');
   INSERT INTO tenants (id, codigo, nombre_comercial, estado, vertical_principal)
-  VALUES (v_otro, 'tenant-0177', 'Otro negocio', 'INTERNO', 'QUICK_SERVICE');
+  VALUES (v_otro, 'tenant-0178', 'Otro negocio', 'INTERNO', 'QUICK_SERVICE');
   INSERT INTO tienda_conexiones (tenant_id, cuenta_id_externo, cuenta_nombre, public_key)
   VALUES (v_t, '501', 'Cuenta real', pk_real) RETURNING id INTO v_real;
   IF tienda_estado_sucursal(v_suc, 'RECOGER') IS NOT NULL THEN RAISE EXCEPTION 'fixture: la tienda debía estar abierta: %', tienda_estado_sucursal(v_suc, 'RECOGER'); END IF;

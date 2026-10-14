@@ -13,7 +13,7 @@
 // tarjeta —un token inventado o usado, una petición que Mercado Pago no aceptó— no cuenta para el
 // negocio (`soloIp`): solo para la IP que lo mandó.
 //
-// Y UN FRENO MÁS, QUE NO ES CONTRA QUIEN PRUEBA TARJETAS (0177): tras un rechazo por RIESGO
+// Y UN FRENO MÁS, QUE NO ES CONTRA QUIEN PRUEBA TARJETAS (0178): tras un rechazo por RIESGO
 // (`high_risk`: el antifraude de Mercado Pago, no el banco) ESE cliente no puede repetir el cobro en
 // línea en ESE negocio durante 30 minutos. Repetirlo enseguida con los mismos datos empeora la
 // puntuación del restaurante en el antifraude (lo dijo el soporte de Mercado Pago). «Ese cliente» es
@@ -26,7 +26,7 @@
 // La clave es un HMAC con una llave que deriva de VIM_TIENDA_SECRET (`claveDeFreno`): la base la
 // recibe ya calculada y de ella no se saca ni el teléfono ni la IP.
 //
-// EN MODO DE PRUEBA (0177) los tres topes de arriba no cuentan: ahí se rechazan tarjetas a propósito,
+// EN MODO DE PRUEBA (0178) los tres topes de arriba no cuentan: ahí se rechazan tarjetas a propósito,
 // una y otra vez, y no hay nada que proteger (no es dinero ni son tarjetas de verdad). El freno por
 // riesgo sí aplica: es el mismo código que en producción.
 // Puro salvo por el cliente que se le pasa: se prueba con `node --test`.
@@ -131,7 +131,7 @@ const hastaDe = (v: unknown): string | null => {
 };
 
 /**
- * ¿El cliente de esa clave tiene frenado el pago en línea (`tienda_pago_frenado`, 0177)? Hasta
+ * ¿El cliente de esa clave tiene frenado el pago en línea (`tienda_pago_frenado`, 0178)? Hasta
  * cuándo, o null. No suma nada. Sin clave no hay freno. Si el control no responde, deja pasar: no se
  * le niega el pago a nadie por una caída de la base (como `ipSinPagoEnLinea`).
  */
@@ -148,7 +148,7 @@ export async function pagoFrenado(db: ClienteRpc, clave: string | null): Promise
 }
 
 /**
- * Pone el freno tras un rechazo por riesgo (`tienda_pago_frenar`, 0177) y dice hasta cuándo. Sin
+ * Pone el freno tras un rechazo por riesgo (`tienda_pago_frenar`, 0178) y dice hasta cuándo. Sin
  * clave, o si no se pudo poner, null: el rechazo se contesta igual.
  */
 export async function frenarPago(db: ClienteRpc, clave: string | null): Promise<string | null> {

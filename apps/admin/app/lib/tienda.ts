@@ -68,7 +68,7 @@ export async function leerConfigTienda(): Promise<ConfigTienda | null> {
 }
 
 /**
- * ¿La tienda está en MODO DE PRUEBA (`tienda_config.pago_de_prueba`, 0177)? Solo se lee: la marca la
+ * ¿La tienda está en MODO DE PRUEBA (`tienda_config.pago_de_prueba`, 0178)? Solo se lee: la marca la
  * pone VIM, y el dueño no tiene permiso de escribirla. Aparte de `leerConfigTienda` a propósito: si
  * esta lectura falla (la columna aún no existe en esa base), la página carga igual y no es modo de prueba.
  */

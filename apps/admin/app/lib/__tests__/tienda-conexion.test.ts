@@ -51,7 +51,7 @@ describe("conectar Mercado Pago para la tienda en línea", () => {
   });
 });
 
-describe("la conexión de prueba no es del dueño (0177)", () => {
+describe("la conexión de prueba no es del dueño (0178)", () => {
   it("cada negativa del servidor tiene su mensaje, sin códigos", () => {
     const generico = mensajeErrorConexionTienda(new Error("ALGO_QUE_NO_EXISTE"));
     for (const codigo of ["CONEXION_DE_PRUEBA", "MODO_DE_PRUEBA", "CUENTA_DE_PRUEBA"]) {

@@ -102,7 +102,7 @@ describe("una cuenta de prueba (espejo de tienda_conexion_cobro: nunca cobra ped
     expect(cuentaQueCobra([PRUEBA, A], "p")).toBeNull();
     expect(avisoDeCobro(true, [PRUEBA], [suc("Centro")])).toEqual({ tipo: "ELEGIR", sucursales: ["Centro"] });
   });
-  it("con una real y una de prueba, sin elegir: la REAL (la de prueba no cuenta para «la única activa»: 0177); y no hay nada que elegir", () => {
+  it("con una real y una de prueba, sin elegir: la REAL (la de prueba no cuenta para «la única activa»: 0178); y no hay nada que elegir", () => {
     expect(cuentaQueCobra([A, PRUEBA], null)).toBe(A);
     expect(cuentaQueCobra([PRUEBA, A], null)).toBe(A);
     expect(cuentaQueCobra([A, PRUEBA], "a")).toBe(A);
@@ -119,7 +119,7 @@ describe("una cuenta de prueba (espejo de tienda_conexion_cobro: nunca cobra ped
   });
 });
 
-describe("una tienda en modo de prueba (espejo de tienda_conexion_cobro, 0177: solo su cuenta de prueba, nunca una real)", () => {
+describe("una tienda en modo de prueba (espejo de tienda_conexion_cobro, 0178: solo su cuenta de prueba, nunca una real)", () => {
   const PRUEBA = { id: "p", cuenta_nombre: "Cuenta de prueba 3754297554", estado: "ACTIVA" as const, de_prueba: true };
   const PRUEBA2 = { ...PRUEBA, id: "p2" };
   it("cobra la única cuenta de prueba activa, esté o no la real, y elija lo que elija la sucursal", () => {

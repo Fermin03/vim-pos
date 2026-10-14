@@ -104,7 +104,7 @@ export function cuposDe(accion: Peticion["accion"], ip: string, negocio: string,
     // agotaría el tope del negocio y dejaría sin poder pedir a quien paga al recibir.
     // En línea, además, el tope por IP y restaurante va en `conNegocio`: se gasta DESPUÉS de saber
     // qué negocio es (los mismos 8 por hora, la misma clave), porque un negocio en modo de prueba
-    // (0177) no lo gasta, ni el de después del antirobot: ahí se prueba el pago una y otra vez. El
+    // (0178) no lo gasta, ni el de después del antirobot: ahí se prueba el pago una y otra vez. El
     // de 40 por IP, que va antes de saber nada, vale para todos.
     case "pedir": {
       const bolsa = enLinea ? "paga" : "pide";
@@ -190,7 +190,7 @@ export type Negocio = {
   /** Los ids de las sucursales que participan, en minúsculas. */
   sucursales: string[];
   /**
-   * El negocio está en modo de prueba (`tienda_config.pago_de_prueba`, 0177): sus pagos en línea van
+   * El negocio está en modo de prueba (`tienda_config.pago_de_prueba`, 0178): sus pagos en línea van
    * contra el ambiente de prueba de Mercado Pago. Solo un `true` de la base cuenta.
    */
   dePrueba: boolean;

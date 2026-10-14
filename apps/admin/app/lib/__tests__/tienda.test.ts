@@ -411,7 +411,7 @@ describe("pago en línea", () => {
   });
 });
 
-describe("modo de prueba (0177)", () => {
+describe("modo de prueba (0178)", () => {
   it("se lee de la fila de la tienda, y solo un `true` cuenta", async () => {
     doble.tablas.tienda_config = [{ tenant_id: "t1", pago_de_prueba: true }];
     expect(await leerModoDePrueba()).toBe(true);

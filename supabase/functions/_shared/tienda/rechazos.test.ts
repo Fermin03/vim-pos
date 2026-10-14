@@ -6,7 +6,7 @@ import { cuposDe } from "./respuesta.ts";
 
 /**
  * Los contadores de la base (consumir_cupo y cupo_agotado, 0136) y el freno por riesgo
- * (tienda_pago_frenar y tienda_pago_frenado, 0177), en memoria. El freno contesta como la base: por
+ * (tienda_pago_frenar y tienda_pago_frenado, 0178), en memoria. El freno contesta como la base: por
  * la clave que recibe, y una hora con zona (`+00:00`).
  */
 function contadores(o: { roto?: boolean; frenoRoto?: boolean } = {}) {
@@ -123,7 +123,7 @@ test("el correo de la pausa dice a quién y por qué, sin datos de clientes ni d
   assert.ok(s.html.includes("la sucursal Centro de Knock-Out") && s.html.includes("401") && s.html.includes("volver a conectar"));
 });
 
-// ── El freno tras un rechazo por riesgo (0177) ──────────────────────────────────────────────────
+// ── El freno tras un rechazo por riesgo (0178) ──────────────────────────────────────────────────
 const T = "99999999-0000-0000-0000-0000000000aa", SECRETO = "secreto-de-la-tienda-de-prueba";
 const TEL = "4771112233", IP = "1.2.3.4";
 const clave = (tel: string | null = TEL, ip = IP, tenant = T, secreto = SECRETO) => claveDeFreno(secreto, tenant, tel, ip);
@@ -256,7 +256,7 @@ test("la función mira el freno DESPUÉS del antirobot, y antes del cupo del neg
   assert.match(pedir, /\.update\(\{ freno_clave: frenoClave \}\)/);
 });
 
-// ── Modo de prueba (0177) ───────────────────────────────────────────────────────────────────────
+// ── Modo de prueba (0178) ───────────────────────────────────────────────────────────────────────
 test("modo de prueba: los rechazos no tocan ningún contador; ni el motivo se esconde, ni la IP se bloquea, ni el negocio se pausa", async () => {
   const db = contadores();
   // 30 rechazos seguidos desde la misma IP y 30 desde otras diez: en un negocio real, motivo escondido, IP fuera y negocio en pausa.

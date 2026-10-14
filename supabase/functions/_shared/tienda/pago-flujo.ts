@@ -38,7 +38,7 @@ export type FilaPago = {
   cuenta_vendedora: string;
   /**
    * `tienda_conexiones.de_prueba`: este pago se cobra contra el ambiente de PRUEBA de Mercado Pago
-   * (un negocio en modo de prueba, 0177). Todo lo demás es igual: mismas comprobaciones, mismo camino.
+   * (un negocio en modo de prueba, 0178). Todo lo demás es igual: mismas comprobaciones, mismo camino.
    */
   de_prueba: boolean;
   /**

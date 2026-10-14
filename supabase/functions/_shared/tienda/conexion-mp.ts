@@ -58,7 +58,7 @@ export async function pedirTokensDeTienda(
  * sesión, el negocio del token y que es Dueño o Administrador. Solo corre en Deno.
  *   · `canjear` {code}: guarda la cuenta, su public key y si es de prueba; los tokens, en Vault;
  *   · `desconectar` {conexion_id}: borra los tokens y la deja DESCONECTADA.
- * LA CONEXIÓN DE PRUEBA NO ES DEL DUEÑO (modo de prueba, 0177): la pone VIM. Desde aquí no se puede
+ * LA CONEXIÓN DE PRUEBA NO ES DEL DUEÑO (modo de prueba, 0178): la pone VIM. Desde aquí no se puede
  * conectar nada con el negocio en modo de prueba (`MODO_DE_PRUEBA`), ni pisar con un canje una fila
  * `de_prueba` que ya existe (`CUENTA_DE_PRUEBA`), ni desconectarla (`CONEXION_DE_PRUEBA`).
  */

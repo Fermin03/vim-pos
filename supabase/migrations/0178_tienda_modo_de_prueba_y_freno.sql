@@ -1,4 +1,4 @@
--- 0177 · Tienda en línea: modo de prueba por negocio y freno tras un rechazo por riesgo.
+-- 0178 · Tienda en línea: modo de prueba por negocio y freno tras un rechazo por riesgo.
 --
 -- DOS COSAS, las dos del pago con tarjeta (Orders API de Mercado Pago):
 --

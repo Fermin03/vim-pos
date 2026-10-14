@@ -19,7 +19,7 @@
 // comprueban referencia, modo y monto (pago-flujo.ts → tienda_pago_aplicar).
 // Aplicar el mismo aviso dos veces deja lo mismo, así que no se deduplica.
 //
-// DOS CLAVES, Y NO HACE FALTA SABER CUÁL FIRMÓ (modo de prueba, 0177). Los avisos de las órdenes de
+// DOS CLAVES, Y NO HACE FALTA SABER CUÁL FIRMÓ (modo de prueba, 0178). Los avisos de las órdenes de
 // prueba los firma la aplicación gemela; los reales, «VIM POS Tienda». Aquí se acepta cualquiera de
 // las dos y NO se cruza la clave con el tipo de pago, porque la firma no decide nada: cada pago
 // guarda la conexión con la que nació, la orden se consulta con el token de ESA conexión (un token
@@ -70,7 +70,7 @@ async function avisar(t: Tarea, de: "DEVOLUCION" | "CONCILIACION" | "RETO"): Pro
     ordenIdExterno: f?.orden_id_externo ?? t.orden_id_externo,
   };
   const correo = de === "DEVOLUCION" ? avisoDeDevolucionFallida({ ...d, error: f?.ultimo_error ?? "" }) : de === "RETO" ? avisoDeRetoSinCerrar(d) : avisoDeConciliacionFallida({ ...d, motivo: f?.ultimo_error });
-  // Un pago del modo de prueba (0177) avisa igual —es el mismo camino, y un fallo ahí es un fallo
+  // Un pago del modo de prueba (0178) avisa igual —es el mismo camino, y un fallo ahí es un fallo
   // del código—, pero el asunto lo dice: ahí no hay dinero de nadie.
   const r = await enviarCorreo({
     to: Deno.env.get("VIM_AVISOS_A") ?? "hola@vimpos.com.mx",

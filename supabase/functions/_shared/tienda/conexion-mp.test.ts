@@ -117,7 +117,7 @@ test("la conexión de la tienda: lo que no es canjear ni desconectar, o viene ma
   assert.deepEqual(hechos, []);
 });
 
-// ── La conexión de prueba no es del dueño (modo de prueba, 0177) ───────────────────────────────
+// ── La conexión de prueba no es del dueño (modo de prueba, 0178) ───────────────────────────────
 test("desconectar: una conexión de PRUEBA no se desconecta desde el admin; ni se pregunta si está ocupada ni se toca un token", async () => {
   const b = baseDeMentira({ conexion: { id: CX, tenant_id: NEGOCIO, estado: "ACTIVA", de_prueba: true }, ocupada: null });
   const r = await conexionDeTienda(b.admin, NEGOCIO, { accion: "desconectar", conexion_id: CX }, json);

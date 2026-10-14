@@ -45,7 +45,7 @@ export const seDesconectaDesdeElAdmin = (c: Pick<Cuenta, "de_prueba">): boolean 
 export const nombreDeCuenta = (c: Pick<Cuenta, "cuenta_nombre">): string => c.cuenta_nombre ?? "Cuenta de Mercado Pago";
 
 /**
- * La cuenta de PRUEBA que cobra en una tienda en modo de prueba (0177), igual que
+ * La cuenta de PRUEBA que cobra en una tienda en modo de prueba (0178), igual que
  * `tienda_conexion_cobro`: la única activa de prueba. Sin ninguna, o con más de una, ninguna. No
  * mira la cuenta elegida por sucursal: esa elección es de las cuentas reales.
  */
@@ -56,7 +56,7 @@ export function cuentaDePrueba<C extends Cuenta>(cuentas: C[]): C | null {
 
 /**
  * La cuenta que cobra en una sucursal, igual que `tienda_conexion_cobro`: la elegida si sigue
- * activa; sin elegir, la única activa REAL (una de prueba que quedó activa no cuenta: 0177). Con
+ * activa; sin elegir, la única activa REAL (una de prueba que quedó activa no cuenta: 0178). Con
  * varias reales y sin elegir, ninguna (no se adivina a quién le cae el dinero); si la elegida dejó
  * de servir tampoco se usa otra. Una cuenta de prueba nunca cobra pedidos reales (el cliente vería
  * «pagado» sin haber pagado).

@@ -5,7 +5,7 @@ confirmación, POS, «Listo», cancelar, devolución, correos) **sin dinero real
 cuenta real**. Es por negocio y solo lo enciende VIM. Hoy el negocio es «VIM Pruebas».
 
 Diseño: [`02-diseno.md`](../integraciones/mercado-pago-checkout-pro/02-diseno.md), sección «Modo de
-prueba». Migración: `0177_tienda_modo_de_prueba_y_freno.sql`.
+prueba». Migración: `0178_tienda_modo_de_prueba_y_freno.sql`.
 
 ## Por qué existe
 
@@ -42,7 +42,7 @@ Admin › Tienda en línea › «Pago en línea», que además deja de ofrecer �
 
 ## Encenderlo
 
-Antes: la migración 0177 aplicada, y la web y las funciones `tienda` y `tienda-webhook-mp`
+Antes: la migración 0178 aplicada, y la web y las funciones `tienda` y `tienda-webhook-mp`
 desplegadas (orden en la cabecera de la migración).
 
 **1. Secretos de las funciones** (una vez; los valores no van en ningún archivo):
