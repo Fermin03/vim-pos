@@ -285,7 +285,7 @@ export default function IntegracionesPage() {
                   </tbody>
                 </table>
                 {sucursales.length === 0 && (
-                  <div className="px-6 py-12 text-center text-sm text-ink-2">Primero crea una sucursal en Configuración › Sucursales.</div>
+                  <div className="px-6 py-12 text-center text-sm text-ink-2">Primero crea una sucursal en Configuración → Sucursales.</div>
                 )}
               </div>
             )}

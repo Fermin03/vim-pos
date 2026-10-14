@@ -1,4 +1,5 @@
 "use client";
+import { Icono } from "@vim/ui/styles";
 import { useState } from "react";
 import { hoyMx, sumarDias } from "@vim/fecha";
 
@@ -56,7 +57,7 @@ export function RangoFechas({
             max={tope}
             onChange={(e) => setD(e.target.value)}
           />
-          <span className="text-ink-2" aria-hidden="true">→</span>
+          <Icono nombre="flecha-derecha" className="h-4 w-4 flex-shrink-0 text-ink-2" />
           <input
             type="date"
             aria-label="Hasta"

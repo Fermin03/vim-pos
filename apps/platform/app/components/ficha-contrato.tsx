@@ -1,4 +1,5 @@
 "use client";
+import { Icono } from "@vim/ui/styles";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { fechaLegible, hoyMx, sumarDias, sumarMeses } from "@vim/fecha";
 import { cantidadDeExtra, esExtra, estadoPrueba, EXTRAS, EXTRAS_MAXIMO, limiteConExtras, textoLimiteCajas, textoPrecio, totalMensual, type CodigoExtra, type PrecioSuscripcion } from "@vim/db/cobro";
@@ -53,7 +54,7 @@ function Cambio({ antes, despues }: { antes: ReactNode; despues: ReactNode }) {
   return (
     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded border border-line bg-sel px-3 py-2.5 text-13">
       <div>{antes}</div>
-      <span className="text-ink-2" aria-hidden="true">→</span>
+      <Icono nombre="flecha-derecha" className="h-4 w-4 text-ink-2" />
       <div className="font-semibold">{despues}</div>
     </div>
   );

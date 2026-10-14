@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Button, Modal } from "@vim/ui/styles";
+import { Button, Modal, Icono } from "@vim/ui/styles";
 import {
   buscarClientesDomicilio, registrarClienteDomicilio, agregarDireccionCliente, conDireccion,
   fijarZonaDireccion, ETIQUETAS_DIRECCION,
@@ -314,9 +314,9 @@ export function ModalClienteDomicilio({
 
       <div className="mt-5 flex items-center justify-between gap-2 border-t border-line pt-4">
         {zonaPendiente ? (
-          <button type="button" onClick={() => setZonaPendiente(null)} className="text-13 font-medium text-ink-3 hover:text-ink-2">← Cancelar</button>
+          <button type="button" onClick={() => setZonaPendiente(null)} className="inline-flex items-center gap-1 text-13 font-medium text-ink-3 hover:text-ink-2"><Icono nombre="flecha-izquierda" className="h-4 w-4 flex-shrink-0" />Cancelar</button>
         ) : agregandoA ? (
-          <button type="button" onClick={() => { setAgregandoA(null); setError(null); }} className="text-13 font-medium text-ink-3 hover:text-ink-2">← Volver a la búsqueda</button>
+          <button type="button" onClick={() => { setAgregandoA(null); setError(null); }} className="inline-flex items-center gap-1 text-13 font-medium text-ink-3 hover:text-ink-2"><Icono nombre="flecha-izquierda" className="h-4 w-4 flex-shrink-0" />Volver a la búsqueda</button>
         ) : <span />}
         <div className="flex items-center gap-2">
           <Button variant="ghost" onClick={onCerrar}>Cancelar</Button>

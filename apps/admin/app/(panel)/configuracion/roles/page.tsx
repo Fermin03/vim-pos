@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Button, Icono } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import {
@@ -106,8 +106,8 @@ export default function RolesPermisosPage() {
                   </thead>
                   <tbody>
                     {categorias.map(([cat, permisos]) => (
-                      <>
-                        <tr key={cat} className="border-b border-line bg-hover">
+                      <Fragment key={cat}>
+                        <tr className="border-b border-line bg-hover">
                           <td colSpan={1 + matriz.roles.length} className="px-4 py-1.5 text-11 font-bold uppercase tracking-wide text-ink-3">{cat}</td>
                         </tr>
                         {permisos.map((p) => (
@@ -138,7 +138,7 @@ export default function RolesPermisosPage() {
                             })}
                           </tr>
                         ))}
-                      </>
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>
