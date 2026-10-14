@@ -109,7 +109,9 @@ encendido**.
 
 - **Giros.** Al tipo `vertical_tipo` se le agregan `BAR`, `CAFETERIA` y `TAQUERIA`.
   `CAFE_BAR` y `ENTERPRISE` se quedan en el tipo (Postgres no los borra fácil), pero el registro ya
-  no los ofrece. Si hay clientes en `CAFE_BAR`, la migración los pasa a `BAR`.
+  no los ofrece. Los giros nuevos no se asignan (ni `CAFE_BAR` se convierte a `BAR`) hasta que la
+  0179 esté en todas las cajas: la caja baja la fila de `tenants` y un valor que no conoce le tumba
+  el pull entero (ADR 0034, "Cómo se despliega").
 - **Interruptores.** Nueva columna `tenants.operacion jsonb NOT NULL` con las diez llaves de §4.
   Su valor por defecto es **todo encendido**: así los clientes existentes no cambian sin que nadie
   haga nada. Se guarda en `tenants` y no en `configuracion_tenant` porque esta última la puede
@@ -136,12 +138,15 @@ encendido**.
 
 ### 6.3 Funciones
 
-- `alta_autoservicio` / `crear_tenant_con_owner`: después de crear el negocio, escriben
-  `operacion := juego_inicial_de_giro(giro)` y la política de cobro. La propina inicial por giro
+- `alta_autoservicio` / `crear_tenant_con_owner` **(entrega 2, junto con las pantallas)**: después
+  de crear el negocio, escriben `operacion := juego_inicial_de_giro(giro)` y la política de cobro.
+  En la entrega 1 el alta deja todo encendido: si aplicara el juego antes de que alguna pantalla lo
+  obedezca, un negocio nuevo perdería pantallas de golpe al salir la entrega 2. La propina inicial por giro
   va en la entrega 2: la sucursal se crea después del alta, desde la primera vez, y
   `sucursal_propinas_config` todavía no baja a la caja, así que fijarla antes no llegaría a ella.
 - `operacion_cambiar(p_tenant, p_cambios jsonb)`: enciende o apaga módulos aplicando las reglas de
-  §6.2, y responde con lo que quedó y con lo que no se pudo cambiar, explicando por qué.
+  §6.2. Es todo o nada: si algo no se puede (dependencia faltante, cuentas abiertas), no cambia
+  nada y el error dice por qué; si se apagó un dependiente, lo reporta en `ajustes`.
 - `cambiar_giro(p_tenant, p_giro, p_reaplicar boolean)`: cambia `vertical_principal` y, si
   `p_reaplicar`, vuelve a aplicar el juego inicial respetando las reglas de §6.2 (si hay cuentas
   abiertas en comedor, el comedor se queda encendido y lo avisa).

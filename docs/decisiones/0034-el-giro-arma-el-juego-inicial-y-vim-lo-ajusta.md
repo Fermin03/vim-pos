@@ -23,6 +23,20 @@ el producto", pero nadie lo había hecho.
   `tenants` en el pull y ahí nada puede fallar.
 - **Los clientes que ya existían quedan con todo encendido.**
 
+## Cómo se despliega (no es obvio)
+
+- **Un giro nuevo no se asigna hasta que todas las cajas conozcan el valor.** La caja baja la fila
+  completa de `tenants`; si en la nube un negocio queda `BAR` y su caja no tiene la 0179, el pull
+  entero de esa caja falla y deja de recibir catálogo, precios y empleados. Por eso la 0180 no
+  convierte `CAFE_BAR` a `BAR`, y `cambiar_giro` responde `GIRO_NO_DISPONIBLE` para `BAR`,
+  `CAFETERIA` y `TAQUERIA`. Se liberan con una migración cuando la 0179 haya viajado en un
+  instalador que ya tengan todas las cajas.
+- **El alta todavía no aplica el juego del giro.** Mientras ninguna pantalla obedezca los módulos,
+  un negocio registrado en el hueco perdería pantallas de golpe al salir la entrega 2. Lo aplica
+  la entrega 2, junto con las pantallas.
+- **0179 y 0180 se aplican en dos transacciones**, una por archivo. En una sola, Postgres responde
+  "unsafe use of new value".
+
 ## Por qué
 
 Precio por giro ya se probó y se retiró (0002). Un molde fijo por giro no sirve para los negocios

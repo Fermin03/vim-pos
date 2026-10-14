@@ -174,11 +174,21 @@ BEGIN
   EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
   BEGIN PERFORM cambiar_giro(v_tenant, 'ENTERPRISE', false); RAISE EXCEPTION '3g: aceptó ENTERPRISE';
   EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+  -- Los giros de la 0179 no se asignan hasta que todas las cajas la tengan (ADR 0034): una caja
+  -- vieja no conoce el valor y su pull entero fallaría.
+  FOREACH v_op IN ARRAY ARRAY['"BAR"', '"CAFETERIA"', '"TAQUERIA"']::jsonb[] LOOP
+    BEGIN
+      PERFORM cambiar_giro(v_tenant, (v_op #>> '{}')::vertical_tipo, false);
+      RAISE EXCEPTION '3g: asignó % antes de que las cajas lo conozcan', v_op;
+    EXCEPTION WHEN invalid_parameter_value THEN
+      IF SQLERRM NOT LIKE 'GIRO_NO_DISPONIBLE%' THEN RAISE; END IF;
+    END;
+  END LOOP;
   -- Sin reaplicar: solo cambia el giro.
   SELECT operacion INTO v_op FROM tenants WHERE id = v_tenant;
-  v_r := cambiar_giro(v_tenant, 'BAR', false);
+  v_r := cambiar_giro(v_tenant, 'FULL_SERVICE', false);
   IF v_r->'operacion' IS DISTINCT FROM v_op THEN RAISE EXCEPTION '3g: sin reaplicar no debía tocar la operación'; END IF;
-  RAISE NOTICE '3g giros retirados y sin reaplicar OK';
+  RAISE NOTICE '3g giros retirados, no disponibles y sin reaplicar OK';
 
   -- 3h) Un usuario autenticado (el dueño incluido) no escribe ni ejecuta nada de esto.
   EXECUTE 'SET LOCAL ROLE authenticated';
@@ -191,7 +201,14 @@ BEGIN
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   BEGIN PERFORM cambiar_giro(v_tenant, 'BAR', true); RAISE EXCEPTION '3h: ejecutó cambiar_giro';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN PERFORM operacion_cuentas_abiertas(v_tenant); RAISE EXCEPTION '3h: leyó cuentas abiertas de cualquier negocio';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   EXECUTE 'RESET ROLE';
+  IF has_function_privilege('anon', 'operacion_cambiar(uuid, jsonb)', 'EXECUTE')
+     OR has_function_privilege('anon', 'cambiar_giro(uuid, vertical_tipo, boolean)', 'EXECUTE')
+     OR has_function_privilege('anon', 'operacion_cuentas_abiertas(uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION '3h: anon puede ejecutar una función de /platform';
+  END IF;
   PERFORM set_config('request.jwt.claims', '', true);
   RAISE NOTICE '3h permisos OK';
 END $$;
@@ -240,7 +257,9 @@ BEGIN
   RAISE NOTICE '4d aislamiento OK';
 END $$;
 
--- 5) Alta por giro: operación y política de cobro.
+-- 5) El alta de la entrega 1 NO aplica todavía el juego del giro: ninguna pantalla lo obedece, y
+--    un negocio dado de alta antes de la entrega 2 perdería pantallas de golpe al salir esta. Queda
+--    todo encendido y la política de cobro por defecto; la entrega 2 aplica el juego en el alta.
 DO $$
 DECLARE
   v_owner uuid := gen_random_uuid();
@@ -255,13 +274,13 @@ BEGIN
                                      '4770000000', 'FOODTRUCK'::vertical_tipo, 'ESENCIAL', 'TRIAL'::tenant_estado, 'smoke 0180');
 
   SELECT operacion INTO v_op FROM tenants WHERE id = v_tenant;
-  IF v_op IS DISTINCT FROM juego_inicial_de_giro('FOODTRUCK') THEN
-    RAISE EXCEPTION '5a: el alta no aplicó el juego de FOODTRUCK: %', v_op;
+  IF v_op IS DISTINCT FROM juego_inicial_de_giro(NULL) THEN
+    RAISE EXCEPTION '5a: el alta de la entrega 1 debía dejar todo encendido: %', v_op;
   END IF;
-  IF (SELECT politica_cobro_cocina FROM configuracion_tenant WHERE tenant_id = v_tenant) IS DISTINCT FROM 'COBRO_PRIMERO' THEN
-    RAISE EXCEPTION '5a: política de cobro inicial mal';
+  IF COALESCE((SELECT politica_cobro_cocina FROM configuracion_tenant WHERE tenant_id = v_tenant), 'COBRO_PRIMERO') <> 'COBRO_PRIMERO' THEN
+    RAISE EXCEPTION '5a: el alta de la entrega 1 no debía tocar la política de cobro';
   END IF;
-  RAISE NOTICE '5a alta por giro OK';
+  RAISE NOTICE '5a alta sin juego todavía OK';
 END $$;
 
 ROLLBACK;
