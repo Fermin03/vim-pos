@@ -1,6 +1,6 @@
 # 0034 — El giro arma el juego inicial de módulos, y después solo VIM lo ajusta
 
-**Fecha:** 14 de octubre de 2026 · **Estado:** vigente (entrega 1 de 3)
+**Fecha:** 14 de octubre de 2026 · **Estado:** vigente (entregas 1 y 2 de 3)
 
 ## Qué había antes
 
@@ -31,11 +31,14 @@ el producto", pero nadie lo había hecho.
   convierte `CAFE_BAR` a `BAR`, y `cambiar_giro` responde `GIRO_NO_DISPONIBLE` para `BAR`,
   `CAFETERIA` y `TAQUERIA`. Se liberan con una migración cuando la 0179 haya viajado en un
   instalador que ya tengan todas las cajas.
-- **El alta todavía no aplica el juego del giro.** Mientras ninguna pantalla obedezca los módulos,
-  un negocio registrado en el hueco perdería pantallas de golpe al salir la entrega 2. Lo aplica
-  la entrega 2, junto con las pantallas.
-- **0179 y 0180 se aplican en dos transacciones**, una por archivo. En una sola, Postgres responde
-  "unsafe use of new value".
+- **El alta aplica el juego del giro desde la 0181, que viaja con las pantallas.** Antes de eso, un
+  negocio registrado en el hueco perdería pantallas de golpe.
+- **La 0181 apaga `eventos` a los negocios existentes que no son food truck,** para que ninguno vea
+  el bloque de evento de golpe.
+- **La 0182 ensancha el CHECK de `prospectos.giro`** (0084) para que `solicitar-demo` acepte `BAR`,
+  `CAFETERIA` y `TAQUERIA` además de los seis giros de antes.
+- **Antes del merge se aplican a mano la 0179, la 0180, la 0181 y la 0182**, cada una en su propia
+  transacción. La 0179 y la 0180 no pueden ir juntas: Postgres responde "unsafe use of new value".
 
 ## Por qué
 

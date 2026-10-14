@@ -93,12 +93,7 @@ otro trabajo; aquí no se tocan.
 | eventos | ○ | ○ | ● | ○ | ○ | ○ | ○ |
 | cuentas_barra | ○ | ○ | ○ | ○ | ● | ○ | ○ |
 
-Ajustes que ya existen y cuyo valor inicial también depende del giro:
-
-| Ajuste | Comida rápida | Restaurante | Food truck | Dark kitchen | Bar | Cafetería | Taquería |
-|---|---|---|---|---|---|---|---|
-| `politica_cobro_cocina` | COBRO_PRIMERO | COCINA_PRIMERO | COBRO_PRIMERO | COBRO_PRIMERO | COCINA_PRIMERO | COBRO_PRIMERO | COCINA_PRIMERO |
-| Sugerir propina (`capturar_propina` de la sucursal) | No | Sí | No | No | Sí | No | No |
+> Cobro y propina no dependen del giro (Fermín, 14 oct): el cobro va por tipo de cuenta y la propina arranca sugerida, como hoy.
 
 `ENTERPRISE` (valor viejo, ya no se ofrece) y cualquier giro sin juego definido reciben **todo
 encendido**.
@@ -120,9 +115,8 @@ encendido**.
   pantalla.
 - **Juego inicial.** Una función `juego_inicial_de_giro(vertical_tipo) RETURNS jsonb` es la única
   fuente de la tabla §5. La usan el alta y el cambio de giro.
-- **Se reaprovecha:** `politica_cobro_cocina` (ya existe, se fija al darse de alta).
-  `modos_servicio_activos` y `modo_servicio_default` no se usan y se dejan como están (no se
-  agregan dos fuentes para lo mismo).
+- **No se tocan:** `modos_servicio_activos` y `modo_servicio_default` no se usan y se dejan como
+  están (no se agregan dos fuentes para lo mismo).
 
 ### 6.2 Reglas
 
@@ -139,11 +133,9 @@ encendido**.
 ### 6.3 Funciones
 
 - `alta_autoservicio` / `crear_tenant_con_owner` **(entrega 2, junto con las pantallas)**: después
-  de crear el negocio, escriben `operacion := juego_inicial_de_giro(giro)` y la política de cobro.
-  En la entrega 1 el alta deja todo encendido: si aplicara el juego antes de que alguna pantalla lo
-  obedezca, un negocio nuevo perdería pantallas de golpe al salir la entrega 2. La propina inicial por giro
-  va en la entrega 2: la sucursal se crea después del alta, desde la primera vez, y
-  `sucursal_propinas_config` todavía no baja a la caja, así que fijarla antes no llegaría a ella.
+  de crear el negocio, escriben `operacion := juego_inicial_de_giro(giro)` y nada más: sin política
+  de cobro y sin propina. En la entrega 1 el alta deja todo encendido: si aplicara el juego antes de
+  que alguna pantalla lo obedezca, un negocio nuevo perdería pantallas de golpe al salir la entrega 2.
 - `operacion_cambiar(p_tenant, p_cambios jsonb)`: enciende o apaga módulos aplicando las reglas de
   §6.2. Es todo o nada: si algo no se puede (dependencia faltante, cuentas abiertas), no cambia
   nada y el error dice por qué; si se apagó un dependiente, lo reporta en `ajustes`.
@@ -173,14 +165,15 @@ Por el camino que ya existe: `modulos_efectivos` → `resolver_directivas` → l
 |---|---|
 | Caja, inicio (`pantalla-inicio.tsx`, `home-pos.tsx`) | Solo aparecen los accesos de módulos encendidos: Comedor, Para llevar / Pick-up, Domicilio, Barra |
 | Caja, abrir turno (`abrir-turno.tsx`) | El bloque de evento depende de `eventos`, ya no del giro |
-| Caja, cuenta | Asignar mesero solo con `meseros`; dividir cuenta solo con `comedor` o `cuentas_barra` |
+| Caja, cuenta | Mis propinas solo con `meseros`; Combinar formas de pago se queda para todos (no existe dividir por persona) |
 | Admin, menú lateral (`admin-shell.tsx`) | Se esconden Mesas, Repartidores, Zonas de envío, Marcas y Reservaciones cuando están apagados |
 | Admin, reportes | "Ventas por mesero" solo con `meseros` |
-| Admin, **Configuración → Cómo vende tu negocio** (nueva, solo lectura) | Muestra el giro y qué módulos tiene encendidos, con una línea que explica cada uno. Abajo: "¿Necesitas otro? Escríbenos" con el WhatsApp de soporte. Reemplaza el giro de solo lectura de `configuracion/negocio` |
-| Registro (`apps/admin/app/registro/page.tsx`, `_shared/alta.ts`) | Ofrece los 7 giros con sus nombres; `PLAN_DE_VERTICAL` y `GIRO_ETIQUETA` se actualizan |
-| Primera vez (#47) | Se salta los pasos que no aplican (por ejemplo, alta de mesas sin `comedor`) |
-| Panel de VIM (`apps/platform`), ficha del cliente | Nueva sección **Operación**, junto a Módulos y límites (`modulos-limites.tsx`): los diez interruptores sin importar el giro, con las dependencias a la vista, el aviso de cuentas abiertas cuando algo no se puede apagar y el botón "Cambiar giro" (muestra qué se encenderá y qué se apagará antes de confirmar). El cambio llega a la caja en el siguiente latido |
-| `solicitar-demo` | Acepta los giros nuevos |
+| Admin, **Configuración → Cómo vende tu negocio** (nueva, solo lectura) | Muestra el giro y qué módulos tiene encendidos, con una línea que explica cada uno. Abajo: "¿Necesitas otro? Escríbenos" con el WhatsApp de soporte. Es de solo consulta: cada módulo sale como "En uso" o "Apagado", sin controles, y el botón de WhatsApp es la única acción. Reemplaza el giro de solo lectura de `configuracion/negocio` |
+| Registro (`apps/admin/app/registro/page.tsx`, `_shared/alta.ts`) | Ofrece los 7 giros con sus nombres; `PLAN_DE_VERTICAL` y `GIRO_ETIQUETA` se actualizan. "Cadena" sale de la lista de giros y se cambia por la casilla "Tengo más de una sucursal" |
+| Primera vez (#47) | Sin cambios: no tiene un paso de mesas |
+| Panel de VIM (`apps/platform`), ficha del cliente | Nueva sección **Cómo vende**, junto a Módulos y límites (`modulos-limites.tsx`): los diez interruptores sin importar el giro, con las dependencias a la vista, el aviso de cuentas abiertas cuando algo no se puede apagar y el botón "Cambiar giro" (muestra qué se encenderá y qué se apagará antes de confirmar). Los rechazos de la base (409/400) se traducen a texto llano. El cambio llega a la caja en el siguiente latido |
+| `solicitar-demo` | Acepta los giros nuevos. La migración 0182 ensancha el CHECK de `prospectos.giro` (0084) para aceptar `BAR`, `CAFETERIA` y `TAQUERIA` además de los seis de antes |
+| Admin, "Estaciones de preparación" | No se esconde: las comandas impresas la usan aunque no haya pantalla de cocina |
 
 Las pantallas siguen `docs/diseno/` y `tokens.css`; la página nueva reutiliza los interruptores que
 ya usan Lealtad y Tienda.
