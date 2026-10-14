@@ -194,6 +194,8 @@ export function HomePos({
   // cajero venía de la lista de domicilios, mandarlo al inicio le cuesta dos toques extra
   // para seguir atendiendo la misma lista.
   const [volverA, setVolverA] = useState<Origen>("inicio");
+  /** Ticket abierto que es cuenta de barra: solo para rotularlo «Barra» (el carrito lo ve como comedor). */
+  const [cuentaBarraId, setCuentaBarraId] = useState<string | null>(null);
   const [enDevoluciones, setEnDevoluciones] = useState(false);
   // ADR 0011 — pedidos de apps de delivery: pantalla, badge del inicio y sonido al llegar uno nuevo.
   const [enPedidosApps, setEnPedidosApps] = useState(false);
@@ -877,6 +879,7 @@ export function HomePos({
       ]);
       dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas, envio: recon.envio, clienteCuenta: recon.clienteCuenta } });
       setVolverA(origen);
+      setCuentaBarraId(recon.esBarra ? ticketId : null);
       setTicketBd(bd);
       setItemsPersistidos(items);
       setEnModoMesa(true);
@@ -2438,6 +2441,7 @@ export function HomePos({
         {nombreBarra && (
           <ModalNombreCuenta
             enUso={nombreBarra.enUso}
+            pasar={nombreBarra.ticketId != null}
             onCancelar={() => setNombreBarra(null)}
             // Si lanza (nombre ganado por otra caja, sin red), el modal se queda abierto y lo dice.
             onListo={async (nombre) => {
@@ -2463,6 +2467,9 @@ export function HomePos({
             tenantId={caja.tenant_id}
             sucursalId={caja.sucursal_id}
             onCerrar={() => setPasandoAMesa(null)}
+            textoConfirmar="Pasar a esta mesa"
+            textoCrear="Crearla y pasar la cuenta"
+            ayudaOcupada="Esa mesa está ocupada. Elige otra."
             // Si la mesa se ocupó en el camino, el error de `asignar_mesa_a_ticket` sale en el modal.
             onMesaElegida={async (mesaId) => {
               await moverCuentaAMesa(token, pasandoAMesa, mesaId, `cuenta-${nuevoClientId()}`);
@@ -2696,6 +2703,7 @@ export function HomePos({
           />
         <SidebarTicket
           estado={carrito}
+          modoTexto={ticketBd?.ticketId === cuentaBarraId ? "Barra" : undefined}
           onCantidad={(id, c) => dispatch({ tipo: "cantidad", clientId: id, cantidad: c })}
           onQuitar={(id) => dispatch({ tipo: "quitar", clientId: id })}
           // Cuenta con el ticket impreso: nada que cambie el total hasta reabrirla desde su lista.

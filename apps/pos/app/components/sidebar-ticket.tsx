@@ -54,6 +54,7 @@ export function SidebarTicket({
   onEfectivoExacto,
   cambioAnterior = null,
   titulo,
+  modoTexto,
   accionSecundaria,
   onEnviarCocinaAbierto,
   onPonerEnEspera,
@@ -104,6 +105,8 @@ export function SidebarTicket({
   cambioAnterior?: number | null;
   /** Sustituye el título de la cabecera. Sin esto: "Cuenta <folio>" o "Ticket nuevo". */
   titulo?: string;
+  /** Sustituye la etiqueta del modo (p. ej. "Barra", que el carrito trata como comedor). */
+  modoTexto?: string;
   /** Botón extra bajo la acción principal del pie (p. ej. "Guardar sin mandar"). */
   accionSecundaria?: { etiqueta: string; onClick: () => void; deshabilitado?: boolean };
   /** Pick-up / Domicilio — envía a cocina y deja la cuenta ABIERTA (sin cobrar); se cobra después
@@ -202,7 +205,7 @@ export function SidebarTicket({
               desmarcar, y no es un botón. */}
           <div className="flex items-center justify-between gap-2">
             <span className="inline-flex h-8 min-w-0 items-center rounded-md bg-hover px-2.5 text-14 font-semibold text-ink-2">
-              <span className="truncate">{etiquetaModo(estado.modoServicio)}</span>
+              <span className="truncate">{modoTexto ?? etiquetaModo(estado.modoServicio)}</span>
             </span>
             <span className="flex-shrink-0 text-13 font-semibold text-ink-3">
               {totalProductos} {totalProductos === 1 ? "producto" : "productos"}

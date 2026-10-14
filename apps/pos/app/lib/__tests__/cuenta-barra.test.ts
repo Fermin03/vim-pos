@@ -41,6 +41,20 @@ describe("cuentas de barra por RPC", () => {
     await expect(moverCuentaAMesa("tok", "t", "m", "cl")).rejects.toThrow("boom");
   });
 
+  it("los códigos conocidos se traducen a español", async () => {
+    const { moverCuentaAMesa } = await import("../cuenta-barra");
+    const casos: [string, string][] = [
+      ["CUENTA_CERRADA", "Esta cuenta ya se cobró o se canceló. Actualiza la lista."],
+      ["NO_ES_CUENTA_DE_BARRA", "Esta cuenta ya no está en la barra. Actualiza la lista."],
+      ["NO_ES_CUENTA_DE_MESA", "Esta cuenta ya no está en una mesa. Actualiza la lista."],
+      ["NOMBRE_REQUERIDO", "Escribe un nombre para la cuenta."],
+    ];
+    for (const [codigo, texto] of casos) {
+      rpcMock.mockResolvedValue({ data: null, error: { message: codigo } });
+      await expect(moverCuentaAMesa("tok", "t", "m", "cl")).rejects.toThrow(new Error(texto));
+    }
+  });
+
   it("moverCuentaAMesa y moverCuentaABarra llaman su RPC", async () => {
     rpcMock.mockResolvedValue({ data: null, error: null });
     const { moverCuentaAMesa, moverCuentaABarra } = await import("../cuenta-barra");

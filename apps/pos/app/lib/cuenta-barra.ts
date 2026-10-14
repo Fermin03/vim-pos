@@ -17,9 +17,16 @@ export function nombreLibre(nombre: string, enUso: readonly string[]): string {
   return candidato;
 }
 
+const MENSAJES: Record<string, string> = {
+  CUENTA_CERRADA: "Esta cuenta ya se cobró o se canceló. Actualiza la lista.",
+  NO_ES_CUENTA_DE_BARRA: "Esta cuenta ya no está en la barra. Actualiza la lista.",
+  NO_ES_CUENTA_DE_MESA: "Esta cuenta ya no está en una mesa. Actualiza la lista.",
+  NOMBRE_REQUERIDO: "Escribe un nombre para la cuenta.",
+};
+
 function lanzar(error: { message: string }): never {
   if (error.message.startsWith("NOMBRE_EN_USO")) throw new NombreEnUso(error.message.replace(/^NOMBRE_EN_USO:\s*/, ""));
-  throw new Error(error.message);
+  throw new Error(MENSAJES[error.message] ?? error.message);
 }
 
 export async function abrirCuentaBarra(

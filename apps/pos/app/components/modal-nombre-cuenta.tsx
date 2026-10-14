@@ -24,6 +24,7 @@ export function ModalNombreCuenta({
   onOmitir,
   onCancelar,
   enUso,
+  pasar = false,
 }: {
   /** Puede ser async: mientras corre, el botón espera; si lanza, el error se enseña aquí. */
   onListo: (nombre: string) => void | Promise<void>;
@@ -33,6 +34,8 @@ export function ModalNombreCuenta({
   onCancelar?: () => void;
   /** Barra: nombres de las cuentas abiertas, para proponer uno libre. */
   enUso?: readonly string[];
+  /** Barra: la cuenta ya existe y se está pasando (desde una mesa), no abriendo. */
+  pasar?: boolean;
 }) {
   const [nombre, setNombre] = useState("");
   const [propuesta, setPropuesta] = useState<string | null>(null);
@@ -98,7 +101,7 @@ export function ModalNombreCuenta({
         />
         {propuesta && (
           <p className="mt-3 text-13 font-medium text-ink-2" role="status">
-            Ya hay una cuenta con ese nombre. ¿La abrimos como «{propuesta}»?
+            Ya hay una cuenta con ese nombre. ¿La {pasar ? "pasamos" : "abrimos"} como «{propuesta}»?
           </p>
         )}
         {error && <p className="mt-3 text-13 font-medium text-danger" role="alert">{error}</p>}
@@ -111,7 +114,7 @@ export function ModalNombreCuenta({
             {obligatorio ? "Cancelar" : "Omitir"}
           </button>
           <Button onClick={() => void confirmar()} disabled={enviando || nombre.trim().length === 0}>
-            {enviando ? "Un momento…" : propuesta ? `Abrir como «${propuesta}»` : "Continuar"}
+            {enviando ? "Un momento…" : propuesta ? `${pasar ? "Pasar" : "Abrir"} como «${propuesta}»` : "Continuar"}
           </Button>
         </div>
       </div>
