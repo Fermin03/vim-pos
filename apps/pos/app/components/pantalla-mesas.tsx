@@ -1,5 +1,5 @@
 "use client";
-import { LogoVim } from "@vim/ui/styles";
+import { LogoVim, Icono } from "@vim/ui/styles";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BotonVolver } from "./boton-volver";
 import { type DatosCaja } from "../lib/turno";
@@ -34,7 +34,7 @@ function AlertaCuenta({ m }: { m: MesaVista }) {
         : { bg: "rgb(var(--warning-soft))", text: "rgb(var(--warning))", msg: `Sin pedidos nuevos hace ${m.minutosSinMovimiento} min` };
   return (
     <div className="mt-1.5 flex w-full items-center gap-1.5 rounded px-2 py-1 text-11 font-bold leading-tight" style={{ background: cfg.bg, color: cfg.text }}>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" className="h-3 w-3 flex-shrink-0"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg>
+      <Icono nombre="alerta" className="h-3 w-3 flex-shrink-0" strokeWidth={2.5} />
       {cfg.msg}
     </div>
   );
@@ -116,10 +116,7 @@ export function PantallaMesas({
             onClick={onVerReservaciones}
             className="flex h-10 items-center gap-2 rounded border border-line-strong bg-surface px-3.5 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-4 w-4">
-              <rect x="3" y="4" width="18" height="17" rx="2" />
-              <path d="M3 10h18M8 2v4M16 2v4" />
-            </svg>
+            <Icono nombre="calendario" className="h-4 w-4" />
             Reservaciones
           </button>
         )}
@@ -144,7 +141,7 @@ export function PantallaMesas({
         {mesas === null && <p className="text-center text-ink-3">Cargando mesas…</p>}
         {mesas !== null && mesas.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-ink-3">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-12 w-12"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 3v18" /></svg>
+            <Icono nombre="plano" className="h-12 w-12" />
             <p className="text-18 font-semibold text-ink-2">No hay mesas configuradas</p>
             <p className="text-13">El dueño las da de alta en el admin: Configuración → Mesas.</p>
           </div>

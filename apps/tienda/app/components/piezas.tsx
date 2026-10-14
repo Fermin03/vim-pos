@@ -1,5 +1,5 @@
 // Las piezas chicas que comparten el menú, la hoja de producto y el carrito.
-import { cn } from "@vim/ui/styles";
+import { cn, Icono } from "@vim/ui/styles";
 
 /**
  * La acción principal de la pantalla, del color del negocio. No es el `Button` de @vim/ui porque ese
@@ -36,17 +36,12 @@ export function Fallo({ titulo, hacer, reintentar }: { titulo: string; hacer: st
   );
 }
 
-const trazo = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
-export const IconoCerrar = () => <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true" {...trazo}><path d="M6 6l12 12M18 6L6 18" /></svg>;
-const IconoMenos = () => <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true" {...trazo}><path d="M5 12h14" /></svg>;
-export const IconoMas = () => <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true" {...trazo}><path d="M12 5v14M5 12h14" /></svg>;
+export const IconoCerrar = () => <Icono nombre="cerrar" className="h-5 w-5" />;
+const IconoMenos = () => <Icono nombre="menos" className="h-5 w-5" />;
+export const IconoMas = () => <Icono nombre="mas" className="h-5 w-5" />;
 /** La flecha de lo que se despliega; quien la usa la gira al abrir. */
-export const IconoAbajo = ({ className }: { className?: string }) => <svg viewBox="0 0 24 24" className={cn("h-4 w-4", className)} aria-hidden="true" {...trazo}><path d="M6 9l6 6 6-6" /></svg>;
-const IconoQuitar = () => (
-  <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true" {...trazo}>
-    <path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12M9 7V4h6v3" />
-  </svg>
-);
+export const IconoAbajo = ({ className }: { className?: string }) => <Icono nombre="chevron-abajo" className={cn("h-4 w-4", className)} />;
+const IconoQuitar = () => <Icono nombre="eliminar" className="h-5 w-5" />;
 
 /**
  * El hueco de un texto que todavía no llega: una barra del color de las líneas, sin movimiento (como

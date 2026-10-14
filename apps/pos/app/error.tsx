@@ -1,3 +1,4 @@
+import { Icono } from "@vim/ui/styles";
 "use client";
 import { useEffect } from "react";
 import { PantallaEstado } from "./components/pantalla-estado";
@@ -24,7 +25,7 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
       acciones={
         <>
           <button type="button" onClick={reset} className={btnAccent}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
+            <Icono nombre="actualizar" className="h-4 w-4" />
             Reintentar
           </button>
           <a href="mailto:soporte@vimpos.com.mx" className={btnGhost}>Reportar a soporte</a>

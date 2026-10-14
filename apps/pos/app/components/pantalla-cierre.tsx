@@ -1,7 +1,7 @@
 "use client";
 import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@vim/ui/styles";
+import { Button, Icono } from "@vim/ui/styles";
 import { employeeClient, listarEmpleados, type Empleado } from "../lib/supabase";
 import { fmtMxn, registrarComisionEvento, type DatosCaja, type Turno } from "../lib/turno";
 import { notificarEventoCritico } from "../lib/push-eventos";
@@ -386,7 +386,7 @@ export function PantallaCierre({
       <div className="flex h-14 flex-shrink-0 items-center justify-between border-b border-line bg-surface px-6">
         <div className="flex items-center gap-3">
           <button type="button" onClick={onCancelar} className="flex h-9 w-9 items-center justify-center rounded border border-line-strong text-ink-2 hover:border-ink hover:text-ink">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><polyline points="15 18 9 12 15 6" /></svg>
+            <Icono nombre="chevron-izquierda" className="h-4 w-4" />
           </button>
           <h1 className="font-display text-18 font-semibold tracking-tight">{paso === "resultado" ? "Resultado del corte" : "Arqueo / Cierre de turno"}</h1>
         </div>
@@ -474,7 +474,7 @@ export function PantallaCierre({
               {ticketsAbiertos > 0 && (
                 <div className="mb-3 rounded-lg border border-danger/30 bg-danger/5 px-3.5 py-3" role="alert">
                   <div className="flex items-start gap-2.5">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="mt-px h-[18px] w-[18px] flex-shrink-0 text-danger"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg>
+                    <Icono nombre="alerta" className="mt-px h-[18px] w-[18px] flex-shrink-0 text-danger" />
                     <div className="text-13 leading-snug">
                       <span className="font-semibold text-danger">{ticketsAbiertos} {ticketsAbiertos === 1 ? "cuenta abierta" : "cuentas abiertas"} sin cobrar.</span>
                       <span className="text-ink-2"> Cóbralas o cancélalas antes de cerrar el turno; si no, quedarían sin registrar y la mesa trabada.</span>
@@ -536,7 +536,7 @@ export function PantallaCierre({
           <div className="w-full max-w-[560px] rounded-lg border border-line bg-surface p-6">
             <div className="mb-4 text-center">
               <div className={["mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full", corte.diferenciaTotal === 0 ? "bg-success/10 text-success" : "bg-warning/10 text-warning"].join(" ")}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" className="h-6 w-6"><path d="M20 6 9 17l-5-5" /></svg>
+                <Icono nombre="palomita" className="h-6 w-6" />
               </div>
               <h2 className="font-display text-20 font-semibold">Corte generado</h2>
             </div>

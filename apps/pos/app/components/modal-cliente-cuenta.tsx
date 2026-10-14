@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Button, Modal } from "@vim/ui/styles";
+import { Button, Modal, Icono } from "@vim/ui/styles";
 import {
   TelefonoDuplicado, buscarClientesCuenta, registrarClienteCuenta, validarRegistro,
   type ClienteCuenta, type DatosRegistro,
@@ -17,17 +17,13 @@ const REGISTRO_VACIO: DatosRegistro = { nombre: "", apellido: "", telefono: "", 
 /** Persona con "+": asignar cliente. Con cliente ya asignado se usa la palomita (`IconoClienteAsignado`). */
 export function IconoAsignarCliente({ className = "h-4 w-4" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
-      <circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="M19 8v6M16 11h6" />
-    </svg>
+    <Icono nombre="persona-mas" className={className} />
   );
 }
 
 export function IconoClienteAsignado({ className = "h-4 w-4" }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
-      <circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="m16 11 2 2 4-4" />
-    </svg>
+    <Icono nombre="persona-ok" className={className} />
   );
 }
 

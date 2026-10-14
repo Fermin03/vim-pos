@@ -1,6 +1,6 @@
 "use client";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { LogoVim } from "@vim/ui/styles";
+import { LogoVim, Icono } from "@vim/ui/styles";
 import { imagenesTrasLeer, imagenesTrasProbar, leerAnuncios, LISTA_VACIA, listaTrasLeer, puedeLeerAnuncios, seEnsenanAnuncios, type EstadoImagenes, type ListaAnuncios } from "../lib/pantalla-cliente/anuncios";
 import { abrirCanal, crearReceptor } from "../lib/pantalla-cliente/canal";
 import { tamanoCifra, tamanoNombre } from "../lib/pantalla-cliente/medidas";
@@ -213,9 +213,7 @@ function Pagado({ cambio }: { cambio: number }) {
       {/* La misma palomita del "Cobro completado" de la caja. Sin ella, cobro y pagado son el mismo
           dibujo —un letrero y una cifra— y de lejos «lo que debe» se confunde con «su cambio». */}
       <span className="flex h-[14vmin] w-[14vmin] items-center justify-center rounded-full bg-success-soft text-success">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="h-[7vmin] w-[7vmin]" aria-hidden="true">
-          <path d="M20 6 9 17l-5-5" />
-        </svg>
+        <Icono nombre="palomita" className="h-[7vmin] w-[7vmin]" />
       </span>
       {/* Con cambio manda la cifra; sin cambio no hay cifra y el agradecimiento ocupa su lugar. */}
       <h1 className={`mt-[3vmin] font-display font-semibold leading-tight tracking-[-0.02em] ${hayCambio ? "text-[7vmin]" : "text-[12vmin]"}`}>

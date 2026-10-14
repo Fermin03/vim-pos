@@ -1,5 +1,5 @@
 "use client";
-import { LogoVim } from "@vim/ui/styles";
+import { LogoVim, Icono, type NombreIcono } from "@vim/ui/styles";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -29,44 +29,31 @@ export const useAccesoTenant = () => useContext(AccesoCtx);
 const ModulosCtx = createContext<ModulosLeidos | "error" | null>(null);
 export const useModulos = () => useContext(ModulosCtx);
 
-type Item = { label: string; href: string; icon: ReactNode };
+type Item = { label: string; href: string; icon: NombreIcono };
 type Seccion = { titulo: string; items: Item[] };
-
-const I = {
-  panel: (
-    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>
-  ),
-  catalogo: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><path d="M3 7h18M3 12h18M3 17h18" /></svg>,
-  inventario: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><path d="M20 7l-8-4-8 4 8 4 8-4zM4 7v10l8 4 8-4V7" /></svg>,
-  clientes: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><circle cx="12" cy="8" r="4" /><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" /></svg>,
-  tienda: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><path d="M5 8h14l-1 12H6L5 8z" /><path d="M9 8V6a3 3 0 0 1 6 0v2" /></svg>,
-  usuarios: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20v-1a5 5 0 0 1 5-5h3a5 5 0 0 1 5 5v1" /></svg>,
-  config: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.5-2.4 1a7 7 0 0 0-1.7-1L16.5 3h-4l-.4 2.5a7 7 0 0 0-1.7 1l-2.4-1-2 3.5L5.1 11a7 7 0 0 0 0 2l-2 1.5 2 3.5 2.4-1a7 7 0 0 0 1.7 1l.4 2.5h4l.4-2.5a7 7 0 0 0 1.7-1l2.4 1 2-3.5-2-1.5a7 7 0 0 0 .1-1z" /></svg>,
-  reportes: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><path d="M3 3v18h18" /><path d="M7 16l4-5 3 3 5-7" /></svg>,
-};
 
 const NAV: Seccion[] = [
   {
     titulo: "Operación",
     items: [
-      { label: "Panel", href: "/dashboard", icon: I.panel },
-      { label: "Catálogo", href: "/catalogo", icon: I.catalogo },
-      { label: "Promociones", href: "/promociones", icon: I.catalogo },
-      { label: "Inventario", href: "/inventario", icon: I.inventario },
-      { label: "Clientes", href: "/clientes", icon: I.clientes },
-      { label: "Lealtad", href: "/lealtad", icon: I.clientes },
-      { label: "Tienda en línea", href: "/tienda", icon: I.tienda },
-      { label: "Reservaciones", href: "/reservaciones", icon: I.clientes },
-      { label: "Conciliación apps", href: "/conciliacion", icon: I.reportes },
+      { label: "Panel", href: "/dashboard", icon: "panel" },
+      { label: "Catálogo", href: "/catalogo", icon: "catalogo" },
+      { label: "Promociones", href: "/promociones", icon: "etiqueta" },
+      { label: "Inventario", href: "/inventario", icon: "caja" },
+      { label: "Clientes", href: "/clientes", icon: "persona" },
+      { label: "Lealtad", href: "/lealtad", icon: "estrella" },
+      { label: "Tienda en línea", href: "/tienda", icon: "bolsa" },
+      { label: "Reservaciones", href: "/reservaciones", icon: "calendario" },
+      { label: "Conciliación apps", href: "/conciliacion", icon: "transferencia" },
     ],
   },
   {
     titulo: "Administración",
     items: [
-      { label: "Usuarios", href: "/usuarios", icon: I.usuarios },
-      { label: "Facturación", href: "/facturacion", icon: I.reportes },
-      { label: "Configuración", href: "/configuracion", icon: I.config },
-      { label: "Reportes", href: "/reportes", icon: I.reportes },
+      { label: "Usuarios", href: "/usuarios", icon: "persona" },
+      { label: "Facturación", href: "/facturacion", icon: "recibo" },
+      { label: "Configuración", href: "/configuracion", icon: "engrane" },
+      { label: "Reportes", href: "/reportes", icon: "grafica" },
     ],
   },
 ];
@@ -76,9 +63,7 @@ function SinAcceso({ rol }: { rol: string }) {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-warning-soft text-warning">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true">
-          <rect x="4" y="11" width="16" height="9" rx="1.5" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
-        </svg>
+        <Icono nombre="candado" className="h-6 w-6" />
       </div>
       <h1 className="font-display text-20 font-semibold tracking-tight">Esta sección no está disponible para ti</h1>
       <p className="max-w-sm text-14 leading-snug text-ink-2">
@@ -178,7 +163,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     return (
       <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 px-6 py-10 text-center">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-warning-soft text-warning">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
+          <Icono nombre="info" className="h-6 w-6" />
         </div>
         <h1 className="font-display text-24 font-semibold tracking-tight">Tu cuenta no terminó de crearse</h1>
         <p className="max-w-md text-14 leading-relaxed text-ink-3">
@@ -205,7 +190,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     return (
       <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 px-6 py-10 text-center">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-warning-soft text-warning">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6"><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
+          <Icono nombre="info" className="h-6 w-6" />
         </div>
         <h1 className="font-display text-24 font-semibold tracking-tight">Tu correo no tiene acceso todavía</h1>
         <p className="max-w-md text-14 leading-relaxed text-ink-3">
@@ -244,9 +229,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     return (
       <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 px-6 py-10 text-center">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-warning-soft text-warning">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true">
-            <rect x="4" y="11" width="16" height="9" rx="1.5" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
-          </svg>
+          <Icono nombre="candado" className="h-6 w-6" />
         </div>
         <h1 className="font-display text-24 font-semibold tracking-tight">Este panel es para la administración</h1>
         <p className="max-w-md text-14 leading-relaxed text-ink-3">
@@ -308,13 +291,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
               onClick={() => setMenuAbierto(false)}
               className="-mr-2 ml-auto flex h-11 w-11 items-center justify-center rounded text-[#76767E] transition-colors hover:text-white lg:hidden"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5"><path d="M18 6L6 18M6 6l12 12" /></svg>
+              <Icono nombre="cerrar" className="h-5 w-5" />
             </button>
           </div>
 
           <div className="mx-3 mb-2 mt-4 flex items-center gap-2.5 rounded border border-[#2C2C32] bg-[#1E1E23] px-3 py-2.5">
             <div className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-md bg-[#2A2A30]">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-3" /></svg>
+              <Icono nombre="edificio" className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-14 font-semibold text-white">{sucursales?.nombre ?? "—"}</div>
@@ -347,7 +330,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
                             : "text-[#C8C8CC] hover:bg-[#1E1E23] hover:text-white",
                         ].join(" ")}
                       >
-                        {it.icon}
+                        <Icono nombre={it.icon} />
                         {it.label}
                         {sinInventario && rutaEsDeInventario(it.href) && (
                           <span className={["ml-auto rounded-full border px-1.5 py-px text-11 font-semibold", active ? "border-line-strong text-ink-2" : "border-[#3A3A42] text-[#9A9AA2]"].join(" ")}>
@@ -371,9 +354,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
               rel="noopener noreferrer"
               className="mx-3 mb-3 flex min-h-[44px] items-center gap-[11px] rounded border border-[#2C2C32] px-3 py-2 text-sm font-medium text-[#C8C8CC] transition-colors hover:bg-[#1E1E23] hover:text-white lg:min-h-0"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[18px] w-[18px] flex-shrink-0" aria-hidden="true">
-                <path d="M20 11.5a8 8 0 0 1-11.8 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5z" />
-              </svg>
+              <Icono nombre="chat" className="h-[18px] w-[18px] flex-shrink-0" />
               <span className="min-w-0">
                 <span className="block">Ayuda por WhatsApp</span>
                 {horarioAyuda && <span className="block text-12 font-normal text-[#76767E]">{horarioAyuda}</span>}
@@ -398,7 +379,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
               }}
               className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded text-[#76767E] transition-colors hover:text-white lg:h-auto lg:w-auto"
             >
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
+              <Icono nombre="salir" width="17" height="17" />
             </button>
           </div>
         </aside>
@@ -415,7 +396,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
               onClick={() => setMenuAbierto(true)}
               className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded text-white transition-colors hover:bg-[#1E1E23]"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[22px] w-[22px]"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
+              <Icono nombre="menu" className="h-[22px] w-[22px]" />
             </button>
             <LogoVim className="h-7 w-7 flex-shrink-0" />
             <div className="min-w-0 flex-1">

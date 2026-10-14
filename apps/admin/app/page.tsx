@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Button, LogoVim } from "@vim/ui/styles";
+import { Button, LogoVim, Icono } from "@vim/ui/styles";
 import { entrar, entrarConProveedor, leerSesion } from "./lib/supabase";
 import { mensajeError } from "./lib/errores";
 import { ReenviarConfirmacion } from "./components/reenviar-confirmacion";
@@ -118,16 +118,9 @@ export default function LoginPage() {
                 className="absolute right-1.5 top-1/2 flex h-[34px] w-[34px] -translate-y-1/2 items-center justify-center rounded-sm text-ink-3 transition-colors hover:bg-hover hover:text-ink-2"
               >
                 {verPass ? (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-[19px] w-[19px]">
-                    <path d="M9.9 5.1A9.5 9.5 0 0 1 12 5c6.5 0 10 7 10 7a16 16 0 0 1-3.2 4M6.6 6.6A16 16 0 0 0 2 12s3.5 7 10 7a9.5 9.5 0 0 0 3.4-.6" />
-                    <path d="m9.9 9.9a3 3 0 0 0 4.2 4.2" />
-                    <path d="M3 3l18 18" />
-                  </svg>
+                  <Icono nombre="ojo-tachado" className="h-[19px] w-[19px]" />
                 ) : (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-[19px] w-[19px]">
-                    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
+                  <Icono nombre="ojo" className="h-[19px] w-[19px]" />
                 )}
               </button>
             </div>
@@ -144,11 +137,7 @@ export default function LoginPage() {
               role="alert"
               className="mb-5 flex items-start gap-2.5 rounded border border-line border-l-[3px] border-l-danger bg-surface px-[13px] py-[11px] text-14 text-ink-2"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="mt-px h-[17px] w-[17px] flex-shrink-0 text-danger">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M12 8v4" />
-                <path d="M12 16h.01" />
-              </svg>
+              <Icono nombre="info" className="mt-px h-[17px] w-[17px] flex-shrink-0 text-danger" />
               <span>{alerta}</span>
             </div>
           )}

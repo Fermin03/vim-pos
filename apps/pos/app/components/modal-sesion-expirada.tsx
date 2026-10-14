@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Button, Modal, PinKeypad } from "@vim/ui/styles";
+import { Button, Modal, PinKeypad, Icono } from "@vim/ui/styles";
 import { pinLogin, type Empleado, type PinLoginResult } from "../lib/supabase";
 import { PosSkeletonBg } from "./pos-skeleton-bg";
 import { ROL_LABEL } from "./selector-empleados";
@@ -70,10 +70,7 @@ export function ModalSesionExpirada({
         className="w-[360px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
       >
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-line bg-hover">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-ink-2">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 7v5l3 2" />
-          </svg>
+          <Icono nombre="reloj" className="h-6 w-6 text-ink-2" />
         </div>
 
         <div className="mb-5 text-center">
@@ -100,9 +97,7 @@ export function ModalSesionExpirada({
         />
 
         <div className="my-4 flex items-start gap-2 rounded border border-line bg-hover px-3 py-2.5 text-13 leading-snug text-ink-2">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-px h-[15px] w-[15px] flex-shrink-0 text-success">
-            <path d="M20 6 9 17l-5-5" />
-          </svg>
+          <Icono nombre="palomita" className="mt-px h-[15px] w-[15px] flex-shrink-0 text-success" />
           Tu trabajo no se perdió: sigue justo donde lo dejaste.
         </div>
 

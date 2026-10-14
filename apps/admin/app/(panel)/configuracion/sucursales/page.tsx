@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, DialogoPeligro } from "@vim/ui/styles";
+import { Button, DialogoPeligro, Icono } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { ModalSucursal } from "../../../components/modal-sucursal";
 import { eliminarSucursal, listarSucursales, type Sucursal } from "../../../lib/configuracion";
@@ -47,9 +47,7 @@ export default function SucursalesPage() {
         migas={[{ label: "Configuración" }, { label: "Sucursales" }]}
         right={
           <Button onClick={() => setModal({ sucursal: null })}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-[17px] w-[17px]">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
+            <Icono nombre="mas" className="h-[17px] w-[17px]" />
             Nueva sucursal
           </Button>
         }
@@ -107,10 +105,10 @@ export default function SucursalesPage() {
                     <td className="px-4 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                       <span className="inline-flex gap-1">
                         <button type="button" title="Editar" onClick={() => setModal({ sucursal: s })} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                          <Icono nombre="editar" className="h-4 w-4" />
                         </button>
                         <button type="button" title="Eliminar" onClick={() => setBorrar(s)} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-danger-line hover:text-danger">
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
+                          <Icono nombre="eliminar" className="h-4 w-4" />
                         </button>
                       </span>
                     </td>

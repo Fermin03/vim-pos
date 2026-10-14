@@ -1,5 +1,5 @@
 "use client";
-import { LogoVim } from "@vim/ui/styles";
+import { LogoVim, Icono } from "@vim/ui/styles";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BotonVolver } from "./boton-volver";
 import { capaVisible } from "../lib/escape";
@@ -165,10 +165,7 @@ export function PantallaReservaciones({
 
         {lista !== null && lista.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-ink-3">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-12 w-12">
-              <rect x="3" y="4" width="18" height="17" rx="2" />
-              <path d="M3 10h18M8 2v4M16 2v4" />
-            </svg>
+            <Icono nombre="calendario" className="h-12 w-12" />
             <p className="text-18 font-semibold text-ink-2">Sin reservaciones este día</p>
             <p className="text-13">Con «Nueva reservación» la agendas en el momento, por teléfono o en la puerta.</p>
           </div>

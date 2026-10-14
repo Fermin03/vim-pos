@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { Button, LogoVim } from "@vim/ui/styles";
+import { Button, LogoVim, Icono } from "@vim/ui/styles";
 import { enviarEnlaceRecuperacion } from "../lib/supabase";
 import { mensajeError } from "../lib/errores";
 
@@ -98,10 +98,7 @@ export default function RecuperarPage() {
         ) : (
           <div className="text-center">
             <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-full bg-success-soft text-success">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6">
-                <rect x="2" y="4" width="20" height="16" rx="2" />
-                <path d="m2 7 10 6 10-6" />
-              </svg>
+              <Icono nombre="sobre" className="h-6 w-6" />
             </div>
             <h1 className="mb-1.5 font-display text-28 font-semibold tracking-tight">Revisa tu correo</h1>
             <p className="text-sm leading-relaxed text-ink-2">

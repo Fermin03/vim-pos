@@ -108,12 +108,3 @@ export function colorCategoria(cat: Categoria, idx: number): { bg: string; ink: 
   const k = ORDEN_FALLBACK[idx % ORDEN_FALLBACK.length]!;
   return PALETA_FALLBACK[k]!;
 }
-
-export const ICONOS_POS: Record<string, string> = {
-  star: "M12 2l2.9 6.3 6.6.7-4.9 4.5 1.4 6.5L12 17.3 5.9 20.5 7.3 14 2.4 9.5l6.6-.7z",
-  burger: "M4 11h16M4 11a8 8 0 0 1 16 0M5 15h14a2 2 0 0 1 0 4H5a2 2 0 0 1 0-4z",
-  fries: "M6 9l1.5 11h9L18 9M6 9h12M9 9V4M12 9V3M15 9V5",
-  cup: "M6 8h12l-1 12a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 8zM8 8V5a4 4 0 0 1 8 0v3",
-  cake: "M4 21h16M5 21v-7a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v7M12 8V4M9 6h6",
-  tag: "M3 7v5l9 9 5-5-9-9H3zM7 7h.01",
-};

@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Button, Modal } from "@vim/ui/styles";
+import { Button, Modal, Icono } from "@vim/ui/styles";
 import { cambiarPinPropio } from "../lib/supabase";
 
 const input = "h-12 w-full rounded border border-line-strong px-3 text-center font-mono text-lg tracking-[0.4em] outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
@@ -48,7 +48,7 @@ export function ModalCambiarPin({ token, onListo, onCerrar }: { token: string; o
       {ok ? (
         <div className="flex flex-col items-center gap-2 py-6 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-success-soft text-success">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-6 w-6"><path d="M20 6 9 17l-5-5" /></svg>
+            <Icono nombre="palomita" className="h-6 w-6" />
           </div>
           <p className="text-14 font-semibold">PIN actualizado</p>
         </div>

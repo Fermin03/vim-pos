@@ -1,3 +1,4 @@
+import { Icono } from "@vim/ui/styles";
 "use client";
 import { useState } from "react";
 import type { EstadoCarrito, LineaCarrito } from "../lib/carrito";
@@ -12,18 +13,7 @@ import { RenglonItem } from "./renglon-item";
 /* ── Íconos SVG inline (del mockup P-066) ────────────────────── */
 function IconoTicket() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-[46px] w-[46px] text-line-strong"
-    >
-      <path d="M4 4h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" />
-      <path d="M8 4v14M16 4v14" />
-    </svg>
+    <Icono nombre="recibo" className="h-[46px] w-[46px] text-line-strong" />
   );
 }
 
@@ -234,7 +224,7 @@ export function SidebarTicket({
               onClick={() => onEditarCliente?.()}
               className="mt-2 flex w-full items-start gap-2 rounded-md border border-line-strong bg-sel px-3 py-2 text-left transition hover:border-ink disabled:opacity-60"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mt-0.5 h-4 w-4 flex-shrink-0 text-ink-3"><path d="M12 2a8 8 0 0 0-8 8c0 5.5 8 12 8 12s8-6.5 8-12a8 8 0 0 0-8-8z" /><circle cx="12" cy="10" r="3" /></svg>
+              <Icono nombre="pin" className="mt-0.5 h-4 w-4 flex-shrink-0 text-ink-3" />
               {estado.clienteDomicilio ? (
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-13 font-semibold">{estado.clienteDomicilio.nombre || "Cliente"}</span>
@@ -535,7 +525,7 @@ export function SidebarTicket({
               className={BOTON_PRINCIPAL}
             >
               {procesando ? "Enviando…" : (
-                <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M3 11l19-9-9 19-2-8-8-2z" /></svg> Enviar a cocina</>
+                <><Icono nombre="enviar" className="h-5 w-5" /> Enviar a cocina</>
               )}
             </button>
             {accionSecundaria && (

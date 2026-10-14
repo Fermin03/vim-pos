@@ -10,7 +10,7 @@ import { leerEstadoOnboarding, type EstadoOnboarding } from "../../lib/onboardin
 import { mensajeError } from "../../lib/errores";
 import { leerPrueba } from "../../lib/plan";
 import { AvisoPrueba } from "../../components/aviso-prueba";
-import { Aviso } from "@vim/ui/styles";
+import { Aviso, Icono } from "@vim/ui/styles";
 import { AvisosFacturacion } from "../../components/avisos-facturacion";
 import { useAvisoCerrado } from "../../components/aviso-cerrado";
 import { SelectorSucursal, useSucursalReporte } from "../../components/selector-sucursal";
@@ -47,9 +47,7 @@ function Delta({ pct, comparativo, sobreOscuro }: { pct: number | null; comparat
   return (
     <>
       <span className={`inline-flex items-center gap-[3px] rounded-full px-[7px] py-0.5 text-13 font-bold ${claseChip}`}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="h-3 w-3">
-          {sube ? <path d="M7 17L17 7M17 7H8M17 7v9" /> : <path d="M7 7l10 10M17 17H8M17 17V8" />}
-        </svg>
+        <Icono nombre={sube ? "tendencia-alza" : "tendencia-baja"} className="h-3 w-3" strokeWidth={2.5} />
         {Math.abs(pct)}%
       </span>
       {comparativo && <span className={claseComparativo}>{comparativo}</span>}
@@ -87,10 +85,10 @@ function Kpi({
 }
 
 const ICONOS = {
-  ventas: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>,
-  tickets: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z" /><path d="M8 8h8M8 12h8" /></svg>,
-  promedio: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M3 3v18h18" /><path d="M7 14l3-3 3 3 4-5" /></svg>,
-  propinas: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><circle cx="12" cy="12" r="9" /><path d="M12 7v10M9.5 9.5h4a1.8 1.8 0 0 1 0 3.5h-3a1.8 1.8 0 0 0 0 3.5h4.5" /></svg>,
+  ventas: <Icono nombre="pesos" className="h-4 w-4" />,
+  tickets: <Icono nombre="recibo" className="h-4 w-4" />,
+  promedio: <Icono nombre="grafica" className="h-4 w-4" />,
+  propinas: <Icono nombre="moneda" className="h-4 w-4" />,
 };
 
 /**
@@ -210,11 +208,11 @@ function FranjaCaja({ caja, cancelados, descuentos, lealtad, devoluciones }: {
       <div className="flex min-w-0 flex-1 items-center gap-3.5">
         <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${estilo.icono}`} aria-hidden="true">
           {tono === "ok" ? (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M20 6 9 17l-5-5" /></svg>
+            <Icono nombre="palomita" className="h-5 w-5" />
           ) : tono === "neutro" ? (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M3 11h18M8 3h8v4H8z" /></svg>
+            <Icono nombre="cajon" className="h-5 w-5" />
           ) : (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M12 8v5M12 16.5v.5" /><circle cx="12" cy="12" r="9" /></svg>
+            <Icono nombre="info" className="h-5 w-5" />
           )}
         </span>
         <div className="min-w-0">
@@ -362,7 +360,7 @@ export default function DashboardPage() {
           <div className="flex flex-wrap items-center gap-2">
             <SelectorSucursal sucursal={suc} />
             <label className="inline-flex items-center gap-2 rounded border border-line-strong bg-surface px-3 py-[7px] text-13 font-semibold focus-within:border-ink focus-within:shadow-[0_0_0_3px_rgba(22,22,26,.06)]">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[15px] w-[15px] flex-shrink-0 text-ink-3" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></svg>
+              <Icono nombre="calendario" className="h-[15px] w-[15px] flex-shrink-0 text-ink-3" />
               <span className="sr-only">Día que se muestra</span>
               <input
                 type="date"
@@ -394,7 +392,7 @@ export default function DashboardPage() {
                   title="Actualizar ahora"
                   className="flex h-9 w-9 items-center justify-center rounded border border-line-strong text-ink-2 transition-[transform,color,border-color] duration-150 ease-vim hover:border-ink hover:text-ink active:scale-[.95] disabled:opacity-50"
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`h-4 w-4 ${refrescando ? "animate-spin" : ""}`} aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 4v5h-5" /></svg>
+                  <Icono nombre="actualizar" className={`h-4 w-4 ${refrescando ? "animate-spin" : ""}`} />
                 </button>
               </span>
             ) : data ? (
@@ -424,7 +422,7 @@ export default function DashboardPage() {
         {mostrarOnboarding && onb && (
           <Link href="/bienvenida" className="mb-6 flex items-center gap-4 rounded-lg border border-warning-line bg-warning-soft p-4 transition hover:border-accent">
             <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-accent text-white">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-5 w-5"><path d="M5 12h14M13 5l7 7-7 7" /></svg>
+              <Icono nombre="flecha-derecha" className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-15 font-semibold">{onb.listoParaVender ? "Ya puedes vender" : "Termina de configurar tu negocio"}</div>
@@ -580,7 +578,7 @@ export default function DashboardPage() {
           {REPORTES_RAPIDOS.map((a) => (
             <Link key={a.href} href={a.href} className="group rounded-lg border border-line bg-surface p-4 transition-colors hover:border-ink hover:bg-sel">
               <div className="mb-2.5 flex h-9 w-9 items-center justify-center rounded bg-hover text-ink-2 transition-colors group-hover:bg-surface group-hover:text-ink">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[18px] w-[18px]"><path d="M3 3v18h18" /><path d="M7 14l3-3 3 3 4-5" /></svg>
+                <Icono nombre="grafica" className="h-[18px] w-[18px]" />
               </div>
               <div className="text-14 font-semibold">{a.nombre}</div>
               <div className="mt-0.5 text-13 leading-snug text-ink-2">{a.desc}</div>

@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, useConfirmar } from "@vim/ui/styles";
+import { Button, useConfirmar, Icono } from "@vim/ui/styles";
 import { fechaLegible } from "@vim/fecha";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import {
@@ -64,7 +64,7 @@ function Paso({
           aria-hidden="true"
         >
           {hecho ? (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M20 6 9 17l-5-5" /></svg>
+            <Icono nombre="palomita" className="h-4 w-4" />
           ) : numero}
         </span>
         <div className="min-w-0 flex-1">
@@ -324,7 +324,7 @@ export default function FacturacionPage() {
                 aria-hidden="true"
               >
                 {estado.lista ? (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M20 6 9 17l-5-5" /></svg>
+                  <Icono nombre="palomita" className="h-5 w-5" />
                 ) : (
                   <span className="font-display text-16 font-bold">{estado.faltan.length}</span>
                 )}

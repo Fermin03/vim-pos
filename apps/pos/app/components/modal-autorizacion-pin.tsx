@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Button, Modal, PinKeypad } from "@vim/ui/styles";
+import { Button, Modal, PinKeypad, Icono } from "@vim/ui/styles";
 import { autorizarConPin, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
 
 /**
@@ -73,10 +73,7 @@ export function ModalAutorizacionPin({
       className="w-[380px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
     >
       <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-line bg-hover">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6 text-ink-2">
-          <rect x="4" y="11" width="16" height="9" rx="1.5" />
-          <path d="M8 11V7a4 4 0 0 1 8 0v4" />
-        </svg>
+        <Icono nombre="candado" className="h-6 w-6 text-ink-2" />
       </div>
 
       <div className="mb-4 text-center">
@@ -90,7 +87,7 @@ export function ModalAutorizacionPin({
       {status === "ok" ? (
         <div className="my-6 flex flex-col items-center gap-2 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-success/10 text-success">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" className="h-6 w-6"><path d="M20 6 9 17l-5-5" /></svg>
+            <Icono nombre="palomita" className="h-6 w-6" />
           </div>
           <p className="font-display text-base font-semibold text-success">Autorizado</p>
           <p className="text-13 text-ink-3">La operación se ejecutará.</p>

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { cn } from "@vim/ui/styles";
+import { cn, Icono } from "@vim/ui/styles";
 import { Interruptor } from "./interruptor";
 import { Tarjeta } from "./tarjeta";
 import { LineaMensaje } from "./tienda-mensaje";
@@ -199,10 +199,7 @@ function Categoria({
           onClick={() => onAlternar(c.id)}
           className="-my-2 flex h-11 w-11 flex-shrink-0 items-center justify-center rounded text-ink-2 transition-colors hover:text-ink active:scale-[.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink"
         >
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-            className={cn("transition-transform duration-150 ease-vim motion-reduce:transition-none", abierta && "rotate-180")}>
-            <path d="M6 9l6 6 6-6" />
-          </svg>
+          <Icono nombre="chevron-abajo" width="20" height="20" className={cn("transition-transform duration-150 ease-vim motion-reduce:transition-none", abierta && "rotate-180")} />
         </button>
       </div>
 

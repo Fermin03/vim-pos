@@ -1,3 +1,4 @@
+import { Icono } from "@vim/ui/styles";
 "use client";
 /**
  * De qué sucursal son las cifras del panel y de los reportes.
@@ -110,9 +111,7 @@ export function SelectorSucursal({ sucursal, className = "" }: { sucursal: Sucur
   return (
     <label className={`inline-flex min-w-0 items-center gap-2 ${className}`}>
       <span className="sr-only">Sucursal</span>
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 flex-shrink-0 text-ink-3" aria-hidden="true">
-        <path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6" />
-      </svg>
+      <Icono nombre="casa" className="h-4 w-4 flex-shrink-0 text-ink-3" />
       <select className={campo} value={sucursal.id ?? TODAS} onChange={(e) => sucursal.cambiar(e.target.value === TODAS ? null : e.target.value)}>
         {sucursal.sucursales.map((s) => (
           <option key={s.id} value={s.id}>

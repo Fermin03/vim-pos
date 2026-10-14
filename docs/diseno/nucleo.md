@@ -248,6 +248,8 @@ Viven en `packages/ui/src/components` y se importan desde `@vim/ui/styles`:
 - **`Modal`** — contenedor de diálogo con título opcional.
 - **`PinKeypad`** — teclado numérico para PIN.
 - **`StatusChip`** — etiqueta de estado.
+- **`Icono`** — los 70 iconos del producto, por nombre (`<Icono nombre="palomita" />`). Ningún
+  componente dibuja su propio `<svg>`: reglas y lista en [`iconos.md`](iconos.md).
 - **`Aviso`** — la tarjeta de aviso (`success`, `warning`, `danger`, `info`) con su borde
   `*-line`. Nada de bordes en hexadecimal.
 - **`DialogoPeligro`** — el marco de TODA confirmación peligrosa: título, contexto, consecuencia,

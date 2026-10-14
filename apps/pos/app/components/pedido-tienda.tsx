@@ -4,7 +4,7 @@
 // de cualquier pantalla cuando llega uno. Aquí solo se pinta: qué pedido se puede atender, la fila
 // del aviso y los textos salen de lib/pedidos-en-linea.ts.
 import { useEffect, useRef, useState } from "react";
-import { Button, Modal } from "@vim/ui/styles";
+import { Button, Modal, Icono } from "@vim/ui/styles";
 import { esEscritorio } from "../lib/actualizacion";
 import { etiquetaAlergia, etiquetaModificadores, pedidoConAlergia, segundosRestantes, type PedidoApp, type PedidoAppItem } from "../lib/pedidos-apps";
 import { colaDeAvisos, etiquetaEntrega, etiquetaPago, PAGADO_EN_LINEA, pagadoEnLinea } from "../lib/pedidos-en-linea";
@@ -176,7 +176,7 @@ function AvisoPedidoTienda({ p, posicion, total, ahora, ocupado, onAceptar, onRe
         {/* La × va primero en el documento (y a la derecha en pantalla): es donde cae el foco al abrir. */}
         <button ref={cerrar} type="button" onClick={onCerrar} aria-label="Cerrar aviso"
           className={`order-last flex h-11 w-11 flex-shrink-0 items-center justify-center rounded text-ink-2 transition hover:bg-hover hover:text-ink active:scale-[.97] ${anillo ? "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink" : "outline-none"}`}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-5 w-5" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
+          <Icono nombre="cerrar" className="h-5 w-5" />
         </button>
         <div className="min-w-0 flex-1">
           <p className="text-13 font-semibold text-ink-2">

@@ -1,3 +1,4 @@
+import { Icono } from "@vim/ui/styles";
 "use client";
 import type { Producto } from "../lib/catalogo";
 import { diferencialCombo, type ComboDef } from "../lib/combos";
@@ -12,7 +13,7 @@ export function HojaCombo({ producto, combo, onSi, onNo }: { producto: Producto;
       <div role="dialog" aria-live="polite"
         className="fixed bottom-5 left-1/2 z-[41] flex w-[min(640px,calc(100%-40px))] -translate-x-1/2 items-center gap-4 rounded-lg border border-line-strong bg-surface px-[18px] py-4 shadow-[0_18px_50px_rgba(22,22,26,.16)]">
         <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="M12 2l2.9 6.3 6.6.7-4.9 4.5 1.4 6.5L12 17.3 5.9 20.5 7.3 14 2.4 9.5l6.6-.7z" /></svg>
+          <Icono nombre="estrella" className="h-6 w-6" />
         </span>
         <div className="min-w-0 flex-1">
           <b className="block font-display text-18 font-semibold tracking-[-0.01em]">¿Lo hacemos combo?</b>

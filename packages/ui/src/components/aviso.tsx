@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "../cn";
+import { Icono } from "./icono";
 
 export type TonoAviso = "success" | "warning" | "danger" | "info";
 
@@ -49,9 +50,7 @@ export function Aviso({
         aria-label="Cerrar aviso"
         className="-my-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded opacity-70 transition-opacity hover:opacity-100 focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-current"
       >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" className="h-4 w-4" aria-hidden="true">
-          <path d="M6 6l12 12M18 6L6 18" />
-        </svg>
+        <Icono nombre="cerrar" className="h-4 w-4" />
       </button>
     </div>
   );

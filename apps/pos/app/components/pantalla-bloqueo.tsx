@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { PinKeypad } from "@vim/ui/styles";
+import { PinKeypad, Icono } from "@vim/ui/styles";
 import { pinLogin, type Empleado, type PinLoginResult } from "../lib/supabase";
 import { PosSkeletonBg } from "./pos-skeleton-bg";
 import { useReloj } from "./topbar-pos";
@@ -99,9 +99,7 @@ export function PantallaBloqueo({
         />
 
         <div className="flex items-center gap-[7px] text-13 text-ink-3">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-success">
-            <path d="M20 6 9 17l-5-5" />
-          </svg>
+          <Icono nombre="palomita" className="h-3.5 w-3.5 text-success" strokeWidth={2.5} />
           Tu turno y el ticket en curso siguen abiertos.
         </div>
 
@@ -110,12 +108,7 @@ export function PantallaBloqueo({
           onClick={onCambiarUsuario}
           className="inline-flex items-center gap-[7px] rounded px-3 py-2 text-13 font-medium text-ink-2 transition-colors hover:bg-hover hover:text-ink"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            <path d="M21 21v-2a4 4 0 0 0-3-3.87" />
-            <circle cx="9" cy="7" r="4" />
-            <path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
-          </svg>
+          <Icono nombre="personas" className="h-4 w-4" />
           Cambiar de usuario
         </button>
       </div>

@@ -1,3 +1,4 @@
+import { Icono } from "@vim/ui/styles";
 import Link from "next/link";
 import { PageHeader, PageBody } from "../../../../components/page-header";
 import { fechaLarga, leerInstalador, RESPALDO_URL } from "../../../../lib/instalador";
@@ -39,9 +40,7 @@ export default async function DescargarCajaPage() {
               {...(inst ? { download: "" } : { target: "_blank", rel: "noopener noreferrer" })}
               className="inline-flex h-12 flex-shrink-0 items-center justify-center gap-2 rounded bg-accent px-6 text-15 font-semibold text-white transition-transform duration-150 ease-vim hover:bg-accent-hover active:scale-[.97]"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]" aria-hidden="true">
-                <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
-              </svg>
+              <Icono nombre="descargar" className="h-[18px] w-[18px]" />
               Descargar VIM POS
             </a>
           </section>

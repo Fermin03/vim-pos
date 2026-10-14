@@ -20,7 +20,7 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Aviso, Captcha, SITE_KEY_TURNSTILE, botonClases, cn } from "@vim/ui/styles";
+import { Aviso, Captcha, SITE_KEY_TURNSTILE, botonClases, cn, Icono } from "@vim/ui/styles";
 import { cotizar, guardarDireccion, intento, pedir, verificacion } from "../lib/api";
 import { TOPES, aCuerpo, type Carrito } from "../lib/carrito";
 import {
@@ -109,7 +109,7 @@ let borrador: { f: Formulario; direccion: string; pago: Pago | null; propina: Pr
 export const useEnviando = (): boolean => useSyncExternalStore(envioDeLaPagina.suscribir, envioDeLaPagina.ocupado, () => false);
 
 const IconoAtras = () => (
-  <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M15 6l-6 6 6 6" /></svg>
+  <Icono nombre="chevron-izquierda" className="h-5 w-5" />
 );
 
 export function PasoDeDatos({

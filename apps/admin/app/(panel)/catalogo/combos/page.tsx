@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@vim/ui/styles";
+import { Button, Icono } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { CatalogoTabs } from "../../../components/catalogo-tabs";
 import { FranjaMenus, useMenuCatalogo } from "../../../components/selector-menu";
@@ -218,9 +218,7 @@ export default function CombosPage() {
         migas={[{ label: "Catálogo" }, { label: "Combos" }]}
         right={
           <Button onClick={() => router.push(hrefConMenu("/catalogo/combos/nuevo", menuHref))}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-[17px] w-[17px]">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
+            <Icono nombre="mas" className="h-[17px] w-[17px]" />
             Nuevo combo
           </Button>
         }

@@ -1,3 +1,4 @@
+import { Icono } from "@vim/ui/styles";
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -112,9 +113,7 @@ export default function ReportesHub() {
                       <p className="flex-1 text-13 leading-snug text-ink-2">{r.descripcion}</p>
                       <span className="mt-3 inline-flex items-center gap-1 text-13 font-semibold text-ink">
                         Abrir
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 transition-transform duration-150 ease-vim group-hover:translate-x-0.5" aria-hidden="true">
-                          <path d="M5 12h14M13 6l6 6-6 6" />
-                        </svg>
+                        <Icono nombre="flecha-derecha" className="h-3.5 w-3.5 transition-transform duration-150 ease-vim group-hover:translate-x-0.5" strokeWidth={2.5} />
                       </span>
                     </Link>
                   ))}

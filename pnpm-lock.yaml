@@ -368,6 +368,9 @@ importers:
       '@vim/db':
         specifier: workspace:*
         version: link:../db
+      '@vim/ui':
+        specifier: workspace:*
+        version: link:../ui
     devDependencies:
       '@types/react':
         specifier: ^19
