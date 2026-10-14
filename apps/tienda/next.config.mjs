@@ -30,6 +30,11 @@ const MERCADO_PAGO = {
   img: ["https://www.mercadolibre.com", "https://www.mercadolivre.com"],
 };
 
+// El mapa del envío por distancia (0179): MapLibre pide a OpenFreeMap el estilo, las teselas, las
+// letras y los iconos, todo con fetch desde ese único origen (visto en el navegador, escuchando las
+// violaciones de la CSP). La librería y su worker se sirven de aquí mismo (public/mapa/): no abren nada.
+const MAPA = "https://tiles.openfreemap.org";
+
 // Las fotos de los productos y el logo viven en el almacén público de Supabase: solo ese origen
 // entra a img-src. Sin la variable (o mal escrita) no entra ninguno y la tienda se ve sin fotos.
 function origenDeSupabase() {
@@ -47,7 +52,9 @@ const nextConfig = {
     return [
       { source: "/:path*", headers: cabecerasSeguridad({
         scriptExtra: [TURNSTILE, ...MERCADO_PAGO.script].join(" "), frameSrc: [TURNSTILE, ...MERCADO_PAGO.frame].join(" "),
-        connectExtra: MERCADO_PAGO.connect, imgSrc: [...origenDeSupabase(), ...MERCADO_PAGO.img],
+        connectExtra: [...MERCADO_PAGO.connect, MAPA], imgSrc: [...origenDeSupabase(), ...MERCADO_PAGO.img],
+        // «Usar mi ubicación» (envío por distancia): solo esta página, ningún marco ajeno.
+        geolocalizacion: true,
       }) },
       // El enlace de seguimiento ES la llave del pedido: no sale en ningún Referer ni en buscadores.
       // Va después a propósito: en Next, la última regla que coincide gana para la misma cabecera.

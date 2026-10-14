@@ -13,12 +13,22 @@ export type Modo = "RECOGER" | "DOMICILIO";
 export type Pago = "EFECTIVO" | "TARJETA" | "EN_LINEA";
 
 export type Zona = { id: string; nombre: string; /** Sin el IVA que el ticket pueda sumarle: el envío exacto lo da `cotizar`. */ costo_mxn: string };
+/** Un tramo del envío por distancia: hasta `hasta_km` (texto con un decimal, «3.0») cuesta `costo_mxn`. */
+export type Tramo = { hasta_km: string; costo_mxn: string };
+/**
+ * Cómo cobra el envío la tienda en esa sucursal (0179). «Por distancia»: los tramos en orden y el
+ * punto de la sucursal, para enseñar el precio mientras se mueve el pin (el que cobra lo da `cotizar`).
+ */
+export type EnvioDeSucursal =
+  | { cobro: "ZONAS" }
+  | { cobro: "DISTANCIA"; tramos: Tramo[]; punto: { lat: number; lng: number } };
 export type Sucursal = {
   id: string; nombre: string; telefono: string | null; direccion: string | null;
   recoger: boolean; domicilio: boolean; horario: Horario;
   /** null = recibe pedidos ahora en ese modo; si no, el motivo (FUERA_DE_HORARIO, EN_PAUSA, CAJA_NO_LISTA…). */
   estado: { recoger: string | null; domicilio: string | null };
   zonas: Zona[];
+  envio: EnvioDeSucursal;
   /** En ESTA sucursal se puede pagar en línea ahora. Falso si la función aún no lo dice. */
   pago_en_linea: boolean;
   /** La public key de la cuenta de Mercado Pago que cobra ahí (pública): con ella se lee la tarjeta. */
@@ -71,6 +81,8 @@ export type Cotizacion = {
   /** Lo que el envío le cuesta al cliente (con IVA si aplica). */
   envio_total_mxn: string;
   total_mxn: string;
+  /** Por distancia y con ubicación: la distancia que calculó la base («3.2» km). Si no, null. */
+  distancia_km: string | null;
 };
 
 /** Con 200 el pedido EXISTE aunque lo demás venga en null (caso degradado): se va al seguimiento. */
@@ -192,6 +204,21 @@ function slot(x: unknown): Slot {
   };
 }
 
+/**
+ * El envío de una sucursal. Sin la clave (una función anterior a la 0179) es «Por zonas», como antes.
+ * «Por distancia» sin tramos o sin punto no se puede pedir a domicilio (la base ya lo dice en su
+ * estado); aquí se lee como «Por zonas» para no enseñar un mapa sin nada que calcular.
+ */
+function envioDe(x: unknown): EnvioDeSucursal {
+  if (x === undefined || x === null) return { cobro: "ZONAS" };
+  const e = obj(x);
+  if (e.cobro !== "DISTANCIA") return { cobro: "ZONAS" };
+  const tramos = lista(e.tramos, (y) => { const t = obj(y); return { hasta_km: con(/^\d{1,2}\.\d$/)(t.hasta_km), costo_mxn: importe(t.costo_mxn) }; });
+  const p = e.punto === null || e.punto === undefined ? null : obj(e.punto);
+  if (!p || typeof p.lat !== "number" || typeof p.lng !== "number" || tramos.length === 0) return { cobro: "ZONAS" };
+  return { cobro: "DISTANCIA", tramos, punto: { lat: p.lat, lng: p.lng } };
+}
+
 export const negocioDe = lector((x): Negocio => {
   const n = obj(x);
   return {
@@ -213,6 +240,7 @@ export const negocioDe = lector((x): Negocio => {
           const zona = obj(z);
           return { id: uuid(zona.id), nombre: txt(zona.nombre), costo_mxn: importe(zona.costo_mxn) };
         }),
+        envio: envioDe(s.envio),
         pago_en_linea: s.pago_en_linea === true,
         // Solo con la forma de una public key de Mercado Pago: se le pasa tal cual a su librería.
         public_key: typeof s.public_key === "string" && /^[A-Za-z0-9_-]{20,100}$/.test(s.public_key) ? s.public_key : null,
@@ -249,6 +277,7 @@ export const cotizacionDe = lector((x): Cotizacion => {
     renglones: lista(c.renglones, (y) => ({ ...renglon(y), total_mxn: importe(obj(y).total_mxn) })),
     subtotal_mxn: importe(c.subtotal_mxn), envio_mxn: importe(c.envio_mxn),
     envio_total_mxn: importe(c.envio_total_mxn), total_mxn: importe(c.total_mxn),
+    distancia_km: typeof c.distancia_km === "string" && /^\d{1,5}\.\d$/.test(c.distancia_km) ? c.distancia_km : null,
   };
 });
 

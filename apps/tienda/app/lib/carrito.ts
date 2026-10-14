@@ -8,6 +8,7 @@
 // Precios NUNCA se guardan: el estimado sale del menú vigente y el total que manda es el de `cotizar`.
 import type { Grupo, Menu, Modo, Producto } from "./contrato";
 import { aCentavos } from "./dinero";
+import type { Punto } from "./distancia";
 
 /** Los topes de la función (anexo §1.8). */
 export const TOPES = { renglones: 40, porRenglon: 50, porModificador: 10, nota: 200 } as const;
@@ -242,14 +243,19 @@ export type ItemDeCuerpo = {
   componentes?: { grupo_id: string; producto_id: string; cantidad: number; modificadores: ModificadorDeCuerpo[] }[];
 };
 /** La parte del carrito en el cuerpo de `cotizar` y `pedir` (anexo §1.8). */
-export type CuerpoCarrito = { sucursal_id: string; modo: Modo; zona_id: string | null; items: ItemDeCuerpo[] };
+export type CuerpoCarrito = {
+  sucursal_id: string; modo: Modo; zona_id: string | null; items: ItemDeCuerpo[];
+  /** Solo a domicilio «Por distancia» (0179): el pin del cliente. Con él la base calcula el envío. */
+  punto?: Punto;
+};
 
 /**
  * El carrito como lo espera la función. Las cantidades salen como enteros JSON dentro de sus topes
  * (la base rechaza `2.0`, `"2"` y lo que se pase): un carrito guardado raro no produce un 400.
  * Un producto simple lleva `modificadores` y nunca `componentes`; un combo, al revés.
+ * `punto` va solo a domicilio: no se guarda con el carrito (es dato personal y vive en memoria).
  */
-export function aCuerpo(carrito: Carrito): CuerpoCarrito {
+export function aCuerpo(carrito: Carrito, punto: Punto | null = null): CuerpoCarrito {
   const mods = (m: ModificadorElegido[]): ModificadorDeCuerpo[] =>
     m.map((x) => ({ opcion_id: x.opcionId, cantidad: acotar(x.cantidad, TOPES.porModificador) }));
   return {
@@ -262,6 +268,7 @@ export function aCuerpo(carrito: Carrito): CuerpoCarrito {
         ? { componentes: r.componentes.map((c) => ({ grupo_id: c.grupoId, producto_id: c.productoId, cantidad: acotar(c.cantidad, 999), modificadores: mods(c.modificadores) })) }
         : { modificadores: mods(r.modificadores) }),
     })),
+    ...(carrito.modo === "DOMICILIO" && punto && { punto }),
   };
 }
 

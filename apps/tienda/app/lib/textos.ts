@@ -178,6 +178,9 @@ const ERRORES: Record<string, TextoDeError> = {
   CLIENTE_INVALIDO: { texto: "Revisa tus datos.", hacer: "Escribe tu nombre, un teléfono de 10 dígitos y, si pones correo, que esté completo." },
   DIRECCION_INVALIDA: { texto: "Revisa tu dirección.", hacer: "Faltan datos o el código postal no tiene 5 dígitos." },
   PAGO_INVALIDO: { texto: "Esa forma de pago no está disponible.", hacer: "Elige otra forma de pago." },
+  // Envío por distancia (0179). TEXTOS PROVISIONALES (James).
+  UBICACION_INVALIDA: { texto: "Falta tu ubicación.", hacer: "Pon el pin del mapa en tu domicilio: con eso calculamos el envío." },
+  FUERA_DE_AREA: { texto: "Esta dirección está fuera del área de entrega.", hacer: "Mueve el pin o elige recoger tu pedido." },
   // Pago en línea (textos provisionales, como los de arriba).
   PAGO_NO_PROCESADO: { texto: "No pudimos procesar el pago.", hacer: "Vuelve a intentar." },
   PAGO_NO_DISPONIBLE: { texto: "El restaurante no puede recibir pagos en línea en este momento. Tu pedido no se envió y no se te cobró nada.", hacer: REINTENTA },
@@ -213,6 +216,27 @@ export function textoDeError(codigo: string, contexto: { telefono?: string | nul
   if (codigo === "PAGO_NO_DISPONIBLE" && contexto.otrasFormas) return { ...base, hacer: "Elige otra forma de pago o vuelve a intentar." };
   return base;
 }
+
+// ── Envío por distancia («¿Quién recibe?») ───────────────────────────────────────────────────────
+// TEXTOS PROVISIONALES (James).
+export const UBICACION = {
+  titulo: "Tu ubicación",
+  apoyo: "Con ella calculamos el envío. Mueve el pin a tu puerta si no quedó exacto.",
+  usar: "Usar mi ubicación",
+  buscando: "Buscando tu ubicación…",
+  aMano: "Marcarla en el mapa",
+  /** No hubo permiso o el teléfono no la dio: el mapa abre en el restaurante. */
+  sinPermiso: "No pudimos usar tu ubicación. Mueve el pin a donde llevamos tu pedido.",
+  mapa: "Mapa con tu ubicación. Arrastra el pin o toca el mapa para moverlo.",
+  centro: "Poner el pin en el centro del mapa",
+  fuera: "Esta dirección está fuera del área de entrega.",
+  aRecoger: "Mejor recojo mi pedido",
+  sinMapa: "No pudimos cargar el mapa.",
+  reintentarMapa: "Volver a intentar",
+} as const;
+/** «Estás a 3.2 km · Envío 5.00». */
+export const lineaDeDistancia = (km: string, costo: string): string =>
+  `Estás a ${km} km · ${Number(costo) === 0 ? "Envío sin costo" : `Envío ${formatoMxn(costo)}`}`;
 
 // ── Modificadores ────────────────────────────────────────────────────────────────────────────────
 /** La regla de un grupo o de un slot, en palabras: «Elige 1», «Opcional · hasta 3», «Elige de 1 a 3». */

@@ -118,6 +118,12 @@ describe("cabeceras de seguridad compartidas", () => {
     expect(con.replace(" https://abc.supabase.co;", ";")).toBe(csp());
     expect(csp({ imgSrc: [] })).toBe(csp());
   });
+  it("la ubicación solo se abre a la propia página, y solo para quien la pide (la tienda)", () => {
+    const permisos = (o?: Parameters<typeof cabecerasSeguridad>[0]) => cabecerasSeguridad(o).find((h) => h.key === "Permissions-Policy")!.value;
+    expect(permisos()).toBe("camera=(), microphone=(), geolocation=()");
+    expect(permisos({ geolocalizacion: true })).toBe("camera=(), microphone=(), geolocation=(self)");
+    expect(csp({ geolocalizacion: true })).toBe(csp());
+  });
 });
 
 describe("la pausa del pago en línea llega a la pantalla con su hora", () => {

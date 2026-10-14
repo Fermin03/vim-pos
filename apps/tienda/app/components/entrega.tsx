@@ -18,6 +18,8 @@ export function Entrega({ sucursal, modo, zonaId, alCambiarModo, alCambiarZona }
   if (modos.length === 0) return null;
   const zona = sucursal.zonas.find((z) => z.id === zonaId);
   const rango = rangoDeEnvio(sucursal.zonas);
+  // Por distancia (0179) no hay zona que elegir: el envío sale de la ubicación, en «Tus datos».
+  const distancia = sucursal.envio.cobro === "DISTANCIA" ? sucursal.envio : null;
   return (
     <div className="flex flex-col gap-3">
       {modos.length === 1 ? (
@@ -38,6 +40,13 @@ export function Entrega({ sucursal, modo, zonaId, alCambiarModo, alCambiarZona }
             ))}
           </div>
         </fieldset>
+      )}
+      {modo === "DOMICILIO" && distancia && (
+        // TEXTO PROVISIONAL (James).
+        <p className="text-15 text-ink-2">
+          El envío depende de la distancia: entregamos hasta {distancia.tramos.at(-1)!.hasta_km.replace(/\.0$/, "")} km.
+          {" "}{rangoDeEnvio(distancia.tramos, "distancia") ?? `Envío ${formatoMxn(distancia.tramos[0]!.costo_mxn)}.`}
+        </p>
       )}
       {modo === "DOMICILIO" && sucursal.zonas.length === 1 && zona && (
         <p className="text-15 text-ink-2 [overflow-wrap:anywhere]">Envío a {zona.nombre}: <span className="font-semibold tabular-nums text-ink">{formatoMxn(zona.costo_mxn)}</span></p>

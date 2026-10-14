@@ -61,6 +61,9 @@ export function Linea({ concepto, importe, estimado, fuerte }: { concepto: strin
   );
 }
 
+/** TEXTO PROVISIONAL (James): el envío por distancia, antes de poner la ubicación. */
+const ENVIO_POR_UBICACION = "Con tu ubicación";
+
 export function VistaDelCarrito({
   sucursal, carrito, menu, ahora, avisos, cotizado, alCambiarCantidad, alQuitar, alCambiarModo, alCambiarZona, alContinuar, alCerrar,
 }: {
@@ -92,6 +95,8 @@ export function VistaDelCarrito({
   const motivo = motivoDeCierre(sucursal, carrito.modo);
   const estimado = estimarTotal(carrito, menu);
   const envioEstimado = aDomicilio && zona ? aCentavos(zona.costo_mxn) ?? 0 : 0;
+  // Por distancia (0179) el envío sale de la ubicación, que se pone en «Tus datos»: aquí todavía no se sabe.
+  const sinEnvioAun = aDomicilio && sucursal.envio.cobro === "DISTANCIA" && !cot?.distancia_km;
 
   // Lo que impide continuar, del más concreto al más general. Si no hay nada, va el botón.
   const freno: { tono: TonoAviso; texto: string; reintentar?: boolean } | null =
@@ -132,8 +137,8 @@ export function VistaDelCarrito({
         <div className="mx-4 mb-4 rounded-lg border border-line bg-sel px-4 py-3">
           <dl aria-busy={cotizado.cotizando} className="flex flex-col gap-2">
           <Linea concepto="Subtotal" importe={cot ? formatoMxn(cot.subtotal_mxn) : formato(estimado)} estimado={!cot} />
-          {aDomicilio && <Linea concepto="Envío" importe={cot ? formatoMxn(cot.envio_total_mxn) : zona ? formato(envioEstimado) : "Por elegir"} estimado={!cot} />}
-          <Linea concepto="Total" importe={cot ? formatoMxn(cot.total_mxn) : formato(estimado + envioEstimado)} estimado={!cot} fuerte />
+          {aDomicilio && <Linea concepto="Envío" importe={sinEnvioAun ? ENVIO_POR_UBICACION : cot ? formatoMxn(cot.envio_total_mxn) : zona ? formato(envioEstimado) : "Por elegir"} estimado={!cot} />}
+          <Linea concepto={sinEnvioAun ? "Total sin envío" : "Total"} importe={cot ? formatoMxn(cot.total_mxn) : formato(estimado + envioEstimado)} estimado={!cot} fuerte />
           </dl>
           {/* Siempre ocupa su renglón: así la cuenta no brinca cuando llega el total. */}
           <p aria-live="polite" className="mt-2 min-h-5 text-13 text-ink-2">

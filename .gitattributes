@@ -1,0 +1,3 @@
+# Copia tal cual de MapLibre (packages/ui/copiar-mapa.mjs): sin conversión de fin de línea, para que
+# siga siendo idéntica a la del paquete instalado.
+apps/*/public/mapa/** -text

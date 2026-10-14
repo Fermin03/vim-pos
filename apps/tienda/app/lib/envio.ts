@@ -39,7 +39,7 @@ export type Desenlace =
   /** El total ya no es el que vio: se enseña el nuevo y se pide confirmar antes de enviar con él. */
   | { tipo: "total"; total: string }
   /** El error es de un campo (o de la forma de pago): se marca ahí y se le da el foco. */
-  | { tipo: "campo"; campo: Campo | "pago"; texto: string }
+  | { tipo: "campo"; campo: Campo | "pago" | "ubicacion"; texto: string }
   | {
     tipo: "aviso"; tono: "danger" | "warning"; texto: string;
     /**
@@ -62,7 +62,11 @@ export type ContextoDeEnvio = {
 };
 
 const DE_RENGLON = new Set(["PRODUCTO_NO_DISPONIBLE", "MODIFICADORES_INVALIDOS", "COMBO_INVALIDO"]);
-const DE_CAMPO: Record<string, Campo | "pago"> = { CLIENTE_INVALIDO: "nombre", DIRECCION_INVALIDA: "calle", PAGO_INVALIDO: "pago" };
+const DE_CAMPO: Record<string, Campo | "pago" | "ubicacion"> = {
+  CLIENTE_INVALIDO: "nombre", DIRECCION_INVALIDA: "calle", PAGO_INVALIDO: "pago",
+  // Envío por distancia (0179): se corrige en el mapa de «¿Quién recibe?».
+  UBICACION_INVALIDA: "ubicacion", FUERA_DE_AREA: "ubicacion",
+};
 const DEL_CARRITO = new Set(["ZONA_INVALIDA", "MODO_INVALIDO", "CARRITO_INVALIDO", "PRECIO_INVALIDO", "SUCURSAL_INVALIDA", "SUCURSAL_DE_OTRO_NEGOCIO", "CUERPO_DEMASIADO_GRANDE"]);
 const SOLO_LLAMAR = new Set(["NO_SE_PUDO_CREAR", "TIENDA_NO_DISPONIBLE"]);
 
