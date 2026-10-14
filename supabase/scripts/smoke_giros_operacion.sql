@@ -45,16 +45,12 @@ BEGIN
   IF juego_inicial_de_giro(NULL) IS DISTINCT FROM v_todo THEN RAISE EXCEPTION '2a: NULL debía ser todo encendido'; END IF;
   RAISE NOTICE '2a juego inicial de los 7 giros OK';
 
-  IF cobro_inicial_de_giro('FULL_SERVICE') <> 'COCINA_PRIMERO' OR cobro_inicial_de_giro('TAQUERIA') <> 'COCINA_PRIMERO'
-     OR cobro_inicial_de_giro('BAR') <> 'COCINA_PRIMERO' OR cobro_inicial_de_giro('QUICK_SERVICE') <> 'COBRO_PRIMERO'
-     OR cobro_inicial_de_giro('CAFETERIA') <> 'COBRO_PRIMERO' OR cobro_inicial_de_giro(NULL) <> 'COBRO_PRIMERO' THEN
-    RAISE EXCEPTION '2b: cobro inicial por giro mal';
-  END IF;
-  RAISE NOTICE '2b cobro inicial OK';
-
-  -- Cliente existente (semilla): todo encendido sin que nadie lo toque.
+  -- Cliente existente (semilla, QUICK_SERVICE): lo mismo que veía antes. Todo encendido salvo
+  -- eventos, que antes solo salía a FOODTRUCK (0181).
   SELECT operacion INTO v_op FROM tenants WHERE id = '99999999-0000-0000-0000-0000000000aa';
-  IF v_op IS DISTINCT FROM v_todo THEN RAISE EXCEPTION '2c: el cliente existente debía quedar todo encendido: %', v_op; END IF;
+  IF v_op IS DISTINCT FROM v_todo || '{"eventos":false}'::jsonb THEN
+    RAISE EXCEPTION '2c: el cliente existente debía ver lo de siempre: %', v_op;
+  END IF;
   RAISE NOTICE '2c cliente existente intacto OK';
 
   -- El disparador completa llaves y corrige dependencias; nunca rechaza un valor válido.
@@ -257,30 +253,25 @@ BEGIN
   RAISE NOTICE '4d aislamiento OK';
 END $$;
 
--- 5) El alta de la entrega 1 NO aplica todavía el juego del giro: ninguna pantalla lo obedece, y
---    un negocio dado de alta antes de la entrega 2 perdería pantallas de golpe al salir esta. Queda
---    todo encendido y la política de cobro por defecto; la entrega 2 aplica el juego en el alta.
+-- 5) El alta aplica el juego del giro (0181); la política de cobro no se toca (sigue por tipo de cuenta).
 DO $$
 DECLARE
-  v_owner uuid := gen_random_uuid();
-  v_tenant uuid; v_op jsonb;
+  v_owner uuid; v_tenant uuid; v_giro text;
 BEGIN
   PERFORM set_config('request.jwt.claims', '', true);
-  INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
-  VALUES (v_owner, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-          'owner-' || substr(v_owner::text, 1, 8) || '@smoke.dev', crypt('smokepass', gen_salt('bf')),
-          now(), now(), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb);
-  v_tenant := crear_tenant_con_owner(v_owner, 'smoke-giro-' || substr(v_owner::text, 1, 8), 'Food Truck Smoke', 'Dueño Smoke',
-                                     '4770000000', 'FOODTRUCK'::vertical_tipo, 'ESENCIAL', 'TRIAL'::tenant_estado, 'smoke 0180');
-
-  SELECT operacion INTO v_op FROM tenants WHERE id = v_tenant;
-  IF v_op IS DISTINCT FROM juego_inicial_de_giro(NULL) THEN
-    RAISE EXCEPTION '5a: el alta de la entrega 1 debía dejar todo encendido: %', v_op;
-  END IF;
-  IF COALESCE((SELECT politica_cobro_cocina FROM configuracion_tenant WHERE tenant_id = v_tenant), 'COBRO_PRIMERO') <> 'COBRO_PRIMERO' THEN
-    RAISE EXCEPTION '5a: el alta de la entrega 1 no debía tocar la política de cobro';
-  END IF;
-  RAISE NOTICE '5a alta sin juego todavía OK';
+  FOREACH v_giro IN ARRAY ARRAY['FOODTRUCK', 'BAR', 'TAQUERIA'] LOOP
+    v_owner := gen_random_uuid();
+    INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
+    VALUES (v_owner, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+            'owner-' || substr(v_owner::text, 1, 8) || '@smoke.dev', crypt('smokepass', gen_salt('bf')),
+            now(), now(), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb);
+    v_tenant := crear_tenant_con_owner(v_owner, 'smoke-giro-' || substr(v_owner::text, 1, 8), 'Giro Smoke', 'Dueño Smoke',
+                                       '4770000000', v_giro::vertical_tipo, 'ESENCIAL', 'TRIAL'::tenant_estado, 'smoke 0181');
+    IF (SELECT operacion FROM tenants WHERE id = v_tenant) IS DISTINCT FROM juego_inicial_de_giro(v_giro::vertical_tipo) THEN
+      RAISE EXCEPTION '5a: el alta de % no aplicó su juego: %', v_giro, (SELECT operacion FROM tenants WHERE id = v_tenant);
+    END IF;
+  END LOOP;
+  RAISE NOTICE '5a alta por giro OK (incluidos giros nuevos para negocios nuevos)';
 END $$;
 
 ROLLBACK;

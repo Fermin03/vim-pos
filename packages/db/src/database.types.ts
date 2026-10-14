@@ -13038,10 +13038,6 @@ export type Database = {
         Returns: string
       }
       clabe_valida: { Args: { p_clabe: string }; Returns: boolean }
-      cobro_inicial_de_giro: {
-        Args: { p_giro: Database["public"]["Enums"]["vertical_tipo"] }
-        Returns: string
-      }
       confirmar_devolucion: {
         Args: { p_devolucion_id: string; p_usuario_id: string }
         Returns: undefined

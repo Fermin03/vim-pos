@@ -26,14 +26,6 @@ $$;
 COMMENT ON FUNCTION juego_inicial_de_giro(vertical_tipo) IS
   'Módulos de operación con que arranca un negocio según su giro (tabla §5 del spec de giros). Sin giro conocido: todo encendido. Única fuente de esa tabla (0180).';
 
-CREATE OR REPLACE FUNCTION cobro_inicial_de_giro(p_giro vertical_tipo)
-RETURNS varchar LANGUAGE sql STABLE SET search_path = public, pg_temp AS $$
-  SELECT CASE WHEN p_giro::text IN ('FULL_SERVICE', 'BAR', 'CAFE_BAR', 'TAQUERIA')
-              THEN 'COCINA_PRIMERO' ELSE 'COBRO_PRIMERO' END::varchar;
-$$;
-COMMENT ON FUNCTION cobro_inicial_de_giro(vertical_tipo) IS
-  'Valor inicial de configuracion_tenant.politica_cobro_cocina según el giro (0180).';
-
 -- ── §2 Los interruptores ─────────────────────────────────────────────────────
 -- Por defecto todo encendido: los clientes que ya existen no cambian sin que nadie haga nada.
 ALTER TABLE tenants ADD COLUMN IF NOT EXISTS operacion jsonb NOT NULL DEFAULT juego_inicial_de_giro(NULL);
