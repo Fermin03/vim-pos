@@ -64,6 +64,8 @@ describe("desenlaceDelError", () => {
   it("ningún código conocido se queda sin texto ni enseña el código", () => {
     for (const codigo of CODIGOS_DE_ERROR) {
       const d = desenlaceDelError(e(codigo), c);
+      // La pausa del pago en línea no lleva texto aquí: lo arma la pantalla con su hora (lib/pausa.ts, con sus pruebas).
+      if (d.tipo === "pausa") { expect(codigo).toBe("PAGO_EN_PAUSA"); continue; }
       const texto = d.tipo === "aviso" || d.tipo === "campo" || d.tipo === "tarjeta" ? d.texto : "";
       expect(texto.length, codigo).toBeGreaterThan(10);
       expect(texto, codigo).not.toMatch(/[A-Z]{3,}_[A-Z]/);

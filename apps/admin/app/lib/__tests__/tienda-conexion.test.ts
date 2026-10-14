@@ -50,3 +50,15 @@ describe("conectar Mercado Pago para la tienda en línea", () => {
     expect(mensajeErrorConexionTienda(new Error("ALGO_NUEVO"))).toBe("Algo salió mal con Mercado Pago. Inténtalo de nuevo.");
   });
 });
+
+describe("la conexión de prueba no es del dueño (0178)", () => {
+  it("cada negativa del servidor tiene su mensaje, sin códigos", () => {
+    const generico = mensajeErrorConexionTienda(new Error("ALGO_QUE_NO_EXISTE"));
+    for (const codigo of ["CONEXION_DE_PRUEBA", "MODO_DE_PRUEBA", "CUENTA_DE_PRUEBA"]) {
+      const m = mensajeErrorConexionTienda(new Error(codigo));
+      expect(m, codigo).not.toBe(generico);
+      expect(m, codigo).toMatch(/prueba/);
+      expect(m, codigo).not.toMatch(/[A-Z]{3,}_[A-Z]/);
+    }
+  });
+});

@@ -27,6 +27,13 @@ export type Desenlace =
    * reintentar con la misma o con otra.
    */
   | { tipo: "tarjeta"; campo: CampoDeTarjeta | null; texto: string }
+  /**
+   * El pago en línea quedó en PAUSA para este cliente: el antifraude de Mercado Pago rechazó el cobro
+   * por riesgo (`rechazado`: acaba de pasar) o ya estaba en pausa y lo intentó otra vez. No se cobró
+   * nada. NO se ofrece repetir el cobro: otra forma de pago si la hay, o más tarde. `hasta`: hasta
+   * cuándo (ISO), si el servidor lo dijo.
+   */
+  | { tipo: "pausa"; hasta: string | null; rechazado: boolean }
   /** Un renglón ya no se puede pedir: de vuelta al carrito, que lo marca. */
   | { tipo: "carrito"; error: ErrorDeTienda }
   /** El total ya no es el que vio: se enseña el nuevo y se pide confirmar antes de enviar con él. */
@@ -63,6 +70,10 @@ const SOLO_LLAMAR = new Set(["NO_SE_PUDO_CREAR", "TIENDA_NO_DISPONIBLE"]);
 export function desenlaceDelError(e: ErrorDeTienda, c: ContextoDeEnvio): Desenlace {
   if (DE_RENGLON.has(e.error) && e.detalle) return { tipo: "carrito", error: e };
   if (e.error === "TOTAL_CAMBIO" && e.detalle && /^\d+\.\d{2}$/.test(e.detalle)) return { tipo: "total", total: e.detalle };
+  // El antifraude (no el banco): el pago en línea queda en pausa. No es un rechazo que se corrija y se reintente.
+  if (e.error === "PAGO_EN_PAUSA" || (e.error === "PAGO_RECHAZADO" && e.detalle === "RIESGO")) {
+    return { tipo: "pausa", hasta: e.hasta ?? null, rechazado: e.error === "PAGO_RECHAZADO" };
+  }
   if (e.error === "PAGO_RECHAZADO") return { tipo: "tarjeta", ...textoDeRechazo(e.detalle, c.otrasFormas === true) };
   // No fue el banco: Mercado Pago no pudo procesar ese cobro (y no se cobró). Junto a la tarjeta, sin culpar a nadie.
   if (e.error === "PAGO_NO_PROCESADO") {
@@ -318,9 +329,10 @@ export const pruebaQueNoHuboCobro = (error: string): boolean => SIN_PEDIDO_NI_CO
 export type Duda =
   /**
    * No había duda, o el servidor confirmó que no hay pedido ni cobro: se puede intentar de nuevo.
-   * `rechazo`: el pedido existía esperando el reto del banco y el pago no pasó; la familia del motivo.
+   * `rechazo`: el pedido existía esperando el reto del banco y el pago no pasó; la familia del motivo
+   * (y, si fue por riesgo, `hasta` cuándo queda en pausa el pago en línea).
    */
-  | { tipo: "libre"; rechazo?: string | null }
+  | { tipo: "libre"; rechazo?: string | null; hasta?: string | null }
   /** El pedido sí había entrado: a su página, que dice cómo va el pago. */
   | { tipo: "hecho"; codigo: string }
   /** El pedido existe y su pago sigue esperando el reto del banco: se continúa ese reto (la duda sigue). */
@@ -351,7 +363,7 @@ export async function resolverDuda(
     // Si no se puede preguntar, lo de siempre: a la página del pedido, que dice cómo va.
     if (verificar) { try { paso = pasoDelReto(await verificar(codigo)); } catch { /* como si no hubiera contestado */ } }
     if (paso.tipo === "sigue") return { tipo: "verificar", codigo, url: paso.url };
-    if (paso.tipo === "rechazado") { intento.aclarar(); return { tipo: "libre", rechazo: paso.detalle }; }
+    if (paso.tipo === "rechazado") { intento.aclarar(); return { tipo: "libre", rechazo: paso.detalle, ...(paso.hasta && { hasta: paso.hasta }) }; }
     intento.cerrar();
     return { tipo: "hecho", codigo };
   }

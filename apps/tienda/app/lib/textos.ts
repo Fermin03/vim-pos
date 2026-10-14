@@ -94,6 +94,14 @@ export const RETO = {
   cancelando: "Cancelando la verificación",
 } as const;
 
+// ── Modo de prueba (la tienda de un negocio interno de VIM: los pagos van al ambiente de prueba) ──
+// TEXTOS PROVISIONALES (James).
+export const MODO_DE_PRUEBA = {
+  titulo: "Modo de prueba: los pagos no son reales.",
+  /** En la pantalla de la tarjeta, para quien prueba. */
+  ayuda: "Usa una tarjeta de prueba. Una tarjeta real no pasa.",
+} as const;
+
 // ── Formas de pago («¿Cómo pagas?») ──────────────────────────────────────────────────────────────
 /**
  * El nombre de una forma de pago. Cuando también se ofrece pagar en línea, las otras dos dicen que
@@ -173,6 +181,8 @@ const ERRORES: Record<string, TextoDeError> = {
   // Pago en línea (textos provisionales, como los de arriba).
   PAGO_NO_PROCESADO: { texto: "No pudimos procesar el pago.", hacer: "Vuelve a intentar." },
   PAGO_NO_DISPONIBLE: { texto: "El restaurante no puede recibir pagos en línea en este momento. Tu pedido no se envió y no se te cobró nada.", hacer: REINTENTA },
+  // El pago en línea en pausa tras un rechazo por riesgo. En «Tus datos» se dice con su hora (lib/pausa.ts); este es el de respaldo.
+  PAGO_EN_PAUSA: { texto: "El pago en línea está en pausa para ti por ahora. No se te cobró nada.", hacer: "Intenta más tarde o elige otra forma de pago." },
   CAPTCHA_INVALIDO: { texto: "No pudimos comprobar que eres una persona.", hacer: "Vuelve a intentar; si sigue pasando, recarga la página." },
   DEMASIADOS_INTENTOS: { texto: "Hiciste demasiados intentos seguidos.", hacer: "Espera unos minutos antes de volver a intentar, o llama al restaurante." },
   NO_SE_PUDO_CREAR: { texto: "No pudimos tomar tu pedido.", hacer: "Llama al restaurante para hacer tu pedido." },

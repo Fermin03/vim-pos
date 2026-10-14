@@ -131,7 +131,9 @@ const RECHAZOS: Record<string, { campo: CampoDeTarjeta | null; texto: string; co
   LLAMAR_BANCO: { campo: null, texto: "Tu banco pide que autorices este pago. Llámale y vuelve a intentar, o usa otra tarjeta." },
   TARJETA_DESHABILITADA: { campo: null, texto: "Tu tarjeta no está activa para compras en línea. Llama a tu banco o usa otra tarjeta." },
   // No fue el banco: el antifraude de Mercado Pago (`high_risk`). TEXTO PROVISIONAL (James).
-  RIESGO: { campo: null, texto: "Mercado Pago no pudo aprobar este pago. Prueba con otra tarjeta." },
+  // «Tus datos» no usa este: con RIESGO el pago en línea queda en pausa y lo dice con su hora
+  // (lib/pausa.ts). Este es el de respaldo, y no invita a repetir el cobro.
+  RIESGO: { campo: null, texto: "No pudimos aprobar este pago en línea. No fue tu banco." },
   // La verificación del banco (3D Secure). TEXTOS PROVISIONALES (James). No prometen tiempos.
   // El cliente contestó el reto y su banco no lo confirmó (VERIFICADO: `3ds_challenge_failed`).
   VERIFICACION: { campo: null, texto: "Tu banco no confirmó el pago. Intenta de nuevo o usa otra tarjeta." },

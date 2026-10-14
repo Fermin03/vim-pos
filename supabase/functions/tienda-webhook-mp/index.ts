@@ -19,6 +19,15 @@
 // comprueban referencia, modo y monto (pago-flujo.ts → tienda_pago_aplicar).
 // Aplicar el mismo aviso dos veces deja lo mismo, así que no se deduplica.
 //
+// DOS CLAVES, Y NO HACE FALTA SABER CUÁL FIRMÓ (modo de prueba, 0178). Los avisos de las órdenes de
+// prueba los firma la aplicación gemela; los reales, «VIM POS Tienda». Aquí se acepta cualquiera de
+// las dos y NO se cruza la clave con el tipo de pago, porque la firma no decide nada: cada pago
+// guarda la conexión con la que nació, la orden se consulta con el token de ESA conexión (un token
+// solo ve las órdenes de su cuenta) y `decidirOrden`
+// exige que la orden traiga nuestra referencia y la cuenta vendedora de esa conexión. Un aviso
+// firmado con la clave de prueba que nombre un pago real (o al revés) solo consigue que se vuelva a
+// consultar ese pago, que es lo que hace cualquier aviso, con el tope de 40 por hora por referencia.
+//
 // LA PUERTA INTERNA. La base (tienda_pagos_barrer, cada minuto, pg_net) llama aquí con
 // `x-vim-interno` cuando hay devoluciones que hacer o pagos que nadie confirmó. Mismo esquema que
 // enviar-push: Vault `vim_interno` = secreto VIM_INTERNO_SECRET. Se contesta 202 y el trabajo
@@ -50,18 +59,22 @@ const texto = (cuerpo: string, status: number): Response => new Response(cuerpo,
 async function avisar(t: Tarea, de: "DEVOLUCION" | "CONCILIACION" | "RETO"): Promise<void> {
   registrarError(FN, de === "DEVOLUCION" ? "DEVOLUCION_FALLIDA" : de === "RETO" ? "RETO_SIN_CERRAR" : "CONCILIACION_FALLIDA", `pago ${t.id}`);
   const { data } = await admin.from("tienda_pagos")
-    .select("monto_mxn, ultimo_error, orden_id_externo, pedido:delivery_pedidos(folio_corto), negocio:tenants(nombre_comercial)")
+    .select("monto_mxn, ultimo_error, orden_id_externo, pedido:delivery_pedidos(folio_corto), negocio:tenants(nombre_comercial), conexion:tienda_conexiones(de_prueba)")
     .eq("id", t.id).maybeSingle();
   const f = data as { monto_mxn?: number; ultimo_error?: string | null; orden_id_externo?: string | null;
-                      pedido?: { folio_corto?: string | null } | null; negocio?: { nombre_comercial?: string | null } | null } | null;
+                      pedido?: { folio_corto?: string | null } | null; negocio?: { nombre_comercial?: string | null } | null;
+                      conexion?: { de_prueba?: boolean } | null } | null;
   const d = {
     pagoId: t.id, negocio: f?.negocio?.nombre_comercial ?? "", folio: f?.pedido?.folio_corto ?? "",
     monto: f?.monto_mxn === undefined ? "" : Number(f.monto_mxn).toFixed(2),
     ordenIdExterno: f?.orden_id_externo ?? t.orden_id_externo,
   };
+  const correo = de === "DEVOLUCION" ? avisoDeDevolucionFallida({ ...d, error: f?.ultimo_error ?? "" }) : de === "RETO" ? avisoDeRetoSinCerrar(d) : avisoDeConciliacionFallida({ ...d, motivo: f?.ultimo_error });
+  // Un pago del modo de prueba (0178) avisa igual —es el mismo camino, y un fallo ahí es un fallo
+  // del código—, pero el asunto lo dice: ahí no hay dinero de nadie.
   const r = await enviarCorreo({
     to: Deno.env.get("VIM_AVISOS_A") ?? "hola@vimpos.com.mx",
-    ...(de === "DEVOLUCION" ? avisoDeDevolucionFallida({ ...d, error: f?.ultimo_error ?? "" }) : de === "RETO" ? avisoDeRetoSinCerrar(d) : avisoDeConciliacionFallida({ ...d, motivo: f?.ultimo_error })),
+    ...correo, subject: f?.conexion?.de_prueba === true ? `[PRUEBA] ${correo.subject}` : correo.subject,
   });
   if (!r.enviado) registrarError(FN, "AVISO_NO_SALIO", `pago ${t.id}`);
 }

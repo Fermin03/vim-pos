@@ -15,6 +15,15 @@
 // direcciones guardadas— y NADA se lee ni se escribe en el teléfono (`vim.tienda.cliente`): eso es
 // del invitado. Lo prellenado se puede cambiar para este pedido sin tocar la cuenta.
 //
+// LA PAUSA TRAS UN RECHAZO POR RIESGO. Si el antifraude de Mercado Pago (no el banco) rechaza el
+// cobro, el pago en línea queda en pausa para ese cliente (lo decide y lo hace valer el servidor:
+// lib/pausa.ts). Aquí NO se ofrece repetir el cobro: «Pagar» deja su lugar a otra forma de pago, si
+// la hay (y en «¿Cómo pagas?» la opción en línea sale apagada, con hasta cuándo), o a llamar al
+// restaurante. El teléfono lo recuerda para que una recarga no lo haga escribir la tarjeta en balde.
+//
+// MODO DE PRUEBA. En la tienda de un negocio en modo de prueba, la pantalla de la tarjeta (y la del
+// reto del banco) lleva arriba la franja «Modo de prueba: los pagos no son reales.».
+//
 // TEXTOS PROVISIONALES (James): «Continuar», «Ir a pagar», «Regresar», «Paso N de M», la pregunta de
 // la propina y «Ahora no».
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
@@ -33,9 +42,10 @@ import { formatoMxn } from "../lib/dinero";
 import { enviarPedido, envioDeLaPagina, intentoDelNegocio, pruebaQueNoHuboCobro, resolverDuda, type Desenlace, type ResultadoDeEnvio } from "../lib/envio";
 import { formasDePago, leerOtroMonto, propinaDe, totalAPagar, type Propina as Porcentaje, type PropinaElegida } from "../lib/pago";
 import { accionDe, avanzar, pasoDelDesenlace, pasosDe, type Paso } from "../lib/pasos";
+import { BOTON_OTRA_FORMA, finDeLaPausa, guardarPausa, leerPausa, lineaDePausa, textoDePausa } from "../lib/pausa";
 import { textoDeRechazo, type CampoDeTarjeta } from "../lib/tarjeta";
 import { enlaceTel, formatoTelefono } from "../lib/telefono";
-import { RETO, apoyoDePago, nombreDePago, textoDeError } from "../lib/textos";
+import { MODO_DE_PRUEBA, RETO, apoyoDePago, nombreDePago, textoDeError } from "../lib/textos";
 import { esFinDelReto, retoQueSigue, seOfreceCancelar, vigilarReto, type PasoDelReto, type Reto } from "../lib/verificacion";
 import { CampoDeTexto } from "./campo";
 import { CamposDeTarjeta, type ManejoDeTarjeta } from "./tarjeta";
@@ -145,6 +155,11 @@ export function PasoDeDatos({
    * la dice). `esperando`: el reto terminó, o el cliente lo canceló, y falta que el servidor diga cómo quedó.
    */
   const [reto, setReto] = useState<Reto | null>(null);
+  /**
+   * El pago en línea está en pausa para este cliente (lib/pausa.ts). `hasta`: cuándo se levanta (ms).
+   * `rechazado`: acaba de pasar en esta pantalla (el cobro no se aprobó); si no, ya venía en pausa.
+   */
+  const [pausa, setPausa] = useState<{ hasta: number; rechazado: boolean } | null>(null);
   const enviando = useEnviando();
   const guardadas = cuenta?.direcciones ?? [];
   const elegida = guardadas.find((d) => d.id === direccion);
@@ -184,6 +199,34 @@ export function PasoDeDatos({
   const tokenAhora = useRef(token);
   tokenAhora.current = token;
   const cuerpo = useRef<HTMLDivElement>(null);
+
+  /** Las formas de pago que no son en línea: lo que se ofrece con el pago en línea en pausa. */
+  const otrasFormas = formas.filter((p) => p !== "EN_LINEA");
+  /** Pone la pausa (o la alarga): la recuerda el teléfono, y de aquí en adelante no se ofrece «Pagar». */
+  const pausar = (hasta: string | null | undefined, rechazado: boolean) => {
+    const fin = finDeLaPausa(hasta);
+    if (fin <= Date.now()) return;
+    guardarPausa(negocio.slug, fin);
+    setPausa({ hasta: fin, rechazado });
+    setAviso(null); setRechazoDeTarjeta(null);
+  };
+  // Al abrir (o recargar): si el teléfono recuerda una pausa viva, la pantalla nace sabiéndolo, y con
+  // otra forma de pago elegida si la hay. Quien la hace valer es el servidor, la recuerde o no.
+  useEffect(() => {
+    const fin = leerPausa(negocio.slug);
+    if (fin === null) return;
+    setPausa({ hasta: fin, rechazado: false });
+    const otra = formas.find((p) => p !== "EN_LINEA");
+    if (otra) setPago((p) => (p === "EN_LINEA" ? otra : p));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montar
+  }, [negocio.slug]);
+  // Se levanta sola a su hora, sin recargar.
+  const finDePausa = pausa?.hasta ?? null;
+  useEffect(() => {
+    if (finDePausa === null) return;
+    const reloj = setTimeout(() => setPausa(null), Math.max(finDePausa - Date.now(), 0));
+    return () => clearTimeout(reloj);
+  }, [finDePausa]);
 
   const pasos = pasosDe(formas, pago);
   const paso: Paso = pasos.includes(vista.paso) ? vista.paso : pasos[pasos.length - 1]!;
@@ -328,12 +371,17 @@ export function PasoDeDatos({
     if (pidio) { setToken(""); setReinicio((n) => n + 1); }
     // A dónde vive el dato que hay que corregir (lib/pasos.ts); null = el aviso sale aquí mismo.
     const destino = pasoDelDesenlace(desenlace, pasos);
+    // El pago en línea quedó en pausa: se anota YA, pase lo que pase abajo (si además había un intento
+    // en duda, primero se pregunta por él; la pausa sigue ahí cuando el servidor conteste).
+    if (desenlace.tipo === "pausa") pausar(desenlace.hasta, desenlace.rechazado);
     if (desenlace.tipo === "hecho") setHecho(true);
     // El banco pide confirmar: se abre el reto aquí mismo. No hay cobro todavía y la duda sigue.
     else if (desenlace.tipo === "verificar") setReto({ codigo: desenlace.codigo, url: desenlace.url, esperando: false, cancelado: false });
     // Salió un cobro y no se sabe qué pasó (sin respuesta, o un error que no lo aclara): no se ofrece
     // «reintentar». Se pregunta por ese intento, y hasta saberlo el formulario queda bloqueado.
     else if (intentoDeLaPagina.enDuda()) void comprobar.current();
+    // (La pausa ya quedó anotada arriba; el pie de la pantalla dice qué sigue.)
+    else if (desenlace.tipo === "pausa") { /* nada más */ }
     else if (desenlace.tipo === "tarjeta") {
       // No se creó ningún pedido ni se cobró nada: se dice junto a la tarjeta y el foco va ahí.
       setRechazoDeTarjeta({ campo: desenlace.campo, texto: desenlace.texto });
@@ -367,7 +415,7 @@ export function PasoDeDatos({
     } else if (d.tipo === "libre" && d.rechazo !== undefined) {
       // Ese pago no pasó y el pedido se descartó: se dice, y se puede pagar otra vez.
       setDuda(null);
-      decirRechazo.current(d.rechazo);
+      decirRechazo.current(d.rechazo, d.hasta);
     } else if (d.tipo === "hecho") {
       // El pedido sí había entrado: a su página, que dice cómo va el pago.
       setHecho(true); setDuda(null);
@@ -382,8 +430,10 @@ export function PasoDeDatos({
   }, []);
 
   /** Un pago que no pasó (y no se cobró): junto a la tarjeta, con el foco ahí; sin pantalla de tarjeta a la vista, encima del botón. */
-  const decirRechazo = useRef<(detalle: string | null) => void>(() => {});
-  decirRechazo.current = (detalle) => {
+  const decirRechazo = useRef<(detalle: string | null, hasta?: string | null) => void>(() => {});
+  decirRechazo.current = (detalle, hasta) => {
+    // Por riesgo (el antifraude, no el banco): no se invita a repetirlo; el pago en línea queda en pausa.
+    if (detalle === "RIESGO") { pausar(hasta, true); if (pasos.includes("tarjeta")) irA("tarjeta"); return; }
     const t = textoDeRechazo(detalle, formas.length > 1);
     if (!pasos.includes("tarjeta")) { setAviso({ tipo: "aviso", tono: "danger", texto: t.texto, sigue: "reintentar" }); return; }
     setRechazoDeTarjeta(t);
@@ -412,7 +462,7 @@ export function PasoDeDatos({
       intentoDeLaPagina.aclarar();
       const cancelado = reto?.cancelado ?? false;
       setReto(null);
-      decirRechazo.current(cancelado ? "CANCELADO" : p.detalle);
+      decirRechazo.current(cancelado ? "CANCELADO" : p.detalle, p.hasta);
     }
   };
   const vigia = useRef<ReturnType<typeof vigilarReto> | null>(null);
@@ -455,6 +505,8 @@ export function PasoDeDatos({
 
   // Con un intento en duda (o enviando, o con el reto del banco a la vista) no se navega: ni adelante ni atrás.
   const ocupado = robot || enviando || hecho || duda !== null || enReto;
+  /** El pago en línea está en pausa Y es lo que se iba a usar: «Pagar» no se ofrece. */
+  const enPausa = pausa !== null && enLinea;
 
   /** Manda el pedido con ese total (el del botón, o el nuevo que confirmó). */
   const intentar = (total: string | null) => {
@@ -474,7 +526,17 @@ export function PasoDeDatos({
     else if (a.tipo === "otro-monto") { setOtroTocado(true); setVista({ paso: "pago", foco: `${id}-otro` }); }
     else if (a.tipo === "preguntar") { setPreguntada(true); setPreguntando(true); }
     else if (a.tipo === "paso") irA(a.paso);
+    // Con el pago en línea en pausa no sale otro cobro, ni con Enter: el servidor lo rechazaría igual.
+    else if (enPausa) return;
     else intentar(total);
+  };
+
+  /** «Elegir otra forma de pago»: a «¿Cómo pagas?», con la primera que no es en línea ya elegida. */
+  const aOtraForma = () => {
+    const otra = otrasFormas[0];
+    if (!otra || ocupado) return;
+    setPago(otra); setConTarjeta(false); setRechazo((r) => ({ ...r, pago: undefined }));
+    irA("pago", `${id}-pago`);
   };
 
   /** La flecha: a la pantalla anterior (o al carrito desde la primera). Nada de lo escrito se pierde. */
@@ -551,6 +613,15 @@ export function PasoDeDatos({
           </button>
           {pasos.length > 1 && <p id={`${id}-paso`} className="text-13 tabular-nums text-ink-2">Paso {pasos.indexOf(paso) + 1} de {pasos.length}</p>}
         </div>}
+
+        {/* Modo de prueba: fija arriba de la pantalla de la tarjeta (y del reto del banco, que la reemplaza). No se cierra. */}
+        {negocio.pago_de_prueba && enLinea && (paso === "tarjeta" || enReto) && (
+          <div className="px-4 pt-2">
+            <Aviso tono="info" className="!text-14">
+              <strong className="font-semibold">{MODO_DE_PRUEBA.titulo}</strong> {MODO_DE_PRUEBA.ayuda}
+            </Aviso>
+          </div>
+        )}
 
         {/* El reto del banco ocupa el lugar de la pantalla en la que se estaba; la tarjeta sigue montada, oculta. */}
         {reto && (
@@ -692,14 +763,20 @@ export function PasoDeDatos({
                 <ul role="radiogroup" aria-labelledby={`${id}-titulo-pago`} className="flex flex-col">
                   {formas.map((p) => (
                     <li key={p}>
-                      <label className="flex min-h-12 cursor-pointer items-center gap-3 py-2 text-16">
-                        <input type="radio" name={`${id}-forma`} checked={pago === p} disabled={ocupado} className="h-6 w-6 flex-shrink-0 accent-ink"
+                      <label className={cn("flex min-h-12 items-center gap-3 py-2 text-16", p === "EN_LINEA" && pausa ? "text-ink-3" : "cursor-pointer")}>
+                        <input type="radio" name={`${id}-forma`} checked={pago === p} disabled={ocupado || (p === "EN_LINEA" && pausa !== null)} className="h-6 w-6 flex-shrink-0 accent-ink"
+                          aria-describedby={p === "EN_LINEA" && pausa ? `${id}-pausa` : undefined}
                           onChange={() => {
                             setPago(p); setRechazo((r) => ({ ...r, pago: undefined }));
                             // Si ya no paga en línea, la tarjeta se desmonta: volver a elegirlo no la carga hasta llegar a su pantalla.
                             if (p !== "EN_LINEA") setConTarjeta(false);
                           }} />
-                        {nombreDePago(p, formas.includes("EN_LINEA"))}
+                        {p === "EN_LINEA" && pausa ? (
+                          <span className="min-w-0">
+                            {nombreDePago(p, true)}
+                            <span id={`${id}-pausa`} className="block text-14 text-ink-2">{lineaDePausa(pausa.hasta)}</span>
+                          </span>
+                        ) : nombreDePago(p, formas.includes("EN_LINEA"))}
                       </label>
                     </li>
                   ))}
@@ -773,6 +850,23 @@ export function PasoDeDatos({
           <>
             {propina === "otro" && boton("Ir a pagar", aPagar)}
             <button key="ahora-no" type="button" onClick={() => elegirPropina(0)} disabled={ocupado} className={GHOST}>Ahora no</button>
+          </>
+        ) : pausa && enPausa && enLaUltima ? (
+          // El pago en línea en pausa: no se repite el cobro. Otra forma de pago si la hay; si no, llamar.
+          <>
+            <Aviso tono={pausa.rechazado ? "danger" : "warning"} role="alert" className="!text-14">
+              {textoDePausa(pausa.hasta, { recienRechazado: pausa.rechazado, otrasFormas: otrasFormas.length > 0 })}
+            </Aviso>
+            {otrasFormas.length > 0 ? (
+              <button key="otra-forma" type="button" onClick={aOtraForma} disabled={ocupado} className={cn(PRINCIPAL, "h-14 w-full justify-center px-5 text-16")}>{BOTON_OTRA_FORMA}</button>
+            ) : (
+              <>
+                {tel
+                  ? <a href={tel} className={cn(PRINCIPAL, "h-14 w-full px-5 text-16")}>Llamar al {formatoTelefono(sucursal.telefono ?? "")}</a>
+                  : sucursal.telefono && <p className="text-16 font-semibold">{sucursal.telefono}</p>}
+                <button type="button" onClick={alVolver} disabled={ocupado} className={GHOST}>Volver a tu pedido</button>
+              </>
+            )}
           </>
         ) : totalNuevo ? (
           <>

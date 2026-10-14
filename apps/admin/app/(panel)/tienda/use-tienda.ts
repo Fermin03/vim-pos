@@ -6,7 +6,7 @@ import { leerModulos } from "../../lib/modulos";
 import { ponerLogoTienda, quitarLogoTienda } from "../../lib/foto-producto";
 import { accionConexionTienda, conexionTiendaDisponible, iniciarConexionTienda, leerConexionesTienda, mensajeErrorConexionTienda, type ConexionTienda } from "../../lib/tienda-conexion";
 import {
-  contarPendientesDeCatalogo, encenderTienda, leerCajasDeTienda, leerCombosNoComprables, guardarConfigTienda, leerConfigTienda, guardarCuentaDeSucursal, guardarSucursalTienda, leerPagosTienda, leerSucursalesTienda, leerTiendaEncendida, urlDelLogo,
+  contarPendientesDeCatalogo, encenderTienda, leerCajasDeTienda, leerCombosNoComprables, guardarConfigTienda, leerConfigTienda, guardarCuentaDeSucursal, guardarSucursalTienda, leerModoDePrueba, leerPagosTienda, leerSucursalesTienda, leerTiendaEncendida, urlDelLogo,
   type BloqueConfig, type DatosConfigTienda,
 } from "../../lib/tienda";
 import { normalizarDireccion, trasEscribir, type Escritura, type Leido } from "../../lib/tienda-pagina";
@@ -33,7 +33,7 @@ const DE_FABRICA: DatosConfigTienda = {
 // mientras el interruptor sigue en `true`. `leerModulos` lanza el mensaje crudo de la base: aquí se
 // cambia por uno que el dueño entienda.
 async function leerTodo(): Promise<Leido> {
-  const [config, sucursales, interruptor, pendientes, combosNoComprables, modulos, cuentas, pagos, cajas] = await Promise.all([
+  const [config, sucursales, interruptor, pendientes, combosNoComprables, modulos, cuentas, pagos, cajas, dePrueba] = await Promise.all([
     leerConfigTienda(), leerSucursalesTienda(), leerTiendaEncendida(), contarPendientesDeCatalogo(),
     // Solo es un aviso: si no se puede revisar, la página carga igual.
     leerCombosNoComprables().catch(() => []),
@@ -44,8 +44,10 @@ async function leerTodo(): Promise<Leido> {
     leerPagosTienda().catch(() => null),
     // Solo es un aviso: si no se puede revisar, no se avisa.
     leerCajasDeTienda().catch(() => []),
+    // La marca del modo de prueba (la pone VIM): si no se puede leer, no es modo de prueba.
+    leerModoDePrueba().catch(() => false),
   ]);
-  return { config, sucursales, interruptor, pendientes, combosNoComprables, cuentas, pagos, cajasSinActualizar: sucursalesConCajaSinActualizar(sucursales, cajas), enPlan: modulos.permitidos.tienda === true };
+  return { config, sucursales, interruptor, pendientes, combosNoComprables, cuentas, pagos, dePrueba, cajasSinActualizar: sucursalesConCajaSinActualizar(sucursales, cajas), enPlan: modulos.permitidos.tienda === true };
 }
 
 function formularioDe(c: DatosConfigTienda): Formulario {
@@ -282,10 +284,10 @@ export function useTienda() {
     sinLeer,
     /** Lo que se le dice al dueño: el interruptor Y el complemento vigente. */
     encendida: leido !== null && leido.interruptor && leido.enPlan,
-    /** Con una cuenta activa que cobre de verdad (no de prueba) se puede ofrecer el pago en línea. */
-    hayCuentaActiva: leido !== null && cuentasActivas(leido.cuentas).some((c) => !c.de_prueba),
+    /** Con una cuenta activa que cobre de verdad (no de prueba) se puede ofrecer el pago en línea. En modo de prueba, al revés: con la de prueba. */
+    hayCuentaActiva: leido !== null && cuentasActivas(leido.cuentas).some((c) => (leido.dePrueba === true) === c.de_prueba),
     /** El dueño ofrece pago en línea (lo GUARDADO) y la tienda no lo está ofreciendo: qué pasa y dónde. */
-    avisoCobro: leido ? avisoDeCobro(leido.config?.pagoEnLinea === true, leido.cuentas, leido.sucursales) : null,
+    avisoCobro: leido ? avisoDeCobro(leido.config?.pagoEnLinea === true, leido.cuentas, leido.sucursales, leido.dePrueba === true) : null,
     mensajeDe,
     mensajeDeSucursal: (id: string): MensajeTienda | null => mensajeDe(deSucursal(id)),
     /** El id de la sucursal que se está guardando, si es una sucursal lo que se guarda. */

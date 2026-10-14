@@ -29,6 +29,8 @@ export type Negocio = {
   pago_efectivo: boolean; pago_tarjeta: boolean;
   /** El negocio ofrece pagar en línea. Se ofrece solo en las sucursales que también lo digan. */
   pago_en_linea: boolean;
+  /** Modo de prueba: los pagos en línea de esta tienda no son reales (van al ambiente de prueba de Mercado Pago). */
+  pago_de_prueba: boolean;
   sucursales: Sucursal[];
 };
 
@@ -104,6 +106,8 @@ export type Seguimiento = {
   /** Lo del pago en línea; null en un pedido que se paga al recibir. */
   enLinea: {
     estado: EstadoDePago; propina_mxn: string; total_a_pagar_mxn: string;
+    /** El pago de ESTE pedido se hizo en modo de prueba: no fue real. */
+    dePrueba: boolean;
   } | null;
   renglones: { nombre: string; cantidad: number; detalle: string | null }[];
   subtotal_mxn: string; envio_total_mxn: string; total_mxn: string; pago: Pago;
@@ -128,7 +132,11 @@ export type PedidoDeCuenta = {
   items: ItemDeCuerpo[] | null;
 };
 
-export type ErrorDeTienda = { error: string; detalle: string | null };
+/**
+ * `hasta`: solo con el pago en línea en pausa tras un rechazo por riesgo (`PAGO_EN_PAUSA`, o
+ * `PAGO_RECHAZADO` con detalle `RIESGO`): hasta cuándo, en ISO. Ausente o null en todo lo demás.
+ */
+export type ErrorDeTienda = { error: string; detalle: string | null; hasta?: string | null };
 
 export const FORMA_SLUG = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/;
 export const FORMA_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -192,6 +200,7 @@ export const negocioDe = lector((x): Negocio => {
     pago_efectivo: bool(n.pago_efectivo), pago_tarjeta: bool(n.pago_tarjeta),
     // Solo un `true` cuenta: una función anterior al pago en línea no manda la clave.
     pago_en_linea: n.pago_en_linea === true,
+    pago_de_prueba: n.pago_de_prueba === true,
     sucursales: lista(n.sucursales, (y) => {
       const s = obj(y), e = obj(s.estado);
       return {
@@ -277,6 +286,7 @@ export const seguimientoDe = lector((x): Seguimiento => {
     // Un pedido en línea SIN el estado de su pago no se pinta a medias: es una respuesta ilegible.
     enLinea: s.pago !== "EN_LINEA" ? null : {
       estado: uno(s.pago_estado, ESTADOS_DE_PAGO), propina_mxn: importe(s.propina_mxn), total_a_pagar_mxn: importe(s.total_a_pagar_mxn),
+      dePrueba: s.pago_de_prueba === true,
     },
   };
 });
@@ -288,7 +298,11 @@ export const seguimientoDe = lector((x): Seguimiento => {
 export function errorDe(x: unknown, porDefecto = "SERVICIO_NO_DISPONIBLE"): ErrorDeTienda {
   const o = typeof x === "object" && x !== null ? (x as Obj) : {};
   if (typeof o.error !== "string" || !/^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/.test(o.error) || o.error.length > 64) return { error: porDefecto, detalle: null };
-  return { error: o.error, detalle: typeof o.detalle === "string" && /^[A-Za-z0-9_.-]{1,64}$/.test(o.detalle) ? o.detalle : null };
+  return {
+    error: o.error, detalle: typeof o.detalle === "string" && /^[A-Za-z0-9_.-]{1,64}$/.test(o.detalle) ? o.detalle : null,
+    // Solo una fecha con la forma que manda la función (ISO en UTC): cualquier otra cosa no es una hora.
+    ...(typeof o.hasta === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$/.test(o.hasta) && { hasta: o.hasta }),
+  };
 }
 
 // ── Cuentas ──────────────────────────────────────────────────────────────────────────────────────

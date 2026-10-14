@@ -1,6 +1,6 @@
 # Pago en línea de la tienda — diseño vigente (Orders API, formulario propio, conexión propia)
 
-Actualizado el 12 de octubre de 2026 (verificación del banco). Sustituye al diseño con Payments API y conexión compartida con
+Actualizado el 13 de octubre de 2026 (modo de prueba y freno tras un rechazo por riesgo). Sustituye al diseño con Payments API y conexión compartida con
 la terminal, que a su vez sustituyó a Checkout Pro. Lo probado contra Mercado Pago está en
 [`04-verificado-orders.md`](04-verificado-orders.md) y **manda sobre este documento**. Firma del
 aviso, OAuth y tarjetas de prueba: [`01-resumen-api.md`](01-resumen-api.md) y
@@ -163,6 +163,82 @@ la marca de la conexión.
   por hora en `tienda_eventos` (`accion = 'barrido:sin_configurar'`).
 - Una orden viva con nuestra referencia que no se puede aplicar no cuenta como conciliada; al tercer
   intento sale el correo «posible cobro sin pedido», con el id de la orden y el motivo.
+
+## El freno tras un rechazo por riesgo (0178)
+
+`high_risk` no lo dice el banco: lo dice el antifraude de Mercado Pago. Su soporte pide «evitar
+reintentos inmediatos con los mismos datos»: repetir el cobro idéntico empeora la puntuación del
+restaurante. Por eso, tras un rechazo con motivo `RIESGO`:
+
+- **Ese cliente no puede cobrar en línea en ese negocio durante 30 minutos.** «Ese cliente» es su
+  **teléfono Y su IP a la vez** (IPv6: su /64): una sola clave con los dos. Es un freno para que el
+  MISMO cliente no repita el cobro al instante, no una defensa contra el abuso (esa son los topes
+  por IP). Con la IP sola frenaría a todos los que comparten red (el wifi del local, un operador
+  móvil); con el teléfono solo, cualquiera frenaría a otro escribiendo su número. Consecuencia
+  aceptada: quien cambia de red (wifi → datos) o de teléfono ya no está frenado. **Sin IP conocida
+  no hay freno.** Solo el pago en línea: puede pedir para pagar al recibir.
+- **La clave** es un HMAC-SHA256 de negocio + teléfono + IP con una llave que deriva de
+  `VIM_TIENDA_SECRET` (`claveDeFreno`, rechazos.ts; igual que `enlace.ts`). La calcula la función y
+  es lo único que llega a la base: de ella no se saca ni el teléfono ni la IP.
+- **Mientras dure, `pedir` con pago en línea contesta 409 `PAGO_EN_PAUSA` con `hasta`** (ISO, UTC),
+  sin crear el pedido ni llamar a Mercado Pago. Se mira **después del antirobot** (antes serviría
+  para preguntar, sin costo, si un teléfono tuvo un rechazo) y antes del cupo del negocio (no lo
+  gasta). **No cuenta como rechazo**: no suma a ningún tope de «Contra la prueba masiva de
+  tarjetas». El rechazo que lo provocó sí cuenta, una vez, como cualquier otro.
+- **El 409 `PAGO_RECHAZADO` con `detalle: "RIESGO"` trae `hasta`.** Si a esa IP ya no se le dice el
+  motivo (va `OTRO`), el freno se pone igual y `hasta` no viaja: lo sabrá al intentar otra vez.
+- **Dónde vive:** en `limites_cupo` (0136), con su vencimiento (`tienda_pago_frenar`,
+  `tienda_pago_frenado`; reciben la clave ya calculada).
+- **Quién lo pone:** la función `tienda` cuando el rechazo llega en la respuesta del cobro o al
+  terminar la verificación del banco (`respuestaDeRechazo`, rechazos.ts); y un disparador sobre
+  `tienda_pagos` cuando llega después —por el aviso, la página del pedido o el barrido—, que es
+  como se vio en producción (`in_review` y, segundos después, `failed`). Para eso **el pago guarda
+  al nacer su clave de freno** (`tienda_pagos.freno_clave`: la del teléfono y la IP con que se
+  pidió): el disparador no conoce el secreto ni la IP. Un pago sin clave no frena a nadie.
+- **En la tienda** (`lib/pausa.ts`): no se ofrece repetir el cobro. «Pagar» deja su lugar a
+  «Elegir otra forma de pago» —que lleva a «¿Cómo pagas?» con la opción en línea apagada y hasta
+  cuándo— o, si en línea es la única forma, a llamar al restaurante. El teléfono lo recuerda para
+  que una recarga no haga escribir la tarjeta en balde; quien lo hace valer es el servidor.
+- Los demás rechazos (fondos, datos, llamar al banco, verificación fallida) siguen como siempre: se
+  corrige y se reintenta.
+
+**Sin verificar:** si 30 minutos es lo que Mercado Pago considera «no inmediato» (su soporte no dio
+un número), y si en producción un cobro repetido tras ese tiempo deja de salir `high_risk`.
+
+## Modo de prueba (0178)
+
+Para probar el pago de punta a punta sin dinero real: operación y pasos en
+[`docs/operacion/tienda-pago-modo-de-prueba.md`](../../operacion/tienda-pago-modo-de-prueba.md).
+
+- **La marca**: `tienda_config.pago_de_prueba`. Solo la pone VIM por SQL: `authenticated` no tiene
+  INSERT ni UPDATE sobre esa columna (privilegios por columna), y ninguna función a su alcance la
+  escribe. Tampoco la apaga borrando la fila para crearla otra vez: perdió el DELETE de la tabla y
+  un disparador niega borrar la fila con la marca puesta a quien llega con sesión. **Quien añada una columna a `tienda_config` tiene que darle su GRANT** (el smoke lo vigila).
+- **La conexión de prueba**: una fila de `tienda_conexiones` con `de_prueba` y su access token en
+  Vault, sin refresh ni vencimiento (`tienda_conexion_de_prueba`, solo `service_role`; se niega sin
+  la marca). No se renueva: la regla de la renovación ya deja fuera a la que no tiene vencimiento.
+  **No es del dueño**: `terminal-mp-conexion` (destino tienda) no la desconecta
+  (`CONEXION_DE_PRUEBA`), no canjea con el negocio en modo de prueba (`MODO_DE_PRUEBA`) y no pisa
+  con un canje una fila `de_prueba` que ya existe (`CUENTA_DE_PRUEBA`); el admin no pinta
+  «Desconectar» en ella.
+- **Qué conexión cobra** (`tienda_conexion_cobro`): negocio en modo de prueba → SOLO su conexión de
+  prueba (la única activa con `de_prueba`; no se mira la elegida por sucursal); negocio normal →
+  NUNCA una de prueba; su regla es la de siempre con un cambio: para «la única activa» cuentan solo
+  las reales, así que una de prueba que quedó activa no estorba al apagar el modo. Cada pago guarda
+  su conexión: no se mezclan.
+- **La orden se verifica igual** (referencia, monto, moneda y cuenta vendedora de la conexión del pago).
+- **Avisos**: se acepta la firma de cualquiera de las dos claves y **no** se cruza con el tipo de
+  pago, porque la firma no decide nada: la orden se consulta con el token de la conexión del pago y
+  tiene que traer su cuenta vendedora. Un aviso con la clave «equivocada» solo provoca una consulta.
+- **El pagador**: en un pago de prueba se manda a Mercado Pago el usuario de prueba
+  (`MP_TIENDA_PAGADOR_DE_PRUEBA`, solo si termina en `@testuser.com`); el correo del cliente sigue
+  siendo el de nuestros correos. Ninguno de los dos llega al rastro de un cobro no aceptado.
+- **Topes**: en modo de prueba no cuentan los de tarjetas rechazadas ni los cupos de `pedir` por IP
+  y restaurante y por negocio (para eso el de IP y restaurante de un pago en línea se gasta ya con
+  el negocio resuelto: `conNegocio` en `cuposDe`; mismos 8 por hora, misma clave). Siguen el
+  antirobot, el de 40 por hora por IP y el freno por riesgo. No se pausa nada ni sale correo de pausa.
+- **Que se note**: `tienda_negocio` dice `pago_de_prueba` (franja en la pantalla de la tarjeta) y
+  `tienda_seguimiento` dice, de cada pedido en línea, si SU pago fue de prueba.
 
 ## Contra la prueba masiva de tarjetas
 

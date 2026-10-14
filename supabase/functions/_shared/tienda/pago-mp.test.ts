@@ -2,7 +2,8 @@
 // (docs/integraciones/mercado-pago-checkout-pro/04-verificado-orders.md), recortadas como están allá.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { articulosDeOrden, clienteMpTienda, cuentaComoRechazo, cuerpoDeOrden, decidirOrden, type DetalleDePedido, enReto, motivoDeRechazo, nombreDePagador, ordenAtascada, ordenesDeBusqueda, ordenViva, partesDeCotizacion, respuestaDeCobro, resumenDeFallo, rutaDeBusqueda, sinDatosPersonales, telefonoDePagador, urlDeReto } from "./pago-mp.ts";
+import { readFileSync } from "node:fs";
+import { articulosDeOrden, clienteMpTienda, cuentaComoRechazo, cuerpoDeOrden, decidirOrden, type DetalleDePedido, enReto, motivoDeRechazo, nombreDePagador, ordenAtascada, ordenesDeBusqueda, ordenViva, pagadorDePrueba, partesDeCotizacion, respuestaDeCobro, resumenDeFallo, rutaDeBusqueda, sinDatosPersonales, telefonoDePagador, urlDeReto } from "./pago-mp.ts";
 
 const PAGO = "2cd9e6fa-1acf-47dc-8ba4-cba918d73770";
 const E = { pagoId: PAGO, cuentaVendedora: "3754297554" };
@@ -375,4 +376,27 @@ test("aprobada tras el reto (VERIFICADO: authenticated y ya sin dirección): se 
   const d = decidirOrden(E, { ...ORDEN_APROBADA, transactions: { payments: [{ ...ORDEN_APROBADA.transactions.payments[0],
     payment_method: { id: "master", type: "credit_card", transaction_security: { id: "x", type: "threeds", status: "authenticated", validation: "on_fraud_risk", liability_shift: "required" } } }] } });
   assert.equal(d.tipo, "APROBADO");
+});
+
+// ── Modo de prueba y freno (0178) ───────────────────────────────────────────────────────────────
+test("el pagador de prueba solo vale si es un usuario de prueba de Mercado Pago (…@testuser.com)", () => {
+  assert.equal(pagadorDePrueba("test_user_3753760462@testuser.com"), "test_user_3753760462@testuser.com");
+  assert.equal(pagadorDePrueba("  Test_User_3753760462@TestUser.com \n"), "test_user_3753760462@testuser.com");
+  // El correo de una persona, o cualquier otra cosa, es como si no estuviera: nunca se manda en lugar del del cliente.
+  for (const v of [undefined, null, "", "   ", "fermin@gmail.com", "test_user@testuser.com.mx", "@testuser.com", "a b@testuser.com", "test_user_1@testuser.com,otro@x.com", "testuser.com"]) {
+    assert.equal(pagadorDePrueba(v), null, String(v));
+  }
+});
+
+test("el motivo que frena desde la base (0178) es el mismo que aquí es RIESGO", () => {
+  // El disparador de la 0178 mira el motivo tal como lo guarda tienda_pago_aplicar; si un día cambia
+  // el nombre aquí o allá, el freno del rechazo tardío dejaría de ponerse sin que nada lo diga.
+  const sql = readFileSync(new URL("../../../migrations/0178_tienda_modo_de_prueba_y_freno.sql", import.meta.url), "utf8");
+  const motivo = /NEW\.detalle = '([a-z_0-9]+)'/.exec(sql)?.[1];
+  assert.equal(motivo, "high_risk");
+  assert.equal(motivoDeRechazo(motivo), "RIESGO");
+  // Y es el único motivo de esa familia: no hay otro por el que debiera frenar.
+  for (const m of ["insufficient_amount", "bad_filled_card_data", "required_call_for_authorize", "card_disabled", "3ds_challenge_failed", "canceled", "expired", "rejected_by_issuer"]) {
+    assert.notEqual(motivoDeRechazo(m), "RIESGO", m);
+  }
 });

@@ -36,6 +36,16 @@ export type FilaPago = {
   conciliaciones: number;
   /** `tienda_conexiones.cuenta_id_externo`: el user_id de Mercado Pago que tiene que traer la orden. */
   cuenta_vendedora: string;
+  /**
+   * `tienda_conexiones.de_prueba`: este pago se cobra contra el ambiente de PRUEBA de Mercado Pago
+   * (un negocio en modo de prueba, 0178). Todo lo demás es igual: mismas comprobaciones, mismo camino.
+   */
+  de_prueba: boolean;
+  /**
+   * `tienda_pagos.freno_clave`: la clave del freno por riesgo del cliente de este pago (rechazos.ts),
+   * guardada al crear el pedido. null = no se conocía su IP: ese pago no frena a nadie.
+   */
+  freno_clave: string | null;
 };
 
 export type Aplicado = { estado: string; pedido_estado: string; recien_aprobado: boolean };
@@ -77,6 +87,13 @@ export type Deps = {
   mp: (token: string) => ClienteMpTienda;
   /** Al log, con un código. Nunca lleva tokens ni el cuerpo de una respuesta. */
   registrar: (codigo: string, detalle: string) => void;
+  /**
+   * El correo que se le manda a Mercado Pago como pagador cuando el pago es de PRUEBA (ya validado:
+   * `pagadorDePrueba`). Mercado Pago exige ahí un usuario de prueba; así quien prueba no tiene que
+   * escribirlo. El correo que escribió el cliente sigue siendo el de NUESTROS correos. null o
+   * ausente = se manda el del cliente, como en un pago real.
+   */
+  pagadorDePrueba?: string | null;
   /** La llave de idempotencia de una devolución: NUEVA en cada intento (por omisión, un uuid). */
   llave?: () => string;
   ahora?: () => Date;
@@ -178,7 +195,10 @@ export async function cobrarPago(deps: Deps, datos: Omit<DatosCobro, "monto">): 
   // (Sin token y con el cobro ya mandado no se llega aquí: `tomarCobro` dio falso arriba.)
   if (!token) return { tipo: "POR_CONFIRMAR" };
   // El cuerpo lleva además lo del pedido y del pagador (para el antifraude); la llave es la de siempre.
-  const r = await deps.mp(token).crearOrden(cuerpoDeOrden({ ...datos, monto: fila.monto }), `tienda-pago-${fila.id}`, datos.tarjeta.dispositivo);
+  // Solo en un pago de PRUEBA (lo dice la conexión del pago, nunca quien llama): el correo del
+  // pagador es el del usuario de prueba, que es lo que Mercado Pago exige en su ambiente de prueba.
+  const email = fila.de_prueba ? deps.pagadorDePrueba || datos.email : datos.email;
+  const r = await deps.mp(token).crearOrden(cuerpoDeOrden({ ...datos, email, monto: fila.monto }), `tienda-pago-${fila.id}`, datos.tarjeta.dispositivo);
   const que = respuestaDeCobro({ pagoId: fila.id, cuentaVendedora: fila.cuenta_vendedora }, r);
   if (que.tipo === "SIN_PERMISO") {
     deps.registrar("COBRO_SIN_PERMISO", `conexión ${fila.conexion_id}: ${resumenDeFallo(r)}`);
@@ -190,7 +210,8 @@ export async function cobrarPago(deps: Deps, datos: Omit<DatosCobro, "monto">): 
   }
   if (que.tipo === "NO_ACEPTADO") {
     // El mensaje de Mercado Pago nombra la propiedad que no le gustó; por si repite su VALOR, se le quitan los datos del cliente.
-    deps.registrar("COBRO_NO_ACEPTADO", `${resumenDeFallo(r)} — ${sinDatosPersonales(motivoDeNoAceptado(r), datos)}`);
+    // (Y el correo que de verdad se mandó como pagador, si es el de prueba: tampoco va al rastro.)
+    deps.registrar("COBRO_NO_ACEPTADO", `${resumenDeFallo(r)} — ${sinDatosPersonales(sinDatosPersonales(motivoDeNoAceptado(r), datos), { ...datos, email })}`);
     // «No se creó nada» lo dice un 400, pero se comprueba: ¿hay alguna orden con nuestra referencia?
     // El cobro ya contestó (con un no): si dejó una orden abierta no hay que esperarla, se cancela ya.
     const c = await confirmarPago(deps, fila.id, undefined, true);

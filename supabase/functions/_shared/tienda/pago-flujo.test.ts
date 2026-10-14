@@ -9,7 +9,7 @@ const PAGO = "2cd9e6fa-1acf-47dc-8ba4-cba918d73770";
 const ORDEN = "ORDTST01M4P8JX8C82XV8G7EB2A16YAC";
 const FILA: FilaPago = {
   id: PAGO, conexion_id: "cx-1", estado: "CREADO", monto: "138.00", cobro_mandado: false,
-  orden_id_externo: null, detalle: null, creado: "2026-10-11T18:00:00.000Z", en_verificacion: false, conciliaciones: 0, cuenta_vendedora: "3754297554",
+  orden_id_externo: null, detalle: null, creado: "2026-10-11T18:00:00.000Z", en_verificacion: false, conciliaciones: 0, cuenta_vendedora: "3754297554", de_prueba: false, freno_clave: null,
 };
 const APROBADA = {
   id: ORDEN, status: "processed", status_detail: "accredited", total_amount: "138.00", total_paid_amount: "138.00",
@@ -29,6 +29,8 @@ function doble(o: {
   mp?: Partial<Record<Metodo, RespuestaMp | RespuestaMp[]>>; devolucion?: (ok: boolean) => string;
   aplicar?: (ordenIdExterno: string) => { estado: string; pedido_estado: string; recien_aprobado: boolean };
   tercerFallo?: (id: string) => boolean;
+  /** El usuario de prueba configurado (MP_TIENDA_PAGADOR_DE_PRUEBA), ya validado. */
+  pagadorDePrueba?: string | null;
 } = {}) {
   const llamadas: string[] = [];
   const tokens: string[] = [];
@@ -77,6 +79,7 @@ function doble(o: {
       };
     },
     registrar: (codigo, detalle) => { llamadas.push(`registrar ${codigo} ${detalle}`); },
+    pagadorDePrueba: o.pagadorDePrueba,
     llave: () => `llave-${++llaves}`,
     ahora: () => new Date("2026-10-11T18:03:00.000Z"),
   };
@@ -773,4 +776,80 @@ test("el correo del reto sin cerrar dice que NO hay cobro y lleva la orden; sin 
   assert.ok(c.html.includes(ORDEN_RETO) && c.html.includes(PAGO) && c.html.includes("No se ha cobrado nada") && c.html.includes("Knock-Out &lt;Burger&gt;"));
   assert.ok(!c.html.includes("Posible cobro") && !/[^\x00-\x7F]/.test(c.subject));
   for (const dato of DEL_RETO) assert.equal(c.html.includes(dato), false);
+});
+
+// ── Modo de prueba (0178) ───────────────────────────────────────────────────────────────────────
+const PAGADOR = "test_user_3753760462@testuser.com";
+const pagadorDe = (cuerpo: unknown): unknown => (cuerpo as { payer: { email: unknown } }).payer.email;
+
+test("pago de prueba: a Mercado Pago se le manda el usuario de prueba como pagador; todo lo demás es el cobro de siempre", async () => {
+  const { deps, llamadas, tokens, cuerpos } = doble({ filas: [{ ...FILA, de_prueba: true }], pagadorDePrueba: PAGADOR, mp: { crearOrden: { status: 201, cuerpo: APROBADA } } });
+  assert.deepEqual(await cobrarPago(deps, DATOS), { tipo: "APROBADO", recienAprobado: true });
+  assert.equal(pagadorDe(cuerpos[0]), PAGADOR);
+  // El correo del cliente no viaja a Mercado Pago en ese cobro (sigue siendo el de nuestros correos, que no salen de aquí).
+  assert.equal(JSON.stringify(cuerpos[0]).includes(DATOS.email), false);
+  // Mismo monto de la base, misma referencia, misma llave, mismo token de SU conexión, y se aplica igual.
+  const { payer: _p, ...resto } = cuerpos[0] as Record<string, unknown>;
+  const real = doble({ mp: { crearOrden: { status: 201, cuerpo: APROBADA } } });
+  await cobrarPago(real.deps, DATOS);
+  const { payer: _q, ...restoReal } = real.cuerpos[0] as Record<string, unknown>;
+  assert.deepEqual(resto, restoReal);
+  assert.deepEqual(llamadas, real.llamadas);
+  assert.deepEqual(tokens, ["TOKEN"]);
+});
+
+test("un pago REAL nunca lleva el usuario de prueba, aunque esté configurado", async () => {
+  const { deps, cuerpos } = doble({ pagadorDePrueba: PAGADOR, mp: { crearOrden: { status: 201, cuerpo: APROBADA } } });
+  await cobrarPago(deps, DATOS);
+  assert.equal(pagadorDe(cuerpos[0]), DATOS.email);
+  assert.equal(JSON.stringify(cuerpos[0]).includes("testuser"), false);
+});
+
+test("pago de prueba sin usuario de prueba configurado: sale con el correo que escribió quien prueba", async () => {
+  for (const pagadorDePrueba of [undefined, null, ""]) {
+    const { deps, cuerpos } = doble({ filas: [{ ...FILA, de_prueba: true }], pagadorDePrueba, mp: { crearOrden: { status: 201, cuerpo: APROBADA } } });
+    await cobrarPago(deps, DATOS);
+    assert.equal(pagadorDe(cuerpos[0]), DATOS.email, String(pagadorDePrueba));
+  }
+});
+
+test("pago de prueba: la orden se cree con las mismas comprobaciones (referencia, cuenta vendedora de SU conexión, moneda)", async () => {
+  // La cuenta de prueba cobra con su conexión: una orden de OTRA cuenta (la real del negocio) no la paga.
+  const ajena = doble({ filas: [{ ...FILA, de_prueba: true, cuenta_vendedora: "3754297554" }], pagadorDePrueba: PAGADOR,
+                        mp: { crearOrden: { status: 201, cuerpo: { ...APROBADA, user_id: "111222333" } } } });
+  assert.deepEqual(await cobrarPago(ajena.deps, DATOS), { tipo: "POR_CONFIRMAR" });
+  assert.ok(sin(ajena.llamadas, "aplicar"));
+  // Y al revés: un pago real no se da por pagado con una orden de la cuenta de prueba.
+  const cruzada = doble({ filas: [{ ...FILA, cuenta_vendedora: "111222333" }], mp: { crearOrden: { status: 201, cuerpo: APROBADA } } });
+  assert.deepEqual(await cobrarPago(cruzada.deps, DATOS), { tipo: "POR_CONFIRMAR" });
+  assert.ok(sin(cruzada.llamadas, "aplicar"));
+});
+
+test("un aviso (de la clave que sea) sobre un pago se resuelve con el token de la conexión de ESE pago y su cuenta vendedora", async () => {
+  // El aviso solo trae una pista: la orden. Quién la firmó no entra aquí. Lo que decide es la orden
+  // leída con el token de la conexión del pago, y que traiga su cuenta vendedora.
+  const dePrueba = doble({ filas: [{ ...FILA, conexion_id: "cx-prueba", de_prueba: true }], mp: { leerOrden: { status: 200, cuerpo: APROBADA } } });
+  let pedida = "";
+  dePrueba.deps.db.token = async (conexion) => { pedida = conexion; return "TOKEN-DE-PRUEBA"; };
+  assert.equal((await confirmarPago(dePrueba.deps, PAGO, ORDEN)).ok, true);
+  assert.equal(pedida, "cx-prueba");
+  assert.deepEqual(dePrueba.tokens, ["TOKEN-DE-PRUEBA"]);
+  // Una orden que no es de la cuenta de esa conexión no mueve el pago, la anuncie quien la anuncie.
+  const cruzado = doble({ filas: [{ ...FILA, conexion_id: "cx-real", cuenta_vendedora: "111222333" }], mp: { leerOrden: { status: 200, cuerpo: APROBADA } } });
+  await confirmarPago(cruzado.deps, PAGO, ORDEN);
+  assert.ok(sin(cruzado.llamadas, "aplicar"));
+});
+
+test("pago de prueba: si Mercado Pago no acepta la orden y repite el correo del pagador de prueba, tampoco llega al rastro", async () => {
+  // El 400 nombra la propiedad y a veces repite su VALOR. El valor que se mandó aquí es el del usuario de prueba, no el del cliente.
+  const eco = { errors: [{ code: "property_value", message: "Invalid value for property", details: [`'$.payer.email' - ${PAGADOR} is not a valid user; ${DATOS.email}`] }] };
+  const { deps, llamadas, aLaBase } = doble({ filas: [{ ...FILA, de_prueba: true }], pagadorDePrueba: PAGADOR,
+                                              mp: { crearOrden: { status: 400, cuerpo: eco }, buscarOrdenes: { status: 200, cuerpo: { data: [] } } } });
+  assert.deepEqual(await cobrarPago(deps, DATOS), { tipo: "NO_PROCESADO", contarIp: false });
+  const escrito = JSON.stringify([llamadas, aLaBase]);
+  assert.equal(escrito.includes(PAGADOR), false);
+  assert.equal(escrito.includes("test_user_3753760462"), false);
+  assert.equal(escrito.includes(DATOS.email), false);
+  // Lo que sirve para arreglarlo sí queda: qué propiedad fue.
+  assert.ok(llamadas.some((l) => l.startsWith("registrar COBRO_NO_ACEPTADO") && l.includes("payer.email")));
 });

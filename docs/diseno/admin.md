@@ -245,6 +245,12 @@ Los bloques, en este orden, cada uno en su `Tarjeta`:
      porcentaje, VIM no cobra por pedido, la devolución es sola y completa, hace falta la caja
      actualizada) y «Últimos pagos en línea»: 30 renglones de solo lectura, sin paginar, con el
      estado en palabras (Pagado, Devuelto, Devolución en proceso, No completado).
+   - **En modo de prueba** (lo pone VIM, 0178): la tarjeta abre con un `Aviso` azul que no se
+     cierra («Tu tienda está en modo de prueba: los pagos en línea no son reales.» y qué cuenta de
+     prueba cobra, o que falta y la configura VIM); **no se ofrece conectar** Mercado Pago (ni
+     «Conectar otra cuenta»), la cuenta real lleva la píldora «No se usa en modo de prueba» y no hay
+     selector por sucursal. La cuenta de prueba nunca lleva «Desconectar» (la pone y la quita VIM),
+     ni aparece en el selector por sucursal.
    - Si el dueño ofrece pago en línea y la tienda no lo está ofreciendo (cuenta en error o
      desconectada, o sucursal sin cuenta elegida), sale un `Aviso` ámbar **arriba de todo**, con su
      botón «Reconectar Mercado Pago» / «Conectar Mercado Pago» cuando eso lo arregla.

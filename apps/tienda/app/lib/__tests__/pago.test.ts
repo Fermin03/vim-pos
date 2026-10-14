@@ -142,11 +142,11 @@ describe("qué hace «Tus datos» con cada respuesta de `pedir`", () => {
     }
     expect(new Set(familias.map((m) => textoDeRechazo(m, false).texto)).size).toBe(6);
   });
-  it("el antifraude de Mercado Pago (RIESGO) no le echa la culpa al banco, y ofrece otra forma de pago solo si la hay", () => {
-    expect(textoDeRechazo("RIESGO", false)).toEqual({ campo: null, texto: "Mercado Pago no pudo aprobar este pago. Prueba con otra tarjeta. No se te cobró nada." });
-    expect(textoDeRechazo("RIESGO", true).texto).toBe("Mercado Pago no pudo aprobar este pago. Prueba con otra tarjeta. No se te cobró nada; también puedes elegir otra forma de pago.");
-    expect(textoDeRechazo("RIESGO", false).texto).not.toMatch(/banco/i);
-    expect(desenlaceDelError(e("PAGO_RECHAZADO", "RIESGO"), c)).toMatchObject({ tipo: "tarjeta", campo: null });
+  it("el antifraude de Mercado Pago (RIESGO) dice que no fue el banco, no invita a repetir el cobro, y en «Tus datos» es la pausa", () => {
+    expect(textoDeRechazo("RIESGO", false)).toEqual({ campo: null, texto: "No pudimos aprobar este pago en línea. No fue tu banco. No se te cobró nada." });
+    expect(textoDeRechazo("RIESGO", true).texto).toBe("No pudimos aprobar este pago en línea. No fue tu banco. No se te cobró nada; también puedes elegir otra forma de pago.");
+    expect(textoDeRechazo("RIESGO", false).texto).not.toMatch(/otra tarjeta|intenta|Mercado Pago/i);
+    expect(desenlaceDelError(e("PAGO_RECHAZADO", "RIESGO"), c)).toEqual({ tipo: "pausa", hasta: null, rechazado: true });
   });
   it("con otra forma de pago, el rechazo la ofrece; el de los datos, no (se corrige y ya)", () => {
     expect(textoDeRechazo("FONDOS", true).texto).toMatch(/también puedes elegir otra forma de pago\.$/);
@@ -202,7 +202,7 @@ const seg = (estado: string, pago_estado: EstadoDePago, mas: object = {}): Segui
 describe("leer el seguimiento de un pedido en línea", () => {
   it("trae cómo va el pago, la propina y el total a pagar; nada de la redirección", () => {
     const s = seg("EN_PROCESO", "PAGADO");
-    expect(s.enLinea).toEqual({ estado: "PAGADO", propina_mxn: "24.00", total_a_pagar_mxn: "264.00" });
+    expect(s.enLinea).toEqual({ estado: "PAGADO", propina_mxn: "24.00", total_a_pagar_mxn: "264.00", dePrueba: false });
   });
   it("un pedido al recibir no trae nada del pago en línea, como siempre", () => {
     expect((seguimientoDe(seguimientoCrudo()) as Seguimiento).enLinea).toBeNull();
