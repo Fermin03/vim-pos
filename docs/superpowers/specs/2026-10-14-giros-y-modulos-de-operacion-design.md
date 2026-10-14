@@ -197,7 +197,10 @@ En un bar, la cuenta se abre a nombre de una persona ("Luis, camisa azul") y no 
 - **Reglas:** nombre obligatorio. No puede haber dos cuentas de barra abiertas con el mismo nombre en
   la misma sucursal: lo garantiza un índice único parcial (`idx_tickets_barra_nombre_abierto`, sobre
   sucursal y nombre sin mayúsculas ni espacios sobrantes). Si se repite, la caja propone "Luis 2",
-  también cuando otra caja se adelanta.
+  también cuando otra caja se adelanta. El nombre es único dentro de una misma base: una caja de
+  escritorio (que trabaja sin internet con su Postgres local) y el POS web de la misma sucursal
+  podrían tener cada uno un «Luis» abierto; los tickets pagados se sincronizan sin choque porque el
+  índice solo cubre cuentas abiertas.
 - **Pasar entre barra y mesa:** los botones **Pasar a mesa** y **Pasar a barra** están en la fila de
   acciones de cada cuenta de la lista; cada uno aparece solo si el módulo de destino está encendido,
   y **Pasar a barra** solo en cuentas de comedor con mesa. Después de mover, la pantalla cambia a la

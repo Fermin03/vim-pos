@@ -40,7 +40,17 @@ el producto", pero nadie lo había hecho.
   `CAFETERIA` y `TAQUERIA` además de los seis giros de antes.
 - **La 0183 apaga `cuentas_barra` a los negocios existentes que no son BAR** y cambia el valor por
   defecto a "todo encendido salvo `eventos` y `cuentas_barra`". También crea el índice único de
-  nombres de barra y las tres RPC de cuentas de barra.
+  nombres de barra y las tres RPC de cuentas de barra. **Antes de aplicarla**, en producción esta
+  consulta debe regresar cero filas (si regresa alguna, el índice no se puede crear):
+
+  ```sql
+  SELECT sucursal_id, lower(btrim(nombre_cliente)), count(*) FROM tickets
+  WHERE modo_servicio = 'BARRA' AND estado_fiscal IN ('BORRADOR','ABIERTO') AND deleted_at IS NULL
+  GROUP BY 1, 2 HAVING count(*) > 1;
+  ```
+
+  Y se aplica fuera del horario de servicio: crear el índice bloquea las escrituras a `tickets`
+  unos segundos.
 - **Antes del merge se aplican a mano la 0179, la 0180, la 0181, la 0182 y la 0183**, cada una en su propia
   transacción. La 0179 y la 0180 no pueden ir juntas: Postgres responde "unsafe use of new value".
 
