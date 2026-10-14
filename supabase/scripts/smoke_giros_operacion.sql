@@ -240,4 +240,28 @@ BEGIN
   RAISE NOTICE '4d aislamiento OK';
 END $$;
 
+-- 5) Alta por giro: operación y política de cobro.
+DO $$
+DECLARE
+  v_owner uuid := gen_random_uuid();
+  v_tenant uuid; v_op jsonb;
+BEGIN
+  PERFORM set_config('request.jwt.claims', '', true);
+  INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
+  VALUES (v_owner, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+          'owner-' || substr(v_owner::text, 1, 8) || '@smoke.dev', crypt('smokepass', gen_salt('bf')),
+          now(), now(), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb);
+  v_tenant := crear_tenant_con_owner(v_owner, 'smoke-giro-' || substr(v_owner::text, 1, 8), 'Food Truck Smoke', 'Dueño Smoke',
+                                     '4770000000', 'FOODTRUCK'::vertical_tipo, 'ESENCIAL', 'TRIAL'::tenant_estado, 'smoke 0180');
+
+  SELECT operacion INTO v_op FROM tenants WHERE id = v_tenant;
+  IF v_op IS DISTINCT FROM juego_inicial_de_giro('FOODTRUCK') THEN
+    RAISE EXCEPTION '5a: el alta no aplicó el juego de FOODTRUCK: %', v_op;
+  END IF;
+  IF (SELECT politica_cobro_cocina FROM configuracion_tenant WHERE tenant_id = v_tenant) IS DISTINCT FROM 'COBRO_PRIMERO' THEN
+    RAISE EXCEPTION '5a: política de cobro inicial mal';
+  END IF;
+  RAISE NOTICE '5a alta por giro OK';
+END $$;
+
 ROLLBACK;

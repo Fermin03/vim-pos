@@ -295,3 +295,54 @@ COMMENT ON FUNCTION modulos_efectivos(uuid) IS
   'Módulos por cliente: permitidos (plan + flags; los de operación siempre) y efectivos (AND encendido por el dueño o, en los de operación, por VIM). Única lectura autorizada (ADR 0014, 0180).';
 REVOKE EXECUTE ON FUNCTION modulos_efectivos(uuid) FROM public, anon;
 GRANT EXECUTE ON FUNCTION modulos_efectivos(uuid) TO authenticated, service_role;
+
+-- ── §5 El alta arranca con el juego del giro ─────────────────────────────────
+-- Cuerpo de la 0141 más el bloque marcado 0180. Se aplica aquí y no en la base del alta para no
+-- tocar crear_tenant_con_owner_base (0012/0085). La propina inicial por giro queda para la entrega
+-- 2: la sucursal se crea después del alta y sucursal_propinas_config aún no baja a la caja.
+CREATE OR REPLACE FUNCTION crear_tenant_con_owner(
+  p_owner_user_id    uuid,
+  p_codigo           varchar,
+  p_nombre_comercial varchar,
+  p_nombre_owner     varchar,
+  p_telefono_owner   varchar,
+  p_vertical         vertical_tipo,
+  p_plan_codigo      varchar,
+  p_estado           tenant_estado,
+  p_notas_internas   text
+) RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $$
+DECLARE
+  v_tenant uuid;
+  v_plan   uuid;
+BEGIN
+  v_tenant := crear_tenant_con_owner_base(
+    p_owner_user_id, p_codigo, p_nombre_comercial, p_nombre_owner,
+    p_telefono_owner, p_vertical, p_plan_codigo, p_estado, p_notas_internas
+  );
+
+  /* Unidades de medida (0085). */
+  PERFORM sembrar_unidades_base(v_tenant);
+
+  /* Lo que el plan incluye (0086 → 0141). En el alta no hay nada que retirar. */
+  SELECT id INTO v_plan FROM planes WHERE codigo = p_plan_codigo;
+  IF v_plan IS NOT NULL THEN
+    PERFORM public._sincronizar_addons_del_plan(v_tenant, v_plan, false);
+  END IF;
+
+  /* 0180: módulos de operación y política de cobro según el giro. */
+  UPDATE tenants SET operacion = juego_inicial_de_giro(p_vertical) WHERE id = v_tenant;
+  INSERT INTO configuracion_tenant (tenant_id, politica_cobro_cocina)
+  VALUES (v_tenant, cobro_inicial_de_giro(p_vertical))
+  ON CONFLICT (tenant_id) DO UPDATE SET politica_cobro_cocina = EXCLUDED.politica_cobro_cocina;
+
+  RETURN v_tenant;
+END;
+$$;
+COMMENT ON FUNCTION crear_tenant_con_owner IS
+  'Alta de negocio + owner. Envuelve crear_tenant_con_owner_base, siembra unidades de medida (0085), los add-ons que el plan incluye (0086, 0141) y el juego inicial del giro (0180). La prueba (prueba_hasta) la pone el trigger de tenants.';
+REVOKE ALL ON FUNCTION crear_tenant_con_owner(uuid, varchar, varchar, varchar, varchar, vertical_tipo, varchar, tenant_estado, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION crear_tenant_con_owner(uuid, varchar, varchar, varchar, varchar, vertical_tipo, varchar, tenant_estado, text) TO service_role;
