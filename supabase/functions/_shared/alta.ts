@@ -15,24 +15,22 @@ import { esc, soloAscii } from "./correo.ts";
  */
 export const TERMINOS_VERSION = "2026-10-01"; // sin días de tolerancia en el pago
 
-export const VERTICALES = ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "CAFE_BAR", "DARK_KITCHEN", "ENTERPRISE"] as const;
+export const VERTICALES = ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "DARK_KITCHEN", "BAR", "CAFETERIA", "TAQUERIA"] as const;
 export type Vertical = (typeof VERTICALES)[number];
-
-// Los planes por giro se desactivaron con los tres escalones (ago 2026). Una cadena empieza en
-// Cadena; todo lo demás en Esencial. El plan se cambia después desde /platform.
-export const PLAN_DE_VERTICAL: Record<Vertical, string> = {
-  FOODTRUCK: "ESENCIAL", QUICK_SERVICE: "ESENCIAL", FULL_SERVICE: "ESENCIAL",
-  CAFE_BAR: "ESENCIAL", DARK_KITCHEN: "ESENCIAL", ENTERPRISE: "CADENA",
-};
 
 export const GIRO_ETIQUETA: Record<Vertical, string> = {
   FOODTRUCK: "Food truck",
   QUICK_SERVICE: "Comida rápida / mostrador",
   FULL_SERVICE: "Restaurante con meseros",
-  CAFE_BAR: "Cafetería o bar",
   DARK_KITCHEN: "Cocina fantasma / solo reparto",
-  ENTERPRISE: "Cadena",
+  BAR: "Bar",
+  CAFETERIA: "Cafetería",
+  TAQUERIA: "Taquería o cocina económica",
 };
+
+/** Una cadena es un plan, no un giro (ADR 0034): quien dice tener varias sucursales empieza en Cadena. */
+export const planDeAlta = (d: Pick<DatosAlta, "varias_sucursales">): "CADENA" | "ESENCIAL" =>
+  d.varias_sucursales ? "CADENA" : "ESENCIAL";
 
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -54,6 +52,7 @@ export type DatosAlta = {
   ciudad: string;
   vertical: Vertical;
   password: string;
+  varias_sucursales: boolean;
 };
 
 export type Rechazo = { ok: false; status: number; error: string; detalle?: string; campos?: string[] };
@@ -98,7 +97,7 @@ export function validarAlta(b: Record<string, unknown>): { ok: true; datos: Dato
 
   return {
     ok: true,
-    datos: { codigo, nombre_comercial, nombre_owner, email_owner, telefono_owner: telefono, ciudad, vertical: vertical as Vertical, password },
+    datos: { codigo, nombre_comercial, nombre_owner, email_owner, telefono_owner: telefono, ciudad, vertical: vertical as Vertical, password, varias_sucursales: b.varias_sucursales === true },
   };
 }
 
@@ -160,7 +159,7 @@ export async function procesarAlta(b: Record<string, unknown>, deps: DepsAlta): 
   }
 
   // 2) El negocio en prueba, con los términos sellados. Si falla, se borra la cuenta.
-  const t = await deps.altaNegocio({ ...d, owner_id: u.id, plan: PLAN_DE_VERTICAL[d.vertical], terminos_version: TERMINOS_VERSION });
+  const t = await deps.altaNegocio({ ...d, owner_id: u.id, plan: planDeAlta(d), terminos_version: TERMINOS_VERSION });
   if ("error" in t) {
     // Si el borrado también falla queda una cuenta sin negocio: se deja en el log para limpiarla a
     // mano (el admin le enseña al dueño "tu cuenta no terminó de crearse" con el WhatsApp).
@@ -218,7 +217,7 @@ export function correoAvisoAlta(d: DatosAlta & { tenantId: string }, platformUrl
       <table style="font-family:sans-serif;font-size:14px;border-collapse:collapse">
         ${fila("Negocio", esc(d.nombre_comercial))}
         ${fila("Código", esc(d.codigo))}
-        ${fila("Giro", esc(GIRO_ETIQUETA[d.vertical]))}
+        ${fila("Giro", esc(GIRO_ETIQUETA[d.vertical]) + (d.varias_sucursales ? " · varias sucursales" : ""))}
         ${fila("Dueño", esc(d.nombre_owner))}
         ${fila("Teléfono", `<a href="https://wa.me/52${esc(d.telefono_owner)}">${esc(d.telefono_owner)}</a>`)}
         ${fila("Correo", esc(d.email_owner))}

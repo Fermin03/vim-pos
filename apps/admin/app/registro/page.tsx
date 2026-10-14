@@ -15,10 +15,11 @@ const AVISO_URL = "https://vimpos.com.mx/aviso-privacidad";
 const VERTICALES = [
   { v: "QUICK_SERVICE", l: "Comida rápida · hamburguesas, pizza, pollo" },
   { v: "FULL_SERVICE", l: "Restaurante con meseros" },
-  { v: "CAFE_BAR", l: "Cafetería o bar" },
+  { v: "TAQUERIA", l: "Taquería o cocina económica" },
+  { v: "CAFETERIA", l: "Cafetería" },
+  { v: "BAR", l: "Bar" },
   { v: "DARK_KITCHEN", l: "Cocina solo para apps de entrega" },
   { v: "FOODTRUCK", l: "Food truck" },
-  { v: "ENTERPRISE", l: "Cadena con varias sucursales" },
 ];
 
 /** «Knock-Out Burger» → «knock-out-burger»: sin acentos, minúsculas y guiones. */
@@ -49,6 +50,7 @@ export default function RegistroPage() {
   const [codigo, setCodigo] = useState("");
   const [codigoEditado, setCodigoEditado] = useState(false);
   const [vertical, setVertical] = useState("QUICK_SERVICE");
+  const [variasSucursales, setVariasSucursales] = useState(false);
   // Paso 2: dueño
   const [nombreOwner, setNombreOwner] = useState("");
   const [email, setEmail] = useState("");
@@ -98,6 +100,7 @@ export default function RegistroPage() {
         codigo,
         nombre_comercial: nombre.trim(),
         vertical,
+        varias_sucursales: variasSucursales,
         nombre_owner: nombreOwner.trim(),
         telefono_owner: telefonoMx10(tel) ?? "",
         email_owner: correo,
@@ -170,6 +173,11 @@ export default function RegistroPage() {
                 <select id="vertical" className={input} value={vertical} onChange={(e) => setVertical(e.target.value)}>
                   {VERTICALES.map((x) => <option key={x.v} value={x.v}>{x.l}</option>)}
                 </select>
+                <label className="mt-3 flex items-center gap-2 text-14 text-ink-2">
+                  <input type="checkbox" checked={variasSucursales} onChange={(e) => setVariasSucursales(e.target.checked)}
+                    className="h-[18px] w-[18px] flex-shrink-0 accent-[rgb(var(--accent))]" />
+                  Tengo más de una sucursal
+                </label>
               </div>
 
               {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { correoAvisoAlta, procesarAlta, procesarReenvio, TERMINOS_VERSION, telefonoMx10, validarAlta, type DepsAlta } from "./alta.ts";
+import { correoAvisoAlta, planDeAlta, procesarAlta, procesarReenvio, TERMINOS_VERSION, telefonoMx10, validarAlta, type DepsAlta } from "./alta.ts";
 
 const BUENO = {
   codigo: "tacos-ana",
@@ -165,4 +165,25 @@ test("reenvío con el límite de GoTrue = 429 ESPERA_UN_MINUTO (nunca 'listo')",
   assert.deepEqual(await procesarReenvio({ email: "ana@tacos.mx" }, d), { status: 429, body: { error: "ESPERA_UN_MINUTO" } });
   const { d: d2 } = deps({ enviarConfirmacion: async () => ({ ok: false, error: "email rate limit exceeded" }) });
   assert.equal((await procesarReenvio({ email: "ana@tacos.mx" }, d2)).status, 429);
+});
+
+test("los siete giros que se ofrecen pasan; los retirados no (formulario viejo en caché)", () => {
+  for (const v of ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "DARK_KITCHEN", "BAR", "CAFETERIA", "TAQUERIA"]) {
+    assert.equal(validarAlta({ ...BUENO, vertical: v }).ok, true, v);
+  }
+  for (const v of ["CAFE_BAR", "ENTERPRISE"]) {
+    const r = validarAlta({ ...BUENO, vertical: v });
+    assert.equal(r.ok, false);
+    assert.equal((r as { error: string }).error, "VERTICAL_INVALIDA");
+  }
+});
+
+test("una cadena es plan, no giro: varias sucursales → Cadena; si no, Esencial", async () => {
+  const conVarias = validarAlta({ ...BUENO, vertical: "TAQUERIA", varias_sucursales: true });
+  assert.equal(conVarias.ok && planDeAlta(conVarias.datos), "CADENA");
+  const sola = validarAlta({ ...BUENO, vertical: "TAQUERIA" });
+  assert.equal(sola.ok && planDeAlta(sola.datos), "ESENCIAL");
+  const { d, llamadas } = deps();
+  await procesarAlta({ ...BUENO, varias_sucursales: true }, d);
+  assert.equal((llamadas.altaNegocio![0] as { plan: string }).plan, "CADENA");
 });
