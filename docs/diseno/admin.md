@@ -249,7 +249,8 @@ Los bloques, en este orden, cada uno en su `Tarjeta`:
      cierra («Tu tienda está en modo de prueba: los pagos en línea no son reales.» y qué cuenta de
      prueba cobra, o que falta y la configura VIM); **no se ofrece conectar** Mercado Pago (ni
      «Conectar otra cuenta»), la cuenta real lleva la píldora «No se usa en modo de prueba» y no hay
-     selector por sucursal.
+     selector por sucursal. La cuenta de prueba nunca lleva «Desconectar» (la pone y la quita VIM),
+     ni aparece en el selector por sucursal.
    - Si el dueño ofrece pago en línea y la tienda no lo está ofreciendo (cuenta en error o
      desconectada, o sucursal sin cuenta elegida), sale un `Aviso` ámbar **arriba de todo**, con su
      botón «Reconectar Mercado Pago» / «Conectar Mercado Pago» cuando eso lo arregla.

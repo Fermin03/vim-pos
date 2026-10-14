@@ -9,7 +9,7 @@ import { precioMxn } from "../lib/catalogo";
 import { fechaHoraMx } from "../lib/reportes-inventario";
 import type { ConexionTienda } from "../lib/tienda-conexion";
 import { PAGOS_A_LA_VISTA, type PagoTienda } from "../lib/tienda";
-import { cuentaDePrueba, cuentaQueCobra, cuentasActivas, hayQueElegir, lista, nombreDeCuenta } from "../lib/tienda-cobro";
+import { cuentaDePrueba, cuentaQueCobra, cuentasActivas, hayQueElegir, lista, nombreDeCuenta, seDesconectaDesdeElAdmin } from "../lib/tienda-cobro";
 import type { SucursalTienda } from "../lib/tienda-reglas";
 
 const subtitulo = "mb-2 text-13 font-semibold text-ink";
@@ -91,7 +91,8 @@ export function TiendaCobro({
                 {c.de_prueba && <span className="rounded-full bg-info-soft px-2.5 py-0.5 text-12 font-semibold text-info">De prueba: no cobra pedidos reales</span>}
                 {dePrueba && !c.de_prueba && c.estado === "ACTIVA" && <span className="rounded-full bg-sel px-2.5 py-0.5 text-12 font-semibold text-ink-2">No se usa en modo de prueba</span>}
                 {c.estado === "ERROR" && <span className="rounded-full bg-danger-soft px-2.5 py-0.5 text-12 font-semibold text-danger">Hay que volver a conectarla</span>}
-                <AccionFila peligro className="ml-auto" disabled={ocupado || soloLectura} onClick={() => onDesconectar(c)}>Desconectar</AccionFila>
+                {/* La cuenta de prueba la pone y la quita VIM: aquí no se desconecta. */}
+                {seDesconectaDesdeElAdmin(c) && <AccionFila peligro className="ml-auto" disabled={ocupado || soloLectura} onClick={() => onDesconectar(c)}>Desconectar</AccionFila>}
               </li>
             ))}
           </ul>
@@ -115,11 +116,11 @@ export function TiendaCobro({
                       className={input}
                       value={cobra?.id ?? (s.conexionId !== null ? "caida" : "")}
                       disabled={ocupado || soloLectura}
-                      onChange={(e) => { if (activas.some((c) => c.id === e.target.value)) onElegir(s.id, e.target.value); }}
+                      onChange={(e) => { if (activas.some((c) => c.id === e.target.value && !c.de_prueba)) onElegir(s.id, e.target.value); }}
                     >
                       {s.conexionId === null && !cobra && <option value="">Elige una cuenta</option>}
                       {s.conexionId !== null && !cobra && <option value="caida">{caida ? `${nombreDeCuenta(caida)} (hay que volver a conectarla)` : "La cuenta que tenía ya no está conectada"}</option>}
-                      {activas.map((c) => <option key={c.id} value={c.id}>{nombreDeCuenta(c)}</option>)}
+                      {activas.filter((c) => !c.de_prueba).map((c) => <option key={c.id} value={c.id}>{nombreDeCuenta(c)}</option>)}
                     </select>
                     {!cobra && <p className="mt-1 text-12 font-medium text-warning">Mientras no elijas una cuenta, esta sucursal no ofrece el pago en línea.</p>}
                   </div>

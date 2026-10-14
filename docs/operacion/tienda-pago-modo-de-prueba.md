@@ -27,7 +27,7 @@ public key y su access token de prueba. Ese token no es de OAuth: no tiene refre
 | Topes de tarjetas rechazadas (motivo escondido, IP bloqueada, pausa del negocio y su correo) | Cuentan | No cuentan |
 | Cupos de `pedir` por IP y restaurante (8/h) y por negocio (60/h) | Cuentan | No cuentan en un pago en línea. Sigue el de 40/h por IP y el antirobot |
 | Pausa de la sucursal y correo a VIM si Mercado Pago rechaza las credenciales (401) | Sí | No: queda en el log (`PAGO_DE_PRUEBA_SIN_PERMISO`) |
-| Freno de 30 minutos tras un rechazo por riesgo | Sí | Sí (es el mismo código) |
+| Freno de 30 minutos tras un rechazo por riesgo (mismo teléfono desde la misma IP) | Sí | Sí (es el mismo código) |
 | Correos a VIM por devolución fallida, cobro sin pedido o reto sin cerrar | Sí | Sí, con `[PRUEBA]` en el asunto |
 | Renovación del permiso | Cada día, si vence pronto | No aplica: la conexión de prueba no vence |
 
@@ -66,11 +66,6 @@ tiene permiso sobre la columna ni sobre la función):
 -- El negocio.
 SELECT c.tenant_id, c.slug, c.pago_en_linea, c.pago_de_prueba FROM tienda_config c WHERE c.slug = '<slug de VIM Pruebas>';
 
--- (Recomendado) Dejar elegida la cuenta REAL en sus sucursales. En modo de prueba esa elección no
--- se mira; sirve para que, al apagarlo, vuelva a cobrar la real sin tener que elegirla.
-SELECT id, cuenta_nombre, de_prueba, estado FROM tienda_conexiones WHERE tenant_id = '<tenant_id>';
-UPDATE tienda_sucursales SET conexion_id = '<id de la conexión real>' WHERE tenant_id = '<tenant_id>' AND conexion_id IS NULL;
-
 -- La marca.
 UPDATE tienda_config SET pago_de_prueba = true WHERE tenant_id = '<tenant_id>' RETURNING slug, pago_de_prueba;
 
@@ -91,6 +86,8 @@ No guardes la consulta con el token en el editor ni la pegues en un chat. Si `ti
 da `NULL`: la casilla «Pago en línea» está apagada, hay una pausa, la caja de esa sucursal no
 declara pedidos pagados, o hay más de una conexión de prueba activa.
 
+El dueño no puede quitar la marca: no puede escribir la columna ni borrar la fila de su tienda.
+
 La función se niega con `NEGOCIO_NO_ES_DE_PRUEBA` si el negocio no tiene la marca, y con
 `CUENTA_REAL` si esa cuenta ya está conectada ahí como real. Llamarla otra vez con otro token lo
 reemplaza.
@@ -102,10 +99,16 @@ UPDATE tienda_config SET pago_de_prueba = false WHERE tenant_id = '<tenant_id>';
 ```
 
 Los pagos de prueba que sigan vivos (por confirmar, por devolver) se siguen atendiendo con la
-conexión de prueba. La conexión se puede dejar: un negocio normal nunca cobra con ella. **Ojo:** si
-la sucursal no tiene elegida la cuenta real y quedan dos conexiones activas (la real y la de
-prueba), la tienda no ofrece el pago en línea hasta elegirla en Admin («¿Qué cuenta cobra en…?») o
-desconectar la de prueba. Es la regla de siempre: con varias cuentas no se adivina.
+conexión de prueba. La conexión se puede dejar activa: un negocio normal nunca cobra con ella, y no
+cuenta para «la única cuenta activa» (con una real y la de prueba, cobra la real).
+
+La conexión de prueba no se quita desde el admin (no hay «Desconectar» en ella, y el servidor lo
+niega). Para quitarla, por SQL con un rol de servicio:
+
+```sql
+SELECT tienda_borrar_tokens(id) FROM tienda_conexiones WHERE tenant_id = '<tenant_id>' AND de_prueba;
+UPDATE tienda_conexiones SET estado = 'DESCONECTADA' WHERE tenant_id = '<tenant_id>' AND de_prueba;
+```
 
 ## Con qué se prueba
 
@@ -131,9 +134,13 @@ Con la verificación del banco encendida **no hay titular verificado para un rec
 - **La conexión por OAuth** de un restaurante («Conectar Mercado Pago») ni su renovación: la
   conexión de prueba no pasa por ahí.
 - **El antifraude real**: en el ambiente de prueba no se ha visto un `high_risk`, así que el freno
-  de 30 minutos no se dispara solo. Para verlo en la tienda, ponerlo a mano y pedir con ese teléfono:
-  `SELECT tienda_pago_frenar('<tenant_id>', '<teléfono de 10 dígitos>');`
-  Y para quitarlo: `DELETE FROM limites_cupo WHERE clave LIKE 'tienda:pago-freno:<tenant_id>:%';`
+  de 30 minutos no se dispara solo. La clave del freno la calcula la función (un HMAC del negocio,
+  el teléfono y la IP), así que no se puede poner a mano para un teléfono cualquiera. Para verlo en
+  la tienda: hacer un pedido en línea y, sin cambiar de red ni de teléfono, frenar con la clave que
+  guardó ese pago y volver a pedir:
+  `SELECT tienda_pago_frenar(freno_clave) FROM tienda_pagos WHERE tenant_id = '<tenant_id>' AND freno_clave IS NOT NULL ORDER BY created_at DESC LIMIT 1;`
+  Y para quitar los frenos (son de todos los negocios: en producción, con cuidado):
+  `DELETE FROM limites_cupo WHERE clave LIKE 'tienda:pago-freno:%';`
 - **La verificación de un banco de verdad** (la página del reto de prueba es de Mercado Pago).
 - **Los topes contra la prueba masiva de tarjetas**: aquí están apagados a propósito.
 - Comisiones, liquidación y tiempos de una devolución real.

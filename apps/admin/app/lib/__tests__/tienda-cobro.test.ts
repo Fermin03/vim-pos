@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { avisoDeCobro, cuentaDePrueba, cuentaQueCobra, estadoDePago, hayQueElegir, sucursalesConCajaSinActualizar, textoDeAviso } from "../tienda-cobro";
+import { avisoDeCobro, cuentaDePrueba, cuentaQueCobra, seDesconectaDesdeElAdmin, estadoDePago, hayQueElegir, sucursalesConCajaSinActualizar, textoDeAviso } from "../tienda-cobro";
 import * as cobro from "../tienda-cobro";
 
 const A = { id: "a", cuenta_nombre: "Knock-Out León", estado: "ACTIVA" as const };
@@ -102,9 +102,20 @@ describe("una cuenta de prueba (espejo de tienda_conexion_cobro: nunca cobra ped
     expect(cuentaQueCobra([PRUEBA, A], "p")).toBeNull();
     expect(avisoDeCobro(true, [PRUEBA], [suc("Centro")])).toEqual({ tipo: "ELEGIR", sucursales: ["Centro"] });
   });
-  it("con una real y una de prueba, sin elegir: ninguna (la base cuenta las dos como activas); eligiendo la real, esa", () => {
-    expect(cuentaQueCobra([A, PRUEBA], null)).toBeNull();
+  it("con una real y una de prueba, sin elegir: la REAL (la de prueba no cuenta para «la única activa»: 0177); y no hay nada que elegir", () => {
+    expect(cuentaQueCobra([A, PRUEBA], null)).toBe(A);
+    expect(cuentaQueCobra([PRUEBA, A], null)).toBe(A);
     expect(cuentaQueCobra([A, PRUEBA], "a")).toBe(A);
+    expect(hayQueElegir([A, PRUEBA], [suc("Centro")])).toBe(false);
+    expect(avisoDeCobro(true, [A, PRUEBA], [suc("Centro")])).toBeNull();
+    // Con DOS reales (y la de prueba) sigue sin adivinarse: ninguna, y hay que elegir.
+    expect(cuentaQueCobra([A, B, PRUEBA], null)).toBeNull();
+    expect(hayQueElegir([A, B, PRUEBA], [suc("Centro")])).toBe(true);
+  });
+  it("la cuenta de prueba no se desconecta desde el admin; una real, sí", () => {
+    expect(seDesconectaDesdeElAdmin(PRUEBA)).toBe(false);
+    expect(seDesconectaDesdeElAdmin({ ...A, de_prueba: false })).toBe(true);
+    expect(seDesconectaDesdeElAdmin({})).toBe(true);
   });
 });
 

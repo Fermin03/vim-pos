@@ -36,6 +36,12 @@ export function sucursalesConCajaSinActualizar(
 
 export const cuentasActivas = <C extends Cuenta>(cuentas: C[]): C[] => cuentas.filter((c) => c.estado === "ACTIVA");
 
+/**
+ * ¿El dueño puede desconectar esa cuenta desde el admin? La de prueba no: la pone y la quita VIM
+ * (el servidor también lo niega: `CONEXION_DE_PRUEBA`).
+ */
+export const seDesconectaDesdeElAdmin = (c: Pick<Cuenta, "de_prueba">): boolean => c.de_prueba !== true;
+
 export const nombreDeCuenta = (c: Pick<Cuenta, "cuenta_nombre">): string => c.cuenta_nombre ?? "Cuenta de Mercado Pago";
 
 /**
@@ -50,15 +56,16 @@ export function cuentaDePrueba<C extends Cuenta>(cuentas: C[]): C | null {
 
 /**
  * La cuenta que cobra en una sucursal, igual que `tienda_conexion_cobro`: la elegida si sigue
- * activa; sin elegir, la única activa. Con varias y sin elegir, ninguna (no se adivina a quién le
- * cae el dinero); si la elegida dejó de servir tampoco se usa otra. Una cuenta de prueba nunca
- * cobra pedidos reales (el cliente vería «pagado» sin haber pagado).
+ * activa; sin elegir, la única activa REAL (una de prueba que quedó activa no cuenta: 0177). Con
+ * varias reales y sin elegir, ninguna (no se adivina a quién le cae el dinero); si la elegida dejó
+ * de servir tampoco se usa otra. Una cuenta de prueba nunca cobra pedidos reales (el cliente vería
+ * «pagado» sin haber pagado).
  * `dePrueba`: la tienda está en modo de prueba; ahí cobra solo su cuenta de prueba, nunca una real.
  */
 export function cuentaQueCobra<C extends Cuenta>(cuentas: C[], elegida: string | null, dePrueba = false): C | null {
   if (dePrueba) return cuentaDePrueba(cuentas);
-  const vivas = cuentasActivas(cuentas);
-  const cobra = elegida ? vivas.find((c) => c.id === elegida) : vivas.length === 1 ? vivas[0] : undefined;
+  const vivas = cuentasActivas(cuentas), reales = vivas.filter((c) => c.de_prueba !== true);
+  const cobra = elegida ? vivas.find((c) => c.id === elegida) : reales.length === 1 ? reales[0] : undefined;
   return cobra && !cobra.de_prueba ? cobra : null;
 }
 
@@ -66,7 +73,8 @@ export function cuentaQueCobra<C extends Cuenta>(cuentas: C[], elegida: string |
 export function hayQueElegir(cuentas: Cuenta[], sucursales: Sucursal[], dePrueba = false): boolean {
   // En modo de prueba no hay nada que elegir: cobra la cuenta de prueba en todas.
   if (dePrueba) return false;
-  const vivas = cuentasActivas(cuentas);
+  // Solo se elige entre cuentas reales: una de prueba nunca cobra en un negocio normal.
+  const vivas = cuentasActivas(cuentas).filter((c) => c.de_prueba !== true);
   if (vivas.length > 1) return true;
   return vivas.length === 1 && sucursales.some((s) => s.participa && s.conexionId !== null && s.conexionId !== vivas[0]!.id);
 }
