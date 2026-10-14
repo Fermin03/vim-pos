@@ -62,7 +62,7 @@ type Copia = {
 };
 
 /** Comedor entra aquí con el mismo flujo que Pick-up y domicilio: lista + "Nueva orden". */
-const COPIA: Record<"DRIVE_THRU" | "DELIVERY_PROPIO" | "COMER_AQUI", Copia> = {
+const COPIA: Record<"DRIVE_THRU" | "DELIVERY_PROPIO" | "COMER_AQUI" | "BARRA", Copia> = {
   COMER_AQUI: {
     titulo: "Comedor",
     subtitulo: (n) => `${n} ${n === 1 ? "mesa abierta" : "mesas abiertas"}`,
@@ -83,6 +83,13 @@ const COPIA: Record<"DRIVE_THRU" | "DELIVERY_PROPIO" | "COMER_AQUI", Copia> = {
     vacioTitulo: "Sin pedidos a domicilio",
     vacioTexto: "Abre una cuenta para tomar un pedido a domicilio.",
     nuevaCuenta: "Nueva orden",
+  },
+  BARRA: {
+    titulo: "Barra",
+    subtitulo: (n) => `${n} ${n === 1 ? "cuenta abierta" : "cuentas abiertas"}`,
+    vacioTitulo: "Sin cuentas en la barra",
+    vacioTexto: "Abre una cuenta con el nombre del cliente.",
+    nuevaCuenta: "Nueva cuenta",
   },
 };
 
@@ -120,13 +127,16 @@ export function PantallaCuentasModo({
   caja: DatosCaja;
   turno: Turno;
   empleado: Empleado;
-  modo: Extract<ModoServicio, "DRIVE_THRU" | "DELIVERY_PROPIO" | "COMER_AQUI">;
+  // BARRA no es un modo del carrito (en la captura se ve como comedor, ver `mapearModo`): solo
+  // existe como lista, por eso va aparte del `Extract`.
+  modo: Extract<ModoServicio, "DRIVE_THRU" | "DELIVERY_PROPIO" | "COMER_AQUI"> | "BARRA";
   onSalir: () => void;
   /** Agenda de reservaciones del día. Solo llega con valor en Comedor: Pick-up y
    *  domicilio no reservan mesa, y un botón muerto ahí sería ruido. */
   onVerReservaciones?: () => void;
-  /** Abre una cuenta NUEVA en este modo (entra al catálogo con el modo ya fijado). */
-  onAbrirCuenta: () => void;
+  /** Abre una cuenta NUEVA en este modo (entra al catálogo con el modo ya fijado). Recibe las
+   *  cuentas listadas: Barra las necesita para no repetir un nombre. */
+  onAbrirCuenta: (cuentas: readonly CuentaAbierta[]) => void;
   /** Carga la cuenta en el carrito para agregarle productos (sale a la pantalla de venta). */
   onAgregarProductos: (ticketId: string) => void;
   /** Carga la cuenta y abre el cobro. */
@@ -189,12 +199,14 @@ export function PantallaCuentasModo({
   // Las cuentas pagadas en línea de este canal que siguen sin entregar: ya están cobradas, pero se
   // listan hasta el «Listo». Va en un ref para que `recargar` no cambie de identidad en cada sondeo.
   const pagadasEnLinea = useRef<string[]>([]);
-  pagadasEnLinea.current = enLinea && modo !== "COMER_AQUI" ? cuentasPagadasEnLinea(enLinea.pedidos, modo) : [];
+  // La tienda en línea solo tiene Pick-up y Domicilio.
+  const canal = modo === "COMER_AQUI" || modo === "BARRA" ? null : modo;
+  pagadasEnLinea.current = enLinea && canal ? cuentasPagadasEnLinea(enLinea.pedidos, canal) : [];
 
   const recargar = useCallback(async () => {
     setError(null);
     try {
-      setItems(await listarCuentasAbiertas(token, caja.sucursal_id, esComedor ? ["MESA", "COMER_AQUI"] : modo, pagadasEnLinea.current));
+      setItems(await listarCuentasAbiertas(token, caja.sucursal_id, esComedor ? ["MESA", "COMER_AQUI"] : [modo], pagadasEnLinea.current));
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudieron cargar las cuentas");
       setItems([]);
@@ -215,7 +227,6 @@ export function PantallaCuentasModo({
   useEffect(() => { recargar(); }, [recargar]);
 
   // ── Tienda en línea ──
-  const canal = modo === "COMER_AQUI" ? null : modo;
   const pedidosTienda = enLinea && canal ? enLinea.pedidos : [];
   const porAceptar = canal ? porAceptarDeCanal(pedidosTienda, canal) : [];
   const cerradosSolos = canal ? avisosDeCanal(pedidosTienda, canal, enLinea?.sabidoAqui).filter((a) => !avisosDeTiendaCerrados.has(a.id)) : [];
@@ -408,7 +419,7 @@ export function PantallaCuentasModo({
               Reservaciones
             </button>
           )}
-          <Button onClick={onAbrirCuenta}>
+          <Button onClick={() => onAbrirCuenta(items ?? [])}>
             <Icono nombre="mas" className="h-[17px] w-[17px]" />
             {copia.nuevaCuenta}
           </Button>
@@ -977,7 +988,7 @@ export function PantallaCuentasModo({
   );
 }
 
-function Accion({
+export function Accion({
   label, onClick, destacado, ocupado, inactivo, peligro, textoOcupado = "Imprimiendo…",
 }: { label: string; onClick: () => void; destacado?: boolean; ocupado?: boolean; inactivo?: boolean; peligro?: boolean; textoOcupado?: string }) {
   return (

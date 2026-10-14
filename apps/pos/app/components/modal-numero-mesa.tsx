@@ -28,8 +28,9 @@ export function ModalNumeroMesa({
   token: string;
   tenantId: string;
   sucursalId: string;
-  /** Mesa resuelta (existente o recién creada), lista para abrirle cuenta. */
-  onMesaElegida: (mesaId: string, numero: string) => void;
+  /** Mesa resuelta (existente o recién creada), lista para abrirle cuenta. Si devuelve una promesa
+   *  y falla, el error se enseña aquí mismo y el modal sigue abierto. */
+  onMesaElegida: (mesaId: string, numero: string) => void | Promise<void>;
   /** Abre el mapa de mesas. Opcional: si no se pasa, no se muestra el botón. */
   onVerMesas?: () => void;
   onCerrar: () => void;
@@ -70,7 +71,7 @@ export function ModalNumeroMesa({
         setError(`La mesa ${n} ya está ocupada. Búscala en la lista para agregarle productos.`);
         return;
       }
-      onMesaElegida(mesa.id, mesa.numero);
+      await onMesaElegida(mesa.id, mesa.numero);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo buscar la mesa");
     } finally {
@@ -84,7 +85,7 @@ export function ModalNumeroMesa({
     setError(null);
     try {
       const mesa = await crearMesaConNumero(token, { tenantId, sucursalId, numero: ofrecerCrear });
-      onMesaElegida(mesa.id, mesa.numero);
+      await onMesaElegida(mesa.id, mesa.numero);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo crear la mesa");
     } finally {
