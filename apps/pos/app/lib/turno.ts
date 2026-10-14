@@ -157,7 +157,7 @@ export function fmtMxn(n: number): string {
 }
 
 /** Cuentas ABIERTAS (sin cobrar) del turno, agrupadas por modo de servicio. */
-export type CuentasAbiertasPorModo = { comedor: number; pickup: number; domicilio: number };
+export type CuentasAbiertasPorModo = { comedor: number; pickup: number; domicilio: number; barra: number };
 
 /**
  * Cuenta las cuentas vivas de cada modo para los badges de la pantalla de inicio.
@@ -181,5 +181,6 @@ export async function contarCuentasAbiertasPorModo(token: string, turnoId: strin
     comedor: n("COMER_AQUI"),
     pickup: n("DRIVE_THRU"),
     domicilio: n("DELIVERY_PROPIO"),
+    barra: n("BARRA"),
   };
 }

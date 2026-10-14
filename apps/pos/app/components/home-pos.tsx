@@ -175,7 +175,7 @@ export function HomePos({
   // El POS arranca en la pantalla de inicio: el cajero elige primero a qué viene.
   const [enInicio, setEnInicio] = useState(true);
   const [enMonitor, setEnMonitor] = useState(false);
-  const [cuentasAbiertas, setCuentasAbiertas] = useState<CuentasAbiertasPorModo>({ comedor: 0, pickup: 0, domicilio: 0 });
+  const [cuentasAbiertas, setCuentasAbiertas] = useState<CuentasAbiertasPorModo>({ comedor: 0, pickup: 0, domicilio: 0, barra: 0 });
   const [enMesas, setEnMesas] = useState(false);
   const [enDelivery, setEnDelivery] = useState(false);
   const [enPickup, setEnPickup] = useState(false);

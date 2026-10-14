@@ -123,7 +123,7 @@ export function PantallaInicio({
   const [confirmandoSalir, setConfirmandoSalir] = useState(false);
   useEffect(() => { setPuedeSalir(typeof window.__VIM_SALIR === "function"); }, []);
   const acceso = useAcceso();
-  const ver = accesosInicio(acceso.modulos, { comedor: nCuentasComedor, pickup: nCuentasPickup, domicilio: nCuentasDomicilio });
+  const ver = accesosInicio(acceso.modulos, { comedor: nCuentasComedor, pickup: nCuentasPickup, domicilio: nCuentasDomicilio, barra: 0 });
   // Avisos de VIM. Esta es la pantalla que el cajero ve tras el PIN y al abrir turno, así que
   // es donde se le enseñan (ADR 0014, entrega 3).
   const [avisos, setAvisos] = useState<Aviso[] | null>(null);

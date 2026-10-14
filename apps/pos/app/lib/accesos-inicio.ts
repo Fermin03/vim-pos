@@ -7,13 +7,14 @@ import { moduloActivo } from "@vim/db/operacion";
  */
 export function accesosInicio(
   modulos: Record<string, boolean> | null | undefined,
-  cuentas: { comedor: number; pickup: number; domicilio: number },
-): { comedor: boolean; paraLlevar: boolean; pickup: boolean; domicilio: boolean } {
+  cuentas: { comedor: number; pickup: number; domicilio: number; barra: number },
+): { comedor: boolean; paraLlevar: boolean; pickup: boolean; domicilio: boolean; barra: boolean } {
   const mostrador = moduloActivo(modulos, "mostrador");
   return {
     comedor: moduloActivo(modulos, "comedor") || cuentas.comedor > 0,
     paraLlevar: mostrador,
     pickup: mostrador || cuentas.pickup > 0,
     domicilio: moduloActivo(modulos, "domicilio") || cuentas.domicilio > 0,
+    barra: moduloActivo(modulos, "cuentas_barra") || cuentas.barra > 0,
   };
 }
