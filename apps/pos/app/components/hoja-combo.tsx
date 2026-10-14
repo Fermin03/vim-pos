@@ -1,5 +1,5 @@
-import { Icono } from "@vim/ui/styles";
 "use client";
+import { Icono } from "@vim/ui/styles";
 import type { Producto } from "../lib/catalogo";
 import { diferencialCombo, type ComboDef } from "../lib/combos";
 import { fmtMxn } from "../lib/turno";

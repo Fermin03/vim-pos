@@ -1,5 +1,5 @@
-import { Icono } from "@vim/ui/styles";
 "use client";
+import { Icono } from "@vim/ui/styles";
 
 /**
  * Botón "Volver", único para todo el POS.

@@ -1,5 +1,5 @@
-import { Icono } from "@vim/ui/styles";
 "use client";
+import { Icono } from "@vim/ui/styles";
 import { PantallaEstado } from "../components/pantalla-estado";
 
 const btnAccent = "inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-14 font-semibold text-white transition hover:brightness-95";

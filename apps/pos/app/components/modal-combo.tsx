@@ -1,5 +1,5 @@
-import { Icono } from "@vim/ui/styles";
 "use client";
+import { Icono } from "@vim/ui/styles";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Producto } from "../lib/catalogo";
 import type { ComboDef, ComponenteSel, SlotCombo } from "../lib/combos";

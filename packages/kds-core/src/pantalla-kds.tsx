@@ -1,5 +1,5 @@
-import { Icono } from "@vim/ui/styles";
 "use client";
+import { Icono } from "@vim/ui/styles";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type CajaKds } from "./caja";
 import { abrirStreamHub } from "./stream-hub";

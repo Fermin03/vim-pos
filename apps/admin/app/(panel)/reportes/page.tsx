@@ -1,5 +1,5 @@
-import { Icono } from "@vim/ui/styles";
 "use client";
+import { Icono } from "@vim/ui/styles";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PageBody, PageHeader } from "../../components/page-header";

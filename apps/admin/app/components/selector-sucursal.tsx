@@ -1,5 +1,5 @@
-import { Icono } from "@vim/ui/styles";
 "use client";
+import { Icono } from "@vim/ui/styles";
 /**
  * De qué sucursal son las cifras del panel y de los reportes.
  *

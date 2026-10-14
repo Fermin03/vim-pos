@@ -1,5 +1,5 @@
-import { Icono } from "@vim/ui/styles";
 "use client";
+import { Icono } from "@vim/ui/styles";
 import { useState } from "react";
 import type { EstadoCarrito, LineaCarrito } from "../lib/carrito";
 import { etiquetaModo } from "@vim/db/modos-servicio";

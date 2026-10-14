@@ -1,5 +1,5 @@
-import { Icono } from "@vim/ui/styles";
 "use client";
+import { Icono } from "@vim/ui/styles";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { capaVisible } from "../lib/escape";
 import { useEscape } from "../lib/use-escape";

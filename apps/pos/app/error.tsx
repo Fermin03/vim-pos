@@ -1,5 +1,5 @@
-import { Icono } from "@vim/ui/styles";
 "use client";
+import { Icono } from "@vim/ui/styles";
 import { useEffect } from "react";
 import { PantallaEstado } from "./components/pantalla-estado";
 import { reportarErrorSinEsperar } from "./lib/reportar-error";

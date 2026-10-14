@@ -1,5 +1,5 @@
-import { Icono } from "@vim/ui/styles";
 "use client";
+import { Icono } from "@vim/ui/styles";
 import { useCallback, useEffect, useState } from "react";
 import { fmtMxn } from "../lib/turno";
 
