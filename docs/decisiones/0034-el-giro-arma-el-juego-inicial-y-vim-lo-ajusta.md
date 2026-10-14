@@ -22,7 +22,7 @@ el producto", pero nadie lo había hecho.
 - **El candado de cuentas abiertas vive en `operacion_cambiar`, no en un disparador:** la caja baja
   `tenants` en el pull y ahí nada puede fallar.
 - **Los clientes que ya existían conservan lo que veían:** todo encendido salvo `eventos`, que
-  solo veía food truck.
+  solo veía food truck, y `cuentas_barra`, que es nueva y solo arranca encendida en BAR.
 
 ## Cómo se despliega (no es obvio)
 

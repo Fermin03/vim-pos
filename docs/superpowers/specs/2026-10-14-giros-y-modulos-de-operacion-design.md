@@ -29,7 +29,7 @@ ninguna app las respeta.
 | Giros que se ofrecen | Comida rápida, Restaurante con meseros, Food truck, Dark kitchen, **Bar**, **Cafetería** (separada de Bar) y **Taquería / cocina económica** |
 | Enfoque | **A:** módulos de operación con interruptor; el giro solo es un juego inicial. Ninguna pantalla pregunta por el giro |
 | Cuentas por nombre en barra | **Entran en la fase 1** |
-| Clientes existentes | Conservan lo que ven hoy: todo encendido salvo `eventos` (que solo veía food truck) |
+| Clientes existentes | Conservan lo que ven hoy: todo encendido salvo `eventos` (que solo veía food truck) y `cuentas_barra` (nueva, apagada salvo en BAR) |
 
 ## 3. Alcance
 
@@ -109,8 +109,10 @@ encendido**.
   el pull entero (ADR 0034, "Cómo se despliega").
 - **Interruptores.** Nueva columna `tenants.operacion jsonb NOT NULL` con las diez llaves de §4.
   La 0180 lo dejó por defecto en todo encendido y la 0181 lo cambió a **todo encendido salvo
-  `eventos`**. La 0181 también apaga `eventos` a los negocios existentes que no son food truck. Así
-  los clientes existentes ven lo mismo que antes y ninguno ve un bloque nuevo. Se guarda en `tenants` y no en `configuracion_tenant` porque esta última la puede
+  `eventos`**. La 0181 también apaga `eventos` a los negocios existentes que no son food truck. La 0183 cambió
+  el valor por defecto a **todo encendido salvo `eventos` y `cuentas_barra`** y apaga `cuentas_barra`
+  a los existentes que no son BAR. Así los clientes existentes ven lo mismo que antes y ninguno ve
+  un bloque nuevo. Se guarda en `tenants` y no en `configuracion_tenant` porque esta última la puede
   escribir el dueño (política `config_tenant FOR ALL`, 0003), mientras que en `tenants` las apps
   solo leen (`REVOKE UPDATE`, 0132). Así, que "solo VIM" decida lo garantiza la base y no solo la
   pantalla.
@@ -217,7 +219,8 @@ Requiere instalador nuevo de la caja (ver la regla de empaquetado y la lista ant
 - **Smokes SQL** (`npm run smokes`, bloquean el merge):
   - `juego_inicial_de_giro` devuelve la tabla §5 para cada giro y todo encendido para
     `ENTERPRISE`/desconocido.
-  - Un cliente existente ve lo mismo que antes: todo encendido salvo `eventos` (food truck lo conserva).
+  - Un cliente existente ve lo mismo que antes: todo encendido salvo `eventos` y `cuentas_barra` (food truck conserva `eventos`; BAR conserva
+    `cuentas_barra`).
   - Las dependencias del disparador (apagar comedor apaga meseros, etc.).
   - No se puede apagar comedor ni barra con cuentas abiertas.
   - `modulos_efectivos` trae las diez llaves y `kds` es plan Y interruptor.
