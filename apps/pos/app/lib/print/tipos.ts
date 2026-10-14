@@ -53,6 +53,9 @@ export type PagoImpresion = {
   montoMxn: number;
   recibidoMxn: number | null; // solo efectivo
   cambioMxn: number;
+  /** «Mastercard **** 1447» y la autorización del banco: solo si se cobró en la terminal integrada. */
+  tarjeta?: string | null;
+  autorizacion?: string | null;
 };
 
 /** Lo que el repartidor necesita para llegar y para que le abran la puerta, y quién lo lleva. */

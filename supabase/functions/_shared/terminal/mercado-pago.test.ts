@@ -16,8 +16,17 @@ test("una order pagada se lee completa", () => {
     estado: "APROBADO", detalle: "accredited", cobro_id: "2cd9e6fa-1acf-47dc-8ba4-cba918d73770",
     orden_id_externo: "ORDTST01M4HN4WJ2Q0VCVQSGNV5TEE24", pago_id_externo: "PAY01M4HN4WJQ6JQ5N2QEQRWQ9H1V",
     tipo_tarjeta: "credit_card", marca: "visa", mensualidades: 1, referencia: "1234567890",
-    pagado_mxn: "12.50", reembolsado_mxn: null,
+    pagado_mxn: "12.50", reembolsado_mxn: null, tarjeta_ultimos4: null,
   });
+});
+
+test("de la tarjeta solo se leen los últimos cuatro, y solo si son cuatro dígitos", () => {
+  // Así llegó el cobro real de Knock-Out (9 oct 2026): la consulta trae `card`; el aviso, no.
+  const con = (card: unknown) => datosDeOrden({ status: "processed", transactions: { payments: [{ id: "PAY1", card }] } });
+  assert.equal(con({ last_digits: "1447", first_digits: "54402509" }).tarjeta_ultimos4, "1447");
+  assert.equal(JSON.stringify(con({ last_digits: "1447", first_digits: "54402509" })).includes("54402509"), false);
+  assert.equal(con({ last_digits: "5440250912341447" }).tarjeta_ultimos4, null);
+  assert.equal(con(undefined).tarjeta_ultimos4, null);
 });
 
 test("el `data` de un aviso no trae id y manda la referencia como reference.id", () => {

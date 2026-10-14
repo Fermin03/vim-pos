@@ -36,6 +36,8 @@ export type DatosCobro = {
   orden_id_externo: string | null; pago_id_externo: string | null;
   tipo_tarjeta: string | null; marca: string | null; mensualidades: number | null;
   referencia: string | null; pagado_mxn: string | null; reembolsado_mxn: string | null;
+  /** Solo los últimos cuatro dígitos. Mercado Pago manda también los primeros ocho: no se leen. */
+  tarjeta_ultimos4: string | null;
 };
 
 const txt = (v: unknown): string | null => (typeof v === "string" && v !== "" ? v : null);
@@ -66,6 +68,8 @@ export function datosDeOrden(orden: unknown, idOrden?: string): DatosCobro {
     referencia: txt(p.reference_id) ?? txt(obj(p.reference).id),
     pagado_mxn: montoTexto(o.total_paid_amount) ?? montoTexto(p.paid_amount),
     reembolsado_mxn: reembolsado > 0 ? reembolsado.toFixed(2) : null,
+    // VERIFICADO con un cobro real: llega en la CONSULTA de la order (`card.last_digits`), no en el aviso.
+    tarjeta_ultimos4: /^\d{4}$/.test(String(obj(p.card).last_digits ?? "")) ? String(obj(p.card).last_digits) : null,
   };
 }
 
@@ -153,7 +157,7 @@ export function aceptaCambio(actual: EstadoCobro, nuevo: EstadoCobro): boolean {
 /** Las columnas de terminal_cobros que salen de una order (sin pisar con null lo que ya se sabía). */
 export function cambiosDeCobro(d: DatosCobro): Record<string, unknown> {
   const c: Record<string, unknown> = { estado: d.estado, detalle: d.detalle };
-  for (const k of ["orden_id_externo", "pago_id_externo", "tipo_tarjeta", "marca", "mensualidades", "referencia", "pagado_mxn", "reembolsado_mxn"] as const) {
+  for (const k of ["orden_id_externo", "pago_id_externo", "tipo_tarjeta", "marca", "mensualidades", "referencia", "pagado_mxn", "reembolsado_mxn", "tarjeta_ultimos4"] as const) {
     if (d[k] !== null) c[k] = d[k];
   }
   return c;

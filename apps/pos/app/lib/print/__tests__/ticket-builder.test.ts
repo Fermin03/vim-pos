@@ -351,3 +351,26 @@ describe("construirTicketJob — nota del pedido", () => {
     expect(sin.bloques.some((b) => b.t === "texto" && b.valor.startsWith("Nota del pedido"))).toBe(false);
   });
 });
+
+describe("pago con la terminal integrada", () => {
+  const filasDePago = (pagos: DatosTicketImpresion["pagos"]) => {
+    const b = construirTicketJob({ ...DATOS, pagos }).bloques;
+    const i = b.findIndex((x) => x.t === "fila" && x.izq === "Forma de pago");
+    return b.slice(i, i + 3);
+  };
+
+  it("imprime la tarjeta y la autorización debajo de la forma de pago", () => {
+    expect(filasDePago([{ metodo: "Tarjeta de débito", montoMxn: 108, recibidoMxn: null, cambioMxn: 0, tarjeta: "Mastercard **** 1447", autorizacion: "183406721568" }]))
+      .toEqual([
+        { t: "fila", izq: "Forma de pago", der: "Tarjeta de débito" },
+        { t: "fila", izq: "", der: "Mastercard **** 1447" },
+        { t: "fila", izq: "Autorización", der: "183406721568" },
+      ]);
+  });
+
+  it("una tarjeta registrada a mano sale como siempre, sin renglones de más", () => {
+    const filas = filasDePago([{ metodo: "Tarjeta de crédito", montoMxn: 108, recibidoMxn: null, cambioMxn: 0, tarjeta: null, autorizacion: null }]);
+    expect(filas[0]).toEqual({ t: "fila", izq: "Forma de pago", der: "Tarjeta de crédito" });
+    expect(filas.some((x) => x.t === "fila" && x.izq === "Autorización")).toBe(false);
+  });
+});

@@ -378,6 +378,10 @@ otro texto para lo mismo.
 - **Sin internet o sin terminal ligada** el selector queda como antes, con Débito y Crédito.
 - **Caja apagada a medio cobro:** al volver a abrir el cobro de esa cuenta, el pago aprobado se
   registra solo.
+- **El ticket dice con qué tarjeta se cobró.** Debajo de «Forma de pago» van la marca y la terminación
+  («Mastercard **** 1447», con asteriscos: la impresora no tiene el punto medio) y, en otro renglón,
+  «Autorización» con el número del banco. Solo en cobros hechos en la terminal desde la caja; una
+  tarjeta registrada a mano sale como siempre. El comprobante de devolución añade «Devuelto a:».
 - **Devolución «Mismo método»:** si la cuenta se cobró en la terminal desde la caja, al confirmar la
   devolución el dinero regresa solo a la tarjeta. Si Mercado Pago no lo devuelve, la devolución ya
   quedó registrada y la caja lo dice: «El dinero no regresó a la tarjeta», con «Volver a intentar».

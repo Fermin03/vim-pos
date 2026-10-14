@@ -11,6 +11,7 @@ export type EstadoCobro = "EN_TERMINAL" | "APROBADO" | "RECHAZADO" | "CANCELADO"
 export type CobroTerminal = {
   id: string; ticket_id: string; monto_mxn: number; estado: EstadoCobro; detalle: string | null;
   tipo_tarjeta: string | null; marca: string | null; referencia: string | null; aplicado_at: string | null;
+  tarjeta_ultimos4?: string | null;
 };
 
 type Peticion =
@@ -48,6 +49,30 @@ export async function pedirCobro(token: string, cajaId: string, p: Peticion): Pr
 /** ¿Esta caja tiene terminal? Cualquier fallo (sin internet, sin nube) es «no»: queda el registro manual. */
 export async function cajaTieneTerminal(token: string, cajaId: string): Promise<boolean> {
   return pedirCobro(token, cajaId, { accion: "disponible" }).then((r) => r.terminal === true).catch(() => false);
+}
+
+const MARCAS: Record<string, string> = {
+  visa: "Visa", debvisa: "Visa", master: "Mastercard", debmaster: "Mastercard", amex: "American Express", carnet: "Carnet",
+};
+
+/**
+ * «Mastercard **** 1447»: lo que se imprime en el ticket. Con asteriscos porque la impresora no
+ * tiene el punto medio. null si Mercado Pago no dijo la terminación (cobro aceptado a mano).
+ */
+export function etiquetaTarjeta(c: Pick<CobroTerminal, "marca" | "tarjeta_ultimos4">): string | null {
+  if (!c.tarjeta_ultimos4) return null;
+  return `${MARCAS[c.marca ?? ""] ?? "Tarjeta"} **** ${c.tarjeta_ultimos4}`;
+}
+
+/**
+ * Cómo entra al ticket un cobro de terminal: la tarjeta en `referencia` y la autorización del
+ * banco en `terminal_aprobacion`, que es para lo que nacieron esas dos columnas de `pagos` (0008).
+ */
+export function pagoDeCobro(c: CobroTerminal): { metodo: MetodoPago; monto: number; referencia?: string; terminalAprobacion?: string } {
+  return {
+    metodo: metodoDeTarjeta(c.tipo_tarjeta), monto: Number(c.monto_mxn),
+    referencia: etiquetaTarjeta(c) ?? undefined, terminalAprobacion: c.referencia ?? undefined,
+  };
 }
 
 /** Mercado Pago dice qué tarjeta fue; lo que no sea débito se registra como crédito. */

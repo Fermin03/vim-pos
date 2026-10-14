@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { cajaTieneTerminal, mensajeErrorCobro, mensajeFinal, metodoDeTarjeta, montoTexto, motivoReembolso, pedirCobro, reembolsarTicket } from "../terminal";
+import { cajaTieneTerminal, etiquetaTarjeta, pagoDeCobro, mensajeErrorCobro, mensajeFinal, metodoDeTarjeta, montoTexto, motivoReembolso, pedirCobro, reembolsarTicket } from "../terminal";
 
 afterEach(() => vi.unstubAllGlobals());
 const responde = (status: number, cuerpo: unknown) =>
@@ -11,6 +11,18 @@ describe("cobro con terminal", () => {
     expect(metodoDeTarjeta("credit_card")).toBe("TARJETA_CREDITO");
     expect(metodoDeTarjeta("prepaid_card")).toBe("TARJETA_CREDITO");
     expect(metodoDeTarjeta(null)).toBe("TARJETA_CREDITO");
+  });
+
+  it("la tarjeta se imprime como marca y terminación; sin terminación no se inventa nada", () => {
+    expect(etiquetaTarjeta({ marca: "debmaster", tarjeta_ultimos4: "1447" })).toBe("Mastercard **** 1447");
+    expect(etiquetaTarjeta({ marca: "naranja", tarjeta_ultimos4: "0001" })).toBe("Tarjeta **** 0001");
+    expect(etiquetaTarjeta({ marca: "visa", tarjeta_ultimos4: null })).toBeNull();
+    const base = { id: "c", ticket_id: "t", monto_mxn: 110, estado: "APROBADO" as const, detalle: null, aplicado_at: null };
+    expect(pagoDeCobro({ ...base, tipo_tarjeta: "debit_card", marca: "debmaster", referencia: "183406721568", tarjeta_ultimos4: "1447" }))
+      .toEqual({ metodo: "TARJETA_DEBITO", monto: 110, referencia: "Mastercard **** 1447", terminalAprobacion: "183406721568" });
+    // Aceptado a mano con PIN: ni tarjeta ni autorización.
+    expect(pagoDeCobro({ ...base, tipo_tarjeta: null, marca: null, referencia: null }))
+      .toEqual({ metodo: "TARJETA_CREDITO", monto: 110, referencia: undefined, terminalAprobacion: undefined });
   });
 
   it("el monto viaja como texto con dos decimales", () => {

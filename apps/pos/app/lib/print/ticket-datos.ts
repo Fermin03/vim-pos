@@ -248,14 +248,22 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
 
   const { data: pagos, error: e3 } = await sb
     .from("pagos")
-    .select("metodo_pago, monto_mxn, monto_recibido_mxn, cambio_mxn")
+    .select("metodo_pago, monto_mxn, monto_recibido_mxn, cambio_mxn, referencia, terminal_aprobacion")
     .eq("ticket_id", ticketId)
     .is("deleted_at", null)
     .order("created_at", { ascending: true });
   if (e3) throw new Error(e3.message);
   const pagosImp: PagoImpresion[] = (pagos ?? []).map((p) => {
-    const r = p as { metodo_pago: string; monto_mxn: string | number; monto_recibido_mxn: string | number | null; cambio_mxn: string | number };
+    const r = p as {
+      metodo_pago: string; monto_mxn: string | number; monto_recibido_mxn: string | number | null; cambio_mxn: string | number;
+      referencia: string | null; terminal_aprobacion: string | null;
+    };
+    // Solo un cobro de la terminal integrada llena `terminal_aprobacion`; con ella, `referencia` es la
+    // tarjeta. Sin ella `referencia` puede ser otra cosa (un folio de transferencia) y no se imprime.
+    const deTerminal = r.metodo_pago.startsWith("TARJETA_") && Boolean(r.terminal_aprobacion);
     return {
+      tarjeta: deTerminal ? r.referencia : null,
+      autorizacion: deTerminal ? r.terminal_aprobacion : null,
       metodo: etiquetaMetodoPago(r.metodo_pago),
       montoMxn: Number(r.monto_mxn),
       recibidoMxn: r.monto_recibido_mxn == null ? null : Number(r.monto_recibido_mxn),
