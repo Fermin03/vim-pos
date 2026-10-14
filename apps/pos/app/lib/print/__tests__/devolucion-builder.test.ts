@@ -34,3 +34,19 @@ describe("construirDevolucionJob", () => {
     expect(job.bloques.some((b) => b.t === "fila" && b.izq === "Autorizó:")).toBe(false);
   });
 });
+
+describe("devolución a la tarjeta", () => {
+  it("dice a qué tarjeta regresó el dinero, una por renglón", () => {
+    const job = construirDevolucionJob({ ...base, medio: "Mismo método", tarjetas: ["Mastercard **** 1447", "Visa **** 0022"] });
+    const i = job.bloques.findIndex((b) => b.t === "fila" && b.izq === "Medio:");
+    expect(job.bloques.slice(i, i + 3)).toEqual([
+      { t: "fila", izq: "Medio:", der: "Mismo método" },
+      { t: "fila", izq: "Devuelto a:", der: "Mastercard **** 1447" },
+      { t: "fila", izq: "Devuelto a:", der: "Visa **** 0022" },
+    ]);
+  });
+
+  it("sin tarjetas el comprobante no cambia", () => {
+    expect(construirDevolucionJob(base).bloques.some((b) => b.t === "fila" && b.izq === "Devuelto a:")).toBe(false);
+  });
+});

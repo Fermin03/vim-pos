@@ -222,6 +222,7 @@ function ModalDevolucion({
           items: datos.lineas.map((l) => ({ cantidad: l.cantidad, nombre: l.nombre, totalMxn: l.totalMxn })),
           motivo: labelMotivo(),
           medio: MEDIOS_DEV.find((m) => m.codigo === medio)?.label ?? medio,
+          tarjetas: medio === "MISMO_METODO_PAGO" ? datos.pagos.flatMap((p) => (p.tarjeta ? [p.tarjeta] : [])) : [],
           totalReembolso: venta.total,
           ancho: 80,
         };

@@ -13,6 +13,8 @@ export type DatosDevolucion = {
   items: { cantidad: number; nombre: string; totalMxn: number }[];
   motivo: string;
   medio: string;
+  /** Tarjetas a las que regresó el dinero («Mastercard **** 1447»), cuando la devolución fue al mismo método. */
+  tarjetas?: string[];
   totalReembolso: number;
   ancho: 58 | 80;
 };
@@ -40,6 +42,7 @@ export function construirDevolucionJob(d: DatosDevolucion): PrintJob {
     { t: "separador", estilo: "solido" },
     { t: "fila", izq: "REEMBOLSO", der: fmt(d.totalReembolso) },
     { t: "fila", izq: "Medio:", der: d.medio },
+    ...(d.tarjetas ?? []).map((t) => ({ t: "fila", izq: "Devuelto a:", der: t }) as Bloque),
     { t: "fila", izq: "Motivo:", der: d.motivo },
     { t: "separador", estilo: "punteado" },
     { t: "texto", valor: "Conserve este comprobante.", align: "centro" },

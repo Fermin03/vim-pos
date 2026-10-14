@@ -116,6 +116,8 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
   // 5. Pago(s) — misma info que ReciboTicket: forma de pago, y si es efectivo, recibido/cambio.
   for (const p of d.pagos) {
     b.push({ t: "fila", izq: "Forma de pago", der: p.metodo });
+    if (p.tarjeta) b.push({ t: "fila", izq: "", der: p.tarjeta });
+    if (p.autorizacion) b.push({ t: "fila", izq: "Autorización", der: p.autorizacion });
     if (p.recibidoMxn != null) {
       b.push({ t: "fila", izq: "Recibido", der: pesos(p.recibidoMxn) });
       b.push({ t: "fila", izq: "Cambio", der: pesos(p.cambioMxn) });
