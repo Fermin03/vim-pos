@@ -6,6 +6,15 @@
 
 ## Octubre de 2026
 
+13 de octubre Caja · 0.10.2
+
+### El ticket dice con qué tarjeta se cobró
+
+#### Mejoras
+
+- Cuando cobras con tu terminal de Mercado Pago, el ticket imprime la terminación de la tarjeta y el número de autorización.
+- El comprobante de devolución dice a qué tarjeta regresó el dinero.
+
 13 de octubre Caja · 0.10.0
 
 ### Devoluciones a la tarjeta, pago dividido con terminal y pedidos ya pagados
