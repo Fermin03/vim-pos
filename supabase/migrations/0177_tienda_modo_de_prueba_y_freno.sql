@@ -9,13 +9,17 @@
 --    de OAuth: no tiene refresh token ni vence).
 --      · La marca: tienda_config.pago_de_prueba. SOLO la pone VIM, a mano, por SQL. El dueño no
 --        puede: `authenticated` no tiene INSERT ni UPDATE sobre esa columna (privilegios por columna,
---        el mecanismo de la 0132 y la 0135), y ninguna función a su alcance la escribe.
+--        el mecanismo de la 0132 y la 0135), y ninguna función a su alcance la escribe. Tampoco la
+--        puede APAGAR borrando la fila y creándola otra vez: pierde el DELETE de la tabla (nada
+--        suyo lo usa) y, además, un disparador niega borrar la fila con la marca puesta.
 --      · La conexión de prueba: una fila de tienda_conexiones con de_prueba = true y su access token
 --        en Vault, sin refresh. La crea tienda_conexion_de_prueba (solo service_role), que se niega
 --        si el negocio no tiene la marca.
 --      · QUÉ CONEXIÓN COBRA (tienda_conexion_cobro), y nunca se mezclan:
 --          negocio en modo de prueba → SOLO su conexión de prueba (la única ACTIVA con de_prueba);
---          negocio normal            → NUNCA una de prueba. Su regla es, letra por letra, la de la 0173.
+--          negocio normal            → NUNCA una de prueba. Su regla es la de la 0173 con un solo
+--                                      cambio: para «la única activa» cuentan solo las reales (una
+--                                      de prueba que quedó activa no estorba al apagar el modo).
 --        Cada pago guarda la conexión con la que nació (tienda_pagos.conexion_id): encender o apagar
 --        la marca no cambia con qué token se consulta o se devuelve un pago que ya existe.
 --      · La conexión de prueba no se renueva: no tiene fecha de vencimiento, y la regla de la
@@ -29,22 +33,29 @@
 --    ese cliente no puede repetir el cobro en línea en ese negocio durante 30 minutos. Repetirlo al
 --    instante con los mismos datos empeora la puntuación del restaurante en el antifraude (lo dijo el
 --    soporte de Mercado Pago).
---      · A quién: al TELÉFONO del pedido y a la IP desde la que se pidió, cada uno por su lado y
---        solo en ESE negocio. Basta uno de los dos para que el freno aplique.
---      · Dónde vive: en limites_cupo (0136), la tabla de los topes, con su vencimiento. No lleva el
---        teléfono: lleva su huella (SHA-256 de negocio + teléfono). La IP va como en los demás topes.
+--      · A quién: al MISMO cliente, que es su teléfono Y su IP A LA VEZ, en ESE negocio. Es un freno
+--        para que el mismo cliente no repita el cobro al instante, no una defensa contra el abuso
+--        (esa son los topes por IP). Con solo la IP frenaría a todos los que comparten red (el wifi
+--        del local, un operador móvil); con solo el teléfono, cualquiera frenaría a otro escribiendo
+--        su número. Sin IP conocida no hay freno.
+--      · La clave del freno la calcula la FUNCIÓN: un HMAC de negocio + teléfono + IP con una llave
+--        que deriva de VIM_TIENDA_SECRET y que la base no tiene. Aquí llega ya calculada: quien lea
+--        la base no saca de ella ni el teléfono ni la IP.
+--      · Dónde vive: en limites_cupo (0136), la tabla de los topes, con su vencimiento.
 --      · Quién lo pone: la función `tienda` cuando el rechazo llega en la respuesta del cobro, y un
 --        disparador sobre tienda_pagos cuando llega después (por el aviso, la página del pedido o el
 --        barrido), que es como se vio en producción (`in_review` y, segundos después, `failed`).
+--        Para eso el pago guarda, al nacer, su clave de freno ya calculada (tienda_pagos.freno_clave):
+--        el disparador no conoce el secreto, ni la IP con la que se pidió. Sin clave, no frena.
 --
 -- ORDEN DE DESPLIEGUE:  1) esta migración  →  2) la web de la tienda y el admin  →  3) las funciones
 -- `tienda` y `tienda-webhook-mp`.
 --   · La migración va PRIMERO: la función `tienda` nueva llama a tienda_pago_frenado en cada pedido
---     en línea y a tienda_pago_frenar en cada rechazo por riesgo.
+--     en línea, escribe tienda_pagos.freno_clave y llama a tienda_pago_frenar en cada rechazo por riesgo.
 --   · La web va ANTES que la función: una pestaña con la web vieja no conoce PAGO_EN_PAUSA y diría
 --     «algo salió mal» (sin cobrar nada; solo el texto).
 --   · Con la migración sola nada cambia: ningún negocio tiene la marca, y nadie pone un freno hasta
---     que hay un `high_risk` (el disparador sí lo pone desde ya; sin la función nueva nadie lo lee).
+--     que la función nueva guarda claves de freno (sin clave, el disparador no hace nada).
 --
 -- Corre también en el Postgres de la caja instalada (sin Vault, pg_net ni pg_cron): lo de Vault va
 -- con EXECUTE dinámico, como en la 0173, y allá tienda_pagos y tienda_conexiones están vacías.
@@ -70,11 +81,42 @@ BEGIN
   EXECUTE format('GRANT INSERT (%s), UPDATE (%s) ON tienda_config TO authenticated', v_columnas, v_columnas);
 END $$;
 
+-- Y que no la apague borrando la fila: la 0161 le dio DELETE a `authenticated` (con política de dueño
+-- o administrador), y borrar la fila y crearla otra vez la dejaría con la marca en falso: la tienda
+-- pasaría a cobrar tarjetas reales con su conexión real. Dos cerrojos:
+--   · se le quita el DELETE de la tabla. Nada con sesión lo usa (el admin nunca borra la tienda; un
+--     negocio se elimina con service_role y la fila se va en cascada con su tenant);
+--   · y un disparador niega borrar una fila con la marca puesta a quien llega con una sesión
+--     (`authenticated` o `anon`), por si un día alguien devuelve ese DELETE. Los roles de servicio
+--     (service_role, y quien elimina un negocio entero) pasan.
+REVOKE DELETE ON tienda_config FROM authenticated;
+CREATE OR REPLACE FUNCTION tienda_config_no_borrar_en_prueba()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF OLD.pago_de_prueba AND current_user IN ('authenticated', 'anon') THEN
+    RAISE EXCEPTION 'TIENDA_EN_MODO_DE_PRUEBA: la tienda está en modo de prueba y solo VIM puede quitarla'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  RETURN OLD;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_tienda_config_no_borrar_en_prueba ON tienda_config;
+CREATE TRIGGER trg_tienda_config_no_borrar_en_prueba
+  BEFORE DELETE ON tienda_config
+  FOR EACH ROW EXECUTE FUNCTION tienda_config_no_borrar_en_prueba();
+
 -- ── §2 Qué conexión cobra ────────────────────────────────────────────────────
--- tienda_conexion_cobro: cuerpo copiado ÍNTEGRO de 0173_tienda_pago_en_linea.sql §3. Un cambio: el
--- bloque del modo de prueba, después de las condiciones que valen para todos (el dueño lo ofrece,
--- sin pausas, la caja sabe de pedidos pagados, la sucursal está en la tienda) y antes de la regla de
--- siempre, que queda letra por letra como estaba.
+-- tienda_conexion_cobro: cuerpo copiado ÍNTEGRO de 0173_tienda_pago_en_linea.sql §3. Dos cambios:
+--   1) el bloque del modo de prueba, después de las condiciones que valen para todos (el dueño lo
+--      ofrece, sin pausas, la caja sabe de pedidos pagados, la sucursal está en la tienda) y antes
+--      de la regla de siempre;
+--   2) en la regla de siempre, «la única conexión activa» cuenta solo las REALES (`AND NOT
+--      x.de_prueba` en el conteo). Antes, con una real y una de prueba activas y sin elegir, no
+--      cobraba ninguna: al apagar el modo de prueba la tienda se quedaba sin pago en línea hasta
+--      elegir cuenta a mano. Lo demás de esa rama queda letra por letra.
 --   · En modo de prueba cobra la ÚNICA conexión ACTIVA de prueba del negocio. Si no hay, o hay más de
 --     una, ninguna. No se mira la cuenta elegida para la sucursal: esa elección es de las cuentas
 --     reales, y así queda intacta para cuando se apague el modo de prueba.
@@ -113,7 +155,7 @@ BEGIN
     RETURN v_id;
   END IF;
 
-  IF (SELECT count(*) FROM tienda_conexiones x WHERE x.tenant_id = p_tenant AND x.estado = 'ACTIVA') = 1 THEN
+  IF (SELECT count(*) FROM tienda_conexiones x WHERE x.tenant_id = p_tenant AND x.estado = 'ACTIVA' AND NOT x.de_prueba) = 1 THEN
     SELECT x.id INTO v_id FROM tienda_conexiones x
      WHERE x.tenant_id = p_tenant AND x.estado = 'ACTIVA' AND NOT x.de_prueba;
   END IF;
@@ -304,65 +346,57 @@ END;
 $$;
 
 -- ── §4 El freno tras un rechazo por riesgo ───────────────────────────────────
--- Las claves del freno de un cliente en un negocio. El teléfono va como huella (SHA-256 de negocio +
--- teléfono): en la tabla de topes no queda el número. La IP va como en los demás topes (IPv6: su /64,
--- ya recortada por quien llama). Lo que no tiene su forma no da clave: sin teléfono válido y sin IP
--- conocida no hay a quién frenar («desconocida» no pasa: frenaría a todos los que caen ahí).
-CREATE OR REPLACE FUNCTION _tienda_freno_claves(p_tenant uuid, p_telefono text, p_ip text)
-RETURNS text[]
-LANGUAGE sql STABLE
-SET search_path = public, pg_temp
-AS $$
-  SELECT CASE WHEN p_tenant IS NULL THEN ARRAY[]::text[] ELSE array_remove(ARRAY[
-    CASE WHEN p_telefono ~ '^[0-9]{10}$'
-         THEN format('tienda:pago-freno:%s:tel:%s', p_tenant, encode(sha256(convert_to(p_tenant::text || ':' || p_telefono, 'UTF8')), 'hex')) END,
-    CASE WHEN p_ip ~ '^[0-9a-f.:/]{3,50}$' AND p_ip ~ '[0-9]'
-         THEN format('tienda:pago-freno:%s:ip:%s', p_tenant, p_ip) END
-  ], NULL) END;
-$$;
+-- La clave de freno de un pago: HMAC(llave derivada de VIM_TIENDA_SECRET, negocio + teléfono + IP),
+-- calculada por la función `tienda` al crear el pedido (freno.ts). Con ella el disparador de abajo
+-- puede frenar al mismo cliente cuando el rechazo llega tarde, sin conocer el secreto ni la IP. No
+-- es el teléfono ni la IP, ni se sacan de ella. NULL = no se conocía la IP: ese pago no frena.
+ALTER TABLE tienda_pagos ADD COLUMN IF NOT EXISTS freno_clave text NULL;
+ALTER TABLE tienda_pagos DROP CONSTRAINT IF EXISTS tienda_pago_freno_clave_valida;
+ALTER TABLE tienda_pagos ADD CONSTRAINT tienda_pago_freno_clave_valida CHECK (freno_clave ~ '^[A-Za-z0-9_-]{40,64}$');
+COMMENT ON COLUMN tienda_pagos.freno_clave IS 'Clave del freno por riesgo del cliente de este pago: un HMAC de negocio + teléfono + IP hecho por la función tienda con una llave que la base no tiene. NULL = sin IP conocida (no frena).';
 
--- Pone el freno: ese teléfono y esa IP no cobran en línea en ese negocio hasta dentro de p_minutos.
--- Devuelve hasta cuándo, o NULL si no había a quién frenar. Ponerlo otra vez lo deja hasta la hora
--- más tardía (nunca lo acorta). Se guarda en limites_cupo, que se limpia sola al vencer (consumir_cupo).
-CREATE OR REPLACE FUNCTION tienda_pago_frenar(p_tenant uuid, p_telefono text, p_ip text DEFAULT NULL, p_minutos integer DEFAULT 30)
+-- Pone el freno: quien tenga esa clave (ese teléfono Y esa IP, en ese negocio) no cobra en línea
+-- hasta dentro de p_minutos. Devuelve hasta cuándo, o NULL si la clave no tiene su forma (no frena a
+-- nadie). Ponerlo otra vez lo deja hasta la hora más tardía (nunca lo acorta). Se guarda en
+-- limites_cupo, que se limpia sola al vencer (consumir_cupo).
+CREATE OR REPLACE FUNCTION tienda_pago_frenar(p_clave text, p_minutos integer DEFAULT 30)
 RETURNS timestamptz
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_claves text[] := _tienda_freno_claves(p_tenant, p_telefono, p_ip);
   -- clock_timestamp y no now(), como los demás topes (0136): no depende de cuándo empezó la transacción.
   v_ahora  timestamptz := clock_timestamp();
   v_hasta  timestamptz := v_ahora + make_interval(mins => LEAST(GREATEST(COALESCE(p_minutos, 30), 1), 1440));
 BEGIN
-  IF cardinality(v_claves) = 0 THEN RETURN NULL; END IF;
+  IF (p_clave ~ '^[A-Za-z0-9_-]{40,64}$') IS NOT TRUE THEN RETURN NULL; END IF;
   INSERT INTO limites_cupo AS l (clave, ventana_inicio, expira_en, usos)
-  SELECT k, v_ahora, v_hasta, 1 FROM unnest(v_claves) AS k
+  VALUES ('tienda:pago-freno:' || p_clave, v_ahora, v_hasta, 1)
   ON CONFLICT (clave, ventana_inicio) DO UPDATE SET expira_en = GREATEST(l.expira_en, EXCLUDED.expira_en);
   RETURN v_hasta;
 END;
 $$;
 COMMENT ON FUNCTION tienda_pago_frenar IS
-  'Tras un rechazo por riesgo del antifraude de Mercado Pago: ese teléfono (por su huella) y esa IP no pueden cobrar en línea en ese negocio durante p_minutos (30). Devuelve hasta cuándo. Solo service_role.';
+  'Tras un rechazo por riesgo del antifraude de Mercado Pago: el cliente de esa clave (HMAC de negocio + teléfono + IP, calculado por la función tienda) no puede cobrar en línea durante p_minutos (30). Devuelve hasta cuándo. Solo service_role.';
 
--- ¿Ese cliente tiene el pago en línea frenado en ese negocio? Hasta cuándo, o NULL si no. Basta que
--- lo esté su teléfono o su IP. No suma ni cambia nada.
-CREATE OR REPLACE FUNCTION tienda_pago_frenado(p_tenant uuid, p_telefono text, p_ip text DEFAULT NULL)
+-- ¿Esa clave tiene el pago en línea frenado? Hasta cuándo, o NULL si no. No suma ni cambia nada.
+CREATE OR REPLACE FUNCTION tienda_pago_frenado(p_clave text)
 RETURNS timestamptz
 LANGUAGE sql SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
   SELECT max(l.expira_en) FROM limites_cupo l
-   WHERE l.clave = ANY (_tienda_freno_claves(p_tenant, p_telefono, p_ip)) AND l.expira_en > clock_timestamp();
+   WHERE p_clave ~ '^[A-Za-z0-9_-]{40,64}$' AND l.clave = 'tienda:pago-freno:' || p_clave AND l.expira_en > clock_timestamp();
 $$;
 COMMENT ON FUNCTION tienda_pago_frenado IS
-  'Hasta cuándo ese cliente (su teléfono o su IP) tiene frenado el pago en línea en ese negocio por un rechazo por riesgo; NULL si no lo tiene. Solo service_role.';
+  'Hasta cuándo el cliente de esa clave de freno tiene frenado el pago en línea por un rechazo por riesgo; NULL si no lo tiene. Solo service_role.';
 
 -- El rechazo por riesgo que se conoce DESPUÉS de contestarle al cliente: el cobro quedó en revisión y
 -- el aviso de Mercado Pago, la página del pedido o el barrido traen el `failed` / `high_risk`
--- (tienda_pago_aplicar deja el pago RECHAZADO con ese motivo). Ese pedido no se borra, así que su
--- teléfono está a la mano; la IP ya no se sabe. Es un disparador, como el de las devoluciones (0173
--- §6): así lo caza venga por donde venga. Y nunca tumba el cambio de estado: se traga sus errores.
+-- (tienda_pago_aplicar deja el pago RECHAZADO con ese motivo). Frena con la clave que el pago guardó
+-- al nacer; sin ella (IP desconocida, o un pago de antes de esta migración) no frena a nadie. Es un
+-- disparador, como el de las devoluciones (0173 §6): así lo caza venga por donde venga. Y nunca
+-- tumba el cambio de estado: se traga sus errores.
 -- `high_risk` es el motivo tal como lo manda Mercado Pago (documento 04); su familia en la función
 -- es RIESGO (pago-mp.ts), y una prueba ata los dos nombres.
 CREATE OR REPLACE FUNCTION tienda_pagos_frenar_por_riesgo()
@@ -371,8 +405,7 @@ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 BEGIN
-  PERFORM tienda_pago_frenar(d.tenant_id, d.cliente_telefono, NULL)
-     FROM delivery_pedidos d WHERE d.id = NEW.pedido_id AND d.canal = 'TIENDA';
+  PERFORM tienda_pago_frenar(NEW.freno_clave);
   RETURN NULL;
 EXCEPTION WHEN OTHERS THEN
   RAISE WARNING 'tienda_pagos_frenar_por_riesgo(%): %', NEW.id, SQLERRM;
@@ -383,11 +416,17 @@ DROP TRIGGER IF EXISTS trg_tienda_pagos_frenar_por_riesgo ON tienda_pagos;
 CREATE TRIGGER trg_tienda_pagos_frenar_por_riesgo
   AFTER UPDATE OF estado ON tienda_pagos
   FOR EACH ROW
-  WHEN (NEW.estado = 'RECHAZADO' AND OLD.estado IS DISTINCT FROM NEW.estado AND NEW.detalle = 'high_risk' AND NOT NEW.extra)
+  WHEN (NEW.estado = 'RECHAZADO' AND OLD.estado IS DISTINCT FROM NEW.estado AND NEW.detalle = 'high_risk'
+        AND NEW.freno_clave IS NOT NULL AND NOT NEW.extra)
   EXECUTE FUNCTION tienda_pagos_frenar_por_riesgo();
 
+-- (De una versión anterior de esta migración, nunca aplicada: el freno por teléfono o por IP sueltos.)
+DROP FUNCTION IF EXISTS tienda_pago_frenar(uuid, text, text, integer);
+DROP FUNCTION IF EXISTS tienda_pago_frenado(uuid, text, text);
+DROP FUNCTION IF EXISTS _tienda_freno_claves(uuid, text, text);
+
 -- ── Privilegios ──────────────────────────────────────────────────────────────
--- Nada para el público ni para el personal. La interna y la del disparador, ni a service_role.
+-- Nada para el público ni para el personal. Las de disparador, ni a service_role.
 -- (Las tres reemplazadas —tienda_conexion_cobro, tienda_negocio, tienda_seguimiento— conservan los
 -- suyos: CREATE OR REPLACE no los toca; se repiten aquí por si acaso.)
 DO $$
@@ -397,10 +436,10 @@ BEGIN
              FROM pg_proc p
             WHERE p.pronamespace = 'public'::regnamespace
               AND p.proname IN ('tienda_conexion_cobro', 'tienda_negocio', 'tienda_seguimiento', 'tienda_conexion_de_prueba',
-                                'tienda_pago_frenar', 'tienda_pago_frenado', '_tienda_freno_claves', 'tienda_pagos_frenar_por_riesgo')
+                                'tienda_pago_frenar', 'tienda_pago_frenado', 'tienda_pagos_frenar_por_riesgo', 'tienda_config_no_borrar_en_prueba')
   LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC, anon, authenticated', f.firma);
-    IF f.proname NOT LIKE '\_%' AND f.proname <> 'tienda_pagos_frenar_por_riesgo' THEN
+    IF f.proname NOT IN ('tienda_pagos_frenar_por_riesgo', 'tienda_config_no_borrar_en_prueba') THEN
       EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO service_role', f.firma);
     ELSE
       EXECUTE format('REVOKE ALL ON FUNCTION %s FROM service_role', f.firma);

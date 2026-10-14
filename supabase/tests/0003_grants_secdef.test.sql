@@ -93,8 +93,9 @@ insert into _secdef_solo_service (fn, motivo) values
   ('_tienda_estado_real',           'lee el ticket de un pedido sin RLS; solo la llaman funciones definer (0166)'),
   ('tienda_conexion_cobro',         'dice qué cuenta de Mercado Pago cobra en una sucursal de cualquier negocio (0173, 0177)'),
   ('tienda_conexion_de_prueba',     'crea la conexión de PRUEBA de Mercado Pago de un negocio y guarda su token en Vault; solo VIM (0177)'),
-  ('tienda_pago_frenar',            'frena el pago en línea de un teléfono y una IP en cualquier negocio (0177)'),
-  ('tienda_pago_frenado',           'dice si un teléfono o una IP tienen frenado el pago en línea en cualquier negocio (0177)'),
+  ('tienda_pago_frenar',            'frena el pago en línea del cliente de una clave de freno, en cualquier negocio (0177)'),
+  ('tienda_pago_frenado',           'dice si una clave de freno tiene frenado el pago en línea (0177)'),
+  ('tienda_config_no_borrar_en_prueba', 'función de disparador: nadie con sesión borra la fila de una tienda en modo de prueba (0177)'),
   ('tienda_pagos_frenar_por_riesgo', 'función de disparador: frena al cliente de un pago rechazado por riesgo (0177)');
 
 -- #2 — CRÍTICA: ninguna de ellas es ejecutable por `authenticated`.

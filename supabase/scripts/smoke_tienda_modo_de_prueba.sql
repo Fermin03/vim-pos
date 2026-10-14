@@ -1,8 +1,9 @@
 -- Smoke del modo de prueba del pago en línea y del freno tras un rechazo por riesgo (mig. 0177):
---   M) la marca tienda_config.pago_de_prueba: el dueño no la puede poner, por ningún camino;
+--   M) la marca tienda_config.pago_de_prueba: el dueño no la puede poner ni quitar, por ningún camino;
 --   C) qué conexión cobra: un negocio normal nunca con una de prueba, uno en modo de prueba nunca
 --      con una real; la conexión de prueba no se renueva; cada pago conserva su conexión;
---   F) el freno: a quién frena, cuánto, que no guarda el teléfono, y el que pone el disparador.
+--   F) el freno: una clave ya calculada por la función (teléfono E IP a la vez), cuánto dura, y el
+--      que pone el disparador con la clave que el pago guardó al nacer.
 -- Aquí no hay Mercado Pago ni Vault: se prueba lo que la base decide.
 -- Fixture propio sobre el negocio y la sucursal de la semilla, como smoke_tienda_pago_en_linea.sql.
 -- Uso: cd desktop && npm run smokes -- smoke_tienda_modo_de_prueba.sql
@@ -34,6 +35,8 @@ DECLARE
   v_cat uuid; v_real uuid; v_prueba uuid; v_prueba2 uuid; v_id uuid;
   v_r jsonb; v_r2 jsonb; v_neg jsonb;
   v_n integer; v_txt text; v_ts timestamptz; v_ts2 timestamptz;
+  -- Claves de freno con la forma de las de verdad (un HMAC-SHA256 en base64url: 43 caracteres).
+  k1 text := repeat('A', 43); k2 text := repeat('b', 43); k3 text := repeat('C', 41) || '_-'; k4 text := repeat('d', 43); k5 text := repeat('e', 43);
 BEGIN
   PERFORM set_config('request.jwt.claims', NULL, true);
 
@@ -98,8 +101,15 @@ BEGIN
     RAISE EXCEPTION 'M1: el dueño insertó una conexión de prueba';
   EXCEPTION WHEN insufficient_privilege THEN NULL;
   END;
+  -- Ni borrar la fila de la tienda (para crearla otra vez con la marca en falso).
+  BEGIN
+    DELETE FROM tienda_config WHERE tenant_id = v_t;
+    RAISE EXCEPTION 'M1: el dueño borró la fila de su tienda';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
   EXECUTE 'RESET ROLE';
   PERFORM set_config('request.jwt.claims', NULL, true);
+  IF NOT EXISTS (SELECT 1 FROM tienda_config WHERE tenant_id = v_t) THEN RAISE EXCEPTION 'M1: la fila de la tienda ya no está'; END IF;
   IF (SELECT pago_de_prueba FROM tienda_config WHERE tenant_id = v_t) THEN RAISE EXCEPTION 'M1: la marca quedó encendida'; END IF;
   IF (SELECT color FROM tienda_config WHERE tenant_id = v_t) <> '#222222' THEN RAISE EXCEPTION 'M1: se guardó un cambio que venía con la marca'; END IF;
 
@@ -116,6 +126,9 @@ BEGIN
      AND NOT has_column_privilege('authenticated', 'public.tienda_config', a.attname, p);
   IF v_txt IS NOT NULL THEN RAISE EXCEPTION 'M2: el dueño perdió permisos sobre: %', v_txt; END IF;
   IF has_table_privilege('anon', 'public.tienda_config', 'SELECT') THEN RAISE EXCEPTION 'M2: anon lee tienda_config'; END IF;
+  IF has_table_privilege('authenticated', 'public.tienda_config', 'DELETE') OR has_table_privilege('anon', 'public.tienda_config', 'DELETE') THEN
+    RAISE EXCEPTION 'M2: alguien con sesión puede borrar la fila de la tienda (y con ella, la marca)';
+  END IF;
 
   -- M3) Ninguna función que alguien con sesión (o sin ella) pueda ejecutar toca la marca, ni las
   --     funciones nuevas quedaron abiertas.
@@ -123,11 +136,16 @@ BEGIN
    WHERE p.pronamespace = 'public'::regnamespace AND p.prosrc ILIKE '%pago_de_prueba%'
      AND (has_function_privilege('authenticated', p.oid, 'EXECUTE') OR has_function_privilege('anon', p.oid, 'EXECUTE'));
   IF v_txt IS NOT NULL THEN RAISE EXCEPTION 'M3: funciones al alcance del dueño que tocan la marca: %', v_txt; END IF;
+  -- Ni ninguna que borre la fila de la tienda por él (sería otra forma de apagar la marca).
+  SELECT string_agg(p.proname, ', ') INTO v_txt FROM pg_proc p
+   WHERE p.pronamespace = 'public'::regnamespace AND p.prosecdef AND p.prosrc ~* 'deletes+froms+(public.)?tienda_config'
+     AND (has_function_privilege('authenticated', p.oid, 'EXECUTE') OR has_function_privilege('anon', p.oid, 'EXECUTE'));
+  IF v_txt IS NOT NULL THEN RAISE EXCEPTION 'M3: funciones al alcance del dueño que borran la fila de la tienda: %', v_txt; END IF;
   SELECT string_agg(p.proname || ' → ' || r, ', ') INTO v_txt
     FROM pg_proc p, unnest(ARRAY['anon', 'authenticated']) r
    WHERE p.pronamespace = 'public'::regnamespace
      AND p.proname IN ('tienda_conexion_cobro', 'tienda_negocio', 'tienda_seguimiento', 'tienda_conexion_de_prueba',
-                       'tienda_pago_frenar', 'tienda_pago_frenado', '_tienda_freno_claves', 'tienda_pagos_frenar_por_riesgo')
+                       'tienda_pago_frenar', 'tienda_pago_frenado', 'tienda_pagos_frenar_por_riesgo', 'tienda_config_no_borrar_en_prueba')
      AND has_function_privilege(r, p.oid, 'EXECUTE');
   IF v_txt IS NOT NULL THEN RAISE EXCEPTION 'M3: funciones abiertas: %', v_txt; END IF;
   IF (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace
@@ -135,6 +153,46 @@ BEGIN
         AND has_function_privilege('service_role', p.oid, 'EXECUTE')) <> 6 THEN
     RAISE EXCEPTION 'M3: service_role debía poder ejecutar las seis (y ninguna tiene sobrecargas)';
   END IF;
+
+  -- M4) El segundo cerrojo: aunque un día alguien le devuelva el DELETE a authenticated (aquí se le da,
+  --     y se deshace con la transacción), la fila con la marca PUESTA no la borra nadie con sesión.
+  --     Sin la marca sí se podría (como antes de esta migración), y un rol de servicio la borra siempre
+  --     (eliminar un negocio entero se la lleva en cascada).
+  UPDATE tienda_config SET pago_de_prueba = true WHERE tenant_id = v_t;
+  GRANT DELETE ON tienda_config TO authenticated;
+  EXECUTE 'SET LOCAL ROLE authenticated';
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_dueno, 'role', 'authenticated', 'tenant_id', v_t)::text, true);
+  BEGIN
+    DELETE FROM tienda_config WHERE tenant_id = v_t;
+    RAISE EXCEPTION 'M4: el dueño borró la fila de una tienda en modo de prueba';
+  EXCEPTION WHEN insufficient_privilege THEN
+    IF SQLERRM NOT LIKE 'TIENDA_EN_MODO_DE_PRUEBA%' THEN RAISE EXCEPTION 'M4: lo negó otra cosa, no el disparador: %', SQLERRM; END IF;
+  END;
+  EXECUTE 'RESET ROLE';
+  PERFORM set_config('request.jwt.claims', NULL, true);
+  IF NOT COALESCE((SELECT pago_de_prueba FROM tienda_config WHERE tenant_id = v_t), false) THEN RAISE EXCEPTION 'M4: la fila en modo de prueba se borró o perdió la marca'; END IF;
+  BEGIN   -- un rol de servicio sí (se deshace: la fila hace falta abajo)
+    DELETE FROM tienda_config WHERE tenant_id = v_t;
+    GET DIAGNOSTICS v_n = ROW_COUNT;
+    IF v_n <> 1 THEN RAISE EXCEPTION 'M4: un rol de servicio no pudo borrar la fila'; END IF;
+    RAISE EXCEPTION 'DESHACER';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'DESHACER' THEN RAISE; END IF;
+  END;
+  UPDATE tienda_config SET pago_de_prueba = false WHERE tenant_id = v_t;
+  EXECUTE 'SET LOCAL ROLE authenticated';
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_dueno, 'role', 'authenticated', 'tenant_id', v_t)::text, true);
+  BEGIN   -- sin la marca, el disparador no estorba (con el DELETE prestado; se deshace)
+    DELETE FROM tienda_config WHERE tenant_id = v_t;
+    GET DIAGNOSTICS v_n = ROW_COUNT;
+    IF v_n <> 1 THEN RAISE EXCEPTION 'M4: sin la marca el disparador no debía negar nada'; END IF;
+    RAISE EXCEPTION 'DESHACER';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'DESHACER' THEN RAISE; END IF;
+  END;
+  EXECUTE 'RESET ROLE';
+  PERFORM set_config('request.jwt.claims', NULL, true);
+  REVOKE DELETE ON tienda_config FROM authenticated;
 
   -- ── C) Qué conexión cobra ───────────────────────────────────────────────────────────────────
   -- C1) Sin la marca, la conexión de prueba no se puede crear por su función.
@@ -156,9 +214,14 @@ BEGIN
   --   · elegida la real: la real;
   UPDATE tienda_sucursales SET conexion_id = v_real WHERE sucursal_id = v_suc;
   IF tienda_conexion_cobro(v_t, v_suc) IS DISTINCT FROM v_real THEN RAISE EXCEPTION 'C2: con la real elegida debía cobrar la real'; END IF;
-  --   · sin elegir y con las dos activas: ninguna (como siempre: con varias no se adivina);
+  --   · sin elegir, con la real y la de prueba activas: la REAL (la de prueba no cuenta para «la
+  --     única activa»: si contara, apagar el modo de prueba dejaría la tienda sin pago en línea);
   UPDATE tienda_sucursales SET conexion_id = NULL WHERE sucursal_id = v_suc;
-  IF tienda_conexion_cobro(v_t, v_suc) IS NOT NULL THEN RAISE EXCEPTION 'C2: con dos cuentas activas y sin elegir no debía cobrar ninguna'; END IF;
+  IF tienda_conexion_cobro(v_t, v_suc) IS DISTINCT FROM v_real THEN RAISE EXCEPTION 'C2: con una real y una de prueba activas, sin elegir, debía cobrar la real'; END IF;
+  --   · y con DOS reales sin elegir sigue sin cobrar ninguna (no se adivina a quién le cae el dinero);
+  INSERT INTO tienda_conexiones (tenant_id, cuenta_id_externo, public_key) VALUES (v_t, '502', 'APP_USR-smoke-cuenta-real-000002') RETURNING id INTO v_id;
+  IF tienda_conexion_cobro(v_t, v_suc) IS NOT NULL THEN RAISE EXCEPTION 'C2: con dos cuentas reales activas y sin elegir no debía cobrar ninguna'; END IF;
+  DELETE FROM tienda_conexiones WHERE id = v_id;
   --   · sin elegir y solo la de prueba activa: ninguna.
   UPDATE tienda_conexiones SET estado = 'DESCONECTADA' WHERE id = v_real;
   IF tienda_conexion_cobro(v_t, v_suc) IS NOT NULL THEN RAISE EXCEPTION 'C2: un negocio normal cobra con su única conexión, que es de prueba'; END IF;
@@ -294,72 +357,83 @@ BEGIN
   IF tienda_seguimiento(v_t, md5('mp-a5') || md5('mp-b5')) ? 'pago_de_prueba' THEN RAISE EXCEPTION 'C6: un pedido al recibir trae pago_de_prueba'; END IF;
 
   -- ── F) El freno tras un rechazo por riesgo ──────────────────────────────────────────────────
-  -- F1) Nadie está frenado hasta que se frena. Se frena al teléfono y a la IP, cada uno por su lado,
-  --     30 minutos, solo en ese negocio.
-  IF tienda_pago_frenado(v_t, '4771110001', '10.0.0.1') IS NOT NULL THEN RAISE EXCEPTION 'F1: frenado sin haber frenado a nadie'; END IF;
-  v_ts := tienda_pago_frenar(v_t, '4771110001', '10.0.0.1');
+  -- La clave llega ya calculada por la función (un HMAC de negocio + teléfono + IP: el MISMO cliente
+  -- es las dos cosas a la vez). Aquí se prueba lo que la base hace con ella.
+  -- F1) Nadie está frenado hasta que se frena; dura 30 minutos; otra clave (otro teléfono, otra red,
+  --     otro negocio: cualquiera de los tres cambia la clave) no se entera.
+  IF tienda_pago_frenado(k1) IS NOT NULL THEN RAISE EXCEPTION 'F1: frenado sin haber frenado a nadie'; END IF;
+  v_ts := tienda_pago_frenar(k1);
   IF v_ts IS NULL OR v_ts < clock_timestamp() + interval '29 minutes' OR v_ts > clock_timestamp() + interval '31 minutes' THEN RAISE EXCEPTION 'F1: el freno debía durar 30 minutos: %', v_ts - clock_timestamp(); END IF;
-  IF tienda_pago_frenado(v_t, '4771110001', '10.0.0.1') IS DISTINCT FROM v_ts THEN RAISE EXCEPTION 'F1: frenado no devuelve hasta cuándo'; END IF;
-  IF tienda_pago_frenado(v_t, '4771110001', '10.9.9.9') IS DISTINCT FROM v_ts THEN RAISE EXCEPTION 'F1: cambiar de red esquiva el freno del teléfono'; END IF;
-  IF tienda_pago_frenado(v_t, '4771110001', NULL) IS DISTINCT FROM v_ts THEN RAISE EXCEPTION 'F1: sin IP conocida no ve el freno del teléfono'; END IF;
-  IF tienda_pago_frenado(v_t, '4779990009', '10.0.0.1') IS DISTINCT FROM v_ts THEN RAISE EXCEPTION 'F1: cambiar de teléfono esquiva el freno de la IP'; END IF;
-  IF tienda_pago_frenado(v_t, '4779990009', '10.9.9.9') IS NOT NULL THEN RAISE EXCEPTION 'F1: frenó a otro cliente (otro teléfono, otra red)'; END IF;
-  IF tienda_pago_frenado(v_otro, '4771110001', '10.0.0.1') IS NOT NULL THEN RAISE EXCEPTION 'F1: el freno de un negocio vale en otro'; END IF;
-  -- El teléfono no queda escrito: solo su huella.
-  IF EXISTS (SELECT 1 FROM limites_cupo WHERE clave LIKE '%4771110001%') THEN RAISE EXCEPTION 'F1: el teléfono quedó en claro en limites_cupo'; END IF;
-  IF (SELECT count(*) FROM limites_cupo WHERE clave LIKE 'tienda:pago-freno:' || v_t || ':%') <> 2 THEN RAISE EXCEPTION 'F1: esperaba dos claves del freno (teléfono e IP)'; END IF;
+  IF tienda_pago_frenado(k1) IS DISTINCT FROM v_ts THEN RAISE EXCEPTION 'F1: frenado no devuelve hasta cuándo'; END IF;
+  IF tienda_pago_frenado(k2) IS NOT NULL THEN RAISE EXCEPTION 'F1: frenó a otro cliente (otra clave)'; END IF;
+  IF tienda_pago_frenado(lower(k1)) IS NOT NULL THEN RAISE EXCEPTION 'F1: la clave no distingue mayúsculas'; END IF;
+  IF (SELECT count(*) FROM limites_cupo WHERE clave LIKE 'tienda:pago-freno:%') <> 1
+     OR NOT EXISTS (SELECT 1 FROM limites_cupo WHERE clave = 'tienda:pago-freno:' || k1) THEN
+    RAISE EXCEPTION 'F1: esperaba una sola clave del freno, la que se mandó';
+  END IF;
 
   -- F2) Frenar otra vez no lo acorta; y se levanta solo al vencer.
-  v_ts2 := tienda_pago_frenar(v_t, '4771110001', '10.0.0.1', 1);
-  IF tienda_pago_frenado(v_t, '4771110001', '10.0.0.1') IS DISTINCT FROM v_ts THEN RAISE EXCEPTION 'F2: un freno más corto acortó el que había'; END IF;
-  UPDATE limites_cupo SET expira_en = clock_timestamp() - interval '1 second' WHERE clave LIKE 'tienda:pago-freno:' || v_t || ':%';
-  IF tienda_pago_frenado(v_t, '4771110001', '10.0.0.1') IS NOT NULL THEN RAISE EXCEPTION 'F2: el freno no se levantó al vencer'; END IF;
+  v_ts2 := tienda_pago_frenar(k1, 1);
+  IF tienda_pago_frenado(k1) IS DISTINCT FROM v_ts THEN RAISE EXCEPTION 'F2: un freno más corto acortó el que había'; END IF;
+  UPDATE limites_cupo SET expira_en = clock_timestamp() - interval '1 second' WHERE clave LIKE 'tienda:pago-freno:%';
+  IF tienda_pago_frenado(k1) IS NOT NULL THEN RAISE EXCEPTION 'F2: el freno no se levantó al vencer'; END IF;
   -- Sin decir cuántos minutos (NULL explícito), los 30 de siempre.
-  v_ts := tienda_pago_frenar(v_t, '4771110004', NULL, NULL);
+  v_ts := tienda_pago_frenar(k2, NULL);
   IF v_ts < clock_timestamp() + interval '29 minutes' OR v_ts > clock_timestamp() + interval '31 minutes' THEN RAISE EXCEPTION 'F2: con minutos NULL el freno debía durar 30: %', v_ts - clock_timestamp(); END IF;
   -- Los minutos, acotados: ni cero ni días.
-  v_ts := tienda_pago_frenar(v_t, '4771110002', NULL, 0);
+  v_ts := tienda_pago_frenar(k3, 0);
   IF v_ts < clock_timestamp() + interval '30 seconds' THEN RAISE EXCEPTION 'F2: un freno de 0 minutos'; END IF;
-  v_ts := tienda_pago_frenar(v_t, '4771110002', NULL, 999999);
+  v_ts := tienda_pago_frenar(k3, 999999);
   IF v_ts > clock_timestamp() + interval '25 hours' THEN RAISE EXCEPTION 'F2: un freno de más de un día'; END IF;
 
-  -- F3) Sin a quién frenar no se frena a nadie: ni un teléfono que no lo es, ni la IP «desconocida»
-  --     (frenaría a todos los que caen en ese saco), ni sin negocio.
+  -- F3) Lo que no tiene la forma de una clave no frena a nadie ni se guarda: ni un teléfono, ni una
+  --     IP, ni vacío, ni algo con espacios o de más. Y el pago tampoco lo acepta como su clave.
   SELECT count(*) INTO v_n FROM limites_cupo WHERE clave LIKE 'tienda:pago-freno:%';
-  IF tienda_pago_frenar(v_t, 'no-es-telefono', 'desconocida') IS NOT NULL OR tienda_pago_frenar(v_t, NULL, NULL) IS NOT NULL
-     OR tienda_pago_frenar(NULL, '4771110003', '10.0.0.3') IS NOT NULL OR tienda_pago_frenar(v_t, '477111000', '') IS NOT NULL THEN
-    RAISE EXCEPTION 'F3: frenó sin tener a quién';
-  END IF;
+  FOR v_txt IN SELECT unnest(ARRAY[NULL, '', '4771110001', '10.0.0.1', 'desconocida', repeat('a', 39), repeat('a', 65), repeat('a', 42) || ' ', repeat('a', 42) || '%', v_t::text || ':4771110001']) LOOP
+    IF tienda_pago_frenar(v_txt) IS NOT NULL THEN RAISE EXCEPTION 'F3: frenó con una clave que no lo es: %', COALESCE(v_txt, 'NULL'); END IF;
+    IF tienda_pago_frenado(v_txt) IS NOT NULL THEN RAISE EXCEPTION 'F3: aparece frenada una clave que no lo es: %', COALESCE(v_txt, 'NULL'); END IF;
+  END LOOP;
   IF (SELECT count(*) FROM limites_cupo WHERE clave LIKE 'tienda:pago-freno:%') <> v_n THEN RAISE EXCEPTION 'F3: quedaron claves de un freno sin dueño'; END IF;
-  IF tienda_pago_frenado(v_t, 'no-es-telefono', 'desconocida') IS NOT NULL THEN RAISE EXCEPTION 'F3: la IP desconocida aparece frenada'; END IF;
-  -- Una IPv6 (su /64, como la manda la función) sí.
-  IF tienda_pago_frenar(v_t, NULL, '2001:db8:0:1::/64') IS NULL OR tienda_pago_frenado(v_t, '4779990008', '2001:db8:0:1::/64') IS NULL THEN RAISE EXCEPTION 'F3: no frena una IPv6'; END IF;
+  -- Un comodín no es una clave: preguntar por «%» no encuentra el freno de nadie.
+  IF tienda_pago_frenado(repeat('_', 43)) IS NOT NULL THEN RAISE EXCEPTION 'F3: una clave de guiones bajos encontró el freno de otro'; END IF;
 
   -- F4) El rechazo por riesgo que llega DESPUÉS (aviso, página del pedido o barrido): al quedar el
-  --     pago RECHAZADO con `high_risk`, el disparador frena ese teléfono. Otro motivo, no.
+  --     pago RECHAZADO con `high_risk`, el disparador frena con la clave que el pago guardó al
+  --     nacer. Otro motivo, no. Y un pago sin clave (no se conocía la IP) no frena a nadie.
   UPDATE tienda_config SET pago_de_prueba = false WHERE tenant_id = v_t;
   v_r := pg_temp.pedir('4771110010', 10);
+  BEGIN
+    UPDATE tienda_pagos SET freno_clave = '4771110010' WHERE id = (v_r ->> 'pago_id')::uuid;
+    RAISE EXCEPTION 'F4: el pago aceptó un teléfono como clave de freno';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+  UPDATE tienda_pagos SET freno_clave = k4 WHERE id = (v_r ->> 'pago_id')::uuid;
   PERFORM tienda_pago_aplicar((v_r ->> 'pago_id')::uuid, 'RECHAZADO', 'ORDRIESGO10', NULL, p_detalle => 'insufficient_amount');
-  IF tienda_pago_frenado(v_t, '4771110010', NULL) IS NOT NULL THEN RAISE EXCEPTION 'F4: frenó por un rechazo que no es por riesgo'; END IF;
+  IF tienda_pago_frenado(k4) IS NOT NULL THEN RAISE EXCEPTION 'F4: frenó por un rechazo que no es por riesgo'; END IF;
   v_r := pg_temp.pedir('4771110011', 11);
+  UPDATE tienda_pagos SET freno_clave = k4 WHERE id = (v_r ->> 'pago_id')::uuid;
   PERFORM tienda_pago_aplicar((v_r ->> 'pago_id')::uuid, 'RECHAZADO', 'ORDRIESGO11', NULL, p_detalle => 'high_risk');
   IF (SELECT estado FROM tienda_pagos WHERE id = (v_r ->> 'pago_id')::uuid) <> 'RECHAZADO' THEN RAISE EXCEPTION 'F4: el pago debía quedar RECHAZADO'; END IF;
-  v_ts := tienda_pago_frenado(v_t, '4771110011', NULL);
+  v_ts := tienda_pago_frenado(k4);
   IF v_ts IS NULL OR v_ts < clock_timestamp() + interval '29 minutes' OR v_ts > clock_timestamp() + interval '31 minutes' THEN RAISE EXCEPTION 'F4: el rechazo por riesgo tardío no frenó 30 minutos: %', v_ts; END IF;
-  IF tienda_pago_frenado(v_otro, '4771110011', NULL) IS NOT NULL THEN RAISE EXCEPTION 'F4: el disparador frenó en otro negocio'; END IF;
   -- El mismo aviso repetido no lo alarga (el pago ya no cambia de estado).
   PERFORM tienda_pago_aplicar((v_r ->> 'pago_id')::uuid, 'RECHAZADO', 'ORDRIESGO11', NULL, p_detalle => 'high_risk');
-  IF tienda_pago_frenado(v_t, '4771110011', NULL) IS DISTINCT FROM v_ts THEN RAISE EXCEPTION 'F4: un aviso repetido movió el freno'; END IF;
+  IF tienda_pago_frenado(k4) IS DISTINCT FROM v_ts THEN RAISE EXCEPTION 'F4: un aviso repetido movió el freno'; END IF;
   -- Ni cualquier otro cambio de ese pago ya rechazado: frena el paso A rechazado, una vez.
   UPDATE tienda_pagos SET ultimo_error = 'una nota', estado = estado WHERE id = (v_r ->> 'pago_id')::uuid;
-  IF tienda_pago_frenado(v_t, '4771110011', NULL) IS DISTINCT FROM v_ts THEN RAISE EXCEPTION 'F4: tocar un pago ya rechazado volvió a frenar'; END IF;
+  IF tienda_pago_frenado(k4) IS DISTINCT FROM v_ts THEN RAISE EXCEPTION 'F4: tocar un pago ya rechazado volvió a frenar'; END IF;
+  -- Sin clave (IP desconocida al pedir): el rechazo tardío por riesgo NO frena a nadie; ni por su teléfono.
+  SELECT count(*) INTO v_n FROM limites_cupo WHERE clave LIKE 'tienda:pago-freno:%';
+  v_r := pg_temp.pedir('4771110013', 13);
+  PERFORM tienda_pago_aplicar((v_r ->> 'pago_id')::uuid, 'RECHAZADO', 'ORDRIESGO13', NULL, p_detalle => 'high_risk');
+  IF (SELECT count(*) FROM limites_cupo WHERE clave LIKE 'tienda:pago-freno:%') <> v_n THEN RAISE EXCEPTION 'F4: un pago sin clave de freno frenó a alguien'; END IF;
   -- Un reto del banco que se dejó y cuya orden acaba `high_risk`: el pago sigue ABANDONADO, no hay rechazo nuevo, no frena.
   v_r := pg_temp.pedir('4771110012', 12);
-  UPDATE tienda_pagos SET cobro_pedido_at = now() WHERE id = (v_r ->> 'pago_id')::uuid;
+  UPDATE tienda_pagos SET cobro_pedido_at = now(), freno_clave = k5 WHERE id = (v_r ->> 'pago_id')::uuid;
   PERFORM tienda_pago_verificacion((v_r ->> 'pago_id')::uuid, 'ORDRIESGO12');
   IF NOT tienda_pago_abandonar((v_r ->> 'pago_id')::uuid) THEN RAISE EXCEPTION 'F4: fixture: el reto debía poder dejarse'; END IF;
   PERFORM tienda_pago_aplicar((v_r ->> 'pago_id')::uuid, 'RECHAZADO', 'ORDRIESGO12', NULL, p_detalle => 'high_risk');
-  IF tienda_pago_frenado(v_t, '4771110012', NULL) IS NOT NULL THEN RAISE EXCEPTION 'F4: frenó por la orden de un reto que el cliente ya había dejado'; END IF;
+  IF tienda_pago_frenado(k5) IS NOT NULL THEN RAISE EXCEPTION 'F4: frenó por la orden de un reto que el cliente ya había dejado'; END IF;
   -- Y el pedido de otro cliente sigue pasando: el freno no es del negocio.
   IF tienda_conexion_cobro(v_t, v_suc) IS DISTINCT FROM v_real THEN RAISE EXCEPTION 'F4: el freno de un cliente apagó el pago en línea del negocio'; END IF;
 
