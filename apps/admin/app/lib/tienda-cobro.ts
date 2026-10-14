@@ -39,19 +39,33 @@ export const cuentasActivas = <C extends Cuenta>(cuentas: C[]): C[] => cuentas.f
 export const nombreDeCuenta = (c: Pick<Cuenta, "cuenta_nombre">): string => c.cuenta_nombre ?? "Cuenta de Mercado Pago";
 
 /**
+ * La cuenta de PRUEBA que cobra en una tienda en modo de prueba (0177), igual que
+ * `tienda_conexion_cobro`: la única activa de prueba. Sin ninguna, o con más de una, ninguna. No
+ * mira la cuenta elegida por sucursal: esa elección es de las cuentas reales.
+ */
+export function cuentaDePrueba<C extends Cuenta>(cuentas: C[]): C | null {
+  const dePrueba = cuentasActivas(cuentas).filter((c) => c.de_prueba === true);
+  return dePrueba.length === 1 ? dePrueba[0]! : null;
+}
+
+/**
  * La cuenta que cobra en una sucursal, igual que `tienda_conexion_cobro`: la elegida si sigue
  * activa; sin elegir, la única activa. Con varias y sin elegir, ninguna (no se adivina a quién le
  * cae el dinero); si la elegida dejó de servir tampoco se usa otra. Una cuenta de prueba nunca
  * cobra pedidos reales (el cliente vería «pagado» sin haber pagado).
+ * `dePrueba`: la tienda está en modo de prueba; ahí cobra solo su cuenta de prueba, nunca una real.
  */
-export function cuentaQueCobra<C extends Cuenta>(cuentas: C[], elegida: string | null): C | null {
+export function cuentaQueCobra<C extends Cuenta>(cuentas: C[], elegida: string | null, dePrueba = false): C | null {
+  if (dePrueba) return cuentaDePrueba(cuentas);
   const vivas = cuentasActivas(cuentas);
   const cobra = elegida ? vivas.find((c) => c.id === elegida) : vivas.length === 1 ? vivas[0] : undefined;
   return cobra && !cobra.de_prueba ? cobra : null;
 }
 
 /** ¿Hay que enseñar el selector por sucursal? Con varias cuentas, o si alguna sucursal apunta a otra que la única. */
-export function hayQueElegir(cuentas: Cuenta[], sucursales: Sucursal[]): boolean {
+export function hayQueElegir(cuentas: Cuenta[], sucursales: Sucursal[], dePrueba = false): boolean {
+  // En modo de prueba no hay nada que elegir: cobra la cuenta de prueba en todas.
+  if (dePrueba) return false;
   const vivas = cuentasActivas(cuentas);
   if (vivas.length > 1) return true;
   return vivas.length === 1 && sucursales.some((s) => s.participa && s.conexionId !== null && s.conexionId !== vivas[0]!.id);
@@ -61,10 +75,12 @@ export function hayQueElegir(cuentas: Cuenta[], sucursales: Sucursal[]): boolean
  * Lo que se avisa arriba de la página cuando el dueño ofrece pago en línea y la tienda no lo está
  * ofreciendo: en todo el negocio (`sucursales` vacío) o solo en las sucursales nombradas.
  */
-export type AvisoCobro = { tipo: "RECONECTAR" | "CONECTAR" | "ELEGIR"; sucursales: string[] };
+export type AvisoCobro = { tipo: "RECONECTAR" | "CONECTAR" | "ELEGIR" | "PRUEBA"; sucursales: string[] };
 
-export function avisoDeCobro(pagoEnLinea: boolean, cuentas: Cuenta[], sucursales: Sucursal[]): AvisoCobro | null {
+export function avisoDeCobro(pagoEnLinea: boolean, cuentas: Cuenta[], sucursales: Sucursal[], dePrueba = false): AvisoCobro | null {
   if (!pagoEnLinea) return null;
+  // En modo de prueba lo único que puede faltar es la cuenta de prueba, y esa no la conecta el dueño: la pone VIM.
+  if (dePrueba) return cuentaDePrueba(cuentas) ? null : { tipo: "PRUEBA", sucursales: [] };
   // Las desconectadas no se leen: sin ninguna en la lista, la cuenta se desconectó (o nunca hubo).
   if (cuentasActivas(cuentas).length === 0) return { tipo: cuentas.length > 0 ? "RECONECTAR" : "CONECTAR", sucursales: [] };
   const sin = sucursales.filter((s) => s.participa && !cuentaQueCobra(cuentas, s.conexionId));
@@ -80,6 +96,7 @@ export const lista = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? "") : `${xs.sl
 export function textoDeAviso(a: AvisoCobro): string {
   const donde = a.sucursales.length > 0 ? `En ${lista(a.sucursales)} tu` : "Tu";
   const inicio = `${donde} tienda no está ofreciendo el pago en línea`;
+  if (a.tipo === "PRUEBA") return `${inicio}: está en modo de prueba y le falta su cuenta de prueba de Mercado Pago. La configura VIM.`;
   if (a.tipo === "CONECTAR") return `${inicio}: ya no hay una cuenta de Mercado Pago conectada. Conéctala para que tus clientes puedan volver a pagar en línea.`;
   if (a.tipo === "RECONECTAR") return `${inicio}: Mercado Pago pide volver a conectar tu cuenta. Reconéctala para que tus clientes puedan volver a pagar en línea.`;
   return `${inicio}: falta elegir qué cuenta de Mercado Pago cobra ahí. Elígela abajo, en «Pago en línea».`;

@@ -63,7 +63,7 @@ vi.mock("../supabase", () => ({
 }));
 
 import {
-  contarPendientesDeCatalogo, encenderTienda, guardarConfigTienda, guardarCuentaDeSucursal, guardarSucursalTienda, leerConfigTienda,
+  contarPendientesDeCatalogo, encenderTienda, guardarConfigTienda, guardarCuentaDeSucursal, guardarSucursalTienda, leerConfigTienda, leerModoDePrueba,
   leerCombosNoComprables, leerPagosTienda, leerOfertaTienda, leerSucursalesTienda, leerTiendaEncendida,
 } from "../tienda";
 
@@ -408,5 +408,31 @@ describe("pago en línea", () => {
     await leerPagosTienda();
     const columnas = doble.consultas.find((c) => c.tabla === "tienda_pagos")!.columnas;
     expect(columnas).not.toMatch(/init_point|preferencia|ultimo_error|detalle|\*/);
+  });
+});
+
+describe("modo de prueba (0177)", () => {
+  it("se lee de la fila de la tienda, y solo un `true` cuenta", async () => {
+    doble.tablas.tienda_config = [{ tenant_id: "t1", pago_de_prueba: true }];
+    expect(await leerModoDePrueba()).toBe(true);
+    for (const v of [false, null, undefined, "true", 1]) {
+      doble.tablas.tienda_config = [{ tenant_id: "t1", pago_de_prueba: v }];
+      expect(await leerModoDePrueba(), String(v)).toBe(false);
+    }
+    doble.tablas.tienda_config = [];
+    expect(await leerModoDePrueba()).toBe(false);
+  });
+  it("si la lectura falla (la columna aún no existe en esa base) no es modo de prueba, y no revienta la página", async () => {
+    doble.tablas.tienda_config = [{ tenant_id: "t1", pago_de_prueba: true }];
+    doble.errorLectura = { message: "column tienda_config.pago_de_prueba does not exist", code: "42703" };
+    expect(await leerModoDePrueba()).toBe(false);
+  });
+  it("el admin nunca escribe la marca: ni al crear la tienda ni al guardar un bloque", async () => {
+    await guardarConfigTienda(CONFIG, "pedidos");
+    doble.tablas.tienda_config = [{ ...FILA_CONFIG }];
+    await guardarConfigTienda(CONFIG, "pedidos");
+    await guardarConfigTienda(CONFIG, "datos");
+    expect(doble.escrituras.length).toBe(3);
+    for (const w of doble.escrituras) expect(w.valores).not.toHaveProperty("pago_de_prueba");
   });
 });

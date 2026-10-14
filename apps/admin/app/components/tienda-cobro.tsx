@@ -9,7 +9,7 @@ import { precioMxn } from "../lib/catalogo";
 import { fechaHoraMx } from "../lib/reportes-inventario";
 import type { ConexionTienda } from "../lib/tienda-conexion";
 import { PAGOS_A_LA_VISTA, type PagoTienda } from "../lib/tienda";
-import { cuentaQueCobra, cuentasActivas, hayQueElegir, lista, nombreDeCuenta } from "../lib/tienda-cobro";
+import { cuentaDePrueba, cuentaQueCobra, cuentasActivas, hayQueElegir, lista, nombreDeCuenta } from "../lib/tienda-cobro";
 import type { SucursalTienda } from "../lib/tienda-reglas";
 
 const subtitulo = "mb-2 text-13 font-semibold text-ink";
@@ -26,6 +26,7 @@ export function TiendaCobro({
   sucursales,
   pagos,
   cajasSinActualizar,
+  dePrueba = false,
   ocupado,
   soloLectura,
   mensaje,
@@ -40,6 +41,11 @@ export function TiendaCobro({
   pagos: PagoTienda[] | null;
   /** Sucursales que venden en la tienda y cuya caja instalada no está actualizada. */
   cajasSinActualizar: string[];
+  /**
+   * La tienda está en MODO DE PRUEBA (lo pone VIM): los pagos en línea no son reales y cobra la cuenta
+   * de prueba. Se avisa, y no se ofrece conectar Mercado Pago: la conexión real no se usa.
+   */
+  dePrueba?: boolean;
   /** Algo se está guardando en la página: una escritura a la vez. */
   ocupado: boolean;
   soloLectura: boolean;
@@ -51,17 +57,30 @@ export function TiendaCobro({
   const activas = cuentasActivas(cuentas);
   const enError = cuentas.some((c) => c.estado === "ERROR");
   const enTienda = sucursales.filter((s) => s.participa);
+  const laDePrueba = dePrueba ? cuentaDePrueba(cuentas) : null;
 
   return (
     <Tarjeta
       titulo="Pago en línea"
       descripcion="Tus clientes pagan con tarjeta al hacer su pedido. El dinero cae directo en tu cuenta de Mercado Pago: VIM no lo toca ni ve los datos de las tarjetas."
     >
+      {/* TEXTO PROVISIONAL (James). No se cierra: mientras dure el modo de prueba, tiene que verse. */}
+      {dePrueba && (
+        <Aviso tono="info" className="mb-4">
+          <strong className="font-semibold">Tu tienda está en modo de prueba: los pagos en línea no son reales.</strong>{" "}
+          {laDePrueba
+            ? `Cobra la cuenta de prueba «${nombreDeCuenta(laDePrueba)}». Ningún pago llega a una cuenta real.`
+            : "Todavía no tiene su cuenta de prueba, así que el pago en línea no se ofrece. La configura VIM."}
+        </Aviso>
+      )}
       {cuentas.length === 0 ? (
-        <div>
-          <p className="text-13 text-ink-2">Para ofrecerlo, conecta la cuenta de Mercado Pago de tu negocio. Ahí recibes el dinero de cada pedido.</p>
-          <div className="mt-3"><Button onClick={onConectar} disabled={ocupado || soloLectura}>Conectar Mercado Pago</Button></div>
-        </div>
+        // En modo de prueba no se conecta nada desde aquí: la cuenta de prueba la pone VIM.
+        dePrueba ? null : (
+          <div>
+            <p className="text-13 text-ink-2">Para ofrecerlo, conecta la cuenta de Mercado Pago de tu negocio. Ahí recibes el dinero de cada pedido.</p>
+            <div className="mt-3"><Button onClick={onConectar} disabled={ocupado || soloLectura}>Conectar Mercado Pago</Button></div>
+          </div>
+        )
       ) : (
         <div>
           <h3 className={subtitulo}>{cuentas.length === 1 ? "Tu cuenta de Mercado Pago" : "Tus cuentas de Mercado Pago"}</h3>
@@ -70,16 +89,19 @@ export function TiendaCobro({
               <li key={c.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5">
                 <span className="min-w-0 break-words text-15 font-semibold">{nombreDeCuenta(c)}</span>
                 {c.de_prueba && <span className="rounded-full bg-info-soft px-2.5 py-0.5 text-12 font-semibold text-info">De prueba: no cobra pedidos reales</span>}
+                {dePrueba && !c.de_prueba && c.estado === "ACTIVA" && <span className="rounded-full bg-sel px-2.5 py-0.5 text-12 font-semibold text-ink-2">No se usa en modo de prueba</span>}
                 {c.estado === "ERROR" && <span className="rounded-full bg-danger-soft px-2.5 py-0.5 text-12 font-semibold text-danger">Hay que volver a conectarla</span>}
                 <AccionFila peligro className="ml-auto" disabled={ocupado || soloLectura} onClick={() => onDesconectar(c)}>Desconectar</AccionFila>
               </li>
             ))}
           </ul>
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-            <Button variant="ghost" onClick={onConectar} disabled={ocupado || soloLectura}>{enError ? "Reconectar Mercado Pago" : "Conectar otra cuenta"}</Button>
-          </div>
+          {!dePrueba && (
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+              <Button variant="ghost" onClick={onConectar} disabled={ocupado || soloLectura}>{enError ? "Reconectar Mercado Pago" : "Conectar otra cuenta"}</Button>
+            </div>
+          )}
 
-          {hayQueElegir(cuentas, sucursales) && enTienda.length > 0 && (
+          {hayQueElegir(cuentas, sucursales, dePrueba) && enTienda.length > 0 && (
             <div className="mt-5 grid grid-cols-1 gap-4">
               {enTienda.map((s) => {
                 const cobra = cuentaQueCobra(cuentas, s.conexionId);

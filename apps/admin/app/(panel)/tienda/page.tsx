@@ -52,7 +52,7 @@ export default function TiendaPage() {
             {t.avisoCobro && (
               <Aviso tono="warning" role="alert" className="flex max-w-[720px] flex-wrap items-center gap-x-4 gap-y-2">
                 <span className="min-w-0 flex-1 basis-64">{textoDeAviso(t.avisoCobro)}</span>
-                {t.avisoCobro.tipo !== "ELEGIR" && (
+                {t.avisoCobro.tipo !== "ELEGIR" && t.avisoCobro.tipo !== "PRUEBA" && (
                   <Button variant="ghost" onClick={t.conectarMercadoPago} disabled={ocupado || soloLectura}>
                     {t.avisoCobro.tipo === "RECONECTAR" ? "Reconectar Mercado Pago" : "Conectar Mercado Pago"}
                   </Button>
@@ -104,6 +104,7 @@ export default function TiendaPage() {
               sucursales={t.leido.sucursales}
               pagos={t.leido.pagos}
               cajasSinActualizar={t.leido.config?.pagoEnLinea ? t.leido.cajasSinActualizar : []}
+              dePrueba={t.leido.dePrueba === true}
               ocupado={ocupado}
               soloLectura={soloLectura}
               mensaje={t.mensajeDe("cobro")}

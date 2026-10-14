@@ -6,6 +6,8 @@ import type { BorradorSucursal, SucursalTienda } from "./tienda-reglas";
 
 /** Lo que hay en la base. `config` null = el dueño todavía no elige dirección. */
 export type Leido = {
+  /** La tienda está en modo de prueba (lo pone VIM; aquí solo se enseña). Ausente = no. */
+  dePrueba?: boolean;
   config: ConfigTienda | null;
   sucursales: SucursalTienda[];
   /** El interruptor crudo: puede seguir en `true` con el complemento vencido. */

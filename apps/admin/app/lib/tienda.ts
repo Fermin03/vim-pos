@@ -68,6 +68,17 @@ export async function leerConfigTienda(): Promise<ConfigTienda | null> {
 }
 
 /**
+ * ¿La tienda está en MODO DE PRUEBA (`tienda_config.pago_de_prueba`, 0177)? Solo se lee: la marca la
+ * pone VIM, y el dueño no tiene permiso de escribirla. Aparte de `leerConfigTienda` a propósito: si
+ * esta lectura falla (la columna aún no existe en esa base), la página carga igual y no es modo de prueba.
+ */
+export async function leerModoDePrueba(): Promise<boolean> {
+  const tid = await tenantId();
+  const { data, error } = await supabase.from("tienda_config").select("pago_de_prueba").eq("tenant_id", tid).maybeSingle();
+  return !error && (data as { pago_de_prueba?: unknown } | null)?.pago_de_prueba === true;
+}
+
+/**
  * Crea la fila la primera vez (con todo, para que nazca completa); después cada bloque actualiza
  * SOLO sus columnas: la página arma `d` con lo que tiene en memoria, y una pestaña vieja que guarda
  * «Pedidos» pisaría la dirección que otra pestaña (u otro administrador) acaba de guardar.
