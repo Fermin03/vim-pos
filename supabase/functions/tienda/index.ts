@@ -124,6 +124,7 @@ import { registrarError } from "../_shared/errores.ts";
 import { leerCuerpo, type Peticion, tieneNul } from "../_shared/tienda/validar.ts";
 import { codigoDeClave, huellaDe, nuevoCodigo } from "../_shared/tienda/seguimiento.ts";
 import { correoDePedido } from "../_shared/tienda/correo-pedido.ts";
+import { cifrarCodigo } from "../_shared/tienda/enlace.ts";
 import { correoDeBienvenida, correoDeRecuperacion, correoYaTienesCuenta } from "../_shared/tienda/correo-cuenta.ts";
 import { CABECERA_SESION, cuentaDe, direccionesPublicas, leerRegistro, leerSesion, pedidosPublicos, type Sesion } from "../_shared/tienda/cuenta.ts";
 import { cotizacionPublica, type Cupos, cuposDe, esTopeDeEntradas, ipDeConfianza, leerNegocio, leerPedido, leerPedidoEnLinea, type Negocio, respuestaDeCaptcha, respuestaDeRpc, yaExistia } from "../_shared/tienda/respuesta.ts";
@@ -681,6 +682,15 @@ async function atender(req: Request): Promise<Response> {
     ...(enLinea && (p.propina_mxn !== null ? { p_propina_mxn: p.propina_mxn } : { p_propina_pct: p.propina_pct ?? 0 })),
   });
   if (alta.error) return rechazo("tienda_crear_pedido", alta.error);
+
+  // Para que los correos de estado (0176) lleven este mismo enlace: el código, cifrado con una llave
+  // que la base no tiene. Solo si dejó correo. Si falla, el pedido sigue y esos correos salen sin botón.
+  if (p.cliente.email) {
+    try {
+      const g = await admin.rpc("tienda_enlace_guardar", { p_tenant, p_seguimiento_hash, p_cifrado: await cifrarCodigo(secreto, codigo, p_seguimiento_hash) });
+      if (g.error) registrarError("tienda", "ENLACE_DE_CORREO", g.error);
+    } catch (e) { registrarError("tienda", "ENLACE_DE_CORREO", e); }
+  }
 
   // ── Pago en línea: el pedido nació POR_PAGAR y se cobra AHORA, en esta misma petición ─────────
   // Lo decide lo que devolvió la base y no lo que pidió quien llama: un reintento con la misma
