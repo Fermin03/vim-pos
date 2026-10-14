@@ -12,10 +12,23 @@
 // lo sumo 5 rechazos por hora (después queda fuera) y hacen falta 8 distintas; y lo que no es una
 // tarjeta —un token inventado o usado, una petición que Mercado Pago no aceptó— no cuenta para el
 // negocio (`soloIp`): solo para la IP que lo mandó.
+//
+// Y UN FRENO MÁS, QUE NO ES CONTRA QUIEN PRUEBA TARJETAS (0177): tras un rechazo por RIESGO
+// (`high_risk`: el antifraude de Mercado Pago, no el banco) ESE cliente no puede repetir el cobro en
+// línea en ESE negocio durante 30 minutos. Repetirlo enseguida con los mismos datos empeora la
+// puntuación del restaurante en el antifraude (lo dijo el soporte de Mercado Pago). Se frena al
+// teléfono del pedido y a la IP, cada uno por su lado: el teléfono sigue al cliente si cambia de red
+// (wifi → datos); la IP, si cambia el teléfono que escribe. Solo en ese negocio, y solo el pago en
+// línea: puede seguir pidiendo para pagar al recibir. Un intento durante el freno se contesta sin
+// llamar a Mercado Pago y NO cuenta como rechazo: no suma a ningún tope de arriba.
+//
+// EN MODO DE PRUEBA (0177) los tres topes de arriba no cuentan: ahí se rechazan tarjetas a propósito,
+// una y otra vez, y no hay nada que proteger (no es dinero ni son tarjetas de verdad). El freno por
+// riesgo sí aplica: es el mismo código que en producción.
 // Puro salvo por el cliente que se le pasa: se prueba con `node --test`.
 import { esc, soloAscii } from "../correo.ts";
 import { type ClienteRpc, consumirCupo } from "../limite.ts";
-import type { MotivoDeRechazo } from "./pago-mp.ts";
+import { cuentaComoRechazo, type MotivoDeRechazo } from "./pago-mp.ts";
 import { claveDeIp } from "./respuesta.ts";
 
 export const RECHAZOS = {
@@ -80,6 +93,79 @@ export async function anotarRechazo(db: ClienteRpc, ip: string, negocio: string,
   const total = await consumirCupo(db, { clave: k.negocio, ventanaSeg: v, max: RECHAZOS.negocioPausa - 1 }, "abrir");
   if (total.motivo !== "AGOTADO") return { detalle, pausar: false };
   return { detalle, pausar: await agotado(db, k.ipsDeNegocio, RECHAZOS.negocioIps).catch(() => false) };
+}
+
+/** Cuánto dura el freno tras un rechazo por riesgo. La base acota lo que reciba (1 minuto a 1 día). */
+export const FRENO_POR_RIESGO_MIN = 30;
+
+/** Lo que identifica al cliente para el freno: su teléfono y su IP (IPv6: su /64). La IP que no se conoce no frena a nadie. */
+const deFreno = (tenantId: string, telefono: string | null, ip: string) => {
+  const quien = claveDeIp(ip);
+  return { p_tenant: tenantId, p_telefono: telefono, p_ip: quien === "desconocida" ? null : quien };
+};
+/** Una hora de la base → ISO en UTC (`…Z`), o null si no es una fecha. Es lo que viaja a la tienda. */
+const hastaDe = (v: unknown): string | null => {
+  const t = typeof v === "string" ? Date.parse(v) : NaN;
+  return Number.isFinite(t) ? new Date(t).toISOString() : null;
+};
+
+/**
+ * ¿Ese cliente tiene frenado el pago en línea en ese negocio (`tienda_pago_frenado`, 0177)? Hasta
+ * cuándo, o null. No suma nada. Si el control no responde, deja pasar: no se le niega el pago a
+ * nadie por una caída de la base (como `ipSinPagoEnLinea`).
+ */
+export async function pagoFrenado(db: ClienteRpc, tenantId: string, telefono: string | null, ip: string): Promise<string | null> {
+  try {
+    const { data, error } = await db.rpc("tienda_pago_frenado", deFreno(tenantId, telefono, ip));
+    if (error) throw new Error(error.message);
+    return hastaDe(data);
+  } catch (e) {
+    console.error("[tienda] tienda_pago_frenado falló; se deja pasar:", e instanceof Error ? e.message : String(e));
+    return null;
+  }
+}
+
+/**
+ * Pone el freno tras un rechazo por riesgo (`tienda_pago_frenar`, 0177) y dice hasta cuándo. Si no
+ * se pudo poner (o no hay a quién: sin teléfono y sin IP conocida), null: el rechazo se contesta igual.
+ */
+export async function frenarPago(db: ClienteRpc, tenantId: string, telefono: string | null, ip: string): Promise<string | null> {
+  try {
+    const { data, error } = await db.rpc("tienda_pago_frenar", { ...deFreno(tenantId, telefono, ip), p_minutos: FRENO_POR_RIESGO_MIN });
+    if (error) throw new Error(error.message);
+    return hastaDe(data);
+  } catch (e) {
+    console.error("[tienda] tienda_pago_frenar falló; el rechazo sigue sin freno:", e instanceof Error ? e.message : String(e));
+    return null;
+  }
+}
+
+export type RespuestaDeRechazo = {
+  /** Lo que se le contesta al cliente (409). `hasta`: solo con RIESGO, hasta cuándo queda frenado su pago en línea. */
+  cuerpo: { error: "PAGO_RECHAZADO"; detalle: MotivoDeRechazo; hasta?: string };
+  /** El negocio acaba de llegar a su tope de tarjetas rechazadas: hay que pausar su pago en línea y avisar a VIM. */
+  pausar: boolean;
+};
+
+/**
+ * Un cobro que no pasó, ya con su motivo: qué se le contesta al cliente, y si hay que pausar al negocio.
+ *   · RIESGO pone el freno de ese cliente SIEMPRE (también en modo de prueba, y aunque después el
+ *     motivo se le diga como OTRO); `hasta` viaja solo si el motivo que se dice es RIESGO;
+ *   · lo que no cuenta como tarjeta rechazada (`cuentaComoRechazo`: un reto del banco que se dejó) y
+ *     todo rechazo en MODO DE PRUEBA se contestan con su motivo y no tocan ningún contador: ni el de
+ *     la IP, ni el del negocio; nunca piden pausar;
+ *   · lo demás se cuenta (`anotarRechazo`): por IP decide qué motivo se dice; por negocio, si se pausa.
+ */
+export async function respuestaDeRechazo(db: ClienteRpc, d: {
+  tenantId: string; slug: string; ip: string; motivo: MotivoDeRechazo;
+  /** El teléfono del pedido (10 dígitos), o null si no se sabe. */
+  telefono: string | null;
+  dePrueba: boolean;
+}): Promise<RespuestaDeRechazo> {
+  const hasta = d.motivo === "RIESGO" ? await frenarPago(db, d.tenantId, d.telefono, d.ip) : null;
+  const como = cuentaComoRechazo(d.motivo);
+  const r = como.cuenta && !d.dePrueba ? await anotarRechazo(db, d.ip, d.slug, d.motivo, como.soloIp) : { detalle: d.motivo, pausar: false };
+  return { cuerpo: { error: "PAGO_RECHAZADO", detalle: r.detalle, ...(r.detalle === "RIESGO" && hasta && { hasta }) }, pausar: r.pausar };
 }
 
 /** El correo interno a VIM cuando el pago en línea de un negocio (o de una sucursal) queda en pausa. Sin datos de clientes ni de tarjetas. */

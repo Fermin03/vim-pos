@@ -110,9 +110,24 @@
 //   barrido de la base hace lo mismo. Ese pedido NO se descarta: su renglón es el que vigila la orden.
 //   De la tarjeta aquí solo pasa el token, que es de un solo uso y no se escribe en ningún log.
 //
+//   EL FRENO TRAS UN RECHAZO POR RIESGO (0177; rechazos.ts). Cuando el motivo es RIESGO (`high_risk`: el
+//   antifraude de Mercado Pago, no el banco), ese cliente —su teléfono y su IP— no puede repetir el cobro
+//   en línea en ese negocio durante 30 minutos: el 409 PAGO_RECHAZADO trae `hasta`, y mientras dure,
+//   `pedir` con pago en línea contesta 409 PAGO_EN_PAUSA con `hasta` SIN crear el pedido ni llamar a
+//   Mercado Pago (y sin contar como rechazo). Puede seguir pidiendo para pagar al recibir.
+//
+//   MODO DE PRUEBA (0177). Un negocio con `tienda_config.pago_de_prueba` cobra contra el ambiente de
+//   prueba de Mercado Pago, con su conexión de prueba, por este mismo código. Lo único distinto:
+//     · a Mercado Pago se le manda como pagador el usuario de prueba (MP_TIENDA_PAGADOR_DE_PRUEBA); el
+//       correo que escribió el cliente sigue siendo el de nuestros correos;
+//     · no cuentan los topes de tarjetas rechazadas (ni el motivo se esconde, ni la IP se bloquea, ni el
+//       negocio se pausa, ni sale correo a VIM), ni los cupos de `pedir` por IP y restaurante y por
+//       negocio: ahí se prueba una y otra vez. Siguen el antirobot, el cupo de 40 por hora por IP y el freno.
+//
 // SECRETOS: VIM_TIENDA_SECRET, VIM_TIENDA_URL (base de los enlaces del correo; https),
 // TURNSTILE_SECRET_KEY, TURNSTILE_HOSTNAMES (tiene que incluir el dominio de la tienda),
-// CAPTCHA_OPCIONAL (solo local), VIM_SMTP_*, VIM_AVISOS_A (a dónde van los avisos internos). Los
+// CAPTCHA_OPCIONAL (solo local), VIM_SMTP_*, VIM_AVISOS_A (a dónde van los avisos internos),
+// MP_TIENDA_PAGADOR_DE_PRUEBA (opcional: el usuario de prueba que paga en modo de prueba). Los
 // tokens de Mercado Pago no son secretos de la función: son de cada restaurante y viven en Vault
 // (`tienda:<conexion>:access`, 0173).
 import { clienteAdmin } from "../_shared/http.ts";
@@ -129,9 +144,9 @@ import { correoDeBienvenida, correoDeRecuperacion, correoYaTienesCuenta } from "
 import { CABECERA_SESION, cuentaDe, direccionesPublicas, leerRegistro, leerSesion, pedidosPublicos, type Sesion } from "../_shared/tienda/cuenta.ts";
 import { cotizacionPublica, type Cupos, cuposDe, esTopeDeEntradas, ipDeConfianza, leerNegocio, leerPedido, leerPedidoEnLinea, type Negocio, respuestaDeCaptcha, respuestaDeRpc, yaExistia } from "../_shared/tienda/respuesta.ts";
 import { cobrarPago, confirmarPago } from "../_shared/tienda/pago-flujo.ts";
-import { cuentaComoRechazo, type MotivoDeRechazo, motivoDeRechazo, partesDeCotizacion } from "../_shared/tienda/pago-mp.ts";
+import { type MotivoDeRechazo, motivoDeRechazo, partesDeCotizacion } from "../_shared/tienda/pago-mp.ts";
 import { depsDePagos } from "../_shared/tienda/pago-puerto.ts";
-import { anotarRechazo, avisoDePagoPausado, ipSinPagoEnLinea } from "../_shared/tienda/rechazos.ts";
+import { anotarRechazo, avisoDePagoPausado, ipSinPagoEnLinea, pagoFrenado, respuestaDeRechazo } from "../_shared/tienda/rechazos.ts";
 
 const MAX_CUERPO = 32_768;
 
@@ -270,17 +285,15 @@ async function pausarPagoEnLinea(admin: Admin, d: { p_tenant: string; sucursal: 
 }
 
 /**
- * Un cobro que no pasó, ya con su motivo: se cuenta (aunque el pedido ya se borró) y se contesta
- * 409 PAGO_RECHAZADO. Por IP decide qué motivo se dice; por negocio, si hay que pausar su pago en
- * línea. Qué cuenta y para quién lo dice `cuentaComoRechazo`: un reto del banco que nadie contestó
- * no es una tarjeta rechazada.
+ * Un cobro que no pasó, ya con su motivo: se contesta 409 PAGO_RECHAZADO. Qué se cuenta, qué motivo
+ * se dice, el freno tras un rechazo por riesgo y lo que cambia en modo de prueba lo decide
+ * `respuestaDeRechazo` (rechazos.ts, que sí se prueba); aquí solo se pausa al negocio si lo pide.
  */
-async function rechazoDePago(admin: Admin, d: { p_tenant: string; ip: string; negocio: string; slug: string; motivo: MotivoDeRechazo }): Promise<Response> {
-  const como = cuentaComoRechazo(d.motivo);
-  if (!como.cuenta) return json({ error: "PAGO_RECHAZADO", detalle: d.motivo }, 409);
-  const r = await anotarRechazo(admin, d.ip, d.slug, d.motivo, como.soloIp);
-  if (r.pausar) await pausarPagoEnLinea(admin, { p_tenant: d.p_tenant, sucursal: null, negocio: d.negocio, slug: d.slug, por: "RECHAZOS" });
-  return json({ error: "PAGO_RECHAZADO", detalle: r.detalle }, 409);
+async function rechazoDePago(admin: Admin, d: { negocio: Negocio; ip: string; slug: string; motivo: MotivoDeRechazo; telefono: string | null }): Promise<Response> {
+  const p_tenant = d.negocio.tenantId;
+  const r = await respuestaDeRechazo(admin, { tenantId: p_tenant, slug: d.slug, ip: d.ip, motivo: d.motivo, telefono: d.telefono, dePrueba: d.negocio.dePrueba });
+  if (r.pausar) await pausarPagoEnLinea(admin, { p_tenant, sucursal: null, negocio: d.negocio.nombre, slug: d.slug, por: "RECHAZOS" });
+  return json(r.cuerpo, 409);
 }
 
 /**
@@ -487,6 +500,14 @@ async function atender(req: Request): Promise<Response> {
   const negocio = leerNegocio(neg.data);
   if (!negocio) return json({ error: "TIENDA_NO_DISPONIBLE" }, 404);
   const p_tenant = negocio.tenantId;   // solo para las RPC: no va en ninguna respuesta
+  // Un pago en línea en un negocio en MODO DE PRUEBA (0177): ahí se prueba el pago una y otra vez.
+  const pagoDePrueba = negocio.dePrueba && p.accion === "pedir" && p.pago === "EN_LINEA";
+  // El cupo por IP y restaurante de un pago en línea (ver cuposDe): el de siempre, pero ya se sabe
+  // qué negocio es, y uno en modo de prueba no lo gasta.
+  if (cupos.conNegocio && !pagoDePrueba) {
+    const r = await consumirCupos(admin, cupos.conNegocio, cupos.alFallar);
+    if (!r.permitido) return sinCupo(r);
+  }
 
   // ── 4) Por acción ───────────────────────────────────────────────────────────────────────────
   if (p.accion === "negocio") return json(negocio.publico);
@@ -555,10 +576,11 @@ async function atender(req: Request): Promise<Response> {
   // cancelar. La dirección del reto sale de esa consulta y viaja solo en esta respuesta.
   if (p.accion === "verificacion") {
     const p_seguimiento_hash = await huellaDe(p.codigo);
-    const ped = await admin.from("delivery_pedidos").select("id, cliente_email, pago_al_recibir")
+    // El teléfono: si el pago acaba rechazado por riesgo, es a quien se frena (el pedido se descarta antes).
+    const ped = await admin.from("delivery_pedidos").select("id, cliente_email, cliente_telefono, pago_al_recibir")
       .eq("seguimiento_hash", p_seguimiento_hash).eq("tenant_id", p_tenant).eq("canal", "TIENDA").maybeSingle();
     if (ped.error) return rechazo("verificacion", ped.error);
-    const pedido = ped.data as { id: string; cliente_email: string | null; pago_al_recibir: string | null } | null;
+    const pedido = ped.data as { id: string; cliente_email: string | null; cliente_telefono: string | null; pago_al_recibir: string | null } | null;
     if (!pedido) return json({ error: "PEDIDO_NO_ENCONTRADO" }, 404);
     const leerPago = async () => {
       const g = await admin.from("tienda_pagos").select("id, estado, detalle, verificacion_at, orden_id_externo").eq("pedido_id", pedido.id).eq("extra", false).maybeSingle();
@@ -596,11 +618,11 @@ async function atender(req: Request): Promise<Response> {
       // puede descartar es que algo lo movió: que lo diga la página del pedido.
       const motivo = motivoDeRechazo(pago.detalle);
       if (!await deps.db.descartar(pago.id)) return json({ pago: { estado: "POR_CONFIRMAR" } });
-      return rechazoDePago(admin, { p_tenant, ip, negocio: negocio.nombre, slug: p.negocio, motivo });
+      return rechazoDePago(admin, { negocio, ip, slug: p.negocio, motivo, telefono: pedido.cliente_telefono });
     }
     // El reto se dejó (lo canceló el cliente, o pasó el plazo): el pedido ya está cerrado sin pago y
     // se puede pagar otra vez. No se descarta ni cuenta como tarjeta rechazada.
-    if (pago.estado === "ABANDONADO") return rechazoDePago(admin, { p_tenant, ip, negocio: negocio.nombre, slug: p.negocio, motivo: "SIN_VERIFICAR" });
+    if (pago.estado === "ABANDONADO") return rechazoDePago(admin, { negocio, ip, slug: p.negocio, motivo: "SIN_VERIFICAR", telefono: pedido.cliente_telefono });
     // Sigue esperando el reto: lo dijo Mercado Pago ahora, o (sin turno para preguntar, o sin
     // respuesta) es lo último que se supo. Cualquier otra cosa ya no es de esta pantalla.
     const sigue = pago.estado === "CREADO" && (consulta?.ok ? consulta.enVerificacion : consulta === null || consulta.motivo === "MP_NO_RESPONDE" || consulta.motivo === "SIN_TOKEN" ? pago.verificacion_at !== null : false);
@@ -643,17 +665,28 @@ async function atender(req: Request): Promise<Response> {
     p_cuenta = s.p_cuenta;
   }
 
-  // Una IP que ya juntó sus tarjetas rechazadas de la hora no intenta otro pago en línea (puede
-  // seguir pidiendo para pagar al recibir). Antes del antirobot: no le gasta el token ni el cupo.
   const enLinea = p.pago === "EN_LINEA";
-  if (enLinea && await ipSinPagoEnLinea(admin, ip, p.negocio)) return json({ error: "DEMASIADOS_INTENTOS" }, 429);
+  if (enLinea) {
+    // EL FRENO (0177): a este cliente —su teléfono o su IP— el antifraude de Mercado Pago le rechazó
+    // un cobro por riesgo aquí hace menos de 30 minutos. No se crea el pedido ni se llama a Mercado
+    // Pago: repetirlo enseguida empeora la puntuación del restaurante. No cuenta como rechazo, y no
+    // gasta el antirobot ni el cupo del negocio. Puede pedir para pagar al recibir. La tienda, si
+    // tenía un intento en duda con esta clave, pregunta por él (`intento`): esto no dice nada de aquel.
+    const hasta = await pagoFrenado(admin, p_tenant, p.cliente.telefono, ip);
+    if (hasta) return json({ error: "PAGO_EN_PAUSA", hasta }, 409);
+    // Una IP que ya juntó sus tarjetas rechazadas de la hora no intenta otro pago en línea (puede
+    // seguir pidiendo para pagar al recibir). Antes del antirobot: no le gasta el token ni el cupo.
+    // En modo de prueba los rechazos no se cuentan, así que tampoco hay nada que mirar.
+    if (!pagoDePrueba && await ipSinPagoEnLinea(admin, ip, p.negocio)) return json({ error: "DEMASIADOS_INTENTOS" }, 429);
+  }
 
   const no = await antirobot(p.captcha, "tienda_pedido", ip);
   if (no) return no;
 
   // El cupo del negocio se gasta solo DESPUÉS del antirobot: sin un token válido nadie le agota la
   // tienda a un restaurante. El slug no es dato personal.
-  const cupoNegocio = await consumirCupos(admin, cupos.despuesDelCaptcha, cupos.alFallar);
+  // (Un pago en línea de un negocio en modo de prueba no lo gasta: ver arriba.)
+  const cupoNegocio = pagoDePrueba ? { permitido: true, motivo: "OK" as const } : await consumirCupos(admin, cupos.despuesDelCaptcha, cupos.alFallar);
   if (!cupoNegocio.permitido) {
     if (cupoNegocio.motivo === "AGOTADO") registrarError("tienda", "CUPO_NEGOCIO_AGOTADO", p.negocio);
     return sinCupo(cupoNegocio);
@@ -716,17 +749,19 @@ async function atender(req: Request): Promise<Response> {
         },
       },
     });
-    if (cobro.tipo === "RECHAZADO") return rechazoDePago(admin, { p_tenant, ip, negocio: negocio.nombre, slug: p.negocio, motivo: cobro.motivo });
+    if (cobro.tipo === "RECHAZADO") return rechazoDePago(admin, { negocio, ip, slug: p.negocio, motivo: cobro.motivo, telefono: p.cliente.telefono });
     if (cobro.tipo === "NO_PROCESADO") {
       // No fue el banco ni una tarjeta: no cuenta como tarjeta rechazada del negocio. Un token
-      // inventado o usado sí cuenta para la IP que lo mandó (y solo para ella).
-      if (cobro.contarIp) await anotarRechazo(admin, ip, p.negocio, "OTRO", true);
+      // inventado o usado sí cuenta para la IP que lo mandó (y solo para ella). En modo de prueba, nada.
+      if (cobro.contarIp && !negocio.dePrueba) await anotarRechazo(admin, ip, p.negocio, "OTRO", true);
       return json({ error: "PAGO_NO_PROCESADO" }, 409);
     }
     if (cobro.tipo === "NO_DISPONIBLE") {
       // Mercado Pago rechazó las credenciales de la cuenta: seguir ofreciendo el pago ahí solo junta
-      // clientes que no pueden pagar. Se pausa esa sucursal y se avisa a VIM.
-      if (cobro.sinPermiso) await pausarPagoEnLinea(admin, { p_tenant, sucursal: p_sucursal, negocio: negocio.nombre, slug: p.negocio, por: "SIN_PERMISO" });
+      // clientes que no pueden pagar. Se pausa esa sucursal y se avisa a VIM. En modo de prueba no se
+      // pausa ni se manda correo (el token de prueba se corrige a mano y se vuelve a probar): queda en el log.
+      if (cobro.sinPermiso && negocio.dePrueba) registrarError("tienda", "PAGO_DE_PRUEBA_SIN_PERMISO", p.negocio);
+      else if (cobro.sinPermiso) await pausarPagoEnLinea(admin, { p_tenant, sucursal: p_sucursal, negocio: negocio.nombre, slug: p.negocio, por: "SIN_PERMISO" });
       return json({ error: "PAGO_NO_DISPONIBLE" }, 409);
     }
     if (cobro.tipo === "POR_CONFIRMAR") return json({ codigo, ...porPagar.publico, pago: { estado: "POR_CONFIRMAR" } });

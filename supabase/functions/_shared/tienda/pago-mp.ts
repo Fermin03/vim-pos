@@ -205,6 +205,18 @@ export function sinDatosPersonales(texto: string, d: Pick<DatosCobro, "email" | 
   return limpio;
 }
 
+/**
+ * El correo del pagador en el AMBIENTE DE PRUEBA de Mercado Pago (secreto `MP_TIENDA_PAGADOR_DE_PRUEBA`).
+ * Mercado Pago exige que quien paga con una cuenta vendedora de prueba sea un usuario de prueba, y
+ * sus correos son siempre `…@testuser.com` (VERIFICADO: `test_user_3753760462@testuser.com`). Solo
+ * vale uno con esa forma: si el secreto trae otra cosa (el correo de una persona, un texto
+ * cualquiera) es como si no estuviera, y el cobro de prueba sale con el correo que escribió quien prueba.
+ */
+export function pagadorDePrueba(v: string | null | undefined): string | null {
+  const correo = (v ?? "").trim().toLowerCase();
+  return /^[a-z0-9._+-]{1,64}@testuser\.com$/.test(correo) ? correo : null;
+}
+
 /** Por qué no pasó un cobro, en familias: lo que la tienda le puede decir al cliente. */
 export const MOTIVOS_DE_RECHAZO = ["FONDOS", "DATOS", "LLAMAR_BANCO", "TARJETA_DESHABILITADA", "RIESGO", "VERIFICACION", "SIN_VERIFICAR", "OTRO"] as const;
 export type MotivoDeRechazo = (typeof MOTIVOS_DE_RECHAZO)[number];

@@ -51,7 +51,15 @@ export function claveDeIp(ip: string): string {
  * minutos por pestaña) y, compartiendo la de leer, dos pedidos vivos desde la misma red dejaban sin
  * menú ni cotización a los demás de esa red. 90 = una pestaña holgada; con dos, la segunda va lenta.
  */
-export type Cupos = { antes: Cupo[]; despuesDelCaptcha: Cupo[]; alFallar: "abrir" | "cerrar" };
+export type Cupos = {
+  antes: Cupo[];
+  /**
+   * Solo en un pedido que se paga en línea: el tope por IP y restaurante, que se gasta ya con el
+   * negocio resuelto (ver `cuposDe`). Ausente en todo lo demás.
+   */
+  conNegocio?: Cupo[];
+  despuesDelCaptcha: Cupo[]; alFallar: "abrir" | "cerrar";
+};
 
 /**
  * Cuentas (entrega 6): cada acción con su rama, y un `switch` sin `default` para que una acción
@@ -94,13 +102,17 @@ export function cuposDe(accion: Peticion["accion"], ip: string, negocio: string,
     // `enLinea`: un pedido que se paga con tarjeta gasta de bolsas PROPIAS (`paga`), las tres. Quien
     // prueba tarjetas robadas hace muchos intentos que acaban rechazados; con las bolsas de `pide`
     // agotaría el tope del negocio y dejaría sin poder pedir a quien paga al recibir.
+    // En línea, además, el tope por IP y restaurante va en `conNegocio`: se gasta DESPUÉS de saber
+    // qué negocio es (los mismos 8 por hora, la misma clave), porque un negocio en modo de prueba
+    // (0177) no lo gasta, ni el de después del antirobot: ahí se prueba el pago una y otra vez. El
+    // de 40 por IP, que va antes de saber nada, vale para todos.
     case "pedir": {
       const bolsa = enLinea ? "paga" : "pide";
+      const porIp = { clave: `tienda:${bolsa}:ip:${quien}`, ventanaSeg: 3600, max: 40 };
+      const porIpYNegocio = { clave: `tienda:${bolsa}:ip:${quien}:${negocio}`, ventanaSeg: 3600, max: 8 };
       return {
-        antes: [
-          { clave: `tienda:${bolsa}:ip:${quien}`, ventanaSeg: 3600, max: 40 },
-          { clave: `tienda:${bolsa}:ip:${quien}:${negocio}`, ventanaSeg: 3600, max: 8 },
-        ],
+        antes: enLinea ? [porIp] : [porIp, porIpYNegocio],
+        ...(enLinea && { conNegocio: [porIpYNegocio] }),
         despuesDelCaptcha: [{ clave: `tienda:${bolsa}:negocio:${negocio}`, ventanaSeg: 3600, max: 60 }],
         alFallar: "cerrar",
       };
@@ -177,6 +189,11 @@ export type Negocio = {
   nombre: string;
   /** Los ids de las sucursales que participan, en minúsculas. */
   sucursales: string[];
+  /**
+   * El negocio está en modo de prueba (`tienda_config.pago_de_prueba`, 0177): sus pagos en línea van
+   * contra el ambiente de prueba de Mercado Pago. Solo un `true` de la base cuenta.
+   */
+  dePrueba: boolean;
 };
 
 /** `{tenant_id, publico}` de `tienda_negocio`. NULL o cualquier otra forma = no hay tienda. */
@@ -188,6 +205,7 @@ export function leerNegocio(x: unknown): Negocio | null {
     publico: x.publico,
     nombre: typeof x.publico.nombre === "string" ? x.publico.nombre : "",
     sucursales: sucursales.flatMap((s) => (objeto(s) && typeof s.id === "string" ? [s.id.toLowerCase()] : [])),
+    dePrueba: x.publico.pago_de_prueba === true,
   };
 }
 

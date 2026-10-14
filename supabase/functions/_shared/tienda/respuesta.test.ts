@@ -162,14 +162,14 @@ test("rpc: lo que no empieza con un código de negocio es 503 y no lleva nada de
 test("negocio: separa el tenant (interno) de lo público, y lista las sucursales en minúsculas", () => {
   const publico = { slug: "knockout", nombre: "Knock-Out", sucursales: [{ id: SUC.toUpperCase(), nombre: "Centro" }, { nombre: "sin id" }, null] };
   const n = leerNegocio({ tenant_id: "t-1", publico });
-  assert.deepEqual(n, { tenantId: "t-1", publico, nombre: "Knock-Out", sucursales: [SUC] });
+  assert.deepEqual(n, { tenantId: "t-1", publico, nombre: "Knock-Out", sucursales: [SUC], dePrueba: false });
   assert.equal(JSON.stringify(n!.publico).includes("t-1"), false);
 });
 test("negocio: NULL o una forma que no es la esperada es «no hay tienda»", () => {
   for (const x of [null, undefined, "x", [], {}, { tenant_id: "t-1" }, { publico: {} }, { tenant_id: 5, publico: {} }, { tenant_id: "t-1", publico: [] }]) {
     assert.equal(leerNegocio(x), null, JSON.stringify(x));
   }
-  assert.deepEqual(leerNegocio({ tenant_id: "t-1", publico: {} }), { tenantId: "t-1", publico: {}, nombre: "", sucursales: [] });
+  assert.deepEqual(leerNegocio({ tenant_id: "t-1", publico: {} }), { tenantId: "t-1", publico: {}, nombre: "", sucursales: [], dePrueba: false });
 });
 
 // ── La cotización que sale al cliente ───────────────────────────────────────────────────────────
@@ -331,4 +331,26 @@ test("pedido en línea: sin su pago, o con un importe que no es un importe, es n
 test("cupos: verificacion (la pantalla de la tarjeta durante el reto del banco) gasta de la bolsa de confirmar_pago y cierra si el control falla", () => {
   assert.deepEqual(cuposDe("verificacion", "1.2.3.4", "knockout"), cuposDe("confirmar_pago", "1.2.3.4", "knockout"));
   assert.equal(cuposDe("verificacion", "1.2.3.4", "knockout").alFallar, "cerrar");
+});
+
+// ── Modo de prueba (0177) ───────────────────────────────────────────────────────────────────────
+test("negocio: está en modo de prueba solo si la base dice `pago_de_prueba: true`", () => {
+  assert.equal(leerNegocio({ tenant_id: "t-1", publico: { pago_de_prueba: true } })!.dePrueba, true);
+  for (const v of [false, null, undefined, "true", 1, "t", {}]) {
+    assert.equal(leerNegocio({ tenant_id: "t-1", publico: { pago_de_prueba: v } })!.dePrueba, false, JSON.stringify(v));
+  }
+});
+test("cupos: en un pago en línea el tope por IP y restaurante se gasta ya con el negocio resuelto; son los mismos topes y las mismas claves", () => {
+  assert.deepEqual(cuposDe("pedir", "1.2.3.4", "knockout", undefined, true), {
+    antes: [{ clave: "tienda:paga:ip:1.2.3.4", ventanaSeg: 3600, max: 40 }],
+    conNegocio: [{ clave: "tienda:paga:ip:1.2.3.4:knockout", ventanaSeg: 3600, max: 8 }],
+    despuesDelCaptcha: [{ clave: "tienda:paga:negocio:knockout", ventanaSeg: 3600, max: 60 }],
+    alFallar: "cerrar",
+  });
+  // El de 40 por IP, que no depende del slug, sigue yendo antes de saber qué negocio es.
+  assert.equal(cuposDe("pedir", "1.2.3.4", "slug-inventado", undefined, true).antes[0]!.clave, "tienda:paga:ip:1.2.3.4");
+  // Un pedido al recibir, y todo lo demás, no tiene esa parte: gasta como siempre.
+  for (const accion of ["pedir", "menu", "cotizar", "negocio", "seguimiento", "confirmar_pago", "verificacion", "intento", "entrar", "cuenta"] as const) {
+    assert.equal("conNegocio" in cuposDe(accion, "1.2.3.4", "knockout"), false, accion);
+  }
 });
