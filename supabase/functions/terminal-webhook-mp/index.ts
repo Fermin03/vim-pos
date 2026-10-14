@@ -4,7 +4,7 @@
 import { clienteAdmin } from "../_shared/http.ts";
 import { consumirCupo, leerCuerpoAcotado } from "../_shared/limite.ts";
 import { registrarError } from "../_shared/errores.ts";
-import { aceptaCambio, cambiosDeCobro, datosDeOrden, type EstadoCobro, firmaValida } from "../_shared/terminal/mercado-pago.ts";
+import { aceptaCambio, cambiosDeCobro, clienteMp, datosDeOrden, type EstadoCobro, firmaValida } from "../_shared/terminal/mercado-pago.ts";
 
 const admin = clienteAdmin();
 // La de prueba es opcional: hoy el panel da una sola clave para las dos pestañas.
@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
   let cuerpo: Record<string, unknown>;
   try { cuerpo = JSON.parse(texto); } catch { return new Response("bad json", { status: 400 }); }
   const accion = String(cuerpo.action ?? "");
-  const d = datosDeOrden(cuerpo.data, dataId ?? undefined);
+  let d = datosDeOrden(cuerpo.data, dataId ?? undefined);
   const cobroId = d.cobro_id && UUID.test(d.cobro_id) ? d.cobro_id : null;
 
   let error: string | null = null;
@@ -45,9 +45,22 @@ Deno.serve(async (req) => {
     if (!accion.startsWith("order.")) error = "acción ignorada";
     else if (!cobroId) error = "sin referencia nuestra";
     else {
-      const { data: cobro } = await admin.from("terminal_cobros").select("estado").eq("id", cobroId).maybeSingle();
+      const { data: cobro } = await admin.from("terminal_cobros").select("estado, conexion_id").eq("id", cobroId).maybeSingle();
       if (!cobro) error = "cobro desconocido";
       else if (aceptaCambio((cobro as { estado: EstadoCobro }).estado, d.estado)) {
+        // El aviso no trae la tarjeta; la consulta sí. Va ANTES de guardar para que la caja reciba
+        // el cobro aprobado ya con su terminación. Si falla, el cobro se aprueba igual, sin ella.
+        if (d.estado === "APROBADO" && d.orden_id_externo) {
+          try {
+            const { data: tk } = await admin.rpc("terminal_leer_tokens", { p_conexion: (cobro as { conexion_id: string }).conexion_id });
+            const token = (tk as { access_token: string | null }[] | null)?.[0]?.access_token;
+            const r = token ? await clienteMp(token).consultarOrden(d.orden_id_externo) : null;
+            const completa = r?.status === 200 ? datosDeOrden(r.cuerpo, d.orden_id_externo) : null;
+            if (completa?.estado === "APROBADO") d = { ...completa, cobro_id: d.cobro_id };
+          } catch (causa) {
+            registrarError("terminal-webhook-mp", "CONSULTA_TARJETA", causa);
+          }
+        }
         const { error: eUp } = await admin.from("terminal_cobros").update(cambiosDeCobro(d)).eq("id", cobroId);
         if (eUp) throw eUp;
       } else error = "llegó tarde: el cobro ya tenía un estado final";

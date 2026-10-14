@@ -158,6 +158,8 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
         {datos.pagos.map((p, i) => (
           <div key={i}>
             <PayRow label="Forma de pago:" value={p.metodo} />
+            {p.tarjeta && <PayRow label="" value={p.tarjeta} />}
+            {p.autorizacion && <PayRow label="Autorización:" value={p.autorizacion} />}
             {p.recibidoMxn != null && (
               <>
                 <PayRow label="Recibido:" value={fmt(p.recibidoMxn)} />

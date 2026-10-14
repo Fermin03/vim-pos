@@ -16,6 +16,8 @@ export type PagoInput = {
   monto: number;
   montoRecibido?: number; // solo efectivo
   referencia?: string;
+  /** Número de autorización del banco, cuando el cobro pasó por la terminal integrada. */
+  terminalAprobacion?: string;
 };
 
 export type TotalesTicket = {
@@ -287,6 +289,7 @@ export async function aplicarPago(
     p_monto_mxn: pago.monto,
     p_monto_recibido_mxn: pago.metodo === "EFECTIVO" ? (pago.montoRecibido ?? pago.monto) : null,
     p_referencia: pago.referencia ?? null,
+    p_terminal_aprobacion: pago.terminalAprobacion ?? null,
     p_client_id_local: pagoClientId,
   });
   if (error) throw new Error(error.message);

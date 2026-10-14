@@ -15,7 +15,7 @@ import {
 } from "../lib/cobro";
 import { nuevoClientId } from "../lib/carrito";
 import { aplicarPagosEnOrden, pagoEntroPeseAlError, ventaQuedoPagada, type PagoPorAplicar } from "../lib/cobro-pagos";
-import { cajaTieneTerminal, metodoDeTarjeta, pedirCobro, type CobroTerminal } from "../lib/terminal";
+import { cajaTieneTerminal, pagoDeCobro, pedirCobro, type CobroTerminal } from "../lib/terminal";
 import { VistaTerminal } from "./vista-terminal";
 
 // ─── Íconos SVG inline (calcan los mockups) ────────────────────────────────
@@ -1154,7 +1154,7 @@ export function ModalCobro({
     try {
       const t = await aplicarPago(
         token, totales.ticketId,
-        { metodo: metodoDeTarjeta(c.tipo_tarjeta), monto: Number(c.monto_mxn), referencia: c.referencia ?? undefined },
+        pagoDeCobro(c),
         c.id,
       );
       // Si este aviso no llega, el cobro sigue «sin aplicar» en la nube y se reintenta al abrir el
@@ -1206,7 +1206,7 @@ export function ModalCobro({
         abandonar: () => rechazar(new Error("El cobro con tarjeta no se completó. Quita ese pago o vuelve a intentar.")),
         aprobado: (c, autorizoId) => {
           aplicarPago(token, totales.ticketId,
-            { metodo: metodoDeTarjeta(c.tipo_tarjeta), monto: Number(c.monto_mxn), referencia: c.referencia ?? undefined }, c.id)
+            pagoDeCobro(c), c.id)
             .then(async (t) => {
               await pedirCobro(token, cajaId, { accion: "confirmar", cobro_id: c.id, autorizo_id: autorizoId }).catch(() => {});
               resolver(t);

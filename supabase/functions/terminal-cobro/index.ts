@@ -15,12 +15,12 @@ const admin = clienteAdmin();
 // Sin aviso en este tiempo, se le pregunta a Mercado Pago (que pide no hacerlo seguido). Como la
 // consulta sella updated_at, es a lo sumo una cada RESPALDO_MS por cobro.
 const RESPALDO_MS = 15_000;
-const CAMPOS = "id, caja_id, ticket_id, monto_mxn, estado, detalle, orden_id_externo, tipo_tarjeta, marca, mensualidades, referencia, pagado_mxn, aplicado_at, conexion_id, updated_at";
+const CAMPOS = "id, caja_id, ticket_id, monto_mxn, estado, detalle, orden_id_externo, tipo_tarjeta, marca, mensualidades, referencia, pagado_mxn, tarjeta_ultimos4, aplicado_at, conexion_id, updated_at";
 
 type Cobro = {
   id: string; caja_id: string; ticket_id: string; monto_mxn: number; estado: EstadoCobro; detalle: string | null;
   orden_id_externo: string | null; tipo_tarjeta: string | null; marca: string | null; mensualidades: number | null;
-  referencia: string | null; pagado_mxn: number | null; aplicado_at: string | null; conexion_id: string; updated_at: string;
+  referencia: string | null; pagado_mxn: number | null; tarjeta_ultimos4: string | null; aplicado_at: string | null; conexion_id: string; updated_at: string;
 };
 
 /** Lo que ve la caja: nada de ids internos de la conexión. */
