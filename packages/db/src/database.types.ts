@@ -8413,6 +8413,7 @@ export type Database = {
           logo_url: string | null
           motivo_baja: string | null
           nombre_comercial: string
+          operacion: Json
           plan_actual_id: string | null
           prueba_hasta: string | null
           razon_social: string | null
@@ -8442,6 +8443,7 @@ export type Database = {
           logo_url?: string | null
           motivo_baja?: string | null
           nombre_comercial: string
+          operacion?: Json
           plan_actual_id?: string | null
           prueba_hasta?: string | null
           razon_social?: string | null
@@ -8471,6 +8473,7 @@ export type Database = {
           logo_url?: string | null
           motivo_baja?: string | null
           nombre_comercial?: string
+          operacion?: Json
           plan_actual_id?: string | null
           prueba_hasta?: string | null
           razon_social?: string | null
@@ -12896,6 +12899,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      cambiar_giro: {
+        Args: {
+          p_giro: Database["public"]["Enums"]["vertical_tipo"]
+          p_reaplicar: boolean
+          p_tenant: string
+        }
+        Returns: Json
+      }
       cambiar_pin_propio: {
         Args: { p_pin_actual: string; p_pin_nuevo: string }
         Returns: undefined
@@ -13027,6 +13038,10 @@ export type Database = {
         Returns: string
       }
       clabe_valida: { Args: { p_clabe: string }; Returns: boolean }
+      cobro_inicial_de_giro: {
+        Args: { p_giro: Database["public"]["Enums"]["vertical_tipo"] }
+        Returns: string
+      }
       confirmar_devolucion: {
         Args: { p_devolucion_id: string; p_usuario_id: string }
         Returns: undefined
@@ -13322,6 +13337,10 @@ export type Database = {
       }
       inventario_permitido: { Args: { p_tenant: string }; Returns: boolean }
       inventario_respetar_uso_previo: { Args: never; Returns: Json }
+      juego_inicial_de_giro: {
+        Args: { p_giro: Database["public"]["Enums"]["vertical_tipo"] }
+        Returns: Json
+      }
       kpis_dia_sucursal: {
         Args: { p_fecha: string; p_sucursal_id: string }
         Returns: Json
@@ -13491,6 +13510,12 @@ export type Database = {
         }
         Returns: undefined
       }
+      operacion_cambiar: {
+        Args: { p_cambios: Json; p_tenant: string }
+        Returns: Json
+      }
+      operacion_cuentas_abiertas: { Args: { p_tenant: string }; Returns: Json }
+      operacion_normalizar: { Args: { p: Json }; Returns: Json }
       periodo_global_de: {
         Args: { p_fecha: string; p_periodicidad: string }
         Returns: {
@@ -14398,6 +14423,9 @@ export type Database = {
         | "CAFE_BAR"
         | "DARK_KITCHEN"
         | "ENTERPRISE"
+        | "BAR"
+        | "CAFETERIA"
+        | "TAQUERIA"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -14859,6 +14887,9 @@ export const Constants = {
         "CAFE_BAR",
         "DARK_KITCHEN",
         "ENTERPRISE",
+        "BAR",
+        "CAFETERIA",
+        "TAQUERIA",
       ],
     },
   },
