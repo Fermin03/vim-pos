@@ -87,7 +87,7 @@ la sugiere y la zona sale sola.
   (`tienda_sucursales.tramos_envio`): las de tramo no se eligen a mano (0185). Lo valida un
   trigger.
 
-### 3.3 `sembrar_colonias(p_sucursal uuid) → integer`
+### 3.3 `sembrar_colonias(p_sucursal uuid) → jsonb {insertadas, heredadas}`
 
 SECURITY DEFINER con guarda de tenant; solo quien administra la sucursal.
 
@@ -100,7 +100,8 @@ SECURITY DEFINER con guarda de tenant; solo quien administra la sucursal.
    sucursal, comparando `f_unaccent(lower(btrim(colonia)))` con `nombre_busqueda`. Si la colonia
    tiene homónimas con distinto CP, solo hereda la que coincide también por CP. Empate → la zona
    más reciente. Nunca pisa una zona ya asignada.
-4. Devuelve cuántas colonias insertó. Repetirlo es seguro.
+4. Devuelve cuántas colonias insertó y cuántas heredaron zona (el admin lo enseña). Repetirlo es
+   seguro.
 
 ### 3.4 `asignar_zona_colonia(p_colonia uuid, p_zona uuid, p_autorizacion_pin_id uuid default null)`
 
@@ -186,6 +187,10 @@ Configuración → Envíos (`apps/admin/app/(panel)/configuracion/envios/page.ts
   2. Si no → **por distancia** con el pin del mapa (tramos de 0185), si la sucursal tiene tramos
      válidos y punto.
   3. Si tampoco → el selector de zonas de hoy («Por zonas»).
+
+  En la práctica, 2 y 3 son «lo que la sucursal ya hace según su modo de cobro»: una sucursal «Por
+  zonas» no tiene tramos utilizables. El selector de zona, cuando la sucursal tiene catálogo, pasa
+  del carrito a «Tus datos», después de la colonia.
 - El servidor resuelve la zona desde `colonia_id`; nunca confía en una zona mandada por el
   navegador cuando hay colonia con zona. Esto cierra el truco de elegir una zona más barata.
 - `components/entrega.tsx` oculta el selector de zona cuando la colonia ya la decide y muestra
