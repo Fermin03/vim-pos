@@ -13,7 +13,7 @@ import {
   aCuerpo, agregar, cambiarCantidad, contarPiezas, estimarTotal, guardarCarrito, leerCarrito, quitar, revalidar, vaciar,
   type Carrito, type Seleccion,
 } from "../lib/carrito";
-import type { Menu, MiCuenta, Negocio, Producto, Sucursal } from "../lib/contrato";
+import type { ColoniaSugerida, Menu, MiCuenta, Negocio, Producto, Sucursal } from "../lib/contrato";
 import { rutaDelMenu, textoDeDescartados, tomarPorRepetir } from "../lib/cuenta";
 import { formato } from "../lib/dinero";
 import { semanaLegible, type Momento } from "../lib/horario";
@@ -173,6 +173,7 @@ export function Tienda({ negocio, sucursal, menu, ahora, conSesion }: {
     sinCambios.current = inicial;
     setAjeno(deOtra ? leido : null);
     setPunto(null);   // el pin es de una sucursal
+    setColonia(null); // y la colonia también
     setCarrito(inicial);
     // Se recargó la página con un pago en línea del que no se sabe el resultado (o a medio reto del
     // banco): «Tus datos» se abre sola. Ahí se pregunta por ese intento y, si el reto sigue vivo, se continúa.
@@ -197,13 +198,16 @@ export function Tienda({ negocio, sucursal, menu, ahora, conSesion }: {
     return m;
   }, [carrito]);
   const porQuitar = useMemo(() => revalidar(carrito, menu), [carrito, menu]);
-  const zonaLista = carrito.modo !== "DOMICILIO" || sucursal.zonas.length === 0 || sucursal.zonas.some((z) => z.id === carrito.zonaId);
+  // La colonia del catálogo que eligió el cliente en «Tus datos» (0187): en memoria, como el pin. Si
+  // tiene zona, ella fija el envío y no hace falta zona para cotizar.
+  const [colonia, setColonia] = useState<ColoniaSugerida | null>(null);
+  const zonaLista = carrito.modo !== "DOMICILIO" || sucursal.zonas.length === 0 || sucursal.zonas.some((z) => z.id === carrito.zonaId) || !!colonia?.con_zona;
   const cotizable = paso !== "menu" && piezas > 0 && zonaLista && Object.keys(porQuitar).length === 0;
   // El pin del cliente (envío por distancia, 0185): en memoria, nunca en el teléfono. Solo cuenta a
   // domicilio en una sucursal que cobra por distancia.
   const [punto, setPunto] = useState<Punto | null>(null);
   const puntoDelEnvio = sucursal.envio.cobro === "DISTANCIA" ? punto : null;
-  const cotizado = useCotizacion(negocio.slug, cotizable ? aCuerpo(carrito, puntoDelEnvio) : null);
+  const cotizado = useCotizacion(negocio.slug, cotizable ? aCuerpo(carrito, puntoDelEnvio, colonia?.id ?? null) : null);
   const errorDeCotizar = cotizado.resultado && !cotizado.resultado.ok ? cotizado.resultado : null;
   const avisos = {
     ...porQuitar,
@@ -266,6 +270,7 @@ export function Tienda({ negocio, sucursal, menu, ahora, conSesion }: {
             cuenta={sesion ? mi : null} conSesion={sesion} alTerminarLaSesion={() => { setSesion(false); setMi(null); }}
             deVuelta={rutaDelMenu(negocio, sucursal.id)} alRetener={setRetenida}
             punto={punto} alCambiarPunto={setPunto}
+            colonia={colonia} alCambiarColonia={setColonia} alCambiarZona={(zonaId) => cambiar((c) => ({ ...c, zonaId }))}
             // «Mejor recojo mi pedido»: el pedido no cambia, solo cómo se recibe; se ve otra vez en el carrito.
             alCambiarModo={(modo) => { cambiar((c) => ({ ...c, modo })); setPaso("carrito"); }} />
         ) : (

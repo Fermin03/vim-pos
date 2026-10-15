@@ -63,6 +63,8 @@ export function Linea({ concepto, importe, estimado, fuerte }: { concepto: strin
 
 /** TEXTO PROVISIONAL (James): el envío por distancia, antes de poner la ubicación. */
 const ENVIO_POR_UBICACION = "Con tu ubicación";
+/** TEXTO PROVISIONAL (James): el envío con catálogo de colonias, antes de elegir la colonia. */
+const ENVIO_POR_COLONIA = "Con tu colonia";
 
 export function VistaDelCarrito({
   sucursal, carrito, menu, ahora, avisos, cotizado, alCambiarCantidad, alQuitar, alCambiarModo, alCambiarZona, alContinuar, alCerrar,
@@ -87,7 +89,10 @@ export function VistaDelCarrito({
 
   const aDomicilio = carrito.modo === "DOMICILIO";
   const zona = sucursal.zonas.find((z) => z.id === carrito.zonaId);
-  const faltaZona = aDomicilio && !zona && sucursal.zonas.length > 0;
+  // Con catálogo de colonias (0187) y varias zonas, la zona no se pide aquí: la da la colonia en «Tus
+  // datos». Hasta entonces no hay envío que cotizar (la tienda no cotiza) y se sigue con el estimado.
+  const conColonia = aDomicilio && sucursal.envio.cobro === "ZONAS" && sucursal.colonias && sucursal.zonas.length > 1 && !zona;
+  const faltaZona = aDomicilio && !zona && sucursal.zonas.length > 0 && !conColonia;
   const cot = cotizado.resultado?.ok ? cotizado.resultado.datos : null;
   const error = cotizado.resultado && !cotizado.resultado.ok ? cotizado.resultado : null;
   // La cotización trae un renglón por cada uno del carrito, en el mismo orden.
@@ -96,7 +101,9 @@ export function VistaDelCarrito({
   const estimado = estimarTotal(carrito, menu);
   const envioEstimado = aDomicilio && zona ? aCentavos(zona.costo_mxn) ?? 0 : 0;
   // Por distancia (0185) el envío sale de la ubicación, que se pone en «Tus datos»: aquí todavía no se sabe.
-  const sinEnvioAun = aDomicilio && sucursal.envio.cobro === "DISTANCIA" && !cot?.distancia_km;
+  const sinEnvioAun = aDomicilio && sucursal.envio.cobro === "DISTANCIA" && !cot?.distancia_km && !cot?.por_colonia;
+  /** Se sigue sin cotización: falta la colonia, y sin ella no hay total que cotizar. */
+  const sinCotizar = conColonia && !cot && !cotizado.cotizando;
 
   // Lo que impide continuar, del más concreto al más general. Si no hay nada, va el botón.
   const freno: { tono: TonoAviso; texto: string; reintentar?: boolean } | null =
@@ -137,8 +144,8 @@ export function VistaDelCarrito({
         <div className="mx-4 mb-4 rounded-lg border border-line bg-sel px-4 py-3">
           <dl aria-busy={cotizado.cotizando} className="flex flex-col gap-2">
           <Linea concepto="Subtotal" importe={cot ? formatoMxn(cot.subtotal_mxn) : formato(estimado)} estimado={!cot} />
-          {aDomicilio && <Linea concepto="Envío" importe={sinEnvioAun ? ENVIO_POR_UBICACION : cot ? formatoMxn(cot.envio_total_mxn) : zona ? formato(envioEstimado) : "Por elegir"} estimado={!cot} />}
-          <Linea concepto={sinEnvioAun ? "Total sin envío" : "Total"} importe={cot ? formatoMxn(cot.total_mxn) : formato(estimado + envioEstimado)} estimado={!cot} fuerte />
+          {aDomicilio && <Linea concepto="Envío" importe={sinEnvioAun ? ENVIO_POR_UBICACION : cot ? formatoMxn(cot.envio_total_mxn) : sinCotizar ? ENVIO_POR_COLONIA : zona ? formato(envioEstimado) : "Por elegir"} estimado={!cot} />}
+          <Linea concepto={sinEnvioAun || sinCotizar ? "Total sin envío" : "Total"} importe={cot ? formatoMxn(cot.total_mxn) : formato(estimado + envioEstimado)} estimado={!cot} fuerte />
           </dl>
           {/* Siempre ocupa su renglón: así la cuenta no brinca cuando llega el total. */}
           <p aria-live="polite" className="mt-2 min-h-5 text-13 text-ink-2">
@@ -154,9 +161,9 @@ export function VistaDelCarrito({
             {freno.reintentar && <button type="button" onClick={cotizado.reintentar} className={cn(botonClases({ variant: "ghost" }), "h-12")}>Volver a intentar</button>}
           </div>
         ) : (
-          <button type="button" onClick={alContinuar} disabled={!cot} className={cn(PRINCIPAL, "h-14 w-full justify-between px-5 text-16")}>
+          <button type="button" onClick={alContinuar} disabled={!cot && !sinCotizar} className={cn(PRINCIPAL, "h-14 w-full justify-between px-5 text-16")}>
             <span>Continuar</span>
-            <span className="tabular-nums">{cot ? formatoMxn(cot.total_mxn) : "Calculando…"}</span>
+            <span className="tabular-nums">{cot ? formatoMxn(cot.total_mxn) : sinCotizar ? formato(estimado) : "Calculando…"}</span>
           </button>
         )}
       </div>

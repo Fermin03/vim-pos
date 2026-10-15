@@ -30,17 +30,18 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react"
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Aviso, Captcha, SITE_KEY_TURNSTILE, botonClases, cn, Icono } from "@vim/ui/styles";
-import { cotizar, guardarDireccion, intento, pedir, verificacion, type DireccionDePedido } from "../lib/api";
+import { colonias, cotizar, guardarDireccion, intento, pedir, verificacion, type DireccionDePedido } from "../lib/api";
 import { TOPES, aCuerpo, type Carrito } from "../lib/carrito";
 import {
   CAMPOS, DE_DIRECCION, FORMULARIO_VACIO, LIMITES, datosDelPedido, erroresDe, guardarCliente, leerCliente, olvidarCliente,
   type Campo, type Formulario,
 } from "../lib/cliente";
-import type { Cotizacion, DireccionGuardada, ErrorDeTienda, MiCuenta, Negocio, Pago, Sucursal } from "../lib/contrato";
+import type { ColoniaSugerida, Cotizacion, DireccionGuardada, ErrorDeTienda, MiCuenta, Negocio, Pago, Sucursal } from "../lib/contrato";
 import { LIMITES_DE_CUENTA, direccionEnUnaLinea, enlaceDeAcceso, formularioDeDireccion, paraTusDatos } from "../lib/cuenta";
 import { formatoMxn } from "../lib/dinero";
 import { enviarPedido, envioDeLaPagina, intentoDelNegocio, pruebaQueNoHuboCobro, resolverDuda, type Desenlace, type ResultadoDeEnvio } from "../lib/envio";
 import { formasDePago, leerOtroMonto, propinaDe, totalAPagar, type Propina as Porcentaje, type PropinaElegida } from "../lib/pago";
+import { coloniaQueCoincide, envioEnDatos } from "../lib/pantalla";
 import { accionDe, avanzar, pasoDelDesenlace, pasosDe, type Paso } from "../lib/pasos";
 import { BOTON_OTRA_FORMA, finDeLaPausa, guardarPausa, leerPausa, lineaDePausa, textoDePausa } from "../lib/pausa";
 import { textoDeRechazo, type CampoDeTarjeta } from "../lib/tarjeta";
@@ -48,6 +49,8 @@ import { enlaceTel, formatoTelefono } from "../lib/telefono";
 import { MODO_DE_PRUEBA, RETO, apoyoDePago, nombreDePago, textoDeError } from "../lib/textos";
 import { esFinDelReto, retoQueSigue, seOfreceCancelar, vigilarReto, type PasoDelReto, type Reto } from "../lib/verificacion";
 import { CampoDeTexto } from "./campo";
+import { CampoColonia } from "./campo-colonia";
+import { SelectorDeZona } from "./entrega";
 import { CamposDeTarjeta, type ManejoDeTarjeta } from "./tarjeta";
 import { Linea } from "./carrito";
 import { COLUMNA, CUERPO, PIE } from "./hoja";
@@ -89,6 +92,11 @@ export type PropsDelPasoDeDatos = {
   alCambiarPunto: (p: Punto | null) => void;
   /** «Mejor recojo mi pedido», desde fuera del área de entrega. */
   alCambiarModo: (m: Modo) => void;
+  /** Catálogo de colonias (0187): la colonia elegida de las sugerencias. Vive en la tienda, que cotiza con ella. null = texto libre. */
+  colonia: ColoniaSugerida | null;
+  alCambiarColonia: (c: ColoniaSugerida | null) => void;
+  /** Con catálogo y una colonia sin zona, la zona se elige aquí (no en el carrito). */
+  alCambiarZona: (id: string | null) => void;
 };
 
 type AvisoDeEnvio = Extract<Desenlace, { tipo: "aviso" }>;
@@ -135,7 +143,7 @@ const IconoAtras = () => (
 
 export function PasoDeDatos({
   negocio, sucursal, carrito, nota, alCambiarNota, cotizacion, alVolver, alCambiarElTotal, alErrorDeCarrito, alPedidoHecho,
-  conSesion, cuenta, alTerminarLaSesion, deVuelta, alRetener, punto, alCambiarPunto, alCambiarModo,
+  conSesion, cuenta, alTerminarLaSesion, deVuelta, alRetener, punto, alCambiarPunto, alCambiarModo, colonia, alCambiarColonia, alCambiarZona,
 }: PropsDelPasoDeDatos) {
   const router = useRouter();
   const id = useId();
@@ -144,8 +152,15 @@ export function PasoDeDatos({
   const formas = formasDePago(negocio, sucursal);
   const aDomicilio = carrito.modo === "DOMICILIO";
   const zona = sucursal.zonas.find((z) => z.id === carrito.zonaId);
+  /**
+   * Qué decide el envío aquí (lib/pantalla.ts): la colonia del catálogo, el mapa, el select de zonas
+   * o nada (el carrito ya tiene la zona). Con la colonia decidiendo no se enseña ni mapa ni select.
+   */
+  const envio = aDomicilio ? envioEnDatos(sucursal, cotizacion, colonia) : "nada";
   /** A domicilio en una sucursal que cobra el envío por distancia: sin un pin dentro del área no se sigue. */
-  const distancia = aDomicilio && sucursal.envio.cobro === "DISTANCIA" ? sucursal.envio : null;
+  const distancia = envio === "mapa" && sucursal.envio.cobro === "DISTANCIA" ? sucursal.envio : null;
+  /** «Por zonas» con catálogo: sin colonia que la dé ni zona elegida no hay envío. */
+  const faltaZona = envio === "zona" && !zona;
   const puntoDelPedido = distancia ? punto : null;
   const tel = enlaceTel(sucursal.telefono);
 
@@ -200,14 +215,16 @@ export function PasoDeDatos({
   /** Lo que el banco (o la librería de Mercado Pago) dijo de la tarjeta en el último intento. */
   const [rechazoDeTarjeta, setRechazoDeTarjeta] = useState<{ campo: CampoDeTarjeta | null; texto: string } | null>(null);
   /** Lo que la función rechazó de un campo; se quita en cuanto el cliente lo cambia. */
-  const [rechazo, setRechazo] = useState<Partial<Record<Campo | "pago" | "ubicacion", string>>>({});
+  const [rechazo, setRechazo] = useState<Partial<Record<Campo | "pago" | "ubicacion" | "zona", string>>>({});
   const [aviso, setAviso] = useState<AvisoDeEnvio | null>(null);
   /** El total que el cliente ya vio (el del botón). */
   const [totalVisto, setTotalVisto] = useState(cotizacion?.total_mxn ?? null);
   // Por distancia, mover el pin cambia el envío: el total que se ve (el del botón) es el de la
   // cotización con el pin de ahora. Sin esto, el botón seguiría con el total sin envío del carrito.
+  // Lo mismo con el catálogo de colonias: elegir la colonia (o la zona) aquí cambia el envío.
   const totalCotizado = cotizacion?.total_mxn ?? null;
-  useEffect(() => { if (distancia && totalCotizado) setTotalVisto(totalCotizado); }, [distancia !== null, totalCotizado]);
+  const envioDeAqui = aDomicilio && (sucursal.envio.cobro === "DISTANCIA" || sucursal.colonias);
+  useEffect(() => { if (envioDeAqui && totalCotizado) setTotalVisto(totalCotizado); }, [envioDeAqui, totalCotizado]);
   /** Un total distinto, a la espera de que lo confirme. */
   const [totalNuevo, setTotalNuevo] = useState<string | null>(null);
   /** Esperando la comprobación del antirobot para enviar. */
@@ -222,6 +239,23 @@ export function PasoDeDatos({
   const [ubicacionTocada, setUbicacionTocada] = useState(false);
   const pin = distancia ? estadoDelPin({ sucursal: distancia.punto, tramos: distancia.tramos, pin: punto, enVivo: null, cotizacion: null }) : null;
   const faltaUbicacion = distancia !== null && (!pin || pin.fuera);
+  /** Ya se quiso seguir sin zona (catálogo de colonias, «Por zonas»). */
+  const [zonaTocada, setZonaTocada] = useState(false);
+
+  /**
+   * La colonia del catálogo que es exactamente la de una dirección ya escrita (guardada en la cuenta,
+   * o recordada en el teléfono): con ella se cotiza sin que el cliente la vuelva a elegir. El turno
+   * descarta una respuesta que llega después de cambiar de dirección o de escribir encima.
+   */
+  const turnoDeColonia = useRef(0);
+  const buscarColonia = (nombre: string, cp: string) => {
+    const turno = ++turnoDeColonia.current;
+    alCambiarColonia(null);
+    if (!sucursal.colonias || nombre.trim().length < 2) return;
+    void colonias(negocio.slug, sucursal.id, nombre.trim()).then((r) => {
+      if (r.ok && turno === turnoDeColonia.current) alCambiarColonia(coloniaQueCoincide(r.datos, nombre, cp));
+    });
+  };
 
   /** Las formas de pago que no son en línea: lo que se ofrece con el pago en línea en pausa. */
   const otrasFormas = formas.filter((p) => p !== "EN_LINEA");
@@ -281,7 +315,10 @@ export function PasoDeDatos({
   useEffect(() => {
     if (conSesion) return;
     const leido = leerCliente();
-    if (leido) { setF((a) => ({ ...a, ...soloVacios(a, leido) })); setRecordado(true); }
+    if (leido) {
+      setF((a) => ({ ...a, ...soloVacios(a, leido) })); setRecordado(true);
+      if (!colonia && !f.colonia.trim() && leido.colonia) buscarColonia(leido.colonia, leido.codigoPostal ?? "");
+    }
   }, [conSesion]);
 
   // Con sesión: nombre, teléfono y correo de la cuenta y, a domicilio, su primera dirección guardada.
@@ -292,6 +329,7 @@ export function PasoDeDatos({
     const usarPrimera = !!primera && direccion === "" && !f.calle.trim();
     if (direccion === "") setDireccion(usarPrimera ? primera.id : OTRA);
     if (usarPrimera && primera.punto) alCambiarPunto(primera.punto);
+    if (usarPrimera && !colonia) buscarColonia(primera.colonia, primera.codigo_postal);
     setF((a) => ({ ...a, ...soloVacios(a, paraTusDatos(cuenta.cuenta)), ...(usarPrimera && camposDe(primera)) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo cuando llega (o cambia) la cuenta
   }, [cuenta]);
@@ -303,6 +341,8 @@ export function PasoDeDatos({
     setF((a) => ({ ...a, ...(d ? camposDe(d) : SIN_DIRECCION) }));
     // Su pin, si lo tiene; si no, ninguno: el de otra dirección cobraría otro envío.
     alCambiarPunto(d?.punto ?? null);
+    // Y su colonia del catálogo, si coincide exacto; con «Otra», ninguna hasta que elija una sugerencia.
+    if (d) buscarColonia(d.colonia, d.codigo_postal); else { turnoDeColonia.current++; alCambiarColonia(null); }
     setTocados((t) => new Set([...t].filter((c) => !esDeDireccion(c))));
     setRechazo((r) => ({ ...r, calle: undefined }));
   };
@@ -341,7 +381,7 @@ export function PasoDeDatos({
    */
   const mandar = (total: string | null) => {
     if (!pago) return;
-    const cuerpoDelCarrito = aCuerpo(carrito, puntoDelPedido), datos = f, modo = carrito.modo;
+    const cuerpoDelCarrito = aCuerpo(carrito, puntoDelPedido, colonia?.id ?? null), datos = f, modo = carrito.modo;
     const delPedido = datosDelPedido(datos, { modo, pago, propina: typeof propina === "number" ? propina : 0, propinaMxn: libre?.ok ? libre.monto : undefined });
     // Lo que se guarda en la cuenta (solo con sesión y a domicilio): la dirección nueva que pidió
     // guardar, con su pin; o el pin nuevo de una guardada (no tenía, o lo movió), con la dirección tal
@@ -375,7 +415,7 @@ export function PasoDeDatos({
           return pedir(negocio.slug, { ...elPedido, ...(t && { tarjeta: t.tarjeta }), clave, captcha: tokenAhora.current, total_esperado: totalEsperado });
         },
         totalVisto: total,
-      }, { telefono: sucursal.telefono, horario: sucursal.horario, otrasFormas: formas.length > 1 });
+      }, { telefono: sucursal.telefono, horario: sucursal.horario, otrasFormas: formas.length > 1, zonaEnDatos: envio === "zona" });
       if (r.desenlace.tipo === "hecho") {
         intentoDeLaPagina.cerrar();
         alEntrar.current?.();
@@ -424,6 +464,7 @@ export function PasoDeDatos({
       setRechazo({ [desenlace.campo]: desenlace.texto });
       if (desenlace.campo === "pago") irA(destino ?? "datos", `${id}-pago`);
       else if (desenlace.campo === "ubicacion") irA("datos", `${id}-ubicacion`);
+      else if (desenlace.campo === "zona") irA("datos", `${id}-zona`);
       else alCampo(desenlace.campo);
     } else {
       // La sesión terminó: desde aquí es un invitado (el servidor ya borró la cookie). Él decide si
@@ -553,6 +594,7 @@ export function PasoDeDatos({
     if (ocupado || envioDeLaPagina.ocupado() || !pago) return;
     // Por distancia, sin un pin dentro del área no hay envío que cobrar: a «Tu ubicación».
     if (faltaUbicacion) { setUbicacionTocada(true); irA("datos", `${id}-ubicacion`); return; }
+    if (faltaZona) { setZonaTocada(true); irA("datos", `${id}-zona`); return; }
     const a = avanzar({ pasos, paso, primerError: CAMPOS.find((c) => errores[c]), enLinea, propina, otroValido: libre?.ok ?? false, yaPreguntada: preguntada });
     if (a.tipo === "campo") { setTocados(new Set(CAMPOS)); alCampo(a.campo); }
     // Se queda en la pregunta si es ahí donde lo está escribiendo; si no, a la pantalla del pago.
@@ -605,7 +647,7 @@ export function PasoDeDatos({
   const seOfreceEnviar = !!totalNuevo || !aviso || aviso.sigue === "reintentar" || aviso.sigue === "reintentar-seguro" || aviso.sigue === "sesion";
   const total = totalNuevo ?? totalVisto;
   // Por distancia sin un pin dentro del área todavía no hay total (falta el envío): el botón no enseña uno.
-  const aPagar = faltaUbicacion ? null : enLinea && total ? totalAPagar(total, montoDePropina) : total;
+  const aPagar = faltaUbicacion || faltaZona ? null : enLinea && total ? totalAPagar(total, montoDePropina) : total;
   const estado = reto ? (reto.cancelado ? RETO.cancelando : reto.esperando ? RETO.confirmando : "") : duda ? "Confirmando tu pago…" : (enviando || hecho) && enLinea ? "Procesando tu pago…"
     : enviando || hecho ? "Enviando tu pedido…" : robot ? "Comprobando que no eres un robot…" : "";
   // Con `key`: React no debe reciclar para este botón el nodo de otro que ocupaba su lugar. Sin ella,
@@ -693,7 +735,12 @@ export function PasoDeDatos({
                 <>
                   <div>
                     <h3 className={TITULO}>¿A dónde lo llevamos?</h3>
-                    {zona && <p className={cn("mt-1 text-14 text-ink-2", PARTE)}>Zona de entrega: {zona.nombre}</p>}
+                    {envio === "colonia" ? (
+                      // TEXTO PROVISIONAL (James).
+                      <p className={cn("mt-1 text-14 text-ink-2", PARTE)}>
+                        Envío a {colonia?.nombre ?? f.colonia}{cotizacion?.por_colonia && <>: <span className="font-semibold tabular-nums text-ink">{formatoMxn(cotizacion.envio_total_mxn)}</span></>}
+                      </p>
+                    ) : zona && envio !== "zona" && <p className={cn("mt-1 text-14 text-ink-2", PARTE)}>Zona de entrega: {zona.nombre}</p>}
                   </div>
                   {distancia && (
                     <UbicacionDeEntrega id={id} sucursal={distancia.punto} tramos={distancia.tramos} punto={punto} cotizacion={cotizacion}
@@ -726,7 +773,21 @@ export function PasoDeDatos({
                         {campo("numeroExterior", "Núm. exterior")}
                         {campo("numeroInterior", "Núm. interior", { opcional: true })}
                       </div>
-                      {campo("colonia", "Colonia", { autoComplete: "address-level3" })}
+                      {sucursal.colonias ? (
+                        <CampoColonia negocio={negocio.slug} sucursalId={sucursal.id} id={`${id}-colonia`} valor={f.colonia} error={errorDe("colonia")} maxLength={LIMITES.colonia}
+                          alSalir={() => setTocados((t) => new Set(t).add("colonia"))}
+                          alEscribir={(v) => {
+                            setF((a) => ({ ...a, colonia: v })); setRechazo((r) => ({ ...r, colonia: undefined }));
+                            // Escribir encima ya no es la colonia elegida.
+                            if (colonia) { turnoDeColonia.current++; alCambiarColonia(null); }
+                          }}
+                          alElegir={(c) => {
+                            turnoDeColonia.current++;
+                            setF((a) => ({ ...a, colonia: c.nombre, ...(c.codigo_postal && { codigoPostal: c.codigo_postal }) }));
+                            setRechazo((r) => ({ ...r, colonia: undefined, codigoPostal: undefined, zona: undefined }));
+                            alCambiarColonia(c);
+                          }} />
+                      ) : campo("colonia", "Colonia", { autoComplete: "address-level3" })}
                       <div className="grid grid-cols-[8rem_1fr] gap-3">
                         {campo("codigoPostal", "Código postal", { inputMode: "numeric", autoComplete: "postal-code" })}
                         {campo("ciudad", "Ciudad", { autoComplete: "address-level2" })}
@@ -747,6 +808,12 @@ export function PasoDeDatos({
                         </div>
                       )}
                     </>
+                  )}
+                  {/* La colonia no dio la zona (o aún no se elige): se elige aquí, como antes en el carrito. */}
+                  {envio === "zona" && (
+                    <SelectorDeZona sucursal={sucursal} zonaId={carrito.zonaId} id={`${id}-zona`}
+                      alCambiarZona={(z) => { alCambiarZona(z); setRechazo((r) => ({ ...r, zona: undefined })); }}
+                      error={rechazo.zona ?? (zonaTocada && !zona ? textoDeError("ZONA_INVALIDA").hacer : undefined)} />
                   )}
                 </>
               ) : (

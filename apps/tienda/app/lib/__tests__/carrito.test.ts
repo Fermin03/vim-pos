@@ -252,6 +252,12 @@ describe("el cuerpo para cotizar y pedir", () => {
   it("al recoger la zona va en null aunque el carrito traiga una", () => {
     expect(aCuerpo({ ...carritoNuevo(ID.sucursal, "DOMICILIO", ID.zona), modo: "RECOGER" }).zona_id).toBeNull();
   });
+  it("la colonia del catálogo va solo a domicilio", () => {
+    const c = carritoNuevo(ID.sucursal, "DOMICILIO", ID.zona);
+    expect(aCuerpo(c, null, ID.zona).colonia_id).toBe(ID.zona);
+    expect("colonia_id" in aCuerpo(c)).toBe(false);
+    expect("colonia_id" in aCuerpo({ ...c, modo: "RECOGER" }, null, ID.zona)).toBe(false);
+  });
   it("las cantidades salen como enteros JSON y dentro de los topes, venga lo que venga guardado", () => {
     const c = agregar(vacio(), hamburguesa, sel({ modificadores: [mod(ID.medio), mod(ID.queso, 2)] }), 2, "");
     const raro: Carrito = { ...c, renglones: Array.from({ length: 45 }, (_, i) => ({

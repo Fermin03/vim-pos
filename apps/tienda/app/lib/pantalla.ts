@@ -3,7 +3,7 @@
 // pertenece un error de la función y la espera antes de recotizar. Puro, para poder probarlo.
 import type { Resultado } from "./api";
 import { carritoNuevo, type Carrito, type CuerpoCarrito } from "./carrito";
-import type { Cotizacion, Modo, Negocio, Sucursal } from "./contrato";
+import type { ColoniaSugerida, Cotizacion, Modo, Negocio, Sucursal } from "./contrato";
 import { textoDeError } from "./textos";
 import { aCentavos, formato } from "./dinero";
 
@@ -113,6 +113,27 @@ export function rangoDeEnvio(zonas: { costo_mxn: string }[], segun: "zona" | "di
   const min = Math.min(...costos), max = Math.max(...costos);
   // TEXTO PROVISIONAL (James) el de la distancia.
   return min === max ? null : `El envío puede costar entre ${formato(min)} y ${formato(max)}, según ${segun === "zona" ? "tu zona" : "la distancia"}.`;
+}
+
+/**
+ * Qué enseña «Tus datos», a domicilio, sobre el envío (catálogo de colonias, 0187):
+ *  · `colonia`: la colonia elegida tiene zona y ella fija el envío, cobre como cobre la sucursal. Lo
+ *    dice la cotización; mientras llega, la sugerencia elegida (`con_zona`).
+ *  · `mapa`: «Por distancia», el pin de siempre.
+ *  · `zona`: «Por zonas» con catálogo y varias zonas: el carrito no la pidió, se elige aquí.
+ *  · `nada`: el carrito ya tiene la zona (sin catálogo, o con una sola).
+ */
+export function envioEnDatos(sucursal: Sucursal, cotizacion: Cotizacion | null, colonia: ColoniaSugerida | null): "colonia" | "mapa" | "zona" | "nada" {
+  if (cotizacion ? cotizacion.por_colonia : colonia?.con_zona) return "colonia";
+  if (sucursal.envio.cobro === "DISTANCIA") return "mapa";
+  return sucursal.colonias && sucursal.zonas.length > 1 ? "zona" : "nada";
+}
+
+/** Para comparar colonias: sin acentos, mayúsculas ni espacios de más. */
+const normal = (s: string): string => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
+/** La colonia del catálogo que es EXACTAMENTE la de una dirección guardada (mismo nombre y mismo CP), o null. */
+export function coloniaQueCoincide(lista: readonly ColoniaSugerida[], nombre: string, cp: string): ColoniaSugerida | null {
+  return lista.find((c) => normal(c.nombre) === normal(nombre) && (c.codigo_postal ?? "") === cp.trim()) ?? null;
 }
 
 /** Cuántos renglones de una lista larga de «Mi cuenta» (pedidos, direcciones) se ven antes de «Mostrar más». */

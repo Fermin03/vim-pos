@@ -39,7 +39,7 @@ export type Desenlace =
   /** El total ya no es el que vio: se enseña el nuevo y se pide confirmar antes de enviar con él. */
   | { tipo: "total"; total: string }
   /** El error es de un campo (o de la forma de pago): se marca ahí y se le da el foco. */
-  | { tipo: "campo"; campo: Campo | "pago" | "ubicacion"; texto: string }
+  | { tipo: "campo"; campo: Campo | "pago" | "ubicacion" | "zona"; texto: string }
   | {
     tipo: "aviso"; tono: "danger" | "warning"; texto: string;
     /**
@@ -59,6 +59,8 @@ export type ContextoDeEnvio = {
   telefono: string | null; horario: Horario; ahora?: Momento;
   /** Hay otra forma de pago además de la elegida: si el pago en línea no pasa, se ofrece. */
   otrasFormas?: boolean;
+  /** La zona se elige en «Tus datos» (catálogo de colonias, 0187): una zona rechazada se marca ahí, no en el carrito. */
+  zonaEnDatos?: boolean;
 };
 
 const DE_RENGLON = new Set(["PRODUCTO_NO_DISPONIBLE", "MODIFICADORES_INVALIDOS", "COMBO_INVALIDO"]);
@@ -87,7 +89,7 @@ export function desenlaceDelError(e: ErrorDeTienda, c: ContextoDeEnvio): Desenla
   const t = textoDeError(e.error, { telefono: c.telefono, detalle: e.detalle, otrasFormas: c.otrasFormas });
   const texto = `${t.texto} ${t.hacer}`;
   // El restaurante no puede cobrar en línea ahora y hay otra forma de pagar: se dice junto a «¿Cómo pagas?».
-  const campo = DE_CAMPO[e.error] ?? (e.error === "PAGO_NO_DISPONIBLE" && c.otrasFormas ? "pago" : undefined);
+  const campo = DE_CAMPO[e.error] ?? (e.error === "PAGO_NO_DISPONIBLE" && c.otrasFormas ? "pago" : e.error === "ZONA_INVALIDA" && c.zonaEnDatos ? "zona" : undefined);
   if (campo) return { tipo: "campo", campo, texto };
   if (e.error === "TIENDA_CERRADA") return { tipo: "aviso", tono: "warning", texto: textoCerrada(e.detalle ?? "", c.horario, c.ahora), sigue: "reintentar" };
   // No se degrada a invitado en silencio: el pedido no quedaría en su cuenta, y eso lo decide él.

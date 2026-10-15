@@ -4,9 +4,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Resultado } from "../api";
 import { agregar, carritoNuevo, seleccionInicial, type Carrito, type CuerpoCarrito } from "../carrito";
-import { cotizacionDe, menuDe, negocioDe, type Cotizacion, type Menu, type Negocio, type Sucursal } from "../contrato";
+import { cotizacionDe, menuDe, negocioDe, type ColoniaSugerida, type Cotizacion, type Menu, type Negocio, type Sucursal } from "../contrato";
 import {
-  alternar, carritoPara, categoriaActiva, cotizarConEspera, modosDe, motivoDeCierre, renglonesDelError, sucursalElegida,
+  alternar, carritoPara, categoriaActiva, coloniaQueCoincide, cotizarConEspera, envioEnDatos, modosDe, motivoDeCierre, renglonesDelError, sucursalElegida,
 } from "../pantalla";
 import { ID, cotizacionCruda, menuCrudo, negocioCrudo, u } from "./datos";
 
@@ -218,5 +218,44 @@ describe("listaCorta: las listas de «Mi cuenta» empiezan con tres", () => {
     const lista = de(5);
     listaCorta(lista, false).visibles.push(99);
     expect(lista).toEqual([1, 2, 3, 4, 5]);
+  });
+});
+
+describe("envioEnDatos", () => {
+  const cot = (por_colonia: boolean): Cotizacion => ({ ...(cotizacionDe(cotizacionCruda()) as Cotizacion), por_colonia });
+  const distancia = con({ envio: { cobro: "DISTANCIA", tramos: [{ hasta_km: "3.0", costo_mxn: "30.00" }], punto: { lat: 21, lng: -101 } } });
+  const dosZonas = [centro.zonas[0]!, { id: u(9), nombre: "Norte", costo_mxn: "50.00" }];
+  const conZona: ColoniaSugerida = { id: u(20), nombre: "Centro", codigo_postal: "37000", con_zona: true };
+  it("la colonia que fijó el envío gana, también «Por distancia»", () => {
+    expect(envioEnDatos(con({ colonias: true, zonas: dosZonas }), cot(true), null)).toBe("colonia");
+    expect(envioEnDatos({ ...distancia, colonias: true }, cot(true), null)).toBe("colonia");
+  });
+  it("mientras se cotiza, una colonia con zona ya decide; con cotización, manda la cotización", () => {
+    expect(envioEnDatos({ ...distancia, colonias: true }, null, conZona)).toBe("colonia");
+    expect(envioEnDatos({ ...distancia, colonias: true }, cot(false), conZona)).toBe("mapa");
+  });
+  it("«Por distancia» sin colonia que decida: el mapa", () => {
+    expect(envioEnDatos(distancia, cot(false), null)).toBe("mapa");
+  });
+  it("«Por zonas» con catálogo y varias zonas: la zona se elige aquí", () => {
+    expect(envioEnDatos(con({ colonias: true, zonas: dosZonas }), cot(false), { ...conZona, con_zona: false })).toBe("zona");
+  });
+  it("sin catálogo, o con una sola zona: nada (el carrito ya la tiene)", () => {
+    expect(envioEnDatos(con({ colonias: false, zonas: dosZonas }), cot(false), null)).toBe("nada");
+    expect(envioEnDatos(con({ colonias: true }), cot(false), null)).toBe("nada");
+  });
+});
+
+describe("coloniaQueCoincide", () => {
+  const lista: ColoniaSugerida[] = [
+    { id: u(21), nombre: "Jardines del Moral", codigo_postal: "37160", con_zona: true },
+    { id: u(22), nombre: "León Moderno", codigo_postal: "37480", con_zona: true },
+  ];
+  it("mismo nombre (sin importar acentos, mayúsculas ni espacios) y mismo CP", () => {
+    expect(coloniaQueCoincide(lista, "  leon   moderno ", "37480")?.id).toBe(u(22));
+  });
+  it("otro CP, o un nombre que solo se parece: ninguna", () => {
+    expect(coloniaQueCoincide(lista, "León Moderno", "37000")).toBeNull();
+    expect(coloniaQueCoincide(lista, "Jardines", "37160")).toBeNull();
   });
 });

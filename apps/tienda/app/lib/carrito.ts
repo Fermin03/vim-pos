@@ -255,9 +255,9 @@ export type CuerpoCarrito = {
  * El carrito como lo espera la función. Las cantidades salen como enteros JSON dentro de sus topes
  * (la base rechaza `2.0`, `"2"` y lo que se pase): un carrito guardado raro no produce un 400.
  * Un producto simple lleva `modificadores` y nunca `componentes`; un combo, al revés.
- * `punto` va solo a domicilio: no se guarda con el carrito (es dato personal y vive en memoria).
+ * `punto` y `coloniaId` van solo a domicilio: no se guardan con el carrito (son del domicilio y viven en memoria).
  */
-export function aCuerpo(carrito: Carrito, punto: Punto | null = null): CuerpoCarrito {
+export function aCuerpo(carrito: Carrito, punto: Punto | null = null, coloniaId: string | null = null): CuerpoCarrito {
   const mods = (m: ModificadorElegido[]): ModificadorDeCuerpo[] =>
     m.map((x) => ({ opcion_id: x.opcionId, cantidad: acotar(x.cantidad, TOPES.porModificador) }));
   return {
@@ -271,6 +271,7 @@ export function aCuerpo(carrito: Carrito, punto: Punto | null = null): CuerpoCar
         : { modificadores: mods(r.modificadores) }),
     })),
     ...(carrito.modo === "DOMICILIO" && punto && { punto }),
+    ...(carrito.modo === "DOMICILIO" && coloniaId && { colonia_id: coloniaId }),
   };
 }
 

@@ -22,6 +22,11 @@ describe("desenlaceDelError", () => {
     expect(desenlaceDelError(e("SIN_CONFIRMAR"), c)).toEqual(esperado);
     expect(desenlaceDelError(e("SIN_CONFIRMAR"), { ...c, telefono: null })).toEqual(esperado);
   });
+  it("ZONA_INVALIDA: con la zona en «Tus datos» (catálogo de colonias) se marca ahí; si no, se vuelve al carrito", () => {
+    expect(desenlaceDelError(e("ZONA_INVALIDA"), { ...c, zonaEnDatos: true }))
+      .toEqual({ tipo: "campo", campo: "zona", texto: "Esa zona de entrega ya no está disponible. Elige tu zona de nuevo." });
+    expect(desenlaceDelError(e("ZONA_INVALIDA"), c)).toMatchObject({ tipo: "aviso", sigue: "volver" });
+  });
   it("lo que se puede reintentar: sin conexión, antirobot, demasiados intentos, servicio caído", () => {
     for (const codigo of ["SIN_CONEXION", "CAPTCHA_INVALIDO", "DEMASIADOS_INTENTOS", "SERVICIO_NO_DISPONIBLE", "ERROR_INTERNO", "UN_CODIGO_NUEVO"]) {
       expect(desenlaceDelError(e(codigo), c), codigo).toMatchObject({ tipo: "aviso", sigue: "reintentar" });
