@@ -255,7 +255,11 @@ Los bloques, en este orden, cada uno en su `Tarjeta`:
      desconectada, o sucursal sin cuenta elegida), sale un `Aviso` ámbar **arriba de todo**, con su
      botón «Reconectar Mercado Pago» / «Conectar Mercado Pago» cuando eso lo arregla.
 4. **Sucursales** — una tarjeta por sucursal: si vende en la tienda, si entrega para recoger o a
-   domicilio, y su horario.
+   domicilio, y su horario. Con domicilio guardado, **«Envío a domicilio en la tienda»** (ADR 0035):
+   «Por zonas» o «Por distancia»; por distancia, el mapa con el punto de la sucursal (tocar o
+   arrastrar el pin) y los tramos en renglones «Hasta [ ] km → $[ ]» con «Quitar» en rojo, «Agregar
+   tramo» y la nota de hasta dónde se entrega. Guarda aparte, con su botón «Guardar envío», y el error
+   de un tramo sale bajo su renglón.
 5. **Menú de la tienda** (0168) — qué categorías y productos enseña cada sucursal. Ver abajo.
 6. **Compartir** — el enlace con su botón de copiar y el QR para descargar. Solo existe cuando ya
    hay dirección guardada.

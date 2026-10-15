@@ -51,12 +51,19 @@ el producto", pero nadie lo había hecho.
 
   Y se aplica fuera del horario de servicio: crear el índice bloquea las escrituras a `tickets`
   unos segundos.
-- **Antes del merge se aplican a mano la 0179, la 0180, la 0181, la 0182 y la 0183**, cada una en su propia
-  transacción. La 0179 y la 0180 no pueden ir juntas: Postgres responde "unsafe use of new value".
+- **Antes del merge se aplican a mano la 0179, la 0180, la 0181, la 0182, la 0183 y la 0184**
+  (propinas a la caja), cada una en su propia transacción. La 0179 y la 0180 no pueden ir juntas:
+  Postgres responde "unsafe use of new value".
+- **En producción ya está la 0185** (envío por distancia de la tienda, ADR 0035), que es más nueva
+  que estas. Por eso se aplican con `npx supabase db push --linked --include-all`: sin
+  `--include-all`, el comando se niega a aplicar migraciones con número menor que una ya aplicada.
+  No se pisan: la 0185 solo toca funciones `tienda_*` y lee la llave `tienda` de
+  `modulos_efectivos`, que estas no cambian; el orden da igual.
 
 **Orden de lanzamiento:**
 
-1. Migraciones 0179 → 0180 → 0181 → 0182 → 0183, a mano, cada una en su propia transacción.
+1. Migraciones 0179 → 0180 → 0181 → 0182 → 0183 → 0184, a mano, cada una en su propia transacción
+   (`npx supabase db push --linked --include-all`).
 2. Publicar como la más reciente el instalador de la caja que ya las trae. Un negocio que nace
    `BAR`, `CAFETERIA` o `TAQUERIA` baja ese instalador; si no conoce la 0179, su primer pull falla.
 3. Desplegar las funciones: `provisionar-tenant`, `signup-tenant` (usa `_shared/alta.ts`) y

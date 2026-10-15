@@ -8,7 +8,7 @@ const CONFIG = {
 };
 const SUCURSAL = {
   id: "s1", nombre: "Centro", telefono: "4771234567", activa: true,
-  participa: false, recoger: true, domicilio: false, horario: {}, zonasActivas: 2, conexionId: null,
+  participa: false, recoger: true, domicilio: false, horario: {}, zonasActivas: 2, conexionId: null, envio: { cobro: "ZONAS" as const, tramos: [], punto: null },
 };
 const LEIDO: Leido = {
   config: CONFIG, sucursales: [SUCURSAL, { ...SUCURSAL, id: "s2", nombre: "Norte" }], interruptor: false, enPlan: true,

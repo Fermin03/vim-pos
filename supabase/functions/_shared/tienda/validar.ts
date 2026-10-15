@@ -14,11 +14,15 @@ export type Direccion = {
   calle: string; numero_exterior: string; numero_interior: string | null; colonia: string;
   codigo_postal: string; ciudad: string; estado: string; referencias: string | null;
 };
+/** Un punto del mapa: grados decimales, ya en rango y con 6 decimales a lo más. */
+export type Punto = { lat: number; lng: number };
 export type Peticion =
   | { accion: "negocio"; negocio: string }
   | { accion: "menu"; negocio: string; sucursal_id: string }
-  | { accion: "cotizar"; negocio: string; sucursal_id: string; modo: Modo; zona_id: string | null; items: unknown[] }
-  | { accion: "pedir"; negocio: string; sucursal_id: string; modo: Modo; zona_id: string | null; items: unknown[];
+  | { accion: "cotizar"; negocio: string; sucursal_id: string; modo: Modo; zona_id: string | null; items: unknown[];
+      /** Solo a domicilio en una sucursal «Por distancia»: el pin del cliente. El envío lo calcula la base. */
+      punto: Punto | null }
+  | { accion: "pedir"; negocio: string; sucursal_id: string; modo: Modo; zona_id: string | null; items: unknown[]; punto: Punto | null;
       cliente: { nombre: string; telefono: string; email: string | null }; direccion: Direccion | null;
       pago: "EFECTIVO" | "TARJETA" | "EN_LINEA"; paga_con: string | null; nota: string | null; captcha: string | null;
       /** Solo con pago EN_LINEA: el porcentaje de propina que eligió el cliente. El monto lo calcula el servidor. */
@@ -104,6 +108,18 @@ function leerDireccion(x: unknown): Direccion | null {
   if (!calle || !numero_exterior || !colonia || !ciudad || !estado || !/^[0-9]{5}$/.test(codigo_postal)) return null;
   return { calle, numero_exterior, numero_interior: textoLimpio(x.numero_interior, 20), colonia,
            codigo_postal, ciudad, estado, referencias: textoLimpio(x.referencias, 300) };
+}
+
+/**
+ * El pin del cliente: `{lat, lng}`, dos números finitos dentro de rango, redondeados a 6 decimales
+ * (lo que guarda la base). Ausente o null = null; cualquier otra cosa = undefined (inválido). Si
+ * está dentro del alcance de la sucursal lo decide la base, que conoce el punto de la sucursal.
+ */
+export function leerPunto(x: unknown): Punto | null | undefined {
+  if (x === null || x === undefined) return null;
+  if (!objeto(x) || typeof x.lat !== "number" || typeof x.lng !== "number" || !Number.isFinite(x.lat) || !Number.isFinite(x.lng)) return undefined;
+  if (Math.abs(x.lat) > 90 || Math.abs(x.lng) > 180) return undefined;
+  return { lat: Math.round(x.lat * 1e6) / 1e6, lng: Math.round(x.lng * 1e6) / 1e6 };
 }
 
 /** Importe como texto con dos decimales, o undefined si no es un importe válido. null/ausente = null.
@@ -246,7 +262,11 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
     const limpia = textoLimpio(nota, 200);
     return limpia === null ? resto : { ...resto, nota: limpia };
   });
-  if (accion === "cotizar") return { ok: true, valor: { accion, negocio, sucursal_id, modo, zona_id, items } };
+  // Al recoger no hay a dónde: el punto, si viene, no se manda.
+  const punto = leerPunto(x.punto);
+  if (punto === undefined) return mal("UBICACION_INVALIDA");
+  const puntoDelModo = modo === "DOMICILIO" ? punto : null;
+  if (accion === "cotizar") return { ok: true, valor: { accion, negocio, sucursal_id, modo, zona_id, items, punto: puntoDelModo } };
 
   // pedir
   if (!objeto(x.cliente)) return mal("CLIENTE_INVALIDO");
@@ -288,7 +308,7 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
   if (clave !== null && !esCodigo(clave)) return mal("CUERPO_INVALIDO");
 
   return { ok: true, valor: {
-    accion, negocio, sucursal_id, modo, zona_id, items,
+    accion, negocio, sucursal_id, modo, zona_id, items, punto: puntoDelModo,
     cliente: { nombre, telefono, email }, direccion, pago: x.pago, paga_con, propina_pct, propina_mxn, tarjeta: tarjeta ?? null, total_esperado, clave,
     nota: textoLimpio(x.nota, 300), captcha: typeof x.captcha === "string" && x.captcha.length <= 4096 ? x.captcha : null,
   } };

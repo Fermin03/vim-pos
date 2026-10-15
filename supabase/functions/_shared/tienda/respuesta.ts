@@ -161,6 +161,8 @@ const IMPORTE = /^\d+\.\d{2}$/;
 const CON_DETALLE = new Map<string, RegExp>([
   ["TIENDA_CERRADA", DETALLE], ["PRODUCTO_NO_DISPONIBLE", DETALLE], ["MODIFICADORES_INVALIDOS", DETALLE],
   ["COMBO_INVALIDO", DETALLE], ["TOTAL_CAMBIO", IMPORTE],
+  // Fuera del área de entrega: a cuántos km quedó (0185), para decírselo al cliente.
+  ["FUERA_DE_AREA", /^\d{1,5}\.\d$/],
 ]);
 
 export type RespuestaRpc =
@@ -252,11 +254,15 @@ export function leerPedidoEnLinea(x: unknown): PedidoEnLinea | null {
  */
 export const yaExistia = (x: unknown): boolean => objeto(x) && x.ya_existia === true;
 
-/** La cotización sin `items`: los renglones normalizados son la forma interna del ticket. */
+/**
+ * La cotización sin `items` (los renglones normalizados son la forma interna del ticket) ni `zona_id`
+ * (la zona del tramo es interna). `distancia_km`: por distancia, la que calculó la base; si no, null.
+ */
 export function cotizacionPublica(x: unknown): Record<string, unknown> | null {
   if (!objeto(x)) return null;
   return {
     renglones: x.renglones, subtotal_mxn: x.subtotal_mxn, envio_mxn: x.envio_mxn,
     envio_total_mxn: x.envio_total_mxn, total_mxn: x.total_mxn,
+    distancia_km: typeof x.distancia_km === "string" ? x.distancia_km : null,
   };
 }

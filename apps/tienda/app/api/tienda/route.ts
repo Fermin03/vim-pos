@@ -64,7 +64,8 @@ async function leerCuerpoAcotado(req: Request): Promise<string | null> {
   }
 }
 
-const DE_CARRITO = ["accion", "negocio", "sucursal_id", "modo", "zona_id", "items"] as const;
+// `punto`: el pin del cliente a domicilio «Por distancia» (0185). Lo valida la función; el envío lo calcula la base.
+const DE_CARRITO = ["accion", "negocio", "sucursal_id", "modo", "zona_id", "items", "punto"] as const;
 const DE_PEDIDO = [...DE_CARRITO, "cliente", "direccion", "pago", "paga_con", "propina_pct", "propina_mxn", "tarjeta", "nota", "captcha", "total_esperado", "clave"] as const;
 const DE_DIRECCION = ["calle", "numero_exterior", "numero_interior", "colonia", "codigo_postal", "ciudad", "estado", "referencias"] as const;
 

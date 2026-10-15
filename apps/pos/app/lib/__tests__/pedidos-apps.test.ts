@@ -200,6 +200,17 @@ describe("pedidoDesdeFila", () => {
       direccion: { texto: "Hidalgo 12, int. 3, Centro, C.P. 37000, León", referencias: "Portón negro" },
     });
   });
+  it("envío por distancia (0185): la distancia llega en las referencias y el punto como enlace al mapa", () => {
+    const dir = { calle: "Hidalgo", numero_exterior: "12", colonia: "Centro", codigo_postal: "37000", ciudad: "León", estado: "Gto", referencias: "A 3.2 km · Portón negro" };
+    const p = pedidoDesdeFila({ ...fila, app: "DELIVERY_PROPIO", canal: "TIENDA", direccion: { ...dir, lat: 21.136551, lng: -101.6824 } });
+    expect(p.direccion).toEqual({
+      texto: "Hidalgo 12, Centro, C.P. 37000, León", referencias: "A 3.2 km · Portón negro",
+      mapa: "https://www.openstreetmap.org/?mlat=21.136551&mlon=-101.6824#map=17/21.136551/-101.6824",
+    });
+    // Sin punto (por zonas, o ya purgado a medias) no hay enlace; un punto que no son números, tampoco.
+    expect(pedidoDesdeFila({ ...fila, canal: "TIENDA", direccion: dir }).direccion).not.toHaveProperty("mapa");
+    expect(pedidoDesdeFila({ ...fila, canal: "TIENDA", direccion: { ...dir, lat: "21", lng: "-101" } }).direccion).not.toHaveProperty("mapa");
+  });
   it("etiquetaApp nombra la tienda", () => {
     expect(etiquetaApp("DRIVE_THRU")).toBe("Tienda");
   });
