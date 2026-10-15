@@ -239,9 +239,9 @@ BEGIN
     v_q := tienda_cotizar(v_t, v_suc, v_c ->> 'modo', (v_c ->> 'zona')::uuid, v_c -> 'items');
     v_qs := v_qs || jsonb_build_object(v_c ->> 'caso', v_q);
 
-    IF NOT (v_q ?& ARRAY['items', 'renglones', 'subtotal_mxn', 'envio_mxn', 'envio_total_mxn', 'total_mxn'])
-       OR (SELECT count(*) FROM jsonb_object_keys(v_q)) <> 6 THEN
-      RAISE EXCEPTION '%: la salida debe traer exactamente items, renglones, subtotal_mxn, envio_mxn, envio_total_mxn y total_mxn: %', v_c ->> 'caso', v_q;
+    IF NOT (v_q ?& ARRAY['items', 'renglones', 'subtotal_mxn', 'envio_mxn', 'envio_total_mxn', 'total_mxn', 'cobro', 'distancia_km', 'zona_id'])
+       OR (SELECT count(*) FROM jsonb_object_keys(v_q)) <> 9 THEN   -- 0185: cobro, distancia_km y zona_id
+      RAISE EXCEPTION '%: la salida debe traer exactamente items, renglones, subtotal_mxn, envio_mxn, envio_total_mxn, total_mxn, cobro, distancia_km y zona_id: %', v_c ->> 'caso', v_q;
     END IF;
     IF v_c ? 'tot' AND ROW(v_q ->> 'subtotal_mxn', v_q ->> 'envio_mxn', v_q ->> 'envio_total_mxn', v_q ->> 'total_mxn')
                        IS DISTINCT FROM ROW(v_c ->> 'sub', v_c ->> 'env', v_c ->> 'envtot', v_c ->> 'tot') THEN
@@ -633,11 +633,11 @@ BEGIN
   END LOOP;
 
   -- Permisos: la cotización es solo para service_role; ni ella ni sus internas son para la API pública.
-  IF NOT has_function_privilege('service_role', 'tienda_cotizar(uuid, uuid, text, uuid, jsonb)', 'EXECUTE') THEN
+  IF NOT has_function_privilege('service_role', 'tienda_cotizar(uuid, uuid, text, uuid, jsonb, jsonb)', 'EXECUTE') THEN
     RAISE EXCEPTION 'permisos: service_role debe poder ejecutar tienda_cotizar';
   END IF;
   FOR r IN SELECT rol, f FROM unnest(ARRAY['anon', 'authenticated']) rol,
-                             unnest(ARRAY['tienda_cotizar(uuid, uuid, text, uuid, jsonb)', '_tienda_modificadores(jsonb, jsonb, integer)',
+                             unnest(ARRAY['tienda_cotizar(uuid, uuid, text, uuid, jsonb, jsonb)', '_tienda_modificadores(jsonb, jsonb, integer)',
                                           '_tienda_con_iva(numeric, uuid, uuid)', '_tienda_entero(jsonb, integer, integer)']) f
   LOOP
     IF has_function_privilege(r.rol, r.f, 'EXECUTE') THEN RAISE EXCEPTION 'permisos: % puede ejecutar %', r.rol, r.f; END IF;

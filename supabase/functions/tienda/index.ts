@@ -644,7 +644,9 @@ async function atender(req: Request): Promise<Response> {
     return menu.error ? rechazo("tienda_menu", menu.error) : json(menu.data);
   }
 
-  const carrito = { p_tenant, p_sucursal, p_modo: p.modo, p_zona: p.zona_id, p_items: p.items };
+  // El pin (0185) solo si vino: sin él, la llamada es, argumento por argumento, la de antes. El envío
+  // por distancia lo calcula la base con este punto; ningún importe del cliente cuenta.
+  const carrito = { p_tenant, p_sucursal, p_modo: p.modo, p_zona: p.zona_id, p_items: p.items, ...(p.punto && { p_punto: p.punto }) };
 
   if (p.accion === "cotizar") {
     const q = await admin.rpc("tienda_cotizar", carrito);

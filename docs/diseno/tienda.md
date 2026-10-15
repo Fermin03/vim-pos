@@ -61,6 +61,7 @@ Pensada para 360–430 px; en escritorio es la misma columna, centrada (`max-w-2
 | Hoja | `components/hoja.tsx` | Sube desde abajo en el teléfono; diálogo centrado desde 640 px |
 | Producto | `components/producto.tsx` | Foto, opciones con su regla, cantidad, nota y «Agregar» |
 | Carrito | `components/carrito.tsx` | Renglones y la cuenta |
+| Tu ubicación | `components/ubicacion.tsx` | Solo a domicilio en una sucursal «Por distancia» (ADR 0035): «Usar mi ubicación», el mapa (`MapaConPin` de `@vim/ui/mapa`, que se descarga aquí y en ningún otro lado), el pin que se arrastra o se pone tocando, y «Estás a 3.2 km · Envío $35.00» en vivo. Fuera del último tramo, en `danger`, y «Mejor recojo mi pedido» si la sucursal deja recoger. Sin pin dentro del área no se sigue y el botón no enseña total |
 | Tus datos | `components/datos.tsx` | En pantallas: quién recibe (o recoge), a dónde y la nota; cómo paga; la tarjeta. Va dentro de la hoja del carrito. Qué pantallas hay lo decide `lib/pasos.ts` |
 | Reto del banco | `components/reto.tsx` | El marco con la verificación del banco (3D Secure), en lugar de la tarjeta. Qué dirección se abre y qué pasó lo decide `lib/verificacion.ts` |
 | Propina | `components/propina.tsx` | El selector de propina y «Otro monto», en «¿Cómo pagas?» y en la pregunta antes de pagar |

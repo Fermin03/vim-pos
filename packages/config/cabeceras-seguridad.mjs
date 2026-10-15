@@ -21,8 +21,9 @@ const CONNECT_NUBE =
  * @param {string[]} [o.connectExtra] Orígenes adicionales para `connect-src` (la tienda: Mercado Pago, al pagar en línea).
  * @param {string[]} [o.imgSrc] Orígenes adicionales para `img-src` (la tienda: las fotos del almacén público).
  * @param {boolean} [o.hsts] `false` quita Strict-Transport-Security (el KDS habla http con su hub).
+ * @param {boolean} [o.geolocalizacion] `true` deja a la propia página pedir la ubicación (la tienda: el envío por distancia).
  */
-export function cabecerasSeguridad({ scriptExtra, frameSrc, connectSrc = CONNECT_NUBE, connectExtra = [], imgSrc = [], hsts = true } = {}) {
+export function cabecerasSeguridad({ scriptExtra, frameSrc, connectSrc = CONNECT_NUBE, connectExtra = [], imgSrc = [], hsts = true, geolocalizacion = false } = {}) {
   const isDev = process.env.NODE_ENV !== "production";
   const scriptSrc = ["script-src 'self' 'unsafe-inline'", isDev && "'unsafe-eval'", scriptExtra].filter(Boolean).join(" ");
   return [
@@ -30,7 +31,7 @@ export function cabecerasSeguridad({ scriptExtra, frameSrc, connectSrc = CONNECT
     { key: "X-Content-Type-Options", value: "nosniff" },
     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
     ...(hsts ? [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" }] : []),
-    { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+    { key: "Permissions-Policy", value: `camera=(), microphone=(), geolocation=(${geolocalizacion ? "self" : ""})` },
     {
       key: "Content-Security-Policy",
       value: [

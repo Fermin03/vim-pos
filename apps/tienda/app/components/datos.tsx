@@ -54,6 +54,9 @@ import { COLUMNA, CUERPO, PIE } from "./hoja";
 import { FOCO, PARTE, PRINCIPAL } from "./piezas";
 import { Propina } from "./propina";
 import { MarcoDelReto } from "./reto";
+import { UbicacionDeEntrega, estadoDelPin } from "./ubicacion";
+import type { Modo } from "../lib/contrato";
+import type { Punto } from "../lib/distancia";
 
 export type PropsDelPasoDeDatos = {
   negocio: Negocio; sucursal: Sucursal; carrito: Carrito;
@@ -80,6 +83,11 @@ export type PropsDelPasoDeDatos = {
   deVuelta: string;
   /** El reto del banco está a la vista (o dejó de estarlo): mientras, la hoja no se cierra. */
   alRetener?: (retenida: boolean) => void;
+  /** A domicilio «Por distancia» (0185): el pin del cliente. Vive en la tienda, que cotiza con él. */
+  punto: Punto | null;
+  alCambiarPunto: (p: Punto) => void;
+  /** «Mejor recojo mi pedido», desde fuera del área de entrega. */
+  alCambiarModo: (m: Modo) => void;
 };
 
 type AvisoDeEnvio = Extract<Desenlace, { tipo: "aviso" }>;
@@ -124,7 +132,7 @@ const IconoAtras = () => (
 
 export function PasoDeDatos({
   negocio, sucursal, carrito, nota, alCambiarNota, cotizacion, alVolver, alCambiarElTotal, alErrorDeCarrito, alPedidoHecho,
-  conSesion, cuenta, alTerminarLaSesion, deVuelta, alRetener,
+  conSesion, cuenta, alTerminarLaSesion, deVuelta, alRetener, punto, alCambiarPunto, alCambiarModo,
 }: PropsDelPasoDeDatos) {
   const router = useRouter();
   const id = useId();
@@ -133,6 +141,9 @@ export function PasoDeDatos({
   const formas = formasDePago(negocio, sucursal);
   const aDomicilio = carrito.modo === "DOMICILIO";
   const zona = sucursal.zonas.find((z) => z.id === carrito.zonaId);
+  /** A domicilio en una sucursal que cobra el envío por distancia: sin un pin dentro del área no se sigue. */
+  const distancia = aDomicilio && sucursal.envio.cobro === "DISTANCIA" ? sucursal.envio : null;
+  const puntoDelPedido = distancia ? punto : null;
   const tel = enlaceTel(sucursal.telefono);
 
   const [f, setF] = useState<Formulario>(borrador?.f ?? FORMULARIO_VACIO);
@@ -186,10 +197,14 @@ export function PasoDeDatos({
   /** Lo que el banco (o la librería de Mercado Pago) dijo de la tarjeta en el último intento. */
   const [rechazoDeTarjeta, setRechazoDeTarjeta] = useState<{ campo: CampoDeTarjeta | null; texto: string } | null>(null);
   /** Lo que la función rechazó de un campo; se quita en cuanto el cliente lo cambia. */
-  const [rechazo, setRechazo] = useState<Partial<Record<Campo | "pago", string>>>({});
+  const [rechazo, setRechazo] = useState<Partial<Record<Campo | "pago" | "ubicacion", string>>>({});
   const [aviso, setAviso] = useState<AvisoDeEnvio | null>(null);
   /** El total que el cliente ya vio (el del botón). */
   const [totalVisto, setTotalVisto] = useState(cotizacion?.total_mxn ?? null);
+  // Por distancia, mover el pin cambia el envío: el total que se ve (el del botón) es el de la
+  // cotización con el pin de ahora. Sin esto, el botón seguiría con el total sin envío del carrito.
+  const totalCotizado = cotizacion?.total_mxn ?? null;
+  useEffect(() => { if (distancia && totalCotizado) setTotalVisto(totalCotizado); }, [distancia !== null, totalCotizado]);
   /** Un total distinto, a la espera de que lo confirme. */
   const [totalNuevo, setTotalNuevo] = useState<string | null>(null);
   /** Esperando la comprobación del antirobot para enviar. */
@@ -199,6 +214,11 @@ export function PasoDeDatos({
   const tokenAhora = useRef(token);
   tokenAhora.current = token;
   const cuerpo = useRef<HTMLDivElement>(null);
+
+  /** Ya se quiso seguir sin ubicación: desde ahí se dice qué falta. */
+  const [ubicacionTocada, setUbicacionTocada] = useState(false);
+  const pin = distancia ? estadoDelPin({ sucursal: distancia.punto, tramos: distancia.tramos, pin: punto, enVivo: null, cotizacion: null }) : null;
+  const faltaUbicacion = distancia !== null && (!pin || pin.fuera);
 
   /** Las formas de pago que no son en línea: lo que se ofrece con el pago en línea en pausa. */
   const otrasFormas = formas.filter((p) => p !== "EN_LINEA");
@@ -315,7 +335,7 @@ export function PasoDeDatos({
    */
   const mandar = (total: string | null) => {
     if (!pago) return;
-    const cuerpoDelCarrito = aCuerpo(carrito), datos = f, modo = carrito.modo;
+    const cuerpoDelCarrito = aCuerpo(carrito, puntoDelPedido), datos = f, modo = carrito.modo;
     const delPedido = datosDelPedido(datos, { modo, pago, propina: typeof propina === "number" ? propina : 0, propinaMxn: libre?.ok ? libre.monto : undefined });
     // La dirección nueva que pidió guardar en su cuenta (solo con sesión, a domicilio y escrita a mano).
     const porGuardar = conSesion && guardar && !elegida && delPedido.direccion
@@ -393,6 +413,7 @@ export function PasoDeDatos({
     else if (desenlace.tipo === "campo") {
       setRechazo({ [desenlace.campo]: desenlace.texto });
       if (desenlace.campo === "pago") irA(destino ?? "datos", `${id}-pago`);
+      else if (desenlace.campo === "ubicacion") irA("datos", `${id}-ubicacion`);
       else alCampo(desenlace.campo);
     } else {
       // La sesión terminó: desde aquí es un invitado (el servidor ya borró la cookie). Él decide si
@@ -520,6 +541,8 @@ export function PasoDeDatos({
   const alBoton = (total: string | null) => {
     // El candado se pregunta en el acto: el estado de React llega un render tarde para un doble toque.
     if (ocupado || envioDeLaPagina.ocupado() || !pago) return;
+    // Por distancia, sin un pin dentro del área no hay envío que cobrar: a «Tu ubicación».
+    if (faltaUbicacion) { setUbicacionTocada(true); irA("datos", `${id}-ubicacion`); return; }
     const a = avanzar({ pasos, paso, primerError: CAMPOS.find((c) => errores[c]), enLinea, propina, otroValido: libre?.ok ?? false, yaPreguntada: preguntada });
     if (a.tipo === "campo") { setTocados(new Set(CAMPOS)); alCampo(a.campo); }
     // Se queda en la pregunta si es ahí donde lo está escribiendo; si no, a la pantalla del pago.
@@ -571,7 +594,8 @@ export function PasoDeDatos({
   // ofrece es enviar: con «llama al restaurante» o «vuelve a tu pedido» a la vista, Enter no manda nada.
   const seOfreceEnviar = !!totalNuevo || !aviso || aviso.sigue === "reintentar" || aviso.sigue === "reintentar-seguro" || aviso.sigue === "sesion";
   const total = totalNuevo ?? totalVisto;
-  const aPagar = enLinea && total ? totalAPagar(total, montoDePropina) : total;
+  // Por distancia sin un pin dentro del área todavía no hay total (falta el envío): el botón no enseña uno.
+  const aPagar = faltaUbicacion ? null : enLinea && total ? totalAPagar(total, montoDePropina) : total;
   const estado = reto ? (reto.cancelado ? RETO.cancelando : reto.esperando ? RETO.confirmando : "") : duda ? "Confirmando tu pago…" : (enviando || hecho) && enLinea ? "Procesando tu pago…"
     : enviando || hecho ? "Enviando tu pedido…" : robot ? "Comprobando que no eres un robot…" : "";
   // Con `key`: React no debe reciclar para este botón el nodo de otro que ocupaba su lugar. Sin ella,
@@ -661,6 +685,12 @@ export function PasoDeDatos({
                     <h3 className={TITULO}>¿A dónde lo llevamos?</h3>
                     {zona && <p className={cn("mt-1 text-14 text-ink-2", PARTE)}>Zona de entrega: {zona.nombre}</p>}
                   </div>
+                  {distancia && (
+                    <UbicacionDeEntrega id={id} sucursal={distancia.punto} tramos={distancia.tramos} punto={punto} cotizacion={cotizacion}
+                      alCambiar={(p) => { alCambiarPunto(p); setRechazo((r) => ({ ...r, ubicacion: undefined })); }}
+                      puedeRecoger={sucursal.recoger} alRecoger={() => alCambiarModo("RECOGER")} deshabilitado={ocupado}
+                      error={rechazo.ubicacion ?? (ubicacionTocada && faltaUbicacion && !pin ? textoDeError("UBICACION_INVALIDA").hacer : undefined)} />
+                  )}
                   {/* Con direcciones guardadas se elige una; los campos solo aparecen para «Otra dirección». */}
                   {guardadas.length > 0 && (
                     <ul role="radiogroup" aria-label="Tus direcciones guardadas" className="flex flex-col">

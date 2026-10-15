@@ -60,9 +60,59 @@ export function copiarATodos(h: Horario, desde: Dia): Horario {
   return nuevo;
 }
 
+/** Un tramo del envío por distancia, como lo escribe el dueño: «hasta 3.5 km → $35». Texto, nunca float. */
+export type TramoTienda = { hastaKm: string; costo: string };
+/**
+ * Cómo cobra el envío la tienda en una sucursal (0185). Los tramos se conservan aunque se vuelva a
+ * «Por zonas». `punto`: el de la sucursal (sucursales.geo_lat/geo_lng), null si no tiene.
+ */
+export type EnvioSucursal = { cobro: "ZONAS" | "DISTANCIA"; tramos: TramoTienda[]; punto: { lat: number; lng: number } | null };
+export const MAX_TRAMOS = 20;
+export const MAX_KM = 50;
+
+/** Décimas de km de lo que escribió el dueño («3» → 30, «3.5» → 35), o null si no es un km válido (0.1 a 50, un decimal). */
+export function decimasDeKm(km: string): number | null {
+  const t = km.trim();
+  if (!/^\d{1,2}(\.\d)?$/.test(t)) return null;
+  const [entero, decimal = "0"] = t.split(".");
+  const d = Number(entero) * 10 + Number(decimal);
+  return d > 0 && d <= MAX_KM * 10 ? d : null;
+}
+const COSTO = /^\d{1,4}(\.\d{1,2})?$/;
+
+/**
+ * Lo que impide guardar el envío, con las MISMAS reglas que `tienda_guardar_envio` (0185). `general`
+ * va debajo de la tabla; `porTramo`, junto a su renglón (por índice).
+ */
+export function erroresDeEnvio(e: EnvioSucursal): { general: string | null; porTramo: Record<number, string> } {
+  const porTramo: Record<number, string> = {};
+  let anterior: number | null = null;
+  e.tramos.forEach((t, i) => {
+    const d = decimasDeKm(t.hastaKm);
+    if (d === null) porTramo[i] = `Los kilómetros van de 0.1 a ${MAX_KM}, con un decimal.`;
+    else if (anterior !== null && d <= anterior) porTramo[i] = "Cada tramo llega más lejos que el anterior.";
+    else if (!COSTO.test(t.costo.trim())) porTramo[i] = "El costo va de $0 a $9,999.99.";
+    if (d !== null) anterior = d;
+  });
+  let general: string | null = null;
+  if (e.tramos.length > MAX_TRAMOS) general = `Puedes tener hasta ${MAX_TRAMOS} tramos.`;
+  else if (e.cobro === "DISTANCIA" && e.tramos.length === 0) general = "Agrega al menos un tramo.";
+  else if (e.cobro === "DISTANCIA" && !e.punto) general = "Marca en el mapa dónde está tu sucursal.";
+  return { general, porTramo };
+}
+
+/** ¿Cambió algo del envío? Los tramos se comparan como se escribieron (sin espacios). */
+export function hayCambiosDeEnvio(a: EnvioSucursal, b: EnvioSucursal): boolean {
+  const t = (x: EnvioSucursal) => x.tramos.map((r) => `${r.hastaKm.trim()}|${r.costo.trim()}`).join(",");
+  return a.cobro !== b.cobro || t(a) !== t(b) || a.punto?.lat !== b.punto?.lat || a.punto?.lng !== b.punto?.lng;
+}
+
 export type SucursalTienda = {
   id: string; nombre: string; telefono: string; activa: boolean;
-  participa: boolean; recoger: boolean; domicilio: boolean; horario: Horario; zonasActivas: number;
+  participa: boolean; recoger: boolean; domicilio: boolean; horario: Horario;
+  /** Zonas de envío activas que eligen los clientes: sin contar las de los tramos por distancia. */
+  zonasActivas: number;
+  envio: EnvioSucursal;
   /** La cuenta de Mercado Pago elegida para cobrar aquí en línea; null = la única activa del negocio. */
   conexionId: string | null;
 };
@@ -121,7 +171,9 @@ export function revisar(d: {
     if (!s.recoger && !s.domicilio) bloquea(`${s.nombre}: elige si ofrece recoger, domicilio o ambos.`);
     if (Object.keys(s.horario).length === 0) bloquea(`${s.nombre}: ponle horario.`);
     if (s.telefono.trim() === "") bloquea(`${s.nombre}: le falta teléfono.`, { href: "/configuracion/sucursales", etiqueta: "Ir a sucursales" });
-    if (s.domicilio && s.zonasActivas === 0) {
+    if (s.domicilio && s.envio.cobro === "DISTANCIA" && (s.envio.tramos.length === 0 || !s.envio.punto)) {
+      bloquea(`${s.nombre}: para domicilio por distancia faltan los tramos o el punto de la sucursal.`);
+    } else if (s.domicilio && s.envio.cobro === "ZONAS" && s.zonasActivas === 0) {
       bloquea(`${s.nombre}: para domicilio necesita al menos una zona de envío.`, { href: "/configuracion/envios", etiqueta: "Ir a zonas de envío" });
     }
     if (!s.activa) bloquea(`${s.nombre} está inactiva.`);

@@ -39,16 +39,26 @@ function payload(d: ZonaInput) {
   };
 }
 
+/**
+ * Las zonas que el dueño administra aquí. Las de los tramos del envío por distancia de la tienda
+ * (0185) no salen: las crea y las cambia «Tienda en línea → Envío a domicilio», y tocarlas aquí
+ * desarmaría esos tramos. (El POS sí las enseña: sirven para un pedido por teléfono.)
+ */
 export async function listarZonas(sucursalId: string): Promise<Zona[]> {
-  const { data, error } = await supabase
-    .from("zonas_envio")
-    .select("id, sucursal_id, nombre, costo_mxn, orden, activa")
-    .eq("sucursal_id", sucursalId)
-    .is("deleted_at", null)
-    .order("orden", { ascending: true })
-    .order("nombre", { ascending: true });
+  const [{ data, error }, tienda] = await Promise.all([
+    supabase
+      .from("zonas_envio")
+      .select("id, sucursal_id, nombre, costo_mxn, orden, activa")
+      .eq("sucursal_id", sucursalId)
+      .is("deleted_at", null)
+      .order("orden", { ascending: true })
+      .order("nombre", { ascending: true }),
+    supabase.from("tienda_sucursales").select("tramos_envio").eq("sucursal_id", sucursalId).maybeSingle(),
+  ]);
   if (error) throw new Error(error.message);
-  return ((data ?? []) as Record<string, unknown>[]).map((z) => ({
+  const tramos = (tienda.data as { tramos_envio?: unknown } | null)?.tramos_envio;
+  const deTramos = new Set((Array.isArray(tramos) ? tramos : []).map((t) => String((t as { zona_id?: unknown } | null)?.zona_id ?? "")));
+  return ((data ?? []) as Record<string, unknown>[]).filter((z) => !deTramos.has(String(z.id))).map((z) => ({
     id: String(z.id),
     sucursalId: String(z.sucursal_id),
     nombre: S(z.nombre),
