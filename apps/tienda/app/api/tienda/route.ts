@@ -65,7 +65,7 @@ async function leerCuerpoAcotado(req: Request): Promise<string | null> {
 }
 
 // `punto`: el pin del cliente a domicilio «Por distancia» (0185). Lo valida la función; el envío lo calcula la base.
-const DE_CARRITO = ["accion", "negocio", "sucursal_id", "modo", "zona_id", "items", "punto"] as const;
+const DE_CARRITO = ["accion", "negocio", "sucursal_id", "modo", "zona_id", "items", "punto", "colonia_id"] as const;
 const DE_PEDIDO = [...DE_CARRITO, "cliente", "direccion", "pago", "paga_con", "propina_pct", "propina_mxn", "tarjeta", "nota", "captcha", "total_esperado", "clave"] as const;
 const DE_DIRECCION = ["calle", "numero_exterior", "numero_interior", "colonia", "codigo_postal", "ciudad", "estado", "referencias"] as const;
 
@@ -118,7 +118,7 @@ export async function POST(req: Request): Promise<Response> {
   // `verificacion` es lo mismo durante el reto del banco (3D Secure): el código y, si el cliente
   // abandona el reto, `cancelar: true` escrito tal cual. Lo que diga la página del reto no pasa de aquí.
   const deSeguimiento = accion === "seguimiento" || accion === "confirmar_pago" || accion === "verificacion";
-  if (!deCuenta && accion !== "cotizar" && accion !== "pedir" && accion !== "intento" && !deSeguimiento) return rechazo("ACCION_INVALIDA");
+  if (!deCuenta && accion !== "cotizar" && accion !== "colonias" && accion !== "pedir" && accion !== "intento" && !deSeguimiento) return rechazo("ACCION_INVALIDA");
   if (typeof negocio !== "string" || !FORMA_SLUG.test(negocio)) return rechazo("NEGOCIO_INVALIDO");
 
   // La cookie del negocio DEL CUERPO, nunca la de otro; y solo para lo que usa sesión (cotizar,
@@ -140,6 +140,9 @@ export async function POST(req: Request): Promise<Response> {
     // ¿Ya hay pedido para esta clave de intento? Solo viaja la clave.
     if (typeof cuerpo.clave !== "string" || !FORMA_CODIGO.test(cuerpo.clave)) return rechazo("CUERPO_INVALIDO");
     limpio = { accion, negocio, clave: cuerpo.clave };
+  } else if (accion === "colonias") {
+    // El autocompletado del domicilio: solo la sucursal y el texto; la función valida la forma.
+    limpio = solo(cuerpo, ["accion", "negocio", "sucursal_id", "q"]);
   } else if (deSeguimiento) {
     if (typeof cuerpo.codigo !== "string" || !FORMA_CODIGO.test(cuerpo.codigo)) return rechazo("CODIGO_INVALIDO");
     limpio = { accion, negocio, codigo: cuerpo.codigo, ...(accion === "verificacion" && cuerpo.cancelar === true && { cancelar: true }) };

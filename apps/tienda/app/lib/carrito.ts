@@ -247,6 +247,8 @@ export type CuerpoCarrito = {
   sucursal_id: string; modo: Modo; zona_id: string | null; items: ItemDeCuerpo[];
   /** Solo a domicilio «Por distancia» (0185): el pin del cliente. Con él la base calcula el envío. */
   punto?: Punto;
+  /** Solo a domicilio: la colonia del catálogo que eligió el cliente. La base saca de ella la zona del envío. */
+  colonia_id?: string;
 };
 
 /**

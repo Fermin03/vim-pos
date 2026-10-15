@@ -18,7 +18,7 @@ test("ip: ausente, vacía, basura o gigante es «desconocida»", () => {
 
 // ── Los cupos de cada acción (diseño §10) ───────────────────────────────────────────────────────
 test("cupos: leer es 120 cada 600 s por IP, sin nada después del antirobot, y deja pasar si el control falla", () => {
-  for (const accion of ["negocio", "menu", "cotizar"] as const) {
+  for (const accion of ["negocio", "menu", "colonias", "cotizar"] as const) {
     assert.deepEqual(cuposDe(accion, "1.2.3.4", "knockout"), {
       antes: [{ clave: "tienda:lee:ip:1.2.3.4", ventanaSeg: 600, max: 120 }],
       despuesDelCaptcha: [],

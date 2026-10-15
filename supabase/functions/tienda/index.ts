@@ -2,7 +2,7 @@
 //
 //   POST /functions/v1/tienda     x-vim-tienda: <VIM_TIENDA_SECRET>     x-tienda-ip: <IP del cliente>
 //                                 x-tienda-sesion: <token de sesión>    (opcional; solo cuentas y `pedir`)
-//   { accion: "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" | "verificacion" | "intento"
+//   { accion: "negocio" | "menu" | "colonias" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" | "verificacion" | "intento"
 //           | "registrar" | "entrar" | "salir" | "recuperar_pedir" | "recuperar_aplicar" | "cuenta"
 //           | "cuenta_guardar" | "cuenta_password" | "direccion_guardar" | "direccion_borrar"
 //           | "mis_pedidos" | "eliminar_cuenta", negocio: <slug>, … }
@@ -154,7 +154,7 @@ import { anotarRechazo, avisoDePagoPausado, claveDeFreno, ipSinPagoEnLinea, pago
 const MAX_CUERPO = 32_768;
 
 type Admin = ReturnType<typeof clienteAdmin>;
-type PeticionDeCuenta = Exclude<Peticion, { accion: "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" | "verificacion" | "intento" }>;
+type PeticionDeCuenta = Exclude<Peticion, { accion: "negocio" | "menu" | "colonias" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" | "verificacion" | "intento" }>;
 
 /**
  * El correo que confirma un pedido: después de responder, y pase lo que pase el pedido ya existe.
@@ -633,9 +633,9 @@ async function atender(req: Request): Promise<Response> {
     return json({ pago: sigue ? { estado: "VERIFICACION", ...(reto.url && { url: reto.url }) } : { estado: "POR_CONFIRMAR" } });
   }
 
-  if (p.accion !== "menu" && p.accion !== "cotizar" && p.accion !== "pedir") return cuentas(p, { admin, negocio, ip, sesion, cupos });
+  if (p.accion !== "menu" && p.accion !== "colonias" && p.accion !== "cotizar" && p.accion !== "pedir") return cuentas(p, { admin, negocio, ip, sesion, cupos });
 
-  // menu, cotizar y pedir: la sucursal tiene que ser una de las que la tienda enseña.
+  // menu, colonias, cotizar y pedir: la sucursal tiene que ser una de las que la tienda enseña.
   const p_sucursal = p.sucursal_id.toLowerCase();
   if (!negocio.sucursales.includes(p_sucursal)) return json({ error: "TIENDA_NO_DISPONIBLE" }, 404);
 
@@ -644,9 +644,15 @@ async function atender(req: Request): Promise<Response> {
     return menu.error ? rechazo("tienda_menu", menu.error) : json(menu.data);
   }
 
+  // Las colonias de la sucursal que se parecen al texto: [{ id, nombre, codigo_postal, con_zona }]. Sin zona_id.
+  if (p.accion === "colonias") {
+    const r = await admin.rpc("tienda_colonias", { p_tenant, p_sucursal, p_q: p.q });
+    return r.error ? rechazo("tienda_colonias", r.error) : json(r.data);
+  }
+
   // El pin (0185) solo si vino: sin él, la llamada es, argumento por argumento, la de antes. El envío
   // por distancia lo calcula la base con este punto; ningún importe del cliente cuenta.
-  const carrito = { p_tenant, p_sucursal, p_modo: p.modo, p_zona: p.zona_id, p_items: p.items, ...(p.punto && { p_punto: p.punto }) };
+  const carrito = { p_tenant, p_sucursal, p_modo: p.modo, p_zona: p.zona_id, p_items: p.items, ...(p.punto && { p_punto: p.punto }), ...(p.colonia_id && { p_colonia: p.colonia_id }) };
 
   if (p.accion === "cotizar") {
     const q = await admin.rpc("tienda_cotizar", carrito);

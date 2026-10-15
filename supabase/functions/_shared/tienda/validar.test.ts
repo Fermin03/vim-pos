@@ -548,3 +548,25 @@ test("punto: viaja en cotizar y pedir a domicilio; al recoger no se manda; mal f
   const conEnvio = leerCuerpo({ ...pedir, punto: p, envio_mxn: "0.00", distancia_km: "0.1" });
   assert.ok(conEnvio.ok && !("envio_mxn" in conEnvio.valor) && !("distancia_km" in conEnvio.valor));
 });
+
+const COL = "99999999-0000-0000-0000-0000000000cc";
+test("colonias: lee sucursal y texto recortado; más de 60 o menos de 2 se rechaza", () => {
+  assert.deepEqual(leerCuerpo({ accion: "colonias", negocio: "knockout", sucursal_id: SUC, q: " san jo " }),
+    { ok: true, valor: { accion: "colonias", negocio: "knockout", sucursal_id: SUC, q: "san jo" } });
+  assert.deepEqual(leerCuerpo({ accion: "colonias", negocio: "knockout", sucursal_id: SUC, q: "s" }), { ok: false, error: "COLONIA_INVALIDA" });
+  assert.deepEqual(leerCuerpo({ accion: "colonias", negocio: "knockout", sucursal_id: SUC, q: "x".repeat(61) }), { ok: false, error: "COLONIA_INVALIDA" });
+  assert.deepEqual(leerCuerpo({ accion: "colonias", negocio: "knockout", sucursal_id: SUC }), { ok: false, error: "COLONIA_INVALIDA" });
+  assert.deepEqual(leerCuerpo({ accion: "colonias", negocio: "knockout", sucursal_id: "x", q: "san" }), { ok: false, error: "SUCURSAL_INVALIDA" });
+});
+test("colonia_id: uuid o null en cotizar y pedir; a recoger se descarta; otra cosa es DIRECCION_INVALIDA", () => {
+  const dom = { ...cotizar, modo: "DOMICILIO" };
+  const r = leerCuerpo({ ...dom, colonia_id: COL });
+  assert.ok(r.ok && r.valor.accion === "cotizar" && r.valor.colonia_id === COL);
+  const sin = leerCuerpo(dom);
+  assert.ok(sin.ok && sin.valor.accion === "cotizar" && sin.valor.colonia_id === null);
+  assert.deepEqual(leerCuerpo({ ...dom, colonia_id: "nope" }), { ok: false, error: "DIRECCION_INVALIDA" });
+  const rec = leerCuerpo({ ...cotizar, colonia_id: COL });
+  assert.ok(rec.ok && rec.valor.accion === "cotizar" && rec.valor.colonia_id === null);
+  const ped = leerCuerpo({ ...pedir, colonia_id: COL });
+  assert.ok(ped.ok && ped.valor.accion === "pedir" && ped.valor.colonia_id === (pedir.modo === "DOMICILIO" ? COL : null));
+});

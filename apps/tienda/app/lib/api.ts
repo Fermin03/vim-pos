@@ -2,8 +2,8 @@
 // Nunca lanza: cada llamada devuelve `ok` con los datos ya validados, o `error` con un código (para
 // `textoDeError`) y su detalle. Un 200 que no tiene la forma del contrato es un error, no datos.
 import {
-  cotizacionDe, cuentaDe, direccionesDe, errorDe, FORMA_CODIGO, miCuentaDe, okDe, pedidoDe, pedidosDe, registroDe, seguimientoDe, verificacionDe,
-  type Cotizacion, type Cuenta, type DireccionGuardada, type MiCuenta, type Pago, type PedidoCreado, type PedidoDeCuenta, type Registro, type Seguimiento, type Verificacion,
+  coloniasDe, cotizacionDe, cuentaDe, direccionesDe, errorDe, FORMA_CODIGO, miCuentaDe, okDe, pedidoDe, pedidosDe, registroDe, seguimientoDe, verificacionDe,
+  type ColoniaSugerida, type Cotizacion, type Cuenta, type DireccionGuardada, type MiCuenta, type Pago, type PedidoCreado, type PedidoDeCuenta, type Registro, type Seguimiento, type Verificacion,
 } from "./contrato";
 import type { CuerpoCarrito } from "./carrito";
 import type { TarjetaDePedido } from "./tarjeta";
@@ -78,6 +78,11 @@ const LECTURA = { red: "SIN_CONEXION", ilegible: "SERVICIO_NO_DISPONIBLE" };
 /** El total que se va a cobrar. Se puede cotizar con la tienda cerrada. `signal` cancela una cotización que ya no interesa. */
 export function cotizar(negocio: string, carrito: CuerpoCarrito, signal?: AbortSignal): Promise<Resultado<Cotizacion>> {
   return llamar({ accion: "cotizar", negocio, ...carrito }, cotizacionDe, LECTURA, signal);
+}
+
+/** Las colonias de la sucursal que se parecen a `q` (2 a 60 letras), para sugerirlas al escribir el domicilio. */
+export function colonias(negocio: string, sucursalId: string, q: string, signal?: AbortSignal): Promise<Resultado<ColoniaSugerida[]>> {
+  return llamar({ accion: "colonias", negocio, sucursal_id: sucursalId, q }, coloniasDe, LECTURA, signal);
 }
 
 /** El estado del pedido. `PEDIDO_NO_ENCONTRADO` = enlace vencido o mal copiado. */

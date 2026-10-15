@@ -19,10 +19,14 @@ export type Punto = { lat: number; lng: number };
 export type Peticion =
   | { accion: "negocio"; negocio: string }
   | { accion: "menu"; negocio: string; sucursal_id: string }
+  /** Las colonias de la sucursal que se parecen a `q` (2–60 caracteres): el autocompletado del domicilio. */
+  | { accion: "colonias"; negocio: string; sucursal_id: string; q: string }
   | { accion: "cotizar"; negocio: string; sucursal_id: string; modo: Modo; zona_id: string | null; items: unknown[];
       /** Solo a domicilio en una sucursal «Por distancia»: el pin del cliente. El envío lo calcula la base. */
-      punto: Punto | null }
-  | { accion: "pedir"; negocio: string; sucursal_id: string; modo: Modo; zona_id: string | null; items: unknown[]; punto: Punto | null;
+      punto: Punto | null;
+      /** Solo a domicilio: la colonia del catálogo que eligió el cliente (la base le saca la zona). */
+      colonia_id: string | null }
+  | { accion: "pedir"; negocio: string; sucursal_id: string; modo: Modo; zona_id: string | null; items: unknown[]; punto: Punto | null; colonia_id: string | null;
       cliente: { nombre: string; telefono: string; email: string | null }; direccion: Direccion | null;
       pago: "EFECTIVO" | "TARJETA" | "EN_LINEA"; paga_con: string | null; nota: string | null; captcha: string | null;
       /** Solo con pago EN_LINEA: el porcentaje de propina que eligió el cliente. El monto lo calcula el servidor. */
@@ -62,7 +66,7 @@ export type Peticion =
   | { accion: "eliminar_cuenta"; negocio: string; password: string };
 
 const ACCIONES: ReadonlySet<string> = new Set<Peticion["accion"]>([
-  "negocio", "menu", "cotizar", "pedir", "seguimiento", "confirmar_pago", "verificacion", "intento", "registrar", "entrar", "salir", "recuperar_pedir", "recuperar_aplicar",
+  "negocio", "menu", "colonias", "cotizar", "pedir", "seguimiento", "confirmar_pago", "verificacion", "intento", "registrar", "entrar", "salir", "recuperar_pedir", "recuperar_aplicar",
   "cuenta", "cuenta_guardar", "cuenta_password", "direccion_guardar", "direccion_borrar", "mis_pedidos", "eliminar_cuenta",
 ]);
 
@@ -173,7 +177,7 @@ export function leerFecha(x: unknown, hoy: Date = new Date()): string | null | u
  * si la cuenta existe. Una contraseña que se va a COMPROBAR (entrar, la actual, eliminar) solo se
  * acota a 1 carácter–72 bytes: si es corta, que la rechace la base como cualquier otra equivocada.
  */
-function leerCuenta(accion: Exclude<Peticion["accion"], "negocio" | "menu" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" | "verificacion" | "intento">,
+function leerCuenta(accion: Exclude<Peticion["accion"], "negocio" | "menu" | "colonias" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" | "verificacion" | "intento">,
                     negocio: string, x: Record<string, unknown>): Resultado<Peticion> {
   const invalida = mal("CUENTA_INVALIDA_DATOS");
   switch (accion) {
@@ -233,7 +237,7 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
   const negocio = typeof x.negocio === "string" ? x.negocio.trim().toLowerCase() : "";
   if (!SLUG.test(negocio)) return mal("NEGOCIO_INVALIDO");
 
-  if (accion !== "negocio" && accion !== "menu" && accion !== "cotizar" && accion !== "pedir" && accion !== "seguimiento" && accion !== "confirmar_pago" && accion !== "verificacion" && accion !== "intento") {
+  if (accion !== "negocio" && accion !== "menu" && accion !== "colonias" && accion !== "cotizar" && accion !== "pedir" && accion !== "seguimiento" && accion !== "confirmar_pago" && accion !== "verificacion" && accion !== "intento") {
     return leerCuenta(accion, negocio, x);
   }
   if (accion === "negocio") return { ok: true, valor: { accion, negocio } };
@@ -251,6 +255,11 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
   if (!esUuid(x.sucursal_id)) return mal("SUCURSAL_INVALIDA");
   const sucursal_id = x.sucursal_id;
   if (accion === "menu") return { ok: true, valor: { accion, negocio, sucursal_id } };
+  if (accion === "colonias") {
+    // Menos de 2 letras no busca nada (la base también devuelve vacío): ni se pregunta.
+    const q = textoLimpio(x.q, 61);
+    return q !== null && Array.from(q).length >= 2 && Array.from(q).length <= 60 ? { ok: true, valor: { accion, negocio, sucursal_id, q } } : mal("COLONIA_INVALIDA");
+  }
 
   if (x.modo !== "RECOGER" && x.modo !== "DOMICILIO") return mal("MODO_INVALIDO");
   const modo: Modo = x.modo;
@@ -268,7 +277,11 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
   const punto = leerPunto(x.punto);
   if (punto === undefined) return mal("UBICACION_INVALIDA");
   const puntoDelModo = modo === "DOMICILIO" ? punto : null;
-  if (accion === "cotizar") return { ok: true, valor: { accion, negocio, sucursal_id, modo, zona_id, items, punto: puntoDelModo } };
+  // La colonia del catálogo: uuid o nada. Al recoger no hay domicilio, así que no se manda.
+  const coloniaCruda = x.colonia_id ?? null;
+  if (coloniaCruda !== null && !esUuid(coloniaCruda)) return mal("DIRECCION_INVALIDA");
+  const colonia_id = modo === "DOMICILIO" ? coloniaCruda : null;
+  if (accion === "cotizar") return { ok: true, valor: { accion, negocio, sucursal_id, modo, zona_id, items, punto: puntoDelModo, colonia_id } };
 
   // pedir
   if (!objeto(x.cliente)) return mal("CLIENTE_INVALIDO");
@@ -310,7 +323,7 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
   if (clave !== null && !esCodigo(clave)) return mal("CUERPO_INVALIDO");
 
   return { ok: true, valor: {
-    accion, negocio, sucursal_id, modo, zona_id, items, punto: puntoDelModo,
+    accion, negocio, sucursal_id, modo, zona_id, items, punto: puntoDelModo, colonia_id,
     cliente: { nombre, telefono, email }, direccion, pago: x.pago, paga_con, propina_pct, propina_mxn, tarjeta: tarjeta ?? null, total_esperado, clave,
     nota: textoLimpio(x.nota, 300), captcha: typeof x.captcha === "string" && x.captcha.length <= 4096 ? x.captcha : null,
   } };
