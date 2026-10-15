@@ -147,7 +147,7 @@ export function ModalClienteDomicilio({
 
   // Catálogo de colonias de la sucursal: si no hay (o falla), la colonia es texto libre como antes.
   const [hayCatalogo, setHayCatalogo] = useState(false);
-  const [avisoColonia, setAvisoColonia] = useState<string | null>(null);
+  const [avisoColonia, setAvisoColonia] = useState<{ texto: string; seguir: () => void } | null>(null);
   // Cambiar la zona ya asignada a una colonia pide PIN; `fin` entrega la autorización (null = canceló).
   const [pinColonia, setPinColonia] = useState<{ coloniaId: string; d: DireccionInput; fin: (id: string | null) => void } | null>(null);
   useEffect(() => {
@@ -155,7 +155,7 @@ export function ModalClienteDomicilio({
   }, [token, sucursalId]);
 
   /** Aplica `planColonia` al catálogo DESPUÉS de guardar el domicilio. Un fallo no frena el pedido. */
-  async function aplicarColonia(d: DireccionInput): Promise<void> {
+  async function aplicarColonia(d: DireccionInput): Promise<string | null> {
     const plan = planColonia(d, hayCatalogo);
     try {
       if (plan.tipo === "crear") await crearColonia(token, { tenantId, sucursalId, nombre: d.colonia, codigoPostal: null, zonaId: d.zona?.id ?? null });
@@ -166,10 +166,25 @@ export function ModalClienteDomicilio({
         // Sin PIN la zona vale solo para este pedido.
         if (pinId) await asignarZonaColonia(token, plan.coloniaId, d.zona!.id, pinId);
       }
+      return null;
     } catch (e) {
-      // El domicilio ya quedó guardado y el pedido sigue: el catálogo se arregla después, pero se dice.
-      setAvisoColonia(e instanceof Error ? e.message : "No se pudo actualizar el catálogo de colonias");
+      // El domicilio ya quedó guardado: quien llama muestra el aviso y deja "Continuar" (no guarda de nuevo).
+      return e instanceof Error ? e.message : "No se pudo actualizar el catálogo de colonias";
     }
+  }
+
+  /** Una colonia escrita igual a una del catálogo cuenta como elegida (CP y zona). Si la consulta falla, sigue como se escribió. */
+  async function resolverColonia(d: DireccionInput): Promise<DireccionInput> {
+    if (!hayCatalogo || d.coloniaCatalogo || !d.colonia.trim()) return d;
+    const hit = await coloniaExacta(token, sucursalId, d.colonia, zonas).catch(() => null);
+    return hit ? { ...d, coloniaCatalogo: hit, codigoPostal: hit.codigoPostal, zona: d.zona ?? hit.zona } : d;
+  }
+
+  /** Cierra el guardado: si el catálogo falló, avisa y espera "Continuar"; si no, selecciona. */
+  async function terminar(d: DireccionInput, seleccionar: () => void) {
+    const fallo = await aplicarColonia(d);
+    if (fallo) setAvisoColonia({ texto: fallo, seguir: seleccionar });
+    else seleccionar();
   }
 
   useEffect(() => {
@@ -198,9 +213,9 @@ export function ModalClienteDomicilio({
     if (v) { setError(v); return; }
     setGuardando(true);
     try {
-      const c = await registrarClienteDomicilio(token, { nombre, telefono, tenantId, sucursalId, dir });
-      await aplicarColonia(dir);
-      onSeleccionar(c);
+      const d = await resolverColonia(dir);
+      const c = await registrarClienteDomicilio(token, { nombre, telefono, tenantId, sucursalId, dir: d });
+      await terminar(d, () => onSeleccionar(c));
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo registrar");
       setGuardando(false);
@@ -214,9 +229,9 @@ export function ModalClienteDomicilio({
     if (v) { setError(v); return; }
     setGuardando(true);
     try {
-      const d = await agregarDireccionCliente(token, { clienteId: agregandoA.clienteId, tenantId, sucursalId, dir: dirNueva });
-      await aplicarColonia(dirNueva);
-      onSeleccionar(conDireccion({ ...agregandoA, direcciones: [...agregandoA.direcciones, d] }, d));
+      const dn = await resolverColonia(dirNueva);
+      const d = await agregarDireccionCliente(token, { clienteId: agregandoA.clienteId, tenantId, sucursalId, dir: dn });
+      await terminar(dn, () => onSeleccionar(conDireccion({ ...agregandoA, direcciones: [...agregandoA.direcciones, d] }, d)));
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo guardar la dirección");
       setGuardando(false);
@@ -286,7 +301,7 @@ export function ModalClienteDomicilio({
 
       {avisoColonia && (
         <div className="mb-3 rounded border border-warning-line bg-warning-soft px-3 py-2 text-13 font-medium text-warning" role="alert">
-          {avisoColonia}
+          {avisoColonia.texto}
         </div>
       )}
 
@@ -381,9 +396,16 @@ export function ModalClienteDomicilio({
           <button type="button" onClick={() => { setAgregandoA(null); setError(null); }} className="inline-flex items-center gap-1 text-13 font-medium text-ink-3 hover:text-ink-2"><Icono nombre="flecha-izquierda" className="h-4 w-4 flex-shrink-0" />Volver a la búsqueda</button>
         ) : <span />}
         <div className="flex items-center gap-2">
-          <Button variant="ghost" onClick={onCerrar}>Cancelar</Button>
-          {agregandoA && !zonaPendiente && <Button onClick={agregarDireccion} disabled={guardando}>{guardando ? "Guardando…" : "Guardar y usar"}</Button>}
-          {!agregandoA && !zonaPendiente && modo === "registrar" && <Button onClick={registrar} disabled={guardando}>{guardando ? "Guardando…" : "Registrar y usar"}</Button>}
+          {avisoColonia ? (
+            /* El domicilio ya está guardado: solo queda seguir con el pedido. */
+            <Button onClick={avisoColonia.seguir}>Continuar</Button>
+          ) : (
+            <>
+              <Button variant="ghost" onClick={onCerrar}>Cancelar</Button>
+              {agregandoA && !zonaPendiente && <Button onClick={agregarDireccion} disabled={guardando}>{guardando ? "Guardando…" : "Guardar y usar"}</Button>}
+              {!agregandoA && !zonaPendiente && modo === "registrar" && <Button onClick={registrar} disabled={guardando}>{guardando ? "Guardando…" : "Registrar y usar"}</Button>}
+            </>
+          )}
         </div>
       </div>
 

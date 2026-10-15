@@ -20,7 +20,7 @@ export function BuscadorColonia({ token, sucursalId, hayCatalogo, zonas, texto, 
   const ultima = useRef(0);
 
   useEffect(() => {
-    if (!hayCatalogo || !abierto || texto.trim().length < 2) { setRes([]); return; }
+    if (!hayCatalogo || !abierto || texto.trim().length < 2) { ultima.current++; setRes([]); return; }
     const n = ++ultima.current;
     const t = setTimeout(() => {
       buscarColonias(token, sucursalId, texto, zonas)
