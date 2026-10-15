@@ -6,7 +6,7 @@ import type { Resultado } from "../api";
 import { agregar, carritoNuevo, seleccionInicial, type Carrito, type CuerpoCarrito } from "../carrito";
 import { cotizacionDe, menuDe, negocioDe, type ColoniaSugerida, type Cotizacion, type Menu, type Negocio, type Sucursal } from "../contrato";
 import {
-  alternar, carritoPara, categoriaActiva, coloniaQueCoincide, cotizarConEspera, envioEnDatos, modosDe, motivoDeCierre, renglonesDelError, sucursalElegida, ultimaVigente,
+  alternar, carritoPara, categoriaActiva, coloniaContestada, coloniaQueCoincide, cotizarConEspera, envioEnDatos, modosDe, motivoDeCierre, renglonesDelError, sucursalElegida, ultimaVigente,
 } from "../pantalla";
 import { ID, cotizacionCruda, menuCrudo, negocioCrudo, u } from "./datos";
 
@@ -243,6 +243,13 @@ describe("envioEnDatos", () => {
     expect(envioEnDatos(con({ colonias: true, zonas: dosZonas }), null, null, "")).toBe("pendiente");
     expect(envioEnDatos(con({ colonias: true }), null, null, "   ")).toBe("pendiente");
     expect(envioEnDatos(con({ colonias: true }), null, null)).toBe("pendiente");
+  });
+  it("lo escrito solo cuenta cuando el catálogo ya contestó: sin buscar, en vuelo o sin respuesta es pendiente", () => {
+    const zonas = con({ colonias: true });
+    for (const b of [null, "en_vuelo", "fallo", "sin_respuesta"] as const) {
+      expect(envioEnDatos(zonas, null, null, coloniaContestada(b, "Centro")), String(b)).toBe("pendiente");
+    }
+    expect(envioEnDatos(zonas, null, null, coloniaContestada("lista", "Centro"))).toBe("sin_cobertura");
   });
 });
 

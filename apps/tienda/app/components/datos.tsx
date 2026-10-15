@@ -41,7 +41,7 @@ import { LIMITES_DE_CUENTA, direccionEnUnaLinea, enlaceDeAcceso, formularioDeDir
 import { formatoMxn } from "../lib/dinero";
 import { enviarPedido, envioDeLaPagina, intentoDelNegocio, pruebaQueNoHuboCobro, resolverDuda, type Desenlace, type ResultadoDeEnvio } from "../lib/envio";
 import { formasDePago, leerOtroMonto, propinaDe, totalAPagar, type Propina as Porcentaje, type PropinaElegida } from "../lib/pago";
-import { coloniaQueCoincide, envioEnDatos, ultimaVigente } from "../lib/pantalla";
+import { coloniaContestada, coloniaQueCoincide, envioEnDatos, ultimaVigente, type BusquedaDeColonia } from "../lib/pantalla";
 import { accionDe, avanzar, pasoDelDesenlace, pasosDe, type Paso } from "../lib/pasos";
 import { BOTON_OTRA_FORMA, finDeLaPausa, guardarPausa, leerPausa, lineaDePausa, textoDePausa } from "../lib/pausa";
 import { textoDeRechazo, type CampoDeTarjeta } from "../lib/tarjeta";
@@ -178,16 +178,17 @@ export function PasoDeDatos({
   const enviando = useEnviando();
   const guardadas = cuenta?.direcciones ?? [];
   const elegida = guardadas.find((d) => d.id === direccion);
-  /**
-   * La búsqueda de la colonia de una dirección ya escrita (guardada o recordada; ver `buscarColonia`):
-   * `en_vuelo` mientras no contesta, `lista` cuando ya dijo si está en el catálogo. Escribir encima la suelta (null).
-   */
-  const [busqueda, setBusqueda] = useState<"en_vuelo" | "lista" | null>(null);
+  /** La búsqueda en el catálogo de la colonia escrita (ver `buscarColonia` y `BusquedaDeColonia`). */
+  const [busqueda, setBusqueda] = useState<BusquedaDeColonia>(null);
+  /** La colonia elegida salió de tocar una sugerencia (no de una búsqueda por lo escrito). */
+  const [deSugerencia, setDeSugerencia] = useState(false);
+  /** La colonia escrita (la de la dirección guardada, o la del campo) y su CP. */
+  const textoDeColonia = elegida?.colonia ?? f.colonia, cpDeColonia = elegida?.codigo_postal ?? f.codigoPostal;
   /**
    * Qué decide el envío aquí (lib/pantalla.ts): la colonia del catálogo, el mapa, o, «Por zonas», que
    * esa colonia no tiene cobertura o que todavía no hay colonia. La zona nunca la elige el cliente (0187 §6).
    */
-  const envio = aDomicilio ? envioEnDatos(sucursal, cotizacion, colonia, busqueda === "en_vuelo" ? "" : elegida?.colonia ?? f.colonia) : null;
+  const envio = aDomicilio ? envioEnDatos(sucursal, cotizacion, colonia, coloniaContestada(busqueda, textoDeColonia)) : null;
   /** A domicilio en una sucursal que cobra el envío por distancia: sin un pin dentro del área no se sigue. */
   const distancia = envio === "mapa" && sucursal.envio.cobro === "DISTANCIA" ? sucursal.envio : null;
   const puntoDelPedido = distancia ? punto : null;
@@ -239,11 +240,12 @@ export function PasoDeDatos({
   const pin = distancia ? estadoDelPin({ sucursal: distancia.punto, tramos: distancia.tramos, pin: punto, enVivo: null, cotizacion: null }) : null;
   const faltaUbicacion = distancia !== null && (!pin || pin.fuera);
   /**
-   * «Por zonas» sin cobertura en esa colonia (0187 §6): se dice, y se ofrece recoger, cuando ya no
-   * se está escribiendo: una sugerencia elegida, una dirección guardada, la búsqueda que ya contestó
-   * o el campo que se dejó. Mientras escribe no se le avisa a cada letra.
+   * «Por zonas» sin cobertura en esa colonia (0187 §6): una sugerencia elegida sin zona, o lo escrito
+   * que el catálogo ya contestó que no está. Sin esa respuesta es «pendiente», nunca esto.
    */
-  const sinCobertura = envio === "sin_cobertura" && (!!colonia || !!elegida || busqueda === "lista" || tocados.has("colonia"));
+  const sinCobertura = envio === "sin_cobertura";
+  /** El servidor rechazó la colonia por no tener cobertura (se marca en el campo, lib/envio.ts). */
+  const coberturaRechazada = !!rechazo.colonia?.startsWith(textoDeError("SIN_COBERTURA").texto);
 
   /**
    * La colonia del catálogo que es exactamente la de una dirección ya escrita (guardada en la cuenta,
@@ -251,27 +253,31 @@ export function PasoDeDatos({
    * cliente la vuelva a elegir. Solo vale la última búsqueda: TODO lo que cambia el texto de la colonia
    * (escribir, elegir una sugerencia, cambiar de dirección, «Olvidar mis datos») la descarta con `soltarColonia`.
    * `escrita`: la tecleó aquí. Si coincide, queda como si hubiera tocado la sugerencia (nombre del
-   * catálogo y su CP, si aún no escribió uno).
+   * catálogo y su CP, si aún no escribió uno). `reintento`: si este segundo intento tampoco contesta,
+   * ya no se insiste (`sin_respuesta`): el pedido sale sin colonia y el servidor decide.
    */
   const [vigencia] = useState(ultimaVigente);
   /** Descarta la búsqueda en vuelo y, si había, la colonia elegida. */
-  const soltarColonia = () => { vigencia.descartar(); setBusqueda(null); alCambiarColonia(null); };
-  const buscarColonia = (nombre: string, cp: string, escrita = false) => {
+  const soltarColonia = () => { vigencia.descartar(); setBusqueda(null); setDeSugerencia(false); alCambiarColonia(null); };
+  const buscarColonia = (nombre: string, cp: string, escrita = false, reintento = false) => {
     const vigente = vigencia.pedir();
+    setDeSugerencia(false);
     alCambiarColonia(null);
     if (!sucursal.colonias || nombre.trim().length < 2) { setBusqueda("lista"); return; }
     setBusqueda("en_vuelo");
     void colonias(negocio.slug, sucursal.id, nombre.trim()).then((r) => {
       if (!vigente()) return;
-      // Sin respuesta no se sabe si está en el catálogo: no se avisa «sin cobertura» (el servidor decide al enviar).
-      setBusqueda(r.ok ? "lista" : null);
+      // Sin respuesta no se sabe si está en el catálogo: no se avisa «sin cobertura»; «Continuar» reintenta una vez.
+      setBusqueda(r.ok ? "lista" : reintento ? "sin_respuesta" : "fallo");
       const c = r.ok ? coloniaQueCoincide(r.datos, nombre, cp) : null;
       if (c && escrita) setF((a) => ({ ...a, colonia: c.nombre, ...(c.codigo_postal && !a.codigoPostal.trim() && { codigoPostal: c.codigo_postal }) }));
       if (r.ok) alCambiarColonia(c);
     });
   };
-  /** La colonia tecleada, sin sugerencia elegida, todavía no se buscó en el catálogo. */
-  const coloniaSinBuscar = aDomicilio && sucursal.colonias && !elegida && !colonia && busqueda === null && f.colonia.trim().length > 0;
+  /** Hay colonia escrita, sin sugerencia elegida, que el catálogo todavía no contestó (sin buscar, o la búsqueda falló). */
+  const coloniaPorBuscar = aDomicilio && sucursal.colonias && !colonia && (busqueda === null || busqueda === "fallo") && textoDeColonia.trim().length > 0;
+  /** Busca la colonia escrita: la de la dirección guardada, o la tecleada (que se llena como una sugerencia). */
+  const buscarLaEscrita = () => buscarColonia(textoDeColonia, cpDeColonia, !elegida, busqueda === "fallo");
 
   /** Las formas de pago que no son en línea: lo que se ofrece con el pago en línea en pausa. */
   const otrasFormas = formas.filter((p) => p !== "EN_LINEA");
@@ -378,8 +384,9 @@ export function PasoDeDatos({
       maxLength={LIMITES[c]}
       alCambiar={(v) => {
         setF((a) => ({ ...a, [c]: v })); setRechazo((r) => ({ ...r, [c]: undefined }));
-        // Una búsqueda de colonia en vuelo comparaba con el CP de antes: ya no vale.
-        if (c === "codigoPostal") vigencia.descartar();
+        // Otro CP: la colonia hallada por lo escrito (o la búsqueda en vuelo) comparaba con el de antes y
+        // ya no vale; se vuelve a buscar al salir de la colonia o con «Continuar». Una sugerencia tocada se queda.
+        if (c === "codigoPostal" && !deSugerencia) soltarColonia();
       }}
       alSalir={() => setTocados((t) => new Set(t).add(c))} {...extra} />
   );
@@ -614,7 +621,9 @@ export function PasoDeDatos({
     // Por distancia, sin un pin dentro del área no hay envío que cobrar: a «Tu ubicación».
     if (faltaUbicacion) { setUbicacionTocada(true); irA("datos", `${id}-ubicacion`); return; }
     // La colonia tecleada aún no se busca en el catálogo (Enter sin salir del campo): se busca y se espera.
-    if (coloniaSinBuscar) { setTocados((t) => new Set(t).add("colonia")); buscarColonia(f.colonia, f.codigoPostal, true); return; }
+    // La colonia escrita aún no la contestó el catálogo (Enter sin salir del campo, o la búsqueda falló):
+    // se busca (o se reintenta, una vez) y se espera. Si tampoco contesta, sigue y el servidor decide.
+    if (coloniaPorBuscar) { setTocados((t) => new Set(t).add("colonia")); buscarLaEscrita(); return; }
     // Con la búsqueda en vuelo todavía no se sabe qué envío toca: no se manda nada (contesta en un momento).
     if (aDomicilio && busqueda === "en_vuelo") return;
     // «Por zonas» y la colonia no tiene cobertura: se dice (si aún no) y el foco va al aviso.
@@ -803,7 +812,7 @@ export function PasoDeDatos({
                           alSalir={() => {
                             setTocados((t) => new Set(t).add("colonia"));
                             // Tecleada sin tocar la sugerencia: se busca igual que una dirección guardada.
-                            if (coloniaSinBuscar) buscarColonia(f.colonia, f.codigoPostal, true);
+                            if (coloniaPorBuscar && busqueda === null) buscarLaEscrita();
                           }}
                           alEscribir={(v) => {
                             setF((a) => ({ ...a, colonia: v })); setRechazo((r) => ({ ...r, colonia: undefined }));
@@ -811,7 +820,7 @@ export function PasoDeDatos({
                             soltarColonia();
                           }}
                           alElegir={(c) => {
-                            vigencia.descartar(); setBusqueda(null);
+                            vigencia.descartar(); setBusqueda(null); setDeSugerencia(true);
                             setF((a) => ({ ...a, colonia: c.nombre, ...(c.codigo_postal && { codigoPostal: c.codigo_postal }) }));
                             setRechazo((r) => ({ ...r, colonia: undefined, codigoPostal: undefined }));
                             alCambiarColonia(c);
@@ -839,10 +848,11 @@ export function PasoDeDatos({
                     </>
                   )}
                   {/* «Por zonas» y esa colonia no tiene envío: no hay zona que elegir (0187 §6), se ofrece recoger. */}
-                  {sinCobertura && (
+                  {/* También cuando lo dijo el servidor (SIN_COBERTURA marcado en la colonia): ahí el texto ya está en el campo. */}
+                  {(sinCobertura || coberturaRechazada) && (
                     <div id={`${id}-cobertura`} tabIndex={-1} className="flex flex-col gap-3 outline-none">
                       {/* TEXTO PROVISIONAL (James). */}
-                      <Aviso tono="warning" role="status" className="!text-14">{textoDeError("SIN_COBERTURA").texto}</Aviso>
+                      {sinCobertura && <Aviso tono="warning" role="status" className="!text-14">{textoDeError("SIN_COBERTURA").texto}</Aviso>}
                       {sucursal.recoger && (
                         // TEXTO PROVISIONAL (James).
                         <button type="button" onClick={() => alCambiarModo("RECOGER")} disabled={ocupado} className={cn(botonClases({ variant: "ghost" }), "h-12 self-start")}>

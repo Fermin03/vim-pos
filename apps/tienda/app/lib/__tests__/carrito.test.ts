@@ -294,6 +294,11 @@ describe("guardado en el teléfono", () => {
     expect(leerCarrito("knockout", a, AHORA + 24 * HORA + 1)).toBeNull();
     expect(a.m.size).toBe(0);
   });
+  it("uno guardado antes de quitar la zona (con `zonaId`) se sigue leyendo", () => {
+    const a = almacen();
+    a.setItem(claveDeCarrito("knockout"), JSON.stringify({ ...c, zonaId: "x", guardado: AHORA }));
+    expect(leerCarrito("knockout", a, AHORA)?.renglones).toEqual(c.renglones);
+  });
   it("uno guardado «en el futuro» (reloj movido) tampoco vale", () => {
     const a = almacen();
     guardarCarrito("knockout", c, a, AHORA + 2 * HORA);

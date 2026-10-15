@@ -114,14 +114,23 @@ export function rangoDeEnvio(tramos: { costo_mxn: string }[]): string | null {
 }
 
 /**
+ * La búsqueda en el catálogo de la colonia escrita en «Tus datos»: null = no se ha buscado (o se
+ * escribió encima), `en_vuelo`, `lista` (contestó, esté o no), `fallo` (no contestó; «Continuar»
+ * reintenta una vez) y `sin_respuesta` (tampoco al reintentar: el servidor decide al enviar).
+ */
+export type BusquedaDeColonia = "en_vuelo" | "lista" | "fallo" | "sin_respuesta" | null;
+/** La colonia escrita que cuenta para el envío: solo la que el catálogo ya contestó; si no, "" (pendiente). */
+export const coloniaContestada = (busqueda: BusquedaDeColonia, texto: string): string => busqueda === "lista" ? texto : "";
+
+/**
  * Qué enseña «Tus datos», a domicilio, sobre el envío (catálogo de colonias, 0187):
  *  · `colonia`: la colonia elegida tiene zona y ella fija el envío, cobre como cobre la sucursal. Lo
  *    dice la cotización; mientras llega, la sugerencia elegida (`con_zona`).
  *  · `mapa`: «Por distancia» y la colonia no decide: el pin de siempre.
  *  · `sin_cobertura`: «Por zonas» y la colonia (elegida sin zona, o escrita y fuera del catálogo) no
  *    tiene envío. La zona nunca la elige el cliente (0187 §6): ahí no se entrega.
- *  · `pendiente`: «Por zonas» sin colonia todavía. `coloniaEscrita` llega vacía mientras se busca
- *    la de una dirección ya escrita, para no avisar «sin cobertura» antes de saberlo.
+ *  · `pendiente`: «Por zonas» sin colonia todavía. `coloniaEscrita` llega vacía mientras el catálogo
+ *    no contesta por ella (`coloniaContestada`), para no avisar «sin cobertura» antes de saberlo.
  */
 export function envioEnDatos(
   sucursal: Sucursal, cotizacion: Cotizacion | null, colonia: ColoniaSugerida | null, coloniaEscrita = "",
