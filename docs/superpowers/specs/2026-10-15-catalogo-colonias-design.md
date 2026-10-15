@@ -74,7 +74,7 @@ la sugiere y la zona sale sola.
 | `codigo_postal` | varchar(5) NULL | NULL en las capturadas sin CP |
 | `zona_envio_id` | uuid NULL → `zonas_envio` | NULL = sin zona |
 | `origen` | text CHECK IN ('SEPOMEX','CAPTURADA') | |
-| `nombre_busqueda` | text GENERATED | `f_unaccent(lower(btrim(nombre)))`, como `clientes.nombre_completo_busqueda` |
+| `nombre_busqueda` | text GENERATED | `lower(f_unaccent(btrim(nombre)))` (el Postgres de la caja usa locale C y `lower()` no baja la «É») |
 | `created_at`, `updated_at`, `deleted_at` | | borrado suave |
 
 - Única entre vivas: `(sucursal_id, nombre_busqueda, coalesce(codigo_postal,''))`. Hay colonias
@@ -97,7 +97,7 @@ SECURITY DEFINER con guarda de tenant; solo quien administra la sucursal.
    existen (misma llave única). No revive colonias borradas.
 3. **Herencia de zona:** a cada colonia **sin zona** le pone la zona más usada en
    `direcciones_cliente` vivas de clientes del tenant cuyas direcciones tienen zona de esa
-   sucursal, comparando `f_unaccent(lower(btrim(colonia)))` con `nombre_busqueda`. Si la colonia
+   sucursal, comparando `lower(f_unaccent(btrim(colonia)))` con `nombre_busqueda` (misma llave; `lower()` va afuera porque con locale C no baja la «É»). Si la colonia
    tiene homónimas con distinto CP, solo hereda la que coincide también por CP. Empate → la zona
    más reciente. Nunca pisa una zona ya asignada.
 4. Devuelve cuántas colonias insertó y cuántas heredaron zona (el admin lo enseña). Repetirlo es
@@ -156,7 +156,9 @@ En `modal-cliente-domicilio.tsx` el campo **Colonia** pasa a ser un buscador (co
   pedido.
 - **Domicilios guardados sin zona** (flujo de hoy, `:179-199`): si su colonia está en el catálogo
   con zona, la toman sola (`fijarZonaDireccion`) y no se le pregunta al cajero.
-- El CP del domicilio sale de la colonia; el «00000» queda solo para colonias capturadas sin CP.
+- El CP del domicilio es el de la colonia; sin él, el de la sucursal; «00000» solo si tampoco hay.
+- Una colonia escrita igual que una del catálogo cuenta como elegida.
+- Si falla actualizar el catálogo, el modal se queda abierto con el aviso y un botón «Continuar».
 - Si la sucursal no tiene colonias en el catálogo, el campo se comporta como hoy (texto libre).
 
 ## 5. Admin
@@ -178,7 +180,7 @@ Configuración → Envíos (`apps/admin/app/(panel)/configuracion/envios/page.ts
 - **Colonia** sugiere desde el catálogo de la sucursal y llena el CP. Escribir una que no está se
   permite (texto libre, como hoy) pero **no** la agrega al catálogo.
 - La búsqueda pasa por la función pública `tienda` (nueva acción `colonias`: slug, sucursal, q;
-  devuelve nombre, CP, id y si tiene zona — **sin** precio ni id de zona). La tabla no se abre a
+  devuelve nombre, CP, id y si tiene zona — **sin** precio ni id de zona). La cotización pública solo dice `por_colonia` (sí/no), nunca la zona ni el precio por colonia. La tabla no se abre a
   `anon`.
 - **Regla del envío** (decisión de Fermín), en `tienda_cotizar` y `crear_ticket_desde_tienda`, en
   este orden:
@@ -191,6 +193,7 @@ Configuración → Envíos (`apps/admin/app/(panel)/configuracion/envios/page.ts
   En la práctica, 2 y 3 son «lo que la sucursal ya hace según su modo de cobro»: una sucursal «Por
   zonas» no tiene tramos utilizables. El selector de zona, cuando la sucursal tiene catálogo, pasa
   del carrito a «Tus datos», después de la colonia.
+- Cuando la colonia decide el envío, el pedido guarda el nombre y el CP del catálogo.
 - El servidor resuelve la zona desde `colonia_id`; nunca confía en una zona mandada por el
   navegador cuando hay colonia con zona. Esto cierra el truco de elegir una zona más barata.
 - `components/entrega.tsx` oculta el selector de zona cuando la colonia ya la decide y muestra

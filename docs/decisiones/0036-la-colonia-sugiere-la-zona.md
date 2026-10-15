@@ -31,7 +31,7 @@ el CP del catálogo. La cotización pública solo expone `por_colonia: boolean`,
 
 Es como lo resuelve Soft Restaurant y quita la memoria del cajero. SEPOMEX vive solo en la nube porque
 son ~145 mil filas que la caja no necesita y no deben viajar en el instalador. Las colonias sí viajan
-en los dos sentidos con huella libreta, igual que `zonas_envio`.
+en los dos sentidos con el mismo mecanismo de sincronización que las zonas.
 
 ## Alternativas descartadas
 
@@ -45,7 +45,7 @@ en los dos sentidos con huella libreta, igual que `zonas_envio`.
 - Cambiar la zona de una colonia **no toca domicilios viejos**; vale para domicilios nuevos o al
   volver a elegir la colonia.
 - Entre caja y panel **gana el último que escribe**, como en las zonas.
-- Una **caja vieja** sigue con texto libre y sube sus colonias sin las columnas que no conoce.
+- Una **caja vieja** no recibe colonias ni las sube; sigue con texto libre y el selector de zona de hoy.
 - Llave normalizada `lower(f_unaccent(btrim(x)))` (no `f_unaccent(lower(...))`): el Postgres embebido
   corre con locale C y `lower` no baja acentos. El push a la nube **fusiona** colonias que chocan
   por llave.
