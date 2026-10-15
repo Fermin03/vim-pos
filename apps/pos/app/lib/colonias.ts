@@ -33,7 +33,7 @@ function mapear(f: Fila, vigentes: ZonaEnvio[]): Colonia {
 }
 
 /** `%` y `_` del texto se buscan tal cual, no como comodines. */
-const escaparLike = (t: string) => t.replace(/[\%_]/g, (m) => `\${m}`);
+export const escaparLike = (t: string) => t.replace(/[\\%_]/g, (m) => `\\${m}`);
 
 export async function hayColonias(token: string, sucursalId: string): Promise<boolean> {
   const { count, error } = await employeeClient(token).from("colonias")

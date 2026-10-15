@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { etiquetaColonia, normalizarColonia, ordenarSugerencias, type Colonia } from "../colonias";
+import { escaparLike, etiquetaColonia, normalizarColonia, ordenarSugerencias, type Colonia } from "../colonias";
 
 const c = (nombre: string, codigoPostal: string | null = null): Colonia => ({ id: nombre + codigoPostal, nombre, codigoPostal, zona: null });
 
@@ -17,6 +17,12 @@ describe("ordenarSugerencias", () => {
     const r = ordenarSugerencias(lista, "san ju");
     expect(r.slice(0, 2).map((x) => x.nombre)).toEqual(["San Juan Bosco", "San Juan de Abajo"]);
     expect(r).toHaveLength(8);
+  });
+});
+
+describe("escaparLike", () => {
+  it("antepone una diagonal a %, _ y \\ para buscarlos tal cual", () => {
+    expect(escaparLike("50%_a\\b")).toBe("50\\%\\_a\\\\b");
   });
 });
 
