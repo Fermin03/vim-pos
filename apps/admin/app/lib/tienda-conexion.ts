@@ -17,7 +17,7 @@ const CLIENT_ID = process.env.NEXT_PUBLIC_MP_TIENDA_CLIENT_ID ?? "";
 const CLAVE_STATE = "vimpos.mp.tienda.state";
 /** El `state` de la tienda empieza así: con eso el regreso sabe a qué producto pertenece la autorización. */
 const PREFIJO = "tienda.";
-export const REGRESO_TIENDA = "/tienda?conectada=1";
+export const REGRESO_TIENDA = "/tienda/pedidos?conectada=1";
 
 export type ConexionTienda = { id: string; cuenta_nombre: string | null; de_prueba: boolean; estado: "ACTIVA" | "ERROR" | "DESCONECTADA"; ultimo_error: string | null };
 
