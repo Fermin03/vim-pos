@@ -263,7 +263,7 @@ BEGIN
            p_nota => NULL, p_seguimiento_hash => md5('dist-ok') || md5('dist-ok2'), p_total_esperado => 155.00,
            p_punto => '{"lat":21.1365512,"lng":-101.6824,"extra":1}');
   SELECT * INTO v_ped FROM delivery_pedidos WHERE id = (v_r ->> 'pedido_id')::uuid;
-  IF v_ped.envio_mxn <> 35 OR v_ped.total_cliente_mxn <> 155 OR v_ped.zona_envio_id <> v_z5 OR v_ped.envio_distancia_km <> 2.1
+  IF v_ped.envio_mxn <> 35 OR v_ped.total_cliente_mxn <> 155 OR v_ped.zona_envio_id <> v_z5 OR v_ped.envio_distancia_km IS DISTINCT FROM 2.1
      OR v_ped.direccion <> (v_dir || '{"lat":21.136551,"lng":-101.682400,"referencias":"A 2.1 km · portón verde"}'::jsonb) THEN
     RAISE EXCEPTION '8: el pedido: envío %, total %, zona % (esperaba %), distancia %, dirección %',
       v_ped.envio_mxn, v_ped.total_cliente_mxn, v_ped.zona_envio_id, v_z5, v_ped.envio_distancia_km, v_ped.direccion;
@@ -299,7 +299,7 @@ BEGIN
   UPDATE delivery_pedidos SET recibido_at = now() - interval '31 days', estado = 'ENTREGADO' WHERE id = v_ped.id;
   PERFORM delivery_anonimizar_pedidos_viejos(30);
   SELECT * INTO v_ped FROM delivery_pedidos WHERE id = v_ped.id;
-  IF v_ped.direccion IS NOT NULL OR v_ped.envio_distancia_km <> 2.1 THEN
+  IF v_ped.direccion IS NOT NULL OR v_ped.envio_distancia_km IS DISTINCT FROM 2.1 THEN
     RAISE EXCEPTION '10: la purga debía borrar la dirección (con el punto) y conservar la distancia: %, %', v_ped.direccion, v_ped.envio_distancia_km;
   END IF;
 
