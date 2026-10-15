@@ -539,3 +539,589 @@ $$;
 REVOKE EXECUTE ON FUNCTION sync_push_snapshot(uuid, jsonb) FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION sync_push_snapshot(uuid, jsonb) TO service_role;
 
+-- ── §6 tienda ────────────────────────────────────────────────────────────────
+-- A domicilio, una colonia viva de la sucursal con zona viva, activa y no de tramo decide el envío:
+-- esa zona y su precio, se ignoran la zona y el punto que mande el navegador, y `cobro` = 'COLONIA'.
+-- Si no, exactamente lo de antes según tienda_sucursales.cobro_envio.
+
+-- La zona que una colonia le da a la tienda: viva, activa, de la sucursal y no de un tramo.
+CREATE OR REPLACE FUNCTION _tienda_zona_de_colonia(p_tenant uuid, p_sucursal uuid, p_colonia uuid)
+RETURNS TABLE (zona_id uuid, costo_mxn numeric)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT z.id, z.costo_mxn
+    FROM colonias c
+    JOIN zonas_envio z ON z.id = c.zona_envio_id
+   WHERE c.id = p_colonia AND c.tenant_id = p_tenant AND c.sucursal_id = p_sucursal AND c.deleted_at IS NULL
+     AND z.sucursal_id = p_sucursal AND z.activa AND z.deleted_at IS NULL
+     AND NOT EXISTS (SELECT 1 FROM tienda_sucursales ts
+                      WHERE ts.sucursal_id = p_sucursal
+                        AND ts.tramos_envio @> jsonb_build_array(jsonb_build_object('zona_id', z.id::text)));
+$$;
+REVOKE ALL ON FUNCTION _tienda_zona_de_colonia(uuid, uuid, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION _tienda_zona_de_colonia(uuid, uuid, uuid) TO service_role;
+
+-- Sugerencias para el formulario de la tienda. Sin precio ni id de zona: solo si tiene.
+-- De 2 a 60 caracteres; `%` y `_` se buscan tal cual. Normaliza igual que colonias.nombre_busqueda.
+CREATE OR REPLACE FUNCTION tienda_colonias(p_tenant uuid, p_sucursal uuid, p_q text)
+RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  WITH q AS (SELECT lower(f_unaccent(btrim(coalesce(p_q, '')))) AS t),
+       l AS (SELECT t, replace(replace(replace(t, '\', '\\'), '%', '\%'), '_', '\_') AS esc FROM q)
+  SELECT coalesce(jsonb_agg(jsonb_build_object('id', x.id, 'nombre', x.nombre, 'codigo_postal', x.codigo_postal,
+                                               'con_zona', x.con_zona) ORDER BY x.empieza DESC, x.nombre), '[]'::jsonb)
+    FROM (SELECT c.id, btrim(c.nombre) AS nombre, c.codigo_postal,   -- la tabla guarda el nombre como se escribió
+                 c.nombre_busqueda LIKE l.esc || '%' AS empieza,
+                 EXISTS (SELECT 1 FROM _tienda_zona_de_colonia(p_tenant, p_sucursal, c.id)) AS con_zona
+            FROM colonias c, l
+           WHERE c.tenant_id = p_tenant AND c.sucursal_id = p_sucursal AND c.deleted_at IS NULL
+             AND char_length(l.t) BETWEEN 2 AND 60
+             AND c.nombre_busqueda LIKE '%' || l.esc || '%'
+           ORDER BY empieza DESC, nombre
+           LIMIT 8) x;
+$$;
+REVOKE ALL ON FUNCTION tienda_colonias(uuid, uuid, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION tienda_colonias(uuid, uuid, text) TO service_role;
+
+-- tienda_cotizar: cuerpo copiado ÍNTEGRO de 0185 §5. Cambios marcados «-- 0187:»: parámetro nuevo
+-- p_colonia (al final, NULL por omisión) y, a domicilio, la colonia con zona decide el envío.
+-- La firma cambia: la anterior se borra (con dos, PostgREST no sabría a cuál llamar).
+DROP FUNCTION IF EXISTS tienda_cotizar(uuid, uuid, text, uuid, jsonb, jsonb);   -- 0187: la firma de 0185
+CREATE OR REPLACE FUNCTION tienda_cotizar(p_tenant uuid, p_sucursal uuid, p_modo text, p_zona uuid, p_items jsonb,
+                                          p_punto jsonb DEFAULT NULL,
+                                          p_colonia uuid DEFAULT NULL)   -- 0187: la colonia del catálogo, si eligió una
+RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  c_uuid       CONSTANT text := '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
+  -- Más lejos que esto (en calles) un punto no es un cliente de la sucursal: es basura o un error.
+  -- Holgado sobre el tramo más largo que se puede configurar (50 km).
+  c_alcance_km CONSTANT numeric := 80;
+  v_menu       jsonb;
+  v_r          jsonb;            -- un renglón del carrito
+  v_pid        text;
+  v_p          jsonb;            -- su producto, como lo enseña el menú
+  v_cant       integer;
+  v_precio     numeric(12,2);    -- precio unitario del renglón (en un combo: base + elecciones)
+  v_total      numeric(12,2);    -- lo que el ticket cobrará por el renglón (un combo: padre + hijos)
+  v_mods       jsonb;            -- sus modificadores normalizados (en un combo: las elecciones)
+  v_m          jsonb;
+  v_comps      jsonb;
+  v_comp       jsonb;
+  v_slot       jsonb;
+  v_op         jsonb;
+  v_n          integer;
+  v_items      jsonb := '[]'::jsonb;
+  v_renglones  jsonb := '[]'::jsonb;
+  v_subtotal   numeric(12,2) := 0;
+  v_envio      numeric(12,2) := 0;
+  v_envio_tot  numeric(12,2) := 0;
+  v_ts         tienda_sucursales%ROWTYPE;
+  v_suc        record;
+  v_tramos     jsonb;
+  v_punto      jsonb;
+  v_dist       numeric;
+  v_zona       uuid := p_zona;
+  v_cobro      text;             -- 0187: 'COLONIA' cuando la colonia decidió el envío
+  v_col        record;           -- 0187: la zona de la colonia
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM sucursales s WHERE s.id = p_sucursal AND s.tenant_id = p_tenant) THEN
+    RAISE EXCEPTION 'SUCURSAL_DE_OTRO_NEGOCIO: la sucursal % no es de este negocio', p_sucursal;
+  END IF;
+
+  IF p_modo = 'DOMICILIO' THEN
+    SELECT * INTO v_ts FROM tienda_sucursales ts WHERE ts.sucursal_id = p_sucursal AND ts.tenant_id = p_tenant;
+    -- 0187: la colonia con zona decide el envío, cobre como cobre la sucursal. La zona y el punto
+    -- que mande el navegador no cuentan (así no se elige una zona más barata).
+    SELECT * INTO v_col FROM _tienda_zona_de_colonia(p_tenant, p_sucursal, p_colonia);
+    IF v_col.zona_id IS NOT NULL THEN
+      v_zona := v_col.zona_id; v_envio := v_col.costo_mxn; v_cobro := 'COLONIA';
+    ELSIF v_ts.cobro_envio IS NOT DISTINCT FROM 'DISTANCIA' THEN   -- 0187: era IF
+      IF p_zona IS NOT NULL THEN
+        RAISE EXCEPTION 'ZONA_INVALIDA: con envío por distancia la zona la decide la ubicación';
+      END IF;
+      v_tramos := _tienda_tramos(p_sucursal);
+      SELECT s.geo_lat, s.geo_lng INTO v_suc FROM sucursales s WHERE s.id = p_sucursal;
+      IF v_tramos IS NULL OR v_suc.geo_lat IS NULL OR v_suc.geo_lng IS NULL THEN
+        RAISE EXCEPTION 'ZONA_INVALIDA: esta sucursal no tiene listo el envío por distancia';
+      END IF;
+      IF p_punto IS NOT NULL AND p_punto <> 'null'::jsonb THEN
+        v_punto := _tienda_punto(p_punto);
+        IF v_punto IS NOT NULL THEN
+          v_dist := _tienda_distancia_km(v_suc.geo_lat, v_suc.geo_lng, (v_punto ->> 'lat')::numeric, (v_punto ->> 'lng')::numeric);
+        END IF;
+        IF v_dist IS NULL OR v_dist > c_alcance_km THEN
+          RAISE EXCEPTION 'UBICACION_INVALIDA: la ubicación no es válida';
+        END IF;
+        -- El primer tramo que la alcanza. El borde cuenta: a 3.0 km exactos, el tramo «hasta 3 km».
+        SELECT (t ->> 'zona_id')::uuid, (t ->> 'costo_mxn')::numeric INTO v_zona, v_envio
+          FROM jsonb_array_elements(v_tramos) t
+         WHERE (t ->> 'hasta_km')::numeric >= v_dist
+         ORDER BY (t ->> 'hasta_km')::numeric
+         LIMIT 1;
+        IF NOT FOUND THEN RAISE EXCEPTION 'FUERA_DE_AREA: %', to_char(v_dist, 'FM99990.0'); END IF;
+      END IF;
+    ELSE
+      SELECT z.costo_mxn INTO v_envio
+        FROM zonas_envio z
+       WHERE z.id = p_zona AND z.tenant_id = p_tenant AND z.sucursal_id = p_sucursal
+         AND z.activa AND z.deleted_at IS NULL
+         AND NOT COALESCE(v_ts.tramos_envio, '[]'::jsonb) @> jsonb_build_array(jsonb_build_object('zona_id', z.id::text));
+      IF NOT FOUND THEN RAISE EXCEPTION 'ZONA_INVALIDA: a domicilio hace falta una zona activa de esta sucursal'; END IF;
+    END IF;
+  ELSIF p_modo = 'RECOGER' THEN
+    IF p_zona IS NOT NULL THEN RAISE EXCEPTION 'ZONA_INVALIDA: al recoger no hay zona de envío'; END IF;
+  ELSE
+    RAISE EXCEPTION 'MODO_INVALIDO: el modo es RECOGER o DOMICILIO';
+  END IF;
+
+  -- jsonb_array_length revienta con lo que no es arreglo: el CASE lo deja en NULL.
+  IF COALESCE(jsonb_array_length(CASE WHEN jsonb_typeof(p_items) = 'array' THEN p_items END), 0) NOT BETWEEN 1 AND 40 THEN
+    RAISE EXCEPTION 'CARRITO_INVALIDO: el carrito es un arreglo de 1 a 40 renglones';
+  END IF;
+
+  v_menu := tienda_menu(p_tenant, p_sucursal);
+
+  FOR v_r IN SELECT e.r FROM jsonb_array_elements(p_items) WITH ORDINALITY AS e(r, ord) ORDER BY e.ord LOOP
+    v_pid  := lower(v_r ->> 'producto_id');
+    v_cant := _tienda_entero(v_r -> 'cantidad', 1, 50);
+    IF jsonb_typeof(v_r) IS DISTINCT FROM 'object' OR jsonb_typeof(v_r -> 'producto_id') IS DISTINCT FROM 'string'
+       OR v_pid !~ c_uuid OR v_cant IS NULL THEN
+      RAISE EXCEPTION 'CARRITO_INVALIDO: cada renglón lleva producto_id y una cantidad entera de 1 a 50';
+    END IF;
+
+    -- Que esté en el menú y no agotado ES la regla de qué se vende (tienda_menu, reglas 1, 2, 6 y 8).
+    v_p := jsonb_path_query_first(v_menu, '$.categorias[*].productos[*] ? (@.id == $id)', jsonb_build_object('id', v_pid));
+    -- «IS NOT FALSE»: sin la clave `agotado` tampoco se vende.
+    IF v_p IS NULL OR (v_p ->> 'agotado')::boolean IS NOT FALSE THEN
+      RAISE EXCEPTION 'PRODUCTO_NO_DISPONIBLE: %', v_pid;
+    END IF;
+    v_precio := (v_p ->> 'precio_mxn')::numeric;
+
+    IF NOT (v_p ->> 'es_combo')::boolean THEN
+      IF COALESCE(v_r -> 'componentes', '[]'::jsonb) NOT IN ('[]'::jsonb, 'null'::jsonb) THEN
+        RAISE EXCEPTION 'CARRITO_INVALIDO: solo un combo lleva componentes';
+      END IF;
+      v_m := _tienda_modificadores(v_p -> 'grupos', v_r -> 'modificadores', v_cant);
+      IF v_m IS NULL THEN RAISE EXCEPTION 'MODIFICADORES_INVALIDOS: %', v_pid; END IF;
+      v_mods  := v_m -> 'normalizados';
+      v_total := _tienda_con_iva(ROUND(v_cant * v_precio, 2) + (v_m ->> 'monto')::numeric, v_pid::uuid, p_tenant);
+    ELSE
+      -- Un combo: el padre cobra base + elecciones (con el IVA del combo); cada hijo va a precio 0
+      -- y solo cobra sus propios modificadores (con el IVA del hijo). Anexo §4.
+      v_comps := COALESCE(NULLIF(v_r -> 'componentes', 'null'::jsonb), '[]'::jsonb);
+      IF COALESCE(v_r -> 'modificadores', '[]'::jsonb) NOT IN ('[]'::jsonb, 'null'::jsonb)
+         OR jsonb_typeof(v_comps) <> 'array' THEN
+        RAISE EXCEPTION 'COMBO_INVALIDO: %', v_pid;
+      END IF;
+      v_mods  := '[]'::jsonb;
+      v_total := 0;
+      FOR v_comp IN SELECT e.c FROM jsonb_array_elements(v_comps) WITH ORDINALITY AS e(c, ord) ORDER BY e.ord LOOP
+        v_slot := jsonb_path_query_first(v_p, '$.slots[*] ? (@.id == $id)',
+                                         jsonb_build_object('id', lower(v_comp ->> 'grupo_id')));
+        v_op   := jsonb_path_query_first(v_slot, '$.opciones[*] ? (@.producto_id == $id)',
+                                         jsonb_build_object('id', lower(v_comp ->> 'producto_id')));
+        v_n    := _tienda_entero(v_comp -> 'cantidad', 1, 999);   -- el tope de verdad es el máximo del slot
+        IF v_op IS NULL OR (v_op ->> 'agotado')::boolean IS NOT FALSE OR v_n IS NULL THEN
+          RAISE EXCEPTION 'COMBO_INVALIDO: %', v_pid;
+        END IF;
+        v_m := _tienda_modificadores(v_op -> 'grupos', v_comp -> 'modificadores', v_n * v_cant);
+        IF v_m IS NULL THEN RAISE EXCEPTION 'COMBO_INVALIDO: %', v_pid; END IF;
+
+        v_precio := v_precio + (v_op ->> 'precio_extra_mxn')::numeric * v_n;
+        v_total  := v_total + _tienda_con_iva((v_m ->> 'monto')::numeric, (v_op ->> 'producto_id')::uuid, p_tenant);
+        v_mods   := v_mods || jsonb_build_object(
+          'opcion_modificador_id', v_op ->> 'producto_id',   -- el PRODUCTO elegido (0161:218-234)
+          'grupo_id', v_slot ->> 'id',
+          'nombre_app', v_op ->> 'nombre',
+          'cantidad', v_n,                                     -- por unidad de combo
+          'precio_extra_mxn', v_op ->> 'precio_extra_mxn',
+          'modificadores', v_m -> 'normalizados');
+      END LOOP;
+      -- El mismo producto dos veces no se admite: el ticket empareja los modificadores de un hijo
+      -- por producto y no sabría a cuál van (0161, COMBO_ELECCION_AMBIGUA). Y cada slot, con su
+      -- mínimo y su máximo.
+      IF (SELECT count(*) <> count(DISTINCT m ->> 'opcion_modificador_id') FROM jsonb_array_elements(v_mods) m)
+         OR EXISTS (
+           SELECT 1 FROM jsonb_array_elements(v_p -> 'slots') s
+            CROSS JOIN LATERAL (SELECT COALESCE(sum((m ->> 'cantidad')::integer), 0) AS n
+                                  FROM jsonb_array_elements(v_mods) m
+                                 WHERE m ->> 'grupo_id' = s ->> 'id') x
+            WHERE x.n NOT BETWEEN (s ->> 'minimo')::integer AND (s ->> 'maximo')::integer) THEN
+        RAISE EXCEPTION 'COMBO_INVALIDO: %', v_pid;
+      END IF;
+      v_total := v_total + _tienda_con_iva(ROUND(v_cant * v_precio, 2), v_pid::uuid, p_tenant);
+    END IF;
+
+    -- Una elección de slot puede restar (precio_delta_mxn no tiene CHECK), pero el renglón no puede
+    -- quedar en negativo: ticket_items.precio_unitario_snapshot tiene CHECK >= 0.
+    IF v_precio < 0 THEN RAISE EXCEPTION 'PRECIO_INVALIDO: un precio unitario quedó en negativo'; END IF;
+
+    v_items := v_items || jsonb_build_object(
+      'producto_id', v_pid,
+      'nombre_app', v_p ->> 'nombre',
+      'cantidad', v_cant,
+      'precio_unitario_mxn', v_p ->> 'precio_mxn',   -- en un combo, la base: las elecciones suman aparte
+      -- Texto del público, última red (la función `tienda` ya lo limpia): los caracteres de control
+      -- se vuelven espacio antes de recortar. Va a la comanda y al ticket impreso.
+      'nota', CASE WHEN jsonb_typeof(v_r -> 'nota') = 'string'
+                   THEN NULLIF(left(btrim(regexp_replace(v_r ->> 'nota', '[[:cntrl:]]', ' ', 'g')), 200), '') END,
+      'alergenos', '[]'::jsonb,
+      'alergia_nota', NULL,
+      'modificadores', v_mods);
+    v_renglones := v_renglones || jsonb_build_object(
+      'nombre', v_p ->> 'nombre',
+      'cantidad', v_cant,
+      'detalle', (SELECT string_agg(m ->> 'nombre_app', ', ') FROM jsonb_array_elements(v_mods) m),
+      'total_mxn', to_char(v_total, 'FM999999990.00'));
+    v_subtotal := v_subtotal + v_total;
+  END LOOP;
+
+  -- El envío es un renglón más del ticket, de cantidad 1, con el IVA del PRIMER renglón del
+  -- carrito (fijar_envio_ticket, 0116:193-205). Una zona de $0 no deja renglón.
+  IF v_envio > 0 THEN
+    v_envio_tot := _tienda_con_iva(v_envio, lower(p_items -> 0 ->> 'producto_id')::uuid, p_tenant);
+  END IF;
+
+  RETURN jsonb_build_object(
+    'items', v_items,
+    'renglones', v_renglones,
+    'subtotal_mxn', to_char(v_subtotal, 'FM999999990.00'),
+    'envio_mxn', to_char(v_envio, 'FM999999990.00'),
+    'envio_total_mxn', to_char(v_envio_tot, 'FM999999990.00'),
+    'total_mxn', to_char(v_subtotal + v_envio_tot, 'FM999999990.00'),
+    'cobro', CASE WHEN p_modo = 'DOMICILIO' THEN COALESCE(v_cobro, v_ts.cobro_envio, 'ZONAS') END,   -- 0187: v_cobro
+    'distancia_km', to_char(v_dist, 'FM99990.0'),
+    'zona_id', CASE WHEN p_modo = 'DOMICILIO' THEN v_zona END);
+END;
+$$;
+REVOKE ALL ON FUNCTION tienda_cotizar(uuid, uuid, text, uuid, jsonb, jsonb, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION tienda_cotizar(uuid, uuid, text, uuid, jsonb, jsonb, uuid) TO service_role;
+
+-- tienda_crear_pedido: cuerpo copiado ÍNTEGRO de 0185 §6. Cambios marcados «-- 0187:»: parámetro
+-- nuevo p_colonia (al final, NULL por omisión), que va a la cotización. La zona del pedido sigue
+-- siendo la que dio la cotización (v_q ->> 'zona_id'), que ahora puede ser la de la colonia.
+DROP FUNCTION IF EXISTS tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric, jsonb);   -- 0187: la firma de 0185
+CREATE OR REPLACE FUNCTION tienda_crear_pedido(
+  p_tenant uuid, p_sucursal uuid, p_modo text, p_zona uuid, p_items jsonb,
+  p_cliente jsonb,          -- {nombre, telefono (10 dígitos), email | null}
+  p_direccion jsonb,        -- NULL al recoger; a domicilio {calle, numero_exterior, numero_interior?, colonia, codigo_postal, ciudad, estado, referencias?}
+  p_pago text,              -- 'EFECTIVO' | 'TARJETA' | 'EN_LINEA'
+  p_paga_con numeric,       -- NULL salvo EFECTIVO
+  p_nota text,
+  p_seguimiento_hash text,  -- SHA-256 en hex del código que solo conoce el cliente
+  p_cuenta uuid DEFAULT NULL,
+  p_total_esperado numeric DEFAULT NULL,
+  p_clave text DEFAULT NULL,  -- la llave del intento de compra: con ella, repetir devuelve el mismo pedido
+  p_propina_pct integer DEFAULT NULL,  -- solo EN_LINEA: 0, 10, 15 o 20. NULL = sin propina
+  p_propina_mxn numeric DEFAULT NULL,  -- solo EN_LINEA y sin p_propina_pct: la propina de «otro monto», en pesos
+  p_punto jsonb DEFAULT NULL,          -- solo a domicilio «Por distancia»: {lat, lng} del pin del cliente
+  p_colonia uuid DEFAULT NULL)         -- 0187: la colonia del catálogo; con zona, decide el envío
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_motivo text;
+  v_nombre text := btrim(p_cliente ->> 'nombre');
+  v_tel    text := p_cliente ->> 'telefono';
+  v_email  text := p_cliente ->> 'email';
+  v_cfg    tienda_config%ROWTYPE;
+  v_q      jsonb;
+  v_total  numeric(12,2);
+  v_dir    jsonb := NULLIF(p_direccion, 'null'::jsonb);
+  v_dir_ok boolean;
+  v_id_ext text := replace(gen_random_uuid()::text, '-', '');
+  v_ped    delivery_pedidos%ROWTYPE;
+  v_en_linea boolean := p_pago IS NOT DISTINCT FROM 'EN_LINEA';
+  v_conexion uuid;
+  v_propina  numeric(12,2) := 0;
+  v_por_distancia boolean;
+BEGIN
+  -- 0) El reintento. Va antes que todo: quien reintenta ya tiene su pedido, y da igual que desde
+  --    entonces la tienda haya cerrado, un precio haya cambiado o él haya llegado a su tope de
+  --    pedidos vivos. Se busca por huella Y negocio (el índice es único en toda la plataforma: la
+  --    huella de otro negocio no se devuelve). El candado pone en fila a dos envíos simultáneos
+  --    del mismo intento: el segundo espera a que el primero termine y aquí ya lo encuentra.
+  IF p_clave IS NOT NULL THEN
+    PERFORM pg_advisory_xact_lock(hashtextextended('tienda_clave:' || COALESCE(p_seguimiento_hash, ''), 0));
+    SELECT * INTO v_ped FROM delivery_pedidos d
+     WHERE d.seguimiento_hash = p_seguimiento_hash AND d.tenant_id = p_tenant AND d.canal = 'TIENDA';
+    IF FOUND THEN RETURN _tienda_pedido_creado(v_ped, true); END IF;
+  END IF;
+
+  -- 1) La sucursal es del negocio (antes que nada: no se contesta por la tienda de otro) y recibe
+  --    pedidos ahora en ese modo. Un modo que no existe sale por aquí como MODO_NO_DISPONIBLE.
+  IF NOT EXISTS (SELECT 1 FROM sucursales s WHERE s.id = p_sucursal AND s.tenant_id = p_tenant) THEN
+    RAISE EXCEPTION 'SUCURSAL_DE_OTRO_NEGOCIO: la sucursal % no es de este negocio', p_sucursal;
+  END IF;
+  v_motivo := tienda_estado_sucursal(p_sucursal, p_modo);
+  IF v_motivo IS NOT NULL THEN RAISE EXCEPTION 'TIENDA_CERRADA: %', v_motivo; END IF;
+
+  -- 2) El cliente. «IS NOT TRUE»: una clave ausente deja la condición en NULL, y NULL no es válido.
+  IF (char_length(v_nombre) BETWEEN 1 AND 100
+      AND v_tel ~ '^[0-9]{10}$'
+      AND (v_email IS NULL OR (char_length(v_email) <= 254 AND v_email ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'))) IS NOT TRUE THEN
+    RAISE EXCEPTION 'CLIENTE_INVALIDO: nombre de 1 a 100 caracteres, teléfono de 10 dígitos y correo válido o ausente';
+  END IF;
+
+  -- 3) La forma de pago, habilitada por el negocio. (tienda_estado_sucursal ya exigió la fila.)
+  --    En línea, además, la sucursal tiene que tener quién cobre AHORA (tienda_conexion_cobro).
+  SELECT * INTO v_cfg FROM tienda_config WHERE tenant_id = p_tenant;
+  IF v_en_linea THEN v_conexion := tienda_conexion_cobro(p_tenant, p_sucursal); END IF;
+  IF ((p_pago = 'EFECTIVO' AND v_cfg.pago_efectivo) OR (p_pago = 'TARJETA' AND v_cfg.pago_tarjeta)
+      OR (v_en_linea AND v_conexion IS NOT NULL)) IS NOT TRUE THEN
+    RAISE EXCEPTION 'PAGO_INVALIDO: esa forma de pago no está disponible';
+  END IF;
+  -- En línea el correo es obligatorio: Mercado Pago lo pide con el cobro, y ahí llega la confirmación.
+  IF v_en_linea AND v_email IS NULL THEN
+    RAISE EXCEPTION 'CLIENTE_INVALIDO: para pagar en línea hace falta el correo';
+  END IF;
+  IF p_propina_pct IS NOT NULL AND (NOT v_en_linea OR p_propina_pct NOT IN (0, 10, 15, 20)) THEN
+    RAISE EXCEPTION 'PAGO_INVALIDO: la propina va solo con el pago en línea y es de 0, 10, 15 o 20 por ciento';
+  END IF;
+  -- «Otro monto»: va en lugar del porcentaje (nunca los dos), solo en línea, mayor que cero y con
+  -- dos decimales a lo más. Contra el subtotal se mide en el paso 4, que es donde se conoce (y
+  -- ese tope también deja fuera NaN e infinito, que para numeric son mayores que todo).
+  IF p_propina_mxn IS NOT NULL AND (NOT v_en_linea OR p_propina_pct IS NOT NULL
+      OR (p_propina_mxn > 0 AND p_propina_mxn = round(p_propina_mxn, 2)) IS NOT TRUE) THEN
+    RAISE EXCEPTION 'PAGO_INVALIDO: la propina de otro monto va sola, solo con el pago en línea, mayor que cero y con dos decimales';
+  END IF;
+
+  -- 4) La cotización: valida el carrito y la zona, y pone los renglones y los importes. Sus errores
+  --    pasan tal cual. Y el total, si el cliente dijo cuál vio, tiene que seguir siendo ese.
+  --    La propina es un porcentaje de los PRODUCTOS (sin el envío) que calcula el servidor, o el
+  --    monto que escribió el cliente, de hasta ese subtotal; no entra en el total del pedido: va
+  --    aparte, como en el ticket.
+  v_q     := tienda_cotizar(p_tenant, p_sucursal, p_modo, p_zona, p_items, p_punto, p_colonia);   -- 0187: p_colonia
+  v_total := (v_q ->> 'total_mxn')::numeric;
+  -- «Por distancia», el envío sale de la ubicación: sin ella no hay a dónde ni cuánto.
+  v_por_distancia := p_modo = 'DOMICILIO' AND v_q ->> 'cobro' = 'DISTANCIA';
+  IF v_por_distancia AND v_q ->> 'distancia_km' IS NULL THEN
+    RAISE EXCEPTION 'UBICACION_INVALIDA: a domicilio hace falta tu ubicación';
+  END IF;
+  IF p_total_esperado IS NOT NULL AND p_total_esperado IS DISTINCT FROM v_total THEN
+    RAISE EXCEPTION 'TOTAL_CAMBIO: %', v_q ->> 'total_mxn';   -- el total de ahora, con dos decimales
+  END IF;
+  IF v_en_linea THEN
+    IF v_total <= 0 THEN RAISE EXCEPTION 'PAGO_INVALIDO: no hay nada que cobrar en línea'; END IF;
+    IF p_propina_mxn IS NOT NULL THEN
+      -- El tope lo pone el subtotal REAL de los productos (sin el envío), el de esta cotización.
+      IF p_propina_mxn > (v_q ->> 'subtotal_mxn')::numeric THEN
+        RAISE EXCEPTION 'PAGO_INVALIDO: la propina no puede ser mayor que el subtotal de los productos';
+      END IF;
+      v_propina := p_propina_mxn;
+    ELSE
+      v_propina := ROUND((v_q ->> 'subtotal_mxn')::numeric * COALESCE(p_propina_pct, 0) / 100, 2);
+    END IF;
+  END IF;
+
+  -- 5) «Paga con»: solo en efectivo, y entre el total y el total + 5000 (el tope también deja
+  --    fuera NaN e infinito, que para numeric son mayores que todo).
+  IF p_paga_con IS NOT NULL AND (p_pago <> 'EFECTIVO' OR p_paga_con < v_total OR p_paga_con > v_total + 5000) THEN
+    RAISE EXCEPTION 'PAGO_INVALIDO: «paga con» va solo en efectivo y entre el total y el total más 5000';
+  END IF;
+
+  -- 6) La dirección: a domicilio, completa y dentro de las longitudes de direcciones_cliente (que
+  --    es donde crear_ticket_desde_tienda la guardará); al recoger, ninguna. Se guarda recortada y
+  --    solo con estas claves: lo demás que mande el cliente no entra.
+  IF p_modo = 'DOMICILIO' THEN
+    SELECT bool_and(char_length(x.valor) BETWEEN k.minimo AND k.maximo),
+           jsonb_object_agg(k.clave, x.valor) FILTER (WHERE x.valor <> '')
+      INTO v_dir_ok, v_dir
+      FROM (VALUES ('calle', 1, 255), ('numero_exterior', 1, 20), ('numero_interior', 0, 20), ('colonia', 1, 150),
+                   ('codigo_postal', 5, 5), ('ciudad', 1, 100), ('estado', 1, 50), ('referencias', 0, 300)) AS k(clave, minimo, maximo)
+     CROSS JOIN LATERAL (SELECT btrim(COALESCE(v_dir ->> k.clave, ''))) AS x(valor);
+    IF (v_dir_ok AND v_dir ->> 'codigo_postal' ~ '^[0-9]{5}$') IS NOT TRUE THEN
+      RAISE EXCEPTION 'DIRECCION_INVALIDA: a domicilio hacen falta calle, número, colonia, código postal de 5 dígitos, ciudad y estado';
+    END IF;
+    -- «Por distancia»: el punto (dato personal: se purga con la dirección a los 30 días) y la
+    -- distancia al frente de las referencias, por donde la caja instalada ya la enseña e imprime.
+    -- Los dos los pone la base: el punto ya validado y la distancia que ella calculó.
+    IF v_por_distancia THEN
+      v_dir := v_dir || _tienda_punto(p_punto)
+               || jsonb_build_object('referencias', 'A ' || (v_q ->> 'distancia_km') || ' km' || COALESCE(' · ' || (v_dir ->> 'referencias'), ''));
+    END IF;
+  ELSIF v_dir IS NOT NULL THEN
+    RAISE EXCEPTION 'DIRECCION_INVALIDA: al recoger no hay dirección';
+  END IF;
+
+  -- 7) La huella del código de seguimiento. Repetida, la rechaza el índice único (0161 §1).
+  IF (p_seguimiento_hash ~ '^[0-9a-f]{64}$') IS NOT TRUE THEN
+    RAISE EXCEPTION 'SEGUIMIENTO_INVALIDO: la huella del seguimiento es un SHA-256 en hexadecimal';
+  END IF;
+
+  -- 8) La cuenta del cliente, si viene, es de este negocio y sigue viva. delivery_pedidos no tiene
+  --    llave foránea a tienda_cuentas (0161 §1): quien lo comprueba es esta función.
+  IF p_cuenta IS NOT NULL AND NOT EXISTS (SELECT 1 FROM tienda_cuentas c
+                                           WHERE c.id = p_cuenta AND c.tenant_id = p_tenant AND c.deleted_at IS NULL) THEN
+    RAISE EXCEPTION 'CUENTA_INVALIDA: la cuenta no existe en este negocio';
+  END IF;
+
+  -- 9) Cliente bloqueado o con 3 pedidos vivos: el MISMO error, letra por letra, para no revelar si
+  --    un teléfono existe o está bloqueado. Va AQUÍ, lo último antes de insertar y después de todas
+  --    las demás validaciones: si fuera antes, una petición inválida a propósito serviría para
+  --    preguntar por un teléfono sin llegar a crear nada. Quien llega hasta aquí, o crea un pedido o
+  --    recibe este error. El candado hace de uno en uno las altas de un mismo teléfono: sin él,
+  --    varias simultáneas contarían lo mismo y pasarían todas el tope.
+  --    «Vivo» tiene que decaer solo: con gestión NUBE nada mueve `estado` más allá de ACEPTADO (el
+  --    seguimiento lo deriva del ticket al leer, §5), así que sin esto tres pedidos aceptados
+  --    dejarían ese teléfono sin poder pedir para siempre. No cuenta el pedido de hace más de 6
+  --    horas ni el que ya tiene en la nube un ticket cobrado, facturado o cancelado.
+  --    El que espera la confirmación de su cobro (POR_PAGAR) cuenta: puede acabar siendo un pedido.
+  -- ponytail: el conteo no tiene índice propio; recorre los pedidos vivos (índice parcial de 0090),
+  -- que son pocos. Si un día pesa, un índice parcial por (tenant_id, cliente_telefono).
+  PERFORM pg_advisory_xact_lock(hashtextextended('tienda_pedido:' || p_tenant || ':' || v_tel, 0));
+  IF EXISTS (SELECT 1 FROM clientes c
+              WHERE c.id = lealtad_resolver_cliente(p_tenant, NULL, v_tel) AND c.estado = 'BLOQUEADO')
+     OR (SELECT count(*) FROM delivery_pedidos d
+          WHERE d.tenant_id = p_tenant AND d.canal = 'TIENDA' AND d.cliente_telefono = v_tel
+            AND d.estado IN ('POR_PAGAR', 'RECIBIDO', 'ACEPTADO', 'EN_PREPARACION', 'LISTO')
+            AND d.recibido_at > now() - interval '6 hours'
+            AND NOT EXISTS (SELECT 1 FROM tickets t
+                             WHERE t.id = d.ticket_id AND t.tenant_id = p_tenant
+                               AND t.estado_fiscal IN ('PAGADO', 'FACTURADO', 'CANCELADO'))) > 2 THEN
+    RAISE EXCEPTION 'NO_SE_PUDO_CREAR: no se pudo crear el pedido';
+  END IF;
+
+  -- 10) La fila. id_externo: 32 hex al azar ('tienda:' || id_externo cabe en el varchar(64) de
+  --    tickets.client_id_local) y único en toda la plataforma, como pide UNIQUE (app, id_externo).
+  --    En su propio bloque por la segunda red del reintento: si aun con el candado del paso 0 otra
+  --    transacción metió antes la misma huella (un llamador que no lee lo ya confirmado), con
+  --    p_clave se devuelve el pedido que ganó en vez del error. Cualquier otra violación de
+  --    unicidad —sin p_clave, o una huella que es de otro negocio— sale tal cual, como antes.
+  BEGIN
+    INSERT INTO delivery_pedidos (
+      tenant_id, sucursal_id, canal, app, conexion_id, estado, tipo_entrega, id_externo, folio_corto,
+      items, subtotal_mxn, envio_mxn, total_cliente_mxn, total_restaurante_mxn, efectivo_a_cobrar_mxn,
+      cliente_nombre, cliente_telefono, cliente_email, direccion, zona_envio_id,
+      pago_al_recibir, paga_con_mxn, propina_mxn, nota_cliente, seguimiento_hash, tienda_cuenta_id,
+      vence_aceptacion, gestion, payload_raw, envio_distancia_km)
+    VALUES (
+      p_tenant, p_sucursal, 'TIENDA',
+      (CASE p_modo WHEN 'DOMICILIO' THEN 'DELIVERY_PROPIO' ELSE 'DRIVE_THRU' END)::modo_servicio,
+      NULL, CASE WHEN v_en_linea THEN 'POR_PAGAR' ELSE 'RECIBIDO' END,
+      CASE p_modo WHEN 'DOMICILIO' THEN 'RESTAURANTE_REPARTE' ELSE 'RECOGE_CLIENTE' END,
+      v_id_ext, 'T' || upper(left(v_id_ext, 5)),
+      v_q -> 'items', (v_q ->> 'subtotal_mxn')::numeric,
+      (v_q ->> 'envio_mxn')::numeric,   -- el costo de la zona, no el total con IVA: así lo espera el ticket
+      v_total, v_total, CASE p_pago WHEN 'EFECTIVO' THEN v_total ELSE 0 END,
+      v_nombre, v_tel, v_email, v_dir, (v_q ->> 'zona_id')::uuid,
+      p_pago, p_paga_con, CASE WHEN v_en_linea THEN v_propina END,
+      NULLIF(left(btrim(p_nota), 300), ''), p_seguimiento_hash, p_cuenta,
+      -- En línea no corre ninguna ventana hasta que se paga.
+      CASE WHEN v_en_linea THEN NULL ELSE now() + make_interval(mins => v_cfg.minutos_aceptacion) END,
+      -- Misma regla que los pedidos de apps (procesar-uber.ts): con una caja instalada viva, el
+      -- ticket lo crea la caja. (En línea se vuelve a decidir al aprobarse el cobro.)
+      CASE WHEN sucursal_con_espejo(p_sucursal) THEN 'ESCRITORIO' ELSE 'NUBE' END,
+      '{}'::jsonb,                      -- nada del cuerpo crudo: ni IP, ni token, ni sesión
+      CASE WHEN v_por_distancia THEN (v_q ->> 'distancia_km')::numeric END)
+    RETURNING * INTO v_ped;
+  EXCEPTION WHEN unique_violation THEN
+    IF p_clave IS NOT NULL THEN
+      SELECT * INTO v_ped FROM delivery_pedidos d
+       WHERE d.seguimiento_hash = p_seguimiento_hash AND d.tenant_id = p_tenant AND d.canal = 'TIENDA';
+      IF FOUND THEN RETURN _tienda_pedido_creado(v_ped, true); END IF;
+    END IF;
+    RAISE;
+  END;
+
+  -- El cobro que se va a hacer enseguida: total + propina, a la cuenta que cobra. `vence_at` es
+  -- hasta cuándo se espera su resultado si Mercado Pago no contestó (lo normal es saberlo al instante).
+  IF v_en_linea THEN
+    INSERT INTO tienda_pagos (tenant_id, pedido_id, conexion_id, monto_mxn, propina_mxn, vence_at)
+    VALUES (p_tenant, v_ped.id, v_conexion, v_total + v_propina, v_propina, now() + interval '5 minutes');
+  END IF;
+
+  RETURN _tienda_pedido_creado(v_ped, false);
+END;
+$$;
+-- Los permisos son de la firma: la nueva nace con los de fábrica (EXECUTE para todos) y hay que
+-- dejarla como estaba la anterior (0185): solo service_role.
+REVOKE ALL ON FUNCTION tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric, jsonb, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric, jsonb, uuid) TO service_role;
+
+-- tienda_negocio: cuerpo copiado ÍNTEGRO de 0185 §4. Un cambio, marcado «-- 0187:»: cada sucursal
+-- dice si tiene catálogo de colonias (`colonias`).
+CREATE OR REPLACE FUNCTION tienda_negocio(p_slug text, p_ahora timestamptz DEFAULT now())
+RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_c  tienda_config%ROWTYPE;
+  v_t  record;
+  v_sucursales jsonb;
+BEGIN
+  SELECT * INTO v_c FROM tienda_config WHERE slug = lower(btrim(COALESCE(p_slug, '')));
+  IF NOT FOUND THEN RETURN NULL; END IF;
+
+  SELECT t.id, t.nombre_comercial INTO v_t
+    FROM tenants t
+   WHERE t.id = v_c.tenant_id AND t.deleted_at IS NULL AND t.estado IN ('ACTIVO', 'TRIAL', 'INTERNO')
+     AND (t.bloqueo_desde IS NULL OR t.bloqueo_desde > p_ahora);
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  IF COALESCE((modulos_efectivos(v_c.tenant_id) -> 'efectivos' ->> 'tienda')::boolean, false) IS NOT TRUE THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT COALESCE(jsonb_agg(jsonb_build_object(
+           'id', s.id,
+           'nombre', s.nombre,
+           'telefono', s.telefono,
+           'direccion', NULLIF(concat_ws(', ',
+                          NULLIF(concat_ws(' ', s.direccion_calle, s.direccion_numero), ''),
+                          s.direccion_colonia, s.ciudad), ''),
+           'recoger', ts.recoger,
+           'domicilio', ts.domicilio,
+           'horario', ts.horario,
+           'pago_en_linea', tienda_conexion_cobro(v_c.tenant_id, s.id) IS NOT NULL,
+           -- La public key de la cuenta que cobra ahí (no es secreta): con ella se tokeniza la tarjeta.
+           'public_key', (SELECT x.public_key FROM tienda_conexiones x WHERE x.id = tienda_conexion_cobro(v_c.tenant_id, s.id)),
+           'estado', jsonb_build_object(
+             'recoger',   tienda_estado_sucursal(s.id, 'RECOGER', p_ahora),
+             'domicilio', tienda_estado_sucursal(s.id, 'DOMICILIO', p_ahora)),
+           'envio', jsonb_build_object(
+             'cobro', ts.cobro_envio,
+             'tramos', CASE WHEN ts.cobro_envio = 'DISTANCIA' THEN COALESCE((
+               SELECT jsonb_agg(tr - 'zona_id') FROM jsonb_array_elements(_tienda_tramos(s.id)) tr), '[]'::jsonb)
+               ELSE '[]'::jsonb END,
+             'punto', CASE WHEN ts.cobro_envio = 'DISTANCIA' AND s.geo_lat IS NOT NULL AND s.geo_lng IS NOT NULL
+                           THEN jsonb_build_object('lat', s.geo_lat, 'lng', s.geo_lng) END),
+           -- 0187: si tiene catálogo de colonias (la tienda sugiere y la colonia puede decidir el envío).
+           'colonias', EXISTS (SELECT 1 FROM colonias c WHERE c.sucursal_id = s.id AND c.deleted_at IS NULL),
+           'zonas', CASE WHEN ts.cobro_envio = 'DISTANCIA' THEN '[]'::jsonb ELSE COALESCE((
+             SELECT jsonb_agg(jsonb_build_object('id', z.id, 'nombre', z.nombre, 'costo_mxn', z.costo_mxn::text)
+                              ORDER BY z.orden, z.nombre)
+               FROM zonas_envio z
+              WHERE z.sucursal_id = s.id AND z.tenant_id = v_c.tenant_id AND z.activa AND z.deleted_at IS NULL
+                AND NOT ts.tramos_envio @> jsonb_build_array(jsonb_build_object('zona_id', z.id::text))),
+             '[]'::jsonb) END)
+         ORDER BY s.nombre), '[]'::jsonb)
+    INTO v_sucursales
+    FROM tienda_sucursales ts
+    JOIN sucursales s ON s.id = ts.sucursal_id AND s.tenant_id = ts.tenant_id
+   WHERE ts.tenant_id = v_c.tenant_id AND ts.participa AND s.activa AND s.deleted_at IS NULL;
+
+  RETURN jsonb_build_object(
+    'tenant_id', v_c.tenant_id,
+    'publico', jsonb_build_object(
+      'slug', v_c.slug,
+      'nombre', v_t.nombre_comercial,
+      'logo_ruta', v_c.logo_ruta,
+      'color', v_c.color,
+      'descripcion', v_c.descripcion,
+      'pago_efectivo', v_c.pago_efectivo,
+      'pago_tarjeta', v_c.pago_tarjeta,
+      'pago_en_linea', v_c.pago_en_linea,
+      'pago_de_prueba', v_c.pago_de_prueba,
+      'sucursales', v_sucursales));
+END;
+$$;
+REVOKE ALL ON FUNCTION tienda_negocio(text, timestamptz) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION tienda_negocio(text, timestamptz) TO service_role;

@@ -25,6 +25,8 @@ DECLARE
   v_col uuid; v_e text; v_n int; v_r jsonb;
   v_cli uuid; v_suc_sin uuid; v_z_borrada uuid;
   v_super uuid := '99999999-0000-0000-0000-0000000000f1'; v_aut uuid; v_libre uuid; v_ajena uuid;
+  v_q jsonb; v_uno text; v_p120 uuid; v_cat uuid; v_aje uuid; v_cli_tienda jsonb; v_dir_tienda jsonb;
+  h_todo jsonb := '{"1":["00:00","00:00"],"2":["00:00","00:00"],"3":["00:00","00:00"],"4":["00:00","00:00"],"5":["00:00","00:00"],"6":["00:00","00:00"],"7":["00:00","00:00"]}';
 BEGIN
   PERFORM set_config('request.jwt.claims', NULL, true);
   UPDATE sucursales SET codigo_postal = '37000' WHERE id = v_suc;
@@ -220,6 +222,73 @@ BEGIN
   IF catalogo_version() IS NULL THEN RAISE EXCEPTION '6: catalogo_version'; END IF;
   -- El push termina en origin: las secciones siguientes necesitan sus disparadores.
   IF current_setting('session_replication_role') <> 'origin' THEN RAISE EXCEPTION '6: el rol de réplica quedó puesto'; END IF;
+
+  -- ── 7) Tienda ────────────────────────────────────────────────────────────
+  INSERT INTO configuracion_tenant (tenant_id) VALUES (v_t) ON CONFLICT (tenant_id) DO NOTHING;
+  INSERT INTO tenant_addons (tenant_id, addon_id, fecha_inicio, activo, precio_mensual_mxn)
+  VALUES (v_t, (SELECT id FROM addons WHERE codigo = 'TIENDA'), (now() AT TIME ZONE 'America/Mexico_City')::date, true, 100.00);
+  INSERT INTO tienda_config (tenant_id, slug, pago_efectivo, pago_tarjeta) VALUES (v_t, 'colonias-smoke', true, true);
+  UPDATE configuracion_tenant SET modulo_tienda_activo = true WHERE tenant_id = v_t;
+  UPDATE tienda_sucursales SET participa = true, recoger = true, domicilio = true, horario = h_todo,
+                               cobro_envio = 'ZONAS', tramos_envio = '[]' WHERE sucursal_id = v_suc;
+  UPDATE cajas SET espejo_turno_abierto_at = now(), espejo_apps_at = NULL WHERE sucursal_id = v_suc;
+  INSERT INTO categorias (tenant_id, nombre, orden_visualizacion) VALUES (v_t, 'Colonias smoke', 62) RETURNING id INTO v_cat;
+  INSERT INTO productos (tenant_id, categoria_id, nombre, precio_base_mxn) VALUES (v_t, v_cat, 'Sencilla colonias', 120) RETURNING id INTO v_p120;
+  UPDATE turnos SET estado = 'CERRADO', fecha_cierre = now() WHERE sucursal_id = v_suc AND estado = 'ABIERTO';
+  INSERT INTO turnos (tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable, usuario_apertura_id, fondo_inicial_mxn, fondo_modo)
+  VALUES (v_t, v_suc, '99999999-0000-0000-0000-0000000000cc', 'SMOKE-COL', (now() AT TIME ZONE 'America/Mexico_City')::date, v_maria, 500, 'TOTAL');
+  v_uno := format('[{"producto_id":"%s","cantidad":1}]', v_p120);
+  v_cli_tienda := '{"nombre":"Ana Colonia","telefono":"4775550187"}';
+  v_dir_tienda := '{"calle":"Av. Pedido","numero_exterior":"12","colonia":"San José","codigo_postal":"37000","ciudad":"León","estado":"Guanajuato"}';
+
+  -- 7a) búsqueda
+  v_r := tienda_colonias(v_t, v_suc, 'SAN jo');
+  IF jsonb_array_length(v_r) = 0 OR v_r -> 0 ->> 'nombre' <> 'San José' OR v_r::text LIKE '%' || v_z_centro || '%'
+     OR (v_r -> 0) ? 'zona_envio_id' THEN
+    RAISE EXCEPTION '7a: búsqueda: %', v_r;
+  END IF;
+  IF tienda_colonias(v_t, v_suc, 'a') <> '[]'::jsonb OR tienda_colonias(v_t, v_suc_o, 'san') <> '[]'::jsonb
+     OR tienda_colonias(v_t, v_suc, '%') <> '[]'::jsonb THEN
+    RAISE EXCEPTION '7a: una letra, otra sucursal o un comodín no debían traer nada';
+  END IF;
+  -- 7b) colonia con zona: manda, aunque el navegador mande otra zona.
+  v_q := tienda_cotizar(v_t, v_suc, 'DOMICILIO', v_z_norte, v_uno::jsonb, NULL, v_col);
+  IF v_q ->> 'cobro' <> 'COLONIA' OR v_q ->> 'envio_mxn' <> '25.00' OR (v_q ->> 'zona_id')::uuid <> v_z_centro THEN
+    RAISE EXCEPTION '7b: %', v_q - 'items' - 'renglones';
+  END IF;
+  -- 7c) colonia sin zona («Por zonas»): la zona elegida, como siempre. (La fusión del push de 6) le
+  -- dejó Norte a v_libre; se le quita para probar una colonia sin zona.)
+  UPDATE colonias SET zona_envio_id = NULL WHERE id = v_libre;
+  v_q := tienda_cotizar(v_t, v_suc, 'DOMICILIO', v_z_norte, v_uno::jsonb, NULL, v_libre);
+  IF v_q ->> 'cobro' <> 'ZONAS' OR (v_q ->> 'zona_id')::uuid <> v_z_norte THEN RAISE EXCEPTION '7c: %', v_q - 'items' - 'renglones'; END IF;
+  -- 7d) colonia cuya zona se desactivó: igual que sin zona.
+  UPDATE zonas_envio SET activa = false WHERE id = v_z_centro;
+  v_e := pg_temp.error_de(format('SELECT tienda_cotizar(%L, %L, %L, NULL, %L, NULL, %L)', v_t, v_suc, 'DOMICILIO', v_uno, v_col));
+  IF v_e IS DISTINCT FROM 'ZONA_INVALIDA' THEN RAISE EXCEPTION '7d: sin zona válida y sin elegir zona (dio %)', v_e; END IF;
+  UPDATE zonas_envio SET activa = true WHERE id = v_z_centro;
+  -- 7e) colonia de otra sucursal (y de otro negocio): no cuenta; cobra la zona elegida.
+  INSERT INTO colonias (tenant_id, sucursal_id, nombre, zona_envio_id) VALUES (v_otro, v_suc_o, 'Ajena con zona', v_z_otra) RETURNING id INTO v_aje;
+  v_q := tienda_cotizar(v_t, v_suc, 'DOMICILIO', v_z_norte, v_uno::jsonb, NULL, v_aje);
+  IF v_q ->> 'cobro' <> 'ZONAS' OR (v_q ->> 'zona_id')::uuid <> v_z_norte THEN RAISE EXCEPTION '7e: %', v_q - 'items' - 'renglones'; END IF;
+  -- 7f) el pedido se crea con la zona de la colonia.
+  v_r := tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', v_z_norte, v_uno::jsonb, v_cli_tienda, v_dir_tienda,
+                             'EFECTIVO', NULL, NULL, encode(sha256('colonias-smoke'::bytea), 'hex'),
+                             p_colonia => v_col);
+  IF (SELECT zona_envio_id FROM delivery_pedidos WHERE id = (v_r ->> 'pedido_id')::uuid) IS DISTINCT FROM v_z_centro THEN
+    RAISE EXCEPTION '7f: el pedido debía llevar la zona de la colonia (%)', v_r;
+  END IF;
+  -- 7g) tienda_negocio dice si la sucursal tiene colonias.
+  IF NOT ((SELECT s FROM jsonb_array_elements(tienda_negocio('colonias-smoke') -> 'publico' -> 'sucursales') s WHERE s ->> 'id' = v_suc::text) ->> 'colonias')::boolean THEN
+    RAISE EXCEPTION '7g: tienda_negocio debía decir colonias = true';
+  END IF;
+  -- 7h) privilegios.
+  IF has_function_privilege('authenticated', 'tienda_colonias(uuid, uuid, text)', 'EXECUTE')
+     OR has_function_privilege('anon', 'tienda_colonias(uuid, uuid, text)', 'EXECUTE')
+     OR NOT has_function_privilege('service_role', 'tienda_colonias(uuid, uuid, text)', 'EXECUTE')
+     OR has_function_privilege('authenticated', '_tienda_zona_de_colonia(uuid, uuid, uuid)', 'EXECUTE')
+     OR EXISTS (SELECT 1 FROM pg_proc WHERE proname IN ('tienda_cotizar', 'tienda_crear_pedido') GROUP BY proname HAVING count(*) > 1) THEN
+    RAISE EXCEPTION '7h: privilegios o firmas';
+  END IF;
 
   RAISE NOTICE 'colonias en verde';
 END $$;

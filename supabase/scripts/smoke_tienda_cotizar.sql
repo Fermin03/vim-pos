@@ -633,11 +633,11 @@ BEGIN
   END LOOP;
 
   -- Permisos: la cotización es solo para service_role; ni ella ni sus internas son para la API pública.
-  IF NOT has_function_privilege('service_role', 'tienda_cotizar(uuid, uuid, text, uuid, jsonb, jsonb)', 'EXECUTE') THEN
+  IF NOT has_function_privilege('service_role', 'tienda_cotizar(uuid, uuid, text, uuid, jsonb, jsonb, uuid)', 'EXECUTE') THEN
     RAISE EXCEPTION 'permisos: service_role debe poder ejecutar tienda_cotizar';
   END IF;
   FOR r IN SELECT rol, f FROM unnest(ARRAY['anon', 'authenticated']) rol,
-                             unnest(ARRAY['tienda_cotizar(uuid, uuid, text, uuid, jsonb, jsonb)', '_tienda_modificadores(jsonb, jsonb, integer)',
+                             unnest(ARRAY['tienda_cotizar(uuid, uuid, text, uuid, jsonb, jsonb, uuid)', '_tienda_modificadores(jsonb, jsonb, integer)',
                                           '_tienda_con_iva(numeric, uuid, uuid)', '_tienda_entero(jsonb, integer, integer)']) f
   LOOP
     IF has_function_privilege(r.rol, r.f, 'EXECUTE') THEN RAISE EXCEPTION 'permisos: % puede ejecutar %', r.rol, r.f; END IF;

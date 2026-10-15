@@ -39,7 +39,7 @@ AS $$ SELECT to_jsonb(p) FROM delivery_pedidos p WHERE p.id = p_id $$;
 -- ── A) `pedir` sin duplicados ────────────────────────────────────────────────
 DO $$
 DECLARE
-  c_firma  CONSTANT text := 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric, jsonb)';   -- 0174: gana p_propina_mxn al final; 0185, p_punto
+  c_firma  CONSTANT text := 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric, jsonb, uuid)';   -- 0174: gana p_propina_mxn al final; 0185, p_punto; 0187, p_colonia
   v_t      uuid := '99999999-0000-0000-0000-0000000000aa';
   v_suc    uuid := '99999999-0000-0000-0000-0000000000bb';
   v_otro   uuid := '67676767-0000-0000-0000-0000000000ab';

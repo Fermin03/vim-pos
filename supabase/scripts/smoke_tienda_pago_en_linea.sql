@@ -318,9 +318,9 @@ BEGIN
   IF (SELECT count(*) FROM pg_proc WHERE proname = 'tienda_crear_pedido' AND pronamespace = 'public'::regnamespace) <> 1 THEN
     RAISE EXCEPTION 'B2b: tienda_crear_pedido tiene más de una firma: PostgREST no sabría a cuál llamar';
   END IF;
-  IF has_function_privilege('anon', 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric, jsonb)', 'EXECUTE')
-     OR has_function_privilege('authenticated', 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric, jsonb)', 'EXECUTE')
-     OR NOT has_function_privilege('service_role', 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric, jsonb)', 'EXECUTE') THEN
+  IF has_function_privilege('anon', 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric, jsonb, uuid)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric, jsonb, uuid)', 'EXECUTE')
+     OR NOT has_function_privilege('service_role', 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric, jsonb, uuid)', 'EXECUTE') THEN
     RAISE EXCEPTION 'B2b: los permisos de tienda_crear_pedido no son los de antes (solo service_role)';
   END IF;
   -- Los dos pedidos de este bloque se van (con su pago, en cascada): lo que sigue cuenta pagos y pedidos.
