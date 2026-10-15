@@ -180,3 +180,43 @@ END;
 $fn$;
 REVOKE EXECUTE ON FUNCTION sembrar_colonias(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION sembrar_colonias(uuid) TO authenticated;
+
+-- ── §4 asignar_zona_colonia ──────────────────────────────────────────────────
+-- Mismo patrón que cambiar_costo_zona (0139). Poner zona a una colonia que no tiene (o cuya zona ya
+-- no está viva y activa) es libre: llega un pedido a esa hora y no hay a quién pedirle PIN. CAMBIAR
+-- una zona viva pide autorización de descuento.override_precio sobre esa colonia; quien administra
+-- el negocio no la necesita. Quitar la zona, solo quien administra.
+CREATE OR REPLACE FUNCTION asignar_zona_colonia(p_colonia uuid, p_zona uuid, p_autorizacion_pin_id uuid DEFAULT NULL)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $fn$
+DECLARE
+  v_tenant uuid := current_tenant_id();
+  v_c      colonias%ROWTYPE;
+  v_viva   boolean;
+  v_admin  boolean;
+BEGIN
+  IF v_tenant IS NULL THEN
+    RAISE EXCEPTION 'Sin negocio en la sesión.' USING ERRCODE = '42501';
+  END IF;
+  SELECT * INTO v_c FROM colonias WHERE id = p_colonia AND tenant_id = v_tenant AND deleted_at IS NULL FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'La colonia no existe.' USING ERRCODE = 'P0002';
+  END IF;
+  IF v_c.zona_envio_id IS NOT DISTINCT FROM p_zona THEN RETURN; END IF;
+
+  v_admin := es_admin_del_tenant(v_tenant);
+  IF p_zona IS NULL AND NOT v_admin THEN
+    RAISE EXCEPTION 'Solo quien administra el negocio quita la zona de una colonia.' USING ERRCODE = '42501';
+  END IF;
+  v_viva := v_c.zona_envio_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM zonas_envio z WHERE z.id = v_c.zona_envio_id AND z.deleted_at IS NULL AND z.activa);
+  IF v_viva AND NOT (v_admin AND p_autorizacion_pin_id IS NULL) THEN
+    PERFORM consumir_autorizacion(p_autorizacion_pin_id, ARRAY['descuento.override_precio'], p_colonia, NULL);
+  END IF;
+  UPDATE colonias SET zona_envio_id = p_zona WHERE id = p_colonia;   -- trg_colonias_zona_valida revisa
+END;
+$fn$;
+REVOKE EXECUTE ON FUNCTION asignar_zona_colonia(uuid, uuid, uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION asignar_zona_colonia(uuid, uuid, uuid) TO authenticated;

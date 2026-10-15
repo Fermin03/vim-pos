@@ -24,6 +24,7 @@ DECLARE
   v_z_centro uuid; v_z_norte uuid; v_z_otra uuid;
   v_col uuid; v_e text; v_n int; v_r jsonb;
   v_cli uuid; v_suc_sin uuid; v_z_borrada uuid;
+  v_super uuid := '99999999-0000-0000-0000-0000000000f1'; v_aut uuid; v_libre uuid; v_ajena uuid;
 BEGIN
   PERFORM set_config('request.jwt.claims', NULL, true);
   UPDATE sucursales SET codigo_postal = '37000' WHERE id = v_suc;
@@ -147,6 +148,50 @@ BEGIN
   IF (SELECT zona_envio_id FROM colonias WHERE sucursal_id = v_suc AND nombre_busqueda = 'jardines del moral') IS DISTINCT FROM v_z_centro THEN
     RAISE EXCEPTION '4: la segunda siembra pisó una zona asignada';
   END IF;
+  PERFORM set_config('request.jwt.claims', NULL, true);
+
+  -- ── 5) asignar_zona_colonia ──────────────────────────────────────────────
+  SELECT id INTO v_libre FROM colonias WHERE sucursal_id = v_suc AND nombre_busqueda = 'centro' AND codigo_postal = '37500';
+  SELECT id INTO v_ajena FROM colonias WHERE tenant_id = v_otro LIMIT 1;
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria, 'role', 'authenticated', 'tenant_id', v_t)::text, true);
+  -- Sin zona: libre, sin PIN.
+  PERFORM asignar_zona_colonia(v_libre, v_z_centro);
+  IF (SELECT zona_envio_id FROM colonias WHERE id = v_libre) IS DISTINCT FROM v_z_centro THEN RAISE EXCEPTION '5: sin zona debía asignarse sin PIN'; END IF;
+  -- La misma otra vez: no hace nada y no pide PIN.
+  PERFORM asignar_zona_colonia(v_libre, v_z_centro);
+  -- Cambiarla sin autorización: no.
+  v_e := pg_temp.error_de(format('SELECT asignar_zona_colonia(%L, %L)', v_libre, v_z_norte));
+  IF v_e IS DISTINCT FROM '42501' THEN RAISE EXCEPTION '5: cambiar sin PIN debía rechazarse (dio %)', v_e; END IF;
+  -- Quitarla: solo admin.
+  v_e := pg_temp.error_de(format('SELECT asignar_zona_colonia(%L, NULL)', v_libre));
+  IF v_e IS DISTINCT FROM '42501' THEN RAISE EXCEPTION '5: la cajera no quita zonas (dio %)', v_e; END IF;
+  -- (Las tres pruebas de 42501 dependen de que `error_de` devuelva el SQLSTATE cuando el mensaje no
+  -- trae prefijo: «Esta acción requiere autorización.» no lo trae.)
+  -- Con PIN de supervisor sobre ESTA colonia, sí; y una sola vez.
+  INSERT INTO autorizaciones_pin (id, tenant_id, usuario_solicitante_id, usuario_autorizo_id, accion,
+                                  permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (gen_random_uuid(), v_t, v_maria, v_super, 'editar_zona_colonia',
+          'descuento.override_precio', 'colonia', v_libre, 'smoke 0187') RETURNING id INTO v_aut;
+  PERFORM asignar_zona_colonia(v_libre, v_z_norte, v_aut);
+  IF (SELECT zona_envio_id FROM colonias WHERE id = v_libre) IS DISTINCT FROM v_z_norte THEN RAISE EXCEPTION '5: con PIN debía cambiar'; END IF;
+  -- El smoke corre en una sola transacción y consumir_autorizacion deja reusar dentro de la misma;
+  -- se simula que el uso fue en otra.
+  UPDATE autorizaciones_pin SET usada_txid = 0 WHERE id = v_aut;
+  v_e := pg_temp.error_de(format('SELECT asignar_zona_colonia(%L, %L, %L)', v_libre, v_z_centro, v_aut));
+  IF v_e IS DISTINCT FROM '42501' THEN RAISE EXCEPTION '5: la autorización es de un uso (dio %)', v_e; END IF;
+  -- Zona actual desactivada = sin zona: libre otra vez.
+  UPDATE zonas_envio SET activa = false WHERE id = v_z_norte;
+  PERFORM asignar_zona_colonia(v_libre, v_z_centro);
+  UPDATE zonas_envio SET activa = true WHERE id = v_z_norte;
+  -- El dueño cambia y quita sin PIN.
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_dueno, 'role', 'authenticated', 'tenant_id', v_t)::text, true);
+  PERFORM asignar_zona_colonia(v_libre, v_z_norte);
+  PERFORM asignar_zona_colonia(v_libre, NULL);
+  v_e := pg_temp.error_de(format('SELECT asignar_zona_colonia(%L, %L)', v_libre, v_z_otra));
+  IF v_e IS DISTINCT FROM 'ZONA_INVALIDA' THEN RAISE EXCEPTION '5: zona ajena (dio %)', v_e; END IF;
+  -- Colonia de otro negocio: para esta sesión no existe.
+  v_e := pg_temp.error_de(format('SELECT asignar_zona_colonia(%L, %L)', v_ajena, v_z_centro));
+  IF v_e IS DISTINCT FROM 'P0002' THEN RAISE EXCEPTION '5: colonia ajena (dio %)', v_e; END IF;
   PERFORM set_config('request.jwt.claims', NULL, true);
 
   RAISE NOTICE 'colonias en verde';
