@@ -141,8 +141,11 @@ const deCuenta = <T>(accion: string, negocio: string, datos: object, lector: (x:
 
 export type DatosDeRegistro = { nombre: string; apellido: string; email: string; telefono: string; password: string };
 export type DatosDeCuenta = { nombre: string; apellido: string; telefono: string; /** `YYYY-MM-DD` o null. */ fecha_nacimiento: string | null };
-/** `id: null` = dirección nueva. Los demás campos son los de la dirección de `pedir`. */
-export type DireccionPorGuardar = DireccionDePedido & { id: string | null; etiqueta: string };
+/**
+ * `id: null` = dirección nueva. Los demás campos son los de la dirección de `pedir`. `punto`: el pin del
+ * mapa; sin él, editar la dirección escrita lo borra en la base (0186).
+ */
+export type DireccionPorGuardar = DireccionDePedido & { id: string | null; etiqueta: string; punto?: DireccionGuardada["punto"] };
 
 /**
  * Crea la cuenta y deja la sesión abierta. `cuenta: null` = el correo ya tenía cuenta: NO hay sesión

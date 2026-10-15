@@ -362,9 +362,9 @@ const dirLimpia = { calle: "Av. Siempre Viva", numero_exterior: "742", numero_in
                     ciudad: "León", estado: "Guanajuato", referencias: null };
 test("direccion_guardar: id uuid o null, etiqueta a 40, y la dirección con las reglas de pedir (suelta o bajo `direccion`)", () => {
   assert.deepEqual(leerCuerpo({ accion: "direccion_guardar", ...N, id: null, etiqueta: " Casa ", ...dir, cuenta_id: ID, tenant_id: ID }),
-    { ok: true, valor: { accion: "direccion_guardar", negocio: "knockout", id: null, etiqueta: "Casa", direccion: dirLimpia } });
-  assert.deepEqual(leerCuerpo({ accion: "direccion_guardar", ...N, id: ID, etiqueta: "e".repeat(60), direccion: dir }),
-    { ok: true, valor: { accion: "direccion_guardar", negocio: "knockout", id: ID, etiqueta: "e".repeat(40), direccion: dirLimpia } });
+    { ok: true, valor: { accion: "direccion_guardar", negocio: "knockout", id: null, etiqueta: "Casa", direccion: dirLimpia, punto: null } });
+  assert.deepEqual(leerCuerpo({ accion: "direccion_guardar", ...N, id: ID, etiqueta: "e".repeat(60), direccion: dir, punto: { lat: 21.1234567, lng: -101.68 } }),
+    { ok: true, valor: { accion: "direccion_guardar", negocio: "knockout", id: ID, etiqueta: "e".repeat(40), direccion: dirLimpia, punto: { lat: 21.123457, lng: -101.68 } } });
   const sinEtiqueta = leerCuerpo({ accion: "direccion_guardar", ...N, ...dir });
   assert.equal(sinEtiqueta.ok && sinEtiqueta.valor.accion === "direccion_guardar" && sinEtiqueta.valor.etiqueta === null && sinEtiqueta.valor.id === null, true);
 });
@@ -373,6 +373,7 @@ test("direccion_guardar y direccion_borrar: lo que no cuadra es DIRECCION_INVALI
   assert.deepEqual(leerCuerpo({ accion: "direccion_guardar", ...N, id: "x", ...dir }), mala);
   assert.deepEqual(leerCuerpo({ accion: "direccion_guardar", ...N, ...dir, codigo_postal: "3700" }), mala);
   assert.deepEqual(leerCuerpo({ accion: "direccion_guardar", ...N }), mala);
+  assert.deepEqual(leerCuerpo({ accion: "direccion_guardar", ...N, ...dir, punto: { lat: 91, lng: 0 } }), mala);
   assert.deepEqual(leerCuerpo({ accion: "direccion_borrar", ...N, id: ID }), { ok: true, valor: { accion: "direccion_borrar", negocio: "knockout", id: ID } });
   for (const id of [null, undefined, "x", 5]) assert.deepEqual(leerCuerpo({ accion: "direccion_borrar", ...N, id }), mala);
 });

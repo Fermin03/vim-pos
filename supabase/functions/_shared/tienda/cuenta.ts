@@ -53,7 +53,7 @@ function lista(x: unknown, clave: string): Record<string, unknown>[] | null {
 const elegir = (o: Record<string, unknown>, campos: readonly string[]): Record<string, unknown> =>
   Object.fromEntries(campos.filter((c) => o[c] !== undefined).map((c) => [c, o[c]]));
 
-const DE_DIRECCION = ["id", "etiqueta", "calle", "numero_exterior", "numero_interior", "colonia", "codigo_postal", "ciudad", "estado", "referencias"] as const;
+const DE_DIRECCION = ["id", "etiqueta", "calle", "numero_exterior", "numero_interior", "colonia", "codigo_postal", "ciudad", "estado", "referencias", "punto"] as const;
 
 /** Las direcciones guardadas: su id (para editarla o borrarla) y sus campos. Ni cuenta ni negocio. */
 export function direccionesPublicas(x: unknown): Record<string, unknown>[] | null {

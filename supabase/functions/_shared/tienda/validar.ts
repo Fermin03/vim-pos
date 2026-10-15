@@ -57,7 +57,7 @@ export type Peticion =
   | { accion: "recuperar_aplicar"; negocio: string; token: string; password: string }
   | { accion: "cuenta_guardar"; negocio: string; nombre: string; apellido: string; telefono: string; fecha_nacimiento: string | null }
   | { accion: "cuenta_password"; negocio: string; actual: string; nueva: string }
-  | { accion: "direccion_guardar"; negocio: string; id: string | null; etiqueta: string | null; direccion: Direccion }
+  | { accion: "direccion_guardar"; negocio: string; id: string | null; etiqueta: string | null; direccion: Direccion; punto: Punto | null }
   | { accion: "direccion_borrar"; negocio: string; id: string }
   | { accion: "eliminar_cuenta"; negocio: string; password: string };
 
@@ -216,8 +216,10 @@ function leerCuenta(accion: Exclude<Peticion["accion"], "negocio" | "menu" | "co
       const id = x.id ?? null;
       // Los campos pueden venir sueltos o bajo `direccion` (como en `pedir`): se leen igual.
       const direccion = leerDireccion(objeto(x.direccion) ? x.direccion : x);
-      if ((id !== null && !esUuid(id)) || !direccion) return mal("DIRECCION_INVALIDA");
-      return { ok: true, valor: { accion, negocio, id, etiqueta: textoLimpio(x.etiqueta, 40), direccion } };
+      // El pin del mapa (0186): opcional; uno que no cuadra invalida la dirección.
+      const punto = leerPunto(x.punto);
+      if ((id !== null && !esUuid(id)) || !direccion || punto === undefined) return mal("DIRECCION_INVALIDA");
+      return { ok: true, valor: { accion, negocio, id, etiqueta: textoLimpio(x.etiqueta, 40), direccion, punto } };
     }
     case "direccion_borrar":
       return esUuid(x.id) ? { ok: true, valor: { accion, negocio, id: x.id } } : mal("DIRECCION_INVALIDA");

@@ -36,11 +36,12 @@ export default async function Privacidad({ params }: Props) {
       <ul className="mt-2 list-disc space-y-1 pl-5">
         <li>Tu nombre y tu teléfono.</li>
         <li>Tu correo, solo si quieres que te llegue el enlace de tu pedido.</li>
-        <li>Tu dirección, solo si pides a domicilio.</li>
+        <li>Tu dirección, solo si pides a domicilio. Si el envío se cobra por distancia, también el punto que marcas en el mapa.</li>
         <li>Lo que pediste, tus notas y cómo vas a pagar. Si pagas en línea, los datos de tu tarjeta van directo a Mercado Pago: esta tienda y el restaurante no los ven ni los guardan.</li>
         <li>
           Si creas una cuenta: tu nombre, apellido, correo, teléfono y una contraseña. Si quieres, también tu fecha de nacimiento
-          y hasta cinco direcciones. Pedir sin cuenta sigue siendo posible.
+          y hasta cinco direcciones. Cada dirección guarda el punto del mapa que marcaste al pedir, para no marcarlo otra vez;
+          si cambias la dirección, ese punto se borra. Pedir sin cuenta sigue siendo posible.
         </li>
       </ul>
 

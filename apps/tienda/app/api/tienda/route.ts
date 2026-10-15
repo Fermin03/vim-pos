@@ -82,7 +82,7 @@ const DE_CUENTA = new Map<string, readonly string[]>([
   ["cuenta", []],
   ["cuenta_guardar", ["nombre", "apellido", "telefono", "fecha_nacimiento"]],
   ["cuenta_password", ["actual", "nueva"]],
-  ["direccion_guardar", ["id", "etiqueta", ...DE_DIRECCION]],
+  ["direccion_guardar", ["id", "etiqueta", "punto", ...DE_DIRECCION]],
   ["direccion_borrar", ["id"]],
   ["mis_pedidos", []],
   ["eliminar_cuenta", ["password"]],
