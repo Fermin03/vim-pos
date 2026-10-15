@@ -5,7 +5,7 @@ import { cabecerasSeguridad } from "@vim/config/cabeceras-seguridad.mjs";
 // script y su iframe vienen de challenges.cloudflare.com. Solo ese origen, solo en script-src y
 // frame-src; nada más se abre.
 const TURNSTILE = "https://challenges.cloudflare.com";
-// El mapa de «Envío a domicilio» (tienda en línea, 0179): estilo, teselas, letras e iconos de
+// El mapa de «Envío a domicilio» (tienda en línea, 0185): estilo, teselas, letras e iconos de
 // OpenFreeMap, todo por fetch desde ese origen. La librería y su worker salen de public/mapa/.
 const MAPA = "https://tiles.openfreemap.org";
 

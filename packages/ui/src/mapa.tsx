@@ -1,5 +1,5 @@
 "use client";
-// Un mapa con un pin que se mueve: el del cliente en la tienda (envío por distancia, 0179) y el de la
+// Un mapa con un pin que se mueve: el del cliente en la tienda (envío por distancia, 0185) y el de la
 // sucursal en el admin. MapLibre GL JS con las teselas de OpenFreeMap (gratis, sin cuenta ni llave;
 // la atribución de OpenFreeMap, OpenMapTiles y OpenStreetMap la pone MapLibre desde el estilo).
 //

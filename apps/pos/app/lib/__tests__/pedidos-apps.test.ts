@@ -200,7 +200,7 @@ describe("pedidoDesdeFila", () => {
       direccion: { texto: "Hidalgo 12, int. 3, Centro, C.P. 37000, León", referencias: "Portón negro" },
     });
   });
-  it("envío por distancia (0179): la distancia llega en las referencias y el punto como enlace al mapa", () => {
+  it("envío por distancia (0185): la distancia llega en las referencias y el punto como enlace al mapa", () => {
     const dir = { calle: "Hidalgo", numero_exterior: "12", colonia: "Centro", codigo_postal: "37000", ciudad: "León", estado: "Gto", referencias: "A 3.2 km · Portón negro" };
     const p = pedidoDesdeFila({ ...fila, app: "DELIVERY_PROPIO", canal: "TIENDA", direccion: { ...dir, lat: 21.136551, lng: -101.6824 } });
     expect(p.direccion).toEqual({

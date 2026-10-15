@@ -1,4 +1,4 @@
--- Smoke tienda en línea, envío por distancia (mig. 0179).
+-- Smoke tienda en línea, envío por distancia (mig. 0185).
 -- Cubre: el cálculo puro (haversine × 1.3, un decimal), lo que guarda el dueño (tramos = zonas,
 -- validación, permisos, zonas que se conservan, se crean y se dan de baja), el estado y lo que enseña
 -- la tienda, la cotización por distancia (bordes del tramo, fuera de área, ubicación basura), el alta
@@ -77,7 +77,7 @@ BEGIN
   UPDATE sucursales SET geo_lat = NULL, geo_lng = NULL WHERE id = v_suc;
 
   INSERT INTO tenants (id, codigo, nombre_comercial, estado, vertical_principal)
-  VALUES (v_otro, 'tenant-0179', 'Otro negocio', 'INTERNO', 'QUICK_SERVICE');
+  VALUES (v_otro, 'tenant-0185', 'Otro negocio', 'INTERNO', 'QUICK_SERVICE');
   INSERT INTO sucursales (tenant_id, codigo, nombre) VALUES (v_otro, 'OD', 'Sucursal del otro') RETURNING id INTO v_suc_o;
   INSERT INTO tienda_sucursales (sucursal_id, tenant_id, participa) VALUES (v_suc_o, v_otro, true);
 

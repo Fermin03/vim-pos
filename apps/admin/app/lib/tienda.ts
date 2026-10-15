@@ -110,7 +110,7 @@ export async function guardarConfigTienda(d: DatosConfigTienda, bloque: BloqueCo
 
 /**
  * Todas las sucursales vivas, participen o no, con sus zonas activas contadas en una sola consulta y
- * su envío (0179). Las zonas de los tramos por distancia no cuentan como zonas: no las elige el
+ * su envío (0185). Las zonas de los tramos por distancia no cuentan como zonas: no las elige el
  * cliente. Su precio sí sale de ellas (un tramo es una zona); un tramo cuya zona ya no existe no se pinta.
  */
 export async function leerSucursalesTienda(): Promise<SucursalTienda[]> {
@@ -176,7 +176,7 @@ export async function guardarSucursalTienda(
 }
 
 /**
- * «Envío a domicilio» de una sucursal (0179): cómo cobra la tienda, los tramos y el punto de la
+ * «Envío a domicilio» de una sucursal (0185): cómo cobra la tienda, los tramos y el punto de la
  * sucursal, en una sola llamada (`tienda_guardar_envio`, que valida todo otra vez y crea, cambia o da
  * de baja las zonas de los tramos). Su error trae ya la frase para el dueño, después del código.
  */

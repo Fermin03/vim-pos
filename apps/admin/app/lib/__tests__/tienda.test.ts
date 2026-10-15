@@ -208,7 +208,7 @@ describe("sucursales de la tienda", () => {
     ]);
   });
 
-  it("por distancia (0179): los tramos con el precio de su zona, el punto, y sus zonas no cuentan como zonas", async () => {
+  it("por distancia (0185): los tramos con el precio de su zona, el punto, y sus zonas no cuentan como zonas", async () => {
     doble.tablas.sucursales![0] = { ...doble.tablas.sucursales![0], geo_lat: 21.1223, geo_lng: -101.6824 };
     doble.tablas.tienda_sucursales![0] = { ...doble.tablas.tienda_sucursales![0], cobro_envio: "DISTANCIA",
       tramos_envio: [{ hasta_km: "2.0", zona_id: "z2" }, { hasta_km: "5.5", zona_id: "z5" }, { hasta_km: "9.0", zona_id: "borrada" }] };

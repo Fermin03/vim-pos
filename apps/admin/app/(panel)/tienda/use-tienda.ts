@@ -19,7 +19,7 @@ import type { PedidosTienda } from "../../components/tienda-pedidos";
 /** Cada sucursal es su propio bloque: su mensaje y su «Guardando…» salen en su tarjeta. */
 export type Bloque = "estado" | "datos" | "logo" | "pedidos" | "cobro" | `sucursal:${string}` | `envio:${string}`;
 const deSucursal = (id: string): Bloque => `sucursal:${id}`;
-/** El envío de una sucursal (0179) guarda aparte de su tarjeta: su mensaje va junto a su botón. */
+/** El envío de una sucursal (0185) guarda aparte de su tarjeta: su mensaje va junto a su botón. */
 const deEnvio = (id: string): Bloque => `envio:${id}`;
 type Formulario = DatosTienda & PedidosTienda;
 

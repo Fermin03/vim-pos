@@ -161,7 +161,7 @@ const IMPORTE = /^\d+\.\d{2}$/;
 const CON_DETALLE = new Map<string, RegExp>([
   ["TIENDA_CERRADA", DETALLE], ["PRODUCTO_NO_DISPONIBLE", DETALLE], ["MODIFICADORES_INVALIDOS", DETALLE],
   ["COMBO_INVALIDO", DETALLE], ["TOTAL_CAMBIO", IMPORTE],
-  // Fuera del área de entrega: a cuántos km quedó (0179), para decírselo al cliente.
+  // Fuera del área de entrega: a cuántos km quedó (0185), para decírselo al cliente.
   ["FUERA_DE_AREA", /^\d{1,5}\.\d$/],
 ]);
 

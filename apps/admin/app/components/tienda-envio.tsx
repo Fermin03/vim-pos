@@ -1,5 +1,5 @@
 "use client";
-// «Envío a domicilio» de una sucursal en la tienda (0179): por zonas (como siempre) o por distancia,
+// «Envío a domicilio» de una sucursal en la tienda (0185): por zonas (como siempre) o por distancia,
 // con los tramos «hasta X km → $Y» y el punto de la sucursal en el mapa. Va dentro de la tarjeta de
 // la sucursal y guarda aparte, con su propio botón: el borrador de la tarjeta no lo toca.
 // TEXTOS PROVISIONALES (James).

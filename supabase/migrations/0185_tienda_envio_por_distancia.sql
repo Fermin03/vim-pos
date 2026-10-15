@@ -1,4 +1,4 @@
--- 0179 · Tienda en línea: costo de envío por distancia.
+-- 0185 · Tienda en línea: costo de envío por distancia.
 --
 -- Una sucursal cobra el envío de la tienda «Por zonas» (como hasta hoy, y lo que queda en todas las
 -- sucursales existentes) o «Por distancia»: tramos «hasta X km → $Y». El cliente pone un pin en el

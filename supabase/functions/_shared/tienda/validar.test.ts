@@ -522,7 +522,7 @@ test("cuerpo: verificacion lleva el código del pedido y, solo si viene escrito 
   assert.deepEqual(leerCuerpo({ accion: "verificacion", negocio: "knockout" }), { ok: false, error: "CODIGO_INVALIDO" });
 });
 
-// ── El pin del cliente (0179) ───────────────────────────────────────────────────────────────────
+// ── El pin del cliente (0185) ───────────────────────────────────────────────────────────────────
 test("punto: dos números en rango, redondeados a 6 decimales; ausente es null", () => {
   assert.deepEqual(leerPunto({ lat: 21.12345678, lng: -101.6824, otra: 1 }), { lat: 21.123457, lng: -101.6824 });
   assert.equal(leerPunto(undefined), null);

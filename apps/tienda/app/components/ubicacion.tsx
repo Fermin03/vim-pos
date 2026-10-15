@@ -1,5 +1,5 @@
 "use client";
-// «Tu ubicación», en «¿Quién recibe?», cuando la sucursal cobra el envío por distancia (0179). El
+// «Tu ubicación», en «¿Quién recibe?», cuando la sucursal cobra el envío por distancia (0185). El
 // cliente usa la ubicación de su teléfono o pone el pin a mano; al moverlo se ve en vivo a cuántos km
 // está y cuánto cuesta el envío (la cuenta de lib/distancia.ts, la misma de la base). Lo que cobra
 // es la cotización de la base, que llega al soltar el pin y reemplaza el número de aquí.

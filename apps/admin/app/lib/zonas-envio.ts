@@ -41,7 +41,7 @@ function payload(d: ZonaInput) {
 
 /**
  * Las zonas que el dueño administra aquí. Las de los tramos del envío por distancia de la tienda
- * (0179) no salen: las crea y las cambia «Tienda en línea → Envío a domicilio», y tocarlas aquí
+ * (0185) no salen: las crea y las cambia «Tienda en línea → Envío a domicilio», y tocarlas aquí
  * desarmaría esos tramos. (El POS sí las enseña: sirven para un pedido por teléfono.)
  */
 export async function listarZonas(sucursalId: string): Promise<Zona[]> {

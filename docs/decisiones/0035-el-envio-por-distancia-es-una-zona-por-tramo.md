@@ -1,4 +1,4 @@
-# 0034 — El envío por distancia es una zona por tramo
+# 0035 — El envío por distancia es una zona por tramo
 
 **Fecha:** 14 de octubre de 2026 · **Estado:** vigente · **Amplía** [0017](0017-el-envio-es-un-renglon.md)
 (el envío sigue siendo un renglón) para la tienda en línea.
@@ -15,7 +15,7 @@ Cada sucursal elige, en «Tienda en línea → Envío a domicilio», cómo cobra
 sucursal. El cliente pone un pin; la **base** calcula la distancia (haversine × 1.3, que aproxima la
 distancia en calles, a un decimal) y cobra el primer tramo cuyo límite la alcanza. Más allá del último,
 no se entrega. Del teléfono solo viaja el punto; el teléfono repite la cuenta para enseñarla en vivo,
-pero la que cobra es la de `tienda_cotizar` y `tienda_crear_pedido` (migración 0179).
+pero la que cobra es la de `tienda_cotizar` y `tienda_crear_pedido` (migración 0185).
 
 **Cada tramo es una zona de envío** («Hasta 3 km», con el precio del tramo), que crea y mantiene
 `tienda_guardar_envio`. Qué zona es de qué tramo lo dice `tienda_sucursales.tramos_envio`.

@@ -240,7 +240,7 @@ BEGIN
     v_qs := v_qs || jsonb_build_object(v_c ->> 'caso', v_q);
 
     IF NOT (v_q ?& ARRAY['items', 'renglones', 'subtotal_mxn', 'envio_mxn', 'envio_total_mxn', 'total_mxn', 'cobro', 'distancia_km', 'zona_id'])
-       OR (SELECT count(*) FROM jsonb_object_keys(v_q)) <> 9 THEN   -- 0179: cobro, distancia_km y zona_id
+       OR (SELECT count(*) FROM jsonb_object_keys(v_q)) <> 9 THEN   -- 0185: cobro, distancia_km y zona_id
       RAISE EXCEPTION '%: la salida debe traer exactamente items, renglones, subtotal_mxn, envio_mxn, envio_total_mxn, total_mxn, cobro, distancia_km y zona_id: %', v_c ->> 'caso', v_q;
     END IF;
     IF v_c ? 'tot' AND ROW(v_q ->> 'subtotal_mxn', v_q ->> 'envio_mxn', v_q ->> 'envio_total_mxn', v_q ->> 'total_mxn')

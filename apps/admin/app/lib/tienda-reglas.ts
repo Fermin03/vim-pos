@@ -63,7 +63,7 @@ export function copiarATodos(h: Horario, desde: Dia): Horario {
 /** Un tramo del envío por distancia, como lo escribe el dueño: «hasta 3.5 km → $35». Texto, nunca float. */
 export type TramoTienda = { hastaKm: string; costo: string };
 /**
- * Cómo cobra el envío la tienda en una sucursal (0179). Los tramos se conservan aunque se vuelva a
+ * Cómo cobra el envío la tienda en una sucursal (0185). Los tramos se conservan aunque se vuelva a
  * «Por zonas». `punto`: el de la sucursal (sucursales.geo_lat/geo_lng), null si no tiene.
  */
 export type EnvioSucursal = { cobro: "ZONAS" | "DISTANCIA"; tramos: TramoTienda[]; punto: { lat: number; lng: number } | null };
@@ -81,7 +81,7 @@ export function decimasDeKm(km: string): number | null {
 const COSTO = /^\d{1,4}(\.\d{1,2})?$/;
 
 /**
- * Lo que impide guardar el envío, con las MISMAS reglas que `tienda_guardar_envio` (0179). `general`
+ * Lo que impide guardar el envío, con las MISMAS reglas que `tienda_guardar_envio` (0185). `general`
  * va debajo de la tabla; `porTramo`, junto a su renglón (por índice).
  */
 export function erroresDeEnvio(e: EnvioSucursal): { general: string | null; porTramo: Record<number, string> } {

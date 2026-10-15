@@ -1,4 +1,4 @@
-// El envío por distancia (0179) visto desde el teléfono: la MISMA cuenta que hace la base
+// El envío por distancia (0185) visto desde el teléfono: la MISMA cuenta que hace la base
 // (`_tienda_distancia_km` y `tienda_cotizar`), solo para enseñar el precio mientras se mueve el pin.
 // La que cobra es la de la base: al soltar el pin se cotiza y su número reemplaza a este.
 import type { Tramo } from "./contrato";

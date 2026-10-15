@@ -30,7 +30,7 @@ export type Escritura =
   | { tipo: "config"; bloque: BloqueConfig; datos: DatosConfigTienda }
   | { tipo: "interruptor"; encendida: boolean }
   | { tipo: "sucursal"; id: string; datos: BorradorSucursal }
-  /** «Envío a domicilio» de una sucursal (0179). */
+  /** «Envío a domicilio» de una sucursal (0185). */
   | { tipo: "envio"; id: string; envio: EnvioSucursal }
   | { tipo: "cuenta"; id: string; conexionId: string | null }
   /** Se desconectó una cuenta de Mercado Pago de la tienda. */

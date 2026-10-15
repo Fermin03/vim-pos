@@ -199,7 +199,7 @@ export function Tienda({ negocio, sucursal, menu, ahora, conSesion }: {
   const porQuitar = useMemo(() => revalidar(carrito, menu), [carrito, menu]);
   const zonaLista = carrito.modo !== "DOMICILIO" || sucursal.zonas.length === 0 || sucursal.zonas.some((z) => z.id === carrito.zonaId);
   const cotizable = paso !== "menu" && piezas > 0 && zonaLista && Object.keys(porQuitar).length === 0;
-  // El pin del cliente (envío por distancia, 0179): en memoria, nunca en el teléfono. Solo cuenta a
+  // El pin del cliente (envío por distancia, 0185): en memoria, nunca en el teléfono. Solo cuenta a
   // domicilio en una sucursal que cobra por distancia.
   const [punto, setPunto] = useState<Punto | null>(null);
   const puntoDelEnvio = sucursal.envio.cobro === "DISTANCIA" ? punto : null;

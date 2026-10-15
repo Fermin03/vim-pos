@@ -95,7 +95,7 @@ export function VistaDelCarrito({
   const motivo = motivoDeCierre(sucursal, carrito.modo);
   const estimado = estimarTotal(carrito, menu);
   const envioEstimado = aDomicilio && zona ? aCentavos(zona.costo_mxn) ?? 0 : 0;
-  // Por distancia (0179) el envío sale de la ubicación, que se pone en «Tus datos»: aquí todavía no se sabe.
+  // Por distancia (0185) el envío sale de la ubicación, que se pone en «Tus datos»: aquí todavía no se sabe.
   const sinEnvioAun = aDomicilio && sucursal.envio.cobro === "DISTANCIA" && !cot?.distancia_km;
 
   // Lo que impide continuar, del más concreto al más general. Si no hay nada, va el botón.

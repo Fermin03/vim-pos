@@ -64,7 +64,7 @@ export type ContextoDeEnvio = {
 const DE_RENGLON = new Set(["PRODUCTO_NO_DISPONIBLE", "MODIFICADORES_INVALIDOS", "COMBO_INVALIDO"]);
 const DE_CAMPO: Record<string, Campo | "pago" | "ubicacion"> = {
   CLIENTE_INVALIDO: "nombre", DIRECCION_INVALIDA: "calle", PAGO_INVALIDO: "pago",
-  // Envío por distancia (0179): se corrige en el mapa de «¿Quién recibe?».
+  // Envío por distancia (0185): se corrige en el mapa de «¿Quién recibe?».
   UBICACION_INVALIDA: "ubicacion", FUERA_DE_AREA: "ubicacion",
 };
 const DEL_CARRITO = new Set(["ZONA_INVALIDA", "MODO_INVALIDO", "CARRITO_INVALIDO", "PRECIO_INVALIDO", "SUCURSAL_INVALIDA", "SUCURSAL_DE_OTRO_NEGOCIO", "CUERPO_DEMASIADO_GRANDE"]);

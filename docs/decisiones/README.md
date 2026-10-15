@@ -37,7 +37,7 @@ Cada archivo dice **qué decía el plan, qué hacemos hoy y por qué**. Manda lo
 | [0031](0031-facturama-es-el-unico-pac.md) | Facturama es el único PAC: se retira Facturapi y la conmutación | 07/10/2026 |
 | [0032](0032-la-tienda-es-un-canal-y-sus-clientes-no-viven-en-auth.md) | La tienda en línea es un canal de `delivery_pedidos` y sus clientes no viven en Supabase Auth | 09/10/2026 |
 | [0033](0033-el-cobro-con-terminal-lo-aplica-la-caja.md) | El cobro con terminal (Mercado Pago Point) lo aplica la caja, y los tokens del restaurante viven en Vault | 09/10/2026 |
-| [0034](0034-el-envio-por-distancia-es-una-zona-por-tramo.md) | El envío por distancia de la tienda: lo calcula la base desde el pin del cliente, y cada tramo es una zona de envío | 14/10/2026 |
+| [0035](0035-el-envio-por-distancia-es-una-zona-por-tramo.md) | El envío por distancia de la tienda: lo calcula la base desde el pin del cliente, y cada tramo es una zona de envío | 14/10/2026 |
 
 ## Pendientes de escribir
 

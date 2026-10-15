@@ -83,7 +83,7 @@ export type PropsDelPasoDeDatos = {
   deVuelta: string;
   /** El reto del banco está a la vista (o dejó de estarlo): mientras, la hoja no se cierra. */
   alRetener?: (retenida: boolean) => void;
-  /** A domicilio «Por distancia» (0179): el pin del cliente. Vive en la tienda, que cotiza con él. */
+  /** A domicilio «Por distancia» (0185): el pin del cliente. Vive en la tienda, que cotiza con él. */
   punto: Punto | null;
   alCambiarPunto: (p: Punto) => void;
   /** «Mejor recojo mi pedido», desde fuera del área de entrega. */

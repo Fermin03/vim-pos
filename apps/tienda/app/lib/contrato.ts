@@ -16,7 +16,7 @@ export type Zona = { id: string; nombre: string; /** Sin el IVA que el ticket pu
 /** Un tramo del envío por distancia: hasta `hasta_km` (texto con un decimal, «3.0») cuesta `costo_mxn`. */
 export type Tramo = { hasta_km: string; costo_mxn: string };
 /**
- * Cómo cobra el envío la tienda en esa sucursal (0179). «Por distancia»: los tramos en orden y el
+ * Cómo cobra el envío la tienda en esa sucursal (0185). «Por distancia»: los tramos en orden y el
  * punto de la sucursal, para enseñar el precio mientras se mueve el pin (el que cobra lo da `cotizar`).
  */
 export type EnvioDeSucursal =
@@ -205,7 +205,7 @@ function slot(x: unknown): Slot {
 }
 
 /**
- * El envío de una sucursal. Sin la clave (una función anterior a la 0179) es «Por zonas», como antes.
+ * El envío de una sucursal. Sin la clave (una función anterior a la 0185) es «Por zonas», como antes.
  * «Por distancia» sin tramos o sin punto no se puede pedir a domicilio (la base ya lo dice en su
  * estado); aquí se lee como «Por zonas» para no enseñar un mapa sin nada que calcular.
  */

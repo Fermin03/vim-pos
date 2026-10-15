@@ -245,7 +245,7 @@ export type ItemDeCuerpo = {
 /** La parte del carrito en el cuerpo de `cotizar` y `pedir` (anexo §1.8). */
 export type CuerpoCarrito = {
   sucursal_id: string; modo: Modo; zona_id: string | null; items: ItemDeCuerpo[];
-  /** Solo a domicilio «Por distancia» (0179): el pin del cliente. Con él la base calcula el envío. */
+  /** Solo a domicilio «Por distancia» (0185): el pin del cliente. Con él la base calcula el envío. */
   punto?: Punto;
 };
 

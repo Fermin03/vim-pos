@@ -30,7 +30,7 @@ const MERCADO_PAGO = {
   img: ["https://www.mercadolibre.com", "https://www.mercadolivre.com"],
 };
 
-// El mapa del envío por distancia (0179): MapLibre pide a OpenFreeMap el estilo, las teselas, las
+// El mapa del envío por distancia (0185): MapLibre pide a OpenFreeMap el estilo, las teselas, las
 // letras y los iconos, todo con fetch desde ese único origen (visto en el navegador, escuchando las
 // violaciones de la CSP). La librería y su worker se sirven de aquí mismo (public/mapa/): no abren nada.
 const MAPA = "https://tiles.openfreemap.org";

@@ -178,7 +178,7 @@ const ERRORES: Record<string, TextoDeError> = {
   CLIENTE_INVALIDO: { texto: "Revisa tus datos.", hacer: "Escribe tu nombre, un teléfono de 10 dígitos y, si pones correo, que esté completo." },
   DIRECCION_INVALIDA: { texto: "Revisa tu dirección.", hacer: "Faltan datos o el código postal no tiene 5 dígitos." },
   PAGO_INVALIDO: { texto: "Esa forma de pago no está disponible.", hacer: "Elige otra forma de pago." },
-  // Envío por distancia (0179). TEXTOS PROVISIONALES (James).
+  // Envío por distancia (0185). TEXTOS PROVISIONALES (James).
   UBICACION_INVALIDA: { texto: "Falta tu ubicación.", hacer: "Pon el pin del mapa en tu domicilio: con eso calculamos el envío." },
   FUERA_DE_AREA: { texto: "Esta dirección está fuera del área de entrega.", hacer: "Mueve el pin o elige recoger tu pedido." },
   // Pago en línea (textos provisionales, como los de arriba).

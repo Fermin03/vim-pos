@@ -1,4 +1,4 @@
-// Envío por distancia (0179) del lado del teléfono: la cuenta que enseña el precio mientras se mueve
+// Envío por distancia (0185) del lado del teléfono: la cuenta que enseña el precio mientras se mueve
 // el pin tiene que ser la de la base (smoke_tienda_envio_distancia.sql usa los mismos puntos), el
 // contrato lee la forma nueva y el carrito manda el punto solo cuando toca.
 import { describe, expect, it } from "vitest";

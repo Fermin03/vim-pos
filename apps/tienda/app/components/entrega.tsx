@@ -18,7 +18,7 @@ export function Entrega({ sucursal, modo, zonaId, alCambiarModo, alCambiarZona }
   if (modos.length === 0) return null;
   const zona = sucursal.zonas.find((z) => z.id === zonaId);
   const rango = rangoDeEnvio(sucursal.zonas);
-  // Por distancia (0179) no hay zona que elegir: el envío sale de la ubicación, en «Tus datos».
+  // Por distancia (0185) no hay zona que elegir: el envío sale de la ubicación, en «Tus datos».
   const distancia = sucursal.envio.cobro === "DISTANCIA" ? sucursal.envio : null;
   return (
     <div className="flex flex-col gap-3">

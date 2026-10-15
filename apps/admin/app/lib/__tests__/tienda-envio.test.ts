@@ -1,4 +1,4 @@
-// «Envío a domicilio» de una sucursal (0179): las reglas del admin son las de tienda_guardar_envio.
+// «Envío a domicilio» de una sucursal (0185): las reglas del admin son las de tienda_guardar_envio.
 import { describe, expect, it } from "vitest";
 import { decimasDeKm, erroresDeEnvio, hayCambiosDeEnvio, revisar, type EnvioSucursal, type SucursalTienda } from "../tienda-reglas";
 import { trasEscribir, type Leido } from "../tienda-pagina";

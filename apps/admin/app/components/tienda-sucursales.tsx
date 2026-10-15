@@ -16,7 +16,7 @@ const casilla = "flex min-h-[44px] cursor-pointer items-center gap-3 text-14 tex
 const enlace = "whitespace-nowrap font-semibold underline underline-offset-2";
 
 type Guardar = (id: string, datos: BorradorSucursal) => Promise<boolean>;
-/** «Envío a domicilio» de cada sucursal (0179): guarda aparte de la tarjeta. */
+/** «Envío a domicilio» de cada sucursal (0185): guarda aparte de la tarjeta. */
 export type EnvioDeTarjetas = {
   guardando: string | null;
   mensajeDe: (id: string) => MensajeTienda | null;

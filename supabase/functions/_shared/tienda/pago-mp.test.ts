@@ -401,7 +401,7 @@ test("el motivo que frena desde la base (0178) es el mismo que aquí es RIESGO",
   }
 });
 
-// ── Envío por distancia (0179): el envío que va a Mercado Pago es el que calculó la base ─────────
+// ── Envío por distancia (0185): el envío que va a Mercado Pago es el que calculó la base ─────────
 test("artículos: con la cotización por distancia, el envío del tramo entra y la suma cuadra con el total", () => {
   const q = { renglones: [{ nombre: "Sencilla", cantidad: 2, detalle: null, total_mxn: "240.00" }], subtotal_mxn: "240.00",
               envio_mxn: "35.00", envio_total_mxn: "40.60", total_mxn: "280.60", cobro: "DISTANCIA", distancia_km: "3.2", zona_id: "z" };
