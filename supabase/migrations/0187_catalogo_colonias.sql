@@ -103,3 +103,80 @@ $fn$;
 REVOKE ALL ON FUNCTION _colonia_zona_valida() FROM PUBLIC, anon, authenticated;
 CREATE TRIGGER trg_colonias_zona_valida BEFORE INSERT OR UPDATE OF zona_envio_id, sucursal_id ON colonias
   FOR EACH ROW EXECUTE FUNCTION _colonia_zona_valida();
+
+-- ── §3 sembrar_colonias ──────────────────────────────────────────────────────
+-- Copia los asentamientos del municipio de la sucursal (sale de su CP) y a cada colonia SIN zona le
+-- pone la zona más usada en el historial de domicilios de esa sucursal. Repetirla es seguro: no
+-- duplica, no revive colonias borradas y nunca pisa una zona asignada.
+-- Herencia: el texto del domicilio se compara sin acentos ni mayúsculas. Si la colonia tiene una
+-- homónima viva con otro CP, solo cuenta el historial con SU CP (muchos domicilios de la caja
+-- guardan «00000»: esos no deciden entre homónimas). Zonas borradas, inactivas o de tramo no cuentan.
+CREATE OR REPLACE FUNCTION sembrar_colonias(p_sucursal uuid)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $fn$
+DECLARE
+  v_tenant uuid := current_tenant_id();
+  v_cp     text;
+  v_mun    text;
+  v_ins    integer;
+  v_her    integer;
+BEGIN
+  IF v_tenant IS NULL OR NOT es_admin_del_tenant(v_tenant) THEN
+    RAISE EXCEPTION 'NO_AUTORIZADO: solo quien administra el negocio carga colonias' USING ERRCODE = '42501';
+  END IF;
+  SELECT s.codigo_postal INTO v_cp FROM sucursales s WHERE s.id = p_sucursal AND s.tenant_id = v_tenant;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'SUCURSAL_INVALIDA: la sucursal no es de este negocio' USING ERRCODE = 'P0002';
+  END IF;
+  SELECT a.clave_municipio INTO v_mun FROM sepomex_asentamientos a WHERE a.codigo_postal = v_cp LIMIT 1;
+  IF v_mun IS NULL THEN
+    RAISE EXCEPTION 'CP_DESCONOCIDO: captura un código postal válido en los datos de la sucursal' USING ERRCODE = '22023';
+  END IF;
+
+  INSERT INTO colonias (tenant_id, sucursal_id, nombre, codigo_postal, origen)
+  SELECT DISTINCT ON (lower(f_unaccent(btrim(a.nombre))), a.codigo_postal)
+         v_tenant, p_sucursal, btrim(a.nombre), a.codigo_postal, 'SEPOMEX'
+    FROM sepomex_asentamientos a
+   WHERE a.clave_municipio = v_mun
+     -- Sin el filtro de deleted_at: una colonia que el dueño borró no vuelve.
+     AND NOT EXISTS (SELECT 1 FROM colonias c
+                      WHERE c.sucursal_id = p_sucursal
+                        AND c.nombre_busqueda = lower(f_unaccent(btrim(a.nombre)))
+                        AND coalesce(c.codigo_postal, '') = a.codigo_postal)
+   ORDER BY lower(f_unaccent(btrim(a.nombre))), a.codigo_postal, a.id;
+  GET DIAGNOSTICS v_ins = ROW_COUNT;
+
+  WITH uso AS (
+    SELECT lower(f_unaccent(btrim(d.colonia))) AS nb, d.codigo_postal AS cp, d.zona_envio_id AS zona,
+           count(*) AS n, max(d.updated_at) AS ult
+      FROM direcciones_cliente d
+      JOIN zonas_envio z ON z.id = d.zona_envio_id
+     WHERE d.tenant_id = v_tenant AND d.activa
+       AND z.sucursal_id = p_sucursal AND z.deleted_at IS NULL AND z.activa
+       AND NOT EXISTS (SELECT 1 FROM tienda_sucursales ts
+                        WHERE ts.sucursal_id = p_sucursal
+                          AND ts.tramos_envio @> jsonb_build_array(jsonb_build_object('zona_id', z.id::text)))
+     GROUP BY 1, 2, 3
+  ), votos AS (
+    SELECT c.id, u.zona, sum(u.n) AS n, max(u.ult) AS ult
+      FROM colonias c
+      JOIN uso u ON u.nb = c.nombre_busqueda
+                AND (u.cp = c.codigo_postal
+                     OR NOT EXISTS (SELECT 1 FROM colonias o
+                                     WHERE o.sucursal_id = c.sucursal_id AND o.deleted_at IS NULL
+                                       AND o.nombre_busqueda = c.nombre_busqueda AND o.id <> c.id))
+     WHERE c.sucursal_id = p_sucursal AND c.deleted_at IS NULL AND c.zona_envio_id IS NULL
+     GROUP BY c.id, u.zona
+  ), elegida AS (
+    SELECT DISTINCT ON (id) id, zona FROM votos ORDER BY id, n DESC, ult DESC
+  )
+  UPDATE colonias c SET zona_envio_id = e.zona FROM elegida e WHERE c.id = e.id;
+  GET DIAGNOSTICS v_her = ROW_COUNT;
+
+  RETURN jsonb_build_object('insertadas', v_ins, 'heredadas', v_her);
+END;
+$fn$;
+REVOKE EXECUTE ON FUNCTION sembrar_colonias(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION sembrar_colonias(uuid) TO authenticated;
