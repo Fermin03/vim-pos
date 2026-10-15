@@ -241,3 +241,17 @@ Báscula y granel; tienda en línea con existencias (y sus textos neutros); apar
   pruebas y umbral configurable.
 - **Pantalla nueva.** Duplicar lógica de `home-pos.tsx`; extraer lo compartido (ticket, cobro) en vez
   de copiarlo.
+
+## 12. Ajustes al planear la entrega 1 (15 oct)
+
+- Defecto y "no le gustó" reutilizan `PRODUCTO_DEFECTUOSO` y `CLIENTE_NO_SATISFECHO`; solo se agrega
+  `CAMBIO_TALLA`.
+- La hija siempre tiene precio propio (`precio_base_mxn` es `NOT NULL` y lo lee todo el cobro); el
+  admin lo prellena con el del padre.
+- El cambio de talla en un solo flujo (con el dinero) va en la entrega 4; en la base son una
+  devolución parcial y una venta, y se prueban juntas en la entrega 1.
+- SKU único solo entre productos con existencias; código de barras único por negocio.
+- Venta, reabrir, cancelación y devolución mueven existencias con una sola función idempotente, para
+  que cancelar con devolución de dinero no regrese dos veces.
+
+Plan: `docs/superpowers/plans/2026-10-15-retail-1-nucleo.md`.
