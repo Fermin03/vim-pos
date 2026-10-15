@@ -41,7 +41,7 @@ import { LIMITES_DE_CUENTA, direccionEnUnaLinea, enlaceDeAcceso, formularioDeDir
 import { formatoMxn } from "../lib/dinero";
 import { enviarPedido, envioDeLaPagina, intentoDelNegocio, pruebaQueNoHuboCobro, resolverDuda, type Desenlace, type ResultadoDeEnvio } from "../lib/envio";
 import { formasDePago, leerOtroMonto, propinaDe, totalAPagar, type Propina as Porcentaje, type PropinaElegida } from "../lib/pago";
-import { coloniaQueCoincide, envioEnDatos } from "../lib/pantalla";
+import { coloniaQueCoincide, envioEnDatos, ultimaVigente } from "../lib/pantalla";
 import { accionDe, avanzar, pasoDelDesenlace, pasosDe, type Paso } from "../lib/pasos";
 import { BOTON_OTRA_FORMA, finDeLaPausa, guardarPausa, leerPausa, lineaDePausa, textoDePausa } from "../lib/pausa";
 import { textoDeRechazo, type CampoDeTarjeta } from "../lib/tarjeta";
@@ -244,16 +244,19 @@ export function PasoDeDatos({
 
   /**
    * La colonia del catálogo que es exactamente la de una dirección ya escrita (guardada en la cuenta,
-   * o recordada en el teléfono): con ella se cotiza sin que el cliente la vuelva a elegir. El turno
-   * descarta una respuesta que llega después de cambiar de dirección o de escribir encima.
+   * o recordada en el teléfono): con ella se cotiza sin que el cliente la vuelva a elegir. Solo vale
+   * la última búsqueda: TODO lo que cambia el texto de la colonia (escribir, elegir una sugerencia,
+   * cambiar de dirección, «Olvidar mis datos») la descarta con `soltarColonia`.
    */
-  const turnoDeColonia = useRef(0);
+  const [vigencia] = useState(ultimaVigente);
+  /** Descarta la búsqueda en vuelo y, si había, la colonia elegida. */
+  const soltarColonia = () => { vigencia.descartar(); alCambiarColonia(null); };
   const buscarColonia = (nombre: string, cp: string) => {
-    const turno = ++turnoDeColonia.current;
+    const vigente = vigencia.pedir();
     alCambiarColonia(null);
     if (!sucursal.colonias || nombre.trim().length < 2) return;
     void colonias(negocio.slug, sucursal.id, nombre.trim()).then((r) => {
-      if (r.ok && turno === turnoDeColonia.current) alCambiarColonia(coloniaQueCoincide(r.datos, nombre, cp));
+      if (r.ok && vigente()) alCambiarColonia(coloniaQueCoincide(r.datos, nombre, cp));
     });
   };
 
@@ -342,7 +345,7 @@ export function PasoDeDatos({
     // Su pin, si lo tiene; si no, ninguno: el de otra dirección cobraría otro envío.
     alCambiarPunto(d?.punto ?? null);
     // Y su colonia del catálogo, si coincide exacto; con «Otra», ninguna hasta que elija una sugerencia.
-    if (d) buscarColonia(d.colonia, d.codigo_postal); else { turnoDeColonia.current++; alCambiarColonia(null); }
+    if (d) buscarColonia(d.colonia, d.codigo_postal); else soltarColonia();
     setTocados((t) => new Set([...t].filter((c) => !esDeDireccion(c))));
     setRechazo((r) => ({ ...r, calle: undefined }));
   };
@@ -360,7 +363,11 @@ export function PasoDeDatos({
   const campo = (c: Campo, etiqueta: string, extra: Partial<Parameters<typeof CampoDeTexto>[0]> = {}) => (
     <CampoDeTexto id={`${id}-${c}`} etiqueta={etiqueta} value={f[c]} error={errorDe(c)}
       maxLength={LIMITES[c]}
-      alCambiar={(v) => { setF((a) => ({ ...a, [c]: v })); setRechazo((r) => ({ ...r, [c]: undefined })); }}
+      alCambiar={(v) => {
+        setF((a) => ({ ...a, [c]: v })); setRechazo((r) => ({ ...r, [c]: undefined }));
+        // Una búsqueda de colonia en vuelo comparaba con el CP de antes: ya no vale.
+        if (c === "codigoPostal") vigencia.descartar();
+      }}
       alSalir={() => setTocados((t) => new Set(t).add(c))} {...extra} />
   );
 
@@ -778,11 +785,11 @@ export function PasoDeDatos({
                           alSalir={() => setTocados((t) => new Set(t).add("colonia"))}
                           alEscribir={(v) => {
                             setF((a) => ({ ...a, colonia: v })); setRechazo((r) => ({ ...r, colonia: undefined }));
-                            // Escribir encima ya no es la colonia elegida.
-                            if (colonia) { turnoDeColonia.current++; alCambiarColonia(null); }
+                            // Escribir encima ya no es la colonia elegida, ni la que se estaba buscando.
+                            soltarColonia();
                           }}
                           alElegir={(c) => {
-                            turnoDeColonia.current++;
+                            vigencia.descartar();
                             setF((a) => ({ ...a, colonia: c.nombre, ...(c.codigo_postal && { codigoPostal: c.codigo_postal }) }));
                             setRechazo((r) => ({ ...r, colonia: undefined, codigoPostal: undefined, zona: undefined }));
                             alCambiarColonia(c);
@@ -851,7 +858,7 @@ export function PasoDeDatos({
                 <p>
                   Llenamos tus datos con los de tu último pedido, guardados en este teléfono.{" "}
                   <button type="button" className={cn("font-medium text-ink underline underline-offset-4", FOCO)}
-                    onClick={() => { olvidarCliente(); setF(FORMULARIO_VACIO); setTocados(new Set()); setRecordado(false); }}>
+                    onClick={() => { olvidarCliente(); soltarColonia(); setF(FORMULARIO_VACIO); setTocados(new Set()); setRecordado(false); }}>
                     Olvidar mis datos
                   </button>
                 </p>

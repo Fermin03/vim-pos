@@ -6,7 +6,7 @@ import type { Resultado } from "../api";
 import { agregar, carritoNuevo, seleccionInicial, type Carrito, type CuerpoCarrito } from "../carrito";
 import { cotizacionDe, menuDe, negocioDe, type ColoniaSugerida, type Cotizacion, type Menu, type Negocio, type Sucursal } from "../contrato";
 import {
-  alternar, carritoPara, categoriaActiva, coloniaQueCoincide, cotizarConEspera, envioEnDatos, modosDe, motivoDeCierre, renglonesDelError, sucursalElegida,
+  alternar, carritoPara, categoriaActiva, coloniaQueCoincide, cotizarConEspera, envioEnDatos, modosDe, motivoDeCierre, renglonesDelError, sucursalElegida, ultimaVigente,
 } from "../pantalla";
 import { ID, cotizacionCruda, menuCrudo, negocioCrudo, u } from "./datos";
 
@@ -243,6 +243,20 @@ describe("envioEnDatos", () => {
   it("sin catálogo, o con una sola zona: nada (el carrito ya la tiene)", () => {
     expect(envioEnDatos(con({ colonias: false, zonas: dosZonas }), cot(false), null)).toBe("nada");
     expect(envioEnDatos(con({ colonias: true }), cot(false), null)).toBe("nada");
+  });
+});
+
+describe("ultimaVigente", () => {
+  it("solo la última búsqueda vale; descartar invalida la que esté en vuelo", () => {
+    const v = ultimaVigente();
+    const primera = v.pedir();
+    expect(primera()).toBe(true);
+    const segunda = v.pedir();
+    expect(primera()).toBe(false);
+    expect(segunda()).toBe(true);
+    // El cliente escribe encima: la respuesta que venía ya no se usa.
+    v.descartar();
+    expect(segunda()).toBe(false);
   });
 });
 

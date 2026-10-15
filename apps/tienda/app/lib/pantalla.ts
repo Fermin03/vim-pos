@@ -129,6 +129,16 @@ export function envioEnDatos(sucursal: Sucursal, cotizacion: Cotizacion | null, 
   return sucursal.colonias && sucursal.zonas.length > 1 ? "zona" : "nada";
 }
 
+/**
+ * Para búsquedas que pueden llegar tarde: solo vale la última. `pedir()` da con qué preguntar, al
+ * llegar la respuesta, si sigue vigente; `descartar()` invalida la que esté en vuelo (el cliente
+ * escribió encima, cambió de dirección o eligió otra cosa).
+ */
+export function ultimaVigente(): { pedir: () => () => boolean; descartar: () => void } {
+  let turno = 0;
+  return { pedir: () => { const mio = ++turno; return () => mio === turno; }, descartar: () => { turno++; } };
+}
+
 /** Para comparar colonias: sin acentos, mayúsculas ni espacios de más. */
 const normal = (s: string): string => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
 /** La colonia del catálogo que es EXACTAMENTE la de una dirección guardada (mismo nombre y mismo CP), o null. */
