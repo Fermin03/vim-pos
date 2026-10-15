@@ -21,7 +21,7 @@
 - Módulo de operación nuevo `existencias`: nace **apagado** para todos los negocios existentes y todos los giros, salvo `RETAIL`. No depende del plan.
 - Movimientos a mano (entrada, ajuste, merma, conteo, traspaso): permiso `config.productos` **y** módulo `existencias` efectivo.
 - Nada de `CURRENT_DATE` contra fechas de negocio en los smokes: `(now() AT TIME ZONE 'America/Mexico_City')::date`.
-- Una migración aplicada en remoto no se edita. Las migraciones van a producción **a mano y antes del merge**, cada una en su transacción.
+- **Todo en local hasta el 100 % (Fermín, 15 oct):** nada de push, PR ni producción en esta entrega. Se prueba solo contra el Postgres embebido de los smokes y el Supabase local. Cuando llegue el momento, las migraciones van a producción **a mano y antes del merge**, cada una en su transacción.
 - Antes de crear los archivos, confirmar que 0188 y 0189 siguen libres en `origin/main`. Si no, usar las dos siguientes y renumerar en todo el plan.
 - Antes de reemplazar `juego_inicial_de_giro`, `modulos_efectivos` o `cambiar_giro`, confirmar con `grep -l "FUNCTION <nombre>" supabase/migrations/*.sql` que la 0180 sigue siendo su versión más nueva. Si otra migración las reescribió, partir de ese cuerpo.
 
@@ -1724,11 +1724,12 @@ git add docs/decisiones/0037-el-stock-de-una-tienda-vive-en-el-producto.md docs/
 git commit -m "docs(retail): ADR 0037 y tipos regenerados"
 ```
 
-- [ ] **Step 5: Entrega**
+- [ ] **Step 5: Cierre local (sin push, sin PR, sin producción)**
 
-- Abrir el PR contra `main` con el resumen y el enlace al spec. **No mezclarlo** hasta que la 0188 y la 0189 estén aplicadas a producción, a mano, en ese orden y cada una en su transacción, con la consulta de códigos de barras en cero y el visto bueno de Fermín.
-- Hacer push **solo** con el OK de Fermín (memoria: `project_sin_push_hasta_fin_de_semana`).
-- Reportar a Fermín el hallazgo del doble regreso de insumos al cancelar un ticket pagado con devolución de dinero (fuera de alcance aquí).
+**Regla de Fermín (15 oct): todo el giro RETAIL se trabaja en local hasta que esté al 100 %.** Esta entrega termina en la rama local `feat/retail-nucleo` con todos los smokes en verde. **No** se hace push, **no** se abre PR y **no** se aplica nada a producción. Las entregas 2 a 5 se apilan encima, en local.
+
+- Reportar a Fermín el resultado de los smokes y el hallazgo del doble regreso de insumos al cancelar un ticket pagado con devolución de dinero (fuera de alcance aquí).
+- Cuando las cinco entregas estén completas y Fermín dé el OK, se sigue el orden de lanzamiento del spec §7. La 0188 y la 0189 van a producción a mano, en ese orden y cada una en su transacción, con la consulta de códigos de barras en cero, y antes del merge.
 
 ## Lo que esta entrega no hace (va en la 2 a la 5)
 
