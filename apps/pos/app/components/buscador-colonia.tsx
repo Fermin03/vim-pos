@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { buscarColonias, type Colonia } from "../lib/colonias";
+import { buscarColonias, normalizarColonia, type Colonia } from "../lib/colonias";
 import type { ZonaEnvio } from "../lib/zonas-envio";
 
 const fmtMxn = (n: number) => n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
@@ -10,13 +10,15 @@ const fmtMxn = (n: number) => n.toLocaleString("es-MX", { style: "currency", cur
  * letras, 300 ms, hasta 8. Elegir una llena zona y CP (lo hace quien lo usa con `onElegir`).
  * Sin catálogo es un campo de texto como siempre.
  */
-export function BuscadorColonia({ token, sucursalId, hayCatalogo, zonas, texto, onTexto, onElegir, className }: {
+export function BuscadorColonia({ token, sucursalId, hayCatalogo, zonas, texto, elegida, onTexto, onElegir, className }: {
   token: string; sucursalId: string; hayCatalogo: boolean; zonas: ZonaEnvio[];
-  texto: string; onTexto: (t: string) => void; onElegir: (c: Colonia) => void; className: string;
+  texto: string; /** Ya se eligió una de las sugerencias: no hay nada que avisar. */ elegida: boolean; onTexto: (t: string) => void; onElegir: (c: Colonia) => void; className: string;
 }) {
   const [res, setRes] = useState<Colonia[]>([]);
   const [abierto, setAbierto] = useState(false);
   const [activo, setActivo] = useState(-1);
+  // Las últimas sugerencias traían una con este mismo nombre: no se agrega otra. Sobrevive al cerrar la lista.
+  const [yaEsta, setYaEsta] = useState(false);
   const ultima = useRef(0);
 
   useEffect(() => {
@@ -24,7 +26,11 @@ export function BuscadorColonia({ token, sucursalId, hayCatalogo, zonas, texto, 
     const n = ++ultima.current;
     const t = setTimeout(() => {
       buscarColonias(token, sucursalId, texto, zonas)
-        .then((r) => { if (n === ultima.current) { setRes(r); setActivo(-1); } })
+        .then((r) => {
+          if (n !== ultima.current) return;
+          setRes(r); setActivo(-1);
+          setYaEsta(r.some((c) => normalizarColonia(c.nombre) === normalizarColonia(texto)));
+        })
         .catch(() => { if (n === ultima.current) setRes([]); });   // sin sugerencias: se escribe a mano
     }, 300);
     return () => clearTimeout(t);
@@ -36,7 +42,7 @@ export function BuscadorColonia({ token, sucursalId, hayCatalogo, zonas, texto, 
     <div className="relative">
       <input className={className} value={texto} maxLength={150} role="combobox" aria-expanded={abierto && res.length > 0}
         aria-autocomplete="list" autoComplete="off"
-        onChange={(e) => { onTexto(e.target.value); setAbierto(true); }}
+        onChange={(e) => { onTexto(e.target.value); setAbierto(true); setYaEsta(false); }}
         onBlur={() => setTimeout(() => setAbierto(false), 120)}
         onKeyDown={(e) => {
           if (!res.length) return;
@@ -56,6 +62,12 @@ export function BuscadorColonia({ token, sucursalId, hayCatalogo, zonas, texto, 
             </li>
           ))}
         </ul>
+      )}
+      {hayCatalogo && texto.trim() && !elegida && (
+        <p className="mt-1 text-12 text-ink-3">
+          {yaEsta ? `«${texto.trim()}» ya está en el catálogo: elígela de la lista para usar su CP y zona.`
+                  : `«${texto.trim()}» se agregará al catálogo de colonias.`}
+        </p>
       )}
     </div>
   );

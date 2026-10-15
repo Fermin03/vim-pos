@@ -50,10 +50,9 @@ export function CamposDireccion({
       <div>
         <span className={label}>Colonia *</span>
         <BuscadorColonia token={token} sucursalId={sucursalId} hayCatalogo={hayCatalogo} zonas={zonas} className={input}
-          texto={dir.colonia}
+          texto={dir.colonia} elegida={!!dir.coloniaCatalogo}
           onTexto={(t) => onCambio({ ...dir, colonia: t, coloniaCatalogo: null, codigoPostal: null, guardarZonaEnColonia: false })}
           onElegir={(c) => onCambio({ ...dir, colonia: c.nombre, coloniaCatalogo: c, codigoPostal: c.codigoPostal, zona: c.zona ?? dir.zona, guardarZonaEnColonia: false })} />
-        {hayCatalogo && dir.colonia.trim() && !dir.coloniaCatalogo && <p className="mt-1 text-12 text-ink-3">«{dir.colonia.trim()}» se agregará al catálogo de colonias.</p>}
       </div>
       <div><span className={label}>Referencias</span><input className={input} value={dir.referencias} maxLength={200} onChange={(e) => onCambio({ ...dir, referencias: e.target.value })} placeholder="Color de casa, entre calles, timbre…" /></div>
       <div>
@@ -176,8 +175,9 @@ export function ModalClienteDomicilio({
   /** Una colonia escrita igual a una del catálogo cuenta como elegida (CP y zona). Si la consulta falla, sigue como se escribió. */
   async function resolverColonia(d: DireccionInput): Promise<DireccionInput> {
     if (!hayCatalogo || d.coloniaCatalogo || !d.colonia.trim()) return d;
-    const hit = await coloniaExacta(token, sucursalId, d.colonia, zonas).catch(() => null);
-    return hit ? { ...d, coloniaCatalogo: hit, codigoPostal: hit.codigoPostal, zona: d.zona ?? hit.zona } : d;
+    const hit = await coloniaExacta(token, sucursalId, d.colonia, zonas).catch(() => ({ tipo: "ninguna" }) as const);
+    if (hit.tipo === "varias") return { ...d, coloniaAmbigua: true };   // se guarda como se escribió, con la zona elegida
+    return hit.tipo === "una" ? { ...d, coloniaCatalogo: hit.colonia, codigoPostal: hit.colonia.codigoPostal, zona: d.zona ?? hit.colonia.zona } : d;
   }
 
   /** Cierra el guardado: si el catálogo falló, avisa y espera "Continuar"; si no, selecciona. */
@@ -247,7 +247,8 @@ export function ModalClienteDomicilio({
     if (zonas.length > 0 && !vigente) {
       setError(null);
       // Antes de pedirla, la colonia del catálogo puede traerla.
-      const delCatalogo = hayCatalogo ? await coloniaExacta(token, sucursalId, d.colonia, zonas).catch(() => null) : null;
+      const hit = hayCatalogo ? await coloniaExacta(token, sucursalId, d.colonia, zonas).catch(() => null) : null;
+      const delCatalogo = hit?.tipo === "una" ? hit.colonia : null;
       if (delCatalogo?.zona) {
         try {
           await fijarZonaDireccion(token, d.id, delCatalogo.zona.id);

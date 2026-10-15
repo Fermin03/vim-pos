@@ -79,6 +79,8 @@ describe("planColonia", () => {
     expect(planColonia({ ...base, zona: zB, guardarZonaEnColonia: true, coloniaCatalogo: { id: "c", nombre: "Las Joyas", codigoPostal: null, zona: zA } }, true)).toEqual({ tipo: "cambiar", coloniaId: "c" }));
   it("sin zona en el pedido no toca el catálogo salvo el alta", () =>
     expect(planColonia({ ...base, zona: null, coloniaCatalogo: { id: "c", nombre: "Las Joyas", codigoPostal: null, zona: null } }, true)).toEqual({ tipo: "nada" }));
+  it("homónimas en el catálogo y escrita a mano: no se da de alta otra", () =>
+    expect(planColonia({ ...base, coloniaAmbigua: true }, true)).toEqual({ tipo: "nada" }));
   it("colonia en blanco: nada", () => expect(planColonia({ ...base, colonia: "  " }, true)).toEqual({ tipo: "nada" }));
 });
 

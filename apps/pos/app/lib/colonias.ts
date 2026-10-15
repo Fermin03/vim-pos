@@ -52,13 +52,16 @@ export async function buscarColonias(token: string, sucursalId: string, q: strin
   return ordenarSugerencias(((data ?? []) as unknown as Fila[]).map((f) => mapear(f, vigentes)), q);
 }
 
-/** La colonia del catálogo que se llama exactamente así (para domicilios ya guardados). Con homónimas, null. */
-export async function coloniaExacta(token: string, sucursalId: string, nombre: string, vigentes: ZonaEnvio[]): Promise<Colonia | null> {
+/** Lo que hay en el catálogo con exactamente ese nombre: ninguna, una, o varias (homónimas con distinto CP). */
+export type Exacta = { tipo: "ninguna" } | { tipo: "una"; colonia: Colonia } | { tipo: "varias" };
+
+export async function coloniaExacta(token: string, sucursalId: string, nombre: string, vigentes: ZonaEnvio[]): Promise<Exacta> {
   const { data, error } = await employeeClient(token).from("colonias").select(COLUMNAS)
     .eq("sucursal_id", sucursalId).is("deleted_at", null).eq("nombre_busqueda", normalizarColonia(nombre)).limit(2);
   if (error) throw new Error(error.message);
   const filas = (data ?? []) as unknown as Fila[];
-  return filas.length === 1 ? mapear(filas[0]!, vigentes) : null;
+  if (filas.length === 0) return { tipo: "ninguna" };
+  return filas.length === 1 ? { tipo: "una", colonia: mapear(filas[0]!, vigentes) } : { tipo: "varias" };
 }
 
 export async function crearColonia(

@@ -126,6 +126,8 @@ export type DireccionInput = {
   codigoPostal: string | null;
   /** Casilla «Guardar esta zona para la colonia» (cambiar una zona ya asignada pide PIN). */
   guardarZonaEnColonia: boolean;
+  /** Escrita a mano y con homónimas en el catálogo: no se sabe cuál es, así que no se da de alta otra. */
+  coloniaAmbigua?: boolean;
 };
 
 /** Qué hacerle al catálogo al guardar el domicilio. Pura, con pruebas. */
@@ -133,7 +135,7 @@ export function planColonia(dir: DireccionInput, hayCatalogo: boolean):
   { tipo: "nada" } | { tipo: "crear" } | { tipo: "asignar"; coloniaId: string } | { tipo: "cambiar"; coloniaId: string } {
   if (!hayCatalogo || !dir.colonia.trim()) return { tipo: "nada" };
   const c = dir.coloniaCatalogo;
-  if (!c) return { tipo: "crear" };
+  if (!c) return dir.coloniaAmbigua ? { tipo: "nada" } : { tipo: "crear" };
   if (!dir.zona) return { tipo: "nada" };
   if (!c.zona) return { tipo: "asignar", coloniaId: c.id };
   if (dir.zona.id !== c.zona.id && dir.guardarZonaEnColonia) return { tipo: "cambiar", coloniaId: c.id };
