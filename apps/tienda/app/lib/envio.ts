@@ -45,7 +45,7 @@ export type Desenlace =
     /**
      * Qué se ofrece después:
      *  · `reintentar`  — el botón de enviar sigue ahí;
-     *  · `volver`      — se arregla en el carrito (zona, modo, productos);
+     *  · `volver`      — se arregla en el carrito (modo, productos);
      *  · `llamar`      — por aquí no se va a poder: llamar al restaurante;
      *  · `reintentar-seguro` — el pedido PUDO haber entrado: «Reintentar» (misma clave: no se duplica)
      *                    y, en secundario, llamar al restaurante;
@@ -66,6 +66,8 @@ const DE_CAMPO: Record<string, Campo | "pago" | "ubicacion"> = {
   CLIENTE_INVALIDO: "nombre", DIRECCION_INVALIDA: "calle", PAGO_INVALIDO: "pago",
   // Envío por distancia (0185): se corrige en el mapa de «¿Quién recibe?».
   UBICACION_INVALIDA: "ubicacion", FUERA_DE_AREA: "ubicacion",
+  // «Por zonas» sin colonia con zona (0187 §6): se corrige en la colonia, o se pide para recoger.
+  SIN_COBERTURA: "colonia",
 };
 const DEL_CARRITO = new Set(["ZONA_INVALIDA", "MODO_INVALIDO", "CARRITO_INVALIDO", "PRECIO_INVALIDO", "SUCURSAL_INVALIDA", "SUCURSAL_DE_OTRO_NEGOCIO", "CUERPO_DEMASIADO_GRANDE"]);
 const SOLO_LLAMAR = new Set(["NO_SE_PUDO_CREAR", "TIENDA_NO_DISPONIBLE"]);

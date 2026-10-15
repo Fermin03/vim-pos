@@ -54,6 +54,8 @@ BEGIN
   INSERT INTO opciones_modificador (tenant_id, grupo_id, nombre, precio_extra_mxn, orden_visualizacion) VALUES (v_t, v_g, 'Extra queso', 15, 1) RETURNING id INTO v_o15;
   INSERT INTO productos_grupos_modificadores (tenant_id, producto_id, grupo_id, orden_visualizacion) VALUES (v_t, v_p120, v_g, 1);
   INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES (v_t, v_suc, 'Seguimiento 35', 35) RETURNING id INTO v_z35;
+  -- 0187: a domicilio la zona sale de la colonia (la de v_dir). Al recoger se ignora.
+  INSERT INTO colonias (tenant_id, sucursal_id, nombre, codigo_postal, zona_envio_id) VALUES (v_t, v_suc, 'Centro', '37000', v_z35);
 
   UPDATE turnos SET estado = 'CERRADO', fecha_cierre = now() WHERE sucursal_id = v_suc AND estado = 'ABIERTO';
   INSERT INTO turnos (tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable, usuario_apertura_id, fondo_inicial_mxn, fondo_modo)
@@ -106,7 +108,7 @@ BEGIN
                CASE WHEN r.modo = 'DOMICILIO' THEN v_dom ELSE v_rec END,
                jsonb_build_object('nombre', 'Ana Seguimiento', 'telefono', v_tel),
                CASE WHEN r.modo = 'DOMICILIO' THEN v_dir END,
-               'EFECTIVO', NULL, NULL, pg_temp.h(v_n)) ->> 'pedido_id')::uuid;
+               'EFECTIVO', NULL, NULL, pg_temp.h(v_n), p_colonia => (SELECT id FROM colonias WHERE zona_envio_id = v_z35)) ->> 'pedido_id')::uuid;
     IF r.estado IS NOT NULL THEN
       UPDATE delivery_pedidos SET estado = r.estado, motivo_cancelacion = r.motivo WHERE id = v_id;
     END IF;
@@ -129,7 +131,8 @@ BEGIN
     v_id := (tienda_crear_pedido(v_t, v_suc, r.modo, CASE WHEN r.modo = 'DOMICILIO' THEN v_z35 END,
                CASE WHEN r.modo = 'DOMICILIO' THEN v_dom ELSE v_rec END,
                jsonb_build_object('nombre', 'Ana Seguimiento', 'telefono', '4775551' || lpad(v_n::text, 3, '0')),
-               CASE WHEN r.modo = 'DOMICILIO' THEN v_dir END, 'EFECTIVO', NULL, NULL, pg_temp.h(v_n)) ->> 'pedido_id')::uuid;
+               CASE WHEN r.modo = 'DOMICILIO' THEN v_dir END, 'EFECTIVO', NULL, NULL, pg_temp.h(v_n),
+               p_colonia => (SELECT id FROM colonias WHERE zona_envio_id = v_z35)) ->> 'pedido_id')::uuid;
     IF (SELECT gestion FROM delivery_pedidos WHERE id = v_id) <> 'NUBE' THEN RAISE EXCEPTION '9: el fixture debía dar gestion NUBE'; END IF;
     v_ticket := crear_ticket_desde_tienda(v_id);
     IF (SELECT estado FROM delivery_pedidos WHERE id = v_id) <> 'ACEPTADO' THEN RAISE EXCEPTION '9 (%): el pedido debía quedar ACEPTADO', r.modo; END IF;
@@ -144,7 +147,7 @@ BEGIN
   -- 10) Con repartidor asignado (a domicilio): EN_CAMINO aunque el ticket no se haya impreso.
   v_n := v_n + 1;   -- 18
   v_id := (tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', v_z35, v_dom, jsonb_build_object('nombre', 'Ana Seguimiento', 'telefono', '4775551' || lpad(v_n::text, 3, '0')),
-             v_dir, 'EFECTIVO', NULL, NULL, pg_temp.h(v_n)) ->> 'pedido_id')::uuid;
+             v_dir, 'EFECTIVO', NULL, NULL, pg_temp.h(v_n), p_colonia => (SELECT id FROM colonias WHERE zona_envio_id = v_z35)) ->> 'pedido_id')::uuid;
   v_ticket := crear_ticket_desde_tienda(v_id);
   IF (tienda_seguimiento(v_t, pg_temp.h(v_n)) ->> 'estado') IS DISTINCT FROM 'EN_PREPARACION' THEN RAISE EXCEPTION '10: sin repartidor debía ser EN_PREPARACION'; END IF;
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
@@ -171,7 +174,7 @@ BEGIN
   -- 12) Cancelado gana a todo: ticket CANCELADO (aunque esté impreso y con repartidor) → CANCELADO, motivo OTRO (el pedido no trae código).
   v_n := v_n + 1;
   v_id := (tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', v_z35, v_dom, jsonb_build_object('nombre', 'Ana Seguimiento', 'telefono', '4775551' || lpad(v_n::text, 3, '0')),
-             v_dir, 'EFECTIVO', NULL, NULL, pg_temp.h(v_n)) ->> 'pedido_id')::uuid;
+             v_dir, 'EFECTIVO', NULL, NULL, pg_temp.h(v_n), p_colonia => (SELECT id FROM colonias WHERE zona_envio_id = v_z35)) ->> 'pedido_id')::uuid;
   v_ticket := crear_ticket_desde_tienda(v_id);
   UPDATE tickets SET ticket_impreso_at = now() WHERE id = v_ticket;
   INSERT INTO delivery_asignaciones (tenant_id, sucursal_id, ticket_id, repartidor_catalogo_id, repartidor_nombre, monto_a_liquidar_mxn, estado, fecha_salida)
@@ -228,7 +231,8 @@ BEGIN
   v_mail := 'privado.secreto@ejemplo-reservado.com';
   v_id := (tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', v_z35, v_dom,
              jsonb_build_object('nombre', 'Ana Seguimiento', 'telefono', v_tel, 'email', v_mail),
-             v_dir, 'EFECTIVO', 500, 'NOTA-SECRETA-DEL-CLIENTE', pg_temp.h(v_n)) ->> 'pedido_id')::uuid;
+             v_dir, 'EFECTIVO', 500, 'NOTA-SECRETA-DEL-CLIENTE', pg_temp.h(v_n),
+             p_colonia => (SELECT id FROM colonias WHERE zona_envio_id = v_z35)) ->> 'pedido_id')::uuid;
   v_s := tienda_seguimiento(v_t, pg_temp.h(v_n));
   -- (para el renglón con extra y nota se usa además un pedido de recoger, más abajo)
   IF (SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(v_s) k)

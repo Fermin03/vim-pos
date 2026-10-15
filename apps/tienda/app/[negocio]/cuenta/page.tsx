@@ -16,5 +16,5 @@ export default async function PaginaDeMiCuenta(props: PropsDeAcceso) {
   if (!(await haySesion(slug))) redirect(enlaceDeAcceso(slug, "entrar", `/${slug}/cuenta`));
   if (!negocio) return <Fallo titulo="No pudimos cargar la tienda" hacer="Vuelve a intentar en unos minutos." reintentar={`/${slug}/cuenta`} />;
   // Solo lo que la pantalla usa: el nombre, y las sucursales para «pedir de nuevo».
-  return <MiCuentaDelNegocio negocio={{ slug, nombre: negocio.nombre, sucursales: negocio.sucursales.map((s) => ({ id: s.id, nombre: s.nombre })) }} />;
+  return <MiCuentaDelNegocio negocio={{ slug, nombre: negocio.nombre, sucursales: negocio.sucursales.map((s) => ({ id: s.id, nombre: s.nombre, colonias: s.colonias })) }} />;
 }

@@ -28,13 +28,13 @@ export type RenglonCarrito = {
   componentes: { grupoId: string; productoId: string; nombre: string; cantidad: number; modificadores: ModificadorGuardado[] }[];
 };
 export type Carrito = {
-  v: 1; sucursalId: string; modo: Modo; zonaId: string | null; renglones: RenglonCarrito[];
+  v: 1; sucursalId: string; modo: Modo; renglones: RenglonCarrito[];
   /** Cuándo se guardó (ms). Lo pone `guardarCarrito`. */
   guardado: number;
 };
 
-export function carritoNuevo(sucursalId: string, modo: Modo, zonaId: string | null = null): Carrito {
-  return { v: 1, sucursalId, modo, zonaId, renglones: [], guardado: 0 };
+export function carritoNuevo(sucursalId: string, modo: Modo): Carrito {
+  return { v: 1, sucursalId, modo, renglones: [], guardado: 0 };
 }
 
 // ── Reglas de selección ──────────────────────────────────────────────────────────────────────────
@@ -212,7 +212,7 @@ export function quitar(carrito: Carrito, id: string): Carrito {
   return { ...carrito, renglones: carrito.renglones.filter((r) => r.id !== id) };
 }
 
-/** Sin renglones; la sucursal, el modo y la zona se conservan. */
+/** Sin renglones; la sucursal y el modo se conservan. */
 export function vaciar(carrito: Carrito): Carrito {
   return { ...carrito, renglones: [] };
 }
@@ -247,20 +247,23 @@ export type CuerpoCarrito = {
   sucursal_id: string; modo: Modo; zona_id: string | null; items: ItemDeCuerpo[];
   /** Solo a domicilio «Por distancia» (0185): el pin del cliente. Con él la base calcula el envío. */
   punto?: Punto;
+  /** Solo a domicilio: la colonia del catálogo que eligió el cliente. La base saca de ella la zona del envío. */
+  colonia_id?: string;
 };
 
 /**
  * El carrito como lo espera la función. Las cantidades salen como enteros JSON dentro de sus topes
  * (la base rechaza `2.0`, `"2"` y lo que se pase): un carrito guardado raro no produce un 400.
  * Un producto simple lleva `modificadores` y nunca `componentes`; un combo, al revés.
- * `punto` va solo a domicilio: no se guarda con el carrito (es dato personal y vive en memoria).
+ * `punto` y `coloniaId` van solo a domicilio: no se guardan con el carrito (son del domicilio y viven en memoria).
  */
-export function aCuerpo(carrito: Carrito, punto: Punto | null = null): CuerpoCarrito {
+export function aCuerpo(carrito: Carrito, punto: Punto | null = null, coloniaId: string | null = null): CuerpoCarrito {
   const mods = (m: ModificadorElegido[]): ModificadorDeCuerpo[] =>
     m.map((x) => ({ opcion_id: x.opcionId, cantidad: acotar(x.cantidad, TOPES.porModificador) }));
   return {
     sucursal_id: carrito.sucursalId, modo: carrito.modo,
-    zona_id: carrito.modo === "DOMICILIO" ? carrito.zonaId : null,
+    // La zona nunca la elige el cliente (0187 §6): a domicilio la da la colonia del catálogo.
+    zona_id: null,
     items: carrito.renglones.slice(0, TOPES.renglones).map((r) => ({
       producto_id: r.productoId, cantidad: acotar(r.cantidad, TOPES.porRenglon),
       ...(r.nota && { nota: r.nota }),
@@ -269,6 +272,7 @@ export function aCuerpo(carrito: Carrito, punto: Punto | null = null): CuerpoCar
         : { modificadores: mods(r.modificadores) }),
     })),
     ...(carrito.modo === "DOMICILIO" && punto && { punto }),
+    ...(carrito.modo === "DOMICILIO" && coloniaId && { colonia_id: coloniaId }),
   };
 }
 
@@ -295,7 +299,7 @@ const esRenglon = (x: unknown): boolean => obj(x) && txt(x.id) && txt(x.producto
   && Array.isArray(x.componentes) && x.componentes.every((c) => obj(c) && txt(c.grupoId) && txt(c.productoId) && txt(c.nombre)
     && typeof c.cantidad === "number" && Array.isArray(c.modificadores) && c.modificadores.every(esMod));
 const esCarrito = (x: unknown): x is Carrito => obj(x) && x.v === 1 && txt(x.sucursalId) && (x.modo === "RECOGER" || x.modo === "DOMICILIO")
-  && (x.zonaId === null || txt(x.zonaId)) && typeof x.guardado === "number" && Array.isArray(x.renglones) && x.renglones.every(esRenglon);
+  && typeof x.guardado === "number" && Array.isArray(x.renglones) && x.renglones.every(esRenglon);
 
 /**
  * El carrito guardado de ese negocio, o null. Se descarta (y se borra) si no tiene la forma de esta

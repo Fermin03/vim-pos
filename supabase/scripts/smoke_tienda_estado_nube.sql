@@ -22,7 +22,8 @@ BEGIN
              format('[{"producto_id":"%s","cantidad":1}]', (SELECT id FROM productos WHERE nombre = 'Sencilla nube'))::jsonb,
              jsonb_build_object('nombre', 'Ana Nube', 'telefono', '4775552' || lpad(v_n::text, 3, '0')),
              CASE WHEN p_modo = 'DOMICILIO' THEN '{"calle":"Av. Nube","numero_exterior":"7","colonia":"Centro","codigo_postal":"37000","ciudad":"León","estado":"Guanajuato"}'::jsonb END,
-             'EFECTIVO', NULL, NULL, pg_temp.h(v_n)) ->> 'pedido_id')::uuid;
+             'EFECTIVO', NULL, NULL, pg_temp.h(v_n),
+             p_colonia => CASE WHEN p_modo = 'DOMICILIO' THEN (SELECT id FROM colonias WHERE nombre = 'Centro' AND tenant_id = v_t) END) ->> 'pedido_id')::uuid;   -- 0187
   IF (SELECT gestion FROM delivery_pedidos WHERE id = v_id) <> 'NUBE' THEN RAISE EXCEPTION 'fixture: el pedido debía nacer de gestión NUBE'; END IF;
   PERFORM crear_ticket_desde_tienda(v_id);
   IF (SELECT estado FROM delivery_pedidos WHERE id = v_id) <> 'ACEPTADO' THEN RAISE EXCEPTION 'fixture: el pedido debía quedar ACEPTADO'; END IF;
@@ -59,6 +60,9 @@ BEGIN
   INSERT INTO categorias (tenant_id, nombre, orden_visualizacion) VALUES (v_t, 'Nube smoke', 62) RETURNING id INTO v_cat;
   INSERT INTO productos (tenant_id, categoria_id, nombre, precio_base_mxn) VALUES (v_t, v_cat, 'Sencilla nube', 120);
   INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES (v_t, v_suc, 'Nube 35', 35);
+  -- 0187: a domicilio la zona sale de la colonia.
+  INSERT INTO colonias (tenant_id, sucursal_id, nombre, codigo_postal, zona_envio_id)
+  VALUES (v_t, v_suc, 'Centro', '37000', (SELECT id FROM zonas_envio WHERE nombre = 'Nube 35'));
   UPDATE turnos SET estado = 'CERRADO', fecha_cierre = now() WHERE sucursal_id = v_suc AND estado = 'ABIERTO';
   INSERT INTO turnos (tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable, usuario_apertura_id, fondo_inicial_mxn, fondo_modo)
   VALUES (v_t, v_suc, '99999999-0000-0000-0000-0000000000cc', 'SMOKE-NUBE', (now() AT TIME ZONE 'America/Mexico_City')::date, v_maria, 500, 'TOTAL');

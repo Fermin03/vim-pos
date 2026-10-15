@@ -106,7 +106,6 @@ describe("el carrito y los errores", () => {
     }
   });
   it("el rango por distancia lo dice así", () => {
-    expect(rangoDeEnvio(TRAMOS, "distancia")).toBe("El envío puede costar entre $0.00 y $50.00, según la distancia.");
-    expect(rangoDeEnvio(TRAMOS)).toBe("El envío puede costar entre $0.00 y $50.00, según tu zona.");
+    expect(rangoDeEnvio(TRAMOS)).toBe("El envío puede costar entre $0.00 y $50.00, según la distancia.");
   });
 });

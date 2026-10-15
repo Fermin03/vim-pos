@@ -86,6 +86,8 @@ BEGIN
   INSERT INTO productos (tenant_id, categoria_id, nombre, precio_base_mxn, tasa_iva, iva_incluido_en_precio)
   VALUES (v_t, v_cat, 'Fuera 16 distancia', 100, 16, false) RETURNING id INTO v_f100;
   INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES (v_t, v_suc, 'Distancia 35', 35) RETURNING id INTO v_z35;
+  -- 0187: «Por zonas» la zona sale de la colonia (el cliente no la elige).
+  INSERT INTO colonias (tenant_id, sucursal_id, nombre, codigo_postal, zona_envio_id) VALUES (v_t, v_suc, 'Centro', '37000', v_z35);
 
   UPDATE turnos SET estado = 'CERRADO', fecha_cierre = now() WHERE sucursal_id = v_suc AND estado = 'ABIERTO';
   INSERT INTO turnos (tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable, usuario_apertura_id, fondo_inicial_mxn, fondo_modo)
@@ -97,14 +99,15 @@ BEGIN
      OR (SELECT tramos_envio FROM tienda_sucursales WHERE sucursal_id = v_suc) <> '[]'::jsonb THEN
     RAISE EXCEPTION '2: una sucursal nueva debía nacer «Por zonas» y sin tramos';
   END IF;
-  IF tienda_estado_sucursal(v_suc, 'DOMICILIO') IS NOT NULL THEN RAISE EXCEPTION '2: por zonas con una zona debía estar abierta'; END IF;
-  v_q := tienda_cotizar(v_t, v_suc, 'DOMICILIO', v_z35, v_uno::jsonb);
-  IF v_q ->> 'total_mxn' <> '155.00' OR v_q ->> 'cobro' <> 'ZONAS' OR v_q -> 'distancia_km' <> 'null'::jsonb
+  IF tienda_estado_sucursal(v_suc, 'DOMICILIO') IS NOT NULL THEN RAISE EXCEPTION '2: por zonas con una colonia con zona debía estar abierta'; END IF;
+  -- 0187: la zona sale de la colonia; cobro = 'COLONIA' (antes 'ZONAS', con la zona elegida).
+  v_q := tienda_cotizar(v_t, v_suc, 'DOMICILIO', v_z35, v_uno::jsonb, p_colonia => (SELECT id FROM colonias WHERE zona_envio_id = v_z35));
+  IF v_q ->> 'total_mxn' <> '155.00' OR v_q ->> 'cobro' <> 'COLONIA' OR v_q -> 'distancia_km' <> 'null'::jsonb
      OR (v_q ->> 'zona_id')::uuid <> v_z35 THEN
     RAISE EXCEPTION '2: cotizar por zonas cambió: %', v_q - 'items' - 'renglones';
   END IF;
   -- Por zonas, el punto no cuenta para nada.
-  IF tienda_cotizar(v_t, v_suc, 'DOMICILIO', v_z35, v_uno::jsonb, '{"lat":21.17,"lng":-101.68}') <> v_q THEN
+  IF tienda_cotizar(v_t, v_suc, 'DOMICILIO', v_z35, v_uno::jsonb, '{"lat":21.17,"lng":-101.68}', (SELECT id FROM colonias WHERE zona_envio_id = v_z35)) <> v_q THEN
     RAISE EXCEPTION '2: por zonas, el punto no debía cambiar la cotización';
   END IF;
   v_s := (SELECT s FROM jsonb_array_elements(tienda_negocio('distancia-smoke') -> 'publico' -> 'sucursales') s WHERE s ->> 'id' = v_suc::text);
@@ -125,10 +128,10 @@ BEGIN
   IF has_function_privilege('anon', 'tienda_guardar_envio(uuid, text, jsonb, jsonb)', 'EXECUTE')
      OR NOT has_function_privilege('authenticated', 'tienda_guardar_envio(uuid, text, jsonb, jsonb)', 'EXECUTE')
      OR has_function_privilege('authenticated', '_tienda_tramos(uuid)', 'EXECUTE')
-     OR has_function_privilege('authenticated', 'tienda_cotizar(uuid, uuid, text, uuid, jsonb, jsonb)', 'EXECUTE')
-     OR NOT has_function_privilege('service_role', 'tienda_cotizar(uuid, uuid, text, uuid, jsonb, jsonb)', 'EXECUTE')
-     OR has_function_privilege('authenticated', 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric, jsonb)', 'EXECUTE')
-     OR NOT has_function_privilege('service_role', 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric, jsonb)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'tienda_cotizar(uuid, uuid, text, uuid, jsonb, jsonb, uuid)', 'EXECUTE')
+     OR NOT has_function_privilege('service_role', 'tienda_cotizar(uuid, uuid, text, uuid, jsonb, jsonb, uuid)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric, jsonb, uuid)', 'EXECUTE')
+     OR NOT has_function_privilege('service_role', 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric, jsonb, uuid)', 'EXECUTE')
      OR EXISTS (SELECT 1 FROM pg_proc WHERE proname IN ('tienda_cotizar', 'tienda_crear_pedido') GROUP BY proname HAVING count(*) > 1) THEN
     RAISE EXCEPTION '3: privilegios o firmas de las funciones';
   END IF;
@@ -226,8 +229,9 @@ BEGIN
     ('punto sin lng',           '{"lat":21.13}', NULL, 'UBICACION_INVALIDA'),
     ('punto que no es objeto',  '[21.13,-101.68]', NULL, 'UBICACION_INVALIDA'),
     ('latitud fuera de rango',  '{"lat":91,"lng":-101.68}', NULL, 'UBICACION_INVALIDA'),
-    ('con zona elegida a mano', '{"lat":21.13,"lng":-101.6824}', v_z35, 'ZONA_INVALIDA'),
-    ('con la zona de un tramo', '{"lat":21.13,"lng":-101.6824}', v_z2, 'ZONA_INVALIDA')
+    -- 0187: la zona que mande el navegador se ignora (antes ZONA_INVALIDA): cotiza por el punto.
+    ('con zona elegida a mano', '{"lat":21.13,"lng":-101.6824}', v_z35, NULL),
+    ('con la zona de un tramo', '{"lat":21.13,"lng":-101.6824}', v_z2, NULL)
   ) AS x(caso, punto, zona, codigo) LOOP
     v_e := pg_temp.error_de(format('SELECT tienda_cotizar(%L, %L, %L, %L, %L, %L)', v_t, v_suc, 'DOMICILIO', c.zona, v_uno, c.punto));
     IF v_e IS DISTINCT FROM c.codigo THEN RAISE EXCEPTION '7 %: esperaba %, dio %', c.caso, c.codigo, v_e; END IF;
@@ -247,7 +251,8 @@ BEGIN
     ('sin ubicación',          NULL::uuid, NULL::jsonb, NULL::numeric, 'UBICACION_INVALIDA'),
     ('ubicación basura',       NULL, '{"lat":"x","lng":0}', NULL, 'UBICACION_INVALIDA'),
     ('fuera del área',         NULL, '{"lat":21.179026,"lng":-101.6824}', NULL, 'FUERA_DE_AREA'),
-    ('con zona a mano',        v_z35, '{"lat":21.136551,"lng":-101.6824}', NULL, 'ZONA_INVALIDA'),
+    -- 0187: la zona a mano ya no se rechaza, se ignora: cobra el tramo (y el total esperado de 1 no cuadra).
+    ('con zona a mano',        v_z35, '{"lat":21.136551,"lng":-101.6824}', 1.00, 'TOTAL_CAMBIO'),
     -- El cliente dice que el envío es gratis (vio 120): la base cobra el de la distancia.
     ('el cliente pone el envío', NULL, '{"lat":21.136551,"lng":-101.6824}', 120.00, 'TOTAL_CAMBIO')
   ) AS x(caso, zona, punto, esperado, codigo) LOOP
@@ -356,10 +361,11 @@ BEGIN
     RAISE EXCEPTION '13: por zonas, la tienda enseña: %', v_s -> 'zonas';
   END IF;
   -- Aunque alguien reactive desde el POS una zona de tramo, «Por zonas» no se puede elegir en la tienda.
+  -- 0187: ninguna zona se elige (antes ZONA_INVALIDA): sin colonia con zona, SIN_COBERTURA.
   UPDATE zonas_envio SET activa = true WHERE id = v_z5;
   v_e := pg_temp.error_de(format('SELECT tienda_cotizar(%L, %L, %L, %L, %L)', v_t, v_suc, 'DOMICILIO', v_z5, v_uno));
-  IF v_e IS DISTINCT FROM 'ZONA_INVALIDA' THEN RAISE EXCEPTION '13: la zona de un tramo no se elige a mano (dio %)', v_e; END IF;
-  IF tienda_cotizar(v_t, v_suc, 'DOMICILIO', v_z35, v_uno::jsonb) ->> 'total_mxn' <> '155.00' THEN
+  IF v_e IS DISTINCT FROM 'SIN_COBERTURA' THEN RAISE EXCEPTION '13: la zona de un tramo no se elige a mano (dio %)', v_e; END IF;
+  IF tienda_cotizar(v_t, v_suc, 'DOMICILIO', v_z35, v_uno::jsonb, p_colonia => (SELECT id FROM colonias WHERE zona_envio_id = v_z35)) ->> 'total_mxn' <> '155.00' THEN
     RAISE EXCEPTION '13: la zona de siempre dejó de cotizar';
   END IF;
   -- Solo con zonas de tramos (aunque una esté activa), «Por zonas» no recibe a domicilio.

@@ -95,7 +95,8 @@ export function cuposDe(accion: Peticion["accion"], ip: string, negocio: string,
     // La tienda pregunta si una clave de intento ya tiene pedido (tras un pago en línea del que no
     // supo el resultado). Solo lee, por llave; pocas veces por intento. Su propia bolsa.
     case "intento": return porIp("intento", 600, 30, "cerrar");
-    case "negocio": case "menu": case "cotizar": return porIp("lee", 600, 120, "abrir");
+    // `colonias` es una lectura como `cotizar`: busca por texto en el catálogo de una sucursal.
+    case "negocio": case "menu": case "colonias": case "cotizar": return porIp("lee", 600, 120, "abrir");
     // Auditoría (B1): el slug llega aquí sin validar (el negocio se busca después), así que el cupo
     // por IP y restaurante solo no basta: cada slug inventado estrenaría un contador. Delante va uno
     // solo por IP, holgado (5 restaurantes a tope desde una misma red de celular).
@@ -264,5 +265,7 @@ export function cotizacionPublica(x: unknown): Record<string, unknown> | null {
     renglones: x.renglones, subtotal_mxn: x.subtotal_mxn, envio_mxn: x.envio_mxn,
     envio_total_mxn: x.envio_total_mxn, total_mxn: x.total_mxn,
     distancia_km: typeof x.distancia_km === "string" ? x.distancia_km : null,
+    // Si la colonia del catálogo fijó el envío. El modo de cobro (`cobro`) y la zona no salen.
+    por_colonia: x.cobro === "COLONIA",
   };
 }

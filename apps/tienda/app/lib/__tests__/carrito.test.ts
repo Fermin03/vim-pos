@@ -5,7 +5,7 @@ import {
   type Carrito, type Seleccion,
 } from "../carrito";
 import { menuDe, type Menu, type Producto } from "../contrato";
-import { ID, menuCrudo } from "./datos";
+import { ID, menuCrudo, u } from "./datos";
 
 const menu = menuDe(menuCrudo()) as Menu;
 const producto = (id: string, m: Menu = menu): Producto => m.categorias.flatMap((c) => c.productos).find((p) => p.id === id)!;
@@ -229,9 +229,9 @@ describe("revalidar contra un menú nuevo", () => {
 
 describe("el cuerpo para cotizar y pedir", () => {
   it("un producto con modificadores: exactamente lo que espera la función", () => {
-    const c = agregar(carritoNuevo(ID.sucursal, "DOMICILIO", ID.zona), hamburguesa, sel({ modificadores: [mod(ID.medio), mod(ID.queso, 2)] }), 2, "sin cebolla");
+    const c = agregar(carritoNuevo(ID.sucursal, "DOMICILIO"), hamburguesa, sel({ modificadores: [mod(ID.medio), mod(ID.queso, 2)] }), 2, "sin cebolla");
     expect(aCuerpo(c)).toEqual({
-      sucursal_id: ID.sucursal, modo: "DOMICILIO", zona_id: ID.zona,
+      sucursal_id: ID.sucursal, modo: "DOMICILIO", zona_id: null,
       items: [{ producto_id: ID.hamburguesa, cantidad: 2, nota: "sin cebolla",
                 modificadores: [{ opcion_id: ID.medio, cantidad: 1 }, { opcion_id: ID.queso, cantidad: 2 }] }],
     });
@@ -249,8 +249,15 @@ describe("el cuerpo para cotizar y pedir", () => {
   it("un producto sin nada: sin nota, sin componentes", () => {
     expect(aCuerpo(agregar(vacio(), refresco, sel(), 1, "")).items).toEqual([{ producto_id: ID.refresco, cantidad: 1, modificadores: [] }]);
   });
-  it("al recoger la zona va en null aunque el carrito traiga una", () => {
-    expect(aCuerpo({ ...carritoNuevo(ID.sucursal, "DOMICILIO", ID.zona), modo: "RECOGER" }).zona_id).toBeNull();
+  it("la zona nunca la elige el cliente: va en null, también a domicilio (la da la colonia)", () => {
+    expect(aCuerpo(carritoNuevo(ID.sucursal, "DOMICILIO")).zona_id).toBeNull();
+    expect(aCuerpo(carritoNuevo(ID.sucursal, "RECOGER")).zona_id).toBeNull();
+  });
+  it("la colonia del catálogo va solo a domicilio", () => {
+    const c = carritoNuevo(ID.sucursal, "DOMICILIO"), COLONIA = u(30);
+    expect(aCuerpo(c, null, COLONIA).colonia_id).toBe(COLONIA);
+    expect("colonia_id" in aCuerpo(c)).toBe(false);
+    expect("colonia_id" in aCuerpo({ ...c, modo: "RECOGER" }, null, COLONIA)).toBe(false);
   });
   it("las cantidades salen como enteros JSON y dentro de los topes, venga lo que venga guardado", () => {
     const c = agregar(vacio(), hamburguesa, sel({ modificadores: [mod(ID.medio), mod(ID.queso, 2)] }), 2, "");
@@ -286,6 +293,11 @@ describe("guardado en el teléfono", () => {
     expect(leerCarrito("knockout", a, AHORA + 24 * HORA)).not.toBeNull();
     expect(leerCarrito("knockout", a, AHORA + 24 * HORA + 1)).toBeNull();
     expect(a.m.size).toBe(0);
+  });
+  it("uno guardado antes de quitar la zona (con `zonaId`) se sigue leyendo", () => {
+    const a = almacen();
+    a.setItem(claveDeCarrito("knockout"), JSON.stringify({ ...c, zonaId: "x", guardado: AHORA }));
+    expect(leerCarrito("knockout", a, AHORA)?.renglones).toEqual(c.renglones);
   });
   it("uno guardado «en el futuro» (reloj movido) tampoco vale", () => {
     const a = almacen();

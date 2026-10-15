@@ -134,7 +134,6 @@ export function volverSeguro(slug: string, valor: unknown): string {
  * por las mismas reglas que al agregarlo a mano (`agregar`): lo que ya no está, se agotó o cambió
  * de opciones no entra. `descartados` trae uno por renglón que no entró: su nombre de hoy, o null si
  * el producto ya ni está en el menú. Precios no se copian: el carrito nunca los guarda.
- * La zona queda sin elegir (a domicilio el cliente la confirma).
  */
 export function carritoDesdePedido(items: readonly ItemDeCuerpo[], sucursalId: string, modo: Modo, menu: Menu): { carrito: Carrito; descartados: (string | null)[] } {
   const mods = (m: ItemDeCuerpo["modificadores"]) => (m ?? []).map((x) => ({ opcionId: x.opcion_id, cantidad: x.cantidad }));

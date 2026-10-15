@@ -30,17 +30,18 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react"
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Aviso, Captcha, SITE_KEY_TURNSTILE, botonClases, cn, Icono } from "@vim/ui/styles";
-import { cotizar, guardarDireccion, intento, pedir, verificacion, type DireccionDePedido } from "../lib/api";
+import { colonias, cotizar, guardarDireccion, intento, pedir, verificacion, type DireccionDePedido } from "../lib/api";
 import { TOPES, aCuerpo, type Carrito } from "../lib/carrito";
 import {
   CAMPOS, DE_DIRECCION, FORMULARIO_VACIO, LIMITES, datosDelPedido, erroresDe, guardarCliente, leerCliente, olvidarCliente,
   type Campo, type Formulario,
 } from "../lib/cliente";
-import type { Cotizacion, DireccionGuardada, ErrorDeTienda, MiCuenta, Negocio, Pago, Sucursal } from "../lib/contrato";
+import type { ColoniaSugerida, Cotizacion, DireccionGuardada, ErrorDeTienda, MiCuenta, Negocio, Pago, Sucursal } from "../lib/contrato";
 import { LIMITES_DE_CUENTA, direccionEnUnaLinea, enlaceDeAcceso, formularioDeDireccion, paraTusDatos } from "../lib/cuenta";
 import { formatoMxn } from "../lib/dinero";
 import { enviarPedido, envioDeLaPagina, intentoDelNegocio, pruebaQueNoHuboCobro, resolverDuda, type Desenlace, type ResultadoDeEnvio } from "../lib/envio";
 import { formasDePago, leerOtroMonto, propinaDe, totalAPagar, type Propina as Porcentaje, type PropinaElegida } from "../lib/pago";
+import { coloniaContestada, coloniaQueCoincide, cpTrasEscribirColonia, envioEnDatos, ultimaVigente, type BusquedaDeColonia } from "../lib/pantalla";
 import { accionDe, avanzar, pasoDelDesenlace, pasosDe, type Paso } from "../lib/pasos";
 import { BOTON_OTRA_FORMA, finDeLaPausa, guardarPausa, leerPausa, lineaDePausa, textoDePausa } from "../lib/pausa";
 import { textoDeRechazo, type CampoDeTarjeta } from "../lib/tarjeta";
@@ -48,6 +49,7 @@ import { enlaceTel, formatoTelefono } from "../lib/telefono";
 import { MODO_DE_PRUEBA, RETO, apoyoDePago, nombreDePago, textoDeError } from "../lib/textos";
 import { esFinDelReto, retoQueSigue, seOfreceCancelar, vigilarReto, type PasoDelReto, type Reto } from "../lib/verificacion";
 import { CampoDeTexto } from "./campo";
+import { CampoColonia } from "./campo-colonia";
 import { CamposDeTarjeta, type ManejoDeTarjeta } from "./tarjeta";
 import { Linea } from "./carrito";
 import { COLUMNA, CUERPO, PIE } from "./hoja";
@@ -87,8 +89,11 @@ export type PropsDelPasoDeDatos = {
   punto: Punto | null;
   /** null = sin pin (al cambiar a una dirección que no tiene). */
   alCambiarPunto: (p: Punto | null) => void;
-  /** «Mejor recojo mi pedido», desde fuera del área de entrega. */
+  /** «Mejor recojo mi pedido», desde fuera del área de entrega o desde una colonia sin cobertura. */
   alCambiarModo: (m: Modo) => void;
+  /** Catálogo de colonias (0187): la colonia elegida de las sugerencias. Vive en la tienda, que cotiza con ella. null = texto libre. */
+  colonia: ColoniaSugerida | null;
+  alCambiarColonia: (c: ColoniaSugerida | null) => void;
 };
 
 type AvisoDeEnvio = Extract<Desenlace, { tipo: "aviso" }>;
@@ -135,7 +140,7 @@ const IconoAtras = () => (
 
 export function PasoDeDatos({
   negocio, sucursal, carrito, nota, alCambiarNota, cotizacion, alVolver, alCambiarElTotal, alErrorDeCarrito, alPedidoHecho,
-  conSesion, cuenta, alTerminarLaSesion, deVuelta, alRetener, punto, alCambiarPunto, alCambiarModo,
+  conSesion, cuenta, alTerminarLaSesion, deVuelta, alRetener, punto, alCambiarPunto, alCambiarModo, colonia, alCambiarColonia,
 }: PropsDelPasoDeDatos) {
   const router = useRouter();
   const id = useId();
@@ -143,10 +148,6 @@ export function PasoDeDatos({
   const intentoDeLaPagina = intentoDelNegocio(negocio.slug);
   const formas = formasDePago(negocio, sucursal);
   const aDomicilio = carrito.modo === "DOMICILIO";
-  const zona = sucursal.zonas.find((z) => z.id === carrito.zonaId);
-  /** A domicilio en una sucursal que cobra el envío por distancia: sin un pin dentro del área no se sigue. */
-  const distancia = aDomicilio && sucursal.envio.cobro === "DISTANCIA" ? sucursal.envio : null;
-  const puntoDelPedido = distancia ? punto : null;
   const tel = enlaceTel(sucursal.telefono);
 
   const [f, setF] = useState<Formulario>(borrador?.f ?? FORMULARIO_VACIO);
@@ -177,6 +178,20 @@ export function PasoDeDatos({
   const enviando = useEnviando();
   const guardadas = cuenta?.direcciones ?? [];
   const elegida = guardadas.find((d) => d.id === direccion);
+  /** La búsqueda en el catálogo de la colonia escrita (ver `buscarColonia` y `BusquedaDeColonia`). */
+  const [busqueda, setBusqueda] = useState<BusquedaDeColonia>(null);
+  /** La colonia elegida salió de tocar una sugerencia (no de una búsqueda por lo escrito). */
+  const [deSugerencia, setDeSugerencia] = useState(false);
+  /** La colonia escrita (la de la dirección guardada, o la del campo) y su CP. */
+  const textoDeColonia = elegida?.colonia ?? f.colonia, cpDeColonia = elegida?.codigo_postal ?? f.codigoPostal;
+  /**
+   * Qué decide el envío aquí (lib/pantalla.ts): la colonia del catálogo, el mapa, o, «Por zonas», que
+   * esa colonia no tiene cobertura o que todavía no hay colonia. La zona nunca la elige el cliente (0187 §6).
+   */
+  const envio = aDomicilio ? envioEnDatos(sucursal, cotizacion, colonia, coloniaContestada(busqueda, textoDeColonia)) : null;
+  /** A domicilio en una sucursal que cobra el envío por distancia: sin un pin dentro del área no se sigue. */
+  const distancia = envio === "mapa" && sucursal.envio.cobro === "DISTANCIA" ? sucursal.envio : null;
+  const puntoDelPedido = distancia ? punto : null;
   const [recordado, setRecordado] = useState(false);
   const [tocados, setTocados] = useState<ReadonlySet<Campo>>(new Set());
   const [pago, setPago] = useState<Pago | null>(borrador?.pago && formas.includes(borrador.pago) ? borrador.pago : formas[0] ?? null);
@@ -206,8 +221,10 @@ export function PasoDeDatos({
   const [totalVisto, setTotalVisto] = useState(cotizacion?.total_mxn ?? null);
   // Por distancia, mover el pin cambia el envío: el total que se ve (el del botón) es el de la
   // cotización con el pin de ahora. Sin esto, el botón seguiría con el total sin envío del carrito.
+  // Lo mismo con el catálogo de colonias: elegir la colonia aquí cambia el envío.
   const totalCotizado = cotizacion?.total_mxn ?? null;
-  useEffect(() => { if (distancia && totalCotizado) setTotalVisto(totalCotizado); }, [distancia !== null, totalCotizado]);
+  const envioDeAqui = aDomicilio && (sucursal.envio.cobro === "DISTANCIA" || sucursal.colonias);
+  useEffect(() => { if (envioDeAqui && totalCotizado) setTotalVisto(totalCotizado); }, [envioDeAqui, totalCotizado]);
   /** Un total distinto, a la espera de que lo confirme. */
   const [totalNuevo, setTotalNuevo] = useState<string | null>(null);
   /** Esperando la comprobación del antirobot para enviar. */
@@ -222,6 +239,51 @@ export function PasoDeDatos({
   const [ubicacionTocada, setUbicacionTocada] = useState(false);
   const pin = distancia ? estadoDelPin({ sucursal: distancia.punto, tramos: distancia.tramos, pin: punto, enVivo: null, cotizacion: null }) : null;
   const faltaUbicacion = distancia !== null && (!pin || pin.fuera);
+  /**
+   * «Por zonas» sin cobertura en esa colonia (0187 §6): una sugerencia elegida sin zona, o lo escrito
+   * que el catálogo ya contestó que no está. Sin esa respuesta es «pendiente», nunca esto.
+   */
+  const sinCobertura = envio === "sin_cobertura";
+  /** El servidor rechazó la colonia por no tener cobertura (se marca en el campo, lib/envio.ts). */
+  const coberturaRechazada = !!rechazo.colonia?.startsWith(textoDeError("SIN_COBERTURA").texto);
+
+  /**
+   * La colonia del catálogo que es exactamente la de una dirección ya escrita (guardada en la cuenta,
+   * o recordada en el teléfono, o tecleada sin tocar la sugerencia): con ella se cotiza sin que el
+   * cliente la vuelva a elegir. Solo vale la última búsqueda: TODO lo que cambia el texto de la colonia
+   * (escribir, elegir una sugerencia, cambiar de dirección, «Olvidar mis datos») la descarta con `soltarColonia`.
+   * `escrita`: la tecleó aquí. Si coincide, queda como si hubiera tocado la sugerencia (nombre del
+   * catálogo y su CP, si aún no escribió uno). `reintento`: si este segundo intento tampoco contesta,
+   * ya no se insiste (`sin_respuesta`): el pedido sale sin colonia y el servidor decide.
+   */
+  const [vigencia] = useState(ultimaVigente);
+  /** El CP que puso la colonia (sugerencia tocada, o lo escrito que coincidió), mientras el cliente no lo cambie. */
+  const cpAutollenado = useRef<string | null>(null);
+  /** Descarta la búsqueda en vuelo y, si había, la colonia elegida. */
+  const soltarColonia = () => { vigencia.descartar(); setBusqueda(null); setDeSugerencia(false); cpAutollenado.current = null; alCambiarColonia(null); };
+  const buscarColonia = (nombre: string, cp: string, escrita = false, reintento = false) => {
+    const vigente = vigencia.pedir();
+    setDeSugerencia(false);
+    cpAutollenado.current = null;
+    alCambiarColonia(null);
+    if (!sucursal.colonias || nombre.trim().length < 2) { setBusqueda("lista"); return; }
+    setBusqueda("en_vuelo");
+    void colonias(negocio.slug, sucursal.id, nombre.trim()).then((r) => {
+      if (!vigente()) return;
+      // Sin respuesta no se sabe si está en el catálogo: no se avisa «sin cobertura»; «Continuar» reintenta una vez.
+      setBusqueda(r.ok ? "lista" : reintento ? "sin_respuesta" : "fallo");
+      const c = r.ok ? coloniaQueCoincide(r.datos, nombre, cp) : null;
+      // `cp` es el de ahora: si el cliente lo hubiera cambiado, `soltarColonia` ya habría descartado esta respuesta.
+      const llenaCp = !!c?.codigo_postal && !cp.trim();
+      if (c && escrita) setF((a) => ({ ...a, colonia: c.nombre, ...(llenaCp && { codigoPostal: c.codigo_postal! }) }));
+      if (c && escrita && llenaCp) cpAutollenado.current = c.codigo_postal;
+      if (r.ok) alCambiarColonia(c);
+    });
+  };
+  /** Hay colonia escrita, sin sugerencia elegida, que el catálogo todavía no contestó (sin buscar, o la búsqueda falló). */
+  const coloniaPorBuscar = aDomicilio && sucursal.colonias && !colonia && (busqueda === null || busqueda === "fallo") && textoDeColonia.trim().length > 0;
+  /** Busca la colonia escrita: la de la dirección guardada, o la tecleada (que se llena como una sugerencia). */
+  const buscarLaEscrita = () => buscarColonia(textoDeColonia, cpDeColonia, !elegida, busqueda === "fallo");
 
   /** Las formas de pago que no son en línea: lo que se ofrece con el pago en línea en pausa. */
   const otrasFormas = formas.filter((p) => p !== "EN_LINEA");
@@ -281,7 +343,10 @@ export function PasoDeDatos({
   useEffect(() => {
     if (conSesion) return;
     const leido = leerCliente();
-    if (leido) { setF((a) => ({ ...a, ...soloVacios(a, leido) })); setRecordado(true); }
+    if (leido) {
+      setF((a) => ({ ...a, ...soloVacios(a, leido) })); setRecordado(true);
+      if (!colonia && !f.colonia.trim() && leido.colonia) buscarColonia(leido.colonia, leido.codigoPostal ?? "");
+    }
   }, [conSesion]);
 
   // Con sesión: nombre, teléfono y correo de la cuenta y, a domicilio, su primera dirección guardada.
@@ -292,6 +357,7 @@ export function PasoDeDatos({
     const usarPrimera = !!primera && direccion === "" && !f.calle.trim();
     if (direccion === "") setDireccion(usarPrimera ? primera.id : OTRA);
     if (usarPrimera && primera.punto) alCambiarPunto(primera.punto);
+    if (usarPrimera && !colonia) buscarColonia(primera.colonia, primera.codigo_postal);
     setF((a) => ({ ...a, ...soloVacios(a, paraTusDatos(cuenta.cuenta)), ...(usarPrimera && camposDe(primera)) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo cuando llega (o cambia) la cuenta
   }, [cuenta]);
@@ -303,6 +369,8 @@ export function PasoDeDatos({
     setF((a) => ({ ...a, ...(d ? camposDe(d) : SIN_DIRECCION) }));
     // Su pin, si lo tiene; si no, ninguno: el de otra dirección cobraría otro envío.
     alCambiarPunto(d?.punto ?? null);
+    // Y su colonia del catálogo, si coincide exacto; con «Otra», ninguna hasta que elija una sugerencia.
+    if (d) buscarColonia(d.colonia, d.codigo_postal); else soltarColonia();
     setTocados((t) => new Set([...t].filter((c) => !esDeDireccion(c))));
     setRechazo((r) => ({ ...r, calle: undefined }));
   };
@@ -320,7 +388,12 @@ export function PasoDeDatos({
   const campo = (c: Campo, etiqueta: string, extra: Partial<Parameters<typeof CampoDeTexto>[0]> = {}) => (
     <CampoDeTexto id={`${id}-${c}`} etiqueta={etiqueta} value={f[c]} error={errorDe(c)}
       maxLength={LIMITES[c]}
-      alCambiar={(v) => { setF((a) => ({ ...a, [c]: v })); setRechazo((r) => ({ ...r, [c]: undefined })); }}
+      alCambiar={(v) => {
+        setF((a) => ({ ...a, [c]: v })); setRechazo((r) => ({ ...r, [c]: undefined }));
+        // Otro CP: la colonia hallada por lo escrito (o la búsqueda en vuelo) comparaba con el de antes y
+        // ya no vale; se vuelve a buscar al salir de la colonia o con «Continuar». Una sugerencia tocada se queda.
+        if (c === "codigoPostal") { cpAutollenado.current = null; if (!deSugerencia) soltarColonia(); }
+      }}
       alSalir={() => setTocados((t) => new Set(t).add(c))} {...extra} />
   );
 
@@ -341,7 +414,7 @@ export function PasoDeDatos({
    */
   const mandar = (total: string | null) => {
     if (!pago) return;
-    const cuerpoDelCarrito = aCuerpo(carrito, puntoDelPedido), datos = f, modo = carrito.modo;
+    const cuerpoDelCarrito = aCuerpo(carrito, puntoDelPedido, colonia?.id ?? null), datos = f, modo = carrito.modo;
     const delPedido = datosDelPedido(datos, { modo, pago, propina: typeof propina === "number" ? propina : 0, propinaMxn: libre?.ok ? libre.monto : undefined });
     // Lo que se guarda en la cuenta (solo con sesión y a domicilio): la dirección nueva que pidió
     // guardar, con su pin; o el pin nuevo de una guardada (no tenía, o lo movió), con la dirección tal
@@ -553,6 +626,14 @@ export function PasoDeDatos({
     if (ocupado || envioDeLaPagina.ocupado() || !pago) return;
     // Por distancia, sin un pin dentro del área no hay envío que cobrar: a «Tu ubicación».
     if (faltaUbicacion) { setUbicacionTocada(true); irA("datos", `${id}-ubicacion`); return; }
+    // La colonia tecleada aún no se busca en el catálogo (Enter sin salir del campo): se busca y se espera.
+    // La colonia escrita aún no la contestó el catálogo (Enter sin salir del campo, o la búsqueda falló):
+    // se busca (o se reintenta, una vez) y se espera. Si tampoco contesta, sigue y el servidor decide.
+    if (coloniaPorBuscar) { setTocados((t) => new Set(t).add("colonia")); buscarLaEscrita(); return; }
+    // Con la búsqueda en vuelo todavía no se sabe qué envío toca: no se manda nada (contesta en un momento).
+    if (aDomicilio && busqueda === "en_vuelo") return;
+    // «Por zonas» y la colonia no tiene cobertura: se dice (si aún no) y el foco va al aviso.
+    if (envio === "sin_cobertura") { setTocados((t) => new Set(t).add("colonia")); irA("datos", `${id}-cobertura`); return; }
     const a = avanzar({ pasos, paso, primerError: CAMPOS.find((c) => errores[c]), enLinea, propina, otroValido: libre?.ok ?? false, yaPreguntada: preguntada });
     if (a.tipo === "campo") { setTocados(new Set(CAMPOS)); alCampo(a.campo); }
     // Se queda en la pregunta si es ahí donde lo está escribiendo; si no, a la pantalla del pago.
@@ -604,15 +685,16 @@ export function PasoDeDatos({
   // ofrece es enviar: con «llama al restaurante» o «vuelve a tu pedido» a la vista, Enter no manda nada.
   const seOfreceEnviar = !!totalNuevo || !aviso || aviso.sigue === "reintentar" || aviso.sigue === "reintentar-seguro" || aviso.sigue === "sesion";
   const total = totalNuevo ?? totalVisto;
-  // Por distancia sin un pin dentro del área todavía no hay total (falta el envío): el botón no enseña uno.
-  const aPagar = faltaUbicacion ? null : enLinea && total ? totalAPagar(total, montoDePropina) : total;
+  // Sin envío todavía (por distancia sin un pin dentro del área; «Por zonas» sin colonia con cobertura) no hay total: el botón no enseña uno.
+  const aPagar = faltaUbicacion || envio === "sin_cobertura" || envio === "pendiente" ? null : enLinea && total ? totalAPagar(total, montoDePropina) : total;
   const estado = reto ? (reto.cancelado ? RETO.cancelando : reto.esperando ? RETO.confirmando : "") : duda ? "Confirmando tu pago…" : (enviando || hecho) && enLinea ? "Procesando tu pago…"
     : enviando || hecho ? "Enviando tu pedido…" : robot ? "Comprobando que no eres un robot…" : "";
   // Con `key`: React no debe reciclar para este botón el nodo de otro que ocupaba su lugar. Sin ella,
   // el toque en «Ahora no» (que al pintarse de nuevo dejaba su sitio a «Pagar») terminaba, en el mismo
   // clic, enviando el formulario: el navegador activa el botón tal como quedó DESPUÉS del clic.
   const boton = (etiqueta: string, importe: string | null) => (
-    <button key="principal" type="submit" disabled={ocupado || formas.length === 0} aria-busy={ocupado}
+    <button key="principal" type="submit" disabled={ocupado || formas.length === 0 || sinCobertura} aria-busy={ocupado}
+      aria-describedby={sinCobertura ? `${id}-cobertura` : undefined}
       className={cn(PRINCIPAL, "h-14 w-full px-5 text-16", ocupado ? "justify-center" : "justify-between")}>
       {ocupado ? estado : <><span>{etiqueta}</span><span className="tabular-nums">{importe ? formatoMxn(importe) : ""}</span></>}
     </button>
@@ -693,7 +775,12 @@ export function PasoDeDatos({
                 <>
                   <div>
                     <h3 className={TITULO}>¿A dónde lo llevamos?</h3>
-                    {zona && <p className={cn("mt-1 text-14 text-ink-2", PARTE)}>Zona de entrega: {zona.nombre}</p>}
+                    {envio === "colonia" ? (
+                      // TEXTO PROVISIONAL (James).
+                      <p className={cn("mt-1 text-14 text-ink-2", PARTE)}>
+                        Envío a {colonia?.nombre ?? f.colonia}{cotizacion?.por_colonia && <>: <span className="font-semibold tabular-nums text-ink">{formatoMxn(cotizacion.envio_total_mxn)}</span></>}
+                      </p>
+                    ) : null}
                   </div>
                   {distancia && (
                     <UbicacionDeEntrega id={id} sucursal={distancia.punto} tramos={distancia.tramos} punto={punto} cotizacion={cotizacion}
@@ -726,7 +813,29 @@ export function PasoDeDatos({
                         {campo("numeroExterior", "Núm. exterior")}
                         {campo("numeroInterior", "Núm. interior", { opcional: true })}
                       </div>
-                      {campo("colonia", "Colonia", { autoComplete: "address-level3" })}
+                      {sucursal.colonias ? (
+                        <CampoColonia negocio={negocio.slug} sucursalId={sucursal.id} id={`${id}-colonia`} valor={f.colonia} error={errorDe("colonia")} maxLength={LIMITES.colonia}
+                          alSalir={() => {
+                            setTocados((t) => new Set(t).add("colonia"));
+                            // Tecleada sin tocar la sugerencia: se busca igual que una dirección guardada.
+                            if (coloniaPorBuscar && busqueda === null) buscarLaEscrita();
+                          }}
+                          alEscribir={(v) => {
+                            // El CP que puso la colonia de antes es de esa colonia: se va con ella (lib/pantalla.ts).
+                            const autollenado = cpAutollenado.current;
+                            setF((a) => ({ ...a, colonia: v, codigoPostal: cpTrasEscribirColonia(a.codigoPostal, autollenado) }));
+                            setRechazo((r) => ({ ...r, colonia: undefined }));
+                            // Escribir encima ya no es la colonia elegida, ni la que se estaba buscando.
+                            soltarColonia();
+                          }}
+                          alElegir={(c) => {
+                            vigencia.descartar(); setBusqueda(null); setDeSugerencia(true);
+                            cpAutollenado.current = c.codigo_postal || null;
+                            setF((a) => ({ ...a, colonia: c.nombre, ...(c.codigo_postal && { codigoPostal: c.codigo_postal }) }));
+                            setRechazo((r) => ({ ...r, colonia: undefined, codigoPostal: undefined }));
+                            alCambiarColonia(c);
+                          }} />
+                      ) : campo("colonia", "Colonia", { autoComplete: "address-level3" })}
                       <div className="grid grid-cols-[8rem_1fr] gap-3">
                         {campo("codigoPostal", "Código postal", { inputMode: "numeric", autoComplete: "postal-code" })}
                         {campo("ciudad", "Ciudad", { autoComplete: "address-level2" })}
@@ -747,6 +856,20 @@ export function PasoDeDatos({
                         </div>
                       )}
                     </>
+                  )}
+                  {/* «Por zonas» y esa colonia no tiene envío: no hay zona que elegir (0187 §6), se ofrece recoger. */}
+                  {/* También cuando lo dijo el servidor (SIN_COBERTURA marcado en la colonia): ahí el texto ya está en el campo. */}
+                  {(sinCobertura || coberturaRechazada) && (
+                    <div id={`${id}-cobertura`} tabIndex={-1} className="flex flex-col gap-3 outline-none">
+                      {/* TEXTO PROVISIONAL (James). */}
+                      {sinCobertura && <Aviso tono="warning" role="status" className="!text-14">{textoDeError("SIN_COBERTURA").texto}</Aviso>}
+                      {sucursal.recoger && (
+                        // TEXTO PROVISIONAL (James).
+                        <button type="button" onClick={() => alCambiarModo("RECOGER")} disabled={ocupado} className={cn(botonClases({ variant: "ghost" }), "h-12 self-start")}>
+                          Pedir para recoger
+                        </button>
+                      )}
+                    </div>
                   )}
                 </>
               ) : (
@@ -784,7 +907,7 @@ export function PasoDeDatos({
                 <p>
                   Llenamos tus datos con los de tu último pedido, guardados en este teléfono.{" "}
                   <button type="button" className={cn("font-medium text-ink underline underline-offset-4", FOCO)}
-                    onClick={() => { olvidarCliente(); setF(FORMULARIO_VACIO); setTocados(new Set()); setRecordado(false); }}>
+                    onClick={() => { olvidarCliente(); soltarColonia(); setF(FORMULARIO_VACIO); setTocados(new Set()); setRecordado(false); }}>
                     Olvidar mis datos
                   </button>
                 </p>

@@ -1,7 +1,7 @@
 // El cliente del navegador hacia /api/tienda, y las cabeceras de seguridad compartidas.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cabecerasSeguridad } from "@vim/config/cabeceras-seguridad.mjs";
-import { cotizar, pedir, seguimiento, type CuerpoPedido } from "../api";
+import { colonias, cotizar, pedir, seguimiento, type CuerpoPedido } from "../api";
 import { CODIGO, ID, cotizacionCruda, pedidoCrudo, seguimientoCrudo } from "./datos";
 
 let llamadas: { url: string; init: RequestInit }[] = [];
@@ -29,6 +29,14 @@ describe("api del navegador", () => {
     expect(llamadas[0]!.url).toBe("/api/tienda");
     expect(llamadas[0]!.init.method).toBe("POST");
     expect(JSON.parse(llamadas[0]!.init.body as string)).toEqual({ accion: "cotizar", negocio: "knockout", ...carrito });
+  });
+  it("colonias: manda la sucursal y el texto, y lee la lista", async () => {
+    const lista = [{ id: ID.sucursal, nombre: "San José", codigo_postal: "37000", con_zona: true }];
+    responder = () => json(lista);
+    expect(await colonias("knockout", ID.sucursal, "san jo")).toEqual({ ok: true, datos: lista });
+    expect(JSON.parse(llamadas[0]!.init.body as string)).toEqual({ accion: "colonias", negocio: "knockout", sucursal_id: ID.sucursal, q: "san jo" });
+    responder = () => json([{ id: "x" }]);
+    expect(await colonias("knockout", ID.sucursal, "san jo")).toEqual({ ok: false, error: "SERVICIO_NO_DISPONIBLE", detalle: null });
   });
   it("seguimiento y pedir", async () => {
     responder = () => json(seguimientoCrudo());

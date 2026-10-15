@@ -3,7 +3,7 @@
 // pertenece un error de la función y la espera antes de recotizar. Puro, para poder probarlo.
 import type { Resultado } from "./api";
 import { carritoNuevo, type Carrito, type CuerpoCarrito } from "./carrito";
-import type { Cotizacion, Modo, Negocio, Sucursal } from "./contrato";
+import type { ColoniaSugerida, Cotizacion, Modo, Negocio, Sucursal } from "./contrato";
 import { textoDeError } from "./textos";
 import { aCentavos, formato } from "./dinero";
 
@@ -29,16 +29,14 @@ export function motivoDeCierre(sucursal: Sucursal, modo: Modo): string | null {
 
 /**
  * El carrito con el que arranca la página de una sucursal. El guardado se usa solo si es de ESA
- * sucursal (el carrito es por sucursal); su modo y su zona se corrigen si el negocio ya no los
- * ofrece. Con una sola zona se elige sola; con varias la elige el cliente.
+ * sucursal (el carrito es por sucursal); su modo se corrige si el negocio ya no lo ofrece. La zona
+ * no es del carrito: a domicilio la da la colonia en «Tus datos» (0187 §6).
  */
 export function carritoPara(sucursal: Sucursal, guardado: Carrito | null): Carrito {
   const modos = modosDe(sucursal);
   const base = guardado?.sucursalId === sucursal.id ? guardado : carritoNuevo(sucursal.id, modos[0] ?? "RECOGER");
-  const zonaId = sucursal.zonas.some((z) => z.id === base.zonaId) ? base.zonaId
-    : sucursal.zonas.length === 1 ? sucursal.zonas[0]!.id : null;
   const modo = modos.includes(base.modo) ? base.modo : modos[0] ?? base.modo;
-  return modo === base.modo && zonaId === base.zonaId ? base : { ...base, modo, zonaId };
+  return modo === base.modo ? base : { ...base, modo };
 }
 
 /**
@@ -104,15 +102,70 @@ export function cotizarConEspera(
 }
 
 /**
- * El aviso del costo de envío antes de elegir zona: «El envío puede costar entre $0.00 y $35.00, según
- * tu zona.» Con una sola zona, o todas al mismo precio, no hay rango que avisar (null): el costo ya se ve.
+ * El aviso del costo de envío por distancia antes de poner el pin: «El envío puede costar entre $0.00 y
+ * $50.00, según la distancia.» Con un solo tramo, o todos al mismo precio, no hay rango que avisar (null).
  */
-export function rangoDeEnvio(zonas: { costo_mxn: string }[], segun: "zona" | "distancia" = "zona"): string | null {
-  const costos = zonas.map((z) => aCentavos(z.costo_mxn)).filter((c): c is number => c !== null);
+export function rangoDeEnvio(tramos: { costo_mxn: string }[]): string | null {
+  const costos = tramos.map((z) => aCentavos(z.costo_mxn)).filter((c): c is number => c !== null);
   if (costos.length < 2) return null;
   const min = Math.min(...costos), max = Math.max(...costos);
-  // TEXTO PROVISIONAL (James) el de la distancia.
-  return min === max ? null : `El envío puede costar entre ${formato(min)} y ${formato(max)}, según ${segun === "zona" ? "tu zona" : "la distancia"}.`;
+  // TEXTO PROVISIONAL (James).
+  return min === max ? null : `El envío puede costar entre ${formato(min)} y ${formato(max)}, según la distancia.`;
+}
+
+/**
+ * La búsqueda en el catálogo de la colonia escrita en «Tus datos»: null = no se ha buscado (o se
+ * escribió encima), `en_vuelo`, `lista` (contestó, esté o no), `fallo` (no contestó; «Continuar»
+ * reintenta una vez) y `sin_respuesta` (tampoco al reintentar: el servidor decide al enviar).
+ */
+export type BusquedaDeColonia = "en_vuelo" | "lista" | "fallo" | "sin_respuesta" | null;
+/**
+ * El CP al escribir encima de la colonia. Si ese CP lo puso la colonia de antes (`autollenado`, de una
+ * sugerencia o de lo escrito que coincidió) y nadie lo cambió, se borra: era de la otra colonia y
+ * haría fallar la búsqueda de la nueva. El que escribió el cliente se queda.
+ */
+export const cpTrasEscribirColonia = (cp: string, autollenado: string | null): string => autollenado && cp === autollenado ? "" : cp;
+/** La colonia escrita que cuenta para el envío: solo la que el catálogo ya contestó; si no, "" (pendiente). */
+export const coloniaContestada = (busqueda: BusquedaDeColonia, texto: string): string => busqueda === "lista" ? texto : "";
+
+/**
+ * Qué enseña «Tus datos», a domicilio, sobre el envío (catálogo de colonias, 0187):
+ *  · `colonia`: la colonia elegida tiene zona y ella fija el envío, cobre como cobre la sucursal. Lo
+ *    dice la cotización; mientras llega, la sugerencia elegida (`con_zona`).
+ *  · `mapa`: «Por distancia» y la colonia no decide: el pin de siempre.
+ *  · `sin_cobertura`: «Por zonas» y la colonia (elegida sin zona, o escrita y fuera del catálogo) no
+ *    tiene envío. La zona nunca la elige el cliente (0187 §6): ahí no se entrega.
+ *  · `pendiente`: «Por zonas» sin colonia todavía. `coloniaEscrita` llega vacía mientras el catálogo
+ *    no contesta por ella (`coloniaContestada`), para no avisar «sin cobertura» antes de saberlo.
+ */
+export function envioEnDatos(
+  sucursal: Sucursal, cotizacion: Cotizacion | null, colonia: ColoniaSugerida | null, coloniaEscrita = "",
+): "colonia" | "mapa" | "sin_cobertura" | "pendiente" {
+  if (cotizacion ? cotizacion.por_colonia : colonia?.con_zona) return "colonia";
+  if (sucursal.envio.cobro === "DISTANCIA") return "mapa";
+  return colonia || coloniaEscrita.trim() ? "sin_cobertura" : "pendiente";
+}
+
+/**
+ * Para búsquedas que pueden llegar tarde: solo vale la última. `pedir()` da con qué preguntar, al
+ * llegar la respuesta, si sigue vigente; `descartar()` invalida la que esté en vuelo (el cliente
+ * escribió encima, cambió de dirección o eligió otra cosa).
+ */
+export function ultimaVigente(): { pedir: () => () => boolean; descartar: () => void } {
+  let turno = 0;
+  return { pedir: () => { const mio = ++turno; return () => mio === turno; }, descartar: () => { turno++; } };
+}
+
+/** Para comparar colonias: sin acentos, mayúsculas ni espacios de más. */
+const normal = (s: string): string => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
+/**
+ * La colonia del catálogo que es EXACTAMENTE la escrita (una dirección guardada, o tecleada sin tocar la
+ * sugerencia), o null. Mismo nombre y, si hay CP escrito, mismo CP. Sin CP vale solo si es la única con
+ * ese nombre: con homónimas no se adivina.
+ */
+export function coloniaQueCoincide(lista: readonly ColoniaSugerida[], nombre: string, cp: string): ColoniaSugerida | null {
+  const mismas = lista.filter((c) => normal(c.nombre) === normal(nombre) && (!cp.trim() || (c.codigo_postal ?? "") === cp.trim()));
+  return mismas.length === 1 ? mismas[0]! : null;
 }
 
 /** Cuántos renglones de una lista larga de «Mi cuenta» (pedidos, direcciones) se ven antes de «Mostrar más». */

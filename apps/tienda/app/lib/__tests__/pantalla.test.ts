@@ -4,9 +4,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Resultado } from "../api";
 import { agregar, carritoNuevo, seleccionInicial, type Carrito, type CuerpoCarrito } from "../carrito";
-import { cotizacionDe, menuDe, negocioDe, type Cotizacion, type Menu, type Negocio, type Sucursal } from "../contrato";
+import { cotizacionDe, menuDe, negocioDe, type ColoniaSugerida, type Cotizacion, type Menu, type Negocio, type Sucursal } from "../contrato";
 import {
-  alternar, carritoPara, categoriaActiva, cotizarConEspera, modosDe, motivoDeCierre, renglonesDelError, sucursalElegida,
+  alternar, carritoPara, categoriaActiva, coloniaContestada, coloniaQueCoincide, cotizarConEspera, cpTrasEscribirColonia, envioEnDatos, modosDe, motivoDeCierre, renglonesDelError, sucursalElegida, ultimaVigente,
 } from "../pantalla";
 import { ID, cotizacionCruda, menuCrudo, negocioCrudo, u } from "./datos";
 
@@ -49,23 +49,19 @@ describe("modos y cierre", () => {
 });
 
 describe("carritoPara", () => {
-  it("sin nada guardado: carrito nuevo en el primer modo que se ofrece, con la zona si solo hay una", () => {
-    expect(carritoPara(centro, null)).toMatchObject({ sucursalId: centro.id, modo: "RECOGER", zonaId: ID.zona, renglones: [] });
+  it("sin nada guardado: carrito nuevo en el primer modo que se ofrece", () => {
+    expect(carritoPara(centro, null)).toMatchObject({ sucursalId: centro.id, modo: "RECOGER", renglones: [] });
+    expect(carritoPara(centro, null)).not.toHaveProperty("zonaId");
     expect(carritoPara(con({ recoger: false }), null).modo).toBe("DOMICILIO");
   });
-  it("con varias zonas no se elige por el cliente", () => {
-    const s = con({ zonas: [...centro.zonas, { id: u(3), nombre: "Norte", costo_mxn: "50.00" }] });
-    expect(carritoPara(s, null).zonaId).toBeNull();
-  });
   it("el guardado de la misma sucursal se conserva con sus renglones", () => {
-    const g = conRefresco(carritoNuevo(centro.id, "DOMICILIO", ID.zona));
+    const g = conRefresco(carritoNuevo(centro.id, "DOMICILIO"));
     expect(carritoPara(centro, g)).toEqual(g);
   });
-  it("si el modo guardado ya no se ofrece o la zona ya no existe, se corrigen sin perder renglones", () => {
-    const g = conRefresco(carritoNuevo(centro.id, "DOMICILIO", u(77)));
+  it("si el modo guardado ya no se ofrece, se corrige sin perder renglones", () => {
+    const g = conRefresco(carritoNuevo(centro.id, "DOMICILIO"));
     const c = carritoPara(con({ domicilio: false }), g);
     expect(c.modo).toBe("RECOGER");
-    expect(c.zonaId).toBe(ID.zona);
     expect(c.renglones).toEqual(g.renglones);
   });
   it("el guardado de otra sucursal no se mezcla", () => {
@@ -183,11 +179,11 @@ describe("cotizarConEspera", () => {
 import { rangoDeEnvio } from "../pantalla";
 
 describe("rangoDeEnvio", () => {
-  it("dice el mínimo y el máximo de las zonas", () => {
+  it("dice el mínimo y el máximo de los tramos", () => {
     expect(rangoDeEnvio([{ costo_mxn: "35.00" }, { costo_mxn: "0.00" }, { costo_mxn: "20.00" }]))
-      .toBe("El envío puede costar entre $0.00 y $35.00, según tu zona.");
+      .toBe("El envío puede costar entre $0.00 y $35.00, según la distancia.");
   });
-  it("sin rango que avisar: una sola zona, ninguna, o todas al mismo precio", () => {
+  it("sin rango que avisar: un solo tramo, ninguno, o todos al mismo precio", () => {
     expect(rangoDeEnvio([])).toBeNull();
     expect(rangoDeEnvio([{ costo_mxn: "35.00" }])).toBeNull();
     expect(rangoDeEnvio([{ costo_mxn: "35.00" }, { costo_mxn: "35.00" }])).toBeNull();
@@ -218,5 +214,89 @@ describe("listaCorta: las listas de «Mi cuenta» empiezan con tres", () => {
     const lista = de(5);
     listaCorta(lista, false).visibles.push(99);
     expect(lista).toEqual([1, 2, 3, 4, 5]);
+  });
+});
+
+describe("envioEnDatos", () => {
+  const cot = (por_colonia: boolean): Cotizacion => ({ ...(cotizacionDe(cotizacionCruda()) as Cotizacion), por_colonia });
+  const distancia = con({ envio: { cobro: "DISTANCIA", tramos: [{ hasta_km: "3.0", costo_mxn: "30.00" }], punto: { lat: 21, lng: -101 } } });
+  const dosZonas = [centro.zonas[0]!, { id: u(9), nombre: "Norte", costo_mxn: "50.00" }];
+  const conZona: ColoniaSugerida = { id: u(20), nombre: "Centro", codigo_postal: "37000", con_zona: true };
+  it("la colonia que fijó el envío gana, también «Por distancia»", () => {
+    expect(envioEnDatos(con({ colonias: true, zonas: dosZonas }), cot(true), null)).toBe("colonia");
+    expect(envioEnDatos({ ...distancia, colonias: true }, cot(true), null)).toBe("colonia");
+  });
+  it("mientras se cotiza, una colonia con zona ya decide; con cotización, manda la cotización", () => {
+    expect(envioEnDatos({ ...distancia, colonias: true }, null, conZona)).toBe("colonia");
+    expect(envioEnDatos({ ...distancia, colonias: true }, cot(false), conZona)).toBe("mapa");
+  });
+  it("«Por distancia» sin colonia que decida: el mapa, con colonia escrita o sin ella", () => {
+    expect(envioEnDatos(distancia, cot(false), null)).toBe("mapa");
+    expect(envioEnDatos({ ...distancia, colonias: true }, null, { ...conZona, con_zona: false }, "Centro")).toBe("mapa");
+    expect(envioEnDatos(distancia, null, null, "Una que no está")).toBe("mapa");
+  });
+  it("«Por zonas»: una colonia sin zona, o escrita y fuera del catálogo, no tiene cobertura", () => {
+    expect(envioEnDatos(con({ colonias: true, zonas: dosZonas }), null, { ...conZona, con_zona: false }, "Centro")).toBe("sin_cobertura");
+    expect(envioEnDatos(con({ colonias: true }), null, null, "Una que no está")).toBe("sin_cobertura");
+  });
+  it("«Por zonas» sin colonia todavía: pendiente (también con la búsqueda en vuelo, que llega vacía)", () => {
+    expect(envioEnDatos(con({ colonias: true, zonas: dosZonas }), null, null, "")).toBe("pendiente");
+    expect(envioEnDatos(con({ colonias: true }), null, null, "   ")).toBe("pendiente");
+    expect(envioEnDatos(con({ colonias: true }), null, null)).toBe("pendiente");
+  });
+  it("lo escrito solo cuenta cuando el catálogo ya contestó: sin buscar, en vuelo o sin respuesta es pendiente", () => {
+    const zonas = con({ colonias: true });
+    for (const b of [null, "en_vuelo", "fallo", "sin_respuesta"] as const) {
+      expect(envioEnDatos(zonas, null, null, coloniaContestada(b, "Centro")), String(b)).toBe("pendiente");
+    }
+    expect(envioEnDatos(zonas, null, null, coloniaContestada("lista", "Centro"))).toBe("sin_cobertura");
+  });
+});
+
+describe("ultimaVigente", () => {
+  it("solo la última búsqueda vale; descartar invalida la que esté en vuelo", () => {
+    const v = ultimaVigente();
+    const primera = v.pedir();
+    expect(primera()).toBe(true);
+    const segunda = v.pedir();
+    expect(primera()).toBe(false);
+    expect(segunda()).toBe(true);
+    // El cliente escribe encima: la respuesta que venía ya no se usa.
+    v.descartar();
+    expect(segunda()).toBe(false);
+  });
+});
+
+describe("cpTrasEscribirColonia", () => {
+  it("escribir sobre una colonia que llenó el CP lo borra: ese CP era de la otra colonia", () => {
+    expect(cpTrasEscribirColonia("37390", "37390")).toBe("");
+  });
+  it("un CP que escribió el cliente (o que ya cambió) se queda", () => {
+    expect(cpTrasEscribirColonia("37390", null)).toBe("37390");
+    expect(cpTrasEscribirColonia("37320", "37390")).toBe("37320");
+    expect(cpTrasEscribirColonia("", null)).toBe("");
+  });
+});
+
+describe("coloniaQueCoincide", () => {
+  const lista: ColoniaSugerida[] = [
+    { id: u(21), nombre: "Jardines del Moral", codigo_postal: "37160", con_zona: true },
+    { id: u(22), nombre: "León Moderno", codigo_postal: "37480", con_zona: true },
+  ];
+  it("mismo nombre (sin importar acentos, mayúsculas ni espacios) y mismo CP", () => {
+    expect(coloniaQueCoincide(lista, "  leon   moderno ", "37480")?.id).toBe(u(22));
+  });
+  it("otro CP, o un nombre que solo se parece: ninguna", () => {
+    expect(coloniaQueCoincide(lista, "León Moderno", "37000")).toBeNull();
+    expect(coloniaQueCoincide(lista, "Jardines", "37160")).toBeNull();
+  });
+  it("sin CP escrito (colonia tecleada sin tocar la sugerencia): la única con ese nombre", () => {
+    expect(coloniaQueCoincide(lista, "leon moderno", "")?.id).toBe(u(22));
+    expect(coloniaQueCoincide(lista, "León Moderno", "  ")?.id).toBe(u(22));
+  });
+  it("sin CP y con homónimas: ninguna (no se adivina); con CP, la de ese CP", () => {
+    const conHomonimas: ColoniaSugerida[] = [...lista, { id: u(23), nombre: "Leon Moderno", codigo_postal: "37490", con_zona: false }];
+    expect(coloniaQueCoincide(conHomonimas, "León Moderno", "")).toBeNull();
+    expect(coloniaQueCoincide(conHomonimas, "León Moderno", "37490")?.id).toBe(u(23));
   });
 });

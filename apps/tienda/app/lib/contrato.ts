@@ -29,6 +29,8 @@ export type Sucursal = {
   estado: { recoger: string | null; domicilio: string | null };
   zonas: Zona[];
   envio: EnvioDeSucursal;
+  /** La sucursal tiene catálogo de colonias: el domicilio las sugiere (`colonias` en api.ts). Falso si la función aún no lo dice. */
+  colonias: boolean;
   /** En ESTA sucursal se puede pagar en línea ahora. Falso si la función aún no lo dice. */
   pago_en_linea: boolean;
   /** La public key de la cuenta de Mercado Pago que cobra ahí (pública): con ella se lee la tarjeta. */
@@ -83,7 +85,12 @@ export type Cotizacion = {
   total_mxn: string;
   /** Por distancia y con ubicación: la distancia que calculó la base («3.2» km). Si no, null. */
   distancia_km: string | null;
+  /** La colonia del catálogo fijó el envío. Falso si la función aún no lo dice. */
+  por_colonia: boolean;
 };
+
+/** Una colonia que sugiere el autocompletado. `con_zona`: ya tiene zona de envío (el id de la zona no sale). */
+export type ColoniaSugerida = { id: string; nombre: string; codigo_postal: string | null; con_zona: boolean };
 
 /** Con 200 el pedido EXISTE aunque lo demás venga en null (caso degradado): se va al seguimiento. */
 export type PedidoCreado = {
@@ -249,6 +256,7 @@ export const negocioDe = lector((x): Negocio => {
           return { id: uuid(zona.id), nombre: txt(zona.nombre), costo_mxn: importe(zona.costo_mxn) };
         }),
         envio: envioDe(s.envio),
+        colonias: s.colonias === true,
         pago_en_linea: s.pago_en_linea === true,
         // Solo con la forma de una public key de Mercado Pago: se le pasa tal cual a su librería.
         public_key: typeof s.public_key === "string" && /^[A-Za-z0-9_-]{20,100}$/.test(s.public_key) ? s.public_key : null,
@@ -286,8 +294,15 @@ export const cotizacionDe = lector((x): Cotizacion => {
     subtotal_mxn: importe(c.subtotal_mxn), envio_mxn: importe(c.envio_mxn),
     envio_total_mxn: importe(c.envio_total_mxn), total_mxn: importe(c.total_mxn),
     distancia_km: typeof c.distancia_km === "string" && /^\d{1,5}\.\d$/.test(c.distancia_km) ? c.distancia_km : null,
+    por_colonia: c.por_colonia === true,
   };
 });
+
+export const coloniasDe = lector((x): ColoniaSugerida[] =>
+  lista(x, (y) => {
+    const c = obj(y);
+    return { id: uuid(c.id), nombre: txt(c.nombre), codigo_postal: txtONull(c.codigo_postal), con_zona: bool(c.con_zona) };
+  }));
 
 /** Solo el código es obligatorio: sin él no hay cómo seguir el pedido. Lo demás, raro = ausente. */
 export const pedidoDe = lector((x): PedidoCreado => {

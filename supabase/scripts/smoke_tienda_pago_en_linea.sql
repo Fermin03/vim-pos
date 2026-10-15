@@ -63,6 +63,8 @@ BEGIN
   INSERT INTO categorias (tenant_id, nombre, orden_visualizacion) VALUES (v_t, 'En línea smoke', 70) RETURNING id INTO v_cat;
   INSERT INTO productos (tenant_id, categoria_id, nombre, precio_base_mxn) VALUES (v_t, v_cat, 'Sencilla en línea', 120) RETURNING id INTO v_prod;
   INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES (v_t, v_suc, 'En línea 35', 35) RETURNING id INTO v_zona;
+  -- 0187: a domicilio la zona sale de la colonia (el cliente no la elige).
+  INSERT INTO colonias (tenant_id, sucursal_id, nombre, codigo_postal, zona_envio_id) VALUES (v_t, v_suc, 'Centro', '37000', v_zona);
   UPDATE turnos SET estado = 'CERRADO', fecha_cierre = now() WHERE sucursal_id = v_suc AND estado = 'ABIERTO';
   INSERT INTO turnos (tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable, usuario_apertura_id, fondo_inicial_mxn, fondo_modo)
   VALUES (v_t, v_suc, v_caja, 'SMOKE-LINEA', (now() AT TIME ZONE 'America/Mexico_City')::date, v_cajero, 500, 'TOTAL');
@@ -254,7 +256,8 @@ BEGIN
   v_r2 := tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', v_zona, format('[{"producto_id":"%s","cantidad":2}]', v_prod)::jsonb,
             '{"nombre":"Ana Línea","telefono":"4776660002","email":"ana.linea@example.com"}',
             '{"calle":"Av. Línea","numero_exterior":"1","colonia":"Centro","codigo_postal":"37000","ciudad":"León","estado":"Guanajuato"}',
-            'EN_LINEA', NULL, NULL, md5('pl-dom-a') || md5('pl-dom-b'), p_propina_pct => 20);
+            'EN_LINEA', NULL, NULL, md5('pl-dom-a') || md5('pl-dom-b'), p_propina_pct => 20,
+            p_colonia => (SELECT id FROM colonias WHERE zona_envio_id = v_zona));
   IF v_r2 ->> 'total_mxn' <> '275.00' OR v_r2 ->> 'propina_mxn' <> '48.00' OR v_r2 ->> 'total_a_pagar_mxn' <> '323.00' THEN
     RAISE EXCEPTION 'B2: la propina debía ser 20 %% de 240.00 (sin el envío): %', v_r2;
   END IF;
@@ -267,7 +270,8 @@ BEGIN
   v_r2 := tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', v_zona, format('[{"producto_id":"%s","cantidad":2}]', v_prod)::jsonb,
             '{"nombre":"Ana Libre","telefono":"4776660011","email":"ana.libre@example.com"}',
             '{"calle":"Av. Línea","numero_exterior":"1","colonia":"Centro","codigo_postal":"37000","ciudad":"León","estado":"Guanajuato"}',
-            'EN_LINEA', NULL, NULL, md5('pl-libre-a') || md5('pl-libre-b'), p_propina_mxn => 33.50);
+            'EN_LINEA', NULL, NULL, md5('pl-libre-a') || md5('pl-libre-b'), p_propina_mxn => 33.50,
+            p_colonia => (SELECT id FROM colonias WHERE zona_envio_id = v_zona));
   IF v_r2 ->> 'total_mxn' <> '275.00' OR v_r2 ->> 'propina_mxn' <> '33.50' OR v_r2 ->> 'total_a_pagar_mxn' <> '308.50' THEN
     RAISE EXCEPTION 'B2b: la propina de otro monto debía ser 33.50 sobre 275.00: %', v_r2;
   END IF;
@@ -281,13 +285,15 @@ BEGIN
   v_r2 := tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', v_zona, format('[{"producto_id":"%s","cantidad":2}]', v_prod)::jsonb,
             '{"nombre":"Ana Tope","telefono":"4776660012","email":"ana.tope@example.com"}',
             '{"calle":"Av. Línea","numero_exterior":"1","colonia":"Centro","codigo_postal":"37000","ciudad":"León","estado":"Guanajuato"}',
-            'EN_LINEA', NULL, NULL, md5('pl-tope-a') || md5('pl-tope-b'), p_propina_mxn => 240.00);
+            'EN_LINEA', NULL, NULL, md5('pl-tope-a') || md5('pl-tope-b'), p_propina_mxn => 240.00,
+            p_colonia => (SELECT id FROM colonias WHERE zona_envio_id = v_zona));
   IF v_r2 ->> 'propina_mxn' <> '240.00' OR v_r2 ->> 'total_a_pagar_mxn' <> '515.00' THEN RAISE EXCEPTION 'B2b: la propina igual al subtotal debía pasar: %', v_r2; END IF;
   BEGIN
     PERFORM tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', v_zona, format('[{"producto_id":"%s","cantidad":2}]', v_prod)::jsonb,
               '{"nombre":"Ana Tope","telefono":"4776660013","email":"ana.tope@example.com"}',
               '{"calle":"Av. Línea","numero_exterior":"1","colonia":"Centro","codigo_postal":"37000","ciudad":"León","estado":"Guanajuato"}',
-              'EN_LINEA', NULL, NULL, md5('pl-tope-c') || md5('pl-tope-d'), p_propina_mxn => 240.01);
+              'EN_LINEA', NULL, NULL, md5('pl-tope-c') || md5('pl-tope-d'), p_propina_mxn => 240.01,
+              p_colonia => (SELECT id FROM colonias WHERE zona_envio_id = v_zona));
     RAISE EXCEPTION 'B2b: aceptó una propina mayor que el subtotal de los productos';
   EXCEPTION WHEN OTHERS THEN
     IF SQLERRM NOT LIKE 'PAGO_INVALIDO:%' THEN RAISE EXCEPTION 'B2b: esperaba PAGO_INVALIDO y salió: %', SQLERRM; END IF;
@@ -318,9 +324,9 @@ BEGIN
   IF (SELECT count(*) FROM pg_proc WHERE proname = 'tienda_crear_pedido' AND pronamespace = 'public'::regnamespace) <> 1 THEN
     RAISE EXCEPTION 'B2b: tienda_crear_pedido tiene más de una firma: PostgREST no sabría a cuál llamar';
   END IF;
-  IF has_function_privilege('anon', 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric, jsonb)', 'EXECUTE')
-     OR has_function_privilege('authenticated', 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric, jsonb)', 'EXECUTE')
-     OR NOT has_function_privilege('service_role', 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric, jsonb)', 'EXECUTE') THEN
+  IF has_function_privilege('anon', 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric, jsonb, uuid)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric, jsonb, uuid)', 'EXECUTE')
+     OR NOT has_function_privilege('service_role', 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text, integer, numeric, jsonb, uuid)', 'EXECUTE') THEN
     RAISE EXCEPTION 'B2b: los permisos de tienda_crear_pedido no son los de antes (solo service_role)';
   END IF;
   -- Los dos pedidos de este bloque se van (con su pago, en cascada): lo que sigue cuenta pagos y pedidos.

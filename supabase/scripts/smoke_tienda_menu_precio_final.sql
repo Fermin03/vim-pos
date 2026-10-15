@@ -69,6 +69,8 @@ BEGIN
 
   INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES (v_t, v_suc, 'Pf 35', 35) RETURNING id INTO v_z35;
   INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES (v_t, v_suc, 'Pf gratis', 0) RETURNING id INTO v_z0;
+  -- 0187: a domicilio la zona sale de la colonia: una colonia por zona.
+  INSERT INTO colonias (tenant_id, sucursal_id, nombre, zona_envio_id) VALUES (v_t, v_suc, 'Pf 35', v_z35), (v_t, v_suc, 'Pf gratis', v_z0);
 
   v_menu := tienda_menu(v_t, v_suc);
 
@@ -224,7 +226,8 @@ BEGIN
                       || '{"producto_id":"%s","cantidad":1}]',
                       v_p120, v_o15, v_o10, v_combo, v_s_beb, v_ref, v_s_aco, v_papas, v_f33)::jsonb));
   FOR v_c IN SELECT * FROM jsonb_array_elements(v_carritos) LOOP
-    v_q := tienda_cotizar(v_t, v_suc, v_c ->> 'modo', (v_c ->> 'zona')::uuid, v_c -> 'items');
+    v_q := tienda_cotizar(v_t, v_suc, v_c ->> 'modo', (v_c ->> 'zona')::uuid, v_c -> 'items',   -- 0187: y la colonia de esa zona
+                          p_colonia => (SELECT c.id FROM colonias c WHERE c.sucursal_id = v_suc AND c.zona_envio_id = (v_c ->> 'zona')::uuid));
     IF ROW(v_q ->> 'subtotal_mxn', v_q ->> 'envio_mxn', v_q ->> 'envio_total_mxn', v_q ->> 'total_mxn')
        IS DISTINCT FROM ROW(v_c ->> 'sub', v_c ->> 'env', v_c ->> 'envtot', v_c ->> 'tot') THEN
       RAISE EXCEPTION '7: carrito %: esperaba subtotal %, envío %, envío total %, total %; dio %, %, %, %', v_c ->> 'n',

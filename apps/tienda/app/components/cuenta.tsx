@@ -25,10 +25,11 @@ import { formatoTelefono } from "../lib/telefono";
 import { textoDeEstado } from "../lib/textos";
 import { irA } from "./acceso";
 import { CampoDePassword, CampoDeTexto, useAccion, useCampos } from "./campo";
+import { CampoColonia } from "./campo-colonia";
 import { COLUMNA, CUERPO, Hoja, PIE } from "./hoja";
 import { Esqueleto, FOCO, PARTE, PRINCIPAL } from "./piezas";
 
-type Negocio = { slug: string; nombre: string; sucursales: { id: string; nombre: string }[] };
+type Negocio = { slug: string; nombre: string; sucursales: { id: string; nombre: string; colonias?: boolean }[] };
 
 const TOPE_DE_DIRECCIONES = 5;
 const TITULO = "font-display text-18 font-semibold tracking-tight";
@@ -97,7 +98,12 @@ function EditarDatos({ slug, cuenta, alGuardar }: { slug: string; cuenta: Cuenta
   );
 }
 
-function EditarDireccion({ slug, direccion, alGuardar }: { slug: string; direccion: DireccionGuardada | null; alGuardar: (d: DireccionGuardada[]) => void }) {
+/**
+ * `catalogo`: la sucursal cuyas colonias se sugieren (0187); null = la colonia es texto libre.
+ * ponytail: la cuenta es del negocio y el catálogo de la sucursal: se sugiere el de la primera que lo
+ * tiene. Con varias sucursales con catálogos distintos, juntar las sugerencias de todas.
+ */
+function EditarDireccion({ slug, catalogo, direccion, alGuardar }: { slug: string; catalogo: string | null; direccion: DireccionGuardada | null; alGuardar: (d: DireccionGuardada[]) => void }) {
   const CAMPOS = ["etiqueta", "calle", "numeroExterior", "numeroInterior", "colonia", "codigoPostal", "ciudad", "estado", "referencias"] as const satisfies readonly CampoDeDireccion[];
   const campos = useCampos(CAMPOS, formularioDeDireccion(direccion), erroresDeDireccion);
   const accion = useAccion();
@@ -119,7 +125,12 @@ function EditarDireccion({ slug, direccion, alGuardar }: { slug: string; direcci
         <CampoDeTexto {...campos.de("numeroExterior")} etiqueta="Núm. exterior" maxLength={LIMITES.numeroExterior} />
         <CampoDeTexto {...campos.de("numeroInterior")} etiqueta="Núm. interior" opcional maxLength={LIMITES.numeroInterior} />
       </div>
-      <CampoDeTexto {...campos.de("colonia")} etiqueta="Colonia" autoComplete="address-level3" maxLength={LIMITES.colonia} />
+      {catalogo ? (
+        // Sugiere y llena el CP; la cuenta guarda solo el texto (la colonia del catálogo se busca al pedir).
+        <CampoColonia {...campos.de("colonia")} negocio={slug} sucursalId={catalogo} valor={campos.f.colonia} maxLength={LIMITES.colonia}
+          alEscribir={campos.de("colonia").alCambiar}
+          alElegir={(c) => { campos.de("colonia").alCambiar(c.nombre); if (c.codigo_postal) campos.de("codigoPostal").alCambiar(c.codigo_postal); }} />
+      ) : <CampoDeTexto {...campos.de("colonia")} etiqueta="Colonia" autoComplete="address-level3" maxLength={LIMITES.colonia} />}
       <div className="grid grid-cols-[8rem_1fr] gap-3">
         <CampoDeTexto {...campos.de("codigoPostal")} etiqueta="Código postal" inputMode="numeric" autoComplete="postal-code" maxLength={LIMITES.codigoPostal} />
         <CampoDeTexto {...campos.de("ciudad")} etiqueta="Ciudad" autoComplete="address-level2" maxLength={LIMITES.ciudad} />
@@ -443,7 +454,7 @@ export function MiCuentaDelNegocio({ negocio }: { negocio: Negocio }) {
 
       <Hoja abierta={abierta} alCerrar={cerrar} titulo={hoja ? TITULO_DE_HOJA(hoja) : "Mi cuenta"}>
         {hoja?.tipo === "datos" && <EditarDatos key={vez} slug={slug} cuenta={cuenta} alGuardar={(c) => { setMi({ cuenta: c, direcciones }); hecho("Guardamos tus datos."); }} />}
-        {hoja?.tipo === "direccion" && <EditarDireccion key={vez} slug={slug} direccion={hoja.direccion} alGuardar={(d) => { setMi({ cuenta, direcciones: d }); hecho("Guardamos tu dirección."); }} />}
+        {hoja?.tipo === "direccion" && <EditarDireccion key={vez} slug={slug} catalogo={negocio.sucursales.find((s) => s.colonias)?.id ?? null} direccion={hoja.direccion} alGuardar={(d) => { setMi({ cuenta, direcciones: d }); hecho("Guardamos tu dirección."); }} />}
         {hoja?.tipo === "borrar" && <BorrarDireccion key={vez} slug={slug} direccion={hoja.direccion} alVolver={cerrar} alBorrar={(d) => { setMi({ cuenta, direcciones: d }); hecho("Borramos la dirección."); }} />}
         {hoja?.tipo === "password" && <CambiarPassword key={vez} slug={slug} alCambiar={() => hecho("Cambiamos tu contraseña. Se cerraron tus sesiones en otros dispositivos.")} />}
         {hoja?.tipo === "eliminar" && <EliminarCuenta key={vez} slug={slug} negocio={negocio.nombre} alVolver={cerrar} />}
