@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Button, DialogoPeligro, Modal } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
+import { EnviosPestanas } from "../../../components/envios-pestanas";
 import { listarSucursales, type Sucursal } from "../../../lib/configuracion";
 import {
   crearZona,
@@ -126,6 +127,7 @@ export default function ZonasEnvioPage() {
         right={sucId ? <Button onClick={nueva}>Nueva zona</Button> : undefined}
       />
       <PageBody>
+        <EnviosPestanas />
         {sucursales.length === 0 ? (
           <p className="text-sm text-ink-3">No hay sucursales. Crea una primero.</p>
         ) : (
