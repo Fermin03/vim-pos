@@ -268,20 +268,23 @@ BEGIN
   IF v_q ->> 'cobro' <> 'COLONIA' OR v_q ->> 'envio_mxn' <> '25.00' OR (v_q ->> 'zona_id')::uuid <> v_z_centro THEN
     RAISE EXCEPTION '7b: %', v_q - 'items' - 'renglones';
   END IF;
-  -- 7c) colonia sin zona («Por zonas»): la zona elegida, como siempre. (La fusión del push de 6) le
-  -- dejó Norte a v_libre; se le quita para probar una colonia sin zona.)
+  -- 7c) «Por zonas» el cliente nunca elige la zona: colonia sin zona → no hay envío, aunque mande
+  -- una zona. (La fusión del push de 6) le dejó Norte a v_libre; se le quita.)
   UPDATE colonias SET zona_envio_id = NULL WHERE id = v_libre;
-  v_q := tienda_cotizar(v_t, v_suc, 'DOMICILIO', v_z_norte, v_uno::jsonb, NULL, v_libre);
-  IF v_q ->> 'cobro' <> 'ZONAS' OR (v_q ->> 'zona_id')::uuid <> v_z_norte THEN RAISE EXCEPTION '7c: %', v_q - 'items' - 'renglones'; END IF;
+  v_e := pg_temp.error_de(format('SELECT tienda_cotizar(%L, %L, %L, %L, %L, NULL, %L)', v_t, v_suc, 'DOMICILIO', v_z_norte, v_uno, v_libre));
+  IF v_e IS DISTINCT FROM 'SIN_COBERTURA' THEN RAISE EXCEPTION '7c: colonia sin zona (dio %)', v_e; END IF;
+  -- 7c2) una zona sin colonia, tampoco.
+  v_e := pg_temp.error_de(format('SELECT tienda_cotizar(%L, %L, %L, %L, %L)', v_t, v_suc, 'DOMICILIO', v_z_norte, v_uno));
+  IF v_e IS DISTINCT FROM 'SIN_COBERTURA' THEN RAISE EXCEPTION '7c2: zona sin colonia (dio %)', v_e; END IF;
   -- 7d) colonia cuya zona se desactivó: igual que sin zona.
   UPDATE zonas_envio SET activa = false WHERE id = v_z_centro;
   v_e := pg_temp.error_de(format('SELECT tienda_cotizar(%L, %L, %L, NULL, %L, NULL, %L)', v_t, v_suc, 'DOMICILIO', v_uno, v_col));
-  IF v_e IS DISTINCT FROM 'ZONA_INVALIDA' THEN RAISE EXCEPTION '7d: sin zona válida y sin elegir zona (dio %)', v_e; END IF;
+  IF v_e IS DISTINCT FROM 'SIN_COBERTURA' THEN RAISE EXCEPTION '7d: sin zona válida (dio %)', v_e; END IF;
   UPDATE zonas_envio SET activa = true WHERE id = v_z_centro;
-  -- 7e) colonia de otra sucursal (y de otro negocio): no cuenta; cobra la zona elegida.
+  -- 7e) colonia de otra sucursal (y de otro negocio): no cuenta.
   INSERT INTO colonias (tenant_id, sucursal_id, nombre, zona_envio_id) VALUES (v_otro, v_suc_o, 'Ajena con zona', v_z_otra) RETURNING id INTO v_aje;
-  v_q := tienda_cotizar(v_t, v_suc, 'DOMICILIO', v_z_norte, v_uno::jsonb, NULL, v_aje);
-  IF v_q ->> 'cobro' <> 'ZONAS' OR (v_q ->> 'zona_id')::uuid <> v_z_norte THEN RAISE EXCEPTION '7e: %', v_q - 'items' - 'renglones'; END IF;
+  v_e := pg_temp.error_de(format('SELECT tienda_cotizar(%L, %L, %L, %L, %L, NULL, %L)', v_t, v_suc, 'DOMICILIO', v_z_norte, v_uno, v_aje));
+  IF v_e IS DISTINCT FROM 'SIN_COBERTURA' THEN RAISE EXCEPTION '7e: colonia ajena (dio %)', v_e; END IF;
   -- 7f) el pedido se crea con la zona de la colonia, y su dirección lleva ESA colonia y su CP
   --     aunque el texto que mandó el navegador diga otra.
   v_r := tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', v_z_norte, v_uno::jsonb, v_cli_tienda,
@@ -311,7 +314,23 @@ BEGIN
   IF (SELECT zona_envio_id FROM delivery_pedidos WHERE id = (v_r ->> 'pedido_id')::uuid) IS DISTINCT FROM v_z_centro THEN
     RAISE EXCEPTION '7f2: el pedido por distancia sin punto debía llevar la zona de la colonia (%)', v_r;
   END IF;
+  -- 7f3) «Por distancia», colonia sin zona y con punto: el tramo, y la zona que mande el navegador
+  --      ni se rechaza ni cuenta.
+  v_q := tienda_cotizar(v_t, v_suc, 'DOMICILIO', v_z_norte, v_uno::jsonb, '{"lat":21.129218,"lng":-101.6824}', v_libre);
+  IF v_q ->> 'cobro' <> 'DISTANCIA' OR v_q ->> 'envio_mxn' <> '50.00' OR (v_q ->> 'zona_id')::uuid <> v_z_tramo THEN
+    RAISE EXCEPTION '7f3: por distancia sin colonia con zona debía cobrar el tramo: %', v_q - 'items' - 'renglones';
+  END IF;
   UPDATE tienda_sucursales SET cobro_envio = 'ZONAS', tramos_envio = '[]' WHERE sucursal_id = v_suc;
+  -- 7f4) «Por zonas» a domicilio abre solo con una colonia con zona.
+  UPDATE colonias SET zona_envio_id = NULL WHERE sucursal_id = v_suc;
+  IF tienda_estado_sucursal(v_suc, 'DOMICILIO') IS DISTINCT FROM 'MODO_NO_DISPONIBLE' THEN
+    RAISE EXCEPTION '7f4: sin colonias con zona a domicilio debía estar cerrado (dio %)', tienda_estado_sucursal(v_suc, 'DOMICILIO');
+  END IF;
+  IF tienda_estado_sucursal(v_suc, 'RECOGER') IS NOT NULL THEN RAISE EXCEPTION '7f4: recoger no depende de colonias'; END IF;
+  UPDATE colonias SET zona_envio_id = v_z_centro WHERE id = v_col;
+  IF tienda_estado_sucursal(v_suc, 'DOMICILIO') IS NOT NULL THEN
+    RAISE EXCEPTION '7f4: con una colonia con zona debía abrir (dio %)', tienda_estado_sucursal(v_suc, 'DOMICILIO');
+  END IF;
   -- 7g) tienda_negocio dice si la sucursal tiene colonias.
   IF NOT ((SELECT s FROM jsonb_array_elements(tienda_negocio('colonias-smoke') -> 'publico' -> 'sucursales') s WHERE s ->> 'id' = v_suc::text) ->> 'colonias')::boolean THEN
     RAISE EXCEPTION '7g: tienda_negocio debía decir colonias = true';

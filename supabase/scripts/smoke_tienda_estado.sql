@@ -60,6 +60,8 @@ BEGIN
   INSERT INTO tienda_sucursales (sucursal_id, tenant_id, participa, recoger, domicilio, horario)
   VALUES (v_suc, v_t, true, true, true, h_fix);
   INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES (v_t, v_suc, 'Centro', 35.00) RETURNING id INTO v_zona;
+  -- 0187: a domicilio «Por zonas» abre solo con una colonia con zona.
+  INSERT INTO colonias (tenant_id, sucursal_id, nombre, zona_envio_id) VALUES (v_t, v_suc, 'Centro', v_zona);
   UPDATE cajas SET espejo_turno_abierto_at = now() WHERE id = v_caja;
 
   -- ── tienda_estado_sucursal ────────────────────────────────────────────────

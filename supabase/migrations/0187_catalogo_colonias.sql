@@ -548,8 +548,9 @@ GRANT EXECUTE ON FUNCTION sync_push_snapshot(uuid, jsonb) TO service_role;
 
 -- ── §6 tienda ────────────────────────────────────────────────────────────────
 -- A domicilio, una colonia viva de la sucursal con zona viva, activa y no de tramo decide el envío:
--- esa zona y su precio, se ignoran la zona y el punto que mande el navegador, y `cobro` = 'COLONIA'.
--- Si no, exactamente lo de antes según tienda_sucursales.cobro_envio.
+-- esa zona y su precio, se ignora el punto que mande el navegador, y `cobro` = 'COLONIA'. En la
+-- tienda el cliente NUNCA elige la zona: la que mande el navegador se ignora siempre. Sin colonia
+-- con zona: «Por distancia», el mapa como antes; «Por zonas», SIN_COBERTURA (no hay envío ahí).
 
 -- La zona que una colonia le da a la tienda: viva, activa, de la sucursal y no de un tramo.
 CREATE OR REPLACE FUNCTION _tienda_zona_de_colonia(p_tenant uuid, p_sucursal uuid, p_colonia uuid)
@@ -593,8 +594,65 @@ $$;
 REVOKE ALL ON FUNCTION tienda_colonias(uuid, uuid, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION tienda_colonias(uuid, uuid, text) TO service_role;
 
+-- tienda_estado_sucursal: cuerpo copiado ÍNTEGRO de 0185 §3. Un cambio, marcado «-- 0187:»: a
+-- domicilio «Por zonas» abre solo si hay al menos una colonia viva cuya zona sirve a la tienda
+-- (_tienda_zona_de_colonia): sin colonia con zona ya no hay cómo cobrar el envío (tienda_cotizar).
+CREATE OR REPLACE FUNCTION tienda_estado_sucursal(p_sucursal uuid, p_modo text, p_ahora timestamptz DEFAULT now())
+RETURNS text
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_suc  record;
+  v_ts   tienda_sucursales%ROWTYPE;
+BEGIN
+  SELECT s.id, s.tenant_id, COALESCE(s.timezone, t.timezone) AS tz, s.geo_lat, s.geo_lng
+    INTO v_suc
+    FROM sucursales s JOIN tenants t ON t.id = s.tenant_id
+   WHERE s.id = p_sucursal AND s.deleted_at IS NULL AND s.activa
+     AND t.deleted_at IS NULL AND t.estado IN ('ACTIVO', 'TRIAL', 'INTERNO')
+     AND (t.bloqueo_desde IS NULL OR t.bloqueo_desde > p_ahora);
+  IF NOT FOUND THEN RETURN 'TIENDA_NO_DISPONIBLE'; END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM tienda_config c WHERE c.tenant_id = v_suc.tenant_id)
+     OR COALESCE((modulos_efectivos(v_suc.tenant_id) -> 'efectivos' ->> 'tienda')::boolean, false) IS NOT TRUE THEN
+    RETURN 'TIENDA_NO_DISPONIBLE';
+  END IF;
+
+  SELECT * INTO v_ts FROM tienda_sucursales WHERE sucursal_id = p_sucursal AND tenant_id = v_suc.tenant_id;
+  IF NOT FOUND OR NOT v_ts.participa THEN RETURN 'NO_PARTICIPA'; END IF;
+
+  IF p_modo = 'RECOGER' THEN
+    IF NOT v_ts.recoger THEN RETURN 'MODO_NO_DISPONIBLE'; END IF;
+  ELSIF p_modo = 'DOMICILIO' THEN
+    IF NOT v_ts.domicilio THEN RETURN 'MODO_NO_DISPONIBLE'; END IF;
+    IF v_ts.cobro_envio = 'DISTANCIA' THEN
+      IF v_suc.geo_lat IS NULL OR v_suc.geo_lng IS NULL OR _tienda_tramos(p_sucursal) IS NULL THEN
+        RETURN 'MODO_NO_DISPONIBLE';
+      END IF;
+    -- 0187: era «hay una zona activa que no es de tramo»; ahora, una colonia viva con esa zona.
+    ELSIF NOT EXISTS (SELECT 1 FROM colonias c
+                       CROSS JOIN LATERAL _tienda_zona_de_colonia(v_suc.tenant_id, p_sucursal, c.id) zc
+                       WHERE c.sucursal_id = p_sucursal AND c.tenant_id = v_suc.tenant_id
+                         AND c.deleted_at IS NULL AND c.zona_envio_id IS NOT NULL) THEN
+      RETURN 'MODO_NO_DISPONIBLE';
+    END IF;
+  ELSE
+    RETURN 'MODO_NO_DISPONIBLE';
+  END IF;
+
+  IF v_ts.pausa_hasta IS NOT NULL AND v_ts.pausa_hasta > p_ahora THEN RETURN 'EN_PAUSA'; END IF;
+  IF NOT tienda_horario_abierto(v_ts.horario, p_ahora, v_suc.tz) THEN RETURN 'FUERA_DE_HORARIO'; END IF;
+  IF NOT sucursal_recibe_pedidos(p_sucursal) THEN RETURN 'CAJA_NO_LISTA'; END IF;
+  RETURN NULL;
+END;
+$$;
+REVOKE ALL ON FUNCTION tienda_estado_sucursal(uuid, text, timestamptz) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION tienda_estado_sucursal(uuid, text, timestamptz) TO service_role;
+
 -- tienda_cotizar: cuerpo copiado ÍNTEGRO de 0185 §5. Cambios marcados «-- 0187:»: parámetro nuevo
--- p_colonia (al final, NULL por omisión) y, a domicilio, la colonia con zona decide el envío.
+-- p_colonia (al final, NULL por omisión) y, a domicilio, la colonia con zona decide el envío y
+-- p_zona se ignora (sin colonia con zona, «Por zonas» da SIN_COBERTURA).
 -- La firma cambia: la anterior se borra (con dos, PostgREST no sabría a cuál llamar).
 DROP FUNCTION IF EXISTS tienda_cotizar(uuid, uuid, text, uuid, jsonb, jsonb);   -- 0187: la firma de 0185
 CREATE OR REPLACE FUNCTION tienda_cotizar(p_tenant uuid, p_sucursal uuid, p_modo text, p_zona uuid, p_items jsonb,
@@ -633,7 +691,7 @@ DECLARE
   v_tramos     jsonb;
   v_punto      jsonb;
   v_dist       numeric;
-  v_zona       uuid := p_zona;
+  v_zona       uuid;             -- 0187: era := p_zona (el navegador ya no elige la zona)
   v_cobro      text;             -- 0187: 'COLONIA' cuando la colonia decidió el envío
   v_col        record;           -- 0187: la zona de la colonia
 BEGIN
@@ -643,15 +701,13 @@ BEGIN
 
   IF p_modo = 'DOMICILIO' THEN
     SELECT * INTO v_ts FROM tienda_sucursales ts WHERE ts.sucursal_id = p_sucursal AND ts.tenant_id = p_tenant;
-    -- 0187: la colonia con zona decide el envío, cobre como cobre la sucursal. La zona y el punto
-    -- que mande el navegador no cuentan (así no se elige una zona más barata).
+    -- 0187: en la tienda el cliente nunca elige la zona: p_zona se ignora a domicilio (sigue en la
+    -- firma por los llamadores viejos). Decide la colonia con zona, cobre como cobre la sucursal; si
+    -- no, «Por distancia» el mapa; si no, no hay envío a esa dirección.
     SELECT * INTO v_col FROM _tienda_zona_de_colonia(p_tenant, p_sucursal, p_colonia);
     IF v_col.zona_id IS NOT NULL THEN
       v_zona := v_col.zona_id; v_envio := v_col.costo_mxn; v_cobro := 'COLONIA';
-    ELSIF v_ts.cobro_envio IS NOT DISTINCT FROM 'DISTANCIA' THEN   -- 0187: era IF
-      IF p_zona IS NOT NULL THEN
-        RAISE EXCEPTION 'ZONA_INVALIDA: con envío por distancia la zona la decide la ubicación';
-      END IF;
+    ELSIF v_ts.cobro_envio IS NOT DISTINCT FROM 'DISTANCIA' THEN   -- 0187: era IF; ya no rechaza p_zona
       v_tramos := _tienda_tramos(p_sucursal);
       SELECT s.geo_lat, s.geo_lng INTO v_suc FROM sucursales s WHERE s.id = p_sucursal;
       IF v_tramos IS NULL OR v_suc.geo_lat IS NULL OR v_suc.geo_lng IS NULL THEN
@@ -674,12 +730,8 @@ BEGIN
         IF NOT FOUND THEN RAISE EXCEPTION 'FUERA_DE_AREA: %', to_char(v_dist, 'FM99990.0'); END IF;
       END IF;
     ELSE
-      SELECT z.costo_mxn INTO v_envio
-        FROM zonas_envio z
-       WHERE z.id = p_zona AND z.tenant_id = p_tenant AND z.sucursal_id = p_sucursal
-         AND z.activa AND z.deleted_at IS NULL
-         AND NOT COALESCE(v_ts.tramos_envio, '[]'::jsonb) @> jsonb_build_array(jsonb_build_object('zona_id', z.id::text));
-      IF NOT FOUND THEN RAISE EXCEPTION 'ZONA_INVALIDA: a domicilio hace falta una zona activa de esta sucursal'; END IF;
+      -- 0187: «Por zonas» sin colonia con zona: antes cobraba la zona que mandaba el navegador.
+      RAISE EXCEPTION 'SIN_COBERTURA: no hay envío a esa dirección';
     END IF;
   ELSIF p_modo = 'RECOGER' THEN
     IF p_zona IS NOT NULL THEN RAISE EXCEPTION 'ZONA_INVALIDA: al recoger no hay zona de envío'; END IF;

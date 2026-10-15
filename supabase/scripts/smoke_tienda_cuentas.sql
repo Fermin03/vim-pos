@@ -53,6 +53,8 @@ BEGIN
   INSERT INTO opciones_modificador (tenant_id, grupo_id, nombre, precio_extra_mxn, orden_visualizacion) VALUES (v_t, v_g, 'Extra queso', 15, 1) RETURNING id INTO v_o15;
   INSERT INTO productos_grupos_modificadores (tenant_id, producto_id, grupo_id, orden_visualizacion) VALUES (v_t, v_p120, v_g, 1);
   INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES (v_t, v_suc, 'Cuentas 35', 35) RETURNING id INTO v_z35;
+  -- 0187: a domicilio la zona sale de la colonia (la de v_dir2).
+  INSERT INTO colonias (tenant_id, sucursal_id, nombre, codigo_postal, zona_envio_id) VALUES (v_t, v_suc, 'Norte', '37100', v_z35);
   -- Un combo de $150 cuyo único slot ofrece la «Sencilla», que admite el extra de $15.
   INSERT INTO productos (tenant_id, categoria_id, nombre, precio_base_mxn, es_combo) VALUES (v_t, v_cat, 'Combo cuentas', 150, true) RETURNING id INTO v_combo;
   INSERT INTO combo_grupos (tenant_id, combo_producto_id, nombre, orden_visualizacion, modo_precio) VALUES (v_t, v_combo, 'Principal', 1, 'DELTA') RETURNING id INTO v_slot;
@@ -465,7 +467,8 @@ BEGIN
   v_ped := (tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, v_carrito, '{"nombre":"Ana Cuenta","telefono":"4775550777"}', NULL,
               'EFECTIVO', NULL, NULL, pg_temp.h('seg1'), v_a) ->> 'pedido_id')::uuid;
   v_ped2 := (tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', v_z35, format('[{"producto_id":"%s","cantidad":1}]', v_p120)::jsonb,
-              '{"nombre":"Ana Cuenta","telefono":"4775550778"}', v_dir2, 'EFECTIVO', NULL, NULL, pg_temp.h('seg2'), v_a) ->> 'pedido_id')::uuid;
+              '{"nombre":"Ana Cuenta","telefono":"4775550778"}', v_dir2, 'EFECTIVO', NULL, NULL, pg_temp.h('seg2'), v_a,
+              p_colonia => (SELECT id FROM colonias WHERE zona_envio_id = v_z35)) ->> 'pedido_id')::uuid;
   v_combo_carrito := format('[{"producto_id":"%s","cantidad":2,"nota":null,"modificadores":[],"componentes":[{"grupo_id":"%s","producto_id":"%s","cantidad":1,"modificadores":[{"opcion_id":"%s","cantidad":1}]}]}]',
                             v_combo, v_slot, v_p120, v_o15)::jsonb;
   PERFORM tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, v_combo_carrito, '{"nombre":"Beto","telefono":"4775550779"}', NULL, 'EFECTIVO', NULL, NULL, pg_temp.h('seg3'), v_beto);

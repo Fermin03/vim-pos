@@ -186,19 +186,19 @@ Configuración → Envíos (`apps/admin/app/(panel)/configuracion/envios/page.ts
   este orden:
   1. La dirección trae `colonia_id` de la sucursal **con zona** → esa zona y su precio, sin
      importar si la sucursal cobra «Por zonas» o «Por distancia».
-  2. Si no → **por distancia** con el pin del mapa (tramos de 0185), si la sucursal tiene tramos
-     válidos y punto.
-  3. Si tampoco → el selector de zonas de hoy («Por zonas»).
+  2. Si no y la sucursal cobra **«Por distancia»** → el pin del mapa (tramos de 0185).
+  3. Si tampoco → `SIN_COBERTURA`: no hay envío a esa dirección.
 
-  En la práctica, 2 y 3 son «lo que la sucursal ya hace según su modo de cobro»: una sucursal «Por
-  zonas» no tiene tramos utilizables. El selector de zona, cuando la sucursal tiene catálogo, pasa
-  del carrito a «Tus datos», después de la colonia.
+  **En la tienda el cliente nunca elige la zona** (decisión de Fermín, 15 oct). `p_zona` sigue en la
+  firma de `tienda_cotizar` / `tienda_crear_pedido` por los llamadores viejos, pero a domicilio se
+  ignora siempre: ni precio ni zona del pedido. Ya no hay selector de zona en la tienda.
 - Cuando la colonia decide el envío, el pedido guarda el nombre y el CP del catálogo.
-- El servidor resuelve la zona desde `colonia_id`; nunca confía en una zona mandada por el
-  navegador cuando hay colonia con zona. Esto cierra el truco de elegir una zona más barata.
-- `components/entrega.tsx` oculta el selector de zona cuando la colonia ya la decide y muestra
-  «Envío a {colonia}: $X».
-- `tienda_estado_sucursal` acepta domicilio si hay al menos un camino de los tres.
+- El servidor resuelve la zona desde `colonia_id`; nunca usa una zona mandada por el navegador.
+  Esto cierra el truco de elegir una zona más barata.
+- `components/entrega.tsx` muestra «Envío a {colonia}: $X».
+- `tienda_estado_sucursal`: a domicilio «Por zonas» abre solo si la sucursal tiene al menos una
+  colonia viva con zona válida para la tienda (`_tienda_zona_de_colonia`); si no,
+  `MODO_NO_DISPONIBLE`. «Por distancia», igual que en 0185.
 
 ## 7. Pruebas
 

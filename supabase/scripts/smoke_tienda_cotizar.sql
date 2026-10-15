@@ -130,6 +130,8 @@ BEGIN
   INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn, deleted_at) VALUES (v_t, v_suc, 'Cotizar borrada', 10, now()) RETURNING id INTO v_z_del;
   INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES (v_t, v_suc2, 'Cotizar otra sucursal', 20) RETURNING id INTO v_z_suc2;
   INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES (v_otro, v_suc_o, 'Cotizar ajena', 20) RETURNING id INTO v_z_ajena;
+  -- 0187: a domicilio la zona sale de la colonia (el cliente no la elige): una colonia por zona.
+  INSERT INTO colonias (tenant_id, sucursal_id, nombre, zona_envio_id) VALUES (v_t, v_suc, 'Cotizar 35', v_z35), (v_t, v_suc, 'Cotizar gratis', v_z0);
 
   -- Un turno abierto, para llevar cada cotización hasta el ticket. dia_contable en hora de México.
   UPDATE turnos SET estado = 'CERRADO', fecha_cierre = now() WHERE caja_id = v_caja AND estado = 'ABIERTO';
@@ -236,7 +238,8 @@ BEGIN
   v_n := 0;
   FOR v_c IN SELECT * FROM jsonb_array_elements(v_casos) LOOP
     v_n := v_n + 1;
-    v_q := tienda_cotizar(v_t, v_suc, v_c ->> 'modo', (v_c ->> 'zona')::uuid, v_c -> 'items');
+    v_q := tienda_cotizar(v_t, v_suc, v_c ->> 'modo', (v_c ->> 'zona')::uuid, v_c -> 'items',   -- 0187: y la colonia de esa zona
+                          p_colonia => (SELECT c.id FROM colonias c WHERE c.sucursal_id = v_suc AND c.zona_envio_id = (v_c ->> 'zona')::uuid));
     v_qs := v_qs || jsonb_build_object(v_c ->> 'caso', v_q);
 
     IF NOT (v_q ?& ARRAY['items', 'renglones', 'subtotal_mxn', 'envio_mxn', 'envio_total_mxn', 'total_mxn', 'cobro', 'distancia_km', 'zona_id'])
@@ -564,12 +567,14 @@ BEGIN
     ('19 el hijo con una opción negativa', 'COMBO_INVALIDO', 'RECOGER', NULL,
        format('[{"producto_id":"%s","cantidad":1,"componentes":[{"grupo_id":"%s","producto_id":"%s","cantidad":1,"modificadores":[{"opcion_id":"%s","cantidad":1}]}]}]',
               v_combo_f, v_s_f, v_p120, v_oneg)::jsonb, v_combo_f),
-    -- 20) La zona.
-    ('20 domicilio sin zona', 'ZONA_INVALIDA', 'DOMICILIO', NULL, format('[{"producto_id":"%s","cantidad":1}]', v_p120)::jsonb, NULL),
-    ('20 zona de otra sucursal', 'ZONA_INVALIDA', 'DOMICILIO', v_z_suc2, format('[{"producto_id":"%s","cantidad":1}]', v_p120)::jsonb, NULL),
-    ('20 zona inactiva', 'ZONA_INVALIDA', 'DOMICILIO', v_z_inact, format('[{"producto_id":"%s","cantidad":1}]', v_p120)::jsonb, NULL),
-    ('20 zona borrada', 'ZONA_INVALIDA', 'DOMICILIO', v_z_del, format('[{"producto_id":"%s","cantidad":1}]', v_p120)::jsonb, NULL),
-    ('20 zona de otro negocio', 'ZONA_INVALIDA', 'DOMICILIO', v_z_ajena, format('[{"producto_id":"%s","cantidad":1}]', v_p120)::jsonb, NULL),
+    -- 20) La zona. 0187: a domicilio la zona que mande el navegador no cuenta; sin colonia con zona
+    --     no hay envío (antes, ZONA_INVALIDA). Incluso una zona válida (v_z35) sin colonia.
+    ('20 domicilio sin zona', 'SIN_COBERTURA', 'DOMICILIO', NULL, format('[{"producto_id":"%s","cantidad":1}]', v_p120)::jsonb, NULL),
+    ('20 zona válida sin colonia', 'SIN_COBERTURA', 'DOMICILIO', v_z35, format('[{"producto_id":"%s","cantidad":1}]', v_p120)::jsonb, NULL),
+    ('20 zona de otra sucursal', 'SIN_COBERTURA', 'DOMICILIO', v_z_suc2, format('[{"producto_id":"%s","cantidad":1}]', v_p120)::jsonb, NULL),
+    ('20 zona inactiva', 'SIN_COBERTURA', 'DOMICILIO', v_z_inact, format('[{"producto_id":"%s","cantidad":1}]', v_p120)::jsonb, NULL),
+    ('20 zona borrada', 'SIN_COBERTURA', 'DOMICILIO', v_z_del, format('[{"producto_id":"%s","cantidad":1}]', v_p120)::jsonb, NULL),
+    ('20 zona de otro negocio', 'SIN_COBERTURA', 'DOMICILIO', v_z_ajena, format('[{"producto_id":"%s","cantidad":1}]', v_p120)::jsonb, NULL),
     ('20 recoger con zona', 'ZONA_INVALIDA', 'RECOGER', v_z35, format('[{"producto_id":"%s","cantidad":1}]', v_p120)::jsonb, NULL),
     -- 21) El modo.
     ('21 MESA', 'MODO_INVALIDO', 'MESA', NULL, format('[{"producto_id":"%s","cantidad":1}]', v_p120)::jsonb, NULL),
@@ -594,7 +599,7 @@ BEGIN
       RAISE EXCEPTION '%: el detalle debía ser solo el producto_id %: %', r.caso, r.detalle, v_err;
     END IF;
   END LOOP;
-  IF v_n <> 71 THEN RAISE EXCEPTION 'rechazos: se probaron % de 71', v_n; END IF;
+  IF v_n <> 72 THEN RAISE EXCEPTION 'rechazos: se probaron % de 72', v_n; END IF;   -- 0187: +1, zona válida sin colonia
 
   -- 22) La sucursal no es del negocio (en los dos sentidos).
   FOR r IN SELECT * FROM (VALUES (v_t, v_suc_o), (v_otro, v_suc), (v_t, NULL::uuid)) AS x(tenant, sucursal) LOOP

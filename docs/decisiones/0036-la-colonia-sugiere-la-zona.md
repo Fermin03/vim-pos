@@ -27,6 +27,10 @@ tramo (0185) no se eligen a mano.
 **En la tienda, la colonia con zona manda** en cualquier modo de envío: el pedido guarda el nombre y
 el CP del catálogo. La cotización pública solo expone `por_colonia: boolean`, no la zona.
 
+**En la tienda el cliente nunca elige la zona.** La zona que mande el navegador se ignora. Sin
+colonia con zona: «Por distancia», el mapa; «Por zonas», no hay envío (`SIN_COBERTURA`), y el
+domicilio «Por zonas» solo abre si la sucursal tiene al menos una colonia con zona.
+
 ## Por qué
 
 Es como lo resuelve Soft Restaurant y quita la memoria del cajero. SEPOMEX vive solo en la nube porque

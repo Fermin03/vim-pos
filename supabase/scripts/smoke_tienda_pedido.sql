@@ -24,7 +24,7 @@ DECLARE
   v_combo uuid; v_combo_f uuid; v_ag uuid;
   v_g2 uuid; v_o15 uuid; v_o10 uuid;
   v_s_beb uuid; v_s_aco uuid; v_s_f uuid;
-  v_z35 uuid; v_z0 uuid;
+  v_z35 uuid; v_z0 uuid; v_col uuid;   -- 0187: v_col, la colonia de la zona
   h_todo   jsonb := '{"1":["00:00","00:00"],"2":["00:00","00:00"],"3":["00:00","00:00"],"4":["00:00","00:00"],"5":["00:00","00:00"],"6":["00:00","00:00"],"7":["00:00","00:00"]}';
   -- La dirección como llega (con espacios y una clave de más) y como debe guardarse.
   v_dir_sucia jsonb := '{"calle":"  Av. Pedido  ","numero_exterior":"12","numero_interior":"","colonia":"Centro","codigo_postal":"37000","ciudad":"León","estado":"Guanajuato","referencias":" portón verde ","basura":"no se guarda"}';
@@ -102,6 +102,10 @@ BEGIN
 
   INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES (v_t, v_suc, 'Pedido 35', 35) RETURNING id INTO v_z35;
   INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES (v_t, v_suc, 'Pedido gratis', 0) RETURNING id INTO v_z0;
+  -- 0187: a domicilio la zona sale de la colonia: una por zona, las dos con el nombre de v_dir (la
+  -- de la gratis sin CP, para no chocar con la llave) y así la dirección guardada no cambia.
+  INSERT INTO colonias (tenant_id, sucursal_id, nombre, codigo_postal, zona_envio_id)
+  VALUES (v_t, v_suc, 'Centro', '37000', v_z35), (v_t, v_suc, 'Centro', NULL, v_z0);
 
   -- Un turno abierto, como el de smoke_tienda_ticket.sql. dia_contable en hora de México.
   UPDATE turnos SET estado = 'CERRADO', fecha_cierre = now() WHERE sucursal_id = v_suc AND estado = 'ABIERTO';
@@ -165,14 +169,15 @@ BEGIN
     v_email := CASE WHEN v_n % 2 = 0 THEN 'ana' || v_n || '@example.com' END;
     v_nota  := CASE v_n WHEN 1 THEN '  ' || repeat('n', 320) || '  ' WHEN 2 THEN NULL WHEN 3 THEN '   ' ELSE 'Tocar el timbre' END;
 
-    v_q := tienda_cotizar(v_t, v_suc, v_c ->> 'modo', (v_c ->> 'zona')::uuid, v_c -> 'items');
+    v_col := (SELECT c.id FROM colonias c WHERE c.sucursal_id = v_suc AND c.zona_envio_id = (v_c ->> 'zona')::uuid);   -- 0187
+    v_q := tienda_cotizar(v_t, v_suc, v_c ->> 'modo', (v_c ->> 'zona')::uuid, v_c -> 'items', p_colonia => v_col);
     v_r := tienda_crear_pedido(v_t, v_suc, v_c ->> 'modo', (v_c ->> 'zona')::uuid, v_c -> 'items',
              -- El nombre llega con espacios; el correo, ausente (9), en null JSON (impares) o puesto (pares).
              jsonb_build_object('nombre', '  Ana Pedido  ', 'telefono', v_tel)
                || CASE WHEN v_n = 9 THEN '{}'::jsonb ELSE jsonb_build_object('email', v_email) END,
              CASE WHEN v_dom THEN v_dir_sucia END,
              v_c ->> 'pago', (v_c ->> 'paga_con')::numeric, v_nota, v_hash,
-             CASE WHEN v_n = 1 THEN v_cuenta END);
+             CASE WHEN v_n = 1 THEN v_cuenta END, p_colonia => v_col);
 
     -- 12 del contrato) Lo que devuelve: cuatro claves, el total como texto; y desde la 0167,
     --    ya_existia (false: sin clave siempre se crea).
@@ -318,7 +323,8 @@ BEGIN
     ('E18 huella vacía',           'SEGUIMIENTO_INVALIDO', 'RECOGER', NULL, v_cli, NULL, 'EFECTIVO', NULL, ''),
     ('E18 sin huella',             'SEGUIMIENTO_INVALIDO', 'RECOGER', NULL, v_cli, NULL, 'EFECTIVO', NULL, NULL),
     -- Los errores de la cotización pasan tal cual (regla 6).
-    ('E19 domicilio sin zona',     'ZONA_INVALIDA', 'DOMICILIO', NULL, v_cli, v_dir, 'EFECTIVO', NULL, 'ok'),
+    -- 0187: sin colonia con zona no hay envío (antes ZONA_INVALIDA).
+    ('E19 domicilio sin zona',     'SIN_COBERTURA', 'DOMICILIO', NULL, v_cli, v_dir, 'EFECTIVO', NULL, 'ok'),
     ('E19 recoger con zona',       'ZONA_INVALIDA', 'RECOGER', v_z35, v_cli, NULL, 'EFECTIVO', NULL, 'ok'),
     -- Un modo que no existe: la tienda no está abierta «en ese modo» (regla 1).
     ('E1 modo desconocido',        'TIENDA_CERRADA', 'MESA', NULL, v_cli, NULL, 'EFECTIVO', NULL, 'ok'),
@@ -329,7 +335,8 @@ BEGIN
     v_err := NULL;
     BEGIN
       PERFORM tienda_crear_pedido(v_t, v_suc, r.modo, r.zona, v_uno, r.cliente, r.direccion, r.pago, r.paga_con, NULL,
-                CASE WHEN r.hash = 'ok' THEN md5('r' || v_n) || md5('s' || v_n) ELSE r.hash END);
+                CASE WHEN r.hash = 'ok' THEN md5('r' || v_n) || md5('s' || v_n) ELSE r.hash END,
+                p_colonia => (SELECT c.id FROM colonias c WHERE c.sucursal_id = v_suc AND c.zona_envio_id = r.zona));   -- 0187
     EXCEPTION WHEN OTHERS THEN
       v_err := SQLERRM;
     END;
@@ -429,7 +436,7 @@ BEGIN
            md5('f4a') || md5('f4b'), p_total_esperado => 120.00);
   IF v_r ->> 'total_mxn' IS DISTINCT FROM '120.00' THEN RAISE EXCEPTION 'F4: con el total esperado correcto debía entrar: %', v_r; END IF;
   v_r := tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', v_z35, v_uno, '{"nombre":"Ana","telefono":"4775550921"}', v_dir, 'TARJETA', NULL, NULL,
-           md5('f4c') || md5('f4d'), NULL, 155);
+           md5('f4c') || md5('f4d'), NULL, 155, p_colonia => (SELECT id FROM colonias WHERE zona_envio_id = v_z35));   -- 0187
   IF v_r ->> 'total_mxn' IS DISTINCT FROM '155.00' THEN RAISE EXCEPTION 'F4: a domicilio, con 155 esperado debía entrar: %', v_r; END IF;
 
   SELECT count(*) INTO v_n0 FROM delivery_pedidos;
@@ -462,7 +469,8 @@ BEGIN
   v_err := NULL;
   BEGIN
     PERFORM tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', v_z35, v_uno, '{"nombre":"Ana","telefono":"4775550923"}', v_dir, 'EFECTIVO', NULL, NULL,
-              md5('f4e') || md5('f4f'), p_total_esperado => 155);
+              md5('f4e') || md5('f4f'), p_total_esperado => 155,
+              p_colonia => (SELECT id FROM colonias WHERE zona_envio_id = v_z35));   -- 0187
   EXCEPTION WHEN OTHERS THEN v_err := SQLERRM;
   END;
   IF v_err IS DISTINCT FROM 'TOTAL_CAMBIO: 160.00' THEN RAISE EXCEPTION 'F4: tras subir el envío, el total viejo debía dar «TOTAL_CAMBIO: 160.00», dio %', COALESCE(v_err, 'un pedido'); END IF;
@@ -506,7 +514,7 @@ BEGIN
     ('paga con menos que el total', 'PAGO_INVALIDO',          'RECOGER',   NULL, v_uno, NULL, 'EFECTIVO', 1,    'ok', NULL),
     ('carrito vacío',               'CARRITO_INVALIDO',       'RECOGER',   NULL, '[]'::jsonb, NULL, 'EFECTIVO', NULL, 'ok', NULL),
     ('producto agotado',            'PRODUCTO_NO_DISPONIBLE', 'RECOGER',   NULL, format('[{"producto_id":"%s","cantidad":1}]', v_ag)::jsonb, NULL, 'EFECTIVO', NULL, 'ok', NULL),
-    ('domicilio sin zona',          'ZONA_INVALIDA',          'DOMICILIO', NULL, v_uno, v_dir, 'EFECTIVO', NULL, 'ok', NULL),
+    ('domicilio sin zona',          'SIN_COBERTURA',          'DOMICILIO', NULL, v_uno, v_dir, 'EFECTIVO', NULL, 'ok', NULL),   -- 0187: era ZONA_INVALIDA
     ('total que no es',             'TOTAL_CAMBIO',           'RECOGER',   NULL, v_uno, NULL, 'EFECTIVO', NULL, 'ok', 1),
     ('domicilio sin dirección',     'DIRECCION_INVALIDA',     'DOMICILIO', v_z35, v_uno, NULL, 'EFECTIVO', NULL, 'ok', NULL),
     ('huella mal formada',          'SEGUIMIENTO_INVALIDO',   'RECOGER',   NULL, v_uno, NULL, 'EFECTIVO', NULL, 'mala', NULL)
@@ -517,7 +525,8 @@ BEGIN
     BEGIN
       PERFORM tienda_crear_pedido(v_t, v_suc, r.modo, r.zona, r.items, jsonb_build_object('nombre', 'Ana', 'telefono', r.tel), r.direccion,
                 r.pago, r.paga_con, NULL, CASE WHEN r.hash = 'ok' THEN md5('f6a') || md5('f6b') ELSE r.hash END,
-                p_total_esperado => r.total);
+                p_total_esperado => r.total,
+                p_colonia => (SELECT c.id FROM colonias c WHERE c.sucursal_id = v_suc AND c.zona_envio_id = r.zona));   -- 0187
     EXCEPTION WHEN OTHERS THEN v_err := SQLERRM;
     END;
     IF v_err IS NULL OR v_err NOT LIKE r.codigo || ':%' THEN
