@@ -25,7 +25,7 @@ DECLARE
   v_col uuid; v_e text; v_n int; v_r jsonb;
   v_cli uuid; v_suc_sin uuid; v_z_borrada uuid;
   v_super uuid := '99999999-0000-0000-0000-0000000000f1'; v_aut uuid; v_libre uuid; v_ajena uuid;
-  v_q jsonb; v_uno text; v_p120 uuid; v_cat uuid; v_aje uuid; v_cli_tienda jsonb; v_dir_tienda jsonb;
+  v_q jsonb; v_uno text; v_z_tramo uuid; v_p120 uuid; v_cat uuid; v_aje uuid; v_cli_tienda jsonb; v_dir_tienda jsonb;
   h_todo jsonb := '{"1":["00:00","00:00"],"2":["00:00","00:00"],"3":["00:00","00:00"],"4":["00:00","00:00"],"5":["00:00","00:00"],"6":["00:00","00:00"],"7":["00:00","00:00"]}';
 BEGIN
   PERFORM set_config('request.jwt.claims', NULL, true);
@@ -244,7 +244,7 @@ BEGIN
   -- 7a) búsqueda
   v_r := tienda_colonias(v_t, v_suc, 'SAN jo');
   IF jsonb_array_length(v_r) = 0 OR v_r -> 0 ->> 'nombre' <> 'San José' OR v_r::text LIKE '%' || v_z_centro || '%'
-     OR (v_r -> 0) ? 'zona_envio_id' THEN
+     OR (v_r -> 0) ? 'zona_envio_id' OR (v_r -> 0 ->> 'con_zona')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION '7a: búsqueda: %', v_r;
   END IF;
   IF tienda_colonias(v_t, v_suc, 'a') <> '[]'::jsonb OR tienda_colonias(v_t, v_suc_o, 'san') <> '[]'::jsonb
@@ -270,13 +270,36 @@ BEGIN
   INSERT INTO colonias (tenant_id, sucursal_id, nombre, zona_envio_id) VALUES (v_otro, v_suc_o, 'Ajena con zona', v_z_otra) RETURNING id INTO v_aje;
   v_q := tienda_cotizar(v_t, v_suc, 'DOMICILIO', v_z_norte, v_uno::jsonb, NULL, v_aje);
   IF v_q ->> 'cobro' <> 'ZONAS' OR (v_q ->> 'zona_id')::uuid <> v_z_norte THEN RAISE EXCEPTION '7e: %', v_q - 'items' - 'renglones'; END IF;
-  -- 7f) el pedido se crea con la zona de la colonia.
-  v_r := tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', v_z_norte, v_uno::jsonb, v_cli_tienda, v_dir_tienda,
+  -- 7f) el pedido se crea con la zona de la colonia, y su dirección lleva ESA colonia y su CP
+  --     aunque el texto que mandó el navegador diga otra.
+  v_r := tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', v_z_norte, v_uno::jsonb, v_cli_tienda,
+                             v_dir_tienda || '{"colonia":"Otra Colonia","codigo_postal":"37999"}',
                              'EFECTIVO', NULL, NULL, encode(sha256('colonias-smoke'::bytea), 'hex'),
                              p_colonia => v_col);
   IF (SELECT zona_envio_id FROM delivery_pedidos WHERE id = (v_r ->> 'pedido_id')::uuid) IS DISTINCT FROM v_z_centro THEN
     RAISE EXCEPTION '7f: el pedido debía llevar la zona de la colonia (%)', v_r;
   END IF;
+  IF (SELECT direccion ->> 'colonia' FROM delivery_pedidos WHERE id = (v_r ->> 'pedido_id')::uuid) IS DISTINCT FROM 'San José'
+     OR (SELECT direccion ->> 'codigo_postal' FROM delivery_pedidos WHERE id = (v_r ->> 'pedido_id')::uuid) IS DISTINCT FROM '37000' THEN
+    RAISE EXCEPTION '7f: la dirección debía llevar la colonia del catálogo: %',
+      (SELECT direccion FROM delivery_pedidos WHERE id = (v_r ->> 'pedido_id')::uuid);
+  END IF;
+  -- 7f2) «Por distancia»: la colonia con zona gana al mapa, y sin punto el pedido se crea igual.
+  INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES (v_t, v_suc, 'Col Tramo 5 km', 50) RETURNING id INTO v_z_tramo;
+  UPDATE sucursales SET geo_lat = 21.1223, geo_lng = -101.6824 WHERE id = v_suc;
+  UPDATE tienda_sucursales SET cobro_envio = 'DISTANCIA',
+         tramos_envio = jsonb_build_array(jsonb_build_object('hasta_km', '5.0', 'zona_id', v_z_tramo)) WHERE sucursal_id = v_suc;
+  v_q := tienda_cotizar(v_t, v_suc, 'DOMICILIO', NULL, v_uno::jsonb, '{"lat":21.129218,"lng":-101.6824}', v_col);
+  IF v_q ->> 'cobro' <> 'COLONIA' OR v_q ->> 'envio_mxn' <> '25.00' OR (v_q ->> 'zona_id')::uuid <> v_z_centro THEN
+    RAISE EXCEPTION '7f2: por distancia la colonia debía mandar: %', v_q - 'items' - 'renglones';
+  END IF;
+  v_r := tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', NULL, v_uno::jsonb, v_cli_tienda, v_dir_tienda,
+                             'EFECTIVO', NULL, NULL, encode(sha256('colonias-smoke-distancia'::bytea), 'hex'),
+                             p_colonia => v_col);
+  IF (SELECT zona_envio_id FROM delivery_pedidos WHERE id = (v_r ->> 'pedido_id')::uuid) IS DISTINCT FROM v_z_centro THEN
+    RAISE EXCEPTION '7f2: el pedido por distancia sin punto debía llevar la zona de la colonia (%)', v_r;
+  END IF;
+  UPDATE tienda_sucursales SET cobro_envio = 'ZONAS', tramos_envio = '[]' WHERE sucursal_id = v_suc;
   -- 7g) tienda_negocio dice si la sucursal tiene colonias.
   IF NOT ((SELECT s FROM jsonb_array_elements(tienda_negocio('colonias-smoke') -> 'publico' -> 'sucursales') s WHERE s ->> 'id' = v_suc::text) ->> 'colonias')::boolean THEN
     RAISE EXCEPTION '7g: tienda_negocio debía decir colonias = true';

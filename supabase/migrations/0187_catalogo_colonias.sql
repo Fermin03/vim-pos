@@ -572,7 +572,7 @@ AS $$
   WITH q AS (SELECT lower(f_unaccent(btrim(coalesce(p_q, '')))) AS t),
        l AS (SELECT t, replace(replace(replace(t, '\', '\\'), '%', '\%'), '_', '\_') AS esc FROM q)
   SELECT coalesce(jsonb_agg(jsonb_build_object('id', x.id, 'nombre', x.nombre, 'codigo_postal', x.codigo_postal,
-                                               'con_zona', x.con_zona) ORDER BY x.empieza DESC, x.nombre), '[]'::jsonb)
+                                               'con_zona', x.con_zona) ORDER BY x.empieza DESC, x.nombre, x.codigo_postal), '[]'::jsonb)
     FROM (SELECT c.id, btrim(c.nombre) AS nombre, c.codigo_postal,   -- la tabla guarda el nombre como se escribió
                  c.nombre_busqueda LIKE l.esc || '%' AS empieza,
                  EXISTS (SELECT 1 FROM _tienda_zona_de_colonia(p_tenant, p_sucursal, c.id)) AS con_zona
@@ -580,7 +580,7 @@ AS $$
            WHERE c.tenant_id = p_tenant AND c.sucursal_id = p_sucursal AND c.deleted_at IS NULL
              AND char_length(l.t) BETWEEN 2 AND 60
              AND c.nombre_busqueda LIKE '%' || l.esc || '%'
-           ORDER BY empieza DESC, nombre
+           ORDER BY empieza DESC, nombre, codigo_postal   -- homónimas: en orden de CP, sin CP al final
            LIMIT 8) x;
 $$;
 REVOKE ALL ON FUNCTION tienda_colonias(uuid, uuid, text) FROM PUBLIC, anon, authenticated;
@@ -946,6 +946,15 @@ BEGIN
     IF v_por_distancia THEN
       v_dir := v_dir || _tienda_punto(p_punto)
                || jsonb_build_object('referencias', 'A ' || (v_q ->> 'distancia_km') || ' km' || COALESCE(' · ' || (v_dir ->> 'referencias'), ''));
+    END IF;
+    -- 0187: si la colonia decidió el envío, la dirección lleva ESA colonia (y su CP, si el catálogo
+    -- lo tiene): así no se cobra la zona de una colonia y el repartidor va a otra.
+    IF v_q ->> 'cobro' = 'COLONIA' THEN
+      SELECT v_dir || jsonb_build_object('colonia', btrim(c.nombre))
+                   || CASE WHEN c.codigo_postal IS NOT NULL THEN jsonb_build_object('codigo_postal', c.codigo_postal) ELSE '{}'::jsonb END
+        INTO v_dir
+        FROM colonias c
+       WHERE c.id = p_colonia AND c.tenant_id = p_tenant AND c.sucursal_id = p_sucursal;
     END IF;
   ELSIF v_dir IS NOT NULL THEN
     RAISE EXCEPTION 'DIRECCION_INVALIDA: al recoger no hay dirección';
