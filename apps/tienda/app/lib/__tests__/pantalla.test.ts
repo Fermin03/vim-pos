@@ -272,4 +272,13 @@ describe("coloniaQueCoincide", () => {
     expect(coloniaQueCoincide(lista, "León Moderno", "37000")).toBeNull();
     expect(coloniaQueCoincide(lista, "Jardines", "37160")).toBeNull();
   });
+  it("sin CP escrito (colonia tecleada sin tocar la sugerencia): la única con ese nombre", () => {
+    expect(coloniaQueCoincide(lista, "leon moderno", "")?.id).toBe(u(22));
+    expect(coloniaQueCoincide(lista, "León Moderno", "  ")?.id).toBe(u(22));
+  });
+  it("sin CP y con homónimas: ninguna (no se adivina); con CP, la de ese CP", () => {
+    const conHomonimas: ColoniaSugerida[] = [...lista, { id: u(23), nombre: "Leon Moderno", codigo_postal: "37490", con_zona: false }];
+    expect(coloniaQueCoincide(conHomonimas, "León Moderno", "")).toBeNull();
+    expect(coloniaQueCoincide(conHomonimas, "León Moderno", "37490")?.id).toBe(u(23));
+  });
 });

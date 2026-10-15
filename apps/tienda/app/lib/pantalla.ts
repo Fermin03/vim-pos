@@ -143,9 +143,14 @@ export function ultimaVigente(): { pedir: () => () => boolean; descartar: () => 
 
 /** Para comparar colonias: sin acentos, mayúsculas ni espacios de más. */
 const normal = (s: string): string => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
-/** La colonia del catálogo que es EXACTAMENTE la de una dirección guardada (mismo nombre y mismo CP), o null. */
+/**
+ * La colonia del catálogo que es EXACTAMENTE la escrita (una dirección guardada, o tecleada sin tocar la
+ * sugerencia), o null. Mismo nombre y, si hay CP escrito, mismo CP. Sin CP vale solo si es la única con
+ * ese nombre: con homónimas no se adivina.
+ */
 export function coloniaQueCoincide(lista: readonly ColoniaSugerida[], nombre: string, cp: string): ColoniaSugerida | null {
-  return lista.find((c) => normal(c.nombre) === normal(nombre) && (c.codigo_postal ?? "") === cp.trim()) ?? null;
+  const mismas = lista.filter((c) => normal(c.nombre) === normal(nombre) && (!cp.trim() || (c.codigo_postal ?? "") === cp.trim()));
+  return mismas.length === 1 ? mismas[0]! : null;
 }
 
 /** Cuántos renglones de una lista larga de «Mi cuenta» (pedidos, direcciones) se ven antes de «Mostrar más». */

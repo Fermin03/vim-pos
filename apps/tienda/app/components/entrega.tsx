@@ -47,8 +47,9 @@ export function Entrega({ sucursal, modo, alCambiarModo }: {
           {" "}{rangoDeEnvio(distancia.tramos) ?? `Envío ${formatoMxn(distancia.tramos[0]!.costo_mxn)}.`}
         </p>
       )}
-      {/* «Por zonas» la zona la da la colonia del catálogo, en «Tus datos». */}
-      {modo === "DOMICILIO" && !distancia && (
+      {/* «Por zonas» la zona la da la colonia del catálogo, en «Tus datos». Sin colonias con zona el
+          domicilio está cerrado (MODO_NO_DISPONIBLE): ahí ya lo dice el aviso, no se promete envío. */}
+      {modo === "DOMICILIO" && !distancia && sucursal.estado.domicilio !== "MODO_NO_DISPONIBLE" && (
         // TEXTO PROVISIONAL (James).
         <p className="text-15 text-ink-2">El envío se calcula con tu colonia.</p>
       )}

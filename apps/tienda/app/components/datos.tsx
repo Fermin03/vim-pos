@@ -247,14 +247,16 @@ export function PasoDeDatos({
 
   /**
    * La colonia del catálogo que es exactamente la de una dirección ya escrita (guardada en la cuenta,
-   * o recordada en el teléfono): con ella se cotiza sin que el cliente la vuelva a elegir. Solo vale
-   * la última búsqueda: TODO lo que cambia el texto de la colonia (escribir, elegir una sugerencia,
-   * cambiar de dirección, «Olvidar mis datos») la descarta con `soltarColonia`.
+   * o recordada en el teléfono, o tecleada sin tocar la sugerencia): con ella se cotiza sin que el
+   * cliente la vuelva a elegir. Solo vale la última búsqueda: TODO lo que cambia el texto de la colonia
+   * (escribir, elegir una sugerencia, cambiar de dirección, «Olvidar mis datos») la descarta con `soltarColonia`.
+   * `escrita`: la tecleó aquí. Si coincide, queda como si hubiera tocado la sugerencia (nombre del
+   * catálogo y su CP, si aún no escribió uno).
    */
   const [vigencia] = useState(ultimaVigente);
   /** Descarta la búsqueda en vuelo y, si había, la colonia elegida. */
   const soltarColonia = () => { vigencia.descartar(); setBusqueda(null); alCambiarColonia(null); };
-  const buscarColonia = (nombre: string, cp: string) => {
+  const buscarColonia = (nombre: string, cp: string, escrita = false) => {
     const vigente = vigencia.pedir();
     alCambiarColonia(null);
     if (!sucursal.colonias || nombre.trim().length < 2) { setBusqueda("lista"); return; }
@@ -263,9 +265,13 @@ export function PasoDeDatos({
       if (!vigente()) return;
       // Sin respuesta no se sabe si está en el catálogo: no se avisa «sin cobertura» (el servidor decide al enviar).
       setBusqueda(r.ok ? "lista" : null);
-      if (r.ok) alCambiarColonia(coloniaQueCoincide(r.datos, nombre, cp));
+      const c = r.ok ? coloniaQueCoincide(r.datos, nombre, cp) : null;
+      if (c && escrita) setF((a) => ({ ...a, colonia: c.nombre, ...(c.codigo_postal && !a.codigoPostal.trim() && { codigoPostal: c.codigo_postal }) }));
+      if (r.ok) alCambiarColonia(c);
     });
   };
+  /** La colonia tecleada, sin sugerencia elegida, todavía no se buscó en el catálogo. */
+  const coloniaSinBuscar = aDomicilio && sucursal.colonias && !elegida && !colonia && busqueda === null && f.colonia.trim().length > 0;
 
   /** Las formas de pago que no son en línea: lo que se ofrece con el pago en línea en pausa. */
   const otrasFormas = formas.filter((p) => p !== "EN_LINEA");
@@ -607,6 +613,10 @@ export function PasoDeDatos({
     if (ocupado || envioDeLaPagina.ocupado() || !pago) return;
     // Por distancia, sin un pin dentro del área no hay envío que cobrar: a «Tu ubicación».
     if (faltaUbicacion) { setUbicacionTocada(true); irA("datos", `${id}-ubicacion`); return; }
+    // La colonia tecleada aún no se busca en el catálogo (Enter sin salir del campo): se busca y se espera.
+    if (coloniaSinBuscar) { setTocados((t) => new Set(t).add("colonia")); buscarColonia(f.colonia, f.codigoPostal, true); return; }
+    // Con la búsqueda en vuelo todavía no se sabe qué envío toca: no se manda nada (contesta en un momento).
+    if (aDomicilio && busqueda === "en_vuelo") return;
     // «Por zonas» y la colonia no tiene cobertura: se dice (si aún no) y el foco va al aviso.
     if (envio === "sin_cobertura") { setTocados((t) => new Set(t).add("colonia")); irA("datos", `${id}-cobertura`); return; }
     const a = avanzar({ pasos, paso, primerError: CAMPOS.find((c) => errores[c]), enLinea, propina, otroValido: libre?.ok ?? false, yaPreguntada: preguntada });
@@ -790,14 +800,18 @@ export function PasoDeDatos({
                       </div>
                       {sucursal.colonias ? (
                         <CampoColonia negocio={negocio.slug} sucursalId={sucursal.id} id={`${id}-colonia`} valor={f.colonia} error={errorDe("colonia")} maxLength={LIMITES.colonia}
-                          alSalir={() => setTocados((t) => new Set(t).add("colonia"))}
+                          alSalir={() => {
+                            setTocados((t) => new Set(t).add("colonia"));
+                            // Tecleada sin tocar la sugerencia: se busca igual que una dirección guardada.
+                            if (coloniaSinBuscar) buscarColonia(f.colonia, f.codigoPostal, true);
+                          }}
                           alEscribir={(v) => {
                             setF((a) => ({ ...a, colonia: v })); setRechazo((r) => ({ ...r, colonia: undefined }));
                             // Escribir encima ya no es la colonia elegida, ni la que se estaba buscando.
                             soltarColonia();
                           }}
                           alElegir={(c) => {
-                            vigencia.descartar();
+                            vigencia.descartar(); setBusqueda(null);
                             setF((a) => ({ ...a, colonia: c.nombre, ...(c.codigo_postal && { codigoPostal: c.codigo_postal }) }));
                             setRechazo((r) => ({ ...r, colonia: undefined, codigoPostal: undefined }));
                             alCambiarColonia(c);
