@@ -208,13 +208,15 @@ Configuración → Envíos (`apps/admin/app/(panel)/configuracion/envios/page.ts
   - RLS: un tenant no ve colonias de otro; `authenticated` no escribe en `sepomex_asentamientos`.
   - `asignar_zona_colonia`: sin PIN si no tenía zona; con zona previa sin autorización → error;
     con autorización → pasa y la consume; zona de otra sucursal o de tramo → error.
-  - `tienda_cotizar`: colonia con zona gana; sin zona cae a distancia; sin tramos cae a zonas;
-    una zona mandada que contradice la colonia se ignora.
+  - `tienda_cotizar`: colonia con zona gana; sin zona cae a distancia; «Por zonas» sin colonia
+    con zona → `SIN_COBERTURA`; la zona que mande el navegador se ignora siempre (el cliente
+    nunca la elige).
 - **Sync** (pruebas del escritorio): colonia capturada sin internet sube; choque de llave se
   fusiona con el id de la nube; asignación de zona desde la caja sube.
 - **Navegador** (worktree + Crazy Burgers + Playwright de `sitio-web/_capturas`): en la caja
   «san jo» sugiere; elegir con zona la llena; alta de colonia nueva; en el admin, sembrado y
-  asignación en bloque; en la tienda, colonia con zona y sin zona (cae al mapa).
+  asignación en bloque; en la tienda, colonia con zona y sin zona («Por distancia» cae al mapa;
+  «Por zonas» dice «Aún no llegamos a esta colonia.» y ofrece recoger).
 - `tsc --noEmit` en pos, admin y tienda (no `next build`: rompe el dev server).
 
 ## 8. Riesgos

@@ -255,7 +255,7 @@ describe("pedir de nuevo", () => {
   it("arma el carrito con lo que sigue en el menú, con los nombres de ahora", () => {
     const { carrito, descartados } = carritoDesdePedido(ITEMS, ID.sucursal, "RECOGER", menu);
     expect(descartados).toEqual([]);
-    expect(carrito).toMatchObject({ v: 1, sucursalId: ID.sucursal, modo: "RECOGER", zonaId: null });
+    expect(carrito).toMatchObject({ v: 1, sucursalId: ID.sucursal, modo: "RECOGER" });
     expect(carrito.renglones.map((r) => [r.nombre, r.cantidad, r.nota])).toEqual([["Hamburguesa", 2, "sin cebolla"], ["Combo clásico", 1, ""]]);
     expect(carrito.renglones[0]!.modificadores.map((m) => m.nombre)).toEqual(["Medio", "Extra queso"]);
     // Lo que saldría a la función es lo mismo que se pidió.

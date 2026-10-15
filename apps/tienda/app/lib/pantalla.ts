@@ -29,16 +29,14 @@ export function motivoDeCierre(sucursal: Sucursal, modo: Modo): string | null {
 
 /**
  * El carrito con el que arranca la página de una sucursal. El guardado se usa solo si es de ESA
- * sucursal (el carrito es por sucursal); su modo y su zona se corrigen si el negocio ya no los
- * ofrece. Con una sola zona se elige sola; con varias la elige el cliente.
+ * sucursal (el carrito es por sucursal); su modo se corrige si el negocio ya no lo ofrece. La zona
+ * no es del carrito: a domicilio la da la colonia en «Tus datos» (0187 §6).
  */
 export function carritoPara(sucursal: Sucursal, guardado: Carrito | null): Carrito {
   const modos = modosDe(sucursal);
   const base = guardado?.sucursalId === sucursal.id ? guardado : carritoNuevo(sucursal.id, modos[0] ?? "RECOGER");
-  const zonaId = sucursal.zonas.some((z) => z.id === base.zonaId) ? base.zonaId
-    : sucursal.zonas.length === 1 ? sucursal.zonas[0]!.id : null;
   const modo = modos.includes(base.modo) ? base.modo : modos[0] ?? base.modo;
-  return modo === base.modo && zonaId === base.zonaId ? base : { ...base, modo, zonaId };
+  return modo === base.modo ? base : { ...base, modo };
 }
 
 /**
@@ -104,29 +102,33 @@ export function cotizarConEspera(
 }
 
 /**
- * El aviso del costo de envío antes de elegir zona: «El envío puede costar entre $0.00 y $35.00, según
- * tu zona.» Con una sola zona, o todas al mismo precio, no hay rango que avisar (null): el costo ya se ve.
+ * El aviso del costo de envío por distancia antes de poner el pin: «El envío puede costar entre $0.00 y
+ * $50.00, según la distancia.» Con un solo tramo, o todos al mismo precio, no hay rango que avisar (null).
  */
-export function rangoDeEnvio(zonas: { costo_mxn: string }[], segun: "zona" | "distancia" = "zona"): string | null {
-  const costos = zonas.map((z) => aCentavos(z.costo_mxn)).filter((c): c is number => c !== null);
+export function rangoDeEnvio(tramos: { costo_mxn: string }[]): string | null {
+  const costos = tramos.map((z) => aCentavos(z.costo_mxn)).filter((c): c is number => c !== null);
   if (costos.length < 2) return null;
   const min = Math.min(...costos), max = Math.max(...costos);
-  // TEXTO PROVISIONAL (James) el de la distancia.
-  return min === max ? null : `El envío puede costar entre ${formato(min)} y ${formato(max)}, según ${segun === "zona" ? "tu zona" : "la distancia"}.`;
+  // TEXTO PROVISIONAL (James).
+  return min === max ? null : `El envío puede costar entre ${formato(min)} y ${formato(max)}, según la distancia.`;
 }
 
 /**
  * Qué enseña «Tus datos», a domicilio, sobre el envío (catálogo de colonias, 0187):
  *  · `colonia`: la colonia elegida tiene zona y ella fija el envío, cobre como cobre la sucursal. Lo
  *    dice la cotización; mientras llega, la sugerencia elegida (`con_zona`).
- *  · `mapa`: «Por distancia», el pin de siempre.
- *  · `zona`: «Por zonas» con catálogo y varias zonas: el carrito no la pidió, se elige aquí.
- *  · `nada`: el carrito ya tiene la zona (sin catálogo, o con una sola).
+ *  · `mapa`: «Por distancia» y la colonia no decide: el pin de siempre.
+ *  · `sin_cobertura`: «Por zonas» y la colonia (elegida sin zona, o escrita y fuera del catálogo) no
+ *    tiene envío. La zona nunca la elige el cliente (0187 §6): ahí no se entrega.
+ *  · `pendiente`: «Por zonas» sin colonia todavía. `coloniaEscrita` llega vacía mientras se busca
+ *    la de una dirección ya escrita, para no avisar «sin cobertura» antes de saberlo.
  */
-export function envioEnDatos(sucursal: Sucursal, cotizacion: Cotizacion | null, colonia: ColoniaSugerida | null): "colonia" | "mapa" | "zona" | "nada" {
+export function envioEnDatos(
+  sucursal: Sucursal, cotizacion: Cotizacion | null, colonia: ColoniaSugerida | null, coloniaEscrita = "",
+): "colonia" | "mapa" | "sin_cobertura" | "pendiente" {
   if (cotizacion ? cotizacion.por_colonia : colonia?.con_zona) return "colonia";
   if (sucursal.envio.cobro === "DISTANCIA") return "mapa";
-  return sucursal.colonias && sucursal.zonas.length > 1 ? "zona" : "nada";
+  return colonia || coloniaEscrita.trim() ? "sin_cobertura" : "pendiente";
 }
 
 /**

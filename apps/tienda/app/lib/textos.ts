@@ -167,7 +167,7 @@ const ERRORES: Record<string, TextoDeError> = {
   SUCURSAL_INVALIDA: { texto: "No pudimos identificar la sucursal.", hacer: RECARGA },
   SUCURSAL_DE_OTRO_NEGOCIO: { texto: "Esa sucursal ya no está disponible.", hacer: RECARGA },
   MODO_INVALIDO: { texto: "Esa forma de recibir tu pedido ya no está disponible.", hacer: "Elige otra y vuelve a intentar." },
-  ZONA_INVALIDA: { texto: "Esa zona de entrega ya no está disponible.", hacer: "Elige tu zona de nuevo." },
+  ZONA_INVALIDA: { texto: "Esa zona de entrega ya no está disponible.", hacer: "Revisa tu dirección y vuelve a intentar." },
   CARRITO_INVALIDO: { texto: "No pudimos leer tu pedido.", hacer: "Revisa las cantidades (hasta 50 por producto y 40 productos distintos) y vuelve a intentar." },
   PRODUCTO_NO_DISPONIBLE: { texto: "Un producto de tu pedido ya no está disponible.", hacer: "Quítalo para continuar." },
   MODIFICADORES_INVALIDOS: { texto: "Las opciones de un producto cambiaron.", hacer: "Quítalo y vuelve a agregarlo." },
@@ -181,6 +181,8 @@ const ERRORES: Record<string, TextoDeError> = {
   // Envío por distancia (0185). TEXTOS PROVISIONALES (James).
   UBICACION_INVALIDA: { texto: "Falta tu ubicación.", hacer: "Pon el pin del mapa en tu domicilio: con eso calculamos el envío." },
   FUERA_DE_AREA: { texto: "Esta dirección está fuera del área de entrega.", hacer: "Mueve el pin o elige recoger tu pedido." },
+  // «Por zonas» sin colonia con zona (0187 §6). TEXTO PROVISIONAL (James).
+  SIN_COBERTURA: { texto: "Aún no llegamos a esta colonia.", hacer: "Revisa tu colonia o pide para recoger." },
   // Pago en línea (textos provisionales, como los de arriba).
   PAGO_NO_PROCESADO: { texto: "No pudimos procesar el pago.", hacer: "Vuelve a intentar." },
   PAGO_NO_DISPONIBLE: { texto: "El restaurante no puede recibir pagos en línea en este momento. Tu pedido no se envió y no se te cobró nada.", hacer: REINTENTA },

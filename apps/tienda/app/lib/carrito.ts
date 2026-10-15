@@ -28,13 +28,13 @@ export type RenglonCarrito = {
   componentes: { grupoId: string; productoId: string; nombre: string; cantidad: number; modificadores: ModificadorGuardado[] }[];
 };
 export type Carrito = {
-  v: 1; sucursalId: string; modo: Modo; zonaId: string | null; renglones: RenglonCarrito[];
+  v: 1; sucursalId: string; modo: Modo; renglones: RenglonCarrito[];
   /** Cuándo se guardó (ms). Lo pone `guardarCarrito`. */
   guardado: number;
 };
 
-export function carritoNuevo(sucursalId: string, modo: Modo, zonaId: string | null = null): Carrito {
-  return { v: 1, sucursalId, modo, zonaId, renglones: [], guardado: 0 };
+export function carritoNuevo(sucursalId: string, modo: Modo): Carrito {
+  return { v: 1, sucursalId, modo, renglones: [], guardado: 0 };
 }
 
 // ── Reglas de selección ──────────────────────────────────────────────────────────────────────────
@@ -212,7 +212,7 @@ export function quitar(carrito: Carrito, id: string): Carrito {
   return { ...carrito, renglones: carrito.renglones.filter((r) => r.id !== id) };
 }
 
-/** Sin renglones; la sucursal, el modo y la zona se conservan. */
+/** Sin renglones; la sucursal y el modo se conservan. */
 export function vaciar(carrito: Carrito): Carrito {
   return { ...carrito, renglones: [] };
 }
@@ -262,7 +262,8 @@ export function aCuerpo(carrito: Carrito, punto: Punto | null = null, coloniaId:
     m.map((x) => ({ opcion_id: x.opcionId, cantidad: acotar(x.cantidad, TOPES.porModificador) }));
   return {
     sucursal_id: carrito.sucursalId, modo: carrito.modo,
-    zona_id: carrito.modo === "DOMICILIO" ? carrito.zonaId : null,
+    // La zona nunca la elige el cliente (0187 §6): a domicilio la da la colonia del catálogo.
+    zona_id: null,
     items: carrito.renglones.slice(0, TOPES.renglones).map((r) => ({
       producto_id: r.productoId, cantidad: acotar(r.cantidad, TOPES.porRenglon),
       ...(r.nota && { nota: r.nota }),
@@ -298,7 +299,7 @@ const esRenglon = (x: unknown): boolean => obj(x) && txt(x.id) && txt(x.producto
   && Array.isArray(x.componentes) && x.componentes.every((c) => obj(c) && txt(c.grupoId) && txt(c.productoId) && txt(c.nombre)
     && typeof c.cantidad === "number" && Array.isArray(c.modificadores) && c.modificadores.every(esMod));
 const esCarrito = (x: unknown): x is Carrito => obj(x) && x.v === 1 && txt(x.sucursalId) && (x.modo === "RECOGER" || x.modo === "DOMICILIO")
-  && (x.zonaId === null || txt(x.zonaId)) && typeof x.guardado === "number" && Array.isArray(x.renglones) && x.renglones.every(esRenglon);
+  && typeof x.guardado === "number" && Array.isArray(x.renglones) && x.renglones.every(esRenglon);
 
 /**
  * El carrito guardado de ese negocio, o null. Se descarta (y se borra) si no tiene la forma de esta

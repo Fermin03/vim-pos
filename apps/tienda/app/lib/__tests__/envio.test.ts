@@ -22,10 +22,9 @@ describe("desenlaceDelError", () => {
     expect(desenlaceDelError(e("SIN_CONFIRMAR"), c)).toEqual(esperado);
     expect(desenlaceDelError(e("SIN_CONFIRMAR"), { ...c, telefono: null })).toEqual(esperado);
   });
-  it("ZONA_INVALIDA: con la zona en «Tus datos» (catálogo de colonias) se marca ahí; si no, se vuelve al carrito", () => {
-    expect(desenlaceDelError(e("ZONA_INVALIDA"), { ...c, zonaEnDatos: true }))
-      .toEqual({ tipo: "campo", campo: "zona", texto: "Esa zona de entrega ya no está disponible. Elige tu zona de nuevo." });
-    expect(desenlaceDelError(e("ZONA_INVALIDA"), c)).toMatchObject({ tipo: "aviso", sigue: "volver" });
+  it("SIN_COBERTURA: se marca en la colonia, con el texto de «Tus datos»", () => {
+    expect(desenlaceDelError(e("SIN_COBERTURA"), c))
+      .toEqual({ tipo: "campo", campo: "colonia", texto: "Aún no llegamos a esta colonia. Revisa tu colonia o pide para recoger." });
   });
   it("lo que se puede reintentar: sin conexión, antirobot, demasiados intentos, servicio caído", () => {
     for (const codigo of ["SIN_CONEXION", "CAPTCHA_INVALIDO", "DEMASIADOS_INTENTOS", "SERVICIO_NO_DISPONIBLE", "ERROR_INTERNO", "UN_CODIGO_NUEVO"]) {
@@ -54,7 +53,7 @@ describe("desenlaceDelError", () => {
     expect(desenlaceDelError(e("PAGO_INVALIDO"), c)).toMatchObject({ tipo: "campo", campo: "pago" });
   });
   it("la zona y el modo se arreglan en el carrito", () => {
-    expect(desenlaceDelError(e("ZONA_INVALIDA"), c)).toMatchObject({ tipo: "aviso", sigue: "volver", texto: "Esa zona de entrega ya no está disponible. Elige tu zona de nuevo." });
+    expect(desenlaceDelError(e("ZONA_INVALIDA"), c)).toMatchObject({ tipo: "aviso", sigue: "volver", texto: "Esa zona de entrega ya no está disponible. Revisa tu dirección y vuelve a intentar." });
     expect(desenlaceDelError(e("MODO_INVALIDO"), c)).toMatchObject({ sigue: "volver" });
   });
   it("NO_SE_PUDO_CREAR: llamar al restaurante, con su teléfono", () => {

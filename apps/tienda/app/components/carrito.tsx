@@ -8,7 +8,7 @@ import { Aviso, botonClases, cn, type TonoAviso } from "@vim/ui/styles";
 import { cotizar, type Resultado } from "../lib/api";
 import { TOPES, estimarRenglon, estimarTotal, type Carrito, type CuerpoCarrito, type RenglonCarrito } from "../lib/carrito";
 import type { Cotizacion, Menu, Modo, Sucursal } from "../lib/contrato";
-import { aCentavos, formato, formatoMxn } from "../lib/dinero";
+import { formato, formatoMxn } from "../lib/dinero";
 import type { Momento } from "../lib/horario";
 import { cotizarConEspera, motivoDeCierre } from "../lib/pantalla";
 import { textoCerrada, textoDeError } from "../lib/textos";
@@ -25,7 +25,7 @@ export type Cotizado = {
 
 /**
  * Cotiza `cuerpo` cada vez que cambia, tras una espera corta, y cancela la cotización anterior.
- * `cuerpo` en null = no toca cotizar (carrito cerrado, vacío, sin zona o con renglones por quitar).
+ * `cuerpo` en null = no toca cotizar (carrito cerrado, vacío, «Por zonas» sin colonia o con renglones por quitar).
  */
 export function useCotizacion(slug: string, cuerpo: CuerpoCarrito | null): Cotizado {
   const clave = cuerpo && JSON.stringify(cuerpo);
@@ -67,14 +67,14 @@ const ENVIO_POR_UBICACION = "Con tu ubicación";
 const ENVIO_POR_COLONIA = "Con tu colonia";
 
 export function VistaDelCarrito({
-  sucursal, carrito, menu, ahora, avisos, cotizado, alCambiarCantidad, alQuitar, alCambiarModo, alCambiarZona, alContinuar, alCerrar,
+  sucursal, carrito, menu, ahora, avisos, cotizado, alCambiarCantidad, alQuitar, alCambiarModo, alContinuar, alCerrar,
 }: {
   sucursal: Sucursal; carrito: Carrito; menu: Menu; ahora: Momento;
   /** Renglones que hay que quitar, con su porqué: `{ [renglon.id]: texto }`. */
   avisos: Record<string, string>;
   cotizado: Cotizado;
   alCambiarCantidad: (id: string, n: number) => void; alQuitar: (id: string) => void;
-  alCambiarModo: (m: Modo) => void; alCambiarZona: (id: string | null) => void;
+  alCambiarModo: (m: Modo) => void;
   alContinuar: () => void; alCerrar: () => void;
 }) {
   if (carrito.renglones.length === 0) {
@@ -88,27 +88,23 @@ export function VistaDelCarrito({
   }
 
   const aDomicilio = carrito.modo === "DOMICILIO";
-  const zona = sucursal.zonas.find((z) => z.id === carrito.zonaId);
-  // Con catálogo de colonias (0187) y varias zonas, la zona no se pide aquí: la da la colonia en «Tus
-  // datos». Hasta entonces no hay envío que cotizar (la tienda no cotiza) y se sigue con el estimado.
-  const conColonia = aDomicilio && sucursal.envio.cobro === "ZONAS" && sucursal.colonias && sucursal.zonas.length > 1 && !zona;
-  const faltaZona = aDomicilio && !zona && sucursal.zonas.length > 0 && !conColonia;
+  // «Por zonas» la zona nunca la elige el cliente (0187 §6): la da la colonia, en «Tus datos». Hasta
+  // entonces no hay envío que cotizar (la tienda no cotiza) y se sigue con el estimado.
+  const porColonia = aDomicilio && sucursal.envio.cobro === "ZONAS";
   const cot = cotizado.resultado?.ok ? cotizado.resultado.datos : null;
   const error = cotizado.resultado && !cotizado.resultado.ok ? cotizado.resultado : null;
   // La cotización trae un renglón por cada uno del carrito, en el mismo orden.
   const porRenglon = cot && cot.renglones.length === carrito.renglones.length ? cot.renglones : null;
   const motivo = motivoDeCierre(sucursal, carrito.modo);
   const estimado = estimarTotal(carrito, menu);
-  const envioEstimado = aDomicilio && zona ? aCentavos(zona.costo_mxn) ?? 0 : 0;
   // Por distancia (0185) el envío sale de la ubicación, que se pone en «Tus datos»: aquí todavía no se sabe.
   const sinEnvioAun = aDomicilio && sucursal.envio.cobro === "DISTANCIA" && !cot?.distancia_km && !cot?.por_colonia;
   /** Se sigue sin cotización: falta la colonia, y sin ella no hay total que cotizar. */
-  const sinCotizar = conColonia && !cot && !cotizado.cotizando;
+  const sinCotizar = porColonia && !cot && !cotizado.cotizando;
 
   // Lo que impide continuar, del más concreto al más general. Si no hay nada, va el botón.
   const freno: { tono: TonoAviso; texto: string; reintentar?: boolean } | null =
     Object.keys(avisos).length > 0 ? { tono: "danger", texto: "Quita lo que está marcado para continuar." }
-    : faltaZona ? { tono: "info", texto: "Elige tu zona de entrega para ver el total." }
     : error ? { tono: "danger", texto: Object.values(textoDeError(error.error, { telefono: sucursal.telefono, detalle: error.detalle })).join(" "), reintentar: true }
     : motivo ? { tono: "warning", texto: textoCerrada(motivo, sucursal.horario, ahora) }
     : null;
@@ -117,7 +113,7 @@ export function VistaDelCarrito({
     <>
       <div className={CUERPO}>
         <div className="px-4 pb-4 pt-2">
-          <Entrega sucursal={sucursal} modo={carrito.modo} zonaId={carrito.zonaId} alCambiarModo={alCambiarModo} alCambiarZona={alCambiarZona} />
+          <Entrega sucursal={sucursal} modo={carrito.modo} alCambiarModo={alCambiarModo} />
         </div>
         <ul className="divide-y divide-line border-t border-line px-4">
           {carrito.renglones.map((r, i) => {
@@ -144,8 +140,8 @@ export function VistaDelCarrito({
         <div className="mx-4 mb-4 rounded-lg border border-line bg-sel px-4 py-3">
           <dl aria-busy={cotizado.cotizando} className="flex flex-col gap-2">
           <Linea concepto="Subtotal" importe={cot ? formatoMxn(cot.subtotal_mxn) : formato(estimado)} estimado={!cot} />
-          {aDomicilio && <Linea concepto="Envío" importe={sinEnvioAun ? ENVIO_POR_UBICACION : cot ? formatoMxn(cot.envio_total_mxn) : sinCotizar ? ENVIO_POR_COLONIA : zona ? formato(envioEstimado) : "Por elegir"} estimado={!cot} />}
-          <Linea concepto={sinEnvioAun || sinCotizar ? "Total sin envío" : "Total"} importe={cot ? formatoMxn(cot.total_mxn) : formato(estimado + envioEstimado)} estimado={!cot} fuerte />
+          {aDomicilio && <Linea concepto="Envío" importe={sinEnvioAun ? ENVIO_POR_UBICACION : cot ? formatoMxn(cot.envio_total_mxn) : ENVIO_POR_COLONIA} estimado={!cot} />}
+          <Linea concepto={sinEnvioAun || sinCotizar ? "Total sin envío" : "Total"} importe={cot ? formatoMxn(cot.total_mxn) : formato(estimado)} estimado={!cot} fuerte />
           </dl>
           {/* Siempre ocupa su renglón: así la cuenta no brinca cuando llega el total. */}
           <p aria-live="polite" className="mt-2 min-h-5 text-13 text-ink-2">

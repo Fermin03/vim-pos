@@ -49,23 +49,19 @@ describe("modos y cierre", () => {
 });
 
 describe("carritoPara", () => {
-  it("sin nada guardado: carrito nuevo en el primer modo que se ofrece, con la zona si solo hay una", () => {
-    expect(carritoPara(centro, null)).toMatchObject({ sucursalId: centro.id, modo: "RECOGER", zonaId: ID.zona, renglones: [] });
+  it("sin nada guardado: carrito nuevo en el primer modo que se ofrece", () => {
+    expect(carritoPara(centro, null)).toMatchObject({ sucursalId: centro.id, modo: "RECOGER", renglones: [] });
+    expect(carritoPara(centro, null)).not.toHaveProperty("zonaId");
     expect(carritoPara(con({ recoger: false }), null).modo).toBe("DOMICILIO");
   });
-  it("con varias zonas no se elige por el cliente", () => {
-    const s = con({ zonas: [...centro.zonas, { id: u(3), nombre: "Norte", costo_mxn: "50.00" }] });
-    expect(carritoPara(s, null).zonaId).toBeNull();
-  });
   it("el guardado de la misma sucursal se conserva con sus renglones", () => {
-    const g = conRefresco(carritoNuevo(centro.id, "DOMICILIO", ID.zona));
+    const g = conRefresco(carritoNuevo(centro.id, "DOMICILIO"));
     expect(carritoPara(centro, g)).toEqual(g);
   });
-  it("si el modo guardado ya no se ofrece o la zona ya no existe, se corrigen sin perder renglones", () => {
-    const g = conRefresco(carritoNuevo(centro.id, "DOMICILIO", u(77)));
+  it("si el modo guardado ya no se ofrece, se corrige sin perder renglones", () => {
+    const g = conRefresco(carritoNuevo(centro.id, "DOMICILIO"));
     const c = carritoPara(con({ domicilio: false }), g);
     expect(c.modo).toBe("RECOGER");
-    expect(c.zonaId).toBe(ID.zona);
     expect(c.renglones).toEqual(g.renglones);
   });
   it("el guardado de otra sucursal no se mezcla", () => {
@@ -183,11 +179,11 @@ describe("cotizarConEspera", () => {
 import { rangoDeEnvio } from "../pantalla";
 
 describe("rangoDeEnvio", () => {
-  it("dice el mínimo y el máximo de las zonas", () => {
+  it("dice el mínimo y el máximo de los tramos", () => {
     expect(rangoDeEnvio([{ costo_mxn: "35.00" }, { costo_mxn: "0.00" }, { costo_mxn: "20.00" }]))
-      .toBe("El envío puede costar entre $0.00 y $35.00, según tu zona.");
+      .toBe("El envío puede costar entre $0.00 y $35.00, según la distancia.");
   });
-  it("sin rango que avisar: una sola zona, ninguna, o todas al mismo precio", () => {
+  it("sin rango que avisar: un solo tramo, ninguno, o todos al mismo precio", () => {
     expect(rangoDeEnvio([])).toBeNull();
     expect(rangoDeEnvio([{ costo_mxn: "35.00" }])).toBeNull();
     expect(rangoDeEnvio([{ costo_mxn: "35.00" }, { costo_mxn: "35.00" }])).toBeNull();
@@ -234,15 +230,19 @@ describe("envioEnDatos", () => {
     expect(envioEnDatos({ ...distancia, colonias: true }, null, conZona)).toBe("colonia");
     expect(envioEnDatos({ ...distancia, colonias: true }, cot(false), conZona)).toBe("mapa");
   });
-  it("«Por distancia» sin colonia que decida: el mapa", () => {
+  it("«Por distancia» sin colonia que decida: el mapa, con colonia escrita o sin ella", () => {
     expect(envioEnDatos(distancia, cot(false), null)).toBe("mapa");
+    expect(envioEnDatos({ ...distancia, colonias: true }, null, { ...conZona, con_zona: false }, "Centro")).toBe("mapa");
+    expect(envioEnDatos(distancia, null, null, "Una que no está")).toBe("mapa");
   });
-  it("«Por zonas» con catálogo y varias zonas: la zona se elige aquí", () => {
-    expect(envioEnDatos(con({ colonias: true, zonas: dosZonas }), cot(false), { ...conZona, con_zona: false })).toBe("zona");
+  it("«Por zonas»: una colonia sin zona, o escrita y fuera del catálogo, no tiene cobertura", () => {
+    expect(envioEnDatos(con({ colonias: true, zonas: dosZonas }), null, { ...conZona, con_zona: false }, "Centro")).toBe("sin_cobertura");
+    expect(envioEnDatos(con({ colonias: true }), null, null, "Una que no está")).toBe("sin_cobertura");
   });
-  it("sin catálogo, o con una sola zona: nada (el carrito ya la tiene)", () => {
-    expect(envioEnDatos(con({ colonias: false, zonas: dosZonas }), cot(false), null)).toBe("nada");
-    expect(envioEnDatos(con({ colonias: true }), cot(false), null)).toBe("nada");
+  it("«Por zonas» sin colonia todavía: pendiente (también con la búsqueda en vuelo, que llega vacía)", () => {
+    expect(envioEnDatos(con({ colonias: true, zonas: dosZonas }), null, null, "")).toBe("pendiente");
+    expect(envioEnDatos(con({ colonias: true }), null, null, "   ")).toBe("pendiente");
+    expect(envioEnDatos(con({ colonias: true }), null, null)).toBe("pendiente");
   });
 });
 

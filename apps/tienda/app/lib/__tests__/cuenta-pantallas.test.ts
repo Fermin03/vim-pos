@@ -101,7 +101,7 @@ describe("el relevo de «Pedir de nuevo»: la cuenta lo deja, el menú de esa su
     const a = almacen();
     expect(dejarPorRepetir("knockout", PEDIDO, a, AHORA)).toBe(true);
     const tomado = tomarPorRepetir("knockout", ID.sucursal, menu, a, AHORA + 1000);
-    expect(tomado!.carrito).toMatchObject({ sucursalId: ID.sucursal, modo: "RECOGER", zonaId: null });
+    expect(tomado!.carrito).toMatchObject({ sucursalId: ID.sucursal, modo: "RECOGER" });
     expect(tomado!.carrito.renglones.map((r) => [r.nombre, r.cantidad])).toEqual([["Refresco", 2]]);
     expect(tomado!.descartados).toEqual([null]);
     expect(a.datos.size).toBe(0);

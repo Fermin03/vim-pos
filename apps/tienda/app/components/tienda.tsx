@@ -199,10 +199,11 @@ export function Tienda({ negocio, sucursal, menu, ahora, conSesion }: {
   }, [carrito]);
   const porQuitar = useMemo(() => revalidar(carrito, menu), [carrito, menu]);
   // La colonia del catálogo que eligió el cliente en «Tus datos» (0187): en memoria, como el pin. Si
-  // tiene zona, ella fija el envío y no hace falta zona para cotizar.
+  // tiene zona, ella fija el envío. «Por zonas» sin ella no hay envío que cotizar: la zona nunca la
+  // elige el cliente (0187 §6). «Por distancia» se cotiza siempre (sin pin, sin envío todavía).
   const [colonia, setColonia] = useState<ColoniaSugerida | null>(null);
-  const zonaLista = carrito.modo !== "DOMICILIO" || sucursal.zonas.length === 0 || sucursal.zonas.some((z) => z.id === carrito.zonaId) || !!colonia?.con_zona;
-  const cotizable = paso !== "menu" && piezas > 0 && zonaLista && Object.keys(porQuitar).length === 0;
+  const envioListo = carrito.modo !== "DOMICILIO" || sucursal.envio.cobro === "DISTANCIA" || !!colonia?.con_zona;
+  const cotizable = paso !== "menu" && piezas > 0 && envioListo && Object.keys(porQuitar).length === 0;
   // El pin del cliente (envío por distancia, 0185): en memoria, nunca en el teléfono. Solo cuenta a
   // domicilio en una sucursal que cobra por distancia.
   const [punto, setPunto] = useState<Punto | null>(null);
@@ -229,8 +230,7 @@ export function Tienda({ negocio, sucursal, menu, ahora, conSesion }: {
   const otra = ajeno && negocio.sucursales.find((s) => s.id === ajeno.sucursalId);
 
   const entrega = (
-    <Entrega sucursal={sucursal} modo={carrito.modo} zonaId={carrito.zonaId}
-      alCambiarModo={(modo) => cambiar((c) => ({ ...c, modo }))} alCambiarZona={(zonaId) => cambiar((c) => ({ ...c, zonaId }))} />
+    <Entrega sucursal={sucursal} modo={carrito.modo} alCambiarModo={(modo) => cambiar((c) => ({ ...c, modo }))} />
   );
 
   return (
@@ -270,8 +270,9 @@ export function Tienda({ negocio, sucursal, menu, ahora, conSesion }: {
             cuenta={sesion ? mi : null} conSesion={sesion} alTerminarLaSesion={() => { setSesion(false); setMi(null); }}
             deVuelta={rutaDelMenu(negocio, sucursal.id)} alRetener={setRetenida}
             punto={punto} alCambiarPunto={setPunto}
-            colonia={colonia} alCambiarColonia={setColonia} alCambiarZona={(zonaId) => cambiar((c) => ({ ...c, zonaId }))}
-            // «Mejor recojo mi pedido»: el pedido no cambia, solo cómo se recibe; se ve otra vez en el carrito.
+            colonia={colonia} alCambiarColonia={setColonia}
+            // «Mejor recojo mi pedido» (fuera del área, o una colonia sin cobertura): el pedido no cambia,
+            // solo cómo se recibe; se ve otra vez en el carrito.
             alCambiarModo={(modo) => { cambiar((c) => ({ ...c, modo })); setPaso("carrito"); }} />
         ) : (
           <>
@@ -282,7 +283,7 @@ export function Tienda({ negocio, sucursal, menu, ahora, conSesion }: {
           )}
           <VistaDelCarrito sucursal={sucursal} carrito={carrito} menu={menu} ahora={ahora} avisos={avisos} cotizado={cotizado}
             alCambiarCantidad={(id, n) => cambiar((c) => cambiarCantidad(c, id, n))} alQuitar={(id) => cambiar((c) => quitar(c, id))}
-            alCambiarModo={(modo) => cambiar((c) => ({ ...c, modo }))} alCambiarZona={(zonaId) => cambiar((c) => ({ ...c, zonaId }))}
+            alCambiarModo={(modo) => cambiar((c) => ({ ...c, modo }))}
             alContinuar={() => pasar("datos")} alCerrar={() => pasar("menu")} />
           </>
         )}
