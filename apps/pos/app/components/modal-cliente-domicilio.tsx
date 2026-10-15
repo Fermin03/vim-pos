@@ -4,19 +4,22 @@ import { Button, Modal, Icono } from "@vim/ui/styles";
 import {
   buscarClientesDomicilio, registrarClienteDomicilio, agregarDireccionCliente, conDireccion,
   fijarZonaDireccion, ETIQUETAS_DIRECCION,
-  type ClienteDomicilio, type DireccionCliente, type DireccionInput,
+  planColonia, type ClienteDomicilio, type DireccionCliente, type DireccionInput,
 } from "../lib/clientes-domicilio";
 import { listarZonas, zonaVigente, type ZonaEnvio } from "../lib/zonas-envio";
+import { hayColonias, coloniaExacta, crearColonia, asignarZonaColonia } from "../lib/colonias";
 import { SelectorZona } from "./selector-zona";
+import { BuscadorColonia } from "./buscador-colonia";
+import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
 
 const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 const label = "mb-1 block text-13 font-medium text-ink-2";
 
-export const DIR_VACIA: DireccionInput = { etiqueta: "Casa", calle: "", numero: "", colonia: "", referencias: "", zona: null };
+export const DIR_VACIA: DireccionInput = { etiqueta: "Casa", calle: "", numero: "", colonia: "", referencias: "", zona: null, coloniaCatalogo: null, codigoPostal: null, guardarZonaEnColonia: false };
 
 /** Campos de una dirección (compartidos entre "cliente nuevo" y "agregar dirección"). */
 export function CamposDireccion({
-  dir, onCambio, token, tenantId, sucursalId, cajaId, turnoId, empleadoNombre, zonas, onZonaSincronizada,
+  dir, onCambio, token, tenantId, sucursalId, cajaId, turnoId, empleadoNombre, zonas, onZonaSincronizada, hayCatalogo = false,
 }: {
   dir: DireccionInput;
   onCambio: (d: DireccionInput) => void;
@@ -24,6 +27,8 @@ export function CamposDireccion({
   empleadoNombre: string;
   zonas: ZonaEnvio[];
   onZonaSincronizada: (z: ZonaEnvio) => void;
+  /** La sucursal tiene catálogo de colonias: la colonia sugiere y fija zona y CP. */
+  hayCatalogo?: boolean;
 }) {
   return (
     <>
@@ -42,7 +47,14 @@ export function CamposDireccion({
         <div><span className={label}>Calle *</span><input className={input} value={dir.calle} maxLength={255} onChange={(e) => onCambio({ ...dir, calle: e.target.value })} /></div>
         <div><span className={label}>Número</span><input className={input} value={dir.numero} maxLength={20} onChange={(e) => onCambio({ ...dir, numero: e.target.value })} /></div>
       </div>
-      <div><span className={label}>Colonia *</span><input className={input} value={dir.colonia} maxLength={150} onChange={(e) => onCambio({ ...dir, colonia: e.target.value })} /></div>
+      <div>
+        <span className={label}>Colonia *</span>
+        <BuscadorColonia token={token} sucursalId={sucursalId} hayCatalogo={hayCatalogo} zonas={zonas} className={input}
+          texto={dir.colonia}
+          onTexto={(t) => onCambio({ ...dir, colonia: t, coloniaCatalogo: null, codigoPostal: null, guardarZonaEnColonia: false })}
+          onElegir={(c) => onCambio({ ...dir, colonia: c.nombre, coloniaCatalogo: c, codigoPostal: c.codigoPostal, zona: c.zona ?? dir.zona, guardarZonaEnColonia: false })} />
+        {hayCatalogo && dir.colonia.trim() && !dir.coloniaCatalogo && <p className="mt-1 text-12 text-ink-3">«{dir.colonia.trim()}» se agregará al catálogo de colonias.</p>}
+      </div>
       <div><span className={label}>Referencias</span><input className={input} value={dir.referencias} maxLength={200} onChange={(e) => onCambio({ ...dir, referencias: e.target.value })} placeholder="Color de casa, entre calles, timbre…" /></div>
       <div>
         <span className={label}>Zona</span>
@@ -54,6 +66,12 @@ export function CamposDireccion({
           onCambio={(z) => onCambio({ ...dir, zona: z })}
           onZonaSincronizada={onZonaSincronizada}
         />
+        {dir.coloniaCatalogo?.zona && dir.zona && dir.zona.id !== dir.coloniaCatalogo.zona.id && (
+          <label className="mt-2 flex items-center gap-2 text-13 text-ink-2">
+            <input type="checkbox" checked={dir.guardarZonaEnColonia} onChange={(e) => onCambio({ ...dir, guardarZonaEnColonia: e.target.checked })} />
+            Guardar {dir.zona.nombre} para {dir.coloniaCatalogo.nombre} (pide PIN)
+          </label>
+        )}
       </div>
     </>
   );
@@ -127,6 +145,33 @@ export function ModalClienteDomicilio({
     });
   }
 
+  // Catálogo de colonias de la sucursal: si no hay (o falla), la colonia es texto libre como antes.
+  const [hayCatalogo, setHayCatalogo] = useState(false);
+  const [avisoColonia, setAvisoColonia] = useState<string | null>(null);
+  // Cambiar la zona ya asignada a una colonia pide PIN; `fin` entrega la autorización (null = canceló).
+  const [pinColonia, setPinColonia] = useState<{ coloniaId: string; d: DireccionInput; fin: (id: string | null) => void } | null>(null);
+  useEffect(() => {
+    hayColonias(token, sucursalId).then(setHayCatalogo).catch(() => setHayCatalogo(false));
+  }, [token, sucursalId]);
+
+  /** Aplica `planColonia` al catálogo DESPUÉS de guardar el domicilio. Un fallo no frena el pedido. */
+  async function aplicarColonia(d: DireccionInput): Promise<void> {
+    const plan = planColonia(d, hayCatalogo);
+    try {
+      if (plan.tipo === "crear") await crearColonia(token, { tenantId, sucursalId, nombre: d.colonia, codigoPostal: null, zonaId: d.zona?.id ?? null });
+      if (plan.tipo === "asignar") await asignarZonaColonia(token, plan.coloniaId, d.zona!.id, null);
+      if (plan.tipo === "cambiar") {
+        const pinId = await new Promise<string | null>((fin) => setPinColonia({ coloniaId: plan.coloniaId, d, fin }));
+        setPinColonia(null);
+        // Sin PIN la zona vale solo para este pedido.
+        if (pinId) await asignarZonaColonia(token, plan.coloniaId, d.zona!.id, pinId);
+      }
+    } catch (e) {
+      // El domicilio ya quedó guardado y el pedido sigue: el catálogo se arregla después, pero se dice.
+      setAvisoColonia(e instanceof Error ? e.message : "No se pudo actualizar el catálogo de colonias");
+    }
+  }
+
   useEffect(() => {
     if (modo !== "buscar" || agregandoA) return;
     if (debounce.current) clearTimeout(debounce.current);
@@ -154,6 +199,7 @@ export function ModalClienteDomicilio({
     setGuardando(true);
     try {
       const c = await registrarClienteDomicilio(token, { nombre, telefono, tenantId, sucursalId, dir });
+      await aplicarColonia(dir);
       onSeleccionar(c);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo registrar");
@@ -169,6 +215,7 @@ export function ModalClienteDomicilio({
     setGuardando(true);
     try {
       const d = await agregarDireccionCliente(token, { clienteId: agregandoA.clienteId, tenantId, sucursalId, dir: dirNueva });
+      await aplicarColonia(dirNueva);
       onSeleccionar(conDireccion({ ...agregandoA, direcciones: [...agregandoA.direcciones, d] }, d));
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo guardar la dirección");
@@ -178,12 +225,21 @@ export function ModalClienteDomicilio({
 
   /** Elegir una dirección guardada: si el negocio tiene zonas y ella no trae ninguna, primero se
    *  la pedimos (y la dejamos guardada para la próxima vez) antes de seleccionarla. */
-  function elegirDireccion(c: ClienteDomicilio, d: DireccionCliente) {
+  async function elegirDireccion(c: ClienteDomicilio, d: DireccionCliente) {
     // La zona guardada solo vale si sigue en el catálogo vigente (activa y sin borrar), y con SU
     // precio de hoy: una zona desactivada cuenta como "sin zona" y se vuelve a pedir.
     const vigente = zonaVigente(d.zona, zonas);
     if (zonas.length > 0 && !vigente) {
       setError(null);
+      // Antes de pedirla, la colonia del catálogo puede traerla.
+      const delCatalogo = hayCatalogo ? await coloniaExacta(token, sucursalId, d.colonia, zonas).catch(() => null) : null;
+      if (delCatalogo?.zona) {
+        try {
+          await fijarZonaDireccion(token, d.id, delCatalogo.zona.id);
+          onSeleccionar(conDireccion(c, { ...d, zona: delCatalogo.zona }));
+          return;
+        } catch { /* no se pudo fijar: se pide la zona a mano */ }
+      }
       setZonaPendiente({ cliente: c, direccion: { ...d, zona: null } });
       return;
     }
@@ -228,6 +284,12 @@ export function ModalClienteDomicilio({
         </div>
       )}
 
+      {avisoColonia && (
+        <div className="mb-3 rounded border border-warning-line bg-warning-soft px-3 py-2 text-13 font-medium text-warning" role="alert">
+          {avisoColonia}
+        </div>
+      )}
+
       {zonaPendiente ? (
         /* ── Esta dirección es de antes de las zonas: se le asigna una antes de continuar ── */
         <div className="flex flex-col gap-2.5">
@@ -251,9 +313,9 @@ export function ModalClienteDomicilio({
           <CamposDireccion
             dir={dirNueva} onCambio={setDirNueva}
             token={token} tenantId={tenantId} sucursalId={sucursalId} cajaId={cajaId} turnoId={turnoId}
-            empleadoNombre={empleadoNombre} zonas={zonas} onZonaSincronizada={onZonaSincronizada}
+            empleadoNombre={empleadoNombre} zonas={zonas} onZonaSincronizada={onZonaSincronizada} hayCatalogo={hayCatalogo}
           />
-          <p className="text-12 text-ink-3">CP, ciudad y estado se toman de la sucursal (editable luego en el admin).</p>
+          <p className="text-12 text-ink-3">{hayCatalogo ? "El CP sale de la colonia; ciudad y estado, de la sucursal." : "CP, ciudad y estado se toman de la sucursal (editable luego en el admin)."}</p>
         </div>
       ) : modo === "buscar" ? (
         <>
@@ -278,7 +340,7 @@ export function ModalClienteDomicilio({
                   <div className="mt-1.5 flex flex-col gap-1">
                     {c.direcciones.length === 0 && <span className="text-12 text-ink-3">Sin domicilio registrado</span>}
                     {c.direcciones.map((d) => (
-                      <button key={d.id} type="button" onClick={() => elegirDireccion(c, d)}
+                      <button key={d.id} type="button" onClick={() => void elegirDireccion(c, d)}
                         className="flex items-center gap-2 rounded border border-line px-2.5 py-1.5 text-left transition hover:border-ink">
                         <span className="rounded-full bg-sel px-2 py-0.5 text-11 font-bold text-ink-2">{d.etiqueta}</span>
                         <span className="truncate text-13 text-ink-2">{d.preview}</span>
@@ -304,9 +366,9 @@ export function ModalClienteDomicilio({
           <CamposDireccion
             dir={dir} onCambio={setDir}
             token={token} tenantId={tenantId} sucursalId={sucursalId} cajaId={cajaId} turnoId={turnoId}
-            empleadoNombre={empleadoNombre} zonas={zonas} onZonaSincronizada={onZonaSincronizada}
+            empleadoNombre={empleadoNombre} zonas={zonas} onZonaSincronizada={onZonaSincronizada} hayCatalogo={hayCatalogo}
           />
-          <p className="text-12 text-ink-3">CP, ciudad y estado se toman de la sucursal. Podrás agregarle más direcciones después (Casa, Oficina…).</p>
+          <p className="text-12 text-ink-3">{hayCatalogo ? "El CP sale de la colonia; ciudad y estado, de la sucursal." : "CP, ciudad y estado se toman de la sucursal."} Podrás agregarle más direcciones después (Casa, Oficina…).</p>
         </div>
       )}
 
@@ -324,6 +386,17 @@ export function ModalClienteDomicilio({
           {!agregandoA && !zonaPendiente && modo === "registrar" && <Button onClick={registrar} disabled={guardando}>{guardando ? "Guardando…" : "Registrar y usar"}</Button>}
         </div>
       </div>
+
+      {pinColonia && (
+        <ModalAutorizacionPin
+          token={token}
+          payload={{ accion: "editar_zona_colonia", permisoCodigo: "descuento.override_precio", entidadTipo: "colonia", entidadId: pinColonia.coloniaId, monto: 0, motivo: `Zona de ${pinColonia.d.colonia}: de ${pinColonia.d.coloniaCatalogo!.zona!.nombre} a ${pinColonia.d.zona!.nombre}`, cajaId, turnoId }}
+          descripcion={`Cambiar la zona de ${pinColonia.d.colonia} de ${pinColonia.d.coloniaCatalogo!.zona!.nombre} a ${pinColonia.d.zona!.nombre}`}
+          ejecutaNombre={empleadoNombre}
+          onAutorizado={(a) => pinColonia.fin(a.autorizacionPinId)}
+          onCancelar={() => pinColonia.fin(null)}
+        />
+      )}
     </Modal>
   );
 }

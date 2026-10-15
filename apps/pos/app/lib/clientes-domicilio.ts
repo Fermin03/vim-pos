@@ -1,6 +1,7 @@
 "use client";
 import { employeeClient } from "./supabase";
 import type { ZonaEnvio } from "./zonas-envio";
+import type { Colonia } from "./colonias";
 import { normalizarTelefono } from "./telefono";
 
 // CRM ligero para domicilios desde el POS. Busca por teléfono/nombre y registra
@@ -11,6 +12,7 @@ export type DireccionCliente = {
   id: string;
   etiqueta: string;
   preview: string;
+  colonia: string;
   referencias: string | null;
   /**
    * Zona de reparto de esta dirección, completa (no solo el id): el ticket lateral necesita
@@ -57,6 +59,7 @@ function mapDir(d: FilaDir): DireccionCliente {
     id: d.id,
     etiqueta: d.etiqueta || "Principal",
     preview: `${d.calle} ${d.numero_exterior}, ${d.colonia}`,
+    colonia: d.colonia,
     referencias: d.referencias ?? null,
     zona: mapZonaEmbed(d.zona),
   };
@@ -117,7 +120,25 @@ export type DireccionInput = {
   referencias: string;
   /** Zona elegida en el formulario (objeto completo: se guarda tal cual en la dirección nueva). */
   zona: ZonaEnvio | null;
+  /** La colonia elegida de las sugerencias (null = escrita a mano o sin catálogo). */
+  coloniaCatalogo: Colonia | null;
+  /** CP de la colonia elegida; null = el de la sucursal. */
+  codigoPostal: string | null;
+  /** Casilla «Guardar esta zona para la colonia» (cambiar una zona ya asignada pide PIN). */
+  guardarZonaEnColonia: boolean;
 };
+
+/** Qué hacerle al catálogo al guardar el domicilio. Pura, con pruebas. */
+export function planColonia(dir: DireccionInput, hayCatalogo: boolean):
+  { tipo: "nada" } | { tipo: "crear" } | { tipo: "asignar"; coloniaId: string } | { tipo: "cambiar"; coloniaId: string } {
+  if (!hayCatalogo || !dir.colonia.trim()) return { tipo: "nada" };
+  const c = dir.coloniaCatalogo;
+  if (!c) return { tipo: "crear" };
+  if (!dir.zona) return { tipo: "nada" };
+  if (!c.zona) return { tipo: "asignar", coloniaId: c.id };
+  if (dir.zona.id !== c.zona.id && dir.guardarZonaEnColonia) return { tipo: "cambiar", coloniaId: c.id };
+  return { tipo: "nada" };
+}
 
 /** Inserta una dirección para un cliente (defaults CP/ciudad/estado de la sucursal). */
 export async function agregarDireccionCliente(
@@ -139,7 +160,7 @@ export async function agregarDireccionCliente(
       calle: args.dir.calle.trim(),
       numero_exterior: numero,
       colonia: args.dir.colonia.trim(),
-      codigo_postal: s.codigo_postal || "00000",
+      codigo_postal: args.dir.codigoPostal || s.codigo_postal || "00000",
       ciudad: s.ciudad || "—",
       estado_geo: s.estado_geo || "—",
       referencias: args.dir.referencias.trim() || null,
@@ -152,6 +173,7 @@ export async function agregarDireccionCliente(
     id: (data as { id: string }).id,
     etiqueta,
     preview: `${args.dir.calle.trim()} ${numero}, ${args.dir.colonia.trim()}`,
+    colonia: args.dir.colonia.trim(),
     referencias: args.dir.referencias.trim() || null,
     zona: args.dir.zona ?? null,
   };
