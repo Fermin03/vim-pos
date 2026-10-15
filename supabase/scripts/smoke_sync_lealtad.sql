@@ -187,7 +187,7 @@ BEGIN
     INTO v_fila FROM clientes c WHERE id = v_real;
   v_res := sync_push_snapshot(v_t, jsonb_build_object('clientes', jsonb_build_array(v_fila)));
   IF v_res ? '_errores' OR v_res ? '_ignoradas' THEN RAISE EXCEPTION '10: el push de siempre dio errores o ignoradas: %', v_res; END IF;
-  v_esperadas := ARRAY['repartidores', 'zonas_envio', 'clientes', 'direcciones_cliente', 'turnos', 'tickets',
+  v_esperadas := ARRAY['repartidores', 'zonas_envio', 'colonias', 'clientes', 'direcciones_cliente', 'turnos', 'tickets',
     'ticket_items', 'ticket_item_modificadores', 'pagos', 'ticket_descuentos_manuales', 'ticket_promociones_aplicadas',
     'comanda_impresiones', 'ticket_reimpresiones', 'devoluciones', 'devolucion_items', 'cancelaciones_ticket',
     'movimientos_caja', 'delivery_asignaciones', 'cortes_parciales', 'cortes_caja', 'cortes_caja_detalle',

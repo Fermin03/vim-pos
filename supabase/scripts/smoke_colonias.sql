@@ -194,6 +194,33 @@ BEGIN
   IF v_e IS DISTINCT FROM 'P0002' THEN RAISE EXCEPTION '5: colonia ajena (dio %)', v_e; END IF;
   PERFORM set_config('request.jwt.claims', NULL, true);
 
+  -- ── 6) Sync de la nube ───────────────────────────────────────────────────
+  v_r := sync_pull_snapshot(v_t);
+  IF jsonb_typeof(v_r -> 'colonias') <> 'array'
+     OR NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_r -> 'colonias') x WHERE (x ->> 'id')::uuid = v_col)
+     OR EXISTS (SELECT 1 FROM jsonb_array_elements(v_r -> 'colonias') x WHERE (x ->> 'tenant_id')::uuid = v_otro) THEN
+    RAISE EXCEPTION '6: el pull debía traer las colonias del negocio y solo esas';
+  END IF;
+  -- Push: una colonia nueva de la caja entra; una que choca por llave con otra de la nube se funde
+  -- (no truena) y le pasa su zona si la de la nube no tenía.
+  UPDATE colonias SET zona_envio_id = NULL WHERE sucursal_id = v_suc AND nombre_busqueda = 'centro' AND codigo_postal = '37500';
+  v_r := sync_push_snapshot(v_t, jsonb_build_object('colonias', jsonb_build_array(
+    jsonb_build_object('id', gen_random_uuid(), 'tenant_id', v_t, 'sucursal_id', v_suc, 'nombre', 'La Nueva', 'codigo_postal', NULL,
+                       'zona_envio_id', v_z_centro, 'origen', 'CAPTURADA', 'created_at', now(), 'updated_at', now(), 'deleted_at', NULL),
+    jsonb_build_object('id', gen_random_uuid(), 'tenant_id', v_t, 'sucursal_id', v_suc, 'nombre', 'CENTRO', 'codigo_postal', '37500',
+                       'zona_envio_id', v_z_norte, 'origen', 'CAPTURADA', 'created_at', now(), 'updated_at', now(), 'deleted_at', NULL))));
+  IF v_r ? '_errores' THEN RAISE EXCEPTION '6: el push no debía rechazar filas: %', v_r -> '_errores'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM colonias WHERE sucursal_id = v_suc AND nombre_busqueda = 'la nueva' AND zona_envio_id = v_z_centro) THEN
+    RAISE EXCEPTION '6: la colonia nueva de la caja no entró';
+  END IF;
+  IF (SELECT count(*) FROM colonias WHERE sucursal_id = v_suc AND nombre_busqueda = 'centro' AND codigo_postal = '37500' AND deleted_at IS NULL) <> 1
+     OR (SELECT zona_envio_id FROM colonias WHERE sucursal_id = v_suc AND nombre_busqueda = 'centro' AND codigo_postal = '37500' AND deleted_at IS NULL) IS DISTINCT FROM v_z_norte THEN
+    RAISE EXCEPTION '6: la homónima de la caja debía fundirse y pasar su zona';
+  END IF;
+  IF catalogo_version() IS NULL THEN RAISE EXCEPTION '6: catalogo_version'; END IF;
+  -- El push termina en origin: las secciones siguientes necesitan sus disparadores.
+  IF current_setting('session_replication_role') <> 'origin' THEN RAISE EXCEPTION '6: el rol de réplica quedó puesto'; END IF;
+
   RAISE NOTICE 'colonias en verde';
 END $$;
 
