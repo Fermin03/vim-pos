@@ -381,7 +381,7 @@ BEGIN
   v_d1 := (v_r -> 0 ->> 'id')::uuid;
   IF v_r - 0 <> '[]'::jsonb OR v_r -> 0 IS DISTINCT FROM jsonb_build_object('id', v_d1, 'etiqueta', 'Casa', 'calle', 'Av. Cuenta',
        'numero_exterior', '12', 'numero_interior', NULL, 'colonia', 'Centro', 'codigo_postal', '37000', 'ciudad', 'León',
-       'estado', 'Guanajuato', 'referencias', 'portón verde') THEN
+       'estado', 'Guanajuato', 'referencias', 'portón verde', 'punto', NULL) THEN
     RAISE EXCEPTION 'D: alta de dirección: %', v_r;
   END IF;
   v_r := tienda_direccion_guardar(v_t, v_a, v_d1, ' Oficina ', v_dir2);
@@ -428,6 +428,36 @@ BEGIN
   v_r := tienda_direccion_borrar(v_t, v_a, v_d1);
   IF jsonb_array_length(v_r) <> 4 OR v_r @> jsonb_build_array(jsonb_build_object('id', v_d1)) THEN RAISE EXCEPTION 'D: borrar: %', v_r; END IF;
   IF tienda_cuenta_leer(v_t, v_a) -> 'direcciones' IS DISTINCT FROM v_r THEN RAISE EXCEPTION 'D: leer la cuenta no trae las mismas direcciones'; END IF;
+
+  -- ── P) El pin de la dirección (0186) ──────────────────────────────────────
+  -- Alta con pin: se guarda a 6 decimales y la lista lo dice.
+  v_r := tienda_direccion_guardar(v_t, v_a, NULL, 'Con pin', v_dir2, '{"lat":21.1234567,"lng":-101.68}');
+  v_d1 := (v_r -> -1 ->> 'id')::uuid;
+  IF v_r -> -1 -> 'punto' IS DISTINCT FROM '{"lat":21.123457,"lng":-101.68}'::jsonb THEN RAISE EXCEPTION 'P: alta con pin: %', v_r -> -1; END IF;
+  -- Editar sin pin la etiqueta o las referencias (la misma dirección escrita): el pin se queda.
+  v_r := tienda_direccion_guardar(v_t, v_a, v_d1, 'Casa nueva', v_dir2 || '{"referencias":"portón azul"}');
+  IF v_r -> -1 -> 'punto' IS NULL OR v_r -> -1 -> 'punto' = 'null'::jsonb THEN RAISE EXCEPTION 'P: cambiar la etiqueta borró el pin'; END IF;
+  -- Editar sin pin la calle: el pin se borra (apuntaría a la casa anterior).
+  v_r := tienda_direccion_guardar(v_t, v_a, v_d1, 'Casa nueva', v_dir2 || '{"calle":"Calle Tres"}');
+  IF v_r -> -1 -> 'punto' <> 'null'::jsonb THEN RAISE EXCEPTION 'P: cambiar la calle no borró el pin: %', v_r -> -1; END IF;
+  -- Ponerle pin a una dirección que no tenía (lo que hace la tienda tras pedir a una guardada).
+  v_r := tienda_direccion_guardar(v_t, v_a, v_d1, 'Casa nueva', v_dir2 || '{"calle":"Calle Tres"}', '{"lat":21.2,"lng":-101.7}');
+  IF v_r -> -1 -> 'punto' IS DISTINCT FROM '{"lat":21.2,"lng":-101.7}'::jsonb THEN RAISE EXCEPTION 'P: agregar pin: %', v_r -> -1; END IF;
+  -- Un pin que no cuadra no entra.
+  FOR r IN SELECT * FROM (VALUES ('lat fuera de rango', '{"lat":91,"lng":0}'::jsonb), ('lng de texto', '{"lat":21,"lng":"-101"}'),
+                                 ('sin lng', '{"lat":21}'), ('no es objeto', '[21, -101]')) AS x(caso, punto) LOOP
+    v_err := NULL;
+    BEGIN PERFORM tienda_direccion_guardar(v_t, v_a, v_d1, 'Casa nueva', v_dir2, r.punto);
+    EXCEPTION WHEN OTHERS THEN v_err := SQLERRM; END;
+    IF v_err IS NULL OR v_err NOT LIKE 'DIRECCION_INVALIDA:%' THEN RAISE EXCEPTION 'P %: esperaba DIRECCION_INVALIDA, dio %', r.caso, v_err; END IF;
+  END LOOP;
+  -- La tabla no acepta medio punto.
+  BEGIN
+    UPDATE tienda_direcciones SET lng = NULL WHERE id = v_d1;
+    RAISE EXCEPTION 'P: la tabla aceptó lat sin lng';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+  PERFORM tienda_direccion_borrar(v_t, v_a, v_d1);
 
   -- ── M) Mis pedidos ────────────────────────────────────────────────────────
   -- Pedir con cuenta sigue funcionando. Dos de Ana (recoger con extra y nota; domicilio), uno de Beto, uno de invitado.

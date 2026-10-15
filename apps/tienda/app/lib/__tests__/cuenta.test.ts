@@ -16,7 +16,7 @@ import { CODIGO, ID, menuCrudo, u } from "./datos";
 
 const CUENTA = { nombre: "Ana", apellido: "López", email: "ana@example.com", telefono: "4771112233", fecha_nacimiento: "1990-05-17" };
 const DIR = { id: u(500), etiqueta: "Casa", calle: "Madero", numero_exterior: "12", numero_interior: null, colonia: "Centro",
-              codigo_postal: "37000", ciudad: "León", estado: "Guanajuato", referencias: null };
+              codigo_postal: "37000", ciudad: "León", estado: "Guanajuato", referencias: null, punto: null };
 const ITEMS = [
   { producto_id: ID.hamburguesa, cantidad: 2, nota: "sin cebolla", modificadores: [{ opcion_id: ID.medio, cantidad: 1 }, { opcion_id: ID.queso, cantidad: 2 }] },
   { producto_id: ID.combo, cantidad: 1, componentes: [{ grupo_id: ID.slotPapas, producto_id: ID.papasGajo, cantidad: 1, modificadores: [{ opcion_id: ID.ranch, cantidad: 2 }] }] },
@@ -49,6 +49,10 @@ describe("contrato de cuentas", () => {
     expect(miCuentaDe({ cuenta: CUENTA, direcciones: [] })).toEqual({ cuenta: CUENTA, direcciones: [] });
     expect(miCuentaDe({ cuenta: CUENTA })).toBeNull();
     expect(direccionesDe({ direcciones: [DIR, { ...DIR, id: u(501), numero_interior: "B", referencias: "portón verde" }] })).toHaveLength(2);
+    // El pin (0186): {lat, lng}, o null si no viene (una función anterior) o no cuadra.
+    const { punto: _p, ...sinPunto } = DIR;
+    expect(direccionesDe({ direcciones: [{ ...DIR, punto: { lat: 21.12, lng: -101.68 } }, sinPunto, { ...DIR, punto: { lat: "21" } }] })?.map((d) => d.punto))
+      .toEqual([{ lat: 21.12, lng: -101.68 }, null, null]);
     for (const mala of [null, {}, { direcciones: "x" }, { direcciones: [{ ...DIR, id: "no-uuid" }] }, { direcciones: [{ ...DIR, calle: null }] }, { direcciones: [null] }]) {
       expect(direccionesDe(mala), JSON.stringify(mala)).toBeNull();
     }

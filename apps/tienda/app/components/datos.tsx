@@ -30,7 +30,7 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react"
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Aviso, Captcha, SITE_KEY_TURNSTILE, botonClases, cn, Icono } from "@vim/ui/styles";
-import { cotizar, guardarDireccion, intento, pedir, verificacion } from "../lib/api";
+import { cotizar, guardarDireccion, intento, pedir, verificacion, type DireccionDePedido } from "../lib/api";
 import { TOPES, aCuerpo, type Carrito } from "../lib/carrito";
 import {
   CAMPOS, DE_DIRECCION, FORMULARIO_VACIO, LIMITES, datosDelPedido, erroresDe, guardarCliente, leerCliente, olvidarCliente,
@@ -85,7 +85,8 @@ export type PropsDelPasoDeDatos = {
   alRetener?: (retenida: boolean) => void;
   /** A domicilio «Por distancia» (0185): el pin del cliente. Vive en la tienda, que cotiza con él. */
   punto: Punto | null;
-  alCambiarPunto: (p: Punto) => void;
+  /** null = sin pin (al cambiar a una dirección que no tiene). */
+  alCambiarPunto: (p: Punto | null) => void;
   /** «Mejor recojo mi pedido», desde fuera del área de entrega. */
   alCambiarModo: (m: Modo) => void;
 };
@@ -107,6 +108,8 @@ const camposDe = (d: DireccionGuardada): Partial<Formulario> => {
   const { etiqueta: _etiqueta, ...campos } = formularioDeDireccion(d);
   return campos;
 };
+/** La dirección escrita de una guardada, tal cual (para ponerle el pin sin tocar lo demás). */
+const escritaDe = ({ id: _id, etiqueta: _etiqueta, punto: _punto, ...escrita }: DireccionGuardada): DireccionDePedido => escrita;
 const SIN_DIRECCION: Partial<Formulario> = Object.fromEntries(DE_DIRECCION.map((c) => [c, ""]));
 /** De `nuevo`, solo lo que en `a` está vacío: lo prellenado nunca pisa lo que el cliente ya escribió. */
 const soloVacios = (a: Formulario, nuevo: Partial<Formulario>): Partial<Formulario> =>
@@ -288,6 +291,7 @@ export function PasoDeDatos({
     const primera = cuenta.direcciones[0];
     const usarPrimera = !!primera && direccion === "" && !f.calle.trim();
     if (direccion === "") setDireccion(usarPrimera ? primera.id : OTRA);
+    if (usarPrimera && primera.punto) alCambiarPunto(primera.punto);
     setF((a) => ({ ...a, ...soloVacios(a, paraTusDatos(cuenta.cuenta)), ...(usarPrimera && camposDe(primera)) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo cuando llega (o cambia) la cuenta
   }, [cuenta]);
@@ -297,6 +301,8 @@ export function PasoDeDatos({
     setDireccion(d ? d.id : OTRA);
     // Una guardada llena los campos (que quedan ocultos); «Otra» los deja en blanco para escribir.
     setF((a) => ({ ...a, ...(d ? camposDe(d) : SIN_DIRECCION) }));
+    // Su pin, si lo tiene; si no, ninguno: el de otra dirección cobraría otro envío.
+    alCambiarPunto(d?.punto ?? null);
     setTocados((t) => new Set([...t].filter((c) => !esDeDireccion(c))));
     setRechazo((r) => ({ ...r, calle: undefined }));
   };
@@ -337,9 +343,13 @@ export function PasoDeDatos({
     if (!pago) return;
     const cuerpoDelCarrito = aCuerpo(carrito, puntoDelPedido), datos = f, modo = carrito.modo;
     const delPedido = datosDelPedido(datos, { modo, pago, propina: typeof propina === "number" ? propina : 0, propinaMxn: libre?.ok ? libre.monto : undefined });
-    // La dirección nueva que pidió guardar en su cuenta (solo con sesión, a domicilio y escrita a mano).
-    const porGuardar = conSesion && guardar && !elegida && delPedido.direccion
-      ? { ...delPedido.direccion, id: null, etiqueta: etiqueta.trim() || "Casa" } : null;
+    // Lo que se guarda en la cuenta (solo con sesión y a domicilio): la dirección nueva que pidió
+    // guardar, con su pin; o el pin nuevo de una guardada (no tenía, o lo movió), con la dirección tal
+    // como está guardada.
+    const pinNuevo = !!elegida && !!puntoDelPedido && (elegida.punto?.lat !== puntoDelPedido.lat || elegida.punto?.lng !== puntoDelPedido.lng);
+    const porGuardar = !conSesion || !delPedido.direccion ? null
+      : !elegida ? (guardar ? { ...delPedido.direccion, id: null, etiqueta: etiqueta.trim() || "Casa", punto: puntoDelPedido } : null)
+      : pinNuevo ? { ...escritaDe(elegida), id: elegida.id, etiqueta: elegida.etiqueta, punto: puntoDelPedido } : null;
     const elPedido = { ...cuerpoDelCarrito, ...delPedido, nota: nota.trim() || null };
     // La misma clave mientras se reintente ESTE pedido; otra si algo de él cambió (también la forma
     // de pago o la propina —el porcentaje o el otro monto—, que van dentro de `delPedido`).

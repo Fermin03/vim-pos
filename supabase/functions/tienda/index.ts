@@ -426,7 +426,7 @@ async function cuentas(p: PeticionDeCuenta, c: { admin: Admin; negocio: Negocio;
       return r.data === true ? json({ ok: true }) : json({ error: "CREDENCIALES_INVALIDAS" }, 403);
     }
     case "direccion_guardar": {
-      const r = await admin.rpc("tienda_direccion_guardar", { p_tenant, p_cuenta, p_id: p.id, p_etiqueta: p.etiqueta, p_direccion: p.direccion });
+      const r = await admin.rpc("tienda_direccion_guardar", { p_tenant, p_cuenta, p_id: p.id, p_etiqueta: p.etiqueta, p_direccion: p.direccion, ...(p.punto && { p_punto: p.punto }) });
       if (r.error) return rechazo("tienda_direccion_guardar", r.error);   // DIRECCIONES_LLENAS → 409
       const direcciones = direccionesPublicas(r.data);
       return direcciones ? json({ direcciones }) : inesperada("tienda_direccion_guardar");

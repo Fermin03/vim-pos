@@ -131,6 +131,8 @@ export type Cuenta = { nombre: string; apellido: string | null; email: string; /
 export type DireccionGuardada = {
   id: string; etiqueta: string; calle: string; numero_exterior: string; numero_interior: string | null; colonia: string;
   codigo_postal: string; ciudad: string; estado: string; referencias: string | null;
+  /** El pin del mapa que se puso al pedir a esta dirección (0186); null si nunca se puso o si se editó la dirección. */
+  punto: { lat: number; lng: number } | null;
 };
 export type MiCuenta = { cuenta: Cuenta; direcciones: DireccionGuardada[] };
 /** `cuenta: null` = el correo ya tenía cuenta: no hay sesión (decisión 4: no se dice que ya existía). */
@@ -214,9 +216,15 @@ function envioDe(x: unknown): EnvioDeSucursal {
   const e = obj(x);
   if (e.cobro !== "DISTANCIA") return { cobro: "ZONAS" };
   const tramos = lista(e.tramos, (y) => { const t = obj(y); return { hasta_km: con(/^\d{1,2}\.\d$/)(t.hasta_km), costo_mxn: importe(t.costo_mxn) }; });
-  const p = e.punto === null || e.punto === undefined ? null : obj(e.punto);
-  if (!p || typeof p.lat !== "number" || typeof p.lng !== "number" || tramos.length === 0) return { cobro: "ZONAS" };
-  return { cobro: "DISTANCIA", tramos, punto: { lat: p.lat, lng: p.lng } };
+  const punto = puntoDe(e.punto);
+  if (!punto || tramos.length === 0) return { cobro: "ZONAS" };
+  return { cobro: "DISTANCIA", tramos, punto };
+}
+
+/** Un punto del mapa {lat, lng}, o null si no viene o no cuadra. */
+function puntoDe(x: unknown): { lat: number; lng: number } | null {
+  const p = x === null || x === undefined ? null : obj(x);
+  return p && typeof p.lat === "number" && typeof p.lng === "number" ? { lat: p.lat, lng: p.lng } : null;
 }
 
 export const negocioDe = lector((x): Negocio => {
@@ -347,7 +355,7 @@ const direcciones = (x: unknown): DireccionGuardada[] => lista(obj(x).direccione
   return {
     id: uuid(d.id), etiqueta: txt(d.etiqueta), calle: txt(d.calle), numero_exterior: txt(d.numero_exterior),
     numero_interior: txtONull(d.numero_interior), colonia: txt(d.colonia), codigo_postal: txt(d.codigo_postal),
-    ciudad: txt(d.ciudad), estado: txt(d.estado), referencias: txtONull(d.referencias),
+    ciudad: txt(d.ciudad), estado: txt(d.estado), referencias: txtONull(d.referencias), punto: puntoDe(d.punto),
   };
 });
 

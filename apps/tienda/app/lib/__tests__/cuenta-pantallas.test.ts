@@ -86,7 +86,7 @@ describe("formularios desde lo guardado", () => {
     expect(paraTusDatos({ ...CUENTA, apellido: null }).nombre).toBe("Ana");
   });
   it("una dirección guardada ↔ su formulario, ida y vuelta", () => {
-    const f = formularioDeDireccion(DIR);
+    const f = formularioDeDireccion({ ...DIR, punto: { lat: 21.12, lng: -101.68 } });
     expect(f).toEqual({ etiqueta: "Casa", calle: "Madero", numeroExterior: "12", numeroInterior: "", colonia: "Centro", codigoPostal: "37000", ciudad: "León", estado: "Guanajuato", referencias: "" });
     expect(direccionPorGuardar(f, DIR.id)).toEqual(DIR);
     expect(formularioDeDireccion(null)).toMatchObject({ etiqueta: "", calle: "", referencias: "" });
