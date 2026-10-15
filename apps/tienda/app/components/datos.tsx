@@ -41,7 +41,7 @@ import { LIMITES_DE_CUENTA, direccionEnUnaLinea, enlaceDeAcceso, formularioDeDir
 import { formatoMxn } from "../lib/dinero";
 import { enviarPedido, envioDeLaPagina, intentoDelNegocio, pruebaQueNoHuboCobro, resolverDuda, type Desenlace, type ResultadoDeEnvio } from "../lib/envio";
 import { formasDePago, leerOtroMonto, propinaDe, totalAPagar, type Propina as Porcentaje, type PropinaElegida } from "../lib/pago";
-import { coloniaContestada, coloniaQueCoincide, envioEnDatos, ultimaVigente, type BusquedaDeColonia } from "../lib/pantalla";
+import { coloniaContestada, coloniaQueCoincide, cpTrasEscribirColonia, envioEnDatos, ultimaVigente, type BusquedaDeColonia } from "../lib/pantalla";
 import { accionDe, avanzar, pasoDelDesenlace, pasosDe, type Paso } from "../lib/pasos";
 import { BOTON_OTRA_FORMA, finDeLaPausa, guardarPausa, leerPausa, lineaDePausa, textoDePausa } from "../lib/pausa";
 import { textoDeRechazo, type CampoDeTarjeta } from "../lib/tarjeta";
@@ -257,11 +257,14 @@ export function PasoDeDatos({
    * ya no se insiste (`sin_respuesta`): el pedido sale sin colonia y el servidor decide.
    */
   const [vigencia] = useState(ultimaVigente);
+  /** El CP que puso la colonia (sugerencia tocada, o lo escrito que coincidió), mientras el cliente no lo cambie. */
+  const cpAutollenado = useRef<string | null>(null);
   /** Descarta la búsqueda en vuelo y, si había, la colonia elegida. */
-  const soltarColonia = () => { vigencia.descartar(); setBusqueda(null); setDeSugerencia(false); alCambiarColonia(null); };
+  const soltarColonia = () => { vigencia.descartar(); setBusqueda(null); setDeSugerencia(false); cpAutollenado.current = null; alCambiarColonia(null); };
   const buscarColonia = (nombre: string, cp: string, escrita = false, reintento = false) => {
     const vigente = vigencia.pedir();
     setDeSugerencia(false);
+    cpAutollenado.current = null;
     alCambiarColonia(null);
     if (!sucursal.colonias || nombre.trim().length < 2) { setBusqueda("lista"); return; }
     setBusqueda("en_vuelo");
@@ -270,7 +273,10 @@ export function PasoDeDatos({
       // Sin respuesta no se sabe si está en el catálogo: no se avisa «sin cobertura»; «Continuar» reintenta una vez.
       setBusqueda(r.ok ? "lista" : reintento ? "sin_respuesta" : "fallo");
       const c = r.ok ? coloniaQueCoincide(r.datos, nombre, cp) : null;
-      if (c && escrita) setF((a) => ({ ...a, colonia: c.nombre, ...(c.codigo_postal && !a.codigoPostal.trim() && { codigoPostal: c.codigo_postal }) }));
+      // `cp` es el de ahora: si el cliente lo hubiera cambiado, `soltarColonia` ya habría descartado esta respuesta.
+      const llenaCp = !!c?.codigo_postal && !cp.trim();
+      if (c && escrita) setF((a) => ({ ...a, colonia: c.nombre, ...(llenaCp && { codigoPostal: c.codigo_postal! }) }));
+      if (c && escrita && llenaCp) cpAutollenado.current = c.codigo_postal;
       if (r.ok) alCambiarColonia(c);
     });
   };
@@ -386,7 +392,7 @@ export function PasoDeDatos({
         setF((a) => ({ ...a, [c]: v })); setRechazo((r) => ({ ...r, [c]: undefined }));
         // Otro CP: la colonia hallada por lo escrito (o la búsqueda en vuelo) comparaba con el de antes y
         // ya no vale; se vuelve a buscar al salir de la colonia o con «Continuar». Una sugerencia tocada se queda.
-        if (c === "codigoPostal" && !deSugerencia) soltarColonia();
+        if (c === "codigoPostal") { cpAutollenado.current = null; if (!deSugerencia) soltarColonia(); }
       }}
       alSalir={() => setTocados((t) => new Set(t).add(c))} {...extra} />
   );
@@ -815,12 +821,16 @@ export function PasoDeDatos({
                             if (coloniaPorBuscar && busqueda === null) buscarLaEscrita();
                           }}
                           alEscribir={(v) => {
-                            setF((a) => ({ ...a, colonia: v })); setRechazo((r) => ({ ...r, colonia: undefined }));
+                            // El CP que puso la colonia de antes es de esa colonia: se va con ella (lib/pantalla.ts).
+                            const autollenado = cpAutollenado.current;
+                            setF((a) => ({ ...a, colonia: v, codigoPostal: cpTrasEscribirColonia(a.codigoPostal, autollenado) }));
+                            setRechazo((r) => ({ ...r, colonia: undefined }));
                             // Escribir encima ya no es la colonia elegida, ni la que se estaba buscando.
                             soltarColonia();
                           }}
                           alElegir={(c) => {
                             vigencia.descartar(); setBusqueda(null); setDeSugerencia(true);
+                            cpAutollenado.current = c.codigo_postal || null;
                             setF((a) => ({ ...a, colonia: c.nombre, ...(c.codigo_postal && { codigoPostal: c.codigo_postal }) }));
                             setRechazo((r) => ({ ...r, colonia: undefined, codigoPostal: undefined }));
                             alCambiarColonia(c);

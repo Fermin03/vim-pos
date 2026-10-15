@@ -6,7 +6,7 @@ import type { Resultado } from "../api";
 import { agregar, carritoNuevo, seleccionInicial, type Carrito, type CuerpoCarrito } from "../carrito";
 import { cotizacionDe, menuDe, negocioDe, type ColoniaSugerida, type Cotizacion, type Menu, type Negocio, type Sucursal } from "../contrato";
 import {
-  alternar, carritoPara, categoriaActiva, coloniaContestada, coloniaQueCoincide, cotizarConEspera, envioEnDatos, modosDe, motivoDeCierre, renglonesDelError, sucursalElegida, ultimaVigente,
+  alternar, carritoPara, categoriaActiva, coloniaContestada, coloniaQueCoincide, cotizarConEspera, cpTrasEscribirColonia, envioEnDatos, modosDe, motivoDeCierre, renglonesDelError, sucursalElegida, ultimaVigente,
 } from "../pantalla";
 import { ID, cotizacionCruda, menuCrudo, negocioCrudo, u } from "./datos";
 
@@ -264,6 +264,17 @@ describe("ultimaVigente", () => {
     // El cliente escribe encima: la respuesta que venía ya no se usa.
     v.descartar();
     expect(segunda()).toBe(false);
+  });
+});
+
+describe("cpTrasEscribirColonia", () => {
+  it("escribir sobre una colonia que llenó el CP lo borra: ese CP era de la otra colonia", () => {
+    expect(cpTrasEscribirColonia("37390", "37390")).toBe("");
+  });
+  it("un CP que escribió el cliente (o que ya cambió) se queda", () => {
+    expect(cpTrasEscribirColonia("37390", null)).toBe("37390");
+    expect(cpTrasEscribirColonia("37320", "37390")).toBe("37320");
+    expect(cpTrasEscribirColonia("", null)).toBe("");
   });
 });
 

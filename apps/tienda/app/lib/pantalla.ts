@@ -119,6 +119,12 @@ export function rangoDeEnvio(tramos: { costo_mxn: string }[]): string | null {
  * reintenta una vez) y `sin_respuesta` (tampoco al reintentar: el servidor decide al enviar).
  */
 export type BusquedaDeColonia = "en_vuelo" | "lista" | "fallo" | "sin_respuesta" | null;
+/**
+ * El CP al escribir encima de la colonia. Si ese CP lo puso la colonia de antes (`autollenado`, de una
+ * sugerencia o de lo escrito que coincidió) y nadie lo cambió, se borra: era de la otra colonia y
+ * haría fallar la búsqueda de la nueva. El que escribió el cliente se queda.
+ */
+export const cpTrasEscribirColonia = (cp: string, autollenado: string | null): string => autollenado && cp === autollenado ? "" : cp;
 /** La colonia escrita que cuenta para el envío: solo la que el catálogo ya contestó; si no, "" (pendiente). */
 export const coloniaContestada = (busqueda: BusquedaDeColonia, texto: string): string => busqueda === "lista" ? texto : "";
 
