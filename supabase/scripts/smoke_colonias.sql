@@ -86,9 +86,21 @@ BEGIN
     VALUES ('37000', 'X', 'Colonia', 'León', 'Guanajuato', '11020');
   EXCEPTION WHEN OTHERS THEN v_e := SQLSTATE;
   END;
+  -- Con su propio tenant_id pero la sucursal de otro negocio, tampoco (ocuparía la llave ajena).
+  v_uno := NULL;
+  BEGIN
+    INSERT INTO colonias (tenant_id, sucursal_id, nombre, codigo_postal) VALUES (v_t, v_suc_o, 'Intrusa', '37000');
+  EXCEPTION WHEN OTHERS THEN v_uno := split_part(SQLERRM, ':', 1) || '/' || SQLSTATE;
+  END;
   RESET ROLE;
   IF v_e IS DISTINCT FROM '42501' THEN RAISE EXCEPTION '3: authenticated no debía escribir en SEPOMEX (dio %)', v_e; END IF;
+  IF v_uno IS DISTINCT FROM 'SUCURSAL_INVALIDA/42501' THEN RAISE EXCEPTION '3: la cajera metió una colonia en la sucursal de otro negocio (dio %)', v_uno; END IF;
   PERFORM set_config('request.jwt.claims', NULL, true);
+  -- Ni siquiera sin RLS: el disparador cuida que sucursal y negocio coincidan.
+  v_e := pg_temp.error_de(format('INSERT INTO colonias (tenant_id, sucursal_id, nombre) VALUES (%L, %L, %L)', v_otro, v_suc, 'Intrusa'));
+  IF v_e IS DISTINCT FROM 'SUCURSAL_INVALIDA' THEN RAISE EXCEPTION '3: tenant y sucursal cruzados debían rechazarse (dio %)', v_e; END IF;
+  v_e := pg_temp.error_de(format('UPDATE colonias SET sucursal_id = %L WHERE id = %L', v_suc_o, v_col));
+  IF v_e IS DISTINCT FROM 'SUCURSAL_INVALIDA' THEN RAISE EXCEPTION '3: mover una colonia a la sucursal ajena debía rechazarse (dio %)', v_e; END IF;
 
   -- ── 4) Sembrar desde SEPOMEX con herencia ────────────────────────────────
   INSERT INTO sepomex_asentamientos (codigo_postal, nombre, tipo, municipio, estado, clave_municipio) VALUES

@@ -75,6 +75,7 @@ insert into _secdef_solo_service (fn, motivo) values
   ('_tienda_tramos',                'lee los tramos de envío y sus zonas de cualquier sucursal sin RLS (0185)'),
   ('_tienda_zona_de_colonia',       'lee la zona de una colonia de cualquier sucursal sin RLS (0187)'),
   ('tienda_colonias',               'busca colonias de cualquier sucursal sin RLS; solo la Edge Function tienda (0187)'),
+  ('_colonia_zona_valida',          'función de disparador: valida sucursal y zona de una colonia sin RLS (0187)'),
   ('tienda_crear_pedido',           'crea pedidos en cualquier negocio; la frontera con el público (0162, 0167)'),
   ('tienda_seguimiento',            'lee un pedido de cualquier negocio por la huella de su enlace (0162, 0166)'),
   ('tienda_reportar_estado',        'mueve el estado de un pedido de la tienda de cualquier negocio (0164, 0167)'),

@@ -79,15 +79,21 @@ DO $$ BEGIN
     USING (tenant_id = current_tenant_id() AND es_admin_del_tenant(tenant_id));
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+DROP TRIGGER IF EXISTS trg_colonias_updated_at ON colonias;
 CREATE TRIGGER trg_colonias_updated_at BEFORE UPDATE ON colonias
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
+-- La sucursal tiene que ser del mismo negocio (sin esto, otro negocio podría ocupar las llaves del
+-- catálogo ajeno: la sucursal de un negocio es pública vía tienda_negocio).
 -- La zona de una colonia: viva, de la MISMA sucursal y no de un tramo por distancia (las de tramo
 -- no se eligen a mano, 0185). SECURITY DEFINER: la cajera no necesita leer tienda_sucursales.
 -- En modo réplica (sync) no corre: la nube y la caja ya validaron al escribir.
 CREATE OR REPLACE FUNCTION _colonia_zona_valida() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
 BEGIN
+  IF NOT EXISTS (SELECT 1 FROM sucursales s WHERE s.id = NEW.sucursal_id AND s.tenant_id = NEW.tenant_id) THEN
+    RAISE EXCEPTION 'SUCURSAL_INVALIDA: la sucursal no es de este negocio' USING ERRCODE = '42501';
+  END IF;
   IF NEW.zona_envio_id IS NULL THEN RETURN NEW; END IF;
   IF NOT EXISTS (SELECT 1 FROM zonas_envio z
                   WHERE z.id = NEW.zona_envio_id AND z.sucursal_id = NEW.sucursal_id
@@ -101,7 +107,8 @@ BEGIN
 END;
 $fn$;
 REVOKE ALL ON FUNCTION _colonia_zona_valida() FROM PUBLIC, anon, authenticated;
-CREATE TRIGGER trg_colonias_zona_valida BEFORE INSERT OR UPDATE OF zona_envio_id, sucursal_id ON colonias
+DROP TRIGGER IF EXISTS trg_colonias_zona_valida ON colonias;
+CREATE TRIGGER trg_colonias_zona_valida BEFORE INSERT OR UPDATE OF zona_envio_id, sucursal_id, tenant_id ON colonias
   FOR EACH ROW EXECUTE FUNCTION _colonia_zona_valida();
 
 -- ── §3 sembrar_colonias ──────────────────────────────────────────────────────
@@ -142,7 +149,7 @@ BEGIN
    WHERE a.clave_municipio = v_mun
      -- Sin el filtro de deleted_at: una colonia que el dueño borró no vuelve.
      AND NOT EXISTS (SELECT 1 FROM colonias c
-                      WHERE c.sucursal_id = p_sucursal
+                      WHERE c.tenant_id = v_tenant AND c.sucursal_id = p_sucursal
                         AND c.nombre_busqueda = lower(f_unaccent(btrim(a.nombre)))
                         AND coalesce(c.codigo_postal, '') = a.codigo_postal)
    ORDER BY lower(f_unaccent(btrim(a.nombre))), a.codigo_postal, a.id;
@@ -170,7 +177,7 @@ BEGIN
      WHERE c.sucursal_id = p_sucursal AND c.deleted_at IS NULL AND c.zona_envio_id IS NULL
      GROUP BY c.id, u.zona
   ), elegida AS (
-    SELECT DISTINCT ON (id) id, zona FROM votos ORDER BY id, n DESC, ult DESC
+    SELECT DISTINCT ON (id) id, zona FROM votos ORDER BY id, n DESC, ult DESC, zona
   )
   UPDATE colonias c SET zona_envio_id = e.zona FROM elegida e WHERE c.id = e.id;
   GET DIAGNOSTICS v_her = ROW_COUNT;
@@ -1103,7 +1110,7 @@ BEGIN
              'punto', CASE WHEN ts.cobro_envio = 'DISTANCIA' AND s.geo_lat IS NOT NULL AND s.geo_lng IS NOT NULL
                            THEN jsonb_build_object('lat', s.geo_lat, 'lng', s.geo_lng) END),
            -- 0187: si tiene catálogo de colonias (la tienda sugiere y la colonia puede decidir el envío).
-           'colonias', EXISTS (SELECT 1 FROM colonias c WHERE c.sucursal_id = s.id AND c.deleted_at IS NULL),
+           'colonias', EXISTS (SELECT 1 FROM colonias c WHERE c.sucursal_id = s.id AND c.tenant_id = v_c.tenant_id AND c.deleted_at IS NULL),
            'zonas', CASE WHEN ts.cobro_envio = 'DISTANCIA' THEN '[]'::jsonb ELSE COALESCE((
              SELECT jsonb_agg(jsonb_build_object('id', z.id, 'nombre', z.nombre, 'costo_mxn', z.costo_mxn::text)
                               ORDER BY z.orden, z.nombre)
