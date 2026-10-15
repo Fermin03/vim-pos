@@ -1,3 +1,5 @@
+import { GIROS, nombreGiro } from "@vim/db/operacion";
+
 export const fmtMxn = (n: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n || 0);
 export const fmtInt = (n: number) => new Intl.NumberFormat("es-MX").format(n || 0);
 
@@ -20,16 +22,10 @@ export function fechaHoraMx(iso: string, estilo: "largo" | "corto" = "largo"): s
   }).format(f);
 }
 
-// Los mismos nombres que ve el dueño al registrarse (apps/admin/app/registro).
-export const VERTICALES = [
-  { v: "QUICK_SERVICE", l: "Comida rápida" },
-  { v: "FULL_SERVICE", l: "Restaurante con meseros" },
-  { v: "CAFE_BAR", l: "Cafetería o bar" },
-  { v: "DARK_KITCHEN", l: "Cocina solo para apps" },
-  { v: "FOODTRUCK", l: "Food truck" },
-  { v: "ENTERPRISE", l: "Cadena" },
-] as const;
-export const nombreVertical = (v: string | null | undefined) => VERTICALES.find((x) => x.v === v)?.l ?? v ?? "—";
+// Los mismos nombres que ve el dueño (ADR 0034). Solo se ofrecen los vigentes; los retirados
+// conservan su nombre para leer a quien ya los tiene.
+export const VERTICALES = GIROS.filter((g) => g.ofrecido).map((g) => ({ v: g.codigo, l: g.nombre }));
+export const nombreVertical = nombreGiro;
 
 export const NOMBRE_SUSCRIPCION: Record<string, string> = {
   ACTIVA: "Cobrando", PAUSADA: "En pausa", CANCELADA: "Cancelada", EXPIRADA: "Vencida", TRIAL: "En prueba",

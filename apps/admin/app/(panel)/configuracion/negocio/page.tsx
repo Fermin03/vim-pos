@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Button } from "@vim/ui/styles";
+import { nombreGiro } from "@vim/db/operacion";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { actualizarNegocio, guardarLogoNegocio, leerNegocio, negocioSchema, LOGO_MAX_BYTES, type Negocio } from "../../../lib/configuracion";
 import { reescalarImagen } from "../../../lib/imagen";
@@ -14,15 +15,6 @@ const TIMEZONES = [
   "America/Mazatlan",
   "America/Cancun",
 ];
-
-const VERT_LABEL: Record<string, string> = {
-  QUICK_SERVICE: "Quick Service",
-  FULL_SERVICE: "Full Service",
-  CAFE_BAR: "Café & Bar",
-  FOODTRUCK: "Foodtruck",
-  DARK_KITCHEN: "Dark Kitchen",
-  ENTERPRISE: "Enterprise",
-};
 
 export default function NegocioPage() {
   const [neg, setNeg] = useState<Negocio | null | undefined>(undefined);
@@ -96,8 +88,8 @@ export default function NegocioPage() {
             <div className="mb-5 rounded-lg border border-line bg-surface p-4">
               <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-13">
                 <div>
-                  <div className="text-12 font-bold uppercase tracking-wide text-ink-3">Vertical</div>
-                  <div className="mt-0.5 font-medium">{VERT_LABEL[neg.vertical_principal] ?? neg.vertical_principal}</div>
+                  <div className="text-12 font-bold uppercase tracking-wide text-ink-3">Giro</div>
+                  <div className="mt-0.5 font-medium">{nombreGiro(neg.vertical_principal)}</div>
                 </div>
                 <div>
                   <div className="text-12 font-bold uppercase tracking-wide text-ink-3">Estado</div>

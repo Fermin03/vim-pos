@@ -60,5 +60,8 @@ export async function reabrirCuenta(
     p_usuario_solicitante_id: args.solicitanteId,
     p_usuario_autorizo_id: args.autorizoId,
   });
+  // Reabrir una cuenta de barra choca con el índice único (0183) si ya hay otra abierta con su nombre.
+  if (error?.message.includes("idx_tickets_barra_nombre_abierto"))
+    throw new Error("Hay otra cuenta de barra abierta con ese nombre. Cóbrala o pásala a una mesa antes de reabrir esta.");
   if (error) throw new Error(error.message);
 }

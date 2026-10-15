@@ -7,6 +7,7 @@
 // un prospecto sin contestar se vuelve una alerta y con qué se pre-llena "Nuevo cliente".
 import { z } from "zod";
 import { enlaceWhatsapp } from "@vim/db/soporte";
+import { GIROS } from "@vim/db/operacion";
 import type { Severidad } from "./tipos";
 
 /** Los mismos del CHECK de `prospectos.estado` (0084). */
@@ -165,13 +166,15 @@ export type PrefijoNuevoCliente = {
  * Con qué se pre-llena "Nuevo cliente" al convertir un prospecto. El plan se sugiere por tamaño,
  * con la misma regla que el correo de aviso de `solicitar-demo`: más de una sucursal es Cadena,
  * más de una caja es Negocio. El correo del dueño no se pre-llena: el formulario de demo no lo pide.
+ * El giro solo pasa si se ofrece: el sitio todavía manda giros retirados (CAFE_BAR, ENTERPRISE) y
+ * el formulario no los tiene, así que se vería uno y se mandaría otro.
  */
 export function prefijoNuevoCliente(p: Pick<Prospecto, "nombre" | "negocio" | "whatsapp" | "giro" | "cajas" | "sucursales">): PrefijoNuevoCliente {
   return {
     nombre_comercial: limpio(p.negocio),
     nombre_owner: limpio(p.nombre),
     telefono_owner: p.whatsapp.replace(/\D/g, ""),
-    vertical: p.giro,
+    vertical: GIROS.some((g) => g.ofrecido && g.codigo === p.giro) ? p.giro : null,
     plan_codigo: p.sucursales > 1 ? "CADENA" : p.cajas > 1 ? "NEGOCIO" : "ESENCIAL",
   };
 }

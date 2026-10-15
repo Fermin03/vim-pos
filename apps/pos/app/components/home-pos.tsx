@@ -65,6 +65,7 @@ import {
 import { CapaPedidosTienda, type AccionTienda, type ListoTienda } from "./pedido-tienda";
 import { esEscritorio } from "../lib/actualizacion";
 import { useAcceso } from "./banda-acceso";
+import { moduloActivo } from "@vim/db/operacion";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalDescuentoItem } from "./modal-descuento-item";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
@@ -77,7 +78,7 @@ import { ModalAgregarProductos } from "./modal-agregar-productos";
 import { ModalNumeroMesa } from "./modal-numero-mesa";
 import { MenuGeneral } from "./menu-general";
 import { PantallaInicio } from "./pantalla-inicio";
-import { PantallaCuentasModo } from "./pantalla-cuentas-modo";
+import { Accion, PantallaCuentasModo } from "./pantalla-cuentas-modo";
 import { PantallaMonitorVentas } from "./pantalla-monitor-ventas";
 import { listarTicketsEnEspera, ponerTicketEnEspera, retomarTicketEnEspera } from "../lib/espera";
 import { ModalEtiquetaEspera, ModalListaEspera } from "./modal-espera";
@@ -90,7 +91,8 @@ import { cacheGet, cachePut } from "../lib/outbox";
 import { claveCatalogo, esErrorDeRed } from "../lib/catalogo-cache";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
 import { capaVisible, type CapaEscape } from "../lib/escape";
-import { leerTicketImpreso } from "../lib/cuentas-abiertas";
+import { leerTicketImpreso, listarCuentasAbiertas } from "../lib/cuentas-abiertas";
+import { abrirCuentaBarra, moverCuentaABarra, moverCuentaAMesa } from "../lib/cuenta-barra";
 import { useEscape } from "../lib/use-escape";
 import { ModalAsignarRepartidor } from "./modal-asignar-repartidor";
 import type { LineaCancelada } from "./modal-cancelar-items";
@@ -116,7 +118,7 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const comandasEnLineaIntentadas = new Set<string>();
 
 /** Pantalla desde la que se entró a capturar; a esa regresa el botón "Volver". */
-type Origen = "inicio" | "mesas" | "pickup" | "domicilio";
+type Origen = "inicio" | "mesas" | "pickup" | "domicilio" | "barra";
 
 /** Lo que la comanda toma tal cual del ticket; cada uso le suma lo suyo (agregado, cancelación). */
 const comandaDe = (datos: DatosTicketImpresion, lineas: DatosComanda["lineas"]): DatosComanda => ({
@@ -174,15 +176,26 @@ export function HomePos({
   // El POS arranca en la pantalla de inicio: el cajero elige primero a qué viene.
   const [enInicio, setEnInicio] = useState(true);
   const [enMonitor, setEnMonitor] = useState(false);
-  const [cuentasAbiertas, setCuentasAbiertas] = useState<CuentasAbiertasPorModo>({ comedor: 0, pickup: 0, domicilio: 0 });
+  const [cuentasAbiertas, setCuentasAbiertas] = useState<CuentasAbiertasPorModo>({ comedor: 0, pickup: 0, domicilio: 0, barra: 0 });
   const [enMesas, setEnMesas] = useState(false);
   const [enDelivery, setEnDelivery] = useState(false);
   const [enPickup, setEnPickup] = useState(false);
+  const [enBarra, setEnBarra] = useState(false);
+  /**
+   * Nombre de una cuenta de barra: abrir una nueva o, con `ticketId`, pasar a barra una de mesa.
+   * `enUso` son los nombres de las cuentas de barra abiertas, para proponer uno libre. Un solo
+   * `clientIdLocal` por apertura: si la respuesta se pierde, el reintento no abre otra cuenta.
+   */
+  const [nombreBarra, setNombreBarra] = useState<null | { enUso: string[]; ticketId?: string; clientIdLocal: string }>(null);
+  /** Cuenta de barra que se está pasando a una mesa (la mesa se elige con `ModalNumeroMesa`). */
+  const [pasandoAMesa, setPasandoAMesa] = useState<string | null>(null);
   const [enConsultaCuentas, setEnConsultaCuentas] = useState(false);
   // Pantalla desde la que se entró a capturar. "Volver" regresa AHÍ, no al inicio: si el
   // cajero venía de la lista de domicilios, mandarlo al inicio le cuesta dos toques extra
   // para seguir atendiendo la misma lista.
   const [volverA, setVolverA] = useState<Origen>("inicio");
+  /** Ticket abierto que es cuenta de barra: solo para rotularlo «Barra» (el carrito lo ve como comedor). */
+  const [cuentaBarraId, setCuentaBarraId] = useState<string | null>(null);
   const [enDevoluciones, setEnDevoluciones] = useState(false);
   // ADR 0011 — pedidos de apps de delivery: pantalla, badge del inicio y sonido al llegar uno nuevo.
   const [enPedidosApps, setEnPedidosApps] = useState(false);
@@ -627,6 +640,7 @@ export function HomePos({
     setEnMesas(volverA === "mesas");
     setEnPickup(volverA === "pickup");
     setEnDelivery(volverA === "domicilio");
+    setEnBarra(volverA === "barra");
     setEnInicio(volverA === "inicio");
   }, [salirNavegacion, volverA]);
 
@@ -636,6 +650,7 @@ export function HomePos({
     setEnMesas(false);
     setEnPickup(false);
     setEnDelivery(false);
+    setEnBarra(false);
     setEnConsultaCuentas(false);
     setEnDevoluciones(false);
     setEnPedidosApps(false);
@@ -864,12 +879,14 @@ export function HomePos({
       ]);
       dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas, envio: recon.envio, clienteCuenta: recon.clienteCuenta } });
       setVolverA(origen);
+      setCuentaBarraId(recon.esBarra ? ticketId : null);
       setTicketBd(bd);
       setItemsPersistidos(items);
       setEnModoMesa(true);
       setEnMesas(false);
       setEnPickup(false);
       setEnDelivery(false);
+      setEnBarra(false);
       // Si la lectura falla se queda en "no impresa": no se le niega la captura a una cuenta por
       // un dato que no se pudo leer.
       leerTicketImpreso(token, ticketId).then(setCuentaImpresa).catch(() => {});
@@ -1655,6 +1672,8 @@ export function HomePos({
       [viendoMapaMesas, () => { setViendoMapaMesas(false); setPidiendoMesa(true); }],
       [pidiendoMesa, () => setPidiendoMesa(false)],
       [nombreCuentaAbierto, () => setNombreCuentaAbierto(false)],
+      [nombreBarra != null, () => setNombreBarra(null)],
+      [pasandoAMesa != null, () => setPasandoAMesa(null)],
       [clienteDomAbierto, () => setClienteDomAbierto(false)],
       [clienteCuentaAbierto, () => setClienteCuentaAbierto(false)],
       [zonaPedidoAbierto, () => setZonaPedidoAbierto(false)],
@@ -1675,7 +1694,7 @@ export function HomePos({
       [enKds, () => setEnKds(false)],
       // Nada abierto: Escape equivale al botón Volver de la pantalla de captura.
       [!enInicio && !enKds && !enMonitor && !enConsultaCuentas && !enDevoluciones && !enPedidosApps
-        && !enDelivery && !enPickup && !enMesas, () => intentarSalirDeCaptura("atras")],
+        && !enDelivery && !enPickup && !enMesas && !enBarra, () => intentarSalirDeCaptura("atras")],
     ];
     return {
       // El aviso grande de la tienda va encima de TODO y CEDE: lo cierra su propio `Modal`.
@@ -1684,11 +1703,11 @@ export function HomePos({
       algoAbierto: capas.some(([visible]) => visible),
     };
   }, [avisoTiendaVisible, modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
-      agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto,
+      agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto, nombreBarra, pasandoAMesa,
       clienteDomAbierto, clienteCuentaAbierto, zonaPedidoAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
       salidaPendiente, confirmandoCierre, menuGeneralAbierto, cerrando, enInicio, enKds, enMonitor,
-      enConsultaCuentas, enDevoluciones, enPedidosApps, enDelivery, enPickup, enMesas, nuevoTicket,
+      enConsultaCuentas, enDevoluciones, enPedidosApps, enDelivery, enPickup, enMesas, enBarra, nuevoTicket,
       intentarSalirDeCaptura]);
   useEscape(alEscapar);
 
@@ -1735,7 +1754,7 @@ export function HomePos({
     // también los diálogos propios de la lista de cuentas (cancelar, descuento, PIN…) y los dos
     // que se pintan encima de ella sin pasar por `alEscapar`: sin esto, «Ver orden» dentro del
     // mismo canal los dejaba abiertos sobre la cuenta recién aceptada.
-    const capturando = !enInicio && !enKds && !enMonitor && !enConsultaCuentas && !enDevoluciones && !enPedidosApps && !enDelivery && !enPickup && !enMesas;
+    const capturando = !enInicio && !enKds && !enMonitor && !enConsultaCuentas && !enDevoluciones && !enPedidosApps && !enDelivery && !enPickup && !enMesas && !enBarra;
     const enLista = listaConDialogo.current || asignandoRepartidor != null || viendoReservaciones;
     if (algoAbierto || enLista || (capturando && (carrito.lineas.length > 0 || ticketBd !== null))) {
       avisarBreveTienda(`Termina lo que tienes abierto. El pedido te espera en ${aDomicilio ? "Domicilio" : "Pick-up"}.`);
@@ -2196,6 +2215,7 @@ export function HomePos({
           turno={turno}
           empleado={empleado}
           nCuentasComedor={cuentasAbiertas.comedor}
+          nCuentasBarra={cuentasAbiertas.barra}
           // Cada canal suma sus pedidos de la tienda por aceptar.
           // Y las pagadas en línea que siguen sin entregar: ya están cobradas, pero ahí siguen.
           nCuentasPickup={cuentasAbiertas.pickup + porAceptarTienda.pickup + cuentasPagadasEnLinea(pedidosTienda, "DRIVE_THRU").length}
@@ -2207,6 +2227,7 @@ export function HomePos({
           // ni el aviso de vencidos (ambos son condicionales a que venga la función).
           onPedidosApps={hayEnLinea ? () => { setEnInicio(false); setEnPedidosApps(true); } : undefined}
           onComedor={() => { setEnInicio(false); setEnMesas(true); }}
+          onBarra={() => { setEnInicio(false); setEnBarra(true); }}
           onPickup={() => { setEnInicio(false); setEnPickup(true); }}
           onDomicilio={() => { setEnInicio(false); setEnDelivery(true); }}
           onParaLlevar={() => {
@@ -2254,8 +2275,8 @@ export function HomePos({
     return <><PantallaMonitorVentas token={token} caja={caja} turno={turno} onSalir={volverAlInicio} />{capaTienda}</>;
   }
 
-  if (enDelivery || enPickup || enMesas) {
-    const modo = enPickup ? "DRIVE_THRU" : enMesas ? "COMER_AQUI" : "DELIVERY_PROPIO";
+  if (enDelivery || enPickup || enMesas || enBarra) {
+    const modo = enPickup ? "DRIVE_THRU" : enMesas ? "COMER_AQUI" : enBarra ? "BARRA" : "DELIVERY_PROPIO";
     return (
       <>
         <PantallaCuentasModo
@@ -2267,8 +2288,14 @@ export function HomePos({
         modo={modo}
         onSalir={volverAlInicio}
         // Solo Comedor: pick-up y domicilio no apartan mesa, y un botón muerto ahí sería ruido.
-        onVerReservaciones={modo === "COMER_AQUI" ? () => setViendoReservaciones(true) : undefined}
-        onAbrirCuenta={() => {
+        onVerReservaciones={modo === "COMER_AQUI" && moduloActivo(modulos, "reservaciones") ? () => setViendoReservaciones(true) : undefined}
+        onAbrirCuenta={(cuentas) => {
+          // Barra: el ticket nace con su nombre ANTES de capturar (el nombre es único y lo valida la
+          // base), así que primero el nombre y después se entra a la cuenta ya abierta.
+          if (modo === "BARRA") {
+            setNombreBarra({ enUso: cuentas.flatMap((c) => (c.cliente ? [c.cliente] : [])), clientIdLocal: `cuenta-${nuevoClientId()}` });
+            return;
+          }
           // Cuenta nueva: se fija el modo y se entra al catálogo con el carrito limpio.
           dispatch({ tipo: "limpiar" });
           dispatch({ tipo: "modo", modo });
@@ -2328,7 +2355,7 @@ export function HomePos({
         onComandaCancelacion={imprimirComandaCancelacion}
         alTenerDialogo={anotarDialogoDeLista}
         // Tienda en línea: los pedidos por aceptar de Pick-up y de Domicilio viven en su lista.
-        enLinea={hayTienda && modo !== "COMER_AQUI" ? {
+        enLinea={hayTienda && (modo === "DRIVE_THRU" || modo === "DELIVERY_PROPIO") ? {
           pedidos: pedidosTienda,
           sinComanda: comandasAtrasadas,
           sabidoAqui: canceladosAlAceptar,
@@ -2351,7 +2378,24 @@ export function HomePos({
           },
         } : undefined}
         extraPorCuenta={
-          enDelivery
+          // Barra y mesa: cada lista ofrece llevar la cuenta a la otra, si ese módulo está prendido.
+          enBarra && moduloActivo(modulos, "comedor")
+            ? (c) => <Accion label="Pasar a mesa" onClick={() => setPasandoAMesa(c.ticketId)} />
+          : enMesas && moduloActivo(modulos, "cuentas_barra")
+            ? (c) => c.mesa ? (
+                <Accion
+                  label="Pasar a barra"
+                  onClick={async () => {
+                    // Los nombres en uso son los de la barra, no los de esta lista. Si no se pueden
+                    // leer se sigue igual: la base rechaza el repetido y el modal propone otro.
+                    const enUso = await listarCuentasAbiertas(token, caja.sucursal_id, ["BARRA"])
+                      .then((cs) => cs.flatMap((x) => (x.cliente ? [x.cliente] : [])))
+                      .catch(() => []);
+                    setNombreBarra({ enUso, ticketId: c.ticketId, clientIdLocal: "" });
+                  }}
+                />
+              ) : null
+          : enDelivery
             ? (c, recargar) => (
                 <button
                   type="button"
@@ -2394,6 +2438,47 @@ export function HomePos({
             }}
           />
         )}
+        {nombreBarra && (
+          <ModalNombreCuenta
+            enUso={nombreBarra.enUso}
+            pasar={nombreBarra.ticketId != null}
+            onCancelar={() => setNombreBarra(null)}
+            // Si lanza (nombre ganado por otra caja, sin red), el modal se queda abierto y lo dice.
+            onListo={async (nombre) => {
+              const { ticketId, clientIdLocal } = nombreBarra;
+              if (ticketId) {
+                await moverCuentaABarra(token, ticketId, nombre);
+                setNombreBarra(null);
+                setEnMesas(false);
+                setEnBarra(true);
+                return;
+              }
+              const nuevo = await abrirCuentaBarra(token, {
+                sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id, nombre, usuarioId: empleado.id, clientIdLocal,
+              });
+              setNombreBarra(null);
+              await entrarCuenta(nuevo, "barra");
+            }}
+          />
+        )}
+        {pasandoAMesa && (
+          <ModalNumeroMesa
+            token={token}
+            tenantId={caja.tenant_id}
+            sucursalId={caja.sucursal_id}
+            onCerrar={() => setPasandoAMesa(null)}
+            textoConfirmar="Pasar a esta mesa"
+            textoCrear="Crearla y pasar la cuenta"
+            ayudaOcupada="Esa mesa está ocupada. Elige otra."
+            // Si la mesa se ocupó en el camino, el error de `asignar_mesa_a_ticket` sale en el modal.
+            onMesaElegida={async (mesaId) => {
+              await moverCuentaAMesa(token, pasandoAMesa, mesaId, `cuenta-${nuevoClientId()}`);
+              setPasandoAMesa(null);
+              setEnBarra(false);
+              setEnMesas(true);
+            }}
+          />
+        )}
         {viendoMapaMesas && (
           // El mapa como CONSULTA opcional, no como paso obligatorio: sirve para ver qué está
           // ocupado cuando no te acuerdas del número.
@@ -2404,7 +2489,7 @@ export function HomePos({
               onSalir={() => { setViendoMapaMesas(false); setPidiendoMesa(true); }}
               onAbrirCuenta={async (mesaId: string) => { setViendoMapaMesas(false); await onAbrirCuentaMesa(mesaId); }}
               onRetomar={(ticketId: string) => { setViendoMapaMesas(false); entrarCuenta(ticketId, "mesas"); }}
-              onVerReservaciones={() => setViendoReservaciones(true)}
+              onVerReservaciones={moduloActivo(modulos, "reservaciones") ? () => setViendoReservaciones(true) : undefined}
             />
           </div>
         )}
@@ -2419,7 +2504,7 @@ export function HomePos({
           <ModalAgregarProductos
             token={token}
             ticketId={agregandoA}
-            modo={modo}
+            modo={modo === "BARRA" ? "COMER_AQUI" : modo}
             categorias={categorias}
             productos={productos}
             combos={combos}
@@ -2618,6 +2703,7 @@ export function HomePos({
           />
         <SidebarTicket
           estado={carrito}
+          modoTexto={ticketBd?.ticketId === cuentaBarraId ? "Barra" : undefined}
           onCantidad={(id, c) => dispatch({ tipo: "cantidad", clientId: id, cantidad: c })}
           onQuitar={(id) => dispatch({ tipo: "quitar", clientId: id })}
           // Cuenta con el ticket impreso: nada que cambie el total hasta reabrirla desde su lista.

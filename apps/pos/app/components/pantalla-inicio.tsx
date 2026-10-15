@@ -4,6 +4,7 @@ import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useReloj } from "./topbar-pos";
 import { evaluarSync, leerEstadoSync, type NivelSync } from "../lib/estado-sync";
 import { BandaAcceso, BandaActualizacion, useAcceso } from "./banda-acceso";
+import { accesosInicio } from "../lib/accesos-inicio";
 import { DialogoAvisos } from "./dialogo-avisos";
 import { avisosDe, leerDirectivas, type Aviso } from "../lib/directivas";
 import { evaluarFolios, leerFolios, type NivelFolios } from "../lib/folios";
@@ -38,6 +39,7 @@ export function PantallaInicio({
   nCuentasComedor,
   nCuentasPickup,
   nCuentasDomicilio,
+  nCuentasBarra = 0,
   nEnEspera,
   nPedidosApps = 0,
   expiradosApps = 0,
@@ -46,6 +48,7 @@ export function PantallaInicio({
   onParaLlevar,
   onPickup,
   onDomicilio,
+  onBarra,
   onPedidosApps,
   onMonitorVentas,
   onConsultarCuentas,
@@ -61,6 +64,7 @@ export function PantallaInicio({
   nCuentasComedor: number;
   nCuentasPickup: number;
   nCuentasDomicilio: number;
+  nCuentasBarra?: number;
   nEnEspera: number;
   /** Pedidos en línea (apps de delivery y tienda propia) esperando que el cajero los acepte. ADR 0011. */
   nPedidosApps?: number;
@@ -72,6 +76,8 @@ export function PantallaInicio({
   onParaLlevar: () => void;
   onPickup: () => void;
   onDomicilio: () => void;
+  /** Cuentas por nombre en barra. Sin la función no hay acceso (el módulo manda además). */
+  onBarra?: () => void;
   onPedidosApps?: () => void;
   onMonitorVentas: () => void;
   onConsultarCuentas: () => void;
@@ -122,6 +128,7 @@ export function PantallaInicio({
   const [confirmandoSalir, setConfirmandoSalir] = useState(false);
   useEffect(() => { setPuedeSalir(typeof window.__VIM_SALIR === "function"); }, []);
   const acceso = useAcceso();
+  const ver = accesosInicio(acceso.modulos, { comedor: nCuentasComedor, pickup: nCuentasPickup, domicilio: nCuentasDomicilio, barra: nCuentasBarra });
   // Avisos de VIM. Esta es la pantalla que el cajero ve tras el PIN y al abrir turno, así que
   // es donde se le enseñan (ADR 0014, entrega 3).
   const [avisos, setAvisos] = useState<Aviso[] | null>(null);
@@ -194,14 +201,26 @@ export function PantallaInicio({
         aria-label="Accesos principales"
         className="flex flex-shrink-0 items-stretch gap-px overflow-hidden border-b border-line bg-line"
       >
-        <Acceso label="Comedor" badge={nCuentasComedor} onClick={onComedor} requiereTurno={sinTurno}
-          icon={<Icono nombre="mesa" />} />
-        <Acceso label="Para llevar" onClick={onParaLlevar} requiereTurno={sinTurno} destacado
-          icon={<Icono nombre="para-llevar" />} />
-        <Acceso label="Pick-up" badge={nCuentasPickup} onClick={onPickup} requiereTurno={sinTurno}
-          icon={<Icono nombre="bolsa" />} />
-        <Acceso label="Domicilio" badge={nCuentasDomicilio} onClick={onDomicilio} requiereTurno={sinTurno}
-          icon={<Icono nombre="moto" />} />
+        {ver.comedor && (
+          <Acceso label="Comedor" badge={nCuentasComedor} onClick={onComedor} requiereTurno={sinTurno}
+            icon={<Icono nombre="mesa" />} />
+        )}
+        {ver.barra && onBarra && (
+          <Acceso label="Barra" badge={nCuentasBarra} onClick={onBarra} requiereTurno={sinTurno}
+            icon={<Icono nombre="vaso" />} />
+        )}
+        {ver.paraLlevar && (
+          <Acceso label="Para llevar" onClick={onParaLlevar} requiereTurno={sinTurno} destacado
+            icon={<Icono nombre="para-llevar" />} />
+        )}
+        {ver.pickup && (
+          <Acceso label="Pick-up" badge={nCuentasPickup} onClick={onPickup} requiereTurno={sinTurno}
+            icon={<Icono nombre="bolsa" />} />
+        )}
+        {ver.domicilio && (
+          <Acceso label="Domicilio" badge={nCuentasDomicilio} onClick={onDomicilio} requiereTurno={sinTurno}
+            icon={<Icono nombre="moto" />} />
+        )}
         {onPedidosApps && (
           <Acceso label="Pedidos en línea" badge={nPedidosApps} onClick={onPedidosApps} requiereTurno={sinTurno}
             icon={<Icono nombre="celular" />} />

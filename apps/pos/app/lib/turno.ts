@@ -40,17 +40,13 @@ export type DatosCaja = {
   /** Logo del negocio como data URI, o null. Viaja embebido en `tenants` (mig. 0066) para
    *  que la caja pueda mostrarlo e imprimirlo sin conexión. */
   logoUrl: string | null;
-  /** Vertical del negocio. La caja la usa para no enseñar campos de una vertical
-   *  a otra: el bloque de "evento o ubicación especial" al abrir turno solo tiene
-   *  sentido en un foodtruck, y a una hamburguesería fija le sobraba en pantalla. */
-  vertical: string | null;
 };
 
 /** Lee datos completos de la caja (caja + sucursal). Usa RLS por tenant. */
 export async function leerCaja(token: string, cajaId: string): Promise<DatosCaja> {
   const { data, error } = await employeeClient(token)
     .from("cajas")
-    .select("tenant_id, sucursal_id, numero, nombre, sucursal:sucursales(nombre), tenant:tenants(nombre_comercial, logo_url, vertical_principal)")
+    .select("tenant_id, sucursal_id, numero, nombre, sucursal:sucursales(nombre), tenant:tenants(nombre_comercial, logo_url)")
     .eq("id", cajaId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -58,7 +54,7 @@ export async function leerCaja(token: string, cajaId: string): Promise<DatosCaja
   type Fila = {
     tenant_id: string; sucursal_id: string; numero: number; nombre: string;
     sucursal: { nombre: string } | null;
-    tenant: { nombre_comercial: string | null; logo_url: string | null; vertical_principal: string | null } | null;
+    tenant: { nombre_comercial: string | null; logo_url: string | null } | null;
   };
   const f = data as unknown as Fila;
   return {
@@ -69,7 +65,6 @@ export async function leerCaja(token: string, cajaId: string): Promise<DatosCaja
     sucursalNombre: f.sucursal?.nombre ?? "—",
     negocioNombre: f.tenant?.nombre_comercial ?? f.sucursal?.nombre ?? "—",
     logoUrl: f.tenant?.logo_url ?? null,
-    vertical: f.tenant?.vertical_principal ?? null,
   };
 }
 
@@ -162,7 +157,7 @@ export function fmtMxn(n: number): string {
 }
 
 /** Cuentas ABIERTAS (sin cobrar) del turno, agrupadas por modo de servicio. */
-export type CuentasAbiertasPorModo = { comedor: number; pickup: number; domicilio: number };
+export type CuentasAbiertasPorModo = { comedor: number; pickup: number; domicilio: number; barra: number };
 
 /**
  * Cuenta las cuentas vivas de cada modo para los badges de la pantalla de inicio.
@@ -186,5 +181,6 @@ export async function contarCuentasAbiertasPorModo(token: string, turnoId: strin
     comedor: n("COMER_AQUI"),
     pickup: n("DRIVE_THRU"),
     domicilio: n("DELIVERY_PROPIO"),
+    barra: n("BARRA"),
   };
 }

@@ -5,6 +5,8 @@ import { buscarActualizacion, esEscritorio } from "../lib/actualizacion";
 import { pedirActualizacionCatalogo } from "../lib/catalogo-eventos";
 import { enlaceWhatsapp, mensajeAyudaCaja, textoHorario } from "@vim/db/soporte";
 import { useSoporte } from "../lib/soporte";
+import { moduloActivo } from "@vim/db/operacion";
+import { useAcceso } from "./banda-acceso";
 
 /**
  * Menú de pantalla completa del POS.
@@ -49,6 +51,7 @@ export function MenuGeneral({
   /** Para el mensaje de "Ayuda por WhatsApp": desde qué negocio, sucursal y caja se escribe. */
   ayuda?: { negocio?: string | null; sucursal?: string | null; caja?: string | null; cajero?: string | null };
 }) {
+  const { modulos } = useAcceso();
   // Actualizar solo aplica dentro de la app de escritorio; se resuelve en efecto porque el
   // export estático se prerenderiza sin window.
   const [enEscritorio, setEnEscritorio] = useState(false);
@@ -114,7 +117,7 @@ export function MenuGeneral({
         <div className="mx-auto flex max-w-4xl flex-col gap-9">
           {(onKds || onDevoluciones || onCorteX || onEnEspera || onAbrirCajon) && (
           <SeccionMenu titulo="Operación">
-            {onKds && (
+            {onKds && moduloActivo(modulos, "kds") && (
               <TileMenu label="Cocina" onClick={con(onKds)} icon={<Icono nombre="megafono" className="h-8 w-8" />} />
             )}
             {onDevoluciones && (
@@ -137,7 +140,7 @@ export function MenuGeneral({
             <TileMenu label="Cambiar cajero" onClick={con(onCambiarCajero)} icon={<Icono nombre="personas" className="h-8 w-8" />} />
             <TileMenu label="Bloquear pantalla" onClick={con(onBloquear)} icon={<Icono nombre="candado" className="h-8 w-8" />} />
             <TileMenu label="Cambiar mi PIN" onClick={con(onCambiarPin)} icon={<Icono nombre="llave" className="h-8 w-8" />} />
-            {onMisPropinas && (
+            {onMisPropinas && moduloActivo(modulos, "meseros") && (
               <TileMenu label="Mis propinas" onClick={con(onMisPropinas)} icon={<Icono nombre="moneda" className="h-8 w-8" />} />
             )}
           </SeccionMenu>
