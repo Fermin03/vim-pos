@@ -78,7 +78,7 @@ export function negocioCrudo(): unknown {
 export function cotizacionCruda(): unknown {
   return {
     renglones: [{ nombre: "Hamburguesa", cantidad: 2, detalle: "Medio, Extra queso", total_mxn: "270.00" }],
-    subtotal_mxn: "270.00", envio_mxn: "35.00", envio_total_mxn: "35.00", total_mxn: "305.00", distancia_km: null,
+    subtotal_mxn: "270.00", envio_mxn: "35.00", envio_total_mxn: "35.00", total_mxn: "305.00", distancia_km: null, por_colonia: false,
   };
 }
 

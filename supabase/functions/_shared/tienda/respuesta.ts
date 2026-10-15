@@ -265,5 +265,7 @@ export function cotizacionPublica(x: unknown): Record<string, unknown> | null {
     renglones: x.renglones, subtotal_mxn: x.subtotal_mxn, envio_mxn: x.envio_mxn,
     envio_total_mxn: x.envio_total_mxn, total_mxn: x.total_mxn,
     distancia_km: typeof x.distancia_km === "string" ? x.distancia_km : null,
+    // Si la colonia del catálogo fijó el envío. El modo de cobro (`cobro`) y la zona no salen.
+    por_colonia: x.cobro === "COLONIA",
   };
 }

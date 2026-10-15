@@ -179,7 +179,7 @@ test("cotización: salen los cinco campos públicos y nunca `items`", () => {
     subtotal_mxn: "120.00", envio_mxn: "30.00", envio_total_mxn: "34.80", total_mxn: "154.80", otra_cosa: "interna",
   };
   assert.deepEqual(cotizacionPublica(q), {
-    renglones: q.renglones, subtotal_mxn: "120.00", envio_mxn: "30.00", envio_total_mxn: "34.80", total_mxn: "154.80", distancia_km: null,
+    renglones: q.renglones, subtotal_mxn: "120.00", envio_mxn: "30.00", envio_total_mxn: "34.80", total_mxn: "154.80", distancia_km: null, por_colonia: false,
   });
 });
 test("cotización por distancia (0185): sale la distancia y nunca la zona del tramo", () => {
@@ -189,6 +189,13 @@ test("cotización por distancia (0185): sale la distancia y nunca la zona del tr
   assert.equal(p?.distancia_km, "3.2");
   assert.equal(JSON.stringify(p).includes(SUC), false);
   assert.equal("cobro" in (p ?? {}), false);
+});
+test("cotización por colonia (0187): sale por_colonia y nunca el cobro ni la zona", () => {
+  const q = { renglones: [], subtotal_mxn: "120.00", envio_mxn: "30.00", envio_total_mxn: "30.00", total_mxn: "150.00", cobro: "COLONIA", zona_id: SUC };
+  const p = cotizacionPublica(q);
+  assert.equal(p?.por_colonia, true);
+  assert.equal("cobro" in (p ?? {}), false);
+  assert.equal(JSON.stringify(p).includes(SUC), false);
 });
 test("rpc: FUERA_DE_AREA es 409 y lleva la distancia; otra cosa no sale", () => {
   assert.deepEqual(respuestaDeRpc("FUERA_DE_AREA: 8.2"), { status: 409, body: { error: "FUERA_DE_AREA", detalle: "8.2" } });

@@ -85,6 +85,8 @@ export type Cotizacion = {
   total_mxn: string;
   /** Por distancia y con ubicación: la distancia que calculó la base («3.2» km). Si no, null. */
   distancia_km: string | null;
+  /** La colonia del catálogo fijó el envío. Falso si la función aún no lo dice. */
+  por_colonia: boolean;
 };
 
 /** Una colonia que sugiere el autocompletado. `con_zona`: ya tiene zona de envío (el id de la zona no sale). */
@@ -292,6 +294,7 @@ export const cotizacionDe = lector((x): Cotizacion => {
     subtotal_mxn: importe(c.subtotal_mxn), envio_mxn: importe(c.envio_mxn),
     envio_total_mxn: importe(c.envio_total_mxn), total_mxn: importe(c.total_mxn),
     distancia_km: typeof c.distancia_km === "string" && /^\d{1,5}\.\d$/.test(c.distancia_km) ? c.distancia_km : null,
+    por_colonia: c.por_colonia === true,
   };
 });
 
