@@ -56,7 +56,7 @@ function crearPoolFalso({
       // Migración de la libreta de zonas a huella (C3): columna y relleno. Aquí no hay huellas que
       // rellenar; lo que hacen de verdad lo prueba el bloque con Postgres real al final del archivo.
       if (sql.startsWith("ALTER TABLE")) return { rows: [], rowCount: 0 };
-      if (sql.startsWith("UPDATE _vim_zonas_ok")) return { rows: [], rowCount: 0 };
+      if (sql.startsWith("UPDATE _vim_zonas_ok") || sql.startsWith("UPDATE _vim_colonias_ok")) return { rows: [], rowCount: 0 };
 
       // `_vim_migraciones_sync`: el marcador de "esto ya corrió una vez en esta caja".
       if (sql.includes("_vim_migraciones_sync")) {
@@ -564,6 +564,88 @@ describe("libreta de zonas por huella (Postgres real)", { skip: SOLO_WINDOWS }, 
     const { rows: [{ costo_mxn }] } = await db.query("SELECT costo_mxn FROM zonas_envio WHERE id = $1", [id]);
     assert.equal(Number(costo_mxn), 50, "el repreciado que terminó durante el pull debe sobrevivir");
     assert.ok((await pendientes()).includes(id), "y seguir pendiente de subir");
+  });
+});
+
+// ── Catálogo de colonias (0187): la caja las captura y les asigna zona; viajan por HUELLA ───────
+//
+// Mismo riesgo que una zona repreciada: una colonia a la que el cajero le asignó zona ya está en la
+// libreta, y sin huella el siguiente pull le quitaba la zona en silencio.
+import { marcarColoniasSubidas } from "./sync-push.mjs";
+
+describe("libreta de colonias por huella (Postgres real)", { skip: SOLO_WINDOWS }, () => {
+  const T = "99999999-0000-0000-0000-0000000000aa";
+  const S = "99999999-0000-0000-0000-0000000000bb";
+  const C1 = "c0000000-0000-4000-8000-000000000001";
+  const C2 = "c0000000-0000-4000-8000-000000000002";
+  const C3 = "c0000000-0000-4000-8000-000000000003";
+  const AHORA = new Date().toISOString();
+  let dir, backend, db, Z1;
+
+  before(async () => {
+    dir = mkdtempSync(path.join(tmpdir(), "vim-colonias-huella-"));
+    backend = await startLocalBackend({ dataRoot: dir, pgPort: 54395, restPort: 54396, log: () => {} });
+    db = backend.pool;
+    await listarPendientes(db);
+    await db.query(`INSERT INTO _vim_push_ok (ticket_id, huella) SELECT x.id, ${HUELLA_TICKET} FROM tickets x ON CONFLICT (ticket_id) DO UPDATE SET huella = EXCLUDED.huella`);
+    ({ rows: [{ id: Z1 }] } = await db.query(
+      "INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES ($1, $2, 'Zona Colonias', 30) RETURNING id", [T, S]));
+  }, { timeout: 120_000 });
+
+  after(async () => {
+    if (backend) await backend.stop();
+    if (dir) rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("colonias: una capturada en la caja queda pendiente y deja de estarlo al subir", async () => {
+    await db.query(`INSERT INTO colonias (id, tenant_id, sucursal_id, nombre) VALUES ($1, $2, $3, 'Las Joyas')`, [C1, T, S]);
+    let p = await listarPendientes(db);
+    assert.deepEqual(p.coloniaIds, [C1]);
+    const { colonias, snapshot } = await construirSnapshotPush(db);
+    assert.equal(snapshot.colonias.length, 1);
+    assert.equal("nombre_busqueda" in snapshot.colonias[0], false, "la columna generada no viaja");
+    await marcarColoniasSubidas(db, colonias);
+    p = await listarPendientes(db);
+    assert.deepEqual(p.coloniaIds, []);
+  });
+
+  test("colonias: asignarle zona en la caja la vuelve a subir", async () => {
+    await db.query(`UPDATE colonias SET zona_envio_id = $1 WHERE id = $2`, [Z1, C1]);
+    assert.deepEqual((await listarPendientes(db)).coloniaIds, [C1]);
+  });
+
+  test("colonias: el pull no pisa una zona asignada en la caja que aún no sube", async () => {
+    // C1 tiene zona Z1 local pendiente; la nube la manda sin zona.
+    await pullSnapshot(db, { colonias: [{ id: C1, tenant_id: T, sucursal_id: S, nombre: "Las Joyas", codigo_postal: null, zona_envio_id: null, origen: "CAPTURADA", created_at: AHORA, updated_at: AHORA, deleted_at: null }] });
+    const { rows } = await db.query("SELECT zona_envio_id FROM colonias WHERE id = $1", [C1]);
+    assert.equal(rows[0].zona_envio_id, Z1);
+  });
+
+  test("colonias: la misma colonia con otro id en la nube reemplaza a la local", async () => {
+    await db.query(`INSERT INTO colonias (id, tenant_id, sucursal_id, nombre, codigo_postal) VALUES ($1, $2, $3, 'Centro', '37500')`, [C2, T, S]);
+    await pullSnapshot(db, { colonias: [{ id: C3, tenant_id: T, sucursal_id: S, nombre: "CENTRO", codigo_postal: "37500", zona_envio_id: null, origen: "SEPOMEX", created_at: AHORA, updated_at: AHORA, deleted_at: null }] });
+    const { rows } = await db.query("SELECT id FROM colonias WHERE sucursal_id = $1 AND nombre_busqueda = 'centro' AND deleted_at IS NULL", [S]);
+    assert.deepEqual(rows.map((r) => r.id), [C3]);
+    // Bajada del pull, queda anotada: no vuelve a subir.
+    assert.ok(!(await listarPendientes(db)).coloniaIds.includes(C3));
+  });
+
+  test("colonias: una colonia sola pasa la guarda de «nada pendiente» y sube con su zona", async () => {
+    // C1 sigue con la zona local de arriba, sin ventas ni turnos de por medio.
+    const nube = nubeFalsa({ resultado: { colonias: 1 } });
+    try {
+      await pushToCloud(db, OPTS, () => {});
+      assert.equal(nube.peticiones[0]?.snapshot?.colonias?.[0]?.zona_envio_id, Z1);
+    } finally { nube.restaurar(); }
+    assert.deepEqual((await listarPendientes(db)).coloniaIds, []);
+  });
+
+  test("colonias: una nube sin la 0187 que las IGNORA no las da por subidas", async () => {
+    const C4 = "c0000000-0000-4000-8000-000000000004";
+    await db.query(`INSERT INTO colonias (id, tenant_id, sucursal_id, nombre) VALUES ($1, $2, $3, 'San Isidro')`, [C4, T, S]);
+    const nube = nubeFalsa({ resultado: { _ignoradas: ["colonias"] } });
+    try { await pushToCloud(db, OPTS, () => {}); } finally { nube.restaurar(); }
+    assert.deepEqual((await listarPendientes(db)).coloniaIds, [C4]);
   });
 });
 
