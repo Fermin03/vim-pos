@@ -12,7 +12,7 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { startBackend } from "./backend.mjs";
 import { startUiServer } from "./ui-server.mjs";
-import { pullFromCloud } from "./sync-pull.mjs";
+import { pullFromCloud, leerUltimoPull } from "./sync-pull.mjs";
 import { cajaIdDeEmail, loginDispositivoNube } from "./dispositivo.mjs";
 import { pushToCloud } from "./sync-push.mjs";
 import { respaldar, respaldarAsync, hacerSitio } from "./backup.mjs";
@@ -343,7 +343,7 @@ async function bootCaja() {
         : imprimirRaw(p)),
       onListarImpresoras: async () => resumirImpresoras(await win.webContents.getPrintersAsync()),
       onVincularNube: (p) => vincularConNube(p),
-      estadoSync: () => ({ disponible: true, vinculada: leerNube() !== null, ...ciclo.estado() }),
+      estadoSync: async () => ({ disponible: true, vinculada: leerNube() !== null, ...ciclo.estado(), ultimoPull: await leerUltimoPull(backend?.pool) }),
       onFolios: () => consultarFolios(),
       onSincronizarCatalogo: () => bajarCatalogoAhora("botón"),
       avisoVisto: (id) => directivas.marcarVisto(id),

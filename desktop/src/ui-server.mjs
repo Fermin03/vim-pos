@@ -196,7 +196,7 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
       // la cocina cargan la interfaz desde este mismo servidor y no tienen preload.
       // Solo lectura y sin datos sensibles: nombres de fechas, nada del negocio.
       if (!kds && req.method === "GET" && req.url.startsWith("/__estado-sync")) {
-        return json(res, 200, opts.estadoSync ? opts.estadoSync() : { disponible: false }, SIN_CACHE);
+        return json(res, 200, opts.estadoSync ? await opts.estadoSync() : { disponible: false }, SIN_CACHE);
       }
 
       // CAJA: lo que la nube dice que este negocio puede hacer (ADR 0014). Va por HTTP y no por

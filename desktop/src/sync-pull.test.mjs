@@ -477,3 +477,72 @@ test("antes de bajar productos se sueltan sus llaves únicas (intercambio de có
   assert.ok(iSoltar < iUpsert, "se sueltan ANTES del upsert");
   assert.deepEqual(client.consultas[iSoltar].params[0].sort(), [A, B].sort());
 });
+
+// ── RETAIL (0195 §3): existencias por producto ─────────────────────────────────────────────────
+
+test("PULL_ORDER baja producto_existencias justo después de productos", () => {
+  const t = PULL_ORDER.map((x) => x.t);
+  assert.equal(t.indexOf("producto_existencias"), t.indexOf("productos") + 1);
+});
+
+// Review Focus 3: con Postgres de verdad, porque la corrección es SQL (un pool falso solo probaría su
+// propia imitación). Fuera de Windows no hay Postgres embebido; ver sync-push.test.mjs.
+import { describe, before, after } from "node:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { startLocalBackend } from "./runtime.mjs";
+import { leerUltimoPull } from "./sync-pull.mjs";
+
+describe("existencias por producto en el pull (Postgres real)", { skip: process.platform !== "win32" ? "Postgres embebido solo en Windows" : false }, () => {
+  const TEN = "99999999-0000-0000-0000-0000000000c1";
+  const SUC = "99999999-0000-0000-0000-0000000000c2";
+  const P = "99999999-0000-0000-0000-0000000000c3";
+  const P2 = "99999999-0000-0000-0000-0000000000c4";
+  const MOV = "99999999-0000-0000-0000-0000000000c5";
+  let dir, backend, db;
+
+  const existencia = async (p) => Number((await db.query(
+    "SELECT cantidad FROM producto_existencias WHERE sucursal_id = $1 AND producto_id = $2", [SUC, p])).rows[0]?.cantidad);
+  const bajan = (p, cantidad) => ({ tenant_id: TEN, sucursal_id: SUC, producto_id: p, cantidad, minimo: null, actualizado_at: new Date().toISOString() });
+
+  before(async () => {
+    dir = mkdtempSync(path.join(tmpdir(), "vim-existencias-producto-"));
+    backend = await startLocalBackend({ dataRoot: dir, pgPort: 54377, restPort: 54378, log: () => {} });
+    db = backend.pool;
+    // Una venta local de una pieza, sin subir. En réplica: sin FKs ni el disparador que mueve la
+    // existencia, para fijar el escenario a mano.
+    const c = await db.connect();
+    try {
+      await c.query("BEGIN");
+      await c.query("SET LOCAL session_replication_role = replica");
+      await c.query(`INSERT INTO movimientos_producto (id, tenant_id, sucursal_id, producto_id, tipo, cantidad)
+                     VALUES ($1, $2, $3, $4, 'VENTA', -1)`, [MOV, TEN, SUC, P]);
+      await c.query("COMMIT");
+    } finally { c.release(); }
+  }, { timeout: 120_000 });
+
+  after(async () => {
+    if (backend) await backend.stop();
+    if (dir) rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("corrige producto_existencias por movimientos sin subir", async () => {
+    // La nube dice 5 (aún no sabe de la venta): la caja no «recupera» la pieza vendida.
+    await pullSnapshot(db, { producto_existencias: [bajan(P, 5), bajan(P2, 7)] });
+    assert.equal(await existencia(P), 4);
+    assert.equal(await existencia(P2), 7, "sin pendientes, lo de la nube tal cual");
+    // Ya subida, la nube la cuenta: ya no se resta.
+    await db.query("INSERT INTO _vim_mov_producto_ok (id) VALUES ($1)", [MOV]);
+    await pullSnapshot(db, { producto_existencias: [bajan(P, 4)] });
+    assert.equal(await existencia(P), 4);
+  });
+
+  test("ultimoPull es la hora del último pull completo", async () => {
+    const antes = Date.now();
+    await pullSnapshot(db, { producto_existencias: [bajan(P2, 7)] });
+    const iso = await leerUltimoPull(db);
+    assert.match(iso, /^\d{4}-\d{2}-\d{2}T/);
+    assert.ok(new Date(iso).getTime() >= antes - 5_000);
+  });
+});

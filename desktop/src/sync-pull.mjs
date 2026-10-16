@@ -26,6 +26,9 @@ export const PULL_ORDER = [
   { t: "categorias" },
   { t: "grupos_modificadores" },
   { t: "productos" },
+  // RETAIL (0195 §3): existencia por (sucursal, producto). Llave compuesta, como productos_sucursal.
+  // Luego se le resta lo que la caja movió y aún no sube (corregirExistenciasProductoPorPendientes).
+  { t: "producto_existencias" },
   // Menú por sucursal (0152): FK a productos y a sucursales, que ya bajaron. Llave compuesta
   // (producto_id, sucursal_id): upsertTabla arma el ON CONFLICT con ella, sin CLAVES_NATURALES.
   { t: "productos_sucursal" },
@@ -422,6 +425,38 @@ export async function corregirExistenciasPorPendientes(client, log = () => {}, f
 }
 
 /**
+ * Lo mismo para las existencias por producto (RETAIL, 0195): a lo que bajó se le suma lo que la caja
+ * movió y la nube aún no sabe (sin anotar en _vim_mov_producto_ok). La cantidad ya trae su signo.
+ * Solo sobre los pares que trajo este pull (I1).
+ */
+export async function corregirExistenciasProductoPorPendientes(client, log = () => {}, filasAplicadas = []) {
+  if (!filasAplicadas.length) return 0;
+  await client.query("CREATE TABLE IF NOT EXISTS _vim_mov_producto_ok (id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
+  const { rowCount } = await client.query(`
+    UPDATE producto_existencias e SET cantidad = e.cantidad + d.delta
+      FROM (SELECT m.sucursal_id, m.producto_id, sum(m.cantidad) AS delta
+              FROM movimientos_producto m
+             WHERE NOT EXISTS (SELECT 1 FROM _vim_mov_producto_ok ok WHERE ok.id = m.id)
+             GROUP BY 1, 2) d
+     WHERE e.sucursal_id = d.sucursal_id AND e.producto_id = d.producto_id AND d.delta <> 0
+       AND (e.sucursal_id, e.producto_id) IN (
+             SELECT (f->>'sucursal_id')::uuid, (f->>'producto_id')::uuid FROM jsonb_array_elements($1::jsonb) f)`,
+    [JSON.stringify(filasAplicadas.map(({ sucursal_id, producto_id }) => ({ sucursal_id, producto_id })))]);
+  if (rowCount) log(`  producto_existencias: ${rowCount} existencia(s) corregida(s) por movimientos pendientes`);
+  return rowCount;
+}
+
+/** Hora ISO del último pull completo (la anota pullSnapshot en _vim_sync), o null si nunca hubo. */
+export async function leerUltimoPull(pool) {
+  try {
+    const { rows } = await pool.query("SELECT at FROM _vim_sync WHERE clave = 'last_pull'");
+    return rows[0]?.at ? new Date(rows[0].at).toISOString() : null;
+  } catch {
+    return null; // sin tabla todavía (caja que nunca bajó nada) o base detenida un instante
+  }
+}
+
+/**
  * Anota en la libreta del PUSH los repartidores que acaban de bajar del pull.
  *
  * `_vim_repartidores_ok` (ver `asegurarTabla` en sync-push.mjs) dice qué repartidores NO hay que
@@ -813,6 +848,7 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
       resumen[t] = n;
       if (n) log(`  ${schema}.${t}: ${n}`);
       if (t === "insumo_stock_sucursal") await corregirExistenciasPorPendientes(client, log, filas);
+      if (t === "producto_existencias") await corregirExistenciasProductoPorPendientes(client, log, filas);
       if (t === "repartidores") await marcarRepartidoresDelPull(client, filas, log);
       if (LIBRETAS[t]) await marcarDelPull(client, t, filas, log);
       if (t === "clientes") await marcarClientesDelPull(client, filas, log);

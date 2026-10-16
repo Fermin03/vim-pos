@@ -1039,7 +1039,7 @@ test("lealtad: el snapshot lleva el canje de TODO ticket del lote, atado a los t
   const snap = consultas.find((c) => c.sql.includes("WITH tk AS"));
   assert.match(snap.sql, /'ticket_canjes_lealtad',\s+\(SELECT jsonb_agg\(to_jsonb\(x\)\) FROM ticket_canjes_lealtad x WHERE x\.ticket_id IN \(SELECT id FROM tk\)\)/);
   assert.match(snap.sql, /'lealtad_movimientos'/);
-  assert.equal(snap.params.length, 8, "$8 son los movimientos de lealtad");
+  assert.equal(snap.params.length, 9, "$8 son los movimientos de lealtad; $9, los de producto");
   assert.deepEqual(snap.params[7], [B]);
 });
 
@@ -1222,4 +1222,111 @@ test("lealtad: un fallo al re-anotar no tumba el arranque y no deja el marcador 
   assert.equal(await reanotarHuellasClientes0156UnaVez(pool, (m) => lineas.push(m)), 0);
   assert.ok(!pool.marcadores.has("reanotar_huellas_clientes_0156"));
   assert.ok(lineas.length >= 1);
+});
+
+// ── RETAIL (0195 §3): movimientos_producto suben como los de inventario ────────────────────────
+
+/**
+ * Un pool con las ventas `tickets` y los movimientos de producto `movs` (`[{ id, ticket_id }]`, el
+ * ticket ya resuelto como lo hace listarPendientes) pendientes. El armado devuelve exactamente lo
+ * que se le pidió ($2 ventas, $9 movimientos de producto) y apunta cada petición en `armados`.
+ */
+function poolConMovProducto({ tickets = [], movs = [] } = {}) {
+  const base = crearPoolFalso();
+  const anotado = { tickets: [], movProducto: [], armados: [] };
+  return {
+    anotado,
+    async query(sql, params = []) {
+      if (sql.includes("ORDER BY x.fecha_apertura")) {
+        return { rows: [{ ids: tickets.length ? tickets : null, turnos: null, movimientos: null, repartidores: null, zonas: null, movimientos_producto: movs.length ? movs : null }] };
+      }
+      if (sql.includes("WITH tk AS")) {
+        const ids = params[1] ?? [];
+        const mp = params[8] ?? [];
+        anotado.armados.push({ tickets: ids, movProducto: mp });
+        return { rows: [{
+          ids, tickets_huella: ids.map((id) => ({ id, huella: "h" })), turnos: null, movimientos: null,
+          repartidores: null, zonas: null, movimientos_producto: mp,
+          snapshot: { tickets: ids.map((id) => ({ id })), movimientos_producto: mp.map((id) => ({ id })) },
+        }] };
+      }
+      if (sql.includes("INSERT INTO _vim_push_ok")) {
+        for (const f of JSON.parse(params[0])) anotado.tickets.push(f.id);
+        return { rows: [], rowCount: 1 };
+      }
+      if (sql.includes("INSERT INTO _vim_mov_producto_ok")) {
+        anotado.movProducto.push(...params[0]);
+        return { rows: [], rowCount: params[0].length };
+      }
+      return base.query(sql, params);
+    },
+  };
+}
+
+const T1 = "11111111-0000-0000-0000-0000000000f1";
+const T2 = "22222222-0000-0000-0000-0000000000f2";
+const MP1 = "33333333-0000-0000-0000-0000000000a1";
+const MP2 = "44444444-0000-0000-0000-0000000000a2";
+
+test("retail: manda movimientos_producto pendientes y los marca", async () => {
+  const pool = poolConMovProducto({ tickets: [T1], movs: [{ id: MP1, ticket_id: T1 }, { id: MP2, ticket_id: null }] });
+  const nube = nubeFalsa({ resultado: { movimientos_producto: 1, _errores: [{ tabla: "movimientos_producto", id: MP2, error: "x" }] } });
+  try {
+    await pushToCloud(pool, OPTS, () => {});
+    assert.deepEqual(nube.peticiones[0].snapshot.movimientos_producto.map((m) => m.id), [MP1, MP2], "viajan los dos");
+    assert.deepEqual(pool.anotado.movProducto, [MP1], "el rechazado no se anota: se reintenta");
+    assert.deepEqual(pool.anotado.tickets, [T1], "un movimiento rechazado no retiene la venta");
+  } finally { nube.restaurar(); }
+});
+
+test("retail: no los marca si la nube ignoró la llave", async () => {
+  const pool = poolConMovProducto({ movs: [{ id: MP1, ticket_id: null }] });
+  const lineas = [];
+  const nube = nubeFalsa({ resultado: { _ignoradas: ["movimientos_producto"] } });
+  try {
+    await pushToCloud(pool, OPTS, (m) => lineas.push(m));
+    assert.equal(nube.peticiones.length, 1, "solo movimientos de producto bastan para subir");
+    assert.deepEqual(pool.anotado.movProducto, [], "la nube sin la 0195 no los guardó");
+    assert.ok(lineas.some((l) => /movimientos_producto/.test(l) && /ignor/i.test(l)));
+  } finally { nube.restaurar(); }
+});
+
+test("retail: los movimientos viajan en el lote de su ticket", async () => {
+  // R4: la nube valida la FK y el negocio del ticket (y de la devolución). Un movimiento cuyo ticket
+  // viaja en un lote posterior se rechazaría.
+  const MA = "55555555-0000-0000-0000-0000000000b1"; // ticket T2: segundo lote
+  const MB = "66666666-0000-0000-0000-0000000000b2"; // sin ticket (ajuste): primer lote
+  const MC = "77777777-0000-0000-0000-0000000000b3"; // ticket T1: primer lote
+  const MD = "88888888-0000-0000-0000-0000000000b4"; // ticket que ya subió antes: primer lote
+  const movs = [
+    { id: MA, ticket_id: T2 }, { id: MB, ticket_id: null },
+    { id: MC, ticket_id: T1 }, { id: MD, ticket_id: "99999999-0000-0000-0000-0000000000b9" },
+  ];
+  // Por lotes de una venta.
+  let pool = poolConMovProducto({ tickets: [T1, T2], movs });
+  let nube = nubeFalsa({ resultado: {} });
+  try {
+    await pushToCloud(pool, OPTS, () => {}, { maxVentasPorLote: 1 });
+    assert.deepEqual(pool.anotado.armados, [
+      { tickets: [T1], movProducto: [MB, MC, MD] },
+      { tickets: [T2], movProducto: [MA] },
+    ]);
+    assert.deepEqual(pool.anotado.movProducto.sort(), [MA, MB, MC, MD].sort());
+  } finally { nube.restaurar(); }
+  // Y al partir un lote por tamaño, cada mitad se lleva los de sus ventas.
+  pool = poolConMovProducto({ tickets: [T1, T2], movs });
+  nube = nubeFalsa({ resultado: {} });
+  try {
+    await pushToCloud(pool, OPTS, () => {}, { maxBytesPorLote: 10 });
+    const enviados = pool.anotado.armados.slice(1); // el primero es el lote entero, que se partió
+    assert.deepEqual(enviados, [
+      { tickets: [T1], movProducto: [MB, MC, MD] },
+      { tickets: [T2], movProducto: [MA] },
+    ]);
+  } finally { nube.restaurar(); }
+  // El ticket de una devolución se resuelve en listarPendientes: el de la venta original.
+  const consultas = [];
+  const base = crearPoolFalso();
+  await listarPendientes({ query: async (sql, params) => { consultas.push(sql); return sql.includes("ORDER BY x.fecha_apertura") ? { rows: [{}] } : base.query(sql, params); } });
+  assert.match(consultas.find((s) => s.includes("ORDER BY x.fecha_apertura")), /COALESCE\(m\.ticket_id, d\.ticket_original_id\)[\s\S]*LEFT JOIN devoluciones d ON d\.id = m\.devolucion_id/);
 });

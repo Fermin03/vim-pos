@@ -146,6 +146,8 @@ async function asegurarTabla(pool) {
   // baja del pull, así que todo lo que hay en la tabla local es de origen local. Se marcan por id
   // en cuanto la nube confirma; la nube es idempotente por id, así que reenviar no descuenta doble.
   await pool.query("CREATE TABLE IF NOT EXISTS _vim_mov_ok (movimiento_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
+  // RETAIL (0195 §3): lo mismo para los movimientos de existencias por producto.
+  await pool.query("CREATE TABLE IF NOT EXISTS _vim_mov_producto_ok (id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
 
   // Repartidores: la caja puede darlos de alta (0114) porque un domicilio no puede quedarse sin
   // salir porque nadie entró al panel. Suben UNA sola vez, por id.
@@ -566,6 +568,13 @@ export async function listarPendientes(pool) {
          FROM lealtad_movimientos m
          LEFT JOIN _vim_lealtad_mov_ok ok ON ok.movimiento_id = m.id
         WHERE ok.movimiento_id IS NULL) AS lealtad,
+      -- Movimientos de producto (RETAIL, 0195) aún no confirmados, en orden, con el ticket en cuyo
+      -- lote deben viajar (R4): el suyo, o el de la venta original si es de una devolución.
+      (SELECT jsonb_agg(jsonb_build_object('id', m.id, 'ticket_id', COALESCE(m.ticket_id, d.ticket_original_id)) ORDER BY m.creado_at)
+         FROM movimientos_producto m
+         LEFT JOIN devoluciones d ON d.id = m.devolucion_id
+         LEFT JOIN _vim_mov_producto_ok ok ON ok.id = m.id
+        WHERE ok.id IS NULL) AS movimientos_producto,
       -- Repartidores dados de alta en la caja aún no confirmados por la nube (ver _vim_repartidores_ok
       -- en asegurarTabla). Sin esto, un alta a media jornada sin ventas ni turnos ni movimientos de
       -- por medio no hace pasar la guarda de pushToCloud y se queda atorada en silencio.
@@ -596,6 +605,7 @@ export async function listarPendientes(pool) {
     zonaIds: rows[0].zonas ?? [], coloniaIds: rows[0].colonias ?? [],
     clienteIds: rows[0].clientes ?? [], direccionIds: rows[0].direcciones ?? [],
     lealtadIds: rows[0].lealtad ?? [],
+    movimientosProducto: rows[0].movimientos_producto ?? [],
   };
 }
 
@@ -628,7 +638,7 @@ export async function listarPendientes(pool) {
  * `movimientos_caja` sigue a los mismos turnos y no solo a los de las ventas: un turno con puras
  * entradas y salidas de efectivo, sin vender nada, tampoco subía jamás.
  */
-export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds = null, movimientoIds = null, clienteIds = null, direccionIds = null, conMesas = true, lealtadIds = null } = {}) {
+export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds = null, movimientoIds = null, clienteIds = null, direccionIds = null, conMesas = true, lealtadIds = null, movimientoProductoIds = null } = {}) {
   await asegurarTabla(pool);
   const { rows } = await pool.query(`
     WITH tk AS (
@@ -680,6 +690,7 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
       (SELECT jsonb_agg(jsonb_build_object('id', id, 'huella', huella)) FROM tn) AS turnos,
       (SELECT array_agg(id) FROM movimientos_inventario x WHERE ($4::uuid[] IS NOT NULL AND x.id = ANY($4::uuid[])) OR ($4::uuid[] IS NULL AND $2::uuid[] IS NULL AND x.id NOT IN (SELECT movimiento_id FROM _vim_mov_ok))) AS movimientos,
       (SELECT array_agg(id) FROM lealtad_movimientos x WHERE ($8::uuid[] IS NOT NULL AND x.id = ANY($8::uuid[])) OR ($8::uuid[] IS NULL AND $2::uuid[] IS NULL AND x.id NOT IN (SELECT movimiento_id FROM _vim_lealtad_mov_ok))) AS lealtad,
+      (SELECT array_agg(id) FROM movimientos_producto x WHERE ($9::uuid[] IS NOT NULL AND x.id = ANY($9::uuid[])) OR ($9::uuid[] IS NULL AND $2::uuid[] IS NULL AND x.id NOT IN (SELECT id FROM _vim_mov_producto_ok))) AS movimientos_producto,
       (SELECT array_agg(id) FROM repartidores x WHERE x.id NOT IN (SELECT repartidor_id FROM _vim_repartidores_ok)) AS repartidores,
       -- Con la huella que se manda: si la zona cambia mientras viaja, la anotada no coincide y
       -- vuelve a subir en el siguiente ciclo.
@@ -758,9 +769,16 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
         'lealtad_movimientos',       (SELECT jsonb_agg(to_jsonb(x) ORDER BY x.fecha) FROM lealtad_movimientos x
                                         WHERE ($8::uuid[] IS NOT NULL AND x.id = ANY($8::uuid[]))
                                            OR ($8::uuid[] IS NULL AND $2::uuid[] IS NULL
-                                               AND x.id NOT IN (SELECT movimiento_id FROM _vim_lealtad_mov_ok)))
+                                               AND x.id NOT IN (SELECT movimiento_id FROM _vim_lealtad_mov_ok))),
+
+        -- RETAIL (0195 §3): la fila entera. Con lista, exactamente esos (pushToCloud los reparte en el
+        -- lote de su ticket); sin lista (modo completo), los pendientes.
+        'movimientos_producto',      (SELECT jsonb_agg(to_jsonb(x) ORDER BY x.creado_at) FROM movimientos_producto x
+                                        WHERE ($9::uuid[] IS NOT NULL AND x.id = ANY($9::uuid[]))
+                                           OR ($9::uuid[] IS NULL AND $2::uuid[] IS NULL
+                                               AND x.id NOT IN (SELECT id FROM _vim_mov_producto_ok)))
       )) AS snapshot
-  `, [TERMINALES, ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds, conMesas, lealtadIds]);
+  `, [TERMINALES, ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds, conMesas, lealtadIds, movimientoProductoIds]);
   return {
     snapshot: rows[0].snapshot ?? {}, ids: rows[0].ids ?? [], turnos: rows[0].turnos ?? [],
     tickets: rows[0].tickets_huella ?? [], mesas: rows[0].mesas ?? [],
@@ -768,6 +786,7 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
     zonas: rows[0].zonas ?? [], colonias: rows[0].colonias ?? [],
     clientes: rows[0].clientes ?? [], direcciones: rows[0].direcciones ?? [],
     lealtad: rows[0].lealtad ?? [],
+    movimientosProducto: rows[0].movimientos_producto ?? [],
   };
 }
 
@@ -810,6 +829,13 @@ export async function marcarMovimientosPushed(pool, ids) {
   if (!ids?.length) return;
   await pool.query(
     "INSERT INTO _vim_mov_ok(movimiento_id) SELECT unnest($1::uuid[]) ON CONFLICT (movimiento_id) DO NOTHING", [ids]);
+}
+
+/** Marca movimientos de producto (RETAIL) confirmados por la nube. */
+export async function marcarMovimientosProductoPushed(pool, ids) {
+  if (!ids?.length) return;
+  await pool.query(
+    "INSERT INTO _vim_mov_producto_ok(id) SELECT unnest($1::uuid[]) ON CONFLICT (id) DO NOTHING", [ids]);
 }
 
 /**
@@ -924,7 +950,7 @@ function rechazadosPorTicket(errores, snapshot) {
       const item = (snapshot.devolucion_items ?? []).find((x) => x.id === e.id);
       const dev = item && (snapshot.devoluciones ?? []).find((x) => x.id === item.devolucion_id);
       if (dev?.ticket_original_id) fuera.add(dev.ticket_original_id);
-    } else if (e.tabla === "movimientos_inventario") {
+    } else if (e.tabla === "movimientos_inventario" || e.tabla === "movimientos_producto") {
       // Un movimiento rechazado se reintenta solo (ver filasRechazadas); no invalida la venta.
       continue;
     } else if (e.tabla === "lealtad_movimientos") {
@@ -961,9 +987,9 @@ function filasRechazadas(errores, tabla) {
  * reintentando lo mismo). Partir a la mitad en vez de recalcular un tamaño "correcto" converge
  * en pocas vueltas y no necesita saber cuál es el límite del otro lado.
  */
-async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds, turnoIds, movimientoIds = [], clienteIds = [], direccionIds = [], lealtadIds = [], conMesas = false, maxBytes }, log) {
-  const { snapshot, ids, tickets, turnos, movimientos, repartidores, zonas, colonias, clientes, direcciones, mesas, lealtad } =
-    await construirSnapshotPush(pool, { ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds, conMesas, lealtadIds });
+async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds, turnoIds, movimientoIds = [], clienteIds = [], direccionIds = [], lealtadIds = [], movProducto = [], conMesas = false, maxBytes }, log) {
+  const { snapshot, ids, tickets, turnos, movimientos, repartidores, zonas, colonias, clientes, direcciones, mesas, lealtad, movimientosProducto } =
+    await construirSnapshotPush(pool, { ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds, conMesas, lealtadIds, movimientoProductoIds: movProducto.map((m) => m.id) });
   const cuerpo = JSON.stringify({ snapshot });
   const bytes = Buffer.byteLength(cuerpo);
 
@@ -981,8 +1007,10 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
     // Los movimientos se parten a la mitad en ambas: no tienen FK que los arrastre solos.
     // Los clientes, igual que los turnos forzados, con la primera mitad (su techo por corrida ya
     // los mantiene muy por debajo del límite de bytes).
-    const a = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(0, mitadT), turnoIds, movimientoIds: movimientoIds.slice(0, mitadM), clienteIds, direccionIds, lealtadIds, conMesas, maxBytes }, log);
-    const b = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(mitadT), turnoIds: [], movimientoIds: movimientoIds.slice(mitadM), maxBytes }, log);
+    // Los de producto siguen a su venta (R4): la segunda mitad lleva solo los de sus tickets.
+    const segunda = new Set(ticketIds.slice(mitadT));
+    const a = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(0, mitadT), turnoIds, movimientoIds: movimientoIds.slice(0, mitadM), clienteIds, direccionIds, lealtadIds, movProducto: movProducto.filter((m) => !segunda.has(m.ticket_id)), conMesas, maxBytes }, log);
+    const b = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(mitadT), turnoIds: [], movimientoIds: movimientoIds.slice(mitadM), movProducto: movProducto.filter((m) => segunda.has(m.ticket_id)), maxBytes }, log);
     return { subidos: a.subidos + b.subidos, turnos: a.turnos + b.turnos, movimientos: a.movimientos + b.movimientos, rechazados: a.rechazados + b.rechazados };
   };
 
@@ -1032,6 +1060,16 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
   } else {
     await marcarLealtadSubidos(pool, lealtad.filter((id) => !leaFuera.has(id)));
   }
+  // RETAIL (0195): mismo molde. Una nube sin la 0195 los ignora y marcarlos los perdería.
+  const mpFuera = filasRechazadas(errores, "movimientos_producto");
+  if (movimientosProducto.length && (respuesta?.resultado?._ignoradas ?? []).includes("movimientos_producto")) {
+    log(`la nube ignoró movimientos_producto (aún sin la migración 0195): ${movimientosProducto.length} movimiento(s) se reintentarán`);
+  } else {
+    await marcarMovimientosProductoPushed(pool, movimientosProducto.filter((id) => !mpFuera.has(id)));
+  }
+  // Descartados: el producto ya no lleva existencias en la nube. No se reintentan; solo se avisa.
+  const mpDescartados = respuesta?.resultado?._descartados?.movimientos_producto ?? [];
+  if (mpDescartados.length) log(`la nube descartó ${mpDescartados.length} movimiento(s) de producto (ya no lleva existencias)`);
   if (errores.length) {
     const muestra = errores.slice(0, 3).map((e) => `${e.tabla}/${String(e.id).slice(0, 8)}: ${e.error}`).join(" · ");
     log(`la nube rechazó ${errores.length} fila(s), se reintentarán: ${muestra}`);
@@ -1070,6 +1108,12 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   }
   // Mismo techo que inventario; el resto sube en el siguiente ciclo, en orden de fecha.
   const lealtadIds = pendientes.lealtadIds.slice(0, maxMovimientos);
+  // RETAIL: mismo techo; cada uno viaja en el lote de su ticket (R4, abajo).
+  const movProductoTodos = pendientes.movimientosProducto ?? [];
+  const movProducto = movProductoTodos.slice(0, maxMovimientos);
+  if (movProductoTodos.length > movProducto.length) {
+    log(`${movProductoTodos.length - movProducto.length} movimiento(s) de producto se posponen al siguiente ciclo (techo ${maxMovimientos} por corrida)`);
+  }
   // Un cierre de turno SIN ventas nuevas también es algo que subir. Cuando esta condición solo
   // miraba los tickets, el cierre se quedaba en la caja y la nube nunca se enteraba. Lo mismo pasa
   // con un movimiento de inventario suelto (ADR 0013), con un repartidor dado de alta a media
@@ -1081,7 +1125,7 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   // Lo mismo con un cliente registrado sin que la venta se haya cobrado todavía.
   // Y con una mesa que se liberó sin que se cobrara nada (una cuenta vacía cancelada, 0104).
   if (!ids.length && !turnosCambiados.length && !movimientoIds.length && !repartidorIds.length && !zonaIds.length && !coloniaIds.length
-      && !clienteIds.length && !direccionIds.length && !mesaIds.length && !lealtadIds.length) { log("nada pendiente por subir"); return { subidos: 0, turnos: 0, movimientos: 0, rechazados: 0, lotes: 0 }; }
+      && !clienteIds.length && !direccionIds.length && !mesaIds.length && !lealtadIds.length && !movProducto.length) { log("nada pendiente por subir"); return { subidos: 0, turnos: 0, movimientos: 0, rechazados: 0, lotes: 0 }; }
 
   const parte = [
     ids.length ? `${ids.length} venta${ids.length === 1 ? "" : "s"}` : null,
@@ -1093,12 +1137,18 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
     clienteIds.length ? `${clienteIds.length} cliente(s)` : null,
     direccionIds.length ? `${direccionIds.length} dirección(es) de cliente` : null,
     lealtadIds.length ? `${lealtadIds.length} movimiento(s) de lealtad` : null,
+    movProducto.length ? `${movProducto.length} movimiento(s) de producto` : null,
     mesaIds.length ? `el estado de ${mesaIds.length} mesa(s)` : null,
   ].filter(Boolean).join(" y ");
 
   // Sin ventas queda un solo lote vacío: el que lleva los turnos que cambiaron (y los movimientos).
   const lotes = ids.length ? trocear(ids, maxVentas) : [[]];
   log(`subiendo ${parte}${lotes.length > 1 ? ` en ${lotes.length} lotes` : ""}…`);
+
+  // R4: la nube valida la FK y el negocio del ticket de cada movimiento de producto, así que viaja en
+  // el lote de su venta. Sin ticket pendiente (ajuste, merma, entrada, conteo, o venta ya subida), en el primero.
+  const loteDeTicket = new Map(lotes.flatMap((lote, i) => lote.map((id) => [id, i])));
+  const movProductoDeLote = (i) => movProducto.filter((m) => (loteDeTicket.get(m.ticket_id) ?? 0) === i);
 
   let subidos = 0;
   let turnos = 0;
@@ -1115,7 +1165,7 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
     const dirIds = n === 0 ? direccionIds : [];
     n++;
     try {
-      const r = await enviarLote(pool, opts, { ticketIds: lote, turnoIds, movimientoIds: movIds, clienteIds: cliIds, direccionIds: dirIds, lealtadIds: n === 1 ? lealtadIds : [], conMesas: n === 1, maxBytes }, log);
+      const r = await enviarLote(pool, opts, { ticketIds: lote, turnoIds, movimientoIds: movIds, clienteIds: cliIds, direccionIds: dirIds, lealtadIds: n === 1 ? lealtadIds : [], movProducto: movProductoDeLote(n - 1), conMesas: n === 1, maxBytes }, log);
       subidos += r.subidos;
       turnos += r.turnos;
       movimientos += r.movimientos;
