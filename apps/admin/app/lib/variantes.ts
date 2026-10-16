@@ -99,3 +99,26 @@ export async function generarCodigoInterno(): Promise<string> {
   if (error) throw new Error(error.message);
   return String(data);
 }
+
+export type ProductoEtiquetable = { id: string; nombre: string; precio: number; codigo_barras: string; codigo_interno: string };
+
+/** Lo que se puede etiquetar: productos con existencias, sin los padres (esos no se venden). */
+export async function listarProductosEtiquetables(): Promise<ProductoEtiquetable[]> {
+  const { data, error } = await supabase
+    .from("productos")
+    .select("id, nombre, precio_base_mxn, codigo_barras, codigo_interno")
+    .is("deleted_at", null)
+    .eq("controla_existencias", true)
+    .order("nombre");
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as { id: string; nombre: string; precio_base_mxn: number; codigo_barras: string | null; codigo_interno: string | null }[]).map((p) => ({
+    id: p.id, nombre: p.nombre, precio: Number(p.precio_base_mxn), codigo_barras: p.codigo_barras ?? "", codigo_interno: p.codigo_interno ?? "",
+  }));
+}
+
+/** Existencia por producto en una sucursal, para proponer cuántas etiquetas imprimir. */
+export async function existenciasDeSucursal(sucursalId: string): Promise<Record<string, number>> {
+  const { data, error } = await supabase.from("producto_existencias").select("producto_id, cantidad").eq("sucursal_id", sucursalId);
+  if (error) throw new Error(error.message);
+  return Object.fromEntries(((data ?? []) as { producto_id: string; cantidad: number }[]).map((r) => [r.producto_id, Number(r.cantidad)]));
+}
