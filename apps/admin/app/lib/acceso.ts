@@ -18,6 +18,8 @@ export const MIN_JERARQUIA: { prefijo: string; min: number }[] = [
   { prefijo: "/catalogo", min: 4 },
   { prefijo: "/promociones", min: 4 },
   { prefijo: "/inventario", min: 4 },
+  // Existencias enseña costos y el valor del inventario, igual que /inventario.
+  { prefijo: "/existencias", min: 4 },
   { prefijo: "/clientes", min: 4 },
   // El programa de lealtad reparte dinero del negocio: lo configura dueño o administrador.
   { prefijo: "/lealtad", min: 4 },

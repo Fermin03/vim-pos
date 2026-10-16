@@ -441,14 +441,16 @@ export type FilaVariante = {
   variante: string;
   sku: string | null;
   unidades: number;
+  /** Con IVA, como se cobró. */
   venta_mxn: number;
-  subtotal_mxn: number;
+  /** Venta sin IVA, ya con los descuentos del renglón: total − IVA. */
+  neto_mxn: number;
   /** unidades × costo de hoy; `null` sin costo. */
   costo_mxn: number | null;
   margen_mxn: number | null;
   margen_pct: number | null;
 };
-export type VentaDiaProducto = { producto_id: string; unidades_vendidas: number; total_mxn: number; subtotal_mxn: number };
+export type VentaDiaProducto = { producto_id: string; unidades_vendidas: number; total_mxn: number; iva_mxn: number };
 export type ProductoVariante = {
   id: string;
   nombre: string;
@@ -462,24 +464,28 @@ export type ProductoVariante = {
 
 const centavos = (v: number) => Math.round(v * 100) / 100;
 
-/** Suma los días por producto, solo los que llevan existencias. Margen = subtotal sin IVA − unidades × costo de hoy. */
+/**
+ * Suma los días por producto, solo los que llevan existencias. Margen = venta sin IVA (total − IVA,
+ * ya con descuentos del renglón) − unidades × costo de hoy. No se usa `subtotal_mxn` de la vista:
+ * es bruto (antes de descuentos) y, con precios con IVA incluido, lo trae dentro.
+ */
 export function agruparVentasVariantes(ventas: VentaDiaProducto[], productos: ProductoVariante[]): FilaVariante[] {
   const porId = new Map(productos.filter((p) => p.controla_existencias).map((p) => [p.id, p]));
-  const agg = new Map<string, { p: ProductoVariante; unidades: number; venta: number; subtotal: number }>();
+  const agg = new Map<string, { p: ProductoVariante; unidades: number; venta: number; neto: number }>();
   for (const v of ventas) {
     const p = porId.get(v.producto_id);
     if (!p) continue;
-    const x = agg.get(p.id) ?? { p, unidades: 0, venta: 0, subtotal: 0 };
+    const x = agg.get(p.id) ?? { p, unidades: 0, venta: 0, neto: 0 };
     x.unidades += v.unidades_vendidas;
     x.venta += v.total_mxn;
-    x.subtotal += v.subtotal_mxn;
+    x.neto += v.total_mxn - v.iva_mxn;
     agg.set(p.id, x);
   }
   return [...agg.values()]
-    .map(({ p, unidades, venta, subtotal }) => {
-      const sub = centavos(subtotal);
+    .map(({ p, unidades, venta, neto: suma }) => {
+      const neto = centavos(suma);
       const costo = p.costo_mxn === null ? null : centavos(unidades * p.costo_mxn);
-      const margen = costo === null ? null : centavos(sub - costo);
+      const margen = costo === null ? null : centavos(neto - costo);
       return {
         producto_id: p.id,
         producto: p.padre_nombre ?? p.nombre,
@@ -487,10 +493,10 @@ export function agruparVentasVariantes(ventas: VentaDiaProducto[], productos: Pr
         sku: p.codigo_interno,
         unidades,
         venta_mxn: centavos(venta),
-        subtotal_mxn: sub,
+        neto_mxn: neto,
         costo_mxn: costo,
         margen_mxn: margen,
-        margen_pct: margen === null || sub === 0 ? null : (margen / sub) * 100,
+        margen_pct: margen === null || neto <= 0 ? null : (margen / neto) * 100,
       };
     })
     .sort((a, b) => b.venta_mxn - a.venta_mxn);
@@ -498,7 +504,7 @@ export function agruparVentasVariantes(ventas: VentaDiaProducto[], productos: Pr
 
 export async function leerVentasPorVariante(desde: string, hasta: string, sucursalId: string | null = null): Promise<FilaVariante[]> {
   const [ventas, productos] = await Promise.all([
-    leerVista("vw_ventas_por_producto", "producto_id, unidades_vendidas, total_mxn, subtotal_mxn, dia_contable", desde, hasta, ["sucursal_id", "producto_id", "producto_nombre"], { sucursalId }),
+    leerVista("vw_ventas_por_producto", "producto_id, unidades_vendidas, total_mxn, iva_mxn, dia_contable", desde, hasta, ["sucursal_id", "producto_id", "producto_nombre"], { sucursalId }),
     leerTodas((a, b) =>
       supabase
         .from("productos")
@@ -509,7 +515,7 @@ export async function leerVentasPorVariante(desde: string, hasta: string, sucurs
     ),
   ]);
   return agruparVentasVariantes(
-    ventas.map((r) => ({ producto_id: String(r.producto_id), unidades_vendidas: num(r.unidades_vendidas), total_mxn: num(r.total_mxn), subtotal_mxn: num(r.subtotal_mxn) })),
+    ventas.map((r) => ({ producto_id: String(r.producto_id), unidades_vendidas: num(r.unidades_vendidas), total_mxn: num(r.total_mxn), iva_mxn: num(r.iva_mxn) })),
     productos.map((r) => {
       const padre = r.padre as { nombre: string; variante_ejes: string[] | null } | null;
       return {

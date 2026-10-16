@@ -53,6 +53,11 @@ describe("puedeVer", () => {
     expect(puedeVer(DUENO, "/reportes/costo-ventas")).toBe(true);
     expect(puedeVer(SUPERVISOR, "/reportes/ventas-variantes")).toBe(false);
     expect(puedeVer(ADMIN, "/reportes/ventas-variantes")).toBe(true);
+    // Existencias enseña costos y el valor del inventario, como /inventario y /catalogo.
+    expect(puedeVer(SUPERVISOR, "/existencias")).toBe(false);
+    expect(puedeVer(SUPERVISOR, "/existencias/movimientos")).toBe(false);
+    expect(puedeVer(ADMIN, "/existencias")).toBe(true);
+    expect(puedeVer(DUENO, "/existencias/traspasos")).toBe(true);
     // El historial de movimientos vive en Inventario y hereda su mínimo.
     expect(puedeVer(SUPERVISOR, "/inventario/movimientos")).toBe(false);
     expect(puedeVer(ADMIN, "/inventario/movimientos")).toBe(true);

@@ -55,8 +55,8 @@ export default function MovimientosExistenciasPage() {
     else salidas -= m.cantidad;
   }
   const cifras: Cifra[] = [
-    { etiqueta: "Entradas", valor: entradas, tipo: "cantidad", pie: "piezas" },
-    { etiqueta: "Salidas", valor: salidas, tipo: "cantidad", pie: "piezas" },
+    { etiqueta: "Piezas que entraron", valor: entradas, tipo: "cantidad" },
+    { etiqueta: "Piezas que salieron", valor: salidas, tipo: "cantidad" },
     { etiqueta: "Movimientos", valor: visibles.length, tipo: "entero" },
   ];
 

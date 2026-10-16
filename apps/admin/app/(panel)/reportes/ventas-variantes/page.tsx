@@ -24,15 +24,15 @@ export default function VentasPorVariantePage() {
   return <Reporte />;
 }
 
-// Margen % de un grupo: solo con lo que tiene costo, para no mezclar subtotales sin margen.
+// Margen % de un grupo: solo con lo que tiene costo, para no mezclar ventas sin margen.
 function margenPct(filas: FilaVariante[]): number | null {
-  let margen = 0, subtotal = 0;
+  let margen = 0, neto = 0;
   for (const f of filas) {
     if (f.margen_mxn === null) continue;
     margen += f.margen_mxn;
-    subtotal += f.subtotal_mxn;
+    neto += f.neto_mxn;
   }
-  return subtotal > 0 ? (margen / subtotal) * 100 : null;
+  return neto > 0 ? (margen / neto) * 100 : null;
 }
 
 function Reporte() {
@@ -84,7 +84,10 @@ function Reporte() {
       cifras={cifras}
       tabla={{ columnas, filas, clave: (f) => f.producto_id, orden: { id: "venta", dir: "desc" }, vacio: "No hubo ventas en estas fechas." }}
     >
-      <Nota>El margen usa el costo actual de cada producto, sin IVA.</Nota>
+      <Nota>
+        El margen usa la venta sin IVA, ya con descuentos por producto, y el costo actual de cada producto. Los
+        descuentos a toda la cuenta no se restan.
+      </Nota>
     </ReporteMarco>
   );
 }

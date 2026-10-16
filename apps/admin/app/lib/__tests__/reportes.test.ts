@@ -79,19 +79,25 @@ describe("agruparVentasVariantes", () => {
     prod("burger", { nombre: "Hamburguesa", controla_existencias: false, costo_mxn: 40 }),
     prod("gorra", { nombre: "Gorra" }),
   ];
+  // Como la vista: total_mxn con IVA y ya con el descuento del renglón; iva_mxn aparte.
   const ventas = [
-    { producto_id: "m", unidades_vendidas: 2, total_mxn: 348, subtotal_mxn: 300 },
-    { producto_id: "m", unidades_vendidas: 1, total_mxn: 174, subtotal_mxn: 150 },
-    { producto_id: "burger", unidades_vendidas: 5, total_mxn: 500, subtotal_mxn: 431.03 },
-    { producto_id: "gorra", unidades_vendidas: 1, total_mxn: 116, subtotal_mxn: 100 },
+    { producto_id: "m", unidades_vendidas: 1, total_mxn: 116, iva_mxn: 16 },
+    // Otro día, con 10 % de descuento en el renglón: el bruto sería 116, el total queda en 104.40.
+    { producto_id: "m", unidades_vendidas: 1, total_mxn: 104.4, iva_mxn: 14.4 },
+    { producto_id: "burger", unidades_vendidas: 5, total_mxn: 500, iva_mxn: 68.97 },
+    { producto_id: "gorra", unidades_vendidas: 1, total_mxn: 116, iva_mxn: 16 },
   ];
 
-  it("suma los días de la misma variante y arma su texto", () => {
+  it("una venta de 116 con IVA incluido: neto 100, costo 80, margen 20 (20 %)", () => {
+    const [m] = agruparVentasVariantes(ventas.slice(0, 1), productos);
+    expect(m).toMatchObject({ producto: "Playera", variante: "M · Negra", sku: "PL-M-N", unidades: 1, venta_mxn: 116, neto_mxn: 100, costo_mxn: 80, margen_mxn: 20 });
+    expect(m!.margen_pct).toBeCloseTo(20, 5);
+  });
+
+  it("suma los días; el descuento del renglón baja el neto, no el costo", () => {
     const m = agruparVentasVariantes(ventas, productos).find((f) => f.producto_id === "m")!;
-    expect(m).toMatchObject({ producto: "Playera", variante: "M · Negra", sku: "PL-M-N", unidades: 3, venta_mxn: 522, subtotal_mxn: 450 });
-    expect(m.costo_mxn).toBe(240);
-    expect(m.margen_mxn).toBe(210);
-    expect(m.margen_pct).toBeCloseTo(46.667, 2);
+    expect(m).toMatchObject({ unidades: 2, venta_mxn: 220.4, neto_mxn: 190, costo_mxn: 160, margen_mxn: 30 });
+    expect(m.margen_pct).toBeCloseTo(15.789, 2);
   });
 
   it("deja fuera lo que no lleva existencias (un producto de restaurante)", () => {
@@ -100,15 +106,21 @@ describe("agruparVentasVariantes", () => {
 
   it("sin costo, costo y margen son null, nunca 0", () => {
     const g = agruparVentasVariantes(ventas, productos).find((f) => f.producto_id === "gorra")!;
-    expect(g).toMatchObject({ producto: "Gorra", variante: "", costo_mxn: null, margen_mxn: null, margen_pct: null });
+    expect(g).toMatchObject({ producto: "Gorra", variante: "", neto_mxn: 100, costo_mxn: null, margen_mxn: null, margen_pct: null });
+  });
+
+  it("con neto en 0 (todo regalado) el margen % es null, no Infinity", () => {
+    const [m] = agruparVentasVariantes([{ producto_id: "m", unidades_vendidas: 1, total_mxn: 0, iva_mxn: 0 }], productos);
+    expect(m).toMatchObject({ neto_mxn: 0, margen_mxn: -80, margen_pct: null });
   });
 
   it("redondea el dinero a centavos y ordena por venta", () => {
     const filas = agruparVentasVariantes(
-      [{ producto_id: "m", unidades_vendidas: 1, total_mxn: 0.1, subtotal_mxn: 0.1 }, { producto_id: "m", unidades_vendidas: 1, total_mxn: 0.2, subtotal_mxn: 0.2 }, ...ventas.slice(3)],
+      [{ producto_id: "m", unidades_vendidas: 1, total_mxn: 0.1, iva_mxn: 0 }, { producto_id: "m", unidades_vendidas: 1, total_mxn: 0.2, iva_mxn: 0 }, ...ventas.slice(3)],
       productos,
     );
     expect(filas[0]!.producto_id).toBe("gorra");
     expect(filas[1]!.venta_mxn).toBe(0.3);
+    expect(filas[1]!.neto_mxn).toBe(0.3);
   });
 });
