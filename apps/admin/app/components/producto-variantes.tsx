@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { label, input } from "./campos";
 import { AccionFila } from "./controles";
-import { armarMatriz, claveValores, filaConPrecioInvalido, guardarVariantes, listarVariantes, parsearValoresEje, type Eje, type FilaVariante } from "../lib/variantes";
+import { armarMatriz, claveValores, filaConDatoInvalido, guardarVariantes, listarVariantes, parsearValoresEje, type Eje, type FilaVariante } from "../lib/variantes";
 import { listarSucursalesOpciones, type SucursalOpcion } from "../lib/inventario";
 import { mensajeError } from "../lib/errores";
 import type { Producto } from "../lib/catalogo";
@@ -26,7 +26,8 @@ export function ProductoVariantes({ producto, onPendiente }: {
   const [sucursales, setSucursales] = useState<SucursalOpcion[]>([]);
   const [sucursal, setSucursal] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const tieneHijas = (filas ?? []).some((f) => f.id && f.activa);
+  // Con cualquier hija guardada (borrada o no) los nombres de los ejes ya no cambian.
+  const tieneHijas = (filas ?? []).some((f) => f.id);
   const ejes = useMemo(() => efectivos(casillas), [casillas]);
 
   useEffect(() => {
@@ -35,7 +36,7 @@ export function ProductoVariantes({ producto, onPendiente }: {
         const nombres = producto.variante_ejes ?? [];
         setCasillas([0, 1].map((i) => {
           const n = nombres[i];
-          return n ? { nombre: n, valores: [...new Set(vs.map((v) => v.valores[n]).filter((x): x is string => !!x))] } : { nombre: "", valores: [] };
+          return n ? { nombre: n, valores: [...new Set(vs.filter((v) => v.activa).map((v) => v.valores[n]).filter((x): x is string => !!x))] } : { nombre: "", valores: [] };
         }));
         setFilas(vs);
         setOriginal(JSON.stringify(vs));
@@ -48,16 +49,24 @@ export function ProductoVariantes({ producto, onPendiente }: {
   const cambio = filas !== null && JSON.stringify(filas) !== original;
   const conExistenciaInicial = (filas ?? []).some((f) => !f.id && f.activa && Number(f.existencia_inicial) > 0);
 
+  const nombres = casillas.map((c) => c.nombre.trim().toLowerCase()).filter(Boolean);
+  const repetidos = nombres.length === 2 && nombres[0] === nombres[1] ? "Los ejes no pueden repetirse" : null;
+
   useEffect(() => {
     onPendiente(cambio ? async () => {
-      const mala = filaConPrecioInvalido(filas ?? []);
-      if (mala) throw new Error(`Precio inválido en ${nombreFila(mala, ejes)}`);
-      await guardarVariantes(producto.id, ejes.map((e) => e.nombre), filas ?? [], conExistenciaInicial ? sucursal || null : null);
-      const vs = await listarVariantes(producto.id);
-      setFilas(vs);
-      setOriginal(JSON.stringify(vs));
+      if (repetidos) throw new Error(`El producto se guardó, pero no las tallas y colores: ${repetidos}`);
+      const malo = filaConDatoInvalido(filas ?? []);
+      if (malo) throw new Error(`El producto se guardó, pero no las tallas y colores: ${malo.campo} inválido en ${nombreFila(malo.fila, ejes)}`);
+      try {
+        await guardarVariantes(producto.id, ejes.map((e) => e.nombre), filas ?? [], conExistenciaInicial ? sucursal || null : null);
+        const vs = await listarVariantes(producto.id);
+        setFilas(vs);
+        setOriginal(JSON.stringify(vs));
+      } catch (e) {
+        throw new Error(`El producto se guardó, pero no las tallas y colores: ${mensajeError(e, "No se pudieron guardar")}`);
+      }
     } : null);
-  }, [cambio, filas, ejes, sucursal, conExistenciaInicial, producto.id, onPendiente]);
+  }, [cambio, filas, ejes, sucursal, conExistenciaInicial, repetidos, producto.id, onPendiente]);
 
   function cambiarCasilla(i: number, parte: Partial<Eje>) {
     const nuevas = casillas.map((c, j) => (j === i ? { ...c, ...parte } : c));
@@ -68,6 +77,7 @@ export function ProductoVariantes({ producto, onPendiente }: {
     setFilas((fs) => (fs ?? []).map((f) => (claveValores(f.valores) === k ? { ...f, ...cambio } : f)));
 
   const activas = useMemo(() => (filas ?? []).filter((f) => f.activa), [filas]);
+  const quitadas = useMemo(() => (filas ?? []).filter((f) => !f.activa), [filas]);
 
   return (
     <section className="rounded-lg border border-line bg-surface p-4" aria-labelledby="titulo-variantes">
@@ -85,10 +95,12 @@ export function ProductoVariantes({ producto, onPendiente }: {
                   onChange={(e) => cambiarCasilla(i, { nombre: e.target.value })} />
                 <input aria-label={`Valores del eje ${i + 1}`} className={input} defaultValue={casillas[i]!.valores.join(", ")}
                   placeholder={i === 0 ? "CH, M, G" : "Negra, Blanca"}
-                  onBlur={(e) => cambiarCasilla(i, { valores: parsearValoresEje(e.target.value) })} />
+                  onBlur={(e) => cambiarCasilla(i, { valores: parsearValoresEje(e.target.value) })}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); cambiarCasilla(i, { valores: parsearValoresEje(e.currentTarget.value) }); } }} />
               </div>
             ))}
           </div>
+          {repetidos && <p className="mt-2 text-13 font-medium text-danger" role="alert">{repetidos}</p>}
           {tieneHijas && <p className="mt-2 text-13 text-ink-2">Los nombres de los ejes ya no se cambian; sí puedes agregar o quitar valores.</p>}
 
           {activas.length > 0 && (
@@ -118,6 +130,18 @@ export function ProductoVariantes({ producto, onPendiente }: {
                 </tbody>
               </table>
             </div>
+          )}
+
+          {quitadas.length > 0 && (
+            <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-13 text-ink-2">
+              <span>Quitadas:</span>
+              {quitadas.map((f) => (
+                <span key={claveValores(f.valores)} className="inline-flex items-center gap-1.5">
+                  {Object.values(f.valores).join(" · ")}
+                  <AccionFila onClick={() => editar(claveValores(f.valores), { activa: true })}>Restaurar</AccionFila>
+                </span>
+              ))}
+            </p>
           )}
 
           {conExistenciaInicial && sucursales.length > 1 && (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { armarMatriz, claveValores, filaConPrecioInvalido, parsearValoresEje, type FilaVariante } from "../variantes";
+import { armarMatriz, claveValores, filaConDatoInvalido, parsearValoresEje, type FilaVariante } from "../variantes";
 
 describe("variantes", () => {
   it("valores de un eje: separa por coma, quita vacíos y repetidos", () => {
@@ -29,12 +29,23 @@ describe("variantes", () => {
     expect(m).toHaveLength(1);
     expect(m[0]).toMatchObject({ id: "x", activa: true, valores: { Talla: "M" } });
   });
-  it("detecta el precio vacío, no numérico o negativo solo en filas activas", () => {
+  it("una existente inactiva cuyos valores siguen en los ejes se queda inactiva", () => {
+    const f: FilaVariante = { id: "x", valores: { Talla: "M" }, codigo_interno: "A", codigo_barras: "", generar_codigo: false,
+      precio: "300", costo: "", existencia_inicial: "", activa: false };
+    const m = armarMatriz([{ nombre: "Talla", valores: ["M", "G"] }], [f], "349");
+    expect(m.find((r) => r.id === "x")?.activa).toBe(false);
+    expect(m.find((r) => !r.id)?.activa).toBe(true);
+  });
+  it("detecta precio, costo o existencia inválidos solo en filas activas", () => {
     const f: FilaVariante = { valores: { Talla: "M" }, codigo_interno: "", codigo_barras: "", generar_codigo: true,
       precio: "349", costo: "", existencia_inicial: "", activa: true };
-    expect(filaConPrecioInvalido([f])).toBeNull();
-    expect(filaConPrecioInvalido([{ ...f, precio: "0" }])).toBeNull();
-    for (const precio of ["", "  ", "abc", "-1"]) expect(filaConPrecioInvalido([{ ...f, precio }])).not.toBeNull();
-    expect(filaConPrecioInvalido([{ ...f, precio: "", activa: false }])).toBeNull();
+    expect(filaConDatoInvalido([f])).toBeNull();
+    expect(filaConDatoInvalido([{ ...f, precio: "0" }])).toBeNull();
+    for (const precio of ["", "  ", "abc", "-1"]) expect(filaConDatoInvalido([{ ...f, precio }])?.campo).toBe("Precio");
+    expect(filaConDatoInvalido([{ ...f, costo: "x" }])?.campo).toBe("Costo");
+    expect(filaConDatoInvalido([{ ...f, costo: "12.5" }])).toBeNull();
+    expect(filaConDatoInvalido([{ ...f, existencia_inicial: "-2" }])?.campo).toBe("Existencia");
+    expect(filaConDatoInvalido([{ ...f, id: "x", existencia_inicial: "-2" }])).toBeNull();
+    expect(filaConDatoInvalido([{ ...f, precio: "", activa: false }])).toBeNull();
   });
 });

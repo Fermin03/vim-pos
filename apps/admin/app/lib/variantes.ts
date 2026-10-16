@@ -36,7 +36,7 @@ export function armarMatriz(ejes: Eje[], existentes: FilaVariante[], precioBase:
     const k = claveValores(valores);
     const vieja = porClave.get(k);
     porClave.delete(k);
-    return vieja ? { ...vieja, activa: true } : {
+    return vieja ? vieja : {
       valores, codigo_interno: "", codigo_barras: "", generar_codigo: true,
       precio: precioBase, costo: "", existencia_inicial: "", activa: true,
     };
@@ -45,12 +45,19 @@ export function armarMatriz(ejes: Eje[], existentes: FilaVariante[], precioBase:
   return [...nuevas, ...sobran];
 }
 
-/** La primera fila activa cuyo precio está vacío o no es un número ≥ 0 (la base lo rechazaría a medias). */
-export function filaConPrecioInvalido(filas: FilaVariante[]): FilaVariante | null {
-  return filas.find((f) => {
-    const p = f.precio.trim();
-    return f.activa && (p === "" || !Number.isFinite(Number(p)) || Number(p) < 0);
-  }) ?? null;
+/** La primera fila activa con un dato que no es número ≥ 0: precio obligatorio; costo y existencia, vacíos o válidos. */
+export function filaConDatoInvalido(filas: FilaVariante[]): { fila: FilaVariante; campo: "Precio" | "Costo" | "Existencia" } | null {
+  const malo = (t: string, obligatorio: boolean) => {
+    const v = t.trim();
+    return v === "" ? obligatorio : !Number.isFinite(Number(v)) || Number(v) < 0;
+  };
+  for (const fila of filas) {
+    if (!fila.activa) continue;
+    if (malo(fila.precio, true)) return { fila, campo: "Precio" };
+    if (malo(fila.costo, false)) return { fila, campo: "Costo" };
+    if (!fila.id && malo(fila.existencia_inicial, false)) return { fila, campo: "Existencia" };
+  }
+  return null;
 }
 
 type FilaBase = {
