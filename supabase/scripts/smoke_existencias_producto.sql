@@ -304,7 +304,7 @@ BEGIN
     RAISE EXCEPTION '5a: la hamburguesa no debía generar movimientos_producto'; END IF;
 
   -- 5b) Llamar otra vez a la sincronización no mueve nada.
-  PERFORM _existencias_sincronizar_ticket(v_tk, false);
+  PERFORM _existencias_sincronizar_ticket(v_tk, false, NULL, NULL);
   IF (SELECT count(*) FROM movimientos_producto WHERE ticket_id = v_tk) <> 1 THEN
     RAISE EXCEPTION '5b: sincronizar dos veces duplicó movimientos'; END IF;
 
@@ -324,6 +324,10 @@ BEGIN
   v_tk2 := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smoke-ret5-c', v_maria);
   PERFORM agregar_item_a_ticket(v_tk2, v_g, 1, NULL, '[]'::jsonb, 'smoke-ret5-c-g');
   PERFORM aplicar_pago(v_tk2, 'EFECTIVO'::metodo_pago, 349, 349, NULL, NULL, NULL, false, NULL, 'smoke-ret5-c-pago');
+  IF NOT EXISTS (SELECT 1 FROM movimientos_producto WHERE ticket_item_id = v_it AND tipo = 'DEVOLUCION' AND devolucion_id = v_dev) THEN
+    RAISE EXCEPTION '5c: el movimiento DEVOLUCION debía traer devolucion_id = la devolución'; END IF;
+  IF EXISTS (SELECT 1 FROM movimientos_producto WHERE ticket_item_id = v_it AND tipo = 'VENTA' AND devolucion_id IS NOT NULL) THEN
+    RAISE EXCEPTION '5c: la VENTA no debía traer devolucion_id'; END IF;
   IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_m) <> v_ini_m - 1 THEN
     RAISE EXCEPTION '5c: tras el cambio de talla M debía quedar en %', v_ini_m - 1; END IF;
   IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_g) <> v_ini_g - 1 THEN
@@ -414,6 +418,27 @@ BEGIN
       RAISE EXCEPTION '5g(ii): la existencia de M no debía cambiar'; END IF;
   END;
 
+  -- 5h) Una línea nueva en un ticket ya pagado registra solo ella: la vieja sin movimientos (R5) no.
+  DECLARE v_tk4 uuid; v_itm uuid; v_itg uuid;
+  BEGIN
+    UPDATE productos SET controla_existencias = false WHERE id = v_m;
+    v_tk4 := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smoke-ret5-h', v_maria);
+    v_itm := agregar_item_a_ticket(v_tk4, v_m, 1, NULL, '[]'::jsonb, 'smoke-ret5-h-m');
+    PERFORM aplicar_pago(v_tk4, 'EFECTIVO'::metodo_pago, 349, 349, NULL, NULL, NULL, false, NULL, 'smoke-ret5-h-pago');
+    UPDATE productos SET controla_existencias = true WHERE id = v_m;
+    -- Segunda línea (G) directo sobre el ticket pagado, copiando el snapshot de la primera.
+    INSERT INTO ticket_items (tenant_id, ticket_id, producto_id, cantidad, producto_nombre_snapshot,
+                              precio_unitario_snapshot, tasa_iva_snapshot, iva_incluido_en_precio_snapshot)
+    SELECT tenant_id, ticket_id, v_g, 1, 'Playera Polo G Negra',
+           precio_unitario_snapshot, tasa_iva_snapshot, iva_incluido_en_precio_snapshot
+      FROM ticket_items WHERE id = v_itm
+    RETURNING id INTO v_itg;
+    IF NOT EXISTS (SELECT 1 FROM movimientos_producto WHERE ticket_item_id = v_itg AND tipo = 'VENTA') THEN
+      RAISE EXCEPTION '5h: la línea nueva (G) debía registrar su VENTA'; END IF;
+    IF EXISTS (SELECT 1 FROM movimientos_producto WHERE ticket_item_id = v_itm) THEN
+      RAISE EXCEPTION '5h: la línea vieja (M) sin movimientos no debía registrarse'; END IF;
+  END;
+
   -- 5f) La existencia sigue siendo la suma de movimientos.
   IF EXISTS (SELECT 1 FROM producto_existencias e
               WHERE e.tenant_id = v_t
@@ -421,6 +446,37 @@ BEGIN
                                     WHERE m.sucursal_id = e.sucursal_id AND m.producto_id = e.producto_id)) THEN
     RAISE EXCEPTION '5f: alguna existencia no cuadra con sus movimientos'; END IF;
   RAISE NOTICE '5 venta, reabrir, cancelación, devolución y cambio de talla OK';
+END $$;
+
+-- 5i) Existencias o receta, nunca las dos.
+DO $$
+DECLARE
+  v_t   uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_cat uuid := 'a7a70000-0000-0000-0000-0000000000c1';
+  v_m   uuid := 'a7a70000-0000-0000-0000-0000000000a1';
+  v_sin uuid;
+BEGIN
+  -- Receta activa para un producto con existencias: se rechaza.
+  BEGIN
+    INSERT INTO recetas (tenant_id, producto_id, activa) VALUES (v_t, v_m, true);
+    RAISE EXCEPTION '5i: debía rechazar una receta activa en un producto con existencias';
+  EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+  -- Una receta inactiva sí cabe; activarla no.
+  INSERT INTO recetas (tenant_id, producto_id, activa) VALUES (v_t, v_m, false);
+  BEGIN
+    UPDATE recetas SET activa = true WHERE producto_id = v_m;
+    RAISE EXCEPTION '5i: debía rechazar activar la receta';
+  EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+  DELETE FROM recetas WHERE producto_id = v_m;
+
+  -- Encender existencias en un producto con receta activa: se rechaza.
+  INSERT INTO productos (tenant_id, nombre, categoria_id, precio_base_mxn) VALUES (v_t, 'Con receta', v_cat, 50) RETURNING id INTO v_sin;
+  INSERT INTO recetas (tenant_id, producto_id, activa) VALUES (v_t, v_sin, true);
+  BEGIN
+    UPDATE productos SET controla_existencias = true WHERE id = v_sin;
+    RAISE EXCEPTION '5i: debía rechazar existencias en un producto con receta';
+  EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+  RAISE NOTICE '5i existencias o receta OK';
 END $$;
 
 -- 6) Movimientos a mano: permiso, módulo, entradas malas, costo y conteo.

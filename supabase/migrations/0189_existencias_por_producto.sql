@@ -102,6 +102,10 @@ DECLARE
   v_flag       boolean;
 BEGIN
   IF p_tenant IS NULL THEN RETURN NULL; END IF;
+  -- Un usuario autenticado solo puede preguntar por su propio tenant. Se decide por el ROL del
+  -- JWT y no por la ausencia del claim: el hook de acceso (0006) emite tokens SIN tenant_id a
+  -- empleados dados de baja, y un token así seguiría siendo `authenticated`. Sin JWT (sesión
+  -- directa a la base: pruebas, semillas) o con service_role, pasa.
   IF auth.jwt() IS NOT NULL
      AND (auth.jwt() ->> 'role') IS DISTINCT FROM 'service_role'
      AND current_tenant_id() IS DISTINCT FROM p_tenant THEN
@@ -149,16 +153,21 @@ BEGIN
 
   SELECT COALESCE(c.modulo_delivery_activo, false) INTO v_del
     FROM configuracion_tenant c WHERE c.tenant_id = p_tenant;
+
+  -- Delivery es el único módulo con las DOS capas a la vez: add-on de pago (como el CFDI) e
+  -- interruptor del dueño (como recetas). El add-on dice si puede; el interruptor, si quiere.
   v_perm := tenant_addon_activo(p_tenant, 'DELIVERY');
   v_permitidos := v_permitidos || jsonb_build_object('delivery_apps', v_perm);
   v_efectivos  := v_efectivos  || jsonb_build_object('delivery_apps', (v_perm AND COALESCE(v_del, false)));
 
+  -- Lealtad: mismas dos capas que delivery. El add-on dice si puede; el interruptor, si quiere.
   SELECT COALESCE(c.modulo_lealtad_activo, false) INTO v_lea
     FROM configuracion_tenant c WHERE c.tenant_id = p_tenant;
   v_perm := tenant_addon_activo(p_tenant, 'LEALTAD');
   v_permitidos := v_permitidos || jsonb_build_object('lealtad', v_perm);
   v_efectivos  := v_efectivos  || jsonb_build_object('lealtad', (v_perm AND COALESCE(v_lea, false)));
 
+  -- Tienda en línea: mismas dos capas que delivery y lealtad.
   SELECT COALESCE(c.modulo_tienda_activo, false) INTO v_tie
     FROM configuracion_tenant c WHERE c.tenant_id = p_tenant;
   v_perm := tenant_addon_activo(p_tenant, 'TIENDA');
@@ -275,6 +284,35 @@ CREATE TRIGGER trg_ticket_items_no_padre
   BEFORE INSERT OR UPDATE OF producto_id ON ticket_items
   FOR EACH ROW EXECUTE FUNCTION ticket_items_no_padre();
 
+-- Existencias o receta, nunca las dos: lo hace cumplir la base y no solo el admin.
+CREATE OR REPLACE FUNCTION productos_existencias_o_receta()
+RETURNS trigger LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
+BEGIN
+  IF NEW.controla_existencias AND EXISTS (SELECT 1 FROM recetas r WHERE r.producto_id = NEW.id AND r.activa) THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: un producto lleva existencias o receta, no las dos' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_productos_existencias_o_receta ON productos;
+CREATE TRIGGER trg_productos_existencias_o_receta
+  BEFORE INSERT OR UPDATE OF controla_existencias ON productos
+  FOR EACH ROW EXECUTE FUNCTION productos_existencias_o_receta();
+
+CREATE OR REPLACE FUNCTION recetas_sin_existencias()
+RETURNS trigger LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
+BEGIN
+  IF NEW.activa AND EXISTS (SELECT 1 FROM productos p WHERE p.id = NEW.producto_id AND p.controla_existencias) THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: un producto lleva existencias o receta, no las dos' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_recetas_sin_existencias ON recetas;
+CREATE TRIGGER trg_recetas_sin_existencias
+  BEFORE INSERT OR UPDATE OF activa, producto_id ON recetas
+  FOR EACH ROW EXECUTE FUNCTION recetas_sin_existencias();
+
 -- ── §3 Existencias y movimientos ─────────────────────────────────────────────
 -- La existencia es la SUMA de los movimientos. Nadie escribe `cantidad` a mano: un ajuste también
 -- es un movimiento. Los movimientos solo se agregan. La caja (entrega 4) los crea con su propio id y
@@ -376,7 +414,7 @@ CREATE TRIGGER trg_movimientos_producto_aplicar
 -- ticket pagado con devolución de dinero crea una devolución Y una cancelación (0134), y reabrir
 -- pasa PAGADO → ABIERTO (0058). La venta nunca falla por esto (D32): la existencia puede quedar
 -- negativa.
-CREATE OR REPLACE FUNCTION _existencias_sincronizar_ticket(p_ticket uuid, p_es_cobro boolean)
+CREATE OR REPLACE FUNCTION _existencias_sincronizar_ticket(p_ticket uuid, p_es_cobro boolean, p_item uuid DEFAULT NULL, p_devolucion uuid DEFAULT NULL)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
   v_tk     tickets%ROWTYPE;
@@ -411,24 +449,25 @@ BEGIN
       ELSE 0 END;
     v_debe := LEAST(v_debe, 0);   -- nunca se regresa más de lo vendido
 
-    -- R5: una línea sin movimientos solo se registra en el cobro.
-    IF NOT p_es_cobro AND NOT EXISTS (SELECT 1 FROM movimientos_producto m WHERE m.ticket_item_id = v_it.id) THEN CONTINUE; END IF;
+    -- R5: una línea sin movimientos solo se registra en el cobro, o si es la línea que cambió (p_item).
+    IF NOT (p_es_cobro OR COALESCE(v_it.id = p_item, false)) AND NOT EXISTS (SELECT 1 FROM movimientos_producto m WHERE m.ticket_item_id = v_it.id) THEN CONTINUE; END IF;
     SELECT COALESCE(sum(m.cantidad), 0) INTO v_hecho FROM movimientos_producto m WHERE m.ticket_item_id = v_it.id;
     v_dif := v_debe - v_hecho;
     IF v_dif <> 0 THEN
       INSERT INTO movimientos_producto (tenant_id, sucursal_id, producto_id, tipo, cantidad,
-                                        ticket_id, ticket_item_id, motivo, usuario_id)
+                                        ticket_id, ticket_item_id, devolucion_id, motivo, usuario_id)
       VALUES (v_tk.tenant_id, v_tk.sucursal_id, v_it.producto_id,
               CASE WHEN v_dif < 0 THEN 'VENTA' ELSE 'DEVOLUCION' END::movimiento_producto_tipo,
-              v_dif, p_ticket, v_it.id, 'Ticket ' || COALESCE(v_tk.folio_completo, p_ticket::text), auth.uid());
+              v_dif, p_ticket, v_it.id, CASE WHEN v_dif > 0 THEN p_devolucion END,
+              'Ticket ' || COALESCE(v_tk.folio_completo, p_ticket::text), auth.uid());
     END IF;
   END LOOP;
 END;
 $$;
-REVOKE ALL ON FUNCTION _existencias_sincronizar_ticket(uuid, boolean) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION _existencias_sincronizar_ticket(uuid, boolean) TO service_role;
-COMMENT ON FUNCTION _existencias_sincronizar_ticket(uuid, boolean) IS
-  'Registra en movimientos_producto la diferencia entre lo que el ticket debe haber movido (por estado, cancelación y devoluciones confirmadas) y lo ya movido. Idempotente (0189). Una línea sin movimientos solo se registra en el cobro (p_es_cobro): facturar, devolver o cancelar solo ajustan líneas ya registradas; una venta de la caja llega por push sin movimientos y la sube la caja.';
+REVOKE ALL ON FUNCTION _existencias_sincronizar_ticket(uuid, boolean, uuid, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION _existencias_sincronizar_ticket(uuid, boolean, uuid, uuid) TO service_role;
+COMMENT ON FUNCTION _existencias_sincronizar_ticket(uuid, boolean, uuid, uuid) IS
+  'Registra en movimientos_producto la diferencia entre lo que el ticket debe haber movido (por estado, cancelación y devoluciones confirmadas) y lo ya movido. Idempotente (0189). Una línea sin movimientos solo se registra en el cobro (p_es_cobro) o si es la línea que cambió (p_item); p_devolucion marca de qué devolución vienen los regresos: facturar, devolver o cancelar solo ajustan líneas ya registradas; una venta de la caja llega por push sin movimientos y la sube la caja.';
 
 -- Los disparadores son SECURITY DEFINER: el cajero no tiene EXECUTE sobre la función interna.
 CREATE OR REPLACE FUNCTION trg_existencias_por_ticket()
@@ -451,7 +490,7 @@ RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_t
 BEGIN
   IF EXISTS (SELECT 1 FROM productos p WHERE p.id = NEW.producto_id AND p.controla_existencias)
      AND EXISTS (SELECT 1 FROM tickets t WHERE t.id = NEW.ticket_id AND t.estado_fiscal IN ('PAGADO', 'FACTURADO')) THEN
-    PERFORM _existencias_sincronizar_ticket(NEW.ticket_id, true);
+    PERFORM _existencias_sincronizar_ticket(NEW.ticket_id, false, NEW.id);
   END IF;
   RETURN NULL;
 END;
@@ -464,7 +503,7 @@ CREATE TRIGGER trg_ticket_items_existencias
 CREATE OR REPLACE FUNCTION trg_existencias_por_devolucion()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
-  PERFORM _existencias_sincronizar_ticket(NEW.ticket_original_id, false);
+  PERFORM _existencias_sincronizar_ticket(NEW.ticket_original_id, false, NULL, NEW.id);
   RETURN NULL;
 END;
 $$;

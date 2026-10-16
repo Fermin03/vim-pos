@@ -40,6 +40,8 @@ ni colores.
 - SKU y código de barras únicos solo entre productos con existencias: los restaurantes pueden
   repetirlos y la migración no puede fallar en ninguna base que ya exista (la nube o la caja
   instalada).
+- Los traspasos no exigen el plan Cadena: piden el módulo y dos sucursales del negocio, y Esencial
+  solo tiene una.
 
 ## Cómo se despliega (no es obvio)
 
