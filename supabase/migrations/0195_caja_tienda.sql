@@ -1,6 +1,6 @@
 -- 0195 · La caja de tienda (Giro RETAIL, entrega 4).
 -- §1 Candados pendientes de la entrega 1. §2 La venta de tienda no va a cocina.
--- §3 Sync de existencias con la caja instalada (al estilo de la 0101).
+-- §3 Sync de existencias con la caja instalada (al estilo de la 0101). §4 Cambio de talla atómico.
 
 -- ── §1 Candados del renglón cobrado y de los movimientos ─────────────────────
 -- Un renglón cobrado no cambia de producto: los movimientos de existencias ya se colgaron de él.
@@ -426,3 +426,114 @@ END;
 $$;
 REVOKE EXECUTE ON FUNCTION sync_push_snapshot(uuid, jsonb) FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION sync_push_snapshot(uuid, jsonb) TO service_role;
+
+-- ── §4 Cambio de talla ───────────────────────────────────────────────────────
+-- Devolución parcial (motivo CAMBIO_TALLA, la prenda vuelve al anaquel) + venta nueva, las dos en
+-- efectivo por lo que regresa: el cajón cuadra solo y solo se mueve la diferencia (pos-retail.md,
+-- «Cómo queda registrado»). Si la nueva cuesta más, el ticket queda ABIERTO con el saldo y la caja
+-- abre el cobro de siempre; su VENTA de existencias llega al cerrarlo. SECURITY INVOKER: todo lo que
+-- llama ya confina. La autorización se pasa tal cual a crear_devolucion, que la exige siempre.
+CREATE OR REPLACE FUNCTION registrar_cambio_talla(
+  p_ticket_origen uuid, p_regresa jsonb, p_lleva jsonb, p_caja_id uuid, p_turno_id uuid,
+  p_usuario_id uuid, p_autorizacion_pin_id uuid, p_usuario_autorizo_id uuid, p_client_id_local varchar DEFAULT NULL)
+RETURNS jsonb LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
+DECLARE
+  v_tk      tickets%ROWTYPE;
+  v_items   jsonb;
+  v_malo    boolean;
+  v_total   boolean;
+  v_dev     uuid;
+  v_nuevo   uuid;
+  v_regresa numeric(12,2);
+  v_lleva   numeric(12,2);
+  v_l       jsonb;
+  v_n       int := 0;
+BEGIN
+  -- Reintento con la misma llave: lo ya hecho (crear_devolucion y abrir_ticket son idempotentes,
+  -- pero confirmar dos veces fallaría).
+  IF p_client_id_local IS NOT NULL THEN
+    SELECT id, total_devuelto_mxn INTO v_dev, v_regresa FROM devoluciones
+     WHERE tenant_id = current_tenant_id() AND client_id_local = p_client_id_local AND motivo = 'CAMBIO_TALLA';
+    IF FOUND THEN
+      SELECT id, total_mxn INTO v_nuevo, v_lleva FROM tickets
+       WHERE tenant_id = current_tenant_id() AND client_id_local = p_client_id_local;
+      RETURN jsonb_build_object('devolucion_id', v_dev, 'ticket_id', v_nuevo, 'regresa_mxn', v_regresa,
+                                'lleva_mxn', v_lleva, 'diferencia_mxn', v_lleva - v_regresa);
+    END IF;
+  END IF;
+
+  SELECT * INTO v_tk FROM tickets WHERE id = p_ticket_origen FOR UPDATE;
+  IF NOT FOUND OR v_tk.tenant_id IS DISTINCT FROM current_tenant_id() THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: la venta no es de este negocio' USING ERRCODE = '22023';
+  END IF;
+  IF v_tk.estado_fiscal = 'FACTURADO' THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: Esta venta está facturada. Haz la devolución desde Devoluciones.' USING ERRCODE = '22023';
+  END IF;
+  IF v_tk.estado_fiscal <> 'PAGADO' THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: solo se cambia una venta pagada' USING ERRCODE = '22023';
+  END IF;
+  IF jsonb_typeof(p_lleva) IS DISTINCT FROM 'array' OR jsonb_array_length(p_lleva) = 0
+     OR EXISTS (SELECT 1 FROM jsonb_array_elements(p_lleva) e
+                 WHERE e->>'producto_id' IS NULL
+                    OR NOT COALESCE((e->>'cantidad')::numeric > 0 AND (e->>'cantidad')::numeric <> 'NaN', false)) THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: falta lo que se lleva' USING ERRCODE = '22023';
+  END IF;
+  IF jsonb_typeof(p_regresa) IS DISTINCT FROM 'array' OR jsonb_array_length(p_regresa) = 0 THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: falta lo que regresa' USING ERRCODE = '22023';
+  END IF;
+
+  -- Cada renglón es de esta venta y no pasa de lo que queda por devolver (mismo criterio que el
+  -- tope de 0040; aquí para que el rechazo sea DATOS_INVALIDOS y no a medias).
+  WITH pedido AS (
+    SELECT (e->>'ticket_item_id')::uuid AS id, sum((e->>'cantidad')::numeric) AS cant
+      FROM jsonb_array_elements(p_regresa) e GROUP BY 1)
+  SELECT jsonb_agg(jsonb_build_object('ticket_item_id', p.id, 'cantidad_devuelta', p.cant, 'reversar_inventario_item', true)),
+         bool_or(ti.id IS NULL OR p.cant IS NULL OR NOT (p.cant > 0) OR p.cant > ti.cantidad - COALESCE(ya.cant, 0))
+    INTO v_items, v_malo
+    FROM pedido p
+    LEFT JOIN ticket_items ti ON ti.id = p.id AND ti.ticket_id = p_ticket_origen AND NOT ti.cancelado
+    LEFT JOIN LATERAL (SELECT sum(di.cantidad_devuelta) AS cant
+                         FROM devolucion_items di JOIN devoluciones d ON d.id = di.devolucion_id
+                        WHERE di.ticket_item_id_original = p.id AND d.estado <> 'CANCELADA' AND d.deleted_at IS NULL) ya ON true;
+  IF v_malo THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: un renglón no es de esta venta o ya se devolvió' USING ERRCODE = '22023';
+  END IF;
+
+  -- TOTAL si con esto queda devuelta toda la venta.
+  v_total := NOT EXISTS (
+    SELECT 1 FROM ticket_items ti
+     WHERE ti.ticket_id = p_ticket_origen AND NOT ti.cancelado
+       AND ti.cantidad > COALESCE((SELECT sum(di.cantidad_devuelta) FROM devolucion_items di JOIN devoluciones d ON d.id = di.devolucion_id
+                                    WHERE di.ticket_item_id_original = ti.id AND d.estado <> 'CANCELADA' AND d.deleted_at IS NULL), 0)
+                       + COALESCE((SELECT (x->>'cantidad_devuelta')::numeric FROM jsonb_array_elements(v_items) x
+                                    WHERE (x->>'ticket_item_id')::uuid = ti.id), 0));
+
+  v_dev := crear_devolucion(p_ticket_origen, p_caja_id, p_turno_id,
+    (CASE WHEN v_total THEN 'TOTAL' ELSE 'PARCIAL' END)::devolucion_alcance,
+    'CAMBIO_TALLA'::devolucion_motivo, NULL, 'EFECTIVO'::devolucion_medio,
+    p_autorizacion_pin_id, p_usuario_id, p_usuario_autorizo_id, v_items, true,
+    v_tk.cliente_id, NULL, p_client_id_local);
+  PERFORM confirmar_devolucion(v_dev, p_usuario_id);
+  SELECT total_devuelto_mxn INTO v_regresa FROM devoluciones WHERE id = v_dev;
+
+  -- abrir_ticket valida que el turno esté abierto en esa caja y en la sucursal de la venta.
+  v_nuevo := abrir_ticket(v_tk.sucursal_id, p_caja_id, p_turno_id, 'PARA_LLEVAR'::modo_servicio,
+                          v_tk.cliente_id, NULL, p_client_id_local, p_usuario_id);
+  FOR v_l IN SELECT * FROM jsonb_array_elements(p_lleva) LOOP
+    v_n := v_n + 1;
+    PERFORM agregar_item_a_ticket(v_nuevo, (v_l->>'producto_id')::uuid, (v_l->>'cantidad')::numeric,
+                                  NULL, '[]'::jsonb, p_client_id_local || '-' || v_n);
+  END LOOP;
+  SELECT total_mxn INTO v_lleva FROM tickets WHERE id = v_nuevo;
+
+  IF LEAST(v_regresa, v_lleva) > 0 THEN
+    PERFORM aplicar_pago(v_nuevo, 'EFECTIVO'::metodo_pago, LEAST(v_regresa, v_lleva), NULL, NULL, NULL, NULL, false,
+                         'Cambio de la venta ' || v_tk.folio_completo, p_client_id_local || '-pago');
+  END IF;
+
+  RETURN jsonb_build_object('devolucion_id', v_dev, 'ticket_id', v_nuevo, 'regresa_mxn', v_regresa,
+                            'lleva_mxn', v_lleva, 'diferencia_mxn', v_lleva - v_regresa);
+END;
+$$;
+REVOKE EXECUTE ON FUNCTION registrar_cambio_talla(uuid, jsonb, jsonb, uuid, uuid, uuid, uuid, uuid, varchar) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION registrar_cambio_talla(uuid, jsonb, jsonb, uuid, uuid, uuid, uuid, uuid, varchar) TO authenticated, service_role;

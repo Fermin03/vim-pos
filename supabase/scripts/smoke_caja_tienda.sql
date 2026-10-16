@@ -208,4 +208,132 @@ BEGIN
   RAISE NOTICE '3 sync de existencias OK';
 END $$;
 
+-- 4) Cambio de talla atómico: devolución parcial + venta nueva, en efectivo por lo que regresa.
+DO $$
+DECLARE
+  v_t     uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_suc   uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_caja  uuid := '99999999-0000-0000-0000-0000000000cc';
+  v_maria uuid := '99999999-0000-0000-0000-000000000001';
+  v_cat   uuid := 'c4c40000-0000-0000-0000-0000000000c1';
+  v_m     uuid := 'c4c40000-0000-0000-0000-0000000000d1';
+  v_g     uuid := 'c4c40000-0000-0000-0000-0000000000d2';
+  v_caro  uuid := 'c4c40000-0000-0000-0000-0000000000d3';
+  v_bara  uuid := 'c4c40000-0000-0000-0000-0000000000d4';
+  v_turno uuid; v_tk uuid; v_it uuid; v_auth uuid; v_res jsonb; v_nuevo uuid; v_dev uuid;
+  v_ex_m numeric; v_ex_g numeric; v_caso text; v_tk_a uuid; v_it_a uuid; v_it_otro uuid;
+BEGIN
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
+  SELECT id INTO v_turno FROM turnos WHERE caja_id = v_caja AND estado = 'ABIERTO';
+  INSERT INTO productos (id, tenant_id, nombre, categoria_id, precio_base_mxn, controla_existencias) VALUES
+    (v_m,    v_t, 'Polo M',     v_cat, 349, true),
+    (v_g,    v_t, 'Polo G',     v_cat, 349, true),
+    (v_caro, v_t, 'Polo Pima',  v_cat, 399, true),
+    (v_bara, v_t, 'Polo Basic', v_cat, 299, true);
+  INSERT INTO movimientos_producto (tenant_id, sucursal_id, producto_id, tipo, cantidad)
+  SELECT v_t, v_suc, p, 'ENTRADA', 10 FROM unnest(ARRAY[v_m, v_g, v_caro, v_bara]) p;
+
+  FOREACH v_caso IN ARRAY ARRAY['a', 'b', 'c'] LOOP
+    -- Venta de una Polo M pagada en efectivo, y la autorización de devolverla.
+    v_tk := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smoke-c4-4' || v_caso, v_maria);
+    v_it := agregar_item_a_ticket(v_tk, v_m, 1, NULL, '[]'::jsonb, 'smoke-c4-4' || v_caso || '-1');
+    PERFORM aplicar_pago(v_tk, 'EFECTIVO'::metodo_pago, 349, 349, NULL, NULL, NULL, false, NULL, 'smoke-c4-4' || v_caso || '-pago');
+    INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                    accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+    VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'devolucion', 'venta.devolucion', 'ticket', v_tk, 'smoke 4' || v_caso)
+    RETURNING id INTO v_auth;
+    v_ex_m := (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_m);
+    v_ex_g := (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_g);
+
+    v_res := registrar_cambio_talla(v_tk,
+      jsonb_build_array(jsonb_build_object('ticket_item_id', v_it, 'cantidad', 1)),
+      jsonb_build_array(jsonb_build_object('producto_id', CASE v_caso WHEN 'a' THEN v_g WHEN 'b' THEN v_caro ELSE v_bara END, 'cantidad', 1)),
+      v_caja, v_turno, v_maria, v_auth, v_maria, 'smoke-c4-cambio-' || v_caso);
+    v_nuevo := (v_res->>'ticket_id')::uuid;
+    v_dev   := (v_res->>'devolucion_id')::uuid;
+
+    -- Comunes: devolución CONFIRMADA por cambio de talla, en efectivo, que regresa la M al anaquel.
+    IF (SELECT (estado::text, motivo::text, medio_devolucion::text, total_devuelto_mxn) FROM devoluciones WHERE id = v_dev)
+       IS DISTINCT FROM ('CONFIRMADA'::text, 'CAMBIO_TALLA'::text, 'EFECTIVO'::text, 349::numeric(12,2)) THEN
+      RAISE EXCEPTION '4%: la devolución debía ser CONFIRMADA, CAMBIO_TALLA, EFECTIVO, $349', v_caso; END IF;
+    IF (v_res->>'regresa_mxn')::numeric <> 349 THEN RAISE EXCEPTION '4%: regresa_mxn: %', v_caso, v_res; END IF;
+    IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_m) <> v_ex_m + 1 THEN
+      RAISE EXCEPTION '4%: la M debía subir 1', v_caso; END IF;
+    IF NOT EXISTS (SELECT 1 FROM movimientos_producto WHERE devolucion_id = v_dev AND tipo = 'DEVOLUCION' AND cantidad = 1) THEN
+      RAISE EXCEPTION '4%: faltó el movimiento DEVOLUCION', v_caso; END IF;
+    IF (SELECT (modo_servicio::text, sucursal_id, caja_id, turno_id, envio_cocina_automatico) FROM tickets WHERE id = v_nuevo)
+       IS DISTINCT FROM ('PARA_LLEVAR'::text, v_suc, v_caja, v_turno, false) THEN
+      RAISE EXCEPTION '4%: el ticket nuevo debía ser PARA_LLEVAR en la misma caja y turno, sin cocina', v_caso; END IF;
+    IF (SELECT (metodo_pago::text, monto_mxn, nota::text) FROM pagos WHERE ticket_id = v_nuevo)
+       IS DISTINCT FROM ('EFECTIVO'::text, LEAST(349, (v_res->>'lleva_mxn')::numeric)::numeric(12,2),
+                         'Cambio de la venta ' || (SELECT folio_completo FROM tickets WHERE id = v_tk)) THEN
+      RAISE EXCEPTION '4%: el pago del ticket nuevo no cuadra', v_caso; END IF;
+
+    IF v_caso = 'a' THEN
+      -- 4a) M por G de $349: sin diferencia, ticket PAGADO, la G baja 1.
+      IF (v_res->>'diferencia_mxn')::numeric <> 0 THEN RAISE EXCEPTION '4a: diferencia: %', v_res; END IF;
+      IF (SELECT estado_fiscal::text FROM tickets WHERE id = v_nuevo) <> 'PAGADO' THEN RAISE EXCEPTION '4a: debía quedar PAGADO'; END IF;
+      IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_g) <> v_ex_g - 1 THEN
+        RAISE EXCEPTION '4a: la G debía bajar 1'; END IF;
+      IF NOT EXISTS (SELECT 1 FROM movimientos_producto WHERE ticket_id = v_nuevo AND producto_id = v_g AND tipo = 'VENTA' AND cantidad = -1) THEN
+        RAISE EXCEPTION '4a: faltó la VENTA de la G'; END IF;
+      IF (SELECT alcance::text FROM devoluciones WHERE id = v_dev) <> 'TOTAL' THEN RAISE EXCEPTION '4a: se regresó todo: TOTAL'; END IF;
+      v_tk_a := v_tk; v_it_a := v_it;
+    ELSIF v_caso = 'b' THEN
+      -- 4b) Por una de $399: diferencia 50, ABIERTO con saldo 50; la VENTA llega al terminar el cobro.
+      IF (v_res->>'diferencia_mxn')::numeric <> 50 THEN RAISE EXCEPTION '4b: diferencia: %', v_res; END IF;
+      IF (SELECT (estado_fiscal::text, total_mxn - monto_pagado_mxn) FROM tickets WHERE id = v_nuevo)
+         IS DISTINCT FROM ('ABIERTO'::text, 50::numeric(12,2)) THEN RAISE EXCEPTION '4b: debía quedar ABIERTO con saldo 50'; END IF;
+      IF EXISTS (SELECT 1 FROM movimientos_producto WHERE ticket_id = v_nuevo) THEN RAISE EXCEPTION '4b: sin cobrar no hay VENTA'; END IF;
+      PERFORM aplicar_pago(v_nuevo, 'TARJETA_DEBITO'::metodo_pago, 50, NULL, NULL, NULL, NULL, false, NULL, 'smoke-c4-4b-saldo');
+      IF (SELECT estado_fiscal::text FROM tickets WHERE id = v_nuevo) <> 'PAGADO' THEN RAISE EXCEPTION '4b: el saldo debía cerrarlo'; END IF;
+      IF NOT EXISTS (SELECT 1 FROM movimientos_producto WHERE ticket_id = v_nuevo AND producto_id = v_caro AND tipo = 'VENTA' AND cantidad = -1) THEN
+        RAISE EXCEPTION '4b: faltó la VENTA al terminar el cobro'; END IF;
+    ELSE
+      -- 4c) Por una de $299: diferencia -50, PAGADO; sale $349 de devolución y entra $299: el cajón neto -50.
+      IF (v_res->>'diferencia_mxn')::numeric <> -50 THEN RAISE EXCEPTION '4c: diferencia: %', v_res; END IF;
+      IF (SELECT estado_fiscal::text FROM tickets WHERE id = v_nuevo) <> 'PAGADO' THEN RAISE EXCEPTION '4c: debía quedar PAGADO'; END IF;
+      IF (SELECT sum(monto_mxn) FROM pagos WHERE ticket_id = v_nuevo AND metodo_pago = 'EFECTIVO')
+         - (SELECT sum(monto_mxn) FROM movimientos_caja WHERE turno_id = v_turno AND tipo = 'DEVOLUCION_EFECTIVO'
+              AND motivo = 'Devolución folio ' || (SELECT folio_completo FROM devoluciones WHERE id = v_dev)) <> -50 THEN
+        RAISE EXCEPTION '4c: el neto en el cajón debía ser -50'; END IF;
+    END IF;
+  END LOOP;
+
+  -- 4d) Rechazos sin dejar nada: facturada, renglón ajeno, cantidad de más (ya devuelta), otro negocio, nada que llevar.
+  v_tk := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smoke-c4-4d', v_maria);
+  v_it := agregar_item_a_ticket(v_tk, v_m, 1, NULL, '[]'::jsonb, 'smoke-c4-4d-1');
+  PERFORM aplicar_pago(v_tk, 'EFECTIVO'::metodo_pago, 349, 349, NULL, NULL, NULL, false, NULL, 'smoke-c4-4d-pago');
+  v_it_otro := v_it_a;   -- renglón de la venta del 4a
+  FOREACH v_caso IN ARRAY ARRAY['facturada', 'ajeno', 'de_mas', 'otro_negocio', 'vacio'] LOOP
+    INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                    accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+    VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'devolucion', 'venta.devolucion', 'ticket',
+            CASE WHEN v_caso = 'de_mas' THEN v_tk_a ELSE v_tk END, 'smoke 4d')
+    RETURNING id INTO v_auth;
+    BEGIN
+      IF v_caso = 'facturada' THEN UPDATE tickets SET estado_fiscal = 'FACTURADO' WHERE id = v_tk; END IF;
+      IF v_caso = 'otro_negocio' THEN
+        PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', 'c4c40000-0000-0000-0000-0000000000ee')::text, true);
+      END IF;
+      PERFORM registrar_cambio_talla(
+        CASE WHEN v_caso = 'de_mas' THEN v_tk_a ELSE v_tk END,
+        jsonb_build_array(jsonb_build_object('ticket_item_id', CASE v_caso WHEN 'ajeno' THEN v_it_otro WHEN 'de_mas' THEN v_it_a ELSE v_it END, 'cantidad', 1)),
+        CASE WHEN v_caso = 'vacio' THEN '[]'::jsonb ELSE jsonb_build_array(jsonb_build_object('producto_id', v_g, 'cantidad', 1)) END,
+        v_caja, v_turno, v_maria, v_auth, v_maria, 'smoke-c4-4d-' || v_caso);
+      RAISE EXCEPTION '4d %: debía rechazarse', v_caso;
+    EXCEPTION WHEN OTHERS THEN
+      IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE EXCEPTION '4d %: error inesperado: %', v_caso, SQLERRM; END IF;
+    END;
+    PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
+    IF EXISTS (SELECT 1 FROM devoluciones WHERE client_id_local = 'smoke-c4-4d-' || v_caso)
+       OR EXISTS (SELECT 1 FROM tickets WHERE client_id_local = 'smoke-c4-4d-' || v_caso) THEN
+      RAISE EXCEPTION '4d %: quedó algo a medias', v_caso; END IF;
+  END LOOP;
+  IF EXISTS (SELECT 1 FROM devoluciones WHERE ticket_original_id = v_tk)
+     OR (SELECT count(*) FROM devoluciones WHERE ticket_original_id = v_tk_a) <> 1 THEN
+    RAISE EXCEPTION '4d: ninguna devolución nueva debía quedar'; END IF;
+  RAISE NOTICE '4 cambio de talla OK';
+END $$;
+
 ROLLBACK;
