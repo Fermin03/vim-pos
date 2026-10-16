@@ -824,23 +824,32 @@ export function HomePos({
    * Agregar en la venta de tienda: la ruta de `agregarSuelto`, sin combo ni hoja «¿Lo hacemos
    * combo?». Con grupos de modificadores sigue el camino de siempre. Un padre nunca entra al ticket
    * (la base lo rechaza con PRODUCTO_CON_VARIANTES). La misma pieza otra vez suma a su renglón.
+   *
+   * Los agregados van en FILA (`colaTienda`): dos escaneos rápidos con una cuenta guardada harían
+   * dos `agregar_item_a_ticket` y dos relecturas cruzadas, y la que llega última podía pintar 1.
+   * En fila, cada pieza entra y se relee antes de la siguiente.
    */
+  const colaTienda = useRef<Promise<void>>(Promise.resolve());
   const agregarTienda = useCallback(
-    async (p: Producto) => {
+    (p: Producto) => {
       if (p.variante_ejes?.length) return;
       setSelectorRetail(null);
+      // Agotado a mano en la sucursal: no entra, como en el restaurante (R7). El agotado por
+      // existencia en cero sí se vende.
+      if (p.agotado) { setAvisoRetail({ tipo: "no-se-vende" }); return; }
       setAvisoRetail(null);
-      try {
-        const grupos = await obtenerGruposDeProducto(token, p.id);
-        if (grupos.length > 0) { setModGrupos({ producto: p, grupos }); return; }
-        const igual = !ticketBd && carrito.lineas.find((l) => l.producto.id === p.id && !l.combo && l.modificadores.length === 0 && !l.notaCocina);
-        if (igual) { dispatch({ tipo: "cantidad", clientId: igual.clientId, cantidad: igual.cantidad + 1 }); return; }
-        await agregarSuelto(p, [], null);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "No se pudo agregar el producto");
-      }
+      colaTienda.current = colaTienda.current.then(async () => {
+        try {
+          const grupos = await obtenerGruposDeProducto(token, p.id);
+          if (grupos.length > 0) { setModGrupos({ producto: p, grupos }); return; }
+          if (ticketBd) { await agregarSuelto(p, [], null); return; }
+          dispatch({ tipo: "agregar", sumarSiIgual: true, linea: { clientId: nuevoClientId(), producto: p, cantidad: 1, modificadores: [], notaCocina: null } });
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "No se pudo agregar el producto");
+        }
+      });
     },
-    [token, ticketBd, carrito.lineas, agregarSuelto],
+    [token, ticketBd, agregarSuelto],
   );
 
   /**
@@ -1700,12 +1709,12 @@ export function HomePos({
    * No cierra nada mientras un cobro está en curso: interrumpir a media aplicación de pago es
    * justo lo que no debe poder hacerse por reflejo.
    */
-  const { alEscapar, algoAbierto, escaneoIgnorado } = useMemo(() => {
+  const { alEscapar, algoAbierto, escaneoIgnorado, cerrarAlEscanear } = useMemo(() => {
     const capaCobro: CapaEscape = [totalesCobro != null, null];
-    const capasTienda: CapaEscape[] = [
-      [selectorRetail != null, () => setSelectorRetail(null)],
-      [avisoRetail != null, () => setAvisoRetail(null)],
-    ];
+    const capaRecibo: CapaEscape = [mostrarRecibo, cerrarVistaRecibo];
+    const capaConfirmacion: CapaEscape = [confirmacion != null, nuevoTicket];
+    const capaSelector: CapaEscape = [selectorRetail != null, () => setSelectorRetail(null)];
+    const capaAvisoRetail: CapaEscape = [avisoRetail != null, () => setAvisoRetail(null)];
     const capas: CapaEscape[] = [
       // Modificadores y combo: overlays sobre la rejilla de captura, por encima de todo lo demás.
       // El de modificadores va primero porque se pinta encima del de combo cuando ambos aplican.
@@ -1727,16 +1736,21 @@ export function HomePos({
       // El aviso del reparto se pinta encima del recibo y de la confirmación de cobro, así que
       // Escape tiene que cerrarlo a él primero.
       [avisoReparto != null, () => setAvisoReparto(null)],
-      [mostrarRecibo, cerrarVistaRecibo],
-      [confirmacion != null, nuevoTicket],
+      capaRecibo,
+      capaConfirmacion,
       // El cobro y «Agregar productos» CEDEN: tienen pasos internos (efectivo → selector, un
       // modificador abierto sobre la tanda) y cada uno atiende su Escape. Antes los cerraba esta
       // lista de un golpe: Escape en el teclado de efectivo tiraba el cobro entero, y con un
       // modificador abierto se llevaba la tanda completa sin guardar.
       capaCobro,
       [agregandoA != null, null],
+      // Descuento de la cuenta (puede pedir PIN) y la lista de cuentas de Para llevar: los cierra
+      // su propio modal; aquí están para que la pila sepa que hay algo abierto.
+      [descuentoAbierto, null],
+      [llevarListaAbierta, null],
       // Venta de tienda: el selector lo cierra también su `Modal`; la franja del escáner, aquí.
-      ...capasTienda,
+      capaSelector,
+      capaAvisoRetail,
       [viendoMapaMesas, () => { setViendoMapaMesas(false); setPidiendoMesa(true); }],
       [pidiendoMesa, () => setPidiendoMesa(false)],
       [nombreCuentaAbierto, () => setNombreCuentaAbierto(false)],
@@ -1768,12 +1782,15 @@ export function HomePos({
       // El aviso grande de la tienda va encima de TODO y CEDE: lo cierra su propio `Modal`.
       alEscapar: capaVisible([[avisoTiendaVisible, null], ...capas, ...pantallas]),
       // Hay algo abierto encima de la pantalla (un cobro, un modal): «Ver orden» no se lo lleva.
-      algoAbierto: capas.some(([visible]) => visible),
-      // El escáner de la tienda se ignora bajo el aviso de un pedido, un PIN u otro diálogo. El
-      // cobro no cuenta (avisa «Termina el cobro…») ni el selector y la franja (el escaneo los cierra).
-      escaneoIgnorado: avisoTiendaVisible || capas.some((c) => c[0] && c !== capaCobro && !capasTienda.includes(c)),
+      // La franja del escáner no tapa nada: no cuenta como «algo abierto».
+      algoAbierto: capas.some((c) => c[0] && c !== capaAvisoRetail),
+      // El escáner de la tienda se ignora bajo el aviso de un pedido, un PIN u otro diálogo. No
+      // cuentan el cobro (avisa «Termina el cobro…»), el selector y la franja (el escaneo los
+      // cierra) ni «Cobro completado» y el recibo: esos se cierran y la pieza abre la venta nueva (R6).
+      escaneoIgnorado: avisoTiendaVisible || capas.some((c) => c[0] && ![capaCobro, capaSelector, capaAvisoRetail, capaRecibo, capaConfirmacion].includes(c)),
+      cerrarAlEscanear: confirmacion != null ? nuevoTicket : mostrarRecibo ? cerrarVistaRecibo : null,
     };
-  }, [selectorRetail, avisoRetail, avisoTiendaVisible, modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
+  }, [selectorRetail, avisoRetail, descuentoAbierto, llevarListaAbierta, avisoTiendaVisible, modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
       agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto, nombreBarra, pasandoAMesa,
       clienteDomAbierto, clienteCuentaAbierto, zonaPedidoAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
@@ -2776,12 +2793,13 @@ export function HomePos({
               actualizadoA={actualizadoA}
               cobroAbierto={totalesCobro != null}
               escaneoIgnorado={escaneoIgnorado}
+              cerrarAlEscanear={cerrarAlEscanear}
               bloqueado={menuBloqueado}
               selector={selectorRetail}
               onSelector={setSelectorRetail}
               aviso={avisoRetail}
               onAviso={setAvisoRetail}
-              onAgregar={(p) => void agregarTienda(p)}
+              onAgregar={agregarTienda}
             />
           ) : (
             <CatalogoProductos

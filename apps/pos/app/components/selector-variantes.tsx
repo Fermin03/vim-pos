@@ -50,7 +50,10 @@ export function SelectorVariantes({
   const [viendo, setViendo] = useState(sucursalId);
   const propia = viendo === sucursalId;
   const m = matrizVariantes(padre, existencias, viendo);
-  const precios = padre.hijas.map((h) => h.precio_base_mxn);
+  // Se vende aquí y no está agotada a mano en esta sucursal (R7). Lo demás se ve, pero no se toca.
+  const vendible = (h: Producto) => h.seVendeAqui !== false && !h.agotado;
+  const aqui = padre.hijas.filter((h) => h.seVendeAqui !== false);
+  const precios = (aqui.length ? aqui : padre.hijas).map((h) => h.precio_base_mxn);
   const desde = Math.min(...precios);
   const mismoPrecio = desde === Math.max(...precios);
   const [ejeCol, ejeRen] = padre.ejes;
@@ -119,16 +122,17 @@ export function SelectorVariantes({
               }
               const precio = celda.hija.precio_base_mxn !== desde ? fmtMxn(celda.hija.precio_base_mxn) : null;
               const esMarcada = celda.hija.id === marcada;
+              const tocable = propia && vendible(celda.hija);
               return (
                 <button
                   key={`${c}-${r}`}
                   type="button"
-                  disabled={!propia}
+                  disabled={!tocable}
                   onClick={() => onElegir(celda.hija)}
                   aria-label={`${[c, r].filter(Boolean).join(" ")}: ${piezas(celda.cantidad)} piezas`}
                   className={[
                     "flex min-h-14 flex-col items-center justify-center rounded border px-1 py-1.5",
-                    propia
+                    tocable
                       ? `${ESTILO[celda.estado]} transition-[transform,border-color] duration-150 ease-vim hover:border-ink active:scale-[.97]`
                       : "cursor-default border-line bg-bg text-ink-3",
                     esMarcada ? "ring-2 ring-ink ring-offset-1" : "",
@@ -136,6 +140,9 @@ export function SelectorVariantes({
                 >
                   <span className="font-display text-20 font-bold leading-none tabular-nums">{piezas(celda.cantidad)}</span>
                   {precio && <span className="mt-1 text-12 tabular-nums text-ink-2">{precio}</span>}
+                  {propia && !tocable && (
+                    <span className="mt-1 text-11 font-semibold text-ink-3">{celda.hija.seVendeAqui === false ? "No se vende aquí" : "No se vende por ahora"}</span>
+                  )}
                   {esMarcada && <span className="mt-1 text-11 font-semibold text-ink">La que regresa</span>}
                 </button>
               );

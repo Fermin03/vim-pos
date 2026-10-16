@@ -62,7 +62,8 @@ export function clienteIdParaTicket(e: EstadoCarrito): string | null {
 export const estadoInicial: EstadoCarrito = { modoServicio: "COMER_AQUI", lineas: [], clienteDomicilio: null, notaOrden: null, nombreCuenta: null, envio: null, clienteCuenta: null };
 
 export type AccionCarrito =
-  | { tipo: "agregar"; linea: LineaCarrito }
+  /** `sumarSiIgual` (solo la tienda): la misma pieza suelta suma a su renglón en vez de abrir otro. */
+  | { tipo: "agregar"; linea: LineaCarrito; sumarSiIgual?: boolean }
   | { tipo: "reemplazar"; linea: LineaCarrito }
   | { tipo: "editar"; clientId: string; editada: LineaCarrito; alcance: AlcanceEdicion }
   | { tipo: "cantidad"; clientId: string; cantidad: number }
@@ -79,8 +80,14 @@ export type AccionCarrito =
 
 export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): EstadoCarrito {
   switch (accion.tipo) {
-    case "agregar":
-      return { ...estado, lineas: [...estado.lineas, accion.linea] };
+    case "agregar": {
+      const l = accion.linea;
+      const simple = (x: LineaCarrito) => !x.combo && x.modificadores.length === 0 && !x.notaCocina;
+      // Se decide aquí, sobre el estado vigente: dos escaneos seguidos suman 2 aunque lleguen juntos.
+      const igual = accion.sumarSiIgual && simple(l) ? estado.lineas.find((x) => x.producto.id === l.producto.id && simple(x)) : undefined;
+      if (igual) return { ...estado, lineas: estado.lineas.map((x) => (x === igual ? { ...x, cantidad: x.cantidad + l.cantidad } : x)) };
+      return { ...estado, lineas: [...estado.lineas, l] };
+    }
     case "reemplazar":
       // Sustituye la línea EN SU LUGAR (edición de combo desde el ticket): no se debe reordenar.
       return { ...estado, lineas: estado.lineas.map((l) => (l.clientId === accion.linea.clientId ? accion.linea : l)) };

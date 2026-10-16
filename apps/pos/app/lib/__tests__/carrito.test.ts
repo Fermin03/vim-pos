@@ -200,3 +200,24 @@ describe("lineasDeEdicion: lo que la cuenta de mesa manda a la base", () => {
     expect(lista.map((l) => [l.cantidad, l.modificadores.length])).toEqual(r.map((l) => [l.cantidad, l.modificadores.length]));
   });
 });
+
+describe("agregar con sumarSiIgual (tienda)", () => {
+  const playera = prod("p1", "Playera M Negra", 349);
+  const linea = (clientId: string): LineaCarrito => ({ clientId, producto: playera, cantidad: 1, modificadores: [], notaCocina: null });
+  it("la tienda suma a su renglón, aunque las dos acciones lleguen seguidas", () => {
+    let e = reducerCarrito(estadoInicial, { tipo: "agregar", linea: linea("a"), sumarSiIgual: true });
+    e = reducerCarrito(e, { tipo: "agregar", linea: linea("b"), sumarSiIgual: true });
+    e = reducerCarrito(e, { tipo: "agregar", linea: linea("c"), sumarSiIgual: true });
+    expect(e.lineas.map((l) => [l.clientId, l.cantidad])).toEqual([["a", 3]]);
+  });
+  it("un restaurante abre un renglón por cada toque", () => {
+    let e = reducerCarrito(estadoInicial, { tipo: "agregar", linea: linea("a") });
+    e = reducerCarrito(e, { tipo: "agregar", linea: linea("b") });
+    expect(e.lineas.map((l) => [l.clientId, l.cantidad])).toEqual([["a", 1], ["b", 1]]);
+  });
+  it("no suma a un renglón con nota o modificadores", () => {
+    const e0 = { ...estadoInicial, lineas: [{ ...linea("a"), notaCocina: "regalo" }] };
+    const e = reducerCarrito(e0, { tipo: "agregar", linea: linea("b"), sumarSiIgual: true });
+    expect(e.lineas).toHaveLength(2);
+  });
+});

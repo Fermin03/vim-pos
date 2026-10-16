@@ -12,7 +12,7 @@ import { Paginador } from "./paginador";
 import { SelectorVariantes } from "./selector-variantes";
 
 /** La franja bajo la barra de escaneo. Su capa de Escape la declara `home-pos`. */
-export type AvisoEscaneo = { tipo: "no-encontrado"; codigo: string } | { tipo: "cobro" };
+export type AvisoEscaneo = { tipo: "no-encontrado"; codigo: string } | { tipo: "no-se-vende" } | { tipo: "cobro" };
 
 /** Sin mayúsculas ni acentos: «camiseta» encuentra «Camíseta». */
 const plano = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -36,6 +36,7 @@ export function PanelVentaRetail({
   actualizadoA,
   cobroAbierto,
   escaneoIgnorado,
+  cerrarAlEscanear,
   bloqueado,
   selector,
   onSelector,
@@ -53,6 +54,8 @@ export function PanelVentaRetail({
   cobroAbierto: boolean;
   /** Un PIN, el aviso de un pedido de la tienda u otro diálogo encima: el escaneo no hace nada. */
   escaneoIgnorado: boolean;
+  /** «Cobro completado» o el recibo a la vista: un escaneo los cierra y empieza la venta nueva (R6). */
+  cerrarAlEscanear: (() => void) | null;
   /** El menú está trabado (ticket incompleto, cuenta impresa…): igual que en `CatalogoProductos`. */
   bloqueado: boolean;
   selector: PadreTienda | null;
@@ -72,6 +75,13 @@ export function PanelVentaRetail({
     // Un padre sin ninguna hija que se venda aquí no tiene nada que elegir: no sale.
     return { vitrina: g.vitrina.filter((p) => !p.variante_ejes?.length || (g.padres.get(p.id)?.hijas.length ?? 0) > 0), padres: g.padres };
   }, [productos]);
+  // El selector se arma con TODAS las hijas: una variante que solo vende otra sucursal también se
+  // consulta. Las que esta sucursal no vende salen apagadas en su matriz.
+  const padresTodos = useMemo(() => agruparTienda(todosProductos ?? []).padres, [todosProductos]);
+  const abrirSelector = (id: string) => {
+    const p = padresTodos.get(id);
+    if (p) onSelector(p);
+  };
 
   const [texto, setTexto] = useState("");
   const [catSel, setCatSel] = useState<string | null>(null); // null = «Todo»
@@ -90,8 +100,7 @@ export function PanelVentaRetail({
   }, [vitrina, padres, texto, catSel]);
 
   const tocar = (p: Producto) => {
-    const padre = padres.get(p.id);
-    if (padre) onSelector(padre);
+    if (padres.has(p.id)) abrirSelector(p.id);
     else onAgregar(p);
   };
 
@@ -100,11 +109,12 @@ export function PanelVentaRetail({
     const d = decidirEscaneo(productos ?? [], codigo, { cobroAbierto, ignorar: escaneoIgnorado || bloqueado });
     if (d.tipo === "ignorar") return;
     if (d.tipo === "cobro") { onAviso({ tipo: "cobro" }); return; }
+    cerrarAlEscanear?.();
     if (d.tipo === "no-encontrado") { onAviso({ tipo: "no-encontrado", codigo }); sonarError(); return; }
     if (d.tipo === "selector") {
       onAviso(null);
       const padre = padres.get(d.padre.id);
-      if (padre?.hijas.length) onSelector(padre);
+      if (padre?.hijas.length) abrirSelector(d.padre.id);
       else { onAviso({ tipo: "no-encontrado", codigo }); sonarError(); }
       return;
     }
@@ -112,16 +122,19 @@ export function PanelVentaRetail({
   };
   useEscaner(alCodigo, true);
 
-  // «Termina el cobro…» solo tiene sentido mientras el cobro sigue abierto.
+  // «Termina el cobro…» se va solo a los 3 s, o en cuanto se cierra el cobro.
   useEffect(() => {
-    if (!cobroAbierto && aviso?.tipo === "cobro") onAviso(null);
+    if (aviso?.tipo !== "cobro") return;
+    if (!cobroAbierto) { onAviso(null); return; }
+    const t = setTimeout(() => onAviso(null), 3000);
+    return () => clearTimeout(t);
   }, [cobroAbierto, aviso, onAviso]);
 
   /** Enter a mano: un código exacto agrega (o abre su selector); si no, un solo resultado. */
   const alEnter = () => {
     const d = decidirEscaneo(productos ?? [], texto, { cobroAbierto: false, ignorar: bloqueado });
     if (d.tipo === "agregar") onAgregar(d.producto);
-    else if (d.tipo === "selector" && padres.get(d.padre.id)?.hijas.length) onSelector(padres.get(d.padre.id)!);
+    else if (d.tipo === "selector" && padres.get(d.padre.id)?.hijas.length) abrirSelector(d.padre.id);
     else if (visibles.length === 1 && !bloqueado) tocar(visibles[0]!);
     else return;
     setTexto("");
@@ -185,16 +198,20 @@ export function PanelVentaRetail({
         <span className="flex-shrink-0 text-13 text-ink-3">Lector listo</span>
       </div>
 
-      {aviso?.tipo === "no-encontrado" && (
+      {(aviso?.tipo === "no-encontrado" || aviso?.tipo === "no-se-vende") && (
         <div className="flex flex-shrink-0 items-center gap-3 bg-danger-soft px-4 py-1.5" role="alert">
-          <p className="min-w-0 flex-1 text-13 font-medium text-danger">No encontramos el código {aviso.codigo}.</p>
-          <button
-            type="button"
-            onClick={() => campo.current?.focus()}
-            className="h-11 flex-shrink-0 rounded border border-danger-line bg-surface px-3 text-14 font-semibold text-danger transition-[transform,background-color] duration-150 ease-vim hover:bg-danger/10 active:scale-[.97]"
-          >
-            Buscar a mano
-          </button>
+          <p className="min-w-0 flex-1 text-13 font-medium text-danger">
+            {aviso.tipo === "no-encontrado" ? `No encontramos el código ${aviso.codigo}.` : "Ese producto no se vende por ahora."}
+          </p>
+          {aviso.tipo === "no-encontrado" && (
+            <button
+              type="button"
+              onClick={() => campo.current?.focus()}
+              className="h-11 flex-shrink-0 rounded border border-danger-line bg-surface px-3 text-14 font-semibold text-danger transition-[transform,background-color] duration-150 ease-vim hover:bg-danger/10 active:scale-[.97]"
+            >
+              Buscar a mano
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onAviso(null)}
@@ -205,19 +222,13 @@ export function PanelVentaRetail({
           </button>
         </div>
       )}
-      {/* Con el cobro abierto la franja de arriba quedaría tapada: este aviso va sobre el modal. */}
+      {/* Con el cobro abierto la franja de arriba quedaría tapada. Va pegado al borde de abajo,
+          en los 34 px que el modal de cobro (máx. 700 px de alto) deja libres a 1024×768, y se va
+          solo a los 3 s: no lleva × que tocar ni tapa la cabecera ni el botón de cobrar. */}
       {aviso?.tipo === "cobro" && (
-        <div className="fixed left-1/2 top-4 z-[80] flex -translate-x-1/2 items-center gap-2 rounded-lg border border-danger-line bg-danger-soft py-1 pl-4 pr-1 shadow-xl" role="alert">
-          <p className="text-14 font-semibold text-danger">Termina el cobro para agregar productos.</p>
-          <button
-            type="button"
-            onClick={() => onAviso(null)}
-            aria-label="Cerrar aviso"
-            className="flex h-11 w-11 items-center justify-center rounded text-danger transition-[transform,background-color] duration-150 ease-vim hover:bg-danger/10 active:scale-[.97]"
-          >
-            <Icono nombre="cerrar" className="h-4 w-4" />
-          </button>
-        </div>
+        <p className="pointer-events-none fixed bottom-1 left-1/2 z-[80] -translate-x-1/2 rounded border border-danger-line bg-danger-soft px-4 py-1 text-13 font-semibold text-danger shadow-xl" role="alert">
+          Termina el cobro para agregar productos.
+        </p>
       )}
 
       <div
@@ -267,7 +278,8 @@ export function PanelVentaRetail({
                   >
                     <span className="line-clamp-2 break-words font-semibold leading-tight text-ink">{p.nombre}</span>
                     <span className="font-display font-bold tabular-nums text-ink" style={{ fontSize: pxNombre - 1 }}>
-                      {r.precioDesde !== null ? `desde ${fmtMxn(r.precioDesde)}` : fmtMxn(p.precio_base_mxn)}
+                      {/* Se cobra la hija, no el padre: con un solo precio, es el de sus hijas. */}
+                      {r.precioDesde !== null ? `desde ${fmtMxn(r.precioDesde)}` : fmtMxn(padres.get(p.id)?.hijas[0]?.precio_base_mxn ?? p.precio_base_mxn)}
                     </span>
                     {conExistencia && (
                       <span className={["text-13", r.estado === "agotada" ? "font-semibold text-danger" : r.estado === "pocas" ? "font-semibold text-warning" : "text-ink-2"].join(" ")}>
