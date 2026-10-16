@@ -94,3 +94,20 @@ BEGIN
   END LOOP;
 END;
 $$;
+
+-- ── §2 La venta de tienda no va a cocina ─────────────────────────────────────
+-- En un negocio RETAIL el ticket nace con envio_cocina_automatico = false: cobrar no lo manda a
+-- cocina (trg_ticket_auto_enviar_cocina_al_pagar, 0008). abrir_ticket y el POS no cambian.
+CREATE OR REPLACE FUNCTION trg_tickets_tienda_sin_cocina()
+RETURNS trigger LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM tenants t WHERE t.id = NEW.tenant_id AND t.vertical_principal = 'RETAIL') THEN
+    NEW.envio_cocina_automatico := false;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_tickets_tienda_sin_cocina ON tickets;
+CREATE TRIGGER trg_tickets_tienda_sin_cocina
+  BEFORE INSERT ON tickets
+  FOR EACH ROW EXECUTE FUNCTION trg_tickets_tienda_sin_cocina();

@@ -70,4 +70,32 @@ BEGIN
   RAISE NOTICE '1 candados OK';
 END $$;
 
+-- 2) La venta de tienda no va a cocina.
+DO $$
+DECLARE
+  v_t     uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_suc   uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_caja  uuid := '99999999-0000-0000-0000-0000000000cc';
+  v_maria uuid := '99999999-0000-0000-0000-000000000001';
+  v_pla   uuid := 'c4c40000-0000-0000-0000-0000000000a1';
+  v_turno uuid; v_tk uuid; v_tot numeric;
+BEGIN
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
+  SELECT id INTO v_turno FROM turnos WHERE caja_id = v_caja AND estado = 'ABIERTO';
+
+  -- 2b) Restaurante: sigue en true.
+  v_tk := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smoke-c4-2b', v_maria);
+  IF NOT (SELECT envio_cocina_automatico FROM tickets WHERE id = v_tk) THEN RAISE EXCEPTION '2b: restaurante debía quedar en true'; END IF;
+
+  -- 2a) RETAIL: false, y al cobrar no pasa a EN_COCINA.
+  UPDATE tenants SET vertical_principal = 'RETAIL' WHERE id = v_t;
+  v_tk := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smoke-c4-2a', v_maria);
+  IF (SELECT envio_cocina_automatico FROM tickets WHERE id = v_tk) THEN RAISE EXCEPTION '2a: RETAIL debía quedar en false'; END IF;
+  PERFORM agregar_item_a_ticket(v_tk, v_pla, 1, NULL, '[]'::jsonb, 'smoke-c4-2a-1');
+  SELECT total_mxn INTO v_tot FROM tickets WHERE id = v_tk;
+  PERFORM aplicar_pago(v_tk, 'EFECTIVO'::metodo_pago, v_tot, v_tot, NULL, NULL, NULL, false, NULL, 'smoke-c4-2a-pago');
+  IF (SELECT estado_cocina::text FROM tickets WHERE id = v_tk) = 'EN_COCINA' THEN RAISE EXCEPTION '2a: la venta de tienda fue a cocina'; END IF;
+  RAISE NOTICE '2 sin cocina OK';
+END $$;
+
 ROLLBACK;
