@@ -153,6 +153,8 @@ export const productoSchema = z.object({
   precio_base_mxn: z.number({ error: "Precio inválido" }).min(0, "El precio no puede ser negativo"),
   descripcion: z.string().trim().max(500).optional().or(z.literal("")),
   codigo_interno: z.string().trim().max(50).optional().or(z.literal("")),
+  codigo_barras: z.string().trim().max(50).optional().or(z.literal("")),
+  costo_mxn: z.number({ error: "Costo inválido" }).min(0, "El costo no puede ser negativo").optional(),
   estado: z.enum(["ACTIVO", "PAUSADO"]),
   agotado: z.boolean(),
   visible_en_pos: z.boolean(),
@@ -202,59 +204,32 @@ export type Producto = {
   iva_incluido_en_precio: boolean;
   /** true = producto padre de un combo (ADR 0015); se administra desde combos.ts, no desde este formulario. */
   es_combo: boolean;
+  /** Campos de tienda (giro RETAIL); en un restaurante quedan vacíos. */
+  codigo_barras: string | null;
+  costo_mxn: number | null;
+  controla_existencias: boolean;
+  /** Ejes de la variante de un padre (p. ej. ["Talla","Color"]); null si no tiene variantes. */
+  variante_ejes: string[] | null;
+  /** Cuántas variantes vivas tiene este padre. */
+  variantes: number;
 };
 
 type FilaProd = Omit<Producto, "categoriaNombre"> & { categoria: { nombre: string } | null };
 
-export async function listarProductos(): Promise<Producto[]> {
-  const { data, error } = await supabase
-    .from("productos")
-    .select(
-      "id, nombre, descripcion, codigo_interno, imagen_url, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, en_menu_general, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
-    )
-    .is("deleted_at", null)
-    .order("orden_visualizacion", { ascending: true });
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as unknown as FilaProd[]).map((f) => ({
-    id: f.id,
-    nombre: f.nombre,
-    descripcion: f.descripcion,
-    codigo_interno: f.codigo_interno,
-    imagen_url: f.imagen_url || null,
-    precio_base_mxn: Number(f.precio_base_mxn),
-    categoria_id: f.categoria_id,
-    categoriaNombre: f.categoria?.nombre ?? "—",
-    estado: f.estado,
-    agotado_manual: f.agotado_manual,
-    agotado_automatico: f.agotado_automatico,
-    visible_en_pos: f.visible_en_pos,
-    en_menu_general: f.en_menu_general !== false,
-    marca_virtual_id: f.marca_virtual_id ?? null,
-    area_cocina_id: f.area_cocina_id ?? null,
-    clave_sat: f.clave_sat ?? null,
-    tasa_iva: Number(f.tasa_iva),
-    iva_incluido_en_precio: f.iva_incluido_en_precio,
-    es_combo: Boolean(f.es_combo),
-  }));
-}
+const COLUMNAS_PRODUCTO =
+  "id, nombre, descripcion, codigo_interno, codigo_barras, costo_mxn, controla_existencias, variante_ejes, imagen_url, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, en_menu_general, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)";
 
-export async function obtenerProducto(id: string): Promise<Producto | null> {
-  const { data, error } = await supabase
-    .from("productos")
-    .select(
-      "id, nombre, descripcion, codigo_interno, imagen_url, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, en_menu_general, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
-    )
-    .eq("id", id)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) return null;
-  const f = data as unknown as FilaProd;
+function aProducto(f: FilaProd, variantes = 0): Producto {
   return {
     id: f.id,
     nombre: f.nombre,
     descripcion: f.descripcion,
     codigo_interno: f.codigo_interno,
+    codigo_barras: f.codigo_barras ?? null,
+    costo_mxn: f.costo_mxn == null ? null : Number(f.costo_mxn),
+    controla_existencias: Boolean(f.controla_existencias),
+    variante_ejes: f.variante_ejes ?? null,
+    variantes,
     imagen_url: f.imagen_url || null,
     precio_base_mxn: Number(f.precio_base_mxn),
     categoria_id: f.categoria_id,
@@ -273,6 +248,37 @@ export async function obtenerProducto(id: string): Promise<Producto | null> {
   };
 }
 
+export async function listarProductos(): Promise<Producto[]> {
+  const { data, error } = await supabase
+    .from("productos")
+    .select(COLUMNAS_PRODUCTO)
+    .is("deleted_at", null)
+    .is("producto_padre_id", null)
+    .order("orden_visualizacion", { ascending: true });
+  if (error) throw new Error(error.message);
+  // Cuántas variantes vivas tiene cada padre (solo tiendas; en un restaurante sale vacío).
+  const { data: hijas } = await supabase
+    .from("productos")
+    .select("producto_padre_id")
+    .is("deleted_at", null)
+    .not("producto_padre_id", "is", null);
+  const cuenta = new Map<string, number>();
+  for (const h of (hijas ?? []) as { producto_padre_id: string }[]) cuenta.set(h.producto_padre_id, (cuenta.get(h.producto_padre_id) ?? 0) + 1);
+  return ((data ?? []) as unknown as FilaProd[]).map((f) => aProducto(f, cuenta.get(f.id) ?? 0));
+}
+
+export async function obtenerProducto(id: string): Promise<Producto | null> {
+  const { data, error } = await supabase
+    .from("productos")
+    .select(COLUMNAS_PRODUCTO)
+    .eq("id", id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return aProducto(data as unknown as FilaProd);
+}
+
 // El agotado vive por sucursal (0152, ADR 0027): el producto solo guarda ACTIVO o PAUSADO, y sus
 // columnas agotado_* las deriva la base («agotado en todas»). `input.agotado` lo guarda el
 // formulario en la fila de cada sucursal (menu-sucursal.ts).
@@ -280,7 +286,11 @@ function resolverEstado(input: ProductoInput): EstadoProducto {
   return input.estado;
 }
 
-export async function crearProducto(input: ProductoInput, opciones: { enMenuGeneral?: boolean } = {}): Promise<string> {
+export type DatosTienda = { codigo_barras: string; costo_mxn: number | null; controla_existencias: boolean };
+const columnasTienda = (t?: DatosTienda) =>
+  t ? { codigo_barras: t.codigo_barras.trim() || null, costo_mxn: t.costo_mxn, controla_existencias: t.controla_existencias } : {};
+
+export async function crearProducto(input: ProductoInput, opciones: { enMenuGeneral?: boolean; tienda?: DatosTienda } = {}): Promise<string> {
   const datos = productoSchema.parse(input);
   const tid = await tenantId();
   const estado = resolverEstado(datos);
@@ -310,6 +320,7 @@ export async function crearProducto(input: ProductoInput, opciones: { enMenuGene
       tasa_iva: datos.tasa_iva,
       iva_incluido_en_precio: datos.iva_incluido_en_precio,
       orden_visualizacion: orden,
+      ...columnasTienda(opciones.tienda),
     })
     .select("id")
     .single();
@@ -317,7 +328,7 @@ export async function crearProducto(input: ProductoInput, opciones: { enMenuGene
   return String((creado as { id: string }).id);
 }
 
-export async function actualizarProducto(id: string, input: ProductoInput): Promise<void> {
+export async function actualizarProducto(id: string, input: ProductoInput, tienda?: DatosTienda): Promise<void> {
   const datos = productoSchema.parse(input);
   const estado = resolverEstado(datos);
   const { error } = await supabase
@@ -335,6 +346,7 @@ export async function actualizarProducto(id: string, input: ProductoInput): Prom
       clave_sat: datos.clave_sat || null,
       tasa_iva: datos.tasa_iva,
       iva_incluido_en_precio: datos.iva_incluido_en_precio,
+      ...columnasTienda(tienda),
     })
     .eq("id", id);
   if (error) throw new Error(error.message);
