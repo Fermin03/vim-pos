@@ -121,8 +121,9 @@ export function renglonTienda(p: Producto, productos: Producto[]): { nombre: str
 }
 
 /** ¿Vender `enCarrito` piezas dejaría la existencia de esta sucursal en cero o menos? No impide nada. */
-export function sinExistencia(p: Producto, enCarrito: number, existencias: Existencia[], sucursalId: string): boolean {
-  return !!p.controla_existencias && (cantidadDe(p.id, existencias, sucursalId)?.cantidad ?? 0) - enCarrito <= 0;
+export function sinExistencia(p: Producto, enCarrito: number, existencias: Existencia[] | null, sucursalId: string): boolean {
+  // null = todavía no se leyeron: sin datos no se avisa (un aviso falso en cada renglón es peor que ninguno).
+  return !!existencias && !!p.controla_existencias && (cantidadDe(p.id, existencias, sucursalId)?.cantidad ?? 0) - enCarrito <= 0;
 }
 
 export type Escaneo =

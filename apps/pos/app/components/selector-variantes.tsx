@@ -38,7 +38,8 @@ export function SelectorVariantes({
   marcada,
 }: {
   padre: PadreTienda;
-  existencias: Existencia[];
+  /** null = aún no se leyeron: las celdas enseñan «—» y no un estado. */
+  existencias: Existencia[] | null;
   sucursalId: string;
   sucursales: { id: string; nombre: string }[];
   actualizadoA: string | null;
@@ -49,7 +50,7 @@ export function SelectorVariantes({
 }) {
   const [viendo, setViendo] = useState(sucursalId);
   const propia = viendo === sucursalId;
-  const m = matrizVariantes(padre, existencias, viendo);
+  const m = matrizVariantes(padre, existencias ?? [], viendo);
   // Se vende aquí y no está agotada a mano en esta sucursal (R7). Lo demás se ve, pero no se toca.
   const vendible = (h: Producto) => h.seVendeAqui !== false && !h.agotado;
   const aqui = padre.hijas.filter((h) => h.seVendeAqui !== false);
@@ -129,16 +130,16 @@ export function SelectorVariantes({
                   type="button"
                   disabled={!tocable}
                   onClick={() => onElegir(celda.hija)}
-                  aria-label={`${[c, r].filter(Boolean).join(" ")}: ${piezas(celda.cantidad)} piezas`}
+                  aria-label={`${[c, r].filter(Boolean).join(" ")}: ${existencias ? `${piezas(celda.cantidad)} piezas` : "existencia sin leer"}`}
                   className={[
                     "flex min-h-14 flex-col items-center justify-center rounded border px-1 py-1.5",
                     tocable
-                      ? `${ESTILO[celda.estado]} transition-[transform,border-color] duration-150 ease-vim hover:border-ink active:scale-[.97]`
+                      ? `${existencias ? ESTILO[celda.estado] : "border-line-strong bg-surface text-ink"} transition-[transform,border-color] duration-150 ease-vim hover:border-ink active:scale-[.97]`
                       : "cursor-default border-line bg-bg text-ink-3",
                     esMarcada ? "ring-2 ring-ink ring-offset-1" : "",
                   ].join(" ")}
                 >
-                  <span className="font-display text-20 font-bold leading-none tabular-nums">{piezas(celda.cantidad)}</span>
+                  <span className="font-display text-20 font-bold leading-none tabular-nums">{existencias ? piezas(celda.cantidad) : "—"}</span>
                   {precio && <span className="mt-1 text-12 tabular-nums text-ink-2">{precio}</span>}
                   {propia && !tocable && (
                     <span className="mt-1 text-11 font-semibold text-ink-3">{celda.hija.seVendeAqui === false ? "No se vende aquí" : "No se vende por ahora"}</span>

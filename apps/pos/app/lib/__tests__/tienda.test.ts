@@ -128,6 +128,7 @@ describe("sinExistencia", () => {
     expect(sinExistencia(p, 2, [ex("A", 2)], "s1")).toBe(true);
     expect(sinExistencia(p, 1, [ex("A", 2)], "s1")).toBe(false);
     expect(sinExistencia(p, 1, [], "s1")).toBe(true);
+    expect(sinExistencia(p, 1, null, "s1")).toBe(false);
   });
   it("no marca lo que no controla existencias", () => {
     expect(sinExistencia({ ...p, controla_existencias: false }, 5, [ex("A", 1)], "s1")).toBe(false);

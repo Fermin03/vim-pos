@@ -570,7 +570,7 @@ export function HomePos({
   /** Selector de talla y color abierto y franja del escáner: estado de aquí para que su Escape viva en la pila. */
   const [selectorRetail, setSelectorRetail] = useState<PadreTienda | null>(null);
   const [avisoRetail, setAvisoRetail] = useState<AvisoEscaneo | null>(null);
-  const [existencias, setExistencias] = useState<Existencia[]>([]);
+  const [existencias, setExistencias] = useState<Existencia[] | null>(null);
   /** Producto del último agregado: su renglón queda marcado hasta la siguiente acción. */
   const [ultimoTienda, setUltimoTienda] = useState<string | null>(null);
   const [sucursalesTienda, setSucursalesTienda] = useState<{ id: string; nombre: string }[]>([]);
@@ -840,13 +840,13 @@ export function HomePos({
       // existencia en cero sí se vende.
       if (p.agotado) { setAvisoRetail({ tipo: "no-se-vende" }); return; }
       setAvisoRetail(null);
-      setUltimoTienda(p.id);
       colaTienda.current = colaTienda.current.then(async () => {
         try {
           const grupos = await obtenerGruposDeProducto(token, p.id);
           if (grupos.length > 0) { setModGrupos({ producto: p, grupos }); return; }
-          if (ticketBd) { await agregarSuelto(p, [], null); return; }
-          dispatch({ tipo: "agregar", sumarSiIgual: true, linea: { clientId: nuevoClientId(), producto: p, cantidad: 1, modificadores: [], notaCocina: null } });
+          if (ticketBd) await agregarSuelto(p, [], null);
+          else dispatch({ tipo: "agregar", sumarSiIgual: true, linea: { clientId: nuevoClientId(), producto: p, cantidad: 1, modificadores: [], notaCocina: null } });
+          setUltimoTienda(p.id);
         } catch (e) {
           setError(e instanceof Error ? e.message : "No se pudo agregar el producto");
         }
@@ -1998,7 +1998,7 @@ export function HomePos({
               };
               setDatosTicket(datos);
               setTicketImpresoId(ticketId);
-              setDatosComanda(datosCom);
+              setDatosComanda(datos.tienda ? null : datosCom);
               setEstadoTicket("lista");
               // Solo "Para llevar": es el único modo que va del carrito al cobro sin pasar por la
               // lista de cuentas, así que no hay un momento anterior para imprimirlo. La regla y su

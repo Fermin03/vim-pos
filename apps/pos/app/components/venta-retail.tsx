@@ -46,7 +46,8 @@ export function PanelVentaRetail({
 }: {
   productos: Producto[] | null;
   categorias: Categoria[] | null;
-  existencias: Existencia[];
+  /** null = aún no se leyeron: no se enseña existencia (nunca una «Agotada» falsa). */
+  existencias: Existencia[] | null;
   sucursalId: string;
   sucursales: { id: string; nombre: string }[];
   /** Hora ISO del último pull de la caja; `null` en el POS web («al momento»). */
@@ -261,9 +262,9 @@ export function PanelVentaRetail({
               style={{ gridTemplateColumns: `repeat(${rejilla.columnas}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${rejilla.filas}, minmax(0, 1fr))` }}
             >
               {enPantalla.map((p) => {
-                const r = resumenVitrina(p, padres, existencias, sucursalId);
+                const r = resumenVitrina(p, padres, existencias ?? [], sucursalId);
                 // Solo hay existencia que enseñar si el producto la lleva (las hijas siempre la llevan).
-                const conExistencia = padres.has(p.id) || p.controla_existencias === true;
+                const conExistencia = existencias !== null && (padres.has(p.id) || p.controla_existencias === true);
                 return (
                   <button
                     key={p.id}

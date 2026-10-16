@@ -401,3 +401,10 @@ describe("construirTicketJob — SKU de tienda", () => {
     expect(construirTicketJob(conSku(undefined))).toEqual(construirTicketJob(sinSku));
   });
 });
+
+describe("construirTicketJob — Servicio en una tienda", () => {
+  it("tienda: la fila Servicio dice Venta; restaurante conserva su modo", () => {
+    expect(construirTicketJob({ ...DATOS, tienda: true }).bloques).toContainEqual({ t: "fila", izq: "Servicio", der: "Venta" });
+    expect(construirTicketJob(DATOS).bloques).toContainEqual({ t: "fila", izq: "Servicio", der: "Para llevar" });
+  });
+});

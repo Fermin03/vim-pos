@@ -44,7 +44,7 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
   // antes de asignar: imprimir y asignar son acciones sueltas y ese orden es válido.
   if (d.entrega?.repartidor) b.push({ t: "fila", izq: "Repartidor", der: d.entrega.repartidor, bold: true });
   b.push({ t: "fila", izq: "Caja", der: d.meta.caja });
-  if (d.meta.modoServicio) b.push({ t: "fila", izq: "Servicio", der: d.meta.modoServicio });
+  if (d.meta.modoServicio) b.push({ t: "fila", izq: "Servicio", der: d.tienda ? "Venta" : d.meta.modoServicio });
   // Nombre suelto de la cuenta (Pick-up): es como se identifica el pedido al entregarlo.
   if (d.meta.nombreCliente) b.push({ t: "fila", izq: "Cliente", der: d.meta.nombreCliente, bold: true });
 
