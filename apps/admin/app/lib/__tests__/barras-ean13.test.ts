@@ -16,7 +16,7 @@ describe("etiquetas", () => {
     expect(renderToStaticMarkup(createElement(BarrasEan13, { codigo: "POL-M" }))).toBe("");
   });
   it("hoja carta 3×10 y rollo a su tamaño", () => {
-    expect(formatoEtiqueta({ tipo: "carta" })).toMatchObject({ pagina: "letter", columnas: 3 });
-    expect(formatoEtiqueta({ tipo: "rollo", anchoMm: 50, altoMm: 25 })).toMatchObject({ pagina: "50mm 25mm", columnas: 1 });
+    expect(formatoEtiqueta({ tipo: "carta" })).toMatchObject({ pagina: "letter", columnas: 3, gap: "3.175mm" });
+    expect(formatoEtiqueta({ tipo: "rollo", anchoMm: 50, altoMm: 25 })).toMatchObject({ pagina: "50mm 25mm", columnas: 1, gap: "0" });
   });
 });

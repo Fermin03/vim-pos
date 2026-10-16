@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { CatalogoTabs } from "../../../components/catalogo-tabs";
@@ -15,6 +16,8 @@ import { existenciasDeSucursal, listarProductosEtiquetables, type ProductoEtique
 
 const codigoDe = (p: ProductoEtiquetable) => p.codigo_barras || p.codigo_interno;
 const entero = (s: string, def: number) => (Number(s) > 0 ? Math.floor(Number(s)) : def);
+/** Cantidad de etiquetas: entero de 0 a 999; 0 = no imprimir. */
+const acotar = (n: number) => Math.min(999, Math.max(0, Math.floor(n) || 0));
 
 /** Una etiqueta: nombre (2 renglones), precio, barras (o el código en texto) y el código en dígitos. */
 function Etiqueta({ p, ancho, alto }: { p: ProductoEtiquetable; ancho: string; alto: string }) {
@@ -50,6 +53,8 @@ export default function EtiquetasPage() {
   const [q, setQ] = useState("");
   const [marcados, setMarcados] = useState<Set<string>>(new Set());
   const [cantidades, setCantidades] = useState<Record<string, string>>({});
+  // La zona de impresión solo existe mientras se imprime: así no hay miles de SVG ocultos en pantalla.
+  const [imprimiendo, setImprimiendo] = useState(false);
 
   useEffect(() => {
     if (!tienda) return;
@@ -57,6 +62,14 @@ export default function EtiquetasPage() {
       .then(([p, s]) => { setProductos(p); setSucursales(s); setSucursal(s[0]?.id ?? ""); })
       .catch((e) => setError(mensajeError(e, "No se pudieron cargar los productos.")));
   }, [tienda]);
+
+  useEffect(() => {
+    if (!imprimiendo) return;
+    const fin = () => setImprimiendo(false);
+    window.addEventListener("afterprint", fin);
+    const r = requestAnimationFrame(() => window.print());
+    return () => { window.removeEventListener("afterprint", fin); cancelAnimationFrame(r); };
+  }, [imprimiendo]);
 
   useEffect(() => {
     if (!sucursal) return;
@@ -69,7 +82,7 @@ export default function EtiquetasPage() {
     return t ? productos.filter((p) => `${p.nombre} ${p.codigo_interno} ${p.codigo_barras}`.toLowerCase().includes(t)) : productos;
   }, [productos, q]);
   const propuesta = (p: ProductoEtiquetable) => Math.max(1, Math.floor(existencias[p.id] ?? 1));
-  const cantidad = (p: ProductoEtiquetable) => entero(cantidades[p.id] ?? "", propuesta(p));
+  const cantidad = (p: ProductoEtiquetable) => acotar(cantidades[p.id] === undefined ? propuesta(p) : Number(cantidades[p.id]));
   const aImprimir = productos.filter((p) => marcados.has(p.id));
   const total = aImprimir.reduce((n, p) => n + cantidad(p), 0);
   const muestra = aImprimir[0] ?? visibles[0];
@@ -84,7 +97,7 @@ export default function EtiquetasPage() {
         titulo="Etiquetas"
         subtitulo="Imprime etiquetas con código de barras para tus productos."
         migas={[{ label: "Catálogo", href: "/catalogo" }, { label: "Etiquetas" }]}
-        right={tienda ? <Button onClick={() => window.print()} disabled={total === 0}>{total > 0 ? `Imprimir ${total}` : "Imprimir"}</Button> : undefined}
+        right={tienda ? <Button onClick={() => setImprimiendo(true)} disabled={total === 0}>{total > 0 ? `Imprimir ${total}` : "Imprimir"}</Button> : undefined}
       />
       <CatalogoTabs />
       <PageBody>
@@ -95,10 +108,9 @@ export default function EtiquetasPage() {
               @media screen { .zona-impresion { display: none; } }
               @media print {
                 @page { size: ${formato.pagina}; margin: ${formato.columnas > 1 ? "12.7mm 4.8mm" : "0"}; }
-                body * { visibility: hidden; }
-                .zona-impresion, .zona-impresion * { visibility: visible; }
-                .zona-impresion { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(${formato.columnas}, ${formato.ancho}); grid-auto-rows: ${formato.alto}; }
-                .etiqueta { break-inside: avoid; overflow: hidden; padding: 1.5mm; font-family: Arial, sans-serif; color: #000; }
+                body > *:not(.zona-impresion) { display: none !important; }
+                .zona-impresion { display: grid; position: static; grid-template-columns: repeat(${formato.columnas}, ${formato.ancho}); column-gap: ${formato.gap}; ${formato.columnas > 1 ? `grid-auto-rows: ${formato.alto};` : ""} }
+                .etiqueta { break-inside: avoid; ${formato.columnas > 1 ? "" : "break-after: page;"} overflow: hidden; padding: 1.5mm; font-family: Arial, sans-serif; color: #000; }
               }
             `}</style>
 
@@ -161,9 +173,9 @@ export default function EtiquetasPage() {
                       </div>
                     </div>
                     <input
-                      type="number" min={1} max={999} aria-label={`Cantidad de ${p.nombre}`}
-                      value={cantidades[p.id] ?? String(propuesta(p))}
-                      onChange={(e) => setCantidades((c) => ({ ...c, [p.id]: e.target.value }))}
+                      type="number" min={0} max={999} aria-label={`Cantidad de ${p.nombre}`}
+                      value={cantidades[p.id] ?? String(acotar(propuesta(p)))}
+                      onChange={(e) => setCantidades((c) => ({ ...c, [p.id]: e.target.value === "" ? "" : String(acotar(Number(e.target.value))) }))}
                       className="h-10 w-20 rounded border border-line-strong bg-surface px-2 text-right text-13 tabular-nums outline-none focus:border-ink"
                     />
                   </div>
@@ -171,11 +183,14 @@ export default function EtiquetasPage() {
               })}
             </div>
 
-            <div className="zona-impresion">
-              {aImprimir.flatMap((p) => Array.from({ length: cantidad(p) }, (_, i) => (
-                <Etiqueta key={`${p.id}-${i}`} p={p} ancho={formato.ancho} alto={formato.alto} />
-              )))}
-            </div>
+            {imprimiendo && createPortal(
+              <div className="zona-impresion">
+                {aImprimir.flatMap((p) => Array.from({ length: cantidad(p) }, (_, i) => (
+                  <Etiqueta key={`${p.id}-${i}`} p={p} ancho={formato.ancho} alto={formato.alto} />
+                )))}
+              </div>,
+              document.body,
+            )}
           </>
         )}
       </PageBody>

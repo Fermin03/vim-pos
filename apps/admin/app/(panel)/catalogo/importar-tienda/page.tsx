@@ -17,7 +17,7 @@ function descargarPlantilla() {
   const url = URL.createObjectURL(new Blob(["﻿" + PLANTILLA_TIENDA], { type: "text/csv;charset=utf-8" }));
   const a = Object.assign(document.createElement("a"), { href: url, download: "plantilla-tienda.csv" });
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export default function ImportarTiendaPage() {

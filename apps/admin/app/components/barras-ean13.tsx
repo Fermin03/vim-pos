@@ -21,6 +21,6 @@ export type Formato = { tipo: "carta" } | { tipo: "rollo"; anchoMm: number; alto
 /** Hoja carta de 3×10 (etiquetas adhesivas comunes) o una etiqueta de rollo por página. */
 export function formatoEtiqueta(f: Formato) {
   return f.tipo === "carta"
-    ? { pagina: "letter", ancho: "66.7mm", alto: "25.4mm", columnas: 3 }
-    : { pagina: `${f.anchoMm}mm ${f.altoMm}mm`, ancho: `${f.anchoMm}mm`, alto: `${f.altoMm}mm`, columnas: 1 };
+    ? { pagina: "letter", ancho: "66.7mm", alto: "25.4mm", columnas: 3, gap: "3.175mm" }
+    : { pagina: `${f.anchoMm}mm ${f.altoMm}mm`, ancho: `${f.anchoMm}mm`, alto: `${f.altoMm}mm`, columnas: 1, gap: "0" };
 }
