@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { input } from "./campos";
 import { buscarClavesSat, type ClaveSat } from "../lib/clave-sat";
@@ -11,10 +11,13 @@ export function BuscadorClaveSat({ onElegir }: { onElegir: (clave: string) => vo
   const [res, setRes] = useState<ClaveSat[] | null>(null);
   const [buscando, setBuscando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const ultima = useRef(0);
   async function buscar() {
+    const n = ++ultima.current; // solo cuenta la búsqueda más reciente
     setBuscando(true); setError(null);
-    try { setRes(await buscarClavesSat(texto)); } catch (e) { setError(mensajeError(e, "No se pudo buscar")); setRes(null); }
-    finally { setBuscando(false); }
+    try { const r = await buscarClavesSat(texto); if (n === ultima.current) setRes(r); }
+    catch (e) { if (n === ultima.current) { setError(mensajeError(e, "No se pudo buscar")); setRes(null); } }
+    finally { if (n === ultima.current) setBuscando(false); }
   }
   return (
     <div className="mt-2">

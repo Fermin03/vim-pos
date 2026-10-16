@@ -601,7 +601,7 @@ export function ProductoForm({
           </div>
           <BuscadorClaveSat onElegir={setClaveSat} />
           <p className="-mt-1 text-13 text-ink-2">
-            {AYUDA_IVA} {tienda ? "Cada prenda necesita su clave para facturar; búscala abajo." : "Sin clave, se factura como servicio de restaurante."}
+            {AYUDA_IVA} {tienda ? "Cada prenda necesita su clave para facturar; búscala arriba." : "Sin clave, se factura como servicio de restaurante."}
           </p>
           <label className="flex min-h-[44px] items-center gap-2.5">
             <input type="checkbox" className="h-5 w-5 accent-ink" checked={ivaIncluido} onChange={(e) => setIvaIncluido(e.target.checked)} />
