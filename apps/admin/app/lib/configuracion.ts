@@ -386,6 +386,8 @@ export const sucursalSchema = z.object({
   direccion_calle: z.string().trim().max(255).optional().or(z.literal("")),
   ciudad: z.string().trim().max(100).optional().or(z.literal("")),
   estado_geo: z.string().trim().max(50).optional().or(z.literal("")),
+  // De aquí sale el municipio para cargar las colonias (sembrar_colonias, 0187).
+  codigo_postal: z.string().trim().regex(/^\d{5}$/, "El código postal lleva 5 dígitos").optional().or(z.literal("")),
   telefono: z.string().trim().max(20).optional().or(z.literal("")),
   activa: z.boolean(),
 });
@@ -405,7 +407,7 @@ type FilaSuc = Omit<Sucursal, "nCajas" | "nAreas"> & {
 export async function listarSucursales(): Promise<Sucursal[]> {
   const { data, error } = await supabase
     .from("sucursales")
-    .select("id, codigo, nombre, direccion_calle, ciudad, estado_geo, telefono, activa, cajas(count), areas_cocina(count)")
+    .select("id, codigo, nombre, direccion_calle, ciudad, estado_geo, codigo_postal, telefono, activa, cajas(count), areas_cocina(count)")
     .is("deleted_at", null)
     .order("nombre", { ascending: true });
   if (error) throw new Error(error.message);
@@ -416,6 +418,7 @@ export async function listarSucursales(): Promise<Sucursal[]> {
     direccion_calle: f.direccion_calle ?? "",
     ciudad: f.ciudad ?? "",
     estado_geo: f.estado_geo ?? "",
+    codigo_postal: f.codigo_postal ?? "",
     telefono: f.telefono ?? "",
     activa: f.activa,
     nCajas: f.cajas?.[0]?.count ?? 0,
@@ -434,6 +437,7 @@ export async function crearSucursal(input: SucursalInput): Promise<string> {
     direccion_calle: datos.direccion_calle || null,
     ciudad: datos.ciudad || null,
     estado_geo: datos.estado_geo || null,
+    codigo_postal: datos.codigo_postal || null,
     telefono: datos.telefono || null,
     activa: datos.activa,
   }).select("id").single();
@@ -451,6 +455,7 @@ export async function actualizarSucursal(id: string, input: SucursalInput): Prom
       direccion_calle: datos.direccion_calle || null,
       ciudad: datos.ciudad || null,
       estado_geo: datos.estado_geo || null,
+      codigo_postal: datos.codigo_postal || null,
       telefono: datos.telefono || null,
       activa: datos.activa,
     })
