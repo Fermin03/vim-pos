@@ -486,3 +486,130 @@ DROP TRIGGER IF EXISTS trg_cancelaciones_z_existencias ON cancelaciones_ticket;
 CREATE TRIGGER trg_cancelaciones_z_existencias
   AFTER INSERT ON cancelaciones_ticket
   FOR EACH ROW EXECUTE FUNCTION trg_existencias_por_cancelacion();
+
+-- ── §5 Movimientos a mano: entrada, ajuste, merma y conteo ───────────────────
+-- Las escribe el dueño (o quien tenga config.productos) desde el admin, con el módulo encendido.
+-- SECURITY DEFINER porque la app no tiene INSERT sobre movimientos_producto; por eso cada función
+-- comprueba el negocio, el permiso y el módulo antes de tocar nada.
+CREATE OR REPLACE FUNCTION _existencias_puede_escribir()
+RETURNS uuid LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_t uuid := current_tenant_id();
+BEGIN
+  IF v_t IS NULL OR NOT usuario_actual_tiene_permiso('config.productos') THEN
+    RAISE EXCEPTION 'SIN_PERMISO: tu rol no puede mover existencias' USING ERRCODE = '42501';
+  END IF;
+  IF NOT COALESCE((modulos_efectivos(v_t)->'efectivos'->>'existencias')::boolean, false) THEN
+    RAISE EXCEPTION 'MODULO_APAGADO: existencias no está encendido para este negocio' USING ERRCODE = '42501';
+  END IF;
+  RETURN v_t;
+END;
+$$;
+REVOKE ALL ON FUNCTION _existencias_puede_escribir() FROM PUBLIC, anon, authenticated;
+
+-- Producto y sucursal válidos para un movimiento a mano, con mensaje que el dueño entiende.
+CREATE OR REPLACE FUNCTION _existencias_validar(p_tenant uuid, p_sucursal uuid, p_producto uuid)
+RETURNS void LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM sucursales WHERE id = p_sucursal AND tenant_id = p_tenant) THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: la sucursal no es de tu negocio' USING ERRCODE = '22023';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM productos WHERE id = p_producto AND tenant_id = p_tenant AND deleted_at IS NULL
+                   AND controla_existencias AND variante_ejes IS NULL) THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: ese producto no lleva existencias (o es el padre: elige la variante)' USING ERRCODE = '22023';
+  END IF;
+END;
+$$;
+REVOKE ALL ON FUNCTION _existencias_validar(uuid, uuid, uuid) FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION registrar_movimiento_producto(
+  p_sucursal       uuid,
+  p_producto       uuid,
+  p_tipo           movimiento_producto_tipo,
+  p_cantidad       numeric,
+  p_costo_unitario numeric DEFAULT NULL,
+  p_motivo         text DEFAULT NULL,
+  p_proveedor      uuid DEFAULT NULL
+) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_t   uuid := _existencias_puede_escribir();
+  v_q   numeric;
+  v_id  uuid;
+BEGIN
+  PERFORM _existencias_validar(v_t, p_sucursal, p_producto);
+  IF p_tipo NOT IN ('ENTRADA', 'MERMA', 'AJUSTE') THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: a mano solo se registran entradas, mermas y ajustes' USING ERRCODE = '22023';
+  END IF;
+  IF p_cantidad IS NULL OR p_cantidad = 0
+     OR (p_tipo IN ('ENTRADA', 'MERMA') AND p_cantidad < 0) THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: cantidad inválida para %', p_tipo USING ERRCODE = '22023';
+  END IF;
+  IF p_costo_unitario IS NOT NULL AND (p_costo_unitario < 0 OR p_tipo <> 'ENTRADA') THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: el costo solo va en una entrada y no puede ser negativo' USING ERRCODE = '22023';
+  END IF;
+  IF p_proveedor IS NOT NULL AND NOT EXISTS (SELECT 1 FROM proveedores WHERE id = p_proveedor AND tenant_id = v_t) THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: el proveedor no es de tu negocio' USING ERRCODE = '22023';
+  END IF;
+
+  v_q := CASE p_tipo WHEN 'MERMA' THEN -p_cantidad ELSE p_cantidad END;
+  INSERT INTO movimientos_producto (tenant_id, sucursal_id, producto_id, tipo, cantidad, costo_unitario_mxn,
+                                    proveedor_id, motivo, usuario_id)
+  VALUES (v_t, p_sucursal, p_producto, p_tipo, v_q, p_costo_unitario, p_proveedor, p_motivo, auth.uid())
+  RETURNING id INTO v_id;
+
+  IF p_tipo = 'ENTRADA' AND p_costo_unitario IS NOT NULL THEN
+    UPDATE productos SET costo_mxn = p_costo_unitario, updated_at = now() WHERE id = p_producto;
+  END IF;
+  RETURN v_id;
+END;
+$$;
+REVOKE ALL ON FUNCTION registrar_movimiento_producto(uuid, uuid, movimiento_producto_tipo, numeric, numeric, text, uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION registrar_movimiento_producto(uuid, uuid, movimiento_producto_tipo, numeric, numeric, text, uuid) TO authenticated, service_role;
+
+-- Conteo físico: lo contado manda. Se registra la diferencia contra el sistema al momento de
+-- confirmar (con la fila bloqueada, para que una venta simultánea no se pierda). Todo o nada.
+CREATE OR REPLACE FUNCTION registrar_conteo(p_sucursal uuid, p_conteo jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_t       uuid := _existencias_puede_escribir();
+  v_fila    jsonb;
+  v_prod    uuid;
+  v_contado numeric;
+  v_sistema numeric;
+  v_n       int := 0;
+  v_dif     jsonb := '[]'::jsonb;
+BEGIN
+  IF p_conteo IS NULL OR jsonb_typeof(p_conteo) <> 'array' OR jsonb_array_length(p_conteo) = 0 THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: el conteo viene vacío' USING ERRCODE = '22023';
+  END IF;
+  IF (SELECT count(DISTINCT e->>'producto_id') FROM jsonb_array_elements(p_conteo) e) <> jsonb_array_length(p_conteo) THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: un producto viene dos veces en el conteo' USING ERRCODE = '22023';
+  END IF;
+
+  FOR v_fila IN SELECT value FROM jsonb_array_elements(p_conteo) LOOP
+    BEGIN
+      v_prod    := (v_fila->>'producto_id')::uuid;
+      v_contado := (v_fila->>'contado')::numeric;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE EXCEPTION 'DATOS_INVALIDOS: renglón de conteo mal formado: %', v_fila USING ERRCODE = '22023';
+    END;
+    IF v_prod IS NULL OR v_contado IS NULL OR v_contado < 0 THEN
+      RAISE EXCEPTION 'DATOS_INVALIDOS: renglón de conteo mal formado: %', v_fila USING ERRCODE = '22023';
+    END IF;
+    PERFORM _existencias_validar(v_t, p_sucursal, v_prod);
+
+    SELECT cantidad INTO v_sistema FROM producto_existencias
+     WHERE sucursal_id = p_sucursal AND producto_id = v_prod FOR UPDATE;
+    v_sistema := COALESCE(v_sistema, 0);
+    IF v_contado <> v_sistema THEN
+      INSERT INTO movimientos_producto (tenant_id, sucursal_id, producto_id, tipo, cantidad, motivo, usuario_id)
+      VALUES (v_t, p_sucursal, v_prod, 'CONTEO', v_contado - v_sistema, 'Conteo físico', auth.uid());
+      v_n := v_n + 1;
+    END IF;
+    v_dif := v_dif || jsonb_build_object('producto_id', v_prod, 'sistema', v_sistema,
+                                         'contado', v_contado, 'diferencia', v_contado - v_sistema);
+  END LOOP;
+  RETURN jsonb_build_object('ajustados', v_n, 'diferencias', v_dif);
+END;
+$$;
+REVOKE ALL ON FUNCTION registrar_conteo(uuid, jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION registrar_conteo(uuid, jsonb) TO authenticated, service_role;

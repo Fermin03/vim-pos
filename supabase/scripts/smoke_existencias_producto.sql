@@ -423,4 +423,86 @@ BEGIN
   RAISE NOTICE '5 venta, reabrir, cancelación, devolución y cambio de talla OK';
 END $$;
 
+-- 6) Movimientos a mano: permiso, módulo, entradas malas, costo y conteo.
+DO $$
+DECLARE
+  v_t      uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_suc    uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_maria  uuid := '99999999-0000-0000-0000-000000000001';
+  v_dueno  uuid := '99999999-0000-0000-0000-0000000000e1';
+  v_m      uuid := 'a7a70000-0000-0000-0000-0000000000a1';
+  v_g      uuid := 'a7a70000-0000-0000-0000-0000000000a2';
+  v_padre  uuid := 'a7a70000-0000-0000-0000-0000000000a0';
+  v_ajeno  uuid := 'a7a70000-0000-0000-0000-0000000000e1';
+  v_antes  numeric; v_r jsonb; v_n int;
+BEGIN
+  -- 6a) La cajera no tiene config.productos.
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
+  BEGIN
+    PERFORM registrar_movimiento_producto(v_suc, v_m, 'ENTRADA', 5);
+    RAISE EXCEPTION '6a: la cajera no debía poder registrar entradas';
+  EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'SIN_PERMISO%' THEN RAISE; END IF;
+  END;
+
+  -- Como el dueño.
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_dueno::text, 'tenant_id', v_t::text)::text, true);
+
+  -- 6b) Entrada de 5 a $160: sube 5 y el costo queda en 160.
+  SELECT cantidad INTO v_antes FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_m;
+  PERFORM registrar_movimiento_producto(v_suc, v_m, 'ENTRADA', 5, 160, 'Llegó pedido');
+  IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_m) <> v_antes + 5 THEN
+    RAISE EXCEPTION '6b: la entrada no sumó 5'; END IF;
+  IF (SELECT costo_mxn FROM productos WHERE id = v_m) <> 160 THEN RAISE EXCEPTION '6b: el costo no quedó en 160'; END IF;
+
+  -- 6c) Merma de 1 (positiva al pedirla, negativa en el libro) y ajuste de −2.
+  PERFORM registrar_movimiento_producto(v_suc, v_m, 'MERMA', 1, NULL, 'Mancha');
+  PERFORM registrar_movimiento_producto(v_suc, v_m, 'AJUSTE', -2, NULL, 'Error de captura');
+  IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_m) <> v_antes + 2 THEN
+    RAISE EXCEPTION '6c: merma y ajuste no cuadran'; END IF;
+
+  -- 6d) Entradas malas: cero, merma negativa, tipo no manual, padre, producto ajeno.
+  BEGIN PERFORM registrar_movimiento_producto(v_suc, v_m, 'ENTRADA', 0);
+        RAISE EXCEPTION '6d: entrada 0'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+  BEGIN PERFORM registrar_movimiento_producto(v_suc, v_m, 'MERMA', -1);
+        RAISE EXCEPTION '6d: merma negativa'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+  BEGIN PERFORM registrar_movimiento_producto(v_suc, v_m, 'VENTA', 1);
+        RAISE EXCEPTION '6d: venta a mano'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+  BEGIN PERFORM registrar_movimiento_producto(v_suc, v_padre, 'ENTRADA', 1);
+        RAISE EXCEPTION '6d: padre'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+  BEGIN PERFORM registrar_movimiento_producto(v_suc, v_ajeno, 'ENTRADA', 1);
+        RAISE EXCEPTION '6d: ajeno'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+
+  -- 6e) Conteo: M contado 4 y G contado 0 (G venía en −1 por la venta del bloque 5). Los dos quedan
+  --     en lo contado; un segundo conteo idéntico no genera nada.
+  v_r := registrar_conteo(v_suc, jsonb_build_array(
+           jsonb_build_object('producto_id', v_m, 'contado', 4),
+           jsonb_build_object('producto_id', v_g, 'contado', 0)));
+  IF (v_r->>'ajustados')::int <> 2 THEN RAISE EXCEPTION '6e: debía ajustar 2, ajustó %', v_r; END IF;
+  IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_m) <> 4
+     OR (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_g) <> 0 THEN
+    RAISE EXCEPTION '6e: M debía quedar en 4 y G en 0 tras el conteo'; END IF;
+  v_r := registrar_conteo(v_suc, jsonb_build_array(jsonb_build_object('producto_id', v_m, 'contado', 4)));
+  IF (v_r->>'ajustados')::int <> 0 THEN RAISE EXCEPTION '6e: un conteo igual no debía ajustar nada'; END IF;
+
+  -- 6f) Conteo malo (producto repetido, contado negativo, ajeno): nada cambia.
+  SELECT count(*) INTO v_n FROM movimientos_producto WHERE tenant_id = v_t;
+  BEGIN PERFORM registrar_conteo(v_suc, jsonb_build_array(
+          jsonb_build_object('producto_id', v_m, 'contado', 1), jsonb_build_object('producto_id', v_m, 'contado', 2)));
+        RAISE EXCEPTION '6f: repetido'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+  BEGIN PERFORM registrar_conteo(v_suc, jsonb_build_array(jsonb_build_object('producto_id', v_m, 'contado', -1)));
+        RAISE EXCEPTION '6f: negativo'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+  BEGIN PERFORM registrar_conteo(v_suc, jsonb_build_array(
+          jsonb_build_object('producto_id', v_g, 'contado', 0), jsonb_build_object('producto_id', v_ajeno, 'contado', 1)));
+        RAISE EXCEPTION '6f: ajeno'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+  IF (SELECT count(*) FROM movimientos_producto WHERE tenant_id = v_t) <> v_n THEN
+    RAISE EXCEPTION '6f: un conteo rechazado dejó movimientos'; END IF;
+
+  -- 6g) Con el módulo apagado, nada a mano.
+  PERFORM operacion_cambiar(v_t, '{"existencias":false}');
+  BEGIN PERFORM registrar_movimiento_producto(v_suc, v_m, 'ENTRADA', 1);
+        RAISE EXCEPTION '6g: módulo apagado'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'MODULO_APAGADO%' THEN RAISE; END IF; END;
+  PERFORM operacion_cambiar(v_t, '{"existencias":true}');
+  RAISE NOTICE '6 movimientos a mano y conteo OK';
+END $$;
+
 ROLLBACK;
