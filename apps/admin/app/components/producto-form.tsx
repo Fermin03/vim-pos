@@ -42,6 +42,7 @@ import { guardarFilaDeMenu, hrefConMenu, leerFilaDeMenu } from "../lib/menus";
 import { useMenuCatalogo } from "./selector-menu";
 import type { Caja } from "../lib/configuracion";
 import { input, label } from "./campos";
+import { BuscadorClaveSat } from "./buscador-clave-sat";
 
 const ayuda = "mt-1 text-13 text-ink-2";
 
@@ -598,6 +599,7 @@ export function ProductoForm({
               />
             </div>
           </div>
+          <BuscadorClaveSat onElegir={setClaveSat} />
           <p className="-mt-1 text-13 text-ink-2">
             {AYUDA_IVA} {tienda ? "Cada prenda necesita su clave para facturar; búscala abajo." : "Sin clave, se factura como servicio de restaurante."}
           </p>
