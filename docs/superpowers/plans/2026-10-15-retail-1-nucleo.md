@@ -1666,6 +1666,11 @@ ni colores.
   agrega (`movimientos_producto`). Un producto lleva existencias **o** receta, nunca las dos.
 - **Una sola función** decide cuánto debe haber movido cada renglón de un ticket y registra la
   diferencia. Venta, reabrir, cancelación y devolución la llaman; ninguna escribe por su cuenta.
+- **La venta se registra solo al cobrar.** Un renglón sin movimientos solo se registra cuando el
+  ticket pasa a pagado en ese momento (o se le agrega ya pagado). Facturar, devolver o cancelar solo
+  ajustan renglones ya registrados. Una venta hecha en la caja llega a la nube por push sin
+  movimientos; sus movimientos los sube la caja (entrega 4). Así facturar en la nube un ticket de la
+  caja no la descuenta dos veces. (Regla R5, tomada al ejecutar.)
 - **Se vende sin existencia** (D32): queda negativa y aparece en alertas.
 
 ## Ajustes al spec
