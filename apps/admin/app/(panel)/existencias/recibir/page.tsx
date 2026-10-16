@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@vim/ui/styles";
+import { Button, useConfirmar } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { ExistenciasTabs } from "../../../components/existencias-tabs";
 import { SelectorSucursal, useSucursalReporte } from "../../../components/selector-sucursal";
@@ -31,6 +31,23 @@ export default function RecibirPage() {
   const enviando = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [listo, setListo] = useState<string | null>(null);
+  const [confirmar, dialogoConfirmar] = useConfirmar();
+  // Lo capturado es de una sucursal: cambiarla con algo capturado pregunta y empieza de nuevo.
+  const selector = {
+    ...sucursal,
+    cambiar: async (id: string | null) => {
+      const n = renglones.length;
+      if (n > 0 && !(await confirmar({
+        titulo: "¿Descartar la recepción?",
+        mensaje: `Llevas ${piezas(n)} ${n === 1 ? "capturado" : "capturados"}.`,
+        boton: "Descartar",
+      }))) return;
+      setRenglones([]);
+      setListo(null);
+      setError(null);
+      sucursal.cambiar(id);
+    },
+  };
 
   useEffect(() => {
     let vivo = true;
@@ -94,7 +111,7 @@ export default function RecibirPage() {
       <PageHeader titulo="Recibir mercancía" subtitulo="Lo que llega del proveedor entra a la existencia de la sucursal." />
       <ExistenciasTabs />
       <PageBody>
-        <SelectorSucursal sucursal={sucursal} className="mb-5 w-full lg:w-auto" />
+        <SelectorSucursal sucursal={selector} className="mb-5 w-full lg:w-auto" />
         {enTodas && sucursal.listo && <p className="mb-5 text-13 text-ink-2">Elige una sucursal para recibir.</p>}
 
         {errorCarga && (
@@ -177,6 +194,7 @@ export default function RecibirPage() {
             </div>
           </div>
         )}
+        {dialogoConfirmar}
       </PageBody>
     </>
   );
