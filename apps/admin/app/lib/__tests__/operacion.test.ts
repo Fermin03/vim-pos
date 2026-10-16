@@ -5,9 +5,16 @@ import { disponiblesDe } from "../reportes";
 const con = (efectivos: Record<string, boolean>) => ({ permitidos: {}, efectivos });
 
 describe("rutasOcultas", () => {
-  it("cargando o con error no esconde nada (esconder de más y luego mostrar salta a la vista)", () => {
-    expect(rutasOcultas(null).size).toBe(0);
-    expect(rutasOcultas("error").size).toBe(0);
+  const TIENDA = ["/catalogo/importar-tienda", "/catalogo/etiquetas", "/existencias", "/reportes/ventas-variantes"];
+  it("cargando o con error no esconde nada de restaurante (esconder de más y luego mostrar salta a la vista)", () => {
+    expect(rutasOcultas(null)).toEqual(new Set(TIENDA));
+    expect(rutasOcultas("error")).toEqual(new Set(TIENDA));
+  });
+  it("Existencias falla cerrado: solo se ve con el módulo leído y encendido", () => {
+    expect(rutasOcultas(null).has("/existencias")).toBe(true);
+    expect(rutasOcultas("error").has("/existencias")).toBe(true);
+    expect(rutasOcultas(con({ existencias: false })).has("/existencias")).toBe(true);
+    expect(rutasOcultas(con({ existencias: true })).has("/existencias")).toBe(false);
   });
   it("un negocio de siempre (todo encendido) ve todo; lo de tienda solo con existencias", () => {
     expect(rutasOcultas(con({ existencias: true })).size).toBe(0);

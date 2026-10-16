@@ -17,13 +17,18 @@ const RUTA_DE_MODULO: readonly [string, CodigoOperacion][] = [
 ];
 
 /**
- * Las rutas que este negocio no usa. Mientras carga o si la lectura falló no se esconde nada: un
- * menú que se encoge un segundo después de abrir salta a la vista, y esconder no es un candado
- * (eso lo decide VIM con el módulo, no el admin).
+ * Las rutas que este negocio no usa. Mientras carga o si la lectura falló no se esconde nada de lo
+ * de restaurante: un menú que se encoge un segundo después de abrir salta a la vista, y esconder no
+ * es un candado (eso lo decide VIM con el módulo, no el admin). Lo de tienda va al revés: solo
+ * aparece con el módulo leído y encendido, para que un restaurante nunca lo vea.
  */
 export function rutasOcultas(m: ModulosLeidos | "error" | null): ReadonlySet<string> {
-  if (m === null || m === "error") return new Set();
-  return new Set(RUTA_DE_MODULO.filter(([, codigo]) => !moduloActivo(m.efectivos, codigo)).map(([ruta]) => ruta));
+  const leidos = m !== null && m !== "error";
+  return new Set(
+    RUTA_DE_MODULO.filter(([, codigo]) =>
+      codigo === "existencias" ? !conExistencias(m) : leidos && !moduloActivo(m.efectivos, codigo),
+    ).map(([ruta]) => ruta),
+  );
 }
 
 export function filtrarSecciones<T extends { items: { href: string }[] }>(secciones: readonly T[], ocultas: ReadonlySet<string>): T[] {
