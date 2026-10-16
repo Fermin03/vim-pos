@@ -74,6 +74,9 @@ import { ModalAbrirCaja } from "./modal-abrir-caja";
 import { fijarContextoErrores, reportarErrorSinEsperar } from "../lib/reportar-error";
 import { BotonVolver } from "./boton-volver";
 import { CatalogoProductos } from "./catalogo-productos";
+import { PanelVentaRetail, type AvisoEscaneo } from "./venta-retail";
+import { esTienda, leerExistencias, leerSucursales, type Existencia, type PadreTienda } from "../lib/tienda";
+import { leerEstadoSync } from "../lib/estado-sync";
 import { ModalAgregarProductos } from "./modal-agregar-productos";
 import { ModalNumeroMesa } from "./modal-numero-mesa";
 import { MenuGeneral } from "./menu-general";
@@ -559,6 +562,41 @@ export function HomePos({
     };
   }, [recargarCatalogo]);
 
+  // ── Venta de tienda (giro RETAIL): solo cambia el panel izquierdo de la captura en Para llevar.
+  // Un restaurante no pasa por nada de esto (pos-retail.md).
+  const tienda = esTienda(caja);
+  const capturaTienda = tienda && carrito.modoServicio === "PARA_LLEVAR" && !cerrando && !enInicio && !enKds && !enMonitor
+    && !enConsultaCuentas && !enDevoluciones && !enPedidosApps && !enDelivery && !enPickup && !enMesas && !enBarra;
+  /** Selector de talla y color abierto y franja del escáner: estado de aquí para que su Escape viva en la pila. */
+  const [selectorRetail, setSelectorRetail] = useState<PadreTienda | null>(null);
+  const [avisoRetail, setAvisoRetail] = useState<AvisoEscaneo | null>(null);
+  const [existencias, setExistencias] = useState<Existencia[]>([]);
+  const [sucursalesTienda, setSucursalesTienda] = useState<{ id: string; nombre: string }[]>([]);
+  /** Hora del último pull de la caja instalada; `null` en el POS web (lee la nube «al momento»). */
+  const [actualizadoA, setActualizadoA] = useState<string | null>(null);
+  useEffect(() => {
+    if (!tienda) return;
+    let vivo = true;
+    leerSucursales(token).then((s) => { if (vivo) setSucursalesTienda(s); }).catch(() => { /* sin la fila de sucursales, solo se ve la propia */ });
+    return () => { vivo = false; };
+  }, [tienda, token]);
+  // Existencias al entrar a la venta, tras cada cobro (`cuentasVersion` sube al pagar) y cada 60 s.
+  // Si una lectura falla se quedan las de antes: una cifra de hace un minuto sirve más que ninguna.
+  useEffect(() => {
+    if (!capturaTienda) return;
+    let vivo = true;
+    const leer = () => {
+      leerExistencias(token).then((x) => { if (vivo) setExistencias(x); }).catch(() => {});
+      leerEstadoSync().then((e) => { if (vivo) setActualizadoA(e.disponible ? e.ultimoPull ?? "" : null); });
+    };
+    leer();
+    const id = setInterval(leer, 60_000);
+    return () => { vivo = false; clearInterval(id); };
+  }, [capturaTienda, token, cuentasVersion]);
+  useEffect(() => {
+    if (!capturaTienda) { setSelectorRetail(null); setAvisoRetail(null); }
+  }, [capturaTienda]);
+
   // El escritorio avisa cuando termina de bajar un menú nuevo (sondeo del minuto o botón
   // "Actualizar menú"). Se relee en el sitio, sin recargar la página: el carrito, la cuenta de
   // mesa abierta y el turno siguen donde estaban. Un fallo aquí se traga a propósito — que no se
@@ -780,6 +818,29 @@ export function HomePos({
       }
     },
     [token, combos, ofrecerCombo],
+  );
+
+  /**
+   * Agregar en la venta de tienda: la ruta de `agregarSuelto`, sin combo ni hoja «¿Lo hacemos
+   * combo?». Con grupos de modificadores sigue el camino de siempre. Un padre nunca entra al ticket
+   * (la base lo rechaza con PRODUCTO_CON_VARIANTES). La misma pieza otra vez suma a su renglón.
+   */
+  const agregarTienda = useCallback(
+    async (p: Producto) => {
+      if (p.variante_ejes?.length) return;
+      setSelectorRetail(null);
+      setAvisoRetail(null);
+      try {
+        const grupos = await obtenerGruposDeProducto(token, p.id);
+        if (grupos.length > 0) { setModGrupos({ producto: p, grupos }); return; }
+        const igual = !ticketBd && carrito.lineas.find((l) => l.producto.id === p.id && !l.combo && l.modificadores.length === 0 && !l.notaCocina);
+        if (igual) { dispatch({ tipo: "cantidad", clientId: igual.clientId, cantidad: igual.cantidad + 1 }); return; }
+        await agregarSuelto(p, [], null);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "No se pudo agregar el producto");
+      }
+    },
+    [token, ticketBd, carrito.lineas, agregarSuelto],
   );
 
   /**
@@ -1639,7 +1700,12 @@ export function HomePos({
    * No cierra nada mientras un cobro está en curso: interrumpir a media aplicación de pago es
    * justo lo que no debe poder hacerse por reflejo.
    */
-  const { alEscapar, algoAbierto } = useMemo(() => {
+  const { alEscapar, algoAbierto, escaneoIgnorado } = useMemo(() => {
+    const capaCobro: CapaEscape = [totalesCobro != null, null];
+    const capasTienda: CapaEscape[] = [
+      [selectorRetail != null, () => setSelectorRetail(null)],
+      [avisoRetail != null, () => setAvisoRetail(null)],
+    ];
     const capas: CapaEscape[] = [
       // Modificadores y combo: overlays sobre la rejilla de captura, por encima de todo lo demás.
       // El de modificadores va primero porque se pinta encima del de combo cuando ambos aplican.
@@ -1667,8 +1733,10 @@ export function HomePos({
       // modificador abierto sobre la tanda) y cada uno atiende su Escape. Antes los cerraba esta
       // lista de un golpe: Escape en el teclado de efectivo tiraba el cobro entero, y con un
       // modificador abierto se llevaba la tanda completa sin guardar.
-      [totalesCobro != null, null],
+      capaCobro,
       [agregandoA != null, null],
+      // Venta de tienda: el selector lo cierra también su `Modal`; la franja del escáner, aquí.
+      ...capasTienda,
       [viendoMapaMesas, () => { setViendoMapaMesas(false); setPidiendoMesa(true); }],
       [pidiendoMesa, () => setPidiendoMesa(false)],
       [nombreCuentaAbierto, () => setNombreCuentaAbierto(false)],
@@ -1701,8 +1769,11 @@ export function HomePos({
       alEscapar: capaVisible([[avisoTiendaVisible, null], ...capas, ...pantallas]),
       // Hay algo abierto encima de la pantalla (un cobro, un modal): «Ver orden» no se lo lleva.
       algoAbierto: capas.some(([visible]) => visible),
+      // El escáner de la tienda se ignora bajo el aviso de un pedido, un PIN u otro diálogo. El
+      // cobro no cuenta (avisa «Termina el cobro…») ni el selector y la franja (el escaneo los cierra).
+      escaneoIgnorado: avisoTiendaVisible || capas.some((c) => c[0] && c !== capaCobro && !capasTienda.includes(c)),
     };
-  }, [avisoTiendaVisible, modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
+  }, [selectorRetail, avisoRetail, avisoTiendaVisible, modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
       agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto, nombreBarra, pasandoAMesa,
       clienteDomAbierto, clienteCuentaAbierto, zonaPedidoAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
@@ -2695,12 +2766,31 @@ export function HomePos({
       )}
 
       <div className="flex min-h-0 flex-1">
-          <CatalogoProductos
-            categorias={categorias}
-            productos={productos}
-            bloqueado={menuBloqueado}
-            onTapProducto={onTapProducto}
-          />
+          {capturaTienda ? (
+            <PanelVentaRetail
+              productos={productos}
+              categorias={categorias}
+              existencias={existencias}
+              sucursalId={caja.sucursal_id}
+              sucursales={sucursalesTienda}
+              actualizadoA={actualizadoA}
+              cobroAbierto={totalesCobro != null}
+              escaneoIgnorado={escaneoIgnorado}
+              bloqueado={menuBloqueado}
+              selector={selectorRetail}
+              onSelector={setSelectorRetail}
+              aviso={avisoRetail}
+              onAviso={setAvisoRetail}
+              onAgregar={(p) => void agregarTienda(p)}
+            />
+          ) : (
+            <CatalogoProductos
+              categorias={categorias}
+              productos={productos}
+              bloqueado={menuBloqueado}
+              onTapProducto={onTapProducto}
+            />
+          )}
         <SidebarTicket
           estado={carrito}
           modoTexto={ticketBd?.ticketId === cuentaBarraId ? "Barra" : undefined}

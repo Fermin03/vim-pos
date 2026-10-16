@@ -100,3 +100,32 @@ export function resumenVitrina(p: Producto, padres: Map<string, PadreTienda>, ex
   const min = Math.min(...precios);
   return { piezas, estado: estadoExistencia(piezas, null), precioDesde: precios.length && min !== Math.max(...precios) ? min : null };
 }
+
+/** Sucursales vivas del negocio, para consultar su existencia desde el selector. */
+export async function leerSucursales(token: string): Promise<{ id: string; nombre: string }[]> {
+  const { data, error } = await employeeClient(token).from("sucursales").select("id, nombre").is("deleted_at", null).order("nombre");
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+export type Escaneo =
+  | { tipo: "ignorar" }
+  | { tipo: "cobro" }
+  | { tipo: "agregar"; producto: Producto }
+  | { tipo: "selector"; padre: Producto }
+  | { tipo: "no-encontrado" };
+
+/**
+ * Qué hace la caja con un código leído (pos-retail.md, «Escáner»). Bajo un PIN, el aviso de un
+ * pedido u otro diálogo se ignora; con el cobro abierto no se agrega nada. El código de un padre
+ * abre su selector: un padre nunca llega al ticket.
+ */
+export function decidirEscaneo(productos: Producto[], codigo: string, { cobroAbierto, ignorar }: { cobroAbierto: boolean; ignorar: boolean }): Escaneo {
+  if (ignorar) return { tipo: "ignorar" };
+  if (cobroAbierto) return { tipo: "cobro" };
+  const producto = buscarPorCodigo(productos, codigo);
+  if (producto) return { tipo: "agregar", producto };
+  const c = norm(codigo);
+  const padre = c ? productos.find((p) => p.variante_ejes?.length && [p.codigo_barras, p.codigo_interno].some((k) => k && norm(k) === c)) : undefined;
+  return padre ? { tipo: "selector", padre } : { tipo: "no-encontrado" };
+}

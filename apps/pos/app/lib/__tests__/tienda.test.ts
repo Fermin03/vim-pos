@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { Producto } from "../catalogo";
 import type { DatosCaja } from "../turno";
-import { agruparTienda, buscarPorCodigo, esTienda, estadoExistencia, matrizVariantes, resumenVitrina, type Existencia } from "../tienda";
+import { agruparTienda, buscarPorCodigo, decidirEscaneo, esTienda, estadoExistencia, matrizVariantes, resumenVitrina, type Existencia } from "../tienda";
 
 const prod = (id: string, extra: Partial<Producto> = {}): Producto => ({
   id, nombre: id, descripcion: null, precio_base_mxn: 100, categoria_id: "c", agotado: false, esCombo: false, seVendeAqui: true, ...extra,
@@ -87,5 +87,22 @@ describe("resumenVitrina", () => {
   });
   it("producto suelto usa su propia existencia", () => {
     expect(resumenVitrina(suelto, padres, [ex("S", 0)], "s1")).toEqual({ piezas: 0, estado: "agotada", precioDesde: null });
+  });
+});
+
+describe("decidirEscaneo", () => {
+  const lista = [{ ...padre, codigo_barras: "PADRE-1" }, h("h1", "M", "Negro", 100, { codigo_barras: "750100" }), suelto];
+  const libre = { cobroAbierto: false, ignorar: false };
+  it("agrega lo que encuentra y avisa lo que no", () => {
+    expect(decidirEscaneo(lista, "750100", libre)).toEqual({ tipo: "agregar", producto: lista[1] });
+    expect(decidirEscaneo(lista, "000", libre)).toEqual({ tipo: "no-encontrado" });
+  });
+  it("el código de un padre abre su selector, nunca lo agrega", () => {
+    expect(decidirEscaneo(lista, " padre-1 ", libre)).toEqual({ tipo: "selector", padre: lista[0] });
+  });
+  it("con el cobro abierto no agrega; bajo un diálogo se ignora (aunque el cobro esté abierto)", () => {
+    expect(decidirEscaneo(lista, "750100", { cobroAbierto: true, ignorar: false })).toEqual({ tipo: "cobro" });
+    expect(decidirEscaneo(lista, "750100", { cobroAbierto: true, ignorar: true })).toEqual({ tipo: "ignorar" });
+    expect(decidirEscaneo(lista, "000", { cobroAbierto: false, ignorar: true })).toEqual({ tipo: "ignorar" });
   });
 });
