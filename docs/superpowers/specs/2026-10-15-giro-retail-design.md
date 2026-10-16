@@ -269,6 +269,9 @@ Plan: `docs/superpowers/plans/2026-10-15-retail-1-nucleo.md`.
 - Mensajes limpios para cantidades con más de 3 decimales y para uuids repetidos en mayúsculas.
 - La caja y el admin no deben permitir cambiar el producto de un renglón ya cobrado (la función de
   existencias no lo concilia).
+- Dónde quedaron los dos que la entrega 2 no cubrió: «Mensajes limpios para >3 decimales y uuids en
+  mayúsculas en conteo y traspaso → entrega 3» y «No permitir cambiar el producto de un renglón ya
+  cobrado → entrega 4».
 
 **Entrega 3 (admin de existencias):** cancelar o revertir un traspaso en camino; decidir si recibir exige
 pertenecer a la sucursal destino; conteos concurrentes (ordenar por producto, bloquear la primera fila).

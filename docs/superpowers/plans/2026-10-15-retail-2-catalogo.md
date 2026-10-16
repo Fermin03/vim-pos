@@ -2137,3 +2137,4 @@ El controlador verifica en el navegador, con el admin de este worktree contra el
 - Liberar `RETAIL` en el alta, el registro y el sitio: entrega 5.
 - Code 128 en etiquetas; una clave SAT por defecto para tiendas en el CFDI (hoy sin clave se factura como restaurante: anotado para la entrega 4 o 5).
 - Variantes visibles en promociones y menús por sucursal (hoy `listarProductos` las esconde).
+- Antes de mezclar: aplicar 0188–0191 a producción y desplegar `buscar-clave-sat`.
