@@ -255,3 +255,28 @@ Báscula y granel; tienda en línea con existencias (y sus textos neutros); apar
   que cancelar con devolución de dinero no regrese dos veces.
 
 Plan: `docs/superpowers/plans/2026-10-15-retail-1-nucleo.md`.
+
+## 13. Pendientes que la entrega 1 deja a las siguientes (revisión final, 15 oct)
+
+**Antes de que el admin pueda editar prendas (entrega 2, requisito para lanzar):**
+- La sincronización de la caja baja `productos` renglón por renglón en modo réplica, y los índices únicos
+  nuevos (variante, SKU y código de barras con existencias) sí aplican ahí. Si el dueño intercambia los
+  códigos de dos variantes, o borra y vuelve a crear una variante, el pull choca y se queda atorado en
+  cada ciclo. Arreglo: en `desktop/src/sync-pull.mjs`, antes de bajar `productos`, neutralizar las copias
+  locales de los renglones del snapshot (`controla_existencias = false`, `deleted_at`) y dejar que el
+  upsert ponga los valores de la nube. Con prueba del intercambio en `sync-pull.test.mjs`.
+- Ejes del padre: rechazar duplicados, NULL o vacíos; no colgar una hija de un padre borrado.
+- Mensajes limpios para cantidades con más de 3 decimales y para uuids repetidos en mayúsculas.
+- La caja y el admin no deben permitir cambiar el producto de un renglón ya cobrado (la función de
+  existencias no lo concilia).
+
+**Entrega 3 (admin de existencias):** cancelar o revertir un traspaso en camino; decidir si recibir exige
+pertenecer a la sucursal destino; conteos concurrentes (ordenar por producto, bloquear la primera fila).
+
+**Entrega 4 (sincronización):** `movimientos_producto_validar` debe comprobar que `ticket_id`,
+`ticket_item_id`, `devolucion_id` y `proveedor_id` sean del mismo negocio antes de que el push de la caja
+escriba movimientos; revisar el orden de bloqueos (renglón→ticket); una cancelación o devolución hecha en
+la nube sobre un ticket de la caja no mueve existencias en la nube hasta que esta entrega lo resuelva.
+
+**Fuera del giro, para Fermín:** al cancelar un ticket pagado devolviendo el dinero, el inventario por
+insumos de los restaurantes parece regresar dos veces (devolución y cancelación lo regresan por su cuenta).
