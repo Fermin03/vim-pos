@@ -13778,6 +13778,10 @@ export type Database = {
         Args: { p_rows: Json; p_tenant: string }
         Returns: Json
       }
+      _vim_aplicar_movimientos_producto: {
+        Args: { p_movs: Json; p_tenant: string }
+        Returns: Json
+      }
       _vim_apply_rows: {
         Args: { p_rows: Json; p_tabla: string; p_tenant: string }
         Returns: number
@@ -14848,6 +14852,20 @@ export type Database = {
           p_motivo: string
           p_permiso_codigo: string
           p_turno_id: string
+        }
+        Returns: Json
+      }
+      registrar_cambio_talla: {
+        Args: {
+          p_autorizacion_pin_id: string
+          p_caja_id: string
+          p_client_id_local?: string
+          p_lleva: Json
+          p_regresa: Json
+          p_ticket_origen: string
+          p_turno_id: string
+          p_usuario_autorizo_id: string
+          p_usuario_id: string
         }
         Returns: Json
       }
