@@ -263,6 +263,12 @@ Al construir la entrega 3 (16 oct):
   renglón. Los descuentos a toda la cuenta no están en la vista y no se restan.
 - `/existencias` (y el reporte) son de nivel 4, dueño y administrador: enseñan costos y valor.
 - `_existencias_validar` rechaza las sucursales borradas (suave): no reciben movimientos ni mínimos.
+- Un traspaso en camino no se recibe en un destino borrado ni se cancela hacia un origen borrado
+  (0194, nueva porque la 0193 ya estaba aplicada en la base local: regla R6). La pantalla esconde el
+  botón que ya no aplica; si las dos puntas están borradas el traspaso se queda en camino.
+- Lo de tienda (existencias, importar, etiquetas, ventas por talla y color) solo aparece en el menú con
+  el módulo leído y encendido; mientras carga o si la lectura falla, un restaurante no lo ve.
+- Recibir con la factura XML del proveedor (§6.2) se pospone: la recepción es a mano o con escáner.
 
 ## 13. Pendientes que la entrega 1 deja a las siguientes (revisión final, 15 oct)
 
@@ -288,6 +294,10 @@ pertenecer a la sucursal destino; conteos concurrentes (ordenar por producto, bl
 `ticket_item_id`, `devolucion_id` y `proveedor_id` sean del mismo negocio antes de que el push de la caja
 escriba movimientos; revisar el orden de bloqueos (renglón→ticket); una cancelación o devolución hecha en
 la nube sobre un ticket de la caja no mueve existencias en la nube hasta que esta entrega lo resuelva.
+Además: sincronizar `estado = CANCELADO` y `cancelado_por`/`cancelado_at` de `traspasos_producto` (el
+`ADD VALUE` de la 0192 debe salir en un instalador antes de que cualquier caja baje `traspasos_producto`;
+lección de la ADR 0034), y ordenar los renglones del ticket por `producto_id` en
+`_existencias_sincronizar_ticket` para no trabarse (deadlock) con un conteo en curso.
 
 **Fuera del giro, para Fermín:** al cancelar un ticket pagado devolviendo el dinero, el inventario por
 insumos de los restaurantes parece regresar dos veces (devolución y cancelación lo regresan por su cuenta).
