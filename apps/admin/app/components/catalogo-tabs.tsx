@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useModulos } from "./admin-shell";
 import { estadoInventario, rutaEsDeInventario } from "../lib/inventario-plan";
+import { conExistencias } from "../lib/operacion";
 
 const TABS = [
   { label: "Categorías", href: "/catalogo/categorias" },
@@ -12,14 +13,22 @@ const TABS = [
   { label: "Recetas", href: "/catalogo/recetas" },
 ];
 
+// Solo con el módulo existencias (giro retail).
+const TABS_TIENDA = [
+  { label: "Importar tienda", href: "/catalogo/importar-tienda" },
+  { label: "Etiquetas", href: "/catalogo/etiquetas" },
+];
+
 /** Sub-navegación del módulo Catálogo. */
 export function CatalogoTabs() {
   const pathname = usePathname();
   // Recetas es parte del inventario (0148): la pestaña se queda, marcada, y dentro se explica.
-  const sinInventario = estadoInventario(useModulos()) === "no_incluido";
+  const modulos = useModulos();
+  const sinInventario = estadoInventario(modulos) === "no_incluido";
+  const tabs = conExistencias(modulos) ? [...TABS, ...TABS_TIENDA] : TABS;
   return (
     <div className="scroll-x-limpio flex flex-shrink-0 items-center gap-1 overflow-x-auto border-b border-line px-4 lg:overflow-x-visible lg:px-8">
-      {TABS.map((t) => {
+      {tabs.map((t) => {
         const active = pathname === t.href || pathname.startsWith(t.href + "/");
         return (
           <Link
