@@ -149,3 +149,113 @@ END;
 $$;
 REVOKE ALL ON FUNCTION cancelar_traspaso_producto(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION cancelar_traspaso_producto(uuid) TO authenticated, service_role;
+
+-- ── §2 Vista, mínimo y recepción ─────────────────────────────────────────────
+-- Cada producto con existencias × cada sucursal viva, aunque nunca se haya movido ahí (para poder
+-- fijarle mínimo o contarlo). security_invoker: manda la RLS de productos, sucursales y existencias.
+CREATE OR REPLACE VIEW vw_existencias WITH (security_invoker = true) AS
+SELECT
+  p.tenant_id,
+  s.id                                   AS sucursal_id,
+  s.nombre                               AS sucursal_nombre,
+  p.id                                   AS producto_id,
+  COALESCE(pa.nombre, p.nombre)          AS producto_nombre,
+  p.nombre                               AS nombre_completo,
+  p.variante_valores,
+  pa.variante_ejes,
+  p.codigo_interno,
+  p.codigo_barras,
+  p.costo_mxn,
+  p.precio_base_mxn,
+  COALESCE(e.cantidad, 0)                AS cantidad,
+  e.minimo,
+  e.actualizado_at,
+  round(COALESCE(e.cantidad, 0) * COALESCE(p.costo_mxn, 0), 2) AS valor_mxn
+FROM productos p
+JOIN sucursales s ON s.tenant_id = p.tenant_id AND s.deleted_at IS NULL
+LEFT JOIN producto_existencias e ON e.producto_id = p.id AND e.sucursal_id = s.id
+LEFT JOIN productos pa ON pa.id = p.producto_padre_id
+WHERE p.controla_existencias AND p.deleted_at IS NULL;
+REVOKE ALL ON vw_existencias FROM PUBLIC, anon;
+GRANT SELECT ON vw_existencias TO authenticated, service_role;
+COMMENT ON VIEW vw_existencias IS 'Existencia y valor de cada producto con existencias en cada sucursal viva (0193).';
+
+-- El mínimo es lo único de producto_existencias que se escribe a mano. Si la fila no existe se
+-- crea en 0 (la suma de movimientos también es 0): la existencia sigue siendo la suma.
+CREATE OR REPLACE FUNCTION fijar_minimo_producto(p_sucursal uuid, p_producto uuid, p_minimo numeric)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_t uuid := _existencias_puede_escribir();
+BEGIN
+  PERFORM _existencias_validar(v_t, p_sucursal, p_producto);
+  IF p_minimo IS NOT NULL AND (p_minimo = 'NaN' OR p_minimo < 0 OR p_minimo >= 1e9 OR p_minimo <> round(p_minimo, 3)) THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: mínimo inválido (0 o más, máximo 3 decimales)' USING ERRCODE = '22023';
+  END IF;
+  INSERT INTO producto_existencias (tenant_id, sucursal_id, producto_id, minimo)
+  VALUES (v_t, p_sucursal, p_producto, p_minimo)
+  ON CONFLICT (sucursal_id, producto_id) DO UPDATE SET minimo = EXCLUDED.minimo, actualizado_at = now();
+END;
+$$;
+REVOKE ALL ON FUNCTION fijar_minimo_producto(uuid, uuid, numeric) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION fijar_minimo_producto(uuid, uuid, numeric) TO authenticated, service_role;
+
+-- Recibir mercancía de un proveedor: varios renglones, todo o nada. El costo de cada renglón,
+-- si viene, pasa a ser el costo del producto. La referencia (remisión, factura) va en el motivo.
+CREATE OR REPLACE FUNCTION recibir_mercancia(p_sucursal uuid, p_proveedor uuid, p_lineas jsonb, p_referencia text)
+RETURNS int LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_t      uuid := _existencias_puede_escribir();
+  v_lineas jsonb := _existencias_lineas(p_lineas, 'cantidad', false);
+  v_l      jsonb;
+  v_prod   uuid;
+  v_costo  numeric;
+  v_motivo text := 'Recepción' || COALESCE(' · ' || NULLIF(left(btrim(p_referencia), 100), ''), ' de mercancía');
+BEGIN
+  IF p_proveedor IS NOT NULL AND NOT EXISTS (SELECT 1 FROM proveedores WHERE id = p_proveedor AND tenant_id = v_t AND deleted_at IS NULL) THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: el proveedor no es de tu negocio' USING ERRCODE = '22023';
+  END IF;
+  FOR v_l IN SELECT value FROM jsonb_array_elements(v_lineas) LOOP
+    PERFORM _existencias_validar(v_t, p_sucursal, (v_l->>'producto_id')::uuid);
+  END LOOP;
+  FOR v_l IN SELECT value FROM jsonb_array_elements(v_lineas) LOOP
+    v_prod  := (v_l->>'producto_id')::uuid;
+    v_costo := NULLIF(v_l->>'costo', '')::numeric;
+    INSERT INTO movimientos_producto (tenant_id, sucursal_id, producto_id, tipo, cantidad, costo_unitario_mxn, proveedor_id, motivo, usuario_id)
+    VALUES (v_t, p_sucursal, v_prod, 'ENTRADA', (v_l->>'cantidad')::numeric, v_costo, p_proveedor, v_motivo, auth.uid());
+    IF v_costo IS NOT NULL THEN
+      UPDATE productos SET costo_mxn = v_costo, updated_at = now() WHERE id = v_prod;
+    END IF;
+  END LOOP;
+  RETURN jsonb_array_length(v_lineas);
+END;
+$$;
+REVOKE ALL ON FUNCTION recibir_mercancia(uuid, uuid, jsonb, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION recibir_mercancia(uuid, uuid, jsonb, text) TO authenticated, service_role;
+
+-- Recibir un traspaso: igual que la 0189, pero distingue uno cancelado de uno ya recibido.
+CREATE OR REPLACE FUNCTION recibir_traspaso_producto(p_traspaso uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_t  uuid := _existencias_puede_escribir();
+  v_tr traspasos_producto%ROWTYPE;
+  v_l  jsonb;
+BEGIN
+  SELECT * INTO v_tr FROM traspasos_producto WHERE id = p_traspaso AND tenant_id = v_t FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: ese traspaso no existe' USING ERRCODE = '22023';
+  END IF;
+  IF v_tr.estado = 'CANCELADO' THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: ese traspaso fue cancelado' USING ERRCODE = '22023';
+  END IF;
+  IF v_tr.estado <> 'ENVIADO' THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: ese traspaso ya se recibió' USING ERRCODE = '22023';
+  END IF;
+  FOR v_l IN SELECT value FROM jsonb_array_elements(v_tr.lineas) LOOP
+    INSERT INTO movimientos_producto (tenant_id, sucursal_id, producto_id, tipo, cantidad, traspaso_id, motivo, usuario_id)
+    VALUES (v_t, v_tr.destino_sucursal_id, (v_l->>'producto_id')::uuid, 'TRASPASO_ENTRADA',
+            (v_l->>'cantidad')::numeric, p_traspaso, 'Traspaso recibido', auth.uid());
+  END LOOP;
+  UPDATE traspasos_producto SET estado = 'RECIBIDO', recibido_por = auth.uid(), recibido_at = now() WHERE id = p_traspaso;
+END;
+$$;
+REVOKE ALL ON FUNCTION recibir_traspaso_producto(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION recibir_traspaso_producto(uuid) TO authenticated, service_role;

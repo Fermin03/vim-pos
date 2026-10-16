@@ -73,7 +73,7 @@ BEGIN
   BEGIN PERFORM cancelar_traspaso_producto(v_tr);
         RAISE EXCEPTION '1d: cancelar dos veces'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
   BEGIN PERFORM recibir_traspaso_producto(v_tr);
-        RAISE EXCEPTION '1d: recibir cancelado'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+        RAISE EXCEPTION '1d: recibir cancelado'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS: ese traspaso fue cancelado%' THEN RAISE; END IF; END;
   -- Uno recibido no se cancela.
   v_tr := enviar_traspaso_producto(v_suc, v_norte, jsonb_build_array(jsonb_build_object('producto_id', v_gor, 'cantidad', 1)));
   PERFORM recibir_traspaso_producto(v_tr);
@@ -87,6 +87,70 @@ BEGIN
         RAISE EXCEPTION '1e: ajeno'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
   IF (SELECT count(*) FROM traspasos_producto WHERE tenant_id = v_t) <> v_n THEN RAISE EXCEPTION '1e: dejó traspaso'; END IF;
   RAISE NOTICE '1 renglones, conteo y traspasos OK';
+END $$;
+
+-- 2) Vista, mínimo y recepción.
+DO $$
+DECLARE
+  v_t     uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_suc   uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_norte uuid := 'e3e30000-0000-0000-0000-0000000000b2';
+  v_gor   uuid := 'e3e30000-0000-0000-0000-0000000000a1';
+  v_cin   uuid := 'e3e30000-0000-0000-0000-0000000000a2';
+  v_antes numeric; v_n int; v_prov uuid;
+BEGIN
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', '99999999-0000-0000-0000-0000000000e1', 'tenant_id', v_t)::text, true);
+
+  -- 2a) Norte sin movimientos del cinturón aparece con 0; el valor es cantidad × costo.
+  IF (SELECT cantidad FROM vw_existencias WHERE sucursal_id = v_norte AND producto_id = v_cin) IS DISTINCT FROM 0 THEN
+    RAISE EXCEPTION '2a: Norte debía tener el cinturón en 0'; END IF;
+  IF (SELECT valor_mxn FROM vw_existencias WHERE sucursal_id = v_suc AND producto_id = v_gor)
+     <> (SELECT cantidad * 90 FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_gor) THEN
+    RAISE EXCEPTION '2a: valor'; END IF;
+
+  -- 2b) Mínimo: crea la fila si no había, no toca la cantidad; NULL lo quita; malo se rechaza.
+  PERFORM fijar_minimo_producto(v_norte, v_cin, 2);
+  IF (SELECT minimo FROM producto_existencias WHERE sucursal_id = v_norte AND producto_id = v_cin) <> 2
+     OR (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_norte AND producto_id = v_cin) <> 0 THEN RAISE EXCEPTION '2b'; END IF;
+  PERFORM fijar_minimo_producto(v_norte, v_cin, NULL);
+  IF (SELECT minimo FROM producto_existencias WHERE sucursal_id = v_norte AND producto_id = v_cin) IS NOT NULL THEN RAISE EXCEPTION '2b: quitar'; END IF;
+  BEGIN PERFORM fijar_minimo_producto(v_norte, v_cin, 1.0005);
+        RAISE EXCEPTION '2b: decimales'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+
+  -- 2c) Recepción: dos renglones con costo y proveedor; sube existencia, actualiza costo, guarda la referencia.
+  INSERT INTO proveedores (tenant_id, nombre) VALUES (v_t, 'Textiles León') RETURNING id INTO v_prov;
+  SELECT cantidad INTO v_antes FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_gor;
+  IF recibir_mercancia(v_suc, v_prov, jsonb_build_array(
+       jsonb_build_object('producto_id', v_gor, 'cantidad', 12, 'costo', 95),
+       jsonb_build_object('producto_id', v_cin, 'cantidad', 4)), 'Remisión 881') <> 2 THEN RAISE EXCEPTION '2c: renglones'; END IF;
+  IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_gor) <> v_antes + 12 THEN RAISE EXCEPTION '2c: existencia'; END IF;
+  IF (SELECT costo_mxn FROM productos WHERE id = v_gor) <> 95 OR (SELECT costo_mxn FROM productos WHERE id = v_cin) <> 150 THEN RAISE EXCEPTION '2c: costo'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM movimientos_producto WHERE producto_id = v_gor AND tipo = 'ENTRADA' AND proveedor_id = v_prov AND motivo LIKE '%Remisión 881%') THEN
+    RAISE EXCEPTION '2c: referencia y proveedor'; END IF;
+
+  -- 2d) Recepción con un renglón malo o con proveedor de otro negocio: nada entra.
+  INSERT INTO proveedores (tenant_id, nombre) VALUES ('e3e30000-0000-0000-0000-0000000000ee', 'Proveedor ajeno');
+  SELECT count(*) INTO v_n FROM movimientos_producto WHERE tenant_id = v_t;
+  BEGIN PERFORM recibir_mercancia(v_suc, NULL, jsonb_build_array(
+          jsonb_build_object('producto_id', v_gor, 'cantidad', 1), jsonb_build_object('producto_id', v_cin, 'cantidad', 'NaN')), NULL);
+        RAISE EXCEPTION '2d: NaN'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+  BEGIN PERFORM recibir_mercancia(v_suc, (SELECT id FROM proveedores WHERE tenant_id = 'e3e30000-0000-0000-0000-0000000000ee'),
+          jsonb_build_array(jsonb_build_object('producto_id', v_gor, 'cantidad', 1)), NULL);
+        RAISE EXCEPTION '2d: proveedor ajeno'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+  IF (SELECT count(*) FROM movimientos_producto WHERE tenant_id = v_t) <> v_n THEN RAISE EXCEPTION '2d: entró algo'; END IF;
+
+  -- 2e) La cajera no puede recibir.
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', '99999999-0000-0000-0000-000000000001', 'tenant_id', v_t)::text, true);
+  BEGIN PERFORM recibir_mercancia(v_suc, NULL, jsonb_build_array(jsonb_build_object('producto_id', v_gor, 'cantidad', 1)), NULL);
+        RAISE EXCEPTION '2e: cajera'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'SIN_PERMISO%' THEN RAISE; END IF; END;
+
+  -- 2f) Como la cajera con RLS: la vista no enseña el producto del otro negocio.
+  EXECUTE 'SET LOCAL ROLE authenticated';
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', '99999999-0000-0000-0000-000000000001', 'role', 'authenticated', 'tenant_id', v_t)::text, true);
+  IF EXISTS (SELECT 1 FROM vw_existencias WHERE producto_id = 'e3e30000-0000-0000-0000-0000000000e1') THEN RAISE EXCEPTION '2f: ajeno visible'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM vw_existencias WHERE producto_id = v_gor) THEN RAISE EXCEPTION '2f: lo propio no se ve'; END IF;
+  EXECUTE 'RESET ROLE';
+  RAISE NOTICE '2 vista, mínimo y recepción OK';
 END $$;
 
 ROLLBACK;
