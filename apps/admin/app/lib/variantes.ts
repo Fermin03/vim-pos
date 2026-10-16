@@ -45,6 +45,14 @@ export function armarMatriz(ejes: Eje[], existentes: FilaVariante[], precioBase:
   return [...nuevas, ...sobran];
 }
 
+/** La primera fila activa cuyo precio está vacío o no es un número ≥ 0 (la base lo rechazaría a medias). */
+export function filaConPrecioInvalido(filas: FilaVariante[]): FilaVariante | null {
+  return filas.find((f) => {
+    const p = f.precio.trim();
+    return f.activa && (p === "" || !Number.isFinite(Number(p)) || Number(p) < 0);
+  }) ?? null;
+}
+
 type FilaBase = {
   id: string; variante_valores: Record<string, string>; codigo_interno: string | null; codigo_barras: string | null;
   precio_base_mxn: number; costo_mxn: number | null; deleted_at: string | null;

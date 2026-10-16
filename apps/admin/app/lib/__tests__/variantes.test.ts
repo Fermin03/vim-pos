@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { armarMatriz, claveValores, parsearValoresEje, type FilaVariante } from "../variantes";
+import { armarMatriz, claveValores, filaConPrecioInvalido, parsearValoresEje, type FilaVariante } from "../variantes";
 
 describe("variantes", () => {
   it("valores de un eje: separa por coma, quita vacíos y repetidos", () => {
@@ -28,5 +28,13 @@ describe("variantes", () => {
     const m = armarMatriz([{ nombre: "Talla", valores: ["m"] }], [f], "349");
     expect(m).toHaveLength(1);
     expect(m[0]).toMatchObject({ id: "x", activa: true, valores: { Talla: "M" } });
+  });
+  it("detecta el precio vacío, no numérico o negativo solo en filas activas", () => {
+    const f: FilaVariante = { valores: { Talla: "M" }, codigo_interno: "", codigo_barras: "", generar_codigo: true,
+      precio: "349", costo: "", existencia_inicial: "", activa: true };
+    expect(filaConPrecioInvalido([f])).toBeNull();
+    expect(filaConPrecioInvalido([{ ...f, precio: "0" }])).toBeNull();
+    for (const precio of ["", "  ", "abc", "-1"]) expect(filaConPrecioInvalido([{ ...f, precio }])).not.toBeNull();
+    expect(filaConPrecioInvalido([{ ...f, precio: "", activa: false }])).toBeNull();
   });
 });
