@@ -462,3 +462,18 @@ test("lealtad N4: solo se sueltan las llaves que cambian", async () => {
   await pullSnapshot(pool, { clientes: [{ id: X, tenant_id: TEN, nombre: "X", telefono: "A", rfc: "R", deleted_at: null }] });
   assert.ok(!client.consultas.some((c) => /SET "(telefono|rfc)" = NULL/.test(c.sql)), "mismos valores: nada que soltar");
 });
+
+test("antes de bajar productos se sueltan sus llaves únicas (intercambio de códigos entre variantes)", async () => {
+  // La nube intercambió el código de barras de dos variantes. El pull aplica productos fila por
+  // fila en réplica y los índices únicos sí se revisan: la primera chocaba con la segunda todavía
+  // vieja y el ROLLBACK se llevaba todo el pull, en cada ciclo.
+  const { client, pool } = clienteFalso();
+  const A = "aaaaaaaa-0000-0000-0000-0000000000a1";
+  const B = "bbbbbbbb-0000-0000-0000-0000000000b2";
+  await pullSnapshot(pool, { productos: [{ id: A, nombre: "Polo M" }, { id: B, nombre: "Polo G" }] });
+  const iSoltar = client.consultas.findIndex((c) => /UPDATE productos SET deleted_at/.test(c.sql));
+  const iUpsert = client.consultas.findIndex((c) => c.sql.includes('INSERT INTO public."productos"'));
+  assert.ok(iSoltar >= 0, "debía soltar las llaves de los productos que bajan");
+  assert.ok(iSoltar < iUpsert, "se sueltan ANTES del upsert");
+  assert.deepEqual(client.consultas[iSoltar].params[0].sort(), [A, B].sort());
+});
