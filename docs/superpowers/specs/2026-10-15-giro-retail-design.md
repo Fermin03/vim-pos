@@ -250,7 +250,7 @@ Báscula y granel; tienda en línea con existencias (y sus textos neutros); apar
   admin lo prellena con el del padre.
 - El cambio de talla en un solo flujo (con el dinero) va en la entrega 4; en la base son una
   devolución parcial y una venta, y se prueban juntas en la entrega 1.
-- SKU único solo entre productos con existencias; código de barras único por negocio.
+- SKU y código de barras únicos solo entre productos con existencias (así la migración no puede fallar en ninguna base existente).
 - Venta, reabrir, cancelación y devolución mueven existencias con una sola función idempotente, para
   que cancelar con devolución de dinero no regrese dos veces.
 

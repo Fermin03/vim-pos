@@ -30,7 +30,7 @@
 1. **Motivos de devolución:** `PRODUCTO_DEFECTUOSO` y `CLIENTE_NO_SATISFECHO` ya existen y son el "defecto" y el "no le gustó" del spec. Solo se agrega `CAMBIO_TALLA`. La caja (entrega 4) los rotula por giro.
 2. **"Precio vacío hereda el del padre":** `precio_base_mxn` es `NOT NULL` y lo leen cobro, menús, combos y tienda. La hija siempre tiene precio propio y el admin (entrega 2) lo prellena con el del padre. Cero cambios en el cobro.
 3. **Cambio de talla:** en la base se compone con dos piezas que ya existen y que aquí se prueban juntas: devolución parcial con motivo `CAMBIO_TALLA` y venta de la talla nueva. La RPC de "un solo flujo" (cobrar o regresar la diferencia) va en la entrega 4, junto con la pantalla que decide el dinero.
-4. **SKU único** solo entre productos que controlan existencias: los restaurantes pueden tener `codigo_interno` repetido hoy. **Código de barras único** por negocio para todos, con consulta previa en producción (hoy la app no lo escribe).
+4. **SKU y código de barras únicos** solo entre productos que controlan existencias: los restaurantes pueden repetirlos hoy, y así la migración no puede fallar en ninguna base existente (nube o caja). (Regla R4, tomada al ejecutar.)
 
 ## Review Focus
 
@@ -1675,18 +1675,13 @@ ni colores.
 - La hija siempre tiene precio propio; el admin lo prellena con el del padre.
 - El cambio de talla en un solo flujo (con el dinero) es de la entrega 4. En la base son una
   devolución parcial y una venta.
-- SKU único solo entre productos con existencias; código de barras único por negocio.
+- SKU y código de barras únicos solo entre productos con existencias. Así la 0189 no puede fallar
+  en ninguna base que ya exista (la nube o el Postgres de cada caja instalada), y los restaurantes
+  pueden seguir repitiéndolos.
 
 ## Cómo se despliega (no es obvio)
 
 - La 0188 (solo `ADD VALUE`) y la 0189 van a producción a mano, **cada una en su transacción**.
-- **Antes de la 0189**, en producción esta consulta debe regresar cero filas (si no, el índice
-  único de código de barras no se crea):
-
-  ```sql
-  SELECT tenant_id, codigo_barras, count(*) FROM productos
-  WHERE codigo_barras IS NOT NULL AND deleted_at IS NULL GROUP BY 1, 2 HAVING count(*) > 1;
-  ```
 - Esta entrega no necesita instalador: nadie es RETAIL. La caja que ya traiga la 0189 descuenta en
   su Postgres local, pero **sus movimientos no suben hasta la entrega 4** (sync).
 
@@ -1729,7 +1724,7 @@ git commit -m "docs(retail): ADR 0037 y tipos regenerados"
 **Regla de Fermín (15 oct): todo el giro RETAIL se trabaja en local hasta que esté al 100 %.** Esta entrega termina en la rama local `feat/retail-nucleo` con todos los smokes en verde. **No** se hace push, **no** se abre PR y **no** se aplica nada a producción. Las entregas 2 a 5 se apilan encima, en local.
 
 - Reportar a Fermín el resultado de los smokes y el hallazgo del doble regreso de insumos al cancelar un ticket pagado con devolución de dinero (fuera de alcance aquí).
-- Cuando las cinco entregas estén completas y Fermín dé el OK, se sigue el orden de lanzamiento del spec §7. La 0188 y la 0189 van a producción a mano, en ese orden y cada una en su transacción, con la consulta de códigos de barras en cero, y antes del merge.
+- Cuando las cinco entregas estén completas y Fermín dé el OK, se sigue el orden de lanzamiento del spec §7. La 0188 y la 0189 van a producción a mano, en ese orden y cada una en su transacción, y antes del merge.
 
 ## Lo que esta entrega no hace (va en la 2 a la 5)
 
