@@ -67,7 +67,8 @@ export default function EtiquetasPage() {
     if (!imprimiendo) return;
     const fin = () => setImprimiendo(false);
     window.addEventListener("afterprint", fin);
-    const r = requestAnimationFrame(() => window.print());
+    // Si el navegador no avisa con afterprint, print() ya regresó cuando se cerró el diálogo.
+    const r = requestAnimationFrame(() => { window.print(); fin(); });
     return () => { window.removeEventListener("afterprint", fin); cancelAnimationFrame(r); };
   }, [imprimiendo]);
 
@@ -107,7 +108,7 @@ export default function EtiquetasPage() {
             <style>{`
               @media screen { .zona-impresion { display: none; } }
               @media print {
-                @page { size: ${formato.pagina}; margin: ${formato.columnas > 1 ? "12.7mm 4.8mm" : "0"}; }
+                @page { size: ${formato.pagina}; margin: ${formato.margen}; }
                 body > *:not(.zona-impresion) { display: none !important; }
                 .zona-impresion { display: grid; position: static; grid-template-columns: repeat(${formato.columnas}, ${formato.ancho}); column-gap: ${formato.gap}; ${formato.columnas > 1 ? `grid-auto-rows: ${formato.alto};` : ""} }
                 .etiqueta { break-inside: avoid; ${formato.columnas > 1 ? "" : "break-after: page;"} overflow: hidden; padding: 1.5mm; font-family: Arial, sans-serif; color: #000; }

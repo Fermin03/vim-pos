@@ -612,50 +612,54 @@ export function ProductoForm({
         </Plegable>
 
         {tienda && (
-          <Plegable titulo="Tienda" resumen={llevaExistencias ? "lleva existencias" : "sin existencias"} abierto>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className={label} htmlFor="codigo-barras">
-                  Código de barras <span className="font-normal text-ink-2">· opcional</span>
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    id="codigo-barras"
-                    className={input}
-                    value={barras}
-                    maxLength={50}
-                    onChange={(e) => setBarras(e.target.value.trim())}
-                    placeholder="El de la etiqueta del proveedor"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    disabled={generando}
-                    onClick={async () => {
-                      setGenerando(true);
-                      try {
-                        setBarras(await generarCodigoInterno());
-                      } catch (e) {
-                        setError(mensajeError(e, "No se pudo generar el código"));
-                      } finally {
-                        setGenerando(false);
-                      }
-                    }}
-                  >
-                    {generando ? "Generando…" : "Generar"}
-                  </Button>
+          <Plegable titulo="Tienda" resumen={!esPadre && llevaExistencias ? "lleva existencias" : "sin existencias"} abierto>
+            {esPadre ? (
+              <p className="text-13 text-ink-2">Código y costo van en cada talla y color.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className={label} htmlFor="codigo-barras">
+                    Código de barras <span className="font-normal text-ink-2">· opcional</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      id="codigo-barras"
+                      className={input}
+                      value={barras}
+                      maxLength={50}
+                      onChange={(e) => setBarras(e.target.value.trim())}
+                      placeholder="El de la etiqueta del proveedor"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={generando}
+                      onClick={async () => {
+                        setGenerando(true);
+                        try {
+                          setBarras(await generarCodigoInterno());
+                        } catch (e) {
+                          setError(mensajeError(e, "No se pudo generar el código"));
+                        } finally {
+                          setGenerando(false);
+                        }
+                      }}
+                    >
+                      {generando ? "Generando…" : "Generar"}
+                    </Button>
+                  </div>
+                  {barras && !normalizarEan(barras) && (
+                    <p className={ayuda}>No es un EAN-13: se puede escanear si tu lector lo lee, pero la etiqueta saldrá sin barras.</p>
+                  )}
                 </div>
-                {barras && !normalizarEan(barras) && (
-                  <p className={ayuda}>No es un EAN-13: se puede escanear si tu lector lo lee, pero la etiqueta saldrá sin barras.</p>
-                )}
+                <div>
+                  <label className={label} htmlFor="costo">
+                    Costo <span className="font-normal text-ink-2">· lo que te cuesta a ti</span>
+                  </label>
+                  <input id="costo" className={input} inputMode="decimal" value={costo} onChange={(e) => setCosto(e.target.value)} placeholder="0.00" />
+                </div>
               </div>
-              <div>
-                <label className={label} htmlFor="costo">
-                  Costo <span className="font-normal text-ink-2">· lo que te cuesta a ti</span>
-                </label>
-                <input id="costo" className={input} inputMode="decimal" value={costo} onChange={(e) => setCosto(e.target.value)} placeholder="0.00" />
-              </div>
-            </div>
+            )}
             {!esPadre && (
               <Interruptor
                 etiqueta="Lleva existencias"
