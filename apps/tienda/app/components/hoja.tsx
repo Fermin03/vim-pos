@@ -70,8 +70,11 @@ export function Hoja({ abierta, alCerrar, fija = false, titulo, children }: {
   }, [abierta]);
 
   // El teclado de iOS no encoge la página: se pone ENCIMA de lo que está pegado abajo, y con él el
-  // pie de la hoja (el botón) y a veces el campo. Mientras la hoja está abierta se sube lo que el
-  // teclado tapa y se limita a lo que queda a la vista, y el campo con foco se trae a la vista.
+  // pie de la hoja (el botón) y a veces el campo. Mientras el teclado está abierto la hoja ocupa
+  // exactamente lo que queda a la vista (arriba de lo visible y su alto), y el campo con foco se trae
+  // a la vista. Antes se subía con `bottom` = lo que tapa el teclado, calculado con `innerHeight`; con
+  // la barra flotante de Safari ese cálculo quedaba corto y entre la hoja y el teclado se asomaba el
+  // menú de atrás (oct 2026). Anclada arriba solo cuentan medidas del área visible.
   // En Android la página ya se encoge sola (`interactiveWidget`, layout.tsx) y aquí no pasa nada.
   useEffect(() => {
     const d = ref.current, vv = window.visualViewport;
@@ -81,10 +84,12 @@ export function Hoja({ abierta, alCerrar, fija = false, titulo, children }: {
       cuadro = 0;
       // Con zoom de pellizco lo visible también se achica y no es el teclado: no se toca.
       const tapado = vv.scale > 1.01 ? 0 : innerHeight - vv.height - vv.offsetTop;
-      // Solo como hoja pegada abajo: el diálogo centrado (640 px o más) no depende de `bottom`.
+      // Solo como hoja pegada abajo: el diálogo centrado (640 px o más) no depende de esto.
       const conElTeclado = tapado > MINIMO_DE_TECLADO && !matchMedia("(min-width: 640px)").matches;
-      d.style.bottom = conElTeclado ? `${Math.round(tapado)}px` : "";
-      d.style.maxHeight = conElTeclado ? `${Math.round(vv.height - 8)}px` : "";
+      d.style.top = conElTeclado ? `${Math.round(vv.offsetTop)}px` : "";
+      d.style.bottom = conElTeclado ? "auto" : "";
+      d.style.height = conElTeclado ? `${Math.round(vv.height)}px` : "";
+      d.style.maxHeight = conElTeclado ? `${Math.round(vv.height)}px` : "";
       const campo = document.activeElement;
       if (conElTeclado && campo instanceof HTMLElement && d.contains(campo)) campo.scrollIntoView({ block: "nearest" });
     };
@@ -95,7 +100,9 @@ export function Hoja({ abierta, alCerrar, fija = false, titulo, children }: {
       vv.removeEventListener("resize", alCambiar);
       vv.removeEventListener("scroll", alCambiar);
       cancelAnimationFrame(cuadro);
+      d.style.top = "";
       d.style.bottom = "";
+      d.style.height = "";
       d.style.maxHeight = "";
     };
   }, [abierta]);

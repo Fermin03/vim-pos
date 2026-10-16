@@ -38,12 +38,19 @@ export function CampoColonia({ negocio, sucursalId, valor, alEscribir, alElegir,
   }, [consulta, negocio, sucursalId]);
 
   const abierta = lista.length > 0;
+  // La lista va bajo el campo, en la parte que el teclado del teléfono suele tapar: al abrirse se trae a la vista.
+  useEffect(() => {
+    if (abierta) document.getElementById(idDeLista)?.scrollIntoView({ block: "nearest" });
+  }, [abierta, idDeLista]);
   const cerrar = () => { setLista([]); setActiva(-1); setConsulta(null); };
   const elegir = (c: ColoniaSugerida) => { cerrar(); alElegir(c); };
 
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <CampoDeTexto id={id} etiqueta={etiqueta} value={valor} error={error} maxLength={maxLength} autoComplete="address-level3"
+      <CampoDeTexto id={id} etiqueta={etiqueta} value={valor} error={error} maxLength={maxLength}
+        // Sin el autollenado de dirección del navegador: Safari llenaba la colonia de golpe con la de la
+        // tarjeta de contacto, sin pasar por la lista del catálogo.
+        autoComplete="off"
         role="combobox" aria-expanded={abierta} aria-controls={idDeLista} aria-autocomplete="list"
         aria-activedescendant={activa >= 0 ? `${idDeLista}-${activa}` : undefined}
         alCambiar={(v) => { alEscribir(v); setConsulta(v); }}
