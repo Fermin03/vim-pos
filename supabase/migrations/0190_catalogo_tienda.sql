@@ -65,19 +65,30 @@ BEGIN
      SET nombre = _nombre_variante(NEW.nombre, NEW.variante_ejes, h.variante_valores),
          categoria_id = NEW.categoria_id, clave_sat = NEW.clave_sat, unidad_sat = NEW.unidad_sat,
          tasa_iva = NEW.tasa_iva, iva_incluido_en_precio = NEW.iva_incluido_en_precio, updated_at = now()
-   WHERE h.producto_padre_id = NEW.id;
+   WHERE h.producto_padre_id = NEW.id AND h.deleted_at IS NULL;
   RETURN NULL;
 END;
 $$;
 DROP TRIGGER IF EXISTS trg_productos_heredar_a_variantes ON productos;
 CREATE TRIGGER trg_productos_heredar_a_variantes
   AFTER UPDATE OF nombre, categoria_id, clave_sat, unidad_sat, tasa_iva, iva_incluido_en_precio ON productos
-  FOR EACH ROW WHEN (NEW.variante_ejes IS NOT NULL)
+  FOR EACH ROW WHEN (NEW.variante_ejes IS NOT NULL AND
+        (OLD.nombre, OLD.categoria_id, OLD.clave_sat, OLD.unidad_sat, OLD.tasa_iva, OLD.iva_incluido_en_precio)
+        IS DISTINCT FROM (NEW.nombre, NEW.categoria_id, NEW.clave_sat, NEW.unidad_sat, NEW.tasa_iva, NEW.iva_incluido_en_precio))
   EXECUTE FUNCTION productos_heredar_a_variantes();
 
 -- ── §2 Códigos de barras internos ────────────────────────────────────────────
 -- EAN-13 con prefijo 20 (rango de uso interno de GS1): "20" + 10 dígitos consecutivos por negocio
--- + dígito verificador. Cuenta también los borrados: un código no se reutiliza.
+-- + dígito verificador. Un contador por negocio: un código borrado, vaciado o tecleado a mano
+-- (20…) no se vuelve a entregar. El candado de fila del contador serializa las llamadas.
+CREATE TABLE IF NOT EXISTS codigos_internos_contador (
+  tenant_id uuid PRIMARY KEY REFERENCES tenants(id) ON DELETE RESTRICT,
+  ultimo    bigint NOT NULL
+);
+ALTER TABLE codigos_internos_contador ENABLE ROW LEVEL SECURITY;   -- sin políticas: solo funciones SECURITY DEFINER
+REVOKE ALL ON codigos_internos_contador FROM PUBLIC, anon, authenticated;
+GRANT ALL ON codigos_internos_contador TO service_role;
+
 CREATE OR REPLACE FUNCTION ean13_digito(p_doce text)
 RETURNS text LANGUAGE sql IMMUTABLE AS $$
   SELECT ((10 - (sum(substr(p_doce, i, 1)::int * CASE WHEN i % 2 = 0 THEN 3 ELSE 1 END) % 10)) % 10)::text
@@ -90,11 +101,11 @@ DECLARE
   v_n    bigint;
   v_doce text;
 BEGIN
-  -- ponytail: candado por negocio + máximo; dentro de una misma transacción no repite. Dos
-  -- llamadas sueltas sin guardar pueden dar el mismo código: lo detiene el índice único (0189).
-  PERFORM pg_advisory_xact_lock(hashtext('codigo_interno:' || p_tenant::text));
-  SELECT COALESCE(max(substr(codigo_barras, 3, 10)::bigint), 0) + 1 INTO v_n
-    FROM productos WHERE tenant_id = p_tenant AND codigo_barras ~ '^20[0-9]{11}$';
+  INSERT INTO codigos_internos_contador AS c (tenant_id, ultimo)
+  VALUES (p_tenant, COALESCE((SELECT max(substr(codigo_barras, 3, 10)::bigint) FROM productos
+                               WHERE tenant_id = p_tenant AND codigo_barras ~ '^20[0-9]{11}$'), 0) + 1)
+  ON CONFLICT (tenant_id) DO UPDATE SET ultimo = GREATEST(c.ultimo + 1, EXCLUDED.ultimo)
+  RETURNING ultimo INTO v_n;
   v_doce := '20' || lpad(v_n::text, 10, '0');
   RETURN v_doce || ean13_digito(v_doce);
 END;
@@ -124,13 +135,16 @@ DECLARE
   v_precio  numeric;
   v_costo   numeric;
   v_q       numeric;
-  v_activa  boolean := COALESCE((p_fila->>'activa')::boolean, true);
+  v_activa  boolean;
+  v_gen     boolean;
 BEGIN
   BEGIN
     v_id     := NULLIF(p_fila->>'id', '')::uuid;
     v_precio := (p_fila->>'precio')::numeric;
     v_costo  := NULLIF(p_fila->>'costo', '')::numeric;
     v_q      := NULLIF(p_fila->>'existencia_inicial', '')::numeric;
+    v_activa := COALESCE((p_fila->>'activa')::boolean, true);
+    v_gen    := COALESCE((p_fila->>'generar_codigo')::boolean, false);
   EXCEPTION WHEN OTHERS THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: variante mal formada: %', p_fila USING ERRCODE = '22023';
   END;
@@ -140,7 +154,7 @@ BEGIN
   IF v_costo = 'NaN' OR v_costo < 0 OR v_q = 'NaN' OR v_q < 0 THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: costo o existencia inválidos en %', v_valores USING ERRCODE = '22023';
   END IF;
-  IF v_barras IS NULL AND COALESCE((p_fila->>'generar_codigo')::boolean, false) THEN
+  IF v_barras IS NULL AND v_gen THEN
     v_barras := _siguiente_codigo_interno(p_tenant);
   END IF;
 
@@ -165,7 +179,8 @@ BEGIN
 
   UPDATE productos
      SET nombre = _nombre_variante(p_padre.nombre, p_padre.variante_ejes, v_valores), variante_valores = v_valores,
-         precio_base_mxn = v_precio, costo_mxn = v_costo, codigo_interno = v_cod, codigo_barras = v_barras,
+         precio_base_mxn = v_precio, costo_mxn = v_costo, codigo_interno = CASE WHEN p_fila ? 'codigo_interno' THEN v_cod ELSE codigo_interno END,
+         codigo_barras = CASE WHEN p_fila ? 'codigo_barras' OR v_barras IS NOT NULL THEN v_barras ELSE codigo_barras END,
          deleted_at = CASE WHEN v_activa THEN NULL ELSE COALESCE(deleted_at, now()) END, updated_at = now()
    WHERE id = v_id AND producto_padre_id = p_padre.id AND tenant_id = p_tenant;
   IF NOT FOUND THEN
@@ -182,7 +197,7 @@ RETURNS text LANGUAGE sql IMMUTABLE AS $$
   SELECT CASE p_constraint
     WHEN 'productos_codigo_barras_unico' THEN 'DATOS_INVALIDOS: el código de barras ya lo tiene otro producto'
     WHEN 'productos_sku_existencias_unico' THEN 'DATOS_INVALIDOS: el SKU ya lo tiene otro producto'
-    WHEN 'productos_variante_unica' THEN 'DATOS_INVALIDOS: esa combinación de talla y color ya existe'
+    WHEN 'productos_variante_unica' THEN 'DATOS_INVALIDOS: esa combinación de variantes ya existe'
     ELSE 'DATOS_INVALIDOS: hay un dato repetido (' || p_constraint || ')' END;
 $$;
 
@@ -203,6 +218,9 @@ BEGIN
   IF v_p.controla_existencias THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: quita «Lleva existencias» del producto antes de darle tallas y colores' USING ERRCODE = '22023';
   END IF;
+  IF p_ejes IS NULL THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: faltan los ejes de las variantes' USING ERRCODE = '22023';
+  END IF;
   IF p_filas IS NULL OR jsonb_typeof(p_filas) <> 'array' THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: variantes mal formadas' USING ERRCODE = '22023';
   END IF;
@@ -216,6 +234,7 @@ BEGIN
 
   BEGIN
     FOR v_f IN SELECT value FROM jsonb_array_elements(p_filas) LOOP
+      CONTINUE WHEN NULLIF(v_f->>'id', '') IS NULL AND v_f->>'activa' = 'false';
       v_r := _guardar_variante(v_t, v_p, v_f, p_sucursal);
       v_n := jsonb_set(v_n, ARRAY[v_r || 's'], to_jsonb((v_n->>(v_r || 's'))::int + 1));
     END LOOP;
