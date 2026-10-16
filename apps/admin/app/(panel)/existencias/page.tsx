@@ -12,6 +12,7 @@ import { mensajeError } from "../../lib/errores";
 import { descargarXlsx } from "../../lib/excel";
 import { formatear, hojaDeReporte, nombreArchivo, type Columna } from "../../lib/reporte-tabla";
 import {
+  avisoRenglon,
   estadoExistencia,
   fijarMinimo,
   listarExistencias,
@@ -258,20 +259,15 @@ function ModalAjuste({ fila, onHecho, onCerrar }: { fila: FilaExistencia; onHech
 
   async function registrar() {
     setError(null);
-    const cant = Number(cantidad);
-    if (cantidad.trim() === "" || !Number.isFinite(cant) || cant === 0 || (tipo !== "AJUSTE" && cant < 0)) {
-      setError(tipo === "AJUSTE" ? "Escribe una cantidad distinta de 0" : "Escribe una cantidad mayor a 0");
+    // Las mismas reglas que los renglones; el ajuste además admite un signo menos.
+    const q = cantidad.trim();
+    const aviso = avisoRenglon(tipo === "AJUSTE" && q.startsWith("-") ? q.slice(1) : q, tipo === "ENTRADA" ? costo : "");
+    if (aviso) {
+      setError(tipo === "AJUSTE" && aviso === "Escribe una cantidad mayor a 0" ? "Escribe una cantidad distinta de 0" : aviso);
       return;
     }
+    const cant = Number(q);
     const c = tipo === "ENTRADA" && costo.trim() !== "" ? Number(costo) : null;
-    if (c !== null && !(Number.isFinite(c) && c >= 0)) {
-      setError("Revisa el costo");
-      return;
-    }
-    if (c !== null && !/^\d+(\.\d{1,2})?$/.test(costo.trim())) {
-      setError("El costo lleva hasta 2 decimales");
-      return;
-    }
     setProcesando(true);
     try {
       await registrarMovimientoProducto(fila.sucursal_id, fila.producto_id, tipo, cant, c, motivo.trim() || null);
