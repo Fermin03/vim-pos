@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { GIROS, OPERACION, moduloActivo, nombreGiro } from "@vim/db/operacion";
+import { conExistencias } from "../operacion";
 
 describe("moduloActivo", () => {
   it("lo que dice la base manda", () => {
@@ -41,8 +42,6 @@ describe("catálogo", () => {
     expect(OPERACION.find((m) => m.codigo === "repartidores")?.requiere).toBe("domicilio");
   });
 });
-
-import { conExistencias } from "../operacion";
 
 describe("conExistencias", () => {
   it("solo con el módulo efectivo; mientras carga o si falló, no", () => {

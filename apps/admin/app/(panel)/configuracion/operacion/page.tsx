@@ -6,7 +6,7 @@ import { PageHeader, PageBody } from "../../../components/page-header";
 import { useModulos, usePerfil } from "../../../components/admin-shell";
 import { leerNegocio } from "../../../lib/configuracion";
 import { leerAyuda, type AyudaAdmin } from "../../../lib/soporte";
-import { mensajeCambiarModulos } from "../../../lib/operacion";
+import { conExistencias, mensajeCambiarModulos } from "../../../lib/operacion";
 
 /**
  * Lo que este negocio usa en VIM POS (ADR 0034). Solo se consulta: los módulos los ajusta VIM a
@@ -37,7 +37,7 @@ export default function OperacionPage() {
             <p className="text-sm text-ink-3">Cargando…</p>
           ) : (
             <ul className="flex flex-col divide-y divide-line rounded-lg border border-line bg-surface">
-              {OPERACION.map((mod) => {
+              {OPERACION.filter((mod) => mod.codigo !== "existencias" || conExistencias(m)).map((mod) => {
                 const activo = moduloActivo(efectivos, mod.codigo);
                 return (
                   <li key={mod.codigo} className="flex items-start justify-between gap-4 p-4">
