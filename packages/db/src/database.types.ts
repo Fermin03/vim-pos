@@ -10557,6 +10557,7 @@ export type Database = {
           ultimo_error: string | null
           updated_at: string
           vence_at: string
+          verificacion_at: string | null
         }
         Insert: {
           aprobado_at?: string | null
@@ -10586,6 +10587,7 @@ export type Database = {
           ultimo_error?: string | null
           updated_at?: string
           vence_at: string
+          verificacion_at?: string | null
         }
         Update: {
           aprobado_at?: string | null
@@ -10615,6 +10617,7 @@ export type Database = {
           ultimo_error?: string | null
           updated_at?: string
           vence_at?: string
+          verificacion_at?: string | null
         }
         Relationships: [
           {
@@ -13862,6 +13865,7 @@ export type Database = {
           p_nota: string
           p_paga_con: number
           p_pago: string
+          p_propina_mxn?: number
           p_propina_pct?: number
           p_seguimiento_hash: string
           p_sucursal: string
@@ -13982,6 +13986,10 @@ export type Database = {
         Args: { p_ahora?: string; p_slug: string }
         Returns: Json
       }
+      tienda_pago_abandonar: {
+        Args: { p_orden?: string; p_pago: string }
+        Returns: boolean
+      }
       tienda_pago_anotar: {
         Args: { p_error?: string; p_orden?: string; p_pago: string }
         Returns: undefined
@@ -14018,6 +14026,10 @@ export type Database = {
         Returns: boolean
       }
       tienda_pago_tomar_correo: { Args: { p_pago: string }; Returns: boolean }
+      tienda_pago_verificacion: {
+        Args: { p_orden: string; p_pago: string }
+        Returns: undefined
+      }
       tienda_pagos_barrer: { Args: never; Returns: number }
       tienda_pagos_tomar: {
         Args: { p_max?: number }
