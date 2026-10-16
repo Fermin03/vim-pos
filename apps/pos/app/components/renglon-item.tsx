@@ -24,6 +24,8 @@ export function RenglonItem({
   notaCocina,
   totalMxn,
   hijos = [],
+  detalle,
+  sinExistencia = false,
 }: {
   cantidad: number;
   nombre: string;
@@ -31,12 +33,18 @@ export function RenglonItem({
   notaCocina: string | null;
   totalMxn: number;
   hijos?: HijoRenglon[];
+  /** Tienda: «M · Negra · POL-M-NEG», bajo el nombre del padre. */
+  detalle?: string;
+  /** Tienda: la pieza deja la existencia en cero o menos. Avisa; no impide cobrar. */
+  sinExistencia?: boolean;
 }) {
   return (
     <div className="flex items-start gap-3">
       <span className="font-display min-w-[28px] text-16 font-semibold tabular-nums text-ink-2">{cantidad}×</span>
       <div className="min-w-0 flex-1">
         <div className="text-16 font-semibold leading-tight text-ink">{nombre}</div>
+        {detalle && <div className="mt-[3px] text-13 leading-[1.4] text-ink-2">{detalle}</div>}
+        {sinExistencia && <div className="mt-[3px] text-13 font-semibold leading-[1.4] text-warning">Sin existencia</div>}
         {modificadores.length > 0 && (
           <div className="mt-[3px] text-13 leading-[1.4] text-ink-2">{modificadores.join(" · ")}</div>
         )}

@@ -69,6 +69,7 @@ export function SidebarTicket({
   bloqueado = false,
   procesando,
   onEditar,
+  tienda,
 }: {
   estado: EstadoCarrito;
   onCantidad: (clientId: string, cantidad: number) => void;
@@ -135,9 +136,18 @@ export function SidebarTicket({
   /** El ticket ya está comprometido en BD: bloquea edición del carrito para evitar desincronización. */
   bloqueado?: boolean;
   procesando: boolean;
+  /** Giro RETAIL: variante y SKU en el renglón, «Sin existencia» y el último agregado marcado. */
+  tienda?: {
+    /** Nombre del padre y «M · Negra · SKU» de la línea. */
+    renglon: (l: LineaCarrito) => { nombre: string; detalle: string | undefined };
+    sinExistencia: (l: LineaCarrito) => boolean;
+    /** Producto del último agregado; se marca hasta la siguiente acción. */
+    ultimoProductoId: string | null;
+  };
 }) {
   const totales = calcularTotalesDisplay(estado.lineas, 16, estado.envio?.costoMxn ?? 0);
   const vacio = estado.lineas.length === 0;
+  const ultimoEnTicket = tienda?.ultimoProductoId ?? null;
   const totalProductos = estado.lineas.reduce((s, l) => s + l.cantidad, 0);
   // Notas de cocina: qué línea se está editando + si el input de nota de orden está abierto.
   const [editandoNota, setEditandoNota] = useState<string | null>(null);
@@ -279,16 +289,18 @@ export function SidebarTicket({
           <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-ink-3">
             <IconoTicket />
             <p className="text-15 font-semibold text-ink-2">
-              Agrega productos para empezar
+              {tienda ? "Escanea una prenda para empezar" : "Agrega productos para empezar"}
             </p>
-            <span className="text-13">
-              Toca un producto del catálogo para iniciar el ticket.
-            </span>
+            {!tienda && (
+              <span className="text-13">
+                Toca un producto del catálogo para iniciar el ticket.
+              </span>
+            )}
           </div>
         ) : (
           <ul>
             {estado.lineas.map((l: LineaCarrito) => (
-              <li key={l.clientId} className="border-b border-line py-2.5">
+              <li key={l.clientId} className={`border-b border-line py-2.5 ${tienda && l.producto.id === ultimoEnTicket ? "-mx-2 bg-sel px-2" : ""}`}>
                 {/* Tocar el renglón lo reabre en su modal de modificadores o de combo. Quien llama
                     decide si hay algo que editar: un producto sin modificadores no abre nada. */}
                 <div
@@ -307,7 +319,9 @@ export function SidebarTicket({
                 >
                   <RenglonItem
                     cantidad={l.cantidad}
-                    nombre={l.producto.nombre}
+                    nombre={tienda ? tienda.renglon(l).nombre : l.producto.nombre}
+                    detalle={tienda?.renglon(l).detalle}
+                    sinExistencia={tienda?.sinExistencia(l)}
                     modificadores={l.modificadores.map((m) => m.opcionNombre)}
                     notaCocina={l.notaCocina}
                     totalMxn={l.clientId === premioClientId ? 0 : totalLinea(l)}

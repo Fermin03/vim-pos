@@ -75,7 +75,7 @@ import { fijarContextoErrores, reportarErrorSinEsperar } from "../lib/reportar-e
 import { BotonVolver } from "./boton-volver";
 import { CatalogoProductos } from "./catalogo-productos";
 import { PanelVentaRetail, type AvisoEscaneo } from "./venta-retail";
-import { esTienda, leerExistencias, leerSucursales, type Existencia, type PadreTienda } from "../lib/tienda";
+import { esTienda, leerExistencias, leerSucursales, renglonTienda, sinExistencia, type Existencia, type PadreTienda } from "../lib/tienda";
 import { leerEstadoSync } from "../lib/estado-sync";
 import { ModalAgregarProductos } from "./modal-agregar-productos";
 import { ModalNumeroMesa } from "./modal-numero-mesa";
@@ -571,6 +571,8 @@ export function HomePos({
   const [selectorRetail, setSelectorRetail] = useState<PadreTienda | null>(null);
   const [avisoRetail, setAvisoRetail] = useState<AvisoEscaneo | null>(null);
   const [existencias, setExistencias] = useState<Existencia[]>([]);
+  /** Producto del último agregado: su renglón queda marcado hasta la siguiente acción. */
+  const [ultimoTienda, setUltimoTienda] = useState<string | null>(null);
   const [sucursalesTienda, setSucursalesTienda] = useState<{ id: string; nombre: string }[]>([]);
   /** Hora del último pull de la caja instalada; `null` en el POS web (lee la nube «al momento»). */
   const [actualizadoA, setActualizadoA] = useState<string | null>(null);
@@ -594,7 +596,7 @@ export function HomePos({
     return () => { vivo = false; clearInterval(id); };
   }, [capturaTienda, token, cuentasVersion]);
   useEffect(() => {
-    if (!capturaTienda) { setSelectorRetail(null); setAvisoRetail(null); }
+    if (!capturaTienda) { setSelectorRetail(null); setAvisoRetail(null); setUltimoTienda(null); }
   }, [capturaTienda]);
 
   // El escritorio avisa cuando termina de bajar un menú nuevo (sondeo del minuto o botón
@@ -838,6 +840,7 @@ export function HomePos({
       // existencia en cero sí se vende.
       if (p.agotado) { setAvisoRetail({ tipo: "no-se-vende" }); return; }
       setAvisoRetail(null);
+      setUltimoTienda(p.id);
       colaTienda.current = colaTienda.current.then(async () => {
         try {
           const grupos = await obtenerGruposDeProducto(token, p.id);
@@ -2022,7 +2025,8 @@ export function HomePos({
               //
               // Y solo si la estación de cocina es una impresora distinta de la de caja: con una
               // sola impresora, el ticket que acaba de salir ya es el papel.
-              if (debeImprimirComandaAlCobrar(datos.meta.modo, hayEstacionDeCocinaDedicada())) {
+              // Una tienda no tiene cocina: aunque haya estaciones configuradas, no sale comanda.
+              if (!datos.tienda && debeImprimirComandaAlCobrar(datos.meta.modo, hayEstacionDeCocinaDedicada())) {
                 // También repartida: en Para llevar la bebida va a la barra igual que en el resto.
                 imprimirComandaPorAreas(datosCom, lineasCom, { ticketId, evento: "IMPRESION_INICIAL" }).catch(() => {});
               }
@@ -2811,19 +2815,24 @@ export function HomePos({
           )}
         <SidebarTicket
           estado={carrito}
-          modoTexto={ticketBd?.ticketId === cuentaBarraId ? "Barra" : undefined}
-          onCantidad={(id, c) => dispatch({ tipo: "cantidad", clientId: id, cantidad: c })}
-          onQuitar={(id) => dispatch({ tipo: "quitar", clientId: id })}
+          modoTexto={ticketBd?.ticketId === cuentaBarraId ? "Barra" : capturaTienda ? "Venta" : undefined}
+          tienda={capturaTienda ? {
+            renglon: (l) => renglonTienda(l.producto, productos ?? []),
+            sinExistencia: (l) => sinExistencia(l.producto, carrito.lineas.filter((x) => x.producto.id === l.producto.id).reduce((s, x) => s + x.cantidad, 0), existencias, caja.sucursal_id),
+            ultimoProductoId: ultimoTienda,
+          } : undefined}
+          onCantidad={(id, c) => { setUltimoTienda(null); dispatch({ tipo: "cantidad", clientId: id, cantidad: c }); }}
+          onQuitar={(id) => { setUltimoTienda(null); dispatch({ tipo: "quitar", clientId: id }); }}
           // Cuenta con el ticket impreso: nada que cambie el total hasta reabrirla desde su lista.
           onCancelarItemPersistido={ticketBd && !cuentaImpresa ? onCancelarItemPersistido : undefined}
           onDescuentoItem={ticketBd && !cuentaImpresa ? onDescuentoItemSolicitado : undefined}
-          onLimpiar={!ticketBd ? () => dispatch({ tipo: "limpiar" }) : undefined}
+          onLimpiar={!ticketBd ? () => { setUltimoTienda(null); dispatch({ tipo: "limpiar" }); } : undefined}
           onCancelarTicket={ticketBd && !cuentaImpresa ? () => setCancelandoTicket(true) : undefined}
           onEditarCliente={() => setClienteDomAbierto(true)}
           onCambiarZona={() => setZonaPedidoAbierto(true)}
           onNotaLinea={(id, nota) => dispatch({ tipo: "nota_linea", clientId: id, nota })}
           onNotaOrden={(nota) => dispatch({ tipo: "nota_orden", nota })}
-          onCobrar={() => void iniciarCobro()}
+          onCobrar={() => { setUltimoTienda(null); void iniciarCobro(); }}
           onEfectivoExacto={() => void iniciarCobro("EFECTIVO_EXACTO")}
           cambioAnterior={cambioAnterior}
           // También en cuenta de mesa: lo que no ha salido a cocina se edita en la base (0119).

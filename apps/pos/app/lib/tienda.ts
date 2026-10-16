@@ -108,6 +108,23 @@ export async function leerSucursales(token: string): Promise<{ id: string; nombr
   return data ?? [];
 }
 
+/**
+ * El renglón del ticket de tienda: el nombre del padre y, debajo, «M · Negra · POL-M-NEG» (valores
+ * en el orden de los ejes, luego el SKU). Sin el padre en el catálogo se queda el nombre del producto.
+ */
+export function renglonTienda(p: Producto, productos: Producto[]): { nombre: string; detalle: string | undefined } {
+  const padre = p.producto_padre_id ? productos.find((x) => x.id === p.producto_padre_id) : undefined;
+  if (p.producto_padre_id && !padre) return { nombre: p.nombre, detalle: undefined };
+  const valores = padre?.variante_ejes?.map((e) => p.variante_valores?.[e]).filter(Boolean) ?? [];
+  const detalle = [...valores, p.codigo_interno].filter(Boolean).join(" · ");
+  return { nombre: padre?.nombre ?? p.nombre, detalle: detalle || undefined };
+}
+
+/** ¿Vender `enCarrito` piezas dejaría la existencia de esta sucursal en cero o menos? No impide nada. */
+export function sinExistencia(p: Producto, enCarrito: number, existencias: Existencia[], sucursalId: string): boolean {
+  return !!p.controla_existencias && (cantidadDe(p.id, existencias, sucursalId)?.cantidad ?? 0) - enCarrito <= 0;
+}
+
 export type Escaneo =
   | { tipo: "ignorar" }
   | { tipo: "cobro" }

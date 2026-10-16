@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { Producto } from "../catalogo";
 import type { DatosCaja } from "../turno";
-import { agruparTienda, buscarPorCodigo, decidirEscaneo, esTienda, estadoExistencia, matrizVariantes, resumenVitrina, type Existencia } from "../tienda";
+import { agruparTienda, buscarPorCodigo, decidirEscaneo, esTienda, estadoExistencia, matrizVariantes, renglonTienda, resumenVitrina, sinExistencia, type Existencia } from "../tienda";
 
 const prod = (id: string, extra: Partial<Producto> = {}): Producto => ({
   id, nombre: id, descripcion: null, precio_base_mxn: 100, categoria_id: "c", agotado: false, esCombo: false, seVendeAqui: true, ...extra,
@@ -104,5 +104,32 @@ describe("decidirEscaneo", () => {
     expect(decidirEscaneo(lista, "750100", { cobroAbierto: true, ignorar: false })).toEqual({ tipo: "cobro" });
     expect(decidirEscaneo(lista, "750100", { cobroAbierto: true, ignorar: true })).toEqual({ tipo: "ignorar" });
     expect(decidirEscaneo(lista, "000", { cobroAbierto: false, ignorar: true })).toEqual({ tipo: "ignorar" });
+  });
+});
+
+describe("renglonTienda", () => {
+  const lista = [padre, h("h1", "M", "Negro", 100, { nombre: "Polo M Negro", codigo_interno: "POL-M-NEG" }), suelto];
+  it("nombre del padre y debajo «talla · color · SKU» en el orden de los ejes", () => {
+    expect(renglonTienda(lista[1]!, lista)).toEqual({ nombre: "P", detalle: "M · Negro · POL-M-NEG" });
+  });
+  it("sin variantes enseña solo su SKU, si tiene", () => {
+    expect(renglonTienda({ ...suelto, codigo_interno: "GOR-1" }, lista)).toEqual({ nombre: "S", detalle: "GOR-1" });
+    expect(renglonTienda(suelto, lista)).toEqual({ nombre: "S", detalle: undefined });
+  });
+  it("si el padre no está en el catálogo, deja el nombre del producto sin detalle de variante", () => {
+    const huerfana = h("h9", "L", "Rojo", 100, { nombre: "Polo L Rojo" });
+    expect(renglonTienda(huerfana, [huerfana])).toEqual({ nombre: "Polo L Rojo", detalle: undefined });
+  });
+});
+
+describe("sinExistencia", () => {
+  const p = prod("A", { controla_existencias: true });
+  it("marca cuando la pieza dejaría la existencia en cero o menos", () => {
+    expect(sinExistencia(p, 2, [ex("A", 2)], "s1")).toBe(true);
+    expect(sinExistencia(p, 1, [ex("A", 2)], "s1")).toBe(false);
+    expect(sinExistencia(p, 1, [], "s1")).toBe(true);
+  });
+  it("no marca lo que no controla existencias", () => {
+    expect(sinExistencia({ ...p, controla_existencias: false }, 5, [ex("A", 1)], "s1")).toBe(false);
   });
 });

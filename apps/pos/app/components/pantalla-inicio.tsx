@@ -9,6 +9,7 @@ import { DialogoAvisos } from "./dialogo-avisos";
 import { avisosDe, leerDirectivas, type Aviso } from "../lib/directivas";
 import { evaluarFolios, leerFolios, type NivelFolios } from "../lib/folios";
 import type { DatosCaja, Turno } from "../lib/turno";
+import { esTienda } from "../lib/tienda";
 import type { Empleado } from "../lib/supabase";
 
 declare global {
@@ -210,7 +211,7 @@ export function PantallaInicio({
             icon={<Icono nombre="vaso" />} />
         )}
         {ver.paraLlevar && (
-          <Acceso label="Para llevar" onClick={onParaLlevar} requiereTurno={sinTurno} destacado
+          <Acceso label={esTienda(caja) ? "Venta" : "Para llevar"} onClick={onParaLlevar} requiereTurno={sinTurno} destacado
             icon={<Icono nombre="para-llevar" />} />
         )}
         {ver.pickup && (

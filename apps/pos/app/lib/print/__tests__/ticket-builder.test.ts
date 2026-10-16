@@ -374,3 +374,30 @@ describe("pago con la terminal integrada", () => {
     expect(filas.some((x) => x.t === "fila" && x.izq === "Autorización")).toBe(false);
   });
 });
+
+describe("construirTicketJob — SKU de tienda", () => {
+  const conSku = (tienda: boolean | undefined): DatosTicketImpresion => ({
+    ...DATOS,
+    tienda,
+    lineas: [{ cantidad: 1, nombre: "Playera Polo M Negra", totalMxn: 349, modificadores: [], notaCocina: null, sku: "POL-M-NEG" }],
+  });
+
+  it("tienda: renglón con SKU imprime la línea SKU debajo", () => {
+    const b = construirTicketJob(conSku(true)).bloques;
+    const i = b.findIndex((x) => x.t === "fila" && x.izq === "1x Playera Polo M Negra");
+    expect(i).toBeGreaterThan(-1);
+    expect(b[i + 1]).toEqual({ t: "texto", valor: "   SKU POL-M-NEG", size: 1 });
+  });
+
+  it("tienda sin SKU en el renglón no imprime la línea", () => {
+    const d = conSku(true);
+    d.lineas[0]!.sku = null;
+    expect(JSON.stringify(construirTicketJob(d).bloques)).not.toContain("SKU");
+  });
+
+  it("restaurante con SKU queda igual que antes", () => {
+    const sinSku = { ...conSku(undefined), lineas: [{ ...conSku(undefined).lineas[0]!, sku: undefined }] };
+    expect(construirTicketJob(conSku(false))).toEqual(construirTicketJob(sinSku));
+    expect(construirTicketJob(conSku(undefined))).toEqual(construirTicketJob(sinSku));
+  });
+});

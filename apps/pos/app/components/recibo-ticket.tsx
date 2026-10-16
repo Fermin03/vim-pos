@@ -122,6 +122,7 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
                 </div>
                 <span className="whitespace-nowrap font-bold">{fmt(l.totalMxn)}</span>
               </div>
+              {datos.tienda && l.sku && <div className="pl-[18px] text-[10px] leading-[1.45] text-[#555]">SKU {l.sku}</div>}
               {l.modificadores.map((m, j) => (
                 <div key={j} className="pl-[18px] text-[10px] leading-[1.45] text-[#555]">+ {m}</div>
               ))}

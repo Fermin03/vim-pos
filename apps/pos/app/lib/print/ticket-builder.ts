@@ -95,6 +95,7 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
       continue;
     }
     b.push({ t: "fila", izq: `${l.cantidad}x ${l.nombre}`, der: pesos(l.totalMxn) });
+    if (d.tienda && l.sku) b.push({ t: "texto", valor: `   SKU ${l.sku}`, size: 1 });
     for (const m of l.modificadores) b.push({ t: "texto", valor: `  + ${m}`, size: 1 });
     if (l.notaCocina && l.notaCocina.trim().length > 0) {
       b.push({ t: "texto", valor: `  > ${l.notaCocina.trim()}`, size: 1 });

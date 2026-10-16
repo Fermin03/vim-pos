@@ -24,7 +24,7 @@ type Ctx = {
  * mostrarle el envío a la cocina, en silencio.
  */
 export const SELECCION_TICKET_ITEMS_IMPRESION =
-  "id, producto_nombre_snapshot, cantidad, total_item_mxn, nota_cocina, cargo_tipo, " +
+  "id, producto_nombre_snapshot, producto_sku_snapshot, cantidad, total_item_mxn, nota_cocina, cargo_tipo, " +
   "parent_item_id, combo_rol, combo_grupo_nombre_snapshot, " +
   "ticket_item_modificadores(opcion_nombre_snapshot, precio_extra_snapshot, cantidad), " +
   // El área se resuelve aquí, con el ticket: producto primero, categoría si el producto no
@@ -211,7 +211,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
     // `as unknown as`: con el select anidado supabase-js no infiere la forma y devuelve su tipo
     // de error genérico. La forma real es la de abajo.
     const r = it as unknown as {
-      id: string; producto_nombre_snapshot: string; cantidad: number; total_item_mxn: string | number; nota_cocina: string | null;
+      id: string; producto_nombre_snapshot: string; producto_sku_snapshot: string | null; cantidad: number; total_item_mxn: string | number; nota_cocina: string | null;
       cargo_tipo: string | null;
       parent_item_id: string | null; combo_rol: "PADRE" | "HIJO" | null; combo_grupo_nombre_snapshot: string | null;
       ticket_item_modificadores: Mod[] | null; producto: Prod;
@@ -225,6 +225,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       id: r.id,
       cantidad: Number(r.cantidad),
       nombre: r.producto_nombre_snapshot,
+      sku: r.producto_sku_snapshot ?? null,
       totalMxn: Number(r.total_item_mxn),
       modificadores: (r.ticket_item_modificadores ?? []).map((m) => m.opcion_nombre_snapshot),
       notaCocina: r.nota_cocina ?? null,
@@ -326,7 +327,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
 
   const { data: ten } = await sb
     .from("tenants")
-    .select("codigo, nombre_comercial, razon_social, rfc, logo_url")
+    .select("codigo, nombre_comercial, razon_social, rfc, logo_url, vertical_principal")
     .eq("id", tk.tenant_id as string)
     .single();
   const tn = (ten ?? {}) as Record<string, string | null>;
@@ -371,6 +372,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
     // restaurante a una dirección ajena en cuanto se encendiera el QR.
     qrUrl: qrActivo && !conPremio ? urlAutofactura(tn.codigo ?? null, (tk.folio_completo as string | null) ?? null, tokenQr) : null,
     lealtad,
+    tienda: tn.vertical_principal === "RETAIL",
     ancho: 80,
   };
 }

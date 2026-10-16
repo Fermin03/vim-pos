@@ -46,6 +46,8 @@ export type LineaImpresion = {
   extras?: { nombre: string; importeMxn: number }[];
   /** 'ENVIO' = cargo, no comida: se imprime en el ticket del cliente pero nunca en la comanda. */
   cargoTipo?: string | null;
+  /** SKU del renglón (`producto_sku_snapshot`). Solo lo imprime una tienda: un restaurante también lo tiene. */
+  sku?: string | null;
 };
 
 export type PagoImpresion = {
@@ -110,5 +112,7 @@ export type DatosTicketImpresion = {
   qrUrl: string | null;
   /** Pie de lealtad. null o ausente = sin cliente, módulo apagado o no se pudo leer: el ticket sale sin él. */
   lealtad?: LealtadImpresion | null;
+  /** Giro RETAIL: el ticket imprime el SKU bajo cada renglón y no sale comanda al cobrar. */
+  tienda?: boolean;
   ancho: 58 | 80;
 };
