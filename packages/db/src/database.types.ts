@@ -1640,6 +1640,93 @@ export type Database = {
           },
         ]
       }
+      codigos_internos_contador: {
+        Row: {
+          tenant_id: string
+          ultimo: number
+        }
+        Insert: {
+          tenant_id: string
+          ultimo: number
+        }
+        Update: {
+          tenant_id?: string
+          ultimo?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "codigos_internos_contador_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      colonias: {
+        Row: {
+          codigo_postal: string | null
+          created_at: string
+          deleted_at: string | null
+          id: string
+          nombre: string
+          nombre_busqueda: string | null
+          origen: string
+          sucursal_id: string
+          tenant_id: string
+          updated_at: string
+          zona_envio_id: string | null
+        }
+        Insert: {
+          codigo_postal?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          nombre: string
+          nombre_busqueda?: string | null
+          origen?: string
+          sucursal_id: string
+          tenant_id: string
+          updated_at?: string
+          zona_envio_id?: string | null
+        }
+        Update: {
+          codigo_postal?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          nombre?: string
+          nombre_busqueda?: string | null
+          origen?: string
+          sucursal_id?: string
+          tenant_id?: string
+          updated_at?: string
+          zona_envio_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "colonias_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "colonias_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "colonias_zona_envio_id_fkey"
+            columns: ["zona_envio_id"]
+            isOneToOne: false
+            referencedRelation: "zonas_envio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comanda_impresiones: {
         Row: {
           area_cocina_id: string | null
@@ -3216,6 +3303,7 @@ export type Database = {
           direccion_texto: string | null
           efectivo_a_cobrar_mxn: number
           entregado_at: string | null
+          envio_distancia_km: number | null
           envio_mxn: number | null
           estado: string
           estado_app: string | null
@@ -3271,6 +3359,7 @@ export type Database = {
           direccion_texto?: string | null
           efectivo_a_cobrar_mxn?: number
           entregado_at?: string | null
+          envio_distancia_km?: number | null
           envio_mxn?: number | null
           estado?: string
           estado_app?: string | null
@@ -3326,6 +3415,7 @@ export type Database = {
           direccion_texto?: string | null
           efectivo_a_cobrar_mxn?: number
           entregado_at?: string | null
+          envio_distancia_km?: number | null
           envio_mxn?: number | null
           estado?: string
           estado_app?: string | null
@@ -5334,6 +5424,131 @@ export type Database = {
           },
         ]
       }
+      movimientos_producto: {
+        Row: {
+          cantidad: number
+          costo_unitario_mxn: number | null
+          creado_at: string
+          devolucion_id: string | null
+          id: string
+          motivo: string | null
+          producto_id: string
+          proveedor_id: string | null
+          sucursal_id: string
+          tenant_id: string
+          ticket_id: string | null
+          ticket_item_id: string | null
+          tipo: Database["public"]["Enums"]["movimiento_producto_tipo"]
+          traspaso_id: string | null
+          usuario_id: string | null
+        }
+        Insert: {
+          cantidad: number
+          costo_unitario_mxn?: number | null
+          creado_at?: string
+          devolucion_id?: string | null
+          id?: string
+          motivo?: string | null
+          producto_id: string
+          proveedor_id?: string | null
+          sucursal_id: string
+          tenant_id: string
+          ticket_id?: string | null
+          ticket_item_id?: string | null
+          tipo: Database["public"]["Enums"]["movimiento_producto_tipo"]
+          traspaso_id?: string | null
+          usuario_id?: string | null
+        }
+        Update: {
+          cantidad?: number
+          costo_unitario_mxn?: number | null
+          creado_at?: string
+          devolucion_id?: string | null
+          id?: string
+          motivo?: string | null
+          producto_id?: string
+          proveedor_id?: string | null
+          sucursal_id?: string
+          tenant_id?: string
+          ticket_id?: string | null
+          ticket_item_id?: string | null
+          tipo?: Database["public"]["Enums"]["movimiento_producto_tipo"]
+          traspaso_id?: string | null
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "movimientos_producto_devolucion_id_fkey"
+            columns: ["devolucion_id"]
+            isOneToOne: false
+            referencedRelation: "devoluciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_producto_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_producto_proveedor_id_fkey"
+            columns: ["proveedor_id"]
+            isOneToOne: false
+            referencedRelation: "proveedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_producto_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_producto_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_producto_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_producto_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cumplimiento_tiempos_cocina"
+            referencedColumns: ["ticket_id"]
+          },
+          {
+            foreignKeyName: "movimientos_producto_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_ventas_apps_externas"
+            referencedColumns: ["ticket_id"]
+          },
+          {
+            foreignKeyName: "movimientos_producto_ticket_item_id_fkey"
+            columns: ["ticket_item_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_producto_traspaso_fk"
+            columns: ["traspaso_id"]
+            isOneToOne: false
+            referencedRelation: "traspasos_producto"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       opciones_modificador: {
         Row: {
           activa: boolean
@@ -5972,6 +6187,55 @@ export type Database = {
         }
         Relationships: []
       }
+      producto_existencias: {
+        Row: {
+          actualizado_at: string
+          cantidad: number
+          minimo: number | null
+          producto_id: string
+          sucursal_id: string
+          tenant_id: string
+        }
+        Insert: {
+          actualizado_at?: string
+          cantidad?: number
+          minimo?: number | null
+          producto_id: string
+          sucursal_id: string
+          tenant_id: string
+        }
+        Update: {
+          actualizado_at?: string
+          cantidad?: number
+          minimo?: number | null
+          producto_id?: string
+          sucursal_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "producto_existencias_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "producto_existencias_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "producto_existencias_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       productos: {
         Row: {
           agotado_automatico: boolean
@@ -5981,6 +6245,8 @@ export type Database = {
           clave_sat: string | null
           codigo_barras: string | null
           codigo_interno: string | null
+          controla_existencias: boolean
+          costo_mxn: number | null
           created_at: string
           created_by: string | null
           deleted_at: string | null
@@ -6000,6 +6266,7 @@ export type Database = {
           notas_internas: string | null
           orden_visualizacion: number
           precio_base_mxn: number
+          producto_padre_id: string | null
           tasa_iva: number
           tenant_id: string
           tiempo_preparacion_min: number | null
@@ -6007,6 +6274,8 @@ export type Database = {
           unidad_sat: string | null
           updated_at: string
           updated_by: string | null
+          variante_ejes: string[] | null
+          variante_valores: Json | null
           visible_en_pos: boolean
         }
         Insert: {
@@ -6017,6 +6286,8 @@ export type Database = {
           clave_sat?: string | null
           codigo_barras?: string | null
           codigo_interno?: string | null
+          controla_existencias?: boolean
+          costo_mxn?: number | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
@@ -6036,6 +6307,7 @@ export type Database = {
           notas_internas?: string | null
           orden_visualizacion?: number
           precio_base_mxn: number
+          producto_padre_id?: string | null
           tasa_iva?: number
           tenant_id: string
           tiempo_preparacion_min?: number | null
@@ -6043,6 +6315,8 @@ export type Database = {
           unidad_sat?: string | null
           updated_at?: string
           updated_by?: string | null
+          variante_ejes?: string[] | null
+          variante_valores?: Json | null
           visible_en_pos?: boolean
         }
         Update: {
@@ -6053,6 +6327,8 @@ export type Database = {
           clave_sat?: string | null
           codigo_barras?: string | null
           codigo_interno?: string | null
+          controla_existencias?: boolean
+          costo_mxn?: number | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
@@ -6072,6 +6348,7 @@ export type Database = {
           notas_internas?: string | null
           orden_visualizacion?: number
           precio_base_mxn?: number
+          producto_padre_id?: string | null
           tasa_iva?: number
           tenant_id?: string
           tiempo_preparacion_min?: number | null
@@ -6079,6 +6356,8 @@ export type Database = {
           unidad_sat?: string | null
           updated_at?: string
           updated_by?: string | null
+          variante_ejes?: string[] | null
+          variante_valores?: Json | null
           visible_en_pos?: boolean
         }
         Relationships: [
@@ -6101,6 +6380,13 @@ export type Database = {
             columns: ["categoria_id"]
             isOneToOne: false
             referencedRelation: "categorias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productos_producto_padre_id_fkey"
+            columns: ["producto_padre_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
             referencedColumns: ["id"]
           },
           {
@@ -7480,6 +7766,36 @@ export type Database = {
           },
         ]
       }
+      sepomex_asentamientos: {
+        Row: {
+          clave_municipio: string
+          codigo_postal: string
+          estado: string
+          id: number
+          municipio: string
+          nombre: string
+          tipo: string
+        }
+        Insert: {
+          clave_municipio: string
+          codigo_postal: string
+          estado: string
+          id?: never
+          municipio: string
+          nombre: string
+          tipo: string
+        }
+        Update: {
+          clave_municipio?: string
+          codigo_postal?: string
+          estado?: string
+          id?: never
+          municipio?: string
+          nombre?: string
+          tipo?: string
+        }
+        Relationships: []
+      }
       sesiones_login: {
         Row: {
           caja_id: string | null
@@ -8574,6 +8890,7 @@ export type Database = {
           reembolsado_mxn: number
           referencia: string | null
           sucursal_id: string
+          tarjeta_ultimos4: string | null
           tenant_id: string
           ticket_id: string
           tipo_tarjeta: string | null
@@ -8599,6 +8916,7 @@ export type Database = {
           reembolsado_mxn?: number
           referencia?: string | null
           sucursal_id: string
+          tarjeta_ultimos4?: string | null
           tenant_id: string
           ticket_id: string
           tipo_tarjeta?: string | null
@@ -8624,6 +8942,7 @@ export type Database = {
           reembolsado_mxn?: number
           referencia?: string | null
           sucursal_id?: string
+          tarjeta_ultimos4?: string | null
           tenant_id?: string
           ticket_id?: string
           tipo_tarjeta?: string | null
@@ -10259,6 +10578,7 @@ export type Database = {
           descripcion: string | null
           logo_ruta: string | null
           minutos_aceptacion: number
+          pago_de_prueba: boolean
           pago_efectivo: boolean
           pago_en_linea: boolean
           pago_pausado_hasta: string | null
@@ -10274,6 +10594,7 @@ export type Database = {
           descripcion?: string | null
           logo_ruta?: string | null
           minutos_aceptacion?: number
+          pago_de_prueba?: boolean
           pago_efectivo?: boolean
           pago_en_linea?: boolean
           pago_pausado_hasta?: string | null
@@ -10289,6 +10610,7 @@ export type Database = {
           descripcion?: string | null
           logo_ruta?: string | null
           minutos_aceptacion?: number
+          pago_de_prueba?: boolean
           pago_efectivo?: boolean
           pago_en_linea?: boolean
           pago_pausado_hasta?: string | null
@@ -10302,6 +10624,63 @@ export type Database = {
             foreignKeyName: "tienda_config_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tienda_correos: {
+        Row: {
+          created_at: string
+          enviado_at: string | null
+          estado: string
+          id: number
+          intentos: number
+          motivo: string | null
+          pedido_id: string
+          proximo_intento_at: string | null
+          tenant_id: string
+          tipo: string
+          tomado_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          enviado_at?: string | null
+          estado?: string
+          id?: number
+          intentos?: number
+          motivo?: string | null
+          pedido_id: string
+          proximo_intento_at?: string | null
+          tenant_id: string
+          tipo: string
+          tomado_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          enviado_at?: string | null
+          estado?: string
+          id?: number
+          intentos?: number
+          motivo?: string | null
+          pedido_id?: string
+          proximo_intento_at?: string | null
+          tenant_id?: string
+          tipo?: string
+          tomado_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tienda_correos_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tienda_correos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
@@ -10380,6 +10759,8 @@ export type Database = {
           estado: string
           etiqueta: string
           id: string
+          lat: number | null
+          lng: number | null
           numero_exterior: string
           numero_interior: string | null
           referencias: string | null
@@ -10396,6 +10777,8 @@ export type Database = {
           estado: string
           etiqueta?: string
           id?: string
+          lat?: number | null
+          lng?: number | null
           numero_exterior: string
           numero_interior?: string | null
           referencias?: string | null
@@ -10412,6 +10795,8 @@ export type Database = {
           estado?: string
           etiqueta?: string
           id?: string
+          lat?: number | null
+          lng?: number | null
           numero_exterior?: string
           numero_interior?: string | null
           referencias?: string | null
@@ -10438,6 +10823,42 @@ export type Database = {
             columns: ["zona_envio_id"]
             isOneToOne: false
             referencedRelation: "zonas_envio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tienda_enlaces: {
+        Row: {
+          cifrado: string
+          created_at: string
+          pedido_id: string
+          tenant_id: string
+        }
+        Insert: {
+          cifrado: string
+          created_at?: string
+          pedido_id: string
+          tenant_id: string
+        }
+        Update: {
+          cifrado?: string
+          created_at?: string
+          pedido_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tienda_enlaces_pedido_id_fkey"
+            columns: ["pedido_id"]
+            isOneToOne: true
+            referencedRelation: "delivery_pedidos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tienda_enlaces_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -10543,6 +10964,7 @@ export type Database = {
           devuelto_at: string | null
           estado: string
           extra: boolean
+          freno_clave: string | null
           id: string
           intentos: number
           marca: string | null
@@ -10557,6 +10979,7 @@ export type Database = {
           ultimo_error: string | null
           updated_at: string
           vence_at: string
+          verificacion_at: string | null
         }
         Insert: {
           aprobado_at?: string | null
@@ -10572,6 +10995,7 @@ export type Database = {
           devuelto_at?: string | null
           estado?: string
           extra?: boolean
+          freno_clave?: string | null
           id?: string
           intentos?: number
           marca?: string | null
@@ -10586,6 +11010,7 @@ export type Database = {
           ultimo_error?: string | null
           updated_at?: string
           vence_at: string
+          verificacion_at?: string | null
         }
         Update: {
           aprobado_at?: string | null
@@ -10601,6 +11026,7 @@ export type Database = {
           devuelto_at?: string | null
           estado?: string
           extra?: boolean
+          freno_clave?: string | null
           id?: string
           intentos?: number
           marca?: string | null
@@ -10615,6 +11041,7 @@ export type Database = {
           ultimo_error?: string | null
           updated_at?: string
           vence_at?: string
+          verificacion_at?: string | null
         }
         Relationships: [
           {
@@ -10726,6 +11153,7 @@ export type Database = {
       }
       tienda_sucursales: {
         Row: {
+          cobro_envio: string
           conexion_id: string | null
           created_at: string
           domicilio: boolean
@@ -10736,9 +11164,11 @@ export type Database = {
           recoger: boolean
           sucursal_id: string
           tenant_id: string
+          tramos_envio: Json
           updated_at: string
         }
         Insert: {
+          cobro_envio?: string
           conexion_id?: string | null
           created_at?: string
           domicilio?: boolean
@@ -10749,9 +11179,11 @@ export type Database = {
           recoger?: boolean
           sucursal_id: string
           tenant_id: string
+          tramos_envio?: Json
           updated_at?: string
         }
         Update: {
+          cobro_envio?: string
           conexion_id?: string | null
           created_at?: string
           domicilio?: boolean
@@ -10762,6 +11194,7 @@ export type Database = {
           recoger?: boolean
           sucursal_id?: string
           tenant_id?: string
+          tramos_envio?: Json
           updated_at?: string
         }
         Relationships: [
@@ -10781,6 +11214,67 @@ export type Database = {
           },
           {
             foreignKeyName: "tienda_sucursales_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      traspasos_producto: {
+        Row: {
+          destino_sucursal_id: string
+          enviado_at: string
+          enviado_por: string | null
+          estado: Database["public"]["Enums"]["traspaso_producto_estado"]
+          id: string
+          lineas: Json
+          origen_sucursal_id: string
+          recibido_at: string | null
+          recibido_por: string | null
+          tenant_id: string
+        }
+        Insert: {
+          destino_sucursal_id: string
+          enviado_at?: string
+          enviado_por?: string | null
+          estado?: Database["public"]["Enums"]["traspaso_producto_estado"]
+          id?: string
+          lineas: Json
+          origen_sucursal_id: string
+          recibido_at?: string | null
+          recibido_por?: string | null
+          tenant_id: string
+        }
+        Update: {
+          destino_sucursal_id?: string
+          enviado_at?: string
+          enviado_por?: string | null
+          estado?: Database["public"]["Enums"]["traspaso_producto_estado"]
+          id?: string
+          lineas?: Json
+          origen_sucursal_id?: string
+          recibido_at?: string | null
+          recibido_por?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "traspasos_producto_destino_sucursal_id_fkey"
+            columns: ["destino_sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "traspasos_producto_origen_sucursal_id_fkey"
+            columns: ["origen_sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "traspasos_producto_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -12474,6 +12968,20 @@ export type Database = {
       _eliminar_usuario_marca: { Args: never; Returns: string }
       _es_escritura_rest_directa: { Args: never; Returns: boolean }
       _es_llamada_de_confianza: { Args: never; Returns: boolean }
+      _existencias_puede_escribir: { Args: never; Returns: string }
+      _existencias_sincronizar_ticket: {
+        Args: {
+          p_devolucion?: string
+          p_es_cobro: boolean
+          p_item?: string
+          p_ticket: string
+        }
+        Returns: undefined
+      }
+      _existencias_validar: {
+        Args: { p_producto: string; p_sucursal: string; p_tenant: string }
+        Returns: undefined
+      }
       _extras_vigentes: {
         Args: { p_codigo: string; p_tenant: string }
         Returns: number
@@ -12482,9 +12990,22 @@ export type Database = {
         Args: { p_desde: string; p_inicio: string; p_meses: number }
         Returns: string
       }
+      _guardar_variante: {
+        Args: {
+          p_fila: Json
+          p_padre: Database["public"]["Tables"]["productos"]["Row"]
+          p_sucursal: string
+          p_tenant: string
+        }
+        Returns: string
+      }
       _inventario_apagar_si_no_permitido: {
         Args: { p_tenant: string }
         Returns: undefined
+      }
+      _mensaje_unico_producto: {
+        Args: { p_constraint: string }
+        Returns: string
       }
       _menu_exigir_permiso: { Args: never; Returns: string }
       _menu_nombre_limpio: { Args: { p_nombre: string }; Returns: string }
@@ -12492,11 +13013,16 @@ export type Database = {
         Args: { p_sucursales: string[]; p_tenant: string }
         Returns: undefined
       }
+      _nombre_variante: {
+        Args: { p_ejes: string[]; p_nombre: string; p_valores: Json }
+        Returns: string
+      }
       _retirar_extras_sin_limite: {
         Args: { p_tenant: string }
         Returns: string[]
       }
       _rol_sujeto_a_rls: { Args: never; Returns: boolean }
+      _siguiente_codigo_interno: { Args: { p_tenant: string }; Returns: string }
       _sincronizar_addons_del_plan: {
         Args: { p_plan: string; p_retirar?: boolean; p_tenant: string }
         Returns: Json
@@ -12530,6 +13056,11 @@ export type Database = {
         Args: { p_neto: number; p_producto: string; p_tenant: string }
         Returns: number
       }
+      _tienda_correo_encolar: {
+        Args: { p_pedido: string; p_tipo: string }
+        Returns: undefined
+      }
+      _tienda_correo_plazo: { Args: { p_tipo: string }; Returns: string }
       _tienda_cuenta_publica: {
         Args: {
           p_cuenta: Database["public"]["Tables"]["tienda_cuentas"]["Row"]
@@ -12539,6 +13070,10 @@ export type Database = {
       _tienda_direcciones: {
         Args: { p_cuenta: string; p_tenant: string }
         Returns: Json
+      }
+      _tienda_distancia_km: {
+        Args: { p_lat1: number; p_lat2: number; p_lng1: number; p_lng2: number }
+        Returns: number
       }
       _tienda_entero: {
         Args: { p_max: number; p_min: number; p_valor: Json }
@@ -12582,8 +13117,17 @@ export type Database = {
         }
         Returns: Json
       }
+      _tienda_punto: { Args: { p: Json }; Returns: Json }
       _tienda_renglones: { Args: { p_items: Json }; Returns: Json }
       _tienda_telefono: { Args: { p_telefono: string }; Returns: string }
+      _tienda_tramos: { Args: { p_sucursal: string }; Returns: Json }
+      _tienda_zona_de_colonia: {
+        Args: { p_colonia: string; p_sucursal: string; p_tenant: string }
+        Returns: {
+          costo_mxn: number
+          zona_id: string
+        }[]
+      }
       _venta_con_descuento_pendiente: {
         Args: { p_ticket_id: string }
         Returns: boolean
@@ -12617,6 +13161,10 @@ export type Database = {
         Returns: Json
       }
       _vim_fusionar_clientes: {
+        Args: { p_snapshot: Json; p_tenant: string }
+        Returns: Json
+      }
+      _vim_fusionar_colonias: {
         Args: { p_snapshot: Json; p_tenant: string }
         Returns: Json
       }
@@ -12851,6 +13399,14 @@ export type Database = {
           p_ticket_id: string
         }
         Returns: string
+      }
+      asignar_zona_colonia: {
+        Args: {
+          p_autorizacion_pin_id?: string
+          p_colonia: string
+          p_zona: string
+        }
+        Returns: undefined
       }
       auto_marcar_no_shows: { Args: never; Returns: number }
       autofactura_token: { Args: { p_ticket_id: string }; Returns: string }
@@ -13233,6 +13789,7 @@ export type Database = {
         }
         Returns: Json
       }
+      ean13_digito: { Args: { p_doce: string }; Returns: string }
       eliminar_menu: { Args: { p_menu: string }; Returns: undefined }
       eliminar_tenant: {
         Args: {
@@ -13262,6 +13819,10 @@ export type Database = {
       entregar_propina: {
         Args: { p_distribucion_id: string }
         Returns: undefined
+      }
+      enviar_traspaso_producto: {
+        Args: { p_destino: string; p_lineas: Json; p_origen: string }
+        Returns: string
       }
       es_admin_del_tenant: { Args: { p_tenant_id: string }; Returns: boolean }
       es_dueno_del_tenant: { Args: { p_tenant_id: string }; Returns: boolean }
@@ -13308,6 +13869,7 @@ export type Database = {
         }
         Returns: Json
       }
+      generar_codigo_interno: { Args: never; Returns: string }
       generar_folio: {
         Args: {
           p_anio?: number
@@ -13327,6 +13889,19 @@ export type Database = {
           p_producto_id: string
         }
         Returns: string
+      }
+      guardar_variantes: {
+        Args: {
+          p_ejes: string[]
+          p_filas: Json
+          p_padre: string
+          p_sucursal?: string
+        }
+        Returns: Json
+      }
+      importar_catalogo_tienda: {
+        Args: { p_filas: Json; p_sucursal?: string }
+        Returns: Json
       }
       imprimir_comanda: {
         Args: {
@@ -13603,6 +14178,10 @@ export type Database = {
         Args: { p_ticket_id: string }
         Returns: undefined
       }
+      recibir_traspaso_producto: {
+        Args: { p_traspaso: string }
+        Returns: undefined
+      }
       reclamar_bienvenida: { Args: { p_tenant_id: string }; Returns: string }
       reemplazar_item_ticket: {
         Args: { p_lineas: Json; p_ticket_item_id: string }
@@ -13622,6 +14201,22 @@ export type Database = {
         Returns: Json
       }
       registrar_compra: { Args: { p_compra: Json }; Returns: string }
+      registrar_conteo: {
+        Args: { p_conteo: Json; p_sucursal: string }
+        Returns: Json
+      }
+      registrar_movimiento_producto: {
+        Args: {
+          p_cantidad: number
+          p_costo_unitario?: number
+          p_motivo?: string
+          p_producto: string
+          p_proveedor?: string
+          p_sucursal: string
+          p_tipo: Database["public"]["Enums"]["movimiento_producto_tipo"]
+        }
+        Returns: string
+      }
       registrar_no_entrega_delivery: {
         Args: {
           p_asignacion_id: string
@@ -13714,6 +14309,7 @@ export type Database = {
         Args: { p_devolucion_id: string }
         Returns: undefined
       }
+      sembrar_colonias: { Args: { p_sucursal: string }; Returns: Json }
       sembrar_unidades_base: {
         Args: { p_tenant_id: string }
         Returns: undefined
@@ -13819,8 +14415,21 @@ export type Database = {
         }[]
       }
       tienda_borrar_tokens: { Args: { p_conexion: string }; Returns: undefined }
+      tienda_colonias: {
+        Args: { p_q: string; p_sucursal: string; p_tenant: string }
+        Returns: Json
+      }
       tienda_conexion_cobro: {
         Args: { p_sucursal: string; p_tenant: string }
+        Returns: string
+      }
+      tienda_conexion_de_prueba: {
+        Args: {
+          p_access: string
+          p_cuenta: string
+          p_public_key: string
+          p_tenant: string
+        }
         Returns: string
       }
       tienda_conexion_ocupada: { Args: { p_conexion: string }; Returns: Json }
@@ -13841,10 +14450,30 @@ export type Database = {
         Args: { p_dias?: number; p_max?: number }
         Returns: string[]
       }
+      tienda_correo_resultado: {
+        Args: { p_id: number; p_resultado: string }
+        Returns: string
+      }
+      tienda_correos_barrer: { Args: never; Returns: number }
+      tienda_correos_tomar: {
+        Args: { p_max?: number; p_tope_hora?: number }
+        Returns: {
+          cifrado: string
+          email: string
+          id: number
+          negocio: string
+          seguimiento_hash: string
+          slug: string
+          tenant_id: string
+          tipo: string
+        }[]
+      }
       tienda_cotizar: {
         Args: {
+          p_colonia?: string
           p_items: Json
           p_modo: string
+          p_punto?: Json
           p_sucursal: string
           p_tenant: string
           p_zona: string
@@ -13855,6 +14484,7 @@ export type Database = {
         Args: {
           p_clave?: string
           p_cliente: Json
+          p_colonia?: string
           p_cuenta?: string
           p_direccion: Json
           p_items: Json
@@ -13862,7 +14492,9 @@ export type Database = {
           p_nota: string
           p_paga_con: number
           p_pago: string
+          p_propina_mxn?: number
           p_propina_pct?: number
+          p_punto?: Json
           p_seguimiento_hash: string
           p_sucursal: string
           p_tenant: string
@@ -13936,14 +14568,32 @@ export type Database = {
           p_direccion: Json
           p_etiqueta: string
           p_id: string
+          p_punto?: Json
           p_tenant: string
         }
         Returns: Json
       }
       tienda_encender_complemento: { Args: never; Returns: Json }
+      tienda_enlace_guardar: {
+        Args: {
+          p_cifrado: string
+          p_seguimiento_hash: string
+          p_tenant: string
+        }
+        Returns: undefined
+      }
       tienda_estado_sucursal: {
         Args: { p_ahora?: string; p_modo: string; p_sucursal: string }
         Returns: string
+      }
+      tienda_guardar_envio: {
+        Args: {
+          p_cobro: string
+          p_punto?: Json
+          p_sucursal: string
+          p_tramos: Json
+        }
+        Returns: Json
       }
       tienda_guardar_tokens: {
         Args: {
@@ -13982,6 +14632,10 @@ export type Database = {
         Args: { p_ahora?: string; p_slug: string }
         Returns: Json
       }
+      tienda_pago_abandonar: {
+        Args: { p_orden?: string; p_pago: string }
+        Returns: boolean
+      }
       tienda_pago_anotar: {
         Args: { p_error?: string; p_orden?: string; p_pago: string }
         Returns: undefined
@@ -14008,6 +14662,11 @@ export type Database = {
         Args: { p_error?: string; p_ok: boolean; p_pago: string }
         Returns: string
       }
+      tienda_pago_frenado: { Args: { p_clave: string }; Returns: string }
+      tienda_pago_frenar: {
+        Args: { p_clave: string; p_minutos?: number }
+        Returns: string
+      }
       tienda_pago_pausar: {
         Args: { p_minutos?: number; p_sucursal: string; p_tenant: string }
         Returns: boolean
@@ -14018,6 +14677,10 @@ export type Database = {
         Returns: boolean
       }
       tienda_pago_tomar_correo: { Args: { p_pago: string }; Returns: boolean }
+      tienda_pago_verificacion: {
+        Args: { p_orden: string; p_pago: string }
+        Returns: undefined
+      }
       tienda_pagos_barrer: { Args: never; Returns: number }
       tienda_pagos_tomar: {
         Args: { p_max?: number }
@@ -14247,6 +14910,7 @@ export type Database = {
         | "CANCELACION_PEDIDO"
         | "PROBLEMA_DELIVERY"
         | "OTRO"
+        | "CAMBIO_TALLA"
       evento_categoria:
         | "AUTENTICACION"
         | "TURNO"
@@ -14347,6 +15011,15 @@ export type Database = {
         | "TRANSFERENCIA_SALIDA"
         | "TRANSFERENCIA_ENTRADA"
         | "DEVOLUCION_PROVEEDOR"
+      movimiento_producto_tipo:
+        | "VENTA"
+        | "DEVOLUCION"
+        | "ENTRADA"
+        | "AJUSTE"
+        | "CONTEO"
+        | "MERMA"
+        | "TRASPASO_SALIDA"
+        | "TRASPASO_ENTRADA"
       movimiento_tipo:
         | "FONDO_APERTURA"
         | "INYECCION_FONDO"
@@ -14427,6 +15100,7 @@ export type Database = {
         | "CANCELADO"
       ticket_origen: "POS_ONLINE" | "POS_OFFLINE" | "API_EXTERNA" | "IMPORTADO"
       tipo_acceso: "PIN_OPERATIVO" | "WEB_ADMIN"
+      traspaso_producto_estado: "ENVIADO" | "RECIBIDO"
       turno_estado: "ABIERTO" | "PENDIENTE_VALIDACION" | "CERRADO"
       uso_cfdi: "G01" | "G02" | "G03" | "P01" | "D01" | "S01"
       usuario_estado:
@@ -14445,6 +15119,7 @@ export type Database = {
         | "BAR"
         | "CAFETERIA"
         | "TAQUERIA"
+        | "RETAIL"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -14689,6 +15364,7 @@ export const Constants = {
         "CANCELACION_PEDIDO",
         "PROBLEMA_DELIVERY",
         "OTRO",
+        "CAMBIO_TALLA",
       ],
       evento_categoria: [
         "AUTENTICACION",
@@ -14800,6 +15476,16 @@ export const Constants = {
         "TRANSFERENCIA_ENTRADA",
         "DEVOLUCION_PROVEEDOR",
       ],
+      movimiento_producto_tipo: [
+        "VENTA",
+        "DEVOLUCION",
+        "ENTRADA",
+        "AJUSTE",
+        "CONTEO",
+        "MERMA",
+        "TRASPASO_SALIDA",
+        "TRASPASO_ENTRADA",
+      ],
       movimiento_tipo: [
         "FONDO_APERTURA",
         "INYECCION_FONDO",
@@ -14890,6 +15576,7 @@ export const Constants = {
       ],
       ticket_origen: ["POS_ONLINE", "POS_OFFLINE", "API_EXTERNA", "IMPORTADO"],
       tipo_acceso: ["PIN_OPERATIVO", "WEB_ADMIN"],
+      traspaso_producto_estado: ["ENVIADO", "RECIBIDO"],
       turno_estado: ["ABIERTO", "PENDIENTE_VALIDACION", "CERRADO"],
       uso_cfdi: ["G01", "G02", "G03", "P01", "D01", "S01"],
       usuario_estado: [
@@ -14909,7 +15596,9 @@ export const Constants = {
         "BAR",
         "CAFETERIA",
         "TAQUERIA",
+        "RETAIL",
       ],
     },
   },
 } as const
+
