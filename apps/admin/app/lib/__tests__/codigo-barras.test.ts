@@ -20,4 +20,12 @@ describe("EAN-13", () => {
     expect(m.slice(45, 50)).toBe("01010");
     expect(m.slice(92)).toBe("101");
   });
+  it("el código completo coincide con las tablas estándar (4 → LGLLGG)", () => {
+    expect(modulosEan13("4006381333931")).toBe(
+      "101" + "0001101" + "0100111" + "0101111" + "0111101" + "0001001" + "0110011" +
+      "01010" + "1000010" + "1000010" + "1000010" + "1110100" + "1000010" + "1100110" + "101");
+  });
+  it("rechaza lo que no es EAN-13", () => {
+    expect(() => modulosEan13("123")).toThrow();
+  });
 });

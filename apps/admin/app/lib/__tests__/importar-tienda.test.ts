@@ -29,4 +29,12 @@ describe("CSV de tienda", () => {
     expect(r.errores.map((e) => e.linea)).toEqual([2, 3, 5, 6]);
     expect(r.filas.map((f) => f.sku)).toEqual(["POL-CH"]);
   });
+  it("rechaza la coma decimal y acepta la de miles", () => {
+    const r = parsearCsvTienda(
+      "Categoría,Producto,Ejes,Valores,SKU,Código de barras,Precio,Costo,Existencia\n" +
+      "Ropa,Polo,,,A,,\"349,50\",,\n" +
+      "Ropa,Saco,,,B,,\"1,299.50\",,\n", false);
+    expect(r.errores).toEqual([{ linea: 2, motivo: "Usa punto decimal (349.50)" }]);
+    expect(r.filas[0]).toMatchObject({ sku: "B", precio: 1299.5 });
+  });
 });

@@ -38,6 +38,7 @@ export function parsearCsvTienda(texto: string, generarFaltantes: boolean): Pars
     if (ejes.length !== vals.length || ejes.some((e) => !e) || vals.some((v) => !v)) {
       return void mal("Los valores no cuadran con los ejes (ej.: Talla|Color y M|Negra)");
     }
+    if ([precioTxt, costoTxt, existTxt].some((t) => /,\d{1,2}$/.test(t.trim()))) return void mal("Usa punto decimal (349.50)");
     const precio = numero(precioTxt);
     const costo = numero(costoTxt);
     const existencia = numero(existTxt);

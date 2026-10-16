@@ -15,7 +15,7 @@ export type FilaVariante = {
 export type Eje = { nombre: string; valores: string[] };
 
 export const claveValores = (v: Record<string, string>): string =>
-  JSON.stringify(Object.keys(v).sort().map((k) => [k, v[k]]));
+  JSON.stringify(Object.keys(v).sort().map((k) => [k, v[k]!.trim().toLowerCase()]));
 
 export function parsearValoresEje(texto: string): string[] {
   const vistos = new Set<string>();

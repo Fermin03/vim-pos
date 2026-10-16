@@ -25,6 +25,7 @@ const PARIDAD = ["LLLLLL", "LLGLGG", "LLGGLG", "LLGGGL", "LGLLGG", "LGGLLG", "LG
 
 /** Las 95 barras (1 = negra) de un EAN-13 ya válido. */
 export function modulosEan13(trece: string): string {
+  if (!esEan13(trece)) throw new Error("modulosEan13: el código no es EAN-13");
   const d = [...trece].map(Number);
   const par = PARIDAD[d[0]!]!;
   const izq = d.slice(1, 7).map((n, i) => (par[i] === "L" ? L[n] : G[n])).join("");

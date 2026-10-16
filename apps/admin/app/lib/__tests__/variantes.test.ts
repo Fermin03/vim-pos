@@ -22,4 +22,11 @@ describe("variantes", () => {
     expect(m.find((f) => f.valores.Talla === "G")?.id).toBeUndefined();
     expect(m.at(-1)).toMatchObject({ id: "x", activa: false });
   });
+  it("compara los valores sin importar mayúsculas", () => {
+    const f: FilaVariante = { id: "x", valores: { Talla: "M" }, codigo_interno: "A", codigo_barras: "", generar_codigo: false,
+      precio: "300", costo: "", existencia_inicial: "", activa: true };
+    const m = armarMatriz([{ nombre: "Talla", valores: ["m"] }], [f], "349");
+    expect(m).toHaveLength(1);
+    expect(m[0]).toMatchObject({ id: "x", activa: true, valores: { Talla: "M" } });
+  });
 });
