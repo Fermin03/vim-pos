@@ -217,7 +217,7 @@ export default function TraspasosPage() {
               </div>
             </section>
 
-            <h2 className="mb-3 font-display text-lg font-semibold tracking-tight">Enviados</h2>
+            <h2 className="mb-3 font-display text-lg font-semibold tracking-tight">Historial</h2>
             {errorLista && <p className="mb-3 text-sm font-medium text-danger" role="alert">{errorLista}</p>}
             {traspasos !== null && traspasos.length === 0 && <p className="text-14 text-ink-2">Todavía no hay traspasos.</p>}
             {traspasos !== null && traspasos.length > 0 && (
