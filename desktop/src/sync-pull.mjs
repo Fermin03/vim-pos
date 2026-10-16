@@ -562,6 +562,21 @@ async function liberarClavesUnicasClientes(client, filas) {
 }
 
 /**
+ * productos (0189): sus índices únicos (variante por padre, código de barras y SKU con existencias)
+ * se revisan aun en réplica, y el snapshot trae las filas sin orden: si la nube intercambió el
+ * código de dos variantes, la primera que entra choca con la segunda todavía vieja. Antes del
+ * upsert se marcan como borradas las copias locales de las filas que van a bajar y que participan
+ * en esos índices; el upsert les devuelve el `deleted_at` de la nube en la misma transacción.
+ */
+async function soltarClavesProductos(client, filas) {
+  const ids = filas.map((f) => f?.id).filter(Boolean);
+  if (!ids.length) return;
+  await client.query(
+    "UPDATE productos SET deleted_at = COALESCE(deleted_at, now()) WHERE id = ANY($1::uuid[]) AND (producto_padre_id IS NOT NULL OR controla_existencias)",
+    [ids]);
+}
+
+/**
  * Devuelve teléfono y RFC a las filas que NO se pudieron aplicar, CADA llave en su propio savepoint
  * (que una choque no impide que la otra vuelva). Si alguna no se pudo devolver, la fila queda con
  * un estado local distinto al de la nube: se anota su huella ACTUAL en la libreta del push para que
@@ -846,19 +861,4 @@ export async function pullFromCloud(pool, { cloudUrl, anonKey, deviceToken }, lo
   if (!snapshot) throw new Error("sync-pull no devolvió snapshot");
   log("aplicando snapshot del tenant…");
   return pullSnapshot(pool, snapshot, log);
-}/**
- * productos (0189): sus índices únicos (variante por padre, código de barras y SKU con existencias)
- * se revisan aun en réplica, y el snapshot trae las filas sin orden: si la nube intercambió el
- * código de dos variantes, la primera que entra choca con la segunda todavía vieja. Antes del
- * upsert se marcan como borradas las copias locales de las filas que van a bajar y que participan
- * en esos índices; el upsert les devuelve el `deleted_at` de la nube en la misma transacción.
- */
-async function soltarClavesProductos(client, filas) {
-  const ids = filas.map((f) => f?.id).filter(Boolean);
-  if (!ids.length) return;
-  await client.query(
-    "UPDATE productos SET deleted_at = COALESCE(deleted_at, now()) WHERE id = ANY($1::uuid[]) AND (producto_padre_id IS NOT NULL OR controla_existencias)",
-    [ids]);
 }
-
-
