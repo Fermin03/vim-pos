@@ -12,7 +12,7 @@ export type ResultadoParse = { filas: FilaMenu[]; errores: { linea: number; text
 const HEADERS = new Set(["categoria", "categoría", "producto", "nombre", "precio", "precio_base"]);
 
 /** Divide una línea CSV respetando comillas dobles. */
-function dividirCSV(linea: string): string[] {
+export function dividirCSV(linea: string): string[] {
   const out: string[] = [];
   let actual = "";
   let enComillas = false;
