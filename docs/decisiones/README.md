@@ -40,6 +40,7 @@ Cada archivo dice **qué decía el plan, qué hacemos hoy y por qué**. Manda lo
 | [0034](0034-el-giro-arma-el-juego-inicial-y-vim-lo-ajusta.md) | El giro arma el juego inicial de módulos de operación, y después solo VIM lo ajusta | 14/10/2026 |
 | [0035](0035-el-envio-por-distancia-es-una-zona-por-tramo.md) | El envío por distancia de la tienda: lo calcula la base desde el pin del cliente, y cada tramo es una zona de envío | 14/10/2026 |
 | [0036](0036-la-colonia-sugiere-la-zona.md) | La colonia sugiere la zona de envío; el domicilio la guarda | 15/10/2026 |
+| [0037](0037-el-stock-de-una-tienda-vive-en-el-producto.md) | El stock de una tienda vive en el producto, no en una receta | 15/10/2026 |
 
 ## Pendientes de escribir
 
