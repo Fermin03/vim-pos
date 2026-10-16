@@ -138,6 +138,65 @@ BEGIN
   RAISE NOTICE '3 guardar_variantes OK';
 END $$;
 
+-- 4) Importar: crea categorías, padres, hijas y productos sueltos; reimportar actualiza sin duplicar
+--    ni volver a sumar existencia; una línea mala no deja nada.
+DO $$
+DECLARE
+  v_t   uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_suc uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_r   jsonb; v_n int; v_hija uuid;
+  v_csv jsonb := jsonb_build_array(
+    jsonb_build_object('linea', 2, 'categoria', 'Pantalones', 'producto', 'Jeans Slim', 'ejes', jsonb_build_array('Talla','Color'),
+                       'valores', jsonb_build_object('Talla','30','Color','Azul'), 'sku', 'JNS-30-AZU', 'generar_codigo', true,
+                       'precio', 799, 'costo', 350, 'existencia', 4),
+    jsonb_build_object('linea', 3, 'categoria', 'Pantalones', 'producto', 'Jeans Slim', 'ejes', jsonb_build_array('Talla','Color'),
+                       'valores', jsonb_build_object('Talla','32','Color','Azul'), 'sku', 'JNS-32-AZU', 'codigo_barras', '7501000000004',
+                       'precio', 799, 'existencia', 2),
+    jsonb_build_object('linea', 4, 'categoria', 'Accesorios', 'producto', 'Gorra', 'ejes', '[]'::jsonb, 'valores', '{}'::jsonb,
+                       'sku', 'GOR-001', 'generar_codigo', true, 'precio', 249, 'existencia', 10));
+BEGIN
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', '99999999-0000-0000-0000-0000000000e1', 'tenant_id', v_t)::text, true);
+  v_r := importar_catalogo_tienda(v_csv, v_suc);
+  IF (v_r->>'categorias')::int <> 2 OR (v_r->>'productos')::int <> 2 OR (v_r->>'variantes_creadas')::int <> 2 THEN
+    RAISE EXCEPTION '4a: %', v_r; END IF;
+  SELECT id INTO v_hija FROM productos WHERE tenant_id = v_t AND codigo_interno = 'JNS-30-AZU' AND deleted_at IS NULL;
+  IF (SELECT nombre FROM productos WHERE id = v_hija) <> 'Jeans Slim 30 Azul' THEN RAISE EXCEPTION '4b: nombre'; END IF;
+  IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_hija) <> 4 THEN RAISE EXCEPTION '4b: existencia'; END IF;
+  IF (SELECT controla_existencias FROM productos WHERE tenant_id = v_t AND codigo_interno = 'GOR-001') IS NOT TRUE THEN
+    RAISE EXCEPTION '4b: el producto suelto lleva existencias'; END IF;
+
+  -- 4c) Reimportar con otro precio: actualiza, no duplica, no vuelve a sumar existencia.
+  SELECT count(*) INTO v_n FROM productos WHERE tenant_id = v_t AND deleted_at IS NULL;
+  v_r := importar_catalogo_tienda(jsonb_set(v_csv, '{0,precio}', '849'), v_suc);
+  IF (SELECT count(*) FROM productos WHERE tenant_id = v_t AND deleted_at IS NULL) <> v_n THEN RAISE EXCEPTION '4c: duplicó'; END IF;
+  IF (SELECT precio_base_mxn FROM productos WHERE id = v_hija) <> 849 THEN RAISE EXCEPTION '4c: no actualizó el precio'; END IF;
+  IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_hija) <> 4 THEN RAISE EXCEPTION '4c: volvió a sumar'; END IF;
+
+  -- 4d) Una línea mala (ejes distintos para el mismo padre) aborta todo y nombra la línea.
+  SELECT count(*) INTO v_n FROM productos WHERE tenant_id = v_t;
+  BEGIN
+    PERFORM importar_catalogo_tienda(jsonb_build_array(
+      jsonb_build_object('linea', 2, 'categoria', 'Nueva', 'producto', 'Sudadera', 'ejes', jsonb_build_array('Talla'),
+                         'valores', jsonb_build_object('Talla','M'), 'sku', 'SUD-M', 'precio', 599),
+      jsonb_build_object('linea', 3, 'categoria', 'Pantalones', 'producto', 'Jeans Slim', 'ejes', jsonb_build_array('Talla'),
+                         'valores', jsonb_build_object('Talla','34'), 'sku', 'JNS-34', 'precio', 799)), v_suc);
+    RAISE EXCEPTION '4d: debía rechazar';
+  EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS: línea 3:%' THEN RAISE; END IF;
+  END;
+  IF (SELECT count(*) FROM productos WHERE tenant_id = v_t) <> v_n THEN RAISE EXCEPTION '4d: dejó productos a medias'; END IF;
+  IF EXISTS (SELECT 1 FROM categorias WHERE tenant_id = v_t AND nombre = 'Nueva') THEN RAISE EXCEPTION '4d: dejó la categoría'; END IF;
+
+  -- 4e) NaN en un producto suelto se rechaza con su línea.
+  BEGIN
+    PERFORM importar_catalogo_tienda(jsonb_build_array(
+      jsonb_build_object('linea', 7, 'categoria', 'Accesorios', 'producto', 'Cinto', 'ejes', '[]'::jsonb, 'valores', '{}'::jsonb,
+                         'sku', 'CIN-001', 'precio', 'NaN')), v_suc);
+    RAISE EXCEPTION '4e: debía rechazar NaN';
+  EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS: línea%' THEN RAISE; END IF;
+  END;
+  RAISE NOTICE '4 importar OK';
+END $$;
+
 -- 5) Otro negocio y módulo apagado.
 DO $$
 DECLARE

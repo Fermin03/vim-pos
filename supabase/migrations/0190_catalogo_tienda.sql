@@ -247,3 +247,127 @@ END;
 $$;
 REVOKE ALL ON FUNCTION guardar_variantes(uuid, text[], jsonb, uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION guardar_variantes(uuid, text[], jsonb, uuid) TO authenticated, service_role;
+
+-- ── §4 Importar el catálogo de una tienda ────────────────────────────────────
+-- Todo o nada. El admin ya parseó y validó cada línea (importar-tienda.ts); aquí se resuelve contra
+-- la base. Un SKU que ya existe se actualiza; la existencia solo cuenta al crear (decisión del
+-- plan de la entrega 2: un CSV viejo no pisa un conteo).
+CREATE OR REPLACE FUNCTION importar_catalogo_tienda(p_filas jsonb, p_sucursal uuid DEFAULT NULL)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_t      uuid := _existencias_puede_escribir();
+  v_f      jsonb;
+  v_linea  text;
+  v_cat    uuid;
+  v_ejes   text[];
+  v_padre  productos%ROWTYPE;
+  v_prod   productos%ROWTYPE;
+  v_fila   jsonb;
+  v_q      numeric;
+  v_precio numeric;
+  v_costo  numeric;
+  v_c      text;
+  v_r      text;
+  v_cats   int := 0; v_prods int := 0; v_vars int := 0; v_act int := 0;
+BEGIN
+  IF p_filas IS NULL OR jsonb_typeof(p_filas) <> 'array' OR jsonb_array_length(p_filas) = 0 THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: el archivo viene vacío' USING ERRCODE = '22023';
+  END IF;
+  IF p_sucursal IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sucursales WHERE id = p_sucursal AND tenant_id = v_t) THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: la sucursal no es de tu negocio' USING ERRCODE = '22023';
+  END IF;
+
+  FOR v_f IN SELECT value FROM jsonb_array_elements(p_filas) LOOP
+    v_linea := COALESCE(v_f->>'linea', '?');
+    BEGIN
+      IF NULLIF(btrim(v_f->>'categoria'), '') IS NULL OR NULLIF(btrim(v_f->>'producto'), '') IS NULL
+         OR NULLIF(btrim(v_f->>'sku'), '') IS NULL THEN
+        RAISE EXCEPTION 'faltan categoría, producto o SKU';
+      END IF;
+      SELECT COALESCE(array_agg(e), '{}') INTO v_ejes FROM jsonb_array_elements_text(COALESCE(v_f->'ejes', '[]')) e;
+
+      SELECT id INTO v_cat FROM categorias
+       WHERE tenant_id = v_t AND deleted_at IS NULL AND lower(btrim(nombre)) = lower(btrim(v_f->>'categoria')) LIMIT 1;
+      IF v_cat IS NULL THEN
+        INSERT INTO categorias (tenant_id, nombre) VALUES (v_t, btrim(v_f->>'categoria')) RETURNING id INTO v_cat;
+        v_cats := v_cats + 1;
+      END IF;
+
+      v_fila := jsonb_build_object('valores', v_f->'valores', 'codigo_interno', v_f->'sku', 'codigo_barras', v_f->'codigo_barras',
+                                   'generar_codigo', v_f->'generar_codigo', 'precio', v_f->'precio', 'costo', v_f->'costo',
+                                   'existencia_inicial', v_f->'existencia');
+
+      -- ¿El SKU ya existe? Entonces es esa fila la que se actualiza.
+      SELECT * INTO v_prod FROM productos
+       WHERE tenant_id = v_t AND deleted_at IS NULL AND controla_existencias AND codigo_interno = btrim(v_f->>'sku');
+
+      IF cardinality(v_ejes) = 0 THEN
+        -- Producto sin variantes que lleva existencias. (Las variantes validan números en _guardar_variante.)
+        v_precio := (v_fila->>'precio')::numeric;
+        v_costo  := NULLIF(v_fila->>'costo', '')::numeric;
+        v_q      := NULLIF(v_f->>'existencia', '')::numeric;
+        IF v_precio IS NULL OR v_precio = 'NaN' OR v_precio < 0 OR v_costo = 'NaN' OR v_costo < 0 OR v_q = 'NaN' OR v_q < 0 THEN
+          RAISE EXCEPTION 'precio, costo o existencia inválidos';
+        END IF;
+        IF v_prod.producto_padre_id IS NOT NULL THEN
+          RAISE EXCEPTION 'el SKU % es de una variante; para esa prenda llena Ejes y Valores', v_f->>'sku';
+        END IF;
+        IF v_prod.id IS NOT NULL THEN
+          UPDATE productos SET nombre = btrim(v_f->>'producto'), categoria_id = v_cat,
+                 precio_base_mxn = v_precio, costo_mxn = v_costo,
+                 codigo_barras = COALESCE(NULLIF(btrim(v_f->>'codigo_barras'), ''), codigo_barras), updated_at = now()
+           WHERE id = v_prod.id;
+          v_act := v_act + 1;
+        ELSE
+          INSERT INTO productos (tenant_id, nombre, categoria_id, precio_base_mxn, costo_mxn, codigo_interno, codigo_barras, controla_existencias)
+          VALUES (v_t, btrim(v_f->>'producto'), v_cat, v_precio, v_costo,
+                  btrim(v_f->>'sku'),
+                  COALESCE(NULLIF(btrim(v_f->>'codigo_barras'), ''),
+                           CASE WHEN COALESCE((v_f->>'generar_codigo')::boolean, false) THEN _siguiente_codigo_interno(v_t) END),
+                  true)
+          RETURNING * INTO v_prod;
+          v_prods := v_prods + 1;
+          IF v_q > 0 THEN
+            IF p_sucursal IS NULL THEN RAISE EXCEPTION 'elige la sucursal de la existencia'; END IF;
+            INSERT INTO movimientos_producto (tenant_id, sucursal_id, producto_id, tipo, cantidad, costo_unitario_mxn, motivo, usuario_id)
+            VALUES (v_t, p_sucursal, v_prod.id, 'ENTRADA', v_q, v_prod.costo_mxn, 'Existencia inicial (importación)', auth.uid());
+          END IF;
+        END IF;
+      ELSE
+        -- Prenda con variantes: el padre se busca por nombre entre los padres vivos.
+        SELECT * INTO v_padre FROM productos
+         WHERE tenant_id = v_t AND deleted_at IS NULL AND variante_ejes IS NOT NULL
+           AND lower(btrim(nombre)) = lower(btrim(v_f->>'producto')) LIMIT 1;
+        IF v_padre.id IS NULL THEN
+          INSERT INTO productos (tenant_id, nombre, categoria_id, precio_base_mxn, variante_ejes)
+          VALUES (v_t, btrim(v_f->>'producto'), v_cat, (v_fila->>'precio')::numeric, v_ejes)
+          RETURNING * INTO v_padre;
+          v_prods := v_prods + 1;
+        ELSIF v_padre.variante_ejes IS DISTINCT FROM v_ejes THEN
+          RAISE EXCEPTION '«%» ya existe con ejes %', v_padre.nombre, array_to_string(v_padre.variante_ejes, ', ');
+        END IF;
+        IF v_prod.id IS NOT NULL THEN
+          IF v_prod.producto_padre_id IS DISTINCT FROM v_padre.id THEN
+            RAISE EXCEPTION 'el SKU % ya es de otro producto', v_f->>'sku';
+          END IF;
+          v_fila := v_fila || jsonb_build_object('id', v_prod.id, 'existencia_inicial', NULL,
+                                                 'codigo_barras', COALESCE(NULLIF(btrim(v_f->>'codigo_barras'), ''), v_prod.codigo_barras));
+        END IF;
+        v_r := _guardar_variante(v_t, v_padre, v_fila, p_sucursal);
+        IF v_r = 'creada' THEN v_vars := v_vars + 1; ELSE v_act := v_act + 1; END IF;
+      END IF;
+    EXCEPTION
+      WHEN unique_violation THEN
+        GET STACKED DIAGNOSTICS v_c = CONSTRAINT_NAME;
+        RAISE EXCEPTION 'DATOS_INVALIDOS: línea %: %', v_linea, replace(_mensaje_unico_producto(v_c), 'DATOS_INVALIDOS: ', '') USING ERRCODE = '22023';
+      WHEN OTHERS THEN
+        RAISE EXCEPTION 'DATOS_INVALIDOS: línea %: %', v_linea, regexp_replace(SQLERRM, '^(DATOS_INVALIDOS|VARIANTE_INVALIDA): ', '') USING ERRCODE = '22023';
+    END;
+    v_prod := NULL; v_padre := NULL;
+  END LOOP;
+
+  RETURN jsonb_build_object('categorias', v_cats, 'productos', v_prods, 'variantes_creadas', v_vars, 'actualizados', v_act);
+END;
+$$;
+REVOKE ALL ON FUNCTION importar_catalogo_tienda(jsonb, uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION importar_catalogo_tienda(jsonb, uuid) TO authenticated, service_role;
