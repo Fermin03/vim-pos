@@ -205,11 +205,10 @@ CREATE INDEX IF NOT EXISTS idx_productos_padre ON productos(producto_padre_id)
 -- jsonb compara por contenido: {"Color":"Negra","Talla":"M"} = {"Talla":"M","Color":"Negra"}.
 CREATE UNIQUE INDEX IF NOT EXISTS productos_variante_unica ON productos(producto_padre_id, variante_valores)
   WHERE producto_padre_id IS NOT NULL AND deleted_at IS NULL;
--- Antes de aplicar en producción, esta consulta debe regresar cero filas (ver ADR 0037):
---   SELECT tenant_id, codigo_barras, count(*) FROM productos
---    WHERE codigo_barras IS NOT NULL AND deleted_at IS NULL GROUP BY 1, 2 HAVING count(*) > 1;
+-- Único solo entre los que controlan existencias (igual que el SKU): así la migración no puede
+-- fallar en ninguna base existente (nube o caja); los restaurantes pueden seguir repitiendo códigos.
 CREATE UNIQUE INDEX IF NOT EXISTS productos_codigo_barras_unico ON productos(tenant_id, codigo_barras)
-  WHERE codigo_barras IS NOT NULL AND deleted_at IS NULL;
+  WHERE codigo_barras IS NOT NULL AND deleted_at IS NULL AND controla_existencias;
 -- SKU único solo entre los que controlan existencias: los restaurantes pueden repetirlo hoy.
 CREATE UNIQUE INDEX IF NOT EXISTS productos_sku_existencias_unico ON productos(tenant_id, codigo_interno)
   WHERE codigo_interno IS NOT NULL AND deleted_at IS NULL AND controla_existencias;

@@ -149,8 +149,8 @@ BEGIN
 
   -- 3g) Código de barras único por negocio; SKU único entre los que controlan existencias.
   BEGIN
-    INSERT INTO productos (tenant_id, nombre, categoria_id, precio_base_mxn, codigo_barras)
-    VALUES (v_t, 'Mismo código', v_cat, 10, '2000000000015');
+    INSERT INTO productos (tenant_id, nombre, categoria_id, precio_base_mxn, codigo_barras, controla_existencias)
+    VALUES (v_t, 'Mismo código', v_cat, 10, '2000000000015', true);
     RAISE EXCEPTION '3g: debía rechazar código de barras repetido';
   EXCEPTION WHEN unique_violation THEN NULL;
   END;
@@ -164,6 +164,10 @@ BEGIN
   INSERT INTO productos (tenant_id, nombre, categoria_id, precio_base_mxn, codigo_interno)
   VALUES (v_t, 'SKU repetido de restaurante 1', v_cat, 10, 'REP-1'),
          (v_t, 'SKU repetido de restaurante 2', v_cat, 10, 'REP-1');
+  -- Y el código de barras tampoco es único sin existencias.
+  INSERT INTO productos (tenant_id, nombre, categoria_id, precio_base_mxn, codigo_barras)
+  VALUES (v_t, 'Código repetido 1', v_cat, 10, '7500000000001'),
+         (v_t, 'Código repetido 2', v_cat, 10, '7500000000001');
 
   -- 3h) El padre no se vende: se vende la hija.
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
