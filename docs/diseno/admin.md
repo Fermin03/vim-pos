@@ -379,6 +379,28 @@ muestra nada: ni en el producto, ni en el menú del Catálogo, y la fila «Exist
 - **Clave del SAT** (campo «Clave de producto SAT», en Fiscal). Debajo del campo hay un buscador
   («camisa, pantalón, tenis…») que llena la clave al elegir un resultado. Es para todos los negocios,
   no solo tiendas, y la clave se puede seguir escribiendo a mano.
+- **Existencias** (menú «Existencias», 0192–0193). Solo la ven el dueño y el administrador, porque
+  enseña costos y valor. Lleva cinco pestañas (`existencias-tabs.tsx`): Existencias, Recibir, Conteo,
+  Traspasos y Movimientos.
+  - *Existencias.* Una tabla por producto y sucursal con existencia, mínimo, costo y valor. Arriba
+    van piezas, «Valor del inventario» («con el costo de hoy»), bajo mínimo y en negativo. Se filtra
+    por Todas, Bajo mínimo, Agotadas y Negativas, y se descarga en Excel. «Mínimo» y «Ajustar» abren
+    un modal; con «Todas las sucursales» quedan apagados y se pide elegir una.
+  - *Captura* (`captura-productos.tsx`, en Recibir, Conteo y Traspasos). Un solo campo para el
+    escáner o el teclado. Con el código exacto (barras o SKU) agrega el producto y se limpia; si no,
+    enseña hasta 8 por nombre. Escanear el mismo producto otra vez suma 1 a su renglón.
+  - *Recibir.* Sucursal, proveedor opcional y referencia («Ej. F-1234»). El costo de cada renglón es
+    opcional; vacío, el costo del producto no cambia.
+  - *Conteo.* Solo se tocan los productos capturados. «Revisar diferencias» vuelve a leer la
+    existencia (pudo venderse algo mientras se contaba) y enseña sistema, contado y diferencia antes
+    de «Confirmar conteo». Cambiar de sucursal con algo contado pregunta antes de descartarlo.
+  - *Traspasos.* Origen, destino y renglones; la mercancía sale del origen al enviar. En «Historial»,
+    uno en camino se puede «Recibir» o «Cancelar» (en rojo); al cancelar, la mercancía regresa al
+    origen. Ambos piden confirmación.
+  - *Movimientos.* Todo lo que entró y salió, por fechas, tipo y producto, con descarga en Excel.
+- **Ventas por talla y color** (Reportes, solo con existencias). Piezas, venta, costo y margen por
+  variante. El margen usa la venta sin IVA, ya con descuentos por producto, y el costo de hoy (el
+  pie lo dice); los descuentos a toda la cuenta no se restan.
 
 ## Piezas que se repiten en el panel
 

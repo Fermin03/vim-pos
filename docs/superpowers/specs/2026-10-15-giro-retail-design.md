@@ -256,6 +256,14 @@ Báscula y granel; tienda en línea con existencias (y sus textos neutros); apar
 
 Plan: `docs/superpowers/plans/2026-10-15-retail-1-nucleo.md`.
 
+Al construir la entrega 3 (16 oct):
+
+- El margen del reporte por talla y color se calcula sobre `total_mxn − iva_mxn` de
+  `vw_ventas_por_producto`: su `subtotal_mxn` es bruto, con IVA incluido y antes del descuento por
+  renglón. Los descuentos a toda la cuenta no están en la vista y no se restan.
+- `/existencias` (y el reporte) son de nivel 4, dueño y administrador: enseñan costos y valor.
+- `_existencias_validar` rechaza las sucursales borradas (suave): no reciben movimientos ni mínimos.
+
 ## 13. Pendientes que la entrega 1 deja a las siguientes (revisión final, 15 oct)
 
 **Antes de que el admin pueda editar prendas (entrega 2, requisito para lanzar):**

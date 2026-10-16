@@ -152,6 +152,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "alertas_inventario_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "alertas_inventario_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -409,6 +416,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "apps_liquidaciones_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "apps_liquidaciones_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -476,6 +490,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "areas_cocina_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "areas_cocina_tenant_id_fkey"
@@ -555,6 +576,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "auditoria_eventos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "auditoria_eventos_tenant_id_fkey"
@@ -671,6 +699,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "autorizaciones_pin_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "autorizaciones_pin_tenant_id_fkey"
@@ -898,6 +933,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "cajas_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "cajas_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -1034,6 +1076,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cancelaciones_ticket_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "cancelaciones_ticket_tenant_id_fkey"
@@ -1478,6 +1527,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "cierres_dia_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "cierres_dia_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -1712,6 +1768,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "colonias_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "colonias_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -1808,6 +1871,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "comanda_impresiones_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "comanda_impresiones_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -1899,6 +1969,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "combo_grupos_combo_producto_id_fkey"
+            columns: ["combo_producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["producto_id"]
+          },
+          {
             foreignKeyName: "combo_grupos_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -1961,6 +2038,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "productos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "combo_opciones_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["producto_id"]
           },
           {
             foreignKeyName: "combo_opciones_tenant_id_fkey"
@@ -2168,6 +2252,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "compras_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "compras_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -2229,6 +2320,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "configuracion_sucursal_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: true
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "configuracion_sucursal_tenant_id_fkey"
@@ -2419,6 +2517,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "contadores_folio_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "contadores_folio_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -2555,6 +2660,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cortes_caja_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "cortes_caja_tenant_id_fkey"
@@ -2840,6 +2952,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "cuentas_abiertas_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "cuentas_abiertas_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -3027,6 +3146,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "delivery_asignaciones_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "delivery_asignaciones_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -3181,6 +3307,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_conexiones_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "delivery_conexiones_tenant_id_fkey"
@@ -3476,6 +3609,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "delivery_pedidos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "delivery_pedidos_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -3728,6 +3868,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "devolucion_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["producto_id"]
+          },
+          {
             foreignKeyName: "devolucion_items_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -3897,6 +4044,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "devoluciones_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "devoluciones_tenant_id_fkey"
@@ -4127,6 +4281,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "errores_app_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "errores_app_tenant_id_fkey"
@@ -4407,6 +4568,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "insumo_stock_sucursal_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "insumo_stock_sucursal_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -4635,6 +4803,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "productos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lealtad_premios_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["producto_id"]
           },
           {
             foreignKeyName: "lealtad_premios_tenant_id_fkey"
@@ -4963,6 +5138,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "menu_productos_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["producto_id"]
+          },
+          {
             foreignKeyName: "menu_productos_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -5094,6 +5276,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mesas_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "mesas_tenant_id_fkey"
@@ -5265,6 +5454,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "movimientos_caja_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "movimientos_caja_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -5409,11 +5605,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "movimientos_inventario_sucursal_destino_id_fkey"
+            columns: ["sucursal_destino_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "movimientos_inventario_sucursal_id_fkey"
             columns: ["sucursal_id"]
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_inventario_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "movimientos_inventario_tenant_id_fkey"
@@ -5492,6 +5702,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "movimientos_producto_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["producto_id"]
+          },
+          {
             foreignKeyName: "movimientos_producto_proveedor_id_fkey"
             columns: ["proveedor_id"]
             isOneToOne: false
@@ -5504,6 +5721,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_producto_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "movimientos_producto_tenant_id_fkey"
@@ -5790,6 +6014,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pagos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "pagos_tenant_id_fkey"
@@ -6221,11 +6452,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "producto_existencias_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["producto_id"]
+          },
+          {
             foreignKeyName: "producto_existencias_sucursal_id_fkey"
             columns: ["sucursal_id"]
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "producto_existencias_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "producto_existencias_tenant_id_fkey"
@@ -6390,6 +6635,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "productos_producto_padre_id_fkey"
+            columns: ["producto_padre_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["producto_id"]
+          },
+          {
             foreignKeyName: "productos_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -6442,6 +6694,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "productos_areas_cocina_extra_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["producto_id"]
+          },
+          {
             foreignKeyName: "productos_areas_cocina_extra_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -6492,6 +6751,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "productos"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productos_grupos_modificadores_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["producto_id"]
           },
           {
             foreignKeyName: "productos_grupos_modificadores_tenant_id_fkey"
@@ -6548,11 +6814,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "productos_sucursal_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["producto_id"]
+          },
+          {
             foreignKeyName: "productos_sucursal_sucursal_id_fkey"
             columns: ["sucursal_id"]
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "productos_sucursal_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "productos_sucursal_tenant_id_fkey"
@@ -6711,6 +6991,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "promociones_productos_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["producto_id"]
+          },
+          {
             foreignKeyName: "promociones_productos_promocion_id_fkey"
             columns: ["promocion_id"]
             isOneToOne: false
@@ -6803,6 +7090,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "propinas_distribucion_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "propinas_distribucion_tenant_id_fkey"
@@ -7179,6 +7473,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "recetas_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: true
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["producto_id"]
+          },
+          {
             foreignKeyName: "recetas_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -7331,6 +7632,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reportes_z_historico_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "reportes_z_historico_tenant_id_fkey"
@@ -7534,6 +7842,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reservaciones_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "reservaciones_tenant_id_fkey"
@@ -7758,6 +8073,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "secciones_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "secciones_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -7853,6 +8175,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sesiones_login_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "sesiones_login_tenant_id_fkey"
@@ -7975,6 +8304,13 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sucursal_propinas_config_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: true
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "sucursal_propinas_config_tenant_id_fkey"
@@ -8387,6 +8723,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sync_eventos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "sync_eventos_tenant_id_fkey"
@@ -8971,6 +9314,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "terminal_cobros_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "terminal_cobros_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -9076,6 +9426,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "terminal_config_sucursal_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: true
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "terminal_config_sucursal_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -9139,6 +9496,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "terminal_dispositivos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "terminal_dispositivos_tenant_id_fkey"
@@ -9654,6 +10018,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ticket_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["producto_id"]
+          },
+          {
             foreignKeyName: "ticket_items_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -9879,6 +10250,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_reimpresiones_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "ticket_reimpresiones_tenant_id_fkey"
@@ -10165,6 +10543,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "tickets_tenant_id_fkey"
@@ -10934,6 +11319,13 @@ export type Database = {
             referencedColumns: ["id", "tenant_id"]
           },
           {
+            foreignKeyName: "tienda_ocultos_producto_del_negocio"
+            columns: ["producto_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["producto_id", "tenant_id"]
+          },
+          {
             foreignKeyName: "tienda_ocultos_sucursal_del_negocio"
             columns: ["sucursal_id", "tenant_id"]
             isOneToOne: false
@@ -11223,6 +11615,8 @@ export type Database = {
       }
       traspasos_producto: {
         Row: {
+          cancelado_at: string | null
+          cancelado_por: string | null
           destino_sucursal_id: string
           enviado_at: string
           enviado_por: string | null
@@ -11235,6 +11629,8 @@ export type Database = {
           tenant_id: string
         }
         Insert: {
+          cancelado_at?: string | null
+          cancelado_por?: string | null
           destino_sucursal_id: string
           enviado_at?: string
           enviado_por?: string | null
@@ -11247,6 +11643,8 @@ export type Database = {
           tenant_id: string
         }
         Update: {
+          cancelado_at?: string | null
+          cancelado_por?: string | null
           destino_sucursal_id?: string
           enviado_at?: string
           enviado_por?: string | null
@@ -11267,11 +11665,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "traspasos_producto_destino_sucursal_id_fkey"
+            columns: ["destino_sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "traspasos_producto_origen_sucursal_id_fkey"
             columns: ["origen_sucursal_id"]
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "traspasos_producto_origen_sucursal_id_fkey"
+            columns: ["origen_sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "traspasos_producto_tenant_id_fkey"
@@ -11473,6 +11885,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "turnos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "turnos_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -11604,6 +12023,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "usuarios_acceso_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "usuarios_acceso_tenant_id_fkey"
@@ -11753,6 +12179,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "zonas_envio_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "zonas_envio_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -11856,6 +12289,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "delivery_asignaciones_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "delivery_asignaciones_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -11916,6 +12356,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tickets_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "tickets_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -11946,6 +12393,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "tickets_tenant_id_fkey"
@@ -11981,6 +12435,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_asignaciones_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "delivery_asignaciones_tenant_id_fkey"
@@ -12028,6 +12489,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "delivery_pedidos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "delivery_pedidos_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -12066,6 +12534,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
         ]
       }
@@ -12134,6 +12609,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "turnos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "turnos_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -12175,7 +12657,43 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tickets_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "tickets_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vw_existencias: {
+        Row: {
+          actualizado_at: string | null
+          cantidad: number | null
+          codigo_barras: string | null
+          codigo_interno: string | null
+          costo_mxn: number | null
+          minimo: number | null
+          nombre_completo: string | null
+          precio_base_mxn: number | null
+          producto_id: string | null
+          producto_nombre: string | null
+          sucursal_id: string | null
+          sucursal_nombre: string | null
+          tenant_id: string | null
+          valor_mxn: number | null
+          variante_ejes: string[] | null
+          variante_valores: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "productos_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -12315,6 +12833,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "mesas_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "mesas_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -12395,6 +12920,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "movimientos_inventario_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "movimientos_inventario_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -12426,6 +12958,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "reservaciones_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "reservaciones_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -12453,6 +12992,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "comanda_impresiones_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "comanda_impresiones_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -12478,6 +13024,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_reimpresiones_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "ticket_reimpresiones_tenant_id_fkey"
@@ -12518,6 +13071,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cortes_caja_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "cortes_caja_tenant_id_fkey"
@@ -12635,6 +13195,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "turnos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "turnos_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -12680,6 +13247,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tickets_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "tickets_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -12705,6 +13279,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "tickets_tenant_id_fkey"
@@ -12737,6 +13318,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tickets_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "tickets_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -12767,6 +13355,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turnos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "turnos_tenant_id_fkey"
@@ -12811,6 +13406,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tickets_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "tickets_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -12841,6 +13443,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tickets_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
             foreignKeyName: "tickets_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
@@ -12867,6 +13476,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "tickets_tenant_id_fkey"
@@ -12901,11 +13517,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ticket_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["producto_id"]
+          },
+          {
             foreignKeyName: "tickets_sucursal_id_fkey"
             columns: ["sucursal_id"]
             isOneToOne: false
             referencedRelation: "sucursales"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
           },
           {
             foreignKeyName: "tickets_tenant_id_fkey"
@@ -12968,6 +13598,10 @@ export type Database = {
       _eliminar_usuario_marca: { Args: never; Returns: string }
       _es_escritura_rest_directa: { Args: never; Returns: boolean }
       _es_llamada_de_confianza: { Args: never; Returns: boolean }
+      _existencias_lineas: {
+        Args: { p: Json; p_campo: string; p_cero_ok: boolean }
+        Returns: Json
+      }
       _existencias_puede_escribir: { Args: never; Returns: string }
       _existencias_sincronizar_ticket: {
         Args: {
@@ -13521,6 +14155,10 @@ export type Database = {
         }
         Returns: string
       }
+      cancelar_traspaso_producto: {
+        Args: { p_traspaso: string }
+        Returns: undefined
+      }
       catalogo_version: { Args: never; Returns: string }
       cerrar_ticket_si_pagado: {
         Args: { p_ticket_id: string }
@@ -13869,6 +14507,10 @@ export type Database = {
         }
         Returns: Json
       }
+      fijar_minimo_producto: {
+        Args: { p_minimo: number; p_producto: string; p_sucursal: string }
+        Returns: undefined
+      }
       generar_codigo_interno: { Args: never; Returns: string }
       generar_folio: {
         Args: {
@@ -14177,6 +14819,15 @@ export type Database = {
       recalcular_totales_ticket: {
         Args: { p_ticket_id: string }
         Returns: undefined
+      }
+      recibir_mercancia: {
+        Args: {
+          p_lineas: Json
+          p_proveedor: string
+          p_referencia: string
+          p_sucursal: string
+        }
+        Returns: number
       }
       recibir_traspaso_producto: {
         Args: { p_traspaso: string }
@@ -15100,7 +15751,7 @@ export type Database = {
         | "CANCELADO"
       ticket_origen: "POS_ONLINE" | "POS_OFFLINE" | "API_EXTERNA" | "IMPORTADO"
       tipo_acceso: "PIN_OPERATIVO" | "WEB_ADMIN"
-      traspaso_producto_estado: "ENVIADO" | "RECIBIDO"
+      traspaso_producto_estado: "ENVIADO" | "RECIBIDO" | "CANCELADO"
       turno_estado: "ABIERTO" | "PENDIENTE_VALIDACION" | "CERRADO"
       uso_cfdi: "G01" | "G02" | "G03" | "P01" | "D01" | "S01"
       usuario_estado:
@@ -15576,7 +16227,7 @@ export const Constants = {
       ],
       ticket_origen: ["POS_ONLINE", "POS_OFFLINE", "API_EXTERNA", "IMPORTADO"],
       tipo_acceso: ["PIN_OPERATIVO", "WEB_ADMIN"],
-      traspaso_producto_estado: ["ENVIADO", "RECIBIDO"],
+      traspaso_producto_estado: ["ENVIADO", "RECIBIDO", "CANCELADO"],
       turno_estado: ["ABIERTO", "PENDIENTE_VALIDACION", "CERRADO"],
       uso_cfdi: ["G01", "G02", "G03", "P01", "D01", "S01"],
       usuario_estado: [
