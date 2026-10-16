@@ -517,4 +517,46 @@ BEGIN
   RAISE NOTICE '6 movimientos a mano y conteo OK';
 END $$;
 
+-- 7) Traspaso: sale al enviar, entra al recibir, una sola vez; entradas malas no dejan nada.
+DO $$
+DECLARE
+  v_t     uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_suc   uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_dueno uuid := '99999999-0000-0000-0000-0000000000e1';
+  v_m     uuid := 'a7a70000-0000-0000-0000-0000000000a1';
+  v_norte uuid := gen_random_uuid();
+  v_tr    uuid; v_antes numeric; v_n int;
+BEGIN
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_dueno::text, 'tenant_id', v_t::text)::text, true);
+  INSERT INTO tenant_limites (tenant_id, max_sucursales) VALUES (v_t, 5)
+    ON CONFLICT (tenant_id) DO UPDATE SET max_sucursales = 5;
+  INSERT INTO sucursales (id, tenant_id, codigo, nombre) VALUES (v_norte, v_t, 'RN', 'Tienda Norte');
+
+  SELECT cantidad INTO v_antes FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_m;
+  v_tr := enviar_traspaso_producto(v_suc, v_norte, jsonb_build_array(jsonb_build_object('producto_id', v_m, 'cantidad', 3)));
+  IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_m) <> v_antes - 3 THEN
+    RAISE EXCEPTION '7a: el origen debía bajar 3 al enviar'; END IF;
+  IF EXISTS (SELECT 1 FROM producto_existencias WHERE sucursal_id = v_norte AND producto_id = v_m AND cantidad <> 0) THEN
+    RAISE EXCEPTION '7a: el destino no debía subir antes de recibir'; END IF;
+
+  PERFORM recibir_traspaso_producto(v_tr);
+  IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_norte AND producto_id = v_m) <> 3 THEN
+    RAISE EXCEPTION '7b: el destino debía quedar en 3'; END IF;
+  BEGIN PERFORM recibir_traspaso_producto(v_tr);
+        RAISE EXCEPTION '7c: recibir dos veces'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+
+  SELECT count(*) INTO v_n FROM traspasos_producto WHERE tenant_id = v_t;
+  BEGIN PERFORM enviar_traspaso_producto(v_suc, v_suc, jsonb_build_array(jsonb_build_object('producto_id', v_m, 'cantidad', 1)));
+        RAISE EXCEPTION '7d: misma sucursal'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+  BEGIN PERFORM enviar_traspaso_producto(v_suc, v_norte, jsonb_build_array(jsonb_build_object('producto_id', v_m, 'cantidad', 0)));
+        RAISE EXCEPTION '7d: cantidad 0'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+  BEGIN PERFORM enviar_traspaso_producto(v_suc, v_norte, '[]'::jsonb);
+        RAISE EXCEPTION '7d: vacío'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+  BEGIN PERFORM enviar_traspaso_producto(v_suc, v_norte, '[{"producto_id":"a7a70000-0000-0000-0000-0000000000a1","cantidad":"NaN"}]'::jsonb);
+        RAISE EXCEPTION '7d: cantidad NaN'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+  IF (SELECT count(*) FROM traspasos_producto WHERE tenant_id = v_t) <> v_n THEN
+    RAISE EXCEPTION '7d: un traspaso rechazado quedó guardado'; END IF;
+  RAISE NOTICE '7 traspasos OK';
+END $$;
+
 ROLLBACK;

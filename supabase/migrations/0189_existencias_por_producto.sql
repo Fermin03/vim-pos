@@ -614,3 +614,102 @@ END;
 $$;
 REVOKE ALL ON FUNCTION registrar_conteo(uuid, jsonb) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION registrar_conteo(uuid, jsonb) TO authenticated, service_role;
+
+-- ── §6 Traspasos entre sucursales ────────────────────────────────────────────
+-- Sale del origen al enviar; entra al destino cuando el destino lo recibe. Lo que va en camino no
+-- está en ninguna de las dos. Las líneas viven en jsonb: el detalle por producto ya queda en
+-- movimientos_producto con traspaso_id.
+CREATE TYPE traspaso_producto_estado AS ENUM ('ENVIADO', 'RECIBIDO');
+
+CREATE TABLE IF NOT EXISTS traspasos_producto (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id           uuid NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  origen_sucursal_id  uuid NOT NULL REFERENCES sucursales(id) ON DELETE RESTRICT,
+  destino_sucursal_id uuid NOT NULL REFERENCES sucursales(id) ON DELETE RESTRICT,
+  estado              traspaso_producto_estado NOT NULL DEFAULT 'ENVIADO',
+  lineas              jsonb NOT NULL CHECK (jsonb_typeof(lineas) = 'array' AND jsonb_array_length(lineas) > 0),
+  enviado_por         uuid NULL REFERENCES auth.users(id),
+  enviado_at          timestamptz NOT NULL DEFAULT now(),
+  recibido_por        uuid NULL REFERENCES auth.users(id),
+  recibido_at         timestamptz NULL,
+  CONSTRAINT traspasos_producto_distintas CHECK (origen_sucursal_id <> destino_sucursal_id)
+);
+CREATE INDEX IF NOT EXISTS idx_traspasos_producto_tenant ON traspasos_producto(tenant_id, estado, enviado_at DESC);
+ALTER TABLE movimientos_producto
+  ADD CONSTRAINT movimientos_producto_traspaso_fk FOREIGN KEY (traspaso_id) REFERENCES traspasos_producto(id) ON DELETE RESTRICT;
+
+ALTER TABLE traspasos_producto ENABLE ROW LEVEL SECURITY;
+CREATE POLICY traspasos_producto_tenant ON traspasos_producto FOR SELECT USING (tenant_id = current_tenant_id());
+REVOKE ALL ON traspasos_producto FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON traspasos_producto TO authenticated;
+GRANT ALL ON traspasos_producto TO service_role;
+
+CREATE OR REPLACE FUNCTION enviar_traspaso_producto(p_origen uuid, p_destino uuid, p_lineas jsonb)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_t    uuid := _existencias_puede_escribir();
+  v_id   uuid;
+  v_l    jsonb;
+  v_prod uuid;
+  v_q    numeric;
+BEGIN
+  IF p_origen IS NULL OR p_destino IS NULL OR p_origen = p_destino THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: el traspaso necesita dos sucursales distintas' USING ERRCODE = '22023';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM sucursales WHERE id = p_destino AND tenant_id = v_t) THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: la sucursal destino no es de tu negocio' USING ERRCODE = '22023';
+  END IF;
+  IF p_lineas IS NULL OR jsonb_typeof(p_lineas) <> 'array' OR jsonb_array_length(p_lineas) = 0 THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: el traspaso viene vacío' USING ERRCODE = '22023';
+  END IF;
+  IF (SELECT count(DISTINCT e->>'producto_id') FROM jsonb_array_elements(p_lineas) e) <> jsonb_array_length(p_lineas) THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: un producto viene dos veces en el traspaso' USING ERRCODE = '22023';
+  END IF;
+
+  INSERT INTO traspasos_producto (tenant_id, origen_sucursal_id, destino_sucursal_id, lineas, enviado_por)
+  VALUES (v_t, p_origen, p_destino, p_lineas, auth.uid()) RETURNING id INTO v_id;
+
+  FOR v_l IN SELECT value FROM jsonb_array_elements(p_lineas) LOOP
+    BEGIN
+      v_prod := (v_l->>'producto_id')::uuid;
+      v_q    := (v_l->>'cantidad')::numeric;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE EXCEPTION 'DATOS_INVALIDOS: línea de traspaso mal formada: %', v_l USING ERRCODE = '22023';
+    END;
+    IF v_prod IS NULL OR v_q IS NULL OR v_q = 'NaN' OR v_q <= 0 THEN
+      RAISE EXCEPTION 'DATOS_INVALIDOS: línea de traspaso mal formada: %', v_l USING ERRCODE = '22023';
+    END IF;
+    PERFORM _existencias_validar(v_t, p_origen, v_prod);
+    INSERT INTO movimientos_producto (tenant_id, sucursal_id, producto_id, tipo, cantidad, traspaso_id, motivo, usuario_id)
+    VALUES (v_t, p_origen, v_prod, 'TRASPASO_SALIDA', -v_q, v_id, 'Traspaso enviado', auth.uid());
+  END LOOP;
+  RETURN v_id;
+END;
+$$;
+REVOKE ALL ON FUNCTION enviar_traspaso_producto(uuid, uuid, jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION enviar_traspaso_producto(uuid, uuid, jsonb) TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION recibir_traspaso_producto(p_traspaso uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_t  uuid := _existencias_puede_escribir();
+  v_tr traspasos_producto%ROWTYPE;
+  v_l  jsonb;
+BEGIN
+  SELECT * INTO v_tr FROM traspasos_producto WHERE id = p_traspaso AND tenant_id = v_t FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: ese traspaso no existe' USING ERRCODE = '22023';
+  END IF;
+  IF v_tr.estado <> 'ENVIADO' THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: ese traspaso ya se recibió' USING ERRCODE = '22023';
+  END IF;
+  FOR v_l IN SELECT value FROM jsonb_array_elements(v_tr.lineas) LOOP
+    INSERT INTO movimientos_producto (tenant_id, sucursal_id, producto_id, tipo, cantidad, traspaso_id, motivo, usuario_id)
+    VALUES (v_t, v_tr.destino_sucursal_id, (v_l->>'producto_id')::uuid, 'TRASPASO_ENTRADA',
+            (v_l->>'cantidad')::numeric, p_traspaso, 'Traspaso recibido', auth.uid());
+  END LOOP;
+  UPDATE traspasos_producto SET estado = 'RECIBIDO', recibido_por = auth.uid(), recibido_at = now() WHERE id = p_traspaso;
+END;
+$$;
+REVOKE ALL ON FUNCTION recibir_traspaso_producto(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION recibir_traspaso_producto(uuid) TO authenticated, service_role;
