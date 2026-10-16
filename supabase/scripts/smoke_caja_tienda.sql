@@ -98,4 +98,89 @@ BEGIN
   RAISE NOTICE '2 sin cocina OK';
 END $$;
 
+-- 3) La nube recibe los movimientos de la caja y baja las existencias.
+DO $$
+DECLARE
+  v_t     uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_suc   uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_caja  uuid := '99999999-0000-0000-0000-0000000000cc';
+  v_maria uuid := '99999999-0000-0000-0000-000000000001';
+  v_pla   uuid := 'c4c40000-0000-0000-0000-0000000000a1';
+  v_m1    uuid := gen_random_uuid(); v_m2 uuid := gen_random_uuid(); v_m3 uuid := gen_random_uuid(); v_m4 uuid := gen_random_uuid();
+  v_suc2  uuid; v_turno uuid; v_tk uuid; v_it uuid; v_auth uuid; v_ini numeric; v_res jsonb; v_snap jsonb; v_pull jsonb;
+BEGIN
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
+  SELECT id INTO v_turno FROM turnos WHERE caja_id = v_caja AND estado = 'ABIERTO';
+  v_ini := COALESCE((SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_pla), 0);
+
+  -- 3a) Una VENTA de -1 aplica una vez; el mismo snapshot otra vez no duplica ni mueve la existencia.
+  v_snap := jsonb_build_object('movimientos_producto', jsonb_build_array(jsonb_build_object(
+    'id', v_m1, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_pla, 'tipo', 'VENTA', 'cantidad', -1,
+    'motivo', 'smoke 3a', 'usuario_id', v_maria, 'creado_at', now())));
+  v_res := sync_push_snapshot(v_t, v_snap);
+  IF (v_res->>'movimientos_producto')::int IS DISTINCT FROM 1 THEN RAISE EXCEPTION '3a: debía aplicar 1: %', v_res; END IF;
+  IF v_res ? '_ignoradas' THEN RAISE EXCEPTION '3a: la nube ignoró movimientos_producto: %', v_res->'_ignoradas'; END IF;
+  v_res := sync_push_snapshot(v_t, v_snap);
+  IF (v_res->>'movimientos_producto')::int IS DISTINCT FROM 0 THEN RAISE EXCEPTION '3a: el reenvío debía aplicar 0: %', v_res; END IF;
+  IF (SELECT count(*) FROM movimientos_producto WHERE id = v_m1) <> 1 THEN RAISE EXCEPTION '3a: el movimiento se duplicó'; END IF;
+  IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_pla) <> v_ini - 1 THEN
+    RAISE EXCEPTION '3a: la existencia debía quedar en %', v_ini - 1; END IF;
+
+  -- 3b) Un producto de otro negocio cae en errores y no detiene a los demás.
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('movimientos_producto', jsonb_build_array(
+    jsonb_build_object('id', v_m2, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', 'c4c40000-0000-0000-0000-0000000000e1',
+      'tipo', 'VENTA', 'cantidad', -1, 'creado_at', now() - interval '1 min'),
+    jsonb_build_object('id', v_m3, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_pla,
+      'tipo', 'ENTRADA', 'cantidad', 5, 'creado_at', now()))));
+  IF (v_res->>'movimientos_producto')::int IS DISTINCT FROM 1 THEN RAISE EXCEPTION '3b: debía aplicar solo el bueno: %', v_res; END IF;
+  IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(v_res->'_errores', '[]'::jsonb)) e WHERE e->>'id' = v_m2::text) THEN
+    RAISE EXCEPTION '3b: el producto ajeno debía estar en _errores: %', v_res; END IF;
+  IF EXISTS (SELECT 1 FROM movimientos_producto WHERE id = v_m2) THEN RAISE EXCEPTION '3b: el ajeno no debía insertarse'; END IF;
+  IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_pla) <> v_ini + 4 THEN
+    RAISE EXCEPTION '3b: la existencia debía quedar en %', v_ini + 4; END IF;
+
+  -- 3c) El pull trae producto_existencias de las dos sucursales (y no de una borrada).
+  INSERT INTO tenant_limites (tenant_id, max_sucursales) VALUES (v_t, 10) ON CONFLICT (tenant_id) DO UPDATE SET max_sucursales = 10;
+  INSERT INTO sucursales (tenant_id, codigo, nombre) VALUES (v_t, 'S195', 'Segunda tienda') RETURNING id INTO v_suc2;
+  INSERT INTO movimientos_producto (tenant_id, sucursal_id, producto_id, tipo, cantidad) VALUES (v_t, v_suc2, v_pla, 'ENTRADA', 3);
+  v_pull := sync_pull_snapshot(v_t);
+  IF (SELECT count(*) FROM jsonb_array_elements(COALESCE(v_pull->'producto_existencias', '[]'::jsonb)) e
+       WHERE e->>'producto_id' = v_pla::text AND e->>'sucursal_id' IN (v_suc::text, v_suc2::text)) <> 2 THEN
+    RAISE EXCEPTION '3c: el pull debía traer la playera de las dos sucursales'; END IF;
+  UPDATE sucursales SET deleted_at = now() WHERE id = v_suc2;
+  v_pull := sync_pull_snapshot(v_t);
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(v_pull->'producto_existencias') e WHERE e->>'sucursal_id' = v_suc2::text) THEN
+    RAISE EXCEPTION '3c: el pull no debía traer una sucursal borrada'; END IF;
+
+  -- 3d) Un ticket de la caja sube PAGADO con su VENTA (en réplica no la genera la nube); cancelado
+  --     en la nube con cancelar_ticket_pagado, la existencia queda como antes de la venta.
+  v_ini := (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_pla);
+  v_tk := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smoke-c4-3d', v_maria);
+  v_it := agregar_item_a_ticket(v_tk, v_pla, 1, NULL, '[]'::jsonb, 'smoke-c4-3d-1');
+  v_res := sync_push_snapshot(v_t, jsonb_build_object(
+    'tickets', jsonb_build_array((SELECT to_jsonb(t) || jsonb_build_object('estado_fiscal', 'PAGADO') FROM tickets t WHERE id = v_tk)),
+    'movimientos_producto', jsonb_build_array(jsonb_build_object(
+      'id', v_m4, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_pla, 'tipo', 'VENTA', 'cantidad', -1,
+      'ticket_id', v_tk, 'ticket_item_id', v_it, 'creado_at', now()))));
+  IF (v_res->>'movimientos_producto')::int IS DISTINCT FROM 1 OR v_res ? '_errores' THEN RAISE EXCEPTION '3d: el push falló: %', v_res; END IF;
+  IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_pla) <> v_ini - 1 THEN
+    RAISE EXCEPTION '3d: la venta subida debía bajar la existencia una vez'; END IF;
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'cancelar_ticket', 'venta.cancelar_pagada', 'ticket', v_tk, 'smoke')
+  RETURNING id INTO v_auth;
+  PERFORM cancelar_ticket_pagado(
+    p_ticket_id := v_tk, p_caja_id := v_caja, p_turno_id := v_turno,
+    p_motivo := 'CLIENTE_DESISTIO'::cancelacion_motivo, p_motivo_texto := 'smoke',
+    p_autorizacion_pin_id := v_auth, p_usuario_solicitante_id := v_maria, p_usuario_autorizo_id := v_maria,
+    p_reversar_inventario := true, p_cancelar_cfdi_sat := false, p_devolver_dinero := false,
+    p_client_id_local := 'smoke-c4-3d');
+  IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_pla) <> v_ini THEN
+    RAISE EXCEPTION '3d: cancelar en la nube debía dejar la existencia en %, es %', v_ini,
+      (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_pla); END IF;
+  IF (SELECT sum(cantidad) FROM movimientos_producto WHERE ticket_id = v_tk) <> 0 THEN
+    RAISE EXCEPTION '3d: el neto del ticket cancelado debía ser 0'; END IF;
+  RAISE NOTICE '3 sync de existencias OK';
+END $$;
+
 ROLLBACK;

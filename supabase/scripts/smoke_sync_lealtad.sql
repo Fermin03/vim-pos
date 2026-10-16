@@ -191,7 +191,7 @@ BEGIN
     'ticket_items', 'ticket_item_modificadores', 'pagos', 'ticket_descuentos_manuales', 'ticket_promociones_aplicadas',
     'comanda_impresiones', 'ticket_reimpresiones', 'devoluciones', 'devolucion_items', 'cancelaciones_ticket',
     'movimientos_caja', 'delivery_asignaciones', 'cortes_parciales', 'cortes_caja', 'cortes_caja_detalle',
-    'reportes_z_historico', 'mesas_estado', 'movimientos_inventario'];
+    'reportes_z_historico', 'mesas_estado', 'movimientos_inventario', 'movimientos_producto'];
   SELECT array_agg(k ORDER BY k) INTO v_llaves FROM jsonb_object_keys(v_res) k WHERE k NOT IN ('lealtad_movimientos', 'ticket_canjes_lealtad');
   IF v_llaves IS DISTINCT FROM (SELECT array_agg(k ORDER BY k) FROM unnest(v_esperadas) k) THEN
     RAISE EXCEPTION '10: las claves de siempre cambiaron: %', v_llaves;
