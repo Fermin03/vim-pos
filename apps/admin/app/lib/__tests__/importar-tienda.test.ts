@@ -37,4 +37,25 @@ describe("CSV de tienda", () => {
     expect(r.errores).toEqual([{ linea: 2, motivo: "Usa punto decimal (349.50)" }]);
     expect(r.filas[0]).toMatchObject({ sku: "B", precio: 1299.5 });
   });
+  it("detecta los códigos que Excel pasó a notación científica", () => {
+    const r = parsearCsvTienda(
+      "Categoría,Producto,Ejes,Valores,SKU,Código de barras,Precio,Costo,Existencia\n" +
+      "Ropa,Polo,,,A,7.50123E+12,349,,\n" +
+      "Ropa,Saco,,,1.2e5,,349,,\n" +
+      "Ropa,Gorra,,,C,7501234567890,349,,\n", false);
+    expect(r.errores.map((e) => e.linea)).toEqual([2, 3]);
+    expect(r.errores[0]!.motivo).toMatch(/notación científica/);
+    expect(r.filas.map((f) => f.sku)).toEqual(["C"]);
+  });
+  it("los números solo aceptan dígitos, comas de miles y punto decimal", () => {
+    const r = parsearCsvTienda(
+      "Categoría,Producto,Ejes,Valores,SKU,Código de barras,Precio,Costo,Existencia\n" +
+      "Ropa,A,,,A,,1e5,,\n" +
+      "Ropa,B,,,B,,0x10,,\n" +
+      "Ropa,C,,,C,,Infinity,,\n" +
+      "Ropa,D,,,D,,100,1e2,\n" +
+      "Ropa,E,,,E,,\"12,345.5\",.5,3\n", false);
+    expect(r.errores.map((e) => e.linea)).toEqual([2, 3, 4, 5]);
+    expect(r.filas[0]).toMatchObject({ precio: 12345.5, costo: 0.5, existencia: 3 });
+  });
 });

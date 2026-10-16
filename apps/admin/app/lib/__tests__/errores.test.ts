@@ -23,6 +23,15 @@ describe("mensajeError", () => {
     expect(mensajeError(new Error(msg))).toBe(msg);
   });
 
+  it("quita el código de la función SQL y nombra el código repetido de un producto", () => {
+    expect(mensajeError(new Error("DATOS_INVALIDOS: línea 3: el SKU ya lo tiene otro producto")))
+      .toBe("línea 3: el SKU ya lo tiene otro producto");
+    expect(mensajeError(new Error('duplicate key value violates unique constraint "productos_codigo_barras_unico"')))
+      .toBe("Ese código de barras ya lo tiene otro producto.");
+    expect(mensajeError(new Error('duplicate key value violates unique constraint "productos_sku_existencias_unico"')))
+      .toBe("Ese SKU ya lo tiene otro producto.");
+  });
+
   it("usa el texto por defecto cuando no hay nada útil que mostrar", () => {
     expect(mensajeError(null, "No se pudo guardar")).toBe("No se pudo guardar");
     expect(mensajeError(new Error(""), "No se pudo cargar")).toBe("No se pudo cargar");

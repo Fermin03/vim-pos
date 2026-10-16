@@ -13,12 +13,14 @@ Playeras,Playera Polo,Talla|Color,M|Negra,POL-M-NEG,,349,150,5
 Playeras,Playera Polo,Talla|Color,G|Negra,POL-G-NEG,,349,150,3
 Accesorios,Gorra,,,GOR-001,,249,90,10`;
 
+// Solo dígitos, con comas de miles opcionales y punto decimal: Number() aceptaría 1e5, 0x10 o Infinity.
 const numero = (s: string): number | null => {
-  const t = s.replace(/[$\s,]/g, "");
+  const t = s.replace(/[$\s]/g, "");
   if (t === "") return null;
-  const n = Number(t);
-  return Number.isFinite(n) ? n : NaN;
+  return /^(\d+|\d{1,3}(,\d{3})+)?(\.\d+)?$/.test(t) ? Number(t.replace(/,/g, "")) : NaN;
 };
+// Excel convierte 7501234567890 en 7.50123E+12 al abrir un CSV, y el código ya no se puede recuperar.
+const notacionCientifica = /^\d+(\.\d+)?E[+-]?\d+$/i;
 
 /** Columnas: categoría, producto, ejes (Talla|Color), valores (M|Negra), SKU, código de barras, precio, costo, existencia. */
 export function parsearCsvTienda(texto: string, generarFaltantes: boolean): ParseTienda {
@@ -33,6 +35,9 @@ export function parsearCsvTienda(texto: string, generarFaltantes: boolean): Pars
     const [categoria = "", producto = "", ejesTxt = "", valoresTxt = "", sku = "", barras = "", precioTxt = "", costoTxt = "", existTxt = ""] = c;
     const mal = (motivo: string) => errores.push({ linea, motivo });
     if (!categoria || !producto || !sku) return void mal("Faltan categoría, producto o SKU");
+    if (notacionCientifica.test(sku) || notacionCientifica.test(barras)) {
+      return void mal("Excel cambió el código a notación científica; dale formato de texto a la columna o sube el .xlsx");
+    }
     const ejes = ejesTxt ? ejesTxt.split("|").map((s) => s.trim()) : [];
     const vals = valoresTxt ? valoresTxt.split("|").map((s) => s.trim()) : [];
     if (ejes.length !== vals.length || ejes.some((e) => !e) || vals.some((v) => !v)) {

@@ -127,7 +127,7 @@ export default function ProductosPage() {
     return (prods ?? []).filter((p) => {
       const estado = estadoDe(p, filasVista.get(p.id));
       if (filtro !== "all" && estado !== filtro) return false;
-      if (query && !`${p.nombre} ${p.codigo_barras ?? ""}`.toLowerCase().includes(query.toLowerCase())) return false;
+      if (query && !`${p.nombre} ${p.codigo_barras ?? ""} ${p.codigosVariantes}`.toLowerCase().includes(query.toLowerCase())) return false;
       return true;
     });
   }, [prods, filtro, query, modoMenu, filasVista]);

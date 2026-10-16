@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { supabase } from "./supabase";
 import { borrarSuave, tenantId } from "./datos";
+import { leerTodas } from "./reportes";
 
 // Paleta funcional de categorías (del design system; NUNCA el naranja de marca).
 export const COLORES: { hex: string; bg: string }[] = [
@@ -212,14 +213,16 @@ export type Producto = {
   variante_ejes: string[] | null;
   /** Cuántas variantes vivas tiene este padre. */
   variantes: number;
+  /** Códigos de barras y SKU de sus variantes vivas, separados por espacio: para que la búsqueda los encuentre. */
+  codigosVariantes: string;
 };
 
-type FilaProd = Omit<Producto, "categoriaNombre"> & { categoria: { nombre: string } | null };
+type FilaProd = Omit<Producto, "categoriaNombre" | "variantes" | "codigosVariantes"> & { categoria: { nombre: string } | null };
 
 const COLUMNAS_PRODUCTO =
   "id, nombre, descripcion, codigo_interno, codigo_barras, costo_mxn, controla_existencias, variante_ejes, imagen_url, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, en_menu_general, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)";
 
-function aProducto(f: FilaProd, variantes = 0): Producto {
+function aProducto(f: FilaProd, variantes = 0, codigosVariantes = ""): Producto {
   return {
     id: f.id,
     nombre: f.nombre,
@@ -230,6 +233,7 @@ function aProducto(f: FilaProd, variantes = 0): Producto {
     controla_existencias: Boolean(f.controla_existencias),
     variante_ejes: f.variante_ejes ?? null,
     variantes,
+    codigosVariantes,
     imagen_url: f.imagen_url || null,
     precio_base_mxn: Number(f.precio_base_mxn),
     categoria_id: f.categoria_id,
@@ -256,15 +260,26 @@ export async function listarProductos(): Promise<Producto[]> {
     .is("producto_padre_id", null)
     .order("orden_visualizacion", { ascending: true });
   if (error) throw new Error(error.message);
-  // Cuántas variantes vivas tiene cada padre (solo tiendas; en un restaurante sale vacío).
-  const { data: hijas } = await supabase
-    .from("productos")
-    .select("producto_padre_id")
-    .is("deleted_at", null)
-    .not("producto_padre_id", "is", null);
+  // Las variantes vivas de cada padre: cuántas son y sus códigos (solo tiendas; en un restaurante
+  // sale vacío). Paginado: una tienda pasa de las 1000 filas que corta PostgREST.
+  const hijas = (await leerTodas((a, b) =>
+    supabase
+      .from("productos")
+      .select("producto_padre_id, codigo_barras, codigo_interno")
+      .is("deleted_at", null)
+      .not("producto_padre_id", "is", null)
+      .order("id")
+      .range(a, b),
+  )) as { producto_padre_id: string; codigo_barras: string | null; codigo_interno: string | null }[];
   const cuenta = new Map<string, number>();
-  for (const h of (hijas ?? []) as { producto_padre_id: string }[]) cuenta.set(h.producto_padre_id, (cuenta.get(h.producto_padre_id) ?? 0) + 1);
-  return ((data ?? []) as unknown as FilaProd[]).map((f) => aProducto(f, cuenta.get(f.id) ?? 0));
+  const codigos = new Map<string, string[]>();
+  for (const h of hijas) {
+    cuenta.set(h.producto_padre_id, (cuenta.get(h.producto_padre_id) ?? 0) + 1);
+    const c = codigos.get(h.producto_padre_id) ?? [];
+    codigos.set(h.producto_padre_id, c);
+    for (const x of [h.codigo_barras, h.codigo_interno]) if (x) c.push(x);
+  }
+  return ((data ?? []) as unknown as FilaProd[]).map((f) => aProducto(f, cuenta.get(f.id) ?? 0, (codigos.get(f.id) ?? []).join(" ")));
 }
 
 export async function obtenerProducto(id: string): Promise<Producto | null> {
