@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buscarCapturable, estadoExistencia, resumenExistencias, varianteDe, type FilaExistencia } from "../existencias";
+import { avisoRenglon, buscarCapturable, estadoExistencia, resumenExistencias, varianteDe, type FilaExistencia } from "../existencias";
 
 const fila = (c: number, m: number | null, v = 0): FilaExistencia => ({
   sucursal_id: "s", sucursal_nombre: "S", producto_id: Math.random().toString(), producto_nombre: "P", variante: "",
@@ -33,5 +33,17 @@ describe("existencias", () => {
     expect(r.exacto).toBeNull();
     expect(r.coincidencias.map((c) => c.id)).toEqual(["1", "2"]);
     expect(buscarCapturable(lista, "").coincidencias).toEqual([]);
+  });
+  it("aviso del renglón, como el validador de la base", () => {
+    expect(avisoRenglon("1")).toBeNull();
+    expect(avisoRenglon("0.001", "12.50")).toBeNull();
+    expect(avisoRenglon("0")).toMatch(/cantidad/);
+    expect(avisoRenglon("0", "", true)).toBeNull();
+    expect(avisoRenglon("")).toMatch(/cantidad/);
+    expect(avisoRenglon("NaN")).toMatch(/cantidad/);
+    expect(avisoRenglon("1.2345")).toMatch(/3 decimales/);
+    expect(avisoRenglon("1000000000")).toMatch(/cantidad/);
+    expect(avisoRenglon("1", "-1")).toMatch(/costo/);
+    expect(avisoRenglon("1", "1.234")).toMatch(/2 decimales/);
   });
 });

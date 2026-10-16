@@ -35,11 +35,23 @@ export function resumenExistencias(filas: FilaExistencia[]) {
 
 export type Capturable = { id: string; nombre: string; codigo_interno: string | null; codigo_barras: string | null };
 /** El escáner escribe el código y Enter: primero el código exacto; si no, el nombre. */
-export function buscarCapturable(lista: Capturable[], texto: string): { exacto: Capturable | null; coincidencias: Capturable[] } {
+export function buscarCapturable<T extends Capturable>(lista: T[], texto: string): { exacto: T | null; coincidencias: T[] } {
   const t = texto.trim().toLowerCase();
   if (!t) return { exacto: null, coincidencias: [] };
   const exacto = lista.find((p) => p.codigo_barras?.toLowerCase() === t || p.codigo_interno?.toLowerCase() === t) ?? null;
   return { exacto, coincidencias: exacto ? [] : lista.filter((p) => p.nombre.toLowerCase().includes(t)).slice(0, 8) };
+}
+
+/** Lo mismo que rechaza `_existencias_lineas`, dicho antes de enviar. `null` = el renglón está bien. */
+export function avisoRenglon(cantidad: string, costo = "", ceroOk = false): string | null {
+  const q = cantidad.trim();
+  if (/^\d+\.\d{4,}$/.test(q)) return "La cantidad lleva hasta 3 decimales";
+  if (!/^\d+(\.\d{1,3})?$/.test(q) || (!ceroOk && Number(q) === 0)) return ceroOk ? "Escribe una cantidad de 0 o más" : "Escribe una cantidad mayor a 0";
+  if (Number(q) >= 1e9) return "Esa cantidad es demasiado grande";
+  const c = costo.trim();
+  if (/^\d+\.\d{3,}$/.test(c)) return "El costo lleva hasta 2 decimales";
+  if (c && (!/^\d+(\.\d{1,2})?$/.test(c) || Number(c) >= 1e10)) return "Revisa el costo";
+  return null;
 }
 
 const n = (v: unknown) => Number(v ?? 0);
