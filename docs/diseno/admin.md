@@ -344,6 +344,42 @@ Aquí los controles **sí miden 44 px** (`h-11`): el dueño abre esta página de
 teléfono en una mano y el local enfrente. En celular la dirección se parte en dos renglones (el
 prefijo arriba, el campo abajo a todo el ancho).
 
+## Tienda (giro RETAIL)
+
+Todo esto aparece solo cuando el negocio tiene el módulo de existencias. A un restaurante no se le
+muestra nada: ni en el producto, ni en el menú del Catálogo, y la fila «Existencias» de Configuración
+→ Operación tampoco sale. Quien entra por enlace directo lee «Esta sección es para tiendas».
+
+- **Bloque «Tienda» del producto** (`producto-form.tsx`). Un `Plegable` más, abierto, como sus
+  hermanos «Más datos» y «Fiscal». Lleva el código de barras con su botón «Generar» (crea uno
+  interno), el costo («lo que te cuesta a ti») y el interruptor «Lleva existencias». Si el código no
+  es un EAN-13 lo avisa, porque la etiqueta saldría sin barras. En un producto con variantes el
+  interruptor no se ofrece: las existencias son de cada variante.
+- **Tallas y colores** (`producto-variantes.tsx`). Una tarjeta en la ficha del producto con dos ejes,
+  por ejemplo «Talla» y «Color», y sus valores separados por coma. De ahí sale una tabla con un
+  renglón por combinación (SKU, código de barras, precio, costo y existencia inicial), separados por
+  una línea. «Quitar» va en rojo desde el reposo; lo quitado se junta abajo en «Quitadas» con su
+  «Restaurar». Una vez guardada cualquier variante, los nombres de los ejes ya no se cambian; los
+  valores sí. No tiene botón propio: se guarda con el «Guardar cambios» del producto y lo dice. Si
+  el producto se guardó pero las variantes no, el error empieza con «El producto se guardó, pero no
+  las tallas y colores».
+- **Lista de productos.** Un producto con variantes lleva la pastilla «N variantes» junto al nombre,
+  y la búsqueda de la lista también encuentra por código de barras.
+- **Importar tienda** (Catálogo → Importar tienda). Se sube un Excel o CSV, o se pega el texto; la
+  plantilla se descarga con BOM para que Excel respete los acentos. «Revisar» enseña cómo quedará
+  cada renglón en una vista previa; los errores salen por línea («Línea 7: …») y mientras haya uno
+  no se puede importar: es todo o nada. La coma decimal se rechaza (se escribe 12.50). Si un SKU ya
+  existe se actualizan su nombre, precio, costo y código; la existencia solo cuenta al crear.
+- **Etiquetas** (Catálogo → Etiquetas). Se marcan productos, se elige cuántas de cada una (de entrada,
+  lo que hay en existencia) y se imprime en hoja carta de 3×10 o en rollo con ancho y alto en mm. El
+  código EAN-13 se dibuja como SVG en negro puro: es la única excepción a los tokens, porque la
+  impresión no lee el tema y un gris no se escanea. En la impresión el texto va en Arial, una letra
+  que toda impresora trae. La zona que se imprime existe solo mientras se imprime (se monta aparte en
+  la página), para no tener miles de dibujos ocultos. El PDF sale de «Imprimir» → «Guardar como PDF».
+- **Clave del SAT** (campo «Clave de producto SAT», en Fiscal). Debajo del campo hay un buscador
+  («camisa, pantalón, tenis…») que llena la clave al elegir un resultado. Es para todos los negocios,
+  no solo tiendas, y la clave se puede seguir escribiendo a mano.
+
 ## Piezas que se repiten en el panel
 
 Viven en `apps/admin/app/components` y se usan en vez de volver a escribir el marcado:
