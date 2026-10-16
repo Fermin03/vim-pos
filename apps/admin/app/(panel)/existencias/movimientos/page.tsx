@@ -73,7 +73,8 @@ export default function MovimientosExistenciasPage() {
     },
     { id: "producto", titulo: "Producto", valor: (m) => m.producto, ancho: 32 },
     ...(conSucursal ? [{ id: "sucursal", titulo: "Sucursal", valor: (m: MovimientoProducto) => nombreSucursal.get(m.sucursal_id) ?? "—", enfasis: "suave" as const, ancho: 18 }] : []),
-    { id: "tipo", titulo: "Tipo", valor: (m) => TIPO[m.tipo] ?? m.tipo, ancho: 22 },
+    // El regreso de un traspaso cancelado también es TRASPASO_ENTRADA; lo distingue el motivo que escribe la RPC.
+    { id: "tipo", titulo: "Tipo", valor: (m) => (m.tipo === "TRASPASO_ENTRADA" && m.motivo === "Traspaso cancelado" ? "Regresa (traspaso cancelado)" : TIPO[m.tipo] ?? m.tipo), ancho: 22 },
     {
       id: "cantidad",
       titulo: "Cantidad",
