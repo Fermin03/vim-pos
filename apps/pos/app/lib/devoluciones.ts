@@ -1,5 +1,7 @@
 "use client";
+import { hoyMx, sumarDias } from "@vim/fecha";
 import { employeeClient } from "./supabase";
+import type { Autorizacion } from "./autorizacion";
 
 // F6.3 (Modelo B) — Devoluciones: la venta queda intacta (PAGADA) y la devolución es un
 // documento aparte que baja el efectivo de la caja. Usa crear_devolucion + confirmar_devolucion.
@@ -131,4 +133,212 @@ export async function devolverVenta(
     p_usuario_id: args.autorizoId,
   });
   if (e2) throw new Error(e2.message);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Giro RETAIL: devolución parcial, por renglón y por pieza, con regreso al anaquel (pos-retail.md,
+// «Devoluciones en una tienda»). La de restaurante (`devolverVenta`) no cambia.
+// ---------------------------------------------------------------------------------------------
+
+/** Los motivos que ve la caja. Una tienda no tiene «Tardó demasiado» ni «Producto equivocado». */
+export function motivosDevolucion(tienda: boolean): { codigo: MotivoDevolucion; label: string }[] {
+  if (!tienda) return MOTIVOS_DEV;
+  return [
+    { codigo: "PRODUCTO_DEFECTUOSO", label: "Producto defectuoso" },
+    { codigo: "CLIENTE_NO_SATISFECHO", label: "No le gustó" },
+    { codigo: "ERROR_COBRO", label: "Error de cobro" },
+    { codigo: "OTRO", label: "Otro" },
+  ];
+}
+
+/** Un renglón (no cancelado) de una venta cobrada, con lo que ya se devolvió de él. */
+export type RenglonVenta = {
+  ticket_item_id: string;
+  producto_id: string | null;
+  /** `producto_nombre_snapshot`: el nombre como se cobró («Playera Polo M Negra»). */
+  nombre: string;
+  cantidad: number;
+  /** Piezas ya devueltas en devoluciones no CANCELADA (la misma cuenta que el tope de 0040). */
+  devuelta: number;
+  precio_unitario: number;
+  /** `total_item_mxn` del renglón completo, antes del descuento global del ticket. */
+  total: number;
+};
+
+/**
+ * Una venta PAGADO/FACTURADO lista para devolver o cambiar: trae todos sus renglones, así quien la
+ * elige (Devoluciones, Cambio de talla) no vuelve a consultar.
+ */
+export type VentaDevolvible = {
+  ticketId: string;
+  folio: string;
+  /** `total_mxn` del ticket: con el descuento global ya aplicado. */
+  total: number;
+  fechaCobro: string | null;
+  renglones: RenglonVenta[];
+};
+
+export type RenglonDevolver = { ticket_item_id: string; cantidad: number; regresaAlAnaquel: boolean };
+
+/** `p_items` de crear_devolucion: cada renglón dice si su pieza regresa a la existencia. */
+export function itemsDevolucion(renglones: RenglonDevolver[]) {
+  return renglones.map((r) => ({
+    ticket_item_id: r.ticket_item_id,
+    cantidad_devuelta: r.cantidad,
+    reversar_inventario_item: r.regresaAlAnaquel,
+  }));
+}
+
+/** TOTAL solo si, con lo ya devuelto, cada renglón de la venta queda devuelto completo (como 0195). */
+export function alcanceDevolucion(venta: VentaDevolvible, renglones: RenglonDevolver[]): "TOTAL" | "PARCIAL" {
+  const ahora = new Map<string, number>();
+  for (const r of renglones) ahora.set(r.ticket_item_id, (ahora.get(r.ticket_item_id) ?? 0) + r.cantidad);
+  const completo = venta.renglones.every((v) => v.devuelta + (ahora.get(v.ticket_item_id) ?? 0) >= v.cantidad - 0.0001);
+  return completo ? "TOTAL" : "PARCIAL";
+}
+
+const centavos = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Lo que se reembolsa, calculado como crear_devolucion (0134): cada renglón en proporción a sus
+ * piezas y al descuento global del ticket, redondeado renglón por renglón.
+ */
+export function totalDevolucion(venta: VentaDevolvible, renglones: RenglonDevolver[]): number {
+  const bruto = venta.renglones.reduce((s, r) => s + r.total, 0);
+  const proporcion = bruto > 0 ? venta.total / bruto : 1;
+  let total = 0;
+  for (const d of renglones) {
+    const r = venta.renglones.find((x) => x.ticket_item_id === d.ticket_item_id);
+    if (r && r.cantidad > 0) total += centavos(((r.total * d.cantidad) / r.cantidad) * proporcion);
+  }
+  return centavos(total);
+}
+
+type FilaTicket = { id: string; folio_completo: string | null; total_mxn: number | string | null; fecha_pago: string | null };
+const COLUMNAS_TICKET = "id, folio_completo, total_mxn, fecha_pago";
+const ESTADOS_DEVOLVIBLES = ["PAGADO", "FACTURADO"];
+
+/** Arma las ventas con sus renglones y lo ya devuelto de cada uno (dos consultas para todas). */
+async function conRenglones(token: string, tickets: FilaTicket[]): Promise<VentaDevolvible[]> {
+  if (tickets.length === 0) return [];
+  const cli = employeeClient(token);
+  const { data: items, error } = await cli
+    .from("ticket_items")
+    .select("id, ticket_id, producto_id, producto_nombre_snapshot, cantidad, precio_unitario_snapshot, total_item_mxn")
+    .in("ticket_id", tickets.map((t) => t.id))
+    .eq("cancelado", false)
+    .order("created_at");
+  if (error) throw new Error(error.message);
+  const filas = (items ?? []) as Record<string, unknown>[];
+
+  const devuelta = new Map<string, number>();
+  if (filas.length > 0) {
+    const { data: devs, error: e2 } = await cli
+      .from("devolucion_items")
+      .select("ticket_item_id_original, cantidad_devuelta, devoluciones!inner(estado, deleted_at)")
+      .in("ticket_item_id_original", filas.map((i) => String(i.id)))
+      .neq("devoluciones.estado", "CANCELADA")
+      .is("devoluciones.deleted_at", null);
+    if (e2) throw new Error(e2.message);
+    for (const d of (devs ?? []) as Record<string, unknown>[]) {
+      const id = String(d.ticket_item_id_original);
+      devuelta.set(id, (devuelta.get(id) ?? 0) + Number(d.cantidad_devuelta));
+    }
+  }
+
+  return tickets.map((t) => ({
+    ticketId: t.id,
+    folio: t.folio_completo ?? t.id.slice(-6),
+    total: Number(t.total_mxn ?? 0),
+    fechaCobro: t.fecha_pago,
+    renglones: filas
+      .filter((i) => i.ticket_id === t.id)
+      .map((i) => ({
+        ticket_item_id: String(i.id),
+        producto_id: i.producto_id == null ? null : String(i.producto_id),
+        nombre: String(i.producto_nombre_snapshot),
+        cantidad: Number(i.cantidad),
+        devuelta: devuelta.get(String(i.id)) ?? 0,
+        precio_unitario: Number(i.precio_unitario_snapshot ?? 0),
+        total: Number(i.total_item_mxn ?? 0),
+      })),
+  }));
+}
+
+/** Una venta (del turno, por ejemplo) con sus renglones, para devolverla por partes. */
+export async function leerVentaDevolvible(token: string, ticketId: string): Promise<VentaDevolvible | null> {
+  const { data, error } = await employeeClient(token)
+    .from("tickets").select(COLUMNAS_TICKET)
+    .eq("id", ticketId).in("estado_fiscal", ESTADOS_DEVOLVIBLES).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? ((await conRenglones(token, [data as FilaTicket]))[0] ?? null) : null;
+}
+
+/**
+ * La venta con ese folio tal como sale impreso (`folio_completo`), si está PAGADO/FACTURADO.
+ * El negocio lo pone RLS; en la caja instalada solo encuentra las ventas de esa caja.
+ */
+export async function buscarVentaPorFolio(token: string, folio: string): Promise<VentaDevolvible | null> {
+  const f = folio.trim();
+  if (!f) return null;
+  const { data, error } = await employeeClient(token)
+    .from("tickets").select(COLUMNAS_TICKET)
+    .eq("folio_completo", f).in("estado_fiscal", ESTADOS_DEVOLVIBLES)
+    .order("fecha_pago", { ascending: false }).limit(1);
+  if (error) throw new Error(error.message);
+  return (await conRenglones(token, (data ?? []) as FilaTicket[]))[0] ?? null;
+}
+
+/**
+ * Ventas PAGADO/FACTURADO de los últimos `dias` (por día contable, en hora de México) con un
+ * renglón no cancelado de ese producto; la más reciente primero. Mismo alcance que el folio.
+ */
+export async function buscarVentasConProducto(token: string, productoId: string, dias = 30): Promise<VentaDevolvible[]> {
+  const { data, error } = await employeeClient(token)
+    .from("tickets").select(`${COLUMNAS_TICKET}, ticket_items!inner(producto_id)`)
+    .eq("ticket_items.producto_id", productoId).eq("ticket_items.cancelado", false)
+    .in("estado_fiscal", ESTADOS_DEVOLVIBLES)
+    .gte("dia_contable", sumarDias(hoyMx(), -dias))
+    .order("fecha_pago", { ascending: false })
+    // ponytail: tope de 50 ventas; con más, se busca por folio.
+    .limit(50);
+  if (error) throw new Error(error.message);
+  return conRenglones(token, (data ?? []) as FilaTicket[]);
+}
+
+/**
+ * Devolución parcial (o TOTAL si completa la venta) de una tienda: cada renglón dice si su pieza
+ * vuelve al anaquel (`reversar_inventario_item`); la existencia regresa al confirmar (0189).
+ * Devuelve el id de la devolución.
+ */
+export async function devolverRenglones(
+  venta: VentaDevolvible,
+  renglones: RenglonDevolver[],
+  motivo: MotivoDevolucion,
+  medio: MedioDevolucion,
+  autorizacion: Autorizacion,
+  ctx: { token: string; cajaId: string; turnoId: string; solicitanteId: string; motivoTexto?: string },
+): Promise<string> {
+  const cli = employeeClient(ctx.token);
+  const { data: devId, error: e1 } = await cli.rpc("crear_devolucion", {
+    p_ticket_original_id: venta.ticketId,
+    p_caja_id: ctx.cajaId,
+    p_turno_id: ctx.turnoId,
+    p_alcance: alcanceDevolucion(venta, renglones),
+    p_motivo: motivo,
+    p_motivo_texto: motivo === "OTRO" ? ctx.motivoTexto?.trim() || null : null,
+    p_medio_devolucion: medio,
+    p_autorizacion_pin_id: autorizacion.autorizacionPinId,
+    p_usuario_solicitante_id: ctx.solicitanteId,
+    p_usuario_autorizo_id: autorizacion.autorizoId,
+    p_items: itemsDevolucion(renglones),
+    p_reversar_inventario: true,
+  });
+  if (e1) throw new Error(e1.message);
+  const { error: e2 } = await cli.rpc("confirmar_devolucion", {
+    p_devolucion_id: String(devId),
+    p_usuario_id: autorizacion.autorizoId,
+  });
+  if (e2) throw new Error(e2.message);
+  return String(devId);
 }

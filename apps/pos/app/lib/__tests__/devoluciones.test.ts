@@ -1,0 +1,57 @@
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("../supabase", () => ({ employeeClient: () => ({}) }));
+
+import { alcanceDevolucion, itemsDevolucion, motivosDevolucion, totalDevolucion, type VentaDevolvible } from "../devoluciones";
+
+const venta: VentaDevolvible = {
+  ticketId: "t1",
+  folio: "A-12",
+  total: 500,
+  fechaCobro: null,
+  renglones: [
+    { ticket_item_id: "i1", producto_id: "p1", nombre: "Playera M", cantidad: 2, devuelta: 0, precio_unitario: 150, total: 300 },
+    { ticket_item_id: "i2", producto_id: "p2", nombre: "Gorra", cantidad: 1, devuelta: 0, precio_unitario: 200, total: 200 },
+  ],
+};
+
+describe("motivos de devolución", () => {
+  it("una tienda no ve «Tardó demasiado» y sí «No le gustó»", () => {
+    const tienda = motivosDevolucion(true);
+    expect(tienda.map((m) => m.codigo)).toEqual(["PRODUCTO_DEFECTUOSO", "CLIENTE_NO_SATISFECHO", "ERROR_COBRO", "OTRO"]);
+    expect(tienda.find((m) => m.codigo === "CLIENTE_NO_SATISFECHO")?.label).toBe("No le gustó");
+  });
+  it("un restaurante sigue con su lista de hoy", () => {
+    expect(motivosDevolucion(false).map((m) => m.codigo)).toContain("TIEMPO_EXCEDIDO");
+  });
+});
+
+describe("armado de la devolución parcial", () => {
+  it("un renglón que no vuelve al anaquel no reversa existencia", () => {
+    expect(itemsDevolucion([
+      { ticket_item_id: "i1", cantidad: 1, regresaAlAnaquel: false },
+      { ticket_item_id: "i2", cantidad: 1, regresaAlAnaquel: true },
+    ])).toEqual([
+      { ticket_item_id: "i1", cantidad_devuelta: 1, reversar_inventario_item: false },
+      { ticket_item_id: "i2", cantidad_devuelta: 1, reversar_inventario_item: true },
+    ]);
+  });
+  it("es TOTAL solo si se devuelve todo completo", () => {
+    const todo = [
+      { ticket_item_id: "i1", cantidad: 2, regresaAlAnaquel: true },
+      { ticket_item_id: "i2", cantidad: 1, regresaAlAnaquel: true },
+    ];
+    expect(alcanceDevolucion(venta, todo)).toBe("TOTAL");
+    expect(alcanceDevolucion(venta, [{ ...todo[0], cantidad: 1 }, todo[1]])).toBe("PARCIAL");
+    expect(alcanceDevolucion(venta, [todo[0]])).toBe("PARCIAL");
+  });
+  it("lo ya devuelto antes cuenta para completar la venta", () => {
+    const conPrevia = { ...venta, renglones: [{ ...venta.renglones[0], devuelta: 2 }, venta.renglones[1]] };
+    expect(alcanceDevolucion(conPrevia, [{ ticket_item_id: "i2", cantidad: 1, regresaAlAnaquel: true }])).toBe("TOTAL");
+  });
+  it("el total sigue el cálculo de la base: proporción por pieza y descuento del ticket", () => {
+    expect(totalDevolucion(venta, [{ ticket_item_id: "i1", cantidad: 1, regresaAlAnaquel: true }])).toBe(150);
+    // Ticket con 10 % de descuento global: total 450 contra 500 de renglones.
+    expect(totalDevolucion({ ...venta, total: 450 }, [{ ticket_item_id: "i1", cantidad: 1, regresaAlAnaquel: true }])).toBe(135);
+  });
+});
