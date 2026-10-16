@@ -172,3 +172,106 @@ COMMENT ON FUNCTION modulos_efectivos(uuid) IS
   'Módulos por cliente: permitidos (plan + flags; los de operación siempre) y efectivos (AND encendido por el dueño o, en los de operación, por VIM). Única lectura autorizada (ADR 0014, 0180, 0189).';
 REVOKE EXECUTE ON FUNCTION modulos_efectivos(uuid) FROM public, anon;
 GRANT EXECUTE ON FUNCTION modulos_efectivos(uuid) TO authenticated, service_role;
+
+-- ── §2 Variantes y costo ─────────────────────────────────────────────────────
+-- La variante es un producto más (con su SKU, código de barras, precio y existencias) que apunta
+-- a su padre. El padre es lo que se ve en catálogo y caja ("Playera Polo") y no se vende.
+-- Un solo nivel. El precio de la hija es siempre suyo: el admin lo prellena con el del padre
+-- (precio_base_mxn es NOT NULL y lo leen cobro, menús, combos y tienda).
+ALTER TABLE productos
+  ADD COLUMN IF NOT EXISTS producto_padre_id    uuid NULL REFERENCES productos(id) ON DELETE RESTRICT,
+  ADD COLUMN IF NOT EXISTS variante_ejes        text[] NULL,
+  ADD COLUMN IF NOT EXISTS variante_valores     jsonb NULL,
+  ADD COLUMN IF NOT EXISTS costo_mxn            numeric(12,2) NULL CHECK (costo_mxn IS NULL OR costo_mxn >= 0),
+  ADD COLUMN IF NOT EXISTS controla_existencias boolean NOT NULL DEFAULT false;
+
+ALTER TABLE productos
+  -- Padre: tiene ejes y no tiene padre ni valores. Hija: tiene padre y valores y no tiene ejes.
+  ADD CONSTRAINT productos_variante_forma CHECK (
+    (producto_padre_id IS NULL AND variante_valores IS NULL)
+    OR (producto_padre_id IS NOT NULL AND variante_ejes IS NULL
+        AND variante_valores IS NOT NULL AND jsonb_typeof(variante_valores) = 'object')),
+  -- El padre no se vende, así que no tiene existencias.
+  ADD CONSTRAINT productos_padre_sin_existencias CHECK (NOT (variante_ejes IS NOT NULL AND controla_existencias));
+
+COMMENT ON COLUMN productos.producto_padre_id IS 'Variante: apunta al producto padre (un nivel). El padre no se vende (0189).';
+COMMENT ON COLUMN productos.variante_ejes IS 'Solo en el padre: ejes de sus variantes, p. ej. {Talla,Color} (0189).';
+COMMENT ON COLUMN productos.variante_valores IS 'Solo en la hija: valor por eje, p. ej. {"Talla":"M","Color":"Negra"} (0189).';
+COMMENT ON COLUMN productos.costo_mxn IS 'Costo vigente (último de entrada). Para margen y existencias valorizadas (0189).';
+COMMENT ON COLUMN productos.controla_existencias IS 'true = lleva existencias por sucursal en producto_existencias. Excluye recetas/insumos (0189).';
+
+CREATE INDEX IF NOT EXISTS idx_productos_padre ON productos(producto_padre_id)
+  WHERE producto_padre_id IS NOT NULL AND deleted_at IS NULL;
+-- jsonb compara por contenido: {"Color":"Negra","Talla":"M"} = {"Talla":"M","Color":"Negra"}.
+CREATE UNIQUE INDEX IF NOT EXISTS productos_variante_unica ON productos(producto_padre_id, variante_valores)
+  WHERE producto_padre_id IS NOT NULL AND deleted_at IS NULL;
+-- Antes de aplicar en producción, esta consulta debe regresar cero filas (ver ADR 0037):
+--   SELECT tenant_id, codigo_barras, count(*) FROM productos
+--    WHERE codigo_barras IS NOT NULL AND deleted_at IS NULL GROUP BY 1, 2 HAVING count(*) > 1;
+CREATE UNIQUE INDEX IF NOT EXISTS productos_codigo_barras_unico ON productos(tenant_id, codigo_barras)
+  WHERE codigo_barras IS NOT NULL AND deleted_at IS NULL;
+-- SKU único solo entre los que controlan existencias: los restaurantes pueden repetirlo hoy.
+CREATE UNIQUE INDEX IF NOT EXISTS productos_sku_existencias_unico ON productos(tenant_id, codigo_interno)
+  WHERE codigo_interno IS NOT NULL AND deleted_at IS NULL AND controla_existencias;
+
+-- Coherencia que un CHECK no alcanza: el padre existe, es del mismo negocio, es padre (tiene ejes,
+-- no tiene padre) y los valores de la hija son exactamente sus ejes, con texto no vacío. Tampoco se
+-- cambian los ejes de un padre que ya tiene hijas. En la caja el pull corre en réplica y esto no
+-- corre: la nube ya lo validó.
+CREATE OR REPLACE FUNCTION productos_variante_coherencia()
+RETURNS trigger LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
+DECLARE
+  v_padre productos%ROWTYPE;
+  k       text;
+BEGIN
+  IF NEW.variante_ejes IS NOT NULL AND cardinality(NEW.variante_ejes) = 0 THEN
+    RAISE EXCEPTION 'VARIANTE_INVALIDA: un producto con variantes necesita al menos un eje' USING ERRCODE = '23514';
+  END IF;
+
+  IF TG_OP = 'UPDATE' AND OLD.variante_ejes IS DISTINCT FROM NEW.variante_ejes
+     AND EXISTS (SELECT 1 FROM productos h WHERE h.producto_padre_id = NEW.id AND h.deleted_at IS NULL) THEN
+    RAISE EXCEPTION 'VARIANTE_INVALIDA: no se cambian los ejes de un producto que ya tiene variantes' USING ERRCODE = '23514';
+  END IF;
+
+  IF NEW.producto_padre_id IS NULL THEN RETURN NEW; END IF;
+
+  SELECT * INTO v_padre FROM productos WHERE id = NEW.producto_padre_id;
+  IF NOT FOUND OR v_padre.tenant_id <> NEW.tenant_id THEN
+    RAISE EXCEPTION 'VARIANTE_INVALIDA: el producto padre no es de este negocio' USING ERRCODE = '23514';
+  END IF;
+  IF v_padre.producto_padre_id IS NOT NULL OR v_padre.variante_ejes IS NULL THEN
+    RAISE EXCEPTION 'VARIANTE_INVALIDA: el padre tiene que ser un producto con variantes' USING ERRCODE = '23514';
+  END IF;
+  IF (SELECT array_agg(x ORDER BY x) FROM jsonb_object_keys(NEW.variante_valores) x)
+     IS DISTINCT FROM (SELECT array_agg(x ORDER BY x) FROM unnest(v_padre.variante_ejes) x) THEN
+    RAISE EXCEPTION 'VARIANTE_INVALIDA: la variante debe traer exactamente los ejes %', v_padre.variante_ejes USING ERRCODE = '23514';
+  END IF;
+  FOR k IN SELECT jsonb_object_keys(NEW.variante_valores) LOOP
+    IF jsonb_typeof(NEW.variante_valores->k) <> 'string' OR btrim(NEW.variante_valores->>k) = '' THEN
+      RAISE EXCEPTION 'VARIANTE_INVALIDA: el valor de % no puede ir vacío', k USING ERRCODE = '23514';
+    END IF;
+  END LOOP;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_productos_variante_coherencia ON productos;
+CREATE TRIGGER trg_productos_variante_coherencia
+  BEFORE INSERT OR UPDATE OF producto_padre_id, variante_ejes, variante_valores, tenant_id ON productos
+  FOR EACH ROW EXECUTE FUNCTION productos_variante_coherencia();
+
+-- El padre no se vende. Disparador y no cambio en agregar_item_a_ticket: cubre también combos,
+-- tienda y cualquier camino futuro sin reescribir esas funciones.
+CREATE OR REPLACE FUNCTION ticket_items_no_padre()
+RETURNS trigger LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
+BEGIN
+  IF NEW.producto_id IS NOT NULL
+     AND EXISTS (SELECT 1 FROM productos WHERE id = NEW.producto_id AND variante_ejes IS NOT NULL) THEN
+    RAISE EXCEPTION 'PRODUCTO_CON_VARIANTES: elige la variante (talla, color) que se vende' USING ERRCODE = '22023';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_ticket_items_no_padre ON ticket_items;
+CREATE TRIGGER trg_ticket_items_no_padre
+  BEFORE INSERT OR UPDATE OF producto_id ON ticket_items
+  FOR EACH ROW EXECUTE FUNCTION ticket_items_no_padre();
