@@ -149,6 +149,8 @@ export default function ExistenciasPage() {
           </div>
         )}
 
+        <SelectorSucursal sucursal={sucursal} className="mb-5 w-full lg:w-auto" />
+
         {consulta.datos === null && !consulta.error && <p className="text-14 text-ink-2">Cargando…</p>}
 
         {consulta.datos !== null && todas.length === 0 && (
@@ -164,7 +166,6 @@ export default function ExistenciasPage() {
         {consulta.datos !== null && todas.length > 0 && (
           <div aria-busy={consulta.cargando} className={`transition-opacity duration-150 ${consulta.cargando ? "opacity-60" : ""}`}>
             <div className="mb-5 flex flex-wrap items-center gap-3">
-              <SelectorSucursal sucursal={sucursal} className="w-full lg:w-auto" />
               <Segmentos etiqueta="Mostrar" opciones={FILTROS} valor={filtro} onCambiar={setFiltro} grande />
               <label className="relative w-full lg:w-auto">
                 <span className="sr-only">Buscar</span>
@@ -173,7 +174,7 @@ export default function ExistenciasPage() {
               </label>
             </div>
             <Cifras cifras={cifras} />
-            {enTodas && variasSucursales && <p className="mb-3 text-13 text-ink-2">Elige una sucursal para ajustar.</p>}
+            {enTodas && <p className="mb-3 text-13 text-ink-2">Elige una sucursal para ajustar.</p>}
             <Tabla columnas={conAcciones} filas={visibles} clave={(f) => `${f.sucursal_id}:${f.producto_id}`} ordenable={false} vacio="Nada coincide con el filtro." />
           </div>
         )}
@@ -267,6 +268,10 @@ function ModalAjuste({ fila, onHecho, onCerrar }: { fila: FilaExistencia; onHech
       setError("Revisa el costo");
       return;
     }
+    if (c !== null && !/^\d+(\.\d{1,2})?$/.test(costo.trim())) {
+      setError("El costo lleva hasta 2 decimales");
+      return;
+    }
     setProcesando(true);
     try {
       await registrarMovimientoProducto(fila.sucursal_id, fila.producto_id, tipo, cant, c, motivo.trim() || null);
@@ -280,7 +285,7 @@ function ModalAjuste({ fila, onHecho, onCerrar }: { fila: FilaExistencia; onHech
   return (
     <Modal open hideTitle onClose={onCerrar} title="Ajustar existencia" className={tarjeta}>
       <Encabezado titulo="Ajustar existencia" fila={fila} />
-      <Segmentos etiqueta="Tipo" opciones={TIPOS} valor={tipo} onCambiar={setTipo} className="mb-3 flex w-full [&>button]:flex-1" />
+      <Segmentos etiqueta="Tipo" opciones={TIPOS} valor={tipo} onCambiar={(t) => { setTipo(t); setCantidad(""); }} className="mb-3 flex w-full [&>button]:flex-1" />
       <div className="mb-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label className={label} htmlFor="e-cant">Cantidad</label>
