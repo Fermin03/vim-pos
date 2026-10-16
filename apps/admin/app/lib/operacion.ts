@@ -10,6 +10,8 @@ const RUTA_DE_MODULO: readonly [string, CodigoOperacion][] = [
   ["/usuarios/repartidores", "repartidores"],
   ["/reservaciones", "reservaciones"],
   ["/configuracion/marcas", "marcas"],
+  ["/catalogo/importar-tienda", "existencias"],
+  ["/catalogo/etiquetas", "existencias"],
 ];
 
 /**
@@ -31,3 +33,7 @@ export function filtrarSecciones<T extends { items: { href: string }[] }>(seccio
 /** El WhatsApp ya escrito para pedir que VIM cambie los módulos. */
 export const mensajeCambiarModulos = (d: { usuario?: string | null; negocio?: string | null; codigo?: string | null }): string =>
   mensajeAyudaAdmin(d).replace(/Necesito ayuda con VIM POS\.$/, "Quiero cambiar lo que mi negocio usa en VIM POS.");
+
+/** ¿Se enseña lo de tienda? Solo con el módulo efectivo: mientras carga o si falló, un restaurante no ve nada nuevo. */
+export const conExistencias = (m: ModulosLeidos | "error" | null): boolean =>
+  m !== null && m !== "error" && moduloActivo(m.efectivos, "existencias");

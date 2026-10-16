@@ -5,7 +5,7 @@
  */
 export type CodigoGiro =
   | "QUICK_SERVICE" | "FULL_SERVICE" | "TAQUERIA" | "CAFETERIA" | "BAR" | "DARK_KITCHEN" | "FOODTRUCK"
-  | "CAFE_BAR" | "ENTERPRISE";
+  | "RETAIL" | "CAFE_BAR" | "ENTERPRISE";
 
 export const GIROS: readonly { codigo: CodigoGiro; nombre: string; ofrecido: boolean }[] = [
   { codigo: "QUICK_SERVICE", nombre: "Comida rápida", ofrecido: true },
@@ -15,6 +15,8 @@ export const GIROS: readonly { codigo: CodigoGiro; nombre: string; ofrecido: boo
   { codigo: "BAR", nombre: "Bar", ofrecido: true },
   { codigo: "DARK_KITCHEN", nombre: "Cocina solo para apps", ofrecido: true },
   { codigo: "FOODTRUCK", nombre: "Food truck", ofrecido: true },
+  // Tienda (ADR 0037): existe en la base, pero no se asigna hasta la entrega 5 del giro.
+  { codigo: "RETAIL", nombre: "Tienda de ropa o calzado", ofrecido: false },
   // Retirados: se quedan para nombrar a quien ya los tiene.
   { codigo: "CAFE_BAR", nombre: "Cafetería o bar", ofrecido: false },
   { codigo: "ENTERPRISE", nombre: "Cadena", ofrecido: false },
@@ -25,7 +27,7 @@ export const nombreGiro = (codigo: string | null | undefined): string =>
 
 export type CodigoOperacion =
   | "mostrador" | "comedor" | "meseros" | "domicilio" | "repartidores"
-  | "kds" | "reservaciones" | "marcas" | "eventos" | "cuentas_barra";
+  | "kds" | "reservaciones" | "marcas" | "eventos" | "cuentas_barra" | "existencias";
 
 /** Lo que se enseña en el admin y en /platform. */
 export const OPERACION: readonly { codigo: CodigoOperacion; nombre: string; descripcion: string; requiere?: CodigoOperacion }[] = [
@@ -39,14 +41,15 @@ export const OPERACION: readonly { codigo: CodigoOperacion; nombre: string; desc
   { codigo: "marcas", nombre: "Marcas virtuales", descripcion: "Varias marcas desde la misma cocina." },
   { codigo: "eventos", nombre: "Eventos", descripcion: "Abrir el turno en una feria o un evento." },
   { codigo: "cuentas_barra", nombre: "Cuentas en barra", descripcion: "Cuentas a nombre de una persona, sin mesa." },
+  { codigo: "existencias", nombre: "Existencias", descripcion: "Tallas y colores, código de barras y cuánto queda de cada prenda por sucursal." },
 ];
 
 /**
  * ¿Está encendido? Lo que diga la base manda. Si la llave no llegó (caja con directivas viejas,
- * todavía cargando) se enseña lo de siempre: todo, menos eventos y cuentas en barra, que antes de
- * los giros nadie veía (eventos solo un food truck).
+ * todavía cargando) se enseña lo de siempre: todo, menos eventos, cuentas en barra y existencias,
+ * que antes nadie veía (eventos solo un food truck; existencias es de tienda, ADR 0037).
  */
 export function moduloActivo(modulos: Record<string, boolean> | null | undefined, codigo: CodigoOperacion): boolean {
   const v = modulos?.[codigo];
-  return typeof v === "boolean" ? v : codigo !== "eventos" && codigo !== "cuentas_barra";
+  return typeof v === "boolean" ? v : codigo !== "eventos" && codigo !== "cuentas_barra" && codigo !== "existencias";
 }

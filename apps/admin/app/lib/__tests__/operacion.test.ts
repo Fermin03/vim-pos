@@ -9,11 +9,11 @@ describe("rutasOcultas", () => {
     expect(rutasOcultas(null).size).toBe(0);
     expect(rutasOcultas("error").size).toBe(0);
   });
-  it("un negocio de siempre (todo encendido o sin llaves) ve todo", () => {
-    expect(rutasOcultas(con({})).size).toBe(0);
+  it("un negocio de siempre (todo encendido) ve todo; lo de tienda solo con existencias", () => {
+    expect(rutasOcultas(con({ existencias: true })).size).toBe(0);
   });
   it("food truck: sin mesas, envíos, repartidores, reservaciones, marcas ni reporte de meseros", () => {
-    const m = con({ comedor: false, meseros: false, domicilio: false, repartidores: false, reservaciones: false, marcas: false });
+    const m = con({ existencias: true, comedor: false, meseros: false, domicilio: false, repartidores: false, reservaciones: false, marcas: false });
     expect([...rutasOcultas(m)].sort()).toEqual([
       "/configuracion/envios", "/configuracion/marcas", "/configuracion/mesas",
       "/reportes/ventas-mesero", "/reservaciones", "/usuarios/repartidores",
