@@ -234,4 +234,62 @@ BEGIN
   RAISE NOTICE '5 otro negocio y módulo OK';
 END $$;
 
+-- 6) Ajustes de 0191: borrar un padre borra sus variantes; reimportar un producto suelto conserva su
+--    existencia y su código; el código interno salta uno tecleado a mano; permisos de las auxiliares.
+DO $$
+DECLARE
+  v_t      uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_suc    uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_padre  uuid; v_nuevo uuid; v_gor uuid; v_barras text; v_q numeric; v_r jsonb; v_sig text; v_a text;
+BEGIN
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', '99999999-0000-0000-0000-0000000000e1', 'tenant_id', v_t)::text, true);
+
+  -- 6a) Borrar «Jeans Slim» (del bloque 4) borra sus dos variantes.
+  SELECT id INTO v_padre FROM productos WHERE tenant_id = v_t AND nombre = 'Jeans Slim' AND variante_ejes IS NOT NULL AND deleted_at IS NULL;
+  UPDATE productos SET deleted_at = now() WHERE id = v_padre;
+  IF EXISTS (SELECT 1 FROM productos WHERE producto_padre_id = v_padre AND deleted_at IS NULL) THEN
+    RAISE EXCEPTION '6a: quedaron variantes vivas de un padre borrado'; END IF;
+
+  -- 6b) Reimportar sus SKU crea un padre nuevo con sus variantes, sin «ya es de otro producto».
+  v_r := importar_catalogo_tienda(jsonb_build_array(
+    jsonb_build_object('linea', 2, 'categoria', 'Pantalones', 'producto', 'Jeans Slim', 'ejes', jsonb_build_array('Talla','Color'),
+                       'valores', jsonb_build_object('Talla','30','Color','Azul'), 'sku', 'JNS-30-AZU', 'precio', 799),
+    jsonb_build_object('linea', 3, 'categoria', 'Pantalones', 'producto', 'Jeans Slim', 'ejes', jsonb_build_array('Talla','Color'),
+                       'valores', jsonb_build_object('Talla','32','Color','Azul'), 'sku', 'JNS-32-AZU', 'codigo_barras', '7501000000004',
+                       'precio', 799)), v_suc);
+  IF (v_r->>'productos')::int <> 1 OR (v_r->>'variantes_creadas')::int <> 2 THEN RAISE EXCEPTION '6b: %', v_r; END IF;
+  SELECT id INTO v_nuevo FROM productos WHERE tenant_id = v_t AND nombre = 'Jeans Slim' AND variante_ejes IS NOT NULL AND deleted_at IS NULL;
+  IF v_nuevo IS NULL OR v_nuevo = v_padre
+     OR (SELECT count(*) FROM productos WHERE producto_padre_id = v_nuevo AND deleted_at IS NULL) <> 2 THEN
+    RAISE EXCEPTION '6b: las variantes no quedaron bajo el padre nuevo'; END IF;
+
+  -- 6c) Reimportar un producto suelto (sin ejes) con otra existencia y sin código: conserva ambos.
+  SELECT id, codigo_barras INTO v_gor, v_barras FROM productos WHERE tenant_id = v_t AND codigo_interno = 'GOR-001' AND deleted_at IS NULL;
+  SELECT cantidad INTO v_q FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_gor;
+  IF v_barras IS NULL OR v_q IS NULL THEN RAISE EXCEPTION '6c: la gorra del bloque 4 debía tener código y existencia'; END IF;
+  v_r := importar_catalogo_tienda(jsonb_build_array(
+    jsonb_build_object('linea', 2, 'categoria', 'Accesorios', 'producto', 'Gorra', 'ejes', '[]'::jsonb, 'valores', '{}'::jsonb,
+                       'sku', 'GOR-001', 'precio', 299, 'existencia', 99)), v_suc);
+  IF (v_r->>'actualizados')::int <> 1 THEN RAISE EXCEPTION '6c: %', v_r; END IF;
+  IF (SELECT codigo_barras FROM productos WHERE id = v_gor) IS DISTINCT FROM v_barras THEN RAISE EXCEPTION '6c: perdió su código de barras'; END IF;
+  IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_gor) <> v_q THEN RAISE EXCEPTION '6c: cambió su existencia'; END IF;
+  IF (SELECT precio_base_mxn FROM productos WHERE id = v_gor) <> 299 THEN RAISE EXCEPTION '6c: no actualizó el precio'; END IF;
+
+  -- 6d) Un código 20… tecleado a mano justo por delante del contador no se vuelve a entregar.
+  v_a := generar_codigo_interno();
+  v_sig := '20' || lpad((substr(v_a, 3, 10)::bigint + 1)::text, 10, '0');
+  v_sig := v_sig || ean13_digito(v_sig);
+  UPDATE productos SET codigo_barras = v_sig WHERE id = v_gor;
+  IF generar_codigo_interno() = v_sig THEN RAISE EXCEPTION '6d: entregó un código que ya tiene otro producto'; END IF;
+
+  -- 6e) anon no ejecuta las auxiliares; authenticated sí _nombre_variante (la usa el trigger de herencia).
+  IF has_function_privilege('anon', '_nombre_variante(text, text[], jsonb)', 'EXECUTE')
+     OR has_function_privilege('anon', 'ean13_digito(text)', 'EXECUTE')
+     OR has_function_privilege('anon', '_mensaje_unico_producto(text)', 'EXECUTE')
+     OR has_function_privilege('authenticated', 'ean13_digito(text)', 'EXECUTE')
+     OR NOT has_function_privilege('authenticated', '_nombre_variante(text, text[], jsonb)', 'EXECUTE') THEN
+    RAISE EXCEPTION '6e: permisos de las auxiliares'; END IF;
+  RAISE NOTICE '6 ajustes 0191 OK';
+END $$;
+
 ROLLBACK;
