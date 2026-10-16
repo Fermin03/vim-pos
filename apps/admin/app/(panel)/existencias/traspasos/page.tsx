@@ -73,6 +73,7 @@ export default function TraspasosPage() {
 
   const recargar = () => setIntento((i) => i + 1);
   const nombreSucursal = (id: string) => sucursales?.find((s) => s.id === id)?.nombre ?? "Sucursal eliminada";
+  const viva = (id: string) => !!sucursales?.some((s) => s.id === id);
   const nombreProducto = (id: string) => catalogo.find((p) => p.id === id)?.nombre ?? "Producto eliminado";
 
   // Origen y destino nunca iguales: si el origen alcanza al destino, el destino se mueve.
@@ -245,14 +246,21 @@ export default function TraspasosPage() {
                           </p>
                         </div>
                         <StatusChip tone={e.tono}>{e.texto}</StatusChip>
-                        {t.estado === "ENVIADO" && (
-                          <span className="flex gap-3">
-                            <AccionFila disabled={ocupado !== null} onClick={() => void accion(t, "recibir")}>
-                              {ocupado === t.id ? "Guardando…" : "Recibir"}
-                            </AccionFila>
-                            <AccionFila peligro disabled={ocupado !== null} onClick={() => void accion(t, "cancelar")}>Cancelar</AccionFila>
-                          </span>
-                        )}
+                        {t.estado === "ENVIADO" && (() => {
+                          // Una sucursal borrada no recibe mercancía (0194): solo queda la punta viva.
+                          const recibe = viva(t.destino_sucursal_id), regresa = viva(t.origen_sucursal_id);
+                          if (!recibe && !regresa) return <p className="text-13 text-ink-3">Las dos sucursales están eliminadas.</p>;
+                          return (
+                            <span className="flex gap-3">
+                              {recibe && (
+                                <AccionFila disabled={ocupado !== null} onClick={() => void accion(t, "recibir")}>
+                                  {ocupado === t.id ? "Guardando…" : "Recibir"}
+                                </AccionFila>
+                              )}
+                              {regresa && <AccionFila peligro disabled={ocupado !== null} onClick={() => void accion(t, "cancelar")}>Cancelar</AccionFila>}
+                            </span>
+                          );
+                        })()}
                       </div>
                       {abierto === t.id && (
                         <ul className="mt-2 rounded border border-line text-sm">
