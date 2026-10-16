@@ -17,29 +17,29 @@ END $$;
 -- 2) Juego inicial por giro (tabla §5 del spec), cliente existente intacto, dependencias.
 DO $$
 DECLARE
-  v_todo jsonb := '{"mostrador":true,"comedor":true,"meseros":true,"domicilio":true,"repartidores":true,"kds":true,"reservaciones":true,"marcas":true,"eventos":true,"cuentas_barra":true}';
+  v_todo jsonb := '{"mostrador":true,"comedor":true,"meseros":true,"domicilio":true,"repartidores":true,"kds":true,"reservaciones":true,"marcas":true,"eventos":true,"cuentas_barra":true,"existencias":false}';
   v_op   jsonb;
 BEGIN
   IF juego_inicial_de_giro('QUICK_SERVICE') IS DISTINCT FROM
-     '{"mostrador":true,"comedor":false,"meseros":false,"domicilio":true,"repartidores":false,"kds":true,"reservaciones":false,"marcas":false,"eventos":false,"cuentas_barra":false}'::jsonb
+     '{"mostrador":true,"comedor":false,"meseros":false,"domicilio":true,"repartidores":false,"kds":true,"reservaciones":false,"marcas":false,"eventos":false,"cuentas_barra":false,"existencias":false}'::jsonb
   THEN RAISE EXCEPTION '2a: QUICK_SERVICE: %', juego_inicial_de_giro('QUICK_SERVICE'); END IF;
   IF juego_inicial_de_giro('FULL_SERVICE') IS DISTINCT FROM
-     '{"mostrador":true,"comedor":true,"meseros":true,"domicilio":false,"repartidores":false,"kds":true,"reservaciones":true,"marcas":false,"eventos":false,"cuentas_barra":false}'::jsonb
+     '{"mostrador":true,"comedor":true,"meseros":true,"domicilio":false,"repartidores":false,"kds":true,"reservaciones":true,"marcas":false,"eventos":false,"cuentas_barra":false,"existencias":false}'::jsonb
   THEN RAISE EXCEPTION '2a: FULL_SERVICE: %', juego_inicial_de_giro('FULL_SERVICE'); END IF;
   IF juego_inicial_de_giro('FOODTRUCK') IS DISTINCT FROM
-     '{"mostrador":true,"comedor":false,"meseros":false,"domicilio":false,"repartidores":false,"kds":false,"reservaciones":false,"marcas":false,"eventos":true,"cuentas_barra":false}'::jsonb
+     '{"mostrador":true,"comedor":false,"meseros":false,"domicilio":false,"repartidores":false,"kds":false,"reservaciones":false,"marcas":false,"eventos":true,"cuentas_barra":false,"existencias":false}'::jsonb
   THEN RAISE EXCEPTION '2a: FOODTRUCK: %', juego_inicial_de_giro('FOODTRUCK'); END IF;
   IF juego_inicial_de_giro('DARK_KITCHEN') IS DISTINCT FROM
-     '{"mostrador":true,"comedor":false,"meseros":false,"domicilio":true,"repartidores":true,"kds":true,"reservaciones":false,"marcas":true,"eventos":false,"cuentas_barra":false}'::jsonb
+     '{"mostrador":true,"comedor":false,"meseros":false,"domicilio":true,"repartidores":true,"kds":true,"reservaciones":false,"marcas":true,"eventos":false,"cuentas_barra":false,"existencias":false}'::jsonb
   THEN RAISE EXCEPTION '2a: DARK_KITCHEN: %', juego_inicial_de_giro('DARK_KITCHEN'); END IF;
   IF juego_inicial_de_giro('BAR') IS DISTINCT FROM
-     '{"mostrador":true,"comedor":true,"meseros":true,"domicilio":false,"repartidores":false,"kds":false,"reservaciones":false,"marcas":false,"eventos":false,"cuentas_barra":true}'::jsonb
+     '{"mostrador":true,"comedor":true,"meseros":true,"domicilio":false,"repartidores":false,"kds":false,"reservaciones":false,"marcas":false,"eventos":false,"cuentas_barra":true,"existencias":false}'::jsonb
   THEN RAISE EXCEPTION '2a: BAR: %', juego_inicial_de_giro('BAR'); END IF;
   IF juego_inicial_de_giro('CAFETERIA') IS DISTINCT FROM
-     '{"mostrador":true,"comedor":false,"meseros":false,"domicilio":false,"repartidores":false,"kds":false,"reservaciones":false,"marcas":false,"eventos":false,"cuentas_barra":false}'::jsonb
+     '{"mostrador":true,"comedor":false,"meseros":false,"domicilio":false,"repartidores":false,"kds":false,"reservaciones":false,"marcas":false,"eventos":false,"cuentas_barra":false,"existencias":false}'::jsonb
   THEN RAISE EXCEPTION '2a: CAFETERIA: %', juego_inicial_de_giro('CAFETERIA'); END IF;
   IF juego_inicial_de_giro('TAQUERIA') IS DISTINCT FROM
-     '{"mostrador":true,"comedor":true,"meseros":true,"domicilio":true,"repartidores":false,"kds":false,"reservaciones":false,"marcas":false,"eventos":false,"cuentas_barra":false}'::jsonb
+     '{"mostrador":true,"comedor":true,"meseros":true,"domicilio":true,"repartidores":false,"kds":false,"reservaciones":false,"marcas":false,"eventos":false,"cuentas_barra":false,"existencias":false}'::jsonb
   THEN RAISE EXCEPTION '2a: TAQUERIA: %', juego_inicial_de_giro('TAQUERIA'); END IF;
   IF juego_inicial_de_giro('ENTERPRISE') IS DISTINCT FROM v_todo THEN RAISE EXCEPTION '2a: ENTERPRISE debía ser todo encendido'; END IF;
   IF juego_inicial_de_giro(NULL) IS DISTINCT FROM v_todo THEN RAISE EXCEPTION '2a: NULL debía ser todo encendido'; END IF;
