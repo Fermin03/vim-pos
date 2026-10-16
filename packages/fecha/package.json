@@ -10,8 +10,8 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "vitest": "^3.0.5",
-    "typescript": "^5.7.3",
+    "vitest": "^5.0.3",
+    "typescript": "^7.0.2",
     "@vim/config": "workspace:*"
   }
 }
