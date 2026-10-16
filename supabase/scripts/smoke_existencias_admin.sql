@@ -153,4 +153,20 @@ BEGIN
   RAISE NOTICE '2 vista, mínimo y recepción OK';
 END $$;
 
+-- 3) Una sucursal borrada (suave) no recibe movimientos ni mínimos.
+DO $$
+DECLARE
+  v_t   uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_bor uuid := 'e3e30000-0000-0000-0000-0000000000b3';
+  v_gor uuid := 'e3e30000-0000-0000-0000-0000000000a1';
+BEGIN
+  INSERT INTO sucursales (id, tenant_id, codigo, nombre, deleted_at) VALUES (v_bor, v_t, 'RB3', 'Tienda cerrada', now());
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', '99999999-0000-0000-0000-0000000000e1', 'tenant_id', v_t)::text, true);
+  BEGIN PERFORM registrar_movimiento_producto(v_bor, v_gor, 'ENTRADA', 1);
+        RAISE EXCEPTION '3: movimiento en borrada'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS: esa sucursal está eliminada%' THEN RAISE; END IF; END;
+  BEGIN PERFORM fijar_minimo_producto(v_bor, v_gor, 2);
+        RAISE EXCEPTION '3: mínimo en borrada'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS: esa sucursal está eliminada%' THEN RAISE; END IF; END;
+  RAISE NOTICE '3 sucursal borrada OK';
+END $$;
+
 ROLLBACK;

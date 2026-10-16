@@ -180,6 +180,24 @@ REVOKE ALL ON vw_existencias FROM PUBLIC, anon;
 GRANT SELECT ON vw_existencias TO authenticated, service_role;
 COMMENT ON VIEW vw_existencias IS 'Existencia y valor de cada producto con existencias en cada sucursal viva (0193).';
 
+-- El validador de 0189, ahora también sin sucursales borradas (suave): no reciben movimientos ni mínimos.
+CREATE OR REPLACE FUNCTION _existencias_validar(p_tenant uuid, p_sucursal uuid, p_producto uuid)
+RETURNS void LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM sucursales WHERE id = p_sucursal AND tenant_id = p_tenant) THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: la sucursal no es de tu negocio' USING ERRCODE = '22023';
+  END IF;
+  IF EXISTS (SELECT 1 FROM sucursales WHERE id = p_sucursal AND deleted_at IS NOT NULL) THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: esa sucursal está eliminada' USING ERRCODE = '22023';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM productos WHERE id = p_producto AND tenant_id = p_tenant AND deleted_at IS NULL
+                   AND controla_existencias AND variante_ejes IS NULL) THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: ese producto no lleva existencias (o es el padre: elige la variante)' USING ERRCODE = '22023';
+  END IF;
+END;
+$$;
+REVOKE ALL ON FUNCTION _existencias_validar(uuid, uuid, uuid) FROM PUBLIC, anon, authenticated;
+
 -- El mínimo es lo único de producto_existencias que se escribe a mano. Si la fila no existe se
 -- crea en 0 (la suma de movimientos también es 0): la existencia sigue siendo la suma.
 CREATE OR REPLACE FUNCTION fijar_minimo_producto(p_sucursal uuid, p_producto uuid, p_minimo numeric)
