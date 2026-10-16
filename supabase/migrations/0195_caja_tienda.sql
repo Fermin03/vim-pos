@@ -118,33 +118,49 @@ CREATE TRIGGER trg_tickets_tienda_sin_cocina
 -- nuevos (por id) y el disparador movimientos_producto_aplicar mueve la existencia (corre en origin,
 -- así que reenviar un snapshot no descuenta dos veces). El resto lo valida movimientos_producto_validar.
 -- Bajan con el pull; no se agregan a catalogo_version (no avisan cada minuto).
+--
+-- Devuelve {aplicados int, errores [{tabla, id, error}], descartados [id]}. La caja marca como
+-- subidos todos los ids que mandó salvo los de errores:
+--   · un id que la nube ya tiene se salta antes del INSERT (ni aplicado ni error): el validador
+--     BEFORE INSERT corre aun cuando ON CONFLICT lo descartaría, y un reenvío podría rechazarse
+--     para siempre (p. ej. si al producto le quitaron las existencias entretanto);
+--   · un movimiento de un producto del negocio que ya no lleva existencias va a descartados: no se
+--     guarda ni se reintenta.
 CREATE OR REPLACE FUNCTION _vim_aplicar_movimientos_producto(p_tenant uuid, p_movs jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
 AS $fn$
 DECLARE
-  v_fila    jsonb;
-  v_id      uuid;
-  v_n       integer := 0;
-  v_errores jsonb := '[]'::jsonb;
+  v_fila        jsonb;
+  v_id          uuid;
+  v_n           integer := 0;
+  v_errores     jsonb := '[]'::jsonb;
+  v_descartados jsonb := '[]'::jsonb;
 BEGIN
   IF jsonb_typeof(p_movs) IS DISTINCT FROM 'array' THEN
-    RETURN jsonb_build_object('aplicados', 0, 'errores', '[]'::jsonb);
+    RETURN jsonb_build_object('aplicados', 0, 'errores', '[]'::jsonb, 'descartados', '[]'::jsonb);
   END IF;
   FOR v_fila IN SELECT value FROM jsonb_array_elements(p_movs) ORDER BY value->>'creado_at' LOOP
     BEGIN
       IF (v_fila->>'tenant_id')::uuid IS DISTINCT FROM p_tenant THEN
         RAISE EXCEPTION 'movimiento de otro negocio';
       END IF;
+      IF EXISTS (SELECT 1 FROM movimientos_producto WHERE id = (v_fila->>'id')::uuid) THEN CONTINUE; END IF;
       v_id := NULL;
       INSERT INTO movimientos_producto SELECT * FROM jsonb_populate_record(NULL::movimientos_producto, v_fila)
         ON CONFLICT (id) DO NOTHING RETURNING id INTO v_id;
-      IF v_id IS NOT NULL THEN v_n := v_n + 1; END IF;   -- NULL: ya existía, nada que mover
+      IF v_id IS NOT NULL THEN v_n := v_n + 1; END IF;
     EXCEPTION WHEN OTHERS THEN
-      v_errores := v_errores || jsonb_build_object('tabla', 'movimientos_producto', 'id', v_fila->>'id', 'error', SQLERRM);
+      -- Producto de este negocio que ya no lleva existencias: descartado. De otro negocio: error.
+      IF SQLERRM LIKE 'MOVIMIENTO_INVALIDO: el producto no lleva existencias%'
+         AND EXISTS (SELECT 1 FROM productos WHERE id = (v_fila->>'producto_id')::uuid AND tenant_id = p_tenant) THEN
+        v_descartados := v_descartados || to_jsonb(v_fila->>'id');
+      ELSE
+        v_errores := v_errores || jsonb_build_object('tabla', 'movimientos_producto', 'id', v_fila->>'id', 'error', SQLERRM);
+      END IF;
     END;
   END LOOP;
-  RETURN jsonb_build_object('aplicados', v_n, 'errores', v_errores);
+  RETURN jsonb_build_object('aplicados', v_n, 'errores', v_errores, 'descartados', v_descartados);
 END;
 $fn$;
 REVOKE ALL ON FUNCTION _vim_aplicar_movimientos_producto(uuid, jsonb) FROM PUBLIC, anon, authenticated;
@@ -229,8 +245,9 @@ $$;
 REVOKE EXECUTE ON FUNCTION sync_pull_snapshot(uuid) FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION sync_pull_snapshot(uuid) TO service_role;
 
--- 0195: sync_push_snapshot es la de la 0187 (vigente) con dos cambios, marcados "0195":
--- aplica movimientos_producto y no los cuenta entre las tablas ignoradas.
+-- 0195: sync_push_snapshot es la de la 0187 (vigente) con cambios marcados "0195": aplica
+-- movimientos_producto, no los cuenta entre las tablas ignoradas, los usa para hallar sucursal y caja
+-- del rastro y devuelve sus descartados en `_descartados`.
 CREATE OR REPLACE FUNCTION sync_push_snapshot(p_tenant uuid, p_snapshot jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -253,6 +270,7 @@ DECLARE
   v_min       timestamptz;
   v_max       timestamptz;
   v_tickets   jsonb;
+  v_descartados jsonb;   -- 0195
   /* Orden de dependencia (ver 0089). `repartidores` primero: `delivery_asignaciones` lo
      referencia. 0117: clientes y direcciones antes que tickets. 0122: lo que cuelga de la venta
      después de sus renglones y pagos; `devoluciones` antes que sus renglones y que
@@ -328,6 +346,7 @@ BEGIN
   v_det := _vim_aplicar_movimientos_producto(p_tenant, p_snapshot->'movimientos_producto');
   v_res := v_res || jsonb_build_object('movimientos_producto', (v_det->>'aplicados')::integer);
   v_errores := v_errores || COALESCE(v_det->'errores', '[]'::jsonb);
+  v_descartados := COALESCE(v_det->'descartados', '[]'::jsonb);   -- 0195
 
   -- ── Rastro del envío (0070/0073) ─────────────────────────────────────────
   BEGIN
@@ -346,7 +365,7 @@ BEGIN
      LIMIT 1;
     IF v_sucursal IS NULL THEN
       SELECT NULLIF(t->>'sucursal_id', '')::uuid INTO v_sucursal
-        FROM jsonb_array_elements(COALESCE(p_snapshot->'movimientos_inventario', '[]'::jsonb)) AS t LIMIT 1;
+        FROM jsonb_array_elements(COALESCE(p_snapshot->'movimientos_inventario', p_snapshot->'movimientos_producto', '[]'::jsonb)) AS t LIMIT 1;   -- 0195
     END IF;
     IF v_caja IS NULL AND v_sucursal IS NOT NULL THEN
       -- Un lote de puros movimientos no trae caja: se toma la de la sucursal con señal de vida más reciente.
@@ -400,7 +419,9 @@ BEGIN
     v_res := v_res || jsonb_build_object('_ignoradas', to_jsonb(v_ignoradas));
   END IF;
 
-  RETURN v_res || CASE WHEN jsonb_array_length(v_errores) > 0 THEN jsonb_build_object('_errores', v_errores) ELSE '{}'::jsonb END;
+  RETURN v_res || CASE WHEN jsonb_array_length(v_errores) > 0 THEN jsonb_build_object('_errores', v_errores) ELSE '{}'::jsonb END
+               -- 0195: ids que la caja marca como subidos aunque la nube no los guardó.
+               || CASE WHEN jsonb_array_length(v_descartados) > 0 THEN jsonb_build_object('_descartados', jsonb_build_object('movimientos_producto', v_descartados)) ELSE '{}'::jsonb END;
 END;
 $$;
 REVOKE EXECUTE ON FUNCTION sync_push_snapshot(uuid, jsonb) FROM public, anon, authenticated;

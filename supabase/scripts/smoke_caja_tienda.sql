@@ -107,6 +107,7 @@ DECLARE
   v_maria uuid := '99999999-0000-0000-0000-000000000001';
   v_pla   uuid := 'c4c40000-0000-0000-0000-0000000000a1';
   v_m1    uuid := gen_random_uuid(); v_m2 uuid := gen_random_uuid(); v_m3 uuid := gen_random_uuid(); v_m4 uuid := gen_random_uuid();
+  v_m5    uuid := gen_random_uuid(); v_m6 uuid := gen_random_uuid();
   v_suc2  uuid; v_turno uuid; v_tk uuid; v_it uuid; v_auth uuid; v_ini numeric; v_res jsonb; v_snap jsonb; v_pull jsonb;
 BEGIN
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
@@ -120,6 +121,8 @@ BEGIN
   v_res := sync_push_snapshot(v_t, v_snap);
   IF (v_res->>'movimientos_producto')::int IS DISTINCT FROM 1 THEN RAISE EXCEPTION '3a: debía aplicar 1: %', v_res; END IF;
   IF v_res ? '_ignoradas' THEN RAISE EXCEPTION '3a: la nube ignoró movimientos_producto: %', v_res->'_ignoradas'; END IF;
+  IF (SELECT sucursal_id FROM sync_eventos WHERE tenant_id = v_t ORDER BY fecha_procesado_inicio DESC LIMIT 1) IS DISTINCT FROM v_suc THEN
+    RAISE EXCEPTION '3a: el rastro de un lote de puros movimientos_producto debía llevar la sucursal'; END IF;
   v_res := sync_push_snapshot(v_t, v_snap);
   IF (v_res->>'movimientos_producto')::int IS DISTINCT FROM 0 THEN RAISE EXCEPTION '3a: el reenvío debía aplicar 0: %', v_res; END IF;
   IF (SELECT count(*) FROM movimientos_producto WHERE id = v_m1) <> 1 THEN RAISE EXCEPTION '3a: el movimiento se duplicó'; END IF;
@@ -131,13 +134,35 @@ BEGIN
     jsonb_build_object('id', v_m2, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', 'c4c40000-0000-0000-0000-0000000000e1',
       'tipo', 'VENTA', 'cantidad', -1, 'creado_at', now() - interval '1 min'),
     jsonb_build_object('id', v_m3, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_pla,
-      'tipo', 'ENTRADA', 'cantidad', 5, 'creado_at', now()))));
+      'tipo', 'ENTRADA', 'cantidad', 5, 'creado_at', now()),
+    -- Fila cuyo propio tenant_id es de otro negocio (con producto y sucursal de este).
+    jsonb_build_object('id', v_m5, 'tenant_id', 'c4c40000-0000-0000-0000-0000000000ee', 'sucursal_id', v_suc, 'producto_id', v_pla,
+      'tipo', 'ENTRADA', 'cantidad', 7, 'creado_at', now()))));
   IF (v_res->>'movimientos_producto')::int IS DISTINCT FROM 1 THEN RAISE EXCEPTION '3b: debía aplicar solo el bueno: %', v_res; END IF;
   IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(v_res->'_errores', '[]'::jsonb)) e WHERE e->>'id' = v_m2::text) THEN
     RAISE EXCEPTION '3b: el producto ajeno debía estar en _errores: %', v_res; END IF;
-  IF EXISTS (SELECT 1 FROM movimientos_producto WHERE id = v_m2) THEN RAISE EXCEPTION '3b: el ajeno no debía insertarse'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(v_res->'_errores', '[]'::jsonb)) e
+                  WHERE e->>'id' = v_m5::text AND e->>'error' = 'movimiento de otro negocio') THEN
+    RAISE EXCEPTION '3b: la fila con tenant ajeno debía estar en _errores: %', v_res; END IF;
+  IF v_res ? '_descartados' THEN RAISE EXCEPTION '3b: lo ajeno es error, no descartado: %', v_res; END IF;
+  IF EXISTS (SELECT 1 FROM movimientos_producto WHERE id IN (v_m2, v_m5)) THEN RAISE EXCEPTION '3b: lo ajeno no debía insertarse'; END IF;
   IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_pla) <> v_ini + 4 THEN
     RAISE EXCEPTION '3b: la existencia debía quedar en %', v_ini + 4; END IF;
+
+  -- 3e) Al producto le quitan las existencias: reenviar lo ya aplicado no es error ni descartado;
+  --     un movimiento nuevo de ese producto va a _descartados (no a _errores) y no se guarda.
+  UPDATE productos SET controla_existencias = false WHERE id = v_pla;
+  v_res := sync_push_snapshot(v_t, v_snap || jsonb_build_object('movimientos_producto',
+    (v_snap->'movimientos_producto') || jsonb_build_array(jsonb_build_object(
+      'id', v_m6, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_pla, 'tipo', 'VENTA', 'cantidad', -1, 'creado_at', now()))));
+  IF v_res ? '_errores' THEN RAISE EXCEPTION '3e: el reenvío no debía dar errores: %', v_res; END IF;
+  IF (v_res->>'movimientos_producto')::int IS DISTINCT FROM 0 THEN RAISE EXCEPTION '3e: nada debía aplicarse: %', v_res; END IF;
+  IF v_res->'_descartados'->'movimientos_producto' IS DISTINCT FROM jsonb_build_array(v_m6::text) THEN
+    RAISE EXCEPTION '3e: solo el nuevo debía ir a _descartados: %', v_res; END IF;
+  IF EXISTS (SELECT 1 FROM movimientos_producto WHERE id = v_m6) THEN RAISE EXCEPTION '3e: el descartado no debía guardarse'; END IF;
+  IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_pla) <> v_ini + 4 THEN
+    RAISE EXCEPTION '3e: la existencia no debía moverse'; END IF;
+  UPDATE productos SET controla_existencias = true WHERE id = v_pla;
 
   -- 3c) El pull trae producto_existencias de las dos sucursales (y no de una borrada).
   INSERT INTO tenant_limites (tenant_id, max_sucursales) VALUES (v_t, 10) ON CONFLICT (tenant_id) DO UPDATE SET max_sucursales = 10;
