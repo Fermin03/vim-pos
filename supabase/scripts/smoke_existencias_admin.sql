@@ -1,4 +1,4 @@
--- Smoke del admin de existencias (spec 2026-10-15-giro-retail-design.md §6.2; migraciones 0192-0193).
+-- Smoke del admin de existencias (spec 2026-10-15-giro-retail-design.md §6.2; migraciones 0192-0194).
 -- Sobre la semilla de dev. ROLLBACK. Ejecutar: cd desktop && npm run smokes -- smoke_existencias_admin.sql
 \set ON_ERROR_STOP on
 BEGIN;
@@ -159,6 +159,9 @@ DECLARE
   v_t   uuid := '99999999-0000-0000-0000-0000000000aa';
   v_bor uuid := 'e3e30000-0000-0000-0000-0000000000b3';
   v_gor uuid := 'e3e30000-0000-0000-0000-0000000000a1';
+  v_suc uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_des uuid := 'e3e30000-0000-0000-0000-0000000000b4';
+  v_tr  uuid;
 BEGIN
   INSERT INTO sucursales (id, tenant_id, codigo, nombre, deleted_at) VALUES (v_bor, v_t, 'RB3', 'Tienda cerrada', now());
   PERFORM set_config('request.jwt.claims', json_build_object('sub', '99999999-0000-0000-0000-0000000000e1', 'tenant_id', v_t)::text, true);
@@ -166,6 +169,22 @@ BEGIN
         RAISE EXCEPTION '3: movimiento en borrada'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS: esa sucursal está eliminada%' THEN RAISE; END IF; END;
   BEGIN PERFORM fijar_minimo_producto(v_bor, v_gor, 2);
         RAISE EXCEPTION '3: mínimo en borrada'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS: esa sucursal está eliminada%' THEN RAISE; END IF; END;
+  -- 0194: un traspaso en camino no se recibe en un destino borrado ni se cancela hacia un origen borrado.
+  INSERT INTO sucursales (id, tenant_id, codigo, nombre) VALUES (v_des, v_t, 'RD3', 'Tienda Sur');
+  PERFORM registrar_movimiento_producto(v_suc, v_gor, 'ENTRADA', 2);
+  v_tr := enviar_traspaso_producto(v_suc, v_des, jsonb_build_array(jsonb_build_object('producto_id', v_gor, 'cantidad', 1)));
+  UPDATE sucursales SET deleted_at = now() WHERE id = v_des;
+  BEGIN PERFORM recibir_traspaso_producto(v_tr);
+        RAISE EXCEPTION '3: recibido en borrada'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS: la sucursal destino está eliminada%' THEN RAISE; END IF; END;
+  PERFORM cancelar_traspaso_producto(v_tr);  -- el camino que sí queda: regresa al origen vivo
+  IF (SELECT estado::text FROM traspasos_producto WHERE id = v_tr) <> 'CANCELADO' THEN RAISE EXCEPTION '3: no se canceló'; END IF;
+  UPDATE sucursales SET deleted_at = NULL WHERE id = v_des;
+  v_tr := enviar_traspaso_producto(v_suc, v_des, jsonb_build_array(jsonb_build_object('producto_id', v_gor, 'cantidad', 1)));
+  UPDATE sucursales SET deleted_at = now() WHERE id = v_suc;
+  BEGIN PERFORM cancelar_traspaso_producto(v_tr);
+        RAISE EXCEPTION '3: cancelado hacia borrada'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS: la sucursal de origen está eliminada%' THEN RAISE; END IF; END;
+  PERFORM recibir_traspaso_producto(v_tr);  -- el destino vivo sí lo recibe
+  UPDATE sucursales SET deleted_at = NULL WHERE id = v_suc;
   RAISE NOTICE '3 sucursal borrada OK';
 END $$;
 
