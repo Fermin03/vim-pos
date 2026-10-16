@@ -12,6 +12,7 @@ const RUTA_DE_MODULO: readonly [string, CodigoOperacion][] = [
   ["/configuracion/marcas", "marcas"],
   ["/catalogo/importar-tienda", "existencias"],
   ["/catalogo/etiquetas", "existencias"],
+  ["/existencias", "existencias"],
 ];
 
 /**

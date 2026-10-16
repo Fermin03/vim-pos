@@ -13,8 +13,9 @@ describe("rutasOcultas", () => {
     expect(rutasOcultas(con({ existencias: true })).size).toBe(0);
   });
   it("las rutas de tienda se esconden salvo con existencias", () => {
-    expect(rutasOcultas(con({}))).toEqual(new Set(["/catalogo/importar-tienda", "/catalogo/etiquetas"]));
-    expect(rutasOcultas(con({ existencias: true })).has("/catalogo/etiquetas")).toBe(false);
+    expect(rutasOcultas(con({}))).toEqual(new Set(["/catalogo/importar-tienda", "/catalogo/etiquetas", "/existencias"]));
+    const tienda = rutasOcultas(con({ existencias: true }));
+    for (const r of ["/catalogo/importar-tienda", "/catalogo/etiquetas", "/existencias"]) expect(tienda.has(r)).toBe(false);
   });
   it("food truck: sin mesas, envíos, repartidores, reservaciones, marcas ni reporte de meseros", () => {
     const m = con({ existencias: true, comedor: false, meseros: false, domicilio: false, repartidores: false, reservaciones: false, marcas: false });

@@ -41,6 +41,7 @@ const NAV: Seccion[] = [
       { label: "Catálogo", href: "/catalogo", icon: "catalogo" },
       { label: "Promociones", href: "/promociones", icon: "etiqueta" },
       { label: "Inventario", href: "/inventario", icon: "caja" },
+      { label: "Existencias", href: "/existencias", icon: "cajon" },
       { label: "Clientes", href: "/clientes", icon: "persona" },
       { label: "Lealtad", href: "/lealtad", icon: "estrella" },
       { label: "Tienda en línea", href: "/tienda", icon: "bolsa" },
