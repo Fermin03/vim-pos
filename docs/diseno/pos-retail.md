@@ -229,10 +229,10 @@ Un restaurante no ve nada de esto. La pantalla de captura, los combos, los modif
 la cocina y su pantalla de devoluciones siguen igual. Lo compartido (ticket, cobro, impresión,
 Escape) se reutiliza; si hay que tocarlo para la tienda, se agrega una opción, no una copia.
 
-## Por decidir con Fermín
+## Decidido con Fermín (16 oct)
 
-1. Si la prenda nueva cuesta **menos**, ¿se regresa la diferencia en efectivo (propuesta) o la tienda
-   no regresa dinero en cambios?
-2. ¿El cambio de talla pide PIN de supervisor como una devolución (propuesta: solo si hay dinero que
-   regresar)?
-3. ¿30 días para encontrar una venta escaneando la prenda está bien?
+Aprobó este diseño y las tres propuestas:
+
+1. Si la prenda nueva cuesta **menos**, la diferencia se regresa **en efectivo**.
+2. El cambio de talla pide la autorización de una devolución **solo si hay dinero que regresar**.
+3. Escanear la prenda busca en las ventas de los **últimos 30 días**.
