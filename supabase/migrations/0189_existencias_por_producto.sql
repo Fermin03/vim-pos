@@ -274,3 +274,97 @@ DROP TRIGGER IF EXISTS trg_ticket_items_no_padre ON ticket_items;
 CREATE TRIGGER trg_ticket_items_no_padre
   BEFORE INSERT OR UPDATE OF producto_id ON ticket_items
   FOR EACH ROW EXECUTE FUNCTION ticket_items_no_padre();
+
+-- ── §3 Existencias y movimientos ─────────────────────────────────────────────
+-- La existencia es la SUMA de los movimientos. Nadie escribe `cantidad` a mano: un ajuste también
+-- es un movimiento. Los movimientos solo se agregan. La caja (entrega 4) los crea con su propio id y
+-- los sube; reenviar uno no lo duplica (PRIMARY KEY).
+CREATE TYPE movimiento_producto_tipo AS ENUM (
+  'VENTA', 'DEVOLUCION', 'ENTRADA', 'AJUSTE', 'CONTEO', 'MERMA', 'TRASPASO_SALIDA', 'TRASPASO_ENTRADA'
+);
+
+CREATE TABLE IF NOT EXISTS producto_existencias (
+  tenant_id      uuid NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  sucursal_id    uuid NOT NULL REFERENCES sucursales(id) ON DELETE RESTRICT,
+  producto_id    uuid NOT NULL REFERENCES productos(id) ON DELETE RESTRICT,
+  cantidad       numeric(12,3) NOT NULL DEFAULT 0,          -- puede ser negativa (D32)
+  minimo         numeric(12,3) NULL CHECK (minimo IS NULL OR minimo >= 0),
+  actualizado_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (sucursal_id, producto_id)
+);
+CREATE INDEX IF NOT EXISTS idx_producto_existencias_tenant ON producto_existencias(tenant_id, sucursal_id);
+COMMENT ON TABLE producto_existencias IS 'Existencia por sucursal de los productos con controla_existencias. = suma de movimientos_producto; la mantiene un disparador (0189).';
+
+CREATE TABLE IF NOT EXISTS movimientos_producto (
+  id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id          uuid NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
+  sucursal_id        uuid NOT NULL REFERENCES sucursales(id) ON DELETE RESTRICT,
+  producto_id        uuid NOT NULL REFERENCES productos(id) ON DELETE RESTRICT,
+  tipo               movimiento_producto_tipo NOT NULL,
+  cantidad           numeric(12,3) NOT NULL,                 -- con signo
+  costo_unitario_mxn numeric(12,2) NULL CHECK (costo_unitario_mxn IS NULL OR costo_unitario_mxn >= 0),
+  ticket_id          uuid NULL REFERENCES tickets(id) ON DELETE RESTRICT,
+  ticket_item_id     uuid NULL REFERENCES ticket_items(id) ON DELETE RESTRICT,
+  devolucion_id      uuid NULL REFERENCES devoluciones(id) ON DELETE RESTRICT,
+  traspaso_id        uuid NULL,                              -- FK en §6
+  proveedor_id       uuid NULL REFERENCES proveedores(id) ON DELETE RESTRICT,
+  motivo             text NULL,
+  usuario_id         uuid NULL REFERENCES auth.users(id),
+  creado_at          timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT movimientos_producto_signo CHECK (
+    (tipo IN ('VENTA', 'MERMA', 'TRASPASO_SALIDA') AND cantidad < 0)
+    OR (tipo IN ('DEVOLUCION', 'ENTRADA', 'TRASPASO_ENTRADA') AND cantidad > 0)
+    OR (tipo IN ('AJUSTE', 'CONTEO') AND cantidad <> 0))
+);
+CREATE INDEX IF NOT EXISTS idx_mov_producto_existencia ON movimientos_producto(sucursal_id, producto_id);
+CREATE INDEX IF NOT EXISTS idx_mov_producto_tenant_fecha ON movimientos_producto(tenant_id, creado_at DESC);
+CREATE INDEX IF NOT EXISTS idx_mov_producto_item ON movimientos_producto(ticket_item_id) WHERE ticket_item_id IS NOT NULL;
+COMMENT ON TABLE movimientos_producto IS 'Libro de existencias por producto: solo se agrega. Se escribe solo por funciones (0189).';
+
+-- Solo lectura para la app; escriben las funciones de esta migración (SECURITY DEFINER).
+-- Sin disparador anti-DELETE: eliminar_tenant (0144) borra toda tabla con tenant_id.
+ALTER TABLE producto_existencias ENABLE ROW LEVEL SECURITY;
+ALTER TABLE movimientos_producto ENABLE ROW LEVEL SECURITY;
+CREATE POLICY producto_existencias_tenant ON producto_existencias FOR SELECT USING (tenant_id = current_tenant_id());
+CREATE POLICY movimientos_producto_tenant ON movimientos_producto FOR SELECT USING (tenant_id = current_tenant_id());
+REVOKE ALL ON producto_existencias, movimientos_producto FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON producto_existencias, movimientos_producto TO authenticated;
+GRANT ALL ON producto_existencias, movimientos_producto TO service_role;
+
+-- Antes de insertar: el producto controla existencias, no es padre, y producto y sucursal son del
+-- negocio del movimiento.
+CREATE OR REPLACE FUNCTION movimientos_producto_validar()
+RETURNS trigger LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM productos p WHERE p.id = NEW.producto_id AND p.tenant_id = NEW.tenant_id
+                   AND p.controla_existencias AND p.variante_ejes IS NULL) THEN
+    RAISE EXCEPTION 'MOVIMIENTO_INVALIDO: el producto no lleva existencias en este negocio' USING ERRCODE = '23514';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM sucursales s WHERE s.id = NEW.sucursal_id AND s.tenant_id = NEW.tenant_id) THEN
+    RAISE EXCEPTION 'MOVIMIENTO_INVALIDO: la sucursal no es de este negocio' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_movimientos_producto_validar ON movimientos_producto;
+CREATE TRIGGER trg_movimientos_producto_validar
+  BEFORE INSERT ON movimientos_producto
+  FOR EACH ROW EXECUTE FUNCTION movimientos_producto_validar();
+
+-- Después de insertar: la existencia se mueve en la misma cantidad. En modo réplica (el push de la
+-- caja, entrega 4) esto NO corre: ese push aplica sus movimientos en modo origin, igual que la 0101.
+CREATE OR REPLACE FUNCTION movimientos_producto_aplicar()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  INSERT INTO producto_existencias (tenant_id, sucursal_id, producto_id, cantidad, actualizado_at)
+  VALUES (NEW.tenant_id, NEW.sucursal_id, NEW.producto_id, NEW.cantidad, now())
+  ON CONFLICT (sucursal_id, producto_id) DO UPDATE
+    SET cantidad = producto_existencias.cantidad + EXCLUDED.cantidad,
+        actualizado_at = now();
+  RETURN NULL;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_movimientos_producto_aplicar ON movimientos_producto;
+CREATE TRIGGER trg_movimientos_producto_aplicar
+  AFTER INSERT ON movimientos_producto
+  FOR EACH ROW EXECUTE FUNCTION movimientos_producto_aplicar();

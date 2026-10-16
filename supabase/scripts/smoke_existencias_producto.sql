@@ -186,4 +186,86 @@ BEGIN
   RAISE NOTICE '3 variantes OK';
 END $$;
 
+-- 4) Existencias = suma de movimientos; signos; solo lectura y aislamiento para el cajero.
+DO $$
+DECLARE
+  v_t      uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_suc    uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_m      uuid := 'a7a70000-0000-0000-0000-0000000000a1';
+  v_otro   uuid := 'a7a70000-0000-0000-0000-0000000000ee';
+  v_ajeno  uuid := 'a7a70000-0000-0000-0000-0000000000e1';
+  v_hamb   uuid := 'b0000000-0000-0000-0000-0000000000f1';
+  v_maria  uuid := '99999999-0000-0000-0000-000000000001';
+  v_suc_o  uuid;
+  v_n      integer;
+  v_cant   numeric;
+BEGIN
+  -- Como postgres (lo que harán las funciones): entra 10, merma 1.
+  INSERT INTO movimientos_producto (tenant_id, sucursal_id, producto_id, tipo, cantidad, motivo)
+  VALUES (v_t, v_suc, v_m, 'ENTRADA', 10, 'smoke'), (v_t, v_suc, v_m, 'MERMA', -1, 'smoke');
+  SELECT cantidad INTO v_cant FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_m;
+  IF v_cant IS DISTINCT FROM 9 THEN RAISE EXCEPTION '4a: existencia debía ser 9, es %', v_cant; END IF;
+  IF v_cant <> (SELECT sum(cantidad) FROM movimientos_producto WHERE sucursal_id = v_suc AND producto_id = v_m) THEN
+    RAISE EXCEPTION '4a: existencia distinta de la suma de movimientos';
+  END IF;
+
+  -- 4b) Signo equivocado para el tipo.
+  BEGIN
+    INSERT INTO movimientos_producto (tenant_id, sucursal_id, producto_id, tipo, cantidad)
+    VALUES (v_t, v_suc, v_m, 'VENTA', 1);
+    RAISE EXCEPTION '4b: una VENTA positiva debía rechazarse';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+
+  -- 4c) Producto sin control de existencias (la hamburguesa), padre o de otro negocio.
+  BEGIN
+    INSERT INTO movimientos_producto (tenant_id, sucursal_id, producto_id, tipo, cantidad)
+    VALUES (v_t, v_suc, v_hamb, 'ENTRADA', 1);
+    RAISE EXCEPTION '4c: un producto sin existencias no lleva movimientos';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'MOVIMIENTO_INVALIDO%' THEN RAISE; END IF;
+  END;
+  BEGIN
+    INSERT INTO movimientos_producto (tenant_id, sucursal_id, producto_id, tipo, cantidad)
+    VALUES (v_t, v_suc, v_ajeno, 'ENTRADA', 1);
+    RAISE EXCEPTION '4c: producto de otro negocio';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'MOVIMIENTO_INVALIDO%' THEN RAISE; END IF;
+  END;
+
+  -- Fila del otro negocio, para ver que el cajero no la ve.
+  INSERT INTO sucursales (tenant_id, codigo, nombre) VALUES (v_otro, 'R189', 'Sucursal ajena') RETURNING id INTO v_suc_o;
+  INSERT INTO movimientos_producto (tenant_id, sucursal_id, producto_id, tipo, cantidad)
+  VALUES (v_otro, v_suc_o, v_ajeno, 'ENTRADA', 5);
+
+  -- Como la cajera, con su JWT y RLS.
+  EXECUTE 'SET LOCAL ROLE authenticated';
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria, 'role', 'authenticated', 'tenant_id', v_t)::text, true);
+
+  SELECT count(*) INTO v_n FROM producto_existencias;
+  IF v_n <> 1 THEN RAISE EXCEPTION '4d: la cajera debía ver 1 existencia (la suya), vio %', v_n; END IF;
+  SELECT count(*) INTO v_n FROM movimientos_producto WHERE tenant_id = v_otro;
+  IF v_n <> 0 THEN RAISE EXCEPTION '4d: ve movimientos de otro negocio'; END IF;
+
+  BEGIN
+    INSERT INTO movimientos_producto (tenant_id, sucursal_id, producto_id, tipo, cantidad)
+    VALUES (v_t, v_suc, v_m, 'ENTRADA', 100);
+    RAISE EXCEPTION '4e: la cajera no debía poder insertar movimientos';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  BEGIN
+    UPDATE producto_existencias SET cantidad = 999;
+    RAISE EXCEPTION '4e: la cajera no debía poder escribir existencias';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  BEGIN
+    DELETE FROM movimientos_producto;
+    RAISE EXCEPTION '4e: la cajera no debía poder borrar movimientos';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+
+  EXECUTE 'RESET ROLE';
+  RAISE NOTICE '4 existencias y movimientos OK';
+END $$;
+
 ROLLBACK;
