@@ -502,6 +502,18 @@ BEGIN
   BEGIN PERFORM registrar_movimiento_producto(v_suc, v_m, 'ENTRADA', 1);
         RAISE EXCEPTION '6g: módulo apagado'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'MODULO_APAGADO%' THEN RAISE; END IF; END;
   PERFORM operacion_cambiar(v_t, '{"existencias":true}');
+  -- 6h) NaN no entra: ni por las funciones ni por INSERT directo.
+  BEGIN PERFORM registrar_movimiento_producto(v_suc, v_m, 'ENTRADA', 'NaN'::numeric);
+        RAISE EXCEPTION '6h: cantidad NaN'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+  BEGIN PERFORM registrar_movimiento_producto(v_suc, v_m, 'ENTRADA', 1, 'NaN'::numeric);
+        RAISE EXCEPTION '6h: costo NaN'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+  BEGIN PERFORM registrar_conteo(v_suc, '[{"producto_id":"a7a70000-0000-0000-0000-0000000000a1","contado":"NaN"}]'::jsonb);
+        RAISE EXCEPTION '6h: conteo NaN'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
+  BEGIN INSERT INTO movimientos_producto (tenant_id, sucursal_id, producto_id, tipo, cantidad)
+        VALUES (v_t, v_suc, v_m, 'AJUSTE', 'NaN');
+        RAISE EXCEPTION '6h: INSERT directo con NaN'; EXCEPTION WHEN check_violation THEN NULL; END;
+  IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_m) = 'NaN' THEN
+    RAISE EXCEPTION '6h: la existencia quedó en NaN'; END IF;
   RAISE NOTICE '6 movimientos a mano y conteo OK';
 END $$;
 

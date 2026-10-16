@@ -182,7 +182,7 @@ ALTER TABLE productos
   ADD COLUMN IF NOT EXISTS producto_padre_id    uuid NULL REFERENCES productos(id) ON DELETE RESTRICT,
   ADD COLUMN IF NOT EXISTS variante_ejes        text[] NULL,
   ADD COLUMN IF NOT EXISTS variante_valores     jsonb NULL,
-  ADD COLUMN IF NOT EXISTS costo_mxn            numeric(12,2) NULL CHECK (costo_mxn IS NULL OR costo_mxn >= 0),
+  ADD COLUMN IF NOT EXISTS costo_mxn            numeric(12,2) NULL CHECK (costo_mxn IS NULL OR (costo_mxn >= 0 AND costo_mxn <> 'NaN')),
   ADD COLUMN IF NOT EXISTS controla_existencias boolean NOT NULL DEFAULT false;
 
 ALTER TABLE productos
@@ -287,8 +287,8 @@ CREATE TABLE IF NOT EXISTS producto_existencias (
   tenant_id      uuid NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
   sucursal_id    uuid NOT NULL REFERENCES sucursales(id) ON DELETE RESTRICT,
   producto_id    uuid NOT NULL REFERENCES productos(id) ON DELETE RESTRICT,
-  cantidad       numeric(12,3) NOT NULL DEFAULT 0,          -- puede ser negativa (D32)
-  minimo         numeric(12,3) NULL CHECK (minimo IS NULL OR minimo >= 0),
+  cantidad       numeric(12,3) NOT NULL DEFAULT 0 CHECK (cantidad <> 'NaN'),  -- puede ser negativa (D32)
+  minimo         numeric(12,3) NULL CHECK (minimo IS NULL OR (minimo >= 0 AND minimo <> 'NaN')),
   actualizado_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (sucursal_id, producto_id)
 );
@@ -302,7 +302,7 @@ CREATE TABLE IF NOT EXISTS movimientos_producto (
   producto_id        uuid NOT NULL REFERENCES productos(id) ON DELETE RESTRICT,
   tipo               movimiento_producto_tipo NOT NULL,
   cantidad           numeric(12,3) NOT NULL,                 -- con signo
-  costo_unitario_mxn numeric(12,2) NULL CHECK (costo_unitario_mxn IS NULL OR costo_unitario_mxn >= 0),
+  costo_unitario_mxn numeric(12,2) NULL CHECK (costo_unitario_mxn IS NULL OR (costo_unitario_mxn >= 0 AND costo_unitario_mxn <> 'NaN')),
   ticket_id          uuid NULL REFERENCES tickets(id) ON DELETE RESTRICT,
   ticket_item_id     uuid NULL REFERENCES ticket_items(id) ON DELETE RESTRICT,
   devolucion_id      uuid NULL REFERENCES devoluciones(id) ON DELETE RESTRICT,
@@ -312,9 +312,10 @@ CREATE TABLE IF NOT EXISTS movimientos_producto (
   usuario_id         uuid NULL REFERENCES auth.users(id),
   creado_at          timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT movimientos_producto_signo CHECK (
+    cantidad <> 'NaN' AND (
     (tipo IN ('VENTA', 'MERMA', 'TRASPASO_SALIDA') AND cantidad < 0)
     OR (tipo IN ('DEVOLUCION', 'ENTRADA', 'TRASPASO_ENTRADA') AND cantidad > 0)
-    OR (tipo IN ('AJUSTE', 'CONTEO') AND cantidad <> 0))
+    OR (tipo IN ('AJUSTE', 'CONTEO') AND cantidad <> 0)))
 );
 CREATE INDEX IF NOT EXISTS idx_mov_producto_existencia ON movimientos_producto(sucursal_id, producto_id);
 CREATE INDEX IF NOT EXISTS idx_mov_producto_tenant_fecha ON movimientos_producto(tenant_id, creado_at DESC);
@@ -539,11 +540,11 @@ BEGIN
   IF p_tipo NOT IN ('ENTRADA', 'MERMA', 'AJUSTE') THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: a mano solo se registran entradas, mermas y ajustes' USING ERRCODE = '22023';
   END IF;
-  IF p_cantidad IS NULL OR p_cantidad = 0
+  IF p_cantidad IS NULL OR p_cantidad = 0 OR p_cantidad = 'NaN'
      OR (p_tipo IN ('ENTRADA', 'MERMA') AND p_cantidad < 0) THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: cantidad inválida para %', p_tipo USING ERRCODE = '22023';
   END IF;
-  IF p_costo_unitario IS NOT NULL AND (p_costo_unitario < 0 OR p_tipo <> 'ENTRADA') THEN
+  IF p_costo_unitario IS NOT NULL AND (p_costo_unitario < 0 OR p_costo_unitario = 'NaN' OR p_tipo <> 'ENTRADA') THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: el costo solo va en una entrada y no puede ser negativo' USING ERRCODE = '22023';
   END IF;
   IF p_proveedor IS NOT NULL AND NOT EXISTS (SELECT 1 FROM proveedores WHERE id = p_proveedor AND tenant_id = v_t) THEN
@@ -592,7 +593,7 @@ BEGIN
     EXCEPTION WHEN OTHERS THEN
       RAISE EXCEPTION 'DATOS_INVALIDOS: renglón de conteo mal formado: %', v_fila USING ERRCODE = '22023';
     END;
-    IF v_prod IS NULL OR v_contado IS NULL OR v_contado < 0 THEN
+    IF v_prod IS NULL OR v_contado IS NULL OR v_contado = 'NaN' OR v_contado < 0 THEN
       RAISE EXCEPTION 'DATOS_INVALIDOS: renglón de conteo mal formado: %', v_fila USING ERRCODE = '22023';
     END IF;
     PERFORM _existencias_validar(v_t, p_sucursal, v_prod);
