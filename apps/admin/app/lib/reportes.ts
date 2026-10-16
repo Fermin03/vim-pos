@@ -5,6 +5,7 @@ import { LABEL_APP, type AppExterna } from "./conciliacion";
 import { resumirCaja, serieHoraria, type ResumenCaja, type TurnoDia } from "./dashboard-calculos";
 import { leerModulos } from "./modulos";
 import { moduloActivo } from "@vim/db/operacion";
+import { varianteDe } from "./existencias";
 
 // F13 — Reportes y analítica. Las vistas SQL ya existen (0011/0012); el admin solo las
 // consume bajo RLS (heredan del tenant_id de las tablas base). Rangos por día_contable.
@@ -433,6 +434,98 @@ export async function leerVentasPorProducto(desde: string, hasta: string, sucurs
   return [...agg.values()].sort((a, b) => b.total_mxn - a.total_mxn);
 }
 
+// ── Ventas por talla y color (giro tienda) ─────────────────────────────────
+export type FilaVariante = {
+  producto_id: string;
+  producto: string;
+  variante: string;
+  sku: string | null;
+  unidades: number;
+  venta_mxn: number;
+  subtotal_mxn: number;
+  /** unidades × costo de hoy; `null` sin costo. */
+  costo_mxn: number | null;
+  margen_mxn: number | null;
+  margen_pct: number | null;
+};
+export type VentaDiaProducto = { producto_id: string; unidades_vendidas: number; total_mxn: number; subtotal_mxn: number };
+export type ProductoVariante = {
+  id: string;
+  nombre: string;
+  padre_nombre: string | null;
+  variante_ejes: string[] | null;
+  variante_valores: Record<string, string> | null;
+  codigo_interno: string | null;
+  costo_mxn: number | null;
+  controla_existencias: boolean;
+};
+
+const centavos = (v: number) => Math.round(v * 100) / 100;
+
+/** Suma los días por producto, solo los que llevan existencias. Margen = subtotal sin IVA − unidades × costo de hoy. */
+export function agruparVentasVariantes(ventas: VentaDiaProducto[], productos: ProductoVariante[]): FilaVariante[] {
+  const porId = new Map(productos.filter((p) => p.controla_existencias).map((p) => [p.id, p]));
+  const agg = new Map<string, { p: ProductoVariante; unidades: number; venta: number; subtotal: number }>();
+  for (const v of ventas) {
+    const p = porId.get(v.producto_id);
+    if (!p) continue;
+    const x = agg.get(p.id) ?? { p, unidades: 0, venta: 0, subtotal: 0 };
+    x.unidades += v.unidades_vendidas;
+    x.venta += v.total_mxn;
+    x.subtotal += v.subtotal_mxn;
+    agg.set(p.id, x);
+  }
+  return [...agg.values()]
+    .map(({ p, unidades, venta, subtotal }) => {
+      const sub = centavos(subtotal);
+      const costo = p.costo_mxn === null ? null : centavos(unidades * p.costo_mxn);
+      const margen = costo === null ? null : centavos(sub - costo);
+      return {
+        producto_id: p.id,
+        producto: p.padre_nombre ?? p.nombre,
+        variante: varianteDe(p.variante_ejes, p.variante_valores),
+        sku: p.codigo_interno,
+        unidades,
+        venta_mxn: centavos(venta),
+        subtotal_mxn: sub,
+        costo_mxn: costo,
+        margen_mxn: margen,
+        margen_pct: margen === null || sub === 0 ? null : (margen / sub) * 100,
+      };
+    })
+    .sort((a, b) => b.venta_mxn - a.venta_mxn);
+}
+
+export async function leerVentasPorVariante(desde: string, hasta: string, sucursalId: string | null = null): Promise<FilaVariante[]> {
+  const [ventas, productos] = await Promise.all([
+    leerVista("vw_ventas_por_producto", "producto_id, unidades_vendidas, total_mxn, subtotal_mxn, dia_contable", desde, hasta, ["sucursal_id", "producto_id", "producto_nombre"], { sucursalId }),
+    leerTodas((a, b) =>
+      supabase
+        .from("productos")
+        .select("id, nombre, codigo_interno, costo_mxn, controla_existencias, variante_valores, padre:productos!producto_padre_id(nombre, variante_ejes)")
+        .eq("controla_existencias", true)
+        .order("id")
+        .range(a, b),
+    ),
+  ]);
+  return agruparVentasVariantes(
+    ventas.map((r) => ({ producto_id: String(r.producto_id), unidades_vendidas: num(r.unidades_vendidas), total_mxn: num(r.total_mxn), subtotal_mxn: num(r.subtotal_mxn) })),
+    productos.map((r) => {
+      const padre = r.padre as { nombre: string; variante_ejes: string[] | null } | null;
+      return {
+        id: String(r.id),
+        nombre: String(r.nombre ?? "—"),
+        padre_nombre: padre?.nombre ?? null,
+        variante_ejes: padre?.variante_ejes ?? null,
+        variante_valores: (r.variante_valores as Record<string, string> | null) ?? null,
+        codigo_interno: (r.codigo_interno as string | null) ?? null,
+        costo_mxn: r.costo_mxn == null ? null : num(r.costo_mxn),
+        controla_existencias: true,
+      };
+    }),
+  );
+}
+
 // ── Ventas por categoría (P-184) ────────────────────────────────────────────
 export type FilaCategoria = {
   categoria: string;
@@ -766,7 +859,7 @@ export async function leerNoShows(desde: string, hasta: string, sucursalId: stri
 }
 
 // ── Qué reportes le sirven a este negocio ──────────────────────────────────────────────────
-export type ReportesDisponibles = { marcas: boolean; eventos: boolean; reservaciones: boolean; apps: boolean; variasSucursales: boolean; inventario: boolean; meseros: boolean };
+export type ReportesDisponibles = { marcas: boolean; eventos: boolean; reservaciones: boolean; apps: boolean; variasSucursales: boolean; inventario: boolean; meseros: boolean; existencias: boolean };
 
 /**
  * Los reportes de módulos que el negocio no usa se esconden del índice: antes aparecían
@@ -807,5 +900,7 @@ export function disponiblesDe(
     variasSucursales: hay.sucursales,
     inventario: hay.movimientos || !!ef.recetas,
     meseros: hay.meseros || moduloActivo(ef, "meseros"),
+    // Solo el módulo: un restaurante no ve el reporte de tienda ni por tener datos.
+    existencias: moduloActivo(ef, "existencias"),
   };
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { variacionPct, agregarTiemposCocina } from "../reportes";
+import { variacionPct, agregarTiemposCocina, agruparVentasVariantes } from "../reportes";
 
 describe("variacionPct (deltas del dashboard P-177)", () => {
   it("calcula subidas y bajadas redondeadas a entero", () => {
@@ -66,5 +66,49 @@ describe("agregarTiemposCocina (P-190)", () => {
     const comerAqui = res.find((r) => r.modo === "COMER_AQUI")!;
     expect(comerAqui.promedio).toBe(0);
     expect(Number.isNaN(comerAqui.promedio)).toBe(false);
+  });
+});
+
+describe("agruparVentasVariantes", () => {
+  const prod = (id: string, extra: Partial<Parameters<typeof agruparVentasVariantes>[1][number]> = {}) => ({
+    id, nombre: `Prod ${id}`, padre_nombre: null, variante_ejes: null, variante_valores: null,
+    codigo_interno: null, costo_mxn: null, controla_existencias: true, ...extra,
+  });
+  const productos = [
+    prod("m", { nombre: "Playera M Negra", padre_nombre: "Playera", variante_ejes: ["Talla", "Color"], variante_valores: { Talla: "M", Color: "Negra" }, codigo_interno: "PL-M-N", costo_mxn: 80 }),
+    prod("burger", { nombre: "Hamburguesa", controla_existencias: false, costo_mxn: 40 }),
+    prod("gorra", { nombre: "Gorra" }),
+  ];
+  const ventas = [
+    { producto_id: "m", unidades_vendidas: 2, total_mxn: 348, subtotal_mxn: 300 },
+    { producto_id: "m", unidades_vendidas: 1, total_mxn: 174, subtotal_mxn: 150 },
+    { producto_id: "burger", unidades_vendidas: 5, total_mxn: 500, subtotal_mxn: 431.03 },
+    { producto_id: "gorra", unidades_vendidas: 1, total_mxn: 116, subtotal_mxn: 100 },
+  ];
+
+  it("suma los días de la misma variante y arma su texto", () => {
+    const m = agruparVentasVariantes(ventas, productos).find((f) => f.producto_id === "m")!;
+    expect(m).toMatchObject({ producto: "Playera", variante: "M · Negra", sku: "PL-M-N", unidades: 3, venta_mxn: 522, subtotal_mxn: 450 });
+    expect(m.costo_mxn).toBe(240);
+    expect(m.margen_mxn).toBe(210);
+    expect(m.margen_pct).toBeCloseTo(46.667, 2);
+  });
+
+  it("deja fuera lo que no lleva existencias (un producto de restaurante)", () => {
+    expect(agruparVentasVariantes(ventas, productos).map((f) => f.producto_id)).not.toContain("burger");
+  });
+
+  it("sin costo, costo y margen son null, nunca 0", () => {
+    const g = agruparVentasVariantes(ventas, productos).find((f) => f.producto_id === "gorra")!;
+    expect(g).toMatchObject({ producto: "Gorra", variante: "", costo_mxn: null, margen_mxn: null, margen_pct: null });
+  });
+
+  it("redondea el dinero a centavos y ordena por venta", () => {
+    const filas = agruparVentasVariantes(
+      [{ producto_id: "m", unidades_vendidas: 1, total_mxn: 0.1, subtotal_mxn: 0.1 }, { producto_id: "m", unidades_vendidas: 1, total_mxn: 0.2, subtotal_mxn: 0.2 }, ...ventas.slice(3)],
+      productos,
+    );
+    expect(filas[0]!.producto_id).toBe("gorra");
+    expect(filas[1]!.venta_mxn).toBe(0.3);
   });
 });

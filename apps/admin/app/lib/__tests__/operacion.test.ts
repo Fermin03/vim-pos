@@ -13,9 +13,9 @@ describe("rutasOcultas", () => {
     expect(rutasOcultas(con({ existencias: true })).size).toBe(0);
   });
   it("las rutas de tienda se esconden salvo con existencias", () => {
-    expect(rutasOcultas(con({}))).toEqual(new Set(["/catalogo/importar-tienda", "/catalogo/etiquetas", "/existencias"]));
+    expect(rutasOcultas(con({}))).toEqual(new Set(["/catalogo/importar-tienda", "/catalogo/etiquetas", "/existencias", "/reportes/ventas-variantes"]));
     const tienda = rutasOcultas(con({ existencias: true }));
-    for (const r of ["/catalogo/importar-tienda", "/catalogo/etiquetas", "/existencias"]) expect(tienda.has(r)).toBe(false);
+    for (const r of ["/catalogo/importar-tienda", "/catalogo/etiquetas", "/existencias", "/reportes/ventas-variantes"]) expect(tienda.has(r)).toBe(false);
   });
   it("food truck: sin mesas, envíos, repartidores, reservaciones, marcas ni reporte de meseros", () => {
     const m = con({ existencias: true, comedor: false, meseros: false, domicilio: false, repartidores: false, reservaciones: false, marcas: false });
@@ -44,6 +44,10 @@ describe("disponiblesDe — ventas por mesero", () => {
   it("apagado y sin historial, no se ve; con historial sí (no se le esconde a nadie su historia)", () => {
     expect(disponiblesDe({ meseros: false }, hay).meseros).toBe(false);
     expect(disponiblesDe({ meseros: false }, { ...hay, meseros: true }).meseros).toBe(true);
+  });
+  it("ventas por talla y color sigue solo al módulo existencias (apagado por omisión)", () => {
+    expect(disponiblesDe({}, hay).existencias).toBe(false);
+    expect(disponiblesDe({ existencias: true }, hay).existencias).toBe(true);
   });
 });
 

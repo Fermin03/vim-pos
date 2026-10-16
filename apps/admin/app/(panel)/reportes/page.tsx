@@ -30,6 +30,7 @@ const GRUPOS: Grupo[] = [
     ayuda: "La venta desglosada por producto, por categoría y por canal.",
     reportes: [
       { href: "/reportes/ventas-producto", titulo: "Ventas por producto", descripcion: "Qué se vende más: unidades, venta y la parte que aporta cada producto." },
+      { href: "/reportes/ventas-variantes", titulo: "Ventas por talla y color", descripcion: "Qué talla y color se vende más y cuánto te deja cada uno.", modulo: "existencias" },
       { href: "/reportes/ventas-categoria", titulo: "Ventas por categoría", descripcion: "La venta repartida por las categorías de tu menú." },
       { href: "/reportes/modo-servicio", titulo: "Ventas por tipo de servicio", descripcion: "Comer aquí, para llevar, a domicilio y apps: cuánto aporta cada uno." },
       { href: "/reportes/apps-externas", titulo: "Ventas por apps de delivery", descripcion: "Uber Eats, Rappi y DiDi: venta, comisión y lo que depositó cada app.", modulo: "apps" },
@@ -82,11 +83,13 @@ export default function ReportesHub() {
     leerReportesDisponibles()
       .then(setDisponibles)
       // Sin respuesta se muestran todos: esconder un reporte que sí usa confunde más.
-      .catch(() => setDisponibles({ marcas: true, eventos: true, reservaciones: true, apps: true, variasSucursales: true, inventario: true, meseros: true }));
+      .catch(() => setDisponibles({ marcas: true, eventos: true, reservaciones: true, apps: true, variasSucursales: true, inventario: true, meseros: true, existencias: false }));
   }, []);
 
-  // Sin perfil todavía se muestran todas: el guardián de rutas es quien decide al entrar.
-  const permitido = (r: Reporte) => !perfil || puedeVer(perfil.jerarquia, r.href);
+  // Sin perfil todavía se muestran todas: el guardián de rutas es quien decide al entrar. Lo de
+  // tienda es la excepción: solo con el módulo confirmado, ni cargando ni con «Verlos».
+  const permitido = (r: Reporte) =>
+    (!perfil || puedeVer(perfil.jerarquia, r.href)) && (r.modulo !== "existencias" || disponibles?.existencias === true);
   const visible = (r: Reporte) => permitido(r) && (verTodos || !r.modulo || !disponibles || disponibles[r.modulo]);
   const ocultos = disponibles ? GRUPOS.flatMap((g) => g.reportes).filter((r) => permitido(r) && r.modulo && !disponibles[r.modulo]).length : 0;
 
