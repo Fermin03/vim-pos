@@ -45,14 +45,18 @@ export function buscarCapturable<T extends Capturable>(lista: T[], texto: string
 /** Lo mismo que rechaza `_existencias_lineas`, dicho antes de enviar. `null` = el renglón está bien. */
 export function avisoRenglon(cantidad: string, costo = "", ceroOk = false): string | null {
   const q = cantidad.trim();
-  if (/^\d+\.\d{4,}$/.test(q)) return "La cantidad lleva hasta 3 decimales";
-  if (!/^\d+(\.\d{1,3})?$/.test(q) || (!ceroOk && Number(q) === 0)) return ceroOk ? "Escribe una cantidad de 0 o más" : "Escribe una cantidad mayor a 0";
+  if (!NUMERO.test(q) || (!ceroOk && Number(q) === 0)) return ceroOk ? "Escribe una cantidad de 0 o más" : "Escribe una cantidad mayor a 0";
+  if (decimales(q) > 3) return "La cantidad lleva hasta 3 decimales";
   if (Number(q) >= 1e9) return "Esa cantidad es demasiado grande";
   const c = costo.trim();
-  if (/^\d+\.\d{3,}$/.test(c)) return "El costo lleva hasta 2 decimales";
-  if (c && (!/^\d+(\.\d{1,2})?$/.test(c) || Number(c) >= 1e10)) return "Revisa el costo";
+  if (!c) return null;
+  if (!NUMERO.test(c) || Number(c) >= 1e10) return "Revisa el costo";
+  if (decimales(c) > 2) return "El costo lleva hasta 2 decimales";
   return null;
 }
+// Como `::numeric`: ".5" y "5." valen, y los ceros al final no cuentan como decimales.
+const NUMERO = /^(\d+\.?\d*|\.\d+)$/;
+const decimales = (s: string) => (s.split(".")[1] ?? "").replace(/0+$/, "").length;
 
 const n = (v: unknown) => Number(v ?? 0);
 

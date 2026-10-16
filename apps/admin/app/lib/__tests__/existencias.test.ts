@@ -46,4 +46,16 @@ describe("existencias", () => {
     expect(avisoRenglon("1", "-1")).toMatch(/costo/);
     expect(avisoRenglon("1", "1.234")).toMatch(/2 decimales/);
   });
+  it("aviso del renglón acepta lo que acepta numeric", () => {
+    expect(avisoRenglon(".5")).toBeNull();
+    expect(avisoRenglon("5.")).toBeNull();
+    expect(avisoRenglon("1.2340")).toBeNull();
+    expect(avisoRenglon("1.2345")).toMatch(/3 decimales/);
+    expect(avisoRenglon("999999999.999")).toBeNull();
+    expect(avisoRenglon(".")).toMatch(/cantidad/);
+    expect(avisoRenglon("1", "0")).toBeNull();
+    expect(avisoRenglon("1", "1.230")).toBeNull();
+    expect(avisoRenglon("1", ".5")).toBeNull();
+    expect(avisoRenglon("1", "1.235")).toMatch(/2 decimales/);
+  });
 });
