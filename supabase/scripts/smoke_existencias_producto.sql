@@ -304,7 +304,7 @@ BEGIN
     RAISE EXCEPTION '5a: la hamburguesa no debía generar movimientos_producto'; END IF;
 
   -- 5b) Llamar otra vez a la sincronización no mueve nada.
-  PERFORM _existencias_sincronizar_ticket(v_tk);
+  PERFORM _existencias_sincronizar_ticket(v_tk, false);
   IF (SELECT count(*) FROM movimientos_producto WHERE ticket_id = v_tk) <> 1 THEN
     RAISE EXCEPTION '5b: sincronizar dos veces duplicó movimientos'; END IF;
 
@@ -368,6 +368,8 @@ BEGIN
     p_client_id_local := 'smoke-ret5-d2');
   IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_m) <> v_ini_m THEN
     RAISE EXCEPTION '5d2: M debía volver a % tras cancelar sin dinero', v_ini_m; END IF;
+  IF (SELECT sum(cantidad) FROM movimientos_producto WHERE ticket_id = v_tk) <> 0 THEN
+    RAISE EXCEPTION '5d2: el neto del ticket cancelado debía ser 0'; END IF;
 
   -- 5e) Reabrir y volver a cobrar: neto = una sola venta.
   v_tk := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smoke-ret5-e', v_maria);
@@ -380,6 +382,37 @@ BEGIN
   UPDATE tickets SET estado_fiscal = 'PAGADO' WHERE id = v_tk;
   IF (SELECT sum(cantidad) FROM movimientos_producto WHERE ticket_id = v_tk) <> -1 THEN
     RAISE EXCEPTION '5e: volver a cobrar debía dejar una sola venta'; END IF;
+
+  -- 5g) Una venta anterior al control de existencias no se toca después (R5): facturar o devolver
+  --     solo ajustan líneas ya registradas.
+  DECLARE v_tk3 uuid; v_it3 uuid; v_stock numeric;
+  BEGIN
+    UPDATE productos SET controla_existencias = false WHERE id = v_m;
+    v_tk3 := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smoke-ret5-g', v_maria);
+    v_it3 := agregar_item_a_ticket(v_tk3, v_m, 2, NULL, '[]'::jsonb, 'smoke-ret5-g-m');
+    PERFORM aplicar_pago(v_tk3, 'EFECTIVO'::metodo_pago, 698, 698, NULL, NULL, NULL, false, NULL, 'smoke-ret5-g-pago');
+    UPDATE productos SET controla_existencias = true WHERE id = v_m;
+    v_stock := (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_m);
+    UPDATE tickets SET estado_fiscal = 'FACTURADO' WHERE id = v_tk3;
+    IF EXISTS (SELECT 1 FROM movimientos_producto WHERE ticket_id = v_tk3) THEN
+      RAISE EXCEPTION '5g(i): facturar una venta sin movimientos no debía registrar nada'; END IF;
+    INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                    accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+    VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'devolucion', 'venta.devolucion', 'ticket', v_tk3, 'Cambio de talla')
+    RETURNING id INTO v_auth;
+    v_dev := crear_devolucion(
+      p_ticket_original_id := v_tk3, p_caja_id := v_caja, p_turno_id := v_turno,
+      p_alcance := 'PARCIAL'::devolucion_alcance, p_motivo := 'CAMBIO_TALLA'::devolucion_motivo,
+      p_motivo_texto := 'Le quedó chica', p_medio_devolucion := 'EFECTIVO'::devolucion_medio,
+      p_autorizacion_pin_id := v_auth, p_usuario_solicitante_id := v_maria, p_usuario_autorizo_id := v_maria,
+      p_items := jsonb_build_array(jsonb_build_object('ticket_item_id', v_it3, 'cantidad_devuelta', 1)),
+      p_reversar_inventario := true, p_nota := 'smoke');
+    PERFORM confirmar_devolucion(v_dev, v_maria);
+    IF EXISTS (SELECT 1 FROM movimientos_producto WHERE ticket_id = v_tk3) THEN
+      RAISE EXCEPTION '5g(ii): devolver de una venta sin movimientos no debía registrar nada'; END IF;
+    IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_m) <> v_stock THEN
+      RAISE EXCEPTION '5g(ii): la existencia de M no debía cambiar'; END IF;
+  END;
 
   -- 5f) La existencia sigue siendo la suma de movimientos.
   IF EXISTS (SELECT 1 FROM producto_existencias e

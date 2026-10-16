@@ -375,7 +375,7 @@ CREATE TRIGGER trg_movimientos_producto_aplicar
 -- ticket pagado con devolución de dinero crea una devolución Y una cancelación (0134), y reabrir
 -- pasa PAGADO → ABIERTO (0058). La venta nunca falla por esto (D32): la existencia puede quedar
 -- negativa.
-CREATE OR REPLACE FUNCTION _existencias_sincronizar_ticket(p_ticket uuid)
+CREATE OR REPLACE FUNCTION _existencias_sincronizar_ticket(p_ticket uuid, p_es_cobro boolean)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
   v_tk     tickets%ROWTYPE;
@@ -389,7 +389,7 @@ BEGIN
   SELECT * INTO v_tk FROM tickets WHERE id = p_ticket FOR UPDATE;
   IF NOT FOUND THEN RETURN; END IF;
   SELECT c.reversar_inventario, c.ticket_estado_fiscal_previo INTO v_canc
-    FROM cancelaciones_ticket c WHERE c.ticket_id = p_ticket ORDER BY c.created_at DESC LIMIT 1;
+    FROM cancelaciones_ticket c WHERE c.ticket_id = p_ticket ORDER BY c.created_at DESC, c.id DESC LIMIT 1;
 
   FOR v_it IN
     SELECT ti.id, ti.producto_id, ti.cantidad, ti.cancelado
@@ -410,6 +410,8 @@ BEGIN
       ELSE 0 END;
     v_debe := LEAST(v_debe, 0);   -- nunca se regresa más de lo vendido
 
+    -- R5: una línea sin movimientos solo se registra en el cobro.
+    IF NOT p_es_cobro AND NOT EXISTS (SELECT 1 FROM movimientos_producto m WHERE m.ticket_item_id = v_it.id) THEN CONTINUE; END IF;
     SELECT COALESCE(sum(m.cantidad), 0) INTO v_hecho FROM movimientos_producto m WHERE m.ticket_item_id = v_it.id;
     v_dif := v_debe - v_hecho;
     IF v_dif <> 0 THEN
@@ -422,16 +424,16 @@ BEGIN
   END LOOP;
 END;
 $$;
-REVOKE ALL ON FUNCTION _existencias_sincronizar_ticket(uuid) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION _existencias_sincronizar_ticket(uuid) TO service_role;
-COMMENT ON FUNCTION _existencias_sincronizar_ticket(uuid) IS
-  'Registra en movimientos_producto la diferencia entre lo que el ticket debe haber movido (por estado, cancelación y devoluciones confirmadas) y lo ya movido. Idempotente (0189).';
+REVOKE ALL ON FUNCTION _existencias_sincronizar_ticket(uuid, boolean) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION _existencias_sincronizar_ticket(uuid, boolean) TO service_role;
+COMMENT ON FUNCTION _existencias_sincronizar_ticket(uuid, boolean) IS
+  'Registra en movimientos_producto la diferencia entre lo que el ticket debe haber movido (por estado, cancelación y devoluciones confirmadas) y lo ya movido. Idempotente (0189). Una línea sin movimientos solo se registra en el cobro (p_es_cobro): facturar, devolver o cancelar solo ajustan líneas ya registradas; una venta de la caja llega por push sin movimientos y la sube la caja.';
 
 -- Los disparadores son SECURITY DEFINER: el cajero no tiene EXECUTE sobre la función interna.
 CREATE OR REPLACE FUNCTION trg_existencias_por_ticket()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
-  PERFORM _existencias_sincronizar_ticket(NEW.id);
+  PERFORM _existencias_sincronizar_ticket(NEW.id, OLD.estado_fiscal IN ('BORRADOR','ABIERTO') AND NEW.estado_fiscal IN ('PAGADO','FACTURADO'));
   RETURN NULL;
 END;
 $$;
@@ -448,7 +450,7 @@ RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_t
 BEGIN
   IF EXISTS (SELECT 1 FROM productos p WHERE p.id = NEW.producto_id AND p.controla_existencias)
      AND EXISTS (SELECT 1 FROM tickets t WHERE t.id = NEW.ticket_id AND t.estado_fiscal IN ('PAGADO', 'FACTURADO')) THEN
-    PERFORM _existencias_sincronizar_ticket(NEW.ticket_id);
+    PERFORM _existencias_sincronizar_ticket(NEW.ticket_id, true);
   END IF;
   RETURN NULL;
 END;
@@ -461,7 +463,7 @@ CREATE TRIGGER trg_ticket_items_existencias
 CREATE OR REPLACE FUNCTION trg_existencias_por_devolucion()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
-  PERFORM _existencias_sincronizar_ticket(NEW.ticket_original_id);
+  PERFORM _existencias_sincronizar_ticket(NEW.ticket_original_id, false);
   RETURN NULL;
 END;
 $$;
@@ -471,12 +473,12 @@ CREATE TRIGGER trg_devoluciones_existencias
   FOR EACH ROW WHEN (OLD.estado IS DISTINCT FROM NEW.estado AND NEW.estado = 'CONFIRMADA')
   EXECUTE FUNCTION trg_existencias_por_devolucion();
 
--- trg_cancelacion_marcar_ticket (0009) cambia el ticket a CANCELADO en modo réplica, así que
+-- El disparador trg_cancelaciones_marcar_ticket (0009) cambia el ticket a CANCELADO en modo réplica, así que
 -- trg_tickets_existencias no lo ve. Este disparador corre después (orden alfabético: "z").
 CREATE OR REPLACE FUNCTION trg_existencias_por_cancelacion()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
-  PERFORM _existencias_sincronizar_ticket(NEW.ticket_id);
+  PERFORM _existencias_sincronizar_ticket(NEW.ticket_id, false);
   RETURN NULL;
 END;
 $$;
