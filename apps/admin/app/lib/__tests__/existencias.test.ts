@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { avisoRenglon, buscarCapturable, estadoExistencia, resumenExistencias, varianteDe, type FilaExistencia } from "../existencias";
+import { avisoRenglon, buscarCapturable, diferenciasConteo, estadoExistencia, resumenExistencias, varianteDe, type FilaExistencia } from "../existencias";
 
 const fila = (c: number, m: number | null, v = 0): FilaExistencia => ({
   sucursal_id: "s", sucursal_nombre: "S", producto_id: Math.random().toString(), producto_nombre: "P", variante: "",
@@ -57,5 +57,33 @@ describe("existencias", () => {
     expect(avisoRenglon("1", "1.230")).toBeNull();
     expect(avisoRenglon("1", ".5")).toBeNull();
     expect(avisoRenglon("1", "1.235")).toMatch(/2 decimales/);
+  });
+});
+
+describe("diferenciasConteo", () => {
+  const ex = (id: string, sucursal: string, cantidad: number): FilaExistencia => ({
+    sucursal_id: sucursal, sucursal_nombre: sucursal, producto_id: id, producto_nombre: id, variante: "",
+    nombre_completo: `Prenda ${id}`, codigo_interno: null, codigo_barras: null, costo_mxn: null, precio_mxn: 0, cantidad, minimo: null, valor_mxn: 0,
+  });
+  it("compara contra la sucursal elegida, 0 sin fila, por diferencia absoluta", () => {
+    const filas = [ex("sobra", "A", 2), ex("falta", "A", 10), ex("igual", "A", 4), ex("sinfila", "B", 99)];
+    const r = diferenciasConteo(
+      [
+        { producto_id: "igual", contado: 4 },
+        { producto_id: "sobra", contado: 3 },
+        { producto_id: "sinfila", contado: 2 },
+        { producto_id: "falta", contado: 7 },
+      ],
+      filas.filter((f) => f.sucursal_id === "A"),
+    );
+    expect(r).toEqual([
+      { producto_id: "falta", nombre: "Prenda falta", sistema: 10, contado: 7, diferencia: -3 },
+      { producto_id: "sinfila", nombre: "", sistema: 0, contado: 2, diferencia: 2 },
+      { producto_id: "sobra", nombre: "Prenda sobra", sistema: 2, contado: 3, diferencia: 1 },
+      { producto_id: "igual", nombre: "Prenda igual", sistema: 4, contado: 4, diferencia: 0 },
+    ]);
+  });
+  it("sin errores de coma flotante", () => {
+    expect(diferenciasConteo([{ producto_id: "x", contado: 0.3 }], [ex("x", "A", 0.1)])[0]!.diferencia).toBe(0.2);
   });
 });

@@ -58,6 +58,20 @@ export function avisoRenglon(cantidad: string, costo = "", ceroOk = false): stri
 const NUMERO = /^(\d+\.?\d*|\.\d+)$/;
 const decimales = (s: string) => (s.split(".")[1] ?? "").replace(/0+$/, "").length;
 
+export type DiferenciaConteo = { producto_id: string; nombre: string; sistema: number; contado: number; diferencia: number };
+/** Lo contado contra la existencia de la sucursal (0 si no hay fila); primero lo que más se aleja. */
+export function diferenciasConteo(contados: { producto_id: string; contado: number }[], existencias: FilaExistencia[]): DiferenciaConteo[] {
+  const porId = new Map(existencias.map((f) => [f.producto_id, f]));
+  return contados
+    .map(({ producto_id, contado }) => {
+      const f = porId.get(producto_id);
+      const sistema = f?.cantidad ?? 0;
+      const nombre = f ? f.nombre_completo || f.producto_nombre : "";
+      return { producto_id, nombre, sistema, contado, diferencia: Math.round((contado - sistema) * 1000) / 1000 };
+    })
+    .sort((a, b) => Math.abs(b.diferencia) - Math.abs(a.diferencia));
+}
+
 const n = (v: unknown) => Number(v ?? 0);
 
 export async function listarExistencias(sucursalId: string | null): Promise<FilaExistencia[]> {
