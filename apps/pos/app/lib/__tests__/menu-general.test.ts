@@ -37,13 +37,14 @@ describe("menú general", () => {
     expect(leer(html).slice(-5)).toEqual(["# Ajustes", "Configurar impresoras y pantallas", "Ayuda por WhatsApp", "# Turno", "Cerrar turno"]);
   });
 
-  it("la tienda suma Retiro / Depósito y Monitor ventas a Operación, y Salir a Turno; Devoluciones vive en Transacciones", () => {
+  it("la tienda suma Retiro / Depósito a Operación, y Salir a Turno; Devoluciones vive en Transacciones y el monitor se abre con Corte caja X", () => {
     // Las mismas opciones que pasa home-pos en la Configuración de la tienda: sin onDevoluciones.
     const { onDevoluciones: _sinDevoluciones, ...tienda } = opciones;
-    const html = renderToStaticMarkup(React.createElement(ContenidoMenu, { enPagina: true, ...tienda, onMovimientoCaja: nada, onMonitorVentas: nada, onSalir: nada }));
+    const html = renderToStaticMarkup(React.createElement(ContenidoMenu, { enPagina: true, ...tienda, onMovimientoCaja: nada, onSalir: nada }));
     const l = leer(html);
     expect(l).not.toContain("Devoluciones");
-    expect(l.slice(l.indexOf("Abrir cajón"), l.indexOf("# Cuenta"))).toEqual(["Abrir cajón", "Retiro / Depósito", "Monitor ventas"]);
+    expect(l).not.toContain("Monitor ventas");
+    expect(l.slice(l.indexOf("Abrir cajón"), l.indexOf("# Cuenta"))).toEqual(["Abrir cajón", "Retiro / Depósito"]);
     expect(l.slice(-3)).toEqual(["# Turno", "Cerrar turno", "Salir"]);
   });
 });

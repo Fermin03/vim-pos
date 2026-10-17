@@ -1641,8 +1641,9 @@ export function HomePos({
   // Contadores de los dos botones de Para llevar (cuentas abiertas y en espera). Se recalculan al
   // entrar a la captura, cada vez que cambia el ticket en pantalla (se guardó, se cobró, se canceló
   // o se salió de él) y cada 20 s: la lista es de toda la sucursal y otra caja puede moverla.
+  // La tienda no pinta esos botones: Transacciones lee su propia lista.
   useEffect(() => {
-    if (enInicio || carrito.modoServicio !== "PARA_LLEVAR") return;
+    if (tienda || enInicio || carrito.modoServicio !== "PARA_LLEVAR") return;
     let vivo = true;
     const refrescar = () => {
       listarCuentasParaLlevar(token, caja.sucursal_id)
@@ -1653,7 +1654,7 @@ export function HomePos({
     refrescar();
     const id = setInterval(refrescar, 20_000);
     return () => { vivo = false; clearInterval(id); };
-  }, [enInicio, carrito.modoServicio, ticketBd?.ticketId, token, caja.sucursal_id, refrescarEspera]);
+  }, [tienda, enInicio, carrito.modoServicio, ticketBd?.ticketId, token, caja.sucursal_id, refrescarEspera]);
 
   /** Abre una cuenta de Para llevar desde su lista, para cobrarla (o cancelarla) aquí mismo. */
   const abrirCuentaLlevar = useCallback(async (ticketId: string) => {
@@ -3134,7 +3135,6 @@ export function HomePos({
                   onEnEspera={nEnEspera > 0 ? () => { setEsperaError(null); setEsperaListaAbierta(true); } : undefined}
                   onAbrirCajon={() => setAbrirCajaAbierto(true)}
                   onMovimientoCaja={() => setMovimientoAbierto(true)}
-                  onMonitorVentas={() => setEnMonitor(true)}
                   nEnEspera={nEnEspera}
                   onCambiarCajero={conVentaSuelta(onCambiarCajero)}
                   onBloquear={conVentaSuelta(onBloquear)}
