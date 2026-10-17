@@ -2,8 +2,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icono, Modal } from "@vim/ui/styles";
 import type { Producto } from "../lib/catalogo";
-import { agruparTienda, buscarVitrina, destinoInventario, estadoExistencia, resumenVitrina, type DestinoInventario, type Existencia } from "../lib/tienda";
+import { agruparTienda, buscarVitrina, destinoInventario, estadoExistencia, renglonTienda, resumenVitrina, type DestinoInventario, type Existencia, type PadreTienda } from "../lib/tienda";
 import { useEscaner } from "../lib/use-escaner";
+import { avisoCantidad, recibirEnCaja, SinPermisoRecibir } from "../lib/recibir-caja";
 import { sonarError } from "./venta-retail";
 import { piezas, SelectorVariantes, textoActualizado } from "./selector-variantes";
 
@@ -11,13 +12,19 @@ type Pestana = "existencias" | "recibir";
 /** Con la lista corta y sin búsqueda no se pintan miles de renglones: se escribe o se escanea. */
 const MAXIMO = 60;
 
+type RenglonRecibir = { producto: Producto; cantidad: string };
+const soloNumero = (v: string) => v.replace(/[^0-9.]/g, "");
+const cuantos = (n: number) => `${n} ${n === 1 ? "producto" : "productos"}`;
+
 const ETIQUETA = { normal: null, pocas: "Pocas", agotada: "Agotada" } as const;
 const COLOR = { normal: "text-ink", pocas: "text-warning", agotada: "text-danger" } as const;
 
 /**
  * Inventario de la tienda (pos-retail.md, «Versión 2 · Inventario»). «Existencias»: buscar o escanear
  * una prenda y ver su existencia por talla y color, en esta sucursal y en las demás, solo lectura;
- * escanear aquí nunca agrega al ticket. «Recibir» es de la Tarea 7: por ahora el hueco y el aviso de permiso.
+ * escanear aquí nunca agrega al ticket. «Recibir»: escanear suma 1 por pieza, sin costo ni proveedor
+ * (se capturan en el admin). Lo capturado vive aquí; `onPendiente` dice cuántos renglones hay para que
+ * home-pos pregunte antes de dejar la sección.
  */
 export function SeccionInventario({
   productos,
@@ -27,6 +34,10 @@ export function SeccionInventario({
   actualizadoA,
   escaneoIgnorado,
   puedeRecibir,
+  token,
+  onRecibido,
+  onPendiente,
+  confirmarDescarte,
   onCambiarCajero,
   onAbierto,
 }: {
@@ -40,6 +51,13 @@ export function SeccionInventario({
   /** Un diálogo o el aviso de un pedido encima: el escaneo no hace nada. */
   escaneoIgnorado: boolean;
   puedeRecibir: boolean;
+  token: string;
+  /** Tras recibir: leer las existencias de nuevo. */
+  onRecibido: () => void;
+  /** Renglones capturados sin recibir (0 = nada que perder). */
+  onPendiente: (n: number) => void;
+  /** Pregunta antes de descartar `n` renglones; `true` = descartar. */
+  confirmarDescarte: (n: number) => Promise<boolean>;
   onCambiarCajero: () => void;
   /** Con una consulta a la vista, cómo cerrarla (o `null`): la pila de Escape de home-pos. */
   onAbierto: (cerrar: (() => void) | null) => void;
@@ -51,10 +69,66 @@ export function SeccionInventario({
   const [aviso, setAviso] = useState<string | null>(null);
   const { vitrina, padres } = useMemo(() => agruparTienda(productos), [productos]);
 
+  // Recibir: lo capturado vive aquí para que cambiar de pestaña o de sección pueda preguntar.
+  const [renglones, setRenglones] = useState<RenglonRecibir[]>([]);
+  const [referencia, setReferencia] = useState("");
+  const [selectorRecibir, setSelectorRecibir] = useState<PadreTienda | null>(null);
+  const [guardando, setGuardando] = useState(false);
+  const enviando = useRef(false);
+  const [errorRecibir, setErrorRecibir] = useState<string | null>(null);
+  const [listo, setListo] = useState<string | null>(null);
+  const [sinPermiso, setSinPermiso] = useState(false);
+
   const avisar = useRef(onAbierto);
   avisar.current = onAbierto;
-  useEffect(() => { avisar.current(destino ? () => setDestino(null) : null); }, [destino]);
+  useEffect(() => {
+    avisar.current(destino ? () => setDestino(null) : selectorRecibir ? () => setSelectorRecibir(null) : null);
+  }, [destino, selectorRecibir]);
   useEffect(() => () => avisar.current(null), []);
+  const pendiente = useRef(onPendiente);
+  pendiente.current = onPendiente;
+  useEffect(() => { pendiente.current(renglones.length); }, [renglones.length]);
+  useEffect(() => () => pendiente.current(0), []);
+
+  /** Cambiar de pestaña con renglones capturados pregunta antes de tirarlos. */
+  const irAPestana = async (id: Pestana) => {
+    if (id === pestana) return;
+    if (pestana === "recibir" && renglones.length > 0) {
+      if (!(await confirmarDescarte(renglones.length))) return;
+      setRenglones([]);
+      setReferencia("");
+      setErrorRecibir(null);
+    }
+    setTexto("");
+    setAviso(null);
+    setDestino(null);
+    setSelectorRecibir(null);
+    setListo(null);
+    setPestana(id);
+  };
+
+  /** Una pieza más de esta prenda: escanear otra vez la misma suma 1 a su renglón. */
+  const agregar = (p: Producto) => {
+    setListo(null);
+    setErrorRecibir(null);
+    setRenglones((rs) => {
+      const i = rs.findIndex((r) => r.producto.id === p.id);
+      if (i < 0) return [...rs, { producto: p, cantidad: "1" }];
+      const c = rs[i]!.cantidad;
+      const cantidad = avisoCantidad(c) ? "1" : String(Math.round((Number(c) + 1) * 1000) / 1000);
+      return rs.map((r, j) => (j === i ? { ...r, cantidad } : r));
+    });
+  };
+
+  /** Un código o una prenda elegida a mano: una pieza suelta o una talla suma; un padre abre su selector. */
+  const recibirDestino = (d: DestinoInventario) => {
+    setAviso(null);
+    if ("suelto" in d) { agregar(d.suelto); return; }
+    const marcada = d.marcada ? d.padre.hijas.find((h) => h.id === d.marcada) : undefined;
+    if (marcada) { agregar(marcada); return; }
+    if (d.padre.hijas.length === 0) { setAviso("Sin tallas cargadas."); return; }
+    setSelectorRecibir(d.padre);
+  };
 
   /** Abre la consulta; un padre sin hijas no tiene matriz que enseñar. */
   const mostrar = (d: DestinoInventario) => {
@@ -71,6 +145,16 @@ export function SeccionInventario({
     if (d) mostrar(d);
     else { setDestino(null); setAviso(`No encontramos el código ${codigo}.`); sonarError(); }
   }, pestana === "existencias");
+
+  // Escáner de Recibir: solo en esa pestaña y con permiso; un diálogo encima lo calla.
+  const puede = puedeRecibir && !sinPermiso;
+  useEscaner((codigo) => {
+    if (escaneoIgnorado || selectorRecibir || guardando) return;
+    const d = destinoInventario(productos, padres, codigo);
+    setTexto("");
+    if (d) recibirDestino(d);
+    else { setAviso(`No encontramos el código ${codigo}.`); sonarError(); }
+  }, pestana === "recibir" && puede);
 
   const visibles = useMemo(() => {
     const lista = texto.trim() ? buscarVitrina(vitrina, padres, texto) : [...vitrina].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
@@ -90,12 +174,53 @@ export function SeccionInventario({
     setTexto("");
   };
 
-  const pestanaBoton = (id: Pestana, nombre: string) => (
+  const abrirRecibir = (p: Producto) => {
+    const padre = padres.get(p.id);
+    recibirDestino(padre ? { padre } : { suelto: p });
+    setTexto("");
+  };
+  const alEnterRecibir = () => {
+    const d = destinoInventario(productos, padres, texto);
+    if (d) recibirDestino(d);
+    else if (visibles.length === 1) abrirRecibir(visibles[0]!);
+    else return;
+    setTexto("");
+  };
+
+  const avisos = renglones.map((r) => avisoCantidad(r.cantidad));
+  const sePuede = renglones.length > 0 && avisos.every((a) => a === null) && !guardando;
+  const recibir = async () => {
+    if (!sePuede || enviando.current) return;
+    enviando.current = true;
+    setGuardando(true);
+    setErrorRecibir(null);
+    try {
+      const n = await recibirEnCaja({
+        token,
+        sucursalId,
+        lineas: renglones.map((r) => ({ productoId: r.producto.id, cantidad: Number(r.cantidad) })),
+        referencia,
+      });
+      setRenglones([]);
+      setReferencia("");
+      setListo(`Listo: entraron ${cuantos(n)}.`);
+      onRecibido();
+    } catch (e) {
+      // Sin el permiso de productos la base lo dice aquí, aunque el rol pareciera bastar.
+      if (e instanceof SinPermisoRecibir) setSinPermiso(true);
+      else setErrorRecibir(e instanceof Error ? e.message : "No se pudo recibir la mercancía");
+    } finally {
+      enviando.current = false;
+      setGuardando(false);
+    }
+  };
+
+  const pestanaBoton =(id: Pestana, nombre: string) => (
     <button
       type="button"
       role="tab"
       aria-selected={pestana === id}
-      onClick={() => setPestana(id)}
+      onClick={() => void irAPestana(id)}
       className={[
         "h-11 rounded-lg border px-5 text-14 font-semibold transition-[transform,background-color,border-color,color] duration-150 ease-vim active:scale-[.97]",
         pestana === id ? "border-ink bg-ink text-white" : "border-line-strong bg-surface text-ink hover:border-ink",
@@ -115,7 +240,18 @@ export function SeccionInventario({
         </div>
       </div>
 
-      {pestana === "existencias" ? (
+      {pestana === "recibir" && !puede ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+          <p className="max-w-md text-15 text-ink-2">Pide a un administrador que entre con su PIN para recibir.</p>
+          <button
+            type="button"
+            onClick={onCambiarCajero}
+            className="h-11 rounded-lg border border-line-strong bg-surface px-5 text-14 font-semibold text-ink transition-[transform,background-color,border-color] duration-150 ease-vim hover:border-ink active:scale-[.97]"
+          >
+            Cambiar cajero
+          </button>
+        </div>
+      ) : (
         <>
           <div className="flex flex-shrink-0 items-center gap-3 border-b border-line bg-surface px-4 py-3">
             <label className="relative flex h-14 min-w-0 flex-1 items-center rounded-lg border border-line-strong bg-surface focus-within:border-ink">
@@ -127,7 +263,7 @@ export function SeccionInventario({
                 type="text"
                 value={texto}
                 onChange={(e) => setTexto(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); alEnter(); } }}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); (pestana === "recibir" ? alEnterRecibir : alEnter)(); } }}
                 placeholder="Escanea o busca por nombre o SKU…"
                 aria-label="Escanea o busca por nombre o SKU"
                 autoComplete="off"
@@ -161,6 +297,99 @@ export function SeccionInventario({
             </div>
           )}
 
+          {pestana === "recibir" ? (
+            <div className="flex min-h-0 flex-1 flex-col bg-bg">
+              <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                <div className="mx-auto max-w-3xl">
+                  {texto.trim() ? (
+                    visibles.length === 0 ? (
+                      <p className="py-8 text-center text-14 text-ink-3">Nada coincide. Revisa el nombre o el SKU, o escanea la etiqueta.</p>
+                    ) : (
+                      <ul className="flex flex-col gap-2">
+                        {visibles.map((p) => (
+                          <li key={p.id}>
+                            <button
+                              type="button"
+                              onClick={() => abrirRecibir(p)}
+                              className="flex min-h-14 w-full items-center gap-3 rounded-lg border border-line bg-surface px-4 py-3 text-left transition-[transform,border-color] duration-150 ease-vim hover:border-ink active:scale-[.99]"
+                            >
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-15 font-semibold text-ink">{p.nombre}</span>
+                                {p.codigo_interno && <span className="block truncate text-13 text-ink-2">{p.codigo_interno}</span>}
+                              </span>
+                              <span className="flex-shrink-0 text-13 font-semibold text-ink-2">{padres.has(p.id) ? "Elegir talla" : "Agregar"}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )
+                  ) : renglones.length === 0 ? (
+                    <div className="flex flex-col items-center gap-2 py-16 text-center">
+                      <p className="font-display text-18 font-semibold">Escanea lo que llega</p>
+                      <p className="max-w-md text-14 text-ink-3">Cada lectura suma una pieza. También puedes buscar por nombre o SKU.</p>
+                    </div>
+                  ) : (
+                    <ul className="flex flex-col gap-2">
+                      {renglones.map((r, i) => {
+                        const { nombre, detalle } = renglonTienda(r.producto, productos);
+                        return (
+                          <li key={r.producto.id} className="flex min-h-14 items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2">
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-15 font-semibold text-ink">{nombre}</span>
+                              {detalle && <span className="block truncate text-13 text-ink-2">{detalle}</span>}
+                              {avisos[i] && <span className="block text-13 font-medium text-danger" role="alert">{avisos[i]}</span>}
+                            </span>
+                            <input
+                              aria-label={`Cantidad de ${nombre}`}
+                              inputMode="decimal"
+                              value={r.cantidad}
+                              onChange={(e) => {
+                                const cantidad = soloNumero(e.target.value);
+                                setRenglones((rs) => rs.map((x) => (x.producto.id === r.producto.id ? { ...x, cantidad } : x)));
+                              }}
+                              className="h-11 w-24 flex-shrink-0 rounded border border-line-strong bg-surface px-3 text-right font-display text-18 font-bold tabular-nums text-ink outline-none focus:border-ink"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setRenglones((rs) => rs.filter((x) => x.producto.id !== r.producto.id))}
+                              className="h-11 flex-shrink-0 rounded px-3 text-14 font-semibold text-danger transition-[transform,background-color] duration-150 ease-vim hover:bg-danger-soft active:scale-[.97]"
+                            >
+                              Quitar
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </div>
+              <div className="flex-shrink-0 border-t border-line bg-surface px-4 py-3">
+                <div className="mx-auto flex max-w-3xl flex-wrap items-end gap-3">
+                  <label className="flex min-w-48 flex-1 flex-col gap-1 text-13 font-medium text-ink-2">
+                    Remisión o factura · opcional
+                    <input
+                      value={referencia}
+                      maxLength={100}
+                      onChange={(e) => setReferencia(e.target.value)}
+                      placeholder="Ej. F-1234"
+                      autoComplete="off"
+                      className="h-11 rounded border border-line-strong bg-surface px-3 text-15 font-normal text-ink outline-none placeholder:text-ink-3 focus:border-ink"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    disabled={!sePuede}
+                    onClick={() => void recibir()}
+                    className="h-11 flex-shrink-0 rounded-lg bg-accent px-5 text-15 font-bold text-white transition-[transform,background-color,opacity] duration-150 ease-vim hover:bg-accent-hover active:scale-[.97] disabled:cursor-default disabled:opacity-40 disabled:active:scale-100"
+                  >
+                    {guardando ? "Recibiendo…" : `Recibir ${cuantos(renglones.length)}`}
+                  </button>
+                </div>
+                {errorRecibir && <p className="mx-auto mt-2 max-w-3xl text-14 font-medium text-danger" role="alert">{errorRecibir}</p>}
+                {listo && <p className="mx-auto mt-2 max-w-3xl text-14 font-medium text-success" role="status">{listo}</p>}
+              </div>
+            </div>
+          ) : (
           <div className="min-h-0 flex-1 overflow-y-auto bg-bg p-4">
             {visibles.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
@@ -197,22 +426,21 @@ export function SeccionInventario({
             )}
             {visibles.length === MAXIMO && <p className="mt-3 text-center text-13 text-ink-3">Hay más productos: escribe o escanea para acotar.</p>}
           </div>
+          )}
         </>
-      ) : puedeRecibir ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
-          <p className="text-15 text-ink-2">Próximamente.</p>
-        </div>
-      ) : (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
-          <p className="max-w-md text-15 text-ink-2">Pide a un administrador que entre con su PIN para recibir.</p>
-          <button
-            type="button"
-            onClick={onCambiarCajero}
-            className="h-11 rounded-lg border border-line-strong bg-surface px-5 text-14 font-semibold text-ink transition-[transform,background-color,border-color] duration-150 ease-vim hover:border-ink active:scale-[.97]"
-          >
-            Cambiar cajero
-          </button>
-        </div>
+      )}
+
+      {selectorRecibir && (
+        <SelectorVariantes
+          paraRecibir
+          padre={selectorRecibir}
+          existencias={existencias}
+          sucursalId={sucursalId}
+          sucursales={[]}
+          actualizadoA={actualizadoA}
+          onElegir={(hija) => { agregar(hija); setSelectorRecibir(null); }}
+          onCerrar={() => setSelectorRecibir(null)}
+        />
       )}
 
       {destino && "padre" in destino && (

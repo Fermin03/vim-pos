@@ -747,6 +747,25 @@ export function HomePos({
   }, [ticketBd, carrito.lineas, dejarCuentaAbierta, confirmar]);
   const conVentaSuelta = (fn: () => void) => () => { void soltarVentaTienda().then((ok) => { if (ok) fn(); }); };
 
+  /** Inventario · Recibir: renglones capturados sin recibir. Salir de la sección o de la pestaña los tira. */
+  const recepcionPendiente = useRef(0);
+  const confirmarDescarteRecepcion = useCallback(async (n: number): Promise<boolean> => {
+    setConfirmandoVenta(true); // mientras pregunta, Escape no navega: lo atiende el diálogo
+    const ok = await confirmar({
+      titulo: "¿Descartar la recepción?",
+      mensaje: `Llevas ${n} ${n === 1 ? "producto capturado" : "productos capturados"}.`,
+      boton: "Descartar",
+    });
+    setConfirmandoVenta(false);
+    return ok;
+  }, [confirmar]);
+  /** Cambio de sección de la tienda: con una recepción a medias, pregunta antes de salir de Inventario. */
+  const irASeccion = useCallback(async (destino: SeccionTienda) => {
+    const n = recepcionPendiente.current;
+    if (destino !== "inventario" && n > 0 && !(await confirmarDescarteRecepcion(n))) return;
+    setSeccionTienda(destino);
+  }, [confirmarDescarteRecepcion]);
+
   // Se cobró, se canceló o se volvió a poner en espera a mano: el ticket ya no está en pantalla y
   // no hay nada que devolver a espera.
   useEffect(() => {
@@ -1884,7 +1903,7 @@ export function HomePos({
       [enCaptura && !tienda, () => intentarSalirDeCaptura("atras")],
       // Transacciones: Escape deja primero la búsqueda. Aquí y no en `capas`: no tapa la barra ni el escáner.
       [enCaptura && tienda && seccionTienda === "transacciones" && cerrarBusquedaTx != null, () => cerrarBusquedaTx?.()],
-      [enCaptura && tienda && seccionTienda !== "panel", () => setSeccionTienda("panel")],
+      [enCaptura && tienda && seccionTienda !== "panel", () => void irASeccion("panel")],
     ];
     return {
       // El aviso grande de la tienda va encima de TODO y CEDE: lo cierra su propio `Modal`.
@@ -1904,7 +1923,7 @@ export function HomePos({
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
       salidaPendiente, confirmandoCierre, menuGeneralAbierto, cerrando, enInicio, enKds, enMonitor,
       enConsultaCuentas, enDevoluciones, enCambioTalla, enPedidosApps, enDelivery, enPickup, enMesas, enBarra, nuevoTicket,
-      intentarSalirDeCaptura, tienda, seccionTienda, cerrarBusquedaTx, cerrarConsultaInv, avisosVim, confirmandoVenta, salirCajaAbierto]);
+      intentarSalirDeCaptura, tienda, seccionTienda, cerrarBusquedaTx, cerrarConsultaInv, irASeccion, avisosVim, confirmandoVenta, salirCajaAbierto]);
   useEscape(alEscapar);
 
   // ── Cambio de talla (giro RETAIL) ─────────────────────────────────────────────────────────
@@ -3108,6 +3127,10 @@ export function HomePos({
               escaneoIgnorado={escaneoIgnorado}
               // Recibir mueve existencias: lo pide el permiso de productos (config.productos), que aquí se infiere del rol.
               puedeRecibir={puedeRecibirMercancia(empleado.rol)}
+              token={token}
+              onRecibido={() => { leerExistencias(token).then(setExistencias).catch(() => {}); }}
+              onPendiente={(n) => { recepcionPendiente.current = n; }}
+              confirmarDescarte={confirmarDescarteRecepcion}
               onCambiarCajero={conVentaSuelta(onCambiarCajero)}
               onAbierto={(cerrar) => setCerrarConsultaInv(() => cerrar)}
             />
@@ -3123,7 +3146,7 @@ export function HomePos({
       {tienda && (
         <BarraTienda
           seccion={seccionTienda}
-          onCambiar={setSeccionTienda}
+          onCambiar={(s) => void irASeccion(s)}
           pendientes={0}
           bloqueada={!puedeCambiarSeccion(algoAbierto || avisoTiendaVisible, totalesCobro != null)}
         />

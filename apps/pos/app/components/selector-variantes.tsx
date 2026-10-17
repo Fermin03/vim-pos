@@ -37,6 +37,7 @@ export function SelectorVariantes({
   onCerrar,
   marcada,
   soloConsulta = false,
+  paraRecibir = false,
 }: {
   padre: PadreTienda;
   /** null = aún no se leyeron: las celdas enseñan «—» y no un estado. */
@@ -51,12 +52,14 @@ export function SelectorVariantes({
   marcada?: string;
   /** Inventario: se ve la existencia por celda, sin tocar nada y sin agregar. */
   soloConsulta?: boolean;
+  /** Inventario · Recibir: cualquier prenda de esta sucursal se puede recibir, aunque no se venda por ahora. */
+  paraRecibir?: boolean;
 }) {
   const [viendo, setViendo] = useState(sucursalId);
   const propia = viendo === sucursalId;
   const m = matrizVariantes(padre, existencias ?? [], viendo);
   // Se vende aquí y no está agotada a mano en esta sucursal (R7). Lo demás se ve, pero no se toca.
-  const vendible = (h: Producto) => h.seVendeAqui !== false && !h.agotado;
+  const vendible = (h: Producto) => paraRecibir || (h.seVendeAqui !== false && !h.agotado);
   const aqui = padre.hijas.filter((h) => h.seVendeAqui !== false);
   const precios = (aqui.length ? aqui : padre.hijas).map((h) => h.precio_base_mxn);
   const desde = Math.min(...precios);
@@ -161,7 +164,7 @@ export function SelectorVariantes({
 
       <div className="flex flex-wrap items-center gap-4 border-t border-line px-6 py-3 text-12 text-ink-2">
         <span className="flex items-center gap-1.5"><span aria-hidden="true" className="h-3 w-3 rounded-sm border border-warning-line bg-warning-soft" />Pocas</span>
-        <span className="flex items-center gap-1.5"><span aria-hidden="true" className="h-3 w-3 rounded-sm border border-danger-line bg-danger-soft" />{soloConsulta ? "Agotada" : "Agotada, se vende con aviso"}</span>
+        <span className="flex items-center gap-1.5"><span aria-hidden="true" className="h-3 w-3 rounded-sm border border-danger-line bg-danger-soft" />{soloConsulta || paraRecibir ? "Agotada" : "Agotada, se vende con aviso"}</span>
       </div>
     </Modal>
   );
