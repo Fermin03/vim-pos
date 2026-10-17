@@ -10,7 +10,7 @@ import { useEscaner } from "../lib/use-escaner";
 import { esEscritorio } from "../lib/actualizacion";
 import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
 import { nuevoClientId } from "../lib/carrito";
-import { registrarCambio, resumenCambio, type CambioRegistrado } from "../lib/cambio-talla";
+import { CambioRechazado, registrarCambio, resumenCambio, type CambioRegistrado } from "../lib/cambio-talla";
 import type { Producto } from "../lib/catalogo";
 import {
   buscarVentaPorFolio,
@@ -131,6 +131,7 @@ export function PantallaCambioTalla({
     const r = marcar ? v.renglones.find((x) => x.producto_id === marcar && x.cantidad - x.devuelta >= 1) : undefined;
     setError(null);
     setVenta(v);
+    clientId.current = nuevoClientId(); // otra venta, otro cambio
     setRegresa(r ? { ticketItemId: r.ticket_item_id, cantidad: 1 } : null);
     setLleva(null);
     setBusqueda(null);
@@ -176,8 +177,8 @@ export function PantallaCambioTalla({
     setSelector(null);
     if (p.agotado) { setError("Ese producto no se vende por ahora."); return; }
     setError(null);
+    // La llave se conserva: si el intento anterior quedó en duda (la red), este no registra otro cambio.
     setLleva(p);
-    clientId.current = nuevoClientId();
     setPaso(4);
   }
 
@@ -187,7 +188,7 @@ export function PantallaCambioTalla({
     if (paso === 1) {
       const p = buscarPorCodigo(productos, codigo);
       if (!p) { setBusqueda({ titulo: `Código ${codigo}`, ventas: [], vacio: `No encontramos el código ${codigo}.` }); return; }
-      void buscar(() => buscarVentasConProducto(token, p.id), {
+      void buscar(() => buscarVentasConProducto(token, p.id, caja.sucursal_id), {
         titulo: `Últimos 30 días · ${p.nombre}`,
         vacio: `Ninguna venta de los últimos 30 días lleva ${p.nombre}.`,
         marcar: p.id,
@@ -252,6 +253,8 @@ export function PantallaCambioTalla({
       void imprimir(r.ticketId);
     } catch (e) {
       if (!montado.current) return;
+      // Rechazo definitivo: nada quedó hecho, el siguiente intento lleva llave nueva.
+      if (e instanceof CambioRechazado) clientId.current = nuevoClientId();
       setError(e instanceof Error ? e.message : "No se pudo registrar el cambio");
       setProcesando(false);
     }

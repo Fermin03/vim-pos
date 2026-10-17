@@ -240,25 +240,35 @@ type FilaTicket = { id: string; folio_completo: string | null; total_mxn: number
 const COLUMNAS_TICKET = "id, folio_completo, total_mxn, fecha_pago, estado_fiscal";
 const ESTADOS_DEVOLVIBLES = ["PAGADO", "FACTURADO"];
 
-/** Arma las ventas con sus renglones y lo ya devuelto de cada uno (dos consultas para todas). */
+/** Partes de a lo más `n`: un `.in()` largo no cabe en la dirección de la petición. */
+function enTrozos<T>(xs: T[], n = 50): T[][] {
+  const r: T[][] = [];
+  for (let i = 0; i < xs.length; i += n) r.push(xs.slice(i, i + n));
+  return r;
+}
+
+/** Arma las ventas con sus renglones y lo ya devuelto de cada uno (dos consultas por cada 50 ids). */
 async function conRenglones(token: string, tickets: FilaTicket[]): Promise<VentaDevolvible[]> {
   if (tickets.length === 0) return [];
   const cli = employeeClient(token);
-  const { data: items, error } = await cli
-    .from("ticket_items")
-    .select("id, ticket_id, producto_id, producto_nombre_snapshot, cantidad, precio_unitario_snapshot, total_item_mxn")
-    .in("ticket_id", tickets.map((t) => t.id))
-    .eq("cancelado", false)
-    .order("created_at");
-  if (error) throw new Error(error.message);
-  const filas = (items ?? []) as Record<string, unknown>[];
+  const filas: Record<string, unknown>[] = [];
+  for (const ids of enTrozos(tickets.map((t) => t.id))) {
+    const { data: items, error } = await cli
+      .from("ticket_items")
+      .select("id, ticket_id, producto_id, producto_nombre_snapshot, cantidad, precio_unitario_snapshot, total_item_mxn")
+      .in("ticket_id", ids)
+      .eq("cancelado", false)
+      .order("created_at");
+    if (error) throw new Error(error.message);
+    filas.push(...((items ?? []) as Record<string, unknown>[]));
+  }
 
   const devuelta = new Map<string, number>();
-  if (filas.length > 0) {
+  for (const ids of enTrozos(filas.map((i) => String(i.id)))) {
     const { data: devs, error: e2 } = await cli
       .from("devolucion_items")
       .select("ticket_item_id_original, cantidad_devuelta, devoluciones!inner(estado, deleted_at)")
-      .in("ticket_item_id_original", filas.map((i) => String(i.id)))
+      .in("ticket_item_id_original", ids)
       .neq("devoluciones.estado", "CANCELADA")
       .is("devoluciones.deleted_at", null);
     if (e2) throw new Error(e2.message);
@@ -315,11 +325,13 @@ export async function buscarVentaPorFolio(token: string, folio: string, sucursal
 
 /**
  * Ventas PAGADO/FACTURADO de los últimos `dias` (por día contable, en hora de México) con un
- * renglón no cancelado de ese producto; la más reciente primero. Mismo alcance que el folio.
+ * renglón no cancelado de ese producto, de la sucursal de la caja; la más reciente primero.
+ * Mismo alcance que el folio.
  */
-export async function buscarVentasConProducto(token: string, productoId: string, dias = 30): Promise<VentaDevolvible[]> {
+export async function buscarVentasConProducto(token: string, productoId: string, sucursalId: string, dias = 30): Promise<VentaDevolvible[]> {
   const { data, error } = await employeeClient(token)
     .from("tickets").select(`${COLUMNAS_TICKET}, ticket_items!inner(producto_id)`)
+    .eq("sucursal_id", sucursalId)
     .eq("ticket_items.producto_id", productoId).eq("ticket_items.cancelado", false)
     .in("estado_fiscal", ESTADOS_DEVOLVIBLES)
     .gte("dia_contable", sumarDias(hoyMx(), -dias))

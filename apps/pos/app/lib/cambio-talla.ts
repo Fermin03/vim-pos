@@ -40,6 +40,9 @@ const Resultado = z.object({
   diferencia_mxn: z.coerce.number(),
 });
 
+/** La base rechazó el cambio (`DATOS_INVALIDOS`): no quedó nada hecho; el siguiente intento lleva otra llave. */
+export class CambioRechazado extends Error {}
+
 export type CambioRegistrado = { ticketId: string; regresa: number; lleva: number; diferencia: number };
 
 /**
@@ -70,7 +73,11 @@ export async function registrarCambio(args: {
     p_client_id_local: args.clientId,
   });
   // «DATOS_INVALIDOS: …» trae el motivo para el cajero (p. ej. el de una venta facturada).
-  if (error) throw new Error(error.message.replace(/^DATOS_INVALIDOS:\s*/, ""));
+  // Otro error (la red, un corte) es ambiguo: el cambio pudo quedar hecho y la llave se conserva.
+  if (error) {
+    if (/^DATOS_INVALIDOS:/.test(error.message)) throw new CambioRechazado(error.message.replace(/^DATOS_INVALIDOS:\s*/, ""));
+    throw new Error(error.message);
+  }
   const r = Resultado.parse(data);
   return { ticketId: r.ticket_id, regresa: r.regresa_mxn, lleva: r.lleva_mxn, diferencia: r.diferencia_mxn };
 }

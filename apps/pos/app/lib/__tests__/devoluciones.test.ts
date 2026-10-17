@@ -1,8 +1,27 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../supabase", () => ({ employeeClient: () => ({}) }));
+/** Cliente falso: anota cada consulta (tabla + filtros) y responde lo que diga `responder`. */
+const falso = vi.hoisted(() => {
+  type Consulta = { tabla: string; filtros: [string, string, unknown][] };
+  const consultas: Consulta[] = [];
+  let responder: (c: Consulta) => unknown[] = () => [];
+  const cliente = {
+    from(tabla: string) {
+      const c: Consulta = { tabla, filtros: [] };
+      consultas.push(c);
+      const b: Record<string, unknown> = {};
+      for (const m of ["select", "eq", "in", "neq", "is", "gte", "order", "limit"]) {
+        b[m] = (col: string, v: unknown) => { c.filtros.push([m, col, v]); return b; };
+      }
+      b.then = (ok: (r: { data: unknown[]; error: null }) => unknown) => Promise.resolve({ data: responder(c), error: null }).then(ok);
+      return b;
+    },
+  };
+  return { consultas, cliente, fijar: (r: (c: Consulta) => unknown[]) => { responder = r; } };
+});
+vi.mock("../supabase", () => ({ employeeClient: () => falso.cliente }));
 
-import { alcanceDevolucion, itemsDevolucion, motivosDevolucion, totalDevolucion, type VentaDevolvible } from "../devoluciones";
+import { alcanceDevolucion, buscarVentasConProducto, itemsDevolucion, motivosDevolucion, totalDevolucion, type VentaDevolvible } from "../devoluciones";
 
 const venta: VentaDevolvible = {
   ticketId: "t1",
@@ -65,5 +84,23 @@ describe("armado de la devolución parcial", () => {
     // 2.01 / 2 = 1.005: en flotante 100.4999… centavos, que redondeaba a 1.00.
     const chico = { ...impar, total: 2.01, renglones: [{ ...impar.renglones[0], total: 2.01 }] };
     expect(totalDevolucion(chico, [{ ticket_item_id: "i1", cantidad: 1, regresaAlAnaquel: true }])).toBe(1.01);
+  });
+});
+
+describe("buscar ventas por la prenda escaneada", () => {
+  it("busca solo en la sucursal de la caja y pide los renglones de a 50 ids", async () => {
+    falso.consultas.length = 0;
+    const tickets = Array.from({ length: 50 }, (_, i) => ({ id: `t${i}`, folio_completo: `A-${i}`, total_mxn: 100, fecha_pago: null, estado_fiscal: "PAGADO" }));
+    // Dos renglones por venta: 100 ids de renglón, que van en dos consultas de devoluciones.
+    falso.fijar((c) => c.tabla === "tickets" ? tickets
+      : c.tabla === "ticket_items" ? tickets.flatMap((t) => [0, 1].map((k) => ({ id: `${t.id}-${k}`, ticket_id: t.id, producto_id: "p1", producto_nombre_snapshot: "Playera", cantidad: 1, precio_unitario_snapshot: 50, total_item_mxn: 50 })))
+      : []);
+    const ventas = await buscarVentasConProducto("tok", "p1", "suc-1");
+    expect(falso.consultas[0]?.filtros).toContainEqual(["eq", "sucursal_id", "suc-1"]);
+    expect(ventas).toHaveLength(50);
+    expect(ventas[0]?.renglones).toHaveLength(2);
+    const enDev = falso.consultas.filter((c) => c.tabla === "devolucion_items")
+      .map((c) => (c.filtros.find(([m]) => m === "in")?.[2] as string[]).length);
+    expect(enDev).toEqual([50, 50]);
   });
 });

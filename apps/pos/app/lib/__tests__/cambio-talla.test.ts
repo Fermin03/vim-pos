@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../supabase", () => ({ employeeClient: () => ({}) }));
+const rpc = vi.hoisted(() => ({ error: null as { message: string } | null }));
+vi.mock("../supabase", () => ({ employeeClient: () => ({ rpc: async () => ({ data: null, error: rpc.error }) }) }));
 
-import { resumenCambio } from "../cambio-talla";
+import { CambioRechazado, registrarCambio, resumenCambio } from "../cambio-talla";
 import { fmtMxn } from "../turno";
 
 describe("resumenCambio", () => {
@@ -24,5 +25,26 @@ describe("resumenCambio", () => {
     expect(r.texto).toBe(`Le regresas ${fmtMxn(0.01)} en efectivo`);
     expect(resumenCambio(0.1, 0.3).diferencia).toBe(0.2);
     expect(resumenCambio(10.005, 10.005).texto).toBe("Sin diferencia");
+  });
+});
+
+describe("registrarCambio: rechazo definitivo o en duda", () => {
+  const args = {
+    token: "t", ticketOrigen: "v", regresa: { ticketItemId: "i", cantidad: 1 }, lleva: { productoId: "p", cantidad: 1 },
+    cajaId: "c", turnoId: "u", usuarioId: "e", autorizacion: { autorizacionPinId: "a", autorizoId: "e" }, clientId: "k",
+  };
+
+  it("DATOS_INVALIDOS es CambioRechazado, con el motivo sin prefijo", async () => {
+    rpc.error = { message: "DATOS_INVALIDOS: esa venta es de otra sucursal" };
+    const e = await registrarCambio(args).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(CambioRechazado);
+    expect((e as Error).message).toBe("esa venta es de otra sucursal");
+  });
+
+  it("otro error (la red) no lo es: la llave se conserva", async () => {
+    rpc.error = { message: "Failed to fetch" };
+    const e = await registrarCambio(args).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(Error);
+    expect(e).not.toBeInstanceOf(CambioRechazado);
   });
 });

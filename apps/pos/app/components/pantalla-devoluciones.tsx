@@ -112,7 +112,7 @@ export function PantallaDevoluciones({
       setBusqueda({ titulo: `Código ${codigo}`, ventas: [], vacio: `No encontramos el código ${codigo}.` });
       return;
     }
-    void buscar(() => buscarVentasConProducto(token, p.id), {
+    void buscar(() => buscarVentasConProducto(token, p.id, caja.sucursal_id), {
       titulo: `Últimos 30 días · ${p.nombre}`,
       vacio: `Ninguna venta de los últimos 30 días lleva ${p.nombre}.`,
       marcar: p.id,
