@@ -56,6 +56,7 @@ export function PantallaCambioTalla({
   sucursales,
   actualizadoA,
   escaneoIgnorado,
+  ventaInicial,
   onSalir,
   onCobrar,
   onImprimir,
@@ -70,6 +71,8 @@ export function PantallaCambioTalla({
   actualizadoA: string | null;
   /** Un aviso de home-pos encima (pedido de la tienda en línea): el escaneo no hace nada. */
   escaneoIgnorado: boolean;
+  /** El id de la venta ya elegida en Transacciones: arranca en el paso 2 y `Volver` desde ahí sale. */
+  ventaInicial?: string;
   onSalir: () => void;
   /** Cambio con saldo: la venta nueva quedó ABIERTA; home-pos la carga y abre su cobro. */
   onCobrar: (ticketId: string, saldo: number) => void;
@@ -122,6 +125,7 @@ export function PantallaCambioTalla({
     setError(null);
     if (hecho) return onSalir();
     if (paso === 1) return busqueda ? setBusqueda(null) : onSalir();
+    if (paso === 2 && ventaInicial) return onSalir();
     setPaso(paso - 1);
   }
   useEscape(atras);
@@ -166,6 +170,12 @@ export function PantallaCambioTalla({
       if (montado.current) setError(e instanceof Error ? e.message : "No se pudo leer la venta");
     }
   }
+
+  // Solo al montar: la venta que se eligió en Transacciones abre de una vez en «Qué regresa».
+  useEffect(() => {
+    if (ventaInicial) void abrirVentaTurno(ventaInicial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function irAPaso3() {
     setPaso(3);

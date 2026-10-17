@@ -172,3 +172,27 @@ export function decidirEscaneo(productos: Producto[], codigo: string, { cobroAbi
   const padre = c ? productos.find((p) => p.variante_ejes?.length && [p.codigo_barras, p.codigo_interno].some((k) => k && norm(k) === c)) : undefined;
   return padre ? { tipo: "selector", padre } : { tipo: "no-encontrado" };
 }
+
+/** Un renglón de «Cuentas abiertas» en Transacciones: abiertas de Para llevar y, si quedaron, en espera. */
+export type FilaCuenta = { ticketId: string; titulo: string; folio: string | null; monto: number; etiquetaEspera: string | null };
+
+/**
+ * Transacciones (pos-retail.md, «Versión 2»): primero las cuentas abiertas, con lo que falta por
+ * cobrar (la de un cambio con diferencia solo debe la diferencia); luego las que quedaron en espera
+ * de antes, que la tienda ya no crea pero se retoman como siempre.
+ */
+export function filasCuentas(
+  abiertas: { ticketId: string; folio: string | null; cliente: string | null; total: number; pendiente: number }[],
+  espera: { ticketId: string; folio: string | null; etiqueta: string; total: number }[],
+): FilaCuenta[] {
+  return [
+    ...abiertas.map((c) => ({ ticketId: c.ticketId, titulo: c.cliente ?? c.folio ?? "Cuenta abierta", folio: c.cliente ? c.folio : null, monto: c.pendiente > 0 ? c.pendiente : c.total, etiquetaEspera: null })),
+    ...espera.map((t) => ({ ticketId: t.ticketId, titulo: t.etiqueta, folio: t.folio, monto: t.total, etiquetaEspera: t.etiqueta })),
+  ];
+}
+
+/** El renglón de una venta como el del ticket: padre y variante si la prenda sigue en el catálogo; si no, el nombre con que se cobró. */
+export function renglonVenta(r: { producto_id: string | null; nombre: string }, productos: Producto[]): { nombre: string; detalle: string | undefined } {
+  const p = r.producto_id ? productos.find((x) => x.id === r.producto_id) : undefined;
+  return p ? renglonTienda(p, productos) : { nombre: r.nombre, detalle: undefined };
+}

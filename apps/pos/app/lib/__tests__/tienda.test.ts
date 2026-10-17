@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { Producto } from "../catalogo";
 import type { DatosCaja } from "../turno";
-import { agruparTienda, buscarPorCodigo, decidirEscaneo, esTienda, estadoExistencia, etiquetaExistencia, matrizVariantes, pasoConLimite, puedeCambiarSeccion, renglonTienda, resumenVitrina, sinExistencia, type Existencia } from "../tienda";
+import { agruparTienda, buscarPorCodigo, decidirEscaneo, esTienda, estadoExistencia, etiquetaExistencia, matrizVariantes, pasoConLimite, filasCuentas, puedeCambiarSeccion, renglonTienda, renglonVenta, resumenVitrina, sinExistencia, type Existencia } from "../tienda";
 
 const prod = (id: string, extra: Partial<Producto> = {}): Producto => ({
   id, nombre: id, descripcion: null, precio_base_mxn: 100, categoria_id: "c", agotado: false, esCombo: false, seVendeAqui: true, ...extra,
@@ -182,5 +182,28 @@ describe("puedeCambiarSeccion", () => {
     expect(puedeCambiarSeccion(false, false)).toBe(true);
     expect(puedeCambiarSeccion(true, false)).toBe(false);
     expect(puedeCambiarSeccion(false, true)).toBe(false);
+  });
+});
+
+describe("Transacciones", () => {
+  it("las abiertas van primero, con lo que falta por cobrar; luego las de espera", () => {
+    const filas = filasCuentas(
+      [
+        { ticketId: "a", folio: "A-1", cliente: null, total: 349, pendiente: 349 },
+        { ticketId: "b", folio: "A-2", cliente: "Ana", total: 399, pendiente: 50 },
+      ],
+      [{ ticketId: "e", folio: "A-0", etiqueta: "Señora de rojo", total: 120 }],
+    );
+    expect(filas.map((f) => [f.ticketId, f.titulo, f.folio, f.monto, f.etiquetaEspera])).toEqual([
+      ["a", "A-1", null, 349, null],
+      ["b", "Ana", "A-2", 50, null],
+      ["e", "Señora de rojo", "A-0", 120, "Señora de rojo"],
+    ]);
+  });
+
+  it("el renglón de la venta usa el catálogo si la prenda sigue ahí", () => {
+    const productos = [padre, h("h1", "M", "Negro", 100, { codigo_interno: "POL-M" })];
+    expect(renglonVenta({ producto_id: "h1", nombre: "P M Negro" }, productos)).toEqual({ nombre: "P", detalle: "M · Negro · POL-M" });
+    expect(renglonVenta({ producto_id: "borrado", nombre: "Playera vieja" }, productos)).toEqual({ nombre: "Playera vieja", detalle: undefined });
   });
 });

@@ -48,6 +48,7 @@ export function PantallaDevoluciones({
   empleado,
   productos = [],
   escaneoIgnorado = false,
+  ventaInicial,
   onSalir,
 }: {
   token: string;
@@ -58,6 +59,8 @@ export function PantallaDevoluciones({
   productos?: Producto[];
   /** Hay un aviso de home-pos encima (pedido de la tienda en línea): el escaneo no hace nada. */
   escaneoIgnorado?: boolean;
+  /** Tienda: el id de la venta ya elegida en Transacciones. Se salta la lista y, al terminar o cerrar, sale. */
+  ventaInicial?: string;
   onSalir: () => void;
 }) {
   const [ventas, setVentas] = useState<VentaTurno[] | null>(null);
@@ -72,7 +75,9 @@ export function PantallaDevoluciones({
   const [buscando, setBuscando] = useState(false);
   // El recibo de la devolución va encima de la lista: Escape lo cierra a él antes de salir. En una
   // tienda, Escape deja primero la búsqueda y regresa a las ventas del turno.
-  useEscape(reciboDev ? () => setReciboDev(null) : busqueda ? () => setBusqueda(null) : onSalir);
+  // Llegando con la venta elegida, cerrar el recibo es terminar: regresa a Transacciones.
+  const cerrarRecibo = () => (ventaInicial ? onSalir() : setReciboDev(null));
+  useEscape(reciboDev ? cerrarRecibo : busqueda ? () => setBusqueda(null) : onSalir);
   const montado = useRef(true);
 
   async function buscar(fn: () => Promise<VentaDevolvible[]>, b: Omit<Busqueda, "ventas">) {
@@ -150,6 +155,12 @@ export function PantallaDevoluciones({
       montado.current = false;
     };
   }, [recargar]);
+
+  // Solo al montar: la venta que se eligió en Transacciones abre de una vez.
+  useEffect(() => {
+    if (ventaInicial) void abrirVentaTurno(ventaInicial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="flex h-screen flex-col">
@@ -273,9 +284,10 @@ export function PantallaDevoluciones({
             setSelTienda(null);
             setBusqueda(null);
             if (d) setReciboDev(d);
+            else if (ventaInicial) return onSalir();
             recargar();
           }}
-          onCerrar={() => setSelTienda(null)}
+          onCerrar={() => (ventaInicial ? onSalir() : setSelTienda(null))}
         />
       )}
 
@@ -299,7 +311,7 @@ export function PantallaDevoluciones({
         <OverlayReciboDevolucion
           d={reciboDev}
           onImprimir={() => { obtenerImpresora("CAJA", { onMostrar: () => window.print() }).imprimir(construirDevolucionJob(reciboDev)); }}
-          onCerrar={() => setReciboDev(null)}
+          onCerrar={cerrarRecibo}
         />
       )}
     </div>

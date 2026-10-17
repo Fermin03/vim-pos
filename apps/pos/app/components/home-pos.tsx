@@ -57,6 +57,7 @@ import { PantallaReservaciones } from "./pantalla-reservaciones";
 import { PantallaConsultaCuentas } from "./pantalla-consulta-cuentas";
 import { PantallaDevoluciones } from "./pantalla-devoluciones";
 import { PantallaCambioTalla } from "./pantalla-cambio-talla";
+import { SeccionTransacciones } from "./seccion-transacciones";
 import { PantallaPedidosApps } from "./pantalla-pedidos-apps";
 import { accionPedidoApp, hayExpiradosSinVer, leerExpiradosHoy, leerPedidosApps, type PedidoApp, type PedidoAppEstado } from "../lib/pedidos-apps";
 import {
@@ -600,6 +601,8 @@ export function HomePos({
   const [avisoRetail, setAvisoRetail] = useState<AvisoEscaneo | null>(null);
   /** Pantalla «Cambio de talla» (pos-retail.md): se entra desde la cabecera o el ticket vacío. */
   const [enCambioTalla, setEnCambioTalla] = useState(false);
+  /** La venta elegida en Transacciones: Devolver o Cambio de talla arrancan con ella. */
+  const [ventaElegida, setVentaElegida] = useState<string | null>(null);
   /** Venta nueva de un cambio con saldo: al cargarse en el carrito se abre su cobro. */
   const [cobrarCambio, setCobrarCambio] = useState<string | null>(null);
   const [existencias, setExistencias] = useState<Existencia[] | null>(null);
@@ -1896,22 +1899,47 @@ export function HomePos({
 
   // ── Cambio de talla (giro RETAIL) ─────────────────────────────────────────────────────────
   /** Entra a la pantalla. Con un ticket a medias no: al final el cambio puede cargar su venta al carrito. */
-  const abrirCambioTalla = () => {
+  /** `ventaId`: la venta ya elegida en Transacciones (arranca en «Qué regresa»). */
+  const abrirCambioTalla = (ventaId?: string) => {
     if (carrito.lineas.length > 0 || ticketBd) {
       setError("Tienes una venta a medias. Cóbrala o déjala en espera antes de hacer un cambio.");
       return;
     }
     setError(null);
     nuevoTicket(); // «Cobro completado» y el recibo de la venta anterior se cierran
+    setVentaElegida(ventaId ?? null);
     setEnCambioTalla(true);
   };
   /** Cambio con saldo: su venta nueva quedó ABIERTA. Se carga como una cuenta y se abre su cobro. */
   const cobrarCambioTalla = async (ticketId: string, saldo: number) => {
     setEnCambioTalla(false);
+    setVentaElegida(null);
     setCuentasVersion((v) => v + 1);
     if (await entrarCuenta(ticketId)) setCobrarCambio(ticketId);
     else setError(`El cambio quedó registrado, pero no se pudo abrir su cobro. Queda en Transacciones: cóbrale ${fmtMxn(saldo)} desde ahí.`);
   };
+  /**
+   * Transacciones: una cuenta abierta (o una en espera de antes) se carga en el Panel. Lo que está
+   * en el Panel se suelta como al salir de la venta: la cuenta guardada sigue abierta, y productos
+   * sin guardar solo se borran si el cajero lo confirma. `entrarCuenta` pasa al Panel.
+   */
+  const abrirDesdeTransacciones = (ticketId: string, etiquetaEspera?: string) => conVentaSuelta(async () => {
+    if (etiquetaEspera === undefined) { await entrarCuenta(ticketId); return; }
+    try {
+      await retomarTicketEnEspera(token, ticketId);
+      if (!(await entrarCuenta(ticketId))) {
+        // Mismo resguardo que `retomarEspera`: sin cargar, no se queda fuera de espera.
+        await ponerTicketEnEspera(token, ticketId, etiquetaEspera).catch(() => {});
+        setError("No se pudo cargar el pedido. Sigue en espera; intenta de nuevo.");
+        return;
+      }
+      setRetomadoEspera({ ticketId, etiqueta: etiquetaEspera });
+      refrescarEspera();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo retomar el pedido");
+    }
+  })();
+
   // `iniciarCobro` lee el carrito y la cuenta recién cargados: por eso espera a que estén.
   useEffect(() => {
     if (!cobrarCambio || ticketBd?.ticketId !== cobrarCambio || carrito.lineas.length === 0) return;
@@ -2739,7 +2767,8 @@ export function HomePos({
   }
 
   if (enDevoluciones) {
-    return <><PantallaDevoluciones token={token} caja={caja} turno={turno} empleado={empleado} productos={productos ?? undefined} escaneoIgnorado={avisoTiendaVisible} onSalir={volverAlInicio} />{capaTienda}</>;
+    return <><PantallaDevoluciones token={token} caja={caja} turno={turno} empleado={empleado} productos={productos ?? undefined} escaneoIgnorado={avisoTiendaVisible}
+      ventaInicial={ventaElegida ?? undefined} onSalir={() => { setVentaElegida(null); volverAlInicio(); }} />{capaTienda}</>;
   }
 
   // `hayEnLinea` manda incluso sobre el estado de navegación: si el módulo se apagó mientras el
@@ -2760,7 +2789,8 @@ export function HomePos({
       <>
         <PantallaCambioTalla token={token} caja={caja} turno={turno} empleado={empleado} productos={productos ?? []}
           existencias={existencias} sucursales={sucursalesTienda} actualizadoA={actualizadoA} escaneoIgnorado={avisoTiendaVisible}
-          onSalir={() => { setEnCambioTalla(false); setCuentasVersion((v) => v + 1); }}
+          ventaInicial={ventaElegida ?? undefined}
+          onSalir={() => { setEnCambioTalla(false); setVentaElegida(null); setCuentasVersion((v) => v + 1); }}
           onCobrar={(id, saldo) => void cobrarCambioTalla(id, saldo)}
           onImprimir={(id) => reimprimirCuenta(id)} />
         {capaTienda}
@@ -2961,7 +2991,7 @@ export function HomePos({
             renglon: (l) => renglonTienda(l.producto, productos ?? []),
             sinExistencia: (l) => sinExistencia(l.producto, carrito.lineas.filter((x) => x.producto.id === l.producto.id).reduce((s, x) => s + x.cantidad, 0), existencias, caja.sucursal_id),
             ultimoProductoId: ultimoTienda,
-            onCambioTalla: abrirCambioTalla,
+            onCambioTalla: () => abrirCambioTalla(),
             simple: true,
             onAsignarCliente: admiteClienteCuenta(carrito.modoServicio) ? () => setClienteCuentaAbierto(true) : undefined,
             cliente: carrito.clienteCuenta?.nombre ?? null,
@@ -3026,7 +3056,7 @@ export function HomePos({
                   enPagina
                   onCorteX={() => setEnMonitor(true)}
                   onKds={() => setEnKds(true)}
-                  onDevoluciones={() => setEnDevoluciones(true)}
+                  // Sin «Devoluciones»: en la tienda vive en Transacciones, con la venta elegida.
                   onEnEspera={nEnEspera > 0 ? () => { setEsperaError(null); setEsperaListaAbierta(true); } : undefined}
                   onAbrirCajon={() => setAbrirCajaAbierto(true)}
                   onMovimientoCaja={() => setMovimientoAbierto(true)}
@@ -3043,11 +3073,24 @@ export function HomePos({
                 />
               </div>
             </>
+          ) : seccionTienda === "transacciones" ? (
+            <SeccionTransacciones
+              caja={caja}
+              turno={turno}
+              token={token}
+              productos={productos ?? []}
+              escaneoIgnorado={escaneoIgnorado}
+              onAbrirCuenta={(id) => abrirDesdeTransacciones(id)}
+              onRetomar={(id, etiqueta) => abrirDesdeTransacciones(id, etiqueta)}
+              onDevolver={(id) => { setVentaElegida(id); setEnDevoluciones(true); }}
+              onCambio={(id) => abrirCambioTalla(id)}
+              onReimprimir={(id) => reimprimirCuenta(id, { origen: "CONSULTA" })}
+            />
           ) : (
-            // Inventario, Transacciones y Notificaciones llegan en las tareas 4, 5, 7 y 8 de la entrega 4b.
+            // Inventario y Notificaciones llegan en las tareas 5, 7 y 8 de la entrega 4b.
             <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
               <h1 className="font-display text-24 font-semibold tracking-tight">
-                {seccionTienda === "inventario" ? "Inventario" : seccionTienda === "transacciones" ? "Transacciones" : "Notificaciones"}
+                {seccionTienda === "inventario" ? "Inventario" : "Notificaciones"}
               </h1>
               <p className="text-15 text-ink-2">Próximamente.</p>
             </div>
