@@ -3121,9 +3121,11 @@ export function HomePos({
         <div className="flex min-h-0 flex-1 flex-col">
           {seccionTienda === "configuracion" ? (
             <>
+              <div className="flex flex-shrink-0 items-center gap-4 border-b border-line bg-surface px-4 py-3">
+                <h1 className="font-display text-20 font-semibold tracking-tight">Configuración</h1>
+              </div>
               {acceso.actualizacion && acceso.nivel !== "bloqueado" && <BandaActualizacion version={acceso.actualizacion} />}
               <div className="min-h-0 flex-1 overflow-y-auto px-8 py-8">
-                <h1 className="mx-auto mb-8 max-w-4xl font-display text-24 font-semibold tracking-tight">Configuración</h1>
                 <ContenidoMenu
                   enPagina
                   onCorteX={() => setEnMonitor(true)}

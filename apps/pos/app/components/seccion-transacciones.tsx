@@ -184,8 +184,8 @@ export function SeccionTransacciones({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-shrink-0 flex-wrap items-center gap-4 px-6 pt-6">
-        <h1 className="mr-auto font-display text-24 font-semibold tracking-tight">Transacciones</h1>
+      <div className="flex flex-shrink-0 items-center gap-4 border-b border-line bg-surface px-4 py-3">
+        <h1 className="mr-auto font-display text-20 font-semibold tracking-tight">Transacciones</h1>
         <form className="flex w-full max-w-[420px] items-center gap-2" onSubmit={(e) => { e.preventDefault(); buscarFolio(); }}>
           <input
             data-escaner="busqueda"

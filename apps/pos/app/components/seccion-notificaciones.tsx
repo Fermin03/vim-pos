@@ -21,7 +21,7 @@ export function SeccionNotificaciones({ notificaciones, onAbrirProducto }: {
   const [aviso, setAviso] = useState<Notificacion | null>(null);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex-shrink-0 border-b border-line bg-surface px-4 py-3">
+      <div className="flex flex-shrink-0 items-center gap-4 border-b border-line bg-surface px-4 py-3">
         <h1 className="font-display text-20 font-semibold tracking-tight">Notificaciones</h1>
       </div>
       {notificaciones.length === 0 ? (
