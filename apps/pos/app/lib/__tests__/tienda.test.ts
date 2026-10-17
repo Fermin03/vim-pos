@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import type { Producto } from "../catalogo";
 import type { DatosCaja } from "../turno";
-import { agruparTienda, buscarPorCodigo, decidirEscaneo, esTienda, estadoExistencia, matrizVariantes, renglonTienda, resumenVitrina, sinExistencia, type Existencia } from "../tienda";
+import { agruparTienda, buscarPorCodigo, decidirEscaneo, esTienda, estadoExistencia, matrizVariantes, pasoConLimite, renglonTienda, resumenVitrina, sinExistencia, type Existencia } from "../tienda";
 
 const prod = (id: string, extra: Partial<Producto> = {}): Producto => ({
   id, nombre: id, descripcion: null, precio_base_mxn: 100, categoria_id: "c", agotado: false, esCombo: false, seVendeAqui: true, ...extra,
@@ -132,5 +132,38 @@ describe("sinExistencia", () => {
   });
   it("no marca lo que no controla existencias", () => {
     expect(sinExistencia({ ...p, controla_existencias: false }, 5, [ex("A", 1)], "s1")).toBe(false);
+  });
+});
+
+describe("pasoConLimite (la fila de agregados de la tienda)", () => {
+  it("un paso colgado vence a los 8 s, la fila sigue y la respuesta tardía no agrega", async () => {
+    vi.useFakeTimers();
+    try {
+      const agregadas: string[] = [];
+      let soltar: () => void = () => {};
+      const colgada = new Promise<void>((ok) => { soltar = ok; });
+      let fila: Promise<unknown> = Promise.resolve();
+      const resultados: boolean[] = [];
+      const encolar = (id: string, espera: Promise<void>) => {
+        fila = fila.then(async () => {
+          resultados.push(await pasoConLimite(async (vigente) => { await espera; if (vigente()) agregadas.push(id); }));
+        });
+      };
+      encolar("a", colgada);
+      encolar("b", Promise.resolve());
+      await vi.advanceTimersByTimeAsync(7999);
+      expect(agregadas).toEqual([]); // «b» espera a «a»
+      await vi.advanceTimersByTimeAsync(1);
+      await fila;
+      expect(resultados).toEqual([false, true]);
+      expect(agregadas).toEqual(["b"]);
+      soltar(); // «a» responde tarde
+      await vi.advanceTimersByTimeAsync(0);
+      expect(agregadas).toEqual(["b"]);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("el error de un paso a tiempo sube", async () => {
+    await expect(pasoConLimite(async () => { throw new Error("sin red"); })).rejects.toThrow("sin red");
   });
 });

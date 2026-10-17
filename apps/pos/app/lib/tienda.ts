@@ -6,6 +6,20 @@ import type { DatosCaja } from "./turno";
 /** La caja de tienda es solo para el giro RETAIL; todo lo demás queda como estaba. */
 export const esTienda = (caja: DatosCaja | null): boolean => caja?.giro === "RETAIL";
 
+/**
+ * Un paso de la fila de agregados con tope de tiempo. Resuelve `true` si `paso` terminó (o falló:
+ * el error sube) y `false` si pasaron `ms`: la fila sigue. `vigente()` es false desde el vencimiento:
+ * el paso lo consulta antes de escribir, así una respuesta tardía no agrega la pieza después.
+ */
+export function pasoConLimite(paso: (vigente: () => boolean) => Promise<void>, ms = 8000): Promise<boolean> {
+  let vencido = false;
+  let reloj: ReturnType<typeof setTimeout> | undefined;
+  const limite = new Promise<boolean>((ok) => { reloj = setTimeout(() => { vencido = true; ok(false); }, ms); });
+  const hecho = paso(() => !vencido).then(() => true);
+  hecho.catch(() => { /* tras vencer, nadie espera este error */ });
+  return Promise.race([hecho, limite]).finally(() => clearTimeout(reloj));
+}
+
 export type Existencia = { producto_id: string; sucursal_id: string; cantidad: number; minimo: number | null };
 export type EstadoExistencia = "normal" | "pocas" | "agotada";
 

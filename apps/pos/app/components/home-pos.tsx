@@ -76,7 +76,7 @@ import { fijarContextoErrores, reportarErrorSinEsperar } from "../lib/reportar-e
 import { BotonVolver } from "./boton-volver";
 import { CatalogoProductos } from "./catalogo-productos";
 import { PanelVentaRetail, type AvisoEscaneo } from "./venta-retail";
-import { esTienda, leerExistencias, leerSucursales, renglonTienda, sinExistencia, type Existencia, type PadreTienda } from "../lib/tienda";
+import { esTienda, leerExistencias, leerSucursales, pasoConLimite, renglonTienda, sinExistencia, type Existencia, type PadreTienda } from "../lib/tienda";
 import { leerEstadoSync } from "../lib/estado-sync";
 import { ModalAgregarProductos } from "./modal-agregar-productos";
 import { ModalNumeroMesa } from "./modal-numero-mesa";
@@ -846,13 +846,20 @@ export function HomePos({
       // existencia en cero sí se vende.
       if (p.agotado) { setAvisoRetail({ tipo: "no-se-vende" }); return; }
       setAvisoRetail(null);
+      // Cada paso tiene 8 s: si la red se cuelga, el aviso sale y la fila sigue con la pieza
+      // siguiente; la respuesta tardía ya no agrega esta (`vigente`). Un agregado a la cuenta
+      // guardada que ya salió no se puede retirar: si la base lo guardó, aparece al releer.
       colaTienda.current = colaTienda.current.then(async () => {
         try {
-          const grupos = await obtenerGruposDeProducto(token, p.id);
-          if (grupos.length > 0) { setModGrupos({ producto: p, grupos }); return; }
-          if (ticketBd) await agregarSuelto(p, [], null);
-          else dispatch({ tipo: "agregar", sumarSiIgual: true, linea: { clientId: nuevoClientId(), producto: p, cantidad: 1, modificadores: [], notaCocina: null } });
-          setUltimoTienda(p.id);
+          const aTiempo = await pasoConLimite(async (vigente) => {
+            const grupos = await obtenerGruposDeProducto(token, p.id);
+            if (!vigente()) return;
+            if (grupos.length > 0) { setModGrupos({ producto: p, grupos }); return; }
+            if (ticketBd) await agregarSuelto(p, [], null);
+            else dispatch({ tipo: "agregar", sumarSiIgual: true, linea: { clientId: nuevoClientId(), producto: p, cantidad: 1, modificadores: [], notaCocina: null } });
+            if (vigente()) setUltimoTienda(p.id);
+          });
+          if (!aTiempo) setError(`No se pudo agregar ${p.nombre}: la conexión tardó demasiado. Vuelve a escanearla.`);
         } catch (e) {
           setError(e instanceof Error ? e.message : "No se pudo agregar el producto");
         }
