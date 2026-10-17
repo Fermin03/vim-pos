@@ -37,6 +37,7 @@ export function PanelVentaRetail({
   actualizadoA,
   cobroAbierto,
   escaneoIgnorado,
+  oculto = false,
   cerrarAlEscanear,
   bloqueado,
   selector,
@@ -56,6 +57,8 @@ export function PanelVentaRetail({
   cobroAbierto: boolean;
   /** Un PIN, el aviso de un pedido de la tienda u otro diálogo encima: el escaneo no hace nada. */
   escaneoIgnorado: boolean;
+  /** El Panel está oculto tras otra sección de la barra: el lector no se escucha aquí, el código es de esa sección. */
+  oculto?: boolean;
   /** «Cobro completado» o el recibo a la vista: un escaneo los cierra y empieza la venta nueva (R6). */
   cerrarAlEscanear: (() => void) | null;
   /** El menú está trabado (ticket incompleto, cuenta impresa…): igual que en `CatalogoProductos`. */
@@ -122,7 +125,7 @@ export function PanelVentaRetail({
     }
     onAgregar(d.producto);
   };
-  useEscaner(alCodigo, true);
+  useEscaner(alCodigo, !oculto);
 
   // «Termina el cobro…» se va solo a los 3 s, o en cuanto se cierra el cobro.
   useEffect(() => {

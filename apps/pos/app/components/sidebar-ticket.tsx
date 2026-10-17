@@ -152,6 +152,8 @@ export function SidebarTicket({
     onAsignarCliente?: () => void;
     /** Nombre del cliente asignado; null = sin cliente. */
     cliente?: string | null;
+    /** Con una cuenta guardada a la vista: la suelta sin cobrarla (queda en Transacciones) y deja una venta nueva. */
+    onDejarAbierta?: () => void;
   };
 }) {
   const totales = calcularTotalesDisplay(estado.lineas, 16, estado.envio?.costoMxn ?? 0);
@@ -217,12 +219,24 @@ export function SidebarTicket({
               <button
                 type="button"
                 onClick={tienda.onAsignarCliente}
-                className={`h-11 min-w-0 rounded-md px-2.5 text-13 font-semibold transition-colors hover:bg-hover ${tienda.cliente ? "text-ink" : "text-ink-2"}`}
+                className={`h-11 min-w-0 rounded-md px-2.5 text-left text-13 font-semibold transition-colors hover:bg-hover ${tienda.cliente ? "text-ink" : "text-ink-2"}`}
               >
                 <span className="block truncate">{tienda.cliente ?? "Asignar cliente"}</span>
               </button>
             ) : <span />}
-            {botonLimpiar}
+            <span className="flex flex-shrink-0 items-center">
+              {tienda?.onDejarAbierta && (
+                <button
+                  type="button"
+                  disabled={procesando}
+                  onClick={tienda.onDejarAbierta}
+                  className="h-11 rounded-md px-2.5 text-13 font-semibold text-ink-2 transition-colors hover:bg-hover disabled:cursor-default disabled:opacity-60"
+                >
+                  Dejar abierta
+                </button>
+              )}
+              {botonLimpiar}
+            </span>
           </div>
         )}
         {/* fila superior: título + Limpiar */}

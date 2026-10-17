@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { Button, Icono } from "@vim/ui/styles";
+import { Button, Icono, useConfirmar } from "@vim/ui/styles";
 import {
   listarCategoriasPos,
   listarProductosPos,
@@ -85,7 +85,7 @@ import { ContenidoMenu } from "./contenido-menu";
 import { BarraTienda } from "./barra-tienda";
 import { DialogoAvisos } from "./dialogo-avisos";
 import { avisosDe, leerDirectivas, type Aviso } from "../lib/directivas";
-import { BarraEstadoCaja, PantallaInicio } from "./pantalla-inicio";
+import { BarraEstadoCaja, ConfirmarSalirCaja, PantallaInicio } from "./pantalla-inicio";
 import { Accion, PantallaCuentasModo } from "./pantalla-cuentas-modo";
 import { PantallaMonitorVentas } from "./pantalla-monitor-ventas";
 import { listarTicketsEnEspera, ponerTicketEnEspera, retomarTicketEnEspera } from "../lib/espera";
@@ -578,6 +578,13 @@ export function HomePos({
    * solo se oculta, así el carrito, el ticket guardado y la fila de agregados siguen donde estaban.
    */
   const [seccionTienda, setSeccionTienda] = useState<SeccionTienda>("panel");
+  /** Salir de la venta desde Configuración (bloquear, cambiar cajero, cerrar turno, salir) con productos sin guardar. */
+  const [confirmar, dialogoConfirmar] = useConfirmar();
+  const [confirmandoVenta, setConfirmandoVenta] = useState(false);
+  /** «Salir» de la caja: la tienda no tiene inicio, así que vive en Configuración. Solo con el preload de escritorio. */
+  const [salirCajaAbierto, setSalirCajaAbierto] = useState(false);
+  const [puedeSalir, setPuedeSalir] = useState(false);
+  useEffect(() => { setPuedeSalir(typeof window.__VIM_SALIR === "function"); }, []);
   /** Avisos de VIM: el inicio los enseña al entrar; la tienda, que no tiene inicio, aquí. */
   const [avisosVim, setAvisosVim] = useState<Aviso[] | null>(null);
   useEffect(() => {
@@ -692,6 +699,45 @@ export function HomePos({
       dispatch({ tipo: "limpiar" });
     }
   }, [cerrarRecibo, enModoMesa, retomadoEspera, token, turno.caja_id]);
+
+  /**
+   * Tienda: suelta la cuenta guardada que está en el Panel sin cobrarla ni cancelarla. Queda abierta
+   * (en Transacciones) o, si se había retomado de espera, vuelve a espera. El Panel queda en una venta
+   * nueva. También suelta la cuenta que se guardó al abrir un cobro, que no entra en «modo cuenta».
+   */
+  const dejarCuentaAbierta = useCallback(() => {
+    salirNavegacion();
+    dispatch({ tipo: "limpiar" });
+    dispatch({ tipo: "modo", modo: "PARA_LLEVAR" });
+    setTicketBd(null);
+    setItemsPersistidos([]);
+    setEnModoMesa(false);
+    setCocinaEnviada(false);
+    setCuentaImpresa(false);
+    setCuentaBarraId(null);
+    setTicketIncompleto(false);
+    setUltimoTienda(null);
+  }, [salirNavegacion]);
+
+  /**
+   * Tienda: antes de dejar la venta desde Configuración. Una cuenta guardada se suelta; productos sin
+   * guardar se borran solo si el cajero lo confirma. `false` = se queda donde estaba.
+   */
+  const soltarVentaTienda = useCallback(async (): Promise<boolean> => {
+    if (ticketBd) { dejarCuentaAbierta(); return true; }
+    const n = carrito.lineas.reduce((s, l) => s + l.cantidad, 0);
+    if (n === 0) return true;
+    setConfirmandoVenta(true);
+    const ok = await confirmar({
+      titulo: "¿Salir de la venta?",
+      mensaje: `Se borra la venta sin guardar (${n} ${n === 1 ? "producto" : "productos"}).`,
+      boton: "Borrar la venta",
+    });
+    setConfirmandoVenta(false);
+    if (ok) dispatch({ tipo: "limpiar" });
+    return ok;
+  }, [ticketBd, carrito.lineas, dejarCuentaAbierta, confirmar]);
+  const conVentaSuelta = (fn: () => void) => () => { void soltarVentaTienda().then((ok) => { if (ok) fn(); }); };
 
   // Se cobró, se canceló o se volvió a poner en espera a mano: el ticket ya no está en pantalla y
   // no hay nada que devolver a espera.
@@ -1814,6 +1860,9 @@ export function HomePos({
       [cerrando, () => setCerrando(false)],
       // Avisos de VIM de la tienda: los cierra su propio diálogo.
       [(avisosVim?.length ?? 0) > 0, null],
+      // Confirmaciones de la Configuración de la tienda: las cierra su propio diálogo.
+      [confirmandoVenta, null],
+      [salirCajaAbierto, null],
     ];
     const pantallas: CapaEscape[] = [
       // La pantalla de cocina no conoce la pila del POS (vive en su propio paquete).
@@ -1842,7 +1891,7 @@ export function HomePos({
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
       salidaPendiente, confirmandoCierre, menuGeneralAbierto, cerrando, enInicio, enKds, enMonitor,
       enConsultaCuentas, enDevoluciones, enCambioTalla, enPedidosApps, enDelivery, enPickup, enMesas, enBarra, nuevoTicket,
-      intentarSalirDeCaptura, tienda, seccionTienda, avisosVim]);
+      intentarSalirDeCaptura, tienda, seccionTienda, avisosVim, confirmandoVenta, salirCajaAbierto]);
   useEscape(alEscapar);
 
   // ── Cambio de talla (giro RETAIL) ─────────────────────────────────────────────────────────
@@ -1861,7 +1910,7 @@ export function HomePos({
     setEnCambioTalla(false);
     setCuentasVersion((v) => v + 1);
     if (await entrarCuenta(ticketId)) setCobrarCambio(ticketId);
-    else setError(`El cambio quedó registrado, pero no se pudo abrir su cobro. Ábrelo en «Cuentas abiertas» y cobra ${fmtMxn(saldo)}.`);
+    else setError(`El cambio quedó registrado, pero no se pudo abrir su cobro. Queda en Transacciones: cóbrale ${fmtMxn(saldo)} desde ahí.`);
   };
   // `iniciarCobro` lee el carrito y la cuenta recién cargados: por eso espera a que estén.
   useEffect(() => {
@@ -2886,8 +2935,9 @@ export function HomePos({
               sucursales={sucursalesTienda}
               actualizadoA={actualizadoA}
               cobroAbierto={totalesCobro != null}
-              // Fuera del Panel el escaneo no llega al ticket: cada sección decide qué hace con el código.
-              escaneoIgnorado={escaneoIgnorado || seccionTienda !== "panel"}
+              escaneoIgnorado={escaneoIgnorado}
+              // Fuera del Panel el lector no se escucha aquí: cada sección decide qué hace con el código.
+              oculto={seccionTienda !== "panel"}
               cerrarAlEscanear={cerrarAlEscanear}
               bloqueado={menuBloqueado}
               selector={selectorRetail}
@@ -2915,6 +2965,7 @@ export function HomePos({
             simple: true,
             onAsignarCliente: admiteClienteCuenta(carrito.modoServicio) ? () => setClienteCuentaAbierto(true) : undefined,
             cliente: carrito.clienteCuenta?.nombre ?? null,
+            onDejarAbierta: ticketBd ? dejarCuentaAbierta : undefined,
           } : undefined}
           onCantidad={(id, c) => { setUltimoTienda(null); dispatch({ tipo: "cantidad", clientId: id, cantidad: c }); }}
           onQuitar={(id) => { setUltimoTienda(null); dispatch({ tipo: "quitar", clientId: id }); }}
@@ -2976,15 +3027,18 @@ export function HomePos({
                   onCorteX={() => setEnMonitor(true)}
                   onKds={() => setEnKds(true)}
                   onDevoluciones={() => setEnDevoluciones(true)}
-                  onEnEspera={() => { setEsperaError(null); setEsperaListaAbierta(true); }}
+                  onEnEspera={nEnEspera > 0 ? () => { setEsperaError(null); setEsperaListaAbierta(true); } : undefined}
                   onAbrirCajon={() => setAbrirCajaAbierto(true)}
+                  onMovimientoCaja={() => setMovimientoAbierto(true)}
+                  onMonitorVentas={() => setEnMonitor(true)}
                   nEnEspera={nEnEspera}
-                  onCambiarCajero={onCambiarCajero}
-                  onBloquear={onBloquear}
+                  onCambiarCajero={conVentaSuelta(onCambiarCajero)}
+                  onBloquear={conVentaSuelta(onBloquear)}
                   onCambiarPin={() => setCambiarPinAbierto(true)}
                   onMisPropinas={() => setMisPropinasAbierto(true)}
                   onImpresora={() => setConfigImpresoraAbierto(true)}
-                  onCerrarTurno={() => setConfirmandoCierre(true)}
+                  onCerrarTurno={conVentaSuelta(() => setConfirmandoCierre(true))}
+                  onSalir={puedeSalir ? conVentaSuelta(() => setSalirCajaAbierto(true)) : undefined}
                   ayuda={{ negocio: caja.negocioNombre, sucursal: caja.sucursalNombre, caja: caja.nombre, cajero: empleado.nombre }}
                 />
               </div>
@@ -3009,6 +3063,8 @@ export function HomePos({
         />
       )}
       {avisosVim && avisosVim.length > 0 && <DialogoAvisos avisos={avisosVim} onCerrar={() => setAvisosVim([])} />}
+      {salirCajaAbierto && <ConfirmarSalirCaja onCancelar={() => setSalirCajaAbierto(false)} />}
+      {dialogoConfirmar}
 
       {esperaPidiendoEtiqueta && (
         <ModalEtiquetaEspera

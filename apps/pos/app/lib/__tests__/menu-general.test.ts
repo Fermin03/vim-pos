@@ -13,9 +13,12 @@ const opciones = {
   onCambiarCajero: nada, onBloquear: nada, onCambiarPin: nada, onMisPropinas: nada, onImpresora: nada, onCerrarTurno: nada,
 };
 
-/** Títulos de sección y etiquetas de las opciones, en el orden en que se pintan. */
+/** Textos de un trozo de HTML, sin etiquetas ni globos numéricos. */
+const textos = (html: string) => html.split(/<[^>]+>/).map((t) => t.trim()).filter((t) => t && !/^\d+$/.test(t));
+/** Títulos de sección («# …») y la etiqueta de cada opción (`role="menuitem"`), en el orden en que se pintan. */
 const leer = (html: string) =>
-  [...html.matchAll(/<h3[^>]*>([^<]+)<\/h3>|<span class="text-center text-15[^"]*">([^<]+)<\/span>/g)].map((m) => m[1] ? `# ${m[1]}` : m[2]);
+  [...html.matchAll(/<h3[^>]*>(.*?)<\/h3>|role="menuitem"[^>]*>(.*?)<\/(?:button|a)>/g)]
+    .map((m) => (m[1] != null ? `# ${textos(m[1])[0]}` : textos(m[2] ?? "")[0]));
 
 describe("menú general", () => {
   it("el restaurante ve el mismo menú de siempre, con Cerrar turno en Ajustes", () => {
@@ -32,5 +35,12 @@ describe("menú general", () => {
     const html = renderToStaticMarkup(React.createElement(ContenidoMenu, { enPagina: true, ...opciones }));
     expect(html).not.toContain('role="dialog"');
     expect(leer(html).slice(-5)).toEqual(["# Ajustes", "Configurar impresoras y pantallas", "Ayuda por WhatsApp", "# Turno", "Cerrar turno"]);
+  });
+
+  it("la tienda suma Retiro / Depósito y Monitor ventas a Operación, y Salir a Turno", () => {
+    const html = renderToStaticMarkup(React.createElement(ContenidoMenu, { enPagina: true, ...opciones, onMovimientoCaja: nada, onMonitorVentas: nada, onSalir: nada }));
+    const l = leer(html);
+    expect(l.slice(l.indexOf("Abrir cajón"), l.indexOf("# Cuenta"))).toEqual(["Abrir cajón", "Retiro / Depósito", "Monitor ventas"]);
+    expect(l.slice(-3)).toEqual(["# Turno", "Cerrar turno", "Salir"]);
   });
 });

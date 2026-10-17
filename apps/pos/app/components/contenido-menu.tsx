@@ -27,6 +27,9 @@ export function ContenidoMenu({
   onMisPropinas,
   onImpresora,
   onCerrarTurno,
+  onMovimientoCaja,
+  onMonitorVentas,
+  onSalir,
   ayuda,
 }: {
   /** Se llama al elegir una opción: el diálogo se cierra para no quedar encima. En la página, nada. */
@@ -49,6 +52,10 @@ export function ContenidoMenu({
   onMisPropinas?: () => void;
   onImpresora: () => void;
   onCerrarTurno?: () => void;
+  /** Solo la tienda, que no tiene inicio: sus accesos «Retiro / Depósito», «Monitor ventas» y «Salir». */
+  onMovimientoCaja?: () => void;
+  onMonitorVentas?: () => void;
+  onSalir?: () => void;
   /** Para el mensaje de "Ayuda por WhatsApp": desde qué negocio, sucursal y caja se escribe. */
   ayuda?: { negocio?: string | null; sucursal?: string | null; caja?: string | null; cajero?: string | null };
 }) {
@@ -102,7 +109,7 @@ export function ContenidoMenu({
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-9">
-      {(onKds || onDevoluciones || onCorteX || onEnEspera || onAbrirCajon) && (
+      {(onKds || onDevoluciones || onCorteX || onEnEspera || onAbrirCajon || onMovimientoCaja || onMonitorVentas) && (
       <SeccionMenu titulo="Operación">
         {onKds && moduloActivo(modulos, "kds") && (
           <TileMenu label="Cocina" onClick={con(onKds)} icon={<Icono nombre="megafono" className="h-8 w-8" />} />
@@ -120,6 +127,12 @@ export function ContenidoMenu({
         )}
         {onAbrirCajon && (
           <TileMenu label="Abrir cajón" onClick={con(onAbrirCajon)} icon={<Icono nombre="cajon" className="h-8 w-8" />} />
+        )}
+        {onMovimientoCaja && (
+          <TileMenu label="Retiro / Depósito" onClick={con(onMovimientoCaja)} icon={<Icono nombre="billete" className="h-8 w-8" />} />
+        )}
+        {onMonitorVentas && (
+          <TileMenu label="Monitor ventas" onClick={con(onMonitorVentas)} icon={<Icono nombre="grafica" className="h-8 w-8" />} />
         )}
       </SeccionMenu>
       )}
@@ -158,7 +171,12 @@ export function ContenidoMenu({
         {!enPagina && cerrarTurno}
       </SeccionMenu>
       {avisoUpd && <p className="-mt-4 text-13 font-medium text-ink-2" role="status">{avisoUpd}</p>}
-      {enPagina && cerrarTurno && <SeccionMenu titulo="Turno">{cerrarTurno}</SeccionMenu>}
+      {enPagina && (cerrarTurno || onSalir) && (
+        <SeccionMenu titulo="Turno">
+          {cerrarTurno}
+          {onSalir && <TileMenu label="Salir" onClick={con(onSalir)} peligro icon={<Icono nombre="salir" className="h-8 w-8" />} />}
+        </SeccionMenu>
+      )}
     </div>
   );
 }

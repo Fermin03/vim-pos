@@ -272,40 +272,48 @@ export function PantallaInicio({
 
       <BarraEstadoCaja caja={caja} online={online} />
 
-      {confirmandoSalir && (
-        <Modal
-          open
-          onClose={() => setConfirmandoSalir(false)}
-          title="Cerrar la caja"
-          hideTitle
-          className="w-[420px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
-        >
-          <h2 className="font-display text-xl font-semibold tracking-tight">¿Cerrar la caja?</h2>
-          {/* Esta computadora es el hub de la LAN: al apagarla, la cocina y cualquier segunda caja
-              se quedan sin backend. Decirlo es la diferencia entre cerrar a propósito y descubrir
-              a media comida que la cocina dejó de recibir comandas. */}
-          <p className="mt-2 text-14 leading-snug text-ink-2">
-            La cocina y las demás pantallas conectadas a esta computadora dejarán de funcionar
-            hasta que la vuelvas a abrir.
-          </p>
-          <p className="mt-2 text-13 leading-snug text-ink-3">
-            Antes de cerrar se guarda un respaldo. No se pierde ninguna venta.
-          </p>
-          <div className="mt-5 flex gap-2">
-            <button
-              type="button"
-              onClick={() => setConfirmandoSalir(false)}
-              className="h-11 flex-1 rounded border border-line-strong text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
-            >
-              Cancelar
-            </button>
-            <Button className="flex-1" onClick={() => { void window.__VIM_SALIR?.(); }}>
-              Cerrar la caja
-            </Button>
-          </div>
-        </Modal>
-      )}
+      {confirmandoSalir && <ConfirmarSalirCaja onCancelar={() => setConfirmandoSalir(false)} />}
     </main>
+  );
+}
+
+/**
+ * Confirmación de «Salir» de la caja (solo existe con el preload de la ventana de escritorio). La usan
+ * el inicio y la Configuración de la caja de tienda.
+ */
+export function ConfirmarSalirCaja({ onCancelar }: { onCancelar: () => void }) {
+  return (
+    <Modal
+      open
+      onClose={onCancelar}
+      title="Cerrar la caja"
+      hideTitle
+      className="w-[420px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
+    >
+      <h2 className="font-display text-xl font-semibold tracking-tight">¿Cerrar la caja?</h2>
+      {/* Esta computadora es el hub de la LAN: al apagarla, la cocina y cualquier segunda caja
+          se quedan sin backend. Decirlo es la diferencia entre cerrar a propósito y descubrir
+          a media comida que la cocina dejó de recibir comandas. */}
+      <p className="mt-2 text-14 leading-snug text-ink-2">
+        La cocina y las demás pantallas conectadas a esta computadora dejarán de funcionar
+        hasta que la vuelvas a abrir.
+      </p>
+      <p className="mt-2 text-13 leading-snug text-ink-3">
+        Antes de cerrar se guarda un respaldo. No se pierde ninguna venta.
+      </p>
+      <div className="mt-5 flex gap-2">
+        <button
+          type="button"
+          onClick={onCancelar}
+          className="h-11 flex-1 rounded border border-line-strong text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+        >
+          Cancelar
+        </button>
+        <Button className="flex-1" onClick={() => { void window.__VIM_SALIR?.(); }}>
+          Cerrar la caja
+        </Button>
+      </div>
+    </Modal>
   );
 }
 

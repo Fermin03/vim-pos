@@ -34,7 +34,7 @@ export function BarraTienda({ seccion, onCambiar, pendientes, bloqueada }: {
             aria-current={elegido ? "page" : undefined}
             onClick={() => { if (!elegido) onCambiar(d.seccion); }}
             className={[
-              "flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 transition-transform duration-150 ease-vim active:scale-[.97] disabled:cursor-default disabled:active:scale-100",
+              "flex h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 transition-transform duration-150 ease-vim active:scale-[.97] disabled:cursor-default disabled:opacity-60 disabled:active:scale-100",
               elegido ? "text-accent" : "text-ink-2",
             ].join(" ")}
           >

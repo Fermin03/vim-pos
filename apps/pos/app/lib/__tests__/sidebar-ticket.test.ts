@@ -23,5 +23,11 @@ describe("SidebarTicket", () => {
     const html = pintar({ tienda: { ...tienda, simple: true, onAsignarCliente: nada, cliente: null } });
     for (const t of [">Precios<", ">Descuento<", ">En espera<"]) expect(html).not.toContain(t);
     for (const t of [">Asignar cliente<", ">Limpiar<", "Cambio de talla", "Efectivo exacto"]) expect(html).toContain(t);
+    expect(html).not.toContain("Dejar abierta");
+  });
+
+  it("con una cuenta guardada, el Panel ofrece dejarla abierta", () => {
+    const html = pintar({ tienda: { ...tienda, simple: true, onDejarAbierta: nada } });
+    expect(html).toContain(">Dejar abierta<");
   });
 });
