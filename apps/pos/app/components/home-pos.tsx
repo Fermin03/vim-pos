@@ -2622,7 +2622,7 @@ export function HomePos({
   }
 
   if (enDevoluciones) {
-    return <><PantallaDevoluciones token={token} caja={caja} turno={turno} empleado={empleado} productos={productos ?? undefined} onSalir={volverAlInicio} />{capaTienda}</>;
+    return <><PantallaDevoluciones token={token} caja={caja} turno={turno} empleado={empleado} productos={productos ?? undefined} escaneoIgnorado={avisoTiendaVisible} onSalir={volverAlInicio} />{capaTienda}</>;
   }
 
   // `hayEnLinea` manda incluso sobre el estado de navegación: si el módulo se apagó mientras el

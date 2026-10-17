@@ -40,7 +40,8 @@ export function MotivoChips<T extends string>({
 }: {
   titulo?: string;
   opciones: ReadonlyArray<{ codigo: T; label: string }>;
-  valor: T;
+  /** null = aún no se elige (la tienda no preselecciona motivo). */
+  valor: T | null;
   onCambiar: (v: T) => void;
   texto: string;
   onTexto: (t: string) => void;

@@ -9,6 +9,7 @@ import {
   alcanceDevolucion,
   buscarVentaPorFolio,
   buscarVentasConProducto,
+  cobradoEnTerminal,
   devolverRenglones,
   devolverVenta,
   leerItemsVenta,
@@ -27,6 +28,7 @@ import {
 } from "../lib/devoluciones";
 import { buscarPorCodigo, esTienda } from "../lib/tienda";
 import { useEscaner } from "../lib/use-escaner";
+import { esEscritorio } from "../lib/actualizacion";
 import type { Producto } from "../lib/catalogo";
 import { ZONA_MX } from "@vim/fecha";
 import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
@@ -46,6 +48,7 @@ export function PantallaDevoluciones({
   turno,
   empleado,
   productos = [],
+  escaneoIgnorado = false,
   onSalir,
 }: {
   token: string;
@@ -54,6 +57,8 @@ export function PantallaDevoluciones({
   empleado: Empleado;
   /** El catálogo de la caja: en una tienda, para reconocer la etiqueta escaneada. */
   productos?: Producto[];
+  /** Hay un aviso de home-pos encima (pedido de la tienda en línea): el escaneo no hace nada. */
+  escaneoIgnorado?: boolean;
   onSalir: () => void;
 }) {
   const [ventas, setVentas] = useState<VentaTurno[] | null>(null);
@@ -88,7 +93,7 @@ export function PantallaDevoluciones({
     const f = folio.trim();
     if (!f) return;
     void buscar(async () => {
-      const v = await buscarVentaPorFolio(token, f);
+      const v = await buscarVentaPorFolio(token, f, caja.sucursal_id);
       // Encontrada: se abre de una vez, sin una lista de un solo renglón en medio.
       if (v && montado.current) {
         setSelTienda({ venta: v });
@@ -98,8 +103,11 @@ export function PantallaDevoluciones({
     }, { titulo: `Folio ${f}`, vacio: `No encontramos una venta cobrada con el folio ${f}.` });
   }
 
-  // El lector de etiquetas: solo en una tienda y con la lista a la vista (no bajo un diálogo).
+  // El lector de etiquetas: encendido siempre en una tienda, para que también bajo un diálogo se
+  // trague la ráfaga (si no, el código cae en el teclado del PIN y puede mandar uno equivocado).
+  // Qué hacer con el código solo aplica con la lista a la vista.
   useEscaner((codigo) => {
+    if (sel || selTienda || reciboDev || buscando || escaneoIgnorado) return;
     const p = buscarPorCodigo(productos, codigo);
     if (!p) {
       setBusqueda({ titulo: `Código ${codigo}`, ventas: [], vacio: `No encontramos el código ${codigo}.` });
@@ -110,7 +118,7 @@ export function PantallaDevoluciones({
       vacio: `Ninguna venta de los últimos 30 días lleva ${p.nombre}.`,
       marcar: p.id,
     });
-  }, tienda && !sel && !selTienda && !reciboDev && !buscando);
+  }, tienda);
 
   async function abrirVentaTurno(ticketId: string) {
     setError(null);
@@ -193,7 +201,12 @@ export function PantallaDevoluciones({
               <div className="mt-8 flex flex-col items-center gap-2 text-center text-ink-3">
                 <Icono nombre="devolver" className="h-12 w-12" />
                 <p className="text-18 font-semibold text-ink-2">{busqueda.vacio}</p>
-                <p className="max-w-[440px] text-13">Aquí salen las ventas cobradas en esta caja. Si se cobró en otra caja o sucursal, devuélvela desde la caja que la cobró o desde el POS web.</p>
+                <p className="max-w-[440px] text-13">
+                  {/* La caja instalada solo tiene sus propias ventas; el POS web, las del negocio. */}
+                  {esEscritorio()
+                    ? "Aquí salen las ventas cobradas en esta caja. Si se cobró en otra caja o sucursal, devuélvela desde la caja que la cobró o desde el POS web."
+                    : "Revisa el folio impreso en el ticket, o escanea otra prenda."}
+                </p>
               </div>
             ) : (
               busqueda.ventas.map((v) => {
@@ -534,13 +547,21 @@ function ModalDevolucionTienda({
     return r ? { [r.ticket_item_id]: 1 } : {};
   });
   const [anaquel, setAnaquel] = useState<Record<string, boolean>>({});
-  const [motivo, setMotivoBase] = useState<MotivoDevolucion>("CLIENTE_NO_SATISFECHO");
+  // Sin motivo de entrada: el cajero lo elige (y con él, si la pieza vuelve al anaquel).
+  const [motivo, setMotivoBase] = useState<MotivoDevolucion | null>(null);
   const [motivoTexto, setMotivoTexto] = useState("");
   const [medio, setMedio] = useState<MedioDevolucion>("EFECTIVO");
   const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
   const [pidiendoPin, setPidiendoPin] = useState(false);
   const [reembolsoFallo, setReembolsoFallo] = useState<{ motivo: string; recibo?: DatosDevolucion } | null>(null);
+  // Devolución ya hecha cuyo dinero falta regresar a la tarjeta a mano: se avisa DESPUÉS también.
+  const [pendiente, setPendiente] = useState<{ total: number; recibo?: DatosDevolucion } | null>(null);
+  // ¿Se cobró en la terminal de Mercado Pago ligada a la caja? Decide dónde se hace el reembolso.
+  const [enTerminal, setEnTerminal] = useState(false);
+  useEffect(() => {
+    cobradoEnTerminal(token, venta.ticketId).then(setEnTerminal).catch(() => {});
+  }, [token, venta.ticketId]);
 
   const tienePermiso = ROLES_DEVOLUCION.includes(empleado.rol);
   const setMotivo = (m: MotivoDevolucion) => {
@@ -548,6 +569,7 @@ function ModalDevolucionTienda({
     setAnaquel({});
   };
   const vuelve = (id: string) => anaquel[id] ?? motivo !== "PRODUCTO_DEFECTUOSO";
+  const dondeReembolsar = enTerminal ? "devuélvelo desde la app o la web de Mercado Pago" : "devuélvelo desde la terminal con que se cobró";
 
   const renglones: RenglonDevolver[] = venta.renglones
     .filter((r) => (piezas[r.ticket_item_id] ?? 0) > 0)
@@ -558,7 +580,8 @@ function ModalDevolucionTienda({
   // devolución es la venta entera y nada se había devuelto antes. Por partes se hace a mano.
   const reembolsoAutomatico =
     medio === "MISMO_METODO_PAGO" && alcanceDevolucion(venta, renglones) === "TOTAL" && venta.renglones.every((r) => r.devuelta === 0);
-  const labelMotivo = () => etiquetaMotivo(MOTIVOS_TIENDA, motivo, motivoTexto);
+  const tarjetaPendiente = medio === "MISMO_METODO_PAGO" && !reembolsoAutomatico;
+  const labelMotivo = () => (motivo ? etiquetaMotivo(MOTIVOS_TIENDA, motivo, motivoTexto) : "");
   const payload: PayloadAutorizacion = { accion: "devolucion", permisoCodigo: "venta.devolucion", entidadTipo: "ticket", entidadId: venta.ticketId, monto: total, motivo: labelMotivo(), cajaId: turno.caja_id, turnoId: turno.id };
 
   async function reembolsar(recibo?: DatosDevolucion) {
@@ -574,15 +597,18 @@ function ModalDevolucionTienda({
   }
 
   async function ejecutar(a: Autorizacion) {
+    if (!motivo) return;
     setProcesando(true);
     setError(null);
     try {
-      await devolverRenglones(venta, renglones, motivo, medio, a, {
+      // `hecha.total` es el que guardó la base: ése se enseña, se imprime y se reembolsa.
+      const hecha = await devolverRenglones(venta, renglones, motivo, medio, a, {
         token,
         cajaId: turno.caja_id,
         turnoId: turno.id,
         solicitanteId: empleado.id,
         motivoTexto,
+        nota: tarjetaPendiente ? `Reembolso a tarjeta pendiente: ${dondeReembolsar}.` : undefined,
       });
       // Comprobante (best-effort: si falla armarlo, la devolución ya quedó).
       let dDev: DatosDevolucion | undefined;
@@ -602,14 +628,21 @@ function ModalDevolucionTienda({
             totalMxn: totalDevolucion(venta, [r]),
           })),
           motivo: labelMotivo(),
-          medio: MEDIOS_DEV.find((m) => m.codigo === medio)?.label ?? medio,
-          tarjetas: medio === "MISMO_METODO_PAGO" ? datos.pagos.flatMap((p) => (p.tarjeta ? [p.tarjeta] : [])) : [],
-          totalReembolso: total,
+          // Si el dinero aún no regresa a la tarjeta, el comprobante no dice «Devuelto a: …».
+          medio: tarjetaPendiente
+            ? "Tarjeta · reembolso pendiente"
+            : (MEDIOS_DEV.find((m) => m.codigo === medio)?.label ?? medio),
+          tarjetas: reembolsoAutomatico ? datos.pagos.flatMap((p) => (p.tarjeta ? [p.tarjeta] : [])) : [],
+          totalReembolso: hecha.total,
           ancho: 80,
         };
       } catch { /* recibo opcional */ }
       if (reembolsoAutomatico) await reembolsar(dDev);
-      else onHecho(dDev);
+      else if (tarjetaPendiente) {
+        setProcesando(false);
+        setPidiendoPin(false);
+        setPendiente({ total: hecha.total, recibo: dDev });
+      } else onHecho(dDev);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo devolver");
       setProcesando(false);
@@ -619,7 +652,7 @@ function ModalDevolucionTienda({
 
   async function confirmar() {
     setError(null);
-    if (renglones.length === 0) return;
+    if (renglones.length === 0 || !motivo) return;
     if (motivo === "OTRO" && motivoTexto.trim().length === 0) {
       setError("Describe el motivo");
       return;
@@ -637,11 +670,25 @@ function ModalDevolucionTienda({
     }
   }
 
+  if (pendiente) {
+    return (
+      <DialogoPeligro
+        peligrosa={false}
+        titulo="Falta regresar el dinero a la tarjeta"
+        contexto={`${venta.folio} · ${fmtMxn(pendiente.total)}`}
+        consecuencia={`La devolución ya quedó registrada, pero por partes el dinero no regresa solo a la tarjeta: ${dondeReembolsar}, por ${fmtMxn(pendiente.total)}.`}
+        boton="Listo"
+        onConfirmar={() => onHecho(pendiente.recibo)}
+        onCerrar={() => onHecho(pendiente.recibo)}
+      />
+    );
+  }
+
   if (reembolsoFallo) {
     return (
       <DialogoPeligro
         titulo="El dinero no regresó a la tarjeta"
-        contexto={`${venta.folio} · ${fmtMxn(total)}`}
+        contexto={venta.folio}
         consecuencia={`La devolución ya quedó registrada, pero el dinero no regresó a la tarjeta: ${reembolsoFallo.motivo}. Vuelve a intentar, o devuélvelo desde la app de Mercado Pago.`}
         boton="Volver a intentar"
         ocupado={procesando}
@@ -666,9 +713,10 @@ function ModalDevolucionTienda({
   }
 
   const notaMedio =
-    medio === "MISMO_METODO_PAGO" && !reembolsoAutomatico && renglones.length > 0
-      ? `Por partes no regresa solo: devuelve ${fmtMxn(total)} desde la terminal o la app de Mercado Pago.`
+    tarjetaPendiente && renglones.length > 0
+      ? `Por partes el dinero no regresa solo a la tarjeta: al confirmar, ${dondeReembolsar}.`
       : undefined;
+  const falta = renglones.length === 0 ? "Elige al menos una pieza." : !motivo ? "Elige el motivo." : undefined;
 
   return (
     <DialogoPeligro
@@ -677,11 +725,11 @@ function ModalDevolucionTienda({
       contexto={`${venta.folio}${venta.fechaCobro ? ` · ${fechaHora(venta.fechaCobro)}` : ""}`}
       consecuencia="Elige qué regresa el cliente y cuántas piezas. La venta queda en el historial."
       error={error}
-      nota={renglones.length === 0 ? "Elige al menos una pieza." : undefined}
+      nota={falta}
       boton={nPiezas === 1 ? "Devolver 1 pieza" : `Devolver ${nPiezas} piezas`}
       ocupado={procesando}
       textoOcupado="Devolviendo…"
-      deshabilitado={renglones.length === 0}
+      deshabilitado={falta !== undefined}
       onConfirmar={() => void confirmar()}
       onCerrar={onCerrar}
     >

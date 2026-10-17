@@ -54,4 +54,16 @@ describe("armado de la devolución parcial", () => {
     // Ticket con 10 % de descuento global: total 450 contra 500 de renglones.
     expect(totalDevolucion({ ...venta, total: 450 }, [{ ticket_item_id: "i1", cantidad: 1, regresaAlAnaquel: true }])).toBe(135);
   });
+  it("redondea como ROUND de la base, mitad hacia arriba en centavos: 100.01 / 2 → 50.01", () => {
+    // En flotante, 100.01 / 2 = 50.00499… y Math.round(·×100)/100 daba 50.00.
+    const impar: VentaDevolvible = {
+      ...venta,
+      total: 100.01,
+      renglones: [{ ticket_item_id: "i1", producto_id: "p1", nombre: "Calcetas", cantidad: 2, devuelta: 0, precio_unitario: 50.005, total: 100.01 }],
+    };
+    expect(totalDevolucion(impar, [{ ticket_item_id: "i1", cantidad: 1, regresaAlAnaquel: true }])).toBe(50.01);
+    // 2.01 / 2 = 1.005: en flotante 100.4999… centavos, que redondeaba a 1.00.
+    const chico = { ...impar, total: 2.01, renglones: [{ ...impar.renglones[0], total: 2.01 }] };
+    expect(totalDevolucion(chico, [{ ticket_item_id: "i1", cantidad: 1, regresaAlAnaquel: true }])).toBe(1.01);
+  });
 });

@@ -197,21 +197,38 @@ export function alcanceDevolucion(venta: VentaDevolvible, renglones: RenglonDevo
   return completo ? "TOTAL" : "PARCIAL";
 }
 
-const centavos = (n: number) => Math.round(n * 100) / 100;
+/** Pesos a centavos enteros (100.01 → 10001, sin el 10000.999… del flotante). */
+const aCentavos = (n: number) => Math.round(n * 100);
 
 /**
- * Lo que se reembolsa, calculado como crear_devolucion (0134): cada renglón en proporción a sus
- * piezas y al descuento global del ticket, redondeado renglón por renglón.
+ * VISTA PREVIA de lo que se reembolsa, calculada como crear_devolucion (0134): cada renglón en
+ * proporción a sus piezas y al descuento global del ticket, redondeado renglón por renglón (mitad
+ * hacia arriba, en centavos enteros). Lo que vale es el `total_devuelto_mxn` que guarda la base.
  */
 export function totalDevolucion(venta: VentaDevolvible, renglones: RenglonDevolver[]): number {
-  const bruto = venta.renglones.reduce((s, r) => s + r.total, 0);
-  const proporcion = bruto > 0 ? venta.total / bruto : 1;
+  const bruto = venta.renglones.reduce((s, r) => s + aCentavos(r.total), 0);
+  const neto = aCentavos(venta.total);
   let total = 0;
   for (const d of renglones) {
     const r = venta.renglones.find((x) => x.ticket_item_id === d.ticket_item_id);
-    if (r && r.cantidad > 0) total += centavos(((r.total * d.cantidad) / r.cantidad) * proporcion);
+    if (!r || r.cantidad <= 0) continue;
+    const linea = (aCentavos(r.total) * d.cantidad) / r.cantidad;
+    total += Math.round(bruto > 0 ? (linea * neto) / bruto : linea);
   }
-  return centavos(total);
+  return total / 100;
+}
+
+/**
+ * ¿Algún pago de la venta pasó por la terminal de Mercado Pago ligada a la caja? Es la misma señal
+ * que el ticket impreso: solo esos cobros llenan `terminal_aprobacion` (ticket-datos.ts).
+ */
+export async function cobradoEnTerminal(token: string, ticketId: string): Promise<boolean> {
+  const { data, error } = await employeeClient(token)
+    .from("pagos").select("metodo_pago, terminal_aprobacion")
+    .eq("ticket_id", ticketId).is("deleted_at", null);
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as { metodo_pago: string; terminal_aprobacion: string | null }[])
+    .some((p) => p.metodo_pago.startsWith("TARJETA_") && Boolean(p.terminal_aprobacion));
 }
 
 type FilaTicket = { id: string; folio_completo: string | null; total_mxn: number | string | null; fecha_pago: string | null };
@@ -276,14 +293,15 @@ export async function leerVentaDevolvible(token: string, ticketId: string): Prom
 
 /**
  * La venta con ese folio tal como sale impreso (`folio_completo`), si está PAGADO/FACTURADO.
- * El negocio lo pone RLS; en la caja instalada solo encuentra las ventas de esa caja.
+ * El folio es único por sucursal (0008, `ticket_folio_unico_por_sucursal`), así que se busca en la
+ * de la caja. El negocio lo pone RLS; en la caja instalada solo encuentra las ventas de esa caja.
  */
-export async function buscarVentaPorFolio(token: string, folio: string): Promise<VentaDevolvible | null> {
+export async function buscarVentaPorFolio(token: string, folio: string, sucursalId: string): Promise<VentaDevolvible | null> {
   const f = folio.trim();
   if (!f) return null;
   const { data, error } = await employeeClient(token)
     .from("tickets").select(COLUMNAS_TICKET)
-    .eq("folio_completo", f).in("estado_fiscal", ESTADOS_DEVOLVIBLES)
+    .eq("sucursal_id", sucursalId).eq("folio_completo", f).in("estado_fiscal", ESTADOS_DEVOLVIBLES)
     .order("fecha_pago", { ascending: false }).limit(1);
   if (error) throw new Error(error.message);
   return (await conRenglones(token, (data ?? []) as FilaTicket[]))[0] ?? null;
@@ -309,7 +327,8 @@ export async function buscarVentasConProducto(token: string, productoId: string,
 /**
  * Devolución parcial (o TOTAL si completa la venta) de una tienda: cada renglón dice si su pieza
  * vuelve al anaquel (`reversar_inventario_item`); la existencia regresa al confirmar (0189).
- * Devuelve el id de la devolución.
+ * Devuelve el id y el total que guardó la base: ése es el que se enseña, se imprime y se reembolsa
+ * (`totalDevolucion` es solo la vista previa).
  */
 export async function devolverRenglones(
   venta: VentaDevolvible,
@@ -317,8 +336,8 @@ export async function devolverRenglones(
   motivo: MotivoDevolucion,
   medio: MedioDevolucion,
   autorizacion: Autorizacion,
-  ctx: { token: string; cajaId: string; turnoId: string; solicitanteId: string; motivoTexto?: string },
-): Promise<string> {
+  ctx: { token: string; cajaId: string; turnoId: string; solicitanteId: string; motivoTexto?: string; nota?: string },
+): Promise<{ id: string; total: number }> {
   const cli = employeeClient(ctx.token);
   const { data: devId, error: e1 } = await cli.rpc("crear_devolucion", {
     p_ticket_original_id: venta.ticketId,
@@ -333,6 +352,7 @@ export async function devolverRenglones(
     p_usuario_autorizo_id: autorizacion.autorizoId,
     p_items: itemsDevolucion(renglones),
     p_reversar_inventario: true,
+    p_nota: ctx.nota || null,
   });
   if (e1) throw new Error(e1.message);
   const { error: e2 } = await cli.rpc("confirmar_devolucion", {
@@ -340,5 +360,9 @@ export async function devolverRenglones(
     p_usuario_id: autorizacion.autorizoId,
   });
   if (e2) throw new Error(e2.message);
-  return String(devId);
+  // Ya quedó confirmada: si esta relectura falla no se reporta error (un reintento chocaría con el
+  // tope de 0040); se usa la vista previa, que coincide salvo algún centavo con descuento global.
+  const { data: dev } = await cli.from("devoluciones").select("total_devuelto_mxn").eq("id", String(devId)).maybeSingle();
+  const guardado = (dev as { total_devuelto_mxn: number | string | null } | null)?.total_devuelto_mxn;
+  return { id: String(devId), total: guardado == null ? totalDevolucion(venta, renglones) : Number(guardado) };
 }
