@@ -4,6 +4,7 @@ import { Icono, Modal } from "@vim/ui/styles";
 import type { Producto } from "../lib/catalogo";
 import { agruparTienda, buscarVitrina, destinoInventario, estadoExistencia, resumenVitrina, type DestinoInventario, type Existencia } from "../lib/tienda";
 import { useEscaner } from "../lib/use-escaner";
+import { sonarError } from "./venta-retail";
 import { piezas, SelectorVariantes, textoActualizado } from "./selector-variantes";
 
 type Pestana = "existencias" | "recibir";
@@ -46,6 +47,8 @@ export function SeccionInventario({
   const [pestana, setPestana] = useState<Pestana>("existencias");
   const [texto, setTexto] = useState("");
   const [destino, setDestino] = useState<DestinoInventario | null>(null);
+  /** La franja de arriba: un código desconocido o un padre sin variantes. Se va con el siguiente escaneo. */
+  const [aviso, setAviso] = useState<string | null>(null);
   const { vitrina, padres } = useMemo(() => agruparTienda(productos), [productos]);
 
   const avisar = useRef(onAbierto);
@@ -53,12 +56,21 @@ export function SeccionInventario({
   useEffect(() => { avisar.current(destino ? () => setDestino(null) : null); }, [destino]);
   useEffect(() => () => avisar.current(null), []);
 
-  // Escáner: abre la consulta de esa prenda. Con un diálogo encima no hace nada.
+  /** Abre la consulta; un padre sin hijas no tiene matriz que enseñar. */
+  const mostrar = (d: DestinoInventario) => {
+    if ("padre" in d && d.padre.hijas.length === 0) { setDestino(null); setAviso("Sin tallas cargadas."); return; }
+    setAviso(null);
+    setDestino(d);
+  };
+
+  // Escáner: abre (o cambia a) la consulta de esa prenda. Solo en Existencias; un diálogo encima lo calla.
   useEscaner((codigo) => {
-    if (escaneoIgnorado || destino) return;
+    if (escaneoIgnorado) return;
     const d = destinoInventario(productos, padres, codigo);
-    if (d) { setDestino(d); setTexto(""); }
-  }, true);
+    setTexto("");
+    if (d) mostrar(d);
+    else { setDestino(null); setAviso(`No encontramos el código ${codigo}.`); sonarError(); }
+  }, pestana === "existencias");
 
   const visibles = useMemo(() => {
     const lista = texto.trim() ? buscarVitrina(vitrina, padres, texto) : [...vitrina].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
@@ -67,12 +79,12 @@ export function SeccionInventario({
 
   const abrir = (p: Producto) => {
     const padre = padres.get(p.id);
-    setDestino(padre ? { padre } : { suelto: p });
+    mostrar(padre ? { padre } : { suelto: p });
   };
   /** Enter a mano: un código exacto abre su consulta; si no, un solo resultado. */
   const alEnter = () => {
     const d = destinoInventario(productos, padres, texto);
-    if (d) setDestino(d);
+    if (d) mostrar(d);
     else if (visibles.length === 1) abrir(visibles[0]!);
     else return;
     setTexto("");
@@ -133,8 +145,21 @@ export function SeccionInventario({
                 </button>
               )}
             </label>
-            <span className="flex-shrink-0 text-13 text-ink-3">Lector listo</span>
+            <span className="flex-shrink-0 text-13 text-ink-3">{escaneoIgnorado ? "Lector en pausa" : "Lector listo"}</span>
           </div>
+          {aviso && (
+            <div className="flex flex-shrink-0 items-center gap-3 bg-danger-soft px-4 py-1.5" role="alert">
+              <p className="min-w-0 flex-1 text-13 font-medium text-danger">{aviso}</p>
+              <button
+                type="button"
+                onClick={() => setAviso(null)}
+                aria-label="Cerrar aviso"
+                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded text-danger transition-[transform,background-color] duration-150 ease-vim hover:bg-danger/10 active:scale-[.97]"
+              >
+                <Icono nombre="cerrar" className="h-4 w-4" />
+              </button>
+            </div>
+          )}
 
           <div className="min-h-0 flex-1 overflow-y-auto bg-bg p-4">
             {visibles.length === 0 ? (

@@ -129,6 +129,8 @@ export function SelectorVariantes({
               const esMarcada = celda.hija.id === marcada;
               const vigente = propia && vendible(celda.hija);
               const tocable = vigente && !soloConsulta;
+              // En consulta la existencia real se ve aunque no se venda aquí o esté agotada a mano.
+              const colorea = propia && (vendible(celda.hija) || soloConsulta);
               return (
                 <button
                   key={`${c}-${r}`}
@@ -138,7 +140,7 @@ export function SelectorVariantes({
                   aria-label={`${[c, r].filter(Boolean).join(" ")}: ${existencias ? `${piezas(celda.cantidad)} piezas` : "existencia sin leer"}`}
                   className={[
                     "flex min-h-14 flex-col items-center justify-center rounded border px-1 py-1.5",
-                    vigente
+                    colorea
                       ? `${existencias ? ESTILO[celda.estado] : "border-line-strong bg-surface text-ink"} ${tocable ? "transition-[transform,border-color] duration-150 ease-vim hover:border-ink active:scale-[.97]" : "cursor-default"}`
                       : "cursor-default border-line bg-bg text-ink-3",
                     esMarcada ? "ring-2 ring-ink ring-offset-1" : "",
@@ -146,7 +148,7 @@ export function SelectorVariantes({
                 >
                   <span className="font-display text-20 font-bold leading-none tabular-nums">{existencias ? piezas(celda.cantidad) : "—"}</span>
                   {precio && <span className="mt-1 text-12 tabular-nums text-ink-2">{precio}</span>}
-                  {propia && !vigente && (
+                  {propia && !vendible(celda.hija) && (
                     <span className="mt-1 text-11 font-semibold text-ink-3">{celda.hija.seVendeAqui === false ? "No se vende aquí" : "No se vende por ahora"}</span>
                   )}
                   {esMarcada && <span className="mt-1 text-11 font-semibold text-ink">{soloConsulta ? "La que escaneaste" : "La que regresa"}</span>}
@@ -159,7 +161,7 @@ export function SelectorVariantes({
 
       <div className="flex flex-wrap items-center gap-4 border-t border-line px-6 py-3 text-12 text-ink-2">
         <span className="flex items-center gap-1.5"><span aria-hidden="true" className="h-3 w-3 rounded-sm border border-warning-line bg-warning-soft" />Pocas</span>
-        <span className="flex items-center gap-1.5"><span aria-hidden="true" className="h-3 w-3 rounded-sm border border-danger-line bg-danger-soft" />Agotada, se vende con aviso</span>
+        <span className="flex items-center gap-1.5"><span aria-hidden="true" className="h-3 w-3 rounded-sm border border-danger-line bg-danger-soft" />{soloConsulta ? "Agotada" : "Agotada, se vende con aviso"}</span>
       </div>
     </Modal>
   );

@@ -15,7 +15,7 @@ import { SelectorVariantes } from "./selector-variantes";
 /** La franja bajo la barra de escaneo. Su capa de Escape la declara `home-pos`. */
 export type AvisoEscaneo = { tipo: "no-encontrado"; codigo: string } | { tipo: "no-se-vende" } | { tipo: "cobro" };
 
-const sonarError = () => {
+export const sonarError = () => {
   try { void new Audio("/sonidos/escaneo-error.wav").play().catch(() => {}); } catch { /* sin audio, la franja basta */ }
 };
 

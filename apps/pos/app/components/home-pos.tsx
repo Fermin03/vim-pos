@@ -1811,6 +1811,7 @@ export function HomePos({
     const capaConfirmacion: CapaEscape = [confirmacion != null, nuevoTicket];
     const capaSelector: CapaEscape = [selectorRetail != null, () => setSelectorRetail(null)];
     const capaAvisoRetail: CapaEscape = [avisoRetail != null, () => setAvisoRetail(null)];
+    const capaConsultaInv: CapaEscape = [tienda && seccionTienda === "inventario" && cerrarConsultaInv != null, () => cerrarConsultaInv?.()];
     const capas: CapaEscape[] = [
       // Modificadores y combo: overlays sobre la rejilla de captura, por encima de todo lo demás.
       // El de modificadores va primero porque se pinta encima del de combo cuando ambos aplican.
@@ -1848,7 +1849,7 @@ export function HomePos({
       capaSelector,
       capaAvisoRetail,
       // Inventario: la consulta de una prenda la cierra también su `Modal`.
-      [tienda && seccionTienda === "inventario" && cerrarConsultaInv != null, () => cerrarConsultaInv?.()],
+      capaConsultaInv,
       [viendoMapaMesas, () => { setViendoMapaMesas(false); setPidiendoMesa(true); }],
       [pidiendoMesa, () => setPidiendoMesa(false)],
       [nombreCuentaAbierto, () => setNombreCuentaAbierto(false)],
@@ -1894,7 +1895,7 @@ export function HomePos({
       // El escáner de la tienda se ignora bajo el aviso de un pedido, un PIN u otro diálogo. No
       // cuentan el cobro (avisa «Termina el cobro…»), el selector y la franja (el escaneo los
       // cierra) ni «Cobro completado» y el recibo: esos se cierran y la pieza abre la venta nueva (R6).
-      escaneoIgnorado: avisoTiendaVisible || capas.some((c) => c[0] && ![capaCobro, capaSelector, capaAvisoRetail, capaRecibo, capaConfirmacion].includes(c)),
+      escaneoIgnorado: avisoTiendaVisible || capas.some((c) => c[0] && ![capaCobro, capaSelector, capaAvisoRetail, capaConsultaInv, capaRecibo, capaConfirmacion].includes(c)),
       cerrarAlEscanear: confirmacion != null ? nuevoTicket : mostrarRecibo ? cerrarVistaRecibo : null,
     };
   }, [selectorRetail, avisoRetail, descuentoAbierto, llevarListaAbierta, avisoTiendaVisible, modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
