@@ -1287,8 +1287,26 @@ test("retail: no los marca si la nube ignoró la llave", async () => {
     await pushToCloud(pool, OPTS, (m) => lineas.push(m));
     assert.equal(nube.peticiones.length, 1, "solo movimientos de producto bastan para subir");
     assert.deepEqual(pool.anotado.movProducto, [], "la nube sin la 0195 no los guardó");
-    assert.ok(lineas.some((l) => /movimientos_producto/.test(l) && /ignor/i.test(l)));
+    assert.ok(lineas.some((l) => /movimientos_producto/.test(l) && /no confirmó/i.test(l)));
   } finally { nube.restaurar(); }
+});
+
+test("retail: un 200 vacío o ilegible no marca movimientos_producto", async () => {
+  // Vacío: la nube respondió sin la cuenta.
+  let pool = poolConMovProducto({ movs: [{ id: MP1, ticket_id: null }] });
+  let nube = nubeFalsa({});
+  try {
+    await pushToCloud(pool, OPTS, () => {});
+    assert.deepEqual(pool.anotado.movProducto, [], "sin la cuenta no se dan por subidos");
+  } finally { nube.restaurar(); }
+  // Ilegible: el cuerpo no es JSON.
+  pool = poolConMovProducto({ movs: [{ id: MP1, ticket_id: null }] });
+  const original = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, status: 200, async json() { throw new SyntaxError("no es JSON"); }, async text() { return "<html>"; } });
+  try {
+    await pushToCloud(pool, OPTS, () => {});
+    assert.deepEqual(pool.anotado.movProducto, [], "un cuerpo ilegible no marca nada");
+  } finally { globalThis.fetch = original; }
 });
 
 test("retail: los movimientos viajan en el lote de su ticket", async () => {
@@ -1304,7 +1322,7 @@ test("retail: los movimientos viajan en el lote de su ticket", async () => {
   ];
   // Por lotes de una venta.
   let pool = poolConMovProducto({ tickets: [T1, T2], movs });
-  let nube = nubeFalsa({ resultado: {} });
+  let nube = nubeFalsa({ resultado: { movimientos_producto: 4 } });
   try {
     await pushToCloud(pool, OPTS, () => {}, { maxVentasPorLote: 1 });
     assert.deepEqual(pool.anotado.armados, [
@@ -1315,7 +1333,7 @@ test("retail: los movimientos viajan en el lote de su ticket", async () => {
   } finally { nube.restaurar(); }
   // Y al partir un lote por tamaño, cada mitad se lleva los de sus ventas.
   pool = poolConMovProducto({ tickets: [T1, T2], movs });
-  nube = nubeFalsa({ resultado: {} });
+  nube = nubeFalsa({ resultado: { movimientos_producto: 4 } });
   try {
     await pushToCloud(pool, OPTS, () => {}, { maxBytesPorLote: 10 });
     const enviados = pool.anotado.armados.slice(1); // el primero es el lote entero, que se partió

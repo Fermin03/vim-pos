@@ -1060,10 +1060,11 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
   } else {
     await marcarLealtadSubidos(pool, lealtad.filter((id) => !leaFuera.has(id)));
   }
-  // RETAIL (0195): mismo molde. Una nube sin la 0195 los ignora y marcarlos los perdería.
+  // RETAIL (0195): mismo molde, pero solo con la cuenta en la mano: una nube sin la 0195 los ignora
+  // y un 200 vacío o ilegible no dice nada. En los dos casos marcarlos los perdería.
   const mpFuera = filasRechazadas(errores, "movimientos_producto");
-  if (movimientosProducto.length && (respuesta?.resultado?._ignoradas ?? []).includes("movimientos_producto")) {
-    log(`la nube ignoró movimientos_producto (aún sin la migración 0195): ${movimientosProducto.length} movimiento(s) se reintentarán`);
+  if (movimientosProducto.length && typeof respuesta?.resultado?.movimientos_producto !== "number") {
+    log(`la nube no confirmó movimientos_producto (¿sin la migración 0195?): ${movimientosProducto.length} movimiento(s) se reintentarán`);
   } else {
     await marcarMovimientosProductoPushed(pool, movimientosProducto.filter((id) => !mpFuera.has(id)));
   }
