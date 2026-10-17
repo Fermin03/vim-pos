@@ -446,13 +446,25 @@ export async function corregirExistenciasProductoPorPendientes(client, log = () 
   return rowCount;
 }
 
-/** Hora ISO del último pull completo (la anota pullSnapshot en _vim_sync), o null si nunca hubo. */
+/** Hora ISO del último pull completo por pool: se lee de _vim_sync una vez y luego la pone pullSnapshot. */
+const ultimoPullDe = new WeakMap();
+
+/**
+ * Hora ISO del último pull completo, o null si nunca hubo. Solo la primera llamada por pool consulta
+ * la base (`_vim_sync`); después responde de memoria, así el sondeo de /__estado-sync no ocupa una
+ * conexión cada vez ni se cuelga con el pool saturado.
+ */
 export async function leerUltimoPull(pool) {
+  if (ultimoPullDe.has(pool)) return ultimoPullDe.get(pool);
   try {
     const { rows } = await pool.query("SELECT at FROM _vim_sync WHERE clave = 'last_pull'");
-    return rows[0]?.at ? new Date(rows[0].at).toISOString() : null;
-  } catch {
-    return null; // sin tabla todavía (caja que nunca bajó nada) o base detenida un instante
+    const iso = rows[0]?.at ? new Date(rows[0].at).toISOString() : null;
+    ultimoPullDe.set(pool, iso);
+    return iso;
+  } catch (e) {
+    // Sin tabla todavía: la caja nunca bajó nada (el primer pull la crea y anota la hora).
+    if (e?.code === "42P01") ultimoPullDe.set(pool, null);
+    return null; // base detenida un instante: se vuelve a leer en la siguiente llamada
   }
 }
 
@@ -873,6 +885,7 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
          ON CONFLICT (clave) DO UPDATE SET valor=EXCLUDED.valor, at=now()`, [String(tenantDelSnapshot)]);
     }
     await client.query("COMMIT");
+    ultimoPullDe.set(pool, new Date().toISOString());
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});
     throw e;

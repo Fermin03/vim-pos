@@ -314,6 +314,8 @@ async function bootCaja() {
   backend = await startBackend(opcionesBackend);
   backupsDir = path.join(backend.dataRoot, "backups");
   console.log(`· [backend] gateway local: ${backend.url}`);
+  // La hora del último pull se lee una vez aquí; luego la lleva pullSnapshot en memoria (sync-pull.mjs).
+  void leerUltimoPull(backend.pool);
 
   // Adónde puede navegar la ventana de la caja: el POS local (por localhost o 127.0.0.1), el POS de
   // desarrollo si se pidió con VIM_POS_URL, y el POS desplegado, que es el respaldo cuando no hay

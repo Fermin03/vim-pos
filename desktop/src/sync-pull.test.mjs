@@ -546,3 +546,26 @@ describe("existencias por producto en el pull (Postgres real)", { skip: process.
     assert.ok(new Date(iso).getTime() >= antes - 5_000);
   });
 });
+
+// /__estado-sync pregunta ultimoPull a cada rato: solo la primera vez va a la base.
+test("leerUltimoPull consulta _vim_sync una sola vez por pool", async () => {
+  let consultas = 0;
+  const pool = { query: async () => { consultas++; return { rows: [{ at: "2026-10-16T10:00:00Z" }] }; } };
+  assert.equal(await leerUltimoPull(pool), "2026-10-16T10:00:00.000Z");
+  assert.equal(await leerUltimoPull(pool), "2026-10-16T10:00:00.000Z");
+  assert.equal(consultas, 1, "la segunda respuesta sale de memoria");
+
+  // Sin la tabla (nunca hubo pull): null, y tampoco se vuelve a preguntar.
+  let sinTabla = 0;
+  const nueva = { query: async () => { sinTabla++; throw Object.assign(new Error("no existe"), { code: "42P01" }); } };
+  assert.equal(await leerUltimoPull(nueva), null);
+  assert.equal(await leerUltimoPull(nueva), null);
+  assert.equal(sinTabla, 1);
+
+  // La base detenida un instante: null, y se reintenta en la siguiente.
+  let caida = 0;
+  const detenida = { query: async () => { caida++; throw new Error("ECONNREFUSED"); } };
+  await leerUltimoPull(detenida);
+  await leerUltimoPull(detenida);
+  assert.equal(caida, 2);
+});
