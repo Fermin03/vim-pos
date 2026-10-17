@@ -145,6 +145,13 @@ export function SidebarTicket({
     ultimoProductoId: string | null;
     /** Con el ticket vacío llega quien viene a cambiar algo: el botón va grande ahí mismo. */
     onCambioTalla?: () => void;
+    /** Panel de la tienda (pos-retail.md, «Versión 2»): sin «Precios», «Descuento» ni «En espera»;
+     *  «Asignar cliente» y «Limpiar» van como texto pequeño arriba del ticket. */
+    simple?: boolean;
+    /** Abre el cliente de la cuenta (la lealtad lo necesita). Sin esto no se pinta. */
+    onAsignarCliente?: () => void;
+    /** Nombre del cliente asignado; null = sin cliente. */
+    cliente?: string | null;
   };
 }) {
   const totales = calcularTotalesDisplay(estado.lineas, 16, estado.envio?.costoMxn ?? 0);
@@ -169,6 +176,27 @@ export function SidebarTicket({
   // No depende de `bloqueado`: en cuenta de mesa los renglones que no han salido a cocina sí se
   // editan (0119). Quien pasa `onEditar` decide qué renglón se abre y avisa del que no.
   const editable = onEditar != null && !procesando;
+  const simple = tienda?.simple === true;
+  /* Dos botones en uno: con la cuenta ya guardada en BD esto CANCELA la cuenta; con un
+     carrito suelto solo lo vacía. Se dice cuál de los dos es, porque no se deshacen igual.
+
+     El `vacio` solo aplica al carrito suelto. Antes deshabilitaba también el otro caso, y
+     eso dejaba sin salida justo a la mesa que más la necesita: la que se abrió por error y
+     no tiene ni un producto. Su ticket ya existe (BORRADOR) y tiene la mesa ocupada; si el
+     único botón que la cancela está gris, la mesa se queda ocupada para siempre.
+
+     Rojo desde el principio, no solo al pasar el mouse: en una pantalla táctil no hay
+     mouse, y era gris hasta el momento de tocarlo. Gris solo cuando no hace nada. */
+  const botonLimpiar = (
+    <button
+      type="button"
+      disabled={procesando || (bloqueado ? !onCancelarTicket : vacio || !onLimpiar)}
+      onClick={() => (bloqueado && onCancelarTicket ? onCancelarTicket() : onLimpiar?.())}
+      className={`${simple ? "text-13" : "-mr-2.5 text-14"} h-11 flex-shrink-0 rounded-md px-2.5 font-semibold text-danger transition-colors hover:bg-danger-soft disabled:cursor-default disabled:text-ink-3 disabled:opacity-60 disabled:hover:bg-transparent`}
+    >
+      {bloqueado && onCancelarTicket ? "Cancelar cuenta" : "Limpiar"}
+    </button>
+  );
 
   // Ancho del carrito: era fijo en 404px, y en una caja de 1024px se comía el 40% de la pantalla
   // dejando el catálogo apretado. Ahora escala con topes: nunca menos de 288px —por debajo no cabe
@@ -182,6 +210,21 @@ export function SidebarTicket({
 
       {/* ── Cabecera ─────────────────────────────────────────── */}
       <div className="flex-shrink-0 border-b border-line px-4 pb-3 pt-1.5">
+        {/* Panel de la tienda: el cliente y Limpiar, chicos, arriba de todo (pos-retail.md, «Versión 2»). */}
+        {simple && (
+          <div className="-mx-2.5 flex items-center justify-between gap-2">
+            {tienda?.onAsignarCliente ? (
+              <button
+                type="button"
+                onClick={tienda.onAsignarCliente}
+                className={`h-11 min-w-0 rounded-md px-2.5 text-13 font-semibold transition-colors hover:bg-hover ${tienda.cliente ? "text-ink" : "text-ink-2"}`}
+              >
+                <span className="block truncate">{tienda.cliente ?? "Asignar cliente"}</span>
+              </button>
+            ) : <span />}
+            {botonLimpiar}
+          </div>
+        )}
         {/* fila superior: título + Limpiar */}
         <div className="flex items-center justify-between gap-2">
           {/* El título decía siempre "Ticket nuevo", incluso editando una cuenta ya abierta:
@@ -190,24 +233,7 @@ export function SidebarTicket({
           <span className="truncate font-display text-18 font-semibold leading-tight tracking-[-0.02em]">
             {titulo ?? (folioCuenta ? `Cuenta ${folioCuenta}` : "Ticket nuevo")}
           </span>
-          {/* Dos botones en uno: con la cuenta ya guardada en BD esto CANCELA la cuenta; con un
-              carrito suelto solo lo vacía. Se dice cuál de los dos es, porque no se deshacen igual.
-
-              El `vacio` solo aplica al carrito suelto. Antes deshabilitaba también el otro caso, y
-              eso dejaba sin salida justo a la mesa que más la necesita: la que se abrió por error y
-              no tiene ni un producto. Su ticket ya existe (BORRADOR) y tiene la mesa ocupada; si el
-              único botón que la cancela está gris, la mesa se queda ocupada para siempre.
-
-              Rojo desde el principio, no solo al pasar el mouse: en una pantalla táctil no hay
-              mouse, y era gris hasta el momento de tocarlo. Gris solo cuando no hace nada. */}
-          <button
-            type="button"
-            disabled={procesando || (bloqueado ? !onCancelarTicket : vacio || !onLimpiar)}
-            onClick={() => (bloqueado && onCancelarTicket ? onCancelarTicket() : onLimpiar?.())}
-            className="-mr-2.5 h-11 flex-shrink-0 rounded-md px-2.5 text-14 font-semibold text-danger transition-colors hover:bg-danger-soft disabled:cursor-default disabled:text-ink-3 disabled:opacity-60 disabled:hover:bg-transparent"
-          >
-            {bloqueado && onCancelarTicket ? "Cancelar cuenta" : "Limpiar"}
-          </button>
+          {!simple && botonLimpiar}
         </div>
         {/* Modo de servicio — SOLO LECTURA. El modo se elige en la pantalla de inicio (una venta
             no cambia de modo a media captura); aquí se muestra para que el cajero no pierda de
@@ -504,6 +530,7 @@ export function SidebarTicket({
           ("+ Nota de la orden"). Ocupaba la mitad del renglón para no hacer nada. */}
       {/* "En espera" subió aquí desde el pie: su lugar bajo Cobrar es ahora "Efectivo exacto", que se
           usa en casi cada venta. Tres botones iguales; a 288px no cabe un icono más. */}
+      {!simple && (
       <div className="flex flex-shrink-0 gap-1.5 px-4 pt-2.5">
         <InterruptorPrecios />
         {!seCobraDespues && (
@@ -532,6 +559,7 @@ export function SidebarTicket({
           </button>
         )}
       </div>
+      )}
 
       {/* ── Pie: Cobrar + Efectivo exacto ─────────────────────── */}
       {/* Pie compactado (mockup: pt-4 pb-5, Cobrar py-18px). "Cobrar" conserva un alto cómodo para

@@ -2741,13 +2741,11 @@ export function HomePos({
 
           Va a la derecha, opuesto a "Volver": son acciones distintas y pegarlas invitaría a
           pulsar la equivocada con prisa. */}
-      {(!tienda || seccionTienda === "panel") && (
+      {/* La tienda no tiene esta fila: su barra inferior reemplaza a Volver, y el cliente y Limpiar
+          van chicos arriba del ticket (pos-retail.md, «Versión 2»). */}
+      {!tienda && (
       <div className="flex flex-shrink-0 items-center gap-3 border-b border-line bg-surface px-3 py-2">
         <BotonVolver onClick={() => intentarSalirDeCaptura("atras")} />
-        {capturaTienda && (
-          /* Empieza otra operación (sobre una venta anterior): va aquí y no junto a Cobrar (pos-retail.md). */
-          <Button variant="ghost" onClick={abrirCambioTalla} className="ml-auto flex-shrink-0">Cambio de talla</Button>
-        )}
         {admiteClienteCuenta(carrito.modoServicio) && (
           /* Cliente de la cuenta (opcional). Con cliente asignado muestra su nombre: así se ve de un
              vistazo a quién le cuenta esta venta. Sin él, la venta sigue igual que siempre. */
@@ -2755,7 +2753,7 @@ export function HomePos({
             type="button"
             onClick={() => setClienteCuentaAbierto(true)}
             className={[
-              capturaTienda ? "" : "ml-auto",
+              "ml-auto",
               "flex h-10 max-w-[240px] flex-shrink-0 items-center gap-2 rounded border px-3 text-14 font-semibold transition hover:border-ink hover:bg-hover",
               carrito.clienteCuenta ? "border-accent text-ink" : "border-line-strong text-ink",
             ].join(" ")}
@@ -2914,6 +2912,9 @@ export function HomePos({
             sinExistencia: (l) => sinExistencia(l.producto, carrito.lineas.filter((x) => x.producto.id === l.producto.id).reduce((s, x) => s + x.cantidad, 0), existencias, caja.sucursal_id),
             ultimoProductoId: ultimoTienda,
             onCambioTalla: abrirCambioTalla,
+            simple: true,
+            onAsignarCliente: admiteClienteCuenta(carrito.modoServicio) ? () => setClienteCuentaAbierto(true) : undefined,
+            cliente: carrito.clienteCuenta?.nombre ?? null,
           } : undefined}
           onCantidad={(id, c) => { setUltimoTienda(null); dispatch({ tipo: "cantidad", clientId: id, cantidad: c }); }}
           onQuitar={(id) => { setUltimoTienda(null); dispatch({ tipo: "quitar", clientId: id }); }}
