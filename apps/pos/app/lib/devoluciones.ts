@@ -3,6 +3,9 @@ import { hoyMx, sumarDias } from "@vim/fecha";
 import { employeeClient } from "./supabase";
 import type { Autorizacion } from "./autorizacion";
 
+/** Roles con `venta.devolucion` por omisión: se autorizan solos; los demás piden PIN. */
+export const ROLES_DEVOLUCION = ["SUPERVISOR", "ADMIN", "DUENO"];
+
 // F6.3 (Modelo B) — Devoluciones: la venta queda intacta (PAGADA) y la devolución es un
 // documento aparte que baja el efectivo de la caja. Usa crear_devolucion + confirmar_devolucion.
 
@@ -175,6 +178,8 @@ export type VentaDevolvible = {
   /** `total_mxn` del ticket: con el descuento global ya aplicado. */
   total: number;
   fechaCobro: string | null;
+  /** Ya tiene CFDI: se devuelve, pero no se cambia (la factura pediría nota de crédito). */
+  facturada?: boolean;
   renglones: RenglonVenta[];
 };
 
@@ -231,8 +236,8 @@ export async function cobradoEnTerminal(token: string, ticketId: string): Promis
     .some((p) => p.metodo_pago.startsWith("TARJETA_") && Boolean(p.terminal_aprobacion));
 }
 
-type FilaTicket = { id: string; folio_completo: string | null; total_mxn: number | string | null; fecha_pago: string | null };
-const COLUMNAS_TICKET = "id, folio_completo, total_mxn, fecha_pago";
+type FilaTicket = { id: string; folio_completo: string | null; total_mxn: number | string | null; fecha_pago: string | null; estado_fiscal: string };
+const COLUMNAS_TICKET = "id, folio_completo, total_mxn, fecha_pago, estado_fiscal";
 const ESTADOS_DEVOLVIBLES = ["PAGADO", "FACTURADO"];
 
 /** Arma las ventas con sus renglones y lo ya devuelto de cada uno (dos consultas para todas). */
@@ -268,6 +273,7 @@ async function conRenglones(token: string, tickets: FilaTicket[]): Promise<Venta
     folio: t.folio_completo ?? t.id.slice(-6),
     total: Number(t.total_mxn ?? 0),
     fechaCobro: t.fecha_pago,
+    facturada: t.estado_fiscal === "FACTURADO",
     renglones: filas
       .filter((i) => i.ticket_id === t.id)
       .map((i) => ({

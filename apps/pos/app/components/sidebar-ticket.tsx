@@ -1,5 +1,5 @@
 "use client";
-import { Icono } from "@vim/ui/styles";
+import { Button, Icono } from "@vim/ui/styles";
 import { useState } from "react";
 import type { EstadoCarrito, LineaCarrito } from "../lib/carrito";
 import { etiquetaModo } from "@vim/db/modos-servicio";
@@ -143,6 +143,8 @@ export function SidebarTicket({
     sinExistencia: (l: LineaCarrito) => boolean;
     /** Producto del último agregado; se marca hasta la siguiente acción. */
     ultimoProductoId: string | null;
+    /** Con el ticket vacío llega quien viene a cambiar algo: el botón va grande ahí mismo. */
+    onCambioTalla?: () => void;
   };
 }) {
   const totales = calcularTotalesDisplay(estado.lineas, 16, estado.envio?.costoMxn ?? 0);
@@ -291,6 +293,9 @@ export function SidebarTicket({
             <p className="text-15 font-semibold text-ink-2">
               {tienda ? "Escanea una prenda para empezar" : "Agrega productos para empezar"}
             </p>
+            {tienda?.onCambioTalla && (
+              <Button variant="ghost" size="lg" onClick={tienda.onCambioTalla} className="mt-2 w-full">Cambio de talla</Button>
+            )}
             {!tienda && (
               <span className="text-13">
                 Toca un producto del catálogo para iniciar el ticket.

@@ -56,6 +56,7 @@ import { PantallaMesas } from "./pantalla-mesas";
 import { PantallaReservaciones } from "./pantalla-reservaciones";
 import { PantallaConsultaCuentas } from "./pantalla-consulta-cuentas";
 import { PantallaDevoluciones } from "./pantalla-devoluciones";
+import { PantallaCambioTalla } from "./pantalla-cambio-talla";
 import { PantallaPedidosApps } from "./pantalla-pedidos-apps";
 import { accionPedidoApp, hayExpiradosSinVer, leerExpiradosHoy, leerPedidosApps, type PedidoApp, type PedidoAppEstado } from "../lib/pedidos-apps";
 import {
@@ -570,6 +571,10 @@ export function HomePos({
   /** Selector de talla y color abierto y franja del escáner: estado de aquí para que su Escape viva en la pila. */
   const [selectorRetail, setSelectorRetail] = useState<PadreTienda | null>(null);
   const [avisoRetail, setAvisoRetail] = useState<AvisoEscaneo | null>(null);
+  /** Pantalla «Cambio de talla» (pos-retail.md): se entra desde la cabecera o el ticket vacío. */
+  const [enCambioTalla, setEnCambioTalla] = useState(false);
+  /** Venta nueva de un cambio con saldo: al cargarse en el carrito se abre su cobro. */
+  const [cobrarCambio, setCobrarCambio] = useState<string | null>(null);
   const [existencias, setExistencias] = useState<Existencia[] | null>(null);
   /** Producto del último agregado: su renglón queda marcado hasta la siguiente acción. */
   const [ultimoTienda, setUltimoTienda] = useState<string | null>(null);
@@ -693,6 +698,7 @@ export function HomePos({
     setEnBarra(false);
     setEnConsultaCuentas(false);
     setEnDevoluciones(false);
+    setEnCambioTalla(false);
     setEnPedidosApps(false);
     setEnMonitor(false);
     setEnInicio(true);
@@ -1777,8 +1783,9 @@ export function HomePos({
     const pantallas: CapaEscape[] = [
       // La pantalla de cocina no conoce la pila del POS (vive en su propio paquete).
       [enKds, () => setEnKds(false)],
-      // Nada abierto: Escape equivale al botón Volver de la pantalla de captura.
-      [!enInicio && !enKds && !enMonitor && !enConsultaCuentas && !enDevoluciones && !enPedidosApps
+      // Nada abierto: Escape equivale al botón Volver de la pantalla de captura. «Cambio de talla»
+      // atiende el suyo (regresa un paso).
+      [!enInicio && !enKds && !enMonitor && !enConsultaCuentas && !enDevoluciones && !enCambioTalla && !enPedidosApps
         && !enDelivery && !enPickup && !enMesas && !enBarra, () => intentarSalirDeCaptura("atras")],
     ];
     return {
@@ -1798,9 +1805,34 @@ export function HomePos({
       clienteDomAbierto, clienteCuentaAbierto, zonaPedidoAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
       salidaPendiente, confirmandoCierre, menuGeneralAbierto, cerrando, enInicio, enKds, enMonitor,
-      enConsultaCuentas, enDevoluciones, enPedidosApps, enDelivery, enPickup, enMesas, enBarra, nuevoTicket,
+      enConsultaCuentas, enDevoluciones, enCambioTalla, enPedidosApps, enDelivery, enPickup, enMesas, enBarra, nuevoTicket,
       intentarSalirDeCaptura]);
   useEscape(alEscapar);
+
+  // ── Cambio de talla (giro RETAIL) ─────────────────────────────────────────────────────────
+  /** Entra a la pantalla. Con un ticket a medias no: al final el cambio puede cargar su venta al carrito. */
+  const abrirCambioTalla = () => {
+    if (carrito.lineas.length > 0 || ticketBd) {
+      setError("Tienes una venta a medias. Cóbrala o déjala en espera antes de hacer un cambio.");
+      return;
+    }
+    setError(null);
+    nuevoTicket(); // «Cobro completado» y el recibo de la venta anterior se cierran
+    setEnCambioTalla(true);
+  };
+  /** Cambio con saldo: su venta nueva quedó ABIERTA. Se carga como una cuenta y se abre su cobro. */
+  const cobrarCambioTalla = async (ticketId: string, saldo: number) => {
+    setEnCambioTalla(false);
+    setCuentasVersion((v) => v + 1);
+    if (await entrarCuenta(ticketId)) setCobrarCambio(ticketId);
+    else setError(`El cambio quedó registrado, pero no se pudo abrir su cobro. Ábrelo en «Cuentas abiertas» y cobra ${fmtMxn(saldo)}.`);
+  };
+  // `iniciarCobro` lee el carrito y la cuenta recién cargados: por eso espera a que estén.
+  useEffect(() => {
+    if (!cobrarCambio || ticketBd?.ticketId !== cobrarCambio || carrito.lineas.length === 0) return;
+    setCobrarCambio(null);
+    void iniciarCobro();
+  }, [cobrarCambio, ticketBd, carrito.lineas.length, iniciarCobro]);
 
   /** Aceptar o rechazar un pedido de la tienda desde este dispositivo: siempre por `delivery-accion`. */
   const atenderPedidoTienda: AccionTienda = async (p, accion, motivo) => {
@@ -1847,7 +1879,7 @@ export function HomePos({
     // mismo canal los dejaba abiertos sobre la cuenta recién aceptada.
     const capturando = !enInicio && !enKds && !enMonitor && !enConsultaCuentas && !enDevoluciones && !enPedidosApps && !enDelivery && !enPickup && !enMesas && !enBarra;
     const enLista = listaConDialogo.current || asignandoRepartidor != null || viendoReservaciones;
-    if (algoAbierto || enLista || (capturando && (carrito.lineas.length > 0 || ticketBd !== null))) {
+    if (algoAbierto || enLista || enCambioTalla || (capturando && (carrito.lineas.length > 0 || ticketBd !== null))) {
       avisarBreveTienda(`Termina lo que tienes abierto. El pedido te espera en ${aDomicilio ? "Domicilio" : "Pick-up"}.`);
       return;
     }
@@ -2638,6 +2670,19 @@ export function HomePos({
     );
   }
 
+  if (enCambioTalla) {
+    return (
+      <>
+        <PantallaCambioTalla token={token} caja={caja} turno={turno} empleado={empleado} productos={productos ?? []}
+          existencias={existencias} sucursales={sucursalesTienda} actualizadoA={actualizadoA} escaneoIgnorado={avisoTiendaVisible}
+          onSalir={() => { setEnCambioTalla(false); setCuentasVersion((v) => v + 1); }}
+          onCobrar={(id, saldo) => void cobrarCambioTalla(id, saldo)}
+          onImprimir={(id) => reimprimirCuenta(id)} />
+        {capaTienda}
+      </>
+    );
+  }
+
   return (
     <div className="flex h-screen flex-col">
       {!online && (
@@ -2659,6 +2704,10 @@ export function HomePos({
           pulsar la equivocada con prisa. */}
       <div className="flex flex-shrink-0 items-center gap-3 border-b border-line bg-surface px-3 py-2">
         <BotonVolver onClick={() => intentarSalirDeCaptura("atras")} />
+        {capturaTienda && (
+          /* Empieza otra operación (sobre una venta anterior): va aquí y no junto a Cobrar (pos-retail.md). */
+          <Button variant="ghost" onClick={abrirCambioTalla} className="ml-auto flex-shrink-0">Cambio de talla</Button>
+        )}
         {admiteClienteCuenta(carrito.modoServicio) && (
           /* Cliente de la cuenta (opcional). Con cliente asignado muestra su nombre: así se ve de un
              vistazo a quién le cuenta esta venta. Sin él, la venta sigue igual que siempre. */
@@ -2666,7 +2715,8 @@ export function HomePos({
             type="button"
             onClick={() => setClienteCuentaAbierto(true)}
             className={[
-              "ml-auto flex h-10 max-w-[240px] flex-shrink-0 items-center gap-2 rounded border px-3 text-14 font-semibold transition hover:border-ink hover:bg-hover",
+              capturaTienda ? "" : "ml-auto",
+              "flex h-10 max-w-[240px] flex-shrink-0 items-center gap-2 rounded border px-3 text-14 font-semibold transition hover:border-ink hover:bg-hover",
               carrito.clienteCuenta ? "border-accent text-ink" : "border-line-strong text-ink",
             ].join(" ")}
           >
@@ -2820,6 +2870,7 @@ export function HomePos({
             renglon: (l) => renglonTienda(l.producto, productos ?? []),
             sinExistencia: (l) => sinExistencia(l.producto, carrito.lineas.filter((x) => x.producto.id === l.producto.id).reduce((s, x) => s + x.cantidad, 0), existencias, caja.sucursal_id),
             ultimoProductoId: ultimoTienda,
+            onCambioTalla: abrirCambioTalla,
           } : undefined}
           onCantidad={(id, c) => { setUltimoTienda(null); dispatch({ tipo: "cantidad", clientId: id, cantidad: c }); }}
           onQuitar={(id) => { setUltimoTienda(null); dispatch({ tipo: "quitar", clientId: id }); }}

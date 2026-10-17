@@ -18,6 +18,7 @@ import {
   MEDIOS_DEV,
   MOTIVOS_DEV,
   motivosDevolucion,
+  ROLES_DEVOLUCION,
   totalDevolucion,
   type ItemVenta,
   type MedioDevolucion,
@@ -39,8 +40,6 @@ import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
 import { obtenerImpresora } from "../lib/print/adapter";
 import { construirDevolucionJob, type DatosDevolucion } from "../lib/print/devolucion-builder";
 import { OverlayReciboDevolucion } from "./recibo-devolucion";
-
-const ROLES_DEVOLUCION = ["SUPERVISOR", "ADMIN", "DUENO"];
 
 export function PantallaDevoluciones({
   token,
