@@ -17,6 +17,58 @@ La misma caja táctil de 15" (1024×768 es el piso), con dos diferencias contra 
 No hay cocina, mesas ni comandas. Lo que sí hay, y en el restaurante casi no: el cliente que vuelve
 días después a cambiar la talla.
 
+## Versión 2: barra inferior y tarjetas con foto (Fermín, 16 oct; en construcción)
+
+> Fermín cambió el diseño después de ver la entrega 4. Esta sección **manda** sobre las de abajo
+> donde choquen; al construirla, las secciones viejas se reescriben y esta se funde en ellas.
+
+**Una barra de navegación abajo, siempre visible**, con cinco destinos: **Panel · Inventario ·
+Transacciones · Notificaciones · Configuración**. En una tienda reemplaza al inicio de mosaicos, al
+botón «Menú» y al `Volver` de la venta: el cajero cambia de sección con un toque, sin regresar a un
+inicio. Cada destino es un botón de 56 px de alto con icono y texto; el elegido va en el color de
+acento. Notificaciones lleva un globo con el número de avisos sin ver. La barra de estado de la caja
+(sin conexión, sincronizando, turno, folios) sigue arriba, como hoy.
+
+- **Panel** es la venta (la pantalla de cobro). Abre aquí al iniciar turno.
+  - **Izquierda, igual que hoy:** barra de escaneo, categorías y cuadrícula.
+  - **Derecha, simplificada:** el ticket con sus renglones, el total, **Cobrar** y «Efectivo exacto».
+    Se van «En espera», «Descuento» y «Precios». Arriba del ticket, como texto pequeño, «Asignar
+    cliente» (la lealtad lo necesita) y «Limpiar». Con el ticket vacío sigue el botón grande «Cambio de
+    talla».
+  - Se va la fila de botones de arriba (`Volver`, «Cuentas abiertas», «Cuentas en espera»): lo abierto
+    vive en Transacciones.
+- **Las tarjetas llevan foto.** La foto del producto (la que sube el admin, `imagen_url`) llena la
+  tarjeta, recortada en cuadrado. Encima, un degradado oscuro de abajo hacia arriba (negro al ~75 %
+  abajo, transparente a media altura). Sobre él, abajo a la izquierda y en blanco: el nombre
+  (`text-14`, seminegrita, hasta dos renglones) y el precio debajo (`text-13`, `font-display`, bold,
+  `tabular-nums`). Chico pero legible a un metro.
+  - Sin foto, o si no carga (caja sin internet), la tarjeta usa el color de su categoría con la
+    inicial del producto en grande, y el mismo degradado y texto. Nunca una tarjeta en blanco.
+  - **Existencia:** sin número en la tarjeta. Una etiqueta arriba a la derecha solo cuando importa:
+    «Pocas» (`warning`) o «Agotada» (`danger`). El número exacto se ve en el selector de talla y color.
+  - Tocar sigue igual: sin variantes agrega; con variantes abre el selector.
+- **Inventario.** Buscar o escanear una prenda y ver su existencia por talla y color, en esta sucursal y
+  en las demás (el mismo selector, de solo consulta). Y **Recibir mercancía** escaneando, como en el
+  admin: proveedor opcional, renglones con cantidad, «Recibir N productos». Recibir solo lo puede hacer
+  quien tenga el permiso de productos (dueño o administrador); a los demás la pantalla les dice
+  «Pide a un administrador que entre con su PIN para recibir.».
+- **Transacciones.** La lista de ventas: arriba las **cuentas abiertas** de esta caja (por ejemplo, la
+  de un cambio con diferencia por cobrar), luego las ventas del turno, y búsqueda por folio o
+  escaneando una prenda (30 días). Al tocar una venta se ve su detalle, con tres acciones:
+  **Reimprimir**, **Devolver** y **Cambio de talla**. Reemplaza las entradas sueltas de Devoluciones y
+  de Cambio de talla (el botón grande del ticket vacío se queda como atajo).
+- **Notificaciones.** Dos tipos, en una lista, lo más nuevo arriba:
+  - **Existencias** de esta sucursal: prendas bajo mínimo, agotadas o en negativo, con la cifra. Al
+    tocar una, abre Inventario con esa prenda.
+  - **Avisos de VIM**: los mismos que hoy salen al abrir turno (se siguen mostrando ahí, uno por uno);
+    aquí quedan para releerlos.
+  - El globo cuenta lo que no se ha visto desde la última vez que se abrió la pestaña.
+- **Configuración.** Lo que hoy está en el «Menú» general: impresoras y pantallas, cambiar cajero,
+  bloquear, cambiar PIN, abrir cajón, corte X, actualizar menú, buscar actualizaciones, ayuda por
+  WhatsApp y **Cerrar turno** (en rojo, separado de lo demás).
+
+Un restaurante no ve nada de esto: su inicio, su menú y su captura quedan iguales.
+
 ## Qué pantalla sale
 
 - La caja usa la venta de tienda cuando el giro del negocio es **RETAIL** (`esTienda`, que sale de lo
