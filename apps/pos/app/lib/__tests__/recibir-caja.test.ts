@@ -18,7 +18,7 @@ describe("masUna", () => {
 });
 
 describe("avisoCantidad", () => {
-  it.each(["1", "5.0000","2.5", ".5", "5.", "1.500", "0.001", "999999999"])("acepta %s", (q) => expect(avisoCantidad(q)).toBeNull());
+  it.each(["1", "5.0000", "2.5", ".5", "5.", "1.500", "0.001", "999999999"])("acepta %s", (q) => expect(avisoCantidad(q)).toBeNull());
   it.each(["", " ", "0", "0.000", "abc", "NaN", "-1", "1.2345", "1e3", "1000000000"])("rechaza %j", (q) => expect(avisoCantidad(q)).not.toBeNull());
 });
 

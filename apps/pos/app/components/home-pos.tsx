@@ -1049,9 +1049,9 @@ export function HomePos({
   }, [carrito.lineas, token, ticketBd, itemsPersistidos, canjeVivo]);
 
   /** Entra en modo cuenta de mesa: carga el ticket persistido al carrito para seguir editando. */
-  const entrarCuenta = useCallback(async (ticketId: string, origen: Origen = "inicio") => {
+  const entrarCuenta = useCallback(async (ticketId: string, origen: Origen = "inicio"): Promise<boolean | "cancelado"> => {
     // Abrir una cuenta lleva al Panel: con una recepción a medias, pregunta antes (el cajero puede quedarse).
-    if (recepcionPendiente.current > 0 && !(await confirmarDescarteRecepcion(recepcionPendiente.current))) return;
+    if (recepcionPendiente.current > 0 && !(await confirmarDescarteRecepcion(recepcionPendiente.current))) return "cancelado" as const;
     // Se arranca en "no enviado" y la consulta de abajo lo corrige. Dejar el valor de la cuenta
     // anterior hacía que una cuenta nueva apareciera como ya enviada, con el botón inutilizable.
     setCocinaEnviada(false);
@@ -1588,9 +1588,11 @@ export function HomePos({
     setEsperaError(null);
     try {
       await retomarTicketEnEspera(token, ticketId);
-      if (!(await entrarCuenta(ticketId))) {
+      const abierta = await entrarCuenta(ticketId);
+      if (abierta !== true) {
         // No se pudo cargar: sin esto quedaría fuera de espera y sin pantalla que lo muestre.
         await ponerTicketEnEspera(token, ticketId, etiqueta).catch(() => {});
+        if (abierta === "cancelado") return; // el cajero dijo que no: sin aviso de error
         throw new Error("No se pudo cargar el pedido. Sigue en espera; intenta de nuevo.");
       }
       setRetomadoEspera({ ticketId, etiqueta });
@@ -1628,8 +1630,9 @@ export function HomePos({
       return;
     }
     setLlevarError(null);
-    if (await entrarCuenta(ticketId)) setLlevarListaAbierta(false);
-    else setLlevarError("No se pudo abrir la cuenta. Intenta de nuevo.");
+    const abierta = await entrarCuenta(ticketId);
+    if (abierta === true) setLlevarListaAbierta(false);
+    else if (abierta === false) setLlevarError("No se pudo abrir la cuenta. Intenta de nuevo.");
   }, [carrito.lineas.length, entrarCuenta]);
 
   /** Descarta el overlay de confirmación/recibo (sin tocar el carrito en curso).
@@ -1946,8 +1949,9 @@ export function HomePos({
     setEnCambioTalla(false);
     setVentaElegida(null);
     setCuentasVersion((v) => v + 1);
-    if (await entrarCuenta(ticketId)) setCobrarCambio(ticketId);
-    else setError(`El cambio quedó registrado, pero no se pudo abrir su cobro. Queda en Transacciones: cóbrale ${fmtMxn(saldo)} desde ahí.`);
+    const abierta = await entrarCuenta(ticketId);
+    if (abierta === true) setCobrarCambio(ticketId);
+    else if (abierta === false) setError(`El cambio quedó registrado, pero no se pudo abrir su cobro. Queda en Transacciones: cóbrale ${fmtMxn(saldo)} desde ahí.`);
   };
   /**
    * Transacciones: una cuenta abierta (o una en espera de antes) se carga en el Panel. Lo que está
@@ -1959,10 +1963,11 @@ export function HomePos({
     if (etiquetaEspera === undefined) { await entrarCuenta(ticketId); return; }
     try {
       await retomarTicketEnEspera(token, ticketId);
-      if (!(await entrarCuenta(ticketId))) {
+      const abierta = await entrarCuenta(ticketId);
+      if (abierta !== true) {
         // Mismo resguardo que `retomarEspera`: sin cargar, no se queda fuera de espera.
         await ponerTicketEnEspera(token, ticketId, etiquetaEspera).catch(() => {});
-        setError("No se pudo cargar el pedido. Sigue en espera; intenta de nuevo.");
+        if (abierta === false) setError("No se pudo cargar el pedido. Sigue en espera; intenta de nuevo.");
         return;
       }
       setRetomadoEspera({ ticketId, etiqueta: etiquetaEspera });

@@ -78,6 +78,8 @@ export function SeccionInventario({
   /** Tras editar una cantidad o la referencia, el foco vuelve aquí: el escáner ignora ráfagas en otros campos. */
   const buscar = useRef<HTMLInputElement>(null);
   const alEnterCampo = (e: React.KeyboardEvent) => { if (e.key === "Enter") { e.preventDefault(); buscar.current?.focus(); } };
+  /** Sin Enter (teclado táctil): si el foco no va a otro control, regresa al buscador. */
+  const alSoltarCampo = (e: React.FocusEvent) => { if (e.relatedTarget === null) buscar.current?.focus(); };
   const [errorRecibir, setErrorRecibir] = useState<string | null>(null);
   const [listo, setListo] = useState<string | null>(null);
   const [sinPermiso, setSinPermiso] = useState(false);
@@ -354,7 +356,9 @@ export function SeccionInventario({
                                 const cantidad = soloNumero(e.target.value);
                                 setRenglones((rs) => rs.map((x) => (x.producto.id === r.producto.id ? { ...x, cantidad } : x)));
                               }}
+                              data-escaner="campo-recibir"
                               onKeyDown={alEnterCampo}
+                              onBlur={alSoltarCampo}
                               className="h-11 w-24 flex-shrink-0 rounded border border-line-strong bg-surface px-3 text-right font-display text-18 font-bold tabular-nums text-ink outline-none focus:border-ink"
                             />
                             <button
@@ -379,7 +383,9 @@ export function SeccionInventario({
                       value={referencia}
                       maxLength={100}
                       onChange={(e) => setReferencia(e.target.value)}
+                      data-escaner="campo-recibir"
                       onKeyDown={alEnterCampo}
+                      onBlur={alSoltarCampo}
                       placeholder="Ej. F-1234"
                       autoComplete="off"
                       className="h-11 rounded border border-line-strong bg-surface px-3 text-15 font-normal text-ink outline-none placeholder:text-ink-3 focus:border-ink"

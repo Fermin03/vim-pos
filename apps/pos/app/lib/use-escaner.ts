@@ -3,9 +3,20 @@ import { useEffect, useRef } from "react";
 import { crearDetectorEscaner, leerUmbral } from "./escaner";
 
 /** Pone "" en un input controlado por React: el setter nativo + `input` hace que su estado lo siga. */
-function limpiarCampo(el: HTMLInputElement) {
-  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(el, "");
+function fijarCampo(el: HTMLInputElement, valor: string) {
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(el, valor);
   el.dispatchEvent(new Event("input", { bubbles: true }));
+}
+const limpiarCampo = (el: HTMLInputElement) => fijarCampo(el, "");
+
+/**
+ * Cómo trata el escáner el campo con foco. `busqueda` es el buscador (se limpia por completo) y
+ * `campo-recibir` una cantidad o referencia de Inventario · Recibir (se restaura lo que tenía). Todo
+ * otro campo de texto es ajeno: la ráfaga no se interpreta como código.
+ */
+export function clasificarFoco(esInput: boolean, marca: string | undefined): { enCampoAjeno: boolean; propio: "busqueda" | "campo-recibir" | null } {
+  const propio = marca === "busqueda" || marca === "campo-recibir" ? marca : null;
+  return { enCampoAjeno: esInput && propio === null, propio };
 }
 
 /**
@@ -27,6 +38,8 @@ function limpiarCampo(el: HTMLInputElement) {
 export function useEscaner(alCodigo: (codigo: string) => void, activo: boolean): void {
   const cb = useRef(alCodigo);
   cb.current = alCodigo;
+  /** Valor de un campo `campo-recibir` antes de la ráfaga: el 1er carácter se escapa y cae ahí. */
+  const antesDeRafaga = useRef("");
 
   useEffect(() => {
     if (!activo) return;
@@ -40,17 +53,18 @@ export function useEscaner(alCodigo: (codigo: string) => void, activo: boolean):
         foco instanceof HTMLTextAreaElement ||
         foco instanceof HTMLSelectElement ||
         (foco instanceof HTMLElement && foco.isContentEditable);
-      const busqueda = foco instanceof HTMLInputElement && foco.dataset.escaner === "busqueda";
-      const { codigo, enRafaga } = detector.tecla({
-        key: e.key,
-        tiempo: e.timeStamp,
-        enCampoAjeno: esInput && !busqueda,
-      });
-      if (codigo === null && !enRafaga) return;
+      const { enCampoAjeno, propio } = clasificarFoco(esInput, foco instanceof HTMLInputElement ? foco.dataset.escaner : undefined);
+      const valorAntes = foco instanceof HTMLInputElement ? foco.value : "";
+      const { codigo, enRafaga } = detector.tecla({ key: e.key, tiempo: e.timeStamp, enCampoAjeno });
+      if (codigo === null && !enRafaga) {
+        if (propio === "campo-recibir") antesDeRafaga.current = valorAntes;
+        return;
+      }
       e.preventDefault();
       e.stopPropagation();
       if (codigo === null) return;
-      if (busqueda) limpiarCampo(foco);
+      if (propio === "busqueda") limpiarCampo(foco as HTMLInputElement);
+      else if (propio === "campo-recibir") fijarCampo(foco as HTMLInputElement, antesDeRafaga.current);
       cb.current(codigo);
     };
     window.addEventListener("keydown", alTeclear, true);
