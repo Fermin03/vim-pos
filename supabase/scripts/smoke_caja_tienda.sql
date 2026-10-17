@@ -492,9 +492,17 @@ DECLARE
   v_maria uuid := '99999999-0000-0000-0000-000000000001';
   v_gor   uuid := 'c4c40000-0000-0000-0000-0000000000a2';
   v_e1 uuid := gen_random_uuid(); v_e2 uuid := gen_random_uuid(); v_e3 uuid := gen_random_uuid(); v_e4 uuid := gen_random_uuid();
-  v_prov uuid; v_ini numeric; v_res jsonb; v_snap jsonb;
+  v_e5 uuid := gen_random_uuid(); v_e6 uuid := gen_random_uuid(); v_e7 uuid := gen_random_uuid();
+  v_prov uuid; v_ini numeric; v_res jsonb; v_snap jsonb; v_item uuid; v_dev uuid; v_tras uuid; v_suc2 uuid;
 BEGIN
   INSERT INTO proveedores (tenant_id, nombre) VALUES (v_t, 'Proveedor smoke 0197') RETURNING id INTO v_prov;
+  -- Referencias reales de este negocio (con una inventada fallaría la llave foránea, no la regla de la 0198).
+  SELECT id INTO v_item FROM ticket_items WHERE tenant_id = v_t LIMIT 1;
+  SELECT id INTO v_dev FROM devoluciones WHERE tenant_id = v_t LIMIT 1;
+  INSERT INTO sucursales (tenant_id, codigo, nombre) VALUES (v_t, 'S198', 'Tercera tienda') RETURNING id INTO v_suc2;
+  INSERT INTO traspasos_producto (tenant_id, origen_sucursal_id, destino_sucursal_id, lineas)
+  VALUES (v_t, v_suc2, v_suc, '[{"producto_id": "c4c40000-0000-0000-0000-0000000000a2", "cantidad": 1}]') RETURNING id INTO v_tras;
+  IF v_item IS NULL OR v_dev IS NULL THEN RAISE EXCEPTION '6: faltan un renglón y una devolución de la semilla'; END IF;
   v_ini := COALESCE((SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_gor), 0);
 
   -- 6a) Aplica una vez y mueve la existencia; reenviada no duplica ni da error.
@@ -511,19 +519,25 @@ BEGIN
   IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_gor) <> v_ini + 4 THEN
     RAISE EXCEPTION '6a: la existencia debía quedar en %', v_ini + 4; END IF;
 
-  -- 6b) Con costo, con proveedor o con cantidad no positiva: a errores, sin guardarse.
+  -- 6b) Con costo, con proveedor, con cantidad no positiva o con renglón, devolución o traspaso (0198): a errores, sin guardarse.
   v_res := sync_push_snapshot(v_t, jsonb_build_object('movimientos_producto', jsonb_build_array(
     jsonb_build_object('id', v_e2, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_gor, 'tipo', 'ENTRADA', 'cantidad', 2,
       'costo_unitario_mxn', 50, 'usuario_id', v_maria, 'creado_at', now()),
     jsonb_build_object('id', v_e3, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_gor, 'tipo', 'ENTRADA', 'cantidad', 2,
       'proveedor_id', v_prov, 'usuario_id', v_maria, 'creado_at', now()),
     jsonb_build_object('id', v_e4, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_gor, 'tipo', 'ENTRADA', 'cantidad', -2,
-      'usuario_id', v_maria, 'creado_at', now()))));
+      'usuario_id', v_maria, 'creado_at', now()),
+    jsonb_build_object('id', v_e5, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_gor, 'tipo', 'ENTRADA', 'cantidad', 2,
+      'ticket_item_id', v_item, 'usuario_id', v_maria, 'creado_at', now()),
+    jsonb_build_object('id', v_e6, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_gor, 'tipo', 'ENTRADA', 'cantidad', 2,
+      'devolucion_id', v_dev, 'usuario_id', v_maria, 'creado_at', now()),
+    jsonb_build_object('id', v_e7, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_gor, 'tipo', 'ENTRADA', 'cantidad', 2,
+      'traspaso_id', v_tras, 'usuario_id', v_maria, 'creado_at', now()))));
   IF (v_res->>'movimientos_producto')::int IS DISTINCT FROM 0 THEN RAISE EXCEPTION '6b: nada debía aplicarse: %', v_res; END IF;
   IF (SELECT count(*) FROM jsonb_array_elements(COALESCE(v_res->'_errores', '[]'::jsonb)) e
-       WHERE e->>'id' IN (v_e2::text, v_e3::text, v_e4::text)) <> 3 THEN
-    RAISE EXCEPTION '6b: los tres debían estar en _errores: %', v_res; END IF;
-  IF EXISTS (SELECT 1 FROM movimientos_producto WHERE id IN (v_e2, v_e3, v_e4)) THEN RAISE EXCEPTION '6b: no debían guardarse'; END IF;
+       WHERE e->>'id' IN (v_e2::text, v_e3::text, v_e4::text, v_e5::text, v_e6::text, v_e7::text)) <> 6 THEN
+    RAISE EXCEPTION '6b: los seis debían estar en _errores: %', v_res; END IF;
+  IF EXISTS (SELECT 1 FROM movimientos_producto WHERE id IN (v_e2, v_e3, v_e4, v_e5, v_e6, v_e7)) THEN RAISE EXCEPTION '6b: no debían guardarse'; END IF;
   RAISE NOTICE '6 entradas de la caja 0197 OK';
 END $$;
 
