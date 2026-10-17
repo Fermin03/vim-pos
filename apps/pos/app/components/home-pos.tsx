@@ -1050,6 +1050,8 @@ export function HomePos({
 
   /** Entra en modo cuenta de mesa: carga el ticket persistido al carrito para seguir editando. */
   const entrarCuenta = useCallback(async (ticketId: string, origen: Origen = "inicio") => {
+    // Abrir una cuenta lleva al Panel: con una recepción a medias, pregunta antes (el cajero puede quedarse).
+    if (recepcionPendiente.current > 0 && !(await confirmarDescarteRecepcion(recepcionPendiente.current))) return;
     // Se arranca en "no enviado" y la consulta de abajo lo corrige. Dejar el valor de la cuenta
     // anterior hacía que una cuenta nueva apareciera como ya enviada, con el botón inutilizable.
     setCocinaEnviada(false);
@@ -1080,7 +1082,7 @@ export function HomePos({
       setError(e instanceof Error ? e.message : "No se pudo cargar la cuenta");
       return false;
     }
-  }, [token, productos, combos]);
+  }, [token, productos, combos, confirmarDescarteRecepcion]);
 
   const onAbrirCuentaMesa = useCallback(async (mesaId: string) => {
     try {

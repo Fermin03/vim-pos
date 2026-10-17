@@ -4,7 +4,7 @@ import { Icono, Modal } from "@vim/ui/styles";
 import type { Producto } from "../lib/catalogo";
 import { agruparTienda, buscarVitrina, destinoInventario, estadoExistencia, renglonTienda, resumenVitrina, type DestinoInventario, type Existencia, type PadreTienda } from "../lib/tienda";
 import { useEscaner } from "../lib/use-escaner";
-import { avisoCantidad, recibirEnCaja, SinPermisoRecibir } from "../lib/recibir-caja";
+import { avisoCantidad, ExistenciasApagadas, masUna, recibirEnCaja, SinPermisoRecibir } from "../lib/recibir-caja";
 import { sonarError } from "./venta-retail";
 import { piezas, SelectorVariantes, textoActualizado } from "./selector-variantes";
 
@@ -75,6 +75,9 @@ export function SeccionInventario({
   const [selectorRecibir, setSelectorRecibir] = useState<PadreTienda | null>(null);
   const [guardando, setGuardando] = useState(false);
   const enviando = useRef(false);
+  /** Tras editar una cantidad o la referencia, el foco vuelve aquí: el escáner ignora ráfagas en otros campos. */
+  const buscar = useRef<HTMLInputElement>(null);
+  const alEnterCampo = (e: React.KeyboardEvent) => { if (e.key === "Enter") { e.preventDefault(); buscar.current?.focus(); } };
   const [errorRecibir, setErrorRecibir] = useState<string | null>(null);
   const [listo, setListo] = useState<string | null>(null);
   const [sinPermiso, setSinPermiso] = useState(false);
@@ -109,13 +112,15 @@ export function SeccionInventario({
 
   /** Una pieza más de esta prenda: escanear otra vez la misma suma 1 a su renglón. */
   const agregar = (p: Producto) => {
+    // La base rechazaría todo el lote por uno que no lleva existencias; `undefined` = aún no se sabe, ella decide.
+    if (p.controla_existencias === false) { setAviso("Ese producto no lleva existencias."); sonarError(); return; }
+    setAviso(null);
     setListo(null);
     setErrorRecibir(null);
     setRenglones((rs) => {
       const i = rs.findIndex((r) => r.producto.id === p.id);
       if (i < 0) return [...rs, { producto: p, cantidad: "1" }];
-      const c = rs[i]!.cantidad;
-      const cantidad = avisoCantidad(c) ? "1" : String(Math.round((Number(c) + 1) * 1000) / 1000);
+      const cantidad = masUna(rs[i]!.cantidad);
       return rs.map((r, j) => (j === i ? { ...r, cantidad } : r));
     });
   };
@@ -207,7 +212,8 @@ export function SeccionInventario({
       onRecibido();
     } catch (e) {
       // Sin el permiso de productos la base lo dice aquí, aunque el rol pareciera bastar.
-      if (e instanceof SinPermisoRecibir) setSinPermiso(true);
+      if (e instanceof SinPermisoRecibir) { setSinPermiso(true); setRenglones([]); setReferencia(""); } // nada invisible que perder
+      else if (e instanceof ExistenciasApagadas) setErrorRecibir("Las existencias están apagadas para este negocio.");
       else setErrorRecibir(e instanceof Error ? e.message : "No se pudo recibir la mercancía");
     } finally {
       enviando.current = false;
@@ -215,7 +221,7 @@ export function SeccionInventario({
     }
   };
 
-  const pestanaBoton =(id: Pestana, nombre: string) => (
+  const pestanaBoton = (id: Pestana, nombre: string) => (
     <button
       type="button"
       role="tab"
@@ -259,6 +265,7 @@ export function SeccionInventario({
                 <path d="M4 5v14M7 5v14M10.5 5v14M13 5v14M16.5 5v14M20 5v14" />
               </svg>
               <input
+                ref={buscar}
                 data-escaner="busqueda"
                 type="text"
                 value={texto}
@@ -347,6 +354,7 @@ export function SeccionInventario({
                                 const cantidad = soloNumero(e.target.value);
                                 setRenglones((rs) => rs.map((x) => (x.producto.id === r.producto.id ? { ...x, cantidad } : x)));
                               }}
+                              onKeyDown={alEnterCampo}
                               className="h-11 w-24 flex-shrink-0 rounded border border-line-strong bg-surface px-3 text-right font-display text-18 font-bold tabular-nums text-ink outline-none focus:border-ink"
                             />
                             <button
@@ -371,6 +379,7 @@ export function SeccionInventario({
                       value={referencia}
                       maxLength={100}
                       onChange={(e) => setReferencia(e.target.value)}
+                      onKeyDown={alEnterCampo}
                       placeholder="Ej. F-1234"
                       autoComplete="off"
                       className="h-11 rounded border border-line-strong bg-surface px-3 text-15 font-normal text-ink outline-none placeholder:text-ink-3 focus:border-ink"

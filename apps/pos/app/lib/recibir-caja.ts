@@ -15,6 +15,12 @@ export function avisoCantidad(cantidad: string): string | null {
 
 /** La base negó el permiso de productos (`SIN_PERMISO`, 42501): la pantalla vuelve al aviso de «Cambiar cajero». */
 export class SinPermisoRecibir extends Error {}
+/** El módulo de existencias está apagado para el negocio (`MODULO_APAGADO`). */
+export class ExistenciasApagadas extends Error {}
+
+/** Suma una pieza a lo ya capturado; una cantidad que no vale vuelve a 1. */
+export const masUna = (cantidad: string): string =>
+  avisoCantidad(cantidad) ? "1" : String(Math.round((Number(cantidad) + 1) * 1000) / 1000);
 
 /**
  * `recibir_mercancia` (0193) sin proveedor y sin costo: los productos y los proveedores los manda la
@@ -33,7 +39,8 @@ export async function recibirEnCaja(args: {
     p_referencia: args.referencia.trim().slice(0, 100),
   });
   if (error) {
-    if (/SIN_PERMISO|MODULO_APAGADO|permission denied/i.test(error.message) || error.code === "42501") throw new SinPermisoRecibir(error.message);
+    if (/MODULO_APAGADO/.test(error.message)) throw new ExistenciasApagadas(error.message);
+    if (/SIN_PERMISO|permission denied/i.test(error.message) || error.code === "42501") throw new SinPermisoRecibir(error.message);
     throw new Error(error.message.replace(/^DATOS_INVALIDOS:\s*/, ""));
   }
   return typeof data === "number" ? data : args.lineas.length;
