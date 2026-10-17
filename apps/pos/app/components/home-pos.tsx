@@ -58,6 +58,7 @@ import { PantallaConsultaCuentas } from "./pantalla-consulta-cuentas";
 import { PantallaDevoluciones } from "./pantalla-devoluciones";
 import { PantallaCambioTalla } from "./pantalla-cambio-talla";
 import { SeccionTransacciones } from "./seccion-transacciones";
+import { SeccionInventario } from "./seccion-inventario";
 import { PantallaPedidosApps } from "./pantalla-pedidos-apps";
 import { accionPedidoApp, hayExpiradosSinVer, leerExpiradosHoy, leerPedidosApps, type PedidoApp, type PedidoAppEstado } from "../lib/pedidos-apps";
 import {
@@ -77,7 +78,7 @@ import { fijarContextoErrores, reportarErrorSinEsperar } from "../lib/reportar-e
 import { BotonVolver } from "./boton-volver";
 import { CatalogoProductos } from "./catalogo-productos";
 import { PanelVentaRetail, type AvisoEscaneo } from "./venta-retail";
-import { esTienda, leerExistencias, leerSucursales, pasoConLimite, puedeCambiarSeccion, renglonTienda, sinExistencia, type Existencia, type PadreTienda, type SeccionTienda } from "../lib/tienda";
+import { esTienda, puedeRecibirMercancia, leerExistencias, leerSucursales, pasoConLimite, puedeCambiarSeccion, renglonTienda, sinExistencia, type Existencia, type PadreTienda, type SeccionTienda } from "../lib/tienda";
 import { leerEstadoSync } from "../lib/estado-sync";
 import { ModalAgregarProductos } from "./modal-agregar-productos";
 import { ModalNumeroMesa } from "./modal-numero-mesa";
@@ -605,6 +606,8 @@ export function HomePos({
   const [ventaElegida, setVentaElegida] = useState<string | null>(null);
   /** Transacciones con resultados de búsqueda: cómo cerrarlos (Escape regresa a «Ventas del turno»). */
   const [cerrarBusquedaTx, setCerrarBusquedaTx] = useState<(() => void) | null>(null);
+  /** Inventario con una consulta a la vista (matriz o lista por sucursal): cómo cerrarla. */
+  const [cerrarConsultaInv, setCerrarConsultaInv] = useState<(() => void) | null>(null);
   /** Venta nueva de un cambio con saldo: al cargarse en el carrito se abre su cobro. */
   const [cobrarCambio, setCobrarCambio] = useState<string | null>(null);
   const [existencias, setExistencias] = useState<Existencia[] | null>(null);
@@ -1844,6 +1847,8 @@ export function HomePos({
       // Venta de tienda: el selector lo cierra también su `Modal`; la franja del escáner, aquí.
       capaSelector,
       capaAvisoRetail,
+      // Inventario: la consulta de una prenda la cierra también su `Modal`.
+      [tienda && seccionTienda === "inventario" && cerrarConsultaInv != null, () => cerrarConsultaInv?.()],
       [viendoMapaMesas, () => { setViendoMapaMesas(false); setPidiendoMesa(true); }],
       [pidiendoMesa, () => setPidiendoMesa(false)],
       [nombreCuentaAbierto, () => setNombreCuentaAbierto(false)],
@@ -1898,7 +1903,7 @@ export function HomePos({
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
       salidaPendiente, confirmandoCierre, menuGeneralAbierto, cerrando, enInicio, enKds, enMonitor,
       enConsultaCuentas, enDevoluciones, enCambioTalla, enPedidosApps, enDelivery, enPickup, enMesas, enBarra, nuevoTicket,
-      intentarSalirDeCaptura, tienda, seccionTienda, cerrarBusquedaTx, avisosVim, confirmandoVenta, salirCajaAbierto]);
+      intentarSalirDeCaptura, tienda, seccionTienda, cerrarBusquedaTx, cerrarConsultaInv, avisosVim, confirmandoVenta, salirCajaAbierto]);
   useEscape(alEscapar);
 
   // ── Cambio de talla (giro RETAIL) ─────────────────────────────────────────────────────────
@@ -3092,12 +3097,23 @@ export function HomePos({
               onCambio={(id) => abrirCambioTalla(id)}
               onReimprimir={(id) => reimprimirCuenta(id, { origen: "CONSULTA" })}
             />
+          ) : seccionTienda === "inventario" ? (
+            <SeccionInventario
+              productos={productos ?? []}
+              existencias={existencias}
+              sucursalId={caja.sucursal_id}
+              sucursales={sucursalesTienda}
+              actualizadoA={actualizadoA}
+              escaneoIgnorado={escaneoIgnorado}
+              // Recibir mueve existencias: lo pide el permiso de productos (config.productos), que aquí se infiere del rol.
+              puedeRecibir={puedeRecibirMercancia(empleado.rol)}
+              onCambiarCajero={conVentaSuelta(onCambiarCajero)}
+              onAbierto={(cerrar) => setCerrarConsultaInv(() => cerrar)}
+            />
           ) : (
-            // Inventario y Notificaciones llegan en las tareas 5, 7 y 8 de la entrega 4b.
+            // Notificaciones llega en la tarea 8 de la entrega 4b.
             <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
-              <h1 className="font-display text-24 font-semibold tracking-tight">
-                {seccionTienda === "inventario" ? "Inventario" : "Notificaciones"}
-              </h1>
+              <h1 className="font-display text-24 font-semibold tracking-tight">Notificaciones</h1>
               <p className="text-15 text-ink-2">Próximamente.</p>
             </div>
           )}

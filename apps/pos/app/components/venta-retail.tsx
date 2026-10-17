@@ -4,7 +4,7 @@ import { Icono } from "@vim/ui/styles";
 import { colorCategoria, type Categoria, type Producto } from "../lib/catalogo";
 import { menuVisible } from "../lib/catalogo-sucursal";
 import { calcularBarraCategorias, calcularRejilla, clampPagina, tamanoEtiqueta } from "../lib/rejilla";
-import { agruparTienda, decidirEscaneo, etiquetaExistencia, resumenVitrina, type Existencia, type PadreTienda } from "../lib/tienda";
+import { agruparTienda, buscarVitrina, decidirEscaneo, etiquetaExistencia, resumenVitrina, type Existencia, type PadreTienda } from "../lib/tienda";
 import { fmtMxn } from "../lib/turno";
 import { useEscaner } from "../lib/use-escaner";
 import { useHueco } from "../lib/usar-hueco";
@@ -14,9 +14,6 @@ import { SelectorVariantes } from "./selector-variantes";
 
 /** La franja bajo la barra de escaneo. Su capa de Escape la declara `home-pos`. */
 export type AvisoEscaneo = { tipo: "no-encontrado"; codigo: string } | { tipo: "no-se-vende" } | { tipo: "cobro" };
-
-/** Sin mayúsculas ni acentos: «camiseta» encuentra «Camíseta». */
-const plano = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 const sonarError = () => {
   try { void new Audio("/sonidos/escaneo-error.wav").play().catch(() => {}); } catch { /* sin audio, la franja basta */ }
@@ -93,13 +90,8 @@ export function PanelVentaRetail({
   const campo = useRef<HTMLInputElement>(null);
 
   const visibles = useMemo(() => {
-    const q = plano(texto.trim());
-    if (q) {
-      // Buscar es sobre todo el catálogo, no sobre la categoría elegida: así se busca en una tienda.
-      const coincide = (p: Producto) =>
-        plano(p.nombre).includes(q) || [p.codigo_barras, p.codigo_interno].some((k) => k && plano(k).includes(q));
-      return vitrina.filter((p) => coincide(p) || (padres.get(p.id)?.hijas.some(coincide) ?? false));
-    }
+    // Buscar es sobre todo el catálogo, no sobre la categoría elegida: así se busca en una tienda.
+    if (texto.trim()) return buscarVitrina(vitrina, padres, texto);
     if (catSel) return vitrina.filter((p) => p.categoria_id === catSel);
     return [...vitrina].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   }, [vitrina, padres, texto, catSel]);

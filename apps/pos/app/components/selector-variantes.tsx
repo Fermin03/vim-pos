@@ -14,7 +14,7 @@ export function textoActualizado(actualizadoA: string | null): string {
 }
 
 /** Un negativo se ve como tal: «−2». */
-const piezas = (n: number) => (n < 0 ? `−${Math.abs(n)}` : String(n));
+export const piezas = (n: number) => (n < 0 ? `−${Math.abs(n)}` : String(n));
 
 const ESTILO: Record<EstadoExistencia, string> = {
   normal: "border-line-strong bg-surface text-ink",
@@ -36,6 +36,7 @@ export function SelectorVariantes({
   onElegir,
   onCerrar,
   marcada,
+  soloConsulta = false,
 }: {
   padre: PadreTienda;
   /** null = aún no se leyeron: las celdas enseñan «—» y no un estado. */
@@ -43,10 +44,13 @@ export function SelectorVariantes({
   sucursalId: string;
   sucursales: { id: string; nombre: string }[];
   actualizadoA: string | null;
-  onElegir: (hija: Producto) => void;
+  /** Sin él (o con `soloConsulta`) ninguna celda se toca. */
+  onElegir?: (hija: Producto) => void;
   onCerrar: () => void;
   /** Id de la hija «La que regresa» (cambio de talla). */
   marcada?: string;
+  /** Inventario: se ve la existencia por celda, sin tocar nada y sin agregar. */
+  soloConsulta?: boolean;
 }) {
   const [viendo, setViendo] = useState(sucursalId);
   const propia = viendo === sucursalId;
@@ -123,28 +127,29 @@ export function SelectorVariantes({
               }
               const precio = celda.hija.precio_base_mxn !== desde ? fmtMxn(celda.hija.precio_base_mxn) : null;
               const esMarcada = celda.hija.id === marcada;
-              const tocable = propia && vendible(celda.hija);
+              const vigente = propia && vendible(celda.hija);
+              const tocable = vigente && !soloConsulta;
               return (
                 <button
                   key={`${c}-${r}`}
                   type="button"
                   disabled={!tocable}
-                  onClick={() => onElegir(celda.hija)}
+                  onClick={() => onElegir?.(celda.hija)}
                   aria-label={`${[c, r].filter(Boolean).join(" ")}: ${existencias ? `${piezas(celda.cantidad)} piezas` : "existencia sin leer"}`}
                   className={[
                     "flex min-h-14 flex-col items-center justify-center rounded border px-1 py-1.5",
-                    tocable
-                      ? `${existencias ? ESTILO[celda.estado] : "border-line-strong bg-surface text-ink"} transition-[transform,border-color] duration-150 ease-vim hover:border-ink active:scale-[.97]`
+                    vigente
+                      ? `${existencias ? ESTILO[celda.estado] : "border-line-strong bg-surface text-ink"} ${tocable ? "transition-[transform,border-color] duration-150 ease-vim hover:border-ink active:scale-[.97]" : "cursor-default"}`
                       : "cursor-default border-line bg-bg text-ink-3",
                     esMarcada ? "ring-2 ring-ink ring-offset-1" : "",
                   ].join(" ")}
                 >
                   <span className="font-display text-20 font-bold leading-none tabular-nums">{existencias ? piezas(celda.cantidad) : "—"}</span>
                   {precio && <span className="mt-1 text-12 tabular-nums text-ink-2">{precio}</span>}
-                  {propia && !tocable && (
+                  {propia && !vigente && (
                     <span className="mt-1 text-11 font-semibold text-ink-3">{celda.hija.seVendeAqui === false ? "No se vende aquí" : "No se vende por ahora"}</span>
                   )}
-                  {esMarcada && <span className="mt-1 text-11 font-semibold text-ink">La que regresa</span>}
+                  {esMarcada && <span className="mt-1 text-11 font-semibold text-ink">{soloConsulta ? "La que escaneaste" : "La que regresa"}</span>}
                 </button>
               );
             }),

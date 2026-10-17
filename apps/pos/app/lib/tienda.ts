@@ -26,6 +26,12 @@ export function pasoConLimite(paso: (vigente: () => boolean) => Promise<void>, m
   return Promise.race([hecho, limite]).finally(() => clearTimeout(reloj));
 }
 
+/**
+ * Recibir mercancía pide el permiso `config.productos`. El POS no trae los permisos del usuario, solo
+ * su rol (como los demás ROLES_* de los modales): dueño o administrador. La base decide al final.
+ */
+export const puedeRecibirMercancia = (rol: string): boolean => rol === "DUENO" || rol === "ADMIN";
+
 export type Existencia = { producto_id: string; sucursal_id: string; cantidad: number; minimo: number | null };
 export type EstadoExistencia = "normal" | "pocas" | "agotada";
 
@@ -73,6 +79,17 @@ export function agruparTienda(productos: Producto[]): { vitrina: Producto[]; pad
     if (p.producto_padre_id) padres.get(p.producto_padre_id)?.hijas.push(p);
   }
   return { vitrina: productos.filter((p) => !p.producto_padre_id), padres };
+}
+
+/** Sin mayúsculas ni acentos: «camiseta» encuentra «Camíseta». */
+export const plano = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+/** La búsqueda por nombre o SKU de la vitrina: un padre sale si él o alguna de sus hijas coincide. */
+export function buscarVitrina(vitrina: Producto[], padres: Map<string, PadreTienda>, texto: string): Producto[] {
+  const q = plano(texto.trim());
+  const coincide = (p: Producto) =>
+    plano(p.nombre).includes(q) || [p.codigo_barras, p.codigo_interno].some((k) => k && plano(k).includes(q));
+  return vitrina.filter((p) => coincide(p) || (padres.get(p.id)?.hijas.some(coincide) ?? false));
 }
 
 const norm = (s: string) => s.replace(/\s+/g, "").toLowerCase();
@@ -195,4 +212,22 @@ export function filasCuentas(
 export function renglonVenta(r: { producto_id: string | null; nombre: string }, productos: Producto[]): { nombre: string; detalle: string | undefined } {
   const p = r.producto_id ? productos.find((x) => x.id === r.producto_id) : undefined;
   return p ? renglonTienda(p, productos) : { nombre: r.nombre, detalle: undefined };
+}
+
+export type DestinoInventario = { padre: PadreTienda; marcada?: string } | { suelto: Producto };
+
+/**
+ * A dónde lleva un código en Inventario (consulta, nunca agrega): una hija abre a su padre con esa
+ * celda marcada; el código de un padre abre su matriz; un producto sin variantes, su lista por sucursal.
+ */
+export function destinoInventario(productos: Producto[], padres: Map<string, PadreTienda>, codigo: string): DestinoInventario | null {
+  const hit = buscarPorCodigo(productos, codigo);
+  if (hit) {
+    const padre = hit.producto_padre_id ? padres.get(hit.producto_padre_id) : undefined;
+    if (padre) return { padre, marcada: hit.id };
+    return hit.producto_padre_id ? null : { suelto: hit };
+  }
+  const d = decidirEscaneo(productos, codigo, { cobroAbierto: false, ignorar: false });
+  const padre = d.tipo === "selector" ? padres.get(d.padre.id) : undefined;
+  return padre ? { padre } : null;
 }

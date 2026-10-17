@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { Producto } from "../catalogo";
 import type { DatosCaja } from "../turno";
-import { agruparTienda, buscarPorCodigo, decidirEscaneo, esTienda, estadoExistencia, etiquetaExistencia, matrizVariantes, pasoConLimite, filasCuentas, puedeCambiarSeccion, renglonTienda, renglonVenta, resumenVitrina, sinExistencia, type Existencia } from "../tienda";
+import { agruparTienda, buscarPorCodigo, decidirEscaneo, destinoInventario, buscarVitrina, puedeRecibirMercancia, esTienda, estadoExistencia, etiquetaExistencia, matrizVariantes, pasoConLimite, filasCuentas, puedeCambiarSeccion, renglonTienda, renglonVenta, resumenVitrina, sinExistencia, type Existencia } from "../tienda";
 
 const prod = (id: string, extra: Partial<Producto> = {}): Producto => ({
   id, nombre: id, descripcion: null, precio_base_mxn: 100, categoria_id: "c", agotado: false, esCombo: false, seVendeAqui: true, ...extra,
@@ -205,5 +205,38 @@ describe("Transacciones", () => {
     const productos = [padre, h("h1", "M", "Negro", 100, { codigo_interno: "POL-M" })];
     expect(renglonVenta({ producto_id: "h1", nombre: "P M Negro" }, productos)).toEqual({ nombre: "P", detalle: "M · Negro · POL-M" });
     expect(renglonVenta({ producto_id: "borrado", nombre: "Playera vieja" }, productos)).toEqual({ nombre: "Playera vieja", detalle: undefined });
+  });
+});
+
+describe("Inventario", () => {
+  const todos = [padre, ...hijas, suelto];
+  const { vitrina, padres } = agruparTienda(todos);
+  const conCodigo = [padre, h("h1", "M", "Negro", 100, { codigo_interno: "POL-M-NEG" }), ...hijas.slice(1), prod("S", { codigo_barras: "7501" })];
+  const g = agruparTienda(conCodigo);
+
+  it("el código de una hija abre a su padre con esa celda marcada", () => {
+    const d = destinoInventario(conCodigo, g.padres, "pol-m-neg");
+    expect(d && "padre" in d && d.padre.padre.id).toBe("P");
+    expect(d && "padre" in d && d.marcada).toBe("h1");
+  });
+  it("el código de un suelto abre su lista; el de un padre, su matriz; uno raro, nada", () => {
+    expect(destinoInventario(conCodigo, g.padres, "7501")).toEqual({ suelto: conCodigo[4] });
+    const g2 = agruparTienda([{ ...padre, codigo_interno: "POL" }, ...hijas]);
+    const d = destinoInventario([{ ...padre, codigo_interno: "POL" }, ...hijas], g2.padres, "POL");
+    expect(d && "padre" in d && d.marcada).toBeUndefined();
+    expect(destinoInventario(conCodigo, g.padres, "nada")).toBeNull();
+  });
+  it("buscarVitrina ignora acentos y encuentra al padre por una hija", () => {
+    const a = [prod("P", { nombre: "Camíseta", variante_ejes: ["Talla"] }), prod("h", { producto_padre_id: "P", codigo_interno: "ZZ-1" })];
+    const ag = agruparTienda(a);
+    expect(buscarVitrina(ag.vitrina, ag.padres, "camiseta").map((p) => p.id)).toEqual(["P"]);
+    expect(buscarVitrina(ag.vitrina, ag.padres, "zz-1").map((p) => p.id)).toEqual(["P"]);
+    expect(buscarVitrina(vitrina, padres, "xyz")).toEqual([]);
+  });
+  it("recibir: dueño o administrador", () => {
+    expect(puedeRecibirMercancia("DUENO")).toBe(true);
+    expect(puedeRecibirMercancia("ADMIN")).toBe(true);
+    expect(puedeRecibirMercancia("CAJERO")).toBe(false);
+    expect(puedeRecibirMercancia("SUPERVISOR")).toBe(false);
   });
 });
