@@ -2048,7 +2048,8 @@ export function HomePos({
     // mismo canal los dejaba abiertos sobre la cuenta recién aceptada.
     const capturando = !enInicio && !enKds && !enMonitor && !enConsultaCuentas && !enDevoluciones && !enPedidosApps && !enDelivery && !enPickup && !enMesas && !enBarra;
     const enLista = listaConDialogo.current || asignandoRepartidor != null || viendoReservaciones;
-    if (algoAbierto || enLista || enCambioTalla || (capturando && (carrito.lineas.length > 0 || ticketBd !== null))) {
+    // Una recepción a medias en Inventario también: salir de la sección la tira.
+    if (algoAbierto || enLista || enCambioTalla || recepcionPendiente.current > 0 || (capturando && (carrito.lineas.length > 0 || ticketBd !== null))) {
       avisarBreveTienda(`Termina lo que tienes abierto. El pedido te espera en ${aDomicilio ? "Domicilio" : "Pick-up"}.`);
       return;
     }
