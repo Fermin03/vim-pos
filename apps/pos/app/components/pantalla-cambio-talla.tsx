@@ -96,7 +96,7 @@ export function PantallaCambioTalla({
   // La llave del intento: un reintento tras un corte de red no registra el cambio dos veces.
   const clientId = useRef(nuevoClientId());
   const montado = useRef(true);
-  useEffect(() => () => { montado.current = false; }, []);
+  useEffect(() => { montado.current = true; return () => { montado.current = false; }; }, []);
 
   useEffect(() => {
     leerVentasTurno(token, turno.id)
