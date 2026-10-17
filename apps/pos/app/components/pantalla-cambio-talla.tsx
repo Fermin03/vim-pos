@@ -30,7 +30,7 @@ import { agruparTienda, buscarPorCodigo, decidirEscaneo, type Existencia, type P
 import { type DatosCaja, type Turno, fmtMxn } from "../lib/turno";
 
 /** pos-retail.md, «Lo que no hace». */
-const FACTURADA = "Esta venta está facturada. Haz la devolución desde Devoluciones.";
+const FACTURADA = "Esta venta está facturada. Haz la devolución en Transacciones, con «Devolver».";
 const PASOS = ["Venta", "Qué regresa", "Qué se lleva", "Listo"];
 
 type Busqueda = { titulo: string; ventas: VentaDevolvible[]; vacio: string; marcar?: string };

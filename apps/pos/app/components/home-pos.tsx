@@ -1612,7 +1612,9 @@ export function HomePos({
     // cajero a media comanda podía perder lo capturado sin un solo aviso. Se avisa en vez de
     // sustituir: lo que está a medias es trabajo que nadie más puede rehacer.
     if (carrito.lineas.length > 0) {
-      setEsperaError("Tienes un pedido a medias. Cóbralo o déjalo en espera antes de retomar otro.");
+      setEsperaError(tienda
+        ? `Tienes una venta a medias. Cóbrala o ${ticketBd ? "déjala abierta" : "límpiala"} antes de retomar otra.`
+        : "Tienes un pedido a medias. Cóbralo o déjalo en espera antes de retomar otro.");
       return;
     }
     setEsperaProcesando(true);
@@ -1634,7 +1636,7 @@ export function HomePos({
     } finally {
       setEsperaProcesando(false);
     }
-  }, [carrito.lineas.length, token, entrarCuenta, refrescarEspera]);
+  }, [carrito.lineas.length, token, entrarCuenta, refrescarEspera, tienda, ticketBd]);
 
   // Contadores de los dos botones de Para llevar (cuentas abiertas y en espera). Se recalculan al
   // entrar a la captura, cada vez que cambia el ticket en pantalla (se guardó, se cobró, se canceló
@@ -1968,7 +1970,7 @@ export function HomePos({
   /** `ventaId`: la venta ya elegida en Transacciones (arranca en «Qué regresa»). */
   const abrirCambioTalla = (ventaId?: string) => {
     if (carrito.lineas.length > 0 || ticketBd) {
-      setError("Tienes una venta a medias. Cóbrala o déjala en espera antes de hacer un cambio.");
+      setError(`Tienes una venta a medias. Cóbrala o ${ticketBd ? "déjala abierta" : "límpiala"} antes de hacer un cambio.`);
       return;
     }
     setError(null);

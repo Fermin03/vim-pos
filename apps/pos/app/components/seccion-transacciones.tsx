@@ -12,7 +12,7 @@ import { esEscritorio } from "../lib/actualizacion";
 import { listarCuentasParaLlevar } from "./modal-cuentas-para-llevar";
 
 /** pos-retail.md, «Cambio de talla» · «Lo que no hace». */
-const FACTURADA = "Esta venta está facturada. Haz la devolución desde Devoluciones.";
+const FACTURADA = "Esta venta está facturada. Haz la devolución con «Devolver».";
 
 type Busqueda = { titulo: string; ventas: VentaDevolvible[]; vacio: string };
 
