@@ -484,4 +484,47 @@ BEGIN
   RAISE NOTICE '5 ajustes 0196 OK';
 END $$;
 
+-- 6) 0197: la caja sube la ENTRADA de una recepción (sin ticket, costo ni proveedor) una sola vez.
+DO $$
+DECLARE
+  v_t     uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_suc   uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_maria uuid := '99999999-0000-0000-0000-000000000001';
+  v_gor   uuid := 'c4c40000-0000-0000-0000-0000000000a2';
+  v_e1 uuid := gen_random_uuid(); v_e2 uuid := gen_random_uuid(); v_e3 uuid := gen_random_uuid(); v_e4 uuid := gen_random_uuid();
+  v_prov uuid; v_ini numeric; v_res jsonb; v_snap jsonb;
+BEGIN
+  INSERT INTO proveedores (tenant_id, nombre) VALUES (v_t, 'Proveedor smoke 0197') RETURNING id INTO v_prov;
+  v_ini := COALESCE((SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_gor), 0);
+
+  -- 6a) Aplica una vez y mueve la existencia; reenviada no duplica ni da error.
+  v_snap := jsonb_build_object('movimientos_producto', jsonb_build_array(jsonb_build_object(
+    'id', v_e1, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_gor, 'tipo', 'ENTRADA', 'cantidad', 4,
+    'motivo', 'Recepción de mercancía', 'usuario_id', v_maria, 'creado_at', now())));
+  v_res := sync_push_snapshot(v_t, v_snap);
+  IF (v_res->>'movimientos_producto')::int IS DISTINCT FROM 1 THEN RAISE EXCEPTION '6a: debía aplicar 1: %', v_res; END IF;
+  v_res := sync_push_snapshot(v_t, v_snap);
+  IF (v_res->>'movimientos_producto')::int IS DISTINCT FROM 0
+     OR jsonb_array_length(COALESCE(v_res->'_errores', '[]'::jsonb)) > 0 THEN
+    RAISE EXCEPTION '6a: el reenvío debía aplicar 0 sin errores: %', v_res; END IF;
+  IF (SELECT count(*) FROM movimientos_producto WHERE id = v_e1) <> 1 THEN RAISE EXCEPTION '6a: la entrada se duplicó'; END IF;
+  IF (SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_gor) <> v_ini + 4 THEN
+    RAISE EXCEPTION '6a: la existencia debía quedar en %', v_ini + 4; END IF;
+
+  -- 6b) Con costo, con proveedor o con cantidad no positiva: a errores, sin guardarse.
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('movimientos_producto', jsonb_build_array(
+    jsonb_build_object('id', v_e2, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_gor, 'tipo', 'ENTRADA', 'cantidad', 2,
+      'costo_unitario_mxn', 50, 'usuario_id', v_maria, 'creado_at', now()),
+    jsonb_build_object('id', v_e3, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_gor, 'tipo', 'ENTRADA', 'cantidad', 2,
+      'proveedor_id', v_prov, 'usuario_id', v_maria, 'creado_at', now()),
+    jsonb_build_object('id', v_e4, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_gor, 'tipo', 'ENTRADA', 'cantidad', -2,
+      'usuario_id', v_maria, 'creado_at', now()))));
+  IF (v_res->>'movimientos_producto')::int IS DISTINCT FROM 0 THEN RAISE EXCEPTION '6b: nada debía aplicarse: %', v_res; END IF;
+  IF (SELECT count(*) FROM jsonb_array_elements(COALESCE(v_res->'_errores', '[]'::jsonb)) e
+       WHERE e->>'id' IN (v_e2::text, v_e3::text, v_e4::text)) <> 3 THEN
+    RAISE EXCEPTION '6b: los tres debían estar en _errores: %', v_res; END IF;
+  IF EXISTS (SELECT 1 FROM movimientos_producto WHERE id IN (v_e2, v_e3, v_e4)) THEN RAISE EXCEPTION '6b: no debían guardarse'; END IF;
+  RAISE NOTICE '6 entradas de la caja 0197 OK';
+END $$;
+
 ROLLBACK;
