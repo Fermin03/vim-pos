@@ -21,7 +21,7 @@ const MIME = {
 
 /** connect-src del CSP. host = de dónde cargó el UI (para la caja-hub); hubHost = el hub remoto
  *  (para la cocina). Sin esto el navegador bloquearía el gateway por LAN. */
-function csp(host, hubHost) {
+function csp(host, hubHost, imgNube = "") {
   const hostname = String(host || "").split(":")[0] || "localhost";
   const lan = hostname && hostname !== "localhost" && hostname !== "127.0.0.1" ? ` http://${hostname}:* ws://${hostname}:*` : "";
   const hub = hubHost ? ` http://${hubHost}:* ws://${hubHost}:*` : "";
@@ -30,7 +30,8 @@ function csp(host, hubHost) {
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",
-    "img-src 'self' data: blob:",
+    // Las fotos de los productos son URLs absolutas del almacén de la nube: solo ese origen.
+    `img-src 'self' data: blob:${imgNube}`,
     "font-src 'self' data: https://fonts.gstatic.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "script-src 'self' 'unsafe-inline'",
@@ -175,6 +176,8 @@ const responder413 = (res) => json(res, 413, { ok: false, error: "Cuerpo demasia
 export const ESPERA_CATALOGO_MANUAL_MS = 10_000;
 
 export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.0.0", opts = {}) {
+  let imgNube = "";
+  try { imgNube = ` ${new URL(opts.cloudUrl ?? "").origin}`; } catch { /* sin nube conocida: sin fotos remotas */ }
   const kds = !!opts.kds;
   let hub = opts.hub || null; // COCINA: gateway remoto (mutable; lo fija el setup)
   // Por servidor y no global: la caja y la cocina corren cada una el suyo y no tienen por qué
@@ -405,7 +408,7 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
 
       // COCINA sin hub configurado → pantalla de setup para CUALQUIER ruta HTML.
       if (kds && !hub && (rel === "/index.html" || rel.endsWith(".html"))) {
-        res.writeHead(200, { "Content-Type": MIME[".html"], "Content-Security-Policy": csp(req.headers.host, null) });
+        res.writeHead(200, { "Content-Type": MIME[".html"], "Content-Security-Policy": csp(req.headers.host, null, imgNube) });
         return res.end(paginaSetup(null));
       }
 
@@ -425,10 +428,10 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
         const inject = kds ? scriptCocina(hub) : scriptCaja(gatewayPort);
         const html = data.toString("utf8");
         const out = html.includes("<head>") ? html.replace("<head>", "<head>" + inject) : inject + html;
-        res.writeHead(200, { "Content-Type": MIME[".html"], "Content-Security-Policy": csp(req.headers.host, hubHost) });
+        res.writeHead(200, { "Content-Type": MIME[".html"], "Content-Security-Policy": csp(req.headers.host, hubHost, imgNube) });
         return res.end(out);
       }
-      res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream", "Content-Security-Policy": csp(req.headers.host, hubHost) });
+      res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream", "Content-Security-Policy": csp(req.headers.host, hubHost, imgNube) });
       res.end(data);
     } catch (e) {
       res.writeHead(500); res.end(String(e?.message ?? e));

@@ -8,6 +8,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
 import http from "node:http";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { startUiServer, ESPERA_CATALOGO_MANUAL_MS } from "./ui-server.mjs";
 import { puertoLibre } from "./puerto-libre.mjs";
@@ -155,4 +157,22 @@ test("si la lectura del estado revienta, se contesta 500 en vez de dejar la peti
     const r = await fetch(`http://127.0.0.1:${port}/__estado-sync`, { signal: AbortSignal.timeout(3000) });
     assert.equal(r.status, 500);
   });
+});
+
+test("la CSP deja pasar las fotos del almacén de la nube y nada más", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "ui-csp-"));
+  writeFileSync(path.join(dir, "index.html"), "<!doctype html><html><head></head><body></body></html>");
+  for (const [cloudUrl, esperado] of [
+    ["https://abc.supabase.co/", "img-src 'self' data: blob: https://abc.supabase.co;"],
+    [undefined, "img-src 'self' data: blob:;"],
+  ]) {
+    const port = await puertoLibre();
+    const server = await startUiServer(dir, port, 54350, "127.0.0.1", { cloudUrl });
+    try {
+      const csp = (await fetch(`http://127.0.0.1:${port}/`)).headers.get("content-security-policy");
+      assert.ok(csp.includes(esperado), csp);
+    } finally {
+      await new Promise((r) => server.close(r));
+    }
+  }
 });

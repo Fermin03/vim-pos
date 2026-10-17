@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Icono } from "@vim/ui/styles";
 import { colorCategoria, type Categoria, type Producto } from "../lib/catalogo";
 import { menuVisible } from "../lib/catalogo-sucursal";
-import { calcularBarraCategorias, calcularRejilla, clampPagina, tamanoEtiqueta, tamanoNombre } from "../lib/rejilla";
+import { calcularBarraCategorias, calcularRejilla, clampPagina, tamanoEtiqueta } from "../lib/rejilla";
 import { agruparTienda, decidirEscaneo, etiquetaExistencia, resumenVitrina, type Existencia, type PadreTienda } from "../lib/tienda";
 import { fmtMxn } from "../lib/turno";
 import { useEscaner } from "../lib/use-escaner";
@@ -155,7 +155,6 @@ export function PanelVentaRetail({
   const paginaActual = clampPagina(pagina, rejilla.paginas);
   useEffect(() => setPagina(1), [catSel, texto]);
   const enPantalla = visibles.slice((paginaActual - 1) * rejilla.porPagina, paginaActual * rejilla.porPagina);
-  const pxNombre = tamanoNombre(rejilla.anchoFicha, rejilla.altoFicha);
   const pxEtiqueta = tamanoEtiqueta(barra.anchoPastilla);
 
   const pastilla = (activa: boolean) =>

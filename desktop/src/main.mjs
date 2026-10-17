@@ -338,6 +338,7 @@ async function bootCaja() {
   let posUrl = process.env.VIM_POS_URL;
   if (!posUrl && existsSync(path.join(UI_DIR, "index.html"))) {
     uiServer = await startUiServer(UI_DIR, UI_PORT, backend.gatewayPort, "0.0.0.0", {
+      cloudUrl: CLOUD_URL,
       onActualizar: () => buscarActualizacionManual(),
       // Con `impresoraWindows` el trabajo va a la cola del sistema (USB, serial…); si no, al 9100.
       onImprimir: (p) => (p?.impresoraWindows
