@@ -17,6 +17,7 @@ import {
   buscarVentasConProducto,
   leerVentaDevolvible,
   leerVentasTurno,
+  aCentavos,
   ROLES_DEVOLUCION,
   totalDevolucion,
   type RenglonVenta,
@@ -91,6 +92,7 @@ export function PantallaCambioTalla({
   const [procesando, setProcesando] = useState(false);
   const [hecho, setHecho] = useState<CambioRegistrado | null>(null);
   const [impresion, setImpresion] = useState<"imprimiendo" | "ok" | "error">("imprimiendo");
+  const [cajonFallo, setCajonFallo] = useState(false);
   // La llave del intento: un reintento tras un corte de red no registra el cambio dos veces.
   const clientId = useRef(nuevoClientId());
   const montado = useRef(true);
@@ -111,7 +113,8 @@ export function PantallaCambioTalla({
 
   // Vista previa para decidir la autorización; lo que se enseña al final es lo que guardó la base.
   const regresaMxn = venta && regresa ? totalDevolucion(venta, [{ ticket_item_id: regresa.ticketItemId, cantidad: regresa.cantidad, regresaAlAnaquel: true }]) : 0;
-  const llevaMxn = lleva ? lleva.precio_base_mxn * piezas : 0;
+  // En centavos enteros: 0.1 × 3 no da 0.30000000000000004 en pantalla.
+  const llevaMxn = lleva ? (aCentavos(lleva.precio_base_mxn) * piezas) / 100 : 0;
   const resumen = hecho ? resumenCambio(hecho.regresa, hecho.lleva) : resumenCambio(regresaMxn, llevaMxn);
 
   function atras() {
@@ -194,7 +197,11 @@ export function PantallaCambioTalla({
     if (paso === 2) {
       const p = buscarPorCodigo(productos, codigo);
       const r = p && venta?.renglones.find((x) => x.producto_id === p.id && x.cantidad - x.devuelta >= 1);
-      if (r) setRegresa({ ticketItemId: r.ticket_item_id, cantidad: 1 });
+      // Otra pieza de la misma prenda suma una, hasta las que quedan por devolver.
+      if (r) setRegresa((a) => ({
+        ticketItemId: r.ticket_item_id,
+        cantidad: a?.ticketItemId === r.ticket_item_id ? Math.min(r.cantidad - r.devuelta, a.cantidad + 1) : 1,
+      }));
       else setError(`Esa prenda no está en la venta ${venta?.folio ?? ""}.`);
       return;
     }
@@ -236,7 +243,10 @@ export function PantallaCambioTalla({
       if (!montado.current) return;
       if (r.diferencia > 0) { onCobrar(r.ticketId, r.diferencia); return; }
       // Ya está pagado: si hay que regresar dinero, el cajón se abre ahora.
-      if (r.diferencia < 0) obtenerImpresora("CAJA", { onMostrar: () => {} }).abrirCajon().catch(() => {});
+      if (r.diferencia < 0) {
+        const aMano = () => { if (montado.current) setCajonFallo(true); };
+        obtenerImpresora("CAJA", { onMostrar: () => {} }).abrirCajon().then((x) => { if (!x.ok) aMano(); }, aMano);
+      }
       setHecho(r);
       setProcesando(false);
       void imprimir(r.ticketId);
@@ -267,6 +277,8 @@ export function PantallaCambioTalla({
       await ejecutar(await autorizacionPropia(token, payload()));
     } catch (e) {
       if (!montado.current) return;
+      // El rol dice que sí, pero el permiso se le quitó a esta persona: lo autoriza un supervisor.
+      if (e instanceof Error && e.message === "SIN_PERMISO") { setProcesando(false); setPidiendoPin(true); return; }
       setError(e instanceof Error ? e.message : "No se pudo autorizar");
       setProcesando(false);
     }
@@ -419,6 +431,9 @@ export function PantallaCambioTalla({
                 resumen.diferencia >= 0 && !ROLES_DEVOLUCION.includes(empleado.rol) && (
                   <p className="text-center text-13 text-ink-3">Un supervisor autoriza el cambio con su PIN.</p>
                 )
+              )}
+              {hecho && cajonFallo && (
+                <p className="text-center text-14 font-semibold text-warning" role="alert">Abre el cajón a mano y entrega {fmtMxn(-hecho.diferencia)}.</p>
               )}
               {hecho && impresion === "error" && (
                 <div className="flex justify-center">

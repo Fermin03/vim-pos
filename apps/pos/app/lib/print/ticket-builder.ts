@@ -70,6 +70,12 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
 
   b.push({ t: "separador", estilo: "punteado" });
 
+  // 2.d Cambio de talla: la prenda que regresó, antes de lo que se lleva.
+  if (d.cambio) {
+    for (const r of d.cambio.regresa) b.push({ t: "fila", izq: `Regresa: ${r.nombre} x${r.cantidad}`, der: pesos(r.total) });
+    b.push({ t: "separador", estilo: "punteado" });
+  }
+
   // 3. Líneas
   //
   // Combos (ADR 0015, spec §7): el PADRE es un renglón normal —cobra, con su precio, hijos
@@ -111,6 +117,8 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
   if ((d.totales.lealtad ?? 0) > 0) b.push({ t: "fila", izq: "Lealtad", der: `-${pesos(d.totales.lealtad ?? 0)}` });
   b.push({ t: "fila", izq: "IVA (16%)", der: pesos(d.totales.iva) });
   b.push({ t: "fila", izq: "TOTAL", der: pesos(d.totales.total), bold: true });
+  // Cambio de talla: qué pasó con el dinero, con palabras («El cliente paga $50.00»).
+  if (d.cambio) b.push({ t: "texto", valor: d.cambio.texto, bold: true });
 
   b.push({ t: "separador", estilo: "punteado" });
 

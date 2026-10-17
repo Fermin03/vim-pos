@@ -79,6 +79,21 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
 
       <DividerDashed />
 
+      {/* Cambio de talla: la prenda que regresó. Espejo de construirTicketJob (2.d). */}
+      {datos.cambio && (
+        <>
+          <div className="text-[11px]">
+            {datos.cambio.regresa.map((r, i) => (
+              <div key={i} className="flex items-start justify-between gap-2">
+                <span className="flex-1">Regresa: {r.nombre} x{r.cantidad}</span>
+                <span className="whitespace-nowrap font-bold">{fmt(r.total)}</span>
+              </div>
+            ))}
+          </div>
+          <DividerDashed />
+        </>
+      )}
+
       {/* Items */}
       <div className="text-[11px]">
         {datos.lineas.map((l, i) => {
@@ -150,6 +165,7 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
           <span className="font-sans text-[15px] font-bold">TOTAL</span>
           <span className="font-sans text-[19px] font-bold tabular-nums">{fmt(datos.totales.total)}</span>
         </div>
+        {datos.cambio && <div className="font-bold">{datos.cambio.texto}</div>}
       </div>
 
       <DividerDashed />

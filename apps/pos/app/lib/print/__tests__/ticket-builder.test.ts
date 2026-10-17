@@ -408,3 +408,36 @@ describe("construirTicketJob — Servicio en una tienda", () => {
     expect(construirTicketJob(DATOS).bloques).toContainEqual({ t: "fila", izq: "Servicio", der: "Para llevar" });
   });
 });
+
+describe("construirTicketJob — cambio de talla", () => {
+  const CAMBIO: DatosTicketImpresion = {
+    ...DATOS,
+    tienda: true,
+    lineas: [{ cantidad: 1, nombre: "Playera Polo G Negra", totalMxn: 399, modificadores: [], notaCocina: null, sku: "POL-G-NEG" }],
+    totales: { subtotal: 343.97, descuentos: 0, iva: 55.03, total: 399, propina: 0 },
+    pagos: [
+      { metodo: "Prenda que regresa", montoMxn: 349, recibidoMxn: null, cambioMxn: 0 },
+      { metodo: "Efectivo", montoMxn: 50, recibidoMxn: 50, cambioMxn: 0 },
+    ],
+    qrUrl: null,
+    cambio: { regresa: [{ nombre: "Playera Polo M Negra", cantidad: 1, total: 349 }], diferencia: 50, texto: "El cliente paga $50.00" },
+  };
+
+  it("dice qué regresa antes de los productos y qué pasa con el dinero bajo el total", () => {
+    const b = construirTicketJob(CAMBIO).bloques;
+    const regresa = b.findIndex((x) => x.t === "fila" && x.izq === "Regresa: Playera Polo M Negra x1");
+    const producto = b.findIndex((x) => x.t === "fila" && x.izq === "1x Playera Polo G Negra");
+    const total = b.findIndex((x) => x.t === "fila" && x.izq === "TOTAL");
+    expect(b[regresa]).toEqual({ t: "fila", izq: "Regresa: Playera Polo M Negra x1", der: "$349.00" });
+    expect(regresa).toBeGreaterThan(-1);
+    expect(regresa).toBeLessThan(producto);
+    expect(b[total + 1]).toEqual({ t: "texto", valor: "El cliente paga $50.00", bold: true });
+    expect(b).toContainEqual({ t: "fila", izq: "Forma de pago", der: "Prenda que regresa" });
+  });
+
+  it("sin cambio (un restaurante) el ticket sale idéntico, bloque por bloque", () => {
+    expect(construirTicketJob({ ...DATOS, cambio: null })).toEqual(construirTicketJob(DATOS));
+    expect(construirTicketJob({ ...DATOS, cambio: undefined })).toEqual(construirTicketJob(DATOS));
+    expect(JSON.stringify(construirTicketJob(DATOS).bloques)).not.toMatch(/Regresa|Prenda que regresa|Sin diferencia/);
+  });
+});

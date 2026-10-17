@@ -4,6 +4,7 @@ import { etiquetaModo } from "@vim/db/modos-servicio";
 import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
 import { leerPrograma } from "../lealtad";
 import { puntosPorCompra, type Programa } from "../lealtad-reglas";
+import { resumenCambio } from "../cambio-talla";
 import type { DatosEntrega, DatosTicketImpresion, LealtadImpresion, LineaImpresion, PagoImpresion } from "./tipos";
 
 
@@ -189,7 +190,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
 
   const { data: t, error: e1 } = await sb
     .from("tickets")
-    .select("folio_completo, modo_servicio, cliente_id, direccion_entrega_id, nombre_cliente, nota_general, origen_creacion, subtotal_mxn, descuentos_manuales_mxn, iva_mxn, total_mxn, propina_mxn, fecha_pago, created_at, sucursal_id, tenant_id, lealtad_mxn, estado_fiscal")
+    .select("folio_completo, modo_servicio, cliente_id, direccion_entrega_id, nombre_cliente, nota_general, origen_creacion, subtotal_mxn, descuentos_manuales_mxn, iva_mxn, total_mxn, propina_mxn, fecha_pago, created_at, sucursal_id, tenant_id, lealtad_mxn, estado_fiscal, client_id_local")
     .eq("id", ticketId)
     .single();
   if (e1 || !t) throw new Error(e1?.message ?? "Ticket no encontrado");
@@ -249,15 +250,15 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
 
   const { data: pagos, error: e3 } = await sb
     .from("pagos")
-    .select("metodo_pago, monto_mxn, monto_recibido_mxn, cambio_mxn, referencia, terminal_aprobacion")
+    .select("metodo_pago, monto_mxn, monto_recibido_mxn, cambio_mxn, referencia, terminal_aprobacion, client_id_local")
     .eq("ticket_id", ticketId)
     .is("deleted_at", null)
     .order("created_at", { ascending: true });
   if (e3) throw new Error(e3.message);
-  const pagosImp: PagoImpresion[] = (pagos ?? []).map((p) => {
+  const pagosImp: (PagoImpresion & { clientId: string | null })[] = (pagos ?? []).map((p) => {
     const r = p as {
       metodo_pago: string; monto_mxn: string | number; monto_recibido_mxn: string | number | null; cambio_mxn: string | number;
-      referencia: string | null; terminal_aprobacion: string | null;
+      referencia: string | null; terminal_aprobacion: string | null; client_id_local: string | null;
     };
     // Solo un cobro de la terminal integrada llena `terminal_aprobacion`; con ella, `referencia` es la
     // tarjeta. Sin ella `referencia` puede ser otra cosa (un folio de transferencia) y no se imprime.
@@ -269,6 +270,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       montoMxn: Number(r.monto_mxn),
       recibidoMxn: r.monto_recibido_mxn == null ? null : Number(r.monto_recibido_mxn),
       cambioMxn: Number(r.cambio_mxn),
+      clientId: r.client_id_local,
     };
   });
 
@@ -346,6 +348,11 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
         baseComida: Math.max(0, Math.round((Number(tk.total_mxn) - cargos) * 100) / 100),
       });
 
+  const tienda = tn.vertical_principal === "RETAIL";
+  const cambio = tienda ? await leerCambioTalla(sb, tk.tenant_id as string, (tk.client_id_local as string | null) ?? null, Number(tk.total_mxn)) : null;
+  // El pago interno del cambio (0195: llave del ticket + "-pago") no es efectivo que entró: es la prenda.
+  const pagoPrenda = cambio ? `${tk.client_id_local as string}-pago` : null;
+
   return {
     negocio: { nombre: tn.nombre_comercial ?? "Negocio", razonSocial: tn.razon_social ?? null, rfc: tn.rfc ?? null, logoUrl: tn.logo_url ?? null },
     sucursal: { nombre: (s.nombre as string) ?? ctx.cajaNombre, direccion, telefono: s.telefono ?? null },
@@ -366,15 +373,45 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       iva: Number(tk.iva_mxn), total: Number(tk.total_mxn), propina: Number(tk.propina_mxn),
       lealtad: Number(tk.lealtad_mxn ?? 0),
     },
-    pagos: pagosImp,
+    pagos: pagosImp.map(({ clientId, ...p }) =>
+      clientId !== null && clientId === pagoPrenda ? { ...p, metodo: "Prenda que regresa", recibidoMxn: null } : p),
     // Dominio .com.mx: el que VIM tiene registrado. Antes decía `factura.vimpos.mx`, sin el
     // `.com`, que es de alguien más — cada ticket impreso habría mandado a los clientes del
     // restaurante a una dirección ajena en cuanto se encendiera el QR.
     qrUrl: qrActivo && !conPremio ? urlAutofactura(tn.codigo ?? null, (tk.folio_completo as string | null) ?? null, tokenQr) : null,
     lealtad,
-    tienda: tn.vertical_principal === "RETAIL",
+    tienda,
+    cambio,
     ancho: 80,
   };
+}
+
+/**
+ * ¿Es la venta nueva de un cambio de talla? 0195 crea la devolución (motivo CAMBIO_TALLA) y el ticket
+ * nuevo con la MISMA `client_id_local`. Nunca lanza: si algo falla, el ticket sale como venta normal.
+ */
+async function leerCambioTalla(sb: ReturnType<typeof employeeClient>, tenantId: string, clientId: string | null, totalTicket: number): Promise<DatosTicketImpresion["cambio"]> {
+  if (!clientId) return null;
+  try {
+    const { data: dev } = await sb
+      .from("devoluciones")
+      .select("id, total_devuelto_mxn")
+      .eq("tenant_id", tenantId).eq("client_id_local", clientId).eq("motivo", "CAMBIO_TALLA")
+      .maybeSingle();
+    if (!dev) return null;
+    const { data: items } = await sb
+      .from("devolucion_items")
+      .select("producto_nombre_snapshot, cantidad_devuelta, total_devuelto_mxn")
+      .eq("devolucion_id", dev.id);
+    const { diferencia, texto } = resumenCambio(Number(dev.total_devuelto_mxn), totalTicket);
+    return {
+      regresa: (items ?? []).map((i) => ({ nombre: i.producto_nombre_snapshot, cantidad: Number(i.cantidad_devuelta), total: Number(i.total_devuelto_mxn) })),
+      diferencia,
+      texto,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** Cliente + dirección de entrega. Si algo falla, el ticket sale igual: entregar sin

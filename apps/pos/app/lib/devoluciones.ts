@@ -203,7 +203,7 @@ export function alcanceDevolucion(venta: VentaDevolvible, renglones: RenglonDevo
 }
 
 /** Pesos a centavos enteros (100.01 → 10001, sin el 10000.999… del flotante). */
-const aCentavos = (n: number) => Math.round(n * 100);
+export const aCentavos = (n: number) => Math.round(n * 100);
 
 /**
  * VISTA PREVIA de lo que se reembolsa, calculada como crear_devolucion (0134): cada renglón en

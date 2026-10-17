@@ -114,5 +114,10 @@ export type DatosTicketImpresion = {
   lealtad?: LealtadImpresion | null;
   /** Giro RETAIL: el ticket imprime el SKU bajo cada renglón y no sale comanda al cobrar. */
   tienda?: boolean;
+  /**
+   * Venta nueva de un cambio de talla (0195): lo que el cliente regresó, arriba de los productos,
+   * y qué pasó con el dinero (`resumenCambio`), debajo del total. Ausente en todo lo demás.
+   */
+  cambio?: { regresa: { nombre: string; cantidad: number; total: number }[]; diferencia: number; texto: string } | null;
   ancho: 58 | 80;
 };
