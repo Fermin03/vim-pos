@@ -59,6 +59,8 @@ import { PantallaDevoluciones } from "./pantalla-devoluciones";
 import { PantallaCambioTalla } from "./pantalla-cambio-talla";
 import { SeccionTransacciones } from "./seccion-transacciones";
 import { SeccionInventario } from "./seccion-inventario";
+import { SeccionNotificaciones } from "./seccion-notificaciones";
+import { guardarVistas, leerVistas, notificacionesTienda, sinVer } from "../lib/notificaciones-tienda";
 import { PantallaPedidosApps } from "./pantalla-pedidos-apps";
 import { accionPedidoApp, hayExpiradosSinVer, leerExpiradosHoy, leerPedidosApps, type PedidoApp, type PedidoAppEstado } from "../lib/pedidos-apps";
 import {
@@ -589,10 +591,12 @@ export function HomePos({
   useEffect(() => { setPuedeSalir(typeof window.__VIM_SALIR === "function"); }, []);
   /** Avisos de VIM: el inicio los enseña al entrar; la tienda, que no tiene inicio, aquí. */
   const [avisosVim, setAvisosVim] = useState<Aviso[] | null>(null);
+  /** Los mismos avisos, que el diálogo de entrada vacía al cerrarse: Notificaciones los conserva para releerlos. */
+  const [avisosTodos, setAvisosTodos] = useState<Aviso[]>([]);
   useEffect(() => {
     if (!tienda) return;
     let vivo = true;
-    leerDirectivas().then((d) => { if (vivo) setAvisosVim(avisosDe(d)); }).catch(() => {});
+    leerDirectivas().then((d) => { if (vivo) { const a = avisosDe(d); setAvisosVim(a); setAvisosTodos(a); } }).catch(() => {});
     return () => { vivo = false; };
   }, [tienda]);
   const capturaTienda = tienda && carrito.modoServicio === "PARA_LLEVAR" && !cerrando && !enInicio && !enKds && !enMonitor
@@ -611,6 +615,21 @@ export function HomePos({
   /** Venta nueva de un cambio con saldo: al cargarse en el carrito se abre su cobro. */
   const [cobrarCambio, setCobrarCambio] = useState<string | null>(null);
   const [existencias, setExistencias] = useState<Existencia[] | null>(null);
+  /** Notificaciones (decisión 4): ids ya vistos en esta caja; `null` = aún no se leyeron (el globo no cuenta). */
+  const [vistas, setVistas] = useState<string[] | null>(null);
+  const [productoInventario, setProductoInventario] = useState<string | null>(null);
+  const notificaciones = useMemo(
+    () => (tienda ? notificacionesTienda(existencias, productos ?? [], caja.sucursal_id, avisosTodos) : []),
+    [tienda, existencias, productos, caja.sucursal_id, avisosTodos],
+  );
+  useEffect(() => { if (tienda) setVistas(leerVistas(turno.caja_id)); }, [tienda, turno.caja_id]);
+  // Abrir la pestaña marca como visto lo que está en la lista, y lo que llegue mientras está abierta.
+  useEffect(() => {
+    if (!tienda || seccionTienda !== "notificaciones") return;
+    const ids = notificaciones.map((n) => n.id);
+    setVistas(ids);
+    guardarVistas(turno.caja_id, ids);
+  }, [tienda, seccionTienda, notificaciones, turno.caja_id]);
   /** Producto del último agregado: su renglón queda marcado hasta la siguiente acción. */
   const [ultimoTienda, setUltimoTienda] = useState<string | null>(null);
   const [sucursalesTienda, setSucursalesTienda] = useState<{ id: string; nombre: string }[]>([]);
@@ -3140,21 +3159,21 @@ export function HomePos({
               confirmarDescarte={confirmarDescarteRecepcion}
               onCambiarCajero={conVentaSuelta(onCambiarCajero)}
               onAbierto={(cerrar) => setCerrarConsultaInv(() => cerrar)}
+              productoInicial={productoInventario}
             />
           ) : (
-            // Notificaciones llega en la tarea 8 de la entrega 4b.
-            <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
-              <h1 className="font-display text-24 font-semibold tracking-tight">Notificaciones</h1>
-              <p className="text-15 text-ink-2">Próximamente.</p>
-            </div>
+            <SeccionNotificaciones
+              notificaciones={notificaciones}
+              onAbrirProducto={(id) => { setProductoInventario(id); void irASeccion("inventario"); }}
+            />
           )}
         </div>
       )}
       {tienda && (
         <BarraTienda
           seccion={seccionTienda}
-          onCambiar={(s) => void irASeccion(s)}
-          pendientes={0}
+          onCambiar={(s) => { setProductoInventario(null); void irASeccion(s); }}
+          pendientes={vistas ? sinVer(notificaciones, vistas) : 0}
           bloqueada={!puedeCambiarSeccion(algoAbierto || avisoTiendaVisible, totalesCobro != null)}
         />
       )}

@@ -40,6 +40,7 @@ export function SeccionInventario({
   confirmarDescarte,
   onCambiarCajero,
   onAbierto,
+  productoInicial,
 }: {
   productos: Producto[];
   /** null = aún no se leyeron: nada se enseña como agotado. */
@@ -61,6 +62,8 @@ export function SeccionInventario({
   onCambiarCajero: () => void;
   /** Con una consulta a la vista, cómo cerrarla (o `null`): la pila de Escape de home-pos. */
   onAbierto: (cerrar: (() => void) | null) => void;
+  /** Una prenda (desde Notificaciones): abre su consulta al montarse. */
+  productoInicial?: string | null;
 }) {
   const [pestana, setPestana] = useState<Pestana>("existencias");
   const [texto, setTexto] = useState("");
@@ -143,6 +146,14 @@ export function SeccionInventario({
     setAviso(null);
     setDestino(d);
   };
+
+  useEffect(() => {
+    const p = productoInicial ? productos.find((x) => x.id === productoInicial) : undefined;
+    if (!p) return;
+    const padre = padres.get(p.producto_padre_id ?? p.id);
+    mostrar(padre ? { padre, marcada: p.producto_padre_id ? p.id : undefined } : { suelto: p });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montarse
+  }, []);
 
   // Escáner: abre (o cambia a) la consulta de esa prenda. Solo en Existencias; un diálogo encima lo calla.
   useEscaner((codigo) => {
