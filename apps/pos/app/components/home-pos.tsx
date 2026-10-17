@@ -603,6 +603,8 @@ export function HomePos({
   const [enCambioTalla, setEnCambioTalla] = useState(false);
   /** La venta elegida en Transacciones: Devolver o Cambio de talla arrancan con ella. */
   const [ventaElegida, setVentaElegida] = useState<string | null>(null);
+  /** Transacciones con resultados de búsqueda: cómo cerrarlos (Escape regresa a «Ventas del turno»). */
+  const [cerrarBusquedaTx, setCerrarBusquedaTx] = useState<(() => void) | null>(null);
   /** Venta nueva de un cambio con saldo: al cargarse en el carrito se abre su cobro. */
   const [cobrarCambio, setCobrarCambio] = useState<string | null>(null);
   const [existencias, setExistencias] = useState<Existencia[] | null>(null);
@@ -1874,6 +1876,8 @@ export function HomePos({
       // atiende el suyo (regresa un paso).
       // En la tienda no hay a dónde volver desde el Panel; desde otra sección, Escape regresa al Panel.
       [enCaptura && !tienda, () => intentarSalirDeCaptura("atras")],
+      // Transacciones: Escape deja primero la búsqueda. Aquí y no en `capas`: no tapa la barra ni el escáner.
+      [enCaptura && tienda && seccionTienda === "transacciones" && cerrarBusquedaTx != null, () => cerrarBusquedaTx?.()],
       [enCaptura && tienda && seccionTienda !== "panel", () => setSeccionTienda("panel")],
     ];
     return {
@@ -1894,7 +1898,7 @@ export function HomePos({
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
       salidaPendiente, confirmandoCierre, menuGeneralAbierto, cerrando, enInicio, enKds, enMonitor,
       enConsultaCuentas, enDevoluciones, enCambioTalla, enPedidosApps, enDelivery, enPickup, enMesas, enBarra, nuevoTicket,
-      intentarSalirDeCaptura, tienda, seccionTienda, avisosVim, confirmandoVenta, salirCajaAbierto]);
+      intentarSalirDeCaptura, tienda, seccionTienda, cerrarBusquedaTx, avisosVim, confirmandoVenta, salirCajaAbierto]);
   useEscape(alEscapar);
 
   // ── Cambio de talla (giro RETAIL) ─────────────────────────────────────────────────────────
@@ -1923,7 +1927,8 @@ export function HomePos({
    * en el Panel se suelta como al salir de la venta: la cuenta guardada sigue abierta, y productos
    * sin guardar solo se borran si el cajero lo confirma. `entrarCuenta` pasa al Panel.
    */
-  const abrirDesdeTransacciones = (ticketId: string, etiquetaEspera?: string) => conVentaSuelta(async () => {
+  const abrirDesdeTransacciones = async (ticketId: string, etiquetaEspera?: string) => {
+    if (!(await soltarVentaTienda())) return;
     if (etiquetaEspera === undefined) { await entrarCuenta(ticketId); return; }
     try {
       await retomarTicketEnEspera(token, ticketId);
@@ -1938,7 +1943,7 @@ export function HomePos({
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo retomar el pedido");
     }
-  })();
+  };
 
   // `iniciarCobro` lee el carrito y la cuenta recién cargados: por eso espera a que estén.
   useEffect(() => {
@@ -3080,6 +3085,7 @@ export function HomePos({
               token={token}
               productos={productos ?? []}
               escaneoIgnorado={escaneoIgnorado}
+              onBusqueda={(cerrar) => setCerrarBusquedaTx(() => cerrar)}
               onAbrirCuenta={(id) => abrirDesdeTransacciones(id)}
               onRetomar={(id, etiqueta) => abrirDesdeTransacciones(id, etiqueta)}
               onDevolver={(id) => { setVentaElegida(id); setEnDevoluciones(true); }}

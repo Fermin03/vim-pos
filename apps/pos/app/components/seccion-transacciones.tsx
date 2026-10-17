@@ -33,6 +33,7 @@ export function SeccionTransacciones({
   token,
   productos,
   escaneoIgnorado,
+  onBusqueda,
   onAbrirCuenta,
   onRetomar,
   onDevolver,
@@ -45,9 +46,11 @@ export function SeccionTransacciones({
   productos: Producto[];
   /** Un diálogo o el aviso de un pedido encima: el escaneo no hace nada. */
   escaneoIgnorado: boolean;
-  onAbrirCuenta: (ticketId: string) => void;
+  /** Con resultados de búsqueda a la vista, cómo cerrarlos (o `null`): la pila de Escape de home-pos. */
+  onBusqueda: (cerrar: (() => void) | null) => void;
+  onAbrirCuenta: (ticketId: string) => Promise<void>;
   /** Una cuenta en espera de antes: se retoma como siempre. */
-  onRetomar: (ticketId: string, etiqueta: string) => void;
+  onRetomar: (ticketId: string, etiqueta: string) => Promise<void>;
   onDevolver: (ticketId: string) => void;
   onCambio: (ticketId: string) => void;
   onReimprimir: (ticketId: string) => Promise<void>;
@@ -62,11 +65,24 @@ export function SeccionTransacciones({
   const [detalle, setDetalle] = useState<VentaDevolvible | null>(null);
   const [imprimiendo, setImprimiendo] = useState(false);
   const [errorImpresion, setErrorImpresion] = useState<string | null>(null);
+  /** Una cuenta cargándose en el Panel: las filas no responden a un segundo toque. */
+  const [abriendo, setAbriendo] = useState(false);
   const montado = useRef(true);
+  /** La última venta que se pidió ver: una lectura que llega tarde no pisa a la nueva. */
+  const pedida = useRef<string | null>(null);
   useEffect(() => { montado.current = true; return () => { montado.current = false; }; }, []);
 
+  // Escape cierra primero la búsqueda (regresa a «Ventas del turno»); sin ella, home-pos va al Panel.
+  const avisar = useRef(onBusqueda);
+  avisar.current = onBusqueda;
   useEffect(() => {
-    Promise.all([listarCuentasParaLlevar(token, caja.sucursal_id), listarTicketsEnEspera(token, turno.caja_id)])
+    avisar.current(busqueda ? () => setBusqueda(null) : null);
+  }, [busqueda]);
+  useEffect(() => () => avisar.current(null), []);
+
+  useEffect(() => {
+    // Solo las de esta caja: el pago se asienta en la caja y el turno del ticket (aplicar_pago).
+    Promise.all([listarCuentasParaLlevar(token, caja.sucursal_id, turno.caja_id), listarTicketsEnEspera(token, turno.caja_id)])
       .then(([a, e]) => { if (montado.current) setCuentas(filasCuentas(a, e)); })
       .catch((e) => { if (montado.current) setError(e instanceof Error ? e.message : "No se pudieron leer las cuentas abiertas"); });
     leerVentasTurno(token, turno.id)
@@ -75,22 +91,35 @@ export function SeccionTransacciones({
   }, [token, caja.sucursal_id, turno.caja_id, turno.id]);
 
   function ver(v: VentaDevolvible) {
+    pedida.current = v.ticketId;
     setElegida(v.ticketId);
     setDetalle(v);
+    setError(null);
     setErrorImpresion(null);
   }
 
   async function verDelTurno(ticketId: string) {
+    pedida.current = ticketId;
     setElegida(ticketId);
     setDetalle(null);
     setErrorImpresion(null);
     try {
       const v = await leerVentaDevolvible(token, ticketId);
-      if (!montado.current) return;
-      if (v) setDetalle(v);
+      if (!montado.current || pedida.current !== ticketId) return;
+      if (v) { setDetalle(v); setError(null); }
       else { setElegida(null); setError("No se pudo abrir esa venta."); }
     } catch (e) {
-      if (montado.current) { setElegida(null); setError(e instanceof Error ? e.message : "No se pudo leer la venta"); }
+      if (montado.current && pedida.current === ticketId) { setElegida(null); setError(e instanceof Error ? e.message : "No se pudo leer la venta"); }
+    }
+  }
+
+  async function abrir(c: FilaCuenta) {
+    if (abriendo) return;
+    setAbriendo(true);
+    try {
+      await (c.etiquetaEspera !== null ? onRetomar(c.ticketId, c.etiquetaEspera) : onAbrirCuenta(c.ticketId));
+    } finally {
+      if (montado.current) setAbriendo(false);
     }
   }
 
@@ -203,8 +232,8 @@ export function SeccionTransacciones({
                 <p className="text-13 text-ink-3">No hay cuentas abiertas.</p>
               ) : (
                 cuentas.map((c) => (
-                  <button key={c.ticketId} type="button" className={`${fila} border-line`}
-                    onClick={() => (c.etiquetaEspera !== null ? onRetomar(c.ticketId, c.etiquetaEspera) : onAbrirCuenta(c.ticketId))}>
+                  <button key={c.ticketId} type="button" disabled={abriendo} className={`${fila} border-line disabled:opacity-60`}
+                    onClick={() => void abrir(c)}>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="truncate font-display text-15 font-bold">{c.titulo}</span>
