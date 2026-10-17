@@ -13673,6 +13673,10 @@ export type Database = {
         }
         Returns: Json
       }
+      _ticket_de_cambio_abierto: {
+        Args: { p_ticket: string }
+        Returns: boolean
+      }
       _tienda_abrir_sesion: {
         Args: {
           p_ahora: string
