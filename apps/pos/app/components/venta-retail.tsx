@@ -1,14 +1,15 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icono } from "@vim/ui/styles";
-import type { Categoria, Producto } from "../lib/catalogo";
+import { colorCategoria, type Categoria, type Producto } from "../lib/catalogo";
 import { menuVisible } from "../lib/catalogo-sucursal";
 import { calcularBarraCategorias, calcularRejilla, clampPagina, tamanoEtiqueta, tamanoNombre } from "../lib/rejilla";
-import { agruparTienda, decidirEscaneo, resumenVitrina, type Existencia, type PadreTienda } from "../lib/tienda";
+import { agruparTienda, decidirEscaneo, etiquetaExistencia, resumenVitrina, type Existencia, type PadreTienda } from "../lib/tienda";
 import { fmtMxn } from "../lib/turno";
 import { useEscaner } from "../lib/use-escaner";
 import { useHueco } from "../lib/usar-hueco";
 import { Paginador } from "./paginador";
+import { TarjetaProductoFoto } from "./tarjeta-producto-foto";
 import { SelectorVariantes } from "./selector-variantes";
 
 /** La franja bajo la barra de escaneo. Su capa de Escape la declara `home-pos`. */
@@ -265,29 +266,21 @@ export function PanelVentaRetail({
                 const r = resumenVitrina(p, padres, existencias ?? [], sucursalId);
                 // Solo hay existencia que enseñar si el producto la lleva (las hijas siempre la llevan).
                 const conExistencia = existencias !== null && (padres.has(p.id) || p.controla_existencias === true);
+                const etiqueta = p.agotado ? "agotada" : etiquetaExistencia(conExistencia ? r.estado : null);
+                const idx = categorias?.findIndex((c) => c.id === p.categoria_id) ?? -1;
+                const cat = categorias?.[idx];
                 return (
-                  <button
+                  <TarjetaProductoFoto
                     key={p.id}
-                    type="button"
-                    disabled={bloqueado}
-                    onClick={() => tocar(p)}
-                    style={{ fontSize: pxNombre }}
-                    className={[
-                      "flex h-full w-full flex-col justify-center gap-1.5 overflow-hidden rounded-lg border px-3.5 py-2 text-left transition-[transform,border-color] duration-150 ease-vim",
-                      bloqueado ? "cursor-not-allowed border-line-strong bg-surface opacity-50" : "border-line-strong bg-surface hover:border-ink active:scale-[.97]",
-                    ].join(" ")}
-                  >
-                    <span className="line-clamp-2 break-words font-semibold leading-tight text-ink">{p.nombre}</span>
-                    <span className="font-display font-bold tabular-nums text-ink" style={{ fontSize: pxNombre - 1 }}>
-                      {/* Se cobra la hija, no el padre: con un solo precio, es el de sus hijas. */}
-                      {r.precioDesde !== null ? `desde ${fmtMxn(r.precioDesde)}` : fmtMxn(padres.get(p.id)?.hijas[0]?.precio_base_mxn ?? p.precio_base_mxn)}
-                    </span>
-                    {conExistencia && (
-                      <span className={["text-13", r.estado === "agotada" ? "font-semibold text-danger" : r.estado === "pocas" ? "font-semibold text-warning" : "text-ink-2"].join(" ")}>
-                        {r.estado === "agotada" ? "Agotada" : r.estado === "pocas" ? `Pocas: ${r.piezas}` : `${r.piezas} en tienda`}
-                      </span>
-                    )}
-                  </button>
+                    nombre={p.nombre}
+                    // Se cobra la hija, no el padre: con un solo precio, es el de sus hijas.
+                    precioTexto={r.precioDesde !== null ? `desde ${fmtMxn(r.precioDesde)}` : fmtMxn(padres.get(p.id)?.hijas[0]?.precio_base_mxn ?? p.precio_base_mxn)}
+                    imagenUrl={p.imagen_url ?? null}
+                    colorCategoria={cat ? colorCategoria(cat, idx).ink : "rgb(var(--ink-2))"}
+                    etiqueta={etiqueta}
+                    onToque={() => tocar(p)}
+                    deshabilitada={bloqueado}
+                  />
                 );
               })}
             </div>

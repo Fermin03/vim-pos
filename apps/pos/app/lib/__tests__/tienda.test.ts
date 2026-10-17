@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { Producto } from "../catalogo";
 import type { DatosCaja } from "../turno";
-import { agruparTienda, buscarPorCodigo, decidirEscaneo, esTienda, estadoExistencia, matrizVariantes, pasoConLimite, renglonTienda, resumenVitrina, sinExistencia, type Existencia } from "../tienda";
+import { agruparTienda, buscarPorCodigo, decidirEscaneo, esTienda, estadoExistencia, etiquetaExistencia, matrizVariantes, pasoConLimite, renglonTienda, resumenVitrina, sinExistencia, type Existencia } from "../tienda";
 
 const prod = (id: string, extra: Partial<Producto> = {}): Producto => ({
   id, nombre: id, descripcion: null, precio_base_mxn: 100, categoria_id: "c", agotado: false, esCombo: false, seVendeAqui: true, ...extra,
@@ -165,5 +165,14 @@ describe("pasoConLimite (la fila de agregados de la tienda)", () => {
 
   it("el error de un paso a tiempo sube", async () => {
     await expect(pasoConLimite(async () => { throw new Error("sin red"); })).rejects.toThrow("sin red");
+  });
+});
+
+describe("etiquetaExistencia", () => {
+  it("solo marca lo que importa; sin cargar, nada", () => {
+    expect(etiquetaExistencia("normal")).toBeNull();
+    expect(etiquetaExistencia("pocas")).toBe("pocas");
+    expect(etiquetaExistencia("agotada")).toBe("agotada");
+    expect(etiquetaExistencia(null)).toBeNull();
   });
 });

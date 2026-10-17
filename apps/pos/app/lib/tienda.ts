@@ -50,6 +50,11 @@ export function estadoExistencia(cantidad: number, minimo: number | null): Estad
   return cantidad <= (minimo ?? 2) ? "pocas" : "normal";
 }
 
+/** La etiqueta de la tarjeta: solo «pocas» o «agotada». `null` (sin existencias cargadas) tampoco enseña nada. */
+export function etiquetaExistencia(estado: EstadoExistencia | null): "pocas" | "agotada" | null {
+  return estado === "pocas" || estado === "agotada" ? estado : null;
+}
+
 export type PadreTienda = { padre: Producto; hijas: Producto[]; ejes: string[] };
 
 /** Vitrina = padres y productos sin variantes. Las hijas viven dentro de su padre, en el orden recibido. */
