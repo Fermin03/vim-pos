@@ -108,15 +108,17 @@ DECLARE
   v_pla   uuid := 'c4c40000-0000-0000-0000-0000000000a1';
   v_m1    uuid := gen_random_uuid(); v_m2 uuid := gen_random_uuid(); v_m3 uuid := gen_random_uuid(); v_m4 uuid := gen_random_uuid();
   v_m5    uuid := gen_random_uuid(); v_m6 uuid := gen_random_uuid();
-  v_suc2  uuid; v_turno uuid; v_tk uuid; v_it uuid; v_auth uuid; v_ini numeric; v_res jsonb; v_snap jsonb; v_pull jsonb;
+  v_suc2  uuid; v_turno uuid; v_tk uuid; v_it uuid; v_auth uuid; v_ini numeric; v_res jsonb; v_snap jsonb; v_pull jsonb; v_tkm uuid;
 BEGIN
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
   SELECT id INTO v_turno FROM turnos WHERE caja_id = v_caja AND estado = 'ABIERTO';
   v_ini := COALESCE((SELECT cantidad FROM producto_existencias WHERE sucursal_id = v_suc AND producto_id = v_pla), 0);
+  -- 0196: la caja solo sube VENTA y DEVOLUCION de un ticket; este es el ticket de los movimientos de 3a, 3b y 3e.
+  v_tkm := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smoke-c4-3m', v_maria);
 
   -- 3a) Una VENTA de -1 aplica una vez; el mismo snapshot otra vez no duplica ni mueve la existencia.
   v_snap := jsonb_build_object('movimientos_producto', jsonb_build_array(jsonb_build_object(
-    'id', v_m1, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_pla, 'tipo', 'VENTA', 'cantidad', -1,
+    'id', v_m1, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_pla, 'tipo', 'VENTA', 'cantidad', -1, 'ticket_id', v_tkm,
     'motivo', 'smoke 3a', 'usuario_id', v_maria, 'creado_at', now())));
   v_res := sync_push_snapshot(v_t, v_snap);
   IF (v_res->>'movimientos_producto')::int IS DISTINCT FROM 1 THEN RAISE EXCEPTION '3a: debía aplicar 1: %', v_res; END IF;
@@ -132,9 +134,9 @@ BEGIN
   -- 3b) Un producto de otro negocio cae en errores y no detiene a los demás.
   v_res := sync_push_snapshot(v_t, jsonb_build_object('movimientos_producto', jsonb_build_array(
     jsonb_build_object('id', v_m2, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', 'c4c40000-0000-0000-0000-0000000000e1',
-      'tipo', 'VENTA', 'cantidad', -1, 'creado_at', now() - interval '1 min'),
+      'tipo', 'VENTA', 'cantidad', -1, 'ticket_id', v_tkm, 'creado_at', now() - interval '1 min'),
     jsonb_build_object('id', v_m3, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_pla,
-      'tipo', 'ENTRADA', 'cantidad', 5, 'creado_at', now()),
+      'tipo', 'DEVOLUCION', 'cantidad', 5, 'ticket_id', v_tkm, 'creado_at', now()),
     -- Fila cuyo propio tenant_id es de otro negocio (con producto y sucursal de este).
     jsonb_build_object('id', v_m5, 'tenant_id', 'c4c40000-0000-0000-0000-0000000000ee', 'sucursal_id', v_suc, 'producto_id', v_pla,
       'tipo', 'ENTRADA', 'cantidad', 7, 'creado_at', now()))));
@@ -154,7 +156,7 @@ BEGIN
   UPDATE productos SET controla_existencias = false WHERE id = v_pla;
   v_res := sync_push_snapshot(v_t, v_snap || jsonb_build_object('movimientos_producto',
     (v_snap->'movimientos_producto') || jsonb_build_array(jsonb_build_object(
-      'id', v_m6, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_pla, 'tipo', 'VENTA', 'cantidad', -1, 'creado_at', now()))));
+      'id', v_m6, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_pla, 'tipo', 'VENTA', 'cantidad', -1, 'ticket_id', v_tkm, 'creado_at', now()))));
   IF v_res ? '_errores' THEN RAISE EXCEPTION '3e: el reenvío no debía dar errores: %', v_res; END IF;
   IF (v_res->>'movimientos_producto')::int IS DISTINCT FROM 0 THEN RAISE EXCEPTION '3e: nada debía aplicarse: %', v_res; END IF;
   IF v_res->'_descartados'->'movimientos_producto' IS DISTINCT FROM jsonb_build_array(v_m6::text) THEN
@@ -334,6 +336,152 @@ BEGIN
      OR (SELECT count(*) FROM devoluciones WHERE ticket_original_id = v_tk_a) <> 1 THEN
     RAISE EXCEPTION '4d: ninguna devolución nueva debía quedar'; END IF;
   RAISE NOTICE '4 cambio de talla OK';
+END $$;
+
+-- 5) 0196: la venta de un cambio, los candados de registrar_cambio_talla y lo que la caja sube.
+DO $$
+DECLARE
+  v_t     uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_suc   uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_caja  uuid := '99999999-0000-0000-0000-0000000000cc';
+  v_maria uuid := '99999999-0000-0000-0000-000000000001';
+  v_cat   uuid := 'c4c40000-0000-0000-0000-0000000000c1';
+  v_m     uuid := 'c4c40000-0000-0000-0000-0000000000d1';
+  v_g     uuid := 'c4c40000-0000-0000-0000-0000000000d2';
+  v_caro  uuid := 'c4c40000-0000-0000-0000-0000000000d3';
+  v_cero  uuid := 'c4c40000-0000-0000-0000-0000000000d5';
+  v_ajeno uuid := 'c4c40000-0000-0000-0000-0000000000f1';
+  v_turno uuid; v_tk uuid; v_it uuid; v_tk2 uuid; v_it2 uuid; v_auth uuid; v_desc uuid; v_res jsonb; v_nuevo uuid; v_nit uuid;
+  v_suc_b uuid; v_caja_b uuid; v_caso text; v_cant jsonb; v_mo uuid := gen_random_uuid(); v_ma uuid := gen_random_uuid();
+  v_mu uuid := gen_random_uuid(); v_pago uuid;
+
+BEGIN
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
+  SELECT id INTO v_turno FROM turnos WHERE caja_id = v_caja AND estado = 'ABIERTO';
+  INSERT INTO productos (id, tenant_id, nombre, categoria_id, precio_base_mxn, controla_existencias)
+  VALUES (v_cero, v_t, 'Bolsa', v_cat, 0, true);
+  INSERT INTO movimientos_producto (tenant_id, sucursal_id, producto_id, tipo, cantidad)
+  SELECT v_t, v_suc, p, 'ENTRADA', 10 FROM unnest(ARRAY[v_m, v_g, v_caro, v_cero]) p;
+
+  -- Dos ventas pagadas de una Polo M; la autorización sirve dentro de esta transacción.
+  v_tk := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smoke-c5-v1', v_maria);
+  v_it := agregar_item_a_ticket(v_tk, v_m, 1, NULL, '[]'::jsonb, 'smoke-c5-v1-1');
+  PERFORM aplicar_pago(v_tk, 'EFECTIVO'::metodo_pago, 349, 349, NULL, NULL, NULL, false, NULL, 'smoke-c5-v1-pago');
+  v_tk2 := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smoke-c5-v2', v_maria);
+  v_it2 := agregar_item_a_ticket(v_tk2, v_m, 1, NULL, '[]'::jsonb, 'smoke-c5-v2-1');
+  PERFORM aplicar_pago(v_tk2, 'EFECTIVO'::metodo_pago, 349, 349, NULL, NULL, NULL, false, NULL, 'smoke-c5-v2-pago');
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'devolucion', 'venta.devolucion', 'ticket', 'smoke 5')
+  RETURNING id INTO v_auth;
+
+  -- 5a) Rechazos de registrar_cambio_talla, sin dejar nada: prenda sin precio, otra sucursal, llave
+  --     nula y cantidades raras.
+  INSERT INTO tenant_limites (tenant_id, max_sucursales) VALUES (v_t, 10) ON CONFLICT (tenant_id) DO UPDATE SET max_sucursales = 10;
+  INSERT INTO sucursales (tenant_id, codigo, nombre) VALUES (v_t, 'S196', 'Otra tienda') RETURNING id INTO v_suc_b;
+  INSERT INTO cajas (tenant_id, sucursal_id, numero, nombre) VALUES (v_t, v_suc_b, 1, 'Caja de la otra') RETURNING id INTO v_caja_b;
+  FOREACH v_caso IN ARRAY ARRAY['sin_precio', 'otra_sucursal', 'sin_llave', 'infinito', 'decimales', 'texto'] LOOP
+    v_cant := CASE v_caso WHEN 'infinito' THEN '"Infinity"'::jsonb WHEN 'decimales' THEN '1.0005'::jsonb
+                          WHEN 'texto' THEN '"uno"'::jsonb ELSE '1'::jsonb END;
+    BEGIN
+      PERFORM registrar_cambio_talla(v_tk,
+        jsonb_build_array(jsonb_build_object('ticket_item_id', v_it, 'cantidad', 1)),
+        jsonb_build_array(jsonb_build_object('producto_id', CASE WHEN v_caso = 'sin_precio' THEN v_cero ELSE v_g END, 'cantidad', v_cant)),
+        CASE WHEN v_caso = 'otra_sucursal' THEN v_caja_b ELSE v_caja END, v_turno, v_maria, v_auth, v_maria,
+        CASE WHEN v_caso = 'sin_llave' THEN NULL ELSE 'smoke-c5-' || v_caso END);
+      RAISE EXCEPTION '5a %: debía rechazarse', v_caso;
+    EXCEPTION WHEN OTHERS THEN
+      IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%'
+         OR (v_caso = 'sin_precio' AND SQLERRM <> 'DATOS_INVALIDOS: la prenda que se lleva no tiene precio')
+         OR (v_caso = 'otra_sucursal' AND SQLERRM <> 'DATOS_INVALIDOS: esa venta es de otra sucursal') THEN
+        RAISE EXCEPTION '5a %: error inesperado: %', v_caso, SQLERRM; END IF;
+    END;
+  END LOOP;
+  IF EXISTS (SELECT 1 FROM devoluciones WHERE ticket_original_id = v_tk) THEN RAISE EXCEPTION '5a: quedó una devolución a medias'; END IF;
+
+  -- 5b) La misma llave con otra venta se rechaza (no devuelve el cambio de la primera).
+  PERFORM registrar_cambio_talla(v_tk, jsonb_build_array(jsonb_build_object('ticket_item_id', v_it, 'cantidad', 1)),
+    jsonb_build_array(jsonb_build_object('producto_id', v_g, 'cantidad', 1)), v_caja, v_turno, v_maria, v_auth, v_maria, 'smoke-c5-llave');
+  BEGIN
+    PERFORM registrar_cambio_talla(v_tk2, jsonb_build_array(jsonb_build_object('ticket_item_id', v_it2, 'cantidad', 1)),
+      jsonb_build_array(jsonb_build_object('producto_id', v_g, 'cantidad', 1)), v_caja, v_turno, v_maria, v_auth, v_maria, 'smoke-c5-llave');
+    RAISE EXCEPTION '5b: la llave de otra venta debía rechazarse';
+  EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE EXCEPTION '5b: error inesperado: %', SQLERRM; END IF; END;
+
+  -- 5c) La venta de un cambio con saldo (M por Pima: paga 50) queda ABIERTA: no se le cancela ni
+  --     reemplaza un renglón, no se le descuenta, no se borra.
+  v_res := registrar_cambio_talla(v_tk2, jsonb_build_array(jsonb_build_object('ticket_item_id', v_it2, 'cantidad', 1)),
+    jsonb_build_array(jsonb_build_object('producto_id', v_caro, 'cantidad', 1)), v_caja, v_turno, v_maria, v_auth, v_maria, 'smoke-c5-saldo');
+  v_nuevo := (v_res->>'ticket_id')::uuid;
+  SELECT id INTO v_nit FROM ticket_items WHERE ticket_id = v_nuevo;
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'descuento', 'descuento.manual_aplicar', 'ticket', 'smoke 5c')
+  RETURNING id INTO v_desc;
+  FOREACH v_caso IN ARRAY ARRAY['cancelar_item', 'reemplazar_item', 'descuento_ticket', 'descuento_renglon', 'borrar'] LOOP
+    BEGIN
+      IF v_caso = 'cancelar_item' THEN PERFORM cancelar_item_ticket(v_nit, 'smoke', NULL);
+      ELSIF v_caso = 'reemplazar_item' THEN
+        PERFORM reemplazar_item_ticket(v_nit, jsonb_build_array(jsonb_build_object('producto_id', v_caro, 'cantidad', 1, 'client_id_local', 'smoke-c5-r1')));
+      ELSIF v_caso = 'descuento_ticket' THEN
+        PERFORM aplicar_descuento_manual(v_nuevo, NULL, 'MONTO_FIJO'::descuento_manual_tipo, 10, 'OTRO'::descuento_manual_motivo, 'smoke', v_desc, v_maria, v_maria, NULL);
+      ELSIF v_caso = 'descuento_renglon' THEN
+        PERFORM aplicar_descuento_manual(v_nuevo, v_nit, 'MONTO_FIJO'::descuento_manual_tipo, 10, 'OTRO'::descuento_manual_motivo, 'smoke', v_desc, v_maria, v_maria, NULL);
+      ELSE UPDATE tickets SET deleted_at = now(), deleted_by = v_maria WHERE id = v_nuevo;
+      END IF;
+      RAISE EXCEPTION '5c %: debía rechazarse', v_caso;
+    EXCEPTION WHEN OTHERS THEN
+      IF SQLERRM <> 'DATOS_INVALIDOS: es la venta de un cambio: cóbrala o cancélala completa' THEN
+        RAISE EXCEPTION '5c %: error inesperado: %', v_caso, SQLERRM; END IF;
+    END;
+  END LOOP;
+
+  -- 5d) Cancelarla anula su pago interno ($349 en efectivo): el cajón regresa esos $349 al cliente.
+  SELECT id INTO v_pago FROM pagos WHERE ticket_id = v_nuevo AND client_id_local = 'smoke-c5-saldo-pago';
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'cancelar_ticket', 'venta.cancelar_abierta', 'ticket', v_nuevo, 'smoke 5d')
+  RETURNING id INTO v_auth;
+  PERFORM cancelar_ticket_pagado(
+    p_ticket_id := v_nuevo, p_caja_id := v_caja, p_turno_id := v_turno,
+    p_motivo := 'CLIENTE_DESISTIO'::cancelacion_motivo, p_motivo_texto := 'smoke',
+    p_autorizacion_pin_id := v_auth, p_usuario_solicitante_id := v_maria, p_usuario_autorizo_id := v_maria,
+    p_reversar_inventario := true, p_cancelar_cfdi_sat := false, p_devolver_dinero := false,
+    p_client_id_local := 'smoke-c5-cancela');
+  IF (SELECT (estado::text, deleted_at IS NOT NULL) FROM pagos WHERE id = v_pago) IS DISTINCT FROM ('CANCELADO'::text, true) THEN
+    RAISE EXCEPTION '5d: el pago interno debía quedar CANCELADO y borrado'; END IF;
+  IF (SELECT estado_fiscal::text FROM tickets WHERE id = v_nuevo) <> 'CANCELADO' THEN RAISE EXCEPTION '5d: debía quedar CANCELADO'; END IF;
+
+  -- 5e) Un renglón de un ticket CANCELADO no cambia de producto.
+  BEGIN UPDATE ticket_items SET producto_id = v_g WHERE id = v_nit;
+        RAISE EXCEPTION '5e: cambió el producto de un renglón cancelado';
+  EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS: no se cambia el producto%' THEN RAISE EXCEPTION '5e: %', SQLERRM; END IF; END;
+
+  -- 5f) Push: la caja solo sube VENTA/DEVOLUCION de un ticket, con usuarios del negocio, y un id que
+  --     ya existe en otro negocio es error (no se salta).
+  INSERT INTO auth.users(id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data)
+  VALUES (v_ajeno, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'ajeno-smoke-0196@prueba.test', '',
+          now(), '{"provider":"email","providers":["email"]}', '{}');
+  INSERT INTO movimientos_producto (id, tenant_id, sucursal_id, producto_id, tipo, cantidad)
+  VALUES (v_mo, 'c4c40000-0000-0000-0000-0000000000ee', 'c4c40000-0000-0000-0000-0000000000b2',
+          'c4c40000-0000-0000-0000-0000000000e1', 'ENTRADA', 1);
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('movimientos_producto', jsonb_build_array(
+    jsonb_build_object('id', v_ma, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_m, 'tipo', 'AJUSTE', 'cantidad', 3,
+      'ticket_id', v_tk, 'creado_at', now()),
+    jsonb_build_object('id', v_mu, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_m, 'tipo', 'VENTA', 'cantidad', -1,
+      'ticket_id', v_tk, 'usuario_id', v_ajeno, 'creado_at', now()),
+    jsonb_build_object('id', v_mo, 'tenant_id', v_t, 'sucursal_id', v_suc, 'producto_id', v_m, 'tipo', 'VENTA', 'cantidad', -1,
+      'ticket_id', v_tk, 'creado_at', now()))));
+  IF (v_res->>'movimientos_producto')::int IS DISTINCT FROM 0 THEN RAISE EXCEPTION '5f: nada debía aplicarse: %', v_res; END IF;
+  IF (SELECT count(*) FROM jsonb_array_elements(COALESCE(v_res->'_errores', '[]'::jsonb)) e
+       WHERE e->>'id' IN (v_ma::text, v_mu::text, v_mo::text)) <> 3 THEN
+    RAISE EXCEPTION '5f: los tres debían estar en _errores: %', v_res; END IF;
+  IF EXISTS (SELECT 1 FROM movimientos_producto WHERE id IN (v_ma, v_mu)) THEN RAISE EXCEPTION '5f: no debían guardarse'; END IF;
+
+  -- 5g) La función del disparador de tienda corre como su dueño.
+  IF NOT (SELECT prosecdef FROM pg_proc WHERE proname = 'trg_tickets_tienda_sin_cocina') THEN
+    RAISE EXCEPTION '5g: trg_tickets_tienda_sin_cocina debía ser SECURITY DEFINER'; END IF;
+  RAISE NOTICE '5 ajustes 0196 OK';
 END $$;
 
 ROLLBACK;
