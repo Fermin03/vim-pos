@@ -60,7 +60,7 @@ import { PantallaCambioTalla } from "./pantalla-cambio-talla";
 import { SeccionTransacciones } from "./seccion-transacciones";
 import { SeccionInventario } from "./seccion-inventario";
 import { SeccionNotificaciones } from "./seccion-notificaciones";
-import { guardarVistas, leerVistas, notificacionesTienda, sinVer } from "../lib/notificaciones-tienda";
+import { guardarAvisos, guardarVistas, leerAvisos, leerVistas, notificacionesTienda, sinVer, unirAvisos } from "../lib/notificaciones-tienda";
 import { PantallaPedidosApps } from "./pantalla-pedidos-apps";
 import { accionPedidoApp, hayExpiradosSinVer, leerExpiradosHoy, leerPedidosApps, type PedidoApp, type PedidoAppEstado } from "../lib/pedidos-apps";
 import {
@@ -591,14 +591,26 @@ export function HomePos({
   useEffect(() => { setPuedeSalir(typeof window.__VIM_SALIR === "function"); }, []);
   /** Avisos de VIM: el inicio los enseña al entrar; la tienda, que no tiene inicio, aquí. */
   const [avisosVim, setAvisosVim] = useState<Aviso[] | null>(null);
-  /** Los mismos avisos, que el diálogo de entrada vacía al cerrarse: Notificaciones los conserva para releerlos. */
+  /**
+   * Los mismos avisos, que el diálogo de entrada vacía al cerrarse: Notificaciones los conserva para
+   * releerlos. La nube ya no manda los que esta caja acusó, así que se unen con los guardados (R7).
+   */
   const [avisosTodos, setAvisosTodos] = useState<Aviso[]>([]);
   useEffect(() => {
     if (!tienda) return;
     let vivo = true;
-    leerDirectivas().then((d) => { if (vivo) { const a = avisosDe(d); setAvisosVim(a); setAvisosTodos(a); } }).catch(() => {});
+    const guardados = leerAvisos(turno.caja_id);
+    setAvisosTodos(unirAvisos(guardados, []));
+    leerDirectivas().then((d) => {
+      if (!vivo) return;
+      const a = avisosDe(d);
+      const todos = unirAvisos(guardados, a);
+      setAvisosVim(a);
+      setAvisosTodos(todos);
+      guardarAvisos(turno.caja_id, todos);
+    }).catch(() => {});
     return () => { vivo = false; };
-  }, [tienda]);
+  }, [tienda, turno.caja_id]);
   const capturaTienda = tienda && carrito.modoServicio === "PARA_LLEVAR" && !cerrando && !enInicio && !enKds && !enMonitor
     && !enConsultaCuentas && !enDevoluciones && !enPedidosApps && !enDelivery && !enPickup && !enMesas && !enBarra;
   /** Selector de talla y color abierto y franja del escáner: estado de aquí para que su Escape viva en la pila. */
@@ -3178,7 +3190,18 @@ export function HomePos({
           bloqueada={!puedeCambiarSeccion(algoAbierto || avisoTiendaVisible, totalesCobro != null)}
         />
       )}
-      {avisosVim && avisosVim.length > 0 && <DialogoAvisos avisos={avisosVim} onCerrar={() => setAvisosVim([])} />}
+      {avisosVim && avisosVim.length > 0 && (
+        <DialogoAvisos
+          avisos={avisosVim}
+          onCerrar={() => {
+            // Acusados aquí: el globo de Notificaciones ya no los cuenta.
+            const ids = [...new Set([...(vistas ?? leerVistas(turno.caja_id)), ...avisosVim.map((a) => a.id)])];
+            setVistas(ids);
+            guardarVistas(turno.caja_id, ids);
+            setAvisosVim([]);
+          }}
+        />
+      )}
       {salirCajaAbierto && <ConfirmarSalirCaja onCancelar={() => setSalirCajaAbierto(false)} />}
       {dialogoConfirmar}
 

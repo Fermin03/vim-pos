@@ -50,7 +50,7 @@ const NIVELES_AVISO: NivelAviso[] = ["info", "warning", "danger"];
  * tumbar la pantalla desde la que se cobra. El orden se respeta tal cual viene — la nube ya los
  * ordenó por urgencia (danger primero) y aquí no se re-decide.
  */
-export function avisosDe(d: Directivas | null): Aviso[] {
+export function avisosDe(d: Pick<Directivas, "avisos"> | null): Aviso[] {
   const xs = Array.isArray(d?.avisos) ? d.avisos : [];
   return xs.flatMap((x) => {
     if (!x || typeof x !== "object") return [];

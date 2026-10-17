@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { Producto } from "../catalogo";
 import type { Aviso } from "../directivas";
-import { notificacionesTienda, sinVer } from "../notificaciones-tienda";
+import { notificacionesTienda, sinVer, unirAvisos } from "../notificaciones-tienda";
 import type { Existencia } from "../tienda";
 
 const prod = (id: string, extra: Partial<Producto> = {}): Producto => ({
@@ -51,5 +51,18 @@ describe("sinVer", () => {
     const vistas = notificacionesTienda([ex("B", 1)], productos, "s1", []).map((n) => n.id);
     const despues = notificacionesTienda([ex("B", 0)], productos, "s1", []);
     expect(sinVer(despues, vistas)).toBe(1);
+  });
+});
+
+describe("unirAvisos", () => {
+  const ahora = Date.parse("2026-10-17T12:00:00Z");
+  const av = (id: string, vigente_hasta: string | null = null, titulo = id): Aviso => ({ ...aviso, id, titulo, vigente_hasta });
+  it("conserva los guardados que la nube ya no manda (acusados) y une por id, ganando el nuevo", () => {
+    const r = unirAvisos([av("a1", null, "viejo"), av("a2")], [av("a1", null, "nuevo"), av("a3")], ahora);
+    expect(r.map((a) => [a.id, a.titulo])).toEqual([["a1", "nuevo"], ["a3", "a3"], ["a2", "a2"]]);
+  });
+  it("tira los que ya vencieron, guardados o nuevos", () => {
+    const r = unirAvisos([av("g", "2026-10-17T11:59:59Z"), av("h", "2026-10-18T00:00:00Z")], [av("n", "2026-10-01T00:00:00Z")], ahora);
+    expect(r.map((a) => a.id)).toEqual(["h"]);
   });
 });

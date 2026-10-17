@@ -1,5 +1,5 @@
 import type { Producto } from "./catalogo";
-import type { Aviso } from "./directivas";
+import { avisosDe, type Aviso } from "./directivas";
 import { estadoExistencia, renglonTienda, type Existencia } from "./tienda";
 
 export type Notificacion = {
@@ -59,4 +59,29 @@ export function leerVistas(cajaId: string): string[] {
 
 export function guardarVistas(cajaId: string, ids: string[]): void {
   try { localStorage.setItem(llaveVistas(cajaId), JSON.stringify(ids)); } catch { /* sin almacenamiento, el globo vuelve a contar */ }
+}
+
+/**
+ * Avisos de VIM para releer (R7). FUNCIÓN PURA. La nube deja de mandar los que esta caja ya acusó,
+ * así que la lista de la última vez se guarda y se une con la nueva: por id (gana el nuevo), los
+ * nuevos primero, y se tira lo que ya venció. Un aviso que VIM retire sigue aquí hasta su vencimiento.
+ */
+export function unirAvisos(guardados: Aviso[], nuevos: Aviso[], ahora = Date.now()): Aviso[] {
+  const ids = new Set(nuevos.map((a) => a.id));
+  return [...nuevos, ...guardados.filter((a) => !ids.has(a.id))]
+    .filter((a) => a.vigente_hasta === null || !(Date.parse(a.vigente_hasta) <= ahora));
+}
+
+const llaveAvisos = (cajaId: string) => `vimpos.notif.avisos.${cajaId}`;
+
+/** Los avisos guardados en esta caja; lo que no tenga forma de aviso se descarta. */
+export function leerAvisos(cajaId: string): Aviso[] {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(llaveAvisos(cajaId)) ?? "[]");
+    return avisosDe({ avisos: Array.isArray(v) ? v : [] });
+  } catch { return []; }
+}
+
+export function guardarAvisos(cajaId: string, avisos: Aviso[]): void {
+  try { localStorage.setItem(llaveAvisos(cajaId), JSON.stringify(avisos)); } catch { /* sin almacenamiento, solo se releen los de este arranque */ }
 }
