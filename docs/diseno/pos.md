@@ -2,7 +2,7 @@
 
 > Hereda todo de [`nucleo.md`](nucleo.md). Aquí va solo lo que es cierto **en una caja**.
 >
-> Para una tienda de ropa o calzado (giro RETAIL), la caja cambia en [`pos-retail.md`](pos-retail.md).
+> Para una tienda de ropa o calzado (giro RETAIL), la caja cambia (barra inferior con cinco secciones, tarjetas con foto) en [`pos-retail.md`](pos-retail.md).
 
 ## Quién y dónde
 

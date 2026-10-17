@@ -2,8 +2,9 @@
 
 > Hereda todo de [`pos.md`](pos.md), que hereda de [`nucleo.md`](nucleo.md). Aquí va solo lo que
 > cambia cuando la caja es de una tienda de ropa o calzado. Spec: `docs/superpowers/specs/2026-10-15-giro-retail-design.md`
-> §5. Boceto del 15 oct 2026; este documento describe lo que quedó construido en la entrega 4 (16 oct
-> 2026). Donde el código hizo algo distinto del boceto, aquí manda el código.
+> §5. Boceto del 15 oct 2026; este documento describe lo que quedó construido en las entregas 4 y 4b
+> (16 y 17 oct 2026), con el cambio de Fermín del 16 oct (barra inferior y tarjetas con foto). Donde
+> el código hizo algo distinto del boceto, aquí manda el código.
 
 ## Quién y dónde
 
@@ -17,87 +18,115 @@ La misma caja táctil de 15" (1024×768 es el piso), con dos diferencias contra 
 No hay cocina, mesas ni comandas. Lo que sí hay, y en el restaurante casi no: el cliente que vuelve
 días después a cambiar la talla.
 
-## Versión 2: barra inferior y tarjetas con foto (Fermín, 16 oct; en construcción)
-
-> Fermín cambió el diseño después de ver la entrega 4. Esta sección **manda** sobre las de abajo
-> donde choquen; al construirla, las secciones viejas se reescriben y esta se funde en ellas.
+## La barra inferior y sus cinco secciones
 
 **Una barra de navegación abajo, siempre visible**, con cinco destinos: **Panel · Inventario ·
 Transacciones · Notificaciones · Configuración**. En una tienda reemplaza al inicio de mosaicos, al
 botón «Menú» y al `Volver` de la venta: el cajero cambia de sección con un toque, sin regresar a un
 inicio. Cada destino es un botón de 56 px de alto con icono y texto; el elegido va en el color de
 acento. Notificaciones lleva un globo con el número de avisos sin ver. La barra de estado de la caja
-(sin conexión, sincronizando, turno, folios) sigue arriba, como hoy.
+(sin conexión, sincronizando, turno, folios) sigue arriba. Con un cobro o un diálogo encima, la barra
+no responde. Al iniciar turno, la caja abre en el Panel. Las secciones comparten la misma cabecera:
+título de 20 px y, a la derecha, lo suyo.
 
-- **Panel** es la venta (la pantalla de cobro). Abre aquí al iniciar turno.
-  - **Izquierda, igual que hoy:** barra de escaneo, categorías y cuadrícula.
-  - **Derecha, simplificada:** el ticket con sus renglones, el total, **Cobrar** y «Efectivo exacto».
-    Se van «En espera», «Descuento» y «Precios». Arriba del ticket, como texto pequeño, «Asignar
-    cliente» (la lealtad lo necesita) y «Limpiar». Con el ticket vacío sigue el botón grande «Cambio de
-    talla».
-  - Se va la fila de botones de arriba (`Volver`, «Cuentas abiertas», «Cuentas en espera»): lo abierto
-    vive en Transacciones.
-- **Las tarjetas llevan foto.** La foto del producto (la que sube el admin, `imagen_url`) llena la
-  tarjeta, recortada en cuadrado. Encima, un degradado oscuro de abajo hacia arriba (negro al ~75 %
-  abajo, transparente a media altura). Sobre él, abajo a la izquierda y en blanco: el nombre
-  (`text-14`, seminegrita, hasta dos renglones) y el precio debajo (`text-13`, `font-display`, bold,
-  `tabular-nums`). Chico pero legible a un metro.
-  - Sin foto, o si no carga (caja sin internet), la tarjeta usa el color de su categoría con la
-    inicial del producto en grande, y el mismo degradado y texto. Nunca una tarjeta en blanco.
-  - **Existencia:** sin número en la tarjeta. Una etiqueta arriba a la derecha solo cuando importa:
-    «Pocas» (`warning`) o «Agotada» (`danger`). El número exacto se ve en el selector de talla y color.
-  - Tocar sigue igual: sin variantes agrega; con variantes abre el selector.
-- **Inventario.** Buscar o escanear una prenda y ver su existencia por talla y color, en esta sucursal y
-  en las demás (el mismo selector, de solo consulta). Y **Recibir mercancía** escaneando, como en el
-  admin: proveedor opcional, renglones con cantidad, «Recibir N productos». Recibir solo lo puede hacer
-  quien tenga el permiso de productos (dueño o administrador); a los demás la pantalla les dice
-  «Pide a un administrador que entre con su PIN para recibir.».
-- **Transacciones.** La lista de ventas: arriba las **cuentas abiertas** de esta caja (por ejemplo, la
-  de un cambio con diferencia por cobrar), luego las ventas del turno, y búsqueda por folio o
-  escaneando una prenda (30 días). Al tocar una venta se ve su detalle, con tres acciones:
-  **Reimprimir**, **Devolver** y **Cambio de talla**. Reemplaza las entradas sueltas de Devoluciones y
-  de Cambio de talla (el botón grande del ticket vacío se queda como atajo).
-- **Notificaciones.** Dos tipos, en una lista, lo más nuevo arriba:
-  - **Existencias** de esta sucursal: prendas bajo mínimo, agotadas o en negativo, con la cifra. Al
-    tocar una, abre Inventario con esa prenda.
-  - **Avisos de VIM**: los mismos que hoy salen al abrir turno (se siguen mostrando ahí, uno por uno);
-    aquí quedan para releerlos.
-  - El globo cuenta lo que no se ha visto desde la última vez que se abrió la pestaña.
-- **Configuración.** Lo que hoy está en el «Menú» general: impresoras y pantallas, cambiar cajero,
-  bloquear, cambiar PIN, abrir cajón, corte X, actualizar menú, buscar actualizaciones, ayuda por
-  WhatsApp y **Cerrar turno** (en rojo, separado de lo demás).
+- **Panel** es la venta (la pantalla de cobro). Ver «La pantalla de venta».
+- **Inventario** tiene dos pestañas, **Existencias** y **Recibir**.
+- **Transacciones** es la lista de ventas y cuentas abiertas.
+- **Notificaciones** junta las alertas de existencias y los avisos de VIM.
+- **Configuración** es el menú general de la caja puesto en una página.
 
 Un restaurante no ve nada de esto: su inicio, su menú y su captura quedan iguales.
+
+### Inventario
+
+- **Existencias.** Buscar o escribir una prenda y ver su existencia por talla y color, en esta
+  sucursal y en las demás. Es el mismo selector de la venta, solo de consulta: tocar una celda no
+  agrega nada. Sin búsqueda se enseñan los primeros 60 productos. Aquí escanear **nunca** agrega al
+  ticket: el código reemplaza a la búsqueda y abre la consulta de esa prenda. Un código que no existe
+  dice «No encontramos el código…».
+- **Recibir.** Recibir mercancía escaneando, como en el admin, pero más corto: **sin costo y sin
+  proveedor** (decisión 1 del plan; los productos y los proveedores los captura el admin). Cada escaneo
+  suma 1 pieza al renglón; la cantidad se puede editar. Un campo de referencia opcional (hasta 100
+  caracteres) y el botón «Recibir N productos». Recibir solo lo puede hacer quien tenga el permiso de
+  productos (**dueño o administrador**); a los demás la pantalla les dice «Pide a un administrador que
+  entre con su PIN para recibir.». Solo recibe productos que controlan existencias. Si el negocio tiene
+  las existencias apagadas, avisa y no deja recibir.
+- Lo capturado en Recibir no se pierde por accidente: cambiar de pestaña o de sección con renglones sin
+  recibir pregunta antes.
+- El escáner solo vive en la pestaña que lo usa. Con un diálogo encima, el lector queda «en pausa».
+
+### Transacciones
+
+La lista de ventas. Arriba las **cuentas abiertas de esta caja** (por ejemplo, la de un cambio con
+diferencia por cobrar, o una venta que se dejó abierta), luego las ventas del turno. Búsqueda por
+folio o escaneando una prenda (30 días). Al tocar una venta se ve su detalle, con tres acciones:
+**Reimprimir**, **Devolver** y **Cambio de talla** (esta última no sale en una venta facturada).
+Reemplaza a las entradas sueltas de Devoluciones y de Cambio de talla; el botón grande del ticket
+vacío se queda como atajo al cambio. Abrir una cuenta la carga en el Panel para cobrarla.
+
+Solo salen las cuentas de **esta caja**: el pago se asienta en la caja y el turno del ticket. En el
+restaurante, «Cuentas abiertas · Para llevar» muestra las de toda la sucursal; ver el hallazgo en el
+spec (§13).
+
+### Notificaciones
+
+Una lista con dos tipos, **ordenada por gravedad** y sin fechas (las existencias no traen fecha):
+primero lo agotado o en negativo, luego «Pocas», luego los avisos de VIM.
+
+- **Existencias** de esta sucursal: prendas bajo mínimo, agotadas o en negativo, con la cifra. Solo
+  productos que controlan existencias; un padre no cuenta, sus variantes llevan la cifra. Al tocar una,
+  abre Inventario con esa prenda.
+- **Avisos de VIM**: los mismos que salen al abrir turno (se siguen mostrando ahí, uno por uno); aquí
+  quedan para releerlos. Se abren completos, en texto plano.
+- **El globo** cuenta lo que no se ha visto desde la última vez que se abrió la pestaña. Lo visto se
+  guarda en esta caja. Si cambia la cantidad de una prenda, su alerta vuelve a contar.
+- **Cómo se guardan los avisos de VIM.** La nube deja de mandar los que la caja ya acusó, así que la
+  caja guarda la última lista y la une con la nueva (por id, gana la nueva). Se queda con **20 como
+  máximo** y tira los que ya pasaron su `vigente_hasta` o traen una fecha que no se entiende. Un aviso
+  que VIM retire sigue ahí hasta que venza.
+
+### Configuración
+
+Lo que antes estaba en el «Menú» general, en una página: impresoras y pantallas, cambiar cajero,
+bloquear, cambiar PIN, mis propinas, abrir cajón, **Corte caja X** (abre el monitor de ventas),
+**Retiro / Depósito**, actualizar menú, buscar actualizaciones, ayuda por WhatsApp, **Salir** (si la
+caja puede) y **Cerrar turno** (en rojo, separado de lo demás). «Devoluciones» ya no está aquí: se hace
+desde Transacciones.
+
+**Proteger la venta en curso.** Bloquear, Cambiar cajero, Cerrar turno y Salir sacan al cajero de la
+pantalla de venta. Antes de hacerlo:
+
+- si hay una cuenta guardada cargada, se **deja abierta** (queda en Transacciones);
+- si es una venta suelta sin guardar, pregunta «Se borra la venta sin guardar (N productos).» y solo
+  sigue si el cajero confirma.
 
 ## Qué pantalla sale
 
 - La caja usa la venta de tienda cuando el giro del negocio es **RETAIL** (`esTienda`, que sale de lo
-  que ya lee de la caja). Solo cambia el **panel izquierdo** de la captura (`PanelVentaRetail`, en
-  `venta-retail.tsx`), y solo en el modo «Venta» (por dentro `PARA_LLEVAR`). El ticket de la derecha,
-  el cobro y lo demás son los de siempre y viven en `home-pos.tsx`. Un restaurante con el módulo de
+  que ya lee de la caja). Cambia el **panel izquierdo** de la captura (`PanelVentaRetail`, en
+  `venta-retail.tsx`) y se agrega la barra inferior con sus secciones. El ticket de la derecha, el
+  cobro y lo demás son los de siempre y viven en `home-pos.tsx`. Un restaurante con el módulo de
   existencias encendido sigue viendo su pantalla de siempre.
-- **El inicio no cambia de forma.** El acceso «Para llevar» se llama **«Venta»** en una tienda y lleva a
-  la pantalla de tienda. Los demás accesos salen o no por sus módulos, como hoy (una tienda arranca con
-  comedor, cocina y domicilio apagados, así que el inicio queda casi vacío: Venta, Devoluciones y lo de
-  turno).
-- `Volver`, el menú general, el estado de la caja (sin conexión, sincronizando, turno, folios), los
-  avisos de VIM y el bloqueo se quedan exactamente donde están.
+- No hay inicio de mosaicos. La caja abre en el Panel.
+- El estado de la caja (sin conexión, sincronizando, turno, folios), los avisos de VIM y el bloqueo se
+  quedan exactamente donde están.
 
 ## La pantalla de venta
 
 Tres zonas, de arriba abajo a la izquierda y el ticket a la derecha (mismo ancho que hoy,
-`SidebarTicket`):
+`SidebarTicket`), y la barra inferior debajo de todo:
 
 ```
-┌ Volver ─ Venta ──────────────────────── Cambio de talla · Asignar cliente ┐
-│ [▮▮ Escanea o busca por nombre o SKU…               ]  Lector listo        │ Venta T0142 │
-│ (Todo) (Playeras) (Pantalones) (Calzado)                                   │ Playera Polo│
-│ ┌──────────┐┌──────────┐┌──────────┐                                       │  M · Negra  │
-│ │Playera   ││Jeans slim││Sudadera  │                                       │  SKU ...    │
-│ │$349      ││$799      ││$599      │                                       │ ...         │
-│ │12 en tien││8 en tien.││Agotada   │                                       │ Total $1,646│
-│ └──────────┘└──────────┘└──────────┘                     ‹ 1/3 ›           │ [  Cobrar  ]│
-└────────────────────────────────────────────────────────────────────────────┴─────────────┘
+┌ [▮▮ Escanea o busca por nombre o SKU…          ]  Lector listo ┬ Venta T0142 ──────────┐
+│ (Todo) (Playeras) (Pantalones) (Calzado)                       │ Asignar cliente Limpiar│
+│ ┌──────────┐┌──────────┐┌──────────┐                           │ Playera Polo           │
+│ │ [foto]   ││ [foto]   ││ [foto]   │                           │  M · Negra · POL-M-NEG │
+│ │Playera   ││Jeans slim││Sudadera  │                           │ Total $1,646           │
+│ │$349      ││$799      ││$599 Pocas│              ‹ 1/3 ›      │ [     Cobrar     ]     │
+│ └──────────┘└──────────┘└──────────┘                           │ [ Efectivo exacto ]    │
+├────────────────────────────────────────────────────────────────┴────────────────────────┤
+│   Panel      Inventario     Transacciones     Notificaciones     Configuración          │
+└──────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Barra de escaneo y búsqueda
@@ -125,13 +154,18 @@ que el cajero espera al entrar.
 - La rejilla de hoy, **paginada y sin scroll** (`calcularRejilla`, `Paginador`). Se enseñan los
   **productos padre** y los productos sin variantes; las variantes nunca salen sueltas en la cuadrícula
   (hoy saldrían todas: hay que filtrarlas).
-- Cada tarjeta: nombre (`tamanoNombre`, como hoy), precio en `font-display` bold, y una línea de
-  existencia de **esta sucursal** en `text-13`:
-  - «12 en tienda» (`ink-2`) — suma de sus variantes.
-  - «Pocas: 2» (`warning`) — ver «Pocas» abajo.
-  - «Agotada» (`danger`) — cero o menos. **La tarjeta sigue activa**: se vende con aviso (decisión de
-    Fermín, spec §2).
-  - Mientras las existencias no se han leído, la línea no sale: nunca una «Agotada» falsa.
+- **Cada tarjeta lleva foto.** La foto del producto (la que sube el admin, `imagen_url`) llena la
+  tarjeta, recortada en cuadrado. Encima, un degradado oscuro de abajo hacia arriba. Sobre él, abajo a
+  la izquierda y en blanco: el nombre (`text-14`, seminegrita, hasta dos renglones) y el precio debajo
+  (`font-display`, bold, `tabular-nums`). Chico pero legible a un metro.
+  - **Las fotos necesitan internet.** Sin foto, o si no carga (caja sin conexión), la tarjeta usa el
+    color de su categoría con la **inicial** del producto en grande, y el mismo degradado y texto.
+    Nunca una tarjeta en blanco. Por eso la política de imágenes (CSP `img-src`) incluye el origen de
+    Supabase, en la web y en el escritorio.
+  - **Existencia:** sin número en la tarjeta. Una etiqueta arriba a la derecha solo cuando importa:
+    «Pocas» (`warning`) o «Agotada» (`danger`). **La tarjeta sigue activa**: se vende con aviso
+    (decisión de Fermín, spec §2). Mientras las existencias no se han leído, no sale etiqueta: nunca
+    una «Agotada» falsa. El número exacto se ve en el selector de talla y color.
 - Si las variantes tienen precios distintos, el precio dice «desde $349»; si no, el de sus variantes.
 - Tocar un producto **sin variantes** lo agrega; tocar un **padre** abre el selector.
 
@@ -184,15 +218,21 @@ Un `Modal` centrado, no un cajón lateral: la matriz necesita ancho.
 - **Cobrar** es el único azul, abajo, como hoy (60 px). «Quitar» y el contador de cantidad, también
   como hoy.
 
-### Cabecera
+### Arriba del ticket
 
-`Volver` a la izquierda (siempre ahí). A la derecha, botones fantasma de 44 px: **«Cambio de talla»** y
-**«Asignar cliente»**. «Cuentas en espera» se queda si hoy aplica a Para llevar.
+Con el ticket en curso, arriba del ticket van, como texto pequeño, **«Asignar cliente»** (la lealtad lo
+necesita) y **«Limpiar»**. No hay «En espera», «Descuento» ni «Precios». Las cuentas abiertas y en
+espera viven en Transacciones.
 
-**¿Por qué «Cambio de talla» no va junto a Cobrar, como en el boceto?** Empieza otra operación (sobre
-una venta anterior, no sobre el ticket en curso). Junto a Cobrar se leía como una forma de cobrar, y
-una pantalla de caja tiene una acción dominante, no dos. Va en la cabecera siempre y, con el ticket
-vacío, también en grande dentro del panel.
+**«Dejar abierta».** Cuando el ticket cargado es una cuenta guardada (por ejemplo, la del cambio con
+diferencia por cobrar), el encabezado ofrece «Dejar abierta». Sale del Panel sin cancelar: una espera
+retomada vuelve a espera, una cuenta abierta queda lista en Transacciones. Sin esto, la única salida
+sería cancelar.
+
+**¿Por qué «Cambio de talla» no va junto a Cobrar?** Empieza otra operación (sobre una venta anterior,
+no sobre el ticket en curso). Junto a Cobrar se leía como una forma de cobrar, y una pantalla de caja
+tiene una acción dominante, no dos. Se hace desde el detalle de una venta en Transacciones y, con el
+ticket vacío, también con el botón grande dentro del panel.
 
 ## Escáner
 
@@ -241,7 +281,8 @@ El lector USB se comporta como un teclado: escribe el código muy rápido y mand
 
 ## Devoluciones en una tienda
 
-La pantalla de Devoluciones de hoy devuelve **toda** la venta y **no** regresa existencias. En una
+Se llega con **Devolver**, en el detalle de una venta en Transacciones (la venta ya viene elegida).
+La pantalla de Devoluciones del restaurante devuelve **toda** la venta y **no** regresa existencias. En una
 tienda eso no sirve: el cliente regresa una prenda de tres.
 
 - **Parcial:** se elige qué renglones y cuántas piezas. El total a devolver se recalcula en vivo.
@@ -255,8 +296,8 @@ tienda eso no sirve: el cliente regresa una prenda de tres.
 - **Encontrar la venta:** el cliente llega días después. Además de las ventas del turno se busca por
   **folio**, y **escanear la etiqueta de la prenda** enseña las ventas recientes (30 días) que la
   llevan. La caja instalada solo ve sus propias ventas; una venta de otra caja o sucursal se devuelve
-  desde la caja que la cobró o desde el POS web. La pantalla lo dice cuando no encuentra nada. La búsqueda por folio y por prenda
-  se limita a la sucursal de la caja.
+  desde la caja que la cobró o desde el POS web. La pantalla lo dice cuando no encuentra nada. La
+  búsqueda por folio y por prenda se limita a la sucursal de la caja.
 - **Autorización:** la de hoy (PIN de supervisor o la propia con el permiso de devolución).
 - **Medio de devolución:** en una devolución parcial de tienda sale **«Efectivo»** de entrada. «Mismo
   método» se puede elegir, pero la terminal de Mercado Pago solo regresa un cobro completo: si la
@@ -267,9 +308,9 @@ tienda eso no sirve: el cliente regresa una prenda de tres.
 ## Cambio de talla
 
 Una sola pantalla de cuatro pasos, de pantalla completa (es una operación, no un diálogo), con
-`Volver` a la izquierda y el paso actual arriba («1 Venta · 2 Qué regresa · 3 Qué se lleva · 4 Listo»):
+un botón para salir a la izquierda y el paso actual arriba («1 Venta · 2 Qué regresa · 3 Qué se lleva · 4 Listo»):
 
-1. **La venta.** Igual que en Devoluciones: folio, ventas del turno o escanear la prenda que trae el
+1. **La venta.** Desde Transacciones ya viene elegida. Si se entra por el botón del ticket vacío: folio, ventas del turno o escanear la prenda que trae el
    cliente. Escanear la etiqueta es el camino normal: casi siempre la trae puesta.
 2. **Qué regresa.** Los renglones de esa venta; se toca **una** prenda (y cuántas piezas de ella). Si
    se llegó escaneando, ya viene marcada.
@@ -303,7 +344,7 @@ no hay forma de pago nueva, el corte no cambia y los reportes lo cuentan como lo
   permiso, pide el PIN de un supervisor. Esto difiere de lo que aprobó Fermín (ver abajo).
 
 **Lo que no hace:** cambiar una venta **facturada** (la factura necesitaría nota de crédito: «Esta
-venta está facturada. Haz la devolución desde Devoluciones.»); cambiar entre sucursales o cajas
+venta está facturada. Haz la devolución con «Devolver».»); cambiar entre sucursales o cajas
 (mismo límite que Devoluciones).
 
 ## Sin internet

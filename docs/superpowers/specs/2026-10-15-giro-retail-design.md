@@ -310,6 +310,26 @@ Al construir la entrega 4 (16 oct):
 
 Plan: `docs/superpowers/plans/2026-10-16-retail-4-caja.md`. Diseño: `docs/diseno/pos-retail.md`.
 
+### Entrega 4b (16–17 oct): la caja de tienda, versión 2
+
+Plan: `docs/superpowers/plans/2026-10-16-retail-4b-caja-v2.md`. Diseño: `docs/diseno/pos-retail.md`.
+
+Decisiones del plan:
+1. **Recibir en la caja no toca el costo ni lleva proveedor.** Los productos los manda la nube y los proveedores no bajan a la caja.
+2. **Recibir exige el permiso de productos** del usuario en turno (dueño o administrador); si no lo tiene, la pantalla lo dice.
+3. **El push acepta `ENTRADA` sin ticket** cuando viene de la caja (0197), para que una recepción suba como una venta.
+4. **Lo visto en Notificaciones se guarda en `localStorage` por caja.** Ni la base ni el escritorio cambian.
+5. **Al iniciar turno, una tienda abre en el Panel.** Los avisos de VIM al abrir turno siguen igual.
+
+Fallos de la revisión y sus arreglos:
+- **R2:** los accesos que perdió el inicio van a Configuración: «Retiro / Depósito» y «Corte caja X» (que abre el monitor). «Consultar ctas.» lo cubre Transacciones.
+- **R3:** el ticket guardado trae «Dejar abierta», porque ya no hay `Volver`.
+- **R4:** Bloquear, Cambiar cajero, Cerrar turno y Salir protegen la venta en curso: una cuenta guardada se deja abierta y una venta suelta pide confirmar.
+- **R5:** Transacciones lista solo las cuentas abiertas de esta caja (hallazgo del restaurante, abajo en §13).
+- **R6:** revisión final y una tanda de arreglos antes de cerrar con los documentos.
+- **R7:** la caja guarda la última lista de avisos de VIM, porque la nube deja de mandar los que ya se acusaron.
+- **R8:** esa lista guarda como mucho 20 y tira los avisos con `vigente_hasta` vencido o ilegible.
+
 ## 13. Pendientes que la entrega 1 deja a las siguientes (revisión final, 15 oct)
 
 **Antes de que el admin pueda editar prendas (entrega 2, requisito para lanzar):**
@@ -369,3 +389,10 @@ Queda:
   falla (PostgREST responde 400).
 - Publicar el instalador con 0188–0196 antes de abrir RETAIL a un cliente (§7).
 - Probar con una caja real, con lector y con impresora, antes de publicar.
+
+**Entrega 4b, 17 oct: notas de lanzamiento.**
+- **Las migraciones 0197 y 0198 deben estar en la nube ANTES de publicar cualquier caja con «Recibir».** La 0197 deja subir una `ENTRADA` sin ticket; la 0198 le prohíbe traer referencias a un renglón, una devolución o un traspaso. Sin ellas, la recepción se rechaza al sincronizar.
+- **La política de imágenes (CSP `img-src`) ahora incluye el origen de Supabase**, en la web y en el escritorio. Sin eso, las tarjetas con foto caen siempre a la inicial.
+- Las fotos necesitan internet; una caja sin conexión pinta la inicial sobre el color de la categoría.
+
+**Hallazgo del restaurante, para Fermín (R5, fuera del giro).** «Cuentas abiertas · Para llevar» del restaurante lista las cuentas de **toda la sucursal**. Si se cobra una cuenta abierta desde otra caja, el pago se asienta en el turno de **esa otra caja** (el de la caja que abrió la cuenta), mientras el efectivo cae en el cajón de la caja que cobró. Los dos cortes quedan descuadrados. La tienda ya filtra por caja; el restaurante se dejó como estaba. Pega en un POS web con varias cajas.
