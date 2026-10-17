@@ -87,37 +87,6 @@ export function PantallaInicio({
   onCerrarTurno: () => void;
   onMenu: () => void;
 }) {
-  const ahora = useReloj();
-
-  // Estado de sincronización: el cajero necesita poder ver que sus ventas están subiendo. Se
-  // relee cada minuto —el ciclo del escritorio corre cada 10— para que el aviso no se quede
-  // pegado tras recuperar la conexión.
-  const [sync, setSync] = useState<{ nivel: NivelSync; texto: string }>({ nivel: "desconocido", texto: "" });
-  useEffect(() => {
-    let vivo = true;
-    const cargar = () => { leerEstadoSync().then((e) => { if (vivo) setSync(evaluarSync(e)); }).catch(() => {}); };
-    cargar();
-    const id = setInterval(cargar, 60000);
-    return () => { vivo = false; clearInterval(id); };
-  }, []);
-  // Folios de facturación. A DEMANDA, no en un intervalo: cada lectura es una ida a la nube, y el
-  // producto es local-first justamente para que la caja no dependa de la conexión. Se consulta una
-  // vez al abrir la pantalla y luego solo si el cajero lo pide.
-  const [folios, setFolios] = useState<{ nivel: NivelFolios; texto: string } | null>(null);
-  const [consultandoFolios, setConsultandoFolios] = useState(false);
-  const consultarFolios = useCallback(async () => {
-    setConsultandoFolios(true);
-    try {
-      const r = await leerFolios();
-      // "no-aplica" (el negocio no tiene facturación) deja el indicador oculto en vez de mostrar
-      // un cero alarmante a quien nunca contrató el add-on.
-      setFolios(r.estado === "ok" ? evaluarFolios(r.saldo) : null);
-    } finally {
-      setConsultandoFolios(false);
-    }
-  }, []);
-  useEffect(() => { consultarFolios(); }, [consultarFolios]);
-
   // Sin turno abierto no hay dónde colgar un ticket (tickets.turno_id es obligatorio), así que
   // vender queda bloqueado hasta abrirlo: los accesos de venta salen apagados y "Abrir turno"
   // toma el lugar de "Cerrar turno".
@@ -301,78 +270,7 @@ export function PantallaInicio({
         </div>
       </div>
 
-      {/* ── Barra de estado ─────────────────────────────────────────────────── */}
-      <footer className="flex h-[clamp(1.5rem,3.5vh,1.875rem)] flex-shrink-0 items-center justify-between gap-4 border-t border-line bg-sel px-3 text-[clamp(0.6rem,1.2vh,0.72rem)] text-ink-3">
-        <span className="truncate">
-          Estación: <b className="font-semibold text-ink-2">{caja.nombre}</b>
-        </span>
-        <span className="flex flex-shrink-0 items-center gap-1.5">
-          <span className={["h-1.5 w-1.5 rounded-full", online ? "bg-success" : "bg-warning"].join(" ")} aria-hidden="true" />
-          {online ? "Conectado" : "Sin internet · la caja sigue cobrando"}
-        </span>
-        {/* Solo aparece en la caja de escritorio (en el POS web no hay servidor local que
-            responda). Si lleva más de un día sin subir se pinta en rojo: ahí ya hay un turno
-            entero de ventas viviendo únicamente en esta computadora. */}
-        {sync.nivel !== "desconocido" && (
-          <span
-            className={[
-              "flex flex-shrink-0 items-center gap-1.5",
-              sync.nivel === "muda" || sync.nivel === "sin-vincular" ? "font-semibold text-danger" : "",
-              sync.nivel === "atrasada" ? "text-warning" : "",
-            ].join(" ")}
-            title={sync.nivel === "muda" ? "Las ventas no están llegando a la nube. Avisa a soporte." : undefined}
-          >
-            <span
-              className={[
-                "h-1.5 w-1.5 rounded-full",
-                sync.nivel === "ok" ? "bg-success" : sync.nivel === "atrasada" ? "bg-warning" : "bg-danger",
-              ].join(" ")}
-              aria-hidden="true"
-            />
-            {sync.texto}
-          </span>
-        )}
-        {/* Folios de facturación. Solo si el negocio tiene facturación activa. El botón vuelve a
-            preguntarle a la nube: cuando VIM acredita un paquete, el cajero lo ve al pulsarlo y no
-            una hora después, que es lo que tardaría la sincronización del catálogo. */}
-        {folios && (
-          <span
-            className={[
-              "flex flex-shrink-0 items-center gap-1.5",
-              folios.nivel === "agotados" ? "font-semibold text-danger" : "",
-              folios.nivel === "pocos" ? "text-warning" : "",
-            ].join(" ")}
-            title={
-              folios.nivel === "agotados"
-                ? "No se pueden emitir facturas. Pídele folios a VIM."
-                : "Folios de facturación disponibles"
-            }
-          >
-            <span
-              className={[
-                "h-1.5 w-1.5 rounded-full",
-                folios.nivel === "ok" ? "bg-success" : folios.nivel === "pocos" ? "bg-warning" : "bg-danger",
-              ].join(" ")}
-              aria-hidden="true"
-            />
-            {folios.texto}
-            <button
-              type="button"
-              onClick={consultarFolios}
-              disabled={consultandoFolios}
-              className="underline underline-offset-2 disabled:opacity-50"
-              aria-label="Actualizar folios"
-            >
-              {consultandoFolios ? "…" : "actualizar"}
-            </button>
-          </span>
-        )}
-        <span className="flex-shrink-0 tabular-nums">
-          {ahora ? ahora.toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—"}
-          {" · "}
-          {ahora ? ahora.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false }) : "—"}
-        </span>
-      </footer>
+      <BarraEstadoCaja caja={caja} online={online} />
 
       {confirmandoSalir && (
         <Modal
@@ -408,6 +306,118 @@ export function PantallaInicio({
         </Modal>
       )}
     </main>
+  );
+}
+
+/**
+ * Barra de estado de la caja: estación, conexión, sincronización, folios y hora. La pinta el inicio
+ * abajo y la caja de tienda, que no tiene inicio, arriba y con el turno (pos-retail.md, «Versión 2»).
+ */
+export function BarraEstadoCaja({ caja, online, turno, arriba = false }: { caja: DatosCaja; online: boolean; turno?: Turno | null; arriba?: boolean }) {
+  const ahora = useReloj();
+
+  // Estado de sincronización: el cajero necesita poder ver que sus ventas están subiendo. Se
+  // relee cada minuto —el ciclo del escritorio corre cada 10— para que el aviso no se quede
+  // pegado tras recuperar la conexión.
+  const [sync, setSync] = useState<{ nivel: NivelSync; texto: string }>({ nivel: "desconocido", texto: "" });
+  useEffect(() => {
+    let vivo = true;
+    const cargar = () => { leerEstadoSync().then((e) => { if (vivo) setSync(evaluarSync(e)); }).catch(() => {}); };
+    cargar();
+    const id = setInterval(cargar, 60000);
+    return () => { vivo = false; clearInterval(id); };
+  }, []);
+  // Folios de facturación. A DEMANDA, no en un intervalo: cada lectura es una ida a la nube, y el
+  // producto es local-first justamente para que la caja no dependa de la conexión. Se consulta una
+  // vez al abrir la pantalla y luego solo si el cajero lo pide.
+  const [folios, setFolios] = useState<{ nivel: NivelFolios; texto: string } | null>(null);
+  const [consultandoFolios, setConsultandoFolios] = useState(false);
+  const consultarFolios = useCallback(async () => {
+    setConsultandoFolios(true);
+    try {
+      const r = await leerFolios();
+      // "no-aplica" (el negocio no tiene facturación) deja el indicador oculto en vez de mostrar
+      // un cero alarmante a quien nunca contrató el add-on.
+      setFolios(r.estado === "ok" ? evaluarFolios(r.saldo) : null);
+    } finally {
+      setConsultandoFolios(false);
+    }
+  }, []);
+  useEffect(() => { consultarFolios(); }, [consultarFolios]);
+  const Tag = arriba ? "div" : "footer";
+
+  return (
+    <Tag className={`flex h-[clamp(1.5rem,3.5vh,1.875rem)] flex-shrink-0 items-center justify-between gap-4 ${arriba ? "border-b" : "border-t"} border-line bg-sel px-3 text-[clamp(0.6rem,1.2vh,0.72rem)] text-ink-3`}>
+      <span className="truncate">
+        Estación: <b className="font-semibold text-ink-2">{caja.nombre}</b>{turno && <> · Turno <b className="font-semibold text-ink-2">{turno.codigo_turno}</b></>}
+      </span>
+      <span className="flex flex-shrink-0 items-center gap-1.5">
+        <span className={["h-1.5 w-1.5 rounded-full", online ? "bg-success" : "bg-warning"].join(" ")} aria-hidden="true" />
+        {online ? "Conectado" : "Sin internet · la caja sigue cobrando"}
+      </span>
+      {/* Solo aparece en la caja de escritorio (en el POS web no hay servidor local que
+          responda). Si lleva más de un día sin subir se pinta en rojo: ahí ya hay un turno
+          entero de ventas viviendo únicamente en esta computadora. */}
+      {sync.nivel !== "desconocido" && (
+        <span
+          className={[
+            "flex flex-shrink-0 items-center gap-1.5",
+            sync.nivel === "muda" || sync.nivel === "sin-vincular" ? "font-semibold text-danger" : "",
+            sync.nivel === "atrasada" ? "text-warning" : "",
+          ].join(" ")}
+          title={sync.nivel === "muda" ? "Las ventas no están llegando a la nube. Avisa a soporte." : undefined}
+        >
+          <span
+            className={[
+              "h-1.5 w-1.5 rounded-full",
+              sync.nivel === "ok" ? "bg-success" : sync.nivel === "atrasada" ? "bg-warning" : "bg-danger",
+            ].join(" ")}
+            aria-hidden="true"
+          />
+          {sync.texto}
+        </span>
+      )}
+      {/* Folios de facturación. Solo si el negocio tiene facturación activa. El botón vuelve a
+          preguntarle a la nube: cuando VIM acredita un paquete, el cajero lo ve al pulsarlo y no
+          una hora después, que es lo que tardaría la sincronización del catálogo. */}
+      {folios && (
+        <span
+          className={[
+            "flex flex-shrink-0 items-center gap-1.5",
+            folios.nivel === "agotados" ? "font-semibold text-danger" : "",
+            folios.nivel === "pocos" ? "text-warning" : "",
+          ].join(" ")}
+          title={
+            folios.nivel === "agotados"
+              ? "No se pueden emitir facturas. Pídele folios a VIM."
+              : "Folios de facturación disponibles"
+          }
+        >
+          <span
+            className={[
+              "h-1.5 w-1.5 rounded-full",
+              folios.nivel === "ok" ? "bg-success" : folios.nivel === "pocos" ? "bg-warning" : "bg-danger",
+            ].join(" ")}
+            aria-hidden="true"
+          />
+          {folios.texto}
+          <button
+            type="button"
+            onClick={consultarFolios}
+            disabled={consultandoFolios}
+            className="underline underline-offset-2 disabled:opacity-50"
+            aria-label="Actualizar folios"
+          >
+            {consultandoFolios ? "…" : "actualizar"}
+          </button>
+        </span>
+      )}
+      <span className="flex-shrink-0 tabular-nums">
+        {ahora ? ahora.toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—"}
+        {" · "}
+        {ahora ? ahora.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false }) : "—"}
+      </span>
+    </Tag>
   );
 }
 

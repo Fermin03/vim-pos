@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { Producto } from "../catalogo";
 import type { DatosCaja } from "../turno";
-import { agruparTienda, buscarPorCodigo, decidirEscaneo, esTienda, estadoExistencia, etiquetaExistencia, matrizVariantes, pasoConLimite, renglonTienda, resumenVitrina, sinExistencia, type Existencia } from "../tienda";
+import { agruparTienda, buscarPorCodigo, decidirEscaneo, esTienda, estadoExistencia, etiquetaExistencia, matrizVariantes, pasoConLimite, puedeCambiarSeccion, renglonTienda, resumenVitrina, sinExistencia, type Existencia } from "../tienda";
 
 const prod = (id: string, extra: Partial<Producto> = {}): Producto => ({
   id, nombre: id, descripcion: null, precio_base_mxn: 100, categoria_id: "c", agotado: false, esCombo: false, seVendeAqui: true, ...extra,
@@ -174,5 +174,13 @@ describe("etiquetaExistencia", () => {
     expect(etiquetaExistencia("pocas")).toBe("pocas");
     expect(etiquetaExistencia("agotada")).toBe("agotada");
     expect(etiquetaExistencia(null)).toBeNull();
+  });
+});
+
+describe("puedeCambiarSeccion", () => {
+  it("solo sin cobro ni diálogo encima", () => {
+    expect(puedeCambiarSeccion(false, false)).toBe(true);
+    expect(puedeCambiarSeccion(true, false)).toBe(false);
+    expect(puedeCambiarSeccion(false, true)).toBe(false);
   });
 });

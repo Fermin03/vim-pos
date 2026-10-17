@@ -65,7 +65,7 @@ import {
 } from "../lib/pedidos-en-linea";
 import { CapaPedidosTienda, type AccionTienda, type ListoTienda } from "./pedido-tienda";
 import { esEscritorio } from "../lib/actualizacion";
-import { useAcceso } from "./banda-acceso";
+import { BandaAcceso, BandaActualizacion, useAcceso } from "./banda-acceso";
 import { moduloActivo } from "@vim/db/operacion";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalDescuentoItem } from "./modal-descuento-item";
@@ -76,12 +76,16 @@ import { fijarContextoErrores, reportarErrorSinEsperar } from "../lib/reportar-e
 import { BotonVolver } from "./boton-volver";
 import { CatalogoProductos } from "./catalogo-productos";
 import { PanelVentaRetail, type AvisoEscaneo } from "./venta-retail";
-import { esTienda, leerExistencias, leerSucursales, pasoConLimite, renglonTienda, sinExistencia, type Existencia, type PadreTienda } from "../lib/tienda";
+import { esTienda, leerExistencias, leerSucursales, pasoConLimite, puedeCambiarSeccion, renglonTienda, sinExistencia, type Existencia, type PadreTienda, type SeccionTienda } from "../lib/tienda";
 import { leerEstadoSync } from "../lib/estado-sync";
 import { ModalAgregarProductos } from "./modal-agregar-productos";
 import { ModalNumeroMesa } from "./modal-numero-mesa";
 import { MenuGeneral } from "./menu-general";
-import { PantallaInicio } from "./pantalla-inicio";
+import { ContenidoMenu } from "./contenido-menu";
+import { BarraTienda } from "./barra-tienda";
+import { DialogoAvisos } from "./dialogo-avisos";
+import { avisosDe, leerDirectivas, type Aviso } from "../lib/directivas";
+import { BarraEstadoCaja, PantallaInicio } from "./pantalla-inicio";
 import { Accion, PantallaCuentasModo } from "./pantalla-cuentas-modo";
 import { PantallaMonitorVentas } from "./pantalla-monitor-ventas";
 import { listarTicketsEnEspera, ponerTicketEnEspera, retomarTicketEnEspera } from "../lib/espera";
@@ -178,7 +182,8 @@ export function HomePos({
   >(null);
   const [enKds, setEnKds] = useState(false);
   // El POS arranca en la pantalla de inicio: el cajero elige primero a qué viene.
-  const [enInicio, setEnInicio] = useState(true);
+  // Una tienda no: su barra inferior reemplaza al inicio.
+  const [enInicio, setEnInicio] = useState(() => !esTienda(caja));
   const [enMonitor, setEnMonitor] = useState(false);
   const [cuentasAbiertas, setCuentasAbiertas] = useState<CuentasAbiertasPorModo>({ comedor: 0, pickup: 0, domicilio: 0, barra: 0 });
   const [enMesas, setEnMesas] = useState(false);
@@ -209,7 +214,8 @@ export function HomePos({
   // Add-on de delivery: el módulo manda sobre la pantalla y sobre el badge. `useAcceso` ya lee
   // las directivas para la banda de gracia y el bloqueo (ADR 0014); se reutiliza esa lectura en
   // vez de abrir una consulta nueva solo para saber si el módulo está prendido.
-  const { modulos } = useAcceso();
+  const acceso = useAcceso();
+  const { modulos } = acceso;
   const hayDelivery = modulos?.delivery_apps === true;
   // Tienda en línea propia: comparte pantalla, sondeo y timbre con las apps («Pedidos en línea»).
   const hayTienda = modulos?.tienda === true;
@@ -285,7 +291,8 @@ export function HomePos({
   const [categorias, setCategorias] = useState<Categoria[] | null>(null);
   const [productos, setProductos] = useState<Producto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [carrito, dispatch] = useReducer(reducerCarrito, estadoInicial);
+  // Una tienda no tiene inicio: abre directo en la venta (modo Para llevar), pos-retail.md «Versión 2».
+  const [carrito, dispatch] = useReducer(reducerCarrito, estadoInicial, (e) => (esTienda(caja) ? { ...e, modoServicio: "PARA_LLEVAR" as const } : e));
   // `edicion`: el renglón del ticket que se reabrió para cambiarle los modificadores.
   const [modGrupos, setModGrupos] = useState<{ producto: Producto; grupos: GrupoModificadores[]; edicion?: LineaCarrito } | null>(null);
   // ADR 0015 — combos: catálogo de defs con slots resueltos, y el drawer de armado abierto (si hay).
@@ -566,6 +573,19 @@ export function HomePos({
   // ── Venta de tienda (giro RETAIL): solo cambia el panel izquierdo de la captura en Para llevar.
   // Un restaurante no pasa por nada de esto (pos-retail.md).
   const tienda = esTienda(caja);
+  /**
+   * Sección de la barra inferior de la tienda. El Panel (la venta) nunca se desmonta al cambiar:
+   * solo se oculta, así el carrito, el ticket guardado y la fila de agregados siguen donde estaban.
+   */
+  const [seccionTienda, setSeccionTienda] = useState<SeccionTienda>("panel");
+  /** Avisos de VIM: el inicio los enseña al entrar; la tienda, que no tiene inicio, aquí. */
+  const [avisosVim, setAvisosVim] = useState<Aviso[] | null>(null);
+  useEffect(() => {
+    if (!tienda) return;
+    let vivo = true;
+    leerDirectivas().then((d) => { if (vivo) setAvisosVim(avisosDe(d)); }).catch(() => {});
+    return () => { vivo = false; };
+  }, [tienda]);
   const capturaTienda = tienda && carrito.modoServicio === "PARA_LLEVAR" && !cerrando && !enInicio && !enKds && !enMonitor
     && !enConsultaCuentas && !enDevoluciones && !enPedidosApps && !enDelivery && !enPickup && !enMesas && !enBarra;
   /** Selector de talla y color abierto y franja del escáner: estado de aquí para que su Escape viva en la pila. */
@@ -686,12 +706,14 @@ export function HomePos({
     setEnPickup(volverA === "pickup");
     setEnDelivery(volverA === "domicilio");
     setEnBarra(volverA === "barra");
-    setEnInicio(volverA === "inicio");
-  }, [salirNavegacion, volverA]);
+    setEnInicio(!tienda && volverA === "inicio");
+  }, [salirNavegacion, volverA, tienda]);
 
   /** Vuelve a la pantalla de inicio dejando la caja limpia (sale de la cuenta de mesa si la hubiera). */
   const volverAlInicio = useCallback(() => {
-    salirNavegacion();
+    // La tienda vuelve a su barra, no a un inicio: el ticket del Panel sigue ahí y no se suelta
+    // (a estas pantallas se entra desde Configuración, con la venta a medias detrás).
+    if (!tienda) salirNavegacion();
     setEnMesas(false);
     setEnPickup(false);
     setEnDelivery(false);
@@ -701,8 +723,9 @@ export function HomePos({
     setEnCambioTalla(false);
     setEnPedidosApps(false);
     setEnMonitor(false);
-    setEnInicio(true);
-  }, [salirNavegacion]);
+    // Una tienda regresa a su barra inferior, en la sección donde estaba (p. ej. Configuración tras el corte X).
+    setEnInicio(!tienda);
+  }, [salirNavegacion, tienda]);
 
   /**
    * El mapa de mesas y las reservaciones viven SOLO dentro de la rama de listas (Comedor, Para
@@ -969,6 +992,7 @@ export function HomePos({
       setTicketBd(bd);
       setItemsPersistidos(items);
       setEnModoMesa(true);
+      setSeccionTienda("panel"); // tienda: la cuenta se ve en el Panel, se haya pedido desde donde sea
       setEnMesas(false);
       setEnPickup(false);
       setEnDelivery(false);
@@ -1726,6 +1750,8 @@ export function HomePos({
    * justo lo que no debe poder hacerse por reflejo.
    */
   const { alEscapar, algoAbierto, escaneoIgnorado, cerrarAlEscanear } = useMemo(() => {
+    const enCaptura = !enInicio && !enKds && !enMonitor && !enConsultaCuentas && !enDevoluciones && !enCambioTalla && !enPedidosApps
+      && !enDelivery && !enPickup && !enMesas && !enBarra;
     const capaCobro: CapaEscape = [totalesCobro != null, null];
     const capaRecibo: CapaEscape = [mostrarRecibo, cerrarVistaRecibo];
     const capaConfirmacion: CapaEscape = [confirmacion != null, nuevoTicket];
@@ -1786,14 +1812,17 @@ export function HomePos({
       [confirmandoCierre, () => setConfirmandoCierre(false)],
       [menuGeneralAbierto, () => setMenuGeneralAbierto(false)],
       [cerrando, () => setCerrando(false)],
+      // Avisos de VIM de la tienda: los cierra su propio diálogo.
+      [(avisosVim?.length ?? 0) > 0, null],
     ];
     const pantallas: CapaEscape[] = [
       // La pantalla de cocina no conoce la pila del POS (vive en su propio paquete).
       [enKds, () => setEnKds(false)],
       // Nada abierto: Escape equivale al botón Volver de la pantalla de captura. «Cambio de talla»
       // atiende el suyo (regresa un paso).
-      [!enInicio && !enKds && !enMonitor && !enConsultaCuentas && !enDevoluciones && !enCambioTalla && !enPedidosApps
-        && !enDelivery && !enPickup && !enMesas && !enBarra, () => intentarSalirDeCaptura("atras")],
+      // En la tienda no hay a dónde volver desde el Panel; desde otra sección, Escape regresa al Panel.
+      [enCaptura && !tienda, () => intentarSalirDeCaptura("atras")],
+      [enCaptura && tienda && seccionTienda !== "panel", () => setSeccionTienda("panel")],
     ];
     return {
       // El aviso grande de la tienda va encima de TODO y CEDE: lo cierra su propio `Modal`.
@@ -1813,7 +1842,7 @@ export function HomePos({
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
       salidaPendiente, confirmandoCierre, menuGeneralAbierto, cerrando, enInicio, enKds, enMonitor,
       enConsultaCuentas, enDevoluciones, enCambioTalla, enPedidosApps, enDelivery, enPickup, enMesas, enBarra, nuevoTicket,
-      intentarSalirDeCaptura]);
+      intentarSalirDeCaptura, tienda, seccionTienda, avisosVim]);
   useEscape(alEscapar);
 
   // ── Cambio de talla (giro RETAIL) ─────────────────────────────────────────────────────────
@@ -2698,6 +2727,9 @@ export function HomePos({
           Sin internet: la caja sigue cobrando igual. Las ventas suben solas cuando vuelva la señal.
         </div>
       )}
+      {/* La tienda no tiene inicio: su aviso de suspensión y su barra de estado van aquí, arriba. */}
+      {tienda && acceso.nivel === "gracia" && <BandaAcceso mensaje={acceso.mensaje} desde={acceso.desde} />}
+      {tienda && <BarraEstadoCaja caja={caja} online={online} turno={turno} arriba />}
       {/* Barra de captura: aquí no van menú, KDS ni cuentas. El cajero está anotando un pedido y
           cada ícono de más es una salida en falso; todo eso vive en el inicio.
 
@@ -2709,6 +2741,7 @@ export function HomePos({
 
           Va a la derecha, opuesto a "Volver": son acciones distintas y pegarlas invitaría a
           pulsar la equivocada con prisa. */}
+      {(!tienda || seccionTienda === "panel") && (
       <div className="flex flex-shrink-0 items-center gap-3 border-b border-line bg-surface px-3 py-2">
         <BotonVolver onClick={() => intentarSalirDeCaptura("atras")} />
         {capturaTienda && (
@@ -2766,6 +2799,7 @@ export function HomePos({
           </button>
         )}
       </div>
+      )}
       {configImpresoraAbierto && <ModalConfigImpresora token={token} sucursalId={caja.sucursal_id} onCerrar={() => setConfigImpresoraAbierto(false)} />}
       {clienteCuentaAbierto && (
         <ModalClienteCuenta
@@ -2837,13 +2871,14 @@ export function HomePos({
         </div>
       )}
 
-      {cuentaImpresa && (
+      {cuentaImpresa && (!tienda || seccionTienda === "panel") && (
         <p className="flex-shrink-0 bg-warning-soft px-4 py-2 text-13 font-medium text-ink" role="status">
           El ticket de esta cuenta ya se imprimió. Para agregarle o quitarle algo, reábrela desde su lista con «Reabrir cuenta».
         </p>
       )}
 
-      <div className="flex min-h-0 flex-1">
+      {/* Oculto y no desmontado fuera del Panel: nada se reinicia al volver. */}
+      <div className={tienda && seccionTienda !== "panel" ? "hidden" : "flex min-h-0 flex-1"}>
           {capturaTienda ? (
             <PanelVentaRetail
               productos={productos}
@@ -2853,7 +2888,8 @@ export function HomePos({
               sucursales={sucursalesTienda}
               actualizadoA={actualizadoA}
               cobroAbierto={totalesCobro != null}
-              escaneoIgnorado={escaneoIgnorado}
+              // Fuera del Panel el escaneo no llega al ticket: cada sección decide qué hace con el código.
+              escaneoIgnorado={escaneoIgnorado || seccionTienda !== "panel"}
               cerrarAlEscanear={cerrarAlEscanear}
               bloqueado={menuBloqueado}
               selector={selectorRetail}
@@ -2927,6 +2963,51 @@ export function HomePos({
           procesando={procesandoCobro}
         />
       </div>
+      {tienda && seccionTienda !== "panel" && (
+        <div className="flex min-h-0 flex-1 flex-col">
+          {seccionTienda === "configuracion" ? (
+            <>
+              {acceso.actualizacion && acceso.nivel !== "bloqueado" && <BandaActualizacion version={acceso.actualizacion} />}
+              <div className="min-h-0 flex-1 overflow-y-auto px-8 py-8">
+                <h1 className="mx-auto mb-8 max-w-4xl font-display text-24 font-semibold tracking-tight">Configuración</h1>
+                <ContenidoMenu
+                  enPagina
+                  onCorteX={() => setEnMonitor(true)}
+                  onKds={() => setEnKds(true)}
+                  onDevoluciones={() => setEnDevoluciones(true)}
+                  onEnEspera={() => { setEsperaError(null); setEsperaListaAbierta(true); }}
+                  onAbrirCajon={() => setAbrirCajaAbierto(true)}
+                  nEnEspera={nEnEspera}
+                  onCambiarCajero={onCambiarCajero}
+                  onBloquear={onBloquear}
+                  onCambiarPin={() => setCambiarPinAbierto(true)}
+                  onMisPropinas={() => setMisPropinasAbierto(true)}
+                  onImpresora={() => setConfigImpresoraAbierto(true)}
+                  onCerrarTurno={() => setConfirmandoCierre(true)}
+                  ayuda={{ negocio: caja.negocioNombre, sucursal: caja.sucursalNombre, caja: caja.nombre, cajero: empleado.nombre }}
+                />
+              </div>
+            </>
+          ) : (
+            // Inventario, Transacciones y Notificaciones llegan en las tareas 4, 5, 7 y 8 de la entrega 4b.
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
+              <h1 className="font-display text-24 font-semibold tracking-tight">
+                {seccionTienda === "inventario" ? "Inventario" : seccionTienda === "transacciones" ? "Transacciones" : "Notificaciones"}
+              </h1>
+              <p className="text-15 text-ink-2">Próximamente.</p>
+            </div>
+          )}
+        </div>
+      )}
+      {tienda && (
+        <BarraTienda
+          seccion={seccionTienda}
+          onCambiar={setSeccionTienda}
+          pendientes={0}
+          bloqueada={!puedeCambiarSeccion(algoAbierto || avisoTiendaVisible, totalesCobro != null)}
+        />
+      )}
+      {avisosVim && avisosVim.length > 0 && <DialogoAvisos avisos={avisosVim} onCerrar={() => setAvisosVim([])} />}
 
       {esperaPidiendoEtiqueta && (
         <ModalEtiquetaEspera

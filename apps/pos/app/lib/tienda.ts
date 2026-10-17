@@ -6,6 +6,12 @@ import type { DatosCaja } from "./turno";
 /** La caja de tienda es solo para el giro RETAIL; todo lo demás queda como estaba. */
 export const esTienda = (caja: DatosCaja | null): boolean => caja?.giro === "RETAIL";
 
+/** Destinos de la barra inferior de la caja de tienda (pos-retail.md, «Versión 2»). */
+export type SeccionTienda = "panel" | "inventario" | "transacciones" | "notificaciones" | "configuracion";
+
+/** Con un cobro o un diálogo encima la barra no navega: sería trabajo que se pierde de vista. */
+export const puedeCambiarSeccion = (capasAbiertas: boolean, cobroAbierto: boolean): boolean => !capasAbiertas && !cobroAbierto;
+
 /**
  * Un paso de la fila de agregados con tope de tiempo. Resuelve `true` si `paso` terminó (o falló:
  * el error sube) y `false` si pasaron `ms`: la fila sigue. `vigente()` es false desde el vencimiento:
