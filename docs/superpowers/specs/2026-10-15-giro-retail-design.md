@@ -270,6 +270,46 @@ Al construir la entrega 3 (16 oct):
   el módulo leído y encendido; mientras carga o si la lectura falla, un restaurante no lo ve.
 - Recibir con la factura XML del proveedor (§6.2) se pospone: la recepción es a mano o con escáner.
 
+Al construir la entrega 4 (16 oct):
+
+- **La tienda cambia solo el panel izquierdo** de la captura (`PanelVentaRetail`), no la pantalla
+  entera como decía §5.2. El ticket, el cobro y lo demás son los de siempre. Solo en el modo «Venta»
+  (`PARA_LLEVAR`).
+- **El cambio de talla es una devolución parcial más una venta nueva, las dos en efectivo**
+  (`registrar_cambio_talla`, 0195 §4). El cajón cuadra solo; solo se mueve la diferencia. Si el cliente
+  paga, la venta queda abierta y se cobra solo esa diferencia.
+- **Sincronización de existencias (R3).** Un movimiento subido cuenta como hecho para la caja salvo
+  error pasajero: un id que la nube ya tiene se salta antes del INSERT, y el de un producto que ya no
+  lleva existencias va a `descartados`. Contrato: `{aplicados, errores, descartados}`.
+- **Orden de subida (R4).** Los movimientos viajan en el mismo lote que su ticket (por `ticket_id`; una
+  devolución, con el de su ticket), y los que no tienen ticket, en el primero.
+- **Autorización del cambio (R5).** La base la exige siempre y no deja que un cajero sin el permiso de
+  devolución se autorice solo (0134). La caja la saca sola solo si no regresa dinero y hay permiso; en
+  otro caso pide PIN. **Difiere de «PIN solo si hay dinero que regresar»** y queda para decisión de
+  Fermín (ver `docs/diseno/pos-retail.md`, «Por decidir»).
+- **Devolución parcial con «Mismo método» (R9).** En tienda el medio de entrada es efectivo. Si se
+  elige «Mismo método» en una parcial, se registra con la nota «Reembolso a tarjeta pendiente» y el
+  aviso lo explica; la terminal solo devuelve cobros completos. Ningún motivo viene preelegido.
+- **La venta abierta de un cambio (R10, 0196).** Solo se cobra o se cancela completa: la base rechaza
+  cancelar o reemplazar un renglón, descontar o borrarla. Al cancelarla se anula su pago interno en
+  efectivo y el aviso dice «Le regresas $X en efectivo». Solo afecta a tickets de un cambio; un
+  restaurante no los tiene.
+- Los motivos de tienda reutilizan `PRODUCTO_DEFECTUOSO` y `CLIENTE_NO_SATISFECHO`; solo
+  `CAMBIO_TALLA` es nuevo (como en la entrega 1).
+- **Lo agotado a mano se respeta (R7)**, como en el restaurante. «Agotada, se vende con aviso» es solo
+  de la cuenta de piezas.
+- **El ticket de tienda dice «Venta» (R8)**, en papel y en pantalla.
+- **Escanear con «Cobro completado» a la vista empieza la venta siguiente (R6).**
+- **El umbral del lector vive solo en `localStorage`** (`vimpos.escaner.umbralMs`, 20 a 80 ms); no se
+  hizo pantalla de ajustes.
+- **Sin prueba E2E de Playwright:** la prueba de la caja (tarea 13) se hace a mano con un lector y una
+  caja de verdad.
+- **Cambio en el restaurante (R12).** «Ver orden» de un pedido de la tienda en línea ahora espera
+  mientras el diálogo de descuento o el de cuentas abiertas esté abierto. Es una mejora de paso, no
+  cambia nada más.
+
+Plan: `docs/superpowers/plans/2026-10-16-retail-4-caja.md`. Diseño: `docs/diseno/pos-retail.md`.
+
 ## 13. Pendientes que la entrega 1 deja a las siguientes (revisión final, 15 oct)
 
 **Antes de que el admin pueda editar prendas (entrega 2, requisito para lanzar):**
@@ -301,3 +341,31 @@ lección de la ADR 0034), y ordenar los renglones del ticket por `producto_id` e
 
 **Fuera del giro, para Fermín:** al cancelar un ticket pagado devolviendo el dinero, el inventario por
 insumos de los restaurantes parece regresar dos veces (devolución y cancelación lo regresan por su cuenta).
+
+**Entrega 4, 16 oct: qué cerró y qué queda.**
+
+Cerró: los candados de §13 «Entrega 4 (sincronización)»: `movimientos_producto_validar` comprueba que lo
+que referencia sea del mismo negocio; los renglones del ticket se recorren por producto en
+`_existencias_sincronizar_ticket`; y un renglón cobrado o cancelado ya no cambia de producto (0195 §1,
+0196 §4). La caja sube y baja las existencias (R3, R4).
+
+Queda:
+- Sincronizar `estado = CANCELADO` y `cancelado_por`/`cancelado_at` de `traspasos_producto` no se tocó
+  en esta entrega (ni el `ADD VALUE` de la 0192 en un instalador).
+- Una cancelación o devolución hecha en la nube sobre un ticket de la caja puede llegar antes de su
+  VENTA: la ventana se achicó con R4, no desapareció.
+- **R13:** la venta abierta de un cambio no cubre promociones (`aplicar_promocion`) ni canje de lealtad,
+  y un ticket de cambio ya pagado puede pasar por `reabrir_ticket_pagado` o `cambiar_forma_pago_ticket`.
+  En esos caminos el cajón puede quedar descuadrado por el pago interno. No se alcanzan en el flujo
+  normal de tienda; falta revisarlos antes de lanzar.
+- «Para llevar» sigue en textos secundarios (cuentas abiertas, cierre).
+- `MotivoChips` mide menos de 44 px (es compartido con el restaurante).
+- Tras escanear sobre «Cobro completado» (R6) en una caja sin impresora, el recibo podría volver a
+  abrirse.
+
+**Requisito duro antes de lanzar (no se negocia):**
+- **Las migraciones 0188 a 0196 deben estar en producción ANTES de desplegar las apps.** El POS web
+  pide las columnas de la 0189 y la 0190; sin ellas el catálogo web de **todos los restaurantes**
+  falla (PostgREST responde 400).
+- Publicar el instalador con 0188–0196 antes de abrir RETAIL a un cliente (§7).
+- Probar con una caja real, con lector y con impresora, antes de publicar.

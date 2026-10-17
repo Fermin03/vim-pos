@@ -58,3 +58,5 @@ de insumos y las recetas con algo que no es una receta. Fermín eligió stock pr
 la sincronización con la caja (entrega 4) se escribe aparte, copiando el patrón de la 0101.
 
 Spec: `docs/superpowers/specs/2026-10-15-giro-retail-design.md`.
+
+Las decisiones de la caja de tienda (entrega 4, 16 oct) están en el spec, §12: `docs/superpowers/specs/2026-10-15-giro-retail-design.md`.
