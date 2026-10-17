@@ -43,7 +43,7 @@ export function TarjetaProductoFoto({
       ) : (
         <span
           aria-hidden="true"
-          className="absolute inset-0 flex items-center justify-center font-display text-40 font-bold leading-none text-white/90"
+          className="absolute inset-0 flex items-start justify-center pt-1.5 font-display text-28 font-bold leading-none text-white/90"
           style={{ backgroundColor: colorCategoria }}
         >
           {nombre.trim().charAt(0).toUpperCase()}

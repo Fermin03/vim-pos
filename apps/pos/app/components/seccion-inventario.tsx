@@ -4,7 +4,7 @@ import { Icono, Modal } from "@vim/ui/styles";
 import type { Producto } from "../lib/catalogo";
 import { agruparTienda, buscarVitrina, destinoInventario, estadoExistencia, renglonTienda, resumenVitrina, type DestinoInventario, type Existencia, type PadreTienda } from "../lib/tienda";
 import { useEscaner } from "../lib/use-escaner";
-import { avisoCantidad, ExistenciasApagadas, masUna, recibirEnCaja, SinPermisoRecibir } from "../lib/recibir-caja";
+import { avisoCantidad, ExistenciasApagadas, masUna, recibirEnCaja, textoRecibido, SinPermisoRecibir } from "../lib/recibir-caja";
 import { sonarError } from "./venta-retail";
 import { piezas, SelectorVariantes, textoActualizado } from "./selector-variantes";
 
@@ -68,6 +68,7 @@ export function SeccionInventario({
   const [pestana, setPestana] = useState<Pestana>("existencias");
   const [texto, setTexto] = useState("");
   const [destino, setDestino] = useState<DestinoInventario | null>(null);
+  const [deAlerta, setDeAlerta] = useState(false);
   /** La franja de arriba: un código desconocido o un padre sin variantes. Se va con el siguiente escaneo. */
   const [aviso, setAviso] = useState<string | null>(null);
   const { vitrina, padres } = useMemo(() => agruparTienda(productos), [productos]);
@@ -141,7 +142,8 @@ export function SeccionInventario({
   };
 
   /** Abre la consulta; un padre sin hijas no tiene matriz que enseñar. */
-  const mostrar = (d: DestinoInventario) => {
+  const mostrar = (d: DestinoInventario, alerta = false) => {
+    setDeAlerta(alerta);
     if ("padre" in d && d.padre.hijas.length === 0) { setDestino(null); setAviso("Sin tallas cargadas."); return; }
     setAviso(null);
     setDestino(d);
@@ -151,7 +153,7 @@ export function SeccionInventario({
     const p = productoInicial ? productos.find((x) => x.id === productoInicial) : undefined;
     if (!p) return;
     const padre = padres.get(p.producto_padre_id ?? p.id);
-    mostrar(padre ? { padre, marcada: p.producto_padre_id ? p.id : undefined } : { suelto: p });
+    mostrar(padre ? { padre, marcada: p.producto_padre_id ? p.id : undefined } : { suelto: p }, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al montarse
   }, []);
 
@@ -221,7 +223,7 @@ export function SeccionInventario({
       });
       setRenglones([]);
       setReferencia("");
-      setListo(`Listo: entraron ${cuantos(n)}.`);
+      setListo(textoRecibido(n));
       onRecibido();
     } catch (e) {
       // Sin el permiso de productos la base lo dice aquí, aunque el rol pareciera bastar.
@@ -478,6 +480,7 @@ export function SeccionInventario({
           sucursales={sucursales}
           actualizadoA={actualizadoA}
           marcada={destino.marcada}
+          etiquetaMarcada={deAlerta ? "La de la alerta" : undefined}
           onCerrar={() => setDestino(null)}
         />
       )}

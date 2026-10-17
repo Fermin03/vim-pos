@@ -5,7 +5,14 @@ vi.mock("../supabase", () => ({
   employeeClient: () => ({ rpc: async (fn: string, args: Record<string, unknown>) => { rpc.llamada = { fn, args }; return { data: 2, error: rpc.error }; } }),
 }));
 
-import { avisoCantidad, ExistenciasApagadas, masUna, recibirEnCaja, SinPermisoRecibir } from "../recibir-caja";
+import { avisoCantidad, ExistenciasApagadas, masUna, recibirEnCaja, SinPermisoRecibir, textoRecibido } from "../recibir-caja";
+
+describe("textoRecibido", () => {
+  it("concuerda en singular y plural", () => {
+    expect(textoRecibido(1)).toBe("Listo: entró 1 producto.");
+    expect(textoRecibido(3)).toBe("Listo: entraron 3 productos.");
+  });
+});
 
 describe("masUna", () => {
   it("suma 1 sin ruido del flotante", () => {

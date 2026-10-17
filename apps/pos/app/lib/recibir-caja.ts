@@ -19,6 +19,10 @@ export class SinPermisoRecibir extends Error {}
 export class ExistenciasApagadas extends Error {}
 
 /** Suma una pieza a lo ya capturado; una cantidad que no vale vuelve a 1. */
+/** Aviso de éxito de Recibir: «entró 1 producto» / «entraron N productos». */
+export const textoRecibido = (n: number): string =>
+  n === 1 ? "Listo: entró 1 producto." : `Listo: entraron ${n} productos.`;
+
 export const masUna = (cantidad: string): string =>
   avisoCantidad(cantidad) ? "1" : String(Math.round((Number(cantidad) + 1) * 1000) / 1000);
 

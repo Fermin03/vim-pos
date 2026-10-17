@@ -36,6 +36,7 @@ export function SelectorVariantes({
   onElegir,
   onCerrar,
   marcada,
+  etiquetaMarcada,
   soloConsulta = false,
   paraRecibir = false,
 }: {
@@ -50,6 +51,8 @@ export function SelectorVariantes({
   onCerrar: () => void;
   /** Id de la hija «La que regresa» (cambio de talla). */
   marcada?: string;
+  /** Lo que dice la celda marcada; sin él, «La que escaneaste» en consulta y «La que regresa» en cambio de talla. */
+  etiquetaMarcada?: string;
   /** Inventario: se ve la existencia por celda, sin tocar nada y sin agregar. */
   soloConsulta?: boolean;
   /** Inventario · Recibir: cualquier prenda de esta sucursal se puede recibir, aunque no se venda por ahora. */
@@ -154,7 +157,7 @@ export function SelectorVariantes({
                   {propia && !vendible(celda.hija) && (
                     <span className="mt-1 text-11 font-semibold text-ink-3">{celda.hija.seVendeAqui === false ? "No se vende aquí" : "No se vende por ahora"}</span>
                   )}
-                  {esMarcada && <span className="mt-1 text-11 font-semibold text-ink">{soloConsulta ? "La que escaneaste" : "La que regresa"}</span>}
+                  {esMarcada && <span className="mt-1 text-11 font-semibold text-ink">{etiquetaMarcada ?? (soloConsulta ? "La que escaneaste" : "La que regresa")}</span>}
                 </button>
               );
             }),
