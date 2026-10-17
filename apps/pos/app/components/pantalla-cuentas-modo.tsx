@@ -10,6 +10,7 @@ import { leerDeliveries } from "../lib/delivery";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalCancelarItems, type LineaCancelada } from "./modal-cancelar-items";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
+import { esTienda } from "../lib/tienda";
 import { ModalDescuento } from "./modal-descuento";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
 import type { Empleado } from "../lib/supabase";
@@ -926,6 +927,7 @@ export function PantallaCuentasModo({
           pagada={sel.pagadaEnLinea}
           enLinea={sel.pagadaEnLinea}
           cuentaDesde={sel.desdeIso}
+          tienda={esTienda(caja)}
           onCancelado={async () => {
             setCancelandoCuenta(false);
             setSelId(null); // la cuenta ya no existe: no dejar el detalle colgado

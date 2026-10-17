@@ -3004,6 +3004,7 @@ export function HomePos({
           totalActual={ticketBd.total}
           cajaId={turno.caja_id}
           turnoId={turno.id}
+          tienda={tienda}
           onCancelado={() => {
             // Resetear todo: carrito local, ticketBd, items persistidos.
             dispatch({ tipo: "limpiar" });

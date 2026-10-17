@@ -16,6 +16,23 @@ export function resumenCambio(regresaMxn: number, llevaMxn: number): { diferenci
   return { diferencia: 0, texto: "Sin diferencia" };
 }
 
+/**
+ * Lo que se le regresa en efectivo al cancelar la venta abierta de un cambio: su pago interno
+ * (`<llave del ticket>-pago`, 0195), que la base anula al cancelar (0196). 0 si no es de un cambio.
+ */
+export async function pagoInternoDelCambio(token: string, ticketId: string): Promise<number> {
+  const sb = employeeClient(token);
+  const { data: tk, error: e1 } = await sb.from("tickets").select("client_id_local").eq("id", ticketId).maybeSingle();
+  if (e1) throw new Error(e1.message);
+  const llave = tk?.client_id_local;
+  if (!llave) return 0;
+  const { data, error } = await sb.from("pagos").select("monto_mxn")
+    .eq("ticket_id", ticketId).eq("client_id_local", `${llave}-pago`)
+    .in("estado", ["APLICADO", "CONCILIADO"]).is("deleted_at", null).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? Number(data.monto_mxn) : 0;
+}
+
 const Resultado = z.object({
   ticket_id: z.string(),
   regresa_mxn: z.coerce.number(),
