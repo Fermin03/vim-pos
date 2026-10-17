@@ -65,4 +65,13 @@ describe("unirAvisos", () => {
     const r = unirAvisos([av("g", "2026-10-17T11:59:59Z"), av("h", "2026-10-18T00:00:00Z")], [av("n", "2026-10-01T00:00:00Z")], ahora);
     expect(r.map((a) => a.id)).toEqual(["h"]);
   });
+  it("guarda como mucho los 20 más nuevos", () => {
+    const guardados = Array.from({ length: 25 }, (_, i) => av(`g${i}`));
+    const r = unirAvisos(guardados, [av("n1"), av("n2")], ahora);
+    expect(r).toHaveLength(20);
+    expect(r.slice(0, 3).map((a) => a.id)).toEqual(["n1", "n2", "g0"]);
+  });
+  it("una fecha de vigencia que no se entiende cuenta como vencida", () => {
+    expect(unirAvisos([av("x", "ayer")], [av("y", "no es fecha")], ahora)).toEqual([]);
+  });
 });
