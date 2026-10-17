@@ -1865,7 +1865,8 @@ export function HomePos({
     const capaRecibo: CapaEscape = [mostrarRecibo, cerrarVistaRecibo];
     const capaConfirmacion: CapaEscape = [confirmacion != null, nuevoTicket];
     const capaSelector: CapaEscape = [selectorRetail != null, () => setSelectorRetail(null)];
-    const capaAvisoRetail: CapaEscape = [avisoRetail != null, () => setAvisoRetail(null)];
+    // La franja vive en el Panel: oculto el Panel, no se come el Escape de otra sección.
+    const capaAvisoRetail: CapaEscape = [avisoRetail != null && (!tienda || seccionTienda === "panel"), () => setAvisoRetail(null)];
     const capaConsultaInv: CapaEscape = [tienda && seccionTienda === "inventario" && cerrarConsultaInv != null, () => cerrarConsultaInv?.()];
     const capas: CapaEscape[] = [
       // Modificadores y combo: overlays sobre la rejilla de captura, por encima de todo lo demás.
