@@ -26,7 +26,7 @@ import {
 } from "../lib/carrito";
 import { listarCombos, combosQueAdmiten, diferencialCombo, type ComboDef } from "../lib/combos";
 import { obtenerGruposDeProducto, type GrupoModificadores } from "../lib/modificadores";
-import { persistirTicket, leerTotales, cambiarZonaDePedido, ErrorEnvioNoFijado, ErrorTicketParcial, type TotalesTicket } from "../lib/cobro";
+import { persistirTicket, leerTotales, cambiarZonaDePedido, cerrarSiYaCubierta, cuentaYaCubierta, ErrorEnvioNoFijado, ErrorTicketParcial, type TotalesTicket } from "../lib/cobro";
 import { SidebarTicket } from "./sidebar-ticket";
 import { ModalModificadores } from "./modal-modificadores";
 import { ModalCombo } from "./modal-combo";
@@ -58,6 +58,10 @@ import { PantallaConsultaCuentas } from "./pantalla-consulta-cuentas";
 import { PantallaDevoluciones } from "./pantalla-devoluciones";
 import { PantallaCambioTalla } from "./pantalla-cambio-talla";
 import { SeccionTransacciones } from "./seccion-transacciones";
+import { ModalReabrirCuenta } from "./modal-reabrir-cuenta";
+import { ModalCambiarPago } from "./modal-cambiar-pago";
+import { esVentaDeCambio } from "../lib/cambio-talla";
+import type { VentaDevolvible } from "../lib/devoluciones";
 import { SeccionInventario } from "./seccion-inventario";
 import { SeccionNotificaciones } from "./seccion-notificaciones";
 import { guardarAvisos, guardarVistas, leerAvisos, leerVistas, notificacionesTienda, sinVer, unirAvisos } from "../lib/notificaciones-tienda";
@@ -577,6 +581,20 @@ export function HomePos({
   // ── Venta de tienda (giro RETAIL): solo cambia el panel izquierdo de la captura en Para llevar.
   // Un restaurante no pasa por nada de esto (pos-retail.md).
   const tienda = esTienda(caja);
+  /** La cuenta cargada es la venta de un cambio: no se le ofrece canje de lealtad (como no suma, 0200).
+   *  `null` mientras se lee o si falla la lectura: tampoco se ofrece. */
+  const [ventaDeCambio, setVentaDeCambio] = useState<boolean | null>(false);
+  useEffect(() => {
+    if (!tienda || !lealtadActiva || !ticketBdId) { setVentaDeCambio(false); return; }
+    let vivo = true;
+    setVentaDeCambio(null);
+    esVentaDeCambio(token, ticketBdId).then((s) => { if (vivo) setVentaDeCambio(s); }).catch(() => { if (vivo) setVentaDeCambio(null); });
+    return () => { vivo = false; };
+  }, [tienda, lealtadActiva, ticketBdId, token]);
+  // Transacciones: «Reabrir» y «Cambiar pago» abren los modales de Cuentas cobradas.
+  const [reabriendoTx, setReabriendoTx] = useState<VentaDevolvible | null>(null);
+  const [cambiandoPagoTx, setCambiandoPagoTx] = useState<VentaDevolvible | null>(null);
+  const [txVersion, setTxVersion] = useState(0);
   /**
    * Sección de la barra inferior de la tienda. El Panel (la venta) nunca se desmonta al cambiar:
    * solo se oculta, así el carrito, el ticket guardado y la fila de agregados siguen donde estaban.
@@ -1398,6 +1416,132 @@ export function HomePos({
     obtenerImpresora("CAJA", { onMostrar: () => {} }).abrirCajon().catch(() => {});
   }, []);
 
+  /** Lo que sigue a una venta cobrada: limpiar la pantalla, «Cobro completado», el ticket impreso,
+   *  la comanda de Para llevar y el cierre del reparto. Del cobro, y de «Cobrar» con saldo 0. */
+  const cobroTerminado = useCallback(async (ticketId: string, folio: string | null, cambio: number, total: number) => {
+    // Lealtad: una cuenta cobrada ya no puede terminar un canje a medias; si quedó uno
+    // guardado en este dispositivo, se limpia para que no viva para siempre. Nunca estorba al cobro.
+    try {
+      const almacen = almacenLocal();
+      if (leerPendiente(almacen, ticketId)) borrarPendiente(almacen, ticketId);
+    } catch { /* un almacén lleno o negado no detiene lo que sigue */ }
+    setTotalesCobro(null);
+    setAtajoCobro(null);
+    setCambioAnterior(cambio > 0 ? cambio : null);
+    setTicketBd(null);
+    setEnModoMesa(false);
+    setCocinaEnviada(false);
+    dispatch({ tipo: "limpiar" });
+    setCuentasVersion((v) => v + 1); // la cuenta pagada ya no va en la lista
+    setConfirmacion({ folio, cambio, total });
+    // Armar el ticket e IMPRIMIR automáticamente. Con PreviewAdapter abre el recibo
+    // en pantalla; al activar EpsonEposAdapter, ese mismo llamado imprime en papel.
+    try {
+      const datos = await leerTicketParaImpresion(ticketId, {
+        token,
+        cajeroNombre: empleado.nombre,
+        cajaNombre: caja.nombre,
+      });
+      // Combos (ADR 0015): igual que en `imprimirComandaCocina` — el padre no se imprime,
+      // cada hijo se manda a su estación con "Combo #n" como contexto.
+      const lineasCom = lineasParaComanda(datos.lineas);
+      const datosCom: DatosComanda = {
+        folio: datos.meta.folio,
+        modoServicio: datos.meta.modoServicio,
+        cajero: datos.meta.cajero,
+        caja: datos.meta.caja,
+        fechaIso: datos.meta.fechaIso,
+        lineas: lineasCom,
+        ancho: 80,
+      };
+      setDatosTicket(datos);
+      setTicketImpresoId(ticketId);
+      setDatosComanda(datos.tienda ? null : datosCom);
+      setEstadoTicket("lista");
+      // Solo "Para llevar": es el único modo que va del carrito al cobro sin pasar por la
+      // lista de cuentas, así que no hay un momento anterior para imprimirlo. La regla y su
+      // historia están en `debeImprimirTicketAlCobrar`.
+      if (debeImprimirTicketAlCobrar(datos.meta.modo)) {
+        try {
+          const job = construirTicketJob(datos, await logoParaTicket(datos.ancho));
+          await obtenerImpresora("CAJA", { onMostrar: () => setMostrarRecibo(true) }).imprimir(job);
+        } catch {
+          // Un fallo de la impresora no puede llevarse por delante lo que viene después:
+          // la comanda, el cajón y la liquidación del reparto van detrás.
+          setEstadoTicket("error");
+        }
+      }
+      // Comanda automática a la estación de cocina.
+      //
+      // SOLO en "Para llevar". Es el único modo donde el pedido va del carrito al cobro sin
+      // pasar por "Enviar a cocina": si no saliera aquí, la cocina no se enteraría nunca.
+      //
+      // En comedor, Pick-up y Domicilio la comanda YA salió al enviar el pedido, y volver a
+      // imprimirla al cobrar hacía que la cocina recibiera dos veces lo mismo —con el riesgo
+      // real de que alguien prepare el pedido otra vez, además del papel de más. Al cobrar,
+      // esos modos imprimen únicamente el ticket del cliente.
+      //
+      // Y solo si la estación de cocina es una impresora distinta de la de caja: con una
+      // sola impresora, el ticket que acaba de salir ya es el papel.
+      // Una tienda no tiene cocina: aunque haya estaciones configuradas, no sale comanda.
+      if (!datos.tienda && debeImprimirComandaAlCobrar(datos.meta.modo, hayEstacionDeCocinaDedicada())) {
+        // También repartida: en Para llevar la bebida va a la barra igual que en el resto.
+        imprimirComandaPorAreas(datosCom, lineasCom, { ticketId, evento: "IMPRESION_INICIAL" }).catch(() => {});
+      }
+      // Reparto a domicilio: se cierra con lo que de verdad entró. Best-effort — la venta
+      // ya quedó cobrada y un fallo aquí no debe deshacerla.
+      if (datos.meta.modo === "DELIVERY_PROPIO") {
+        const efectivo = datos.pagos.filter((p) => p.metodo === "Efectivo").reduce((a, p) => a + p.montoMxn, 0);
+        const otros = datos.pagos.filter((p) => p.metodo !== "Efectivo").reduce((a, p) => a + p.montoMxn, 0);
+        const r = await cerrarRepartoAlCobrar(token, {
+          ticketId, efectivo, tarjeta: otros, liquidadoPorId: empleado.id,
+        });
+        // "Sin asignación" YA NO SE CALLA.
+        //
+        // Se silenciaba porque asignar repartidor era opcional: un domicilio podía salir
+        // sin nadie anotado y no había nada que reportar. Desde la 0114 asignar es
+        // obligatorio, así que este caso dejó de ser normal — y callarlo borraba la única
+        // señal de que la regla se rompió.
+        //
+        // Y no es hipotético: `listarCuentasAbiertas` solo trae BORRADOR/ABIERTO, así que
+        // un ticket cobrado se sale de "En el local" y ya no aparece en ninguna de las dos
+        // pestañas; `asignar_delivery_lote` lo rechaza con "ya está cerrado". En un pedido
+        // PREPAGADO —tarjeta o transferencia al tomar la orden, cuando todavía no hay
+        // repartidor a quién asignárselo— cobrar antes de asignar es la ÚNICA secuencia
+        // posible, o sea el camino normal, no un descuido raro.
+        //
+        // Se avisa DESPUÉS del cobro y nunca antes: el dinero ya entró, y una confirmación
+        // previa saldría en cada prepago para hacer una pregunta que el cajero no puede
+        // contestar de otra manera. Lo que sí necesita es enterarse, porque ese pedido no
+        // va a poder cuadrarse contra ningún repartidor.
+        if (!r.liquidada) {
+          setAvisoReparto(
+            r.motivo === "sin asignación"
+              ? {
+                  titulo: "Pedido sin repartidor",
+                  texto: "Este pedido se cobró sin repartidor asignado, y ya cerrado no se le puede asignar uno. Anota por fuera quién lo lleva: el sistema ya no va a poder decir de quién fue.",
+                }
+              : {
+                  titulo: "El reparto quedó sin cerrar",
+                  texto: `El cobro sí se registró, pero no se pudo cerrar el reparto: ${r.motivo ?? "error"}. Revisa a mano la liquidación del repartidor.`,
+                },
+          );
+        }
+      }
+      // El cajón NO se abre aquí. Ya se abrió al presionar "Cobrar" (`abrirCajonParaCobrar`),
+      // que es lo que la caja pidió: contar el cambio empieza al abrir la gaveta, no al
+      // cerrar la venta. Esta segunda apertura es de cuando era la única, y desde la 0.4.36
+      // convivían las dos: el cajón se abría, el cajero lo cerraba, y al imprimirse el
+      // ticket se volvía a abrir solo.
+      //
+      // Los dos caminos que llegan al cobro —capturar y cobrar, o cobrar desde la lista de
+      // cuentas— abren el cajón antes, así que quitarlo de aquí no deja ningún flujo sin
+      // apertura.
+    } catch {
+      setEstadoTicket("error");
+    }
+  }, [token, empleado, caja.nombre, imprimirComandaPorAreas]);
+
   const iniciarCobro = useCallback(async (atajo: "EFECTIVO_EXACTO" | null = null) => {
     if (carrito.lineas.length === 0) return;
     if (revisandoCobro.current) return;
@@ -1427,6 +1571,22 @@ export function HomePos({
         cuenta = r.totales;
       } catch {
         /* se cobra con lo que hay */
+      } finally {
+        revisandoCobro.current = false;
+        setProcesandoCobro(false);
+      }
+    }
+    // Una cuenta que ya no debe nada (el cambio sin diferencia, reabierto): se cierra y se da por
+    // cobrada, sin cobro ni cajón. Si la base no la cierra, sigue por el cobro de siempre.
+    if (cuenta && !ticketIncompleto && cuentaYaCubierta(cuenta)) {
+      revisandoCobro.current = true;
+      setProcesandoCobro(true);
+      try {
+        const cerrada = await cerrarSiYaCubierta(token, cuenta.ticketId);
+        if (cerrada) { await cobroTerminado(cerrada.ticketId, cerrada.folio, cerrada.cambio, cerrada.total); return; }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "No se pudo cerrar la cuenta");
+        return;
       } finally {
         revisandoCobro.current = false;
         setProcesandoCobro(false);
@@ -1463,7 +1623,7 @@ export function HomePos({
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, turno.caja_id, turno.id, online, adoptarTicketSiQuedoAbierto, lealtadActiva, programa]);
+  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, turno.caja_id, turno.id, online, adoptarTicketSiQuedoAbierto, lealtadActiva, programa, cobroTerminado]);
 
   /**
    * Ronda de arreglos 1/5 (Task 7) — cambiar la zona de ESTE pedido desde el renglón de envío.
@@ -1912,6 +2072,8 @@ export function HomePos({
       // Descuento de la cuenta (puede pedir PIN) y la lista de cuentas de Para llevar: los cierra
       // su propio modal; aquí están para que la pila sepa que hay algo abierto.
       [descuentoAbierto, null],
+      // Reabrir y Cambiar pago (Transacciones): los cierra su propio `Modal`, también su PIN.
+      [reabriendoTx != null || cambiandoPagoTx != null, null],
       [llevarListaAbierta, null],
       // Venta de tienda: el selector lo cierra también su `Modal`; la franja del escáner, aquí.
       capaSelector,
@@ -1972,7 +2134,7 @@ export function HomePos({
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
       salidaPendiente, confirmandoCierre, menuGeneralAbierto, cerrando, enInicio, enKds, enMonitor,
       enConsultaCuentas, enDevoluciones, enCambioTalla, enPedidosApps, enDelivery, enPickup, enMesas, enBarra, nuevoTicket,
-      intentarSalirDeCaptura, tienda, seccionTienda, cerrarBusquedaTx, cerrarConsultaInv, irASeccion, avisosVim, confirmandoVenta, salirCajaAbierto]);
+      intentarSalirDeCaptura, tienda, seccionTienda, reabriendoTx, cambiandoPagoTx, cerrarBusquedaTx, cerrarConsultaInv, irASeccion, avisosVim, confirmandoVenta, salirCajaAbierto]);
   useEscape(alEscapar);
 
   // ── Cambio de talla (giro RETAIL) ─────────────────────────────────────────────────────────
@@ -2176,6 +2338,33 @@ export function HomePos({
 
   const modalesCobro = (
     <>
+      {reabriendoTx && (
+        <ModalReabrirCuenta
+          token={token}
+          empleado={empleado}
+          ticketId={reabriendoTx.ticketId}
+          folio={reabriendoTx.folio}
+          total={reabriendoTx.total}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          onReabierto={() => { const id = reabriendoTx.ticketId; setReabriendoTx(null); setTxVersion((v) => v + 1); void abrirDesdeTransacciones(id); }}
+          onCerrar={() => setReabriendoTx(null)}
+        />
+      )}
+      {cambiandoPagoTx && (
+        <ModalCambiarPago
+          token={token}
+          empleado={empleado}
+          ticketId={cambiandoPagoTx.ticketId}
+          folio={cambiandoPagoTx.folio}
+          total={cambiandoPagoTx.total}
+          metodoActual={cambiandoPagoTx.pagoCambiable?.metodo ?? null}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          onCambiado={() => { setCambiandoPagoTx(null); setTxVersion((v) => v + 1); }}
+          onCerrar={() => setCambiandoPagoTx(null)}
+        />
+      )}
       {totalesCobro && (
         <ModalCobro
           token={token}
@@ -2186,130 +2375,7 @@ export function HomePos({
           totalesIniciales={totalesCobro}
           atajo={atajoCobro}
           onMontoACobrar={setMontoCobro}
-          onPagado={async (folio, cambio, total) => {
-            const ticketId = totalesCobro.ticketId;
-            // Lealtad: una cuenta cobrada ya no puede terminar un canje a medias; si quedó uno
-            // guardado en este dispositivo, se limpia para que no viva para siempre. Nunca estorba al cobro.
-            try {
-              const almacen = almacenLocal();
-              if (leerPendiente(almacen, ticketId)) borrarPendiente(almacen, ticketId);
-            } catch { /* un almacén lleno o negado no detiene lo que sigue */ }
-            setTotalesCobro(null);
-            setAtajoCobro(null);
-            setCambioAnterior(cambio > 0 ? cambio : null);
-            setTicketBd(null);
-            setEnModoMesa(false);
-            setCocinaEnviada(false);
-            dispatch({ tipo: "limpiar" });
-            setCuentasVersion((v) => v + 1); // la cuenta pagada ya no va en la lista
-            setConfirmacion({ folio, cambio, total });
-            // Armar el ticket e IMPRIMIR automáticamente. Con PreviewAdapter abre el recibo
-            // en pantalla; al activar EpsonEposAdapter, ese mismo llamado imprime en papel.
-            try {
-              const datos = await leerTicketParaImpresion(ticketId, {
-                token,
-                cajeroNombre: empleado.nombre,
-                cajaNombre: caja.nombre,
-              });
-              // Combos (ADR 0015): igual que en `imprimirComandaCocina` — el padre no se imprime,
-              // cada hijo se manda a su estación con "Combo #n" como contexto.
-              const lineasCom = lineasParaComanda(datos.lineas);
-              const datosCom: DatosComanda = {
-                folio: datos.meta.folio,
-                modoServicio: datos.meta.modoServicio,
-                cajero: datos.meta.cajero,
-                caja: datos.meta.caja,
-                fechaIso: datos.meta.fechaIso,
-                lineas: lineasCom,
-                ancho: 80,
-              };
-              setDatosTicket(datos);
-              setTicketImpresoId(ticketId);
-              setDatosComanda(datos.tienda ? null : datosCom);
-              setEstadoTicket("lista");
-              // Solo "Para llevar": es el único modo que va del carrito al cobro sin pasar por la
-              // lista de cuentas, así que no hay un momento anterior para imprimirlo. La regla y su
-              // historia están en `debeImprimirTicketAlCobrar`.
-              if (debeImprimirTicketAlCobrar(datos.meta.modo)) {
-                try {
-                  const job = construirTicketJob(datos, await logoParaTicket(datos.ancho));
-                  await obtenerImpresora("CAJA", { onMostrar: () => setMostrarRecibo(true) }).imprimir(job);
-                } catch {
-                  // Un fallo de la impresora no puede llevarse por delante lo que viene después:
-                  // la comanda, el cajón y la liquidación del reparto van detrás.
-                  setEstadoTicket("error");
-                }
-              }
-              // Comanda automática a la estación de cocina.
-              //
-              // SOLO en "Para llevar". Es el único modo donde el pedido va del carrito al cobro sin
-              // pasar por "Enviar a cocina": si no saliera aquí, la cocina no se enteraría nunca.
-              //
-              // En comedor, Pick-up y Domicilio la comanda YA salió al enviar el pedido, y volver a
-              // imprimirla al cobrar hacía que la cocina recibiera dos veces lo mismo —con el riesgo
-              // real de que alguien prepare el pedido otra vez, además del papel de más. Al cobrar,
-              // esos modos imprimen únicamente el ticket del cliente.
-              //
-              // Y solo si la estación de cocina es una impresora distinta de la de caja: con una
-              // sola impresora, el ticket que acaba de salir ya es el papel.
-              // Una tienda no tiene cocina: aunque haya estaciones configuradas, no sale comanda.
-              if (!datos.tienda && debeImprimirComandaAlCobrar(datos.meta.modo, hayEstacionDeCocinaDedicada())) {
-                // También repartida: en Para llevar la bebida va a la barra igual que en el resto.
-                imprimirComandaPorAreas(datosCom, lineasCom, { ticketId, evento: "IMPRESION_INICIAL" }).catch(() => {});
-              }
-              // Reparto a domicilio: se cierra con lo que de verdad entró. Best-effort — la venta
-              // ya quedó cobrada y un fallo aquí no debe deshacerla.
-              if (datos.meta.modo === "DELIVERY_PROPIO") {
-                const efectivo = datos.pagos.filter((p) => p.metodo === "Efectivo").reduce((a, p) => a + p.montoMxn, 0);
-                const otros = datos.pagos.filter((p) => p.metodo !== "Efectivo").reduce((a, p) => a + p.montoMxn, 0);
-                const r = await cerrarRepartoAlCobrar(token, {
-                  ticketId, efectivo, tarjeta: otros, liquidadoPorId: empleado.id,
-                });
-                // "Sin asignación" YA NO SE CALLA.
-                //
-                // Se silenciaba porque asignar repartidor era opcional: un domicilio podía salir
-                // sin nadie anotado y no había nada que reportar. Desde la 0114 asignar es
-                // obligatorio, así que este caso dejó de ser normal — y callarlo borraba la única
-                // señal de que la regla se rompió.
-                //
-                // Y no es hipotético: `listarCuentasAbiertas` solo trae BORRADOR/ABIERTO, así que
-                // un ticket cobrado se sale de "En el local" y ya no aparece en ninguna de las dos
-                // pestañas; `asignar_delivery_lote` lo rechaza con "ya está cerrado". En un pedido
-                // PREPAGADO —tarjeta o transferencia al tomar la orden, cuando todavía no hay
-                // repartidor a quién asignárselo— cobrar antes de asignar es la ÚNICA secuencia
-                // posible, o sea el camino normal, no un descuido raro.
-                //
-                // Se avisa DESPUÉS del cobro y nunca antes: el dinero ya entró, y una confirmación
-                // previa saldría en cada prepago para hacer una pregunta que el cajero no puede
-                // contestar de otra manera. Lo que sí necesita es enterarse, porque ese pedido no
-                // va a poder cuadrarse contra ningún repartidor.
-                if (!r.liquidada) {
-                  setAvisoReparto(
-                    r.motivo === "sin asignación"
-                      ? {
-                          titulo: "Pedido sin repartidor",
-                          texto: "Este pedido se cobró sin repartidor asignado, y ya cerrado no se le puede asignar uno. Anota por fuera quién lo lleva: el sistema ya no va a poder decir de quién fue.",
-                        }
-                      : {
-                          titulo: "El reparto quedó sin cerrar",
-                          texto: `El cobro sí se registró, pero no se pudo cerrar el reparto: ${r.motivo ?? "error"}. Revisa a mano la liquidación del repartidor.`,
-                        },
-                  );
-                }
-              }
-              // El cajón NO se abre aquí. Ya se abrió al presionar "Cobrar" (`abrirCajonParaCobrar`),
-              // que es lo que la caja pidió: contar el cambio empieza al abrir la gaveta, no al
-              // cerrar la venta. Esta segunda apertura es de cuando era la única, y desde la 0.4.36
-              // convivían las dos: el cajón se abría, el cajero lo cerraba, y al imprimirse el
-              // ticket se volvía a abrir solo.
-              //
-              // Los dos caminos que llegan al cobro —capturar y cobrar, o cobrar desde la lista de
-              // cuentas— abren el cajón antes, así que quitarlo de aquí no deja ningún flujo sin
-              // apertura.
-            } catch {
-              setEstadoTicket("error");
-            }
-          }}
+          onPagado={(folio, cambio, total) => cobroTerminado(totalesCobro.ticketId, folio, cambio, total)}
           onCerrar={() => { setTotalesCobro(null); setAtajoCobro(null); }}
         />
       )}
@@ -3119,7 +3185,8 @@ export function HomePos({
             ? {
                 nombre: clienteLealtad.nombre.split(" ")[0] ?? clienteLealtad.nombre,
                 franja,
-                onAbrir: admiteClienteCuenta(carrito.modoServicio) && carrito.lineas.length > 0 && !cuentaImpresa ? () => void onAbrirLealtad() : undefined,
+                // La venta de un cambio no lleva canje (como no suma, 0200).
+                onAbrir: admiteClienteCuenta(carrito.modoServicio) && carrito.lineas.length > 0 && !cuentaImpresa && ventaDeCambio === false ? () => void onAbrirLealtad() : undefined,
               }
             : null}
           totalConDescuento={totalAutoritativo ?? undefined}
@@ -3169,6 +3236,9 @@ export function HomePos({
               onDevolver={(id) => { setVentaElegida(id); setEnDevoluciones(true); }}
               onCambio={(id) => abrirCambioTalla(id)}
               onReimprimir={(id) => reimprimirCuenta(id, { origen: "CONSULTA" })}
+              onReabrir={setReabriendoTx}
+              onCambiarPago={setCambiandoPagoTx}
+              version={txVersion}
             />
           ) : seccionTienda === "inventario" ? (
             <SeccionInventario

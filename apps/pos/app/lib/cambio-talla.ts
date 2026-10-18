@@ -33,6 +33,17 @@ export async function pagoInternoDelCambio(token: string, ticketId: string): Pro
   return data ? Number(data.monto_mxn) : 0;
 }
 
+/**
+ * ¿La cuenta es la venta nueva de un cambio de talla? Lo dice la base (`_ticket_es_de_cambio`, 0200),
+ * con el criterio del ticket impreso (`leerCambioTalla`): una devolución CAMBIO_TALLA con la misma
+ * `client_id_local`.
+ */
+export async function esVentaDeCambio(token: string, ticketId: string): Promise<boolean> {
+  const { data, error } = await employeeClient(token).rpc("_ticket_es_de_cambio", { p_ticket: ticketId });
+  if (error) throw new Error(error.message);
+  return data === true;
+}
+
 const Resultado = z.object({
   ticket_id: z.string(),
   regresa_mxn: z.coerce.number(),

@@ -21,13 +21,14 @@ const falso = vi.hoisted(() => {
 });
 vi.mock("../supabase", () => ({ employeeClient: () => falso.cliente }));
 
-import { alcanceDevolucion, buscarVentasConProducto, itemsDevolucion, motivosDevolucion, totalDevolucion, type VentaDevolvible } from "../devoluciones";
+import { alcanceDevolucion, buscarVentaPorFolio, buscarVentasConProducto, itemsDevolucion, motivosDevolucion, totalDevolucion, type VentaDevolvible } from "../devoluciones";
 
 const venta: VentaDevolvible = {
   ticketId: "t1",
   folio: "A-12",
   total: 500,
   fechaCobro: null,
+  pagoCambiable: null,
   renglones: [
     { ticket_item_id: "i1", producto_id: "p1", nombre: "Playera M", cantidad: 2, devuelta: 0, precio_unitario: 150, total: 300 },
     { ticket_item_id: "i2", producto_id: "p2", nombre: "Gorra", cantidad: 1, devuelta: 0, precio_unitario: 200, total: 200 },
@@ -102,5 +103,35 @@ describe("buscar ventas por la prenda escaneada", () => {
     const enDev = falso.consultas.filter((c) => c.tabla === "devolucion_items")
       .map((c) => (c.filtros.find(([m]) => m === "in")?.[2] as string[]).length);
     expect(enDev).toEqual([50, 50]);
+  });
+});
+
+describe("pago que se puede cambiar", () => {
+  const ticket = (id: string) => ({ id, client_id_local: `llave-${id}`, folio_completo: `A-${id}`, total_mxn: 399, fecha_pago: null, estado_fiscal: "PAGADO" });
+  const armar = async (pagos: { metodo_pago: string; client_id_local: string | null }[]) => {
+    falso.fijar((c) => c.tabla === "tickets" ? [ticket("t1")]
+      : c.tabla === "pagos" ? pagos.map((p) => ({ ticket_id: "t1", ...p }))
+      : []);
+    return (await buscarVentaPorFolio("tok", "A-t1", "suc-1"))?.pagoCambiable;
+  };
+
+  it("un cambio que se pagó solo con la prenda (lleva ≤ regresa) no tiene pago que cambiar", async () => {
+    expect(await armar([{ metodo_pago: "EFECTIVO", client_id_local: "llave-t1-pago" }])).toBeNull();
+  });
+  it("un cambio con saldo: se cambia el pago del saldo, no el de la prenda", async () => {
+    expect(await armar([
+      { metodo_pago: "EFECTIVO", client_id_local: "llave-t1-pago" },
+      { metodo_pago: "TARJETA_DEBITO", client_id_local: "p-2" },
+    ])).toEqual({ metodo: "TARJETA_DEBITO" });
+  });
+  it("una venta normal con un pago lo ofrece; con pago dividido, no", async () => {
+    expect(await armar([{ metodo_pago: "EFECTIVO", client_id_local: null }])).toEqual({ metodo: "EFECTIVO" });
+    expect(await armar([{ metodo_pago: "EFECTIVO", client_id_local: "a" }, { metodo_pago: "TARJETA_CREDITO", client_id_local: "b" }])).toBeNull();
+  });
+  it("solo cuentan los pagos vigentes", async () => {
+    await armar([]);
+    const pagos = falso.consultas.filter((c) => c.tabla === "pagos").at(-1)!;
+    expect(pagos.filtros).toContainEqual(["in", "estado", ["APLICADO", "CONCILIADO"]]);
+    expect(pagos.filtros).toContainEqual(["is", "deleted_at", null]);
   });
 });

@@ -216,6 +216,20 @@ export async function leerTotales(token: string, ticketId: string): Promise<Tota
 }
 
 /**
+ * Una cuenta ABIERTA que ya no debe nada: la venta de un cambio sin diferencia, reabierta (0201),
+ * conserva su pago interno. «Cobrar» la cierra sin abrir el cobro. Con total 0 no:
+ * `cerrar_ticket_si_pagado` no la cerraría y va por el cobro de siempre.
+ */
+export const cuentaYaCubierta = (t: TotalesTicket) => t.estadoFiscal === "ABIERTO" && t.total > 0 && t.pendiente <= 0;
+
+/** `cerrar_ticket_si_pagado` (como cierra registrar_cambio_talla) y los totales ya cerrados; `null` si la base no la cerró. */
+export async function cerrarSiYaCubierta(token: string, ticketId: string): Promise<TotalesTicket | null> {
+  const { data, error } = await employeeClient(token).rpc("cerrar_ticket_si_pagado", { p_ticket_id: ticketId });
+  if (error) throw new Error(error.message);
+  return data === true ? leerTotales(token, ticketId) : null;
+}
+
+/**
  * Cambia (o quita, con `zonaId` null) la zona de reparto de un pedido que YA tiene ticket, y
  * relee los totales autoritativos — para que el renglón de envío del ticket lateral y el total
  * del pie se muevan juntos (Task 7, ronda de arreglos 1/5).

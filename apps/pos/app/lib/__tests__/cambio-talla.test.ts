@@ -1,9 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 
 const rpc = vi.hoisted(() => ({ error: null as { message: string } | null }));
-vi.mock("../supabase", () => ({ employeeClient: () => ({ rpc: async () => ({ data: null, error: rpc.error }) }) }));
+const llamadas = vi.hoisted(() => ({ de: [] as [string, unknown][], es: false as unknown }));
+vi.mock("../supabase", () => ({
+  employeeClient: () => ({
+    rpc: async (fn: string, args: unknown) => {
+      llamadas.de.push([fn, args]);
+      return fn === "_ticket_es_de_cambio" ? { data: llamadas.es, error: null } : { data: null, error: rpc.error };
+    },
+  }),
+}));
 
-import { CambioRechazado, registrarCambio, resumenCambio } from "../cambio-talla";
+import { CambioRechazado, esVentaDeCambio, registrarCambio, resumenCambio } from "../cambio-talla";
 import { fmtMxn } from "../turno";
 
 describe("resumenCambio", () => {
@@ -46,5 +54,16 @@ describe("registrarCambio: rechazo definitivo o en duda", () => {
     const e = await registrarCambio(args).catch((x: unknown) => x);
     expect(e).toBeInstanceOf(Error);
     expect(e).not.toBeInstanceOf(CambioRechazado);
+  });
+});
+
+describe("esVentaDeCambio", () => {
+  it("pregunta a la base con su criterio (_ticket_es_de_cambio, 0200)", async () => {
+    llamadas.de.length = 0;
+    llamadas.es = true;
+    expect(await esVentaDeCambio("tok", "t1")).toBe(true);
+    expect(llamadas.de).toEqual([["_ticket_es_de_cambio", { p_ticket: "t1" }]]);
+    llamadas.es = false;
+    expect(await esVentaDeCambio("tok", "t1")).toBe(false);
   });
 });

@@ -22,6 +22,41 @@ const fechaHora = (iso: string) =>
 const fila = "flex min-h-14 w-full items-center gap-3 rounded-lg border bg-surface px-4 py-3 text-left transition-transform duration-150 ease-vim active:scale-[.99]";
 
 /**
+ * Las acciones del detalle de una venta, en dos filas para que cada botón conserve sus 44 px a
+ * 1024 px de ancho. Una venta facturada solo se reimprime o se devuelve; una cobrada en línea no se
+ * reabre ni cambia de pago (como en Cuentas cobradas). «Cambiar pago» solo con un pago que cambiar.
+ */
+export function AccionesVenta({ venta, imprimiendo, onReimprimir, onDevolver, onCambio, onReabrir, onCambiarPago }: {
+  venta: VentaDevolvible;
+  imprimiendo: boolean;
+  onReimprimir: () => void;
+  onDevolver: () => void;
+  onCambio: () => void;
+  onReabrir: () => void;
+  onCambiarPago: () => void;
+}) {
+  const editable = !venta.facturada && !venta.pagadaEnLinea;
+  return (
+    <>
+      <div className="flex gap-2">
+        <Button className="flex-1" onClick={onReimprimir} disabled={imprimiendo}>
+          {imprimiendo ? "Imprimiendo…" : "Reimprimir"}
+        </Button>
+        <Button variant="ghost" className="flex-1" onClick={onDevolver}>Devolver</Button>
+        {!venta.facturada && <Button variant="ghost" className="flex-1" onClick={onCambio}>Cambio de talla</Button>}
+      </div>
+      {editable && (
+        <div className="flex gap-2">
+          <Button variant="ghost" className="flex-1" onClick={onReabrir}>Reabrir</Button>
+          {venta.pagoCambiable && <Button variant="ghost" className="flex-1" onClick={onCambiarPago}>Cambiar pago</Button>}
+        </div>
+      )}
+      {venta.facturada && <p className="text-13 text-ink-3">{FACTURADA}</p>}
+    </>
+  );
+}
+
+/**
  * Transacciones de la tienda (pos-retail.md, «Versión 2»): arriba las cuentas abiertas (se tocan y
  * se cargan en el Panel), luego las ventas del turno, y búsqueda por folio o escaneando una prenda
  * (30 días). Aquí el escaneo nunca agrega al ticket. Al tocar una venta, su detalle con Reimprimir,
@@ -39,6 +74,9 @@ export function SeccionTransacciones({
   onDevolver,
   onCambio,
   onReimprimir,
+  onReabrir,
+  onCambiarPago,
+  version,
 }: {
   caja: DatosCaja;
   turno: Turno;
@@ -54,6 +92,11 @@ export function SeccionTransacciones({
   onDevolver: (ticketId: string) => void;
   onCambio: (ticketId: string) => void;
   onReimprimir: (ticketId: string) => Promise<void>;
+  /** Abren los modales de home-pos (los mismos de Cuentas cobradas). */
+  onReabrir: (venta: VentaDevolvible) => void;
+  onCambiarPago: (venta: VentaDevolvible) => void;
+  /** Sube cuando home-pos cambió una venta (otro pago): se releen las listas y el detalle. */
+  version: number;
 }) {
   const [cuentas, setCuentas] = useState<FilaCuenta[] | null>(null);
   const [ventas, setVentas] = useState<VentaTurno[] | null>(null);
@@ -88,7 +131,21 @@ export function SeccionTransacciones({
     leerVentasTurno(token, turno.id)
       .then((v) => { if (montado.current) setVentas(v); })
       .catch((e) => { if (montado.current) setError(e instanceof Error ? e.message : "No se pudieron leer las ventas"); });
-  }, [token, caja.sucursal_id, turno.caja_id, turno.id]);
+  }, [token, caja.sucursal_id, turno.caja_id, turno.id, version]);
+
+  // home-pos cambió una venta (`version`): el detalle a la vista se relee. Si ya no está cobrada
+  // (se reabrió y el Panel no la tomó), sale del detalle: ahora está en «Cuentas abiertas».
+  useEffect(() => {
+    const id = pedida.current;
+    if (version === 0 || !id) return;
+    leerVentaDevolvible(token, id)
+      .then((v) => {
+        if (!montado.current || pedida.current !== id) return;
+        setDetalle(v);
+        if (!v) { pedida.current = null; setElegida(null); }
+      })
+      .catch(() => { /* el detalle anterior se queda; tocar la venta lo vuelve a leer */ });
+  }, [version, token]);
 
   function ver(v: VentaDevolvible) {
     pedida.current = v.ticketId;
@@ -293,14 +350,15 @@ export function SeccionTransacciones({
               </ul>
               <div className="flex flex-shrink-0 flex-col gap-3 border-t border-line px-5 py-4">
                 {errorImpresion && <p className="text-13 font-medium text-danger" role="alert">{errorImpresion}</p>}
-                <div className="flex gap-2">
-                  <Button className="flex-1" onClick={() => void reimprimir(detalle.ticketId)} disabled={imprimiendo}>
-                    {imprimiendo ? "Imprimiendo…" : "Reimprimir"}
-                  </Button>
-                  <Button variant="ghost" className="flex-1" onClick={() => onDevolver(detalle.ticketId)}>Devolver</Button>
-                  {!detalle.facturada && <Button variant="ghost" className="flex-1" onClick={() => onCambio(detalle.ticketId)}>Cambio de talla</Button>}
-                </div>
-                {detalle.facturada && <p className="text-13 text-ink-3">{FACTURADA}</p>}
+                <AccionesVenta
+                  venta={detalle}
+                  imprimiendo={imprimiendo}
+                  onReimprimir={() => void reimprimir(detalle.ticketId)}
+                  onDevolver={() => onDevolver(detalle.ticketId)}
+                  onCambio={() => onCambio(detalle.ticketId)}
+                  onReabrir={() => onReabrir(detalle)}
+                  onCambiarPago={() => onCambiarPago(detalle)}
+                />
               </div>
             </>
           )}

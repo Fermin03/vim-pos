@@ -22,7 +22,7 @@ vi.mock("../supabase", () => ({
   }),
 }));
 
-import { persistirTicket, cambiarZonaDePedido, ErrorEnvioNoFijado, ErrorTicketParcial } from "../cobro";
+import { persistirTicket, cambiarZonaDePedido, cerrarSiYaCubierta, cuentaYaCubierta, ErrorEnvioNoFijado, ErrorTicketParcial, type TotalesTicket } from "../cobro";
 import type { LineaCarrito } from "../carrito";
 import type { Producto } from "../catalogo";
 
@@ -224,5 +224,30 @@ describe("persistirTicket — un corte a medias lleva el ticket (auditoría 30/0
     const e = new ErrorEnvioNoFijado("zona", "t", null);
     expect(e).toBeInstanceOf(ErrorTicketParcial);
     expect(e.fase).toBe("envio");
+  });
+});
+
+describe("Cobrar una cuenta que ya no debe nada (cambio sin diferencia reabierto)", () => {
+  const t: TotalesTicket = { ticketId: "ticket-1", subtotal: 349, iva: 0, descuentos: 0, promociones: 0, lealtad: 0, total: 349, montoPagado: 349, cambio: 0, pendiente: 0, estadoFiscal: "ABIERTO", folio: "A-9" };
+
+  it("solo una cuenta ABIERTA, con total y sin saldo, se cierra sin abrir el cobro", () => {
+    expect(cuentaYaCubierta(t)).toBe(true);
+    expect(cuentaYaCubierta({ ...t, pendiente: 50, montoPagado: 299 })).toBe(false);
+    // Total 0 (todo de descuento): cerrar_ticket_si_pagado no la cierra; va por el cobro de siempre.
+    expect(cuentaYaCubierta({ ...t, total: 0, montoPagado: 0 })).toBe(false);
+    expect(cuentaYaCubierta({ ...t, estadoFiscal: "PAGADO" })).toBe(false);
+  });
+
+  it("llama a cerrar_ticket_si_pagado y relee los totales; si la base no la cerró, null", async () => {
+    rpcMock.mockReset();
+    singleMock.mockReset();
+    singleMock.mockImplementation(async () => ({ data: { ...TOTALES_ROW, estado_fiscal: "PAGADO", monto_pendiente_mxn: "0" }, error: null }));
+    rpcMock.mockImplementation(async () => ({ data: true, error: null }));
+    expect((await cerrarSiYaCubierta("tok", "ticket-1"))?.estadoFiscal).toBe("PAGADO");
+    expect(rpcMock).toHaveBeenCalledWith("cerrar_ticket_si_pagado", { p_ticket_id: "ticket-1" });
+    rpcMock.mockImplementation(async () => ({ data: false, error: null }));
+    expect(await cerrarSiYaCubierta("tok", "ticket-1")).toBeNull();
+    rpcMock.mockImplementation(async () => ({ data: null, error: { message: "sin red" } }));
+    await expect(cerrarSiYaCubierta("tok", "ticket-1")).rejects.toThrow("sin red");
   });
 });

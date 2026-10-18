@@ -180,6 +180,14 @@ export type VentaDevolvible = {
   fechaCobro: string | null;
   /** Ya tiene CFDI: se devuelve, pero no se cambia (la factura pediría nota de crédito). */
   facturada?: boolean;
+  /** Se cobró en línea (tienda): no se reabre ni se cambia el pago aquí, como en Cuentas cobradas. */
+  pagadaEnLinea?: boolean;
+  /**
+   * El pago que «Cambiar pago» puede cambiar: el único pago vigente, sin contar el interno de la
+   * venta de un cambio (`<llave del ticket>-pago`, la prenda que regresa, 0195/0201). `null` si no
+   * queda ninguno (cambio pagado solo con la prenda) o hay más de uno (pago dividido).
+   */
+  pagoCambiable: { metodo: string } | null;
   renglones: RenglonVenta[];
 };
 
@@ -236,8 +244,8 @@ export async function cobradoEnTerminal(token: string, ticketId: string): Promis
     .some((p) => p.metodo_pago.startsWith("TARJETA_") && Boolean(p.terminal_aprobacion));
 }
 
-type FilaTicket = { id: string; folio_completo: string | null; total_mxn: number | string | null; fecha_pago: string | null; estado_fiscal: string };
-const COLUMNAS_TICKET = "id, folio_completo, total_mxn, fecha_pago, estado_fiscal";
+type FilaTicket = { id: string; client_id_local: string | null; folio_completo: string | null; total_mxn: number | string | null; fecha_pago: string | null; estado_fiscal: string };
+const COLUMNAS_TICKET = "id, client_id_local, folio_completo, total_mxn, fecha_pago, estado_fiscal";
 const ESTADOS_DEVOLVIBLES = ["PAGADO", "FACTURADO"];
 
 /** Partes de a lo más `n`: un `.in()` largo no cabe en la dirección de la petición. */
@@ -247,7 +255,7 @@ function enTrozos<T>(xs: T[], n = 50): T[][] {
   return r;
 }
 
-/** Arma las ventas con sus renglones y lo ya devuelto de cada uno (dos consultas por cada 50 ids). */
+/** Arma las ventas con sus renglones, lo ya devuelto de cada uno y sus pagos (consultas de a 50 ids). */
 async function conRenglones(token: string, tickets: FilaTicket[]): Promise<VentaDevolvible[]> {
   if (tickets.length === 0) return [];
   const cli = employeeClient(token);
@@ -278,12 +286,33 @@ async function conRenglones(token: string, tickets: FilaTicket[]): Promise<Venta
     }
   }
 
+  const pagos: { ticket_id: string; metodo_pago: string; client_id_local: string | null }[] = [];
+  for (const ids of enTrozos(tickets.map((t) => t.id))) {
+    const { data, error: e3 } = await cli
+      .from("pagos")
+      .select("ticket_id, metodo_pago, client_id_local")
+      .in("ticket_id", ids)
+      .in("estado", ["APLICADO", "CONCILIADO"])
+      .is("deleted_at", null);
+    if (e3) throw new Error(e3.message);
+    pagos.push(...((data ?? []) as typeof pagos));
+  }
+
+  const cobro = (t: FilaTicket) => {
+    const suyos = pagos.filter((p) => p.ticket_id === t.id);
+    // El pago interno del cambio no se cambia (0201): se cuenta solo lo que pagó el cliente.
+    const reales = suyos.filter((p) => !t.client_id_local || p.client_id_local !== `${t.client_id_local}-pago`);
+    const pagadaEnLinea = suyos.some((p) => p.metodo_pago === "PAGO_EN_LINEA");
+    return { pagadaEnLinea, pagoCambiable: reales.length === 1 && !pagadaEnLinea ? { metodo: reales[0]!.metodo_pago } : null };
+  };
+
   return tickets.map((t) => ({
     ticketId: t.id,
     folio: t.folio_completo ?? t.id.slice(-6),
     total: Number(t.total_mxn ?? 0),
     fechaCobro: t.fecha_pago,
     facturada: t.estado_fiscal === "FACTURADO",
+    ...cobro(t),
     renglones: filas
       .filter((i) => i.ticket_id === t.id)
       .map((i) => ({
