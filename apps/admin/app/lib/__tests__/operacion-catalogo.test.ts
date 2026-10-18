@@ -26,9 +26,9 @@ describe("moduloActivo", () => {
 });
 
 describe("catálogo", () => {
-  it("los siete giros que se ofrecen, y los retirados con nombre para leer datos viejos", () => {
+  it("los ocho giros que se ofrecen, y los retirados con nombre para leer datos viejos", () => {
     expect(GIROS.filter((g) => g.ofrecido).map((g) => g.codigo)).toEqual(
-      ["QUICK_SERVICE", "FULL_SERVICE", "TAQUERIA", "CAFETERIA", "BAR", "DARK_KITCHEN", "FOODTRUCK"]);
+      ["QUICK_SERVICE", "FULL_SERVICE", "TAQUERIA", "CAFETERIA", "BAR", "DARK_KITCHEN", "FOODTRUCK", "RETAIL"]);
     expect(nombreGiro("RETAIL")).toBe("Tienda de ropa o calzado");
     expect(nombreGiro("CAFE_BAR")).toBe("Cafetería o bar");
     expect(nombreGiro("TAQUERIA")).toBe("Taquería o cocina económica");

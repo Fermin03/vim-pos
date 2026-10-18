@@ -15,8 +15,8 @@ export const GIROS: readonly { codigo: CodigoGiro; nombre: string; ofrecido: boo
   { codigo: "BAR", nombre: "Bar", ofrecido: true },
   { codigo: "DARK_KITCHEN", nombre: "Cocina solo para apps", ofrecido: true },
   { codigo: "FOODTRUCK", nombre: "Food truck", ofrecido: true },
-  // Tienda (ADR 0037): existe en la base, pero no se asigna hasta la entrega 5 del giro.
-  { codigo: "RETAIL", nombre: "Tienda de ropa o calzado", ofrecido: false },
+  // Tienda (ADR 0037).
+  { codigo: "RETAIL", nombre: "Tienda de ropa o calzado", ofrecido: true },
   // Retirados: se quedan para nombrar a quien ya los tiene.
   { codigo: "CAFE_BAR", nombre: "Cafetería o bar", ofrecido: false },
   { codigo: "ENTERPRISE", nombre: "Cadena", ofrecido: false },
