@@ -223,8 +223,12 @@ Un `Modal` centrado, no un cajón lateral: la matriz necesita ancho.
 ### Arriba del ticket
 
 Con el ticket en curso, arriba del ticket van, como texto pequeño, **«Asignar cliente»** (la lealtad lo
-necesita) y **«Limpiar»**. No hay «En espera», «Descuento» ni «Precios». Las cuentas abiertas y en
-espera viven en Transacciones.
+necesita) y **«Limpiar»**. No hay «En espera» ni «Precios». Las cuentas abiertas y en espera viven en
+Transacciones.
+
+**Menú «⋯».** A la derecha de «Ticket nuevo», un botón «⋯» despliega **«Nota»** (de la venta) y
+**«Descuento»** (el mismo de hoy, con PIN de supervisor). Se cierra con Escape o tocando fuera
+(Fermín, 18 oct). Lo que se agregue después va en esta lista.
 
 **«Dejar abierta».** Cuando el ticket cargado es una cuenta guardada (por ejemplo, la del cambio con
 diferencia por cobrar), el encabezado ofrece «Dejar abierta». Sale del Panel sin cancelar: una espera

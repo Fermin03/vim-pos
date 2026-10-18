@@ -36,6 +36,8 @@ describe("SidebarTicket", () => {
     for (const t of ['aria-label="Más"', 'aria-label="Menos"', ">Nota<", "Nota de la orden", ">Venta<"]) expect(panel).not.toContain(t);
     expect(panel).toContain(">Quitar<");
     expect(panel).toContain("w-1/2");
+    expect(panel).toContain('aria-label="Más opciones"');
+    expect(restaurante).not.toContain('aria-label="Más opciones"');
   });
 
   it("con una cuenta guardada, el Panel ofrece dejarla abierta", () => {

@@ -8,6 +8,7 @@ import { setPreciosVisibles, usePreciosVisibles } from "../lib/precios-visibles"
 import { fmtMxn } from "../lib/turno";
 import type { FranjaLealtad } from "../lib/lealtad-reglas";
 import { RenglonItem } from "./renglon-item";
+import { useEscape } from "../lib/use-escape";
 
 /* ── helpers ─────────────────────────────────────────────────── */
 /* ── Íconos SVG inline (del mockup P-066) ────────────────────── */
@@ -179,6 +180,47 @@ export function SidebarTicket({
   // editan (0119). Quien pasa `onEditar` decide qué renglón se abre y avisa del que no.
   const editable = onEditar != null && !procesando;
   const simple = tienda?.simple === true;
+  // Menú «⋯» del Panel de la tienda: ahí viven la nota y el descuento (Fermín, 18 oct).
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  useEscape(() => setMenuAbierto(false), menuAbierto);
+  const opcionesMenu = [
+    { texto: estado.notaOrden ? "Editar nota" : "Nota", hacer: () => setNotaOrdenAbierta(true), activa: !!onNotaOrden && !bloqueado },
+    ...(seCobraDespues ? [] : [{ texto: "Descuento", hacer: () => onAplicarDescuento?.(), activa: !vacio && !hayDescuento && !procesando && !!onAplicarDescuento }]),
+  ];
+  const menuTienda = (
+    <div className="relative -mr-2.5 flex-shrink-0">
+      <button
+        type="button"
+        aria-label="Más opciones"
+        aria-haspopup="menu"
+        aria-expanded={menuAbierto}
+        onClick={() => setMenuAbierto((v) => !v)}
+        className={`h-11 w-11 rounded-md font-display text-20 font-bold leading-none text-ink-2 transition-colors hover:bg-hover hover:text-ink ${menuAbierto ? "bg-hover text-ink" : ""}`}
+      >
+        ⋯
+      </button>
+      {menuAbierto && (
+        <>
+          {/* Tocar fuera cierra, como Escape. */}
+          <button type="button" aria-label="Cerrar opciones" tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setMenuAbierto(false)} />
+          <div role="menu" className="absolute right-0 top-full z-20 mt-1 min-w-[12rem] rounded-lg border border-line bg-surface p-1 shadow-lg">
+            {opcionesMenu.map((o) => (
+              <button
+                key={o.texto}
+                type="button"
+                role="menuitem"
+                disabled={!o.activa}
+                onClick={() => { setMenuAbierto(false); o.hacer(); }}
+                className="flex h-11 w-full items-center rounded-md px-3 text-left text-15 font-semibold text-ink transition-colors hover:bg-hover disabled:cursor-default disabled:text-ink-3 disabled:hover:bg-transparent"
+              >
+                {o.texto}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
   /* Dos botones en uno: con la cuenta ya guardada en BD esto CANCELA la cuenta; con un
      carrito suelto solo lo vacía. Se dice cuál de los dos es, porque no se deshacen igual.
 
@@ -248,7 +290,7 @@ export function SidebarTicket({
           <span className="truncate font-display text-18 font-semibold leading-tight tracking-[-0.02em]">
             {titulo ?? (folioCuenta ? `Cuenta ${folioCuenta}` : "Ticket nuevo")}
           </span>
-          {!simple && botonLimpiar}
+          {simple ? menuTienda : botonLimpiar}
         </div>
         {/* Modo de servicio — SOLO LECTURA. El modo se elige en la pantalla de inicio (una venta
             no cambia de modo a media captura); aquí se muestra para que el cajero no pierda de
@@ -313,7 +355,7 @@ export function SidebarTicket({
               autoFocus
               defaultValue={estado.notaOrden ?? ""}
               maxLength={300}
-              placeholder="Nota para cocina de toda la orden…"
+              placeholder={simple ? "Nota de la venta…" : "Nota para cocina de toda la orden…"}
               className="mt-1.5 h-10 w-full rounded border border-line-strong px-3 text-13 outline-none focus:border-ink"
               onBlur={(e) => { onNotaOrden?.(e.target.value.trim() || null); setNotaOrdenAbierta(false); }}
               onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
