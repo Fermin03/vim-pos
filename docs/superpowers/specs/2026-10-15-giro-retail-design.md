@@ -415,7 +415,7 @@ Queda:
 - Admin, onboarding de RETAIL: «Tus productos» lleva a /catalogo/importar-tienda y «Crea a tus cajeros con su PIN.».
 
 **Orden de lanzamiento** (nada a producción hasta terminar todos los giros de retail, Fermín 18 oct):
-1. Migraciones 0188–0202 a producción **antes** de desplegar las apps; la 0199 junto con la 0196, nunca después.
+1. Migraciones 0188–0202 y 0204 a producción **antes** de desplegar las apps; la 0199 junto con la 0196, nunca después.
 2. Publicar el instalador que trae la 0188 (martes).
 3. La 0203 (libera RETAIL), siempre después del instalador.
 4. Desplegar provisionar-tenant, signup-tenant y solicitar-demo.
@@ -423,4 +423,4 @@ Queda:
 
 **Sitio y PDF.** La página de sitio y el PDF de prospectos para tiendas esperan a que existan todos los giros de retail (Fermín estuvo de acuerdo el 18 oct).
 
-**Pendiente para Fermín.** Cancelar (con dinero) una venta de cambio devuelve todo el cobro, mientras la venta original conserva sus puntos.
+**Decidido por Fermín (18 oct), 0204.** Si al cliente se le regresa dinero por la venta de un cambio (cancelarla con dinero o devolverla; también cancelar la venta abierta de un cambio, que le regresa lo que cubría la prenda), la venta original pierde sus puntos en proporción a lo que se le regresa: (devuelto / total del cambio) × (lo que cubría la prenda / total de la venta original). En una cadena de cambios se sube hasta la venta original. Cancelar sin dinero no quita puntos. Smoke: `smoke_caja_tienda.sql` §9.
