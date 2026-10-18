@@ -108,7 +108,7 @@ describe("buscar ventas por la prenda escaneada", () => {
 
 describe("pago que se puede cambiar", () => {
   const ticket = (id: string) => ({ id, client_id_local: `llave-${id}`, folio_completo: `A-${id}`, total_mxn: 399, fecha_pago: null, estado_fiscal: "PAGADO" });
-  const armar = async (pagos: { metodo_pago: string; client_id_local: string | null }[]) => {
+  const armar = async (pagos: { metodo_pago: string; client_id_local: string | null; monto_mxn?: string }[]) => {
     falso.fijar((c) => c.tabla === "tickets" ? [ticket("t1")]
       : c.tabla === "pagos" ? pagos.map((p) => ({ ticket_id: "t1", ...p }))
       : []);
@@ -127,6 +127,12 @@ describe("pago que se puede cambiar", () => {
   it("una venta normal con un pago lo ofrece; con pago dividido, no", async () => {
     expect(await armar([{ metodo_pago: "EFECTIVO", client_id_local: null }])).toEqual({ metodo: "EFECTIVO" });
     expect(await armar([{ metodo_pago: "EFECTIVO", client_id_local: "a" }, { metodo_pago: "TARJETA_CREDITO", client_id_local: "b" }])).toBeNull();
+  });
+  it("la venta de un cambio trae lo que cubre la prenda; una venta normal, nada", async () => {
+    await armar([{ metodo_pago: "EFECTIVO", client_id_local: "llave-t1-pago", monto_mxn: "100.00" }]);
+    expect((await buscarVentaPorFolio("tok", "A-t1", "suc-1"))?.pagoInterno).toBe(100);
+    await armar([{ metodo_pago: "EFECTIVO", client_id_local: null }]);
+    expect((await buscarVentaPorFolio("tok", "A-t1", "suc-1"))?.pagoInterno).toBeUndefined();
   });
   it("solo cuentan los pagos vigentes", async () => {
     await armar([]);

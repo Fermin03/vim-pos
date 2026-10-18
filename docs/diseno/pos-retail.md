@@ -65,7 +65,7 @@ folio o escaneando una prenda (30 días). Al tocar una venta se ve su detalle, c
 **Cambiar pago** (solo cuando la venta tiene exactamente un pago real; una venta de cambio de talla
 se pagó con la prenda devuelta y no tiene pago que cambiar).
 Reemplaza a las entradas sueltas de Devoluciones y de Cambio de talla; el botón grande del ticket
-vacío se queda como atajo al cambio. Abrir una cuenta la carga en el Panel para cobrarla. «Cobrar» con $0 pendiente (por ejemplo, un cambio parejo) cierra la cuenta sin abrir el modal de pago.
+vacío se queda como atajo al cambio. Abrir una cuenta la carga en el Panel para cobrarla. Una cuenta abierta que ya trae pagos (la venta de un cambio, reabierta) muestra en el botón lo **pendiente**, no el total; con $0 pendiente (un cambio parejo) el botón dice «Cerrar venta», cierra la cuenta sin abrir el modal de pago y «Cobro completado» dice «Sin cobro». Reabrir esa venta no anula la prenda devuelta: su aviso dice que solo se anula lo que el cliente pagó aparte.
 
 Solo salen las cuentas de **esta caja**: el pago se asienta en la caja y el turno del ticket. En el
 restaurante, «Cuentas abiertas · Para llevar» muestra las de toda la sucursal; ver el hallazgo en el

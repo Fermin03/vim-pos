@@ -1426,7 +1426,7 @@ export function HomePos({
 
   /** Lo que sigue a una venta cobrada: limpiar la pantalla, «Cobro completado», el ticket impreso,
    *  la comanda de Para llevar y el cierre del reparto. Del cobro, y de «Cobrar» con saldo 0. */
-  const cobroTerminado = useCallback(async (ticketId: string, folio: string | null, cambio: number, total: number) => {
+  const cobroTerminado = useCallback(async (ticketId: string, folio: string | null, cambio: number, total: number | null) => {
     // Lealtad: una cuenta cobrada ya no puede terminar un canje a medias; si quedó uno
     // guardado en este dispositivo, se limpia para que no viva para siempre. Nunca estorba al cobro.
     try {
@@ -1591,7 +1591,8 @@ export function HomePos({
       setProcesandoCobro(true);
       try {
         const cerrada = await cerrarSiYaCubierta(token, cuenta.ticketId);
-        if (cerrada) { await cobroTerminado(cerrada.ticketId, cerrada.folio, cerrada.cambio, cerrada.total); return; }
+        // Sin total: no se cobró nada aquí, y «Cobro completado» no debe anunciarlo como cobrado.
+        if (cerrada) { await cobroTerminado(cerrada.ticketId, cerrada.folio, cerrada.cambio, null); return; }
       } catch (e) {
         setError(e instanceof Error ? e.message : "No se pudo cerrar la cuenta");
         return;
@@ -2345,6 +2346,7 @@ export function HomePos({
           ticketId={reabriendoTx.ticketId}
           folio={reabriendoTx.folio}
           total={reabriendoTx.total}
+          pagoInterno={reabriendoTx.pagoInterno}
           cajaId={turno.caja_id}
           turnoId={turno.id}
           onReabierto={() => { const id = reabriendoTx.ticketId; setReabriendoTx(null); setTxVersion((v) => v + 1); void abrirDesdeTransacciones(id); }}
@@ -3189,6 +3191,8 @@ export function HomePos({
               }
             : null}
           totalConDescuento={totalAutoritativo ?? undefined}
+          // La venta de un cambio, reabierta, ya trae el pago de la prenda: «Cobrar» pide solo lo que falta.
+          pendienteMxn={capturaTienda && totalAutoritativo != null && ticketBd?.estadoFiscal === "ABIERTO" && ticketBd.montoPagado > 0 ? ticketBd.pendiente : undefined}
           bloqueado={bloqueado}
           procesando={procesandoCobro}
         />

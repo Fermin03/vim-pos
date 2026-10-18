@@ -34,6 +34,7 @@ export function CobroCompletado({
 }: {
   folio: string | null;
   cambio: number;
+  /** null = la cuenta se cerró sin cobrar nada (ya estaba cubierta): «Sin cobro». */
   total: number | null;
   estadoTicket: "idle" | "lista" | "error";
   /** El recibo ya se armó. */
@@ -97,9 +98,9 @@ export function CobroCompletado({
             )}
           </>
         ) : (
-          total != null && (
-            <div className="mt-2 text-16 font-medium tabular-nums text-ink-2">Total {fmtMxn(total)} · sin cambio</div>
-          )
+          <div className="mt-2 text-16 font-medium tabular-nums text-ink-2">
+            {total != null ? `Total ${fmtMxn(total)} · sin cambio` : "Sin cobro"}
+          </div>
         )}
 
         {estadoTicket === "error" && (

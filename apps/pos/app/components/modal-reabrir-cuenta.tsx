@@ -7,6 +7,7 @@ import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
 import { AvisoAutorizacion } from "./motivo-y-autorizacion";
 import { reabrirCuenta } from "../lib/cuentas-acciones";
 import { fmtMxn } from "../lib/turno";
+import { redondearCentavos } from "../lib/dinero";
 
 const ROLES_POST_COBRO = ["SUPERVISOR", "ADMIN", "DUENO"];
 const PERMISO = "venta.editar_post_cobro";
@@ -21,6 +22,7 @@ export function ModalReabrirCuenta({
   total,
   cajaId,
   turnoId,
+  pagoInterno,
   onReabierto,
   onCerrar,
 }: {
@@ -31,6 +33,9 @@ export function ModalReabrirCuenta({
   total: number;
   cajaId: string;
   turnoId: string;
+  /** Venta de un cambio de talla: lo que cubre la prenda devuelta (su pago interno, que reabrir
+   *  no anula, 0201). Sin esto (restaurante, venta normal), el aviso de siempre. */
+  pagoInterno?: number;
   onReabierto: () => void;
   onCerrar: () => void;
 }) {
@@ -41,6 +46,8 @@ export function ModalReabrirCuenta({
 
   const tienePermisoRol = ROLES_POST_COBRO.includes(empleado.rol);
   const motivoFinal = motivo.trim() || "Reapertura de cuenta";
+  // Lo que el cliente pagó aparte de la prenda: en un cambio es lo único que reabrir anula.
+  const aparte = pagoInterno == null ? null : Math.max(redondearCentavos(total - pagoInterno), 0);
 
   function payload(): PayloadAutorizacion {
     return {
@@ -92,7 +99,7 @@ export function ModalReabrirCuenta({
       <ModalAutorizacionPin
         token={token}
         payload={payload()}
-        descripcion={`Reabrir cuenta · folio ${folio ?? ""} · ${fmtMxn(total)}`}
+        descripcion={`Reabrir cuenta · folio ${folio ?? ""} · ${aparte == null ? fmtMxn(total) : `se anula ${fmtMxn(aparte)}`}`}
         ejecutaNombre={empleado.nombre}
         onAutorizado={(a) => ejecutar(a)}
         onCancelar={() => setPidiendoPin(false)}
@@ -111,7 +118,15 @@ export function ModalReabrirCuenta({
       </div>
 
       <div className="mb-4 rounded border border-warning-line bg-warning-soft px-3 py-2 text-13 font-medium text-warning">
-        La cuenta vuelve a <b>abierta</b> para editarla o volver a cobrarla. Se <b>anula el pago</b> registrado y el efectivo deja de contar en el corte hasta que se cobre de nuevo. El folio se conserva.
+        La cuenta vuelve a <b>abierta</b> para editarla o volver a cobrarla.{" "}
+        {aparte == null ? (
+          <>Se <b>anula el pago</b> registrado y el efectivo deja de contar en el corte hasta que se cobre de nuevo.</>
+        ) : aparte > 0 ? (
+          <>Se anula solo lo que el cliente pagó aparte; la prenda devuelta sigue cubriendo {fmtMxn(pagoInterno ?? 0)}.</>
+        ) : (
+          <>No se anula ningún pago: la prenda devuelta cubre la venta.</>
+        )}{" "}
+        El folio se conserva.
       </div>
 
       <label className="mb-1.5 block text-13 font-medium text-ink-2">Motivo (opcional)</label>

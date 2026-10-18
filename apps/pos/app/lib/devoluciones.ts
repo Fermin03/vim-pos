@@ -188,6 +188,8 @@ export type VentaDevolvible = {
    * queda ninguno (cambio pagado solo con la prenda) o hay más de uno (pago dividido).
    */
   pagoCambiable: { metodo: string } | null;
+  /** Venta de un cambio: lo que cubre la prenda devuelta (su pago interno, que reabrir no anula). */
+  pagoInterno?: number;
   renglones: RenglonVenta[];
 };
 
@@ -286,11 +288,11 @@ async function conRenglones(token: string, tickets: FilaTicket[]): Promise<Venta
     }
   }
 
-  const pagos: { ticket_id: string; metodo_pago: string; client_id_local: string | null }[] = [];
+  const pagos: { ticket_id: string; metodo_pago: string; client_id_local: string | null; monto_mxn: number | string }[] = [];
   for (const ids of enTrozos(tickets.map((t) => t.id))) {
     const { data, error: e3 } = await cli
       .from("pagos")
-      .select("ticket_id, metodo_pago, client_id_local")
+      .select("ticket_id, metodo_pago, client_id_local, monto_mxn")
       .in("ticket_id", ids)
       .in("estado", ["APLICADO", "CONCILIADO"])
       .is("deleted_at", null);
@@ -301,9 +303,15 @@ async function conRenglones(token: string, tickets: FilaTicket[]): Promise<Venta
   const cobro = (t: FilaTicket) => {
     const suyos = pagos.filter((p) => p.ticket_id === t.id);
     // El pago interno del cambio no se cambia (0201): se cuenta solo lo que pagó el cliente.
-    const reales = suyos.filter((p) => !t.client_id_local || p.client_id_local !== `${t.client_id_local}-pago`);
+    const esInterno = (p: (typeof pagos)[number]) => !!t.client_id_local && p.client_id_local === `${t.client_id_local}-pago`;
+    const reales = suyos.filter((p) => !esInterno(p));
+    const interno = suyos.find(esInterno);
     const pagadaEnLinea = suyos.some((p) => p.metodo_pago === "PAGO_EN_LINEA");
-    return { pagadaEnLinea, pagoCambiable: reales.length === 1 && !pagadaEnLinea ? { metodo: reales[0]!.metodo_pago } : null };
+    return {
+      pagadaEnLinea,
+      pagoCambiable: reales.length === 1 && !pagadaEnLinea ? { metodo: reales[0]!.metodo_pago } : null,
+      ...(interno ? { pagoInterno: Number(interno.monto_mxn) } : {}),
+    };
   };
 
   return tickets.map((t) => ({

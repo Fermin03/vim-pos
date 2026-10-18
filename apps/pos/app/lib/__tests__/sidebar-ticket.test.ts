@@ -47,3 +47,23 @@ describe("SidebarTicket", () => {
     expect(pintar({ ...comun, tienda: { ...tienda, simple: true } })).not.toContain("Descuento o precio del producto");
   });
 });
+
+describe("SidebarTicket: Cobrar de una cuenta con pagos", () => {
+  const linea = { clientId: "l1", producto: { id: "p1", nombre: "Polo", precio_base_mxn: 116 }, cantidad: 1, modificadores: [], notaCocina: null };
+  const estado = { ...base.estado, lineas: [linea] } as unknown as typeof base.estado;
+  const comun = { estado, totalConDescuento: 116 };
+
+  it("sin nada pendiente dice «Cerrar venta», sin monto", () => {
+    const html = pintar({ ...comun, pendienteMxn: 0 });
+    expect(html).toContain("Cerrar venta");
+    expect(html).not.toMatch(/Cobrar[^<]*<span[^>]*>\$116/);
+  });
+  it("con saldo parcial cobra lo pendiente, no el total", () => {
+    const html = pintar({ ...comun, pendienteMxn: 16 });
+    expect(html).toMatch(/Cobrar[^<]*<span[^>]*>\$16\.00/);
+    expect(html).not.toContain("Cerrar venta");
+  });
+  it("sin pendiente (restaurante) cobra el total", () => {
+    expect(pintar(comun)).toMatch(/Cobrar[^<]*<span[^>]*>\$116\.00/);
+  });
+});

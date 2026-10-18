@@ -63,6 +63,7 @@ export function SidebarTicket({
   onAplicarDescuento,
   descuentoMxn = 0,
   totalConDescuento,
+  pendienteMxn,
   promocionMxn = 0,
   lealtad = null,
   lealtadMxn = 0,
@@ -123,6 +124,9 @@ export function SidebarTicket({
   descuentoMxn?: number;
   /** Total autoritativo de la BD cuando el ticket ya está persistido; si falta, se usa el display. */
   totalConDescuento?: number;
+  /** Saldo de una cuenta abierta que ya trae pagos (la venta de un cambio, reabierta): «Cobrar»
+   *  enseña lo que falta y, en 0, «Cerrar venta». Sin esto, el total. */
+  pendienteMxn?: number;
   /** Rebajado por promociones del negocio. Renglón propio: si se sumara al descuento, el
    *  cliente vería bajar el total sin que nada en pantalla diga por qué. */
   promocionMxn?: number;
@@ -669,10 +673,12 @@ export function SidebarTicket({
         >
           {procesando ? (
             "Procesando…"
+          ) : pendienteMxn != null && pendienteMxn <= 0 ? (
+            "Cerrar venta"
           ) : (
             <>
               Cobrar{" "}
-              <span className="font-display tabular-nums">{fmtMxn(totalFinal)}</span>
+              <span className="font-display tabular-nums">{fmtMxn(pendienteMxn ?? totalFinal)}</span>
             </>
           )}
         </button>
