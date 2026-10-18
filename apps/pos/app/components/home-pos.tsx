@@ -3320,7 +3320,7 @@ export function HomePos({
           producto={modGrupos.producto}
           grupos={modGrupos.grupos}
           inicial={modGrupos.edicion ? { modificadores: modGrupos.edicion.modificadores, nota: modGrupos.edicion.notaCocina } : null}
-          cantidadLinea={modGrupos.edicion?.cantidad ?? 1}
+          cantidadLinea={modGrupos.edicion && !aGranel(modGrupos.edicion.producto.tipoVenta) ? modGrupos.edicion.cantidad : 1}
           onConfirmar={confirmarModificadores}
           onCancelar={() => setModGrupos(null)}
         />
@@ -3407,6 +3407,7 @@ export function HomePos({
           ticketItemId={descuentoItem.id}
           productoNombre={descuentoItem.productoNombre}
           cantidad={descuentoItem.cantidad}
+          tipoVenta={descuentoItem.tipoVenta}
           totalItem={descuentoItem.totalItemMxn}
           cajaId={turno.caja_id}
           turnoId={turno.id}

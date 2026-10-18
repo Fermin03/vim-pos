@@ -188,7 +188,8 @@ export function aplicarEdicion(
  * La primera línea conserva el `clientId` de la original; la separada lleva uno nuevo.
  */
 export function lineasDeEdicion(original: LineaCarrito, editada: LineaCarrito, alcance: AlcanceEdicion): LineaCarrito[] | null {
-  if (alcance === "una" && original.cantidad > 1) {
+  // Un renglón a granel es UNA pesada: se edita completo (1.25 kg no se parte en 0.25 + 1).
+  if (alcance === "una" && original.cantidad > 1 && !aGranel(original.producto.tipoVenta)) {
     if (mismaLinea(original, editada)) return null;
     return [{ ...original, cantidad: original.cantidad - 1 }, { ...editada, clientId: nuevoClientId(), cantidad: 1 }];
   }

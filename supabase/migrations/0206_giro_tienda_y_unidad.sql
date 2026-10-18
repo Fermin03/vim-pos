@@ -122,8 +122,11 @@ CREATE TRIGGER trg_productos_unidad_sat
   BEFORE INSERT OR UPDATE OF tipo_venta, controla_existencias ON productos
   FOR EACH ROW EXECUTE FUNCTION productos_unidad_sat();
 
--- Lo que ya lleva existencias queda en Pieza.
-UPDATE productos SET unidad_sat = 'H87' WHERE controla_existencias AND unidad_sat IS NULL;
+-- Lo que ya lleva existencias queda en Pieza; lo que ya es granel, en su unidad (la misma regla
+-- del trigger). Pieza sin existencias (restaurante) no se toca.
+UPDATE productos
+   SET unidad_sat = CASE tipo_venta::text WHEN 'PESO' THEN 'KGM' WHEN 'LONGITUD' THEN 'MTR' WHEN 'VOLUMEN' THEN 'LTR' ELSE 'H87' END
+ WHERE (controla_existencias AND unidad_sat IS NULL) OR tipo_venta <> 'UNIDAD';
 
 -- ── §4 La variante hereda tipo_venta ─────────────────────────────────────────
 -- Cuerpo de la 0190 §1 con tipo_venta junto a clave_sat y unidad_sat.

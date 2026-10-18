@@ -14,6 +14,17 @@ BEGIN
   RAISE NOTICE '1 valores de enum OK';
 END $$;
 
+-- 1b) Tras el backfill de la 0206 ningún granel queda con otra unidad que la suya.
+DO $$
+DECLARE v_n int;
+BEGIN
+  SELECT count(*) INTO v_n FROM productos
+   WHERE tipo_venta <> 'UNIDAD'
+     AND unidad_sat IS DISTINCT FROM CASE tipo_venta::text WHEN 'PESO' THEN 'KGM' WHEN 'LONGITUD' THEN 'MTR' WHEN 'VOLUMEN' THEN 'LTR' END;
+  IF v_n > 0 THEN RAISE EXCEPTION '1b: % productos a granel con unidad_sat ajena', v_n; END IF;
+  RAISE NOTICE '1b backfill de unidad OK';
+END $$;
+
 -- Fixture: módulo de existencias encendido y una categoría de granel.
 DO $$
 BEGIN

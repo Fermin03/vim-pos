@@ -1,5 +1,6 @@
 "use client";
 import { employeeClient } from "./supabase";
+import { tipoDesdeSat, type TipoVenta } from "./unidades";
 
 // ── F6.2: Cancelar ticket completo ────────────────────────────────────────
 
@@ -92,6 +93,8 @@ export type ItemTicket = {
   clientId: string;
   productoNombre: string;
   cantidad: number;
+  /** Desde `unidad_sat_snapshot`: kilo, metro o litro; pieza (o restaurante), undefined. */
+  tipoVenta: TipoVenta | undefined;
   totalItemMxn: number;
   estadoCocina: string | null;
   /** El renglón ya salió en una comanda (0069). Ya no se edita (0119); se cancela con motivo. */
@@ -110,7 +113,7 @@ export async function leerItemsPersistidos(token: string, ticketId: string): Pro
   const sb = employeeClient(token);
   const [itemsRes, ticketRes] = await Promise.all([
     sb.from("ticket_items")
-      .select("id, client_id_local, producto_nombre_snapshot, cantidad, total_item_mxn, enviado_cocina_at")
+      .select("id, client_id_local, producto_nombre_snapshot, cantidad, unidad_sat_snapshot, total_item_mxn, enviado_cocina_at")
       .eq("ticket_id", ticketId)
       .eq("cancelado", false)
       // Los cargos (envío) no son productos: no se cancelan desde aquí —se quitan cambiando la
@@ -131,6 +134,7 @@ export async function leerItemsPersistidos(token: string, ticketId: string): Pro
     client_id_local: string | null;
     producto_nombre_snapshot: string;
     cantidad: number;
+    unidad_sat_snapshot: string | null;
     total_item_mxn: string | number;
     enviado_cocina_at: string | null;
   }[];
@@ -139,6 +143,7 @@ export async function leerItemsPersistidos(token: string, ticketId: string): Pro
     clientId: r.client_id_local ?? r.id,
     productoNombre: r.producto_nombre_snapshot,
     cantidad: Number(r.cantidad),
+    tipoVenta: tipoDesdeSat(r.unidad_sat_snapshot),
     totalItemMxn: Number(r.total_item_mxn),
     estadoCocina,
     enviadoCocina: r.enviado_cocina_at != null,

@@ -6,6 +6,7 @@ import { agruparTienda, buscarVitrina, destinoInventario, estadoExistencia, reng
 import { useEscaner } from "../lib/use-escaner";
 import { avisoCantidad, ExistenciasApagadas, masUna, recibirEnCaja, textoRecibido, SinPermisoRecibir } from "../lib/recibir-caja";
 import { sonarError } from "./venta-retail";
+import { aGranel, unidadDeVenta } from "../lib/unidades";
 import { piezas, SelectorVariantes, textoActualizado } from "./selector-variantes";
 
 type Pestana = "existencias" | "recibir";
@@ -374,6 +375,7 @@ export function SeccionInventario({
                               onBlur={alSoltarCampo}
                               className="h-11 w-24 flex-shrink-0 rounded border border-line-strong bg-surface px-3 text-right font-display text-18 font-bold tabular-nums text-ink outline-none focus:border-ink"
                             />
+                            {aGranel(r.producto.tipoVenta) && <span className="-ml-1.5 flex-shrink-0 text-15 font-semibold text-ink-2">{unidadDeVenta(r.producto.tipoVenta).abrev}</span>}
                             <button
                               type="button"
                               onClick={() => setRenglones((rs) => rs.filter((x) => x.producto.id !== r.producto.id))}

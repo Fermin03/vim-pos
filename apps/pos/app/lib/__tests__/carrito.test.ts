@@ -190,6 +190,11 @@ describe("lineasDeEdicion: lo que la cuenta de mesa manda a la base", () => {
   it("'todas': una sola línea con la cantidad de la editada", () => {
     expect(lineasDeEdicion(burger(3), burger(3, []), "todas")!.map((l) => l.cantidad)).toEqual([3]);
   });
+  it("un renglón a granel se edita completo: 1.25 kg no se parte en 0.25 + 1", () => {
+    const pesada: LineaCarrito = { ...burger(1.25), producto: { ...prod("j", "Jitomate", 28), tipoVenta: "PESO" } };
+    const r = lineasDeEdicion(pesada, { ...pesada, modificadores: [] }, "una")!;
+    expect(r.map((l) => [l.cantidad, l.modificadores.length])).toEqual([[1.25, 0]]);
+  });
   it("sin cambios devuelve null: no se llama a la base", () => {
     expect(lineasDeEdicion(burger(3), burger(3), "una")).toBeNull();
     expect(lineasDeEdicion(burger(1), burger(1), "todas")).toBeNull();

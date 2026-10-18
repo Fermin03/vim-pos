@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button, Modal } from "@vim/ui/styles";
 import { type Empleado } from "../lib/supabase";
 import { fmtMxn } from "../lib/turno";
+import { cantidadRenglon, type TipoVenta } from "../lib/unidades";
 import {
   aplicarDescuento,
   MOTIVOS,
@@ -32,6 +33,7 @@ export function ModalDescuentoItem({
   ticketItemId,
   productoNombre,
   cantidad,
+  tipoVenta,
   totalItem,
   cajaId,
   turnoId,
@@ -44,6 +46,7 @@ export function ModalDescuentoItem({
   ticketItemId: string;
   productoNombre: string;
   cantidad: number;
+  tipoVenta: TipoVenta | undefined;
   totalItem: number;
   cajaId: string;
   turnoId: string;
@@ -143,7 +146,7 @@ export function ModalDescuentoItem({
       className="w-[440px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]">
       <div className="mb-5">
         <h2 className="font-display text-xl font-semibold tracking-tight">Ajustar ítem</h2>
-        <p className="mt-0.5 text-13 text-ink-3">{cantidad}× {productoNombre} · {fmtMxn(totalItem)}</p>
+        <p className="mt-0.5 text-13 text-ink-3">{cantidadRenglon(cantidad, tipoVenta)} {productoNombre} · {fmtMxn(totalItem)}</p>
       </div>
 
       <div className="mb-4 inline-flex w-full gap-0.5 rounded border border-line bg-hover p-[3px]">

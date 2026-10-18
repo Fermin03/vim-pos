@@ -450,8 +450,8 @@ describe("construirTicketJob — cantidades con unidad (tienda)", () => {
       { cantidad: 2, nombre: "Playera", totalMxn: 300, modificadores: [], notaCocina: null, precioUnitario: 150, unidadSat: "H87" },
     ],
   } as DatosTicketImpresion);
-  it("a granel: «1.250 kg x Jitomate» y debajo el precio por kilo", () => {
-    const i = job.bloques.findIndex((b) => b.t === "fila" && b.izq === "1.250 kg x Jitomate" && b.der === "$35.00");
+  it("a granel: «1.250 kg Jitomate» y debajo el precio por kilo", () => {
+    const i = job.bloques.findIndex((b) => b.t === "fila" && b.izq === "1.250 kg Jitomate" && b.der === "$35.00");
     expect(i).toBeGreaterThan(-1);
     expect(job.bloques[i + 1]).toEqual({ t: "texto", valor: "   $28.00/kg", size: 1 });
   });
