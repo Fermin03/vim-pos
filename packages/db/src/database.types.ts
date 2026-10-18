@@ -15654,6 +15654,8 @@ export type Database = {
         | "PAGO_AL_RECIBIR"
         | "OTRO"
         | "PAGO_EN_LINEA"
+        | "CREDITO"
+        | "SALDO_FAVOR"
       modificador_naturaleza:
         | "EXTRA"
         | "SUSTITUCION"
@@ -16118,6 +16120,8 @@ export const Constants = {
         "PAGO_AL_RECIBIR",
         "OTRO",
         "PAGO_EN_LINEA",
+        "CREDITO",
+        "SALDO_FAVOR",
       ],
       modificador_naturaleza: [
         "EXTRA",

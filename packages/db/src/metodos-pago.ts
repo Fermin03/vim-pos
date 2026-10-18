@@ -31,6 +31,9 @@ export const ETIQUETA_METODO_PAGO: Record<MetodoPago, string> = {
   PAGO_AL_RECIBIR: "Pago al recibir",
   /** Pedido de la tienda en línea que el cliente pagó con Mercado Pago antes de llegar a la caja. */
   PAGO_EN_LINEA: "Pago en línea",
+  /** Venta a cuenta del cliente (retail, 0207): no es dinero recibido. */
+  CREDITO: "A crédito",
+  SALDO_FAVOR: "Saldo a favor",
   OTRO: "Otro",
 };
 
