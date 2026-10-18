@@ -55,13 +55,11 @@ BEGIN
     RAISE EXCEPTION '2f: encender existencias no se reflejó';
   END IF;
 
-  -- Nadie pasa a RETAIL todavía.
-  BEGIN
-    PERFORM cambiar_giro(v_t, 'RETAIL', true);
-    RAISE EXCEPTION '2g: cambiar_giro debía rechazar RETAIL';
-  EXCEPTION WHEN OTHERS THEN
-    IF SQLERRM NOT LIKE 'GIRO_NO_DISPONIBLE%' THEN RAISE; END IF;
-  END;
+  -- Un negocio pasa a RETAIL (0203) y recibe el juego inicial del giro.
+  PERFORM cambiar_giro(v_t, 'RETAIL', true);
+  IF (SELECT operacion FROM tenants WHERE id = v_t) IS DISTINCT FROM juego_inicial_de_giro('RETAIL') THEN
+    RAISE EXCEPTION '2g: cambiar_giro a RETAIL no dejó el juego inicial';
+  END IF;
   RAISE NOTICE '2 giro RETAIL y módulo existencias OK';
 END $$;
 

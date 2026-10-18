@@ -59,10 +59,13 @@ Un restaurante no ve nada de esto: su inicio, su menú y su captura quedan igual
 
 La lista de ventas. Arriba las **cuentas abiertas de esta caja** (por ejemplo, la de un cambio con
 diferencia por cobrar, o una venta que se dejó abierta), luego las ventas del turno. Búsqueda por
-folio o escaneando una prenda (30 días). Al tocar una venta se ve su detalle, con tres acciones:
-**Reimprimir**, **Devolver** y **Cambio de talla** (esta última no sale en una venta facturada).
+folio o escaneando una prenda (30 días). Al tocar una venta se ve su detalle, con cinco acciones:
+**Reimprimir**, **Devolver**, **Cambio de talla** (esta última no sale en una venta facturada),
+**Reabrir** (no sale si alguna línea tiene devoluciones ni si la venta se pagó en línea) y
+**Cambiar pago** (solo cuando la venta tiene exactamente un pago real; una venta de cambio de talla
+se pagó con la prenda devuelta y no tiene pago que cambiar).
 Reemplaza a las entradas sueltas de Devoluciones y de Cambio de talla; el botón grande del ticket
-vacío se queda como atajo al cambio. Abrir una cuenta la carga en el Panel para cobrarla.
+vacío se queda como atajo al cambio. Abrir una cuenta la carga en el Panel para cobrarla. «Cobrar» con $0 pendiente (por ejemplo, un cambio parejo) cierra la cuenta sin abrir el modal de pago.
 
 Solo salen las cuentas de **esta caja**: el pago se asienta en la caja y el turno del ticket. En el
 restaurante, «Cuentas abiertas · Para llevar» muestra las de toda la sucursal; ver el hallazgo en el

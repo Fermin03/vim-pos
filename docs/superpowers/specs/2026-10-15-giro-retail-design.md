@@ -403,3 +403,24 @@ Queda:
   el método de pago, cuadrando el pago interno del cambio. Se hace en la entrega 5.
 
 **Hallazgo del restaurante, para Fermín (R5, fuera del giro).** «Cuentas abiertas · Para llevar» del restaurante lista las cuentas de **toda la sucursal**. Si se cobra una cuenta abierta desde otra caja, el pago se asienta en el turno de **esa otra caja** (el de la caja que abrió la cuenta), mientras el efectivo cae en el cajón de la caja que cobró. Los dos cortes quedan descuadrados. La tienda ya filtra por caja; el restaurante se dejó como estaba. Pega en un POS web con varias cajas.
+
+### Entrega 5, 18 oct: abrir RETAIL
+
+**Qué cerró.**
+- 0200: un cambio de talla ni suma ni revierte lealtad (`lealtad_acumular_por_ticket` salta las ventas de cambio; la devolución CAMBIO_TALLA no revierte puntos), y su venta abierta rechaza promociones y canje de lealtad.
+- 0201: `reabrir_ticket_pagado` nunca cancela el pago interno del cambio (`<client_id_local>-pago`); `cambiar_forma_pago_ticket` lo ignora y, si no hay otro pago, responde «DATOS_INVALIDOS: esta venta se pagó con la prenda devuelta; no hay pago que cambiar».
+- 0202: `prospectos` acepta RETAIL; RETAIL en signup, provisionar-tenant, solicitar-demo, /registro del admin y /platform (`ofrecido: true`).
+- 0203: `cambiar_giro` deja de rechazar RETAIL. BAR, CAFETERIA y TAQUERIA siguen bloqueados.
+- Caja: Transacciones tiene «Reabrir» (oculto si alguna línea tiene devoluciones o la venta se pagó en línea) y «Cambiar pago» (solo con exactamente un pago real); «Cobrar» con $0 pendiente cierra la cuenta sin el modal de pago; una venta de cambio nunca ofrece el canje.
+- Admin, onboarding de RETAIL: «Tus productos» lleva a /catalogo/importar-tienda y «Crea a tus cajeros con su PIN.».
+
+**Orden de lanzamiento** (nada a producción hasta terminar todos los giros de retail, Fermín 18 oct):
+1. Migraciones 0188–0202 a producción **antes** de desplegar las apps; la 0199 junto con la 0196, nunca después.
+2. Publicar el instalador que trae la 0188 (martes).
+3. La 0203 (libera RETAIL), siempre después del instalador.
+4. Desplegar provisionar-tenant, signup-tenant y solicitar-demo.
+5. Mezclar.
+
+**Sitio y PDF.** La página de sitio y el PDF de prospectos para tiendas esperan a que existan todos los giros de retail (Fermín estuvo de acuerdo el 18 oct).
+
+**Pendiente para Fermín.** Cancelar (con dinero) una venta de cambio devuelve todo el cobro, mientras la venta original conserva sus puntos.
