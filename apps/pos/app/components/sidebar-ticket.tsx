@@ -623,15 +623,15 @@ export function SidebarTicket({
         </button>
         {/* Efectivo exacto: un toque en vez de cinco (Cobrar → Efectivo → Pago exacto → Cobrar).
             Es el cobro más común de mostrador. Borde de tinta: es la segunda acción del pie, no
-            una más de las grises. */}
-        <button
+            una más de las grises. En la tienda no va: Fermín prefirió el espacio para los renglones. */}
+        {!simple && <button
           type="button"
           disabled={vacio || procesando || !onEfectivoExacto}
           onClick={() => onEfectivoExacto?.()}
           className="flex h-12 w-full items-center justify-center rounded-lg border border-ink bg-surface text-16 font-bold text-ink transition-[transform,background-color] duration-150 ease-vim hover:bg-hover active:scale-[.98] disabled:cursor-default disabled:border-line-strong disabled:opacity-[.45] disabled:active:scale-100"
         >
           Efectivo exacto
-        </button>
+        </button>}
         </>
         )}
       </div>

@@ -123,7 +123,7 @@ Tres zonas, de arriba abajo a la izquierda y el ticket a la derecha (mismo ancho
 │ │ [foto]   ││ [foto]   ││ [foto]   │                           │  M · Negra · POL-M-NEG │
 │ │Playera   ││Jeans slim││Sudadera  │                           │ Total $1,646           │
 │ │$349      ││$799      ││$599 Pocas│              ‹ 1/3 ›      │ [     Cobrar     ]     │
-│ └──────────┘└──────────┘└──────────┘                           │ [ Efectivo exacto ]    │
+│ └──────────┘└──────────┘└──────────┘                           │                        │
 ├────────────────────────────────────────────────────────────────┴────────────────────────┤
 │   Panel      Inventario     Transacciones     Notificaciones     Configuración          │
 └──────────────────────────────────────────────────────────────────────────────────────────┘
@@ -216,7 +216,7 @@ Un `Modal` centrado, no un cajón lateral: la matriz necesita ancho.
   **«Cambio de talla»** grande (botón fantasma, `h-14`), porque un ticket vacío es justo el momento en
   que llega quien viene a cambiar algo.
 - **Cobrar** es el único azul, abajo, como hoy (60 px). «Quitar» y el contador de cantidad, también
-  como hoy.
+  como hoy. No hay «Efectivo exacto» (Fermín, 18 oct): ese espacio es para la lista de renglones.
 
 ### Arriba del ticket
 

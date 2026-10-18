@@ -15,14 +15,14 @@ const pintar = (p: Partial<React.ComponentProps<typeof SidebarTicket>>) => rende
 describe("SidebarTicket", () => {
   it("el restaurante conserva Precios, Descuento y En espera", () => {
     const html = pintar({});
-    for (const t of [">Precios<", ">Descuento<", ">En espera<", ">Limpiar<"]) expect(html).toContain(t);
+    for (const t of [">Precios<", ">Descuento<", ">En espera<", ">Limpiar<", "Efectivo exacto"]) expect(html).toContain(t);
     expect(html).not.toContain("Asignar cliente");
   });
 
   it("el Panel de la tienda se queda con el cliente, Limpiar y Cambio de talla", () => {
     const html = pintar({ tienda: { ...tienda, simple: true, onAsignarCliente: nada, cliente: null } });
-    for (const t of [">Precios<", ">Descuento<", ">En espera<"]) expect(html).not.toContain(t);
-    for (const t of [">Asignar cliente<", ">Limpiar<", "Cambio de talla", "Efectivo exacto"]) expect(html).toContain(t);
+    for (const t of [">Precios<", ">Descuento<", ">En espera<", "Efectivo exacto"]) expect(html).not.toContain(t);
+    for (const t of [">Asignar cliente<", ">Limpiar<", "Cambio de talla"]) expect(html).toContain(t);
     expect(html).not.toContain("Dejar abierta");
   });
 
