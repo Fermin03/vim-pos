@@ -1,6 +1,6 @@
 import type { ClienteDomicilio } from "../clientes-domicilio";
 import { describe, it, expect } from "vitest";
-import { reducerCarrito, estadoInicial, precioUnitarioLinea, totalLinea, calcularTotalesDisplay, clienteIdParaTicket, admiteClienteCuenta, aplicarEdicion, lineasDeEdicion, type LineaCarrito } from "../carrito";
+import { reducerCarrito, estadoInicial, precioUnitarioLinea, totalLinea, calcularTotalesDisplay, clienteIdParaTicket, admiteClienteCuenta, aplicarEdicion, lineasDeEdicion, lineaSuelta, type LineaCarrito } from "../carrito";
 import type { Producto } from "../catalogo";
 import type { ComboDef } from "../combos";
 
@@ -228,4 +228,16 @@ describe("agregar con sumarSiIgual (tienda)", () => {
     const e = reducerCarrito(e0, { tipo: "agregar", linea: linea("b"), sumarSiIgual: true });
     expect(e.lineas).toHaveLength(2);
   });
+});
+
+describe("lineaSuelta: la pesada con modificadores", () => {
+  it("un producto por peso con modificadores entra con la cantidad tecleada, sin juntarse", () => {
+    const queso = { ...prod("q", "Queso", 200), tipoVenta: "PESO" as const };
+    const mods = [{ opcionId: "o1", grupoNombre: "Corte", opcionNombre: "Rebanado", precioExtra: 0, cantidad: 1 }];
+    let e = reducerCarrito(estadoInicial, { tipo: "agregar", linea: lineaSuelta(queso, mods, null, 1.25) });
+    e = reducerCarrito(e, { tipo: "agregar", linea: lineaSuelta(queso, mods, null, 1.25), sumarSiIgual: true });
+    expect(e.lineas.map((l) => l.cantidad)).toEqual([1.25, 1.25]);
+    expect(totalLinea(e.lineas[0]!)).toBe(250);
+  });
+  it("sin cantidad, una pieza", () => expect(lineaSuelta(prod("p", "P", 10), [], null).cantidad).toBe(1));
 });

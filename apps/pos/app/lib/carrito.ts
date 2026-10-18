@@ -257,6 +257,10 @@ export function nuevoClientId(): string {
   return uuidV4Respaldo();
 }
 
+/** Un renglón suelto (sin combo). Una pesada a granel lleva su cantidad, también con modificadores. */
+export const lineaSuelta = (producto: Producto, modificadores: ModificadorSel[], notaCocina: string | null, cantidad = 1): LineaCarrito =>
+  ({ clientId: nuevoClientId(), producto, cantidad, modificadores, notaCocina });
+
 /** uuid v4 sin `crypto.randomUUID`. Usa `getRandomValues` (sí existe fuera de https) y, si ni eso,
  *  `Math.random`: para un id de idempotencia basta con que no choque, no con que sea secreto. */
 export function uuidV4Respaldo(): string {

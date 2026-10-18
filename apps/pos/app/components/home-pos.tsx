@@ -15,6 +15,7 @@ import {
   reducerCarrito,
   estadoInicial,
   nuevoClientId,
+  lineaSuelta,
   lineasDeEdicion,
   admiteClienteCuenta,
   clienteIdParaTicket,
@@ -303,7 +304,7 @@ export function HomePos({
   // Una tienda no tiene inicio: abre directo en la venta (modo Para llevar), pos-retail.md «Versión 2».
   const [carrito, dispatch] = useReducer(reducerCarrito, estadoInicial, (e) => (esTienda(caja) ? { ...e, modoServicio: "PARA_LLEVAR" as const } : e));
   // `edicion`: el renglón del ticket que se reabrió para cambiarle los modificadores.
-  const [modGrupos, setModGrupos] = useState<{ producto: Producto; grupos: GrupoModificadores[]; edicion?: LineaCarrito } | null>(null);
+  const [modGrupos, setModGrupos] = useState<{ producto: Producto; grupos: GrupoModificadores[]; edicion?: LineaCarrito; /** La pesada de la tienda: entra con esta cantidad. */ cantidad?: number } | null>(null);
   // ADR 0015 — combos: catálogo de defs con slots resueltos, y el drawer de armado abierto (si hay).
   const [combos, setCombos] = useState<ComboDef[]>([]);
   const [comboAbierto, setComboAbierto] = useState<{ combo: ComboDef; linea?: LineaCarrito | null; preset?: { producto: Producto; modificadores: ModificadorSel[]; notaCocina?: string | null } | null } | null>(null);
@@ -936,7 +937,7 @@ export function HomePos({
         await recargarCuenta();
         return;
       }
-      dispatch({ tipo: "agregar", linea: { clientId: nuevoClientId(), producto: p, cantidad, modificadores: mods, notaCocina: nota } });
+      dispatch({ tipo: "agregar", linea: lineaSuelta(p, mods, nota, cantidad) });
     },
     [ticketBd, token, recargarCuenta],
   );
@@ -1002,7 +1003,7 @@ export function HomePos({
           const aTiempo = await pasoConLimite(async (vigente) => {
             const grupos = await obtenerGruposDeProducto(token, p.id);
             if (!vigente()) return;
-            if (grupos.length > 0) { setModGrupos({ producto: p, grupos }); return; }
+            if (grupos.length > 0) { setModGrupos({ producto: p, grupos, ...(aGranel(p.tipoVenta) ? { cantidad } : {}) }); return; }
             if (ticketBd) await agregarSuelto(p, [], null, cantidad);
             else dispatch({ tipo: "agregar", sumarSiIgual: !aGranel(p.tipoVenta), linea: { clientId: nuevoClientId(), producto: p, cantidad, modificadores: [], notaCocina: null } });
             if (vigente()) setUltimoTienda(p.id);
@@ -1042,6 +1043,7 @@ export function HomePos({
       if (!modGrupos) return;
       const prod = modGrupos.producto;
       const edicion = modGrupos.edicion;
+      const pesada = modGrupos.cantidad;
       setModGrupos(null);
       if (edicion) {
         // Edición de un renglón ya capturado: no se ofrece combo, solo se cambia (o se separa).
@@ -1051,12 +1053,14 @@ export function HomePos({
         return;
       }
       try {
-        await ofrecerCombo(prod, mods, nota);
+        // Una pesada no ofrece combo: entra suelta con su cantidad (también a la cuenta guardada).
+        if (pesada !== undefined) await agregarSuelto(prod, mods, nota, pesada);
+        else await ofrecerCombo(prod, mods, nota);
       } catch (e) {
         setError(e instanceof Error ? e.message : "No se pudo agregar el ítem");
       }
     },
-    [modGrupos, ofrecerCombo, ticketBd, guardarEdicionEnCuenta],
+    [modGrupos, ofrecerCombo, agregarSuelto, ticketBd, guardarEdicionEnCuenta],
   );
 
   /** Confirmación del drawer de combo: agrega (o reemplaza, si venía de "Editar") la línea. */
