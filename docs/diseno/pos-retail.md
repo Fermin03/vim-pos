@@ -202,9 +202,9 @@ Un `Modal` centrado, no un cajón lateral: la matriz necesita ancho.
 
 ### El ticket
 
-- El panel de hoy (`SidebarTicket`, `RenglonItem`). En pantalla el modo se llama **«Venta»**, no «Para
-  llevar» (spec §5.2; el ticket por dentro sigue siendo `PARA_LLEVAR`). El ticket impreso y su vista
-  en pantalla también dicen «Servicio: Venta». Los textos secundarios (cuentas abiertas, cierre) aún
+- El panel de hoy (`SidebarTicket`, `RenglonItem`), **mitad y mitad** con el catálogo (Fermín, 18 oct).
+  En el Panel no se pinta la etiqueta del modo bajo «Ticket nuevo». Por dentro el ticket sigue siendo
+  `PARA_LLEVAR` (spec §5.2); el ticket impreso y su vista en pantalla dicen «Servicio: Venta». Los textos secundarios (cuentas abiertas, cierre) aún
   dicen «Para llevar».
 - Cada renglón: el nombre del padre en la primera línea y, debajo en `text-13 ink-2`, la variante y
   el SKU: «M · Negra · POL-M-NEG». Un producto sin variantes enseña solo su SKU, si tiene.
@@ -215,8 +215,10 @@ Un `Modal` centrado, no un cajón lateral: la matriz necesita ancho.
 - Con el ticket vacío, el panel no queda en blanco: dice «Escanea una prenda para empezar» y ofrece
   **«Cambio de talla»** grande (botón fantasma, `h-14`), porque un ticket vacío es justo el momento en
   que llega quien viene a cambiar algo.
-- **Cobrar** es el único azul, abajo, como hoy (60 px). «Quitar» y el contador de cantidad, también
-  como hoy. No hay «Efectivo exacto» (Fermín, 18 oct): ese espacio es para la lista de renglones.
+- **Cobrar** es el único azul, abajo, como hoy (60 px). «Quitar», también como hoy. No hay
+  «Efectivo exacto», ni contador de cantidad, ni nota por renglón, ni «Nota de la orden» (Fermín,
+  18 oct): cada escaneo es una pieza y ese espacio es para la lista de renglones. Dos escaneos de la
+  misma prenda quedan en un renglón «2×»; ahí «Quitar» saca una pieza, no el renglón entero.
 
 ### Arriba del ticket
 

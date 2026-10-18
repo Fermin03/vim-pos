@@ -208,7 +208,8 @@ export function SidebarTicket({
   // catálogo es el que tiene que caber sin scroll. En 1366 le devuelve ~90px —una columna más de
   // productos—; en 1024 es la diferencia entre 3 y 4 columnas.
   return (
-    <aside className="flex w-[clamp(18rem,26vw,26.25rem)] flex-shrink-0 flex-col border-l border-line bg-surface">
+    // En el Panel de la tienda, mitad y mitad con el catálogo (Fermín, 18 oct).
+    <aside className={`flex ${simple ? "w-1/2" : "w-[clamp(18rem,26vw,26.25rem)]"} flex-shrink-0 flex-col border-l border-line bg-surface`}>
 
       {/* ── Cabecera ─────────────────────────────────────────── */}
       <div className="flex-shrink-0 border-b border-line px-4 pb-3 pt-1.5">
@@ -256,9 +257,11 @@ export function SidebarTicket({
           {/* Sin palomita y en gris neutro: con ella parecía una opción marcada que se podía
               desmarcar, y no es un botón. */}
           <div className="flex items-center justify-between gap-2">
-            <span className="inline-flex h-8 min-w-0 items-center rounded-md bg-hover px-2.5 text-14 font-semibold text-ink-2">
-              <span className="truncate">{modoTexto ?? etiquetaModo(estado.modoServicio)}</span>
-            </span>
+            {simple ? <span /> : (
+              <span className="inline-flex h-8 min-w-0 items-center rounded-md bg-hover px-2.5 text-14 font-semibold text-ink-2">
+                <span className="truncate">{modoTexto ?? etiquetaModo(estado.modoServicio)}</span>
+              </span>
+            )}
             <span className="flex-shrink-0 text-13 font-semibold text-ink-3">
               {totalProductos} {totalProductos === 1 ? "producto" : "productos"}
             </span>
@@ -291,7 +294,7 @@ export function SidebarTicket({
             </button>
           )}
           {/* Era un texto de 12.5px sin caja: se tocaba a ciegas. */}
-          {onNotaOrden && !bloqueado && (
+          {onNotaOrden && !bloqueado && !simple && (
             <button
               type="button"
               onClick={() => setNotaOrdenAbierta((v) => !v)}
@@ -384,7 +387,8 @@ export function SidebarTicket({
                     no queda un toque libre para seleccionar. Sin sangría: a 288px de ancho es la
                     única forma de que quepan stepper, Nota y Quitar a 44px. */}
                 <div className="mt-2 flex items-center gap-1.5">
-                  <span className="inline-flex items-center rounded-md border border-line-strong bg-surface">
+                  {/* La tienda no lleva cantidad ni nota por renglón: cada escaneo es una pieza (Fermín, 18 oct). */}
+                  {!simple && <span className="inline-flex items-center rounded-md border border-line-strong bg-surface">
                     <button
                       type="button"
                       aria-label="Menos"
@@ -406,7 +410,7 @@ export function SidebarTicket({
                     >
                       <Icono nombre="mas" className="h-4 w-4" />
                     </button>
-                  </span>
+                  </span>}
                   {bloqueado && onDescuentoItem && (
                     <button
                       type="button"
@@ -418,7 +422,7 @@ export function SidebarTicket({
                       %
                     </button>
                   )}
-                  {!bloqueado && onNotaLinea && (
+                  {!bloqueado && onNotaLinea && !simple && (
                     <button
                       type="button"
                       onClick={() => setEditandoNota(editandoNota === l.clientId ? null : l.clientId)}
@@ -436,7 +440,9 @@ export function SidebarTicket({
                   <button
                     type="button"
                     disabled={bloqueado && !onCancelarItemPersistido}
-                    onClick={() => (bloqueado && onCancelarItemPersistido ? onCancelarItemPersistido(l.clientId) : onQuitar(l.clientId))}
+                    // Sin «−» en la tienda, dos escaneos de la misma prenda quedan en «2×»: Quitar saca una.
+                    onClick={() => (bloqueado && onCancelarItemPersistido ? onCancelarItemPersistido(l.clientId)
+                      : simple && l.cantidad > 1 ? onCantidad(l.clientId, l.cantidad - 1) : onQuitar(l.clientId))}
                     className={`${BOTON_RENGLON} -mr-2.5 ml-auto text-danger hover:bg-danger-soft disabled:cursor-default disabled:text-ink-3 disabled:opacity-60 disabled:hover:bg-transparent`}
                   >
                     Quitar

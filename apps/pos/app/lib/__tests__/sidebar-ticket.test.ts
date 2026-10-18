@@ -26,6 +26,18 @@ describe("SidebarTicket", () => {
     expect(html).not.toContain("Dejar abierta");
   });
 
+  it("el Panel va mitad y mitad, sin cantidad, notas ni etiqueta del modo", () => {
+    const linea = { clientId: "l1", producto: { id: "p1", nombre: "Polo", precio: 100 }, cantidad: 1, modificadores: [], notaCocina: null };
+    const estado = { ...base.estado, lineas: [linea] } as unknown as typeof base.estado;
+    const comun = { estado, onNotaOrden: nada, onNotaLinea: nada, modoTexto: "Venta" };
+    const restaurante = pintar(comun);
+    for (const t of ['aria-label="Más"', ">Nota<", "Nota de la orden", ">Venta<"]) expect(restaurante).toContain(t);
+    const panel = pintar({ ...comun, tienda: { ...tienda, simple: true } });
+    for (const t of ['aria-label="Más"', 'aria-label="Menos"', ">Nota<", "Nota de la orden", ">Venta<"]) expect(panel).not.toContain(t);
+    expect(panel).toContain(">Quitar<");
+    expect(panel).toContain("w-1/2");
+  });
+
   it("con una cuenta guardada, el Panel ofrece dejarla abierta", () => {
     const html = pintar({ tienda: { ...tienda, simple: true, onDejarAbierta: nada } });
     expect(html).toContain(">Dejar abierta<");
