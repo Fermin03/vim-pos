@@ -1,0 +1,11 @@
+-- 0199 · cancelar_ticket_pagado volvía a fallar para todos (Giro RETAIL, hallazgo del 18 oct).
+--
+-- La 0196 le agregó a cancelar_ticket_pagado una llamada a _ticket_de_cambio_abierto y a esa
+-- ayudante le quitó EXECUTE a authenticated. cancelar_ticket_pagado NO es SECURITY DEFINER: corre
+-- con el JWT del cajero, así que cualquier cancelación de ticket —de tienda o de restaurante—
+-- terminaba en «permission denied for function _ticket_de_cambio_abierto». Los smokes corren como
+-- superusuario y no lo vieron; la prueba 0040 (supabase/tests) ya mira esta clase de error.
+--
+-- Se otorga a authenticated en vez de volver SECURITY DEFINER a cancelar_ticket_pagado: la ayudante
+-- solo responde un booleano sobre un uuid, y quien la llama ya leyó ese ticket bajo RLS.
+GRANT EXECUTE ON FUNCTION _ticket_de_cambio_abierto(uuid) TO authenticated;

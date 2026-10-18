@@ -392,6 +392,7 @@ Queda:
 
 **Entrega 4b, 17 oct: notas de lanzamiento.**
 - **Las migraciones 0197 y 0198 deben estar en la nube ANTES de publicar cualquier caja con «Recibir».** La 0197 deja subir una `ENTRADA` sin ticket; la 0198 le prohíbe traer referencias a un renglón, una devolución o un traspaso. Sin ellas, la recepción se rechaza al sincronizar.
+- **La 0199 va a la nube JUNTO con la 0196, nunca después.** La 0196 hace que  (que corre con el JWT del cajero) llame a , revocada para : sin la 0199, cancelar cualquier ticket —de restaurante también— falla con «permission denied». La prueba  atrapa esta clase de error (los smokes corren como superusuario y no la ven). Hallado el 18 oct al probar el menú «⋯» de la tienda.
 - **La política de imágenes (CSP `img-src`) ahora incluye el origen de Supabase**, en la web y en el escritorio. Sin eso, las tarjetas con foto caen siempre a la inicial.
 - Las fotos necesitan internet; una caja sin conexión pinta la inicial sobre el color de la categoría.
 
