@@ -21,7 +21,7 @@ const falso = vi.hoisted(() => {
 });
 vi.mock("../supabase", () => ({ employeeClient: () => falso.cliente }));
 
-import { alcanceDevolucion, buscarVentaPorFolio, buscarVentasConProducto, itemsDevolucion, motivosDevolucion, totalDevolucion, type VentaDevolvible } from "../devoluciones";
+import { alcanceDevolucion, buscarVentaPorFolio, buscarVentasConProducto, cantidadADevolver, itemsDevolucion, motivosDevolucion, totalDevolucion, type VentaDevolvible } from "../devoluciones";
 
 const venta: VentaDevolvible = {
   ticketId: "t1",
@@ -139,5 +139,22 @@ describe("pago que se puede cambiar", () => {
     const pagos = falso.consultas.filter((c) => c.tabla === "pagos").at(-1)!;
     expect(pagos.filtros).toContainEqual(["in", "estado", ["APLICADO", "CONCILIADO"]]);
     expect(pagos.filtros).toContainEqual(["is", "deleted_at", null]);
+  });
+});
+
+describe("devolución de un renglón a granel (pantalla de devoluciones)", () => {
+  const jitomate = { ticket_item_id: "j", producto_id: "pj", nombre: "Jitomate", cantidad: 1.25, devuelta: 0, precio_unitario: 28, total: 35, unidad_sat: "KGM" };
+  const playera = { ...venta.renglones[0]!, unidad_sat: "H87" };
+  it("a granel se devuelve completo o nada", () => {
+    expect(cantidadADevolver(jitomate, 1)).toBe(1.25);
+    expect(cantidadADevolver(jitomate, 0.5)).toBe(1.25);
+    expect(cantidadADevolver(jitomate, 0)).toBe(0);
+    expect(cantidadADevolver({ ...jitomate, devuelta: 1.25 }, 1)).toBe(0);
+  });
+  it("las piezas, de una en una hasta lo que queda", () => {
+    expect(cantidadADevolver(playera, 1)).toBe(1);
+    expect(cantidadADevolver(playera, 5)).toBe(2);
+    expect(cantidadADevolver(playera, -1)).toBe(0);
+    expect(cantidadADevolver({ ...venta.renglones[0]! }, 3)).toBe(2);
   });
 });

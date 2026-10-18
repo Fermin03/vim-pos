@@ -48,6 +48,9 @@ export type LineaImpresion = {
   cargoTipo?: string | null;
   /** SKU del renglón (`producto_sku_snapshot`). Solo lo imprime una tienda: un restaurante también lo tiene. */
   sku?: string | null;
+  /** Tienda a granel: `precio_unitario_snapshot` y `unidad_sat_snapshot` (KGM, MTR, LTR), para «$28.00/kg». */
+  precioUnitario?: number;
+  unidadSat?: string | null;
 };
 
 export type PagoImpresion = {

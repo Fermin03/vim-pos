@@ -9,6 +9,8 @@
 import { z } from "zod";
 import { calcularTotalesDisplay, totalLinea, type EstadoCarrito, type LineaCarrito, type ModificadorSel } from "../carrito";
 import { redondearCentavos } from "../dinero";
+import { TIPOS_VENTA } from "@vim/db/operacion";
+import { aGranel } from "../unidades";
 
 const dinero = z.number().finite();
 
@@ -18,6 +20,8 @@ const esquemaRenglon = z.object({
   nombre: z.string(),
   detalle: z.array(z.string()),
   importe: dinero,
+  /** Solo a granel (kilo, metro, litro): la pieza no lo manda y se ve «2×» como siempre. */
+  tipoVenta: z.enum(TIPOS_VENTA).optional(),
 });
 
 export const esquemaVista = z.discriminatedUnion("fase", [
@@ -88,7 +92,10 @@ export function construirVista(e: EntradaVista): VistaCliente {
   const envioMxn = envio?.costoMxn ?? 0;
   return {
     fase: "cuenta",
-    renglones: lineas.map((l) => ({ id: l.clientId, cantidad: l.cantidad, nombre: l.producto.nombre, detalle: detalleDe(l), importe: totalLinea(l) })),
+    renglones: lineas.map((l) => ({
+      id: l.clientId, cantidad: l.cantidad, nombre: l.producto.nombre, detalle: detalleDe(l), importe: totalLinea(l),
+      ...(aGranel(l.producto.tipoVenta) ? { tipoVenta: l.producto.tipoVenta } : {}),
+    })),
     envio: envio ? { nombre: envio.nombre, importe: redondearCentavos(envio.costoMxn) } : null,
     // El mismo número que el cajero ve en el costado (`SidebarTicket`: totalConDescuento ?? totales.total).
     total: e.totalAutoritativo ?? calcularTotalesDisplay(lineas, 16, envioMxn).total,

@@ -9,7 +9,7 @@ import { fmtMxn } from "../lib/turno";
 import type { FranjaLealtad } from "../lib/lealtad-reglas";
 import { RenglonItem } from "./renglon-item";
 import { useEscape } from "../lib/use-escape";
-import { aGranel } from "../lib/unidades";
+import { aGranel, contarProductos } from "../lib/unidades";
 
 /* ── helpers ─────────────────────────────────────────────────── */
 /* ── Íconos SVG inline (del mockup P-066) ────────────────────── */
@@ -168,7 +168,7 @@ export function SidebarTicket({
   const totales = calcularTotalesDisplay(estado.lineas, 16, estado.envio?.costoMxn ?? 0);
   const vacio = estado.lineas.length === 0;
   const ultimoEnTicket = tienda?.ultimoProductoId ?? null;
-  const totalProductos = estado.lineas.reduce((s, l) => s + l.cantidad, 0);
+  const totalProductos = contarProductos(estado.lineas.map((l) => ({ cantidad: l.cantidad, tipo: l.producto.tipoVenta })));
   // Notas de cocina: qué línea se está editando + si el input de nota de orden está abierto.
   const [editandoNota, setEditandoNota] = useState<string | null>(null);
   const [notaOrdenAbierta, setNotaOrdenAbierta] = useState(false);
@@ -424,6 +424,7 @@ export function SidebarTicket({
                 >
                   <RenglonItem
                     cantidad={l.cantidad}
+                    unidad={l.producto.tipoVenta}
                     nombre={tienda ? tienda.renglon(l).nombre : l.producto.nombre}
                     detalle={tienda?.renglon(l).detalle}
                     sinExistencia={tienda?.sinExistencia(l)}

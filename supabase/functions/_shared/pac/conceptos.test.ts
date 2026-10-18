@@ -82,6 +82,13 @@ test("respeta la clave del SAT del producto cuando existe", () => {
   assert.equal(r.conceptos[0].claveUnidad, "H87");
 });
 
+test("el nombre de la unidad sale de su clave: pieza, kilo, metro, litro o servicio", () => {
+  const nombres = ["H87", "KGM", "MTR", "LTR", "E48", null].map(
+    (unidadSat) => armarConceptos([linea({ totalItemMxn: 116, ivaItemMxn: 16, unidadSat })], 116).conceptos[0].unidad,
+  );
+  assert.deepEqual(nombres, ["Pieza", "Kilogramo", "Metro", "Litro", "Servicio", "Servicio"]);
+});
+
 test("el IVA por fuera no vuelve a descontarse del precio", () => {
   const r = armarConceptos(
     [linea({ subtotalBrutoMxn: 100, totalItemMxn: 116, ivaItemMxn: 16, ivaIncluidoEnPrecio: false })],

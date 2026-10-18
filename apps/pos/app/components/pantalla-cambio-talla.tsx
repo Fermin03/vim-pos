@@ -28,6 +28,7 @@ import { obtenerImpresora } from "../lib/print/adapter";
 import { type Empleado } from "../lib/supabase";
 import { agruparTienda, buscarPorCodigo, decidirEscaneo, type Existencia, type PadreTienda } from "../lib/tienda";
 import { type DatosCaja, type Turno, fmtMxn } from "../lib/turno";
+import { aGranel, fmtCantidad, tipoDesdeSat } from "../lib/unidades";
 
 /** pos-retail.md, «Lo que no hace». */
 const FACTURADA = "Esta venta está facturada. Haz la devolución en Transacciones, con «Devolver».";
@@ -108,7 +109,9 @@ export function PantallaCambioTalla({
   }, [token, turno.id]);
 
   const padres = useMemo(() => agruparTienda(productos).padres, [productos]);
-  const vendibles = useMemo(() => productos.filter((p) => p.seVendeAqui !== false), [productos]);
+  // Lo que se vende por kilo, metro o litro no entra a un cambio: se devuelve completo.
+  const vendibles = useMemo(() => productos.filter((p) => p.seVendeAqui !== false && !aGranel(p.tipoVenta)), [productos]);
+  const cambiable = (r: RenglonVenta) => r.cantidad - r.devuelta >= 1 && !aGranel(tipoDesdeSat(r.unidad_sat));
   const renglon: RenglonVenta | undefined = venta?.renglones.find((r) => r.ticket_item_id === regresa?.ticketItemId);
   const productoRegresa = renglon?.producto_id ? productos.find((p) => p.id === renglon.producto_id) : undefined;
   const padreRegresa = productoRegresa?.producto_padre_id ? padres.get(productoRegresa.producto_padre_id) : undefined;
@@ -207,7 +210,7 @@ export function PantallaCambioTalla({
     }
     if (paso === 2) {
       const p = buscarPorCodigo(productos, codigo);
-      const r = p && venta?.renglones.find((x) => x.producto_id === p.id && x.cantidad - x.devuelta >= 1);
+      const r = p && venta?.renglones.find((x) => x.producto_id === p.id && cambiable(x));
       // Otra pieza de la misma prenda suma una, hasta las que quedan por devolver.
       if (r) setRegresa((a) => ({
         ticketItemId: r.ticket_item_id,
@@ -389,15 +392,17 @@ export function PantallaCambioTalla({
                 {venta.renglones.map((r) => {
                   const disponible = r.cantidad - r.devuelta;
                   const elegido = r.ticket_item_id === regresa?.ticketItemId;
+                  const granel = aGranel(tipoDesdeSat(r.unidad_sat));
                   const poner = (n: number) => setRegresa({ ticketItemId: r.ticket_item_id, cantidad: Math.max(1, Math.min(disponible, n)) });
                   return (
                     <li key={r.ticket_item_id} className={["flex items-center gap-3 p-3", elegido ? "bg-sel" : ""].join(" ")}>
-                      <button type="button" disabled={disponible <= 0} onClick={() => poner(1)} aria-pressed={elegido}
+                      <button type="button" disabled={!cambiable(r)} onClick={() => poner(1)} aria-pressed={elegido}
                         className="flex min-h-11 min-w-0 flex-1 flex-col items-start justify-center rounded text-left disabled:opacity-50">
                         <span className="truncate text-14 font-medium text-ink">{r.nombre}</span>
                         <span className="text-12 text-ink-3">
-                          {r.cantidad} × {fmtMxn(r.precio_unitario)}
-                          {disponible <= 0 ? " · ya devuelto" : r.devuelta > 0 ? ` · ya devueltas ${r.devuelta}` : ""}
+                          {granel
+                            ? `${fmtCantidad(r.cantidad, tipoDesdeSat(r.unidad_sat))} · se devuelve, no se cambia`
+                            : <>{r.cantidad} × {fmtMxn(r.precio_unitario)}{disponible <= 0 ? " · ya devuelto" : r.devuelta > 0 ? ` · ya devueltas ${r.devuelta}` : ""}</>}
                         </span>
                       </button>
                       {elegido && disponible > 1 && (

@@ -8,6 +8,7 @@ import { type Empleado } from "../lib/supabase";
 import {
   alcanceDevolucion,
   buscarVentaPorFolio,
+  cantidadADevolver,
   buscarVentasConProducto,
   cobradoEnTerminal,
   devolverRenglones,
@@ -28,6 +29,7 @@ import {
   type VentaTurno,
 } from "../lib/devoluciones";
 import { buscarPorCodigo, esTienda } from "../lib/tienda";
+import { aGranel, contarProductos, fmtCantidad, precioConUnidad, tipoDesdeSat } from "../lib/unidades";
 import { useEscaner } from "../lib/use-escaner";
 import { esEscritorio } from "../lib/actualizacion";
 import type { Producto } from "../lib/catalogo";
@@ -395,7 +397,7 @@ function ModalDevolucion({
           cajero: empleado.nombre,
           caja: caja.nombre,
           autorizo: null,
-          items: datos.lineas.map((l) => ({ cantidad: l.cantidad, nombre: l.nombre, totalMxn: l.totalMxn })),
+          items: datos.lineas.map((l) => ({ cantidad: l.cantidad, nombre: l.nombre, totalMxn: l.totalMxn, unidadSat: l.unidadSat })),
           motivo: labelMotivo(),
           medio: MEDIOS_DEV.find((m) => m.codigo === medio)?.label ?? medio,
           tarjetas: medio === "MISMO_METODO_PAGO" ? datos.pagos.flatMap((p) => (p.tarjeta ? [p.tarjeta] : [])) : [],
@@ -554,8 +556,9 @@ function ModalDevolucionTienda({
   onCerrar: () => void;
 }) {
   const [piezas, setPiezas] = useState<Record<string, number>>(() => {
-    const r = marcar ? venta.renglones.find((x) => x.producto_id === marcar && x.cantidad - x.devuelta >= 1) : undefined;
-    return r ? { [r.ticket_item_id]: 1 } : {};
+    // A granel, el escaneo marca el renglón completo (se devuelve todo o nada).
+    const r = marcar ? venta.renglones.find((x) => x.producto_id === marcar && cantidadADevolver(x, 1) > 0) : undefined;
+    return r ? { [r.ticket_item_id]: cantidadADevolver(r, 1) } : {};
   });
   const [anaquel, setAnaquel] = useState<Record<string, boolean>>({});
   // Sin motivo de entrada: el cajero lo elige (y con él, si la pieza vuelve al anaquel).
@@ -586,7 +589,11 @@ function ModalDevolucionTienda({
     .filter((r) => (piezas[r.ticket_item_id] ?? 0) > 0)
     .map((r) => ({ ticket_item_id: r.ticket_item_id, cantidad: piezas[r.ticket_item_id] ?? 0, regresaAlAnaquel: vuelve(r.ticket_item_id) }));
   const total = totalDevolucion(venta, renglones);
-  const nPiezas = renglones.reduce((s, r) => s + r.cantidad, 0);
+  const tipoDe = (id: string) => tipoDesdeSat(venta.renglones.find((x) => x.ticket_item_id === id)?.unidad_sat);
+  const hayGranel = venta.renglones.some((r) => aGranel(tipoDesdeSat(r.unidad_sat)));
+  // Con algo a granel en la venta se cuentan productos (cada pesada, 1); si todo es pieza, piezas como siempre.
+  const nPiezas = contarProductos(renglones.map((r) => ({ cantidad: r.cantidad, tipo: tipoDe(r.ticket_item_id) })));
+  const unidadBoton = hayGranel ? ["producto", "productos"] : ["pieza", "piezas"];
   // El reembolso a la tarjeta de Mercado Pago regresa el cobro COMPLETO: solo va solo cuando esta
   // devolución es la venta entera y nada se había devuelto antes. Por partes se hace a mano.
   const reembolsoAutomatico =
@@ -633,11 +640,10 @@ function ModalDevolucionTienda({
           cajero: empleado.nombre,
           caja: caja.nombre,
           autorizo: null,
-          items: renglones.map((r) => ({
-            cantidad: r.cantidad,
-            nombre: venta.renglones.find((x) => x.ticket_item_id === r.ticket_item_id)?.nombre ?? "",
-            totalMxn: totalDevolucion(venta, [r]),
-          })),
+          items: renglones.map((r) => {
+            const v = venta.renglones.find((x) => x.ticket_item_id === r.ticket_item_id);
+            return { cantidad: r.cantidad, nombre: v?.nombre ?? "", totalMxn: totalDevolucion(venta, [r]), unidadSat: v?.unidad_sat ?? null };
+          }),
           motivo: labelMotivo(),
           // Si el dinero aún no regresa a la tarjeta, el comprobante no dice «Devuelto a: …».
           medio: tarjetaPendiente
@@ -727,17 +733,19 @@ function ModalDevolucionTienda({
     tarjetaPendiente && renglones.length > 0
       ? `Por partes el dinero no regresa solo a la tarjeta: al confirmar, ${dondeReembolsar}.`
       : undefined;
-  const falta = renglones.length === 0 ? "Elige al menos una pieza." : !motivo ? "Elige el motivo." : undefined;
+  const falta = renglones.length === 0 ? `Elige al menos ${hayGranel ? "un producto" : "una pieza"}.` : !motivo ? "Elige el motivo." : undefined;
 
   return (
     <DialogoPeligro
       ancho="lg"
       titulo="Devolver productos"
       contexto={`${venta.folio}${venta.fechaCobro ? ` · ${fechaHora(venta.fechaCobro)}` : ""}`}
-      consecuencia="Elige qué regresa el cliente y cuántas piezas. La venta queda en el historial."
+      consecuencia={hayGranel
+        ? "Elige qué regresa el cliente. Lo que se vende por kilo, metro o litro se devuelve completo. La venta queda en el historial."
+        : "Elige qué regresa el cliente y cuántas piezas. La venta queda en el historial."}
       error={error}
       nota={falta}
-      boton={nPiezas === 1 ? "Devolver 1 pieza" : `Devolver ${nPiezas} piezas`}
+      boton={nPiezas === 1 ? `Devolver 1 ${unidadBoton[0]}` : `Devolver ${nPiezas} ${unidadBoton[1]}`}
       ocupado={procesando}
       textoOcupado="Devolviendo…"
       deshabilitado={falta !== undefined}
@@ -748,19 +756,25 @@ function ModalDevolucionTienda({
         {venta.renglones.map((r) => {
           const disponible = r.cantidad - r.devuelta;
           const n = piezas[r.ticket_item_id] ?? 0;
-          const poner = (v: number) => setPiezas((p) => ({ ...p, [r.ticket_item_id]: Math.max(0, Math.min(disponible, v)) }));
+          const tipo = tipoDesdeSat(r.unidad_sat);
+          const poner = (v: number) => setPiezas((p) => ({ ...p, [r.ticket_item_id]: cantidadADevolver(r, v) }));
           return (
             <li key={r.ticket_item_id} className="flex flex-col gap-2 p-3">
               <div className="flex items-center gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-14 font-medium text-ink">{r.nombre}</div>
                   <div className="text-12 text-ink-3">
-                    {r.cantidad} × {fmtMxn(r.precio_unitario)}
-                    {r.devuelta > 0 && ` · ya devueltas ${r.devuelta}`}
+                    {aGranel(tipo) ? fmtCantidad(r.cantidad, tipo) : r.cantidad} × {precioConUnidad(fmtMxn(r.precio_unitario), tipo)}
+                    {r.devuelta > 0 && !aGranel(tipo) && ` · ya devueltas ${r.devuelta}`}
                   </div>
                 </div>
                 {disponible <= 0 ? (
                   <span className="text-13 font-medium text-ink-3">Ya devuelto</span>
+                ) : aGranel(tipo) ? (
+                  <label className="flex h-11 cursor-pointer items-center gap-2 text-13 font-semibold text-ink">
+                    <input type="checkbox" checked={n > 0} onChange={(e) => poner(e.target.checked ? disponible : 0)} className="h-5 w-5 accent-ink" />
+                    Devolver los {fmtCantidad(disponible, tipo)}
+                  </label>
                 ) : (
                   <div className="flex items-center gap-1" role="group" aria-label={`Piezas de ${r.nombre}`}>
                     <button type="button" aria-label="Una pieza menos" disabled={n <= 0} onClick={() => poner(n - 1)}

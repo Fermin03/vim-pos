@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { aGranel, fmtCantidad, precioConUnidad, unidadDeVenta, unidadDesdeSat } from "../unidades";
+import { aGranel, cantidadRenglon, contarProductos, fmtCantidad, precioConUnidad, tipoDesdeSat, unidadDeVenta, unidadDesdeSat } from "../unidades";
 
 describe("unidades de venta", () => {
   it("la tabla completa", () => {
@@ -27,5 +27,19 @@ describe("unidades de venta", () => {
   it("precio con unidad: una pieza se ve como siempre", () => {
     expect(precioConUnidad("$28.00", "PESO")).toBe("$28.00/kg");
     expect(precioConUnidad("$28.00", "UNIDAD")).toBe("$28.00");
+  });
+});
+
+describe("cantidadRenglon", () => {
+  it("una pieza como siempre («2×»); a granel con su unidad", () => {
+    expect(cantidadRenglon(2, undefined)).toBe("2×");
+    expect(cantidadRenglon(2, "UNIDAD")).toBe("2×");
+    expect(cantidadRenglon(1.25, "PESO")).toBe("1.250 kg");
+    expect(cantidadRenglon(7.5, tipoDesdeSat("MTR"))).toBe("7.50 m");
+    expect(cantidadRenglon(3, tipoDesdeSat("E48"))).toBe("3×");
+  });
+  it("contarProductos: cada pesada cuenta 1, las piezas suman su cantidad", () => {
+    expect(contarProductos([{ cantidad: 1.25, tipo: "PESO" }, { cantidad: 2, tipo: "UNIDAD" }])).toBe(3);
+    expect(contarProductos([{ cantidad: 3, tipo: undefined }])).toBe(3);
   });
 });

@@ -442,7 +442,7 @@ export function SeccionInventario({
                         </span>
                         {lleva && (
                           <span className={`flex-shrink-0 text-right font-display text-18 font-bold tabular-nums ${COLOR[r.estado]}`}>
-                            {piezas(r.piezas)}
+                            {piezas(r.piezas, p.tipoVenta)}
                             {ETIQUETA[r.estado] && <span className="ml-2 text-13 font-semibold">{ETIQUETA[r.estado]}</span>}
                           </span>
                         )}
@@ -541,7 +541,7 @@ function ExistenciaSuelta({ producto, existencias, sucursalId, sucursales, actua
                     {s.id === sucursalId && filas.length > 1 && <span className="ml-2 text-13 font-normal text-ink-2">Esta sucursal</span>}
                   </span>
                   <span className={`font-display text-18 font-bold tabular-nums ${existencias ? COLOR[estado] : "text-ink"}`}>
-                    {existencias ? piezas(cantidad) : "—"}
+                    {existencias ? piezas(cantidad, producto.tipoVenta) : "—"}
                   </span>
                   {existencias && ETIQUETA[estado] && <span className={`text-13 font-semibold ${COLOR[estado]}`}>{ETIQUETA[estado]}</span>}
                 </li>

@@ -441,3 +441,23 @@ describe("construirTicketJob — cambio de talla", () => {
     expect(JSON.stringify(construirTicketJob(DATOS).bloques)).not.toMatch(/Regresa|Prenda que regresa|Sin diferencia/);
   });
 });
+
+describe("construirTicketJob — cantidades con unidad (tienda)", () => {
+  const job = construirTicketJob({
+    ...DATOS,
+    lineas: [
+      { cantidad: 1.25, nombre: "Jitomate", totalMxn: 35, modificadores: [], notaCocina: null, precioUnitario: 28, unidadSat: "KGM" },
+      { cantidad: 2, nombre: "Playera", totalMxn: 300, modificadores: [], notaCocina: null, precioUnitario: 150, unidadSat: "H87" },
+    ],
+  } as DatosTicketImpresion);
+  it("a granel: «1.250 kg x Jitomate» y debajo el precio por kilo", () => {
+    const i = job.bloques.findIndex((b) => b.t === "fila" && b.izq === "1.250 kg x Jitomate" && b.der === "$35.00");
+    expect(i).toBeGreaterThan(-1);
+    expect(job.bloques[i + 1]).toEqual({ t: "texto", valor: "   $28.00/kg", size: 1 });
+  });
+  it("una pieza se imprime como siempre, sin precio por unidad", () => {
+    const i = job.bloques.findIndex((b) => b.t === "fila" && b.izq === "2x Playera");
+    expect(i).toBeGreaterThan(-1);
+    expect(job.bloques).not.toContainEqual({ t: "texto", valor: "   $150.00", size: 1 });
+  });
+});

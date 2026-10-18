@@ -97,6 +97,9 @@ export type ConceptosArmados = {
 export const CLAVE_SAT_POR_DEFECTO = "90101500";
 export const UNIDAD_SAT_POR_DEFECTO = "E48";
 
+/** El nombre que acompaña a la clave de unidad. Copia de `UNIDADES_VENTA` (packages/db): Deno no ve el workspace. */
+const NOMBRE_UNIDAD: Record<string, string> = { H87: "Pieza", KGM: "Kilogramo", MTR: "Metro", LTR: "Litro", E48: "Servicio" };
+
 /** Los errores de armado son datos incoherentes, no fallos de red: no tiene sentido reintentar. */
 export class ConceptosIncoherentes extends Error {
   constructor(mensaje: string) {
@@ -369,10 +372,11 @@ function aConcepto(l: LineaEnCentavos): ConceptoCfdi {
     throw new ConceptosIncoherentes(`El renglón "${l.origen.descripcion}" tiene cantidad ${cantidad}`);
   }
 
+  const claveUnidad = l.origen.unidadSat || UNIDAD_SAT_POR_DEFECTO;
   return {
     claveProdServ: l.origen.claveSat || CLAVE_SAT_POR_DEFECTO,
-    claveUnidad: l.origen.unidadSat || UNIDAD_SAT_POR_DEFECTO,
-    unidad: "Servicio",
+    claveUnidad,
+    unidad: NOMBRE_UNIDAD[claveUnidad] ?? "Servicio",
     descripcion: l.origen.descripcion,
     cantidad,
     // Seis decimales: es lo que admite el CFDI 4.0 y evita que `valorUnitario × cantidad` se

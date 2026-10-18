@@ -2,6 +2,7 @@
 import { hoyMx, sumarDias } from "@vim/fecha";
 import { employeeClient } from "./supabase";
 import type { Autorizacion } from "./autorizacion";
+import { aGranel, tipoDesdeSat } from "./unidades";
 
 /** Roles con `venta.devolucion` por omisión: se autorizan solos; los demás piden PIN. */
 export const ROLES_DEVOLUCION = ["SUPERVISOR", "ADMIN", "DUENO"];
@@ -164,6 +165,8 @@ export type RenglonVenta = {
   /** Piezas ya devueltas en devoluciones no CANCELADA (la misma cuenta que el tope de 0040). */
   devuelta: number;
   precio_unitario: number;
+  /** `unidad_sat_snapshot`: KGM, MTR o LTR es a granel; H87, E48 o nada, pieza. */
+  unidad_sat?: string | null;
   /** `total_item_mxn` del renglón completo, antes del descuento global del ticket. */
   total: number;
 };
@@ -194,6 +197,13 @@ export type VentaDevolvible = {
 };
 
 export type RenglonDevolver = { ticket_item_id: string; cantidad: number; regresaAlAnaquel: boolean };
+
+/** Lo que se devuelve de un renglón si se piden `n`: a granel, todo lo que queda o nada; piezas, entre 0 y lo que queda. */
+export function cantidadADevolver(r: RenglonVenta, n: number): number {
+  const disponible = Math.max(0, r.cantidad - r.devuelta);
+  if (aGranel(tipoDesdeSat(r.unidad_sat))) return n > 0 ? disponible : 0;
+  return Math.max(0, Math.min(disponible, n));
+}
 
 /** `p_items` de crear_devolucion: cada renglón dice si su pieza regresa a la existencia. */
 export function itemsDevolucion(renglones: RenglonDevolver[]) {
@@ -265,7 +275,7 @@ async function conRenglones(token: string, tickets: FilaTicket[]): Promise<Venta
   for (const ids of enTrozos(tickets.map((t) => t.id))) {
     const { data: items, error } = await cli
       .from("ticket_items")
-      .select("id, ticket_id, producto_id, producto_nombre_snapshot, cantidad, precio_unitario_snapshot, total_item_mxn")
+      .select("id, ticket_id, producto_id, producto_nombre_snapshot, cantidad, precio_unitario_snapshot, unidad_sat_snapshot, total_item_mxn")
       .in("ticket_id", ids)
       .eq("cancelado", false)
       .order("created_at");
@@ -330,6 +340,7 @@ async function conRenglones(token: string, tickets: FilaTicket[]): Promise<Venta
         cantidad: Number(i.cantidad),
         devuelta: devuelta.get(String(i.id)) ?? 0,
         precio_unitario: Number(i.precio_unitario_snapshot ?? 0),
+        unidad_sat: i.unidad_sat_snapshot == null ? null : String(i.unidad_sat_snapshot),
         total: Number(i.total_item_mxn ?? 0),
       })),
   }));

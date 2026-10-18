@@ -27,6 +27,7 @@ type Ctx = {
  */
 export const SELECCION_TICKET_ITEMS_IMPRESION =
   "id, producto_nombre_snapshot, producto_sku_snapshot, cantidad, total_item_mxn, nota_cocina, cargo_tipo, " +
+  "precio_unitario_snapshot, unidad_sat_snapshot, " +
   "parent_item_id, combo_rol, combo_grupo_nombre_snapshot, " +
   "ticket_item_modificadores(opcion_nombre_snapshot, precio_extra_snapshot, cantidad), " +
   // El área se resuelve aquí, con el ticket: producto primero, categoría si el producto no
@@ -214,7 +215,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
     // de error genérico. La forma real es la de abajo.
     const r = it as unknown as {
       id: string; producto_nombre_snapshot: string; producto_sku_snapshot: string | null; cantidad: number; total_item_mxn: string | number; nota_cocina: string | null;
-      cargo_tipo: string | null;
+      cargo_tipo: string | null; precio_unitario_snapshot: string | number | null; unidad_sat_snapshot: string | null;
       parent_item_id: string | null; combo_rol: "PADRE" | "HIJO" | null; combo_grupo_nombre_snapshot: string | null;
       ticket_item_modificadores: Mod[] | null; producto: Prod;
     };
@@ -228,6 +229,8 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       cantidad: Number(r.cantidad),
       nombre: r.producto_nombre_snapshot,
       sku: r.producto_sku_snapshot ?? null,
+      precioUnitario: Number(r.precio_unitario_snapshot ?? 0),
+      unidadSat: r.unidad_sat_snapshot ?? null,
       totalMxn: Number(r.total_item_mxn),
       modificadores: (r.ticket_item_modificadores ?? []).map((m) => m.opcion_nombre_snapshot),
       notaCocina: r.nota_cocina ?? null,

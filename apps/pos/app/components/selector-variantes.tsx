@@ -4,6 +4,7 @@ import { Icono, Modal } from "@vim/ui/styles";
 import type { Producto } from "../lib/catalogo";
 import { matrizVariantes, type EstadoExistencia, type Existencia, type PadreTienda } from "../lib/tienda";
 import { fmtMxn } from "../lib/turno";
+import { fmtCantidad, type TipoVenta } from "../lib/unidades";
 
 /** «Actualizado a las 10:42», o «al momento» en el POS web (`null`), donde se lee la nube. */
 export function textoActualizado(actualizadoA: string | null): string {
@@ -13,8 +14,8 @@ export function textoActualizado(actualizadoA: string | null): string {
   return `Actualizado a las ${d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
 }
 
-/** Un negativo se ve como tal: «−2». */
-export const piezas = (n: number) => (n < 0 ? `−${Math.abs(n)}` : String(n));
+/** Un negativo se ve como tal: «−2». A granel, con su unidad: «12.500 kg». */
+export const piezas = (n: number, t?: TipoVenta | null) => (n < 0 ? `−${fmtCantidad(Math.abs(n), t)}` : fmtCantidad(n, t));
 
 const ESTILO: Record<EstadoExistencia, string> = {
   normal: "border-line-strong bg-surface text-ink",

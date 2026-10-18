@@ -74,3 +74,15 @@ describe("Quitar en la tienda", () => {
   it("a granel quita el renglón completo", () => expect(quitaUna(linea(2.5, "PESO"), true)).toBe(false));
   it("el restaurante quita el renglón", () => expect(quitaUna(linea(2), false)).toBe(false));
 });
+
+describe("«N productos» del encabezado", () => {
+  it("cada pesada cuenta 1 y las piezas suman: 1.25 kg de jitomate + 2 playeras = 3 productos", () => {
+    const lineas = [
+      { clientId: "l1", producto: { id: "j", nombre: "Jitomate", precio_base_mxn: 28, tipoVenta: "PESO" }, cantidad: 1.25, modificadores: [], notaCocina: null },
+      { clientId: "l2", producto: { id: "p", nombre: "Playera", precio_base_mxn: 150, tipoVenta: "UNIDAD" }, cantidad: 2, modificadores: [], notaCocina: null },
+    ];
+    const html = pintar({ estado: { ...base.estado, lineas } as unknown as typeof base.estado });
+    expect(html).toContain("3 productos");
+    expect(html).toContain("1.250 kg");
+  });
+});

@@ -7,6 +7,7 @@ import { buscarVentaPorFolio, buscarVentasConProducto, leerVentaDevolvible, leer
 import { listarTicketsEnEspera } from "../lib/espera";
 import { buscarPorCodigo, filasCuentas, renglonVenta, type FilaCuenta } from "../lib/tienda";
 import { type DatosCaja, type Turno, fmtMxn } from "../lib/turno";
+import { aGranel, cantidadRenglon, fmtCantidad, tipoDesdeSat } from "../lib/unidades";
 import { useEscaner } from "../lib/use-escaner";
 import { esEscritorio } from "../lib/actualizacion";
 import { listarCuentasParaLlevar } from "./modal-cuentas-para-llevar";
@@ -339,13 +340,14 @@ export function SeccionTransacciones({
               <ul className="min-h-0 flex-1 divide-y divide-line overflow-y-auto px-5">
                 {detalle.renglones.map((r) => {
                   const { nombre, detalle: variante } = renglonVenta(r, productos);
+                  const tipo = tipoDesdeSat(r.unidad_sat);
                   return (
                     <li key={r.ticket_item_id} className="flex items-start gap-3 py-3">
-                      <span className="w-8 flex-shrink-0 font-display text-14 font-bold tabular-nums text-ink-2">{r.cantidad}×</span>
+                      <span className="min-w-[2rem] flex-shrink-0 whitespace-nowrap font-display text-14 font-bold tabular-nums text-ink-2">{cantidadRenglon(r.cantidad, tipo)}</span>
                       <div className="min-w-0 flex-1">
                         <div className="text-14 font-semibold text-ink">{nombre}</div>
                         {variante && <div className="mt-0.5 text-12 text-ink-3">{variante}</div>}
-                        {r.devuelta > 0 && <div className="mt-0.5 text-12 font-semibold text-warning">{r.devuelta} devuelta{r.devuelta === 1 ? "" : "s"}</div>}
+                        {r.devuelta > 0 && <div className="mt-0.5 text-12 font-semibold text-warning">{aGranel(tipo) ? `${fmtCantidad(r.devuelta, tipo)} devueltos` : `${r.devuelta} devuelta${r.devuelta === 1 ? "" : "s"}`}</div>}
                       </div>
                       <span className="font-display text-14 font-bold tabular-nums">{fmtMxn(r.total)}</span>
                     </li>

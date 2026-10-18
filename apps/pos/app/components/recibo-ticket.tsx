@@ -4,6 +4,7 @@ import { QRCodeSVG } from "qrcode.react";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
 import { cantidadLealtad } from "../lib/print/ticket-builder";
 import { fechaCorta } from "../lib/lealtad-reglas";
+import { aGranel, cantidadRenglon, precioConUnidad, tipoDesdeSat } from "../lib/unidades";
 
 /**
  * Render fiel del ticket de venta P-222 desde los datos crudos del ticket.
@@ -129,14 +130,18 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
               </div>
             );
           }
+          const tipo = tipoDesdeSat(l.unidadSat);
           return (
             <div key={i} className="mb-[9px]">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1">
-                  <span className="font-bold">{l.cantidad}×</span> {l.nombre}
+                  <span className="font-bold">{cantidadRenglon(l.cantidad, tipo)}</span> {l.nombre}
                 </div>
                 <span className="whitespace-nowrap font-bold">{fmt(l.totalMxn)}</span>
               </div>
+              {aGranel(tipo) && (
+                <div className="pl-[18px] text-[10px] leading-[1.45] text-[#555]">{precioConUnidad(fmt(l.precioUnitario ?? 0), tipo)}</div>
+              )}
               {datos.tienda && l.sku && <div className="pl-[18px] text-[10px] leading-[1.45] text-[#555]">SKU {l.sku}</div>}
               {l.modificadores.map((m, j) => (
                 <div key={j} className="pl-[18px] text-[10px] leading-[1.45] text-[#555]">+ {m}</div>
