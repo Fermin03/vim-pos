@@ -210,16 +210,20 @@ COMMENT ON VIEW vw_saldo_favor_cliente IS 'Saldo a favor por cliente (0209).';
 REVOKE ALL ON vw_saldo_favor_cliente FROM anon, authenticated;
 GRANT SELECT ON vw_saldo_favor_cliente TO authenticated;
 
--- ── §4 Cancelar o devolver una venta a crédito ──────────────────────────────
--- La llama trg_devolucion_pago_efectivo al confirmarse una devolución. NULL = la venta no fue a
--- crédito (todo sigue como antes). Si fue a crédito: lo devuelto baja primero la deuda
--- (AJUSTE_CANCELACION, sin dinero); lo que queda ya se había abonado y, si la devolución es en
--- efectivo, sale del cajón (modo EFECTIVO: devuelve ese monto) o queda a favor (modo SALDO_FAVOR:
--- devuelve 0). Con otro medio (cortesía, nota de crédito…) solo baja la deuda.
--- SECURITY DEFINER: el cajero no escribe abonos_credito ni saldo_favor_movimientos, y hace falta el
--- mismo FOR UPDATE en clientes_credito que registrar_abono (un abono y una cancelación a la vez no
--- leen el mismo saldo). Llamarla a mano no hace nada nuevo: solo actúa sobre una devolución ya
--- CONFIRMADA y sus renglones son únicos por devolución.
+-- ── §4 Cancelar o devolver una venta a crédito o pagada con saldo a favor ───
+-- La llama trg_devolucion_pago_efectivo al confirmarse una devolución y devuelve cuánto sale del
+-- cajón. NULL = la venta no tiene CREDITO ni SALDO_FAVOR: todo sigue como antes.
+--   · Venta a crédito: lo devuelto baja primero la deuda (AJUSTE_CANCELACION, sin dinero); la
+--     cancelación TOTAL la baja entera, propina incluida. Lo que queda ya se había abonado: con una
+--     devolución en efectivo sale del cajón (modo EFECTIVO) o queda a favor (modo SALDO_FAVOR). Con
+--     otro medio (cortesía, nota de crédito…) solo baja la deuda.
+--   · Venta pagada (en parte) con saldo a favor: esa parte vuelve a saldo a favor en los dos modos,
+--     nunca en efectivo (va primero); el resto sigue la regla de siempre (efectivo si el medio lo es).
+-- Nadie la llama directo (sin EXECUTE para nadie): solo el disparador, que es SECURITY DEFINER. Es
+-- idempotente por devolución (llave `devolucion:<id>`) y el negocio sale de la propia devolución.
+-- Toma los mismos candados que registrar_abono (FOR UPDATE en clientes_credito), pagar_a_credito
+-- y pagar_con_saldo_favor (consultivos por cliente): una cancelación y un abono o un pago con saldo
+-- a favor del mismo cliente no leen el mismo saldo.
 CREATE OR REPLACE FUNCTION _credito_devolucion(p_devolucion uuid)
 RETURNS numeric
 LANGUAGE plpgsql
@@ -227,60 +231,91 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_dev    devoluciones%ROWTYPE;
-  v_t      tickets%ROWTYPE;
-  v_deuda  numeric(12,2);
-  v_resto  numeric(12,2);
-  v_llave  varchar(100);
+  v_dev     devoluciones%ROWTYPE;
+  v_t       tickets%ROWTYPE;
+  v_credito boolean;
+  v_saldo   numeric(12,2);
+  v_deuda   numeric(12,2);
+  v_resto   numeric(12,2);
+  v_sf      numeric(12,2);
+  v_llave   varchar(100);
 BEGIN
   SELECT * INTO v_dev FROM devoluciones WHERE id = p_devolucion AND estado = 'CONFIRMADA';
-  IF NOT FOUND OR (current_tenant_id() IS NOT NULL AND v_dev.tenant_id <> current_tenant_id()) THEN
-    RETURN NULL;
-  END IF;
-  SELECT * INTO v_t FROM tickets WHERE id = v_dev.ticket_original_id;
-  IF NOT EXISTS (SELECT 1 FROM pagos WHERE ticket_id = v_t.id AND metodo_pago = 'CREDITO'
-                                       AND estado = 'APLICADO' AND deleted_at IS NULL) THEN
-    RETURN NULL;
-  END IF;
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  SELECT * INTO v_t FROM tickets WHERE id = v_dev.ticket_original_id AND tenant_id = v_dev.tenant_id;
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  v_credito := EXISTS (SELECT 1 FROM pagos WHERE ticket_id = v_t.id AND metodo_pago = 'CREDITO'
+                                             AND estado = 'APLICADO' AND deleted_at IS NULL);
+  SELECT COALESCE(sum(monto_mxn), 0) INTO v_sf FROM pagos
+   WHERE ticket_id = v_t.id AND metodo_pago = 'SALDO_FAVOR' AND estado = 'APLICADO' AND deleted_at IS NULL;
+  IF NOT v_credito AND v_sf = 0 THEN RETURN NULL; END IF;
 
+  PERFORM pg_advisory_xact_lock(hashtextextended('credito:' || v_t.cliente_id::text, 0));
+  PERFORM pg_advisory_xact_lock(hashtextextended('saldo_favor:' || v_t.cliente_id::text, 0));
   PERFORM 1 FROM clientes_credito WHERE tenant_id = v_t.tenant_id AND cliente_id = v_t.cliente_id FOR UPDATE;
 
   v_llave := 'devolucion:' || v_dev.id;
-  v_deuda := LEAST(v_dev.total_devuelto_mxn, GREATEST(credito_saldo_ticket(v_t.id), 0));
-  v_resto := v_dev.total_devuelto_mxn - v_deuda;
-  IF v_deuda > 0 THEN
-    INSERT INTO abonos_credito (tenant_id, sucursal_id, caja_id, turno_id, cliente_id, ticket_id,
-                                tipo, metodo_pago, monto_mxn, client_id_local, usuario_id)
-    VALUES (v_t.tenant_id, v_dev.sucursal_id, v_dev.caja_id, v_dev.turno_id, v_t.cliente_id, v_t.id,
-            'AJUSTE_CANCELACION', NULL, v_deuda, v_llave, COALESCE(auth.uid(), v_dev.usuario_solicitante_id))
-    ON CONFLICT (tenant_id, client_id_local) DO NOTHING;
-  END IF;
-
-  IF v_dev.medio_devolucion <> 'EFECTIVO' OR v_resto <= 0 THEN
+  IF EXISTS (SELECT 1 FROM abonos_credito WHERE tenant_id = v_t.tenant_id AND client_id_local = v_llave)
+     OR EXISTS (SELECT 1 FROM saldo_favor_movimientos WHERE tenant_id = v_t.tenant_id AND client_id_local = v_llave) THEN
     RETURN 0;
   END IF;
-  IF (SELECT credito_abonos_al_cancelar FROM configuracion_tenant WHERE tenant_id = v_t.tenant_id) = 'EFECTIVO' THEN
-    RETURN v_resto;
+
+  IF v_credito THEN
+    v_saldo := GREATEST(credito_saldo_ticket(v_t.id), 0);
+    v_deuda := LEAST(v_dev.total_devuelto_mxn, v_saldo);
+    v_resto := v_dev.total_devuelto_mxn - v_deuda;
+    IF v_dev.alcance = 'TOTAL' THEN
+      v_deuda := v_saldo;   -- la propina no viene en lo devuelto y también se debía
+    END IF;
+    IF v_deuda > 0 THEN
+      INSERT INTO abonos_credito (tenant_id, sucursal_id, caja_id, turno_id, cliente_id, ticket_id,
+                                  tipo, metodo_pago, monto_mxn, client_id_local, usuario_id)
+      VALUES (v_t.tenant_id, v_dev.sucursal_id, v_dev.caja_id, v_dev.turno_id, v_t.cliente_id, v_t.id,
+              'AJUSTE_CANCELACION', NULL, v_deuda, v_llave, COALESCE(auth.uid(), v_dev.usuario_solicitante_id));
+    END IF;
+    IF v_dev.medio_devolucion <> 'EFECTIVO' OR v_resto <= 0 THEN
+      RETURN 0;
+    END IF;
+    IF (SELECT credito_abonos_al_cancelar FROM configuracion_tenant WHERE tenant_id = v_t.tenant_id) = 'EFECTIVO' THEN
+      RETURN v_resto;
+    END IF;
+    v_sf := v_resto;   -- modo SALDO_FAVOR: lo abonado queda a favor
+    v_resto := 0;
+  ELSE
+    IF v_dev.medio_devolucion NOT IN ('EFECTIVO', 'MISMO_METODO_PAGO') THEN
+      RETURN 0;
+    END IF;
+    -- Lo pagado con saldo a favor que no se ha regresado ya (devoluciones anteriores de esta venta).
+    v_sf := LEAST(v_dev.total_devuelto_mxn,
+                  GREATEST(v_sf - COALESCE((SELECT sum(monto_mxn) FROM saldo_favor_movimientos
+                                             WHERE ticket_id = v_t.id AND tipo = 'ENTRADA_CANCELACION'), 0), 0));
+    v_resto := 0;
+    IF v_dev.medio_devolucion = 'EFECTIVO' THEN v_resto := v_dev.total_devuelto_mxn - v_sf; END IF;
   END IF;
-  INSERT INTO saldo_favor_movimientos (tenant_id, cliente_id, tipo, monto_mxn, ticket_id, turno_id, client_id_local)
-  VALUES (v_t.tenant_id, v_t.cliente_id, 'ENTRADA_CANCELACION', v_resto, v_t.id, v_dev.turno_id, v_llave)
-  ON CONFLICT (tenant_id, client_id_local) DO NOTHING;
-  RETURN 0;
+
+  IF v_sf > 0 THEN
+    INSERT INTO saldo_favor_movimientos (tenant_id, cliente_id, tipo, monto_mxn, ticket_id, turno_id, client_id_local)
+    VALUES (v_t.tenant_id, v_t.cliente_id, 'ENTRADA_CANCELACION', v_sf, v_t.id, v_dev.turno_id, v_llave);
+  END IF;
+  RETURN v_resto;
 END $$;
 COMMENT ON FUNCTION _credito_devolucion(uuid) IS
-  'Devolución confirmada de una venta a crédito: baja la deuda y decide qué parte sale del cajón (0209). NULL si la venta no fue a crédito.';
--- La llama un disparador invoker (lo dispara el cajero): necesita EXECUTE para authenticated.
-REVOKE ALL ON FUNCTION _credito_devolucion(uuid) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION _credito_devolucion(uuid) TO authenticated, service_role;
+  'Devolución confirmada de una venta a crédito o con saldo a favor: baja la deuda, regresa el saldo a favor y dice cuánto sale del cajón (0209). NULL si no aplica. Solo la llama trg_devolucion_pago_efectivo.';
+REVOKE ALL ON FUNCTION _credito_devolucion(uuid) FROM PUBLIC, anon, authenticated, service_role;
 
--- La de la 0033 (vigente). Lo nuevo va antes y solo entra con una venta a crédito; el resto, igual.
+-- La de la 0033 (vigente). Lo nuevo va antes y solo entra con CREDITO o SALDO_FAVOR; el resto, igual.
+-- 0209: SECURITY DEFINER con search_path fijo, para que _credito_devolucion no se pueda llamar
+-- directo. El INSERT del camino de siempre usa los datos de la devolución (ya validada por RLS al
+-- confirmarla), como antes.
 CREATE OR REPLACE FUNCTION trg_devolucion_pago_efectivo() RETURNS trigger
 LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_efectivo numeric(12,2);   -- 0209
 BEGIN
-  -- 0209: venta a crédito. Solo sale del cajón lo ya abonado que se devuelve en efectivo.
+  -- 0209: venta a crédito o con saldo a favor. Solo sale del cajón lo que _credito_devolucion diga.
   IF TG_OP = 'UPDATE' AND OLD.estado <> 'CONFIRMADA' AND NEW.estado = 'CONFIRMADA' THEN
     v_efectivo := _credito_devolucion(NEW.id);
     IF v_efectivo IS NOT NULL THEN
@@ -315,6 +350,7 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+REVOKE ALL ON FUNCTION trg_devolucion_pago_efectivo() FROM PUBLIC, anon, authenticated;
 
 -- ── §5 Pagar con saldo a favor ──────────────────────────────────────────────
 -- SECURITY DEFINER (molde de registrar_abono): el USO no lo escribe el cajero. El negocio se acota
@@ -359,6 +395,11 @@ BEGIN
   IF v_t.cliente_id IS NULL THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: asigna un cliente para pagar con su saldo a favor.' USING ERRCODE = '22023';
   END IF;
+  -- aplicar_pago también lo frena, pero sin un mensaje para la caja.
+  IF v_monto > v_t.total_mxn + COALESCE(v_t.propina_mxn, 0) - v_t.monto_pagado_mxn THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: el saldo a favor (%) pasa de lo que falta por cobrar (%).',
+      v_monto, v_t.total_mxn + COALESCE(v_t.propina_mxn, 0) - v_t.monto_pagado_mxn USING ERRCODE = '22023';
+  END IF;
 
   -- Dos pagos simultáneos del mismo cliente no gastan dos veces el mismo saldo.
   -- ponytail: candado consultivo por cliente (el cliente puede no tener fila en clientes_credito).
@@ -374,6 +415,7 @@ BEGIN
   v_pago := aplicar_pago(p_ticket_id, 'SALDO_FAVOR'::metodo_pago, v_monto, p_client_id_local := p_client_id_local);
   PERFORM set_config('vim.pago_saldo_favor', '', true);
 
+  -- El turno del USO es el del ticket, el mismo que aplicar_pago le pone al pago (no recibe otro).
   INSERT INTO saldo_favor_movimientos (tenant_id, cliente_id, tipo, monto_mxn, ticket_id, turno_id, client_id_local)
   VALUES (v_tenant, v_t.cliente_id, 'USO', v_monto, p_ticket_id, v_t.turno_id, p_client_id_local);
   RETURN v_pago;

@@ -345,7 +345,7 @@ DECLARE
   v_prod   uuid := 'c2080000-0000-0000-0000-0000000000a1';
   v_beto   uuid := 'c2080000-0000-0000-0000-000000000002';
   v_carla  uuid := 'c2090000-0000-0000-0000-000000000001';
-  v_turno uuid; v_ca uuid; v_cb uuid; v_cc uuid; v_cd uuid; v_ce uuid; v_cn uuid; v_tk uuid;
+  v_turno uuid; v_ca uuid; v_cb uuid; v_cc uuid; v_cd uuid; v_ce uuid; v_cn uuid; v_tk uuid; v_cf uuid; v_cg uuid; v_ch uuid;
   v_auth uuid; v_dev uuid; v_pago uuid; v_cfdi uuid; v_e numeric; v_ok boolean; v_x jsonb; j jsonb; v_td numeric;
 BEGIN
   PERFORM set_config('request.jwt.claims',
@@ -532,6 +532,113 @@ BEGIN
                     'smoke 20', v_maria);
   IF (j->>'diferencia_total_mxn')::numeric <> 0 THEN
     RAISE EXCEPTION '20: declarar la tarjeta del reporte X da diferencia: %', j; END IF;
+
+  -- 22) Saldo a favor: no pasa de lo que falta por cobrar. Al cancelar, lo pagado con saldo a favor
+  --     vuelve a saldo a favor en los dos modos y solo el resto sale del cajón.
+  v_cf := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_carla, NULL, 'smoke-cr9-f', v_maria);
+  PERFORM agregar_item_a_ticket(v_cf, v_prod, 1, NULL, '[]'::jsonb, 'smoke-cr9-fa');
+  PERFORM aplicar_pago(v_cf, 'EFECTIVO'::metodo_pago, 480, 480);
+  BEGIN
+    PERFORM pagar_con_saldo_favor(v_cf, 30, 'smoke-cr9-sf2x');
+    RAISE EXCEPTION '22: el saldo a favor pagó más de lo que faltaba';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'DATOS_INVALIDOS:%falta por cobrar%' THEN RAISE; END IF;
+  END;
+  PERFORM pagar_con_saldo_favor(v_cf, 20, 'smoke-cr9-sf2');
+  IF (SELECT estado_fiscal FROM tickets WHERE id = v_cf) <> 'PAGADO' THEN RAISE EXCEPTION '22: no quedó PAGADO'; END IF;
+  IF (SELECT saldo_mxn FROM vw_saldo_favor_cliente WHERE cliente_id = v_carla) <> 30 THEN RAISE EXCEPTION '22: saldo a favor no quedó en 30'; END IF;
+  -- Modo SALDO_FAVOR: cancelar la de 150 a favor + 350 en efectivo.
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'cancelar_ticket', 'venta.cancelar_pagada', 'ticket', v_cd, 'smoke 22a')
+  RETURNING id INTO v_auth;
+  PERFORM cancelar_ticket_pagado(
+    p_ticket_id := v_cd, p_caja_id := v_caja, p_turno_id := v_turno,
+    p_motivo := 'CLIENTE_DESISTIO'::cancelacion_motivo, p_motivo_texto := 'smoke 22a',
+    p_autorizacion_pin_id := v_auth, p_usuario_solicitante_id := v_maria, p_usuario_autorizo_id := v_maria,
+    p_reversar_inventario := true, p_cancelar_cfdi_sat := false, p_devolver_dinero := true,
+    p_client_id_local := 'smoke-cr9-cancela-d');
+  SELECT devolucion_id INTO v_dev FROM cancelaciones_ticket WHERE ticket_id = v_cd;
+  IF (SELECT sum(m.monto_mxn) FROM movimientos_caja m JOIN devoluciones d ON d.id = v_dev
+       WHERE m.tipo = 'DEVOLUCION_EFECTIVO' AND m.motivo = 'Devolución folio ' || d.folio_completo) IS DISTINCT FROM 350 THEN
+    RAISE EXCEPTION '22: modo SALDO_FAVOR: del cajón debían salir 350'; END IF;
+  IF (SELECT saldo_mxn FROM vw_saldo_favor_cliente WHERE cliente_id = v_carla) <> 180 THEN
+    RAISE EXCEPTION '22: modo SALDO_FAVOR: saldo a favor % (esperado 180)', (SELECT saldo_mxn FROM vw_saldo_favor_cliente WHERE cliente_id = v_carla); END IF;
+  -- Modo EFECTIVO: cancelar la de 480 en efectivo + 20 a favor.
+  UPDATE configuracion_tenant SET credito_abonos_al_cancelar = 'EFECTIVO' WHERE tenant_id = v_t;
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'cancelar_ticket', 'venta.cancelar_pagada', 'ticket', v_cf, 'smoke 22b')
+  RETURNING id INTO v_auth;
+  PERFORM cancelar_ticket_pagado(
+    p_ticket_id := v_cf, p_caja_id := v_caja, p_turno_id := v_turno,
+    p_motivo := 'CLIENTE_DESISTIO'::cancelacion_motivo, p_motivo_texto := 'smoke 22b',
+    p_autorizacion_pin_id := v_auth, p_usuario_solicitante_id := v_maria, p_usuario_autorizo_id := v_maria,
+    p_reversar_inventario := true, p_cancelar_cfdi_sat := false, p_devolver_dinero := true,
+    p_client_id_local := 'smoke-cr9-cancela-f');
+  SELECT devolucion_id INTO v_dev FROM cancelaciones_ticket WHERE ticket_id = v_cf;
+  IF (SELECT sum(m.monto_mxn) FROM movimientos_caja m JOIN devoluciones d ON d.id = v_dev
+       WHERE m.tipo = 'DEVOLUCION_EFECTIVO' AND m.motivo = 'Devolución folio ' || d.folio_completo) IS DISTINCT FROM 480 THEN
+    RAISE EXCEPTION '22: modo EFECTIVO: del cajón debían salir 480'; END IF;
+  IF (SELECT saldo_mxn FROM vw_saldo_favor_cliente WHERE cliente_id = v_carla) <> 200 THEN
+    RAISE EXCEPTION '22: modo EFECTIVO: saldo a favor % (esperado 200)', (SELECT saldo_mxn FROM vw_saldo_favor_cliente WHERE cliente_id = v_carla); END IF;
+
+  -- 23) Cancelar una venta a crédito con propina borra la deuda entera: 500 + 50 de propina con
+  --     $30 abonados deben 520, y lo devuelto son los $500 de producto. No sale dinero: lo abonado
+  --     no llega a la propina, que se queda como en una venta de contado.
+  v_cg := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_carla, NULL, 'smoke-cr9-g', v_maria);
+  PERFORM agregar_item_a_ticket(v_cg, v_prod, 1, NULL, '[]'::jsonb, 'smoke-cr9-ga');
+  PERFORM establecer_propina_ticket(v_cg, 50);
+  PERFORM pagar_a_credito(v_cg, NULL, 'smoke-cr9-pg');
+  IF credito_saldo_ticket(v_cg) <> 550 THEN RAISE EXCEPTION '23: la deuda con propina es %', credito_saldo_ticket(v_cg); END IF;
+  PERFORM registrar_abono(v_carla, 30, 'EFECTIVO'::metodo_pago, v_caja, v_turno, 'smoke-cr9-ab-g');
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'cancelar_ticket', 'venta.cancelar_pagada', 'ticket', v_cg, 'smoke 23')
+  RETURNING id INTO v_auth;
+  PERFORM cancelar_ticket_pagado(
+    p_ticket_id := v_cg, p_caja_id := v_caja, p_turno_id := v_turno,
+    p_motivo := 'CLIENTE_DESISTIO'::cancelacion_motivo, p_motivo_texto := 'smoke 23',
+    p_autorizacion_pin_id := v_auth, p_usuario_solicitante_id := v_maria, p_usuario_autorizo_id := v_maria,
+    p_reversar_inventario := true, p_cancelar_cfdi_sat := false, p_devolver_dinero := true,
+    p_client_id_local := 'smoke-cr9-cancela-g');
+  IF credito_saldo_ticket(v_cg) <> 0 THEN RAISE EXCEPTION '23: quedó deuda de % tras cancelar', credito_saldo_ticket(v_cg); END IF;
+  SELECT devolucion_id INTO v_dev FROM cancelaciones_ticket WHERE ticket_id = v_cg;
+  IF EXISTS (SELECT 1 FROM movimientos_caja m JOIN devoluciones d ON d.id = v_dev
+              WHERE m.motivo = 'Devolución folio ' || d.folio_completo) THEN
+    RAISE EXCEPTION '23: salió dinero del cajón'; END IF;
+
+  -- 24) Nadie llama a _credito_devolucion directo: una venta a crédito sin abonos, cancelada en modo
+  --     SALDO_FAVOR, no deja saldo a favor; el cajero no puede volver a llamarla, y repetirla no hace nada.
+  UPDATE configuracion_tenant SET credito_abonos_al_cancelar = 'SALDO_FAVOR' WHERE tenant_id = v_t;
+  v_ch := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_carla, NULL, 'smoke-cr9-h', v_maria);
+  PERFORM agregar_item_a_ticket(v_ch, v_prod, 1, NULL, '[]'::jsonb, 'smoke-cr9-ha');
+  PERFORM pagar_a_credito(v_ch, NULL, 'smoke-cr9-ph');
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'cancelar_ticket', 'venta.cancelar_pagada', 'ticket', v_ch, 'smoke 24')
+  RETURNING id INTO v_auth;
+  PERFORM cancelar_ticket_pagado(
+    p_ticket_id := v_ch, p_caja_id := v_caja, p_turno_id := v_turno,
+    p_motivo := 'CLIENTE_DESISTIO'::cancelacion_motivo, p_motivo_texto := 'smoke 24',
+    p_autorizacion_pin_id := v_auth, p_usuario_solicitante_id := v_maria, p_usuario_autorizo_id := v_maria,
+    p_reversar_inventario := true, p_cancelar_cfdi_sat := false, p_devolver_dinero := true,
+    p_client_id_local := 'smoke-cr9-cancela-h');
+  SELECT devolucion_id INTO v_dev FROM cancelaciones_ticket WHERE ticket_id = v_ch;
+  IF credito_saldo_ticket(v_ch) <> 0 OR (SELECT saldo_mxn FROM vw_saldo_favor_cliente WHERE cliente_id = v_carla) <> 200 THEN
+    RAISE EXCEPTION '24: la cancelación sin abonos dejó deuda o saldo a favor'; END IF;
+  EXECUTE 'SET LOCAL ROLE authenticated';
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria, 'role', 'authenticated', 'tenant_id', v_t)::text, true);
+  v_ok := false;
+  BEGIN
+    PERFORM _credito_devolucion(v_dev);
+  EXCEPTION WHEN insufficient_privilege THEN v_ok := true;
+  END;
+  RESET ROLE;
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
+  IF NOT v_ok THEN RAISE EXCEPTION '24: el cajero llamó a _credito_devolucion'; END IF;
+  IF _credito_devolucion(v_dev) <> 0 OR (SELECT saldo_mxn FROM vw_saldo_favor_cliente WHERE cliente_id = v_carla) <> 200 THEN
+    RAISE EXCEPTION '24: repetir _credito_devolucion movió el saldo a favor'; END IF;
 
   -- 21) Regresión: una venta sin crédito cancelada con dinero saca del cajón su total, como antes,
   --     aunque el negocio esté en modo SALDO_FAVOR.
