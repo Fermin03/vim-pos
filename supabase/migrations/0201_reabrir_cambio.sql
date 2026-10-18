@@ -54,7 +54,7 @@ BEGIN
   SELECT count(*) INTO v_n_pagos
   FROM pagos
   WHERE ticket_id = p_ticket_id AND estado IN ('APLICADO', 'CONCILIADO') AND deleted_at IS NULL
-    AND client_id_local IS DISTINCT FROM v_interno;
+    AND (v_interno IS NULL OR client_id_local IS DISTINCT FROM v_interno);
 
   IF v_n_pagos = 0 AND v_interno IS NOT NULL THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: esta venta se pagó con la prenda devuelta; no hay pago que cambiar' USING ERRCODE = '22023';
@@ -67,7 +67,7 @@ BEGIN
   SELECT * INTO v_pago
   FROM pagos
   WHERE ticket_id = p_ticket_id AND estado IN ('APLICADO', 'CONCILIADO') AND deleted_at IS NULL
-    AND client_id_local IS DISTINCT FROM v_interno
+    AND (v_interno IS NULL OR client_id_local IS DISTINCT FROM v_interno)
   LIMIT 1;
 
   v_metodo_previo := v_pago.metodo_pago;
@@ -124,9 +124,12 @@ DECLARE
   v_componente    record;
   v_solicitante   uuid;
   v_autorizo      uuid;
+  v_interno       text;   -- 0201
 BEGIN
   SELECT * INTO v_ticket FROM tickets WHERE id = p_ticket_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Ticket % no existe', p_ticket_id; END IF;
+  -- 0201: en la venta de un cambio, el pago interno (la prenda devuelta) no se cancela.
+  IF _ticket_es_de_cambio(p_ticket_id) THEN v_interno := v_ticket.client_id_local || '-pago'; END IF;
 
   IF v_ticket.estado_fiscal = 'FACTURADO' THEN
     RAISE EXCEPTION 'La cuenta ya está facturada (CFDI emitido); cancélala en vez de reabrirla.';
@@ -190,7 +193,7 @@ BEGIN
       deleted_at = now(),
       updated_at = now()
   WHERE ticket_id = p_ticket_id AND estado IN ('APLICADO', 'CONCILIADO') AND deleted_at IS NULL
-    AND (client_id_local IS DISTINCT FROM v_ticket.client_id_local || '-pago' OR NOT _ticket_es_de_cambio(p_ticket_id));
+    AND (v_interno IS NULL OR client_id_local IS DISTINCT FROM v_interno);
 
   -- Volver a ABIERTO (transición habilitada en la Parte 1). Folio se conserva.
   UPDATE tickets

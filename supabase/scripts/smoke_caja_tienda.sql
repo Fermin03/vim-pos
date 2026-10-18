@@ -718,7 +718,7 @@ DECLARE
   v_c300  uuid := 'c4c40000-0000-0000-0000-0000000000d6';   -- de §7
   v_c350  uuid := 'c4c40000-0000-0000-0000-0000000000d7';
   v_turno uuid; v_cli uuid; v_tk uuid; v_it uuid; v_auth uuid; v_res jsonb; v_igual uuid; v_saldo uuid; v_dividido uuid;
-  v_interno uuid; v_pago_saldo uuid; v_pago_saldo2 uuid; v_efe numeric; v_snap jsonb; v_caso text; v_editar uuid;
+  v_interno uuid; v_pago_saldo uuid; v_pago_saldo2 uuid; v_efe numeric; v_snap jsonb; v_caso text; v_editar uuid; v_normal uuid;
 BEGIN
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
   SELECT id INTO v_turno FROM turnos WHERE caja_id = v_caja AND estado = 'ABIERTO';
@@ -808,6 +808,13 @@ BEGIN
   EXCEPTION WHEN OTHERS THEN
     IF SQLERRM NOT LIKE 'La cuenta tiene pago dividido%' THEN RAISE EXCEPTION '8d dividido: error inesperado: %', SQLERRM; END IF;
   END;
+  -- Regresión: en una venta normal, un pago sin client_id_local sí se cambia.
+  v_normal := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smoke-c8-normal', v_maria);
+  PERFORM agregar_item_a_ticket(v_normal, v_c300, 1, NULL, '[]'::jsonb, 'smoke-c8-normal-1');
+  PERFORM aplicar_pago(v_normal, 'EFECTIVO'::metodo_pago, 300, 300, NULL, NULL, NULL, false, NULL, NULL);
+  PERFORM cambiar_forma_pago_ticket(v_normal, 'TARJETA_DEBITO'::metodo_pago, NULL, v_editar);
+  IF (SELECT metodo_pago::text FROM pagos WHERE ticket_id = v_normal AND client_id_local IS NULL) IS DISTINCT FROM 'TARJETA_DEBITO' THEN
+    RAISE EXCEPTION '8d normal: el pago sin client_id_local debía pasar a TARJETA'; END IF;
 
   -- 8e) Push: la caja reabre y cobra otra vez; la nube (aquí, el estado de antes, recuperado al
   --     deshacer el bloque) recibe ese ticket y sus pagos. El interno sigue APLICADO y el esperado coincide.
