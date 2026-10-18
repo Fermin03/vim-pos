@@ -1,0 +1,167 @@
+# Giros de retail, segunda tanda (abarrotes, frutería, ferretería, vinos) — diseño
+
+Fecha: 18 oct 2026. Base: el giro RETAIL de ropa y calzado
+(`2026-10-15-giro-retail-design.md`, entregas 1–5 en la rama local `feat/retail-abrir`).
+
+## 1. Para qué
+
+Fermín quiere que VIM POS se pueda vender a más tiendas que restaurantes, y **nada sale a producción
+hasta tener todos los giros que eligió**. Los repartió en tres tandas, en este orden:
+
+1. **Retail:** tiendas y supermercados, fruterías, ferreterías, vinos y licores. Este documento cubre esta tanda.
+2. **Servicios:** talleres automotrices y similares. Va en un documento aparte.
+3. **Belleza:** salón de belleza, spa, peluquería, barbería y tatuajes/piercings. Va en un documento aparte.
+   *Pregunté si tatuajes va con belleza; no hubo respuesta todavía.*
+
+Esta tanda reutiliza la caja de tienda que ya existe: escáner, existencias, Panel con barra inferior.
+Le agrega tres cosas que la ropa no necesitaba: **vender por kilo, metro o litro**, **crédito** y **cotizaciones**.
+
+## 2. Decisiones de Fermín (18 oct)
+
+- **Giros nuevos y lo que traen encendido al nacer:**
+
+  | Giro en el registro | De inicio |
+  |---|---|
+  | Tienda de abarrotes o supermercado | existencias, venta por peso |
+  | Frutería y verdulería | existencias, venta por peso |
+  | Ferretería | existencias, venta por kilo/metro/litro, crédito, cotizaciones |
+  | Vinos y licores | existencias |
+
+  (Ropa o calzado sigue como está.)
+- **Todos usan la misma caja de tienda.** Vinos y licores no tiene nada propio. Quedan fuera los
+  horarios de venta y la ley seca; se agregan si un cliente los pide.
+- **Venta por unidad.** Cada producto se vende por pieza, kilo, metro o litro y guarda su precio por esa
+  unidad. Al tocarlo o escanearlo, si no es pieza, se abre una ventana de cantidad con su unidad
+  («Peso: 0.000 kg», «Metros: 0.00», «Litros: 0.00»). La cajera teclea, da Enter, y el renglón entra con
+  cantidad × precio por unidad. Ejemplo: «Jitomate · 1.250 kg × $28 = $35.00».
+- **Báscula: primero se teclea.** Nadie la ha pedido y Fermín tendría que comprar una. La ventana de
+  cantidad queda lista para que, más adelante, una báscula ponga el peso en vez de teclearlo. Nada de
+  hardware hasta que Fermín lo pida (misma regla que la terminal).
+- **Pintura:** el galón o la cubeta cerrada es una pieza con su precio; la que se surte por litro es un producto por litro.
+- **Crédito** (propuesta aceptada tal cual):
+  - El dueño da de alta el crédito **por cliente** en el admin, con **límite en pesos y plazo en días**.
+    Solo pueden comprar a crédito los clientes que él autoriza.
+  - En la caja, **«A crédito» es una forma de pago más**. Exige un cliente asignado con crédito activo.
+    Si la venta pasa del límite o el cliente tiene pagos vencidos, **pide el PIN de un supervisor**.
+  - La venta es una venta: folio y existencias descontadas. Su dinero queda **por cobrar** y **no entra al corte**.
+  - **Abonos** desde la caja, totales o parciales, en efectivo, tarjeta o transferencia. Cada abono **sí
+    entra al corte** del turno en que se recibe.
+  - El admin muestra quién debe, cuánto, desde cuándo y qué está vencido.
+  - Fuera de esta versión: intereses, recargos y estados de cuenta por correo.
+- **Cotizaciones** (propuesta aceptada):
+  - Se arman como un ticket, con metros y kilos incluidos, y se guardan como **cotización con folio propio** (COT-…).
+  - Llevan los precios del día y una **vigencia que fija el dueño** (por ejemplo, 15 días).
+  - Se imprimen en el ticket o **se mandan por WhatsApp como PDF**.
+  - No descuentan existencias ni son venta.
+  - **«Convertir en venta»** las carga para cobrar. Si venció o cambió algún precio, la caja avisa y cobra con los precios de hoy.
+  - El admin muestra las cotizaciones hechas y cuáles se volvieron venta.
+- **Crédito y cotizaciones son interruptores** de módulo: se pueden encender en cualquier giro de esta
+  tanda, no solo en ferretería. La venta por unidad se define en cada producto, así que cualquier tienda
+  puede tener algo a granel.
+- **Barra inferior de la caja de tienda, con nombres nuevos:** **Cobrar** (lo que hoy se llama Panel) ·
+  Inventario · Transacciones · Notificaciones · **Más**.
+  - «Más» reemplaza a Configuración.
+  - Adentro de «Más» van **Cotizaciones** (vigentes y vencidas; buscar por folio o cliente; reimprimir o
+    mandar por WhatsApp; «Convertir en venta»; «Nueva cotización») y **Créditos** (quién debe, cuánto,
+    qué está vencido, «Registrar abono»).
+  - Fermín pidió un menú específico para cotizaciones; por eso tienen su lugar en «Más», además de
+    «Guardar como cotización» en el menú «⋯» de Cobrar.
+
+- **Facturación del crédito:** una venta a crédito **solo se factura cuando queda liquidada**. Mientras
+  deba algo no se puede facturar: ni el cliente en el portal de autofactura ni la caja. Al liquidarse
+  se factura como cualquier venta pagada. No hay complemento de pago en esta versión.
+- **Cancelar o devolver una venta a crédito con abonos:** el **dueño elige** si lo abonado se le regresa
+  al cliente **en efectivo** (sale del corte del turno) o se le queda como **saldo a favor** para su
+  siguiente compra. Sin abonos, la deuda simplemente desaparece.
+- **Crédito y cotizaciones los enciende el dueño en su admin**, sin costo, en cualquier plan.
+- **Existencias van incluidas** en todos los planes para estos cuatro giros, como en ropa.
+
+## 3. Lo que decidí yo (Fermín puede corregirlo)
+
+- **«El dueño elige» lo leí como una opción del negocio en el admin:** «Al cancelar o devolver una
+  venta a crédito con abonos: regresar en efectivo / dejar saldo a favor», con «saldo a favor» por
+  omisión. Ese saldo a favor se usa en la caja como forma de pago («Saldo a favor») del mismo cliente.
+
+- Lo que hoy está en Configuración pasa a «Más» (retiro/depósito, corte X, cambiar cajero, cerrar turno, salir).
+- Los nombres nuevos de la barra aplican también a la caja de ropa: todas las tiendas se ven igual.
+- **Decimales:**
+  - kilo con 3 decimales (gramos);
+  - metro y litro con 2;
+  - pieza entera, salvo que el producto diga lo contrario.
+
+  La base ya guarda `ticket_items.cantidad` y las existencias como `numeric(12,3)`.
+- **En el ticket impreso** un renglón a granel dice cantidad, unidad y precio por unidad
+  («1.250 kg × $28.00/kg»).
+- **Escanear dos veces un producto a granel no suma en el mismo renglón:** cada pesada es un renglón.
+  Hoy el carrito junta renglones iguales (`carrito.ts`, al agregar).
+- **Facturación:** la unidad del SAT sale de la unidad del producto:
+  - pieza → H87
+  - kilo → KGM
+  - metro → MTR
+  - litro → LTR
+
+  Hoy el concepto usa `unidad_sat_snapshot` con E48 por omisión y la etiqueta fija «Servicio»
+  (`supabase/functions/_shared/pac/conceptos.ts`); la etiqueta debe salir de la unidad.
+- **Cambio de talla** sigue siendo de ropa. En estos giros, «Devolver» cubre las devoluciones.
+- **El crédito vive en `clientes`** (límite, plazo, activo). Una venta a crédito es un **pago con método
+  `CREDITO`** que no cuenta como efectivo en el corte. El saldo deudor es la suma de las ventas a
+  crédito menos sus abonos. Cómo modelarlo exactamente le toca al plan; la regla es que el corte no lo
+  cuente y que cada abono cuente en el turno en que entra.
+
+- **La venta por unidad no es un módulo.** En los giros de tienda (ropa incluida), el formulario de
+  producto siempre deja elegir la unidad. En la tabla de §2, «venta por peso» solo indica qué unidad
+  sugiere el alta del producto y qué explica la primera vez del admin. No se agrega ninguna bandera en `operacion`.
+- **Ropa también puede encender crédito y cotizaciones.** Todas las tiendas son una familia: lo que hoy
+  se decide con `vertical_principal = 'RETAIL'` pasa a «es giro de tienda».
+- **Lealtad:** una venta a crédito **no genera puntos**. Es lo más sencillo y evita regalar puntos por
+  dinero que nunca se cobró. Si Fermín quiere que los genere al liquidarse, se agrega después.
+- **Permisos:**
+  - Dar o cambiar el crédito de un cliente: dueño o administrador, en el admin.
+  - Registrar un abono: cualquier cajero.
+  - Crear o convertir una cotización: cualquier cajero.
+  - Pasar del límite o vender con pagos vencidos: el mismo PIN de supervisor de un solo uso que ya
+    existe (autorizaciones de la 0134), con su permiso nuevo en la matriz (doc 09).
+- **Límite con la caja sin internet:** cada caja revisa el límite con el saldo que conoce: lo último que
+  bajó de la nube más lo que ella misma vendió y cobró. Dos cajas pueden pasar juntas el límite sin
+  darse cuenta. Se acepta, porque el PIN es el respaldo y el admin muestra el saldo real. El POS web
+  revisa contra la nube.
+
+## 4. Metas, no-metas y lo que lo haría fracasar
+
+- **Meta:** que una frutería, una ferretería, una tiendita o una vinatería puedan operar su día completo
+  con la caja de tienda, sin báscula conectada, y que el dueño controle su crédito.
+- **No-metas de esta tanda:**
+  - báscula conectada;
+  - código de barras de peso variable (etiquetas de báscula con precio dentro);
+  - intereses y recargos;
+  - precios de mayoreo;
+  - controles de alcohol;
+  - tienda en línea para estos giros;
+  - servicios y belleza.
+- **Fracaso aunque funcione:**
+  - Que el corte de caja cuente como efectivo lo vendido a crédito o lo que solo se cotizó.
+  - Que un error de decimales cobre de más o de menos: 1.250 kg no puede volverse 1 ni 1250.
+  - Que los restaurantes noten cualquier cambio.
+
+## 5. Restricciones
+
+- **Todo en local:** sin push, PR, producción ni instalador hasta tener los tres grupos de giros (servicios y belleza incluidos).
+- **Lanzamiento** como el de ropa (spec de ropa §7): un `ADD VALUE` de cada giro nuevo por migración propia, el
+  instalador antes de liberar los giros y una migración final que los libera.
+- **Los restaurantes no cambian.**
+- La caja instalada (escritorio, sync por snapshot) recibe las mismas migraciones, y lo nuevo (créditos,
+  abonos, cotizaciones) sube y baja en el sync.
+
+## 6. Lo que queda al constructor
+
+- Nombres de tablas, columnas y RPC.
+- El orden de las entregas. Sugerencia:
+  1. venta por unidad y giros nuevos;
+  2. crédito;
+  3. cotizaciones;
+  4. barra Cobrar/Más y liberar.
+- El diseño visual de la ventana de cantidad, de «Más», «Cotizaciones» y «Créditos», siguiendo
+  `docs/diseno/pos-retail.md` (se actualiza ese documento, no se crea otro).
+- El PDF de la cotización y cómo se manda por WhatsApp. El mecanismo de compartir que ya exista en la
+  caja tiene prioridad.
+- Si «A crédito» cobra todo el ticket o se puede combinar con otro pago en un cobro dividido.
