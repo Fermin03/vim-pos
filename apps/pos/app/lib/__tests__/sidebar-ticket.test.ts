@@ -19,11 +19,10 @@ describe("SidebarTicket", () => {
     expect(html).not.toContain("Asignar cliente");
   });
 
-  it("el Panel de la tienda se queda con el cliente, Limpiar y Cambio de talla", () => {
-    const html = pintar({ tienda: { ...tienda, simple: true, onAsignarCliente: nada, cliente: null } });
-    for (const t of [">Precios<", ">Descuento<", ">En espera<", "Efectivo exacto"]) expect(html).not.toContain(t);
-    for (const t of [">Asignar cliente<", ">Limpiar<", "Cambio de talla"]) expect(html).toContain(t);
-    expect(html).not.toContain("Dejar abierta");
+  it("el Panel de la tienda deja arriba solo el menú ⋯ y el cliente asignado", () => {
+    const html = pintar({ tienda: { ...tienda, simple: true, onAsignarCliente: nada, cliente: "Ana López" } });
+    for (const t of [">Precios<", ">Descuento<", ">En espera<", "Efectivo exacto", ">Asignar cliente<", ">Limpiar<", "Dejar abierta"]) expect(html).not.toContain(t);
+    for (const t of ["Más opciones", ">Ana López<", "Cambio de talla"]) expect(html).toContain(t);
   });
 
   it("el Panel va mitad y mitad, sin cantidad, notas ni etiqueta del modo", () => {
@@ -40,8 +39,11 @@ describe("SidebarTicket", () => {
     expect(restaurante).not.toContain('aria-label="Más opciones"');
   });
 
-  it("con una cuenta guardada, el Panel ofrece dejarla abierta", () => {
-    const html = pintar({ tienda: { ...tienda, simple: true, onDejarAbierta: nada } });
-    expect(html).toContain(">Dejar abierta<");
+  it("con la cuenta guardada, el renglón de la tienda no lleva el botón de descuento", () => {
+    const linea = { clientId: "l1", producto: { id: "p1", nombre: "Polo", precio: 100 }, cantidad: 1, modificadores: [], notaCocina: null };
+    const estado = { ...base.estado, lineas: [linea] } as unknown as typeof base.estado;
+    const comun = { estado, bloqueado: true, onDescuentoItem: nada };
+    expect(pintar(comun)).toContain("Descuento o precio del producto");
+    expect(pintar({ ...comun, tienda: { ...tienda, simple: true } })).not.toContain("Descuento o precio del producto");
   });
 });

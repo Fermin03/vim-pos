@@ -222,18 +222,24 @@ Un `Modal` centrado, no un cajón lateral: la matriz necesita ancho.
 
 ### Arriba del ticket
 
-Con el ticket en curso, arriba del ticket van, como texto pequeño, **«Asignar cliente»** (la lealtad lo
-necesita) y **«Limpiar»**. No hay «En espera» ni «Precios». Las cuentas abiertas y en espera viven en
-Transacciones.
+Arriba del ticket solo van el título y, a su derecha, un botón **«⋯»** (Fermín, 18 oct). No hay
+botones sueltos: ni «Asignar cliente», ni «Limpiar», ni «Dejar abierta», ni «En espera», ni
+«Precios». Si hay cliente asignado, su nombre va en texto chico bajo el título, donde el restaurante
+pinta el modo. Las cuentas abiertas y en espera viven en Transacciones.
 
-**Menú «⋯».** A la derecha de «Ticket nuevo», un botón «⋯» despliega **«Nota»** (de la venta) y
-**«Descuento»** (el mismo de hoy, con PIN de supervisor). Se cierra con Escape o tocando fuera
-(Fermín, 18 oct). Lo que se agregue después va en esta lista.
+**Menú «⋯».** Despliega, en este orden:
 
-**«Dejar abierta».** Cuando el ticket cargado es una cuenta guardada (por ejemplo, la del cambio con
-diferencia por cobrar), el encabezado ofrece «Dejar abierta». Sale del Panel sin cancelar: una espera
-retomada vuelve a espera, una cuenta abierta queda lista en Transacciones. Sin esto, la única salida
-sería cancelar.
+- **Nota** (de la venta; «Editar nota» si ya hay una).
+- **Descuento por producto.** Con un solo renglón abre su descuento directo; con varios, el ticket
+  pide «Toca el producto al que le harás descuento» y el siguiente toque en un renglón lo elige
+  (Escape o «Cancelar» lo deja). En el renglón no hay botón de descuento.
+- **Descuento general** (el de todo el ticket, el mismo de hoy).
+- **Asignar cliente** («Cambiar cliente» si ya hay uno).
+- **Limpiar** en rojo, o **Cancelar cuenta** si el ticket ya está guardado. Es la única salida de una
+  cuenta guardada que no se va a cobrar, ahora que no hay «Dejar abierta».
+
+Los dos descuentos guardan la venta como cuenta antes de pedir el PIN de supervisor, igual que en
+restaurante. Se cierra con Escape o tocando fuera.
 
 **¿Por qué «Cambio de talla» no va junto a Cobrar?** Empieza otra operación (sobre una venta anterior,
 no sobre el ticket en curso). Junto a Cobrar se leía como una forma de cobrar, y una pantalla de caja

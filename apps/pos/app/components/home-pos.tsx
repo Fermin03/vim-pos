@@ -1328,8 +1328,11 @@ export function HomePos({
     setClienteCuentaAbierto(false);
   }, [ticketBd, token, carrito.clienteCuenta?.clienteId]);
 
-  /** Persiste el ticket si aún no existe; abre el modal de descuento sobre ese ticket. */
-  const onAplicarDescuento = useCallback(async () => {
+  /**
+   * Persiste el ticket si aún no existe; abre el modal de descuento sobre ese ticket. Con `clientId`
+   * (menú «⋯» de la tienda) abre el descuento de ese renglón en vez del general.
+   */
+  const onAplicarDescuento = useCallback(async (clientId?: string) => {
     if (carrito.lineas.length === 0) return;
     setProcesandoCobro(true);
     setError(null);
@@ -1341,8 +1344,14 @@ export function HomePos({
         setTicketIncompleto(false);
       }
       // Cargar items persistidos (mapping clientId ↔ ticket_item_id real para cancelaciones F6).
-      try { setItemsPersistidos(await leerItemsPersistidos(token, bd.ticketId)); } catch { /* no bloquear */ }
-      setDescuentoAbierto(true);
+      let items: Awaited<ReturnType<typeof leerItemsPersistidos>> = [];
+      try { items = await leerItemsPersistidos(token, bd.ticketId); setItemsPersistidos(items); } catch { /* no bloquear */ }
+      if (clientId === undefined) setDescuentoAbierto(true);
+      else {
+        const it = items.find((x) => x.clientId === clientId);
+        if (it) setDescuentoItem(it);
+        else setError("No se pudo abrir el descuento de ese producto. Intenta de nuevo.");
+      }
     } catch (e) {
       setError(await adoptarTicketSiQuedoAbierto(e, "Error al preparar el descuento"));
     } finally {
@@ -3068,7 +3077,7 @@ export function HomePos({
             simple: true,
             onAsignarCliente: admiteClienteCuenta(carrito.modoServicio) ? () => setClienteCuentaAbierto(true) : undefined,
             cliente: carrito.clienteCuenta?.nombre ?? null,
-            onDejarAbierta: ticketBd ? dejarCuentaAbierta : undefined,
+            onDescuentoProducto: cuentaImpresa ? undefined : (id) => void onAplicarDescuento(id),
           } : undefined}
           onCantidad={(id, c) => { setUltimoTienda(null); dispatch({ tipo: "cantidad", clientId: id, cantidad: c }); }}
           onQuitar={(id) => { setUltimoTienda(null); dispatch({ tipo: "quitar", clientId: id }); }}
@@ -3101,7 +3110,7 @@ export function HomePos({
                 : undefined
           }
           folioCuenta={ticketBd?.folio ?? null}
-          onAplicarDescuento={cuentaImpresa ? undefined : onAplicarDescuento}
+          onAplicarDescuento={cuentaImpresa ? undefined : () => void onAplicarDescuento()}
           descuentoMxn={ticketBd?.descuentos ?? 0}
             promocionMxn={ticketBd?.promociones ?? 0}
           lealtadMxn={ticketBd?.lealtad ?? 0}
