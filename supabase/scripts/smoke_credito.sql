@@ -1,4 +1,4 @@
--- Smoke crédito (retail 2, entrega 2; 0207–0208). Hace ROLLBACK.
+-- Smoke crédito (retail 2, entrega 2; 0207–0209). Hace ROLLBACK.
 -- Ejecutar: cd desktop && npm run smokes -- smoke_credito.sql
 \set ON_ERROR_STOP on
 BEGIN;
@@ -333,5 +333,230 @@ BEGIN
   IF NOT (SELECT modulo_credito_activo FROM configuracion_tenant WHERE tenant_id = v_t) THEN RAISE EXCEPTION 'R6: un cajero apagó el crédito'; END IF;
   IF (SELECT count(*) FROM abonos_credito WHERE client_id_local LIKE 'smoke-cr-rls-ab%') <> 1 THEN RAISE EXCEPTION 'R7: el abono del cajero no quedó'; END IF;
   RAISE NOTICE 'SMOKE CREDITO 0208 RLS OK';
+END $$;
+
+-- 0209: crédito sin puntos, factura al liquidar, cancelación, saldo a favor y arqueo con abonos.
+DO $$
+DECLARE
+  v_t      uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_suc    uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_caja   uuid := '99999999-0000-0000-0000-0000000000cc';
+  v_maria  uuid := '99999999-0000-0000-0000-000000000001';
+  v_prod   uuid := 'c2080000-0000-0000-0000-0000000000a1';
+  v_beto   uuid := 'c2080000-0000-0000-0000-000000000002';
+  v_carla  uuid := 'c2090000-0000-0000-0000-000000000001';
+  v_turno uuid; v_ca uuid; v_cb uuid; v_cc uuid; v_cd uuid; v_ce uuid; v_cn uuid; v_tk uuid;
+  v_auth uuid; v_dev uuid; v_pago uuid; v_cfdi uuid; v_e numeric; v_ok boolean; v_x jsonb; j jsonb; v_td numeric;
+BEGIN
+  PERFORM set_config('request.jwt.claims',
+    json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
+  SELECT id INTO v_turno FROM turnos WHERE caja_id = v_caja AND estado = 'ABIERTO';
+  INSERT INTO clientes (id, tenant_id, nombre, telefono) VALUES (v_carla, v_t, 'Carla Crédito', '4770002091');
+  INSERT INTO clientes_credito (tenant_id, cliente_id, limite_mxn, plazo_dias) VALUES (v_t, v_carla, 10000, 30);
+  -- Lealtad encendida (10 %): la venta de contado gana; la de crédito, no.
+  INSERT INTO tenant_addons (tenant_id, addon_id, fecha_inicio, activo, precio_mensual_mxn)
+  SELECT v_t, id, (now() AT TIME ZONE 'America/Mexico_City')::date, true, 100 FROM addons a WHERE codigo = 'LEALTAD'
+     AND NOT EXISTS (SELECT 1 FROM tenant_addons x WHERE x.tenant_id = v_t AND x.addon_id = a.id);
+  INSERT INTO lealtad_programa (tenant_id, mecanica, porcentaje, tope_compras_dia) VALUES (v_t, 'PUNTOS_DINERO', 10, 50)
+  ON CONFLICT (tenant_id) DO UPDATE SET mecanica = 'PUNTOS_DINERO', porcentaje = 10, tope_compras_dia = 50;
+  UPDATE configuracion_tenant SET modulo_lealtad_activo = true WHERE tenant_id = v_t;
+
+  -- 15) Lealtad: una venta a crédito no gana puntos; la de contado sí.
+  v_cn := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_carla, NULL, 'smoke-cr9-n', v_maria);
+  PERFORM agregar_item_a_ticket(v_cn, v_prod, 1, NULL, '[]'::jsonb, 'smoke-cr9-na');
+  PERFORM aplicar_pago(v_cn, 'EFECTIVO'::metodo_pago, 500, 500);
+  IF lealtad_neto_ganado(v_cn) <= 0 THEN RAISE EXCEPTION '15: la venta de contado no ganó (¿lealtad apagada?)'; END IF;
+  v_ca := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_carla, NULL, 'smoke-cr9-a', v_maria);
+  PERFORM agregar_item_a_ticket(v_ca, v_prod, 1, NULL, '[]'::jsonb, 'smoke-cr9-aa');
+  PERFORM pagar_a_credito(v_ca, NULL, 'smoke-cr9-pa');
+  IF lealtad_neto_ganado(v_ca) <> 0 THEN RAISE EXCEPTION '15: la venta a crédito ganó % puntos', lealtad_neto_ganado(v_ca); END IF;
+
+  -- 16) Factura: con saldo no se factura (CFDI, autofactura, global); liquidada, sí.
+  v_ok := false;
+  BEGIN
+    v_cfdi := cfdi_crear_borrador(
+      p_ticket_id := v_ca, p_tipo_comprobante := 'INGRESO'::cfdi_tipo_comprobante,
+      p_receptor_rfc := 'XAXX010101000', p_receptor_razon_social := 'PUBLICO EN GENERAL',
+      p_receptor_uso_cfdi := 'S01', p_receptor_codigo_postal := '37000', p_receptor_regimen_fiscal := '616',
+      p_receptor_email := 'cliente@demo.mx', p_emisor_rfc := 'XAXX010101000',
+      p_emisor_razon_social := 'VIM MARKETING SA DE CV', p_emisor_regimen_fiscal := '601',
+      p_emisor_lugar_expedicion := '37000', p_metodo_pago_sat := 'PUE', p_forma_pago_sat := '01',
+      p_pac_proveedor := 'FACTURAPI'::cfdi_proveedor_pac);
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE '%saldo de crédito: se factura al liquidarse%' THEN RAISE EXCEPTION '16: falló por otra razón: %', SQLERRM; END IF;
+    v_ok := true;
+  END;
+  IF NOT v_ok THEN RAISE EXCEPTION '16: una venta con saldo de crédito admitió factura'; END IF;
+  IF ticket_autofacturable(v_ca) THEN RAISE EXCEPTION '16: con saldo era autofacturable'; END IF;
+  IF EXISTS (SELECT 1 FROM tickets t, tickets_de_periodo_global(v_t, t.dia_contable, t.dia_contable) g
+              WHERE t.id = v_ca AND g.ticket_id = v_ca) THEN
+    RAISE EXCEPTION '16: con saldo entró en la global'; END IF;
+  PERFORM registrar_abono(v_carla, 500, 'EFECTIVO'::metodo_pago, v_caja, v_turno, 'smoke-cr9-ab-a');
+  IF ticket_con_credito_pendiente(v_ca) THEN RAISE EXCEPTION '16: liquidada sigue con saldo'; END IF;
+  IF NOT ticket_autofacturable(v_ca) THEN RAISE EXCEPTION '16: liquidada no es autofacturable'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM tickets t, tickets_de_periodo_global(v_t, t.dia_contable, t.dia_contable) g
+                  WHERE t.id = v_ca AND g.ticket_id = v_ca) THEN
+    RAISE EXCEPTION '16: liquidada no entró en la global'; END IF;
+  v_cfdi := cfdi_crear_borrador(
+    p_ticket_id := v_ca, p_tipo_comprobante := 'INGRESO'::cfdi_tipo_comprobante,
+    p_receptor_rfc := 'XAXX010101000', p_receptor_razon_social := 'PUBLICO EN GENERAL',
+    p_receptor_uso_cfdi := 'S01', p_receptor_codigo_postal := '37000', p_receptor_regimen_fiscal := '616',
+    p_receptor_email := 'cliente@demo.mx', p_emisor_rfc := 'XAXX010101000',
+    p_emisor_razon_social := 'VIM MARKETING SA DE CV', p_emisor_regimen_fiscal := '601',
+    p_emisor_lugar_expedicion := '37000', p_metodo_pago_sat := 'PUE', p_forma_pago_sat := '01',
+    p_pac_proveedor := 'FACTURAPI'::cfdi_proveedor_pac);
+
+  -- 17) $500 a crédito, $200 abonados, cancelar con dinero en modo EFECTIVO: deuda 0, salen $200
+  --     del cajón del turno que cancela y no queda saldo a favor.
+  UPDATE configuracion_tenant SET credito_abonos_al_cancelar = 'EFECTIVO' WHERE tenant_id = v_t;
+  v_cb := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_carla, NULL, 'smoke-cr9-b', v_maria);
+  PERFORM agregar_item_a_ticket(v_cb, v_prod, 1, NULL, '[]'::jsonb, 'smoke-cr9-ba');
+  PERFORM pagar_a_credito(v_cb, NULL, 'smoke-cr9-pb');
+  PERFORM registrar_abono(v_carla, 200, 'EFECTIVO'::metodo_pago, v_caja, v_turno, 'smoke-cr9-ab-b');
+  v_e := calcular_efectivo_esperado(v_turno);
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'cancelar_ticket', 'venta.cancelar_pagada', 'ticket', v_cb, 'smoke 17')
+  RETURNING id INTO v_auth;
+  PERFORM cancelar_ticket_pagado(
+    p_ticket_id := v_cb, p_caja_id := v_caja, p_turno_id := v_turno,
+    p_motivo := 'CLIENTE_DESISTIO'::cancelacion_motivo, p_motivo_texto := 'smoke 17',
+    p_autorizacion_pin_id := v_auth, p_usuario_solicitante_id := v_maria, p_usuario_autorizo_id := v_maria,
+    p_reversar_inventario := true, p_cancelar_cfdi_sat := false, p_devolver_dinero := true,
+    p_client_id_local := 'smoke-cr9-cancela-b');
+  SELECT devolucion_id INTO v_dev FROM cancelaciones_ticket WHERE ticket_id = v_cb;
+  IF credito_saldo_ticket(v_cb) <> 0 THEN RAISE EXCEPTION '17: deuda % (esperada 0)', credito_saldo_ticket(v_cb); END IF;
+  IF (SELECT sum(monto_mxn) FROM abonos_credito WHERE ticket_id = v_cb AND tipo = 'AJUSTE_CANCELACION') IS DISTINCT FROM 300 THEN
+    RAISE EXCEPTION '17: el ajuste no fue de 300'; END IF;
+  IF (SELECT sum(m.monto_mxn) FROM movimientos_caja m JOIN devoluciones d ON d.id = v_dev
+       WHERE m.turno_id = v_turno AND m.tipo = 'DEVOLUCION_EFECTIVO' AND m.motivo = 'Devolución folio ' || d.folio_completo)
+     IS DISTINCT FROM 200 THEN
+    RAISE EXCEPTION '17: no salieron $200 del cajón'; END IF;
+  IF calcular_efectivo_esperado(v_turno) <> v_e - 200 THEN
+    RAISE EXCEPTION '17: esperado % (esperado %)', calcular_efectivo_esperado(v_turno), v_e - 200; END IF;
+  IF EXISTS (SELECT 1 FROM saldo_favor_movimientos WHERE cliente_id = v_carla) THEN
+    RAISE EXCEPTION '17: en modo EFECTIVO quedó saldo a favor'; END IF;
+
+  -- 18) Lo mismo en modo SALDO_FAVOR, con el abono en tarjeta y cancelando el cajero bajo RLS:
+  --     deuda 0, nada sale del cajón y queda $200 a favor.
+  UPDATE configuracion_tenant SET credito_abonos_al_cancelar = 'SALDO_FAVOR' WHERE tenant_id = v_t;
+  v_cc := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_carla, NULL, 'smoke-cr9-c', v_maria);
+  PERFORM agregar_item_a_ticket(v_cc, v_prod, 1, NULL, '[]'::jsonb, 'smoke-cr9-ca');
+  PERFORM pagar_a_credito(v_cc, NULL, 'smoke-cr9-pc');
+  PERFORM registrar_abono(v_carla, 200, 'TARJETA_DEBITO'::metodo_pago, v_caja, v_turno, 'smoke-cr9-ab-c');
+  v_e := calcular_efectivo_esperado(v_turno);
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'cancelar_ticket', 'venta.cancelar_pagada', 'ticket', v_cc, 'smoke 18')
+  RETURNING id INTO v_auth;
+  EXECUTE 'SET LOCAL ROLE authenticated';
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria, 'role', 'authenticated', 'tenant_id', v_t)::text, true);
+  PERFORM cancelar_ticket_pagado(
+    p_ticket_id := v_cc, p_caja_id := v_caja, p_turno_id := v_turno,
+    p_motivo := 'CLIENTE_DESISTIO'::cancelacion_motivo, p_motivo_texto := 'smoke 18',
+    p_autorizacion_pin_id := v_auth, p_usuario_solicitante_id := v_maria, p_usuario_autorizo_id := v_maria,
+    p_reversar_inventario := true, p_cancelar_cfdi_sat := false, p_devolver_dinero := true,
+    p_client_id_local := 'smoke-cr9-cancela-c');
+  RESET ROLE;
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
+  SELECT devolucion_id INTO v_dev FROM cancelaciones_ticket WHERE ticket_id = v_cc;
+  IF credito_saldo_ticket(v_cc) <> 0 THEN RAISE EXCEPTION '18: deuda % (esperada 0)', credito_saldo_ticket(v_cc); END IF;
+  IF EXISTS (SELECT 1 FROM movimientos_caja m JOIN devoluciones d ON d.id = v_dev
+              WHERE m.motivo = 'Devolución folio ' || d.folio_completo) THEN
+    RAISE EXCEPTION '18: en modo SALDO_FAVOR salió dinero del cajón'; END IF;
+  IF calcular_efectivo_esperado(v_turno) <> v_e THEN RAISE EXCEPTION '18: el efectivo esperado cambió'; END IF;
+  IF (SELECT saldo_mxn FROM vw_saldo_favor_cliente WHERE cliente_id = v_carla) IS DISTINCT FROM 200 THEN
+    RAISE EXCEPTION '18: saldo a favor % (esperado 200)', (SELECT saldo_mxn FROM vw_saldo_favor_cliente WHERE cliente_id = v_carla); END IF;
+
+  -- 19) Pagar con saldo a favor: $300 se rechaza, $150 deja $50; solo entra por su RPC y no cambia de método.
+  v_cd := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_carla, NULL, 'smoke-cr9-d', v_maria);
+  PERFORM agregar_item_a_ticket(v_cd, v_prod, 1, NULL, '[]'::jsonb, 'smoke-cr9-da');
+  BEGIN
+    PERFORM pagar_con_saldo_favor(v_cd, 300, 'smoke-cr9-sf0');
+    RAISE EXCEPTION '19: pagó $300 con $200 a favor';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'DATOS_INVALIDOS:%' THEN RAISE; END IF;
+  END;
+  v_ok := false;
+  BEGIN
+    PERFORM aplicar_pago(v_cd, 'SALDO_FAVOR'::metodo_pago, 10);
+  EXCEPTION WHEN insufficient_privilege THEN v_ok := true;
+  END;
+  IF NOT v_ok THEN RAISE EXCEPTION '19: aplicar_pago metió un SALDO_FAVOR directo'; END IF;
+  v_tk := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smoke-cr9-sin', v_maria);
+  PERFORM agregar_item_a_ticket(v_tk, v_prod, 1, NULL, '[]'::jsonb, 'smoke-cr9-sina');
+  BEGIN
+    PERFORM pagar_con_saldo_favor(v_tk, 10, 'smoke-cr9-sf-sin');
+    RAISE EXCEPTION '19: pagó con saldo a favor sin cliente';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'DATOS_INVALIDOS:%' THEN RAISE; END IF;
+  END;
+  -- El cajero bajo RLS: no escribe movimientos a mano, pero sí paga con la RPC.
+  EXECUTE 'SET LOCAL ROLE authenticated';
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria, 'role', 'authenticated', 'tenant_id', v_t)::text, true);
+  v_ok := false;
+  BEGIN
+    INSERT INTO saldo_favor_movimientos (tenant_id, cliente_id, tipo, monto_mxn, ticket_id)
+    VALUES (v_t, v_carla, 'ENTRADA_CANCELACION', 1000, v_cd);
+  EXCEPTION WHEN insufficient_privilege THEN v_ok := true;
+  END;
+  IF NOT v_ok THEN RAISE EXCEPTION '19: un cajero escribió saldo a favor a mano'; END IF;
+  v_pago := pagar_con_saldo_favor(v_cd, 150, 'smoke-cr9-sf1');
+  IF pagar_con_saldo_favor(v_cd, 150, 'smoke-cr9-sf1') <> v_pago THEN RAISE EXCEPTION '19: no es idempotente'; END IF;
+  RESET ROLE;
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
+  IF (SELECT saldo_mxn FROM vw_saldo_favor_cliente WHERE cliente_id = v_carla) IS DISTINCT FROM 50 THEN
+    RAISE EXCEPTION '19: saldo a favor % (esperado 50)', (SELECT saldo_mxn FROM vw_saldo_favor_cliente WHERE cliente_id = v_carla); END IF;
+  IF (SELECT (metodo_pago::text, monto_mxn) FROM pagos WHERE id = v_pago) IS DISTINCT FROM ('SALDO_FAVOR'::text, 150::numeric(12,2)) THEN
+    RAISE EXCEPTION '19: el pago no es SALDO_FAVOR de 150'; END IF;
+  BEGIN
+    UPDATE pagos SET metodo_pago = 'EFECTIVO' WHERE id = v_pago;
+    RAISE EXCEPTION '19: un pago con saldo a favor cambió de método';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'DATOS_INVALIDOS:%' THEN RAISE; END IF;
+  END;
+  v_e := calcular_efectivo_esperado(v_turno);
+  PERFORM aplicar_pago(v_cd, 'EFECTIVO'::metodo_pago, 350, 350);
+  IF (SELECT estado_fiscal FROM tickets WHERE id = v_cd) <> 'PAGADO' THEN RAISE EXCEPTION '19: no quedó PAGADO'; END IF;
+  IF calcular_efectivo_esperado(v_turno) <> v_e + 350 THEN RAISE EXCEPTION '19: el saldo a favor contó como efectivo'; END IF;
+
+  -- 20) Corte: SALDO_FAVOR no se declara (sale informativo) y un abono con tarjeta no da diferencia.
+  v_x := reporte_x(v_turno);
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(v_x->'pagos_por_metodo') e WHERE e->>'metodo_pago' = 'SALDO_FAVOR') THEN
+    RAISE EXCEPTION '20: reporte_x pide declarar el saldo a favor'; END IF;
+  IF (v_x->>'pagado_con_saldo_favor_mxn')::numeric IS DISTINCT FROM 150 THEN
+    RAISE EXCEPTION '20: pagado_con_saldo_favor_mxn % (esperado 150)', v_x->>'pagado_con_saldo_favor_mxn'; END IF;
+  SELECT (e->>'monto_total_mxn')::numeric INTO v_td FROM jsonb_array_elements(v_x->'pagos_por_metodo') e
+   WHERE e->>'metodo_pago' = 'TARJETA_DEBITO';
+  j := arquear_caja(v_turno, jsonb_build_array(jsonb_build_object('metodo_pago', 'TARJETA_DEBITO', 'monto_declarado_mxn', v_td)),
+                    'smoke 20', v_maria);
+  IF (j->>'diferencia_total_mxn')::numeric <> 0 THEN
+    RAISE EXCEPTION '20: declarar la tarjeta del reporte X da diferencia: %', j; END IF;
+
+  -- 21) Regresión: una venta sin crédito cancelada con dinero saca del cajón su total, como antes,
+  --     aunque el negocio esté en modo SALDO_FAVOR.
+  v_ce := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_beto, NULL, 'smoke-cr9-e', v_maria);
+  PERFORM agregar_item_a_ticket(v_ce, v_prod, 1, NULL, '[]'::jsonb, 'smoke-cr9-ea');
+  PERFORM aplicar_pago(v_ce, 'EFECTIVO'::metodo_pago, 500, 500);
+  v_e := calcular_efectivo_esperado(v_turno);
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'cancelar_ticket', 'venta.cancelar_pagada', 'ticket', v_ce, 'smoke 21')
+  RETURNING id INTO v_auth;
+  PERFORM cancelar_ticket_pagado(
+    p_ticket_id := v_ce, p_caja_id := v_caja, p_turno_id := v_turno,
+    p_motivo := 'CLIENTE_DESISTIO'::cancelacion_motivo, p_motivo_texto := 'smoke 21',
+    p_autorizacion_pin_id := v_auth, p_usuario_solicitante_id := v_maria, p_usuario_autorizo_id := v_maria,
+    p_reversar_inventario := true, p_cancelar_cfdi_sat := false, p_devolver_dinero := true,
+    p_client_id_local := 'smoke-cr9-cancela-e');
+  SELECT devolucion_id INTO v_dev FROM cancelaciones_ticket WHERE ticket_id = v_ce;
+  IF (SELECT count(*) || ':' || sum(m.monto_mxn) FROM movimientos_caja m JOIN devoluciones d ON d.id = v_dev
+       WHERE m.turno_id = v_turno AND m.tipo = 'DEVOLUCION_EFECTIVO' AND m.motivo = 'Devolución folio ' || d.folio_completo)
+     IS DISTINCT FROM '1:500.00' THEN
+    RAISE EXCEPTION '21: la cancelación sin crédito no sacó un movimiento de $500'; END IF;
+  IF calcular_efectivo_esperado(v_turno) <> v_e - 500 THEN RAISE EXCEPTION '21: el esperado no bajó 500'; END IF;
+  IF EXISTS (SELECT 1 FROM abonos_credito WHERE ticket_id = v_ce) OR EXISTS (SELECT 1 FROM saldo_favor_movimientos WHERE ticket_id = v_ce) THEN
+    RAISE EXCEPTION '21: la venta sin crédito tocó crédito o saldo a favor'; END IF;
+  RAISE NOTICE 'SMOKE CREDITO 0209 OK';
 END $$;
 ROLLBACK;
