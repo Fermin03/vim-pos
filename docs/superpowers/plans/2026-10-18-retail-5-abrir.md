@@ -190,8 +190,8 @@
 - [ ] Revisar la rama completa (`git diff feat/retail-caja...feat/retail-abrir`) con foco en dinero (pago interno, efectivo esperado) y en RLS/grants de las funciones nuevas.
 - [ ] Dejar el tenant de prueba como estaba antes de empezar: `vertical_principal='QUICK_SERVICE'`, `existencias=false`, y los productos `e3e30000-…` borrados (suave) y sin `imagen_url`.
 
-## Fuera de esta entrega (decisión de Fermín, 18 oct)
+## Fuera de esta entrega (propuesta, a confirmar con Fermín)
 
-- **Página del sitio y PDF de prospectos para tienda.** El spec los pone en la entrega 5, pero como nada sale a producción hasta tener todos los giros de retail, se hacen una sola vez, para todos, al final. Los textos los escribe James.
+- **Página del sitio y PDF de prospectos para tienda.** El spec los pone en la entrega 5, pero como nada sale a producción hasta tener todos los giros de retail (Fermín, 18 oct), se propone hacerlos una sola vez, para todos, al final. Los textos los escribe James.
 - **Liberar BAR, CAFETERIA y TAQUERIA en `cambiar_giro`.** Son de restaurante y nadie lo ha pedido.
 - **El formulario de demo del sitio (`sitio-web/demo.html:257-266`)** sigue con los 6 giros viejos (CAFE_BAR, ENTERPRISE). Es un problema de los restaurantes, no del giro.
