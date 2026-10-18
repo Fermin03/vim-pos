@@ -707,4 +707,137 @@ BEGIN
   RAISE NOTICE '7 cambio sin lealtad 0200 OK';
 END $$;
 
+-- 8) 0201: reabrir y cambiar el pago de la venta de un cambio respetan su pago interno (la prenda
+--    devuelta): nunca se cancela ni cambia de método, y el efectivo esperado sigue cuadrando.
+DO $$
+DECLARE
+  v_t     uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_suc   uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_caja  uuid := '99999999-0000-0000-0000-0000000000cc';
+  v_maria uuid := '99999999-0000-0000-0000-000000000001';
+  v_c300  uuid := 'c4c40000-0000-0000-0000-0000000000d6';   -- de §7
+  v_c350  uuid := 'c4c40000-0000-0000-0000-0000000000d7';
+  v_turno uuid; v_cli uuid; v_tk uuid; v_it uuid; v_auth uuid; v_res jsonb; v_igual uuid; v_saldo uuid; v_dividido uuid;
+  v_interno uuid; v_pago_saldo uuid; v_pago_saldo2 uuid; v_efe numeric; v_snap jsonb; v_caso text; v_editar uuid;
+BEGIN
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
+  SELECT id INTO v_turno FROM turnos WHERE caja_id = v_caja AND estado = 'ABIERTO';
+  -- Con cliente y lealtad prendida (§7): reabrir y volver a cerrar no debe dar puntos.
+  INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_t, 'Cliente cambio 0201', '4770002010') RETURNING id INTO v_cli;
+  INSERT INTO movimientos_producto (tenant_id, sucursal_id, producto_id, tipo, cantidad)
+  SELECT v_t, v_suc, p, 'ENTRADA', 10 FROM unnest(ARRAY[v_c300, v_c350]) p;
+  -- Sin entidad, la autorización sirve para todo el smoke (misma transacción; ver consumir_autorizacion).
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'editar_post_cobro', 'venta.editar_post_cobro', 'ticket', 'smoke 8')
+  RETURNING id INTO v_editar;
+
+  -- Cuatro cambios: lleva ≤ regresa (8c), lleva > regresa (8c'/8d), saldo en dos pagos (8d) y uno para el push (8e).
+  FOREACH v_caso IN ARRAY ARRAY['igual', 'saldo', 'dividido', 'push'] LOOP
+    v_tk := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_cli, NULL, 'smoke-c8-' || v_caso, v_maria);
+    v_it := agregar_item_a_ticket(v_tk, CASE WHEN v_caso = 'igual' THEN v_c350 ELSE v_c300 END, 1, NULL, '[]'::jsonb, 'smoke-c8-' || v_caso || '-1');
+    PERFORM aplicar_pago(v_tk, 'EFECTIVO'::metodo_pago, CASE WHEN v_caso = 'igual' THEN 350 ELSE 300 END, NULL, NULL, NULL, NULL, false, NULL,
+                         'smoke-c8-' || v_caso || '-pago');
+    INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                    accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+    VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'devolucion', 'venta.devolucion', 'ticket', v_tk, 'smoke 8')
+    RETURNING id INTO v_auth;
+    v_res := registrar_cambio_talla(v_tk, jsonb_build_array(jsonb_build_object('ticket_item_id', v_it, 'cantidad', 1)),
+      jsonb_build_array(jsonb_build_object('producto_id', CASE WHEN v_caso = 'igual' THEN v_c300 ELSE v_c350 END, 'cantidad', 1)),
+      v_caja, v_turno, v_maria, v_auth, v_maria, 'smoke-c8-cambio-' || v_caso);
+    CASE v_caso
+      WHEN 'igual' THEN v_igual := (v_res->>'ticket_id')::uuid;
+      WHEN 'saldo' THEN v_saldo := (v_res->>'ticket_id')::uuid;
+      WHEN 'dividido' THEN v_dividido := (v_res->>'ticket_id')::uuid;
+      ELSE v_tk := (v_res->>'ticket_id')::uuid;   -- push
+    END CASE;
+  END LOOP;
+  PERFORM aplicar_pago(v_saldo, 'EFECTIVO'::metodo_pago, 50, 50, NULL, NULL, NULL, false, NULL, 'smoke-c8-saldo-saldo');
+  PERFORM aplicar_pago(v_dividido, 'EFECTIVO'::metodo_pago, 20, 20, NULL, NULL, NULL, false, NULL, 'smoke-c8-dividido-saldo1');
+  PERFORM aplicar_pago(v_dividido, 'TARJETA_DEBITO'::metodo_pago, 30, NULL, NULL, NULL, NULL, false, NULL, 'smoke-c8-dividido-saldo2');
+  PERFORM aplicar_pago(v_tk, 'EFECTIVO'::metodo_pago, 50, 50, NULL, NULL, NULL, false, NULL, 'smoke-c8-push-saldo');
+  IF EXISTS (SELECT 1 FROM tickets WHERE id IN (v_igual, v_saldo, v_dividido, v_tk) AND estado_fiscal <> 'PAGADO') THEN
+    RAISE EXCEPTION '8: las cuatro ventas de cambio debían quedar PAGADAS'; END IF;
+
+  -- 8c) Lleva ≤ regresa (350 por 300): reabrir deja el pago interno APLICADO, nada pendiente y el
+  --     esperado igual; cerrar_ticket_si_pagado la regresa a PAGADO sin puntos.
+  SELECT id INTO v_interno FROM pagos WHERE ticket_id = v_igual AND client_id_local = 'smoke-c8-cambio-igual-pago';
+  v_efe := calcular_efectivo_esperado(v_turno);
+  PERFORM reabrir_ticket_pagado(v_igual, 'smoke 8c', v_editar);
+  IF (SELECT estado_fiscal::text FROM tickets WHERE id = v_igual) <> 'ABIERTO' THEN RAISE EXCEPTION '8c: debía quedar ABIERTO'; END IF;
+  IF (SELECT (estado::text, deleted_at IS NULL) FROM pagos WHERE id = v_interno) IS DISTINCT FROM ('APLICADO'::text, true) THEN
+    RAISE EXCEPTION '8c: el pago interno debía seguir APLICADO'; END IF;
+  IF (SELECT monto_pendiente_mxn FROM tickets WHERE id = v_igual) <> 0 THEN
+    RAISE EXCEPTION '8c: no debía quedar nada pendiente, quedó %', (SELECT monto_pendiente_mxn FROM tickets WHERE id = v_igual); END IF;
+  IF calcular_efectivo_esperado(v_turno) <> v_efe THEN RAISE EXCEPTION '8c: el esperado no debía moverse'; END IF;
+  IF NOT cerrar_ticket_si_pagado(v_igual) THEN RAISE EXCEPTION '8c: cerrar_ticket_si_pagado debía cerrarla'; END IF;
+  IF (SELECT estado_fiscal::text FROM tickets WHERE id = v_igual) <> 'PAGADO' THEN RAISE EXCEPTION '8c: debía volver a PAGADO'; END IF;
+  IF EXISTS (SELECT 1 FROM lealtad_movimientos WHERE ticket_id = v_igual) THEN RAISE EXCEPTION '8c: la venta del cambio movió puntos'; END IF;
+
+  -- 8c') Lleva > regresa (300 por 350): se cancela solo el pago del saldo; pendiente 50 y el esperado
+  --      baja 50. Cobrar el saldo otra vez la deja PAGADA y el esperado vuelve.
+  SELECT id INTO v_interno FROM pagos WHERE ticket_id = v_saldo AND client_id_local = 'smoke-c8-cambio-saldo-pago';
+  SELECT id INTO v_pago_saldo FROM pagos WHERE ticket_id = v_saldo AND client_id_local = 'smoke-c8-saldo-saldo';
+  v_efe := calcular_efectivo_esperado(v_turno);
+  PERFORM reabrir_ticket_pagado(v_saldo, 'smoke 8c''', v_editar);
+  IF (SELECT estado::text FROM pagos WHERE id = v_interno) <> 'APLICADO' OR (SELECT estado::text FROM pagos WHERE id = v_pago_saldo) <> 'CANCELADO' THEN
+    RAISE EXCEPTION '8c'': debía cancelarse solo el pago del saldo'; END IF;
+  IF (SELECT (estado_fiscal::text, monto_pendiente_mxn) FROM tickets WHERE id = v_saldo) IS DISTINCT FROM ('ABIERTO'::text, 50::numeric(12,2)) THEN
+    RAISE EXCEPTION '8c'': debía quedar ABIERTA con 50 pendientes'; END IF;
+  IF calcular_efectivo_esperado(v_turno) <> v_efe - 50 THEN RAISE EXCEPTION '8c'': el esperado debía bajar solo los 50 del saldo'; END IF;
+  PERFORM aplicar_pago(v_saldo, 'EFECTIVO'::metodo_pago, 50, 50, NULL, NULL, NULL, false, NULL, 'smoke-c8-saldo-saldo2');
+  IF (SELECT estado_fiscal::text FROM tickets WHERE id = v_saldo) <> 'PAGADO' THEN RAISE EXCEPTION '8c'': cobrar el saldo debía cerrarla'; END IF;
+  IF calcular_efectivo_esperado(v_turno) <> v_efe THEN RAISE EXCEPTION '8c'': el esperado debía volver'; END IF;
+
+  -- 8d) Cambiar el pago: el del saldo pasa a TARJETA y el interno sigue EFECTIVO; sin saldo, el
+  --     mensaje nuevo; con el saldo en dos pagos, el «pago dividido» de siempre.
+  PERFORM cambiar_forma_pago_ticket(v_saldo, 'TARJETA_DEBITO'::metodo_pago, NULL, v_editar);
+  IF (SELECT metodo_pago::text FROM pagos WHERE id = v_interno) <> 'EFECTIVO'
+     OR (SELECT metodo_pago::text FROM pagos WHERE ticket_id = v_saldo AND client_id_local = 'smoke-c8-saldo-saldo2') <> 'TARJETA_DEBITO' THEN
+    RAISE EXCEPTION '8d: el saldo debía pasar a TARJETA y el interno seguir en EFECTIVO'; END IF;
+  BEGIN
+    PERFORM cambiar_forma_pago_ticket(v_igual, 'TARJETA_DEBITO'::metodo_pago, NULL, v_editar);
+    RAISE EXCEPTION '8d igual: debía rechazarse';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'DATOS_INVALIDOS: esta venta se pagó con la prenda devuelta; no hay pago que cambiar' THEN
+      RAISE EXCEPTION '8d igual: error inesperado: %', SQLERRM; END IF;
+  END;
+  BEGIN
+    PERFORM cambiar_forma_pago_ticket(v_dividido, 'TARJETA_CREDITO'::metodo_pago, NULL, v_editar);
+    RAISE EXCEPTION '8d dividido: debía rechazarse';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'La cuenta tiene pago dividido%' THEN RAISE EXCEPTION '8d dividido: error inesperado: %', SQLERRM; END IF;
+  END;
+
+  -- 8e) Push: la caja reabre y cobra otra vez; la nube (aquí, el estado de antes, recuperado al
+  --     deshacer el bloque) recibe ese ticket y sus pagos. El interno sigue APLICADO y el esperado coincide.
+  SELECT id INTO v_interno FROM pagos WHERE ticket_id = v_tk AND client_id_local = 'smoke-c8-cambio-push-pago';
+  SELECT id INTO v_pago_saldo FROM pagos WHERE ticket_id = v_tk AND client_id_local = 'smoke-c8-push-saldo';
+  BEGIN
+    PERFORM reabrir_ticket_pagado(v_tk, 'smoke 8e', v_editar);
+    PERFORM aplicar_pago(v_tk, 'EFECTIVO'::metodo_pago, 50, 50, NULL, NULL, NULL, false, NULL, 'smoke-c8-push-saldo2');
+    SELECT id INTO v_pago_saldo2 FROM pagos WHERE ticket_id = v_tk AND client_id_local = 'smoke-c8-push-saldo2';
+    v_efe := calcular_efectivo_esperado(v_turno);
+    v_snap := jsonb_build_object(
+      'tickets', (SELECT jsonb_agg(to_jsonb(t)) FROM tickets t WHERE t.id = v_tk),
+      'pagos',   (SELECT jsonb_agg(to_jsonb(p)) FROM pagos p WHERE p.ticket_id = v_tk));
+    RAISE EXCEPTION 'smoke-c8e-deshacer';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'smoke-c8e-deshacer' THEN RAISE; END IF;
+  END;
+  IF (SELECT estado::text FROM pagos WHERE id = v_pago_saldo) <> 'APLICADO' OR EXISTS (SELECT 1 FROM pagos WHERE id = v_pago_saldo2) THEN
+    RAISE EXCEPTION '8e: la nube debía seguir como antes de reabrir'; END IF;
+  v_res := sync_push_snapshot(v_t, v_snap);
+  IF jsonb_array_length(COALESCE(v_res->'_errores', '[]'::jsonb)) > 0 THEN RAISE EXCEPTION '8e: el push dio errores: %', v_res; END IF;
+  IF (SELECT (estado::text, deleted_at IS NULL) FROM pagos WHERE id = v_interno) IS DISTINCT FROM ('APLICADO'::text, true) THEN
+    RAISE EXCEPTION '8e: el pago interno debía seguir APLICADO en la nube'; END IF;
+  IF (SELECT estado::text FROM pagos WHERE id = v_pago_saldo) <> 'CANCELADO'
+     OR (SELECT estado::text FROM pagos WHERE id = v_pago_saldo2) <> 'APLICADO'
+     OR (SELECT estado_fiscal::text FROM tickets WHERE id = v_tk) <> 'PAGADO' THEN
+    RAISE EXCEPTION '8e: la nube debía quedar con el saldo nuevo y la venta PAGADA'; END IF;
+  IF calcular_efectivo_esperado(v_turno) <> v_efe THEN
+    RAISE EXCEPTION '8e: el esperado de la nube (%) debía coincidir con el de la caja (%)', calcular_efectivo_esperado(v_turno), v_efe; END IF;
+  RAISE NOTICE '8 reabrir y cambiar pago de un cambio 0201 OK';
+END $$;
+
 ROLLBACK;
