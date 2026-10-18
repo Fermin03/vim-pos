@@ -6,9 +6,11 @@ const con = (efectivos: Record<string, boolean>) => ({ permitidos: {}, efectivos
 
 describe("rutasOcultas", () => {
   const TIENDA = ["/catalogo/importar-tienda", "/catalogo/etiquetas", "/existencias", "/reportes/ventas-variantes"];
+  // Crédito (0208): apagado mientras no se lea encendido; su configuración, solo en tiendas.
+  const CREDITO = ["/creditos", "/configuracion/credito"];
   it("cargando o con error no esconde nada de restaurante (esconder de más y luego mostrar salta a la vista)", () => {
-    expect(rutasOcultas(null)).toEqual(new Set(TIENDA));
-    expect(rutasOcultas("error")).toEqual(new Set(TIENDA));
+    expect(rutasOcultas(null)).toEqual(new Set([...TIENDA, ...CREDITO]));
+    expect(rutasOcultas("error")).toEqual(new Set([...TIENDA, ...CREDITO]));
   });
   it("Existencias falla cerrado: solo se ve con el módulo leído y encendido", () => {
     expect(rutasOcultas(null).has("/existencias")).toBe(true);
@@ -17,15 +19,16 @@ describe("rutasOcultas", () => {
     expect(rutasOcultas(con({ existencias: true })).has("/existencias")).toBe(false);
   });
   it("un negocio de siempre (todo encendido) ve todo; lo de tienda solo con existencias", () => {
-    expect(rutasOcultas(con({ existencias: true })).size).toBe(0);
+    expect(rutasOcultas(con({ existencias: true, credito: true })).size).toBe(0);
+    expect([...rutasOcultas(con({ existencias: true }))]).toEqual(["/creditos"]);
   });
   it("las rutas de tienda se esconden salvo con existencias", () => {
-    expect(rutasOcultas(con({}))).toEqual(new Set(["/catalogo/importar-tienda", "/catalogo/etiquetas", "/existencias", "/reportes/ventas-variantes"]));
+    expect(rutasOcultas(con({}))).toEqual(new Set([...TIENDA, ...CREDITO]));
     const tienda = rutasOcultas(con({ existencias: true }));
     for (const r of ["/catalogo/importar-tienda", "/catalogo/etiquetas", "/existencias", "/reportes/ventas-variantes"]) expect(tienda.has(r)).toBe(false);
   });
   it("food truck: sin mesas, envíos, repartidores, reservaciones, marcas ni reporte de meseros", () => {
-    const m = con({ existencias: true, comedor: false, meseros: false, domicilio: false, repartidores: false, reservaciones: false, marcas: false });
+    const m = con({ existencias: true, credito: true, comedor: false, meseros: false, domicilio: false, repartidores: false, reservaciones: false, marcas: false });
     expect([...rutasOcultas(m)].sort()).toEqual([
       "/configuracion/envios", "/configuracion/marcas", "/configuracion/mesas",
       "/reportes/ventas-mesero", "/reservaciones", "/usuarios/repartidores",

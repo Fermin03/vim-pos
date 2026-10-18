@@ -29,6 +29,9 @@ export const useAccesoTenant = () => useContext(AccesoCtx);
  */
 const ModulosCtx = createContext<ModulosLeidos | "error" | null>(null);
 export const useModulos = () => useContext(ModulosCtx);
+/** Vuelve a leer los módulos: tras encender un interruptor del dueño, el menú cambia sin recargar. */
+const RecargarModulosCtx = createContext<() => void>(() => {});
+export const useRecargarModulos = () => useContext(RecargarModulosCtx);
 
 type Item = { label: string; href: string; icon: NombreIcono };
 type Seccion = { titulo: string; items: Item[] };
@@ -43,6 +46,7 @@ const NAV: Seccion[] = [
       { label: "Inventario", href: "/inventario", icon: "caja" },
       { label: "Existencias", href: "/existencias", icon: "cajon" },
       { label: "Clientes", href: "/clientes", icon: "persona" },
+      { label: "Créditos", href: "/creditos", icon: "billete" },
       { label: "Lealtad", href: "/lealtad", icon: "estrella" },
       { label: "Tienda en línea", href: "/tienda", icon: "bolsa" },
       { label: "Reservaciones", href: "/reservaciones", icon: "calendario" },
@@ -263,6 +267,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   return (
     <PerfilCtx.Provider value={perfil}>
      <ModulosCtx.Provider value={modulos}>
+     <RecargarModulosCtx.Provider value={() => { leerModulos().then(setModulos).catch(() => {}); }}>
      <AccesoCtx.Provider value={acceso}>
       <div className="flex h-[100dvh] lg:h-screen">
         {/* Velo del cajón (solo móvil/tablet). */}
@@ -437,6 +442,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         </div>
       </div>
      </AccesoCtx.Provider>
+     </RecargarModulosCtx.Provider>
      </ModulosCtx.Provider>
     </PerfilCtx.Provider>
   );

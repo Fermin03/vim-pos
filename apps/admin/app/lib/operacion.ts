@@ -24,11 +24,16 @@ const RUTA_DE_MODULO: readonly [string, CodigoOperacion][] = [
  */
 export function rutasOcultas(m: ModulosLeidos | "error" | null): ReadonlySet<string> {
   const leidos = m !== null && m !== "error";
-  return new Set(
+  const ocultas = new Set(
     RUTA_DE_MODULO.filter(([, codigo]) =>
       codigo === "existencias" ? !conExistencias(m) : leidos && !moduloActivo(m.efectivos, codigo),
     ).map(([ruta]) => ruta),
   );
+  // Crédito (0208): como lo de tienda, nada se ve mientras carga. Su interruptor vive en las tiendas
+  // (los giros de retail 2), o donde ya esté encendido para poder apagarlo.
+  if (!conCredito(m)) ocultas.add("/creditos");
+  if (!conCredito(m) && !conExistencias(m)) ocultas.add("/configuracion/credito");
+  return ocultas;
 }
 
 export function filtrarSecciones<T extends { items: { href: string }[] }>(secciones: readonly T[], ocultas: ReadonlySet<string>): T[] {
@@ -44,3 +49,7 @@ export const mensajeCambiarModulos = (d: { usuario?: string | null; negocio?: st
 /** ¿Se enseña lo de tienda? Solo con el módulo efectivo: mientras carga o si falló, un restaurante no ve nada nuevo. */
 export const conExistencias = (m: ModulosLeidos | "error" | null): boolean =>
   m !== null && m !== "error" && moduloActivo(m.efectivos, "existencias");
+
+/** ¿Se enseña lo de crédito (menú Créditos, sección del cliente)? Solo con el módulo leído y encendido. */
+export const conCredito = (m: ModulosLeidos | "error" | null): boolean =>
+  m !== null && m !== "error" && m.efectivos.credito === true;

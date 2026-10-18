@@ -21,6 +21,8 @@ export const MIN_JERARQUIA: { prefijo: string; min: number }[] = [
   // Existencias enseña costos y el valor del inventario, igual que /inventario.
   { prefijo: "/existencias", min: 4 },
   { prefijo: "/clientes", min: 4 },
+  // Quién le debe al negocio y cuánto: lo mismo que Clientes.
+  { prefijo: "/creditos", min: 4 },
   // El programa de lealtad reparte dinero del negocio: lo configura dueño o administrador.
   { prefijo: "/lealtad", min: 4 },
   // La tienda en línea recibe pedidos y fija precios y horarios del negocio: dueño o administrador.

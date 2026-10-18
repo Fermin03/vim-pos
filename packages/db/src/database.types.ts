@@ -39,6 +39,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      abonos_credito: {
+        Row: {
+          caja_id: string
+          client_id_local: string | null
+          cliente_id: string
+          created_at: string
+          estado: string
+          id: string
+          metodo_pago: Database["public"]["Enums"]["metodo_pago"] | null
+          monto_mxn: number
+          sucursal_id: string
+          tenant_id: string
+          ticket_id: string
+          tipo: string
+          turno_id: string
+          usuario_id: string | null
+        }
+        Insert: {
+          caja_id: string
+          client_id_local?: string | null
+          cliente_id: string
+          created_at?: string
+          estado?: string
+          id?: string
+          metodo_pago?: Database["public"]["Enums"]["metodo_pago"] | null
+          monto_mxn: number
+          sucursal_id: string
+          tenant_id: string
+          ticket_id: string
+          tipo: string
+          turno_id: string
+          usuario_id?: string | null
+        }
+        Update: {
+          caja_id?: string
+          client_id_local?: string | null
+          cliente_id?: string
+          created_at?: string
+          estado?: string
+          id?: string
+          metodo_pago?: Database["public"]["Enums"]["metodo_pago"] | null
+          monto_mxn?: number
+          sucursal_id?: string
+          tenant_id?: string
+          ticket_id?: string
+          tipo?: string
+          turno_id?: string
+          usuario_id?: string | null
+        }
+        Relationships: []
+      }
       addons: {
         Row: {
           activo: boolean
@@ -1646,6 +1697,45 @@ export type Database = {
           },
         ]
       }
+      clientes_credito: {
+        Row: {
+          activo: boolean
+          cliente_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          limite_mxn: number
+          plazo_dias: number
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          activo?: boolean
+          cliente_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          limite_mxn: number
+          plazo_dias: number
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          activo?: boolean
+          cliente_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          limite_mxn?: number
+          plazo_dias?: number
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       clientes_alias: {
         Row: {
           alias_id: string
@@ -2361,6 +2451,8 @@ export type Database = {
           modulo_delivery_propio_activo: boolean
           modulo_display_cliente_activo: boolean
           modulo_inventario_activo: boolean
+          credito_abonos_al_cancelar: string
+          modulo_credito_activo: boolean
           modulo_lealtad_activo: boolean
           modulo_tienda_activo: boolean
           mostrar_nota_producto_ticket: boolean
@@ -2404,6 +2496,8 @@ export type Database = {
           modulo_delivery_propio_activo?: boolean
           modulo_display_cliente_activo?: boolean
           modulo_inventario_activo?: boolean
+          credito_abonos_al_cancelar?: string
+          modulo_credito_activo?: boolean
           modulo_lealtad_activo?: boolean
           modulo_tienda_activo?: boolean
           mostrar_nota_producto_ticket?: boolean
@@ -2447,6 +2541,8 @@ export type Database = {
           modulo_delivery_propio_activo?: boolean
           modulo_display_cliente_activo?: boolean
           modulo_inventario_activo?: boolean
+          credito_abonos_al_cancelar?: string
+          modulo_credito_activo?: boolean
           modulo_lealtad_activo?: boolean
           modulo_tienda_activo?: boolean
           mostrar_nota_producto_ticket?: boolean
@@ -8015,6 +8111,42 @@ export type Database = {
           },
         ]
       }
+      saldo_favor_movimientos: {
+        Row: {
+          client_id_local: string | null
+          cliente_id: string
+          created_at: string
+          id: string
+          monto_mxn: number
+          tenant_id: string
+          ticket_id: string
+          tipo: string
+          turno_id: string | null
+        }
+        Insert: {
+          client_id_local?: string | null
+          cliente_id: string
+          created_at?: string
+          id?: string
+          monto_mxn: number
+          tenant_id: string
+          ticket_id: string
+          tipo: string
+          turno_id?: string | null
+        }
+        Update: {
+          client_id_local?: string | null
+          cliente_id?: string
+          created_at?: string
+          id?: string
+          monto_mxn?: number
+          tenant_id?: string
+          ticket_id?: string
+          tipo?: string
+          turno_id?: string | null
+        }
+        Relationships: []
+      }
       secciones: {
         Row: {
           activa: boolean
@@ -12265,6 +12397,22 @@ export type Database = {
           },
         ]
       }
+      vw_creditos_cliente: {
+        Row: {
+          activo: boolean | null
+          cliente_id: string | null
+          deuda_mxn: number | null
+          deuda_otras_cajas_mxn: number | null
+          disponible_mxn: number | null
+          limite_mxn: number | null
+          plazo_dias: number | null
+          tenant_id: string | null
+          tiene_vencido: boolean | null
+          venta_mas_vieja_fecha: string | null
+          venta_mas_vieja_ticket_id: string | null
+        }
+        Relationships: []
+      }
       vw_cumplimiento_delivery_agregado: {
         Row: {
           cumplidos: number | null
@@ -13209,6 +13357,14 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      vw_saldo_favor_cliente: {
+        Row: {
+          cliente_id: string | null
+          saldo_mxn: number | null
+          tenant_id: string | null
+        }
+        Relationships: []
       }
       vw_ventas_apps_externas: {
         Row: {

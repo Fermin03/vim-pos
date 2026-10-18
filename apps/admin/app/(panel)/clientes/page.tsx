@@ -17,7 +17,11 @@ import {
 } from "../../lib/clientes";
 import { CLIENTES_POR_PAGINA, paginasTotales, textoRango } from "../../lib/clientes-paginacion";
 import { mensajeError } from "../../lib/errores";
-import { useModulos } from "../../components/admin-shell";
+import { useModulos, usePerfil } from "../../components/admin-shell";
+import { creditoClienteSchema, formDeCredito, guardarCreditoCliente, leerCreditoCliente, type FormCredito } from "../../lib/credito";
+import { conCredito } from "../../lib/operacion";
+import { limpiarPrecio } from "../../lib/numeros";
+import { Interruptor } from "../../components/interruptor";
 import { ClienteLealtad } from "../../components/cliente-lealtad";
 import { input, label } from "../../components/campos";
 import { AccionFila, Segmentos } from "../../components/controles";
@@ -66,6 +70,11 @@ export default function ClientesPage() {
   const modulos = useModulos();
   const conLealtad = modulos !== null && modulos !== "error" && modulos.permitidos.lealtad === true;
   const [lealtadDe, setLealtadDe] = useState<{ id: string; nombre: string; saldo: number; venceEl: string | null } | null>(null);
+  // Crédito (0208): con el módulo encendido, solo dueño o administrador lo da (la base lo exige igual).
+  const perfil = usePerfil();
+  const darCredito = conCredito(modulos) && (perfil?.rolCodigo === "DUENO" || perfil?.rolCodigo === "ADMIN");
+  /** null = leyendo; "error" = no se pudo leer y no se toca al guardar. */
+  const [credito, setCredito] = useState<{ form: FormCredito; existia: boolean } | "error" | null>(null);
 
   // Cualquier cambio de búsqueda o filtro vuelve a la página 1: quedarse en la 4 de un filtro que
   // ahora solo tiene una página enseñaría una tabla vacía.
@@ -108,6 +117,12 @@ export default function ClientesPage() {
   }
   function editar(c: Cliente) {
     setError(null);
+    setCredito(null);
+    if (darCredito) {
+      leerCreditoCliente(c.id)
+        .then((f) => setCredito({ form: formDeCredito(f), existia: f !== null }))
+        .catch(() => setCredito("error"));
+    }
     setEditando({
       id: c.id,
       datos: {
@@ -126,10 +141,16 @@ export default function ClientesPage() {
       setError(parsed.error.issues[0]?.message ?? "Datos inválidos");
       return;
     }
+    const conCreditoForm = darCredito && editando.id && credito !== null && credito !== "error" ? credito : null;
+    if (conCreditoForm && (conCreditoForm.form.activo || conCreditoForm.existia)) {
+      const c = creditoClienteSchema.safeParse(conCreditoForm.form);
+      if (!c.success) { setError(c.error.issues[0]?.message ?? "Revisa el crédito"); return; }
+    }
     setGuardando(true);
     try {
       if (editando.id) await actualizarCliente(editando.id, parsed.data);
       else await crearCliente(parsed.data);
+      if (editando.id && conCreditoForm) await guardarCreditoCliente(editando.id, conCreditoForm.form, conCreditoForm.existia);
       setOkMsg("Cliente guardado.");
       setTimeout(() => setOkMsg(null), 2500);
       setEditando(null);
@@ -158,6 +179,10 @@ export default function ClientesPage() {
     } catch (e) {
       setError(mensajeError(e, "No se pudo eliminar"));
     }
+  }
+
+  function setCred<K extends keyof FormCredito>(k: K, v: FormCredito[K]) {
+    if (credito && credito !== "error") setCredito({ ...credito, form: { ...credito.form, [k]: v } });
   }
 
   function set<K extends keyof typeof VACIO>(k: K, v: (typeof VACIO)[K]) {
@@ -360,6 +385,44 @@ export default function ClientesPage() {
                 <label className={label} htmlFor="c-notas">Notas internas · opcional</label>
                 <textarea id="c-notas" className={`${input} h-16 resize-none py-2`} value={editando.datos.notas_internas} maxLength={500} onChange={(e) => set("notas_internas", e.target.value)} />
               </div>
+
+              {darCredito && (
+                <>
+                  <div className="border-t border-line pt-3 text-13 font-semibold uppercase tracking-wide text-ink-3">Crédito</div>
+                  {!editando.id ? (
+                    <p className="text-13 text-ink-2">Guarda primero al cliente y luego ábrelo para darle crédito.</p>
+                  ) : credito === null ? (
+                    <p className="text-13 text-ink-3">Cargando…</p>
+                  ) : credito === "error" ? (
+                    <p className="text-13 font-medium text-danger">No se pudo leer su crédito. Ciérralo y vuelve a abrirlo; al guardar no se cambia.</p>
+                  ) : (
+                    <>
+                      <Interruptor
+                        encendido={credito.form.activo}
+                        onCambiar={(v) => setCred("activo", v)}
+                        etiqueta="Puede comprar a crédito"
+                        descripcion={credito.form.activo
+                          ? "En la caja puede pagar «A crédito» hasta su límite."
+                          : credito.existia ? "Apagado: ya no compra a crédito, pero lo que debe lo sigue abonando." : "Apagado."}
+                      />
+                      {(credito.form.activo || credito.existia) && (
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                          <div>
+                            <label className={label} htmlFor="c-limite">Límite ($)</label>
+                            <input id="c-limite" className={`${input} tabular-nums`} inputMode="decimal" value={credito.form.limite} placeholder="5000"
+                              onChange={(e) => setCred("limite", limpiarPrecio(e.target.value))} />
+                          </div>
+                          <div>
+                            <label className={label} htmlFor="c-plazo">Plazo (días)</label>
+                            <input id="c-plazo" className={`${input} tabular-nums`} inputMode="numeric" value={credito.form.plazo} placeholder="30" maxLength={4}
+                              onChange={(e) => setCred("plazo", e.target.value.replace(/\D/g, ""))} />
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
 
               {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
 
