@@ -666,4 +666,118 @@ BEGIN
     RAISE EXCEPTION '21: la venta sin crédito tocó crédito o saldo a favor'; END IF;
   RAISE NOTICE 'SMOKE CREDITO 0209 OK';
 END $$;
+
+-- 0210: el crédito viaja con la caja instalada (pull y push).
+DO $$
+DECLARE
+  v_t     uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_suc   uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_caja  uuid := '99999999-0000-0000-0000-0000000000cc';
+  v_maria uuid := '99999999-0000-0000-0000-000000000001';
+  v_prod  uuid := 'c2080000-0000-0000-0000-0000000000a1';
+  v_ajeno uuid := 'c2080000-0000-0000-0000-000000000003';   -- cliente de otro negocio (bloque RLS)
+  v_dora  uuid := 'c2100000-0000-0000-0000-000000000001';
+  v_eva   uuid := 'c2100000-0000-0000-0000-000000000002';
+  v_ab1   uuid := 'c2100000-0000-0000-0000-0000000000a1';
+  v_ab2   uuid := 'c2100000-0000-0000-0000-0000000000a2';
+  v_ab3   uuid := 'c2100000-0000-0000-0000-0000000000a3';
+  v_ab4   uuid := 'c2100000-0000-0000-0000-0000000000a4';
+  v_sf1   uuid := 'c2100000-0000-0000-0000-0000000000f1';
+  v_sf2   uuid := 'c2100000-0000-0000-0000-0000000000f2';
+  v_turno uuid; v_tk uuid; v_tv uuid; v_tl uuid; v_lim numeric;
+  v_ab    jsonb; v_res jsonb; v_pull jsonb;
+BEGIN
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
+  INSERT INTO clientes (id, tenant_id, nombre, telefono) VALUES
+    (v_dora, v_t, 'Dora Crédito', '4770002101'), (v_eva, v_t, 'Eva Saldo', '4770002102');
+  INSERT INTO clientes_credito (tenant_id, cliente_id, limite_mxn, plazo_dias) VALUES (v_t, v_dora, 5000, 30);
+  UPDATE configuracion_tenant SET modulo_credito_activo = true WHERE tenant_id = v_t;
+  UPDATE turnos SET estado = 'CERRADO', fecha_cierre = now() WHERE caja_id = v_caja AND estado = 'ABIERTO';
+  INSERT INTO turnos(tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable, usuario_apertura_id, fondo_inicial_mxn, fondo_modo)
+  VALUES (v_t, v_suc, v_caja, 'SMOKE-CR10', (now() AT TIME ZONE 'America/Mexico_City')::date, v_maria, 0, 'TOTAL')
+  RETURNING id INTO v_turno;
+  -- Tres ventas a crédito de Dora: con saldo (v_tk), vieja con saldo (v_tv) y vieja liquidada (v_tl).
+  v_tk := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_dora, NULL, 'smoke-cr10-1', v_maria);
+  PERFORM agregar_item_a_ticket(v_tk, v_prod, 1, NULL, '[]'::jsonb, 'smoke-cr10-1a');
+  PERFORM pagar_a_credito(v_tk, NULL, 'smoke-cr10-p1');
+  v_tv := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_dora, NULL, 'smoke-cr10-2', v_maria);
+  PERFORM agregar_item_a_ticket(v_tv, v_prod, 1, NULL, '[]'::jsonb, 'smoke-cr10-2a');
+  PERFORM pagar_a_credito(v_tv, NULL, 'smoke-cr10-p2');
+  v_tl := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_dora, NULL, 'smoke-cr10-3', v_maria);
+  PERFORM agregar_item_a_ticket(v_tl, v_prod, 1, NULL, '[]'::jsonb, 'smoke-cr10-3a');
+  PERFORM pagar_a_credito(v_tl, NULL, 'smoke-cr10-p3');
+  INSERT INTO abonos_credito (id, tenant_id, sucursal_id, caja_id, turno_id, cliente_id, ticket_id, tipo, metodo_pago, monto_mxn, client_id_local, created_at) VALUES
+    (v_ab3, v_t, v_suc, v_caja, v_turno, v_dora, v_tv, 'ABONO', 'EFECTIVO', 100, 'smoke-cr10-ab3', now() - interval '100 days'),
+    (v_ab4, v_t, v_suc, v_caja, v_turno, v_dora, v_tl, 'ABONO', 'EFECTIVO', 500, 'smoke-cr10-ab4', now() - interval '100 days');
+  -- Eva tuvo $80 a favor hace meses y los acaba de usar: su saldo es 0.
+  INSERT INTO saldo_favor_movimientos (tenant_id, cliente_id, tipo, monto_mxn, ticket_id, client_id_local, created_at) VALUES
+    (v_t, v_eva, 'ENTRADA_CANCELACION', 80, v_tk, 'smoke-cr10-sfe', now() - interval '100 days'),
+    (v_t, v_eva, 'USO', 80, v_tk, 'smoke-cr10-sfu', now());
+
+  -- 25) El pull baja el crédito, los abonos que importan, el saldo a favor y la configuración nueva.
+  v_pull := sync_pull_snapshot(v_t);
+  IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(v_pull->'clientes_credito', '[]')) e WHERE e->>'cliente_id' = v_dora::text) THEN
+    RAISE EXCEPTION '25: el pull no trajo el crédito de Dora'; END IF;
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(v_pull->'clientes_credito') e WHERE e->>'tenant_id' <> v_t::text) THEN
+    RAISE EXCEPTION '25: el pull trajo crédito de otro negocio'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(v_pull->'abonos_credito', '[]')) e WHERE e->>'id' = v_ab3::text) THEN
+    RAISE EXCEPTION '25: un abono viejo de una venta con saldo debía bajar'; END IF;
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(v_pull->'abonos_credito') e WHERE e->>'id' = v_ab4::text) THEN
+    RAISE EXCEPTION '25: un abono viejo de una venta liquidada no debía bajar'; END IF;
+  IF (SELECT count(*) FROM jsonb_array_elements(COALESCE(v_pull->'saldo_favor_movimientos', '[]')) e WHERE e->>'cliente_id' = v_eva::text) <> 2 THEN
+    RAISE EXCEPTION '25: el saldo a favor de Eva (usado hace poco) debía bajar entero'; END IF;
+  IF NOT (v_pull->'configuracion_tenant'->0 ? 'modulo_credito_activo') OR NOT (v_pull->'configuracion_tenant'->0 ? 'credito_abonos_al_cancelar') THEN
+    RAISE EXCEPTION '25: la configuración del crédito no bajó'; END IF;
+
+  -- 26) Un abono hecho en la caja sube una vez: el reenvío no lo duplica ni baja la deuda dos veces.
+  v_ab := jsonb_build_object('id', v_ab1, 'tenant_id', v_t, 'sucursal_id', v_suc, 'caja_id', v_caja, 'turno_id', v_turno,
+    'cliente_id', v_dora, 'ticket_id', v_tk, 'tipo', 'ABONO', 'metodo_pago', 'EFECTIVO', 'monto_mxn', 150,
+    'estado', 'APLICADO', 'client_id_local', 'smoke-cr10-ab1', 'usuario_id', v_maria, 'created_at', now());
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('abonos_credito', jsonb_build_array(v_ab)));
+  IF (v_res->>'abonos_credito')::int IS DISTINCT FROM 1 OR v_res ? '_errores' OR v_res ? '_ignoradas' THEN
+    RAISE EXCEPTION '26: el abono debía aplicarse: %', v_res; END IF;
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('abonos_credito', jsonb_build_array(v_ab)));
+  IF (v_res->>'abonos_credito')::int IS DISTINCT FROM 0 OR v_res ? '_errores' THEN
+    RAISE EXCEPTION '26: el reenvío debía aplicar 0 sin errores: %', v_res; END IF;
+  IF (SELECT count(*) FROM abonos_credito WHERE id = v_ab1) <> 1 THEN RAISE EXCEPTION '26: el abono se duplicó'; END IF;
+  IF credito_saldo_ticket(v_tk) <> 350 THEN RAISE EXCEPTION '26: saldo % (esperado 350)', credito_saldo_ticket(v_tk); END IF;
+
+  -- 27) Lo que no es del negocio se rechaza y no detiene a lo bueno.
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('abonos_credito', jsonb_build_array(
+    v_ab || jsonb_build_object('id', v_ab2, 'client_id_local', 'smoke-cr10-ab2', 'tenant_id', 'c2080000-0000-0000-0000-0000000000ee'),
+    v_ab || jsonb_build_object('id', gen_random_uuid(), 'client_id_local', 'smoke-cr10-ab5', 'cliente_id', v_ajeno),
+    v_ab || jsonb_build_object('id', gen_random_uuid(), 'client_id_local', 'smoke-cr10-ab6', 'ticket_id', gen_random_uuid()),
+    v_ab || jsonb_build_object('id', gen_random_uuid(), 'client_id_local', 'smoke-cr10-ab7', 'turno_id', gen_random_uuid()),
+    v_ab || jsonb_build_object('id', gen_random_uuid(), 'client_id_local', 'smoke-cr10-ab8', 'monto_mxn', 50))));
+  IF (v_res->>'abonos_credito')::int IS DISTINCT FROM 1 THEN RAISE EXCEPTION '27: solo el bueno debía aplicarse: %', v_res; END IF;
+  IF jsonb_array_length(COALESCE(v_res->'_errores', '[]')) <> 4 THEN RAISE EXCEPTION '27: debían ser 4 errores: %', v_res; END IF;
+  IF EXISTS (SELECT 1 FROM abonos_credito WHERE id = v_ab2) THEN RAISE EXCEPTION '27: el abono de otro negocio entró'; END IF;
+  IF credito_saldo_ticket(v_tk) <> 300 THEN RAISE EXCEPTION '27: saldo % (esperado 300)', credito_saldo_ticket(v_tk); END IF;
+
+  -- 28) Saldo a favor de la caja: idempotente y validado igual.
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('saldo_favor_movimientos', jsonb_build_array(
+    jsonb_build_object('id', v_sf1, 'tenant_id', v_t, 'cliente_id', v_eva, 'tipo', 'ENTRADA_CANCELACION', 'monto_mxn', 40,
+                       'ticket_id', v_tk, 'turno_id', v_turno, 'client_id_local', 'smoke-cr10-sf1', 'created_at', now()),
+    jsonb_build_object('id', v_sf2, 'tenant_id', v_t, 'cliente_id', v_ajeno, 'tipo', 'ENTRADA_CANCELACION', 'monto_mxn', 40,
+                       'ticket_id', v_tk, 'client_id_local', 'smoke-cr10-sf2', 'created_at', now()))));
+  IF (v_res->>'saldo_favor_movimientos')::int IS DISTINCT FROM 1 OR jsonb_array_length(COALESCE(v_res->'_errores', '[]')) <> 1 THEN
+    RAISE EXCEPTION '28: debía aplicar 1 y rechazar al cliente ajeno: %', v_res; END IF;
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('saldo_favor_movimientos', jsonb_build_array(
+    jsonb_build_object('id', v_sf1, 'tenant_id', v_t, 'cliente_id', v_eva, 'tipo', 'ENTRADA_CANCELACION', 'monto_mxn', 40,
+                       'ticket_id', v_tk, 'turno_id', v_turno, 'client_id_local', 'smoke-cr10-sf1', 'created_at', now()))));
+  IF (v_res->>'saldo_favor_movimientos')::int IS DISTINCT FROM 0 OR v_res ? '_errores' THEN
+    RAISE EXCEPTION '28: el reenvío debía aplicar 0: %', v_res; END IF;
+  IF (SELECT saldo_mxn FROM vw_saldo_favor_cliente WHERE cliente_id = v_eva) <> 40 THEN RAISE EXCEPTION '28: Eva debía tener $40 a favor'; END IF;
+
+  -- 29) El crédito no se acepta desde la caja: lo maneja solo el admin.
+  SELECT limite_mxn INTO v_lim FROM clientes_credito WHERE cliente_id = v_dora;
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('clientes_credito', jsonb_build_array(
+    (SELECT to_jsonb(c) || jsonb_build_object('limite_mxn', 999999) FROM clientes_credito c WHERE cliente_id = v_dora),
+    jsonb_build_object('id', gen_random_uuid(), 'tenant_id', v_t, 'cliente_id', v_eva, 'limite_mxn', 999999, 'plazo_dias', 999))));
+  IF NOT (v_res->'_ignoradas' ? 'clientes_credito') THEN RAISE EXCEPTION '29: clientes_credito debía ignorarse: %', v_res; END IF;
+  IF (SELECT limite_mxn FROM clientes_credito WHERE cliente_id = v_dora) <> v_lim
+     OR EXISTS (SELECT 1 FROM clientes_credito WHERE cliente_id = v_eva) THEN
+    RAISE EXCEPTION '29: la caja cambió el crédito'; END IF;
+  RAISE NOTICE 'SMOKE CREDITO 0210 OK';
+END $$;
 ROLLBACK;

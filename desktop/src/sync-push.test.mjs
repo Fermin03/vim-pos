@@ -903,6 +903,99 @@ describe("ventas que cambian después de subir, y el piso de las mesas (Postgres
     await enReplica("UPDATE turnos SET efectivo_contado_mxn = 999 WHERE id = $1", [nuevo]);
     assert.ok((await pend()).turnosCambiados.includes(nuevo), "la huella es de la fila completa: cualquier cambio lo detecta");
   });
+
+  // ── Crédito (0210): los abonos y el saldo a favor viajan con su turno, no con su venta ────────
+  /** Un turno nuevo de esta caja (cierra el que esté abierto), sin subir. */
+  const turnoNuevo = async (codigo) => {
+    await enReplica("UPDATE turnos SET estado = 'CERRADO', fecha_cierre = now() WHERE caja_id = $1 AND estado = 'ABIERTO'", [CAJA]);
+    const { rows: [{ id }] } = await enReplica(
+      `INSERT INTO turnos (tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable, usuario_apertura_id, fondo_inicial_mxn, fondo_modo)
+       VALUES ($1, $2, $3, $4, CURRENT_DATE, $5, 0, 'TOTAL') RETURNING id`, [TENANT, SUC, CAJA, codigo, MARIA]);
+    return id;
+  };
+  /** Un abono como lo deja registrar_abono en la caja. */
+  const abonar = async (turnoId, ticketId, clave) => {
+    const { rows: [{ id }] } = await enReplica(
+      `INSERT INTO abonos_credito (tenant_id, sucursal_id, caja_id, turno_id, cliente_id, ticket_id, tipo, metodo_pago, monto_mxn, client_id_local)
+       VALUES ($1, $2, $3, $4, gen_random_uuid(), $5, 'ABONO', 'EFECTIVO', 100, $6) RETURNING id`, [TENANT, SUC, CAJA, turnoId, ticketId, clave]);
+    return id;
+  };
+
+  test("crédito: un abono a una venta de hace 90 días sube en el lote de su turno; confirmado, no se repite", async () => {
+    await subir();
+    await enReplica("UPDATE tickets SET fecha_apertura = now() - interval '90 days' WHERE id = $1", [ticket]);
+    const tn = await turnoNuevo("PRUEBA-CR-1");
+    const ab = await abonar(tn, ticket, "cr-ab-1");
+    const { rows: [{ id: sf }] } = await enReplica(
+      `INSERT INTO saldo_favor_movimientos (tenant_id, cliente_id, tipo, monto_mxn, ticket_id, turno_id, client_id_local)
+       VALUES ($1, gen_random_uuid(), 'ENTRADA_CANCELACION', 30, $2, $3, 'cr-sf-1') RETURNING id`, [TENANT, ticket, tn]);
+
+    const p = await pend();
+    assert.ok(!p.ids.includes(ticket), "la venta vieja no está pendiente");
+    assert.ok(p.abonos.some((a) => a.id === ab), "el abono sí");
+    assert.ok(p.saldoFavor.some((s) => s.id === sf), "y el movimiento de saldo a favor");
+
+    const [snap] = await subir({ resultado: { abonos_credito: 1, saldo_favor_movimientos: 1 } });
+    assert.ok((snap?.abonos_credito ?? []).some((a) => a.id === ab), "el abono viaja");
+    assert.ok((snap?.saldo_favor_movimientos ?? []).some((s) => s.id === sf), "el saldo a favor viaja");
+    assert.ok((snap?.turnos ?? []).some((t) => t.id === tn), "con su turno");
+    assert.ok(!(snap?.tickets ?? []).some((t) => t.id === ticket), "sin la venta vieja");
+    const p2 = await pend();
+    assert.ok(!p2.abonos.some((a) => a.id === ab) && !p2.saldoFavor.some((s) => s.id === sf), "confirmados, no se repiten");
+    const [otra] = await subir();
+    assert.equal((otra?.abonos_credito ?? []).length, 0, "el siguiente push no lo vuelve a mandar");
+  });
+
+  test("crédito: un abono rechazado, o que una nube sin la 0210 no confirma, se reintenta", async () => {
+    const tn = await turnoNuevo("PRUEBA-CR-2");
+    const ab = await abonar(tn, ticket, "cr-ab-2");
+    await subir({ resultado: { abonos_credito: 0, _errores: [{ tabla: "abonos_credito", id: ab, error: "x" }] } });
+    assert.ok((await pend()).abonos.some((a) => a.id === ab), "rechazado: sigue pendiente");
+    await subir({ resultado: { _ignoradas: ["abonos_credito"] } });
+    assert.ok((await pend()).abonos.some((a) => a.id === ab), "ignorado: sigue pendiente");
+    await subir({ resultado: { abonos_credito: 1 } });
+    assert.ok(!(await pend()).abonos.some((a) => a.id === ab), "confirmado: ya no");
+  });
+
+  test("crédito: el abono de una venta que aún no sube viaja en el lote de esa venta, no antes", async () => {
+    await subir();
+    const tn = await turnoNuevo("PRUEBA-CR-3");
+    turno = tn; // crearVenta abre las ventas en este turno
+    const v1 = await crearVenta("cr-v1");
+    const v2 = await crearVenta("cr-v2");
+    await enReplica("UPDATE tickets SET estado_fiscal = 'PAGADO', fecha_apertura = now() WHERE id = ANY($1::uuid[])", [[v1, v2]]);
+    const ab = await abonar(tn, v2, "cr-ab-3");
+    const nube = nubeFalsa({ resultado: { abonos_credito: 1 } });
+    try {
+      await pushToCloud(db, OPTS, () => {}, { maxVentasPorLote: 1 });
+    } finally { nube.restaurar(); }
+    const lote = nube.peticiones.findIndex((x) => (x.snapshot?.abonos_credito ?? []).some((a) => a.id === ab));
+    assert.ok(lote >= 0, "el abono viajó");
+    assert.ok((nube.peticiones[lote].snapshot.tickets ?? []).some((t) => t.id === v2), "en el mismo lote que su venta");
+    assert.equal(nube.peticiones.filter((x) => (x.snapshot?.abonos_credito ?? []).length).length, 1, "una sola vez");
+  });
+
+  test("crédito: lo que baja del pull se guarda y no vuelve a subir", async () => {
+    const { rows: [{ id: cliente }] } = await db.query(
+      "INSERT INTO clientes (tenant_id, nombre, telefono) VALUES ($1, 'Crédito Nube', '4770009901') RETURNING id", [TENANT]);
+    const { rows: [{ id: tn }] } = await db.query("SELECT id FROM turnos WHERE caja_id = $1 ORDER BY created_at DESC LIMIT 1", [CAJA]);
+    const abNube = { id: "99999999-0000-0000-0000-00000000c0a1", tenant_id: TENANT, sucursal_id: SUC, caja_id: CAJA, turno_id: tn,
+      cliente_id: cliente, ticket_id: ticket, tipo: "ABONO", metodo_pago: "TARJETA_DEBITO", monto_mxn: "50.00", estado: "APLICADO",
+      client_id_local: "nube-ab-1", usuario_id: null, created_at: new Date().toISOString() };
+    const sfNube = { id: "99999999-0000-0000-0000-00000000c0f1", tenant_id: TENANT, cliente_id: cliente, tipo: "ENTRADA_CANCELACION",
+      monto_mxn: "20.00", ticket_id: ticket, turno_id: null, client_id_local: "nube-sf-1", created_at: new Date().toISOString() };
+    const credito = { id: "99999999-0000-0000-0000-00000000c0c1", tenant_id: TENANT, cliente_id: cliente, limite_mxn: "1000.00",
+      plazo_dias: 30, activo: true, created_at: new Date().toISOString(), created_by: null, updated_at: new Date().toISOString(), updated_by: null };
+    await pullSnapshot(db, { clientes_credito: [credito], abonos_credito: [abNube], saldo_favor_movimientos: [sfNube] });
+    const { rows: [n] } = await db.query(
+      `SELECT (SELECT count(*) FROM clientes_credito WHERE id = $1)::int AS c, (SELECT count(*) FROM abonos_credito WHERE id = $2)::int AS a,
+              (SELECT count(*) FROM saldo_favor_movimientos WHERE id = $3)::int AS s`, [credito.id, abNube.id, sfNube.id]);
+    assert.deepEqual(n, { c: 1, a: 1, s: 1 }, "el pull guarda crédito, abono y saldo a favor");
+    const p = await pend();
+    assert.ok(!p.abonos.some((a) => a.id === abNube.id) && !p.saldoFavor.some((s) => s.id === sfNube.id), "lo de la nube no sube de vuelta");
+    // Un segundo pull con lo mismo no truena (idempotente).
+    await pullSnapshot(db, { clientes_credito: [credito], abonos_credito: [abNube], saldo_favor_movimientos: [sfNube] });
+  });
 });
 
 // ── El arranque sobrevive a un PostgREST que muere al nacer (Postgres real) ───────────────────
@@ -1039,7 +1132,7 @@ test("lealtad: el snapshot lleva el canje de TODO ticket del lote, atado a los t
   const snap = consultas.find((c) => c.sql.includes("WITH tk AS"));
   assert.match(snap.sql, /'ticket_canjes_lealtad',\s+\(SELECT jsonb_agg\(to_jsonb\(x\)\) FROM ticket_canjes_lealtad x WHERE x\.ticket_id IN \(SELECT id FROM tk\)\)/);
   assert.match(snap.sql, /'lealtad_movimientos'/);
-  assert.equal(snap.params.length, 9, "$8 son los movimientos de lealtad; $9, los de producto");
+  assert.equal(snap.params.length, 11, "$8 son los movimientos de lealtad; $9, los de producto; $10 y $11, los del crédito (0210)");
   assert.deepEqual(snap.params[7], [B]);
 });
 

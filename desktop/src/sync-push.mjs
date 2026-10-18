@@ -216,7 +216,32 @@ async function asegurarTabla(pool) {
   // gateway al asentarla (lealtad-puente.mjs): la nube ya lo tiene y no debe contar como pendiente.
   await pool.query("CREATE TABLE IF NOT EXISTS _vim_lealtad_mov_ok (movimiento_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
 
+  // Crédito (0210): ver LIBRETAS_POR_ID. Sin siembra: las tablas nacen con esta versión.
+  for (const libreta of Object.values(LIBRETAS_POR_ID)) {
+    await pool.query(`CREATE TABLE IF NOT EXISTS ${libreta} (id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())`);
+  }
+
   await rescatarCortesUnaVez(pool);
+}
+
+/**
+ * Crédito (0210): abonos y movimientos de saldo a favor. La caja los crea (registrar_abono,
+ * pagar_con_saldo_favor y la devolución de una venta a crédito) y no cambian después, así que suben
+ * UNA vez por id, como los movimientos de inventario. Pero también BAJAN del pull: lo que baja se
+ * anota aquí mismo (sync-pull.mjs), como los repartidores, para que no suba de vuelta.
+ *
+ * Viajan con su TURNO (que se manda con ellos) y no con su venta: una venta de hace más de
+ * DIAS_REVISION_TICKETS ya no vuelve a subir, y su abono tiene que subir igual. Si la venta todavía
+ * está pendiente, la fila va en el mismo lote que ella (ver pushToCloud), porque la nube exige que
+ * la venta ya exista.
+ */
+export const LIBRETAS_POR_ID = { abonos_credito: "_vim_abonos_ok", saldo_favor_movimientos: "_vim_saldo_favor_ok" };
+
+/** Anota ids en una libreta de LIBRETAS_POR_ID. La crea: el pull puede llegar antes que el primer push. */
+export async function marcarPorId(db, libreta, ids) {
+  if (!ids?.length) return;
+  await db.query(`CREATE TABLE IF NOT EXISTS ${libreta} (id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())`);
+  await db.query(`INSERT INTO ${libreta} (id) SELECT unnest($1::uuid[]) ON CONFLICT (id) DO NOTHING`, [ids]);
 }
 
 /** Huella de una zona: la fila completa, igual que la de los turnos (ver `construirSnapshotPush`). */
@@ -575,6 +600,11 @@ export async function listarPendientes(pool) {
          LEFT JOIN devoluciones d ON d.id = m.devolucion_id
          LEFT JOIN _vim_mov_producto_ok ok ON ok.id = m.id
         WHERE ok.id IS NULL) AS movimientos_producto,
+      -- Crédito (0210): con la venta en cuyo lote deben viajar si aún no sube.
+      (SELECT jsonb_agg(jsonb_build_object('id', x.id, 'ticket_id', x.ticket_id) ORDER BY x.created_at)
+         FROM abonos_credito x LEFT JOIN _vim_abonos_ok ok ON ok.id = x.id WHERE ok.id IS NULL) AS abonos,
+      (SELECT jsonb_agg(jsonb_build_object('id', x.id, 'ticket_id', x.ticket_id) ORDER BY x.created_at)
+         FROM saldo_favor_movimientos x LEFT JOIN _vim_saldo_favor_ok ok ON ok.id = x.id WHERE ok.id IS NULL) AS saldo_favor,
       -- Repartidores dados de alta en la caja aún no confirmados por la nube (ver _vim_repartidores_ok
       -- en asegurarTabla). Sin esto, un alta a media jornada sin ventas ni turnos ni movimientos de
       -- por medio no hace pasar la guarda de pushToCloud y se queda atorada en silencio.
@@ -606,6 +636,7 @@ export async function listarPendientes(pool) {
     clienteIds: rows[0].clientes ?? [], direccionIds: rows[0].direcciones ?? [],
     lealtadIds: rows[0].lealtad ?? [],
     movimientosProducto: rows[0].movimientos_producto ?? [],
+    abonos: rows[0].abonos ?? [], saldoFavor: rows[0].saldo_favor ?? [],
   };
 }
 
@@ -638,7 +669,7 @@ export async function listarPendientes(pool) {
  * `movimientos_caja` sigue a los mismos turnos y no solo a los de las ventas: un turno con puras
  * entradas y salidas de efectivo, sin vender nada, tampoco subía jamás.
  */
-export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds = null, movimientoIds = null, clienteIds = null, direccionIds = null, conMesas = true, lealtadIds = null, movimientoProductoIds = null } = {}) {
+export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds = null, movimientoIds = null, clienteIds = null, direccionIds = null, conMesas = true, lealtadIds = null, movimientoProductoIds = null, abonoIds = null, saldoFavorIds = null } = {}) {
   await asegurarTabla(pool);
   const { rows } = await pool.query(`
     WITH tk AS (
@@ -674,11 +705,23 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
           OR ($6::uuid[] IS NULL AND $2::uuid[] IS NULL
               AND (o.direccion_id IS NULL OR o.huella IS DISTINCT FROM ${HUELLA_FILA}))
     ),
+    -- Crédito (0210): con lista, exactamente esos; sin lista (modo completo), los pendientes.
+    ab AS (
+      SELECT x.id, x.turno_id FROM abonos_credito x
+       WHERE ($10::uuid[] IS NOT NULL AND x.id = ANY($10::uuid[]))
+          OR ($10::uuid[] IS NULL AND $2::uuid[] IS NULL AND x.id NOT IN (SELECT id FROM _vim_abonos_ok))
+    ),
+    sf AS (
+      SELECT x.id, x.turno_id FROM saldo_favor_movimientos x
+       WHERE ($11::uuid[] IS NOT NULL AND x.id = ANY($11::uuid[]))
+          OR ($11::uuid[] IS NULL AND $2::uuid[] IS NULL AND x.id NOT IN (SELECT id FROM _vim_saldo_favor_ok))
+    ),
     tn AS (
       SELECT x.id, md5(to_jsonb(x)::text) AS huella
         FROM turnos x
         LEFT JOIN _vim_turnos_ok o ON o.turno_id = x.id
        WHERE x.id IN (SELECT turno_id FROM tk)                       -- los que la FK exige
+          OR x.id IN (SELECT turno_id FROM ab UNION SELECT turno_id FROM sf)   -- 0210: el turno del abono viaja con él
           OR ($3::uuid[] IS NOT NULL AND x.id = ANY($3::uuid[]))     -- los que pidió el llamador
           OR ($3::uuid[] IS NULL AND $2::uuid[] IS NULL              -- modo completo: los cambiados
               AND (o.turno_id IS NULL OR o.huella IS DISTINCT FROM md5(to_jsonb(x)::text)))
@@ -691,6 +734,8 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
       (SELECT array_agg(id) FROM movimientos_inventario x WHERE ($4::uuid[] IS NOT NULL AND x.id = ANY($4::uuid[])) OR ($4::uuid[] IS NULL AND $2::uuid[] IS NULL AND x.id NOT IN (SELECT movimiento_id FROM _vim_mov_ok))) AS movimientos,
       (SELECT array_agg(id) FROM lealtad_movimientos x WHERE ($8::uuid[] IS NOT NULL AND x.id = ANY($8::uuid[])) OR ($8::uuid[] IS NULL AND $2::uuid[] IS NULL AND x.id NOT IN (SELECT movimiento_id FROM _vim_lealtad_mov_ok))) AS lealtad,
       (SELECT array_agg(id) FROM movimientos_producto x WHERE ($9::uuid[] IS NOT NULL AND x.id = ANY($9::uuid[])) OR ($9::uuid[] IS NULL AND $2::uuid[] IS NULL AND x.id NOT IN (SELECT id FROM _vim_mov_producto_ok))) AS movimientos_producto,
+      (SELECT array_agg(id) FROM ab) AS abonos,
+      (SELECT array_agg(id) FROM sf) AS saldo_favor,
       (SELECT array_agg(id) FROM repartidores x WHERE x.id NOT IN (SELECT repartidor_id FROM _vim_repartidores_ok)) AS repartidores,
       -- Con la huella que se manda: si la zona cambia mientras viaja, la anotada no coincide y
       -- vuelve a subir en el siguiente ciclo.
@@ -711,6 +756,9 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
         'ticket_item_modificadores', (SELECT jsonb_agg(to_jsonb(x)) FROM ticket_item_modificadores x WHERE x.ticket_item_id IN (SELECT id FROM ticket_items WHERE ticket_id IN (SELECT id FROM tk))),
         'pagos',                     (SELECT jsonb_agg(to_jsonb(x)) FROM pagos x WHERE x.ticket_id IN (SELECT id FROM tk)),
         'movimientos_caja',          (SELECT jsonb_agg(to_jsonb(x)) FROM movimientos_caja x WHERE x.turno_id IN (SELECT id FROM tn)),
+        -- Crédito (0210): ver LIBRETAS_POR_ID.
+        'abonos_credito',            (SELECT jsonb_agg(to_jsonb(x) ORDER BY x.created_at) FROM abonos_credito x WHERE x.id IN (SELECT id FROM ab)),
+        'saldo_favor_movimientos',   (SELECT jsonb_agg(to_jsonb(x) ORDER BY x.created_at) FROM saldo_favor_movimientos x WHERE x.id IN (SELECT id FROM sf)),
         -- Quién repartió cada domicilio. Viaja con su ticket: la asignación se anota al marcar la
         -- salida, antes de cobrar, así que para cuando el ticket entra en esta rebanada ya está
         -- liquidada y sube completa.
@@ -778,7 +826,7 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
                                            OR ($9::uuid[] IS NULL AND $2::uuid[] IS NULL
                                                AND x.id NOT IN (SELECT id FROM _vim_mov_producto_ok)))
       )) AS snapshot
-  `, [TERMINALES, ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds, conMesas, lealtadIds, movimientoProductoIds]);
+  `, [TERMINALES, ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds, conMesas, lealtadIds, movimientoProductoIds, abonoIds, saldoFavorIds]);
   return {
     snapshot: rows[0].snapshot ?? {}, ids: rows[0].ids ?? [], turnos: rows[0].turnos ?? [],
     tickets: rows[0].tickets_huella ?? [], mesas: rows[0].mesas ?? [],
@@ -787,6 +835,7 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
     clientes: rows[0].clientes ?? [], direcciones: rows[0].direcciones ?? [],
     lealtad: rows[0].lealtad ?? [],
     movimientosProducto: rows[0].movimientos_producto ?? [],
+    abonos: rows[0].abonos ?? [], saldoFavor: rows[0].saldo_favor ?? [],
   };
 }
 
@@ -950,7 +999,7 @@ function rechazadosPorTicket(errores, snapshot) {
       const item = (snapshot.devolucion_items ?? []).find((x) => x.id === e.id);
       const dev = item && (snapshot.devoluciones ?? []).find((x) => x.id === item.devolucion_id);
       if (dev?.ticket_original_id) fuera.add(dev.ticket_original_id);
-    } else if (e.tabla === "movimientos_inventario" || e.tabla === "movimientos_producto") {
+    } else if (["movimientos_inventario", "movimientos_producto", "abonos_credito", "saldo_favor_movimientos"].includes(e.tabla)) {
       // Un movimiento rechazado se reintenta solo (ver filasRechazadas); no invalida la venta.
       continue;
     } else if (e.tabla === "lealtad_movimientos") {
@@ -987,9 +1036,10 @@ function filasRechazadas(errores, tabla) {
  * reintentando lo mismo). Partir a la mitad en vez de recalcular un tamaño "correcto" converge
  * en pocas vueltas y no necesita saber cuál es el límite del otro lado.
  */
-async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds, turnoIds, movimientoIds = [], clienteIds = [], direccionIds = [], lealtadIds = [], movProducto = [], conMesas = false, maxBytes }, log) {
-  const { snapshot, ids, tickets, turnos, movimientos, repartidores, zonas, colonias, clientes, direcciones, mesas, lealtad, movimientosProducto } =
-    await construirSnapshotPush(pool, { ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds, conMesas, lealtadIds, movimientoProductoIds: movProducto.map((m) => m.id) });
+async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds, turnoIds, movimientoIds = [], clienteIds = [], direccionIds = [], lealtadIds = [], movProducto = [], abonos = [], saldoFavor = [], conMesas = false, maxBytes }, log) {
+  const { snapshot, ids, tickets, turnos, movimientos, repartidores, zonas, colonias, clientes, direcciones, mesas, lealtad, movimientosProducto, abonos: abonosEnviados, saldoFavor: saldoFavorEnviado } =
+    await construirSnapshotPush(pool, { ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds, conMesas, lealtadIds, movimientoProductoIds: movProducto.map((m) => m.id),
+      abonoIds: abonos.map((m) => m.id), saldoFavorIds: saldoFavor.map((m) => m.id) });
   const cuerpo = JSON.stringify({ snapshot });
   const bytes = Buffer.byteLength(cuerpo);
 
@@ -1009,8 +1059,9 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
     // los mantiene muy por debajo del límite de bytes).
     // Los de producto siguen a su venta (R4): la segunda mitad lleva solo los de sus tickets.
     const segunda = new Set(ticketIds.slice(mitadT));
-    const a = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(0, mitadT), turnoIds, movimientoIds: movimientoIds.slice(0, mitadM), clienteIds, direccionIds, lealtadIds, movProducto: movProducto.filter((m) => !segunda.has(m.ticket_id)), conMesas, maxBytes }, log);
-    const b = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(mitadT), turnoIds: [], movimientoIds: movimientoIds.slice(mitadM), movProducto: movProducto.filter((m) => segunda.has(m.ticket_id)), maxBytes }, log);
+    const enLa = (lista, deLaSegunda) => lista.filter((m) => segunda.has(m.ticket_id) === deLaSegunda);
+    const a = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(0, mitadT), turnoIds, movimientoIds: movimientoIds.slice(0, mitadM), clienteIds, direccionIds, lealtadIds, movProducto: enLa(movProducto, false), abonos: enLa(abonos, false), saldoFavor: enLa(saldoFavor, false), conMesas, maxBytes }, log);
+    const b = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(mitadT), turnoIds: [], movimientoIds: movimientoIds.slice(mitadM), movProducto: enLa(movProducto, true), abonos: enLa(abonos, true), saldoFavor: enLa(saldoFavor, true), maxBytes }, log);
     return { subidos: a.subidos + b.subidos, turnos: a.turnos + b.turnos, movimientos: a.movimientos + b.movimientos, rechazados: a.rechazados + b.rechazados };
   };
 
@@ -1068,6 +1119,17 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
   } else {
     await marcarMovimientosProductoPushed(pool, movimientosProducto.filter((id) => !mpFuera.has(id)));
   }
+  // Crédito (0210): mismo molde que los de producto. Sin la cuenta de la nube (una sin la 0210 los
+  // ignora), no se marcan: se reintentan.
+  for (const [tabla, enviados] of [["abonos_credito", abonosEnviados], ["saldo_favor_movimientos", saldoFavorEnviado]]) {
+    if (!enviados.length) continue;
+    if (typeof respuesta?.resultado?.[tabla] !== "number") {
+      log(`la nube no confirmó ${tabla} (¿sin la migración 0210?): ${enviados.length} fila(s) se reintentarán`);
+      continue;
+    }
+    const fuera = filasRechazadas(errores, tabla);
+    await marcarPorId(pool, LIBRETAS_POR_ID[tabla], enviados.filter((id) => !fuera.has(id)));
+  }
   // Descartados: el producto ya no lleva existencias en la nube. No se reintentan; solo se avisa.
   const mpDescartados = respuesta?.resultado?._descartados?.movimientos_producto ?? [];
   if (mpDescartados.length) log(`la nube descartó ${mpDescartados.length} movimiento(s) de producto (ya no lleva existencias)`);
@@ -1115,6 +1177,9 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   if (movProductoTodos.length > movProducto.length) {
     log(`${movProductoTodos.length - movProducto.length} movimiento(s) de producto se posponen al siguiente ciclo (techo ${maxMovimientos} por corrida)`);
   }
+  // Crédito (0210): mismo techo; cada fila viaja en el lote de su venta si esta aún no sube (abajo).
+  const abonos = (pendientes.abonos ?? []).slice(0, maxMovimientos);
+  const saldoFavor = (pendientes.saldoFavor ?? []).slice(0, maxMovimientos);
   // Un cierre de turno SIN ventas nuevas también es algo que subir. Cuando esta condición solo
   // miraba los tickets, el cierre se quedaba en la caja y la nube nunca se enteraba. Lo mismo pasa
   // con un movimiento de inventario suelto (ADR 0013), con un repartidor dado de alta a media
@@ -1126,7 +1191,7 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   // Lo mismo con un cliente registrado sin que la venta se haya cobrado todavía.
   // Y con una mesa que se liberó sin que se cobrara nada (una cuenta vacía cancelada, 0104).
   if (!ids.length && !turnosCambiados.length && !movimientoIds.length && !repartidorIds.length && !zonaIds.length && !coloniaIds.length
-      && !clienteIds.length && !direccionIds.length && !mesaIds.length && !lealtadIds.length && !movProducto.length) { log("nada pendiente por subir"); return { subidos: 0, turnos: 0, movimientos: 0, rechazados: 0, lotes: 0 }; }
+      && !clienteIds.length && !direccionIds.length && !mesaIds.length && !lealtadIds.length && !movProducto.length && !abonos.length && !saldoFavor.length) { log("nada pendiente por subir"); return { subidos: 0, turnos: 0, movimientos: 0, rechazados: 0, lotes: 0 }; }
 
   const parte = [
     ids.length ? `${ids.length} venta${ids.length === 1 ? "" : "s"}` : null,
@@ -1139,6 +1204,8 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
     direccionIds.length ? `${direccionIds.length} dirección(es) de cliente` : null,
     lealtadIds.length ? `${lealtadIds.length} movimiento(s) de lealtad` : null,
     movProducto.length ? `${movProducto.length} movimiento(s) de producto` : null,
+    abonos.length ? `${abonos.length} abono(s) de crédito` : null,
+    saldoFavor.length ? `${saldoFavor.length} movimiento(s) de saldo a favor` : null,
     mesaIds.length ? `el estado de ${mesaIds.length} mesa(s)` : null,
   ].filter(Boolean).join(" y ");
 
@@ -1149,7 +1216,7 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   // R4: la nube valida la FK y el negocio del ticket de cada movimiento de producto, así que viaja en
   // el lote de su venta. Sin ticket pendiente (ajuste, merma, entrada, conteo, o venta ya subida), en el primero.
   const loteDeTicket = new Map(lotes.flatMap((lote, i) => lote.map((id) => [id, i])));
-  const movProductoDeLote = (i) => movProducto.filter((m) => (loteDeTicket.get(m.ticket_id) ?? 0) === i);
+  const deLote = (lista, i) => lista.filter((m) => (loteDeTicket.get(m.ticket_id) ?? 0) === i);
 
   let subidos = 0;
   let turnos = 0;
@@ -1166,7 +1233,7 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
     const dirIds = n === 0 ? direccionIds : [];
     n++;
     try {
-      const r = await enviarLote(pool, opts, { ticketIds: lote, turnoIds, movimientoIds: movIds, clienteIds: cliIds, direccionIds: dirIds, lealtadIds: n === 1 ? lealtadIds : [], movProducto: movProductoDeLote(n - 1), conMesas: n === 1, maxBytes }, log);
+      const r = await enviarLote(pool, opts, { ticketIds: lote, turnoIds, movimientoIds: movIds, clienteIds: cliIds, direccionIds: dirIds, lealtadIds: n === 1 ? lealtadIds : [], movProducto: deLote(movProducto, n - 1), abonos: deLote(abonos, n - 1), saldoFavor: deLote(saldoFavor, n - 1), conMesas: n === 1, maxBytes }, log);
       subidos += r.subidos;
       turnos += r.turnos;
       movimientos += r.movimientos;

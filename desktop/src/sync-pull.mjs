@@ -6,7 +6,7 @@
 // generadas, y hace INSERT ... ON CONFLICT (pk) DO UPDATE. Corre en modo réplica para no
 // disparar triggers (misma semántica que la replicación lógica). Reusable con cualquier fuente.
 
-import { asegurarLibreta, LIBRETAS, ZONA_EDITADA_LOCAL, HUELLA_FILA } from "./sync-push.mjs";
+import { asegurarLibreta, LIBRETAS, ZONA_EDITADA_LOCAL, HUELLA_FILA, LIBRETAS_POR_ID, marcarPorId } from "./sync-push.mjs";
 
 // Orden de FKs: padres antes que hijos. Solo se procesan las tablas presentes en el snapshot.
 export const PULL_ORDER = [
@@ -47,6 +47,12 @@ export const PULL_ORDER = [
   { t: "lealtad_programa" },
   { t: "lealtad_premios" },
   { t: "lealtad_saldos" },
+  // Crédito (0210): el que dio el admin, y los abonos y el saldo a favor que la caja necesita para
+  // mostrar la deuda y cobrar. Abonos y saldo a favor apuntan a ventas y turnos que pueden no estar
+  // en esta caja (modo réplica: sin FK). Se anotan en su libreta para no subir de vuelta.
+  { t: "clientes_credito" },
+  { t: "abonos_credito" },
+  { t: "saldo_favor_movimientos" },
   // Inventario (ADR 0013): unidades antes que insumos; existencias, recetas y componentes después.
   // La caja lo necesita para descontar al vender; los movimientos que genera suben por el push.
   { t: "unidades_medida" },
@@ -256,8 +262,11 @@ const CLAVES_NATURALES = {
     dependientes: [
       { tabla: "lealtad_saldos", col: "cliente_id" },
       { tabla: "_vim_clientes_ok", col: "cliente_id" },
+      // 0210: UNIQUE (tenant_id, cliente_id), igual que lealtad_saldos: no se muda; el crédito del
+      // cliente real baja de la nube en este mismo pull.
+      { tabla: "clientes_credito", col: "cliente_id" },
     ],
-    reapuntarFk: { tabla: "clientes", excepto: ["lealtad_saldos"] },
+    reapuntarFk: { tabla: "clientes", excepto: ["lealtad_saldos", "clientes_credito"] },
     antesDeReapuntar: dejarUnaDireccionPrincipal,
     // El duplicado se bloquea antes de mudarlo: una venta en vuelo que le asigna ese cliente a un
     // ticket no puede quedar apuntando a un id que se borra.
@@ -850,10 +859,12 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
       } else {
         await reconciliarCatalogo(client, t, filas, log);
         if (t === "productos") await soltarClavesProductos(client, filas);
+        // 0210: una fila que choque (p. ej. con la llave client_id_local) se salta sola, no tumba el pull.
+        if (LIBRETAS_POR_ID[t]) opcionesFila = { aislarFilas: true, fallidas, log };
       }
       const n = await upsertTabla(client, schema, t, filas, opcionesFila);
       if (fallidas.length) {
-        await restaurarClavesClientes(client, fallidas, soltadas, log);
+        if (soltadas) await restaurarClavesClientes(client, fallidas, soltadas, log);
         const malas = new Set(fallidas.map((x) => x.fila.id));
         filas = filas.filter((x) => !malas.has(x.id)); // no se anotan en la libreta del push
       }
@@ -862,6 +873,7 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
       if (t === "insumo_stock_sucursal") await corregirExistenciasPorPendientes(client, log, filas);
       if (t === "producto_existencias") await corregirExistenciasProductoPorPendientes(client, log, filas);
       if (t === "repartidores") await marcarRepartidoresDelPull(client, filas, log);
+      if (LIBRETAS_POR_ID[t]) await marcarPorId(client, LIBRETAS_POR_ID[t], filas.map((x) => x.id));
       if (LIBRETAS[t]) await marcarDelPull(client, t, filas, log);
       if (t === "clientes") await marcarClientesDelPull(client, filas, log);
       if (t === "lealtad_saldos" && n) { await corregirSaldosLealtadPorPendientes(client, log, filas, fusionados); saldosCorregidos = true; }
