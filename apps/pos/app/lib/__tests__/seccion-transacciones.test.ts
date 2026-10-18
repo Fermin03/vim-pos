@@ -31,6 +31,15 @@ describe("Acciones del detalle de una venta (Transacciones)", () => {
     expect(html).toContain(">Devolver<");
   });
 
+  it("con algo devuelto (también la venta original de un cambio) no se reabre; el pago sí se cambia", () => {
+    const renglon = { ticket_item_id: "i1", producto_id: "p1", nombre: "Polo M", cantidad: 2, devuelta: 1, precio_unitario: 349, total: 698 };
+    const html = pintar({ ...venta, renglones: [renglon] });
+    expect(html).not.toContain(">Reabrir<");
+    expect(html).toContain(">Cambiar pago<");
+    // Sin pago que cambiar tampoco queda una fila vacía.
+    expect(pintar({ ...venta, renglones: [renglon], pagoCambiable: null })).not.toMatch(/<div class="flex gap-2"><\/div>/);
+  });
+
   it("una venta cobrada en línea no se reabre ni cambia de pago (como en Cuentas cobradas)", () => {
     const html = pintar({ ...venta, pagadaEnLinea: true, pagoCambiable: null });
     for (const t of [">Reabrir<", ">Cambiar pago<"]) expect(html).not.toContain(t);

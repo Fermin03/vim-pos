@@ -24,7 +24,9 @@ const fila = "flex min-h-14 w-full items-center gap-3 rounded-lg border bg-surfa
 /**
  * Las acciones del detalle de una venta, en dos filas para que cada botón conserve sus 44 px a
  * 1024 px de ancho. Una venta facturada solo se reimprime o se devuelve; una cobrada en línea no se
- * reabre ni cambia de pago (como en Cuentas cobradas). «Cambiar pago» solo con un pago que cambiar.
+ * reabre ni cambia de pago (como en Cuentas cobradas). Con algo devuelto (también la venta original
+ * de un cambio) no se reabre: la devolución quedaría colgando de una venta que cambió. «Cambiar pago»
+ * solo con un pago que cambiar.
  */
 export function AccionesVenta({ venta, imprimiendo, onReimprimir, onDevolver, onCambio, onReabrir, onCambiarPago }: {
   venta: VentaDevolvible;
@@ -36,6 +38,8 @@ export function AccionesVenta({ venta, imprimiendo, onReimprimir, onDevolver, on
   onCambiarPago: () => void;
 }) {
   const editable = !venta.facturada && !venta.pagadaEnLinea;
+  const reabrible = editable && !venta.renglones.some((r) => r.devuelta > 0);
+  const cambiable = editable && venta.pagoCambiable != null;
   return (
     <>
       <div className="flex gap-2">
@@ -45,10 +49,10 @@ export function AccionesVenta({ venta, imprimiendo, onReimprimir, onDevolver, on
         <Button variant="ghost" className="flex-1" onClick={onDevolver}>Devolver</Button>
         {!venta.facturada && <Button variant="ghost" className="flex-1" onClick={onCambio}>Cambio de talla</Button>}
       </div>
-      {editable && (
+      {(reabrible || cambiable) && (
         <div className="flex gap-2">
-          <Button variant="ghost" className="flex-1" onClick={onReabrir}>Reabrir</Button>
-          {venta.pagoCambiable && <Button variant="ghost" className="flex-1" onClick={onCambiarPago}>Cambiar pago</Button>}
+          {reabrible && <Button variant="ghost" className="flex-1" onClick={onReabrir}>Reabrir</Button>}
+          {cambiable && <Button variant="ghost" className="flex-1" onClick={onCambiarPago}>Cambiar pago</Button>}
         </div>
       )}
       {venta.facturada && <p className="text-13 text-ink-3">{FACTURADA}</p>}

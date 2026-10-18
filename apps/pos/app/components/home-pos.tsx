@@ -115,7 +115,7 @@ import type { LineaCancelada } from "./modal-cancelar-items";
 import { cerrarRepartoAlCobrar } from "../lib/delivery";
 import { registrarImpresionComanda, registrarReimpresionTicket, type OrigenReimpresionTicket, type RegistroComanda } from "../lib/impresiones";
 import { ModalReimprimirComanda } from "./modal-reimprimir-comanda";
-import { baseDeLealtad, franjaLealtad, type Programa } from "../lib/lealtad-reglas";
+import { baseDeLealtad, franjaLealtad, ofreceCanje, type Programa } from "../lib/lealtad-reglas";
 import { comprasQueSumanHoy, leerCanjeDelTicket, leerPrograma, leerSaldoLocal, type CanjeVivo, type SaldoCliente } from "../lib/lealtad";
 import { almacenLocal, borrarPendiente, leerPendiente, motivoNoCambiarCliente } from "../lib/lealtad-canje";
 import { revisarLealtadAntesDeCobrar } from "../lib/lealtad-cobro";
@@ -1416,6 +1416,14 @@ export function HomePos({
     obtenerImpresora("CAJA", { onMostrar: () => {} }).abrirCajon().catch(() => {});
   }, []);
 
+  /** Logo del negocio listo para la térmica. Se rasteriza al vuelo (es rápido y evita
+   *  guardar estado que se desincronice si cambian el logo desde el panel). Si no hay logo
+   *  o la imagen falla, devuelve null y el ticket sale sin él. */
+  const logoParaTicket = useCallback(async (ancho: 58 | 80) => {
+    if (!caja.logoUrl) return null;
+    return rasterizarImagen(caja.logoUrl, ancho);
+  }, [caja.logoUrl]);
+
   /** Lo que sigue a una venta cobrada: limpiar la pantalla, «Cobro completado», el ticket impreso,
    *  la comanda de Para llevar y el cierre del reparto. Del cobro, y de «Cobrar» con saldo 0. */
   const cobroTerminado = useCallback(async (ticketId: string, folio: string | null, cambio: number, total: number) => {
@@ -1540,7 +1548,7 @@ export function HomePos({
     } catch {
       setEstadoTicket("error");
     }
-  }, [token, empleado, caja.nombre, imprimirComandaPorAreas]);
+  }, [token, empleado, caja.nombre, imprimirComandaPorAreas, logoParaTicket]);
 
   const iniciarCobro = useCallback(async (atajo: "EFECTIVO_EXACTO" | null = null) => {
     if (carrito.lineas.length === 0) return;
@@ -1725,14 +1733,6 @@ export function HomePos({
       setProcesandoCobro(false);
     }
   }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, turno.caja_id, turno.id, cocinaEnviada, imprimirComandaCocina, volverAtras, adoptarTicketSiQuedoAbierto]);
-
-  /** Logo del negocio listo para la térmica. Se rasteriza al vuelo (es rápido y evita
-   *  guardar estado que se desincronice si cambian el logo desde el panel). Si no hay logo
-   *  o la imagen falla, devuelve null y el ticket sale sin él. */
-  const logoParaTicket = useCallback(async (ancho: 58 | 80) => {
-    if (!caja.logoUrl) return null;
-    return rasterizarImagen(caja.logoUrl, ancho);
-  }, [caja.logoUrl]);
 
   /**
    * Reimprime la comanda completa de un ticket, repartida por estación como la original, ya con
@@ -3185,8 +3185,7 @@ export function HomePos({
             ? {
                 nombre: clienteLealtad.nombre.split(" ")[0] ?? clienteLealtad.nombre,
                 franja,
-                // La venta de un cambio no lleva canje (como no suma, 0200).
-                onAbrir: admiteClienteCuenta(carrito.modoServicio) && carrito.lineas.length > 0 && !cuentaImpresa && ventaDeCambio === false ? () => void onAbrirLealtad() : undefined,
+                onAbrir: ofreceCanje({ admite: admiteClienteCuenta(carrito.modoServicio), hayLineas: carrito.lineas.length > 0, impresa: cuentaImpresa, ventaDeCambio }) ? () => void onAbrirLealtad() : undefined,
               }
             : null}
           totalConDescuento={totalAutoritativo ?? undefined}
