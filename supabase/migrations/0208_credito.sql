@@ -309,14 +309,22 @@ SELECT rp.rol_id, (SELECT id FROM permisos WHERE codigo = 'venta.credito_excedid
 -- ── §6 Guardia: un CREDITO solo entra por pagar_a_credito ───────────────────
 -- pagar_a_credito pone vim.pago_credito = 'si' (local a la transacción) antes de llamar a
 -- aplicar_pago. Sin eso, aplicar_pago directo con CREDITO marcaría la venta PAGADO sin validar
--- cliente ni límite. En la caja el push y el pull van en modo réplica y esto no corre: la caja ya
--- validó en local. Cada método "solo por RPC" es una rama más aquí (SALDO_FAVOR: 0209).
+-- cliente ni límite. Y un pago no se cambia de ni a CREDITO (cambiar_forma_pago_ticket, 0201, o
+-- un PATCH directo a pagos): EFECTIVO→CREDITO crearía deuda sin validar nada y sacaría el efectivo
+-- del corte; CREDITO→EFECTIVO borraría la deuda y el corte esperaría dinero que nadie dio
+-- (precedente: PAGO_EN_LINEA, 0173). En la caja el push y el pull van en modo réplica y esto no
+-- corre: la caja ya validó en local. Cada método "solo por RPC" se suma a los WHEN y a una rama
+-- de la función (SALDO_FAVOR: 0209).
 CREATE OR REPLACE FUNCTION pagos_metodo_solo_por_rpc()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = public, pg_temp
 AS $$
 BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: una venta a crédito no cambia de forma de pago, ni otra pasa a crédito. Cancela la venta y vuelve a cobrarla.'
+      USING ERRCODE = '22023';
+  END IF;
   IF NEW.metodo_pago = 'CREDITO' AND current_setting('vim.pago_credito', true) IS DISTINCT FROM 'si' THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: una venta a crédito se cobra con «A crédito» (pagar_a_credito).'
       USING ERRCODE = '42501';
@@ -328,7 +336,14 @@ REVOKE ALL ON FUNCTION pagos_metodo_solo_por_rpc() FROM PUBLIC, anon, authentica
 DROP TRIGGER IF EXISTS trg_pagos_metodo_solo_por_rpc ON pagos;
 CREATE TRIGGER trg_pagos_metodo_solo_por_rpc
   BEFORE INSERT ON pagos
-  FOR EACH ROW WHEN (NEW.metodo_pago = 'CREDITO')
+  FOR EACH ROW WHEN (NEW.metodo_pago IN ('CREDITO'))
+  EXECUTE FUNCTION pagos_metodo_solo_por_rpc();
+-- Un disparador de INSERT no puede leer OLD en su WHEN: el del cambio va aparte.
+DROP TRIGGER IF EXISTS trg_pagos_metodo_solo_por_rpc_cambio ON pagos;
+CREATE TRIGGER trg_pagos_metodo_solo_por_rpc_cambio
+  BEFORE UPDATE OF metodo_pago ON pagos
+  FOR EACH ROW WHEN (OLD.metodo_pago IS DISTINCT FROM NEW.metodo_pago
+                     AND (OLD.metodo_pago IN ('CREDITO') OR NEW.metodo_pago IN ('CREDITO')))
   EXECUTE FUNCTION pagos_metodo_solo_por_rpc();
 
 -- ── §7 pagar_a_credito ──────────────────────────────────────────────────────
@@ -354,10 +369,15 @@ BEGIN
     RAISE EXCEPTION 'DATOS_INVALIDOS: la venta no existe.' USING ERRCODE = '22023';
   END IF;
 
-  -- Idempotencia (reintento de la caja): mismo client_id_local, mismo pago.
+  -- Idempotencia (reintento de la caja): mismo client_id_local y misma venta, mismo pago. Si el
+  -- client_id_local es de otra venta, aplicar_pago devolvería ese pago ajeno: se rechaza.
   IF p_client_id_local IS NOT NULL THEN
-    SELECT id INTO v_pago FROM pagos WHERE tenant_id = v_t.tenant_id AND client_id_local = p_client_id_local;
+    SELECT id INTO v_pago FROM pagos
+     WHERE tenant_id = v_t.tenant_id AND client_id_local = p_client_id_local AND ticket_id = p_ticket_id;
     IF FOUND THEN RETURN v_pago; END IF;
+    IF EXISTS (SELECT 1 FROM pagos WHERE tenant_id = v_t.tenant_id AND client_id_local = p_client_id_local) THEN
+      RAISE EXCEPTION 'DATOS_INVALIDOS: ese identificador de pago ya es de otra venta.' USING ERRCODE = '22023';
+    END IF;
   END IF;
 
   IF NOT COALESCE((SELECT modulo_credito_activo FROM configuracion_tenant WHERE tenant_id = v_t.tenant_id), false) THEN
@@ -448,6 +468,10 @@ BEGIN
   END IF;
   IF v_monto IS NULL OR v_monto <= 0 THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: el abono debe ser mayor a 0.' USING ERRCODE = '22023';
+  END IF;
+  -- Cabe en varchar(100) con el sufijo de renglón (-1, -2, …).
+  IF length(p_client_id_local) > 90 THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: el identificador del abono pasa de 90 caracteres.' USING ERRCODE = '22023';
   END IF;
 
   -- Un abono a la vez por cliente: dos simultáneos no pasan juntos la deuda.

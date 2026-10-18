@@ -21,7 +21,7 @@ DECLARE
   v_prod   uuid := 'c2080000-0000-0000-0000-0000000000a1';
   v_ana    uuid := 'c2080000-0000-0000-0000-000000000001';
   v_beto   uuid := 'c2080000-0000-0000-0000-000000000002';
-  v_turno1 uuid; v_turno2 uuid; v_t1 uuid; v_t2 uuid; v_t3 uuid; v_t4 uuid; v_tb uuid; v_auth uuid;
+  v_turno1 uuid; v_turno2 uuid; v_t1 uuid; v_t2 uuid; v_t3 uuid; v_t4 uuid; v_t5 uuid; v_t6 uuid; v_tb uuid; v_auth uuid;
   v_e1 numeric; v_e2 numeric; v_n integer; j jsonb; v_x jsonb; v_ok boolean;
 BEGIN
   PERFORM set_config('request.jwt.claims',
@@ -96,6 +96,8 @@ BEGIN
   -- 5) Con algo vencido (la de $500 tiene 40 días y el plazo es 30) se rechaza sin PIN aunque haya límite.
   UPDATE clientes_credito SET limite_mxn = 10000 WHERE cliente_id = v_ana;
   UPDATE tickets SET fecha_apertura = fecha_apertura - interval '40 days', fecha_pago = fecha_pago - interval '40 days' WHERE id = v_t1;
+  -- En una sola transacción now() no avanza: sin esto t2 y t3 empatan y el reparto (7) queda al azar.
+  UPDATE tickets SET fecha_apertura = fecha_apertura - interval '1 day', fecha_pago = fecha_pago - interval '1 day' WHERE id = v_t2;
   IF NOT (SELECT tiene_vencido FROM vw_creditos_cliente WHERE cliente_id = v_ana) THEN RAISE EXCEPTION '5: la vista no ve lo vencido'; END IF;
   v_t3 := abrir_ticket(v_suc, v_caja, v_turno1, 'PARA_LLEVAR'::modo_servicio, v_ana, NULL, 'smoke-cr-3', v_maria);
   PERFORM agregar_item_a_ticket(v_t3, v_prod, 1, NULL, '[]'::jsonb, 'smoke-cr-3a');
@@ -202,6 +204,62 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM permisos WHERE codigo = 'venta.credito_excedido' AND permite_autorizacion_pin AND jerarquia_minima_pin = 3) THEN
     RAISE EXCEPTION '11: falta el permiso venta.credito_excedido';
   END IF;
+
+  -- 12) Un pago no cambia de ni a CREDITO (cambiar_forma_pago_ticket); entre otros métodos, sí.
+  v_t5 := abrir_ticket(v_suc, v_caja, v_turno2, 'PARA_LLEVAR'::modo_servicio, v_ana, NULL, 'smoke-cr-5', v_maria);
+  PERFORM agregar_item_a_ticket(v_t5, v_prod, 1, NULL, '[]'::jsonb, 'smoke-cr-5a');
+  PERFORM aplicar_pago(v_t5, 'EFECTIVO'::metodo_pago, 500, 500);
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno2, v_maria, v_maria, 'forma_pago', 'venta.editar_post_cobro', 'ticket', v_t5, 'smoke 12')
+  RETURNING id INTO v_auth;
+  BEGIN
+    PERFORM cambiar_forma_pago_ticket(v_t5, 'CREDITO'::metodo_pago, NULL, v_auth);
+    RAISE EXCEPTION '12: un pago en efectivo pasó a crédito';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'DATOS_INVALIDOS: una venta a crédito no cambia%' THEN RAISE; END IF;
+  END;
+  PERFORM cambiar_forma_pago_ticket(v_t5, 'TARJETA_DEBITO'::metodo_pago, NULL, v_auth);
+  IF (SELECT metodo_pago FROM pagos WHERE ticket_id = v_t5) <> 'TARJETA_DEBITO' THEN
+    RAISE EXCEPTION '12: el cambio de efectivo a tarjeta no se hizo';
+  END IF;
+
+  v_t6 := abrir_ticket(v_suc, v_caja, v_turno2, 'PARA_LLEVAR'::modo_servicio, v_ana, NULL, 'smoke-cr-6', v_maria);
+  PERFORM agregar_item_a_ticket(v_t6, v_prod, 1, NULL, '[]'::jsonb, 'smoke-cr-6a');
+  -- 13) El client_id_local de otra venta no devuelve ese pago ajeno.
+  BEGIN
+    PERFORM pagar_a_credito(v_t6, NULL, 'smoke-cr-p1');
+    RAISE EXCEPTION '13: pagar_a_credito aceptó el client_id_local de otra venta';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'DATOS_INVALIDOS: ese identificador%' THEN RAISE; END IF;
+  END;
+  PERFORM pagar_a_credito(v_t6, NULL, 'smoke-cr-p6');
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno2, v_maria, v_maria, 'forma_pago', 'venta.editar_post_cobro', 'ticket', v_t6, 'smoke 12b')
+  RETURNING id INTO v_auth;
+  BEGIN
+    PERFORM cambiar_forma_pago_ticket(v_t6, 'EFECTIVO'::metodo_pago, NULL, v_auth);
+    RAISE EXCEPTION '12: una venta a crédito pasó a efectivo';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'DATOS_INVALIDOS: una venta a crédito no cambia%' THEN RAISE; END IF;
+  END;
+  -- Un UPDATE directo (el PATCH de PostgREST) tampoco.
+  BEGIN
+    UPDATE pagos SET metodo_pago = 'TRANSFERENCIA' WHERE ticket_id = v_t6;
+    RAISE EXCEPTION '12: un UPDATE directo sacó una venta de crédito';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'DATOS_INVALIDOS: una venta a crédito no cambia%' THEN RAISE; END IF;
+  END;
+  IF credito_saldo_ticket(v_t6) <> 500 THEN RAISE EXCEPTION '12: la deuda de la venta cambió'; END IF;
+
+  -- 14) Un client_id_local que no cabe con su sufijo se rechaza.
+  BEGIN
+    PERFORM registrar_abono(v_ana, 1, 'EFECTIVO'::metodo_pago, v_caja, v_turno2, repeat('x', 91));
+    RAISE EXCEPTION '14: aceptó un client_id_local de 91 caracteres';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'DATOS_INVALIDOS:%90 caracteres%' THEN RAISE; END IF;
+  END;
   RAISE NOTICE 'SMOKE CREDITO 0208 OK';
 END $$;
 
