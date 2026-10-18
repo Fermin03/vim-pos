@@ -362,6 +362,25 @@ no hay forma de pago nueva, el corte no cambia y los reportes lo cuentan como lo
 venta está facturada. Haz la devolución con «Devolver».»); cambiar entre sucursales o cajas
 (mismo límite que Devoluciones).
 
+## Productos que se venden por kilo, metro o litro
+
+Un producto puede venderse por **pieza, kilo, metro o litro**. Lo elige el dueño en el admin.
+
+- **Tarjeta:** el precio lleva la unidad: «$28.00/kg», «$45.00/m», «$32.00/l». Las piezas no cambian.
+- **Al tocarla** (o al escanearla) se abre la **ventana de cantidad**. El título dice la unidad:
+  «Peso · kg», «Metros» o «Litros».
+  - Teclado en pantalla con punto «.».
+  - Con el teclado físico sirven los dígitos, el punto y también la coma «,».
+  - Enter agrega; Escape cierra sin agregar.
+  - Rechaza 0 y más decimales de los que la unidad admite.
+- **Cada pesada es su propio renglón.** Pesar dos veces el mismo producto deja dos renglones, no uno
+  con la suma.
+- **El renglón y el ticket impreso** muestran «1.250 kg» y «$28.00/kg» en lugar de «1.25×».
+- **«Quitar»** en un renglón a granel lo quita completo.
+- **«N productos»** cuenta un renglón a granel como 1, pese lo que pese.
+- **Devolución:** un renglón a granel se devuelve **completo o nada**; no hay devolución de una fracción.
+- **Cambio de talla:** un producto a granel no se ofrece.
+
 ## Sin internet
 
 - La caja vende, devuelve y cambia contra su copia local; las existencias de su sucursal bajan al

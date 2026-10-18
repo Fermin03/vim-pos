@@ -165,3 +165,44 @@ Le agrega tres cosas que la ropa no necesitaba: **vender por kilo, metro o litro
 - El PDF de la cotización y cómo se manda por WhatsApp. El mecanismo de compartir que ya exista en la
   caja tiene prioridad.
 - Si «A crédito» cobra todo el ticket o se puede combinar con otro pago en un cobro dividido.
+
+## Entrega 1, hecha (18 oct)
+
+Venta por kilo, metro y litro, y los cuatro giros nuevos en la base. Todo en local.
+
+**Migraciones**
+
+- **0205:** solo `ADD VALUE`: los 4 giros y la unidad LONGITUD. Va aparte porque Postgres no deja usar un
+  valor de enum en la misma transacción que lo crea.
+- **0206:** `es_giro_tienda` (una sola lista de giros de tienda en lugar de RETAIL), el juego inicial de
+  los giros nuevos, los giros nuevos bloqueados en `cambiar_giro`, la unidad SAT derivada de `tipo_venta`
+  (el admin no muestra campo aparte), la herencia de unidad a las variantes y la columna «Unidad» del CSV
+  de importación.
+- **Caja:** ventana de cantidad, renglones con unidad en pantalla, ticket, devolución y factura. Detalle
+  en `docs/diseno/pos-retail.md`.
+
+**Para el lanzamiento**
+
+- **La 0205 debe ir en un instalador ANTES de que cualquier negocio use los giros nuevos o venda por
+  metro.** Un valor de enum que la caja no conoce rompe su pull.
+- BAR, CAFETERIA y TAQUERIA siguen bloqueados para negocios existentes. Los giros nuevos también, hasta
+  la entrega 4.
+
+**Quedó para después**
+
+- Hallazgo de lanzamiento: un producto de restaurante con `tipo_venta` PESO o VOLUMEN pasaría a facturar
+  KGM o LTR al crearse o cambiar. Revisar en producción si existe alguno antes de lanzar.
+- Backfill de 0206 pone H87 aunque el producto sea granel (falta `AND tipo_venta='UNIDAD'` o pasar por el
+  disparador).
+- El disparador no corrige un UPDATE directo de `unidad_sat` en un producto granel.
+- Smoke de importación sin kg, l ni SKU existente sin unidad.
+- Comentarios «giro RETAIL» desactualizados; un cast innecesario en `ticket-datos.ts`.
+- La suma de «Existencia» mezcla unidades; segunda consulta de productos en existencias (mejor
+  `tipo_venta` en `vw_existencias`); el select de unidad aparece también en combos y padres de variantes.
+- Ventana de cantidad: escanear con ella abierta deja colar el primer dígito; sin tope de cantidad;
+  doble toque rápido en «Agregar» podría agregar dos pesadas.
+- CSS `whitespace-nowrap` en renglones también en restaurante; la prueba CFDI no comprueba 1.25; la
+  prueba de devolución es de lib, no de pantalla; falta marcador «ya devuelto» en cambio de talla para
+  granel; «completo o nada» solo se exige en la caja.
+- Pantallas aún con «1.25×»: descuento por producto, cancelar renglón(es), devolución de restaurante,
+  cuentas por modo, comanda. «Recibir» suma 1 a un producto a granel.
