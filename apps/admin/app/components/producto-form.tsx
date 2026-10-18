@@ -21,6 +21,7 @@ import { normalizarEan } from "../lib/codigo-barras";
 import { ponerFotoProducto, quitarFotoProducto } from "../lib/foto-producto";
 import { ofreceFotoDeProducto } from "../lib/tienda-plan";
 import { limpiarPrecio } from "../lib/numeros";
+import { TIPOS_VENTA, UNIDADES, type TipoVenta } from "../lib/unidades";
 import { Plegable } from "./plegable";
 import { Interruptor } from "./interruptor";
 import { CampoImagen } from "./campo-imagen";
@@ -133,6 +134,7 @@ export function ProductoForm({
   const [barras, setBarras] = useState(producto?.codigo_barras ?? "");
   const [costo, setCosto] = useState(producto?.costo_mxn == null ? "" : String(producto.costo_mxn));
   const [llevaExistencias, setLlevaExistencias] = useState(producto?.controla_existencias ?? false);
+  const [tipoVenta, setTipoVenta] = useState<TipoVenta>(producto?.tipo_venta ?? "UNIDAD");
   const [generando, setGenerando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -261,7 +263,7 @@ export function ProductoForm({
       return;
     }
     const datosTienda: DatosTienda | undefined = tienda
-      ? { codigo_barras: barras, costo_mxn: costo.trim() === "" ? null : Number(costo), controla_existencias: !esPadre && llevaExistencias }
+      ? { codigo_barras: barras, costo_mxn: costo.trim() === "" ? null : Number(costo), controla_existencias: !esPadre && llevaExistencias, tipo_venta: tipoVenta }
       : undefined;
     if (datosTienda && datosTienda.costo_mxn !== null && !(Number.isFinite(datosTienda.costo_mxn) && datosTienda.costo_mxn >= 0)) {
       setError("Costo inválido");
@@ -389,7 +391,7 @@ export function ProductoForm({
           <div>
             <div className="flex items-baseline justify-between gap-2">
               <label className={label} htmlFor="precio">
-                Precio
+                {tienda ? UNIDADES[tipoVenta].precio : "Precio"}
               </label>
               {enMenu && <span className="mb-1.5 truncate text-13 text-ink-2">en {menuCat.nombre}</span>}
             </div>
@@ -410,6 +412,20 @@ export function ProductoForm({
               {ivaIncluido ? `Con IVA de ${tasa}% incluido.` : `Al cobrar se le suma ${tasa}% de IVA.`}
             </p>
           </div>
+          {tienda && (
+            <div>
+              <label className={label} htmlFor="se-vende-por">
+                Se vende por
+              </label>
+              <select id="se-vende-por" className={input} value={tipoVenta} onChange={(e) => setTipoVenta(e.target.value as TipoVenta)}>
+                {TIPOS_VENTA.map((t) => (
+                  <option key={t} value={t}>
+                    {UNIDADES[t].opcion}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label className={label} htmlFor="categoria">
               Categoría
@@ -601,7 +617,7 @@ export function ProductoForm({
           </div>
           <BuscadorClaveSat onElegir={setClaveSat} />
           <p className="-mt-1 text-13 text-ink-2">
-            {AYUDA_IVA} {tienda ? "Cada prenda necesita su clave para facturar; búscala arriba." : "Sin clave, se factura como servicio de restaurante."}
+            {AYUDA_IVA} {tienda ? "Cada producto necesita su clave para facturar; búscala arriba." : "Sin clave, se factura como servicio de restaurante."}
           </p>
           <label className="flex min-h-[44px] items-center gap-2.5">
             <input type="checkbox" className="h-5 w-5 accent-ink" checked={ivaIncluido} onChange={(e) => setIvaIncluido(e.target.checked)} />

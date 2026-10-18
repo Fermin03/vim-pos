@@ -1,6 +1,7 @@
 "use client";
 import { supabase } from "./supabase";
 import { leerTodas } from "./reportes";
+import type { TipoVenta } from "./unidades";
 
 export type FilaVariante = {
   id?: string;
@@ -101,22 +102,22 @@ export async function generarCodigoInterno(): Promise<string> {
   return String(data);
 }
 
-export type ProductoEtiquetable = { id: string; nombre: string; precio: number; codigo_barras: string; codigo_interno: string };
+export type ProductoEtiquetable = { id: string; nombre: string; precio: number; codigo_barras: string; codigo_interno: string; tipo_venta: TipoVenta };
 
 /** Lo que se puede etiquetar: productos con existencias, sin los padres (esos no se venden). */
 export async function listarProductosEtiquetables(): Promise<ProductoEtiquetable[]> {
   const data = await leerTodas((a, b) =>
     supabase
       .from("productos")
-      .select("id, nombre, precio_base_mxn, codigo_barras, codigo_interno")
+      .select("id, nombre, precio_base_mxn, codigo_barras, codigo_interno, tipo_venta")
       .is("deleted_at", null)
       .eq("controla_existencias", true)
       .order("nombre")
       .order("id")
       .range(a, b),
   );
-  return (data as unknown as { id: string; nombre: string; precio_base_mxn: number; codigo_barras: string | null; codigo_interno: string | null }[]).map((p) => ({
-    id: p.id, nombre: p.nombre, precio: Number(p.precio_base_mxn), codigo_barras: p.codigo_barras ?? "", codigo_interno: p.codigo_interno ?? "",
+  return (data as unknown as { id: string; nombre: string; precio_base_mxn: number; codigo_barras: string | null; codigo_interno: string | null; tipo_venta: TipoVenta }[]).map((p) => ({
+    id: p.id, nombre: p.nombre, precio: Number(p.precio_base_mxn), codigo_barras: p.codigo_barras ?? "", codigo_interno: p.codigo_interno ?? "", tipo_venta: p.tipo_venta,
   }));
 }
 

@@ -9,6 +9,7 @@ import { Cifras, Tabla, useConsulta, type Cifra, type Rango } from "../../compon
 import { AccionFila, Segmentos } from "../../components/controles";
 import { input, label } from "../../components/campos";
 import { mensajeError } from "../../lib/errores";
+import { conUnidad } from "../../lib/unidades";
 import { descargarXlsx } from "../../lib/excel";
 import { formatear, hojaDeReporte, nombreArchivo, type Columna } from "../../lib/reporte-tabla";
 import {
@@ -67,7 +68,7 @@ export default function ExistenciasPage() {
   const enTodas = sucursal.id === null;
 
   const cifras: Cifra[] = [
-    { etiqueta: "Piezas", valor: r.piezas, tipo: "cantidad" },
+    { etiqueta: "Existencia", valor: r.piezas, tipo: "cantidad" },
     { etiqueta: "Valor del inventario", valor: r.valor_mxn, tipo: "mxn", pie: "con el costo de hoy" },
     { etiqueta: "Bajo mínimo", valor: r.bajo, tipo: "entero", tono: r.bajo > 0 ? "atencion" : "neutro" },
     { etiqueta: "En negativo", valor: r.negativas, tipo: "entero", tono: r.negativas > 0 ? "mal" : "neutro" },
@@ -94,7 +95,7 @@ export default function ExistenciasPage() {
       tipo: "cantidad",
       enfasis: "fuerte",
       valor: (f) => f.cantidad,
-      celda: (f) => <span className={COLOR_ESTADO[estadoExistencia(f.cantidad, f.minimo)]}>{formatear(f.cantidad, "cantidad")}</span>,
+      celda: (f) => <span className={COLOR_ESTADO[estadoExistencia(f.cantidad, f.minimo)]}>{conUnidad(formatear(f.cantidad, "cantidad"), f.tipo_venta)}</span>,
     },
     { id: "minimo", titulo: "Mínimo", tipo: "cantidad", valor: (f) => f.minimo },
     { id: "costo", titulo: "Costo", tipo: "mxn", valor: (f) => f.costo_mxn, enfasis: "suave" },

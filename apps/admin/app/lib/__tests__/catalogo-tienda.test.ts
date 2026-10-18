@@ -70,8 +70,24 @@ describe("catálogo con tienda", () => {
   });
 
   it("con tienda escribe código de barras, costo y existencias", async () => {
-    await crearProducto(base, { tienda: { codigo_barras: "4006381333931", costo_mxn: 90, controla_existencias: true } });
+    await crearProducto(base, { tienda: { codigo_barras: "4006381333931", costo_mxn: 90, controla_existencias: true, tipo_venta: "UNIDAD" as const } });
     const ins = h.llamadas.find((l) => l.op === "insert")!.args[0] as Record<string, unknown>;
     expect(ins).toMatchObject({ codigo_barras: "4006381333931", costo_mxn: 90, controla_existencias: true });
+  });
+});
+
+describe("unidad de venta en el catálogo", () => {
+  it("el armado de columnas lleva tipo_venta a insert y update", async () => {
+    h.llamadas.length = 0;
+    const tienda = { codigo_barras: "", costo_mxn: null, controla_existencias: true, tipo_venta: "PESO" as const };
+    await crearProducto(base, { tienda });
+    await actualizarProducto("p1", base, tienda);
+    const escrituras = h.llamadas.filter((l) => l.op === "insert" || l.op === "update");
+    expect(escrituras.map((l) => (l.args[0] as { tipo_venta?: string }).tipo_venta)).toEqual(["PESO", "PESO"]);
+  });
+  it("sin tienda (restaurante) no se escribe tipo_venta", async () => {
+    h.llamadas.length = 0;
+    await crearProducto(base);
+    expect(h.llamadas.find((l) => l.op === "insert")!.args[0]).not.toHaveProperty("tipo_venta");
   });
 });

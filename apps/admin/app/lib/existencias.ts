@@ -2,11 +2,14 @@
 import { sumarDias } from "@vim/fecha";
 import { supabase } from "./supabase";
 import { leerTodas } from "./reportes";
+import type { TipoVenta } from "./unidades";
 
 export type FilaExistencia = {
   sucursal_id: string; sucursal_nombre: string; producto_id: string; producto_nombre: string; variante: string;
   nombre_completo: string; codigo_interno: string | null; codigo_barras: string | null; costo_mxn: number | null;
   precio_mxn: number; cantidad: number; minimo: number | null; valor_mxn: number;
+  /** Unidad de venta; ausente = pieza. */
+  tipo_venta?: TipoVenta;
 };
 
 export const varianteDe = (ejes: string[] | null, valores: Record<string, string> | null): string =>
@@ -82,7 +85,13 @@ export async function listarExistencias(sucursalId: string | null): Promise<Fila
     if (sucursalId) q = q.eq("sucursal_id", sucursalId);
     return q.range(desde, hasta);
   });
+  // La vista no trae la unidad: solo los productos a granel la tienen distinta de pieza.
+  const granel = await leerTodas((a, b) =>
+    supabase.from("productos").select("id, tipo_venta").neq("tipo_venta", "UNIDAD").is("deleted_at", null).order("id").range(a, b),
+  );
+  const tipos = new Map(granel.map((p) => [String(p.id), p.tipo_venta as TipoVenta]));
   return filas.map((r) => ({
+    tipo_venta: tipos.get(String(r.producto_id)),
     sucursal_id: String(r.sucursal_id), sucursal_nombre: String(r.sucursal_nombre ?? ""), producto_id: String(r.producto_id),
     producto_nombre: String(r.producto_nombre ?? ""),
     variante: varianteDe(r.variante_ejes as string[] | null, r.variante_valores as Record<string, string> | null),

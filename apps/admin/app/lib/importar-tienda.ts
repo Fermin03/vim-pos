@@ -1,17 +1,21 @@
 "use client";
 import { supabase } from "./supabase";
 import { dividirCSV } from "./importar-menu";
+import { tipoDeUnidadCsv, UNIDADES } from "./unidades";
 
 export type FilaImport = {
   linea: number; categoria: string; producto: string; ejes: string[]; valores: Record<string, string>;
   sku: string; codigo_barras: string; generar_codigo: boolean; precio: number; costo: number | null; existencia: number | null;
+  /** pieza|kg|m|l; ausente = el RPC deja la unidad que ya tenía (o pieza si es nuevo). */
+  unidad?: string;
 };
 export type ParseTienda = { filas: FilaImport[]; errores: { linea: number; motivo: string }[] };
 
-export const PLANTILLA_TIENDA = `Categoría,Producto,Ejes,Valores,SKU,Código de barras,Precio,Costo,Existencia
-Playeras,Playera Polo,Talla|Color,M|Negra,POL-M-NEG,,349,150,5
-Playeras,Playera Polo,Talla|Color,G|Negra,POL-G-NEG,,349,150,3
-Accesorios,Gorra,,,GOR-001,,249,90,10`;
+export const PLANTILLA_TIENDA = `Categoría,Producto,Ejes,Valores,SKU,Código de barras,Precio,Unidad,Costo,Existencia
+Playeras,Playera Polo,Talla|Color,M|Negra,POL-M-NEG,,349,pieza,150,5
+Playeras,Playera Polo,Talla|Color,G|Negra,POL-G-NEG,,349,pieza,150,3
+Accesorios,Gorra,,,GOR-001,,249,pieza,90,10
+Telas,Manta,,,MAN-001,,60,m,25,40`;
 
 // Solo dígitos, con comas de miles opcionales y punto decimal: Number() aceptaría 1e5, 0x10 o Infinity.
 const numero = (s: string): number | null => {
@@ -22,16 +26,22 @@ const numero = (s: string): number | null => {
 // Excel convierte 7501234567890 en 7.50123E+12 al abrir un CSV, y el código ya no se puede recuperar.
 const notacionCientifica = /^\d+(\.\d+)?E[+-]?\d+$/i;
 
-/** Columnas: categoría, producto, ejes (Talla|Color), valores (M|Negra), SKU, código de barras, precio, costo, existencia. */
+/** Columnas: categoría, producto, ejes (Talla|Color), valores (M|Negra), SKU, código de barras, precio, [unidad], costo, existencia. */
 export function parsearCsvTienda(texto: string, generarFaltantes: boolean): ParseTienda {
   const filas: FilaImport[] = [];
   const errores: ParseTienda["errores"] = [];
   const skus = new Set<string>();
+  // «Unidad» va después de «Precio» solo si el encabezado la trae; sin ella el archivo es el de antes.
+  let conUnidad = false;
   texto.split(/\r?\n/).forEach((raw, i) => {
     const linea = i + 1;
     if (!raw.trim()) return;
     const c = dividirCSV(raw);
-    if (i === 0 && /categor/i.test(c[0] ?? "")) return;
+    if (i === 0 && /categor/i.test(c[0] ?? "")) {
+      conUnidad = /unidad/i.test(c[7] ?? "");
+      return;
+    }
+    const unidadTxt = conUnidad ? (c.splice(7, 1)[0] ?? "") : "";
     const [categoria = "", producto = "", ejesTxt = "", valoresTxt = "", sku = "", barras = "", precioTxt = "", costoTxt = "", existTxt = ""] = c;
     const mal = (motivo: string) => errores.push({ linea, motivo });
     if (!categoria || !producto || !sku) return void mal("Faltan categoría, producto o SKU");
@@ -51,11 +61,14 @@ export function parsearCsvTienda(texto: string, generarFaltantes: boolean): Pars
     if (Number.isNaN(costo) || (costo ?? 0) < 0 || Number.isNaN(existencia) || (existencia ?? 0) < 0) {
       return void mal("Costo o existencia inválidos");
     }
+    const tipo = tipoDeUnidadCsv(unidadTxt);
+    if (tipo === null) return void mal(`Unidad inválida: "${unidadTxt}" (usa pieza, kg, m o l)`);
     if (skus.has(sku.toLowerCase())) return void mal(`El SKU ${sku} viene dos veces`);
     skus.add(sku.toLowerCase());
     filas.push({
       linea, categoria, producto, ejes, valores: Object.fromEntries(ejes.map((e, k) => [e, vals[k]!])),
       sku, codigo_barras: barras, generar_codigo: generarFaltantes && !barras, precio, costo, existencia,
+      ...(tipo ? { unidad: UNIDADES[tipo].csv } : {}),
     });
   });
   return { filas, errores };

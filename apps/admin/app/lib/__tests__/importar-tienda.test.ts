@@ -59,3 +59,21 @@ describe("CSV de tienda", () => {
     expect(r.filas[0]).toMatchObject({ precio: 12345.5, costo: 0.5, existencia: 3 });
   });
 });
+
+describe("CSV de tienda: columna Unidad", () => {
+  const enc = "Categoría,Producto,Ejes,Valores,SKU,Código de barras,Precio,Unidad,Costo,Existencia\n";
+  it("válida (con acentos y mayúsculas), vacía y sin columna", () => {
+    const r = parsearCsvTienda(enc + "Frutas,Manzana,,,MAN,,40,KG,20,10\nTelas,Manta,,,MTA,,60,M,25,4\nFrutas,Pera,,,PER,,30,,12,3\n", false);
+    expect(r.errores).toEqual([]);
+    expect(r.filas.map((f) => f.unidad)).toEqual(["kg", "m", undefined]);
+    expect(r.filas[0]).toMatchObject({ precio: 40, costo: 20, existencia: 10 });
+    const vieja = parsearCsvTienda("Categoría,Producto,Ejes,Valores,SKU,Código de barras,Precio,Costo,Existencia\nA,B,,,S1,,5,2,7\n", false);
+    expect(vieja.filas[0]).toMatchObject({ precio: 5, costo: 2, existencia: 7 });
+    expect(vieja.filas[0]!.unidad).toBeUndefined();
+  });
+  it("unidad inválida: error con su línea", () => {
+    const r = parsearCsvTienda(enc + "Frutas,Manzana,,,MAN,,40,libra,20,10\n", false);
+    expect(r.filas).toEqual([]);
+    expect(r.errores).toEqual([{ linea: 2, motivo: expect.stringContaining("Unidad inválida") }]);
+  });
+});

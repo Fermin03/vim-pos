@@ -8,6 +8,7 @@ import { CapturaProductos } from "../../../components/captura-productos";
 import { AccionFila } from "../../../components/controles";
 import { input, label } from "../../../components/campos";
 import { mensajeError } from "../../../lib/errores";
+import { conUnidad } from "../../../lib/unidades";
 import { formatear } from "../../../lib/reporte-tabla";
 import { listarSucursalesOpciones, type SucursalOpcion } from "../../../lib/inventario";
 import { listarProductosEtiquetables, type ProductoEtiquetable } from "../../../lib/variantes";
@@ -224,7 +225,6 @@ export default function TraspasosPage() {
             {traspasos !== null && traspasos.length > 0 && (
               <ul className="border-t border-line">
                 {traspasos.map((t) => {
-                  const piezas = t.lineas.reduce((s, l) => s + Number(l.cantidad), 0);
                   const e = ESTADO[t.estado];
                   return (
                     <li key={t.id} className="border-b border-line py-3">
@@ -241,7 +241,7 @@ export default function TraspasosPage() {
                               onClick={() => setAbierto((a) => (a === t.id ? null : t.id))}
                               className="font-medium text-ink-2 underline underline-offset-2 hover:text-ink"
                             >
-                              {productos(t.lineas.length)} · {formatear(piezas, "cantidad")} {piezas === 1 ? "pieza" : "piezas"}
+                              {productos(t.lineas.length)}
                             </button>
                           </p>
                         </div>
@@ -267,7 +267,7 @@ export default function TraspasosPage() {
                           {t.lineas.map((l) => (
                             <li key={l.producto_id} className="flex justify-between gap-3 border-t border-line px-3 py-2 first:border-t-0">
                               <span>{nombreProducto(l.producto_id)}</span>
-                              <span className="tabular-nums text-ink-2">{formatear(Number(l.cantidad), "cantidad")}</span>
+                              <span className="tabular-nums text-ink-2">{conUnidad(formatear(Number(l.cantidad), "cantidad"), catalogo.find((p) => p.id === l.producto_id)?.tipo_venta)}</span>
                             </li>
                           ))}
                         </ul>

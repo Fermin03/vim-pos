@@ -1,4 +1,5 @@
 "use client";
+import type { TipoVenta } from "./unidades";
 import { z } from "zod";
 import { supabase } from "./supabase";
 import { borrarSuave, tenantId } from "./datos";
@@ -209,6 +210,7 @@ export type Producto = {
   codigo_barras: string | null;
   costo_mxn: number | null;
   controla_existencias: boolean;
+  tipo_venta: TipoVenta;
   /** Ejes de la variante de un padre (p. ej. ["Talla","Color"]); null si no tiene variantes. */
   variante_ejes: string[] | null;
   /** Cuántas variantes vivas tiene este padre. */
@@ -220,7 +222,7 @@ export type Producto = {
 type FilaProd = Omit<Producto, "categoriaNombre" | "variantes" | "codigosVariantes"> & { categoria: { nombre: string } | null };
 
 const COLUMNAS_PRODUCTO =
-  "id, nombre, descripcion, codigo_interno, codigo_barras, costo_mxn, controla_existencias, variante_ejes, imagen_url, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, en_menu_general, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)";
+  "id, nombre, descripcion, codigo_interno, codigo_barras, costo_mxn, controla_existencias, tipo_venta, variante_ejes, imagen_url, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, en_menu_general, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)";
 
 function aProducto(f: FilaProd, variantes = 0, codigosVariantes = ""): Producto {
   return {
@@ -231,6 +233,7 @@ function aProducto(f: FilaProd, variantes = 0, codigosVariantes = ""): Producto 
     codigo_barras: f.codigo_barras ?? null,
     costo_mxn: f.costo_mxn == null ? null : Number(f.costo_mxn),
     controla_existencias: Boolean(f.controla_existencias),
+    tipo_venta: f.tipo_venta ?? "UNIDAD",
     variante_ejes: f.variante_ejes ?? null,
     variantes,
     codigosVariantes,
@@ -301,9 +304,9 @@ function resolverEstado(input: ProductoInput): EstadoProducto {
   return input.estado;
 }
 
-export type DatosTienda = { codigo_barras: string; costo_mxn: number | null; controla_existencias: boolean };
+export type DatosTienda = { codigo_barras: string; costo_mxn: number | null; controla_existencias: boolean; tipo_venta: TipoVenta };
 const columnasTienda = (t?: DatosTienda) =>
-  t ? { codigo_barras: t.codigo_barras.trim() || null, costo_mxn: t.costo_mxn, controla_existencias: t.controla_existencias } : {};
+  t ? { codigo_barras: t.codigo_barras.trim() || null, costo_mxn: t.costo_mxn, controla_existencias: t.controla_existencias, tipo_venta: t.tipo_venta } : {};
 
 export async function crearProducto(input: ProductoInput, opciones: { enMenuGeneral?: boolean; tienda?: DatosTienda } = {}): Promise<string> {
   const datos = productoSchema.parse(input);
