@@ -1,5 +1,6 @@
 "use client";
 import { employeeClient } from "../supabase";
+import { esGiroTienda } from "@vim/db/operacion";
 import { etiquetaModo } from "@vim/db/modos-servicio";
 import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
 import { leerPrograma } from "../lealtad";
@@ -348,7 +349,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
         baseComida: Math.max(0, Math.round((Number(tk.total_mxn) - cargos) * 100) / 100),
       });
 
-  const tienda = tn.vertical_principal === "RETAIL";
+  const tienda = esGiroTienda(tn.vertical_principal as string);
   const cambio = tienda ? await leerCambioTalla(sb, tk.tenant_id as string, (tk.client_id_local as string | null) ?? null, Number(tk.total_mxn)) : null;
   // El pago interno del cambio (0195: llave del ticket + "-pago") no es efectivo que entró: es la prenda.
   const pagoPrenda = cambio ? `${tk.client_id_local as string}-pago` : null;

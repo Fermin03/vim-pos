@@ -5,7 +5,7 @@
  */
 export type CodigoGiro =
   | "QUICK_SERVICE" | "FULL_SERVICE" | "TAQUERIA" | "CAFETERIA" | "BAR" | "DARK_KITCHEN" | "FOODTRUCK"
-  | "RETAIL" | "CAFE_BAR" | "ENTERPRISE";
+  | "RETAIL" | "ABARROTES" | "FRUTERIA" | "FERRETERIA" | "VINOS" | "CAFE_BAR" | "ENTERPRISE";
 
 export const GIROS: readonly { codigo: CodigoGiro; nombre: string; ofrecido: boolean }[] = [
   { codigo: "QUICK_SERVICE", nombre: "Comida rápida", ofrecido: true },
@@ -17,10 +17,20 @@ export const GIROS: readonly { codigo: CodigoGiro; nombre: string; ofrecido: boo
   { codigo: "FOODTRUCK", nombre: "Food truck", ofrecido: true },
   // Tienda (ADR 0037).
   { codigo: "RETAIL", nombre: "Tienda de ropa o calzado", ofrecido: true },
+  // Las demás tiendas no se ofrecen hasta la entrega 4 (cambiar_giro las bloquea).
+  { codigo: "ABARROTES", nombre: "Tienda de abarrotes o supermercado", ofrecido: false },
+  { codigo: "FRUTERIA", nombre: "Frutería y verdulería", ofrecido: false },
+  { codigo: "FERRETERIA", nombre: "Ferretería", ofrecido: false },
+  { codigo: "VINOS", nombre: "Vinos y licores", ofrecido: false },
   // Retirados: se quedan para nombrar a quien ya los tiene.
   { codigo: "CAFE_BAR", nombre: "Cafetería o bar", ofrecido: false },
   { codigo: "ENTERPRISE", nombre: "Cadena", ofrecido: false },
 ];
+
+/** Giros de tienda: espejo de `es_giro_tienda` en la base (0206). */
+export const GIROS_TIENDA: readonly CodigoGiro[] = ["RETAIL", "ABARROTES", "FRUTERIA", "FERRETERIA", "VINOS"];
+
+export const esGiroTienda = (g: string | null | undefined): boolean => GIROS_TIENDA.some((t) => t === g);
 
 export const nombreGiro = (codigo: string | null | undefined): string =>
   GIROS.find((g) => g.codigo === codigo)?.nombre ?? codigo ?? "—";
@@ -41,7 +51,7 @@ export const OPERACION: readonly { codigo: CodigoOperacion; nombre: string; desc
   { codigo: "marcas", nombre: "Marcas virtuales", descripcion: "Varias marcas desde la misma cocina." },
   { codigo: "eventos", nombre: "Eventos", descripcion: "Abrir el turno en una feria o un evento." },
   { codigo: "cuentas_barra", nombre: "Cuentas en barra", descripcion: "Cuentas a nombre de una persona, sin mesa." },
-  { codigo: "existencias", nombre: "Existencias", descripcion: "Tallas y colores, código de barras y cuánto queda de cada prenda por sucursal." },
+  { codigo: "existencias", nombre: "Existencias", descripcion: "Existencias por producto: piezas, kilos, metros o litros." },
 ];
 
 /**

@@ -14471,6 +14471,10 @@ export type Database = {
         Args: { p_destino: string; p_lineas: Json; p_origen: string }
         Returns: string
       }
+      es_giro_tienda: {
+        Args: { p: Database["public"]["Enums"]["vertical_tipo"] }
+        Returns: boolean
+      }
       es_admin_del_tenant: { Args: { p_tenant_id: string }; Returns: boolean }
       es_dueno_del_tenant: { Args: { p_tenant_id: string }; Returns: boolean }
       establecer_propina_ticket: {
@@ -15710,7 +15714,7 @@ export type Database = {
         | "ABANDONADO"
       pago_estado: "PENDIENTE" | "APLICADO" | "CONCILIADO" | "CANCELADO"
       producto_estado: "ACTIVO" | "PAUSADO" | "AGOTADO"
-      producto_tipo_venta: "UNIDAD" | "PESO" | "VOLUMEN"
+      producto_tipo_venta: "UNIDAD" | "PESO" | "VOLUMEN" | "LONGITUD"
       promocion_alcance: "TICKET_COMPLETO" | "PRODUCTO" | "CATEGORIA"
       promocion_estado: "ACTIVA" | "PAUSADA" | "EXPIRADA" | "AGOTADA"
       promocion_tipo:
@@ -15794,6 +15798,10 @@ export type Database = {
         | "CAFETERIA"
         | "TAQUERIA"
         | "RETAIL"
+        | "ABARROTES"
+        | "FRUTERIA"
+        | "FERRETERIA"
+        | "VINOS"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -16178,7 +16186,7 @@ export const Constants = {
       ],
       pago_estado: ["PENDIENTE", "APLICADO", "CONCILIADO", "CANCELADO"],
       producto_estado: ["ACTIVO", "PAUSADO", "AGOTADO"],
-      producto_tipo_venta: ["UNIDAD", "PESO", "VOLUMEN"],
+      producto_tipo_venta: ["UNIDAD", "PESO", "VOLUMEN", "LONGITUD"],
       promocion_alcance: ["TICKET_COMPLETO", "PRODUCTO", "CATEGORIA"],
       promocion_estado: ["ACTIVA", "PAUSADA", "EXPIRADA", "AGOTADA"],
       promocion_tipo: [
@@ -16271,6 +16279,10 @@ export const Constants = {
         "CAFETERIA",
         "TAQUERIA",
         "RETAIL",
+        "ABARROTES",
+        "FRUTERIA",
+        "FERRETERIA",
+        "VINOS",
       ],
     },
   },

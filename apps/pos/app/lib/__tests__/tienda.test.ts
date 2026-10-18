@@ -14,8 +14,9 @@ const suelto = prod("S");
 const ex = (producto_id: string, cantidad: number, minimo: number | null = null): Existencia => ({ producto_id, sucursal_id: "s1", cantidad, minimo });
 
 describe("esTienda", () => {
-  it("solo RETAIL", () => {
-    expect(esTienda({ giro: "RETAIL" } as DatosCaja)).toBe(true);
+  it("los cinco giros de tienda, y un restaurante no", () => {
+    for (const giro of ["RETAIL", "ABARROTES", "FRUTERIA", "FERRETERIA", "VINOS"]) expect(esTienda({ giro } as DatosCaja)).toBe(true);
+    expect(esTienda({ giro: "QUICK_SERVICE" } as DatosCaja)).toBe(false);
     expect(esTienda({ giro: "RESTAURANTE" } as DatosCaja)).toBe(false);
     expect(esTienda({} as DatosCaja)).toBe(false);
     expect(esTienda(null)).toBe(false);

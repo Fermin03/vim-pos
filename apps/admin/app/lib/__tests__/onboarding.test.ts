@@ -37,6 +37,16 @@ describe("leerEstadoOnboarding — giro", () => {
     expect((await paso("equipo")).descripcion).toBe("Crea a tus cajeros con su PIN.");
   });
 
+  it("FERRETERIA: textos de tienda sin hablar de prendas", async () => {
+    doble.vertical = "FERRETERIA";
+    expect(await paso("catalogo")).toMatchObject({
+      titulo: "Tus productos",
+      descripcion: "Importa tus productos o captúralos.",
+      href: "/catalogo/importar-tienda",
+    });
+    expect((await paso("equipo")).descripcion).toBe("Crea a tus cajeros con su PIN.");
+  });
+
   it("QUICK_SERVICE: los textos de hoy", async () => {
     expect(await paso("catalogo")).toMatchObject({ titulo: "Tu menú", href: "/catalogo/importar" });
     expect((await paso("equipo")).descripcion).toBe("Crea cajeros y cocina con su PIN.");

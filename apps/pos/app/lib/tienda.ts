@@ -1,10 +1,11 @@
 "use client";
 import { deviceClient, employeeClient } from "./supabase";
+import { esGiroTienda } from "@vim/db/operacion";
 import type { Producto } from "./catalogo";
 import type { DatosCaja } from "./turno";
 
-/** La caja de tienda es solo para el giro RETAIL; todo lo demás queda como estaba. */
-export const esTienda = (caja: DatosCaja | null): boolean => caja?.giro === "RETAIL";
+/** La caja de tienda es para los giros de tienda; todo lo demás queda como estaba. */
+export const esTienda = (caja: DatosCaja | null): boolean => esGiroTienda(caja?.giro);
 
 /** Destinos de la barra inferior de la caja de tienda (pos-retail.md, «Versión 2»). */
 export type SeccionTienda = "panel" | "inventario" | "transacciones" | "notificaciones" | "configuracion";

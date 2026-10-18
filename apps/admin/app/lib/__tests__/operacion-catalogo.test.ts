@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GIROS, OPERACION, moduloActivo, nombreGiro } from "@vim/db/operacion";
+import { GIROS, GIROS_TIENDA, OPERACION, esGiroTienda, moduloActivo, nombreGiro } from "@vim/db/operacion";
 import { conExistencias } from "../operacion";
 
 describe("moduloActivo", () => {
@@ -30,6 +30,14 @@ describe("catálogo", () => {
     expect(GIROS.filter((g) => g.ofrecido).map((g) => g.codigo)).toEqual(
       ["QUICK_SERVICE", "FULL_SERVICE", "TAQUERIA", "CAFETERIA", "BAR", "DARK_KITCHEN", "FOODTRUCK", "RETAIL"]);
     expect(nombreGiro("RETAIL")).toBe("Tienda de ropa o calzado");
+    expect(nombreGiro("ABARROTES")).toBe("Tienda de abarrotes o supermercado");
+    expect(nombreGiro("FRUTERIA")).toBe("Frutería y verdulería");
+    expect(nombreGiro("FERRETERIA")).toBe("Ferretería");
+    expect(nombreGiro("VINOS")).toBe("Vinos y licores");
+    expect(GIROS_TIENDA).toEqual(["RETAIL", "ABARROTES", "FRUTERIA", "FERRETERIA", "VINOS"]);
+    expect(esGiroTienda("VINOS")).toBe(true);
+    expect(esGiroTienda("BAR")).toBe(false);
+    expect(esGiroTienda(null)).toBe(false);
     expect(nombreGiro("CAFE_BAR")).toBe("Cafetería o bar");
     expect(nombreGiro("TAQUERIA")).toBe("Taquería o cocina económica");
     expect(nombreGiro("NUEVO_RARO")).toBe("NUEVO_RARO");

@@ -1,4 +1,5 @@
 "use client";
+import { esGiroTienda } from "@vim/db/operacion";
 import { supabase } from "./supabase";
 
 // Tier1 — Wizard de onboarding. En vez de un contador de clics, autodetecta qué pasos están
@@ -65,12 +66,14 @@ export async function leerEstadoOnboarding(): Promise<EstadoOnboarding> {
     contarCajasVinculadas(),
   ]);
 
-  const tienda = negocio?.vertical_principal === "RETAIL";
+  const giro = negocio?.vertical_principal as string | undefined;
+  const ropa = giro === "RETAIL";
+  const tienda = esGiroTienda(giro);
 
   const pasos: PasoOnboarding[] = [
     { clave: "negocio", titulo: "Datos del negocio", descripcion: "Nombre, zona horaria y hora de corte.", href: "/configuracion/negocio", completo: tieneNegocio, opcional: false },
     { clave: "catalogo", ...(tienda
-      ? { titulo: "Tus productos", descripcion: "Importa tus prendas con tallas y colores, o captúralas.", href: "/catalogo/importar-tienda" }
+      ? { titulo: "Tus productos", descripcion: ropa ? "Importa tus prendas con tallas y colores, o captúralas." : "Importa tus productos o captúralos.", href: "/catalogo/importar-tienda" }
       : { titulo: "Tu menú", descripcion: "Importa o captura tus productos y categorías.", href: "/catalogo/importar" }), completo: productos > 0, opcional: false },
     { clave: "caja", titulo: "Tu caja", descripcion: "Da de alta tu punto de cobro; tu sucursal se crea con ella.", href: "/configuracion/cajas", completo: cajas > 0, opcional: false },
     // Dar de alta la caja en el admin no es vender: falta conectar la computadora. Antes el
