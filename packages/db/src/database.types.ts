@@ -13677,6 +13677,7 @@ export type Database = {
         Args: { p_ticket: string }
         Returns: boolean
       }
+      _ticket_es_de_cambio: { Args: { p_ticket: string }; Returns: boolean }
       _tienda_abrir_sesion: {
         Args: {
           p_ahora: string

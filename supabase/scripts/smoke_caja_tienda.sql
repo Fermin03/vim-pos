@@ -541,4 +541,170 @@ BEGIN
   RAISE NOTICE '6 entradas de la caja 0197 OK';
 END $$;
 
+-- 7) 0200: el cambio de talla no suma ni resta lealtad, y su venta abierta no lleva promoción ni canje.
+DO $$
+DECLARE
+  v_t     uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_suc   uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_caja  uuid := '99999999-0000-0000-0000-0000000000cc';
+  v_maria uuid := '99999999-0000-0000-0000-000000000001';
+  v_cat   uuid := 'c4c40000-0000-0000-0000-0000000000c1';
+  v_c300  uuid := 'c4c40000-0000-0000-0000-0000000000d6';
+  v_c350  uuid := 'c4c40000-0000-0000-0000-0000000000d7';
+  v_c350b uuid := 'c4c40000-0000-0000-0000-0000000000d8';
+  v_turno uuid; v_cli uuid; v_tk uuid; v_it uuid; v_it2 uuid; v_auth uuid; v_res jsonb; v_nuevo uuid; v_nit uuid;
+  v_saldo integer; v_movs bigint; v_efe numeric; v_promo uuid; v_dev uuid;
+BEGIN
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
+  SELECT id INTO v_turno FROM turnos WHERE caja_id = v_caja AND estado = 'ABIERTO';
+  -- Lealtad como en smoke_lealtad_ganar.sql: add-on, programa (10 %, tope holgado) e interruptor.
+  INSERT INTO tenant_addons (tenant_id, addon_id, fecha_inicio, activo, precio_mensual_mxn)
+  SELECT v_t, id, (now() AT TIME ZONE 'America/Mexico_City')::date, true, 100 FROM addons WHERE codigo = 'LEALTAD';
+  INSERT INTO lealtad_programa (tenant_id, mecanica, porcentaje, tope_compras_dia) VALUES (v_t, 'PUNTOS_DINERO', 10, 50);
+  INSERT INTO configuracion_tenant (tenant_id, modulo_lealtad_activo) VALUES (v_t, true)
+  ON CONFLICT (tenant_id) DO UPDATE SET modulo_lealtad_activo = true;
+  INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_t, 'Cliente cambio 0200', '4770002000') RETURNING id INTO v_cli;
+  INSERT INTO productos (id, tenant_id, nombre, categoria_id, precio_base_mxn, controla_existencias) VALUES
+    (v_c300,  v_t, 'Camisa 300',   v_cat, 300, true),
+    (v_c350,  v_t, 'Camisa 350',   v_cat, 350, true),
+    (v_c350b, v_t, 'Camisa 350 B', v_cat, 350, true);
+  INSERT INTO movimientos_producto (tenant_id, sucursal_id, producto_id, tipo, cantidad)
+  SELECT v_t, v_suc, p, 'ENTRADA', 10 FROM unnest(ARRAY[v_c300, v_c350, v_c350b]) p;
+
+  -- 7a) La venta gana 30. Su cambio (lleva 350, regresa 300, cobra 50) no gana ni le quita los 30;
+  --     cancelar después la venta del cambio tampoco mueve puntos.
+  v_tk := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_cli, NULL, 'smoke-c7a', v_maria);
+  v_it := agregar_item_a_ticket(v_tk, v_c300, 1, NULL, '[]'::jsonb, 'smoke-c7a-1');
+  PERFORM aplicar_pago(v_tk, 'EFECTIVO'::metodo_pago, 300, 300, NULL, NULL, NULL, false, NULL, 'smoke-c7a-pago');
+  IF lealtad_neto_ganado(v_tk) <> 30 THEN RAISE EXCEPTION '7a: la venta debía ganar 30, ganó %', lealtad_neto_ganado(v_tk); END IF;
+  SELECT saldo INTO v_saldo FROM lealtad_saldos WHERE cliente_id = v_cli;
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'devolucion', 'venta.devolucion', 'ticket', v_tk, 'smoke 7a')
+  RETURNING id INTO v_auth;
+  v_res := registrar_cambio_talla(v_tk, jsonb_build_array(jsonb_build_object('ticket_item_id', v_it, 'cantidad', 1)),
+    jsonb_build_array(jsonb_build_object('producto_id', v_c350, 'cantidad', 1)), v_caja, v_turno, v_maria, v_auth, v_maria, 'smoke-c7a-cambio');
+  v_nuevo := (v_res->>'ticket_id')::uuid;
+  IF (v_res->>'diferencia_mxn')::numeric <> 50 THEN RAISE EXCEPTION '7a: diferencia: %', v_res; END IF;
+  PERFORM aplicar_pago(v_nuevo, 'EFECTIVO'::metodo_pago, 50, 50, NULL, NULL, NULL, false, NULL, 'smoke-c7a-saldo');
+  IF (SELECT estado_fiscal::text FROM tickets WHERE id = v_nuevo) <> 'PAGADO' THEN RAISE EXCEPTION '7a: el saldo debía cerrarlo'; END IF;
+  IF EXISTS (SELECT 1 FROM lealtad_movimientos WHERE ticket_id = v_nuevo AND tipo = 'GANADO') THEN
+    RAISE EXCEPTION '7a: la venta del cambio ganó puntos'; END IF;
+  IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_cli) <> v_saldo THEN
+    RAISE EXCEPTION '7a: el saldo debía seguir en %, es %', v_saldo, (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_cli); END IF;
+  IF lealtad_neto_ganado(v_tk) <> 30 THEN RAISE EXCEPTION '7a: la devolución del cambio revirtió la venta'; END IF;
+  SELECT count(*) INTO v_movs FROM lealtad_movimientos WHERE cliente_id = v_cli;
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'cancelar_ticket', 'venta.cancelar_pagada', 'ticket', v_nuevo, 'smoke 7a')
+  RETURNING id INTO v_auth;
+  PERFORM cancelar_ticket_pagado(
+    p_ticket_id := v_nuevo, p_caja_id := v_caja, p_turno_id := v_turno,
+    p_motivo := 'CLIENTE_DESISTIO'::cancelacion_motivo, p_motivo_texto := 'smoke',
+    p_autorizacion_pin_id := v_auth, p_usuario_solicitante_id := v_maria, p_usuario_autorizo_id := v_maria,
+    p_reversar_inventario := true, p_cancelar_cfdi_sat := false, p_devolver_dinero := true,
+    p_client_id_local := 'smoke-c7a-cancela');
+  IF (SELECT estado_fiscal::text FROM tickets WHERE id = v_nuevo) <> 'CANCELADO' THEN RAISE EXCEPTION '7a: debía quedar CANCELADO'; END IF;
+  IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_cli) <> v_saldo
+     OR (SELECT count(*) FROM lealtad_movimientos WHERE cliente_id = v_cli) <> v_movs THEN
+    RAISE EXCEPTION '7a: cancelar la venta del cambio movió puntos'; END IF;
+
+  -- 7b) Venta → cambio (cobra 50 en efectivo) → cambio de ese cambio (mismo precio). Los puntos no se
+  --     mueven; el efectivo esperado sube solo los 50: en cada cambio, como en 4a/4b, sale y entra lo mismo.
+  v_tk := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_cli, NULL, 'smoke-c7b', v_maria);
+  v_it := agregar_item_a_ticket(v_tk, v_c300, 1, NULL, '[]'::jsonb, 'smoke-c7b-1');
+  PERFORM aplicar_pago(v_tk, 'EFECTIVO'::metodo_pago, 300, 300, NULL, NULL, NULL, false, NULL, 'smoke-c7b-pago');
+  SELECT saldo INTO v_saldo FROM lealtad_saldos WHERE cliente_id = v_cli;
+  SELECT count(*) INTO v_movs FROM lealtad_movimientos WHERE cliente_id = v_cli;
+  v_efe := calcular_efectivo_esperado(v_turno);
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'devolucion', 'venta.devolucion', 'ticket', v_tk, 'smoke 7b')
+  RETURNING id INTO v_auth;
+  v_res := registrar_cambio_talla(v_tk, jsonb_build_array(jsonb_build_object('ticket_item_id', v_it, 'cantidad', 1)),
+    jsonb_build_array(jsonb_build_object('producto_id', v_c350, 'cantidad', 1)), v_caja, v_turno, v_maria, v_auth, v_maria, 'smoke-c7b-cambio1');
+  v_nuevo := (v_res->>'ticket_id')::uuid;
+  IF calcular_efectivo_esperado(v_turno) <> v_efe THEN RAISE EXCEPTION '7b: el cambio con saldo debía dejar el efectivo igual'; END IF;
+  PERFORM aplicar_pago(v_nuevo, 'EFECTIVO'::metodo_pago, 50, 50, NULL, NULL, NULL, false, NULL, 'smoke-c7b-saldo');
+  IF calcular_efectivo_esperado(v_turno) <> v_efe + 50 THEN RAISE EXCEPTION '7b: el saldo en efectivo debía sumar 50'; END IF;
+  SELECT id INTO v_nit FROM ticket_items WHERE ticket_id = v_nuevo;
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'devolucion', 'venta.devolucion', 'ticket', v_nuevo, 'smoke 7b2')
+  RETURNING id INTO v_auth;
+  v_res := registrar_cambio_talla(v_nuevo, jsonb_build_array(jsonb_build_object('ticket_item_id', v_nit, 'cantidad', 1)),
+    jsonb_build_array(jsonb_build_object('producto_id', v_c350b, 'cantidad', 1)), v_caja, v_turno, v_maria, v_auth, v_maria, 'smoke-c7b-cambio2');
+  IF (v_res->>'diferencia_mxn')::numeric <> 0
+     OR (SELECT estado_fiscal::text FROM tickets WHERE id = (v_res->>'ticket_id')::uuid) <> 'PAGADO' THEN
+    RAISE EXCEPTION '7b: el cambio del cambio debía quedar PAGADO sin diferencia: %', v_res; END IF;
+  IF calcular_efectivo_esperado(v_turno) <> v_efe + 50 THEN RAISE EXCEPTION '7b: el cambio del cambio debía dejar el efectivo igual'; END IF;
+  IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_cli) <> v_saldo
+     OR (SELECT count(*) FROM lealtad_movimientos WHERE cliente_id = v_cli) <> v_movs THEN
+    RAISE EXCEPTION '7b: la cadena de cambios movió puntos'; END IF;
+
+  -- 7f) Con la venta de un cambio ABIERTA (lleva 350, regresa 300): ni promoción ni canje.
+  v_tk := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_cli, NULL, 'smoke-c7f', v_maria);
+  v_it := agregar_item_a_ticket(v_tk, v_c300, 1, NULL, '[]'::jsonb, 'smoke-c7f-1');
+  PERFORM aplicar_pago(v_tk, 'EFECTIVO'::metodo_pago, 300, 300, NULL, NULL, NULL, false, NULL, 'smoke-c7f-pago');
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'devolucion', 'venta.devolucion', 'ticket', v_tk, 'smoke 7f')
+  RETURNING id INTO v_auth;
+  v_res := registrar_cambio_talla(v_tk, jsonb_build_array(jsonb_build_object('ticket_item_id', v_it, 'cantidad', 1)),
+    jsonb_build_array(jsonb_build_object('producto_id', v_c350, 'cantidad', 1)), v_caja, v_turno, v_maria, v_auth, v_maria, 'smoke-c7f-cambio');
+  v_nuevo := (v_res->>'ticket_id')::uuid;
+  IF (SELECT estado_fiscal::text FROM tickets WHERE id = v_nuevo) <> 'ABIERTO' THEN RAISE EXCEPTION '7f: debía quedar ABIERTO'; END IF;
+  INSERT INTO promociones (tenant_id, nombre, tipo, alcance, valor_monto_mxn)
+  VALUES (v_t, 'SMOKE 0200 — $10 al ticket', 'MONTO_FIJO', 'TICKET_COMPLETO', 10) RETURNING id INTO v_promo;
+  BEGIN
+    PERFORM aplicar_promocion(v_nuevo, v_promo, NULL);
+    RAISE EXCEPTION '7f promoción: debía rechazarse';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'DATOS_INVALIDOS: es la venta de un cambio: cóbrala o cancélala completa' THEN
+      RAISE EXCEPTION '7f promoción: error inesperado: %', SQLERRM; END IF;
+  END;
+  BEGIN
+    PERFORM lealtad_asentar_canje(jsonb_build_object('canje_id', gen_random_uuid(), 'tenant_id', v_t, 'ticket_id', v_nuevo,
+      'cliente_id', v_cli, 'puntos', 10, 'monto_mxn', 10, 'programa_version', (SELECT version FROM lealtad_programa WHERE tenant_id = v_t)));
+    RAISE EXCEPTION '7f canje: debía rechazarse';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'DATOS_INVALIDOS: es la venta de un cambio: cóbrala o cancélala completa' THEN
+      RAISE EXCEPTION '7f canje: error inesperado: %', SQLERRM; END IF;
+  END;
+  -- En una venta abierta cualquiera las dos sí entran: el candado es solo de la venta de un cambio.
+  v_tk := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_cli, NULL, 'smoke-c7f-normal', v_maria);
+  PERFORM agregar_item_a_ticket(v_tk, v_c350, 1, NULL, '[]'::jsonb, 'smoke-c7f-normal-1');
+  PERFORM aplicar_promocion(v_tk, v_promo, NULL);
+  PERFORM lealtad_asentar_canje(jsonb_build_object('canje_id', gen_random_uuid(), 'tenant_id', v_t, 'ticket_id', v_tk,
+    'cliente_id', v_cli, 'puntos', 10, 'monto_mxn', 10, 'programa_version', (SELECT version FROM lealtad_programa WHERE tenant_id = v_t)));
+  IF (SELECT total_mxn FROM tickets WHERE id = v_tk) <> 330 THEN
+    RAISE EXCEPTION '7f: la venta normal debía quedar en 330, quedó %', (SELECT total_mxn FROM tickets WHERE id = v_tk); END IF;
+
+  -- 7r) Regresión: una devolución por otro motivo sigue revirtiendo en proporción. 300 + 350 = 650
+  --     gana 65; devolver la de 300 revierte ceil(65 × 300/650) = 30.
+  v_tk := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_cli, NULL, 'smoke-c7r', v_maria);
+  v_it := agregar_item_a_ticket(v_tk, v_c300, 1, NULL, '[]'::jsonb, 'smoke-c7r-1');
+  v_it2 := agregar_item_a_ticket(v_tk, v_c350, 1, NULL, '[]'::jsonb, 'smoke-c7r-2');
+  PERFORM aplicar_pago(v_tk, 'EFECTIVO'::metodo_pago, 650, 650, NULL, NULL, NULL, false, NULL, 'smoke-c7r-pago');
+  IF lealtad_neto_ganado(v_tk) <> 65 THEN RAISE EXCEPTION '7r: debía ganar 65, ganó %', lealtad_neto_ganado(v_tk); END IF;
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'devolucion', 'venta.devolucion', 'ticket', v_tk, 'smoke 7r')
+  RETURNING id INTO v_auth;
+  v_dev := crear_devolucion(
+    p_ticket_original_id := v_tk, p_caja_id := v_caja, p_turno_id := v_turno,
+    p_alcance := 'PARCIAL'::devolucion_alcance, p_motivo := 'PRODUCTO_DEFECTUOSO'::devolucion_motivo,
+    p_motivo_texto := 'smoke 7r', p_medio_devolucion := 'EFECTIVO'::devolucion_medio,
+    p_autorizacion_pin_id := v_auth, p_usuario_solicitante_id := v_maria, p_usuario_autorizo_id := v_maria,
+    p_items := jsonb_build_array(jsonb_build_object('ticket_item_id', v_it, 'cantidad_devuelta', 1)),
+    p_reversar_inventario := false, p_nota := 'smoke 7r');
+  PERFORM confirmar_devolucion(v_dev, v_maria);
+  IF lealtad_neto_ganado(v_tk) <> 35 THEN RAISE EXCEPTION '7r: debía quedar en 35, quedó %', lealtad_neto_ganado(v_tk); END IF;
+
+  -- 7g) El cajero puede ejecutar la ayudante (la usan funciones SECURITY INVOKER; ver la 0199).
+  IF NOT has_function_privilege('authenticated', '_ticket_es_de_cambio(uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION '7g: authenticated debía poder ejecutar _ticket_es_de_cambio'; END IF;
+  RAISE NOTICE '7 cambio sin lealtad 0200 OK';
+END $$;
+
 ROLLBACK;
