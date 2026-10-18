@@ -11,6 +11,8 @@ import { useHueco } from "../lib/usar-hueco";
 import { Paginador } from "./paginador";
 import { TarjetaProductoFoto } from "./tarjeta-producto-foto";
 import { SelectorVariantes } from "./selector-variantes";
+import { ModalCantidad } from "./modal-cantidad";
+import { aGranel, precioConUnidad } from "../lib/unidades";
 
 /** La franja bajo la barra de escaneo. Su capa de Escape la declara `home-pos`. */
 export type AvisoEscaneo = { tipo: "no-encontrado"; codigo: string } | { tipo: "no-se-vende" } | { tipo: "cobro" };
@@ -18,6 +20,12 @@ export type AvisoEscaneo = { tipo: "no-encontrado"; codigo: string } | { tipo: "
 export const sonarError = () => {
   try { void new Audio("/sonidos/escaneo-error.wav").play().catch(() => {}); } catch { /* sin audio, la franja basta */ }
 };
+
+/** Tocar, escanear o elegir en el selector: lo que va por kilo, metro o litro pide antes su cantidad. */
+export function venderOPedirCantidad(p: Producto, onAgregar: (p: Producto) => void, pedirCantidad: (p: Producto) => void): void {
+  if (aGranel(p.tipoVenta)) pedirCantidad(p);
+  else onAgregar(p);
+}
 
 /**
  * Panel izquierdo de la venta de tienda (pos-retail.md, «La pantalla de venta» y «Escáner»):
@@ -41,6 +49,8 @@ export function PanelVentaRetail({
   onSelector,
   aviso,
   onAviso,
+  cantidad,
+  onCantidad,
   onAgregar,
 }: {
   productos: Producto[] | null;
@@ -64,8 +74,11 @@ export function PanelVentaRetail({
   onSelector: (p: PadreTienda | null) => void;
   aviso: AvisoEscaneo | null;
   onAviso: (a: AvisoEscaneo | null) => void;
-  /** Nunca recibe un padre. */
-  onAgregar: (p: Producto) => void;
+  /** El producto a granel que espera su cantidad. Su capa de Escape la declara `home-pos`. */
+  cantidad: Producto | null;
+  onCantidad: (p: Producto | null) => void;
+  /** Nunca recibe un padre. Sin cantidad, una pieza. */
+  onAgregar: (p: Producto, cantidad?: number) => void;
 }) {
   // Lo que esta sucursal no vende no se pinta ni se escanea (ADR 0027), igual que en el catálogo.
   const { categorias, productos } = useMemo(
@@ -96,9 +109,10 @@ export function PanelVentaRetail({
     return [...vitrina].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   }, [vitrina, padres, texto, catSel]);
 
+  const vender = (p: Producto) => venderOPedirCantidad(p, onAgregar, (x) => { onSelector(null); onCantidad(x); });
   const tocar = (p: Producto) => {
     if (padres.has(p.id)) abrirSelector(p.id);
-    else onAgregar(p);
+    else vender(p);
   };
 
   // ── Escáner: funciona sin foco. Encontrado agrega (sin sonido: el lector ya pita). ─────────
@@ -115,7 +129,7 @@ export function PanelVentaRetail({
       else { onAviso({ tipo: "no-encontrado", codigo }); sonarError(); }
       return;
     }
-    onAgregar(d.producto);
+    vender(d.producto);
   };
   useEscaner(alCodigo, !oculto);
 
@@ -130,7 +144,7 @@ export function PanelVentaRetail({
   /** Enter a mano: un código exacto agrega (o abre su selector); si no, un solo resultado. */
   const alEnter = () => {
     const d = decidirEscaneo(productos ?? [], texto, { cobroAbierto: false, ignorar: bloqueado });
-    if (d.tipo === "agregar") onAgregar(d.producto);
+    if (d.tipo === "agregar") vender(d.producto);
     else if (d.tipo === "selector" && padres.get(d.padre.id)?.hijas.length) abrirSelector(d.padre.id);
     else if (visibles.length === 1 && !bloqueado) tocar(visibles[0]!);
     else return;
@@ -268,7 +282,7 @@ export function PanelVentaRetail({
                     key={p.id}
                     nombre={p.nombre}
                     // Se cobra la hija, no el padre: con un solo precio, es el de sus hijas.
-                    precioTexto={r.precioDesde !== null ? `desde ${fmtMxn(r.precioDesde)}` : fmtMxn(padres.get(p.id)?.hijas[0]?.precio_base_mxn ?? p.precio_base_mxn)}
+                    precioTexto={r.precioDesde !== null ? `desde ${fmtMxn(r.precioDesde)}` : precioConUnidad(fmtMxn(padres.get(p.id)?.hijas[0]?.precio_base_mxn ?? p.precio_base_mxn), p.tipoVenta)}
                     imagenUrl={p.imagen_url ?? null}
                     colorCategoria={cat ? colorCategoria(cat, idx).ink : "rgb(var(--ink-2))"}
                     etiqueta={etiqueta}
@@ -290,9 +304,12 @@ export function PanelVentaRetail({
           sucursalId={sucursalId}
           sucursales={sucursales}
           actualizadoA={actualizadoA}
-          onElegir={onAgregar}
+          onElegir={vender}
           onCerrar={() => onSelector(null)}
         />
+      )}
+      {cantidad && (
+        <ModalCantidad producto={cantidad} onConfirmar={(n) => { onCantidad(null); onAgregar(cantidad, n); }} onCerrar={() => onCantidad(null)} />
       )}
     </div>
   );

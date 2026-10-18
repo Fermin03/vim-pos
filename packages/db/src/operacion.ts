@@ -63,3 +63,15 @@ export function moduloActivo(modulos: Record<string, boolean> | null | undefined
   const v = modulos?.[codigo];
   return typeof v === "boolean" ? v : codigo !== "eventos" && codigo !== "cuentas_barra" && codigo !== "existencias";
 }
+
+/** Unidad de venta de un producto (`productos.tipo_venta`, 0206). La clave SAT la deriva la base. */
+export const TIPOS_VENTA = ["UNIDAD", "PESO", "LONGITUD", "VOLUMEN"] as const;
+export type TipoVenta = (typeof TIPOS_VENTA)[number];
+
+/** La tabla de unidades del admin y de la caja: decimales que admite y título de la ventana de cantidad. */
+export const UNIDADES_VENTA: Record<TipoVenta, { sat: string; nombre: string; abrev: string; decimales: number; titulo: string }> = {
+  UNIDAD: { sat: "H87", nombre: "Pieza", abrev: "pz", decimales: 0, titulo: "Piezas" },
+  PESO: { sat: "KGM", nombre: "Kilogramo", abrev: "kg", decimales: 3, titulo: "Peso" },
+  LONGITUD: { sat: "MTR", nombre: "Metro", abrev: "m", decimales: 2, titulo: "Metros" },
+  VOLUMEN: { sat: "LTR", nombre: "Litro", abrev: "l", decimales: 2, titulo: "Litros" },
+};

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { SidebarTicket } from "../../components/sidebar-ticket";
+import { SidebarTicket, quitaUna } from "../../components/sidebar-ticket";
 import { estadoInicial } from "../carrito";
 
 // Los .tsx se transforman con JSX clásico en las pruebas: piden `React` global.
@@ -66,4 +66,11 @@ describe("SidebarTicket: Cobrar de una cuenta con pagos", () => {
   it("sin pendiente (restaurante) cobra el total", () => {
     expect(pintar(comun)).toMatch(/Cobrar[^<]*<span[^>]*>\$116\.00/);
   });
+});
+
+describe("Quitar en la tienda", () => {
+  const linea = (cantidad: number, tipoVenta?: "PESO") => ({ clientId: "l1", producto: { id: "p1", nombre: "Jitomate", precio_base_mxn: 28, tipoVenta }, cantidad, modificadores: [], notaCocina: null }) as unknown as Parameters<typeof quitaUna>[0];
+  it("dos piezas: Quitar saca una", () => expect(quitaUna(linea(2), true)).toBe(true));
+  it("a granel quita el renglón completo", () => expect(quitaUna(linea(2.5, "PESO"), true)).toBe(false));
+  it("el restaurante quita el renglón", () => expect(quitaUna(linea(2), false)).toBe(false));
 });

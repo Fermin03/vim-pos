@@ -1,5 +1,6 @@
 "use client";
 import { employeeClient } from "./supabase";
+import type { TipoVenta } from "./unidades";
 import { aplicarSucursal, type FilaProductoSucursal } from "./catalogo-sucursal";
 
 export type Categoria = {
@@ -31,6 +32,8 @@ export type Producto = {
   codigo_barras?: string | null;
   codigo_interno?: string | null;
   imagen_url?: string | null;
+  /** Pieza, kilo, metro o litro (0206). Sin él, pieza. */
+  tipoVenta?: TipoVenta;
 };
 
 /** Lista de categorías activas del tenant, ordenadas. RLS por tenant. */
@@ -60,7 +63,7 @@ export async function listarProductosPos(token: string, sucursalId: string): Pro
   const [{ data, error }, { data: filas, error: errorFilas }] = await Promise.all([
     sb
       .from("productos")
-      .select("id, nombre, descripcion, precio_base_mxn, categoria_id, estado, visible_en_pos, es_combo, producto_padre_id, variante_ejes, variante_valores, controla_existencias, codigo_barras, codigo_interno, imagen_url")
+      .select("id, nombre, descripcion, precio_base_mxn, categoria_id, estado, visible_en_pos, es_combo, producto_padre_id, variante_ejes, variante_valores, controla_existencias, codigo_barras, codigo_interno, imagen_url, tipo_venta")
       .is("deleted_at", null)
       .eq("visible_en_pos", true)
       .in("estado", ["ACTIVO", "AGOTADO"])
@@ -93,6 +96,7 @@ export async function listarProductosPos(token: string, sucursalId: string): Pro
       codigo_barras: (p.codigo_barras as string) ?? null,
       codigo_interno: (p.codigo_interno as string) ?? null,
       imagen_url: (p.imagen_url as string) ?? null,
+      tipoVenta: (p.tipo_venta as TipoVenta) ?? "UNIDAD",
     };
   });
   return aplicarSucursal(base, (filas ?? []) as FilaProductoSucursal[]);

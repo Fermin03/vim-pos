@@ -110,6 +110,7 @@ import { capaVisible, type CapaEscape } from "../lib/escape";
 import { leerTicketImpreso, listarCuentasAbiertas } from "../lib/cuentas-abiertas";
 import { abrirCuentaBarra, moverCuentaABarra, moverCuentaAMesa } from "../lib/cuenta-barra";
 import { useEscape } from "../lib/use-escape";
+import { aGranel } from "../lib/unidades";
 import { ModalAsignarRepartidor } from "./modal-asignar-repartidor";
 import type { LineaCancelada } from "./modal-cancelar-items";
 import { cerrarRepartoAlCobrar } from "../lib/delivery";
@@ -633,6 +634,7 @@ export function HomePos({
     && !enConsultaCuentas && !enDevoluciones && !enPedidosApps && !enDelivery && !enPickup && !enMesas && !enBarra;
   /** Selector de talla y color abierto y franja del escáner: estado de aquí para que su Escape viva en la pila. */
   const [selectorRetail, setSelectorRetail] = useState<PadreTienda | null>(null);
+  const [cantidadRetail, setCantidadRetail] = useState<Producto | null>(null);
   const [avisoRetail, setAvisoRetail] = useState<AvisoEscaneo | null>(null);
   /** Pantalla «Cambio de talla» (pos-retail.md): se entra desde la cabecera o el ticket vacío. */
   const [enCambioTalla, setEnCambioTalla] = useState(false);
@@ -685,7 +687,7 @@ export function HomePos({
     return () => { vivo = false; clearInterval(id); };
   }, [capturaTienda, token, cuentasVersion]);
   useEffect(() => {
-    if (!capturaTienda) { setSelectorRetail(null); setAvisoRetail(null); setUltimoTienda(null); }
+    if (!capturaTienda) { setSelectorRetail(null); setCantidadRetail(null); setAvisoRetail(null); setUltimoTienda(null); }
   }, [capturaTienda]);
 
   // El escritorio avisa cuando termina de bajar un menú nuevo (sondeo del minuto o botón
@@ -928,13 +930,13 @@ export function HomePos({
 
   /** Agrega el producto suelto, sin ofrecer combo: mesa (llama al servidor) o venta rápida (reducer). */
   const agregarSuelto = useCallback(
-    async (p: Producto, mods: ModificadorSel[], nota: string | null) => {
+    async (p: Producto, mods: ModificadorSel[], nota: string | null, cantidad = 1) => {
       if (ticketBd) {
-        await agregarItemAlTicket(token, { ticketId: ticketBd.ticketId, productoId: p.id, cantidad: 1, modificadores: mods, nota });
+        await agregarItemAlTicket(token, { ticketId: ticketBd.ticketId, productoId: p.id, cantidad, modificadores: mods, nota });
         await recargarCuenta();
         return;
       }
-      dispatch({ tipo: "agregar", linea: { clientId: nuevoClientId(), producto: p, cantidad: 1, modificadores: mods, notaCocina: nota } });
+      dispatch({ tipo: "agregar", linea: { clientId: nuevoClientId(), producto: p, cantidad, modificadores: mods, notaCocina: nota } });
     },
     [ticketBd, token, recargarCuenta],
   );
@@ -976,7 +978,8 @@ export function HomePos({
   /**
    * Agregar en la venta de tienda: la ruta de `agregarSuelto`, sin combo ni hoja «¿Lo hacemos
    * combo?». Con grupos de modificadores sigue el camino de siempre. Un padre nunca entra al ticket
-   * (la base lo rechaza con PRODUCTO_CON_VARIANTES). La misma pieza otra vez suma a su renglón.
+   * (la base lo rechaza con PRODUCTO_CON_VARIANTES). La misma pieza otra vez suma a su renglón; a
+   * granel llega con su cantidad y cada pesada es su propio renglón.
    *
    * Los agregados van en FILA (`colaTienda`): dos escaneos rápidos con una cuenta guardada harían
    * dos `agregar_item_a_ticket` y dos relecturas cruzadas, y la que llega última podía pintar 1.
@@ -984,7 +987,7 @@ export function HomePos({
    */
   const colaTienda = useRef<Promise<void>>(Promise.resolve());
   const agregarTienda = useCallback(
-    (p: Producto) => {
+    (p: Producto, cantidad = 1) => {
       if (p.variante_ejes?.length) return;
       setSelectorRetail(null);
       // Agotado a mano en la sucursal: no entra, como en el restaurante (R7). El agotado por
@@ -1000,8 +1003,8 @@ export function HomePos({
             const grupos = await obtenerGruposDeProducto(token, p.id);
             if (!vigente()) return;
             if (grupos.length > 0) { setModGrupos({ producto: p, grupos }); return; }
-            if (ticketBd) await agregarSuelto(p, [], null);
-            else dispatch({ tipo: "agregar", sumarSiIgual: true, linea: { clientId: nuevoClientId(), producto: p, cantidad: 1, modificadores: [], notaCocina: null } });
+            if (ticketBd) await agregarSuelto(p, [], null, cantidad);
+            else dispatch({ tipo: "agregar", sumarSiIgual: !aGranel(p.tipoVenta), linea: { clientId: nuevoClientId(), producto: p, cantidad, modificadores: [], notaCocina: null } });
             if (vigente()) setUltimoTienda(p.id);
           });
           if (!aTiempo) setError(`No se pudo agregar ${p.nombre}: la conexión tardó demasiado. Vuelve a escanearla.`);
@@ -2076,7 +2079,9 @@ export function HomePos({
       // Reabrir y Cambiar pago (Transacciones): los cierra su propio `Modal`, también su PIN.
       [reabriendoTx != null || cambiandoPagoTx != null, null],
       [llevarListaAbierta, null],
-      // Venta de tienda: el selector lo cierra también su `Modal`; la franja del escáner, aquí.
+      // Venta de tienda: la ventana de cantidad la cierra su propio `useEscape`; el selector, también
+      // su `Modal`; la franja del escáner, aquí. La cantidad cuenta en `escaneoIgnorado`: no se escanea encima.
+      [cantidadRetail != null, null],
       capaSelector,
       capaAvisoRetail,
       // Inventario: la consulta de una prenda la cierra también su `Modal`.
@@ -2129,7 +2134,7 @@ export function HomePos({
       escaneoIgnorado: avisoTiendaVisible || capas.some((c) => c[0] && ![capaCobro, capaSelector, capaAvisoRetail, capaConsultaInv, capaRecibo, capaConfirmacion].includes(c)),
       cerrarAlEscanear: confirmacion != null ? nuevoTicket : mostrarRecibo ? cerrarVistaRecibo : null,
     };
-  }, [selectorRetail, avisoRetail, descuentoAbierto, llevarListaAbierta, avisoTiendaVisible, modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
+  }, [selectorRetail, cantidadRetail, avisoRetail, descuentoAbierto, llevarListaAbierta, avisoTiendaVisible, modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
       agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto, nombreBarra, pasandoAMesa,
       clienteDomAbierto, clienteCuentaAbierto, zonaPedidoAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
@@ -3122,6 +3127,8 @@ export function HomePos({
               bloqueado={menuBloqueado}
               selector={selectorRetail}
               onSelector={setSelectorRetail}
+              cantidad={cantidadRetail}
+              onCantidad={setCantidadRetail}
               aviso={avisoRetail}
               onAviso={setAvisoRetail}
               onAgregar={agregarTienda}

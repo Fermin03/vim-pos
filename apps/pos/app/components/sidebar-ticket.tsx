@@ -9,6 +9,7 @@ import { fmtMxn } from "../lib/turno";
 import type { FranjaLealtad } from "../lib/lealtad-reglas";
 import { RenglonItem } from "./renglon-item";
 import { useEscape } from "../lib/use-escape";
+import { aGranel } from "../lib/unidades";
 
 /* ── helpers ─────────────────────────────────────────────────── */
 /* ── Íconos SVG inline (del mockup P-066) ────────────────────── */
@@ -39,6 +40,9 @@ const BOTON_PIE =
   "flex h-11 w-full items-center justify-center gap-2 rounded-md border px-4 text-14 font-semibold transition-[transform,background-color,border-color,color] duration-150 ease-vim active:scale-[.98] disabled:cursor-default disabled:active:scale-100";
 
 /* ── Componente principal ─────────────────────────────────────── */
+/** Panel de la tienda: «Quitar» saca UNA pieza de un renglón con varias. Una pesada se quita completa. */
+export const quitaUna = (l: LineaCarrito, simple: boolean): boolean => simple && l.cantidad > 1 && !aGranel(l.producto.tipoVenta);
+
 export function SidebarTicket({
   estado,
   onCantidad,
@@ -493,9 +497,9 @@ export function SidebarTicket({
                   <button
                     type="button"
                     disabled={bloqueado && !onCancelarItemPersistido}
-                    // Sin «−» en la tienda, dos escaneos de la misma prenda quedan en «2×»: Quitar saca una.
+                    // Sin «−» en la tienda, dos escaneos de la misma prenda quedan en «2×»: Quitar saca una (una pesada, completa).
                     onClick={() => (bloqueado && onCancelarItemPersistido ? onCancelarItemPersistido(l.clientId)
-                      : simple && l.cantidad > 1 ? onCantidad(l.clientId, l.cantidad - 1) : onQuitar(l.clientId))}
+                      : quitaUna(l, simple) ? onCantidad(l.clientId, l.cantidad - 1) : onQuitar(l.clientId))}
                     className={`${BOTON_RENGLON} -mr-2.5 ml-auto text-danger hover:bg-danger-soft disabled:cursor-default disabled:text-ink-3 disabled:opacity-60 disabled:hover:bg-transparent`}
                   >
                     Quitar

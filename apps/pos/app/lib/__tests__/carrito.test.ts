@@ -215,6 +215,14 @@ describe("agregar con sumarSiIgual (tienda)", () => {
     e = reducerCarrito(e, { tipo: "agregar", linea: linea("b") });
     expect(e.lineas.map((l) => [l.clientId, l.cantidad])).toEqual([["a", 1], ["b", 1]]);
   });
+  it("dos pesadas del mismo producto a granel no se juntan, y 1.25 kg × $28 = $35.00", () => {
+    const jitomate = { ...prod("j", "Jitomate", 28), tipoVenta: "PESO" as const };
+    const pesada = (clientId: string): LineaCarrito => ({ clientId, producto: jitomate, cantidad: 1.25, modificadores: [], notaCocina: null });
+    let e = reducerCarrito(estadoInicial, { tipo: "agregar", linea: pesada("a"), sumarSiIgual: true });
+    e = reducerCarrito(e, { tipo: "agregar", linea: pesada("b"), sumarSiIgual: true });
+    expect(e.lineas.map((l) => [l.clientId, l.cantidad])).toEqual([["a", 1.25], ["b", 1.25]]);
+    expect(totalLinea(e.lineas[0]!)).toBe(35);
+  });
   it("no suma a un renglón con nota o modificadores", () => {
     const e0 = { ...estadoInicial, lineas: [{ ...linea("a"), notaCocina: "regalo" }] };
     const e = reducerCarrito(e0, { tipo: "agregar", linea: linea("b"), sumarSiIgual: true });

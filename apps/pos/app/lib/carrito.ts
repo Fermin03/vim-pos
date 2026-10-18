@@ -5,6 +5,7 @@ import type { ClienteDomicilio } from "./clientes-domicilio";
 import type { ClienteCuenta } from "./clientes-cuenta";
 import type { ComboDef, ComponenteSel } from "./combos";
 import { redondearCentavos } from "./dinero";
+import { aGranel } from "./unidades";
 
 export type ModoServicio = "COMER_AQUI" | "PARA_LLEVAR" | "DRIVE_THRU" | "DELIVERY_PROPIO";
 
@@ -82,7 +83,8 @@ export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): Es
   switch (accion.tipo) {
     case "agregar": {
       const l = accion.linea;
-      const simple = (x: LineaCarrito) => !x.combo && x.modificadores.length === 0 && !x.notaCocina;
+      // A granel cada pesada es su propio renglón: nunca se suma.
+      const simple = (x: LineaCarrito) => !x.combo && x.modificadores.length === 0 && !x.notaCocina && !aGranel(x.producto.tipoVenta);
       // Se decide aquí, sobre el estado vigente: dos escaneos seguidos suman 2 aunque lleguen juntos.
       const igual = accion.sumarSiIgual && simple(l) ? estado.lineas.find((x) => x.producto.id === l.producto.id && simple(x)) : undefined;
       if (igual) return { ...estado, lineas: estado.lineas.map((x) => (x === igual ? { ...x, cantidad: x.cantidad + l.cantidad } : x)) };
