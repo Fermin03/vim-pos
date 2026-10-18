@@ -396,4 +396,10 @@ Queda:
 - **La política de imágenes (CSP `img-src`) ahora incluye el origen de Supabase**, en la web y en el escritorio. Sin eso, las tarjetas con foto caen siempre a la inicial.
 - Las fotos necesitan internet; una caja sin conexión pinta la inicial sobre el color de la categoría.
 
+**Decisiones de Fermín, 18 oct (cierran R5 y R13 de la entrega 4):**
+- **R5: se queda así.** La caja no pide PIN en un cambio sin dinero que regresar solo si el cajero
+  tiene el permiso de devolución; si no lo tiene, pide PIN aunque no salga dinero.
+- **R13: un cambio de talla no suma lealtad.** La venta de un cambio **sí** se puede reabrir y cambiarle
+  el método de pago, cuadrando el pago interno del cambio. Se hace en la entrega 5.
+
 **Hallazgo del restaurante, para Fermín (R5, fuera del giro).** «Cuentas abiertas · Para llevar» del restaurante lista las cuentas de **toda la sucursal**. Si se cobra una cuenta abierta desde otra caja, el pago se asienta en el turno de **esa otra caja** (el de la caja que abrió la cuenta), mientras el efectivo cae en el cajón de la caja que cobró. Los dos cortes quedan descuadrados. La tienda ya filtra por caja; el restaurante se dejó como estaba. Pega en un POS web con varias cajas.
