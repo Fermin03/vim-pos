@@ -53,6 +53,9 @@ export const PULL_ORDER = [
   { t: "clientes_credito" },
   { t: "abonos_credito" },
   { t: "saldo_favor_movimientos" },
+  // La deuda de otras cajas (0210 §0): el saldo de cada venta a crédito según la nube. Se REEMPLAZA
+  // entera (ver pullSnapshot): una venta que se liquidó ya no viene y no debe quedar aquí.
+  { t: "creditos_resumen_nube" },
   // Inventario (ADR 0013): unidades antes que insumos; existencias, recetas y componentes después.
   // La caja lo necesita para descontar al vender; los movimientos que genera suben por el push.
   { t: "unidades_medida" },
@@ -805,6 +808,8 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
   try {
     await client.query("BEGIN");
     await client.query("SET LOCAL session_replication_role = replica"); // no disparar triggers/audit
+    // 0210: foto completa, no upsert. Solo si la nube la mandó (una sin la 0210 no la trae).
+    if (Array.isArray(snapshot.creditos_resumen_nube)) await client.query("DELETE FROM creditos_resumen_nube");
     for (const { t, schema = "public" } of PULL_ORDER) {
       let filas = snapshot[t] ?? snapshot[`${schema}.${t}`];
       if (!filas?.length) continue;

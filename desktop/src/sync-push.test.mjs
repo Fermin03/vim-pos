@@ -996,6 +996,25 @@ describe("ventas que cambian después de subir, y el piso de las mesas (Postgres
     // Un segundo pull con lo mismo no truena (idempotente).
     await pullSnapshot(db, { clientes_credito: [credito], abonos_credito: [abNube], saldo_favor_movimientos: [sfNube] });
   });
+
+  test("crédito: la deuda de otras cajas se reemplaza entera en cada pull y cuenta en la vista", async () => {
+    const { rows: [{ id: cliente }] } = await db.query(
+      "INSERT INTO clientes (tenant_id, nombre, telefono) VALUES ($1, 'Otra Caja', '4770009902') RETURNING id", [TENANT]);
+    await db.query("INSERT INTO clientes_credito (tenant_id, cliente_id, limite_mxn, plazo_dias) VALUES ($1, $2, 500, 30)", [TENANT, cliente]);
+    const fila = (n, saldo) => ({ ticket_id: `99999999-0000-0000-0000-00000000d0${n}0`, tenant_id: TENANT, cliente_id: cliente,
+      saldo_mxn: saldo, fecha_venta: new Date().toISOString(), sincronizado_at: new Date().toISOString() });
+    const deuda = async () => (await db.query(
+      "SELECT deuda_mxn::text AS d, deuda_otras_cajas_mxn::text AS o FROM vw_creditos_cliente WHERE cliente_id = $1", [cliente])).rows[0];
+
+    await pullSnapshot(db, { creditos_resumen_nube: [fila(1, "300.00"), fila(2, "100.00")] });
+    assert.deepEqual(await deuda(), { d: "400.00", o: "400.00" }, "la vista suma lo de otras cajas");
+    await pullSnapshot(db, { creditos_resumen_nube: [fila(1, "250.00")] });
+    assert.deepEqual(await deuda(), { d: "250.00", o: "250.00" }, "lo liquidado allá ya no viene y se borra aquí");
+    await pullSnapshot(db, { tenants: [] });
+    assert.deepEqual(await deuda(), { d: "250.00", o: "250.00" }, "un snapshot sin la clave (nube sin la 0210) no la toca");
+    await pullSnapshot(db, { creditos_resumen_nube: [] });
+    assert.deepEqual(await deuda(), { d: "0.00", o: "0.00" }, "una lista vacía la deja vacía");
+  });
 });
 
 // ── El arranque sobrevive a un PostgREST que muere al nacer (Postgres real) ───────────────────

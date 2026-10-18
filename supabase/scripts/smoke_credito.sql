@@ -778,6 +778,79 @@ BEGIN
   IF (SELECT limite_mxn FROM clientes_credito WHERE cliente_id = v_dora) <> v_lim
      OR EXISTS (SELECT 1 FROM clientes_credito WHERE cliente_id = v_eva) THEN
     RAISE EXCEPTION '29: la caja cambió el crédito'; END IF;
+  -- 30) Un id que ya es de otro negocio es error, no se salta en silencio.
+  INSERT INTO saldo_favor_movimientos (id, tenant_id, cliente_id, tipo, monto_mxn, ticket_id, client_id_local)
+  VALUES (v_sf2, 'c2080000-0000-0000-0000-0000000000ee', v_ajeno, 'ENTRADA_CANCELACION', 5, v_tk, 'smoke-cr10-ajeno');
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('saldo_favor_movimientos', jsonb_build_array(
+    jsonb_build_object('id', v_sf2, 'tenant_id', v_t, 'cliente_id', v_eva, 'tipo', 'ENTRADA_CANCELACION', 'monto_mxn', 40,
+                       'ticket_id', v_tk, 'client_id_local', 'smoke-cr10-sf3', 'created_at', now()))));
+  IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(v_res->'_errores', '[]')) e
+                  WHERE e->>'id' = v_sf2::text AND e->>'error' = 'el id ya existe en otro negocio') THEN
+    RAISE EXCEPTION '30: el id de otro negocio debía ser error: %', v_res; END IF;
+
+  -- 31) Deuda de otras cajas: el pull baja el saldo de cada venta a crédito con saldo.
+  v_pull := sync_pull_snapshot(v_t);
+  IF (SELECT (e->>'saldo_mxn')::numeric FROM jsonb_array_elements(COALESCE(v_pull->'creditos_resumen_nube', '[]')) e
+       WHERE e->>'ticket_id' = v_tk::text) IS DISTINCT FROM 300 THEN
+    RAISE EXCEPTION '31: el resumen debía traer la venta de Dora con 300: %', v_pull->'creditos_resumen_nube'; END IF;
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(v_pull->'creditos_resumen_nube') e WHERE e->>'ticket_id' = v_tl::text) THEN
+    RAISE EXCEPTION '31: una venta liquidada no debía ir en el resumen'; END IF;
   RAISE NOTICE 'SMOKE CREDITO 0210 OK';
+END $$;
+
+-- 0210: en la caja, la deuda de otras cajas cuenta para el límite y para lo vencido.
+DO $$
+DECLARE
+  v_t     uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_suc   uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_caja  uuid := '99999999-0000-0000-0000-0000000000cc';
+  v_maria uuid := '99999999-0000-0000-0000-000000000001';
+  v_cat   uuid := 'c2080000-0000-0000-0000-0000000000c1';
+  v_fina  uuid := 'c2100000-0000-0000-0000-000000000003';
+  v_gorra uuid := 'c2100000-0000-0000-0000-0000000000b1';
+  v_fuera uuid := 'c2100000-0000-0000-0000-0000000000d1';   -- venta de otra caja: no está aquí
+  v_turno uuid; v_tk uuid; v_otra uuid; v_c record; v_ok boolean;
+BEGIN
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
+  INSERT INTO productos (id, tenant_id, nombre, categoria_id, precio_base_mxn) VALUES (v_gorra, v_t, 'Gorra crédito', v_cat, 200);
+  INSERT INTO clientes (id, tenant_id, nombre, telefono) VALUES (v_fina, v_t, 'Fina Otra Caja', '4770002103');
+  INSERT INTO clientes_credito (tenant_id, cliente_id, limite_mxn, plazo_dias) VALUES (v_t, v_fina, 500, 30);
+  SELECT id INTO v_turno FROM turnos WHERE caja_id = v_caja AND estado = 'ABIERTO';
+  -- Lo que bajó de la nube: Fina debe $400 de una venta de ayer en otra caja.
+  INSERT INTO creditos_resumen_nube (ticket_id, tenant_id, cliente_id, saldo_mxn, fecha_venta)
+  VALUES (v_fuera, v_t, v_fina, 400, now() - interval '1 day');
+
+  -- 32) La vista la suma.
+  SELECT * INTO v_c FROM vw_creditos_cliente WHERE cliente_id = v_fina;
+  IF v_c.deuda_mxn <> 400 OR v_c.deuda_otras_cajas_mxn <> 400 OR v_c.disponible_mxn <> 100 OR v_c.tiene_vencido THEN
+    RAISE EXCEPTION '32: la vista debía sumar los 400 de otra caja: %', row_to_json(v_c); END IF;
+
+  -- 33) Una venta de $200 aquí pasa el límite (400 + 200 > 500): pide PIN.
+  v_tk := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_fina, NULL, 'smoke-cr11-1', v_maria);
+  PERFORM agregar_item_a_ticket(v_tk, v_gorra, 1, NULL, '[]'::jsonb, 'smoke-cr11-1a');
+  v_ok := false;
+  BEGIN
+    PERFORM pagar_a_credito(v_tk, NULL, 'smoke-cr11-p1');
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE '%pasa el límite de crédito: pide autorización%' THEN RAISE; END IF;
+    v_ok := true;
+  END;
+  IF NOT v_ok THEN RAISE EXCEPTION '33: la deuda de otra caja no contó para el límite'; END IF;
+
+  -- 34) Vencida en otra caja (hace 40 días, plazo 30): también cuenta.
+  UPDATE creditos_resumen_nube SET saldo_mxn = 10, fecha_venta = now() - interval '40 days' WHERE ticket_id = v_fuera;
+  IF NOT (SELECT tiene_vencido FROM vw_creditos_cliente WHERE cliente_id = v_fina) THEN
+    RAISE EXCEPTION '34: lo vencido en otra caja no contó'; END IF;
+
+  -- 35) En la nube todas las ventas están: una fila de una venta que existe aquí no suma nada (ya se
+  --     cuenta por sus pagos). Con eso, la misma venta de $200 entra sin PIN.
+  v_otra := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smoke-cr11-2', v_maria);
+  UPDATE creditos_resumen_nube SET ticket_id = v_otra, saldo_mxn = 400, fecha_venta = now() - interval '40 days' WHERE ticket_id = v_fuera;
+  SELECT * INTO v_c FROM vw_creditos_cliente WHERE cliente_id = v_fina;
+  IF v_c.deuda_mxn <> 0 OR v_c.deuda_otras_cajas_mxn <> 0 OR v_c.tiene_vencido THEN
+    RAISE EXCEPTION '35: una venta que está aquí no debía sumarse dos veces: %', row_to_json(v_c); END IF;
+  PERFORM pagar_a_credito(v_tk, NULL, 'smoke-cr11-p1');
+  IF (SELECT estado_fiscal FROM tickets WHERE id = v_tk) <> 'PAGADO' THEN RAISE EXCEPTION '35: la venta no quedó PAGADO'; END IF;
+  RAISE NOTICE 'SMOKE CREDITO 0210 OTRAS CAJAS OK';
 END $$;
 ROLLBACK;

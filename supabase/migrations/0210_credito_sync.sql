@@ -8,13 +8,84 @@
 -- pagar_con_saldo_favor y el disparador de devoluciones), idempotente por id y validando que todo
 -- lo que referencian sea del negocio. `clientes_credito` NO se acepta desde la caja: lo maneja el
 -- admin, y queda en `_ignoradas`.
+-- Deuda de otras cajas: el pull baja también `creditos_resumen_nube` (el saldo de cada venta a
+-- crédito del negocio) y `vw_creditos_cliente` le suma a la caja lo de las ventas que no tiene.
+-- Así el límite y lo vencido se revisan «con el saldo que conoce: lo último que bajó de la nube más
+-- lo que ella misma vendió y cobró».
+
+-- ── §0 Deuda de otras cajas ─────────────────────────────────────────────────
+-- Una fila por venta a crédito con saldo, tal como la nube la conoce. Solo tiene filas en la caja
+-- (el pull la reemplaza entera en cada ciclo); en la nube queda vacía, nadie la escribe. Va por
+-- VENTA y no por cliente a propósito: la caja descarta sola las suyas (las que tiene en `tickets`,
+-- que ya cuenta con sus propios pagos y abonos) sin tener que saber cuál caja es, y la fecha de cada
+-- venta sirve para lo vencido y para la venta más vieja. Sin FK: las ventas y hasta los clientes
+-- pueden no estar en esta caja.
+-- Abonar a una venta de otra caja NO entra en esta versión: registrar_abono solo reparte entre las
+-- ventas que la caja tiene. Ese abono se hace en la caja donde se vendió, en el POS web, o se ve en
+-- el admin.
+CREATE TABLE IF NOT EXISTS creditos_resumen_nube (
+  ticket_id       uuid PRIMARY KEY,
+  tenant_id       uuid NOT NULL,
+  cliente_id      uuid NOT NULL,
+  saldo_mxn       numeric(12,2) NOT NULL,
+  fecha_venta     timestamptz NOT NULL,
+  sincronizado_at timestamptz NOT NULL DEFAULT now()
+);
+COMMENT ON TABLE creditos_resumen_nube IS
+  'Solo en la caja: saldo de las ventas a crédito del negocio según la nube, para sumar la deuda de otras cajas (0210). En la nube está vacía.';
+ALTER TABLE creditos_resumen_nube ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS creditos_resumen_nube_lectura ON creditos_resumen_nube;
+CREATE POLICY creditos_resumen_nube_lectura ON creditos_resumen_nube FOR SELECT
+  USING (tenant_id = current_tenant_id());
+REVOKE ALL ON creditos_resumen_nube FROM anon, authenticated;
+GRANT SELECT ON creditos_resumen_nube TO authenticated;
+
+-- La de la 0208 (vigente) con las ventas de otras cajas ("0210"): las de creditos_resumen_nube cuya
+-- venta no está aquí. En la nube todas las ventas están, así que no suma nada aunque hubiera filas.
+-- Columna nueva al final: deuda_otras_cajas_mxn (lo que registrar_abono no puede repartir aquí).
+-- pagar_a_credito lee deuda_mxn y tiene_vencido de esta vista: no cambia.
+CREATE OR REPLACE VIEW vw_creditos_cliente WITH (security_invoker = true) AS
+WITH ventas AS (
+  SELECT t.tenant_id, t.cliente_id, t.id AS ticket_id, t.fecha_pago, credito_saldo_ticket(t.id) AS saldo, false AS de_otra_caja
+    FROM tickets t
+   WHERE t.cliente_id IS NOT NULL
+     AND EXISTS (SELECT 1 FROM pagos p
+                  WHERE p.ticket_id = t.id AND p.metodo_pago = 'CREDITO'
+                    AND p.estado = 'APLICADO' AND p.deleted_at IS NULL)
+  UNION ALL   -- 0210
+  SELECT r.tenant_id, r.cliente_id, r.ticket_id, r.fecha_venta, r.saldo_mxn, true
+    FROM creditos_resumen_nube r
+   WHERE NOT EXISTS (SELECT 1 FROM tickets t WHERE t.id = r.ticket_id)
+)
+SELECT cc.tenant_id,
+       cc.cliente_id,
+       cc.limite_mxn,
+       cc.plazo_dias,
+       cc.activo,
+       COALESCE(sum(v.saldo) FILTER (WHERE v.saldo > 0), 0)::numeric(12,2) AS deuda_mxn,
+       GREATEST(cc.limite_mxn - COALESCE(sum(v.saldo) FILTER (WHERE v.saldo > 0), 0), 0)::numeric(12,2) AS disponible_mxn,
+       min(v.fecha_pago) FILTER (WHERE v.saldo > 0) AS venta_mas_vieja_fecha,
+       (array_agg(v.ticket_id ORDER BY v.fecha_pago, v.ticket_id) FILTER (WHERE v.saldo > 0))[1] AS venta_mas_vieja_ticket_id,
+       COALESCE(bool_or(v.saldo > 0
+                        AND (v.fecha_pago AT TIME ZONE tn.timezone)::date + cc.plazo_dias
+                            < (now() AT TIME ZONE tn.timezone)::date), false) AS tiene_vencido,
+       COALESCE(sum(v.saldo) FILTER (WHERE v.saldo > 0 AND v.de_otra_caja), 0)::numeric(12,2) AS deuda_otras_cajas_mxn   -- 0210
+  FROM clientes_credito cc
+  JOIN tenants tn ON tn.id = cc.tenant_id
+  LEFT JOIN ventas v ON v.tenant_id = cc.tenant_id AND v.cliente_id = cc.cliente_id
+ GROUP BY cc.tenant_id, cc.cliente_id, cc.limite_mxn, cc.plazo_dias, cc.activo, tn.timezone;
+COMMENT ON VIEW vw_creditos_cliente IS
+  'Por cliente con crédito: deuda, disponible, venta más vieja con saldo y si hay algo vencido (0208). En la caja incluye las ventas de otras cajas (0210, creditos_resumen_nube).';
+REVOKE ALL ON vw_creditos_cliente FROM anon, authenticated;
+GRANT SELECT ON vw_creditos_cliente TO authenticated;
 
 -- ── §1 Aplicador de lo que la caja manda ────────────────────────────────────
 -- Molde de _vim_aplicar_movimientos_producto (0195). Corre en origin (FK normales; estas tablas no
 -- tienen disparadores). El push está en modo réplica para el resto, así que la pertenencia al
 -- negocio se revisa aquí a mano: la FK solo diría que la fila existe, no de quién es.
 --   · tenant_id de la fila = el del dispositivo;
---   · un id que la nube ya tiene se salta (ni aplicado ni error): reenviar no duplica;
+--   · un id que la nube ya tiene en este negocio se salta (ni aplicado ni error): reenviar no
+--     duplica. Si es de otro negocio, es error (como la 0196);
 --   · cliente (redirigido si la nube lo fundió con otro, clientes_alias 0156), venta, turno,
 --     sucursal y caja: del negocio. La venta tiene que estar YA en la nube: la caja manda cada fila
 --     en el lote de su venta si esta aún no sube, así que no llega antes; si llegara, cae en
@@ -28,6 +99,7 @@ AS $fn$
 DECLARE
   v_fila    jsonb;
   v_cli     uuid;
+  v_dueno   uuid;
   v_id      uuid;
   v_n       integer := 0;
   v_errores jsonb := '[]'::jsonb;
@@ -43,8 +115,14 @@ BEGIN
       IF (v_fila->>'tenant_id')::uuid IS DISTINCT FROM p_tenant THEN
         RAISE EXCEPTION 'fila de otro negocio';
       END IF;
-      IF p_tabla = 'abonos_credito' AND EXISTS (SELECT 1 FROM abonos_credito WHERE id = (v_fila->>'id')::uuid) THEN CONTINUE; END IF;
-      IF p_tabla = 'saldo_favor_movimientos' AND EXISTS (SELECT 1 FROM saldo_favor_movimientos WHERE id = (v_fila->>'id')::uuid) THEN CONTINUE; END IF;
+      v_dueno := NULL;
+      IF p_tabla = 'abonos_credito' THEN
+        SELECT tenant_id INTO v_dueno FROM abonos_credito WHERE id = (v_fila->>'id')::uuid;
+      ELSE
+        SELECT tenant_id INTO v_dueno FROM saldo_favor_movimientos WHERE id = (v_fila->>'id')::uuid;
+      END IF;
+      IF v_dueno = p_tenant THEN CONTINUE; END IF;
+      IF v_dueno IS NOT NULL THEN RAISE EXCEPTION 'el id ya existe en otro negocio'; END IF;
       v_cli := (v_fila->>'cliente_id')::uuid;
       v_cli := COALESCE((SELECT cliente_id FROM clientes_alias WHERE alias_id = v_cli AND tenant_id = p_tenant), v_cli);
       v_fila := v_fila || jsonb_build_object('cliente_id', v_cli);
@@ -134,6 +212,16 @@ AS $$
     'clientes_credito',               coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM clientes_credito x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
     'abonos_credito',                 coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM abonos_credito x WHERE x.tenant_id = p_tenant
                                         AND (x.created_at >= now() - interval '90 days' OR credito_saldo_ticket(x.ticket_id) > 0)), '[]'::jsonb),
+    -- 0210: deuda de cada venta a crédito con saldo, para que la caja sume la de otras cajas (§0).
+    'creditos_resumen_nube',          coalesce((SELECT jsonb_agg(jsonb_build_object('ticket_id', v.id, 'tenant_id', v.tenant_id,
+                                          'cliente_id', v.cliente_id, 'saldo_mxn', v.saldo, 'fecha_venta', v.fecha, 'sincronizado_at', now()))
+                                        FROM (SELECT t.id, t.tenant_id, t.cliente_id, COALESCE(t.fecha_pago, t.fecha_apertura) AS fecha,
+                                                     credito_saldo_ticket(t.id) AS saldo
+                                                FROM tickets t
+                                               WHERE t.tenant_id = p_tenant AND t.cliente_id IS NOT NULL
+                                                 AND t.id IN (SELECT p.ticket_id FROM pagos p WHERE p.metodo_pago = 'CREDITO'
+                                                                 AND p.estado = 'APLICADO' AND p.deleted_at IS NULL)) v
+                                       WHERE v.saldo > 0), '[]'::jsonb),
     'saldo_favor_movimientos',        coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM saldo_favor_movimientos x WHERE x.tenant_id = p_tenant
                                         AND x.cliente_id IN (SELECT s.cliente_id FROM saldo_favor_movimientos s WHERE s.tenant_id = p_tenant
                                                               GROUP BY s.cliente_id
