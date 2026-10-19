@@ -80,6 +80,26 @@
       "permanent": true
     },
     {
+      "source": "/punto-de-venta-servicio-rapido.html",
+      "destination": "/punto-de-venta-servicio-rapido",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-restaurantes-servicio-completo.html",
+      "destination": "/punto-de-venta-restaurantes-servicio-completo",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-bares.html",
+      "destination": "/punto-de-venta-bares",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-food-trucks.html",
+      "destination": "/punto-de-venta-food-trucks",
+      "permanent": true
+    },
+    {
       "source": "/punto-de-venta-restaurantes-leon.html",
       "destination": "/punto-de-venta-restaurantes-leon",
       "permanent": true
@@ -231,6 +251,50 @@
         }
       ],
       "destination": "/punto-de-venta-cafeterias.md"
+    },
+    {
+      "source": "/punto-de-venta-servicio-rapido",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*(text/markdown|text/x-markdown).*"
+        }
+      ],
+      "destination": "/punto-de-venta-servicio-rapido.md"
+    },
+    {
+      "source": "/punto-de-venta-restaurantes-servicio-completo",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*(text/markdown|text/x-markdown).*"
+        }
+      ],
+      "destination": "/punto-de-venta-restaurantes-servicio-completo.md"
+    },
+    {
+      "source": "/punto-de-venta-bares",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*(text/markdown|text/x-markdown).*"
+        }
+      ],
+      "destination": "/punto-de-venta-bares.md"
+    },
+    {
+      "source": "/punto-de-venta-food-trucks",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*(text/markdown|text/x-markdown).*"
+        }
+      ],
+      "destination": "/punto-de-venta-food-trucks.md"
     },
     {
       "source": "/punto-de-venta-restaurantes-leon",
@@ -385,6 +449,22 @@
     {
       "source": "/punto-de-venta-cafeterias",
       "destination": "/punto-de-venta-cafeterias.html"
+    },
+    {
+      "source": "/punto-de-venta-servicio-rapido",
+      "destination": "/punto-de-venta-servicio-rapido.html"
+    },
+    {
+      "source": "/punto-de-venta-restaurantes-servicio-completo",
+      "destination": "/punto-de-venta-restaurantes-servicio-completo.html"
+    },
+    {
+      "source": "/punto-de-venta-bares",
+      "destination": "/punto-de-venta-bares.html"
+    },
+    {
+      "source": "/punto-de-venta-food-trucks",
+      "destination": "/punto-de-venta-food-trucks.html"
     },
     {
       "source": "/punto-de-venta-restaurantes-leon",
@@ -658,6 +738,74 @@
         {
           "key": "Link",
           "value": "<https://vimpos.com.mx/punto-de-venta-cafeterias.md>; rel=\"alternate\"; type=\"text/markdown\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-servicio-rapido",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-servicio-rapido.md>; rel=\"alternate\"; type=\"text/markdown\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-restaurantes-servicio-completo",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo.md>; rel=\"alternate\"; type=\"text/markdown\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-bares",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-bares.md>; rel=\"alternate\"; type=\"text/markdown\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-food-trucks",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-food-trucks.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
@@ -1032,6 +1180,74 @@
         {
           "key": "Link",
           "value": "<https://vimpos.com.mx/punto-de-venta-cafeterias>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-servicio-rapido.md",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-servicio-rapido>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-restaurantes-servicio-completo.md",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-bares.md",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-bares>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-food-trucks.md",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-food-trucks>; rel=\"canonical\""
         }
       ]
     },

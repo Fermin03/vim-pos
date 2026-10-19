@@ -1,0 +1,224 @@
+# Punto de venta para food trucksCobra donde estaciones, con o sin señal
+
+> Cobra donde estaciones, con o sin señal, y lleva la venta de cada evento por separado. Para food trucks, desde $699 al mes más IVA.
+
+**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-food-trucks
+
+Una caja rápida para la fila del evento, con la venta de cada turno por separado.
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+## Lista para la fila, en cualquier lugar
+
+![La caja cobrando con el aviso de que no hay internet.](https://vimpos.com.mx/assets/img/capturas/pos-sin-conexion.webp?v=3)
+
+_Sin internet, la caja sigue igual._
+
+### Sin internet, sigues cobrando
+
+En el estacionamiento o en la feria, la caja cobra e imprime sin señal. [Así funciona](https://vimpos.com.mx/sin-internet).
+
+_El turno abierto con su evento._
+
+### Cada turno, con su evento
+
+Abres el turno con el nombre del evento y su venta queda aparte.
+
+![La caja en plena venta: el catálogo por categorías y un ticket en curso.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=3)
+
+_El menú y la cuenta en curso._
+
+### Cobro en segundos
+
+Tu menú en botones grandes, con sus extras y su precio.
+
+![Pantalla de cobro con el total, las formas de pago y el cambio.](https://vimpos.com.mx/assets/img/capturas/pos-pago.webp?v=3)
+
+_El cobro con efectivo, tarjeta o las dos._
+
+### Cobra como te paguen
+
+Efectivo, tarjeta o las dos en una misma cuenta.
+
+_Los sellos del cliente, en la misma cuenta._
+
+### Que te busquen en el siguiente evento
+
+Sellos por visita o puntos por compra, sin tarjetas de cartón. Incluido desde Negocio.
+
+_Para el dueño_
+
+## Lo que necesitas para crecer
+
+![Inventario con existencias y alertas de insumos.](https://vimpos.com.mx/assets/img/capturas/admin-inventario.webp?v=3)
+
+### [Cuánto insumo se fue en cada evento](https://vimpos.com.mx/funciones#inventario)
+
+Con la receta cargada, cada venta descuenta sus insumos. Desde Negocio.
+
+![Panel con la venta del día, las horas pico y lo más vendido.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
+
+### [Qué evento vendió más](https://vimpos.com.mx/funciones#reportes)
+
+Qué se vende, a qué hora y en cuál turno. El corte cuadra contra el cajón.
+
+![Ticket de venta con el código para facturar.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp?v=3)
+
+### [Facturas sin detener la fila](https://vimpos.com.mx/facturacion-cfdi)
+
+Tu cliente se factura solo con su ticket. Incluida desde Negocio.
+
+![El panel del dueño en un celular.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard-movil.webp?v=3)
+
+### [La venta del día en tu celular](https://vimpos.com.mx/funciones#reportes)
+
+Revisa ventas y cortes desde donde estés.
+
+_Equipo_
+
+## Funciona con lo que ya tienes
+
+Sin equipo especial: lo compras donde quieras.
+
+### Computadora con Windows
+
+Windows 10 u 11. Es tu caja.
+
+### Impresora de tickets
+
+Térmica de 80 mm, de red o USB.
+
+### Terminal Mercado Pago
+
+Cobra con tarjeta desde la caja con la Point Smart 2.
+
+### Cajón de dinero
+
+El de siempre, para el efectivo.
+
+_Precios_
+
+## Un plan para cada tamaño de food truck
+
+Sin pago inicial y sin contrato forzoso.
+
+[Ver precios](https://vimpos.com.mx/precios)
+
+### Esencial
+
+Para arrancar con una caja.
+
+**$699**
+
+/mes
+
+1 sucursal · 1 caja · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal para un food truck
+
+- Turno por evento, con su propio corte
+- Cobra e imprime sin internet
+- Lealtad por sellos o puntos: $100 al mes aparte
+- Facturación: $349 al mes aparte
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+### Negocio
+
+El que recomendamos
+
+Todo para un local, con tu menú cargado por nosotros.
+
+**$999**
+
+/mes
+
+1 sucursal · 3 cajas · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal para un food truck
+
+- Hasta 3 cajas para los eventos grandes
+- Lealtad y facturación incluidas, 20 folios al mes
+- Inventario por receta
+- Cargamos tu menú y capacitamos a tu equipo
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+### Cadena
+
+Varias sucursales, vistas en un solo lugar.
+
+**$1,999**
+
+/mes
+
+3 sucursales · cajas sin límite · más IVA
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+Lo principal para un food truck
+
+- Hasta 3 trucks, cada uno con sus cajas
+- Un reporte que suma todos
+- Lealtad y facturación incluidas, 40 folios al mes
+- Vamos el día del arranque
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+_Guías_
+
+## Antes de decidir
+
+### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
+
+Nueve preguntas antes de firmar.
+
+### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
+
+Las tres formas de cobrarte, con cuentas.
+
+### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
+
+Qué es y cómo se emite.
+
+_Preguntas_
+
+## Lo que pregunta un food truck
+
+### ¿Sirve si solo tengo una caja?
+
+Sí. El plan Esencial es una sucursal y una caja, por $699 al mes más IVA. Los tres planes están en [precios](https://vimpos.com.mx/precios).
+
+### ¿Funciona sin internet en el evento?
+
+Sí: cobras, imprimes y llevas el corte sin señal. Al volver la conexión, todo sube solo. [Así funciona](https://vimpos.com.mx/sin-internet).
+
+### ¿Puedo cobrar con tarjeta desde la caja?
+
+Sí, con la terminal Mercado Pago Point Smart 2. Con otra terminal, registras el pago y el corte cuadra igual.
+
+### ¿Tengo que capturar todo mi menú?
+
+No. Lo pegas desde tu sistema actual o una hoja de cálculo. Desde Negocio lo cargamos nosotros.
+
+## Pon tu food truck a vender hoy
+
+Empieza tú solo, o te lo enseñamos con tu menú.
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+---
+
+**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Factura global](https://vimpos.com.mx/factura-global-restaurantes.md) · [Hamburgueserías](https://vimpos.com.mx/punto-de-venta-hamburgueserias.md) · [Cafeterías](https://vimpos.com.mx/punto-de-venta-cafeterias.md) · [Comida rápida](https://vimpos.com.mx/punto-de-venta-servicio-rapido.md) · [Restaurantes con meseros](https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo.md) · [Bares y cervecerías](https://vimpos.com.mx/punto-de-venta-bares.md) · [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
+
+**Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
+
+_Generado desde punto-de-venta-food-trucks.html. La versión en HTML es la fuente; este archivo no se edita a mano._

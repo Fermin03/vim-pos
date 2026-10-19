@@ -95,6 +95,30 @@ export const PAGINAS = [
     enSitemap: true,
   },
   {
+    ruta: '/punto-de-venta-servicio-rapido',
+    nombre: 'Comida rápida',
+    resumen: 'VIM POS para comida rápida: opciones obligatorias, extras con precio, combos, pantalla de cocina por estación, para llevar y a domicilio, y pedidos de Uber Eats en la caja.',
+    enSitemap: true,
+  },
+  {
+    ruta: '/punto-de-venta-restaurantes-servicio-completo',
+    nombre: 'Restaurantes con meseros',
+    resumen: 'VIM POS para un restaurante de servicio completo: mapa de mesas, meseros y propinas por mesero, cocina por estación, cuenta impresa e inventario con mermas.',
+    enSitemap: true,
+  },
+  {
+    ruta: '/punto-de-venta-bares',
+    nombre: 'Bares y cervecerías',
+    resumen: 'VIM POS para un bar o cervecería: cuentas por nombre en la barra, mesas, propinas, comandas a la barra y a cocina, y un corte que cuadra.',
+    enSitemap: true,
+  },
+  {
+    ruta: '/punto-de-venta-food-trucks',
+    nombre: 'Food trucks',
+    resumen: 'VIM POS para un food truck: cobra sin internet, turno por evento con su propio corte, menú rápido, cobro con tarjeta y lealtad.',
+    enSitemap: true,
+  },
+  {
     ruta: '/punto-de-venta-restaurantes-leon',
     nombre: 'León, Guanajuato',
     resumen: 'VIM POS para restaurantes de León, Guanajuato, donde se hace el producto: en la zona, la demostración puede ser en el local.',

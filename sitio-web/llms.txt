@@ -60,6 +60,10 @@ extension, and the normal address answers with `text/markdown` when asked with a
 - [Factura global](https://vimpos.com.mx/factura-global-restaurantes.md): Guía fiscal: qué es la factura global, cada cuándo se emite, qué datos lleva en CFDI 4.0 (RFC genérico, uso S01, periodo) y los errores más comunes en un restaurante. No es asesoría fiscal.
 - [Hamburgueserías](https://vimpos.com.mx/punto-de-venta-hamburgueserias.md): VIM POS para una hamburguesería: término obligatorio, extras con precio, combos, para llevar y a domicilio, cocina por estación e inventario por receta.
 - [Cafeterías](https://vimpos.com.mx/punto-de-venta-cafeterias.md): VIM POS para una cafetería: tamaño, leche y extras por bebida, cobro con propina, pantalla del cliente, lealtad por sellos o puntos, inventario por receta y caja que sigue sin internet.
+- [Comida rápida](https://vimpos.com.mx/punto-de-venta-servicio-rapido.md): VIM POS para comida rápida: opciones obligatorias, extras con precio, combos, pantalla de cocina por estación, para llevar y a domicilio, y pedidos de Uber Eats en la caja.
+- [Restaurantes con meseros](https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo.md): VIM POS para un restaurante de servicio completo: mapa de mesas, meseros y propinas por mesero, cocina por estación, cuenta impresa e inventario con mermas.
+- [Bares y cervecerías](https://vimpos.com.mx/punto-de-venta-bares.md): VIM POS para un bar o cervecería: cuentas por nombre en la barra, mesas, propinas, comandas a la barra y a cocina, y un corte que cuadra.
+- [Food trucks](https://vimpos.com.mx/punto-de-venta-food-trucks.md): VIM POS para un food truck: cobra sin internet, turno por evento con su propio corte, menú rápido, cobro con tarjeta y lealtad.
 - [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon.md): VIM POS para restaurantes de León, Guanajuato, donde se hace el producto: en la zona, la demostración puede ser en el local.
 - [Nosotros](https://vimpos.com.mx/nosotros.md): Quién construye VIM POS, desde dónde, por qué existe y en qué punto está el producto hoy.
 - [Contacto](https://vimpos.com.mx/contacto.md): Cómo contactar a VIM POS: WhatsApp, correo, domicilio fiscal, horario y en cuánto contestamos.
@@ -76,5 +80,5 @@ extension, and the normal address answers with `text/markdown` when asked with a
 - [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md): Qué datos se recaban, para qué, cuánto se guardan y cómo ejercer los derechos ARCO.
 - [Términos del servicio](https://vimpos.com.mx/terminos.md): Qué se contrata, qué no incluye, cómo se cobra y cómo se cancela.
 - [Agent instructions / Instrucciones para agentes](https://vimpos.com.mx/agents.md): when to use VIM POS, when not to, and how to act on it. Bilingual.
-- [Todo el sitio en un solo archivo](https://vimpos.com.mx/llms-full.txt): las 17 páginas concatenadas, para cargar el contexto completo de una vez.
+- [Todo el sitio en un solo archivo](https://vimpos.com.mx/llms-full.txt): las 21 páginas concatenadas, para cargar el contexto completo de una vez.
 - [Índice de direcciones](https://vimpos.com.mx/sitemap.xml): el sitemap en XML.
