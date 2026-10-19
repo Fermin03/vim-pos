@@ -1167,8 +1167,8 @@ export function ModalCobro({
   atajo?: "EFECTIVO_EXACTO" | null;
   /** Módulo de crédito encendido (`modulos.credito`): «A crédito» y «Saldo a favor» para el cliente de la cuenta. */
   moduloCredito?: boolean;
-  /** `total` null = no entró dinero (venta a crédito): «Cobro completado» no lo anuncia como cobrado. */
-  onPagado: (folio: string | null, cambio: number, total: number | null) => void;
+  /** `aCredito`: no entró dinero; «Cobro completado» dice «A crédito» y no anuncia un total cobrado. */
+  onPagado: (folio: string | null, cambio: number, total: number | null, aCredito?: boolean) => void;
   onCerrar: () => void;
 }) {
   const [totales, setTotales] = useState<TotalesTicket>(totalesIniciales);
@@ -1235,11 +1235,12 @@ export function ModalCobro({
    * pendiente viejo) y, si el ticket ya quedó PAGADO, da la venta por cobrada en vez de mostrar
    * un error que invita a cobrar otra vez (B2-1). Devuelve los totales releídos.
    */
-  async function trasFalloDeCobro(e: unknown): Promise<TotalesTicket | null> {
+  async function trasFalloDeCobro(e: unknown, aCredito = false): Promise<TotalesTicket | null> {
     const t = await leerTotales(token, totales.ticketId).catch(() => null);
     if (t) setTotales(t);
     if (ventaQuedoPagada(t)) {
-      onPagado(t.folio, t.cambio, t.total);
+      if (aCredito) onPagado(t.folio, 0, null, true);
+      else onPagado(t.folio, t.cambio, t.total);
       return t;
     }
     setError(e instanceof Error ? e.message : "Error al cobrar");
@@ -1319,12 +1320,16 @@ export function ModalCobro({
       pagoCreditoId.current = null;
       const t = await leerTotales(token, totales.ticketId);
       setTotales(t);
-      if (t.estadoFiscal === "PAGADO") onPagado(t.folio, t.cambio, vista === "credito" ? null : t.total);
+      if (t.estadoFiscal === "PAGADO") {
+        if (vista === "credito") onPagado(t.folio, 0, null, true);
+        else onPagado(t.folio, t.cambio, t.total);
+      }
       else { alQuedarPendiente?.(); setVista("selector"); }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
       if (vista === "credito" && pideAutorizacionCredito(msg)) { setPinCredito(msg); return; }
-      const t = await trasFalloDeCobro(e);
+      // La venta a crédito pudo entrar aunque la respuesta se perdiera: tampoco se anuncia un total cobrado.
+      const t = await trasFalloDeCobro(e, vista === "credito");
       if (pagoEntroPeseAlError(antes, t)) pagoCreditoId.current = null;
     } finally {
       setProcesando(false);

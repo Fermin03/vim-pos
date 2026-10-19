@@ -2,7 +2,7 @@
 import { LogoVim } from "@vim/ui/styles";
 import { QRCodeSVG } from "qrcode.react";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
-import { cantidadLealtad } from "../lib/print/ticket-builder";
+import { cantidadLealtad, conSaldoPorPagar } from "../lib/print/ticket-builder";
 import { fechaCorta } from "../lib/lealtad-reglas";
 import { aGranel, cantidadRenglon, precioConUnidad, tipoDesdeSat } from "../lib/unidades";
 
@@ -218,7 +218,9 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
       {/* Pie + QR fiscal */}
       <div className="text-center">
         <div className="mb-2.5 font-sans text-[12.5px] font-semibold">¡Gracias por su compra!</div>
-        {datos.qrUrl && (
+        {datos.qrUrl && conSaldoPorPagar(datos) ? (
+          <div className="text-[9.5px] leading-[1.5] text-[#555]">Se factura al liquidarse.</div>
+        ) : datos.qrUrl && (
           <>
             <div className="mb-2 text-[9.5px] leading-[1.5] text-[#555]">
               ¿Necesitas factura? Escanea el código<br />o visita el portal con tu folio.

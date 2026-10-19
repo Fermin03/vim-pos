@@ -57,6 +57,16 @@ describe("construirTicketJob", () => {
     expect(filas[i + 2]).toEqual({ t: "fila", izq: "Fecha límite", der: "02/11/2026" });
   });
 
+  it("venta a crédito con saldo: «Se factura al liquidarse.» en lugar del QR", () => {
+    const d = { ...DATOS, pagos: [{ metodo: "A crédito", montoMxn: 108, recibidoMxn: null, cambioMxn: 0, porPagar: { montoMxn: 108, fechaLimite: "2026-11-02" } }] };
+    const job = construirTicketJob(d);
+    expect(job.bloques).toContainEqual({ t: "texto", valor: "Se factura al liquidarse.", align: "centro", size: 1 });
+    expect(job.bloques.find((b) => b.t === "qr")).toBeUndefined();
+    expect(job.bloques.find((b) => b.t === "texto" && b.valor.startsWith("¿Necesitas factura?"))).toBeUndefined();
+    // Sin QR del negocio, tampoco se promete factura.
+    expect(construirTicketJob({ ...d, qrUrl: null }).bloques.find((b) => b.t === "texto" && b.valor === "Se factura al liquidarse.")).toBeUndefined();
+  });
+
   it("sin crédito no hay renglón «Por pagar»", () => {
     expect(construirTicketJob(DATOS).bloques.find((b) => b.t === "fila" && b.izq === "Por pagar")).toBeUndefined();
   });

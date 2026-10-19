@@ -334,7 +334,7 @@ export function HomePos({
   // no lanza otra revisión ni abre el cajón dos veces. Es un ref y no estado porque dos toques
   // seguidos pueden llegar antes de que React vuelva a pintar el botón apagado.
   const revisandoCobro = useRef(false);
-  const [confirmacion, setConfirmacion] = useState<{ folio: string | null; cambio: number; total: number | null } | null>(null);
+  const [confirmacion, setConfirmacion] = useState<{ folio: string | null; cambio: number; total: number | null; aCredito?: boolean } | null>(null);
   /**
    * El cambio de la venta anterior, para el encabezado del ticket nuevo. "Cobro completado" se
    * cierra solo a los 5 s, y a veces la cajera todavía está contando el dinero: así no lo pierde.
@@ -1437,7 +1437,7 @@ export function HomePos({
 
   /** Lo que sigue a una venta cobrada: limpiar la pantalla, «Cobro completado», el ticket impreso,
    *  la comanda de Para llevar y el cierre del reparto. Del cobro, y de «Cobrar» con saldo 0. */
-  const cobroTerminado = useCallback(async (ticketId: string, folio: string | null, cambio: number, total: number | null) => {
+  const cobroTerminado = useCallback(async (ticketId: string, folio: string | null, cambio: number, total: number | null, aCredito = false) => {
     // Lealtad: una cuenta cobrada ya no puede terminar un canje a medias; si quedó uno
     // guardado en este dispositivo, se limpia para que no viva para siempre. Nunca estorba al cobro.
     try {
@@ -1452,7 +1452,7 @@ export function HomePos({
     setCocinaEnviada(false);
     dispatch({ tipo: "limpiar" });
     setCuentasVersion((v) => v + 1); // la cuenta pagada ya no va en la lista
-    setConfirmacion({ folio, cambio, total });
+    setConfirmacion({ folio, cambio, total, ...(aCredito ? { aCredito } : {}) });
     // Armar el ticket e IMPRIMIR automáticamente. Con PreviewAdapter abre el recibo
     // en pantalla; al activar EpsonEposAdapter, ese mismo llamado imprime en papel.
     try {
@@ -2391,7 +2391,7 @@ export function HomePos({
           atajo={atajoCobro}
           moduloCredito={modulos?.credito === true}
           onMontoACobrar={setMontoCobro}
-          onPagado={(folio, cambio, total) => cobroTerminado(totalesCobro.ticketId, folio, cambio, total)}
+          onPagado={(folio, cambio, total, aCredito) => cobroTerminado(totalesCobro.ticketId, folio, cambio, total, aCredito)}
           onCerrar={() => { setTotalesCobro(null); setAtajoCobro(null); }}
         />
       )}
@@ -2400,6 +2400,7 @@ export function HomePos({
           folio={confirmacion.folio}
           cambio={confirmacion.cambio}
           total={confirmacion.total}
+          aCredito={confirmacion.aCredito}
           estadoTicket={estadoTicket}
           puedeImprimir={datosTicket != null}
           pausa={mostrarRecibo || avisoReparto != null}

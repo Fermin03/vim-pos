@@ -7,6 +7,7 @@ import { fechaCorta } from "../lib/lealtad-reglas";
 import { nuevoClientId } from "../lib/carrito";
 import { redondearCentavos } from "../lib/dinero";
 import { useEscape } from "../lib/use-escape";
+import { obtenerImpresora } from "../lib/print/adapter";
 import {
   avisoAbono,
   filtrarDeudores,
@@ -22,8 +23,8 @@ const METODOS_ABONO: MetodoAbono[] = ["EFECTIVO", "TARJETA_DEBITO", "TARJETA_CRE
 
 /**
  * Créditos de la tienda (retail 2, entrega 2): quién debe y registrar abonos. Entrada temporal en
- * Configuración; la entrega 4 la lleva a «Más». Solo se abona a las ventas de ESTA caja
- * (`registrar_abono` no ve las de otras): lo que se debe en otra caja se dice aparte.
+ * Configuración; la entrega 4 la lleva a «Más». Se abona a las ventas que `registrar_abono` ve en
+ * esta base (en la caja instalada, las suyas): lo que se debe en otra caja se dice aparte.
  */
 export function SeccionCreditos({ token, cajaId, turnoId, onVolver }: {
   token: string;
@@ -159,11 +160,11 @@ export function SeccionCreditos({ token, cajaId, turnoId, onVolver }: {
               )}
 
               <div className="overflow-hidden rounded-lg border border-line">
-                <div className="border-b border-line bg-sel px-4 py-2.5 text-12 font-bold uppercase tracking-widest text-ink-3">Ventas con saldo en esta caja</div>
+                <div className="border-b border-line bg-sel px-4 py-2.5 text-12 font-bold uppercase tracking-widest text-ink-3">Ventas con saldo que se abonan aquí</div>
                 {ventas === null ? (
                   <p className="px-4 py-3 text-14 text-ink-3">Cargando…</p>
                 ) : ventas.length === 0 ? (
-                  <p className="px-4 py-3 text-14 text-ink-3">No hay ventas con saldo en esta caja.</p>
+                  <p className="px-4 py-3 text-14 text-ink-3">No hay ventas con saldo que se abonen aquí.</p>
                 ) : (
                   ventas.map((v) => (
                     <div key={v.ticketId} className="flex items-center gap-3 border-b border-line px-4 py-3 last:border-b-0">
@@ -234,6 +235,8 @@ function ModalAbono({ token, cajaId, turnoId, cliente, maximo, onCerrar, onAbona
     setProcesando(true);
     try {
       const r = await registrarAbono(token, { clienteId: cliente.clienteId, monto: valor, metodo, cajaId, turnoId, clientId: llave.current });
+      // El efectivo del abono va al cajón: se abre como al cobrar (sin el PIN de «Abrir cajón»).
+      if (metodo === "EFECTIVO") obtenerImpresora("CAJA", { onMostrar: () => {} }).abrirCajon().catch(() => {});
       onAbonado(avisoAbono(r.abonado, r.deudaRestante, cliente.deudaOtrasCajas));
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo registrar el abono");

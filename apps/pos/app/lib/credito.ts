@@ -187,7 +187,11 @@ export function ventasConSaldo(
     .sort((x, y) => x.fecha.localeCompare(y.fecha) || x.ticketId.localeCompare(y.ticketId));
 }
 
-/** Las ventas a crédito de ESTA caja con saldo. Las de otras cajas no están aquí (`deudaOtrasCajas`). */
+/**
+ * Las ventas a crédito con saldo que `registrar_abono` ve aquí: las mismas a las que reparte un abono
+ * (todas las del cliente en esta base). En la caja instalada son las de su base local; las de otras
+ * cajas van en `deudaOtrasCajas`. En el POS web (la nube) son las de todas las cajas del negocio.
+ */
 export async function leerVentasConSaldo(token: string, clienteId: string, plazoDias: number): Promise<VentaConSaldo[]> {
   const sb = employeeClient(token);
   const [p, a] = await Promise.all([

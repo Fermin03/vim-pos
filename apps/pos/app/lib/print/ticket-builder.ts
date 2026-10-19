@@ -3,6 +3,9 @@ import { aGranel, fmtCantidad, precioConUnidad, tipoDesdeSat } from "../unidades
 import type { Bloque, DatosTicketImpresion, PrintJob } from "./tipos";
 
 /** Formatea pesos sin depender de módulos cliente (testeable en node). */
+/** El ticket es de una venta a crédito que aún debe algo. */
+export const conSaldoPorPagar = (d: Pick<DatosTicketImpresion, "pagos">) => d.pagos.some((p) => (p.porPagar?.montoMxn ?? 0) > 0);
+
 export function pesos(n: number): string {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
 }
@@ -160,7 +163,10 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
   b.push({ t: "texto", valor: "¡Gracias por su compra!", align: "centro" });
   // El QR solo si el negocio lo activó. Imprimir "¿Necesitas factura?" sin portal detrás es
   // prometerle algo al cliente que nadie puede cumplir.
-  if (d.qrUrl) {
+  // Una venta a crédito con saldo no se factura hasta liquidarse (0209): ni QR ni invitación.
+  if (d.qrUrl && conSaldoPorPagar(d)) {
+    b.push({ t: "texto", valor: "Se factura al liquidarse.", align: "centro", size: 1 });
+  } else if (d.qrUrl) {
     b.push({ t: "texto", valor: "¿Necesitas factura? Escanea el código:", align: "centro", size: 1 });
     b.push({ t: "qr", valor: d.qrUrl });
     b.push({ t: "texto", valor: d.qrUrl.replace(/^https?:\/\//, ""), align: "centro", size: 1 });
