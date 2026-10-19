@@ -209,3 +209,64 @@ que le toca), citas atendidas / canceladas / faltas, ocupación de la agenda.
    ocupación), registro de los giros en alta/registro/platform/prospectos y migración de liberación.
 
 Cada entrega lleva su propio plan.
+
+## Entrega 1 (agenda), hecha (18 oct)
+
+Giros de belleza en la base, servicios, colaboradores, espacios, citas sin empalmes, calendario, espera,
+ficha, Clientes y la barra de belleza. Todo en local. Diseño de la caja: `docs/diseno/pos-belleza.md`;
+decisión: ADR 0038.
+
+**Migraciones**
+
+- **0216:** solo `ADD VALUE`: los 5 giros (SALON, SPA, PELUQUERIA, BARBERIA, TATUAJES). Va aparte porque
+  Postgres no deja usar un valor de enum en la misma transacción que lo crea.
+- **0217:** `btree_gist`, `es_giro_belleza`, el juego inicial de los giros (con el módulo `agenda`),
+  los 5 giros bloqueados en `cambiar_giro`, y el backfill que pone `agenda: false` en
+  `tenants.operacion` de todos los negocios existentes.
+- **0218:** enums `cita_estado` y `cita_canal`, tolerancia en `configuracion_tenant`, las tablas
+  (`tipos_espacio`, `espacios`, `servicios_agenda`, `colaboradores_agenda`, `servicio_colaborador`,
+  `horarios_colaborador`, `ausencias_colaborador`, `citas`, `citas_servicios`), los candados `EXCLUDE`
+  de empalme por colaborador y por espacio, las RPC (`guardar_cita`, `colaborador_libre`,
+  `agregar_en_espera`, `atender_cita`, `terminar_cita`, `marcar_no_llego`, `cancelar_cita`,
+  `resolver_empalme`, `faltas_cliente`) y `modulos_efectivos` publicando `agenda`.
+- **0219:** sync. `sync_pull_snapshot` baja catálogo y citas (últimos 7 días y las en espera);
+  `sync_push_snapshot` acepta citas y tramos de la caja (el catálogo desde la caja se ignora);
+  `_agenda_choques` y las reglas de empalme: un choque al subir marca ambas citas, no borra ni cancela;
+  `resolver_empalme` quita la marca.
+- **Admin:** `/agenda/servicios`, `/agenda/colaboradores`, `/agenda/espacios` y `/configuracion/agenda`.
+- **Caja y escritorio:** barra de belleza, calendario, cita, ficha, espera y Clientes; el sync de
+  escritorio sube citas por huella y baja el catálogo.
+
+**Para el lanzamiento**
+
+- **La 0216 Y la 0217 van en el instalador ANTES de aplicar la 0217 en la nube.** El backfill de la
+  0217 agrega `agenda` a `tenants.operacion`; una caja que no la traiga falla el pull con
+  `MODULO_DESCONOCIDO`. La 0218 y la 0219 pueden ir después, a mano y antes del merge.
+- `btree_gist` existe en el Postgres embebido de la caja instalada (verificado en
+  `@embedded-postgres/windows-x64`).
+- Los giros nuevos no se ofrecen en el registro y siguen bloqueados en `cambiar_giro` hasta la entrega 4.
+  Para probar en local, el negocio se pone en SALON por SQL.
+
+**Rulings de este plan (Fermín puede corregirlos)**
+
+- En la caja, con colaborador elegido, se puede agendar **fuera de su horario o en su ausencia** (la
+  recepción manda). «Quien esté libre» y la reserva en línea (entrega 3) sí los respetan.
+- Con colaborador elegido solo se exige que esté activo en la sucursal; no que ofrezca ese servicio.
+- Un servicio sin tipo de espacio no ocupa espacio.
+- El calendario muestra el día; la semana es la tira para cambiar de día (sin vista semanal completa).
+- «Cobrar» en la barra de belleza es la caja de tienda de hoy hasta la entrega 2.
+- Sin el módulo `agenda`, la caja de belleza se comporta como tienda.
+
+**Quedó para después / avisos para Fermín**
+
+- **Clave SAT de los servicios de belleza:** hoy es NULL y cae en 90101500 (la de restaurantes). Decidir
+  en la entrega 2 (cobro y factura).
+- **Clienta nueva sin teléfono:** la cita lleva solo el nombre y no se registra en Clientes (el modal lo dice).
+- **Último push gana:** si la caja y la nube editan la misma cita, queda lo que subió al final.
+- **`ticket_id` no lo actualiza el sync** al subir una cita; entrega 2.
+- **Carrera en «quien esté libre»:** si dos recepciones piden al mismo tiempo, la segunda recibe el
+  mensaje del colaborador ocupado. El candado decide bien; solo el texto es el del colaborador.
+- Sin carriles para citas que se cruzan en el calendario, sin vista por espacio y sin
+  «Colaboradores · Espacios» del boceto.
+- Menores de la revisión: nombres de color sin `aria-label` en el admin, fechas del admin por regex,
+  guardar y borrar horarios no es atómico, los inactivos no se ven en el admin.
