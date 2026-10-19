@@ -632,11 +632,6 @@ export function HomePos({
    * solo se oculta, así el carrito, el ticket guardado y la fila de agregados siguen donde estaban.
    */
   const [seccionTienda, setSeccionTienda] = useState<SeccionTienda>(() => seccionInicial(caja, agenda));
-  // El módulo puede llegar después (primera lectura de directivas) o apagarse con la caja abierta:
-  // se va a la sección de inicio que toque si se está en una que ya no es de esta barra.
-  useEffect(() => {
-    setSeccionTienda((s) => (!agenda && (s === "calendario" || s === "clientes") ? "panel" : agenda && s === "panel" ? "calendario" : s));
-  }, [agenda]);
   // Agenda de belleza: la ficha de una cita, la cita nueva o en edición, la lista de espera, y la
   // versión que relee el calendario al guardar, mover o cancelar.
   const [fichaCita, setFichaCita] = useState<string | null>(null);
@@ -644,6 +639,13 @@ export function HomePos({
   const [esperaAgendaAbierta, setEsperaAgendaAbierta] = useState(false);
   const [agendaVersion, setAgendaVersion] = useState(0);
   const agendaCambio = useCallback(() => setAgendaVersion((v) => v + 1), []);
+  // El módulo puede llegar después (primera lectura de directivas) o apagarse con la caja abierta:
+  // se va a la sección de inicio que toque si se está en una que ya no es de esta barra.
+  useEffect(() => {
+    setSeccionTienda((s) => (!agenda && (s === "calendario" || s === "clientes") ? "panel" : agenda && s === "panel" ? "calendario" : s));
+    // Apagada, sus capas se cierran: si no, se quedarían «abiertas» en la pila sin pintarse.
+    if (!agenda) { setFichaCita(null); setModalCita(null); setEsperaAgendaAbierta(false); }
+  }, [agenda]);
   /** Salir de la venta desde «Más» (bloquear, cambiar cajero, cerrar turno, salir) con productos sin guardar. */
   const [confirmar, dialogoConfirmar] = useConfirmar();
   const [confirmandoVenta, setConfirmandoVenta] = useState(false);

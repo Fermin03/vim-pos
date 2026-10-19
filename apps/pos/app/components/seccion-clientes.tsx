@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, Icono } from "@vim/ui/styles";
 import { diaLargo } from "@vim/db/agenda";
-import { citasDeCliente, guardarNotasCliente, leerFichaCliente, resumenCliente, type CitaDia, type FichaCliente } from "../lib/agenda";
+import { citasDeCliente, faltasCliente, guardarNotasCliente, leerFichaCliente, visitasCliente, type CitaDia, type FichaCliente } from "../lib/agenda";
+import { telefonoLegible } from "../lib/telefono";
 import { buscarClientesCuenta, type ClienteCuenta } from "../lib/clientes-cuenta";
 import { leerPrograma, leerSaldoLocal } from "../lib/lealtad";
 import { cantidad } from "../lib/lealtad-reglas";
@@ -74,6 +75,7 @@ function Ficha({ token, id, lealtad, version, onAgendar }: {
 }) {
   const [ficha, setFicha] = useState<FichaCliente | null>(null);
   const [citas, setCitas] = useState<CitaDia[] | null>(null);
+  const [faltas, setFaltas] = useState(0);
   const [puntos, setPuntos] = useState<string | null>(null);
   const [notas, setNotas] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -82,8 +84,9 @@ function Ficha({ token, id, lealtad, version, onAgendar }: {
 
   useEffect(() => {
     let vivo = true;
-    Promise.all([leerFichaCliente(token, id), citasDeCliente(token, id)])
-      .then(([f, c]) => { if (!vivo) return; setFicha(f); setNotas(f.notas ?? ""); setCitas(c); })
+    // Las faltas, de la misma función que la ficha de la cita: el mismo número en las dos pantallas.
+    Promise.all([leerFichaCliente(token, id), citasDeCliente(token, id), faltasCliente(token, id)])
+      .then(([f, c, n]) => { if (!vivo) return; setFicha(f); setNotas(f.notas ?? ""); setCitas(c); setFaltas(n); })
       .catch((e) => { if (vivo) setError(e instanceof Error ? e.message : "No se pudo leer la clienta"); });
     return () => { vivo = false; };
   }, [token, id, version]);
@@ -115,7 +118,7 @@ function Ficha({ token, id, lealtad, version, onAgendar }: {
   }
 
   if (!ficha || !citas) return <p className="p-8 text-14 text-ink-3" role={error ? "alert" : undefined}>{error ?? "Cargando…"}</p>;
-  const { visitas, faltas } = resumenCliente(citas);
+  const visitas = visitasCliente(citas);
   const cambiaron = notas.trim() !== (ficha.notas ?? "").trim();
   const dato = "rounded-lg border border-line px-4 py-3";
 
@@ -124,7 +127,7 @@ function Ficha({ token, id, lealtad, version, onAgendar }: {
       <div className="flex flex-wrap items-start gap-4">
         <div className="min-w-0 flex-1">
           <h2 className="font-display text-24 font-semibold tracking-tight">{ficha.nombre}</h2>
-          <p className="text-14 tabular-nums text-ink-2">{[ficha.telefono, ficha.email].filter(Boolean).join(" · ") || "Sin teléfono ni correo"}</p>
+          <p className="text-14 tabular-nums text-ink-2">{[ficha.telefono && telefonoLegible(ficha.telefono), ficha.email].filter(Boolean).join(" · ") || "Sin teléfono ni correo"}</p>
         </div>
         <Button className="h-12 px-5 text-15" onClick={() => onAgendar({ clienteId: ficha.id, nombre: ficha.nombre, telefono: ficha.telefono })}>
           <Icono nombre="calendario" className="h-5 w-5" />

@@ -6,3 +6,9 @@
 export function normalizarTelefono(t: string): string {
   return t.replace(/\D/g, "");
 }
+
+/** «477 123 4567» para leerlo en pantalla; si no son 10 dígitos, como venga. */
+export function telefonoLegible(t: string): string {
+  const d = normalizarTelefono(t);
+  return d.length === 10 ? `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}` : t;
+}

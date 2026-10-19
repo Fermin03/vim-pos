@@ -81,17 +81,16 @@ export function posicionTramo(inicia: Date, termina: Date, dia: string, desdeMin
 }
 
 /**
- * Horas de la rejilla, en minutos y en horas cerradas: de la primera entrada a la última salida de
- * los colaboradores de ese día, estiradas para que quepa toda cita. Sin nada, 9:00 a 20:00.
+ * Horas de la rejilla, en minutos y en horas cerradas: la unión de 9:00–20:00, el horario de los
+ * colaboradores de ese día y sus citas. Un domingo sin horario igual enseña el día de trabajo.
  */
 export function rangoHoras(colaboradores: ColaboradorDia[], citas: CitaDia[], dia: string): { desde: number; hasta: number } {
-  const ini: number[] = [];
-  const fin: number[] = [];
+  const ini: number[] = [9 * 60];
+  const fin: number[] = [20 * 60];
   for (const c of colaboradores) if (c.horario) { ini.push(c.horario.inicia); fin.push(c.horario.termina); }
   for (const c of citas) for (const t of c.tramos) {
     if (t.inicia && t.termina) { ini.push(minutoDelDia(t.inicia, dia)); fin.push(minutoDelDia(t.termina, dia)); }
   }
-  if (!ini.length) return { desde: 9 * 60, hasta: 20 * 60 };
   return {
     desde: Math.max(0, Math.floor(Math.min(...ini) / 60) * 60),
     hasta: Math.min(24 * 60, Math.ceil(Math.max(...fin) / 60) * 60),
@@ -281,6 +280,12 @@ export async function leerFichaCliente(token: string, id: string): Promise<Ficha
 }
 
 /** Notas de la clienta (alergias, preferencias). El cajero puede: `clientes` es por negocio (RLS). */
+/** Por qué el panel bloqueó a una clienta (o null si no lo dice). */
+export async function motivoBloqueo(token: string, id: string): Promise<string | null> {
+  const { data } = await employeeClient(token).from("clientes").select("motivo_bloqueo").eq("id", id).maybeSingle();
+  return data?.motivo_bloqueo ?? null;
+}
+
 export async function guardarNotasCliente(token: string, id: string, notas: string): Promise<void> {
   const { data, error } = await employeeClient(token)
     .from("clientes").update({ notas_internas: notas.trim() || null }).eq("id", id).select("id");
@@ -341,7 +346,8 @@ export function accionesCita(c: Pick<CitaDia, "estado" | "inicia" | "empalme" | 
     terminar: c.estado === "EN_CURSO",
     noLlego: porLlegar && c.inicia != null && ahora.getTime() >= c.inicia.getTime(),
     cancelar: porLlegar || c.estado === "EN_ESPERA",
-    empalme: c.empalme || c.tramos.some((t) => t.empalme),
+    // Una cita cerrada ya no ocupa: su empalme no se avisa.
+    empalme: (porLlegar || c.estado === "EN_ESPERA" || c.estado === "EN_CURSO") && (c.empalme || c.tramos.some((t) => t.empalme)),
   };
 }
 
@@ -352,12 +358,9 @@ export function enlaceRecordatorio(c: Pick<CitaDia, "clienteNombre" | "clienteTe
   return enlaceWhatsappCotizacion(c.clienteTelefono, mensajeRecordatorio({ nombre, negocio, inicia: c.inicia, servicios: c.tramos.map((t) => t.servicio) }));
 }
 
-/** Visitas (citas terminadas, la más reciente arriba) y faltas de una clienta. */
-export function resumenCliente(citas: CitaDia[]): { visitas: CitaDia[]; faltas: number } {
-  return {
-    visitas: citas.filter((c) => c.estado === "TERMINADA").sort((a, b) => (b.inicia?.getTime() ?? 0) - (a.inicia?.getTime() ?? 0)),
-    faltas: citas.filter((c) => c.estado === "NO_LLEGO").length,
-  };
+/** Visitas de una clienta: sus citas terminadas, la más reciente arriba. Las faltas salen de `faltas_cliente` (todas, no solo estas). */
+export function visitasCliente(citas: CitaDia[]): CitaDia[] {
+  return citas.filter((c) => c.estado === "TERMINADA").sort((a, b) => (b.inicia?.getTime() ?? 0) - (a.inicia?.getTime() ?? 0));
 }
 
 /** «1 h 15 min», «45 min». */

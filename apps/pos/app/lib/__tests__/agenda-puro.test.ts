@@ -65,8 +65,12 @@ describe("layout del calendario", () => {
     tramos: [{ id: "t", orden: 1, productoId: "p", servicio: "Corte", usuarioId: "d", colaborador: "Diego R.", espacio: null, precio: 150, inicia: t(`${dia}T${i}:00-06:00`), termina: t(`${dia}T${f}:00-06:00`), empalme: false }],
   });
 
-  it("horas: del horario de los colaboradores, estiradas a las citas; sin nada, 9 a 20", () => {
-    expect(rangoHoras([diego], [], dia)).toEqual({ desde: 600, hasta: 1140 });
+  it("horas: la unión de 9 a 20, el horario de los colaboradores y las citas", () => {
+    expect(rangoHoras([diego], [], dia)).toEqual({ desde: 540, hasta: 1200 });
+    expect(rangoHoras([{ ...diego, horario: { inicia: 480, termina: 1290, comida: null } }], [], dia)).toEqual({ desde: 480, hasta: 1320 });
+    // Domingo sin horario con una cita a las 17:00: igual se ve de 9 a 20, no solo 17 a 19.
+    expect(rangoHoras([{ ...diego, horario: null }], [cita("17:00", "18:30")], dia)).toEqual({ desde: 540, hasta: 1200 });
+    expect(rangoHoras([], [cita("07:15", "08:00"), cita("21:00", "21:40")], dia)).toEqual({ desde: 420, hasta: 1320 });
     expect(rangoHoras([diego], [cita("09:30", "10:15"), cita("18:30", "19:20")], dia)).toEqual({ desde: 540, hasta: 1200 });
     expect(rangoHoras([], [], dia)).toEqual({ desde: 540, hasta: 1200 });
   });

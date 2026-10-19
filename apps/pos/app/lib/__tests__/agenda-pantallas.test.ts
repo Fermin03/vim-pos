@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { horaCorta } from "@vim/db/agenda";
+import { telefonoLegible } from "../telefono";
 import {
-  accionesCita, duracionCon, duracionTexto, enlaceRecordatorio, entradaCita, posicionTramo, precioCon, resumenCliente,
+  accionesCita, duracionCon, duracionTexto, enlaceRecordatorio, entradaCita, posicionTramo, precioCon, visitasCliente,
   type CitaDia, type ServicioAgenda,
 } from "../agenda";
 
@@ -68,6 +69,10 @@ describe("acciones de la ficha", () => {
     const c = cita();
     c.tramos[1]!.empalme = true;
     expect(accionesCita(c, t("2026-11-06T10:00:00-06:00")).empalme).toBe(true);
+    // Cerrada ya no ocupa: el aviso y «Ya lo moví» no salen.
+    for (const estado of ["TERMINADA", "NO_LLEGO", "CANCELADA"] as const) {
+      expect(accionesCita({ ...c, estado, empalme: true }, t("2026-11-06T12:00:00-06:00")).empalme).toBe(false);
+    }
   });
 });
 
@@ -86,8 +91,8 @@ describe("recordatorio por WhatsApp", () => {
 });
 
 describe("ficha de la clienta", () => {
-  it("cuenta visitas (terminadas, la más reciente arriba) y faltas", () => {
-    const r = resumenCliente([
+  it("visitas: las terminadas, la más reciente arriba (las faltas salen de faltas_cliente)", () => {
+    const r = visitasCliente([
       cita({ id: "1", estado: "TERMINADA", inicia: t("2026-10-01T10:00:00-06:00") }),
       cita({ id: "2", estado: "NO_LLEGO" }),
       cita({ id: "3", estado: "TERMINADA", inicia: t("2026-10-15T10:00:00-06:00") }),
@@ -95,8 +100,12 @@ describe("ficha de la clienta", () => {
       cita({ id: "5", estado: "AGENDADA" }),
       cita({ id: "6", estado: "NO_LLEGO" }),
     ]);
-    expect(r.visitas.map((c) => c.id)).toEqual(["3", "1"]);
-    expect(r.faltas).toBe(2);
+    expect(r.map((c) => c.id)).toEqual(["3", "1"]);
+  });
+
+  it("teléfono legible «477 123 4567»; si no son 10 dígitos, como venga", () => {
+    expect(telefonoLegible("4771234567")).toBe("477 123 4567");
+    expect(telefonoLegible("12345")).toBe("12345");
   });
 });
 

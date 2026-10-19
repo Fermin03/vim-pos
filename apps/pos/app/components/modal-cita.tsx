@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Icono, Modal } from "@vim/ui/styles";
 import { horaCorta, tramosEncadenados } from "@vim/db/agenda";
 import {
-  agregarEnEspera, colaboradoresDelDia, duracionCon, entradaCita, guardarCita, precioCon, serviciosAgenda,
+  agregarEnEspera, colaboradoresDelDia, motivoBloqueo, duracionCon, entradaCita, guardarCita, precioCon, serviciosAgenda,
   type CitaDia, type ColaboradorDia, type RenglonCita, type ServicioAgenda,
 } from "../lib/agenda";
 import { TelefonoDuplicado, buscarClientesCuenta, normalizarTelefono, registrarClienteCuenta, type ClienteCuenta } from "../lib/clientes-cuenta";
@@ -74,7 +74,9 @@ export function ModalCita({ token, tenantId, sucursalId, abrir, onGuardada, onCe
     return () => { vivo = false; clearTimeout(t); };
   }, [q, elegida, token]);
 
-  const nombreDe = (id: string | null) => (id ? colaboradores.find((c) => c.usuarioId === id)?.nombre ?? "Colaborador" : "Quien esté libre");
+  const nombreDe = (id: string | null) => (id
+    ? colaboradores.find((c) => c.usuarioId === id)?.nombre ?? cita?.tramos.find((t) => t.usuarioId === id)?.colaborador ?? "Colaborador"
+    : "Quien esté libre");
   const inicio = /^\d{4}-\d{2}-\d{2}$/.test(dia) && /^\d{2}:\d{2}$/.test(hora) ? new Date(`${dia}T${hora}:00-06:00`) : null;
 
   const completos = renglones.every((r) => r.productoId) && renglones.length > 0;
@@ -112,6 +114,11 @@ export function ModalCita({ token, tenantId, sucursalId, abrir, onGuardada, onCe
           c = { ...clienta, id: nueva.clienteId };
         } catch (e) {
           if (!(e instanceof TelefonoDuplicado)) throw e;
+          // Como en la búsqueda: a una clienta bloqueada desde el panel no se le agenda.
+          if (e.cliente.bloqueado) {
+            const m = await motivoBloqueo(token, e.cliente.clienteId).catch(() => null);
+            throw new Error(`Ese teléfono es de ${e.cliente.nombre}, bloqueada desde el panel${m ? `: ${m}` : "."}`);
+          }
           c = { ...clienta, id: e.cliente.clienteId, nombre: e.cliente.nombre };
         }
         setClienta(c);
@@ -194,7 +201,11 @@ export function ModalCita({ token, tenantId, sucursalId, abrir, onGuardada, onCe
             <div className="flex flex-col gap-2">
               {renglones.map((r, i) => {
                 const s = servicios.find((x) => x.productoId === r.productoId);
-                const quienes = s ? colaboradores.filter((c) => s.colaboradores.some((x) => x.usuarioId === c.usuarioId)) : [];
+                const quienes = (s ? colaboradores.filter((c) => s.colaboradores.some((x) => x.usuarioId === c.usuarioId)) : colaboradores)
+                  .map((c) => ({ usuarioId: c.usuarioId, nombre: c.nombre }));
+                // Quien ya estaba elegido sigue en la lista aunque ese día no salga o no tenga el servicio:
+                // lo que se ve es lo que se guarda.
+                if (r.usuarioId && !quienes.some((c) => c.usuarioId === r.usuarioId)) quienes.unshift({ usuarioId: r.usuarioId, nombre: nombreDe(r.usuarioId) });
                 return (
                   <div key={i} className="flex items-center gap-2">
                     <select className={input} value={r.productoId} aria-label={`Servicio ${i + 1}`}
@@ -209,7 +220,7 @@ export function ModalCita({ token, tenantId, sucursalId, abrir, onGuardada, onCe
                     <select className={input} value={r.usuarioId ?? ""} aria-label={`Quién atiende el servicio ${i + 1}`}
                       onChange={(e) => cambiar(i, { usuarioId: e.target.value || null })}>
                       <option value="">{espera ? "Sin preferencia" : "Quien esté libre"}</option>
-                      {(s ? quienes : colaboradores).map((c) => <option key={c.usuarioId} value={c.usuarioId}>{c.nombre}</option>)}
+                      {quienes.map((c) => <option key={c.usuarioId} value={c.usuarioId}>{c.nombre}</option>)}
                     </select>
                     <button type="button" aria-label={`Quitar el servicio ${i + 1}`} disabled={renglones.length === 1}
                       onClick={() => setRenglones((rs) => rs.filter((_, j) => j !== i))}

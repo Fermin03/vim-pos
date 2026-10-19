@@ -32,7 +32,7 @@ const iniciales = (nombre: string) =>
 const hhmm = (min: number) => `${Math.floor(min / 60) || "00"}:${String(min % 60).padStart(2, "0")}`;
 
 /** Columna para los tramos de alguien que ya no está en la agenda (dado de baja) o sin colaborador. */
-const SIN_COLABORADOR: ColaboradorDia = { usuarioId: "", nombre: "Sin colaborador", color: "#6E6E74", horario: null, ausente: false };
+const SIN_COLABORADOR: ColaboradorDia = { usuarioId: "", nombre: "Sin colaborador", color: "rgb(var(--ink-3))", horario: null, ausente: false };
 
 /**
  * Calendario de la caja de belleza (boceto 1): el día por colaborador, con la línea de la hora,
@@ -294,7 +294,8 @@ function TarjetaTramo({ cita, tramo, dia, desde, color, ahora, tolerancia, onAbr
         top: top + 2,
         height: Math.max(alto - 4, ALTO_MIN),
         borderLeftColor: noLlego ? "rgb(var(--danger))" : color,
-        backgroundColor: noLlego ? undefined : `${color}1A`,
+        // 10 % del color (hex de la paleta o un token): color-mix sirve para los dos.
+        backgroundColor: noLlego ? undefined : `color-mix(in srgb, ${color} 10%, transparent)`,
       }}
     >
       <span className="flex items-start gap-2">

@@ -7,6 +7,7 @@ import {
   marcarNoLlego, resolverEmpalme, terminarCita, toleranciaMin, type CitaCanal, type CitaDia,
 } from "../lib/agenda";
 import { fmtMxn } from "../lib/turno";
+import { telefonoLegible } from "../lib/telefono";
 
 const CANAL: Record<CitaCanal, string> = { CAJA: "En la caja", SIN_CITA: "Sin cita, de la lista de espera", EN_LINEA: "En línea" };
 
@@ -88,7 +89,7 @@ export function FichaCita({ token, citaId, negocio, onMover, onCambio, onCerrar 
     : cita?.estado === "EN_CURSO" ? "border-success-line bg-success-soft text-success"
       : cita?.estado === "AGENDADA" || cita?.estado === "EN_ESPERA" ? "border-warning-line bg-warning-soft text-warning"
         : "border-line bg-sel text-ink-2";
-  const contacto = cita ? [cita.clienteTelefono, cita.clienteEmail, faltas ? `${faltas} ${faltas === 1 ? "falta" : "faltas"} antes` : null].filter(Boolean).join(" · ") : "";
+  const contacto = cita ? [cita.clienteTelefono && telefonoLegible(cita.clienteTelefono), cita.clienteEmail, faltas ? `${faltas} ${faltas === 1 ? "falta" : "faltas"} antes` : null].filter(Boolean).join(" · ") : "";
   const fila = "flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-line py-3";
   const accion = "h-12 w-full text-15";
   const peligro = "flex h-12 w-full items-center justify-center rounded border border-danger-line bg-surface font-display text-15 font-semibold text-danger transition-[background-color,transform] duration-150 ease-vim hover:bg-danger-soft active:scale-[.97] disabled:pointer-events-none disabled:opacity-50";
