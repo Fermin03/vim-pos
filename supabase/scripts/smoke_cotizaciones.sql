@@ -171,6 +171,8 @@ BEGIN
      OR jsonb_array_length(j2->'renglones') <> 2 OR (j2->>'vigente_hasta')::date <> v_hoy - 1 THEN
     RAISE EXCEPTION '8: cotizacion_publica dio %', j2;
   END IF;
+  IF EXISTS (SELECT 1 FROM jsonb_array_elements(j2->'renglones') r WHERE NOT r ? 'unidad_sat') THEN
+    RAISE EXCEPTION '8: un renglón sin unidad_sat: %', j2; END IF;
   IF j2::text ~* '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-' OR j2::text LIKE '%' || v_tok || '%' THEN
     RAISE EXCEPTION '8: cotizacion_publica filtró ids: %', j2; END IF;
   IF cotizacion_publica('no-existe-este-token-de-cotizacion') IS NOT NULL OR cotizacion_publica(NULL) IS NOT NULL THEN

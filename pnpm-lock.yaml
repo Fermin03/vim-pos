@@ -83,6 +83,9 @@ importers:
 
   apps/factura:
     dependencies:
+      '@vim/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@vim/fecha':
         specifier: workspace:*
         version: link:../../packages/fecha

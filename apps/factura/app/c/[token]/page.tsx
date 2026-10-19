@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { buscarCotizacion, fechaDia } from "../../lib/cotizacion";
 import { BotonImprimir } from "./boton-imprimir";
 
@@ -5,6 +6,8 @@ import { BotonImprimir } from "./boton-imprimir";
  * La cotización que le llega al cliente por WhatsApp (`/c/<token>`). Se pinta en el servidor: sin
  * sesión, sin cookies y sin rastreo. Lo de `print:` deja en el PDF solo la cotización.
  */
+export const metadata: Metadata = { robots: { index: false, follow: false } };
+
 const mxn = (n: number) => n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
 
 export default async function PaginaCotizacion({ params }: { params: Promise<{ token: string }> }) {
@@ -41,8 +44,8 @@ export default async function PaginaCotizacion({ params }: { params: Promise<{ t
         {c.renglones.map((r, i) => (
           <li key={i} className="flex items-start justify-between gap-4 py-3">
             <div className="min-w-0">
-              <div className="text-16 font-semibold leading-snug">{r.cantidad} × {r.nombre}</div>
-              <div className="text-14 text-ink-2">{r.sku ? `${r.sku} · ` : ""}{mxn(r.precio)} c/u</div>
+              <div className="text-16 font-semibold leading-snug">{r.cantidad} {r.nombre}</div>
+              <div className="text-14 text-ink-2">{r.sku ? `${r.sku} · ` : ""}{mxn(r.precio)}{r.precioUnidad || " c/u"}</div>
             </div>
             <div className="flex-shrink-0 text-16 font-semibold tabular-nums">{mxn(r.total)}</div>
           </li>

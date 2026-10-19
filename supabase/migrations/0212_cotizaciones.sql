@@ -442,6 +442,7 @@ AS $$
     'renglones', (SELECT COALESCE(jsonb_agg(jsonb_build_object(
                      'nombre', i.producto_nombre_snapshot,
                      'sku', i.producto_sku_snapshot,
+                     'unidad_sat', i.unidad_sat_snapshot,
                      'cantidad', i.cantidad,
                      'precio_unitario', i.precio_unitario_snapshot,
                      'total', i.total_item_mxn) ORDER BY i.orden_visualizacion), '[]'::jsonb)
