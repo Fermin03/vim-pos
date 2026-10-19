@@ -56,7 +56,7 @@ function crearPoolFalso({
       // Migración de la libreta de zonas a huella (C3): columna y relleno. Aquí no hay huellas que
       // rellenar; lo que hacen de verdad lo prueba el bloque con Postgres real al final del archivo.
       if (sql.startsWith("ALTER TABLE")) return { rows: [], rowCount: 0 };
-      if (sql.startsWith("UPDATE _vim_zonas_ok") || sql.startsWith("UPDATE _vim_colonias_ok")) return { rows: [], rowCount: 0 };
+      if (sql.startsWith("UPDATE _vim_zonas_ok") || sql.startsWith("UPDATE _vim_colonias_ok") || sql.startsWith("UPDATE _vim_cotizaciones_ok")) return { rows: [], rowCount: 0 };
 
       // `_vim_migraciones_sync`: el marcador de "esto ya corrió una vez en esta caja".
       if (sql.includes("_vim_migraciones_sync")) {
@@ -975,6 +975,74 @@ describe("ventas que cambian después de subir, y el piso de las mesas (Postgres
     assert.equal(nube.peticiones.filter((x) => (x.snapshot?.abonos_credito ?? []).length).length, 1, "una sola vez");
   });
 
+  // ── Cotizaciones (0213): suben por huella, con sus renglones ───────────────────────────────
+  /** Una cotización como la deja guardar_cotizacion en la caja. */
+  const cotizar = async (clave) => {
+    await db.query(`INSERT INTO configuracion_tenant (tenant_id, modulo_cotizaciones_activo) VALUES ($1, true)
+                    ON CONFLICT (tenant_id) DO UPDATE SET modulo_cotizaciones_activo = true`, [TENANT]);
+    const c = await db.connect();
+    try {
+      await c.query("SELECT set_config('request.jwt.claims', $1, false)", [JSON.stringify({ sub: MARIA, tenant_id: TENANT })]);
+      const { rows: [{ j }] } = await c.query(
+        `SELECT guardar_cotizacion($1, $2, NULL, jsonb_build_array(
+           jsonb_build_object('producto_id', (SELECT id FROM productos WHERE tenant_id = $3 AND nombre = 'Hamburguesa Clásica' LIMIT 1), 'cantidad', 2),
+           jsonb_build_object('producto_id', (SELECT id FROM productos WHERE tenant_id = $3 AND nombre = 'Hamburguesa Clásica' LIMIT 1), 'cantidad', 1)),
+           $4) AS j`, [SUC, CAJA, TENANT, clave]);
+      return j.id;
+    } finally { c.release(); }
+  };
+  const cotPend = async (id) => (await pend()).cotizaciones.some((x) => x.id === id);
+
+  test("cotizaciones: sube una vez con sus renglones; al cancelarla vuelve a subir", async () => {
+    await subir();
+    const cot = await cotizar("cot-1");
+    assert.ok(await cotPend(cot), "recién hecha, está pendiente");
+
+    const [snap] = await subir({ resultado: { cotizaciones: 1, cotizacion_items: 2 } });
+    assert.ok((snap?.cotizaciones ?? []).some((x) => x.id === cot), "la cotización viaja");
+    assert.equal((snap?.cotizacion_items ?? []).filter((x) => x.cotizacion_id === cot).length, 2, "con sus dos renglones");
+    assert.ok(!(await cotPend(cot)), "confirmada, no se repite");
+    const [otra] = await subir();
+    assert.equal((otra?.cotizaciones ?? []).length, 0, "el siguiente push no la vuelve a mandar");
+
+    await enReplica("UPDATE cotizaciones SET estado = 'CANCELADA', updated_at = now() WHERE id = $1", [cot]);
+    assert.ok(await cotPend(cot), "cancelarla la deja pendiente");
+    const [snap2] = await subir({ resultado: { cotizaciones: 1, cotizacion_items: 0 } });
+    assert.equal((snap2?.cotizaciones ?? []).find((x) => x.id === cot)?.estado, "CANCELADA", "viaja cancelada");
+    assert.ok(!(await cotPend(cot)), "confirmada, ya no");
+  });
+
+  test("cotizaciones: rechazada, con un renglón rechazado o sin la 0213 en la nube, se reintenta", async () => {
+    const cot = await cotizar("cot-2");
+    await subir({ resultado: { cotizaciones: 0, cotizacion_items: 0, _errores: [{ tabla: "cotizaciones", id: cot, error: "x" }] } });
+    assert.ok(await cotPend(cot), "rechazada: sigue pendiente");
+    const { rows: [{ id: item }] } = await db.query("SELECT id FROM cotizacion_items WHERE cotizacion_id = $1 LIMIT 1", [cot]);
+    await subir({ resultado: { cotizaciones: 1, cotizacion_items: 1, _errores: [{ tabla: "cotizacion_items", id: item, error: "x" }] } });
+    assert.ok(await cotPend(cot), "un renglón rechazado: la cotización sigue pendiente");
+    await subir({ resultado: { _ignoradas: ["cotizaciones", "cotizacion_items"] } });
+    assert.ok(await cotPend(cot), "ignorada: sigue pendiente");
+    await subir({ resultado: { cotizaciones: 1, cotizacion_items: 2 } });
+    assert.ok(!(await cotPend(cot)), "confirmada: ya no");
+  });
+
+  test("cotizaciones: una convertida viaja en el lote de su venta, no antes", async () => {
+    await subir();
+    const cot = await cotizar("cot-3");
+    await subir({ resultado: { cotizaciones: 1, cotizacion_items: 2 } });
+    const v1 = await crearVenta("cot-v1");
+    const v2 = await crearVenta("cot-v2");
+    await enReplica("UPDATE tickets SET estado_fiscal = 'PAGADO', fecha_apertura = now() WHERE id = ANY($1::uuid[])", [[v1, v2]]);
+    await enReplica("UPDATE cotizaciones SET estado = 'CONVERTIDA', ticket_id = $2, updated_at = now() WHERE id = $1", [cot, v2]);
+    const nube = nubeFalsa({ resultado: { cotizaciones: 1, cotizacion_items: 0 } });
+    try {
+      await pushToCloud(db, OPTS, () => {}, { maxVentasPorLote: 1 });
+    } finally { nube.restaurar(); }
+    const lotes = nube.peticiones.filter((x) => (x.snapshot?.cotizaciones ?? []).some((c) => c.id === cot));
+    assert.equal(lotes.length, 1, "una sola vez");
+    assert.ok((lotes[0].snapshot.tickets ?? []).some((t) => t.id === v2), "en el mismo lote que su venta");
+    assert.ok(!(await cotPend(cot)), "confirmada, ya no");
+  });
+
   test("crédito: lo que baja del pull se guarda y no vuelve a subir", async () => {
     const { rows: [{ id: cliente }] } = await db.query(
       "INSERT INTO clientes (tenant_id, nombre, telefono) VALUES ($1, 'Crédito Nube', '4770009901') RETURNING id", [TENANT]);
@@ -1151,7 +1219,7 @@ test("lealtad: el snapshot lleva el canje de TODO ticket del lote, atado a los t
   const snap = consultas.find((c) => c.sql.includes("WITH tk AS"));
   assert.match(snap.sql, /'ticket_canjes_lealtad',\s+\(SELECT jsonb_agg\(to_jsonb\(x\)\) FROM ticket_canjes_lealtad x WHERE x\.ticket_id IN \(SELECT id FROM tk\)\)/);
   assert.match(snap.sql, /'lealtad_movimientos'/);
-  assert.equal(snap.params.length, 11, "$8 son los movimientos de lealtad; $9, los de producto; $10 y $11, los del crédito (0210)");
+  assert.equal(snap.params.length, 12, "$8 son los movimientos de lealtad; $9, los de producto; $10 y $11, los del crédito (0210); $12, las cotizaciones (0213)");
   assert.deepEqual(snap.params[7], [B]);
 });
 
