@@ -64,6 +64,13 @@ extension, and the normal address answers with `text/markdown` when asked with a
 - [Restaurantes con meseros](https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo.md): VIM POS para un restaurante de servicio completo: mapa de mesas, meseros y propinas por mesero, cocina por estación, cuenta impresa e inventario con mermas.
 - [Bares y cervecerías](https://vimpos.com.mx/punto-de-venta-bares.md): VIM POS para un bar o cervecería: cuentas por nombre en la barra, mesas, propinas, comandas a la barra y a cocina, y un corte que cuadra.
 - [Food trucks](https://vimpos.com.mx/punto-de-venta-food-trucks.md): VIM POS para un food truck: cobra sin internet, turno por evento con su propio corte, menú rápido, cobro con tarjeta y lealtad.
+- [Tiendas de ropa](https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa.md): VIM POS para una tienda de ropa o calzado: existencias por talla y color, lector de código de barras, cambios de talla, etiquetas y ventas por talla y color.
+- [Vinos y licores](https://vimpos.com.mx/punto-de-venta-vinaterias.md): VIM POS para una vinatería o licorería: código de barras, existencias con aviso de mínimo, recibir mercancía, cotizaciones y crédito a clientes.
+- [Abarrotes y fruterías](https://vimpos.com.mx/punto-de-venta-abarrotes.md): VIM POS para abarrotes y fruterías: venta por kilo o por pieza, crédito a clientes con abonos, cotizaciones y existencias.
+- [Salones de belleza](https://vimpos.com.mx/punto-de-venta-salones-de-belleza.md): VIM POS para un salón de belleza: agenda por colaboradora, cobro de la cita, anticipos, comisiones y lista de espera.
+- [Spas](https://vimpos.com.mx/punto-de-venta-spa.md): VIM POS para un spa: agenda por terapeuta y por cabina sin empalmes, anticipos, cobro de la cita y comisiones.
+- [Peluquerías y barberías](https://vimpos.com.mx/punto-de-venta-peluquerias.md): VIM POS para una peluquería o barbería: citas y lista de espera, agenda por barbero, cobro y comisiones.
+- [Estudios de tatuajes](https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes.md): VIM POS para un estudio de tatuajes: citas con anticipo, agenda por artista, cobro de la sesión y comisiones.
 - [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon.md): VIM POS para restaurantes de León, Guanajuato, donde se hace el producto: en la zona, la demostración puede ser en el local.
 - [Nosotros](https://vimpos.com.mx/nosotros.md): Quién construye VIM POS, desde dónde, por qué existe y en qué punto está el producto hoy.
 - [Contacto](https://vimpos.com.mx/contacto.md): Cómo contactar a VIM POS: WhatsApp, correo, domicilio fiscal, horario y en cuánto contestamos.
@@ -80,5 +87,5 @@ extension, and the normal address answers with `text/markdown` when asked with a
 - [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md): Qué datos se recaban, para qué, cuánto se guardan y cómo ejercer los derechos ARCO.
 - [Términos del servicio](https://vimpos.com.mx/terminos.md): Qué se contrata, qué no incluye, cómo se cobra y cómo se cancela.
 - [Agent instructions / Instrucciones para agentes](https://vimpos.com.mx/agents.md): when to use VIM POS, when not to, and how to act on it. Bilingual.
-- [Todo el sitio en un solo archivo](https://vimpos.com.mx/llms-full.txt): las 21 páginas concatenadas, para cargar el contexto completo de una vez.
+- [Todo el sitio en un solo archivo](https://vimpos.com.mx/llms-full.txt): las 28 páginas concatenadas, para cargar el contexto completo de una vez.
 - [Índice de direcciones](https://vimpos.com.mx/sitemap.xml): el sitemap en XML.

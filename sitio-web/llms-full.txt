@@ -2,7 +2,7 @@
 
 > VIM POS es un sistema de punto de venta para restaurantes en México. El programa completo se instala en la computadora de la caja, así que cobrar, imprimir tickets y mandar comandas a cocina funcionan sin conexión a internet; la nube sirve de respaldo y de panel para el dueño. Incluye caja, pantalla de cocina, mapa de mesas, inventario, reportes y facturación electrónica CFDI 4.0. Desde $699 MXN al mes más IVA, sin pago inicial; desde el plan Negocio, VIM carga el menú y capacita al equipo, y en Esencial el dueño arranca con una guía paso a paso.
 
-Este archivo concatena las 21 páginas de https://vimpos.com.mx en Markdown. Es el
+Este archivo concatena las 28 páginas de https://vimpos.com.mx en Markdown. Es el
 contexto completo del producto en una sola descarga. El índice corto, con la guía de
 cuándo recomendarlo, está en https://vimpos.com.mx/llms.txt
 
@@ -2741,6 +2741,1477 @@ No. Lo pegas desde tu sistema actual o una hoja de cálculo. Desde Negocio lo ca
 ## Pon tu food truck a vender hoy
 
 Empieza tú solo, o te lo enseñamos con tu menú.
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+---
+
+<!-- https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa -->
+
+# Punto de venta para tiendas de ropaCada talla y cada color, contados sin libreta
+
+> Tallas y colores con su existencia, lector de código de barras, cambios de talla y etiquetas. Para tiendas de ropa y calzado, desde $699 al mes más IVA.
+
+**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa
+
+Vende con lector de código de barras, cambia tallas y sabe qué tienes en el anaquel.
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+## Vende rápido y sabe siempre qué te queda
+
+_La talla y el color, con su existencia._
+
+### Talla y color en un toque
+
+Eliges la prenda y su talla y color en una cuadrícula, con la existencia a la vista.
+
+_Las prendas escaneadas, en el ticket._
+
+### Escanea y cobra
+
+Con un lector de código de barras, cada prenda entra al ticket en un segundo.
+
+_Un cambio de talla, en la caja._
+
+### Cambios de talla sin enredos
+
+Regresa una prenda y llévate otra. La diferencia se cobra o se devuelve en efectivo.
+
+_Las etiquetas, listas para imprimir._
+
+### Etiquetas con código
+
+Imprime las etiquetas de cada talla y color, con su código de barras.
+
+_Las ventas por talla y color._
+
+### Qué talla se vende más
+
+Las ventas por talla y color, con su margen.
+
+_Para el dueño_
+
+## Lo que necesitas para crecer
+
+### Existencias al día
+
+Recibe mercancía, haz conteos y pasa prendas entre sucursales.
+
+### Avisos antes de que se acabe
+
+Fija un mínimo por prenda y la caja te avisa cuando baja.
+
+### Tu catálogo en una hoja
+
+Sube tus prendas desde una hoja de cálculo, con su talla, color y código.
+
+![El panel del dueño en un celular.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard-movil.webp?v=3)
+
+### [La venta del día en tu celular](https://vimpos.com.mx/funciones#reportes)
+
+Revisa ventas y cortes desde donde estés.
+
+_Equipo_
+
+## Funciona con lo que ya tienes
+
+Sin equipo especial: lo compras donde quieras.
+
+### Computadora con Windows
+
+Windows 10 u 11. Es tu caja.
+
+### Impresora de tickets
+
+Térmica de 80 mm, de red o USB.
+
+### Terminal Mercado Pago
+
+Cobra con tarjeta desde la caja con la Point Smart 2.
+
+### Lector de código de barras
+
+Uno USB, de los que venden en cualquier lado.
+
+_Precios_
+
+## Un plan para cada tamaño de tienda
+
+Sin pago inicial y sin contrato forzoso.
+
+[Ver precios](https://vimpos.com.mx/precios)
+
+### Esencial
+
+Para arrancar con una caja.
+
+**$699**
+
+/mes
+
+1 sucursal · 1 caja · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal para una tienda de ropa
+
+- Existencias por talla y color, incluidas
+- Cambios de talla y devoluciones
+- Etiquetas con código de barras
+- Facturación: $349 al mes aparte
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+### Negocio
+
+El que recomendamos
+
+Todo para un local, con tu menú cargado por nosotros.
+
+**$999**
+
+/mes
+
+1 sucursal · 3 cajas · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal para una tienda de ropa
+
+- Hasta 3 cajas en la tienda
+- Facturación incluida, 20 folios al mes
+- Cargamos tu catálogo
+- Capacitamos a tu equipo
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+### Cadena
+
+Varias sucursales, vistas en un solo lugar.
+
+**$1,999**
+
+/mes
+
+3 sucursales · cajas sin límite · más IVA
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+Lo principal para una tienda de ropa
+
+- Cajas sin límite en cada sucursal
+- Traspasos de mercancía entre sucursales
+- Facturación incluida, 40 folios al mes
+- Vamos a tu local el día del arranque
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+_Guías_
+
+## Antes de decidir
+
+### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
+
+Nueve preguntas antes de firmar.
+
+### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
+
+Las tres formas de cobrarte, con cuentas.
+
+### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
+
+Qué es y cómo se emite.
+
+_Preguntas_
+
+## Lo que pregunta una tienda de ropa
+
+### ¿Sirve si solo tengo una caja?
+
+Sí. El plan Esencial es una sucursal y una caja, por $699 al mes más IVA. Los tres planes están en [precios](https://vimpos.com.mx/precios).
+
+### ¿Funciona con mi lector de código de barras?
+
+Sí, con cualquier lector USB que escriba como teclado.
+
+### ¿Tengo que capturar todo mi catálogo?
+
+No. Lo subes desde una hoja de cálculo. Desde Negocio lo cargamos nosotros.
+
+### ¿Cómo funciona un cambio de talla?
+
+Regresas la prenda y eliges la nueva. Si cuesta más se cobra la diferencia, y si cuesta menos se devuelve en efectivo.
+
+### ¿Qué pasa si se cae el internet?
+
+Nada: sigues vendiendo e imprimiendo. Todo sube al volver la señal. [Así funciona](https://vimpos.com.mx/sin-internet).
+
+## Pon tu tienda a vender hoy
+
+Empieza tú solo, o te lo enseñamos con tu catálogo.
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+---
+
+<!-- https://vimpos.com.mx/punto-de-venta-vinaterias -->
+
+# Punto de venta para vinaterías y licoreríasCada botella en su lugar y cada venta en segundos
+
+> Código de barras, existencias con aviso de mínimo, cotizaciones y crédito a clientes. Para vinaterías y licorerías, desde $699 al mes más IVA.
+
+**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-vinaterias
+
+Código de barras, existencias con aviso de mínimo y cotizaciones, en una caja que sigue sin internet.
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+## Menos faltantes y ventas más rápidas
+
+_Las botellas escaneadas, en el ticket._
+
+### Escanea y cobra
+
+Cada botella entra al ticket con su código de barras, en un segundo.
+
+_Lo que está por acabarse, a la vista._
+
+### Avisos antes de que se acabe
+
+Fija un mínimo por producto y la caja te avisa cuando baja.
+
+_La mercancía que entra, sumada._
+
+### Recibe mercancía en minutos
+
+Al llegar el pedido sumas lo que entró, y queda en existencias.
+
+_Una cotización lista para mandar._
+
+### Cotizaciones para eventos
+
+Arma la cotización de una boda o una fiesta y mándala por WhatsApp.
+
+_El crédito y los abonos de un cliente._
+
+### Crédito a tus clientes
+
+Cada cliente con su límite y su plazo. Los abonos quedan registrados.
+
+_Para el dueño_
+
+## Lo que necesitas para crecer
+
+### Existencias al día
+
+Conteos, mínimos y movimientos de cada producto.
+
+### Quién te debe y cuánto
+
+Los créditos de tus clientes y sus abonos, en el panel.
+
+### Tu catálogo en una hoja
+
+Sube tus productos desde una hoja de cálculo, con su código.
+
+![El panel del dueño en un celular.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard-movil.webp?v=3)
+
+### [La venta del día en tu celular](https://vimpos.com.mx/funciones#reportes)
+
+Revisa ventas y cortes desde donde estés.
+
+_Equipo_
+
+## Funciona con lo que ya tienes
+
+Sin equipo especial: lo compras donde quieras.
+
+### Computadora con Windows
+
+Windows 10 u 11. Es tu caja.
+
+### Impresora de tickets
+
+Térmica de 80 mm, de red o USB.
+
+### Terminal Mercado Pago
+
+Cobra con tarjeta desde la caja con la Point Smart 2.
+
+### Lector de código de barras
+
+Uno USB, de los que venden en cualquier lado.
+
+_Precios_
+
+## Un plan para cada tamaño de vinatería
+
+Sin pago inicial y sin contrato forzoso.
+
+[Ver precios](https://vimpos.com.mx/precios)
+
+### Esencial
+
+Para arrancar con una caja.
+
+**$699**
+
+/mes
+
+1 sucursal · 1 caja · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal para una vinatería
+
+- Existencias con aviso de mínimo, incluidas
+- Cotizaciones y crédito a clientes
+- Lector de código de barras
+- Facturación: $349 al mes aparte
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+### Negocio
+
+El que recomendamos
+
+Todo para un local, con tu menú cargado por nosotros.
+
+**$999**
+
+/mes
+
+1 sucursal · 3 cajas · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal para una vinatería
+
+- Hasta 3 cajas en la tienda
+- Facturación incluida, 20 folios al mes
+- Cargamos tu catálogo
+- Capacitamos a tu equipo
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+### Cadena
+
+Varias sucursales, vistas en un solo lugar.
+
+**$1,999**
+
+/mes
+
+3 sucursales · cajas sin límite · más IVA
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+Lo principal para una vinatería
+
+- Cajas sin límite en cada sucursal
+- Traspasos de mercancía entre sucursales
+- Facturación incluida, 40 folios al mes
+- Vamos a tu local el día del arranque
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+_Guías_
+
+## Antes de decidir
+
+### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
+
+Nueve preguntas antes de firmar.
+
+### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
+
+Las tres formas de cobrarte, con cuentas.
+
+### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
+
+Qué es y cómo se emite.
+
+_Preguntas_
+
+## Lo que pregunta una vinatería
+
+### ¿Sirve si solo tengo una caja?
+
+Sí. El plan Esencial es una sucursal y una caja, por $699 al mes más IVA. Los tres planes están en [precios](https://vimpos.com.mx/precios).
+
+### ¿Funciona con mi lector de código de barras?
+
+Sí, con cualquier lector USB que escriba como teclado.
+
+### ¿Puedo vender a crédito?
+
+Sí. Le das límite y plazo a cada cliente y registras sus abonos. Se factura al liquidarse.
+
+### ¿Tengo que capturar todo mi catálogo?
+
+No. Lo subes desde una hoja de cálculo. Desde Negocio lo cargamos nosotros.
+
+## Pon tu vinatería a vender hoy
+
+Empieza tú solo, o te lo enseñamos con tu catálogo.
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+---
+
+<!-- https://vimpos.com.mx/punto-de-venta-abarrotes -->
+
+# Punto de venta para abarrotes y fruteríasVende por kilo, por pieza o a crédito, sin cuaderno
+
+> Venta por kilo o por pieza, crédito a clientes con abonos y cotizaciones. Para abarrotes y fruterías, desde $699 al mes más IVA.
+
+**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-abarrotes
+
+La fruta por kilo, lo empaquetado por pieza y el fiado de tus clientes, en una sola caja.
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+## Todo lo de la tienda, sin libreta ni calculadora
+
+_Una venta por kilo, con su precio._
+
+### Por kilo o por pieza
+
+Tecleas el peso y la caja calcula el precio: 1.250 kg de jitomate, sin calculadora.
+
+_El crédito de un cliente, al cobrar._
+
+### Crédito sin cuaderno
+
+Cada cliente con su límite y su plazo. Los abonos quedan registrados.
+
+_Una cotización lista para mandar._
+
+### Cotizaciones con enlace
+
+Para un pedido grande, arma la cotización y mándala por WhatsApp.
+
+_Lo escaneado, en el ticket._
+
+### Escanea lo empaquetado
+
+Con lector de código de barras, lo de anaquel entra al ticket en un segundo.
+
+_Las existencias al día._
+
+### Sabes cuánto te queda
+
+La mercancía que entra y la que se vende, al día.
+
+_Para el dueño_
+
+## Lo que necesitas para crecer
+
+### Quién te debe y cuánto
+
+Los créditos de tus clientes y sus abonos, en el panel.
+
+### Existencias al día
+
+Recibe mercancía, haz conteos y fija mínimos.
+
+### Tu catálogo en una hoja
+
+Sube tus productos desde una hoja de cálculo, con su unidad y su código.
+
+![El panel del dueño en un celular.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard-movil.webp?v=3)
+
+### [La venta del día en tu celular](https://vimpos.com.mx/funciones#reportes)
+
+Revisa ventas y cortes desde donde estés.
+
+_Equipo_
+
+## Funciona con lo que ya tienes
+
+Sin equipo especial: lo compras donde quieras.
+
+### Computadora con Windows
+
+Windows 10 u 11. Es tu caja.
+
+### Impresora de tickets
+
+Térmica de 80 mm, de red o USB.
+
+### Lector de código de barras
+
+Uno USB, de los que venden en cualquier lado.
+
+### Tu báscula de siempre
+
+Pesas como siempre y tecleas el peso.
+
+_Precios_
+
+## Un plan para cada tamaño de tienda
+
+Sin pago inicial y sin contrato forzoso.
+
+[Ver precios](https://vimpos.com.mx/precios)
+
+### Esencial
+
+Para arrancar con una caja.
+
+**$699**
+
+/mes
+
+1 sucursal · 1 caja · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal para abarrotes y fruterías
+
+- Venta por kilo, pieza, metro o litro
+- Crédito y abonos de clientes
+- Cotizaciones con enlace
+- Facturación: $349 al mes aparte
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+### Negocio
+
+El que recomendamos
+
+Todo para un local, con tu menú cargado por nosotros.
+
+**$999**
+
+/mes
+
+1 sucursal · 3 cajas · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal para abarrotes y fruterías
+
+- Hasta 3 cajas en la tienda
+- Facturación incluida, 20 folios al mes
+- Cargamos tu catálogo
+- Capacitamos a tu equipo
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+### Cadena
+
+Varias sucursales, vistas en un solo lugar.
+
+**$1,999**
+
+/mes
+
+3 sucursales · cajas sin límite · más IVA
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+Lo principal para abarrotes y fruterías
+
+- Cajas sin límite en cada sucursal
+- Traspasos de mercancía entre sucursales
+- Facturación incluida, 40 folios al mes
+- Vamos a tu local el día del arranque
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+_Guías_
+
+## Antes de decidir
+
+### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
+
+Nueve preguntas antes de firmar.
+
+### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
+
+Las tres formas de cobrarte, con cuentas.
+
+### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
+
+Qué es y cómo se emite.
+
+_Preguntas_
+
+## Lo que pregunta una tienda de abarrotes
+
+### ¿Sirve si solo tengo una caja?
+
+Sí. El plan Esencial es una sucursal y una caja, por $699 al mes más IVA. Los tres planes están en [precios](https://vimpos.com.mx/precios).
+
+### ¿Se conecta a mi báscula?
+
+Por ahora el peso se teclea, y la caja calcula el precio.
+
+### ¿Puedo fiar a mis clientes?
+
+Sí. Le das límite y plazo a cada uno y registras sus abonos.
+
+### ¿Tengo que capturar todo mi catálogo?
+
+No. Lo subes desde una hoja de cálculo. Desde Negocio lo cargamos nosotros.
+
+### ¿Qué pasa si se cae el internet?
+
+Nada: sigues vendiendo e imprimiendo. Todo sube al volver la señal. [Así funciona](https://vimpos.com.mx/sin-internet).
+
+## Pon tu tienda a vender hoy
+
+Empieza tú solo, o te lo enseñamos con tu catálogo.
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+---
+
+<!-- https://vimpos.com.mx/punto-de-venta-salones-de-belleza -->
+
+# Punto de venta para salones de bellezaTu agenda llena y cada comisión, clara
+
+> Agenda de tu equipo, cobro de la cita, anticipos y comisiones. Para salones de belleza, desde $699 al mes más IVA.
+
+**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-salones-de-belleza
+
+Citas, cobro y comisiones de tu equipo en una sola pantalla.
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+## Menos huecos en la agenda y cero cuentas a mano
+
+_Las citas del día, por colaboradora._
+
+### La agenda de todo tu equipo
+
+Cada colaboradora con su horario y sus citas. La caja no deja empalmar dos.
+
+_El cobro de la cita, con el anticipo descontado._
+
+### Cobra la cita en un toque
+
+Los servicios de la cita pasan al cobro con la colaboradora que los hizo, y el anticipo ya descontado.
+
+_La cita con su anticipo._
+
+### Anticipos que se respetan
+
+Pide un anticipo al agendar. Si cancelan a tiempo se devuelve; si no, tú decides.
+
+_Las comisiones de cada quien, por periodo._
+
+### Comisiones claras
+
+Cada servicio con su comisión. Al cerrar el periodo, cada colaboradora sabe lo suyo.
+
+_La lista de espera, en la caja._
+
+### Quien llega sin cita, a la lista
+
+La lista de espera dice quién sigue y con quién.
+
+_Para el dueño_
+
+## Lo que necesitas para crecer
+
+### Comisiones sin calculadora
+
+Lo que le toca a cada colaboradora por periodo, con los descuentos ya repartidos.
+
+### Servicios con su precio y su comisión
+
+Duración, precio, comisión y anticipo de cada servicio, en un solo lugar.
+
+### Horarios y ausencias
+
+El horario de cada colaboradora y sus días libres, para que la agenda no ofrezca lo que no hay.
+
+![El panel del dueño en un celular.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard-movil.webp?v=3)
+
+### [La venta del día en tu celular](https://vimpos.com.mx/funciones#reportes)
+
+Revisa ventas y cortes desde donde estés.
+
+_Equipo_
+
+## Funciona con lo que ya tienes
+
+Sin equipo especial: lo compras donde quieras.
+
+### Computadora con Windows
+
+Windows 10 u 11. Es tu caja.
+
+### Impresora de tickets
+
+Térmica de 80 mm, de red o USB.
+
+### Terminal Mercado Pago
+
+Cobra con tarjeta desde la caja con la Point Smart 2.
+
+### Cajón de dinero
+
+El de siempre, para el efectivo.
+
+_Precios_
+
+## Un plan para cada tamaño de salón
+
+Sin pago inicial y sin contrato forzoso.
+
+[Ver precios](https://vimpos.com.mx/precios)
+
+### Esencial
+
+Para arrancar con una caja.
+
+**$699**
+
+/mes
+
+1 sucursal · 1 caja · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal para un salón
+
+- Agenda con colaboradoras y espacios
+- Anticipos al agendar
+- Comisiones por servicio
+- Facturación: $349 al mes aparte
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+### Negocio
+
+El que recomendamos
+
+Todo para un local, con tu menú cargado por nosotros.
+
+**$999**
+
+/mes
+
+1 sucursal · 3 cajas · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal para un salón
+
+- Hasta 3 cajas en el local
+- Facturación incluida, 20 folios al mes
+- Cargamos tus servicios y tu equipo
+- Capacitamos a tu equipo
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+### Cadena
+
+Varias sucursales, vistas en un solo lugar.
+
+**$1,999**
+
+/mes
+
+3 sucursales · cajas sin límite · más IVA
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+Lo principal para un salón
+
+- Cajas sin límite en cada sucursal
+- Un reporte que suma tus 3 sucursales
+- Facturación incluida, 40 folios al mes
+- Vamos a tu local el día del arranque
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+_Guías_
+
+## Antes de decidir
+
+### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
+
+Nueve preguntas antes de firmar.
+
+### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
+
+Las tres formas de cobrarte, con cuentas.
+
+### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
+
+Qué es y cómo se emite.
+
+_Preguntas_
+
+## Lo que pregunta un salón de belleza
+
+### ¿Sirve si solo tengo una caja?
+
+Sí. El plan Esencial es una sucursal y una caja, por $699 al mes más IVA. Los tres planes están en [precios](https://vimpos.com.mx/precios).
+
+### ¿Qué pasa con el anticipo si cancelan?
+
+Si cancelan dentro del plazo que tú fijas, se devuelve. Si no, tú decides si se retiene.
+
+### ¿Cómo se calculan las comisiones?
+
+Cada servicio lleva su comisión. El reporte suma lo de cada quien por periodo, con los descuentos ya repartidos.
+
+### ¿Qué pasa si se cae el internet?
+
+La agenda y el cobro siguen en la caja. Todo sube al volver la señal.
+
+## Pon tu salón a vender hoy
+
+Empieza tú solo, o te lo enseñamos con tus servicios.
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+---
+
+<!-- https://vimpos.com.mx/punto-de-venta-spa -->
+
+# Punto de venta para spasCada cabina ocupada a su hora, sin empalmes
+
+> Agenda por terapeuta y por cabina, anticipos, cobro de la cita y comisiones. Para spas, desde $699 al mes más IVA.
+
+**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-spa
+
+Agenda por terapeuta y por cabina, con anticipos y comisiones.
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+## Tu spa lleno, en orden y sin cuentas a mano
+
+_Las cabinas del día, sin empalmes._
+
+### Cabinas que no se empalman
+
+Cada cita aparta su cabina. La caja no deja dar la misma a la misma hora.
+
+_Las citas de cada terapeuta._
+
+### La agenda de tus terapeutas
+
+Cada terapeuta con su horario, sus días libres y sus citas.
+
+_La cita con su anticipo._
+
+### Anticipos que se respetan
+
+Pide un anticipo al agendar. Si cancelan a tiempo se devuelve; si no, tú decides.
+
+_El cobro de la cita, con el anticipo descontado._
+
+### Cobra la cita en un toque
+
+Los servicios de la cita pasan al cobro con la terapeuta que los hizo, y el anticipo ya descontado.
+
+_Las comisiones de cada quien, por periodo._
+
+### Comisiones claras
+
+Cada servicio con su comisión. Al cerrar el periodo, cada terapeuta sabe lo suyo.
+
+_Para el dueño_
+
+## Lo que necesitas para crecer
+
+### Comisiones sin calculadora
+
+Lo que le toca a cada terapeuta por periodo, con los descuentos ya repartidos.
+
+### Servicios con su precio y su comisión
+
+Duración, precio, comisión y anticipo de cada servicio, en un solo lugar.
+
+### Horarios y ausencias
+
+El horario de cada terapeuta y sus días libres, para que la agenda no ofrezca lo que no hay.
+
+![El panel del dueño en un celular.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard-movil.webp?v=3)
+
+### [La venta del día en tu celular](https://vimpos.com.mx/funciones#reportes)
+
+Revisa ventas y cortes desde donde estés.
+
+_Equipo_
+
+## Funciona con lo que ya tienes
+
+Sin equipo especial: lo compras donde quieras.
+
+### Computadora con Windows
+
+Windows 10 u 11. Es tu caja.
+
+### Impresora de tickets
+
+Térmica de 80 mm, de red o USB.
+
+### Terminal Mercado Pago
+
+Cobra con tarjeta desde la caja con la Point Smart 2.
+
+### Cajón de dinero
+
+El de siempre, para el efectivo.
+
+_Precios_
+
+## Un plan para cada tamaño de spa
+
+Sin pago inicial y sin contrato forzoso.
+
+[Ver precios](https://vimpos.com.mx/precios)
+
+### Esencial
+
+Para arrancar con una caja.
+
+**$699**
+
+/mes
+
+1 sucursal · 1 caja · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal para un spa
+
+- Agenda por terapeuta y por cabina
+- Anticipos al reservar
+- Comisiones por servicio
+- Facturación: $349 al mes aparte
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+### Negocio
+
+El que recomendamos
+
+Todo para un local, con tu menú cargado por nosotros.
+
+**$999**
+
+/mes
+
+1 sucursal · 3 cajas · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal para un spa
+
+- Hasta 3 cajas en el local
+- Facturación incluida, 20 folios al mes
+- Cargamos tus servicios y tu equipo
+- Capacitamos a tu equipo
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+### Cadena
+
+Varias sucursales, vistas en un solo lugar.
+
+**$1,999**
+
+/mes
+
+3 sucursales · cajas sin límite · más IVA
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+Lo principal para un spa
+
+- Cajas sin límite en cada sucursal
+- Un reporte que suma tus 3 sucursales
+- Facturación incluida, 40 folios al mes
+- Vamos a tu local el día del arranque
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+_Guías_
+
+## Antes de decidir
+
+### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
+
+Nueve preguntas antes de firmar.
+
+### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
+
+Las tres formas de cobrarte, con cuentas.
+
+### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
+
+Qué es y cómo se emite.
+
+_Preguntas_
+
+## Lo que pregunta un spa
+
+### ¿Sirve si solo tengo una caja?
+
+Sí. El plan Esencial es una sucursal y una caja, por $699 al mes más IVA. Los tres planes están en [precios](https://vimpos.com.mx/precios).
+
+### ¿Qué pasa con el anticipo si cancelan?
+
+Si cancelan dentro del plazo que tú fijas, se devuelve. Si no, tú decides si se retiene.
+
+### ¿Cómo se calculan las comisiones?
+
+Cada servicio lleva su comisión. El reporte suma lo de cada quien por periodo, con los descuentos ya repartidos.
+
+### ¿Qué pasa si se cae el internet?
+
+La agenda y el cobro siguen en la caja. Todo sube al volver la señal.
+
+## Pon tu spa a vender hoy
+
+Empieza tú solo, o te lo enseñamos con tus servicios.
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+---
+
+<!-- https://vimpos.com.mx/punto-de-venta-peluquerias -->
+
+# Punto de venta para peluquerías y barberíasCada silla con su turno y cada barbero con su comisión
+
+> Citas y lista de espera, agenda por barbero, cobro y comisiones. Para peluquerías y barberías, desde $699 al mes más IVA.
+
+**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-peluquerias
+
+Citas, lista de espera y cobro en una sola caja.
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+## Sin perder un cliente por esperar
+
+_La lista de espera, en la caja._
+
+### Con cita o sin cita
+
+Quien llega sin cita entra a la lista de espera, y la caja dice quién sigue.
+
+_Las citas del día, por barbero._
+
+### Cada silla con su agenda
+
+Cada barbero con su horario y sus citas, sin empalmes.
+
+_El cobro de la cita, con el anticipo descontado._
+
+### Cobra la cita en un toque
+
+Los servicios de la cita pasan al cobro con la persona que los hizo, y el anticipo ya descontado.
+
+_Las comisiones de cada quien, por periodo._
+
+### Comisiones claras
+
+Cada servicio con su comisión. Al cerrar el periodo, cada barbero sabe lo suyo.
+
+_La cita con su anticipo._
+
+### Anticipos que se respetan
+
+Pide un anticipo al agendar. Si cancelan a tiempo se devuelve; si no, tú decides.
+
+_Para el dueño_
+
+## Lo que necesitas para crecer
+
+### Comisiones sin calculadora
+
+Lo que le toca a cada barbero por periodo, con los descuentos ya repartidos.
+
+### Servicios con su precio y su comisión
+
+Duración, precio, comisión y anticipo de cada servicio, en un solo lugar.
+
+### Horarios y ausencias
+
+El horario de cada barbero y sus días libres, para que la agenda no ofrezca lo que no hay.
+
+![El panel del dueño en un celular.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard-movil.webp?v=3)
+
+### [La venta del día en tu celular](https://vimpos.com.mx/funciones#reportes)
+
+Revisa ventas y cortes desde donde estés.
+
+_Equipo_
+
+## Funciona con lo que ya tienes
+
+Sin equipo especial: lo compras donde quieras.
+
+### Computadora con Windows
+
+Windows 10 u 11. Es tu caja.
+
+### Impresora de tickets
+
+Térmica de 80 mm, de red o USB.
+
+### Terminal Mercado Pago
+
+Cobra con tarjeta desde la caja con la Point Smart 2.
+
+### Cajón de dinero
+
+El de siempre, para el efectivo.
+
+_Precios_
+
+## Un plan para cada tamaño de peluquería
+
+Sin pago inicial y sin contrato forzoso.
+
+[Ver precios](https://vimpos.com.mx/precios)
+
+### Esencial
+
+Para arrancar con una caja.
+
+**$699**
+
+/mes
+
+1 sucursal · 1 caja · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal para una peluquería
+
+- Citas y lista de espera
+- Agenda por barbero
+- Comisiones por servicio
+- Facturación: $349 al mes aparte
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+### Negocio
+
+El que recomendamos
+
+Todo para un local, con tu menú cargado por nosotros.
+
+**$999**
+
+/mes
+
+1 sucursal · 3 cajas · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal para una peluquería
+
+- Hasta 3 cajas en el local
+- Facturación incluida, 20 folios al mes
+- Cargamos tus servicios y tu equipo
+- Capacitamos a tu equipo
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+### Cadena
+
+Varias sucursales, vistas en un solo lugar.
+
+**$1,999**
+
+/mes
+
+3 sucursales · cajas sin límite · más IVA
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+Lo principal para una peluquería
+
+- Cajas sin límite en cada sucursal
+- Un reporte que suma tus 3 sucursales
+- Facturación incluida, 40 folios al mes
+- Vamos a tu local el día del arranque
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+_Guías_
+
+## Antes de decidir
+
+### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
+
+Nueve preguntas antes de firmar.
+
+### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
+
+Las tres formas de cobrarte, con cuentas.
+
+### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
+
+Qué es y cómo se emite.
+
+_Preguntas_
+
+## Lo que pregunta una peluquería
+
+### ¿Sirve si solo tengo una caja?
+
+Sí. El plan Esencial es una sucursal y una caja, por $699 al mes más IVA. Los tres planes están en [precios](https://vimpos.com.mx/precios).
+
+### ¿Qué pasa con el anticipo si cancelan?
+
+Si cancelan dentro del plazo que tú fijas, se devuelve. Si no, tú decides si se retiene.
+
+### ¿Cómo se calculan las comisiones?
+
+Cada servicio lleva su comisión. El reporte suma lo de cada quien por periodo, con los descuentos ya repartidos.
+
+### ¿Qué pasa si se cae el internet?
+
+La agenda y el cobro siguen en la caja. Todo sube al volver la señal.
+
+## Pon tu peluquería a vender hoy
+
+Empieza tú solo, o te lo enseñamos con tus servicios.
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+---
+
+<!-- https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes -->
+
+# Punto de venta para estudios de tatuajesCitas con anticipo y cada artista con su agenda
+
+> Citas con anticipo, agenda por artista, cobro de la sesión y comisiones. Para estudios de tatuajes, desde $699 al mes más IVA.
+
+**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes
+
+Aparta la fecha, cobra la sesión y reparte las comisiones.
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+## Tu estudio en orden, de la cita al cobro
+
+_La cita con su anticipo._
+
+### Aparta la fecha con anticipo
+
+La cita queda apartada con su anticipo. Si cancelan a tiempo se devuelve; si no, tú decides.
+
+_Las sesiones del día, por artista._
+
+### Cada artista con su agenda
+
+Las sesiones de cada artista, sin empalmes.
+
+_El cobro de la cita, con el anticipo descontado._
+
+### Cobra la cita en un toque
+
+Los servicios de la cita pasan al cobro con la persona que los hizo, y el anticipo ya descontado.
+
+_Las comisiones de cada quien, por periodo._
+
+### Comisiones claras
+
+Cada servicio con su comisión. Al cerrar el periodo, cada artista sabe lo suyo.
+
+_Los espacios del estudio._
+
+### Camillas que no se empalman
+
+Cada sesión aparta su lugar, para que no se crucen dos en la misma camilla.
+
+_Para el dueño_
+
+## Lo que necesitas para crecer
+
+### Comisiones sin calculadora
+
+Lo que le toca a cada artista por periodo, con los descuentos ya repartidos.
+
+### Servicios con su precio y su comisión
+
+Duración, precio, comisión y anticipo de cada servicio, en un solo lugar.
+
+### Horarios y ausencias
+
+El horario de cada artista y sus días libres, para que la agenda no ofrezca lo que no hay.
+
+![El panel del dueño en un celular.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard-movil.webp?v=3)
+
+### [La venta del día en tu celular](https://vimpos.com.mx/funciones#reportes)
+
+Revisa ventas y cortes desde donde estés.
+
+_Equipo_
+
+## Funciona con lo que ya tienes
+
+Sin equipo especial: lo compras donde quieras.
+
+### Computadora con Windows
+
+Windows 10 u 11. Es tu caja.
+
+### Impresora de tickets
+
+Térmica de 80 mm, de red o USB.
+
+### Terminal Mercado Pago
+
+Cobra con tarjeta desde la caja con la Point Smart 2.
+
+### Cajón de dinero
+
+El de siempre, para el efectivo.
+
+_Precios_
+
+## Un plan para cada tamaño de estudio
+
+Sin pago inicial y sin contrato forzoso.
+
+[Ver precios](https://vimpos.com.mx/precios)
+
+### Esencial
+
+Para arrancar con una caja.
+
+**$699**
+
+/mes
+
+1 sucursal · 1 caja · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal para un estudio de tatuajes
+
+- Agenda por artista
+- Anticipos para apartar la fecha
+- Comisiones por sesión
+- Facturación: $349 al mes aparte
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+### Negocio
+
+El que recomendamos
+
+Todo para un local, con tu menú cargado por nosotros.
+
+**$999**
+
+/mes
+
+1 sucursal · 3 cajas · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal para un estudio de tatuajes
+
+- Hasta 3 cajas en el local
+- Facturación incluida, 20 folios al mes
+- Cargamos tus servicios y tu equipo
+- Capacitamos a tu equipo
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+### Cadena
+
+Varias sucursales, vistas en un solo lugar.
+
+**$1,999**
+
+/mes
+
+3 sucursales · cajas sin límite · más IVA
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+Lo principal para un estudio de tatuajes
+
+- Cajas sin límite en cada sucursal
+- Un reporte que suma tus 3 sucursales
+- Facturación incluida, 40 folios al mes
+- Vamos a tu local el día del arranque
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+_Guías_
+
+## Antes de decidir
+
+### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
+
+Nueve preguntas antes de firmar.
+
+### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
+
+Las tres formas de cobrarte, con cuentas.
+
+### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
+
+Qué es y cómo se emite.
+
+_Preguntas_
+
+## Lo que pregunta un estudio de tatuajes
+
+### ¿Sirve si solo tengo una caja?
+
+Sí. El plan Esencial es una sucursal y una caja, por $699 al mes más IVA. Los tres planes están en [precios](https://vimpos.com.mx/precios).
+
+### ¿Qué pasa con el anticipo si cancelan?
+
+Si cancelan dentro del plazo que tú fijas, se devuelve. Si no, tú decides si se retiene.
+
+### ¿Cómo se calculan las comisiones?
+
+Cada servicio lleva su comisión. El reporte suma lo de cada quien por periodo, con los descuentos ya repartidos.
+
+### ¿Qué pasa si se cae el internet?
+
+La agenda y el cobro siguen en la caja. Todo sube al volver la señal.
+
+## Pon tu estudio a vender hoy
+
+Empieza tú solo, o te lo enseñamos con tus servicios.
 
 [Contactar ventas](https://vimpos.com.mx/contacto)
 

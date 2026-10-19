@@ -100,6 +100,41 @@
       "permanent": true
     },
     {
+      "source": "/punto-de-venta-tiendas-de-ropa.html",
+      "destination": "/punto-de-venta-tiendas-de-ropa",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-vinaterias.html",
+      "destination": "/punto-de-venta-vinaterias",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-abarrotes.html",
+      "destination": "/punto-de-venta-abarrotes",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-salones-de-belleza.html",
+      "destination": "/punto-de-venta-salones-de-belleza",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-spa.html",
+      "destination": "/punto-de-venta-spa",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-peluquerias.html",
+      "destination": "/punto-de-venta-peluquerias",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-estudios-de-tatuajes.html",
+      "destination": "/punto-de-venta-estudios-de-tatuajes",
+      "permanent": true
+    },
+    {
       "source": "/punto-de-venta-restaurantes-leon.html",
       "destination": "/punto-de-venta-restaurantes-leon",
       "permanent": true
@@ -297,6 +332,83 @@
       "destination": "/punto-de-venta-food-trucks.md"
     },
     {
+      "source": "/punto-de-venta-tiendas-de-ropa",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*(text/markdown|text/x-markdown).*"
+        }
+      ],
+      "destination": "/punto-de-venta-tiendas-de-ropa.md"
+    },
+    {
+      "source": "/punto-de-venta-vinaterias",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*(text/markdown|text/x-markdown).*"
+        }
+      ],
+      "destination": "/punto-de-venta-vinaterias.md"
+    },
+    {
+      "source": "/punto-de-venta-abarrotes",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*(text/markdown|text/x-markdown).*"
+        }
+      ],
+      "destination": "/punto-de-venta-abarrotes.md"
+    },
+    {
+      "source": "/punto-de-venta-salones-de-belleza",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*(text/markdown|text/x-markdown).*"
+        }
+      ],
+      "destination": "/punto-de-venta-salones-de-belleza.md"
+    },
+    {
+      "source": "/punto-de-venta-spa",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*(text/markdown|text/x-markdown).*"
+        }
+      ],
+      "destination": "/punto-de-venta-spa.md"
+    },
+    {
+      "source": "/punto-de-venta-peluquerias",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*(text/markdown|text/x-markdown).*"
+        }
+      ],
+      "destination": "/punto-de-venta-peluquerias.md"
+    },
+    {
+      "source": "/punto-de-venta-estudios-de-tatuajes",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*(text/markdown|text/x-markdown).*"
+        }
+      ],
+      "destination": "/punto-de-venta-estudios-de-tatuajes.md"
+    },
+    {
       "source": "/punto-de-venta-restaurantes-leon",
       "has": [
         {
@@ -465,6 +577,34 @@
     {
       "source": "/punto-de-venta-food-trucks",
       "destination": "/punto-de-venta-food-trucks.html"
+    },
+    {
+      "source": "/punto-de-venta-tiendas-de-ropa",
+      "destination": "/punto-de-venta-tiendas-de-ropa.html"
+    },
+    {
+      "source": "/punto-de-venta-vinaterias",
+      "destination": "/punto-de-venta-vinaterias.html"
+    },
+    {
+      "source": "/punto-de-venta-abarrotes",
+      "destination": "/punto-de-venta-abarrotes.html"
+    },
+    {
+      "source": "/punto-de-venta-salones-de-belleza",
+      "destination": "/punto-de-venta-salones-de-belleza.html"
+    },
+    {
+      "source": "/punto-de-venta-spa",
+      "destination": "/punto-de-venta-spa.html"
+    },
+    {
+      "source": "/punto-de-venta-peluquerias",
+      "destination": "/punto-de-venta-peluquerias.html"
+    },
+    {
+      "source": "/punto-de-venta-estudios-de-tatuajes",
+      "destination": "/punto-de-venta-estudios-de-tatuajes.html"
     },
     {
       "source": "/punto-de-venta-restaurantes-leon",
@@ -806,6 +946,125 @@
         {
           "key": "Link",
           "value": "<https://vimpos.com.mx/punto-de-venta-food-trucks.md>; rel=\"alternate\"; type=\"text/markdown\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-tiendas-de-ropa",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa.md>; rel=\"alternate\"; type=\"text/markdown\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-vinaterias",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-vinaterias.md>; rel=\"alternate\"; type=\"text/markdown\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-abarrotes",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-abarrotes.md>; rel=\"alternate\"; type=\"text/markdown\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-salones-de-belleza",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-salones-de-belleza.md>; rel=\"alternate\"; type=\"text/markdown\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-spa",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-spa.md>; rel=\"alternate\"; type=\"text/markdown\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-peluquerias",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-peluquerias.md>; rel=\"alternate\"; type=\"text/markdown\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-estudios-de-tatuajes",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
@@ -1248,6 +1507,125 @@
         {
           "key": "Link",
           "value": "<https://vimpos.com.mx/punto-de-venta-food-trucks>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-tiendas-de-ropa.md",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-vinaterias.md",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-vinaterias>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-abarrotes.md",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-abarrotes>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-salones-de-belleza.md",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-salones-de-belleza>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-spa.md",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-spa>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-peluquerias.md",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-peluquerias>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-estudios-de-tatuajes.md",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes>; rel=\"canonical\""
         }
       ]
     },

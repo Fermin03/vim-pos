@@ -119,6 +119,48 @@ export const PAGINAS = [
     enSitemap: true,
   },
   {
+    ruta: '/punto-de-venta-tiendas-de-ropa',
+    nombre: 'Tiendas de ropa',
+    resumen: 'VIM POS para una tienda de ropa o calzado: existencias por talla y color, lector de código de barras, cambios de talla, etiquetas y ventas por talla y color.',
+    enSitemap: true,
+  },
+  {
+    ruta: '/punto-de-venta-vinaterias',
+    nombre: 'Vinos y licores',
+    resumen: 'VIM POS para una vinatería o licorería: código de barras, existencias con aviso de mínimo, recibir mercancía, cotizaciones y crédito a clientes.',
+    enSitemap: true,
+  },
+  {
+    ruta: '/punto-de-venta-abarrotes',
+    nombre: 'Abarrotes y fruterías',
+    resumen: 'VIM POS para abarrotes y fruterías: venta por kilo o por pieza, crédito a clientes con abonos, cotizaciones y existencias.',
+    enSitemap: true,
+  },
+  {
+    ruta: '/punto-de-venta-salones-de-belleza',
+    nombre: 'Salones de belleza',
+    resumen: 'VIM POS para un salón de belleza: agenda por colaboradora, cobro de la cita, anticipos, comisiones y lista de espera.',
+    enSitemap: true,
+  },
+  {
+    ruta: '/punto-de-venta-spa',
+    nombre: 'Spas',
+    resumen: 'VIM POS para un spa: agenda por terapeuta y por cabina sin empalmes, anticipos, cobro de la cita y comisiones.',
+    enSitemap: true,
+  },
+  {
+    ruta: '/punto-de-venta-peluquerias',
+    nombre: 'Peluquerías y barberías',
+    resumen: 'VIM POS para una peluquería o barbería: citas y lista de espera, agenda por barbero, cobro y comisiones.',
+    enSitemap: true,
+  },
+  {
+    ruta: '/punto-de-venta-estudios-de-tatuajes',
+    nombre: 'Estudios de tatuajes',
+    resumen: 'VIM POS para un estudio de tatuajes: citas con anticipo, agenda por artista, cobro de la sesión y comisiones.',
+    enSitemap: true,
+  },
+  {
     ruta: '/punto-de-venta-restaurantes-leon',
     nombre: 'León, Guanajuato',
     resumen: 'VIM POS para restaurantes de León, Guanajuato, donde se hace el producto: en la zona, la demostración puede ser en el local.',
