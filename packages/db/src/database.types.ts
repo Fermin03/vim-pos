@@ -14827,6 +14827,10 @@ export type Database = {
         }
         Returns: string[]
       }
+      _agenda_remarcar: {
+        Args: { p_citas?: string[]; p_tenant: string; p_tramos: string[] }
+        Returns: undefined
+      }
       _agenda_tenant: { Args: never; Returns: string }
       _agenda_tramos: {
         Args: {
@@ -14837,6 +14841,10 @@ export type Database = {
           p_tenant: string
         }
         Returns: string
+      }
+      _agenda_vecinos: {
+        Args: { p_cita: string; p_tenant: string }
+        Returns: string[]
       }
       _cajas_excedente: {
         Args: { p_base: number; p_excluir?: string; p_tenant: string }
@@ -15570,12 +15578,7 @@ export type Database = {
       }
       clabe_valida: { Args: { p_clabe: string }; Returns: boolean }
       colaborador_libre: {
-        Args: {
-          p_inicia: string
-          p_producto: string
-          p_sucursal: string
-          p_termina: string
-        }
+        Args: { p_inicia: string; p_producto: string; p_sucursal: string }
         Returns: string
       }
       confirmar_devolucion: {

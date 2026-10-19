@@ -403,46 +403,55 @@ REVOKE ALL ON citas, citas_servicios FROM anon, authenticated;
 GRANT SELECT ON citas, citas_servicios TO authenticated;
 
 -- ── §5 colaborador_libre ────────────────────────────────────────────────────
--- Entre los que hacen el servicio, activos en la sucursal, con horario que cubre el tramo (fuera
--- de comida), sin ausencia ese día y sin otro tramo que se cruce: el de menos citas ese día.
-CREATE OR REPLACE FUNCTION colaborador_libre(p_sucursal uuid, p_producto uuid, p_inicia timestamptz, p_termina timestamptz)
+-- Entre los que hacen el servicio, activos en la sucursal y todavía empleados del negocio (acceso
+-- activo y perfil sin borrar), con horario que cubre SU tramo (con la duración que tendría con
+-- cada uno: la suya si la tiene, si no la del servicio), fuera de comida, sin ausencia ese día y
+-- sin otro tramo que se cruce: el de menos citas ese día.
+CREATE OR REPLACE FUNCTION colaborador_libre(p_sucursal uuid, p_producto uuid, p_inicia timestamptz)
 RETURNS uuid
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
-  WITH l AS (
-    SELECT (p_inicia AT TIME ZONE 'America/Mexico_City') AS ini,
-           (p_termina AT TIME ZONE 'America/Mexico_City') AS fin
+  WITH c AS (
+    SELECT ca.tenant_id, ca.usuario_id, ca.orden,
+           p_inicia + make_interval(mins => COALESCE(sc.duracion_min, sa.duracion_min)) AS termina
+      FROM servicios_agenda sa
+      JOIN servicio_colaborador sc ON sc.tenant_id = sa.tenant_id AND sc.producto_id = sa.producto_id
+      JOIN colaboradores_agenda ca ON ca.tenant_id = sc.tenant_id AND ca.usuario_id = sc.usuario_id
+     WHERE sa.tenant_id = current_tenant_id() AND sa.producto_id = p_producto AND sa.activo
+       AND ca.sucursal_id = p_sucursal AND ca.activo
+       AND EXISTS (SELECT 1 FROM usuarios_acceso ua WHERE ua.tenant_id = ca.tenant_id AND ua.usuario_id = ca.usuario_id AND ua.activo)
+       AND EXISTS (SELECT 1 FROM usuarios_perfil up WHERE up.id = ca.usuario_id AND up.deleted_at IS NULL)
+  ), l AS (
+    SELECT c.*, (p_inicia AT TIME ZONE 'America/Mexico_City') AS ini,
+           (c.termina AT TIME ZONE 'America/Mexico_City') AS fin
+      FROM c
   )
-  SELECT ca.usuario_id
-    FROM l, servicio_colaborador sc
-    JOIN colaboradores_agenda ca ON ca.tenant_id = sc.tenant_id AND ca.usuario_id = sc.usuario_id
-    JOIN horarios_colaborador h  ON h.tenant_id = ca.tenant_id AND h.usuario_id = ca.usuario_id
-   WHERE sc.tenant_id = current_tenant_id()
-     AND sc.producto_id = p_producto
-     AND ca.sucursal_id = p_sucursal AND ca.activo
-     AND h.dia_semana = extract(dow FROM l.ini)
+  SELECT l.usuario_id
+    FROM l
+    JOIN horarios_colaborador h ON h.tenant_id = l.tenant_id AND h.usuario_id = l.usuario_id
+   WHERE h.dia_semana = extract(dow FROM l.ini)
      AND l.fin::date = l.ini::date
      AND l.ini::time >= h.inicia AND l.fin::time <= h.termina
      AND NOT (h.comida_inicia IS NOT NULL AND l.ini::time < h.comida_termina AND l.fin::time > h.comida_inicia)
      AND NOT EXISTS (SELECT 1 FROM ausencias_colaborador a
-                      WHERE a.tenant_id = ca.tenant_id AND a.usuario_id = ca.usuario_id
+                      WHERE a.tenant_id = l.tenant_id AND a.usuario_id = l.usuario_id
                         AND l.ini::date BETWEEN a.desde AND a.hasta)
      AND NOT EXISTS (SELECT 1 FROM citas_servicios cs
-                      WHERE cs.tenant_id = ca.tenant_id AND cs.usuario_id = ca.usuario_id AND cs.activa
-                        AND tstzrange(cs.inicia, cs.termina, '[)') && tstzrange(p_inicia, p_termina, '[)'))
+                      WHERE cs.tenant_id = l.tenant_id AND cs.usuario_id = l.usuario_id AND cs.activa
+                        AND tstzrange(cs.inicia, cs.termina, '[)') && tstzrange(p_inicia, l.termina, '[)'))
    ORDER BY (SELECT count(DISTINCT cs.cita_id) FROM citas_servicios cs
-              WHERE cs.tenant_id = ca.tenant_id AND cs.usuario_id = ca.usuario_id AND cs.activa
+              WHERE cs.tenant_id = l.tenant_id AND cs.usuario_id = l.usuario_id AND cs.activa
                 AND (cs.inicia AT TIME ZONE 'America/Mexico_City')::date = l.ini::date),
-            ca.orden, ca.usuario_id
+            l.orden, l.usuario_id
    LIMIT 1;
 $$;
-COMMENT ON FUNCTION colaborador_libre(uuid, uuid, timestamptz, timestamptz) IS
-  '«Quien esté libre»: colaborador que hace el servicio y puede en ese tramo, con menos citas ese día (desempate: orden). NULL si nadie (0218).';
-REVOKE EXECUTE ON FUNCTION colaborador_libre(uuid, uuid, timestamptz, timestamptz) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION colaborador_libre(uuid, uuid, timestamptz, timestamptz) TO authenticated, service_role;
+COMMENT ON FUNCTION colaborador_libre(uuid, uuid, timestamptz) IS
+  '«Quien esté libre»: empleado vigente que hace el servicio y puede en su tramo (con su duración), con menos citas ese día (desempate: orden). NULL si nadie (0218).';
+REVOKE EXECUTE ON FUNCTION colaborador_libre(uuid, uuid, timestamptz) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION colaborador_libre(uuid, uuid, timestamptz) TO authenticated, service_role;
 
 -- ── §6 Tramos (interna) ─────────────────────────────────────────────────────
 -- Inserta los servicios de una cita encadenados desde p_inicia (NULL = en espera, sin tramo) y
@@ -494,8 +503,7 @@ BEGIN
     v_fin := NULL;
     IF v_cursor IS NOT NULL THEN
       IF v_usuario IS NULL THEN
-        -- La duración de «quien esté libre» es la del servicio: aún no se sabe quién.
-        v_usuario := colaborador_libre(p_sucursal, v_prod, v_cursor, v_cursor + make_interval(mins => v_dur));
+        v_usuario := colaborador_libre(p_sucursal, v_prod, v_cursor);
         IF v_usuario IS NULL THEN
           RAISE EXCEPTION 'CITA_EMPALMADA: no hay quien esté libre a esa hora' USING ERRCODE = '23P01';
         END IF;
@@ -582,6 +590,7 @@ DECLARE
   v_nombre  text := NULLIF(btrim(p->>'cliente_nombre'), '');
   v_estado  cita_estado;
   v_termina timestamptz;
+  v_vecinos uuid[] := '{}';
 BEGIN
   IF v_id IS NULL AND p->>'client_id_local' IS NOT NULL THEN
     SELECT id INTO v_id FROM citas WHERE tenant_id = v_tenant AND client_id_local = p->>'client_id_local';
@@ -620,6 +629,8 @@ BEGIN
     IF v_estado <> 'AGENDADA' THEN
       RAISE EXCEPTION 'DATOS_INVALIDOS: solo se edita una cita por llegar.' USING ERRCODE = '22023';
     END IF;
+    -- Lo que chocaba con su hora vieja pierde la marca si ya no choca (0219, como el push).
+    v_vecinos := _agenda_vecinos(v_tenant, v_id);
     DELETE FROM citas_servicios WHERE cita_id = v_id;
     UPDATE citas SET sucursal_id = v_suc, cliente_id = v_cliente, cliente_nombre = v_nombre,
                      cliente_telefono = p->>'cliente_telefono', cliente_email = p->>'cliente_email',
@@ -630,6 +641,7 @@ BEGIN
 
   v_termina := _agenda_tramos(v_tenant, v_id, v_suc, v_inicia, p->'servicios');
   UPDATE citas SET termina = v_termina WHERE id = v_id;
+  PERFORM _agenda_remarcar(v_tenant, v_vecinos);
   RETURN v_id;
 END;
 $$;
@@ -737,6 +749,7 @@ AS $$
 DECLARE
   v_tenant uuid := _agenda_tenant();
   v_c      citas%ROWTYPE;
+  v_vecinos uuid[];
 BEGIN
   SELECT * INTO v_c FROM citas WHERE id = p_cita AND tenant_id = v_tenant FOR UPDATE;
   IF NOT FOUND OR v_c.estado <> 'AGENDADA' THEN
@@ -745,7 +758,10 @@ BEGIN
   IF now() < v_c.inicia THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: la cita todavía no empieza' USING ERRCODE = '22023';
   END IF;
+  v_vecinos := _agenda_vecinos(v_tenant, p_cita);
   UPDATE citas SET estado = 'NO_LLEGO' WHERE id = p_cita;
+  -- Ya no ocupa: ella y lo que chocaba con ella pierden la marca (0219).
+  PERFORM _agenda_remarcar(v_tenant, v_vecinos || ARRAY(SELECT id FROM citas_servicios WHERE cita_id = p_cita));
 END;
 $$;
 
@@ -755,13 +771,19 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
-DECLARE v_tenant uuid := _agenda_tenant();
+DECLARE
+  v_tenant  uuid := _agenda_tenant();
+  v_vecinos uuid[];
 BEGIN
+  PERFORM 1 FROM citas WHERE id = p_cita AND tenant_id = v_tenant FOR UPDATE;
+  v_vecinos := _agenda_vecinos(v_tenant, p_cita);
   UPDATE citas SET estado = 'CANCELADA', cancelada_motivo = NULLIF(btrim(p_motivo), '')
    WHERE id = p_cita AND tenant_id = v_tenant AND estado IN ('AGENDADA', 'EN_ESPERA');
   IF NOT FOUND THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: solo se cancela una cita por llegar o en espera.' USING ERRCODE = '22023';
   END IF;
+  -- Ya no ocupa: ella y lo que chocaba con ella pierden la marca (0219).
+  PERFORM _agenda_remarcar(v_tenant, v_vecinos || ARRAY(SELECT id FROM citas_servicios WHERE cita_id = p_cita));
 END;
 $$;
 

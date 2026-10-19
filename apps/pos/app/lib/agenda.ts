@@ -150,34 +150,42 @@ export async function citasEnEspera(token: string, sucursalId: string): Promise<
   return ((data ?? []) as unknown as FilaCita[]).map(aCita);
 }
 
-type FilaColab = { usuario_id: string; color_hex: string; usuarios_perfil: { nombre: string } | null };
+type FilaColab = { usuario_id: string; color_hex: string; usuarios_perfil: { nombre: string; deleted_at: string | null } | null };
 type FilaHorario = { usuario_id: string; inicia: string; termina: string; comida_inicia: string | null; comida_termina: string | null };
 
-/** Colaboradores activos de la sucursal, en su orden, con su horario y si faltan ese día. */
+/**
+ * Colaboradores activos de la sucursal, en su orden, con su horario y si faltan ese día. Solo los que
+ * siguen siendo empleados (acceso activo, perfil sin borrar), como en la base: a uno dado de baja ya
+ * no se le agenda y sus citas caen en «Sin colaborador».
+ */
 export async function colaboradoresDelDia(token: string, sucursalId: string, dia: string): Promise<ColaboradorDia[]> {
   const sb = employeeClient(token);
-  const [c, h, a] = await Promise.all([
-    sb.from("colaboradores_agenda").select("usuario_id, color_hex, usuarios_perfil(nombre)")
+  const [c, h, a, u] = await Promise.all([
+    sb.from("colaboradores_agenda").select("usuario_id, color_hex, usuarios_perfil(nombre, deleted_at)")
       .eq("sucursal_id", sucursalId).eq("activo", true).order("orden"),
     sb.from("horarios_colaborador").select("usuario_id, inicia, termina, comida_inicia, comida_termina").eq("dia_semana", diaSemana(dia)),
     sb.from("ausencias_colaborador").select("usuario_id").lte("desde", dia).gte("hasta", dia),
+    sb.from("usuarios_acceso").select("usuario_id").eq("activo", true),
   ]);
-  for (const r of [c, h, a]) if (r.error) throw new Error(r.error.message);
+  for (const r of [c, h, a, u]) if (r.error) throw new Error(r.error.message);
+  const conAcceso = new Set(((u.data ?? []) as { usuario_id: string }[]).map((x) => x.usuario_id));
   const horarios = (h.data ?? []) as FilaHorario[];
   const ausentes = new Set(((a.data ?? []) as { usuario_id: string }[]).map((x) => x.usuario_id));
-  return ((c.data ?? []) as unknown as FilaColab[]).map((f) => {
-    const x = horarios.find((y) => y.usuario_id === f.usuario_id);
-    return {
-      usuarioId: f.usuario_id,
-      nombre: f.usuarios_perfil?.nombre ?? "Colaborador",
-      color: f.color_hex,
-      horario: x ? {
-        inicia: aMin(x.inicia), termina: aMin(x.termina),
-        comida: x.comida_inicia && x.comida_termina ? [aMin(x.comida_inicia), aMin(x.comida_termina)] : null,
-      } : null,
-      ausente: ausentes.has(f.usuario_id),
-    };
-  });
+  return ((c.data ?? []) as unknown as FilaColab[])
+    .filter((f) => f.usuarios_perfil && !f.usuarios_perfil.deleted_at && conAcceso.has(f.usuario_id))
+    .map((f) => {
+      const x = horarios.find((y) => y.usuario_id === f.usuario_id);
+      return {
+        usuarioId: f.usuario_id,
+        nombre: f.usuarios_perfil?.nombre ?? "Colaborador",
+        color: f.color_hex,
+        horario: x ? {
+          inicia: aMin(x.inicia), termina: aMin(x.termina),
+          comida: x.comida_inicia && x.comida_termina ? [aMin(x.comida_inicia), aMin(x.comida_termina)] : null,
+        } : null,
+        ausente: ausentes.has(f.usuario_id),
+      };
+    });
 }
 
 /** Minutos de tolerancia del negocio; sin fila, los 15 de la columna. */
@@ -193,18 +201,20 @@ export type ServicioAgenda = {
 };
 
 type FilaServicio = {
-  producto_id: string; duracion_min: number; productos: { nombre: string; precio_base_mxn: number } | null;
+  producto_id: string; duracion_min: number;
+  productos: { nombre: string; precio_base_mxn: number; deleted_at: string | null; estado: string } | null;
   servicio_colaborador: { usuario_id: string; precio_mxn: number | null; duracion_min: number | null }[] | null;
 };
 
-/** Servicios activos que se agendan. */
+/** Servicios activos que se agendan: sin los de un producto borrado o pausado en /productos (la base tampoco los acepta). */
 export async function serviciosAgenda(token: string): Promise<ServicioAgenda[]> {
   const { data, error } = await employeeClient(token)
     .from("servicios_agenda")
-    .select("producto_id, duracion_min, productos(nombre, precio_base_mxn), servicio_colaborador(usuario_id, precio_mxn, duracion_min)")
+    .select("producto_id, duracion_min, productos(nombre, precio_base_mxn, deleted_at, estado), servicio_colaborador(usuario_id, precio_mxn, duracion_min)")
     .eq("activo", true);
   if (error) throw new Error(error.message);
   return ((data ?? []) as unknown as FilaServicio[])
+    .filter((f) => f.productos && !f.productos.deleted_at && f.productos.estado !== "PAUSADO")
     .map((f) => ({
       productoId: f.producto_id, nombre: f.productos?.nombre ?? "Servicio", precio: Number(f.productos?.precio_base_mxn ?? 0), duracionMin: f.duracion_min,
       colaboradores: (f.servicio_colaborador ?? []).map((s) => ({
@@ -301,6 +311,17 @@ export type RenglonCita = { productoId: string; usuarioId: string | null };
 /** Lo que dura con esa persona (su duración propia, si la tiene); con «quien esté libre», la del servicio. */
 export function duracionCon(s: ServicioAgenda, usuarioId: string | null): number {
   return (usuarioId && s.colaboradores.find((c) => c.usuarioId === usuarioId)?.duracionMin) || s.duracionMin;
+}
+
+/**
+ * ¿La vista previa puede fallar en la hora? Con «quien esté libre» la base elige a alguien y le aplica
+ * SU duración; si algún colaborador del servicio tiene una propia distinta, la hora final se sabe al guardar.
+ */
+export function horaSeFijaAlGuardar(renglones: RenglonCita[], servicios: ServicioAgenda[]): boolean {
+  return renglones.some((r) => {
+    const s = r.usuarioId ? null : servicios.find((x) => x.productoId === r.productoId);
+    return !!s && s.colaboradores.some((c) => c.duracionMin != null && c.duracionMin !== s.duracionMin);
+  });
 }
 
 /** Lo que cuesta con esa persona; con «quien esté libre», el del servicio. */

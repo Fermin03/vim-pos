@@ -170,15 +170,15 @@ BEGIN
     v_suc, d || '19:00' || tz, v_corte), 'CITA_EMPALMADA: no hay quien esté libre a esa hora', 'A6 fuera de horario');
   --    Diego ausente ese día: aunque tenga menos citas, toca María; con los dos ausentes, nadie.
   INSERT INTO ausencias_colaborador (tenant_id, usuario_id, desde, hasta, motivo) VALUES (v_t, v_diego, '2030-01-07', '2030-01-07', 'Vacaciones');
-  v_u := colaborador_libre(v_suc, v_corte, (d || '17:00' || tz)::timestamptz, (d || '18:00' || tz)::timestamptz);
+  v_u := colaborador_libre(v_suc, v_corte, (d || '17:00' || tz)::timestamptz);
   IF v_u IS DISTINCT FROM v_maria THEN RAISE EXCEPTION 'A6: con Diego ausente debía tocar María, tocó %', v_u; END IF;
   INSERT INTO ausencias_colaborador (tenant_id, usuario_id, desde, hasta) VALUES (v_t, v_maria, '2030-01-06', '2030-01-08');
-  IF colaborador_libre(v_suc, v_corte, (d || '17:00' || tz)::timestamptz, (d || '18:00' || tz)::timestamptz) IS NOT NULL THEN
+  IF colaborador_libre(v_suc, v_corte, (d || '17:00' || tz)::timestamptz) IS NOT NULL THEN
     RAISE EXCEPTION 'A6: con los dos ausentes no debía haber nadie'; END IF;
   --    El día es el de México: una ausencia el día 8 no tapa el 7 a las 17:00 local (23:00 UTC).
   DELETE FROM ausencias_colaborador WHERE usuario_id = v_maria;
   INSERT INTO ausencias_colaborador (tenant_id, usuario_id, desde, hasta) VALUES (v_t, v_maria, '2030-01-08', '2030-01-08');
-  IF colaborador_libre(v_suc, v_corte, (d || '17:00' || tz)::timestamptz, (d || '18:00' || tz)::timestamptz) IS DISTINCT FROM v_maria THEN
+  IF colaborador_libre(v_suc, v_corte, (d || '17:00' || tz)::timestamptz) IS DISTINCT FROM v_maria THEN
     RAISE EXCEPTION 'A6: la ausencia del día 8 tapó el día 7'; END IF;
 
   -- 7) «No llegó»: antes de la hora se rechaza; pasada, cuenta como falta y libera el tramo.
@@ -300,11 +300,94 @@ BEGIN
   SELECT string_agg(f, ', ') INTO v_txt
     FROM unnest(ARRAY['guardar_cita(jsonb)', 'agregar_en_espera(jsonb)', 'atender_cita(uuid, jsonb)', 'terminar_cita(uuid)',
                       'marcar_no_llego(uuid)', 'cancelar_cita(uuid, text)', 'resolver_empalme(uuid)', 'faltas_cliente(uuid)',
-                      'colaborador_libre(uuid, uuid, timestamptz, timestamptz)', '_agenda_tramos(uuid, uuid, uuid, timestamptz, jsonb)']) f
+                      'colaborador_libre(uuid, uuid, timestamptz)', '_agenda_tramos(uuid, uuid, uuid, timestamptz, jsonb)']) f
    WHERE has_function_privilege('anon', f, 'execute');
   IF v_txt IS NOT NULL THEN RAISE EXCEPTION 'A10: anon ejecuta %', v_txt; END IF;
   IF has_function_privilege('authenticated', '_agenda_tramos(uuid, uuid, uuid, timestamptz, jsonb)', 'execute') THEN
     RAISE EXCEPTION 'A10: authenticated ejecuta la función interna'; END IF;
+
+  -- 11) Correcciones de la revisión final. Otro lunes, con el JWT de María en su negocio.
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria, 'role', 'authenticated', 'tenant_id', v_t)::text, true);
+  d := '2030-01-14 ';
+  --     a) Un empleado dado de baja (acceso inactivo) o eliminado (perfil borrado) no se agenda:
+  --        ni elegido ni por «quien esté libre» (Diego es el único que hace pedicure).
+  IF colaborador_libre(v_suc, v_pedi, (d || '10:00' || tz)::timestamptz) IS DISTINCT FROM v_diego THEN
+    RAISE EXCEPTION 'A11a: con acceso activo debía tocar Diego'; END IF;
+  UPDATE usuarios_acceso SET activo = false WHERE usuario_id = v_diego AND tenant_id = v_t;
+  IF colaborador_libre(v_suc, v_pedi, (d || '10:00' || tz)::timestamptz) IS NOT NULL THEN
+    RAISE EXCEPTION 'A11a: «quien esté libre» asignó a un empleado dado de baja'; END IF;
+  PERFORM pg_temp.debe_fallar(format($q$SELECT guardar_cita('{"sucursal_id":"%s","cliente_nombre":"R","inicia":"%s","servicios":[{"producto_id":"%s","usuario_id":"%s"}]}')$q$,
+    v_suc, d || '10:00' || tz, v_pedi, v_diego), 'DATOS_INVALIDOS: el colaborador no está activo en esta sucursal.', 'A11a baja elegido');
+  UPDATE usuarios_acceso SET activo = true WHERE usuario_id = v_diego AND tenant_id = v_t;
+  UPDATE usuarios_perfil SET deleted_at = now() WHERE id = v_diego;
+  IF colaborador_libre(v_suc, v_pedi, (d || '10:00' || tz)::timestamptz) IS NOT NULL THEN
+    RAISE EXCEPTION 'A11a: «quien esté libre» asignó a un empleado eliminado'; END IF;
+  PERFORM pg_temp.debe_fallar(format($q$SELECT guardar_cita('{"sucursal_id":"%s","cliente_nombre":"R","inicia":"%s","servicios":[{"producto_id":"%s","usuario_id":"%s"}]}')$q$,
+    v_suc, d || '10:00' || tz, v_pedi, v_diego), 'DATOS_INVALIDOS: el colaborador no está activo en esta sucursal.', 'A11a eliminado elegido');
+  UPDATE usuarios_perfil SET deleted_at = NULL WHERE id = v_diego;
+
+  --     b) «Quien esté libre» evalúa a cada quien con SU duración. María hace el corte en 120 min:
+  --        a las 16:30 se pasaría de su horario (18:00) → Diego, en 60. A las 10:00 cabe → María, en 120.
+  UPDATE servicio_colaborador SET duracion_min = 120 WHERE producto_id = v_corte AND usuario_id = v_maria;
+  v_cx := guardar_cita(jsonb_build_object('sucursal_id', v_suc, 'cliente_nombre', 'S', 'inicia', d || '16:30' || tz,
+            'servicios', jsonb_build_array(jsonb_build_object('producto_id', v_corte))));
+  SELECT usuario_id, termina INTO r FROM citas_servicios WHERE cita_id = v_cx;
+  IF r.usuario_id IS DISTINCT FROM v_diego OR r.termina <> (d || '17:30' || tz)::timestamptz THEN
+    RAISE EXCEPTION 'A11b: a las 16:30 debía tocar Diego hasta 17:30: %', to_jsonb(r); END IF;
+  v_cx := guardar_cita(jsonb_build_object('sucursal_id', v_suc, 'cliente_nombre', 'T', 'inicia', d || '10:00' || tz,
+            'servicios', jsonb_build_array(jsonb_build_object('producto_id', v_corte))));
+  SELECT usuario_id, termina INTO r FROM citas_servicios WHERE cita_id = v_cx;
+  IF r.usuario_id IS DISTINCT FROM v_maria OR r.termina <> (d || '12:00' || tz)::timestamptz THEN
+    RAISE EXCEPTION 'A11b: a las 10:00 debía tocar María hasta 12:00: %', to_jsonb(r); END IF;
+  UPDATE servicio_colaborador SET duracion_min = NULL WHERE producto_id = v_corte AND usuario_id = v_maria;
+
+  --     c) Un servicio cuyo producto se borró o se pausó no se agenda.
+  UPDATE productos SET deleted_at = now() WHERE id = v_pedi;
+  PERFORM pg_temp.debe_fallar(format($q$SELECT guardar_cita('{"sucursal_id":"%s","cliente_nombre":"U","inicia":"%s","servicios":[{"producto_id":"%s","usuario_id":"%s"}]}')$q$,
+    v_suc, d || '14:00' || tz, v_pedi, v_diego), 'DATOS_INVALIDOS: un servicio de la cita no existe o ya no se ofrece.', 'A11c producto borrado');
+  UPDATE productos SET deleted_at = NULL, estado = 'PAUSADO' WHERE id = v_pedi;
+  PERFORM pg_temp.debe_fallar(format($q$SELECT guardar_cita('{"sucursal_id":"%s","cliente_nombre":"U","inicia":"%s","servicios":[{"producto_id":"%s","usuario_id":"%s"}]}')$q$,
+    v_suc, d || '14:00' || tz, v_pedi, v_diego), 'DATOS_INVALIDOS: un servicio de la cita no existe o ya no se ofrece.', 'A11c producto pausado');
+  UPDATE productos SET estado = 'ACTIVO' WHERE id = v_pedi;
+
+  --     d) Mover, cancelar o «No llegó» en la nube le quitan la marca a la compañera, como el push.
+  --        La pareja marcada la deja la sincronización: V (por RPC) y W, de la caja, encima.
+  v_c1 := guardar_cita(jsonb_build_object('sucursal_id', v_suc, 'cliente_nombre', 'V', 'inicia', d || '14:00' || tz,
+            'servicios', jsonb_build_array(jsonb_build_object('producto_id', v_mani, 'usuario_id', v_maria))));
+  INSERT INTO citas (tenant_id, sucursal_id, cliente_nombre, inicia, termina, empalme)
+  VALUES (v_t, v_suc, 'W', (d || '14:00' || tz)::timestamptz, (d || '15:00' || tz)::timestamptz, true) RETURNING id INTO v_c2;
+  INSERT INTO citas_servicios (tenant_id, cita_id, orden, producto_id, usuario_id, inicia, termina, precio_mxn, empalme)
+  VALUES (v_t, v_c2, 1, v_corte, v_maria, (d || '14:00' || tz)::timestamptz, (d || '15:00' || tz)::timestamptz, 250, true);
+  UPDATE citas_servicios SET empalme = true WHERE cita_id = v_c1;
+  UPDATE citas SET empalme = true WHERE id = v_c1;
+  PERFORM guardar_cita(jsonb_build_object('id', v_c1, 'sucursal_id', v_suc, 'cliente_nombre', 'V', 'inicia', d || '15:00' || tz,
+            'servicios', jsonb_build_array(jsonb_build_object('producto_id', v_mani, 'usuario_id', v_maria))));
+  IF (SELECT empalme FROM citas WHERE id = v_c2) OR (SELECT empalme FROM citas_servicios WHERE cita_id = v_c2) THEN
+    RAISE EXCEPTION 'A11d: al mover, la compañera siguió marcada'; END IF;
+  --        Cancelar: otra cita de la caja (X) encima de W; se cancela X.
+  INSERT INTO citas (tenant_id, sucursal_id, cliente_nombre, inicia, termina, empalme)
+  VALUES (v_t, v_suc, 'X', (d || '14:30' || tz)::timestamptz, (d || '15:00' || tz)::timestamptz, true) RETURNING id INTO v_c3;
+  INSERT INTO citas_servicios (tenant_id, cita_id, orden, producto_id, usuario_id, inicia, termina, precio_mxn, empalme)
+  VALUES (v_t, v_c3, 1, v_corte, v_maria, (d || '14:30' || tz)::timestamptz, (d || '15:00' || tz)::timestamptz, 250, true);
+  UPDATE citas_servicios SET empalme = true WHERE cita_id = v_c2;
+  UPDATE citas SET empalme = true WHERE id = v_c2;
+  PERFORM cancelar_cita(v_c3, NULL);
+  IF (SELECT empalme FROM citas WHERE id = v_c2) OR (SELECT empalme FROM citas_servicios WHERE cita_id = v_c2) THEN
+    RAISE EXCEPTION 'A11d: al cancelar, la compañera siguió marcada'; END IF;
+  IF (SELECT empalme FROM citas WHERE id = v_c3) OR (SELECT empalme FROM citas_servicios WHERE cita_id = v_c3) THEN
+    RAISE EXCEPTION 'A11d: la cancelada siguió marcada'; END IF;
+  --        «No llegó»: una pareja en el pasado (con Diego); la de la nube no llegó.
+  v_c5 := guardar_cita(jsonb_build_object('sucursal_id', v_suc, 'cliente_nombre', 'Y', 'inicia', date_trunc('hour', now()) - interval '6 hours',
+            'servicios', jsonb_build_array(jsonb_build_object('producto_id', v_corte, 'usuario_id', v_diego))));
+  INSERT INTO citas (tenant_id, sucursal_id, cliente_nombre, inicia, termina, empalme)
+  VALUES (v_t, v_suc, 'Z', date_trunc('hour', now()) - interval '6 hours', date_trunc('hour', now()) - interval '5 hours', true) RETURNING id INTO v_cx;
+  INSERT INTO citas_servicios (tenant_id, cita_id, orden, producto_id, usuario_id, inicia, termina, precio_mxn, empalme)
+  VALUES (v_t, v_cx, 1, v_corte, v_diego, date_trunc('hour', now()) - interval '6 hours', date_trunc('hour', now()) - interval '5 hours', 250, true);
+  UPDATE citas_servicios SET empalme = true WHERE cita_id = v_c5;
+  UPDATE citas SET empalme = true WHERE id = v_c5;
+  PERFORM marcar_no_llego(v_c5);
+  IF (SELECT empalme FROM citas WHERE id = v_cx) OR (SELECT empalme FROM citas_servicios WHERE cita_id = v_cx) THEN
+    RAISE EXCEPTION 'A11d: con «No llegó», la compañera siguió marcada'; END IF;
 
   RAISE NOTICE 'belleza agenda OK';
 END $$;

@@ -79,7 +79,7 @@ BEGIN
   EXCEPTION WHEN exclusion_violation THEN
     IF SQLERRM NOT LIKE 'CITA_EMPALMADA:%ya tiene cita a esa hora' THEN RAISE; END IF;
   END;
-  IF colaborador_libre(v_suc, v_corte, (d || '10:00' || tz)::timestamptz, (d || '11:00' || tz)::timestamptz) IS DISTINCT FROM v_diego THEN
+  IF colaborador_libre(v_suc, v_corte, (d || '10:00' || tz)::timestamptz) IS DISTINCT FROM v_diego THEN
     RAISE EXCEPTION '2c: «quien esté libre» debía saltar a María'; END IF;
 
   -- 3) Lo de otro negocio se rechaza y no entra. Una cita entra con todos sus tramos o no entra.

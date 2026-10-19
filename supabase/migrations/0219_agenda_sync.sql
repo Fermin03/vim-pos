@@ -29,6 +29,48 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION _agenda_choques(uuid, uuid, uuid, uuid, timestamptz, timestamptz) FROM PUBLIC, anon, authenticated;
 
+-- Tramos de otras citas con los que hoy chocan los tramos activos de una cita. Se toman ANTES de
+-- moverla, cancelarla o marcarla «No llegó», para revisarles la marca después.
+CREATE OR REPLACE FUNCTION _agenda_vecinos(p_tenant uuid, p_cita uuid)
+RETURNS uuid[]
+LANGUAGE sql STABLE SET search_path = public, pg_temp
+AS $$
+  SELECT COALESCE(array_agg(u), '{}')
+    FROM citas_servicios o, unnest(_agenda_choques(p_tenant, p_cita, o.usuario_id, o.espacio_id, o.inicia, o.termina)) u
+   WHERE o.cita_id = p_cita AND o.activa;
+$$;
+REVOKE ALL ON FUNCTION _agenda_vecinos(uuid, uuid) FROM PUBLIC, anon, authenticated;
+
+-- Recalcula con la regla de arriba la marca de estos tramos, y la de sus citas más p_citas. La
+-- usan el aplicador del push y las RPC de la 0218 que mueven, cancelan o dan por no llegada una
+-- cita: así la compañera pierde la marca por el canal que sea.
+CREATE OR REPLACE FUNCTION _agenda_remarcar(p_tenant uuid, p_tramos uuid[], p_citas uuid[] DEFAULT '{}')
+RETURNS void
+LANGUAGE plpgsql SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_citas uuid[] := COALESCE(p_citas, '{}');
+  v_marca boolean;
+  r       record;
+BEGIN
+  FOR r IN SELECT * FROM citas_servicios WHERE id = ANY(p_tramos) AND tenant_id = p_tenant LOOP
+    v_marca := r.activa AND _agenda_choques(p_tenant, r.cita_id, r.usuario_id, r.espacio_id, r.inicia, r.termina) IS NOT NULL;
+    IF v_marca IS DISTINCT FROM r.empalme THEN
+      BEGIN
+        UPDATE citas_servicios SET empalme = v_marca WHERE id = r.id;
+      EXCEPTION WHEN exclusion_violation THEN NULL;   -- otro envío lo ocupó en el ínterin: queda marcado
+      END;
+    END IF;
+    v_citas := v_citas || r.cita_id;
+  END LOOP;
+  UPDATE citas c SET empalme = m.marca
+    FROM (SELECT x.id, EXISTS (SELECT 1 FROM citas_servicios s WHERE s.cita_id = x.id AND s.empalme) AS marca
+            FROM citas x WHERE x.id = ANY(v_citas) AND x.tenant_id = p_tenant) m
+   WHERE c.id = m.id AND c.empalme IS DISTINCT FROM m.marca;
+END;
+$$;
+REVOKE ALL ON FUNCTION _agenda_remarcar(uuid, uuid[], uuid[]) FROM PUBLIC, anon, authenticated;
+
 -- Cuerpo de la 0218 con la regla de arriba: la marca solo se quita si el tramo ya no choca con
 -- NADA (tampoco con un tramo marcado, que el EXCLUDE dejaría pasar).
 CREATE OR REPLACE FUNCTION resolver_empalme(p_cita uuid)
@@ -61,10 +103,11 @@ BEGIN
 END;
 $$;
 
--- Cuerpo de la 0218 con una sola diferencia: un tramo nuevo (guardar_cita, atender_cita desde la
+-- Cuerpo de la 0218 con estas diferencias: un tramo nuevo (guardar_cita, atender_cita desde la
 -- espera) no se encima sobre NINGÚN tramo activo de otra cita, tampoco sobre uno marcado con
--- empalme, y el espacio automático tampoco elige uno ocupado por un tramo marcado. Mismos mensajes
--- CITA_EMPALMADA. colaborador_libre (0218) ya no excluía los marcados: no cambia.
+-- empalme, y el espacio automático tampoco elige uno ocupado por un tramo marcado (mismos mensajes
+-- CITA_EMPALMADA); un servicio cuyo producto se borró o pausó no se agenda; el colaborador elegido
+-- debe seguir siendo empleado del negocio. colaborador_libre (0218) ya no excluía los marcados.
 CREATE OR REPLACE FUNCTION _agenda_tramos(p_tenant uuid, p_cita uuid, p_sucursal uuid, p_inicia timestamptz, p_servicios jsonb)
 RETURNS timestamptz
 LANGUAGE plpgsql
@@ -93,15 +136,20 @@ BEGIN
     v_prod    := (v_s->>'producto_id')::uuid;
     v_usuario := (v_s->>'usuario_id')::uuid;
     v_espacio := (v_s->>'espacio_id')::uuid;
+    -- Un producto borrado o pausado en /productos ya no se agenda.
     SELECT sa.duracion_min, sa.tipo_espacio_id INTO v_dur, v_tipo
       FROM servicios_agenda sa
+      JOIN productos p ON p.id = sa.producto_id AND p.deleted_at IS NULL AND p.estado <> 'PAUSADO'
      WHERE sa.producto_id = v_prod AND sa.tenant_id = p_tenant AND sa.activo;
     IF NOT FOUND THEN
-      RAISE EXCEPTION 'DATOS_INVALIDOS: un servicio de la cita no existe.' USING ERRCODE = '22023';
+      RAISE EXCEPTION 'DATOS_INVALIDOS: un servicio de la cita no existe o ya no se ofrece.' USING ERRCODE = '22023';
     END IF;
+    -- Activo en la sucursal y todavía empleado del negocio (acceso activo, perfil sin borrar).
     IF v_usuario IS NOT NULL AND NOT EXISTS (
-         SELECT 1 FROM colaboradores_agenda
-          WHERE tenant_id = p_tenant AND usuario_id = v_usuario AND activo AND sucursal_id = p_sucursal) THEN
+         SELECT 1 FROM colaboradores_agenda ca
+          WHERE ca.tenant_id = p_tenant AND ca.usuario_id = v_usuario AND ca.activo AND ca.sucursal_id = p_sucursal
+            AND EXISTS (SELECT 1 FROM usuarios_acceso ua WHERE ua.tenant_id = p_tenant AND ua.usuario_id = v_usuario AND ua.activo)
+            AND EXISTS (SELECT 1 FROM usuarios_perfil up WHERE up.id = v_usuario AND up.deleted_at IS NULL)) THEN
       RAISE EXCEPTION 'DATOS_INVALIDOS: el colaborador no está activo en esta sucursal.' USING ERRCODE = '22023';
     END IF;
     IF v_espacio IS NOT NULL AND NOT EXISTS (
@@ -112,8 +160,7 @@ BEGIN
     v_fin := NULL;
     IF v_cursor IS NOT NULL THEN
       IF v_usuario IS NULL THEN
-        -- La duración de «quien esté libre» es la del servicio: aún no se sabe quién.
-        v_usuario := colaborador_libre(p_sucursal, v_prod, v_cursor, v_cursor + make_interval(mins => v_dur));
+        v_usuario := colaborador_libre(p_sucursal, v_prod, v_cursor);
         IF v_usuario IS NULL THEN
           RAISE EXCEPTION 'CITA_EMPALMADA: no hay quien esté libre a esa hora' USING ERRCODE = '23P01';
         END IF;
@@ -201,7 +248,6 @@ DECLARE
   v_dueno   uuid;
   v_estado  cita_estado;
   v_activa  boolean;
-  v_marca   boolean;
   v_choca   uuid[];
   v_revisar uuid[] := '{}';
   v_tocadas uuid[] := '{}';
@@ -209,7 +255,6 @@ DECLARE
   v_nc      integer := 0;
   v_ns      integer := 0;
   v_errores jsonb := '[]'::jsonb;
-  r         record;
 BEGIN
   IF jsonb_typeof(p_citas) IS DISTINCT FROM 'array' THEN p_citas := '[]'::jsonb; END IF;
   IF jsonb_typeof(p_servicios) IS DISTINCT FROM 'array' THEN p_servicios := '[]'::jsonb; END IF;
@@ -256,10 +301,7 @@ BEGIN
 
       -- Lo que chocaba con sus tramos viejos se vuelve a revisar al final: si la cita se movió o se
       -- canceló, la otra pierde la marca.
-      v_revisar := v_revisar || COALESCE((
-        SELECT array_agg(u) FROM citas_servicios o,
-               unnest(_agenda_choques(p_tenant, v_cita, o.usuario_id, o.espacio_id, o.inicia, o.termina)) u
-         WHERE o.cita_id = v_cita AND o.activa), '{}');
+      v_revisar := v_revisar || _agenda_vecinos(p_tenant, v_cita);
       -- Primero fuera los tramos de la nube: cambiar el estado no debe reactivar unos que se van.
       DELETE FROM citas_servicios WHERE cita_id = v_cita;
       INSERT INTO citas AS c SELECT * FROM jsonb_populate_record(NULL::citas, v_c || '{"empalme": false}'::jsonb)
@@ -313,20 +355,7 @@ BEGIN
   END LOOP;
 
   -- La marca, recalculada sobre lo tocado ya con todo el envío aplicado.
-  FOR r IN SELECT * FROM citas_servicios WHERE id = ANY(v_revisar) LOOP
-    v_marca := r.activa AND _agenda_choques(p_tenant, r.cita_id, r.usuario_id, r.espacio_id, r.inicia, r.termina) IS NOT NULL;
-    IF v_marca IS DISTINCT FROM r.empalme THEN
-      BEGIN
-        UPDATE citas_servicios SET empalme = v_marca WHERE id = r.id;
-      EXCEPTION WHEN exclusion_violation THEN NULL;   -- otro envío lo ocupó en el ínterin: queda marcado
-      END;
-    END IF;
-    v_tocadas := v_tocadas || r.cita_id;
-  END LOOP;
-  UPDATE citas c SET empalme = m.marca
-    FROM (SELECT x.id, EXISTS (SELECT 1 FROM citas_servicios s WHERE s.cita_id = x.id AND s.empalme) AS marca
-            FROM citas x WHERE x.id = ANY(v_tocadas)) m
-   WHERE c.id = m.id AND c.empalme IS DISTINCT FROM m.marca;
+  PERFORM _agenda_remarcar(p_tenant, v_revisar, v_tocadas);
 
   RETURN jsonb_build_object('citas', v_nc, 'citas_servicios', v_ns, 'errores', v_errores);
 END;

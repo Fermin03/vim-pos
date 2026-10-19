@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Icono, Modal } from "@vim/ui/styles";
 import { horaCorta, tramosEncadenados } from "@vim/db/agenda";
 import {
-  agregarEnEspera, colaboradoresDelDia, motivoBloqueo, duracionCon, entradaCita, guardarCita, precioCon, serviciosAgenda,
+  agregarEnEspera, colaboradoresDelDia, motivoBloqueo, duracionCon, entradaCita, guardarCita, horaSeFijaAlGuardar, precioCon, serviciosAgenda,
   type CitaDia, type ColaboradorDia, type RenglonCita, type ServicioAgenda,
 } from "../lib/agenda";
 import { TelefonoDuplicado, buscarClientesCuenta, normalizarTelefono, registrarClienteCuenta, type ClienteCuenta } from "../lib/clientes-cuenta";
@@ -269,6 +269,9 @@ export function ModalCita({ token, tenantId, sucursalId, abrir, onGuardada, onCe
                 </li>
               ))}
             </ul>
+          )}
+          {previa.length > 0 && !espera && horaSeFijaAlGuardar(renglones, servicios) && (
+            <p className="text-13 text-ink-3">Con «Quien esté libre» la hora final se fija al guardar: depende de quién atienda.</p>
           )}
           {previa.length > 0 && (
             <p className="flex items-baseline justify-between border-t border-line pt-3 text-15 font-semibold">

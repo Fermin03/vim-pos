@@ -29,9 +29,13 @@ producto, y no había forma de decir quién lo hace, cuánto dura ni dónde.
 
 ## Cómo se despliega (no es obvio)
 
-- La 0216 (solo `ADD VALUE`) y la 0217 van **en un instalador antes** de aplicarse en la nube. La 0217
-  agrega `agenda` a `tenants.operacion` de todos los negocios; una caja que no la traiga falla el pull
-  con `MODULO_DESCONOCIDO`.
+- La 0216 → 0219 van a la nube a mano y **antes del merge**, como siempre, sin esperar a las cajas; el
+  instalador con ellas sale después. Una caja vieja aguanta: su pull escribe en réplica (no corre el
+  disparador de `tenants.operacion`, así que la llave `agenda` no da error) e ignora tablas y llaves
+  que no conoce.
+- **La compuerta es el enum de la 0216:** un `vertical_principal` de belleza sí tumba el pull de una
+  caja sin ella. Por eso `cambiar_giro` bloquea los cinco giros hasta la migración de liberación
+  (entrega 4), que se aplica solo cuando todas las cajas en uso tengan el instalador con la 0216.
 - `btree_gist` ya viene en el Postgres embebido de la caja (verificado en `@embedded-postgres/windows-x64`).
 - Los giros nuevos no se ofrecen en el registro todavía y están bloqueados en `cambiar_giro`.
 

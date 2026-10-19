@@ -239,9 +239,14 @@ decisión: ADR 0038.
 
 **Para el lanzamiento**
 
-- **La 0216 Y la 0217 van en el instalador ANTES de aplicar la 0217 en la nube.** El backfill de la
-  0217 agrega `agenda` a `tenants.operacion`; una caja que no la traiga falla el pull con
-  `MODULO_DESCONOCIDO`. La 0218 y la 0219 pueden ir después, a mano y antes del merge.
+- **Orden:** 0216 → 0219 en la nube, a mano y **antes del merge** (la regla de siempre), sin esperar
+  a las cajas. Después, el instalador con 0216–0219. Una caja vieja no se rompe: el pull escribe en
+  réplica (el disparador de `tenants.operacion` no corre en la caja, así que la llave `agenda` no da
+  error), ignora las tablas y llaves que no conoce, y su push no manda citas.
+- **La compuerta real es el enum de la 0216.** Un `vertical_principal` de belleza sí tumba el pull de
+  una caja sin la 0216; por eso `cambiar_giro` bloquea los cinco giros (`GIRO_NO_DISPONIBLE`). La
+  migración de liberación (entrega 4) se aplica solo cuando todas las cajas en uso ya tengan el
+  instalador con la 0216.
 - `btree_gist` existe en el Postgres embebido de la caja instalada (verificado en
   `@embedded-postgres/windows-x64`).
 - Los giros nuevos no se ofrecen en el registro y siguen bloqueados en `cambiar_giro` hasta la entrega 4.
@@ -251,7 +256,12 @@ decisión: ADR 0038.
 
 - En la caja, con colaborador elegido, se puede agendar **fuera de su horario o en su ausencia** (la
   recepción manda). «Quien esté libre» y la reserva en línea (entrega 3) sí los respetan.
-- Con colaborador elegido solo se exige que esté activo en la sucursal; no que ofrezca ese servicio.
+- Con colaborador elegido solo se exige que esté activo en la sucursal y siga siendo empleado (acceso
+  activo, perfil sin borrar); no que ofrezca ese servicio. A un empleado dado de baja no se le agenda
+  por ningún camino; sus citas siguen a la vista (columna «Sin colaborador»).
+- «Quien esté libre» mide a cada candidato con su propia duración del servicio.
+- Mover, cancelar o marcar «No llegó» una cita, por la nube o por la caja, le quita la marca de empalme
+  a la que chocaba con ella si ya no choca con nada.
 - Un servicio sin tipo de espacio no ocupa espacio.
 - El calendario muestra el día; la semana es la tira para cambiar de día (sin vista semanal completa).
 - «Cobrar» en la barra de belleza es la caja de tienda de hoy hasta la entrega 2.
