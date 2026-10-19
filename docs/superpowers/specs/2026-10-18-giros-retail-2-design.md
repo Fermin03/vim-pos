@@ -319,3 +319,39 @@ Título de pestaña «Cotización · VIM POS» y `noindex`.
   simulado.
 - Tipos de BD escritos a mano, fuera de orden.
 - Sitio web y PDF de prospectos: pendientes hasta el final de todos los giros retail.
+
+## Entrega 4 (barra y abrir giros), hecha (18 oct)
+
+La barra de la tienda con nombres nuevos y los cuatro giros abiertos. Todo en local, rama
+`feat/retail2-barra`.
+
+**Barra de la caja de tienda:** Cobrar · Inventario · Transacciones · Notificaciones · Más. Solo cambia
+el texto; los ids internos (`panel`, `configuracion`) se quedan. «Más» es la antigua Configuración con
+título «Más» y un primer grupo «Ventas» (Cotizaciones y Créditos), que sale solo si su módulo está
+encendido. Los botones de regreso dicen «Volver a Más». Los restaurantes no cambian.
+
+**Migraciones**
+
+- **0214:** `prospectos` acepta ABARROTES, FRUTERIA, FERRETERIA y VINOS.
+- **0215:** `cambiar_giro` libera esos cuatro giros. BAR, CAFETERIA y TAQUERIA siguen bloqueados.
+
+**Giros abiertos:** alta.ts, provisionar-tenant, solicitar-demo, admin `/registro` y `operacion.ts`
+(`ofrecido: true`). Smokes actualizados (smoke_retail2, bloque 5: una FERRETERIA nace con su juego
+inicial). El test de Deno de `alta.test.ts` se actualizó pero no se corrió (no hay Deno aquí).
+
+**Rulings** (Fermín puede corregirlos)
+
+- La barra cambia solo de texto; «Más» no es una pantalla nueva.
+- El formulario de demo del sitio no se toca: sitio y PDF de prospectos van al final de todos los giros.
+
+## Lanzamiento de la segunda tanda
+
+Orden completo:
+
+1. Migraciones 0205–0214 a producción, a mano, ANTES de las apps (0205 y 0207 son solo `ADD VALUE`).
+2. Instalador con 0205/0207.
+3. Migración 0215 (después del instalador que trae la 0205).
+4. Desplegar las funciones de alta, provisión y demo, y el portal de factura.
+5. Merge.
+
+**Nada sale a producción hasta tener terminados retail, servicios y belleza** (regla de Fermín).

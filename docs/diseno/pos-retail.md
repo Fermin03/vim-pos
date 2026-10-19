@@ -20,20 +20,20 @@ días después a cambiar la talla.
 
 ## La barra inferior y sus cinco secciones
 
-**Una barra de navegación abajo, siempre visible**, con cinco destinos: **Panel · Inventario ·
-Transacciones · Notificaciones · Configuración**. En una tienda reemplaza al inicio de mosaicos, al
+**Una barra de navegación abajo, siempre visible**, con cinco destinos: **Cobrar · Inventario ·
+Transacciones · Notificaciones · Más**. En una tienda reemplaza al inicio de mosaicos, al
 botón «Menú» y al `Volver` de la venta: el cajero cambia de sección con un toque, sin regresar a un
 inicio. Cada destino es un botón de 56 px de alto con icono y texto; el elegido va en el color de
 acento. Notificaciones lleva un globo con el número de avisos sin ver. La barra de estado de la caja
 (sin conexión, sincronizando, turno, folios) sigue arriba. Con un cobro o un diálogo encima, la barra
-no responde. Al iniciar turno, la caja abre en el Panel. Las secciones comparten la misma cabecera:
+no responde. Al iniciar turno, la caja abre en Cobrar. Las secciones comparten la misma cabecera:
 título de 20 px y, a la derecha, lo suyo.
 
-- **Panel** es la venta (la pantalla de cobro). Ver «La pantalla de venta».
+- **Cobrar** es la venta (la pantalla de cobro; su id interno sigue siendo `panel`). Ver «La pantalla de venta».
 - **Inventario** tiene dos pestañas, **Existencias** y **Recibir**.
 - **Transacciones** es la lista de ventas y cuentas abiertas.
 - **Notificaciones** junta las alertas de existencias y los avisos de VIM.
-- **Configuración** es el menú general de la caja puesto en una página.
+- **Más** es el menú general de la caja puesto en una página (id interno `configuracion`).
 
 Un restaurante no ve nada de esto: su inicio, su menú y su captura quedan iguales.
 
@@ -65,7 +65,7 @@ folio o escaneando una prenda (30 días). Al tocar una venta se ve su detalle, c
 **Cambiar pago** (solo cuando la venta tiene exactamente un pago real; una venta de cambio de talla
 se pagó con la prenda devuelta y no tiene pago que cambiar).
 Reemplaza a las entradas sueltas de Devoluciones y de Cambio de talla; el botón grande del ticket
-vacío se queda como atajo al cambio. Abrir una cuenta la carga en el Panel para cobrarla. Una cuenta abierta que ya trae pagos (la venta de un cambio, reabierta) muestra en el botón lo **pendiente**, no el total; con $0 pendiente (un cambio parejo) el botón dice «Cerrar venta», cierra la cuenta sin abrir el modal de pago y «Cobro completado» dice «Sin cobro». Reabrir esa venta no anula la prenda devuelta: su aviso dice que solo se anula lo que el cliente pagó aparte.
+vacío se queda como atajo al cambio. Abrir una cuenta la carga en Cobrar para cobrarla. Una cuenta abierta que ya trae pagos (la venta de un cambio, reabierta) muestra en el botón lo **pendiente**, no el total; con $0 pendiente (un cambio parejo) el botón dice «Cerrar venta», cierra la cuenta sin abrir el modal de pago y «Cobro completado» dice «Sin cobro». Reabrir esa venta no anula la prenda devuelta: su aviso dice que solo se anula lo que el cliente pagó aparte.
 
 Solo salen las cuentas de **esta caja**: el pago se asienta en la caja y el turno del ticket. En el
 restaurante, «Cuentas abiertas · Para llevar» muestra las de toda la sucursal; ver el hallazgo en el
@@ -88,12 +88,12 @@ primero lo agotado o en negativo, luego «Pocas», luego los avisos de VIM.
   máximo** y tira los que ya pasaron su `vigente_hasta` o traen una fecha que no se entiende. Un aviso
   que VIM retire sigue ahí hasta que venza.
 
-### Configuración
+### Más
 
-Lo que antes estaba en el «Menú» general, en una página: impresoras y pantallas, cambiar cajero,
+Título «Más». Su primer grupo, **«Ventas»**, trae **Cotizaciones** y **Créditos**, y cada uno aparece solo si su módulo está encendido. Después, lo que antes estaba en el «Menú» general, en una página: impresoras y pantallas, cambiar cajero,
 bloquear, cambiar PIN, mis propinas, abrir cajón, **Corte caja X** (abre el monitor de ventas),
 **Retiro / Depósito**, actualizar menú, buscar actualizaciones, ayuda por WhatsApp, **Salir** (si la
-caja puede) y **Cerrar turno** (en rojo, separado de lo demás). «Devoluciones» ya no está aquí: se hace
+caja puede) y **Cerrar turno** (en rojo, separado de lo demás). Los botones de regreso dicen «Volver a Más». «Devoluciones» ya no está aquí: se hace
 desde Transacciones.
 
 **Proteger la venta en curso.** Bloquear, Cambiar cajero, Cerrar turno y Salir sacan al cajero de la
@@ -110,7 +110,7 @@ pantalla de venta. Antes de hacerlo:
   `venta-retail.tsx`) y se agrega la barra inferior con sus secciones. El ticket de la derecha, el
   cobro y lo demás son los de siempre y viven en `home-pos.tsx`. Un restaurante con el módulo de
   existencias encendido sigue viendo su pantalla de siempre.
-- No hay inicio de mosaicos. La caja abre en el Panel.
+- No hay inicio de mosaicos. La caja abre en Cobrar.
 - El estado de la caja (sin conexión, sincronizando, turno, folios), los avisos de VIM y el bloqueo se
   quedan exactamente donde están.
 
@@ -128,7 +128,7 @@ Tres zonas, de arriba abajo a la izquierda y el ticket a la derecha (mismo ancho
 │ │$349      ││$799      ││$599 Pocas│              ‹ 1/3 ›      │ [     Cobrar     ]     │
 │ └──────────┘└──────────┘└──────────┘                           │                        │
 ├────────────────────────────────────────────────────────────────┴────────────────────────┤
-│   Panel      Inventario     Transacciones     Notificaciones     Configuración          │
+│   Cobrar     Inventario     Transacciones     Notificaciones     Más                    │
 └──────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -206,7 +206,7 @@ Un `Modal` centrado, no un cajón lateral: la matriz necesita ancho.
 ### El ticket
 
 - El panel de hoy (`SidebarTicket`, `RenglonItem`), **mitad y mitad** con el catálogo (Fermín, 18 oct).
-  En el Panel no se pinta la etiqueta del modo bajo «Ticket nuevo». Por dentro el ticket sigue siendo
+  En Cobrar no se pinta la etiqueta del modo bajo «Ticket nuevo». Por dentro el ticket sigue siendo
   `PARA_LLEVAR` (spec §5.2); el ticket impreso y su vista en pantalla dicen «Servicio: Venta». Los textos secundarios (cuentas abiertas, cierre) aún
   dicen «Para llevar».
 - Cada renglón: el nombre del padre en la primera línea y, debajo en `text-13 ink-2`, la variante y
@@ -308,7 +308,7 @@ cliente).
   parcial y completar con otro método.
 - **«Cobro completado»** dice «A crédito» en vez de cambio. La venta a crédito no gana puntos.
 - **Ticket impreso:** «Por pagar» y «Fecha límite», y la leyenda «Se factura al liquidarse.».
-- **Créditos** (entrada temporal en Configuración, hasta que exista «Más»): lista de clientes con
+- **Créditos** (en «Más», grupo «Ventas»): lista de clientes con
   deuda, detalle por cliente y **«Registrar abono»**. El abono abre el cajón si es en efectivo y suma
   al corte del turno que lo recibe. Si el cliente debe en otras cajas, el detalle dice «Además debe $X
   de otras cajas» (el abono solo reparte entre las ventas de esta caja).
@@ -327,7 +327,7 @@ en días).
 - **«Mandar por WhatsApp».** Abre WhatsApp con un texto y el enlace público de la cotización
   (`/c/<token>` en el portal de factura). El cliente la abre en su teléfono y usa «Guardar como PDF».
   Una cotización cancelada dice «no existe o ya no está disponible».
-- **Cotizaciones** (entrada temporal en Configuración, hasta que exista «Más»): lista de vigentes y
+- **Cotizaciones** (en «Más», grupo «Ventas»): lista de vigentes y
   vencidas, búsqueda, y por cada una **Reimprimir**, **WhatsApp**, **Convertir en venta** y
   **Cancelar**. **«Nueva cotización»** regresa a Cobrar con el carrito vacío y un aviso.
 - **Convertir en venta** carga el carrito con los **precios de hoy**. Avisa si algún precio cambió,
