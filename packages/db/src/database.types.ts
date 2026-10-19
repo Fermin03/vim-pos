@@ -310,6 +310,165 @@ export type Database = {
           },
         ]
       }
+      anticipos_cita: {
+        Row: {
+          caja_id: string
+          cita_id: string
+          client_id_local: string | null
+          created_at: string
+          estado: string
+          id: string
+          metodo_pago: Database["public"]["Enums"]["metodo_pago"]
+          monto_mxn: number
+          referencia_devolucion: string | null
+          resuelto_at: string | null
+          sucursal_id: string
+          tenant_id: string
+          ticket_id: string | null
+          turno_id: string
+          turno_resuelve_id: string | null
+          updated_at: string
+          usuario_id: string | null
+        }
+        Insert: {
+          caja_id: string
+          cita_id: string
+          client_id_local?: string | null
+          created_at?: string
+          estado?: string
+          id?: string
+          metodo_pago: Database["public"]["Enums"]["metodo_pago"]
+          monto_mxn: number
+          referencia_devolucion?: string | null
+          resuelto_at?: string | null
+          sucursal_id: string
+          tenant_id: string
+          ticket_id?: string | null
+          turno_id: string
+          turno_resuelve_id?: string | null
+          updated_at?: string
+          usuario_id?: string | null
+        }
+        Update: {
+          caja_id?: string
+          cita_id?: string
+          client_id_local?: string | null
+          created_at?: string
+          estado?: string
+          id?: string
+          metodo_pago?: Database["public"]["Enums"]["metodo_pago"]
+          monto_mxn?: number
+          referencia_devolucion?: string | null
+          resuelto_at?: string | null
+          sucursal_id?: string
+          tenant_id?: string
+          ticket_id?: string | null
+          turno_id?: string
+          turno_resuelve_id?: string | null
+          updated_at?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anticipos_cita_caja_id_fkey"
+            columns: ["caja_id"]
+            isOneToOne: false
+            referencedRelation: "cajas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anticipos_cita_cita_id_fkey"
+            columns: ["cita_id"]
+            isOneToOne: false
+            referencedRelation: "citas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anticipos_cita_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anticipos_cita_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
+            foreignKeyName: "anticipos_cita_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anticipos_cita_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anticipos_cita_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cumplimiento_tiempos_cocina"
+            referencedColumns: ["ticket_id"]
+          },
+          {
+            foreignKeyName: "anticipos_cita_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_ventas_apps_externas"
+            referencedColumns: ["ticket_id"]
+          },
+          {
+            foreignKeyName: "anticipos_cita_turno_id_fkey"
+            columns: ["turno_id"]
+            isOneToOne: false
+            referencedRelation: "turnos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anticipos_cita_turno_id_fkey"
+            columns: ["turno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_efectivo_esperado_turno"
+            referencedColumns: ["turno_id"]
+          },
+          {
+            foreignKeyName: "anticipos_cita_turno_id_fkey"
+            columns: ["turno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_resumen_turno"
+            referencedColumns: ["turno_id"]
+          },
+          {
+            foreignKeyName: "anticipos_cita_turno_resuelve_id_fkey"
+            columns: ["turno_resuelve_id"]
+            isOneToOne: false
+            referencedRelation: "turnos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anticipos_cita_turno_resuelve_id_fkey"
+            columns: ["turno_resuelve_id"]
+            isOneToOne: false
+            referencedRelation: "vw_efectivo_esperado_turno"
+            referencedColumns: ["turno_id"]
+          },
+          {
+            foreignKeyName: "anticipos_cita_turno_resuelve_id_fkey"
+            columns: ["turno_resuelve_id"]
+            isOneToOne: false
+            referencedRelation: "vw_resumen_turno"
+            referencedColumns: ["turno_id"]
+          },
+        ]
+      }
       anuncios_pantalla: {
         Row: {
           activo: boolean
@@ -14994,6 +15153,49 @@ export type Database = {
         Args: { p_cita: string; p_tenant: string }
         Returns: string[]
       }
+      _anticipo_turno: {
+        Args: { p_caja_id: string; p_tenant: string; p_turno_id: string }
+        Returns: {
+          admin_decision:
+            | Database["public"]["Enums"]["admin_decision_cierre"]
+            | null
+          admin_notas: string | null
+          caja_id: string
+          codigo_turno: string
+          created_at: string
+          dia_contable: string
+          diferencia_descripcion: string | null
+          diferencia_justificacion: string | null
+          diferencia_mxn: number | null
+          efectivo_contado_mxn: number | null
+          efectivo_esperado_mxn: number | null
+          estado: Database["public"]["Enums"]["turno_estado"]
+          evento_comision_mxn: number | null
+          evento_nombre: string | null
+          evento_notas: string | null
+          evento_tipo: string | null
+          fecha_apertura: string
+          fecha_cierre: string | null
+          fecha_validacion: string | null
+          fondo_inicial_mxn: number
+          fondo_modo: Database["public"]["Enums"]["fondo_modo_captura"]
+          id: string
+          notas_apertura: string | null
+          notas_cierre: string | null
+          sucursal_id: string
+          tenant_id: string
+          updated_at: string
+          usuario_apertura_id: string
+          usuario_cierre_id: string | null
+          usuario_validacion_id: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "turnos"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       _cajas_excedente: {
         Args: { p_base: number; p_excluir?: string; p_tenant: string }
         Returns: number
@@ -15387,6 +15589,7 @@ export type Database = {
         }
         Returns: string
       }
+      anticipo_sugerido: { Args: { p_cita: string }; Returns: number }
       anular_compra: {
         Args: { p_compra_id: string; p_motivo: string }
         Returns: undefined
@@ -15929,6 +16132,15 @@ export type Database = {
         }
         Returns: Json
       }
+      devolver_anticipo: {
+        Args: {
+          p_anticipo: string
+          p_caja_id: string
+          p_referencia?: string
+          p_turno_id: string
+        }
+        Returns: undefined
+      }
       ean13_digito: { Args: { p_doce: string }; Returns: string }
       eliminar_menu: { Args: { p_menu: string }; Returns: undefined }
       eliminar_tenant: {
@@ -16287,6 +16499,14 @@ export type Database = {
         }
         Returns: string
       }
+      pagar_con_anticipo: {
+        Args: {
+          p_cita_id: string
+          p_client_id_local: string
+          p_ticket_id: string
+        }
+        Returns: number
+      }
       pagar_con_saldo_favor: {
         Args: {
           p_client_id_local?: string
@@ -16398,6 +16618,17 @@ export type Database = {
           p_turno_id: string
         }
         Returns: Json
+      }
+      registrar_anticipo: {
+        Args: {
+          p_caja_id: string
+          p_cita: string
+          p_client_id_local: string
+          p_metodo: Database["public"]["Enums"]["metodo_pago"]
+          p_monto: number
+          p_turno_id: string
+        }
+        Returns: string
       }
       registrar_autorizacion_propia: {
         Args: {
@@ -16526,6 +16757,10 @@ export type Database = {
           movimientos: number
           tipo: string
         }[]
+      }
+      retener_anticipo: {
+        Args: { p_anticipo: string; p_turno_id: string }
+        Returns: undefined
       }
       retomar_ticket: { Args: { p_ticket_id: string }; Returns: undefined }
       reversar_inventario_por_cancelacion: {
