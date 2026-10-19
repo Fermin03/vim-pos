@@ -94,6 +94,7 @@ DECLARE
   v_monto  numeric(12,2) := round(p_monto, 2);
   v_turno  turnos%ROWTYPE;
   v_estado cita_estado;
+  v_suc    uuid;
   v_id     uuid;
 BEGIN
   IF length(p_client_id_local) > 100 THEN
@@ -118,9 +119,12 @@ BEGIN
   v_turno := _anticipo_turno(v_tenant, p_caja_id, p_turno_id);
 
   -- La cita no cambia de estado mientras entra su anticipo (pagar_con_anticipo también la bloquea).
-  SELECT estado INTO v_estado FROM citas WHERE id = p_cita AND tenant_id = v_tenant FOR UPDATE;
+  SELECT estado, sucursal_id INTO v_estado, v_suc FROM citas WHERE id = p_cita AND tenant_id = v_tenant FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: la cita no existe.' USING ERRCODE = '22023';
+  END IF;
+  IF v_suc <> v_turno.sucursal_id THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: el anticipo se recibe en una caja de la sucursal de la cita.' USING ERRCODE = '22023';
   END IF;
   IF v_estado NOT IN ('AGENDADA', 'EN_ESPERA') THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: el anticipo se recibe en una cita por llegar o en espera.' USING ERRCODE = '22023';
@@ -216,11 +220,20 @@ BEGIN
     END IF;
   END IF;
 
-  -- El anticipo de una cita solo paga la venta de esa cita.
+  IF v_t.turno_id IS NULL THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: la venta no tiene turno; ábrela en un turno para cobrar con anticipo.' USING ERRCODE = '22023';
+  END IF;
+
+  -- El anticipo de una cita solo paga la venta de esa cita. Candados en orden cita → anticipos
+  -- (el mismo de devolver_anticipo, retener_anticipo y _anticipo_regresar) ANTES de sumar: un
+  -- anticipo que otra sesión devuelve o retiene no se cobra.
   PERFORM 1 FROM citas WHERE id = p_cita_id AND tenant_id = v_tenant AND ticket_id = p_ticket_id FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: la cita no está en esta venta.' USING ERRCODE = '22023';
   END IF;
+  PERFORM 1 FROM anticipos_cita
+   WHERE cita_id = p_cita_id AND tenant_id = v_tenant AND estado = 'VIGENTE'
+   ORDER BY created_at, id FOR UPDATE;
 
   SELECT COALESCE(sum(monto_mxn), 0) INTO v_monto FROM anticipos_cita
    WHERE cita_id = p_cita_id AND tenant_id = v_tenant AND estado = 'VIGENTE';
@@ -254,6 +267,9 @@ BEGIN
      WHERE id = v_a.id;
     v_resto := v_resto - v_parte;
   END LOOP;
+  IF v_resto > 0 THEN   -- no debería pasar con los candados de arriba; si pasa, no se cobra
+    RAISE EXCEPTION 'DATOS_INVALIDOS: el anticipo cambió mientras se cobraba; vuelve a intentarlo.' USING ERRCODE = '40001';
+  END IF;
   RETURN v_monto;
 END;
 $$;
@@ -282,6 +298,8 @@ BEGIN
   IF v_tenant IS NULL THEN
     RAISE EXCEPTION 'Sin negocio en la sesión.' USING ERRCODE = '42501';
   END IF;
+  -- Candados en orden cita → anticipo, como pagar_con_anticipo.
+  PERFORM 1 FROM citas WHERE id = (SELECT cita_id FROM anticipos_cita WHERE id = p_anticipo AND tenant_id = v_tenant) FOR UPDATE;
   SELECT * INTO v_a FROM anticipos_cita WHERE id = p_anticipo AND tenant_id = v_tenant FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: el anticipo no existe.' USING ERRCODE = '22023';
@@ -339,6 +357,10 @@ DECLARE
   v_parte numeric(12,2);
   v_a     anticipos_cita%ROWTYPE;
 BEGIN
+  -- Candados en orden cita → anticipos, como pagar_con_anticipo, antes de sumar.
+  PERFORM 1 FROM citas WHERE id IN (SELECT cita_id FROM anticipos_cita WHERE ticket_id = p_ticket AND estado = 'APLICADO')
+   ORDER BY id FOR UPDATE;
+  PERFORM 1 FROM anticipos_cita WHERE ticket_id = p_ticket AND estado = 'APLICADO' ORDER BY created_at DESC, id DESC FOR UPDATE;
   SELECT COALESCE(sum(monto_mxn), 0) INTO v_total FROM anticipos_cita WHERE ticket_id = p_ticket AND estado = 'APLICADO';
   v_total := LEAST(v_total, COALESCE(p_monto, v_total));
   IF v_total <= 0 THEN RETURN 0; END IF;
@@ -362,7 +384,7 @@ BEGIN
     END IF;
     v_resto := v_resto - v_parte;
   END LOOP;
-  RETURN v_total;
+  RETURN v_total - v_resto;   -- lo que de verdad regresó
 END $$;
 REVOKE ALL ON FUNCTION _anticipo_regresar(uuid, numeric) FROM PUBLIC, anon, authenticated, service_role;
 
@@ -485,8 +507,11 @@ DECLARE
   v_efectivo numeric(12,2);   -- 0209
   v_anticipo numeric(12,2) := 0;   -- 0222
 BEGIN
-  -- 0222: la parte pagada con anticipo regresa a la cita, no al cajón.
-  IF TG_OP = 'UPDATE' AND OLD.estado <> 'CONFIRMADA' AND NEW.estado = 'CONFIRMADA' THEN
+  -- 0222: la parte pagada con anticipo regresa a la cita, no al cajón. Solo cuando la devolución
+  -- reembolsa (efectivo o mismo método); con cortesía, vale o nota de crédito el anticipo sigue
+  -- APLICADO y ese medio se comporta como siempre.
+  IF TG_OP = 'UPDATE' AND OLD.estado <> 'CONFIRMADA' AND NEW.estado = 'CONFIRMADA'
+     AND NEW.medio_devolucion IN ('EFECTIVO', 'MISMO_METODO_PAGO') THEN
     v_anticipo := _anticipo_regresar(NEW.ticket_original_id, NEW.total_devuelto_mxn);
   END IF;
 
@@ -542,6 +567,8 @@ BEGIN
   IF v_tenant IS NULL THEN
     RAISE EXCEPTION 'Sin negocio en la sesión.' USING ERRCODE = '42501';
   END IF;
+  -- Candados en orden cita → anticipo, como pagar_con_anticipo.
+  PERFORM 1 FROM citas WHERE id = (SELECT cita_id FROM anticipos_cita WHERE id = p_anticipo AND tenant_id = v_tenant) FOR UPDATE;
   SELECT * INTO v_a FROM anticipos_cita WHERE id = p_anticipo AND tenant_id = v_tenant FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: el anticipo no existe.' USING ERRCODE = '22023';

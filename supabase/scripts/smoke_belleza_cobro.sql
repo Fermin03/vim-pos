@@ -344,6 +344,7 @@ DECLARE
   v_diego  uuid := '99999999-0000-0000-0000-0000000000f1';
   v_cp uuid; v_cq uuid; v_cr uuid; v_ap uuid; v_aq uuid; v_ar uuid; v_kp uuid; v_kq uuid; v_kk uuid; v_kn uuid; v_auth uuid; v_dev uuid;
   i_r uuid; i_n uuid; v_e0 numeric;
+  v_cs uuid; v_as uuid; v_ct uuid; v_at uuid; v_medio text;
   v_n integer; j jsonb; r record;
 BEGIN
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria, 'tenant_id', v_t)::text, true);
@@ -616,6 +617,69 @@ BEGIN
     jsonb_build_array(jsonb_build_object('ticket_item_id', i_n, 'cantidad_devuelta', 1)), false, NULL, 'b222-dn');
   PERFORM confirmar_devolucion(v_dev, v_maria);
   IF pg_temp.esp(v_tc) <> v_e0 - 180 THEN RAISE EXCEPTION 'B2: sin anticipo debía sacar 180: % vs %', pg_temp.esp(v_tc), v_e0; END IF;
+
+
+  -- R1) Un anticipo devuelto ya no se cobra, y uno cobrado ya no se devuelve ni se retiene.
+  v_cs := pg_temp.cita('Sara', '2030-01-08 18:00-06');
+  v_as := registrar_anticipo(v_cs, 100, 'EFECTIVO', v_caja, v_tc, 'b222-as');
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_tc, v_maria, v_diego, 'devolver_anticipo', 'venta.devolucion', 'anticipo', v_as, 'smoke')
+  RETURNING id INTO v_auth;
+  PERFORM devolver_anticipo(v_as, v_caja, v_tc, NULL, v_auth);
+  v_kn := abrir_ticket(v_suc, v_caja, v_tc, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'b222-ks', v_maria);
+  PERFORM agregar_item_a_ticket(v_kn, v_corte, 1, NULL, '[]'::jsonb, 'b222-ks-1');
+  PERFORM vincular_cita_ticket(v_cs, v_kn);
+  IF pagar_con_anticipo(v_kn, v_cs, 'b222-ps') <> 0
+     OR EXISTS (SELECT 1 FROM pagos WHERE ticket_id = v_kn AND metodo_pago = 'ANTICIPO')
+     OR (SELECT monto_pagado_mxn FROM tickets WHERE id = v_kn) <> 0
+     OR (SELECT estado FROM anticipos_cita WHERE id = v_as) <> 'DEVUELTO' THEN
+    RAISE EXCEPTION 'R1: un anticipo devuelto se cobró'; END IF;
+  v_ct := pg_temp.cita('Tere', '2030-01-08 19:00-06');
+  v_at := registrar_anticipo(v_ct, 100, 'TRANSFERENCIA', v_caja, v_tc, 'b222-at');
+  v_kn := abrir_ticket(v_suc, v_caja, v_tc, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'b222-kt', v_maria);
+  PERFORM agregar_item_a_ticket(v_kn, v_corte, 1, NULL, '[]'::jsonb, 'b222-kt-1');
+  PERFORM vincular_cita_ticket(v_ct, v_kn);
+  IF pagar_con_anticipo(v_kn, v_ct, 'b222-pt') <> 100 THEN RAISE EXCEPTION 'R1: debía cobrar 100'; END IF;
+  PERFORM pg_temp.debe_fallar(format('SELECT devolver_anticipo(%L, %L, %L, %L)', v_at, v_caja, v_tc, 'REF'),
+    'DATOS_INVALIDOS: el anticipo ya se resolvió (APLICADO).', 'R1 devolver cobrado');
+  PERFORM pg_temp.debe_fallar(format('SELECT retener_anticipo(%L, %L)', v_at, v_tc),
+    'DATOS_INVALIDOS: el anticipo ya se resolvió (APLICADO).', 'R1 retener cobrado');
+  IF (SELECT (estado, ticket_id) FROM anticipos_cita WHERE id = v_at) IS DISTINCT FROM ('APLICADO'::text, v_kn) THEN
+    RAISE EXCEPTION 'R1: el anticipo cobrado cambió'; END IF;
+
+  -- R2) Devolución parcial por medio: solo efectivo o mismo método regresan el anticipo. Con
+  --     cortesía, vale o nota de crédito sigue APLICADO y el cajón no se mueve (como siempre).
+  FOREACH v_medio IN ARRAY ARRAY['CORTESIA_SIN_REEMBOLSO', 'VALE_PROXIMA_COMPRA', 'NOTA_CREDITO_CFDI', 'MISMO_METODO_PAGO'] LOOP
+    v_n := array_position(ARRAY['CORTESIA_SIN_REEMBOLSO', 'VALE_PROXIMA_COMPRA', 'NOTA_CREDITO_CFDI', 'MISMO_METODO_PAGO'], v_medio);
+    v_cr := pg_temp.cita('Medio ' || v_n, format('2030-01-09 %s:00-06', 9 + v_n));
+    v_ar := registrar_anticipo(v_cr, 100, 'EFECTIVO', v_caja, v_tc, 'b222-am' || v_n);
+    v_kk := abrir_ticket(v_suc, v_caja, v_tc, 'PARA_LLEVAR'::modo_servicio, v_ana, NULL, 'b222-km' || v_n, v_maria);
+    i_r := agregar_item_a_ticket(v_kk, v_corte, 2, NULL, '[]'::jsonb, 'b222-km-1-' || v_n);
+    PERFORM vincular_cita_ticket(v_cr, v_kk);
+    PERFORM pagar_con_anticipo(v_kk, v_cr, 'b222-pm' || v_n);
+    PERFORM aplicar_pago(v_kk, 'EFECTIVO'::metodo_pago, 260, 260, NULL, NULL, NULL, false, NULL, 'b222-pm2-' || v_n);
+    v_e0 := pg_temp.esp(v_tc);
+    INSERT INTO autorizaciones_pin (tenant_id, usuario_solicitante_id, usuario_autorizo_id, accion, permiso_codigo, motivo, caja_id, turno_id)
+    VALUES (v_t, v_maria, v_diego, 'devolucion', 'venta.devolucion', 't', v_caja, v_tc) RETURNING id INTO v_auth;
+    v_dev := crear_devolucion(v_kk, v_caja, v_tc, 'PARCIAL'::devolucion_alcance, 'PRODUCTO_DEFECTUOSO'::devolucion_motivo, 'x',
+      v_medio::devolucion_medio, v_auth, v_maria, v_diego,
+      jsonb_build_array(jsonb_build_object('ticket_item_id', i_r, 'cantidad_devuelta', 1)), false, v_ana, 'b222-dm' || v_n);
+    PERFORM confirmar_devolucion(v_dev, v_maria);
+    IF pg_temp.esp(v_tc) <> v_e0 THEN RAISE EXCEPTION 'R2 %: el cajón se movió: % vs %', v_medio, pg_temp.esp(v_tc), v_e0; END IF;
+    IF v_medio = 'MISMO_METODO_PAGO' THEN
+      IF (SELECT (estado, ticket_id, monto_mxn) FROM anticipos_cita WHERE id = v_ar) IS DISTINCT FROM ('VIGENTE'::text, NULL::uuid, 100::numeric) THEN
+        RAISE EXCEPTION 'R2 %: el anticipo debía volver VIGENTE: %', v_medio, (SELECT to_jsonb(a) FROM anticipos_cita a WHERE id = v_ar); END IF;
+    ELSIF (SELECT (estado, ticket_id, monto_mxn) FROM anticipos_cita WHERE id = v_ar) IS DISTINCT FROM ('APLICADO'::text, v_kk, 100::numeric)
+          OR (SELECT count(*) FROM anticipos_cita WHERE cita_id = v_cr) <> 1 THEN
+      RAISE EXCEPTION 'R2 %: el anticipo debía seguir APLICADO: %', v_medio, (SELECT jsonb_agg(to_jsonb(a)) FROM anticipos_cita a WHERE cita_id = v_cr); END IF;
+  END LOOP;
+
+  -- R4) El anticipo se recibe en una caja de la sucursal de la cita.
+  v_cr := pg_temp.cita('Úrsula', '2030-01-09 15:00-06');
+  UPDATE citas SET sucursal_id = (SELECT id FROM sucursales WHERE tenant_id = v_t AND codigo = 'S221') WHERE id = v_cr;
+  PERFORM pg_temp.debe_fallar(format('SELECT registrar_anticipo(%L, 10, %L, %L, %L, NULL)', v_cr, 'EFECTIVO', v_caja, v_tc),
+    'DATOS_INVALIDOS: el anticipo se recibe en una caja de la sucursal de la cita.', 'R4 otra sucursal');
 
   RAISE NOTICE 'belleza anticipos OK';
 END $$;
