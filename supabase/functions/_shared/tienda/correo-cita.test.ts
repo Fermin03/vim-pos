@@ -30,6 +30,12 @@ test("confirmación: asunto, día y hora, servicios, colaborador, dirección y b
 
 test("asuntos de recordatorio, cambio y cancelación", () => {
   assert.equal(correo("RECORDATORIO")!.subject, "Manana es tu cita en Salon Ana");
+  // Un recordatorio que sale el mismo día (México) de la cita dice «Hoy».
+  const hoy = correoDeCita({ tipo: "RECORDATORIO", version: 0, negocio: "Salón Ana", enlace: null, cita: cita(), ahora: new Date("2026-11-06T08:00:00-06:00") })!;
+  assert.equal(hoy.subject, "Hoy es tu cita en Salon Ana");
+  assert.match(texto(hoy.html), /Hoy es tu cita Te esperamos./);
+  // 23:30 del día anterior en México (ya 05:30 del 6 en UTC): sigue siendo «Mañana».
+  assert.equal(correoDeCita({ tipo: "RECORDATORIO", version: 0, negocio: "Salón Ana", enlace: null, cita: cita(), ahora: new Date("2026-11-06T05:30:00Z") })!.subject, "Manana es tu cita en Salon Ana");
   assert.equal(correo("CAMBIO")!.subject, "Tu cita en Salon Ana cambio de horario");
   assert.equal(correo("CANCELACION", { estado: "CANCELADA" })!.subject, "Tu cita en Salon Ana se cancelo");
 });

@@ -57,6 +57,9 @@ export function fechaDeCita(iso: string): string {
   return `${p.weekday} ${p.day} de ${p.month}, ${p.hour}:${p.minute}`;
 }
 
+/** El día (AAAA-MM-DD) en México. */
+const diaMx = (t: Date): string => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Mexico_City" }).format(t);
+
 type Texto = { asunto: string; titulo: string; apoyo: string };
 
 /** Qué decir, o null si el correo ya no corresponde a la cita como está AHORA. */
@@ -89,7 +92,9 @@ function textoDe(tipo: TipoCita, negocio: string, c: Cita, version: number, ahor
   if (tipo === "CAMBIO") return { asunto: `Tu cita en ${negocio} cambió de horario`, titulo: "Tu cita cambió de horario", apoyo: "Este es tu nuevo horario." };
   // RECORDATORIO
   if (c.estado !== "AGENDADA" || Date.parse(c.inicia) <= ahora.getTime()) return null;
-  return { asunto: `Mañana es tu cita en ${negocio}`, titulo: "Mañana es tu cita", apoyo: "Te esperamos." };
+  // «Hoy» o «Mañana» según el día real (México) de la cita y el del envío: el cron puede atrasarse.
+  const cuando = diaMx(new Date(c.inicia)) === diaMx(ahora) ? "Hoy" : "Mañana";
+  return { asunto: `${cuando} es tu cita en ${negocio}`, titulo: `${cuando} es tu cita`, apoyo: "Te esperamos." };
 }
 
 /** El correo, o null si ya no corresponde. Sin `enlace` sale sin botón. */

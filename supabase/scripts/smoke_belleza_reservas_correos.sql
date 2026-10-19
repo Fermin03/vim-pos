@@ -35,7 +35,7 @@ DECLARE
   v_hoy    date := (now() AT TIME ZONE 'America/Mexico_City')::date;
   c_cif    CONSTANT text := repeat('Ab3_-', 13);
   d date;
-  v_cat uuid; v_cx uuid; v_c1 uuid; v_c2 uuid; v_c3 uuid; v_c4 uuid; v_c5 uuid; v_caja uuid; v_pago uuid;
+  v_cat uuid; v_cx uuid; v_c1 uuid; v_c2 uuid; v_c3 uuid; v_c4 uuid; v_c5 uuid; v_c6 uuid; v_caja uuid; v_pago uuid;
   v_r jsonb; v_r2 jsonb; v_n integer; v_txt text;
   r record;
 BEGIN
@@ -120,14 +120,14 @@ BEGIN
   v_r2 := pg_temp.reservar(pg_temp.a(d, '13:00'), 'smk-correo-0002', '4770004402');
   v_c2 := (v_r2->>'cita_id')::uuid;
   IF v_r2->>'pago_id' IS NULL OR pg_temp.cola(v_c2) <> '' THEN RAISE EXCEPTION 'C4 antes de pagar: % %', v_r2, pg_temp.cola(v_c2); END IF;
-  -- Se mueve mientras espera el pago: tampoco avisa (la clienta nunca tuvo confirmación).
+  -- Se mueve mientras espera el pago: no avisa (la clienta nunca tuvo confirmación), pero cuenta.
   PERFORM agenda_mover_en_linea(v_t, pg_temp.h(v_r2->>'codigo'), pg_temp.a(d, '13:30'));
-  IF pg_temp.cola(v_c2) <> '' THEN RAISE EXCEPTION 'C4 cambio sin pagar: %', pg_temp.cola(v_c2); END IF;
+  IF pg_temp.cola(v_c2) <> 'CAMBIO/1:DESCARTADO' THEN RAISE EXCEPTION 'C4 cambio sin pagar: %', pg_temp.cola(v_c2); END IF;
   PERFORM tienda_pago_tomar_cobro((v_r2->>'pago_id')::uuid);
   PERFORM tienda_pago_aplicar((v_r2->>'pago_id')::uuid, 'APROBADO', 'ORDCORREO01', 100.00, 'credit_card', 'visa');
-  IF pg_temp.cola(v_c2) <> 'CONFIRMACION/0:PENDIENTE' THEN RAISE EXCEPTION 'C4 pagada: %', pg_temp.cola(v_c2); END IF;
+  IF pg_temp.cola(v_c2) <> 'CAMBIO/1:DESCARTADO,CONFIRMACION/0:PENDIENTE' THEN RAISE EXCEPTION 'C4 pagada: %', pg_temp.cola(v_c2); END IF;
   PERFORM tienda_pago_aplicar((v_r2->>'pago_id')::uuid, 'APROBADO', 'ORDCORREO01', 100.00, 'credit_card', 'visa');
-  IF pg_temp.cola(v_c2) <> 'CONFIRMACION/0:PENDIENTE' THEN RAISE EXCEPTION 'C4 aviso repetido: %', pg_temp.cola(v_c2); END IF;
+  IF pg_temp.cola(v_c2) <> 'CAMBIO/1:DESCARTADO,CONFIRMACION/0:PENDIENTE' THEN RAISE EXCEPTION 'C4 aviso repetido: %', pg_temp.cola(v_c2); END IF;
 
   -- C5) Con anticipo que nunca se paga: sin confirmación; sí el aviso de que se liberó.
   v_r := pg_temp.reservar(pg_temp.a(d, '15:00'), 'smk-correo-0003', '4770004403');
@@ -145,24 +145,24 @@ BEGIN
   IF pg_temp.cola(v_caja) <> '' THEN RAISE EXCEPTION 'C6: %', pg_temp.cola(v_caja); END IF;
 
   -- C7) Recordatorio: solo si se reservó (o cambió) con más de 24 h, una vez por versión.
-  v_c4 := v_c2;                                   -- pagada, AGENDADA, versión 0
+  v_c4 := v_c2;                                   -- pagada, AGENDADA, versión 1 (movida sin pagar)
   UPDATE citas SET created_at = now() - interval '8 days' WHERE id = v_c4;
   PERFORM agenda_recordatorios_encolar();         -- a 7 días: todavía no
-  IF pg_temp.cola(v_c4) <> 'CONFIRMACION/0:PENDIENTE' THEN RAISE EXCEPTION 'C7 lejos: %', pg_temp.cola(v_c4); END IF;
-  -- La cita pasa a mañana (un cambio: versión 1, hecho hoy → sin recordatorio).
+  IF pg_temp.cola(v_c4) <> 'CAMBIO/1:DESCARTADO,CONFIRMACION/0:PENDIENTE' THEN RAISE EXCEPTION 'C7 lejos: %', pg_temp.cola(v_c4); END IF;
+  -- La cita pasa a mañana (un cambio: versión 2, hecho hoy → sin recordatorio).
   UPDATE citas SET inicia = now() + interval '20 hours', termina = now() + interval '21 hours' WHERE id = v_c4;
   PERFORM agenda_recordatorios_encolar();
-  IF pg_temp.cola(v_c4) <> 'CONFIRMACION/0:PENDIENTE,CAMBIO/1:PENDIENTE' THEN RAISE EXCEPTION 'C7 cambio reciente: %', pg_temp.cola(v_c4); END IF;
+  IF pg_temp.cola(v_c4) <> 'CAMBIO/1:DESCARTADO,CONFIRMACION/0:PENDIENTE,CAMBIO/2:PENDIENTE' THEN RAISE EXCEPTION 'C7 cambio reciente: %', pg_temp.cola(v_c4); END IF;
   -- El cambio fue hace dos días: ahora sí, y una sola vez.
   UPDATE agenda_correos SET created_at = now() - interval '2 days' WHERE cita_id = v_c4 AND tipo = 'CAMBIO';
   v_n := agenda_recordatorios_encolar();
   PERFORM agenda_recordatorios_encolar();
-  IF v_n < 1 OR pg_temp.cola(v_c4) <> 'CONFIRMACION/0:PENDIENTE,CAMBIO/1:PENDIENTE,RECORDATORIO/1:PENDIENTE' THEN
+  IF v_n < 1 OR pg_temp.cola(v_c4) <> 'CAMBIO/1:DESCARTADO,CONFIRMACION/0:PENDIENTE,CAMBIO/2:PENDIENTE,RECORDATORIO/2:PENDIENTE' THEN
     RAISE EXCEPTION 'C7 recordatorio: % %', v_n, pg_temp.cola(v_c4); END IF;
   -- Otro cambio: el recordatorio pendiente se descarta y el nuevo horario, reservado hoy, no lleva.
   UPDATE citas SET inicia = now() + interval '22 hours', termina = now() + interval '23 hours' WHERE id = v_c4;
   PERFORM agenda_recordatorios_encolar();
-  IF pg_temp.cola(v_c4) <> 'CONFIRMACION/0:PENDIENTE,CAMBIO/1:DESCARTADO,RECORDATORIO/1:DESCARTADO,CAMBIO/2:PENDIENTE' THEN
+  IF pg_temp.cola(v_c4) <> 'CAMBIO/1:DESCARTADO,CONFIRMACION/0:PENDIENTE,CAMBIO/2:DESCARTADO,RECORDATORIO/2:DESCARTADO,CAMBIO/3:PENDIENTE' THEN
     RAISE EXCEPTION 'C7 recambio: %', pg_temp.cola(v_c4); END IF;
   -- Reservada con menos de 24 h: sin recordatorio. Cancelada: tampoco.
   UPDATE citas SET created_at = now() - interval '3 hours', inicia = now() + interval '10 hours', termina = now() + interval '11 hours'
@@ -180,6 +180,19 @@ BEGIN
   IF EXISTS (SELECT 1 FROM agenda_correos WHERE cita_id = v_c5 AND tipo = 'RECORDATORIO') THEN
     RAISE EXCEPTION 'C7 reservada hace poco: %', pg_temp.cola(v_c5); END IF;
 
+  -- C7b) Reservada hace 8 días, movida a mañana HOY mientras esperaba su pago, y pagada: el cambio
+  --      cuenta para la regla de 24 h (no created_at), así que no lleva recordatorio.
+  UPDATE configuracion_tenant SET agenda_cobro_modo = 'ANTICIPO' WHERE tenant_id = v_t;
+  v_r := pg_temp.reservar(pg_temp.a(d, '16:00'), 'smk-correo-0006', '4770004406');
+  v_c6 := (v_r->>'cita_id')::uuid;
+  UPDATE citas SET created_at = now() - interval '8 days', inicia = now() + interval '20 hours', termina = now() + interval '21 hours'
+   WHERE id = v_c6;
+  PERFORM tienda_pago_tomar_cobro((v_r->>'pago_id')::uuid);
+  PERFORM tienda_pago_aplicar((v_r->>'pago_id')::uuid, 'APROBADO', 'ORDCORREO06', 100.00, 'credit_card', 'visa');
+  PERFORM agenda_recordatorios_encolar();
+  IF pg_temp.cola(v_c6) <> 'CAMBIO/1:DESCARTADO,CONFIRMACION/0:PENDIENTE' THEN RAISE EXCEPTION 'C7b: %', pg_temp.cola(v_c6); END IF;
+  UPDATE configuracion_tenant SET agenda_cobro_modo = 'AL_FINAL' WHERE tenant_id = v_t;
+
   -- C8) Enlace cifrado: se guarda solo para la cita de ese negocio con correo; una vez.
   PERFORM agenda_enlace_guardar(v_t, pg_temp.h(v_r2->>'codigo'), c_cif);
   PERFORM agenda_enlace_guardar(v_t, pg_temp.h(v_r2->>'codigo'), 'otro' || c_cif);
@@ -194,7 +207,7 @@ BEGIN
   SELECT * INTO r FROM agenda_correos_tomar(10, 30);
   IF r.tipo <> 'CONFIRMACION' OR r.email <> 'correo.web@example.com' OR r.slug <> 'correos-citas-smoke' OR r.negocio <> 'Salón Correos'
      OR r.cifrado <> c_cif OR r.enlace_hash <> pg_temp.h(v_r2->>'codigo') OR r.cita->>'estado' <> 'AGENDADA'
-     OR (r.cita->>'anticipo_en_linea_mxn')::numeric <> 100 OR (r.cita->>'version')::int <> 2 OR r.cita->'sucursal'->>'nombre' IS NULL
+     OR (r.cita->>'anticipo_en_linea_mxn')::numeric <> 100 OR (r.cita->>'version')::int <> 3 OR r.cita->'sucursal'->>'nombre' IS NULL
      OR jsonb_array_length(r.cita->'servicios') <> 1 THEN
     RAISE EXCEPTION 'C9 tomar: %', to_jsonb(r); END IF;
   IF EXISTS (SELECT 1 FROM agenda_correos_tomar(10, 30)) THEN RAISE EXCEPTION 'C9: tomó dos veces lo mismo'; END IF;
@@ -205,6 +218,13 @@ BEGIN
   EXCEPTION WHEN OTHERS THEN
     IF SQLERRM NOT LIKE 'CORREO_RESULTADO_INVALIDO%' THEN RAISE; END IF;
   END;
+  -- La confirmación sin enlace guardado espera hasta 5 minutos; luego sale (sin botón).
+  INSERT INTO agenda_correos (tenant_id, cita_id, tipo) VALUES (v_t, v_c5, 'CONFIRMACION') RETURNING id INTO v_n;
+  IF EXISTS (SELECT 1 FROM agenda_correos_tomar(10, 30)) THEN RAISE EXCEPTION 'C9: tomó la confirmación sin enlace'; END IF;
+  UPDATE agenda_correos SET created_at = now() - interval '6 minutes' WHERE id = v_n;
+  SELECT * INTO r FROM agenda_correos_tomar(10, 30);
+  IF r.id IS DISTINCT FROM v_n::bigint OR r.cifrado IS NOT NULL THEN RAISE EXCEPTION 'C9: no salió pasados 5 min: %', to_jsonb(r); END IF;
+  PERFORM agenda_correo_resultado(v_n, 'ENVIADO');
   -- Falla cuatro veces: MUERTO.
   INSERT INTO agenda_correos (tenant_id, cita_id, tipo, version) VALUES (v_t, v_c2, 'CAMBIO', 9) RETURNING id INTO v_n;
   FOR i IN 1..4 LOOP

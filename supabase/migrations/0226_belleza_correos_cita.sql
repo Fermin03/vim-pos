@@ -125,7 +125,8 @@ $$;
 --   nace AGENDADA sin pago pendiente          → CONFIRMACION
 --   pago_hasta pasa a NULL y sigue AGENDADA   → CONFIRMACION (se aprobó su anticipo)
 --   pasa a CANCELADA                          → CANCELACION (y lo pendiente se descarta)
---   cambia `inicia`, sin pago pendiente       → CAMBIO con la versión siguiente
+--   cambia `inicia`                           → CAMBIO con la versión siguiente (si espera su pago,
+--                                               queda registrado pero DESCARTADO: no se avisa)
 CREATE OR REPLACE FUNCTION citas_correo()
 RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER
@@ -153,20 +154,26 @@ BEGIN
     DELETE FROM agenda_correos
      WHERE cita_id = NEW.id AND tipo = 'CONFIRMACION' AND estado = 'PENDIENTE' AND intentos = 0;
   END IF;
-  IF NEW.estado = 'CANCELADA' OR NEW.pago_hasta IS NOT NULL THEN RETURN NULL; END IF;
+  IF NEW.estado = 'CANCELADA' THEN RETURN NULL; END IF;
 
-  IF OLD.pago_hasta IS NOT NULL AND NEW.estado = 'AGENDADA' THEN
+  IF OLD.pago_hasta IS NOT NULL AND NEW.pago_hasta IS NULL AND NEW.estado = 'AGENDADA' THEN
     PERFORM _agenda_correo_encolar(NEW.id, 'CONFIRMACION');
   END IF;
+  -- Sin bloque que se trague errores: si la versión no se puede calcular, el cambio de hora falla
+  -- (mejor que perder el aviso en silencio).
   IF OLD.inicia IS DISTINCT FROM NEW.inicia AND NEW.inicia IS NOT NULL THEN
-    BEGIN
-      v_version := _agenda_correo_version(NEW.id) + 1;
-      UPDATE agenda_correos SET estado = 'DESCARTADO', motivo = 'OBSOLETO'
-       WHERE cita_id = NEW.id AND estado = 'PENDIENTE' AND tipo IN ('CAMBIO', 'RECORDATORIO');
-    EXCEPTION WHEN OTHERS THEN
-      RAISE WARNING 'citas_correo(%): %', NEW.id, SQLERRM;
-    END;
-    PERFORM _agenda_correo_encolar(NEW.id, 'CAMBIO', v_version);
+    v_version := _agenda_correo_version(NEW.id) + 1;
+    UPDATE agenda_correos SET estado = 'DESCARTADO', motivo = 'OBSOLETO'
+     WHERE cita_id = NEW.id AND estado = 'PENDIENTE' AND tipo IN ('CAMBIO', 'RECORDATORIO');
+    IF NEW.pago_hasta IS NULL THEN
+      PERFORM _agenda_correo_encolar(NEW.id, 'CAMBIO', v_version);
+    ELSE
+      -- Espera su pago: la clienta no tiene confirmación, así que no se avisa; pero el cambio
+      -- cuenta (versión y hora del cambio, que usa la regla de 24 h del recordatorio).
+      INSERT INTO agenda_correos (tenant_id, cita_id, tipo, version, estado, motivo)
+      VALUES (NEW.tenant_id, NEW.id, 'CAMBIO', v_version, 'DESCARTADO', 'SIN_PAGO')
+      ON CONFLICT (cita_id, tipo, version) DO NOTHING;
+    END IF;
   END IF;
   RETURN NULL;
 END;
@@ -233,6 +240,10 @@ BEGIN
      WHERE c.estado = 'PENDIENTE' AND c.intentos < 4
        AND (c.proximo_intento_at IS NULL OR c.proximo_intento_at <= now())
        AND c.created_at > now() - _agenda_correo_plazo(c.tipo)
+       -- La confirmación espera hasta 5 minutos a que la función guarde el enlace cifrado
+       -- (agenda_enlace_guardar va justo después de reservar); pasado eso sale sin botón.
+       AND NOT (c.tipo = 'CONFIRMACION' AND c.created_at > now() - interval '5 minutes'
+                AND NOT EXISTS (SELECT 1 FROM agenda_enlaces e WHERE e.cita_id = c.cita_id))
      ORDER BY (c.tipo = 'CANCELACION') DESC, c.created_at
      LIMIT GREATEST(LEAST(COALESCE(p_max, 10), v_cupo), 0) FOR UPDATE SKIP LOCKED
   ), tomados AS (
