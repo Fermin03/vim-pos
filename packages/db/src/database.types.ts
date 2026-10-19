@@ -1896,6 +1896,7 @@ export type Database = {
         Row: {
           canal: Database["public"]["Enums"]["cita_canal"]
           cancelada_motivo: string | null
+          cancelada_por: string | null
           client_id_local: string | null
           cliente_email: string | null
           cliente_id: string | null
@@ -1904,11 +1905,14 @@ export type Database = {
           created_at: string
           created_by: string | null
           empalme: boolean
+          enlace_hash: string | null
           estado: Database["public"]["Enums"]["cita_estado"]
           id: string
           inicia: string | null
           llego_at: string | null
           nota: string | null
+          pago_hasta: string | null
+          reservo_email: string | null
           sucursal_id: string
           tenant_id: string
           termina: string | null
@@ -1918,6 +1922,7 @@ export type Database = {
         Insert: {
           canal?: Database["public"]["Enums"]["cita_canal"]
           cancelada_motivo?: string | null
+          cancelada_por?: string | null
           client_id_local?: string | null
           cliente_email?: string | null
           cliente_id?: string | null
@@ -1926,11 +1931,14 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           empalme?: boolean
+          enlace_hash?: string | null
           estado?: Database["public"]["Enums"]["cita_estado"]
           id?: string
           inicia?: string | null
           llego_at?: string | null
           nota?: string | null
+          pago_hasta?: string | null
+          reservo_email?: string | null
           sucursal_id: string
           tenant_id: string
           termina?: string | null
@@ -1940,6 +1948,7 @@ export type Database = {
         Update: {
           canal?: Database["public"]["Enums"]["cita_canal"]
           cancelada_motivo?: string | null
+          cancelada_por?: string | null
           client_id_local?: string | null
           cliente_email?: string | null
           cliente_id?: string | null
@@ -1948,11 +1957,14 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           empalme?: boolean
+          enlace_hash?: string | null
           estado?: Database["public"]["Enums"]["cita_estado"]
           id?: string
           inicia?: string | null
           llego_at?: string | null
           nota?: string | null
+          pago_hasta?: string | null
+          reservo_email?: string | null
           sucursal_id?: string
           tenant_id?: string
           termina?: string | null
@@ -3049,10 +3061,13 @@ export type Database = {
       }
       configuracion_tenant: {
         Row: {
+          agenda_aviso_min_horas: number
           agenda_cancelar_horas: number
           agenda_cobro_modo: string
           agenda_comision_base: string
           agenda_comision_productos_pct: number | null
+          agenda_dias_reserva: number
+          agenda_intervalo_min: number
           agenda_periodo_comisiones: string
           agenda_tolerancia_min: number
           alerta_pedidos_espera_min: number
@@ -3082,6 +3097,7 @@ export type Database = {
           modulo_display_cliente_activo: boolean
           modulo_inventario_activo: boolean
           modulo_lealtad_activo: boolean
+          modulo_reservas_activo: boolean
           modulo_tienda_activo: boolean
           mostrar_nota_producto_ticket: boolean
           mostrar_qr_factura_ticket: boolean
@@ -3102,10 +3118,13 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          agenda_aviso_min_horas?: number
           agenda_cancelar_horas?: number
           agenda_cobro_modo?: string
           agenda_comision_base?: string
           agenda_comision_productos_pct?: number | null
+          agenda_dias_reserva?: number
+          agenda_intervalo_min?: number
           agenda_periodo_comisiones?: string
           agenda_tolerancia_min?: number
           alerta_pedidos_espera_min?: number
@@ -3135,6 +3154,7 @@ export type Database = {
           modulo_display_cliente_activo?: boolean
           modulo_inventario_activo?: boolean
           modulo_lealtad_activo?: boolean
+          modulo_reservas_activo?: boolean
           modulo_tienda_activo?: boolean
           mostrar_nota_producto_ticket?: boolean
           mostrar_qr_factura_ticket?: boolean
@@ -3155,10 +3175,13 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          agenda_aviso_min_horas?: number
           agenda_cancelar_horas?: number
           agenda_cobro_modo?: string
           agenda_comision_base?: string
           agenda_comision_productos_pct?: number | null
+          agenda_dias_reserva?: number
+          agenda_intervalo_min?: number
           agenda_periodo_comisiones?: string
           agenda_tolerancia_min?: number
           alerta_pedidos_espera_min?: number
@@ -3188,6 +3211,7 @@ export type Database = {
           modulo_display_cliente_activo?: boolean
           modulo_inventario_activo?: boolean
           modulo_lealtad_activo?: boolean
+          modulo_reservas_activo?: boolean
           modulo_tienda_activo?: boolean
           mostrar_nota_producto_ticket?: boolean
           mostrar_qr_factura_ticket?: boolean
@@ -9419,6 +9443,7 @@ export type Database = {
           comision_valor: number | null
           created_at: string
           duracion_min: number
+          en_linea: boolean
           producto_id: string
           tenant_id: string
           tipo_espacio_id: string | null
@@ -9432,6 +9457,7 @@ export type Database = {
           comision_valor?: number | null
           created_at?: string
           duracion_min: number
+          en_linea?: boolean
           producto_id: string
           tenant_id: string
           tipo_espacio_id?: string | null
@@ -9445,6 +9471,7 @@ export type Database = {
           comision_valor?: number | null
           created_at?: string
           duracion_min?: number
+          en_linea?: boolean
           producto_id?: string
           tenant_id?: string
           tipo_espacio_id?: string | null
@@ -15123,6 +15150,15 @@ export type Database = {
       }
     }
     Functions: {
+      _agenda_cadena: {
+        Args: {
+          p_inicia: string
+          p_servicios: Json
+          p_sucursal: string
+          p_tenant: string
+        }
+        Returns: Json
+      }
       _agenda_choques: {
         Args: {
           p_cita: string
@@ -15134,6 +15170,42 @@ export type Database = {
         }
         Returns: string[]
       }
+      _agenda_cita_cambiable: {
+        Args: { p_enlace_hash: string; p_tenant: string }
+        Returns: {
+          canal: Database["public"]["Enums"]["cita_canal"]
+          cancelada_motivo: string | null
+          cancelada_por: string | null
+          client_id_local: string | null
+          cliente_email: string | null
+          cliente_id: string | null
+          cliente_nombre: string
+          cliente_telefono: string | null
+          created_at: string
+          created_by: string | null
+          empalme: boolean
+          enlace_hash: string | null
+          estado: Database["public"]["Enums"]["cita_estado"]
+          id: string
+          inicia: string | null
+          llego_at: string | null
+          nota: string | null
+          pago_hasta: string | null
+          reservo_email: string | null
+          sucursal_id: string
+          tenant_id: string
+          termina: string | null
+          ticket_id: string | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "citas"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      _agenda_cita_resumen: { Args: { p_cita: string }; Returns: Json }
       _agenda_remarcar: {
         Args: { p_citas?: string[]; p_tenant: string; p_tramos: string[] }
         Returns: undefined
@@ -15152,6 +15224,19 @@ export type Database = {
       _agenda_vecinos: {
         Args: { p_cita: string; p_tenant: string }
         Returns: string[]
+      }
+      _anticipo_cita: {
+        Args: { p_cita: string; p_tenant: string }
+        Returns: number
+      }
+      _anticipo_de: {
+        Args: {
+          p_modo: string
+          p_precio: number
+          p_tipo: string
+          p_valor: number
+        }
+        Returns: number
       }
       _anticipo_regresar: {
         Args: { p_monto: number; p_ticket: string }
@@ -15207,6 +15292,16 @@ export type Database = {
       _cita_cobro_en_conflicto: {
         Args: { p_cita: string; p_ticket: string }
         Returns: boolean
+      }
+      _colaborador_libre: {
+        Args: {
+          p_inicia: string
+          p_producto: string
+          p_sucursal: string
+          p_tenant: string
+          p_usuario?: string
+        }
+        Returns: string
       }
       _credito_devolucion: {
         Args: { p_devolucion: string; p_ya_regresado?: number }
@@ -15311,9 +15406,90 @@ export type Database = {
         Args: { p_sucursales: string[]; p_tenant: string }
         Returns: undefined
       }
+      _nombre_corto: { Args: { p_usuario: string }; Returns: string }
       _nombre_variante: {
         Args: { p_ejes: string[]; p_nombre: string; p_valores: Json }
         Returns: string
+      }
+      _reservas_oferta: {
+        Args: { p_tenant: string }
+        Returns: {
+          orden: number
+          producto_id: string
+          sucursal_id: string
+          usuario_id: string
+        }[]
+      }
+      _reservas_validar: {
+        Args: {
+          p_inicia: string
+          p_servicios: Json
+          p_sucursal: string
+          p_tenant: string
+        }
+        Returns: {
+          agenda_aviso_min_horas: number
+          agenda_cancelar_horas: number
+          agenda_cobro_modo: string
+          agenda_comision_base: string
+          agenda_comision_productos_pct: number | null
+          agenda_dias_reserva: number
+          agenda_intervalo_min: number
+          agenda_periodo_comisiones: string
+          agenda_tolerancia_min: number
+          alerta_pedidos_espera_min: number
+          alerta_reincidencia_cierres: number
+          alerta_reincidencia_dias: number
+          cfdi_folio_inicial: number | null
+          cfdi_serie_default: string | null
+          combo_upsell_activo: boolean
+          cotizacion_vigencia_dias: number
+          created_at: string
+          credito_abonos_al_cancelar: string
+          csd_archivo_encrypted: string | null
+          csd_password_encrypted: string | null
+          fondo_estandar_mxn: number | null
+          fondo_minimo_mxn: number
+          fondo_modo_captura: string
+          id: string
+          modo_servicio_default: string
+          modos_servicio_activos: string[]
+          modulo_apps_externas_activo: boolean
+          modulo_cfdi_activo: boolean
+          modulo_cotizaciones_activo: boolean
+          modulo_credito_activo: boolean
+          modulo_crm_avanzado_activo: boolean
+          modulo_delivery_activo: boolean
+          modulo_delivery_propio_activo: boolean
+          modulo_display_cliente_activo: boolean
+          modulo_inventario_activo: boolean
+          modulo_lealtad_activo: boolean
+          modulo_reservas_activo: boolean
+          modulo_tienda_activo: boolean
+          mostrar_nota_producto_ticket: boolean
+          mostrar_qr_factura_ticket: boolean
+          pac_credenciales_encrypted: string | null
+          pac_proveedor: string | null
+          pantalla_cliente_segundos: number
+          pie_ticket: string | null
+          politica_cobro_cocina: string
+          propina_permite_otro_monto: boolean
+          propina_porcentajes: number[]
+          propina_sugerida_activa: boolean
+          redondeo_efectivo_activo: boolean
+          reimpresion_comanda_requiere_pin: boolean
+          reimpresion_ticket_requiere_pin: boolean
+          tenant_id: string
+          umbral_sangria_sin_pin_mxn: number
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "configuracion_tenant"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       _retirar_extras_sin_limite: {
         Args: { p_tenant: string }
@@ -15570,6 +15746,34 @@ export type Database = {
         Args: { p_menu: string; p_nombre: string; p_sucursales: string[] }
         Returns: undefined
       }
+      agenda_cancelar_en_linea: {
+        Args: { p_enlace_hash: string; p_tenant: string }
+        Returns: Json
+      }
+      agenda_cita_publica: {
+        Args: { p_enlace_hash: string; p_tenant: string }
+        Returns: Json
+      }
+      agenda_huecos: {
+        Args: {
+          p_dia: string
+          p_servicios: Json
+          p_sucursal: string
+          p_tenant: string
+        }
+        Returns: {
+          inicia: string
+        }[]
+      }
+      agenda_mover_en_linea: {
+        Args: { p_enlace_hash: string; p_inicia: string; p_tenant: string }
+        Returns: Json
+      }
+      agenda_reservar_en_linea: {
+        Args: { p: Json; p_tenant: string }
+        Returns: Json
+      }
+      agenda_vencer_reservas: { Args: never; Returns: number }
       agregar_combo_a_ticket: {
         Args: {
           p_cantidad?: number
@@ -16757,6 +16961,7 @@ export type Database = {
         Args: { p_padre_id: string; p_precio_padre: number }
         Returns: undefined
       }
+      reservas_negocio: { Args: { p_slug: string }; Returns: Json }
       resetear_pin_empleado: {
         Args: { p_pin_nuevo: string; p_usuario_id: string }
         Returns: undefined
