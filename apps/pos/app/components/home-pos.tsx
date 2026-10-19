@@ -94,13 +94,14 @@ import { fijarContextoErrores, reportarErrorSinEsperar } from "../lib/reportar-e
 import { BotonVolver } from "./boton-volver";
 import { CatalogoProductos } from "./catalogo-productos";
 import { PanelVentaRetail, type AvisoEscaneo } from "./venta-retail";
-import { esTienda, puedeRecibirMercancia, leerExistencias, leerSucursales, pasoConLimite, puedeCambiarSeccion, renglonTienda, sinExistencia, type Existencia, type PadreTienda, type SeccionTienda } from "../lib/tienda";
+import { destinosDe, esBelleza, esTienda, seccionInicial, puedeRecibirMercancia, leerExistencias, leerSucursales, pasoConLimite, puedeCambiarSeccion, renglonTienda, sinExistencia, type Existencia, type PadreTienda, type SeccionTienda } from "../lib/tienda";
 import { leerEstadoSync } from "../lib/estado-sync";
 import { ModalAgregarProductos } from "./modal-agregar-productos";
 import { ModalNumeroMesa } from "./modal-numero-mesa";
 import { MenuGeneral } from "./menu-general";
 import { ContenidoMenu } from "./contenido-menu";
 import { BarraTienda } from "./barra-tienda";
+import { SeccionCalendario } from "./seccion-calendario";
 import { DialogoAvisos } from "./dialogo-avisos";
 import { avisosDe, leerDirectivas, type Aviso } from "../lib/directivas";
 import { BarraEstadoCaja, ConfirmarSalirCaja, PantallaInicio } from "./pantalla-inicio";
@@ -201,8 +202,8 @@ export function HomePos({
   >(null);
   const [enKds, setEnKds] = useState(false);
   // El POS arranca en la pantalla de inicio: el cajero elige primero a qué viene.
-  // Una tienda no: su barra inferior reemplaza al inicio.
-  const [enInicio, setEnInicio] = useState(() => !esTienda(caja));
+  // Una tienda (y la caja de belleza) no: su barra inferior reemplaza al inicio.
+  const [enInicio, setEnInicio] = useState(() => !(esTienda(caja) || esBelleza(caja)));
   const [enMonitor, setEnMonitor] = useState(false);
   const [cuentasAbiertas, setCuentasAbiertas] = useState<CuentasAbiertasPorModo>({ comedor: 0, pickup: 0, domicilio: 0, barra: 0 });
   const [enMesas, setEnMesas] = useState(false);
@@ -323,7 +324,7 @@ export function HomePos({
   const [productos, setProductos] = useState<Producto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Una tienda no tiene inicio: abre directo en la venta (modo Para llevar), pos-retail.md «Versión 2».
-  const [carrito, dispatch] = useReducer(reducerCarrito, estadoInicial, (e) => (esTienda(caja) ? { ...e, modoServicio: "PARA_LLEVAR" as const } : e));
+  const [carrito, dispatch] = useReducer(reducerCarrito, estadoInicial, (e) => (esTienda(caja) || esBelleza(caja) ? { ...e, modoServicio: "PARA_LLEVAR" as const } : e));
   // `edicion`: el renglón del ticket que se reabrió para cambiarle los modificadores.
   const [modGrupos, setModGrupos] = useState<{ producto: Producto; grupos: GrupoModificadores[]; edicion?: LineaCarrito; /** La pesada de la tienda: entra con esta cantidad. */ cantidad?: number } | null>(null);
   // ADR 0015 — combos: catálogo de defs con slots resueltos, y el drawer de armado abierto (si hay).
@@ -602,8 +603,10 @@ export function HomePos({
   }, [recargarCatalogo]);
 
   // ── Venta de tienda (giro RETAIL): solo cambia el panel izquierdo de la captura en Para llevar.
-  // Un restaurante no pasa por nada de esto (pos-retail.md).
-  const tienda = esTienda(caja);
+  // Un restaurante no pasa por nada de esto (pos-retail.md). La caja de belleza es la de tienda con
+  // su barra (Calendario · Cobrar · Clientes · Transacciones · Más) y abre en el calendario.
+  const tienda = esTienda(caja) || esBelleza(caja);
+  const seccionInicio = seccionInicial(caja);
   /** La cuenta cargada es la venta de un cambio: no se le ofrece canje de lealtad (como no suma, 0200).
    *  `null` mientras se lee o si falla la lectura: tampoco se ofrece. */
   const [ventaDeCambio, setVentaDeCambio] = useState<boolean | null>(false);
@@ -622,7 +625,7 @@ export function HomePos({
    * Sección de la barra inferior de la tienda. El Panel (la venta) nunca se desmonta al cambiar:
    * solo se oculta, así el carrito, el ticket guardado y la fila de agregados siguen donde estaban.
    */
-  const [seccionTienda, setSeccionTienda] = useState<SeccionTienda>("panel");
+  const [seccionTienda, setSeccionTienda] = useState<SeccionTienda>(() => seccionInicial(caja));
   /** Salir de la venta desde «Más» (bloquear, cambiar cajero, cerrar turno, salir) con productos sin guardar. */
   const [confirmar, dialogoConfirmar] = useConfirmar();
   const [confirmandoVenta, setConfirmandoVenta] = useState(false);
@@ -2157,11 +2160,12 @@ export function HomePos({
       [enKds, () => setEnKds(false)],
       // Nada abierto: Escape equivale al botón Volver de la pantalla de captura. «Cambio de talla»
       // atiende el suyo (regresa un paso).
-      // En la tienda no hay a dónde volver desde el Panel; desde otra sección, Escape regresa al Panel.
+      // En la tienda no hay a dónde volver desde el Panel; desde otra sección, Escape regresa al Panel
+      // (en belleza, al calendario).
       [enCaptura && !tienda, () => intentarSalirDeCaptura("atras")],
       // Transacciones: Escape deja primero la búsqueda. Aquí y no en `capas`: no tapa la barra ni el escáner.
       [enCaptura && tienda && seccionTienda === "transacciones" && cerrarBusquedaTx != null, () => cerrarBusquedaTx?.()],
-      [enCaptura && tienda && seccionTienda !== "panel", () => void irASeccion("panel")],
+      [enCaptura && tienda && seccionTienda !== seccionInicio, () => void irASeccion(seccionInicio)],
     ];
     return {
       // El aviso grande de la tienda va encima de TODO y CEDE: lo cierra su propio `Modal`.
@@ -2181,7 +2185,7 @@ export function HomePos({
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
       salidaPendiente, confirmandoCierre, menuGeneralAbierto, cerrando, enInicio, enKds, enMonitor,
       enConsultaCuentas, enDevoluciones, enCambioTalla, enPedidosApps, enDelivery, enPickup, enMesas, enBarra, nuevoTicket,
-      intentarSalirDeCaptura, tienda, seccionTienda, reabriendoTx, cambiandoPagoTx, cerrarBusquedaTx, cerrarConsultaInv, irASeccion, avisosVim, confirmandoVenta, salirCajaAbierto]);
+      intentarSalirDeCaptura, tienda, seccionTienda, seccionInicio, reabriendoTx, cambiandoPagoTx, cerrarBusquedaTx, cerrarConsultaInv, irASeccion, avisosVim, confirmandoVenta, salirCajaAbierto]);
   useEscape(alEscapar);
 
   // ── Cotizaciones (retail 2, entrega 3) ────────────────────────────────────────────────────
@@ -3334,7 +3338,16 @@ export function HomePos({
       </div>
       {tienda && seccionTienda !== "panel" && (
         <div className="flex min-h-0 flex-1 flex-col">
-          {seccionTienda === "configuracion" && enCotizaciones ? (
+          {seccionTienda === "calendario" ? (
+            <SeccionCalendario
+              token={token}
+              sucursalId={caja.sucursal_id}
+              // La ficha, la cita nueva y la lista de espera llegan con la tarea 6.
+              onAbrirCita={() => {}}
+              onNuevaCita={() => {}}
+              onAbrirEspera={() => {}}
+            />
+          ) : seccionTienda === "clientes" ? null : seccionTienda === "configuracion" && enCotizaciones ? (
             <SeccionCotizaciones
               token={token}
               cajaId={turno.caja_id}
@@ -3425,6 +3438,7 @@ export function HomePos({
       )}
       {tienda && (
         <BarraTienda
+          destinos={destinosDe(caja)}
           seccion={seccionTienda}
           onCambiar={(s) => { setProductoInventario(null); void irASeccion(s); }}
           pendientes={vistas ? sinVer(notificaciones, vistas) : 0}

@@ -1,14 +1,41 @@
 "use client";
 import { deviceClient, employeeClient } from "./supabase";
-import { esGiroTienda } from "@vim/db/operacion";
+import { esGiroBelleza, esGiroTienda } from "@vim/db/operacion";
+import type { NombreIcono } from "@vim/ui/styles";
 import type { Producto } from "./catalogo";
 import type { DatosCaja } from "./turno";
 
 /** La caja de tienda es para los giros de tienda; todo lo demás queda como estaba. */
 export const esTienda = (caja: DatosCaja | null): boolean => esGiroTienda(caja?.giro);
 
-/** Destinos de la barra inferior de la caja de tienda (pos-retail.md, «Versión 2»). */
-export type SeccionTienda = "panel" | "inventario" | "transacciones" | "notificaciones" | "configuracion";
+/** La caja de belleza (agenda, 0218) es la de tienda con su propia barra y el calendario. */
+export const esBelleza = (caja: DatosCaja | null): boolean => esGiroBelleza(caja?.giro);
+
+/** Destinos de la barra inferior de la caja de tienda (pos-retail.md, «Versión 2») y de la de belleza. */
+export type SeccionTienda = "panel" | "inventario" | "transacciones" | "notificaciones" | "configuracion" | "calendario" | "clientes";
+
+export type Destino = { seccion: SeccionTienda; etiqueta: string; icono: NombreIcono };
+
+const DESTINOS_TIENDA: Destino[] = [
+  { seccion: "panel", etiqueta: "Cobrar", icono: "caja" },
+  { seccion: "inventario", etiqueta: "Inventario", icono: "etiqueta" },
+  { seccion: "transacciones", etiqueta: "Transacciones", icono: "recibo" },
+  { seccion: "notificaciones", etiqueta: "Notificaciones", icono: "megafono" },
+  { seccion: "configuracion", etiqueta: "Más", icono: "menu" },
+];
+
+const DESTINOS_BELLEZA: Destino[] = [
+  { seccion: "calendario", etiqueta: "Calendario", icono: "calendario" },
+  { seccion: "panel", etiqueta: "Cobrar", icono: "caja" },
+  { seccion: "clientes", etiqueta: "Clientes", icono: "personas" },
+  { seccion: "transacciones", etiqueta: "Transacciones", icono: "recibo" },
+  { seccion: "configuracion", etiqueta: "Más", icono: "menu" },
+];
+
+export const destinosDe = (caja: DatosCaja | null): Destino[] => (esBelleza(caja) ? DESTINOS_BELLEZA : DESTINOS_TIENDA);
+
+/** Donde abre la caja y a donde regresa Escape: el calendario en belleza, el Panel en tienda. */
+export const seccionInicial = (caja: DatosCaja | null): SeccionTienda => (esBelleza(caja) ? "calendario" : "panel");
 
 /** Con un cobro o un diálogo encima la barra no navega: sería trabajo que se pierde de vista. */
 export const puedeCambiarSeccion = (capasAbiertas: boolean, cobroAbierto: boolean): boolean => !capasAbiertas && !cobroAbierto;

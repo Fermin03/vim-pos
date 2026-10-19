@@ -1,21 +1,15 @@
 "use client";
-import { Icono, type NombreIcono } from "@vim/ui/styles";
-import type { SeccionTienda } from "../lib/tienda";
-
-const DESTINOS: { seccion: SeccionTienda; etiqueta: string; icono: NombreIcono }[] = [
-  { seccion: "panel", etiqueta: "Cobrar", icono: "caja" },
-  { seccion: "inventario", etiqueta: "Inventario", icono: "etiqueta" },
-  { seccion: "transacciones", etiqueta: "Transacciones", icono: "recibo" },
-  { seccion: "notificaciones", etiqueta: "Notificaciones", icono: "megafono" },
-  { seccion: "configuracion", etiqueta: "Más", icono: "menu" },
-];
+import { Icono } from "@vim/ui/styles";
+import type { Destino, SeccionTienda } from "../lib/tienda";
 
 /**
- * Barra inferior de la caja de tienda (pos-retail.md, «Versión 2»): reemplaza al inicio de
+ * Barra inferior de la caja de tienda y de la de belleza (pos-retail.md, «Versión 2»): reemplaza al inicio de
  * mosaicos, al «Menú» y al `Volver`. Sin animación al cambiar: se toca decenas de veces al día.
  * `bloqueada` (un cobro o un diálogo encima) la deja sin responder.
  */
-export function BarraTienda({ seccion, onCambiar, pendientes, bloqueada }: {
+export function BarraTienda({ destinos, seccion, onCambiar, pendientes, bloqueada }: {
+  /** `destinosDe(caja)`: la barra de tienda o la de belleza. */
+  destinos: Destino[];
   seccion: SeccionTienda;
   onCambiar: (s: SeccionTienda) => void;
   /** Avisos sin ver: el globo de Notificaciones. */
@@ -24,7 +18,7 @@ export function BarraTienda({ seccion, onCambiar, pendientes, bloqueada }: {
 }) {
   return (
     <nav aria-label="Secciones de la caja" className="flex flex-shrink-0 border-t border-line bg-surface">
-      {DESTINOS.map((d) => {
+      {destinos.map((d) => {
         const elegido = d.seccion === seccion;
         return (
           <button
