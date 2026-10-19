@@ -15204,6 +15204,10 @@ export type Database = {
         Args: { p_base: number; p_excluir?: string; p_tenant: string }
         Returns: number
       }
+      _cita_cobro_en_conflicto: {
+        Args: { p_cita: string; p_ticket: string }
+        Returns: boolean
+      }
       _credito_devolucion: {
         Args: { p_devolucion: string; p_ya_regresado?: number }
         Returns: number

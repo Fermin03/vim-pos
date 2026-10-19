@@ -257,7 +257,7 @@
 
 - `docs/diseno/pos-belleza.md`: Cobrar, colaborador por renglón y anticipos.
 - ADR `0039-la-comision-se-congela-en-el-renglon.md`.
-- El spec de belleza: «Entrega 2, hecha», con migraciones y orden de lanzamiento. 0220 va antes en el instalador, porque un valor de enum desconocido tumba el pull de `pagos` y de `citas`; 0221–0223 van a la nube antes del merge.
+- El spec de belleza: «Entrega 2, hecha», con migraciones y orden de lanzamiento. 0216–0223 van a la nube a mano, en orden y cada una en su transacción (0220 antes de 0221), antes del merge; el instalador va después. Una caja vieja no se afecta (ver el spec).
 - Suites completas, revisión de toda la rama y commit.
 
 ## Rulings de este plan (Fermín puede corregirlos)
