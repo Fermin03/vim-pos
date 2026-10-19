@@ -46,9 +46,9 @@ DECLARE
   v_turno  uuid; v_auth uuid;
   v_t1 uuid; v_t2 uuid; v_t3 uuid; v_t4 uuid; v_t5 uuid; v_tx uuid;
   i_corte1 uuid; i_tinte1 uuid; i_champu uuid; i_papas uuid; i_corte2 uuid; i_cancel uuid; i_corte4 uuid; i_tinte5 uuid;
-  v_cita1 uuid; v_cita2 uuid; v_cita3 uuid;
+  v_cita1 uuid; v_cita2 uuid; v_cita3 uuid; v_cita4 uuid; v_t6 uuid; i_corte6 uuid; i_champu6 uuid; v_suc2 uuid;
   v_hoy  date := (now() AT TIME ZONE 'America/Mexico_City')::date;
-  v_per  daterange;
+  v_desde date; v_hasta date;
   r record; v_n integer; v_x numeric;
 BEGIN
   -- Negocio de belleza con agenda; otro negocio para RLS.
@@ -172,12 +172,45 @@ BEGIN
   UPDATE servicios_agenda SET comision_valor = 40 WHERE producto_id = v_corte;
   UPDATE servicio_colaborador SET comision_valor = 20 WHERE producto_id = v_tinte AND usuario_id = v_diego;
 
+  -- 8b) Descuento a nivel TICKET (10 %) sobre renglones de dos colaboradores y un envío: se reparte
+  --     solo entre los renglones (el envío no se descuenta). Corte $180 → 139.66 / 55.86; champú $100
+  --     (ya con 50 % por productos) → 77.59 / 38.80. El envío no tiene colaborador ni cuenta.
+  INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES (v_t, v_suc, 'Norte 0221', 35) RETURNING id INTO v_tx;
+  v_t6 := abrir_ticket(v_suc, v_caja, v_turno, 'DELIVERY_PROPIO'::modo_servicio, NULL, NULL, 'b221-t6', v_maria);
+  i_corte6 := agregar_item_a_ticket(v_t6, v_corte, 1, NULL, '[]'::jsonb, 'b221-corte6', v_diego);
+  i_champu6 := agregar_item_a_ticket(v_t6, v_champu, 1, NULL, '[]'::jsonb, 'b221-champu6', v_maria);
+  PERFORM fijar_envio_ticket(v_t6, v_tx);
+  INSERT INTO autorizaciones_pin (tenant_id, usuario_solicitante_id, usuario_autorizo_id, accion, permiso_codigo, motivo, caja_id, turno_id)
+  VALUES (v_t, v_maria, v_maria, 'd', 'descuento.manual_aplicar', 't', v_caja, v_turno) RETURNING id INTO v_auth;
+  PERFORM aplicar_descuento_manual(v_t6, NULL, 'PORCENTAJE'::descuento_manual_tipo, 10, 'CLIENTE_FRECUENTE'::descuento_manual_motivo, '10', v_auth, v_maria, v_maria, 'b221-desc6');
+  SELECT total_mxn INTO v_x FROM tickets WHERE id = v_t6;
+  IF v_x <> 287 THEN RAISE EXCEPTION 'B8b: el ticket debía quedar en 280 − 28 + 35 = 287: %', v_x; END IF;
+  PERFORM aplicar_pago(v_t6, 'EFECTIVO'::metodo_pago, v_x, v_x, NULL, NULL, NULL, false, NULL, 'b221-pago6');
+  SELECT * INTO r FROM vw_comisiones_renglon WHERE ticket_item_id = i_corte6;
+  IF r.base_mxn <> 139.66 OR r.comision_mxn <> 55.86 OR r.venta_mxn <> 139.66 THEN
+    RAISE EXCEPTION 'B8b: corte con descuento de ticket esperaba 139.66 / 55.86: %', to_jsonb(r); END IF;
+  SELECT * INTO r FROM vw_comisiones_renglon WHERE ticket_item_id = i_champu6;
+  IF r.base_mxn <> 77.59 OR r.comision_mxn <> 38.80 THEN
+    RAISE EXCEPTION 'B8b: champú con descuento de ticket esperaba 77.59 / 38.80: %', to_jsonb(r); END IF;
+  SELECT count(*) INTO v_n FROM vw_comisiones_renglon WHERE ticket_id = v_t6;
+  IF v_n <> 2 THEN RAISE EXCEPTION 'B8b: el ticket con envío debía dar 2 renglones: %', v_n; END IF;
+
+  -- 8c) vincular: no otra sucursal.
+  INSERT INTO sucursales (tenant_id, codigo, nombre) VALUES (v_t, 'S221', 'Segunda') RETURNING id INTO v_suc2;
+  v_cita4 := guardar_cita(jsonb_build_object('sucursal_id', v_suc, 'cliente_nombre', 'Olga', 'inicia', '2030-01-07 15:00-06',
+               'servicios', jsonb_build_array(jsonb_build_object('producto_id', v_corte, 'usuario_id', v_diego))));
+  UPDATE citas SET sucursal_id = v_suc2 WHERE id = v_cita4;   -- la cita es de la otra sucursal
+  v_tx := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'b221-tx', v_maria);
+  PERFORM pg_temp.debe_fallar(format('SELECT vincular_cita_ticket(%L, %L)', v_cita4, v_tx), 'DATOS_INVALIDOS: la cita es de otra sucursal.', 'B8c sucursal');
+
   -- 9) Un ticket pagado y luego cancelado no suma, y su cita vuelve a TERMINADA.
   v_t4 := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'b221-t4', v_maria);
   i_corte4 := agregar_item_a_ticket(v_t4, v_corte, 1, NULL, '[]'::jsonb, 'b221-corte4', v_diego);
   v_cita2 := guardar_cita(jsonb_build_object('sucursal_id', v_suc, 'cliente_nombre', 'Laura', 'inicia', '2030-01-07 11:00-06',
                'servicios', jsonb_build_array(jsonb_build_object('producto_id', v_corte, 'usuario_id', v_diego))));
   PERFORM vincular_cita_ticket(v_cita2, v_t4);   -- AGENDADA también se cobra
+  PERFORM vincular_cita_ticket(v_cita2, v_t4);   -- repetir con la misma venta es inofensivo
+  PERFORM pg_temp.debe_fallar(format('SELECT vincular_cita_ticket(%L, %L)', v_cita2, v_tx), 'DATOS_INVALIDOS: la cita ya está en otra venta abierta.', 'B9 robar cita');
   PERFORM aplicar_pago(v_t4, 'EFECTIVO'::metodo_pago, 180, 180, NULL, NULL, NULL, false, NULL, 'b221-pago4');
   IF (SELECT estado FROM citas WHERE id = v_cita2) <> 'COBRADA' THEN RAISE EXCEPTION 'B9: la cita 2 debía quedar COBRADA'; END IF;
   IF pg_temp.com(i_corte4) <> 62.07 THEN RAISE EXCEPTION 'B9: corte sin descuento al 40 %% debía dar 62.07: %', pg_temp.com(i_corte4); END IF;
@@ -211,38 +244,39 @@ BEGIN
   IF r.base_mxn <> 387.93 OR r.comision_mxn <> 77.59 OR r.venta_mxn <> 387.93 THEN
     RAISE EXCEPTION 'B10: la devolución parcial debía dejar 387.93 / 77.59: %', to_jsonb(r); END IF;
 
-  -- 11) periodo_comisiones: semana lunes–domingo y quincenas.
-  IF periodo_comisiones('2030-01-07') <> daterange('2030-01-07', '2030-01-14')
-     OR periodo_comisiones('2030-01-13') <> daterange('2030-01-07', '2030-01-14') THEN
-    RAISE EXCEPTION 'B11: semana: % / %', periodo_comisiones('2030-01-07'), periodo_comisiones('2030-01-13'); END IF;
+  -- 11) periodo_comisiones (ambas fechas inclusive): semana lunes–domingo y quincenas.
+  IF (SELECT (desde, hasta) FROM periodo_comisiones('2030-01-07')) <> ('2030-01-07'::date, '2030-01-13'::date)
+     OR (SELECT (desde, hasta) FROM periodo_comisiones('2030-01-13')) <> ('2030-01-07'::date, '2030-01-13'::date) THEN
+    RAISE EXCEPTION 'B11: semana'; END IF;
   UPDATE configuracion_tenant SET agenda_periodo_comisiones = 'QUINCENAL' WHERE tenant_id = v_t;
-  IF periodo_comisiones('2030-02-01') <> daterange('2030-02-01', '2030-02-16')
-     OR periodo_comisiones('2030-02-15') <> daterange('2030-02-01', '2030-02-16')
-     OR periodo_comisiones('2030-02-16') <> daterange('2030-02-16', '2030-03-01')
-     OR periodo_comisiones('2030-02-28') <> daterange('2030-02-16', '2030-03-01') THEN
-    RAISE EXCEPTION 'B11: quincenas: % % %', periodo_comisiones('2030-02-15'), periodo_comisiones('2030-02-16'), periodo_comisiones('2030-02-28'); END IF;
+  IF (SELECT (desde, hasta) FROM periodo_comisiones('2030-02-01')) <> ('2030-02-01'::date, '2030-02-15'::date)
+     OR (SELECT (desde, hasta) FROM periodo_comisiones('2030-02-15')) <> ('2030-02-01'::date, '2030-02-15'::date)
+     OR (SELECT (desde, hasta) FROM periodo_comisiones('2030-02-16')) <> ('2030-02-16'::date, '2030-02-28'::date)
+     OR (SELECT (desde, hasta) FROM periodo_comisiones('2030-02-28')) <> ('2030-02-16'::date, '2030-02-28'::date)
+     OR (SELECT (desde, hasta) FROM periodo_comisiones('2030-01-31')) <> ('2030-01-16'::date, '2030-01-31'::date) THEN
+    RAISE EXCEPTION 'B11: quincenas'; END IF;
   UPDATE configuracion_tenant SET agenda_periodo_comisiones = 'SEMANAL' WHERE tenant_id = v_t;
 
   -- 12) comisiones_periodo: el dueño ve a todos; sueldo solo en un periodo exacto.
-  --     Diego: 55.86 + 77.59 + 62.07 + 77.59 = 273.11 en 4 servicios; María: 8.62 de productos.
-  v_per := periodo_comisiones(v_hoy);
+  --     Diego: 55.86 + 77.59 + 62.07 + 55.86 + 77.59 = 328.97 en 5 servicios; María: 8.62 + 38.80 de productos.
+  SELECT desde, hasta INTO v_desde, v_hasta FROM periodo_comisiones(v_hoy);
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_dueno, 'role', 'authenticated', 'tenant_id', v_t)::text, true);
   EXECUTE 'SET LOCAL ROLE authenticated';
-  SELECT * INTO r FROM comisiones_periodo(lower(v_per), upper(v_per) - 1) WHERE usuario_id = v_diego;
-  IF r.servicios <> 4 OR r.comision_servicios_mxn <> 273.11 OR r.comision_productos_mxn <> 0 OR r.sueldo_mxn <> 1000 OR r.total_mxn <> 1273.11 THEN
+  SELECT * INTO r FROM comisiones_periodo(v_desde, v_hasta) WHERE usuario_id = v_diego;
+  IF r.servicios <> 5 OR r.comision_servicios_mxn <> 328.97 OR r.comision_productos_mxn <> 0 OR r.sueldo_mxn <> 1000 OR r.total_mxn <> 1328.97 THEN
     RAISE EXCEPTION 'B12: Diego en el periodo: %', to_jsonb(r); END IF;
-  SELECT * INTO r FROM comisiones_periodo(lower(v_per), upper(v_per) - 1) WHERE usuario_id = v_maria;
-  IF r.comision_productos_mxn <> 8.62 OR r.servicios <> 0 OR r.total_mxn <> 8.62 THEN RAISE EXCEPTION 'B12: María: %', to_jsonb(r); END IF;
+  SELECT * INTO r FROM comisiones_periodo(v_desde, v_hasta) WHERE usuario_id = v_maria;
+  IF r.comision_productos_mxn <> 47.42 OR r.servicios <> 0 OR r.total_mxn <> 47.42 THEN RAISE EXCEPTION 'B12: María: %', to_jsonb(r); END IF;
   SELECT * INTO r FROM comisiones_periodo(v_hoy, v_hoy + 30) WHERE usuario_id = v_diego;
-  IF r.sueldo_mxn <> 0 OR r.total_mxn <> 273.11 THEN RAISE EXCEPTION 'B12: rango libre no lleva sueldo: %', to_jsonb(r); END IF;
+  IF r.sueldo_mxn <> 0 OR r.total_mxn <> 328.97 THEN RAISE EXCEPTION 'B12: rango libre no lleva sueldo: %', to_jsonb(r); END IF;
   -- Cambiar las reglas como dueño sí se puede.
   UPDATE configuracion_tenant SET agenda_cobro_modo = 'ANTICIPO' WHERE tenant_id = v_t;
 
   -- 13) Un colaborador que no administra solo ve lo suyo; el cajero no cambia las reglas.
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_diego, 'role', 'authenticated', 'tenant_id', v_t)::text, true);
   SELECT count(*) FILTER (WHERE colaborador_id <> v_diego), count(*) INTO v_n, v_x FROM vw_comisiones_renglon;
-  IF v_n <> 0 OR v_x <> 4 THEN RAISE EXCEPTION 'B13: Diego ve % ajenos de %', v_n, v_x; END IF;
-  SELECT count(*) INTO v_n FROM comisiones_periodo(lower(v_per), upper(v_per) - 1);
+  IF v_n <> 0 OR v_x <> 5 THEN RAISE EXCEPTION 'B13: Diego ve % ajenos de %', v_n, v_x; END IF;
+  SELECT count(*) INTO v_n FROM comisiones_periodo(v_desde, v_hasta);
   IF v_n <> 1 THEN RAISE EXCEPTION 'B13: Diego ve % filas en comisiones_periodo', v_n; END IF;
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria, 'role', 'authenticated', 'tenant_id', v_t)::text, true);
   PERFORM pg_temp.debe_fallar(format('UPDATE configuracion_tenant SET agenda_comision_base = %L WHERE tenant_id = %L', 'LISTA', v_t),
@@ -257,7 +291,7 @@ BEGIN
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_dueno, 'role', 'authenticated', 'tenant_id', v_otro)::text, true);
   SELECT count(*) INTO v_n FROM vw_comisiones_renglon;
   IF v_n <> 0 THEN RAISE EXCEPTION 'B14: otro negocio ve % renglones', v_n; END IF;
-  SELECT count(*) INTO v_n FROM comisiones_periodo(lower(v_per), upper(v_per) - 1);
+  SELECT count(*) INTO v_n FROM comisiones_periodo(v_desde, v_hasta);
   IF v_n <> 0 THEN RAISE EXCEPTION 'B14: otro negocio ve % filas', v_n; END IF;
   EXECUTE 'RESET ROLE';
   IF has_table_privilege('anon', 'vw_comisiones_renglon', 'SELECT') OR has_function_privilege('anon', 'comisiones_periodo(date, date)', 'EXECUTE') THEN

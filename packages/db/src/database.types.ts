@@ -16295,7 +16295,13 @@ export type Database = {
         }
         Returns: string
       }
-      periodo_comisiones: { Args: { p_fecha: string }; Returns: unknown }
+      periodo_comisiones: {
+        Args: { p_fecha: string }
+        Returns: {
+          desde: string
+          hasta: string
+        }[]
+      }
       periodo_global_de: {
         Args: { p_fecha: string; p_periodicidad: string }
         Returns: {

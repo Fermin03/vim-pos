@@ -134,7 +134,8 @@ BEGIN
     FROM configuracion_tenant c WHERE c.tenant_id = NEW.tenant_id;
 
   IF v_tipo IS NULL AND v_pct IS NOT NULL
-     AND NOT EXISTS (SELECT 1 FROM servicios_agenda sa WHERE sa.producto_id = NEW.producto_id) THEN
+     AND NOT EXISTS (SELECT 1 FROM servicios_agenda sa
+                      WHERE sa.producto_id = NEW.producto_id AND sa.tenant_id = NEW.tenant_id AND sa.activo) THEN
     v_tipo := 'PORCENTAJE';
     v_valor := v_pct;
   END IF;
@@ -299,16 +300,28 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_tenant uuid := _agenda_tenant();
+  v_cita   citas%ROWTYPE;
+  v_suc    uuid;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM tickets WHERE id = p_ticket AND tenant_id = v_tenant
-                   AND estado_fiscal IN ('BORRADOR', 'ABIERTO') AND deleted_at IS NULL) THEN
+  SELECT sucursal_id INTO v_suc FROM tickets
+   WHERE id = p_ticket AND tenant_id = v_tenant AND estado_fiscal IN ('BORRADOR', 'ABIERTO') AND deleted_at IS NULL;
+  IF NOT FOUND THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: la venta no está abierta en este negocio.' USING ERRCODE = '22023';
   END IF;
-  UPDATE citas SET ticket_id = p_ticket
-   WHERE id = p_cita AND tenant_id = v_tenant AND estado IN ('AGENDADA', 'EN_CURSO', 'TERMINADA');
+  SELECT * INTO v_cita FROM citas
+   WHERE id = p_cita AND tenant_id = v_tenant AND estado IN ('AGENDADA', 'EN_CURSO', 'TERMINADA') FOR UPDATE;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: la cita no se puede cobrar.' USING ERRCODE = '22023';
   END IF;
+  IF v_cita.sucursal_id <> v_suc THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: la cita es de otra sucursal.' USING ERRCODE = '22023';
+  END IF;
+  -- No se roba una cita que ya está en otra venta abierta (sí se reemplaza la de una venta cancelada).
+  IF v_cita.ticket_id IS NOT NULL AND v_cita.ticket_id <> p_ticket AND EXISTS (
+       SELECT 1 FROM tickets WHERE id = v_cita.ticket_id AND estado_fiscal IN ('BORRADOR', 'ABIERTO') AND deleted_at IS NULL) THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: la cita ya está en otra venta abierta.' USING ERRCODE = '22023';
+  END IF;
+  UPDATE citas SET ticket_id = p_ticket WHERE id = p_cita;
 END;
 $$;
 COMMENT ON FUNCTION vincular_cita_ticket(uuid, uuid) IS
@@ -342,7 +355,12 @@ CREATE TRIGGER trg_tickets_cita_cobrada
 
 -- ── §6 Comisiones al leer ───────────────────────────────────────────────────
 -- Renglones con colaborador de tickets PAGADO o FACTURADO, no cancelados, menos la parte devuelta
--- (devoluciones CONFIRMADA). base COBRADO = total − IVA; LISTA = precio de lista × cantidad sin IVA.
+-- (devoluciones CONFIRMADA). LISTA = precio de lista × cantidad sin IVA (sin modificadores).
+-- COBRADO = total del renglón × factor del ticket, sin IVA. El factor reparte entre los renglones
+-- que no son cargo lo que el ticket descontó a nivel ticket (descuento manual, promoción y canje de
+-- lealtad; recalcular_totales_ticket solo los resta de tickets.total_mxn y nunca del envío):
+-- (total del ticket − cargos) / renglones, acotado a [0, 1]. El IVA se quita al final con la tasa
+-- (total / (1 + tasa)), no restando iva_item_mxn ya redondeado; se redondea una sola vez.
 -- venta_mxn = lo cobrado sin IVA (para «ventas por colaborador»). Sin regla congelada, comisión 0.
 -- Visibilidad: el RLS de ticket_items acota al negocio; además, un usuario autenticado que no es
 -- dueño ni administrador solo ve sus renglones. Sin JWT de usuario (postgres, service_role) se ve todo.
@@ -357,11 +375,17 @@ WITH r AS (
            SELECT sum(di.cantidad_devuelta)
              FROM devolucion_items di JOIN devoluciones d ON d.id = di.devolucion_id
             WHERE di.ticket_item_id_original = ti.id AND d.estado = 'CONFIRMADA' AND d.deleted_at IS NULL), 0) AS cantidad_neta,
-         ti.total_item_mxn - ti.iva_item_mxn AS cobrado_sin_iva,
+         ti.total_item_mxn
+           * CASE WHEN s.lineas > 0 THEN LEAST(1, GREATEST(0, (t.total_mxn - s.cargos) / s.lineas)) ELSE 1 END
+           / (1 + ti.tasa_iva_snapshot / 100) AS cobrado_sin_iva,
          COALESCE(ti.precio_unitario_original_snapshot, ti.precio_unitario_snapshot) * ti.cantidad
            / CASE WHEN ti.iva_incluido_en_precio_snapshot THEN 1 + ti.tasa_iva_snapshot / 100 ELSE 1 END AS lista_sin_iva
     FROM ticket_items ti
     JOIN tickets t ON t.id = ti.ticket_id
+    CROSS JOIN LATERAL (
+      SELECT COALESCE(sum(x.total_item_mxn) FILTER (WHERE x.cargo_tipo IS NULL), 0)     AS lineas,
+             COALESCE(sum(x.total_item_mxn) FILTER (WHERE x.cargo_tipo IS NOT NULL), 0) AS cargos
+        FROM ticket_items x WHERE x.ticket_id = t.id AND NOT x.cancelado) s
    WHERE ti.colaborador_id IS NOT NULL
      AND NOT ti.cancelado
      AND t.estado_fiscal IN ('PAGADO', 'FACTURADO')
@@ -389,23 +413,24 @@ COMMENT ON VIEW vw_comisiones_renglon IS
 REVOKE ALL ON vw_comisiones_renglon FROM PUBLIC, anon;
 GRANT SELECT ON vw_comisiones_renglon TO authenticated, service_role;
 
--- Periodo del negocio que contiene p_fecha: semana lunes–domingo o quincena 1–15 / 16–fin.
+-- Periodo del negocio que contiene p_fecha (ambas fechas inclusive): semana lunes–domingo o
+-- quincena 1–15 / 16–fin de mes.
 CREATE OR REPLACE FUNCTION periodo_comisiones(p_fecha date)
-RETURNS daterange
+RETURNS TABLE(desde date, hasta date)
 LANGUAGE sql
 STABLE
 SET search_path = public, pg_temp
 AS $$
-  SELECT CASE
-    WHEN (SELECT agenda_periodo_comisiones FROM configuracion_tenant WHERE tenant_id = current_tenant_id()) = 'QUINCENAL' THEN
-      CASE WHEN extract(day FROM p_fecha) <= 15
-        THEN daterange(date_trunc('month', p_fecha)::date, date_trunc('month', p_fecha)::date + 15)
-        ELSE daterange(date_trunc('month', p_fecha)::date + 15, (date_trunc('month', p_fecha) + interval '1 month')::date)
-      END
-    ELSE daterange(p_fecha - (extract(isodow FROM p_fecha)::int - 1), p_fecha - (extract(isodow FROM p_fecha)::int - 1) + 7)
-  END;
+  WITH m AS (SELECT date_trunc('month', p_fecha)::date AS ini,
+                    p_fecha - (extract(isodow FROM p_fecha)::int - 1) AS lunes)
+  SELECT CASE WHEN q THEN (CASE WHEN extract(day FROM p_fecha) <= 15 THEN m.ini ELSE m.ini + 15 END) ELSE m.lunes END,
+         CASE WHEN q THEN (CASE WHEN extract(day FROM p_fecha) <= 15 THEN m.ini + 14
+                                ELSE (m.ini + interval '1 month')::date - 1 END)
+              ELSE m.lunes + 6 END
+    FROM m, LATERAL (SELECT COALESCE((SELECT agenda_periodo_comisiones = 'QUINCENAL' FROM configuracion_tenant
+                                       WHERE tenant_id = current_tenant_id()), false) AS q) x;
 $$;
-COMMENT ON FUNCTION periodo_comisiones(date) IS 'Periodo de comisiones del negocio que contiene la fecha, como daterange [) (0221).';
+COMMENT ON FUNCTION periodo_comisiones(date) IS 'Periodo de comisiones del negocio que contiene la fecha: desde y hasta, inclusive (0221).';
 
 -- Por colaborador: servicios, ventas sin IVA, comisiones y sueldo (solo si el rango es exactamente
 -- un periodo del negocio). SECURITY INVOKER: la vista ya acota quién ve qué.
@@ -435,7 +460,7 @@ AS $$
            COALESCE(sum(r.venta_mxn), 0) AS ventas,
            COALESCE(sum(r.comision_mxn) FILTER (WHERE r.es_servicio), 0) AS com_serv,
            COALESCE(sum(r.comision_mxn) FILTER (WHERE NOT r.es_servicio), 0) AS com_prod,
-           CASE WHEN daterange(p_desde, p_hasta, '[]') = periodo_comisiones(p_desde)
+           CASE WHEN (p_desde, p_hasta) = (SELECT p.desde, p.hasta FROM periodo_comisiones(p_desde) p)
                 THEN COALESCE(max(c.sueldo_periodo_mxn), 0) ELSE 0 END AS sueldo
       FROM u
       LEFT JOIN r ON r.colaborador_id = u.usuario_id
