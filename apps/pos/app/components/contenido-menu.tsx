@@ -10,7 +10,7 @@ import { useAcceso } from "./banda-acceso";
 
 /**
  * Las opciones del menú general. Las pinta `MenuGeneral` dentro de su diálogo (restaurante) y la
- * sección «Configuración» de la caja de tienda directo en la página (pos-retail.md, «Versión 2»).
+ * sección «Más» de la caja de tienda directo en la página (pos-retail.md, «Versión 2»).
  */
 export function ContenidoMenu({
   alElegir,
