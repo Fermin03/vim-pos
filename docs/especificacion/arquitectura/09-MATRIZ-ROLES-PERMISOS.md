@@ -452,6 +452,8 @@ Las columnas usan abreviaturas:
 | Vender a crédito pasando el límite o con saldo vencido | ✅ | ✅ | ✅ | ✅ | 🔐 | ❌ | ❌ | ❌ | ❌ |
 | Registrar abono de crédito | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Dar crédito a un cliente (límite y plazo) | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Crear, convertir en venta o cancelar una cotización | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Encender cotizaciones y fijar su vigencia | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Poner ticket en espera | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Retomar ticket en espera | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Ver tickets propios (del turno) | 👁️ | 👁️ | 👁️ | ✅ | ✅ | ✅ | ❌ | 👁️* | ❌ |

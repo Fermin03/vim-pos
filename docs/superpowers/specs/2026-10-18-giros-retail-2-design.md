@@ -269,3 +269,53 @@ Crédito por cliente, venta a crédito, abonos, saldo a favor y corte. Todo en l
 - **Hallazgo de seguridad previo a esta rama.** La RLS de `devoluciones` solo revisa el negocio: un
   cajero con acceso directo a la tabla podría insertar o confirmar una devolución inventada (ya podía
   forjar DEVOLUCION_EFECTIVO). Se propone como sesión aparte.
+
+## Entrega 3 (cotizaciones), hecha (18 oct)
+
+Cotizar desde el carrito, mandarla por WhatsApp y convertirla en venta. Todo en local, rama
+`feat/retail2-cotizaciones`.
+
+**Migraciones**
+
+- **0212:** módulo de cotizaciones apagado por defecto, tablas de cotizaciones y renglones, RPCs para
+  guardar, convertir y cancelar, folio `COT-…`, vigencia, y la RPC pública por token
+  (`cotizacion_publica`).
+- **0213:** sync: la caja sube sus cotizaciones (push). No hay pull: la cotización de otra caja no se
+  ve en esta.
+
+**Página pública:** `/c/<token>` en el portal de factura (`apps/factura`), con «Guardar como PDF».
+Título de pestaña «Cotización · VIM POS» y `noindex`.
+
+**Para el lanzamiento**
+
+- La 0212–0213 se aplican a producción a mano, con las demás, ANTES de desplegar las apps.
+- El portal de factura debe estar desplegado para que los enlaces de WhatsApp funcionen.
+
+**Rulings** (Fermín puede corregirlos)
+
+- «Por WhatsApp como PDF» es un enlace que el cliente abre y guarda como PDF: WhatsApp no adjunta
+  archivos por enlace y el repo no genera PDF.
+- Sin combos en cotizaciones.
+- La cotización de otra caja no se ve ni se convierte en esta; sí en el admin y el POS web.
+- Cancelar la puede hacer cualquier cajero (no mueve dinero).
+- Una cotización cancelada se ve en el enlace público como «no existe o ya no está disponible».
+- `caja_id` obligatorio: el admin no crea cotizaciones.
+- «Nueva cotización» solo regresa a Cobrar con el carrito vacío y un aviso; no hay modo especial.
+- «Vencida» en la caja usa la fecha de Ciudad de México (el POS no conoce la zona del negocio), igual
+  que el crédito.
+- Para las cotizaciones se corrigió `cotizacion_publica` editando la 0212 en su lugar (solo vive en la
+  rama y el Docker local).
+
+**Quedó para después**
+
+- Idempotencia SELECT-luego-INSERT (una carrera da `unique_violation`); un ticket puede ligarse a
+  varias cotizaciones; el enlace muestra el nombre de un cliente borrado.
+- La nube acepta cualquier transición de estado (no regresar de CONVERTIDA) y no exige PAGADO para
+  CONVERTIDA; la caja no se valida contra la sucursal; el tope de cotizaciones no deja log; el token
+  es único global.
+- Se puede abrir la configuración de cotizaciones por URL en un restaurante; el límite de 500 afecta
+  los totales del mes; la cuadrícula del admin es de 4 columnas con 2 tarjetas.
+- Sin prueba de render de ⋯ ni de la baldosa con el módulo; sin prueba de `buscarCotizacion` con fetch
+  simulado.
+- Tipos de BD escritos a mano, fuera de orden.
+- Sitio web y PDF de prospectos: pendientes hasta el final de todos los giros retail.

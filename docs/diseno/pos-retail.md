@@ -314,6 +314,28 @@ cliente).
   de otras cajas» (el abono solo reparte entre las ventas de esta caja).
 - **Corte:** «Vendido a crédito» y «Pagado con saldo a favor» salen como información, no se declaran.
 
+### Cotizaciones (entrega 3)
+
+Solo con el módulo de cotizaciones encendido (viene apagado; el admin lo enciende y fija la vigencia
+en días).
+
+- **«Guardar como cotización».** Está en ⋯ del cobro. Con carrito vacío no hace nada; con extras o
+  combos queda desactivado y dice «Sin extras ni combos». Guarda el carrito con su cliente, folio
+  `COT-…` y vigencia, y deja el carrito vacío.
+- **Cotización impresa o en pantalla:** negocio, folio, fecha, «Válida hasta», cliente, renglones
+  (granel con su cantidad y unidad) y total. Es un documento, no un ticket: no mueve inventario ni dinero.
+- **«Mandar por WhatsApp».** Abre WhatsApp con un texto y el enlace público de la cotización
+  (`/c/<token>` en el portal de factura). El cliente la abre en su teléfono y usa «Guardar como PDF».
+  Una cotización cancelada dice «no existe o ya no está disponible».
+- **Cotizaciones** (entrada temporal en Configuración, hasta que exista «Más»): lista de vigentes y
+  vencidas, búsqueda, y por cada una **Reimprimir**, **WhatsApp**, **Convertir en venta** y
+  **Cancelar**. **«Nueva cotización»** regresa a Cobrar con el carrito vacío y un aviso.
+- **Convertir en venta** carga el carrito con los **precios de hoy**. Avisa si algún precio cambió,
+  si la cotización está vencida o si se omitió un producto que ya no existe. Al cobrar la venta, la
+  cotización queda **Convertida**.
+- Cualquier cajero crea, convierte y cancela. Una cotización de otra caja no se ve ni se convierte aquí
+  (sí en el admin y en el POS web).
+
 ## Devoluciones en una tienda
 
 Se llega con **Devolver**, en el detalle de una venta en Transacciones (la venta ya viene elegida).

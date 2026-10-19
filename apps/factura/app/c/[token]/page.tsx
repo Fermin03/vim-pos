@@ -6,7 +6,7 @@ import { BotonImprimir } from "./boton-imprimir";
  * La cotización que le llega al cliente por WhatsApp (`/c/<token>`). Se pinta en el servidor: sin
  * sesión, sin cookies y sin rastreo. Lo de `print:` deja en el PDF solo la cotización.
  */
-export const metadata: Metadata = { robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Cotización · VIM POS", robots: { index: false, follow: false } };
 
 const mxn = (n: number) => n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
 
