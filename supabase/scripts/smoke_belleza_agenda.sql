@@ -217,6 +217,49 @@ BEGIN
             'servicios', jsonb_build_array(jsonb_build_object('producto_id', v_corte, 'usuario_id', v_maria))));
   PERFORM pg_temp.debe_fallar(format('SELECT resolver_empalme(%L)', v_c2), 'CITA_EMPALMADA: María G. ya tiene cita a esa hora', 'A9 con choque');
 
+  -- 9b) Editar (guardar_cita con id), otro día para no cruzarse con lo anterior.
+  --     Mover más tarde (10:00 → 15:00) y cambiarle los servicios: los tramos viejos se van.
+  v_cx := guardar_cita(jsonb_build_object('sucursal_id', v_suc, 'cliente_nombre', 'Nora', 'inicia', '2030-01-08 10:00' || tz,
+            'servicios', jsonb_build_array(jsonb_build_object('producto_id', v_corte, 'usuario_id', v_maria))));
+  IF guardar_cita(jsonb_build_object('id', v_cx, 'sucursal_id', v_suc, 'cliente_nombre', 'Nora', 'inicia', '2030-01-08 15:00' || tz,
+       'servicios', jsonb_build_array(jsonb_build_object('producto_id', v_mani, 'usuario_id', v_maria),
+                                      jsonb_build_object('producto_id', v_pedi, 'usuario_id', v_diego)))) <> v_cx THEN
+    RAISE EXCEPTION 'A9b: editar devolvió otra cita'; END IF;
+  SELECT * INTO r FROM citas WHERE id = v_cx;
+  IF r.inicia <> ('2030-01-08 15:00' || tz)::timestamptz OR r.termina <> ('2030-01-08 16:15' || tz)::timestamptz THEN
+    RAISE EXCEPTION 'A9b: al mover quedó %', to_jsonb(r); END IF;
+  SELECT string_agg(p.nombre, ',' ORDER BY cs.orden) INTO v_txt
+    FROM citas_servicios cs JOIN productos p ON p.id = cs.producto_id WHERE cs.cita_id = v_cx;
+  IF v_txt <> 'Manicure,Pedicure' THEN RAISE EXCEPTION 'A9b: servicios tras editar: %', v_txt; END IF;
+  --     El hueco viejo quedó libre; el nuevo, con candado (y un fallo no toca la cita).
+  PERFORM guardar_cita(jsonb_build_object('sucursal_id', v_suc, 'cliente_nombre', 'Olga', 'inicia', '2030-01-08 10:00' || tz,
+            'servicios', jsonb_build_array(jsonb_build_object('producto_id', v_corte, 'usuario_id', v_maria))));
+  PERFORM pg_temp.debe_fallar(format($q$SELECT guardar_cita('{"id":"%s","sucursal_id":"%s","cliente_nombre":"Nora","inicia":"%s","servicios":[{"producto_id":"%s","usuario_id":"%s"}]}')$q$,
+    v_cx, v_suc, '2030-01-08 10:30' || tz, v_corte, v_maria), 'CITA_EMPALMADA: María G. ya tiene cita a esa hora', 'A9b mover a un hueco ocupado');
+  IF (SELECT inicia FROM citas WHERE id = v_cx) <> ('2030-01-08 15:00' || tz)::timestamptz
+     OR (SELECT count(*) FROM citas_servicios WHERE cita_id = v_cx) <> 2 THEN
+    RAISE EXCEPTION 'A9b: el intento fallido cambió la cita'; END IF;
+  --     Solo se edita una AGENDADA; una de otro negocio «no existe».
+  PERFORM pg_temp.debe_fallar(format($q$SELECT guardar_cita('{"id":"%s","sucursal_id":"%s","cliente_nombre":"Dora","inicia":"%s","servicios":[{"producto_id":"%s","usuario_id":"%s"}]}')$q$,
+    v_c3, v_suc, d || '12:00' || tz, v_corte, v_maria), 'DATOS_INVALIDOS: solo se edita una cita por llegar.', 'A9b editar cancelada');
+  INSERT INTO sucursales (tenant_id, codigo, nombre) VALUES (v_otro, 'OT', 'Sucursal del otro') RETURNING id INTO v_u;
+  --     client_id_local es único por negocio: el otro puede repetir 'smk-c1'.
+  INSERT INTO citas (tenant_id, sucursal_id, cliente_nombre, inicia, termina, client_id_local)
+  VALUES (v_otro, v_u, 'Ajena', now(), now() + interval '1 hour', 'smk-c1') RETURNING id INTO v_cx;
+  PERFORM pg_temp.debe_fallar(format($q$SELECT guardar_cita('{"id":"%s","sucursal_id":"%s","cliente_nombre":"X","inicia":"%s","servicios":[{"producto_id":"%s","usuario_id":"%s"}]}')$q$,
+    v_cx, v_suc, d || '08:00' || tz, v_corte, v_maria), 'DATOS_INVALIDOS: la cita no existe.', 'A9b editar ajena');
+  DELETE FROM citas WHERE id = v_cx;
+  --     Colaborador elegido: tiene que estar activo y en la sucursal (no hace falta que haga el servicio).
+  UPDATE colaboradores_agenda SET activo = false WHERE usuario_id = v_diego;
+  PERFORM pg_temp.debe_fallar(format($q$SELECT guardar_cita('{"sucursal_id":"%s","cliente_nombre":"P","inicia":"%s","servicios":[{"producto_id":"%s","usuario_id":"%s"}]}')$q$,
+    v_suc, '2030-01-08 12:00' || tz, v_corte, v_diego), 'DATOS_INVALIDOS: el colaborador no está activo en esta sucursal.', 'A9b colaborador inactivo');
+  UPDATE colaboradores_agenda SET activo = true WHERE usuario_id = v_diego;
+  PERFORM guardar_cita(jsonb_build_object('sucursal_id', v_suc, 'cliente_nombre', 'Q', 'inicia', '2030-01-08 12:00' || tz,
+            'servicios', jsonb_build_array(jsonb_build_object('producto_id', v_mani, 'usuario_id', v_diego))));   -- Diego no hace manicure
+  --     Atender una AGENDADA con servicios nuevos se rechaza.
+  PERFORM pg_temp.debe_fallar(format('SELECT atender_cita(%L, %L::jsonb)', v_c1, jsonb_build_array(jsonb_build_object('producto_id', v_corte))),
+    'DATOS_INVALIDOS: la cita ya tiene sus servicios%', 'A9b atender con servicios');
+
   -- 10) RLS: el cajero lee el catálogo pero no lo escribe, ni cambia la tolerancia; sí agenda por RPC.
   --     El dueño escribe. Otro negocio no lee citas. anon no toca nada.
   EXECUTE 'SET LOCAL ROLE authenticated';

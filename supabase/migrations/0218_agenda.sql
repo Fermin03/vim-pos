@@ -275,14 +275,15 @@ CREATE TABLE citas (
   cancelada_motivo  text NULL,
   empalme           boolean NOT NULL DEFAULT false,
   ticket_id         uuid NULL REFERENCES tickets(id) ON DELETE RESTRICT,
-  client_id_local   varchar(100) NULL UNIQUE,
+  client_id_local   varchar(100) NULL,
   created_by        uuid NULL,
   created_at        timestamptz NOT NULL DEFAULT now(),
   updated_at        timestamptz NOT NULL DEFAULT now(),
   -- Sin tramo solo quien espera (o la espera que se canceló).
   CONSTRAINT citas_tramo CHECK (
     estado IN ('EN_ESPERA', 'CANCELADA') OR (inicia IS NOT NULL AND termina IS NOT NULL)),
-  CONSTRAINT citas_tramo_orden CHECK (termina IS NULL OR inicia IS NULL OR termina > inicia)
+  CONSTRAINT citas_tramo_orden CHECK (termina IS NULL OR inicia IS NULL OR termina > inicia),
+  CONSTRAINT citas_client_id_local_uq UNIQUE (tenant_id, client_id_local)
 );
 CREATE INDEX idx_citas_sucursal_inicia ON citas (tenant_id, sucursal_id, inicia);
 CREATE INDEX idx_citas_cliente ON citas (cliente_id) WHERE cliente_id IS NOT NULL;
@@ -481,8 +482,9 @@ BEGIN
       RAISE EXCEPTION 'DATOS_INVALIDOS: un servicio de la cita no existe.' USING ERRCODE = '22023';
     END IF;
     IF v_usuario IS NOT NULL AND NOT EXISTS (
-         SELECT 1 FROM colaboradores_agenda WHERE tenant_id = p_tenant AND usuario_id = v_usuario) THEN
-      RAISE EXCEPTION 'DATOS_INVALIDOS: el colaborador no es de este negocio.' USING ERRCODE = '22023';
+         SELECT 1 FROM colaboradores_agenda
+          WHERE tenant_id = p_tenant AND usuario_id = v_usuario AND activo AND sucursal_id = p_sucursal) THEN
+      RAISE EXCEPTION 'DATOS_INVALIDOS: el colaborador no está activo en esta sucursal.' USING ERRCODE = '22023';
     END IF;
     IF v_espacio IS NOT NULL AND NOT EXISTS (
          SELECT 1 FROM espacios WHERE id = v_espacio AND tenant_id = p_tenant AND sucursal_id = p_sucursal) THEN
@@ -621,7 +623,8 @@ BEGIN
     DELETE FROM citas_servicios WHERE cita_id = v_id;
     UPDATE citas SET sucursal_id = v_suc, cliente_id = v_cliente, cliente_nombre = v_nombre,
                      cliente_telefono = p->>'cliente_telefono', cliente_email = p->>'cliente_email',
-                     inicia = v_inicia, nota = p->>'nota', empalme = false
+                     inicia = v_inicia, termina = v_inicia + interval '1 minute',
+                     nota = p->>'nota', empalme = false
      WHERE id = v_id;
   END IF;
 
@@ -680,7 +683,7 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_tenant    uuid := current_tenant_id();
+  v_tenant    uuid := _agenda_tenant();
   v_c         citas%ROWTYPE;
   v_servicios jsonb;
   v_termina   timestamptz;
@@ -688,6 +691,9 @@ BEGIN
   SELECT * INTO v_c FROM citas WHERE id = p_cita AND tenant_id = v_tenant FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'DATOS_INVALIDOS: la cita no existe.' USING ERRCODE = '22023'; END IF;
   IF v_c.estado = 'AGENDADA' THEN
+    IF p_servicios IS NOT NULL THEN
+      RAISE EXCEPTION 'DATOS_INVALIDOS: la cita ya tiene sus servicios; para cambiarlos, edítala antes de atenderla.' USING ERRCODE = '22023';
+    END IF;
     UPDATE citas SET estado = 'EN_CURSO', llego_at = now() WHERE id = p_cita;
     RETURN;
   END IF;
@@ -712,9 +718,10 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
+DECLARE v_tenant uuid := _agenda_tenant();
 BEGIN
   UPDATE citas SET estado = 'TERMINADA'
-   WHERE id = p_cita AND tenant_id = current_tenant_id() AND estado = 'EN_CURSO';
+   WHERE id = p_cita AND tenant_id = v_tenant AND estado = 'EN_CURSO';
   IF NOT FOUND THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: la cita no se está atendiendo.' USING ERRCODE = '22023';
   END IF;
@@ -727,9 +734,11 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
-DECLARE v_c citas%ROWTYPE;
+DECLARE
+  v_tenant uuid := _agenda_tenant();
+  v_c      citas%ROWTYPE;
 BEGIN
-  SELECT * INTO v_c FROM citas WHERE id = p_cita AND tenant_id = current_tenant_id() FOR UPDATE;
+  SELECT * INTO v_c FROM citas WHERE id = p_cita AND tenant_id = v_tenant FOR UPDATE;
   IF NOT FOUND OR v_c.estado <> 'AGENDADA' THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: la cita no está por llegar.' USING ERRCODE = '22023';
   END IF;
@@ -746,9 +755,10 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
+DECLARE v_tenant uuid := _agenda_tenant();
 BEGIN
   UPDATE citas SET estado = 'CANCELADA', cancelada_motivo = NULLIF(btrim(p_motivo), '')
-   WHERE id = p_cita AND tenant_id = current_tenant_id() AND estado IN ('AGENDADA', 'EN_ESPERA');
+   WHERE id = p_cita AND tenant_id = v_tenant AND estado IN ('AGENDADA', 'EN_ESPERA');
   IF NOT FOUND THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: solo se cancela una cita por llegar o en espera.' USING ERRCODE = '22023';
   END IF;
@@ -763,11 +773,12 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
+  v_tenant uuid := _agenda_tenant();
   v_restr  text;
   v_nombre text;
   v_s      record;
 BEGIN
-  PERFORM 1 FROM citas WHERE id = p_cita AND tenant_id = current_tenant_id() FOR UPDATE;
+  PERFORM 1 FROM citas WHERE id = p_cita AND tenant_id = v_tenant FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'DATOS_INVALIDOS: la cita no existe.' USING ERRCODE = '22023'; END IF;
   FOR v_s IN SELECT id, usuario_id, espacio_id FROM citas_servicios WHERE cita_id = p_cita AND empalme ORDER BY orden LOOP
     BEGIN
