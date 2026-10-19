@@ -7,7 +7,7 @@
 import { aFechaMx, sumarDias } from "@vim/fecha";
 import type { CuerpoReserva, Resultado, ServicioDeCadena } from "./api";
 import { CORREO } from "./cliente";
-import type { Cita, ColaboradorDeReservas, Huecos, Reserva, Reservas, ServicioReservable } from "./contrato";
+import type { Cita, ColaboradorDeReservas, Huecos, Reserva, Reservas, ServicioReservable, SucursalDeReservas } from "./contrato";
 import { aCentavos, aTexto } from "./dinero";
 import { claveNueva } from "./envio";
 import { hora12, momentoMx } from "./horario";
@@ -15,7 +15,8 @@ import type { TarjetaDePedido } from "./tarjeta";
 import { textoDeRechazo } from "./tarjeta";
 import { normalizarTelefono } from "./telefono";
 import { textoDeError } from "./textos";
-import type { PasoDelReto } from "./verificacion";
+import { aPartirDe, finDeLaPausa } from "./pausa";
+import { retoQueSigue, type PasoDelReto, type Reto } from "./verificacion";
 
 // ── Catálogo ─────────────────────────────────────────────────────────────────────────────────────
 /** Lo que se ofrece en una sucursal: los servicios que hace alguno de sus colaboradores. */
@@ -53,6 +54,21 @@ export function resumenDe(servicios: ServicioReservable[], cadena: ServicioDeCad
   }
   return { total: aTexto(total), duracion, anticipo: aTexto(anticipo) };
 }
+
+/**
+ * Cómo se cobra en línea al reservar, para el resumen. null = nada en línea. Con `TODO` (o un anticipo
+ * que ya es el total) no queda resto que pagar en el negocio.
+ */
+export function cobroEnLinea(cobroModo: Reservas["reglas"]["cobro_modo"], anticipo: string, total: string): { etiqueta: string; resto: boolean } | null {
+  const a = aCentavos(anticipo) ?? 0;
+  if (a <= 0) return null;
+  const todo = cobroModo === "TODO" || a >= (aCentavos(total) ?? 0);
+  return { etiqueta: todo ? "Pago en línea" : "Anticipo en línea", resto: !todo };
+}
+/** Hay que cobrar en línea y esta sucursal no puede (sin Mercado Pago): aquí no se puede reservar. */
+export const sinCobroDe = (sucursal: Pick<SucursalDeReservas, "pago_en_linea" | "public_key">, anticipo: string): boolean =>
+  (aCentavos(anticipo) ?? 0) > 0 && (!sucursal.pago_en_linea || !sucursal.public_key);
+export const SIN_COBRO = "Por ahora no podemos cobrar el anticipo en línea. Comunícate con el negocio para agendar.";
 
 /** La base acepta de 1 a 5 servicios por cita. */
 export const MAX_SERVICIOS = 5;
@@ -114,18 +130,18 @@ export function desdeDe(hoy: string, dia: string): number {
 
 /**
  * El primer día con lugar DESPUÉS de `dia`, preguntando uno por uno (como mucho `DIAS_EN_TIRA`
- * preguntas) sin pasar de `ultimo`. null = ninguno, o una pregunta falló (no se adivina).
+ * preguntas) sin pasar de `ultimo`. `ok` con null = ninguno. Una pregunta que falla corta la
+ * búsqueda y devuelve su error: un 429 no se vuelve «no hay lugar».
  */
-export async function siguienteDiaConLugar(dia: string, ultimo: string, consultar: (dia: string) => Promise<Resultado<Huecos>>): Promise<Huecos | null> {
+export async function siguienteDiaConLugar(dia: string, ultimo: string, consultar: (dia: string) => Promise<Resultado<Huecos>>): Promise<Resultado<Huecos | null>> {
   let d = dia;
   for (let i = 0; i < DIAS_EN_TIRA; i++) {
     d = sumarDias(d, 1);
-    if (d > ultimo) return null;
+    if (d > ultimo) break;
     const r = await consultar(d);
-    if (!r.ok) return null;
-    if (r.datos.huecos.length > 0) return r.datos;
+    if (!r.ok || r.datos.huecos.length > 0) return r;
   }
-  return null;
+  return { ok: true, datos: null };
 }
 
 // ── Tus datos ────────────────────────────────────────────────────────────────────────────────────
@@ -234,25 +250,40 @@ export function textoDeFallo(e: { error: string; mensaje?: string }): string {
  *  · `datos`     — escribiendo; `aviso`: lo que salió mal en el último intento.
  *  · `enviando`  — `reservar` en vuelo (con o sin tarjeta: `conTarjeta`).
  *  · `tarjeta`   — la cita quedó apartada esperando el anticipo (`POR_PAGAR`) o el banco rechazó la tarjeta.
- *  · `reto`      — el banco pide confirmar (3D Secure) en un marco; `url` puede faltar todavía.
+ *                  `pausa`: el antifraude lo rechazó por riesgo (o ya estaba en pausa): no se invita a repetir.
+ *  · `reto`      — el banco pide confirmar (3D Secure) en un marco: `reto`, con las mismas reglas que la
+ *                  tienda (`retoQueSigue`, `seOfreceCancelar`: tras el aviso de que terminó ya no se cancela).
  *  · `hecho`     — la cita quedó (pagada si tocaba); `porConfirmar`: el pago aún se está confirmando.
  *  · `horario`   — ese horario ya no se puede (lo ganó otra o venció el plazo para pagar): a elegir otro, con otra clave.
  */
 export type Flujo = {
   fase: "datos" | "enviando" | "tarjeta" | "reto" | "hecho" | "horario";
-  aviso: string | null; conTarjeta: boolean;
-  codigo: string | null; cita: Cita | null; url: string | null; porConfirmar: boolean;
+  aviso: string | null; conTarjeta: boolean; pausa: boolean;
+  codigo: string | null; cita: Cita | null; reto: Reto | null; porConfirmar: boolean;
 };
-export const FLUJO_INICIAL: Flujo = { fase: "datos", aviso: null, conTarjeta: false, codigo: null, cita: null, url: null, porConfirmar: false };
+export const FLUJO_INICIAL: Flujo = { fase: "datos", aviso: null, conTarjeta: false, pausa: false, codigo: null, cita: null, reto: null, porConfirmar: false };
 
 export type EventoDeFlujo =
   | { tipo: "enviar"; conTarjeta: boolean }
   | { tipo: "respuesta"; r: Resultado<Reserva> }
   | { tipo: "reto"; paso: PasoDelReto }
+  /** La página del banco avisó que terminó: el marco se quita y se espera al servidor. */
+  | { tipo: "reto-termino" }
+  /** La clienta tocó «Cancelar» en el reto. */
+  | { tipo: "reto-cancelar" }
   /** La tarjeta no se pudo leer (no se llamó al servidor). */
   | { tipo: "tarjeta-mal"; texto: string };
 
-const rechazo = (detalle: string | null) => textoDeRechazo(detalle, false).texto;
+/** El pago en línea en pausa (riesgo): hasta cuándo, sin invitar a probar otra tarjeta. */
+export function textoDePausaDeReserva(hasta: string | null | undefined, recien: boolean, ahora: number = Date.now()): string {
+  const que = recien ? "No pudimos aprobar este pago en línea. No fue tu banco y no se te cobró nada." : "El pago en línea está en pausa por ahora. No se te cobró nada.";
+  return `${que} Intenta otra vez ${aPartirDe(finDeLaPausa(hasta, ahora))} o comunícate con el negocio.`;
+}
+
+function rechazado(s: Flujo, detalle: string | null, hasta?: string | null): Flujo {
+  if (detalle === "RIESGO") return { ...s, fase: "tarjeta", reto: null, pausa: true, aviso: textoDePausaDeReserva(hasta, true) };
+  return { ...s, fase: "tarjeta", reto: null, aviso: textoDeRechazo(detalle, false).texto };
+}
 
 export function flujo(s: Flujo, e: EventoDeFlujo): Flujo {
   switch (e.tipo) {
@@ -261,7 +292,8 @@ export function flujo(s: Flujo, e: EventoDeFlujo): Flujo {
     case "respuesta": {
       const r = e.r;
       if (!r.ok) {
-        if (r.error === "PAGO_RECHAZADO") return { ...s, fase: "tarjeta", aviso: rechazo(r.detalle) };
+        if (r.error === "PAGO_RECHAZADO") return rechazado(s, r.detalle, r.hasta);
+        if (r.error === "PAGO_EN_PAUSA") return { ...s, fase: s.conTarjeta ? "tarjeta" : "datos", pausa: true, aviso: textoDePausaDeReserva(r.hasta, false) };
         if (r.error === "HUECO_OCUPADO" || r.error === "HORA_INVALIDA" || r.error === "FUERA_DE_PLAZO") return { ...FLUJO_INICIAL, fase: "horario", aviso: textoDeFallo(r) };
         return { ...s, fase: s.conTarjeta ? "tarjeta" : "datos", aviso: textoDeFallo(r) };
       }
@@ -272,15 +304,20 @@ export function flujo(s: Flujo, e: EventoDeFlujo): Flujo {
       if (pago === null || pago.estado === "PAGADO") return { ...t, fase: "hecho", porConfirmar: false };
       if (pago.estado === "POR_PAGAR") return { ...t, fase: "tarjeta" };
       // Sin código no hay cómo seguir el reto desde aquí: el correo lleva el enlace.
-      if (pago.estado === "VERIFICACION" && t.codigo) return { ...t, fase: "reto", url: pago.url };
+      if (pago.estado === "VERIFICACION" && t.codigo) return { ...t, fase: "reto", reto: { codigo: t.codigo, url: pago.url, esperando: false, cancelado: false } };
       return { ...t, fase: "hecho", porConfirmar: true };
     }
+    case "reto-termino": return s.reto ? { ...s, reto: { ...s.reto, esperando: true } } : s;
+    case "reto-cancelar": return s.reto ? { ...s, reto: { ...s.reto, esperando: true, cancelado: true } } : s;
     case "reto": {
       const p = e.paso;
-      if (s.fase !== "reto") return s;
-      if (p.tipo === "pedido") return { ...s, fase: "hecho", url: null, porConfirmar: false };
-      if (p.tipo === "rechazado") return { ...s, fase: "tarjeta", url: null, aviso: rechazo(p.detalle) };
-      if (p.tipo === "sigue" && !s.url && p.url) return { ...s, url: p.url };
+      if (s.fase !== "reto" || !s.reto) return s;
+      if (p.tipo === "pedido") return { ...s, fase: "hecho", reto: null, porConfirmar: false };
+      if (p.tipo === "rechazado") return rechazado(s, s.reto.cancelado ? "CANCELADO" : p.detalle, p.hasta);
+      if (p.tipo === "sigue") {
+        const reto = retoQueSigue(s.reto, p);
+        return reto === s.reto ? s : { ...s, reto };
+      }
       return s;
     }
   }

@@ -5,10 +5,11 @@ import { describe, expect, it } from "vitest";
 import type { Resultado } from "../api";
 import type { Cita, Huecos, Reserva, Reservas } from "../contrato";
 import {
-  FLUJO_INICIAL, categoriasDe, cuerpoDeReserva, desdeDe, duracionLegible, erroresDeDatos, estadoDeCita, etiquetaDeDia, fechaLarga, flujo,
+  FLUJO_INICIAL, categoriasDe, cobroEnLinea, sinCobroDe, textoDePausaDeReserva, cuerpoDeReserva, desdeDe, duracionLegible, erroresDeDatos, estadoDeCita, etiquetaDeDia, fechaLarga, flujo,
   horaDe, diaDe, intentoDeReserva, queSePuede, quienesHacen, resumenDe, serviciosDeSucursal, siguienteDiaConLugar, textoDeFallo, tiraDeDias,
   type Flujo,
 } from "../reservas";
+import { pasoDelReto } from "../verificacion";
 import { CODIGO, u } from "./datos";
 
 const SUC = u(1), OTRA = u(2), CORTE = u(10), TINTE = u(11), UNAS = u(12), DIEGO = u(40), ANA = u(41);
@@ -122,18 +123,21 @@ describe("tira de días", () => {
       pedidos.push(dia);
       return { ok: true, datos: { dia, huecos: dia === "2026-10-22" ? ["2026-10-22T16:00:00Z"] : [] } };
     };
-    expect(await siguienteDiaConLugar("2026-10-19", "2026-11-18", consultar)).toEqual({ dia: "2026-10-22", huecos: ["2026-10-22T16:00:00Z"] });
+    expect(await siguienteDiaConLugar("2026-10-19", "2026-11-18", consultar)).toEqual({ ok: true, datos: { dia: "2026-10-22", huecos: ["2026-10-22T16:00:00Z"] } });
     expect(pedidos).toEqual(["2026-10-20", "2026-10-21", "2026-10-22"]);
   });
-  it("como mucho 14 preguntas, sin pasar del último día, y un fallo corta", async () => {
+  it("como mucho 14 preguntas, sin pasar del último día; un fallo (429) corta y se devuelve, no es «sin lugar»", async () => {
     let n = 0;
     const vacio = async (dia: string): Promise<Resultado<Huecos>> => { n++; return { ok: true, datos: { dia, huecos: [] } }; };
-    expect(await siguienteDiaConLugar("2026-10-19", "2026-12-31", vacio)).toBeNull();
+    expect(await siguienteDiaConLugar("2026-10-19", "2026-12-31", vacio)).toEqual({ ok: true, datos: null });
     expect(n).toBe(14);
     n = 0;
-    expect(await siguienteDiaConLugar("2026-10-19", "2026-10-21", vacio)).toBeNull();
+    expect(await siguienteDiaConLugar("2026-10-19", "2026-10-21", vacio)).toEqual({ ok: true, datos: null });
     expect(n).toBe(2);
-    expect(await siguienteDiaConLugar("2026-10-19", "2026-12-31", async () => ({ ok: false, error: "SIN_CONEXION", detalle: null }))).toBeNull();
+    let m = 0;
+    const r = await siguienteDiaConLugar("2026-10-19", "2026-12-31", async () => { m++; return { ok: false, error: "DEMASIADOS_INTENTOS", detalle: null }; });
+    expect(r).toMatchObject({ ok: false, error: "DEMASIADOS_INTENTOS" });
+    expect(m).toBe(1);
   });
 });
 
@@ -181,10 +185,10 @@ describe("reservar → anticipo", () => {
     expect(s).toMatchObject({ fase: "enviando", conTarjeta: true });
     // En el reintento la cita no siempre viene: se conserva la que ya se tenía.
     s = flujo(s, { tipo: "respuesta", r: ok({ cita: null, codigo: null, pago: { estado: "VERIFICACION", url: null } }) });
-    expect(s).toMatchObject({ fase: "reto", codigo: CODIGO, url: null });
+    expect(s).toMatchObject({ fase: "reto", codigo: CODIGO, reto: { codigo: CODIGO, url: null, esperando: false, cancelado: false } });
     expect(s.cita).not.toBeNull();
     s = flujo(s, { tipo: "reto", paso: { tipo: "sigue", url: "https://www.mercadopago.com.mx/reto" } });
-    expect(s.url).toBe("https://www.mercadopago.com.mx/reto");
+    expect(s.reto?.url).toBe("https://www.mercadopago.com.mx/reto");
     s = flujo(s, { tipo: "reto", paso: { tipo: "pedido" } });
     expect(s).toMatchObject({ fase: "hecho", porConfirmar: false });
   });
@@ -194,8 +198,9 @@ describe("reservar → anticipo", () => {
     const s = flujo(enviar(enTarjeta, true), { tipo: "respuesta", r: { ok: false, error: "PAGO_RECHAZADO", detalle: "FONDOS" } });
     expect(s.fase).toBe("tarjeta");
     expect(s.aviso).toMatch(/fondos suficientes.*No se te cobró nada/);
-    const r = flujo({ ...enTarjeta, fase: "reto" }, { tipo: "reto", paso: { tipo: "rechazado", detalle: "CANCELADO" } });
-    expect(r).toMatchObject({ fase: "tarjeta", aviso: expect.stringMatching(/Cancelaste/) });
+    const enReto: Flujo = { ...enTarjeta, fase: "reto", reto: { codigo: CODIGO, url: "https://www.mercadopago.com.mx/r", esperando: false, cancelado: false } };
+    const r = flujo(flujo(enReto, { tipo: "reto-cancelar" }), { tipo: "reto", paso: { tipo: "rechazado", detalle: "SIN_VERIFICAR" } });
+    expect(r).toMatchObject({ fase: "tarjeta", reto: null, aviso: expect.stringMatching(/Cancelaste/) });
   });
 
   it("otro error vuelve a donde estaba, con el texto", () => {
@@ -220,5 +225,53 @@ describe("reservar → anticipo", () => {
 
   it("un paso del reto fuera del reto no hace nada", () => {
     expect(flujo(FLUJO_INICIAL, { tipo: "reto", paso: { tipo: "pedido" } })).toBe(FLUJO_INICIAL);
+  });
+});
+
+describe("reto como en la tienda", () => {
+  const enReto: Flujo = { ...FLUJO_INICIAL, fase: "reto", codigo: CODIGO, reto: { codigo: CODIGO, url: "https://www.mercadopago.com.mx/r", esperando: false, cancelado: false } };
+  it("el banco avisa que terminó: se espera; si el servidor sigue diciendo que no, el marco vuelve", () => {
+    const t = flujo(enReto, { tipo: "reto-termino" });
+    expect(t.reto).toMatchObject({ esperando: true, cancelado: false });
+    expect(flujo(t, { tipo: "reto", paso: { tipo: "sigue", url: null, conPrisa: true } }).reto?.esperando).toBe(true);
+    expect(flujo(t, { tipo: "reto", paso: { tipo: "sigue", url: null } }).reto?.esperando).toBe(false);
+  });
+  it("cancelado no vuelve a pintar el marco", () => {
+    const c = flujo(enReto, { tipo: "reto-cancelar" });
+    expect(flujo(c, { tipo: "reto", paso: { tipo: "sigue", url: null } }).reto).toMatchObject({ esperando: true, cancelado: true });
+  });
+  it("una cita que ya no existe termina el reto", () => {
+    expect(pasoDelReto({ ok: false, error: "CITA_NO_ENCONTRADA", detalle: null })).toEqual({ tipo: "rechazado", detalle: "SIN_VERIFICAR" });
+  });
+});
+
+describe("riesgo y pausa", () => {
+  const ahora = Date.parse("2026-10-19T18:00:00Z");
+  it("RIESGO no invita a otra tarjeta: pausa con hora y «comunícate con el negocio»", () => {
+    const s = flujo(flujo({ ...FLUJO_INICIAL, fase: "tarjeta" }, { tipo: "enviar", conTarjeta: true }),
+      { tipo: "respuesta", r: { ok: false, error: "PAGO_RECHAZADO", detalle: "RIESGO", hasta: "2026-10-19T18:30:00Z" } });
+    expect(s).toMatchObject({ fase: "tarjeta", pausa: true });
+    expect(s.aviso).toMatch(/No fue tu banco.*comunícate con el negocio/);
+    expect(s.aviso).not.toMatch(/otra tarjeta/);
+    expect(textoDePausaDeReserva("2026-10-19T18:30:00Z", true, ahora)).toMatch(/a partir de las 12:30 p. m./);
+  });
+  it("PAGO_EN_PAUSA también pausa", () => {
+    const s = flujo(flujo(FLUJO_INICIAL, { tipo: "enviar", conTarjeta: false }), { tipo: "respuesta", r: { ok: false, error: "PAGO_EN_PAUSA", detalle: null } });
+    expect(s).toMatchObject({ fase: "datos", pausa: true });
+  });
+});
+
+describe("cobro en línea", () => {
+  it("anticipo: hay resto; TODO o anticipo = total: no", () => {
+    expect(cobroEnLinea("ANTICIPO", "72.00", "180.00")).toEqual({ etiqueta: "Anticipo en línea", resto: true });
+    expect(cobroEnLinea("TODO", "180.00", "180.00")).toEqual({ etiqueta: "Pago en línea", resto: false });
+    expect(cobroEnLinea("ANTICIPO", "180.00", "180.00")?.resto).toBe(false);
+    expect(cobroEnLinea("AL_FINAL", "0.00", "180.00")).toBeNull();
+  });
+  it("sin Mercado Pago y con algo que cobrar: no se puede reservar", () => {
+    expect(sinCobroDe({ pago_en_linea: false, public_key: null }, "72.00")).toBe(true);
+    expect(sinCobroDe({ pago_en_linea: true, public_key: null }, "72.00")).toBe(true);
+    expect(sinCobroDe({ pago_en_linea: false, public_key: null }, "0.00")).toBe(false);
+    expect(sinCobroDe({ pago_en_linea: true, public_key: "APP_USR-x" }, "72.00")).toBe(false);
   });
 });

@@ -11,7 +11,7 @@ import type { Reservas, ServicioReservable } from "../../lib/contrato";
 import { formatoMxn } from "../../lib/dinero";
 import { semanaLegible } from "../../lib/horario";
 import {
-  MAX_SERVICIOS, SIN_CATEGORIA, categoriasDe, duracionLegible, intentoDeReserva, quienesHacen, resumenDe, serviciosDeSucursal,
+  MAX_SERVICIOS, SIN_CATEGORIA, SIN_COBRO, categoriasDe, cobroEnLinea, diaDe, duracionLegible, intentoDeReserva, quienesHacen, resumenDe, serviciosDeSucursal, sinCobroDe,
 } from "../../lib/reservas";
 import { enlaceWhatsApp } from "../../lib/telefono";
 import { FOCO, PARTE, PRINCIPAL } from "../piezas";
@@ -48,6 +48,8 @@ export function SitioReservas({ reservas, hoy, sucursalInicial }: { reservas: Re
   const [categoria, setCategoria] = useState<string | null>(null);
   const [agregando, setAgregando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  /** El día que se estaba viendo en la tira: al volver (o al perder el horario) se abre en él. */
+  const [diaVisto, setDiaVisto] = useState<string | null>(null);
   const intento = useRef(intentoDeReserva()).current;
 
   const sucursal = reservas.sucursales.find((x) => x.id === sucursalId);
@@ -77,18 +79,21 @@ export function SitioReservas({ reservas, hoy, sucursalInicial }: { reservas: Re
     setCadena((c) => c.map((e, j) => (j === i ? { ...e, usuario_id: usuario } : e)));
     setInicia(null);
   };
-  const elegirSucursal = (id: string) => { setSucursalId(id); setCadena([]); setInicia(null); setCambiando(false); setCategoria(null); };
+  const elegirSucursal = (id: string) => { setSucursalId(id); setCadena([]); setInicia(null); setDiaVisto(null); setCambiando(false); setCategoria(null); };
 
   if (pantalla === "datos" && inicia) {
     return (
       <Reservar reservas={reservas} sucursal={sucursal} cadena={cadena} inicia={inicia} hoy={hoy} intento={intento}
         alVolver={() => setPantalla("cita")}
-        alPerderHorario={(texto) => { setAviso(texto); setInicia(null); setPantalla("cita"); }} />
+        alPerderHorario={(texto) => { setAviso(texto); setDiaVisto(diaDe(inicia)); setInicia(null); setPantalla("cita"); }} />
     );
   }
 
   if (pantalla === "cita") {
     const total = resumenDe(reservas.servicios, cadena);
+    const cobro = cobroEnLinea(reservas.reglas.cobro_modo, total.anticipo, total.total);
+    // Sin Mercado Pago no se puede cobrar lo que se pide en línea: se dice aquí, antes de elegir hora.
+    const sinCobro = sinCobroDe(sucursal, total.anticipo);
     const otros = servicios.filter((s) => !cadena.some((e) => e.producto_id === s.producto_id));
     return (
       <div className="flex flex-col gap-6 px-4">
@@ -144,10 +149,18 @@ export function SitioReservas({ reservas, hoy, sucursalInicial }: { reservas: Re
           )}
         </section>
 
+        {cobro && !sinCobro && (
+          <p className="-mt-2 text-14 text-ink-2">
+            {cobro.resto ? `Al reservar pagas un anticipo de ${formatoMxn(total.anticipo)}. El resto, en el negocio.` : `Al reservar pagas ${formatoMxn(total.anticipo)} en línea.`}
+          </p>
+        )}
         {aviso && <Aviso tono="warning" role="alert" className="!text-14">{aviso}</Aviso>}
 
-        <Horarios slug={reservas.slug} sucursalId={sucursalId} cadena={cadena} hoy={hoy} diasReserva={reservas.reglas.dias_reserva}
-          elegido={inicia} alElegir={(h) => { setInicia(h); if (h) setAviso(null); }} />
+        {sinCobro ? <Aviso tono="warning" role="status" className="!text-14">{SIN_COBRO}</Aviso> : (
+          <Horarios slug={reservas.slug} sucursalId={sucursalId} cadena={cadena} hoy={hoy} diasReserva={reservas.reglas.dias_reserva}
+            diaInicial={diaVisto ?? undefined} alCambiarDia={setDiaVisto}
+            elegido={inicia} alElegir={(h) => { setInicia(h); if (h) setAviso(null); }} />
+        )}
 
         {/* La acción queda al alcance del pulgar mientras se recorren los horarios. */}
         <div className="sticky bottom-0 z-10 -mx-4 border-t border-line bg-surface/95 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
@@ -156,7 +169,7 @@ export function SitioReservas({ reservas, hoy, sucursalInicial }: { reservas: Re
               <span className="block font-display text-16 font-semibold tabular-nums text-ink">{formatoMxn(total.total)}</span>
               {duracionLegible(total.duracion)}
             </p>
-            <button type="button" disabled={!inicia} onClick={() => setPantalla("datos")} className={cn(PRINCIPAL, "h-14 px-6 text-16")}>
+            <button type="button" disabled={!inicia || sinCobro} onClick={() => setPantalla("datos")} className={cn(PRINCIPAL, "h-14 px-6 text-16")}>
               Continuar
             </button>
           </div>
@@ -199,7 +212,7 @@ export function SitioReservas({ reservas, hoy, sucursalInicial }: { reservas: Re
       <section id="servicios" aria-labelledby="titulo-servicios" className="flex scroll-mt-4 flex-col gap-4">
         <h2 id="titulo-servicios" className={H2}>Servicios</h2>
         {categorias.length > 1 && (
-          <div role="group" aria-label="Filtrar por categoría" className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none]">
+          <div role="group" aria-label="Filtrar por categoría" className="flex gap-2 overflow-x-auto [scrollbar-width:none]">
             {[null, ...categorias].map((c) => {
               const activo = c === categoria;
               return (

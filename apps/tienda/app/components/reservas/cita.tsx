@@ -5,7 +5,7 @@
 //
 // TEXTOS PROVISIONALES: los revisa James.
 import { useEffect, useState } from "react";
-import { Aviso, StatusChip, cn } from "@vim/ui/styles";
+import { Aviso, StatusChip, botonClases, cn } from "@vim/ui/styles";
 import { cancelarCita, confirmarPagoDeCita, moverCita, verCita } from "../../lib/api";
 import type { Cita } from "../../lib/contrato";
 import { aCentavos, formatoMxn } from "../../lib/dinero";
@@ -24,6 +24,8 @@ export function PaginaDeCita({ slug, codigo, hoy, diasReserva }: { slug: string;
   const [modo, setModo] = useState<"ver" | "cambiar" | "cancelar">("ver");
   const [nueva, setNueva] = useState<string | null>(null);
   const [hecho, setHecho] = useState<string | null>(null);
+  /** Sube cuando el horario elegido ya no estaba: la lista se vuelve a pedir. */
+  const [recarga, setRecarga] = useState(0);
   const accion = useAccion();
 
   useEffect(() => {
@@ -39,6 +41,8 @@ export function PaginaDeCita({ slug, codigo, hoy, diasReserva }: { slug: string;
   }, [slug, codigo]);
 
   useEffect(() => { if (modo !== "ver") document.getElementById(`cita-${modo}`)?.focus(); }, [modo]);
+  // Tras cancelar o cambiar, la sección que tenía el foco desaparece: el foco va al resultado.
+  useEffect(() => { if (hecho) document.getElementById("cita-resultado")?.focus(); }, [hecho]);
 
   if (fallo) {
     return (
@@ -67,6 +71,8 @@ export function PaginaDeCita({ slug, codigo, hoy, diasReserva }: { slug: string;
     const r = await llamar();
     if (r.ok) { setCita(r.datos); setModo("ver"); setNueva(null); setHecho(listo); return null; }
     if (r.error === "FUERA_DE_PLAZO") { const v = await verCita(slug, codigo); if (v.ok) setCita(v.datos); setModo("ver"); }
+    // Ese horario lo ganó alguien más: la lista se actualiza y se elige otro.
+    if (r.error === "HUECO_OCUPADO") { setNueva(null); setRecarga((n) => n + 1); }
     return textoDeFallo(r);
   });
 
@@ -78,8 +84,8 @@ export function PaginaDeCita({ slug, codigo, hoy, diasReserva }: { slug: string;
         <p className="text-16 text-ink-2">{horaDe(cita.inicia)}{cita.termina && ` a ${horaDe(cita.termina)}`}</p>
       </div>
 
-      <div aria-live="polite" className="empty:hidden">{hecho && <Aviso tono="success" className="!text-14">{hecho}</Aviso>}</div>
-      {cita.cancelada_motivo && <p className="text-15 text-ink">{cita.cancelada_motivo}.</p>}
+      <div id="cita-resultado" tabIndex={-1} aria-live="polite" className="outline-none empty:hidden">{hecho && <Aviso tono="success" className="!text-14">{hecho}</Aviso>}</div>
+      {cita.cancelada_motivo && <p className="text-15 text-ink">{cita.cancelada_motivo.replace(/.?$/, ".")}</p>}
       {cita.reembolso && <Aviso tono={cita.reembolso.estado === "DEVUELTO" ? "success" : "info"} role="status" className="!text-14">{cita.reembolso.mensaje}</Aviso>}
 
       <div className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4">
@@ -124,7 +130,7 @@ export function PaginaDeCita({ slug, codigo, hoy, diasReserva }: { slug: string;
       {sePuede === "cambiar" && modo === "cambiar" && (
         <section aria-labelledby="cita-cambiar" className="flex flex-col gap-4">
           <h2 id="cita-cambiar" tabIndex={-1} className="font-display text-20 font-semibold outline-none">Elige otro horario</h2>
-          <Horarios slug={slug} sucursalId={cita.sucursal.id} codigo={codigo} hoy={hoy} diasReserva={diasReserva}
+          <Horarios slug={slug} sucursalId={cita.sucursal.id} codigo={codigo} hoy={hoy} diasReserva={diasReserva} diaInicial={cita.dia} recarga={recarga}
             cadena={cita.servicios.map((s) => ({ producto_id: s.producto_id, usuario_id: s.colaborador_id }))}
             elegido={nueva} alElegir={setNueva} />
           <button type="button" disabled={!nueva || accion.ocupado} aria-busy={accion.ocupado}
@@ -142,7 +148,7 @@ export function PaginaDeCita({ slug, codigo, hoy, diasReserva }: { slug: string;
           {anticipoPagado && <p className="text-15">Te devolvemos tu anticipo completo por Mercado Pago.</p>}
           <button type="button" disabled={accion.ocupado} aria-busy={accion.ocupado}
             onClick={() => void correr(() => cancelarCita(slug, codigo), "Cancelamos tu cita.")}
-            className={cn("inline-flex h-12 w-full items-center justify-center rounded bg-danger font-display text-15 font-semibold text-white disabled:opacity-50", FOCO)}>
+            className={cn(botonClases({ variant: "danger" }), "h-12 w-full font-display text-15", FOCO)}>
             {accion.ocupado ? "Cancelando…" : "Sí, cancelar"}
           </button>
           <button type="button" onClick={() => setModo("ver")} className={SECUNDARIO}>No, conservarla</button>
