@@ -213,8 +213,14 @@ BEGIN
     RAISE EXCEPTION 'A9: el empalme no se resolvió'; END IF;
   UPDATE citas SET empalme = true WHERE id = v_c2;
   UPDATE citas_servicios SET empalme = true WHERE cita_id = v_c2;
-  PERFORM guardar_cita(jsonb_build_object('sucursal_id', v_suc, 'cliente_nombre', 'K', 'inicia', d || '11:30' || tz,
-            'servicios', jsonb_build_array(jsonb_build_object('producto_id', v_corte, 'usuario_id', v_maria))));
+  --     0219: una cita marcada sigue ocupando; guardar_cita no se encima sobre ella.
+  PERFORM pg_temp.debe_fallar(format($q$SELECT guardar_cita('{"sucursal_id":"%s","cliente_nombre":"K","inicia":"%s","servicios":[{"producto_id":"%s","usuario_id":"%s"}]}')$q$,
+    v_suc, d || '11:30' || tz, v_corte, v_maria), 'CITA_EMPALMADA: María G. ya tiene cita a esa hora', 'A9 encima de una marcada');
+  --     El choque que dejaría la sincronización: otra cita marcada a las 11:30.
+  INSERT INTO citas (tenant_id, sucursal_id, cliente_nombre, inicia, termina, empalme)
+  VALUES (v_t, v_suc, 'K', (d || '11:30' || tz)::timestamptz, (d || '12:30' || tz)::timestamptz, true) RETURNING id INTO v_cx;
+  INSERT INTO citas_servicios (tenant_id, cita_id, orden, producto_id, usuario_id, inicia, termina, precio_mxn, empalme)
+  VALUES (v_t, v_cx, 1, v_corte, v_maria, (d || '11:30' || tz)::timestamptz, (d || '12:30' || tz)::timestamptz, 250, true);
   PERFORM pg_temp.debe_fallar(format('SELECT resolver_empalme(%L)', v_c2), 'CITA_EMPALMADA: María G. ya tiene cita a esa hora', 'A9 con choque');
 
   -- 9b) Editar (guardar_cita con id), otro día para no cruzarse con lo anterior.

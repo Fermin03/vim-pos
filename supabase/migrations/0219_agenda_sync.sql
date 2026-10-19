@@ -61,6 +61,117 @@ BEGIN
 END;
 $$;
 
+-- Cuerpo de la 0218 con una sola diferencia: un tramo nuevo (guardar_cita, atender_cita desde la
+-- espera) no se encima sobre NINGÚN tramo activo de otra cita, tampoco sobre uno marcado con
+-- empalme, y el espacio automático tampoco elige uno ocupado por un tramo marcado. Mismos mensajes
+-- CITA_EMPALMADA. colaborador_libre (0218) ya no excluía los marcados: no cambia.
+CREATE OR REPLACE FUNCTION _agenda_tramos(p_tenant uuid, p_cita uuid, p_sucursal uuid, p_inicia timestamptz, p_servicios jsonb)
+RETURNS timestamptz
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_s       jsonb;
+  v_orden   smallint := 0;
+  v_cursor  timestamptz := p_inicia;
+  v_fin     timestamptz;
+  v_dur     integer;
+  v_tipo    uuid;
+  v_usuario uuid;
+  v_espacio uuid;
+  v_precio  numeric(12,2);
+  v_prod    uuid;
+  v_restr   text;
+  v_nombre  text;
+  v_choca   uuid[];
+BEGIN
+  IF jsonb_typeof(p_servicios) IS DISTINCT FROM 'array' OR jsonb_array_length(p_servicios) = 0 THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: la cita no tiene servicios.' USING ERRCODE = '22023';
+  END IF;
+
+  FOR v_s IN SELECT * FROM jsonb_array_elements(p_servicios) LOOP
+    v_prod    := (v_s->>'producto_id')::uuid;
+    v_usuario := (v_s->>'usuario_id')::uuid;
+    v_espacio := (v_s->>'espacio_id')::uuid;
+    SELECT sa.duracion_min, sa.tipo_espacio_id INTO v_dur, v_tipo
+      FROM servicios_agenda sa
+     WHERE sa.producto_id = v_prod AND sa.tenant_id = p_tenant AND sa.activo;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'DATOS_INVALIDOS: un servicio de la cita no existe.' USING ERRCODE = '22023';
+    END IF;
+    IF v_usuario IS NOT NULL AND NOT EXISTS (
+         SELECT 1 FROM colaboradores_agenda
+          WHERE tenant_id = p_tenant AND usuario_id = v_usuario AND activo AND sucursal_id = p_sucursal) THEN
+      RAISE EXCEPTION 'DATOS_INVALIDOS: el colaborador no está activo en esta sucursal.' USING ERRCODE = '22023';
+    END IF;
+    IF v_espacio IS NOT NULL AND NOT EXISTS (
+         SELECT 1 FROM espacios WHERE id = v_espacio AND tenant_id = p_tenant AND sucursal_id = p_sucursal) THEN
+      RAISE EXCEPTION 'DATOS_INVALIDOS: el espacio no es de esta sucursal.' USING ERRCODE = '22023';
+    END IF;
+
+    v_fin := NULL;
+    IF v_cursor IS NOT NULL THEN
+      IF v_usuario IS NULL THEN
+        -- La duración de «quien esté libre» es la del servicio: aún no se sabe quién.
+        v_usuario := colaborador_libre(p_sucursal, v_prod, v_cursor, v_cursor + make_interval(mins => v_dur));
+        IF v_usuario IS NULL THEN
+          RAISE EXCEPTION 'CITA_EMPALMADA: no hay quien esté libre a esa hora' USING ERRCODE = '23P01';
+        END IF;
+      END IF;
+      SELECT COALESCE(sc.duracion_min, v_dur) INTO v_dur
+        FROM (SELECT 1) x LEFT JOIN servicio_colaborador sc ON sc.producto_id = v_prod AND sc.usuario_id = v_usuario;
+      v_fin := v_cursor + make_interval(mins => v_dur);
+
+      IF v_tipo IS NOT NULL AND v_espacio IS NULL THEN
+        SELECT e.id INTO v_espacio
+          FROM espacios e
+         WHERE e.tenant_id = p_tenant AND e.sucursal_id = p_sucursal AND e.tipo_espacio_id = v_tipo AND e.activo
+           AND NOT EXISTS (SELECT 1 FROM citas_servicios cs
+                            WHERE cs.espacio_id = e.id AND cs.activa
+                              AND tstzrange(cs.inicia, cs.termina, '[)') && tstzrange(v_cursor, v_fin, '[)'))
+         ORDER BY e.orden, e.nombre
+         LIMIT 1;
+        IF v_espacio IS NULL THEN
+          SELECT lower(nombre) INTO v_nombre FROM tipos_espacio WHERE id = v_tipo;
+          RAISE EXCEPTION 'CITA_EMPALMADA: no hay % libre a esa hora', v_nombre USING ERRCODE = '23P01';
+        END IF;
+      END IF;
+    END IF;
+
+    SELECT COALESCE(sc.precio_mxn, precio_producto_en_sucursal(v_prod, p_sucursal)) INTO v_precio
+      FROM (SELECT 1) x LEFT JOIN servicio_colaborador sc ON sc.producto_id = v_prod AND sc.usuario_id = v_usuario;
+
+    -- 0219: tampoco encima de un tramo marcado con empalme (el EXCLUDE no lo ve).
+    v_choca := _agenda_choques(p_tenant, p_cita, v_usuario, v_espacio, v_cursor, v_fin);
+    IF v_choca IS NOT NULL THEN
+      IF EXISTS (SELECT 1 FROM citas_servicios WHERE id = ANY(v_choca) AND usuario_id = v_usuario) THEN
+        SELECT nombre INTO v_nombre FROM usuarios_perfil WHERE id = v_usuario;
+        RAISE EXCEPTION 'CITA_EMPALMADA: % ya tiene cita a esa hora', v_nombre USING ERRCODE = '23P01';
+      END IF;
+      SELECT nombre INTO v_nombre FROM espacios WHERE id = v_espacio;
+      RAISE EXCEPTION 'CITA_EMPALMADA: % ya está ocupado a esa hora', v_nombre USING ERRCODE = '23P01';
+    END IF;
+
+    v_orden := v_orden + 1;
+    BEGIN
+      INSERT INTO citas_servicios (tenant_id, cita_id, orden, producto_id, usuario_id, espacio_id, inicia, termina, precio_mxn)
+      VALUES (p_tenant, p_cita, v_orden, v_prod, v_usuario, v_espacio, v_cursor, v_fin, COALESCE(v_precio, 0));
+    EXCEPTION WHEN exclusion_violation THEN
+      GET STACKED DIAGNOSTICS v_restr = CONSTRAINT_NAME;
+      IF v_restr = 'citas_servicios_sin_empalme_espacio' THEN
+        SELECT nombre INTO v_nombre FROM espacios WHERE id = v_espacio;
+        RAISE EXCEPTION 'CITA_EMPALMADA: % ya está ocupado a esa hora', v_nombre USING ERRCODE = '23P01';
+      END IF;
+      SELECT nombre INTO v_nombre FROM usuarios_perfil WHERE id = v_usuario;
+      RAISE EXCEPTION 'CITA_EMPALMADA: % ya tiene cita a esa hora', v_nombre USING ERRCODE = '23P01';
+    END;
+    v_cursor := v_fin;
+  END LOOP;
+  RETURN v_cursor;
+END;
+$$;
+REVOKE ALL ON FUNCTION _agenda_tramos(uuid, uuid, uuid, timestamptz, jsonb) FROM PUBLIC, anon, authenticated;
+
 -- ── §2 Aplicador ────────────────────────────────────────────────────────────
 -- Molde de _vim_aplicar_cotizaciones_caja (0213). Corre en origin: el disparador de `activa`
 -- (0218) decide si cada tramo ocupa, según el estado de la cita en la nube.
@@ -143,6 +254,12 @@ BEGIN
         CONTINUE;   -- cerrada en la nube: la copia de la caja no la reabre
       END IF;
 
+      -- Lo que chocaba con sus tramos viejos se vuelve a revisar al final: si la cita se movió o se
+      -- canceló, la otra pierde la marca.
+      v_revisar := v_revisar || COALESCE((
+        SELECT array_agg(u) FROM citas_servicios o,
+               unnest(_agenda_choques(p_tenant, v_cita, o.usuario_id, o.espacio_id, o.inicia, o.termina)) u
+         WHERE o.cita_id = v_cita AND o.activa), '{}');
       -- Primero fuera los tramos de la nube: cambiar el estado no debe reactivar unos que se van.
       DELETE FROM citas_servicios WHERE cita_id = v_cita;
       INSERT INTO citas AS c SELECT * FROM jsonb_populate_record(NULL::citas, v_c || '{"empalme": false}'::jsonb)

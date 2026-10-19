@@ -17,6 +17,7 @@ DECLARE
   v_cita jsonb; v_serv jsonb; v_res jsonb; v_pull jsonb;
   v_prod_ajeno uuid := gen_random_uuid(); v_esp_ajeno uuid := gen_random_uuid(); v_x4 uuid := gen_random_uuid(); v_x7 uuid := gen_random_uuid();
   v_hoy date := (now() AT TIME ZONE 'America/Mexico_City')::date;
+  v_c uuid; v_d uuid; v_cita_d jsonb; v_serv_d jsonb;
 BEGIN
   INSERT INTO tenants (id, codigo, nombre_comercial, estado, vertical_principal)
   VALUES (v_otro, 'tenant-0219', 'Otro negocio 0219', 'INTERNO', 'QUICK_SERVICE');
@@ -27,6 +28,8 @@ BEGIN
   INSERT INTO colaboradores_agenda (usuario_id, tenant_id, sucursal_id, color_hex, orden) VALUES
     (v_maria, v_t, v_suc, '#C2410C', 1), (v_diego, v_t, v_suc, '#0F766E', 2);
   INSERT INTO servicio_colaborador (producto_id, usuario_id, tenant_id) VALUES (v_corte, v_maria, v_t), (v_corte, v_diego, v_t);
+  INSERT INTO horarios_colaborador (tenant_id, usuario_id, dia_semana, inicia, termina) VALUES
+    (v_t, v_maria, 1, '09:00', '20:00'), (v_t, v_diego, 1, '09:00', '20:00');
 
   -- Lo que la caja manda: una cita con María 10:30–11:30 hecha con la RPC, tal como to_jsonb la deja.
   -- Se borra aquí para que la «nube» no la tenga; luego la nube agenda a María 10:00–11:00.
@@ -66,6 +69,18 @@ BEGIN
   EXCEPTION WHEN exclusion_violation THEN
     IF SQLERRM NOT LIKE 'CITA_EMPALMADA:%' THEN RAISE; END IF;
   END;
+
+  -- 2c) Sobre dos citas en empalme no se agenda otra: guardar_cita la rechaza y «quien esté libre»
+  --     salta a María (el EXCLUDE no ve los tramos marcados; la 0219 sí).
+  BEGIN
+    PERFORM guardar_cita(jsonb_build_object('sucursal_id', v_suc, 'cliente_nombre', 'Encima', 'inicia', d || '10:00' || tz,
+              'servicios', jsonb_build_array(jsonb_build_object('producto_id', v_corte, 'usuario_id', v_maria))));
+    RAISE EXCEPTION '2c: se agendó encima de dos citas en empalme' USING ERRCODE = 'P0099';
+  EXCEPTION WHEN exclusion_violation THEN
+    IF SQLERRM NOT LIKE 'CITA_EMPALMADA:%ya tiene cita a esa hora' THEN RAISE; END IF;
+  END;
+  IF colaborador_libre(v_suc, v_corte, (d || '10:00' || tz)::timestamptz, (d || '11:00' || tz)::timestamptz) IS DISTINCT FROM v_diego THEN
+    RAISE EXCEPTION '2c: «quien esté libre» debía saltar a María'; END IF;
 
   -- 3) Lo de otro negocio se rechaza y no entra. Una cita entra con todos sus tramos o no entra.
   SET LOCAL session_replication_role = replica;
@@ -130,6 +145,24 @@ BEGIN
   IF (v_res->>'citas')::int IS DISTINCT FROM 1 OR (SELECT empalme FROM citas WHERE id = v_a)
      OR EXISTS (SELECT 1 FROM citas_servicios WHERE cita_id = v_a AND empalme) THEN
     RAISE EXCEPTION '4b: la copia de la caja volvió a marcar una cita resuelta: %', v_res; END IF;
+
+  -- 4c) La caja mueve la cita que chocaba: la de la nube pierde la marca.
+  v_d := guardar_cita(jsonb_build_object('sucursal_id', v_suc, 'cliente_nombre', 'Caja D', 'inicia', d || '15:30' || tz,
+           'client_id_local', 'smk-sync-d', 'servicios', jsonb_build_array(jsonb_build_object('producto_id', v_corte, 'usuario_id', v_maria))));
+  SELECT to_jsonb(c) INTO v_cita_d FROM citas c WHERE id = v_d;
+  SELECT jsonb_agg(to_jsonb(x)) INTO v_serv_d FROM citas_servicios x WHERE cita_id = v_d;
+  DELETE FROM citas WHERE id = v_d;
+  v_c := guardar_cita(jsonb_build_object('sucursal_id', v_suc, 'cliente_nombre', 'Nube C', 'inicia', d || '15:00' || tz,
+           'servicios', jsonb_build_array(jsonb_build_object('producto_id', v_corte, 'usuario_id', v_maria))));
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('citas', jsonb_build_array(v_cita_d), 'citas_servicios', v_serv_d));
+  IF NOT (SELECT empalme FROM citas WHERE id = v_c) OR NOT (SELECT empalme FROM citas WHERE id = v_d) THEN
+    RAISE EXCEPTION '4c: C y D debían quedar marcadas: %', v_res; END IF;
+  v_res := sync_push_snapshot(v_t, jsonb_build_object(
+    'citas', jsonb_build_array(v_cita_d || jsonb_build_object('inicia', d || '17:00' || tz, 'termina', d || '18:00' || tz, 'updated_at', now())),
+    'citas_servicios', jsonb_build_array(v_serv_d->0 || jsonb_build_object('id', gen_random_uuid(), 'inicia', d || '17:00' || tz, 'termina', d || '18:00' || tz))));
+  IF v_res ? '_errores' OR (SELECT empalme FROM citas WHERE id = v_d) THEN RAISE EXCEPTION '4c: D movida debía quedar limpia: %', v_res; END IF;
+  IF (SELECT empalme FROM citas WHERE id = v_c) OR EXISTS (SELECT 1 FROM citas_servicios WHERE cita_id = v_c AND empalme) THEN
+    RAISE EXCEPTION '4c: C debía perder la marca al moverse D'; END IF;
 
   -- 5) Una cita cerrada en la nube no vuelve a «Por llegar» con la copia de la caja.
   PERFORM cancelar_cita(v_a, 'Llamó');
