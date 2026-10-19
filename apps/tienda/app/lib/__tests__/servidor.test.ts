@@ -222,9 +222,9 @@ describe("leerNegocio y leerMenu (con caché)", () => {
 
 describe("POST /api/tienda", () => {
   const pedir = (cuerpo: unknown, cabeceras: Record<string, string> = {}) =>
-    POST(new Request("https://pedidos.vimpos.com.mx/api/tienda", {
+    POST(new Request("https://online.vimpos.com.mx/api/tienda", {
       method: "POST",
-      headers: { host: "pedidos.vimpos.com.mx", origin: "https://pedidos.vimpos.com.mx", "content-type": "application/json", "x-real-ip": "189.203.11.4", ...cabeceras },
+      headers: { host: "online.vimpos.com.mx", origin: "https://online.vimpos.com.mx", "content-type": "application/json", "x-real-ip": "189.203.11.4", ...cabeceras },
       body: typeof cuerpo === "string" ? cuerpo : JSON.stringify(cuerpo),
     }));
   const seguimiento = { accion: "seguimiento", negocio: "knockout", codigo: CODIGO };
@@ -310,8 +310,8 @@ describe("POST /api/tienda", () => {
       pull(c) { if (leidos.n >= total) return c.close(); leidos.n++; c.enqueue(trozo); },
     }, { highWaterMark: 0 });
     const conFlujo = (leidos: { n: number }, total: number, cabeceras: Record<string, string> = {}) =>
-      POST(new Request("https://pedidos.vimpos.com.mx/api/tienda", {
-        method: "POST", headers: { host: "pedidos.vimpos.com.mx", ...cabeceras }, body: flujo(leidos, total), duplex: "half",
+      POST(new Request("https://online.vimpos.com.mx/api/tienda", {
+        method: "POST", headers: { host: "online.vimpos.com.mx", ...cabeceras }, body: flujo(leidos, total), duplex: "half",
       } as RequestInit));
     // 1 000 trozos de 8 KB (8 MB): se corta al quinto, el primero que pasa del tope.
     const leidos = { n: 0 };
@@ -332,8 +332,8 @@ describe("POST /api/tienda", () => {
   it("un cuerpo que llega en varios trozos se lee completo (también con un carácter partido entre dos)", async () => {
     const bytes = new TextEncoder().encode(JSON.stringify({ accion: "seguimiento", negocio: "knockout", codigo: CODIGO, nota: "ñandú" }));
     const corte = bytes.indexOf(0xc3) + 1;   // a media «ñ»
-    const r = await POST(new Request("https://pedidos.vimpos.com.mx/api/tienda", {
-      method: "POST", headers: { host: "pedidos.vimpos.com.mx" }, duplex: "half",
+    const r = await POST(new Request("https://online.vimpos.com.mx/api/tienda", {
+      method: "POST", headers: { host: "online.vimpos.com.mx" }, duplex: "half",
       body: new ReadableStream<Uint8Array>({ start(c) { c.enqueue(bytes.slice(0, corte)); c.enqueue(bytes.slice(corte)); c.close(); } }),
     } as RequestInit));
     expect(r.status).toBe(200);
@@ -348,13 +348,13 @@ describe("POST /api/tienda", () => {
     expect(llamadas).toHaveLength(0);
   });
   it("un Origin ajeno se rechaza; sin Origin (no es un navegador en otra página) pasa", async () => {
-    for (const origin of ["https://evil.example.com", "https://pedidos.vimpos.com.mx.evil.example.com", "http://pedidos.vimpos.com.mx:8080", "null"]) {
+    for (const origin of ["https://evil.example.com", "https://online.vimpos.com.mx.evil.example.com", "http://online.vimpos.com.mx:8080", "null"]) {
       const r = await pedir(seguimiento, { origin });
       expect(r.status, origin).toBe(403);
       expect(await r.json()).toEqual({ error: "ORIGEN_NO_PERMITIDO" });
     }
     expect(llamadas).toHaveLength(0);
-    const sinOrigin = await POST(new Request("https://pedidos.vimpos.com.mx/api/tienda", { method: "POST", headers: { host: "pedidos.vimpos.com.mx" }, body: JSON.stringify(seguimiento) }));
+    const sinOrigin = await POST(new Request("https://online.vimpos.com.mx/api/tienda", { method: "POST", headers: { host: "online.vimpos.com.mx" }, body: JSON.stringify(seguimiento) }));
     expect(sinOrigin.status).toBe(200);
   });
   it("la dirección y el código se revisan antes de gastar una llamada", async () => {

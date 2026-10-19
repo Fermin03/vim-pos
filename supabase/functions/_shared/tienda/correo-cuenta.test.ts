@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { correoDeBienvenida, correoDeRecuperacion, correoYaTienesCuenta } from "./correo-cuenta.ts";
 
-const BASE = "https://pedidos.vimpos.com.mx";
+const BASE = "https://online.vimpos.com.mx";
 const TOKEN = "Ab3_-".repeat(4) + "Zz";
 const d = { negocio: "Knock-Out Burger", slug: "knockout", base: BASE };
 const MALO = `<script>x</script> & "y" 'z'`;

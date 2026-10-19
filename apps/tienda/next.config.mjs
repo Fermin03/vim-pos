@@ -48,6 +48,16 @@ function origenDeSupabase() {
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ["@vim/ui", "@vim/config", "@vim/fecha"],
+  // La tienda se mudó de pedidos.vimpos.com.mx a online.vimpos.com.mx (ADR 0032, nota): los enlaces viejos
+  // (correos, redes) siguen funcionando con un 308 a la misma ruta. Solo aplica a ese host.
+  async redirects() {
+    return [{
+      source: "/:path*",
+      has: [{ type: "host", value: "pedidos.vimpos.com.mx" }],
+      destination: "https://online.vimpos.com.mx/:path*",
+      permanent: true,
+    }];
+  },
   async headers() {
     return [
       { source: "/:path*", headers: cabecerasSeguridad({

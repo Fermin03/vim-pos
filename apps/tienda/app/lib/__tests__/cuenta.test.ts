@@ -239,7 +239,7 @@ describe("volverSeguro", () => {
   it("todo lo demás vuelve al menú del negocio", () => {
     for (const mala of [
       null, undefined, 5, ["/knockout"], "", "/", "knockout", "/otro", "/otro/cuenta", "/knockout-2", "/knockoutx/cuenta", "/Knockout",
-      "//evil.com", "//evil.com/knockout", "/knockout//evil.com", "https://evil.com/knockout", "http://pedidos.vimpos.com.mx/knockout",
+      "//evil.com", "//evil.com/knockout", "/knockout//evil.com", "https://evil.com/knockout", "http://online.vimpos.com.mx/knockout",
       "javascript:alert(1)", "/knockout\\evil.com", "\\\\evil.com", "/\\evil.com", "/knockout/../otro", "/knockout/..", "/knockout/%2e%2e/otro",
       "/knockout/\t/evil.com", "/knockout\n", " /knockout", "/knockout?next=https://evil.com", "/knockout/x:y", "/knockout" + "/a".repeat(300),
     ]) {

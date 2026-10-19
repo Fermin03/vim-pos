@@ -232,7 +232,7 @@ plan. Escríbenos para contratarla.»). En los tres la acción es escribir por W
 Los bloques, en este orden, cada uno en su `Tarjeta`:
 
 1. **Estado** — el interruptor «Tienda en línea» y, debajo, la lista de revisión.
-2. **Tu tienda** — dirección (`pedidos.vimpos.com.mx/` + lo que escriba), logo, color y una
+2. **Tu tienda** — dirección (`online.vimpos.com.mx/` + lo que escriba), logo, color y una
    descripción de hasta 200 caracteres.
 3. **Pedidos** — aceptación «A mano» o «Automática», minutos de espera (3 a 15, solo en «A mano») y
    formas de pago: «Pago en línea», «Efectivo al recibir» y «Tarjeta al recibir» (al menos una; la

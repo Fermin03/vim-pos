@@ -6,7 +6,7 @@
 > legal** y nadie con formación jurídica lo ha leído. No está publicado en ningún sitio: la tienda
 > enseña hoy una versión corta marcada como provisional.
 
-**Cómo se usa.** Un solo texto para todas las tiendas, en `pedidos.vimpos.com.mx/<negocio>/terminos`.
+**Cómo se usa.** Un solo texto para todas las tiendas, en `online.vimpos.com.mx/<negocio>/terminos`.
 Lo que va entre `[CORCHETES]` cambia por restaurante; `[NOMBRE COMERCIAL]` y los teléfonos los pone
 el sistema; la razón social y el domicilio solo los puede dar el restaurante (ver
 [`LEEME.md`](LEEME.md), decisión 1). Las notas `> Nota para quien revisa:` no son parte del texto.

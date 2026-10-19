@@ -7,8 +7,8 @@ pueden tener mal no es lo que dicen que hace el sistema, sino si eso basta para 
 
 | Archivo | Para quién es | Dónde se publicaría |
 |---|---|---|
-| [`tienda-aviso-de-privacidad.md`](tienda-aviso-de-privacidad.md) | El comensal que pide en la tienda de un restaurante | En cada tienda: `pedidos.vimpos.com.mx/<negocio>/privacidad` |
-| [`tienda-terminos-para-el-comensal.md`](tienda-terminos-para-el-comensal.md) | El mismo comensal | En cada tienda: `pedidos.vimpos.com.mx/<negocio>/terminos` |
+| [`tienda-aviso-de-privacidad.md`](tienda-aviso-de-privacidad.md) | El comensal que pide en la tienda de un restaurante | En cada tienda: `online.vimpos.com.mx/<negocio>/privacidad` |
+| [`tienda-terminos-para-el-comensal.md`](tienda-terminos-para-el-comensal.md) | El mismo comensal | En cada tienda: `online.vimpos.com.mx/<negocio>/terminos` |
 | [`vimpos-terminos-seccion-tienda.md`](vimpos-terminos-seccion-tienda.md) | El restaurante que contrata VIM POS | Sección nueva en `vimpos.com.mx/terminos` |
 
 **Qué hay hoy en la tienda, mientras tanto.** Dos páginas cortas, veraces y marcadas como

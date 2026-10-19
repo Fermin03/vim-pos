@@ -9,6 +9,9 @@ dominios, claves y servicios externos, y por eso no se tocan sin ti.
 > [`tienda-encendido.md`](tienda-encendido.md). Lo de aquí son sus fases 1 y 2, con el detalle de
 > cada pantalla. Publicar la tienda no la enciende para ningún cliente.
 
+> **Mudanza a `online.vimpos.com.mx`:** esta guía ya usa la dirección nueva. Si la tienda ya estaba
+> publicada en `pedidos`, sigue [`mudanza-online.md`](mudanza-online.md).
+
 Cada paso dice **quién lo hace**:
 
 - **[Tú]** solo tú puedes: entras con tu cuenta (Cloudflare, el proveedor del dominio) o es una
@@ -48,11 +51,11 @@ persona.»
 ## Paso 1 — Cloudflare Turnstile: añadir el dominio nuevo · **[Tú]**
 
 El captcha de la tienda es **el mismo widget** que el del registro del admin (la función solo conoce
-una pareja de llaves). Hay que decirle que ahora también vale en `pedidos.vimpos.com.mx`.
+una pareja de llaves). Hay que decirle que ahora también vale en `online.vimpos.com.mx`.
 
 1. Entra a Cloudflare → **Turnstile** → el widget que ya existe (el del registro de VIM POS).
 2. En **Hostnames** deja los que tiene (`admin.vimpos.com.mx`, `localhost`) y **añade**
-   `pedidos.vimpos.com.mx`. Guarda.
+   `online.vimpos.com.mx`. Guarda.
 
 Ese mismo widget cubre las tres cosas que la tienda protege: pedir (`tienda_pedido`), crear cuenta
 (`tienda_registro`) y pedir el enlace para recuperar la contraseña (`tienda_recuperar`). Esos
@@ -68,10 +71,10 @@ La función revisa de qué sitio viene cada captcha. Hoy, sin esta variable, sol
 `admin.vimpos.com.mx`. Hay que ponerla con **los dos**:
 
 ```
-TURNSTILE_HOSTNAMES=admin.vimpos.com.mx,pedidos.vimpos.com.mx
+TURNSTILE_HOSTNAMES=admin.vimpos.com.mx,online.vimpos.com.mx
 ```
 
-> **Ojo:** si pones solo `pedidos.vimpos.com.mx`, **se rompe el registro de negocios del admin**
+> **Ojo:** si pones solo `online.vimpos.com.mx`, **se rompe el registro de negocios del admin**
 > (la variable reemplaza a la de fábrica, no se suma). Siempre los dos, separados por coma, sin
 > espacios.
 
@@ -79,7 +82,7 @@ Mientras estás en los secretos de Supabase:
 
 - **`CAPTCHA_OPCIONAL` no debe existir en producción.** Es un atajo solo para desarrollo que apaga
   la verificación. Si aparece en la lista, bórralo. **[Tú o Claude]**
-- **`VIM_TIENDA_URL=https://pedidos.vimpos.com.mx`** — **obligatoria desde que hay cuentas.** Es la
+- **`VIM_TIENDA_URL=https://online.vimpos.com.mx`** — **obligatoria desde que hay cuentas.** Es la
   base de los enlaces de los correos: el de confirmación del pedido y, sobre todo, el de
   **recuperar la contraseña**. Sin barra al final. También hacen falta los `VIM_SMTP_*` (ya los usa
   el registro de negocios).
@@ -133,18 +136,18 @@ La tienda **no** necesita la `anon key` ni la `service_role`: no las pongas.
 (oculta). Dale **Deploy** (o *Redeploy*) al último commit de la rama principal una vez mezclada la
 rama de la tienda; el despliegue debe terminar en «Ready».
 
-## Paso 5 — Dominio `pedidos.vimpos.com.mx` · **[Tú]**
+## Paso 5 — Dominio `online.vimpos.com.mx` · **[Tú]**
 
-1. En `vim-tienda` → **Settings → Domains** → añade `pedidos.vimpos.com.mx`.
+1. En `vim-tienda` → **Settings → Domains** → añade `online.vimpos.com.mx`.
 2. Vercel te dirá qué registro DNS falta (normalmente un **CNAME** de `pedidos` hacia el valor que
    muestra). Si el DNS de `vimpos.com.mx` lo lleva Vercel, se crea solo. Si lo lleva otro proveedor
    (el del dominio), añade ahí el registro tal como lo muestra Vercel.
 3. Espera a que Vercel marque el dominio en verde (minutos; a veces más con el DNS). El certificado
    HTTPS se crea solo.
 
-**Cómo comprobarlo:** abrir `https://pedidos.vimpos.com.mx/` carga una página sencilla que dice
+**Cómo comprobarlo:** abrir `https://online.vimpos.com.mx/` carga una página sencilla que dice
 «Pedidos en línea» (la raíz no es una tienda: no hay nada más que ver ahí, y está bien). Una
-dirección que no existe, por ejemplo `https://pedidos.vimpos.com.mx/nadie-existe`, dice «No
+dirección que no existe, por ejemplo `https://online.vimpos.com.mx/nadie-existe`, dice «No
 encontramos esta página».
 
 > Con *Deployment Protection* activa, las direcciones `.vercel.app` piden iniciar sesión; el dominio
@@ -178,7 +181,7 @@ cliente. Hace falta:
 
 Hazla desde tu teléfono, con datos tuyos. Marca cada punto:
 
-1. Abre `https://pedidos.vimpos.com.mx/<dirección-del-negocio>`. **Debe verse:** nombre, logo y
+1. Abre `https://online.vimpos.com.mx/<dirección-del-negocio>`. **Debe verse:** nombre, logo y
    color del negocio, el menú con precios y «Abierto».
 2. Elige un producto (si hay uno con opciones, elige alguna) y agrégalo. **Debe:** salir el carrito
    con el total.
@@ -254,7 +257,7 @@ mismo tope por correo y 5 por hora desde una misma red.
 | «Cerrado ahora. Abre hoy a las…» | La hora de la prueba está fuera del horario que se le puso a la sucursal. |
 | «No estamos tomando pedidos en este momento.» | La tienda está en pausa desde la caja. |
 | Captcha que no aparece | Falta `NEXT_PUBLIC_TURNSTILE_SITE_KEY` en Vercel o el dominio no está en Cloudflare (paso 1). Hace falta redesplegar tras cambiar una variable. |
-| «No pudimos comprobar que eres una persona.» al enviar | `TURNSTILE_HOSTNAMES` sin `pedidos.vimpos.com.mx` (paso 2). |
+| «No pudimos comprobar que eres una persona.» al enviar | `TURNSTILE_HOSTNAMES` sin `online.vimpos.com.mx` (paso 2). |
 | Las fotos no cargan | `NEXT_PUBLIC_SUPABASE_URL` distinta de la del proyecto real. |
 | Entrar o crear cuenta dan un error aunque los datos estén bien | Falta aplicar la migración 0166, o la función `tienda` no se redesplegó después. |
 | «Revisa tu correo» pero el correo nunca llega (recuperar, bienvenida) | Falta `VIM_TIENDA_URL` o algún `VIM_SMTP_*` en Supabase (paso 2). La pantalla no lo distingue; los registros de la función, sí. |

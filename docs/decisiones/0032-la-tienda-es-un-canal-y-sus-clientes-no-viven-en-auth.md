@@ -88,7 +88,7 @@ Las que conviene tener presentes, dichas sin adornos:
   tecleó en el formulario (sería texto de un desconocido con nuestro remitente) y `registrar` y
   `recuperar_pedir` tienen tope por destinatario. Ese tope lo puede agotar otro: la víctima ve
   «demasiados intentos» una hora.
-- **Todas las tiendas comparten origen** (`pedidos.vimpos.com.mx/<slug>`). Las cookies van por
+- **Todas las tiendas comparten origen** (`online.vimpos.com.mx/<slug>`). Las cookies van por
   negocio y con nombre exacto, pero un XSS en una tienda alcanzaría las sesiones de las demás. No
   hay ninguno conocido; es una razón más para no pintar HTML de terceros.
 - **Eliminar la cuenta borra la cuenta, no la venta.** Se borran cuenta, sesiones y direcciones
@@ -169,3 +169,8 @@ El dueño decide qué enseña su tienda. Tres decisiones:
 
 La tabla vive solo en la nube (no entra al sync, como `tienda_config`) y no afecta a la caja ni a
 las apps de reparto.
+
+> **Nota (19 oct 2026):** la tienda se mudó de `pedidos.vimpos.com.mx` a `online.vimpos.com.mx`
+> porque ahora también reserva citas (belleza). El host viejo redirige con 308 a la misma ruta.
+> Las sesiones de cuenta se cierran una vez (cookie `__Host-`, atada al host). Pasos de lanzamiento:
+> [`mudanza-online.md`](../operacion/mudanza-online.md).

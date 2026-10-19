@@ -55,7 +55,7 @@ describe("la cookie de sesión", () => {
   it("se llama __Host-vt_<slug> (vt_<slug> solo en el localhost de desarrollo), y todo slug válido es un nombre de cookie válido", () => {
     // El prefijo __Host- hace que el navegador solo la acepte de ESTE host, con Secure y Path=/: otro
     // subdominio no puede plantarle una sesión al visitante. Exige Secure, así que en http://localhost no va.
-    for (const host of ["pedidos.vimpos.com.mx", "localhost.evil.com", "192.168.1.5:3005", ""]) expect(nombreDeCookie("knockout", host), host).toBe("__Host-vt_knockout");
+    for (const host of ["online.vimpos.com.mx", "localhost.evil.com", "192.168.1.5:3005", ""]) expect(nombreDeCookie("knockout", host), host).toBe("__Host-vt_knockout");
     for (const local of ["localhost", "localhost:3005", "127.0.0.1", "127.0.0.1:3005"]) expect(nombreDeCookie("knockout", local), local).toBe("vt_knockout");
     expect(nombreDeCookie("knockout")).toBe("__Host-vt_knockout");
     // El alfabeto del slug (a-z, 0-9, guion) cabe entero en el de un nombre de cookie (token de RFC 7230).
@@ -78,8 +78,8 @@ describe("la cookie de sesión", () => {
   });
   it("lee la que corresponde al host: en producción una sin prefijo no es una sesión, y al revés en localhost", () => {
     const h = (host: string, cookie: string) => new Headers({ host, cookie });
-    expect(sesionDe(h("pedidos.vimpos.com.mx", `vt_knockout=${OTRO}`), "knockout")).toBeNull();
-    expect(sesionDe(h("pedidos.vimpos.com.mx", `vt_knockout=${OTRO}; __Host-vt_knockout=${TOKEN}`), "knockout")).toBe(TOKEN);
+    expect(sesionDe(h("online.vimpos.com.mx", `vt_knockout=${OTRO}`), "knockout")).toBeNull();
+    expect(sesionDe(h("online.vimpos.com.mx", `vt_knockout=${OTRO}; __Host-vt_knockout=${TOKEN}`), "knockout")).toBe(TOKEN);
     expect(sesionDe(h("localhost:3005", `vt_knockout=${TOKEN}`), "knockout")).toBe(TOKEN);
     expect(sesionDe(h("localhost:3005", `__Host-vt_knockout=${OTRO}`), "knockout")).toBeNull();
     // El host se puede dar aparte (la ruta ya lo tiene resuelto).
@@ -91,7 +91,7 @@ describe("la cookie de sesión", () => {
     expect(await haySesion("knockout")).toBe(false);
     cookiesDeLaPeticion = { "vt_knockout": TOKEN };
     expect(await haySesion("knockout")).toBe(true);
-    cabecerasDeLaPeticion = new Headers({ host: "pedidos.vimpos.com.mx" });
+    cabecerasDeLaPeticion = new Headers({ host: "online.vimpos.com.mx" });
     expect(await haySesion("knockout")).toBe(false);
   });
   it("lo que no tiene forma de token no es una sesión", () => {
@@ -100,8 +100,8 @@ describe("la cookie de sesión", () => {
     }
   });
   it("se pone y se borra con sus atributos exactos; Secure solo falta en localhost", () => {
-    expect(cookieDeSesion("knockout", TOKEN, "pedidos.vimpos.com.mx")).toBe(PUESTA);
-    expect(cookieBorrada("knockout", "pedidos.vimpos.com.mx")).toBe(BORRADA);
+    expect(cookieDeSesion("knockout", TOKEN, "online.vimpos.com.mx")).toBe(PUESTA);
+    expect(cookieBorrada("knockout", "online.vimpos.com.mx")).toBe(BORRADA);
     for (const local of ["localhost", "localhost:3005", "127.0.0.1", "127.0.0.1:3005"]) {
       expect(cookieDeSesion("knockout", TOKEN, local), local).toBe(`vt_knockout=${TOKEN}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000`);
       expect(cookieBorrada("knockout", local), local).toBe("vt_knockout=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0");
@@ -145,10 +145,10 @@ describe("llamarTienda con sesión", () => {
 });
 
 describe("POST /api/tienda — cuentas", () => {
-  const BASE = { host: "pedidos.vimpos.com.mx", origin: "https://pedidos.vimpos.com.mx", "content-type": "application/json", "x-real-ip": "189.203.11.4" };
+  const BASE = { host: "online.vimpos.com.mx", origin: "https://online.vimpos.com.mx", "content-type": "application/json", "x-real-ip": "189.203.11.4" };
   /** `cabeceras` REEMPLAZA a las de base cuando `soloEsas` es true. */
   const llamar = (cuerpo: unknown, cabeceras: Record<string, string> = {}, soloEsas = false) =>
-    POST(new Request("https://pedidos.vimpos.com.mx/api/tienda", {
+    POST(new Request("https://online.vimpos.com.mx/api/tienda", {
       method: "POST", headers: soloEsas ? cabeceras : { ...BASE, ...cabeceras }, body: JSON.stringify(cuerpo),
     }));
   const conSesion = { cookie: `otra=1; __Host-vt_knockout=${TOKEN}; __Host-vt_otro=${OTRO}` };
@@ -196,7 +196,7 @@ describe("POST /api/tienda — cuentas", () => {
       const r = await llamar({ accion, negocio: "knockout", ...ACCIONES[accion] }, { ...sinOrigin, ...conSesion }, true);
       expect(r.status, accion).toBe(403);
       expect(await r.json(), accion).toEqual({ error: "ORIGEN_NO_PERMITIDO" });
-      for (const origin of ["https://evil.example.com", "null", "http://pedidos.vimpos.com.mx:8080"]) {
+      for (const origin of ["https://evil.example.com", "null", "http://online.vimpos.com.mx:8080"]) {
         const r2 = await llamar({ accion, negocio: "knockout", ...ACCIONES[accion] }, { ...conSesion, origin });
         expect(r2.status, `${accion} ${origin}`).toBe(403);
         expect(r2.headers.get("set-cookie"), accion).toBeNull();
@@ -355,19 +355,19 @@ describe("POST /api/tienda — cuentas", () => {
     });
     it("de invitado (sin cookie) manda exactamente lo de siempre, también sin Origin ni Content-Type", async () => {
       responder = () => json(pedidoCrudo());
-      const r = await llamar(pedido, { host: "pedidos.vimpos.com.mx" }, true);
+      const r = await llamar(pedido, { host: "online.vimpos.com.mx" }, true);
       expect(r.status).toBe(200);
       expect([...cabecerasEnviadas().keys()].sort()).toEqual(["content-type", "x-tienda-ip", "x-vim-tienda"]);
       expect(cuerpoEnviado()).toEqual(pedido);
       // La cookie de otro negocio no lo vuelve un pedido con sesión.
-      await llamar(pedido, { host: "pedidos.vimpos.com.mx", cookie: `__Host-vt_otro=${OTRO}` }, true);
+      await llamar(pedido, { host: "online.vimpos.com.mx", cookie: `__Host-vt_otro=${OTRO}` }, true);
       expect(cabecerasEnviadas(1).has("x-tienda-sesion")).toBe(false);
     });
     it("con cookie de sesión exige Origin propio y JSON", async () => {
-      const r = await llamar(pedido, { host: "pedidos.vimpos.com.mx", "content-type": "application/json", ...conSesion }, true);
+      const r = await llamar(pedido, { host: "online.vimpos.com.mx", "content-type": "application/json", ...conSesion }, true);
       expect(r.status).toBe(403);
       expect(await r.json()).toEqual({ error: "ORIGEN_NO_PERMITIDO" });
-      const r2 = await llamar(pedido, { host: "pedidos.vimpos.com.mx", origin: "https://pedidos.vimpos.com.mx", ...conSesion }, true);
+      const r2 = await llamar(pedido, { host: "online.vimpos.com.mx", origin: "https://online.vimpos.com.mx", ...conSesion }, true);
       expect(r2.status).toBe(400);
       expect(llamadas).toHaveLength(0);
     });

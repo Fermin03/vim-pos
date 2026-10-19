@@ -31,7 +31,7 @@ Las siete entregas de la tienda en línea están construidas, revisadas y mezcla
 
 Todo está detallado, en orden y con cómo comprobar y cómo deshacer cada paso, en [`tienda-encendido.md`](tienda-encendido.md). En corto:
 
-1. **Publicar la tienda en internet:** proyecto de Vercel `vim-tienda`, dominio `pedidos.vimpos.com.mx` y su DNS, añadir ese dominio al antirobot (Cloudflare), y los secretos. Guía: [`tienda-publica-salida.md`](tienda-publica-salida.md).
+1. **Publicar la tienda en internet:** proyecto de Vercel `vim-tienda`, dominio `online.vimpos.com.mx` y su DNS, añadir ese dominio al antirobot (Cloudflare), y los secretos. Guía: [`tienda-publica-salida.md`](tienda-publica-salida.md).
 2. **Probar con un negocio interno** usando el POS web.
 3. **Aprobar y publicar el instalador 0.8.0 de la caja** (martes). Sin él, ninguna caja instalada recibe pedidos de la tienda. Su lista y su nota: [`instalador-0.8.0-pendiente.md`](instalador-0.8.0-pendiente.md).
 4. **Knock-Out como primer negocio real**, concedido a mano.

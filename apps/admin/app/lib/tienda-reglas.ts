@@ -1,7 +1,7 @@
 // Reglas puras del apartado Tienda en línea del admin: dirección, horario y lista de revisión.
 // Sin supabase ni efectos: se prueban solas. Los candados de verdad están en la base (0162/0163).
 
-export const BASE_TIENDA = "pedidos.vimpos.com.mx";
+export const BASE_TIENDA = "online.vimpos.com.mx";
 
 /** Las mismas del CHECK de `tienda_config_slug_check` (0163, ampliadas en 0165); una prueba las compara con el .sql vigente. */
 export const DIRECCIONES_RESERVADAS: readonly string[] = [

@@ -11,7 +11,7 @@
 //   `verificacion` con `cita: true` son las del anticipo de una cita.)
 //
 // QUIÉN LA LLAMA
-//   Solo el servidor de la tienda (pedidos.vimpos.com.mx). El navegador del cliente, nunca.
+//   Solo el servidor de la tienda (online.vimpos.com.mx). El navegador del cliente, nunca.
 //
 // POR QUÉ NO HAY CORS
 //   Porque ningún navegador tiene que llegar aquí. No se usa `servir()` de _shared/http.ts (añade
