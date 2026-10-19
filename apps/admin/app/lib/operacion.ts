@@ -16,6 +16,9 @@ const RUTA_DE_MODULO: readonly [string, CodigoOperacion][] = [
   ["/reportes/ventas-variantes", "existencias"],
 ];
 
+/** Las pantallas de la agenda: el grupo del menú y su configuración. */
+const RUTAS_AGENDA = ["/agenda/servicios", "/agenda/colaboradores", "/agenda/espacios", "/configuracion/agenda"] as const;
+
 /**
  * Las rutas que este negocio no usa. Mientras carga o si la lectura falló no se esconde nada de lo
  * de restaurante: un menú que se encoge un segundo después de abrir salta a la vista, y esconder no
@@ -36,6 +39,8 @@ export function rutasOcultas(m: ModulosLeidos | "error" | null): ReadonlySet<str
   // Cotizaciones (0212): igual que el crédito.
   if (!conCotizaciones(m)) ocultas.add("/cotizaciones");
   if (!conCotizaciones(m) && !conExistencias(m)) ocultas.add("/configuracion/cotizaciones");
+  // Agenda (0218): de belleza. Como lo de tienda, nada se ve mientras carga.
+  if (!conAgenda(m)) for (const r of RUTAS_AGENDA) ocultas.add(r);
   return ocultas;
 }
 
@@ -60,3 +65,7 @@ export const conCredito = (m: ModulosLeidos | "error" | null): boolean =>
 /** ¿Se enseña lo de cotizaciones (menú Cotizaciones)? Solo con el módulo leído y encendido. */
 export const conCotizaciones = (m: ModulosLeidos | "error" | null): boolean =>
   m !== null && m !== "error" && m.efectivos.cotizaciones === true;
+
+/** ¿Se enseña la agenda (belleza, 0218)? Solo con el módulo leído y encendido. */
+export const conAgenda = (m: ModulosLeidos | "error" | null): boolean =>
+  m !== null && m !== "error" && moduloActivo(m.efectivos, "agenda");

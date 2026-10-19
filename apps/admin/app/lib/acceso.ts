@@ -30,6 +30,8 @@ export const MIN_JERARQUIA: { prefijo: string; min: number }[] = [
   // La tienda en línea recibe pedidos y fija precios y horarios del negocio: dueño o administrador.
   { prefijo: "/tienda", min: 4 },
   { prefijo: "/reservaciones", min: 3 },
+  // El catálogo de la agenda (servicios, colaboradores, espacios) solo lo escriben dueño o administrador (0218).
+  { prefijo: "/agenda", min: 4 },
   { prefijo: "/conciliacion", min: 3 },
   { prefijo: "/usuarios", min: 4 },
   { prefijo: "/facturacion", min: 4 },

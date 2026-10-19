@@ -18,6 +18,7 @@ const SECCIONES_BASE = [
     { label: "Propinas", href: "/configuracion/propinas" },
     { label: "Venta a crédito", href: "/configuracion/credito" },
     { label: "Cotizaciones", href: "/configuracion/cotizaciones" },
+    { label: "Agenda", href: "/configuracion/agenda" },
     { label: "Terminal de tarjetas", href: "/configuracion/terminal" },
     { label: "Zonas de envío", href: "/configuracion/envios" },
     { label: "Pantalla del cliente", href: "/configuracion/pantalla-cliente" },

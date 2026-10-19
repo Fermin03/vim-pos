@@ -55,6 +55,14 @@ const NAV: Seccion[] = [
     ],
   },
   {
+    titulo: "Agenda",
+    items: [
+      { label: "Servicios", href: "/agenda/servicios", icon: "calendario" },
+      { label: "Colaboradores", href: "/agenda/colaboradores", icon: "personas" },
+      { label: "Espacios", href: "/agenda/espacios", icon: "plano" },
+    ],
+  },
+  {
     titulo: "Administración",
     items: [
       { label: "Usuarios", href: "/usuarios", icon: "persona" },
