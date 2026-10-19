@@ -29,6 +29,7 @@ export function ContenidoMenu({
   onCerrarTurno,
   onMovimientoCaja,
   onCreditos,
+  onCotizaciones,
   onSalir,
   ayuda,
 }: {
@@ -56,12 +57,15 @@ export function ContenidoMenu({
   onMovimientoCaja?: () => void;
   /** Solo la tienda, con el módulo de crédito: quién debe y registrar abonos (temporal: la entrega 4 lo lleva a «Más»). */
   onCreditos?: () => void;
+  /** Solo la tienda, con el módulo de cotizaciones (temporal, como «Créditos»). */
+  onCotizaciones?: () => void;
   onSalir?: () => void;
   /** Para el mensaje de "Ayuda por WhatsApp": desde qué negocio, sucursal y caja se escribe. */
   ayuda?: { negocio?: string | null; sucursal?: string | null; caja?: string | null; cajero?: string | null };
 }) {
   const { modulos } = useAcceso();
   const creditos = onCreditos && modulos?.credito === true ? onCreditos : undefined;
+  const cotizaciones = onCotizaciones && modulos?.cotizaciones === true ? onCotizaciones : undefined;
   // Actualizar solo aplica dentro de la app de escritorio; se resuelve en efecto porque el
   // export estático se prerenderiza sin window.
   const [enEscritorio, setEnEscritorio] = useState(false);
@@ -111,7 +115,7 @@ export function ContenidoMenu({
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-9">
-      {(onKds || onDevoluciones || onCorteX || onEnEspera || onAbrirCajon || onMovimientoCaja || creditos) && (
+      {(onKds || onDevoluciones || onCorteX || onEnEspera || onAbrirCajon || onMovimientoCaja || creditos || cotizaciones) && (
       <SeccionMenu titulo="Operación">
         {onKds && moduloActivo(modulos, "kds") && (
           <TileMenu label="Cocina" onClick={con(onKds)} icon={<Icono nombre="megafono" className="h-8 w-8" />} />
@@ -135,6 +139,9 @@ export function ContenidoMenu({
         )}
         {creditos && (
           <TileMenu label="Créditos" onClick={con(creditos)} icon={<Icono nombre="pesos" className="h-8 w-8" />} />
+        )}
+        {cotizaciones && (
+          <TileMenu label="Cotizaciones" onClick={con(cotizaciones)} icon={<Icono nombre="etiqueta" className="h-8 w-8" />} />
         )}
       </SeccionMenu>
       )}

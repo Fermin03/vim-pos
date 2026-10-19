@@ -47,6 +47,8 @@ export type EstadoCarrito = {
    * (`clienteDomicilio`). No confundir con `nombreCuenta`, que es un nombre suelto sin registro.
    */
   clienteCuenta?: ClienteCuenta | null;
+  /** La cotización que se convirtió en esta venta (0212): al quedar PAGADO se marca CONVERTIDA. «Limpiar» la suelta. */
+  cotizacionId?: string | null;
 };
 
 /** Los modos donde se puede asignar un cliente a la cuenta (domicilio va aparte). */

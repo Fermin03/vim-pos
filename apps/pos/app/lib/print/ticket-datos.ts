@@ -64,6 +64,22 @@ export function foldearHijosEnPadre(lineas: LineaImpresion[]): LineaImpresion[] 
   });
 }
 
+/** Origen del portal público: la autofactura y, desde la 0212, el enlace de una cotización (`/c/<token>`). */
+export const PORTAL_FACTURA = "https://factura.vimpos.com.mx";
+
+/** Lo que se lee de la sucursal para el encabezado impreso. */
+export const COLUMNAS_SUCURSAL = "nombre, direccion_calle, direccion_numero, direccion_colonia, ciudad, estado_geo, codigo_postal, telefono";
+
+/** La dirección de la sucursal en una línea, como sale en el ticket. */
+export function direccionSucursal(s: Record<string, string | null>): string | null {
+  return [
+    [s.direccion_calle, s.direccion_numero].filter(Boolean).join(" "),
+    s.direccion_colonia,
+    [s.ciudad, s.estado_geo].filter(Boolean).join(", "),
+    s.codigo_postal ? `CP ${s.codigo_postal}` : null,
+  ].filter(Boolean).join(", ") || null;
+}
+
 /**
  * URL del QR de autofactura. Pura, con pruebas.
  *
@@ -75,7 +91,7 @@ export function foldearHijosEnPadre(lineas: LineaImpresion[]): LineaImpresion[] 
 export function urlAutofactura(codigoNegocio: string | null, folio: string | null, token: string | null): string {
   const q = new URLSearchParams({ folio: folio ?? "" });
   if (token && /^[A-Za-z0-9_-]{16}$/.test(token)) q.set("t", token);
-  return `https://factura.vimpos.com.mx/${encodeURIComponent(codigoNegocio ?? "negocio")}?${q.toString()}`;
+  return `${PORTAL_FACTURA}/${encodeURIComponent(codigoNegocio ?? "negocio")}?${q.toString()}`;
 }
 
 type MovimientoLealtad = { tipo: string; puntos: number; saldo_visto: number | null; programa_version: number; fecha: string };
@@ -286,16 +302,11 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
 
   const { data: suc } = await sb
     .from("sucursales")
-    .select("nombre, direccion_calle, direccion_numero, direccion_colonia, ciudad, estado_geo, codigo_postal, telefono")
+    .select(COLUMNAS_SUCURSAL)
     .eq("id", tk.sucursal_id as string)
     .single();
   const s = (suc ?? {}) as Record<string, string | null>;
-  const direccion = [
-    [s.direccion_calle, s.direccion_numero].filter(Boolean).join(" "),
-    s.direccion_colonia,
-    [s.ciudad, s.estado_geo].filter(Boolean).join(", "),
-    s.codigo_postal ? `CP ${s.codigo_postal}` : null,
-  ].filter(Boolean).join(", ") || null;
+  const direccion = direccionSucursal(s);
 
   // Datos de entrega: solo en domicilio. El repartidor necesita a quién buscar, dónde y con
   // qué referencias; sin esto el ticket no le sirve para entregar. En los demás modos no se

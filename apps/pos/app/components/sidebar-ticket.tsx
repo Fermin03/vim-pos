@@ -163,6 +163,8 @@ export function SidebarTicket({
     cliente?: string | null;
     /** Descuento de un renglón; quien llama guarda la cuenta antes si hace falta. */
     onDescuentoProducto?: (clientId: string) => void;
+    /** «Guardar como cotización»: solo lo pasa quien tiene el módulo, renglones y un carrito suelto (`puedeCotizar`). */
+    onGuardarCotizacion?: () => void;
   };
 }) {
   const totales = calcularTotalesDisplay(estado.lineas, 16, estado.envio?.costoMxn ?? 0);
@@ -208,6 +210,7 @@ export function SidebarTicket({
       { texto: "Descuento general", hacer: () => onAplicarDescuento?.(), activa: !vacio && !hayDescuento && !procesando && !!onAplicarDescuento },
     ]),
     { texto: tienda?.cliente ? "Cambiar cliente" : "Asignar cliente", hacer: () => tienda?.onAsignarCliente?.(), activa: !!tienda?.onAsignarCliente },
+    ...(tienda?.onGuardarCotizacion ? [{ texto: "Guardar como cotización", hacer: tienda.onGuardarCotizacion, activa: !procesando }] : []),
     // Sin el botón de arriba, esta es la única salida de una cuenta guardada que no se va a cobrar.
     {
       texto: bloqueado && onCancelarTicket ? "Cancelar cuenta" : "Limpiar",

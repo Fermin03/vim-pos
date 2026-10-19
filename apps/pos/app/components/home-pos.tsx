@@ -34,6 +34,14 @@ import { ModalCombo } from "./modal-combo";
 import { HojaCombo } from "./hoja-combo";
 import { ModalCobro } from "./modal-cobro";
 import { SeccionCreditos } from "./seccion-creditos";
+import { SeccionCotizaciones } from "./seccion-cotizaciones";
+import { OverlayReciboCotizacion } from "./recibo-cotizacion";
+import { hoyMx } from "@vim/fecha";
+import { construirCotizacionJob } from "../lib/print/cotizacion-builder";
+import {
+  anotarPorMarcar, avisosConversion, enlaceWhatsappCotizacion, guardarCotizacion, leerCotizacion, leerEncabezado, lineasDeCotizacion,
+  marcarConvertida, marcarPendientes, puedeCotizar, textoWhatsappCotizacion, urlCotizacion, type Cotizacion, type Encabezado,
+} from "../lib/cotizaciones";
 import { CobroCompletado } from "./cobro-completado";
 import { ModalDescuento } from "./modal-descuento";
 import { obtenerImpresora, obtenerImpresoraDeEstacion } from "../lib/print/adapter";
@@ -219,6 +227,16 @@ export function HomePos({
   const [enDevoluciones, setEnDevoluciones] = useState(false);
   /** Tienda: «Créditos» abierto dentro de Configuración (quién debe y abonos). */
   const [enCreditos, setEnCreditos] = useState(false);
+  /** Tienda: «Cotizaciones» abierto dentro de Configuración. */
+  const [enCotizaciones, setEnCotizaciones] = useState(false);
+  /** La vista de una cotización (al guardarla o al reimprimirla), con el encabezado del papel. */
+  const [vistaCotizacion, setVistaCotizacion] = useState<{ c: Cotizacion; e: Encabezado } | null>(null);
+  /** Franja del Panel: lo que cambió al convertir una cotización, o cómo armar una nueva. */
+  const [avisoCotizacion, setAvisoCotizacion] = useState<string | null>(null);
+  const [guardandoCotizacion, setGuardandoCotizacion] = useState(false);
+  /** Llave del guardado: se reusa si el intento falla, así un reintento no duplica la cotización. */
+  const llaveCotizacion = useRef<string | null>(null);
+  const encabezadoCotizacion = useRef<Encabezado | null>(null);
   // ADR 0011 — pedidos de apps de delivery: pantalla, badge del inicio y sonido al llegar uno nuevo.
   const [enPedidosApps, setEnPedidosApps] = useState(false);
   const [nPedidosApps, setNPedidosApps] = useState(0);
@@ -820,6 +838,7 @@ export function HomePos({
     if (destino !== "inventario" && n > 0 && !(await confirmarDescarteRecepcion(n))) return;
     setSeccionTienda(destino);
     setEnCreditos(false); // tocar Configuración otra vez vuelve a su menú
+    setEnCotizaciones(false);
   }, [confirmarDescarteRecepcion]);
 
   // Se cobró, se canceló o se volvió a poner en espera a mano: el ticket ya no está en pantalla y
@@ -1435,6 +1454,10 @@ export function HomePos({
     return rasterizarImagen(caja.logoUrl, ancho);
   }, [caja.logoUrl]);
 
+  /** La cotización convertida en la venta del Panel y su ticket: `cobroTerminado` no depende del carrito. */
+  const cotizacionDeVenta = useRef<{ cotizacionId: string | null; ticketId: string | null }>({ cotizacionId: null, ticketId: null });
+  cotizacionDeVenta.current = { cotizacionId: carrito.cotizacionId ?? null, ticketId: ticketBd?.ticketId ?? null };
+
   /** Lo que sigue a una venta cobrada: limpiar la pantalla, «Cobro completado», el ticket impreso,
    *  la comanda de Para llevar y el cierre del reparto. Del cobro, y de «Cobrar» con saldo 0. */
   const cobroTerminado = useCallback(async (ticketId: string, folio: string | null, cambio: number, total: number | null, aCredito = false) => {
@@ -1444,6 +1467,15 @@ export function HomePos({
       const almacen = almacenLocal();
       if (leerPendiente(almacen, ticketId)) borrarPendiente(almacen, ticketId);
     } catch { /* un almacén lleno o negado no detiene lo que sigue */ }
+    // Cotización convertida (0212): ya cobrada, se marca CONVERTIDA. Si falla no detiene el cobro:
+    // queda anotada y se reintenta en el siguiente cobro o al abrir Cotizaciones.
+    try {
+      const almacen = almacenLocal();
+      const v = cotizacionDeVenta.current;
+      if (v.cotizacionId && v.ticketId === ticketId) anotarPorMarcar(almacen, { cotizacionId: v.cotizacionId, ticketId });
+      void marcarPendientes(almacen, (p) => marcarConvertida(token, p));
+    } catch { /* igual: nunca estorba al cobro */ }
+    setAvisoCotizacion(null);
     setTotalesCobro(null);
     setAtajoCobro(null);
     setCambioAnterior(cambio > 0 ? cambio : null);
@@ -2073,6 +2105,7 @@ export function HomePos({
       // El aviso del reparto se pinta encima del recibo y de la confirmación de cobro, así que
       // Escape tiene que cerrarlo a él primero.
       [avisoReparto != null, () => setAvisoReparto(null)],
+      [vistaCotizacion != null, () => setVistaCotizacion(null)],
       capaRecibo,
       capaConfirmacion,
       // El cobro y «Agregar productos» CEDEN: tienen pasos internos (efectivo → selector, un
@@ -2142,7 +2175,7 @@ export function HomePos({
       escaneoIgnorado: avisoTiendaVisible || capas.some((c) => c[0] && ![capaCobro, capaSelector, capaAvisoRetail, capaConsultaInv, capaRecibo, capaConfirmacion].includes(c)),
       cerrarAlEscanear: confirmacion != null ? nuevoTicket : mostrarRecibo ? cerrarVistaRecibo : null,
     };
-  }, [selectorRetail, cantidadRetail, avisoRetail, descuentoAbierto, llevarListaAbierta, avisoTiendaVisible, modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
+  }, [selectorRetail, cantidadRetail, avisoRetail, descuentoAbierto, llevarListaAbierta, avisoTiendaVisible, modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, vistaCotizacion, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
       agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto, nombreBarra, pasandoAMesa,
       clienteDomAbierto, clienteCuentaAbierto, zonaPedidoAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
@@ -2150,6 +2183,68 @@ export function HomePos({
       enConsultaCuentas, enDevoluciones, enCambioTalla, enPedidosApps, enDelivery, enPickup, enMesas, enBarra, nuevoTicket,
       intentarSalirDeCaptura, tienda, seccionTienda, reabriendoTx, cambiandoPagoTx, cerrarBusquedaTx, cerrarConsultaInv, irASeccion, avisosVim, confirmandoVenta, salirCajaAbierto]);
   useEscape(alEscapar);
+
+  // ── Cotizaciones (retail 2, entrega 3) ────────────────────────────────────────────────────
+  /** El encabezado del papel, leído una vez. Si falla, sale solo con el nombre del negocio. */
+  const encabezado = async (): Promise<Encabezado> => {
+    try {
+      return (encabezadoCotizacion.current ??= await leerEncabezado(token, caja.tenant_id, caja.sucursal_id, caja.negocioNombre));
+    } catch {
+      return { negocio: caja.negocioNombre, rfc: null, direccion: null, telefono: null };
+    }
+  };
+  const whatsappCotizacion = (c: Cotizacion) => enlaceWhatsappCotizacion(
+    c.cliente?.telefono,
+    textoWhatsappCotizacion({ folio: c.folio, negocio: caja.negocioNombre, total: c.total, vigenteHasta: c.vigenteHasta, url: urlCotizacion(c.token) }),
+  );
+  /** Con la vista previa, `onMostrar` enseña la cotización en pantalla; con la térmica, sale el papel. */
+  const imprimirCotizacion = async (c: Cotizacion, onMostrar: (e: Encabezado) => void) => {
+    const e = await encabezado();
+    await obtenerImpresora("CAJA", { onMostrar: () => onMostrar(e) }).imprimir(construirCotizacionJob(c, e, 80));
+  };
+  /** «Guardar como cotización»: la base pone precios, IVA, folio y vigencia; el carrito se limpia y se abre la vista. */
+  const guardarComoCotizacion = async () => {
+    if (guardandoCotizacion) return;
+    setGuardandoCotizacion(true);
+    setError(null);
+    try {
+      llaveCotizacion.current ??= `cot-${nuevoClientId()}`;
+      const id = await guardarCotizacion(token, {
+        sucursalId: caja.sucursal_id, cajaId: turno.caja_id, clienteId: carrito.clienteCuenta?.clienteId ?? null,
+        lineas: carrito.lineas, clientId: llaveCotizacion.current,
+      });
+      llaveCotizacion.current = null;
+      setUltimoTienda(null);
+      setAvisoCotizacion(null);
+      dispatch({ tipo: "limpiar" });
+      try {
+        const [c, e] = await Promise.all([leerCotizacion(token, id), encabezado()]);
+        setVistaCotizacion({ c, e });
+      } catch {
+        setError("La cotización se guardó, pero no se pudo abrir. Búscala en Configuración › Cotizaciones.");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar la cotización");
+    } finally {
+      setGuardandoCotizacion(false);
+    }
+  };
+  /** «Convertir en venta»: el carrito con el catálogo de HOY; se marca CONVERTIDA al cobrarse (`cobroTerminado`). */
+  const convertirCotizacion = (c: Cotizacion) => {
+    if (carrito.lineas.length > 0 || ticketBd) {
+      setError(`Tienes una venta a medias. Cóbrala o ${ticketBd ? "déjala abierta" : "límpiala"} antes de convertir una cotización.`);
+      return;
+    }
+    const r = lineasDeCotizacion(c.items, productos ?? []);
+    if (r.lineas.length === 0) {
+      setError("Ningún producto de esta cotización se vende hoy: ya no existen o están agotados.");
+      return;
+    }
+    setError(null);
+    dispatch({ tipo: "cargar", estado: { ...estadoInicial, modoServicio: "PARA_LLEVAR", lineas: r.lineas, clienteCuenta: c.cliente, cotizacionId: c.id } });
+    setAvisoCotizacion([`Cotización ${c.folio} en la venta.`, ...avisosConversion({ ...r, vigenteHasta: c.vigenteHasta, hoy: hoyMx() })].join(" "));
+    void irASeccion("panel");
+  };
 
   // ── Cambio de talla (giro RETAIL) ─────────────────────────────────────────────────────────
   /** Entra a la pantalla. Con un ticket a medias no: al final el cambio puede cargar su venta al carrito. */
@@ -3119,6 +3214,24 @@ export function HomePos({
         </p>
       )}
 
+      {avisoCotizacion && tienda && seccionTienda === "panel" && (
+        <p className="flex flex-shrink-0 items-center gap-3 bg-warning-soft px-4 py-1 text-13 font-medium text-ink" role="status">
+          <span className="min-w-0 flex-1">{avisoCotizacion}</span>
+          <button type="button" onClick={() => setAvisoCotizacion(null)} aria-label="Cerrar aviso" className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded text-ink-2 transition hover:bg-ink/5">
+            <Icono nombre="cerrar" className="h-4 w-4" />
+          </button>
+        </p>
+      )}
+      {vistaCotizacion && (
+        <OverlayReciboCotizacion
+          c={vistaCotizacion.c}
+          e={vistaCotizacion.e}
+          whatsapp={whatsappCotizacion(vistaCotizacion.c)}
+          onImprimir={() => { imprimirCotizacion(vistaCotizacion.c, () => window.print()).catch(() => setError("No se pudo imprimir la cotización")); }}
+          onCerrar={() => setVistaCotizacion(null)}
+        />
+      )}
+
       {/* Oculto y no desmontado fuera del Panel: nada se reinicia al volver. */}
       <div className={tienda && seccionTienda !== "panel" ? "hidden" : "flex min-h-0 flex-1"}>
           {capturaTienda ? (
@@ -3163,6 +3276,9 @@ export function HomePos({
             onAsignarCliente: admiteClienteCuenta(carrito.modoServicio) ? () => setClienteCuentaAbierto(true) : undefined,
             cliente: carrito.clienteCuenta?.nombre ?? null,
             onDescuentoProducto: cuentaImpresa ? undefined : (id) => void onAplicarDescuento(id),
+            onGuardarCotizacion: puedeCotizar({ modulo: modulos?.cotizaciones === true, lineas: carrito.lineas.length, guardada: ticketBd != null })
+              ? () => void guardarComoCotizacion()
+              : undefined,
           } : undefined}
           onCantidad={(id, c) => { setUltimoTienda(null); dispatch({ tipo: "cantidad", clientId: id, cantidad: c }); }}
           onQuitar={(id) => { setUltimoTienda(null); dispatch({ tipo: "quitar", clientId: id }); }}
@@ -3211,12 +3327,22 @@ export function HomePos({
           // La venta de un cambio, reabierta, ya trae el pago de la prenda: «Cobrar» pide solo lo que falta.
           pendienteMxn={capturaTienda && totalAutoritativo != null && ticketBd?.estadoFiscal === "ABIERTO" && ticketBd.montoPagado > 0 ? ticketBd.pendiente : undefined}
           bloqueado={bloqueado}
-          procesando={procesandoCobro}
+          procesando={procesandoCobro || guardandoCotizacion}
         />
       </div>
       {tienda && seccionTienda !== "panel" && (
         <div className="flex min-h-0 flex-1 flex-col">
-          {seccionTienda === "configuracion" && enCreditos ? (
+          {seccionTienda === "configuracion" && enCotizaciones ? (
+            <SeccionCotizaciones
+              token={token}
+              cajaId={turno.caja_id}
+              whatsapp={whatsappCotizacion}
+              onReimprimir={(c) => { imprimirCotizacion(c, (e) => setVistaCotizacion({ c, e })).catch(() => setError("No se pudo imprimir la cotización")); }}
+              onConvertir={convertirCotizacion}
+              onNueva={conVentaSuelta(() => { void irASeccion("panel"); setAvisoCotizacion("Arma la cotización y guárdala desde ⋯."); })}
+              onVolver={() => setEnCotizaciones(false)}
+            />
+          ) : seccionTienda === "configuracion" && enCreditos ? (
             <SeccionCreditos
               token={token}
               cajaId={turno.caja_id}
@@ -3239,6 +3365,7 @@ export function HomePos({
                   onAbrirCajon={() => setAbrirCajaAbierto(true)}
                   onMovimientoCaja={() => setMovimientoAbierto(true)}
                   onCreditos={() => setEnCreditos(true)}
+                  onCotizaciones={() => setEnCotizaciones(true)}
                   nEnEspera={nEnEspera}
                   onCambiarCajero={conVentaSuelta(onCambiarCajero)}
                   onBloquear={conVentaSuelta(onBloquear)}
