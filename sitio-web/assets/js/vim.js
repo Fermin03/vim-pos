@@ -88,7 +88,21 @@
      inertes, para que el foco no se meta en ellas. El foco pasa a la pantalla
      nueva ANTES de marcar inerte la vieja: si no, el panel de la PC lo pierde,
      cree que te saliste y se cierra. Con teclado el foco va a la primera
-     entrada; con un toque, a la pantalla misma, para no pintar el aro. */
+     entrada; con un toque, a la pantalla misma, para no pintar el aro.
+
+     En el panel de la PC no hay deslizamiento: la lista de la izquierda se
+     queda y la pantalla del grupo bajo el cursor (o con el foco) se asoma a
+     su derecha. Al abrir se asoma la del primero, para que no quede vacío. */
+  function asomar(cont, ir) {
+    Array.prototype.forEach.call(cont.querySelectorAll("[data-ir]"), function (b) {
+      var p = cont.querySelector('[data-pantalla="' + b.getAttribute("data-ir") + '"]');
+      var este = b === ir;
+      b.toggleAttribute("data-activo", este);
+      if (este) p.removeAttribute("data-lado"); else p.setAttribute("data-lado", "despues");
+      p.inert = !este;
+    });
+  }
+
   function reiniciarPantallas(cont) {
     if (!cont) return;
     cont.pila = [];
@@ -98,6 +112,8 @@
       p.inert = i > 0;
       p.tabIndex = -1;
     });
+    var primero = cont.querySelector("[data-ir]");
+    if (cont.closest(".nav-panel") && primero) asomar(cont, primero);
     void cont.offsetHeight;
     cont.removeAttribute("data-instante");
   }
@@ -114,6 +130,31 @@
   document.querySelectorAll("[data-pantallas]").forEach(function (cont) {
     cont.setAttribute("data-js", "");
     reiniciarPantallas(cont);
+
+    if (cont.closest(".nav-panel")) {
+      /* Con el cursor, el cambio espera 100 ms y se cancela si antes llega a
+         la lista de la derecha: así, bajar en diagonal de «Alimentos» a «Food
+         trucks» no cambia la lista al cruzar «Tienda» y «Belleza». */
+      var pendiente = null;
+      cont.addEventListener("mouseover", function (e) {
+        clearTimeout(pendiente);
+        var ir = e.target.closest("[data-ir]");
+        if (ir) pendiente = setTimeout(function () { asomar(cont, ir); }, 100);
+      });
+      cont.addEventListener("focusin", function (e) {
+        var ir = e.target.closest("[data-ir]");
+        if (ir) asomar(cont, ir);
+      });
+      /* Un clic (o Enter) también asoma; con teclado, además, entra a la lista. */
+      cont.addEventListener("click", function (e) {
+        var ir = e.target.closest("[data-ir]");
+        if (!ir) return;
+        asomar(cont, ir);
+        if (e.detail === 0) cont.querySelector('[data-pantalla="' + ir.getAttribute("data-ir") + '"] a').focus();
+      });
+      return;
+    }
+
     cont.addEventListener("click", function (e) {
       var ir = e.target.closest("[data-ir]");
       if (ir) {

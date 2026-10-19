@@ -41,15 +41,17 @@ En orden: **Tipos de negocio**, **Producto**, Facturación, Precios y **Recursos
 Fermín, 19 oct 2026). Tipos de negocio agrupa los giros en Alimentos y bebidas, Tienda, Belleza y
 Servicios, y cada giro lleva a su página `/punto-de-venta-<giro>`.
 
-**Nada se despliega: el menú son pantallas.** Tocar un grupo con hijos (Belleza) abre otra
-pantalla que entra deslizándose desde la derecha, con «‹ Belleza» arriba para volver. Una sola
-letra en todo el menú, la de la barra (Inter Tight 500), sin descripciones ni títulos en mono.
+**Nada se despliega.** Una sola letra en todo el menú, la de la barra (Inter Tight 500), sin
+descripciones ni títulos en mono.
 
-- **PC:** el panel sigue bajando de arriba hacia abajo bajo el encabezado. Su primera pantalla va
-  un 30 % más grande que la barra; las siguientes, del mismo tamaño que la barra. Las listas de
-  más de cinco renglones siguen en otra columna.
-- **Teléfono y tableta (menos de 900 px):** el cajón es de pantalla completa y todo mide igual
-  (18 px). La primera pantalla es el menú entero con las dos acciones abajo.
+- **PC:** el panel sigue bajando de arriba hacia abajo bajo el encabezado. A la izquierda, la
+  lista del panel un 30 % más grande que la barra; al pasar el cursor por un grupo (Belleza), sus
+  giros aparecen a la derecha, del mismo tamaño que la barra. El cambio es instantáneo y espera
+  100 ms para que bajar en diagonal no cambie la lista. Al abrir se ve el primer grupo. Las listas
+  de más de cinco renglones siguen en otra columna.
+- **Teléfono y tableta (menos de 900 px):** el cajón es de pantalla completa, sin líneas entre
+  renglones, y todo mide igual (18 px). Tocar un grupo abre otra pantalla que entra deslizándose
+  desde la derecha, con «‹ Belleza» arriba para volver.
 
 **Acciones (19 oct 2026):** se quitaron «Pide una demo» y «Pruébalo 30 días gratis» del menú y
 de la barra. En la PC la barra lleva «Iniciar sesión» (admin), «Contactar ventas» (/contacto, solo
