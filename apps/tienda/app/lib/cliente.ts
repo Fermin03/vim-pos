@@ -26,7 +26,7 @@ export const LIMITES: Record<Campo, number> = {
 };
 
 // El mismo patrón que la función: solo ASCII (el correo acaba en cabeceras de correo).
-const CORREO = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/;
+export const CORREO = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/;
 const OBLIGATORIO: Partial<Record<Campo, string>> = {
   nombre: "Escribe tu nombre.",
   calle: "Escribe tu calle.",

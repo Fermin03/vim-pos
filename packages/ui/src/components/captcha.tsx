@@ -43,7 +43,7 @@ function cargarScript(): Promise<void> {
   return cargando;
 }
 
-export type AccionCaptcha = "registro" | "reenvio" | "tienda_pedido" | "tienda_registro" | "tienda_recuperar";
+export type AccionCaptcha = "registro" | "reenvio" | "tienda_pedido" | "tienda_registro" | "tienda_recuperar" | "tienda_reserva";
 
 /**
  * `accion` viaja dentro del token y la función la comprueba: un token resuelto para reenviar el
