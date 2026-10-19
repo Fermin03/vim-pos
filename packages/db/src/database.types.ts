@@ -15432,11 +15432,16 @@ export type Database = {
         Returns: boolean
       }
       _vim_aplicar_anticipos_caja: {
-        Args: { p_filas: Json; p_tenant: string }
+        Args: { p_filas: Json; p_pendientes?: string[]; p_tenant: string }
         Returns: Json
       }
       _vim_aplicar_citas_caja: {
-        Args: { p_citas: Json; p_servicios: Json; p_tenant: string }
+        Args: {
+          p_citas: Json
+          p_pendientes?: string[]
+          p_servicios: Json
+          p_tenant: string
+        }
         Returns: Json
       }
       _vim_aplicar_cotizaciones_caja: {

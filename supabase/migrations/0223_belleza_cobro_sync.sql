@@ -1,21 +1,32 @@
 -- Belleza, entrega 2: el cobro viaja con la caja instalada (diseño 2026-10-18, ADR 0038).
 --
+-- «Venta pendiente de deshacer» (p_pendientes): una venta que la caja manda en ESTE envío como
+-- CANCELADO, o con una devolución CONFIRMADA, y que la nube todavía no tiene así (p. ej. porque esa
+-- fila se rechazó). Lo que dependa de ella va a _errores (la caja lo reintenta) en vez de perderse.
+-- La caja manda el anticipo y la cita en el lote de su venta, así que la cancelación viaja con ellos.
+--
 -- §1 _vim_aplicar_citas_caja (vigente 0219): `ticket_id` se actualiza (nunca se borra desde la
---    caja) y COBRADA es terminal. Una cita TERMINADA en la nube sí acepta el paso a COBRADA, y una
---    COBRADA solo regresa a TERMINADA si su venta ya está CANCELADA en la nube (lo mismo que hace
---    tickets_cita_cobrada, que en réplica no corre).
+--    caja) y COBRADA es terminal. Una TERMINADA en la nube acepta COBRADA. Deshacer el cobro
+--    (COBRADA → TERMINADA, o COBRADA con otra venta) entra si la venta de la nube ya está CANCELADA
+--    (lo que hace tickets_cita_cobrada, que en réplica no corre); si esa cancelación viene pendiente
+--    en el envío, es error y se reintenta; si no, es una copia vieja y se ignora.
 -- §2 _vim_aplicar_anticipos_caja: los anticipos de la caja, por id e idempotentes. Validan negocio
---    de cita, turnos, caja, sucursal y venta. Precedencia caja vs nube:
+--    de cita, turnos (el que lo recibe, de su caja y sucursal), caja, sucursal y venta (la de su
+--    cita). Precedencia caja vs nube:
 --      · fila nueva (incluidas las partes que nacen del sistema, con client_id_local NULL: los NULL
 --        no chocan en el UNIQUE (tenant_id, client_id_local)) → entra;
 --      · la nube la tiene VIGENTE → gana la caja (VIGENTE → APLICADO/DEVUELTO/RETENIDO);
---      · la nube la tiene resuelta y la caja manda el mismo estado → gana la caja (p. ej. una parte
---        que se encogió por una devolución, o un anticipo que se volvió a cobrar en otra venta);
---      · la nube la tiene APLICADO y la caja VIGENTE → solo si la venta de la nube ya está
---        CANCELADA o tiene una devolución CONFIRMADA (las dos vueltas atrás del sistema, 0222, que
---        en réplica no corren en la nube);
---      · cualquier otro cambio sobre una resuelta se ignora sin error: la nube conserva la suya y
---        el siguiente pull se la baja a la caja.
+--      · la nube la tiene APLICADO y su venta ya está CANCELADA o con devolución CONFIRMADA (las
+--        vueltas atrás del sistema, 0222, que en réplica no corren en la nube) → gana la caja;
+--      · la nube la tiene APLICADO y su venta viene pendiente de deshacer → error, se reintenta;
+--      · la caja manda VIGENTE sobre una resuelta, sin nada que lo justifique → copia vieja, se
+--        ignora sin error; el pull le baja a la caja la versión de la nube;
+--      · mismo estado, misma venta y resuelto en la misma caja → gana la caja (una parte que se
+--        encogió por una devolución);
+--      · cualquier otra cosa sobre una resuelta (otro estado resuelto, otra venta, o resuelto en otra
+--        caja) es un CONFLICTO: dinero resuelto dos veces. La nube conserva la suya y lo devuelve en
+--        `_conflictos` (la caja lo da por subido y lo anota en su bitácora) y en el rastro
+--        (sync_eventos.operaciones_conflicto y response_summary._conflictos) para el panel.
 --    Candados en orden cita → anticipo, como en 0222.
 -- §3 sync_pull_snapshot (vigente 0219): baja los anticipos de las citas que baja (todos los estados:
 --    la caja necesita saber que uno ya se resolvió en otra caja para no cobrarlo).
@@ -44,7 +55,9 @@
 --     recalcula la marca de todo lo tocado (así un intercambio de horario entre dos citas de la caja
 --     no deja una marca falsa) y la de sus citas.
 -- Devuelve {citas int, citas_servicios int, errores [{tabla, id, error}]}.
-CREATE OR REPLACE FUNCTION _vim_aplicar_citas_caja(p_tenant uuid, p_citas jsonb, p_servicios jsonb)
+DROP FUNCTION IF EXISTS _vim_aplicar_citas_caja(uuid, jsonb, jsonb);
+CREATE OR REPLACE FUNCTION _vim_aplicar_citas_caja(p_tenant uuid, p_citas jsonb, p_servicios jsonb,
+                                                   p_pendientes uuid[] DEFAULT '{}')
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
 AS $fn$
@@ -58,6 +71,7 @@ DECLARE
   v_estado  cita_estado;
   v_activa  boolean;
   v_paso    boolean;   -- 0223
+  v_tk_nube uuid;      -- 0223
   v_choca   uuid[];
   v_revisar uuid[] := '{}';
   v_tocadas uuid[] := '{}';
@@ -81,8 +95,8 @@ BEGIN
       IF (v_c->>'tenant_id')::uuid IS DISTINCT FROM p_tenant THEN
         RAISE EXCEPTION 'fila de otro negocio';
       END IF;
-      v_dueno := NULL; v_estado := NULL;
-      SELECT tenant_id, estado INTO v_dueno, v_estado FROM citas WHERE id = v_cita;
+      v_dueno := NULL; v_estado := NULL; v_tk_nube := NULL;
+      SELECT tenant_id, estado, ticket_id INTO v_dueno, v_estado, v_tk_nube FROM citas WHERE id = v_cita;
       IF v_dueno IS DISTINCT FROM p_tenant AND v_dueno IS NOT NULL THEN
         RAISE EXCEPTION 'el id ya existe en otro negocio';
       END IF;
@@ -105,11 +119,15 @@ BEGIN
            SELECT 1 FROM usuarios_acceso WHERE usuario_id = (v_c->>'created_by')::uuid AND tenant_id = p_tenant) THEN
         v_c := v_c || '{"created_by": null}'::jsonb;
       END IF;
-      -- 0223: los dos pasos permitidos sobre una cerrada (ver el encabezado).
-      v_paso := (v_estado = 'TERMINADA' AND v_c->>'estado' = 'COBRADA')
-                OR (v_estado = 'COBRADA' AND v_c->>'estado' = 'TERMINADA'
-                    AND EXISTS (SELECT 1 FROM citas ci JOIN tickets t ON t.id = ci.ticket_id
-                                 WHERE ci.id = v_cita AND t.estado_fiscal = 'CANCELADO'));
+      -- 0223: lo permitido sobre una cerrada (ver el encabezado).
+      v_paso := v_estado = 'TERMINADA' AND v_c->>'estado' = 'COBRADA';
+      IF v_estado = 'COBRADA' AND (v_c->>'estado' = 'TERMINADA'
+           OR (v_c->>'estado' = 'COBRADA' AND (v_c->>'ticket_id')::uuid IS DISTINCT FROM v_tk_nube)) THEN
+        v_paso := EXISTS (SELECT 1 FROM tickets WHERE id = v_tk_nube AND estado_fiscal = 'CANCELADO');
+        IF NOT v_paso AND v_tk_nube = ANY(p_pendientes) THEN
+          RAISE EXCEPTION 'la cancelación de la venta aún no sube';
+        END IF;
+      END IF;
       IF v_estado IN ('TERMINADA', 'NO_LLEGO', 'CANCELADA', 'COBRADA') AND NOT COALESCE(v_paso, false) THEN
         CONTINUE;   -- cerrada en la nube: la copia de la caja no la reabre
       END IF;
@@ -176,12 +194,13 @@ BEGIN
   RETURN jsonb_build_object('citas', v_nc, 'citas_servicios', v_ns, 'errores', v_errores);
 END;
 $fn$;
-REVOKE ALL ON FUNCTION _vim_aplicar_citas_caja(uuid, jsonb, jsonb) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION _vim_aplicar_citas_caja(uuid, jsonb, jsonb, uuid[]) FROM PUBLIC, anon, authenticated;
 
 -- ── §2 _vim_aplicar_anticipos_caja ──────────────────────────────────────────
 -- Ver el encabezado. Corre en origin (FK y updated_at normales), después de ventas, turnos y citas.
--- Devuelve {aplicados int, errores [{tabla, id, error}]}.
-CREATE OR REPLACE FUNCTION _vim_aplicar_anticipos_caja(p_tenant uuid, p_filas jsonb)
+-- Devuelve {aplicados int, errores [{tabla, id, error}], conflictos [{tabla, id, nube, caja, error}]}.
+DROP FUNCTION IF EXISTS _vim_aplicar_anticipos_caja(uuid, jsonb);
+CREATE OR REPLACE FUNCTION _vim_aplicar_anticipos_caja(p_tenant uuid, p_filas jsonb, p_pendientes uuid[] DEFAULT '{}')
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
 AS $fn$
@@ -190,12 +209,13 @@ DECLARE
   v_id      uuid;
   v_ref     text;
   v_nube    anticipos_cita%ROWTYPE;
-  v_regresa boolean;
+  v_tk_cita uuid;
   v_n       integer := 0;
   v_errores jsonb := '[]'::jsonb;
+  v_conflictos jsonb := '[]'::jsonb;
 BEGIN
   IF jsonb_typeof(p_filas) IS DISTINCT FROM 'array' THEN
-    RETURN jsonb_build_object('aplicados', 0, 'errores', '[]'::jsonb);
+    RETURN jsonb_build_object('aplicados', 0, 'errores', '[]'::jsonb, 'conflictos', '[]'::jsonb);
   END IF;
   FOR v_f IN SELECT value FROM jsonb_array_elements(p_filas) ORDER BY value->>'created_at', value->>'id' LOOP
     BEGIN
@@ -204,7 +224,7 @@ BEGIN
         RAISE EXCEPTION 'fila de otro negocio';
       END IF;
       -- Candado de la cita primero (orden cita → anticipo, 0222); de paso valida que sea del negocio.
-      PERFORM 1 FROM citas WHERE id = (v_f->>'cita_id')::uuid AND tenant_id = p_tenant FOR UPDATE;
+      SELECT ticket_id INTO v_tk_cita FROM citas WHERE id = (v_f->>'cita_id')::uuid AND tenant_id = p_tenant FOR UPDATE;
       IF NOT FOUND THEN RAISE EXCEPTION 'cita de otro negocio o que aún no sube'; END IF;
       FOREACH v_ref IN ARRAY ARRAY['turno_id', 'turno_resuelve_id'] LOOP
         IF v_f->>v_ref IS NOT NULL
@@ -212,6 +232,11 @@ BEGIN
           RAISE EXCEPTION 'turno de otro negocio o que aún no sube';
         END IF;
       END LOOP;
+      -- El turno que lo recibe es de su caja y su sucursal.
+      IF NOT EXISTS (SELECT 1 FROM turnos WHERE id = (v_f->>'turno_id')::uuid
+                        AND caja_id = (v_f->>'caja_id')::uuid AND sucursal_id = (v_f->>'sucursal_id')::uuid) THEN
+        RAISE EXCEPTION 'el turno no es de la caja y sucursal del anticipo';
+      END IF;
       IF NOT EXISTS (SELECT 1 FROM cajas WHERE id = (v_f->>'caja_id')::uuid AND tenant_id = p_tenant) THEN
         RAISE EXCEPTION 'caja de otro negocio';
       END IF;
@@ -221,6 +246,9 @@ BEGIN
       IF v_f->>'ticket_id' IS NOT NULL
          AND NOT EXISTS (SELECT 1 FROM tickets WHERE id = (v_f->>'ticket_id')::uuid AND tenant_id = p_tenant) THEN
         RAISE EXCEPTION 'venta de otro negocio o que aún no sube';
+      END IF;
+      IF v_f->>'ticket_id' IS NOT NULL AND (v_f->>'ticket_id')::uuid IS DISTINCT FROM v_tk_cita THEN
+        RAISE EXCEPTION 'la venta no es la de la cita (o el cambio de la cita aún no sube)';
       END IF;
       IF v_f->>'usuario_id' IS NOT NULL AND NOT EXISTS (
            SELECT 1 FROM usuarios_acceso WHERE usuario_id = (v_f->>'usuario_id')::uuid AND tenant_id = p_tenant) THEN
@@ -235,13 +263,25 @@ BEGIN
       IF FOUND AND v_nube.cita_id IS DISTINCT FROM (v_f->>'cita_id')::uuid THEN
         RAISE EXCEPTION 'el anticipo es de otra cita';
       END IF;
-      IF FOUND AND v_nube.estado <> 'VIGENTE' AND v_nube.estado IS DISTINCT FROM v_f->>'estado' THEN
-        -- Resuelto en la nube: solo las vueltas atrás del sistema (APLICADO → VIGENTE).
-        v_regresa := v_nube.estado = 'APLICADO' AND v_f->>'estado' = 'VIGENTE'
-                     AND (EXISTS (SELECT 1 FROM tickets WHERE id = v_nube.ticket_id AND estado_fiscal = 'CANCELADO')
-                          OR EXISTS (SELECT 1 FROM devoluciones WHERE ticket_original_id = v_nube.ticket_id AND estado = 'CONFIRMADA'));
-        IF NOT v_regresa THEN
-          CONTINUE;   -- la nube conserva la suya; el pull se la baja a la caja
+      -- Resuelto en la nube: ver la precedencia en el encabezado.
+      IF FOUND AND v_nube.estado <> 'VIGENTE'
+         AND NOT (v_nube.estado = 'APLICADO'
+                  AND (EXISTS (SELECT 1 FROM tickets WHERE id = v_nube.ticket_id AND estado_fiscal = 'CANCELADO')
+                       OR EXISTS (SELECT 1 FROM devoluciones WHERE ticket_original_id = v_nube.ticket_id
+                                     AND estado = 'CONFIRMADA' AND deleted_at IS NULL))) THEN
+        IF v_nube.estado = 'APLICADO' AND v_nube.ticket_id = ANY(p_pendientes) THEN
+          RAISE EXCEPTION 'la cancelación de la venta aún no sube';
+        END IF;
+        IF v_f->>'estado' = 'VIGENTE' THEN
+          CONTINUE;   -- copia vieja: la nube conserva la suya y el pull se la baja a la caja
+        END IF;
+        IF v_f->>'estado' IS DISTINCT FROM v_nube.estado
+           OR (v_f->>'ticket_id')::uuid IS DISTINCT FROM v_nube.ticket_id
+           OR (SELECT caja_id FROM turnos WHERE id = (v_f->>'turno_resuelve_id')::uuid)
+              IS DISTINCT FROM (SELECT caja_id FROM turnos WHERE id = v_nube.turno_resuelve_id) THEN
+          v_conflictos := v_conflictos || jsonb_build_object('tabla', 'anticipos_cita', 'id', v_id,
+            'nube', v_nube.estado, 'caja', v_f->>'estado', 'error', 'anticipo resuelto dos veces');
+          CONTINUE;
         END IF;
       END IF;
 
@@ -256,10 +296,10 @@ BEGIN
       v_errores := v_errores || jsonb_build_object('tabla', 'anticipos_cita', 'id', v_f->>'id', 'error', SQLERRM);
     END;
   END LOOP;
-  RETURN jsonb_build_object('aplicados', v_n, 'errores', v_errores);
+  RETURN jsonb_build_object('aplicados', v_n, 'errores', v_errores, 'conflictos', v_conflictos);
 END;
 $fn$;
-REVOKE ALL ON FUNCTION _vim_aplicar_anticipos_caja(uuid, jsonb) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION _vim_aplicar_anticipos_caja(uuid, jsonb, uuid[]) FROM PUBLIC, anon, authenticated;
 
 -- ── §3 sync_pull_snapshot ───────────────────────────────────────────────────
 -- La de la 0219 (vigente) más los anticipos de las citas que bajan (marcado "0223").
@@ -412,6 +452,8 @@ DECLARE
   v_max       timestamptz;
   v_tickets   jsonb;
   v_descartados jsonb;   -- 0195
+  v_pendientes uuid[];   -- 0223
+  v_conflictos jsonb := '[]'::jsonb;   -- 0223
   /* Orden de dependencia (ver 0089). `repartidores` primero: `delivery_asignaciones` lo
      referencia. 0117: clientes y direcciones antes que tickets. 0122: lo que cuelga de la venta
      después de sus renglones y pagos; `devoluciones` antes que sus renglones y que
@@ -503,16 +545,28 @@ BEGIN
                                        'cotizacion_items', (v_det->>'cotizacion_items')::integer);
   v_errores := v_errores || COALESCE(v_det->'errores', '[]'::jsonb);
 
+  -- 0223: ventas que este envío cancela o devuelve y que la nube aún no tiene así (ver el encabezado).
+  v_pendientes := ARRAY(
+    SELECT (r->>'id')::uuid FROM jsonb_array_elements(COALESCE(p_snapshot->'tickets', '[]'::jsonb)) r
+     WHERE r->>'estado_fiscal' = 'CANCELADO'
+       AND NOT EXISTS (SELECT 1 FROM tickets t WHERE t.id = (r->>'id')::uuid AND t.tenant_id = p_tenant AND t.estado_fiscal = 'CANCELADO')
+    UNION
+    SELECT (d->>'ticket_original_id')::uuid FROM jsonb_array_elements(COALESCE(p_snapshot->'devoluciones', '[]'::jsonb)) d
+     WHERE d->>'estado' = 'CONFIRMADA' AND d->>'deleted_at' IS NULL
+       AND NOT EXISTS (SELECT 1 FROM devoluciones x WHERE x.id = (d->>'id')::uuid AND x.tenant_id = p_tenant
+                         AND x.estado = 'CONFIRMADA' AND x.deleted_at IS NULL));
+
   -- 0219: las citas de la caja. En origin: el disparador de `activa` decide qué tramos ocupan.
-  v_det := _vim_aplicar_citas_caja(p_tenant, p_snapshot->'citas', p_snapshot->'citas_servicios');
+  v_det := _vim_aplicar_citas_caja(p_tenant, p_snapshot->'citas', p_snapshot->'citas_servicios', v_pendientes);
   v_res := v_res || jsonb_build_object('citas', (v_det->>'citas')::integer,
                                        'citas_servicios', (v_det->>'citas_servicios')::integer);
   v_errores := v_errores || COALESCE(v_det->'errores', '[]'::jsonb);
 
   -- 0223: los anticipos, ya con ventas, turnos y citas del lote aplicados.
-  v_det := _vim_aplicar_anticipos_caja(p_tenant, p_snapshot->'anticipos_cita');
+  v_det := _vim_aplicar_anticipos_caja(p_tenant, p_snapshot->'anticipos_cita', v_pendientes);
   v_res := v_res || jsonb_build_object('anticipos_cita', (v_det->>'aplicados')::integer);
   v_errores := v_errores || COALESCE(v_det->'errores', '[]'::jsonb);
+  v_conflictos := COALESCE(v_det->'conflictos', '[]'::jsonb);
 
   -- ── Rastro del envío (0070/0073) ─────────────────────────────────────────
   BEGIN
@@ -547,12 +601,12 @@ BEGIN
 
     INSERT INTO public.sync_eventos (
       tenant_id, sucursal_id, caja_id, dispositivo_id, dispositivo_descripcion,
-      operaciones_total, operaciones_exitosas, operaciones_error,
+      operaciones_total, operaciones_exitosas, operaciones_error, operaciones_conflicto,
       fecha_operacion_min, fecha_operacion_max,
       fecha_procesado_inicio, fecha_procesado_fin, duracion_ms, request_summary, response_summary
     ) VALUES (
       p_tenant, v_sucursal, v_caja, COALESCE(v_disp, 'escritorio'), v_desc,
-      v_total, v_aplicadas, jsonb_array_length(v_errores),
+      v_total, v_aplicadas, jsonb_array_length(v_errores), jsonb_array_length(v_conflictos),
       v_min, v_max,
       v_ini, clock_timestamp(),
       GREATEST(EXTRACT(MILLISECONDS FROM clock_timestamp() - v_ini)::integer, 0),
@@ -563,6 +617,7 @@ BEGIN
       v_res || CASE WHEN jsonb_array_length(v_errores) > 0
                     THEN jsonb_build_object('_errores', (SELECT jsonb_agg(e) FROM (SELECT e FROM jsonb_array_elements(v_errores) e LIMIT 20) x))
                     ELSE '{}'::jsonb END
+              || CASE WHEN jsonb_array_length(v_conflictos) > 0 THEN jsonb_build_object('_conflictos', v_conflictos) ELSE '{}'::jsonb END   -- 0223
     );
   EXCEPTION WHEN OTHERS THEN
     RAISE WARNING 'sync_push_snapshot: no se pudo registrar el evento: %', SQLERRM;
@@ -586,6 +641,8 @@ BEGIN
   END IF;
 
   RETURN v_res || CASE WHEN jsonb_array_length(v_errores) > 0 THEN jsonb_build_object('_errores', v_errores) ELSE '{}'::jsonb END
+               -- 0223: anticipos resueltos dos veces; la caja los da por subidos y los anota.
+               || CASE WHEN jsonb_array_length(v_conflictos) > 0 THEN jsonb_build_object('_conflictos', v_conflictos) ELSE '{}'::jsonb END
                -- 0195: ids que la caja marca como subidos aunque la nube no los guardó.
                || CASE WHEN jsonb_array_length(v_descartados) > 0 THEN jsonb_build_object('_descartados', jsonb_build_object('movimientos_producto', v_descartados)) ELSE '{}'::jsonb END;
 END;

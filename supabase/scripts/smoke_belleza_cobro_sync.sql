@@ -15,6 +15,8 @@ DECLARE
   v_turno uuid; v_cita uuid; v_k uuid; v_item uuid; v_ant uuid; v_parte uuid;
   v_snap jsonb; v_res jsonb; v_a jsonb; v_p jsonb; v_c jsonb; v_pull jsonb;
   r record;
+  v_cita2 uuid; v_ant2 uuid; v_k2 uuid; v_k3 uuid; v_caja2 uuid; v_turno2 uuid;
+  v_a2 jsonb; v_c2 jsonb; v_s2 jsonb; v_tk2 jsonb;
 BEGIN
   INSERT INTO tenants (id, codigo, nombre_comercial, estado, vertical_principal)
   VALUES (v_otro, 'tenant-0223', 'Otro negocio 0223', 'INTERNO', 'QUICK_SERVICE');
@@ -137,6 +139,80 @@ BEGIN
   v_pull := sync_pull_snapshot(v_t);
   IF (SELECT count(*) FROM jsonb_array_elements(v_pull->'anticipos_cita') a WHERE a->>'cita_id' = v_cita::text) <> 3 THEN
     RAISE EXCEPTION '6: el pull debía bajar los 3 anticipos: %', v_pull->'anticipos_cita'; END IF;
+
+  -- Otra cita cobrada con anticipo que la nube ya tiene (K2), y una venta abierta (K3).
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria, 'role', 'authenticated', 'tenant_id', v_t)::text, true);
+  v_cita2 := guardar_cita(jsonb_build_object('sucursal_id', v_suc, 'cliente_nombre', 'Otra', 'inicia', '2030-01-07 12:00-06',
+               'servicios', jsonb_build_array(jsonb_build_object('producto_id', v_corte, 'usuario_id', v_diego))));
+  v_ant2 := registrar_anticipo(v_cita2, 180, 'EFECTIVO', v_caja, v_turno, 'smk-0223-ant2');
+  v_k2 := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smk-0223-k2', v_maria);
+  PERFORM agregar_item_a_ticket(v_k2, v_corte, 1, NULL, '[]'::jsonb, 'smk-0223-i2', v_diego);
+  PERFORM vincular_cita_ticket(v_cita2, v_k2);
+  PERFORM pagar_con_anticipo(v_k2, v_cita2, 'smk-0223-p2');
+  v_k3 := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smk-0223-k3', v_maria);
+  PERFORM set_config('request.jwt.claims', json_build_object('role', 'service_role')::text, true);
+  SELECT to_jsonb(a) || '{"estado": "VIGENTE", "ticket_id": null, "turno_resuelve_id": null, "resuelto_at": null}'::jsonb
+    INTO v_a2 FROM anticipos_cita a WHERE id = v_ant2;
+  SELECT to_jsonb(c) INTO v_c2 FROM citas c WHERE id = v_cita2;
+  SELECT jsonb_agg(to_jsonb(s)) INTO v_s2 FROM citas_servicios s WHERE cita_id = v_cita2;
+  SELECT to_jsonb(t) INTO v_tk2 FROM tickets t WHERE id = v_k2;
+  IF (SELECT estado FROM citas WHERE id = v_cita2) <> 'COBRADA' OR (SELECT estado FROM anticipos_cita WHERE id = v_ant2) <> 'APLICADO' THEN
+    RAISE EXCEPTION '8: preparación'; END IF;
+
+  -- 8) La caja canceló K2 pero esa fila se rechaza en el mismo envío: el anticipo VIGENTE y la cita
+  --    TERMINADA van a _errores (se reintentan), no se pierden.
+  v_res := sync_push_snapshot(v_t, jsonb_build_object(
+    'tickets', jsonb_build_array(v_tk2 || jsonb_build_object('estado_fiscal', 'CANCELADO', 'tenant_id', v_otro)),
+    'citas', jsonb_build_array(v_c2 || '{"estado": "TERMINADA"}'::jsonb), 'citas_servicios', v_s2,
+    'anticipos_cita', jsonb_build_array(v_a2)));
+  IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_res->'_errores') e WHERE e->>'id' = v_ant2::text AND e->>'error' = 'la cancelación de la venta aún no sube')
+     OR NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_res->'_errores') e WHERE e->>'id' = v_cita2::text AND e->>'error' = 'la cancelación de la venta aún no sube') THEN
+    RAISE EXCEPTION '8: debían quedar en _errores: %', v_res; END IF;
+  IF (SELECT estado FROM anticipos_cita WHERE id = v_ant2) <> 'APLICADO' OR (SELECT estado FROM citas WHERE id = v_cita2) <> 'COBRADA' THEN
+    RAISE EXCEPTION '8: la nube no debía cambiar todavía'; END IF;
+
+  -- 9) Cobrar la cita en otra venta (K3): sin K2 cancelada es una copia vieja; con K2 cancelada entra.
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('citas', jsonb_build_array(v_c2 || jsonb_build_object('ticket_id', v_k3)), 'citas_servicios', v_s2));
+  IF v_res ? '_errores' OR (SELECT ticket_id FROM citas WHERE id = v_cita2) <> v_k2 THEN
+    RAISE EXCEPTION '9: sin cancelar K2 no debía cambiar: %', v_res; END IF;
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('tickets', jsonb_build_array(v_tk2 || '{"estado_fiscal": "CANCELADO"}'::jsonb),
+             'citas', jsonb_build_array(v_c2 || jsonb_build_object('ticket_id', v_k3)), 'citas_servicios', v_s2,
+             'anticipos_cita', jsonb_build_array(v_a2)));
+  IF v_res ? '_errores' OR (SELECT (estado::text, ticket_id) FROM citas WHERE id = v_cita2) IS DISTINCT FROM ('COBRADA'::text, v_k3)
+     OR (SELECT estado FROM anticipos_cita WHERE id = v_ant2) <> 'VIGENTE' THEN
+    RAISE EXCEPTION '9: con K2 cancelada debían entrar: %', v_res; END IF;
+
+  -- 10) Resuelto dos veces: la nube conserva el suyo, lo reporta en _conflictos y en el rastro.
+  INSERT INTO cajas (tenant_id, sucursal_id, numero, nombre) VALUES (v_t, v_suc, 99, 'Caja 0223') RETURNING id INTO v_caja2;
+  SET LOCAL session_replication_role = replica;
+  INSERT INTO turnos (tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable, usuario_apertura_id, fondo_inicial_mxn, fondo_modo)
+  VALUES (v_t, v_suc, v_caja2, 'SMK-0223-2', (now() AT TIME ZONE 'America/Mexico_City')::date, v_maria, 0, 'TOTAL') RETURNING id INTO v_turno2;
+  SET LOCAL session_replication_role = origin;
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('anticipos_cita', jsonb_build_array(
+             v_p || jsonb_build_object('estado', 'DEVUELTO', 'turno_resuelve_id', v_turno, 'resuelto_at', now(), 'referencia_devolucion', 'x'))));
+  IF v_res ? '_errores' OR (v_res->'_conflictos'->0->>'id') IS DISTINCT FROM v_parte::text
+     OR (SELECT estado FROM anticipos_cita WHERE id = v_parte) <> 'RETENIDO' THEN
+    RAISE EXCEPTION '10: otro estado resuelto debía ser conflicto: %', v_res; END IF;
+  SELECT operaciones_conflicto, response_summary INTO r FROM sync_eventos WHERE tenant_id = v_t ORDER BY fecha_procesado_fin DESC LIMIT 1;
+  IF r.operaciones_conflicto <> 1 OR NOT (r.response_summary ? '_conflictos') THEN
+    RAISE EXCEPTION '10: el rastro no anotó el conflicto: %', to_jsonb(r); END IF;
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('anticipos_cita', jsonb_build_array(
+             v_p || jsonb_build_object('estado', 'RETENIDO', 'turno_resuelve_id', v_turno2, 'resuelto_at', now()))));
+  IF jsonb_array_length(COALESCE(v_res->'_conflictos', '[]')) <> 1 OR (SELECT turno_resuelve_id FROM anticipos_cita WHERE id = v_parte) <> v_turno THEN
+    RAISE EXCEPTION '10: resuelto en otra caja debía ser conflicto: %', v_res; END IF;
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('anticipos_cita', jsonb_build_array(
+             v_p || jsonb_build_object('estado', 'RETENIDO', 'turno_resuelve_id', v_turno, 'resuelto_at', now(), 'referencia_devolucion', 'nota'))));
+  IF v_res ? '_conflictos' OR v_res ? '_errores' OR (SELECT referencia_devolucion FROM anticipos_cita WHERE id = v_parte) IS DISTINCT FROM 'nota' THEN
+    RAISE EXCEPTION '10: mismo estado y misma caja debía entrar: %', v_res; END IF;
+
+  -- 11) El turno es de la caja del anticipo y la venta es la de su cita.
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('anticipos_cita', jsonb_build_array(
+    v_p || jsonb_build_object('id', gen_random_uuid(), 'turno_id', v_turno2),
+    v_a || jsonb_build_object('id', gen_random_uuid(), 'estado', 'APLICADO', 'ticket_id', v_k3, 'turno_resuelve_id', v_turno))));
+  IF (v_res->>'anticipos_cita')::int <> 0
+     OR NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_res->'_errores') e WHERE e->>'error' = 'el turno no es de la caja y sucursal del anticipo')
+     OR NOT EXISTS (SELECT 1 FROM jsonb_array_elements(v_res->'_errores') e WHERE e->>'error' LIKE 'la venta no es la de la cita%') THEN
+    RAISE EXCEPTION '11: debían rechazarse: %', v_res; END IF;
 
   -- 7) Lo de otro negocio se rechaza y no entra.
   v_res := sync_push_snapshot(v_t, jsonb_build_object('anticipos_cita', jsonb_build_array(

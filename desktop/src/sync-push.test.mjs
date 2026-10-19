@@ -1170,6 +1170,63 @@ describe("ventas que cambian después de subir, y el piso de las mesas (Postgres
     assert.ok(!(await antPend()), "lo que bajó no sube de vuelta");
   });
 
+  /** Un anticipo VIGENTE como lo deja registrar_anticipo, en un turno nuevo. */
+  const anticipar = async (cita, clave) => {
+    const tn = await turnoNuevo(`PRUEBA-${clave}`);
+    const { rows: [{ id }] } = await enReplica(
+      `INSERT INTO anticipos_cita (tenant_id, sucursal_id, caja_id, turno_id, cita_id, metodo_pago, monto_mxn, client_id_local)
+       VALUES ($1, $2, $3, $4, $5, 'EFECTIVO', 200, $6) RETURNING id`, [TENANT, SUC, CAJA, tn, cita, clave]);
+    return { id, tn };
+  };
+  const antPendiente = async (id) => (await pend()).anticipos.some((x) => x.id === id);
+
+  test("anticipos: el pull no pisa uno con cambio local pendiente", async () => {
+    await subir();
+    const cita = await agendar("cita-ant2", "03:00");
+    const { id: ant, tn } = await anticipar(cita, "ant-2");
+    await subir({ resultado: { citas: 1, citas_servicios: 1, anticipos_cita: 1 } });
+    const { rows: [{ f }] } = await db.query("SELECT to_jsonb(a) AS f FROM anticipos_cita a WHERE id = $1", [ant]);
+    await enReplica("UPDATE anticipos_cita SET estado = 'RETENIDO', turno_resuelve_id = $2, resuelto_at = now() WHERE id = $1", [ant, tn]);
+    await pullSnapshot(db, { anticipos_cita: [f] });   // la nube aún lo tiene VIGENTE
+    const { rows: [l] } = await db.query("SELECT estado FROM anticipos_cita WHERE id = $1", [ant]);
+    assert.equal(l.estado, "RETENIDO", "el pull no regresa el anticipo resuelto en la caja");
+    assert.ok(await antPendiente(ant), "y sigue pendiente de subir");
+  });
+
+  test("anticipos: uno aplicado viaja en el lote de su venta", async () => {
+    await subir();
+    const cita = await agendar("cita-ant3", "02:00");
+    const { id: ant, tn } = await anticipar(cita, "ant-3");
+    turno = tn; // crearVenta abre las ventas en este turno
+    const v1 = await crearVenta("ant-v1");
+    const v2 = await crearVenta("ant-v2");
+    await enReplica("UPDATE tickets SET estado_fiscal = 'PAGADO', fecha_apertura = now() WHERE id = ANY($1::uuid[])", [[v1, v2]]);
+    await enReplica("UPDATE citas SET ticket_id = $2, estado = 'COBRADA' WHERE id = $1", [cita, v2]);
+    await enReplica("UPDATE anticipos_cita SET estado = 'APLICADO', ticket_id = $2, turno_resuelve_id = $3, resuelto_at = now() WHERE id = $1", [ant, v2, tn]);
+    const nube = nubeFalsa({ resultado: { citas: 1, citas_servicios: 1, anticipos_cita: 1 } });
+    try {
+      await pushToCloud(db, OPTS, () => {}, { maxVentasPorLote: 1 });
+    } finally { nube.restaurar(); }
+    const lotes = nube.peticiones.filter((x) => (x.snapshot?.anticipos_cita ?? []).some((a) => a.id === ant));
+    assert.equal(lotes.length, 1, "una sola vez");
+    assert.ok((lotes[0].snapshot.tickets ?? []).some((t) => t.id === v2), "en el mismo lote que su venta");
+    assert.ok(!(await antPendiente(ant)), "confirmado, ya no");
+  });
+
+  test("anticipos: un conflicto de la nube se da por subido y queda en la bitácora", async () => {
+    await subir();
+    const cita = await agendar("cita-ant4", "01:00");
+    const { id: ant } = await anticipar(cita, "ant-4");
+    const bitacora = [];
+    const nube = nubeFalsa({ resultado: { citas: 1, citas_servicios: 1, anticipos_cita: 0,
+      _conflictos: [{ tabla: "anticipos_cita", id: ant, nube: "APLICADO", caja: "DEVUELTO", error: "anticipo resuelto dos veces" }] } });
+    try {
+      await pushToCloud(db, OPTS, (m) => bitacora.push(m));
+    } finally { nube.restaurar(); }
+    assert.ok(!(await antPendiente(ant)), "no se reintenta");
+    assert.ok(bitacora.some((m) => m.includes("resuelto(s) dos veces") && m.includes(String(ant).slice(0, 8))), "queda en la bitácora");
+  });
+
   test("citas: el catálogo vacío en la nube vacía el de la caja", async () => {
     await agendar("cita-cat", "21:00");   // asegura el colaborador
     const { rows: [{ t }] } = await db.query("SELECT to_jsonb(x) AS t FROM tenants x WHERE id = $1", [TENANT]);
