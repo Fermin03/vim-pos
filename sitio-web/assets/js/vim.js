@@ -707,8 +707,44 @@
 
     document.querySelectorAll(".seccion > .contenedor > *").forEach(function (bloque) {
       if (bloque.getBoundingClientRect().top < window.innerHeight) return;
-      bloque.classList.add(bloque.matches(".tres, .dos, .tira, .planes") ? "por-entrar-grupo" : "por-entrar");
+      bloque.classList.add(bloque.matches(".tres, .dos, .tira, .planes, .cuatro, .giro-tira") ? "por-entrar-grupo" : "por-entrar");
       entrada.observe(bloque);
     });
+  }
+
+  /* ---- Páginas por giro: la imagen que acompaña a cada rasgo -----------------
+     En la PC la columna de la imagen se queda quieta y muestra la del rasgo que
+     cruza la mitad de la pantalla. La línea de disparo es una franja delgada en
+     el centro (rootMargin −50 %), así que solo un rasgo la toca a la vez. */
+  var rasgos = document.querySelectorAll("[data-rasgo]");
+  var medios = document.querySelectorAll("[data-rasgo-media]");
+  if (rasgos.length && medios.length && "IntersectionObserver" in window) {
+    var verRasgo = new IntersectionObserver(function (entradas) {
+      entradas.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        var n = e.target.getAttribute("data-rasgo");
+        medios.forEach(function (m) { m.toggleAttribute("data-activo", m.getAttribute("data-rasgo-media") === n); });
+      });
+    }, { rootMargin: "-50% 0px -50% 0px" });
+    rasgos.forEach(function (r) { verRasgo.observe(r); });
+  }
+
+  /* ---- Barra fija de acciones (teléfono) ------------------------------------
+     Sale cuando el hero ya no se ve y se va cuando aparece el cierre, que trae
+     los mismos botones. */
+  var barra = document.querySelector("[data-barra-accion]");
+  var heroGiro = document.querySelector(".giro-hero");
+  var cierreGiro = document.querySelector(".cierre");
+  if (barra && heroGiro && "IntersectionObserver" in window) {
+    var heroVisible = true, cierreVisible = false;
+    var pintarBarra = function () { barra.toggleAttribute("data-visible", !heroVisible && !cierreVisible); };
+    var verBarra = new IntersectionObserver(function (entradas) {
+      entradas.forEach(function (e) {
+        if (e.target === heroGiro) heroVisible = e.isIntersecting; else cierreVisible = e.isIntersecting;
+      });
+      pintarBarra();
+    });
+    verBarra.observe(heroGiro);
+    if (cierreGiro) verBarra.observe(cierreGiro);
   }
 })();

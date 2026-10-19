@@ -1729,3 +1729,126 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 @media (hover: hover) and (pointer: fine) { .subnav a:hover { color: var(--ink); } }
 /* El destino de un ancla tiene ahora dos barras encima, no una. */
 body:has(.subnav) :target { scroll-margin-top: calc(65px + 44px + var(--sp-5)); }
+
+/* ==========================================================================
+   Páginas por giro (/punto-de-venta-<giro>)
+
+   Una sola plantilla para los catorce giros: hero con tira de fotos, rasgos con
+   la imagen quieta a un lado, herramientas en tarjetas con imagen, equipo,
+   planes, guías, preguntas y cierre. Lo que cambia de un giro a otro es el
+   texto y las imágenes, no el orden.
+
+   Las fotos del local todavía no existen: cada una es un `.hueco` que dice qué
+   foto va ahí. Es la lista de tomas para la sesión de fotos, y como se ve
+   rayado no se confunde con una foto terminada.
+   ========================================================================== */
+
+.giro-hero { padding-block: clamp(var(--sp-10), 8vw, var(--sp-12)) var(--sp-8); }
+.giro-hero h1 { max-width: 20ch; }
+.giro-hero h1 .eyebrow { display: block; margin-bottom: var(--sp-4); }
+/* En el teléfono los dos botones van lado a lado y del mismo ancho, igual que
+   en la barra fija de abajo. */
+@media (max-width: 599px) {
+  .giro-hero .fila, main:has(.giro-hero) .cierre .fila { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+  .giro-hero .btn-hero, main:has(.giro-hero) .cierre .btn-hero { padding-inline: var(--sp-3); }
+  .giro-tira .hueco span { display: none; }   /* la toma se lee en la PC; aquí no cabe */
+}
+
+/* La tira de tres fotos bajo el hero. En el teléfono siguen siendo tres, más
+   bajitas: una sola foto grande empujaba el primer rasgo fuera de la pantalla. */
+.giro-tira {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: clamp(var(--sp-2), 1.2vw, var(--sp-4));
+}
+.foto {
+  margin: 0;
+  aspect-ratio: 4 / 5;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--hover);
+}
+.foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.foto .hueco { height: 100%; min-height: 0; padding: var(--sp-3); }
+.foto-ancha { aspect-ratio: 16 / 10; }
+
+/* ---- Rasgos: la imagen se queda y el texto pasa -------------------------
+   En la PC la columna de la imagen es pegajosa y cambia —solo un fundido— al
+   llegar a cada rasgo; vim.js marca cuál. En el teléfono cada rasgo lleva su
+   imagen arriba, y la columna pegajosa no existe. Sin script se ve la primera. */
+.giro-rasgos-titulo { text-align: center; max-width: 22ch; margin-inline: auto; }
+.giro-rasgos { display: grid; gap: var(--sp-10); }
+.giro-rasgos-media { display: none; }
+.giro-rasgos > .pila { gap: var(--sp-10); }
+.giro-rasgo { display: flex; flex-direction: column; gap: var(--sp-4); }
+.giro-rasgo h3 { font-size: clamp(var(--t-24), 2.6vw, var(--t-32)); }
+.giro-rasgo p { font-size: var(--t-18); }
+
+@media (min-width: 900px) {
+  .giro-rasgos { grid-template-columns: 1fr 1fr; gap: var(--sp-12); align-items: start; }
+  .giro-rasgos-media {
+    display: grid;
+    position: sticky; top: calc(65px + var(--sp-8));
+  }
+  .giro-rasgos-media > * {
+    grid-area: 1 / 1;
+    opacity: 0;
+    transition: opacity var(--v-media) ease;
+  }
+  .giro-rasgos-media > [data-activo] { opacity: 1; }
+  .giro-rasgos > .pila { gap: 0; }
+  .giro-rasgo { min-height: 70vh; justify-content: center; }
+  .giro-rasgo > .figura, .giro-rasgo > .foto { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .giro-rasgos-media > * { transition: none; }
+}
+
+/* ---- Tarjetas con imagen arriba (herramientas, equipo, guías) ------------ */
+.tarjeta-media {
+  position: relative;
+  display: flex; flex-direction: column; gap: var(--sp-4);
+  transition: border-color var(--v-corta) ease;
+}
+.tarjeta-media-imagen {
+  margin: calc(-1 * var(--sp-6)) calc(-1 * var(--sp-6)) 0;
+  padding: var(--sp-6) var(--sp-6) 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  overflow: hidden;
+  aspect-ratio: 16 / 10;              /* todas las tarjetas igual de altas; lo alto (ticket, celular) se corta abajo */
+}
+.tarjeta-media-imagen .figura-papel .monitor { max-width: 46%; }
+.tarjeta-media-imagen .monitor { border-radius: var(--r-lg) var(--r-lg) 0 0; border-bottom: 0; box-shadow: none; }
+.tarjeta-media-imagen.foto { aspect-ratio: 16 / 10; padding: 0; }
+.tarjeta-media-imagen > img { width: 100%; height: auto; display: block; border-radius: var(--r) var(--r) 0 0; }
+.tarjeta-media .mas { margin-top: auto; font-weight: 600; font-size: var(--t-15); }
+.tarjeta-media:has(.enlace-tarjeta:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .tarjeta-media:has(.enlace-tarjeta):hover { border-color: var(--accent); }
+}
+
+.cuatro { display: grid; gap: var(--sp-5); }
+@media (min-width: 640px) { .cuatro { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1040px) { .cuatro { grid-template-columns: repeat(4, 1fr); } }
+
+/* ---- Barra fija de acciones (solo teléfono y tableta) -------------------
+   Aparece cuando el hero sale de la pantalla y se quita cuando llega el
+   cierre, que ya trae los mismos dos botones. vim.js la marca. */
+.barra-accion {
+  position: fixed; inset: auto 0 0 0; z-index: 45;   /* bajo el encabezado (50) y el cajón (60) */
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-5) calc(var(--sp-3) + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line);
+  transform: translateY(100%);
+  visibility: hidden;
+  transition: transform var(--v-media) var(--sal), visibility 0s linear var(--v-media);
+}
+.barra-accion[data-visible] {
+  transform: none; visibility: visible;
+  transition: transform var(--v-media) var(--sal), visibility 0s;
+}
+@media (min-width: 900px) { .barra-accion { display: none; } }
+@media (prefers-reduced-motion: reduce) { .barra-accion { transition: none; } }

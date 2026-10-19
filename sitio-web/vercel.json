@@ -75,6 +75,11 @@
       "permanent": true
     },
     {
+      "source": "/punto-de-venta-cafeterias.html",
+      "destination": "/punto-de-venta-cafeterias",
+      "permanent": true
+    },
+    {
       "source": "/punto-de-venta-restaurantes-leon.html",
       "destination": "/punto-de-venta-restaurantes-leon",
       "permanent": true
@@ -215,6 +220,17 @@
         }
       ],
       "destination": "/punto-de-venta-hamburgueserias.md"
+    },
+    {
+      "source": "/punto-de-venta-cafeterias",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*(text/markdown|text/x-markdown).*"
+        }
+      ],
+      "destination": "/punto-de-venta-cafeterias.md"
     },
     {
       "source": "/punto-de-venta-restaurantes-leon",
@@ -365,6 +381,10 @@
     {
       "source": "/punto-de-venta-hamburgueserias",
       "destination": "/punto-de-venta-hamburgueserias.html"
+    },
+    {
+      "source": "/punto-de-venta-cafeterias",
+      "destination": "/punto-de-venta-cafeterias.html"
     },
     {
       "source": "/punto-de-venta-restaurantes-leon",
@@ -621,6 +641,23 @@
         {
           "key": "Link",
           "value": "<https://vimpos.com.mx/punto-de-venta-hamburgueserias.md>; rel=\"alternate\"; type=\"text/markdown\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-cafeterias",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-cafeterias.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
@@ -978,6 +1015,23 @@
         {
           "key": "Link",
           "value": "<https://vimpos.com.mx/punto-de-venta-hamburgueserias>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-cafeterias.md",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-cafeterias>; rel=\"canonical\""
         }
       ]
     },
