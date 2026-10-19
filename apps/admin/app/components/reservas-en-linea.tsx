@@ -96,7 +96,7 @@ export function ReservasEnLinea({ direccion, soloLectura }: {
     <>
       {reembolsos.length > 0 && (
         <Tarjeta titulo="Reembolsos por resolver">
-          <Aviso tono="warning" role="alert">Mercado Pago no pudo devolver este anticipo. Devuélvelo a mano y márcalo como resuelto.</Aviso>
+          <Aviso tono="warning" role="alert">Mercado Pago no pudo devolver este anticipo. Devuélvelo a mano desde tu cuenta de Mercado Pago.</Aviso>
           <ul className="mt-3 divide-y divide-line">
             {reembolsos.map((r) => (
               <li key={r.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2.5">
