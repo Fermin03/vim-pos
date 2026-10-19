@@ -56,6 +56,21 @@ reservó, servicios con colaborador, espacio, duración y precio. Acciones segú
 - Terminada, cancelada o No llegó: sin acciones.
 - Con empalme marcado por el sync: aviso con **Ya lo moví**.
 
+### Anticipos (entrega 2)
+
+- Si el negocio no cobra «Al final», una cita por llegar o en espera tiene **Cobrar anticipo** (monto
+  sugerido editable y método). Al agendar una cita nueva la ficha abre ofreciéndolo; «Ahora no» la cierra.
+  Lo cobrado se ve como **«Anticipo pagado $X»**.
+- **Cancelar** con anticipo pregunta quién cancela («Cancela la clienta» / «Cancela el salón»). Primero se
+  cancela o se marca **No llegó**; después: **«¿Qué hacemos con el anticipo de $X?»** — Devolver o
+  Retener, con la sugerida marcada (salón o a tiempo → Devolver; tarde o no llegó → Retener). Devolver con
+  tarjeta o transferencia pide la referencia; en efectivo sin permiso, el PIN de un supervisor. Si se
+  cierra sin elegir, la ficha dice **«Anticipo pendiente de devolver o retener»** con los dos botones.
+- Al cobrar la venta de la cita, el anticipo vigente se aplica solo y primero: el cobro muestra
+  **Total**, **Anticipo −$X** y **Por cobrar**. Si cubre todo, la venta queda pagada con anticipo.
+- El corte enseña «Anticipos recibidos», «Pagado con anticipo», «Anticipos devueltos» y «Anticipos
+  retenidos (no reembolsables)» como información; ANTICIPO nunca se declara.
+
 ## Lista de espera
 
 Panel con quien llegó sin cita: nombre, «Llegó a las HH:MM · hace N min», servicios y preferencia.

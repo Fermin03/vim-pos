@@ -14,6 +14,7 @@ import {
   leerEstadisticasTurno,
   leerMovimientosTurno,
   filasDeclarables,
+  filasAnticipos,
   type ReporteXResumen,
   type CorteResultado,
   type CierreZ,
@@ -450,6 +451,8 @@ export function PantallaCierre({
               {/* Crédito (0208/0209): no entró dinero, así que no se cuenta. Solo para saberlo. */}
               {resumen.ventasACredito > 0 && <Row l="Vendido a crédito" v={fmtMxn(resumen.ventasACredito)} />}
               {resumen.pagadoConSaldoFavor > 0 && <Row l="Pagado con saldo a favor" v={fmtMxn(resumen.pagadoConSaldoFavor)} />}
+              {/* Anticipos de cita (0222): informativos, nunca se declaran. */}
+              {filasAnticipos(resumen).map((f) => <Row key={f.l} l={f.l} v={fmtMxn(f.v)} />)}
               {/* Venta, propinas y efectivo esperado se ven en el resultado: con ellos a la vista
                   se puede sacar la cuenta del cajón y el conteo deja de ser ciego. */}
               <p className="mt-4 rounded border border-line bg-sel px-3 py-2.5 text-13 leading-snug text-ink-2">
@@ -563,10 +566,11 @@ export function PantallaCierre({
                 </span>
               </div>
             </div>
-            {(resumen.ventasACredito > 0 || resumen.pagadoConSaldoFavor > 0) && (
+            {(resumen.ventasACredito > 0 || resumen.pagadoConSaldoFavor > 0 || filasAnticipos(resumen).length > 0) && (
               <div className="mt-3 px-1 text-14">
                 {resumen.ventasACredito > 0 && <Row l="Vendido a crédito (no se cuenta)" v={fmtMxn(resumen.ventasACredito)} />}
                 {resumen.pagadoConSaldoFavor > 0 && <Row l="Pagado con saldo a favor (no se cuenta)" v={fmtMxn(resumen.pagadoConSaldoFavor)} />}
+                {filasAnticipos(resumen).map((f) => <Row key={f.l} l={f.l} v={fmtMxn(f.v)} />)}
               </div>
             )}
             <div className="mt-5 flex items-center justify-between gap-3">

@@ -105,6 +105,7 @@ import { SeccionCalendario } from "./seccion-calendario";
 import { SeccionClientes } from "./seccion-clientes";
 import { ModalCita, type AbrirCita } from "./modal-cita";
 import { FichaCita } from "./ficha-cita";
+import { configCobroAgenda } from "../lib/anticipos";
 import { PanelEspera } from "./panel-espera";
 import { CitasCobro, ElegirColaborador } from "./citas-cobro";
 import { colaboradoresDelDia, lineasDeCita, nombreCorto, precioEnCaja, servicioSinColaborador, serviciosAgenda, type CitaDia, type ColaboradorDia, type ServicioAgenda } from "../lib/agenda";
@@ -645,6 +646,8 @@ export function HomePos({
   // Agenda de belleza: la ficha de una cita, la cita nueva o en edición, la lista de espera, y la
   // versión que relee el calendario al guardar, mover o cancelar.
   const [fichaCita, setFichaCita] = useState<string | null>(null);
+  /** La ficha abre ofreciendo el anticipo de la cita recién agendada. */
+  const [ofrecerAnticipo, setOfrecerAnticipo] = useState(false);
   const [modalCita, setModalCita] = useState<AbrirCita | null>(null);
   const [esperaAgendaAbierta, setEsperaAgendaAbierta] = useState(false);
   const [agendaVersion, setAgendaVersion] = useState(0);
@@ -2609,6 +2612,7 @@ export function HomePos({
           totalesIniciales={totalesCobro}
           atajo={atajoCobro}
           moduloCredito={modulos?.credito === true}
+          conCitas={agenda}
           onMontoACobrar={setMontoCobro}
           onPagado={(folio, cambio, total, aCredito) => cobroTerminado(totalesCobro.ticketId, folio, cambio, total, aCredito)}
           onCerrar={() => { setTotalesCobro(null); setAtajoCobro(null); }}
@@ -3693,9 +3697,13 @@ export function HomePos({
           token={token}
           citaId={fichaCita}
           negocio={caja.negocioNombre}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          ejecutaNombre={empleado.nombre}
+          ofrecerAnticipo={ofrecerAnticipo}
           onMover={(cita) => setModalCita({ cita })}
           onCambio={agendaCambio}
-          onCerrar={() => setFichaCita(null)}
+          onCerrar={() => { setFichaCita(null); setOfrecerAnticipo(false); }}
         />
       )}
       {agenda && modalCita && (
@@ -3704,11 +3712,15 @@ export function HomePos({
           tenantId={caja.tenant_id}
           sucursalId={caja.sucursal_id}
           abrir={modalCita}
-          onGuardada={() => {
+          onGuardada={(nuevaId) => {
             // Mover cierra también la ficha: la cita cambió de lugar y se ve en el calendario.
             if (modalCita.cita) setFichaCita(null);
             setModalCita(null);
             agendaCambio();
+            // Cita nueva en un negocio que cobra por adelantado: la ficha abre «Cobrar anticipo».
+            if (nuevaId) void configCobroAgenda(token).then((c) => {
+              if (c.modo !== "AL_FINAL") { setOfrecerAnticipo(true); setFichaCita(nuevaId); }
+            }).catch(() => {});
           }}
           onCerrar={() => setModalCita(null)}
         />

@@ -27,6 +27,7 @@ import {
   type CreditoCliente,
   type CuentaCredito,
 } from "../lib/credito";
+import { anticipoPorAplicar, leerAnticipoVenta, pagarConAnticipo, TEXTO_ANTICIPO } from "../lib/anticipos";
 
 // ─── Íconos SVG inline (calcan los mockups) ────────────────────────────────
 
@@ -252,11 +253,14 @@ function VistaSelector({
   totales,
   conTerminal,
   extras = [],
+  anticipo = 0,
   error,
   onElegir,
   onCerrar,
 }: {
   totales: TotalesTicket;
+  /** Lo que esta venta ya pagó con el anticipo de su cita (belleza): «Anticipo −$X» y «Por cobrar». */
+  anticipo?: number;
   /** La caja tiene terminal ligada: Débito y Crédito se vuelven un solo «Tarjeta» que cobra en ella. */
   conTerminal: boolean;
   /** «A crédito» y «Saldo a favor», ya con su detalle (módulo de crédito). Vacío = como siempre. */
@@ -285,12 +289,29 @@ function VistaSelector({
   return (
     <div className="flex flex-col h-full">
       {/* Total a cobrar */}
-      <div className="text-center px-6 py-5 border border-line rounded-lg bg-sel mb-5">
-        <div className="text-12 font-bold uppercase tracking-widest text-ink-3 mt-3">Total a cobrar</div>
-        <div className="font-display text-40 font-bold tracking-tight text-ink tabular-nums leading-none mt-1 mb-1">
-          {fmtMxn(totales.total)}
+      {anticipo > 0 ? (
+        <div className="border border-line rounded-lg bg-sel mb-5 px-5 py-4">
+          <div className="flex items-baseline justify-between text-15 text-ink-2">
+            <span>Total</span>
+            <span className="tabular-nums">{fmtMxn(totales.total)}</span>
+          </div>
+          <div className="mt-1 flex items-baseline justify-between text-15 text-ink-2">
+            <span>{TEXTO_ANTICIPO.lineaCobro}</span>
+            <span className="tabular-nums">−{fmtMxn(anticipo)}</span>
+          </div>
+          <div className="mt-3 flex items-baseline justify-between border-t border-line pt-3">
+            <span className="font-display text-20 font-bold text-ink">{TEXTO_ANTICIPO.porCobrar}</span>
+            <span className="font-display text-32 font-bold tracking-tight text-ink tabular-nums leading-none">{fmtMxn(totales.pendiente)}</span>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="text-center px-6 py-5 border border-line rounded-lg bg-sel mb-5">
+          <div className="text-12 font-bold uppercase tracking-widest text-ink-3 mt-3">Total a cobrar</div>
+          <div className="font-display text-40 font-bold tracking-tight text-ink tabular-nums leading-none mt-1 mb-1">
+            {fmtMxn(totales.total)}
+          </div>
+        </div>
+      )}
 
       {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
       <div className="text-15 font-semibold text-ink-2 mb-3">¿Cómo paga el cliente?</div>
@@ -1142,6 +1163,7 @@ export function ModalCobro({
   totalesIniciales,
   atajo = null,
   moduloCredito = false,
+  conCitas = false,
   onPagado,
   onCerrar,
   onMontoACobrar,
@@ -1167,6 +1189,8 @@ export function ModalCobro({
   atajo?: "EFECTIVO_EXACTO" | null;
   /** Módulo de crédito encendido (`modulos.credito`): «A crédito» y «Saldo a favor» para el cliente de la cuenta. */
   moduloCredito?: boolean;
+  /** Caja de belleza: si la venta es de una cita con anticipo vigente, se aplica primero (0222). */
+  conCitas?: boolean;
   /** `aCredito`: no entró dinero; «Cobro completado» dice «A crédito» y no anuncia un total cobrado. */
   onPagado: (folio: string | null, cambio: number, total: number | null, aCredito?: boolean) => void;
   onCerrar: () => void;
@@ -1281,12 +1305,48 @@ export function ModalCobro({
 
   // Efectivo exacto: se aplica UNA vez al llegar a su vista (después de la propina, si la hubo).
   const atajoAplicado = useRef(false);
+  // Anticipo de la cita (abajo): el atajo espera a que se aplique.
+  const [anticipoListo, setAnticipoListo] = useState(!conCitas);
+  const [anticipoAplicado, setAnticipoAplicado] = useState(0);
+  const anticipoLeido = useRef(false);
+  const pagoAnticipoId = useRef<string | null>(null);
   useEffect(() => {
-    if (vista !== "atajo" || atajoAplicado.current) return;
+    if (vista !== "atajo" || atajoAplicado.current || !anticipoListo) return;
     atajoAplicado.current = true;
     void aplicarUnPago("EFECTIVO", totalesEf.pendiente, totalesEf.pendiente);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vista]);
+  }, [vista, anticipoListo]);
+
+  // ── Anticipo de la cita (belleza, 0222) ─────────────────────────────────────────────────────
+  // Se aplica solo y primero, ya con la propina: el resto se cobra con otra forma de pago. Si el
+  // anticipo cubre todo, la venta queda pagada con ANTICIPO. Fuera de belleza no se lee nada.
+  useEffect(() => {
+    if (!conCitas || anticipoLeido.current || (vista !== "selector" && vista !== "atajo")) return;
+    anticipoLeido.current = true;
+    (async () => {
+      try {
+        const a = await leerAnticipoVenta(token, totales.ticketId);
+        let aplicado = a?.aplicado ?? 0;
+        if (a && anticipoPorAplicar(a, totalesEf.pendiente) > 0) {
+          aplicado += await pagarConAnticipo(token, totales.ticketId, a.citaId, (pagoAnticipoId.current ??= nuevoClientId()));
+          const t = await leerTotales(token, totales.ticketId);
+          setTotales(t);
+          if (t.estadoFiscal === "PAGADO") {
+            atajoAplicado.current = true;
+            onPagado(t.folio, 0, t.total);
+            return;
+          }
+        }
+        setAnticipoAplicado(Math.round(aplicado * 100) / 100);
+      } catch (e) {
+        // Sin el anticipo se cobra como siempre; el anticipo sigue vigente en la cita.
+        const t = await trasFalloDeCobro(e);
+        if (ventaQuedoPagada(t)) { atajoAplicado.current = true; return; }
+      }
+      setAnticipoListo(true);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conCitas, vista]);
 
   // ── A crédito y saldo a favor (retail 2, entrega 2) ─────────────────────────────────────────
   // Con el módulo apagado no se lee nada: un restaurante cobra exactamente como antes.
@@ -1526,11 +1586,15 @@ export function ModalCobro({
             <div className="font-display text-32 font-bold tabular-nums">{fmtMxn(totalesEf.pendiente)}</div>
           </div>
         )}
-        {vista === "selector" && (
+        {vista === "selector" && !anticipoListo && (
+          <div className="flex items-center justify-center py-16 text-sm text-ink-3">Cargando…</div>
+        )}
+        {vista === "selector" && anticipoListo && (
           <VistaSelector
             totales={totalesEf}
             conTerminal={conTerminal}
             extras={extras}
+            anticipo={anticipoAplicado}
             error={error}
             onElegir={elegirMetodo}
             onCerrar={onCerrar}

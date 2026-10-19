@@ -33,7 +33,8 @@ export function ModalCita({ token, tenantId, sucursalId, abrir, onGuardada, onCe
   tenantId: string;
   sucursalId: string;
   abrir: AbrirCita;
-  onGuardada: () => void;
+  /** `nuevaId`: la cita recién agendada (no la movida ni la de espera), para ofrecer su anticipo. */
+  onGuardada: (nuevaId: string | null) => void;
   onCerrar: () => void;
 }) {
   const { cita, espera } = abrir;
@@ -128,9 +129,9 @@ export function ModalCita({ token, tenantId, sucursalId, abrir, onGuardada, onCe
         id: cita?.id, sucursalId, cliente: c, inicia: espera ? null : inicio, nota, renglones,
         clientIdLocal: cita ? undefined : clave.current,
       });
-      if (espera) await agregarEnEspera(token, p);
-      else await guardarCita(token, p);
-      onGuardada();
+      if (espera) { await agregarEnEspera(token, p); onGuardada(null); return; }
+      const id = await guardarCita(token, p);
+      onGuardada(cita ? null : id);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo guardar la cita");
       setGuardando(false);
