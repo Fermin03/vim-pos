@@ -19,7 +19,22 @@ export type ReporteXResumen = {
   propinaTotal: number;
   devoluciones: number;
   pagosPorMetodo: PagoMetodo[];
+  /** Vendido a crédito en el turno (0208): no es dinero recibido, no se declara. */
+  ventasACredito: number;
+  /** Pagado con saldo a favor en el turno (0209): tampoco se declara. */
+  pagadoConSaldoFavor: number;
 };
+
+/** Ni CREDITO ni SALDO_FAVOR son dinero que se cuente: `reporte_x` ya no los trae, y si llegaran no se declaran. */
+const NO_SE_DECLARA = new Set(["CREDITO", "SALDO_FAVOR"]);
+
+/** Lo que el cajero cuenta: el efectivo esperado y, después, cada método que recibió dinero (abonos incluidos). */
+export function filasDeclarables(r: Pick<ReporteXResumen, "efectivoEsperado" | "pagosPorMetodo">): { metodo: string; esperado: number }[] {
+  const otros = r.pagosPorMetodo
+    .filter((p) => p.metodo !== "EFECTIVO" && !NO_SE_DECLARA.has(p.metodo))
+    .map((p) => ({ metodo: p.metodo, esperado: p.total }));
+  return [{ metodo: "EFECTIVO", esperado: r.efectivoEsperado }, ...otros];
+}
 
 /** Lectura intermedia del turno (no cierra nada). Bajo RLS del empleado. */
 export async function leerReporteX(token: string, turnoId: string): Promise<ReporteXResumen> {
@@ -46,6 +61,8 @@ export async function leerReporteX(token: string, turnoId: string): Promise<Repo
       total: num(p.monto_total_mxn),
       cantidad: num(p.cantidad_pagos),
     })),
+    ventasACredito: num(x.ventas_a_credito_mxn),
+    pagadoConSaldoFavor: num(x.pagado_con_saldo_favor_mxn),
   };
 }
 

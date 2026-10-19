@@ -9,7 +9,10 @@ export type MetodoPago =
   | "TARJETA_CREDITO"
   | "TARJETA_DEBITO"
   | "TRANSFERENCIA"
-  | "APP_OTRO";
+  | "APP_OTRO"
+  /** Venta a crédito y saldo a favor (0208/0209): van por su RPC (`lib/credito.ts`), no por `aplicar_pago`. */
+  | "CREDITO"
+  | "SALDO_FAVOR";
 
 export type PagoInput = {
   metodo: MetodoPago;

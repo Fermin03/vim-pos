@@ -33,6 +33,7 @@ import { ModalModificadores } from "./modal-modificadores";
 import { ModalCombo } from "./modal-combo";
 import { HojaCombo } from "./hoja-combo";
 import { ModalCobro } from "./modal-cobro";
+import { SeccionCreditos } from "./seccion-creditos";
 import { CobroCompletado } from "./cobro-completado";
 import { ModalDescuento } from "./modal-descuento";
 import { obtenerImpresora, obtenerImpresoraDeEstacion } from "../lib/print/adapter";
@@ -216,6 +217,8 @@ export function HomePos({
   /** Ticket abierto que es cuenta de barra: solo para rotularlo «Barra» (el carrito lo ve como comedor). */
   const [cuentaBarraId, setCuentaBarraId] = useState<string | null>(null);
   const [enDevoluciones, setEnDevoluciones] = useState(false);
+  /** Tienda: «Créditos» abierto dentro de Configuración (quién debe y abonos). */
+  const [enCreditos, setEnCreditos] = useState(false);
   // ADR 0011 — pedidos de apps de delivery: pantalla, badge del inicio y sonido al llegar uno nuevo.
   const [enPedidosApps, setEnPedidosApps] = useState(false);
   const [nPedidosApps, setNPedidosApps] = useState(0);
@@ -816,6 +819,7 @@ export function HomePos({
     const n = recepcionPendiente.current;
     if (destino !== "inventario" && n > 0 && !(await confirmarDescarteRecepcion(n))) return;
     setSeccionTienda(destino);
+    setEnCreditos(false); // tocar Configuración otra vez vuelve a su menú
   }, [confirmarDescarteRecepcion]);
 
   // Se cobró, se canceló o se volvió a poner en espera a mano: el ticket ya no está en pantalla y
@@ -2385,6 +2389,7 @@ export function HomePos({
           ejecutaNombre={empleado.nombre}
           totalesIniciales={totalesCobro}
           atajo={atajoCobro}
+          moduloCredito={modulos?.credito === true}
           onMontoACobrar={setMontoCobro}
           onPagado={(folio, cambio, total) => cobroTerminado(totalesCobro.ticketId, folio, cambio, total)}
           onCerrar={() => { setTotalesCobro(null); setAtajoCobro(null); }}
@@ -3210,7 +3215,14 @@ export function HomePos({
       </div>
       {tienda && seccionTienda !== "panel" && (
         <div className="flex min-h-0 flex-1 flex-col">
-          {seccionTienda === "configuracion" ? (
+          {seccionTienda === "configuracion" && enCreditos ? (
+            <SeccionCreditos
+              token={token}
+              cajaId={turno.caja_id}
+              turnoId={turno.id}
+              onVolver={() => setEnCreditos(false)}
+            />
+          ) : seccionTienda === "configuracion" ? (
             <>
               <div className="flex flex-shrink-0 items-center gap-4 border-b border-line bg-surface px-4 py-3">
                 <h1 className="font-display text-20 font-semibold tracking-tight">Configuración</h1>
@@ -3225,6 +3237,7 @@ export function HomePos({
                   onEnEspera={nEnEspera > 0 ? () => { setEsperaError(null); setEsperaListaAbierta(true); } : undefined}
                   onAbrirCajon={() => setAbrirCajaAbierto(true)}
                   onMovimientoCaja={() => setMovimientoAbierto(true)}
+                  onCreditos={() => setEnCreditos(true)}
                   nEnEspera={nEnEspera}
                   onCambiarCajero={conVentaSuelta(onCambiarCajero)}
                   onBloquear={conVentaSuelta(onBloquear)}

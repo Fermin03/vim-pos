@@ -131,6 +131,10 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
     b.push({ t: "fila", izq: "Forma de pago", der: p.metodo });
     if (p.tarjeta) b.push({ t: "fila", izq: "", der: p.tarjeta });
     if (p.autorizacion) b.push({ t: "fila", izq: "Autorización", der: p.autorizacion });
+    if (p.porPagar) {
+      b.push({ t: "fila", izq: "Por pagar", der: pesos(p.porPagar.montoMxn), bold: true });
+      b.push({ t: "fila", izq: "Fecha límite", der: fechaCorta(p.porPagar.fechaLimite) });
+    }
     if (p.recibidoMxn != null) {
       b.push({ t: "fila", izq: "Recibido", der: pesos(p.recibidoMxn) });
       b.push({ t: "fila", izq: "Cambio", der: pesos(p.cambioMxn) });

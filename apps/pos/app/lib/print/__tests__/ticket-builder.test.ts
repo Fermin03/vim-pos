@@ -48,6 +48,19 @@ describe("construirTicketJob", () => {
     expect(job.bloques[job.bloques.length - 1]).toEqual({ t: "corte" });
   });
 
+  it("venta a crédito: «A crédito» y debajo «Por pagar» con la fecha límite", () => {
+    const d = { ...DATOS, pagos: [{ metodo: "A crédito", montoMxn: 108, recibidoMxn: null, cambioMxn: 0, porPagar: { montoMxn: 108, fechaLimite: "2026-11-02" } }] };
+    const filas = construirTicketJob(d).bloques.filter((b) => b.t === "fila");
+    const i = filas.findIndex((b) => b.t === "fila" && b.izq === "Forma de pago" && b.der === "A crédito");
+    expect(i).toBeGreaterThanOrEqual(0);
+    expect(filas[i + 1]).toEqual({ t: "fila", izq: "Por pagar", der: "$108.00", bold: true });
+    expect(filas[i + 2]).toEqual({ t: "fila", izq: "Fecha límite", der: "02/11/2026" });
+  });
+
+  it("sin crédito no hay renglón «Por pagar»", () => {
+    expect(construirTicketJob(DATOS).bloques.find((b) => b.t === "fila" && b.izq === "Por pagar")).toBeUndefined();
+  });
+
   it("omite la línea de descuento cuando es 0", () => {
     const sinDesc = { ...DATOS, totales: { ...DATOS.totales, descuentos: 0 } };
     const job = construirTicketJob(sinDesc);

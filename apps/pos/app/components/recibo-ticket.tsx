@@ -182,6 +182,12 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
             <PayRow label="Forma de pago:" value={p.metodo} />
             {p.tarjeta && <PayRow label="" value={p.tarjeta} />}
             {p.autorizacion && <PayRow label="Autorización:" value={p.autorizacion} />}
+            {p.porPagar && (
+              <>
+                <PayRow label="Por pagar:" value={fmt(p.porPagar.montoMxn)} />
+                <PayRow label="Fecha límite:" value={fechaCorta(p.porPagar.fechaLimite)} />
+              </>
+            )}
             {p.recibidoMxn != null && (
               <>
                 <PayRow label="Recibido:" value={fmt(p.recibidoMxn)} />

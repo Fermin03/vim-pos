@@ -61,6 +61,8 @@ export type PagoImpresion = {
   /** «Mastercard **** 1447» y la autorización del banco: solo si se cobró en la terminal integrada. */
   tarjeta?: string | null;
   autorizacion?: string | null;
+  /** Venta a crédito (0208): lo que falta por pagar y hasta cuándo (YYYY-MM-DD, venta + plazo). */
+  porPagar?: { montoMxn: number; fechaLimite: string } | null;
 };
 
 /** Lo que el repartidor necesita para llegar y para que le abran la puerta, y quién lo lleva. */

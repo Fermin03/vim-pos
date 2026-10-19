@@ -6,6 +6,7 @@ import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
 import { leerPrograma } from "../lealtad";
 import { puntosPorCompra, type Programa } from "../lealtad-reglas";
 import { resumenCambio } from "../cambio-talla";
+import { fechaLimiteCredito } from "../credito";
 import type { DatosEntrega, DatosTicketImpresion, LealtadImpresion, LineaImpresion, PagoImpresion } from "./tipos";
 
 
@@ -259,6 +260,10 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
     .is("deleted_at", null)
     .order("created_at", { ascending: true });
   if (e3) throw new Error(e3.message);
+  // Venta a crédito: debajo de «A crédito», lo que falta por pagar y la fecha límite.
+  const porPagar = (pagos ?? []).some((p) => (p as { metodo_pago: string }).metodo_pago === "CREDITO")
+    ? await leerPorPagar(sb, ticketId, (tk.cliente_id as string | null) ?? null, (tk.fecha_pago as string) ?? (tk.created_at as string))
+    : null;
   const pagosImp: (PagoImpresion & { clientId: string | null })[] = (pagos ?? []).map((p) => {
     const r = p as {
       metodo_pago: string; monto_mxn: string | number; monto_recibido_mxn: string | number | null; cambio_mxn: string | number;
@@ -275,6 +280,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       recibidoMxn: r.monto_recibido_mxn == null ? null : Number(r.monto_recibido_mxn),
       cambioMxn: Number(r.cambio_mxn),
       clientId: r.client_id_local,
+      ...(r.metodo_pago === "CREDITO" && porPagar ? { porPagar } : {}),
     };
   });
 
@@ -413,6 +419,23 @@ async function leerCambioTalla(sb: ReturnType<typeof employeeClient>, tenantId: 
       diferencia,
       texto,
     };
+  } catch {
+    return null;
+  }
+}
+
+/** Saldo de la venta a crédito y su fecha límite. Nunca lanza: sin el dato, el ticket sale sin el renglón. */
+async function leerPorPagar(sb: ReturnType<typeof employeeClient>, ticketId: string, clienteId: string | null, fechaVenta: string): Promise<PagoImpresion["porPagar"]> {
+  if (!clienteId) return null;
+  try {
+    const [{ data: saldo }, { data: cc }] = await Promise.all([
+      sb.rpc("credito_saldo_ticket", { p_ticket: ticketId }),
+      sb.from("clientes_credito").select("plazo_dias").eq("cliente_id", clienteId).maybeSingle(),
+    ]);
+    const monto = Number(saldo ?? 0);
+    const plazo = (cc as { plazo_dias: number } | null)?.plazo_dias;
+    if (!(monto > 0) || !plazo) return null;
+    return { montoMxn: monto, fechaLimite: fechaLimiteCredito(fechaVenta, plazo) };
   } catch {
     return null;
   }

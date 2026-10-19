@@ -17,6 +17,16 @@ import { nuevoClientId } from "../lib/carrito";
 import { aplicarPagosEnOrden, pagoEntroPeseAlError, ventaQuedoPagada, type PagoPorAplicar } from "../lib/cobro-pagos";
 import { cajaTieneTerminal, pagoDeCobro, pedirCobro, type CobroTerminal } from "../lib/terminal";
 import { VistaTerminal } from "./vista-terminal";
+import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
+import {
+  leerCuentaCredito,
+  opcionesCredito,
+  pagarACredito,
+  pagarConSaldoFavor,
+  pideAutorizacionCredito,
+  type CreditoCliente,
+  type CuentaCredito,
+} from "../lib/credito";
 
 // ─── Íconos SVG inline (calcan los mockups) ────────────────────────────────
 
@@ -137,9 +147,27 @@ function metodoCfg(v: MetodoPago): MetodoConfig {
   return METODOS.find((m) => m.valor === v) ?? (METODOS[0] as MetodoConfig);
 }
 
+// Solo en el selector, y solo con el módulo de crédito (retail): no se combinan en el pago dividido.
+const CFG_CREDITO: MetodoConfig = {
+  valor: "CREDITO",
+  etiqueta: "A crédito",
+  sub: "",
+  icoFn: ({ cls }) => <Icono nombre="calendario" className={cls} />,
+  icoBg: "#F6EFE3",
+  icoColor: "#8A5A12",
+};
+const CFG_SALDO_FAVOR: MetodoConfig = {
+  valor: "SALDO_FAVOR",
+  etiqueta: "Saldo a favor",
+  sub: "",
+  icoFn: ({ cls }) => <Icono nombre="moneda" className={cls} />,
+  icoBg: "#E7F2EC",
+  icoColor: "#2E7D52",
+};
+
 // ─── Sub-vistas ──────────────────────────────────────────────────────────────
 
-type Vista = "propina" | "selector" | "efectivo" | "otro" | "dividido" | "atajo" | "terminal";
+type Vista = "propina" | "selector" | "efectivo" | "otro" | "dividido" | "atajo" | "terminal" | "credito" | "saldo";
 
 // ─── Tipos locales ───────────────────────────────────────────────────────────
 
@@ -223,6 +251,7 @@ function Numpad({
 function VistaSelector({
   totales,
   conTerminal,
+  extras = [],
   error,
   onElegir,
   onCerrar,
@@ -230,6 +259,8 @@ function VistaSelector({
   totales: TotalesTicket;
   /** La caja tiene terminal ligada: Débito y Crédito se vuelven un solo «Tarjeta» que cobra en ella. */
   conTerminal: boolean;
+  /** «A crédito» y «Saldo a favor», ya con su detalle (módulo de crédito). Vacío = como siempre. */
+  extras?: MetodoConfig[];
   error: string | null;
   onElegir: (m: MetodoPago | "dividido" | "terminal") => void;
   onCerrar: () => void;
@@ -250,6 +281,7 @@ function VistaSelector({
       filas.push({ cfg: { ...m, etiqueta: `${m.etiqueta} · a mano`, sub: "Ya se cobró en otra terminal" }, elegir: () => onElegir(m.valor), clave: m.valor });
     }
   }
+  for (const m of extras) filas.push({ cfg: m, elegir: () => onElegir(m.valor), clave: m.valor });
   return (
     <div className="flex flex-col h-full">
       {/* Total a cobrar */}
@@ -986,6 +1018,119 @@ function VistaPropina({
   );
 }
 
+// ─── Vista: a crédito / saldo a favor (retail 2, entrega 2) ─────────────────
+
+/** Cabecera y pie compartidos por las dos vistas de crédito: mismo molde que el resto del cobro. */
+function MarcoCredito({ cfg, children, error, procesando, etiqueta, onConfirmar, onVolver }: {
+  cfg: MetodoConfig;
+  children: React.ReactNode;
+  error: string | null;
+  procesando: boolean;
+  etiqueta: React.ReactNode;
+  onConfirmar: () => void;
+  onVolver: () => void;
+}) {
+  return (
+    <div className="flex flex-col">
+      <div className="mb-5 flex items-center gap-3">
+        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[11px]" style={{ background: cfg.icoBg, color: cfg.icoColor }}>
+          <cfg.icoFn cls="w-[22px] h-[22px]" />
+        </span>
+        <h1 className="font-display text-xl font-semibold tracking-tight">{cfg.etiqueta}</h1>
+      </div>
+      <div className="overflow-hidden rounded-lg border border-line">{children}</div>
+      {error && <p className="mt-3 text-sm font-medium text-danger" role="alert">{error}</p>}
+      <div className="mt-5 flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={onVolver}
+          disabled={procesando}
+          className="inline-flex min-h-[44px] items-center gap-2 rounded border border-line-strong px-[20px] py-[14px] text-15 font-semibold text-ink-2 transition-colors hover:bg-hover hover:text-ink disabled:opacity-50"
+        >
+          <IcoBack cls="w-4 h-4" />
+          Cambiar método
+        </button>
+        <button
+          type="button"
+          onClick={() => { if (!procesando) onConfirmar(); }}
+          disabled={procesando}
+          className="inline-flex min-h-[44px] items-center gap-[9px] rounded bg-accent px-[30px] py-[14px] text-15 font-bold text-white shadow-sm transition-[transform,background-color] duration-150 ease-vim hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong"
+        >
+          {procesando ? "Aplicando…" : etiqueta}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Renglon({ l, v, tono }: { l: string; v: string; tono?: "fuerte" }) {
+  return (
+    <div className={["flex items-center justify-between border-b border-line px-[18px] py-[13px] last:border-b-0", tono ? "bg-sel" : ""].join(" ")}>
+      <span className={tono ? "text-15 font-bold text-ink" : "text-15 text-ink-2"}>{l}</span>
+      <span className={["font-display tabular-nums text-ink", tono ? "text-24 font-bold" : "text-16 font-semibold"].join(" ")}>{v}</span>
+    </div>
+  );
+}
+
+function VistaCredito({ total, credito, procesando, error, onConfirmar, onVolver }: {
+  total: number;
+  credito: CreditoCliente;
+  procesando: boolean;
+  error: string | null;
+  onConfirmar: () => void;
+  onVolver: () => void;
+}) {
+  // La base decide; esto solo avisa antes de tocar el botón que va a pedir el PIN.
+  const pasa = Math.round((total - credito.disponible) * 100) / 100;
+  const aviso = credito.tieneVencido
+    ? "Tiene pagos vencidos. Se pide el PIN de un supervisor."
+    : pasa > 0
+      ? `Pasa del límite por ${fmtMxn(pasa)}. Se pide el PIN de un supervisor.`
+      : null;
+  return (
+    <MarcoCredito
+      cfg={CFG_CREDITO}
+      error={error}
+      procesando={procesando}
+      etiqueta={<>Vender a crédito <span className="font-display tabular-nums opacity-90">{fmtMxn(total)}</span></>}
+      onConfirmar={onConfirmar}
+      onVolver={onVolver}
+    >
+      <Renglon l="Ya debe" v={fmtMxn(credito.deuda)} />
+      <Renglon l="Disponible" v={fmtMxn(credito.disponible)} />
+      <Renglon l="Esta venta" v={fmtMxn(total)} tono="fuerte" />
+      {aviso && <p className="border-t border-warning-line bg-warning-soft px-[18px] py-3 text-14 font-medium text-warning">{aviso}</p>}
+      <p className="border-t border-line px-[18px] py-3 text-13 text-ink-3">Va la venta completa. Paga en {credito.plazoDias} días.</p>
+    </MarcoCredito>
+  );
+}
+
+function VistaSaldoFavor({ pendiente, monto, procesando, error, onConfirmar, onVolver }: {
+  pendiente: number;
+  /** Lo que se usa: el saldo, hasta lo que falta. */
+  monto: number;
+  procesando: boolean;
+  error: string | null;
+  onConfirmar: () => void;
+  onVolver: () => void;
+}) {
+  const resto = Math.round((pendiente - monto) * 100) / 100;
+  return (
+    <MarcoCredito
+      cfg={CFG_SALDO_FAVOR}
+      error={error}
+      procesando={procesando}
+      etiqueta={<>Usar <span className="font-display tabular-nums opacity-90">{fmtMxn(monto)}</span></>}
+      onConfirmar={onConfirmar}
+      onVolver={onVolver}
+    >
+      <Renglon l="Por cobrar" v={fmtMxn(pendiente)} />
+      <Renglon l="Se usa del saldo a favor" v={fmtMxn(monto)} tono="fuerte" />
+      {resto > 0 && <p className="border-t border-line px-[18px] py-3 text-13 text-ink-3">Los {fmtMxn(resto)} que faltan se cobran después con otra forma de pago.</p>}
+    </MarcoCredito>
+  );
+}
+
 // ─── Componente principal ────────────────────────────────────────────────────
 
 export function ModalCobro({
@@ -996,6 +1141,7 @@ export function ModalCobro({
   ejecutaNombre,
   totalesIniciales,
   atajo = null,
+  moduloCredito = false,
   onPagado,
   onCerrar,
   onMontoACobrar,
@@ -1019,7 +1165,10 @@ export function ModalCobro({
    * vista de efectivo normal con el error a la vista.
    */
   atajo?: "EFECTIVO_EXACTO" | null;
-  onPagado: (folio: string | null, cambio: number, total: number) => void;
+  /** Módulo de crédito encendido (`modulos.credito`): «A crédito» y «Saldo a favor» para el cliente de la cuenta. */
+  moduloCredito?: boolean;
+  /** `total` null = no entró dinero (venta a crédito): «Cobro completado» no lo anuncia como cobrado. */
+  onPagado: (folio: string | null, cambio: number, total: number | null) => void;
   onCerrar: () => void;
 }) {
   const [totales, setTotales] = useState<TotalesTicket>(totalesIniciales);
@@ -1138,6 +1287,60 @@ export function ModalCobro({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vista]);
 
+  // ── A crédito y saldo a favor (retail 2, entrega 2) ─────────────────────────────────────────
+  // Con el módulo apagado no se lee nada: un restaurante cobra exactamente como antes.
+  const [cuentaCredito, setCuentaCredito] = useState<CuentaCredito | null>(null);
+  useEffect(() => {
+    if (!moduloCredito) return;
+    let activo = true;
+    leerCuentaCredito(token, totales.ticketId)
+      .then((c) => { if (activo) setCuentaCredito(c); })
+      .catch(() => { /* sin el dato, el cobro de siempre */ });
+    return () => { activo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moduloCredito, token, totales.ticketId]);
+  const opciones = opcionesCredito({ moduloCredito, cuenta: cuentaCredito, pendiente: totalesEf.pendiente, montoPagado: totales.montoPagado });
+  const extras: MetodoConfig[] = [
+    ...(opciones.aCredito ? [{ ...CFG_CREDITO, sub: `Disponible: ${fmtMxn(opciones.aCredito.disponible)}` }] : []),
+    ...(opciones.saldoFavor > 0 ? [{ ...CFG_SALDO_FAVOR, sub: `Tiene ${fmtMxn(cuentaCredito?.saldoFavor ?? 0)} a favor` }] : []),
+  ];
+  /** La base pidió el PIN de `venta.credito_excedido`: su motivo, para el diálogo. */
+  const [pinCredito, setPinCredito] = useState<string | null>(null);
+  /** `client_id_local` del pago a crédito / con saldo en curso: un reintento no lo duplica (B2-2). */
+  const pagoCreditoId = useRef<string | null>(null);
+
+  async function cobrarConCredito(pagar: (clientId: string) => Promise<void>, alQuedarPendiente?: () => void) {
+    setError(null);
+    setProcesando(true);
+    const antes = totales;
+    const clientId = (pagoCreditoId.current ??= nuevoClientId());
+    try {
+      await pagar(clientId);
+      pagoCreditoId.current = null;
+      const t = await leerTotales(token, totales.ticketId);
+      setTotales(t);
+      if (t.estadoFiscal === "PAGADO") onPagado(t.folio, t.cambio, vista === "credito" ? null : t.total);
+      else { alQuedarPendiente?.(); setVista("selector"); }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      if (vista === "credito" && pideAutorizacionCredito(msg)) { setPinCredito(msg); return; }
+      const t = await trasFalloDeCobro(e);
+      if (pagoEntroPeseAlError(antes, t)) pagoCreditoId.current = null;
+    } finally {
+      setProcesando(false);
+    }
+  }
+
+  const venderACredito = (autorizacionPinId: string | null) =>
+    cobrarConCredito((id) => pagarACredito(token, totales.ticketId, autorizacionPinId, id));
+  const usarSaldoFavor = () => {
+    const monto = opciones.saldoFavor;
+    return cobrarConCredito(
+      (id) => pagarConSaldoFavor(token, totales.ticketId, monto, id),
+      () => setCuentaCredito((c) => (c ? { ...c, saldoFavor: Math.round((c.saldoFavor - monto) * 100) / 100 } : c)),
+    );
+  };
+
   // ── Cobro con terminal (ADR 0033) ──────────────────────────────────────────────────────────
   // Lo último que se supo de esta caja evita que el selector cambie de botones al abrir.
   const [conTerminal, setConTerminal] = useState(() => {
@@ -1247,6 +1450,10 @@ export function ModalCobro({
       setVista("terminal");
     } else if (m === "dividido") {
       setVista("dividido");
+    } else if (m === "CREDITO") {
+      setVista("credito");
+    } else if (m === "SALDO_FAVOR") {
+      setVista("saldo");
     } else if (m === "EFECTIVO") {
       setMetodo(m);
       setVista("efectivo");
@@ -1265,11 +1472,11 @@ export function ModalCobro({
   const alEscapar = useMemo(
     () => capaVisible([
       // Con el cobro en la terminal tampoco: de ahí se sale cancelándolo, no por reflejo.
-      [procesando || vista === "atajo" || vista === "terminal", () => {}],
-      [vista === "efectivo" || vista === "otro" || vista === "dividido", () => { setError(null); setVista("selector"); }],
+      [procesando || pinCredito !== null || vista === "atajo" || vista === "terminal", () => {}],
+      [vista === "efectivo" || vista === "otro" || vista === "dividido" || vista === "credito" || vista === "saldo", () => { setError(null); setVista("selector"); }],
       [true, () => cerrarRef.current()],
     ]),
-    [procesando, vista],
+    [procesando, vista, pinCredito],
   );
   useEscape(alEscapar);
 
@@ -1318,6 +1525,7 @@ export function ModalCobro({
           <VistaSelector
             totales={totalesEf}
             conTerminal={conTerminal}
+            extras={extras}
             error={error}
             onElegir={elegirMetodo}
             onCerrar={onCerrar}
@@ -1333,6 +1541,26 @@ export function ModalCobro({
             folio={totales.folio}
             monto={totalesEf.pendiente}
             onAprobado={aplicarCobroTerminal}
+            onVolver={() => { setError(null); setVista("selector"); }}
+          />
+        )}
+        {vista === "credito" && opciones.aCredito && (
+          <VistaCredito
+            total={totalesEf.pendiente}
+            credito={opciones.aCredito}
+            procesando={procesando}
+            error={error}
+            onConfirmar={() => void venderACredito(null)}
+            onVolver={() => { setError(null); setVista("selector"); }}
+          />
+        )}
+        {vista === "saldo" && opciones.saldoFavor > 0 && (
+          <VistaSaldoFavor
+            pendiente={totalesEf.pendiente}
+            monto={opciones.saldoFavor}
+            procesando={procesando}
+            error={error}
+            onConfirmar={() => void usarSaldoFavor()}
             onVolver={() => { setError(null); setVista("selector"); }}
           />
         )}
@@ -1366,6 +1594,26 @@ export function ModalCobro({
           />
         )}
       </div>
+      {pinCredito !== null && (
+        <ModalAutorizacionPin
+          token={token}
+          capa="z-[70]"
+          payload={{
+            accion: "venta_credito_excedido",
+            permisoCodigo: "venta.credito_excedido",
+            entidadTipo: "ticket",
+            entidadId: totales.ticketId,
+            monto: totalesEf.pendiente,
+            motivo: pinCredito,
+            cajaId,
+            turnoId,
+          }}
+          descripcion={`Venta a crédito de ${fmtMxn(totalesEf.pendiente)}: ${pinCredito}`}
+          ejecutaNombre={ejecutaNombre}
+          onAutorizado={(a) => { setPinCredito(null); void venderACredito(a.autorizacionPinId); }}
+          onCancelar={() => setPinCredito(null)}
+        />
+      )}
       {esperaDividido && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/40 p-4">
           <div className="w-full max-w-[560px] rounded-lg bg-surface p-6 shadow-xl">
