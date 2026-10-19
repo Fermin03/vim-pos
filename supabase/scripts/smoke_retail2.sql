@@ -156,9 +156,8 @@ BEGIN
   v_tenant := crear_tenant_con_owner(v_owner, 'smoke-ferr-' || substr(v_owner::text, 1, 8), 'Ferretería Smoke', 'Dueño Smoke',
                                      '4770000000', 'FERRETERIA'::vertical_tipo, 'ESENCIAL', 'TRIAL'::tenant_estado, 'smoke 0215');
   SELECT operacion INTO v_op FROM tenants WHERE id = v_tenant;
-  IF NOT (v_op->>'mostrador')::boolean OR NOT (v_op->>'existencias')::boolean
-     OR (v_op->>'cocina') IS NOT NULL AND (v_op->>'cocina')::boolean
-     OR (v_op->>'comedor')::boolean OR (v_op->>'kds')::boolean THEN
+  IF v_op IS DISTINCT FROM juego_inicial_de_giro('FERRETERIA')
+     OR NOT (v_op->>'existencias')::boolean OR (v_op->>'kds')::boolean THEN
     RAISE EXCEPTION '5: la ferretería nació con %', v_op; END IF;
   RAISE NOTICE '5 alta como FERRETERIA OK';
 END $$;
