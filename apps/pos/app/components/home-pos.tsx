@@ -3394,6 +3394,7 @@ export function HomePos({
                   onCobrar={cargarCita}
                   onRetomar={(v) => void abrirDesdeTransacciones(v.id, v.etiquetaEspera ?? undefined)}
                   onAtender={() => setEsperaAgendaAbierta(true)}
+                  onAbrirCita={setFichaCita}
                 />
               ) : (
                 <div className="flex min-h-0 flex-1">

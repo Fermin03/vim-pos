@@ -102,6 +102,20 @@ export function anticipoPorAplicar(a: AnticipoVenta | null, pendiente: number): 
   return redondearCentavos(Math.min(a.vigente, pendiente));
 }
 
+/**
+ * Lo que enseña el cobro antes de aplicar nada. `pendiente` = lo que falta de la venta (con propina).
+ * `anticipo`: lo ya aplicado a esta venta más lo que se aplicará; `porCobrar`: lo que se cobra con
+ * otra forma de pago (0 = el anticipo cubre todo).
+ */
+export function resumenAnticipoCobro(a: AnticipoVenta | null, pendiente: number): { porAplicar: number; anticipo: number; porCobrar: number } {
+  const porAplicar = anticipoPorAplicar(a, pendiente);
+  return {
+    porAplicar,
+    anticipo: redondearCentavos((a?.aplicado ?? 0) + porAplicar),
+    porCobrar: redondearCentavos(Math.max(0, pendiente) - porAplicar),
+  };
+}
+
 /** Aplica los anticipos vigentes de la cita a su venta (como pago ANTICIPO). Devuelve lo aplicado. */
 export async function pagarConAnticipo(token: string, ticketId: string, citaId: string, clientId: string): Promise<number> {
   const { data, error } = await employeeClient(token).rpc("pagar_con_anticipo", { p_ticket_id: ticketId, p_cita_id: citaId, p_client_id_local: clientId });
@@ -135,6 +149,9 @@ export const TEXTO_ANTICIPO = {
   devolver: "Devolver",
   retener: "Retener",
   pendiente: "Anticipo pendiente de devolver o retener",
+  /** Marca de la tarjeta en el calendario y título del grupo en «Citas de hoy». */
+  marcaPendiente: "Anticipo pendiente",
+  grupoPendientes: "Anticipos pendientes",
   lineaCobro: "Anticipo",
   porCobrar: "Por cobrar",
 } as const;

@@ -264,11 +264,11 @@ export function FichaCita({ token, citaId, negocio, cajaId, turnoId, ejecutaNomb
             <div className="flex flex-col gap-1">
               <span className="text-13 font-medium text-ink-2">¿Quién cancela? Dejó {fmtMxn(anticipoVigente)} de anticipo.</span>
               <div className="grid grid-cols-2 gap-2">
-                {(["CLIENTA", "SALON"] as const).map((q) => (
+                {(["SALON", "CLIENTA"] as const).map((q) => (
                   <button key={q} type="button" onClick={() => setQuienCancela(q)} aria-pressed={quienCancela === q}
                     className={["min-h-[44px] rounded-lg border px-3 text-14 font-semibold transition-[transform,border-color,background-color] duration-150 ease-vim active:scale-[.97]",
                       quienCancela === q ? "border-ink bg-sel text-ink shadow-[inset_0_0_0_1.5px_#16161A]" : "border-line-strong text-ink-2 hover:border-ink"].join(" ")}>
-                    {q === "CLIENTA" ? "Cancela la clienta" : "Cancela el salón"}
+                    {q === "CLIENTA" ? "Cancela la clienta" : "Cancela el negocio"}
                   </button>
                 ))}
               </div>

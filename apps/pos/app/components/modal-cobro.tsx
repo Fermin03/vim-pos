@@ -27,7 +27,7 @@ import {
   type CreditoCliente,
   type CuentaCredito,
 } from "../lib/credito";
-import { anticipoPorAplicar, leerAnticipoVenta, pagarConAnticipo, TEXTO_ANTICIPO } from "../lib/anticipos";
+import { leerAnticipoVenta, pagarConAnticipo, resumenAnticipoCobro, TEXTO_ANTICIPO, type AnticipoVenta } from "../lib/anticipos";
 
 // ─── Íconos SVG inline (calcan los mockups) ────────────────────────────────
 
@@ -254,6 +254,8 @@ function VistaSelector({
   conTerminal,
   extras = [],
   anticipo = 0,
+  onCobrarConAnticipo,
+  procesando = false,
   error,
   onElegir,
   onCerrar,
@@ -261,6 +263,9 @@ function VistaSelector({
   totales: TotalesTicket;
   /** Lo que esta venta ya pagó con el anticipo de su cita (belleza): «Anticipo −$X» y «Por cobrar». */
   anticipo?: number;
+  /** El anticipo cubre todo: en vez de las formas de pago, un solo botón que lo confirma. */
+  onCobrarConAnticipo?: () => void;
+  procesando?: boolean;
   /** La caja tiene terminal ligada: Débito y Crédito se vuelven un solo «Tarjeta» que cobra en ella. */
   conTerminal: boolean;
   /** «A crédito» y «Saldo a favor», ya con su detalle (módulo de crédito). Vacío = como siempre. */
@@ -314,6 +319,16 @@ function VistaSelector({
       )}
 
       {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
+      {onCobrarConAnticipo ? (
+        <button
+          type="button"
+          onClick={() => { if (!procesando) onCobrarConAnticipo(); }}
+          disabled={procesando}
+          className="h-14 w-full rounded bg-accent text-16 font-bold text-white shadow-sm transition-[transform,background-color] duration-150 ease-vim hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong"
+        >
+          {procesando ? "Aplicando…" : `Cobrar con anticipo ${fmtMxn(anticipo)}`}
+        </button>
+      ) : (<>
       <div className="text-15 font-semibold text-ink-2 mb-3">¿Cómo paga el cliente?</div>
 
       {/* Lista de métodos */}
@@ -365,6 +380,7 @@ function VistaSelector({
           <IcoChevron cls="w-5 h-5 text-ink-3 flex-shrink-0" />
         </button>
       </div>
+      </>)}
 
       {/* Footer */}
       <div className="mt-auto pt-5 flex items-center justify-between gap-4">
@@ -1222,12 +1238,67 @@ export function ModalCobro({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, sucursalId]);
 
-  // Total autoritativo (BD) + propina capturada en cliente; la propina ya quedó persistida.
+  // ── Anticipo de la cita (belleza, 0222) ─────────────────────────────────────────────────────
+  // Se lee al abrir y se enseña desde el principio («Anticipo −$X», «Por cobrar»), pero se APLICA
+  // solo al confirmar el primer pago (asegurarAnticipo), justo antes de cobrar el resto. Salir del
+  // cobro no deja nada aplicado. Fuera de belleza no se lee nada.
+  const [anticipoVenta, setAnticipoVenta] = useState<AnticipoVenta | null>(null);
+  const [anticipoListo, setAnticipoListo] = useState(!conCitas);
+  useEffect(() => {
+    if (!conCitas) return;
+    let activo = true;
+    leerAnticipoVenta(token, totalesIniciales.ticketId)
+      .then((a) => { if (activo) setAnticipoVenta(a); })
+      .catch(() => { /* sin el dato, el cobro de siempre; el anticipo sigue vigente en la cita */ })
+      .finally(() => { if (activo) setAnticipoListo(true); });
+    return () => { activo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conCitas, token]);
+
+  // Total autoritativo (BD) + propina capturada en cliente; la propina ya quedó persistida. El
+  // pendiente ya descuenta el anticipo por aplicar: todas las vistas cobran solo el resto.
+  const anticipoCobro = resumenAnticipoCobro(anticipoVenta, Math.round((totales.pendiente + propina) * 100) / 100);
   const totalesEf: TotalesTicket = {
     ...totales,
     total: Math.round((totales.total + propina) * 100) / 100,
-    pendiente: Math.round((totales.pendiente + propina) * 100) / 100,
+    pendiente: anticipoCobro.porCobrar,
   };
+
+  const pagoAnticipoId = useRef<string | null>(null);
+  /**
+   * Aplica el anticipo por aplicar (si hay) antes de cobrar el resto; devuelve los totales releídos
+   * (null si no había nada que aplicar). El pendiente a la vista no cambia: ya lo descontaba.
+   */
+  async function asegurarAnticipo(): Promise<TotalesTicket | null> {
+    if (!anticipoVenta || anticipoCobro.porAplicar <= 0) return null;
+    const aplicado = await pagarConAnticipo(token, totales.ticketId, anticipoVenta.citaId, (pagoAnticipoId.current ??= nuevoClientId()));
+    const t = await leerTotales(token, totales.ticketId);
+    pagoAnticipoId.current = null;   // hasta aquí: si la relectura falla, el reintento reusa la llave
+
+    // Juntos (mismo render): el pendiente a la vista no brinca.
+    setTotales(t);
+    setAnticipoVenta((a) => a && {
+      ...a,
+      vigente: Math.round((a.vigente - aplicado) * 100) / 100,
+      aplicado: Math.round((a.aplicado + aplicado) * 100) / 100,
+    });
+    return t;
+  }
+
+  /** El anticipo cubre todo: se confirma y la venta queda pagada solo con ANTICIPO. */
+  async function cobrarSoloConAnticipo() {
+    setError(null);
+    setProcesando(true);
+    try {
+      const t = await asegurarAnticipo();
+      if (ventaQuedoPagada(t)) onPagado(t.folio, 0, t.total);
+      else setError("El anticipo no cubrió la venta; cobra el resto con otra forma de pago.");
+    } catch (e) {
+      await trasFalloDeCobro(e);
+    } finally {
+      setProcesando(false);
+    }
+  }
 
   useEffect(() => {
     onMontoACobrar?.(totalesEf.pendiente);
@@ -1275,9 +1346,10 @@ export function ModalCobro({
     setError(null);
     if (!(monto > 0)) { setError("Monto inválido"); return; }
     setProcesando(true);
-    const antes = totales;
+    let antes = totales;
     const clientId = (pagoUnicoId.current ??= nuevoClientId());
     try {
+      antes = (await asegurarAnticipo()) ?? antes;
       const t = await aplicarPago(
         token,
         totales.ticketId,
@@ -1305,48 +1377,15 @@ export function ModalCobro({
 
   // Efectivo exacto: se aplica UNA vez al llegar a su vista (después de la propina, si la hubo).
   const atajoAplicado = useRef(false);
-  // Anticipo de la cita (abajo): el atajo espera a que se aplique.
-  const [anticipoListo, setAnticipoListo] = useState(!conCitas);
-  const [anticipoAplicado, setAnticipoAplicado] = useState(0);
-  const anticipoLeido = useRef(false);
-  const pagoAnticipoId = useRef<string | null>(null);
+  // Con anticipo, el atajo espera a leerlo; si el anticipo cubre todo, se confirma en el selector.
   useEffect(() => {
     if (vista !== "atajo" || atajoAplicado.current || !anticipoListo) return;
     atajoAplicado.current = true;
+    if (anticipoCobro.porAplicar > 0 && totalesEf.pendiente <= 0) { setVista("selector"); return; }
     void aplicarUnPago("EFECTIVO", totalesEf.pendiente, totalesEf.pendiente);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vista, anticipoListo]);
 
-  // ── Anticipo de la cita (belleza, 0222) ─────────────────────────────────────────────────────
-  // Se aplica solo y primero, ya con la propina: el resto se cobra con otra forma de pago. Si el
-  // anticipo cubre todo, la venta queda pagada con ANTICIPO. Fuera de belleza no se lee nada.
-  useEffect(() => {
-    if (!conCitas || anticipoLeido.current || (vista !== "selector" && vista !== "atajo")) return;
-    anticipoLeido.current = true;
-    (async () => {
-      try {
-        const a = await leerAnticipoVenta(token, totales.ticketId);
-        let aplicado = a?.aplicado ?? 0;
-        if (a && anticipoPorAplicar(a, totalesEf.pendiente) > 0) {
-          aplicado += await pagarConAnticipo(token, totales.ticketId, a.citaId, (pagoAnticipoId.current ??= nuevoClientId()));
-          const t = await leerTotales(token, totales.ticketId);
-          setTotales(t);
-          if (t.estadoFiscal === "PAGADO") {
-            atajoAplicado.current = true;
-            onPagado(t.folio, 0, t.total);
-            return;
-          }
-        }
-        setAnticipoAplicado(Math.round(aplicado * 100) / 100);
-      } catch (e) {
-        // Sin el anticipo se cobra como siempre; el anticipo sigue vigente en la cita.
-        const t = await trasFalloDeCobro(e);
-        if (ventaQuedoPagada(t)) { atajoAplicado.current = true; return; }
-      }
-      setAnticipoListo(true);
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conCitas, vista]);
 
   // ── A crédito y saldo a favor (retail 2, entrega 2) ─────────────────────────────────────────
   // Con el módulo apagado no se lee nada: un restaurante cobra exactamente como antes.
@@ -1360,7 +1399,7 @@ export function ModalCobro({
     return () => { activo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moduloCredito, token, totales.ticketId]);
-  const opciones = opcionesCredito({ moduloCredito, cuenta: cuentaCredito, pendiente: totalesEf.pendiente, montoPagado: totales.montoPagado });
+  const opciones = opcionesCredito({ moduloCredito, cuenta: cuentaCredito, pendiente: totalesEf.pendiente, montoPagado: totales.montoPagado + anticipoCobro.porAplicar });
   const extras: MetodoConfig[] = [
     ...(opciones.aCredito ? [{ ...CFG_CREDITO, sub: `Disponible: ${fmtMxn(opciones.aCredito.disponible)}` }] : []),
     ...(opciones.saldoFavor > 0 ? [{ ...CFG_SALDO_FAVOR, sub: `Tiene ${fmtMxn(cuentaCredito?.saldoFavor ?? 0)} a favor` }] : []),
@@ -1373,9 +1412,10 @@ export function ModalCobro({
   async function cobrarConCredito(pagar: (clientId: string) => Promise<void>, alQuedarPendiente?: () => void) {
     setError(null);
     setProcesando(true);
-    const antes = totales;
+    let antes = totales;
     const clientId = (pagoCreditoId.current ??= nuevoClientId());
     try {
+      antes = (await asegurarAnticipo()) ?? antes;
       await pagar(clientId);
       pagoCreditoId.current = null;
       const t = await leerTotales(token, totales.ticketId);
@@ -1420,6 +1460,7 @@ export function ModalCobro({
     setError(null);
     setProcesando(true);
     try {
+      await asegurarAnticipo();
       const t = await aplicarPago(
         token, totales.ticketId,
         pagoDeCobro(c),
@@ -1491,6 +1532,12 @@ export function ModalCobro({
     if (lista.length === 0) return [];
     setProcesando(true);
     try {
+      try {
+        await asegurarAnticipo();
+      } catch (e) {
+        await trasFalloDeCobro(e);
+        return [];
+      }
       const ticketId = totales.ticketId;
       const r = await aplicarPagosEnOrden(
         lista,
@@ -1594,7 +1641,9 @@ export function ModalCobro({
             totales={totalesEf}
             conTerminal={conTerminal}
             extras={extras}
-            anticipo={anticipoAplicado}
+            anticipo={anticipoCobro.anticipo}
+            procesando={procesando}
+            onCobrarConAnticipo={anticipoCobro.porAplicar > 0 && totalesEf.pendiente <= 0 ? () => void cobrarSoloConAnticipo() : undefined}
             error={error}
             onElegir={elegirMetodo}
             onCerrar={onCerrar}

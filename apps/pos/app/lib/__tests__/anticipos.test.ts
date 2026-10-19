@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../supabase", () => ({ employeeClient: () => ({}) }));
 
-import { TEXTO_ANTICIPO, anticipoPorAplicar, decisionSugerida, pideAutorizacionAnticipo, sumaAnticipos, vigentes, type Anticipo } from "../anticipos";
+import { TEXTO_ANTICIPO, anticipoPorAplicar, resumenAnticipoCobro, decisionSugerida, pideAutorizacionAnticipo, sumaAnticipos, vigentes, type Anticipo } from "../anticipos";
 import { fmtMxn } from "../turno";
+import { seVeEnCalendario, tieneAnticipoPendiente } from "../agenda";
 
 const t = (iso: string) => new Date(iso);
 
@@ -59,5 +60,39 @@ describe("textos exactos", () => {
     expect([TEXTO_ANTICIPO.devolver, TEXTO_ANTICIPO.retener]).toEqual(["Devolver", "Retener"]);
     expect(TEXTO_ANTICIPO.pendiente).toBe("Anticipo pendiente de devolver o retener");
     expect([TEXTO_ANTICIPO.lineaCobro, TEXTO_ANTICIPO.porCobrar]).toEqual(["Anticipo", "Por cobrar"]);
+  });
+});
+
+describe("el cobro enseña el anticipo sin aplicarlo", () => {
+  it("desde el principio: Anticipo −$390 y Por cobrar $1,450 (boceto 2); nada aplicado aún", () => {
+    expect(resumenAnticipoCobro({ citaId: "c", vigente: 390, aplicado: 0 }, 1840)).toEqual({ porAplicar: 390, anticipo: 390, porCobrar: 1450 });
+  });
+  it("si cubre todo, no queda nada por cobrar con otra forma de pago", () => {
+    expect(resumenAnticipoCobro({ citaId: "c", vigente: 2000, aplicado: 0 }, 1840)).toEqual({ porAplicar: 1840, anticipo: 1840, porCobrar: 0 });
+  });
+  it("ya aplicado (primer pago confirmado): se sigue viendo y no se aplica de nuevo", () => {
+    expect(resumenAnticipoCobro({ citaId: "c", vigente: 0, aplicado: 390 }, 1000)).toEqual({ porAplicar: 0, anticipo: 390, porCobrar: 1000 });
+  });
+  it("sin cita o sin anticipo: el cobro de siempre", () => {
+    expect(resumenAnticipoCobro(null, 500)).toEqual({ porAplicar: 0, anticipo: 0, porCobrar: 500 });
+  });
+});
+
+describe("anticipo pendiente: la cita sigue a la vista", () => {
+  const v = [{ estado: "VIGENTE" }];
+  it("cancelada o no llegó con anticipo vigente", () => {
+    expect(tieneAnticipoPendiente("CANCELADA", v)).toBe(true);
+    expect(tieneAnticipoPendiente("NO_LLEGO", v)).toBe(true);
+    expect(tieneAnticipoPendiente("CANCELADA", [{ estado: "DEVUELTO" }, { estado: "RETENIDO" }])).toBe(false);
+    expect(tieneAnticipoPendiente("AGENDADA", v)).toBe(false);
+  });
+  it("el calendario enseña la cancelada solo mientras su anticipo esté pendiente", () => {
+    expect(seVeEnCalendario({ estado: "CANCELADA", anticipoPendiente: true })).toBe(true);
+    expect(seVeEnCalendario({ estado: "CANCELADA", anticipoPendiente: false })).toBe(false);
+    expect(seVeEnCalendario({ estado: "AGENDADA" })).toBe(true);
+  });
+  it("textos de la marca y del grupo", () => {
+    expect(TEXTO_ANTICIPO.marcaPendiente).toBe("Anticipo pendiente");
+    expect(TEXTO_ANTICIPO.grupoPendientes).toBe("Anticipos pendientes");
   });
 });

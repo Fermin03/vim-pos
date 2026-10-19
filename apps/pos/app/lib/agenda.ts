@@ -46,6 +46,10 @@ export type CitaDia = {
   tramos: TramoCita[];
   /** Solo la lectura del cobro: la venta abierta (sin pagar ni cancelar) a la que ya está ligada. */
   ventaAbierta?: { id: string; etiquetaEspera: string | null } | null;
+  /** Cancelada o «No llegó» con anticipo VIGENTE: falta devolverlo o retenerlo (0222). Solo donde se lee. */
+  anticipoPendiente?: boolean;
+  /** Lo VIGENTE de sus anticipos (solo donde se lee con el monto). */
+  anticipoVigente?: number;
 };
 
 /** Minutos desde la medianoche (hora de México). */
@@ -121,9 +125,17 @@ type FilaCita = {
   inicia: string | null; termina: string | null; llego_at: string | null; empalme: boolean; nota: string | null; citas_servicios: FilaTramo[] | null;
   ticket_id?: string | null;
   ticket?: { estado_fiscal: string; deleted_at: string | null; en_espera: boolean | null; etiqueta_espera: string | null } | null;
+  anticipos_cita?: { estado: string; monto_mxn?: number | string }[] | null;
 };
 
 const fecha = (s: string | null) => (s ? new Date(s) : null);
+
+/** Cancelada o que no llegó, con algún anticipo VIGENTE: el dinero sigue sin destino. */
+export const tieneAnticipoPendiente = (estado: CitaEstado, anticipos: { estado: string }[]): boolean =>
+  (estado === "CANCELADA" || estado === "NO_LLEGO") && anticipos.some((a) => a.estado === "VIGENTE");
+
+/** El calendario no enseña lo cancelado, salvo si su anticipo falta por resolver. */
+export const seVeEnCalendario = (c: Pick<CitaDia, "estado" | "anticipoPendiente">): boolean => c.estado !== "CANCELADA" || c.anticipoPendiente === true;
 
 function aCita(f: FilaCita): CitaDia {
   const t = f.ticket;
@@ -131,6 +143,10 @@ function aCita(f: FilaCita): CitaDia {
     ...(f.ticket_id && t && !t.deleted_at && (t.estado_fiscal === "ABIERTO" || t.estado_fiscal === "BORRADOR")
       ? { ventaAbierta: { id: f.ticket_id, etiquetaEspera: t.en_espera ? t.etiqueta_espera ?? "Sin etiqueta" : null } }
       : {}),
+    ...(f.anticipos_cita ? {
+      anticipoPendiente: tieneAnticipoPendiente(f.estado, f.anticipos_cita),
+      anticipoVigente: redondearCentavos(f.anticipos_cita.filter((a) => a.estado === "VIGENTE").reduce((x, a) => x + Number(a.monto_mxn ?? 0), 0)),
+    } : {}),
     id: f.id, clienteId: f.cliente_id, clienteNombre: f.cliente_nombre, clienteTelefono: f.cliente_telefono, clienteEmail: f.cliente_email,
     estado: f.estado, canal: f.canal, inicia: fecha(f.inicia), termina: fecha(f.termina), llegoAt: fecha(f.llego_at), empalme: f.empalme, nota: f.nota,
     tramos: [...(f.citas_servicios ?? [])].sort((a, b) => a.orden - b.orden).map((t) => ({
@@ -140,12 +156,22 @@ function aCita(f: FilaCita): CitaDia {
   };
 }
 
-/** Las citas que empiezan ese día (de México) en la sucursal. Las canceladas no ocupan: no se leen. */
+/** Las citas que empiezan ese día (de México) en la sucursal. Las canceladas no ocupan: no se ven, salvo con anticipo pendiente. */
 export async function citasDelDia(token: string, sucursalId: string, dia: string): Promise<CitaDia[]> {
   const { data, error } = await employeeClient(token)
-    .from("citas").select(COLUMNAS)
-    .eq("sucursal_id", sucursalId).neq("estado", "CANCELADA")
+    .from("citas").select(`${COLUMNAS}, anticipos_cita(estado)`)
+    .eq("sucursal_id", sucursalId)
     .gte("inicia", inicioDiaMx(dia).toISOString()).lt("inicia", inicioDiaMx(sumarDias(dia, 1)).toISOString())
+    .order("inicia");
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as unknown as FilaCita[]).map(aCita).filter(seVeEnCalendario);
+}
+
+/** Citas canceladas o que no llegaron con anticipo VIGENTE (de cualquier día): «Anticipos pendientes» del cobro. */
+export async function citasConAnticipoPendiente(token: string, sucursalId: string): Promise<CitaDia[]> {
+  const { data, error } = await employeeClient(token)
+    .from("citas").select(`${COLUMNAS}, anticipos_cita!inner(estado, monto_mxn)`)
+    .eq("sucursal_id", sucursalId).in("estado", ["CANCELADA", "NO_LLEGO"]).eq("anticipos_cita.estado", "VIGENTE")
     .order("inicia");
   if (error) throw new Error(error.message);
   return ((data ?? []) as unknown as FilaCita[]).map(aCita);

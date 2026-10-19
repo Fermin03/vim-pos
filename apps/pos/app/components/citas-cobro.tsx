@@ -2,8 +2,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { hoyMx } from "@vim/fecha";
 import { Icono, Modal } from "@vim/ui/styles";
-import { horaCorta } from "@vim/db/agenda";
-import { citasEnEspera, citasParaCobrar, diaCita, gruposCitasCobro, nombreCorto, totalCita, type CitaDia } from "../lib/agenda";
+import { ETIQUETA_ESTADO_CITA, horaCorta } from "@vim/db/agenda";
+import { TEXTO_ANTICIPO } from "../lib/anticipos";
+import { citasConAnticipoPendiente, citasEnEspera, citasParaCobrar, diaCita, gruposCitasCobro, nombreCorto, totalCita, type CitaDia } from "../lib/agenda";
 import { fmtMxn } from "../lib/turno";
 import { iniciales } from "./selector-empleados";
 
@@ -19,9 +20,10 @@ const resumen = (c: CitaDia) => {
 
 /**
  * Pestaña «Citas de hoy» del cobro de belleza (boceto 2): Termina pronto (se tocan para cobrar),
- * En espera (se atienden, no se cobran: aún no tienen tramos) y Cobradas hoy (solo se ven).
+ * En espera (se atienden, no se cobran: aún no tienen tramos), Anticipos pendientes (canceladas o que
+ * no llegaron con anticipo sin devolver ni retener: abren la ficha) y Cobradas hoy (solo se ven).
  */
-export function CitasCobro({ token, sucursalId, version, activa, ventaActual, bloqueado, errorExterno, onReintentar, onCobrar, onRetomar, onAtender }: {
+export function CitasCobro({ token, sucursalId, version, activa, ventaActual, bloqueado, errorExterno, onReintentar, onCobrar, onRetomar, onAtender, onAbrirCita }: {
   token: string;
   sucursalId: string;
   /** Sube al cambiar la agenda o al cobrar: la lista se relee. */
@@ -39,15 +41,17 @@ export function CitasCobro({ token, sucursalId, version, activa, ventaActual, bl
   /** La cita ya está en otra venta abierta: se retoma esa venta en lugar de abrir otra. */
   onRetomar: (venta: NonNullable<CitaDia["ventaAbierta"]>) => void;
   onAtender: () => void;
+  /** «Anticipos pendientes»: abre la ficha de la cita (Devolver / Retener). */
+  onAbrirCita: (citaId: string) => void;
 }) {
-  const [datos, setDatos] = useState<{ citas: CitaDia[]; espera: CitaDia[] } | null>(null);
+  const [datos, setDatos] = useState<{ citas: CitaDia[]; espera: CitaDia[]; pendientes: CitaDia[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [texto, setTexto] = useState("");
 
   useEffect(() => {
     let vivo = true;
-    Promise.all([citasParaCobrar(token, sucursalId, hoyMx()), citasEnEspera(token, sucursalId)])
-      .then(([citas, espera]) => { if (vivo) { setDatos({ citas, espera }); setError(null); } })
+    Promise.all([citasParaCobrar(token, sucursalId, hoyMx()), citasEnEspera(token, sucursalId), citasConAnticipoPendiente(token, sucursalId)])
+      .then(([citas, espera, pendientes]) => { if (vivo) { setDatos({ citas, espera, pendientes }); setError(null); } })
       .catch((e) => { if (vivo) setError(e instanceof Error ? e.message : "No se pudieron leer las citas"); });
     return () => { vivo = false; };
   }, [token, sucursalId, version]);
@@ -57,7 +61,7 @@ export function CitasCobro({ token, sucursalId, version, activa, ventaActual, bl
     const q = plano(texto.trim());
     const pasa = (c: CitaDia) => !q || plano(c.clienteNombre).includes(q) || c.tramos.some((t) => plano(t.servicio).includes(q));
     const g = gruposCitasCobro(datos.citas, datos.espera, hoyMx());
-    return { terminaPronto: g.terminaPronto.filter(pasa), enEspera: g.enEspera.filter(pasa), cobradas: g.cobradas.filter(pasa) };
+    return { terminaPronto: g.terminaPronto.filter(pasa), enEspera: g.enEspera.filter(pasa), pendientes: datos.pendientes.filter(pasa), cobradas: g.cobradas.filter(pasa) };
   }, [datos, texto]);
 
   const titulo = (t: string) => (
@@ -69,7 +73,7 @@ export function CitasCobro({ token, sucursalId, version, activa, ventaActual, bl
     </span>
   );
   const ahora = Date.now();
-  const nada = grupos && grupos.terminaPronto.length + grupos.enEspera.length + grupos.cobradas.length === 0;
+  const nada = grupos && grupos.terminaPronto.length + grupos.enEspera.length + grupos.pendientes.length + grupos.cobradas.length === 0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -163,6 +167,24 @@ export function CitasCobro({ token, sucursalId, version, activa, ventaActual, bl
                   </li>
                 );
               })}
+            </ul>
+
+            {grupos.pendientes.length > 0 && titulo(TEXTO_ANTICIPO.grupoPendientes)}
+            <ul>
+              {grupos.pendientes.map((c) => (
+                <li key={c.id} className="border-b border-line">
+                  <button type="button" onClick={() => onAbrirCita(c.id)}
+                    className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left transition-[background-color] duration-150 ease-vim hover:bg-hover">
+                    {avatar(c)}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-16 font-semibold">{c.clienteNombre}</span>
+                      <span className="block truncate text-13 text-ink-2">{[ETIQUETA_ESTADO_CITA[c.estado], diaCita(c.inicia, hoyMx()), resumen(c)].filter(Boolean).join(" · ")}</span>
+                      <span className="block text-13 font-semibold text-warning">{TEXTO_ANTICIPO.pendiente}</span>
+                    </span>
+                    <span className="font-display whitespace-nowrap text-16 font-semibold tabular-nums">{fmtMxn(c.anticipoVigente ?? 0)}</span>
+                  </button>
+                </li>
+              ))}
             </ul>
 
             {grupos.cobradas.length > 0 && titulo("Cobradas hoy")}

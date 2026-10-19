@@ -1,4 +1,5 @@
 "use client";
+import { TEXTO_ANTICIPO } from "../lib/anticipos";
 import { useEffect, useMemo, useState } from "react";
 import { hoyMx, sumarDias } from "@vim/fecha";
 import { Icono } from "@vim/ui/styles";
@@ -260,10 +261,12 @@ function TarjetaTramo({ cita, tramo, dia, desde, color, ahora, tolerancia, onAbr
 }) {
   const { top, alto } = posicionTramo(tramo.inicia!, tramo.termina!, dia, desde);
   const noLlego = cita.estado === "NO_LLEGO";
-  const apagada = cita.estado === "TERMINADA";
+  // Una cancelada solo se ve con anticipo pendiente (citasDelDia): apagada y marcada.
+  const cancelada = cita.estado === "CANCELADA";
+  const apagada = cita.estado === "TERMINADA" || cancelada;
   const porLlegar = cita.estado === "AGENDADA" && cita.inicia != null;
   const paso = porLlegar && pasoTolerancia(cita.inicia!, ahora, tolerancia);
-  const empalme = cita.empalme || tramo.empalme;
+  const empalme = !cancelada && (cita.empalme || tramo.empalme);
   const detalle = cita.canal === "SIN_CITA"
     ? "Sin cita (de la lista de espera)"
     : porLlegar && !paso
@@ -299,9 +302,10 @@ function TarjetaTramo({ cita, tramo, dia, desde, color, ahora, tolerancia, onAbr
       }}
     >
       <span className="flex items-start gap-2">
-        <span className={["min-w-0 flex-1 truncate text-14 font-semibold", noLlego ? "text-ink-3 line-through" : "text-ink"].join(" ")}>{cita.clienteNombre}</span>
+        <span className={["min-w-0 flex-1 truncate text-14 font-semibold", noLlego || cancelada ? "text-ink-3 line-through" : "text-ink"].join(" ")}>{cita.clienteNombre}</span>
         <span className="flex flex-shrink-0 flex-wrap justify-end gap-1">
           {empalme && <span className="rounded bg-danger px-1.5 py-px text-11 font-bold text-white">Empalme</span>}
+          {cita.anticipoPendiente && <span className="rounded bg-warning-soft px-1.5 py-px text-11 font-bold text-warning">{TEXTO_ANTICIPO.marcaPendiente}</span>}
           <span className={`rounded px-1.5 py-px text-11 font-bold ${insignia.clase}`}>{insignia.texto}</span>
         </span>
       </span>
