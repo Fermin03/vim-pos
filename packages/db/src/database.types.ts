@@ -15152,6 +15152,7 @@ export type Database = {
     Functions: {
       _agenda_cadena: {
         Args: {
+          p_excluir_cita?: string
           p_inicia: string
           p_servicios: Json
           p_sucursal: string
@@ -15295,6 +15296,7 @@ export type Database = {
       }
       _colaborador_libre: {
         Args: {
+          p_excluir_cita?: string
           p_inicia: string
           p_producto: string
           p_sucursal: string
@@ -15757,6 +15759,7 @@ export type Database = {
       agenda_huecos: {
         Args: {
           p_dia: string
+          p_excluir_cita?: string
           p_servicios: Json
           p_sucursal: string
           p_tenant: string

@@ -18,9 +18,9 @@ END $f$;
 CREATE FUNCTION pg_temp.a(p_d date, p_h text) RETURNS timestamptz LANGUAGE sql IMMUTABLE
 AS $$ SELECT (p_d + p_h::time) AT TIME ZONE 'America/Mexico_City' $$;
 -- Los huecos de un día como «,09:00,09:15,…,».
-CREATE FUNCTION pg_temp.huecos(p_d date, p_serv jsonb) RETURNS text LANGUAGE sql
+CREATE FUNCTION pg_temp.huecos(p_d date, p_serv jsonb, p_excluir uuid DEFAULT NULL) RETURNS text LANGUAGE sql
 AS $$ SELECT ',' || COALESCE(string_agg(to_char(h.inicia AT TIME ZONE 'America/Mexico_City', 'HH24:MI'), ',' ORDER BY h.inicia), '') || ','
-        FROM agenda_huecos('99999999-0000-0000-0000-0000000000aa', '99999999-0000-0000-0000-0000000000bb', p_d, p_serv) h $$;
+        FROM agenda_huecos('99999999-0000-0000-0000-0000000000aa', '99999999-0000-0000-0000-0000000000bb', p_d, p_serv, p_excluir) h $$;
 CREATE FUNCTION pg_temp.s(p_prod uuid, p_u uuid DEFAULT NULL) RETURNS jsonb LANGUAGE sql IMMUTABLE
 AS $$ SELECT jsonb_build_array(jsonb_build_object('producto_id', p_prod, 'usuario_id', p_u)) $$;
 CREATE FUNCTION pg_temp.como(p_u uuid) RETURNS void LANGUAGE sql
@@ -288,6 +288,14 @@ BEGIN
     'DATOS_INVALIDOS: ese horario no se ofrece.', 'R20 fuera de los días');
   PERFORM pg_temp.debe_fallar(format('SELECT agenda_mover_en_linea(%L, %L, %L)', v_t, v_hash, date_trunc('hour', now()) - interval '1 hour'),
     'HUECO_OCUPADO:%', 'R20 al pasado');
+  -- 15 minutos después se encima sobre su propio tramo: con la exclusión se ofrece y se puede mover.
+  IF pg_temp.huecos(d, pg_temp.s(v_corte, v_diego)) LIKE '%,16:15,%'
+     OR pg_temp.huecos(d, pg_temp.s(v_corte, v_diego), v_c2) NOT LIKE '%,16:15,%' THEN
+    RAISE EXCEPTION 'R20: la exclusión de la propia cita no funciona'; END IF;
+  v_r := agenda_mover_en_linea(v_t, v_hash, pg_temp.a(d, '16:15'));
+  IF v_r->>'hora' <> '16:15' OR (SELECT termina FROM citas WHERE id = v_c2) <> pg_temp.a(d, '17:15')
+     OR (SELECT count(*) FROM citas_servicios WHERE cita_id = v_c2) <> 1 THEN
+    RAISE EXCEPTION 'R20: mover 15 min sobre sí misma: %', v_r; END IF;
 
   -- R21) Fuera de plazo (48 h antes; la cita es mañana): ni cancelar ni mover.
   v_r := pg_temp.reservar(pg_temp.a(v_hoy + 1, '12:00'), pg_temp.s(v_corte, v_maria), 'smk-res-0006');
@@ -375,14 +383,14 @@ BEGIN
   PERFORM pg_temp.como(NULL);
 
   -- R26) Permisos: solo service_role ejecuta las RPC; las internas, nadie.
-  FOREACH f IN ARRAY ARRAY['reservas_negocio(text)', 'agenda_huecos(uuid, uuid, date, jsonb)', 'agenda_reservar_en_linea(uuid, jsonb)',
+  FOREACH f IN ARRAY ARRAY['reservas_negocio(text)', 'agenda_huecos(uuid, uuid, date, jsonb, uuid)', 'agenda_reservar_en_linea(uuid, jsonb)',
                            'agenda_cita_publica(uuid, text)', 'agenda_cancelar_en_linea(uuid, text)',
                            'agenda_mover_en_linea(uuid, text, timestamptz)', 'agenda_vencer_reservas()'] LOOP
     IF has_function_privilege('anon', f, 'execute') OR has_function_privilege('authenticated', f, 'execute')
        OR NOT has_function_privilege('service_role', f, 'execute') THEN
       RAISE EXCEPTION 'R26: permisos de %', f; END IF;
   END LOOP;
-  FOREACH f IN ARRAY ARRAY['_colaborador_libre(uuid, uuid, uuid, timestamptz, uuid)', '_agenda_cadena(uuid, uuid, timestamptz, jsonb)',
+  FOREACH f IN ARRAY ARRAY['_colaborador_libre(uuid, uuid, uuid, timestamptz, uuid, uuid)', '_agenda_cadena(uuid, uuid, timestamptz, jsonb, uuid)',
                            '_reservas_validar(uuid, uuid, jsonb, timestamptz)', '_agenda_cita_resumen(uuid)',
                            '_agenda_cita_cambiable(uuid, text)', '_anticipo_cita(uuid, uuid)', '_nombre_corto(uuid)',
                            '_reservas_oferta(uuid)', '_anticipo_de(text, text, numeric, numeric)'] LOOP

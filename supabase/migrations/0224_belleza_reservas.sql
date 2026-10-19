@@ -217,9 +217,10 @@ GRANT EXECUTE ON FUNCTION modulos_efectivos(uuid) TO authenticated, service_role
 
 -- ── §3 «Quien esté libre» con el negocio explícito ──────────────────────────
 -- Cuerpo vigente de colaborador_libre (0218) con el negocio como parámetro y, opcional, un
--- colaborador fijo (¿puede ESTE en ese tramo?). La pública conserva su firma y lee el JWT.
+-- colaborador fijo (¿puede ESTE en ese tramo?) y una cita cuyos tramos no cuentan (la que se
+-- cambia de hora). La pública conserva su firma y lee el JWT.
 CREATE OR REPLACE FUNCTION _colaborador_libre(p_tenant uuid, p_sucursal uuid, p_producto uuid, p_inicia timestamptz,
-                                              p_usuario uuid DEFAULT NULL)
+                                              p_usuario uuid DEFAULT NULL, p_excluir_cita uuid DEFAULT NULL)
 RETURNS uuid
 LANGUAGE sql
 STABLE
@@ -252,15 +253,15 @@ AS $$
                       WHERE a.tenant_id = l.tenant_id AND a.usuario_id = l.usuario_id
                         AND l.ini::date BETWEEN a.desde AND a.hasta)
      AND NOT EXISTS (SELECT 1 FROM citas_servicios cs
-                      WHERE cs.tenant_id = l.tenant_id AND cs.usuario_id = l.usuario_id AND cs.activa
+                      WHERE cs.tenant_id = l.tenant_id AND cs.usuario_id = l.usuario_id AND cs.activa AND cs.cita_id IS DISTINCT FROM p_excluir_cita
                         AND tstzrange(cs.inicia, cs.termina, '[)') && tstzrange(p_inicia, l.termina, '[)'))
    ORDER BY (SELECT count(DISTINCT cs.cita_id) FROM citas_servicios cs
-              WHERE cs.tenant_id = l.tenant_id AND cs.usuario_id = l.usuario_id AND cs.activa
+              WHERE cs.tenant_id = l.tenant_id AND cs.usuario_id = l.usuario_id AND cs.activa AND cs.cita_id IS DISTINCT FROM p_excluir_cita
                 AND (cs.inicia AT TIME ZONE 'America/Mexico_City')::date = l.ini::date),
             l.orden, l.usuario_id
    LIMIT 1;
 $$;
-REVOKE ALL ON FUNCTION _colaborador_libre(uuid, uuid, uuid, timestamptz, uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION _colaborador_libre(uuid, uuid, uuid, timestamptz, uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION colaborador_libre(p_sucursal uuid, p_producto uuid, p_inicia timestamptz)
 RETURNS uuid
@@ -557,7 +558,8 @@ REVOKE ALL ON FUNCTION _reservas_validar(uuid, uuid, jsonb, timestamptz) FROM PU
 -- La cadena de servicios desde p_inicia, con el colaborador de cada tramo resuelto (el elegido si
 -- puede, si no «quien esté libre») y espacio libre de su tipo. NULL si algún tramo no cabe. Todo
 -- tramo activo cuenta, marcado con empalme o no. El candado final lo pone _agenda_tramos.
-CREATE OR REPLACE FUNCTION _agenda_cadena(p_tenant uuid, p_sucursal uuid, p_inicia timestamptz, p_servicios jsonb)
+CREATE OR REPLACE FUNCTION _agenda_cadena(p_tenant uuid, p_sucursal uuid, p_inicia timestamptz, p_servicios jsonb,
+                                          p_excluir_cita uuid DEFAULT NULL)
 RETURNS jsonb
 LANGUAGE plpgsql
 STABLE
@@ -574,7 +576,7 @@ DECLARE
 BEGIN
   FOR v_s IN SELECT value FROM jsonb_array_elements(p_servicios) LOOP
     v_prod := (v_s->>'producto_id')::uuid;
-    v_u := _colaborador_libre(p_tenant, p_sucursal, v_prod, v_cursor, (v_s->>'usuario_id')::uuid);
+    v_u := _colaborador_libre(p_tenant, p_sucursal, v_prod, v_cursor, (v_s->>'usuario_id')::uuid, p_excluir_cita);
     IF v_u IS NULL THEN RETURN NULL; END IF;
     SELECT COALESCE(sc.duracion_min, sa.duracion_min), sa.tipo_espacio_id INTO v_dur, v_tipo
       FROM servicios_agenda sa
@@ -584,7 +586,7 @@ BEGIN
          SELECT 1 FROM espacios e
           WHERE e.tenant_id = p_tenant AND e.sucursal_id = p_sucursal AND e.tipo_espacio_id = v_tipo AND e.activo
             AND NOT EXISTS (SELECT 1 FROM citas_servicios cs
-                             WHERE cs.espacio_id = e.id AND cs.activa
+                             WHERE cs.espacio_id = e.id AND cs.activa AND cs.cita_id IS DISTINCT FROM p_excluir_cita
                                AND tstzrange(cs.inicia, cs.termina, '[)') && tstzrange(v_cursor, v_cursor + make_interval(mins => v_dur), '[)'))) THEN
       RETURN NULL;
     END IF;
@@ -594,7 +596,7 @@ BEGIN
   RETURN v_out;
 END;
 $$;
-REVOKE ALL ON FUNCTION _agenda_cadena(uuid, uuid, timestamptz, jsonb) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION _agenda_cadena(uuid, uuid, timestamptz, jsonb, uuid) FROM PUBLIC, anon, authenticated, service_role;
 
 -- Lo que la clienta ve de su cita: día y hora en México, sucursal, servicios y colaborador corto.
 CREATE OR REPLACE FUNCTION _agenda_cita_resumen(p_cita uuid)
@@ -763,10 +765,10 @@ END;
 $$;
 
 -- Horarios en que empieza la cadena de servicios ese día (México). p_servicios: [{producto_id,
--- usuario_id|null}] en orden. Vacío fuera de los días permitidos.
--- ponytail: al cambiar una cita, sus propios tramos tapan los horarios que se le enciman; si estorba,
--- un parámetro para excluir la cita.
-CREATE OR REPLACE FUNCTION agenda_huecos(p_tenant uuid, p_sucursal uuid, p_dia date, p_servicios jsonb)
+-- usuario_id|null}] en orden. Vacío fuera de los días permitidos. p_excluir_cita: la cita que se
+-- cambia de hora; sus propios tramos no tapan horarios.
+CREATE OR REPLACE FUNCTION agenda_huecos(p_tenant uuid, p_sucursal uuid, p_dia date, p_servicios jsonb,
+                                         p_excluir_cita uuid DEFAULT NULL)
 RETURNS TABLE (inicia timestamptz)
 LANGUAGE plpgsql
 STABLE
@@ -800,7 +802,7 @@ BEGIN
       FROM generate_series(((v_ini + v_cfg.agenda_intervalo_min - 1) / v_cfg.agenda_intervalo_min) * v_cfg.agenda_intervalo_min,
                            v_fin - 5, v_cfg.agenda_intervalo_min) m
   LOOP
-    IF v_t >= v_desde AND _agenda_cadena(p_tenant, p_sucursal, v_t, p_servicios) IS NOT NULL THEN
+    IF v_t >= v_desde AND _agenda_cadena(p_tenant, p_sucursal, v_t, p_servicios, p_excluir_cita) IS NOT NULL THEN
       inicia := v_t;
       RETURN NEXT;
     END IF;
@@ -965,12 +967,12 @@ BEGIN
   PERFORM _reservas_validar(p_tenant, v_c.sucursal_id, NULL, p_inicia);
   SELECT jsonb_agg(jsonb_build_object('producto_id', producto_id, 'usuario_id', usuario_id) ORDER BY orden)
     INTO v_servicios FROM citas_servicios WHERE cita_id = v_c.id;
-  -- Fuera sus tramos (no se estorba a sí misma) y se revalida el hueco como al reservar.
-  v_vecinos := _agenda_vecinos(p_tenant, v_c.id);
-  DELETE FROM citas_servicios WHERE cita_id = v_c.id;
-  IF _agenda_cadena(p_tenant, v_c.sucursal_id, p_inicia, v_servicios) IS NULL THEN
+  -- Se revalida el hueco como al reservar, sin contar sus propios tramos; luego salen los viejos.
+  IF _agenda_cadena(p_tenant, v_c.sucursal_id, p_inicia, v_servicios, v_c.id) IS NULL THEN
     RAISE EXCEPTION 'HUECO_OCUPADO: Ese horario ya no está disponible' USING ERRCODE = '23P01';
   END IF;
+  v_vecinos := _agenda_vecinos(p_tenant, v_c.id);
+  DELETE FROM citas_servicios WHERE cita_id = v_c.id;
   UPDATE citas SET inicia = p_inicia, termina = p_inicia + interval '1 minute', empalme = false WHERE id = v_c.id;
   BEGIN
     v_termina := _agenda_tramos(p_tenant, v_c.id, v_c.sucursal_id, p_inicia, v_servicios);
@@ -1012,7 +1014,7 @@ $$;
 DO $$
 DECLARE f text;
 BEGIN
-  FOREACH f IN ARRAY ARRAY['reservas_negocio(text)', 'agenda_huecos(uuid, uuid, date, jsonb)',
+  FOREACH f IN ARRAY ARRAY['reservas_negocio(text)', 'agenda_huecos(uuid, uuid, date, jsonb, uuid)',
                            'agenda_reservar_en_linea(uuid, jsonb)', 'agenda_cita_publica(uuid, text)',
                            'agenda_cancelar_en_linea(uuid, text)', 'agenda_mover_en_linea(uuid, text, timestamptz)',
                            'agenda_vencer_reservas()'] LOOP
