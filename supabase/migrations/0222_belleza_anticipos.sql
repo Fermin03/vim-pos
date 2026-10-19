@@ -220,6 +220,11 @@ BEGIN
     END IF;
   END IF;
 
+  -- Antes de tocar la cita: una venta pagada o cancelada no se cobra (y así no se toma el candado
+  -- de la cita mientras cancelar_ticket_pagado la tiene en orden contrario).
+  IF v_t.estado_fiscal NOT IN ('ABIERTO', 'BORRADOR') THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: la venta no está abierta.' USING ERRCODE = '22023';
+  END IF;
   IF v_t.turno_id IS NULL THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: la venta no tiene turno; ábrela en un turno para cobrar con anticipo.' USING ERRCODE = '22023';
   END IF;

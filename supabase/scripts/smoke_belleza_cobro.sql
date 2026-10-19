@@ -424,6 +424,9 @@ BEGIN
   -- El pago ANTICIPO no se reabre ni se edita.
   PERFORM pg_temp.debe_fallar(format('UPDATE pagos SET estado = %L WHERE ticket_id = %L AND metodo_pago = %L', 'CANCELADO', v_kx, 'ANTICIPO'),
     'DATOS_INVALIDOS: una venta pagada con anticipo no se reabre%', 'A3 cancelar pago');
+  -- Una venta ya pagada se rechaza antes de tocar la cita.
+  PERFORM pg_temp.debe_fallar(format('SELECT pagar_con_anticipo(%L, %L, NULL)', v_kx, v_cx),
+    'DATOS_INVALIDOS: la venta no está abierta.', 'A3 venta pagada');
 
   -- A4) Anticipo mayor que el saldo: $300 con tarjeta para un corte de $180 → 180 APLICADO, 120 VIGENTE.
   v_cy := pg_temp.cita('Yolanda', '2030-01-08 11:00-06');
