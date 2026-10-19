@@ -31,6 +31,7 @@ export function TiendaPedidos({
   mensaje,
   onCambio,
   onGuardar,
+  soloEnLinea = false,
 }: {
   valores: PedidosTienda;
   /** Sin dirección guardada todavía no existe la tienda: no hay dónde guardar esto. */
@@ -44,6 +45,8 @@ export function TiendaPedidos({
   mensaje: MensajeTienda | null;
   onCambio: (cambio: Partial<PedidosTienda>) => void;
   onGuardar: () => void;
+  /** Negocio con agenda que no vende en línea: solo el pago en línea, que cobra los anticipos de las reservas. */
+  soloEnLinea?: boolean;
 }) {
   const n = Number(valores.minutos);
   // El error sale al dejar el campo, no a media tecla: «1» camino de «12» no es un error.
@@ -58,9 +61,9 @@ export function TiendaPedidos({
   const quieto = soloLectura || !hayDireccion;
 
   return (
-    <Tarjeta titulo="Pedidos">
+    <Tarjeta titulo={soloEnLinea ? "Anticipos en línea" : "Pedidos"}>
       <div className="grid grid-cols-1 gap-5">
-        <div>
+        {!soloEnLinea && <div>
           <span className={label}>Aceptación</span>
           <Segmentos
             etiqueta="Aceptación"
@@ -74,9 +77,9 @@ export function TiendaPedidos({
               ? "Cada pedido suena en la caja y alguien lo acepta o lo rechaza."
               : "Los pedidos entran directo a cocina."}
           </p>
-        </div>
+        </div>}
 
-        {valores.aceptacion === "MANUAL" && (
+        {!soloEnLinea && valores.aceptacion === "MANUAL" && (
           <div>
             <label className={label} htmlFor="tie-minutos">Minutos de espera</label>
             <input
@@ -100,7 +103,7 @@ export function TiendaPedidos({
         )}
 
         <fieldset>
-          <legend className={label}>Formas de pago</legend>
+          <legend className={soloEnLinea ? "sr-only" : label}>Formas de pago</legend>
           <label className={cn(casilla, sinCuenta && "cursor-default text-ink-3")}>
             <input
               type="checkbox"
@@ -111,13 +114,14 @@ export function TiendaPedidos({
               aria-describedby={sinCuenta ? "tie-pago-linea-ayuda" : undefined}
               onChange={(e) => onCambio({ pagoEnLinea: e.target.checked })}
             />
-            Pago en línea
+            {soloEnLinea ? "Cobrar el anticipo en línea con Mercado Pago" : "Pago en línea"}
           </label>
           {sinCuenta && (
             <p id="tie-pago-linea-ayuda" className="-mt-1 mb-1 pl-8 text-12 text-ink-3">
               Para ofrecerlo, conecta tu cuenta de Mercado Pago abajo, en «Pago en línea».
             </p>
           )}
+          {!soloEnLinea && <>
           <label className={casilla}>
             <input
               type="checkbox"
@@ -139,6 +143,7 @@ export function TiendaPedidos({
             Tarjeta al recibir
           </label>
           <p className={ayuda}>Deja activa al menos una forma de pago.</p>
+          </>}
         </fieldset>
       </div>
 

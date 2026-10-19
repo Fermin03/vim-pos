@@ -406,11 +406,13 @@ describe("pago en línea", () => {
       { id: "g1", created_at: "2026-10-10T18:00:00Z", monto_mxn: 230.5, propina_mxn: 20.5, estado: "APROBADO", orden_id_externo: "ORDTST01M4P8JX8C82XV8G7EB2A16YAC", pedido: { folio_corto: "A7K2" } },
       { id: "g2", created_at: "2026-10-10T17:00:00Z", monto_mxn: 99, propina_mxn: 0, estado: "VENCIDO", orden_id_externo: null, pedido: null },
       { id: "g3", created_at: "2026-10-10T16:00:00Z", monto_mxn: 99, propina_mxn: 0, estado: "DEVOLUCION_FALLIDA", orden_id_externo: "ORD55", pedido: { folio_corto: "B1" } },
+      { id: "g4", created_at: "2026-10-10T15:00:00Z", monto_mxn: 50, propina_mxn: 0, estado: "APROBADO", orden_id_externo: "ORD56", cita_id: "c1", pedido: null },
     ];
     expect(await leerPagosTienda()).toEqual([
-      { id: "g1", fecha: "2026-10-10T18:00:00Z", folio: "A7K2", monto: 230.5, propina: 20.5, estado: "Pagado", pagoMp: "ORDTST01M4P8JX8C82XV8G7EB2A16YAC" },
-      { id: "g2", fecha: "2026-10-10T17:00:00Z", folio: null, monto: 99, propina: 0, estado: "No completado", pagoMp: null },
-      { id: "g3", fecha: "2026-10-10T16:00:00Z", folio: "B1", monto: 99, propina: 0, estado: "Devolución en proceso", pagoMp: "ORD55" },
+      { id: "g1", fecha: "2026-10-10T18:00:00Z", folio: "A7K2", monto: 230.5, propina: 20.5, estado: "Pagado", pagoMp: "ORDTST01M4P8JX8C82XV8G7EB2A16YAC", cita: false },
+      { id: "g2", fecha: "2026-10-10T17:00:00Z", folio: null, monto: 99, propina: 0, estado: "No completado", pagoMp: null, cita: false },
+      { id: "g3", fecha: "2026-10-10T16:00:00Z", folio: "B1", monto: 99, propina: 0, estado: "Devolución en proceso", pagoMp: "ORD55", cita: false },
+      { id: "g4", fecha: "2026-10-10T15:00:00Z", folio: null, monto: 50, propina: 0, estado: "Pagado", pagoMp: "ORD56", cita: true },
     ]);
   });
 

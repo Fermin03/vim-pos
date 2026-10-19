@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decidirAltaAddon, precioAltaAddon, type FilaAddon } from "../addons";
+import { decidirAltaAddon, nombreDeAddon, precioAltaAddon, type FilaAddon } from "../addons";
 
 const HOY = "2026-09-13";
 
@@ -77,5 +77,12 @@ describe("precioAltaAddon: lo que el plan ya incluye entra a $0", () => {
 
   it("un add-on que ningún plan regala se cobra siempre a su precio", () => {
     expect(precioAltaAddon("CFDI", "NEGOCIO", 250)).toBe(250);
+  });
+});
+
+describe("nombreDeAddon", () => {
+  it("TIENDA se enseña como En línea (tienda y reservas); el resto, con su nombre", () => {
+    expect(nombreDeAddon("TIENDA", "Tienda en línea")).toBe("En línea (tienda y reservas)");
+    expect(nombreDeAddon("DELIVERY", "Apps de delivery")).toBe("Apps de delivery");
   });
 });

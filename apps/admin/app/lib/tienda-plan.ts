@@ -1,6 +1,7 @@
 // La tienda en línea es un complemento que VIM concede (add-on TIENDA) y el dueño enciende. Lógica
 // pura de qué enseña el admin; el candado de verdad está en la base (`configuracion_tenant_tienda_guardia`, 0163).
 import { mensajeAyudaAdmin } from "@vim/db/soporte";
+import { conAgenda } from "./operacion";
 
 export type ModulosLeidos = { permitidos: Record<string, boolean>; efectivos: Record<string, boolean> };
 export type EstadoTienda = "cargando" | "permitida" | "sin_contratar";
@@ -83,4 +84,57 @@ export function invitacionTienda(o: OfertaTienda | null): { cierre: string; boto
       ? `La tienda en línea cuesta ${enPesos(o.precio)} al mes en tu plan. Escríbenos para contratarla.`
       : "La tienda en línea se contrata aparte en tu plan. Escríbenos para contratarla.";
   return { cierre, boton: "Quiero mi tienda en línea", mensaje: mensajeActivarTienda };
+}
+
+/** Lo que traen las reservas en línea, para la tarjeta de quien todavía no tiene el complemento. TEXTOS PROVISIONALES (James). */
+export const RESERVAS_INCLUYE: { titulo: string; detalle: string }[] = [
+  { titulo: "Abierto a toda hora", detalle: "Tus clientas apartan aunque el negocio esté cerrado." },
+  { titulo: "Solo horarios libres", detalle: "Respeta el horario de cada colaborador y las citas que ya tienes." },
+  { titulo: "Anticipo en línea", detalle: "Si cobras anticipo, lo pagan con Mercado Pago al apartar." },
+  { titulo: "Sin comisión", detalle: "Una cuota fija, no un porcentaje de cada cita." },
+];
+
+/** El nombre del complemento TIENDA para el dueño: desde las reservas (belleza, entrega 3) cubre las dos cosas. */
+export const NOMBRE_ADDON_TIENDA = "En línea (tienda y reservas)";
+/** El nombre de un add-on como lo ve el dueño; solo TIENDA cambia, el plan y el cobro no. */
+export const nombreDeAddon = (codigo: string, nombre: string): string => (codigo === "TIENDA" ? NOMBRE_ADDON_TIENDA : nombre);
+
+export type SeccionEnLinea = {
+  /** Negocio con agenda (belleza): la sección lleva las reservas. */
+  agenda: boolean;
+  titulo: string;
+  subtitulo: string;
+  pestanas: { label: string; href: string }[];
+  /** La pestaña de pagos enseña también cómo entran los pedidos (vende en línea, o es restaurante/tienda). */
+  conPedidos: boolean;
+};
+
+/**
+ * Cómo se llama la sección y qué pestañas tiene. Restaurantes y tiendas: exactamente lo de antes.
+ * Con agenda (belleza): «En línea», con Reservas; los pedidos y el Menú solo si además vende en línea
+ * (la tienda encendida).
+ */
+export function seccionEnLinea(m: ModulosLeidos | "error" | null): SeccionEnLinea {
+  if (!conAgenda(m) || m === null || m === "error") {
+    return {
+      agenda: false, titulo: "Tienda en línea", subtitulo: "Recibe los pedidos de tus clientes en tu caja.", conPedidos: true,
+      pestanas: [
+        { label: "General", href: "/tienda" },
+        { label: "Pedidos y pagos", href: "/tienda/pedidos" },
+        { label: "Sucursales y horarios", href: "/tienda/sucursales" },
+        { label: "Menú", href: "/tienda/menu" },
+      ],
+    };
+  }
+  const vende = m.efectivos.tienda === true;
+  return {
+    agenda: true, titulo: "En línea", subtitulo: "Tus clientas reservan desde su teléfono y la cita cae en tu agenda.", conPedidos: vende,
+    pestanas: [
+      { label: "General", href: "/tienda" },
+      { label: "Reservas", href: "/tienda/reservas" },
+      { label: vende ? "Pedidos y pagos" : "Pagos", href: "/tienda/pedidos" },
+      { label: "Sucursales", href: "/tienda/sucursales" },
+      ...(vende ? [{ label: "Menú", href: "/tienda/menu" }] : []),
+    ],
+  };
 }

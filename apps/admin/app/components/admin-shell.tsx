@@ -13,6 +13,7 @@ import { enlaceWhatsapp, mensajeAyudaAdmin, SOPORTE_POR_DEFECTO, textoHorario } 
 import { leerAyuda, type AyudaAdmin } from "../lib/soporte";
 import { leerModulos } from "../lib/modulos";
 import { filtrarSecciones, rutasOcultas } from "../lib/operacion";
+import { seccionEnLinea } from "../lib/tienda-plan";
 import { estadoInventario, rutaEsDeInventario, type ModulosLeidos } from "../lib/inventario-plan";
 
 const PerfilCtx = createContext<Perfil | null>(null);
@@ -271,7 +272,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const horarioAyuda = textoHorario(ayuda.soporte);
   // Inventario sigue en el menú aunque el plan no lo incluya: se marca, no se esconde (0148).
   const sinInventario = estadoInventario(modulos) === "no_incluido";
-  const navVisible = filtrarSecciones(NAV, rutasOcultas(modulos));
+  // Con agenda (belleza) la sección de la tienda también lleva las reservas: se llama «En línea».
+  const tituloEnLinea = seccionEnLinea(modulos).titulo;
+  const navVisible = filtrarSecciones(NAV, rutasOcultas(modulos))
+    .map((s) => ({ ...s, items: s.items.map((it) => (it.href === "/tienda" ? { ...it, label: tituloEnLinea } : it)) }));
 
   return (
     <PerfilCtx.Provider value={perfil}>

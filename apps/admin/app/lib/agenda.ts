@@ -56,6 +56,8 @@ export const servicioSchema = z.object({
   tipo_espacio_id: z.string().guid().nullable(),
   comision: reglaSchema,
   anticipo: reglaSchema,
+  /** Se ofrece en las reservas en línea (0224). */
+  en_linea: z.boolean().default(true),
   /** undefined = no se tocó: una clave vieja con otro formato no impide guardar el servicio. */
   clave_sat: claveSatSchema.nullable().optional(),
 });
@@ -116,10 +118,12 @@ export type Servicio = {
   id: string; nombre: string; precio: number; categoriaId: string; duracionMin: number;
   tipoEspacioId: string | null; activo: boolean; colaboradores: ServicioColaboradorInput[];
   comision: Regla; anticipo: Regla; claveSat: string | null;
+  /** Se reserva en línea (0224). */
+  enLinea: boolean;
 };
 
 type FilaServicio = {
-  producto_id: string; duracion_min: number; tipo_espacio_id: string | null; activo: boolean;
+  producto_id: string; duracion_min: number; tipo_espacio_id: string | null; activo: boolean; en_linea: boolean;
   comision_tipo: string | null; comision_valor: unknown; anticipo_tipo: string | null; anticipo_valor: unknown;
   producto: { nombre: string; precio_base_mxn: unknown; categoria_id: string; clave_sat: string | null; deleted_at: string | null } | null;
 };
@@ -127,7 +131,7 @@ type FilaSC = { producto_id: string; usuario_id: string; precio_mxn: unknown; du
 
 export async function listarServicios(): Promise<Servicio[]> {
   const [s, sc] = await Promise.all([
-    supabase.from("servicios_agenda").select("producto_id, duracion_min, tipo_espacio_id, activo, comision_tipo, comision_valor, anticipo_tipo, anticipo_valor, producto:productos(nombre, precio_base_mxn, categoria_id, clave_sat, deleted_at)"),
+    supabase.from("servicios_agenda").select("producto_id, duracion_min, tipo_espacio_id, activo, en_linea, comision_tipo, comision_valor, anticipo_tipo, anticipo_valor, producto:productos(nombre, precio_base_mxn, categoria_id, clave_sat, deleted_at)"),
     supabase.from("servicio_colaborador").select("producto_id, usuario_id, precio_mxn, duracion_min, comision_tipo, comision_valor"),
   ]);
   ok(s); ok(sc);
@@ -142,7 +146,7 @@ export async function listarServicios(): Promise<Servicio[]> {
     .map((f) => ({
       id: f.producto_id, nombre: f.producto!.nombre, precio: Number(f.producto!.precio_base_mxn), categoriaId: f.producto!.categoria_id,
       duracionMin: f.duracion_min, tipoEspacioId: f.tipo_espacio_id, activo: f.activo, colaboradores: porServicio.get(f.producto_id) ?? [],
-      comision: reglaDe(f.comision_tipo, f.comision_valor), anticipo: reglaDe(f.anticipo_tipo, f.anticipo_valor), claveSat: f.producto!.clave_sat,
+      comision: reglaDe(f.comision_tipo, f.comision_valor), anticipo: reglaDe(f.anticipo_tipo, f.anticipo_valor), claveSat: f.producto!.clave_sat, enLinea: f.en_linea,
     }))
     .sort((a, b) => a.nombre.localeCompare(b.nombre));
 }
@@ -160,7 +164,7 @@ export async function crearServicio(input: ServicioInput): Promise<string> {
     { tienda: { codigo_barras: "", costo_mxn: null, controla_existencias: false, tipo_venta: "UNIDAD" } },
   );
   const { error } = await supabase.from("servicios_agenda").insert({
-    producto_id: id, tenant_id: tid, duracion_min: d.duracion_min, tipo_espacio_id: d.tipo_espacio_id,
+    producto_id: id, tenant_id: tid, duracion_min: d.duracion_min, tipo_espacio_id: d.tipo_espacio_id, en_linea: d.en_linea,
     ...columnasRegla("comision", d.comision), ...columnasRegla("anticipo", d.anticipo),
   });
   if (error) {
@@ -175,12 +179,17 @@ export async function actualizarServicio(id: string, input: ServicioInput): Prom
   const d = servicioSchema.parse(input);
   ok(await supabase.from("productos").update({ nombre: d.nombre, categoria_id: d.categoria_id, precio_base_mxn: d.precio_base_mxn, ...(d.clave_sat !== undefined && { clave_sat: d.clave_sat }) }).eq("id", id));
   ok(await supabase.from("servicios_agenda").update({
-    duracion_min: d.duracion_min, tipo_espacio_id: d.tipo_espacio_id, ...columnasRegla("comision", d.comision), ...columnasRegla("anticipo", d.anticipo),
+    duracion_min: d.duracion_min, tipo_espacio_id: d.tipo_espacio_id, en_linea: d.en_linea, ...columnasRegla("comision", d.comision), ...columnasRegla("anticipo", d.anticipo),
   }).eq("producto_id", id));
 }
 
 export async function activarServicio(id: string, activo: boolean): Promise<void> {
   ok(await supabase.from("servicios_agenda").update({ activo }).eq("producto_id", id));
+}
+
+/** El interruptor «Se reserva en línea» de la pestaña Reservas. */
+export async function servicioEnLinea(id: string, enLinea: boolean): Promise<void> {
+  ok(await supabase.from("servicios_agenda").update({ en_linea: enLinea }).eq("producto_id", id));
 }
 
 /** Deja exactamente esta lista de colaboradores en el servicio, con su precio y duración. */

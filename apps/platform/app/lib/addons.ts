@@ -71,3 +71,8 @@ export function decidirAltaAddon(filas: FilaAddon[], hoy: string): AltaAddon {
   const deHoy = filas.find((f) => f.fecha_inicio?.slice(0, 10) === hoy);
   return deHoy ? { accion: "reactivar", id: deHoy.id } : { accion: "insertar" };
 }
+
+/** El nombre del add-on TIENDA en el panel: desde las reservas (belleza, entrega 3) cubre tienda y reservas. */
+export const NOMBRE_ADDON_TIENDA = "En línea (tienda y reservas)";
+/** El nombre con que el panel enseña un add-on. Solo cambia TIENDA; precio, plan y cobro siguen igual. */
+export const nombreDeAddon = (codigo: string, nombre: string): string => (codigo === "TIENDA" ? NOMBRE_ADDON_TIENDA : nombre);

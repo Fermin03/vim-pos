@@ -5,7 +5,7 @@ import { MODULOS } from "@vim/db/modulos";
 import { GIROS } from "@vim/db/operacion";
 import { esExtra, EXTRAS_MAXIMO } from "@vim/db/cobro";
 import { fechaBloqueo, mensajeBloqueoPorDefecto } from "../../../lib/bloqueo";
-import { decidirAltaAddon, precioAltaAddon, type FilaAddon } from "../../../lib/addons";
+import { decidirAltaAddon, nombreDeAddon, precioAltaAddon, type FilaAddon } from "../../../lib/addons";
 import { precioValido } from "../../../lib/precio";
 import { fechaValida, leerPromocion } from "../../../lib/promocion";
 import { accesoDeDueno, type UsuarioAuth } from "../../../lib/acceso-dueno";
@@ -106,8 +106,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     foliosBase: saldo
       ? { mensuales: saldo.folios_base_mensuales, consumidos: saldo.folios_base_consumidos, periodo: saldo.periodo_actual }
       : null,
-    addons: addonsRaw ?? [],
-    catalogoAddons: catalogoAddons ?? [],
+    // El nombre de TIENDA es el del panel («En línea (tienda y reservas)»), no el de la fila.
+    addons: ((addonsRaw ?? []) as unknown as { addon: { codigo: string; nombre: string } | null }[])
+      .map((a) => (a.addon ? { ...a, addon: { ...a.addon, nombre: nombreDeAddon(a.addon.codigo, a.addon.nombre) } } : a)),
+    catalogoAddons: (catalogoAddons ?? []).map((a) => ({ ...a, nombre: nombreDeAddon(a.codigo, a.nombre) })),
     paquetes: paquetes ?? [],
     nSucursales: nSucursales ?? 0,
   });

@@ -24,7 +24,7 @@ const corto = "h-10 w-24 rounded border border-line-strong px-2.5 text-sm tabula
 type Quien = { precio: string; duracion: string; comision: CamposRegla };
 type Editando = {
   id: string | null; nombre: string; categoriaId: string; precio: string; duracion: string; tipoEspacioId: string;
-  comision: CamposRegla; anticipo: CamposRegla; claveSat: string; claveSatOriginal: string;
+  comision: CamposRegla; anticipo: CamposRegla; claveSat: string; claveSatOriginal: string; enLinea: boolean;
   quien: Record<string, Quien>;
 };
 
@@ -82,14 +82,14 @@ export default function ServiciosPage() {
     setError(null);
     setEditando({
       id: null, nombre: "", categoriaId: categorias[0]?.id ?? "", precio: "", duracion: "30", tipoEspacioId: "",
-      comision: SIN_REGLA, anticipo: SIN_REGLA, claveSat: "", claveSatOriginal: "", quien: {},
+      comision: SIN_REGLA, anticipo: SIN_REGLA, claveSat: "", claveSatOriginal: "", enLinea: true, quien: {},
     });
   }
   function editar(s: Servicio) {
     setError(null);
     setEditando({
       id: s.id, nombre: s.nombre, categoriaId: s.categoriaId, precio: String(s.precio), duracion: String(s.duracionMin),
-      tipoEspacioId: s.tipoEspacioId ?? "", comision: camposDe(s.comision), anticipo: camposDe(s.anticipo), claveSat: s.claveSat ?? "", claveSatOriginal: s.claveSat ?? "",
+      tipoEspacioId: s.tipoEspacioId ?? "", comision: camposDe(s.comision), anticipo: camposDe(s.anticipo), claveSat: s.claveSat ?? "", claveSatOriginal: s.claveSat ?? "", enLinea: s.enLinea,
       quien: Object.fromEntries(s.colaboradores.map((c) => [c.usuario_id, {
         precio: c.precio_mxn === null ? "" : String(c.precio_mxn), duracion: c.duracion_min === null ? "" : String(c.duracion_min),
         comision: camposDe(c.comision),
@@ -103,7 +103,7 @@ export default function ServiciosPage() {
     const p = servicioSchema.safeParse({
       nombre: editando.nombre, categoria_id: editando.categoriaId, precio_base_mxn: editando.precio.trim() === "" ? NaN : Number(editando.precio),
       duracion_min: Number(editando.duracion), tipo_espacio_id: editando.tipoEspacioId || null,
-      comision: reglaDeCampos(editando.comision), anticipo: reglaDeCampos(editando.anticipo), // Sin tocar el campo no se reescribe: una clave vieja de otro formato no bloquea el resto.
+      comision: reglaDeCampos(editando.comision), anticipo: reglaDeCampos(editando.anticipo), en_linea: editando.enLinea, // Sin tocar el campo no se reescribe: una clave vieja de otro formato no bloquea el resto.
       clave_sat: editando.claveSat === editando.claveSatOriginal ? undefined : editando.claveSat.trim() || null,
     });
     if (!p.success) {
@@ -219,6 +219,14 @@ export default function ServiciosPage() {
                     <label className={label} htmlFor="srv-anticipo">Anticipo al apartar</label>
                     <CampoRegla id="srv-anticipo" etiqueta="Anticipo" sin="Sin anticipo" valor={editando.anticipo}
                       onCambiar={(anticipo) => setEditando({ ...editando, anticipo })} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="flex min-h-[44px] cursor-pointer items-center gap-3 text-14 text-ink">
+                      <input type="checkbox" className="h-5 w-5 flex-shrink-0 accent-ink" checked={editando.enLinea}
+                        aria-describedby="srv-en-linea-ayuda" onChange={(e) => setEditando({ ...editando, enLinea: e.target.checked })} />
+                      Se reserva en línea
+                    </label>
+                    <p id="srv-en-linea-ayuda" className="text-13 text-ink-2">Tus clientas pueden apartarlo desde tu página de reservas.</p>
                   </div>
                   <div className="sm:col-span-2">
                     <label className={label} htmlFor="srv-clave-sat">

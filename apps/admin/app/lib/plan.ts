@@ -1,6 +1,7 @@
 import { supabase, leerSesion } from "./supabase";
 import { addonVigente, importeAddon, precioVigente, textoLimiteCajas, totalMensual, type AddonCobro, type MetodoCobro, type PrecioSuscripcion } from "@vim/db/cobro";
 import type { DatosPago } from "./datos-pago";
+import { nombreDeAddon } from "./tienda-plan";
 
 /** Lo que el dueño ve de su contrato con VIM: plan, cobro, prueba, pagos y a dónde pagar (0130, 0141). Solo lectura. */
 export type PlanYPagos = {
@@ -82,7 +83,7 @@ export function desgloseMensual(
     const cantidad = a.cantidad ?? 1;
     renglones.push({
       clave: a.codigo,
-      concepto: a.nombre,
+      concepto: nombreDeAddon(a.codigo, a.nombre),
       detalle: importe === 0 ? (a.incluido_en_plan ? "incluido en tu plan" : "sin costo")
         : cantidad > 1 ? `${cantidad} × ${pesos(Number(a.precio_mensual_mxn))}` : null,
       importe,
