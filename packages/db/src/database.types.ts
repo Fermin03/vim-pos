@@ -15413,6 +15413,7 @@ export type Database = {
         Args: { p_ejes: string[]; p_nombre: string; p_valores: Json }
         Returns: string
       }
+      _reservas_negocio_vivo: { Args: { p_tenant: string }; Returns: undefined }
       _reservas_oferta: {
         Args: { p_tenant: string }
         Returns: {
@@ -15515,6 +15516,7 @@ export type Database = {
         }
         Returns: Json
       }
+      _telefono_10: { Args: { p: string }; Returns: string }
       _ticket_de_cambio_abierto: {
         Args: { p_ticket: string }
         Returns: boolean
@@ -15759,7 +15761,7 @@ export type Database = {
       agenda_huecos: {
         Args: {
           p_dia: string
-          p_excluir_cita?: string
+          p_excluir_enlace_hash?: string
           p_servicios: Json
           p_sucursal: string
           p_tenant: string

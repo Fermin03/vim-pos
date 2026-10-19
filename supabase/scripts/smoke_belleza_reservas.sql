@@ -2,7 +2,9 @@
 -- (horario, comida, ausencia, empalme también marcado, espacio, intervalo, aviso y días), cadena de
 -- dos servicios, «quien esté libre», doble reserva del mismo hueco, clave idempotente, clienta por
 -- teléfono, cancelar y cambiar dentro y fuera del plazo, vencimiento sin pago, otro negocio,
--- permisos y el módulo `reservas`. Sobre la semilla; las fechas son relativas a hoy (México). ROLLBACK.
+-- permisos, el módulo `reservas`, entrada mal formada, celular a 10 dígitos, clienta bloqueada,
+-- motivo público, tope de 3 citas por celular y negocio bloqueado. Sobre la semilla; las fechas son
+-- relativas a hoy (México). ROLLBACK.
 -- Uso: cd desktop && npm run smokes -- smoke_belleza_reservas.sql
 \set ON_ERROR_STOP on
 BEGIN;
@@ -18,7 +20,7 @@ END $f$;
 CREATE FUNCTION pg_temp.a(p_d date, p_h text) RETURNS timestamptz LANGUAGE sql IMMUTABLE
 AS $$ SELECT (p_d + p_h::time) AT TIME ZONE 'America/Mexico_City' $$;
 -- Los huecos de un día como «,09:00,09:15,…,».
-CREATE FUNCTION pg_temp.huecos(p_d date, p_serv jsonb, p_excluir uuid DEFAULT NULL) RETURNS text LANGUAGE sql
+CREATE FUNCTION pg_temp.huecos(p_d date, p_serv jsonb, p_excluir text DEFAULT NULL) RETURNS text LANGUAGE sql
 AS $$ SELECT ',' || COALESCE(string_agg(to_char(h.inicia AT TIME ZONE 'America/Mexico_City', 'HH24:MI'), ',' ORDER BY h.inicia), '') || ','
         FROM agenda_huecos('99999999-0000-0000-0000-0000000000aa', '99999999-0000-0000-0000-0000000000bb', p_d, p_serv, p_excluir) h $$;
 CREATE FUNCTION pg_temp.s(p_prod uuid, p_u uuid DEFAULT NULL) RETURNS jsonb LANGUAGE sql IMMUTABLE
@@ -51,12 +53,16 @@ DECLARE
   v_valor  uuid := '22400000-0000-0000-0000-0000000000a5';   -- fuera de línea
   v_hoy    date := (now() AT TIME ZONE 'America/Mexico_City')::date;
   d        date;
+  e        date;
+  v_rosa   uuid;
+  v_h      text;
   v_cat uuid; v_tipo uuid; v_cx uuid; v_turno uuid; v_lucia uuid;
   v_c1 uuid; v_c2 uuid; v_c3 uuid;
   v_r jsonb; v_r2 jsonb; v_neg jsonb; v_hash text; v_hash2 text; v_txt text; v_n integer; f text;
   r record;
 BEGIN
   d := v_hoy + 7;
+  e := v_hoy + 3;
   PERFORM pg_temp.como(NULL);
 
   -- ── Fixture ────────────────────────────────────────────────────────────────
@@ -269,6 +275,7 @@ BEGIN
   IF r.estado <> 'CANCELADA' OR r.cancelada_por <> 'CLIENTA_EN_LINEA' OR r.cancelada_motivo <> 'Cancelada por la clienta en línea'
      OR v_r->>'estado' <> 'CANCELADA' OR (v_r->>'puede_cambiar')::boolean THEN
     RAISE EXCEPTION 'R19: % %', to_jsonb(r), v_r; END IF;
+  IF v_r->>'cancelada_motivo' <> 'Cancelada por ti' THEN RAISE EXCEPTION 'R19: motivo público %', v_r->>'cancelada_motivo'; END IF;
   IF (SELECT bool_or(activa) FROM citas_servicios WHERE cita_id = v_c3) THEN RAISE EXCEPTION 'R19: sigue ocupando'; END IF;
   PERFORM pg_temp.debe_fallar(format('SELECT agenda_cancelar_en_linea(%L, %L)', v_t, v_hash2), 'DATOS_INVALIDOS: la cita ya no se puede cambiar.', 'R19 dos veces');
 
@@ -289,8 +296,10 @@ BEGIN
   PERFORM pg_temp.debe_fallar(format('SELECT agenda_mover_en_linea(%L, %L, %L)', v_t, v_hash, date_trunc('hour', now()) - interval '1 hour'),
     'HUECO_OCUPADO:%', 'R20 al pasado');
   -- 15 minutos después se encima sobre su propio tramo: con la exclusión se ofrece y se puede mover.
+  -- La exclusión va por el enlace (hash) y solo dentro del negocio; un hash ajeno no excluye nada.
   IF pg_temp.huecos(d, pg_temp.s(v_corte, v_diego)) LIKE '%,16:15,%'
-     OR pg_temp.huecos(d, pg_temp.s(v_corte, v_diego), v_c2) NOT LIKE '%,16:15,%' THEN
+     OR pg_temp.huecos(d, pg_temp.s(v_corte, v_diego), pg_temp.h('otro-codigo')) LIKE '%,16:15,%'
+     OR pg_temp.huecos(d, pg_temp.s(v_corte, v_diego), v_hash) NOT LIKE '%,16:15,%' THEN
     RAISE EXCEPTION 'R20: la exclusión de la propia cita no funciona'; END IF;
   v_r := agenda_mover_en_linea(v_t, v_hash, pg_temp.a(d, '16:15'));
   IF v_r->>'hora' <> '16:15' OR (SELECT termina FROM citas WHERE id = v_c2) <> pg_temp.a(d, '17:15')
@@ -314,7 +323,7 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(reservas_negocio('reservas-smoke')->'servicios') s
                   WHERE (s->>'producto_id')::uuid = v_corte AND (s->>'anticipo_mxn')::numeric = 100) THEN
     RAISE EXCEPTION 'R22: el negocio no anuncia el anticipo del corte'; END IF;
-  PERFORM pg_temp.debe_fallar(format('SELECT pg_temp.reservar(%L, %L, %L)', pg_temp.a(d, '13:00'), pg_temp.s(v_corte, v_maria), 'smk-res-0007'),
+  PERFORM pg_temp.debe_fallar(format('SELECT pg_temp.reservar(%L, %L, %L)', pg_temp.a(d, '13:00'), pg_temp.s(v_corte, v_maria), 'smk-res-0007', '4770002246'),
     'PAGO_NO_DISPONIBLE:%', 'R22 sin cobro en línea');
   IF EXISTS (SELECT 1 FROM citas WHERE client_id_local = 'web:smk-res-0007') THEN RAISE EXCEPTION 'R22: quedó la cita sin cobro'; END IF;
   UPDATE tienda_config SET pago_en_linea = true WHERE tenant_id = v_t;
@@ -325,7 +334,7 @@ BEGIN
   IF tienda_conexion_cobro(v_t, v_suc) IS NULL THEN RAISE EXCEPTION 'R22 fixture: sin cobro en línea'; END IF;
   IF (reservas_negocio('reservas-smoke')->'reglas'->>'pago_en_linea_disponible')::boolean IS NOT TRUE THEN
     RAISE EXCEPTION 'R22: el negocio no anuncia el pago en línea'; END IF;
-  v_r := pg_temp.reservar(pg_temp.a(d, '13:00'), pg_temp.s(v_corte, v_maria), 'smk-res-0007');
+  v_r := pg_temp.reservar(pg_temp.a(d, '13:00'), pg_temp.s(v_corte, v_maria), 'smk-res-0007', '4770002246');
   v_c1 := (v_r->>'cita_id')::uuid;
   SELECT * INTO r FROM citas WHERE id = v_c1;
   IF (v_r->>'anticipo_mxn')::numeric <> 100 OR r.pago_hasta NOT BETWEEN now() + interval '14 minutes' AND now() + interval '16 minutes' THEN
@@ -334,7 +343,7 @@ BEGIN
   PERFORM agenda_mover_en_linea(v_t, pg_temp.h(v_r->>'codigo'), pg_temp.a(d, '13:15'));
   IF (SELECT pago_hasta FROM citas WHERE id = v_c1) IS DISTINCT FROM r.pago_hasta THEN RAISE EXCEPTION 'R22: mover perdió el apartado'; END IF;
   -- Otra con su anticipo ya pagado (VIGENTE): esa no vence.
-  v_r2 := pg_temp.reservar(pg_temp.a(d, '14:30'), pg_temp.s(v_corte, v_maria), 'smk-res-0008');
+  v_r2 := pg_temp.reservar(pg_temp.a(d, '14:30'), pg_temp.s(v_corte, v_maria), 'smk-res-0008', '4770002247');
   UPDATE turnos SET estado = 'CERRADO', fecha_cierre = now() WHERE caja_id = v_caja AND estado = 'ABIERTO';
   INSERT INTO turnos (tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable, usuario_apertura_id, fondo_inicial_mxn, fondo_modo)
   VALUES (v_t, v_suc, v_caja, 'SMK-0224', v_hoy, v_maria, 500, 'TOTAL') RETURNING id INTO v_turno;
@@ -348,6 +357,8 @@ BEGIN
     RAISE EXCEPTION 'R22: vencer % %', v_n, to_jsonb(r); END IF;
   IF pg_temp.huecos(d, pg_temp.s(v_corte, v_maria)) NOT LIKE '%,13:15,%' THEN RAISE EXCEPTION 'R22: el lugar vencido no se liberó'; END IF;
   IF agenda_vencer_reservas() <> 0 THEN RAISE EXCEPTION 'R22: vencer no es idempotente'; END IF;
+  IF agenda_cita_publica(v_t, pg_temp.h(v_r->>'codigo'))->>'cancelada_motivo' <> 'No se completó el pago' THEN
+    RAISE EXCEPTION 'R22: motivo público del vencimiento'; END IF;
   UPDATE configuracion_tenant SET agenda_cobro_modo = 'AL_FINAL' WHERE tenant_id = v_t;
 
   -- R23) Servicio fuera de línea: ni huecos ni reserva.
@@ -360,9 +371,9 @@ BEGIN
 
   -- R24) Otro negocio no ve ni toca nada.
   IF agenda_cita_publica(v_otro, v_hash) IS NOT NULL THEN RAISE EXCEPTION 'R24: otro negocio ve la cita'; END IF;
-  PERFORM pg_temp.debe_fallar(format('SELECT agenda_cancelar_en_linea(%L, %L)', v_otro, v_hash), 'DATOS_INVALIDOS: la cita no existe.', 'R24 cancelar');
+  PERFORM pg_temp.debe_fallar(format('SELECT agenda_cancelar_en_linea(%L, %L)', v_otro, v_hash), 'DATOS_INVALIDOS:%', 'R24 cancelar');
   PERFORM pg_temp.debe_fallar(format('SELECT agenda_mover_en_linea(%L, %L, %L)', v_otro, v_hash, pg_temp.a(d, '12:00')),
-    'DATOS_INVALIDOS: la cita no existe.', 'R24 mover');
+    'DATOS_INVALIDOS:%', 'R24 mover');
   PERFORM pg_temp.debe_fallar(format('SELECT count(*) FROM agenda_huecos(%L, %L, %L, %L)', v_otro, v_suc, d, pg_temp.s(v_corte)),
     'DATOS_INVALIDOS: este negocio no tiene reservas en línea.', 'R24 huecos');
   -- Aun con reservas encendidas, la sucursal y el catálogo de otro negocio no pasan.
@@ -374,16 +385,66 @@ BEGIN
     'inicia', pg_temp.a(d, '12:00'), 'servicios', pg_temp.s(v_corte), 'clave', 'smk-otro-0001',
     'cliente', jsonb_build_object('nombre', 'X', 'telefono', '4770000000', 'email', 'x@example.com'))),
     'DATOS_INVALIDOS: la sucursal no es de este negocio.', 'R24 reservar en sucursal ajena');
+  PERFORM pg_temp.debe_fallar(format('SELECT agenda_cancelar_en_linea(%L, %L)', v_otro, v_hash), 'DATOS_INVALIDOS: la cita no existe.', 'R24 cancelar con reservas');
+  IF agenda_cita_publica(v_otro, v_hash) IS NOT NULL THEN RAISE EXCEPTION 'R24: otro negocio ve la cita con reservas'; END IF;
 
   -- R25) Caja: cancelar_cita anota CAJA; colaborador_libre (JWT) sigue funcionando.
   PERFORM pg_temp.como(v_maria);
   PERFORM cancelar_cita((v_r2->>'cita_id')::uuid, 'La clienta llamó');
   IF (SELECT cancelada_por FROM citas WHERE id = (v_r2->>'cita_id')::uuid) <> 'CAJA' THEN RAISE EXCEPTION 'R25: cancelar_cita no anotó CAJA'; END IF;
+  -- El motivo que escribió la recepción no sale al sitio.
+  IF agenda_cita_publica(v_t, pg_temp.h(v_r2->>'codigo'))->>'cancelada_motivo' <> 'Cancelada por el negocio' THEN
+    RAISE EXCEPTION 'R25: el sitio ve el motivo de la caja'; END IF;
   IF colaborador_libre(v_suc, v_corte, pg_temp.a(d, '14:30')) IS NULL THEN RAISE EXCEPTION 'R25: colaborador_libre dejó de funcionar'; END IF;
   PERFORM pg_temp.como(NULL);
 
+  -- R27) Entrada mal formada: DATOS_INVALIDOS con mensaje claro, nunca un error crudo de cast.
+  PERFORM pg_temp.debe_fallar(format('SELECT agenda_reservar_en_linea(%L, %L)', v_t, '"x"'),
+    'DATOS_INVALIDOS: faltan los datos de la reserva.', 'R27 no es objeto');
+  PERFORM pg_temp.debe_fallar(format('SELECT agenda_reservar_en_linea(%L, %L)', v_t, jsonb_build_object('sucursal_id', 'no-uuid',
+    'inicia', pg_temp.a(e, '09:00'), 'servicios', pg_temp.s(v_corte), 'clave', 'smk-mal-0001',
+    'cliente', jsonb_build_object('nombre', 'X', 'telefono', '4770000000', 'email', 'x@example.com'))),
+    'DATOS_INVALIDOS: la sucursal no es válida.', 'R27 sucursal');
+  PERFORM pg_temp.debe_fallar(format('SELECT agenda_reservar_en_linea(%L, %L)', v_t, jsonb_build_object('sucursal_id', v_suc,
+    'inicia', 'mañana temprano', 'servicios', pg_temp.s(v_corte), 'clave', 'smk-mal-0002',
+    'cliente', jsonb_build_object('nombre', 'X', 'telefono', '4770000000', 'email', 'x@example.com'))),
+    'DATOS_INVALIDOS: la hora de la cita no es válida.', 'R27 hora');
+  PERFORM pg_temp.debe_fallar(format('SELECT pg_temp.reservar(%L, %L, %L, %L)', pg_temp.a(e, '09:00'), pg_temp.s(v_corte), 'smk-mal-0003', 'abc'),
+    'DATOS_INVALIDOS: el celular debe tener 10 dígitos.', 'R27 celular');
+
+  -- R28) Celular a 10 dígitos: «+52 1 …» encuentra a la clienta guardada como «+52 …».
+  INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_t, 'Rosa', '+52 477 000 2244') RETURNING id INTO v_rosa;
+  v_r := pg_temp.reservar(pg_temp.a(e, '09:00'), pg_temp.s(v_corte, v_maria), 'smk-res-0010', '+52 1 477 000 2244');
+  SELECT * INTO r FROM citas WHERE id = (v_r->>'cita_id')::uuid;
+  IF r.cliente_id <> v_rosa OR r.cliente_telefono <> '4770002244' THEN RAISE EXCEPTION 'R28: %', to_jsonb(r); END IF;
+
+  -- R29) Clienta bloqueada: mensaje genérico (no se dice que está bloqueada) y sin cita.
+  UPDATE clientes SET estado = 'BLOQUEADO', motivo_bloqueo = 'Smoke' WHERE id = v_lucia;
+  PERFORM pg_temp.debe_fallar(format('SELECT pg_temp.reservar(%L, %L, %L, %L)', pg_temp.a(e, '10:00'), pg_temp.s(v_corte, v_maria), 'smk-res-0011', '4770002242'),
+    'DATOS_INVALIDOS: No pudimos apartar tu cita. Comunícate con el negocio.', 'R29 bloqueada');
+  IF EXISTS (SELECT 1 FROM citas WHERE client_id_local = 'web:smk-res-0011') THEN RAISE EXCEPTION 'R29: quedó la cita'; END IF;
+
+  -- R30) Tope: 3 citas por llegar por celular; al cancelar una, cabe otra.
+  v_r := pg_temp.reservar(pg_temp.a(e, '10:00'), pg_temp.s(v_corte, v_maria), 'smk-res-0012', '477 000 2250');
+  v_h := pg_temp.h(v_r->>'codigo');
+  PERFORM pg_temp.reservar(pg_temp.a(e, '11:00'), pg_temp.s(v_corte, v_maria), 'smk-res-0013', '4770002250');
+  v_r2 := pg_temp.reservar(pg_temp.a(e, '12:00'), pg_temp.s(v_corte, v_maria), 'smk-res-0014', '4770002250');
+  PERFORM pg_temp.debe_fallar(format('SELECT pg_temp.reservar(%L, %L, %L, %L)', pg_temp.a(e, '13:00'), pg_temp.s(v_corte, v_maria), 'smk-res-0015', '+524770002250'),
+    'LIMITE_RESERVAS: Ya tienes 3 citas apartadas; para más, comunícate con el negocio.', 'R30 cuarta');
+  PERFORM agenda_cancelar_en_linea(v_t, v_h);
+  PERFORM pg_temp.reservar(pg_temp.a(e, '13:00'), pg_temp.s(v_corte, v_maria), 'smk-res-0016', '4770002250');
+
+  -- R31) Negocio bloqueado después de resolverse el sitio: ni reservar ni cancelar.
+  UPDATE tenants SET bloqueo_desde = now() - interval '1 minute' WHERE id = v_t;
+  PERFORM pg_temp.debe_fallar(format('SELECT pg_temp.reservar(%L, %L, %L)', pg_temp.a(e, '15:00'), pg_temp.s(v_corte, v_maria), 'smk-res-0017'),
+    'DATOS_INVALIDOS: este negocio no tiene reservas en línea.', 'R31 reservar');
+  PERFORM pg_temp.debe_fallar(format('SELECT agenda_cancelar_en_linea(%L, %L)', v_t, pg_temp.h(v_r2->>'codigo')),
+    'DATOS_INVALIDOS: este negocio no tiene reservas en línea.', 'R31 cancelar');
+  IF reservas_negocio('reservas-smoke') IS NOT NULL THEN RAISE EXCEPTION 'R31: el sitio ve un negocio bloqueado'; END IF;
+  UPDATE tenants SET bloqueo_desde = NULL WHERE id = v_t;
+
   -- R26) Permisos: solo service_role ejecuta las RPC; las internas, nadie.
-  FOREACH f IN ARRAY ARRAY['reservas_negocio(text)', 'agenda_huecos(uuid, uuid, date, jsonb, uuid)', 'agenda_reservar_en_linea(uuid, jsonb)',
+  FOREACH f IN ARRAY ARRAY['reservas_negocio(text)', 'agenda_huecos(uuid, uuid, date, jsonb, text)', 'agenda_reservar_en_linea(uuid, jsonb)',
                            'agenda_cita_publica(uuid, text)', 'agenda_cancelar_en_linea(uuid, text)',
                            'agenda_mover_en_linea(uuid, text, timestamptz)', 'agenda_vencer_reservas()'] LOOP
     IF has_function_privilege('anon', f, 'execute') OR has_function_privilege('authenticated', f, 'execute')
@@ -392,7 +453,7 @@ BEGIN
   END LOOP;
   FOREACH f IN ARRAY ARRAY['_colaborador_libre(uuid, uuid, uuid, timestamptz, uuid, uuid)', '_agenda_cadena(uuid, uuid, timestamptz, jsonb, uuid)',
                            '_reservas_validar(uuid, uuid, jsonb, timestamptz)', '_agenda_cita_resumen(uuid)',
-                           '_agenda_cita_cambiable(uuid, text)', '_anticipo_cita(uuid, uuid)', '_nombre_corto(uuid)',
+                           '_agenda_cita_cambiable(uuid, text)', '_anticipo_cita(uuid, uuid)', '_nombre_corto(uuid)', '_telefono_10(text)', '_reservas_negocio_vivo(uuid)',
                            '_reservas_oferta(uuid)', '_anticipo_de(text, text, numeric, numeric)'] LOOP
     IF has_function_privilege('anon', f, 'execute') OR has_function_privilege('authenticated', f, 'execute')
        OR has_function_privilege('service_role', f, 'execute') THEN

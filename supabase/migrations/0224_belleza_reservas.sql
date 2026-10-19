@@ -8,7 +8,7 @@
 -- §3 colaborador_libre con el negocio explícito (_colaborador_libre); _agenda_tramos la usa.
 -- §4 Internas: cadena de tramos, validación, resumen, anticipo, nombre corto.
 -- §5 RPC: reservas_negocio, agenda_huecos, agenda_reservar_en_linea, agenda_cita_publica,
---    agenda_cancelar_en_linea, agenda_mover_en_linea, agenda_vencer_reservas (cron tienda-pagos).
+--    agenda_cancelar_en_linea, agenda_mover_en_linea, agenda_vencer_reservas (su propio cron).
 -- Horas: todo en America/Mexico_City. México no tiene horario de verano desde 2022, así que un día
 -- local siempre dura 24 h y no hay horas repetidas ni saltadas.
 -- Los restaurantes y las tiendas no cambian: sin el interruptor, nada de esto se ve.
@@ -79,7 +79,12 @@ ALTER TABLE citas
   ADD COLUMN IF NOT EXISTS reservo_email  text NULL CHECK (char_length(reservo_email) <= 254),
   ADD COLUMN IF NOT EXISTS cancelada_por  text NULL
     CHECK (cancelada_por IN ('CLIENTA_EN_LINEA', 'NEGOCIO', 'CAJA', 'PAGO_VENCIDO'));
-ALTER TABLE citas ADD CONSTRAINT citas_enlace_hash_uq UNIQUE (tenant_id, enlace_hash);
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'citas_enlace_hash_uq') THEN
+    ALTER TABLE citas ADD CONSTRAINT citas_enlace_hash_uq UNIQUE (tenant_id, enlace_hash);
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_citas_pago_hasta ON citas (pago_hasta) WHERE pago_hasta IS NOT NULL AND estado = 'AGENDADA';
 COMMENT ON COLUMN citas.enlace_hash IS 'SHA-256 (hex) del código del enlace de la cita en línea. El código en claro no se guarda (0224).';
 COMMENT ON COLUMN citas.pago_hasta IS 'Reserva en línea con anticipo por pagar: el lugar se aparta hasta aquí; luego agenda_vencer_reservas la cancela (0224).';
@@ -498,8 +503,27 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION _reservas_oferta(uuid) FROM PUBLIC, anon, authenticated, service_role;
 
+-- El negocio opera (como en reservas_negocio) y tiene las reservas encendidas; si no, error. Se
+-- revisa en cada escritura: el negocio pudo bloquearse después de que el sitio lo resolvió.
+CREATE OR REPLACE FUNCTION _reservas_negocio_vivo(p_tenant uuid)
+RETURNS void
+LANGUAGE plpgsql
+STABLE
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM tenants t
+                  WHERE t.id = p_tenant AND t.deleted_at IS NULL AND t.estado IN ('ACTIVO', 'TRIAL', 'INTERNO')
+                    AND (t.bloqueo_desde IS NULL OR t.bloqueo_desde > now()))
+     OR NOT COALESCE((modulos_efectivos(p_tenant)->'efectivos'->>'reservas')::boolean, false) THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: este negocio no tiene reservas en línea.' USING ERRCODE = '22023';
+  END IF;
+END;
+$$;
+REVOKE ALL ON FUNCTION _reservas_negocio_vivo(uuid) FROM PUBLIC, anon, authenticated, service_role;
+
 -- Valida lo que llega del sitio y devuelve la configuración del negocio:
---   · reservas encendidas; sucursal del negocio y activa;
+--   · el negocio opera y tiene reservas; sucursal del negocio y activa;
 --   · p_servicios (si viene): 1 a 5 servicios en línea, cada colaborador elegido de la oferta;
 --   · p_inicia (si viene): con el aviso mínimo, dentro de los días y en un múltiplo del intervalo.
 CREATE OR REPLACE FUNCTION _reservas_validar(p_tenant uuid, p_sucursal uuid, p_servicios jsonb, p_inicia timestamptz)
@@ -514,9 +538,7 @@ DECLARE
   v_loc  timestamp;
   v_uuid CONSTANT text := '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
 BEGIN
-  IF NOT COALESCE((modulos_efectivos(p_tenant)->'efectivos'->>'reservas')::boolean, false) THEN
-    RAISE EXCEPTION 'DATOS_INVALIDOS: este negocio no tiene reservas en línea.' USING ERRCODE = '22023';
-  END IF;
+  PERFORM _reservas_negocio_vivo(p_tenant);
   SELECT * INTO v_cfg FROM configuracion_tenant WHERE tenant_id = p_tenant;
   IF NOT EXISTS (SELECT 1 FROM sucursales WHERE id = p_sucursal AND tenant_id = p_tenant AND activa AND deleted_at IS NULL) THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: la sucursal no es de este negocio.' USING ERRCODE = '22023';
@@ -644,6 +666,7 @@ DECLARE
   v_c     citas;
   v_horas integer;
 BEGIN
+  PERFORM _reservas_negocio_vivo(p_tenant);
   SELECT * INTO v_c FROM citas
    WHERE tenant_id = p_tenant AND enlace_hash = p_enlace_hash AND p_enlace_hash ~ '^[0-9a-f]{64}$'
    FOR UPDATE;
@@ -765,10 +788,12 @@ END;
 $$;
 
 -- Horarios en que empieza la cadena de servicios ese día (México). p_servicios: [{producto_id,
--- usuario_id|null}] en orden. Vacío fuera de los días permitidos. p_excluir_cita: la cita que se
--- cambia de hora; sus propios tramos no tapan horarios.
+-- usuario_id|null}] en orden. Vacío fuera de los días permitidos. p_excluir_enlace_hash: el enlace
+-- de la cita que se cambia de hora (de este negocio); sus propios tramos no tapan horarios.
+DROP FUNCTION IF EXISTS agenda_huecos(uuid, uuid, date, jsonb);
+DROP FUNCTION IF EXISTS agenda_huecos(uuid, uuid, date, jsonb, uuid);
 CREATE OR REPLACE FUNCTION agenda_huecos(p_tenant uuid, p_sucursal uuid, p_dia date, p_servicios jsonb,
-                                         p_excluir_cita uuid DEFAULT NULL)
+                                         p_excluir_enlace_hash text DEFAULT NULL)
 RETURNS TABLE (inicia timestamptz)
 LANGUAGE plpgsql
 STABLE
@@ -783,8 +808,12 @@ DECLARE
   v_ini   integer;
   v_fin   integer;
   v_t     timestamptz;
+  v_excl  uuid;
 BEGIN
   v_cfg := _reservas_validar(p_tenant, p_sucursal, p_servicios, NULL);
+  IF p_excluir_enlace_hash ~ '^[0-9a-f]{64}$' THEN
+    SELECT id INTO v_excl FROM citas WHERE tenant_id = p_tenant AND enlace_hash = p_excluir_enlace_hash;
+  END IF;
   IF p_dia IS NULL OR p_dia < v_hoy OR p_dia > v_hoy + v_cfg.agenda_dias_reserva THEN RETURN; END IF;
   v_desde := now() + make_interval(hours => v_cfg.agenda_aviso_min_horas);
 
@@ -802,13 +831,27 @@ BEGIN
       FROM generate_series(((v_ini + v_cfg.agenda_intervalo_min - 1) / v_cfg.agenda_intervalo_min) * v_cfg.agenda_intervalo_min,
                            v_fin - 5, v_cfg.agenda_intervalo_min) m
   LOOP
-    IF v_t >= v_desde AND _agenda_cadena(p_tenant, p_sucursal, v_t, p_servicios, p_excluir_cita) IS NOT NULL THEN
+    IF v_t >= v_desde AND _agenda_cadena(p_tenant, p_sucursal, v_t, p_servicios, v_excl) IS NOT NULL THEN
       inicia := v_t;
       RETURN NEXT;
     END IF;
   END LOOP;
 END;
 $$;
+
+-- Celular a 10 dígitos: sin espacios ni signos y sin la lada de país (+52, o +52 1 de los viejos).
+CREATE OR REPLACE FUNCTION _telefono_10(p text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT CASE WHEN d ~ '^521[0-9]{10}$' THEN right(d, 10)
+              WHEN d ~ '^52[0-9]{10}$' THEN right(d, 10)
+              ELSE d END
+    FROM (SELECT regexp_replace(COALESCE(p, ''), '\D', '', 'g') AS d) x;
+$$;
+REVOKE ALL ON FUNCTION _telefono_10(text) FROM PUBLIC, anon, authenticated, service_role;
 
 -- Crea la cita en línea. Idempotente por `clave`; el código del enlace solo sale la primera vez.
 CREATE OR REPLACE FUNCTION agenda_reservar_en_linea(p_tenant uuid, p jsonb)
@@ -818,12 +861,13 @@ SECURITY DEFINER
 SET search_path = public, extensions, pg_temp
 AS $$
 DECLARE
-  v_suc      uuid := (p->>'sucursal_id')::uuid;
-  v_inicia   timestamptz := (p->>'inicia')::timestamptz;
-  v_clave    text := p->>'clave';
-  v_nombre   text := NULLIF(btrim(p->'cliente'->>'nombre'), '');
-  v_tel      text := regexp_replace(COALESCE(p->'cliente'->>'telefono', ''), '\D', '', 'g');
-  v_email    text := lower(NULLIF(btrim(p->'cliente'->>'email'), ''));
+  v_uuid     CONSTANT text := '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
+  v_clave    text;
+  v_suc      uuid;
+  v_inicia   timestamptz;
+  v_nombre   text;
+  v_tel      text;
+  v_email    text;
   v_id       uuid;
   v_cli      uuid;
   v_cadena   jsonb;
@@ -831,9 +875,30 @@ DECLARE
   v_termina  timestamptz;
   v_anticipo numeric(12,2);
 BEGIN
+  -- La forma antes de cualquier cast: lo que llega mal es DATOS_INVALIDOS, no un error crudo.
+  IF jsonb_typeof(p) IS DISTINCT FROM 'object' OR jsonb_typeof(p->'cliente') IS DISTINCT FROM 'object' THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: faltan los datos de la reserva.' USING ERRCODE = '22023';
+  END IF;
+  v_clave := p->>'clave';
   IF v_clave IS NULL OR v_clave !~ '^[A-Za-z0-9_-]{8,64}$' THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: falta la clave de la reserva.' USING ERRCODE = '22023';
   END IF;
+  IF COALESCE(p->>'sucursal_id', '') !~* v_uuid THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: la sucursal no es válida.' USING ERRCODE = '22023';
+  END IF;
+  v_suc := (p->>'sucursal_id')::uuid;
+  IF p->>'inicia' IS NULL THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: falta la hora de la cita.' USING ERRCODE = '22023';
+  END IF;
+  BEGIN
+    v_inicia := (p->>'inicia')::timestamptz;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: la hora de la cita no es válida.' USING ERRCODE = '22023';
+  END;
+  v_nombre := NULLIF(btrim(p->'cliente'->>'nombre'), '');
+  v_tel    := _telefono_10(p->'cliente'->>'telefono');
+  v_email  := lower(NULLIF(btrim(p->'cliente'->>'email'), ''));
+
   PERFORM pg_advisory_xact_lock(hashtextextended('cita_web:' || p_tenant || ':' || v_clave, 0));
   SELECT id INTO v_id FROM citas WHERE tenant_id = p_tenant AND client_id_local = 'web:' || v_clave;
   IF FOUND THEN
@@ -842,9 +907,6 @@ BEGIN
   END IF;
 
   PERFORM _reservas_validar(p_tenant, v_suc, p->'servicios', v_inicia);
-  IF v_inicia IS NULL THEN
-    RAISE EXCEPTION 'DATOS_INVALIDOS: falta la hora de la cita.' USING ERRCODE = '22023';
-  END IF;
   IF v_nombre IS NULL OR char_length(v_nombre) > 150 THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: escribe tu nombre.' USING ERRCODE = '22023';
   END IF;
@@ -855,20 +917,40 @@ BEGIN
     RAISE EXCEPTION 'DATOS_INVALIDOS: escribe un correo válido.' USING ERRCODE = '22023';
   END IF;
 
+  -- Un celular aparta a lo más 3 citas por llegar en el negocio. El candado por celular también
+  -- ordena a dos reservas simultáneas del mismo número (el tope y el alta de la clienta).
+  PERFORM pg_advisory_xact_lock(hashtextextended('cita_tel:' || p_tenant || ':' || v_tel, 0));
+  IF (SELECT count(*) FROM citas c
+       WHERE c.tenant_id = p_tenant AND c.estado = 'AGENDADA' AND c.inicia > now()
+         AND _telefono_10(c.cliente_telefono) = v_tel) >= 3 THEN
+    RAISE EXCEPTION 'LIMITE_RESERVAS: Ya tienes 3 citas apartadas; para más, comunícate con el negocio.' USING ERRCODE = '22023';
+  END IF;
+
   v_cadena := _agenda_cadena(p_tenant, v_suc, v_inicia, p->'servicios');
   IF v_cadena IS NULL THEN
     RAISE EXCEPTION 'HUECO_OCUPADO: Ese horario ya no está disponible' USING ERRCODE = '23P01';
   END IF;
 
-  -- La clienta: por teléfono (comparado por dígitos), o se crea. Una existente no se edita desde
-  -- el sitio: la cita guarda lo que escribió.
-  v_cli := lealtad_resolver_cliente(p_tenant, NULL, v_tel);
-  IF v_cli IS NULL THEN
-    INSERT INTO clientes (tenant_id, nombre, telefono, email)
-    VALUES (p_tenant, v_nombre, v_tel, v_email)
-    RETURNING id INTO v_cli;
-  ELSIF (SELECT estado = 'BLOQUEADO' FROM clientes WHERE id = v_cli) THEN
-    RAISE EXCEPTION 'CLIENTE_BLOQUEADO: Para reservar, comunícate con el negocio' USING ERRCODE = '22023';
+  -- La clienta: por celular (a 10 dígitos), o se crea. Una existente no se edita desde el sitio: la
+  -- cita guarda lo que escribió. Si la caja la da de alta en el mismo instante (23505), se vuelve a
+  -- buscar. A una bloqueada no se le dice por qué.
+  FOR i IN 1..2 LOOP
+    SELECT c.id INTO v_cli FROM clientes c
+     WHERE c.tenant_id = p_tenant AND c.deleted_at IS NULL AND c.telefono IS NOT NULL
+       AND _telefono_10(c.telefono) = v_tel
+     ORDER BY c.created_at, c.id LIMIT 1;
+    EXIT WHEN v_cli IS NOT NULL;
+    BEGIN
+      INSERT INTO clientes (tenant_id, nombre, telefono, email)
+      VALUES (p_tenant, v_nombre, v_tel, v_email)
+      RETURNING id INTO v_cli;
+      EXIT;
+    EXCEPTION WHEN unique_violation THEN
+      IF i = 2 THEN RAISE; END IF;
+    END;
+  END LOOP;
+  IF (SELECT estado = 'BLOQUEADO' FROM clientes WHERE id = v_cli) THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: No pudimos apartar tu cita. Comunícate con el negocio.' USING ERRCODE = '22023';
   END IF;
 
   v_codigo := rtrim(translate(encode(gen_random_bytes(16), 'base64'), '+/', '-_'), '=');
@@ -918,7 +1000,11 @@ BEGIN
   SELECT agenda_cancelar_horas INTO v_horas FROM configuracion_tenant WHERE tenant_id = p_tenant;
   RETURN _agenda_cita_resumen(v_c.id) || jsonb_build_object(
     'estado', v_c.estado,
-    'cancelada_motivo', v_c.cancelada_motivo,
+    -- El motivo que escribe la recepción no sale al sitio: solo quién canceló.
+    'cancelada_motivo', CASE WHEN v_c.estado = 'CANCELADA' THEN CASE v_c.cancelada_por
+                          WHEN 'CLIENTA_EN_LINEA' THEN 'Cancelada por ti'
+                          WHEN 'PAGO_VENCIDO' THEN 'No se completó el pago'
+                          ELSE 'Cancelada por el negocio' END END,
     'anticipo_mxn', _anticipo_cita(p_tenant, v_c.id),
     'anticipo_pagado_mxn', (SELECT COALESCE(sum(a.monto_mxn), 0) FROM anticipos_cita a
                              WHERE a.cita_id = v_c.id AND a.estado IN ('VIGENTE', 'APLICADO')),
@@ -1014,7 +1100,7 @@ $$;
 DO $$
 DECLARE f text;
 BEGIN
-  FOREACH f IN ARRAY ARRAY['reservas_negocio(text)', 'agenda_huecos(uuid, uuid, date, jsonb, uuid)',
+  FOREACH f IN ARRAY ARRAY['reservas_negocio(text)', 'agenda_huecos(uuid, uuid, date, jsonb, text)',
                            'agenda_reservar_en_linea(uuid, jsonb)', 'agenda_cita_publica(uuid, text)',
                            'agenda_cancelar_en_linea(uuid, text)', 'agenda_mover_en_linea(uuid, text, timestamptz)',
                            'agenda_vencer_reservas()'] LOOP
@@ -1023,16 +1109,15 @@ BEGIN
   END LOOP;
 END $$;
 
--- El barrido de la tienda (0173) también vence las reservas. Solo donde pg_cron exista (Supabase
--- nube); en la caja instalada no se hace nada. Molde de 0173.
+-- Su propio trabajo de cron, cada minuto: un error aquí no frena el barrido de la tienda (0173).
+-- Solo donde pg_cron exista (Supabase nube); en la caja instalada no se hace nada. Molde de 0173.
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'pg_cron') THEN
     CREATE EXTENSION IF NOT EXISTS pg_cron;
-    IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'tienda-pagos') THEN
-      PERFORM cron.unschedule('tienda-pagos');
+    IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'agenda-reservas-vencer') THEN
+      PERFORM cron.unschedule('agenda-reservas-vencer');
     END IF;
-    PERFORM cron.schedule('tienda-pagos', '* * * * *',
-                          'SELECT public.agenda_vencer_reservas(); SELECT public.tienda_pagos_barrer()');
+    PERFORM cron.schedule('agenda-reservas-vencer', '* * * * *', 'SELECT public.agenda_vencer_reservas()');
   END IF;
 END $$;
