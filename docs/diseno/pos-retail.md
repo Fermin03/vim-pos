@@ -294,6 +294,26 @@ El lector USB se comporta como un teclado: escribe el código muy rápido y mand
   juntos.
 - La pantalla del cliente enseña los renglones con su variante, igual que el ticket.
 
+### Crédito y saldo a favor (entrega 2)
+
+Solo con el módulo de crédito encendido (viene apagado; el admin lo enciende y fija límite y plazo por
+cliente).
+
+- **«A crédito».** Sale en el cobro solo si la venta tiene cliente con crédito y el módulo está
+  encendido. Muestra «Disponible $X» (límite menos lo que ya debe). Va **por el ticket entero**: no se
+  combina con efectivo ni con otro método.
+- **Pasarse del límite o tener algo vencido** pide PIN de dueño o administrador (permiso
+  `venta.credito_excedido`). Vencido es: fecha de la venta + plazo < hoy, con saldo.
+- **«Saldo a favor».** Aparece si el cliente tiene saldo (y el módulo está encendido). Se puede usar
+  parcial y completar con otro método.
+- **«Cobro completado»** dice «A crédito» en vez de cambio. La venta a crédito no gana puntos.
+- **Ticket impreso:** «Por pagar» y «Fecha límite», y la leyenda «Se factura al liquidarse.».
+- **Créditos** (entrada temporal en Configuración, hasta que exista «Más»): lista de clientes con
+  deuda, detalle por cliente y **«Registrar abono»**. El abono abre el cajón si es en efectivo y suma
+  al corte del turno que lo recibe. Si el cliente debe en otras cajas, el detalle dice «Además debe $X
+  de otras cajas» (el abono solo reparte entre las ventas de esta caja).
+- **Corte:** «Vendido a crédito» y «Pagado con saldo a favor» salen como información, no se declaran.
+
 ## Devoluciones en una tienda
 
 Se llega con **Devolver**, en el detalle de una venta en Transacciones (la venta ya viene elegida).

@@ -448,6 +448,10 @@ Las columnas usan abreviaturas:
 | Cancelar promoción aplicada | ✅ | ✅ | ✅ | 🔐 | 🔐 | ❌ | ❌ | ❌ | ❌ |
 | Aplicar pago (efectivo/tarjeta/etc) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Pago dividido (múltiples métodos) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Vender a crédito (cliente con crédito, dentro de límite y sin vencido) | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Vender a crédito pasando el límite o con saldo vencido | ✅ | ✅ | ✅ | 🔐 | 🔐 | ❌ | ❌ | ❌ | ❌ |
+| Registrar abono de crédito | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Dar crédito a un cliente (límite y plazo) | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Poner ticket en espera | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Retomar ticket en espera | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
 | Ver tickets propios (del turno) | 👁️ | 👁️ | 👁️ | ✅ | ✅ | ✅ | ❌ | 👁️* | ❌ |
@@ -678,6 +682,7 @@ Una operación marcada como 🔐 en la matriz requiere autorización por PIN ANT
 | 24 | Ajuste manual de inventario | ADM | OWN | Cambia el stock sin movimiento |
 | 25 | Merma / desperdicio | SPV, ADM | SPV(self), ADM, OWN | Salida no-venta |
 | 26 | Cancelar item ticket (post-cobro abierto) | SPV | ADM, OWN | Caso muy raro |
+| 27 | Venta a crédito sobre el límite o con saldo vencido (`venta.credito_excedido`, nivel 3) | CAJ, SPV | ADM, OWN | Quién da crédito: OWN y ADM (desde el admin). Abonos: cualquier cajero, sin PIN |
 
 ### 5.3 Configuración del PIN
 

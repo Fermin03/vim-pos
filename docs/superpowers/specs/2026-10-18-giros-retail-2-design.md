@@ -206,3 +206,66 @@ Venta por kilo, metro y litro, y los cuatro giros nuevos en la base. Todo en loc
   granel; «completo o nada» solo se exige en la caja.
 - Pantallas aún con «1.25×»: descuento por producto, cancelar renglón(es), devolución de restaurante,
   cuentas por modo, comanda. «Recibir» suma 1 a un producto a granel.
+
+## Entrega 2 (crédito), hecha (18 oct)
+
+Crédito por cliente, venta a crédito, abonos, saldo a favor y corte. Todo en local, rama
+`feat/retail2-credito`.
+
+**Migraciones**
+
+- **0207:** solo `ADD VALUE` `CREDITO` y `SALDO_FAVOR` en el enum de métodos de pago (aparte, por la
+  misma razón que la 0205).
+- **0208:** módulo de crédito apagado por defecto, `clientes_credito`, `abonos_credito`, venta a
+  crédito (`pagar_a_credito`), `registrar_abono` y el corte (`calcular_efectivo_esperado`, `reporte_x`).
+- **0209:** reglas: sin puntos en ventas a crédito, sin factura con saldo, saldo a favor, cancelar o
+  devolver una venta a crédito, y `arquear_caja` cuenta los abonos no efectivo.
+- **0210:** sync: la caja baja crédito, abonos y saldo a favor, sube abonos y movimientos de saldo, y
+  baja un resumen de deuda de otras cajas para el límite y lo vencido.
+
+**Para el lanzamiento**
+
+- **La 0207 debe ir en un instalador ANTES de que alguien venda a crédito.** Un valor de enum que la
+  caja no conoce rompe su pull.
+- La 0208–0210 se aplican a producción a mano, con las demás, ANTES de desplegar las apps.
+
+**Rulings** (Fermín puede corregirlos)
+
+- Todo el ticket va a crédito; solo «Saldo a favor» se combina con otro método.
+- Sin comprobante impreso del abono; la caja muestra el aviso y el admin el historial.
+- El crédito vive en `clientes_credito`, no en `clientes`, para que el sync no lo pise.
+- Un abono se reparte de la venta más vieja a la más nueva.
+- «Vencido» usa la zona horaria del negocio. Un abono se acepta aunque el módulo o el crédito estén
+  apagados (una deuda siempre se puede pagar).
+- Cancelar por completo una venta a crédito salda toda su deuda, propina incluida; lo pagado con saldo
+  a favor vuelve a saldo a favor, no a efectivo.
+- Otros medios (cortesía, vale, nota de crédito) solo bajan la deuda.
+- La caja revisa el límite con el resumen de deuda de otras cajas que bajó de la nube más lo propio.
+- El interruptor de crédito solo se ve en tiendas o con el crédito ya encendido.
+- «Saldo a favor» se ofrece solo con el módulo encendido.
+
+**Quedó para después**
+
+- Abonar en una caja una venta hecha en otra (se hace en la caja de origen, en el POS web, o se ve en
+  el admin).
+- Comprobante impreso del abono; el Z impreso no trae las líneas de crédito ni de saldo a favor.
+- `registrar_abono` recorre todos los tickets del cliente; cualquier empleado puede abonar; sin prueba
+  de concurrencia; el desempate del reparto es por uuid (agregar folio).
+- El push no revalida reglas de dinero; un abono que la nube rechaza se reintenta para siempre.
+- `usuario_id` del abono sin validar contra el negocio; `clientes_credito` sin aislamiento por fila en
+  el pull; costo de `credito_saldo_ticket` por renglón y de `tickets_de_periodo_global` en periodos
+  largos.
+- La llave de idempotencia de la devolución solo se escribe si hubo renglón; un `cliente_id` NULL en un
+  ticket pagado con saldo a favor abortaría la cancelación.
+- Fecha del resumen distinta entre nube y caja; `cliente_id` del resumen sin remapeo por alias.
+- UI: `fmt` local en `creditos/page.tsx`, lista de liquidadas sin tope, config de crédito sin candado
+  de rol en pantalla (la base lo rechaza), sin pruebas de UI del modal de abono, el recibo ofrece
+  factura (QR) aunque no se pueda facturar hasta liquidar.
+
+**Notas para Fermín**
+
+- **Fiscal.** Una venta a crédito se factura solo al liquidarse, y si se liquida en un periodo
+  posterior solo se factura individual desde el admin. No hay PPD ni complemento de pago.
+- **Hallazgo de seguridad previo a esta rama.** La RLS de `devoluciones` solo revisa el negocio: un
+  cajero con acceso directo a la tabla podría insertar o confirmar una devolución inventada (ya podía
+  forjar DEVOLUCION_EFECTIVO). Se propone como sesión aparte.
