@@ -509,6 +509,18 @@ export function topesDelAviso(ref: string, esNuestra: boolean): Tope[] {
 }
 
 /**
+ * Cómo se nombra un pago de cita (0225) en los correos internos, donde un pedido lleva su folio:
+ * «Cita de Ana López, 26/10 13:15» (día y hora de México). Sin cita conocida, "".
+ */
+export function referenciaDeCita(c: { cliente_nombre?: string | null; inicia?: string | null } | null | undefined): string {
+  if (!c?.inicia) return "";
+  const cuando = new Intl.DateTimeFormat("es-MX", {
+    timeZone: "America/Mexico_City", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).format(new Date(c.inicia)).replace(",", "");
+  return `Cita de ${(c.cliente_nombre ?? "").trim() || "clienta"}, ${cuando}`;
+}
+
+/**
  * El correo interno a VIM cuando no se ha podido preguntar tres veces seguidas a Mercado Pago por un
  * pago que nadie confirmó. Puede haber un cobro hecho y el pedido vencido como si no se hubiera pagado.
  */

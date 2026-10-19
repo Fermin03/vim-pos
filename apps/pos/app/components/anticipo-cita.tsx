@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button, Modal } from "@vim/ui/styles";
 import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
 import {
-  METODOS_ANTICIPO, TEXTO_ANTICIPO, pideReferencia, anticipoSugerido, devolverAnticipo, pideAutorizacionAnticipo, registrarAnticipo, retenerAnticipo,
+  METODOS_ANTICIPO, TEXTO_ANTICIPO, pideReferencia, devuelveEnEfectivo, anticipoSugerido, devolverAnticipo, pideAutorizacionAnticipo, registrarAnticipo, retenerAnticipo,
   sumaAnticipos, type Anticipo, type DecisionAnticipo, type MetodoAnticipo,
 } from "../lib/anticipos";
 import { nuevoClientId } from "../lib/carrito";
@@ -106,9 +106,11 @@ export function ModalCobrarAnticipo({ token, citaId, clienta, cajaId, turnoId, t
  * cancelada o que no llegó. `sugerida` sale de `decisionSugerida`; null = el cajero elige sin pista.
  * Devolver con tarjeta o transferencia pide la referencia; devolver o retener, sin permiso, el PIN.
  */
-export function DialogoAnticipo({ token, vigentes, sugerida, elegida, retener = true, cajaId, turnoId, ejecutaNombre, onHecho, onCerrar }: {
+export function DialogoAnticipo({ token, vigentes, todos = vigentes, sugerida, elegida, retener = true, cajaId, turnoId, ejecutaNombre, onHecho, onCerrar }: {
   token: string;
   vigentes: Anticipo[];
+  /** Todos los anticipos de la cita: dicen si el sobrante de uno en línea se devuelve en efectivo. */
+  todos?: Anticipo[];
   sugerida: DecisionAnticipo | null;
   /** Ya elegida (botones del aviso «pendiente»); si no, arranca en la sugerida. */
   elegida?: DecisionAnticipo;
@@ -129,6 +131,8 @@ export function DialogoAnticipo({ token, vigentes, sugerida, elegida, retener = 
   const total = sumaAnticipos(vigentes);
   const conReferencia = eleccion === "DEVOLVER" && vigentes.some((a) => pideReferencia(a.metodo));
   const listo = eleccion != null && (!conReferencia || referencia.trim() !== "");
+  const enEfectivo = vigentes.some((a) => devuelveEnEfectivo(a, todos));
+  const todoEnEfectivo = vigentes.every((a) => devuelveEnEfectivo(a, todos));
 
   /** Resuelve cada anticipo; la base ignora el que ya quedó resuelto, así que reintentar es seguro. */
   async function aplicar(pin?: { anticipoId: string; autorizacionPinId: string }) {
@@ -151,7 +155,7 @@ export function DialogoAnticipo({ token, vigentes, sugerida, elegida, retener = 
           throw e;
         }
       }
-      if (eleccion === "DEVOLVER" && vigentes.some((a) => a.metodo === "EFECTIVO")) abrirCajon();
+      if (eleccion === "DEVOLVER" && enEfectivo) abrirCajon();
       onHecho();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo");
@@ -191,7 +195,7 @@ export function DialogoAnticipo({ token, vigentes, sugerida, elegida, retener = 
         <div className="mt-5 flex gap-2">
           <Button variant="ghost" className="h-12 flex-1" onClick={onCerrar} disabled={ocupado}>Decidir después</Button>
           <Button className="h-12 flex-1" onClick={() => void aplicar()} disabled={!listo || ocupado}>
-            {ocupado ? "Aplicando…" : eleccion === "RETENER" ? `${TEXTO_ANTICIPO.retener} ${fmtMxn(total)}` : `${TEXTO_ANTICIPO.devolver} ${fmtMxn(total)}`}
+            {ocupado ? "Aplicando…" : eleccion === "RETENER" ? `${TEXTO_ANTICIPO.retener} ${fmtMxn(total)}` : `${TEXTO_ANTICIPO.devolver} ${fmtMxn(total)}${todoEnEfectivo && vigentes.some((a) => a.metodo === "PAGO_EN_LINEA") ? " en efectivo" : ""}`}
           </Button>
         </div>
       </Modal>

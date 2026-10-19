@@ -33,7 +33,10 @@ ALTER TABLE tienda_pagos ALTER COLUMN pedido_id DROP NOT NULL;
 ALTER TABLE tienda_pagos ADD COLUMN IF NOT EXISTS cita_id uuid NULL REFERENCES citas(id);
 ALTER TABLE tienda_pagos DROP CONSTRAINT IF EXISTS tienda_pago_pedido_o_cita;
 ALTER TABLE tienda_pagos ADD CONSTRAINT tienda_pago_pedido_o_cita CHECK (num_nonnulls(pedido_id, cita_id) = 1);
-CREATE UNIQUE INDEX IF NOT EXISTS tienda_pagos_cita_uq ON tienda_pagos (cita_id) WHERE NOT extra;
+-- Un solo pago vivo (CREADO o APROBADO) por cita. Los que fallaron (RECHAZADO, VENCIDO, ABANDONADO)
+-- se quedan: son los intentos de la cita (máximo 5) y lo que la conciliación sigue vigilando.
+DROP INDEX IF EXISTS tienda_pagos_cita_uq;
+CREATE UNIQUE INDEX tienda_pagos_cita_uq ON tienda_pagos (cita_id) WHERE NOT extra AND estado IN ('CREADO', 'APROBADO');
 CREATE INDEX IF NOT EXISTS idx_tienda_pagos_cita ON tienda_pagos (cita_id) WHERE cita_id IS NOT NULL;
 COMMENT ON COLUMN tienda_pagos.cita_id IS 'Pago del anticipo de una cita reservada en línea (0225). Exactamente uno de pedido_id y cita_id.';
 
@@ -91,9 +94,9 @@ BEGIN
 END;
 $$;
 
--- tienda_pago_descartar, pago de cita: un NO seguro de Mercado Pago. Se borra solo el renglón del
--- pago (la cita sigue apartada hasta pago_hasta y se puede pagar otra vez con otra orden). Mismas
--- dos formas que el pedido: CREADO sin orden, o RECHAZADO (el aviso del rechazo llegó primero).
+-- tienda_pago_descartar, pago de cita: un NO seguro de Mercado Pago. El pago queda RECHAZADO (es un
+-- intento de la cita; no se borra) y la cita sigue apartada hasta pago_hasta: reservar con la misma
+-- clave da otro pago. Mismas dos formas que el pedido: CREADO sin orden, o ya RECHAZADO.
 CREATE OR REPLACE FUNCTION _tienda_pago_descartar_cita(p_pago uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -107,7 +110,7 @@ BEGIN
   IF NOT FOUND THEN RETURN false; END IF;
   -- Siempre la cita antes que el pago (como el pedido en la 0173).
   PERFORM 1 FROM citas WHERE id = v_cita FOR UPDATE;
-  DELETE FROM tienda_pagos
+  UPDATE tienda_pagos SET estado = 'RECHAZADO'
    WHERE id = p_pago AND aprobado_at IS NULL
      AND ((estado = 'CREADO' AND orden_id_externo IS NULL) OR estado = 'RECHAZADO');
   RETURN FOUND;
@@ -119,7 +122,7 @@ $$;
 --     PAGO_EN_LINEA por lo cobrado, y pago_hasta en NULL (ya no vence);
 --   · aprobado tarde (la cita ya no espera: venció o se canceló) → POR_DEVOLVER, sin anticipo;
 --   · de más (otra orden, otro monto) → renglón `extra` POR_DEVOLVER;
---   · RECHAZADO deja el pago RECHAZADO y la cita apartada: descartar lo borra y se paga otra vez.
+--   · RECHAZADO deja el pago RECHAZADO y la cita apartada: se paga otra vez con otro pago.
 -- Devuelve {estado, pedido_estado: null, cita_estado, recien_aprobado}.
 CREATE OR REPLACE FUNCTION _tienda_pago_aplicar_cita(
   p_pago uuid, p_resultado text, p_orden_id_externo text, p_monto numeric,
@@ -142,7 +145,7 @@ BEGIN
   SELECT * INTO v_c FROM citas WHERE id = v_cita FOR UPDATE;
   SELECT * INTO v_g FROM tienda_pagos WHERE id = p_pago FOR UPDATE;
   v_suya := v_g.aprobado_at IS NULL AND (v_g.orden_id_externo IS NULL OR v_g.orden_id_externo = p_orden_id_externo);
-  v_espera := v_c.estado IN ('AGENDADA', 'EN_ESPERA') AND v_c.pago_hasta IS NOT NULL;
+  v_espera := v_c.estado = 'AGENDADA' AND v_c.pago_hasta IS NOT NULL;
 
   IF p_resultado = 'DEVUELTO' THEN
     UPDATE tienda_pagos SET estado = 'DEVUELTO', devuelto_at = COALESCE(devuelto_at, now()), ultimo_error = NULL
@@ -196,7 +199,7 @@ END;
 $$;
 
 -- tienda_pago_abandonar, pago de cita: el reto del banco se dejó. El pago queda ABANDONADO y
--- vigilado (como el del pedido) y la cita, si seguía esperando, se cancela sin pago.
+-- vigilado (como el del pedido); la cita sigue apartada hasta pago_hasta (se puede pagar otra vez).
 CREATE OR REPLACE FUNCTION _tienda_pago_abandonar_cita(p_pago uuid, p_orden text)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -218,9 +221,7 @@ BEGIN
    WHERE g.id = p_pago AND NOT g.extra AND g.aprobado_at IS NULL AND g.estado IN ('CREADO', 'VENCIDO')
      AND COALESCE(g.orden_id_externo, p_orden) IS NOT NULL
      AND (g.orden_id_externo IS NOT NULL OR NOT EXISTS (SELECT 1 FROM tienda_pagos o WHERE o.orden_id_externo = p_orden));
-  IF NOT FOUND THEN RETURN false; END IF;
-  PERFORM _agenda_cancelar_sin_pago(v_cita);
-  RETURN true;
+  RETURN FOUND;
 END;
 $$;
 
@@ -413,17 +414,22 @@ DECLARE
   v_base    text;
   v_cita    uuid;   -- 0225
 BEGIN
-  -- 0225: el pago de una cita vence con su plazo (vence_at: 5 minutos, o el de la verificación del
-  -- banco). Como el pedido: la cita primero, el pago queda VENCIDO o ABANDONADO, y la cita que
-  -- esperaba se cancela sin pago. Si después se aprueba, se devuelve (tienda_pago_aplicar).
-  FOR v_cita IN SELECT DISTINCT g.cita_id FROM tienda_pagos g
-                 WHERE g.cita_id IS NOT NULL AND NOT g.extra AND g.estado = 'CREADO' AND g.vence_at < now() LOOP
-    PERFORM 1 FROM citas WHERE id = v_cita FOR UPDATE;
-    UPDATE tienda_pagos
-       SET estado = CASE WHEN verificacion_at IS NOT NULL AND orden_id_externo IS NOT NULL THEN 'ABANDONADO' ELSE 'VENCIDO' END
-     WHERE cita_id = v_cita AND NOT extra AND estado = 'CREADO' AND vence_at < now();
-    IF FOUND THEN PERFORM _agenda_cancelar_sin_pago(v_cita); END IF;
-  END LOOP;
+  -- 0225: el pago de una cita vence con su plazo (vence_at = el pago_hasta de la cita, o el de la
+  -- verificación del banco si es más tarde): queda VENCIDO o ABANDONADO. La cita se cancela sin
+  -- pago solo si además ya pasó su pago_hasta. Si después se aprueba, se devuelve. En su propio
+  -- bloque: un error aquí no frena lo de los pedidos.
+  BEGIN
+    FOR v_cita IN SELECT DISTINCT g.cita_id FROM tienda_pagos g
+                   WHERE g.cita_id IS NOT NULL AND NOT g.extra AND g.estado = 'CREADO' AND g.vence_at < now() LOOP
+      PERFORM 1 FROM citas WHERE id = v_cita FOR UPDATE;
+      UPDATE tienda_pagos
+         SET estado = CASE WHEN verificacion_at IS NOT NULL AND orden_id_externo IS NOT NULL THEN 'ABANDONADO' ELSE 'VENCIDO' END
+       WHERE cita_id = v_cita AND NOT extra AND estado = 'CREADO' AND vence_at < now();
+      IF EXISTS (SELECT 1 FROM citas WHERE id = v_cita AND pago_hasta < now()) THEN PERFORM _agenda_cancelar_sin_pago(v_cita); END IF;
+    END LOOP;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'tienda_pagos_barrer (citas): %', SQLERRM;
+  END;
 
   WITH vencidos AS (
     UPDATE delivery_pedidos d
@@ -521,7 +527,7 @@ SET search_path = public, pg_temp
 AS $$
 BEGIN
   UPDATE tienda_pagos SET estado = 'POR_DEVOLVER', proximo_intento_at = NULL
-   WHERE cita_id = NEW.cita_id AND NOT extra AND estado = 'APROBADO';
+   WHERE id = _anticipo_pago_en_linea(NEW.cita_id) AND estado = 'APROBADO';
   RETURN NULL;
 END;
 $$;
@@ -529,8 +535,22 @@ DROP TRIGGER IF EXISTS trg_anticipos_cita_devolver_pago_en_linea ON anticipos_ci
 CREATE TRIGGER trg_anticipos_cita_devolver_pago_en_linea
   AFTER UPDATE OF estado ON anticipos_cita
   FOR EACH ROW
-  WHEN (NEW.metodo_pago = 'PAGO_EN_LINEA' AND NEW.estado = 'DEVUELTO' AND OLD.estado IS DISTINCT FROM NEW.estado)
+  WHEN (NEW.metodo_pago = 'PAGO_EN_LINEA' AND NEW.estado = 'DEVUELTO' AND OLD.estado IS DISTINCT FROM NEW.estado
+        AND NEW.referencia_devolucion IS DISTINCT FROM 'EN_EFECTIVO')
   EXECUTE FUNCTION anticipos_cita_devolver_pago_en_linea();
+
+-- El pago del anticipo en línea de una cita: el de su primer renglón con tienda_pago_id (las partes
+-- que nacen al partirlo no lo copian).
+CREATE OR REPLACE FUNCTION _anticipo_pago_en_linea(p_cita uuid)
+RETURNS uuid
+LANGUAGE sql STABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT a.tienda_pago_id FROM anticipos_cita a
+   WHERE a.cita_id = p_cita AND a.metodo_pago = 'PAGO_EN_LINEA' AND a.tienda_pago_id IS NOT NULL
+   ORDER BY a.created_at, a.id LIMIT 1;
+$$;
+REVOKE ALL ON FUNCTION _anticipo_pago_en_linea(uuid) FROM PUBLIC, anon, authenticated, service_role;
 
 -- El pago de la cita quedó DEVUELTO (lo devolvimos, o el negocio desde su cuenta): su anticipo
 -- vigente también. Lo ya aplicado o retenido no se toca.
@@ -540,8 +560,11 @@ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 BEGIN
-  UPDATE anticipos_cita SET estado = 'DEVUELTO', resuelto_at = now()
-   WHERE cita_id = NEW.cita_id AND metodo_pago = 'PAGO_EN_LINEA' AND estado = 'VIGENTE';
+  -- Solo si es EL pago del anticipo: la devolución de un cobro tardío no toca el anticipo bueno.
+  IF _anticipo_pago_en_linea(NEW.cita_id) = NEW.id THEN
+    UPDATE anticipos_cita SET estado = 'DEVUELTO', resuelto_at = now()
+     WHERE cita_id = NEW.cita_id AND metodo_pago = 'PAGO_EN_LINEA' AND estado = 'VIGENTE';
+  END IF;
   RETURN NULL;
 END;
 $$;
@@ -568,7 +591,8 @@ REVOKE ALL ON FUNCTION tienda_pagos_devuelto_anticipo() FROM PUBLIC, anon, authe
 -- devolver_anticipo: la de la 0222 (vigente). Cambios "0225" para PAGO_EN_LINEA: no pide
 -- referencia ni turno (si viene, se valida y se anota), no sale del cajón y su pago pasa a
 -- POR_DEVOLVER (disparador de §3). Sigue pidiendo venta.devolucion o su PIN. Mercado Pago devuelve
--- la orden completa: si parte del anticipo ya pagó una venta, no se devuelve por aquí.
+-- la orden completa: si parte del anticipo ya pagó una venta, el sobrante se devuelve EN EFECTIVO del
+-- turno que lo devuelve (como uno en efectivo; referencia 'EN_EFECTIVO') y el pago sigue APROBADO.
 CREATE OR REPLACE FUNCTION devolver_anticipo(p_anticipo uuid, p_caja_id uuid, p_turno_id uuid, p_referencia text DEFAULT NULL,
                                              p_autorizacion_pin_id uuid DEFAULT NULL)
 RETURNS void
@@ -582,6 +606,7 @@ DECLARE
   v_turno   turnos%ROWTYPE;
   v_ref     text := NULLIF(btrim(p_referencia), '');
   v_autorizo uuid;
+  v_efectivo boolean := false;   -- 0225
 BEGIN
   IF v_tenant IS NULL THEN
     RAISE EXCEPTION 'Sin negocio en la sesión.' USING ERRCODE = '42501';
@@ -599,13 +624,12 @@ BEGIN
   IF v_a.metodo_pago NOT IN ('EFECTIVO', 'PAGO_EN_LINEA') AND v_ref IS NULL THEN   -- 0225
     RAISE EXCEPTION 'DATOS_INVALIDOS: falta la referencia de la devolución con tarjeta o transferencia.' USING ERRCODE = '22023';
   END IF;
-  -- 0225: en línea, Mercado Pago devuelve la orden completa; si una parte ya pagó una venta, no.
-  IF v_a.metodo_pago = 'PAGO_EN_LINEA' AND EXISTS (
-       SELECT 1 FROM anticipos_cita WHERE cita_id = v_a.cita_id AND metodo_pago = 'PAGO_EN_LINEA' AND estado = 'APLICADO') THEN
-    RAISE EXCEPTION 'DATOS_INVALIDOS: parte de este anticipo en línea ya pagó una venta; Mercado Pago solo devuelve el pago completo. Cancela esa venta primero.'
-      USING ERRCODE = '22023';
-  END IF;
-  IF v_a.metodo_pago <> 'PAGO_EN_LINEA' OR p_turno_id IS NOT NULL THEN   -- 0225: en línea no hace falta turno
+  -- 0225: en línea, Mercado Pago devuelve la orden completa; si una parte ya pagó una venta, el
+  -- sobrante sale en efectivo del cajón.
+  v_efectivo := v_a.metodo_pago = 'PAGO_EN_LINEA' AND EXISTS (
+       SELECT 1 FROM anticipos_cita WHERE cita_id = v_a.cita_id AND metodo_pago = 'PAGO_EN_LINEA' AND estado = 'APLICADO');
+  IF v_efectivo THEN v_ref := 'EN_EFECTIVO'; END IF;
+  IF v_a.metodo_pago <> 'PAGO_EN_LINEA' OR p_turno_id IS NOT NULL OR v_efectivo THEN   -- 0225: en línea (por MP) no hace falta turno
     v_turno := _anticipo_turno(v_tenant, p_caja_id, p_turno_id);
   END IF;
 
@@ -618,7 +642,7 @@ BEGIN
       USING ERRCODE = 'insufficient_privilege';
   END IF;
 
-  IF v_a.metodo_pago = 'EFECTIVO' THEN
+  IF v_a.metodo_pago = 'EFECTIVO' OR v_efectivo THEN   -- 0225
     INSERT INTO movimientos_caja (tenant_id, sucursal_id, caja_id, turno_id, tipo, monto_mxn, dia_contable,
                                   motivo, usuario_solicitante_id, usuario_autorizo_id, autorizacion_pin_id)
     VALUES (v_tenant, v_turno.sucursal_id, v_turno.caja_id, v_turno.id, 'DEVOLUCION_EFECTIVO', v_a.monto_mxn,
@@ -666,7 +690,7 @@ BEGIN
   END IF;
   IF v_a.metodo_pago = 'PAGO_EN_LINEA' THEN   -- 0225
     IF EXISTS (SELECT 1 FROM citas WHERE id = v_a.cita_id AND cancelada_por = 'CLIENTA_EN_LINEA')
-       OR EXISTS (SELECT 1 FROM tienda_pagos WHERE cita_id = v_a.cita_id AND NOT extra
+       OR EXISTS (SELECT 1 FROM tienda_pagos WHERE id = _anticipo_pago_en_linea(v_a.cita_id)
                    AND estado IN ('POR_DEVOLVER', 'DEVOLUCION_FALLIDA', 'DEVUELTO')) THEN
       RAISE EXCEPTION 'DATOS_INVALIDOS: este anticipo en línea se le devuelve a la clienta; no se puede retener.' USING ERRCODE = '22023';
     END IF;
@@ -687,8 +711,9 @@ BEGIN
 END;
 $$;
 
--- reporte_x: la de la 0222 (vigente). Cambio "0225": anticipos_en_linea_aplicados_mxn, lo que el
--- turno aplicó de anticipos pagados en línea. Solo informa: ese dinero no entró a ningún turno.
+-- reporte_x: la de la 0222 (vigente). Cambios "0225": anticipos_en_linea_aplicados_mxn, lo que el
+-- turno aplicó de anticipos pagados en línea (solo informa: ese dinero no entró a ningún turno); y
+-- devueltos/retenidos no mezclan lo de Mercado Pago (sí el sobrante devuelto en efectivo).
 CREATE OR REPLACE FUNCTION reporte_x(
   p_turno_id uuid
 ) RETURNS jsonb
@@ -781,8 +806,11 @@ BEGIN
 
   -- 0222: anticipos recibidos en el turno y los que el turno devolvió o retuvo (informativos).
   SELECT COALESCE(SUM(monto_mxn) FILTER (WHERE turno_id = p_turno_id), 0) AS recibidos,
-         COALESCE(SUM(monto_mxn) FILTER (WHERE turno_resuelve_id = p_turno_id AND estado = 'DEVUELTO'), 0) AS devueltos,
-         COALESCE(SUM(monto_mxn) FILTER (WHERE turno_resuelve_id = p_turno_id AND estado = 'RETENIDO'), 0) AS retenidos,
+         -- 0225: lo de Mercado Pago no es del turno; solo cuenta el sobrante en línea devuelto en efectivo.
+         COALESCE(SUM(monto_mxn) FILTER (WHERE turno_resuelve_id = p_turno_id AND estado = 'DEVUELTO'
+                                           AND (metodo_pago <> 'PAGO_EN_LINEA' OR referencia_devolucion = 'EN_EFECTIVO')), 0) AS devueltos,
+         COALESCE(SUM(monto_mxn) FILTER (WHERE turno_resuelve_id = p_turno_id AND estado = 'RETENIDO'
+                                           AND metodo_pago <> 'PAGO_EN_LINEA'), 0) AS retenidos,
          COALESCE(SUM(monto_mxn) FILTER (WHERE turno_resuelve_id = p_turno_id AND estado = 'APLICADO'
                                            AND metodo_pago = 'PAGO_EN_LINEA'), 0) AS en_linea_aplicados   -- 0225
     INTO v_anticipos
@@ -1122,11 +1150,10 @@ BEGIN
              + (SELECT COALESCE(sum(monto_mxn), 0) FROM anticipos_cita
                  WHERE cita_id = (v_f->>'cita_id')::uuid AND metodo_pago = 'PAGO_EN_LINEA')
              > COALESCE((SELECT monto_mxn FROM tienda_pagos
-                          WHERE cita_id = (v_f->>'cita_id')::uuid AND NOT extra AND aprobado_at IS NOT NULL), 0) THEN
+                          WHERE id = _anticipo_pago_en_linea((v_f->>'cita_id')::uuid)), 0) THEN
           RAISE EXCEPTION 'la caja no crea anticipos en línea';
         END IF;
-        v_f := v_f || jsonb_build_object('tienda_pago_id',
-                 (SELECT id FROM tienda_pagos WHERE cita_id = (v_f->>'cita_id')::uuid AND NOT extra));
+        v_f := v_f || jsonb_build_object('tienda_pago_id', _anticipo_pago_en_linea((v_f->>'cita_id')::uuid));
       END IF;
       -- Resuelto en la nube: ver la precedencia en el encabezado.
       IF FOUND AND v_nube.estado <> 'VIGENTE'
@@ -1167,11 +1194,16 @@ $fn$;
 REVOKE ALL ON FUNCTION _vim_aplicar_anticipos_caja(uuid, jsonb, uuid[]) FROM PUBLIC, anon, authenticated;
 
 -- ── §6 Reservar y vencer ────────────────────────────────────────────────────
--- El pago de la cita para cobrar ahora: {pago_id, total_a_pagar_mxn}, o {} si no hay. Mientras la
--- cita espera su pago y su apartado sigue vivo, si no tiene pago (o el que tenía fue un NO seguro)
--- nace uno por el anticipo, a la cuenta que cobra en su sucursal. Su id es la referencia en
--- Mercado Pago; vence_at, cuánto se espera el resultado del cobro (como el pedido).
-CREATE OR REPLACE FUNCTION _agenda_cita_pago(p_tenant uuid, p_cita uuid)
+-- El pago de la cita para cobrar ahora: {pago_id, total_a_pagar_mxn}, o {} si no hay.
+--   · La cita espera su pago (AGENDADA con pago_hasta vivo): su pago CREADO; si no tiene (el
+--     anterior fue un NO seguro, venció o se dejó el reto), nace otro por el anticipo, a la cuenta
+--     que cobra en su sucursal, con vence_at = pago_hasta y la clave de freno de quien paga.
+--     Máximo 5 intentos por cita (LIMITE_INTENTOS); con el freno por riesgo puesto, PAGO_EN_PAUSA.
+--   · Ya pagada: su pago APROBADO (el reintento lo ve cobrado). Cancelada o sin anticipo: {}.
+-- p_freno: tienda_pagos.freno_clave (0178), el HMAC de negocio + teléfono + IP que calcula la
+-- función `tienda` (claveDeFreno); NULL = sin IP conocida, no frena.
+DROP FUNCTION IF EXISTS _agenda_cita_pago(uuid, uuid);
+CREATE OR REPLACE FUNCTION _agenda_cita_pago(p_tenant uuid, p_cita uuid, p_freno text)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -1182,30 +1214,36 @@ DECLARE
   v_g     tienda_pagos%ROWTYPE;
   v_cx    uuid;
   v_monto numeric(12,2);
+  v_hasta timestamptz;
 BEGIN
   SELECT * INTO v_c FROM citas WHERE id = p_cita AND tenant_id = p_tenant FOR UPDATE;
   IF NOT FOUND THEN RETURN '{}'::jsonb; END IF;
-  SELECT * INTO v_g FROM tienda_pagos WHERE cita_id = p_cita AND NOT extra;
-  IF v_c.estado IN ('AGENDADA', 'EN_ESPERA') AND v_c.pago_hasta > now() THEN
-    IF v_g.estado = 'RECHAZADO' AND tienda_pago_descartar(v_g.id) THEN v_g := NULL; END IF;
-    IF v_g.id IS NULL THEN
-      v_cx := tienda_conexion_cobro(p_tenant, v_c.sucursal_id);
-      v_monto := _anticipo_cita(p_tenant, p_cita);
-      IF v_cx IS NOT NULL AND v_monto > 0 THEN
-        INSERT INTO tienda_pagos (tenant_id, cita_id, conexion_id, monto_mxn, vence_at)
-        VALUES (p_tenant, p_cita, v_cx, v_monto, now() + interval '5 minutes')
-        RETURNING * INTO v_g;
-      END IF;
+  SELECT * INTO v_g FROM tienda_pagos WHERE cita_id = p_cita AND NOT extra AND estado IN ('CREADO', 'APROBADO');
+  IF v_g.id IS NULL AND v_c.estado = 'AGENDADA' AND v_c.pago_hasta > now() THEN
+    IF (SELECT count(*) FROM tienda_pagos WHERE cita_id = p_cita AND NOT extra) >= 5 THEN
+      RAISE EXCEPTION 'LIMITE_INTENTOS: Demasiados intentos de pago. Comunícate con el negocio.' USING ERRCODE = '22023';
+    END IF;
+    v_hasta := tienda_pago_frenado(p_freno);
+    IF v_hasta IS NOT NULL THEN
+      RAISE EXCEPTION 'PAGO_EN_PAUSA: %', v_hasta USING ERRCODE = '22023';
+    END IF;
+    v_cx := tienda_conexion_cobro(p_tenant, v_c.sucursal_id);
+    v_monto := _anticipo_cita(p_tenant, p_cita);
+    IF v_cx IS NOT NULL AND v_monto > 0 THEN
+      INSERT INTO tienda_pagos (tenant_id, cita_id, conexion_id, monto_mxn, vence_at, freno_clave)
+      VALUES (p_tenant, p_cita, v_cx, v_monto, v_c.pago_hasta, p_freno)
+      RETURNING * INTO v_g;
     END IF;
   END IF;
   IF v_g.id IS NULL THEN RETURN '{}'::jsonb; END IF;
   RETURN jsonb_build_object('pago_id', v_g.id, 'total_a_pagar_mxn', to_char(v_g.monto_mxn, 'FM999999990.00'));
 END;
 $$;
-REVOKE ALL ON FUNCTION _agenda_cita_pago(uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION _agenda_cita_pago(uuid, uuid, text) FROM PUBLIC, anon, authenticated, service_role;
 
 -- agenda_reservar_en_linea: la de la 0224 (vigente). Cambio "0225": con anticipo, la respuesta
--- trae el pago para cobrarlo (pago_id, total_a_pagar_mxn), también al reintentar con la clave.
+-- trae el pago para cobrarlo (pago_id, total_a_pagar_mxn), también al reintentar con la clave; y
+-- `p.freno_clave` (opcional) va al pago para el freno por riesgo (0178).
 CREATE OR REPLACE FUNCTION agenda_reservar_en_linea(p_tenant uuid, p jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -1226,6 +1264,7 @@ DECLARE
   v_codigo   text;
   v_termina  timestamptz;
   v_anticipo numeric(12,2);
+  v_freno    text := NULLIF(p->>'freno_clave', '');   -- 0225
 BEGIN
   -- La forma antes de cualquier cast: lo que llega mal es DATOS_INVALIDOS, no un error crudo.
   IF jsonb_typeof(p) IS DISTINCT FROM 'object' OR jsonb_typeof(p->'cliente') IS DISTINCT FROM 'object' THEN
@@ -1250,13 +1289,17 @@ BEGIN
   v_nombre := NULLIF(btrim(p->'cliente'->>'nombre'), '');
   v_tel    := _telefono_10(p->'cliente'->>'telefono');
   v_email  := lower(NULLIF(btrim(p->'cliente'->>'email'), ''));
+  -- 0225: la clave del freno por riesgo (HMAC de la función tienda), opcional.
+  IF v_freno IS NOT NULL AND v_freno !~ '^[A-Za-z0-9_-]{40,64}$' THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: la clave de freno no es válida.' USING ERRCODE = '22023';
+  END IF;
 
   PERFORM pg_advisory_xact_lock(hashtextextended('cita_web:' || p_tenant || ':' || v_clave, 0));
   SELECT id INTO v_id FROM citas WHERE tenant_id = p_tenant AND client_id_local = 'web:' || v_clave;
   IF FOUND THEN
     RETURN jsonb_build_object('cita_id', v_id, 'codigo', NULL, 'anticipo_mxn', _anticipo_cita(p_tenant, v_id),
                               'resumen', _agenda_cita_resumen(v_id))
-           || _agenda_cita_pago(p_tenant, v_id);   -- 0225
+           || _agenda_cita_pago(p_tenant, v_id, v_freno);   -- 0225
   END IF;
 
   PERFORM _reservas_validar(p_tenant, v_suc, p->'servicios', v_inicia);
@@ -1332,7 +1375,7 @@ BEGIN
 
   RETURN jsonb_build_object('cita_id', v_id, 'codigo', v_codigo, 'anticipo_mxn', v_anticipo,
                             'resumen', _agenda_cita_resumen(v_id))
-         || _agenda_cita_pago(p_tenant, v_id);   -- 0225
+         || _agenda_cita_pago(p_tenant, v_id, v_freno);   -- 0225
 END;
 $$;
 

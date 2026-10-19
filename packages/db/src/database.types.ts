@@ -15221,7 +15221,7 @@ export type Database = {
         }
       }
       _agenda_cita_pago: {
-        Args: { p_cita: string; p_tenant: string }
+        Args: { p_cita: string; p_freno: string; p_tenant: string }
         Returns: Json
       }
       _agenda_cita_resumen: { Args: { p_cita: string }; Returns: Json }
@@ -15257,6 +15257,7 @@ export type Database = {
         }
         Returns: number
       }
+      _anticipo_pago_en_linea: { Args: { p_cita: string }; Returns: string }
       _anticipo_regresar: {
         Args: { p_monto: number; p_ticket: string }
         Returns: number

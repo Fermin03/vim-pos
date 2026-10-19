@@ -2,7 +2,7 @@
 // (docs/integraciones/mercado-pago-checkout-pro/04-verificado-orders.md).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { type Aplicado, avisoDeConciliacionFallida, avisoDeDevolucionFallida, avisoDeRetoSinCerrar, barrer, cobrarPago, confirmarPago, type Deps, devolverPago, type FilaPago, type PuertoPagos, respuestaDeConfirmacion, type Tarea, topesDelAviso } from "./pago-flujo.ts";
+import { type Aplicado, avisoDeConciliacionFallida, referenciaDeCita, avisoDeDevolucionFallida, avisoDeRetoSinCerrar, barrer, cobrarPago, confirmarPago, type Deps, devolverPago, type FilaPago, type PuertoPagos, respuestaDeConfirmacion, type Tarea, topesDelAviso } from "./pago-flujo.ts";
 import type { ClienteMpTienda, RespuestaMp } from "./pago-mp.ts";
 
 const PAGO = "2cd9e6fa-1acf-47dc-8ba4-cba918d73770";
@@ -874,4 +874,11 @@ test("pago de prueba: si Mercado Pago no acepta la orden y repite el correo del 
   assert.equal(escrito.includes(DATOS.email), false);
   // Lo que sirve para arreglarlo sí queda: qué propiedad fue.
   assert.ok(llamadas.some((l) => l.startsWith("registrar COBRO_NO_ACEPTADO") && l.includes("payer.email")));
+});
+
+test("cita: los avisos internos la nombran por la clienta y su hora en México (no tiene folio)", () => {
+  assert.equal(referenciaDeCita({ cliente_nombre: " Ana López ", inicia: "2026-10-26T19:15:00Z" }), "Cita de Ana López, 26/10 13:15");
+  assert.equal(referenciaDeCita(null), "");
+  const d = avisoDeDevolucionFallida({ pagoId: PAGO, negocio: "Salón", folio: referenciaDeCita({ cliente_nombre: "Ana", inicia: "2026-10-26T19:15:00Z" }), monto: "100.00", error: "x" });
+  assert.ok(d.html.includes("Cita de Ana, 26/10 13:15"));
 });

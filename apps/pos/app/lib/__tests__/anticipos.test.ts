@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../supabase", () => ({ employeeClient: () => ({}) }));
 
-import { TEXTO_ANTICIPO, anticipoPorAplicar, pideReferencia, cobroEsperaAnticipo, permiteRetener, resumenAnticipoCobro, sugerenciaPendiente, decisionSugerida, pideAutorizacionAnticipo, sumaAnticipos, vigentes, type Anticipo } from "../anticipos";
+import { TEXTO_ANTICIPO, anticipoPorAplicar, pideReferencia, devuelveEnEfectivo, cobroEsperaAnticipo, permiteRetener, resumenAnticipoCobro, sugerenciaPendiente, decisionSugerida, pideAutorizacionAnticipo, sumaAnticipos, vigentes, type Anticipo } from "../anticipos";
 import { fmtMxn } from "../turno";
 import { capaTramo, seVeEnCalendario, tieneAnticipoPendiente } from "../agenda";
 
@@ -142,5 +142,15 @@ describe("pideReferencia (devolver)", () => {
     expect(["TARJETA_DEBITO", "TARJETA_CREDITO", "TRANSFERENCIA"].every((m) => pideReferencia(m as Anticipo["metodo"]))).toBe(true);
     expect(pideReferencia("EFECTIVO")).toBe(false);
     expect(pideReferencia("PAGO_EN_LINEA")).toBe(false);
+  });
+});
+
+describe("devuelveEnEfectivo", () => {
+  const a = (metodo: Anticipo["metodo"], estado: Anticipo["estado"]): Anticipo => ({ id: `${metodo}-${estado}`, monto: 40, metodo, estado, ticketId: null });
+  it("el efectivo y el sobrante de uno en línea ya usado en parte; el en línea entero lo devuelve Mercado Pago", () => {
+    expect(devuelveEnEfectivo(a("EFECTIVO", "VIGENTE"), [])).toBe(true);
+    expect(devuelveEnEfectivo(a("PAGO_EN_LINEA", "VIGENTE"), [a("PAGO_EN_LINEA", "VIGENTE")])).toBe(false);
+    expect(devuelveEnEfectivo(a("PAGO_EN_LINEA", "VIGENTE"), [a("PAGO_EN_LINEA", "APLICADO"), a("PAGO_EN_LINEA", "VIGENTE")])).toBe(true);
+    expect(devuelveEnEfectivo(a("TARJETA_DEBITO", "VIGENTE"), [a("PAGO_EN_LINEA", "APLICADO")])).toBe(false);
   });
 });

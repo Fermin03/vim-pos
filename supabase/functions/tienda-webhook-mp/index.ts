@@ -42,7 +42,7 @@ import { enSegundoPlano, enviarCorreo } from "../_shared/correo.ts";
 import { secretoInternoValido } from "../_shared/delivery/interno.ts";
 import { firmaValida } from "../_shared/terminal/mercado-pago.ts";
 import { ordenDelAviso } from "../_shared/tienda/aviso-mp.ts";
-import { avisoDeConciliacionFallida, avisoDeDevolucionFallida, avisoDeRetoSinCerrar, barrer, confirmarPago, respuestaDeConfirmacion, type Tarea, topesDelAviso } from "../_shared/tienda/pago-flujo.ts";
+import { avisoDeConciliacionFallida, avisoDeDevolucionFallida, avisoDeRetoSinCerrar, barrer, confirmarPago, referenciaDeCita, respuestaDeConfirmacion, type Tarea, topesDelAviso } from "../_shared/tienda/pago-flujo.ts";
 import { depsDePagos } from "../_shared/tienda/pago-puerto.ts";
 
 const FN = "tienda-webhook-mp";
@@ -59,13 +59,15 @@ const texto = (cuerpo: string, status: number): Response => new Response(cuerpo,
 async function avisar(t: Tarea, de: "DEVOLUCION" | "CONCILIACION" | "RETO"): Promise<void> {
   registrarError(FN, de === "DEVOLUCION" ? "DEVOLUCION_FALLIDA" : de === "RETO" ? "RETO_SIN_CERRAR" : "CONCILIACION_FALLIDA", `pago ${t.id}`);
   const { data } = await admin.from("tienda_pagos")
-    .select("monto_mxn, ultimo_error, orden_id_externo, pedido:delivery_pedidos(folio_corto), negocio:tenants(nombre_comercial), conexion:tienda_conexiones(de_prueba)")
+    .select("monto_mxn, ultimo_error, orden_id_externo, pedido:delivery_pedidos(folio_corto), cita:citas(cliente_nombre, inicia), negocio:tenants(nombre_comercial), conexion:tienda_conexiones(de_prueba)")
     .eq("id", t.id).maybeSingle();
   const f = data as { monto_mxn?: number; ultimo_error?: string | null; orden_id_externo?: string | null;
                       pedido?: { folio_corto?: string | null } | null; negocio?: { nombre_comercial?: string | null } | null;
+                      cita?: { cliente_nombre?: string | null; inicia?: string | null } | null;
                       conexion?: { de_prueba?: boolean } | null } | null;
   const d = {
-    pagoId: t.id, negocio: f?.negocio?.nombre_comercial ?? "", folio: f?.pedido?.folio_corto ?? "",
+    // Un pago de cita (0225) no tiene folio: se nombra por la clienta y la hora de la cita.
+    pagoId: t.id, negocio: f?.negocio?.nombre_comercial ?? "", folio: f?.pedido?.folio_corto ?? referenciaDeCita(f?.cita),
     monto: f?.monto_mxn === undefined ? "" : Number(f.monto_mxn).toFixed(2),
     ordenIdExterno: f?.orden_id_externo ?? t.orden_id_externo,
   };

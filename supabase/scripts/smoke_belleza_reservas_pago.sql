@@ -22,13 +22,13 @@ CREATE FUNCTION pg_temp.como(p_u uuid) RETURNS void LANGUAGE sql
 AS $$ SELECT set_config('request.jwt.claims', CASE WHEN p_u IS NULL THEN NULL ELSE
         json_build_object('sub', p_u, 'role', 'authenticated', 'tenant_id', '99999999-0000-0000-0000-0000000000aa')::text END, true) $$;
 -- Una reserva en línea de corte con María (anticipo 50 % de $200 = $100).
-CREATE FUNCTION pg_temp.reservar(p_inicia timestamptz, p_clave text, p_tel text) RETURNS jsonb LANGUAGE sql
+CREATE FUNCTION pg_temp.reservar(p_inicia timestamptz, p_clave text, p_tel text, p_freno text DEFAULT NULL) RETURNS jsonb LANGUAGE sql
 AS $$ SELECT agenda_reservar_en_linea('99999999-0000-0000-0000-0000000000aa', jsonb_build_object(
         'sucursal_id', '99999999-0000-0000-0000-0000000000bb', 'inicia', p_inicia,
         'servicios', jsonb_build_array(jsonb_build_object('producto_id', '22500000-0000-0000-0000-0000000000a1',
                                                           'usuario_id', '99999999-0000-0000-0000-000000000001')),
         'cliente', jsonb_build_object('nombre', 'Paga Web', 'telefono', p_tel, 'email', 'paga.web@example.com'),
-        'clave', p_clave)) $$;
+        'clave', p_clave, 'freno_clave', p_freno)) $$;
 CREATE FUNCTION pg_temp.h(p_codigo text) RETURNS text LANGUAGE sql IMMUTABLE
 AS $$ SELECT encode(sha256(convert_to(p_codigo, 'UTF8')), 'hex') $$;
 -- Reserva y paga: devuelve la reserva (con cita_id y codigo).
@@ -41,9 +41,9 @@ BEGIN
   RETURN v;
 END $f$;
 CREATE FUNCTION pg_temp.ant(p_cita uuid) RETURNS anticipos_cita LANGUAGE sql
-AS $$ SELECT * FROM anticipos_cita WHERE cita_id = p_cita AND metodo_pago = 'PAGO_EN_LINEA' $$;
+AS $$ SELECT * FROM anticipos_cita WHERE cita_id = p_cita AND metodo_pago = 'PAGO_EN_LINEA' ORDER BY created_at, monto_mxn DESC, id LIMIT 1 $$;
 CREATE FUNCTION pg_temp.pago(p_cita uuid) RETURNS tienda_pagos LANGUAGE sql
-AS $$ SELECT * FROM tienda_pagos WHERE cita_id = p_cita AND NOT extra $$;
+AS $$ SELECT * FROM tienda_pagos WHERE cita_id = p_cita AND NOT extra ORDER BY estado IN ('CREADO', 'APROBADO') DESC, created_at DESC LIMIT 1 $$;
 
 DO $$
 DECLARE
@@ -55,6 +55,8 @@ DECLARE
   v_corte  uuid := '22500000-0000-0000-0000-0000000000a1';
   v_hoy    date := (now() AT TIME ZONE 'America/Mexico_City')::date;
   d date; e date;
+  v_champu uuid := '22500000-0000-0000-0000-0000000000a2';
+  v_g2 uuid; v_resto uuid; v_k2 uuid;
   v_cat uuid; v_cx uuid; v_turno uuid; v_auth uuid; v_k uuid; v_ped uuid; v_g uuid;
   v_c1 uuid; v_c2 uuid; v_c3 uuid; v_c4 uuid; v_c5 uuid; v_c6 uuid; v_c7 uuid;
   v_r jsonb; v_r2 jsonb; v_x jsonb; v_res jsonb; v_aj jsonb;
@@ -84,7 +86,8 @@ BEGIN
   UPDATE cajas SET espejo_turno_abierto_at = now(), espejo_apps_at = NULL, version_app = NULL WHERE sucursal_id = v_suc;
   IF tienda_conexion_cobro(v_t, v_suc) IS DISTINCT FROM v_cx THEN RAISE EXCEPTION 'fixture: sin cobro en línea'; END IF;
   INSERT INTO categorias (tenant_id, nombre, orden_visualizacion) VALUES (v_t, 'Pago smoke', 72) RETURNING id INTO v_cat;
-  INSERT INTO productos (id, tenant_id, categoria_id, nombre, precio_base_mxn) VALUES (v_corte, v_t, v_cat, 'Corte pago', 200);
+  INSERT INTO productos (id, tenant_id, categoria_id, nombre, precio_base_mxn) VALUES (v_corte, v_t, v_cat, 'Corte pago', 200),
+    (v_champu, v_t, v_cat, 'Champú pago', 60);
   INSERT INTO servicios_agenda (producto_id, tenant_id, duracion_min, en_linea, anticipo_tipo, anticipo_valor)
   VALUES (v_corte, v_t, 60, true, 'PORCENTAJE', 50);
   INSERT INTO colaboradores_agenda (usuario_id, tenant_id, sucursal_id, color_hex, orden) VALUES (v_maria, v_t, v_suc, '#C2410C', 1)
@@ -140,8 +143,8 @@ BEGIN
      OR (SELECT count(*) FROM anticipos_cita WHERE cita_id = v_c1) <> 1 THEN
     RAISE EXCEPTION 'P2: el cobro de más'; END IF;
 
-  -- P3) Tarjeta rechazada (el aviso llega primero): la cita sigue apartada; descartar borra solo el
-  --     pago y reservar con la misma clave trae otro.
+  -- P3) Tarjeta rechazada (el aviso llega primero): la cita sigue apartada; descartar deja el pago
+  --     RECHAZADO (cuenta como intento) y reservar con la misma clave trae otro.
   v_r2 := pg_temp.reservar(pg_temp.a(d, '11:00'), 'smk-pago-0002', '4770003302');
   v_c2 := (v_r2->>'cita_id')::uuid;
   v_g := (v_r2->>'pago_id')::uuid;
@@ -149,50 +152,85 @@ BEGIN
   v_x := tienda_pago_aplicar(v_g, 'RECHAZADO', 'ORDCITA02', 100.00, NULL, NULL, 'cc_rejected_insufficient_amount');
   IF v_x->>'estado' <> 'RECHAZADO' OR v_x->>'cita_estado' <> 'AGENDADA' THEN RAISE EXCEPTION 'P3: %', v_x; END IF;
   IF NOT tienda_pago_descartar(v_g) THEN RAISE EXCEPTION 'P3: no descartó'; END IF;
-  IF EXISTS (SELECT 1 FROM tienda_pagos WHERE id = v_g)
+  IF (SELECT estado FROM tienda_pagos WHERE id = v_g) IS DISTINCT FROM 'RECHAZADO'
      OR (SELECT estado FROM citas WHERE id = v_c2) <> 'AGENDADA' THEN RAISE EXCEPTION 'P3: descartar'; END IF;
   v_r2 := pg_temp.reservar(pg_temp.a(d, '11:00'), 'smk-pago-0002', '4770003302');
   IF (v_r2->>'pago_id')::uuid IS NOT DISTINCT FROM v_g OR (v_r2->>'cita_id')::uuid <> v_c2
-     OR (pg_temp.pago(v_c2)).estado <> 'CREADO' THEN RAISE EXCEPTION 'P3: el reintento no trajo otro pago: %', v_r2; END IF;
-  -- Un pago aprobado nunca se descarta.
+     OR (SELECT estado FROM tienda_pagos WHERE id = (v_r2->>'pago_id')::uuid) <> 'CREADO' THEN
+    RAISE EXCEPTION 'P3: el reintento no trajo otro pago: %', v_r2; END IF;
+  -- Un pago aprobado nunca se descarta; ya pagada, el reintento trae el pago aprobado.
   PERFORM tienda_pago_aplicar((v_r2->>'pago_id')::uuid, 'APROBADO', 'ORDCITA02B', 100.00);
   IF tienda_pago_descartar((v_r2->>'pago_id')::uuid) THEN RAISE EXCEPTION 'P3: descartó un pago aprobado'; END IF;
+  IF (pg_temp.reservar(pg_temp.a(d, '11:00'), 'smk-pago-0002', '4770003302')->>'pago_id')::uuid IS DISTINCT FROM (v_r2->>'pago_id')::uuid THEN
+    RAISE EXCEPTION 'P3: pagada, el reintento no trajo su pago aprobado'; END IF;
 
-  -- P4) Cobro en curso: aunque pase pago_hasta, vencer no la cancela; el barrido la vence con el
-  --     plazo de su pago (VENCIDO, cita «No se completó el pago»), y el aprobado tardío se devuelve.
+  -- P4) El plazo del pago es el apartado de la cita (vence_at = pago_hasta). Un pago que vence antes
+  --     queda VENCIDO pero la cita sigue apartada y el reintento trae otro; con un cobro en curso,
+  --     vencer no la cancela; el barrido la cancela cuando su pago venció Y pasó pago_hasta; el
+  --     aprobado tardío se devuelve.
   v_r := pg_temp.reservar(pg_temp.a(d, '13:00'), 'smk-pago-0003', '4770003303');
   v_c3 := (v_r->>'cita_id')::uuid;
   v_g := (v_r->>'pago_id')::uuid;
+  IF (SELECT vence_at FROM tienda_pagos WHERE id = v_g) IS DISTINCT FROM (SELECT pago_hasta FROM citas WHERE id = v_c3) THEN
+    RAISE EXCEPTION 'P4: el pago no vence con el apartado'; END IF;
   PERFORM tienda_pago_tomar_cobro(v_g);
+  UPDATE tienda_pagos SET vence_at = now() - interval '1 second' WHERE id = v_g;
+  PERFORM tienda_pagos_barrer();
+  IF (SELECT estado FROM tienda_pagos WHERE id = v_g) <> 'VENCIDO' OR (SELECT estado FROM citas WHERE id = v_c3) <> 'AGENDADA' THEN
+    RAISE EXCEPTION 'P4: con el apartado vivo, la cita no debía cancelarse'; END IF;
+  v_r := pg_temp.reservar(pg_temp.a(d, '13:00'), 'smk-pago-0003', '4770003303');
+  v_g2 := (v_r->>'pago_id')::uuid;
+  IF v_g2 IS NULL OR v_g2 = v_g OR (SELECT estado FROM tienda_pagos WHERE id = v_g2) <> 'CREADO' THEN
+    RAISE EXCEPTION 'P4: tras el vencido el reintento no trajo otro pago: %', v_r; END IF;
+  PERFORM tienda_pago_tomar_cobro(v_g2);
   UPDATE citas SET pago_hasta = now() - interval '1 minute' WHERE id = v_c3;
   PERFORM agenda_vencer_reservas();
   IF (SELECT estado FROM citas WHERE id = v_c3) <> 'AGENDADA' THEN RAISE EXCEPTION 'P4: venció con el cobro en curso'; END IF;
-  UPDATE tienda_pagos SET vence_at = now() - interval '1 second' WHERE id = v_g;
+  UPDATE tienda_pagos SET vence_at = now() - interval '1 second' WHERE id = v_g2;
   PERFORM tienda_pagos_barrer();
-  IF (pg_temp.pago(v_c3)).estado <> 'VENCIDO' OR (SELECT (estado::text, cancelada_por) FROM citas WHERE id = v_c3)
+  IF (SELECT estado FROM tienda_pagos WHERE id = v_g2) <> 'VENCIDO' OR (SELECT (estado::text, cancelada_por) FROM citas WHERE id = v_c3)
        IS DISTINCT FROM ('CANCELADA'::text, 'PAGO_VENCIDO'::text) THEN
-    RAISE EXCEPTION 'P4: barrido % %', to_jsonb(pg_temp.pago(v_c3)), (SELECT to_jsonb(c) FROM citas c WHERE id = v_c3); END IF;
+    RAISE EXCEPTION 'P4: barrido %', (SELECT to_jsonb(c) FROM citas c WHERE id = v_c3); END IF;
   v_x := tienda_pago_aplicar(v_g, 'APROBADO', 'ORDCITA03', 100.00, 'debit_card', 'master');
   IF v_x->>'estado' <> 'POR_DEVOLVER' OR (v_x->>'recien_aprobado')::boolean
      OR EXISTS (SELECT 1 FROM anticipos_cita WHERE cita_id = v_c3) THEN RAISE EXCEPTION 'P4: pago tardío %', v_x; END IF;
-  -- El tardío sobre una cita que venció por pago_hasta (sin cobro en curso) también.
-  v_r := pg_temp.reservar(pg_temp.a(d, '15:00'), 'smk-pago-0004', '4770003304');
-  v_c4 := (v_r->>'cita_id')::uuid;
-  DELETE FROM tienda_pagos WHERE cita_id = v_c4;   -- un NO seguro que nadie volvió a intentar
-  UPDATE citas SET pago_hasta = now() - interval '1 minute' WHERE id = v_c4;
-  PERFORM agenda_vencer_reservas();
-  IF (SELECT cancelada_por FROM citas WHERE id = v_c4) IS DISTINCT FROM 'PAGO_VENCIDO' THEN RAISE EXCEPTION 'P4: vencer'; END IF;
-  IF pg_temp.reservar(pg_temp.a(d, '15:00'), 'smk-pago-0004', '4770003304') ? 'pago_id' THEN
+  IF pg_temp.reservar(pg_temp.a(d, '13:00'), 'smk-pago-0003', '4770003303') ? 'pago_id' THEN
     RAISE EXCEPTION 'P4: una cita vencida volvió a dar pago'; END IF;
-  -- El reto del banco abandonado: pago ABANDONADO y la cita se cancela sin pago.
+  -- El reto del banco abandonado: pago ABANDONADO; la cita sigue apartada y se paga otra vez.
   v_r := pg_temp.reservar(pg_temp.a(d, '17:00'), 'smk-pago-0005', '4770003305');
   v_c5 := (v_r->>'cita_id')::uuid;
+  v_g := (v_r->>'pago_id')::uuid;
+  PERFORM tienda_pago_tomar_cobro(v_g);
+  PERFORM tienda_pago_verificacion(v_g, 'ORDCITA05');
+  IF NOT tienda_pago_abandonar(v_g) THEN RAISE EXCEPTION 'P4: no abandonó'; END IF;
+  IF (SELECT estado FROM tienda_pagos WHERE id = v_g) <> 'ABANDONADO' OR (SELECT estado FROM citas WHERE id = v_c5) <> 'AGENDADA' THEN
+    RAISE EXCEPTION 'P4: abandonar'; END IF;
+  v_r := pg_temp.reservar(pg_temp.a(d, '17:00'), 'smk-pago-0005', '4770003305');
+  IF (v_r->>'pago_id')::uuid IS NOT DISTINCT FROM v_g THEN RAISE EXCEPTION 'P4: tras abandonar no hubo otro pago'; END IF;
+
+  -- P4b) Freno y tope: el pago lleva la clave de freno; un rechazo por riesgo frena a ese cliente
+  --      (PAGO_EN_PAUSA); a lo más 5 intentos de pago por cita (LIMITE_INTENTOS).
+  PERFORM pg_temp.debe_fallar(format('SELECT pg_temp.reservar(%L, %L, %L, %L)', pg_temp.a(d, '15:00'), 'smk-pago-0004', '4770003304', 'corta'),
+    'DATOS_INVALIDOS: la clave de freno no es válida.', 'P4b clave mal formada');
+  v_r := pg_temp.reservar(pg_temp.a(d, '15:00'), 'smk-pago-0004', '4770003304', repeat('k', 43));
+  v_c4 := (v_r->>'cita_id')::uuid;
+  IF (SELECT freno_clave FROM tienda_pagos WHERE id = (v_r->>'pago_id')::uuid) IS DISTINCT FROM repeat('k', 43) THEN
+    RAISE EXCEPTION 'P4b: el pago no guardó su clave de freno'; END IF;
+  FOR v_n IN 2..5 LOOP
+    PERFORM tienda_pago_descartar((v_r->>'pago_id')::uuid);
+    v_r := pg_temp.reservar(pg_temp.a(d, '15:00'), 'smk-pago-0004', '4770003304', repeat('k', 43));
+  END LOOP;
+  IF (SELECT count(*) FROM tienda_pagos WHERE cita_id = v_c4) <> 5 THEN RAISE EXCEPTION 'P4b: intentos'; END IF;
+  PERFORM tienda_pago_descartar((v_r->>'pago_id')::uuid);
+  PERFORM pg_temp.debe_fallar(format('SELECT pg_temp.reservar(%L, %L, %L)', pg_temp.a(d, '15:00'), 'smk-pago-0004', '4770003304'),
+    'LIMITE_INTENTOS: Demasiados intentos de pago. Comunícate con el negocio.', 'P4b sexto intento');
+  v_r := pg_temp.reservar(pg_temp.a(d, '16:00'), 'smk-pago-0009', '4770003309', repeat('f', 43));
   PERFORM tienda_pago_tomar_cobro((v_r->>'pago_id')::uuid);
-  PERFORM tienda_pago_verificacion((v_r->>'pago_id')::uuid, 'ORDCITA05');
-  IF NOT tienda_pago_abandonar((v_r->>'pago_id')::uuid) THEN RAISE EXCEPTION 'P4: no abandonó'; END IF;
-  IF (pg_temp.pago(v_c5)).estado <> 'ABANDONADO'
-     OR (SELECT cancelada_por FROM citas WHERE id = v_c5) IS DISTINCT FROM 'PAGO_VENCIDO' THEN
-    RAISE EXCEPTION 'P4: abandonar %', to_jsonb(pg_temp.pago(v_c5)); END IF;
+  PERFORM tienda_pago_aplicar((v_r->>'pago_id')::uuid, 'RECHAZADO', 'ORDCITA09', 100.00, NULL, NULL, 'high_risk');
+  IF tienda_pago_frenado(repeat('f', 43)) IS NULL THEN RAISE EXCEPTION 'P4b: el rechazo por riesgo no frenó'; END IF;
+  PERFORM tienda_pago_descartar((v_r->>'pago_id')::uuid);
+  PERFORM pg_temp.debe_fallar(format('SELECT pg_temp.reservar(%L, %L, %L, %L)', pg_temp.a(d, '16:00'), 'smk-pago-0009', '4770003309', repeat('f', 43)),
+    'PAGO_EN_PAUSA:%', 'P4b frenado');
 
   -- P5) Cancelar en línea a tiempo: POR_DEVOLVER → (barrido) DEVUELTO, y el anticipo DEVUELTO sin
   --     turno. Ningún correo de la tienda (son de pedidos).
@@ -236,8 +274,8 @@ BEGIN
                                   accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
   VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_diego, 'retener_anticipo', 'venta.devolucion', 'anticipo', (pg_temp.ant(v_c7)).id, 'smoke')
   RETURNING id INTO v_auth;
-  PERFORM retener_anticipo((pg_temp.ant(v_c7)).id, NULL, NULL, v_auth);
-  IF (pg_temp.ant(v_c7)).estado <> 'RETENIDO' OR (pg_temp.ant(v_c7)).turno_resuelve_id IS NOT NULL
+  PERFORM retener_anticipo((pg_temp.ant(v_c7)).id, v_caja, v_turno, v_auth);
+  IF (pg_temp.ant(v_c7)).estado <> 'RETENIDO' OR (pg_temp.ant(v_c7)).turno_resuelve_id IS DISTINCT FROM v_turno
      OR (pg_temp.pago(v_c7)).estado <> 'APROBADO' THEN RAISE EXCEPTION 'P6: retener %', to_jsonb(pg_temp.ant(v_c7)); END IF;
   -- Devolver: otra cita pagada que la caja cancela tarde.
   PERFORM pg_temp.como(NULL);
@@ -250,12 +288,16 @@ BEGIN
                                   accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
   VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_diego, 'devolver_anticipo', 'venta.devolucion', 'anticipo', (pg_temp.ant(v_c7)).id, 'smoke')
   RETURNING id INTO v_auth;
-  PERFORM devolver_anticipo((pg_temp.ant(v_c7)).id, NULL, NULL, NULL, v_auth);
+  PERFORM devolver_anticipo((pg_temp.ant(v_c7)).id, v_caja, v_turno, NULL, v_auth);
   IF (pg_temp.ant(v_c7)).estado <> 'DEVUELTO' OR (pg_temp.pago(v_c7)).estado <> 'POR_DEVOLVER'
      OR (SELECT count(*) FROM movimientos_caja WHERE turno_id = v_turno) <> v_n THEN
     RAISE EXCEPTION 'P6: devolver % %', to_jsonb(pg_temp.ant(v_c7)), to_jsonb(pg_temp.pago(v_c7)); END IF;
   PERFORM tienda_pago_devolucion((pg_temp.pago(v_c7)).id, true);
   IF (pg_temp.ant(v_c7)).estado <> 'DEVUELTO' THEN RAISE EXCEPTION 'P6: el anticipo cambió al devolverse'; END IF;
+  -- Lo devuelto o retenido por Mercado Pago no entra en las cifras del turno.
+  v_x := reporte_x(v_turno);
+  IF (v_x->>'anticipos_devueltos_mxn')::numeric <> 0 OR (v_x->>'anticipos_retenidos_mxn')::numeric <> 0 THEN
+    RAISE EXCEPTION 'P6: el corte mezcla lo de Mercado Pago: %', v_x; END IF;
   PERFORM pg_temp.como(NULL);
   UPDATE configuracion_tenant SET agenda_cancelar_horas = 24 WHERE tenant_id = v_t;
 
@@ -287,6 +329,32 @@ BEGIN
     v_t, v_suc, v_caja, v_turno, v_c2, 'PAGO_EN_LINEA'), '%anticipos_cita_en_linea_sin_turno%', 'P7 en línea con turno');
   PERFORM pg_temp.debe_fallar(format('INSERT INTO anticipos_cita (tenant_id, sucursal_id, cita_id, metodo_pago, monto_mxn) VALUES (%L, %L, %L, %L, 1)',
     v_t, v_suc, v_c2, 'EFECTIVO'), '%anticipos_cita_en_linea_sin_turno%', 'P7 efectivo sin turno');
+
+  -- P7b) Sobrante de un anticipo en línea partido (la cita ya se cobró): se devuelve EN EFECTIVO del
+  --      turno, con permiso o PIN; el pago de Mercado Pago sigue APROBADO y el corte lo cuenta.
+  v_k2 := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smk-0225-k2', v_maria);
+  PERFORM agregar_item_a_ticket(v_k2, v_champu, 1, NULL, '[]'::jsonb, 'smk-0225-i2');
+  PERFORM vincular_cita_ticket(v_c2, v_k2);
+  v_falta := pagar_con_anticipo(v_k2, v_c2, 'smk-0225-px2');
+  SELECT id INTO v_resto FROM anticipos_cita WHERE cita_id = v_c2 AND estado = 'VIGENTE';
+  IF v_falta >= 100 OR v_resto IS NULL OR (SELECT monto_mxn FROM anticipos_cita WHERE id = v_resto) <> 100 - v_falta
+     OR (SELECT estado FROM citas WHERE id = v_c2) <> 'COBRADA' THEN
+    RAISE EXCEPTION 'P7b: el anticipo no se partió: % %', v_falta, (SELECT jsonb_agg(to_jsonb(a)) FROM anticipos_cita a WHERE cita_id = v_c2); END IF;
+  PERFORM pg_temp.debe_fallar(format('SELECT devolver_anticipo(%L, NULL, NULL)', v_resto),
+    'DATOS_INVALIDOS: el anticipo se mueve en un turno abierto%', 'P7b efectivo sin turno');
+  v_e0 := calcular_efectivo_esperado(v_turno);
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_diego, 'devolver_anticipo', 'venta.devolucion', 'anticipo', v_resto, 'smoke')
+  RETURNING id INTO v_auth;
+  PERFORM devolver_anticipo(v_resto, v_caja, v_turno, NULL, v_auth);
+  IF (SELECT (estado, referencia_devolucion, turno_resuelve_id) FROM anticipos_cita WHERE id = v_resto)
+       IS DISTINCT FROM ('DEVUELTO'::text, 'EN_EFECTIVO'::text, v_turno)
+     OR (pg_temp.pago(v_c2)).estado <> 'APROBADO'
+     OR calcular_efectivo_esperado(v_turno) <> v_e0 - (100 - v_falta)
+     OR NOT EXISTS (SELECT 1 FROM movimientos_caja WHERE turno_id = v_turno AND tipo = 'DEVOLUCION_EFECTIVO' AND monto_mxn = 100 - v_falta)
+     OR (reporte_x(v_turno)->>'anticipos_devueltos_mxn')::numeric <> 100 - v_falta THEN
+    RAISE EXCEPTION 'P7b: devolver en efectivo %', (SELECT to_jsonb(a) FROM anticipos_cita a WHERE id = v_resto); END IF;
 
   -- P8) Sync: el anticipo en línea que la caja aplicó sin internet sube sin caja ni turno; la caja
   --     no crea uno nuevo ni le cambia el método; la cita sube con quién la canceló.
@@ -366,8 +434,9 @@ BEGIN
 
   -- P10) Permisos: las internas nuevas no las ejecuta nadie de fuera.
   IF has_function_privilege('service_role', '_tienda_pago_aplicar_cita(uuid, text, text, numeric, text, text, text, text)', 'EXECUTE')
-     OR has_function_privilege('authenticated', '_agenda_cita_pago(uuid, uuid)', 'EXECUTE')
+     OR has_function_privilege('authenticated', '_agenda_cita_pago(uuid, uuid, text)', 'EXECUTE')
      OR has_function_privilege('anon', '_agenda_cancelar_sin_pago(uuid)', 'EXECUTE')
+     OR has_function_privilege('authenticated', '_anticipo_pago_en_linea(uuid)', 'EXECUTE')
      OR NOT has_function_privilege('service_role', 'tienda_pago_aplicar(uuid, text, text, numeric, text, text, text, text)', 'EXECUTE')
      OR has_function_privilege('authenticated', 'tienda_pago_aplicar(uuid, text, text, numeric, text, text, text, text)', 'EXECUTE') THEN
     RAISE EXCEPTION 'P10: permisos'; END IF;

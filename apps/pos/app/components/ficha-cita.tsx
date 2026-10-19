@@ -322,6 +322,7 @@ export function FichaCita({ token, citaId, negocio, cajaId, turnoId, ejecutaNomb
         <DialogoAnticipo
           token={token}
           vigentes={porResolver}
+          todos={anticipos ?? []}
           sugerida={decidiendo.sugerida}
           elegida={decidiendo.elegida}
           retener={cita ? permiteRetener(cita.estado) : false}
