@@ -33,6 +33,9 @@ export function rutasOcultas(m: ModulosLeidos | "error" | null): ReadonlySet<str
   // (los giros de retail 2), o donde ya esté encendido para poder apagarlo.
   if (!conCredito(m)) ocultas.add("/creditos");
   if (!conCredito(m) && !conExistencias(m)) ocultas.add("/configuracion/credito");
+  // Cotizaciones (0212): igual que el crédito.
+  if (!conCotizaciones(m)) ocultas.add("/cotizaciones");
+  if (!conCotizaciones(m) && !conExistencias(m)) ocultas.add("/configuracion/cotizaciones");
   return ocultas;
 }
 
@@ -53,3 +56,7 @@ export const conExistencias = (m: ModulosLeidos | "error" | null): boolean =>
 /** ¿Se enseña lo de crédito (menú Créditos, sección del cliente)? Solo con el módulo leído y encendido. */
 export const conCredito = (m: ModulosLeidos | "error" | null): boolean =>
   m !== null && m !== "error" && m.efectivos.credito === true;
+
+/** ¿Se enseña lo de cotizaciones (menú Cotizaciones)? Solo con el módulo leído y encendido. */
+export const conCotizaciones = (m: ModulosLeidos | "error" | null): boolean =>
+  m !== null && m !== "error" && m.efectivos.cotizaciones === true;

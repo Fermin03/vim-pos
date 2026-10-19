@@ -23,6 +23,8 @@ export const MIN_JERARQUIA: { prefijo: string; min: number }[] = [
   { prefijo: "/clientes", min: 4 },
   // Quién le debe al negocio y cuánto: lo mismo que Clientes.
   { prefijo: "/creditos", min: 4 },
+  // Cotizaciones: precios y clientes del negocio, igual que Clientes.
+  { prefijo: "/cotizaciones", min: 4 },
   // El programa de lealtad reparte dinero del negocio: lo configura dueño o administrador.
   { prefijo: "/lealtad", min: 4 },
   // La tienda en línea recibe pedidos y fija precios y horarios del negocio: dueño o administrador.

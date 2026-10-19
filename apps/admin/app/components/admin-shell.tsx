@@ -47,6 +47,7 @@ const NAV: Seccion[] = [
       { label: "Existencias", href: "/existencias", icon: "cajon" },
       { label: "Clientes", href: "/clientes", icon: "persona" },
       { label: "Créditos", href: "/creditos", icon: "billete" },
+      { label: "Cotizaciones", href: "/cotizaciones", icon: "recibo" },
       { label: "Lealtad", href: "/lealtad", icon: "estrella" },
       { label: "Tienda en línea", href: "/tienda", icon: "bolsa" },
       { label: "Reservaciones", href: "/reservaciones", icon: "calendario" },
