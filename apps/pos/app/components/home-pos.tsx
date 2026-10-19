@@ -3722,7 +3722,7 @@ export function HomePos({
             // Cita nueva en un negocio que cobra por adelantado: la ficha abre «Cobrar anticipo».
             if (nuevaId) void configCobroAgenda(token).then((c) => {
               if (c.modo !== "AL_FINAL") { setOfrecerAnticipo(true); setFichaCita(nuevaId); }
-            }).catch(() => {});
+            }).catch((e) => setError(`La cita se guardó, pero no se pudo saber si cobra anticipo: ${e instanceof Error ? e.message : "error"}. Ábrela para cobrarlo.`));
           }}
           onCerrar={() => setModalCita(null)}
         />

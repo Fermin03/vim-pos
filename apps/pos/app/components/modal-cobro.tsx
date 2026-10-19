@@ -27,7 +27,7 @@ import {
   type CreditoCliente,
   type CuentaCredito,
 } from "../lib/credito";
-import { leerAnticipoVenta, pagarConAnticipo, resumenAnticipoCobro, TEXTO_ANTICIPO, type AnticipoVenta } from "../lib/anticipos";
+import { cobroEsperaAnticipo, leerAnticipoVenta, pagarConAnticipo, resumenAnticipoCobro, TEXTO_ANTICIPO, type AnticipoVenta } from "../lib/anticipos";
 
 // ─── Íconos SVG inline (calcan los mockups) ────────────────────────────────
 
@@ -1243,17 +1243,21 @@ export function ModalCobro({
   // solo al confirmar el primer pago (asegurarAnticipo), justo antes de cobrar el resto. Salir del
   // cobro no deja nada aplicado. Fuera de belleza no se lee nada.
   const [anticipoVenta, setAnticipoVenta] = useState<AnticipoVenta | null>(null);
-  const [anticipoListo, setAnticipoListo] = useState(!conCitas);
+  const [anticipoLeido, setAnticipoLeido] = useState(false);
+  const anticipoListo = !cobroEsperaAnticipo(conCitas, anticipoLeido);
+  /** No se pudo leer: falla cerrado (nunca se cobra el total completo si pudo haber anticipo). */
+  const [errorAnticipo, setErrorAnticipo] = useState<string | null>(null);
+  const [intentoAnticipo, setIntentoAnticipo] = useState(0);
   useEffect(() => {
     if (!conCitas) return;
     let activo = true;
+    setErrorAnticipo(null);
     leerAnticipoVenta(token, totalesIniciales.ticketId)
-      .then((a) => { if (activo) setAnticipoVenta(a); })
-      .catch(() => { /* sin el dato, el cobro de siempre; el anticipo sigue vigente en la cita */ })
-      .finally(() => { if (activo) setAnticipoListo(true); });
+      .then((a) => { if (activo) { setAnticipoVenta(a); setAnticipoLeido(true); } })
+      .catch((e) => { if (activo) setErrorAnticipo(e instanceof Error ? e.message : "error"); });
     return () => { activo = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conCitas, token]);
+  }, [conCitas, token, intentoAnticipo]);
 
   // Total autoritativo (BD) + propina capturada en cliente; la propina ya quedó persistida. El
   // pendiente ya descuenta el anticipo por aplicar: todas las vistas cobran solo el resto.
@@ -1627,13 +1631,22 @@ export function ModalCobro({
             <div className="flex items-center justify-center py-16 text-sm text-ink-3">Cargando…</div>
           )
         )}
-        {vista === "atajo" && (
+        {vista === "atajo" && !errorAnticipo && (
           <div className="flex flex-col items-center gap-2 py-10 text-center" role="status">
             <div className="font-display text-24 font-semibold">Cobrando en efectivo exacto…</div>
             <div className="font-display text-32 font-bold tabular-nums">{fmtMxn(totalesEf.pendiente)}</div>
           </div>
         )}
-        {vista === "selector" && !anticipoListo && (
+        {(vista === "selector" || vista === "atajo") && errorAnticipo && (
+          <div className="flex flex-col items-center gap-4 py-10 text-center" role="alert">
+            <p className="max-w-sm text-15 font-medium text-danger">No se pudo saber si la cita dejó anticipo: {errorAnticipo}. No se cobra hasta saberlo.</p>
+            <div className="flex gap-2">
+              <Button variant="ghost" className="h-12" onClick={onCerrar}>Volver al ticket</Button>
+              <Button className="h-12" onClick={() => setIntentoAnticipo((n) => n + 1)}>Reintentar</Button>
+            </div>
+          </div>
+        )}
+        {vista === "selector" && !anticipoListo && !errorAnticipo && (
           <div className="flex items-center justify-center py-16 text-sm text-ink-3">Cargando…</div>
         )}
         {vista === "selector" && anticipoListo && (

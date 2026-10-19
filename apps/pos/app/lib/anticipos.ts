@@ -96,6 +96,12 @@ export async function leerAnticipoVenta(token: string, ticketId: string): Promis
   };
 }
 
+/**
+ * El cobro de belleza no ofrece formas de pago hasta saber si la cita dejó anticipo: si la lectura
+ * falla, falla cerrado (error y «Reintentar»), nunca cobra el total completo.
+ */
+export const cobroEsperaAnticipo = (conCitas: boolean, anticipoLeido: boolean): boolean => conCitas && !anticipoLeido;
+
 /** Lo que el cobro aplica con anticipo: lo vigente, hasta lo que falta. 0 = no hay «Anticipo». */
 export function anticipoPorAplicar(a: AnticipoVenta | null, pendiente: number): number {
   if (!a || !(a.vigente > 0) || !(pendiente > 0)) return 0;
@@ -141,6 +147,20 @@ export function decisionSugerida(causa: CausaCancelacion, inicia: Date | null, a
   return inicia.getTime() - ahora.getTime() > cancelarHoras * 3_600_000 ? "DEVOLVER" : "RETENER";
 }
 
+/** La base solo retiene el anticipo de una cita cancelada o que no llegó; el sobrante de una cobrada, solo se devuelve. */
+export const permiteRetener = (estado: string): boolean => estado === "CANCELADA" || estado === "NO_LLEGO";
+
+/**
+ * La sugerida del aviso «pendiente» (la cita ya se cerró): no llegó → Retener; sobrante de una cobrada →
+ * Devolver; cancelada → la regla del límite con la hora en que se canceló (quién canceló no se guarda:
+ * se toma como la clienta). Sin esa hora, sin sugerencia.
+ */
+export function sugerenciaPendiente(c: { estado: string; inicia: Date | null; canceladaAt?: Date | null }, cancelarHoras: number): DecisionAnticipo | null {
+  if (c.estado === "NO_LLEGO") return "RETENER";
+  if (c.estado === "CANCELADA") return c.canceladaAt ? decisionSugerida("CLIENTA", c.inicia, c.canceladaAt, cancelarHoras) : null;
+  return "DEVOLVER";
+}
+
 /** Textos de la caja (los dice el brief; las pruebas los fijan). */
 export const TEXTO_ANTICIPO = {
   cobrar: "Cobrar anticipo",
@@ -149,6 +169,7 @@ export const TEXTO_ANTICIPO = {
   devolver: "Devolver",
   retener: "Retener",
   pendiente: "Anticipo pendiente de devolver o retener",
+  sinUsar: (monto: string) => `Anticipo sin usar ${monto}`,
   /** Marca de la tarjeta en el calendario y título del grupo en «Citas de hoy». */
   marcaPendiente: "Anticipo pendiente",
   grupoPendientes: "Anticipos pendientes",

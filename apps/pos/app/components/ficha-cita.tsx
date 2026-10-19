@@ -9,10 +9,10 @@ import {
 import { fmtMxn } from "../lib/turno";
 import { telefonoLegible } from "../lib/telefono";
 import {
-  TEXTO_ANTICIPO, configCobroAgenda, decisionSugerida, leerAnticipos, sumaAnticipos, vigentes,
+  TEXTO_ANTICIPO, configCobroAgenda, decisionSugerida, leerAnticipos, permiteRetener, sugerenciaPendiente, sumaAnticipos, vigentes,
   type Anticipo, type CausaCancelacion, type ConfigCobroAgenda, type DecisionAnticipo,
 } from "../lib/anticipos";
-import { DialogoAnticipo, ModalCobrarAnticipo } from "./anticipo-cita";
+import { DialogoAnticipo, ModalCobrarAnticipo, claseOpcion } from "./anticipo-cita";
 
 const CANAL: Record<CitaCanal, string> = { CAJA: "En la caja", SIN_CITA: "Sin cita, de la lista de espera", EN_LINEA: "En línea" };
 
@@ -47,8 +47,13 @@ export function FichaCita({ token, citaId, negocio, cajaId, turnoId, ejecutaNomb
   const [cancelando, setCancelando] = useState(false);
   const [motivo, setMotivo] = useState("");
   const [confirmar, dialogoConfirmar] = useConfirmar();
-  const [anticipos, setAnticipos] = useState<Anticipo[]>([]);
+  /** null = sin leer todavía (o falló): Cancelar y No llegó esperan, para no saltarse la pregunta del anticipo. */
+  const [anticipos, setAnticipos] = useState<Anticipo[] | null>(null);
+  const [errorAnticipos, setErrorAnticipos] = useState<string | null>(null);
   const [config, setConfig] = useState<ConfigCobroAgenda | null>(null);
+  const [errorConfig, setErrorConfig] = useState<string | null>(null);
+  /** Se ofrece una vez (cita recién agendada); ya cobrado u omitido, «Cobrar anticipo» es el normal. */
+  const [ofreciendo, setOfreciendo] = useState(ofrecerAnticipo);
   const [cobrandoAnticipo, setCobrandoAnticipo] = useState(ofrecerAnticipo);
   /** Quién cancela (solo se pregunta con anticipo vigente: decide la sugerencia). */
   const [quienCancela, setQuienCancela] = useState<"SALON" | "CLIENTA" | null>(null);
@@ -56,7 +61,9 @@ export function FichaCita({ token, citaId, negocio, cajaId, turnoId, ejecutaNomb
   const [decidiendo, setDecidiendo] = useState<{ sugerida: DecisionAnticipo | null; elegida?: DecisionAnticipo } | null>(null);
 
   const leer = useCallback(() => {
-    leerAnticipos(token, citaId).then(setAnticipos).catch(() => {});
+    leerAnticipos(token, citaId)
+      .then((a) => { setAnticipos(a); setErrorAnticipos(null); })
+      .catch((e) => setErrorAnticipos(e instanceof Error ? e.message : "No se pudo leer el anticipo"));
     leerCita(token, citaId)
       .then((c) => {
         setCita(c);
@@ -66,7 +73,10 @@ export function FichaCita({ token, citaId, negocio, cajaId, turnoId, ejecutaNomb
   }, [token, citaId]);
   useEffect(() => { leer(); }, [leer]);
   useEffect(() => { toleranciaMin(token).then(setTolerancia).catch(() => {}); }, [token]);
-  useEffect(() => { configCobroAgenda(token).then(setConfig).catch(() => {}); }, [token]);
+  useEffect(() => {
+    configCobroAgenda(token).then(setConfig)
+      .catch((e) => setErrorConfig(`No se pudo leer cómo cobra el negocio sus citas: ${e instanceof Error ? e.message : "error"}`));
+  }, [token]);
   useEffect(() => {
     const t = setInterval(() => setAhora(new Date()), 30_000);
     return () => clearInterval(t);
@@ -89,7 +99,10 @@ export function FichaCita({ token, citaId, negocio, cajaId, turnoId, ejecutaNomb
     }
   }
 
-  const porResolver = vigentes(anticipos);
+  const porResolver = vigentes(anticipos ?? []);
+  const anticiposListos = anticipos !== null;
+  /** La sugerida del aviso «pendiente», según la regla (la cita ya se cerró). */
+  const sugerida = cita ? sugerenciaPendiente(cita, config?.cancelarHoras ?? 24) : null;
   const anticipoVigente = sumaAnticipos(porResolver);
   /** Primero la cita (la base solo retiene el de una cancelada o que no llegó); luego, el anticipo. */
   const preguntarAnticipo = (causa: CausaCancelacion) =>
@@ -196,11 +209,23 @@ export function FichaCita({ token, citaId, negocio, cajaId, turnoId, ejecutaNomb
                 ))}
               </ul>
 
-              {anticipoVigente > 0 && (cita.estado === "CANCELADA" || cita.estado === "NO_LLEGO") ? (
+              {errorAnticipos && (
+                <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-danger-line bg-danger-soft px-4 py-3" role="alert">
+                  <p className="min-w-0 flex-1 text-14 text-danger">No se pudo leer el anticipo de la cita: {errorAnticipos}</p>
+                  <Button variant="ghost" className="h-11 bg-surface" onClick={leer}>Reintentar</Button>
+                </div>
+              )}
+              {anticipoVigente > 0 && (permiteRetener(cita.estado) || cita.estado === "COBRADA") ? (
                 <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-warning-line bg-warning-soft px-4 py-3" role="status">
-                  <p className="min-w-0 flex-1 text-14 font-medium text-warning">{TEXTO_ANTICIPO.pendiente} · <span className="tabular-nums">{fmtMxn(anticipoVigente)}</span></p>
-                  <Button variant="ghost" className="h-11 bg-surface" onClick={() => setDecidiendo({ sugerida: null, elegida: "DEVOLVER" })}>{TEXTO_ANTICIPO.devolver}</Button>
-                  <Button variant="ghost" className="h-11 bg-surface" onClick={() => setDecidiendo({ sugerida: null, elegida: "RETENER" })}>{TEXTO_ANTICIPO.retener}</Button>
+                  <p className="min-w-0 flex-1 text-14 font-medium text-warning">
+                    {cita.estado === "COBRADA"
+                      ? TEXTO_ANTICIPO.sinUsar(fmtMxn(anticipoVigente))
+                      : <>{TEXTO_ANTICIPO.pendiente} · <span className="tabular-nums">{fmtMxn(anticipoVigente)}</span></>}
+                  </p>
+                  <Button variant="ghost" className="h-11 bg-surface" onClick={() => setDecidiendo({ sugerida: sugerida, elegida: "DEVOLVER" })}>{TEXTO_ANTICIPO.devolver}</Button>
+                  {permiteRetener(cita.estado) && (
+                    <Button variant="ghost" className="h-11 bg-surface" onClick={() => setDecidiendo({ sugerida: sugerida, elegida: "RETENER" })}>{TEXTO_ANTICIPO.retener}</Button>
+                  )}
                 </div>
               ) : anticipoVigente > 0 ? (
                 <p className="mt-4 rounded-lg border border-success-line bg-success-soft px-4 py-3 text-14 font-medium text-success">
@@ -238,9 +263,10 @@ export function FichaCita({ token, citaId, negocio, cajaId, turnoId, ejecutaNomb
               ))}
               {a?.mover && <Button variant="ghost" className={`${accion} bg-surface text-ink`} disabled={ocupado} onClick={() => onMover(cita)}>Mover de horario</Button>}
               {(a?.noLlego || a?.cancelar) && <hr className="my-1 border-line" />}
-              {a?.noLlego && <button type="button" className={peligro} disabled={ocupado} onClick={() => void noLlego()}>No llegó · liberar lugar</button>}
-              {a?.cancelar && <button type="button" className={peligro} disabled={ocupado} onClick={() => { setMotivo(""); setQuienCancela(null); setCancelando(true); }}>Cancelar cita</button>}
+              {a?.noLlego && <button type="button" className={peligro} disabled={ocupado || !anticiposListos} onClick={() => void noLlego()}>No llegó · liberar lugar</button>}
+              {a?.cancelar && <button type="button" className={peligro} disabled={ocupado || !anticiposListos} onClick={() => { setMotivo(""); setQuienCancela(null); setCancelando(true); }}>Cancelar cita</button>}
               {error && <p className="text-14 font-medium text-danger" role="alert">{error}</p>}
+              {errorConfig && <p className="text-14 font-medium text-danger" role="alert">{errorConfig}</p>}
             </aside>
           </div>
         )}
@@ -266,8 +292,7 @@ export function FichaCita({ token, citaId, negocio, cajaId, turnoId, ejecutaNomb
               <div className="grid grid-cols-2 gap-2">
                 {(["SALON", "CLIENTA"] as const).map((q) => (
                   <button key={q} type="button" onClick={() => setQuienCancela(q)} aria-pressed={quienCancela === q}
-                    className={["min-h-[44px] rounded-lg border px-3 text-14 font-semibold transition-[transform,border-color,background-color] duration-150 ease-vim active:scale-[.97]",
-                      quienCancela === q ? "border-ink bg-sel text-ink shadow-[inset_0_0_0_1.5px_#16161A]" : "border-line-strong text-ink-2 hover:border-ink"].join(" ")}>
+                    className={claseOpcion(quienCancela === q)}>
                     {q === "CLIENTA" ? "Cancela la clienta" : "Cancela el negocio"}
                   </button>
                 ))}
@@ -288,9 +313,9 @@ export function FichaCita({ token, citaId, negocio, cajaId, turnoId, ejecutaNomb
           clienta={cita.clienteNombre}
           cajaId={cajaId}
           turnoId={turnoId}
-          textoSalir={ofrecerAnticipo ? "Ahora no" : "Volver"}
-          onCobrado={() => { setCobrandoAnticipo(false); onCambio(); leer(); }}
-          onCerrar={() => { setCobrandoAnticipo(false); if (ofrecerAnticipo && anticipos.length === 0) onCerrar(); }}
+          textoSalir={ofreciendo ? "Ahora no" : "Volver"}
+          onCobrado={() => { setCobrandoAnticipo(false); setOfreciendo(false); onCambio(); leer(); }}
+          onCerrar={() => { setCobrandoAnticipo(false); if (ofreciendo) { setOfreciendo(false); onCerrar(); } }}
         />
       )}
       {decidiendo && porResolver.length > 0 && (
@@ -299,6 +324,7 @@ export function FichaCita({ token, citaId, negocio, cajaId, turnoId, ejecutaNomb
           vigentes={porResolver}
           sugerida={decidiendo.sugerida}
           elegida={decidiendo.elegida}
+          retener={cita ? permiteRetener(cita.estado) : false}
           cajaId={cajaId}
           turnoId={turnoId}
           ejecutaNombre={ejecutaNombre}

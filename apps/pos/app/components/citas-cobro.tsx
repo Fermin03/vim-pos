@@ -179,7 +179,7 @@ export function CitasCobro({ token, sucursalId, version, activa, ventaActual, bl
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-16 font-semibold">{c.clienteNombre}</span>
                       <span className="block truncate text-13 text-ink-2">{[ETIQUETA_ESTADO_CITA[c.estado], diaCita(c.inicia, hoyMx()), resumen(c)].filter(Boolean).join(" · ")}</span>
-                      <span className="block text-13 font-semibold text-warning">{TEXTO_ANTICIPO.pendiente}</span>
+                      <span className="block text-13 font-semibold text-warning">{c.estado === "COBRADA" ? TEXTO_ANTICIPO.sinUsar(fmtMxn(c.anticipoVigente ?? 0)) : TEXTO_ANTICIPO.pendiente}</span>
                     </span>
                     <span className="font-display whitespace-nowrap text-16 font-semibold tabular-nums">{fmtMxn(c.anticipoVigente ?? 0)}</span>
                   </button>

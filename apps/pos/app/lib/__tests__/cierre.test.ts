@@ -34,13 +34,18 @@ describe("anticipos en el corte", () => {
     expect(filas.map((f) => f.metodo)).toEqual(["EFECTIVO", "TRANSFERENCIA"]);
   });
 
-  it("las cuatro cifras informativas, con sus textos, solo las que no son 0", () => {
+  it("las cuatro cifras informativas, con sus textos, también en $0", () => {
     expect(filasAnticipos({ anticiposRecibidos: 200, pagadoConAnticipo: 390, anticiposDevueltos: 150, anticiposRetenidos: 100 })).toEqual([
       { l: "Anticipos recibidos", v: 200 },
       { l: "Pagado con anticipo", v: 390 },
       { l: "Anticipos devueltos", v: 150 },
       { l: "Anticipos retenidos (no reembolsables)", v: 100 },
     ]);
-    expect(filasAnticipos({ anticiposRecibidos: 0, pagadoConAnticipo: 0, anticiposDevueltos: 0, anticiposRetenidos: 0 })).toEqual([]);
+    expect(filasAnticipos({ anticiposRecibidos: 0, pagadoConAnticipo: 0, anticiposDevueltos: 0, anticiposRetenidos: 0 })).toEqual([
+      { l: "Anticipos recibidos", v: 0 },
+      { l: "Pagado con anticipo", v: 0 },
+      { l: "Anticipos devueltos", v: 0 },
+      { l: "Anticipos retenidos (no reembolsables)", v: 0 },
+    ]);
   });
 });

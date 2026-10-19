@@ -12,10 +12,12 @@ import { obtenerImpresora } from "../lib/print/adapter";
 import { fmtMxn } from "../lib/turno";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
 
-const MARCO = "w-[min(480px,calc(100vw-2rem))] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]";
-const opcion = (activa: boolean) => [
+const MARCO = "w-[min(480px,calc(100vw-2rem))] rounded-lg border border-line bg-surface p-6 shadow-xl";
+
+/** Una opción que se elige tocándola (método, quién cancela, devolver o retener). */
+export const claseOpcion = (activa: boolean) => [
   "min-h-[44px] rounded-lg border px-3 text-14 font-semibold transition-[transform,border-color,background-color] duration-150 ease-vim active:scale-[.97]",
-  activa ? "border-ink bg-sel text-ink shadow-[inset_0_0_0_1.5px_#16161A]" : "border-line-strong text-ink-2 hover:border-ink",
+  activa ? "border-ink bg-sel text-ink ring-[1.5px] ring-inset ring-ink" : "border-line-strong text-ink-2 hover:border-ink",
 ].join(" ");
 
 // El efectivo entra o sale del cajón: se abre como al cobrar o abonar (sin el PIN de «Abrir cajón»).
@@ -36,11 +38,12 @@ export function ModalCobrarAnticipo({ token, citaId, clienta, cajaId, turnoId, t
   const [metodo, setMetodo] = useState<MetodoAnticipo>("EFECTIVO");
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const [sinSugerido, setSinSugerido] = useState(false);
   // La llave nace al abrir y se reusa en los reintentos: la base no lo registra dos veces.
   const llave = useRef(nuevoClientId());
 
   useEffect(() => {
-    anticipoSugerido(token, citaId).then((s) => { if (s > 0) setMonto((m) => m || String(s)); }).catch(() => {});
+    anticipoSugerido(token, citaId).then((s) => { if (s > 0) setMonto((m) => m || String(s)); }).catch(() => setSinSugerido(true));
   }, [token, citaId]);
 
   const valor = redondearCentavos(Number(monto) || 0);
@@ -65,6 +68,7 @@ export function ModalCobrarAnticipo({ token, citaId, clienta, cajaId, turnoId, t
       <p className="mt-0.5 text-14 text-ink-3">{clienta}</p>
 
       <label className="mt-5 block text-13 font-semibold text-ink-2" htmlFor="monto-anticipo">Monto</label>
+      {sinSugerido && <p className="mt-1 text-13 font-medium text-warning" role="status">No se pudo calcular el anticipo sugerido. Escribe el monto.</p>}
       <input
         id="monto-anticipo"
         inputMode="decimal"
@@ -79,7 +83,7 @@ export function ModalCobrarAnticipo({ token, citaId, clienta, cajaId, turnoId, t
       <div className="mt-5 text-13 font-semibold text-ink-2">Cómo paga</div>
       <div className="mt-1.5 grid grid-cols-2 gap-2">
         {METODOS_ANTICIPO.map((m) => (
-          <button key={m} type="button" onClick={() => setMetodo(m)} aria-pressed={metodo === m} className={opcion(metodo === m)}>
+          <button key={m} type="button" onClick={() => setMetodo(m)} aria-pressed={metodo === m} className={claseOpcion(metodo === m)}>
             {etiquetaMetodoPago(m)}
           </button>
         ))}
@@ -102,19 +106,21 @@ export function ModalCobrarAnticipo({ token, citaId, clienta, cajaId, turnoId, t
  * cancelada o que no llegó. `sugerida` sale de `decisionSugerida`; null = el cajero elige sin pista.
  * Devolver con tarjeta o transferencia pide la referencia; en efectivo, sin permiso, el PIN.
  */
-export function DialogoAnticipo({ token, vigentes, sugerida, elegida, cajaId, turnoId, ejecutaNombre, onHecho, onCerrar }: {
+export function DialogoAnticipo({ token, vigentes, sugerida, elegida, retener = true, cajaId, turnoId, ejecutaNombre, onHecho, onCerrar }: {
   token: string;
   vigentes: Anticipo[];
   sugerida: DecisionAnticipo | null;
   /** Ya elegida (botones del aviso «pendiente»); si no, arranca en la sugerida. */
   elegida?: DecisionAnticipo;
+  /** false: sobrante de una cita cobrada; la base solo deja devolverlo. */
+  retener?: boolean;
   cajaId: string;
   turnoId: string;
   ejecutaNombre: string;
   onHecho: () => void;
   onCerrar: () => void;
 }) {
-  const [eleccion, setEleccion] = useState<DecisionAnticipo | null>(elegida ?? sugerida);
+  const [eleccion, setEleccion] = useState<DecisionAnticipo | null>(retener ? elegida ?? sugerida : "DEVOLVER");
   const [referencia, setReferencia] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -155,7 +161,7 @@ export function DialogoAnticipo({ token, vigentes, sugerida, elegida, cajaId, tu
 
   const tarjeta = (d: DecisionAnticipo, detalle: string) => (
     <button type="button" onClick={() => setEleccion(d)} aria-pressed={eleccion === d}
-      className={`${opcion(eleccion === d)} flex flex-col items-start gap-0.5 px-4 py-3 text-left`}>
+      className={`${claseOpcion(eleccion === d)} flex flex-col items-start gap-0.5 px-4 py-3 text-left`}>
       <span className="flex w-full items-center gap-2 text-15 text-ink">
         {d === "DEVOLVER" ? TEXTO_ANTICIPO.devolver : TEXTO_ANTICIPO.retener}
         {sugerida === d && <span className="ml-auto rounded-full bg-sel px-2 py-0.5 text-12 font-semibold text-ink-2">Sugerido</span>}
@@ -169,9 +175,9 @@ export function DialogoAnticipo({ token, vigentes, sugerida, elegida, cajaId, tu
       <Modal open onClose={() => { if (!ocupado) onCerrar(); }} title={TEXTO_ANTICIPO.pregunta(fmtMxn(total))} hideTitle className={MARCO}>
         <h2 className="font-display text-20 font-semibold leading-tight tracking-tight">{TEXTO_ANTICIPO.pregunta(fmtMxn(total))}</h2>
         <p className="mt-1 text-13 text-ink-3">{[...new Set(vigentes.map((a) => etiquetaMetodoPago(a.metodo)))].join(" · ")}</p>
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className={`mt-4 grid gap-2 ${retener ? "grid-cols-2" : ""}`}>
           {tarjeta("DEVOLVER", "Se le regresa a la clienta")}
-          {tarjeta("RETENER", "Queda como no reembolsable")}
+          {retener && tarjeta("RETENER", "Queda como no reembolsable")}
         </div>
         {pideReferencia && (
           <label className="mt-4 flex flex-col gap-1">

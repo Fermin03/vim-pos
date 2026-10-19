@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../supabase", () => ({ employeeClient: () => ({}) }));
 
-import { TEXTO_ANTICIPO, anticipoPorAplicar, resumenAnticipoCobro, decisionSugerida, pideAutorizacionAnticipo, sumaAnticipos, vigentes, type Anticipo } from "../anticipos";
+import { TEXTO_ANTICIPO, anticipoPorAplicar, cobroEsperaAnticipo, permiteRetener, resumenAnticipoCobro, sugerenciaPendiente, decisionSugerida, pideAutorizacionAnticipo, sumaAnticipos, vigentes, type Anticipo } from "../anticipos";
 import { fmtMxn } from "../turno";
-import { seVeEnCalendario, tieneAnticipoPendiente } from "../agenda";
+import { capaTramo, seVeEnCalendario, tieneAnticipoPendiente } from "../agenda";
 
 const t = (iso: string) => new Date(iso);
 
@@ -94,5 +94,44 @@ describe("anticipo pendiente: la cita sigue a la vista", () => {
   it("textos de la marca y del grupo", () => {
     expect(TEXTO_ANTICIPO.marcaPendiente).toBe("Anticipo pendiente");
     expect(TEXTO_ANTICIPO.grupoPendientes).toBe("Anticipos pendientes");
+  });
+});
+
+describe("sobrante en una cita cobrada", () => {
+  it("cuenta como pendiente y solo se devuelve", () => {
+    expect(tieneAnticipoPendiente("COBRADA", [{ estado: "APLICADO" }, { estado: "VIGENTE" }])).toBe(true);
+    expect(tieneAnticipoPendiente("COBRADA", [{ estado: "APLICADO" }])).toBe(false);
+    expect(permiteRetener("COBRADA")).toBe(false);
+    expect(permiteRetener("CANCELADA")).toBe(true);
+    expect(permiteRetener("NO_LLEGO")).toBe(true);
+    expect(TEXTO_ANTICIPO.sinUsar(fmtMxn(110))).toBe("Anticipo sin usar $110.00");
+  });
+});
+
+describe("el cobro falla cerrado sin saber del anticipo", () => {
+  it("belleza espera la lectura (o su reintento); tienda y restaurante no", () => {
+    expect(cobroEsperaAnticipo(true, false)).toBe(true);
+    expect(cobroEsperaAnticipo(true, true)).toBe(false);
+    expect(cobroEsperaAnticipo(false, false)).toBe(false);
+  });
+});
+
+describe("calendario: la cancelada no tapa a la cita viva", () => {
+  it("cancelada → franja angosta debajo; las demás → tarjeta a todo el ancho", () => {
+    expect(capaTramo({ estado: "CANCELADA" })).toBe("franja");
+    for (const e of ["AGENDADA", "EN_CURSO", "TERMINADA", "NO_LLEGO", "COBRADA"] as const) expect(capaTramo({ estado: e })).toBe("tarjeta");
+  });
+});
+
+describe("sugerida del aviso «pendiente»", () => {
+  const inicia = t("2026-11-06T10:00:00-06:00");
+  it("no llegó → Retener; sobrante de cobrada → Devolver", () => {
+    expect(sugerenciaPendiente({ estado: "NO_LLEGO", inicia }, 24)).toBe("RETENER");
+    expect(sugerenciaPendiente({ estado: "COBRADA", inicia }, 24)).toBe("DEVOLVER");
+  });
+  it("cancelada a tiempo → Devolver; tarde → Retener; sin hora de cancelación → sin sugerencia", () => {
+    expect(sugerenciaPendiente({ estado: "CANCELADA", inicia, canceladaAt: t("2026-11-04T10:00:00-06:00") }, 24)).toBe("DEVOLVER");
+    expect(sugerenciaPendiente({ estado: "CANCELADA", inicia, canceladaAt: t("2026-11-06T08:00:00-06:00") }, 24)).toBe("RETENER");
+    expect(sugerenciaPendiente({ estado: "CANCELADA", inicia, canceladaAt: null }, 24)).toBeNull();
   });
 });

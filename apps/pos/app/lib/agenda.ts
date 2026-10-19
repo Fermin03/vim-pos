@@ -50,6 +50,8 @@ export type CitaDia = {
   anticipoPendiente?: boolean;
   /** Lo VIGENTE de sus anticipos (solo donde se lee con el monto). */
   anticipoVigente?: number;
+  /** Cancelada: cuándo (su `updated_at`; una cita cancelada ya no cambia). Para sugerir devolver o retener. */
+  canceladaAt?: Date | null;
 };
 
 /** Minutos desde la medianoche (hora de México). */
@@ -113,7 +115,7 @@ export const trabajaA = (c: ColaboradorDia, min: number): boolean =>
 
 // ── Lecturas ─────────────────────────────────────────────────────────────────
 
-const COLUMNAS = "id, cliente_id, cliente_nombre, cliente_telefono, cliente_email, estado, canal, inicia, termina, llego_at, empalme, nota, "
+const COLUMNAS = "id, updated_at, cliente_id, cliente_nombre, cliente_telefono, cliente_email, estado, canal, inicia, termina, llego_at, empalme, nota, "
   + "citas_servicios(id, orden, producto_id, usuario_id, inicia, termina, empalme, precio_mxn, productos(nombre), espacios(nombre), usuarios_perfil(nombre))";
 
 type FilaTramo = {
@@ -126,13 +128,24 @@ type FilaCita = {
   ticket_id?: string | null;
   ticket?: { estado_fiscal: string; deleted_at: string | null; en_espera: boolean | null; etiqueta_espera: string | null } | null;
   anticipos_cita?: { estado: string; monto_mxn?: number | string }[] | null;
+  updated_at?: string | null;
 };
 
 const fecha = (s: string | null) => (s ? new Date(s) : null);
 
-/** Cancelada o que no llegó, con algún anticipo VIGENTE: el dinero sigue sin destino. */
+/** Estados en los que un anticipo VIGENTE ya no se va a usar: se devuelve (o se retiene). */
+export const ESTADOS_ANTICIPO_PENDIENTE = ["CANCELADA", "NO_LLEGO", "COBRADA"] as const;
+
+/** Cancelada, que no llegó o cobrada con sobrante, con algún anticipo VIGENTE: el dinero sigue sin destino. */
 export const tieneAnticipoPendiente = (estado: CitaEstado, anticipos: { estado: string }[]): boolean =>
-  (estado === "CANCELADA" || estado === "NO_LLEGO") && anticipos.some((a) => a.estado === "VIGENTE");
+  (ESTADOS_ANTICIPO_PENDIENTE as readonly string[]).includes(estado) && anticipos.some((a) => a.estado === "VIGENTE");
+
+/**
+ * Cómo se pinta un tramo en el calendario. Una cancelada (solo se ve con anticipo pendiente) va como
+ * franja angosta al lado y DEBAJO de las citas vivas: su lugar ya puede ser de otra cita, que conserva
+ * todo el ancho y el toque. ponytail: si la viva la tapa entera, se llega por «Anticipos pendientes».
+ */
+export const capaTramo = (c: Pick<CitaDia, "estado">): "franja" | "tarjeta" => (c.estado === "CANCELADA" ? "franja" : "tarjeta");
 
 /** El calendario no enseña lo cancelado, salvo si su anticipo falta por resolver. */
 export const seVeEnCalendario = (c: Pick<CitaDia, "estado" | "anticipoPendiente">): boolean => c.estado !== "CANCELADA" || c.anticipoPendiente === true;
@@ -143,6 +156,7 @@ function aCita(f: FilaCita): CitaDia {
     ...(f.ticket_id && t && !t.deleted_at && (t.estado_fiscal === "ABIERTO" || t.estado_fiscal === "BORRADOR")
       ? { ventaAbierta: { id: f.ticket_id, etiquetaEspera: t.en_espera ? t.etiqueta_espera ?? "Sin etiqueta" : null } }
       : {}),
+    ...(f.estado === "CANCELADA" && f.updated_at ? { canceladaAt: new Date(f.updated_at) } : {}),
     ...(f.anticipos_cita ? {
       anticipoPendiente: tieneAnticipoPendiente(f.estado, f.anticipos_cita),
       anticipoVigente: redondearCentavos(f.anticipos_cita.filter((a) => a.estado === "VIGENTE").reduce((x, a) => x + Number(a.monto_mxn ?? 0), 0)),
@@ -167,11 +181,11 @@ export async function citasDelDia(token: string, sucursalId: string, dia: string
   return ((data ?? []) as unknown as FilaCita[]).map(aCita).filter(seVeEnCalendario);
 }
 
-/** Citas canceladas o que no llegaron con anticipo VIGENTE (de cualquier día): «Anticipos pendientes» del cobro. */
+/** Citas canceladas, que no llegaron o cobradas con sobrante, con anticipo VIGENTE (de cualquier día): «Anticipos pendientes» del cobro. */
 export async function citasConAnticipoPendiente(token: string, sucursalId: string): Promise<CitaDia[]> {
   const { data, error } = await employeeClient(token)
     .from("citas").select(`${COLUMNAS}, anticipos_cita!inner(estado, monto_mxn)`)
-    .eq("sucursal_id", sucursalId).in("estado", ["CANCELADA", "NO_LLEGO"]).eq("anticipos_cita.estado", "VIGENTE")
+    .eq("sucursal_id", sucursalId).in("estado", [...ESTADOS_ANTICIPO_PENDIENTE]).eq("anticipos_cita.estado", "VIGENTE")
     .order("inicia");
   if (error) throw new Error(error.message);
   return ((data ?? []) as unknown as FilaCita[]).map(aCita);

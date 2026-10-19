@@ -67,7 +67,13 @@ reservó, servicios con colaborador, espacio, duración y precio. Acciones segú
   tarjeta o transferencia pide la referencia; en efectivo sin permiso, el PIN de un supervisor. Si se
   cierra sin elegir, la ficha dice **«Anticipo pendiente de devolver o retener»** con los dos botones. La
   cita sigue en el calendario (apagada, con la marca «Anticipo pendiente») y en Cobrar → «Citas de hoy»,
-  grupo **Anticipos pendientes**, que abre la ficha. Resuelto, desaparece.
+  grupo **Anticipos pendientes**, que abre la ficha. Resuelto, desaparece. En el calendario la cancelada
+  va como franja angosta a la derecha, debajo de las citas vivas (no les tapa el toque). El aviso abre el
+  diálogo con la sugerida de la regla (no llegó o tarde → Retener; a tiempo → Devolver).
+- Un sobrante VIGENTE en una cita **Cobrada** sale igual en «Anticipos pendientes» y la ficha dice
+  **«Anticipo sin usar $X»** con solo **Devolver** (la base no deja retenerlo).
+- Si el cobro no puede leer el anticipo, no ofrece formas de pago: error con «Reintentar».
+- El corte de belleza enseña las cuatro cifras de anticipos siempre, también en $0.
 - Al cobrar la venta de la cita, el cobro muestra desde el principio **Total**, **Anticipo −$X** y
   **Por cobrar**, y las formas de pago cobran solo el resto. El anticipo se aplica al confirmar el primer
   pago; si cubre todo, un solo botón «Cobrar con anticipo $X». Salir del cobro no aplica nada.

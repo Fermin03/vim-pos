@@ -31,7 +31,7 @@ export type ReporteXResumen = {
 };
 
 /**
- * Las cuatro cifras de anticipos del corte, solo las que no son 0. Son información: lo recibido ya
+ * Las cuatro cifras de anticipos del corte, también en $0 (el corte de belleza las enseña siempre). Son información: lo recibido ya
  * entra en lo esperado de su método, y ANTICIPO no se declara (lo contó el turno que lo recibió).
  */
 export function filasAnticipos(r: Pick<ReporteXResumen, "anticiposRecibidos" | "pagadoConAnticipo" | "anticiposDevueltos" | "anticiposRetenidos">): { l: string; v: number }[] {
@@ -40,7 +40,7 @@ export function filasAnticipos(r: Pick<ReporteXResumen, "anticiposRecibidos" | "
     { l: "Pagado con anticipo", v: r.pagadoConAnticipo },
     { l: "Anticipos devueltos", v: r.anticiposDevueltos },
     { l: "Anticipos retenidos (no reembolsables)", v: r.anticiposRetenidos },
-  ].filter((f) => f.v > 0);
+  ];
 }
 
 /** Ni CREDITO, SALDO_FAVOR ni ANTICIPO son dinero que se cuente: `reporte_x` ya no los trae, y si llegaran no se declaran. */

@@ -6,6 +6,7 @@ import { Icono } from "@vim/ui/styles";
 import { ETIQUETA_ESTADO_CITA, horaCorta, pasoTolerancia } from "@vim/db/agenda";
 import {
   ALTO_MIN,
+  capaTramo,
   PX_POR_MIN,
   citasDelDia,
   citasEnEspera,
@@ -261,12 +262,26 @@ function TarjetaTramo({ cita, tramo, dia, desde, color, ahora, tolerancia, onAbr
 }) {
   const { top, alto } = posicionTramo(tramo.inicia!, tramo.termina!, dia, desde);
   const noLlego = cita.estado === "NO_LLEGO";
-  // Una cancelada solo se ve con anticipo pendiente (citasDelDia): apagada y marcada.
-  const cancelada = cita.estado === "CANCELADA";
-  const apagada = cita.estado === "TERMINADA" || cancelada;
+  const apagada = cita.estado === "TERMINADA";
   const porLlegar = cita.estado === "AGENDADA" && cita.inicia != null;
   const paso = porLlegar && pasoTolerancia(cita.inicia!, ahora, tolerancia);
-  const empalme = !cancelada && (cita.empalme || tramo.empalme);
+  const empalme = cita.empalme || tramo.empalme;
+
+  // Cancelada con anticipo pendiente: franja angosta a la derecha, DEBAJO de las citas vivas (z-0 vs
+  // z-[1]): no tapa ni le gana el toque a la cita que ocupó su lugar.
+  if (capaTramo(cita) === "franja") {
+    return (
+      <button
+        type="button"
+        onClick={onAbrir}
+        aria-label={`${cita.clienteNombre} · ${ETIQUETA_ESTADO_CITA.CANCELADA} · ${TEXTO_ANTICIPO.marcaPendiente}`}
+        className="absolute right-1.5 z-0 flex w-11 items-center justify-center overflow-hidden rounded-lg border border-dashed border-warning-line bg-warning-soft transition-transform duration-150 ease-vim active:scale-[.97]"
+        style={{ top: top + 2, height: Math.max(alto - 4, ALTO_MIN) }}
+      >
+        <span className="truncate text-11 font-bold text-warning [writing-mode:vertical-rl]">{TEXTO_ANTICIPO.marcaPendiente}</span>
+      </button>
+    );
+  }
   const detalle = cita.canal === "SIN_CITA"
     ? "Sin cita (de la lista de espera)"
     : porLlegar && !paso
@@ -302,7 +317,7 @@ function TarjetaTramo({ cita, tramo, dia, desde, color, ahora, tolerancia, onAbr
       }}
     >
       <span className="flex items-start gap-2">
-        <span className={["min-w-0 flex-1 truncate text-14 font-semibold", noLlego || cancelada ? "text-ink-3 line-through" : "text-ink"].join(" ")}>{cita.clienteNombre}</span>
+        <span className={["min-w-0 flex-1 truncate text-14 font-semibold", noLlego ? "text-ink-3 line-through" : "text-ink"].join(" ")}>{cita.clienteNombre}</span>
         <span className="flex flex-shrink-0 flex-wrap justify-end gap-1">
           {empalme && <span className="rounded bg-danger px-1.5 py-px text-11 font-bold text-white">Empalme</span>}
           {cita.anticipoPendiente && <span className="rounded bg-warning-soft px-1.5 py-px text-11 font-bold text-warning">{TEXTO_ANTICIPO.marcaPendiente}</span>}
