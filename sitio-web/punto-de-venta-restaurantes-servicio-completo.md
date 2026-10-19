@@ -12,31 +12,33 @@ Del mapa de mesas a la cocina, sin papelitos y sin perder una orden.
 
 ## El servicio en orden, de la mesa a la cocina
 
-![Las mesas abiertas con su consumo y su tiempo, y la cuenta de la mesa elegida.](https://vimpos.com.mx/assets/img/capturas/pos-mesas.webp?v=3)
+![El mapa de mesas por sección, con los minutos y el consumo de cada mesa ocupada.](https://vimpos.com.mx/assets/img/capturas/giros/servicio-completo-mesas.webp?v=1)
 
-_Las mesas abiertas y la cuenta de una de ellas._
+_Las mesas por sección, con su tiempo y su consumo._
 
 ### Todo el comedor en una pantalla
 
 Cada mesa con su consumo y su tiempo. Abres la cuenta con un toque.
 
-![Pantalla de cocina con las comandas activas, cada una con su tiempo y sus notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
+![La pantalla de cocina con las comandas de cuatro mesas, con guarniciones, término y notas.](https://vimpos.com.mx/assets/img/capturas/giros/servicio-completo-kds.webp?v=1)
 
-_Las comandas con su tiempo y sus notas._
+_Las comandas de cada mesa, con sus notas._
 
 ### Cada platillo a su estación
 
 La comida a cocina y las bebidas a la barra, en pantalla o impresas.
 
-_La cuenta con su mesero._
+![Las propinas de un mesero en su turno, con lo que vendió y su ticket promedio.](https://vimpos.com.mx/assets/img/capturas/giros/servicio-completo-propinas-mesero.webp?v=1)
+
+_Las propinas de cada mesero, en su turno._
 
 ### Meseros y propinas claras
 
 Cada cuenta guarda su mesero, y las propinas salen en su reporte.
 
-![Pantalla de cobro con el total, las formas de pago y el cambio.](https://vimpos.com.mx/assets/img/capturas/pos-pago.webp?v=3)
+![La cuenta abierta de una mesa con sus productos y los botones para imprimirla y cobrarla.](https://vimpos.com.mx/assets/img/capturas/giros/servicio-completo-cuenta-mesa.webp?v=1)
 
-_El cobro con efectivo, tarjeta o las dos._
+_La cuenta de la mesa, lista para imprimir o cobrar._
 
 ### La cuenta, sin errores
 

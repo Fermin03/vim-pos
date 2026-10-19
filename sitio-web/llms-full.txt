@@ -1639,25 +1639,31 @@ Una caja rápida para la hora pico, que sigue cobrando aunque se caiga el intern
 
 ## Menos espera en la barra, más clientes que vuelven
 
+![Un latte de vainilla abierto en la caja: grande, con leche de avena y shot extra, cada opción con su precio.](https://vimpos.com.mx/assets/img/capturas/giros/cafeteria-modificadores.webp?v=1)
+
 _Un latte con su tamaño, su leche y su extra._
 
 ### Cada bebida, como la pidieron
 
 Tamaño, leche y shot extra se eligen en dos toques, y el precio se ajusta solo.
 
-![Pantalla de cobro con el total, las formas de pago y el cambio.](https://vimpos.com.mx/assets/img/capturas/pos-pago.webp?v=3)
+![El cobro con la propina sugerida de 10, 15 o 20 por ciento.](https://vimpos.com.mx/assets/img/capturas/giros/cafeteria-propina.webp?v=1)
 
-_El cobro con efectivo, tarjeta o las dos._
+_La propina, al cobrar._
 
 ### Cobra en segundos
 
 Efectivo, tarjeta o las dos en una misma cuenta. La propina se suma al cobrar.
+
+![La pantalla que ve el cliente con su pedido, renglón por renglón, y el total.](https://vimpos.com.mx/assets/img/capturas/giros/cafeteria-pantalla-cliente.webp?v=1)
 
 _Lo que ve el cliente mientras pide._
 
 ### Tu cliente ve lo que pidió
 
 Una pantalla de cara al cliente muestra su pedido y el total. Entre ventas, tus promociones.
+
+![La lealtad de una clienta en la caja: sus sellos y los premios que puede canjear.](https://vimpos.com.mx/assets/img/capturas/giros/cafeteria-lealtad.webp?v=1)
 
 _Los sellos del cliente, en la misma cuenta._
 
@@ -1689,7 +1695,7 @@ Con la receta cargada, cada bebida descuenta sus insumos. Desde Negocio.
 
 Qué se vende, a qué hora y quién cobró. El corte cuadra contra el cajón.
 
-![Ticket de venta con el código para facturar.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp?v=3)
+![Ticket de la cafetería con los extras, la propina, los sellos ganados y el código para facturar.](https://vimpos.com.mx/assets/img/capturas/giros/cafeteria-ticket.webp?v=1)
 
 ### [Facturas sin detener la fila](https://vimpos.com.mx/facturacion-cfdi)
 
@@ -1858,13 +1864,15 @@ Combos, extras y comandas a cocina en segundos, aunque se caiga el internet.
 
 ## Órdenes completas, cocina al día y la fila avanzando
 
-![Un producto abierto con sus opciones y los extras con su precio.](https://vimpos.com.mx/assets/img/capturas/pos-catalogo.webp?v=3)
+![El catálogo de hamburguesas y un ticket con un combo, una hamburguesa con su término y aros de cebolla.](https://vimpos.com.mx/assets/img/capturas/giros/servicio-rapido-catalogo.webp?v=1)
 
-_Un producto con sus opciones y sus extras._
+_La orden completa, con sus opciones._
 
 ### La orden sale completa a la primera
 
 Si un producto lleva una opción obligatoria, la caja no lo deja pasar sin ella. Los extras suman su precio.
+
+![Un combo armado: hamburguesa con tocino, papas con queso y limonada, cada cambio con su precio.](https://vimpos.com.mx/assets/img/capturas/giros/servicio-rapido-combo.webp?v=1)
 
 _Un combo con sus opciones._
 
@@ -1872,7 +1880,7 @@ _Un combo con sus opciones._
 
 El plato fuerte, el acompañamiento y la bebida, cada uno con sus opciones.
 
-![Pantalla de cocina con las comandas activas, cada una con su tiempo y sus notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
+![La pantalla de cocina con las comandas en colores por tiempo, con términos y notas.](https://vimpos.com.mx/assets/img/capturas/giros/servicio-rapido-kds.webp?v=1)
 
 _Las comandas con su tiempo y sus notas._
 
@@ -1880,9 +1888,11 @@ _Las comandas con su tiempo y sus notas._
 
 La comanda llega a su estación, en pantalla o impresa, con su tiempo.
 
+![El inicio de la caja con los modos de venta: para llevar, pick-up y domicilio.](https://vimpos.com.mx/assets/img/capturas/giros/servicio-rapido-modos.webp?v=1)
+
 _El tipo de orden, al tomarla._
 
-### Aquí, para llevar o a domicilio
+### Para llevar, pick-up o a domicilio
 
 Lo eliges al tomar la orden. A domicilio, con repartidor y zona de envío.
 
@@ -2079,31 +2089,33 @@ Del mapa de mesas a la cocina, sin papelitos y sin perder una orden.
 
 ## El servicio en orden, de la mesa a la cocina
 
-![Las mesas abiertas con su consumo y su tiempo, y la cuenta de la mesa elegida.](https://vimpos.com.mx/assets/img/capturas/pos-mesas.webp?v=3)
+![El mapa de mesas por sección, con los minutos y el consumo de cada mesa ocupada.](https://vimpos.com.mx/assets/img/capturas/giros/servicio-completo-mesas.webp?v=1)
 
-_Las mesas abiertas y la cuenta de una de ellas._
+_Las mesas por sección, con su tiempo y su consumo._
 
 ### Todo el comedor en una pantalla
 
 Cada mesa con su consumo y su tiempo. Abres la cuenta con un toque.
 
-![Pantalla de cocina con las comandas activas, cada una con su tiempo y sus notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
+![La pantalla de cocina con las comandas de cuatro mesas, con guarniciones, término y notas.](https://vimpos.com.mx/assets/img/capturas/giros/servicio-completo-kds.webp?v=1)
 
-_Las comandas con su tiempo y sus notas._
+_Las comandas de cada mesa, con sus notas._
 
 ### Cada platillo a su estación
 
 La comida a cocina y las bebidas a la barra, en pantalla o impresas.
 
-_La cuenta con su mesero._
+![Las propinas de un mesero en su turno, con lo que vendió y su ticket promedio.](https://vimpos.com.mx/assets/img/capturas/giros/servicio-completo-propinas-mesero.webp?v=1)
+
+_Las propinas de cada mesero, en su turno._
 
 ### Meseros y propinas claras
 
 Cada cuenta guarda su mesero, y las propinas salen en su reporte.
 
-![Pantalla de cobro con el total, las formas de pago y el cambio.](https://vimpos.com.mx/assets/img/capturas/pos-pago.webp?v=3)
+![La cuenta abierta de una mesa con sus productos y los botones para imprimirla y cobrarla.](https://vimpos.com.mx/assets/img/capturas/giros/servicio-completo-cuenta-mesa.webp?v=1)
 
-_El cobro con efectivo, tarjeta o las dos._
+_La cuenta de la mesa, lista para imprimir o cobrar._
 
 ### La cuenta, sin errores
 
@@ -2302,31 +2314,33 @@ Cuentas en la barra y en mesa, con propinas, en una caja que no se detiene.
 
 ## La noche entera, sin perder una cuenta
 
+![Las cuentas abiertas en la barra, cada una con el nombre del cliente, su total y sus minutos.](https://vimpos.com.mx/assets/img/capturas/giros/bar-cuentas.webp?v=1)
+
 _Las cuentas de la barra, por nombre._
 
 ### Cuentas por nombre en la barra
 
 Sin mesa: la cuenta se abre con el nombre del cliente y se le suma toda la noche.
 
-![Las mesas abiertas con su consumo y su tiempo, y la cuenta de la mesa elegida.](https://vimpos.com.mx/assets/img/capturas/pos-mesas.webp?v=3)
+![El inicio de la caja con los accesos a comedor y a barra, con las cuentas abiertas.](https://vimpos.com.mx/assets/img/capturas/giros/bar-inicio.webp?v=1)
 
-_Las mesas abiertas y la cuenta de una de ellas._
+_Comedor y barra, desde el inicio de la caja._
 
 ### Barra y mesas en la misma caja
 
 Las mesas con su consumo y su tiempo, junto a las cuentas de la barra.
 
-![Pantalla de cocina con las comandas activas, cada una con su tiempo y sus notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
+![Una cuenta de barra abierta con cubetas, mezcales y botanas, y el botón para pasarla a mesa.](https://vimpos.com.mx/assets/img/capturas/giros/bar-cuenta-abierta.webp?v=1)
 
-_Las comandas con su tiempo y sus notas._
+_Una cuenta de barra, con todo lo que se pidió._
 
-### Cada pedido a su lugar
+### Una cuenta que crece toda la noche
 
-Las bebidas salen en la barra y la comida en cocina, cada una en su impresora.
+Súmale cubetas, mezcales y botanas. Si se sientan, la pasas a una mesa.
 
-![Pantalla de cobro con el total, las formas de pago y el cambio.](https://vimpos.com.mx/assets/img/capturas/pos-pago.webp?v=3)
+![El cobro de una cuenta de barra con la propina del 15 por ciento elegida.](https://vimpos.com.mx/assets/img/capturas/giros/bar-propina.webp?v=1)
 
-_El cobro con efectivo, tarjeta o las dos._
+_La propina, al cobrar._
 
 ### Propinas al cobrar
 
@@ -2525,7 +2539,7 @@ Una caja rápida para la fila del evento, con la venta de cada turno por separad
 
 ## Lista para la fila, en cualquier lugar
 
-![La caja cobrando con el aviso de que no hay internet.](https://vimpos.com.mx/assets/img/capturas/pos-sin-conexion.webp?v=3)
+![La caja del food truck cobrando con el aviso de que no hay internet.](https://vimpos.com.mx/assets/img/capturas/giros/food-truck-sin-conexion.webp?v=1)
 
 _Sin internet, la caja sigue igual._
 
@@ -2533,13 +2547,15 @@ _Sin internet, la caja sigue igual._
 
 En el estacionamiento o en la feria, la caja cobra e imprime sin señal. [Así funciona](https://vimpos.com.mx/sin-internet).
 
+![La apertura del turno con el fondo de caja y el evento del día.](https://vimpos.com.mx/assets/img/capturas/giros/food-truck-abrir-turno.webp?v=1)
+
 _El turno abierto con su evento._
 
 ### Cada turno, con su evento
 
 Abres el turno con el nombre del evento y su venta queda aparte.
 
-![La caja en plena venta: el catálogo por categorías y un ticket en curso.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=3)
+![El menú de tacos y un ticket en curso con sus extras.](https://vimpos.com.mx/assets/img/capturas/giros/food-truck-catalogo.webp?v=1)
 
 _El menú y la cuenta en curso._
 
@@ -2547,19 +2563,21 @@ _El menú y la cuenta en curso._
 
 Tu menú en botones grandes, con sus extras y su precio.
 
-![Pantalla de cobro con el total, las formas de pago y el cambio.](https://vimpos.com.mx/assets/img/capturas/pos-pago.webp?v=3)
+![El cobro en efectivo con el cambio calculado.](https://vimpos.com.mx/assets/img/capturas/giros/food-truck-cobro.webp?v=1)
 
-_El cobro con efectivo, tarjeta o las dos._
+_El cobro, con el cambio a la vista._
 
 ### Cobra como te paguen
 
 Efectivo, tarjeta o las dos en una misma cuenta.
 
-_Los sellos del cliente, en la misma cuenta._
+![Reporte de ventas por evento con la venta, la comisión del organizador y lo que le quedó al negocio.](https://vimpos.com.mx/assets/img/capturas/giros/food-truck-ventas-por-evento.webp?v=1)
 
-### Que te busquen en el siguiente evento
+_Las ventas por evento, en el panel._
 
-Sellos por visita o puntos por compra, sin tarjetas de cartón. Incluido desde Negocio.
+### Qué evento te dejó más
+
+La venta de cada evento, la comisión del organizador y lo que te quedó.
 
 _Para el dueño_
 
@@ -2573,9 +2591,9 @@ Con la receta cargada, cada venta descuenta sus insumos. Desde Negocio.
 
 ![Panel con la venta del día, las horas pico y lo más vendido.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
 
-### [Qué evento vendió más](https://vimpos.com.mx/funciones#reportes)
+### [Tus horas pico, a la vista](https://vimpos.com.mx/funciones#reportes)
 
-Qué se vende, a qué hora y en cuál turno. El corte cuadra contra el cajón.
+Qué se vende, a qué hora y quién cobró. El corte cuadra contra el cajón.
 
 ![Ticket de venta con el código para facturar.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp?v=3)
 

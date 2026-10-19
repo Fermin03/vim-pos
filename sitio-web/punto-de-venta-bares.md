@@ -12,31 +12,33 @@ Cuentas en la barra y en mesa, con propinas, en una caja que no se detiene.
 
 ## La noche entera, sin perder una cuenta
 
+![Las cuentas abiertas en la barra, cada una con el nombre del cliente, su total y sus minutos.](https://vimpos.com.mx/assets/img/capturas/giros/bar-cuentas.webp?v=1)
+
 _Las cuentas de la barra, por nombre._
 
 ### Cuentas por nombre en la barra
 
 Sin mesa: la cuenta se abre con el nombre del cliente y se le suma toda la noche.
 
-![Las mesas abiertas con su consumo y su tiempo, y la cuenta de la mesa elegida.](https://vimpos.com.mx/assets/img/capturas/pos-mesas.webp?v=3)
+![El inicio de la caja con los accesos a comedor y a barra, con las cuentas abiertas.](https://vimpos.com.mx/assets/img/capturas/giros/bar-inicio.webp?v=1)
 
-_Las mesas abiertas y la cuenta de una de ellas._
+_Comedor y barra, desde el inicio de la caja._
 
 ### Barra y mesas en la misma caja
 
 Las mesas con su consumo y su tiempo, junto a las cuentas de la barra.
 
-![Pantalla de cocina con las comandas activas, cada una con su tiempo y sus notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
+![Una cuenta de barra abierta con cubetas, mezcales y botanas, y el botón para pasarla a mesa.](https://vimpos.com.mx/assets/img/capturas/giros/bar-cuenta-abierta.webp?v=1)
 
-_Las comandas con su tiempo y sus notas._
+_Una cuenta de barra, con todo lo que se pidió._
 
-### Cada pedido a su lugar
+### Una cuenta que crece toda la noche
 
-Las bebidas salen en la barra y la comida en cocina, cada una en su impresora.
+Súmale cubetas, mezcales y botanas. Si se sientan, la pasas a una mesa.
 
-![Pantalla de cobro con el total, las formas de pago y el cambio.](https://vimpos.com.mx/assets/img/capturas/pos-pago.webp?v=3)
+![El cobro de una cuenta de barra con la propina del 15 por ciento elegida.](https://vimpos.com.mx/assets/img/capturas/giros/bar-propina.webp?v=1)
 
-_El cobro con efectivo, tarjeta o las dos._
+_La propina, al cobrar._
 
 ### Propinas al cobrar
 

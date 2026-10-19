@@ -12,25 +12,31 @@ Una caja rápida para la hora pico, que sigue cobrando aunque se caiga el intern
 
 ## Menos espera en la barra, más clientes que vuelven
 
+![Un latte de vainilla abierto en la caja: grande, con leche de avena y shot extra, cada opción con su precio.](https://vimpos.com.mx/assets/img/capturas/giros/cafeteria-modificadores.webp?v=1)
+
 _Un latte con su tamaño, su leche y su extra._
 
 ### Cada bebida, como la pidieron
 
 Tamaño, leche y shot extra se eligen en dos toques, y el precio se ajusta solo.
 
-![Pantalla de cobro con el total, las formas de pago y el cambio.](https://vimpos.com.mx/assets/img/capturas/pos-pago.webp?v=3)
+![El cobro con la propina sugerida de 10, 15 o 20 por ciento.](https://vimpos.com.mx/assets/img/capturas/giros/cafeteria-propina.webp?v=1)
 
-_El cobro con efectivo, tarjeta o las dos._
+_La propina, al cobrar._
 
 ### Cobra en segundos
 
 Efectivo, tarjeta o las dos en una misma cuenta. La propina se suma al cobrar.
+
+![La pantalla que ve el cliente con su pedido, renglón por renglón, y el total.](https://vimpos.com.mx/assets/img/capturas/giros/cafeteria-pantalla-cliente.webp?v=1)
 
 _Lo que ve el cliente mientras pide._
 
 ### Tu cliente ve lo que pidió
 
 Una pantalla de cara al cliente muestra su pedido y el total. Entre ventas, tus promociones.
+
+![La lealtad de una clienta en la caja: sus sellos y los premios que puede canjear.](https://vimpos.com.mx/assets/img/capturas/giros/cafeteria-lealtad.webp?v=1)
 
 _Los sellos del cliente, en la misma cuenta._
 
@@ -62,7 +68,7 @@ Con la receta cargada, cada bebida descuenta sus insumos. Desde Negocio.
 
 Qué se vende, a qué hora y quién cobró. El corte cuadra contra el cajón.
 
-![Ticket de venta con el código para facturar.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp?v=3)
+![Ticket de la cafetería con los extras, la propina, los sellos ganados y el código para facturar.](https://vimpos.com.mx/assets/img/capturas/giros/cafeteria-ticket.webp?v=1)
 
 ### [Facturas sin detener la fila](https://vimpos.com.mx/facturacion-cfdi)
 

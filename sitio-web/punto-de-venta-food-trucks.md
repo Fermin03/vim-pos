@@ -12,7 +12,7 @@ Una caja rápida para la fila del evento, con la venta de cada turno por separad
 
 ## Lista para la fila, en cualquier lugar
 
-![La caja cobrando con el aviso de que no hay internet.](https://vimpos.com.mx/assets/img/capturas/pos-sin-conexion.webp?v=3)
+![La caja del food truck cobrando con el aviso de que no hay internet.](https://vimpos.com.mx/assets/img/capturas/giros/food-truck-sin-conexion.webp?v=1)
 
 _Sin internet, la caja sigue igual._
 
@@ -20,13 +20,15 @@ _Sin internet, la caja sigue igual._
 
 En el estacionamiento o en la feria, la caja cobra e imprime sin señal. [Así funciona](https://vimpos.com.mx/sin-internet).
 
+![La apertura del turno con el fondo de caja y el evento del día.](https://vimpos.com.mx/assets/img/capturas/giros/food-truck-abrir-turno.webp?v=1)
+
 _El turno abierto con su evento._
 
 ### Cada turno, con su evento
 
 Abres el turno con el nombre del evento y su venta queda aparte.
 
-![La caja en plena venta: el catálogo por categorías y un ticket en curso.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=3)
+![El menú de tacos y un ticket en curso con sus extras.](https://vimpos.com.mx/assets/img/capturas/giros/food-truck-catalogo.webp?v=1)
 
 _El menú y la cuenta en curso._
 
@@ -34,19 +36,21 @@ _El menú y la cuenta en curso._
 
 Tu menú en botones grandes, con sus extras y su precio.
 
-![Pantalla de cobro con el total, las formas de pago y el cambio.](https://vimpos.com.mx/assets/img/capturas/pos-pago.webp?v=3)
+![El cobro en efectivo con el cambio calculado.](https://vimpos.com.mx/assets/img/capturas/giros/food-truck-cobro.webp?v=1)
 
-_El cobro con efectivo, tarjeta o las dos._
+_El cobro, con el cambio a la vista._
 
 ### Cobra como te paguen
 
 Efectivo, tarjeta o las dos en una misma cuenta.
 
-_Los sellos del cliente, en la misma cuenta._
+![Reporte de ventas por evento con la venta, la comisión del organizador y lo que le quedó al negocio.](https://vimpos.com.mx/assets/img/capturas/giros/food-truck-ventas-por-evento.webp?v=1)
 
-### Que te busquen en el siguiente evento
+_Las ventas por evento, en el panel._
 
-Sellos por visita o puntos por compra, sin tarjetas de cartón. Incluido desde Negocio.
+### Qué evento te dejó más
+
+La venta de cada evento, la comisión del organizador y lo que te quedó.
 
 _Para el dueño_
 
@@ -60,9 +64,9 @@ Con la receta cargada, cada venta descuenta sus insumos. Desde Negocio.
 
 ![Panel con la venta del día, las horas pico y lo más vendido.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
 
-### [Qué evento vendió más](https://vimpos.com.mx/funciones#reportes)
+### [Tus horas pico, a la vista](https://vimpos.com.mx/funciones#reportes)
 
-Qué se vende, a qué hora y en cuál turno. El corte cuadra contra el cajón.
+Qué se vende, a qué hora y quién cobró. El corte cuadra contra el cajón.
 
 ![Ticket de venta con el código para facturar.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp?v=3)
 

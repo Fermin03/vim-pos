@@ -12,13 +12,15 @@ Combos, extras y comandas a cocina en segundos, aunque se caiga el internet.
 
 ## Órdenes completas, cocina al día y la fila avanzando
 
-![Un producto abierto con sus opciones y los extras con su precio.](https://vimpos.com.mx/assets/img/capturas/pos-catalogo.webp?v=3)
+![El catálogo de hamburguesas y un ticket con un combo, una hamburguesa con su término y aros de cebolla.](https://vimpos.com.mx/assets/img/capturas/giros/servicio-rapido-catalogo.webp?v=1)
 
-_Un producto con sus opciones y sus extras._
+_La orden completa, con sus opciones._
 
 ### La orden sale completa a la primera
 
 Si un producto lleva una opción obligatoria, la caja no lo deja pasar sin ella. Los extras suman su precio.
+
+![Un combo armado: hamburguesa con tocino, papas con queso y limonada, cada cambio con su precio.](https://vimpos.com.mx/assets/img/capturas/giros/servicio-rapido-combo.webp?v=1)
 
 _Un combo con sus opciones._
 
@@ -26,7 +28,7 @@ _Un combo con sus opciones._
 
 El plato fuerte, el acompañamiento y la bebida, cada uno con sus opciones.
 
-![Pantalla de cocina con las comandas activas, cada una con su tiempo y sus notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
+![La pantalla de cocina con las comandas en colores por tiempo, con términos y notas.](https://vimpos.com.mx/assets/img/capturas/giros/servicio-rapido-kds.webp?v=1)
 
 _Las comandas con su tiempo y sus notas._
 
@@ -34,9 +36,11 @@ _Las comandas con su tiempo y sus notas._
 
 La comanda llega a su estación, en pantalla o impresa, con su tiempo.
 
+![El inicio de la caja con los modos de venta: para llevar, pick-up y domicilio.](https://vimpos.com.mx/assets/img/capturas/giros/servicio-rapido-modos.webp?v=1)
+
 _El tipo de orden, al tomarla._
 
-### Aquí, para llevar o a domicilio
+### Para llevar, pick-up o a domicilio
 
 Lo eliges al tomar la orden. A domicilio, con repartidor y zona de envío.
 
