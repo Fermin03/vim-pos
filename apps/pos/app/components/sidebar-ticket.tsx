@@ -167,6 +167,10 @@ export function SidebarTicket({
     onGuardarCotizacion?: () => void;
     /** Con la opción a la vista pero apagada: por qué (extras o combos). */
     motivoSinCotizacion?: string | null;
+    /** Belleza: quién hizo el renglón («Diego R.») o `falta` si es un servicio sin nadie (no se cobra así). */
+    colaborador?: (l: LineaCarrito) => { texto: string; falta: boolean };
+    /** Belleza: elegir quién lo hizo. Sin esto (venta ya guardada) el nombre solo se lee. */
+    onColaborador?: (clientId: string) => void;
   };
 }) {
   const totales = calcularTotalesDisplay(estado.lineas, 16, estado.envio?.costoMxn ?? 0);
@@ -453,6 +457,21 @@ export function SidebarTicket({
                     no queda un toque libre para seleccionar. Sin sangría: a 288px de ancho es la
                     única forma de que quepan stepper, Nota y Quitar a 44px. */}
                 <div className="mt-2 flex items-center gap-1.5">
+                  {tienda?.colaborador && (() => {
+                    const c = tienda.colaborador(l);
+                    const tono = c.falta ? "font-semibold text-warning" : "text-ink-2";
+                    return tienda.onColaborador ? (
+                      <button
+                        type="button"
+                        onClick={() => tienda.onColaborador?.(l.clientId)}
+                        aria-label={`${c.texto}: cambiar quién hizo ${l.producto.nombre}`}
+                        className={`-ml-2.5 flex h-11 min-w-0 items-center gap-1 rounded-md px-2.5 text-14 transition-[transform,background-color] duration-150 ease-vim hover:bg-hover active:scale-[.97] ${tono}`}
+                      >
+                        <span className="truncate">{c.texto}</span>
+                        <Icono nombre="chevron-abajo" className="h-4 w-4 flex-shrink-0" />
+                      </button>
+                    ) : <span className={`min-w-0 truncate text-14 ${tono}`}>{c.texto}</span>;
+                  })()}
                   {/* La tienda no lleva cantidad ni nota por renglón: cada escaneo es una pieza (Fermín, 18 oct). */}
                   {!simple && <span className="inline-flex items-center rounded-md border border-line-strong bg-surface">
                     <button

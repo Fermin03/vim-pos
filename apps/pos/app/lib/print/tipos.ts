@@ -51,6 +51,8 @@ export type LineaImpresion = {
   /** Tienda a granel: `precio_unitario_snapshot` y `unidad_sat_snapshot` (KGM, MTR, LTR), para «$28.00/kg». */
   precioUnitario?: number;
   unidadSat?: string | null;
+  /** Belleza: quien hizo el renglón, ya corto («Diego R.»). Va debajo del servicio. */
+  colaborador?: string | null;
 };
 
 export type PagoImpresion = {

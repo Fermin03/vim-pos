@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ETIQUETA_ESTADO_CITA, mensajeRecordatorio, pasoTolerancia, seCruzan, tramosEncadenados } from "@vim/db/agenda";
-import { ALTO_MIN, diaSemana, posicionTramo, rangoHoras, trabajaA, type CitaDia, type ColaboradorDia } from "../agenda";
+import { ALTO_MIN, diaSemana, gruposCitasCobro, lineasDeCita, nombreCorto, posicionTramo, precioEnCaja, rangoHoras, servicioSinColaborador, trabajaA, type CitaDia, type ColaboradorDia, type ServicioAgenda } from "../agenda";
+import type { Producto } from "../catalogo";
 
 const t = (iso: string) => new Date(iso);
 
@@ -85,5 +86,59 @@ describe("layout del calendario", () => {
   it("día de la semana como la base (0 = domingo)", () => {
     expect(diaSemana("2026-11-08")).toBe(0);
     expect(diaSemana("2026-10-20")).toBe(2);
+  });
+});
+
+describe("cobrar la cita", () => {
+  const tramo = (id: string, productoId: string, usuarioId: string | null, precio = 180) => ({
+    id, orden: 1, productoId, servicio: productoId, usuarioId, colaborador: usuarioId, espacio: null, precio, inicia: null, termina: null, empalme: false,
+  });
+  const cita = (id: string, estado: CitaDia["estado"], inicia: string, tramos = [tramo(`${id}-t`, "corte", "diego")]): CitaDia => ({
+    id, clienteId: null, clienteNombre: id, clienteTelefono: null, clienteEmail: null, estado, canal: "CAJA",
+    inicia: t(inicia), termina: t(inicia), llegoAt: null, empalme: false, nota: null, tramos,
+  });
+  const producto = (id: string, precio: number): Producto => ({ id, nombre: id, descripcion: null, precio_base_mxn: precio, categoria_id: "c", agotado: false, esCombo: false, seVendeAqui: true });
+  const servicios: ServicioAgenda[] = [{ productoId: "corte", nombre: "Corte", precio: 150, duracionMin: 40, colaboradores: [{ usuarioId: "adriana", precio: 250, duracionMin: null }, { usuarioId: "diego", precio: null, duracionMin: null }] }];
+
+  it("agrupa: termina pronto (en curso y terminadas, la que acaba antes arriba), en espera y cobradas de hoy", () => {
+    const g = gruposCitasCobro([
+      cita("laura", "EN_CURSO", "2026-11-06T12:00:00-06:00"),
+      cita("camila", "TERMINADA", "2026-11-06T10:00:00-06:00"),
+      cita("emilia", "COBRADA", "2026-11-06T09:00:00-06:00"),
+      cita("vieja", "COBRADA", "2026-11-05T09:00:00-06:00"),
+      cita("sin-tramos", "TERMINADA", "2026-11-06T09:00:00-06:00", []),
+    ], [cita("luis", "EN_ESPERA", "2026-11-06T11:40:00-06:00", [])], "2026-11-06");
+    expect(g.terminaPronto.map((c) => c.id)).toEqual(["camila", "laura"]);
+    expect(g.enEspera.map((c) => c.id)).toEqual(["luis"]);
+    expect(g.cobradas.map((c) => c.id)).toEqual(["emilia"]);
+  });
+
+  it("los renglones llevan quién lo hizo y el precio con esa persona (el del catálogo si no tiene uno propio)", () => {
+    const c = cita("x", "TERMINADA", "2026-11-06T10:00:00-06:00", [tramo("t1", "corte", "adriana"), tramo("t2", "corte", "diego")]);
+    const { lineas, faltan } = lineasDeCita(c, [producto("corte", 180)], servicios, new Set(["adriana", "diego"]));
+    expect(faltan).toEqual([]);
+    expect(lineas.map((l) => [l.colaboradorId, l.producto.precio_base_mxn, l.citaServicioId, l.cantidad])).toEqual([["adriana", 250, "t1", 1], ["diego", 180, "t2", 1]]);
+  });
+
+  it("un colaborador que ya no está activo no viaja: el servicio pide quién lo hizo y bloquea el cobro", () => {
+    const c = cita("x", "TERMINADA", "2026-11-06T10:00:00-06:00", [tramo("t1", "corte", "baja"), tramo("t2", "tinte", "diego")]);
+    const { lineas, faltan } = lineasDeCita(c, [producto("corte", 180)], servicios, new Set(["diego"]));
+    expect(faltan).toEqual(["tinte"]);
+    expect(lineas[0]).not.toHaveProperty("colaboradorId");
+    expect(servicioSinColaborador(lineas, new Set(["corte"]))?.clientId).toBe(lineas[0]!.clientId);
+    // Un producto sin colaborador no bloquea.
+    expect(servicioSinColaborador([{ ...lineas[0]!, producto: producto("shampoo", 240) }], new Set(["corte"]))).toBeUndefined();
+  });
+
+  it("nombre corto del colaborador", () => {
+    expect(nombreCorto("Adriana Castro")).toBe("Adriana C.");
+    expect(nombreCorto("Diego R.")).toBe("Diego R.");
+    expect(nombreCorto(" Berta ")).toBe("Berta");
+  });
+
+  it("precio en caja: el propio del colaborador o el del catálogo de la sucursal", () => {
+    expect(precioEnCaja(producto("corte", 190), servicios[0], "adriana")).toBe(250);
+    expect(precioEnCaja(producto("corte", 190), servicios[0], "diego")).toBe(190);
+    expect(precioEnCaja(producto("corte", 190), servicios[0], null)).toBe(190);
   });
 });

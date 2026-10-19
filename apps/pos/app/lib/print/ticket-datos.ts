@@ -1,6 +1,7 @@
 "use client";
 import { employeeClient } from "../supabase";
-import { esGiroTienda } from "@vim/db/operacion";
+import { esGiroBelleza, esGiroTienda } from "@vim/db/operacion";
+import { nombreCorto } from "../agenda";
 import { etiquetaModo } from "@vim/db/modos-servicio";
 import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
 import { leerPrograma } from "../lealtad";
@@ -30,6 +31,8 @@ export const SELECCION_TICKET_ITEMS_IMPRESION =
   "id, producto_nombre_snapshot, producto_sku_snapshot, cantidad, total_item_mxn, nota_cocina, cargo_tipo, " +
   "precio_unitario_snapshot, unidad_sat_snapshot, " +
   "parent_item_id, combo_rol, combo_grupo_nombre_snapshot, " +
+  // Belleza: quien hizo el renglón, para imprimirlo bajo el servicio.
+  "colaborador:usuarios_perfil!ticket_items_colaborador_id_fkey(nombre), " +
   "ticket_item_modificadores(opcion_nombre_snapshot, precio_extra_snapshot, cantidad), " +
   // El área se resuelve aquí, con el ticket: producto primero, categoría si el producto no
   // tiene. Traerla en la misma consulta evita una segunda vuelta por renglón en hora pico.
@@ -234,7 +237,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       id: string; producto_nombre_snapshot: string; producto_sku_snapshot: string | null; cantidad: number; total_item_mxn: string | number; nota_cocina: string | null;
       cargo_tipo: string | null; precio_unitario_snapshot: string | number | null; unidad_sat_snapshot: string | null;
       parent_item_id: string | null; combo_rol: "PADRE" | "HIJO" | null; combo_grupo_nombre_snapshot: string | null;
-      ticket_item_modificadores: Mod[] | null; producto: Prod;
+      ticket_item_modificadores: Mod[] | null; producto: Prod; colaborador: { nombre: string } | null;
     };
     const prod = r.producto;
     // El producto manda sobre la categoría: la categoría es el valor por defecto y el producto la
@@ -257,6 +260,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       parentId: (r.parent_item_id as string) ?? null,
       grupoNombre: (r.combo_grupo_nombre_snapshot as string) ?? null,
       cargoTipo: (r.cargo_tipo as string) ?? null,
+      colaborador: r.colaborador ? nombreCorto(r.colaborador.nombre) : null,
       extras: (r.ticket_item_modificadores ?? [])
         .filter((m) => Number(m.precio_extra_snapshot ?? 0) > 0)
         .map((m) => ({ nombre: m.opcion_nombre_snapshot, importeMxn: Number(m.precio_extra_snapshot) * Number(m.cantidad ?? 1) * Number(r.cantidad) })),
@@ -369,7 +373,8 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
         baseComida: Math.max(0, Math.round((Number(tk.total_mxn) - cargos) * 100) / 100),
       });
 
-  const tienda = esGiroTienda(tn.vertical_principal as string);
+  // Belleza imprime como tienda (Venta, SKU, cambio de talla).
+  const tienda = esGiroTienda(tn.vertical_principal as string) || esGiroBelleza(tn.vertical_principal as string);
   const cambio = tienda ? await leerCambioTalla(sb, tk.tenant_id as string, (tk.client_id_local as string | null) ?? null, Number(tk.total_mxn)) : null;
   // El pago interno del cambio (0195: llave del ticket + "-pago") no es efectivo que entró: es la prenda.
   const pagoPrenda = cambio ? `${tk.client_id_local as string}-pago` : null;

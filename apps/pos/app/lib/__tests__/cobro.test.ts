@@ -251,3 +251,35 @@ describe("Cobrar una cuenta que ya no debe nada (cambio sin diferencia reabierto
     await expect(cerrarSiYaCubierta("tok", "ticket-1")).rejects.toThrow("sin red");
   });
 });
+
+describe("persistirTicket — belleza: colaborador por renglón y la cita", () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+    rpcMock.mockImplementation(async () => ({ data: "ticket-1", error: null }));
+    singleMock.mockReset();
+    singleMock.mockImplementation(async () => ({ data: TOTALES_ROW, error: null }));
+  });
+
+  it("manda p_colaborador_id solo en el renglón que lo trae (sin él, la firma de siempre)", async () => {
+    await persistirTicket(ctx, "PARA_LLEVAR", [{ ...linea("l1", "Corte"), colaboradorId: "diego" }, linea("l2", "Shampoo")], "cli-1");
+    const renglones = rpcMock.mock.calls.filter((c) => c[0] === "agregar_item_a_ticket").map((c) => c[1]);
+    expect(renglones[0]).toMatchObject({ p_client_id_local: "l1", p_colaborador_id: "diego" });
+    expect(renglones[1]).not.toHaveProperty("p_colaborador_id");
+  });
+
+  it("liga la cita al ticket recién abierto, antes de los renglones", async () => {
+    await persistirTicket(ctx, "PARA_LLEVAR", [linea("l1", "Corte")], "cli-1", null, null, null, null, null, "cita-7");
+    expect(rpcMock.mock.calls.map((c) => c[0])).toEqual(["abrir_ticket", "vincular_cita_ticket", "agregar_item_a_ticket"]);
+    expect(rpcMock.mock.calls[1]![1]).toEqual({ p_cita: "cita-7", p_ticket: "ticket-1" });
+  });
+
+  it("sin cita no se liga nada; si la base la rechaza, el ticket abierto viaja en el error", async () => {
+    await persistirTicket(ctx, "PARA_LLEVAR", [], "cli-1");
+    expect(rpcMock.mock.calls.map((c) => c[0])).not.toContain("vincular_cita_ticket");
+    rpcMock.mockImplementation(async (n: string) =>
+      n === "vincular_cita_ticket" ? { data: null, error: { message: "la cita ya está en otra venta abierta." } } : { data: "ticket-1", error: null });
+    const e = await persistirTicket(ctx, "PARA_LLEVAR", [], "cli-1", null, null, null, null, null, "cita-7").catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(ErrorTicketParcial);
+    expect((e as ErrorTicketParcial).ticketId).toBe("ticket-1");
+  });
+});

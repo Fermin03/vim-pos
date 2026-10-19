@@ -6,6 +6,9 @@ import { employeeClient } from "./supabase";
 import { motivoDeLaBase } from "./credito";
 import { enlaceWhatsappCotizacion } from "./cotizaciones";
 import { normalizarTelefono } from "./telefono";
+import { nuevoClientId, type LineaCarrito } from "./carrito";
+import type { Producto } from "./catalogo";
+import { redondearCentavos } from "./dinero";
 
 // Agenda en la caja de belleza (0218/0219). Las citas se escriben solo por RPC; aquí se leen el día,
 // el catálogo y la tolerancia. En la caja instalada el gateway lee la copia local.
@@ -390,3 +393,78 @@ export function duracionTexto(min: number): string {
   const m = Math.round(min % 60);
   return h ? (m ? `${h} h ${m} min` : `${h} h`) : `${m} min`;
 }
+
+// ── Cobrar la cita (entrega 2) ───────────────────────────────────────────────
+
+/**
+ * Las citas que el cobro necesita: atendiéndose, terminadas y cobradas. ponytail: una cita sin cobrar
+ * de hace más de una semana ya no se ofrece; se cobra desde la venta suelta si hiciera falta.
+ */
+export async function citasParaCobrar(token: string, sucursalId: string, hoy: string): Promise<CitaDia[]> {
+  const { data, error } = await employeeClient(token)
+    .from("citas").select(COLUMNAS)
+    .eq("sucursal_id", sucursalId).in("estado", ["EN_CURSO", "TERMINADA", "COBRADA"])
+    .gte("inicia", inicioDiaMx(sumarDias(hoy, -6)).toISOString()).lt("inicia", inicioDiaMx(sumarDias(hoy, 1)).toISOString())
+    .order("inicia");
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as unknown as FilaCita[]).map(aCita);
+}
+
+export type GruposCobro = { terminaPronto: CitaDia[]; enEspera: CitaDia[]; cobradas: CitaDia[] };
+
+/**
+ * «Citas de hoy» del cobro (boceto 2). Termina pronto: atendiéndose o terminadas sin cobrar, la que
+ * acaba primero arriba. En espera: no se cobran (no tienen tramos); se atienden. Cobradas: las de hoy.
+ */
+export function gruposCitasCobro(citas: CitaDia[], espera: CitaDia[], hoy: string): GruposCobro {
+  const desde = inicioDiaMx(hoy).getTime();
+  const hasta = inicioDiaMx(sumarDias(hoy, 1)).getTime();
+  const fin = (c: CitaDia) => (c.termina ?? c.inicia)?.getTime() ?? 0;
+  return {
+    terminaPronto: citas.filter((c) => (c.estado === "EN_CURSO" || c.estado === "TERMINADA") && c.tramos.length > 0).sort((a, b) => fin(a) - fin(b)),
+    enEspera: espera.filter((c) => c.estado === "EN_ESPERA"),
+    cobradas: citas.filter((c) => c.estado === "COBRADA" && c.inicia != null && c.inicia.getTime() >= desde && c.inicia.getTime() < hasta),
+  };
+}
+
+/** Lo que suma la cita a precio de agenda (para la lista; el cobro usa el precio de la caja). */
+export const totalCita = (c: CitaDia): number => redondearCentavos(c.tramos.reduce((s, t) => s + t.precio, 0));
+
+/** «Adriana Castro» → «Adriana C.»; «Diego R.» se queda. */
+export function nombreCorto(nombre: string): string {
+  const [a, b] = nombre.trim().split(/\s+/);
+  return a && b ? `${a} ${b.charAt(0)}.` : nombre.trim();
+}
+
+/**
+ * Precio del renglón en la caja, igual que `agregar_item_a_ticket` (0221): el propio del colaborador si
+ * lo tiene; si no, el del catálogo de esta sucursal (`producto`, recién leído del catálogo).
+ */
+export function precioEnCaja(producto: Producto, servicio: ServicioAgenda | undefined, colaboradorId: string | null): number {
+  return (colaboradorId ? servicio?.colaboradores.find((c) => c.usuarioId === colaboradorId)?.precio : null) ?? producto.precio_base_mxn;
+}
+
+/**
+ * Los renglones de una cita: un servicio por tramo, con quien lo hizo y su precio. Un colaborador que
+ * ya no está activo no viaja (la base lo rechazaría): el renglón pide «Elige quién lo hizo».
+ * `faltan` = servicios que el catálogo de hoy ya no tiene.
+ */
+export function lineasDeCita(cita: CitaDia, productos: Producto[], servicios: ServicioAgenda[], activos: ReadonlySet<string>): { lineas: LineaCarrito[]; faltan: string[] } {
+  const lineas: LineaCarrito[] = [];
+  const faltan: string[] = [];
+  for (const t of cita.tramos) {
+    const p = productos.find((x) => x.id === t.productoId);
+    if (!p) { faltan.push(t.servicio); continue; }
+    const colaborador = t.usuarioId && activos.has(t.usuarioId) ? t.usuarioId : null;
+    const precio = precioEnCaja(p, servicios.find((s) => s.productoId === t.productoId), colaborador);
+    lineas.push({
+      clientId: nuevoClientId(), producto: { ...p, precio_base_mxn: precio }, cantidad: 1, modificadores: [], notaCocina: null,
+      citaServicioId: t.id, ...(colaborador ? { colaboradorId: colaborador } : {}),
+    });
+  }
+  return { lineas, faltan };
+}
+
+/** El primer servicio sin quien lo hizo: sin él no se cobra (los productos pueden ir sin colaborador). */
+export const servicioSinColaborador = (lineas: LineaCarrito[], servicioIds: ReadonlySet<string>): LineaCarrito | undefined =>
+  lineas.find((l) => servicioIds.has(l.producto.id) && !l.colaboradorId);

@@ -108,6 +108,7 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
     const tipo = tipoDesdeSat(l.unidadSat);
     b.push({ t: "fila", izq: `${aGranel(tipo) ? fmtCantidad(l.cantidad, tipo) : `${l.cantidad}x`} ${l.nombre}`, der: pesos(l.totalMxn) });
     if (aGranel(tipo)) b.push({ t: "texto", valor: `   ${precioConUnidad(pesos(l.precioUnitario ?? 0), tipo)}`, size: 1 });
+    if (l.colaborador) b.push({ t: "texto", valor: `   ${l.colaborador}`, size: 1 });
     if (d.tienda && l.sku) b.push({ t: "texto", valor: `   SKU ${l.sku}`, size: 1 });
     for (const m of l.modificadores) b.push({ t: "texto", valor: `  + ${m}`, size: 1 });
     if (l.notaCocina && l.notaCocina.trim().length > 0) {

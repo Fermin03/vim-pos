@@ -14,7 +14,13 @@ desde la entrega 2, cobra. No hay cocina, mesas ni comandas.
 ## La barra inferior
 
 Misma barra de la caja de tienda, con cinco destinos: **Calendario · Cobrar · Clientes · Transacciones ·
-Más**. Abre en Calendario. **Cobrar es hoy la caja de tienda**; la cobranza de citas llega en la entrega 2.
+Más**. Abre en Calendario. **Cobrar** es la caja de tienda con tres pestañas a la izquierda (boceto 2):
+**Citas de hoy · Servicios · Productos**. «Citas de hoy» agrupa **Termina pronto** (en curso y terminadas
+sin cobrar; tocar una la carga a la venta con su clienta y pregunta antes si había otra venta), **En
+espera** (con «Atender»; no se cobran, aún no tienen servicio) y **Cobradas hoy** (solo se ven). Cada
+renglón del ticket lleva debajo quién lo hizo («Diego R.») y se cambia tocándolo; lo agregado a mano toma
+el colaborador de la cita cargada. Un servicio sin colaborador dice «Elige quién lo hizo» y no deja
+cobrar; un producto puede ir sin colaborador. El ticket impreso repite el colaborador bajo el servicio.
 Sin el módulo `agenda` encendido, la caja se comporta como tienda (sin Calendario ni Clientes).
 
 ## Calendario

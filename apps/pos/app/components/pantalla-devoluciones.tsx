@@ -28,7 +28,7 @@ import {
   type VentaDevolvible,
   type VentaTurno,
 } from "../lib/devoluciones";
-import { buscarPorCodigo, esTienda } from "../lib/tienda";
+import { buscarPorCodigo, comoTienda } from "../lib/tienda";
 import { aGranel, contarProductos, fmtCantidad, precioConUnidad, tipoDesdeSat } from "../lib/unidades";
 import { useEscaner } from "../lib/use-escaner";
 import { esEscritorio } from "../lib/actualizacion";
@@ -70,7 +70,7 @@ export function PantallaDevoluciones({
   const [sel, setSel] = useState<VentaTurno | null>(null);
   const [reciboDev, setReciboDev] = useState<DatosDevolucion | null>(null);
   // Tienda: la venta elegida (con sus renglones), lo que trae la búsqueda y el folio tecleado.
-  const tienda = esTienda(caja);
+  const tienda = comoTienda(caja);
   const [selTienda, setSelTienda] = useState<{ venta: VentaDevolvible; marcar?: string } | null>(null);
   const [busqueda, setBusqueda] = useState<Busqueda | null>(null);
   const [folio, setFolio] = useState("");

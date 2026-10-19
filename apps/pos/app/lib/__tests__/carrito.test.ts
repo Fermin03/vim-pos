@@ -246,3 +246,47 @@ describe("lineaSuelta: la pesada con modificadores", () => {
   });
   it("sin cantidad, una pieza", () => expect(lineaSuelta(prod("p", "P", 10), [], null).cantidad).toBe(1));
 });
+
+describe("belleza: cargar la cita y fijar el colaborador", () => {
+  const corte = (id: string, extra: Partial<LineaCarrito> = {}): LineaCarrito => ({ clientId: id, producto: prod("corte", "Corte", 180), cantidad: 1, modificadores: [], notaCocina: null, ...extra });
+
+  it("cargar_cita reemplaza la venta: renglones, clienta y cita", () => {
+    const antes = reducerCarrito(estadoInicial, { tipo: "agregar", linea: corte("x") });
+    const e = reducerCarrito(antes, { tipo: "cargar_cita", citaId: "cita-1", lineas: [corte("a", { colaboradorId: "diego" })], cliente: { clienteId: "laura", nombre: "Laura Soto", telefono: null }, nombre: "Laura Soto" });
+    expect(e.lineas.map((l) => l.clientId)).toEqual(["a"]);
+    expect(e.lineas[0]!.colaboradorId).toBe("diego");
+    expect(e.citaId).toBe("cita-1");
+    expect(e.clienteCuenta?.clienteId).toBe("laura");
+    expect(e.nombreCuenta).toBeNull();
+    expect(e.modoServicio).toBe("PARA_LLEVAR");
+  });
+
+  it("sin clienta registrada, su nombre queda en la cuenta", () => {
+    const e = reducerCarrito(estadoInicial, { tipo: "cargar_cita", citaId: "c", lineas: [corte("a")], cliente: null, nombre: "Camila Vergara" });
+    expect(e.nombreCuenta).toBe("Camila Vergara");
+  });
+
+  it("fijar_colaborador cambia quién y el precio del renglón; null lo quita", () => {
+    let e = reducerCarrito(estadoInicial, { tipo: "cargar_cita", citaId: "c", lineas: [corte("a"), corte("b")], cliente: null, nombre: null });
+    e = reducerCarrito(e, { tipo: "fijar_colaborador", clientId: "a", colaboradorId: "adriana", precio: 220 });
+    expect(e.lineas[0]).toMatchObject({ colaboradorId: "adriana" });
+    expect(totalLinea(e.lineas[0]!)).toBe(220);
+    expect(e.lineas[1]!.colaboradorId).toBeUndefined();
+    e = reducerCarrito(e, { tipo: "fijar_colaborador", clientId: "a", colaboradorId: null });
+    expect(e.lineas[0]).not.toHaveProperty("colaboradorId");
+    expect(totalLinea(e.lineas[0]!)).toBe(220);
+  });
+
+  it("vaciar la venta o limpiarla suelta la cita", () => {
+    const e = reducerCarrito(estadoInicial, { tipo: "cargar_cita", citaId: "c", lineas: [corte("a")], cliente: null, nombre: null });
+    expect(reducerCarrito(e, { tipo: "quitar", clientId: "a" }).citaId).toBeNull();
+    expect(reducerCarrito(e, { tipo: "limpiar" }).citaId).toBeUndefined();
+  });
+
+  it("la misma pieza escaneada suma solo con el mismo colaborador", () => {
+    let e = reducerCarrito(estadoInicial, { tipo: "agregar", sumarSiIgual: true, linea: corte("a", { colaboradorId: "diego" }) });
+    e = reducerCarrito(e, { tipo: "agregar", sumarSiIgual: true, linea: corte("b", { colaboradorId: "adriana" }) });
+    e = reducerCarrito(e, { tipo: "agregar", sumarSiIgual: true, linea: corte("c", { colaboradorId: "diego" }) });
+    expect(e.lineas.map((l) => [l.clientId, l.cantidad])).toEqual([["a", 2], ["b", 1]]);
+  });
+});

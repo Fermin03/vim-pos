@@ -484,3 +484,20 @@ describe("construirTicketJob — cantidades con unidad (tienda)", () => {
     expect(job.bloques).not.toContainEqual({ t: "texto", valor: "   $150.00", size: 1 });
   });
 });
+
+describe("construirTicketJob — colaborador de belleza", () => {
+  it("imprime quién lo hizo debajo del servicio; el producto sin colaborador, igual que siempre", () => {
+    const b = construirTicketJob({
+      ...DATOS,
+      tienda: true,
+      lineas: [
+        { cantidad: 1, nombre: "Corte de cabello", totalMxn: 180, modificadores: [], notaCocina: null, colaborador: "Diego R." },
+        { cantidad: 1, nombre: "Shampoo", totalMxn: 240, modificadores: [], notaCocina: null, colaborador: null },
+      ],
+    }).bloques;
+    const i = b.findIndex((x) => x.t === "fila" && x.izq === "1x Corte de cabello");
+    expect(b[i + 1]).toEqual({ t: "texto", valor: "   Diego R.", size: 1 });
+    const j = b.findIndex((x) => x.t === "fila" && x.izq === "1x Shampoo");
+    expect(b[j + 1]).not.toMatchObject({ t: "texto" });
+  });
+});

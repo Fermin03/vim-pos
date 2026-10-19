@@ -11,6 +11,9 @@ export const esTienda = (caja: DatosCaja | null): boolean => esGiroTienda(caja?.
 /** La caja de belleza (agenda, 0218) es la de tienda con su propia barra y el calendario. */
 export const esBelleza = (caja: DatosCaja | null): boolean => esGiroBelleza(caja?.giro);
 
+/** La caja de belleza vende como la de tienda (Venta, devoluciones por renglón, cuentas). */
+export const comoTienda = (caja: DatosCaja | null): boolean => esTienda(caja) || esBelleza(caja);
+
 /** Destinos de la barra inferior de la caja de tienda (pos-retail.md, «Versión 2») y de la de belleza. */
 export type SeccionTienda = "panel" | "inventario" | "transacciones" | "notificaciones" | "configuracion" | "calendario" | "clientes";
 

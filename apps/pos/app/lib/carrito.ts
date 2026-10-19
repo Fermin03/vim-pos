@@ -29,6 +29,10 @@ export type LineaCarrito = {
   /** Solo líneas de combo: el padre es `producto`, los hijos son `componentes`. `precioUnitario` se
    *  congela al confirmar (precioCombo) para que la línea no dependa del catálogo después. */
   combo?: { def: ComboDef; componentes: ComponenteSel[]; precioUnitario: number };
+  /** Belleza: quien lo hizo (`usuario_id`). Va a `agregar_item_a_ticket(p_colaborador_id)`. */
+  colaboradorId?: string;
+  /** Belleza: el tramo de la cita de donde salió el renglón. */
+  citaServicioId?: string;
 };
 
 export type EstadoCarrito = {
@@ -49,6 +53,8 @@ export type EstadoCarrito = {
   clienteCuenta?: ClienteCuenta | null;
   /** La cotización que se convirtió en esta venta (0212): al quedar PAGADO se marca CONVERTIDA. «Limpiar» la suelta. */
   cotizacionId?: string | null;
+  /** Belleza: la cita que se cobra con esta venta (`vincular_cita_ticket`); al pagarse queda COBRADA. */
+  citaId?: string | null;
 };
 
 /** Los modos donde se puede asignar un cliente a la cuenta (domicilio va aparte). */
@@ -79,13 +85,19 @@ export type AccionCarrito =
   | { tipo: "nombre_cuenta"; nombre: string | null }
   | { tipo: "zona"; envio: EnvioCarrito | null }
   | { tipo: "cargar"; estado: EstadoCarrito }
+  /** Belleza: la venta pasa a ser la de la cita (reemplaza el carrito; quien llama pregunta antes).
+   *  Sin clienta registrada, su nombre queda como nombre de la cuenta. */
+  | { tipo: "cargar_cita"; citaId: string; lineas: LineaCarrito[]; cliente: ClienteCuenta | null; nombre: string | null }
+  /** Belleza: quién hizo el renglón (null = nadie); `precio` = el suyo con esa persona. */
+  | { tipo: "fijar_colaborador"; clientId: string; colaboradorId: string | null; precio?: number }
   | { tipo: "limpiar" };
 
 export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): EstadoCarrito {
   const r = reducirCarrito(estado, accion);
   // Vaciado renglón por renglón (sin «Limpiar»): lo que se capture después ya no es la venta de la
   // cotización, y marcarla CONVERTIDA con ese ticket sería mentir.
-  return r.cotizacionId && r.lineas.length === 0 ? { ...r, cotizacionId: null } : r;
+  // Lo mismo con la cita: ligarla a una venta sin sus servicios la marcaría COBRADA sin serlo.
+  return r.lineas.length === 0 && (r.cotizacionId || r.citaId) ? { ...r, cotizacionId: null, citaId: null } : r;
 }
 
 function reducirCarrito(estado: EstadoCarrito, accion: AccionCarrito): EstadoCarrito {
@@ -95,7 +107,7 @@ function reducirCarrito(estado: EstadoCarrito, accion: AccionCarrito): EstadoCar
       // A granel cada pesada es su propio renglón: nunca se suma.
       const simple = (x: LineaCarrito) => !x.combo && x.modificadores.length === 0 && !x.notaCocina && !aGranel(x.producto.tipoVenta);
       // Se decide aquí, sobre el estado vigente: dos escaneos seguidos suman 2 aunque lleguen juntos.
-      const igual = accion.sumarSiIgual && simple(l) ? estado.lineas.find((x) => x.producto.id === l.producto.id && simple(x)) : undefined;
+      const igual = accion.sumarSiIgual && simple(l) ? estado.lineas.find((x) => x.producto.id === l.producto.id && x.colaboradorId === l.colaboradorId && simple(x)) : undefined;
       if (igual) return { ...estado, lineas: estado.lineas.map((x) => (x === igual ? { ...x, cantidad: x.cantidad + l.cantidad } : x)) };
       return { ...estado, lineas: [...estado.lineas, l] };
     }
@@ -107,6 +119,20 @@ function reducirCarrito(estado: EstadoCarrito, accion: AccionCarrito): EstadoCar
     case "cargar":
       // T2 — reemplaza el carrito completo (reconstrucción desde un ticket persistido de mesa).
       return accion.estado;
+    case "cargar_cita":
+      return { ...estadoInicial, modoServicio: "PARA_LLEVAR", lineas: accion.lineas, clienteCuenta: accion.cliente, nombreCuenta: accion.cliente ? null : accion.nombre, citaId: accion.citaId };
+    case "fijar_colaborador":
+      return {
+        ...estado,
+        lineas: estado.lineas.map((l) => {
+          if (l.clientId !== accion.clientId) return l;
+          const producto = accion.precio === undefined ? l.producto : { ...l.producto, precio_base_mxn: accion.precio };
+          const nueva: LineaCarrito = { ...l, producto };
+          if (accion.colaboradorId) nueva.colaboradorId = accion.colaboradorId;
+          else delete nueva.colaboradorId;
+          return nueva;
+        }),
+      };
     case "cantidad":
       return {
         ...estado,

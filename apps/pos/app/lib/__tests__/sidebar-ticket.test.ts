@@ -86,3 +86,21 @@ describe("«N productos» del encabezado", () => {
     expect(html).toContain("1.250 kg");
   });
 });
+
+describe("SidebarTicket: colaborador de belleza en el renglón", () => {
+  const linea = (id: string, colaboradorId?: string) => ({ clientId: id, producto: { id, nombre: id, precio_base_mxn: 180 }, cantidad: 1, modificadores: [], notaCocina: null, ...(colaboradorId ? { colaboradorId } : {}) });
+  const estado = { ...base.estado, lineas: [linea("Corte", "diego"), linea("Tinte")] } as unknown as typeof base.estado;
+  const colaborador = (l: { colaboradorId?: string }) => (l.colaboradorId ? { texto: "Diego R.", falta: false } : { texto: "Elige quién lo hizo", falta: true });
+
+  it("debajo del nombre va quién lo hizo, y se cambia tocándolo", () => {
+    const html = pintar({ estado, tienda: { ...tienda, simple: true, colaborador, onColaborador: nada } });
+    expect(html).toContain(">Diego R.<");
+    expect(html).toContain(">Elige quién lo hizo<");
+    expect(html).toContain("cambiar quién hizo Corte");
+  });
+
+  it("con la venta guardada solo se lee; la tienda no lo enseña", () => {
+    expect(pintar({ estado, tienda: { ...tienda, simple: true, colaborador } })).not.toContain("cambiar quién hizo");
+    expect(pintar({ estado, tienda: { ...tienda, simple: true } })).not.toContain("Diego R.");
+  });
+});

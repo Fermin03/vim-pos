@@ -113,6 +113,8 @@ export async function persistirTicket(
   /** Zona de reparto del pedido. El cargo entra como renglón, después de los productos: la RPC
    *  hereda la política de IVA del primer renglón, así que los productos tienen que existir ya. */
   envioZonaId?: string | null,
+  /** Belleza: la cita que se cobra con esta venta. Se liga al abrir el ticket (reintentable). */
+  citaId?: string | null,
 ): Promise<TotalesTicket> {
   const sb = employeeClient(ctx.token);
 
@@ -154,6 +156,12 @@ export async function persistirTicket(
     if (error) await parcial(`No se guardó la nota de la orden: ${error.message}`, "encabezado");
   }
 
+  // Ligar la misma cita al mismo ticket otra vez no falla: el reintento pasa por aquí sin problema.
+  if (citaId) {
+    const { error } = await sb.rpc("vincular_cita_ticket", { p_cita: citaId, p_ticket: tid });
+    if (error) await parcial(`No se pudo ligar la cita a la venta: ${error.message}`, "encabezado");
+  }
+
   for (const l of lineas) {
     const { error } = l.combo
       ? await sb.rpc("agregar_combo_a_ticket", {
@@ -172,6 +180,8 @@ export async function persistirTicket(
           p_nota_cocina: l.notaCocina,
           p_modificadores: modifsJsonb(l),
           p_client_id_local: l.clientId,
+          // Sin colaborador no se manda: la firma vieja sigue sirviendo a restaurantes y tiendas.
+          ...(l.colaboradorId ? { p_colaborador_id: l.colaboradorId } : {}),
         });
     if (error) await parcial(`No se guardó «${l.producto.nombre}»: ${error.message}`, "renglones");
   }

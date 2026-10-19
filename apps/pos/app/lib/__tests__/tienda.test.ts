@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { Producto } from "../catalogo";
 import type { DatosCaja } from "../turno";
-import { agruparTienda, buscarPorCodigo, decidirEscaneo, destinoInventario, buscarVitrina, puedeRecibirMercancia, esTienda, estadoExistencia, etiquetaExistencia, matrizVariantes, pasoConLimite, filasCuentas, puedeCambiarSeccion, renglonTienda, renglonVenta, resumenVitrina, sinExistencia, type Existencia } from "../tienda";
+import { agruparTienda, buscarPorCodigo, decidirEscaneo, destinoInventario, buscarVitrina, puedeRecibirMercancia, esTienda, comoTienda, estadoExistencia, etiquetaExistencia, matrizVariantes, pasoConLimite, filasCuentas, puedeCambiarSeccion, renglonTienda, renglonVenta, resumenVitrina, sinExistencia, type Existencia } from "../tienda";
 
 const prod = (id: string, extra: Partial<Producto> = {}): Producto => ({
   id, nombre: id, descripcion: null, precio_base_mxn: 100, categoria_id: "c", agotado: false, esCombo: false, seVendeAqui: true, ...extra,
@@ -20,6 +20,11 @@ describe("esTienda", () => {
     expect(esTienda({ giro: "RESTAURANTE" } as DatosCaja)).toBe(false);
     expect(esTienda({} as DatosCaja)).toBe(false);
     expect(esTienda(null)).toBe(false);
+  });
+  it("comoTienda: tienda y belleza venden igual; el restaurante no", () => {
+    expect(comoTienda({ giro: "RETAIL" } as DatosCaja)).toBe(true);
+    expect(comoTienda({ giro: "SALON" } as DatosCaja)).toBe(true);
+    expect(comoTienda({ giro: "RESTAURANTE" } as DatosCaja)).toBe(false);
   });
 });
 
