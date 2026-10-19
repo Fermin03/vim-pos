@@ -65,6 +65,18 @@ instalador antes de usarse, como 0188/0205) y se liberan al final con su propia 
 - Pueden trabajar **las dos formas**: todo desde la recepción, o cada uno con su vista en el celular.
 - **Colaborador y dueño ven las comisiones** (cada colaborador solo las suyas).
 
+- **Cómo se calcula la comisión lo decide el dueño:** porcentaje o monto fijo, y si se calcula sobre lo
+  cobrado (con descuentos, sin IVA) o sobre el precio de lista. Se configura por servicio, con
+  excepción por colaborador.
+
+**Reserva en línea con varios servicios** (Fermín, 18 oct)
+- Una reserva en línea **puede llevar varios servicios**, cada uno con su colaborador (o «quien esté
+  libre»). *Mi propuesta de cómo:* los servicios van seguidos, en el orden que eligió la clienta, y el
+  sitio solo ofrece las horas de inicio donde toda la cadena cabe (cada colaborador y espacio libre en
+  su tramo).
+- **«Quien esté libre» se asigna solo** al reservar: al colaborador libre con menos citas ese día; la
+  recepción lo puede cambiar.
+
 **Tatuajes**
 - En línea se reserva una cita de **cotización/valoración**; **las sesiones las agenda el dueño a
   mano** (una o varias).
