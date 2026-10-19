@@ -2,7 +2,7 @@
 // (docs/integraciones/mercado-pago-checkout-pro/04-verificado-orders.md).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { avisoDeConciliacionFallida, avisoDeDevolucionFallida, avisoDeRetoSinCerrar, barrer, cobrarPago, confirmarPago, type Deps, devolverPago, type FilaPago, type PuertoPagos, respuestaDeConfirmacion, type Tarea, topesDelAviso } from "./pago-flujo.ts";
+import { type Aplicado, avisoDeConciliacionFallida, avisoDeDevolucionFallida, avisoDeRetoSinCerrar, barrer, cobrarPago, confirmarPago, type Deps, devolverPago, type FilaPago, type PuertoPagos, respuestaDeConfirmacion, type Tarea, topesDelAviso } from "./pago-flujo.ts";
 import type { ClienteMpTienda, RespuestaMp } from "./pago-mp.ts";
 
 const PAGO = "2cd9e6fa-1acf-47dc-8ba4-cba918d73770";
@@ -27,7 +27,7 @@ function doble(o: {
   filas?: (FilaPago | null)[]; token?: string | null; toma?: boolean; tareas?: Tarea[]; descarta?: boolean; abandona?: boolean;
   /** Lo que contesta Mercado Pago: una respuesta por método, o una lista (una por llamada; la última se repite). */
   mp?: Partial<Record<Metodo, RespuestaMp | RespuestaMp[]>>; devolucion?: (ok: boolean) => string;
-  aplicar?: (ordenIdExterno: string) => { estado: string; pedido_estado: string; recien_aprobado: boolean };
+  aplicar?: (ordenIdExterno: string) => Aplicado;
   tercerFallo?: (id: string) => boolean;
   /** El usuario de prueba configurado (MP_TIENDA_PAGADOR_DE_PRUEBA), ya validado. */
   pagadorDePrueba?: string | null;
@@ -96,6 +96,28 @@ test("cobro aprobado: una sola orden, por el monto de la BASE, y se aplica con s
   assert.deepEqual(tokens, ["TOKEN"]);
   assert.equal((cuerpos[0] as { total_amount: string; external_reference: string }).total_amount, "138.00");
   assert.equal((cuerpos[0] as { external_reference: string }).external_reference, PAGO);
+});
+
+// ── El anticipo de una cita (0225): mismo camino, por el id del pago ────────────────────────────
+
+const CITA_APROBADA: Aplicado = { estado: "APROBADO", pedido_estado: null, cita_estado: "AGENDADA", recien_aprobado: true };
+
+test("cita: el anticipo aprobado se aplica igual que un pedido y la base contesta con el estado de la cita", async () => {
+  const { deps, llamadas } = doble({ mp: { crearOrden: { status: 201, cuerpo: APROBADA } }, aplicar: () => CITA_APROBADA });
+  assert.deepEqual(await cobrarPago(deps, DATOS), { tipo: "APROBADO", recienAprobado: true });
+  assert.deepEqual(llamadas, ["tomarCobro", `mp.crearOrden {…} tienda-pago-${PAGO}`, `aplicar APROBADO ${ORDEN} 138.00`]);
+});
+
+test("cita: la base no la toma (la cita ya venció): POR_CONFIRMAR, y el pago queda por devolver allá", async () => {
+  const { deps } = doble({ mp: { crearOrden: { status: 201, cuerpo: APROBADA } },
+                           aplicar: () => ({ estado: "POR_DEVOLVER", pedido_estado: null, cita_estado: "CANCELADA", recien_aprobado: false }) });
+  assert.deepEqual(await cobrarPago(deps, DATOS), { tipo: "POR_CONFIRMAR" });
+});
+
+test("cita: un 402 es rechazo seguro y se descarta el pago (la cita sigue apartada para pagar con otra tarjeta)", async () => {
+  const { deps, llamadas } = doble({ mp: { crearOrden: { status: 402, cuerpo: RECHAZO_402 } } });
+  assert.deepEqual(await cobrarPago(deps, DATOS), { tipo: "RECHAZADO", motivo: "FONDOS" });
+  assert.deepEqual(llamadas.slice(-1), ["descartar"]);
 });
 
 test("402 failed: rechazo seguro; el pedido se descarta y el motivo sale de details", async () => {

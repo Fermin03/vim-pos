@@ -312,7 +312,7 @@ export type Database = {
       }
       anticipos_cita: {
         Row: {
-          caja_id: string
+          caja_id: string | null
           cita_id: string
           client_id_local: string | null
           created_at: string
@@ -325,13 +325,14 @@ export type Database = {
           sucursal_id: string
           tenant_id: string
           ticket_id: string | null
-          turno_id: string
+          tienda_pago_id: string | null
+          turno_id: string | null
           turno_resuelve_id: string | null
           updated_at: string
           usuario_id: string | null
         }
         Insert: {
-          caja_id: string
+          caja_id?: string | null
           cita_id: string
           client_id_local?: string | null
           created_at?: string
@@ -344,13 +345,14 @@ export type Database = {
           sucursal_id: string
           tenant_id: string
           ticket_id?: string | null
-          turno_id: string
+          tienda_pago_id?: string | null
+          turno_id?: string | null
           turno_resuelve_id?: string | null
           updated_at?: string
           usuario_id?: string | null
         }
         Update: {
-          caja_id?: string
+          caja_id?: string | null
           cita_id?: string
           client_id_local?: string | null
           created_at?: string
@@ -363,7 +365,8 @@ export type Database = {
           sucursal_id?: string
           tenant_id?: string
           ticket_id?: string | null
-          turno_id?: string
+          tienda_pago_id?: string | null
+          turno_id?: string | null
           turno_resuelve_id?: string | null
           updated_at?: string
           usuario_id?: string | null
@@ -12781,6 +12784,7 @@ export type Database = {
       tienda_pagos: {
         Row: {
           aprobado_at: string | null
+          cita_id: string | null
           cobro_pedido_at: string | null
           conciliacion_fallos: number
           conciliaciones: number
@@ -12800,7 +12804,7 @@ export type Database = {
           monto_mxn: number
           orden_id_externo: string | null
           pago_id_externo: string | null
-          pedido_id: string
+          pedido_id: string | null
           propina_mxn: number
           proximo_intento_at: string | null
           tenant_id: string
@@ -12812,6 +12816,7 @@ export type Database = {
         }
         Insert: {
           aprobado_at?: string | null
+          cita_id?: string | null
           cobro_pedido_at?: string | null
           conciliacion_fallos?: number
           conciliaciones?: number
@@ -12831,7 +12836,7 @@ export type Database = {
           monto_mxn: number
           orden_id_externo?: string | null
           pago_id_externo?: string | null
-          pedido_id: string
+          pedido_id?: string | null
           propina_mxn?: number
           proximo_intento_at?: string | null
           tenant_id: string
@@ -12843,6 +12848,7 @@ export type Database = {
         }
         Update: {
           aprobado_at?: string | null
+          cita_id?: string | null
           cobro_pedido_at?: string | null
           conciliacion_fallos?: number
           conciliaciones?: number
@@ -12862,7 +12868,7 @@ export type Database = {
           monto_mxn?: number
           orden_id_externo?: string | null
           pago_id_externo?: string | null
-          pedido_id?: string
+          pedido_id?: string | null
           propina_mxn?: number
           proximo_intento_at?: string | null
           tenant_id?: string
@@ -12873,6 +12879,13 @@ export type Database = {
           verificacion_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "tienda_pagos_cita_id_fkey"
+            columns: ["cita_id"]
+            isOneToOne: false
+            referencedRelation: "citas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tienda_pagos_conexion_id_fkey"
             columns: ["conexion_id"]
@@ -15160,6 +15173,7 @@ export type Database = {
         }
         Returns: Json
       }
+      _agenda_cancelar_sin_pago: { Args: { p_cita: string }; Returns: boolean }
       _agenda_choques: {
         Args: {
           p_cita: string
@@ -15205,6 +15219,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      _agenda_cita_pago: {
+        Args: { p_cita: string; p_tenant: string }
+        Returns: Json
       }
       _agenda_cita_resumen: { Args: { p_cita: string }; Returns: Json }
       _agenda_remarcar: {
@@ -15579,6 +15597,27 @@ export type Database = {
       _tienda_modificadores: {
         Args: { p_cantidad: number; p_grupos: Json; p_mods: Json }
         Returns: Json
+      }
+      _tienda_pago_abandonar_cita: {
+        Args: { p_orden: string; p_pago: string }
+        Returns: boolean
+      }
+      _tienda_pago_aplicar_cita: {
+        Args: {
+          p_detalle: string
+          p_marca: string
+          p_monto: number
+          p_orden_id_externo: string
+          p_pago: string
+          p_pago_id_externo: string
+          p_resultado: string
+          p_tipo: string
+        }
+        Returns: Json
+      }
+      _tienda_pago_descartar_cita: {
+        Args: { p_pago: string }
+        Returns: boolean
       }
       _tienda_pago_sin_confirmar: {
         Args: { p_pedido: string }

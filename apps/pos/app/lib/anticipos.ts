@@ -6,8 +6,12 @@ import { redondearCentavos } from "./dinero";
 // Anticipos de cita en la caja de belleza (0222). La base decide todo: aquí se leen, se llaman sus RPC
 // y se arma la sugerencia de devolver o retener.
 
-export type MetodoAnticipo = "EFECTIVO" | "TARJETA_DEBITO" | "TARJETA_CREDITO" | "TRANSFERENCIA";
+// PAGO_EN_LINEA (0225): lo pagó la clienta al reservar en línea; la caja no lo recibe, solo lo aplica,
+// lo devuelve (por Mercado Pago, sin cajón ni referencia) o lo retiene.
+export type MetodoAnticipo = "EFECTIVO" | "TARJETA_DEBITO" | "TARJETA_CREDITO" | "TRANSFERENCIA" | "PAGO_EN_LINEA";
 export const METODOS_ANTICIPO: MetodoAnticipo[] = ["EFECTIVO", "TARJETA_DEBITO", "TARJETA_CREDITO", "TRANSFERENCIA"];
+/** Devolverlo pide la referencia de la terminal o del banco: el efectivo sale del cajón y el de línea lo devuelve Mercado Pago. */
+export const pideReferencia = (m: MetodoAnticipo): boolean => m !== "EFECTIVO" && m !== "PAGO_EN_LINEA";
 
 export type EstadoAnticipo = "VIGENTE" | "APLICADO" | "DEVUELTO" | "RETENIDO";
 export type Anticipo = { id: string; monto: number; metodo: MetodoAnticipo; estado: EstadoAnticipo; ticketId: string | null };

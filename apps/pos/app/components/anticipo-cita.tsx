@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button, Modal } from "@vim/ui/styles";
 import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
 import {
-  METODOS_ANTICIPO, TEXTO_ANTICIPO, anticipoSugerido, devolverAnticipo, pideAutorizacionAnticipo, registrarAnticipo, retenerAnticipo,
+  METODOS_ANTICIPO, TEXTO_ANTICIPO, pideReferencia, anticipoSugerido, devolverAnticipo, pideAutorizacionAnticipo, registrarAnticipo, retenerAnticipo,
   sumaAnticipos, type Anticipo, type DecisionAnticipo, type MetodoAnticipo,
 } from "../lib/anticipos";
 import { nuevoClientId } from "../lib/carrito";
@@ -127,8 +127,8 @@ export function DialogoAnticipo({ token, vigentes, sugerida, elegida, retener = 
   const [pidePin, setPidePin] = useState<Anticipo | null>(null);
 
   const total = sumaAnticipos(vigentes);
-  const pideReferencia = eleccion === "DEVOLVER" && vigentes.some((a) => a.metodo !== "EFECTIVO");
-  const listo = eleccion != null && (!pideReferencia || referencia.trim() !== "");
+  const conReferencia = eleccion === "DEVOLVER" && vigentes.some((a) => pideReferencia(a.metodo));
+  const listo = eleccion != null && (!conReferencia || referencia.trim() !== "");
 
   /** Resuelve cada anticipo; la base ignora el que ya quedó resuelto, así que reintentar es seguro. */
   async function aplicar(pin?: { anticipoId: string; autorizacionPinId: string }) {
@@ -142,7 +142,7 @@ export function DialogoAnticipo({ token, vigentes, sugerida, elegida, retener = 
           if (eleccion === "RETENER") await retenerAnticipo(token, { anticipoId: a.id, cajaId, turnoId, autorizacionPinId });
           else await devolverAnticipo(token, {
             anticipoId: a.id, cajaId, turnoId,
-            referencia: a.metodo === "EFECTIVO" ? null : referencia.trim(),
+            referencia: pideReferencia(a.metodo) ? referencia.trim() : null,
             autorizacionPinId,
           });
         } catch (e) {
@@ -180,7 +180,7 @@ export function DialogoAnticipo({ token, vigentes, sugerida, elegida, retener = 
           {tarjeta("DEVOLVER", "Se le regresa a la clienta")}
           {retener && tarjeta("RETENER", "Queda como no reembolsable")}
         </div>
-        {pideReferencia && (
+        {conReferencia && (
           <label className="mt-4 flex flex-col gap-1">
             <span className="text-13 font-medium text-ink-2">Referencia de la devolución</span>
             <input value={referencia} onChange={(e) => setReferencia(e.target.value)} placeholder="Folio de la terminal o del banco"

@@ -350,6 +350,8 @@ BEGIN
   INSERT INTO anticipos_cita (tenant_id, sucursal_id, caja_id, turno_id, cita_id, metodo_pago, monto_mxn)
   VALUES (v_t, v_suc, v_caja, v_turno, (v_r2->>'cita_id')::uuid, 'EFECTIVO', 100);
   UPDATE citas SET pago_hasta = now() - interval '1 minute' WHERE id IN (v_c1, (v_r2->>'cita_id')::uuid);
+  -- Sin cobro en curso (0225: una cita con su pago CREADO la vence el barrido de pagos, no esta).
+  DELETE FROM tienda_pagos WHERE cita_id IN (v_c1, (v_r2->>'cita_id')::uuid);
   v_n := agenda_vencer_reservas();
   SELECT * INTO r FROM citas WHERE id = v_c1;
   IF v_n <> 1 OR r.estado <> 'CANCELADA' OR r.cancelada_motivo <> 'No se completó el pago' OR r.cancelada_por <> 'PAGO_VENCIDO'

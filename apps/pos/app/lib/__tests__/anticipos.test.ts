@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../supabase", () => ({ employeeClient: () => ({}) }));
 
-import { TEXTO_ANTICIPO, anticipoPorAplicar, cobroEsperaAnticipo, permiteRetener, resumenAnticipoCobro, sugerenciaPendiente, decisionSugerida, pideAutorizacionAnticipo, sumaAnticipos, vigentes, type Anticipo } from "../anticipos";
+import { TEXTO_ANTICIPO, anticipoPorAplicar, pideReferencia, cobroEsperaAnticipo, permiteRetener, resumenAnticipoCobro, sugerenciaPendiente, decisionSugerida, pideAutorizacionAnticipo, sumaAnticipos, vigentes, type Anticipo } from "../anticipos";
 import { fmtMxn } from "../turno";
 import { capaTramo, seVeEnCalendario, tieneAnticipoPendiente } from "../agenda";
 
@@ -134,5 +134,13 @@ describe("sugerida del aviso «pendiente»", () => {
     expect(sugerenciaPendiente({ estado: "CANCELADA", inicia, canceladaAt: t("2026-11-04T10:00:00-06:00") }, 24)).toBe("DEVOLVER");
     expect(sugerenciaPendiente({ estado: "CANCELADA", inicia, canceladaAt: t("2026-11-06T08:00:00-06:00") }, 24)).toBe("RETENER");
     expect(sugerenciaPendiente({ estado: "CANCELADA", inicia, canceladaAt: null }, 24)).toBeNull();
+  });
+});
+
+describe("pideReferencia (devolver)", () => {
+  it("con tarjeta o transferencia sí; en efectivo o pagado en línea (lo devuelve Mercado Pago) no", () => {
+    expect(["TARJETA_DEBITO", "TARJETA_CREDITO", "TRANSFERENCIA"].every((m) => pideReferencia(m as Anticipo["metodo"]))).toBe(true);
+    expect(pideReferencia("EFECTIVO")).toBe(false);
+    expect(pideReferencia("PAGO_EN_LINEA")).toBe(false);
   });
 });
