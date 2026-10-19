@@ -13,11 +13,12 @@ export const METODOS_ANTICIPO: MetodoAnticipo[] = ["EFECTIVO", "TARJETA_DEBITO",
 /** Devolverlo pide la referencia de la terminal o del banco: el efectivo sale del cajón y el de línea lo devuelve Mercado Pago. */
 export const pideReferencia = (m: MetodoAnticipo): boolean => m !== "EFECTIVO" && m !== "PAGO_EN_LINEA";
 /**
- * ¿Devolverlo sale del cajón? El efectivo, y el sobrante de uno en línea que ya pagó parte de una
- * venta (Mercado Pago solo devuelve el pago completo; la base lo devuelve en efectivo, 0225).
+ * ¿Devolverlo sale del cajón? El efectivo, y uno en línea del que ya se usó algo (una parte aplicada,
+ * retenida o devuelta): Mercado Pago solo devuelve el pago completo, así que va por Mercado Pago
+ * únicamente si todo sigue vigente. Es la regla de devolver_anticipo (0225).
  */
 export const devuelveEnEfectivo = (a: Anticipo, todos: Anticipo[]): boolean =>
-  a.metodo === "EFECTIVO" || (a.metodo === "PAGO_EN_LINEA" && todos.some((x) => x.metodo === "PAGO_EN_LINEA" && x.estado === "APLICADO"));
+  a.metodo === "EFECTIVO" || (a.metodo === "PAGO_EN_LINEA" && todos.some((x) => x.metodo === "PAGO_EN_LINEA" && x.estado !== "VIGENTE"));
 
 export type EstadoAnticipo = "VIGENTE" | "APLICADO" | "DEVUELTO" | "RETENIDO";
 export type Anticipo = { id: string; monto: number; metodo: MetodoAnticipo; estado: EstadoAnticipo; ticketId: string | null };

@@ -248,6 +248,8 @@ BEGIN
   RETURNING id INTO v_auth;
   PERFORM pg_temp.debe_fallar(format('SELECT retener_anticipo(%L, NULL, NULL, %L)', (pg_temp.ant(v_c6)).id, v_auth),
     'DATOS_INVALIDOS: este anticipo en línea se le devuelve%', 'P5 retener el que se devuelve solo');
+  PERFORM pg_temp.debe_fallar(format('SELECT devolver_anticipo(%L, %L, %L, NULL, %L)', (pg_temp.ant(v_c6)).id, v_caja, v_turno, v_auth),
+    'DATOS_INVALIDOS: el pago en línea de esta cita ya se está devolviendo.', 'P5 devolver lo que ya se devuelve');
   PERFORM pg_temp.como(NULL);
   UPDATE tienda_pagos SET aprobado_at = now() - interval '2 minutes' WHERE id = (v_r->>'pago_id')::uuid;
   IF NOT EXISTS (SELECT 1 FROM tienda_pagos_tomar(50) t WHERE t.id = (v_r->>'pago_id')::uuid AND t.tarea = 'DEVOLVER') THEN
@@ -268,6 +270,8 @@ BEGIN
   PERFORM pg_temp.como(v_maria);
   PERFORM cancelar_cita(v_c7, 'Llamó para cancelar');
   IF (pg_temp.pago(v_c7)).estado <> 'APROBADO' THEN RAISE EXCEPTION 'P6: la caja canceló y se devolvió solo'; END IF;
+  IF pg_temp.reservar(pg_temp.a(e, '10:00'), 'smk-pago-0007', '4770003307') ? 'pago_id' THEN
+    RAISE EXCEPTION 'P6: una cita cancelada dio su pago'; END IF;
   PERFORM pg_temp.debe_fallar(format('SELECT retener_anticipo(%L, NULL, NULL)', (pg_temp.ant(v_c7)).id),
     'Retener un anticipo requiere autorización%', 'P6 retener sin permiso');
   INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
@@ -355,6 +359,50 @@ BEGIN
      OR NOT EXISTS (SELECT 1 FROM movimientos_caja WHERE turno_id = v_turno AND tipo = 'DEVOLUCION_EFECTIVO' AND monto_mxn = 100 - v_falta)
      OR (reporte_x(v_turno)->>'anticipos_devueltos_mxn')::numeric <> 100 - v_falta THEN
     RAISE EXCEPTION 'P7b: devolver en efectivo %', (SELECT to_jsonb(a) FROM anticipos_cita a WHERE id = v_resto); END IF;
+
+  -- P7c) Revisión N1: $100 en línea, venta de $60, sobrante de $40 en efectivo; se cancela la venta
+  --      devolviendo el dinero y los $60 regresan VIGENTES: se devuelven en EFECTIVO, nunca por
+  --      Mercado Pago. La clienta recibe $100 en total y el pago sigue APROBADO.
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_diego, 'cancelar_ticket', 'venta.cancelar_pagada', 'ticket', v_k2, 'smoke')
+  RETURNING id INTO v_auth;
+  PERFORM cancelar_ticket_pagado(p_ticket_id := v_k2, p_caja_id := v_caja, p_turno_id := v_turno,
+    p_motivo := 'CLIENTE_DESISTIO'::cancelacion_motivo, p_motivo_texto := 'smoke', p_autorizacion_pin_id := v_auth,
+    p_usuario_solicitante_id := v_maria, p_usuario_autorizo_id := v_diego, p_reversar_inventario := true,
+    p_cancelar_cfdi_sat := false, p_devolver_dinero := true, p_client_id_local := 'smk-0225-cancela');
+  SELECT id INTO v_resto FROM anticipos_cita WHERE cita_id = v_c2 AND estado = 'VIGENTE';
+  IF v_resto IS NULL OR (SELECT monto_mxn FROM anticipos_cita WHERE id = v_resto) <> v_falta THEN
+    RAISE EXCEPTION 'P7c: lo aplicado no regresó VIGENTE: %', (SELECT jsonb_agg(to_jsonb(a)) FROM anticipos_cita a WHERE cita_id = v_c2); END IF;
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_diego, 'devolver_anticipo', 'venta.devolucion', 'anticipo', v_resto, 'smoke')
+  RETURNING id INTO v_auth;
+  PERFORM devolver_anticipo(v_resto, v_caja, v_turno, NULL, v_auth);
+  IF (pg_temp.pago(v_c2)).estado <> 'APROBADO'
+     OR (SELECT referencia_devolucion FROM anticipos_cita WHERE id = v_resto) IS DISTINCT FROM 'EN_EFECTIVO'
+     OR (SELECT sum(monto_mxn) FROM movimientos_caja WHERE turno_id = v_turno AND tipo = 'DEVOLUCION_EFECTIVO'
+           AND motivo LIKE 'Anticipo devuelto%') <> 100
+     OR EXISTS (SELECT 1 FROM anticipos_cita WHERE cita_id = v_c2 AND estado = 'VIGENTE') THEN
+    RAISE EXCEPTION 'P7c: doble reembolso: pago % anticipos %', to_jsonb(pg_temp.pago(v_c2)),
+      (SELECT jsonb_agg(to_jsonb(a)) FROM anticipos_cita a WHERE cita_id = v_c2); END IF;
+
+  -- P7d) Revisión N2: un pago viejo (RECHAZADO) que se aprueba mientras el reintento sigue vivo se
+  --      devuelve, sin romper el índice; el reintento es el que paga.
+  PERFORM pg_temp.como(NULL);
+  v_r := pg_temp.reservar(pg_temp.a(d, '08:00'), 'smk-pago-0010', '4770003310');
+  v_g := (v_r->>'pago_id')::uuid;
+  PERFORM tienda_pago_tomar_cobro(v_g);
+  PERFORM tienda_pago_aplicar(v_g, 'RECHAZADO', 'ORDCITA10A', 100.00, NULL, NULL, 'cc_rejected_other_reason');
+  v_g2 := (pg_temp.reservar(pg_temp.a(d, '08:00'), 'smk-pago-0010', '4770003310')->>'pago_id')::uuid;
+  v_x := tienda_pago_aplicar(v_g, 'APROBADO', 'ORDCITA10A', 100.00);
+  IF v_x->>'estado' <> 'POR_DEVOLVER' OR (v_x->>'recien_aprobado')::boolean
+     OR EXISTS (SELECT 1 FROM anticipos_cita WHERE cita_id = (v_r->>'cita_id')::uuid) THEN
+    RAISE EXCEPTION 'P7d: el pago viejo aprobado %', v_x; END IF;
+  v_x := tienda_pago_aplicar(v_g2, 'APROBADO', 'ORDCITA10B', 100.00);
+  IF v_x->>'estado' <> 'APROBADO' OR (SELECT count(*) FROM anticipos_cita WHERE cita_id = (v_r->>'cita_id')::uuid) <> 1 THEN
+    RAISE EXCEPTION 'P7d: el reintento %', v_x; END IF;
+  PERFORM pg_temp.como(v_maria);
 
   -- P8) Sync: el anticipo en línea que la caja aplicó sin internet sube sin caja ni turno; la caja
   --     no crea uno nuevo ni le cambia el método; la cita sube con quién la canceló.

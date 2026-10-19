@@ -120,7 +120,8 @@ $$;
 -- tienda_pago_aplicar, pago de cita. Las mismas reglas que el pedido (0175), con la cita:
 --   · APROBADO por el monto esperado y la cita esperando su pago → pago APROBADO, anticipo VIGENTE
 --     PAGO_EN_LINEA por lo cobrado, y pago_hasta en NULL (ya no vence);
---   · aprobado tarde (la cita ya no espera: venció o se canceló) → POR_DEVOLVER, sin anticipo;
+--   · aprobado tarde (la cita ya no espera: venció o se canceló; u otro pago suyo sigue vivo) →
+--     POR_DEVOLVER, sin anticipo;
 --   · de más (otra orden, otro monto) → renglón `extra` POR_DEVOLVER;
 --   · RECHAZADO deja el pago RECHAZADO y la cita apartada: se paga otra vez con otro pago.
 -- Devuelve {estado, pedido_estado: null, cita_estado, recien_aprobado}.
@@ -164,7 +165,10 @@ BEGIN
   ELSIF (p_monto > 0) IS NOT TRUE THEN
     RAISE EXCEPTION 'PAGO_RESULTADO_INVALIDO: monto %', COALESCE(p_monto::text, 'NULL');
 
-  ELSIF v_suya AND v_g.estado IN ('CREADO', 'RECHAZADO') AND v_espera AND p_monto = v_g.monto_mxn THEN
+  ELSIF v_suya AND v_g.estado IN ('CREADO', 'RECHAZADO') AND v_espera AND p_monto = v_g.monto_mxn
+        -- Otro pago de la cita sigue vivo (el reintento): este, aprobado tarde, se devuelve.
+        AND NOT EXISTS (SELECT 1 FROM tienda_pagos o WHERE o.cita_id = v_cita AND NOT o.extra AND o.id <> p_pago
+                         AND o.estado IN ('CREADO', 'APROBADO')) THEN
     UPDATE tienda_pagos
        SET estado = 'APROBADO', orden_id_externo = p_orden_id_externo, pago_id_externo = p_pago_id_externo,
            tipo_tarjeta = left(p_tipo, 20), marca = left(p_marca, 30), aprobado_at = now(), detalle = NULL, ultimo_error = NULL
@@ -505,8 +509,12 @@ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 BEGIN
-  UPDATE tienda_pagos SET estado = 'POR_DEVOLVER', proximo_intento_at = NULL
-   WHERE cita_id = NEW.id AND NOT extra AND estado = 'APROBADO';
+  -- Solo si nada del anticipo se usó (aplicado, retenido o devuelto en efectivo): Mercado Pago
+  -- devuelve el pago completo.
+  IF _anticipo_en_linea_entero(NEW.id) THEN
+    UPDATE tienda_pagos SET estado = 'POR_DEVOLVER', proximo_intento_at = NULL
+     WHERE cita_id = NEW.id AND NOT extra AND estado = 'APROBADO';
+  END IF;
   RETURN NULL;
 END;
 $$;
@@ -526,8 +534,10 @@ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 BEGIN
-  UPDATE tienda_pagos SET estado = 'POR_DEVOLVER', proximo_intento_at = NULL
-   WHERE id = _anticipo_pago_en_linea(NEW.cita_id) AND estado = 'APROBADO';
+  IF _anticipo_en_linea_entero(NEW.cita_id) THEN
+    UPDATE tienda_pagos SET estado = 'POR_DEVOLVER', proximo_intento_at = NULL
+     WHERE id = _anticipo_pago_en_linea(NEW.cita_id) AND estado = 'APROBADO';
+  END IF;
   RETURN NULL;
 END;
 $$;
@@ -551,6 +561,20 @@ AS $$
    ORDER BY a.created_at, a.id LIMIT 1;
 $$;
 REVOKE ALL ON FUNCTION _anticipo_pago_en_linea(uuid) FROM PUBLIC, anon, authenticated, service_role;
+
+-- ¿Nada del anticipo en línea de la cita se usó? Ninguna parte aplicada, retenida ni devuelta en
+-- efectivo (lo devuelto por Mercado Pago sí vale: es el mismo reembolso completo). Solo así se
+-- devuelve por Mercado Pago, que regresa el pago completo; si no, lo que quede se devuelve en efectivo.
+CREATE OR REPLACE FUNCTION _anticipo_en_linea_entero(p_cita uuid)
+RETURNS boolean
+LANGUAGE sql STABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT NOT EXISTS (SELECT 1 FROM anticipos_cita a
+                      WHERE a.cita_id = p_cita AND a.metodo_pago = 'PAGO_EN_LINEA'
+                        AND (a.estado IN ('APLICADO', 'RETENIDO') OR a.referencia_devolucion = 'EN_EFECTIVO'));
+$$;
+REVOKE ALL ON FUNCTION _anticipo_en_linea_entero(uuid) FROM PUBLIC, anon, authenticated, service_role;
 
 -- El pago de la cita quedó DEVUELTO (lo devolvimos, o el negocio desde su cuenta): su anticipo
 -- vigente también. Lo ya aplicado o retenido no se toca.
@@ -591,8 +615,10 @@ REVOKE ALL ON FUNCTION tienda_pagos_devuelto_anticipo() FROM PUBLIC, anon, authe
 -- devolver_anticipo: la de la 0222 (vigente). Cambios "0225" para PAGO_EN_LINEA: no pide
 -- referencia ni turno (si viene, se valida y se anota), no sale del cajón y su pago pasa a
 -- POR_DEVOLVER (disparador de §3). Sigue pidiendo venta.devolucion o su PIN. Mercado Pago devuelve
--- la orden completa: si parte del anticipo ya pagó una venta, el sobrante se devuelve EN EFECTIVO del
--- turno que lo devuelve (como uno en efectivo; referencia 'EN_EFECTIVO') y el pago sigue APROBADO.
+-- la orden completa, así que va por Mercado Pago SOLO si todo lo cobrado sigue VIGENTE (nada se
+-- aplicó, retuvo ni devolvió): entonces todas sus partes quedan DEVUELTO juntas. Si no, la parte se
+-- devuelve EN EFECTIVO del turno que la devuelve (referencia 'EN_EFECTIVO') y el pago sigue APROBADO.
+-- Con el pago ya devolviéndose o devuelto (POR_DEVOLVER, DEVOLUCION_FALLIDA, DEVUELTO), nada.
 CREATE OR REPLACE FUNCTION devolver_anticipo(p_anticipo uuid, p_caja_id uuid, p_turno_id uuid, p_referencia text DEFAULT NULL,
                                              p_autorizacion_pin_id uuid DEFAULT NULL)
 RETURNS void
@@ -624,10 +650,15 @@ BEGIN
   IF v_a.metodo_pago NOT IN ('EFECTIVO', 'PAGO_EN_LINEA') AND v_ref IS NULL THEN   -- 0225
     RAISE EXCEPTION 'DATOS_INVALIDOS: falta la referencia de la devolución con tarjeta o transferencia.' USING ERRCODE = '22023';
   END IF;
-  -- 0225: en línea, Mercado Pago devuelve la orden completa; si una parte ya pagó una venta, el
-  -- sobrante sale en efectivo del cajón.
+  -- 0225: en línea, Mercado Pago devuelve el pago completo: solo si todas sus partes siguen
+  -- VIGENTES; si no, la parte sale en efectivo del cajón. En la caja tienda_pagos está vacía y el
+  -- estado del pago no se puede ver: decide lo que dicen los anticipos.
+  IF v_a.metodo_pago = 'PAGO_EN_LINEA' AND EXISTS (SELECT 1 FROM tienda_pagos
+       WHERE id = _anticipo_pago_en_linea(v_a.cita_id) AND estado <> 'APROBADO') THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: el pago en línea de esta cita ya se está devolviendo.' USING ERRCODE = '22023';
+  END IF;
   v_efectivo := v_a.metodo_pago = 'PAGO_EN_LINEA' AND EXISTS (
-       SELECT 1 FROM anticipos_cita WHERE cita_id = v_a.cita_id AND metodo_pago = 'PAGO_EN_LINEA' AND estado = 'APLICADO');
+       SELECT 1 FROM anticipos_cita WHERE cita_id = v_a.cita_id AND metodo_pago = 'PAGO_EN_LINEA' AND estado <> 'VIGENTE');
   IF v_efectivo THEN v_ref := 'EN_EFECTIVO'; END IF;
   IF v_a.metodo_pago <> 'PAGO_EN_LINEA' OR p_turno_id IS NOT NULL OR v_efectivo THEN   -- 0225: en línea (por MP) no hace falta turno
     v_turno := _anticipo_turno(v_tenant, p_caja_id, p_turno_id);
@@ -653,7 +684,10 @@ BEGIN
 
   UPDATE anticipos_cita
      SET estado = 'DEVUELTO', turno_resuelve_id = v_turno.id, referencia_devolucion = v_ref, resuelto_at = now()
-   WHERE id = v_a.id;
+   WHERE id = v_a.id
+      -- 0225: por Mercado Pago se devuelve todo junto: las demás partes vigentes del mismo pago también.
+      OR (v_a.metodo_pago = 'PAGO_EN_LINEA' AND NOT v_efectivo AND cita_id = v_a.cita_id
+          AND metodo_pago = 'PAGO_EN_LINEA' AND estado = 'VIGENTE');
 END;
 $$;
 
@@ -1217,7 +1251,7 @@ DECLARE
   v_hasta timestamptz;
 BEGIN
   SELECT * INTO v_c FROM citas WHERE id = p_cita AND tenant_id = p_tenant FOR UPDATE;
-  IF NOT FOUND THEN RETURN '{}'::jsonb; END IF;
+  IF NOT FOUND OR v_c.estado = 'CANCELADA' THEN RETURN '{}'::jsonb; END IF;
   SELECT * INTO v_g FROM tienda_pagos WHERE cita_id = p_cita AND NOT extra AND estado IN ('CREADO', 'APROBADO');
   IF v_g.id IS NULL AND v_c.estado = 'AGENDADA' AND v_c.pago_hasta > now() THEN
     IF (SELECT count(*) FROM tienda_pagos WHERE cita_id = p_cita AND NOT extra) >= 5 THEN

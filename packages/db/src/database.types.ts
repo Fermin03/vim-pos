@@ -15359,6 +15359,7 @@ export type Database = {
         }
         Returns: number
       }
+      _anticipo_en_linea_entero: { Args: { p_cita: string }; Returns: boolean }
       _anticipo_pago_en_linea: { Args: { p_cita: string }; Returns: string }
       _anticipo_regresar: {
         Args: { p_monto: number; p_ticket: string }

@@ -152,5 +152,7 @@ describe("devuelveEnEfectivo", () => {
     expect(devuelveEnEfectivo(a("PAGO_EN_LINEA", "VIGENTE"), [a("PAGO_EN_LINEA", "VIGENTE")])).toBe(false);
     expect(devuelveEnEfectivo(a("PAGO_EN_LINEA", "VIGENTE"), [a("PAGO_EN_LINEA", "APLICADO"), a("PAGO_EN_LINEA", "VIGENTE")])).toBe(true);
     expect(devuelveEnEfectivo(a("TARJETA_DEBITO", "VIGENTE"), [a("PAGO_EN_LINEA", "APLICADO")])).toBe(false);
+    // Revisión N1: la venta se canceló y lo aplicado volvió; el sobrante ya se había devuelto en efectivo.
+    expect(devuelveEnEfectivo(a("PAGO_EN_LINEA", "VIGENTE"), [a("PAGO_EN_LINEA", "VIGENTE"), a("PAGO_EN_LINEA", "DEVUELTO")])).toBe(true);
   });
 });
