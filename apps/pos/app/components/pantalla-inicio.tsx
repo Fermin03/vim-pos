@@ -279,7 +279,7 @@ export function PantallaInicio({
 
 /**
  * Confirmación de «Salir» de la caja (solo existe con el preload de la ventana de escritorio). La usan
- * el inicio y la Configuración de la caja de tienda.
+ * el inicio y la sección «Más» de la caja de tienda.
  */
 export function ConfirmarSalirCaja({ onCancelar }: { onCancelar: () => void }) {
   return (
