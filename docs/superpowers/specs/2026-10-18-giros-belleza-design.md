@@ -280,3 +280,57 @@ decisión: ADR 0038.
   «Colaboradores · Espacios» del boceto.
 - Menores de la revisión: nombres de color sin `aria-label` en el admin, fechas del admin por regex,
   guardar y borrar horarios no es atómico, los inactivos no se ven en el admin.
+
+## Entrega 2 (cobro y comisiones), hecha (19 oct)
+
+Cobrar la cita en la caja, colaborador por renglón, comisiones y sueldo, anticipos y sus reportes. Todo
+en local. Diseño de la caja: `docs/diseno/pos-belleza.md`; del panel: `docs/diseno/admin.md`; decisión:
+ADR 0039.
+
+**Migraciones**
+
+- **0220:** solo `ADD VALUE`: `cita_estado` COBRADA y `metodo_pago` ANTICIPO. Va aparte por la misma
+  razón que la 0216.
+- **0221:** colaborador por renglón, regla de comisión congelada en `ticket_items` (disparador),
+  columnas de comisión y anticipo en servicios y en la configuración, sueldo, `periodo_comisiones`,
+  `vw_comisiones_renglon`, `vincular_cita_ticket` y la cita COBRADA al pagar (vuelve a TERMINADA si el
+  ticket se cancela).
+- **0222:** `anticipos_cita`, `registrar_anticipo`, `anticipo_sugerido`, `pagar_con_anticipo`,
+  `devolver_anticipo`, `retener_anticipo`, la guardia de pagos ANTICIPO y el corte (X, arqueo y
+  efectivo esperado suman los anticipos recibidos).
+- **0223:** sync del cobro: anticipos y citas COBRADA por la caja, venta pendiente de deshacer,
+  conflictos registrados en `sync_eventos`.
+
+**Para el lanzamiento**
+
+- **0220 va en el instalador ANTES de usarse.** Un valor de enum desconocido en la caja tumba el pull
+  de `pagos` y de `citas`. Mientras la nube no cobre con ANTICIPO ni cite como COBRADA no pasa nada,
+  pero ningún negocio debe estrenar la función antes de que sus cajas tengan el instalador.
+- **0221–0223 a la nube, a mano y antes del merge.** Después, el instalador con 0220–0223.
+
+**Rulings de este plan (Fermín puede corregirlos)**
+
+- La comisión se calcula al leer, con la regla congelada en el renglón; no hay tabla de comisiones.
+- Base COBRADO: resta también el descuento a nivel ticket (y el canje de lealtad), prorrateado entre
+  renglones. LISTA no incluye modificadores.
+- El anticipo vuelve a VIGENTE al cancelar la venta y en devoluciones EFECTIVO o MISMO_METODO_PAGO
+  (primero la parte pagada con anticipo); con CORTESIA, VALE o NOTA_CREDITO queda APLICADO.
+- Devolver un anticipo en efectivo exige `venta.devolucion` o el PIN de un supervisor.
+- El anticipo se aplica al confirmar el primer pago, no al abrir el cobro.
+- Una cita cancelada con anticipo VIGENTE sigue visible (calendario y Cobrar) hasta resolverlo.
+- Los conflictos del sync se registran en `sync_eventos`; gana la nube, y la caja reintenta cuando
+  deshace algo que la nube aún no ve.
+- El sueldo solo se suma con un periodo exacto; los productos pueden ir sin colaborador (sin comisión).
+- Un servicio sin cita no toma colaborador en silencio: se pregunta o queda en «Elige quién lo hizo».
+
+**Quedó para después / avisos para Fermín**
+
+- **Anticipo retenido:** ese dinero se recibió y no se factura (no es venta ni entra a la factura
+  global). Verlo con el contador.
+- **Clave SAT por defecto de belleza:** sin elegir clave el servicio sale como 90101500 (restaurante).
+  Definir con el contador la clave por defecto.
+- **Comisión LISTA sin modificadores:** lo dice el spec; el texto del admin no promete más.
+- **Reportes de comisiones sin filtro por sucursal:** la vista no trae `sucursal_id`.
+- **Sync, caso raro entre lotes:** una cancelación de venta rechazada en un lote y el recobro de la
+  cita en otro lote distinto. Se resuelve al reintentar, pero no tiene prueba propia.
+- La barra del ticket no muestra el anticipo (solo el modal de cobro).

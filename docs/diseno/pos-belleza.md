@@ -3,7 +3,7 @@
 > Hereda de [`pos-retail.md`](pos-retail.md), que hereda de [`pos.md`](pos.md) y [`nucleo.md`](nucleo.md).
 > Aquí va solo lo que cambia cuando la caja es de un negocio de belleza. Spec:
 > `docs/superpowers/specs/2026-10-18-giros-belleza-design.md` §4. Bocetos en
-> `docs/superpowers/bocetos-belleza/`. Describe la entrega 1 (agenda, 18 oct 2026); donde el código
+> `docs/superpowers/bocetos-belleza/`. Describe las entregas 1 (agenda, 18 oct 2026) y 2 (cobro, colaborador por renglón y anticipos, 19 oct; ADR 0039); donde el código
 > hizo algo distinto del boceto, manda el código.
 
 ## Quién y dónde

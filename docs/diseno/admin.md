@@ -410,6 +410,50 @@ muestra nada: ni en el producto, ni en el menú del Catálogo, y la fila «Exist
   variante. El margen usa la venta sin IVA, ya con descuentos por producto, y el costo de hoy (el
   pie lo dice); los descuentos a toda la cuenta no se restan.
 
+## Agenda: cobro y comisiones (belleza, entrega 2; ADR 0039)
+
+Solo con el módulo `agenda`. Sin él, las rutas y las tarjetas de reportes se ocultan y un enlace
+directo dice «Este reporte es para negocios con agenda.».
+
+### Configuración › Agenda (`/configuracion/agenda`)
+
+Tres tarjetas, cada una con su propio Guardar:
+
+- **Tolerancia**, como antes.
+- **Cobro:** «Al final», «Anticipo al apartar» o «Todo por adelantado», y el límite para cancelar con
+  devolución (de 0 a 168 h).
+- **Comisiones:** la base, «Sobre lo cobrado (con descuentos, sin IVA)» o «Sobre el precio de lista
+  (sin IVA)» (la de lista no incluye modificadores); un interruptor «Comisión por vender productos»
+  con su %; y el periodo, Semanal o Quincenal. Cambiar la base o el % no mueve las ventas ya hechas:
+  la regla se congela en cada renglón.
+
+### Servicios (`/agenda/servicios`)
+
+- El formulario trae **Comisión** y **Anticipo**, cada uno con «Sin…», «Porcentaje (%)» o «Monto fijo
+  ($)» y su valor, y la **clave SAT**: se escribe o se busca (buscador con ejemplos «corte de cabello,
+  manicure, masaje…»). Sin clave, la factura sigue saliendo como servicios de restaurante (90101500).
+  Una clave vieja con otro formato no impide guardar si no se toca.
+- En «Quién lo hace», cada colaborador puede tener su comisión propia; vacía = la del servicio.
+- La tabla suma las columnas Comisión y Anticipo.
+
+### Colaboradores (`/agenda/colaboradores`)
+
+**Sueldo por periodo** va en la tarjeta del colaborador y se guarda con su Guardar. Vacío no es válido:
+se escribe 0.
+
+### Reportes
+
+Los dos son de todo el negocio (la vista no filtra por sucursal) y aparecen en «Cómo va la operación».
+
+- **Comisiones** (`/reportes/comisiones`). Abre siempre en el periodo actual; «Periodo actual» y
+  «Periodo anterior» ponen el periodo completo y el rango también se puede elegir libre. Cuatro cifras
+  y una fila por colaborador: servicios, ventas sin IVA, comisión de servicios, comisión de productos,
+  sueldo y total. Tocar un nombre abre sus renglones. **El sueldo solo se suma con un periodo
+  exacto**; en un rango libre sale $0 y un aviso lo explica. Si falla el cálculo de periodos, un aviso
+  pide elegir las fechas a mano. Un supervisor que no es administrador solo ve sus renglones.
+- **Ventas por colaborador** (`/reportes/ventas-colaborador`). Agrupa por colaborador o por servicio:
+  vendidos, tickets, ventas sin IVA y %.
+
 ## Piezas que se repiten en el panel
 
 Viven en `apps/admin/app/components` y se usan en vez de volver a escribir el marcado:
