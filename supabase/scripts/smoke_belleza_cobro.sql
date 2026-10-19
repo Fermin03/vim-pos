@@ -341,6 +341,9 @@ DECLARE
   v_cx uuid; v_cy uuid; v_cz uuid; v_cw uuid;
   v_ax uuid; v_ay uuid; v_az uuid; v_aw uuid; v_a2 uuid;
   v_kx uuid; v_ky uuid; v_kr uuid;
+  v_diego  uuid := '99999999-0000-0000-0000-0000000000f1';
+  v_cp uuid; v_cq uuid; v_cr uuid; v_ap uuid; v_aq uuid; v_ar uuid; v_kp uuid; v_kq uuid; v_kk uuid; v_kn uuid; v_auth uuid; v_dev uuid;
+  i_r uuid; i_n uuid; v_e0 numeric;
   v_n integer; j jsonb; r record;
 BEGIN
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria, 'tenant_id', v_t)::text, true);
@@ -457,8 +460,23 @@ BEGIN
   IF pg_temp.esp(v_tb) <> 950 THEN RAISE EXCEPTION 'A5: B esperaba 950: %', pg_temp.esp(v_tb); END IF;
   PERFORM cancelar_cita(v_cz, 'se mudó');
   v_tc := pg_temp.turno('SMK-0222-C', 1000);
-  PERFORM devolver_anticipo(v_az, v_caja, v_tc);
+  -- C) En efectivo pide venta.devolucion: la cajera sin PIN no; con la autorización de un supervisor, sí.
+  PERFORM pg_temp.debe_fallar(format('SELECT devolver_anticipo(%L, %L, %L)', v_az, v_caja, v_tc),
+    'Devolver un anticipo en efectivo requiere autorización%', 'C sin permiso');
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_tc, v_maria, v_diego, 'devolver_anticipo', 'venta.cancelar_pagada', 'anticipo', v_az, 'smoke')
+  RETURNING id INTO v_auth;
+  PERFORM pg_temp.debe_fallar(format('SELECT devolver_anticipo(%L, %L, %L, NULL, %L)', v_az, v_caja, v_tc, v_auth),
+    'La autorización es para "venta.cancelar_pagada"%', 'C otro permiso');
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_tc, v_maria, v_diego, 'devolver_anticipo', 'venta.devolucion', 'anticipo', v_az, 'smoke')
+  RETURNING id INTO v_auth;
+  PERFORM devolver_anticipo(v_az, v_caja, v_tc, NULL, v_auth);
   PERFORM devolver_anticipo(v_az, v_caja, v_tc);   -- reintento inofensivo
+  IF (SELECT (usuario_autorizo_id, autorizacion_pin_id) FROM movimientos_caja WHERE turno_id = v_tc AND tipo = 'DEVOLUCION_EFECTIVO')
+     <> (v_diego, v_auth) THEN RAISE EXCEPTION 'C: el movimiento no guardó quién autorizó'; END IF;
   IF pg_temp.esp(v_tc) <> 850 OR pg_temp.esp(v_tb) <> 950 THEN
     RAISE EXCEPTION 'A5: C esperaba 850 y B 950: % %', pg_temp.esp(v_tc), pg_temp.esp(v_tb); END IF;
   SELECT count(*) INTO v_n FROM movimientos_caja
@@ -501,6 +519,103 @@ BEGIN
     RAISE EXCEPTION 'A6: reporte_x de C: %', j; END IF;
   PERFORM pg_temp.debe_fallar(format('SELECT devolver_anticipo(%L, %L, %L, %L)', v_aw, v_caja, v_tc, 'x'),
     'DATOS_INVALIDOS: el anticipo ya se resolvió (RETENIDO).', 'A6 devolver retenido');
+
+
+  -- A8) Ruling A, venta ABIERTA cancelada: el anticipo aplicado regresa VIGENTE y paga la siguiente venta.
+  v_cp := pg_temp.cita('Paty', '2030-01-08 14:00-06');
+  v_ap := registrar_anticipo(v_cp, 100, 'EFECTIVO', v_caja, v_tc, 'b222-ap');
+  v_e0 := pg_temp.esp(v_tc);
+  v_kp := abrir_ticket(v_suc, v_caja, v_tc, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'b222-kp', v_maria);
+  PERFORM agregar_item_a_ticket(v_kp, v_corte, 1, NULL, '[]'::jsonb, 'b222-kp-1');
+  PERFORM vincular_cita_ticket(v_cp, v_kp);
+  IF pagar_con_anticipo(v_kp, v_cp, 'b222-pp') <> 100 THEN RAISE EXCEPTION 'A8: debía aplicar 100'; END IF;
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_tc, v_maria, v_diego, 'cancelar_ticket', 'venta.cancelar_abierta', 'ticket', v_kp, 'smoke')
+  RETURNING id INTO v_auth;
+  PERFORM cancelar_ticket_pagado(p_ticket_id := v_kp, p_caja_id := v_caja, p_turno_id := v_tc,
+    p_motivo := 'CLIENTE_DESISTIO'::cancelacion_motivo, p_motivo_texto := 'smoke', p_autorizacion_pin_id := v_auth,
+    p_usuario_solicitante_id := v_maria, p_usuario_autorizo_id := v_diego, p_client_id_local := 'b222-cp');
+  IF (SELECT (estado, ticket_id, turno_resuelve_id, monto_mxn) FROM anticipos_cita WHERE id = v_ap)
+     IS DISTINCT FROM ('VIGENTE'::text, NULL::uuid, NULL::uuid, 100::numeric) THEN
+    RAISE EXCEPTION 'A8: el anticipo de la venta cancelada debía volver VIGENTE: %', (SELECT to_jsonb(a) FROM anticipos_cita a WHERE id = v_ap); END IF;
+  IF pg_temp.esp(v_tc) <> v_e0 THEN RAISE EXCEPTION 'A8: la cancelación tocó el cajón: % vs %', pg_temp.esp(v_tc), v_e0; END IF;
+  v_kn := abrir_ticket(v_suc, v_caja, v_tc, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'b222-kp2', v_maria);
+  PERFORM agregar_item_a_ticket(v_kn, v_corte, 1, NULL, '[]'::jsonb, 'b222-kp2-1');
+  PERFORM vincular_cita_ticket(v_cp, v_kn);
+  IF pagar_con_anticipo(v_kn, v_cp, 'b222-pp2') <> 100 THEN RAISE EXCEPTION 'A8: la otra venta debía usar los 100'; END IF;
+
+  -- A9) Ruling A, venta PAGADA cancelada con devolución en efectivo: $200 de anticipo + $300 en
+  --     efectivo → regresan $200 VIGENTES a la cita y del cajón solo salen $300.
+  v_cq := pg_temp.cita('Quetzal', '2030-01-08 16:00-06');
+  v_aq := registrar_anticipo(v_cq, 200, 'EFECTIVO', v_caja, v_tc, 'b222-aq');
+  v_kq := abrir_ticket(v_suc, v_caja, v_tc, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'b222-kq', v_maria);
+  PERFORM agregar_item_a_ticket(v_kq, v_tinte, 1, NULL, '[]'::jsonb, 'b222-kq-1');
+  PERFORM vincular_cita_ticket(v_cq, v_kq);
+  PERFORM pagar_con_anticipo(v_kq, v_cq, 'b222-pq');
+  PERFORM aplicar_pago(v_kq, 'EFECTIVO'::metodo_pago, 300, 300, NULL, NULL, NULL, false, NULL, 'b222-pq2');
+  v_e0 := pg_temp.esp(v_tc);
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_tc, v_maria, v_diego, 'cancelar_ticket', 'venta.cancelar_pagada', 'ticket', v_kq, 'smoke')
+  RETURNING id INTO v_auth;
+  PERFORM cancelar_ticket_pagado(p_ticket_id := v_kq, p_caja_id := v_caja, p_turno_id := v_tc,
+    p_motivo := 'CLIENTE_DESISTIO'::cancelacion_motivo, p_motivo_texto := 'smoke', p_autorizacion_pin_id := v_auth,
+    p_usuario_solicitante_id := v_maria, p_usuario_autorizo_id := v_diego, p_reversar_inventario := true,
+    p_cancelar_cfdi_sat := false, p_devolver_dinero := true, p_client_id_local := 'b222-cq');
+  IF pg_temp.esp(v_tc) <> v_e0 - 300 THEN RAISE EXCEPTION 'A9: del cajón debían salir 300: % vs %', pg_temp.esp(v_tc), v_e0; END IF;
+  IF (SELECT (estado, ticket_id, monto_mxn) FROM anticipos_cita WHERE id = v_aq) IS DISTINCT FROM ('VIGENTE'::text, NULL::uuid, 200::numeric)
+     OR (SELECT count(*) FROM anticipos_cita WHERE cita_id = v_cq) <> 1 THEN
+    RAISE EXCEPTION 'A9: el anticipo debía volver VIGENTE en 200: %', (SELECT jsonb_agg(to_jsonb(a)) FROM anticipos_cita a WHERE cita_id = v_cq); END IF;
+  IF (SELECT estado FROM citas WHERE id = v_cq) <> 'TERMINADA' THEN RAISE EXCEPTION 'A9: la cita debía volver a TERMINADA'; END IF;
+
+  -- B) Devolución parcial: 2 cortes ($360) pagados con $250 de anticipo y $110 en efectivo.
+  --    Se devuelve 1 corte ($180): los 180 salen del anticipo (se parte: 70 sigue APLICADO, 180
+  --    VIGENTE) y del cajón nada. El otro corte: 70 regresan al anticipo y 110 salen en efectivo.
+  v_cr := pg_temp.cita('Rita', '2030-01-08 17:00-06');
+  v_ar := registrar_anticipo(v_cr, 250, 'EFECTIVO', v_caja, v_tc, 'b222-ar');
+  v_kk := abrir_ticket(v_suc, v_caja, v_tc, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'b222-kk', v_maria);
+  i_r := agregar_item_a_ticket(v_kk, v_corte, 2, NULL, '[]'::jsonb, 'b222-kk-1');
+  PERFORM vincular_cita_ticket(v_cr, v_kk);
+  IF pagar_con_anticipo(v_kk, v_cr, 'b222-pk') <> 250 THEN RAISE EXCEPTION 'B: debía aplicar 250'; END IF;
+  PERFORM aplicar_pago(v_kk, 'EFECTIVO'::metodo_pago, 110, 110, NULL, NULL, NULL, false, NULL, 'b222-pk2');
+  v_e0 := pg_temp.esp(v_tc);
+  INSERT INTO autorizaciones_pin (tenant_id, usuario_solicitante_id, usuario_autorizo_id, accion, permiso_codigo, motivo, caja_id, turno_id)
+  VALUES (v_t, v_maria, v_diego, 'devolucion', 'venta.devolucion', 't', v_caja, v_tc) RETURNING id INTO v_auth;
+  v_dev := crear_devolucion(v_kk, v_caja, v_tc, 'PARCIAL'::devolucion_alcance, 'PRODUCTO_DEFECTUOSO'::devolucion_motivo, 'x',
+    'EFECTIVO'::devolucion_medio, v_auth, v_maria, v_diego,
+    jsonb_build_array(jsonb_build_object('ticket_item_id', i_r, 'cantidad_devuelta', 1)), false, NULL, 'b222-dk1');
+  PERFORM confirmar_devolucion(v_dev, v_maria);
+  IF pg_temp.esp(v_tc) <> v_e0 THEN RAISE EXCEPTION 'B: la primera devolución sacó efectivo: % vs %', pg_temp.esp(v_tc), v_e0; END IF;
+  IF (SELECT (estado, monto_mxn, ticket_id) FROM anticipos_cita WHERE id = v_ar) IS DISTINCT FROM ('APLICADO'::text, 70::numeric, v_kk)
+     OR (SELECT count(*) FROM anticipos_cita WHERE cita_id = v_cr AND estado = 'VIGENTE' AND monto_mxn = 180 AND turno_id = v_tc) <> 1 THEN
+    RAISE EXCEPTION 'B: el anticipo debía partirse en 70 APLICADO y 180 VIGENTE: %', (SELECT jsonb_agg(to_jsonb(a)) FROM anticipos_cita a WHERE cita_id = v_cr); END IF;
+  INSERT INTO autorizaciones_pin (tenant_id, usuario_solicitante_id, usuario_autorizo_id, accion, permiso_codigo, motivo, caja_id, turno_id)
+  VALUES (v_t, v_maria, v_diego, 'devolucion', 'venta.devolucion', 't', v_caja, v_tc) RETURNING id INTO v_auth;
+  v_dev := crear_devolucion(v_kk, v_caja, v_tc, 'PARCIAL'::devolucion_alcance, 'PRODUCTO_DEFECTUOSO'::devolucion_motivo, 'x',
+    'EFECTIVO'::devolucion_medio, v_auth, v_maria, v_diego,
+    jsonb_build_array(jsonb_build_object('ticket_item_id', i_r, 'cantidad_devuelta', 1)), false, NULL, 'b222-dk2');
+  PERFORM confirmar_devolucion(v_dev, v_maria);
+  IF pg_temp.esp(v_tc) <> v_e0 - 110 THEN RAISE EXCEPTION 'B: la segunda devolución debía sacar 110: % vs %', pg_temp.esp(v_tc), v_e0; END IF;
+  IF (SELECT sum(monto_mxn) FROM anticipos_cita WHERE cita_id = v_cr AND estado = 'VIGENTE') <> 250
+     OR EXISTS (SELECT 1 FROM anticipos_cita WHERE cita_id = v_cr AND estado = 'APLICADO') THEN
+    RAISE EXCEPTION 'B: los 250 debían quedar VIGENTES: %', (SELECT jsonb_agg(to_jsonb(a)) FROM anticipos_cita a WHERE cita_id = v_cr); END IF;
+  -- El corte del turno que recibió los anticipos no cambia por partirlos (Wendy 100, Paty 100, Quetzal 200, Rita 250).
+  IF (reporte_x(v_tc)->>'anticipos_recibidos_mxn')::numeric <> 650 THEN
+    RAISE EXCEPTION 'B: recibidos en C: %', reporte_x(v_tc)->>'anticipos_recibidos_mxn'; END IF;
+
+  -- B2) Una venta sin ANTICIPO no cambia: devolver 1 de 2 cortes en efectivo saca los 180.
+  v_kn := abrir_ticket(v_suc, v_caja, v_tc, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'b222-kn', v_maria);
+  i_n := agregar_item_a_ticket(v_kn, v_corte, 2, NULL, '[]'::jsonb, 'b222-kn-1');
+  PERFORM aplicar_pago(v_kn, 'EFECTIVO'::metodo_pago, 360, 360, NULL, NULL, NULL, false, NULL, 'b222-pn');
+  v_e0 := pg_temp.esp(v_tc);
+  INSERT INTO autorizaciones_pin (tenant_id, usuario_solicitante_id, usuario_autorizo_id, accion, permiso_codigo, motivo, caja_id, turno_id)
+  VALUES (v_t, v_maria, v_diego, 'devolucion', 'venta.devolucion', 't', v_caja, v_tc) RETURNING id INTO v_auth;
+  v_dev := crear_devolucion(v_kn, v_caja, v_tc, 'PARCIAL'::devolucion_alcance, 'PRODUCTO_DEFECTUOSO'::devolucion_motivo, 'x',
+    'EFECTIVO'::devolucion_medio, v_auth, v_maria, v_diego,
+    jsonb_build_array(jsonb_build_object('ticket_item_id', i_n, 'cantidad_devuelta', 1)), false, NULL, 'b222-dn');
+  PERFORM confirmar_devolucion(v_dev, v_maria);
+  IF pg_temp.esp(v_tc) <> v_e0 - 180 THEN RAISE EXCEPTION 'B2: sin anticipo debía sacar 180: % vs %', pg_temp.esp(v_tc), v_e0; END IF;
 
   RAISE NOTICE 'belleza anticipos OK';
 END $$;

@@ -3,9 +3,11 @@
 -- §1 anticipos_cita: el dinero que la clienta deja al apartar. Suma al corte del turno que lo
 --    RECIBE (como un abono a crédito, 0208), por método. Se resuelve una sola vez:
 --    APLICADO (paga su venta con el método ANTICIPO), DEVUELTO o RETENIDO («Anticipo no
---    reembolsable»). Solo se escribe por RPC; un anticipo resuelto ya no cambia.
--- §2 RPC: registrar_anticipo, anticipo_sugerido, pagar_con_anticipo, devolver_anticipo y
---    retener_anticipo.
+--    reembolsable»). Solo se escribe por RPC; un anticipo resuelto ya no cambia a mano. La única
+--    vuelta atrás es del sistema: si la venta se cancela o se devuelve, lo APLICADO regresa a
+--    VIGENTE (primero que cualquier otro medio) para cobrar la cita en otra venta.
+-- §2 RPC: registrar_anticipo, anticipo_sugerido, pagar_con_anticipo, devolver_anticipo (en
+--    efectivo pide venta.devolucion o su PIN) y retener_anticipo; cancelación y devoluciones.
 -- §3 Guardia de pagos: ANTICIPO solo entra por pagar_con_anticipo y no se reabre ni se edita.
 -- §4 Corte: calcular_efectivo_esperado, reporte_x y arquear_caja suman los anticipos recibidos;
 --    ANTICIPO no se declara (el dinero ya se contó en el turno que lo recibió).
@@ -40,6 +42,7 @@ CREATE TABLE IF NOT EXISTS anticipos_cita (
 CREATE INDEX IF NOT EXISTS idx_anticipos_cita_cita ON anticipos_cita (cita_id);
 CREATE INDEX IF NOT EXISTS idx_anticipos_cita_turno ON anticipos_cita (turno_id);
 CREATE INDEX IF NOT EXISTS idx_anticipos_cita_turno_resuelve ON anticipos_cita (turno_resuelve_id) WHERE turno_resuelve_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_anticipos_cita_ticket ON anticipos_cita (ticket_id) WHERE ticket_id IS NOT NULL;
 COMMENT ON TABLE anticipos_cita IS
   'Anticipo de una cita: suma al corte del turno que lo recibe; se aplica a la venta (ANTICIPO), se devuelve o se retiene. Solo se escribe por RPC (0222).';
 
@@ -259,19 +262,22 @@ COMMENT ON FUNCTION pagar_con_anticipo(uuid, uuid, text) IS
 REVOKE EXECUTE ON FUNCTION pagar_con_anticipo(uuid, uuid, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION pagar_con_anticipo(uuid, uuid, text) TO authenticated, service_role;
 
--- Devolver: en efectivo sale del cajón del turno que devuelve (DEVOLUCION_EFECTIVO, sin PIN como
--- toda devolución del sistema); con tarjeta o transferencia solo se marca, con la referencia.
-CREATE OR REPLACE FUNCTION devolver_anticipo(p_anticipo uuid, p_caja_id uuid, p_turno_id uuid, p_referencia text DEFAULT NULL)
+-- Devolver: en efectivo sale del cajón del turno que devuelve (DEVOLUCION_EFECTIVO) y pide lo
+-- mismo que devolver una venta: el permiso venta.devolucion o una autorización con PIN para este
+-- anticipo. Con tarjeta o transferencia solo se marca, con la referencia.
+CREATE OR REPLACE FUNCTION devolver_anticipo(p_anticipo uuid, p_caja_id uuid, p_turno_id uuid, p_referencia text DEFAULT NULL,
+                                             p_autorizacion_pin_id uuid DEFAULT NULL)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_tenant uuid := current_tenant_id();
-  v_a      anticipos_cita%ROWTYPE;
-  v_turno  turnos%ROWTYPE;
-  v_ref    text := NULLIF(btrim(p_referencia), '');
+  v_tenant  uuid := current_tenant_id();
+  v_a       anticipos_cita%ROWTYPE;
+  v_turno   turnos%ROWTYPE;
+  v_ref     text := NULLIF(btrim(p_referencia), '');
+  v_autorizo uuid;
 BEGIN
   IF v_tenant IS NULL THEN
     RAISE EXCEPTION 'Sin negocio en la sesión.' USING ERRCODE = '42501';
@@ -290,12 +296,20 @@ BEGIN
   v_turno := _anticipo_turno(v_tenant, p_caja_id, p_turno_id);
 
   IF v_a.metodo_pago = 'EFECTIVO' THEN
+    -- Molde de arquear_caja (0134): con autorización se consume; sin ella, solo quien tiene el permiso.
+    IF p_autorizacion_pin_id IS NOT NULL THEN
+      v_autorizo := consumir_autorizacion(p_autorizacion_pin_id, ARRAY['venta.devolucion'],
+        p_anticipo, v_a.monto_mxn, NULL, false, v_tenant);
+    ELSIF NOT usuario_actual_tiene_permiso('venta.devolucion') THEN
+      RAISE EXCEPTION 'Devolver un anticipo en efectivo requiere autorización (venta.devolucion).'
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
     INSERT INTO movimientos_caja (tenant_id, sucursal_id, caja_id, turno_id, tipo, monto_mxn, dia_contable,
-                                  motivo, usuario_solicitante_id)
+                                  motivo, usuario_solicitante_id, usuario_autorizo_id, autorizacion_pin_id)
     VALUES (v_tenant, v_turno.sucursal_id, v_turno.caja_id, v_turno.id, 'DEVOLUCION_EFECTIVO', v_a.monto_mxn,
             v_turno.dia_contable,
             left('Anticipo devuelto · ' || (SELECT cliente_nombre FROM citas WHERE id = v_a.cita_id), 100),
-            COALESCE(auth.uid(), v_turno.usuario_apertura_id));
+            COALESCE(auth.uid(), v_turno.usuario_apertura_id), v_autorizo, p_autorizacion_pin_id);
   END IF;
 
   UPDATE anticipos_cita
@@ -303,10 +317,216 @@ BEGIN
    WHERE id = v_a.id;
 END;
 $$;
-COMMENT ON FUNCTION devolver_anticipo(uuid, uuid, uuid, text) IS
-  'Devuelve un anticipo vigente: en efectivo sale del cajón del turno que devuelve; con tarjeta o transferencia exige referencia (0222).';
-REVOKE EXECUTE ON FUNCTION devolver_anticipo(uuid, uuid, uuid, text) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION devolver_anticipo(uuid, uuid, uuid, text) TO authenticated, service_role;
+COMMENT ON FUNCTION devolver_anticipo(uuid, uuid, uuid, text, uuid) IS
+  'Devuelve un anticipo vigente: en efectivo sale del cajón del turno que devuelve y pide venta.devolucion (o su PIN); con tarjeta o transferencia exige referencia (0222).';
+REVOKE EXECUTE ON FUNCTION devolver_anticipo(uuid, uuid, uuid, text, uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION devolver_anticipo(uuid, uuid, uuid, text, uuid) TO authenticated, service_role;
+
+-- Regresa a VIGENTE hasta p_monto (NULL = todo) de los anticipos APLICADOS a una venta, del más
+-- nuevo al más viejo. Si un anticipo pasa de lo que falta, se parte: lo que sigue pagando la venta
+-- queda APLICADO y lo que regresa nace VIGENTE con el mismo turno, método y fecha (el corte del
+-- turno que lo recibió no cambia). Transición del sistema: la llaman el disparador de cancelación y
+-- el de devoluciones, nunca la caja. Devuelve lo regresado.
+CREATE OR REPLACE FUNCTION _anticipo_regresar(p_ticket uuid, p_monto numeric)
+RETURNS numeric
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_total numeric(12,2);
+  v_resto numeric(12,2);
+  v_parte numeric(12,2);
+  v_a     anticipos_cita%ROWTYPE;
+BEGIN
+  SELECT COALESCE(sum(monto_mxn), 0) INTO v_total FROM anticipos_cita WHERE ticket_id = p_ticket AND estado = 'APLICADO';
+  v_total := LEAST(v_total, COALESCE(p_monto, v_total));
+  IF v_total <= 0 THEN RETURN 0; END IF;
+  v_resto := v_total;
+  FOR v_a IN
+    SELECT * FROM anticipos_cita WHERE ticket_id = p_ticket AND estado = 'APLICADO'
+     ORDER BY created_at DESC, id DESC FOR UPDATE
+  LOOP
+    EXIT WHEN v_resto <= 0;
+    v_parte := LEAST(v_resto, v_a.monto_mxn);
+    IF v_parte < v_a.monto_mxn THEN
+      UPDATE anticipos_cita SET monto_mxn = monto_mxn - v_parte WHERE id = v_a.id;
+      INSERT INTO anticipos_cita (tenant_id, sucursal_id, caja_id, turno_id, cita_id, metodo_pago, monto_mxn,
+                                  usuario_id, created_at)
+      VALUES (v_a.tenant_id, v_a.sucursal_id, v_a.caja_id, v_a.turno_id, v_a.cita_id, v_a.metodo_pago,
+              v_parte, v_a.usuario_id, v_a.created_at);
+    ELSE
+      UPDATE anticipos_cita
+         SET estado = 'VIGENTE', ticket_id = NULL, turno_resuelve_id = NULL, resuelto_at = NULL
+       WHERE id = v_a.id;
+    END IF;
+    v_resto := v_resto - v_parte;
+  END LOOP;
+  RETURN v_total;
+END $$;
+REVOKE ALL ON FUNCTION _anticipo_regresar(uuid, numeric) FROM PUBLIC, anon, authenticated, service_role;
+
+-- Venta cancelada (abierta o pagada): lo que sigue APLICADO regresa a VIGENTE para cobrar la cita
+-- en otra venta. Si la cancelación devolvió dinero, la devolución ya regresó primero la parte del
+-- anticipo (trg_devolucion_pago_efectivo) y aquí solo queda lo que no cubrió (p. ej. la propina).
+CREATE OR REPLACE FUNCTION tickets_cancelado_regresa_anticipo()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  PERFORM _anticipo_regresar(NEW.id, NULL);
+  RETURN NULL;
+END $$;
+REVOKE ALL ON FUNCTION tickets_cancelado_regresa_anticipo() FROM PUBLIC, anon, authenticated;
+DROP TRIGGER IF EXISTS trg_tickets_cancelado_regresa_anticipo ON tickets;
+CREATE TRIGGER trg_tickets_cancelado_regresa_anticipo
+  AFTER UPDATE OF estado_fiscal ON tickets
+  FOR EACH ROW WHEN (NEW.estado_fiscal = 'CANCELADO' AND OLD.estado_fiscal IS DISTINCT FROM 'CANCELADO')
+  EXECUTE FUNCTION tickets_cancelado_regresa_anticipo();
+
+-- Devoluciones: lo devuelto va PRIMERO a la parte pagada con anticipo, que regresa VIGENTE a la
+-- cita (no sale del cajón); solo el resto sigue el medio de siempre. Una venta sin ANTICIPO se
+-- comporta igual que antes (lo regresado es 0).
+-- _credito_devolucion: la de la 0211 (vigente). Cambio "0222": p_ya_regresado (lo que ya regresó
+-- como anticipo) se descuenta de lo devuelto antes de bajar la deuda o regresar saldo a favor.
+DROP FUNCTION IF EXISTS _credito_devolucion(uuid);
+CREATE OR REPLACE FUNCTION _credito_devolucion(p_devolucion uuid, p_ya_regresado numeric DEFAULT 0)
+RETURNS numeric
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_dev     devoluciones%ROWTYPE;
+  v_t       tickets%ROWTYPE;
+  v_credito boolean;
+  v_saldo   numeric(12,2);
+  v_deuda   numeric(12,2);
+  v_resto   numeric(12,2);
+  v_sf      numeric(12,2);
+  v_llave   varchar(100);
+  v_devuelto numeric(12,2);   -- 0222
+BEGIN
+  SELECT * INTO v_dev FROM devoluciones WHERE id = p_devolucion AND estado = 'CONFIRMADA';
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  v_devuelto := v_dev.total_devuelto_mxn - COALESCE(p_ya_regresado, 0);   -- 0222
+  SELECT * INTO v_t FROM tickets WHERE id = v_dev.ticket_original_id AND tenant_id = v_dev.tenant_id;
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  v_credito := EXISTS (SELECT 1 FROM pagos WHERE ticket_id = v_t.id AND metodo_pago = 'CREDITO'
+                                             AND estado = 'APLICADO' AND deleted_at IS NULL);
+  SELECT COALESCE(sum(monto_mxn), 0) INTO v_sf FROM pagos
+   WHERE ticket_id = v_t.id AND metodo_pago = 'SALDO_FAVOR' AND estado = 'APLICADO' AND deleted_at IS NULL;
+  IF NOT v_credito AND v_sf = 0 THEN RETURN NULL; END IF;
+
+  PERFORM pg_advisory_xact_lock(hashtextextended('credito:' || v_t.cliente_id::text, 0));
+  PERFORM pg_advisory_xact_lock(hashtextextended('saldo_favor:' || v_t.cliente_id::text, 0));
+  PERFORM 1 FROM clientes_credito WHERE tenant_id = v_t.tenant_id AND cliente_id = v_t.cliente_id FOR UPDATE;
+
+  v_llave := 'devolucion:' || v_dev.id;
+  IF EXISTS (SELECT 1 FROM abonos_credito WHERE tenant_id = v_t.tenant_id AND client_id_local = v_llave)
+     OR EXISTS (SELECT 1 FROM saldo_favor_movimientos WHERE tenant_id = v_t.tenant_id AND client_id_local = v_llave) THEN
+    RETURN 0;
+  END IF;
+
+  IF v_credito THEN
+    v_saldo := GREATEST(credito_saldo_ticket(v_t.id), 0);
+    v_deuda := LEAST(v_devuelto, v_saldo);
+    v_resto := v_devuelto - v_deuda;
+    IF v_dev.alcance = 'TOTAL' THEN
+      v_deuda := v_saldo;   -- la propina no viene en lo devuelto y también se debía
+    END IF;
+    IF v_deuda > 0 THEN
+      INSERT INTO abonos_credito (tenant_id, sucursal_id, caja_id, turno_id, cliente_id, ticket_id,
+                                  tipo, metodo_pago, monto_mxn, client_id_local, usuario_id)
+      VALUES (v_t.tenant_id, v_dev.sucursal_id, v_dev.caja_id, v_dev.turno_id, v_t.cliente_id, v_t.id,
+              'AJUSTE_CANCELACION', NULL, v_deuda, v_llave, COALESCE(auth.uid(), v_dev.usuario_solicitante_id));
+    END IF;
+    -- 0211: «Mismo método» cuenta como efectivo.
+    IF v_dev.medio_devolucion NOT IN ('EFECTIVO', 'MISMO_METODO_PAGO') OR v_resto <= 0 THEN
+      RETURN 0;
+    END IF;
+    IF (SELECT credito_abonos_al_cancelar FROM configuracion_tenant WHERE tenant_id = v_t.tenant_id) = 'EFECTIVO' THEN
+      RETURN v_resto;
+    END IF;
+    v_sf := v_resto;   -- modo SALDO_FAVOR: lo abonado queda a favor
+    v_resto := 0;
+  ELSE
+    IF v_dev.medio_devolucion NOT IN ('EFECTIVO', 'MISMO_METODO_PAGO') THEN
+      RETURN 0;
+    END IF;
+    -- Lo pagado con saldo a favor que no se ha regresado ya (devoluciones anteriores de esta venta).
+    v_sf := LEAST(v_devuelto,
+                  GREATEST(v_sf - COALESCE((SELECT sum(monto_mxn) FROM saldo_favor_movimientos
+                                             WHERE ticket_id = v_t.id AND tipo = 'ENTRADA_CANCELACION'), 0), 0));
+    v_resto := 0;
+    IF v_dev.medio_devolucion = 'EFECTIVO' THEN v_resto := v_devuelto - v_sf; END IF;
+  END IF;
+
+  IF v_sf > 0 THEN
+    INSERT INTO saldo_favor_movimientos (tenant_id, cliente_id, tipo, monto_mxn, ticket_id, turno_id, client_id_local)
+    VALUES (v_t.tenant_id, v_t.cliente_id, 'ENTRADA_CANCELACION', v_sf, v_t.id, v_dev.turno_id, v_llave);
+  END IF;
+  RETURN v_resto;
+END $$;
+COMMENT ON FUNCTION _credito_devolucion(uuid, numeric) IS
+  'Devolución confirmada de una venta a crédito o con saldo a favor: baja la deuda, regresa el saldo a favor y dice cuánto sale del cajón (0209, «mismo método» = efectivo en crédito: 0211, sin lo ya regresado como anticipo: 0222). NULL si no aplica. Solo la llama trg_devolucion_pago_efectivo.';
+REVOKE ALL ON FUNCTION _credito_devolucion(uuid, numeric) FROM PUBLIC, anon, authenticated, service_role;
+
+-- trg_devolucion_pago_efectivo: la de la 0209 (vigente). Cambios "0222": primero regresa la parte
+-- del anticipo y el efectivo de siempre es lo devuelto menos eso.
+CREATE OR REPLACE FUNCTION trg_devolucion_pago_efectivo() RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_efectivo numeric(12,2);   -- 0209
+  v_anticipo numeric(12,2) := 0;   -- 0222
+BEGIN
+  -- 0222: la parte pagada con anticipo regresa a la cita, no al cajón.
+  IF TG_OP = 'UPDATE' AND OLD.estado <> 'CONFIRMADA' AND NEW.estado = 'CONFIRMADA' THEN
+    v_anticipo := _anticipo_regresar(NEW.ticket_original_id, NEW.total_devuelto_mxn);
+  END IF;
+
+  -- 0209: venta a crédito o con saldo a favor. Solo sale del cajón lo que _credito_devolucion diga.
+  IF TG_OP = 'UPDATE' AND OLD.estado <> 'CONFIRMADA' AND NEW.estado = 'CONFIRMADA' THEN
+    v_efectivo := _credito_devolucion(NEW.id, v_anticipo);
+    IF v_efectivo IS NOT NULL THEN
+      IF v_efectivo > 0 THEN
+        INSERT INTO movimientos_caja (
+          tenant_id, sucursal_id, caja_id, turno_id,
+          tipo, monto_mxn, dia_contable, motivo, usuario_solicitante_id
+        ) VALUES (
+          NEW.tenant_id, NEW.sucursal_id, NEW.caja_id, NEW.turno_id,
+          'DEVOLUCION_EFECTIVO', v_efectivo, NEW.dia_contable,
+          'Devolución folio ' || NEW.folio_completo, NEW.usuario_solicitante_id
+        );
+      END IF;
+      RETURN NEW;
+    END IF;
+  END IF;
+
+  IF TG_OP = 'UPDATE'
+     AND OLD.estado <> 'CONFIRMADA'
+     AND NEW.estado = 'CONFIRMADA'
+     AND NEW.medio_devolucion = 'EFECTIVO'
+     AND NEW.total_devuelto_mxn - v_anticipo > 0 THEN   -- 0222
+    -- Única consecuencia en caja: sale efectivo por el reembolso. El ticket original NO se toca.
+    INSERT INTO movimientos_caja (
+      tenant_id, sucursal_id, caja_id, turno_id,
+      tipo, monto_mxn, dia_contable, motivo, usuario_solicitante_id
+    ) VALUES (
+      NEW.tenant_id, NEW.sucursal_id, NEW.caja_id, NEW.turno_id,
+      'DEVOLUCION_EFECTIVO', NEW.total_devuelto_mxn - v_anticipo, NEW.dia_contable,   -- 0222
+      'Devolución folio ' || NEW.folio_completo, NEW.usuario_solicitante_id
+    );
+  END IF;
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION trg_devolucion_pago_efectivo() FROM PUBLIC, anon, authenticated;
 
 -- Retener («No llegó» o cancelación fuera del límite): el negocio se queda el anticipo.
 CREATE OR REPLACE FUNCTION retener_anticipo(p_anticipo uuid, p_turno_id uuid)

@@ -15153,6 +15153,10 @@ export type Database = {
         Args: { p_cita: string; p_tenant: string }
         Returns: string[]
       }
+      _anticipo_regresar: {
+        Args: { p_monto: number; p_ticket: string }
+        Returns: number
+      }
       _anticipo_turno: {
         Args: { p_caja_id: string; p_tenant: string; p_turno_id: string }
         Returns: {
@@ -15200,7 +15204,10 @@ export type Database = {
         Args: { p_base: number; p_excluir?: string; p_tenant: string }
         Returns: number
       }
-      _credito_devolucion: { Args: { p_devolucion: string }; Returns: number }
+      _credito_devolucion: {
+        Args: { p_devolucion: string; p_ya_regresado?: number }
+        Returns: number
+      }
       _cupo_ventana: { Args: { p_ventana: string }; Returns: string }
       _delivery_items_a_ticket: {
         Args: { p_generico_id: string; p_items: Json; p_ticket_id: string }
@@ -16135,6 +16142,7 @@ export type Database = {
       devolver_anticipo: {
         Args: {
           p_anticipo: string
+          p_autorizacion_pin_id?: string
           p_caja_id: string
           p_referencia?: string
           p_turno_id: string
