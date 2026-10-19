@@ -2452,7 +2452,9 @@ export type Database = {
           modulo_display_cliente_activo: boolean
           modulo_inventario_activo: boolean
           credito_abonos_al_cancelar: string
+          cotizacion_vigencia_dias: number
           modulo_credito_activo: boolean
+          modulo_cotizaciones_activo: boolean
           modulo_lealtad_activo: boolean
           modulo_tienda_activo: boolean
           mostrar_nota_producto_ticket: boolean
@@ -2497,7 +2499,9 @@ export type Database = {
           modulo_display_cliente_activo?: boolean
           modulo_inventario_activo?: boolean
           credito_abonos_al_cancelar?: string
+          cotizacion_vigencia_dias?: number
           modulo_credito_activo?: boolean
+          modulo_cotizaciones_activo?: boolean
           modulo_lealtad_activo?: boolean
           modulo_tienda_activo?: boolean
           mostrar_nota_producto_ticket?: boolean
@@ -2542,7 +2546,9 @@ export type Database = {
           modulo_display_cliente_activo?: boolean
           modulo_inventario_activo?: boolean
           credito_abonos_al_cancelar?: string
+          cotizacion_vigencia_dias?: number
           modulo_credito_activo?: boolean
+          modulo_cotizaciones_activo?: boolean
           modulo_lealtad_activo?: boolean
           modulo_tienda_activo?: boolean
           mostrar_nota_producto_ticket?: boolean
@@ -2572,6 +2578,134 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cotizacion_items: {
+        Row: {
+          cantidad: number
+          clave_sat_snapshot: string | null
+          cotizacion_id: string
+          created_at: string
+          id: string
+          iva_incluido_en_precio_snapshot: boolean
+          iva_item_mxn: number
+          orden_visualizacion: number
+          precio_unitario_snapshot: number
+          producto_id: string | null
+          producto_nombre_snapshot: string
+          producto_sku_snapshot: string | null
+          subtotal_bruto_mxn: number
+          tasa_iva_snapshot: number
+          tenant_id: string
+          total_item_mxn: number
+          unidad_sat_snapshot: string | null
+        }
+        Insert: {
+          cantidad: number
+          clave_sat_snapshot?: string | null
+          cotizacion_id: string
+          created_at?: string
+          id?: string
+          iva_incluido_en_precio_snapshot: boolean
+          iva_item_mxn: number
+          orden_visualizacion?: number
+          precio_unitario_snapshot: number
+          producto_id?: string | null
+          producto_nombre_snapshot: string
+          producto_sku_snapshot?: string | null
+          subtotal_bruto_mxn: number
+          tasa_iva_snapshot: number
+          tenant_id: string
+          total_item_mxn: number
+          unidad_sat_snapshot?: string | null
+        }
+        Update: {
+          cantidad?: number
+          clave_sat_snapshot?: string | null
+          cotizacion_id?: string
+          created_at?: string
+          id?: string
+          iva_incluido_en_precio_snapshot?: boolean
+          iva_item_mxn?: number
+          orden_visualizacion?: number
+          precio_unitario_snapshot?: number
+          producto_id?: string | null
+          producto_nombre_snapshot?: string
+          producto_sku_snapshot?: string | null
+          subtotal_bruto_mxn?: number
+          tasa_iva_snapshot?: number
+          tenant_id?: string
+          total_item_mxn?: number
+          unidad_sat_snapshot?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotizacion_items_cotizacion_id_fkey"
+            columns: ["cotizacion_id"]
+            isOneToOne: false
+            referencedRelation: "cotizaciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cotizaciones: {
+        Row: {
+          caja_id: string
+          client_id_local: string | null
+          cliente_id: string | null
+          created_at: string
+          estado: string
+          folio: string
+          id: string
+          iva_mxn: number
+          subtotal_mxn: number
+          sucursal_id: string
+          tenant_id: string
+          ticket_id: string | null
+          token_publico: string
+          total_mxn: number
+          updated_at: string
+          usuario_id: string | null
+          vigente_hasta: string
+        }
+        Insert: {
+          caja_id: string
+          client_id_local?: string | null
+          cliente_id?: string | null
+          created_at?: string
+          estado?: string
+          folio: string
+          id?: string
+          iva_mxn?: number
+          subtotal_mxn?: number
+          sucursal_id: string
+          tenant_id: string
+          ticket_id?: string | null
+          token_publico?: string
+          total_mxn?: number
+          updated_at?: string
+          usuario_id?: string | null
+          vigente_hasta: string
+        }
+        Update: {
+          caja_id?: string
+          client_id_local?: string | null
+          cliente_id?: string | null
+          created_at?: string
+          estado?: string
+          folio?: string
+          id?: string
+          iva_mxn?: number
+          subtotal_mxn?: number
+          sucursal_id?: string
+          tenant_id?: string
+          ticket_id?: string | null
+          token_publico?: string
+          total_mxn?: number
+          updated_at?: string
+          usuario_id?: string | null
+          vigente_hasta?: string
+        }
+        Relationships: []
       }
       contadores_folio: {
         Row: {
@@ -14280,6 +14414,28 @@ export type Database = {
       cambiar_plan_tenant: {
         Args: { p_plan_id: string; p_precio?: number; p_tenant_id: string }
         Returns: Json
+      }
+      cancelar_cotizacion: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
+      cotizacion_publica: {
+        Args: { p_token: string }
+        Returns: Json
+      }
+      guardar_cotizacion: {
+        Args: {
+          p_caja_id: string
+          p_client_id_local?: string
+          p_cliente_id: string | null
+          p_items: Json
+          p_sucursal_id: string
+        }
+        Returns: Json
+      }
+      marcar_cotizacion_convertida: {
+        Args: { p_cotizacion_id: string; p_ticket_id: string }
+        Returns: undefined
       }
       cancelar_item_ticket: {
         Args: {
