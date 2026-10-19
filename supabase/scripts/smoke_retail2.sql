@@ -32,7 +32,7 @@ BEGIN
   INSERT INTO categorias (id, tenant_id, nombre) VALUES ('c8c80000-0000-0000-0000-0000000000c1', '99999999-0000-0000-0000-0000000000aa', 'Granel');
 END $$;
 
--- 2) Giros de tienda (0206): quién es tienda, con qué módulos arranca y que aún no se asignan.
+-- 2) Giros de tienda (0206): quién es tienda, con qué módulos arranca y que los cuatro ya se asignan (0215; BAR sigue bloqueado).
 DO $$
 DECLARE v_g text;
 BEGIN
@@ -47,10 +47,13 @@ BEGIN
   END LOOP;
 
   BEGIN
-    PERFORM cambiar_giro('99999999-0000-0000-0000-0000000000aa', 'FRUTERIA', true);
-    RAISE EXCEPTION '2c: FRUTERIA debía estar bloqueado';
+    PERFORM cambiar_giro('99999999-0000-0000-0000-0000000000aa', 'BAR', true);
+    RAISE EXCEPTION '2c: BAR debía seguir bloqueado';
   EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'GIRO_NO_DISPONIBLE%' THEN RAISE; END IF;
   END;
+  PERFORM cambiar_giro('99999999-0000-0000-0000-0000000000aa', 'FRUTERIA', true);
+  IF (SELECT operacion FROM tenants WHERE id = '99999999-0000-0000-0000-0000000000aa') IS DISTINCT FROM juego_inicial_de_giro('FRUTERIA') THEN
+    RAISE EXCEPTION '2c: FRUTERIA no dejó su juego inicial'; END IF;
   RAISE NOTICE '2 giros de tienda OK';
 END $$;
 
@@ -127,7 +130,7 @@ BEGIN
   VALUES (v_t, v_suc, v_caja, 'SMOKE-R2', (now() AT TIME ZONE 'America/Mexico_City')::date, v_maria, 500, 'TOTAL')
   RETURNING id INTO v_turno;
 
-  -- 4d) FERRETERIA puesto a mano: cambiar_giro todavía lo bloquea.
+  -- 4d) FERRETERIA puesto a mano: cambiar_giro ya lo permite (0215).
   UPDATE tenants SET vertical_principal = 'FERRETERIA' WHERE id = v_t;
   v_tk := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smoke-r2-4', v_maria);
   IF (SELECT envio_cocina_automatico FROM tickets WHERE id = v_tk) THEN RAISE EXCEPTION '4d: FERRETERIA debía quedar en false'; END IF;
@@ -139,6 +142,25 @@ BEGIN
     RAISE EXCEPTION '4g: total %', (SELECT total_item_mxn FROM ticket_items WHERE id = v_it); END IF;
   IF (SELECT unidad_sat_snapshot FROM ticket_items WHERE id = v_it) IS DISTINCT FROM 'KGM' THEN RAISE EXCEPTION '4g: unidad_sat_snapshot'; END IF;
   RAISE NOTICE '4 venta de tienda OK';
+END $$;
+
+-- 5) Un alta nueva como FERRETERIA (0215): nace con mostrador y existencias, sin cocina.
+DO $$
+DECLARE v_owner uuid := gen_random_uuid(); v_tenant uuid; v_op jsonb;
+BEGIN
+  PERFORM set_config('request.jwt.claims', '', true);
+  INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
+  VALUES (v_owner, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+          'owner-' || substr(v_owner::text, 1, 8) || '@smoke.dev', crypt('smokepass', gen_salt('bf')),
+          now(), now(), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb);
+  v_tenant := crear_tenant_con_owner(v_owner, 'smoke-ferr-' || substr(v_owner::text, 1, 8), 'Ferretería Smoke', 'Dueño Smoke',
+                                     '4770000000', 'FERRETERIA'::vertical_tipo, 'ESENCIAL', 'TRIAL'::tenant_estado, 'smoke 0215');
+  SELECT operacion INTO v_op FROM tenants WHERE id = v_tenant;
+  IF NOT (v_op->>'mostrador')::boolean OR NOT (v_op->>'existencias')::boolean
+     OR (v_op->>'cocina') IS NOT NULL AND (v_op->>'cocina')::boolean
+     OR (v_op->>'comedor')::boolean OR (v_op->>'kds')::boolean THEN
+    RAISE EXCEPTION '5: la ferretería nació con %', v_op; END IF;
+  RAISE NOTICE '5 alta como FERRETERIA OK';
 END $$;
 
 ROLLBACK;

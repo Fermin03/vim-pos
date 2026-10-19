@@ -61,7 +61,7 @@ import { clienteAdmin, servir } from "../_shared/http.ts";
 import { consumirCupo, ipDeLaPeticion } from "../_shared/limite.ts";
 import { enviarCorreo, esc, soloAscii } from "../_shared/correo.ts";
 
-const GIROS = ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "CAFE_BAR", "DARK_KITCHEN", "ENTERPRISE", "BAR", "CAFETERIA", "TAQUERIA", "RETAIL"];
+const GIROS = ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "CAFE_BAR", "DARK_KITCHEN", "ENTERPRISE", "BAR", "CAFETERIA", "TAQUERIA", "RETAIL", "ABARROTES", "FRUTERIA", "FERRETERIA", "VINOS"];
 
 const GIRO_ETIQUETA: Record<string, string> = {
   FOODTRUCK: "Food truck",
@@ -74,6 +74,10 @@ const GIRO_ETIQUETA: Record<string, string> = {
   CAFETERIA: "Cafetería",
   TAQUERIA: "Taquería o cocina económica",
   RETAIL: "Tienda de ropa o calzado",
+  ABARROTES: "Tienda de abarrotes o supermercado",
+  FRUTERIA: "Frutería y verdulería",
+  FERRETERIA: "Ferretería",
+  VINOS: "Vinos y licores",
 };
 
 const MIN_SEGUNDOS_LLENADO = 3;

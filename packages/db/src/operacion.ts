@@ -17,11 +17,10 @@ export const GIROS: readonly { codigo: CodigoGiro; nombre: string; ofrecido: boo
   { codigo: "FOODTRUCK", nombre: "Food truck", ofrecido: true },
   // Tienda (ADR 0037).
   { codigo: "RETAIL", nombre: "Tienda de ropa o calzado", ofrecido: true },
-  // Las demás tiendas no se ofrecen hasta la entrega 4 (cambiar_giro las bloquea).
-  { codigo: "ABARROTES", nombre: "Tienda de abarrotes o supermercado", ofrecido: false },
-  { codigo: "FRUTERIA", nombre: "Frutería y verdulería", ofrecido: false },
-  { codigo: "FERRETERIA", nombre: "Ferretería", ofrecido: false },
-  { codigo: "VINOS", nombre: "Vinos y licores", ofrecido: false },
+  { codigo: "ABARROTES", nombre: "Tienda de abarrotes o supermercado", ofrecido: true },
+  { codigo: "FRUTERIA", nombre: "Frutería y verdulería", ofrecido: true },
+  { codigo: "FERRETERIA", nombre: "Ferretería", ofrecido: true },
+  { codigo: "VINOS", nombre: "Vinos y licores", ofrecido: true },
   // Retirados: se quedan para nombrar a quien ya los tiene.
   { codigo: "CAFE_BAR", nombre: "Cafetería o bar", ofrecido: false },
   { codigo: "ENTERPRISE", nombre: "Cadena", ofrecido: false },

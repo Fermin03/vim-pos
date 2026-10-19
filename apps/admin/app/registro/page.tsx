@@ -21,6 +21,10 @@ const VERTICALES = [
   { v: "DARK_KITCHEN", l: "Cocina solo para apps de entrega" },
   { v: "FOODTRUCK", l: "Food truck" },
   { v: "RETAIL", l: "Tienda de ropa o calzado" },
+  { v: "ABARROTES", l: "Tienda de abarrotes o supermercado" },
+  { v: "FRUTERIA", l: "Frutería y verdulería" },
+  { v: "FERRETERIA", l: "Ferretería" },
+  { v: "VINOS", l: "Vinos y licores" },
 ];
 
 /** «Knock-Out Burger» → «knock-out-burger»: sin acentos, minúsculas y guiones. */
