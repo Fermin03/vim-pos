@@ -32,6 +32,8 @@ export type FilaItemPersistido = {
    *  esto: un producto borrado del catálogo también deja ese campo en null. */
   cargo_tipo: string | null;
   producto_nombre_snapshot: string;
+  /** Belleza (0221): quien hizo el renglón. Opcional: las filas de otras lecturas no lo traen. */
+  colaborador_id?: string | null;
   ticket_item_modificadores: { opcion_modificador_id: string; grupo_nombre_snapshot: string | null; opcion_nombre_snapshot: string | null; precio_extra_snapshot: number | string | null; cantidad: number | null }[] | null;
 };
 
@@ -66,6 +68,7 @@ export function agruparPadresHijos(filas: FilaItemPersistido[], porId: Map<strin
       cantidad: Number(r.cantidad),
       modificadores: modsDe(r),
       notaCocina: r.nota_cocina ?? null,
+      ...(r.colaborador_id ? { colaboradorId: r.colaborador_id } : {}),
     };
     if (r.combo_rol !== "PADRE") { lineas.push(base); continue; }
     const def = combos.find((c) => c.producto.id === prod.id) ?? { producto: prod, slots: [] };
@@ -152,7 +155,7 @@ export async function reconstruirCarrito(
 
   const { data, error } = await sb
     .from("ticket_items")
-    .select("id, client_id_local, producto_id, cantidad, nota_cocina, cancelado, parent_item_id, combo_rol, combo_grupo_nombre_snapshot, precio_unitario_snapshot, cargo_tipo, producto_nombre_snapshot, ticket_item_modificadores(opcion_modificador_id, grupo_nombre_snapshot, opcion_nombre_snapshot, precio_extra_snapshot, cantidad)")
+    .select("id, client_id_local, producto_id, cantidad, nota_cocina, cancelado, parent_item_id, combo_rol, combo_grupo_nombre_snapshot, precio_unitario_snapshot, cargo_tipo, producto_nombre_snapshot, colaborador_id, ticket_item_modificadores(opcion_modificador_id, grupo_nombre_snapshot, opcion_nombre_snapshot, precio_extra_snapshot, cantidad)")
     .eq("ticket_id", ticketId)
     .order("orden_visualizacion", { ascending: true });
   if (error) throw new Error(error.message);
@@ -285,7 +288,7 @@ export async function abrirCuentaEnMesa(
  */
 export async function agregarItemAlTicket(
   token: string,
-  args: { ticketId: string; productoId: string; cantidad: number; modificadores: ModificadorSel[]; nota: string | null; clientId?: string },
+  args: { ticketId: string; productoId: string; cantidad: number; modificadores: ModificadorSel[]; nota: string | null; clientId?: string; colaboradorId?: string },
 ): Promise<void> {
   const mods = args.modificadores.map((m) => ({ opcion_modificador_id: m.opcionId, cantidad: m.cantidad }));
   const { error } = await employeeClient(token).rpc("agregar_item_a_ticket", {
@@ -295,6 +298,8 @@ export async function agregarItemAlTicket(
     p_nota_cocina: args.nota,
     p_modificadores: mods,
     p_client_id_local: args.clientId ?? clientIdLocal(),
+    // Belleza: sin colaborador no se manda (firma vieja para restaurantes y tiendas).
+    ...(args.colaboradorId ? { p_colaborador_id: args.colaboradorId } : {}),
   });
   if (error) throw new Error(error.message);
 }

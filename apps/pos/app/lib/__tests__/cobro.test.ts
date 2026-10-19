@@ -281,5 +281,8 @@ describe("persistirTicket — belleza: colaborador por renglón y la cita", () =
     const e = await persistirTicket(ctx, "PARA_LLEVAR", [], "cli-1", null, null, null, null, null, "cita-7").catch((x: unknown) => x);
     expect(e).toBeInstanceOf(ErrorTicketParcial);
     expect((e as ErrorTicketParcial).ticketId).toBe("ticket-1");
+    // Fase propia: quien llama borra la venta vacía en vez de reintentar sin fin.
+    expect((e as ErrorTicketParcial).fase).toBe("cita");
+    expect(rpcMock.mock.calls.map((c) => c[0])).not.toContain("agregar_item_a_ticket");
   });
 });

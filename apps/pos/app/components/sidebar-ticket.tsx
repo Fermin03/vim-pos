@@ -171,6 +171,8 @@ export function SidebarTicket({
     colaborador?: (l: LineaCarrito) => { texto: string; falta: boolean };
     /** Belleza: elegir quién lo hizo. Sin esto (venta ya guardada) el nombre solo se lee. */
     onColaborador?: (clientId: string) => void;
+    /** Ticket vacío: lo que invita a empezar. Sin esto, el de la tienda. */
+    textoVacio?: string;
   };
 }) {
   const totales = calcularTotalesDisplay(estado.lineas, 16, estado.envio?.costoMxn ?? 0);
@@ -391,7 +393,7 @@ export function SidebarTicket({
           <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-ink-3">
             <IconoTicket />
             <p className="text-15 font-semibold text-ink-2">
-              {tienda ? "Escanea una prenda para empezar" : "Agrega productos para empezar"}
+              {tienda ? tienda.textoVacio ?? "Escanea una prenda para empezar" : "Agrega productos para empezar"}
             </p>
             {tienda?.onCambioTalla && (
               <Button variant="ghost" size="lg" onClick={tienda.onCambioTalla} className="mt-2 w-full">Cambio de talla</Button>

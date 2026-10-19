@@ -52,7 +52,8 @@ type CtxCobro = {
 };
 
 /** En qué paso de `persistirTicket` se cortó un ticket que YA se abrió. */
-export type FaseTicketParcial = "encabezado" | "renglones" | "envio";
+/** "cita": la base no dejó ligar la cita (ya está en otra venta abierta); el ticket sigue vacío. */
+export type FaseTicketParcial = "encabezado" | "cita" | "renglones" | "envio";
 
 /**
  * `abrir_ticket` ya devolvió un id —el ticket EXISTE en la base— pero un paso posterior de
@@ -159,7 +160,7 @@ export async function persistirTicket(
   // Ligar la misma cita al mismo ticket otra vez no falla: el reintento pasa por aquí sin problema.
   if (citaId) {
     const { error } = await sb.rpc("vincular_cita_ticket", { p_cita: citaId, p_ticket: tid });
-    if (error) await parcial(`No se pudo ligar la cita a la venta: ${error.message}`, "encabezado");
+    if (error) await parcial(`No se pudo ligar la cita a la venta: ${error.message}`, "cita");
   }
 
   for (const l of lineas) {

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { hoyMx } from "@vim/fecha";
 import { Icono, Modal } from "@vim/ui/styles";
 import { horaCorta } from "@vim/db/agenda";
-import { citasEnEspera, citasParaCobrar, gruposCitasCobro, nombreCorto, totalCita, type CitaDia } from "../lib/agenda";
+import { citasEnEspera, citasParaCobrar, diaCita, gruposCitasCobro, nombreCorto, totalCita, type CitaDia } from "../lib/agenda";
 import { fmtMxn } from "../lib/turno";
 import { iniciales } from "./selector-empleados";
 
@@ -21,16 +21,23 @@ const resumen = (c: CitaDia) => {
  * Pestaña «Citas de hoy» del cobro de belleza (boceto 2): Termina pronto (se tocan para cobrar),
  * En espera (se atienden, no se cobran: aún no tienen tramos) y Cobradas hoy (solo se ven).
  */
-export function CitasCobro({ token, sucursalId, version, activa, bloqueado, onCobrar, onAtender }: {
+export function CitasCobro({ token, sucursalId, version, activa, ventaActual, bloqueado, errorExterno, onReintentar, onCobrar, onRetomar, onAtender }: {
   token: string;
   sucursalId: string;
   /** Sube al cambiar la agenda o al cobrar: la lista se relee. */
   version: number;
   /** La cita que está en la venta. */
   activa: string | null;
+  /** El ticket guardado que está en la venta (una cita ligada a él no está «en otra venta»). */
+  ventaActual: string | null;
   /** Cobro abierto o venta guardada: no se cambia de cita. */
   bloqueado: boolean;
+  /** No se leyeron los servicios o los colaboradores: no se cobra una cita hasta reintentar. */
+  errorExterno: string | null;
+  onReintentar: () => void;
   onCobrar: (c: CitaDia) => void;
+  /** La cita ya está en otra venta abierta: se retoma esa venta en lugar de abrir otra. */
+  onRetomar: (venta: NonNullable<CitaDia["ventaAbierta"]>) => void;
   onAtender: () => void;
 }) {
   const [datos, setDatos] = useState<{ citas: CitaDia[]; espera: CitaDia[] } | null>(null);
@@ -88,6 +95,15 @@ export function CitasCobro({ token, sucursalId, version, activa, bloqueado, onCo
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {error && <p className="px-4 pt-4 text-14 font-medium text-danger" role="alert">{error}</p>}
+        {errorExterno && (
+          <div className="flex items-center gap-3 bg-danger-soft px-4 py-2" role="alert">
+            <p className="min-w-0 flex-1 text-14 font-medium text-danger">{errorExterno}</p>
+            <button type="button" onClick={onReintentar}
+              className="h-11 flex-shrink-0 rounded-lg border border-danger-line bg-surface px-4 text-14 font-semibold text-danger transition-[transform,background-color] duration-150 ease-vim hover:bg-danger/10 active:scale-[.97]">
+              Reintentar
+            </button>
+          </div>
+        )}
         {!grupos ? (
           !error && <p className="p-4 text-14 text-ink-3">Cargando citas…</p>
         ) : nada ? (
@@ -100,20 +116,24 @@ export function CitasCobro({ token, sucursalId, version, activa, bloqueado, onCo
             {grupos.terminaPronto.length > 0 && titulo("Termina pronto")}
             <ul>
               {grupos.terminaPronto.map((c) => {
-                const marcada = c.id === activa;
+                const enEstaVenta = ventaActual != null && c.ventaAbierta?.id === ventaActual;
+                const enOtra = c.ventaAbierta && !enEstaVenta ? c.ventaAbierta : null;
+                const marcada = c.id === activa || enEstaVenta;
+                const dia = diaCita(c.inicia, hoyMx());
                 return (
                   <li key={c.id} className="border-b border-line">
                     <button
                       type="button"
-                      disabled={bloqueado && !marcada}
+                      disabled={(bloqueado || (!enOtra && errorExterno != null)) && !marcada}
                       aria-current={marcada ? "true" : undefined}
-                      onClick={() => onCobrar(c)}
+                      onClick={() => (marcada ? undefined : enOtra ? onRetomar(enOtra) : onCobrar(c))}
                       className={`flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left transition-[background-color] duration-150 ease-vim disabled:opacity-60 ${marcada ? "bg-accent-soft" : "hover:bg-hover"}`}
                     >
                       {avatar(c, marcada)}
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-16 font-semibold">{c.clienteNombre}</span>
-                        <span className="block truncate text-13 text-ink-2">{resumen(c)}</span>
+                        <span className="block truncate text-13 text-ink-2">{[dia, resumen(c)].filter(Boolean).join(" · ")}</span>
+                        {enOtra && <span className="block text-13 font-semibold text-warning">En otra venta abierta · tócala para retomarla</span>}
                       </span>
                       <span className="font-display whitespace-nowrap text-16 font-semibold tabular-nums">{fmtMxn(totalCita(c))}</span>
                     </button>

@@ -44,6 +44,8 @@ export type CitaDia = {
   empalme: boolean;
   nota: string | null;
   tramos: TramoCita[];
+  /** Solo la lectura del cobro: la venta abierta (sin pagar ni cancelar) a la que ya está ligada. */
+  ventaAbierta?: { id: string; etiquetaEspera: string | null } | null;
 };
 
 /** Minutos desde la medianoche (hora de México). */
@@ -117,12 +119,18 @@ type FilaTramo = {
 type FilaCita = {
   id: string; cliente_id: string | null; cliente_nombre: string; cliente_telefono: string | null; cliente_email: string | null; estado: CitaEstado; canal: CitaCanal;
   inicia: string | null; termina: string | null; llego_at: string | null; empalme: boolean; nota: string | null; citas_servicios: FilaTramo[] | null;
+  ticket_id?: string | null;
+  ticket?: { estado_fiscal: string; deleted_at: string | null; en_espera: boolean | null; etiqueta_espera: string | null } | null;
 };
 
 const fecha = (s: string | null) => (s ? new Date(s) : null);
 
 function aCita(f: FilaCita): CitaDia {
+  const t = f.ticket;
   return {
+    ...(f.ticket_id && t && !t.deleted_at && (t.estado_fiscal === "ABIERTO" || t.estado_fiscal === "BORRADOR")
+      ? { ventaAbierta: { id: f.ticket_id, etiquetaEspera: t.en_espera ? t.etiqueta_espera ?? "Sin etiqueta" : null } }
+      : {}),
     id: f.id, clienteId: f.cliente_id, clienteNombre: f.cliente_nombre, clienteTelefono: f.cliente_telefono, clienteEmail: f.cliente_email,
     estado: f.estado, canal: f.canal, inicia: fecha(f.inicia), termina: fecha(f.termina), llegoAt: fecha(f.llego_at), empalme: f.empalme, nota: f.nota,
     tramos: [...(f.citas_servicios ?? [])].sort((a, b) => a.orden - b.orden).map((t) => ({
@@ -402,7 +410,7 @@ export function duracionTexto(min: number): string {
  */
 export async function citasParaCobrar(token: string, sucursalId: string, hoy: string): Promise<CitaDia[]> {
   const { data, error } = await employeeClient(token)
-    .from("citas").select(COLUMNAS)
+    .from("citas").select(`${COLUMNAS}, ticket_id, ticket:tickets!citas_ticket_id_fkey(estado_fiscal, deleted_at, en_espera, etiqueta_espera)`)
     .eq("sucursal_id", sucursalId).in("estado", ["EN_CURSO", "TERMINADA", "COBRADA"])
     .gte("inicia", inicioDiaMx(sumarDias(hoy, -6)).toISOString()).lt("inicia", inicioDiaMx(sumarDias(hoy, 1)).toISOString())
     .order("inicia");
@@ -425,6 +433,15 @@ export function gruposCitasCobro(citas: CitaDia[], espera: CitaDia[], hoy: strin
     enEspera: espera.filter((c) => c.estado === "EN_ESPERA"),
     cobradas: citas.filter((c) => c.estado === "COBRADA" && c.inicia != null && c.inicia.getTime() >= desde && c.inicia.getTime() < hasta),
   };
+}
+
+const fmtDia = new Intl.DateTimeFormat("es-MX", { timeZone: "America/Mexico_City", weekday: "short", day: "numeric" });
+
+/** El día de una cita que no es de hoy: «ayer» o «lun 13». De hoy (o sin hora), null. */
+export function diaCita(inicia: Date | null, hoy: string): string | null {
+  if (!inicia || inicia.getTime() >= inicioDiaMx(hoy).getTime()) return null;
+  if (inicia.getTime() >= inicioDiaMx(sumarDias(hoy, -1)).getTime()) return "ayer";
+  return fmtDia.format(inicia).replace(".", "").replace(",", "");
 }
 
 /** Lo que suma la cita a precio de agenda (para la lista; el cobro usa el precio de la caja). */

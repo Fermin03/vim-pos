@@ -6,14 +6,14 @@ vi.mock("../supabase", () => ({
   employeeClient: () => ({
     from: (t: string) => {
       const q: Record<string, unknown> = {};
-      for (const m of ["select", "eq", "lte", "gte", "order"]) q[m] = () => q;
+      for (const m of ["select", "eq", "lte", "gte", "lt", "in", "order"]) q[m] = () => q;
       q.then = (ok: (r: { data: unknown[]; error: null }) => unknown) => ok({ data: tablas.datos[t] ?? [], error: null });
       return q;
     },
   }),
 }));
 
-import { colaboradoresDelDia, horaSeFijaAlGuardar, serviciosAgenda, type ServicioAgenda } from "../agenda";
+import { citasParaCobrar, colaboradoresDelDia, horaSeFijaAlGuardar, serviciosAgenda, type ServicioAgenda } from "../agenda";
 
 describe("colaboradoresDelDia", () => {
   it("deja fuera a quien ya no es empleado: acceso inactivo o perfil borrado", async () => {
@@ -57,5 +57,27 @@ describe("horaSeFijaAlGuardar", () => {
   it("con colaborador elegido, o si nadie dura distinto, la vista previa es la hora final", () => {
     expect(horaSeFijaAlGuardar([{ productoId: "corte", usuarioId: "ana" }], [s])).toBe(false);
     expect(horaSeFijaAlGuardar([{ productoId: "mani", usuarioId: null }], [igual])).toBe(false);
+  });
+});
+
+describe("citasParaCobrar", () => {
+  const cita = (id: string, ticket_id: string | null, ticket: { estado_fiscal: string; deleted_at: string | null; en_espera: boolean | null; etiqueta_espera: string | null } | null) => ({
+    id, cliente_id: null, cliente_nombre: id, cliente_telefono: null, cliente_email: null, estado: "TERMINADA", canal: "CAJA",
+    inicia: "2026-11-06T16:00:00Z", termina: null, llego_at: null, empalme: false, nota: null, citas_servicios: [], ticket_id, ticket,
+  });
+  it("marca la venta abierta a la que ya está ligada la cita (y si está en espera); una pagada o cancelada no cuenta", async () => {
+    tablas.datos = {
+      citas: [
+        cita("abierta", "t1", { estado_fiscal: "ABIERTO", deleted_at: null, en_espera: false, etiqueta_espera: null }),
+        cita("espera", "t2", { estado_fiscal: "ABIERTO", deleted_at: null, en_espera: true, etiqueta_espera: "Laura" }),
+        cita("cancelada", "t3", { estado_fiscal: "CANCELADO", deleted_at: null, en_espera: false, etiqueta_espera: null }),
+        cita("borrada", "t4", { estado_fiscal: "ABIERTO", deleted_at: "2026-11-06T17:00:00Z", en_espera: false, etiqueta_espera: null }),
+        cita("suelta", null, null),
+      ],
+    };
+    const r = await citasParaCobrar("t", "s", "2026-11-06");
+    expect(r.map((c) => c.ventaAbierta ?? null)).toEqual([
+      { id: "t1", etiquetaEspera: null }, { id: "t2", etiquetaEspera: "Laura" }, null, null, null,
+    ]);
   });
 });

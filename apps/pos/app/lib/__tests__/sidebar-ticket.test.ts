@@ -104,3 +104,14 @@ describe("SidebarTicket: colaborador de belleza en el renglón", () => {
     expect(pintar({ estado, tienda: { ...tienda, simple: true } })).not.toContain("Diego R.");
   });
 });
+
+describe("SidebarTicket: ticket vacío de belleza", () => {
+  it("invita a elegir una cita y no ofrece «Cambio de talla»; la tienda sigue igual", () => {
+    const belleza = pintar({ tienda: { renglon: tienda.renglon, sinExistencia: tienda.sinExistencia, ultimoProductoId: null, simple: true, textoVacio: "Elige una cita, un servicio o escanea un producto" } });
+    expect(belleza).toContain("Elige una cita, un servicio o escanea un producto");
+    expect(belleza).not.toContain("Cambio de talla");
+    const deTienda = pintar({ tienda: { ...tienda, simple: true } });
+    expect(deTienda).toContain("Escanea una prenda para empezar");
+    expect(deTienda).toContain("Cambio de talla");
+  });
+});

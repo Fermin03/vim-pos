@@ -143,7 +143,7 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
                 <div className="pl-[18px] text-[10px] leading-[1.45] text-[#555]">{precioConUnidad(fmt(l.precioUnitario ?? 0), tipo)}</div>
               )}
               {l.colaborador && <div className="pl-[18px] text-[10px] leading-[1.45] text-[#555]">{l.colaborador}</div>}
-              {datos.tienda && l.sku &&<div className="pl-[18px] text-[10px] leading-[1.45] text-[#555]">SKU {l.sku}</div>}
+              {datos.tienda && l.sku && <div className="pl-[18px] text-[10px] leading-[1.45] text-[#555]">SKU {l.sku}</div>}
               {l.modificadores.map((m, j) => (
                 <div key={j} className="pl-[18px] text-[10px] leading-[1.45] text-[#555]">+ {m}</div>
               ))}

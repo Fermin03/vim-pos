@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ETIQUETA_ESTADO_CITA, mensajeRecordatorio, pasoTolerancia, seCruzan, tramosEncadenados } from "@vim/db/agenda";
-import { ALTO_MIN, diaSemana, gruposCitasCobro, lineasDeCita, nombreCorto, posicionTramo, precioEnCaja, rangoHoras, servicioSinColaborador, trabajaA, type CitaDia, type ColaboradorDia, type ServicioAgenda } from "../agenda";
+import { ALTO_MIN, diaCita, diaSemana, gruposCitasCobro, lineasDeCita, nombreCorto, posicionTramo, precioEnCaja, rangoHoras, servicioSinColaborador, trabajaA, type CitaDia, type ColaboradorDia, type ServicioAgenda } from "../agenda";
 import type { Producto } from "../catalogo";
 
 const t = (iso: string) => new Date(iso);
@@ -140,5 +140,14 @@ describe("cobrar la cita", () => {
     expect(precioEnCaja(producto("corte", 190), servicios[0], "adriana")).toBe(250);
     expect(precioEnCaja(producto("corte", 190), servicios[0], "diego")).toBe(190);
     expect(precioEnCaja(producto("corte", 190), servicios[0], null)).toBe(190);
+  });
+});
+
+describe("diaCita", () => {
+  it("de hoy no dice nada; ayer dice «ayer»; antes, el día corto", () => {
+    expect(diaCita(t("2026-11-06T09:00:00-06:00"), "2026-11-06")).toBeNull();
+    expect(diaCita(t("2026-11-05T23:30:00-06:00"), "2026-11-06")).toBe("ayer");
+    expect(diaCita(t("2026-11-02T12:00:00-06:00"), "2026-11-06")).toBe("lun 2");
+    expect(diaCita(null, "2026-11-06")).toBeNull();
   });
 });

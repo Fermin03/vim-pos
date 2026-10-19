@@ -124,7 +124,7 @@ import { cacheGet, cachePut } from "../lib/outbox";
 import { claveCatalogo, esErrorDeRed } from "../lib/catalogo-cache";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
 import { capaVisible, type CapaEscape } from "../lib/escape";
-import { leerTicketImpreso, listarCuentasAbiertas } from "../lib/cuentas-abiertas";
+import { borrarCuentaVacia, leerTicketImpreso, listarCuentasAbiertas } from "../lib/cuentas-abiertas";
 import { abrirCuentaBarra, moverCuentaABarra, moverCuentaAMesa } from "../lib/cuenta-barra";
 import { useEscape } from "../lib/use-escape";
 import { aGranel } from "../lib/unidades";
@@ -400,7 +400,10 @@ export function HomePos({
   /** Guarda el carrito como ticket (abrir, renglones y envío). Reintentable: lleva el mismo id local. */
   const persistirCarrito = () => {
     // Belleza: un servicio sin quien lo hizo no se cobra (su comisión no tendría dueño).
-    const falta = agenda ? servicioSinColaborador(carrito.lineas, servicioIdsRef.current) : undefined;
+    if (agenda && carrito.lineas.length > 0 && !servicioIdsRef.current) {
+      return Promise.reject(new Error("Todavía no se leen los servicios de la agenda: revisa la conexión en «Citas de hoy» y vuelve a intentar."));
+    }
+    const falta = agenda && servicioIdsRef.current ? servicioSinColaborador(carrito.lineas, servicioIdsRef.current) : undefined;
     if (falta) return Promise.reject(new Error(`Elige quién hizo «${falta.producto.nombre}» antes de cobrar.`));
     return persistirTicket(
       { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
@@ -649,30 +652,40 @@ export function HomePos({
   // Cobrar de belleza (entrega 2): pestaña del lado izquierdo, servicios y colaboradores activos de la
   // sucursal (para el precio y el nombre del renglón) y el renglón al que se le elige quién lo hizo.
   const [pestanaCobro, setPestanaCobro] = useState<"citas" | "servicios" | "productos">("citas");
-  const [serviciosCobro, setServiciosCobro] = useState<ServicioAgenda[]>([]);
+  // null = todavía no se leen (o falló): la guarda de colaborador falla cerrada y «Citas de hoy» lo dice.
+  const [serviciosCobro, setServiciosCobro] = useState<ServicioAgenda[] | null>(null);
   const [colaboradoresCobro, setColaboradoresCobro] = useState<ColaboradorDia[] | null>(null);
+  const [errorAgendaCobro, setErrorAgendaCobro] = useState<string | null>(null);
   const [eligiendoColaborador, setEligiendoColaborador] = useState<string | null>(null);
+  /** Servicio que se agrega a una venta ya guardada sin saber quién lo hizo: se pregunta antes de guardarlo. */
+  const [servicioPorAgregar, setServicioPorAgregar] = useState<{ producto: Producto; mods: ModificadorSel[]; nota: string | null; cantidad: number } | null>(null);
   useEffect(() => {
     if (!agenda) return;
     let vivo = true;
-    serviciosAgenda(token).then((s) => { if (vivo) setServiciosCobro(s); }).catch(() => {});
-    colaboradoresDelDia(token, caja.sucursal_id, hoyMx()).then((c) => { if (vivo) setColaboradoresCobro(c); }).catch(() => {});
+    Promise.all([serviciosAgenda(token), colaboradoresDelDia(token, caja.sucursal_id, hoyMx())])
+      .then(([s, c]) => { if (vivo) { setServiciosCobro(s); setColaboradoresCobro(c); setErrorAgendaCobro(null); } })
+      .catch((e) => { if (vivo) setErrorAgendaCobro(`No se pudieron leer los servicios y colaboradores: ${e instanceof Error ? e.message : "sin conexión"}. Sin ellos no se cobran servicios.`); });
     return () => { vivo = false; };
   }, [agenda, token, caja.sucursal_id, agendaVersion]);
-  const servicioIds = useMemo(() => new Set(serviciosCobro.map((s) => s.productoId)), [serviciosCobro]);
+  const servicioIds = useMemo(() => new Set((serviciosCobro ?? []).map((s) => s.productoId)), [serviciosCobro]);
   // Los usan `persistirCarrito` y la fila de agregados, que pueden correr con un cierre viejo.
-  const servicioIdsRef = useRef(servicioIds);
-  servicioIdsRef.current = servicioIds;
-  /** Lo agregado a mano con una cita en la venta lo hizo su colaborador (con su precio); se cambia en el renglón. */
+  const servicioIdsRef = useRef<ReadonlySet<string> | null>(null);
+  servicioIdsRef.current = serviciosCobro ? servicioIds : null;
+  /**
+   * Lo agregado a mano lo hizo el colaborador de la cita cargada (o, sin ella, el del primer servicio de la
+   * venta), con su precio; se cambia en el renglón. Sale de los renglones: también sirve con la venta guardada.
+   */
   const delColaboradorDeLaCita = useRef((p: Producto): Pick<LineaCarrito, "producto" | "colaboradorId"> => ({ producto: p }));
   delColaboradorDeLaCita.current = (p) => {
-    const colab = agenda && carrito.citaId ? carrito.lineas.find((l) => l.citaServicioId && l.colaboradorId)?.colaboradorId : undefined;
+    const colab = agenda
+      ? (carrito.lineas.find((l) => l.citaServicioId && l.colaboradorId) ?? carrito.lineas.find((l) => l.colaboradorId && servicioIds.has(l.producto.id)))?.colaboradorId
+      : undefined;
     if (!colab) return { producto: p };
-    return { producto: { ...p, precio_base_mxn: precioEnCaja(p, serviciosCobro.find((s) => s.productoId === p.id), colab) }, colaboradorId: colab };
+    return { producto: { ...p, precio_base_mxn: precioEnCaja(p, serviciosCobro?.find((s) => s.productoId === p.id), colab) }, colaboradorId: colab };
   };
   /** Tocar una cita de «Termina pronto»: la venta pasa a ser la suya, con su clienta. Con otra venta, pregunta antes. */
   const cargarCita = (c: CitaDia) => {
-    if (carrito.citaId === c.id || !colaboradoresCobro) return;
+    if (carrito.citaId === c.id || !colaboradoresCobro || !serviciosCobro) return;
     const activos = new Set(colaboradoresCobro.map((x) => x.usuarioId));
     const cargar = () => {
       const { lineas, faltan } = lineasDeCita(c, productos ?? [], serviciosCobro, activos);
@@ -694,14 +707,14 @@ export function HomePos({
     setEligiendoColaborador(null);
     if (!l) return;
     const p = productos?.find((x) => x.id === l.producto.id) ?? l.producto;
-    dispatch({ tipo: "fijar_colaborador", clientId, colaboradorId: usuarioId, precio: precioEnCaja(p, serviciosCobro.find((s) => s.productoId === p.id), usuarioId) });
+    dispatch({ tipo: "fijar_colaborador", clientId, colaboradorId: usuarioId, precio: precioEnCaja(p, serviciosCobro?.find((s) => s.productoId === p.id), usuarioId) });
   };
   // El módulo puede llegar después (primera lectura de directivas) o apagarse con la caja abierta:
   // se va a la sección de inicio que toque si se está en una que ya no es de esta barra.
   useEffect(() => {
     setSeccionTienda((s) => (!agenda && (s === "calendario" || s === "clientes") ? "panel" : agenda && s === "panel" ? "calendario" : s));
     // Apagada, sus capas se cierran: si no, se quedarían «abiertas» en la pila sin pintarse.
-    if (!agenda) { setFichaCita(null); setModalCita(null); setEsperaAgendaAbierta(false); setEligiendoColaborador(null); }
+    if (!agenda) { setFichaCita(null); setModalCita(null); setEsperaAgendaAbierta(false); setEligiendoColaborador(null); setServicioPorAgregar(null); }
   }, [agenda]);
   /** Salir de la venta desde «Más» (bloquear, cambiar cajero, cerrar turno, salir) con productos sin guardar. */
   const [confirmar, dialogoConfirmar] = useConfirmar();
@@ -1034,15 +1047,22 @@ export function HomePos({
 
   /** Agrega el producto suelto, sin ofrecer combo: mesa (llama al servidor) o venta rápida (reducer). */
   const agregarSuelto = useCallback(
-    async (p: Producto, mods: ModificadorSel[], nota: string | null, cantidad = 1) => {
+    async (p: Producto, mods: ModificadorSel[], nota: string | null, cantidad = 1, colaboradorElegido?: string) => {
+      const deBelleza = delColaboradorDeLaCita.current(p);
       if (ticketBd) {
-        await agregarItemAlTicket(token, { ticketId: ticketBd.ticketId, productoId: p.id, cantidad, modificadores: mods, nota });
+        const colaboradorId = colaboradorElegido ?? deBelleza.colaboradorId;
+        // Belleza: un servicio nunca se guarda sin quien lo hizo (después ya no se puede cambiar).
+        if (agenda && !colaboradorId) {
+          if (!servicioIdsRef.current) throw new Error("Todavía no se leen los servicios de la agenda: revisa la conexión en «Citas de hoy».");
+          if (servicioIdsRef.current.has(p.id)) { setServicioPorAgregar({ producto: p, mods, nota, cantidad }); return; }
+        }
+        await agregarItemAlTicket(token, { ticketId: ticketBd.ticketId, productoId: p.id, cantidad, modificadores: mods, nota, ...(colaboradorId ? { colaboradorId } : {}) });
         await recargarCuenta();
         return;
       }
-      dispatch({ tipo: "agregar", linea: lineaSuelta(p, mods, nota, cantidad) });
+      dispatch({ tipo: "agregar", linea: { ...lineaSuelta(p, mods, nota, cantidad), ...deBelleza } });
     },
-    [ticketBd, token, recargarCuenta],
+    [ticketBd, token, recargarCuenta, agenda],
   );
 
   /** Decide entre ofrecer "¿Lo hacemos combo?" o agregar el producto suelto de una vez (spec §6.5). */
@@ -1420,6 +1440,18 @@ export function HomePos({
    */
   const adoptarTicketSiQuedoAbierto = useCallback(async (e: unknown, porDefecto: string): Promise<string> => {
     if (!(e instanceof ErrorTicketParcial)) return e instanceof Error ? e.message : porDefecto;
+    // Belleza: la cita ya está en otra venta abierta. El ticket recién abierto sigue vacío: se borra y la
+    // venta se suelta, en vez de quedar «a medias» con un reintento que nunca pasa.
+    if (e.fase === "cita") {
+      try {
+        await borrarCuentaVacia(token, e.ticketId, empleado.id);
+        setTicketBd(null);
+        setTicketIncompleto(false);
+        dispatch({ tipo: "limpiar" });
+        setAgendaVersion((v) => v + 1);
+        return `${e.message} No se guardó nada: toca la cita en «Citas de hoy» para retomar la venta donde ya está.`;
+      } catch { /* si no se pudo borrar, se adopta como cualquier ticket a medias */ }
+    }
     const bd = e.totales ?? await leerTotales(token, e.ticketId).catch(() => null);
     if (bd) setTicketBd(bd);
     if (e instanceof ErrorEnvioNoFijado) {
@@ -1430,7 +1462,7 @@ export function HomePos({
     }
     setTicketIncompleto(true);
     return `El pedido quedó guardado a medias. ${e.message}. Vuelve a intentarlo: se completa el mismo ticket, no se abre otro.`;
-  }, [token]);
+  }, [token, empleado.id]);
 
   // Carrito vacío = venta terminada (cobrada, cancelada, en espera o limpiada): el siguiente
   // carrito es otra venta y lleva su propio `client_id_local`.
@@ -2238,6 +2270,7 @@ export function HomePos({
       [fichaCita != null, null],
       [esperaAgendaAbierta, null],
       [eligiendoColaborador != null, null],
+      [servicioPorAgregar != null, null],
     ];
     const pantallas: CapaEscape[] = [
       // La pantalla de cocina no conoce la pila del POS (vive en su propio paquete).
@@ -2269,7 +2302,7 @@ export function HomePos({
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
       salidaPendiente, confirmandoCierre, menuGeneralAbierto, cerrando, enInicio, enKds, enMonitor,
       enConsultaCuentas, enDevoluciones, enCambioTalla, enPedidosApps, enDelivery, enPickup, enMesas, enBarra, nuevoTicket,
-      intentarSalirDeCaptura, tienda, seccionTienda, seccionInicio, reabriendoTx, cambiandoPagoTx, cerrarBusquedaTx, cerrarConsultaInv, irASeccion, avisosVim, confirmandoVenta, salirCajaAbierto, modalCita, fichaCita, esperaAgendaAbierta, eligiendoColaborador]);
+      intentarSalirDeCaptura, tienda, seccionTienda, seccionInicio, reabriendoTx, cambiandoPagoTx, cerrarBusquedaTx, cerrarConsultaInv, irASeccion, avisosVim, confirmandoVenta, salirCajaAbierto, modalCita, fichaCita, esperaAgendaAbierta, eligiendoColaborador, servicioPorAgregar]);
   useEscape(alEscapar);
 
   // ── Cotizaciones (retail 2, entrega 3) ────────────────────────────────────────────────────
@@ -3349,8 +3382,12 @@ export function HomePos({
                   sucursalId={caja.sucursal_id}
                   version={agendaVersion}
                   activa={carrito.citaId ?? null}
-                  bloqueado={menuBloqueado || totalesCobro != null || !colaboradoresCobro}
+                  ventaActual={ticketBd?.ticketId ?? null}
+                  bloqueado={menuBloqueado || totalesCobro != null || !colaboradoresCobro || !serviciosCobro}
+                  errorExterno={errorAgendaCobro}
+                  onReintentar={agendaCambio}
                   onCobrar={cargarCita}
+                  onRetomar={(v) => void abrirDesdeTransacciones(v.id, v.etiquetaEspera ?? undefined)}
                   onAtender={() => setEsperaAgendaAbierta(true)}
                 />
               ) : (
@@ -3416,7 +3453,8 @@ export function HomePos({
             renglon: (l) => renglonTienda(l.producto, productos ?? []),
             sinExistencia: (l) => sinExistencia(l.producto, carrito.lineas.filter((x) => x.producto.id === l.producto.id).reduce((s, x) => s + x.cantidad, 0), existencias, caja.sucursal_id),
             ultimoProductoId: ultimoTienda,
-            onCambioTalla: () => abrirCambioTalla(),
+            // Belleza no hace cambios de talla y su ticket vacío invita a elegir una cita.
+            ...(esBelleza(caja) ? { textoVacio: "Elige una cita, un servicio o escanea un producto" } : { onCambioTalla: () => abrirCambioTalla() }),
             simple: true,
             onAsignarCliente: admiteClienteCuenta(carrito.modoServicio) ? () => setClienteCuentaAbierto(true) : undefined,
             // Una cita sin clienta registrada trae su nombre en la cuenta.
@@ -3636,6 +3674,20 @@ export function HomePos({
           />
         ) : null;
       })()}
+      {agenda && servicioPorAgregar && (
+        <ElegirColaborador
+          servicio={servicioPorAgregar.producto.nombre}
+          colaboradores={colaboradoresCobro ?? []}
+          actual={null}
+          permiteNadie={false}
+          onElegir={(id) => {
+            const x = servicioPorAgregar;
+            setServicioPorAgregar(null);
+            if (id) void agregarSuelto(x.producto, x.mods, x.nota, x.cantidad, id).catch((e) => setError(e instanceof Error ? e.message : "No se pudo agregar el servicio"));
+          }}
+          onCerrar={() => setServicioPorAgregar(null)}
+        />
+      )}
       {agenda && fichaCita && (
         <FichaCita
           token={token}
