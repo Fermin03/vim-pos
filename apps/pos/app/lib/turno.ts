@@ -40,7 +40,7 @@ export type DatosCaja = {
   /** Logo del negocio como data URI, o null. Viaja embebido en `tenants` (mig. 0066) para
    *  que la caja pueda mostrarlo e imprimirlo sin conexión. */
   logoUrl: string | null;
-  /** `tenants.vertical_principal`: «RETAIL» enciende la caja de tienda. */
+  /** `tenants.vertical_principal`: los giros de tienda (`esGiroTienda`) encienden la caja de tienda. */
   giro: string | null;
 };
 
