@@ -16919,6 +16919,7 @@ export type Database = {
         | "TERMINADA"
         | "NO_LLEGO"
         | "CANCELADA"
+        | "COBRADA"
       cliente_estado: "ACTIVO" | "BLOQUEADO"
       cliente_tipo_fiscal: "PERSONA_FISICA" | "PERSONA_MORAL" | "EVENTUAL"
       comanda_evento_tipo:
@@ -17049,6 +17050,7 @@ export type Database = {
         | "PAGO_EN_LINEA"
         | "CREDITO"
         | "SALDO_FAVOR"
+        | "ANTICIPO"
       modificador_naturaleza:
         | "EXTRA"
         | "SUSTITUCION"
@@ -17385,6 +17387,7 @@ export const Constants = {
         "TERMINADA",
         "NO_LLEGO",
         "CANCELADA",
+        "COBRADA",
       ],
       cliente_estado: ["ACTIVO", "BLOQUEADO"],
       cliente_tipo_fiscal: ["PERSONA_FISICA", "PERSONA_MORAL", "EVENTUAL"],
@@ -17529,6 +17532,7 @@ export const Constants = {
         "PAGO_EN_LINEA",
         "CREDITO",
         "SALDO_FAVOR",
+        "ANTICIPO",
       ],
       modificador_naturaleza: [
         "EXTRA",

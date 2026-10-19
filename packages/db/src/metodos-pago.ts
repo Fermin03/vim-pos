@@ -34,6 +34,8 @@ export const ETIQUETA_METODO_PAGO: Record<MetodoPago, string> = {
   /** Venta a cuenta del cliente (retail, 0207): no es dinero recibido. */
   CREDITO: "A crédito",
   SALDO_FAVOR: "Saldo a favor",
+  /** Pago a cuenta al apartar una cita de belleza (0220): se aplica al ticket al cobrarla. */
+  ANTICIPO: "Anticipo",
   OTRO: "Otro",
 };
 

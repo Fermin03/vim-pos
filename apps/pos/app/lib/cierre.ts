@@ -25,8 +25,8 @@ export type ReporteXResumen = {
   pagadoConSaldoFavor: number;
 };
 
-/** Ni CREDITO ni SALDO_FAVOR son dinero que se cuente: `reporte_x` ya no los trae, y si llegaran no se declaran. */
-const NO_SE_DECLARA = new Set(["CREDITO", "SALDO_FAVOR"]);
+/** Ni CREDITO, SALDO_FAVOR ni ANTICIPO son dinero que se cuente: `reporte_x` ya no los trae, y si llegaran no se declaran. */
+const NO_SE_DECLARA = new Set(["CREDITO", "SALDO_FAVOR", "ANTICIPO"]);
 
 /** Lo que el cajero cuenta: el efectivo esperado y, después, cada método que recibió dinero (abonos incluidos). */
 export function filasDeclarables(r: Pick<ReporteXResumen, "efectivoEsperado" | "pagosPorMetodo">): { metodo: string; esperado: number }[] {

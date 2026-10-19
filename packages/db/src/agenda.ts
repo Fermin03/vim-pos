@@ -33,6 +33,7 @@ export const ETIQUETA_ESTADO_CITA: Record<CitaEstado, string> = {
   TERMINADA: "Terminada",
   NO_LLEGO: "No llegó",
   CANCELADA: "Cancelada",
+  COBRADA: "Cobrada",
 };
 
 const ZONA = "America/Mexico_City";

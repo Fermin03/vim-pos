@@ -35,7 +35,7 @@ describe("etiquetas de estado", () => {
   it("son las del diseño", () => {
     expect(ETIQUETA_ESTADO_CITA).toEqual({
       AGENDADA: "Por llegar", EN_ESPERA: "En espera", EN_CURSO: "Atendiendo",
-      TERMINADA: "Terminada", NO_LLEGO: "No llegó", CANCELADA: "Cancelada",
+      TERMINADA: "Terminada", NO_LLEGO: "No llegó", CANCELADA: "Cancelada", COBRADA: "Cobrada",
     });
   });
 });

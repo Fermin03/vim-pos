@@ -12,7 +12,9 @@ export type MetodoPago =
   | "APP_OTRO"
   /** Venta a crédito y saldo a favor (0208/0209): van por su RPC (`lib/credito.ts`), no por `aplicar_pago`. */
   | "CREDITO"
-  | "SALDO_FAVOR";
+  | "SALDO_FAVOR"
+  /** Anticipo de una cita de belleza (0220): lo registra la agenda, no `aplicar_pago`. */
+  | "ANTICIPO";
 
 export type PagoInput = {
   metodo: MetodoPago;
