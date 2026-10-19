@@ -37,13 +37,22 @@ terminar.
 
 ## El menú
 
-Tres paneles —**Producto**, **Tipos de negocio** y **Recursos**— y dos enlaces directos, Facturación
-y Precios. Tipos de negocio (19 oct 2026) tiene cuatro columnas —Alimentos y bebidas, Tienda,
-Belleza y Servicios— y cada giro lleva a su página `/punto-de-venta-<giro>`; la rejilla del panel
-pone una columna por grupo, así que Recursos sigue en tres. Con este panel la barra ya no cabe
-junto a «Pruébalo 30 días gratis» antes de 1120 px, por eso ese botón aparece desde ahí. El panel
-ocupa todo el ancho bajo el encabezado: blanco, títulos en Sora, líneas finas y ninguna foto. En
-el teléfono son los mismos grupos, plegados dentro del cajón.
+En orden: **Tipos de negocio**, **Producto**, Facturación, Precios y **Recursos** (decisión de
+Fermín, 19 oct 2026). Tipos de negocio agrupa los giros en Alimentos y bebidas, Tienda, Belleza y
+Servicios, y cada giro lleva a su página `/punto-de-venta-<giro>`.
+
+**Nada se despliega: el menú son pantallas.** Tocar un grupo con hijos (Belleza) abre otra
+pantalla que entra deslizándose desde la derecha, con «‹ Belleza» arriba para volver. Una sola
+letra en todo el menú, la de la barra (Inter Tight 500), sin descripciones ni títulos en mono.
+
+- **PC:** el panel sigue bajando de arriba hacia abajo bajo el encabezado. Su primera pantalla va
+  un 30 % más grande que la barra; las siguientes, del mismo tamaño que la barra. Las listas de
+  más de cinco renglones siguen en otra columna.
+- **Teléfono y tableta (menos de 900 px):** el cajón es de pantalla completa y todo mide igual
+  (18 px). La primera pantalla es el menú entero con las dos acciones abajo.
+
+Con «Tipos de negocio» la barra ya no cabe junto a «Pruébalo 30 días gratis» antes de 1120 px, por
+eso ese botón aparece desde ahí.
 
 El menú vive duplicado en cada HTML (no hay build). Para cambiarlo se cambia en `_patron.html` y
 se replica en todas las páginas con un script de un solo uso, no a mano: dieciocho copias editadas

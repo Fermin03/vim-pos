@@ -37,7 +37,7 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="/assets/css/vim.css?v=24">
+<link rel="stylesheet" href="/assets/css/vim.css?v=26">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
@@ -64,80 +64,81 @@
       </a>
       <nav class="nav-enlaces" aria-label="Principal">
         <div class="nav-grupo" data-nav-grupo data-abierto="false">
-          <button class="nav-enlace" type="button" aria-expanded="false" aria-controls="panel-producto">
-            Producto
-            <svg class="nav-flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
-          <div class="nav-panel" id="panel-producto">
-            <div class="contenedor nav-panel-rejilla">
-              <div>
-                <p class="nav-panel-titulo">Lo de todos los días</p>
-                <ul class="nav-panel-lista">
-                  <li><a href="/funciones#caja"><b>Caja y cobro</b><span>Vender, cobrar y dar cambio</span></a></li>
-                  <li><a href="/funciones#cocina"><b>Cocina</b><span>Comandas impresas o en pantalla</span></a></li>
-                  <li><a href="/funciones#mesas"><b>Mesas</b><span>Mapa, cuentas abiertas y propinas</span></a></li>
-                  <li><a href="/funciones#domicilio"><b>A domicilio</b><span>Repartidor, zona de envío y Uber Eats</span></a></li>
-                </ul>
-              </div>
-              <div>
-                <p class="nav-panel-titulo">Lo del dueño</p>
-                <ul class="nav-panel-lista">
-                  <li><a href="/funciones#inventario"><b>Inventario</b><span>Cuánto insumo se fue de verdad</span></a></li>
-                  <li><a href="/funciones#reportes"><b>Corte y reportes</b><span>El corte que ya conoces y quince reportes</span></a></li>
-                  <li><a href="/funciones#lealtad"><b>Lealtad</b><span>Puntos o sellos para que vuelvan</span></a></li>
-                  <li><a href="/funciones#migracion"><b>Cambiar de sistema</b><span>Tu menú se pega y ya</span></a></li>
-                </ul>
-              </div>
-              <div class="nav-panel-destacado">
-                <p class="nav-panel-titulo">Por qué es distinto</p>
-                <ul class="nav-panel-lista">
-                  <li><a href="/sin-internet"><b>Sin internet</b><span>Se cae la señal y sigues cobrando</span></a></li>
-                  <li><a href="/funciones"><b>Todas las funciones</b><span>Sección por sección, con capturas</span></a></li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="nav-grupo" data-nav-grupo data-abierto="false">
           <button class="nav-enlace" type="button" aria-expanded="false" aria-controls="panel-negocios">
             Tipos de negocio
             <svg class="nav-flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
           </button>
           <div class="nav-panel" id="panel-negocios">
-            <div class="contenedor nav-panel-rejilla">
-              <div>
-                <p class="nav-panel-titulo">Alimentos y bebidas</p>
-                <ul class="nav-panel-lista">
-                  <li><a href="/punto-de-venta-cafeterias"><b>Cafés</b><span>Barra, para llevar y lealtad</span></a></li>
-                  <li><a href="/punto-de-venta-servicio-rapido"><b>Servicio rápido</b><span>Mostrador, combos y comandas</span></a></li>
-                  <li><a href="/punto-de-venta-restaurantes-servicio-completo"><b>Servicio completo</b><span>Mesas, meseros y cuentas</span></a></li>
-                  <li><a href="/punto-de-venta-bares"><b>Bares y cervecerías</b><span>Cuentas abiertas y propinas</span></a></li>
-                  <li><a href="/punto-de-venta-food-trucks"><b>Food trucks</b><span>Cobra rápido, aun sin señal</span></a></li>
-                </ul>
+            <div class="contenedor">
+              <div class="nav-pantallas" data-pantallas>
+                <div class="nav-pantalla" data-pantalla="raiz">
+                  <ul class="nav-lista nav-lista-raiz">
+                    <li><button type="button" data-ir="negocios-alimentos">Alimentos y bebidas<svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+                    <li><button type="button" data-ir="negocios-tienda">Tienda<svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+                    <li><button type="button" data-ir="negocios-belleza">Belleza<svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+                    <li><button type="button" data-ir="negocios-servicios">Servicios<svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+                  </ul>
+                </div>
+                <div class="nav-pantalla" data-pantalla="negocios-alimentos" role="group" aria-label="Alimentos y bebidas">
+                  <button class="nav-volver" type="button" data-volver aria-label="Volver: Alimentos y bebidas"><svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Alimentos y bebidas</button>
+                  <ul class="nav-lista">
+                    <li><a href="/punto-de-venta-cafeterias">Cafés</a></li>
+                    <li><a href="/punto-de-venta-servicio-rapido">Servicio rápido</a></li>
+                    <li><a href="/punto-de-venta-restaurantes-servicio-completo">Servicio completo</a></li>
+                    <li><a href="/punto-de-venta-bares">Bares y cervecerías</a></li>
+                    <li><a href="/punto-de-venta-food-trucks">Food trucks</a></li>
+                  </ul>
+                </div>
+                <div class="nav-pantalla" data-pantalla="negocios-tienda" role="group" aria-label="Tienda">
+                  <button class="nav-volver" type="button" data-volver aria-label="Volver: Tienda"><svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Tienda</button>
+                  <ul class="nav-lista">
+                    <li><a href="/punto-de-venta-tiendas-de-ropa">Ropa</a></li>
+                    <li><a href="/punto-de-venta-vinaterias">Vino y licor</a></li>
+                    <li><a href="/punto-de-venta-abarrotes">Abarrotes y fruterías</a></li>
+                  </ul>
+                </div>
+                <div class="nav-pantalla" data-pantalla="negocios-belleza" role="group" aria-label="Belleza">
+                  <button class="nav-volver" type="button" data-volver aria-label="Volver: Belleza"><svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Belleza</button>
+                  <ul class="nav-lista">
+                    <li><a href="/punto-de-venta-salones-de-belleza">Salón de belleza</a></li>
+                    <li><a href="/punto-de-venta-spa">Spa</a></li>
+                    <li><a href="/punto-de-venta-peluquerias">Peluquería</a></li>
+                    <li><a href="/punto-de-venta-estudios-de-tatuajes">Tatuajes</a></li>
+                  </ul>
+                </div>
+                <div class="nav-pantalla" data-pantalla="negocios-servicios" role="group" aria-label="Servicios">
+                  <button class="nav-volver" type="button" data-volver aria-label="Volver: Servicios"><svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Servicios</button>
+                  <ul class="nav-lista">
+                    <li><a href="/punto-de-venta-talleres-automotrices">Servicios automotrices</a></li>
+                    <li><a href="/punto-de-venta-consultorios">Servicios de salud</a></li>
+                  </ul>
+                </div>
               </div>
-              <div>
-                <p class="nav-panel-titulo">Tienda</p>
-                <ul class="nav-panel-lista">
-                  <li><a href="/punto-de-venta-tiendas-de-ropa"><b>Ropa</b><span>Tallas, colores y existencias</span></a></li>
-                  <li><a href="/punto-de-venta-vinaterias"><b>Vino y licor</b><span>Código de barras y existencias</span></a></li>
-                  <li><a href="/punto-de-venta-abarrotes"><b>Abarrotes y fruterías</b><span>Venta rápida con código de barras</span></a></li>
-                </ul>
-              </div>
-              <div>
-                <p class="nav-panel-titulo">Belleza</p>
-                <ul class="nav-panel-lista">
-                  <li><a href="/punto-de-venta-salones-de-belleza"><b>Salón de belleza</b><span>Agenda, servicios y comisiones</span></a></li>
-                  <li><a href="/punto-de-venta-spa"><b>Spa</b><span>Agenda y cobro de servicios</span></a></li>
-                  <li><a href="/punto-de-venta-peluquerias"><b>Peluquería</b><span>Turnos y comisiones</span></a></li>
-                  <li><a href="/punto-de-venta-estudios-de-tatuajes"><b>Tatuajes</b><span>Citas y cobro por artista</span></a></li>
-                </ul>
-              </div>
-              <div>
-                <p class="nav-panel-titulo">Servicios</p>
-                <ul class="nav-panel-lista">
-                  <li><a href="/punto-de-venta-talleres-automotrices"><b>Servicios automotrices</b><span>Órdenes de servicio y refacciones</span></a></li>
-                  <li><a href="/punto-de-venta-consultorios"><b>Servicios de salud</b><span>Citas, consultas y cobro</span></a></li>
-                </ul>
+            </div>
+          </div>
+        </div>
+        <div class="nav-grupo" data-nav-grupo data-abierto="false">
+          <button class="nav-enlace" type="button" aria-expanded="false" aria-controls="panel-producto">
+            Producto
+            <svg class="nav-flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="nav-panel" id="panel-producto">
+            <div class="contenedor">
+              <div class="nav-pantallas" data-pantallas>
+                <div class="nav-pantalla" data-pantalla="raiz">
+                  <ul class="nav-lista nav-lista-raiz">
+                    <li><a href="/funciones#caja">Caja y cobro</a></li>
+                    <li><a href="/funciones#cocina">Cocina</a></li>
+                    <li><a href="/funciones#mesas">Mesas</a></li>
+                    <li><a href="/funciones#domicilio">A domicilio</a></li>
+                    <li><a href="/funciones#inventario">Inventario</a></li>
+                    <li><a href="/funciones#reportes">Corte y reportes</a></li>
+                    <li><a href="/funciones#lealtad">Lealtad</a></li>
+                    <li><a href="/funciones#migracion">Cambiar de sistema</a></li>
+                    <li><a href="/sin-internet">Sin internet</a></li>
+                    <li><a href="/funciones">Todas las funciones</a></li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
@@ -150,28 +151,19 @@
             <svg class="nav-flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
           </button>
           <div class="nav-panel" id="panel-recursos">
-            <div class="contenedor nav-panel-rejilla">
-              <div>
-                <p class="nav-panel-titulo">Guías</p>
-                <ul class="nav-panel-lista">
-                  <li><a href="/como-elegir-sistema-restaurante"><b>Cómo elegir sistema</b><span>Nueve preguntas antes de firmar</span></a></li>
-                  <li><a href="/cuanto-cuesta-un-sistema-para-restaurante"><b>Cuánto cuesta</b><span>Las tres formas de cobrarte, con cuentas</span></a></li>
-                  <li><a href="/factura-global-restaurantes"><b>Factura global</b><span>Qué es y cómo se emite</span></a></li>
-                </ul>
-              </div>
-              <div>
-                <p class="nav-panel-titulo">Por ciudad</p>
-                <ul class="nav-panel-lista">
-                  <li><a href="/punto-de-venta-restaurantes-leon"><b>Restaurantes en León</b><span>La demo es en tu mostrador</span></a></li>
-                </ul>
-              </div>
-              <div>
-                <p class="nav-panel-titulo">VIM POS</p>
-                <ul class="nav-panel-lista">
-                  <li><a href="/novedades"><b>Novedades</b><span>Qué cambió y cuándo</span></a></li>
-                  <li><a href="/nosotros"><b>Nosotros</b><span>Quién está detrás</span></a></li>
-                  <li><a href="/contacto"><b>Contacto</b><span>Contesta una persona</span></a></li>
-                </ul>
+            <div class="contenedor">
+              <div class="nav-pantallas" data-pantallas>
+                <div class="nav-pantalla" data-pantalla="raiz">
+                  <ul class="nav-lista nav-lista-raiz">
+                    <li><a href="/como-elegir-sistema-restaurante">Cómo elegir sistema</a></li>
+                    <li><a href="/cuanto-cuesta-un-sistema-para-restaurante">Cuánto cuesta</a></li>
+                    <li><a href="/factura-global-restaurantes">Factura global</a></li>
+                    <li><a href="/punto-de-venta-restaurantes-leon">Restaurantes en León</a></li>
+                    <li><a href="/novedades">Novedades</a></li>
+                    <li><a href="/nosotros">Nosotros</a></li>
+                    <li><a href="/contacto">Contacto</a></li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
@@ -200,54 +192,90 @@
       </svg>
     </button>
     <nav aria-label="Menú">
-      <div class="nav-movil-lista">
-          <details>
-            <summary>Producto</summary>
-            <a href="/funciones">Todas las funciones</a>
-            <a href="/funciones#caja">Caja y cobro</a>
-            <a href="/funciones#cocina">Cocina</a>
-            <a href="/funciones#mesas">Mesas</a>
-            <a href="/funciones#domicilio">A domicilio</a>
-            <a href="/funciones#inventario">Inventario</a>
-            <a href="/funciones#reportes">Corte y reportes</a>
-            <a href="/funciones#lealtad">Lealtad</a>
-            <a href="/sin-internet">Sin internet</a>
-          </details>
-          <details>
-            <summary>Tipos de negocio</summary>
-            <p class="nav-movil-sub">Alimentos y bebidas</p>
-            <a href="/punto-de-venta-cafeterias">Cafés</a>
-            <a href="/punto-de-venta-servicio-rapido">Servicio rápido</a>
-            <a href="/punto-de-venta-restaurantes-servicio-completo">Servicio completo</a>
-            <a href="/punto-de-venta-bares">Bares y cervecerías</a>
-            <a href="/punto-de-venta-food-trucks">Food trucks</a>
-            <p class="nav-movil-sub">Tienda</p>
-            <a href="/punto-de-venta-tiendas-de-ropa">Ropa</a>
-            <a href="/punto-de-venta-vinaterias">Vino y licor</a>
-            <a href="/punto-de-venta-abarrotes">Abarrotes y fruterías</a>
-            <p class="nav-movil-sub">Belleza</p>
-            <a href="/punto-de-venta-salones-de-belleza">Salón de belleza</a>
-            <a href="/punto-de-venta-spa">Spa</a>
-            <a href="/punto-de-venta-peluquerias">Peluquería</a>
-            <a href="/punto-de-venta-estudios-de-tatuajes">Tatuajes</a>
-            <p class="nav-movil-sub">Servicios</p>
-            <a href="/punto-de-venta-talleres-automotrices">Servicios automotrices</a>
-            <a href="/punto-de-venta-consultorios">Servicios de salud</a>
-          </details>
-          <a href="/facturacion-cfdi">Facturación</a>
-          <a href="/precios">Precios</a>
-          <details>
-            <summary>Recursos</summary>
-            <a href="/como-elegir-sistema-restaurante">Cómo elegir sistema</a>
-            <a href="/cuanto-cuesta-un-sistema-para-restaurante">Cuánto cuesta</a>
-            <a href="/factura-global-restaurantes">Factura global</a>
-            <a href="/punto-de-venta-restaurantes-leon">Restaurantes en León</a>
-            <a href="/novedades">Novedades</a>
-            <a href="/nosotros">Nosotros</a>
-            <a href="/contacto">Contacto</a>
-          </details>
-          <a href="/demo">Pide una demo</a>
-          <a href="https://admin.vimpos.com.mx/registro">Pruébalo 30 días gratis</a>
+      <div class="nav-pantallas" data-pantallas>
+        <div class="nav-pantalla" data-pantalla="raiz">
+          <ul class="nav-lista nav-lista-raiz">
+            <li><button type="button" data-ir="m-negocios">Tipos de negocio<svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+            <li><button type="button" data-ir="m-producto">Producto<svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+            <li><a href="/facturacion-cfdi">Facturación</a></li>
+            <li><a href="/precios">Precios</a></li>
+            <li><button type="button" data-ir="m-recursos">Recursos<svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+          </ul>
+          <div class="nav-movil-acciones">
+            <a class="btn btn-primario" href="/demo">Pide una demo</a>
+            <a class="btn btn-fantasma" href="https://admin.vimpos.com.mx/registro">Pruébalo 30 días gratis</a>
+          </div>
+        </div>
+        <div class="nav-pantalla" data-pantalla="m-negocios" role="group" aria-label="Tipos de negocio">
+          <button class="nav-volver" type="button" data-volver aria-label="Volver: Tipos de negocio"><svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Tipos de negocio</button>
+          <ul class="nav-lista">
+            <li><button type="button" data-ir="m-alimentos">Alimentos y bebidas<svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+            <li><button type="button" data-ir="m-tienda">Tienda<svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+            <li><button type="button" data-ir="m-belleza">Belleza<svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+            <li><button type="button" data-ir="m-servicios">Servicios<svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+          </ul>
+        </div>
+        <div class="nav-pantalla" data-pantalla="m-alimentos" role="group" aria-label="Alimentos y bebidas">
+          <button class="nav-volver" type="button" data-volver aria-label="Volver: Alimentos y bebidas"><svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Alimentos y bebidas</button>
+          <ul class="nav-lista">
+            <li><a href="/punto-de-venta-cafeterias">Cafés</a></li>
+            <li><a href="/punto-de-venta-servicio-rapido">Servicio rápido</a></li>
+            <li><a href="/punto-de-venta-restaurantes-servicio-completo">Servicio completo</a></li>
+            <li><a href="/punto-de-venta-bares">Bares y cervecerías</a></li>
+            <li><a href="/punto-de-venta-food-trucks">Food trucks</a></li>
+          </ul>
+        </div>
+        <div class="nav-pantalla" data-pantalla="m-tienda" role="group" aria-label="Tienda">
+          <button class="nav-volver" type="button" data-volver aria-label="Volver: Tienda"><svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Tienda</button>
+          <ul class="nav-lista">
+            <li><a href="/punto-de-venta-tiendas-de-ropa">Ropa</a></li>
+            <li><a href="/punto-de-venta-vinaterias">Vino y licor</a></li>
+            <li><a href="/punto-de-venta-abarrotes">Abarrotes y fruterías</a></li>
+          </ul>
+        </div>
+        <div class="nav-pantalla" data-pantalla="m-belleza" role="group" aria-label="Belleza">
+          <button class="nav-volver" type="button" data-volver aria-label="Volver: Belleza"><svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Belleza</button>
+          <ul class="nav-lista">
+            <li><a href="/punto-de-venta-salones-de-belleza">Salón de belleza</a></li>
+            <li><a href="/punto-de-venta-spa">Spa</a></li>
+            <li><a href="/punto-de-venta-peluquerias">Peluquería</a></li>
+            <li><a href="/punto-de-venta-estudios-de-tatuajes">Tatuajes</a></li>
+          </ul>
+        </div>
+        <div class="nav-pantalla" data-pantalla="m-servicios" role="group" aria-label="Servicios">
+          <button class="nav-volver" type="button" data-volver aria-label="Volver: Servicios"><svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Servicios</button>
+          <ul class="nav-lista">
+            <li><a href="/punto-de-venta-talleres-automotrices">Servicios automotrices</a></li>
+            <li><a href="/punto-de-venta-consultorios">Servicios de salud</a></li>
+          </ul>
+        </div>
+        <div class="nav-pantalla" data-pantalla="m-producto" role="group" aria-label="Producto">
+          <button class="nav-volver" type="button" data-volver aria-label="Volver: Producto"><svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Producto</button>
+          <ul class="nav-lista">
+            <li><a href="/funciones#caja">Caja y cobro</a></li>
+            <li><a href="/funciones#cocina">Cocina</a></li>
+            <li><a href="/funciones#mesas">Mesas</a></li>
+            <li><a href="/funciones#domicilio">A domicilio</a></li>
+            <li><a href="/funciones#inventario">Inventario</a></li>
+            <li><a href="/funciones#reportes">Corte y reportes</a></li>
+            <li><a href="/funciones#lealtad">Lealtad</a></li>
+            <li><a href="/funciones#migracion">Cambiar de sistema</a></li>
+            <li><a href="/sin-internet">Sin internet</a></li>
+            <li><a href="/funciones">Todas las funciones</a></li>
+          </ul>
+        </div>
+        <div class="nav-pantalla" data-pantalla="m-recursos" role="group" aria-label="Recursos">
+          <button class="nav-volver" type="button" data-volver aria-label="Volver: Recursos"><svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Recursos</button>
+          <ul class="nav-lista">
+            <li><a href="/como-elegir-sistema-restaurante">Cómo elegir sistema</a></li>
+            <li><a href="/cuanto-cuesta-un-sistema-para-restaurante">Cuánto cuesta</a></li>
+            <li><a href="/factura-global-restaurantes">Factura global</a></li>
+            <li><a href="/punto-de-venta-restaurantes-leon">Restaurantes en León</a></li>
+            <li><a href="/novedades">Novedades</a></li>
+            <li><a href="/nosotros">Nosotros</a></li>
+            <li><a href="/contacto">Contacto</a></li>
+          </ul>
+        </div>
       </div>
     </nav>
   </div>
@@ -423,7 +451,7 @@
   </div>
 </footer>
 
-<script src="/assets/js/vim.js?v=17" defer></script>
+<script src="/assets/js/vim.js?v=19" defer></script>
 <!-- Medición sin cookies (Vercel Web Analytics). Se sirve desde este dominio y
      solo existe si está encendida en el proyecto de Vercel; si no, es un 404
      inofensivo. Los eventos se mandan desde vim.js. -->

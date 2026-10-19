@@ -82,6 +82,50 @@
        · Bloquear el scroll de fondo. Sin esto, deslizar sobre el velo mueve la
          página de debajo y al cerrar el menú ya no estás donde estabas.
        · Devolver el foco a la hamburguesa al cerrar. */
+  /* ---- Pantallas del menú -------------------------------------------------
+     Un botón con `data-ir` lleva a la pantalla de ese nombre dentro del mismo
+     contenedor y `data-volver` regresa a la anterior. Las que no se ven van
+     inertes, para que el foco no se meta en ellas. El foco pasa a la pantalla
+     nueva ANTES de marcar inerte la vieja: si no, el panel de la PC lo pierde,
+     cree que te saliste y se cierra. Con teclado el foco va a la primera
+     entrada; con un toque, a la pantalla misma, para no pintar el aro. */
+  function reiniciarPantallas(cont) {
+    if (!cont) return;
+    cont.pila = [];
+    cont.setAttribute("data-instante", "");
+    Array.prototype.forEach.call(cont.children, function (p, i) {
+      if (i) p.setAttribute("data-lado", "despues"); else p.removeAttribute("data-lado");
+      p.inert = i > 0;
+      p.tabIndex = -1;
+    });
+    void cont.offsetHeight;
+    cont.removeAttribute("data-instante");
+  }
+
+  function mostrarPantalla(cont, destino, lado, teclado, foco) {
+    var actual = cont.querySelector(":scope > .nav-pantalla:not([data-lado])");
+    destino.removeAttribute("data-lado");
+    destino.inert = false;
+    (teclado ? foco || destino.querySelector("a, button") : destino).focus();
+    actual.setAttribute("data-lado", lado);
+    actual.inert = true;
+  }
+
+  document.querySelectorAll("[data-pantallas]").forEach(function (cont) {
+    cont.setAttribute("data-js", "");
+    reiniciarPantallas(cont);
+    cont.addEventListener("click", function (e) {
+      var ir = e.target.closest("[data-ir]");
+      if (ir) {
+        cont.pila.push(ir);
+        mostrarPantalla(cont, cont.querySelector('[data-pantalla="' + ir.getAttribute("data-ir") + '"]'), "antes", e.detail === 0);
+      } else if (e.target.closest("[data-volver]") && cont.pila.length) {
+        var de = cont.pila.pop();
+        mostrarPantalla(cont, de.closest(".nav-pantalla"), "despues", e.detail === 0, de);
+      }
+    });
+  });
+
   var boton = document.querySelector("[data-menu-boton]");
   var menu = document.querySelector("[data-menu]");
   var botonCerrar = document.querySelector("[data-menu-cerrar]");
@@ -99,11 +143,11 @@
       boton.setAttribute("aria-expanded", "true");
       document.body.setAttribute("data-menu-abierto", "true");
 
-      /* A la primera entrada, no al botón de cerrar: quien abre el menú quiere
-         ir a algún sitio, no cerrarlo. La primera puede ser un grupo plegado,
-         así que se busca su `summary`: un enlace dentro de un <details>
-         cerrado no acepta el foco. */
-      var primero = menu.querySelector(".nav-movil-lista summary, .nav-movil-lista > a");
+      /* Siempre abre en la primera pantalla, y el foco va a su primera
+         entrada, no al botón de cerrar: quien abre el menú quiere ir a algún
+         sitio, no cerrarlo. */
+      reiniciarPantallas(menu.querySelector("[data-pantallas]"));
+      var primero = menu.querySelector(".nav-pantalla:not([data-lado]) :is(a, button)");
       if (primero) primero.focus();
     }
 
@@ -149,7 +193,8 @@
       if (e.key !== "Tab") return;
 
       /* El aro del foco: del último se salta al primero y al revés. */
-      var f = Array.prototype.slice.call(menu.querySelectorAll(FOCABLES));
+      var f = Array.prototype.slice.call(menu.querySelectorAll(FOCABLES))
+        .filter(function (el) { return !el.closest("[inert]"); });
       if (!f.length) return;
       var primero = f[0], ultimo = f[f.length - 1];
 
@@ -195,6 +240,7 @@
       if (previo === grupo) return;
       /* De un panel al de al lado no hay animación: ya había uno abierto. */
       enlaces.toggleAttribute("data-instante", !!(previo && grupo));
+      if (grupo) reiniciarPantallas(grupo.querySelector("[data-pantallas]"));
       grupos.forEach(function (g) {
         g.setAttribute("data-abierto", String(g === grupo));
         g.querySelector("button").setAttribute("aria-expanded", String(g === grupo));
@@ -584,7 +630,7 @@
      es exactamente el tipo de cosa que se olvida en la quinta página. */
   function ruta(p) { return p.replace(/\.html$/, "").replace(/\/+$/, "").replace(/^\/?index$/, "") || "/"; }
   var aqui = ruta(location.pathname);
-  document.querySelectorAll(".nav-enlace, .nav-panel a, .nav-movil-lista a").forEach(function (a) {
+  document.querySelectorAll(".nav-enlace, .nav-panel a, .nav-movil a").forEach(function (a) {
     var destino = a.getAttribute("href");
     if (!destino || destino.charAt(0) !== "/" || ruta(destino) !== aqui) return;
     a.setAttribute("aria-current", "page");
