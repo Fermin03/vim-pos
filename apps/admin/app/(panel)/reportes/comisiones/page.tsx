@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useModulos } from "../../../components/admin-shell";
 import { Segmentos } from "../../../components/controles";
 import { PageBody, PageHeader } from "../../../components/page-header";
@@ -39,22 +39,39 @@ const columnasRenglon: Columna<RenglonComision>[] = [
   { id: "comision", titulo: "Comisión", tipo: "mxn", valor: (r) => r.comision, total: "suma", enfasis: "fuerte" },
 ];
 
+/** La URL tal como llegó. Se lee antes que useRangoReporte, que recorta a hoy el fin del periodo actual. */
+function urlInicial(): { desde: string | null; hasta: string | null } {
+  const p = new URLSearchParams(window.location.search);
+  return { desde: p.get("desde"), hasta: p.get("hasta") };
+}
+
 function Reporte() {
+  // Este efecto va ANTES de useRangoReporte: los efectos corren en orden y aquel reescribe la URL.
+  const url = useRef<{ desde: string | null; hasta: string | null } | null>(null);
+  useEffect(() => { url.current ??= urlInicial(); }, []);
   const { rango, cambiar } = useRangoReporte();
   const [periodos, setPeriodos] = useState<{ actual: Periodo; anterior: Periodo } | null>(null);
-  const [errorPeriodos, setErrorPeriodos] = useState<string | null>(null);
+  const [errorPeriodos, setErrorPeriodos] = useState(false);
   const [sel, setSel] = useState<string | null>(null);
   const [renglones, setRenglones] = useState<{ de: string; filas: RenglonComision[] } | null>(null);
   const [errorRenglones, setErrorRenglones] = useState<string | null>(null);
 
-  // Abre siempre en el periodo que corre: es lo que se va a pagar. Hasta saberlo no se consulta.
+  // Abre en el periodo que corre (es lo que se va a pagar), salvo que la URL traiga otro rango: si
+  // es un periodo se respeta tal cual, aunque termine después de hoy; si es libre, ya viene recortado.
+  // Hasta saberlo no se consulta.
   useEffect(() => {
     leerPeriodosComision()
-      .then((p) => { setPeriodos(p); cambiar(p.actual.desde, p.actual.hasta); })
-      .catch((e) => setErrorPeriodos(mensajeError(e, "No se pudo calcular el periodo")));
+      .then((p) => {
+        setPeriodos(p);
+        const u = url.current;
+        const dePeriodo = [p.actual, p.anterior].find((x) => x.desde === u?.desde && x.hasta === u?.hasta);
+        if (dePeriodo) cambiar(dePeriodo.desde, dePeriodo.hasta);
+        else if (!u?.desde || !u.hasta) cambiar(p.actual.desde, p.actual.hasta);
+      })
+      .catch(() => setErrorPeriodos(true));
   }, [cambiar]);
 
-  const listo = periodos !== null || errorPeriodos !== null;
+  const listo = periodos !== null || errorPeriodos;
   const consulta = useConsulta((r) => leerComisiones(r.desde, r.hasta), listo ? rango : null);
   const filas = consulta.datos?.filas ?? [];
 
@@ -102,7 +119,11 @@ function Reporte() {
     <Segmentos grande etiqueta="Periodo" valor={enPeriodo}
       opciones={[{ v: "actual", l: "Periodo actual" }, { v: "anterior", l: "Periodo anterior" }]}
       onCambiar={(v) => { const p = v === "actual" ? periodos.actual : periodos.anterior; cambiar(p.desde, p.hasta); }} />
-  );
+  ) || (errorPeriodos && (
+    <p role="alert" className="w-full text-14 font-medium text-danger lg:w-auto lg:max-w-[420px] lg:self-center">
+      No se pudo calcular el periodo de comisiones. Elige las fechas a mano; el sueldo solo se suma con un periodo completo.
+    </p>
+  ));
 
   return (
     <ReporteMarco
@@ -114,7 +135,6 @@ function Reporte() {
       cifras={cifras}
       tabla={{ columnas, filas, clave: (f) => f.clave, orden: { id: "total", dir: "desc" }, minimo: 880, vacio: "Nadie tiene comisiones en estas fechas." }}
     >
-      {errorPeriodos && <p role="alert" className="mt-4 text-14 font-medium text-danger">{errorPeriodos}</p>}
       {consulta.datos && !consulta.datos.esPeriodo && (
         <p className="mt-4 rounded-lg border border-line bg-warning-soft px-4 py-3 text-14 text-ink">
           Estas fechas no son un periodo completo, así que el sueldo sale en $0. Elige «Periodo actual» o «Periodo anterior» para sumarlo.

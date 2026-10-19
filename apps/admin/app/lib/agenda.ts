@@ -4,6 +4,7 @@ import { DIAS, horaValida } from "@vim/fecha";
 import { supabase } from "./supabase";
 import { tenantId } from "./datos";
 import { COLORES, crearProducto } from "./catalogo";
+import { claveSatSchema } from "./clave-sat";
 
 // Catálogo de la agenda (belleza, 0218): servicios, colaboradores, espacios y tolerancia. Escribe
 // directo a las tablas; la RLS deja escribir solo al dueño o a un administrador.
@@ -55,7 +56,8 @@ export const servicioSchema = z.object({
   tipo_espacio_id: z.string().guid().nullable(),
   comision: reglaSchema,
   anticipo: reglaSchema,
-  clave_sat: z.string().trim().regex(/^\d{8}$/, "La clave del SAT son 8 dígitos").nullable(),
+  /** undefined = no se tocó: una clave vieja con otro formato no impide guardar el servicio. */
+  clave_sat: claveSatSchema.nullable().optional(),
 });
 export type ServicioInput = z.infer<typeof servicioSchema>;
 
@@ -171,7 +173,7 @@ export async function crearServicio(input: ServicioInput): Promise<string> {
 /** Solo lo que este formulario enseña: el resto de la ficha del producto (IVA, foto…) no se toca. */
 export async function actualizarServicio(id: string, input: ServicioInput): Promise<void> {
   const d = servicioSchema.parse(input);
-  ok(await supabase.from("productos").update({ nombre: d.nombre, categoria_id: d.categoria_id, precio_base_mxn: d.precio_base_mxn, clave_sat: d.clave_sat }).eq("id", id));
+  ok(await supabase.from("productos").update({ nombre: d.nombre, categoria_id: d.categoria_id, precio_base_mxn: d.precio_base_mxn, ...(d.clave_sat !== undefined && { clave_sat: d.clave_sat }) }).eq("id", id));
   ok(await supabase.from("servicios_agenda").update({
     duracion_min: d.duracion_min, tipo_espacio_id: d.tipo_espacio_id, ...columnasRegla("comision", d.comision), ...columnasRegla("anticipo", d.anticipo),
   }).eq("producto_id", id));

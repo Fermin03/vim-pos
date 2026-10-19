@@ -1,6 +1,6 @@
 "use client";
 import { Icono } from "@vim/ui/styles";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { hoyMx, sumarDias } from "@vim/fecha";
 
 /** Selector compacto de rango de días contables con presets rápidos.
@@ -19,13 +19,18 @@ export function RangoFechas({
 }) {
   const [d, setD] = useState(desde);
   const [h, setH] = useState(hasta);
+  // El rango también cambia desde fuera (los botones de periodo de Comisiones): los campos lo
+  // siguen, o se vería un rango distinto al que se consulta y «Aplicar» quedaría encendido.
+  useEffect(() => { setD(desde); setH(hasta); }, [desde, hasta]);
 
   // Tope: hoy. No hay día contable en el futuro, y pedirlo solo devolvía una
-  // tabla vacía sin decir por qué.
+  // tabla vacía sin decir por qué. La excepción es un periodo que llega de fuera (la semana o la
+  // quincena de Comisiones, que terminan después de hoy): ese no se toca, pero a mano no se aplica.
   const tope = hoyMx();
   const invertido = d > h;
   // Fechas editadas a mano y sin aplicar todavía.
   const pendiente = d !== desde || h !== hasta;
+  const futuro = pendiente && h > tope;
 
   function presetUltimos(n: number) {
     // Hora de México: con `toISOString()` el rango arrancaba en la fecha de mañana a partir de
@@ -99,7 +104,7 @@ export function RangoFechas({
           <button
             type="button"
             onClick={() => onCambio(d, h)}
-            disabled={invertido}
+            disabled={invertido || futuro}
             className={`${boton} col-span-4 whitespace-nowrap border-line-strong text-ink hover:border-ink disabled:cursor-not-allowed disabled:opacity-40 ${pendiente ? "" : "hidden lg:block"}`}
           >
             Aplicar
@@ -109,6 +114,11 @@ export function RangoFechas({
       {invertido && (
         <p className="mt-2 text-13 font-medium text-danger" role="alert">
           La fecha de inicio es posterior a la de fin. Corrige el rango para poder aplicarlo.
+        </p>
+      )}
+      {!invertido && futuro && (
+        <p className="mt-2 text-13 font-medium text-danger" role="alert">
+          La fecha de fin no puede ser después de hoy. Corrige el rango para poder aplicarlo.
         </p>
       )}
     </div>

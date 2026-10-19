@@ -30,6 +30,11 @@ Todo reporte lleva rango de fechas, y el rango **nunca deja elegir el futuro** n
 posterior al fin: se deshabilita Aplicar y se dice por qué. Un reporte vacío por un rango
 invertido parece un negocio sin ventas.
 
+**Excepción: los periodos de Comisiones.** «Periodo actual» pone la semana o la quincena completa,
+que termina después de hoy: es lo que se va a pagar, y solo con el periodo exacto se suma el sueldo.
+Ese fin futuro lo pone el botón (o una URL que es exactamente un periodo, que no se recorta al
+recargar); escrito a mano, un fin después de hoy sigue sin poder aplicarse.
+
 El día contable no es el día natural. Cuando un reporte usa día contable, lo dice.
 
 ## Gráficas

@@ -1,5 +1,9 @@
 "use client";
+import { z } from "zod";
 import { supabase } from "./supabase";
+
+/** Clave del catálogo c_ClaveProdServ: 8 dígitos. La comparten productos, combos y servicios. */
+export const claveSatSchema = z.string().trim().regex(/^\d{8}$/, "La clave del SAT son 8 dígitos");
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SB_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;

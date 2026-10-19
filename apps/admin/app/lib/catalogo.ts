@@ -4,6 +4,7 @@ import { z } from "zod";
 import { supabase } from "./supabase";
 import { borrarSuave, tenantId } from "./datos";
 import { leerTodas } from "./reportes";
+import { claveSatSchema } from "./clave-sat";
 
 // Paleta funcional de categorías (del design system; NUNCA el naranja de marca).
 export const COLORES: { hex: string; bg: string }[] = [
@@ -171,7 +172,7 @@ export const productoSchema = z.object({
    * Clave del catálogo c_ClaveProdServ del SAT. Vacía = el CFDI usa la genérica del giro
    * (90101500, servicios de restaurantes), que es lo que un contador pondría de todos modos.
    */
-  clave_sat: z.string().trim().regex(/^\d{8}$/, "La clave del SAT son 8 dígitos").optional().or(z.literal("")),
+  clave_sat: claveSatSchema.optional().or(z.literal("")),
   /**
    * Tasa de IVA del producto. No es siempre 16: la comida para llevar va a tasa 0, y hasta que
    * esto se pudo capturar el CFDI declaraba 16 % de todo.

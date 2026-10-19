@@ -104,6 +104,8 @@ describe("reglaSchema (comisión y anticipo)", () => {
     expect(servicioSchema.safeParse({ ...base, anticipo: { tipo: "PORCENTAJE", valor: 101 } }).success).toBe(false);
     expect(servicioSchema.safeParse({ ...base, clave_sat: "85121800" }).success).toBe(true);
     expect(servicioSchema.safeParse({ ...base, clave_sat: "8512" }).success).toBe(false);
+    // Sin tocar el campo (undefined) no se valida ni se reescribe la clave que ya tenía.
+    expect(servicioSchema.safeParse({ ...base, clave_sat: undefined }).success).toBe(true);
     expect(servicioColaboradorSchema.safeParse({ usuario_id: UUID, precio_mxn: null, duracion_min: null, comision: { tipo: "MONTO", valor: 50 } }).success).toBe(true);
     expect(servicioColaboradorSchema.safeParse({ usuario_id: UUID, precio_mxn: null, duracion_min: null, comision: { tipo: "PORCENTAJE", valor: 101 } }).success).toBe(false);
   });

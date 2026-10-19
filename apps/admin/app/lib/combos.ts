@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { supabase } from "./supabase";
 import { borrarSuave, tenantId } from "./datos";
+import { claveSatSchema } from "./clave-sat";
 import type { EstadoProducto } from "./catalogo";
 import { estadoGeneral } from "./menu-sucursal";
 import type { FilaDeMenu } from "./menus";
@@ -22,7 +23,7 @@ export const comboSchema = z.object({
   categoria_id: z.string().guid("Elige una categoría"),
   precio_base_mxn: z.number({ error: "Precio inválido" }).min(0, "El precio no puede ser negativo"),
   descripcion: z.string().trim().max(500).optional().or(z.literal("")),
-  clave_sat: z.string().trim().regex(/^\d{8}$/, "La clave del SAT son 8 dígitos").optional().or(z.literal("")),
+  clave_sat: claveSatSchema.optional().or(z.literal("")),
   tasa_iva: z.number().min(0).max(100),
   iva_incluido_en_precio: z.boolean(),
 });

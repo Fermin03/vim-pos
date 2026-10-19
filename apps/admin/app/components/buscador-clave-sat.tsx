@@ -6,7 +6,11 @@ import { buscarClavesSat, type ClaveSat } from "../lib/clave-sat";
 import { mensajeError } from "../lib/errores";
 
 /** Busca en el catálogo del SAT y llena la clave al elegir. La clave se puede seguir escribiendo a mano. */
-export function BuscadorClaveSat({ onElegir }: { onElegir: (clave: string) => void }) {
+export function BuscadorClaveSat({ onElegir, ejemplos = "camisa, pantalón, tenis" }: {
+  onElegir: (clave: string) => void;
+  /** Lo que se sugiere buscar, según qué se da de alta. */
+  ejemplos?: string;
+}) {
   const [texto, setTexto] = useState("");
   const [res, setRes] = useState<ClaveSat[] | null>(null);
   const [buscando, setBuscando] = useState(false);
@@ -22,7 +26,7 @@ export function BuscadorClaveSat({ onElegir }: { onElegir: (clave: string) => vo
   return (
     <div className="mt-2">
       <div className="flex gap-2">
-        <input aria-label="Buscar clave en el catálogo del SAT" className={input} value={texto} placeholder="Buscar: camisa, pantalón, tenis…"
+        <input aria-label="Buscar clave en el catálogo del SAT" className={input} value={texto} placeholder={`Buscar: ${ejemplos}…`}
           onChange={(e) => setTexto(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void buscar(); } }} />
         <Button type="button" variant="ghost" disabled={buscando || texto.trim().length < 3} onClick={() => void buscar()}>{buscando ? "Buscando…" : "Buscar"}</Button>
       </div>

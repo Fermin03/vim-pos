@@ -24,7 +24,7 @@ const corto = "h-10 w-24 rounded border border-line-strong px-2.5 text-sm tabula
 type Quien = { precio: string; duracion: string; comision: CamposRegla };
 type Editando = {
   id: string | null; nombre: string; categoriaId: string; precio: string; duracion: string; tipoEspacioId: string;
-  comision: CamposRegla; anticipo: CamposRegla; claveSat: string;
+  comision: CamposRegla; anticipo: CamposRegla; claveSat: string; claveSatOriginal: string;
   quien: Record<string, Quien>;
 };
 
@@ -82,14 +82,14 @@ export default function ServiciosPage() {
     setError(null);
     setEditando({
       id: null, nombre: "", categoriaId: categorias[0]?.id ?? "", precio: "", duracion: "30", tipoEspacioId: "",
-      comision: SIN_REGLA, anticipo: SIN_REGLA, claveSat: "", quien: {},
+      comision: SIN_REGLA, anticipo: SIN_REGLA, claveSat: "", claveSatOriginal: "", quien: {},
     });
   }
   function editar(s: Servicio) {
     setError(null);
     setEditando({
       id: s.id, nombre: s.nombre, categoriaId: s.categoriaId, precio: String(s.precio), duracion: String(s.duracionMin),
-      tipoEspacioId: s.tipoEspacioId ?? "", comision: camposDe(s.comision), anticipo: camposDe(s.anticipo), claveSat: s.claveSat ?? "",
+      tipoEspacioId: s.tipoEspacioId ?? "", comision: camposDe(s.comision), anticipo: camposDe(s.anticipo), claveSat: s.claveSat ?? "", claveSatOriginal: s.claveSat ?? "",
       quien: Object.fromEntries(s.colaboradores.map((c) => [c.usuario_id, {
         precio: c.precio_mxn === null ? "" : String(c.precio_mxn), duracion: c.duracion_min === null ? "" : String(c.duracion_min),
         comision: camposDe(c.comision),
@@ -103,7 +103,8 @@ export default function ServiciosPage() {
     const p = servicioSchema.safeParse({
       nombre: editando.nombre, categoria_id: editando.categoriaId, precio_base_mxn: editando.precio.trim() === "" ? NaN : Number(editando.precio),
       duracion_min: Number(editando.duracion), tipo_espacio_id: editando.tipoEspacioId || null,
-      comision: reglaDeCampos(editando.comision), anticipo: reglaDeCampos(editando.anticipo), clave_sat: editando.claveSat.trim() || null,
+      comision: reglaDeCampos(editando.comision), anticipo: reglaDeCampos(editando.anticipo), // Sin tocar el campo no se reescribe: una clave vieja de otro formato no bloquea el resto.
+      clave_sat: editando.claveSat === editando.claveSatOriginal ? undefined : editando.claveSat.trim() || null,
     });
     if (!p.success) {
       const i = p.error.issues[0];
@@ -225,7 +226,7 @@ export default function ServiciosPage() {
                     </label>
                     <input id="srv-clave-sat" className={`${input} max-w-[200px] tabular-nums`} inputMode="numeric" maxLength={8}
                       value={editando.claveSat} onChange={(e) => setEditando({ ...editando, claveSat: e.target.value.replace(/\D/g, "") })} />
-                    <BuscadorClaveSat onElegir={(claveSat) => setEditando({ ...editando, claveSat })} />
+                    <BuscadorClaveSat ejemplos="corte de cabello, manicure, masaje" onElegir={(claveSat) => setEditando({ ...editando, claveSat })} />
                     <p className="mt-1.5 text-13 text-ink-2">La clave del catálogo del SAT que lleva la factura de este servicio. Búscala por su nombre.</p>
                   </div>
                 </div>
