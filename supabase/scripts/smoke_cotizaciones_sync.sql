@@ -13,7 +13,7 @@ DECLARE
   v_pa     uuid := 'c2130000-0000-0000-0000-0000000000a1';
   v_ana    uuid := 'c2130000-0000-0000-0000-000000000001';
   v_alias  uuid := 'c2130000-0000-0000-0000-000000000002';
-  v_turno  uuid; v_tk uuid; v_c1 uuid; v_c2 uuid; v_ajena uuid := gen_random_uuid();
+  v_turno  uuid; v_tk uuid; v_suc2 uuid; v_caja2 uuid; v_c1 uuid; v_c2 uuid; v_ajena uuid := gen_random_uuid();
   j jsonb; v_cot jsonb; v_items jsonb; v_cot2 jsonb; v_items2 jsonb; v_res jsonb;
 BEGIN
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
@@ -127,6 +127,23 @@ BEGIN
     RAISE EXCEPTION '6: se pisó la cotización de otro negocio'; END IF;
   IF EXISTS (SELECT 1 FROM cotizaciones WHERE tenant_id = v_otro AND folio <> 'COT-AJENA') THEN
     RAISE EXCEPTION '6: entró una cotización a otro negocio'; END IF;
+
+  -- 8) Una CONVERTIDA en la nube no se mueve aunque llegue una copia vieja CANCELADA.
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('cotizaciones', jsonb_build_array(
+    v_cot2 || jsonb_build_object('estado', 'CANCELADA', 'ticket_id', NULL, 'updated_at', now() + interval '2 minutes'))));
+  IF (v_res->>'cotizaciones')::int IS DISTINCT FROM 0 OR v_res ? '_errores' THEN
+    RAISE EXCEPTION '8: la copia vieja debía ignorarse: %', v_res; END IF;
+  IF (SELECT estado || ':' || ticket_id FROM cotizaciones WHERE id = v_c2) <> 'CONVERTIDA:' || v_tk THEN
+    RAISE EXCEPTION '8: la CONVERTIDA cambió'; END IF;
+
+  -- 9) La caja tiene que ser de la sucursal de la cotización.
+  INSERT INTO sucursales (tenant_id, codigo, nombre) VALUES (v_t, 'S213', 'Otra tienda 0213') RETURNING id INTO v_suc2;
+  INSERT INTO cajas (tenant_id, sucursal_id, numero, nombre) VALUES (v_t, v_suc2, 99, 'Caja 0213') RETURNING id INTO v_caja2;
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('cotizaciones', jsonb_build_array(v_cot || jsonb_build_object(
+    'id', gen_random_uuid(), 'folio', 'COT-X7', 'client_id_local', 'x7', 'token_publico', md5('x7') || md5('y7'), 'caja_id', v_caja2))));
+  IF (v_res->>'cotizaciones')::int IS DISTINCT FROM 0
+     OR NOT EXISTS (SELECT 1 FROM jsonb_array_elements(COALESCE(v_res->'_errores', '[]')) e WHERE e->>'error' = 'caja de otra sucursal') THEN
+    RAISE EXCEPTION '9: una caja de otra sucursal debía rechazarse: %', v_res; END IF;
 
   -- 7) El pull no las baja.
   IF sync_pull_snapshot(v_t) ? 'cotizaciones' OR sync_pull_snapshot(v_t) ? 'cotizacion_items' THEN

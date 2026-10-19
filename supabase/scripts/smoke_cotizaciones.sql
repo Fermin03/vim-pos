@@ -177,6 +177,11 @@ BEGIN
     RAISE EXCEPTION '8: cotizacion_publica filtró ids: %', j2; END IF;
   IF cotizacion_publica('no-existe-este-token-de-cotizacion') IS NOT NULL OR cotizacion_publica(NULL) IS NOT NULL THEN
     RAISE EXCEPTION '8: un token inventado devolvió algo'; END IF;
+  -- Un cliente borrado ya no sale con su nombre.
+  UPDATE clientes SET deleted_at = now() WHERE id = v_ana;
+  IF cotizacion_publica(v_tok)->>'cliente' IS NOT NULL THEN
+    RAISE EXCEPTION '8: salió el nombre de un cliente borrado: %', cotizacion_publica(v_tok); END IF;
+  UPDATE clientes SET deleted_at = NULL WHERE id = v_ana;
   EXECUTE 'SET LOCAL ROLE anon';
   PERFORM set_config('request.jwt.claims', json_build_object('role', 'anon')::text, true);
   IF cotizacion_publica(v_tok) IS NULL THEN RAISE EXCEPTION '8: anon no pudo leer el enlace'; END IF;

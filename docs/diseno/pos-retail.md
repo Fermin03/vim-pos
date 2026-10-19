@@ -334,7 +334,7 @@ en días).
   si la cotización está vencida o si se omitió un producto que ya no existe. Al cobrar la venta, la
   cotización queda **Convertida**.
 - Cualquier cajero crea, convierte y cancela. Una cotización de otra caja no se ve ni se convierte aquí
-  (sí en el admin y en el POS web).
+  (sí en el admin; en la caja, web o instalada, solo salen las de esa caja).
 
 ## Devoluciones en una tienda
 

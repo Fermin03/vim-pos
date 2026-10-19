@@ -17,8 +17,10 @@ export default async function PaginaCotizacion({ params }: { params: Promise<{ t
   if (!c) {
     return (
       <main className="mx-auto flex min-h-[100dvh] w-full max-w-[460px] flex-col justify-center px-5 py-10">
-        <h1 className="font-display text-24 font-semibold leading-tight">Esta cotización no existe o ya no está disponible.</h1>
-        <p className="mt-2 text-16 leading-relaxed text-ink-2">Pide a tu vendedor que te mande el enlace otra vez.</p>
+        <h1 className="font-display text-24 font-semibold leading-tight">No encontramos esta cotización.</h1>
+        <p className="mt-2 text-16 leading-relaxed text-ink-2">
+          Si te la acaban de mandar, espera unos minutos y vuelve a abrir el enlace; si no, pide a tu vendedor que te la mande otra vez.
+        </p>
       </main>
     );
   }

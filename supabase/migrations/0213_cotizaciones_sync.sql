@@ -10,7 +10,8 @@
 -- Molde de _vim_aplicar_credito_caja (0210). Corre en origin (FK normales). La pertenencia al
 -- negocio se revisa a mano: la FK solo diría que la fila existe, no de quién es.
 --   · tenant_id de la fila = el del dispositivo; un id que ya es de otro negocio es error;
---   · sucursal, caja y cliente (redirigido por clientes_alias, 0156) del negocio;
+--   · sucursal, caja y cliente (redirigido por clientes_alias, 0156) del negocio; la caja, de esa sucursal;
+--   · una CONVERTIDA en la nube ya no cambia: una copia vieja de la caja no la regresa;
 --   · la venta de una CONVERTIDA tiene que estar YA en la nube: la caja la manda en el lote de su
 --     venta; si llegara antes, cae en _errores y se reintenta en el siguiente ciclo;
 --   · un renglón entra solo si su cotización ya está en la nube y es del negocio. Uno ya subido se
@@ -24,6 +25,7 @@ DECLARE
   v_fila    jsonb;
   v_cli     uuid;
   v_dueno   uuid;
+  v_suc     uuid;
   v_id      uuid;
   v_nc      integer := 0;
   v_ni      integer := 0;
@@ -42,8 +44,12 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM sucursales WHERE id = (v_fila->>'sucursal_id')::uuid AND tenant_id = p_tenant) THEN
           RAISE EXCEPTION 'sucursal de otro negocio';
         END IF;
-        IF NOT EXISTS (SELECT 1 FROM cajas WHERE id = (v_fila->>'caja_id')::uuid AND tenant_id = p_tenant) THEN
+        SELECT sucursal_id INTO v_suc FROM cajas WHERE id = (v_fila->>'caja_id')::uuid AND tenant_id = p_tenant;
+        IF NOT FOUND THEN
           RAISE EXCEPTION 'caja de otro negocio';
+        END IF;
+        IF v_suc IS DISTINCT FROM (v_fila->>'sucursal_id')::uuid THEN
+          RAISE EXCEPTION 'caja de otra sucursal';
         END IF;
         v_cli := (v_fila->>'cliente_id')::uuid;
         IF v_cli IS NOT NULL THEN
@@ -61,6 +67,7 @@ BEGIN
         INSERT INTO cotizaciones AS c SELECT * FROM jsonb_populate_record(NULL::cotizaciones, v_fila)
           ON CONFLICT (id) DO UPDATE SET estado = EXCLUDED.estado, ticket_id = EXCLUDED.ticket_id, updated_at = EXCLUDED.updated_at
            WHERE c.tenant_id = p_tenant
+             AND c.estado <> 'CONVERTIDA'
              AND (c.estado, c.ticket_id, c.updated_at) IS DISTINCT FROM (EXCLUDED.estado, EXCLUDED.ticket_id, EXCLUDED.updated_at)
           RETURNING id INTO v_id;
         IF v_id IS NOT NULL THEN v_nc := v_nc + 1; END IF;

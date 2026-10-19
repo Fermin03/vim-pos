@@ -296,7 +296,7 @@ Título de pestaña «Cotización · VIM POS» y `noindex`.
 - «Por WhatsApp como PDF» es un enlace que el cliente abre y guarda como PDF: WhatsApp no adjunta
   archivos por enlace y el repo no genera PDF.
 - Sin combos en cotizaciones.
-- La cotización de otra caja no se ve ni se convierte en esta; sí en el admin y el POS web.
+- La cotización de otra caja no se ve ni se convierte en esta; sí en el admin. En la caja (web o instalada) solo salen las de esa caja.
 - Cancelar la puede hacer cualquier cajero (no mueve dinero).
 - Una cotización cancelada se ve en el enlace público como «no existe o ya no está disponible».
 - `caja_id` obligatorio: el admin no crea cotizaciones.

@@ -88,7 +88,99 @@ export type Database = {
           turno_id?: string
           usuario_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "abonos_credito_caja_id_fkey"
+            columns: ["caja_id"]
+            isOneToOne: false
+            referencedRelation: "cajas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "abonos_credito_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "abonos_credito_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "abonos_credito_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_resumen"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "abonos_credito_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "abonos_credito_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
+            foreignKeyName: "abonos_credito_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "abonos_credito_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "abonos_credito_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cumplimiento_tiempos_cocina"
+            referencedColumns: ["ticket_id"]
+          },
+          {
+            foreignKeyName: "abonos_credito_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_ventas_apps_externas"
+            referencedColumns: ["ticket_id"]
+          },
+          {
+            foreignKeyName: "abonos_credito_turno_id_fkey"
+            columns: ["turno_id"]
+            isOneToOne: false
+            referencedRelation: "turnos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "abonos_credito_turno_id_fkey"
+            columns: ["turno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_efectivo_esperado_turno"
+            referencedColumns: ["turno_id"]
+          },
+          {
+            foreignKeyName: "abonos_credito_turno_id_fkey"
+            columns: ["turno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_resumen_turno"
+            referencedColumns: ["turno_id"]
+          },
+        ]
       }
       addons: {
         Row: {
@@ -1697,45 +1789,6 @@ export type Database = {
           },
         ]
       }
-      clientes_credito: {
-        Row: {
-          activo: boolean
-          cliente_id: string
-          created_at: string
-          created_by: string | null
-          id: string
-          limite_mxn: number
-          plazo_dias: number
-          tenant_id: string
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          activo?: boolean
-          cliente_id: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          limite_mxn: number
-          plazo_dias: number
-          tenant_id: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          activo?: boolean
-          cliente_id?: string
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          limite_mxn?: number
-          plazo_dias?: number
-          tenant_id?: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: []
-      }
       clientes_alias: {
         Row: {
           alias_id: string
@@ -1779,6 +1832,74 @@ export type Database = {
           },
           {
             foreignKeyName: "clientes_alias_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clientes_credito: {
+        Row: {
+          activo: boolean
+          cliente_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          limite_mxn: number
+          plazo_dias: number
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          activo?: boolean
+          cliente_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          limite_mxn: number
+          plazo_dias: number
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          activo?: boolean
+          cliente_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          limite_mxn?: number
+          plazo_dias?: number
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clientes_credito_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_credito_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_credito_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_resumen"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "clientes_credito_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -2435,7 +2556,9 @@ export type Database = {
           cfdi_folio_inicial: number | null
           cfdi_serie_default: string | null
           combo_upsell_activo: boolean
+          cotizacion_vigencia_dias: number
           created_at: string
+          credito_abonos_al_cancelar: string
           csd_archivo_encrypted: string | null
           csd_password_encrypted: string | null
           fondo_estandar_mxn: number | null
@@ -2446,15 +2569,13 @@ export type Database = {
           modos_servicio_activos: string[]
           modulo_apps_externas_activo: boolean
           modulo_cfdi_activo: boolean
+          modulo_cotizaciones_activo: boolean
+          modulo_credito_activo: boolean
           modulo_crm_avanzado_activo: boolean
           modulo_delivery_activo: boolean
           modulo_delivery_propio_activo: boolean
           modulo_display_cliente_activo: boolean
           modulo_inventario_activo: boolean
-          credito_abonos_al_cancelar: string
-          cotizacion_vigencia_dias: number
-          modulo_credito_activo: boolean
-          modulo_cotizaciones_activo: boolean
           modulo_lealtad_activo: boolean
           modulo_tienda_activo: boolean
           mostrar_nota_producto_ticket: boolean
@@ -2482,7 +2603,9 @@ export type Database = {
           cfdi_folio_inicial?: number | null
           cfdi_serie_default?: string | null
           combo_upsell_activo?: boolean
+          cotizacion_vigencia_dias?: number
           created_at?: string
+          credito_abonos_al_cancelar?: string
           csd_archivo_encrypted?: string | null
           csd_password_encrypted?: string | null
           fondo_estandar_mxn?: number | null
@@ -2493,15 +2616,13 @@ export type Database = {
           modos_servicio_activos?: string[]
           modulo_apps_externas_activo?: boolean
           modulo_cfdi_activo?: boolean
+          modulo_cotizaciones_activo?: boolean
+          modulo_credito_activo?: boolean
           modulo_crm_avanzado_activo?: boolean
           modulo_delivery_activo?: boolean
           modulo_delivery_propio_activo?: boolean
           modulo_display_cliente_activo?: boolean
           modulo_inventario_activo?: boolean
-          credito_abonos_al_cancelar?: string
-          cotizacion_vigencia_dias?: number
-          modulo_credito_activo?: boolean
-          modulo_cotizaciones_activo?: boolean
           modulo_lealtad_activo?: boolean
           modulo_tienda_activo?: boolean
           mostrar_nota_producto_ticket?: boolean
@@ -2529,7 +2650,9 @@ export type Database = {
           cfdi_folio_inicial?: number | null
           cfdi_serie_default?: string | null
           combo_upsell_activo?: boolean
+          cotizacion_vigencia_dias?: number
           created_at?: string
+          credito_abonos_al_cancelar?: string
           csd_archivo_encrypted?: string | null
           csd_password_encrypted?: string | null
           fondo_estandar_mxn?: number | null
@@ -2540,15 +2663,13 @@ export type Database = {
           modos_servicio_activos?: string[]
           modulo_apps_externas_activo?: boolean
           modulo_cfdi_activo?: boolean
+          modulo_cotizaciones_activo?: boolean
+          modulo_credito_activo?: boolean
           modulo_crm_avanzado_activo?: boolean
           modulo_delivery_activo?: boolean
           modulo_delivery_propio_activo?: boolean
           modulo_display_cliente_activo?: boolean
           modulo_inventario_activo?: boolean
-          credito_abonos_al_cancelar?: string
-          cotizacion_vigencia_dias?: number
-          modulo_credito_activo?: boolean
-          modulo_cotizaciones_activo?: boolean
           modulo_lealtad_activo?: boolean
           modulo_tienda_activo?: boolean
           mostrar_nota_producto_ticket?: boolean
@@ -2578,134 +2699,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      cotizacion_items: {
-        Row: {
-          cantidad: number
-          clave_sat_snapshot: string | null
-          cotizacion_id: string
-          created_at: string
-          id: string
-          iva_incluido_en_precio_snapshot: boolean
-          iva_item_mxn: number
-          orden_visualizacion: number
-          precio_unitario_snapshot: number
-          producto_id: string | null
-          producto_nombre_snapshot: string
-          producto_sku_snapshot: string | null
-          subtotal_bruto_mxn: number
-          tasa_iva_snapshot: number
-          tenant_id: string
-          total_item_mxn: number
-          unidad_sat_snapshot: string | null
-        }
-        Insert: {
-          cantidad: number
-          clave_sat_snapshot?: string | null
-          cotizacion_id: string
-          created_at?: string
-          id?: string
-          iva_incluido_en_precio_snapshot: boolean
-          iva_item_mxn: number
-          orden_visualizacion?: number
-          precio_unitario_snapshot: number
-          producto_id?: string | null
-          producto_nombre_snapshot: string
-          producto_sku_snapshot?: string | null
-          subtotal_bruto_mxn: number
-          tasa_iva_snapshot: number
-          tenant_id: string
-          total_item_mxn: number
-          unidad_sat_snapshot?: string | null
-        }
-        Update: {
-          cantidad?: number
-          clave_sat_snapshot?: string | null
-          cotizacion_id?: string
-          created_at?: string
-          id?: string
-          iva_incluido_en_precio_snapshot?: boolean
-          iva_item_mxn?: number
-          orden_visualizacion?: number
-          precio_unitario_snapshot?: number
-          producto_id?: string | null
-          producto_nombre_snapshot?: string
-          producto_sku_snapshot?: string | null
-          subtotal_bruto_mxn?: number
-          tasa_iva_snapshot?: number
-          tenant_id?: string
-          total_item_mxn?: number
-          unidad_sat_snapshot?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "cotizacion_items_cotizacion_id_fkey"
-            columns: ["cotizacion_id"]
-            isOneToOne: false
-            referencedRelation: "cotizaciones"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      cotizaciones: {
-        Row: {
-          caja_id: string
-          client_id_local: string | null
-          cliente_id: string | null
-          created_at: string
-          estado: string
-          folio: string
-          id: string
-          iva_mxn: number
-          subtotal_mxn: number
-          sucursal_id: string
-          tenant_id: string
-          ticket_id: string | null
-          token_publico: string
-          total_mxn: number
-          updated_at: string
-          usuario_id: string | null
-          vigente_hasta: string
-        }
-        Insert: {
-          caja_id: string
-          client_id_local?: string | null
-          cliente_id?: string | null
-          created_at?: string
-          estado?: string
-          folio: string
-          id?: string
-          iva_mxn?: number
-          subtotal_mxn?: number
-          sucursal_id: string
-          tenant_id: string
-          ticket_id?: string | null
-          token_publico?: string
-          total_mxn?: number
-          updated_at?: string
-          usuario_id?: string | null
-          vigente_hasta: string
-        }
-        Update: {
-          caja_id?: string
-          client_id_local?: string | null
-          cliente_id?: string | null
-          created_at?: string
-          estado?: string
-          folio?: string
-          id?: string
-          iva_mxn?: number
-          subtotal_mxn?: number
-          sucursal_id?: string
-          tenant_id?: string
-          ticket_id?: string | null
-          token_publico?: string
-          total_mxn?: number
-          updated_at?: string
-          usuario_id?: string | null
-          vigente_hasta?: string
-        }
-        Relationships: []
       }
       contadores_folio: {
         Row: {
@@ -3074,6 +3067,253 @@ export type Database = {
             referencedColumns: ["turno_id"]
           },
         ]
+      }
+      cotizacion_items: {
+        Row: {
+          cantidad: number
+          clave_sat_snapshot: string | null
+          cotizacion_id: string
+          created_at: string
+          id: string
+          iva_incluido_en_precio_snapshot: boolean
+          iva_item_mxn: number
+          orden_visualizacion: number
+          precio_unitario_snapshot: number
+          producto_id: string | null
+          producto_nombre_snapshot: string
+          producto_sku_snapshot: string | null
+          subtotal_bruto_mxn: number
+          tasa_iva_snapshot: number
+          tenant_id: string
+          total_item_mxn: number
+          unidad_sat_snapshot: string | null
+        }
+        Insert: {
+          cantidad: number
+          clave_sat_snapshot?: string | null
+          cotizacion_id: string
+          created_at?: string
+          id?: string
+          iva_incluido_en_precio_snapshot: boolean
+          iva_item_mxn: number
+          orden_visualizacion?: number
+          precio_unitario_snapshot: number
+          producto_id?: string | null
+          producto_nombre_snapshot: string
+          producto_sku_snapshot?: string | null
+          subtotal_bruto_mxn: number
+          tasa_iva_snapshot: number
+          tenant_id: string
+          total_item_mxn: number
+          unidad_sat_snapshot?: string | null
+        }
+        Update: {
+          cantidad?: number
+          clave_sat_snapshot?: string | null
+          cotizacion_id?: string
+          created_at?: string
+          id?: string
+          iva_incluido_en_precio_snapshot?: boolean
+          iva_item_mxn?: number
+          orden_visualizacion?: number
+          precio_unitario_snapshot?: number
+          producto_id?: string | null
+          producto_nombre_snapshot?: string
+          producto_sku_snapshot?: string | null
+          subtotal_bruto_mxn?: number
+          tasa_iva_snapshot?: number
+          tenant_id?: string
+          total_item_mxn?: number
+          unidad_sat_snapshot?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotizacion_items_cotizacion_id_fkey"
+            columns: ["cotizacion_id"]
+            isOneToOne: false
+            referencedRelation: "cotizaciones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizacion_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizacion_items_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["producto_id"]
+          },
+          {
+            foreignKeyName: "cotizacion_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cotizaciones: {
+        Row: {
+          caja_id: string
+          client_id_local: string | null
+          cliente_id: string | null
+          created_at: string
+          estado: string
+          folio: string
+          id: string
+          iva_mxn: number
+          subtotal_mxn: number
+          sucursal_id: string
+          tenant_id: string
+          ticket_id: string | null
+          token_publico: string
+          total_mxn: number
+          updated_at: string
+          usuario_id: string | null
+          vigente_hasta: string
+        }
+        Insert: {
+          caja_id: string
+          client_id_local?: string | null
+          cliente_id?: string | null
+          created_at?: string
+          estado?: string
+          folio: string
+          id?: string
+          iva_mxn?: number
+          subtotal_mxn?: number
+          sucursal_id: string
+          tenant_id: string
+          ticket_id?: string | null
+          token_publico?: string
+          total_mxn?: number
+          updated_at?: string
+          usuario_id?: string | null
+          vigente_hasta: string
+        }
+        Update: {
+          caja_id?: string
+          client_id_local?: string | null
+          cliente_id?: string | null
+          created_at?: string
+          estado?: string
+          folio?: string
+          id?: string
+          iva_mxn?: number
+          subtotal_mxn?: number
+          sucursal_id?: string
+          tenant_id?: string
+          ticket_id?: string | null
+          token_publico?: string
+          total_mxn?: number
+          updated_at?: string
+          usuario_id?: string | null
+          vigente_hasta?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cotizaciones_caja_id_fkey"
+            columns: ["caja_id"]
+            isOneToOne: false
+            referencedRelation: "cajas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizaciones_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizaciones_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizaciones_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_resumen"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "cotizaciones_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizaciones_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "vw_existencias"
+            referencedColumns: ["sucursal_id"]
+          },
+          {
+            foreignKeyName: "cotizaciones_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizaciones_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cotizaciones_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cumplimiento_tiempos_cocina"
+            referencedColumns: ["ticket_id"]
+          },
+          {
+            foreignKeyName: "cotizaciones_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_ventas_apps_externas"
+            referencedColumns: ["ticket_id"]
+          },
+        ]
+      }
+      creditos_resumen_nube: {
+        Row: {
+          cliente_id: string
+          fecha_venta: string
+          saldo_mxn: number
+          sincronizado_at: string
+          tenant_id: string
+          ticket_id: string
+        }
+        Insert: {
+          cliente_id: string
+          fecha_venta: string
+          saldo_mxn: number
+          sincronizado_at?: string
+          tenant_id: string
+          ticket_id: string
+        }
+        Update: {
+          cliente_id?: string
+          fecha_venta?: string
+          saldo_mxn?: number
+          sincronizado_at?: string
+          tenant_id?: string
+          ticket_id?: string
+        }
+        Relationships: []
       }
       cuentas_abiertas: {
         Row: {
@@ -8279,7 +8519,78 @@ export type Database = {
           tipo?: string
           turno_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "saldo_favor_movimientos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saldo_favor_movimientos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saldo_favor_movimientos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_resumen"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "saldo_favor_movimientos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saldo_favor_movimientos_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saldo_favor_movimientos_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cumplimiento_tiempos_cocina"
+            referencedColumns: ["ticket_id"]
+          },
+          {
+            foreignKeyName: "saldo_favor_movimientos_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_ventas_apps_externas"
+            referencedColumns: ["ticket_id"]
+          },
+          {
+            foreignKeyName: "saldo_favor_movimientos_turno_id_fkey"
+            columns: ["turno_id"]
+            isOneToOne: false
+            referencedRelation: "turnos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saldo_favor_movimientos_turno_id_fkey"
+            columns: ["turno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_efectivo_esperado_turno"
+            referencedColumns: ["turno_id"]
+          },
+          {
+            foreignKeyName: "saldo_favor_movimientos_turno_id_fkey"
+            columns: ["turno_id"]
+            isOneToOne: false
+            referencedRelation: "vw_resumen_turno"
+            referencedColumns: ["turno_id"]
+          },
+        ]
       }
       secciones: {
         Row: {
@@ -12545,7 +12856,36 @@ export type Database = {
           venta_mas_vieja_fecha: string | null
           venta_mas_vieja_ticket_id: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clientes_credito_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_credito_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_credito_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_resumen"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "clientes_credito_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vw_cumplimiento_delivery_agregado: {
         Row: {
@@ -13498,7 +13838,36 @@ export type Database = {
           saldo_mxn: number | null
           tenant_id: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "saldo_favor_movimientos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saldo_favor_movimientos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saldo_favor_movimientos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_resumen"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "saldo_favor_movimientos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vw_ventas_apps_externas: {
         Row: {
@@ -13842,6 +14211,7 @@ export type Database = {
         Args: { p_base: number; p_excluir?: string; p_tenant: string }
         Returns: number
       }
+      _credito_devolucion: { Args: { p_devolucion: string }; Returns: number }
       _cupo_ventana: { Args: { p_ventana: string }; Returns: string }
       _delivery_items_a_ticket: {
         Args: { p_generico_id: string; p_items: Json; p_ticket_id: string }
@@ -13925,6 +14295,10 @@ export type Database = {
       }
       _inventario_apagar_si_no_permitido: {
         Args: { p_tenant: string }
+        Returns: undefined
+      }
+      _lealtad_revertir_por_cambio: {
+        Args: { p_fraccion: number; p_nivel?: number; p_ticket: string }
         Returns: undefined
       }
       _mensaje_unico_producto: {
@@ -14060,6 +14434,14 @@ export type Database = {
       _venta_con_descuento_pendiente: {
         Args: { p_ticket_id: string }
         Returns: boolean
+      }
+      _vim_aplicar_cotizaciones_caja: {
+        Args: { p_cotizaciones: Json; p_items: Json; p_tenant: string }
+        Returns: Json
+      }
+      _vim_aplicar_credito_caja: {
+        Args: { p_filas: Json; p_tabla: string; p_tenant: string }
+        Returns: Json
       }
       _vim_aplicar_estado_mesas: {
         Args: { p_rows: Json; p_tenant: string }
@@ -14415,28 +14797,7 @@ export type Database = {
         Args: { p_plan_id: string; p_precio?: number; p_tenant_id: string }
         Returns: Json
       }
-      cancelar_cotizacion: {
-        Args: { p_id: string }
-        Returns: undefined
-      }
-      cotizacion_publica: {
-        Args: { p_token: string }
-        Returns: Json
-      }
-      guardar_cotizacion: {
-        Args: {
-          p_caja_id: string
-          p_client_id_local?: string
-          p_cliente_id: string | null
-          p_items: Json
-          p_sucursal_id: string
-        }
-        Returns: Json
-      }
-      marcar_cotizacion_convertida: {
-        Args: { p_cotizacion_id: string; p_ticket_id: string }
-        Returns: undefined
-      }
+      cancelar_cotizacion: { Args: { p_id: string }; Returns: undefined }
       cancelar_item_ticket: {
         Args: {
           p_autorizacion_pin_id?: string
@@ -14613,6 +14974,7 @@ export type Database = {
         }
         Returns: number
       }
+      cotizacion_publica: { Args: { p_token: string }; Returns: Json }
       crear_devolucion: {
         Args: {
           p_alcance: Database["public"]["Enums"]["devolucion_alcance"]
@@ -14693,6 +15055,7 @@ export type Database = {
         Args: { p_pedido_id: string }
         Returns: string
       }
+      credito_saldo_ticket: { Args: { p_ticket: string }; Returns: number }
       cupo_agotado: {
         Args: { p_clave: string; p_max: number; p_ventana: string }
         Returns: boolean
@@ -14783,12 +15146,12 @@ export type Database = {
         Args: { p_destino: string; p_lineas: Json; p_origen: string }
         Returns: string
       }
+      es_admin_del_tenant: { Args: { p_tenant_id: string }; Returns: boolean }
+      es_dueno_del_tenant: { Args: { p_tenant_id: string }; Returns: boolean }
       es_giro_tienda: {
         Args: { p: Database["public"]["Enums"]["vertical_tipo"] }
         Returns: boolean
       }
-      es_admin_del_tenant: { Args: { p_tenant_id: string }; Returns: boolean }
-      es_dueno_del_tenant: { Args: { p_tenant_id: string }; Returns: boolean }
       establecer_propina_ticket: {
         Args: { p_monto_mxn: number; p_ticket_id: string }
         Returns: undefined
@@ -14847,6 +15210,16 @@ export type Database = {
           consecutivo: number
           folio_completo: string
         }[]
+      }
+      guardar_cotizacion: {
+        Args: {
+          p_caja_id: string
+          p_client_id_local?: string
+          p_cliente_id: string
+          p_items: Json
+          p_sucursal_id: string
+        }
+        Returns: Json
       }
       guardar_receta: {
         Args: {
@@ -15017,6 +15390,10 @@ export type Database = {
         Returns: number
       }
       marcar_aviso_visto: { Args: { p_aviso: string }; Returns: boolean }
+      marcar_cotizacion_convertida: {
+        Args: { p_cotizacion_id: string; p_ticket_id: string }
+        Returns: undefined
+      }
       marcar_listo_cocina: {
         Args: { p_area?: string; p_ticket_id: string; p_todas?: boolean }
         Returns: Json
@@ -15077,6 +15454,22 @@ export type Database = {
       }
       operacion_cuentas_abiertas: { Args: { p_tenant: string }; Returns: Json }
       operacion_normalizar: { Args: { p: Json }; Returns: Json }
+      pagar_a_credito: {
+        Args: {
+          p_autorizacion_pin_id?: string
+          p_client_id_local?: string
+          p_ticket_id: string
+        }
+        Returns: string
+      }
+      pagar_con_saldo_favor: {
+        Args: {
+          p_client_id_local?: string
+          p_monto: number
+          p_ticket_id: string
+        }
+        Returns: string
+      }
       periodo_global_de: {
         Args: { p_fecha: string; p_periodicidad: string }
         Returns: {
@@ -15162,6 +15555,17 @@ export type Database = {
       reemplazar_item_ticket: {
         Args: { p_lineas: Json; p_ticket_item_id: string }
         Returns: string[]
+      }
+      registrar_abono: {
+        Args: {
+          p_caja_id: string
+          p_client_id_local?: string
+          p_cliente_id: string
+          p_metodo: Database["public"]["Enums"]["metodo_pago"]
+          p_monto: number
+          p_turno_id: string
+        }
+        Returns: Json
       }
       registrar_autorizacion_propia: {
         Args: {
@@ -15395,6 +15799,10 @@ export type Database = {
       }
       terminal_pedir_renovacion: { Args: never; Returns: boolean }
       ticket_autofacturable: { Args: { p_ticket_id: string }; Returns: boolean }
+      ticket_con_credito_pendiente: {
+        Args: { p_ticket: string }
+        Returns: boolean
+      }
       ticket_lleva_premio: { Args: { p_ticket_id: string }; Returns: boolean }
       tickets_de_periodo_global: {
         Args: { p_desde: string; p_hasta: string; p_tenant_id: string }

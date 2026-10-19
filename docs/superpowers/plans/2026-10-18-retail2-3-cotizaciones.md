@@ -183,5 +183,5 @@
 
 - «Mandar por WhatsApp como PDF» se resuelve con un enlace a la cotización que el cliente abre y guarda como PDF desde su teléfono. WhatsApp no deja adjuntar archivos por enlace, y el repo no genera PDF.
 - Sin combos en cotizaciones en esta versión.
-- La cotización de otra caja no se ve ni se convierte en esta, igual que pasa con las ventas. Sí se ve en el admin y en el POS web.
+- La cotización de otra caja no se ve ni se convierte en esta, igual que pasa con las ventas. Sí se ve en el admin; en la caja (web o instalada) solo salen las de esa caja.
 - Cancelar una cotización la puede hacer cualquier cajero (no mueve dinero).

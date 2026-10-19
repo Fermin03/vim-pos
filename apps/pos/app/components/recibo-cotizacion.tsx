@@ -1,5 +1,6 @@
 "use client";
 import { LogoVim } from "@vim/ui/styles";
+import { esEscritorio } from "../lib/actualizacion";
 import type { Cotizacion, Encabezado } from "../lib/cotizaciones";
 import { fechaHora } from "../lib/print/cotizacion-builder";
 import { fechaCorta } from "../lib/lealtad-reglas";
@@ -93,7 +94,11 @@ export function OverlayReciboCotizacion({ c, e, whatsapp, onImprimir, onCerrar }
   return (
     <div data-overlay-imprimible className="fixed inset-0 z-[60] flex flex-col bg-ink/70" role="dialog" aria-modal="true" aria-label={`Cotización ${c.folio}`}>
       <div className="flex items-center justify-between gap-3 px-5 py-3">
-        <span className="text-15 font-semibold text-white">Cotización {c.folio}</span>
+        <div>
+          <span className="text-15 font-semibold text-white">Cotización {c.folio}</span>
+          {/* El enlace abre la nube, y la caja instalada sube la cotización en su siguiente ciclo. */}
+          {esEscritorio() && <p className="text-13 text-white/70">El enlace funciona en cuanto la caja se sincronice (unos minutos).</p>}
+        </div>
         <div className="flex gap-2">
           <button type="button" onClick={onImprimir} className={`${boton} border border-white/40 text-white hover:bg-white/10`}>Imprimir</button>
           <a href={whatsapp} target="_blank" rel="noopener noreferrer" className={`${boton} border border-white/40 text-white hover:bg-white/10`}>Mandar por WhatsApp</a>

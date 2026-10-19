@@ -438,7 +438,7 @@ AS $$
     'fecha', (c.created_at AT TIME ZONE t.timezone)::date,
     'vigente_hasta', c.vigente_hasta,
     'cliente', (SELECT NULLIF(trim(concat_ws(' ', cl.nombre, cl.apellido_paterno)), '')
-                  FROM clientes cl WHERE cl.id = c.cliente_id),
+                  FROM clientes cl WHERE cl.id = c.cliente_id AND cl.deleted_at IS NULL),
     'renglones', (SELECT COALESCE(jsonb_agg(jsonb_build_object(
                      'nombre', i.producto_nombre_snapshot,
                      'sku', i.producto_sku_snapshot,
