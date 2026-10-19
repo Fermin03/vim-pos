@@ -7,9 +7,11 @@ import { Tarjeta } from "../../../components/tarjeta";
 import { AccionFila } from "../../../components/controles";
 import { input, label } from "../../../components/campos";
 import {
-  activarServicio, actualizarServicio, crearServicio, guardarColaboradoresDeServicio, listarColaboradores, listarServicios,
-  listarTiposEspacio, servicioColaboradorSchema, servicioSchema, type Colaborador, type Servicio, type TipoEspacio,
+  activarServicio, actualizarServicio, camposDe, crearServicio, guardarColaboradoresDeServicio, listarColaboradores, listarServicios,
+  listarTiposEspacio, reglaDeCampos, servicioColaboradorSchema, servicioSchema, textoRegla,
+  type CamposRegla, type Colaborador, type Servicio, type TipoEspacio,
 } from "../../../lib/agenda";
+import { BuscadorClaveSat } from "../../../components/buscador-clave-sat";
 import { listarCategorias, precioMxn, type Categoria } from "../../../lib/catalogo";
 import { listarUsuarios } from "../../../lib/usuarios";
 import { limpiarPrecio } from "../../../lib/numeros";
@@ -19,13 +21,36 @@ const th = "border-b border-line bg-sel px-4 py-[11px] text-left text-12 font-bo
 const corto = "h-10 w-24 rounded border border-line-strong px-2.5 text-sm tabular-nums outline-none focus:border-ink disabled:opacity-50";
 
 /** Quién lo hace, como se teclea: vacío = lo del servicio. */
-type Quien = { precio: string; duracion: string };
+type Quien = { precio: string; duracion: string; comision: CamposRegla };
 type Editando = {
   id: string | null; nombre: string; categoriaId: string; precio: string; duracion: string; tipoEspacioId: string;
+  comision: CamposRegla; anticipo: CamposRegla; claveSat: string;
   quien: Record<string, Quien>;
 };
 
 const numeroONulo = (v: string): number | null => (v.trim() === "" ? null : Number(v));
+const SIN_REGLA: CamposRegla = { tipo: "", valor: "" };
+
+/** Tipo (ninguno, % o $) y su valor. `sin` es cómo se llama no tener regla. */
+function CampoRegla({ id, etiqueta, sin, valor, onCambiar, compacto = false }: {
+  id: string; etiqueta: string; sin: string; valor: CamposRegla; onCambiar: (c: CamposRegla) => void; compacto?: boolean;
+}) {
+  return (
+    <div className={compacto ? "flex items-center gap-2" : "flex gap-2"}>
+      <select id={id} aria-label={compacto ? etiqueta : undefined} className={compacto ? `${corto} w-auto` : `${input} w-auto flex-shrink-0`}
+        value={valor.tipo} onChange={(e) => onCambiar({ tipo: e.target.value as CamposRegla["tipo"], valor: e.target.value === "" ? "" : valor.valor })}>
+        <option value="">{sin}</option>
+        <option value="PORCENTAJE">Porcentaje (%)</option>
+        <option value="MONTO">Monto fijo ($)</option>
+      </select>
+      {valor.tipo !== "" && (
+        <input className={compacto ? corto : `${input} tabular-nums`} inputMode="decimal" aria-label={`${etiqueta}: ${valor.tipo === "PORCENTAJE" ? "porcentaje" : "monto en pesos"}`}
+          placeholder={valor.tipo === "PORCENTAJE" ? "40" : "0.00"} value={valor.valor}
+          onChange={(e) => onCambiar({ ...valor, valor: limpiarPrecio(e.target.value) })} />
+      )}
+    </div>
+  );
+}
 
 /** Los servicios que se agendan: cuánto duran, qué espacio piden y quién los hace (0218). */
 export default function ServiciosPage() {
@@ -55,15 +80,19 @@ export default function ServiciosPage() {
 
   function nuevo() {
     setError(null);
-    setEditando({ id: null, nombre: "", categoriaId: categorias[0]?.id ?? "", precio: "", duracion: "30", tipoEspacioId: "", quien: {} });
+    setEditando({
+      id: null, nombre: "", categoriaId: categorias[0]?.id ?? "", precio: "", duracion: "30", tipoEspacioId: "",
+      comision: SIN_REGLA, anticipo: SIN_REGLA, claveSat: "", quien: {},
+    });
   }
   function editar(s: Servicio) {
     setError(null);
     setEditando({
       id: s.id, nombre: s.nombre, categoriaId: s.categoriaId, precio: String(s.precio), duracion: String(s.duracionMin),
-      tipoEspacioId: s.tipoEspacioId ?? "",
+      tipoEspacioId: s.tipoEspacioId ?? "", comision: camposDe(s.comision), anticipo: camposDe(s.anticipo), claveSat: s.claveSat ?? "",
       quien: Object.fromEntries(s.colaboradores.map((c) => [c.usuario_id, {
         precio: c.precio_mxn === null ? "" : String(c.precio_mxn), duracion: c.duracion_min === null ? "" : String(c.duracion_min),
+        comision: camposDe(c.comision),
       }])),
     });
   }
@@ -74,11 +103,16 @@ export default function ServiciosPage() {
     const p = servicioSchema.safeParse({
       nombre: editando.nombre, categoria_id: editando.categoriaId, precio_base_mxn: editando.precio.trim() === "" ? NaN : Number(editando.precio),
       duracion_min: Number(editando.duracion), tipo_espacio_id: editando.tipoEspacioId || null,
+      comision: reglaDeCampos(editando.comision), anticipo: reglaDeCampos(editando.anticipo), clave_sat: editando.claveSat.trim() || null,
     });
-    if (!p.success) return setError(p.error.issues[0]?.message ?? "Datos inválidos");
+    if (!p.success) {
+      const i = p.error.issues[0];
+      const campo = i?.path[0] === "comision" ? "Comisión: " : i?.path[0] === "anticipo" ? "Anticipo: " : "";
+      return setError(`${campo}${i?.message ?? "Datos inválidos"}`);
+    }
     const filas = [];
     for (const [usuario_id, q] of Object.entries(editando.quien)) {
-      const f = servicioColaboradorSchema.safeParse({ usuario_id, precio_mxn: numeroONulo(q.precio), duracion_min: numeroONulo(q.duracion) });
+      const f = servicioColaboradorSchema.safeParse({ usuario_id, precio_mxn: numeroONulo(q.precio), duracion_min: numeroONulo(q.duracion), comision: reglaDeCampos(q.comision) });
       if (!f.success) return setError(`${nombre(usuario_id)}: ${f.error.issues[0]?.message ?? "datos inválidos"}`);
       filas.push(f.data);
     }
@@ -117,7 +151,7 @@ export default function ServiciosPage() {
   function marcar(usuarioId: string, hace: boolean) {
     if (!editando) return;
     const quien = { ...editando.quien };
-    if (hace) quien[usuarioId] = { precio: "", duracion: "" };
+    if (hace) quien[usuarioId] = { precio: "", duracion: "", comision: SIN_REGLA };
     else delete quien[usuarioId];
     setEditando({ ...editando, quien });
   }
@@ -175,6 +209,25 @@ export default function ServiciosPage() {
                     <input id="srv-duracion" className={`${input} tabular-nums`} inputMode="numeric" value={editando.duracion}
                       onChange={(e) => setEditando({ ...editando, duracion: e.target.value.replace(/\D/g, "") })} />
                   </div>
+                  <div>
+                    <label className={label} htmlFor="srv-comision">Comisión de quien lo hace</label>
+                    <CampoRegla id="srv-comision" etiqueta="Comisión" sin="Sin comisión" valor={editando.comision}
+                      onCambiar={(comision) => setEditando({ ...editando, comision })} />
+                  </div>
+                  <div>
+                    <label className={label} htmlFor="srv-anticipo">Anticipo al apartar</label>
+                    <CampoRegla id="srv-anticipo" etiqueta="Anticipo" sin="Sin anticipo" valor={editando.anticipo}
+                      onCambiar={(anticipo) => setEditando({ ...editando, anticipo })} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className={label} htmlFor="srv-clave-sat">
+                      Clave de producto SAT <span className="font-normal text-ink-2">· opcional</span>
+                    </label>
+                    <input id="srv-clave-sat" className={`${input} max-w-[200px] tabular-nums`} inputMode="numeric" maxLength={8}
+                      value={editando.claveSat} onChange={(e) => setEditando({ ...editando, claveSat: e.target.value.replace(/\D/g, "") })} />
+                    <BuscadorClaveSat onElegir={(claveSat) => setEditando({ ...editando, claveSat })} />
+                    <p className="mt-1.5 text-13 text-ink-2">La clave del catálogo del SAT que lleva la factura de este servicio. Búscala por su nombre.</p>
+                  </div>
                 </div>
 
                 <fieldset className="border-t border-line pt-4">
@@ -185,7 +238,7 @@ export default function ServiciosPage() {
                     </p>
                   ) : (
                     <>
-                      <p className="mb-2 text-13 text-ink-3">Deja vacíos el precio y la duración propios para usar los del servicio.</p>
+                      <p className="mb-2 text-13 text-ink-3">Deja vacíos el precio y la duración propios para usar los del servicio. Su comisión propia gana a la del servicio.</p>
                       <ul className="divide-y divide-line">
                         {activos.map((c) => {
                           const q = editando.quien[c.usuarioId];
@@ -203,6 +256,8 @@ export default function ServiciosPage() {
                                     value={q.precio} onChange={(e) => cambiarQuien(c.usuarioId, { precio: limpiarPrecio(e.target.value) })} />
                                   <input className={corto} inputMode="numeric" aria-label={`${n}: minutos propios`} placeholder={`${editando.duracion || "—"} min`}
                                     value={q.duracion} onChange={(e) => cambiarQuien(c.usuarioId, { duracion: e.target.value.replace(/\D/g, "") })} />
+                                  <CampoRegla compacto id={`srv-com-${c.usuarioId}`} etiqueta={`${n}: comisión propia`} sin="Comisión del servicio"
+                                    valor={q.comision} onCambiar={(comision) => cambiarQuien(c.usuarioId, { comision })} />
                                 </div>
                               )}
                             </li>
@@ -238,6 +293,8 @@ export default function ServiciosPage() {
                   <th className={th}>Servicio</th>
                   <th className={`${th} w-[100px] text-right`}>Duración</th>
                   <th className={`${th} w-[120px] text-right`}>Precio</th>
+                  <th className={`${th} w-[100px] text-right`}>Comisión</th>
+                  <th className={`${th} w-[100px] text-right`}>Anticipo</th>
                   <th className={th}>Espacio</th>
                   <th className={th}>Quién lo hace</th>
                   <th className={`${th} w-[110px]`}>Estado</th>
@@ -250,12 +307,14 @@ export default function ServiciosPage() {
                     <td className="px-4 py-2.5 font-semibold">{s.nombre}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{s.duracionMin} min</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{precioMxn(s.precio)}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-ink-2">{textoRegla(s.comision)}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-ink-2">{textoRegla(s.anticipo)}</td>
                     <td className="px-4 py-2.5 text-ink-2">{s.tipoEspacioId ? nombreTipo.get(s.tipoEspacioId) ?? "—" : "—"}</td>
                     <td className="px-4 py-2.5 text-ink-2">
                       {s.colaboradores.length === 0
                         ? <span className="text-warning">Nadie todavía</span>
                         : s.colaboradores.map((c) => {
-                          const propio = [c.precio_mxn !== null ? precioMxn(c.precio_mxn) : null, c.duracion_min !== null ? `${c.duracion_min} min` : null].filter(Boolean).join(", ");
+                          const propio = [c.precio_mxn !== null ? precioMxn(c.precio_mxn) : null, c.duracion_min !== null ? `${c.duracion_min} min` : null, c.comision ? `comisión ${textoRegla(c.comision)}` : null].filter(Boolean).join(", ");
                           return `${nombre(c.usuario_id)}${propio ? ` (${propio})` : ""}`;
                         }).join(" · ")}
                     </td>

@@ -16,8 +16,11 @@ const RUTA_DE_MODULO: readonly [string, CodigoOperacion][] = [
   ["/reportes/ventas-variantes", "existencias"],
 ];
 
-/** Las pantallas de la agenda: el grupo del menú y su configuración. */
-const RUTAS_AGENDA = ["/agenda/servicios", "/agenda/colaboradores", "/agenda/espacios", "/configuracion/agenda"] as const;
+/** Las pantallas de la agenda: el grupo del menú, su configuración y sus reportes. */
+const RUTAS_AGENDA = [
+  "/agenda/servicios", "/agenda/colaboradores", "/agenda/espacios", "/configuracion/agenda",
+  "/reportes/comisiones", "/reportes/ventas-colaborador",
+] as const;
 
 /**
  * Las rutas que este negocio no usa. Mientras carga o si la lectura falló no se esconde nada de lo

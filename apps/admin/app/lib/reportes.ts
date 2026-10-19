@@ -626,6 +626,100 @@ export async function leerVentasPorMesero(desde: string, hasta: string, sucursal
   return [...map.values()].map((m) => ({ ...m, promedio: m.tickets > 0 ? m.total / m.tickets : 0 })).sort((a, b) => b.total - a.total);
 }
 
+// ── Belleza (0221): comisiones y ventas por colaborador. Montos SIN IVA. ──────────────────────
+// Las dos leen vw_comisiones_renglon, que no tiene sucursal: el reporte es de todo el negocio, y
+// un colaborador que no administra solo ve lo suyo (lo acota la vista).
+
+export type Periodo = { desde: string; hasta: string };
+
+async function periodoDe(fecha: string): Promise<Periodo> {
+  const { data, error } = await supabase.rpc("periodo_comisiones", { p_fecha: fecha });
+  if (error) throw new Error(error.message);
+  const p = data?.[0];
+  if (!p) throw new Error("No se pudo calcular el periodo de comisiones");
+  return { desde: p.desde, hasta: p.hasta };
+}
+
+/** El periodo de comisiones que corre hoy y el anterior (semanal o quincenal, según el negocio). */
+export async function leerPeriodosComision(): Promise<{ actual: Periodo; anterior: Periodo }> {
+  const actual = await periodoDe(hoyMx());
+  return { actual, anterior: await periodoDe(sumarDias(actual.desde, -1)) };
+}
+
+export type FilaComision = {
+  clave: string; nombre: string; servicios: number; ventas: number;
+  comisionServicios: number; comisionProductos: number; sueldo: number; total: number;
+};
+
+/**
+ * Una fila por colaborador. `esPeriodo`: el rango es exactamente un periodo del negocio; solo
+ * entonces la base suma el sueldo (con otro rango sale en 0).
+ */
+export async function leerComisiones(desde: string, hasta: string): Promise<{ filas: FilaComision[]; esPeriodo: boolean }> {
+  const [r, p] = await Promise.all([supabase.rpc("comisiones_periodo", { p_desde: desde, p_hasta: hasta }), periodoDe(desde)]);
+  if (r.error) throw new Error(r.error.message);
+  return { filas: (r.data ?? []).map(filaComision), esPeriodo: p.desde === desde && p.hasta === hasta };
+}
+
+export function filaComision(f: Record<string, unknown>): FilaComision {
+  return {
+    clave: String(f.usuario_id), nombre: String(f.nombre ?? "—"), servicios: num(f.servicios), ventas: num(f.ventas_mxn),
+    comisionServicios: num(f.comision_servicios_mxn), comisionProductos: num(f.comision_productos_mxn),
+    sueldo: num(f.sueldo_mxn), total: num(f.total_mxn),
+  };
+}
+
+export type RenglonComision = {
+  clave: string; ticketId: string; fecha: string; producto: string; esServicio: boolean; venta: number; base: number; comision: number;
+};
+
+/** Los renglones de un colaborador en el rango: de dónde sale su comisión. */
+export async function leerRenglonesComision(colaboradorId: string, desde: string, hasta: string): Promise<RenglonComision[]> {
+  const filas = await leerTodas((a, b) => supabase.from("vw_comisiones_renglon")
+    .select("ticket_item_id, ticket_id, fecha_negocio, producto_nombre, es_servicio, venta_mxn, base_mxn, comision_mxn")
+    .eq("colaborador_id", colaboradorId).gte("fecha_negocio", desde).lte("fecha_negocio", hasta)
+    .order("fecha_negocio").order("ticket_item_id").range(a, b) as unknown as RespuestaPagina);
+  return filas.map((f) => ({
+    clave: String(f.ticket_item_id), ticketId: String(f.ticket_id), fecha: String(f.fecha_negocio), producto: String(f.producto_nombre ?? "—"),
+    esServicio: f.es_servicio === true, venta: num(f.venta_mxn), base: num(f.base_mxn), comision: num(f.comision_mxn),
+  }));
+}
+
+export type AgruparColaborador = "colaborador" | "servicio";
+export type FilaVentaColaborador = { clave: string; nombre: string; veces: number; tickets: number; ventas: number; comision: number };
+
+/**
+ * Renglones → filas por colaborador o por servicio (o producto). `veces` = renglones vendidos;
+ * `tickets` = tickets distintos. Pura para poder probarla.
+ */
+export function agruparVentasColaborador(
+  renglones: { colaborador_id: string; producto_nombre: string; ticket_id: string; venta_mxn: number; comision_mxn: number }[],
+  por: AgruparColaborador,
+  nombres: ReadonlyMap<string, string>,
+): FilaVentaColaborador[] {
+  const m = new Map<string, FilaVentaColaborador & { ids: Set<string> }>();
+  for (const r of renglones) {
+    const k = por === "colaborador" ? r.colaborador_id : r.producto_nombre;
+    const cur = m.get(k) ?? { clave: k, nombre: por === "colaborador" ? nombres.get(k) ?? "Empleado dado de baja" : k, veces: 0, tickets: 0, ventas: 0, comision: 0, ids: new Set<string>() };
+    cur.veces += 1; cur.ventas += r.venta_mxn; cur.comision += r.comision_mxn; cur.ids.add(r.ticket_id);
+    m.set(k, cur);
+  }
+  return [...m.values()]
+    .map(({ ids, ...f }) => ({ ...f, tickets: ids.size, ventas: Math.round(f.ventas * 100) / 100, comision: Math.round(f.comision * 100) / 100 }))
+    .sort((a, b) => b.ventas - a.ventas);
+}
+
+export async function leerVentasPorColaborador(desde: string, hasta: string): Promise<{ colaborador_id: string; producto_nombre: string; ticket_id: string; venta_mxn: number; comision_mxn: number }[]> {
+  const filas = await leerTodas((a, b) => supabase.from("vw_comisiones_renglon")
+    .select("ticket_item_id, colaborador_id, producto_nombre, ticket_id, venta_mxn, comision_mxn")
+    .gte("fecha_negocio", desde).lte("fecha_negocio", hasta)
+    .order("fecha_negocio").order("ticket_item_id").range(a, b) as unknown as RespuestaPagina);
+  return filas.map((f) => ({
+    colaborador_id: String(f.colaborador_id), producto_nombre: String(f.producto_nombre ?? "—"), ticket_id: String(f.ticket_id),
+    venta_mxn: num(f.venta_mxn), comision_mxn: num(f.comision_mxn),
+  }));
+}
+
 // Ventas por área de cocina (P-187)
 export type FilaArea = { clave: string; area: string; tickets: number; unidades: number; total: number };
 export async function leerVentasPorArea(desde: string, hasta: string, sucursalId: string | null = null): Promise<FilaArea[]> {
@@ -865,7 +959,7 @@ export async function leerNoShows(desde: string, hasta: string, sucursalId: stri
 }
 
 // ── Qué reportes le sirven a este negocio ──────────────────────────────────────────────────
-export type ReportesDisponibles = { marcas: boolean; eventos: boolean; reservaciones: boolean; apps: boolean; variasSucursales: boolean; inventario: boolean; meseros: boolean; existencias: boolean };
+export type ReportesDisponibles = { marcas: boolean; eventos: boolean; reservaciones: boolean; apps: boolean; variasSucursales: boolean; inventario: boolean; meseros: boolean; existencias: boolean; agenda: boolean };
 
 /**
  * Los reportes de módulos que el negocio no usa se esconden del índice: antes aparecían
@@ -908,5 +1002,7 @@ export function disponiblesDe(
     meseros: hay.meseros || moduloActivo(ef, "meseros"),
     // Solo el módulo: un restaurante no ve el reporte de tienda ni por tener datos.
     existencias: moduloActivo(ef, "existencias"),
+    // Comisiones y ventas por colaborador (belleza): igual, solo con la agenda.
+    agenda: moduloActivo(ef, "agenda"),
   };
 }

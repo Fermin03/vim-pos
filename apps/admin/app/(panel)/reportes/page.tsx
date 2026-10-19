@@ -44,6 +44,8 @@ const GRUPOS: Grupo[] = [
     reportes: [
       { href: "/reportes/z-historico", titulo: "Cortes de turno", descripcion: "Cada cierre de caja: lo vendido, el efectivo esperado contra el contado y quién cerró." },
       { href: "/reportes/ventas-mesero", titulo: "Ventas por mesero", descripcion: "Tickets, venta y propinas de cada mesero.", modulo: "meseros" },
+      { href: "/reportes/comisiones", titulo: "Comisiones", descripcion: "Cuánto se le paga a cada colaborador en el periodo: comisiones y sueldo.", modulo: "agenda" },
+      { href: "/reportes/ventas-colaborador", titulo: "Ventas por colaborador", descripcion: "Qué vende cada colaborador y qué servicios se venden más.", modulo: "agenda" },
       { href: "/reportes/ventas-area", titulo: "Ventas por estación", descripcion: "Cuánto prepara y cuánto vende cada estación de la cocina." },
       { href: "/reportes/tiempos-cocina", titulo: "Tiempos de cocina", descripcion: "Cuánto tarda en salir la comida contra tu objetivo." },
     ],
@@ -83,13 +85,15 @@ export default function ReportesHub() {
     leerReportesDisponibles()
       .then(setDisponibles)
       // Sin respuesta se muestran todos: esconder un reporte que sí usa confunde más.
-      .catch(() => setDisponibles({ marcas: true, eventos: true, reservaciones: true, apps: true, variasSucursales: true, inventario: true, meseros: true, existencias: false }));
+      .catch(() => setDisponibles({ marcas: true, eventos: true, reservaciones: true, apps: true, variasSucursales: true, inventario: true, meseros: true, existencias: false, agenda: false }));
   }, []);
 
   // Sin perfil todavía se muestran todas: el guardián de rutas es quien decide al entrar. Lo de
-  // tienda es la excepción: solo con el módulo confirmado, ni cargando ni con «Verlos».
+  // tienda y de belleza es la excepción: solo con el módulo confirmado, ni cargando ni con «Verlos».
   const permitido = (r: Reporte) =>
-    (!perfil || puedeVer(perfil.jerarquia, r.href)) && (r.modulo !== "existencias" || disponibles?.existencias === true);
+    (!perfil || puedeVer(perfil.jerarquia, r.href))
+    && (r.modulo !== "existencias" || disponibles?.existencias === true)
+    && (r.modulo !== "agenda" || disponibles?.agenda === true);
   const visible = (r: Reporte) => permitido(r) && (verTodos || !r.modulo || !disponibles || disponibles[r.modulo]);
   const ocultos = disponibles ? GRUPOS.flatMap((g) => g.reportes).filter((r) => permitido(r) && r.modulo && !disponibles[r.modulo]).length : 0;
 

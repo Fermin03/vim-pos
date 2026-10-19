@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { DIAS_AGENDA, ausenciaSchema, horarioSchema, servicioColaboradorSchema, servicioSchema, siguienteColor, toleranciaValida } from "../agenda";
+import {
+  DIAS_AGENDA, ausenciaSchema, camposDe, horarioSchema, horasCancelarValidas, pctValido, reglaDeCampos, reglaSchema, servicioColaboradorSchema,
+  servicioSchema, siguienteColor, sueldoValido, textoRegla, toleranciaValida,
+} from "../agenda";
 import { COLORES } from "../catalogo";
 
 const PALETA = COLORES.map((c) => c.hex);
@@ -24,7 +27,7 @@ describe("DIAS_AGENDA", () => {
 });
 
 describe("servicioSchema", () => {
-  const base = { nombre: "Manicure", categoria_id: UUID, precio_base_mxn: 250, duracion_min: 45, tipo_espacio_id: null };
+  const base = { nombre: "Manicure", categoria_id: UUID, precio_base_mxn: 250, duracion_min: 45, tipo_espacio_id: null, comision: null, anticipo: null, clave_sat: null };
   it("la duración va de 5 a 600 minutos enteros", () => {
     expect(servicioSchema.safeParse(base).success).toBe(true);
     expect(servicioSchema.safeParse({ ...base, duracion_min: 5 }).success).toBe(true);
@@ -34,9 +37,9 @@ describe("servicioSchema", () => {
     expect(servicioSchema.safeParse({ ...base, duracion_min: 30.5 }).success).toBe(false);
   });
   it("precio y duración propios del colaborador: vacíos o válidos", () => {
-    expect(servicioColaboradorSchema.safeParse({ usuario_id: UUID, precio_mxn: null, duracion_min: null }).success).toBe(true);
-    expect(servicioColaboradorSchema.safeParse({ usuario_id: UUID, precio_mxn: -1, duracion_min: null }).success).toBe(false);
-    expect(servicioColaboradorSchema.safeParse({ usuario_id: UUID, precio_mxn: null, duracion_min: 700 }).success).toBe(false);
+    expect(servicioColaboradorSchema.safeParse({ usuario_id: UUID, precio_mxn: null, duracion_min: null, comision: null }).success).toBe(true);
+    expect(servicioColaboradorSchema.safeParse({ usuario_id: UUID, precio_mxn: -1, duracion_min: null, comision: null }).success).toBe(false);
+    expect(servicioColaboradorSchema.safeParse({ usuario_id: UUID, precio_mxn: null, duracion_min: 700, comision: null }).success).toBe(false);
   });
 });
 
@@ -78,5 +81,64 @@ describe("toleranciaValida", () => {
     expect(toleranciaValida("-1")).toBe(false);
     expect(toleranciaValida("1.5")).toBe(false);
     expect(toleranciaValida("")).toBe(false);
+  });
+});
+
+describe("reglaSchema (comisión y anticipo)", () => {
+  const ok = (x: unknown) => reglaSchema.safeParse(x).success;
+  it("porcentaje de 0 a 100; monto desde 0 sin tope; null = sin regla", () => {
+    expect(ok(null)).toBe(true);
+    expect(ok({ tipo: "PORCENTAJE", valor: 0 })).toBe(true);
+    expect(ok({ tipo: "PORCENTAJE", valor: 100 })).toBe(true);
+    expect(ok({ tipo: "PORCENTAJE", valor: 100.01 })).toBe(false);
+    expect(ok({ tipo: "PORCENTAJE", valor: -1 })).toBe(false);
+    expect(ok({ tipo: "MONTO", valor: 0 })).toBe(true);
+    expect(ok({ tipo: "MONTO", valor: 350 })).toBe(true);
+    expect(ok({ tipo: "MONTO", valor: -0.01 })).toBe(false);
+    expect(ok({ tipo: "OTRO", valor: 1 })).toBe(false);
+  });
+  it("el servicio valida su comisión y su anticipo, y la clave SAT son 8 dígitos", () => {
+    const base = { nombre: "Corte", categoria_id: UUID, precio_base_mxn: 180, duracion_min: 30, tipo_espacio_id: null, comision: null, anticipo: null, clave_sat: null };
+    expect(servicioSchema.safeParse({ ...base, comision: { tipo: "PORCENTAJE", valor: 40 }, anticipo: { tipo: "MONTO", valor: 100 } }).success).toBe(true);
+    expect(servicioSchema.safeParse({ ...base, comision: { tipo: "PORCENTAJE", valor: 140 } }).success).toBe(false);
+    expect(servicioSchema.safeParse({ ...base, anticipo: { tipo: "PORCENTAJE", valor: 101 } }).success).toBe(false);
+    expect(servicioSchema.safeParse({ ...base, clave_sat: "85121800" }).success).toBe(true);
+    expect(servicioSchema.safeParse({ ...base, clave_sat: "8512" }).success).toBe(false);
+    expect(servicioColaboradorSchema.safeParse({ usuario_id: UUID, precio_mxn: null, duracion_min: null, comision: { tipo: "MONTO", valor: 50 } }).success).toBe(true);
+    expect(servicioColaboradorSchema.safeParse({ usuario_id: UUID, precio_mxn: null, duracion_min: null, comision: { tipo: "PORCENTAJE", valor: 101 } }).success).toBe(false);
+  });
+  it("de los campos a la regla y de vuelta", () => {
+    expect(reglaDeCampos({ tipo: "", valor: "40" })).toBeNull();
+    expect(reglaDeCampos({ tipo: "PORCENTAJE", valor: "40" })).toEqual({ tipo: "PORCENTAJE", valor: 40 });
+    expect(reglaSchema.safeParse(reglaDeCampos({ tipo: "MONTO", valor: " " })).success).toBe(false);
+    expect(camposDe({ tipo: "MONTO", valor: 50 })).toEqual({ tipo: "MONTO", valor: "50" });
+    expect(camposDe(null)).toEqual({ tipo: "", valor: "" });
+    expect(textoRegla({ tipo: "PORCENTAJE", valor: 40 })).toBe("40 %");
+    expect(textoRegla(null)).toBe("—");
+  });
+});
+
+describe("reglas del negocio", () => {
+  it("límite para cancelar: de 0 a 168 horas enteras", () => {
+    expect(horasCancelarValidas("0")).toBe(true);
+    expect(horasCancelarValidas("168")).toBe(true);
+    expect(horasCancelarValidas("169")).toBe(false);
+    expect(horasCancelarValidas("-1")).toBe(false);
+    expect(horasCancelarValidas("2.5")).toBe(false);
+    expect(horasCancelarValidas("")).toBe(false);
+  });
+  it("comisión por productos: de 0 a 100 con dos decimales", () => {
+    expect(pctValido("0")).toBe(true);
+    expect(pctValido("100")).toBe(true);
+    expect(pctValido("12.5")).toBe(true);
+    expect(pctValido("100.5")).toBe(false);
+    expect(pctValido("1.234")).toBe(false);
+    expect(pctValido("")).toBe(false);
+  });
+  it("sueldo: pesos con centavos, sin negativos ni vacío", () => {
+    expect(sueldoValido("0")).toBe(true);
+    expect(sueldoValido("1500.50")).toBe(true);
+    expect(sueldoValido("-1")).toBe(false);
+    expect(sueldoValido("")).toBe(false);
   });
 });

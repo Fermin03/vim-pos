@@ -9,7 +9,7 @@ describe("rutasOcultas", () => {
   // Crédito (0208): apagado mientras no se lea encendido; su configuración, solo en tiendas.
   const CREDITO = ["/creditos", "/configuracion/credito", "/cotizaciones", "/configuracion/cotizaciones"];
   // Agenda (0218): de belleza; apagada mientras no se lea encendida.
-  const AGENDA = ["/agenda/servicios", "/agenda/colaboradores", "/agenda/espacios", "/configuracion/agenda"];
+  const AGENDA = ["/agenda/servicios", "/agenda/colaboradores", "/agenda/espacios", "/configuracion/agenda", "/reportes/comisiones", "/reportes/ventas-colaborador"];
   it("cargando o con error no esconde nada de restaurante (esconder de más y luego mostrar salta a la vista)", () => {
     expect(rutasOcultas(null)).toEqual(new Set([...TIENDA, ...CREDITO, ...AGENDA]));
     expect(rutasOcultas("error")).toEqual(new Set([...TIENDA, ...CREDITO, ...AGENDA]));
@@ -67,6 +67,10 @@ describe("disponiblesDe — ventas por mesero", () => {
   it("ventas por talla y color sigue solo al módulo existencias (apagado por omisión)", () => {
     expect(disponiblesDe({}, hay).existencias).toBe(false);
     expect(disponiblesDe({ existencias: true }, hay).existencias).toBe(true);
+  });
+  it("comisiones y ventas por colaborador siguen solo al módulo agenda", () => {
+    expect(disponiblesDe({}, hay).agenda).toBe(false);
+    expect(disponiblesDe({ agenda: true }, hay).agenda).toBe(true);
   });
 });
 

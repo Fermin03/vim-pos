@@ -8,13 +8,14 @@ import { AccionFila } from "../../../components/controles";
 import { input, label } from "../../../components/campos";
 import {
   DIAS_AGENDA, actualizarColaborador, altaColaborador, ausenciaSchema, borrarAusencia, crearAusencia, guardarHorarios,
-  guardarServiciosDeColaborador, horarioSchema, listarColaboradores, listarServicios, siguienteColor,
+  guardarServiciosDeColaborador, horarioSchema, listarColaboradores, listarServicios, siguienteColor, sueldoValido,
   type Colaborador, type HorarioInput, type Servicio,
 } from "../../../lib/agenda";
 import { COLORES } from "../../../lib/catalogo";
 import { listarSucursales, type Sucursal } from "../../../lib/configuracion";
 import { listarUsuarios, type Usuario } from "../../../lib/usuarios";
 import { mensajeError } from "../../../lib/errores";
+import { limpiarPrecio } from "../../../lib/numeros";
 
 const hora = "h-10 w-[7.5rem] rounded border border-line-strong px-2.5 text-sm tabular-nums outline-none focus:border-ink";
 
@@ -23,7 +24,7 @@ const fecha = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("es-MX
 
 /** Un día como se edita: sin `trabaja` el día no se guarda (ese día no atiende). */
 type DiaEditado = { trabaja: boolean; inicia: string; termina: string; comida: boolean; comidaInicia: string; comidaTermina: string };
-type Detalle = { sucursalId: string; color: string; dias: Record<number, DiaEditado>; servicios: Set<string> };
+type Detalle = { sucursalId: string; color: string; sueldo: string; dias: Record<number, DiaEditado>; servicios: Set<string> };
 
 const diaDe = (h?: HorarioInput): DiaEditado => h
   ? { trabaja: true, inicia: h.inicia, termina: h.termina, comida: h.comida_inicia !== null, comidaInicia: h.comida_inicia ?? "14:00", comidaTermina: h.comida_termina ?? "15:00" }
@@ -121,7 +122,7 @@ export default function ColaboradoresPage() {
     setSel(c.usuarioId);
     setAusencia({ desde: "", hasta: "", motivo: "" });
     setDetalle({
-      sucursalId: c.sucursalId, color: c.color,
+      sucursalId: c.sucursalId, color: c.color, sueldo: String(c.sueldo),
       dias: Object.fromEntries(DIAS_AGENDA.map(({ dia }) => [dia, diaDe(c.horarios.find((h) => h.dia_semana === dia))])),
       servicios: new Set(sv.filter((s) => s.colaboradores.some((x) => x.usuario_id === c.usuarioId)).map((s) => s.id)),
     });
@@ -163,6 +164,7 @@ export default function ColaboradoresPage() {
     detalle && setDetalle({ ...detalle, dias: { ...detalle.dias, [dia]: { ...detalle.dias[dia]!, ...cambio } } });
 
   const actual = colaboradores?.find((c) => c.usuarioId === sel) ?? null;
+  const sueldoOk = !detalle || sueldoValido(detalle.sueldo);
 
   return (
     <>
@@ -255,12 +257,20 @@ export default function ColaboradoresPage() {
                       <span id="det-color" className={label}>Color en el calendario</span>
                       <ElegirColor id="det-color" valor={detalle.color} onCambiar={(color) => setDetalle({ ...detalle, color })} />
                     </div>
+                    <div className="max-w-[320px]">
+                      <label className={label} htmlFor="det-sueldo">Sueldo por periodo</label>
+                      <input id="det-sueldo" className={`${input} tabular-nums`} inputMode="decimal" placeholder="0.00" value={detalle.sueldo}
+                        onChange={(e) => setDetalle({ ...detalle, sueldo: limpiarPrecio(e.target.value) })} aria-invalid={!sueldoOk} />
+                      <p className="mt-1.5 text-13 text-ink-2">
+                        Lo fijo de cada periodo de comisiones (semanal o quincenal, en <Link href="/configuracion/agenda" className="font-semibold text-ink underline">Configuración</Link>). 0 si solo gana comisión.
+                      </p>
+                    </div>
                     <div className="flex items-center gap-2 border-t border-line pt-4">
                       <AccionFila peligro={actual.activo} disabled={guardando} onClick={() => void cambiarActivo(actual)}>
                         {actual.activo ? "Quitar de la agenda" : "Volver a la agenda"}
                       </AccionFila>
-                      <Button className="ml-auto" disabled={guardando || (detalle.sucursalId === actual.sucursalId && detalle.color === actual.color)}
-                        onClick={() => void escribir(() => actualizarColaborador(actual.usuarioId, { sucursalId: detalle.sucursalId, color: detalle.color }), "Datos guardados.")}>
+                      <Button className="ml-auto" disabled={guardando || !sueldoOk || (detalle.sucursalId === actual.sucursalId && detalle.color === actual.color && Number(detalle.sueldo) === actual.sueldo)}
+                        onClick={() => void escribir(() => actualizarColaborador(actual.usuarioId, { sucursalId: detalle.sucursalId, color: detalle.color, sueldo: Number(detalle.sueldo) }), "Datos guardados.")}>
                         Guardar
                       </Button>
                     </div>
