@@ -19,7 +19,7 @@ Más**. Abre en Calendario. **Cobrar** es la caja de tienda con tres pestañas a
 sin cobrar; tocar una la carga a la venta con su clienta y pregunta antes si había otra venta), **En
 espera** (con «Atender»; no se cobran, aún no tienen servicio) y **Cobradas hoy** (solo se ven). Cada
 renglón del ticket lleva debajo quién lo hizo («Diego R.») y se cambia tocándolo; lo agregado a mano toma
-el colaborador de la cita cargada (o el del primer servicio de la venta), también con la venta ya guardada; un servicio sin nadie pregunta antes de guardarse. Una cita ligada a otra venta abierta dice «En otra venta abierta» y tocarla retoma esa venta; la de otro día muestra el día («ayer», «lun 2»). En la caja de belleza el ticket vacío dice «Elige una cita, un servicio o escanea un producto» y no ofrece «Cambio de talla». Un servicio sin colaborador dice «Elige quién lo hizo» y no deja
+el colaborador de la cita cargada, también con la venta ya guardada. Sin cita no se asigna a nadie en silencio: un servicio queda en «Elige quién lo hizo» y, con la venta ya guardada, se pregunta antes de guardarlo. Una cita ligada a otra venta abierta dice «En otra venta abierta» y tocarla retoma esa venta; la de otro día muestra el día («ayer», «lun 2»). En la caja de belleza el ticket vacío dice «Elige una cita, un servicio o escanea un producto» y no ofrece «Cambio de talla». Un servicio sin colaborador dice «Elige quién lo hizo» y no deja
 cobrar; un producto puede ir sin colaborador. El ticket impreso repite el colaborador bajo el servicio.
 Sin el módulo `agenda` encendido, la caja se comporta como tienda (sin Calendario ni Clientes).
 

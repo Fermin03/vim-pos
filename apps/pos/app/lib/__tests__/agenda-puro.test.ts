@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ETIQUETA_ESTADO_CITA, mensajeRecordatorio, pasoTolerancia, seCruzan, tramosEncadenados } from "@vim/db/agenda";
-import { ALTO_MIN, diaCita, diaSemana, gruposCitasCobro, lineasDeCita, nombreCorto, posicionTramo, precioEnCaja, rangoHoras, servicioSinColaborador, trabajaA, type CitaDia, type ColaboradorDia, type ServicioAgenda } from "../agenda";
+import { ALTO_MIN, colaboradorDeLaCita, diaCita, diaSemana, gruposCitasCobro, lineasDeCita, nombreCorto, posicionTramo, precioEnCaja, rangoHoras, servicioSinColaborador, trabajaA, type CitaDia, type ColaboradorDia, type ServicioAgenda } from "../agenda";
 import type { Producto } from "../catalogo";
 
 const t = (iso: string) => new Date(iso);
@@ -149,5 +149,21 @@ describe("diaCita", () => {
     expect(diaCita(t("2026-11-05T23:30:00-06:00"), "2026-11-06")).toBe("ayer");
     expect(diaCita(t("2026-11-02T12:00:00-06:00"), "2026-11-06")).toBe("lun 2");
     expect(diaCita(null, "2026-11-06")).toBeNull();
+  });
+});
+
+describe("colaboradorDeLaCita", () => {
+  const p = (id: string): Producto => ({ id, nombre: id, descripcion: null, precio_base_mxn: 100, categoria_id: "c", agotado: false, esCombo: false, seVendeAqui: true });
+  const l = (id: string, extra: { colaboradorId?: string; citaServicioId?: string } = {}) => ({ clientId: id, producto: p(id), cantidad: 1, modificadores: [], notaCocina: null, ...extra });
+  const servicios = new Set(["corte", "tinte"]);
+
+  it("con la cita cargada, lo agregado es de su colaborador (también releída de la base, sin el tramo)", () => {
+    expect(colaboradorDeLaCita({ citaId: "c1", lineas: [l("corte", { colaboradorId: "diego", citaServicioId: "t1" })] }, servicios)).toBe("diego");
+    expect(colaboradorDeLaCita({ citaId: "c1", lineas: [l("corte", { colaboradorId: "diego" })] }, servicios)).toBe("diego");
+  });
+
+  it("sin cita nunca se asigna en silencio, aunque otro servicio ya tenga colaborador", () => {
+    expect(colaboradorDeLaCita({ citaId: null, lineas: [l("corte", { colaboradorId: "diego" })] }, servicios)).toBeUndefined();
+    expect(colaboradorDeLaCita({ lineas: [] }, servicios)).toBeUndefined();
   });
 });

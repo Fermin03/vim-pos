@@ -108,7 +108,7 @@ import { FichaCita } from "./ficha-cita";
 import { configCobroAgenda } from "../lib/anticipos";
 import { PanelEspera } from "./panel-espera";
 import { CitasCobro, ElegirColaborador } from "./citas-cobro";
-import { colaboradoresDelDia, lineasDeCita, nombreCorto, precioEnCaja, servicioSinColaborador, serviciosAgenda, type CitaDia, type ColaboradorDia, type ServicioAgenda } from "../lib/agenda";
+import { colaboradorDeLaCita, colaboradoresDelDia, lineasDeCita, nombreCorto, precioEnCaja, servicioSinColaborador, serviciosAgenda, type CitaDia, type ColaboradorDia, type ServicioAgenda } from "../lib/agenda";
 import { DialogoAvisos } from "./dialogo-avisos";
 import { avisosDe, leerDirectivas, type Aviso } from "../lib/directivas";
 import { BarraEstadoCaja, ConfirmarSalirCaja, PantallaInicio } from "./pantalla-inicio";
@@ -679,10 +679,11 @@ export function HomePos({
    * venta), con su precio; se cambia en el renglón. Sale de los renglones: también sirve con la venta guardada.
    */
   const delColaboradorDeLaCita = useRef((p: Producto): Pick<LineaCarrito, "producto" | "colaboradorId"> => ({ producto: p }));
+  // `recargarCuenta` relee la venta guardada sin la cita: la conserva para que lo agregado siga siendo de ella.
+  const citaIdRef = useRef<string | null>(null);
+  citaIdRef.current = carrito.citaId ?? null;
   delColaboradorDeLaCita.current = (p) => {
-    const colab = agenda
-      ? (carrito.lineas.find((l) => l.citaServicioId && l.colaboradorId) ?? carrito.lineas.find((l) => l.colaboradorId && servicioIds.has(l.producto.id)))?.colaboradorId
-      : undefined;
+    const colab = agenda ? colaboradorDeLaCita(carrito, servicioIds) : undefined;
     if (!colab) return { producto: p };
     return { producto: { ...p, precio_base_mxn: precioEnCaja(p, serviciosCobro?.find((s) => s.productoId === p.id), colab) }, colaboradorId: colab };
   };
@@ -1030,7 +1031,7 @@ export function HomePos({
         reconstruirCarrito(token, tId, productos ?? [], combos),
         leerItemsPersistidos(token, tId).catch(() => [] as ItemTicket[]),
       ]);
-      dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas, envio: recon.envio, clienteCuenta: recon.clienteCuenta } });
+      dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas, envio: recon.envio, clienteCuenta: recon.clienteCuenta, ...(citaIdRef.current ? { citaId: citaIdRef.current } : {}) } });
       setTicketBd(bd);
       // Un renglón agregado después del primer envío deja el botón habilitado otra vez: si no,
       // lo nuevo se queda sin mandar y la cocina nunca se entera.

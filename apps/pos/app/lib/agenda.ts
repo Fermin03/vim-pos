@@ -6,7 +6,7 @@ import { employeeClient } from "./supabase";
 import { motivoDeLaBase } from "./credito";
 import { enlaceWhatsappCotizacion } from "./cotizaciones";
 import { normalizarTelefono } from "./telefono";
-import { nuevoClientId, type LineaCarrito } from "./carrito";
+import { nuevoClientId, type EstadoCarrito, type LineaCarrito } from "./carrito";
 import type { Producto } from "./catalogo";
 import { redondearCentavos } from "./dinero";
 
@@ -485,3 +485,14 @@ export function lineasDeCita(cita: CitaDia, productos: Producto[], servicios: Se
 /** El primer servicio sin quien lo hizo: sin él no se cobra (los productos pueden ir sin colaborador). */
 export const servicioSinColaborador = (lineas: LineaCarrito[], servicioIds: ReadonlySet<string>): LineaCarrito | undefined =>
   lineas.find((l) => servicioIds.has(l.producto.id) && !l.colaboradorId);
+
+/**
+ * Quién hizo lo que se agrega a mano: el colaborador de la cita cargada (su renglón de la cita o, si la
+ * venta ya se releyó de la base, el primer servicio con colaborador). Sin cita, nadie: se elige, nunca
+ * se asigna en silencio.
+ */
+export function colaboradorDeLaCita(e: Pick<EstadoCarrito, "citaId" | "lineas">, servicioIds: ReadonlySet<string>): string | undefined {
+  const deCita = e.lineas.find((l) => l.citaServicioId && l.colaboradorId)?.colaboradorId;
+  if (deCita) return deCita;
+  return e.citaId ? e.lineas.find((l) => l.colaboradorId && servicioIds.has(l.producto.id))?.colaboradorId : undefined;
+}
