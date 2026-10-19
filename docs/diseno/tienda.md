@@ -520,6 +520,62 @@ Un botón dice lo que hace y lleva su importe a la derecha: «Agregar   $139.20�
 - El error de entrar y lo que rechaza el servidor son `role="alert"`; lo que se guardó y lo que pasa
   mientras se envía se anuncia con `aria-live` sin mover el foco.
 
+## Reservas en línea (salones)
+
+El mismo `apps/tienda`, la misma dirección (`online.vimpos.com.mx/<negocio>`) y el mismo marco: si el
+negocio tiene reservas activas, `[negocio]/page.tsx` pinta el sitio de reservas en lugar del menú
+(ADR 0040). Un salón puede no tener tienda de pedidos; un restaurante nunca ve esto.
+
+### Quién y dónde
+
+La **clienta** de un salón, spa o barbería. Llegó por el enlace del Instagram o del WhatsApp del
+negocio, con el teléfono en la mano, y quiere una hora. No tiene cuenta ni la necesita: deja nombre,
+celular y correo, y el correo le trae el enlace para ver, cambiar o cancelar su cita.
+
+Hereda todo lo de arriba (color del negocio solo en la acción principal, 44 px, `text-16`, una
+acción principal por pantalla). La referencia visual es `docs/superpowers/bocetos-belleza/referencia-reservas.webp`.
+
+### Pantallas
+
+| Pantalla | Qué hace |
+|---|---|
+| **Inicio** (`[negocio]`) | Marca del negocio, sucursal si hay más de una, servicios por categoría (solo los marcados «Se reserva en línea»), quién lo hace («Quien esté libre» o una persona), cómo llegar y WhatsApp |
+| **Horarios** | Tira de días (de hoy a `agenda_dias_reserva`) y horas cada `agenda_intervalo_min`. «Buscar el siguiente día con lugar» solo por botón |
+| **Tus datos** | Nombre, celular de 10 dígitos y correo (los tres obligatorios) y el resumen: servicios, hora, total y anticipo |
+| **Paga tu anticipo** | Solo si el servicio lo pide y la sucursal tiene Mercado Pago. Tarjeta con las mismas piezas de la tienda y «Apartamos tu lugar hasta …» |
+| **Reto 3DS** | El mismo marco del reto de la tienda; mientras dura no se puede cancelar |
+| **Listo** | La cita confirmada y «Revisa tu correo para ver tu cita» |
+| **Tu cita** (`[negocio]/cita/[codigo]`) | Estado, datos, anticipo y reembolso; «Cambiar horario» y «Cancelar cita» dentro del límite. Va con `no-referrer` y `noindex`: el código es la llave |
+
+### Estados de la cita
+
+| Estado | Qué se ve |
+|---|---|
+| Confirmada | Chip de estado, datos y las acciones permitidas |
+| Espera el pago | «Apartamos tu lugar hasta …»; primero se confirma el pago, después se deja actuar |
+| Cancelada | Motivo en una frase («Se canceló porque no se pagó el anticipo a tiempo») y, si hubo anticipo, qué pasó con él |
+| Dentro de las 24 h | Sin «Cambiar» ni «Cancelar»: «Para cambios, comunícate con el negocio» y WhatsApp |
+| Pago en pausa (riesgo) | Aviso con la hora, sin tarjeta; WhatsApp del negocio |
+| Cita que ya no existe | «No encontramos esta cita» |
+
+### Reglas
+
+- **Se aparta 15 minutos** mientras se paga el anticipo. Si no se paga, la cita se cancela sola.
+  Mientras tanto cuenta para el tope de citas de esa persona.
+- **Sin anticipo** la cita queda confirmada al reservar.
+- **No se reserva con menos de 2 horas** (`agenda_aviso_min_horas`) ni más allá de `agenda_dias_reserva`.
+- **Tope de 3 citas futuras por teléfono** y como máximo 5 intentos de pago por cita.
+- **Cambiar o cancelar en línea** solo con 24 horas o más de anticipación. Después se llama al negocio.
+- **Reembolso automático** solo si la clienta cancela en línea a tiempo y el pago fue entero por
+  Mercado Pago. Cualquier otro caso lo resuelve la recepción desde la caja.
+- Si Mercado Pago no devuelve, el negocio lo ve en Admin → En línea → Reservas («Reembolsos por resolver»)
+  y lo devuelve a mano; no hay botón de resuelto.
+- Cada intento de reservar pide un token antirrobot nuevo.
+- La marca sale de las reservas si las hay; «Iniciar sesión» y los enlaces de privacidad y términos
+  solo aparecen si el negocio tiene tienda.
+
+Los textos de esta pantalla son **provisionales** hasta que los pase James.
+
 ## Lo que NO se hereda
 
 - El azul de VIM: aquí `--accent` es del negocio. Por eso tampoco el `Button` primario de `@vim/ui`.

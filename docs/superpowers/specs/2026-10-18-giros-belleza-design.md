@@ -348,3 +348,48 @@ ADR 0039.
 - Si la nube rechaza en el mismo lote la venta de una cita cobrada, la cita se toma como copia vieja y el anticipo se rechaza en cada envío. Hay que tratarlo como reintento.
 - `_cita_cobro_en_conflicto` decide «misma caja» por `caja_id`. Un cobro desde el POS web y otro de la caja sin internet de la misma cita pueden reintentar sin fin, o marcarse como conflicto final antes de tiempo.
 - Los conflictos solo quedan en `sync_eventos`; falta mostrarlos en el panel.
+
+## Entrega 3 (reservas en línea), hecha (19 oct)
+
+Sitio de reservas en la tienda, anticipo con Mercado Pago, correos, y panel «En línea». Todo en local.
+Diseño: `docs/diseno/tienda.md`; decisión: ADR 0040; textos de la clienta: `docs/legal/reservas-terminos-para-la-clienta.md`.
+
+**Migraciones**
+
+- **0224:** reglas de reserva en `configuracion_tenant`, `servicios_agenda.en_linea`, columnas de
+  `citas` (enlace, `pago_hasta`, `reservo_email`, `cancelada_por`), módulo `reservas`, RPC de huecos,
+  reservar, ver, mover y cancelar, y el barrido de reservas vencidas.
+- **0225:** pago de cita en `tienda_pagos` (`cita_id`), anticipo `PAGO_EN_LINEA` sin turno, reembolso
+  automático y devolución en efectivo del sobrante.
+- **0226:** cola de correos de cita (confirmación, cambio, cancelación y recordatorio).
+
+**Orden de lanzamiento**
+
+1. **0224–0226 a la nube a mano y antes del merge**, en orden y cada archivo en su propia transacción.
+2. **Desplegar `tienda`, `tienda-correos` y `tienda-webhook-mp` antes del merge.**
+3. **Mudanza de dirección:** los pasos de `docs/operacion/mudanza-online.md` (DNS, Vercel, `VIM_TIENDA_URL`,
+   `TURNSTILE_HOSTNAMES`, Turnstile), solo cuando Fermín lo pida.
+4. **Textos legales de reservas:** Fermín revisa el borrador antes de enlazarlo.
+
+Una caja vieja no se rompe: no usa nada de esto. Nada sale a clientas hasta que estén los servicios
+(entrega 4) y Fermín lo apruebe.
+
+**Rulings de este plan (Fermín puede corregirlos)**
+
+- Correo y celular obligatorios al reservar. El lugar se aparta 15 minutos mientras se paga el anticipo.
+- No se reserva en línea con menos de 2 horas; cambiar o cancelar, 24 horas o más.
+- Tope de 3 citas futuras por teléfono.
+- Reembolso automático solo si cancela la clienta en línea a tiempo y Mercado Pago cubre todo el anticipo.
+- La clienta queda en Clientes por su teléfono.
+
+**Para Fermín**
+
+- **Textos provisionales:** los de la reserva, los correos y el panel están marcados para que los pase James (lista pendiente).
+- **Reembolsos fallidos** se resuelven a mano desde la cuenta de Mercado Pago; no hay botón.
+- **Páginas de privacidad y términos de un salón sin tienda:** hoy no se enseñan enlaces (esas
+  páginas leen la tienda). Decidir cuál se muestra.
+- **Una cita apartada en pago abandonado** queda 15 minutos y cuenta para el tope de 3.
+- **Pruebas en local:** las funciones se sirven desde el worktree (`supabase functions serve`) con
+  `CAPTCHA_OPCIONAL=1` y sin `TURNSTILE_SECRET_KEY`; la app sin `NEXT_PUBLIC_TURNSTILE_SITE_KEY`.
+  Deno no está instalado: las pruebas de las funciones no corren aquí.
+- **Recordar:** nada sale hasta tener todos los servicios (entrega 4).
