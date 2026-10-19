@@ -343,3 +343,8 @@ ADR 0039.
   veces) solo queda en `sync_eventos`; la venta de la otra caja queda pagada con un ANTICIPO que la
   nube no aplicó. Falta mostrarlo en el panel.
 - La barra del ticket no muestra el anticipo (solo el modal de cobro).
+
+**Pendientes de sync que quedaron abiertos (casos raros, revisión final del 19 oct):**
+- Si la nube rechaza en el mismo lote la venta de una cita cobrada, la cita se toma como copia vieja y el anticipo se rechaza en cada envío. Hay que tratarlo como reintento.
+- `_cita_cobro_en_conflicto` decide «misma caja» por `caja_id`. Un cobro desde el POS web y otro de la caja sin internet de la misma cita pueden reintentar sin fin, o marcarse como conflicto final antes de tiempo.
+- Los conflictos solo quedan en `sync_eventos`; falta mostrarlos en el panel.
