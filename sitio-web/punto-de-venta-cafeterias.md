@@ -98,34 +98,73 @@ Un segundo monitor para que vea su pedido.
 
 _Precios_
 
-## Un precio claro para tu cafetería
+## Un plan para cada tamaño de cafetería
 
-Al mes, más IVA. Sin pago inicial y sin contrato forzoso.
+Sin pago inicial y sin contrato forzoso.
 
-### [Esencial](https://vimpos.com.mx/precios)
+[Ver precios](https://vimpos.com.mx/precios)
 
-$699
+### Esencial
 
-- 1 sucursal · 1 caja
-- Cocina, mesas, reportes y corte
-- Arrancas tú, con nuestra guía
+Para arrancar con una caja.
 
-_El que recomendamos_
+**$699**
 
-### [Negocio](https://vimpos.com.mx/precios)
+/mes
 
-$999
+1 sucursal · 1 caja · más IVA
 
-- 1 sucursal · 3 cajas
-- Facturación incluida · 20 folios al mes
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal para una cafetería
+
+- Tamaños, leches y extras con su precio
+- Cobro con propina y pantalla del cliente
+- Lealtad por sellos o puntos: $100 al mes aparte
+- Facturación: $349 al mes aparte
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+### Negocio
+
+El que recomendamos
+
+Todo para un local, con tu menú cargado por nosotros.
+
+**$999**
+
+/mes
+
+1 sucursal · 3 cajas · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal para una cafetería
+
+- Hasta 3 cajas: barra, mostrador y para llevar
+- Lealtad y facturación incluidas, 20 folios al mes
+- Inventario por receta: café, leche y vasos
 - Cargamos tu menú y capacitamos a tu equipo
 
-### [Cadena](https://vimpos.com.mx/precios)
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
 
-$1,999
+### Cadena
 
-- 3 sucursales · cajas sin límite
-- Un reporte que suma todas
+Varias sucursales, vistas en un solo lugar.
+
+**$1,999**
+
+/mes
+
+3 sucursales · cajas sin límite · más IVA
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+Lo principal para una cafetería
+
+- Cajas sin límite en cada sucursal
+- Un reporte que suma tus 3 sucursales
+- Lealtad y facturación incluidas, 40 folios al mes
 - Vamos a tu local el día del arranque
 
 [Ver todo lo que incluye](https://vimpos.com.mx/precios)
