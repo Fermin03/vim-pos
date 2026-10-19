@@ -15148,6 +15148,10 @@ export type Database = {
       }
       es_admin_del_tenant: { Args: { p_tenant_id: string }; Returns: boolean }
       es_dueno_del_tenant: { Args: { p_tenant_id: string }; Returns: boolean }
+      es_giro_belleza: {
+        Args: { p: Database["public"]["Enums"]["vertical_tipo"] }
+        Returns: boolean
+      }
       es_giro_tienda: {
         Args: { p: Database["public"]["Enums"]["vertical_tipo"] }
         Returns: boolean
@@ -16524,6 +16528,11 @@ export type Database = {
         | "FRUTERIA"
         | "FERRETERIA"
         | "VINOS"
+        | "SALON"
+        | "SPA"
+        | "PELUQUERIA"
+        | "BARBERIA"
+        | "TATUAJES"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -17007,6 +17016,11 @@ export const Constants = {
         "FRUTERIA",
         "FERRETERIA",
         "VINOS",
+        "SALON",
+        "SPA",
+        "PELUQUERIA",
+        "BARBERIA",
+        "TATUAJES",
       ],
     },
   },

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GIROS, GIROS_TIENDA, OPERACION, esGiroTienda, moduloActivo, nombreGiro } from "@vim/db/operacion";
+import { GIROS, GIROS_BELLEZA, GIROS_TIENDA, OPERACION, esGiroBelleza, esGiroTienda, moduloActivo, nombreGiro } from "@vim/db/operacion";
 import { conExistencias } from "../operacion";
 
 describe("moduloActivo", () => {
@@ -43,11 +43,29 @@ describe("catálogo", () => {
     expect(nombreGiro("NUEVO_RARO")).toBe("NUEVO_RARO");
     expect(nombreGiro(null)).toBe("—");
   });
-  it("once módulos visibles", () => {
+  it("doce módulos visibles", () => {
     expect(OPERACION.map((m) => m.codigo)).toEqual(
-      ["mostrador", "comedor", "meseros", "domicilio", "repartidores", "kds", "reservaciones", "marcas", "eventos", "cuentas_barra", "existencias"]);
+      ["mostrador", "comedor", "meseros", "domicilio", "repartidores", "kds", "reservaciones", "marcas", "eventos", "cuentas_barra", "existencias", "agenda"]);
     expect(OPERACION.find((m) => m.codigo === "meseros")?.requiere).toBe("comedor");
     expect(OPERACION.find((m) => m.codigo === "repartidores")?.requiere).toBe("domicilio");
+  });
+});
+
+describe("belleza", () => {
+  it("los cinco giros existen, con nombre, y no se ofrecen todavía", () => {
+    expect(GIROS_BELLEZA).toEqual(["SALON", "SPA", "PELUQUERIA", "BARBERIA", "TATUAJES"]);
+    for (const g of GIROS_BELLEZA) {
+      expect(GIROS.find((x) => x.codigo === g)?.ofrecido).toBe(false);
+      expect(esGiroBelleza(g)).toBe(true);
+    }
+    expect(nombreGiro("TATUAJES")).toBe("Tatuajes y piercings");
+    expect(esGiroBelleza("RETAIL")).toBe(false);
+    expect(esGiroBelleza("QUICK_SERVICE")).toBe(false);
+    expect(esGiroBelleza(null)).toBe(false);
+  });
+  it("agenda ausente es apagada", () => {
+    expect(moduloActivo({}, "agenda")).toBe(false);
+    expect(moduloActivo({ agenda: true }, "agenda")).toBe(true);
   });
 });
 

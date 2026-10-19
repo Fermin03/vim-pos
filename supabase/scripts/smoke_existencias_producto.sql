@@ -24,7 +24,7 @@ DECLARE
   v_m  jsonb;
 BEGIN
   IF juego_inicial_de_giro('RETAIL') IS DISTINCT FROM
-     '{"mostrador":true,"comedor":false,"meseros":false,"domicilio":false,"repartidores":false,"kds":false,"reservaciones":false,"marcas":false,"eventos":false,"cuentas_barra":false,"existencias":true}'::jsonb
+     '{"mostrador":true,"comedor":false,"meseros":false,"domicilio":false,"repartidores":false,"kds":false,"reservaciones":false,"marcas":false,"eventos":false,"cuentas_barra":false,"existencias":true,"agenda":false}'::jsonb
   THEN RAISE EXCEPTION '2a: RETAIL: %', juego_inicial_de_giro('RETAIL'); END IF;
 
   -- Ningún giro de comida arranca con existencias, y sin giro (o ENTERPRISE) tampoco.
@@ -50,7 +50,7 @@ BEGIN
   END IF;
 
   -- VIM lo enciende (como cualquier módulo de operación) y se refleja.
-  PERFORM operacion_cambiar(v_t, '{"existencias":true}');
+  PERFORM operacion_cambiar(v_t, '{"existencias":true,"agenda":false}');
   IF (modulos_efectivos(v_t)->'efectivos'->>'existencias')::boolean IS DISTINCT FROM true THEN
     RAISE EXCEPTION '2f: encender existencias no se reflejó';
   END IF;
@@ -552,10 +552,10 @@ BEGIN
     RAISE EXCEPTION '6f: un conteo rechazado dejó movimientos'; END IF;
 
   -- 6g) Con el módulo apagado, nada a mano.
-  PERFORM operacion_cambiar(v_t, '{"existencias":false}');
+  PERFORM operacion_cambiar(v_t, '{"existencias":false,"agenda":false}');
   BEGIN PERFORM registrar_movimiento_producto(v_suc, v_m, 'ENTRADA', 1);
         RAISE EXCEPTION '6g: módulo apagado'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'MODULO_APAGADO%' THEN RAISE; END IF; END;
-  PERFORM operacion_cambiar(v_t, '{"existencias":true}');
+  PERFORM operacion_cambiar(v_t, '{"existencias":true,"agenda":false}');
   -- 6h) NaN no entra: ni por las funciones ni por INSERT directo.
   BEGIN PERFORM registrar_movimiento_producto(v_suc, v_m, 'ENTRADA', 'NaN'::numeric);
         RAISE EXCEPTION '6h: cantidad NaN'; EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS%' THEN RAISE; END IF; END;
