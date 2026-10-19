@@ -4,6 +4,7 @@ import { hoyMx, sumarDias } from "@vim/fecha";
 import { Icono } from "@vim/ui/styles";
 import { ETIQUETA_ESTADO_CITA, horaCorta, pasoTolerancia } from "@vim/db/agenda";
 import {
+  ALTO_MIN,
   PX_POR_MIN,
   citasDelDia,
   citasEnEspera,
@@ -27,16 +28,22 @@ const fmtMes = new Intl.DateTimeFormat("es-MX", { timeZone: "UTC", month: "long"
 const iniciales = (nombre: string) =>
   nombre.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join("");
 
-const hhmm = (min: number) => `${Math.floor(min / 60)}:${String(min % 60).padStart(2, "0")}`;
+/** «9:00», «17:30»; la medianoche con su cero: «00:30» (como `horaCorta`). */
+const hhmm = (min: number) => `${Math.floor(min / 60) || "00"}:${String(min % 60).padStart(2, "0")}`;
+
+/** Columna para los tramos de alguien que ya no está en la agenda (dado de baja) o sin colaborador. */
+const SIN_COLABORADOR: ColaboradorDia = { usuarioId: "", nombre: "Sin colaborador", color: "#6E6E74", horario: null, ausente: false };
 
 /**
  * Calendario de la caja de belleza (boceto 1): el día por colaborador, con la línea de la hora,
  * las citas en su tramo y su estado. Tocar una cita, un hueco o los botones de arriba lo resuelve
  * quien lo monta (ficha, nueva cita, lista de espera).
  */
-export function SeccionCalendario({ token, sucursalId, onAbrirCita, onNuevaCita, onAbrirEspera }: {
+export function SeccionCalendario({ token, sucursalId, version, onAbrirCita, onNuevaCita, onAbrirEspera }: {
   token: string;
   sucursalId: string;
+  /** Sube al guardar, mover o cancelar una cita: el calendario se relee en ese momento. */
+  version: number;
   onAbrirCita: (id: string) => void;
   /** Desde un hueco llega con la hora y el colaborador; desde «+ Nueva cita», sin nada. */
   onNuevaCita: (inicio?: Date, usuarioId?: string) => void;
@@ -67,7 +74,7 @@ export function SeccionCalendario({ token, sucursalId, onAbrirCita, onNuevaCita,
     leer();
     const t = setInterval(leer, 60_000);
     return () => { vivo = false; clearInterval(t); };
-  }, [token, sucursalId, dia]);
+  }, [token, sucursalId, dia, version]);
 
   // Lunes a domingo de la semana del día elegido.
   const lunes = sumarDias(dia, -((diaSemana(dia) + 6) % 7));
@@ -83,12 +90,17 @@ export function SeccionCalendario({ token, sucursalId, onAbrirCita, onNuevaCita,
   const minAhora = minutoDelDia(ahora, dia);
   const lineaAhora = rango && dia === hoy && minAhora >= rango.desde && minAhora <= rango.hasta ? (minAhora - rango.desde) * PX_POR_MIN : null;
 
+  const conocidos = new Set(vigentes?.colaboradores.map((c) => c.usuarioId));
+  const huerfanos = vigentes?.citas.some((c) => c.tramos.some((t) => t.inicia && t.termina && !conocidos.has(t.usuarioId ?? ""))) ?? false;
+  const columnas = vigentes ? [...vigentes.colaboradores, ...(huerfanos ? [SIN_COLABORADOR] : [])] : [];
+
   const boton = "flex h-12 items-center justify-center rounded-lg px-4 text-15 font-semibold transition-[transform,background-color,border-color] duration-150 ease-vim active:scale-[.97]";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-shrink-0 items-center gap-4 border-b border-line bg-surface px-4 py-3">
-        <h1 className="min-w-[132px] font-display text-24 font-semibold capitalize tracking-tight">{mes}</h1>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      {/* Angosta (≈800 px) la cabecera se parte en dos renglones en vez de empujar la página de lado. */}
+      <div className="flex flex-shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-surface px-4 py-3">
+        <h1 className="font-display text-24 font-semibold capitalize tracking-tight">{mes}</h1>
         <div className="flex items-center gap-1">
           <button type="button" aria-label="Semana anterior" onClick={() => setDia(sumarDias(dia, -7))}
             className="flex h-11 w-11 items-center justify-center rounded-lg text-ink-2 transition-transform duration-150 ease-vim hover:bg-hover hover:text-ink active:scale-[.97]">
@@ -118,7 +130,7 @@ export function SeccionCalendario({ token, sucursalId, onAbrirCita, onNuevaCita,
             <Icono nombre="chevron-derecha" className="h-5 w-5" />
           </button>
         </div>
-        <div className="flex-1" />
+        <div className="ml-auto flex items-center gap-2">
         {dia !== hoy && (
           <button type="button" onClick={() => setDia(hoy)} className={`${boton} border border-line-strong text-ink-2 hover:border-ink hover:text-ink`}>Hoy</button>
         )}
@@ -133,13 +145,14 @@ export function SeccionCalendario({ token, sucursalId, onAbrirCita, onNuevaCita,
           <Icono nombre="mas" className="h-5 w-5" />
           Nueva cita
         </button>
+        </div>
       </div>
 
       {error && <p className="flex-shrink-0 px-4 py-2.5 text-14 font-medium text-danger" role="alert">{error}</p>}
 
       {!vigentes || !rango ? (
         <p className="p-4 text-14 text-ink-3">{error ? "" : "Cargando…"}</p>
-      ) : vigentes.colaboradores.length === 0 ? (
+      ) : columnas.length === 0 ? (
         <p className="p-8 text-15 text-ink-2">No hay colaboradores en esta sucursal. Dalos de alta en el admin, en Agenda › Colaboradores.</p>
       ) : (
         <div className="min-h-0 flex-1 overflow-auto">
@@ -148,9 +161,10 @@ export function SeccionCalendario({ token, sucursalId, onAbrirCita, onNuevaCita,
             <div className="sticky left-0 z-20 w-16 flex-shrink-0 border-r border-line bg-surface">
               <div className="sticky top-0 z-10 h-14 border-b border-line bg-surface" />
               <div className="relative" style={{ height: alto }}>
-                {Array.from({ length: (rango.hasta - rango.desde) / 60 + 1 }, (_, i) => rango.desde + i * 60).map((m) => (
-                  <span key={m} className="absolute right-2 -translate-y-1/2 text-12 tabular-nums text-ink-3" style={{ top: (m - rango.desde) * PX_POR_MIN }}>
-                    {m === rango.desde ? "" : hhmm(m)}
+                {/* Toda hora lleva su etiqueta; la primera va debajo de la raya (centrada, la taparía la cabecera). */}
+                {Array.from({ length: (rango.hasta - rango.desde) / 60 + 1 }, (_, i) => rango.desde + i * 60).map((m, i) => (
+                  <span key={m} className={["absolute right-2 text-12 tabular-nums text-ink-3", i === 0 ? "translate-y-0.5" : "-translate-y-1/2"].join(" ")} style={{ top: (m - rango.desde) * PX_POR_MIN }}>
+                    {hhmm(m)}
                   </span>
                 ))}
                 {lineaAhora != null && (
@@ -161,15 +175,17 @@ export function SeccionCalendario({ token, sucursalId, onAbrirCita, onNuevaCita,
               </div>
             </div>
 
-            {vigentes.colaboradores.map((c) => (
+            {columnas.map((c) => (
               <Columna
-                key={c.usuarioId}
+                key={c.usuarioId || "sin"}
                 colaborador={c}
                 dia={dia}
                 desde={rango.desde}
                 hasta={rango.hasta}
                 alto={alto}
-                tramos={vigentes.citas.flatMap((cita) => cita.tramos.filter((t) => t.usuarioId === c.usuarioId && t.inicia && t.termina).map((t) => ({ cita, t })))}
+                tramos={vigentes.citas.flatMap((cita) => cita.tramos
+                  .filter((t) => t.inicia && t.termina && (c === SIN_COLABORADOR ? !conocidos.has(t.usuarioId ?? "") : t.usuarioId === c.usuarioId))
+                  .map((t) => ({ cita, t })))}
                 ahora={ahora}
                 tolerancia={vigentes.tolerancia}
                 lineaAhora={lineaAhora}
@@ -209,7 +225,7 @@ function Columna({ colaborador: c, dia, desde, hasta, alto, tramos, ahora, toler
       </div>
       <div className="relative" style={{ height: alto }}>
         {/* Huecos de media hora: tocar uno agenda ahí. Fuera de su horario se ven apagados. */}
-        {slots.map((m) => (
+        {c !== SIN_COLABORADOR && slots.map((m) => (
           <button
             key={m}
             type="button"
@@ -276,7 +292,7 @@ function TarjetaTramo({ cita, tramo, dia, desde, color, ahora, tolerancia, onAbr
       ].join(" ")}
       style={{
         top: top + 2,
-        height: alto - 4,
+        height: Math.max(alto - 4, ALTO_MIN),
         borderLeftColor: noLlego ? "rgb(var(--danger))" : color,
         backgroundColor: noLlego ? undefined : `${color}1A`,
       }}

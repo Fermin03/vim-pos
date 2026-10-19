@@ -46,8 +46,8 @@ export function diaLargo(d: Date): string {
   return `${p.weekday} ${p.day} de ${p.month}`;
 }
 
-/** «10:30» (y «9:00», sin el cero que pone h23), en México. */
-export const horaCorta = (d: Date): string => fmtHora.format(d).replace(/^0(?=\d:)/, "");
+/** «10:30» (y «9:00», sin el cero que pone h23; la medianoche lo conserva: «00:30»), en México. */
+export const horaCorta = (d: Date): string => fmtHora.format(d).replace(/^0(?=[1-9]:)/, "");
 
 /** El recordatorio por WhatsApp, con el texto exacto del diseño. */
 export function mensajeRecordatorio(d: { nombre: string; negocio: string; inicia: Date; servicios: string[] }): string {

@@ -32,10 +32,14 @@ const DESTINOS_BELLEZA: Destino[] = [
   { seccion: "configuracion", etiqueta: "Más", icono: "menu" },
 ];
 
-export const destinosDe = (caja: DatosCaja | null): Destino[] => (esBelleza(caja) ? DESTINOS_BELLEZA : DESTINOS_TIENDA);
+/**
+ * La barra de belleza solo con el módulo `agenda` encendido (`moduloActivo(modulos, "agenda")`): sin
+ * él, la caja de belleza es una caja de tienda y no enseña Calendario ni Clientes.
+ */
+export const destinosDe = (caja: DatosCaja | null, agenda: boolean): Destino[] => (esBelleza(caja) && agenda ? DESTINOS_BELLEZA : DESTINOS_TIENDA);
 
-/** Donde abre la caja y a donde regresa Escape: el calendario en belleza, el Panel en tienda. */
-export const seccionInicial = (caja: DatosCaja | null): SeccionTienda => (esBelleza(caja) ? "calendario" : "panel");
+/** Donde abre la caja y a donde regresa Escape: el calendario en belleza con agenda, el Panel en tienda. */
+export const seccionInicial = (caja: DatosCaja | null, agenda: boolean): SeccionTienda => (esBelleza(caja) && agenda ? "calendario" : "panel");
 
 /** Con un cobro o un diálogo encima la barra no navega: sería trabajo que se pierde de vista. */
 export const puedeCambiarSeccion = (capasAbiertas: boolean, cobroAbierto: boolean): boolean => !capasAbiertas && !cobroAbierto;

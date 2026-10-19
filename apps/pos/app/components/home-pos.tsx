@@ -102,6 +102,10 @@ import { MenuGeneral } from "./menu-general";
 import { ContenidoMenu } from "./contenido-menu";
 import { BarraTienda } from "./barra-tienda";
 import { SeccionCalendario } from "./seccion-calendario";
+import { SeccionClientes } from "./seccion-clientes";
+import { ModalCita, type AbrirCita } from "./modal-cita";
+import { FichaCita } from "./ficha-cita";
+import { PanelEspera } from "./panel-espera";
 import { DialogoAvisos } from "./dialogo-avisos";
 import { avisosDe, leerDirectivas, type Aviso } from "../lib/directivas";
 import { BarraEstadoCaja, ConfirmarSalirCaja, PantallaInicio } from "./pantalla-inicio";
@@ -252,6 +256,8 @@ export function HomePos({
   // Tienda en línea propia: comparte pantalla, sondeo y timbre con las apps («Pedidos en línea»).
   const hayTienda = modulos?.tienda === true;
   const hayEnLinea = hayDelivery || hayTienda;
+  /** Caja de belleza con la agenda encendida: Calendario y Clientes. Sin el módulo es una caja de tienda. */
+  const agenda = esBelleza(caja) && moduloActivo(modulos, "agenda");
   const ultimoTimbre = useRef<number | null>(null);
   /** Hasta cuándo timbrar por lo que este dispositivo puede aceptar (`timbrarHasta`); null = nada. */
   const timbreHasta = useRef<number | null>(null);
@@ -606,7 +612,7 @@ export function HomePos({
   // Un restaurante no pasa por nada de esto (pos-retail.md). La caja de belleza es la de tienda con
   // su barra (Calendario · Cobrar · Clientes · Transacciones · Más) y abre en el calendario.
   const tienda = esTienda(caja) || esBelleza(caja);
-  const seccionInicio = seccionInicial(caja);
+  const seccionInicio = seccionInicial(caja, agenda);
   /** La cuenta cargada es la venta de un cambio: no se le ofrece canje de lealtad (como no suma, 0200).
    *  `null` mientras se lee o si falla la lectura: tampoco se ofrece. */
   const [ventaDeCambio, setVentaDeCambio] = useState<boolean | null>(false);
@@ -625,7 +631,19 @@ export function HomePos({
    * Sección de la barra inferior de la tienda. El Panel (la venta) nunca se desmonta al cambiar:
    * solo se oculta, así el carrito, el ticket guardado y la fila de agregados siguen donde estaban.
    */
-  const [seccionTienda, setSeccionTienda] = useState<SeccionTienda>(() => seccionInicial(caja));
+  const [seccionTienda, setSeccionTienda] = useState<SeccionTienda>(() => seccionInicial(caja, agenda));
+  // El módulo puede llegar después (primera lectura de directivas) o apagarse con la caja abierta:
+  // se va a la sección de inicio que toque si se está en una que ya no es de esta barra.
+  useEffect(() => {
+    setSeccionTienda((s) => (!agenda && (s === "calendario" || s === "clientes") ? "panel" : agenda && s === "panel" ? "calendario" : s));
+  }, [agenda]);
+  // Agenda de belleza: la ficha de una cita, la cita nueva o en edición, la lista de espera, y la
+  // versión que relee el calendario al guardar, mover o cancelar.
+  const [fichaCita, setFichaCita] = useState<string | null>(null);
+  const [modalCita, setModalCita] = useState<AbrirCita | null>(null);
+  const [esperaAgendaAbierta, setEsperaAgendaAbierta] = useState(false);
+  const [agendaVersion, setAgendaVersion] = useState(0);
+  const agendaCambio = useCallback(() => setAgendaVersion((v) => v + 1), []);
   /** Salir de la venta desde «Más» (bloquear, cambiar cajero, cerrar turno, salir) con productos sin guardar. */
   const [confirmar, dialogoConfirmar] = useConfirmar();
   const [confirmandoVenta, setConfirmandoVenta] = useState(false);
@@ -2154,6 +2172,11 @@ export function HomePos({
       // Confirmaciones de la sección «Más» de la tienda: las cierra su propio diálogo.
       [confirmandoVenta, null],
       [salirCajaAbierto, null],
+      // Agenda de belleza: los cierra su propio `Modal` (el de más arriba primero); aquí, para que la
+      // pila sepa que hay algo abierto y la barra no navegue debajo.
+      [modalCita != null, null],
+      [fichaCita != null, null],
+      [esperaAgendaAbierta, null],
     ];
     const pantallas: CapaEscape[] = [
       // La pantalla de cocina no conoce la pila del POS (vive en su propio paquete).
@@ -2185,7 +2208,7 @@ export function HomePos({
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
       salidaPendiente, confirmandoCierre, menuGeneralAbierto, cerrando, enInicio, enKds, enMonitor,
       enConsultaCuentas, enDevoluciones, enCambioTalla, enPedidosApps, enDelivery, enPickup, enMesas, enBarra, nuevoTicket,
-      intentarSalirDeCaptura, tienda, seccionTienda, seccionInicio, reabriendoTx, cambiandoPagoTx, cerrarBusquedaTx, cerrarConsultaInv, irASeccion, avisosVim, confirmandoVenta, salirCajaAbierto]);
+      intentarSalirDeCaptura, tienda, seccionTienda, seccionInicio, reabriendoTx, cambiandoPagoTx, cerrarBusquedaTx, cerrarConsultaInv, irASeccion, avisosVim, confirmandoVenta, salirCajaAbierto, modalCita, fichaCita, esperaAgendaAbierta]);
   useEscape(alEscapar);
 
   // ── Cotizaciones (retail 2, entrega 3) ────────────────────────────────────────────────────
@@ -3342,12 +3365,19 @@ export function HomePos({
             <SeccionCalendario
               token={token}
               sucursalId={caja.sucursal_id}
-              // La ficha, la cita nueva y la lista de espera llegan con la tarea 6.
-              onAbrirCita={() => {}}
-              onNuevaCita={() => {}}
-              onAbrirEspera={() => {}}
+              version={agendaVersion}
+              onAbrirCita={setFichaCita}
+              onNuevaCita={(inicio, usuarioId) => setModalCita({ inicio, usuarioId })}
+              onAbrirEspera={() => setEsperaAgendaAbierta(true)}
             />
-          ) : seccionTienda === "clientes" ? null : seccionTienda === "configuracion" && enCotizaciones ? (
+          ) : seccionTienda === "clientes" ? (
+            <SeccionClientes
+              token={token}
+              lealtad={lealtadActiva}
+              version={agendaVersion}
+              onAgendar={(cliente) => setModalCita({ cliente })}
+            />
+          ) : seccionTienda === "configuracion" && enCotizaciones ? (
             <SeccionCotizaciones
               token={token}
               cajaId={turno.caja_id}
@@ -3438,7 +3468,7 @@ export function HomePos({
       )}
       {tienda && (
         <BarraTienda
-          destinos={destinosDe(caja)}
+          destinos={destinosDe(caja, agenda)}
           seccion={seccionTienda}
           onCambiar={(s) => { setProductoInventario(null); void irASeccion(s); }}
           pendientes={vistas ? sinVer(notificaciones, vistas) : 0}
@@ -3459,6 +3489,42 @@ export function HomePos({
       )}
       {salirCajaAbierto && <ConfirmarSalirCaja onCancelar={() => setSalirCajaAbierto(false)} />}
       {dialogoConfirmar}
+      {agenda && esperaAgendaAbierta && (
+        <PanelEspera
+          token={token}
+          sucursalId={caja.sucursal_id}
+          version={agendaVersion}
+          onAbrirCita={setFichaCita}
+          onAgregar={() => setModalCita({ espera: true })}
+          onAtendida={agendaCambio}
+          onCerrar={() => setEsperaAgendaAbierta(false)}
+        />
+      )}
+      {agenda && fichaCita && (
+        <FichaCita
+          token={token}
+          citaId={fichaCita}
+          negocio={caja.negocioNombre}
+          onMover={(cita) => setModalCita({ cita })}
+          onCambio={agendaCambio}
+          onCerrar={() => setFichaCita(null)}
+        />
+      )}
+      {agenda && modalCita && (
+        <ModalCita
+          token={token}
+          tenantId={caja.tenant_id}
+          sucursalId={caja.sucursal_id}
+          abrir={modalCita}
+          onGuardada={() => {
+            // Mover cierra también la ficha: la cita cambió de lugar y se ve en el calendario.
+            if (modalCita.cita) setFichaCita(null);
+            setModalCita(null);
+            agendaCambio();
+          }}
+          onCerrar={() => setModalCita(null)}
+        />
+      )}
 
       {esperaPidiendoEtiqueta && (
         <ModalEtiquetaEspera

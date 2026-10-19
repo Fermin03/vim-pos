@@ -61,8 +61,8 @@ describe("layout del calendario", () => {
 
   const diego: ColaboradorDia = { usuarioId: "d", nombre: "Diego R.", color: "#2C5AA0", horario: { inicia: 600, termina: 1140, comida: [840, 900] }, ausente: false };
   const cita = (i: string, f: string): CitaDia => ({
-    id: "c", clienteId: null, clienteNombre: "X", clienteTelefono: null, estado: "AGENDADA", canal: "CAJA", inicia: null, termina: null, empalme: false, nota: null,
-    tramos: [{ id: "t", orden: 1, servicio: "Corte", usuarioId: "d", espacio: null, inicia: t(`${dia}T${i}:00-06:00`), termina: t(`${dia}T${f}:00-06:00`), empalme: false }],
+    id: "c", clienteId: null, clienteNombre: "X", clienteTelefono: null, clienteEmail: null, estado: "AGENDADA", canal: "CAJA", inicia: null, termina: null, llegoAt: null, empalme: false, nota: null,
+    tramos: [{ id: "t", orden: 1, productoId: "p", servicio: "Corte", usuarioId: "d", colaborador: "Diego R.", espacio: null, precio: 150, inicia: t(`${dia}T${i}:00-06:00`), termina: t(`${dia}T${f}:00-06:00`), empalme: false }],
   });
 
   it("horas: del horario de los colaboradores, estiradas a las citas; sin nada, 9 a 20", () => {
