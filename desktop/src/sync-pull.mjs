@@ -71,6 +71,18 @@ export const PULL_ORDER = [
   { t: "users", schema: "auth" },
   { t: "usuarios_perfil" },
   { t: "usuarios_acceso" },
+  // Agenda (0219): después de productos, clientes y empleados, a los que apunta. El catálogo solo
+  // lo edita el admin: se reemplaza entero (CLAVES_NATURALES, porPadre). Las citas van por huella
+  // como las zonas (LIBRETAS): una con cambio local pendiente no se pisa, ni sus tramos.
+  { t: "tipos_espacio" },
+  { t: "espacios" },
+  { t: "servicios_agenda" },
+  { t: "colaboradores_agenda" },
+  { t: "servicio_colaborador" },
+  { t: "horarios_colaborador" },
+  { t: "ausencias_colaborador" },
+  { t: "citas" },
+  { t: "citas_servicios" },
 ];
 
 /**
@@ -286,6 +298,20 @@ const CLAVES_NATURALES = {
   // Una configuración de propinas por sucursal (UNIQUE sucursal_id, 0184): si llega con otro id,
   // chocaría con propinas_config_sucursal_unica y tumbaría el pull entero. Nadie apunta a su id.
   sucursal_propinas_config: { claves: ["sucursal_id"], dependientes: [] },
+  // Agenda (0219): el catálogo es solo del admin y el pull no trae lo que se borró en la nube (un
+  // colaborador que ya no hace un servicio, una ausencia cancelada). Se borra lo del negocio y entra
+  // lo de la nube; de paso no chocan sus llaves naturales (nombre del tipo, día del horario). En
+  // réplica, borrar no arrastra las citas que apuntan a un espacio o a un colaborador.
+  tipos_espacio: { porPadre: "tenant_id" },
+  espacios: { porPadre: "tenant_id" },
+  servicios_agenda: { porPadre: "tenant_id" },
+  colaboradores_agenda: { porPadre: "tenant_id" },
+  servicio_colaborador: { porPadre: "tenant_id" },
+  horarios_colaborador: { porPadre: "tenant_id" },
+  ausencias_colaborador: { porPadre: "tenant_id" },
+  // Editar una cita le da ids nuevos a sus tramos (guardar_cita borra y vuelve a insertar): se
+  // reemplazan los de cada cita que baja.
+  citas_servicios: { porPadre: "cita_id" },
 };
 
 const fkCache = new Map();
@@ -805,6 +831,7 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
   const resumen = {};
   const fusionados = new Map(); // clientes destino de una fusión en este pull (id → tenant)
   let saldosCorregidos = false;
+  let citasFuera = new Set(); // 0219: citas que este pull no escribió; sus tramos tampoco se tocan
   try {
     await client.query("BEGIN");
     await client.query("SET LOCAL session_replication_role = replica"); // no disparar triggers/audit
@@ -818,6 +845,7 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
         if (descartadas.length) {
           log(`  ${t}: ${descartadas.length} con cambio local pendiente de subir, no se pisan`);
         }
+        if (t === "citas") citasFuera = new Set(descartadas.map((f) => f.id));
         filas = aplicar;
         if (!filas.length) continue;
       }
@@ -862,12 +890,26 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
           },
         };
       } else {
+        if (t === "citas_servicios") {
+          filas = filas.filter((f) => !citasFuera.has(f.cita_id));
+          if (!filas.length) continue;
+        }
         await reconciliarCatalogo(client, t, filas, log);
         if (t === "productos") await soltarClavesProductos(client, filas);
         // 0210: una fila que choque (p. ej. con la llave client_id_local) se salta sola, no tumba el pull.
-        if (LIBRETAS_POR_ID[t]) opcionesFila = { aislarFilas: true, fallidas, log };
+        if (LIBRETAS_POR_ID[t] || t === "citas" || t === "citas_servicios") opcionesFila = { aislarFilas: true, fallidas, log };
       }
-      const n = await upsertTabla(client, schema, t, filas, opcionesFila);
+      let n = await upsertTabla(client, schema, t, filas, opcionesFila);
+      if (t === "citas_servicios" && fallidas.some((x) => x.error?.code === "23P01")) {
+        // Choca con una cita de esta caja que aún no sube: entra marcada (el EXCLUDE no ve los tramos
+        // con empalme). El push de esa cita marca a las dos en la nube y el pull siguiente lo trae.
+        const choques = fallidas.filter((x) => x.error?.code === "23P01");
+        const otras = fallidas.filter((x) => x.error?.code !== "23P01");
+        fallidas.length = 0;
+        fallidas.push(...otras);
+        n += await upsertTabla(client, schema, t, choques.map((x) => ({ ...x.fila, empalme: true })), { aislarFilas: true, fallidas, log });
+      }
+      if (t === "citas") for (const x of fallidas) citasFuera.add(x.fila.id);
       if (fallidas.length) {
         if (soltadas) await restaurarClavesClientes(client, fallidas, soltadas, log);
         const malas = new Set(fallidas.map((x) => x.fila.id));

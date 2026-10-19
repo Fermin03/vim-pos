@@ -56,7 +56,7 @@ function crearPoolFalso({
       // Migración de la libreta de zonas a huella (C3): columna y relleno. Aquí no hay huellas que
       // rellenar; lo que hacen de verdad lo prueba el bloque con Postgres real al final del archivo.
       if (sql.startsWith("ALTER TABLE")) return { rows: [], rowCount: 0 };
-      if (sql.startsWith("UPDATE _vim_zonas_ok") || sql.startsWith("UPDATE _vim_colonias_ok") || sql.startsWith("UPDATE _vim_cotizaciones_ok")) return { rows: [], rowCount: 0 };
+      if (sql.startsWith("UPDATE _vim_zonas_ok") || sql.startsWith("UPDATE _vim_colonias_ok") || sql.startsWith("UPDATE _vim_cotizaciones_ok") || sql.startsWith("UPDATE _vim_citas_ok")) return { rows: [], rowCount: 0 };
 
       // `_vim_migraciones_sync`: el marcador de "esto ya corrió una vez en esta caja".
       if (sql.includes("_vim_migraciones_sync")) {
@@ -1043,6 +1043,90 @@ describe("ventas que cambian después de subir, y el piso de las mesas (Postgres
     assert.ok(!(await cotPend(cot)), "confirmada, ya no");
   });
 
+  // ── Citas (0219): suben por huella, con sus tramos; las de la nube no rebotan ──────────────
+  const SERVICIO = "21900000-0000-0000-0000-0000000000d1";
+  const DIEGO = "99999999-0000-0000-0000-0000000000f1";
+  /** Una cita como la deja guardar_cita en la caja; con `id`, la edita. */
+  const agendar = async (clave, hora, id = null) => {
+    await db.query(`UPDATE tenants SET operacion = operacion || '{"agenda":true}' WHERE id = $1`, [TENANT]);
+    await db.query(`INSERT INTO productos (id, tenant_id, categoria_id, nombre, precio_base_mxn) VALUES ($1, $2, 'a0000000-0000-0000-0000-0000000000c1', 'Corte caja', 250) ON CONFLICT DO NOTHING`, [SERVICIO, TENANT]);
+    await db.query(`INSERT INTO servicios_agenda (producto_id, tenant_id, duracion_min) VALUES ($1, $2, 60) ON CONFLICT DO NOTHING`, [SERVICIO, TENANT]);
+    await db.query(`INSERT INTO colaboradores_agenda (usuario_id, tenant_id, sucursal_id, color_hex) VALUES ($1, $2, $3, '#0F766E') ON CONFLICT DO NOTHING`, [DIEGO, TENANT, SUC]);
+    const c = await db.connect();
+    try {
+      await c.query("SELECT set_config('request.jwt.claims', $1, false)", [JSON.stringify({ sub: MARIA, tenant_id: TENANT })]);
+      const { rows: [{ id: cita }] } = await c.query("SELECT guardar_cita($1) AS id", [JSON.stringify({
+        id, sucursal_id: SUC, cliente_nombre: "Clienta caja", inicia: `2030-01-07 ${hora}-06`, client_id_local: id ? null : clave,
+        servicios: [{ producto_id: SERVICIO, usuario_id: DIEGO }] })]);
+      return cita;
+    } finally { c.release(); }
+  };
+  const citaPend = async (id) => (await pend()).citas.some((x) => x.id === id);
+
+  test("citas: sube una vez con su tramo; editada en la caja vuelve a subir; sin cambio no", async () => {
+    await subir();
+    const cita = await agendar("cita-1", "10:00");
+    assert.ok(await citaPend(cita), "recién agendada, está pendiente");
+    const [snap] = await subir({ resultado: { citas: 1, citas_servicios: 1 } });
+    assert.ok((snap?.citas ?? []).some((x) => x.id === cita), "la cita viaja");
+    assert.equal((snap?.citas_servicios ?? []).filter((x) => x.cita_id === cita).length, 1, "con su tramo");
+    assert.ok(!(await citaPend(cita)), "confirmada, no se repite");
+    const [otra] = await subir();
+    assert.equal((otra?.citas ?? []).length, 0, "sin cambio no se reenvía");
+
+    await agendar(null, "12:00", cita);
+    assert.ok(await citaPend(cita), "editada en la caja, vuelve a estar pendiente");
+    const [snap2] = await subir({ resultado: { citas: 1, citas_servicios: 1 } });
+    const tramo = (snap2?.citas_servicios ?? []).find((x) => x.cita_id === cita);
+    assert.equal(new Date(tramo?.inicia).toISOString(), "2030-01-07T18:00:00.000Z", "viaja con la hora nueva");
+    assert.ok(!(await citaPend(cita)), "confirmada, ya no");
+  });
+
+  test("citas: con un tramo rechazado o sin la 0219 en la nube, se reintenta", async () => {
+    const cita = await agendar("cita-2", "14:00");
+    const { rows: [{ id: tramo }] } = await db.query("SELECT id FROM citas_servicios WHERE cita_id = $1", [cita]);
+    await subir({ resultado: { citas: 1, citas_servicios: 0, _errores: [{ tabla: "citas_servicios", id: tramo, error: "x" }] } });
+    assert.ok(await citaPend(cita), "un tramo rechazado: la cita sigue pendiente");
+    await subir({ resultado: { _ignoradas: ["citas", "citas_servicios"] } });
+    assert.ok(await citaPend(cita), "ignorada: sigue pendiente");
+    await subir({ resultado: { citas: 1, citas_servicios: 1 } });
+    assert.ok(!(await citaPend(cita)), "confirmada: ya no");
+  });
+
+  test("citas: lo que baja del pull no vuelve a subir ni pisa una edición local pendiente", async () => {
+    await subir();
+    const cita = await agendar("cita-3", "16:00");
+    const fila = async () => (await db.query("SELECT to_jsonb(c) AS f FROM citas c WHERE id = $1", [cita])).rows[0].f;
+    const tramos = async () => (await db.query("SELECT jsonb_agg(to_jsonb(s)) AS f FROM citas_servicios s WHERE cita_id = $1", [cita])).rows[0].f;
+    // La nube la tiene con empalme (chocó con otra al subir): baja así y no rebota.
+    const nube = { ...(await fila()), empalme: true };
+    const nubeTramos = (await tramos()).map((t) => ({ ...t, empalme: true }));
+    await pullSnapshot(db, { citas: [nube], citas_servicios: nubeTramos });
+    const { rows: [r] } = await db.query(
+      "SELECT c.empalme AS cita, bool_and(s.empalme) AS tramos FROM citas c JOIN citas_servicios s ON s.cita_id = c.id WHERE c.id = $1 GROUP BY c.empalme", [cita]);
+    assert.deepEqual(r, { cita: true, tramos: true }, "el pull trae la marca de empalme");
+    assert.ok(!(await citaPend(cita)), "lo que bajó no sube de vuelta");
+
+    await agendar(null, "17:00", cita);   // editada en la caja: queda sin marca y pendiente
+    await pullSnapshot(db, { citas: [nube], citas_servicios: nubeTramos });
+    const { rows: [l] } = await db.query("SELECT empalme FROM citas WHERE id = $1", [cita]);
+    assert.equal(l.empalme, false, "el pull no pisa la edición local");
+    assert.equal(new Date((await tramos())[0].inicia).toISOString(), "2030-01-07T23:00:00.000Z", "ni sus tramos");
+    assert.ok(await citaPend(cita), "y sigue pendiente de subir");
+  });
+
+  test("citas: un tramo de la nube que choca con una cita local aún sin subir entra con empalme, no tumba el pull", async () => {
+    await agendar("cita-local", "08:00");   // Diego 8:00–9:00, sin subir
+    const otra = await agendar("cita-nube", "20:00");
+    const { rows: [{ c, s }] } = await db.query(
+      `SELECT (SELECT to_jsonb(x) FROM citas x WHERE id = $1) AS c,
+              (SELECT jsonb_agg(to_jsonb(x) || '{"inicia":"2030-01-07T14:30:00Z","termina":"2030-01-07T15:30:00Z"}'::jsonb) FROM citas_servicios x WHERE cita_id = $1) AS s`, [otra]);
+    await db.query("DELETE FROM citas WHERE id = $1", [otra]);   // así la «nube» la tiene y la caja no
+    await pullSnapshot(db, { citas: [c], citas_servicios: s });
+    const { rows: [r] } = await db.query("SELECT activa, empalme FROM citas_servicios WHERE cita_id = $1", [otra]);
+    assert.deepEqual(r, { activa: true, empalme: true }, "entra activa y marcada");
+  });
+
   test("crédito: lo que baja del pull se guarda y no vuelve a subir", async () => {
     const { rows: [{ id: cliente }] } = await db.query(
       "INSERT INTO clientes (tenant_id, nombre, telefono) VALUES ($1, 'Crédito Nube', '4770009901') RETURNING id", [TENANT]);
@@ -1219,7 +1303,7 @@ test("lealtad: el snapshot lleva el canje de TODO ticket del lote, atado a los t
   const snap = consultas.find((c) => c.sql.includes("WITH tk AS"));
   assert.match(snap.sql, /'ticket_canjes_lealtad',\s+\(SELECT jsonb_agg\(to_jsonb\(x\)\) FROM ticket_canjes_lealtad x WHERE x\.ticket_id IN \(SELECT id FROM tk\)\)/);
   assert.match(snap.sql, /'lealtad_movimientos'/);
-  assert.equal(snap.params.length, 12, "$8 son los movimientos de lealtad; $9, los de producto; $10 y $11, los del crédito (0210); $12, las cotizaciones (0213)");
+  assert.equal(snap.params.length, 13, "$8 son los movimientos de lealtad; $9, los de producto; $10 y $11, los del crédito (0210); $12, las cotizaciones (0213); $13, las citas (0219)");
   assert.deepEqual(snap.params[7], [B]);
 });
 
