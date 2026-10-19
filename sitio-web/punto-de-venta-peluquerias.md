@@ -12,17 +12,15 @@ Citas, lista de espera y cobro en una sola caja.
 
 ## Sin perder un cliente por esperar
 
+![La lista de espera con los clientes sin cita, cuánto llevan esperando y su barbero o quien esté libre.](https://vimpos.com.mx/assets/img/capturas/giros/barberia-lista-espera.webp?v=1)
+
 _La lista de espera, en la caja._
 
 ### Con cita o sin cita
 
 Quien llega sin cita entra a la lista de espera, y la caja dice quién sigue.
 
-_Las citas del día, por barbero._
-
-### Cada silla con su agenda
-
-Cada barbero con su horario y sus citas, sin empalmes.
+![El cobro de una cita: el total, el anticipo descontado y lo que falta por cobrar.](https://vimpos.com.mx/assets/img/capturas/giros/salon-cobro-anticipo.webp?v=1)
 
 _El cobro de la cita, con el anticipo descontado._
 
@@ -30,11 +28,15 @@ _El cobro de la cita, con el anticipo descontado._
 
 Los servicios de la cita pasan al cobro con la persona que los hizo, y el anticipo ya descontado.
 
+![Reporte de comisiones por colaboradora en la quincena.](https://vimpos.com.mx/assets/img/capturas/giros/salon-comisiones.webp?v=1)
+
 _Las comisiones de cada quien, por periodo._
 
 ### Comisiones claras
 
 Cada servicio con su comisión. Al cerrar el periodo, cada barbero sabe lo suyo.
+
+![La ficha de una cita por llegar con su anticipo pagado.](https://vimpos.com.mx/assets/img/capturas/giros/salon-ficha-cita.webp?v=1)
 
 _La cita con su anticipo._
 
@@ -46,17 +48,23 @@ _Para el dueño_
 
 ## Lo que necesitas para crecer
 
+![Reporte de comisiones de la quincena: servicios, comisión, sueldo y total a pagar por colaboradora.](https://vimpos.com.mx/assets/img/capturas/giros/salon-comisiones.webp?v=1)
+
 ### Comisiones sin calculadora
 
 Lo que le toca a cada barbero por periodo, con los descuentos ya repartidos.
+
+![Los servicios en el panel con su duración, precio, comisión, anticipo y quién los hace.](https://vimpos.com.mx/assets/img/capturas/giros/salon-servicios.webp?v=1)
 
 ### Servicios con su precio y su comisión
 
 Duración, precio, comisión y anticipo de cada servicio, en un solo lugar.
 
-### Horarios y ausencias
+![Ticket de una cita con el nombre de quien atendió y sus formas de pago.](https://vimpos.com.mx/assets/img/capturas/giros/salon-ticket.webp?v=1)
 
-El horario de cada barbero y sus días libres, para que la agenda no ofrezca lo que no hay.
+### Cada ticket con quien atendió
+
+El ticket dice qué hizo cada barbero y cómo se pagó.
 
 ![El panel del dueño en un celular.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard-movil.webp?v=3)
 
@@ -205,7 +213,7 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 ---
 
-**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Factura global](https://vimpos.com.mx/factura-global-restaurantes.md) · [Hamburgueserías](https://vimpos.com.mx/punto-de-venta-hamburgueserias.md) · [Cafeterías](https://vimpos.com.mx/punto-de-venta-cafeterias.md) · [Comida rápida](https://vimpos.com.mx/punto-de-venta-servicio-rapido.md) · [Restaurantes con meseros](https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo.md) · [Bares y cervecerías](https://vimpos.com.mx/punto-de-venta-bares.md) · [Food trucks](https://vimpos.com.mx/punto-de-venta-food-trucks.md) · [Tiendas de ropa](https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa.md) · [Vinos y licores](https://vimpos.com.mx/punto-de-venta-vinaterias.md) · [Abarrotes y fruterías](https://vimpos.com.mx/punto-de-venta-abarrotes.md) · [Salones de belleza](https://vimpos.com.mx/punto-de-venta-salones-de-belleza.md) · [Spas](https://vimpos.com.mx/punto-de-venta-spa.md) · [Estudios de tatuajes](https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes.md) · [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
+**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Factura global](https://vimpos.com.mx/factura-global-restaurantes.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md) · [Por tipo de negocio](https://vimpos.com.mx/llms.txt)
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 

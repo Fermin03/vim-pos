@@ -161,6 +161,18 @@ export const PAGINAS = [
     enSitemap: true,
   },
   {
+    ruta: '/punto-de-venta-talleres-automotrices',
+    nombre: 'Talleres automotrices',
+    resumen: 'VIM POS para un taller automotriz: órdenes de servicio, cotizaciones, refacciones con existencia, anticipos, crédito y comisiones por mecánico.',
+    enSitemap: true,
+  },
+  {
+    ruta: '/punto-de-venta-consultorios',
+    nombre: 'Servicios de salud',
+    resumen: 'VIM POS para consultorios y servicios de salud: agenda por especialista, anticipos, cobro de la consulta, lista de espera y comisiones. No lleva el expediente clínico.',
+    enSitemap: true,
+  },
+  {
     ruta: '/punto-de-venta-restaurantes-leon',
     nombre: 'León, Guanajuato',
     resumen: 'VIM POS para restaurantes de León, Guanajuato, donde se hace el producto: en la zona, la demostración puede ser en el local.',

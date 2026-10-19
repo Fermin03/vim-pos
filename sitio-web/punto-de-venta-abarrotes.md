@@ -12,11 +12,15 @@ La fruta por kilo, lo empaquetado por pieza y el fiado de tus clientes, en una s
 
 ## Todo lo de la tienda, sin libreta ni calculadora
 
+![El teclado de peso con 1.250 kg de jitomate a $28.00 el kilo.](https://vimpos.com.mx/assets/img/capturas/giros/abarrotes-venta-kg.webp?v=1)
+
 _Una venta por kilo, con su precio._
 
 ### Por kilo o por pieza
 
 Tecleas el peso y la caja calcula el precio: 1.250 kg de jitomate, sin calculadora.
+
+![Las formas de pago con la opción a crédito y lo que le queda disponible al cliente.](https://vimpos.com.mx/assets/img/capturas/giros/abarrotes-cobro-credito.webp?v=1)
 
 _El crédito de un cliente, al cobrar._
 
@@ -24,39 +28,43 @@ _El crédito de un cliente, al cobrar._
 
 Cada cliente con su límite y su plazo. Los abonos quedan registrados.
 
+![Una cotización recién guardada en la caja, con su folio y los botones para imprimirla o mandarla por WhatsApp.](https://vimpos.com.mx/assets/img/capturas/giros/abarrotes-cotizacion-caja.webp?v=1)
+
 _Una cotización lista para mandar._
 
 ### Cotizaciones con enlace
 
 Para un pedido grande, arma la cotización y mándala por WhatsApp.
 
-_Lo escaneado, en el ticket._
+![Los créditos en la caja: clientes con deuda, lo vencido y el detalle de un cliente.](https://vimpos.com.mx/assets/img/capturas/giros/abarrotes-creditos-caja.webp?v=1)
 
-### Escanea lo empaquetado
+_Los créditos, desde la caja._
 
-Con lector de código de barras, lo de anaquel entra al ticket en un segundo.
+### Quién te debe, a la vista
 
-_Las existencias al día._
-
-### Sabes cuánto te queda
-
-La mercancía que entra y la que se vende, al día.
+Los clientes con deuda, lo vencido y cada venta con su fecha, desde la caja.
 
 _Para el dueño_
 
 ## Lo que necesitas para crecer
 
-### Quién te debe y cuánto
+![Créditos en el panel: lo que hay por cobrar, los clientes vencidos y la tabla de clientes.](https://vimpos.com.mx/assets/img/capturas/giros/abarrotes-creditos-panel.webp?v=1)
 
-Los créditos de tus clientes y sus abonos, en el panel.
+### Lo que te deben, en el panel
 
-### Existencias al día
+Lo que hay por cobrar, los clientes vencidos y sus abonos.
 
-Recibe mercancía, haz conteos y fija mínimos.
+![La cotización abierta en un celular, con sus productos, sus unidades y su vigencia.](https://vimpos.com.mx/assets/img/capturas/giros/abarrotes-cotizacion-publica-movil.webp?v=1)
 
-### Tu catálogo en una hoja
+### La cotización, en su celular
 
-Sube tus productos desde una hoja de cálculo, con su unidad y su código.
+Tu cliente abre el enlace y la ve con su folio y su vigencia.
+
+![El detalle del crédito de un cliente con sus ventas pendientes y su abono.](https://vimpos.com.mx/assets/img/capturas/giros/abarrotes-credito-detalle.webp?v=1)
+
+### Cada cliente con su historial
+
+Sus ventas a crédito, sus abonos y su saldo.
 
 ![El panel del dueño en un celular.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard-movil.webp?v=3)
 
@@ -209,7 +217,7 @@ Empieza tú solo, o te lo enseñamos con tu catálogo.
 
 ---
 
-**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Factura global](https://vimpos.com.mx/factura-global-restaurantes.md) · [Hamburgueserías](https://vimpos.com.mx/punto-de-venta-hamburgueserias.md) · [Cafeterías](https://vimpos.com.mx/punto-de-venta-cafeterias.md) · [Comida rápida](https://vimpos.com.mx/punto-de-venta-servicio-rapido.md) · [Restaurantes con meseros](https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo.md) · [Bares y cervecerías](https://vimpos.com.mx/punto-de-venta-bares.md) · [Food trucks](https://vimpos.com.mx/punto-de-venta-food-trucks.md) · [Tiendas de ropa](https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa.md) · [Vinos y licores](https://vimpos.com.mx/punto-de-venta-vinaterias.md) · [Salones de belleza](https://vimpos.com.mx/punto-de-venta-salones-de-belleza.md) · [Spas](https://vimpos.com.mx/punto-de-venta-spa.md) · [Peluquerías y barberías](https://vimpos.com.mx/punto-de-venta-peluquerias.md) · [Estudios de tatuajes](https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes.md) · [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
+**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Factura global](https://vimpos.com.mx/factura-global-restaurantes.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md) · [Por tipo de negocio](https://vimpos.com.mx/llms.txt)
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 

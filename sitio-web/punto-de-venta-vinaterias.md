@@ -12,11 +12,15 @@ Código de barras, existencias con aviso de mínimo y cotizaciones, en una caja 
 
 ## Menos faltantes y ventas más rápidas
 
-_Las botellas escaneadas, en el ticket._
+![La caja de la vinatería con la categoría de tequila y mezcal y un ticket en curso.](https://vimpos.com.mx/assets/img/capturas/giros/vinos-caja.webp?v=1)
+
+_Las botellas, en el ticket._
 
 ### Escanea y cobra
 
 Cada botella entra al ticket con su código de barras, en un segundo.
+
+![Los avisos de la caja con los productos que están por acabarse.](https://vimpos.com.mx/assets/img/capturas/giros/vinos-alertas-caja.webp?v=1)
 
 _Lo que está por acabarse, a la vista._
 
@@ -24,39 +28,31 @@ _Lo que está por acabarse, a la vista._
 
 Fija un mínimo por producto y la caja te avisa cuando baja.
 
+![Recibir mercancía en el panel: proveedor, factura y cada producto con su cantidad y su costo.](https://vimpos.com.mx/assets/img/capturas/giros/vinos-recibir.webp?v=1)
+
 _La mercancía que entra, sumada._
 
 ### Recibe mercancía en minutos
 
 Al llegar el pedido sumas lo que entró, y queda en existencias.
 
-_Una cotización lista para mandar._
+![Existencias en el panel filtradas por las que están bajo el mínimo.](https://vimpos.com.mx/assets/img/capturas/giros/vinos-existencias-minimo.webp?v=1)
 
-### Cotizaciones para eventos
+_Lo que hay que pedir._
 
-Arma la cotización de una boda o una fiesta y mándala por WhatsApp.
+### Lo que está bajo el mínimo
 
-_El crédito y los abonos de un cliente._
-
-### Crédito a tus clientes
-
-Cada cliente con su límite y su plazo. Los abonos quedan registrados.
+Cada producto con su existencia contra su mínimo, para hacer el pedido a tiempo.
 
 _Para el dueño_
 
 ## Lo que necesitas para crecer
 
-### Existencias al día
+![Recibir mercancía desde la caja, escaneando cada producto.](https://vimpos.com.mx/assets/img/capturas/giros/vinos-recibir-caja.webp?v=1)
 
-Conteos, mínimos y movimientos de cada producto.
+### Recibe desde la caja
 
-### Quién te debe y cuánto
-
-Los créditos de tus clientes y sus abonos, en el panel.
-
-### Tu catálogo en una hoja
-
-Sube tus productos desde una hoja de cálculo, con su código.
+Lo que llega se escanea en la caja y entra a las existencias.
 
 ![El panel del dueño en un celular.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard-movil.webp?v=3)
 
@@ -205,7 +201,7 @@ Empieza tú solo, o te lo enseñamos con tu catálogo.
 
 ---
 
-**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Factura global](https://vimpos.com.mx/factura-global-restaurantes.md) · [Hamburgueserías](https://vimpos.com.mx/punto-de-venta-hamburgueserias.md) · [Cafeterías](https://vimpos.com.mx/punto-de-venta-cafeterias.md) · [Comida rápida](https://vimpos.com.mx/punto-de-venta-servicio-rapido.md) · [Restaurantes con meseros](https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo.md) · [Bares y cervecerías](https://vimpos.com.mx/punto-de-venta-bares.md) · [Food trucks](https://vimpos.com.mx/punto-de-venta-food-trucks.md) · [Tiendas de ropa](https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa.md) · [Abarrotes y fruterías](https://vimpos.com.mx/punto-de-venta-abarrotes.md) · [Salones de belleza](https://vimpos.com.mx/punto-de-venta-salones-de-belleza.md) · [Spas](https://vimpos.com.mx/punto-de-venta-spa.md) · [Peluquerías y barberías](https://vimpos.com.mx/punto-de-venta-peluquerias.md) · [Estudios de tatuajes](https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes.md) · [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
+**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Factura global](https://vimpos.com.mx/factura-global-restaurantes.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md) · [Por tipo de negocio](https://vimpos.com.mx/llms.txt)
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 

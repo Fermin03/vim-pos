@@ -95,6 +95,33 @@ artículos y su largo es su contenido. Los textos legales tampoco se recortan.
 
 Los datos sí se conservan exactos: precios, planes, folios, horarios y plazos.
 
+## Las páginas por giro (`/punto-de-venta-<giro>`)
+
+Catorce páginas con una sola plantilla (19 oct 2026), tomada de la distribución de las páginas
+por giro de un punto de venta de referencia y pasada a la identidad de VIM:
+
+1. **Hero:** el H1 lleva dentro el eyebrow «Punto de venta para …» (bueno para buscadores), un
+   titular de beneficio y los dos botones de la barra: Contactar ventas y Comenzar. Debajo, una
+   tira de tres fotos.
+2. **Rasgos:** cinco como máximo. En la PC la imagen se queda pegada a la izquierda y cambia con
+   un fundido al llegar a cada rasgo; en el teléfono cada rasgo lleva su imagen arriba.
+3. **Para el dueño:** tarjetas con imagen arriba (cortada a 16:10).
+4. **Equipo:** cuatro tarjetas con foto.
+5. **Precios:** tarjetas que listan lo principal de cada plan **para ese giro**, con el precio de
+   lo que va aparte. Las filas se alinean entre planes con subgrid.
+6. **Guías**, **Preguntas** (también como FAQPage en JSON-LD) y **Cierre**.
+7. **Barra fija** con los dos botones en el teléfono: aparece al salir del hero y se va al llegar al
+   cierre.
+
+**Fotos:** cada hueco rayado «Foto pendiente» dice qué toma va ahí. Es la lista de la sesión de
+fotos y no se confunde con una foto terminada.
+
+**Capturas:** salen de la caja y del panel con un negocio de prueba por giro (semillas
+`sitio-web/_capturas/semilla-*.sql`). No se publica una captura que enseñe un defecto del producto.
+
+**Servicios:** talleres automotrices y servicios de salud todavía no existen en la caja. Sus
+páginas se hicieron completas por decisión de Fermín, con huecos donde irían las capturas.
+
 ## Las cuatro funciones de la portada son un acordeón
 
 El mismo acordeón de las preguntas frecuentes, con una sola captura al lado: la de la fila

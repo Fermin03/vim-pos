@@ -71,6 +71,8 @@ extension, and the normal address answers with `text/markdown` when asked with a
 - [Spas](https://vimpos.com.mx/punto-de-venta-spa.md): VIM POS para un spa: agenda por terapeuta y por cabina sin empalmes, anticipos, cobro de la cita y comisiones.
 - [Peluquerías y barberías](https://vimpos.com.mx/punto-de-venta-peluquerias.md): VIM POS para una peluquería o barbería: citas y lista de espera, agenda por barbero, cobro y comisiones.
 - [Estudios de tatuajes](https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes.md): VIM POS para un estudio de tatuajes: citas con anticipo, agenda por artista, cobro de la sesión y comisiones.
+- [Talleres automotrices](https://vimpos.com.mx/punto-de-venta-talleres-automotrices.md): VIM POS para un taller automotriz: órdenes de servicio, cotizaciones, refacciones con existencia, anticipos, crédito y comisiones por mecánico.
+- [Servicios de salud](https://vimpos.com.mx/punto-de-venta-consultorios.md): VIM POS para consultorios y servicios de salud: agenda por especialista, anticipos, cobro de la consulta, lista de espera y comisiones. No lleva el expediente clínico.
 - [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon.md): VIM POS para restaurantes de León, Guanajuato, donde se hace el producto: en la zona, la demostración puede ser en el local.
 - [Nosotros](https://vimpos.com.mx/nosotros.md): Quién construye VIM POS, desde dónde, por qué existe y en qué punto está el producto hoy.
 - [Contacto](https://vimpos.com.mx/contacto.md): Cómo contactar a VIM POS: WhatsApp, correo, domicilio fiscal, horario y en cuánto contestamos.
@@ -87,5 +89,5 @@ extension, and the normal address answers with `text/markdown` when asked with a
 - [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md): Qué datos se recaban, para qué, cuánto se guardan y cómo ejercer los derechos ARCO.
 - [Términos del servicio](https://vimpos.com.mx/terminos.md): Qué se contrata, qué no incluye, cómo se cobra y cómo se cancela.
 - [Agent instructions / Instrucciones para agentes](https://vimpos.com.mx/agents.md): when to use VIM POS, when not to, and how to act on it. Bilingual.
-- [Todo el sitio en un solo archivo](https://vimpos.com.mx/llms-full.txt): las 28 páginas concatenadas, para cargar el contexto completo de una vez.
+- [Todo el sitio en un solo archivo](https://vimpos.com.mx/llms-full.txt): las 30 páginas concatenadas, para cargar el contexto completo de una vez.
 - [Índice de direcciones](https://vimpos.com.mx/sitemap.xml): el sitemap en XML.

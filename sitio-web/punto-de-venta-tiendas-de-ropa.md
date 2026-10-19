@@ -12,11 +12,15 @@ Vende con lector de código de barras, cambia tallas y sabe qué tienes en el an
 
 ## Vende rápido y sabe siempre qué te queda
 
+![La caja con el selector de talla y color de unos jeans, con las piezas de cada combinación.](https://vimpos.com.mx/assets/img/capturas/giros/tienda-ropa-talla-color.webp?v=1)
+
 _La talla y el color, con su existencia._
 
 ### Talla y color en un toque
 
 Eliges la prenda y su talla y color en una cuadrícula, con la existencia a la vista.
+
+![Un ticket con prendas escaneadas, cada una con su talla, color y código.](https://vimpos.com.mx/assets/img/capturas/giros/tienda-ropa-ticket.webp?v=1)
 
 _Las prendas escaneadas, en el ticket._
 
@@ -24,11 +28,15 @@ _Las prendas escaneadas, en el ticket._
 
 Con un lector de código de barras, cada prenda entra al ticket en un segundo.
 
+![El resumen de un cambio de talla: la prenda que regresa, la que se lleva y la diferencia.](https://vimpos.com.mx/assets/img/capturas/giros/tienda-ropa-cambio-talla.webp?v=1)
+
 _Un cambio de talla, en la caja._
 
 ### Cambios de talla sin enredos
 
 Regresa una prenda y llévate otra. La diferencia se cobra o se devuelve en efectivo.
+
+![Las etiquetas por imprimir, con su vista previa en hoja carta.](https://vimpos.com.mx/assets/img/capturas/giros/tienda-ropa-etiquetas.webp?v=1)
 
 _Las etiquetas, listas para imprimir._
 
@@ -36,27 +44,23 @@ _Las etiquetas, listas para imprimir._
 
 Imprime las etiquetas de cada talla y color, con su código de barras.
 
-_Las ventas por talla y color._
+![Existencias en el panel: piezas, valor del inventario y lo que está bajo el mínimo.](https://vimpos.com.mx/assets/img/capturas/giros/tienda-ropa-existencias.webp?v=1)
 
-### Qué talla se vende más
+_Las existencias, por talla y color._
 
-Las ventas por talla y color, con su margen.
+### Existencias al día
+
+Piezas por talla y color, su costo y lo que está bajo el mínimo.
 
 _Para el dueño_
 
 ## Lo que necesitas para crecer
 
-### Existencias al día
+![Una hoja carta con treinta etiquetas, cada una con su precio y su código de barras.](https://vimpos.com.mx/assets/img/capturas/giros/tienda-ropa-etiquetas-hoja.webp?v=1)
 
-Recibe mercancía, haz conteos y pasa prendas entre sucursales.
+### Etiquetas en hoja carta
 
-### Avisos antes de que se acabe
-
-Fija un mínimo por prenda y la caja te avisa cuando baja.
-
-### Tu catálogo en una hoja
-
-Sube tus prendas desde una hoja de cálculo, con su talla, color y código.
+Treinta por hoja, con su precio y su código de barras.
 
 ![El panel del dueño en un celular.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard-movil.webp?v=3)
 
@@ -209,7 +213,7 @@ Empieza tú solo, o te lo enseñamos con tu catálogo.
 
 ---
 
-**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Factura global](https://vimpos.com.mx/factura-global-restaurantes.md) · [Hamburgueserías](https://vimpos.com.mx/punto-de-venta-hamburgueserias.md) · [Cafeterías](https://vimpos.com.mx/punto-de-venta-cafeterias.md) · [Comida rápida](https://vimpos.com.mx/punto-de-venta-servicio-rapido.md) · [Restaurantes con meseros](https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo.md) · [Bares y cervecerías](https://vimpos.com.mx/punto-de-venta-bares.md) · [Food trucks](https://vimpos.com.mx/punto-de-venta-food-trucks.md) · [Vinos y licores](https://vimpos.com.mx/punto-de-venta-vinaterias.md) · [Abarrotes y fruterías](https://vimpos.com.mx/punto-de-venta-abarrotes.md) · [Salones de belleza](https://vimpos.com.mx/punto-de-venta-salones-de-belleza.md) · [Spas](https://vimpos.com.mx/punto-de-venta-spa.md) · [Peluquerías y barberías](https://vimpos.com.mx/punto-de-venta-peluquerias.md) · [Estudios de tatuajes](https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes.md) · [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
+**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Factura global](https://vimpos.com.mx/factura-global-restaurantes.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md) · [Por tipo de negocio](https://vimpos.com.mx/llms.txt)
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 

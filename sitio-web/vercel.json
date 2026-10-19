@@ -135,6 +135,16 @@
       "permanent": true
     },
     {
+      "source": "/punto-de-venta-talleres-automotrices.html",
+      "destination": "/punto-de-venta-talleres-automotrices",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-consultorios.html",
+      "destination": "/punto-de-venta-consultorios",
+      "permanent": true
+    },
+    {
       "source": "/punto-de-venta-restaurantes-leon.html",
       "destination": "/punto-de-venta-restaurantes-leon",
       "permanent": true
@@ -409,6 +419,28 @@
       "destination": "/punto-de-venta-estudios-de-tatuajes.md"
     },
     {
+      "source": "/punto-de-venta-talleres-automotrices",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*(text/markdown|text/x-markdown).*"
+        }
+      ],
+      "destination": "/punto-de-venta-talleres-automotrices.md"
+    },
+    {
+      "source": "/punto-de-venta-consultorios",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*(text/markdown|text/x-markdown).*"
+        }
+      ],
+      "destination": "/punto-de-venta-consultorios.md"
+    },
+    {
       "source": "/punto-de-venta-restaurantes-leon",
       "has": [
         {
@@ -605,6 +637,14 @@
     {
       "source": "/punto-de-venta-estudios-de-tatuajes",
       "destination": "/punto-de-venta-estudios-de-tatuajes.html"
+    },
+    {
+      "source": "/punto-de-venta-talleres-automotrices",
+      "destination": "/punto-de-venta-talleres-automotrices.html"
+    },
+    {
+      "source": "/punto-de-venta-consultorios",
+      "destination": "/punto-de-venta-consultorios.html"
     },
     {
       "source": "/punto-de-venta-restaurantes-leon",
@@ -1065,6 +1105,40 @@
         {
           "key": "Link",
           "value": "<https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes.md>; rel=\"alternate\"; type=\"text/markdown\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-talleres-automotrices",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-talleres-automotrices.md>; rel=\"alternate\"; type=\"text/markdown\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-consultorios",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-consultorios.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
@@ -1626,6 +1700,40 @@
         {
           "key": "Link",
           "value": "<https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-talleres-automotrices.md",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-talleres-automotrices>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-consultorios.md",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-consultorios>; rel=\"canonical\""
         }
       ]
     },
