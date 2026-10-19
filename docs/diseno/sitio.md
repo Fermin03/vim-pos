@@ -37,7 +37,11 @@ terminar.
 
 ## El menú
 
-Dos paneles —**Producto** y **Recursos**— y dos enlaces directos, Facturación y Precios. El panel
+Tres paneles —**Producto**, **Tipos de negocio** y **Recursos**— y dos enlaces directos, Facturación
+y Precios. Tipos de negocio (19 oct 2026) tiene cuatro columnas —Alimentos y bebidas, Tienda,
+Belleza y Servicios— y cada giro lleva a su página `/punto-de-venta-<giro>`; la rejilla del panel
+pone una columna por grupo, así que Recursos sigue en tres. Con este panel la barra ya no cabe
+junto a «Pruébalo 30 días gratis» antes de 1120 px, por eso ese botón aparece desde ahí. El panel
 ocupa todo el ancho bajo el encabezado: blanco, títulos en Sora, líneas finas y ninguna foto. En
 el teléfono son los mismos grupos, plegados dentro del cajón.
 
@@ -45,8 +49,9 @@ El menú vive duplicado en cada HTML (no hay build). Para cambiarlo se cambia en
 se replica en todas las páginas con un script de un solo uso, no a mano: dieciocho copias editadas
 a mano son dieciocho oportunidades de que una quede distinta.
 
-Una entrada nueva en el panel tiene que llevar a una página que exista. «Para tu giro» no es panel
-propio todavía porque solo hay una página por giro; el día que haya tres, se separa.
+Una entrada nueva en el panel tiene que llevar a una página que exista: la prueba «ningún enlace
+interno lleva a un 404» lo vigila. Hamburgueserías ya no está en el menú: se llega desde la página
+de servicio rápido.
 
 ## Movimiento
 
