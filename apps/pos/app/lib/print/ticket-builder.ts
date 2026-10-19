@@ -2,10 +2,10 @@ import { fechaCorta } from "../lealtad-reglas";
 import { aGranel, fmtCantidad, precioConUnidad, tipoDesdeSat } from "../unidades";
 import type { Bloque, DatosTicketImpresion, PrintJob } from "./tipos";
 
-/** Formatea pesos sin depender de módulos cliente (testeable en node). */
 /** El ticket es de una venta a crédito que aún debe algo. */
 export const conSaldoPorPagar = (d: Pick<DatosTicketImpresion, "pagos">) => d.pagos.some((p) => (p.porPagar?.montoMxn ?? 0) > 0);
 
+/** Formatea pesos sin depender de módulos cliente (testeable en node). */
 export function pesos(n: number): string {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
 }

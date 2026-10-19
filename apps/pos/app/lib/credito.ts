@@ -148,7 +148,12 @@ export function filtrarDeudores(lista: Deudor[], texto: string): Deudor[] {
 
 export type VentaConSaldo = { ticketId: string; folio: string | null; fecha: string; saldo: number; fechaLimite: string; vencida: boolean };
 
-/** Día de México (YYYY-MM-DD) de un instante. México no tiene horario de verano. */
+/**
+ * Día de México (YYYY-MM-DD) de un instante. México no tiene horario de verano.
+ * ponytail: la base usa `tenants.timezone`; el POS no conoce la zona del negocio (todo el POS usa
+ * America/Mexico_City). Un negocio en otra zona vería la fecha límite corrida un día cerca de la
+ * medianoche; si llega a pasar, bajar `tenants.timezone` con los datos de la caja y usarla aquí.
+ */
 function diaMexico(iso: string | Date): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Mexico_City", year: "numeric", month: "2-digit", day: "2-digit" })
     .format(typeof iso === "string" ? new Date(iso) : iso);

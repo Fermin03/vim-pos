@@ -302,7 +302,7 @@ cliente).
 - **«A crédito».** Sale en el cobro solo si la venta tiene cliente con crédito y el módulo está
   encendido. Muestra «Disponible $X» (límite menos lo que ya debe). Va **por el ticket entero**: no se
   combina con efectivo ni con otro método.
-- **Pasarse del límite o tener algo vencido** pide PIN de dueño o administrador (permiso
+- **Pasarse del límite o tener algo vencido** pide PIN de supervisor o superior (permiso
   `venta.credito_excedido`). Vencido es: fecha de la venta + plazo < hoy, con saldo.
 - **«Saldo a favor».** Aparece si el cliente tiene saldo (y el módulo está encendido). Se puede usar
   parcial y completar con otro método.

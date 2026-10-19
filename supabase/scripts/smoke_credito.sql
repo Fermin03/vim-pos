@@ -853,4 +853,203 @@ BEGIN
   IF (SELECT estado_fiscal FROM tickets WHERE id = v_tk) <> 'PAGADO' THEN RAISE EXCEPTION '35: la venta no quedó PAGADO'; END IF;
   RAISE NOTICE 'SMOKE CREDITO 0210 OTRAS CAJAS OK';
 END $$;
+
+-- 0211: candados del crédito y del saldo a favor.
+DO $$
+DECLARE
+  v_t      uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_suc    uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_caja   uuid := '99999999-0000-0000-0000-0000000000cc';
+  v_maria  uuid := '99999999-0000-0000-0000-000000000001';
+  v_cat    uuid := 'c2080000-0000-0000-0000-0000000000c1';
+  v_prod   uuid := 'c2080000-0000-0000-0000-0000000000a1';   -- $500
+  v_play   uuid := 'c2110000-0000-0000-0000-0000000000b1';   -- $300
+  v_calc   uuid := 'c2110000-0000-0000-0000-0000000000b2';   -- $200
+  v_hugo   uuid := 'c2110000-0000-0000-0000-000000000001';
+  v_iris   uuid := 'c2110000-0000-0000-0000-000000000002';
+  v_juan   uuid := 'c2110000-0000-0000-0000-000000000003';
+  v_turno uuid; v_a uuid; v_b uuid; v_c uuid; v_d uuid; v_e uuid; v_f uuid; v_auth uuid; v_dev uuid; v_it uuid;
+  v_pago uuid; v_ok boolean; v_msg text;
+BEGIN
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
+  INSERT INTO productos (id, tenant_id, nombre, categoria_id, precio_base_mxn) VALUES
+    (v_play, v_t, 'Playera crédito', v_cat, 300), (v_calc, v_t, 'Calcetas crédito', v_cat, 200);
+  INSERT INTO clientes (id, tenant_id, nombre, telefono) VALUES
+    (v_hugo, v_t, 'Hugo Candado', '4770002111'), (v_iris, v_t, 'Iris Saldo', '4770002112'), (v_juan, v_t, 'Juan Mismo', '4770002113');
+  INSERT INTO clientes_credito (tenant_id, cliente_id, limite_mxn, plazo_dias) VALUES (v_t, v_hugo, 10000, 30), (v_t, v_juan, 10000, 30);
+  UPDATE configuracion_tenant SET modulo_credito_activo = true, credito_abonos_al_cancelar = 'SALDO_FAVOR' WHERE tenant_id = v_t;
+  SELECT id INTO v_turno FROM turnos WHERE caja_id = v_caja AND estado = 'ABIERTO';
+
+  -- 36) El pago CREDITO no se cancela, borra ni cambia de monto por fuera: la deuda no se esfuma.
+  v_a := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_hugo, NULL, 'smoke-cr11-a', v_maria);
+  PERFORM agregar_item_a_ticket(v_a, v_prod, 1, NULL, '[]'::jsonb, 'smoke-cr11-aa');
+  v_pago := pagar_a_credito(v_a, NULL, 'smoke-cr11-pa');
+  PERFORM registrar_abono(v_hugo, 100, 'EFECTIVO'::metodo_pago, v_caja, v_turno, 'smoke-cr11-ab-a');
+  BEGIN
+    UPDATE pagos SET estado = 'CANCELADO', deleted_at = now() WHERE id = v_pago;
+    RAISE EXCEPTION '36: se canceló el pago CREDITO por fuera';
+  EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS:%' THEN RAISE; END IF;
+  END;
+  BEGIN
+    UPDATE pagos SET deleted_at = now() WHERE id = v_pago;
+    RAISE EXCEPTION '36: se borró el pago CREDITO por fuera';
+  EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS:%' THEN RAISE; END IF;
+  END;
+  BEGIN
+    UPDATE pagos SET monto_mxn = 1 WHERE id = v_pago;
+    RAISE EXCEPTION '36: se cambió el monto del pago CREDITO';
+  EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS:%' THEN RAISE; END IF;
+  END;
+  UPDATE pagos SET nota = 'nota libre' WHERE id = v_pago;   -- lo que no toca la deuda sí se edita
+  IF credito_saldo_ticket(v_a) <> 400 THEN RAISE EXCEPTION '36: la deuda quedó en %', credito_saldo_ticket(v_a); END IF;
+  -- La caja sincroniza en modo réplica: ahí la guardia no corre (se deshace con la subtransacción).
+  v_ok := false;
+  BEGIN
+    SET LOCAL session_replication_role = replica;
+    UPDATE pagos SET estado = 'CANCELADO' WHERE id = v_pago;
+    RAISE EXCEPTION 'smoke-replica-ok';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM <> 'smoke-replica-ok' THEN RAISE; END IF;
+    v_ok := true;
+  END;
+  IF NOT v_ok OR current_setting('session_replication_role') <> 'origin' THEN RAISE EXCEPTION '36: el modo réplica no pasó'; END IF;
+
+  -- 37) Al ticket a crédito no se le cambia el cliente (ni se le quita).
+  BEGIN
+    UPDATE tickets SET cliente_id = v_iris WHERE id = v_a;
+    RAISE EXCEPTION '37: la deuda se movió a otro cliente';
+  EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS:%' THEN RAISE; END IF;
+  END;
+  BEGIN
+    UPDATE tickets SET cliente_id = NULL WHERE id = v_a;
+    RAISE EXCEPTION '37: la deuda se quedó sin cliente';
+  EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS:%' THEN RAISE; END IF;
+  END;
+  -- Regresión: una cuenta sin crédito ni saldo a favor sí cambia de cliente.
+  v_f := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_hugo, NULL, 'smoke-cr11-f', v_maria);
+  UPDATE tickets SET cliente_id = v_iris WHERE id = v_f;
+  UPDATE tickets SET cliente_id = NULL WHERE id = v_f;
+
+  -- 38) Reabrir una venta a crédito con abono se rechaza con un mensaje claro.
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'reabrir', 'venta.editar_post_cobro', 'ticket', v_a, 'smoke 38')
+  RETURNING id INTO v_auth;
+  v_msg := NULL;
+  BEGIN
+    PERFORM reabrir_ticket_pagado(v_a, 'smoke 38', v_auth);
+  EXCEPTION WHEN OTHERS THEN v_msg := SQLERRM;
+  END;
+  IF v_msg IS NULL OR v_msg NOT LIKE '%crédito%Cancela la venta y vuelve a cobrarla%' THEN
+    RAISE EXCEPTION '38: reabrir la venta a crédito debía rechazarse claro: %', v_msg; END IF;
+  IF (SELECT estado_fiscal FROM tickets WHERE id = v_a) <> 'PAGADO' OR credito_saldo_ticket(v_a) <> 400 THEN
+    RAISE EXCEPTION '38: la venta a crédito cambió'; END IF;
+
+  -- 39) Reabrir una venta pagada con saldo a favor, igual.
+  INSERT INTO saldo_favor_movimientos (tenant_id, cliente_id, tipo, monto_mxn, ticket_id, client_id_local)
+  VALUES (v_t, v_iris, 'ENTRADA_CANCELACION', 100, v_a, 'smoke-cr11-sf1');
+  v_b := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_iris, NULL, 'smoke-cr11-b', v_maria);
+  PERFORM agregar_item_a_ticket(v_b, v_prod, 1, NULL, '[]'::jsonb, 'smoke-cr11-ba');
+  PERFORM pagar_con_saldo_favor(v_b, 100, 'smoke-cr11-pb1');
+  PERFORM aplicar_pago(v_b, 'EFECTIVO'::metodo_pago, 400, 400);
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'reabrir', 'venta.editar_post_cobro', 'ticket', v_b, 'smoke 39')
+  RETURNING id INTO v_auth;
+  v_msg := NULL;
+  BEGIN
+    PERFORM reabrir_ticket_pagado(v_b, 'smoke 39', v_auth);
+  EXCEPTION WHEN OTHERS THEN v_msg := SQLERRM;
+  END;
+  IF v_msg IS NULL OR v_msg NOT LIKE '%saldo a favor%Cancela la venta y vuelve a cobrarla%' THEN
+    RAISE EXCEPTION '39: reabrir la venta con saldo a favor debía rechazarse claro: %', v_msg; END IF;
+  IF (SELECT estado_fiscal FROM tickets WHERE id = v_b) <> 'PAGADO' OR (SELECT saldo_mxn FROM vw_saldo_favor_cliente WHERE cliente_id = v_iris) <> 0 THEN
+    RAISE EXCEPTION '39: la venta con saldo a favor cambió'; END IF;
+
+  -- 40) Cuenta ABIERTA con un pago parcial de saldo a favor: no cambia de cliente, y al cancelarla
+  --     el saldo usado regresa a su dueña (una sola vez).
+  INSERT INTO saldo_favor_movimientos (tenant_id, cliente_id, tipo, monto_mxn, ticket_id, client_id_local)
+  VALUES (v_t, v_iris, 'ENTRADA_CANCELACION', 100, v_a, 'smoke-cr11-sf2');
+  v_c := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_iris, NULL, 'smoke-cr11-c', v_maria);
+  PERFORM agregar_item_a_ticket(v_c, v_prod, 1, NULL, '[]'::jsonb, 'smoke-cr11-ca');
+  PERFORM pagar_con_saldo_favor(v_c, 60, 'smoke-cr11-pc1');
+  IF (SELECT estado_fiscal FROM tickets WHERE id = v_c) = 'PAGADO' THEN RAISE EXCEPTION '40: debía quedar abierta'; END IF;
+  BEGIN
+    UPDATE tickets SET cliente_id = v_hugo WHERE id = v_c;
+    RAISE EXCEPTION '40: el saldo a favor usado cambió de cliente';
+  EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS:%' THEN RAISE; END IF;
+  END;
+  BEGIN
+    UPDATE tickets SET cliente_id = NULL WHERE id = v_c;
+    RAISE EXCEPTION '40: la cuenta con saldo a favor se quedó sin cliente';
+  EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE 'DATOS_INVALIDOS:%' THEN RAISE; END IF;
+  END;
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'cancelar_ticket', 'venta.cancelar_abierta', 'ticket', v_c, 'smoke 40')
+  RETURNING id INTO v_auth;
+  PERFORM cancelar_ticket_pagado(
+    p_ticket_id := v_c, p_caja_id := v_caja, p_turno_id := v_turno,
+    p_motivo := 'CLIENTE_DESISTIO'::cancelacion_motivo, p_motivo_texto := 'smoke 40',
+    p_autorizacion_pin_id := v_auth, p_usuario_solicitante_id := v_maria, p_usuario_autorizo_id := v_maria,
+    p_reversar_inventario := true, p_cancelar_cfdi_sat := false, p_devolver_dinero := true,
+    p_client_id_local := 'smoke-cr11-cancela-c');
+  IF (SELECT estado_fiscal FROM tickets WHERE id = v_c) <> 'CANCELADO' THEN RAISE EXCEPTION '40: no quedó cancelada'; END IF;
+  IF (SELECT saldo_mxn FROM vw_saldo_favor_cliente WHERE cliente_id = v_iris) <> 100 THEN
+    RAISE EXCEPTION '40: el saldo a favor quedó en % (esperado 100)', (SELECT saldo_mxn FROM vw_saldo_favor_cliente WHERE cliente_id = v_iris); END IF;
+  IF (SELECT count(*) FROM saldo_favor_movimientos WHERE ticket_id = v_c AND tipo = 'ENTRADA_CANCELACION') <> 1 THEN
+    RAISE EXCEPTION '40: el regreso del saldo a favor no es uno solo'; END IF;
+
+  -- 41) Venta a crédito liquidada: devolver $200 con «Mismo método» es como en efectivo.
+  --     Modo SALDO_FAVOR: +$200 a favor y nada del cajón. Modo EFECTIVO: $200 del cajón.
+  v_d := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_juan, NULL, 'smoke-cr11-d', v_maria);
+  PERFORM agregar_item_a_ticket(v_d, v_play, 1, NULL, '[]'::jsonb, 'smoke-cr11-da');
+  PERFORM agregar_item_a_ticket(v_d, v_calc, 1, NULL, '[]'::jsonb, 'smoke-cr11-db');
+  PERFORM pagar_a_credito(v_d, NULL, 'smoke-cr11-pd');
+  v_e := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_juan, NULL, 'smoke-cr11-e', v_maria);
+  PERFORM agregar_item_a_ticket(v_e, v_play, 1, NULL, '[]'::jsonb, 'smoke-cr11-ea');
+  PERFORM agregar_item_a_ticket(v_e, v_calc, 1, NULL, '[]'::jsonb, 'smoke-cr11-eb');
+  PERFORM pagar_a_credito(v_e, NULL, 'smoke-cr11-pe');
+  PERFORM registrar_abono(v_juan, 1000, 'EFECTIVO'::metodo_pago, v_caja, v_turno, 'smoke-cr11-ab-d');
+  IF credito_saldo_ticket(v_d) <> 0 OR credito_saldo_ticket(v_e) <> 0 THEN RAISE EXCEPTION '41: no quedaron liquidadas'; END IF;
+
+  SELECT id INTO v_it FROM ticket_items WHERE ticket_id = v_d AND producto_id = v_calc;
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'devolucion', 'venta.devolucion', 'ticket', v_d, 'smoke 41a')
+  RETURNING id INTO v_auth;
+  v_dev := crear_devolucion(
+    p_ticket_original_id := v_d, p_caja_id := v_caja, p_turno_id := v_turno,
+    p_alcance := 'PARCIAL'::devolucion_alcance, p_motivo := 'PRODUCTO_DEFECTUOSO'::devolucion_motivo,
+    p_motivo_texto := 'smoke 41a', p_medio_devolucion := 'MISMO_METODO_PAGO'::devolucion_medio,
+    p_autorizacion_pin_id := v_auth, p_usuario_solicitante_id := v_maria, p_usuario_autorizo_id := v_maria,
+    p_items := jsonb_build_array(jsonb_build_object('ticket_item_id', v_it, 'cantidad_devuelta', 1)),
+    p_reversar_inventario := false, p_nota := 'smoke 41a');
+  PERFORM confirmar_devolucion(v_dev, v_maria);
+  IF (SELECT saldo_mxn FROM vw_saldo_favor_cliente WHERE cliente_id = v_juan) IS DISTINCT FROM 200 THEN
+    RAISE EXCEPTION '41: modo SALDO_FAVOR: saldo a favor % (esperado 200)', (SELECT saldo_mxn FROM vw_saldo_favor_cliente WHERE cliente_id = v_juan); END IF;
+  IF EXISTS (SELECT 1 FROM movimientos_caja m JOIN devoluciones d ON d.id = v_dev WHERE m.motivo = 'Devolución folio ' || d.folio_completo) THEN
+    RAISE EXCEPTION '41: modo SALDO_FAVOR: salió dinero del cajón'; END IF;
+
+  UPDATE configuracion_tenant SET credito_abonos_al_cancelar = 'EFECTIVO' WHERE tenant_id = v_t;
+  SELECT id INTO v_it FROM ticket_items WHERE ticket_id = v_e AND producto_id = v_calc;
+  INSERT INTO autorizaciones_pin (tenant_id, sucursal_id, caja_id, turno_id, usuario_solicitante_id, usuario_autorizo_id,
+                                  accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_t, v_suc, v_caja, v_turno, v_maria, v_maria, 'devolucion', 'venta.devolucion', 'ticket', v_e, 'smoke 41b')
+  RETURNING id INTO v_auth;
+  v_dev := crear_devolucion(
+    p_ticket_original_id := v_e, p_caja_id := v_caja, p_turno_id := v_turno,
+    p_alcance := 'PARCIAL'::devolucion_alcance, p_motivo := 'PRODUCTO_DEFECTUOSO'::devolucion_motivo,
+    p_motivo_texto := 'smoke 41b', p_medio_devolucion := 'MISMO_METODO_PAGO'::devolucion_medio,
+    p_autorizacion_pin_id := v_auth, p_usuario_solicitante_id := v_maria, p_usuario_autorizo_id := v_maria,
+    p_items := jsonb_build_array(jsonb_build_object('ticket_item_id', v_it, 'cantidad_devuelta', 1)),
+    p_reversar_inventario := false, p_nota := 'smoke 41b');
+  PERFORM confirmar_devolucion(v_dev, v_maria);
+  IF (SELECT sum(m.monto_mxn) FROM movimientos_caja m JOIN devoluciones d ON d.id = v_dev
+       WHERE m.tipo = 'DEVOLUCION_EFECTIVO' AND m.motivo = 'Devolución folio ' || d.folio_completo) IS DISTINCT FROM 200 THEN
+    RAISE EXCEPTION '41: modo EFECTIVO: del cajón debían salir 200'; END IF;
+  IF (SELECT saldo_mxn FROM vw_saldo_favor_cliente WHERE cliente_id = v_juan) <> 200 THEN
+    RAISE EXCEPTION '41: modo EFECTIVO: el saldo a favor cambió'; END IF;
+  RAISE NOTICE 'SMOKE CREDITO 0211 OK';
+END $$;
 ROLLBACK;
