@@ -2212,6 +2212,7 @@ export type Database = {
           created_at: string
           orden: number
           sucursal_id: string
+          sueldo_periodo_mxn: number
           tenant_id: string
           updated_at: string
           usuario_id: string
@@ -2222,6 +2223,7 @@ export type Database = {
           created_at?: string
           orden?: number
           sucursal_id: string
+          sueldo_periodo_mxn?: number
           tenant_id: string
           updated_at?: string
           usuario_id: string
@@ -2232,6 +2234,7 @@ export type Database = {
           created_at?: string
           orden?: number
           sucursal_id?: string
+          sueldo_periodo_mxn?: number
           tenant_id?: string
           updated_at?: string
           usuario_id?: string
@@ -2887,6 +2890,11 @@ export type Database = {
       }
       configuracion_tenant: {
         Row: {
+          agenda_cancelar_horas: number
+          agenda_cobro_modo: string
+          agenda_comision_base: string
+          agenda_comision_productos_pct: number | null
+          agenda_periodo_comisiones: string
           agenda_tolerancia_min: number
           alerta_pedidos_espera_min: number
           alerta_reincidencia_cierres: number
@@ -2935,6 +2943,11 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          agenda_cancelar_horas?: number
+          agenda_cobro_modo?: string
+          agenda_comision_base?: string
+          agenda_comision_productos_pct?: number | null
+          agenda_periodo_comisiones?: string
           agenda_tolerancia_min?: number
           alerta_pedidos_espera_min?: number
           alerta_reincidencia_cierres?: number
@@ -2983,6 +2996,11 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          agenda_cancelar_horas?: number
+          agenda_cobro_modo?: string
+          agenda_comision_base?: string
+          agenda_comision_productos_pct?: number | null
+          agenda_periodo_comisiones?: string
           agenda_tolerancia_min?: number
           alerta_pedidos_espera_min?: number
           alerta_reincidencia_cierres?: number
@@ -4697,6 +4715,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "ticket_items"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "devolucion_items_ticket_item_id_original_fkey"
+            columns: ["ticket_item_id_original"]
+            isOneToOne: false
+            referencedRelation: "vw_comisiones_renglon"
+            referencedColumns: ["ticket_item_id"]
           },
         ]
       }
@@ -6692,6 +6717,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "ticket_items"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_producto_ticket_item_id_fkey"
+            columns: ["ticket_item_id"]
+            isOneToOne: false
+            referencedRelation: "vw_comisiones_renglon"
+            referencedColumns: ["ticket_item_id"]
           },
           {
             foreignKeyName: "movimientos_producto_traspaso_fk"
@@ -9156,6 +9188,8 @@ export type Database = {
       }
       servicio_colaborador: {
         Row: {
+          comision_tipo: string | null
+          comision_valor: number | null
           created_at: string
           duracion_min: number | null
           precio_mxn: number | null
@@ -9165,6 +9199,8 @@ export type Database = {
           usuario_id: string
         }
         Insert: {
+          comision_tipo?: string | null
+          comision_valor?: number | null
           created_at?: string
           duracion_min?: number | null
           precio_mxn?: number | null
@@ -9174,6 +9210,8 @@ export type Database = {
           usuario_id: string
         }
         Update: {
+          comision_tipo?: string | null
+          comision_valor?: number | null
           created_at?: string
           duracion_min?: number | null
           precio_mxn?: number | null
@@ -9216,6 +9254,10 @@ export type Database = {
       servicios_agenda: {
         Row: {
           activo: boolean
+          anticipo_tipo: string | null
+          anticipo_valor: number | null
+          comision_tipo: string | null
+          comision_valor: number | null
           created_at: string
           duracion_min: number
           producto_id: string
@@ -9225,6 +9267,10 @@ export type Database = {
         }
         Insert: {
           activo?: boolean
+          anticipo_tipo?: string | null
+          anticipo_valor?: number | null
+          comision_tipo?: string | null
+          comision_valor?: number | null
           created_at?: string
           duracion_min: number
           producto_id: string
@@ -9234,6 +9280,10 @@ export type Database = {
         }
         Update: {
           activo?: boolean
+          anticipo_tipo?: string | null
+          anticipo_valor?: number | null
+          comision_tipo?: string | null
+          comision_valor?: number | null
           created_at?: string
           duracion_min?: number
           producto_id?: string
@@ -10800,6 +10850,13 @@ export type Database = {
             referencedRelation: "ticket_items"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ticket_canjes_lealtad_ticket_item_id_fkey"
+            columns: ["ticket_item_id"]
+            isOneToOne: false
+            referencedRelation: "vw_comisiones_renglon"
+            referencedColumns: ["ticket_item_id"]
+          },
         ]
       }
       ticket_descuentos_manuales: {
@@ -10921,6 +10978,13 @@ export type Database = {
             referencedRelation: "ticket_items"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ticket_descuentos_manuales_ticket_item_id_fkey"
+            columns: ["ticket_item_id"]
+            isOneToOne: false
+            referencedRelation: "vw_comisiones_renglon"
+            referencedColumns: ["ticket_item_id"]
+          },
         ]
       }
       ticket_item_modificadores: {
@@ -11004,6 +11068,13 @@ export type Database = {
             referencedRelation: "ticket_items"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "ticket_item_modificadores_ticket_item_id_fkey"
+            columns: ["ticket_item_id"]
+            isOneToOne: false
+            referencedRelation: "vw_comisiones_renglon"
+            referencedColumns: ["ticket_item_id"]
+          },
         ]
       }
       ticket_items: {
@@ -11018,8 +11089,12 @@ export type Database = {
           categoria_nombre_snapshot: string | null
           clave_sat_snapshot: string | null
           client_id_local: string | null
+          colaborador_id: string | null
           combo_grupo_nombre_snapshot: string | null
           combo_rol: string | null
+          comision_base: string | null
+          comision_tipo: string | null
+          comision_valor: number | null
           created_at: string
           created_by: string | null
           descuento_item_mxn: number
@@ -11063,8 +11138,12 @@ export type Database = {
           categoria_nombre_snapshot?: string | null
           clave_sat_snapshot?: string | null
           client_id_local?: string | null
+          colaborador_id?: string | null
           combo_grupo_nombre_snapshot?: string | null
           combo_rol?: string | null
+          comision_base?: string | null
+          comision_tipo?: string | null
+          comision_valor?: number | null
           created_at?: string
           created_by?: string | null
           descuento_item_mxn?: number
@@ -11108,8 +11187,12 @@ export type Database = {
           categoria_nombre_snapshot?: string | null
           clave_sat_snapshot?: string | null
           client_id_local?: string | null
+          colaborador_id?: string | null
           combo_grupo_nombre_snapshot?: string | null
           combo_rol?: string | null
+          comision_base?: string | null
+          comision_tipo?: string | null
+          comision_valor?: number | null
           created_at?: string
           created_by?: string | null
           descuento_item_mxn?: number
@@ -11158,11 +11241,25 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ticket_items_colaborador_id_fkey"
+            columns: ["colaborador_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios_perfil"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "ticket_items_parent_item_id_fkey"
             columns: ["parent_item_id"]
             isOneToOne: false
             referencedRelation: "ticket_items"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_items_parent_item_id_fkey"
+            columns: ["parent_item_id"]
+            isOneToOne: false
+            referencedRelation: "vw_comisiones_renglon"
+            referencedColumns: ["ticket_item_id"]
           },
           {
             foreignKeyName: "ticket_items_producto_id_fkey"
@@ -13451,6 +13548,57 @@ export type Database = {
           },
         ]
       }
+      vw_comisiones_renglon: {
+        Row: {
+          base_mxn: number | null
+          colaborador_id: string | null
+          comision_mxn: number | null
+          es_servicio: boolean | null
+          fecha_negocio: string | null
+          producto_nombre: string | null
+          tenant_id: string | null
+          ticket_id: string | null
+          ticket_item_id: string | null
+          venta_mxn: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_items_colaborador_id_fkey"
+            columns: ["colaborador_id"]
+            isOneToOne: false
+            referencedRelation: "usuarios_perfil"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_items_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_items_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cumplimiento_tiempos_cocina"
+            referencedColumns: ["ticket_id"]
+          },
+          {
+            foreignKeyName: "ticket_items_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_ventas_apps_externas"
+            referencedColumns: ["ticket_id"]
+          },
+        ]
+      }
       vw_creditos_cliente: {
         Row: {
           activo: boolean | null
@@ -15217,6 +15365,7 @@ export type Database = {
         Args: {
           p_cantidad: number
           p_client_id_local?: string
+          p_colaborador_id?: string
           p_modificadores?: Json
           p_nota_cocina?: string
           p_producto_id: string
@@ -15580,6 +15729,19 @@ export type Database = {
       colaborador_libre: {
         Args: { p_inicia: string; p_producto: string; p_sucursal: string }
         Returns: string
+      }
+      comisiones_periodo: {
+        Args: { p_desde: string; p_hasta: string }
+        Returns: {
+          comision_productos_mxn: number
+          comision_servicios_mxn: number
+          nombre: string
+          servicios: number
+          sueldo_mxn: number
+          total_mxn: number
+          usuario_id: string
+          ventas_mxn: number
+        }[]
       }
       confirmar_devolucion: {
         Args: { p_devolucion_id: string; p_usuario_id: string }
@@ -16133,6 +16295,7 @@ export type Database = {
         }
         Returns: string
       }
+      periodo_comisiones: { Args: { p_fecha: string }; Returns: unknown }
       periodo_global_de: {
         Args: { p_fecha: string; p_periodicidad: string }
         Returns: {
@@ -16868,6 +17031,10 @@ export type Database = {
       verificar_pin_login: {
         Args: { p_caja_id: string; p_pin: string; p_usuario_id: string }
         Returns: Json
+      }
+      vincular_cita_ticket: {
+        Args: { p_cita: string; p_ticket: string }
+        Returns: undefined
       }
     }
     Enums: {
