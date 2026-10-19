@@ -22,8 +22,7 @@ import {
 const METODOS_ABONO: MetodoAbono[] = ["EFECTIVO", "TARJETA_DEBITO", "TARJETA_CREDITO", "TRANSFERENCIA"];
 
 /**
- * Créditos de la tienda (retail 2, entrega 2): quién debe y registrar abonos. Entrada temporal en
- * Configuración; la entrega 4 la lleva a «Más». Se abona a las ventas que `registrar_abono` ve en
+ * Créditos de la tienda (retail 2, entrega 2): quién debe y registrar abonos. Se abre desde «Más». Se abona a las ventas que `registrar_abono` ve en
  * esta base (en la caja instalada, las suyas): lo que se debe en otra caja se dice aparte.
  */
 export function SeccionCreditos({ token, cajaId, turnoId, onVolver }: {
@@ -72,7 +71,7 @@ export function SeccionCreditos({ token, cajaId, turnoId, onVolver }: {
         <button
           type="button"
           onClick={onVolver}
-          aria-label="Volver a Configuración"
+          aria-label="Volver a Más"
           className="flex h-11 w-11 items-center justify-center rounded-lg border border-line-strong text-ink-2 transition-[transform,border-color] duration-150 ease-vim hover:border-ink hover:text-ink active:scale-[.97]"
         >
           <Icono nombre="chevron-izquierda" className="h-5 w-5" />

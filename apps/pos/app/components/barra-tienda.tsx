@@ -3,11 +3,11 @@ import { Icono, type NombreIcono } from "@vim/ui/styles";
 import type { SeccionTienda } from "../lib/tienda";
 
 const DESTINOS: { seccion: SeccionTienda; etiqueta: string; icono: NombreIcono }[] = [
-  { seccion: "panel", etiqueta: "Panel", icono: "caja" },
+  { seccion: "panel", etiqueta: "Cobrar", icono: "caja" },
   { seccion: "inventario", etiqueta: "Inventario", icono: "etiqueta" },
   { seccion: "transacciones", etiqueta: "Transacciones", icono: "recibo" },
   { seccion: "notificaciones", etiqueta: "Notificaciones", icono: "megafono" },
-  { seccion: "configuracion", etiqueta: "Configuración", icono: "engrane" },
+  { seccion: "configuracion", etiqueta: "Más", icono: "menu" },
 ];
 
 /**

@@ -1,8 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MenuGeneral } from "../../components/menu-general";
 import { ContenidoMenu } from "../../components/contenido-menu";
+
+// Los módulos del negocio salen de useAcceso (contexto de la nube): aquí se fijan a mano.
+let modulosPrueba: Record<string, boolean> = {};
+vi.mock("../../components/banda-acceso", async (orig) => ({
+  ...(await orig<typeof import("../../components/banda-acceso")>()),
+  useAcceso: () => ({ modulos: modulosPrueba }),
+}));
 
 // Los .tsx se transforman con JSX clásico en las pruebas: piden `React` global.
 (globalThis as { React?: unknown }).React = React;
@@ -46,5 +53,19 @@ describe("menú general", () => {
     expect(l).not.toContain("Monitor ventas");
     expect(l.slice(l.indexOf("Abrir cajón"), l.indexOf("# Cuenta"))).toEqual(["Abrir cajón", "Retiro / Depósito"]);
     expect(l.slice(-3)).toEqual(["# Turno", "Cerrar turno", "Salir"]);
+  });
+
+  it("la tienda con crédito y cotizaciones los pone primero, en Ventas; sin módulos o en el restaurante no aparece", () => {
+    const { onDevoluciones: _sinDevoluciones, ...tienda } = opciones;
+    const con = { ...tienda, enPagina: true, onCreditos: nada, onCotizaciones: nada };
+    modulosPrueba = { credito: true, cotizaciones: true };
+    const l = leer(renderToStaticMarkup(React.createElement(ContenidoMenu, con)));
+    expect(l.slice(0, 3)).toEqual(["# Ventas", "Cotizaciones", "Créditos"]);
+    expect(l.indexOf("Cotizaciones")).toBeLessThan(l.indexOf("# Operación"));
+    modulosPrueba = {};
+    const sin = leer(renderToStaticMarkup(React.createElement(ContenidoMenu, con)));
+    expect(sin).not.toContain("# Ventas");
+    const resto = leer(renderToStaticMarkup(React.createElement(MenuGeneral, { onCerrar: nada, ...opciones })));
+    expect(resto).not.toContain("# Ventas");
   });
 });

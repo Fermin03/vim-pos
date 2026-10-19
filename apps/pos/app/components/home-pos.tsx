@@ -225,9 +225,9 @@ export function HomePos({
   /** Ticket abierto que es cuenta de barra: solo para rotularlo «Barra» (el carrito lo ve como comedor). */
   const [cuentaBarraId, setCuentaBarraId] = useState<string | null>(null);
   const [enDevoluciones, setEnDevoluciones] = useState(false);
-  /** Tienda: «Créditos» abierto dentro de Configuración (quién debe y abonos). */
+  /** Tienda: «Créditos» abierto dentro de «Más» (quién debe y abonos). */
   const [enCreditos, setEnCreditos] = useState(false);
-  /** Tienda: «Cotizaciones» abierto dentro de Configuración. */
+  /** Tienda: «Cotizaciones» abierto dentro de «Más». */
   const [enCotizaciones, setEnCotizaciones] = useState(false);
   /** La vista de una cotización (al guardarla o al reimprimirla), con el encabezado del papel. */
   const [vistaCotizacion, setVistaCotizacion] = useState<{ c: Cotizacion; e: Encabezado } | null>(null);
@@ -623,10 +623,10 @@ export function HomePos({
    * solo se oculta, así el carrito, el ticket guardado y la fila de agregados siguen donde estaban.
    */
   const [seccionTienda, setSeccionTienda] = useState<SeccionTienda>("panel");
-  /** Salir de la venta desde Configuración (bloquear, cambiar cajero, cerrar turno, salir) con productos sin guardar. */
+  /** Salir de la venta desde «Más» (bloquear, cambiar cajero, cerrar turno, salir) con productos sin guardar. */
   const [confirmar, dialogoConfirmar] = useConfirmar();
   const [confirmandoVenta, setConfirmandoVenta] = useState(false);
-  /** «Salir» de la caja: la tienda no tiene inicio, así que vive en Configuración. Solo con el preload de escritorio. */
+  /** «Salir» de la caja: la tienda no tiene inicio, así que vive en «Más». Solo con el preload de escritorio. */
   const [salirCajaAbierto, setSalirCajaAbierto] = useState(false);
   const [puedeSalir, setPuedeSalir] = useState(false);
   useEffect(() => { setPuedeSalir(typeof window.__VIM_SALIR === "function"); }, []);
@@ -801,7 +801,7 @@ export function HomePos({
   }, [salirNavegacion]);
 
   /**
-   * Tienda: antes de dejar la venta desde Configuración. Una cuenta guardada se suelta; productos sin
+   * Tienda: antes de dejar la venta desde «Más». Una cuenta guardada se suelta; productos sin
    * guardar se borran solo si el cajero lo confirma. `false` = se queda donde estaba.
    */
   const soltarVentaTienda = useCallback(async (): Promise<boolean> => {
@@ -837,7 +837,7 @@ export function HomePos({
     const n = recepcionPendiente.current;
     if (destino !== "inventario" && n > 0 && !(await confirmarDescarteRecepcion(n))) return;
     setSeccionTienda(destino);
-    setEnCreditos(false); // tocar Configuración otra vez vuelve a su menú
+    setEnCreditos(false); // tocar «Más» otra vez vuelve a su menú
     setEnCotizaciones(false);
   }, [confirmarDescarteRecepcion]);
 
@@ -860,7 +860,7 @@ export function HomePos({
   /** Vuelve a la pantalla de inicio dejando la caja limpia (sale de la cuenta de mesa si la hubiera). */
   const volverAlInicio = useCallback(() => {
     // La tienda vuelve a su barra, no a un inicio: el ticket del Panel sigue ahí y no se suelta
-    // (a estas pantallas se entra desde Configuración, con la venta a medias detrás).
+    // (a estas pantallas se entra desde «Más», con la venta a medias detrás).
     if (!tienda) salirNavegacion();
     setEnMesas(false);
     setEnPickup(false);
@@ -871,7 +871,7 @@ export function HomePos({
     setEnCambioTalla(false);
     setEnPedidosApps(false);
     setEnMonitor(false);
-    // Una tienda regresa a su barra inferior, en la sección donde estaba (p. ej. Configuración tras el corte X).
+    // Una tienda regresa a su barra inferior, en la sección donde estaba (p. ej. «Más» tras el corte X).
     setEnInicio(!tienda);
   }, [salirNavegacion, tienda]);
 
@@ -2148,7 +2148,7 @@ export function HomePos({
       [cerrando, () => setCerrando(false)],
       // Avisos de VIM de la tienda: los cierra su propio diálogo.
       [(avisosVim?.length ?? 0) > 0, null],
-      // Confirmaciones de la Configuración de la tienda: las cierra su propio diálogo.
+      // Confirmaciones de la sección «Más» de la tienda: las cierra su propio diálogo.
       [confirmandoVenta, null],
       [salirCajaAbierto, null],
     ];
@@ -2224,7 +2224,7 @@ export function HomePos({
         const [c, e] = await Promise.all([leerCotizacion(token, id), encabezado()]);
         setVistaCotizacion({ c, e });
       } catch {
-        setError("La cotización se guardó, pero no se pudo abrir. Búscala en Configuración › Cotizaciones.");
+        setError("La cotización se guardó, pero no se pudo abrir. Búscala en Más › Cotizaciones.");
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo guardar la cotización");
@@ -3354,7 +3354,7 @@ export function HomePos({
           ) : seccionTienda === "configuracion" ? (
             <>
               <div className="flex flex-shrink-0 items-center gap-4 border-b border-line bg-surface px-4 py-3">
-                <h1 className="font-display text-20 font-semibold tracking-tight">Configuración</h1>
+                <h1 className="font-display text-20 font-semibold tracking-tight">Más</h1>
               </div>
               {acceso.actualizacion && acceso.nivel !== "bloqueado" && <BandaActualizacion version={acceso.actualizacion} />}
               <div className="min-h-0 flex-1 overflow-y-auto px-8 py-8">

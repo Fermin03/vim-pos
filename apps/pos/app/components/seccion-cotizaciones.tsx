@@ -18,8 +18,8 @@ import {
 } from "../lib/cotizaciones";
 
 /**
- * Cotizaciones de la tienda (retail 2, entrega 3): las vigentes y vencidas de esta caja. Entrada
- * temporal en Configuración, como «Créditos»; la entrega 4 la lleva a «Más».
+ * Cotizaciones de la tienda (retail 2, entrega 3): las vigentes y vencidas de esta caja. Se abre desde «Más»,
+ * como «Créditos».
  */
 export function SeccionCotizaciones({ token, cajaId, whatsapp, onReimprimir, onConvertir, onNueva, onVolver }: {
   token: string;
@@ -61,7 +61,7 @@ export function SeccionCotizaciones({ token, cajaId, whatsapp, onReimprimir, onC
         <button
           type="button"
           onClick={onVolver}
-          aria-label="Volver a Configuración"
+          aria-label="Volver a Más"
           className="flex h-11 w-11 items-center justify-center rounded-lg border border-line-strong text-ink-2 transition-[transform,border-color] duration-150 ease-vim hover:border-ink hover:text-ink active:scale-[.97]"
         >
           <Icono nombre="chevron-izquierda" className="h-5 w-5" />

@@ -9,7 +9,7 @@ import { ContenidoMenu } from "./contenido-menu";
  * Vivía dentro del topbar de la pantalla de venta, así que desde el inicio no había forma de
  * abrirlo: su botón "Menú" solo cambiaba de pantalla y no pasaba nada visible. Extraído aquí
  * para que ambas pantallas abran EL MISMO menú. Sus opciones viven en `ContenidoMenu`, que la
- * caja de tienda pinta en su sección «Configuración».
+ * caja de tienda pinta en su sección «Más».
  */
 export function MenuGeneral({
   onCerrar,

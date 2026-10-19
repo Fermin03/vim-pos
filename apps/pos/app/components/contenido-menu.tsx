@@ -55,9 +55,9 @@ export function ContenidoMenu({
   onCerrarTurno?: () => void;
   /** Solo la tienda, que no tiene inicio: sus accesos «Retiro / Depósito» y «Salir» («Corte caja X» abre el monitor). */
   onMovimientoCaja?: () => void;
-  /** Solo la tienda, con el módulo de crédito: quién debe y registrar abonos (temporal: la entrega 4 lo lleva a «Más»). */
+  /** Solo la tienda, con el módulo de crédito: quién debe y registrar abonos. */
   onCreditos?: () => void;
-  /** Solo la tienda, con el módulo de cotizaciones (temporal, como «Créditos»). */
+  /** Solo la tienda, con el módulo de cotizaciones. */
   onCotizaciones?: () => void;
   onSalir?: () => void;
   /** Para el mensaje de "Ayuda por WhatsApp": desde qué negocio, sucursal y caja se escribe. */
@@ -115,7 +115,17 @@ export function ContenidoMenu({
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-9">
-      {(onKds || onDevoluciones || onCorteX || onEnEspera || onAbrirCajon || onMovimientoCaja || creditos || cotizaciones) && (
+      {(creditos || cotizaciones) && (
+      <SeccionMenu titulo="Ventas">
+        {cotizaciones && (
+          <TileMenu label="Cotizaciones" onClick={con(cotizaciones)} icon={<Icono nombre="etiqueta" className="h-8 w-8" />} />
+        )}
+        {creditos && (
+          <TileMenu label="Créditos" onClick={con(creditos)} icon={<Icono nombre="pesos" className="h-8 w-8" />} />
+        )}
+      </SeccionMenu>
+      )}
+      {(onKds || onDevoluciones || onCorteX || onEnEspera || onAbrirCajon || onMovimientoCaja) && (
       <SeccionMenu titulo="Operación">
         {onKds && moduloActivo(modulos, "kds") && (
           <TileMenu label="Cocina" onClick={con(onKds)} icon={<Icono nombre="megafono" className="h-8 w-8" />} />
@@ -136,12 +146,6 @@ export function ContenidoMenu({
         )}
         {onMovimientoCaja && (
           <TileMenu label="Retiro / Depósito" onClick={con(onMovimientoCaja)} icon={<Icono nombre="billete" className="h-8 w-8" />} />
-        )}
-        {creditos && (
-          <TileMenu label="Créditos" onClick={con(creditos)} icon={<Icono nombre="pesos" className="h-8 w-8" />} />
-        )}
-        {cotizaciones && (
-          <TileMenu label="Cotizaciones" onClick={con(cotizaciones)} icon={<Icono nombre="etiqueta" className="h-8 w-8" />} />
         )}
       </SeccionMenu>
       )}
