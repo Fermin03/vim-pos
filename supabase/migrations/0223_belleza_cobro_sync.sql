@@ -9,7 +9,11 @@
 --    caja) y COBRADA es terminal. Una TERMINADA en la nube acepta COBRADA. Deshacer el cobro
 --    (COBRADA → TERMINADA, o COBRADA con otra venta) entra si la venta de la nube ya está CANCELADA
 --    (lo que hace tickets_cita_cobrada, que en réplica no corre); si esa cancelación viene pendiente
---    en el envío, es error y se reintenta; si no, es una copia vieja y se ignora.
+--    en el envío, es error y se reintenta; si no, es una copia vieja y se ignora. Excepción: si la
+--    caja la cobró en una venta ya pagada en la nube y la nube la tiene CANCELADA, NO_LLEGO o
+--    COBRADA en otra venta viva, es error (se reintenta hasta que suba la cancelación que viene en
+--    otro lote), o conflicto final si la otra venta es de otra caja y está pagada, o si la nube la
+--    canceló (_cita_cobro_en_conflicto): va a `_conflictos`, como un anticipo resuelto dos veces.
 -- §2 _vim_aplicar_anticipos_caja: los anticipos de la caja, por id e idempotentes. Validan negocio
 --    de cita, turnos (el que lo recibe, de su caja y sucursal), caja, sucursal y venta (la de su
 --    cita). Precedencia caja vs nube:
@@ -26,7 +30,9 @@
 --      · cualquier otra cosa sobre una resuelta (otro estado resuelto, otra venta, o resuelto en otra
 --        caja) es un CONFLICTO: dinero resuelto dos veces. La nube conserva la suya y lo devuelve en
 --        `_conflictos` (la caja lo da por subido y lo anota en su bitácora) y en el rastro
---        (sync_eventos.operaciones_conflicto y response_summary._conflictos) para el panel.
+--        (sync_eventos.operaciones_conflicto y response_summary._conflictos) para el panel;
+--      · aplicado a una venta que no es la de su cita en la nube: error (se reintenta), salvo que la
+--        cita haya quedado en conflicto final (§1): entonces también va a `_conflictos`.
 --    Candados en orden cita → anticipo, como en 0222.
 -- §3 sync_pull_snapshot (vigente 0219): baja los anticipos de las citas que baja (todos los estados:
 --    la caja necesita saber que uno ya se resolvió en otra caja para no cobrarlo).
@@ -54,7 +60,32 @@
 --   · un tramo que se cruza con otro activo entra con empalme = true y marca al otro. Al final se
 --     recalcula la marca de todo lo tocado (así un intercambio de horario entre dos citas de la caja
 --     no deja una marca falsa) y la de sus citas.
--- Devuelve {citas int, citas_servicios int, errores [{tabla, id, error}]}.
+--   · 0223: COBRADA con una venta ya pagada en la nube, cuando la nube la tiene CANCELADA, NO_LLEGO
+--     o COBRADA con otra venta que no está cancelada: error (se reintenta; entra cuando sube la
+--     cancelación de la otra venta), salvo un conflicto final (_cita_cobro_en_conflicto), que va a
+--     `conflictos`: la nube conserva la suya y la caja la da por subida.
+-- Devuelve {citas int, citas_servicios int, errores [{tabla, id, error}], conflictos [{tabla, id, nube, caja, error}]}.
+
+-- Conflicto final del cobro de una cita, visto desde la nube: la caja la cobró en p_ticket (ya
+-- pagado en la nube) y la nube la tiene CANCELADA o «No llegó» (nada lo va a cambiar), o COBRADA en
+-- otra venta pagada de OTRA caja (dos cajas la cobraron). Si la otra venta es de la misma caja, la
+-- caja la canceló antes de volver a cobrar y esa cancelación viene en otro lote: no es conflicto.
+CREATE OR REPLACE FUNCTION _cita_cobro_en_conflicto(p_cita uuid, p_ticket uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SET search_path = public, pg_temp
+AS $fn$
+  SELECT EXISTS (
+    SELECT 1 FROM citas c
+      JOIN tickets t2 ON t2.id = p_ticket AND t2.estado_fiscal IN ('PAGADO', 'FACTURADO')
+     WHERE c.id = p_cita
+       AND (c.estado IN ('CANCELADA', 'NO_LLEGO')
+            OR EXISTS (SELECT 1 FROM tickets t1
+                        WHERE t1.id = c.ticket_id AND t1.id <> p_ticket
+                          AND t1.estado_fiscal IN ('PAGADO', 'FACTURADO')
+                          AND t1.caja_id IS DISTINCT FROM t2.caja_id)))
+$fn$;
+REVOKE ALL ON FUNCTION _cita_cobro_en_conflicto(uuid, uuid) FROM PUBLIC, anon, authenticated;
+
 DROP FUNCTION IF EXISTS _vim_aplicar_citas_caja(uuid, jsonb, jsonb);
 CREATE OR REPLACE FUNCTION _vim_aplicar_citas_caja(p_tenant uuid, p_citas jsonb, p_servicios jsonb,
                                                    p_pendientes uuid[] DEFAULT '{}')
@@ -79,6 +110,7 @@ DECLARE
   v_nc      integer := 0;
   v_ns      integer := 0;
   v_errores jsonb := '[]'::jsonb;
+  v_conflictos jsonb := '[]'::jsonb;   -- 0223
 BEGIN
   IF jsonb_typeof(p_citas) IS DISTINCT FROM 'array' THEN p_citas := '[]'::jsonb; END IF;
   IF jsonb_typeof(p_servicios) IS DISTINCT FROM 'array' THEN p_servicios := '[]'::jsonb; END IF;
@@ -127,6 +159,20 @@ BEGIN
         IF NOT v_paso AND v_tk_nube = ANY(p_pendientes) THEN
           RAISE EXCEPTION 'la cancelación de la venta aún no sube';
         END IF;
+      END IF;
+      -- 0223: la caja la cobró en una venta ya pagada en la nube, pero la nube la tiene cobrada en
+      -- otra venta viva, cancelada o «No llegó». No es copia vieja: o se reintenta (la cancelación
+      -- de la otra venta viene en otro lote) o es un conflicto final (_cita_cobro_en_conflicto).
+      IF NOT COALESCE(v_paso, false) AND v_c->>'estado' = 'COBRADA'
+         AND (v_estado IN ('CANCELADA', 'NO_LLEGO')
+              OR (v_estado = 'COBRADA' AND (v_c->>'ticket_id')::uuid IS DISTINCT FROM v_tk_nube))
+         AND EXISTS (SELECT 1 FROM tickets WHERE id = (v_c->>'ticket_id')::uuid AND estado_fiscal IN ('PAGADO', 'FACTURADO')) THEN
+        IF _cita_cobro_en_conflicto(v_cita, (v_c->>'ticket_id')::uuid) THEN
+          v_conflictos := v_conflictos || jsonb_build_object('tabla', 'citas', 'id', v_cita,
+            'nube', v_estado, 'caja', 'COBRADA', 'error', 'cita cobrada en dos ventas');
+          CONTINUE;
+        END IF;
+        RAISE EXCEPTION 'la cita ya se cobró en otra venta que aún no se cancela en la nube';
       END IF;
       IF v_estado IN ('TERMINADA', 'NO_LLEGO', 'CANCELADA', 'COBRADA') AND NOT COALESCE(v_paso, false) THEN
         CONTINUE;   -- cerrada en la nube: la copia de la caja no la reabre
@@ -191,7 +237,7 @@ BEGIN
   -- La marca, recalculada sobre lo tocado ya con todo el envío aplicado.
   PERFORM _agenda_remarcar(p_tenant, v_revisar, v_tocadas);
 
-  RETURN jsonb_build_object('citas', v_nc, 'citas_servicios', v_ns, 'errores', v_errores);
+  RETURN jsonb_build_object('citas', v_nc, 'citas_servicios', v_ns, 'errores', v_errores, 'conflictos', v_conflictos);
 END;
 $fn$;
 REVOKE ALL ON FUNCTION _vim_aplicar_citas_caja(uuid, jsonb, jsonb, uuid[]) FROM PUBLIC, anon, authenticated;
@@ -248,6 +294,13 @@ BEGIN
         RAISE EXCEPTION 'venta de otro negocio o que aún no sube';
       END IF;
       IF v_f->>'ticket_id' IS NOT NULL AND (v_f->>'ticket_id')::uuid IS DISTINCT FROM v_tk_cita THEN
+        -- La cita quedó en conflicto final (ver §1): el anticipo también, o se reintentaría siempre.
+        IF _cita_cobro_en_conflicto((v_f->>'cita_id')::uuid, (v_f->>'ticket_id')::uuid) THEN
+          v_conflictos := v_conflictos || jsonb_build_object('tabla', 'anticipos_cita', 'id', v_id,
+            'nube', (SELECT estado FROM anticipos_cita WHERE id = v_id), 'caja', v_f->>'estado',
+            'error', 'la cita se cobró en dos ventas');
+          CONTINUE;
+        END IF;
         RAISE EXCEPTION 'la venta no es la de la cita (o el cambio de la cita aún no sube)';
       END IF;
       IF v_f->>'usuario_id' IS NOT NULL AND NOT EXISTS (
@@ -561,12 +614,13 @@ BEGIN
   v_res := v_res || jsonb_build_object('citas', (v_det->>'citas')::integer,
                                        'citas_servicios', (v_det->>'citas_servicios')::integer);
   v_errores := v_errores || COALESCE(v_det->'errores', '[]'::jsonb);
+  v_conflictos := COALESCE(v_det->'conflictos', '[]'::jsonb);
 
   -- 0223: los anticipos, ya con ventas, turnos y citas del lote aplicados.
   v_det := _vim_aplicar_anticipos_caja(p_tenant, p_snapshot->'anticipos_cita', v_pendientes);
   v_res := v_res || jsonb_build_object('anticipos_cita', (v_det->>'aplicados')::integer);
   v_errores := v_errores || COALESCE(v_det->'errores', '[]'::jsonb);
-  v_conflictos := COALESCE(v_det->'conflictos', '[]'::jsonb);
+  v_conflictos := v_conflictos || COALESCE(v_det->'conflictos', '[]'::jsonb);
 
   -- ── Rastro del envío (0070/0073) ─────────────────────────────────────────
   BEGIN

@@ -45,9 +45,10 @@ describe("«Anticipo» en el cobro", () => {
   });
 });
 
-describe("devolver en efectivo sin permiso", () => {
+describe("devolver o retener sin permiso", () => {
   it("reconoce el rechazo que pide el PIN", () => {
-    expect(pideAutorizacionAnticipo("Devolver un anticipo en efectivo requiere autorización (venta.devolucion).")).toBe(true);
+    expect(pideAutorizacionAnticipo("Devolver un anticipo requiere autorización (venta.devolucion).")).toBe(true);
+    expect(pideAutorizacionAnticipo("Retener un anticipo requiere autorización (venta.devolucion).")).toBe(true);
     expect(pideAutorizacionAnticipo("falta la referencia de la devolución con tarjeta o transferencia.")).toBe(false);
   });
 });

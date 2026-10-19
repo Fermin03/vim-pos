@@ -4,10 +4,13 @@
 --    RECIBE (como un abono a crédito, 0208), por método. Se resuelve una sola vez:
 --    APLICADO (paga su venta con el método ANTICIPO), DEVUELTO o RETENIDO («Anticipo no
 --    reembolsable»). Solo se escribe por RPC; un anticipo resuelto ya no cambia a mano. La única
---    vuelta atrás es del sistema: si la venta se cancela o se devuelve, lo APLICADO regresa a
---    VIGENTE (primero que cualquier otro medio) para cobrar la cita en otra venta.
--- §2 RPC: registrar_anticipo, anticipo_sugerido, pagar_con_anticipo, devolver_anticipo (en
---    efectivo pide venta.devolucion o su PIN) y retener_anticipo; cancelación y devoluciones.
+--    vuelta atrás es del sistema: si la venta se cancela sin haberse pagado, o se cancela o se
+--    devuelve regresando el dinero en efectivo o por el mismo método, lo APLICADO regresa a
+--    VIGENTE (primero que cualquier otro medio) para cobrar la cita en otra venta. Con cortesía,
+--    vale, nota de crédito o sin devolver dinero, sigue APLICADO.
+-- §2 RPC: registrar_anticipo, anticipo_sugerido, pagar_con_anticipo, devolver_anticipo y
+--    retener_anticipo (los dos piden venta.devolucion o su PIN, en un turno abierto de la caja);
+--    cancelación y devoluciones.
 -- §3 Guardia de pagos: ANTICIPO solo entra por pagar_con_anticipo y no se reabre ni se edita.
 -- §4 Corte: calcular_efectivo_esperado, reporte_x y arquear_caja suman los anticipos recibidos;
 --    ANTICIPO no se declara (el dinero ya se contó en el turno que lo recibió).
@@ -283,9 +286,9 @@ COMMENT ON FUNCTION pagar_con_anticipo(uuid, uuid, text) IS
 REVOKE EXECUTE ON FUNCTION pagar_con_anticipo(uuid, uuid, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION pagar_con_anticipo(uuid, uuid, text) TO authenticated, service_role;
 
--- Devolver: en efectivo sale del cajón del turno que devuelve (DEVOLUCION_EFECTIVO) y pide lo
--- mismo que devolver una venta: el permiso venta.devolucion o una autorización con PIN para este
--- anticipo. Con tarjeta o transferencia solo se marca, con la referencia.
+-- Devolver pide lo mismo que devolver una venta: el permiso venta.devolucion o una autorización
+-- con PIN para este anticipo, con cualquier método. En efectivo sale del cajón del turno que
+-- devuelve (DEVOLUCION_EFECTIVO); con tarjeta o transferencia solo se marca, con la referencia.
 CREATE OR REPLACE FUNCTION devolver_anticipo(p_anticipo uuid, p_caja_id uuid, p_turno_id uuid, p_referencia text DEFAULT NULL,
                                              p_autorizacion_pin_id uuid DEFAULT NULL)
 RETURNS void
@@ -318,15 +321,16 @@ BEGIN
   END IF;
   v_turno := _anticipo_turno(v_tenant, p_caja_id, p_turno_id);
 
+  -- Molde de arquear_caja (0134): con autorización se consume; sin ella, solo quien tiene el permiso.
+  IF p_autorizacion_pin_id IS NOT NULL THEN
+    v_autorizo := consumir_autorizacion(p_autorizacion_pin_id, ARRAY['venta.devolucion'],
+      p_anticipo, v_a.monto_mxn, NULL, false, v_tenant);
+  ELSIF NOT usuario_actual_tiene_permiso('venta.devolucion') THEN
+    RAISE EXCEPTION 'Devolver un anticipo requiere autorización (venta.devolucion).'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
   IF v_a.metodo_pago = 'EFECTIVO' THEN
-    -- Molde de arquear_caja (0134): con autorización se consume; sin ella, solo quien tiene el permiso.
-    IF p_autorizacion_pin_id IS NOT NULL THEN
-      v_autorizo := consumir_autorizacion(p_autorizacion_pin_id, ARRAY['venta.devolucion'],
-        p_anticipo, v_a.monto_mxn, NULL, false, v_tenant);
-    ELSIF NOT usuario_actual_tiene_permiso('venta.devolucion') THEN
-      RAISE EXCEPTION 'Devolver un anticipo en efectivo requiere autorización (venta.devolucion).'
-        USING ERRCODE = 'insufficient_privilege';
-    END IF;
     INSERT INTO movimientos_caja (tenant_id, sucursal_id, caja_id, turno_id, tipo, monto_mxn, dia_contable,
                                   motivo, usuario_solicitante_id, usuario_autorizo_id, autorizacion_pin_id)
     VALUES (v_tenant, v_turno.sucursal_id, v_turno.caja_id, v_turno.id, 'DEVOLUCION_EFECTIVO', v_a.monto_mxn,
@@ -341,7 +345,7 @@ BEGIN
 END;
 $$;
 COMMENT ON FUNCTION devolver_anticipo(uuid, uuid, uuid, text, uuid) IS
-  'Devuelve un anticipo vigente: en efectivo sale del cajón del turno que devuelve y pide venta.devolucion (o su PIN); con tarjeta o transferencia exige referencia (0222).';
+  'Devuelve un anticipo vigente con venta.devolucion (o su PIN): en efectivo sale del cajón del turno que devuelve; con tarjeta o transferencia exige referencia (0222).';
 REVOKE EXECUTE ON FUNCTION devolver_anticipo(uuid, uuid, uuid, text, uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION devolver_anticipo(uuid, uuid, uuid, text, uuid) TO authenticated, service_role;
 
@@ -393,9 +397,12 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION _anticipo_regresar(uuid, numeric) FROM PUBLIC, anon, authenticated, service_role;
 
--- Venta cancelada (abierta o pagada): lo que sigue APLICADO regresa a VIGENTE para cobrar la cita
--- en otra venta. Si la cancelación devolvió dinero, la devolución ya regresó primero la parte del
--- anticipo (trg_devolucion_pago_efectivo) y aquí solo queda lo que no cubrió (p. ej. la propina).
+-- Venta cancelada: lo que sigue APLICADO regresa a VIGENTE para cobrar la cita en otra venta si la
+-- venta no se había pagado, o si la cancelación devolvió el dinero en efectivo o por el mismo
+-- método (esa devolución ya regresó primero la parte del anticipo, trg_devolucion_pago_efectivo, y
+-- aquí solo queda lo que no cubrió, p. ej. la propina). Con cortesía, vale, nota de crédito o sin
+-- devolver dinero sigue APLICADO: la clienta ya recibió ese valor, o no se le regresa nada.
+-- La fila de cancelaciones_ticket ya existe: este UPDATE lo hace su disparador AFTER INSERT (0104).
 CREATE OR REPLACE FUNCTION tickets_cancelado_regresa_anticipo()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -403,7 +410,12 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 BEGIN
-  PERFORM _anticipo_regresar(NEW.id, NULL);
+  IF OLD.estado_fiscal NOT IN ('PAGADO', 'FACTURADO') OR EXISTS (
+       SELECT 1 FROM cancelaciones_ticket c JOIN devoluciones d ON d.id = c.devolucion_id
+        WHERE c.ticket_id = NEW.id AND d.estado = 'CONFIRMADA'
+          AND d.medio_devolucion IN ('EFECTIVO', 'MISMO_METODO_PAGO')) THEN
+    PERFORM _anticipo_regresar(NEW.id, NULL);
+  END IF;
   RETURN NULL;
 END $$;
 REVOKE ALL ON FUNCTION tickets_cancelado_regresa_anticipo() FROM PUBLIC, anon, authenticated;
@@ -558,8 +570,11 @@ END;
 $$;
 REVOKE ALL ON FUNCTION trg_devolucion_pago_efectivo() FROM PUBLIC, anon, authenticated;
 
--- Retener («No llegó» o cancelación fuera del límite): el negocio se queda el anticipo.
-CREATE OR REPLACE FUNCTION retener_anticipo(p_anticipo uuid, p_turno_id uuid)
+-- Retener («No llegó» o cancelación fuera del límite): el negocio se queda el anticipo. Pide lo
+-- mismo que devolverlo: venta.devolucion (o su PIN) y un turno abierto de esa caja.
+DROP FUNCTION IF EXISTS retener_anticipo(uuid, uuid);
+CREATE OR REPLACE FUNCTION retener_anticipo(p_anticipo uuid, p_caja_id uuid, p_turno_id uuid,
+                                            p_autorizacion_pin_id uuid DEFAULT NULL)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -568,6 +583,7 @@ AS $$
 DECLARE
   v_tenant uuid := current_tenant_id();
   v_a      anticipos_cita%ROWTYPE;
+  v_turno  turnos%ROWTYPE;
 BEGIN
   IF v_tenant IS NULL THEN
     RAISE EXCEPTION 'Sin negocio en la sesión.' USING ERRCODE = '42501';
@@ -585,19 +601,23 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM citas WHERE id = v_a.cita_id AND estado IN ('NO_LLEGO', 'CANCELADA')) THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: solo se retiene el anticipo de una cita cancelada o que no llegó.' USING ERRCODE = '22023';
   END IF;
-  PERFORM 1 FROM turnos WHERE id = p_turno_id AND tenant_id = v_tenant AND estado = 'ABIERTO';
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'DATOS_INVALIDOS: el anticipo se mueve en un turno abierto de esta caja.' USING ERRCODE = '22023';
+  v_turno := _anticipo_turno(v_tenant, p_caja_id, p_turno_id);
+  IF p_autorizacion_pin_id IS NOT NULL THEN
+    PERFORM consumir_autorizacion(p_autorizacion_pin_id, ARRAY['venta.devolucion'],
+      p_anticipo, v_a.monto_mxn, NULL, false, v_tenant);
+  ELSIF NOT usuario_actual_tiene_permiso('venta.devolucion') THEN
+    RAISE EXCEPTION 'Retener un anticipo requiere autorización (venta.devolucion).'
+      USING ERRCODE = 'insufficient_privilege';
   END IF;
   UPDATE anticipos_cita
-     SET estado = 'RETENIDO', turno_resuelve_id = p_turno_id, resuelto_at = now()
+     SET estado = 'RETENIDO', turno_resuelve_id = v_turno.id, resuelto_at = now()
    WHERE id = v_a.id;
 END;
 $$;
-COMMENT ON FUNCTION retener_anticipo(uuid, uuid) IS
-  'El negocio retiene el anticipo de una cita cancelada o que no llegó: «Anticipo no reembolsable» en el corte del turno (0222).';
-REVOKE EXECUTE ON FUNCTION retener_anticipo(uuid, uuid) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION retener_anticipo(uuid, uuid) TO authenticated, service_role;
+COMMENT ON FUNCTION retener_anticipo(uuid, uuid, uuid, uuid) IS
+  'El negocio retiene el anticipo de una cita cancelada o que no llegó, con venta.devolucion (o su PIN) en un turno abierto de la caja: «Anticipo no reembolsable» en el corte del turno (0222).';
+REVOKE EXECUTE ON FUNCTION retener_anticipo(uuid, uuid, uuid, uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION retener_anticipo(uuid, uuid, uuid, uuid) TO authenticated, service_role;
 
 -- ── §3 Guardia de pagos ─────────────────────────────────────────────────────
 -- La de la 0211 (vigente) con ANTICIPO: solo entra por pagar_con_anticipo y, como el saldo a

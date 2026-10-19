@@ -55,7 +55,7 @@ export async function registrarAnticipo(
   if (error) throw new Error(motivoDeLaBase(error.message));
 }
 
-/** En efectivo, sin el permiso `venta.devolucion` la base pide el PIN (`pideAutorizacionAnticipo`). */
+/** Sin el permiso `venta.devolucion` la base pide el PIN (`pideAutorizacionAnticipo`), con cualquier método. */
 export async function devolverAnticipo(
   token: string,
   a: { anticipoId: string; cajaId: string; turnoId: string; referencia: string | null; autorizacionPinId: string | null },
@@ -67,12 +67,18 @@ export async function devolverAnticipo(
   if (error) throw new Error(motivoDeLaBase(error.message));
 }
 
-export async function retenerAnticipo(token: string, anticipoId: string, turnoId: string): Promise<void> {
-  const { error } = await employeeClient(token).rpc("retener_anticipo", { p_anticipo: anticipoId, p_turno_id: turnoId });
+/** Igual que devolver: sin `venta.devolucion`, la base pide el PIN; el turno es el abierto de esta caja. */
+export async function retenerAnticipo(
+  token: string,
+  a: { anticipoId: string; cajaId: string; turnoId: string; autorizacionPinId: string | null },
+): Promise<void> {
+  const { error } = await employeeClient(token).rpc("retener_anticipo", {
+    p_anticipo: a.anticipoId, p_caja_id: a.cajaId, p_turno_id: a.turnoId, p_autorizacion_pin_id: a.autorizacionPinId ?? undefined,
+  });
   if (error) throw new Error(motivoDeLaBase(error.message));
 }
 
-/** La base pidió el PIN de `venta.devolucion` para devolver en efectivo. */
+/** La base pidió el PIN de `venta.devolucion` para devolver o retener. */
 export const pideAutorizacionAnticipo = (mensaje: string) => /requiere autorizaci[oó]n/i.test(mensaje);
 
 // ── Cobro de la venta de una cita ────────────────────────────────────────────

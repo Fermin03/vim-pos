@@ -104,7 +104,7 @@ export function ModalCobrarAnticipo({ token, citaId, clienta, cajaId, turnoId, t
 /**
  * «¿Qué hacemos con el anticipo de $X?»: Devolver o Retener los anticipos vigentes de una cita ya
  * cancelada o que no llegó. `sugerida` sale de `decisionSugerida`; null = el cajero elige sin pista.
- * Devolver con tarjeta o transferencia pide la referencia; en efectivo, sin permiso, el PIN.
+ * Devolver con tarjeta o transferencia pide la referencia; devolver o retener, sin permiso, el PIN.
  */
 export function DialogoAnticipo({ token, vigentes, sugerida, elegida, retener = true, cajaId, turnoId, ejecutaNombre, onHecho, onCerrar }: {
   token: string;
@@ -137,16 +137,17 @@ export function DialogoAnticipo({ token, vigentes, sugerida, elegida, retener = 
     setOcupado(true);
     try {
       for (const a of vigentes) {
-        if (eleccion === "RETENER") { await retenerAnticipo(token, a.id, turnoId); continue; }
+        const autorizacionPinId = pin?.anticipoId === a.id ? pin.autorizacionPinId : null;
         try {
-          await devolverAnticipo(token, {
+          if (eleccion === "RETENER") await retenerAnticipo(token, { anticipoId: a.id, cajaId, turnoId, autorizacionPinId });
+          else await devolverAnticipo(token, {
             anticipoId: a.id, cajaId, turnoId,
             referencia: a.metodo === "EFECTIVO" ? null : referencia.trim(),
-            autorizacionPinId: pin?.anticipoId === a.id ? pin.autorizacionPinId : null,
+            autorizacionPinId,
           });
         } catch (e) {
           const msg = e instanceof Error ? e.message : "";
-          if (a.metodo === "EFECTIVO" && pideAutorizacionAnticipo(msg)) { setPidePin(a); return; }
+          if (pideAutorizacionAnticipo(msg)) { setPidePin(a); return; }
           throw e;
         }
       }
@@ -199,10 +200,11 @@ export function DialogoAnticipo({ token, vigentes, sugerida, elegida, retener = 
           token={token}
           capa="z-[70]"
           payload={{
-            accion: "devolver_anticipo", permisoCodigo: "venta.devolucion", entidadTipo: "anticipo_cita", entidadId: pidePin.id,
-            monto: pidePin.monto, motivo: "Devolver anticipo en efectivo", cajaId, turnoId,
+            accion: eleccion === "RETENER" ? "retener_anticipo" : "devolver_anticipo",
+            permisoCodigo: "venta.devolucion", entidadTipo: "anticipo_cita", entidadId: pidePin.id,
+            monto: pidePin.monto, motivo: `${eleccion === "RETENER" ? "Retener" : "Devolver"} anticipo`, cajaId, turnoId,
           }}
-          descripcion={`Devolver ${fmtMxn(pidePin.monto)} de anticipo en efectivo`}
+          descripcion={`${eleccion === "RETENER" ? "Retener" : "Devolver"} ${fmtMxn(pidePin.monto)} de anticipo`}
           ejecutaNombre={ejecutaNombre}
           onAutorizado={(a) => { const id = pidePin.id; setPidePin(null); void aplicar({ anticipoId: id, autorizacionPinId: a.autorizacionPinId }); }}
           onCancelar={() => setPidePin(null)}

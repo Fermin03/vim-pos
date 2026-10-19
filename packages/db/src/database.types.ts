@@ -16776,7 +16776,12 @@ export type Database = {
         }[]
       }
       retener_anticipo: {
-        Args: { p_anticipo: string; p_turno_id: string }
+        Args: {
+          p_anticipo: string
+          p_autorizacion_pin_id?: string
+          p_caja_id: string
+          p_turno_id: string
+        }
         Returns: undefined
       }
       retomar_ticket: { Args: { p_ticket_id: string }; Returns: undefined }

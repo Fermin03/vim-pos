@@ -29,22 +29,30 @@ ticket por venir, pero no había forma de cobrarla, ni de dejar un anticipo al a
   tabla, `anticipos_cita`. El dinero entra al corte del turno que lo recibe (como un abono a crédito);
   después se resuelve una sola vez: APLICADO (paga su venta), DEVUELTO o RETENIDO («Anticipo no
   reembolsable»). Solo se escribe por RPC y un anticipo resuelto no se edita a mano.
-- **La única vuelta atrás es del sistema.** Si la venta se cancela, o se devuelve con EFECTIVO o
-  MISMO_METODO_PAGO, el anticipo APLICADO vuelve a VIGENTE para cobrar la cita en otra venta. Con
-  CORTESIA, VALE o NOTA_CREDITO queda APLICADO.
-- **Devolver un anticipo en efectivo** pide el mismo permiso que devolver una venta
-  (`venta.devolucion`) o el PIN de un supervisor.
+- **La única vuelta atrás es del sistema.** Si la venta se cancela sin haberse pagado, o se cancela
+  o se devuelve regresando el dinero con EFECTIVO o MISMO_METODO_PAGO, el anticipo APLICADO vuelve a
+  VIGENTE para cobrar la cita en otra venta. Con CORTESIA, VALE, NOTA_CREDITO o cancelando sin
+  devolver dinero queda APLICADO (si no, la clienta recibiría ese valor dos veces).
+- **Devolver o retener un anticipo**, con cualquier método, pide el mismo permiso que devolver una
+  venta (`venta.devolucion`) o el PIN de un supervisor, en un turno abierto de la caja que lo hace.
+- **Editar un renglón** conserva su colaborador: su precio y su regla de comisión.
 - **Un anticipo retenido no es venta ni factura** en esta entrega: sale en el corte y en los reportes.
 
 ## Cómo se despliega (no es obvio)
 
-- **0220 solo agrega valores de enum** (`COBRADA`, `ANTICIPO`) y va en su propio archivo, porque
-  Postgres no deja usar un valor en la transacción que lo crea. **Debe estar en el instalador
-  antes de usarse:** una caja que reciba un pago `ANTICIPO` o una cita `COBRADA` sin conocer el
-  valor tumba su pull de `pagos` y de `citas`.
-- 0221–0223 van a la nube a mano y **antes del merge**, como siempre.
+- **0216–0223 a la nube a mano y antes del merge, en orden y cada archivo en su propia
+  transacción.** 0220 solo agrega valores de enum (`COBRADA`, `ANTICIPO`) y tiene que quedar
+  confirmada antes de correr 0221: Postgres no deja usar un valor en la transacción que lo crea, y
+  0222 lo usa al crear el disparador de pagos. Después, el instalador con 0216–0223.
+- Una caja vieja no se rompe con la nube nueva: no baja pagos, no tiene agenda (el pull ignora
+  `citas` y `anticipos_cita`), guarda solo las columnas que conoce y no sube nada nuevo (sus
+  renglones sin colaborador entran igual). Solo no tiene la función, así
+  que ningún negocio debe usar anticipos ni el cobro de citas mientras sus cajas no tengan el
+  instalador.
 - Los conflictos del sync se registran en `sync_eventos`: gana la nube cuando los dos lados
-  resolvieron un anticipo distinto, y la caja reintenta si deshace algo que la nube aún no ve.
+  resolvieron un anticipo distinto, o cuando una cita quedó cobrada en dos ventas pagadas de cajas
+  distintas (o cobrada en la caja y cancelada en la nube). La caja reintenta si deshace algo que la
+  nube aún no ve, incluido el recobro de una cita cuya primera venta se canceló en otro lote.
 
 ## Por qué
 

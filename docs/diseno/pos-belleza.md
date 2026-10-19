@@ -64,7 +64,7 @@ reservó, servicios con colaborador, espacio, duración y precio. Acciones segú
 - **Cancelar** con anticipo pregunta quién cancela («Cancela el negocio» / «Cancela la clienta»). Primero se
   cancela o se marca **No llegó**; después: **«¿Qué hacemos con el anticipo de $X?»** — Devolver o
   Retener, con la sugerida marcada (negocio o a tiempo → Devolver; tarde o no llegó → Retener). Devolver con
-  tarjeta o transferencia pide la referencia; en efectivo sin permiso, el PIN de un supervisor. Si se
+  tarjeta o transferencia pide la referencia; devolver o retener sin permiso pide el PIN de un supervisor. Si se
   cierra sin elegir, la ficha dice **«Anticipo pendiente de devolver o retener»** con los dos botones. La
   cita sigue en el calendario (apagada, con la marca «Anticipo pendiente») y en Cobrar → «Citas de hoy»,
   grupo **Anticipos pendientes**, que abre la ficha. Resuelto, desaparece. En el calendario la cancelada

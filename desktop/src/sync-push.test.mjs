@@ -1224,7 +1224,7 @@ describe("ventas que cambian después de subir, y el piso de las mesas (Postgres
       await pushToCloud(db, OPTS, (m) => bitacora.push(m));
     } finally { nube.restaurar(); }
     assert.ok(!(await antPendiente(ant)), "no se reintenta");
-    assert.ok(bitacora.some((m) => m.includes("resuelto(s) dos veces") && m.includes(String(ant).slice(0, 8))), "queda en la bitácora");
+    assert.ok(bitacora.some((m) => m.includes("resuelta(s) dos veces") && m.includes(String(ant).slice(0, 8))), "queda en la bitácora");
   });
 
   test("citas: el catálogo vacío en la nube vacía el de la caja", async () => {

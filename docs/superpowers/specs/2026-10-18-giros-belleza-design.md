@@ -303,19 +303,22 @@ ADR 0039.
 
 **Para el lanzamiento**
 
-- **0220 va en el instalador ANTES de usarse.** Un valor de enum desconocido en la caja tumba el pull
-  de `pagos` y de `citas`. Mientras la nube no cobre con ANTICIPO ni cite como COBRADA no pasa nada,
-  pero ningún negocio debe estrenar la función antes de que sus cajas tengan el instalador.
-- **0221–0223 a la nube, a mano y antes del merge.** Después, el instalador con 0220–0223.
+- **0216–0223 a la nube a mano y antes del merge, en orden y cada archivo en su propia transacción
+  (0220 confirmada antes de 0221).** Después, el instalador con 0216–0223.
+- Una caja vieja no se rompe con la nube nueva (no baja pagos ni citas); solo no tiene la función.
+  Ningún negocio debe usar anticipos ni el cobro de citas mientras sus cajas no tengan el instalador.
 
 **Rulings de este plan (Fermín puede corregirlos)**
 
 - La comisión se calcula al leer, con la regla congelada en el renglón; no hay tabla de comisiones.
 - Base COBRADO: resta también el descuento a nivel ticket (y el canje de lealtad), prorrateado entre
   renglones. LISTA no incluye modificadores.
-- El anticipo vuelve a VIGENTE al cancelar la venta y en devoluciones EFECTIVO o MISMO_METODO_PAGO
-  (primero la parte pagada con anticipo); con CORTESIA, VALE o NOTA_CREDITO queda APLICADO.
-- Devolver un anticipo en efectivo exige `venta.devolucion` o el PIN de un supervisor.
+- El anticipo vuelve a VIGENTE al cancelar una venta sin pagar, y al cancelar o devolver una pagada
+  regresando el dinero por EFECTIVO o MISMO_METODO_PAGO (primero la parte pagada con anticipo); con
+  CORTESIA, VALE, NOTA_CREDITO o sin devolver dinero queda APLICADO.
+- Devolver o retener un anticipo, con cualquier método, exige `venta.devolucion` o el PIN de un
+  supervisor, en un turno abierto de la caja que lo hace.
+- Editar un renglón conserva su colaborador (precio y regla de comisión).
 - El anticipo se aplica al confirmar el primer pago, no al abrir el cobro.
 - Una cita cancelada con anticipo VIGENTE sigue visible (calendario y Cobrar) hasta resolverlo.
 - Los conflictos del sync se registran en `sync_eventos`; gana la nube, y la caja reintenta cuando
@@ -331,6 +334,12 @@ ADR 0039.
   Definir con el contador la clave por defecto.
 - **Comisión LISTA sin modificadores:** lo dice el spec; el texto del admin no promete más.
 - **Reportes de comisiones sin filtro por sucursal:** la vista no trae `sucursal_id`.
-- **Sync, caso raro entre lotes:** una cancelación de venta rechazada en un lote y el recobro de la
-  cita en otro lote distinto. Se resuelve al reintentar, pero no tiene prueba propia.
+- **Sync, caso raro entre lotes:** si el lote del recobro de una cita llega antes que la cancelación
+  de su primera venta, la nube rechaza la cita y su anticipo y la caja los reintenta; entran cuando
+  sube la cancelación (smoke de sync, paso 12). Si la cita quedó cobrada y pagada en dos cajas, o
+  cobrada en la caja y cancelada en la nube, es un conflicto final: la nube conserva la suya y lo
+  anota en `sync_eventos` (sin aviso en el panel todavía).
+- **Conflictos del sync en el panel:** un anticipo resuelto en dos cajas (o una cita cobrada dos
+  veces) solo queda en `sync_eventos`; la venta de la otra caja queda pagada con un ANTICIPO que la
+  nube no aplicó. Falta mostrarlo en el panel.
 - La barra del ticket no muestra el anticipo (solo el modal de cobro).

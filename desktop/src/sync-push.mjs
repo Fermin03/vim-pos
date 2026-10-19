@@ -1239,12 +1239,13 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
       await anotarHuellas(pool, "_vim_anticipos_ok", "anticipo_id", anticiposEnviados.filter((a) => !fuera.has(a.id)));
     }
   }
-  // Conflictos (0223): un anticipo resuelto dos veces. La nube conservó el suyo y lo dejó en su
-  // rastro; aquí ya quedó anotado como subido (no está en _errores) y el pull baja esa versión.
+  // Conflictos (0223): un anticipo resuelto dos veces o una cita cobrada en dos ventas. La nube
+  // conservó lo suyo y lo dejó en su rastro; aquí ya quedó anotado como subido (no está en _errores)
+  // y el pull baja esa versión.
   const conflictos = respuesta?.resultado?._conflictos ?? [];
   if (conflictos.length) {
-    log(`la nube conservó su versión de ${conflictos.length} anticipo(s) resuelto(s) dos veces: `
-      + conflictos.slice(0, 3).map((c) => `${String(c.id).slice(0, 8)} nube ${c.nube} / caja ${c.caja}`).join(" · "));
+    log(`la nube conservó su versión de ${conflictos.length} fila(s) resuelta(s) dos veces: `
+      + conflictos.slice(0, 3).map((c) => `${c.tabla}/${String(c.id).slice(0, 8)} nube ${c.nube} / caja ${c.caja}`).join(" · "));
   }
   // Descartados: el producto ya no lleva existencias en la nube. No se reintentan; solo se avisa.
   const mpDescartados = respuesta?.resultado?._descartados?.movimientos_producto ?? [];

@@ -1,6 +1,7 @@
 -- Belleza, entrega 2: colaborador por renglón, comisiones y cita cobrada (diseño 2026-10-18).
 --
--- · El colaborador va en el renglón (`ticket_items.colaborador_id`), lo pone agregar_item_a_ticket.
+-- · El colaborador va en el renglón (`ticket_items.colaborador_id`), lo pone agregar_item_a_ticket
+--   y editar el renglón (reemplazar_item_ticket) lo conserva.
 -- · Al insertar el renglón, un disparador CONGELA la regla de comisión en el propio renglón: la
 --   comisión de una venta no cambia si el dueño edita las reglas después. El disparador no corre en
 --   el push del sync (session_replication_role = replica, 0219), así que la nube guarda lo que
@@ -352,6 +353,8 @@ CREATE TRIGGER trg_tickets_cita_cobrada
   AFTER UPDATE OF estado_fiscal ON tickets
   FOR EACH ROW WHEN (OLD.estado_fiscal IS DISTINCT FROM NEW.estado_fiscal)
   EXECUTE FUNCTION tickets_cita_cobrada();
+-- El disparador corre en cada cobro o cancelación de cualquier negocio y busca la cita por su venta.
+CREATE INDEX IF NOT EXISTS idx_citas_ticket ON citas (ticket_id) WHERE ticket_id IS NOT NULL;
 
 -- ── §6 Comisiones al leer ───────────────────────────────────────────────────
 -- Renglones con colaborador de tickets PAGADO o FACTURADO, no cancelados, menos la parte devuelta
@@ -483,3 +486,157 @@ BEGIN
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO authenticated, service_role', f);
   END LOOP;
 END $$;
+
+-- ── §7 Editar un renglón conserva su colaborador ────────────────────────────
+-- reemplazar_item_ticket: la de la 0119 (vigente). Cambio "0221": el renglón nuevo lleva el
+-- colaborador del viejo (las líneas son del mismo producto), así que conserva su precio y la regla
+-- de comisión se vuelve a congelar. Sin colaborador, igual que antes.
+CREATE OR REPLACE FUNCTION reemplazar_item_ticket(
+  p_ticket_item_id uuid,
+  p_lineas         jsonb
+) RETURNS uuid[]
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_item        record;
+  v_linea       jsonb;
+  v_client      text;
+  v_nuevo       uuid;
+  v_nuevos      uuid[] := '{}';
+  v_filas_nuevas uuid[];
+  v_ultimo      integer;
+  v_n_filas     integer;
+  v_existentes  uuid[];
+BEGIN
+  IF p_lineas IS NULL OR jsonb_typeof(p_lineas) <> 'array' OR jsonb_array_length(p_lineas) = 0 THEN
+    RAISE EXCEPTION 'Hace falta al menos una línea para reemplazar el renglón';
+  END IF;
+
+  SELECT ti.*, t.estado_fiscal
+    INTO v_item
+    FROM ticket_items ti
+    JOIN tickets t ON t.id = ti.ticket_id
+   WHERE ti.id = p_ticket_item_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'ticket_item % no existe', p_ticket_item_id; END IF;
+
+  -- Reintento de una edición que ya se aplicó: devolver lo que quedó, no fallar.
+  IF v_item.cancelado AND v_item.motivo_cancelacion = 'EDITADO' THEN
+    SELECT array_agg(ti.id ORDER BY ti.orden_visualizacion) INTO v_existentes
+      FROM ticket_items ti
+     WHERE ti.tenant_id = v_item.tenant_id
+       AND ti.client_id_local IN (SELECT l->>'client_id_local' FROM jsonb_array_elements(p_lineas) l);
+    IF COALESCE(array_length(v_existentes, 1), 0) = jsonb_array_length(p_lineas) THEN
+      RETURN v_existentes;
+    END IF;
+  END IF;
+
+  IF v_item.cancelado THEN RAISE EXCEPTION 'El producto ya está cancelado'; END IF;
+  IF v_item.combo_rol = 'HIJO' THEN RAISE EXCEPTION 'Edita el combo completo'; END IF;
+  IF v_item.cargo_tipo IS NOT NULL THEN RAISE EXCEPTION 'El cargo de envío se cambia desde la zona'; END IF;
+  IF v_item.estado_fiscal NOT IN ('BORRADOR', 'ABIERTO') THEN
+    RAISE EXCEPTION 'Solo se editan productos de cuentas abiertas (estado actual: %)', v_item.estado_fiscal;
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM ticket_items
+     WHERE (id = p_ticket_item_id OR (parent_item_id = p_ticket_item_id AND cancelado = false))
+       AND enviado_cocina_at IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION 'El producto ya se mandó a cocina: ya no se puede modificar';
+  END IF;
+  IF v_item.precio_override THEN
+    RAISE EXCEPTION 'El producto tiene el precio cambiado con autorización: quítalo antes de editarlo';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM ticket_descuentos_manuales
+     WHERE ticket_item_id = p_ticket_item_id AND reversado = false
+  ) THEN
+    RAISE EXCEPTION 'El producto tiene un descuento: quítalo antes de editarlo';
+  END IF;
+
+  -- Cada línea: del mismo producto, con cantidad, y con un client_id_local que no exista todavía
+  -- (si existiera, las RPC de alta devolverían ESE renglón por idempotencia y lo robaríamos).
+  FOR v_linea IN SELECT * FROM jsonb_array_elements(p_lineas) LOOP
+    IF COALESCE(v_linea->>'combo_producto_id', v_linea->>'producto_id') IS DISTINCT FROM v_item.producto_id::text THEN
+      RAISE EXCEPTION 'Las líneas tienen que ser del mismo producto que el renglón que se edita';
+    END IF;
+    -- COALESCE: en un renglón normal combo_rol es NULL, y NULL <> algo no dispara el IF.
+    IF COALESCE(v_item.combo_rol = 'PADRE', false) <> (v_linea ? 'combo_producto_id') THEN
+      RAISE EXCEPTION 'Un combo se reemplaza por combos y un producto por productos';
+    END IF;
+    IF COALESCE((v_linea->>'cantidad')::numeric, 0) <= 0 THEN
+      RAISE EXCEPTION 'Cantidad inválida';
+    END IF;
+    v_client := NULLIF(v_linea->>'client_id_local', '');
+    IF v_client IS NULL THEN RAISE EXCEPTION 'Cada línea necesita su client_id_local'; END IF;
+    IF EXISTS (SELECT 1 FROM ticket_items WHERE tenant_id = v_item.tenant_id AND client_id_local = v_client) THEN
+      RAISE EXCEPTION 'client_id_local % ya existe', v_client;
+    END IF;
+    -- Los componentes de un combo también: reusar el id de un hijo del renglón viejo (cancelado,
+    -- pero sigue ahí) haría que agregar_combo_a_ticket lo encontrara y rechazara el combo.
+    IF EXISTS (
+      SELECT 1 FROM jsonb_array_elements(COALESCE(v_linea->'componentes', '[]'::jsonb)) c
+        JOIN ticket_items ti ON ti.tenant_id = v_item.tenant_id AND ti.client_id_local = c->>'client_id_local'
+    ) THEN
+      RAISE EXCEPTION 'Un componente trae un client_id_local que ya existe: manda ids nuevos';
+    END IF;
+  END LOOP;
+
+  -- El hueco que deja el renglón viejo: su último orden (el del padre o el de su último hijo).
+  SELECT MAX(orden_visualizacion) INTO v_ultimo
+    FROM ticket_items
+   WHERE id = p_ticket_item_id OR parent_item_id = p_ticket_item_id;
+
+  -- 2) Cancelar el viejo con sus hijos. El trigger recalcula los totales (UPDATE OF cancelado).
+  UPDATE ticket_items
+     SET cancelado = true,
+         motivo_cancelacion = 'EDITADO',
+         usuario_cancelo_id = auth.uid(),
+         cancelado_at = now()
+   WHERE id = p_ticket_item_id
+      OR (parent_item_id = p_ticket_item_id AND cancelado = false);
+
+  -- 3) Las líneas nuevas, por las RPC de alta.
+  FOR v_linea IN SELECT * FROM jsonb_array_elements(p_lineas) LOOP
+    IF v_linea ? 'combo_producto_id' THEN
+      v_nuevo := agregar_combo_a_ticket(
+        v_item.ticket_id,
+        (v_linea->>'combo_producto_id')::uuid,
+        (v_linea->>'cantidad')::numeric,
+        COALESCE(v_linea->'componentes', '[]'::jsonb),
+        '[]'::jsonb,
+        NULLIF(v_linea->>'nota_cocina', ''),
+        v_linea->>'client_id_local');
+    ELSE
+      v_nuevo := agregar_item_a_ticket(
+        v_item.ticket_id,
+        (v_linea->>'producto_id')::uuid,
+        (v_linea->>'cantidad')::numeric,
+        NULLIF(v_linea->>'nota_cocina', ''),
+        COALESCE(v_linea->'modificadores', '[]'::jsonb),
+        v_linea->>'client_id_local',
+        v_item.colaborador_id);   -- 0221
+    END IF;
+    v_nuevos := v_nuevos || v_nuevo;
+  END LOOP;
+
+  -- 4) Acomodarlas donde estaba el viejo: se recorre lo que venía después y las nuevas (con sus
+  --    hijos, en el orden en que entraron) ocupan el hueco.
+  SELECT array_agg(id ORDER BY orden_visualizacion) INTO v_filas_nuevas
+    FROM ticket_items
+   WHERE id = ANY (v_nuevos) OR parent_item_id = ANY (v_nuevos);
+  v_n_filas := array_length(v_filas_nuevas, 1);
+
+  UPDATE ticket_items
+     SET orden_visualizacion = orden_visualizacion + v_n_filas
+   WHERE ticket_id = v_item.ticket_id
+     AND orden_visualizacion > v_ultimo
+     AND NOT (id = ANY (v_filas_nuevas));
+
+  UPDATE ticket_items ti
+     SET orden_visualizacion = v_ultimo + x.pos
+    FROM unnest(v_filas_nuevas) WITH ORDINALITY AS x(id, pos)
+   WHERE ti.id = x.id;
+
+  RETURN v_nuevos;
+END;
+$$;
