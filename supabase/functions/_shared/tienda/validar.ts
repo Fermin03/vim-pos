@@ -40,14 +40,30 @@ export type Peticion =
       /** La llave del intento de compra (entrega 7): con ella, reintentar devuelve el mismo pedido. null = sin llave. */
       clave: string | null }
   | { accion: "seguimiento"; negocio: string; codigo: string }
-  /** El respaldo del aviso de Mercado Pago: la página del pedido pide que se confirme su pago. */
-  | { accion: "confirmar_pago"; negocio: string; codigo: string }
+  /**
+   * El respaldo del aviso de Mercado Pago: la página del pedido pide que se confirme su pago.
+   * `cita: true` = el código es el de una cita en línea (belleza, entrega 3), no el de un pedido.
+   */
+  | { accion: "confirmar_pago"; negocio: string; codigo: string; cita?: true }
   /**
    * Cómo va la verificación del banco (3D Secure) del pago de ese pedido: le pregunta a Mercado Pago
    * y contesta si sigue, si ya se pagó o si no pasó. Con `cancelar`, el cliente abandona el reto: se
-   * cancela la orden en Mercado Pago antes de dejarle intentar otro pago.
+   * cancela la orden en Mercado Pago antes de dejarle intentar otro pago. `cita: true`, como arriba.
    */
-  | { accion: "verificacion"; negocio: string; codigo: string; cancelar: boolean }
+  | { accion: "verificacion"; negocio: string; codigo: string; cancelar: boolean; cita?: true }
+  // ── Reservas en línea (belleza, entrega 3). El negocio sale de `reservas_negocio`. ──
+  | { accion: "reservas"; negocio: string }
+  /** Los horarios en que cabe la cadena de servicios ese día. `codigo`: el de la cita que se cambia de hora. */
+  | { accion: "huecos"; negocio: string; sucursal_id: string; dia: string; servicios: ServicioDeCita[]; codigo: string | null }
+  | { accion: "reservar"; negocio: string; sucursal_id: string; inicia: string; servicios: ServicioDeCita[];
+      cliente: { nombre: string; telefono: string; email: string }; nota: string | null; captcha: string | null;
+      /** La llave del intento (22 caracteres al azar del navegador): reintentar devuelve la misma cita. Obligatoria. */
+      clave: string;
+      /** Solo si la cita lleva anticipo: el token de la tarjeta. Sin él, la cita queda apartada esperando el pago. */
+      tarjeta: TarjetaDePedido | null }
+  | { accion: "cita"; negocio: string; codigo: string }
+  | { accion: "cita_cancelar"; negocio: string; codigo: string }
+  | { accion: "cita_mover"; negocio: string; codigo: string; inicia: string }
   /**
    * ¿Existe ya un pedido para esta clave de intento? No crea ni cobra nada. La tienda lo pregunta
    * cuando mandó un pago en línea y no supo qué pasó: mientras no lo sepa, no emite otra clave.
@@ -68,7 +84,16 @@ export type Peticion =
 const ACCIONES: ReadonlySet<string> = new Set<Peticion["accion"]>([
   "negocio", "menu", "colonias", "cotizar", "pedir", "seguimiento", "confirmar_pago", "verificacion", "intento", "registrar", "entrar", "salir", "recuperar_pedir", "recuperar_aplicar",
   "cuenta", "cuenta_guardar", "cuenta_password", "direccion_guardar", "direccion_borrar", "mis_pedidos", "eliminar_cuenta",
+  "reservas", "huecos", "reservar", "cita", "cita_cancelar", "cita_mover",
 ]);
+
+/** Las acciones de reservas en línea: su negocio se resuelve con `reservas_negocio`. */
+export type PeticionDeReservas = Extract<Peticion, { accion: "reservas" | "huecos" | "reservar" | "cita" | "cita_cancelar" | "cita_mover" }>;
+const ACCIONES_DE_RESERVAS: ReadonlySet<string> = new Set<PeticionDeReservas["accion"]>(["reservas", "huecos", "reservar", "cita", "cita_cancelar", "cita_mover"]);
+export const esDeReservas = (accion: string): accion is PeticionDeReservas["accion"] => ACCIONES_DE_RESERVAS.has(accion);
+
+/** Un servicio de la cadena de una cita: el producto y, si la clienta eligió, quién lo hace (null = quien esté libre). */
+export type ServicioDeCita = { producto_id: string; usuario_id: string | null };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SLUG = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/;
@@ -177,7 +202,7 @@ export function leerFecha(x: unknown, hoy: Date = new Date()): string | null | u
  * si la cuenta existe. Una contraseña que se va a COMPROBAR (entrar, la actual, eliminar) solo se
  * acota a 1 carácter–72 bytes: si es corta, que la rechace la base como cualquier otra equivocada.
  */
-function leerCuenta(accion: Exclude<Peticion["accion"], "negocio" | "menu" | "colonias" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" | "verificacion" | "intento">,
+function leerCuenta(accion: Exclude<Peticion["accion"], "negocio" | "menu" | "colonias" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" | "verificacion" | "intento" | PeticionDeReservas["accion"]>,
                     negocio: string, x: Record<string, unknown>): Resultado<Peticion> {
   const invalida = mal("CUENTA_INVALIDA_DATOS");
   switch (accion) {
@@ -230,12 +255,82 @@ function leerCuenta(accion: Exclude<Peticion["accion"], "negocio" | "menu" | "co
   }
 }
 
+/** Un día del calendario `YYYY-MM-DD` que existe, o null. Si se ofrece o no lo decide la base. */
+export function leerDia(x: unknown): string | null {
+  if (typeof x !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(x)) return null;
+  const d = new Date(`${x}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === x ? x : null;
+}
+
+/** Una hora con su zona (`…Z` o `±hh:mm`), ya en ISO UTC; o null. Sin zona no se adivina: es otra hora. */
+export function leerInstante(x: unknown): string | null {
+  if (typeof x !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?(Z|[+-]\d{2}:\d{2})$/.test(x)) return null;
+  const t = Date.parse(x);
+  return Number.isFinite(t) ? new Date(t).toISOString() : null;
+}
+
+/** La cadena de servicios: de 1 a 5, cada uno `{producto_id, usuario_id|null}`. Que se ofrezcan, lo decide la base. */
+export function leerServicios(x: unknown): ServicioDeCita[] | null {
+  if (!Array.isArray(x) || x.length < 1 || x.length > 5) return null;
+  const out: ServicioDeCita[] = [];
+  for (const s of x) {
+    if (!objeto(s) || !esUuid(s.producto_id)) return null;
+    const u = s.usuario_id ?? null;
+    if (u !== null && !esUuid(u)) return null;
+    out.push({ producto_id: s.producto_id.toLowerCase(), usuario_id: u === null ? null : (u as string).toLowerCase() });
+  }
+  return out;
+}
+
+/**
+ * Las acciones de reservas. El código de una cita tiene la forma del seguimiento (22 caracteres): el
+ * claro solo lo usa la función para sacar su huella. La clave del intento también: de ella depende
+ * que reintentar devuelva la misma cita (y su código), así que tiene que ser igual de difícil de adivinar.
+ */
+function leerReservas(accion: PeticionDeReservas["accion"], negocio: string, x: Record<string, unknown>): Resultado<Peticion> {
+  if (accion === "reservas") return { ok: true, valor: { accion, negocio } };
+  if (accion === "cita" || accion === "cita_cancelar") {
+    return esCodigo(x.codigo) ? { ok: true, valor: { accion, negocio, codigo: x.codigo } } : mal("CODIGO_INVALIDO");
+  }
+  if (accion === "cita_mover") {
+    if (!esCodigo(x.codigo)) return mal("CODIGO_INVALIDO");
+    const inicia = leerInstante(x.inicia);
+    return inicia ? { ok: true, valor: { accion, negocio, codigo: x.codigo, inicia } } : mal("HORA_INVALIDA");
+  }
+  if (!esUuid(x.sucursal_id)) return mal("SUCURSAL_INVALIDA");
+  const sucursal_id = x.sucursal_id.toLowerCase();
+  const servicios = leerServicios(x.servicios);
+  if (!servicios) return mal("SERVICIOS_INVALIDOS");
+  if (accion === "huecos") {
+    const dia = leerDia(x.dia);
+    if (!dia) return mal("HORA_INVALIDA");
+    const codigo = x.codigo ?? null;
+    if (codigo !== null && !esCodigo(codigo)) return mal("CODIGO_INVALIDO");
+    return { ok: true, valor: { accion, negocio, sucursal_id, dia, servicios, codigo } };
+  }
+  // reservar
+  const inicia = leerInstante(x.inicia);
+  if (!inicia) return mal("HORA_INVALIDA");
+  if (!objeto(x.cliente)) return mal("CLIENTE_INVALIDO");
+  const nombre = textoLimpio(x.cliente.nombre, 100), telefono = normalizarTelefono(x.cliente.telefono), email = leerCorreo(x.cliente.email);
+  // El correo es obligatorio: ahí llega el enlace de la cita.
+  if (!nombre || !telefono || !email) return mal("CLIENTE_INVALIDO");
+  if (!esCodigo(x.clave)) return mal("CUERPO_INVALIDO");
+  const tarjeta = leerTarjeta(x.tarjeta);
+  if (tarjeta === null) return mal("PAGO_INVALIDO");
+  return { ok: true, valor: {
+    accion, negocio, sucursal_id, inicia, servicios, cliente: { nombre, telefono, email },
+    nota: textoLimpio(x.nota, 300), captcha: leerCaptcha(x.captcha), clave: x.clave, tarjeta: tarjeta ?? null,
+  } };
+}
+
 export function leerCuerpo(x: unknown): Resultado<Peticion> {
   if (!objeto(x)) return mal("CUERPO_INVALIDO");
   if (typeof x.accion !== "string" || !ACCIONES.has(x.accion)) return mal("ACCION_INVALIDA");
   const accion = x.accion as Peticion["accion"];
   const negocio = typeof x.negocio === "string" ? x.negocio.trim().toLowerCase() : "";
   if (!SLUG.test(negocio)) return mal("NEGOCIO_INVALIDO");
+  if (esDeReservas(accion)) return leerReservas(accion, negocio, x);
 
   if (accion !== "negocio" && accion !== "menu" && accion !== "colonias" && accion !== "cotizar" && accion !== "pedir" && accion !== "seguimiento" && accion !== "confirmar_pago" && accion !== "verificacion" && accion !== "intento") {
     return leerCuenta(accion, negocio, x);
@@ -246,10 +341,14 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
   }
   if (accion === "verificacion") {
     // `cancelar` solo vale escrito tal cual: cualquier otra cosa es «no cancelar».
-    return esCodigo(x.codigo) ? { ok: true, valor: { accion, negocio, codigo: x.codigo, cancelar: x.cancelar === true } } : mal("CODIGO_INVALIDO");
+    return esCodigo(x.codigo) ? { ok: true, valor: { accion, negocio, codigo: x.codigo, cancelar: x.cancelar === true, ...(x.cita === true && { cita: true as const }) } } : mal("CODIGO_INVALIDO");
   }
-  if (accion === "seguimiento" || accion === "confirmar_pago") {
+  if (accion === "seguimiento") {
     return esCodigo(x.codigo) ? { ok: true, valor: { accion, negocio, codigo: x.codigo } } : mal("CODIGO_INVALIDO");
+  }
+  if (accion === "confirmar_pago") {
+    // `cita` solo vale escrito tal cual; sin él es el pago de un pedido, como siempre.
+    return esCodigo(x.codigo) ? { ok: true, valor: { accion, negocio, codigo: x.codigo, ...(x.cita === true && { cita: true as const }) } } : mal("CODIGO_INVALIDO");
   }
 
   if (!esUuid(x.sucursal_id)) return mal("SUCURSAL_INVALIDA");

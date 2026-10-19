@@ -17,7 +17,7 @@ vi.mock("next/cache", () => ({
 let cabecerasDeLaPeticion = new Headers();
 vi.mock("next/headers", () => ({ headers: async () => cabecerasDeLaPeticion }));
 
-import { leerMenu, leerNegocio, llamarTienda } from "../servidor/funcion";
+import { leerMenu, leerNegocio, leerReservas, llamarTienda } from "../servidor/funcion";
 import { ipDe } from "../servidor/ip";
 import { POST } from "../../api/tienda/route";
 
@@ -424,5 +424,80 @@ describe("POST /api/tienda", () => {
     const r = await pedir(seguimiento);
     expect(r.status).toBe(503);
     expect(llamadas).toHaveLength(0);
+  });
+});
+
+describe("reservas en línea por /api/tienda", () => {
+  const enviar = (cuerpo: unknown) =>
+    POST(new Request("https://online.vimpos.com.mx/api/tienda", {
+      method: "POST",
+      headers: { host: "online.vimpos.com.mx", origin: "https://online.vimpos.com.mx", "content-type": "application/json", "x-real-ip": "189.203.11.4" },
+      body: JSON.stringify(cuerpo),
+    }));
+  const servicio = { producto_id: ID.hamburguesa, usuario_id: null };
+  const reservar = {
+    accion: "reservar", negocio: "salon-ana", sucursal_id: ID.sucursal, inicia: "2026-10-20T16:00:00Z", servicios: [servicio],
+    cliente: { nombre: "Ana", telefono: "4771112233", email: "ana@x.mx" }, nota: null, captcha: "tok", clave: CODIGO,
+  };
+
+  it("huecos: solo la sucursal, el día, los servicios (producto y quién) y el código de la cita que se cambia", async () => {
+    await enviar({ accion: "huecos", negocio: "salon-ana", sucursal_id: ID.sucursal, dia: "2026-10-20", codigo: CODIGO, tenant: "x",
+                   servicios: [{ ...servicio, precio: "1.00", tenant_id: "x" }] });
+    expect(cuerpoEnviado()).toEqual({ accion: "huecos", negocio: "salon-ana", sucursal_id: ID.sucursal, dia: "2026-10-20", codigo: CODIGO, servicios: [servicio] });
+  });
+  it("reservar: los datos de la cita, la clave y la tarjeta (solo sus claves conocidas); nada que parezca un precio ni un anticipo", async () => {
+    await enviar({ ...reservar, anticipo_mxn: "0.00", total_a_pagar_mxn: "1.00", pago_id: "x",
+                   cliente: { ...reservar.cliente, cliente_id: "x" },
+                   tarjeta: { token: "a".repeat(32), payment_method_id: "visa", type: "credit_card", numero: "4111111111111111" } });
+    expect(cuerpoEnviado()).toEqual({ ...reservar, tarjeta: { token: "a".repeat(32), payment_method_id: "visa", type: "credit_card" } });
+  });
+  it("reservar sin clave (o con una sin forma de código) no se reenvía", async () => {
+    for (const clave of [undefined, "corta", 5]) {
+      const r = await enviar({ ...reservar, clave });
+      expect(r.status).toBe(400);
+      expect(await r.json()).toEqual({ error: "CUERPO_INVALIDO" });
+    }
+    expect(llamadas).toHaveLength(0);
+  });
+  it("cita, cancelar y mover: el código (y, al mover, la hora); nada más", async () => {
+    await enviar({ accion: "cita", negocio: "salon-ana", codigo: CODIGO, inicia: "x", estado: "CANCELADA" });
+    expect(cuerpoEnviado()).toEqual({ accion: "cita", negocio: "salon-ana", codigo: CODIGO });
+    await enviar({ accion: "cita_cancelar", negocio: "salon-ana", codigo: CODIGO, motivo: "x" });
+    expect(cuerpoEnviado(1)).toEqual({ accion: "cita_cancelar", negocio: "salon-ana", codigo: CODIGO });
+    await enviar({ accion: "cita_mover", negocio: "salon-ana", codigo: CODIGO, inicia: "2026-10-21T15:00:00Z", sucursal_id: ID.sucursal });
+    expect(cuerpoEnviado(2)).toEqual({ accion: "cita_mover", negocio: "salon-ana", codigo: CODIGO, inicia: "2026-10-21T15:00:00Z" });
+    const r = await enviar({ accion: "cita_cancelar", negocio: "salon-ana", codigo: "corto" });
+    expect(r.status).toBe(400);
+    expect(llamadas).toHaveLength(3);
+  });
+  it("el pago del anticipo: confirmar_pago y verificacion con `cita: true` escrito tal cual", async () => {
+    await enviar({ accion: "confirmar_pago", negocio: "salon-ana", codigo: CODIGO, cita: true });
+    expect(cuerpoEnviado()).toEqual({ accion: "confirmar_pago", negocio: "salon-ana", codigo: CODIGO, cita: true });
+    await enviar({ accion: "verificacion", negocio: "salon-ana", codigo: CODIGO, cita: "true", cancelar: true });
+    expect(cuerpoEnviado(1)).toEqual({ accion: "verificacion", negocio: "salon-ana", codigo: CODIGO, cancelar: true });
+    await enviar({ accion: "seguimiento", negocio: "salon-ana", codigo: CODIGO, cita: true });
+    expect(cuerpoEnviado(2)).toEqual({ accion: "seguimiento", negocio: "salon-ana", codigo: CODIGO });
+  });
+  it("el catálogo no pasa por aquí (lo leen los componentes de servidor, con caché)", async () => {
+    const r = await enviar({ accion: "reservas", negocio: "salon-ana" });
+    expect(r.status).toBe(400);
+    expect(llamadas).toHaveLength(0);
+  });
+  it("PAGO_EN_PAUSA (423) y los mensajes de la agenda llegan tal cual", async () => {
+    responder = () => json({ error: "PAGO_EN_PAUSA", hasta: "2026-10-20T16:30:00.000Z" }, 423);
+    const r = await enviar(reservar);
+    expect(r.status).toBe(423);
+    expect(await r.json()).toEqual({ error: "PAGO_EN_PAUSA", hasta: "2026-10-20T16:30:00.000Z" });
+    responder = () => json({ error: "HUECO_OCUPADO", mensaje: "Ese horario ya no está disponible" }, 409);
+    expect(await (await enviar(reservar)).json()).toEqual({ error: "HUECO_OCUPADO", mensaje: "Ese horario ya no está disponible" });
+  });
+  it("leerReservas: el catálogo con la caché de 30 s del negocio", async () => {
+    responder = () => json({ error: "TIENDA_NO_DISPONIBLE" }, 404);
+    expect(await leerReservas("salon-ana")).toEqual({ estado: "no-existe" });
+    expect(await leerReservas("salon-ana")).toEqual({ estado: "no-existe" });
+    expect(llamadas).toHaveLength(1);
+    expect(cuerpoEnviado()).toEqual({ accion: "reservas", negocio: "salon-ana" });
+    expect(await leerReservas("NO VALE")).toEqual({ estado: "no-existe" });
+    expect(llamadas).toHaveLength(1);
   });
 });

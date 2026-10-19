@@ -87,6 +87,18 @@ const DE_CUENTA = new Map<string, readonly string[]>([
   ["mis_pedidos", []],
   ["eliminar_cuenta", ["password"]],
 ]);
+// Reservas en línea (belleza, entrega 3). `reservas` (el catálogo) no pasa por aquí: lo leen los
+// componentes de servidor, con caché, como el negocio y el menú. Ninguna usa sesión.
+const DE_SERVICIO = ["producto_id", "usuario_id"] as const;
+const DE_HUECOS = ["accion", "negocio", "sucursal_id", "dia", "servicios", "codigo"] as const;
+const DE_RESERVA = ["accion", "negocio", "sucursal_id", "inicia", "servicios", "cliente", "nota", "captcha", "clave", "tarjeta"] as const;
+/** La página de una cita: el código y, al cambiarla de hora, la hora nueva. */
+const DE_CITA = new Map<string, readonly string[]>([
+  ["cita", ["accion", "negocio", "codigo"]],
+  ["cita_cancelar", ["accion", "negocio", "codigo"]],
+  ["cita_mover", ["accion", "negocio", "codigo", "inicia"]],
+]);
+
 /** Las que ABREN sesión: su respuesta trae el token. No reciben la sesión que hubiera. */
 const ABREN_SESION = new Set(["registrar", "entrar", "recuperar_aplicar"]);
 /** Las de cuenta que no usan sesión: a la función no le llega ninguna. */
@@ -118,7 +130,9 @@ export async function POST(req: Request): Promise<Response> {
   // `verificacion` es lo mismo durante el reto del banco (3D Secure): el código y, si el cliente
   // abandona el reto, `cancelar: true` escrito tal cual. Lo que diga la página del reto no pasa de aquí.
   const deSeguimiento = accion === "seguimiento" || accion === "confirmar_pago" || accion === "verificacion";
-  if (!deCuenta && accion !== "cotizar" && accion !== "colonias" && accion !== "pedir" && accion !== "intento" && !deSeguimiento) return rechazo("ACCION_INVALIDA");
+  const deCita = typeof accion === "string" ? DE_CITA.get(accion) : undefined;
+  if (!deCuenta && !deCita && accion !== "cotizar" && accion !== "colonias" && accion !== "pedir" && accion !== "intento"
+      && accion !== "huecos" && accion !== "reservar" && !deSeguimiento) return rechazo("ACCION_INVALIDA");
   if (typeof negocio !== "string" || !FORMA_SLUG.test(negocio)) return rechazo("NEGOCIO_INVALIDO");
 
   // La cookie del negocio DEL CUERPO, nunca la de otro; y solo para lo que usa sesión (cotizar,
@@ -143,9 +157,22 @@ export async function POST(req: Request): Promise<Response> {
   } else if (accion === "colonias") {
     // El autocompletado del domicilio: solo la sucursal y el texto; la función valida la forma.
     limpio = solo(cuerpo, ["accion", "negocio", "sucursal_id", "q"]);
-  } else if (deSeguimiento) {
+  } else if (deSeguimiento || deCita) {
     if (typeof cuerpo.codigo !== "string" || !FORMA_CODIGO.test(cuerpo.codigo)) return rechazo("CODIGO_INVALIDO");
-    limpio = { accion, negocio, codigo: cuerpo.codigo, ...(accion === "verificacion" && cuerpo.cancelar === true && { cancelar: true }) };
+    limpio = deCita ? solo(cuerpo, deCita) : {
+      accion, negocio, codigo: cuerpo.codigo,
+      ...(accion === "verificacion" && cuerpo.cancelar === true && { cancelar: true }),
+      // El pago del anticipo de una cita (no de un pedido): solo escrito tal cual.
+      ...(accion !== "seguimiento" && cuerpo.cita === true && { cita: true }),
+    };
+  } else if (accion === "huecos" || accion === "reservar") {
+    // La clave del intento es obligatoria al reservar: de ella sale que reintentar no aparte otra cita.
+    if (accion === "reservar" && (typeof cuerpo.clave !== "string" || !FORMA_CODIGO.test(cuerpo.clave))) return rechazo("CUERPO_INVALIDO");
+    const base = solo(cuerpo, accion === "huecos" ? DE_HUECOS : DE_RESERVA) as Obj;
+    if ("servicios" in base) base.servicios = cada(base.servicios, (s) => solo(s, DE_SERVICIO));
+    if ("cliente" in base) base.cliente = solo(base.cliente, ["nombre", "telefono", "email"]);
+    if ("tarjeta" in base) base.tarjeta = solo(base.tarjeta, ["token", "payment_method_id", "type", "dispositivo"]);
+    limpio = base;
   } else {
     const { items } = cuerpo;
     if (!Array.isArray(items) || items.length < 1 || items.length > MAX_RENGLONES || !items.every(esObj)) return rechazo("CARRITO_INVALIDO");

@@ -7,7 +7,7 @@ import "server-only";
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { headers } from "next/headers";
-import { FORMA_SLUG, FORMA_UUID, menuDe, negocioDe, type Menu, type Negocio } from "../contrato";
+import { FORMA_SLUG, FORMA_UUID, menuDe, negocioDe, reservasDe, type Menu, type Negocio, type Reservas } from "../contrato";
 import { ipDe } from "./ip";
 
 export type RespuestaDeTienda = { estado: number; json: unknown };
@@ -16,14 +16,15 @@ const NO_DISPONIBLE = { error: "SERVICIO_NO_DISPONIBLE" } as const;
 /** No se supo qué pasó del otro lado: en `pedir`, el pedido PUDO haber entrado. */
 const SIN_RESPUESTA = { ...NO_DISPONIBLE, detalle: "SIN_RESPUESTA" } as const;
 /** Lo que la función contesta a propósito (anexo §1.3). Cualquier otro estado es un fallo nuestro. */
-const ESTADOS_CONOCIDOS = new Set([200, 400, 403, 404, 409, 413, 429, 503]);
+// 423: PAGO_EN_PAUSA al reservar (el freno tras un rechazo por riesgo).
+const ESTADOS_CONOCIDOS = new Set([200, 400, 403, 404, 409, 413, 423, 429, 503]);
 const LIMITE_MS = 10_000;
 
 /**
  * Llama a la función con el secreto y la IP real del cliente. Nunca lanza.
  *  · `sesion` (el token de la cookie del negocio; lo pone SOLO la ruta /api/tienda) viaja en
  *    `x-tienda-sesion`. Las lecturas con caché de abajo nunca la llevan: son del negocio, no del visitante.
- *  · 200 y los rechazos conocidos (400, 403, 404, 409, 413, 429, 503) salen con su estado y su JSON.
+ *  · 200 y los rechazos conocidos (400, 403, 404, 409, 413, 423, 429, 503) salen con su estado y su JSON.
  *  · Cualquier otro estado sale como 503 y queda en el registro del servidor SIN el cuerpo (trae
  *    datos del cliente y códigos de seguimiento). Un 401 es el secreto mal puesto.
  *  · Sin secreto o sin URL: 503 sin llamar.
@@ -117,3 +118,15 @@ export async function leerMenu(slug: string, sucursalId: string): Promise<Leido<
   const sucursal = sucursalId.toLowerCase();
   return leer(["tienda-menu", slug, sucursal], { accion: "menu", negocio: slug, sucursal_id: sucursal }, menuDe);
 }
+
+/**
+ * El catálogo de reservas en línea (belleza, entrega 3): sucursales, servicios, colaboradores y reglas.
+ * Con la misma caché de 30 s que el negocio. Los horarios (`huecos`) NUNCA pasan por caché: van por /api/tienda.
+ */
+export async function leerReservas(slug: string): Promise<Leido<Reservas>> {
+  if (!FORMA_SLUG.test(slug)) return { estado: "no-existe" };
+  return leer(["tienda-reservas", slug], { accion: "reservas", negocio: slug }, reservasDe);
+}
+
+/** `leerReservas` una sola vez por petición (layout, página y metadatos). */
+export const reservasDeLaPeticion = cache(leerReservas);

@@ -131,6 +131,22 @@ export function cuposDe(accion: Peticion["accion"], ip: string, negocio: string,
     case "cuenta": case "mis_pedidos": case "salir": return porIp("cuenta", 600, 60, "abrir");
     case "cuenta_guardar": case "cuenta_password": case "direccion_guardar": case "direccion_borrar": case "eliminar_cuenta":
       return porIp("cuenta", 600, 60, "cerrar");
+    // ── Reservas en línea (belleza, entrega 3) ──
+    // El catálogo es una lectura como el menú (y el sitio lo guarda 30 s).
+    case "reservas": return porIp("lee", 600, 120, "abrir");
+    // Los horarios se consultan al mover el día o los servicios, sin caché: 60 por minuto por IP.
+    case "huecos": return porIp("huecos", 60, 60, "abrir");
+    // Reservar crea filas como `pedir`, con los mismos topes en su propia bolsa: 40 por IP y 8 por IP
+    // y negocio antes del antirobot; 60 por negocio solo después de pasarlo. Cierra si el control falla.
+    case "reservar": return {
+      antes: [{ clave: `tienda:reserva:ip:${quien}`, ventanaSeg: 3600, max: 40 },
+              { clave: `tienda:reserva:ip:${quien}:${negocio}`, ventanaSeg: 3600, max: 8 }],
+      despuesDelCaptcha: [{ clave: `tienda:reserva:negocio:${negocio}`, ventanaSeg: 3600, max: 60 }],
+      alFallar: "cerrar",
+    };
+    // La página de la cita: 20 por minuto por IP, una sola bolsa. Leer abre si el control falla; cancelar y mover, no.
+    case "cita": return porIp("cita", 60, 20, "abrir");
+    case "cita_cancelar": case "cita_mover": return porIp("cita", 60, 20, "cerrar");
   }
 }
 

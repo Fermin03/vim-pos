@@ -5,7 +5,10 @@
 //   { accion: "negocio" | "menu" | "colonias" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" | "verificacion" | "intento"
 //           | "registrar" | "entrar" | "salir" | "recuperar_pedir" | "recuperar_aplicar" | "cuenta"
 //           | "cuenta_guardar" | "cuenta_password" | "direccion_guardar" | "direccion_borrar"
-//           | "mis_pedidos" | "eliminar_cuenta", negocio: <slug>, … }
+//           | "mis_pedidos" | "eliminar_cuenta"
+//           | "reservas" | "huecos" | "reservar" | "cita" | "cita_cancelar" | "cita_mover", negocio: <slug>, … }
+//   (Reservas en línea, belleza entrega 3: ver «Reservas en línea» más abajo. `confirmar_pago` y
+//   `verificacion` con `cita: true` son las del anticipo de una cita.)
 //
 // QUIÉN LA LLAMA
 //   Solo el servidor de la tienda (pedidos.vimpos.com.mx). El navegador del cliente, nunca.
@@ -139,10 +142,11 @@ import { secretoInternoValido } from "../_shared/delivery/interno.ts";
 import { type AccionCaptcha, hostnamesPermitidos, verificarTurnstile } from "../_shared/turnstile.ts";
 import { enSegundoPlano, enviarCorreo } from "../_shared/correo.ts";
 import { registrarError } from "../_shared/errores.ts";
-import { leerCuerpo, type Peticion, tieneNul } from "../_shared/tienda/validar.ts";
+import { leerCuerpo, type Peticion, type PeticionDeReservas, tieneNul } from "../_shared/tienda/validar.ts";
 import { codigoDeClave, huellaDe, nuevoCodigo } from "../_shared/tienda/seguimiento.ts";
 import { correoDePedido } from "../_shared/tienda/correo-pedido.ts";
-import { cifrarCodigo } from "../_shared/tienda/enlace.ts";
+import { cifrarCodigo, descifrarCodigo } from "../_shared/tienda/enlace.ts";
+import { citaPublica, huecosPublicos, leerReservada, negocioDeReservas, type NegocioDeReservas, respuestaDeAgenda } from "../_shared/tienda/reservas.ts";
 import { correoDeBienvenida, correoDeRecuperacion, correoYaTienesCuenta } from "../_shared/tienda/correo-cuenta.ts";
 import { CABECERA_SESION, cuentaDe, direccionesPublicas, leerRegistro, leerSesion, pedidosPublicos, type Sesion } from "../_shared/tienda/cuenta.ts";
 import { cotizacionPublica, type Cupos, cuposDe, esTopeDeEntradas, ipDeConfianza, leerNegocio, leerPedido, leerPedidoEnLinea, type Negocio, respuestaDeCaptcha, respuestaDeRpc, yaExistia } from "../_shared/tienda/respuesta.ts";
@@ -154,7 +158,7 @@ import { anotarRechazo, avisoDePagoPausado, claveDeFreno, ipSinPagoEnLinea, pago
 const MAX_CUERPO = 32_768;
 
 type Admin = ReturnType<typeof clienteAdmin>;
-type PeticionDeCuenta = Exclude<Peticion, { accion: "negocio" | "menu" | "colonias" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" | "verificacion" | "intento" }>;
+type PeticionDeCuenta = Exclude<Peticion, { accion: "negocio" | "menu" | "colonias" | "cotizar" | "pedir" | "seguimiento" | "confirmar_pago" | "verificacion" | "intento" | PeticionDeReservas["accion"] }>;
 
 /**
  * El correo que confirma un pedido: después de responder, y pase lo que pase el pedido ya existe.
@@ -292,7 +296,7 @@ async function pausarPagoEnLinea(admin: Admin, d: { p_tenant: string; sucursal: 
  * se dice, el freno tras un rechazo por riesgo y lo que cambia en modo de prueba lo decide
  * `respuestaDeRechazo` (rechazos.ts, que sí se prueba); aquí solo se pausa al negocio si lo pide.
  */
-async function rechazoDePago(admin: Admin, d: { negocio: Negocio; ip: string; slug: string; motivo: MotivoDeRechazo; /** La clave de freno de ese cliente, o null. */ frenoClave: string | null }): Promise<Response> {
+async function rechazoDePago(admin: Admin, d: { negocio: Pick<Negocio, "tenantId" | "nombre" | "dePrueba">; ip: string; slug: string; motivo: MotivoDeRechazo; /** La clave de freno de ese cliente, o null. */ frenoClave: string | null }): Promise<Response> {
   const p_tenant = d.negocio.tenantId;
   const r = await respuestaDeRechazo(admin, { slug: d.slug, ip: d.ip, motivo: d.motivo, frenoClave: d.frenoClave, dePrueba: d.negocio.dePrueba });
   if (r.pausar) await pausarPagoEnLinea(admin, { p_tenant, sucursal: null, negocio: d.negocio.nombre, slug: d.slug, por: "RECHAZOS" });
@@ -451,6 +455,303 @@ async function cuentas(p: PeticionDeCuenta, c: { admin: Admin; negocio: Negocio;
   }
 }
 
+// ── El pago en línea visto desde la página (de un pedido o de una cita) ──────────────────────────
+
+type PagoPorConfirmar = { id: string; estado: string; conciliado_at: string | null };
+
+/**
+ * `confirmar_pago`: le pregunta a Mercado Pago por un pago que no se ha resuelto. A lo sumo una
+ * consulta cada 10 s por pago, por mucho que insista la página; ya vencido (se espera la segunda
+ * conciliación, que tarda una hora), cada 5 minutos. null = siguió (preguntara o no).
+ */
+async function consultarSiHaceFalta(admin: Admin, pago: PagoPorConfirmar): Promise<Response | null> {
+  const sinResolver = pago.estado === "CREADO" || (pago.estado === "VENCIDO" && !pago.conciliado_at);
+  if (!sinResolver) return null;
+  const turno = await admin.rpc("tienda_pago_tomar_consulta", { p_pago: pago.id, p_segundos: pago.estado === "VENCIDO" ? 300 : 10 });
+  if (turno.error) return rechazo("tienda_pago_tomar_consulta", turno.error);
+  // Si Mercado Pago no contesta no es un error para el cliente: ve su pedido como está y la página reintenta.
+  if (turno.data === true) await confirmarPago(depsDePagos(admin, "tienda"), pago.id);
+  return null;
+}
+
+type PagoEnVuelo = { id: string; estado: string; detalle: string | null; verificacion_at: string | null; freno_clave: string | null; conciliado_at: string | null };
+
+/**
+ * El pago (no `extra`) de un pedido o de una cita. Una cita puede tener varios —uno por intento
+ * (0225)—, y el vivo siempre es el último que nació: se toma el más reciente.
+ */
+async function pagoEnVuelo(admin: Admin, columna: "pedido_id" | "cita_id", id: string): Promise<PagoEnVuelo | null> {
+  const g = await admin.from("tienda_pagos").select("id, estado, detalle, verificacion_at, freno_clave, conciliado_at")
+    .eq(columna, id).eq("extra", false).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  if (g.error) throw new Error(g.error.message);
+  return g.data as PagoEnVuelo | null;
+}
+
+/**
+ * `verificacion`: cómo va el reto del banco (3D Secure) de ese pago. Es el mismo camino que el aviso
+ * y que `confirmar_pago` (pago-flujo.ts): la verdad sale de consultar la orden con el token del
+ * negocio. `alPagar` corre cuando el pago quedó aprobado (el correo de un pedido; una cita no: su
+ * confirmación sale de la cola de la agenda, 0226).
+ */
+async function verificarPago(admin: Admin, d: {
+  negocio: Pick<Negocio, "tenantId" | "nombre" | "dePrueba">; ip: string; slug: string; cancelar: boolean;
+  pago: PagoEnVuelo; leerPago: () => Promise<PagoEnVuelo | null>; alPagar?: (pagoId: string) => Promise<void>;
+}): Promise<Response> {
+  let pago = d.pago;
+  const reto: { url: string | null } = { url: null };
+  const deps = depsDePagos(admin, "tienda");
+  let consulta: Awaited<ReturnType<typeof confirmarPago>> | null = null;
+  if (pago.estado === "CREADO") {
+    // A lo sumo una consulta a Mercado Pago cada 3 s por pago (la pantalla pregunta cada 10 s, y en
+    // cuanto la página del reto avisa que terminó). Cancelar no espera turno: lo pidió el cliente, una vez.
+    const turno = d.cancelar ? { data: true, error: null } : await admin.rpc("tienda_pago_tomar_consulta", { p_pago: pago.id, p_segundos: 3 });
+    if (turno.error) return rechazo("tienda_pago_tomar_consulta", turno.error);
+    if (turno.data === true) {
+      // Con `cancelar`, dejar el reto lo decide ESTA consulta, con la orden a la vista
+      // (pago-flujo.ts): se abandona solo si sigue esperando el reto. Si el cliente ya lo había
+      // contestado está cobrada (se le da su pedido) o cobrándose (`processing`, `in_review`: no se
+      // deja; lo dirá la página del pedido). Si Mercado Pago no contesta, tampoco se deja a ciegas.
+      consulta = await confirmarPago(deps, pago.id, undefined, false, { cancelar: d.cancelar, alReto: (url) => { reto.url = url; } });
+      pago = await d.leerPago() ?? pago;
+    }
+  }
+  if (pago.estado === "APROBADO") {
+    await d.alPagar?.(pago.id);
+    return json({ pago: { estado: "PAGADO" } });
+  }
+  if (pago.estado === "RECHAZADO") {
+    // Mercado Pago dijo que no (o la orden quedó cancelada): es el mismo no que un rechazo directo.
+    // El pedido se descarta (de una cita, solo el pago: la cita sigue apartada) y el cliente puede
+    // pagar otra vez. Si ya no se puede descartar es que algo lo movió: que lo diga la página.
+    const motivo = motivoDeRechazo(pago.detalle);
+    if (!await deps.db.descartar(pago.id)) return json({ pago: { estado: "POR_CONFIRMAR" } });
+    return rechazoDePago(admin, { negocio: d.negocio, ip: d.ip, slug: d.slug, motivo, frenoClave: pago.freno_clave });
+  }
+  // El reto se dejó (lo canceló el cliente, o pasó el plazo): ya está cerrado sin pago y se puede
+  // pagar otra vez. No se descarta ni cuenta como tarjeta rechazada.
+  if (pago.estado === "ABANDONADO") return rechazoDePago(admin, { negocio: d.negocio, ip: d.ip, slug: d.slug, motivo: "SIN_VERIFICAR", frenoClave: pago.freno_clave });
+  // Sigue esperando el reto: lo dijo Mercado Pago ahora, o (sin turno para preguntar, o sin
+  // respuesta) es lo último que se supo. Cualquier otra cosa ya no es de esta pantalla.
+  const sigue = pago.estado === "CREADO" && (consulta?.ok ? consulta.enVerificacion : consulta === null || consulta.motivo === "MP_NO_RESPONDE" || consulta.motivo === "SIN_TOKEN" ? pago.verificacion_at !== null : false);
+  return json({ pago: sigue ? { estado: "VERIFICACION", ...(reto.url && { url: reto.url }) } : { estado: "POR_CONFIRMAR" } });
+}
+
+// ── Reservas en línea (belleza, entrega 3; 0224–0226) ───────────────────────────────────────────
+//
+// El negocio sale de `reservas_negocio` (no de `tienda_negocio`): existe, opera y tiene el módulo
+// `reservas`. El CÓDIGO de una cita (22 caracteres) lo genera la base en `agenda_reservar_en_linea`
+// y guarda solo su huella (SHA-256); en claro sale una vez, en la respuesta de `reservar`, y aquí se
+// cifra para el correo (`agenda_enlace_guardar`, como `tienda_enlace_guardar` en `pedir`). Un
+// reintento con la misma `clave` lo recupera de ese cifrado: quien tiene la clave (128 bits del
+// navegador) es quien hizo la reserva, igual que en `intento`. El código no va a ningún log; en las
+// demás acciones solo se usa para sacar su huella.
+//
+// El anticipo se cobra como un pedido en línea (`cobrarPago`, mismas respuestas: PAGADO, VERIFICACION,
+// POR_CONFIRMAR, PAGO_RECHAZADO…). Un rechazo deja la cita apartada mientras dure `pago_hasta`:
+// reservar otra vez con la MISMA clave trae un pago nuevo. Ningún correo de cita sale de aquí: los
+// manda la cola de la agenda (0226).
+
+type PeticionDeCita = PeticionDeReservas | Extract<Peticion, { accion: "confirmar_pago" | "verificacion" }>;
+
+const CITA_NO_ENCONTRADA = (): Response => json({ error: "CITA_NO_ENCONTRADA" }, 404);
+
+/** Rechazo de una RPC de la agenda (respuestaDeAgenda): mensaje para la clienta o el 503 de siempre. */
+function rechazoDeAgenda(rpc: string, error: { message: string }): Response {
+  const r = respuestaDeAgenda(error.message);
+  if (r.status === 503) registrarError("tienda", rpc, error);
+  return json(r.body, r.status);
+}
+
+/** ¿El negocio cobra en el ambiente de prueba de Mercado Pago (0178)? Solo un `true` de la base cuenta. */
+async function pagoDePruebaDe(admin: Admin, p_tenant: string): Promise<boolean> {
+  const r = await admin.from("tienda_config").select("pago_de_prueba").eq("tenant_id", p_tenant).maybeSingle();
+  return (r.data as { pago_de_prueba?: boolean } | null)?.pago_de_prueba === true;
+}
+
+/** La cita de ese enlace para el sitio (con su reembolso), o null si no es de este negocio. */
+async function citaParaSitio(admin: Admin, p_tenant: string, p_enlace_hash: string, yaLeida?: unknown): Promise<Record<string, unknown> | null> {
+  let datos = yaLeida;
+  if (datos === undefined) {
+    const r = await admin.rpc("agenda_cita_publica", { p_tenant, p_enlace_hash });
+    if (r.error) throw new Error(r.error.message);
+    datos = r.data;
+  }
+  if (datos === null) return null;
+  const pagos = await admin.from("citas").select("tienda_pagos(estado)").eq("tenant_id", p_tenant).eq("enlace_hash", p_enlace_hash).maybeSingle();
+  if (pagos.error) throw new Error(pagos.error.message);
+  const estados = ((pagos.data as { tienda_pagos?: { estado: string }[] } | null)?.tienda_pagos ?? []).map((g) => g.estado);
+  const cita = citaPublica(datos, estados);
+  if (!cita) registrarError("tienda", "RPC_FORMA_INESPERADA", "agenda_cita_publica");
+  return cita;
+}
+
+/** El id de la cita de ese enlace en este negocio, o null. */
+async function citaDelEnlace(admin: Admin, p_tenant: string, enlace_hash: string): Promise<string | null> {
+  const r = await admin.from("citas").select("id").eq("tenant_id", p_tenant).eq("enlace_hash", enlace_hash).maybeSingle();
+  if (r.error) throw new Error(r.error.message);
+  return (r.data as { id: string } | null)?.id ?? null;
+}
+
+/**
+ * El código de una cita que ya existía (reintento con la misma clave), sacado de su enlace cifrado.
+ * null si no se guardó o no se puede descifrar: la clienta lo tiene en su correo.
+ */
+async function codigoGuardado(admin: Admin, secreto: string, p_tenant: string, citaId: string): Promise<string | null> {
+  const c = await admin.from("citas").select("enlace_hash").eq("id", citaId).eq("tenant_id", p_tenant).maybeSingle();
+  const hash = (c.data as { enlace_hash: string | null } | null)?.enlace_hash;
+  if (c.error || !hash) return null;
+  const e = await admin.from("agenda_enlaces").select("cifrado").eq("cita_id", citaId).eq("tenant_id", p_tenant).maybeSingle();
+  if (e.error) return null;
+  return descifrarCodigo(secreto, (e.data as { cifrado: string | null } | null)?.cifrado, hash);
+}
+
+/** El catálogo con la llave pública de Mercado Pago de cada sucursal que cobra (para leer la tarjeta). */
+async function catalogoDeReservas(admin: Admin, negocio: NegocioDeReservas): Promise<Response> {
+  const p_tenant = negocio.tenantId;
+  const sucursales = negocio.publico.sucursales as Record<string, unknown>[];
+  const llaves: (string | null)[] = [];
+  for (const s of sucursales) {
+    if (s.pago_en_linea !== true) { llaves.push(null); continue; }
+    const cx = await admin.rpc("tienda_conexion_cobro", { p_tenant, p_sucursal: s.id });
+    if (cx.error) return rechazo("tienda_conexion_cobro", cx.error);
+    const k = typeof cx.data === "string" ? await admin.from("tienda_conexiones").select("public_key").eq("id", cx.data).maybeSingle() : null;
+    if (k?.error) return rechazo("tienda_conexiones", k.error);
+    const llave = (k?.data as { public_key: string | null } | null)?.public_key ?? null;
+    llaves.push(llave);
+  }
+  return json({
+    ...negocio.publico,
+    pago_de_prueba: await pagoDePruebaDe(admin, p_tenant),
+    sucursales: sucursales.map((s, i) => ({ ...s, public_key: llaves[i] })),
+  });
+}
+
+async function reservas(p: PeticionDeCita, c: { admin: Admin; negocio: NegocioDeReservas; ip: string; secreto: string; cupos: Cupos }): Promise<Response> {
+  const { admin, negocio, ip, secreto } = c;
+  const p_tenant = negocio.tenantId;   // solo para las RPC: no va en ninguna respuesta
+
+  if (p.accion === "reservas") return catalogoDeReservas(admin, negocio);
+
+  // ── La cita de un enlace: ver, cancelar, cambiar de hora y su pago ──
+  if (p.accion === "cita" || p.accion === "cita_cancelar" || p.accion === "cita_mover" || p.accion === "confirmar_pago" || p.accion === "verificacion") {
+    const p_enlace_hash = await huellaDe(p.codigo);
+    if (p.accion === "cita_cancelar" || p.accion === "cita_mover") {
+      // Las dos devuelven la cita ya actualizada. FUERA_DE_PLAZO: «Para cambios, comunícate con el negocio».
+      const r = p.accion === "cita_cancelar"
+        ? await admin.rpc("agenda_cancelar_en_linea", { p_tenant, p_enlace_hash })
+        : await admin.rpc("agenda_mover_en_linea", { p_tenant, p_enlace_hash, p_inicia: p.inicia });
+      if (r.error) return rechazoDeAgenda(p.accion === "cita_cancelar" ? "agenda_cancelar_en_linea" : "agenda_mover_en_linea", r.error);
+      const cita = await citaParaSitio(admin, p_tenant, p_enlace_hash, r.data);
+      return cita ? json(cita) : CITA_NO_ENCONTRADA();
+    }
+    if (p.accion === "cita") {
+      const cita = await citaParaSitio(admin, p_tenant, p_enlace_hash);
+      return cita ? json(cita) : CITA_NO_ENCONTRADA();
+    }
+    const citaId = await citaDelEnlace(admin, p_tenant, p_enlace_hash);
+    if (!citaId) return CITA_NO_ENCONTRADA();
+    const leerPago = () => pagoEnVuelo(admin, "cita_id", citaId);
+    const pago = await leerPago();
+    if (p.accion === "verificacion") {
+      if (!pago) return json({ pago: { estado: "POR_CONFIRMAR" } });
+      return verificarPago(admin, { negocio: { ...negocio, dePrueba: await pagoDePruebaDe(admin, p_tenant) }, ip, slug: p.negocio, cancelar: p.cancelar, pago, leerPago });
+    }
+    // confirmar_pago: pregunta si hace falta y contesta la cita, como el de un pedido contesta su seguimiento.
+    if (pago) {
+      const no = await consultarSiHaceFalta(admin, pago);
+      if (no) return no;
+    }
+    const cita = await citaParaSitio(admin, p_tenant, p_enlace_hash);
+    return cita ? json(cita) : CITA_NO_ENCONTRADA();
+  }
+
+  // huecos y reservar: la sucursal tiene que ser una de las que tienen oferta.
+  if (!negocio.sucursales.includes(p.sucursal_id)) return json({ error: "TIENDA_NO_DISPONIBLE" }, 404);
+
+  if (p.accion === "huecos") {
+    const r = await admin.rpc("agenda_huecos", {
+      p_tenant, p_sucursal: p.sucursal_id, p_dia: p.dia, p_servicios: p.servicios,
+      // Al cambiar la hora de una cita, sus propios tramos no tapan horarios. La base resuelve la huella
+      // dentro de este negocio; una ajena no excluye nada.
+      ...(p.codigo && { p_excluir_enlace_hash: await huellaDe(p.codigo) }),
+    });
+    if (r.error) return rechazoDeAgenda("agenda_huecos", r.error);
+    const huecos = huecosPublicos(r.data);
+    return huecos ? json({ dia: p.dia, huecos }) : inesperada("agenda_huecos");
+  }
+
+  // ── reservar ── Orden, como `pedir`: cupo por IP (arriba) → negocio y sucursal → antirobot → cupo del negocio → alta → cobro.
+  const dePrueba = await pagoDePruebaDe(admin, p_tenant);
+  // Una IP que ya juntó sus tarjetas rechazadas de la hora no intenta otro pago (antes del antirobot).
+  if (p.tarjeta && !dePrueba && await ipSinPagoEnLinea(admin, ip, p.negocio)) return json({ error: "DEMASIADOS_INTENTOS" }, 429);
+  const no = await antirobot(p.captcha, "tienda_reserva", ip);
+  if (no) return no;
+  // En modo de prueba no se gasta el cupo del negocio: ahí se prueba el pago una y otra vez.
+  const cupoNegocio = dePrueba ? { permitido: true, motivo: "OK" as const } : await consumirCupos(admin, c.cupos.despuesDelCaptcha, c.cupos.alFallar);
+  if (!cupoNegocio.permitido) {
+    if (cupoNegocio.motivo === "AGOTADO") registrarError("tienda", "CUPO_NEGOCIO_AGOTADO", p.negocio);
+    return sinCupo(cupoNegocio);
+  }
+
+  // El freno tras un rechazo por riesgo (0178): la base lo revisa al crear el pago (PAGO_EN_PAUSA → 423)
+  // y lo guarda en él para frenar con un rechazo que llegue tarde.
+  const frenoClave = await claveDeFreno(secreto, p_tenant, p.cliente.telefono, ip);
+  const alta = await admin.rpc("agenda_reservar_en_linea", {
+    p_tenant,
+    p: {
+      clave: p.clave, sucursal_id: p.sucursal_id, inicia: p.inicia, servicios: p.servicios,
+      cliente: p.cliente, nota: p.nota, ...(frenoClave && { freno_clave: frenoClave }),
+    },
+  });
+  if (alta.error) return rechazoDeAgenda("agenda_reservar_en_linea", alta.error);
+  const hecha = leerReservada(alta.data);
+  if (!hecha) return inesperada("agenda_reservar_en_linea");
+
+  // El código: el de esta respuesta (primera vez) o, en un reintento, el del enlace cifrado.
+  let codigo = hecha.codigo;
+  if (codigo) {
+    // Para que los correos de la cita lleven el enlace: el código, cifrado con una llave que la base
+    // no tiene. Si falla, la cita sigue y sus correos salen sin botón. Antes de cobrar: un reintento lo necesita.
+    try {
+      const h = await huellaDe(codigo);
+      const g = await admin.rpc("agenda_enlace_guardar", { p_tenant, p_enlace_hash: h, p_cifrado: await cifrarCodigo(secreto, codigo, h) });
+      if (g.error) registrarError("tienda", "ENLACE_DE_CORREO", g.error);
+    } catch (e) { registrarError("tienda", "ENLACE_DE_CORREO", e); }
+  } else {
+    codigo = await codigoGuardado(admin, secreto, p_tenant, hecha.citaId);
+  }
+  const cita = codigo ? await citaParaSitio(admin, p_tenant, await huellaDe(codigo)) : null;
+  const base = { codigo, cita, anticipo_mxn: hecha.anticipo_mxn, total_a_pagar_mxn: hecha.total_a_pagar_mxn };
+  // Sin pago (no hay anticipo, o la cita ya no espera uno): listo.
+  if (!hecha.pagoId) return json({ ...base, pago: null });
+  // Con anticipo y sin tarjeta en esta petición: la cita queda apartada esperando el pago (15 min).
+  if (!p.tarjeta) return json({ ...base, pago: { estado: "POR_PAGAR" } });
+
+  const cobro = await cobrarPago(depsDePagos(admin, "tienda"), {
+    pagoId: hecha.pagoId, email: p.cliente.email, tarjeta: p.tarjeta,
+    detalle: {
+      descripcion: `Anticipo de cita en ${negocio.nombre}`, renglones: [], envio: null, propina: null,
+      pagador: { nombre: p.cliente.nombre, telefono: p.cliente.telefono, direccion: null },
+    },
+  });
+  const deNegocio = { tenantId: p_tenant, nombre: negocio.nombre, dePrueba };
+  if (cobro.tipo === "RECHAZADO") return rechazoDePago(admin, { negocio: deNegocio, ip, slug: p.negocio, motivo: cobro.motivo, frenoClave });
+  if (cobro.tipo === "NO_PROCESADO") {
+    if (cobro.contarIp && !dePrueba) await anotarRechazo(admin, ip, p.negocio, "OTRO", true);
+    return json({ error: "PAGO_NO_PROCESADO" }, 409);
+  }
+  if (cobro.tipo === "NO_DISPONIBLE") {
+    if (cobro.sinPermiso && dePrueba) registrarError("tienda", "PAGO_DE_PRUEBA_SIN_PERMISO", p.negocio);
+    else if (cobro.sinPermiso) await pausarPagoEnLinea(admin, { p_tenant, sucursal: p.sucursal_id, negocio: negocio.nombre, slug: p.negocio, por: "SIN_PERMISO" });
+    return json({ error: "PAGO_NO_DISPONIBLE" }, 409);
+  }
+  if (cobro.tipo === "POR_CONFIRMAR") return json({ ...base, pago: { estado: "POR_CONFIRMAR" } });
+  if (cobro.tipo === "VERIFICACION") return json({ ...base, pago: { estado: "VERIFICACION", url: cobro.url } });
+  // Aprobado: la cita ya no espera el pago; su confirmación sale por la cola de la agenda (0226).
+  const pagada = codigo ? await citaParaSitio(admin, p_tenant, await huellaDe(codigo)) : null;
+  return json({ ...base, cita: pagada ?? cita, pago: { estado: "PAGADO" } });
+}
+
 async function atender(req: Request): Promise<Response> {
   // ── 1) Método, secreto y cuerpo ─────────────────────────────────────────────────────────────
   if (req.method !== "POST") return json({ error: "METODO_NO_PERMITIDO" }, 405);
@@ -479,7 +780,7 @@ async function atender(req: Request): Promise<Response> {
   // La sesión solo se lee de su cabecera (después del secreto: la pone nuestro servidor), nunca del cuerpo.
   const sesion = leerSesion(req.headers.get(CABECERA_SESION));
   // Sin IP, todos los que le piden a ese restaurante comparten un contador de 8 por hora: que quede en el log.
-  if (p.accion === "pedir" && ip === "desconocida") registrarError("tienda", "IP_CLIENTE_DESCONOCIDA", p.negocio);
+  if ((p.accion === "pedir" || p.accion === "reservar") && ip === "desconocida") registrarError("tienda", "IP_CLIENTE_DESCONOCIDA", p.negocio);
   // El correo no va en claro a la tabla de cupos: su huella, atada al negocio.
   const conCorreo = p.accion === "registrar" || p.accion === "recuperar_pedir";
   // Un pedido que se paga en línea gasta de sus propias bolsas: sus intentos rechazados no le quitan
@@ -497,7 +798,16 @@ async function atender(req: Request): Promise<Response> {
   }
 
   // ── 3) El negocio, por su slug ──────────────────────────────────────────────────────────────
+  // Las reservas (y el pago de una cita) lo resuelven con `reservas_negocio`; lo demás, con la tienda.
   // No existe, está de baja o bloqueado, o no tiene el módulo: la misma respuesta en los tres.
+  if (p.accion === "reservas" || p.accion === "huecos" || p.accion === "reservar" || p.accion === "cita" || p.accion === "cita_cancelar" || p.accion === "cita_mover"
+      || ((p.accion === "confirmar_pago" || p.accion === "verificacion") && p.cita === true)) {
+    const r = await admin.rpc("reservas_negocio", { p_slug: p.negocio });
+    if (r.error) return rechazo("reservas_negocio", r.error);
+    const negocio = negocioDeReservas(r.data);
+    if (!negocio) return json({ error: "TIENDA_NO_DISPONIBLE" }, 404);
+    return reservas(p, { admin, negocio, ip, secreto, cupos });
+  }
   const neg = await admin.rpc("tienda_negocio", { p_slug: p.negocio });
   if (neg.error) return rechazo("tienda_negocio", neg.error);
   const negocio = leerNegocio(neg.data);
@@ -551,17 +861,10 @@ async function atender(req: Request): Promise<Response> {
       const pg = await admin.from("tienda_pagos").select("id, estado, conciliado_at")
         .eq("pedido_id", pedido.id).eq("extra", false).maybeSingle();
       if (pg.error) return rechazo("confirmar_pago", pg.error);
-      const pago = pg.data as { id: string; estado: string; conciliado_at: string | null } | null;
+      const pago = pg.data as PagoPorConfirmar | null;
       if (pago) {
-        const sinResolver = pago.estado === "CREADO" || (pago.estado === "VENCIDO" && !pago.conciliado_at);
-        // A lo sumo una consulta a Mercado Pago cada 10 s por pago, por mucho que insista la página.
-        // Ya vencido (se espera la segunda conciliación, que tarda una hora), cada 5 minutos.
-        if (sinResolver) {
-          const turno = await admin.rpc("tienda_pago_tomar_consulta", { p_pago: pago.id, p_segundos: pago.estado === "VENCIDO" ? 300 : 10 });
-          if (turno.error) return rechazo("tienda_pago_tomar_consulta", turno.error);
-          // Si Mercado Pago no contesta no es un error para el cliente: ve su pedido como está y la página reintenta.
-          if (turno.data === true) await confirmarPago(depsDePagos(admin, "tienda"), pago.id);
-        }
+        const no = await consultarSiHaceFalta(admin, pago);
+        if (no) return no;
         // El correo de un pedido cuyo cobro se confirmó después (por el aviso o el barrido) sale aquí:
         // es quien tiene el código del enlace. Una sola vez; si ya salió al cobrar, no se repite.
         await correoDePagado(admin, pago.id, { p_tenant, p_seguimiento_hash, email: pedido.cliente_email, negocio: negocio.nombre, slug: p.negocio, codigo: p.codigo });
@@ -584,53 +887,16 @@ async function atender(req: Request): Promise<Response> {
     if (ped.error) return rechazo("verificacion", ped.error);
     const pedido = ped.data as { id: string; cliente_email: string | null; pago_al_recibir: string | null } | null;
     if (!pedido) return json({ error: "PEDIDO_NO_ENCONTRADO" }, 404);
-    const leerPago = async () => {
-      // `freno_clave`: si el pago acaba rechazado por riesgo, es la clave de a quién se frena (la del
-      // cliente que hizo ESE pedido: su teléfono y la IP con la que pidió), no la de quien pregunta ahora.
-      const g = await admin.from("tienda_pagos").select("id, estado, detalle, verificacion_at, orden_id_externo, freno_clave").eq("pedido_id", pedido.id).eq("extra", false).maybeSingle();
-      if (g.error) throw new Error(g.error.message);
-      return g.data as { id: string; estado: string; detalle: string | null; verificacion_at: string | null; orden_id_externo: string | null; freno_clave: string | null } | null;
-    };
-    let pago = pedido.pago_al_recibir === "EN_LINEA" ? await leerPago() : null;
+    // `freno_clave`: si el pago acaba rechazado por riesgo, es la clave de a quién se frena (la del
+    // cliente que hizo ESE pedido: su teléfono y la IP con la que pidió), no la de quien pregunta ahora.
+    const leerPago = () => pagoEnVuelo(admin, "pedido_id", pedido.id);
+    const pago = pedido.pago_al_recibir === "EN_LINEA" ? await leerPago() : null;
     // Sin pago en línea no hay nada que verificar: la página del pedido dice cómo va.
     if (!pago) return json({ pago: { estado: "POR_CONFIRMAR" } });
-
-    const reto: { url: string | null } = { url: null };
-    const deps = depsDePagos(admin, "tienda");
-    let consulta: Awaited<ReturnType<typeof confirmarPago>> | null = null;
-    if (pago.estado === "CREADO") {
-      // A lo sumo una consulta a Mercado Pago cada 3 s por pago (la pantalla pregunta cada 10 s, y en
-      // cuanto la página del reto avisa que terminó). Cancelar no espera turno: lo pidió el cliente, una vez.
-      const turno = p.cancelar ? { data: true, error: null } : await admin.rpc("tienda_pago_tomar_consulta", { p_pago: pago.id, p_segundos: 3 });
-      if (turno.error) return rechazo("tienda_pago_tomar_consulta", turno.error);
-      if (turno.data === true) {
-        // Con `cancelar`, dejar el reto lo decide ESTA consulta, con la orden a la vista
-        // (pago-flujo.ts): se abandona solo si sigue esperando el reto. Si el cliente ya lo había
-        // contestado está cobrada (se le da su pedido) o cobrándose (`processing`, `in_review`: no se
-        // deja; lo dirá la página del pedido). Si Mercado Pago no contesta, tampoco se deja a ciegas.
-        consulta = await confirmarPago(deps, pago.id, undefined, false, { cancelar: p.cancelar, alReto: (url) => { reto.url = url; } });
-        pago = await leerPago() ?? pago;
-      }
-    }
-    if (pago.estado === "APROBADO") {
-      await correoDePagado(admin, pago.id, { p_tenant, p_seguimiento_hash, email: pedido.cliente_email, negocio: negocio.nombre, slug: p.negocio, codigo: p.codigo });
-      return json({ pago: { estado: "PAGADO" } });
-    }
-    if (pago.estado === "RECHAZADO") {
-      // Mercado Pago dijo que no (o la orden quedó cancelada): es el mismo no que un rechazo directo.
-      // El pedido se descarta y el cliente puede pagar otra vez sin perder su carrito. Si ya no se
-      // puede descartar es que algo lo movió: que lo diga la página del pedido.
-      const motivo = motivoDeRechazo(pago.detalle);
-      if (!await deps.db.descartar(pago.id)) return json({ pago: { estado: "POR_CONFIRMAR" } });
-      return rechazoDePago(admin, { negocio, ip, slug: p.negocio, motivo, frenoClave: pago.freno_clave });
-    }
-    // El reto se dejó (lo canceló el cliente, o pasó el plazo): el pedido ya está cerrado sin pago y
-    // se puede pagar otra vez. No se descarta ni cuenta como tarjeta rechazada.
-    if (pago.estado === "ABANDONADO") return rechazoDePago(admin, { negocio, ip, slug: p.negocio, motivo: "SIN_VERIFICAR", frenoClave: pago.freno_clave });
-    // Sigue esperando el reto: lo dijo Mercado Pago ahora, o (sin turno para preguntar, o sin
-    // respuesta) es lo último que se supo. Cualquier otra cosa ya no es de esta pantalla.
-    const sigue = pago.estado === "CREADO" && (consulta?.ok ? consulta.enVerificacion : consulta === null || consulta.motivo === "MP_NO_RESPONDE" || consulta.motivo === "SIN_TOKEN" ? pago.verificacion_at !== null : false);
-    return json({ pago: sigue ? { estado: "VERIFICACION", ...(reto.url && { url: reto.url }) } : { estado: "POR_CONFIRMAR" } });
+    return verificarPago(admin, {
+      negocio, ip, slug: p.negocio, cancelar: p.cancelar, pago, leerPago,
+      alPagar: (pagoId) => correoDePagado(admin, pagoId, { p_tenant, p_seguimiento_hash, email: pedido.cliente_email, negocio: negocio.nombre, slug: p.negocio, codigo: p.codigo }),
+    });
   }
 
   if (p.accion !== "menu" && p.accion !== "colonias" && p.accion !== "cotizar" && p.accion !== "pedir") return cuentas(p, { admin, negocio, ip, sesion, cupos });
