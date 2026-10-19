@@ -41,7 +41,7 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="/assets/css/vim.css?v=26">
+<link rel="stylesheet" href="/assets/css/vim.css?v=28">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
@@ -174,8 +174,9 @@
         </div>
       </nav>
       <div class="nav-acciones">
-        <a class="btn btn-fantasma nav-prueba" href="https://admin.vimpos.com.mx/registro">Pruébalo 30 días gratis</a>
-        <a class="btn btn-primario" href="/demo">Pide una demo</a>
+        <a class="nav-enlace nav-solo-pc" href="https://admin.vimpos.com.mx/">Iniciar sesión</a>
+        <a class="btn btn-fantasma nav-solo-pc nav-ventas" href="/contacto">Contactar ventas</a>
+        <a class="btn btn-primario nav-solo-pc" href="https://admin.vimpos.com.mx/registro">Comenzar</a>
         <button class="nav-hamburguesa" data-menu-boton type="button"
                 aria-expanded="false" aria-controls="menu-movil" aria-label="Abrir menú">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -204,11 +205,8 @@
             <li><a href="/facturacion-cfdi">Facturación</a></li>
             <li><a href="/precios">Precios</a></li>
             <li><button type="button" data-ir="m-recursos">Recursos<svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+            <li><a href="https://admin.vimpos.com.mx/">Iniciar sesión</a></li>
           </ul>
-          <div class="nav-movil-acciones">
-            <a class="btn btn-primario" href="/demo">Pide una demo</a>
-            <a class="btn btn-fantasma" href="https://admin.vimpos.com.mx/registro">Pruébalo 30 días gratis</a>
-          </div>
         </div>
         <div class="nav-pantalla" data-pantalla="m-negocios" role="group" aria-label="Tipos de negocio">
           <button class="nav-volver" type="button" data-volver aria-label="Volver: Tipos de negocio"><svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Tipos de negocio</button>
@@ -282,6 +280,10 @@
         </div>
       </div>
     </nav>
+    <div class="nav-movil-pie">
+      <a class="btn btn-fantasma" href="/contacto">Contactar ventas</a>
+      <a class="btn btn-primario" href="https://admin.vimpos.com.mx/registro">Comenzar</a>
+    </div>
   </div>
 
 <main id="contenido">

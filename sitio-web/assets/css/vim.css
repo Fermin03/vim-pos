@@ -420,11 +420,12 @@ a { color: var(--ink); text-underline-offset: 3px; }
 
 .nav-acciones { display: flex; align-items: center; gap: var(--sp-3); }
 
-/* La prueba gratis es la acción SECUNDARIA: fantasma, a la izquierda de la
-   demo, y solo cuando hay ancho de sobra. En el teléfono no cabe junto al logo
-   y la hamburguesa, así que vive en el cajón del menú. */
-.nav-prueba { display: none; }
-@media (min-width: 1120px) { .nav-prueba { display: inline-flex; } }   /* con «Tipos de negocio» no cabe antes */
+/* En el teléfono y la tableta la barra solo lleva el logo y la hamburguesa:
+   las acciones viven en el pie del cajón. En la PC, «Contactar ventas» espera a
+   que haya ancho de sobra. */
+.nav-solo-pc { display: none; }
+@media (min-width: 900px) { .nav-solo-pc { display: inline-flex; } }
+@media (min-width: 900px) and (max-width: 1119px) { .nav-ventas { display: none; } }
 
 .nav-hamburguesa {
   display: inline-flex;
@@ -531,7 +532,17 @@ body[data-menu-abierto="true"]::before {
 }
 .nav-movil :is(.nav-lista a, .nav-lista button, .nav-volver) { font-size: var(--t-18); padding-block: var(--sp-3); }
 .nav-movil .nav-lista li { border-bottom: 1px solid var(--line); }
-.nav-movil-acciones { display: grid; gap: var(--sp-3); margin-top: var(--sp-6); }
+/* El pie del cajón se queda abajo en todas las pantallas: Contactar ventas a
+   la izquierda, Comenzar a la derecha. */
+.nav-movil { display: flex; flex-direction: column; }
+.nav-movil > nav { flex: 1; }
+.nav-movil-pie {
+  position: sticky; bottom: 0;
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5) calc(var(--sp-4) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
 
 /* El botón de cerrar vive dentro del cajón: con el menú abierto, la
    hamburguesa del encabezado queda debajo del velo y no se puede tocar. */

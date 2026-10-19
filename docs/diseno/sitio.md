@@ -51,8 +51,11 @@ letra en todo el menú, la de la barra (Inter Tight 500), sin descripciones ni t
 - **Teléfono y tableta (menos de 900 px):** el cajón es de pantalla completa y todo mide igual
   (18 px). La primera pantalla es el menú entero con las dos acciones abajo.
 
-Con «Tipos de negocio» la barra ya no cabe junto a «Pruébalo 30 días gratis» antes de 1120 px, por
-eso ese botón aparece desde ahí.
+**Acciones (19 oct 2026):** se quitaron «Pide una demo» y «Pruébalo 30 días gratis» del menú y
+de la barra. En la PC la barra lleva «Iniciar sesión» (admin), «Contactar ventas» (/contacto, solo
+desde 1120 px porque antes no cabe) y «Comenzar» (registro). En teléfono y tableta la barra solo
+tiene el logo y la hamburguesa; el cajón termina con «Iniciar sesión» y un pie fijo con «Contactar
+ventas» a la izquierda y «Comenzar» a la derecha.
 
 El menú vive duplicado en cada HTML (no hay build). Para cambiarlo se cambia en `_patron.html` y
 se replica en todas las páginas con un script de un solo uso, no a mano: dieciocho copias editadas
