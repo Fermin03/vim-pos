@@ -82,6 +82,13 @@ export type AccionCarrito =
   | { tipo: "limpiar" };
 
 export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): EstadoCarrito {
+  const r = reducirCarrito(estado, accion);
+  // Vaciado renglón por renglón (sin «Limpiar»): lo que se capture después ya no es la venta de la
+  // cotización, y marcarla CONVERTIDA con ese ticket sería mentir.
+  return r.cotizacionId && r.lineas.length === 0 ? { ...r, cotizacionId: null } : r;
+}
+
+function reducirCarrito(estado: EstadoCarrito, accion: AccionCarrito): EstadoCarrito {
   switch (accion.tipo) {
     case "agregar": {
       const l = accion.linea;

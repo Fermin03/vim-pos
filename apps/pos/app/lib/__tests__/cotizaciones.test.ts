@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   avisosConversion,
   enlaceWhatsappCotizacion,
+  estadoCotizar,
   esRechazoFinal,
   estaVencida,
   filtrarCotizaciones,
@@ -27,11 +28,22 @@ const item = (productoId: string | null, cantidad: number, precio: number, nombr
 const memoria = (): Almacen => { const m = new Map<string, string>(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => { m.set(k, v); } }; };
 
 describe("«Guardar como cotización» en el menú ⋯", () => {
+  const suelta = { producto: prod("p", 10), modificadores: [] };
   it("solo con el módulo, con renglones y sin cuenta guardada", () => {
-    expect(puedeCotizar({ modulo: true, lineas: 2, guardada: false })).toBe(true);
-    expect(puedeCotizar({ modulo: false, lineas: 2, guardada: false })).toBe(false);
-    expect(puedeCotizar({ modulo: true, lineas: 0, guardada: false })).toBe(false);
-    expect(puedeCotizar({ modulo: true, lineas: 2, guardada: true })).toBe(false);
+    expect(puedeCotizar({ modulo: true, lineas: [suelta], guardada: false })).toBe(true);
+    expect(puedeCotizar({ modulo: false, lineas: [suelta], guardada: false })).toBe(false);
+    expect(puedeCotizar({ modulo: true, lineas: [], guardada: false })).toBe(false);
+    expect(puedeCotizar({ modulo: true, lineas: [suelta], guardada: true })).toBe(false);
+    expect(estadoCotizar({ modulo: false, lineas: [suelta], guardada: false })).toEqual({ ofrecer: false, motivo: null });
+  });
+
+  it("con extras o un combo se ve apagada, con el motivo", () => {
+    const conExtra = { ...suelta, modificadores: [{ opcionId: "o", grupoNombre: "G", opcionNombre: "Grande", precioExtra: 5, cantidad: 1 }] };
+    const combo = { producto: prod("k", 99, { esCombo: true }), modificadores: [] };
+    for (const l of [conExtra, combo]) {
+      expect(puedeCotizar({ modulo: true, lineas: [suelta, l], guardada: false })).toBe(false);
+      expect(estadoCotizar({ modulo: true, lineas: [suelta, l], guardada: false })).toEqual({ ofrecer: true, motivo: "Sin extras ni combos" });
+    }
   });
 });
 
@@ -102,13 +114,13 @@ describe("lista", () => {
 describe("marcar convertida sin detener el cobro", () => {
   it("lo que falla se queda guardado y se reintenta", async () => {
     const a = memoria();
-    anotarPorMarcar(a, { cotizacionId: "c1", ticketId: "t1" });
-    anotarPorMarcar(a, { cotizacionId: "c1", ticketId: "t1" });
-    expect(porMarcar(a)).toEqual([{ cotizacionId: "c1", ticketId: "t1" }]);
-    await marcarPendientes(a, async () => { throw new Error("sin red"); });
+    anotarPorMarcar(a, { cotizacionId: "c1", ticketId: "t1" }, 1000);
+    anotarPorMarcar(a, { cotizacionId: "c1", ticketId: "t1" }, 1000);
+    expect(porMarcar(a)).toEqual([{ cotizacionId: "c1", ticketId: "t1", desdeMs: 1000 }]);
+    await marcarPendientes(a, async () => { throw new Error("sin red"); }, 2000);
     expect(porMarcar(a)).toHaveLength(1);
     const hechas: string[] = [];
-    await marcarPendientes(a, async (p) => { hechas.push(p.cotizacionId); });
+    await marcarPendientes(a, async (p) => { hechas.push(p.cotizacionId); }, 3000);
     expect(hechas).toEqual(["c1"]);
     expect(porMarcar(a)).toEqual([]);
   });
@@ -119,14 +131,43 @@ describe("marcar convertida sin detener el cobro", () => {
     expect(esRechazoFinal("DATOS_INVALIDOS: la cotización no existe.")).toBe(true);
     expect(esRechazoFinal("DATOS_INVALIDOS: la venta no existe o todavía no está cobrada.")).toBe(false);
     expect(esRechazoFinal("Failed to fetch")).toBe(false);
+    // La venta se canceló después del cobro: tampoco cambia.
+    expect(esRechazoFinal("DATOS_INVALIDOS: la venta no existe o todavía no está cobrada.", "CANCELADO")).toBe(true);
+    expect(esRechazoFinal("DATOS_INVALIDOS: la venta no existe o todavía no está cobrada.", "ABIERTO")).toBe(false);
+  });
+
+  it("pasada una semana se suelta sin intentarla", async () => {
+    const a = memoria();
+    const dia = 24 * 60 * 60 * 1000;
+    anotarPorMarcar(a, { cotizacionId: "vieja", ticketId: "t1" }, 0);
+    anotarPorMarcar(a, { cotizacionId: "nueva", ticketId: "t2" }, 7 * dia);
+    const intentadas: string[] = [];
+    await marcarPendientes(a, async (p) => { intentadas.push(p.cotizacionId); throw new Error("sin red"); }, 7 * dia + 1);
+    expect(intentadas).toEqual(["nueva"]);
+    expect(porMarcar(a).map((p) => p.cotizacionId)).toEqual(["nueva"]);
   });
 });
 
 describe("la venta recuerda su cotización", () => {
   it("«cargar» la guarda y «limpiar» la suelta", async () => {
     const { reducerCarrito, estadoInicial } = await import("../carrito");
-    const cargado = reducerCarrito(estadoInicial, { tipo: "cargar", estado: { ...estadoInicial, cotizacionId: "c1" } });
+    const linea = { clientId: "l", producto: prod("p", 10), cantidad: 1, modificadores: [], notaCocina: null };
+    const cargado = reducerCarrito(estadoInicial, { tipo: "cargar", estado: { ...estadoInicial, lineas: [linea], cotizacionId: "c1" } });
     expect(cargado.cotizacionId).toBe("c1");
     expect(reducerCarrito(cargado, { tipo: "limpiar" }).cotizacionId).toBeUndefined();
+  });
+
+  it("vaciada renglón por renglón (✕ o cantidad 0) también la suelta", async () => {
+    const { reducerCarrito, estadoInicial } = await import("../carrito");
+    const l = (id: string) => ({ clientId: id, producto: prod(id, 10), cantidad: 1, modificadores: [], notaCocina: null });
+    let e = reducerCarrito(estadoInicial, { tipo: "cargar", estado: { ...estadoInicial, lineas: [l("a"), l("b")], cotizacionId: "c1" } });
+    e = reducerCarrito(e, { tipo: "quitar", clientId: "a" });
+    expect(e.cotizacionId).toBe("c1");
+    e = reducerCarrito(e, { tipo: "cantidad", clientId: "b", cantidad: 0 });
+    expect(e.lineas).toEqual([]);
+    expect(e.cotizacionId).toBeNull();
+    // Lo que se capture después ya no lleva la cotización.
+    e = reducerCarrito(e, { tipo: "agregar", linea: l("z") });
+    expect(e.cotizacionId).toBeNull();
   });
 });

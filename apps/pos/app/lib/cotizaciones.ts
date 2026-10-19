@@ -41,8 +41,20 @@ export type Cotizacion = {
   total: number;
 };
 
-/** «Guardar como cotización» va con el módulo, con renglones y con un carrito suelto (no una cuenta guardada). */
-export const puedeCotizar = (e: { modulo: boolean; lineas: number; guardada: boolean }) => e.modulo && e.lineas > 0 && !e.guardada;
+type EntradaCotizar = { modulo: boolean; lineas: Pick<LineaCarrito, "modificadores" | "combo" | "producto">[]; guardada: boolean };
+
+/**
+ * «Guardar como cotización» se ofrece con el módulo, con renglones y con un carrito suelto (no una
+ * cuenta guardada). Con extras o combos se ve, pero apagada y con el motivo: la cotización guarda
+ * solo producto y cantidad (0212), y callarlo cotizaría otra cosa.
+ */
+export function estadoCotizar(e: EntradaCotizar): { ofrecer: boolean; motivo: string | null } {
+  const ofrecer = e.modulo && e.lineas.length > 0 && !e.guardada;
+  const conExtras = e.lineas.some((l) => l.combo || l.producto.esCombo || l.modificadores.length > 0);
+  return { ofrecer, motivo: ofrecer && conExtras ? "Sin extras ni combos" : null };
+}
+
+export const puedeCotizar = (e: EntradaCotizar) => { const r = estadoCotizar(e); return r.ofrecer && !r.motivo; };
 
 /** El enlace público de la cotización, en el portal donde ya vive la autofactura. */
 export const urlCotizacion = (token: string) => `${PORTAL_FACTURA}/c/${encodeURIComponent(token)}`;
@@ -175,13 +187,17 @@ export async function leerEncabezado(token: string, tenantId: string, sucursalId
 
 // ─── Marcar CONVERTIDA sin detener el cobro ─────────────────────────────────
 
-export type PorMarcar = { cotizacionId: string; ticketId: string };
+/** `desdeMs`: cuándo se cobró. Pasada una semana se suelta: lo que no se marcó en ese tiempo no se va a marcar. */
+export type PorMarcar = { cotizacionId: string; ticketId: string; desdeMs: number };
 const LLAVE = "vim.cotizaciones.por-marcar";
+const CADUCA_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function porMarcar(a: Almacen): PorMarcar[] {
   try {
     const v: unknown = JSON.parse(a.getItem(LLAVE) ?? "[]");
-    return Array.isArray(v) ? v.filter((x): x is PorMarcar => typeof x?.cotizacionId === "string" && typeof x?.ticketId === "string") : [];
+    return Array.isArray(v)
+      ? v.filter((x): x is PorMarcar => typeof x?.cotizacionId === "string" && typeof x?.ticketId === "string" && typeof x?.desdeMs === "number")
+      : [];
   } catch {
     return [];
   }
@@ -189,25 +205,35 @@ export function porMarcar(a: Almacen): PorMarcar[] {
 
 const guardarPorMarcar = (a: Almacen, l: PorMarcar[]) => { try { a.setItem(LLAVE, JSON.stringify(l)); } catch { /* sin almacén, se pierde al cerrar */ } };
 
-export function anotarPorMarcar(a: Almacen, p: PorMarcar): void {
-  guardarPorMarcar(a, [...porMarcar(a).filter((x) => x.cotizacionId !== p.cotizacionId), p]);
+export function anotarPorMarcar(a: Almacen, p: Omit<PorMarcar, "desdeMs">, ahora = Date.now()): void {
+  guardarPorMarcar(a, [...porMarcar(a).filter((x) => x.cotizacionId !== p.cotizacionId), { ...p, desdeMs: ahora }]);
 }
 
-/** Intenta cada pendiente; lo que falla se queda para la siguiente vez. */
-export async function marcarPendientes(a: Almacen, marcar: (p: PorMarcar) => Promise<void>): Promise<void> {
+/** Intenta cada pendiente; lo que falla se queda para la siguiente vez, hasta que caduca. */
+export async function marcarPendientes(a: Almacen, marcar: (p: PorMarcar) => Promise<void>, ahora = Date.now()): Promise<void> {
+  const quitar = (id: string) => guardarPorMarcar(a, porMarcar(a).filter((x) => x.cotizacionId !== id));
   for (const p of porMarcar(a)) {
+    if (ahora - p.desdeMs > CADUCA_MS) { quitar(p.cotizacionId); continue; }
     try {
       await marcar(p);
-      guardarPorMarcar(a, porMarcar(a).filter((x) => x.cotizacionId !== p.cotizacionId));
+      quitar(p.cotizacionId);
     } catch { /* se reintenta en el siguiente cobro o al abrir Cotizaciones */ }
   }
 }
 
 export async function marcarConvertida(token: string, p: PorMarcar): Promise<void> {
-  const { error } = await employeeClient(token).rpc("marcar_cotizacion_convertida", { p_cotizacion_id: p.cotizacionId, p_ticket_id: p.ticketId });
-  // Cancelada, convertida con otra venta o borrada: reintentar no la arregla, se suelta.
-  if (error && !esRechazoFinal(error.message)) throw new Error(motivoDeLaBase(error.message));
+  const sb = employeeClient(token);
+  const { error } = await sb.rpc("marcar_cotizacion_convertida", { p_cotizacion_id: p.cotizacionId, p_ticket_id: p.ticketId });
+  if (!error) return;
+  // «Todavía no está cobrada» puede ser una venta que se canceló después: eso tampoco cambia.
+  let estadoTicket: string | null = null;
+  if (/todav[ií]a no est[aá] cobrada/.test(error.message)) {
+    const { data } = await sb.from("tickets").select("estado_fiscal").eq("id", p.ticketId).maybeSingle();
+    estadoTicket = (data as { estado_fiscal: string } | null)?.estado_fiscal ?? null;
+  }
+  if (!esRechazoFinal(error.message, estadoTicket)) throw new Error(motivoDeLaBase(error.message));
 }
 
-/** Los rechazos de `marcar_cotizacion_convertida` que no cambian por reintentar. */
-export const esRechazoFinal = (mensaje: string) => /ya está (cancelada|convertida)|la cotización no existe/.test(mensaje);
+/** Los rechazos que no cambian por reintentar: cotización cancelada, convertida con otra venta o borrada, o venta cancelada. */
+export const esRechazoFinal = (mensaje: string, estadoTicket: string | null = null) =>
+  estadoTicket === "CANCELADO" || /ya está (cancelada|convertida)|la cotización no existe/.test(mensaje);

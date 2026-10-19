@@ -40,7 +40,7 @@ import { hoyMx } from "@vim/fecha";
 import { construirCotizacionJob } from "../lib/print/cotizacion-builder";
 import {
   anotarPorMarcar, avisosConversion, enlaceWhatsappCotizacion, guardarCotizacion, leerCotizacion, leerEncabezado, lineasDeCotizacion,
-  marcarConvertida, marcarPendientes, puedeCotizar, textoWhatsappCotizacion, urlCotizacion, type Cotizacion, type Encabezado,
+  marcarConvertida, marcarPendientes, estadoCotizar, textoWhatsappCotizacion, urlCotizacion, type Cotizacion, type Encabezado,
 } from "../lib/cotizaciones";
 import { CobroCompletado } from "./cobro-completado";
 import { ModalDescuento } from "./modal-descuento";
@@ -2202,6 +2202,9 @@ export function HomePos({
     const e = await encabezado();
     await obtenerImpresora("CAJA", { onMostrar: () => onMostrar(e) }).imprimir(construirCotizacionJob(c, e, 80));
   };
+  const cotizar = estadoCotizar({ modulo: modulos?.cotizaciones === true, lineas: carrito.lineas, guardada: ticketBd != null });
+  // La llave es de ESTE carrito: si cambia tras una respuesta perdida, es otra cotización.
+  useEffect(() => { llaveCotizacion.current = null; }, [carrito.lineas]);
   /** «Guardar como cotización»: la base pone precios, IVA, folio y vigencia; el carrito se limpia y se abre la vista. */
   const guardarComoCotizacion = async () => {
     if (guardandoCotizacion) return;
@@ -3276,9 +3279,8 @@ export function HomePos({
             onAsignarCliente: admiteClienteCuenta(carrito.modoServicio) ? () => setClienteCuentaAbierto(true) : undefined,
             cliente: carrito.clienteCuenta?.nombre ?? null,
             onDescuentoProducto: cuentaImpresa ? undefined : (id) => void onAplicarDescuento(id),
-            onGuardarCotizacion: puedeCotizar({ modulo: modulos?.cotizaciones === true, lineas: carrito.lineas.length, guardada: ticketBd != null })
-              ? () => void guardarComoCotizacion()
-              : undefined,
+            onGuardarCotizacion: cotizar.ofrecer ? () => void guardarComoCotizacion() : undefined,
+            motivoSinCotizacion: cotizar.motivo,
           } : undefined}
           onCantidad={(id, c) => { setUltimoTienda(null); dispatch({ tipo: "cantidad", clientId: id, cantidad: c }); }}
           onQuitar={(id) => { setUltimoTienda(null); dispatch({ tipo: "quitar", clientId: id }); }}

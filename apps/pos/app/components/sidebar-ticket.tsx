@@ -165,6 +165,8 @@ export function SidebarTicket({
     onDescuentoProducto?: (clientId: string) => void;
     /** «Guardar como cotización»: solo lo pasa quien tiene el módulo, renglones y un carrito suelto (`puedeCotizar`). */
     onGuardarCotizacion?: () => void;
+    /** Con la opción a la vista pero apagada: por qué (extras o combos). */
+    motivoSinCotizacion?: string | null;
   };
 }) {
   const totales = calcularTotalesDisplay(estado.lineas, 16, estado.envio?.costoMxn ?? 0);
@@ -210,7 +212,9 @@ export function SidebarTicket({
       { texto: "Descuento general", hacer: () => onAplicarDescuento?.(), activa: !vacio && !hayDescuento && !procesando && !!onAplicarDescuento },
     ]),
     { texto: tienda?.cliente ? "Cambiar cliente" : "Asignar cliente", hacer: () => tienda?.onAsignarCliente?.(), activa: !!tienda?.onAsignarCliente },
-    ...(tienda?.onGuardarCotizacion ? [{ texto: "Guardar como cotización", hacer: tienda.onGuardarCotizacion, activa: !procesando }] : []),
+    ...(tienda?.onGuardarCotizacion
+      ? [{ texto: "Guardar como cotización", hacer: tienda.onGuardarCotizacion, activa: !procesando && !tienda.motivoSinCotizacion, detalle: tienda.motivoSinCotizacion ?? undefined }]
+      : []),
     // Sin el botón de arriba, esta es la única salida de una cuenta guardada que no se va a cobrar.
     {
       texto: bloqueado && onCancelarTicket ? "Cancelar cuenta" : "Limpiar",
@@ -243,9 +247,10 @@ export function SidebarTicket({
                 role="menuitem"
                 disabled={!o.activa}
                 onClick={() => { setMenuAbierto(false); o.hacer(); }}
-                className={`flex h-11 w-full items-center whitespace-nowrap rounded-md px-3 text-left text-15 font-semibold transition-colors disabled:cursor-default disabled:text-ink-3 disabled:hover:bg-transparent ${"peligro" in o ? "mt-1 text-danger hover:bg-danger-soft" : "text-ink hover:bg-hover"}`}
+                className={`flex min-h-[44px] w-full flex-col items-start justify-center whitespace-nowrap rounded-md px-3 text-left text-15 font-semibold transition-colors disabled:cursor-default disabled:text-ink-3 disabled:hover:bg-transparent ${"peligro" in o ? "mt-1 text-danger hover:bg-danger-soft" : "text-ink hover:bg-hover"}`}
               >
                 {o.texto}
+                {"detalle" in o && o.detalle && <span className="text-12 font-medium text-ink-3">{o.detalle}</span>}
               </button>
             ))}
           </div>
