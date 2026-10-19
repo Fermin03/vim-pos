@@ -83,6 +83,8 @@ export const PULL_ORDER = [
   { t: "ausencias_colaborador" },
   { t: "citas" },
   { t: "citas_servicios" },
+  // Anticipos (0223): de las citas que bajan, por huella como ellas.
+  { t: "anticipos_cita" },
 ];
 
 /**
@@ -908,7 +910,7 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
         await reconciliarCatalogo(client, t, filas, log);
         if (t === "productos") await soltarClavesProductos(client, filas);
         // 0210: una fila que choque (p. ej. con la llave client_id_local) se salta sola, no tumba el pull.
-        if (LIBRETAS_POR_ID[t] || t === "citas" || t === "citas_servicios") opcionesFila = { aislarFilas: true, fallidas, log };
+        if (LIBRETAS_POR_ID[t] || t === "citas" || t === "citas_servicios" || t === "anticipos_cita") opcionesFila = { aislarFilas: true, fallidas, log };
       }
       let n = await upsertTabla(client, schema, t, filas, opcionesFila);
       if (t === "citas_servicios" && fallidas.some((x) => x.error?.code === "23P01")) {

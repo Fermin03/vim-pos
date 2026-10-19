@@ -194,7 +194,8 @@ BEGIN
     'reportes_z_historico', 'mesas_estado', 'movimientos_inventario', 'movimientos_producto',
     'abonos_credito', 'saldo_favor_movimientos',   -- 0210
     'cotizaciones', 'cotizacion_items',   -- 0213
-    'citas', 'citas_servicios'];   -- 0219
+    'citas', 'citas_servicios',   -- 0219
+    'anticipos_cita'];   -- 0223
   SELECT array_agg(k ORDER BY k) INTO v_llaves FROM jsonb_object_keys(v_res) k WHERE k NOT IN ('lealtad_movimientos', 'ticket_canjes_lealtad');
   IF v_llaves IS DISTINCT FROM (SELECT array_agg(k ORDER BY k) FROM unnest(v_esperadas) k) THEN
     RAISE EXCEPTION '10: las claves de siempre cambiaron: %', v_llaves;

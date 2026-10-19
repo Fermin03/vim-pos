@@ -199,6 +199,8 @@ async function asegurarTabla(pool) {
   await asegurarLibreta(pool, "cotizaciones");
   // Citas (0219): ver LIBRETAS. Sin siembra: la tabla nace con esta versión.
   await asegurarLibreta(pool, "citas");
+  // Anticipos (0223): ver LIBRETAS. Sin siembra: la tabla nace con esta versión.
+  await asegurarLibreta(pool, "anticipos_cita");
 
   // Clientes y sus direcciones: el POS los da de alta al tomar un domicilio y NUNCA subían. El
   // padrón se quedaba en la caja: /admin/clientes vacío y los tickets de la nube apuntando a
@@ -283,6 +285,10 @@ export const LIBRETAS = {
   // cambio local pendiente. Sus tramos viajan siempre con ella.
   // sinLibretaEsLocal: una cita que está aquí y no en la libreta es de esta caja y no se ha confirmado.
   citas: { libreta: "_vim_citas_ok", col: "cita_id", sinLibretaEsLocal: true },
+  // 0223: como las citas. Por huella y no una vez por id (como los abonos): un anticipo cambia de
+  // estado (VIGENTE → APLICADO, DEVUELTO o RETENIDO, y de vuelta si la venta se cancela) y cada
+  // cambio tiene que volver a subir. La nube decide qué cambio acepta (ver 0223).
+  anticipos_cita: { libreta: "_vim_anticipos_ok", col: "anticipo_id", sinLibretaEsLocal: true },
 };
 
 /**
@@ -625,6 +631,11 @@ export async function listarPendientes(pool) {
       (SELECT jsonb_agg(jsonb_build_object('id', x.id, 'ticket_id', x.ticket_id) ORDER BY x.created_at)
          FROM citas x LEFT JOIN _vim_citas_ok o ON o.cita_id = x.id
         WHERE ${pendiente("citas")}) AS citas,
+      -- Anticipos (0223): nuevos o que cambiaron, en el lote de su venta (o la de su cita).
+      (SELECT jsonb_agg(jsonb_build_object('id', x.id, 'ticket_id', COALESCE(x.ticket_id, c.ticket_id)) ORDER BY x.created_at, x.id)
+         FROM anticipos_cita x LEFT JOIN citas c ON c.id = x.cita_id
+         LEFT JOIN _vim_anticipos_ok o ON o.anticipo_id = x.id
+        WHERE ${pendiente("anticipos_cita")}) AS anticipos,
       -- Repartidores dados de alta en la caja aún no confirmados por la nube (ver _vim_repartidores_ok
       -- en asegurarTabla). Sin esto, un alta a media jornada sin ventas ni turnos ni movimientos de
       -- por medio no hace pasar la guarda de pushToCloud y se queda atorada en silencio.
@@ -659,6 +670,7 @@ export async function listarPendientes(pool) {
     abonos: rows[0].abonos ?? [], saldoFavor: rows[0].saldo_favor ?? [],
     cotizaciones: rows[0].cotizaciones ?? [],
     citas: rows[0].citas ?? [],
+    anticipos: rows[0].anticipos ?? [],
   };
 }
 
@@ -691,7 +703,7 @@ export async function listarPendientes(pool) {
  * `movimientos_caja` sigue a los mismos turnos y no solo a los de las ventas: un turno con puras
  * entradas y salidas de efectivo, sin vender nada, tampoco subía jamás.
  */
-export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds = null, movimientoIds = null, clienteIds = null, direccionIds = null, conMesas = true, lealtadIds = null, movimientoProductoIds = null, abonoIds = null, saldoFavorIds = null, cotizacionIds = null, citaIds = null } = {}) {
+export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds = null, movimientoIds = null, clienteIds = null, direccionIds = null, conMesas = true, lealtadIds = null, movimientoProductoIds = null, abonoIds = null, saldoFavorIds = null, cotizacionIds = null, citaIds = null, anticipoIds = null } = {}) {
   await asegurarTabla(pool);
   const { rows } = await pool.query(`
     WITH tk AS (
@@ -753,12 +765,20 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
        WHERE ($13::uuid[] IS NOT NULL AND x.id = ANY($13::uuid[]))
           OR ($13::uuid[] IS NULL AND $2::uuid[] IS NULL AND ${pendiente("citas")})
     ),
+    -- Anticipos (0223): igual que las citas.
+    an AS (
+      SELECT x.id, x.turno_id, x.turno_resuelve_id, ${HUELLA_ZONA} AS huella FROM anticipos_cita x
+        LEFT JOIN _vim_anticipos_ok o ON o.anticipo_id = x.id
+       WHERE ($14::uuid[] IS NOT NULL AND x.id = ANY($14::uuid[]))
+          OR ($14::uuid[] IS NULL AND $2::uuid[] IS NULL AND ${pendiente("anticipos_cita")})
+    ),
     tn AS (
       SELECT x.id, md5(to_jsonb(x)::text) AS huella
         FROM turnos x
         LEFT JOIN _vim_turnos_ok o ON o.turno_id = x.id
        WHERE x.id IN (SELECT turno_id FROM tk)                       -- los que la FK exige
           OR x.id IN (SELECT turno_id FROM ab UNION SELECT turno_id FROM sf)   -- 0210: el turno del abono viaja con él
+          OR x.id IN (SELECT turno_id FROM an UNION SELECT turno_resuelve_id FROM an)   -- 0223: y los del anticipo
           OR ($3::uuid[] IS NOT NULL AND x.id = ANY($3::uuid[]))     -- los que pidió el llamador
           OR ($3::uuid[] IS NULL AND $2::uuid[] IS NULL              -- modo completo: los cambiados
               AND (o.turno_id IS NULL OR o.huella IS DISTINCT FROM md5(to_jsonb(x)::text)))
@@ -775,6 +795,7 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
       (SELECT array_agg(id) FROM sf) AS saldo_favor,
       (SELECT jsonb_agg(jsonb_build_object('id', id, 'huella', huella)) FROM ct) AS cotizaciones,
       (SELECT jsonb_agg(jsonb_build_object('id', id, 'huella', huella)) FROM ci) AS citas,
+      (SELECT jsonb_agg(jsonb_build_object('id', id, 'huella', huella)) FROM an) AS anticipos,
       (SELECT array_agg(id) FROM repartidores x WHERE x.id NOT IN (SELECT repartidor_id FROM _vim_repartidores_ok)) AS repartidores,
       -- Con la huella que se manda: si la zona cambia mientras viaja, la anotada no coincide y
       -- vuelve a subir en el siguiente ciclo.
@@ -804,6 +825,8 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
         -- Citas (0219): ver LIBRETAS. Los tramos van siempre con su cita.
         'citas',                     (SELECT jsonb_agg(to_jsonb(x) ORDER BY x.created_at) FROM citas x WHERE x.id IN (SELECT id FROM ci)),
         'citas_servicios',           (SELECT jsonb_agg(to_jsonb(x) ORDER BY x.cita_id, x.orden) FROM citas_servicios x WHERE x.cita_id IN (SELECT id FROM ci)),
+        -- Anticipos (0223): ver LIBRETAS. La nube los aplica después de ventas, turnos y citas.
+        'anticipos_cita',            (SELECT jsonb_agg(to_jsonb(x) ORDER BY x.created_at, x.id) FROM anticipos_cita x WHERE x.id IN (SELECT id FROM an)),
         -- Quién repartió cada domicilio. Viaja con su ticket: la asignación se anota al marcar la
         -- salida, antes de cobrar, así que para cuando el ticket entra en esta rebanada ya está
         -- liquidada y sube completa.
@@ -871,7 +894,7 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
                                            OR ($9::uuid[] IS NULL AND $2::uuid[] IS NULL
                                                AND x.id NOT IN (SELECT id FROM _vim_mov_producto_ok)))
       )) AS snapshot
-  `, [TERMINALES, ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds, conMesas, lealtadIds, movimientoProductoIds, abonoIds, saldoFavorIds, cotizacionIds, citaIds]);
+  `, [TERMINALES, ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds, conMesas, lealtadIds, movimientoProductoIds, abonoIds, saldoFavorIds, cotizacionIds, citaIds, anticipoIds]);
   return {
     snapshot: rows[0].snapshot ?? {}, ids: rows[0].ids ?? [], turnos: rows[0].turnos ?? [],
     tickets: rows[0].tickets_huella ?? [], mesas: rows[0].mesas ?? [],
@@ -883,6 +906,7 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
     abonos: rows[0].abonos ?? [], saldoFavor: rows[0].saldo_favor ?? [],
     cotizaciones: rows[0].cotizaciones ?? [],
     citas: rows[0].citas ?? [],
+    anticipos: rows[0].anticipos ?? [],
   };
 }
 
@@ -1046,7 +1070,7 @@ function rechazadosPorTicket(errores, snapshot) {
       const item = (snapshot.devolucion_items ?? []).find((x) => x.id === e.id);
       const dev = item && (snapshot.devoluciones ?? []).find((x) => x.id === item.devolucion_id);
       if (dev?.ticket_original_id) fuera.add(dev.ticket_original_id);
-    } else if (["movimientos_inventario", "movimientos_producto", "abonos_credito", "saldo_favor_movimientos", "cotizaciones", "cotizacion_items", "citas", "citas_servicios"].includes(e.tabla)) {
+    } else if (["movimientos_inventario", "movimientos_producto", "abonos_credito", "saldo_favor_movimientos", "cotizaciones", "cotizacion_items", "citas", "citas_servicios", "anticipos_cita"].includes(e.tabla)) {
       // Un movimiento rechazado se reintenta solo (ver filasRechazadas); no invalida la venta.
       continue;
     } else if (e.tabla === "lealtad_movimientos") {
@@ -1083,10 +1107,10 @@ function filasRechazadas(errores, tabla) {
  * reintentando lo mismo). Partir a la mitad en vez de recalcular un tamaño "correcto" converge
  * en pocas vueltas y no necesita saber cuál es el límite del otro lado.
  */
-async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds, turnoIds, movimientoIds = [], clienteIds = [], direccionIds = [], lealtadIds = [], movProducto = [], abonos = [], saldoFavor = [], cotizaciones = [], citas = [], conMesas = false, maxBytes }, log) {
-  const { snapshot, ids, tickets, turnos, movimientos, repartidores, zonas, colonias, clientes, direcciones, mesas, lealtad, movimientosProducto, abonos: abonosEnviados, saldoFavor: saldoFavorEnviado, cotizaciones: cotizacionesEnviadas, citas: citasEnviadas } =
+async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds, turnoIds, movimientoIds = [], clienteIds = [], direccionIds = [], lealtadIds = [], movProducto = [], abonos = [], saldoFavor = [], cotizaciones = [], citas = [], anticipos = [], conMesas = false, maxBytes }, log) {
+  const { snapshot, ids, tickets, turnos, movimientos, repartidores, zonas, colonias, clientes, direcciones, mesas, lealtad, movimientosProducto, abonos: abonosEnviados, saldoFavor: saldoFavorEnviado, cotizaciones: cotizacionesEnviadas, citas: citasEnviadas, anticipos: anticiposEnviados } =
     await construirSnapshotPush(pool, { ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds, conMesas, lealtadIds, movimientoProductoIds: movProducto.map((m) => m.id),
-      abonoIds: abonos.map((m) => m.id), saldoFavorIds: saldoFavor.map((m) => m.id), cotizacionIds: cotizaciones.map((m) => m.id), citaIds: citas.map((m) => m.id) });
+      abonoIds: abonos.map((m) => m.id), saldoFavorIds: saldoFavor.map((m) => m.id), cotizacionIds: cotizaciones.map((m) => m.id), citaIds: citas.map((m) => m.id), anticipoIds: anticipos.map((m) => m.id) });
   const cuerpo = JSON.stringify({ snapshot });
   const bytes = Buffer.byteLength(cuerpo);
 
@@ -1107,8 +1131,8 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
     // Los de producto siguen a su venta (R4): la segunda mitad lleva solo los de sus tickets.
     const segunda = new Set(ticketIds.slice(mitadT));
     const enLa = (lista, deLaSegunda) => lista.filter((m) => segunda.has(m.ticket_id) === deLaSegunda);
-    const a = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(0, mitadT), turnoIds, movimientoIds: movimientoIds.slice(0, mitadM), clienteIds, direccionIds, lealtadIds, movProducto: enLa(movProducto, false), abonos: enLa(abonos, false), saldoFavor: enLa(saldoFavor, false), cotizaciones: enLa(cotizaciones, false), citas: enLa(citas, false), conMesas, maxBytes }, log);
-    const b = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(mitadT), turnoIds: [], movimientoIds: movimientoIds.slice(mitadM), movProducto: enLa(movProducto, true), abonos: enLa(abonos, true), saldoFavor: enLa(saldoFavor, true), cotizaciones: enLa(cotizaciones, true), citas: enLa(citas, true), maxBytes }, log);
+    const a = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(0, mitadT), turnoIds, movimientoIds: movimientoIds.slice(0, mitadM), clienteIds, direccionIds, lealtadIds, movProducto: enLa(movProducto, false), abonos: enLa(abonos, false), saldoFavor: enLa(saldoFavor, false), cotizaciones: enLa(cotizaciones, false), citas: enLa(citas, false), anticipos: enLa(anticipos, false), conMesas, maxBytes }, log);
+    const b = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(mitadT), turnoIds: [], movimientoIds: movimientoIds.slice(mitadM), movProducto: enLa(movProducto, true), abonos: enLa(abonos, true), saldoFavor: enLa(saldoFavor, true), cotizaciones: enLa(cotizaciones, true), citas: enLa(citas, true), anticipos: enLa(anticipos, true), maxBytes }, log);
     return { subidos: a.subidos + b.subidos, turnos: a.turnos + b.turnos, movimientos: a.movimientos + b.movimientos, rechazados: a.rechazados + b.rechazados };
   };
 
@@ -1205,6 +1229,16 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
       await anotarHuellas(pool, "_vim_citas_ok", "cita_id", citasEnviadas.filter((c) => !fuera.has(c.id)));
     }
   }
+  // Anticipos (0223): mismo molde. Uno que la nube ignoró a propósito (resuelto allá) sí se anota:
+  // el siguiente pull le baja a la caja la versión de la nube.
+  if (anticiposEnviados.length) {
+    if (typeof respuesta?.resultado?.anticipos_cita !== "number") {
+      log(`la nube no confirmó anticipos (¿sin la migración 0223?): ${anticiposEnviados.length} se reintentarán`);
+    } else {
+      const fuera = filasRechazadas(errores, "anticipos_cita");
+      await anotarHuellas(pool, "_vim_anticipos_ok", "anticipo_id", anticiposEnviados.filter((a) => !fuera.has(a.id)));
+    }
+  }
   // Descartados: el producto ya no lleva existencias en la nube. No se reintentan; solo se avisa.
   const mpDescartados = respuesta?.resultado?._descartados?.movimientos_producto ?? [];
   if (mpDescartados.length) log(`la nube descartó ${mpDescartados.length} movimiento(s) de producto (ya no lleva existencias)`);
@@ -1259,6 +1293,8 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   const cotizaciones = (pendientes.cotizaciones ?? []).slice(0, maxMovimientos);
   // Citas (0219): mismo techo; sin venta, en el primer lote.
   const citas = (pendientes.citas ?? []).slice(0, maxMovimientos);
+  // Anticipos (0223): mismo techo; en el lote de su venta (o la de su cita).
+  const anticipos = (pendientes.anticipos ?? []).slice(0, maxMovimientos);
   // Un cierre de turno SIN ventas nuevas también es algo que subir. Cuando esta condición solo
   // miraba los tickets, el cierre se quedaba en la caja y la nube nunca se enteraba. Lo mismo pasa
   // con un movimiento de inventario suelto (ADR 0013), con un repartidor dado de alta a media
@@ -1270,7 +1306,7 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   // Lo mismo con un cliente registrado sin que la venta se haya cobrado todavía.
   // Y con una mesa que se liberó sin que se cobrara nada (una cuenta vacía cancelada, 0104).
   if (!ids.length && !turnosCambiados.length && !movimientoIds.length && !repartidorIds.length && !zonaIds.length && !coloniaIds.length
-      && !clienteIds.length && !direccionIds.length && !mesaIds.length && !lealtadIds.length && !movProducto.length && !abonos.length && !saldoFavor.length && !cotizaciones.length && !citas.length) { log("nada pendiente por subir"); return { subidos: 0, turnos: 0, movimientos: 0, rechazados: 0, lotes: 0 }; }
+      && !clienteIds.length && !direccionIds.length && !mesaIds.length && !lealtadIds.length && !movProducto.length && !abonos.length && !saldoFavor.length && !cotizaciones.length && !citas.length && !anticipos.length) { log("nada pendiente por subir"); return { subidos: 0, turnos: 0, movimientos: 0, rechazados: 0, lotes: 0 }; }
 
   const parte = [
     ids.length ? `${ids.length} venta${ids.length === 1 ? "" : "s"}` : null,
@@ -1287,6 +1323,7 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
     saldoFavor.length ? `${saldoFavor.length} movimiento(s) de saldo a favor` : null,
     cotizaciones.length ? `${cotizaciones.length} cotización(es)` : null,
     citas.length ? `${citas.length} cita(s)` : null,
+    anticipos.length ? `${anticipos.length} anticipo(s)` : null,
     mesaIds.length ? `el estado de ${mesaIds.length} mesa(s)` : null,
   ].filter(Boolean).join(" y ");
 
@@ -1314,7 +1351,7 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
     const dirIds = n === 0 ? direccionIds : [];
     n++;
     try {
-      const r = await enviarLote(pool, opts, { ticketIds: lote, turnoIds, movimientoIds: movIds, clienteIds: cliIds, direccionIds: dirIds, lealtadIds: n === 1 ? lealtadIds : [], movProducto: deLote(movProducto, n - 1), abonos: deLote(abonos, n - 1), saldoFavor: deLote(saldoFavor, n - 1), cotizaciones: deLote(cotizaciones, n - 1), citas: deLote(citas, n - 1), conMesas: n === 1, maxBytes }, log);
+      const r = await enviarLote(pool, opts, { ticketIds: lote, turnoIds, movimientoIds: movIds, clienteIds: cliIds, direccionIds: dirIds, lealtadIds: n === 1 ? lealtadIds : [], movProducto: deLote(movProducto, n - 1), abonos: deLote(abonos, n - 1), saldoFavor: deLote(saldoFavor, n - 1), cotizaciones: deLote(cotizaciones, n - 1), citas: deLote(citas, n - 1), anticipos: deLote(anticipos, n - 1), conMesas: n === 1, maxBytes }, log);
       subidos += r.subidos;
       turnos += r.turnos;
       movimientos += r.movimientos;

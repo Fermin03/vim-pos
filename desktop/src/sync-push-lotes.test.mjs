@@ -51,7 +51,7 @@ function crearPoolFalso({ nTickets = 450, nTurnos = 5, turnosCambiados = [], rep
 
       if (sql.startsWith("CREATE TABLE") || sql.startsWith("ALTER TABLE")) return { rows: [] };
       // Relleno de huellas de las libretas de zonas (0116) y colonias (0187): aquí no hay ninguna.
-      if (sql.startsWith("UPDATE _vim_zonas_ok") || sql.startsWith("UPDATE _vim_colonias_ok") || sql.startsWith("UPDATE _vim_cotizaciones_ok") || sql.startsWith("UPDATE _vim_citas_ok")) return { rows: [], rowCount: 0 };
+      if (sql.startsWith("UPDATE _vim_zonas_ok") || sql.startsWith("UPDATE _vim_colonias_ok") || sql.startsWith("UPDATE _vim_cotizaciones_ok") || sql.startsWith("UPDATE _vim_citas_ok") || sql.startsWith("UPDATE _vim_anticipos_ok")) return { rows: [], rowCount: 0 };
 
       // La libreta de repartidores ya no se siembra desde el push (la siembra vive en el arranque,
       // `sembrarRepartidoresUnaVez`), así que aquí solo llega el marcado de lo que la nube confirmó.

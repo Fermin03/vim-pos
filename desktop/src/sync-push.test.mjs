@@ -56,7 +56,7 @@ function crearPoolFalso({
       // Migración de la libreta de zonas a huella (C3): columna y relleno. Aquí no hay huellas que
       // rellenar; lo que hacen de verdad lo prueba el bloque con Postgres real al final del archivo.
       if (sql.startsWith("ALTER TABLE")) return { rows: [], rowCount: 0 };
-      if (sql.startsWith("UPDATE _vim_zonas_ok") || sql.startsWith("UPDATE _vim_colonias_ok") || sql.startsWith("UPDATE _vim_cotizaciones_ok") || sql.startsWith("UPDATE _vim_citas_ok")) return { rows: [], rowCount: 0 };
+      if (sql.startsWith("UPDATE _vim_zonas_ok") || sql.startsWith("UPDATE _vim_colonias_ok") || sql.startsWith("UPDATE _vim_cotizaciones_ok") || sql.startsWith("UPDATE _vim_citas_ok") || sql.startsWith("UPDATE _vim_anticipos_ok")) return { rows: [], rowCount: 0 };
 
       // `_vim_migraciones_sync`: el marcador de "esto ya corrió una vez en esta caja".
       if (sql.includes("_vim_migraciones_sync")) {
@@ -1132,6 +1132,44 @@ describe("ventas que cambian después de subir, y el piso de las mesas (Postgres
     assert.ok(!(await citaPend(cita)), "confirmada: ya no");
   });
 
+  // ── Anticipos (0223): por huella, como las citas ─────────────────────────────────────────────
+  test("anticipos: sube una vez con su turno; resuelto vuelve a subir; lo que baja no rebota", async () => {
+    await subir();
+    const cita = await agendar("cita-ant", "04:00");
+    await subir({ resultado: { citas: 1, citas_servicios: 1 } });
+    const tn = await turnoNuevo("PRUEBA-ANT");
+    const { rows: [{ id: ant }] } = await enReplica(
+      `INSERT INTO anticipos_cita (tenant_id, sucursal_id, caja_id, turno_id, cita_id, metodo_pago, monto_mxn, client_id_local)
+       VALUES ($1, $2, $3, $4, $5, 'EFECTIVO', 200, 'ant-1') RETURNING id`, [TENANT, SUC, CAJA, tn, cita]);
+    const antPend = async () => (await pend()).anticipos.some((x) => x.id === ant);
+    assert.ok(await antPend(), "recién recibido, está pendiente");
+
+    await subir({ resultado: { anticipos_cita: 0, _errores: [{ tabla: "anticipos_cita", id: ant, error: "x" }] } });
+    assert.ok(await antPend(), "rechazado: sigue pendiente");
+    await subir({ resultado: { _ignoradas: ["anticipos_cita"] } });
+    assert.ok(await antPend(), "una nube sin la 0223: sigue pendiente");
+
+    const [snap] = await subir({ resultado: { anticipos_cita: 1 } });
+    assert.equal((snap?.anticipos_cita ?? []).filter((x) => x.id === ant).length, 1, "viaja una vez");
+    assert.ok((snap?.turnos ?? []).some((t) => t.id === tn), "con su turno");
+    assert.ok(!(await antPend()), "confirmado, no se repite");
+    const [otra] = await subir();
+    assert.equal((otra?.anticipos_cita ?? []).length, 0, "el siguiente push no lo vuelve a mandar");
+
+    await enReplica("UPDATE anticipos_cita SET estado = 'RETENIDO', turno_resuelve_id = $2, resuelto_at = now() WHERE id = $1", [ant, tn]);
+    assert.ok(await antPend(), "resuelto en la caja, vuelve a estar pendiente");
+    const [snap2] = await subir({ resultado: { anticipos_cita: 1 } });
+    assert.equal((snap2?.anticipos_cita ?? []).find((x) => x.id === ant)?.estado, "RETENIDO", "viaja resuelto");
+    assert.ok(!(await antPend()), "confirmado, ya no");
+
+    // La versión de la nube baja y no rebota.
+    const { rows: [{ f }] } = await db.query("SELECT to_jsonb(a) || '{\"referencia_devolucion\":\"nube\"}'::jsonb AS f FROM anticipos_cita a WHERE id = $1", [ant]);
+    await pullSnapshot(db, { anticipos_cita: [f] });
+    const { rows: [l] } = await db.query("SELECT referencia_devolucion FROM anticipos_cita WHERE id = $1", [ant]);
+    assert.equal(l.referencia_devolucion, "nube", "el pull lo trae");
+    assert.ok(!(await antPend()), "lo que bajó no sube de vuelta");
+  });
+
   test("citas: el catálogo vacío en la nube vacía el de la caja", async () => {
     await agendar("cita-cat", "21:00");   // asegura el colaborador
     const { rows: [{ t }] } = await db.query("SELECT to_jsonb(x) AS t FROM tenants x WHERE id = $1", [TENANT]);
@@ -1333,7 +1371,7 @@ test("lealtad: el snapshot lleva el canje de TODO ticket del lote, atado a los t
   const snap = consultas.find((c) => c.sql.includes("WITH tk AS"));
   assert.match(snap.sql, /'ticket_canjes_lealtad',\s+\(SELECT jsonb_agg\(to_jsonb\(x\)\) FROM ticket_canjes_lealtad x WHERE x\.ticket_id IN \(SELECT id FROM tk\)\)/);
   assert.match(snap.sql, /'lealtad_movimientos'/);
-  assert.equal(snap.params.length, 13, "$8 son los movimientos de lealtad; $9, los de producto; $10 y $11, los del crédito (0210); $12, las cotizaciones (0213); $13, las citas (0219)");
+  assert.equal(snap.params.length, 14, "$8 son los movimientos de lealtad; $9, los de producto; $10 y $11, los del crédito (0210); $12, las cotizaciones (0213); $13, las citas (0219); $14, los anticipos (0223)");
   assert.deepEqual(snap.params[7], [B]);
 });
 
