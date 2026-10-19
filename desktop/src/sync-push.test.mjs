@@ -1096,6 +1096,7 @@ describe("ventas que cambian después de subir, y el piso de las mesas (Postgres
   test("citas: lo que baja del pull no vuelve a subir ni pisa una edición local pendiente", async () => {
     await subir();
     const cita = await agendar("cita-3", "16:00");
+    await subir({ resultado: { citas: 1, citas_servicios: 1 } });
     const fila = async () => (await db.query("SELECT to_jsonb(c) AS f FROM citas c WHERE id = $1", [cita])).rows[0].f;
     const tramos = async () => (await db.query("SELECT jsonb_agg(to_jsonb(s)) AS f FROM citas_servicios s WHERE cita_id = $1", [cita])).rows[0].f;
     // La nube la tiene con empalme (chocó con otra al subir): baja así y no rebota.
@@ -1113,6 +1114,35 @@ describe("ventas que cambian después de subir, y el piso de las mesas (Postgres
     assert.equal(l.empalme, false, "el pull no pisa la edición local");
     assert.equal(new Date((await tramos())[0].inicia).toISOString(), "2030-01-07T23:00:00.000Z", "ni sus tramos");
     assert.ok(await citaPend(cita), "y sigue pendiente de subir");
+  });
+
+  test("citas: rechazada por la nube, el pull no la pisa y el siguiente push la reintenta", async () => {
+    await subir();
+    const cita = await agendar("cita-5", "06:00");
+    await subir({ resultado: { citas: 0, citas_servicios: 0, _errores: [{ tabla: "citas", id: cita, error: "x" }] } });
+    assert.ok(await citaPend(cita), "rechazada: sigue pendiente");
+    const { rows: [{ c, s }] } = await db.query(
+      `SELECT (SELECT to_jsonb(x) || '{"cliente_nombre":"Versión de la nube"}'::jsonb FROM citas x WHERE id = $1) AS c,
+              (SELECT jsonb_agg(to_jsonb(x)) FROM citas_servicios x WHERE cita_id = $1) AS s`, [cita]);
+    await pullSnapshot(db, { citas: [c], citas_servicios: s });
+    const { rows: [l] } = await db.query("SELECT cliente_nombre FROM citas WHERE id = $1", [cita]);
+    assert.equal(l.cliente_nombre, "Clienta caja", "el pull no pisa una cita de la caja sin confirmar");
+    const [snap] = await subir({ resultado: { citas: 1, citas_servicios: 1 } });
+    assert.ok((snap?.citas ?? []).some((x) => x.id === cita), "el siguiente push la reintenta");
+    assert.ok(!(await citaPend(cita)), "confirmada: ya no");
+  });
+
+  test("citas: el catálogo vacío en la nube vacía el de la caja", async () => {
+    await agendar("cita-cat", "21:00");   // asegura el colaborador
+    const { rows: [{ t }] } = await db.query("SELECT to_jsonb(x) AS t FROM tenants x WHERE id = $1", [TENANT]);
+    const aus = { id: "21900000-0000-0000-0000-0000000000e1", tenant_id: TENANT, usuario_id: DIEGO, desde: "2030-01-01", hasta: "2030-01-31", motivo: "Vacaciones" };
+    await pullSnapshot(db, { tenants: [t], ausencias_colaborador: [aus] });
+    const cuenta = async () => (await db.query("SELECT count(*)::int AS n FROM ausencias_colaborador WHERE tenant_id = $1", [TENANT])).rows[0].n;
+    assert.equal(await cuenta(), 1, "bajó la ausencia");
+    await pullSnapshot(db, { tenants: [t] });
+    assert.equal(await cuenta(), 1, "sin la clave (nube vieja) no se toca");
+    await pullSnapshot(db, { tenants: [t], ausencias_colaborador: [] });
+    assert.equal(await cuenta(), 0, "cancelada la última en la nube, se borra aquí");
   });
 
   test("citas: un tramo de la nube que choca con una cita local aún sin subir entra con empalme, no tumba el pull", async () => {

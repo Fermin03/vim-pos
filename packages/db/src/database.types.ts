@@ -14816,6 +14816,17 @@ export type Database = {
       }
     }
     Functions: {
+      _agenda_choques: {
+        Args: {
+          p_cita: string
+          p_espacio: string
+          p_inicia: string
+          p_tenant: string
+          p_termina: string
+          p_usuario: string
+        }
+        Returns: string[]
+      }
       _agenda_tenant: { Args: never; Returns: string }
       _agenda_tramos: {
         Args: {

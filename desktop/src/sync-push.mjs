@@ -281,7 +281,8 @@ export const LIBRETAS = {
   // 0219: la caja las agenda y las mueve de estado; cada cambio vuelve a subir. A diferencia de las
   // cotizaciones, también bajan del pull (las de la nube y otras cajas): el pull no pisa una con
   // cambio local pendiente. Sus tramos viajan siempre con ella.
-  citas: { libreta: "_vim_citas_ok", col: "cita_id" },
+  // sinLibretaEsLocal: una cita que está aquí y no en la libreta es de esta caja y no se ha confirmado.
+  citas: { libreta: "_vim_citas_ok", col: "cita_id", sinLibretaEsLocal: true },
 };
 
 /**

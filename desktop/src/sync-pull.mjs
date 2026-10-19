@@ -314,6 +314,9 @@ const CLAVES_NATURALES = {
   citas_servicios: { porPadre: "cita_id" },
 };
 
+const CATALOGO_AGENDA = new Set(["tipos_espacio", "espacios", "servicios_agenda", "colaboradores_agenda",
+  "servicio_colaborador", "horarios_colaborador", "ausencias_colaborador"]);
+
 const fkCache = new Map();
 /**
  * Columnas de otras tablas de `public` con llave foránea SIMPLE (una sola columna) hacia
@@ -587,7 +590,7 @@ export const marcarZonasDelPull = (client, filas, log) => marcarDelPull(client, 
 async function separarPendientes(client, tabla, filas) {
   const ids = [...new Set((filas ?? []).map((f) => f?.id).filter((id) => id != null))];
   if (!ids.length) return { aplicar: filas ?? [], descartadas: [] };
-  const { libreta, col } = LIBRETAS[tabla];
+  const { libreta, col, sinLibretaEsLocal } = LIBRETAS[tabla];
   await asegurarLibreta(client, tabla);
   // Candado ANTES de mirar la huella, y en su propia sentencia: un `cambiarCostoZona` en vuelo (su
   // UPDATE hecho, sin COMMIT) haría que esta consulta viera la versión vieja, la diera por no
@@ -602,9 +605,12 @@ async function separarPendientes(client, tabla, filas) {
   // Las colonias (0187) van por aquí igual: asignarles zona en la caja es el mismo UPDATE en vuelo.
   await client.query(`SELECT 1 FROM ${tabla} WHERE id = ANY($1::uuid[]) FOR NO KEY UPDATE`, [ids]);
   const { rows } = await client.query(
-    `SELECT o.${col} AS id FROM ${libreta} o
-       JOIN ${tabla} x ON x.id = o.${col}
-      WHERE o.${col} = ANY($1::uuid[]) AND ${ZONA_EDITADA_LOCAL}`,
+    // 0219: una cita que existe aquí y que la nube nunca confirmó es de esta caja (las que bajan se
+    // anotan al bajar): no se pisa aunque la nube ya tenga una versión (un envío que rechazó).
+    `SELECT x.id FROM ${tabla} x
+       LEFT JOIN ${libreta} o ON o.${col} = x.id
+      WHERE x.id = ANY($1::uuid[])
+        AND (${ZONA_EDITADA_LOCAL}${sinLibretaEsLocal ? ` OR o.${col} IS NULL` : ""})`,
     [ids]);
   const pendientes = new Set(rows.map((r) => r.id));
   if (!pendientes.size) return { aplicar: filas, descartadas: [] };
@@ -839,6 +845,11 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
     if (Array.isArray(snapshot.creditos_resumen_nube)) await client.query("DELETE FROM creditos_resumen_nube");
     for (const { t, schema = "public" } of PULL_ORDER) {
       let filas = snapshot[t] ?? snapshot[`${schema}.${t}`];
+      // 0219: el catálogo de la agenda se borra a mano en el admin. Una lista vacía (el último horario,
+      // la última ausencia) también reemplaza: se vacía lo del negocio, como creditos_resumen_nube.
+      if (Array.isArray(filas) && !filas.length && CATALOGO_AGENDA.has(t) && snapshot.tenants?.[0]?.id) {
+        await client.query(`DELETE FROM ${schema}."${t}" WHERE tenant_id = $1`, [snapshot.tenants[0].id]);
+      }
       if (!filas?.length) continue;
       if (LIBRETAS[t]) {
         const { aplicar, descartadas } = await separarPendientes(client, t, filas);

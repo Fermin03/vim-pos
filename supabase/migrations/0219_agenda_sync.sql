@@ -7,147 +7,216 @@
 -- NO se acepta desde la caja: si llega, queda en `_ignoradas`.
 -- Empalmes: la caja agenda sin ver lo que la nube agendó mientras estaba sin internet. Un tramo que
 -- choca con otro de la nube no se pierde ni se rechaza: entra con `empalme = true`, y se marcan
--- también el tramo de la nube y las dos citas. La recepción lo arregla y `resolver_empalme` (0218)
--- quita la marca. Nunca se borra ni se cancela una cita por chocar.
+-- también el tramo de la nube y las dos citas. La recepción lo arregla y `resolver_empalme` quita la
+-- marca. Nunca se borra ni se cancela una cita por chocar.
+-- Regla de la marca: un tramo está marcado si y solo si hoy se cruza con otro tramo activo (marcado
+-- o no) de otra cita, del mismo colaborador o del mismo espacio. La copia de la caja no la decide.
 
--- ── §1 Aplicador ────────────────────────────────────────────────────────────
+-- ── §1 Empalmes ─────────────────────────────────────────────────────────────
+-- Tramos activos de otras citas con los que se cruza un tramo. A mano y no con el EXCLUDE: el EXCLUDE
+-- no ve los tramos ya marcados. NULL si no choca con nada.
+CREATE OR REPLACE FUNCTION _agenda_choques(p_tenant uuid, p_cita uuid, p_usuario uuid, p_espacio uuid,
+                                           p_inicia timestamptz, p_termina timestamptz)
+RETURNS uuid[]
+LANGUAGE sql STABLE SET search_path = public, pg_temp
+AS $$
+  SELECT array_agg(o.id)
+    FROM citas_servicios o
+   WHERE p_inicia IS NOT NULL AND p_termina IS NOT NULL
+     AND o.tenant_id = p_tenant AND o.activa AND o.cita_id <> p_cita
+     AND (o.usuario_id = p_usuario OR (p_espacio IS NOT NULL AND o.espacio_id = p_espacio))
+     AND tstzrange(o.inicia, o.termina, '[)') && tstzrange(p_inicia, p_termina, '[)');
+$$;
+REVOKE ALL ON FUNCTION _agenda_choques(uuid, uuid, uuid, uuid, timestamptz, timestamptz) FROM PUBLIC, anon, authenticated;
+
+-- Cuerpo de la 0218 con la regla de arriba: la marca solo se quita si el tramo ya no choca con
+-- NADA (tampoco con un tramo marcado, que el EXCLUDE dejaría pasar).
+CREATE OR REPLACE FUNCTION resolver_empalme(p_cita uuid)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_tenant uuid := _agenda_tenant();
+  v_nombre text;
+  v_choca  uuid[];
+  v_s      record;
+BEGIN
+  PERFORM 1 FROM citas WHERE id = p_cita AND tenant_id = v_tenant FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'DATOS_INVALIDOS: la cita no existe.' USING ERRCODE = '22023'; END IF;
+  FOR v_s IN SELECT * FROM citas_servicios WHERE cita_id = p_cita AND empalme ORDER BY orden LOOP
+    v_choca := CASE WHEN v_s.activa THEN _agenda_choques(v_tenant, p_cita, v_s.usuario_id, v_s.espacio_id, v_s.inicia, v_s.termina) END;
+    IF v_choca IS NOT NULL THEN
+      IF EXISTS (SELECT 1 FROM citas_servicios WHERE id = ANY(v_choca) AND usuario_id = v_s.usuario_id) THEN
+        SELECT nombre INTO v_nombre FROM usuarios_perfil WHERE id = v_s.usuario_id;
+        RAISE EXCEPTION 'CITA_EMPALMADA: % ya tiene cita a esa hora', v_nombre USING ERRCODE = '23P01';
+      END IF;
+      SELECT nombre INTO v_nombre FROM espacios WHERE id = v_s.espacio_id;
+      RAISE EXCEPTION 'CITA_EMPALMADA: % ya está ocupado a esa hora', v_nombre USING ERRCODE = '23P01';
+    END IF;
+    UPDATE citas_servicios SET empalme = false WHERE id = v_s.id;
+  END LOOP;
+  UPDATE citas SET empalme = false WHERE id = p_cita;
+END;
+$$;
+
+-- ── §2 Aplicador ────────────────────────────────────────────────────────────
 -- Molde de _vim_aplicar_cotizaciones_caja (0213). Corre en origin: el disparador de `activa`
 -- (0218) decide si cada tramo ocupa, según el estado de la cita en la nube.
---   · tenant_id de la fila = el del dispositivo; un id que ya es de otro negocio es error;
---   · sucursal, cliente (redirigido por clientes_alias, 0156) y venta, del negocio;
+--   · cada cita entra con TODOS sus tramos o no entra: un bloque por cita. Si algo falla, la versión
+--     de la nube queda como estaba y la cita va a `_errores` (la caja la reintenta);
+--   · tenant_id de cada fila = el del dispositivo; un id que ya es de otro negocio es error;
+--   · sucursal, cliente (redirigido por clientes_alias, 0156) y venta, del negocio; created_by solo
+--     si tiene acceso al negocio (si no, NULL);
 --   · una cita TERMINADA, NO_LLEGO o CANCELADA en la nube ya no cambia: una copia vieja de la caja
 --     no la regresa a «Por llegar». Fuera de eso gana el último push;
---   · la cita se escribe completa con sus tramos: los de la nube se borran y entran los que manda la
---     caja (editar en la caja les da ids nuevos). Un tramo cuya cita no entró en este envío se salta;
---   · producto, colaborador y espacio de cada tramo, del negocio;
---   · un tramo que se cruza con otro activo (de otra cita, mismo colaborador o mismo espacio) entra
---     con empalme = true y marca al otro y a las dos citas. Se busca a mano y no con el EXCLUDE:
---     el EXCLUDE no ve los tramos ya marcados, y un reenvío borraría la marca de la cita entrante.
+--   · los tramos de la nube se borran y entran los que manda la caja (editar en la caja les da ids
+--     nuevos); producto, colaborador y espacio de cada uno, del negocio;
+--   · un tramo que se cruza con otro activo entra con empalme = true y marca al otro. Al final se
+--     recalcula la marca de todo lo tocado (así un intercambio de horario entre dos citas de la caja
+--     no deja una marca falsa) y la de sus citas.
 -- Devuelve {citas int, citas_servicios int, errores [{tabla, id, error}]}.
 CREATE OR REPLACE FUNCTION _vim_aplicar_citas_caja(p_tenant uuid, p_citas jsonb, p_servicios jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
 AS $fn$
 DECLARE
-  v_fila      jsonb;
-  v_cita      uuid;
-  v_cli       uuid;
-  v_dueno     uuid;
-  v_estado    cita_estado;
-  v_choca     uuid[];
-  v_aplicadas uuid[] := '{}';
-  v_nc        integer := 0;
-  v_ns        integer := 0;
-  v_errores   jsonb := '[]'::jsonb;
+  v_c       jsonb;
+  v_s       jsonb;
+  v_cita    uuid;
+  v_tramo   uuid;
+  v_cli     uuid;
+  v_dueno   uuid;
+  v_estado  cita_estado;
+  v_activa  boolean;
+  v_marca   boolean;
+  v_choca   uuid[];
+  v_revisar uuid[] := '{}';
+  v_tocadas uuid[] := '{}';
+  v_k       integer;
+  v_nc      integer := 0;
+  v_ns      integer := 0;
+  v_errores jsonb := '[]'::jsonb;
+  r         record;
 BEGIN
-  IF jsonb_typeof(p_citas) = 'array' THEN
-    FOR v_fila IN SELECT value FROM jsonb_array_elements(p_citas) ORDER BY value->>'created_at' LOOP
-      BEGIN
-        v_cita := (v_fila->>'id')::uuid;
-        IF (v_fila->>'tenant_id')::uuid IS DISTINCT FROM p_tenant THEN
-          RAISE EXCEPTION 'fila de otro negocio';
-        END IF;
-        v_dueno := NULL; v_estado := NULL;
-        SELECT tenant_id, estado INTO v_dueno, v_estado FROM citas WHERE id = v_cita;
-        IF v_dueno IS DISTINCT FROM p_tenant AND v_dueno IS NOT NULL THEN
-          RAISE EXCEPTION 'el id ya existe en otro negocio';
-        END IF;
-        IF NOT EXISTS (SELECT 1 FROM sucursales WHERE id = (v_fila->>'sucursal_id')::uuid AND tenant_id = p_tenant) THEN
-          RAISE EXCEPTION 'sucursal de otro negocio';
-        END IF;
-        v_cli := (v_fila->>'cliente_id')::uuid;
-        IF v_cli IS NOT NULL THEN
-          v_cli := COALESCE((SELECT cliente_id FROM clientes_alias WHERE alias_id = v_cli AND tenant_id = p_tenant), v_cli);
-          v_fila := v_fila || jsonb_build_object('cliente_id', v_cli);
-          IF NOT EXISTS (SELECT 1 FROM clientes WHERE id = v_cli AND tenant_id = p_tenant) THEN
-            RAISE EXCEPTION 'cliente de otro negocio';
-          END IF;
-        END IF;
-        IF v_fila->>'ticket_id' IS NOT NULL
-           AND NOT EXISTS (SELECT 1 FROM tickets WHERE id = (v_fila->>'ticket_id')::uuid AND tenant_id = p_tenant) THEN
-          RAISE EXCEPTION 'venta de otro negocio o que aún no sube';
-        END IF;
-        IF v_estado IN ('TERMINADA', 'NO_LLEGO', 'CANCELADA') THEN
-          CONTINUE;   -- cerrada en la nube: la copia de la caja no la reabre
-        END IF;
-        -- Primero fuera los tramos de la nube: cambiar el estado no debe reactivar unos que se van.
-        DELETE FROM citas_servicios WHERE cita_id = v_cita;
-        INSERT INTO citas AS c SELECT * FROM jsonb_populate_record(NULL::citas, v_fila)
-          ON CONFLICT (id) DO UPDATE SET
-            sucursal_id = EXCLUDED.sucursal_id, cliente_id = EXCLUDED.cliente_id,
-            cliente_nombre = EXCLUDED.cliente_nombre, cliente_telefono = EXCLUDED.cliente_telefono,
-            cliente_email = EXCLUDED.cliente_email, estado = EXCLUDED.estado, canal = EXCLUDED.canal,
-            inicia = EXCLUDED.inicia, termina = EXCLUDED.termina, llego_at = EXCLUDED.llego_at,
-            nota = EXCLUDED.nota, cancelada_motivo = EXCLUDED.cancelada_motivo, empalme = EXCLUDED.empalme,
-            updated_at = EXCLUDED.updated_at
-          WHERE c.tenant_id = p_tenant;
-        v_aplicadas := v_aplicadas || v_cita;
-        v_nc := v_nc + 1;
-      EXCEPTION WHEN OTHERS THEN
-        v_errores := v_errores || jsonb_build_object('tabla', 'citas', 'id', v_fila->>'id', 'error', SQLERRM);
-      END;
-    END LOOP;
-  END IF;
+  IF jsonb_typeof(p_citas) IS DISTINCT FROM 'array' THEN p_citas := '[]'::jsonb; END IF;
+  IF jsonb_typeof(p_servicios) IS DISTINCT FROM 'array' THEN p_servicios := '[]'::jsonb; END IF;
 
-  IF jsonb_typeof(p_servicios) = 'array' THEN
-    FOR v_fila IN SELECT value FROM jsonb_array_elements(p_servicios) ORDER BY value->>'cita_id', (value->>'orden')::integer LOOP
-      BEGIN
-        v_cita := (v_fila->>'cita_id')::uuid;
-        IF (v_fila->>'tenant_id')::uuid IS DISTINCT FROM p_tenant THEN
-          RAISE EXCEPTION 'fila de otro negocio';
-        END IF;
-        IF NOT EXISTS (SELECT 1 FROM citas WHERE id = v_cita AND tenant_id = p_tenant) THEN
-          RAISE EXCEPTION 'cita de otro negocio o que aún no sube';
-        END IF;
-        IF NOT (v_cita = ANY(v_aplicadas)) THEN
-          CONTINUE;   -- su cita no se escribió en este envío (cerrada en la nube)
-        END IF;
-        SELECT tenant_id INTO v_dueno FROM citas_servicios WHERE id = (v_fila->>'id')::uuid;
-        IF FOUND AND v_dueno IS DISTINCT FROM p_tenant THEN
-          RAISE EXCEPTION 'el id ya existe en otro negocio';
-        END IF;
-        IF NOT EXISTS (SELECT 1 FROM productos WHERE id = (v_fila->>'producto_id')::uuid AND tenant_id = p_tenant) THEN
-          RAISE EXCEPTION 'producto de otro negocio';
-        END IF;
-        IF v_fila->>'usuario_id' IS NOT NULL AND NOT EXISTS (
-             SELECT 1 FROM usuarios_acceso WHERE usuario_id = (v_fila->>'usuario_id')::uuid AND tenant_id = p_tenant) THEN
-          RAISE EXCEPTION 'colaborador de otro negocio';
-        END IF;
-        IF v_fila->>'espacio_id' IS NOT NULL AND NOT EXISTS (
-             SELECT 1 FROM espacios WHERE id = (v_fila->>'espacio_id')::uuid AND tenant_id = p_tenant) THEN
-          RAISE EXCEPTION 'espacio de otro negocio';
-        END IF;
+  -- Un tramo viaja siempre con su cita.
+  FOR v_s IN SELECT s.value FROM jsonb_array_elements(p_servicios) s
+              WHERE NOT EXISTS (SELECT 1 FROM jsonb_array_elements(p_citas) c WHERE c.value->>'id' = s.value->>'cita_id') LOOP
+    v_errores := v_errores || jsonb_build_object('tabla', 'citas_servicios', 'id', v_s->>'id', 'error', 'llegó sin su cita');
+  END LOOP;
 
-        -- ¿Ocupará (según el estado de su cita en la nube) un tramo que otro ya ocupa?
-        v_choca := NULL;
-        IF (SELECT estado NOT IN ('CANCELADA', 'NO_LLEGO', 'EN_ESPERA') FROM citas WHERE id = v_cita)
-           AND v_fila->>'inicia' IS NOT NULL AND v_fila->>'termina' IS NOT NULL THEN
-          SELECT array_agg(o.id) INTO v_choca
-            FROM citas_servicios o
-           WHERE o.tenant_id = p_tenant AND o.activa AND o.cita_id <> v_cita
-             AND (o.usuario_id = (v_fila->>'usuario_id')::uuid
-                  OR (v_fila->>'espacio_id' IS NOT NULL AND o.espacio_id = (v_fila->>'espacio_id')::uuid))
-             AND tstzrange(o.inicia, o.termina, '[)') && tstzrange((v_fila->>'inicia')::timestamptz, (v_fila->>'termina')::timestamptz, '[)');
+  FOR v_c IN SELECT value FROM jsonb_array_elements(p_citas) ORDER BY value->>'created_at' LOOP
+    BEGIN
+      v_cita := (v_c->>'id')::uuid;
+      IF (v_c->>'tenant_id')::uuid IS DISTINCT FROM p_tenant THEN
+        RAISE EXCEPTION 'fila de otro negocio';
+      END IF;
+      v_dueno := NULL; v_estado := NULL;
+      SELECT tenant_id, estado INTO v_dueno, v_estado FROM citas WHERE id = v_cita;
+      IF v_dueno IS DISTINCT FROM p_tenant AND v_dueno IS NOT NULL THEN
+        RAISE EXCEPTION 'el id ya existe en otro negocio';
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM sucursales WHERE id = (v_c->>'sucursal_id')::uuid AND tenant_id = p_tenant) THEN
+        RAISE EXCEPTION 'sucursal de otro negocio';
+      END IF;
+      v_cli := (v_c->>'cliente_id')::uuid;
+      IF v_cli IS NOT NULL THEN
+        v_cli := COALESCE((SELECT cliente_id FROM clientes_alias WHERE alias_id = v_cli AND tenant_id = p_tenant), v_cli);
+        v_c := v_c || jsonb_build_object('cliente_id', v_cli);
+        IF NOT EXISTS (SELECT 1 FROM clientes WHERE id = v_cli AND tenant_id = p_tenant) THEN
+          RAISE EXCEPTION 'cliente de otro negocio';
         END IF;
+      END IF;
+      IF v_c->>'ticket_id' IS NOT NULL
+         AND NOT EXISTS (SELECT 1 FROM tickets WHERE id = (v_c->>'ticket_id')::uuid AND tenant_id = p_tenant) THEN
+        RAISE EXCEPTION 'venta de otro negocio o que aún no sube';
+      END IF;
+      IF v_c->>'created_by' IS NOT NULL AND NOT EXISTS (
+           SELECT 1 FROM usuarios_acceso WHERE usuario_id = (v_c->>'created_by')::uuid AND tenant_id = p_tenant) THEN
+        v_c := v_c || '{"created_by": null}'::jsonb;
+      END IF;
+      IF v_estado IN ('TERMINADA', 'NO_LLEGO', 'CANCELADA') THEN
+        CONTINUE;   -- cerrada en la nube: la copia de la caja no la reabre
+      END IF;
+
+      -- Primero fuera los tramos de la nube: cambiar el estado no debe reactivar unos que se van.
+      DELETE FROM citas_servicios WHERE cita_id = v_cita;
+      INSERT INTO citas AS c SELECT * FROM jsonb_populate_record(NULL::citas, v_c || '{"empalme": false}'::jsonb)
+        ON CONFLICT (id) DO UPDATE SET
+          sucursal_id = EXCLUDED.sucursal_id, cliente_id = EXCLUDED.cliente_id,
+          cliente_nombre = EXCLUDED.cliente_nombre, cliente_telefono = EXCLUDED.cliente_telefono,
+          cliente_email = EXCLUDED.cliente_email, estado = EXCLUDED.estado, canal = EXCLUDED.canal,
+          inicia = EXCLUDED.inicia, termina = EXCLUDED.termina, llego_at = EXCLUDED.llego_at,
+          nota = EXCLUDED.nota, cancelada_motivo = EXCLUDED.cancelada_motivo, updated_at = EXCLUDED.updated_at
+        WHERE c.tenant_id = p_tenant;
+      SELECT estado NOT IN ('CANCELADA', 'NO_LLEGO', 'EN_ESPERA') INTO v_activa FROM citas WHERE id = v_cita;
+
+      v_k := 0;
+      FOR v_s IN SELECT value FROM jsonb_array_elements(p_servicios)
+                  WHERE value->>'cita_id' = v_cita::text ORDER BY (value->>'orden')::integer LOOP
+        v_tramo := (v_s->>'id')::uuid;
+        IF (v_s->>'tenant_id')::uuid IS DISTINCT FROM p_tenant THEN
+          RAISE EXCEPTION 'tramo %: fila de otro negocio', v_tramo;
+        END IF;
+        IF EXISTS (SELECT 1 FROM citas_servicios WHERE id = v_tramo AND tenant_id <> p_tenant) THEN
+          RAISE EXCEPTION 'tramo %: el id ya existe en otro negocio', v_tramo;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM productos WHERE id = (v_s->>'producto_id')::uuid AND tenant_id = p_tenant) THEN
+          RAISE EXCEPTION 'tramo %: producto de otro negocio', v_tramo;
+        END IF;
+        IF v_s->>'usuario_id' IS NOT NULL AND NOT EXISTS (
+             SELECT 1 FROM usuarios_acceso WHERE usuario_id = (v_s->>'usuario_id')::uuid AND tenant_id = p_tenant) THEN
+          RAISE EXCEPTION 'tramo %: colaborador de otro negocio', v_tramo;
+        END IF;
+        IF v_s->>'espacio_id' IS NOT NULL AND NOT EXISTS (
+             SELECT 1 FROM espacios WHERE id = (v_s->>'espacio_id')::uuid AND tenant_id = p_tenant) THEN
+          RAISE EXCEPTION 'tramo %: espacio de otro negocio', v_tramo;
+        END IF;
+        v_choca := CASE WHEN v_activa THEN _agenda_choques(p_tenant, v_cita, (v_s->>'usuario_id')::uuid, (v_s->>'espacio_id')::uuid,
+                                                           (v_s->>'inicia')::timestamptz, (v_s->>'termina')::timestamptz) END;
         IF v_choca IS NOT NULL THEN
           UPDATE citas_servicios SET empalme = true WHERE id = ANY(v_choca) AND NOT empalme;
-          UPDATE citas SET empalme = true
-           WHERE NOT empalme AND (id = v_cita OR id IN (SELECT cita_id FROM citas_servicios WHERE id = ANY(v_choca)));
-          v_fila := v_fila || '{"empalme": true}'::jsonb;
+          v_revisar := v_revisar || v_choca;
         END IF;
-        INSERT INTO citas_servicios SELECT * FROM jsonb_populate_record(NULL::citas_servicios, v_fila);
-        v_ns := v_ns + 1;
-      EXCEPTION WHEN OTHERS THEN
-        v_errores := v_errores || jsonb_build_object('tabla', 'citas_servicios', 'id', v_fila->>'id', 'error', SQLERRM);
+        INSERT INTO citas_servicios
+          SELECT * FROM jsonb_populate_record(NULL::citas_servicios, v_s || jsonb_build_object('empalme', v_choca IS NOT NULL));
+        v_revisar := v_revisar || v_tramo;
+        v_k := v_k + 1;
+      END LOOP;
+      v_tocadas := v_tocadas || v_cita;
+      v_nc := v_nc + 1;
+      v_ns := v_ns + v_k;
+    EXCEPTION WHEN OTHERS THEN
+      v_errores := v_errores || jsonb_build_object('tabla', 'citas', 'id', v_c->>'id', 'error', SQLERRM);
+    END;
+  END LOOP;
+
+  -- La marca, recalculada sobre lo tocado ya con todo el envío aplicado.
+  FOR r IN SELECT * FROM citas_servicios WHERE id = ANY(v_revisar) LOOP
+    v_marca := r.activa AND _agenda_choques(p_tenant, r.cita_id, r.usuario_id, r.espacio_id, r.inicia, r.termina) IS NOT NULL;
+    IF v_marca IS DISTINCT FROM r.empalme THEN
+      BEGIN
+        UPDATE citas_servicios SET empalme = v_marca WHERE id = r.id;
+      EXCEPTION WHEN exclusion_violation THEN NULL;   -- otro envío lo ocupó en el ínterin: queda marcado
       END;
-    END LOOP;
-  END IF;
+    END IF;
+    v_tocadas := v_tocadas || r.cita_id;
+  END LOOP;
+  UPDATE citas c SET empalme = m.marca
+    FROM (SELECT x.id, EXISTS (SELECT 1 FROM citas_servicios s WHERE s.cita_id = x.id AND s.empalme) AS marca
+            FROM citas x WHERE x.id = ANY(v_tocadas)) m
+   WHERE c.id = m.id AND c.empalme IS DISTINCT FROM m.marca;
+
   RETURN jsonb_build_object('citas', v_nc, 'citas_servicios', v_ns, 'errores', v_errores);
 END;
 $fn$;
 REVOKE ALL ON FUNCTION _vim_aplicar_citas_caja(uuid, jsonb, jsonb) FROM PUBLIC, anon, authenticated;
 
--- ── §2 sync_pull_snapshot ───────────────────────────────────────────────────
+-- ── §3 sync_pull_snapshot ───────────────────────────────────────────────────
 -- La de la 0210 (vigente) más la agenda (marcado "0219"). La ventana de citas vive en `ci`.
 CREATE OR REPLACE FUNCTION sync_pull_snapshot(p_tenant uuid)
 RETURNS jsonb
@@ -271,7 +340,7 @@ $$;
 REVOKE EXECUTE ON FUNCTION sync_pull_snapshot(uuid) FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION sync_pull_snapshot(uuid) TO service_role;
 
--- ── §3 sync_push_snapshot ───────────────────────────────────────────────────
+-- ── §4 sync_push_snapshot ───────────────────────────────────────────────────
 -- La de la 0213 (vigente) más las citas (marcado "0219"): se aplican al final, en origin; no cuentan
 -- entre las ignoradas y sirven para hallar la sucursal del rastro.
 CREATE OR REPLACE FUNCTION sync_push_snapshot(p_tenant uuid, p_snapshot jsonb)
