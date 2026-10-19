@@ -224,6 +224,102 @@ export type Database = {
         }
         Relationships: []
       }
+      agenda_correos: {
+        Row: {
+          cita_id: string
+          created_at: string
+          enviado_at: string | null
+          estado: string
+          id: number
+          intentos: number
+          motivo: string | null
+          proximo_intento_at: string | null
+          tenant_id: string
+          tipo: string
+          tomado_at: string | null
+          version: number
+        }
+        Insert: {
+          cita_id: string
+          created_at?: string
+          enviado_at?: string | null
+          estado?: string
+          id?: number
+          intentos?: number
+          motivo?: string | null
+          proximo_intento_at?: string | null
+          tenant_id: string
+          tipo: string
+          tomado_at?: string | null
+          version?: number
+        }
+        Update: {
+          cita_id?: string
+          created_at?: string
+          enviado_at?: string | null
+          estado?: string
+          id?: number
+          intentos?: number
+          motivo?: string | null
+          proximo_intento_at?: string | null
+          tenant_id?: string
+          tipo?: string
+          tomado_at?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agenda_correos_cita_id_fkey"
+            columns: ["cita_id"]
+            isOneToOne: false
+            referencedRelation: "citas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_correos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agenda_enlaces: {
+        Row: {
+          cifrado: string
+          cita_id: string
+          created_at: string
+          tenant_id: string
+        }
+        Insert: {
+          cifrado: string
+          cita_id: string
+          created_at?: string
+          tenant_id: string
+        }
+        Update: {
+          cifrado?: string
+          cita_id?: string
+          created_at?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agenda_enlaces_cita_id_fkey"
+            columns: ["cita_id"]
+            isOneToOne: true
+            referencedRelation: "citas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agenda_enlaces_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       alertas_inventario: {
         Row: {
           activa: boolean
@@ -15225,6 +15321,12 @@ export type Database = {
         Returns: Json
       }
       _agenda_cita_resumen: { Args: { p_cita: string }; Returns: Json }
+      _agenda_correo_encolar: {
+        Args: { p_cita: string; p_tipo: string; p_version?: number }
+        Returns: undefined
+      }
+      _agenda_correo_plazo: { Args: { p_tipo: string }; Returns: string }
+      _agenda_correo_version: { Args: { p_cita: string }; Returns: number }
       _agenda_remarcar: {
         Args: { p_citas?: string[]; p_tenant: string; p_tramos: string[] }
         Returns: undefined
@@ -15798,6 +15900,29 @@ export type Database = {
         Args: { p_enlace_hash: string; p_tenant: string }
         Returns: Json
       }
+      agenda_correo_resultado: {
+        Args: { p_id: number; p_resultado: string }
+        Returns: string
+      }
+      agenda_correos_tomar: {
+        Args: { p_max?: number; p_tope_hora?: number }
+        Returns: {
+          cifrado: string
+          cita: Json
+          email: string
+          enlace_hash: string
+          id: number
+          negocio: string
+          slug: string
+          tenant_id: string
+          tipo: string
+          version: number
+        }[]
+      }
+      agenda_enlace_guardar: {
+        Args: { p_cifrado: string; p_enlace_hash: string; p_tenant: string }
+        Returns: undefined
+      }
       agenda_huecos: {
         Args: {
           p_dia: string
@@ -15814,6 +15939,7 @@ export type Database = {
         Args: { p_enlace_hash: string; p_inicia: string; p_tenant: string }
         Returns: Json
       }
+      agenda_recordatorios_encolar: { Args: never; Returns: number }
       agenda_reservar_en_linea: {
         Args: { p: Json; p_tenant: string }
         Returns: Json
