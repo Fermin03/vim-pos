@@ -1,6 +1,6 @@
 # Giros de belleza — diseño
 
-**Fecha:** 18 oct 2026 · **Estado:** borrador para Fermín · **Grupo:** 2 de 3 antes de producción
+**Fecha:** 18 oct 2026 · **Estado:** completo, para aprobación de Fermín · **Grupo:** 2 de 3 antes de producción
 (retail ✔ → **belleza** → servicios). Fermín cambió el orden el 18 oct: belleza va antes que servicios.
 
 Bocetos aprobados por Fermín («los dejaría como están»): `docs/superpowers/bocetos-belleza/`
