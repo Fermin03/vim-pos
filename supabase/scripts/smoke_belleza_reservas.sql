@@ -104,6 +104,8 @@ BEGIN
      OR (modulos_efectivos(v_t)->'efectivos'->>'reservas') IS DISTINCT FROM 'false' THEN
     RAISE EXCEPTION 'R1: con add-on y sin interruptor: %', modulos_efectivos(v_t); END IF;
   IF reservas_negocio('reservas-smoke') IS NOT NULL THEN RAISE EXCEPTION 'R1: el sitio ve un negocio sin reservas'; END IF;
+  -- La página de una cita sí lo ve con las reservas apagadas (la clienta ve su cita y su reembolso).
+  IF reservas_negocio('reservas-smoke', true) IS NULL THEN RAISE EXCEPTION 'R1: la página de la cita no ve el negocio'; END IF;
   UPDATE configuracion_tenant SET modulo_reservas_activo = true WHERE tenant_id = v_t;
   IF (modulos_efectivos(v_t)->'efectivos'->>'reservas') IS DISTINCT FROM 'true' THEN RAISE EXCEPTION 'R1: debía quedar encendido'; END IF;
   UPDATE tenants SET operacion = operacion || '{"agenda":false}' WHERE id = v_t;
@@ -227,7 +229,7 @@ BEGIN
   v_hash := pg_temp.h(v_r->>'codigo');
   SELECT * INTO r FROM citas WHERE id = v_c2;
   IF (v_r->>'codigo') !~ '^[A-Za-z0-9_-]{22}$' OR r.enlace_hash <> v_hash OR r.estado <> 'AGENDADA' OR r.canal <> 'EN_LINEA'
-     OR r.client_id_local <> 'web:smk-res-0001' OR r.reservo_email <> 'ana.web@example.com' OR r.pago_hasta IS NOT NULL
+     OR r.client_id_local <> ('web:' || pg_temp.h('smk-res-0001')) OR r.reservo_email <> 'ana.web@example.com' OR r.pago_hasta IS NOT NULL
      OR (v_r->>'anticipo_mxn')::numeric <> 0 OR r.termina <> pg_temp.a(d, '10:00') THEN
     RAISE EXCEPTION 'R14: % %', v_r, to_jsonb(r); END IF;
   IF (SELECT usuario_id FROM citas_servicios WHERE cita_id = v_c2) <> v_diego OR v_r->'resumen'->>'colaborador' <> 'Diego R.'
@@ -247,7 +249,7 @@ BEGIN
   -- R16) Clave idempotente: misma cita, sin código nuevo.
   v_r2 := pg_temp.reservar(pg_temp.a(d, '09:00'), pg_temp.s(v_corte), 'smk-res-0001');
   IF (v_r2->>'cita_id')::uuid <> v_c2 OR v_r2->>'codigo' IS NOT NULL
-     OR (SELECT count(*) FROM citas WHERE tenant_id = v_t AND client_id_local = 'web:smk-res-0001') <> 1 THEN
+     OR (SELECT count(*) FROM citas WHERE tenant_id = v_t AND client_id_local = ('web:' || pg_temp.h('smk-res-0001'))) <> 1 THEN
     RAISE EXCEPTION 'R16: %', v_r2; END IF;
   PERFORM pg_temp.debe_fallar(format('SELECT pg_temp.reservar(%L, %L, %L)', pg_temp.a(d, '12:00'), pg_temp.s(v_corte), 'x'),
     'DATOS_INVALIDOS: falta la clave%', 'R16 clave corta');
@@ -325,7 +327,7 @@ BEGIN
     RAISE EXCEPTION 'R22: el negocio no anuncia el anticipo del corte'; END IF;
   PERFORM pg_temp.debe_fallar(format('SELECT pg_temp.reservar(%L, %L, %L)', pg_temp.a(d, '13:00'), pg_temp.s(v_corte, v_maria), 'smk-res-0007', '4770002246'),
     'PAGO_NO_DISPONIBLE:%', 'R22 sin cobro en línea');
-  IF EXISTS (SELECT 1 FROM citas WHERE client_id_local = 'web:smk-res-0007') THEN RAISE EXCEPTION 'R22: quedó la cita sin cobro'; END IF;
+  IF EXISTS (SELECT 1 FROM citas WHERE client_id_local = ('web:' || pg_temp.h('smk-res-0007'))) THEN RAISE EXCEPTION 'R22: quedó la cita sin cobro'; END IF;
   UPDATE tienda_config SET pago_en_linea = true WHERE tenant_id = v_t;
   INSERT INTO tienda_conexiones (tenant_id, cuenta_id_externo, public_key) VALUES (v_t, '2240', 'APP_USR-smoke-reservas-00000001') RETURNING id INTO v_cx;
   INSERT INTO tienda_sucursales (sucursal_id, tenant_id, participa) VALUES (v_suc, v_t, true)
@@ -424,7 +426,7 @@ BEGIN
   UPDATE clientes SET estado = 'BLOQUEADO', motivo_bloqueo = 'Smoke' WHERE id = v_lucia;
   PERFORM pg_temp.debe_fallar(format('SELECT pg_temp.reservar(%L, %L, %L, %L)', pg_temp.a(e, '10:00'), pg_temp.s(v_corte, v_maria), 'smk-res-0011', '4770002242'),
     'DATOS_INVALIDOS: No pudimos apartar tu cita. Comunícate con el negocio.', 'R29 bloqueada');
-  IF EXISTS (SELECT 1 FROM citas WHERE client_id_local = 'web:smk-res-0011') THEN RAISE EXCEPTION 'R29: quedó la cita'; END IF;
+  IF EXISTS (SELECT 1 FROM citas WHERE client_id_local = ('web:' || pg_temp.h('smk-res-0011'))) THEN RAISE EXCEPTION 'R29: quedó la cita'; END IF;
 
   -- R30) Tope: 3 citas por llegar por celular; al cancelar una, cabe otra.
   v_r := pg_temp.reservar(pg_temp.a(e, '10:00'), pg_temp.s(v_corte, v_maria), 'smk-res-0012', '477 000 2250');
@@ -443,10 +445,11 @@ BEGIN
   PERFORM pg_temp.debe_fallar(format('SELECT agenda_cancelar_en_linea(%L, %L)', v_t, pg_temp.h(v_r2->>'codigo')),
     'DATOS_INVALIDOS: este negocio no tiene reservas en línea.', 'R31 cancelar');
   IF reservas_negocio('reservas-smoke') IS NOT NULL THEN RAISE EXCEPTION 'R31: el sitio ve un negocio bloqueado'; END IF;
+  IF reservas_negocio('reservas-smoke', true) IS NOT NULL THEN RAISE EXCEPTION 'R31: la página de la cita ve un negocio bloqueado'; END IF;
   UPDATE tenants SET bloqueo_desde = NULL WHERE id = v_t;
 
   -- R26) Permisos: solo service_role ejecuta las RPC; las internas, nadie.
-  FOREACH f IN ARRAY ARRAY['reservas_negocio(text)', 'agenda_huecos(uuid, uuid, date, jsonb, text)', 'agenda_reservar_en_linea(uuid, jsonb)',
+  FOREACH f IN ARRAY ARRAY['reservas_negocio(text, boolean)', 'agenda_huecos(uuid, uuid, date, jsonb, text)', 'agenda_reservar_en_linea(uuid, jsonb)',
                            'agenda_cita_publica(uuid, text)', 'agenda_cancelar_en_linea(uuid, text)',
                            'agenda_mover_en_linea(uuid, text, timestamptz)', 'agenda_vencer_reservas()'] LOOP
     IF has_function_privilege('anon', f, 'execute') OR has_function_privilege('authenticated', f, 'execute')

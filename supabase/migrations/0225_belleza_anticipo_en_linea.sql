@@ -38,6 +38,9 @@ ALTER TABLE tienda_pagos ADD CONSTRAINT tienda_pago_pedido_o_cita CHECK (num_non
 DROP INDEX IF EXISTS tienda_pagos_cita_uq;
 CREATE UNIQUE INDEX tienda_pagos_cita_uq ON tienda_pagos (cita_id) WHERE NOT extra AND estado IN ('CREADO', 'APROBADO');
 CREATE INDEX IF NOT EXISTS idx_tienda_pagos_cita ON tienda_pagos (cita_id) WHERE cita_id IS NOT NULL;
+-- Cuándo se descartó un pago de cita rechazado. El pago no se borra (es un intento de la cita), así
+-- que esto es lo que hace que el descarte —y el rechazo que la función cuenta con él— pase una vez.
+ALTER TABLE tienda_pagos ADD COLUMN IF NOT EXISTS descartado_at timestamptz NULL;
 COMMENT ON COLUMN tienda_pagos.cita_id IS 'Pago del anticipo de una cita reservada en línea (0225). Exactamente uno de pedido_id y cita_id.';
 
 -- El CHECK de método de la 0222 era anónimo: se busca por lo que dice y se repone con nombre.
@@ -97,6 +100,8 @@ $$;
 -- tienda_pago_descartar, pago de cita: un NO seguro de Mercado Pago. El pago queda RECHAZADO (es un
 -- intento de la cita; no se borra) y la cita sigue apartada hasta pago_hasta: reservar con la misma
 -- clave da otro pago. Mismas dos formas que el pedido: CREADO sin orden, o ya RECHAZADO.
+-- Verdadero UNA sola vez por pago (descartado_at): el pedido desaparece al descartarse y el pago de
+-- una cita no, así que sin esto cada consulta repetida contaría otra vez el mismo rechazo.
 CREATE OR REPLACE FUNCTION _tienda_pago_descartar_cita(p_pago uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -110,8 +115,8 @@ BEGIN
   IF NOT FOUND THEN RETURN false; END IF;
   -- Siempre la cita antes que el pago (como el pedido en la 0173).
   PERFORM 1 FROM citas WHERE id = v_cita FOR UPDATE;
-  UPDATE tienda_pagos SET estado = 'RECHAZADO'
-   WHERE id = p_pago AND aprobado_at IS NULL
+  UPDATE tienda_pagos SET estado = 'RECHAZADO', descartado_at = now()
+   WHERE id = p_pago AND aprobado_at IS NULL AND descartado_at IS NULL
      AND ((estado = 'CREADO' AND orden_id_externo IS NULL) OR estado = 'RECHAZADO');
   RETURN FOUND;
 END;
@@ -1329,7 +1334,7 @@ BEGIN
   END IF;
 
   PERFORM pg_advisory_xact_lock(hashtextextended('cita_web:' || p_tenant || ':' || v_clave, 0));
-  SELECT id INTO v_id FROM citas WHERE tenant_id = p_tenant AND client_id_local = 'web:' || v_clave;
+  SELECT id INTO v_id FROM citas WHERE tenant_id = p_tenant AND client_id_local = 'web:' || encode(sha256(convert_to(v_clave, 'UTF8')), 'hex');
   IF FOUND THEN
     RETURN jsonb_build_object('cita_id', v_id, 'codigo', NULL, 'anticipo_mxn', _anticipo_cita(p_tenant, v_id),
                               'resumen', _agenda_cita_resumen(v_id))
@@ -1388,7 +1393,7 @@ BEGIN
                      estado, canal, inicia, termina, nota, client_id_local, enlace_hash, reservo_email)
   VALUES (p_tenant, v_suc, v_cli, v_nombre, v_tel, v_email,
           'AGENDADA', 'EN_LINEA', v_inicia, v_inicia + interval '1 minute',
-          left(NULLIF(btrim(p->>'nota'), ''), 300), 'web:' || v_clave,
+          left(NULLIF(btrim(p->>'nota'), ''), 300), 'web:' || encode(sha256(convert_to(v_clave, 'UTF8')), 'hex'),
           encode(sha256(convert_to(v_codigo, 'UTF8')), 'hex'), v_email)
   RETURNING id INTO v_id;
   BEGIN

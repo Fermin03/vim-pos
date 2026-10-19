@@ -688,7 +688,11 @@ REVOKE ALL ON FUNCTION _agenda_cita_cambiable(uuid, text) FROM PUBLIC, anon, aut
 -- ── §5 RPC (solo service_role) ──────────────────────────────────────────────
 -- El negocio para el sitio, por su dirección. NULL si no existe, no opera o no tiene reservas.
 -- Molde de tienda_negocio (0187). `tenant` es para la función, no para el navegador.
-CREATE OR REPLACE FUNCTION reservas_negocio(p_slug text)
+-- p_cita: para la página de una cita (verla y confirmar su pago). No exige las reservas encendidas
+-- —la clienta sigue viendo su cita y su reembolso aunque el negocio las apague—, pero sí que el
+-- negocio exista y opere. Cancelar y mover las siguen exigiendo (_agenda_cita_cambiable).
+DROP FUNCTION IF EXISTS reservas_negocio(text);
+CREATE OR REPLACE FUNCTION reservas_negocio(p_slug text, p_cita boolean DEFAULT false)
 RETURNS jsonb
 LANGUAGE plpgsql
 STABLE
@@ -710,7 +714,8 @@ BEGIN
    WHERE t.id = v_c.tenant_id AND t.deleted_at IS NULL AND t.estado IN ('ACTIVO', 'TRIAL', 'INTERNO')
      AND (t.bloqueo_desde IS NULL OR t.bloqueo_desde > now());
   IF NOT FOUND THEN RETURN NULL; END IF;
-  IF COALESCE((modulos_efectivos(v_c.tenant_id)->'efectivos'->>'reservas')::boolean, false) IS NOT TRUE THEN
+  IF NOT COALESCE(p_cita, false)
+     AND COALESCE((modulos_efectivos(v_c.tenant_id)->'efectivos'->>'reservas')::boolean, false) IS NOT TRUE THEN
     RETURN NULL;
   END IF;
   SELECT * INTO v_cfg FROM configuracion_tenant WHERE tenant_id = v_c.tenant_id;
@@ -854,6 +859,7 @@ $$;
 REVOKE ALL ON FUNCTION _telefono_10(text) FROM PUBLIC, anon, authenticated, service_role;
 
 -- Crea la cita en línea. Idempotente por `clave`; el código del enlace solo sale la primera vez.
+-- La clave no se guarda: client_id_local = 'web:' || su SHA-256 (con ella se recupera el enlace).
 CREATE OR REPLACE FUNCTION agenda_reservar_en_linea(p_tenant uuid, p jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -900,7 +906,7 @@ BEGIN
   v_email  := lower(NULLIF(btrim(p->'cliente'->>'email'), ''));
 
   PERFORM pg_advisory_xact_lock(hashtextextended('cita_web:' || p_tenant || ':' || v_clave, 0));
-  SELECT id INTO v_id FROM citas WHERE tenant_id = p_tenant AND client_id_local = 'web:' || v_clave;
+  SELECT id INTO v_id FROM citas WHERE tenant_id = p_tenant AND client_id_local = 'web:' || encode(sha256(convert_to(v_clave, 'UTF8')), 'hex');
   IF FOUND THEN
     RETURN jsonb_build_object('cita_id', v_id, 'codigo', NULL, 'anticipo_mxn', _anticipo_cita(p_tenant, v_id),
                               'resumen', _agenda_cita_resumen(v_id));
@@ -958,7 +964,7 @@ BEGIN
                      estado, canal, inicia, termina, nota, client_id_local, enlace_hash, reservo_email)
   VALUES (p_tenant, v_suc, v_cli, v_nombre, v_tel, v_email,
           'AGENDADA', 'EN_LINEA', v_inicia, v_inicia + interval '1 minute',
-          left(NULLIF(btrim(p->>'nota'), ''), 300), 'web:' || v_clave,
+          left(NULLIF(btrim(p->>'nota'), ''), 300), 'web:' || encode(sha256(convert_to(v_clave, 'UTF8')), 'hex'),
           encode(sha256(convert_to(v_codigo, 'UTF8')), 'hex'), v_email)
   RETURNING id INTO v_id;
   BEGIN
@@ -1100,7 +1106,7 @@ $$;
 DO $$
 DECLARE f text;
 BEGIN
-  FOREACH f IN ARRAY ARRAY['reservas_negocio(text)', 'agenda_huecos(uuid, uuid, date, jsonb, text)',
+  FOREACH f IN ARRAY ARRAY['reservas_negocio(text, boolean)', 'agenda_huecos(uuid, uuid, date, jsonb, text)',
                            'agenda_reservar_en_linea(uuid, jsonb)', 'agenda_cita_publica(uuid, text)',
                            'agenda_cancelar_en_linea(uuid, text)', 'agenda_mover_en_linea(uuid, text, timestamptz)',
                            'agenda_vencer_reservas()'] LOOP

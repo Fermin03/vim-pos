@@ -152,6 +152,8 @@ BEGIN
   v_x := tienda_pago_aplicar(v_g, 'RECHAZADO', 'ORDCITA02', 100.00, NULL, NULL, 'cc_rejected_insufficient_amount');
   IF v_x->>'estado' <> 'RECHAZADO' OR v_x->>'cita_estado' <> 'AGENDADA' THEN RAISE EXCEPTION 'P3: %', v_x; END IF;
   IF NOT tienda_pago_descartar(v_g) THEN RAISE EXCEPTION 'P3: no descartó'; END IF;
+  -- Una vez: la función cuenta el rechazo con este descarte, y una consulta repetida no lo vuelve a contar.
+  IF tienda_pago_descartar(v_g) THEN RAISE EXCEPTION 'P3: descartó dos veces el mismo pago'; END IF;
   IF (SELECT estado FROM tienda_pagos WHERE id = v_g) IS DISTINCT FROM 'RECHAZADO'
      OR (SELECT estado FROM citas WHERE id = v_c2) <> 'AGENDADA' THEN RAISE EXCEPTION 'P3: descartar'; END IF;
   v_r2 := pg_temp.reservar(pg_temp.a(d, '11:00'), 'smk-pago-0002', '4770003302');

@@ -94,13 +94,29 @@ export function reembolsoDeCita(estados: readonly string[]): Reembolso {
  */
 export function citaPublica(x: unknown, estadosDePago: readonly string[]): Obj | null {
   if (!objeto(x) || typeof x.estado !== "string" || typeof x.inicia !== "string") return null;
+  const suc = objeto(x.sucursal) ? x.sucursal : {};
+  // Campo por campo: lo que la base agregue mañana no llega al navegador solo.
   return {
-    ...x,
-    servicios: (Array.isArray(x.servicios) ? x.servicios.filter(objeto) : []).map((s) => ({ ...s, precio: importe(s.precio) })),
-    total_mxn: importe(x.total_mxn), anticipo_mxn: importe(x.anticipo_mxn) ?? "0.00", anticipo_pagado_mxn: importe(x.anticipo_pagado_mxn) ?? "0.00",
+    inicia: x.inicia, termina: x.termina ?? null, dia: x.dia ?? null, hora: x.hora ?? null,
+    sucursal: { id: suc.id ?? null, nombre: suc.nombre ?? null, direccion: suc.direccion ?? null },
+    servicios: (Array.isArray(x.servicios) ? x.servicios.filter(objeto) : []).map((v) => ({
+      producto_id: v.producto_id ?? null, nombre: v.nombre ?? null, colaborador_id: v.colaborador_id ?? null,
+      colaborador: v.colaborador ?? null, inicia: v.inicia ?? null, precio: importe(v.precio),
+    })),
+    colaborador: x.colaborador ?? null, total_mxn: importe(x.total_mxn), estado: x.estado,
+    cancelada_motivo: x.cancelada_motivo ?? null,
+    anticipo_mxn: importe(x.anticipo_mxn) ?? "0.00", anticipo_pagado_mxn: importe(x.anticipo_pagado_mxn) ?? "0.00",
+    pago_hasta: x.pago_hasta ?? null, puede_cambiar: x.puede_cambiar === true,
+    cancelar_horas: typeof x.cancelar_horas === "number" ? x.cancelar_horas : 24, whatsapp: x.whatsapp ?? null,
     reembolso: reembolsoDeCita(estadosDePago),
   };
 }
+
+/**
+ * El no de un pago de cita que otra consulta ya descartó (y contó): se repite sin volver a contarlo.
+ * El motivo no se repite (`OTRO`): pudo haberse dicho ya enmascarado por el tope de la IP.
+ */
+export const rechazoYaContado = (): { error: "PAGO_RECHAZADO"; detalle: "OTRO" } => ({ error: "PAGO_RECHAZADO", detalle: "OTRO" });
 
 /** Los rechazos de la agenda que llevan un mensaje para la clienta, con su estado HTTP. */
 const DE_AGENDA = new Map<string, number>([

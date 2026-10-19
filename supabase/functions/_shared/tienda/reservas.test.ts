@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { citaPublica, huecosPublicos, importe, leerReservada, MENSAJE_REEMBOLSO_EN_PROCESO, negocioDeReservas, reembolsoDeCita, respuestaDeAgenda } from "./reservas.ts";
+import { citaPublica, huecosPublicos, rechazoYaContado, importe, leerReservada, MENSAJE_REEMBOLSO_EN_PROCESO, negocioDeReservas, reembolsoDeCita, respuestaDeAgenda } from "./reservas.ts";
 import { leerCuerpo } from "./validar.ts";
 import { cuposDe } from "./respuesta.ts";
 
@@ -65,8 +65,14 @@ test("cita pública: importes en texto y su reembolso; lo que no es una cita es 
   assert.ok(c);
   assert.equal(c.total_mxn, "180.00");
   assert.equal(c.anticipo_pagado_mxn, "72.00");
-  assert.deepEqual(c.servicios, [{ nombre: "Corte", precio: "180.00" }]);
+  assert.deepEqual(c.servicios, [{ producto_id: null, nombre: "Corte", colaborador_id: null, colaborador: null, inicia: null, precio: "180.00" }]);
   assert.deepEqual(c.reembolso, { estado: "EN_PROCESO", mensaje: MENSAJE_REEMBOLSO_EN_PROCESO });
+  // Solo los campos conocidos: lo que la base agregue no sale solo.
+  const x = citaPublica({ estado: "AGENDADA", inicia: "2026-10-20T16:00:00+00:00", tenant_id: "t", cliente_telefono: "4771112233",
+                          sucursal: { id: "s", nombre: "Centro", direccion: null, telefono: "4770000000" }, servicios: [{ nombre: "Corte", usuario_email: "x@y" }] }, []);
+  assert.ok(x);
+  for (const fuera of ["tenant_id", "cliente_telefono", "4770000000", "usuario_email"]) assert.equal(JSON.stringify(x).includes(fuera), false, fuera);
+  assert.equal(x.puede_cambiar, false);
   assert.equal(citaPublica(null, []), null);
   assert.equal(citaPublica({ inicia: "x" }, []), null);
 });
@@ -167,4 +173,8 @@ test("cupos: reservar = los topes de pedir en su propia bolsa; el del negocio so
     despuesDelCaptcha: [{ clave: "tienda:reserva:negocio:salon-ana", ventanaSeg: 3600, max: 60 }],
     alFallar: "cerrar",
   });
+});
+
+test("rechazo ya contado: el mismo no, sin repetir el motivo", () => {
+  assert.deepEqual(rechazoYaContado(), { error: "PAGO_RECHAZADO", detalle: "OTRO" });
 });

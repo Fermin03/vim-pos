@@ -12889,6 +12889,7 @@ export type Database = {
           consultado_at: string | null
           correo_at: string | null
           created_at: string
+          descartado_at: string | null
           detalle: string | null
           devuelto_at: string | null
           estado: string
@@ -12921,6 +12922,7 @@ export type Database = {
           consultado_at?: string | null
           correo_at?: string | null
           created_at?: string
+          descartado_at?: string | null
           detalle?: string | null
           devuelto_at?: string | null
           estado?: string
@@ -12953,6 +12955,7 @@ export type Database = {
           consultado_at?: string | null
           correo_at?: string | null
           created_at?: string
+          descartado_at?: string | null
           detalle?: string | null
           devuelto_at?: string | null
           estado?: string
@@ -17133,7 +17136,10 @@ export type Database = {
         Args: { p_padre_id: string; p_precio_padre: number }
         Returns: undefined
       }
-      reservas_negocio: { Args: { p_slug: string }; Returns: Json }
+      reservas_negocio: {
+        Args: { p_cita?: boolean; p_slug: string }
+        Returns: Json
+      }
       resetear_pin_empleado: {
         Args: { p_pin_nuevo: string; p_usuario_id: string }
         Returns: undefined

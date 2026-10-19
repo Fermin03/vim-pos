@@ -146,7 +146,7 @@ import { leerCuerpo, type Peticion, type PeticionDeReservas, tieneNul } from "..
 import { codigoDeClave, huellaDe, nuevoCodigo } from "../_shared/tienda/seguimiento.ts";
 import { correoDePedido } from "../_shared/tienda/correo-pedido.ts";
 import { cifrarCodigo, descifrarCodigo } from "../_shared/tienda/enlace.ts";
-import { citaPublica, huecosPublicos, leerReservada, negocioDeReservas, type NegocioDeReservas, respuestaDeAgenda } from "../_shared/tienda/reservas.ts";
+import { citaPublica, huecosPublicos, rechazoYaContado, leerReservada, negocioDeReservas, type NegocioDeReservas, respuestaDeAgenda } from "../_shared/tienda/reservas.ts";
 import { correoDeBienvenida, correoDeRecuperacion, correoYaTienesCuenta } from "../_shared/tienda/correo-cuenta.ts";
 import { CABECERA_SESION, cuentaDe, direccionesPublicas, leerRegistro, leerSesion, pedidosPublicos, type Sesion } from "../_shared/tienda/cuenta.ts";
 import { cotizacionPublica, type Cupos, cuposDe, esTopeDeEntradas, ipDeConfianza, leerNegocio, leerPedido, leerPedidoEnLinea, type Negocio, respuestaDeCaptcha, respuestaDeRpc, yaExistia } from "../_shared/tienda/respuesta.ts";
@@ -496,6 +496,11 @@ async function pagoEnVuelo(admin: Admin, columna: "pedido_id" | "cita_id", id: s
 async function verificarPago(admin: Admin, d: {
   negocio: Pick<Negocio, "tenantId" | "nombre" | "dePrueba">; ip: string; slug: string; cancelar: boolean;
   pago: PagoEnVuelo; leerPago: () => Promise<PagoEnVuelo | null>; alPagar?: (pagoId: string) => Promise<void>;
+  /**
+   * Pago de una cita: su renglón no desaparece al descartarse (0225), y el descarte da verdadero una
+   * sola vez. Si ya se descartó (otra consulta lo contó), se repite el no SIN contarlo otra vez.
+   */
+  deCita?: boolean;
 }): Promise<Response> {
   let pago = d.pago;
   const reto: { url: string | null } = { url: null };
@@ -524,7 +529,7 @@ async function verificarPago(admin: Admin, d: {
     // El pedido se descarta (de una cita, solo el pago: la cita sigue apartada) y el cliente puede
     // pagar otra vez. Si ya no se puede descartar es que algo lo movió: que lo diga la página.
     const motivo = motivoDeRechazo(pago.detalle);
-    if (!await deps.db.descartar(pago.id)) return json({ pago: { estado: "POR_CONFIRMAR" } });
+    if (!await deps.db.descartar(pago.id)) return d.deCita ? json(rechazoYaContado(), 409) : json({ pago: { estado: "POR_CONFIRMAR" } });
     return rechazoDePago(admin, { negocio: d.negocio, ip: d.ip, slug: d.slug, motivo, frenoClave: pago.freno_clave });
   }
   // El reto se dejó (lo canceló el cliente, o pasó el plazo): ya está cerrado sin pago y se puede
@@ -654,7 +659,7 @@ async function reservas(p: PeticionDeCita, c: { admin: Admin; negocio: NegocioDe
     const pago = await leerPago();
     if (p.accion === "verificacion") {
       if (!pago) return json({ pago: { estado: "POR_CONFIRMAR" } });
-      return verificarPago(admin, { negocio: { ...negocio, dePrueba: await pagoDePruebaDe(admin, p_tenant) }, ip, slug: p.negocio, cancelar: p.cancelar, pago, leerPago });
+      return verificarPago(admin, { negocio: { ...negocio, dePrueba: await pagoDePruebaDe(admin, p_tenant) }, ip, slug: p.negocio, cancelar: p.cancelar, pago, leerPago, deCita: true });
     }
     // confirmar_pago: pregunta si hace falta y contesta la cita, como el de un pedido contesta su seguimiento.
     if (pago) {
@@ -725,6 +730,9 @@ async function reservas(p: PeticionDeCita, c: { admin: Admin; negocio: NegocioDe
   // Sin pago (no hay anticipo, o la cita ya no espera uno): listo.
   if (!hecha.pagoId) return json({ ...base, pago: null });
   // Con anticipo y sin tarjeta en esta petición: la cita queda apartada esperando el pago (15 min).
+  // Un reintento después de pagar trae el pago ya aprobado: no se pide pagar otra vez.
+  const vivo = await admin.from("tienda_pagos").select("estado").eq("id", hecha.pagoId).maybeSingle();
+  if ((vivo.data as { estado: string } | null)?.estado === "APROBADO") return json({ ...base, pago: { estado: "PAGADO" } });
   if (!p.tarjeta) return json({ ...base, pago: { estado: "POR_PAGAR" } });
 
   const cobro = await cobrarPago(depsDePagos(admin, "tienda"), {
@@ -802,7 +810,10 @@ async function atender(req: Request): Promise<Response> {
   // No existe, está de baja o bloqueado, o no tiene el módulo: la misma respuesta en los tres.
   if (p.accion === "reservas" || p.accion === "huecos" || p.accion === "reservar" || p.accion === "cita" || p.accion === "cita_cancelar" || p.accion === "cita_mover"
       || ((p.accion === "confirmar_pago" || p.accion === "verificacion") && p.cita === true)) {
-    const r = await admin.rpc("reservas_negocio", { p_slug: p.negocio });
+    // Ver una cita y confirmar su pago no exigen las reservas encendidas (la clienta sigue viendo su
+    // cita y su reembolso si el negocio las apaga); el negocio sí tiene que existir y operar.
+    const deUnaCita = p.accion === "cita" || p.accion === "confirmar_pago" || p.accion === "verificacion";
+    const r = await admin.rpc("reservas_negocio", { p_slug: p.negocio, ...(deUnaCita && { p_cita: true }) });
     if (r.error) return rechazo("reservas_negocio", r.error);
     const negocio = negocioDeReservas(r.data);
     if (!negocio) return json({ error: "TIENDA_NO_DISPONIBLE" }, 404);
