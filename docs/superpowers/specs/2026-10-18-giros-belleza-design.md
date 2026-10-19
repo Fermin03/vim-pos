@@ -160,6 +160,27 @@ que le toca), citas atendidas / canceladas / faltas, ocupación de la agenda.
 - Citas en tablas nuevas, no en `reservaciones`.
 - Un mismo servicio pide **un tipo de espacio** (o ninguno); el sistema asigna uno libre de ese tipo.
 - Colores del calendario: uno por colaborador, de una paleta fija que respete contraste.
+- **«No llegó» es manual.** Pasada la tolerancia, la cita se pinta en rojo («Pasó la tolerancia») y la
+  recepción toca «No llegó · liberar lugar». Nada se marca solo (no hay reloj que corra en la caja
+  apagada, y no se queda un anticipo sin que alguien lo decida). Cuenta como falta de la clienta.
+- **Empalmes entre la caja sin internet y el sitio en línea.** El sitio reserva contra la nube; la
+  caja instalada reserva en su base y sube en el sync. Si al sincronizar dos citas chocan, **se quedan
+  las dos** marcadas «Empalme» en el calendario y la recepción mueve una. No se borra ni se cancela nada
+  solo. (Con la caja en línea, el candado de la nube evita el choque.)
+- **Anticipo:** monto fijo o porcentaje, lo elige el dueño, por servicio. Pagado en línea se devuelve
+  por Mercado Pago; pagado en la caja (efectivo/tarjeta) se devuelve como una devolución normal de la
+  caja. Si el salón se lo queda, entra al corte como venta («Anticipo no reembolsable»). Se factura en
+  el ticket final; **sin CFDI de anticipo** en esta versión.
+- **Sueldo:** monto fijo por periodo (semanal o quincenal) que pone el dueño. VIM POS no descuenta
+  faltas ni vacaciones; el dueño ajusta a mano si quiere.
+- **Comisión de una cita «quien esté libre» o con cambio de colaborador:** es de quien la atendió
+  (el colaborador del renglón al cobrar). Un anticipo perdido no genera comisión.
+- **Un solo complemento «En línea»** para Esencial cubre la tienda y las reservas (un negocio usa una
+  u otra según su giro).
+- **La mudanza a `online.vimpos.com.mx`** se construye en local en la entrega 3 (constantes, secretos y
+  redirección documentados); en producción es un paso del lanzamiento, con la redirección desde
+  `pedidos` el mismo día. Los restaurantes no notan nada hasta entonces.
+- **Rama base:** encima de `feat/retail2-barra` (retail completo en local); migraciones desde la 0216.
 
 ## 9. Entregas propuestas
 
