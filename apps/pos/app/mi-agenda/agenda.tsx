@@ -40,29 +40,45 @@ export function Agenda({ sb, alVencer, alSalir }: {
   const pestanaRef = useRef(pestana);
   pestanaRef.current = pestana;
 
-  const fallo = useCallback((e: unknown) => {
+  const vuelta = useRef(0);
+
+  /** Devuelve true si el error solo se muestra (la sesión sigue). */
+  const fallo = useCallback((e: unknown): boolean => {
     const c = clasificarError(e);
-    if (c.tipo === "mensaje") setAviso({ texto: c.texto, error: true });
-    else alVencer(c.tipo);
+    if (c.tipo !== "mensaje") { alVencer(c.tipo); return false; }
+    setAviso({ texto: c.texto, error: true });
+    return true;
   }, [alVencer]);
 
-  const actualizar = useCallback(async () => {
+  /**
+   * Lee la agenda y, con «Mis comisiones» abierta, las comisiones; cada una por su lado (si una falla,
+   * la otra se aplica). Solo cuenta la vuelta más reciente: focus y visibilitychange llegan juntos y
+   * sus respuestas pueden volver en otro orden. `limpiar`: un refresco bueno borra el error visible
+   * (no después de una acción fallida, cuyo error es lo que hay que leer).
+   */
+  const actualizar = useCallback(async (limpiar = true) => {
+    const n = ++vuelta.current;
+    const vigente = () => n === vuelta.current;
     const h = hoyMx();
     setHoy(h);
     setCargando(true);
-    try {
-      const [a, c] = await Promise.all([
-        leerMiAgenda(sb, h),
-        pestanaRef.current === "comisiones" ? leerMisComisiones(sb, h) : Promise.resolve(null),
-      ]);
-      setAgenda(a);
-      if (c) setComisiones(c);
-      setAviso((v) => (v?.error ? null : v));
-    } catch (e) {
-      fallo(e);
-    } finally {
-      setCargando(false);
-    }
+    const leer = async <T,>(p: Promise<T>, aplicar: (v: T) => void): Promise<boolean> => {
+      try {
+        const v = await p;
+        if (vigente()) aplicar(v);
+        return true;
+      } catch (e) {
+        if (vigente()) fallo(e);
+        return false;
+      }
+    };
+    const ok = await Promise.all([
+      leer(leerMiAgenda(sb, h), setAgenda),
+      pestanaRef.current === "comisiones" ? leer(leerMisComisiones(sb, h), setComisiones) : Promise.resolve(true),
+    ]);
+    if (!vigente()) return;
+    if (limpiar && ok.every(Boolean)) setAviso((v) => (v?.error ? null : v));
+    setCargando(false);
   }, [sb, fallo]);
 
   // Al abrir, al volver a la pestaña o a la app (el celular la deja dormida horas).
@@ -74,7 +90,8 @@ export function Agenda({ sb, alVencer, alSalir }: {
     return () => { window.removeEventListener("focus", alVolver); document.removeEventListener("visibilitychange", alVolver); };
   }, [actualizar]);
 
-  useEffect(() => { if (pestana === "comisiones" && !comisiones) void actualizar(); }, [pestana, comisiones, actualizar]);
+  // Cada vez que se abre «Mis comisiones»: un «Terminé» de hace un momento ya cuenta en «Hoy».
+  useEffect(() => { if (pestana === "comisiones") void actualizar(); }, [pestana, actualizar]);
 
   // Si cambió el día con la app abierta, el día elegido no puede quedar antes de hoy.
   useEffect(() => { setDia((d) => (d < hoy ? hoy : d)); }, [hoy]);
@@ -92,9 +109,11 @@ export function Agenda({ sb, alVencer, alSalir }: {
       const texto = await ejecutarAccion(sb, tipo, t.cita.id);
       if (tipo === "terminar" && !t.ultimo) setPartesHechas((s) => new Set(s).add(t.id));
       setAviso({ texto, error: false });
+      setComisiones(null);
       await actualizar();
     } catch (e) {
-      fallo(e);
+      // La cita cambió en otro lado (la recepción la canceló o la empezó): traer el estado real.
+      if (fallo(e)) await actualizar(false);
     } finally {
       setOcupado(null);
     }
@@ -121,7 +140,7 @@ export function Agenda({ sb, alVencer, alSalir }: {
         </div>
         <div role="tablist" aria-label="Secciones" className="grid grid-cols-2 gap-1 px-4 pb-3">
           {(["agenda", "comisiones"] as const).map((p) => (
-            <button key={p} type="button" role="tab" aria-selected={pestana === p} onClick={() => setPestana(p)}
+            <button key={p} type="button" role="tab" id={`pestana-${p}`} aria-controls={pestana === p ? `panel-${p}` : undefined} aria-selected={pestana === p} onClick={() => setPestana(p)}
               className={`min-h-[44px] rounded text-15 font-semibold transition-[background-color,color,transform] duration-150 active:scale-[.97] ${
                 pestana === p ? "bg-ink text-bg" : "bg-sel text-ink-2"}`}>
               {p === "agenda" ? "Agenda" : "Mis comisiones"}
@@ -136,8 +155,8 @@ export function Agenda({ sb, alVencer, alSalir }: {
       </p>
 
       {pestana === "agenda" ? (
-        <section className="flex flex-1 flex-col gap-3 px-4 py-3">
-          <div className="grid grid-cols-7 gap-1" aria-label="Días">
+        <section role="tabpanel" id="panel-agenda" aria-labelledby="pestana-agenda" className="flex flex-1 flex-col gap-3 px-4 py-3">
+          <div role="group" className="grid grid-cols-7 gap-1" aria-label="Días">
             {diasTira(hoy).map((d) => {
               const elegido = d === dia;
               return (
@@ -196,7 +215,7 @@ export function Agenda({ sb, alVencer, alSalir }: {
           </ul>
         </section>
       ) : (
-        <section className="flex flex-1 flex-col gap-3 px-4 py-3">
+        <section role="tabpanel" id="panel-comisiones" aria-labelledby="pestana-comisiones" className="flex flex-1 flex-col gap-3 px-4 py-3">
           <div className="flex justify-end">
             <Button variant="ghost" onClick={() => void actualizar()} disabled={cargando}>
               {cargando ? "Actualizando…" : "Actualizar"}
