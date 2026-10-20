@@ -38,14 +38,14 @@ export function Entrada({ alEntrar, aviso = null }: { alEntrar: () => void; avis
       </header>
 
       <form onSubmit={enviar} noValidate className="flex w-full max-w-sm flex-col gap-3">
-        <label className="flex flex-col gap-1 text-sm">
+        <label htmlFor="mi-agenda-correo" className="flex flex-col gap-1 text-sm">
           <span className="font-medium text-ink-2">Correo</span>
-          <input type="email" autoComplete="username" inputMode="email" autoCapitalize="none" spellCheck={false}
+          <input id="mi-agenda-correo" name="email" type="email" autoComplete="email" inputMode="email" autoCapitalize="none" spellCheck={false}
             value={email} onChange={(e) => setEmail(e.target.value)} className={campo} />
         </label>
-        <label className="flex flex-col gap-1 text-sm">
+        <label htmlFor="mi-agenda-contrasena" className="flex flex-col gap-1 text-sm">
           <span className="font-medium text-ink-2">Contraseña</span>
-          <input type="password" autoComplete="current-password"
+          <input id="mi-agenda-contrasena" name="password" type="password" autoComplete="current-password"
             value={password} onChange={(e) => setPassword(e.target.value)} className={campo} />
         </label>
         {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
