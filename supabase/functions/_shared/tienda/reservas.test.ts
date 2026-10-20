@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { citaPublica, huecosPublicos, rechazoYaContado, importe, leerReservada, MENSAJE_REEMBOLSO_EN_PROCESO, negocioDeReservas, reembolsoDeCita, respuestaDeAgenda } from "./reservas.ts";
+import { citaPublica, estadosDelAnticipo, huecosPublicos, rechazoYaContado, importe, leerReservada, MENSAJE_REEMBOLSO_EN_PROCESO, negocioDeReservas, reembolsoDeCita, respuestaDeAgenda } from "./reservas.ts";
 import { leerCuerpo } from "./validar.ts";
 import { cuposDe } from "./respuesta.ts";
 
@@ -57,6 +57,22 @@ test("reembolso: devolviéndose o fallido = en proceso (con el texto de la clien
   assert.equal(reembolsoDeCita(["DEVUELTO", "RECHAZADO"])?.estado, "DEVUELTO");
   assert.equal(reembolsoDeCita(["APROBADO", "RECHAZADO", "VENCIDO"]), null);
   assert.equal(reembolsoDeCita([]), null);
+});
+
+test("reembolso: solo el pago del anticipo; sin anticipo, los que no son extra", () => {
+  const pagos = [
+    { id: "bueno", estado: "APROBADO", extra: false },
+    { id: "tardio", estado: "POR_DEVOLVER", extra: false },
+    { id: "extra", estado: "DEVUELTO", extra: true },
+  ];
+  const anticipos = [
+    { id: "b", tienda_pago_id: null, created_at: "2026-10-19T10:00:00Z" },
+    { id: "a", tienda_pago_id: "bueno", created_at: "2026-10-19T11:00:00Z" },
+  ];
+  assert.deepEqual(estadosDelAnticipo(pagos, anticipos), ["APROBADO"]);
+  assert.equal(reembolsoDeCita(estadosDelAnticipo(pagos, anticipos)), null);
+  // Cita vencida con un cobro tardío: no hay anticipo, cuenta el tardío.
+  assert.deepEqual(estadosDelAnticipo(pagos, []), ["APROBADO", "POR_DEVOLVER"]);
 });
 
 test("cita pública: importes en texto y su reembolso; lo que no es una cita es null", () => {

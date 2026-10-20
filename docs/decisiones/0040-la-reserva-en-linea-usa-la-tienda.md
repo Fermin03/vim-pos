@@ -46,6 +46,13 @@ web. Que las RPC reciban el negocio de forma explícita y solo las llame el serv
 entre negocios en el mismo lugar que ya usa la tienda. Limitar el reembolso automático al caso sin
 ambigüedad evita devolver de más; todo lo demás pasa por una persona con permiso.
 
+## Consecuencias
+
+- **Belleza sale en un solo instalador con 0216–0226.** Una caja con 0222/0223 pero sin 0225 no ve el
+  anticipo `PAGO_EN_LINEA` (el pull lo aísla por el `NOT NULL` de `turno_id` y el `CHECK` de método) y
+  cobra la cita completa. La migración que libera los giros de belleza (entrega 4) corre solo después de
+  publicar ese instalador, así que ningún salón existe con una caja sin 0225.
+
 ## Qué queda fuera
 
 - Un reembolso que Mercado Pago no logra (`DEVOLUCION_FALLIDA`) se ve en el panel y se devuelve a mano;

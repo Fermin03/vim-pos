@@ -87,6 +87,21 @@ export function reembolsoDeCita(estados: readonly string[]): Reembolso {
   return null;
 }
 
+export type PagoDeCita = { id: string; estado: string; extra: boolean };
+export type AnticipoConPago = { id: string; tienda_pago_id: string | null; created_at: string };
+
+/**
+ * Los estados que cuentan para el aviso de reembolso. Con anticipo en línea, solo el pago de ese
+ * anticipo (el del primer renglón con pago, como `_anticipo_pago_en_linea`): un cobro tardío
+ * duplicado o un pago `extra` que se devuelve no se lee como si se devolviera el anticipo bueno.
+ * Sin anticipo (cita vencida con un cobro tardío), los pagos que no son `extra`.
+ */
+export function estadosDelAnticipo(pagos: readonly PagoDeCita[], anticipos: readonly AnticipoConPago[]): string[] {
+  const id = [...anticipos].filter((a) => a.tienda_pago_id)
+    .sort((x, y) => x.created_at.localeCompare(y.created_at) || x.id.localeCompare(y.id))[0]?.tienda_pago_id ?? null;
+  return pagos.filter((p) => (id ? p.id === id : !p.extra)).map((p) => p.estado);
+}
+
 /**
  * `agenda_cita_publica` (o lo que devuelven cancelar y mover) para el sitio: importes en texto y el
  * reembolso. Sin ids internos: los de sucursal, servicio y colaborador ya salen en el catálogo y

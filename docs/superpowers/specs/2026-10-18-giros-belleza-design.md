@@ -365,14 +365,24 @@ Diseño: `docs/diseno/tienda.md`; decisión: ADR 0040; textos de la clienta: `do
 
 **Orden de lanzamiento**
 
-1. **0224–0226 a la nube a mano y antes del merge**, en orden y cada archivo en su propia transacción.
-2. **Desplegar `tienda`, `tienda-correos` y `tienda-webhook-mp` antes del merge.**
-3. **Mudanza de dirección:** los pasos de `docs/operacion/mudanza-online.md` (DNS, Vercel, `VIM_TIENDA_URL`,
-   `TURNSTILE_HOSTNAMES`, Turnstile), solo cuando Fermín lo pida.
-4. **Textos legales de reservas:** Fermín revisa el borrador antes de enlazarlo.
+1. **0188–0223 primero** (retail y belleza 1–2, que tampoco están en la nube), en orden. 0225 busca el
+   CHECK de `anticipos_cita` que crea 0222.
+2. **Después 0224–0226 a la nube a mano y antes del merge**, en orden y cada archivo en su propia transacción.
+3. **Desplegar `tienda`, `tienda-correos` y `tienda-webhook-mp` antes del merge.**
+4. **Mudanza de dirección, también antes del merge:** los pasos 1–6 de `docs/operacion/mudanza-online.md`
+   (DNS de `online`, dominio `online` + `pedidos` en el proyecto `vim-tienda` de Vercel, hostname en el
+   widget de Turnstile, `TURNSTILE_HOSTNAMES` con `online`, `admin` y `pedidos`, `VIM_TIENDA_URL` y
+   `VIM_TIENDA_SECRET`). El merge despliega solo el redirect 308 de `pedidos` a `online` y los enlaces
+   del admin: si va primero, la tienda pública se cae. Todo esto, cuando Fermín lo pida.
+5. **Merge.**
+6. **Textos legales de reservas:** Fermín revisa el borrador antes de enlazarlo.
 
-Una caja vieja no se rompe: no usa nada de esto. Nada sale a clientas hasta que estén los servicios
-(entrega 4) y Fermín lo apruebe.
+**Un solo instalador de belleza.** Las migraciones de belleza 0216–0226 salen juntas en UN instalador de la
+caja. Una caja con 0222/0223 pero sin 0225 no ve el anticipo pagado en línea (el pull lo aísla) y cobraría la
+cita completa. Por eso la migración que libera los giros de belleza (entrega 4) corre en la nube solo
+después de publicar ese instalador: no puede existir un salón con una caja sin 0225. Una caja de otro giro
+no se rompe: no usa nada de esto. Nada sale a clientas hasta que estén los servicios (entrega 4) y Fermín
+lo apruebe.
 
 **Rulings de este plan (Fermín puede corregirlos)**
 

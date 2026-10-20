@@ -23,6 +23,10 @@ export type Cita = {
   colaborador: string | null;
   anticipo_en_linea_mxn: number;
   anticipo_mxn: number;
+  /** El anticipo en línea está entero: Mercado Pago lo devuelve (_anticipo_en_linea_entero). */
+  reembolso_mp: boolean;
+  /** Hubo un cobro tardío que Mercado Pago devuelve (pago POR_DEVOLVER o DEVUELTO). */
+  cobro_tardio: boolean;
 };
 
 const num = (x: unknown): number => (typeof x === "number" ? x : typeof x === "string" ? Number(x) : NaN);
@@ -45,6 +49,8 @@ export function leerCita(x: unknown): Cita | null {
     colaborador: typeof c.colaborador === "string" ? c.colaborador : null,
     anticipo_en_linea_mxn: num(c.anticipo_en_linea_mxn) || 0,
     anticipo_mxn: num(c.anticipo_mxn) || 0,
+    reembolso_mp: c.reembolso_mp === true,
+    cobro_tardio: c.cobro_tardio === true,
   };
 }
 
@@ -68,11 +74,13 @@ function textoDe(tipo: TipoCita, negocio: string, c: Cita, version: number, ahor
   if (tipo === "CANCELACION") {
     if (!cancelada) return null;
     const asunto = `Tu cita en ${negocio} se canceló`;
-    if (c.cancelada_por === "PAGO_VENCIDO") return { asunto, titulo: "Cita cancelada", apoyo: "No se completó el pago y tu cita se liberó." };
+    if (c.cancelada_por === "PAGO_VENCIDO") return { asunto, titulo: "Cita cancelada", apoyo: `No se completó el pago y tu cita se liberó.${c.cobro_tardio ? " Si se llegó a hacer un cargo, Mercado Pago lo devuelve automáticamente." : ""}` };
     if (c.cancelada_por === "CLIENTA_EN_LINEA") {
       return {
         asunto, titulo: "Cita cancelada",
-        apoyo: `Cancelaste tu cita.${c.anticipo_en_linea_mxn > 0 ? " Te devolvemos tu anticipo por Mercado Pago. Cuándo lo ves reflejado depende de tu banco." : ""}`,
+        apoyo: `Cancelaste tu cita.${c.anticipo_en_linea_mxn <= 0 ? "" : c.reembolso_mp
+          ? " Te devolvemos tu anticipo por Mercado Pago. Cuándo lo ves reflejado depende de tu banco."
+          : " El negocio se comunicará contigo sobre tu anticipo."}`,
       };
     }
     // El negocio o la caja (o una cancelación sin quién): nunca un reembolso automático.

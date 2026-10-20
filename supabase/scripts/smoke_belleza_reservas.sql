@@ -95,6 +95,9 @@ BEGIN
   DELETE FROM ausencias_colaborador WHERE tenant_id = v_t;
 
   -- R1) `reservas` = add-on TIENDA + interruptor + agenda.
+  -- La base de desarrollo puede traer el add-on TIENDA o el interruptor encendidos: se apagan aquí.
+  DELETE FROM tenant_addons WHERE tenant_id = v_t AND addon_id = (SELECT id FROM addons WHERE codigo = 'TIENDA');
+  UPDATE configuracion_tenant SET modulo_reservas_activo = false WHERE tenant_id = v_t;
   IF (modulos_efectivos(v_t)->'permitidos'->>'reservas') IS DISTINCT FROM 'false'
      OR (modulos_efectivos(v_t)->'efectivos'->>'reservas') IS DISTINCT FROM 'false' THEN
     RAISE EXCEPTION 'R1: sin add-on, reservas no debía estar permitido: %', modulos_efectivos(v_t); END IF;

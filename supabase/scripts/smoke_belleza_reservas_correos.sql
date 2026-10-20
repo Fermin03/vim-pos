@@ -208,7 +208,8 @@ BEGIN
   IF r.tipo <> 'CONFIRMACION' OR r.email <> 'correo.web@example.com' OR r.slug <> 'correos-citas-smoke' OR r.negocio <> 'Salón Correos'
      OR r.cifrado <> c_cif OR r.enlace_hash <> pg_temp.h(v_r2->>'codigo') OR r.cita->>'estado' <> 'AGENDADA'
      OR (r.cita->>'anticipo_en_linea_mxn')::numeric <> 100 OR (r.cita->>'version')::int <> 3 OR r.cita->'sucursal'->>'nombre' IS NULL
-     OR jsonb_array_length(r.cita->'servicios') <> 1 THEN
+     OR jsonb_array_length(r.cita->'servicios') <> 1
+     OR (r.cita->>'reembolso_mp')::boolean IS NOT TRUE OR (r.cita->>'cobro_tardio')::boolean IS NOT FALSE THEN
     RAISE EXCEPTION 'C9 tomar: %', to_jsonb(r); END IF;
   IF EXISTS (SELECT 1 FROM agenda_correos_tomar(10, 30)) THEN RAISE EXCEPTION 'C9: tomó dos veces lo mismo'; END IF;
   IF agenda_correo_resultado(r.id, 'ENVIADO') <> 'ENVIADO' THEN RAISE EXCEPTION 'C9 resultado'; END IF;

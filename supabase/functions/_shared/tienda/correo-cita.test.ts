@@ -8,7 +8,7 @@ const AHORA = new Date("2026-11-05T12:00:00-06:00");
 const cita = (x: Partial<Cita> = {}): Cita => ({
   inicia: "2026-11-06T16:30:00Z", estado: "AGENDADA", cancelada_por: null, version: 0,
   sucursal: { nombre: "Centro", direccion: "Madero 12, Centro, León" }, servicios: ["Corte de cabello", "Peinado"],
-  colaborador: "Diego R.", anticipo_en_linea_mxn: 0, anticipo_mxn: 0, ...x,
+  colaborador: "Diego R.", anticipo_en_linea_mxn: 0, anticipo_mxn: 0, reembolso_mp: false, cobro_tardio: false, ...x,
 });
 const correo = (tipo: TipoCita, c: Partial<Cita> = {}, version = 0, enlace: string | null = ENLACE) =>
   correoDeCita({ tipo, version, negocio: "Salón Ana", enlace, cita: cita(c), ahora: AHORA });
@@ -44,7 +44,11 @@ test("cancelación según quién canceló; el negocio nunca promete reembolso au
   const t = (c: Partial<Cita>) => texto(correo("CANCELACION", { estado: "CANCELADA", ...c })!.html);
   assert.match(t({ cancelada_por: "CLIENTA_EN_LINEA" }), /Cancelaste tu cita\./);
   assert.doesNotMatch(t({ cancelada_por: "CLIENTA_EN_LINEA" }), /anticipo/);
-  assert.match(t({ cancelada_por: "CLIENTA_EN_LINEA", anticipo_en_linea_mxn: 90, anticipo_mxn: 90 }), /Te devolvemos tu anticipo por Mercado Pago\./);
+  assert.match(t({ cancelada_por: "CLIENTA_EN_LINEA", anticipo_en_linea_mxn: 90, anticipo_mxn: 90, reembolso_mp: true }), /Te devolvemos tu anticipo por Mercado Pago\./);
+  // Una parte ya se usó o se devolvió en efectivo: Mercado Pago no devuelve, no se promete.
+  const usado = t({ cancelada_por: "CLIENTA_EN_LINEA", anticipo_en_linea_mxn: 90, anticipo_mxn: 90, reembolso_mp: false });
+  assert.match(usado, /El negocio se comunicará contigo sobre tu anticipo\./);
+  assert.doesNotMatch(usado, /Mercado Pago/);
   for (const quien of ["NEGOCIO", "CAJA", null]) {
     const sin = t({ cancelada_por: quien });
     assert.match(sin, /Salón Ana canceló tu cita\./);
@@ -54,6 +58,8 @@ test("cancelación según quién canceló; el negocio nunca promete reembolso au
     assert.doesNotMatch(con, /devolv|Mercado Pago/i);
   }
   assert.match(t({ cancelada_por: "PAGO_VENCIDO" }), /No se completó el pago y tu cita se liberó\./);
+  assert.doesNotMatch(t({ cancelada_por: "PAGO_VENCIDO" }), /cargo/);
+  assert.match(t({ cancelada_por: "PAGO_VENCIDO", cobro_tardio: true }), /Si se llegó a hacer un cargo, Mercado Pago lo devuelve automáticamente\./);
 });
 
 test("lo que ya no corresponde no sale", () => {

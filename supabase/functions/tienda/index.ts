@@ -146,7 +146,7 @@ import { leerCuerpo, type Peticion, type PeticionDeReservas, tieneNul } from "..
 import { codigoDeClave, huellaDe, nuevoCodigo } from "../_shared/tienda/seguimiento.ts";
 import { correoDePedido } from "../_shared/tienda/correo-pedido.ts";
 import { cifrarCodigo, descifrarCodigo } from "../_shared/tienda/enlace.ts";
-import { citaPublica, huecosPublicos, rechazoYaContado, leerReservada, negocioDeReservas, type NegocioDeReservas, respuestaDeAgenda } from "../_shared/tienda/reservas.ts";
+import { type AnticipoConPago, citaPublica, estadosDelAnticipo, huecosPublicos, type PagoDeCita, rechazoYaContado, leerReservada, negocioDeReservas, type NegocioDeReservas, respuestaDeAgenda } from "../_shared/tienda/reservas.ts";
 import { correoDeBienvenida, correoDeRecuperacion, correoYaTienesCuenta } from "../_shared/tienda/correo-cuenta.ts";
 import { CABECERA_SESION, cuentaDe, direccionesPublicas, leerRegistro, leerSesion, pedidosPublicos, type Sesion } from "../_shared/tienda/cuenta.ts";
 import { cotizacionPublica, type Cupos, cuposDe, esTopeDeEntradas, ipDeConfianza, leerNegocio, leerPedido, leerPedidoEnLinea, type Negocio, respuestaDeCaptcha, respuestaDeRpc, yaExistia } from "../_shared/tienda/respuesta.ts";
@@ -582,9 +582,11 @@ async function citaParaSitio(admin: Admin, p_tenant: string, p_enlace_hash: stri
     datos = r.data;
   }
   if (datos === null) return null;
-  const pagos = await admin.from("citas").select("tienda_pagos(estado)").eq("tenant_id", p_tenant).eq("enlace_hash", p_enlace_hash).maybeSingle();
+  const pagos = await admin.from("citas").select("tienda_pagos(id,estado,extra), anticipos_cita(id,tienda_pago_id,created_at)")
+    .eq("tenant_id", p_tenant).eq("enlace_hash", p_enlace_hash).maybeSingle();
   if (pagos.error) throw new Error(pagos.error.message);
-  const estados = ((pagos.data as { tienda_pagos?: { estado: string }[] } | null)?.tienda_pagos ?? []).map((g) => g.estado);
+  const fila = pagos.data as { tienda_pagos?: PagoDeCita[]; anticipos_cita?: AnticipoConPago[] } | null;
+  const estados = estadosDelAnticipo(fila?.tienda_pagos ?? [], fila?.anticipos_cita ?? []);
   const cita = citaPublica(datos, estados);
   if (!cita) registrarError("tienda", "RPC_FORMA_INESPERADA", "agenda_cita_publica");
   return cita;

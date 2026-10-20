@@ -261,7 +261,12 @@ BEGIN
            'version', _agenda_correo_version(ci.id),
            'anticipo_en_linea_mxn', (SELECT COALESCE(sum(a.monto_mxn), 0) FROM anticipos_cita a
                                       WHERE a.cita_id = ci.id AND a.metodo_pago = 'PAGO_EN_LINEA'),
-           'anticipo_mxn', (SELECT COALESCE(sum(a.monto_mxn), 0) FROM anticipos_cita a WHERE a.cita_id = ci.id))
+           'anticipo_mxn', (SELECT COALESCE(sum(a.monto_mxn), 0) FROM anticipos_cita a WHERE a.cita_id = ci.id),
+           -- Mercado Pago devuelve solo el anticipo entero (misma regla que el reembolso automático).
+           'reembolso_mp', _anticipo_en_linea_entero(ci.id),
+           -- Un cobro que llegó tarde (cita ya vencida) y que Mercado Pago devuelve.
+           'cobro_tardio', EXISTS (SELECT 1 FROM tienda_pagos p
+                                  WHERE p.cita_id = ci.id AND p.estado IN ('POR_DEVOLVER', 'DEVUELTO')))
     FROM tomados t
     JOIN citas ci ON ci.id = t.cita_id
     JOIN tenants n ON n.id = t.tenant_id

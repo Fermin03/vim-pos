@@ -45,13 +45,12 @@ Esta página funciona con VIM POS, que es solo la herramienta: no presta el serv
 
 ### 4. Cambiar o cancelar
 
-- Puedes **cambiar la hora o cancelar** desde el enlace de tu correo, siempre que falten **24 horas
-  o más** para tu cita.
-- Con menos de 24 horas ya no se puede en línea: comunícate con el negocio. Cambiarla o no depende de él.
+- Puedes **cambiar la hora o cancelar** desde el enlace de tu correo, con la anticipación que fije el negocio.
+- Fuera de ese plazo ya no se puede en línea: comunícate con el negocio. Cambiarla o no depende de él.
 
 ### 5. Reembolso del anticipo
 
-- Si **cancelas en línea dentro del plazo** (24 horas o más antes) y pagaste el anticipo completo
+- Si **cancelas en línea dentro del plazo** (con la anticipación que fije el negocio) y pagaste el anticipo completo
   por Mercado Pago, **se te devuelve automáticamente a la misma tarjeta**. El banco puede tardar
   unos días en reflejarlo.
 - Si el negocio cancela tu cita, él decide cómo devolverte el anticipo.
@@ -60,7 +59,7 @@ Esta página funciona con VIM POS, que es solo la herramienta: no presta el serv
 
 ### 6. Si no llegas o cancelas tarde
 
-- Si **no llegas** a tu cita, o la cancelas **con menos de 24 horas**, el negocio **se queda con el
+- Si **no llegas** a tu cita, o la cancelas **fuera del plazo que fija el negocio**, el negocio **se queda con el
   anticipo**, porque ese horario ya no pudo ofrecerlo a otra persona.
 - El negocio puede devolvértelo si lo decide, por ejemplo, ante una emergencia. No es obligatorio.
 
@@ -84,4 +83,4 @@ Para cualquier duda sobre tu cita, escribe al negocio al `[TELÉFONO / WHATSAPP]
 > - El plazo de devolución cuando Mercado Pago falla; hoy lo resuelve el negocio a mano.
 > - Jurisdicción, razón social y domicilio (ver `LEEME.md`, decisión 1).
 > - Menores de edad: la reserva no pregunta la edad.
-> - La cifra de 24 horas y de 15 minutos son las reglas actuales del sistema; si cambian, cambia el texto.
+> - El plazo para cambiar o cancelar lo fija cada negocio; los 15 minutos para pagar son la regla actual del sistema; si cambia, cambia el texto.
