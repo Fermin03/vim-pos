@@ -14,8 +14,8 @@ debe serlo: no queremos cajas ni PIN en teléfonos personales.
   recibe un enlace, pone su contraseña y entra a `/mi-agenda` del POS. Es una sesión web normal de
   Supabase Auth, no la de la caja.
 - **Rol de base dedicado, `colaborador_web`.** El hook del token pone ese rol a todo login web (con
-  `session_id`) de un usuario sin acceso activo de jerarquía 3 o más. Solo puede ejecutar cinco RPC:
-  `mi_agenda`, `mi_cita_empezar`, `mi_cita_terminar`, `mis_comisiones` y `mi_periodo_comisiones`. No
+  `session_id`) de un usuario sin acceso activo de jerarquía 3 o más. Solo ejecuta cinco RPC con permisos de dueño:
+  `mi_agenda`, `mi_cita_empezar`, `mi_cita_terminar`, `mis_comisiones` y `mi_periodo_comisiones`. Las demás funciones públicas fallan por falta de permisos sobre las tablas. No
   tiene privilegios sobre ninguna tabla. Las dos de comisiones son envolturas que filtran a
   `auth.uid()`; no se expone `comisiones_periodo`.
 - **Segunda capa en RLS (0228).** `es_sesion_web_limitada()` saca a esas sesiones de clientes, citas,

@@ -434,21 +434,24 @@ decisión: ADR 0041.
 **Nada sale a producción hasta que esté el grupo de servicios (talleres automotrices): regla de Fermín.**
 Cuando llegue ese momento, en este orden:
 
-1. **Pasos de dominio, antes del merge:** los de `docs/operacion/mudanza-online.md` (DNS de `online`,
+1. **UN instalador desde la rama** (checkout completo, RUNBOOK «Antes de empaquetar») con las migraciones
+   0188–0230 (retail y belleza juntos), y **publicarlo** (primero la lista de lo que incluye, con el OK de
+   Fermín). Va antes de todo lo demás: así ningún salón se registra y descarga una caja sin las
+   migraciones de belleza.
+2. **Pasos de dominio, antes del merge:** los de `docs/operacion/mudanza-online.md` (DNS de `online`,
    dominio `online` + `pedidos` en el proyecto `vim-tienda` de Vercel, hostname en Turnstile,
    `TURNSTILE_HOSTNAMES`, `VIM_TIENDA_URL` y `VIM_TIENDA_SECRET`). El merge despliega el redirect 308 de
    `pedidos` a `online`: si va primero, la tienda pública se cae.
-2. **Migraciones 0188–0229 a la nube, a mano y en orden**, cada archivo en su propia transacción (0216 y
-   0220 son solo `ADD VALUE`). 0230 no entra aquí.
-3. **Comprobar en la nube** que `GRANT colaborador_web TO authenticator` se aplicó y que GoTrue acepta el
-   rol personalizado que pone el hook. Agregar `https://admin.vimpos.com.mx/establecer-acceso` a las
-   redirect URLs de Auth.
-4. **Desplegar las funciones:** `tienda`, `tienda-correos`, `tienda-webhook-mp` y todas las demás, porque
+3. **Migraciones 0188–0230 a la nube, a mano y en orden**, cada archivo en su propia transacción (0216 y
+   0220 son solo `ADD VALUE`). La 0217 ya redefine `cambiar_giro` sobre la 0215, así que libera retail;
+   0203, 0215 y 0230 corren en secuencia sin problema porque el instalador ya salió.
+4. **Comprobar en la nube** `select pg_has_role('authenticator','colaborador_web','member')` (debe dar
+   true) y que `https://admin.vimpos.com.mx/establecer-acceso` está en las redirect URLs de Auth.
+5. **Desplegar todas las funciones** (`tienda`, `tienda-correos`, `tienda-webhook-mp` y las demás):
    `servir()` de `_shared/http.ts` cambió (rechaza `colaborador_web`) y toca a todas.
-5. **Merge.**
-6. **UN instalador** con 0188–0229 (retail y belleza juntos).
-7. **0230 después de publicar ese instalador** (y la liberación de retail, 0215, si aún no corrió). Así
-   no existe un salón con una caja sin las migraciones de belleza.
+6. **Merge.**
+7. **Lista después del lanzamiento:** probar una vez con un usuario PERSONAL/CAJERO (fijar contraseña con
+   «Dar acceso», entrar a `/mi-agenda`), un registro de SALON de punta a punta y una reserva en línea.
 
 **Para Fermín (pendientes)**
 

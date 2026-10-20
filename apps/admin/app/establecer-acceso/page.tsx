@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, LogoVim } from "@vim/ui/styles";
-import { supabase, establecerPassword, leerSesion, salir } from "../lib/supabase";
+import { supabase, establecerPassword, leerSesion } from "../lib/supabase";
 import { enlaceMiAgenda, tieneAgenda } from "../lib/acceso-celular";
 import { abrirSesionDelEnlace, leerEnlace } from "../lib/enlace-acceso";
 import { mensajeError } from "../lib/errores";
@@ -83,7 +83,7 @@ export default function EstablecerAccesoPage() {
         // El hook decide con la jerarquía en el negocio DEL TOKEN: sin panel, role = colaborador_web.
         const panel = (await leerSesion())?.rol !== "colaborador_web";
         // Quien no entra al panel no se queda con su sesión abierta aquí.
-        if (!panel) await salir();
+        if (!panel) await supabase.auth.signOut({ scope: "local" }); // local: no revoca la sesión del celular
         setConPanel(panel);
         setEstado("agenda");
         return;

@@ -1,6 +1,6 @@
 -- Libera SALON, SPA, PELUQUERIA, BARBERIA y TATUAJES en cambiar_giro (belleza, entrega 4, ADR 0038).
 -- BAR, CAFETERIA y TAQUERIA siguen bloqueados.
--- En el lanzamiento va DESPUÉS de publicar el instalador con 0216–0230 (molde: la 0215):
+-- En el lanzamiento va DESPUÉS de publicar el instalador con 0188–0230 (molde: la 0215):
 -- una caja sin la 0216 no conoce estos valores y su pull de `tenants` fallaría.
 
 -- Cuerpo de la 0217 sin los cinco giros de belleza en la lista de no disponibles.
