@@ -6,7 +6,7 @@ const ID = "11111111-1111-4111-8111-111111111111";
 
 test("credenciales: vacías, con espacios o de más de 200 caracteres no pasan", () => {
   assert.deepEqual(validarCredenciales({ api_key: "abc123", secreto: "s3cr3t" }), { ok: true, api_key: "abc123", secreto: "s3cr3t" });
-  for (const malo of ["", " abc", "ab c", "abc\n", "x".repeat(201), 123, null, undefined]) {
+  for (const malo of ["", " abc", "ab c", "abc\n", "x".repeat(201), "abc–", "clé", "abc ", 123, null, undefined]) {
     assert.deepEqual(validarCredenciales({ api_key: malo, secreto: "ok" }), { ok: false, error: "FALTAN_CAMPOS" });
     assert.deepEqual(validarCredenciales({ api_key: "ok", secreto: malo }), { ok: false, error: "FALTAN_CAMPOS" });
   }

@@ -2,7 +2,8 @@
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const uuid = (v: unknown): string | null => (typeof v === "string" && UUID.test(v) ? v.toLowerCase() : null);
-const clave = (v: unknown): v is string => typeof v === "string" && /^\S{1,200}$/.test(v);
+// ASCII imprimible sin espacios: van en Basic auth por `btoa`, que truena con lo que no es Latin-1.
+const clave = (v: unknown): v is string => typeof v === "string" && /^[\x21-\x7E]{1,200}$/.test(v);
 
 /** La API key y la clave secreta del Panel de Desarrollador de Clip, tal cual (sin espacios, ≤ 200). */
 export function validarCredenciales(crudo: unknown): { ok: true; api_key: string; secreto: string } | { ok: false; error: string } {
