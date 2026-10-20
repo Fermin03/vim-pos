@@ -2,7 +2,7 @@
 import { encabezadosFuncion, urlFuncion } from "./supabase";
 import type { MetodoPago } from "./cobro";
 
-// Cobro con terminal (ADR 0033). La caja le manda el monto a la terminal de Mercado Pago a través de
+// Cobro con terminal (ADR 0033). La caja le manda el monto a la terminal (Mercado Pago o Clip) a través de
 // la nube (`terminal-cobro`) y pregunta en qué va. El pago lo aplica la caja a su ticket, como
 // cualquier otro; aquí no se toca el ticket.
 
@@ -14,6 +14,10 @@ export type CobroTerminal = {
   tarjeta_ultimos4?: string | null;
 };
 
+export type ProveedorTerminal = "MERCADO_PAGO" | "CLIP";
+/** `lista`: el lector puede recibir el cobro ahora (Clip lo pregunta; Mercado Pago siempre lo está). */
+export type TerminalCaja = { hay: boolean; lista: boolean; proveedor: ProveedorTerminal | null };
+
 type Peticion =
   | { accion: "disponible" | "pendientes" }
   | { accion: "crear"; cobro_id: string; ticket_id: string; folio: string | null; monto: string }
@@ -22,7 +26,7 @@ type Peticion =
   | { accion: "reembolsar"; ticket_id: string };
 
 type Respuesta = {
-  ok?: boolean; error?: string; terminal?: boolean; cobro?: CobroTerminal; cobros?: CobroTerminal[];
+  ok?: boolean; error?: string; terminal?: boolean; lista?: boolean; proveedor?: ProveedorTerminal | null; cobro?: CobroTerminal; cobros?: CobroTerminal[];
   cancelacion?: "HECHA" | "PEDIDA" | "FALLO";
   /** De `reembolsar`: cuántos pagos de ese ticket pasaron por la terminal y cuánto regresó. */
   n_cobros?: number; devuelto_mxn?: string;
@@ -46,9 +50,11 @@ export async function pedirCobro(token: string, cajaId: string, p: Peticion): Pr
   return j;
 }
 
-/** ¿Esta caja tiene terminal? Cualquier fallo (sin internet, sin nube) es «no»: queda el registro manual. */
-export async function cajaTieneTerminal(token: string, cajaId: string): Promise<boolean> {
-  return pedirCobro(token, cajaId, { accion: "disponible" }).then((r) => r.terminal === true).catch(() => false);
+/** ¿Esta caja tiene terminal, y está lista? Cualquier fallo (sin internet, sin nube) es «no»: queda el registro manual. */
+export async function terminalDeCaja(token: string, cajaId: string): Promise<TerminalCaja> {
+  return pedirCobro(token, cajaId, { accion: "disponible" })
+    .then((r) => ({ hay: r.terminal === true, lista: r.lista !== false, proveedor: r.proveedor ?? null }))
+    .catch(() => ({ hay: false, lista: false, proveedor: null }));
 }
 
 const MARCAS: Record<string, string> = {
@@ -57,7 +63,7 @@ const MARCAS: Record<string, string> = {
 
 /**
  * «Mastercard **** 1447»: lo que se imprime en el ticket. Con asteriscos porque la impresora no
- * tiene el punto medio. null si Mercado Pago no dijo la terminación (cobro aceptado a mano).
+ * tiene el punto medio. null si la terminal no dijo la terminación (cobro aceptado a mano).
  */
 export function etiquetaTarjeta(c: Pick<CobroTerminal, "marca" | "tarjeta_ultimos4">): string | null {
   if (!c.tarjeta_ultimos4) return null;
@@ -75,7 +81,7 @@ export function pagoDeCobro(c: CobroTerminal): { metodo: MetodoPago; monto: numb
   };
 }
 
-/** Mercado Pago dice qué tarjeta fue; lo que no sea débito se registra como crédito. */
+/** La terminal dice qué tarjeta fue; lo que no sea débito se registra como crédito. */
 export function metodoDeTarjeta(tipo: string | null): MetodoPago {
   return tipo === "debit_card" ? "TARJETA_DEBITO" : "TARJETA_CREDITO";
 }
@@ -89,9 +95,10 @@ const RECHAZOS: Record<string, string> = {
   rejected_by_issuer: "El banco rechazó el cobro.",
   required_call_for_authorize: "El banco pide que el cliente llame para autorizar el cobro.",
   max_attempts_exceeded: "Se agotaron los intentos con esa tarjeta.",
-  high_risk: "Mercado Pago rechazó el cobro por seguridad.",
+  high_risk: "El cobro se rechazó por seguridad.",
   amount_limit_exceeded: "El monto supera el límite de la tarjeta.",
   bad_filled_card_data: "La terminal no pudo leer la tarjeta.",
+  SIN_RESPUESTA: "La terminal no contestó. Vuelve a intentar.",
 };
 
 /** Lo que se le dice a la cajera cuando el cobro terminó sin pagarse. */
@@ -105,7 +112,7 @@ export function mensajeFinal(c: Pick<CobroTerminal, "estado" | "detalle">): stri
 /**
  * Devuelve a la tarjeta lo que ese ticket se cobró en la terminal. `cobros: 0` = nada pasó por la
  * terminal (se cobró en otra, o a mano): el reembolso se hace como siempre, fuera de VIM.
- * Lanza Error con el código si Mercado Pago no devolvió el dinero.
+ * Lanza Error con el código si el proveedor de la terminal no devolvió el dinero.
  */
 export async function reembolsarTicket(token: string, cajaId: string, ticketId: string): Promise<{ cobros: number; devuelto: number }> {
   const r = await pedirCobro(token, cajaId, { accion: "reembolsar", ticket_id: ticketId });
@@ -115,7 +122,7 @@ export async function reembolsarTicket(token: string, cajaId: string, ticketId: 
 const REEMBOLSOS: Record<string, string> = {
   SIN_RED: "no hay internet",
   FUNCION_REQUIERE_NUBE: "no hay internet",
-  CONEXION_INVALIDA: "Mercado Pago ya no reconoce la conexión del negocio",
+  CONEXION_INVALIDA: "la conexión de la terminal ya no es válida",
   refund_amount_exceeds: "ese cobro ya se había devuelto",
   SIN_DEVOLUCION: "la devolución no quedó registrada en la caja",
 };
@@ -123,7 +130,7 @@ const REEMBOLSOS: Record<string, string> = {
 /** Por qué no regresó el dinero a la tarjeta, para completar «…no regresó a la tarjeta: ___». */
 export function motivoReembolso(e: unknown): string {
   const codigo = e instanceof Error ? e.message : String(e);
-  return REEMBOLSOS[codigo] ?? "Mercado Pago no aceptó la devolución";
+  return REEMBOLSOS[codigo] ?? "el proveedor de la terminal no aceptó la devolución";
 }
 
 const ERRORES: Record<string, string> = {
@@ -131,8 +138,10 @@ const ERRORES: Record<string, string> = {
   FUNCION_REQUIERE_NUBE: "No hay internet. Cobra tecleando el monto en la terminal y registra el pago con «La cobré en otra terminal».",
   TERMINAL_OCUPADA: "La terminal tiene otro cobro esperando. Termínalo o cancélalo en la terminal y vuelve a intentar.",
   SIN_TERMINAL: "Esta caja ya no tiene una terminal ligada. Revísalo en el panel, en Terminal de tarjetas.",
-  CONEXION_INVALIDA: "Mercado Pago ya no reconoce la conexión. El dueño tiene que volver a conectarla en el panel.",
+  CONEXION_INVALIDA: "La conexión de la terminal ya no es válida. El dueño tiene que volver a conectarla en el panel.",
   TERMINAL_AJENA: "La terminal ya no pertenece a la cuenta conectada. Revísalo en el panel.",
+  TERMINAL_NO_DISPONIBLE: "La terminal no está lista. Revisa que esté encendida, con internet y con Clip PinPad abierta.",
+  SIN_RESPUESTA: "La terminal no contestó. Vuelve a intentar.",
 };
 
 export function mensajeErrorCobro(e: unknown): string {

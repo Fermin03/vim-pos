@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { cajaTieneTerminal, etiquetaTarjeta, pagoDeCobro, mensajeErrorCobro, mensajeFinal, metodoDeTarjeta, montoTexto, motivoReembolso, pedirCobro, reembolsarTicket } from "../terminal";
+import { terminalDeCaja, etiquetaTarjeta, pagoDeCobro, mensajeErrorCobro, mensajeFinal, metodoDeTarjeta, montoTexto, motivoReembolso, pedirCobro, reembolsarTicket } from "../terminal";
 
 afterEach(() => vi.unstubAllGlobals());
 const responde = (status: number, cuerpo: unknown) =>
@@ -35,6 +35,11 @@ describe("cobro con terminal", () => {
     expect(mensajeFinal({ estado: "RECHAZADO", detalle: "algo_nuevo" })).toBe("La terminal rechazó el cobro.");
     expect(mensajeFinal({ estado: "VENCIDO", detalle: "expired" })).toContain("tiempo");
     expect(mensajeErrorCobro(new Error("TERMINAL_OCUPADA"))).toContain("otro cobro");
+    expect(mensajeErrorCobro(new Error("TERMINAL_NO_DISPONIBLE"))).toBe("La terminal no está lista. Revisa que esté encendida, con internet y con Clip PinPad abierta.");
+    expect(mensajeErrorCobro(new Error("SIN_RESPUESTA"))).toBe("La terminal no contestó. Vuelve a intentar.");
+    expect(mensajeFinal({ estado: "RECHAZADO", detalle: "SIN_RESPUESTA" })).toBe("La terminal no contestó. Vuelve a intentar.");
+    expect(mensajeFinal({ estado: "RECHAZADO", detalle: "high_risk" })).not.toContain("Mercado Pago");
+    expect(mensajeErrorCobro(new Error("CONEXION_INVALIDA"))).not.toContain("Mercado Pago");
     expect(mensajeErrorCobro(new Error("ERROR_INTERNO"))).toBe("No se pudo mandar el cobro a la terminal. Vuelve a intentar.");
   });
 
@@ -53,15 +58,22 @@ describe("cobro con terminal", () => {
     responde(409, { ok: false, n_cobros: 1, devuelto_mxn: "0.00", error: "CONEXION_INVALIDA" });
     await expect(reembolsarTicket("tok", "caja-1", "t-1")).rejects.toThrow("CONEXION_INVALIDA");
     expect(motivoReembolso(new Error("SIN_RED"))).toBe("no hay internet");
-    expect(motivoReembolso(new Error("algo_nuevo"))).toBe("Mercado Pago no aceptó la devolución");
+    expect(motivoReembolso(new Error("algo_nuevo"))).toBe("el proveedor de la terminal no aceptó la devolución");
+    expect(motivoReembolso(new Error("CONEXION_INVALIDA"))).not.toContain("Mercado Pago");
   });
 
   it("sin internet o sin nube, la caja no ofrece terminal", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("failed to fetch"); }));
-    expect(await cajaTieneTerminal("tok", "caja-1")).toBe(false);
+    const sin = { hay: false, lista: false, proveedor: null };
+    expect(await terminalDeCaja("tok", "caja-1")).toEqual(sin);
     responde(503, { error: "FUNCION_REQUIERE_NUBE" });
-    expect(await cajaTieneTerminal("tok", "caja-1")).toBe(false);
+    expect(await terminalDeCaja("tok", "caja-1")).toEqual(sin);
+    responde(200, { ok: true, terminal: true, lista: true, proveedor: "MERCADO_PAGO" });
+    expect(await terminalDeCaja("tok", "caja-1")).toEqual({ hay: true, lista: true, proveedor: "MERCADO_PAGO" });
+    responde(200, { ok: true, terminal: true, lista: false, proveedor: "CLIP" });
+    expect(await terminalDeCaja("tok", "caja-1")).toEqual({ hay: true, lista: false, proveedor: "CLIP" });
+    // Una nube sin `lista` (anterior a Clip) es Mercado Pago: lista.
     responde(200, { ok: true, terminal: true });
-    expect(await cajaTieneTerminal("tok", "caja-1")).toBe(true);
+    expect(await terminalDeCaja("tok", "caja-1")).toEqual({ hay: true, lista: true, proveedor: null });
   });
 });

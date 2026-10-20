@@ -15,7 +15,7 @@ import {
 } from "../lib/cobro";
 import { nuevoClientId } from "../lib/carrito";
 import { aplicarPagosEnOrden, pagoEntroPeseAlError, ventaQuedoPagada, type PagoPorAplicar } from "../lib/cobro-pagos";
-import { cajaTieneTerminal, pagoDeCobro, pedirCobro, type CobroTerminal } from "../lib/terminal";
+import { pagoDeCobro, pedirCobro, terminalDeCaja, type CobroTerminal, type TerminalCaja } from "../lib/terminal";
 import { VistaTerminal } from "./vista-terminal";
 
 // ─── Íconos SVG inline (calcan los mockups) ────────────────────────────────
@@ -223,6 +223,7 @@ function Numpad({
 function VistaSelector({
   totales,
   conTerminal,
+  terminalLista,
   error,
   onElegir,
   onCerrar,
@@ -230,6 +231,8 @@ function VistaSelector({
   totales: TotalesTicket;
   /** La caja tiene terminal ligada: Débito y Crédito se vuelven un solo «Tarjeta» que cobra en ella. */
   conTerminal: boolean;
+  /** El lector puede recibir el cobro (Clip apagado o con la app cerrada = no): si no, «Tarjeta» abre el registro a mano. */
+  terminalLista: boolean;
   error: string | null;
   onElegir: (m: MetodoPago | "dividido" | "terminal") => void;
   onCerrar: () => void;
@@ -242,8 +245,11 @@ function VistaSelector({
     if (!conTerminal || !esTarjeta) { filas.push({ cfg: m, elegir: () => onElegir(m.valor), clave: m.valor }); continue; }
     if (m.valor === "TARJETA_DEBITO") {
       filas.push({
-        cfg: { ...metodoCfg("TARJETA_CREDITO"), etiqueta: "Tarjeta", sub: "Débito o crédito · se cobra en la terminal" },
-        elegir: () => onElegir("terminal"), clave: "terminal",
+        cfg: {
+          ...metodoCfg("TARJETA_CREDITO"), etiqueta: "Tarjeta",
+          sub: terminalLista ? "Débito o crédito · se cobra en la terminal" : "Terminal no disponible: enciéndela y abre Clip PinPad",
+        },
+        elegir: terminalLista ? () => onElegir("terminal") : () => setAMano(true), clave: "terminal",
       });
     }
     if (aMano) {
@@ -1140,9 +1146,12 @@ export function ModalCobro({
 
   // ── Cobro con terminal (ADR 0033) ──────────────────────────────────────────────────────────
   // Lo último que se supo de esta caja evita que el selector cambie de botones al abrir.
-  const [conTerminal, setConTerminal] = useState(() => {
-    try { return sessionStorage.getItem("vimpos.terminal") === "1"; } catch { return false; }
+  const [terminal, setTerminal] = useState<TerminalCaja>(() => {
+    let hay = false;
+    try { hay = sessionStorage.getItem("vimpos.terminal") === "1"; } catch { /* sin almacén no hay recuerdo */ }
+    return { hay, lista: true, proveedor: null };
   });
+  const conTerminal = terminal.hay;
 
   /**
    * La terminal ya cobró: el pago entra al ticket como débito o crédito, con su referencia. El id del
@@ -1179,9 +1188,10 @@ export function ModalCobro({
   useEffect(() => {
     let activo = true;
     (async () => {
-      const tiene = await cajaTieneTerminal(token, cajaId);
+      const t = await terminalDeCaja(token, cajaId);
+      const tiene = t.hay;
       if (!activo) return;
-      setConTerminal(tiene);
+      setTerminal(t);
       try { sessionStorage.setItem("vimpos.terminal", tiene ? "1" : "0"); } catch { /* sin almacén no hay recuerdo */ }
       if (!tiene) return;
       const r = await pedirCobro(token, cajaId, { accion: "pendientes" }).catch(() => null);
@@ -1318,6 +1328,7 @@ export function ModalCobro({
           <VistaSelector
             totales={totalesEf}
             conTerminal={conTerminal}
+            terminalLista={terminal.lista}
             error={error}
             onElegir={elegirMetodo}
             onCerrar={onCerrar}
@@ -1332,6 +1343,7 @@ export function ModalCobro({
             ticketId={totales.ticketId}
             folio={totales.folio}
             monto={totalesEf.pendiente}
+            proveedor={terminal.proveedor}
             onAprobado={aplicarCobroTerminal}
             onVolver={() => { setError(null); setVista("selector"); }}
           />
@@ -1358,7 +1370,7 @@ export function ModalCobro({
         {vista === "dividido" && (
           <VistaDividida
             totales={totalesEf}
-            conTerminal={conTerminal}
+            conTerminal={conTerminal && terminal.lista}
             procesando={procesando}
             error={error}
             onAplicarPagos={aplicarPagosDivididos}
@@ -1378,6 +1390,7 @@ export function ModalCobro({
               ticketId={totales.ticketId}
               folio={totales.folio}
               monto={esperaDividido.monto}
+              proveedor={terminal.proveedor}
               onAprobado={esperaDividido.aprobado}
               onVolver={esperaDividido.abandonar}
             />

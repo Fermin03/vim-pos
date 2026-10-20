@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { fmtMxn } from "../lib/turno";
 import { nuevoClientId } from "../lib/carrito";
-import { mensajeErrorCobro, mensajeFinal, montoTexto, pedirCobro, type CobroTerminal } from "../lib/terminal";
+import { mensajeErrorCobro, mensajeFinal, montoTexto, pedirCobro, type CobroTerminal, type ProveedorTerminal } from "../lib/terminal";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
 
 const CADA_MS = 2500;
@@ -17,14 +17,16 @@ type Fase =
   | { t: "error"; mensaje: string };     // ni siquiera llegó a la terminal
 
 /**
- * «Cobra en la terminal» (ADR 0033): manda el monto, espera y avisa cuando Mercado Pago dice que
+ * «Cobra en la terminal» (ADR 0033): manda el monto, espera y avisa cuando el proveedor dice que
  * pasó. No aplica el pago: eso lo hace el modal de cobro con `onAprobado`. Mientras está abierta no
  * se sale con Escape; se sale cancelando.
  */
 export function VistaTerminal({
-  token, cajaId, turnoId, ejecutaNombre, ticketId, folio, monto, onAprobado, onVolver,
+  token, cajaId, turnoId, ejecutaNombre, ticketId, folio, monto, proveedor, onAprobado, onVolver,
 }: {
   token: string; cajaId: string; turnoId: string; ejecutaNombre: string;
+  /** Cambia la instrucción mientras espera; null = la de Mercado Pago, como siempre. */
+  proveedor: ProveedorTerminal | null;
   ticketId: string; folio: string | null; monto: number;
   /** `autorizoId` viene cuando un encargado aceptó con su PIN un cobro que quedó sin confirmar. */
   onAprobado: (cobro: CobroTerminal, autorizoId?: string) => void;
@@ -101,7 +103,11 @@ export function VistaTerminal({
       {fase.t === "esperando" && (
         <>
           <p className="mt-4 font-display text-20 font-semibold" role="status">Cobra en la terminal</p>
-          <p className="max-w-[380px] text-15 text-ink-2">En la terminal, toca «Tarjeta» y acerca o inserta la tarjeta del cliente.</p>
+          <p className="max-w-[380px] text-15 text-ink-2">
+            {proveedor === "CLIP"
+              ? "Pide al cliente que acerque o inserte su tarjeta en la terminal."
+              : "En la terminal, toca «Tarjeta» y acerca o inserta la tarjeta del cliente."}
+          </p>
           {fase.aviso && <p className="mt-2 text-14 font-medium text-warning" role="status">{fase.aviso}</p>}
           <div className="mt-6 w-full max-w-[380px]">
             <button type="button" className={secundario} onClick={cancelar} disabled={fase.aviso === "Cancelando…"}>Cancelar cobro</button>
