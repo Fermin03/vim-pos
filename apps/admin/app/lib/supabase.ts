@@ -1,5 +1,6 @@
 "use client";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { RUTA_ENLACE } from "./enlace-acceso";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -15,6 +16,8 @@ export const supabase: SupabaseClient = createClient(URL, ANON, {
     persistSession: true,
     autoRefreshToken: true,
     storageKey: "vimpos.admin.session",
+    // /establecer-acceso abre la sesión del enlace por su cuenta (lib/enlace-acceso.ts).
+    detectSessionInUrl: (url) => url.pathname !== RUTA_ENLACE,
   },
 });
 

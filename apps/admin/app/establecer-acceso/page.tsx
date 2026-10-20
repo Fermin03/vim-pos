@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Button, LogoVim } from "@vim/ui/styles";
 import { supabase, establecerPassword, leerSesion, salir } from "../lib/supabase";
 import { enlaceMiAgenda, tieneAgenda } from "../lib/acceso-celular";
+import { abrirSesionDelEnlace, leerEnlace } from "../lib/enlace-acceso";
 import { mensajeError } from "../lib/errores";
 import { pedirBienvenida } from "../lib/bienvenida";
 
@@ -25,10 +26,24 @@ export default function EstablecerAccesoPage() {
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [conPanel, setConPanel] = useState(false);
+  // Se lee una vez, antes de limpiar la URL (el efecto puede correr dos veces en desarrollo).
+  const [enlace] = useState(() => (typeof window === "undefined" ? null : leerEnlace(window.location.href)));
 
-  // El link establece la sesión vía la URL. Esperamos a que aparezca.
   useEffect(() => {
     let cancelado = false;
+    // Con un enlace en la URL, su sesión reemplaza a la que hubiera (el dueño con el panel abierto)
+    // y, si no abre, el enlace es inválido: nunca se usa otra sesión.
+    if (enlace) {
+      window.history.replaceState(window.history.state, "", window.location.pathname);
+      void abrirSesionDelEnlace(supabase.auth, enlace).then((correo) => {
+        if (cancelado) return;
+        if (correo === null) return setEstado("invalido");
+        setEmail(correo);
+        setEstado("listo");
+      });
+      return () => { cancelado = true; };
+    }
+    // Sin enlace: la sesión que ya hay (cambiar la contraseña estando dentro).
     const verificar = async () => {
       const { data } = await supabase.auth.getSession();
       if (cancelado) return;
@@ -54,7 +69,7 @@ export default function EstablecerAccesoPage() {
       clearTimeout(t);
       sub.subscription.unsubscribe();
     };
-  }, []);
+  }, [enlace]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
