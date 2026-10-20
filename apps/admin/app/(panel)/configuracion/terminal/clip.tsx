@@ -58,6 +58,7 @@ export function ClipSucursal({ sucursal, cajas, cfg, t, ocupado, correr, setErro
   correr: Correr; setError: (e: string | null) => void;
 }) {
   const [lectores, setLectores] = useState<Lector[] | null>(null);
+  const [fallo, setFallo] = useState(false);
   const [elegido, setElegido] = useState<Record<string, string>>({});
   const [propinas, setPropinas] = useState<string[]>(() => [0, 1, 2].map((i) => String(cfg.propina_opciones?.[i] ?? "")));
 
@@ -65,7 +66,7 @@ export function ClipSucursal({ sucursal, cajas, cfg, t, ocupado, correr, setErro
     let vivo = true;
     accionTerminal({ accion: "lectores", conexion_id: cfg.conexion_id }, "terminal-clip-conexion")
       .then((r) => { if (vivo) setLectores(Array.isArray(r.lectores) ? (r.lectores as Lector[]) : []); })
-      .catch((e) => { if (vivo) { setLectores([]); setError(mensajeErrorTerminal(e)); } });
+      .catch((e) => { if (vivo) { setLectores([]); setFallo(true); setError(mensajeErrorTerminal(e)); } });
     return () => { vivo = false; };
   }, [cfg.conexion_id, setError]);
 
@@ -96,11 +97,11 @@ export function ClipSucursal({ sucursal, cajas, cfg, t, ocupado, correr, setErro
         <div className="max-w-[260px]">
           <label className={label} htmlFor={`espera-${sucursal.id}`}>Tiempo para pagar en el lector</label>
           <select
-            id={`espera-${sucursal.id}`} className={input} value={cfg.espera_segundos} disabled={ocupado}
+            id={`espera-${sucursal.id}`} className={input} value={Math.max(60, cfg.espera_segundos)} disabled={ocupado}
             onChange={(e) => void configurar({ espera_segundos: Number(e.target.value) })}
           >
             {ESPERAS.map(([seg, texto]) => <option key={seg} value={seg}>{texto}</option>)}
-            {!ESPERAS.some(([seg]) => seg === cfg.espera_segundos) && <option value={cfg.espera_segundos}>{cfg.espera_segundos} segundos</option>}
+            {cfg.espera_segundos > 60 && !ESPERAS.some(([seg]) => seg === cfg.espera_segundos) && <option value={cfg.espera_segundos}>{cfg.espera_segundos} segundos</option>}
           </select>
           <p className="mt-1.5 text-13 text-ink-3">Si el cliente no paga en ese tiempo, el cobro se cancela solo.</p>
         </div>
@@ -122,7 +123,7 @@ export function ClipSucursal({ sucursal, cajas, cfg, t, ocupado, correr, setErro
 
         <div>
           <h3 className="mb-1 text-13 font-bold uppercase tracking-wide text-ink-3">Cajas</h3>
-          {lectores?.length === 0 && (
+          {lectores?.length === 0 && !fallo && (
             <p className="mb-2 text-sm text-ink-2">Falta que Clip instale la app PinPad en tu lector: escribe a sdk@payclip.com con el número de serie.</p>
           )}
           {cajas.length === 0 && <p className="text-sm text-ink-2">Esta sucursal no tiene cajas activas.</p>}
