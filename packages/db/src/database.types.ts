@@ -15898,6 +15898,14 @@ export type Database = {
         Args: { p_menu: string; p_nombre: string; p_sucursales: string[] }
         Returns: undefined
       }
+      agenda_accesos_colaboradores: {
+        Args: never
+        Returns: {
+          email: string
+          ultimo_acceso: string
+          usuario_id: string
+        }[]
+      }
       agenda_cancelar_en_linea: {
         Args: { p_enlace_hash: string; p_tenant: string }
         Returns: Json
@@ -16612,6 +16620,7 @@ export type Database = {
         Args: { p: Database["public"]["Enums"]["vertical_tipo"] }
         Returns: boolean
       }
+      es_sesion_web_limitada: { Args: never; Returns: boolean }
       establecer_propina_ticket: {
         Args: { p_monto_mxn: number; p_ticket_id: string }
         Returns: undefined
