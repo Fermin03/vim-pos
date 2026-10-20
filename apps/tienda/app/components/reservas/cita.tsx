@@ -85,7 +85,7 @@ export function PaginaDeCita({ slug, codigo, hoy, diasReserva }: { slug: string;
       </div>
 
       <div id="cita-resultado" tabIndex={-1} aria-live="polite" className="outline-none empty:hidden">{hecho && <Aviso tono="success" className="!text-14">{hecho}</Aviso>}</div>
-      {cita.cancelada_motivo && <p className="text-15 text-ink">{cita.cancelada_motivo.replace(/.?$/, ".")}</p>}
+      {cita.cancelada_motivo && <p className="text-15 text-ink">{cita.cancelada_motivo.replace(/\.?$/, ".")}</p>}
       {cita.reembolso && <Aviso tono={cita.reembolso.estado === "DEVUELTO" ? "success" : "info"} role="status" className="!text-14">{cita.reembolso.mensaje}</Aviso>}
 
       <div className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4">
