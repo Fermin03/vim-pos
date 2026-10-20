@@ -1,19 +1,17 @@
 "use client";
 import type { ReactNode } from "react";
 import { PageBody, PageHeader } from "./page-header";
-import { CatalogoTabs } from "./catalogo-tabs";
 import { PedirModulo } from "./pedir-modulo";
 import { useModulos } from "./admin-shell";
 import { estadoInventario, INVENTARIO_INCLUYE, mensajeQuieroInventario } from "../lib/inventario-plan";
 
 /** Lo que ve en Inventario (y en Recetas) un negocio cuyo plan no lo incluye (0148, ADR 0025). */
-export function InventarioDesdeNegocio({ enRecetas = false }: { /** Desde Catálogo → Recetas: conserva su encabezado y sus pestañas. */ enRecetas?: boolean }) {
+export function InventarioDesdeNegocio({ enRecetas = false }: { /** Desde Catálogo → Recetas: conserva su encabezado. */ enRecetas?: boolean }) {
   return (
     <>
       {enRecetas ? (
         <>
           <PageHeader titulo="Recetas y costos" subtitulo="Qué insumos lleva cada producto y cuánto te cuesta." migas={[{ label: "Catálogo" }, { label: "Recetas" }]} />
-          <CatalogoTabs />
         </>
       ) : (
         <PageHeader titulo="Inventario" subtitulo="Insumos, recetas, compras y mermas." />

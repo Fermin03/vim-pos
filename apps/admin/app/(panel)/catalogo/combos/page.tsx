@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Icono } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
-import { CatalogoTabs } from "../../../components/catalogo-tabs";
 import { FranjaMenus, useMenuCatalogo } from "../../../components/selector-menu";
 import { CasillaMenu } from "../../../components/casilla-menu";
 import { activarComboUpsell, leerComboUpsellActivo, listarCombos, type ComboResumen } from "../../../lib/combos";
@@ -224,7 +223,6 @@ export default function CombosPage() {
         }
       />
       <FranjaMenus menu={menu} />
-      <CatalogoTabs />
       <PageBody>
         {okMsg && <p className="mb-3 text-sm font-medium text-success">{okMsg}</p>}
         {error && (

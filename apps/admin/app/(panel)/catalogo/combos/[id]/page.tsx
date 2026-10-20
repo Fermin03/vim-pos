@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { PageHeader, PageBody } from "../../../../components/page-header";
-import { CatalogoTabs } from "../../../../components/catalogo-tabs";
 import { ProductoForm } from "../../../../components/producto-form";
 import { ComboSlotsEditor } from "../../../../components/combo-slots-editor";
 import { ComboPreview } from "../../../../components/combo-preview";
@@ -33,7 +32,6 @@ export default function EditarComboPage() {
         titulo={combo ? combo.nombre : "Editar combo"}
         migas={[{ label: "Catálogo" }, { label: "Combos", href: "/catalogo/combos" }, { label: combo ? combo.nombre : "Editar" }]}
       />
-      <CatalogoTabs />
       <PageBody>
         {combo === undefined && <p className="text-sm text-ink-2">Cargando…</p>}
         {combo === null && <p className="text-sm text-danger">Combo no encontrado.</p>}
