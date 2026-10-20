@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@vim/ui/styles";
 import { PageBody, PageHeader, TablaScroll } from "../../../../components/page-header";
-import { CatalogoTabs } from "../../../../components/catalogo-tabs";
 import { obtenerProducto, type Producto } from "../../../../lib/catalogo";
 import {
   convertirCantidad, costoReceta, guardarReceta, listarConversiones, listarInsumosOpciones, listarUnidadesDetalle,
@@ -124,7 +123,6 @@ export default function EditorRecetaPage() {
         migas={[{ label: "Catálogo" }, { label: "Recetas", href: "/catalogo/recetas" }, { label: producto?.nombre ?? "…" }]}
         right={<Button variant="ghost" onClick={() => router.push("/catalogo/recetas")}>Volver</Button>}
       />
-      <CatalogoTabs />
       <PageBody>
         {producto === undefined && <p className="text-sm text-ink-3">Cargando…</p>}
         {producto === null && <p className="text-sm text-danger">Producto no encontrado.</p>}

@@ -25,7 +25,7 @@ export default function CuentaConfirmadaPage() {
     const seguir = () => {
       if (cancelado) return;
       if (!pedida) { pedida = true; void pedirBienvenida(); }
-      router.replace("/bienvenida");
+      router.replace("/dashboard");
     };
     // Un enlace vencido regresa con `#error=…` en vez de la sesión: no hace falta esperar.
     if (/[#&]error=/.test(window.location.hash)) { setEstado("invalido"); return; }

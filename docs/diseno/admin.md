@@ -10,6 +10,38 @@ tabla de 40 filas sin que se le caiga el negocio encima.
 
 Es la app más grande del monorepo (73 pantallas) y la que más crece.
 
+## Navegación: un solo menú, desplegable (oct 2026)
+
+Inspirado en el panel de Square: **el menú lateral es la navegación**. Pocos grupos arriba que se
+despliegan ahí mismo en sus opciones (hasta tres niveles); cada página del panel tiene su entrada, y
+ninguna sección repite sus opciones como pestañas o columna dentro de la página. El árbol vive en
+`lib/menu-admin.ts` (con pruebas); el diseño completo, en
+`docs/superpowers/specs/2026-10-20-admin-menu-tipo-square-design.md`.
+
+- **Grupos:** Inicio · Menú · Inventario · Clientes · Informes · Personal · Facturación · Ajustes
+  (Mi negocio / Dispositivos / Cuenta) — línea — Tienda en línea · Apps de delivery.
+- **Acordeón:** tocar un grupo lo despliega o lo pliega, no navega; abrir uno cierra a su hermano.
+  Al entrar a una página se despliega su camino y se marca la opción (gana la ruta más larga:
+  `/configuracion/cajas/descargar` marca «Conectar computadora», no «Cajas»).
+- **Sin animación de altura:** se abre decenas de veces al día. Solo gira el chevron.
+- **Buscador** arriba del menú: busca en el menú (etiquetas y unas palabras clave, sin acentos), no
+  en datos del negocio. Enter abre el primer resultado; Esc limpia. 16 px en el celular.
+- **Lo que no se ve se quita, no se apaga:** rol (`lib/acceso.ts`), módulos de operación
+  (`rutasOcultas`) y lo concedido (sin `delivery_apps` desaparece «Conexión», no «Conciliación»).
+  Un grupo sin opciones desaparece. La Tienda sin contratar es un solo enlace. Informes enseña los
+  mismos grupos que el índice de reportes (`lib/reportes-grupos.ts`).
+- **Arriba:** el nombre del negocio y su sucursal, solo texto (la sucursal se elige en cada página).
+- **Se quedan como pestañas** solo las partes de UNA opción: Lealtad (Programa / Premios /
+  Movimientos) y Zonas de envío (Zonas / Colonias).
+
+**Inicio con pasos.** Mientras el negocio no esté en operación (`fase` ≠ GO_LIVE) y a quien puede
+hacerlos (Dueño y Administrador), el inicio abre con «Configura tu negocio para empezar a vender»: una
+tarjeta por paso de `lib/onboarding.ts`, el siguiente marcado como **Siguiente** con el único botón
+primario, los terminados en una línea. Solo Facturación (opcional) se puede ignorar, y se recuerda en
+el navegador. Con todo listo, «Terminar configuración» marca GO_LIVE y el bloque se va. Verlo por
+primera vez pasa la fase de INVITADO a EN_CONFIGURACION (Plataforma lee esa fase). `/bienvenida`
+redirige al inicio.
+
 ## Densidad, al revés que en el POS
 
 Aquí sí se aprieta. Filas de tabla de 40px, tipografía de 13–14px, y tantas columnas como quepan
@@ -44,7 +76,7 @@ consecuencia** y, cuando toca dinero, PIN. Nada destructivo vive junto a un filt
 
 ## Combos
 
-En Catálogo, **Combos** vive como pestaña propia entre Modificadores y Recetas (ADR 0015). Un
+En el menú **Menú**, **Combos** tiene entrada propia entre Modificadores y Recetas (ADR 0015). Un
 combo se crea con los mismos datos que cualquier producto —nombre, categoría, clave SAT sugerida
 `90101503` (editable, no obligatoria)— y de ahí se navega a la pantalla del combo a agregarle
 **slots**: uno por paso que va a ver la caja. Un slot puede tomar sus opciones de **una categoría
@@ -175,11 +207,11 @@ desde el celular, parado junto a la caja, con la foto de la promoción que acaba
 
 ## Menús del catálogo (0155, ADR 0029)
 
-La franja de menús aparece arriba de las pestañas del Catálogo cuando el negocio tiene dos o más
+La franja de menús aparece arriba de las páginas del Catálogo cuando el negocio tiene dos o más
 sucursales, o algún menú propio; con una sola sucursal, el Catálogo se ve como siempre.
 
 - **Una pastilla por menú**, con las sucursales que lo usan en gris. «General» siempre va primero.
-  El menú elegido se recuerda entre pestañas y entre visitas.
+  El menú elegido se recuerda entre páginas y entre visitas.
 - **La pastilla activa va en tinta sólida** (`bg-ink`, texto blanco; sus sucursales en blanco al
   75 %), como el atajo activo del rango de fechas. Las demás, superficie blanca con borde. Solo
   borde y negrita no bastaba para saber qué menú se está editando.
@@ -190,7 +222,7 @@ sucursales, o algún menú propio; con una sola sucursal, el Catálogo se ve com
 - **«Nuevo menú»** pide nombre (hasta 80 caracteres) y sucursales. Arranca igual que el General; si
   una sucursal viene de otro menú propio, se dice antes de guardar. Eliminar nombra la
   consecuencia: sus sucursales vuelven al General.
-- **Cada pestaña trabaja sobre el menú elegido.** Productos y Combos: casilla «En este menú» y
+- **Cada página del Catálogo trabaja sobre el menú elegido.** Productos y Combos: casilla «En este menú» y
   precio en línea. Categorías: «N de M productos» y un interruptor que apaga o enciende la
   categoría entera (con parte encendida se ve «parcial», con la casilla en estado indeterminado).
   Modificadores y Recetas dicen que son los mismos en todos los menús; Recetas aclara además que
@@ -216,8 +248,8 @@ sucursales, o algún menú propio; con una sola sucursal, el Catálogo se ve com
 
 ## Tienda en línea (0161–0163, 0168)
 
-Menú principal → **Tienda en línea**: donde el dueño arma la tienda en la que sus clientes piden
-desde el teléfono. Una sola página, sin pestañas, porque son pocos campos y se llenan una vez. Sin
+Menú lateral → **Tienda en línea** (General · Pedidos y pagos · Sucursales y horarios · Menú, cada
+una con su entrada): donde el dueño arma la tienda en la que sus clientes piden desde el teléfono. Sin
 el complemento concedido, en su lugar va la invitación (`PedirModulo`). Su cierre depende de lo que
 VIM ofrece (`invitacionTienda`): mientras el complemento no esté activo en el catálogo, sin precios
 («Estamos por lanzarla…»); ya activo, «Tu plan incluye la tienda en línea. Escríbenos para

@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, DialogoPeligro, Icono, IconoCategoria } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
-import { CatalogoTabs } from "../../../components/catalogo-tabs";
 import { FranjaMenus, useMenuCatalogo } from "../../../components/selector-menu";
 import { ModalCategoria } from "../../../components/modal-categoria";
 import {
@@ -233,7 +232,6 @@ export default function CategoriasPage() {
         }
       />
       <FranjaMenus menu={menu} />
-      <CatalogoTabs />
       <PageBody>
         {/* Toolbar */}
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">

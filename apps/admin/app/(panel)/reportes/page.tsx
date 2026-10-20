@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PageBody, PageHeader } from "../../components/page-header";
 import { usePerfil } from "../../components/admin-shell";
-import { puedeVer } from "../../lib/acceso";
 import { leerReportesDisponibles, type ReportesDisponibles } from "../../lib/reportes";
+import { GRUPOS, reporteVisible, type Reporte } from "../../lib/reportes-grupos";
 
 /**
  * Índice de reportes, agrupado por la PREGUNTA que responde cada uno.
@@ -20,58 +20,6 @@ import { leerReportesDisponibles, type ReportesDisponibles } from "../../lib/rep
  * Tampoco se enseña un reporte que el rol no puede abrir (costo de ventas pide administrador; el
  * historial vive en Inventario): una tarjeta que lleva a "no disponible para ti" solo estorba.
  */
-type Modulo = keyof ReportesDisponibles;
-type Reporte = { href: string; titulo: string; descripcion: string; modulo?: Modulo };
-type Grupo = { titulo: string; ayuda: string; reportes: Reporte[] };
-
-const GRUPOS: Grupo[] = [
-  {
-    titulo: "Qué se vende",
-    ayuda: "La venta desglosada por producto, por categoría y por canal.",
-    reportes: [
-      { href: "/reportes/ventas-producto", titulo: "Ventas por producto", descripcion: "Qué se vende más: unidades, venta y la parte que aporta cada producto." },
-      { href: "/reportes/ventas-categoria", titulo: "Ventas por categoría", descripcion: "La venta repartida por las categorías de tu menú." },
-      { href: "/reportes/modo-servicio", titulo: "Ventas por tipo de servicio", descripcion: "Comer aquí, para llevar, a domicilio y apps: cuánto aporta cada uno." },
-      { href: "/reportes/apps-externas", titulo: "Ventas por apps de delivery", descripcion: "Uber Eats, Rappi y DiDi: venta, comisión y lo que depositó cada app.", modulo: "apps" },
-      { href: "/reportes/ventas-marca", titulo: "Ventas por marca virtual", descripcion: "Cómo le va a cada marca que opera desde tu cocina.", modulo: "marcas" },
-      { href: "/reportes/eventos", titulo: "Ventas por evento", descripcion: "Ferias y eventos: venta, comisión del organizador y lo que te quedó.", modulo: "eventos" },
-    ],
-  },
-  {
-    titulo: "Cómo va la operación",
-    ayuda: "Cierres de caja, el equipo y los tiempos de cocina.",
-    reportes: [
-      { href: "/reportes/z-historico", titulo: "Cortes de turno", descripcion: "Cada cierre de caja: lo vendido, el efectivo esperado contra el contado y quién cerró." },
-      { href: "/reportes/ventas-mesero", titulo: "Ventas por mesero", descripcion: "Tickets, venta y propinas de cada mesero.", modulo: "meseros" },
-      { href: "/reportes/ventas-area", titulo: "Ventas por estación", descripcion: "Cuánto prepara y cuánto vende cada estación de la cocina." },
-      { href: "/reportes/tiempos-cocina", titulo: "Tiempos de cocina", descripcion: "Cuánto tarda en salir la comida contra tu objetivo." },
-    ],
-  },
-  {
-    titulo: "Inventario y costos",
-    ayuda: "Lo que entra y sale de tu inventario, y cuánto te cuesta lo que vendes.",
-    reportes: [
-      { href: "/reportes/costo-ventas", titulo: "Costo de ventas y margen", descripcion: "Cuánto te costó lo que vendiste y cuánto te quedó, producto por producto.", modulo: "inventario" },
-      { href: "/inventario/movimientos", titulo: "Movimientos de inventario", descripcion: "Compras, consumo por ventas, mermas y ajustes, insumo por insumo.", modulo: "inventario" },
-    ],
-  },
-  {
-    titulo: "Qué vigilar",
-    ayuda: "Señales que conviene revisar de cerca.",
-    reportes: [
-      { href: "/reportes/descuentos", titulo: "Descuentos por usuario", descripcion: "Quién da descuentos y cortesías, y cuánto suman frente a la venta." },
-      { href: "/reportes/reimpresiones", titulo: "Reimpresiones por cajero", descripcion: "Reimprimir mucho puede esconder producto que salió sin cobrar." },
-      { href: "/reportes/no-shows", titulo: "Reservas que no llegaron", descripcion: "Reservas que se quedaron esperando y comensales perdidos.", modulo: "reservaciones" },
-    ],
-  },
-  {
-    titulo: "Varias sucursales",
-    ayuda: "Tu cadena, sucursal por sucursal.",
-    reportes: [
-      { href: "/reportes/consolidado", titulo: "Consolidado por sucursal", descripcion: "Venta, tickets y participación de cada sucursal, una junto a otra.", modulo: "variasSucursales" },
-    ],
-  },
-];
 
 export default function ReportesHub() {
   const perfil = usePerfil();
@@ -86,9 +34,9 @@ export default function ReportesHub() {
   }, []);
 
   // Sin perfil todavía se muestran todas: el guardián de rutas es quien decide al entrar.
-  const permitido = (r: Reporte) => !perfil || puedeVer(perfil.jerarquia, r.href);
-  const visible = (r: Reporte) => permitido(r) && (verTodos || !r.modulo || !disponibles || disponibles[r.modulo]);
-  const ocultos = disponibles ? GRUPOS.flatMap((g) => g.reportes).filter((r) => permitido(r) && r.modulo && !disponibles[r.modulo]).length : 0;
+  const jer = perfil?.jerarquia ?? null;
+  const visible = (r: Reporte) => reporteVisible(r, disponibles, jer, verTodos);
+  const ocultos = disponibles ? GRUPOS.flatMap((g) => g.reportes).filter((r) => reporteVisible(r, disponibles, jer, true) && !reporteVisible(r, disponibles, jer)).length : 0;
 
   return (
     <>
@@ -99,7 +47,7 @@ export default function ReportesHub() {
             const reportes = g.reportes.filter(visible);
             if (reportes.length === 0) return null;
             return (
-              <section key={g.titulo}>
+              <section key={g.id} id={g.id} className="scroll-mt-6">
                 <h2 className="font-display text-15 font-semibold tracking-tight">{g.titulo}</h2>
                 <p className="mb-3 mt-0.5 text-13 text-ink-2">{g.ayuda}</p>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
