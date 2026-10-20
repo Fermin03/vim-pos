@@ -16887,6 +16887,26 @@ export type Database = {
       mi_agenda: { Args: { p_desde: string; p_hasta: string }; Returns: Json }
       mi_cita_empezar: { Args: { p_cita: string }; Returns: undefined }
       mi_cita_terminar: { Args: { p_cita: string }; Returns: string }
+      mi_periodo_comisiones: {
+        Args: { p_fecha: string }
+        Returns: {
+          desde: string
+          hasta: string
+        }[]
+      }
+      mis_comisiones: {
+        Args: { p_desde: string; p_hasta: string }
+        Returns: {
+          comision_productos_mxn: number
+          comision_servicios_mxn: number
+          nombre: string
+          servicios: number
+          sueldo_mxn: number
+          total_mxn: number
+          usuario_id: string
+          ventas_mxn: number
+        }[]
+      }
       modificar_reservacion: {
         Args: {
           p_cliente_nombre?: string

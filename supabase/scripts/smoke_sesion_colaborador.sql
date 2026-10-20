@@ -34,7 +34,7 @@ DECLARE
   v_pers   uuid := '22800000-0000-0000-0000-0000000000b1';   -- PERSONAL; colaboradora
   v_cat    uuid := 'a0000000-0000-0000-0000-0000000000c1';
   v_corte  uuid := '22800000-0000-0000-0000-0000000000a1';
-  v_vis text; v_j jsonb; v_n integer;
+  v_vis text; v_j jsonb; v_n integer; v_x text;
 BEGIN
   UPDATE tenants SET vertical_principal = 'SALON', operacion = operacion || '{"agenda":true}' WHERE id = v_t;
   INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data)
@@ -143,6 +143,58 @@ BEGIN
   IF has_table_privilege('anon', 'public.clientes', 'SELECT') THEN
     IF (SELECT count(*) FROM clientes) <> 0 THEN RAISE EXCEPTION 'C7: anon lee clientas'; END IF;
   END IF;
+  EXECUTE 'RESET ROLE';
+
+  -- 8) El hook: la sesión web sin jerarquía de panel sale con role = colaborador_web.
+  SELECT custom_access_token_hook(jsonb_build_object('user_id', v_pers, 'claims', '{"role":"authenticated"}'::jsonb))
+         #>> '{claims,role}' INTO v_x;
+  IF v_x <> 'colaborador_web' THEN RAISE EXCEPTION 'C8: Paty sale con role %', v_x; END IF;
+  SELECT custom_access_token_hook(jsonb_build_object('user_id', v_maria, 'claims', '{"role":"authenticated"}'::jsonb))
+         #>> '{claims,role}' INTO v_x;
+  IF v_x <> 'colaborador_web' THEN RAISE EXCEPTION 'C8: la cajera sale con role %', v_x; END IF;
+  SELECT string_agg(custom_access_token_hook(jsonb_build_object('user_id', u, 'claims', '{"role":"authenticated"}'::jsonb))
+                    #>> '{claims,role}', ',' ORDER BY u) INTO v_x
+    FROM unnest(ARRAY[v_dueno, v_diego, v_caja]) u;
+  IF v_x <> 'authenticated,authenticated,authenticated' THEN RAISE EXCEPTION 'C8: dueño, supervisor o caja cambiaron de rol: %', v_x; END IF;
+  SELECT custom_access_token_hook(jsonb_build_object('user_id', v_pers, 'claims', '{"role":"authenticated"}'::jsonb))
+         #>> '{claims,tenant_id}' INTO v_x;
+  IF v_x IS DISTINCT FROM v_t::text THEN RAISE EXCEPTION 'C8: Paty perdió el tenant_id'; END IF;
+
+  -- 9) colaborador_web solo ejecuta lo de /mi-agenda: ninguna otra función DEFINER, ninguna tabla.
+  SELECT string_agg(p.proname, ',' ORDER BY p.proname) INTO v_x FROM pg_proc p
+   WHERE p.pronamespace = 'public'::regnamespace AND p.prosecdef AND p.prorettype <> 'trigger'::regtype
+     AND has_function_privilege('colaborador_web', p.oid, 'execute');
+  IF v_x IS DISTINCT FROM 'mi_agenda,mi_cita_empezar,mi_cita_terminar,mi_periodo_comisiones,mis_comisiones' THEN
+    RAISE EXCEPTION 'C9: colaborador_web ejecuta: %', v_x;
+  END IF;
+  SELECT count(*) INTO v_n FROM pg_class c
+   WHERE c.relnamespace = 'public'::regnamespace AND c.relkind IN ('r', 'v', 'm', 'p')
+     AND (has_table_privilege('colaborador_web', c.oid, 'SELECT') OR has_table_privilege('colaborador_web', c.oid, 'INSERT')
+          OR has_table_privilege('colaborador_web', c.oid, 'UPDATE') OR has_table_privilege('colaborador_web', c.oid, 'DELETE'));
+  IF v_n <> 0 THEN RAISE EXCEPTION 'C9: colaborador_web tiene privilegios en % tablas', v_n; END IF;
+
+  -- 10) Como PostgREST con ese token: su agenda y sus comisiones sí; la caja y las tablas no.
+  EXECUTE 'SET LOCAL ROLE colaborador_web';
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_pers, 'tenant_id', v_t, 'role', 'colaborador_web',
+    'tipo_identidad', 'EMPLEADO', 'session_id', gen_random_uuid())::text, true);
+  v_j := mi_agenda('2030-01-14', '2030-01-14');
+  IF jsonb_array_length(v_j->'tramos') <> 1 THEN RAISE EXCEPTION 'C10: mi_agenda: %', v_j; END IF;
+  SELECT count(*) INTO v_n FROM mi_periodo_comisiones('2030-01-14');
+  IF v_n <> 1 THEN RAISE EXCEPTION 'C10: mi_periodo_comisiones'; END IF;
+  SELECT count(*) INTO v_n FROM mis_comisiones('2030-01-14', '2030-01-20') c WHERE c.usuario_id <> v_pers;
+  IF v_n <> 0 THEN RAISE EXCEPTION 'C10: mis_comisiones trae % filas ajenas', v_n; END IF;
+  FOREACH v_x IN ARRAY ARRAY[
+    format('SELECT guardar_cita(%L::jsonb)', jsonb_build_object('sucursal_id', v_suc)),
+    format('SELECT cancelar_cita(%L, %L)', gen_random_uuid(), 'x'),
+    format('SELECT marcar_no_llego(%L)', gen_random_uuid()),
+    format('SELECT aplicar_pago(%L, %L, 1, 1, NULL, NULL, NULL, false, NULL, NULL)', gen_random_uuid(), 'EFECTIVO'),
+    'SELECT count(*) FROM citas', 'SELECT count(*) FROM productos', 'SELECT count(*) FROM tickets'] LOOP
+    BEGIN
+      EXECUTE v_x;
+      RAISE EXCEPTION 'C10: colaborador_web pudo: %', v_x;
+    EXCEPTION WHEN insufficient_privilege THEN NULL;
+    END;
+  END LOOP;
   EXECUTE 'RESET ROLE';
 END $$;
 

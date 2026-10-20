@@ -166,7 +166,7 @@ BEGIN
   PERFORM pg_temp.como(v_diego, v_t);
   PERFORM pg_temp.debe_fallar($q$SELECT * FROM agenda_reporte_citas('2030-01-14', '2030-01-20')$q$, 'SIN_PERMISO:%', 'C6 supervisor');
   PERFORM pg_temp.como(v_dueno, v_otro);
-  PERFORM pg_temp.debe_fallar($q$SELECT * FROM agenda_reporte_citas('2030-01-14', '2030-01-20')$q$, '%', 'C6 otro negocio');
+  PERFORM pg_temp.debe_fallar($q$SELECT * FROM agenda_reporte_citas('2030-01-14', '2030-01-20')$q$, 'DATOS_INVALIDOS: la agenda no está encendida%', 'C6 otro negocio');
 
   PERFORM pg_temp.como(v_dueno, v_t);
   SELECT * INTO r FROM agenda_reporte_citas('2030-01-14', '2030-01-20') WHERE usuario_id = v_diego AND producto_id = v_corte;

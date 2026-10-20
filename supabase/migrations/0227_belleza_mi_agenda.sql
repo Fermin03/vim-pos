@@ -58,6 +58,9 @@ END;
 $$;
 REVOKE ALL ON FUNCTION _agenda_admin_tenant() FROM PUBLIC, anon, authenticated;
 
+-- Tramos de un colaborador por tiempo (mi_agenda y agenda_ocupacion).
+CREATE INDEX IF NOT EXISTS idx_citas_servicios_colaborador_inicia ON citas_servicios (tenant_id, usuario_id, inicia);
+
 -- Sus tramos entre dos días de México (inclusive, máximo 14 días).
 CREATE OR REPLACE FUNCTION mi_agenda(p_desde date, p_hasta date)
 RETURNS jsonb
@@ -92,7 +95,8 @@ BEGIN
         LEFT JOIN espacios e ON e.id = cs.espacio_id
        WHERE cs.tenant_id = v_tenant AND cs.usuario_id = auth.uid()
          AND c.estado <> 'CANCELADA'
-         AND (cs.inicia AT TIME ZONE 'America/Mexico_City')::date BETWEEN p_desde AND p_hasta), '[]'::jsonb));
+         AND cs.inicia >= (p_desde::timestamp AT TIME ZONE 'America/Mexico_City')
+         AND cs.inicia < ((p_hasta + 1)::timestamp AT TIME ZONE 'America/Mexico_City')), '[]'::jsonb));
 END;
 $$;
 COMMENT ON FUNCTION mi_agenda(date, date) IS
@@ -157,7 +161,11 @@ STABLE
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
-DECLARE v_tenant uuid := _agenda_admin_tenant();
+DECLARE
+  v_tenant uuid := _agenda_admin_tenant();
+  -- El rango como instantes (semiabierto), para que los filtros usen los índices.
+  v_ini timestamptz := p_desde::timestamp AT TIME ZONE 'America/Mexico_City';
+  v_fin timestamptz := (p_hasta + 1)::timestamp AT TIME ZONE 'America/Mexico_City';
 BEGIN
   IF p_desde IS NULL OR p_hasta IS NULL OR p_hasta < p_desde OR p_hasta - p_desde > 366 THEN
     RAISE EXCEPTION 'DATOS_INVALIDOS: el rango va de 1 a 367 días.' USING ERRCODE = '22023';
@@ -175,7 +183,8 @@ BEGIN
       FROM citas_servicios cs
       JOIN citas c ON c.id = cs.cita_id
      WHERE cs.tenant_id = v_tenant
-       AND (COALESCE(c.inicia, c.created_at) AT TIME ZONE 'America/Mexico_City')::date BETWEEN p_desde AND p_hasta
+       AND ((c.inicia >= v_ini AND c.inicia < v_fin)
+            OR (c.inicia IS NULL AND c.created_at >= v_ini AND c.created_at < v_fin))
        AND (p_canal IS NULL OR (c.canal = 'EN_LINEA') = (p_canal = 'EN_LINEA'))
   )
   SELECT t.usuario_id, up.nombre::text, t.producto_id, p.nombre::text,
