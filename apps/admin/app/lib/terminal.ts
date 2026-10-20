@@ -12,16 +12,16 @@ const CLIENT_ID = "763906729621235";
 export const REGRESO_MP = "https://admin.vimpos.com.mx/integraciones/mercado-pago/callback";
 const CLAVE_STATE = "vimpos.mp.state";
 
-export type ConexionTerminal = { id: string; cuenta_nombre: string | null; de_prueba: boolean; estado: "ACTIVA" | "ERROR" | "DESCONECTADA"; ultimo_error: string | null };
-export type ConfigSucursal = { sucursal_id: string; conexion_id: string; sucursal_id_externo: string | null; imprime_terminal: boolean; espera_segundos: number; propina_en_terminal: boolean };
+export type ConexionTerminal = { id: string; proveedor: "MERCADO_PAGO" | "CLIP"; cuenta_nombre: string | null; de_prueba: boolean; estado: "ACTIVA" | "ERROR" | "DESCONECTADA"; ultimo_error: string | null };
+export type ConfigSucursal = { sucursal_id: string; conexion_id: string; sucursal_id_externo: string | null; imprime_terminal: boolean; espera_segundos: number; propina_en_terminal: boolean; propina_opciones: number[] | null };
 export type DispositivoTerminal = { caja_id: string; sucursal_id: string; terminal_id_externo: string | null; modo: string | null; activa: boolean };
 export type EstadoTerminal = { conexiones: ConexionTerminal[]; config: ConfigSucursal[]; dispositivos: DispositivoTerminal[] };
 
 /** Lo que el negocio tiene conectado (RLS). Las cuentas desconectadas no se muestran. */
 export async function leerTerminal(): Promise<EstadoTerminal> {
   const [c, g, d] = await Promise.all([
-    supabase.from("terminal_conexiones").select("id, cuenta_nombre, de_prueba, estado, ultimo_error").neq("estado", "DESCONECTADA").order("conectada_at"),
-    supabase.from("terminal_config_sucursal").select("sucursal_id, conexion_id, sucursal_id_externo, imprime_terminal, espera_segundos, propina_en_terminal"),
+    supabase.from("terminal_conexiones").select("id, proveedor, cuenta_nombre, de_prueba, estado, ultimo_error").neq("estado", "DESCONECTADA").order("conectada_at"),
+    supabase.from("terminal_config_sucursal").select("sucursal_id, conexion_id, sucursal_id_externo, imprime_terminal, espera_segundos, propina_en_terminal, propina_opciones"),
     supabase.from("terminal_dispositivos").select("caja_id, sucursal_id, terminal_id_externo, modo, activa"),
   ]);
   const error = c.error ?? g.error ?? d.error;
@@ -55,7 +55,15 @@ export function validarStateMp(recibido: string | null): boolean {
   return Boolean(recibido) && guardado !== null && recibido === guardado;
 }
 
+export type FuncionTerminal = "terminal-mp-conexion" | "terminal-clip-conexion";
+
 type Accion =
+  // Clip (terminal-clip-conexion): las claves viajan solo en «conectar» y nunca vuelven.
+  | { accion: "conectar"; api_key: string; secreto: string }
+  | { accion: "lectores"; conexion_id: string }
+  | { accion: "sucursal"; conexion_id: string; sucursal_id: string }
+  | { accion: "caja"; caja_id: string; serie: string }
+  | { accion: "configurar"; sucursal_id: string; imprime_terminal: boolean; espera_segundos: number; propina_opciones: number[] | null }
   | { accion: "canjear"; code: string }
   | { accion: "sucursal"; conexion_id: string; sucursal_id: string; latitud: number; longitud: number }
   | { accion: "caja"; caja_id: string }
@@ -64,13 +72,13 @@ type Accion =
   | { accion: "configurar"; sucursal_id: string; imprime_terminal: boolean; espera_segundos: number; propina_en_terminal: boolean }
   | { accion: "desconectar"; conexion_id: string };
 
-export async function accionTerminal(cuerpo: Accion): Promise<Record<string, unknown>> {
+export async function accionTerminal(cuerpo: Accion, funcion: FuncionTerminal = "terminal-mp-conexion"): Promise<Record<string, unknown>> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new Error("SESION_INVALIDA");
   let r: Response;
   try {
-    r = await fetch(`${URL_SB}/functions/v1/terminal-mp-conexion`, {
+    r = await fetch(`${URL_SB}/functions/v1/${funcion}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify(cuerpo),
@@ -112,6 +120,14 @@ const MENSAJES: Record<string, string> = {
   CAJA_NO_EXISTE: "Esa caja ya no existe o está desactivada.",
   SIN_TERMINAL: "Todavía no hay una terminal ligada a esta caja.",
   MP_ERROR: "Mercado Pago no respondió como se esperaba. Inténtalo de nuevo en unos minutos.",
+  CLAVE_RECHAZADA: "Clip no reconoció la API key o la clave secreta. Cópialas de nuevo de tu panel de Clip.",
+  CLIP_SIN_RESPUESTA: "Clip no respondió. Inténtalo de nuevo en unos minutos.",
+  CLIP_ERROR: "Clip no respondió como se esperaba. Inténtalo de nuevo en unos minutos.",
+  CONEXION_INVALIDA: "Clip ya no acepta las claves de esta cuenta. Desconéctala y vuelve a conectarla con claves nuevas.",
+  FALTAN_CAMPOS: "Faltan datos. Revisa lo que escribiste e inténtalo de nuevo.",
+  PROPINA_INVALIDA: "Los porcentajes de propina deben ser números enteros del 1 al 100 (hasta tres).",
+  LECTOR_NO_ES_DE_LA_CUENTA: "Ese lector no pertenece a la cuenta de Clip conectada. Elige uno de la lista.",
+  LECTOR_EN_OTRO_NEGOCIO: "Ese lector ya lo usa otro negocio en VIM POS. Si es tuyo, escríbenos a soporte.",
   MP_NO_CONFIGURADO: "La conexión con Mercado Pago no está disponible por ahora. Escríbenos a soporte.",
 };
 
