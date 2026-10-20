@@ -307,7 +307,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             </div>
           </div>
 
-          <MenuLateral menu={menu} pathname={pathname} marcaPlan={(href) => sinInventario && rutaEsDeInventario(href)} />
+          <MenuLateral menu={menu} pathname={pathname} marcaPlan={(href) => sinInventario && rutaEsDeInventario(href)} alNavegar={() => setMenuAbierto(false)} />
 
           {/* Ayuda por WhatsApp (0142): fuera de las secciones porque no es una pantalla, y a la
               vista en el cajón del celular igual que en el escritorio. Abre en otra pestaña. */}

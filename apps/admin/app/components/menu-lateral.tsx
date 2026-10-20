@@ -12,17 +12,28 @@ import { buscarEnMenu, caminoDe, rutaActiva, type Grupo, type MenuAdmin, type No
  *
  * Sin animación de altura a propósito: es un menú que se abre decenas de veces al día.
  */
-export function MenuLateral({ menu, pathname, marcaPlan }: { menu: MenuAdmin; pathname: string; marcaPlan: (href: string) => boolean }) {
+export function MenuLateral({ menu, pathname, marcaPlan, alNavegar }: {
+  menu: MenuAdmin;
+  pathname: string;
+  marcaPlan: (href: string) => boolean;
+  /** Se llama al tocar cualquier opción, también un ancla de la misma página (Informes), donde la
+   *  ruta no cambia y quien escucha la ruta (el cajón del celular) no se entera. */
+  alNavegar?: () => void;
+}) {
   const router = useRouter();
   const activa = rutaActiva(menu, pathname);
+  const camino = caminoDe(menu, activa).join(" ");
   const [abiertos, setAbiertos] = useState<string[]>(() => caminoDe(menu, activa));
   const [texto, setTexto] = useState("");
 
-  // Navegar (o que el menú termine de filtrarse) despliega el camino de la página actual.
+  // Navegar despliega el camino de la página actual. Depende del camino y no del menú: una lectura
+  // que llega tarde (reportes, módulos) recalcula el menú y no debe plegar lo que el usuario abrió.
   useEffect(() => {
-    setAbiertos(caminoDe(menu, activa));
+    setAbiertos(camino ? camino.split(" ") : []);
     setTexto("");
-  }, [menu, activa]);
+  }, [camino, activa]);
+
+  const navegado = () => { setTexto(""); alNavegar?.(); };
 
   const alternar = (grupo: Grupo, hermanos: Nodo[]) => {
     setAbiertos((prev) => {
@@ -50,7 +61,7 @@ export function MenuLateral({ menu, pathname, marcaPlan }: { menu: MenuAdmin; pa
           onChange={(e) => setTexto(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Escape" && texto) { e.stopPropagation(); setTexto(""); }
-            if (e.key === "Enter" && resultados[0]) router.push(resultados[0].href);
+            if (e.key === "Enter" && resultados[0]) { router.push(resultados[0].href); navegado(); }
           }}
           placeholder="Buscar en el menú"
           aria-label="Buscar en el menú"
@@ -58,13 +69,17 @@ export function MenuLateral({ menu, pathname, marcaPlan }: { menu: MenuAdmin; pa
         />
       </div>
 
-      <nav aria-label="Menú del panel" className="flex flex-1 flex-col gap-px overflow-y-auto px-3 pb-4 pt-2">
+      <nav
+        aria-label="Menú del panel"
+        onClick={(e) => { if ((e.target as Element).closest("a")) navegado(); }}
+        className="flex flex-1 flex-col gap-px overflow-y-auto px-3 pb-4 pt-2"
+      >
         {texto.trim() ? (
           resultados.length === 0 ? (
             <p className="px-3 py-2 text-13 text-[#76767E]">Nada en el menú con «{texto.trim()}».</p>
           ) : (
             resultados.map((r) => (
-              <Link key={r.href} href={r.href} onClick={() => setTexto("")} className={claseHoja(false, 0)}>
+              <Link key={r.href} href={r.href} className={claseHoja(false, 0)}>
                 <span className="min-w-0">
                   <span className="block">{r.label}</span>
                   {r.ruta.length > 0 && <span className="block text-12 font-normal text-[#76767E]">{r.ruta.join(" › ")}</span>}
