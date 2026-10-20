@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { variacionPct, agregarTiemposCocina, agruparVentasVariantes } from "../reportes";
+import {
+  variacionPct, agregarTiemposCocina, agruparVentasVariantes, agruparCitas, agruparOcupacion, ocupacionTotal, recortarRango, tasaFalta,
+  type RenglonCitas, type RenglonOcupacion,
+} from "../reportes";
 
 describe("variacionPct (deltas del dashboard P-177)", () => {
   it("calcula subidas y bajadas redondeadas a entero", () => {
@@ -122,5 +125,63 @@ describe("agruparVentasVariantes", () => {
     expect(filas[0]!.producto_id).toBe("gorra");
     expect(filas[1]!.venta_mxn).toBe(0.3);
     expect(filas[1]!.neto_mxn).toBe(0.3);
+  });
+});
+
+describe("reportes de la agenda (belleza, 0227)", () => {
+  const r = (x: Partial<RenglonCitas>): RenglonCitas => ({
+    usuario_id: "u1", colaborador: "Diego", producto_id: "p1", servicio: "Corte",
+    atendidas: 0, canceladas_clienta: 0, canceladas_negocio: 0, no_llego: 0, total: 0, ...x,
+  });
+
+  it("tasa de falta = no llegó / total, 0 sin citas", () => {
+    expect(tasaFalta(1, 4)).toBe(25);
+    expect(tasaFalta(0, 0)).toBe(0);
+  });
+
+  it("citas por colaborador suma sus servicios; sin colaborador va en su propia fila", () => {
+    const filas = agruparCitas([
+      r({ atendidas: 3, no_llego: 1, total: 4 }),
+      r({ producto_id: "p2", servicio: "Tinte", canceladas_clienta: 1, canceladas_negocio: 1, no_llego: 2, total: 4 }),
+      r({ usuario_id: null, colaborador: null, canceladas_clienta: 1, total: 1 }),
+    ], "colaborador");
+    expect(filas).toEqual([
+      { clave: "u1", nombre: "Diego", atendidas: 3, canceladasClienta: 1, canceladasNegocio: 1, noLlego: 3, total: 8, tasa: 37.5 },
+      { clave: "", nombre: "Sin colaborador", atendidas: 0, canceladasClienta: 1, canceladasNegocio: 0, noLlego: 0, total: 1, tasa: 0 },
+    ]);
+  });
+
+  it("citas por servicio junta a todos los colaboradores", () => {
+    const filas = agruparCitas([
+      r({ atendidas: 1, total: 1 }),
+      r({ usuario_id: "u2", colaborador: "Ana", atendidas: 1, no_llego: 2, total: 3 }),
+    ], "servicio");
+    expect(filas).toEqual([{ clave: "p1", nombre: "Corte", atendidas: 2, canceladasClienta: 0, canceladasNegocio: 0, noLlego: 2, total: 4, tasa: 50 }]);
+  });
+
+  const o = (usuario_id: string, dia: string, minutos_horario: number, minutos_agendados: number): RenglonOcupacion =>
+    ({ usuario_id, colaborador: usuario_id === "u1" ? "Diego" : "Ana", dia, minutos_horario, minutos_agendados });
+  const renglones = [o("u1", "2030-01-14", 480, 240), o("u1", "2030-01-15", 0, 60), o("u1", "2030-01-16", 0, 0), o("u2", "2030-01-14", 0, 0)];
+
+  it("ocupación por colaborador: el % solo cuenta lo agendado en días con horario; sin horario, null", () => {
+    expect(agruparOcupacion(renglones, "colaborador")).toEqual([
+      { clave: "u1", colaborador: "Diego", dia: null, horario: 480, agendados: 300, pct: 50 },
+      { clave: "u2", colaborador: "Ana", dia: null, horario: 0, agendados: 0, pct: null },
+    ]);
+    expect(ocupacionTotal(renglones)).toBe(50);
+    expect(ocupacionTotal([o("u2", "2030-01-14", 0, 0)])).toBeNull();
+  });
+
+  it("ocupación por día omite los días vacíos; un día sin horario sale sin %", () => {
+    expect(agruparOcupacion(renglones, "dia")).toEqual([
+      { clave: "u1|2030-01-14", colaborador: "Diego", dia: "2030-01-14", horario: 480, agendados: 240, pct: 50 },
+      { clave: "u1|2030-01-15", colaborador: "Diego", dia: "2030-01-15", horario: 0, agendados: 60, pct: null },
+    ]);
+  });
+
+  it("recortarRango deja los últimos N días (contando ambos extremos) y avisa", () => {
+    expect(recortarRango("2030-01-01", "2030-01-31", 93)).toEqual({ desde: "2030-01-01", hasta: "2030-01-31", recortado: false });
+    expect(recortarRango("2030-01-01", "2030-04-03", 93)).toEqual({ desde: "2030-01-01", hasta: "2030-04-03", recortado: false });
+    expect(recortarRango("2029-12-31", "2030-04-03", 93)).toEqual({ desde: "2030-01-01", hasta: "2030-04-03", recortado: true });
   });
 });

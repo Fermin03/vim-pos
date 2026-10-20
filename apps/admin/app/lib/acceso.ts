@@ -41,6 +41,9 @@ export const MIN_JERARQUIA: { prefijo: string; min: number }[] = [
   // (/catalogo): un supervisor ve la venta, no cuánto le queda al negocio de cada producto.
   { prefijo: "/reportes/costo-ventas", min: 4 },
   { prefijo: "/reportes/ventas-variantes", min: 4 },
+  // Los reportes de la agenda los lee solo dueño o administrador (0227, es_admin_del_tenant).
+  { prefijo: "/reportes/citas", min: 4 },
+  { prefijo: "/reportes/ocupacion", min: 4 },
   { prefijo: "/bienvenida", min: 0 },
 ];
 

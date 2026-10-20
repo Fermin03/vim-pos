@@ -46,6 +46,8 @@ const GRUPOS: Grupo[] = [
       { href: "/reportes/ventas-mesero", titulo: "Ventas por mesero", descripcion: "Tickets, venta y propinas de cada mesero.", modulo: "meseros" },
       { href: "/reportes/comisiones", titulo: "Comisiones", descripcion: "Cuánto se le paga a cada colaborador en el periodo: comisiones y sueldo.", modulo: "agenda" },
       { href: "/reportes/ventas-colaborador", titulo: "Ventas por colaborador", descripcion: "Qué vende cada colaborador y qué servicios se venden más.", modulo: "agenda" },
+      { href: "/reportes/citas", titulo: "Citas y faltas", descripcion: "Citas atendidas, canceladas y clientas que no llegaron, por colaborador y por servicio.", modulo: "agenda" },
+      { href: "/reportes/ocupacion", titulo: "Ocupación", descripcion: "Qué parte del horario de cada colaborador estuvo agendada.", modulo: "agenda" },
       { href: "/reportes/ventas-area", titulo: "Ventas por estación", descripcion: "Cuánto prepara y cuánto vende cada estación de la cocina." },
       { href: "/reportes/tiempos-cocina", titulo: "Tiempos de cocina", descripcion: "Cuánto tarda en salir la comida contra tu objetivo." },
     ],

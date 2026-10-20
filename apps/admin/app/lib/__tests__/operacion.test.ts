@@ -9,7 +9,7 @@ describe("rutasOcultas", () => {
   // Crédito (0208): apagado mientras no se lea encendido; su configuración, solo en tiendas.
   const CREDITO = ["/creditos", "/configuracion/credito", "/cotizaciones", "/configuracion/cotizaciones"];
   // Agenda (0218): de belleza; apagada mientras no se lea encendida.
-  const AGENDA = ["/agenda/servicios", "/agenda/colaboradores", "/agenda/espacios", "/configuracion/agenda", "/reportes/comisiones", "/reportes/ventas-colaborador"];
+  const AGENDA = ["/agenda/servicios", "/agenda/colaboradores", "/agenda/espacios", "/configuracion/agenda", "/reportes/comisiones", "/reportes/ventas-colaborador", "/reportes/citas", "/reportes/ocupacion"];
   it("cargando o con error no esconde nada de restaurante (esconder de más y luego mostrar salta a la vista)", () => {
     expect(rutasOcultas(null)).toEqual(new Set([...TIENDA, ...CREDITO, ...AGENDA]));
     expect(rutasOcultas("error")).toEqual(new Set([...TIENDA, ...CREDITO, ...AGENDA]));

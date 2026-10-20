@@ -19,7 +19,7 @@ const RUTA_DE_MODULO: readonly [string, CodigoOperacion][] = [
 /** Las pantallas de la agenda: el grupo del menú, su configuración y sus reportes. */
 const RUTAS_AGENDA = [
   "/agenda/servicios", "/agenda/colaboradores", "/agenda/espacios", "/configuracion/agenda",
-  "/reportes/comisiones", "/reportes/ventas-colaborador",
+  "/reportes/comisiones", "/reportes/ventas-colaborador", "/reportes/citas", "/reportes/ocupacion",
 ] as const;
 
 /**

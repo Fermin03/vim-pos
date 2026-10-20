@@ -41,6 +41,14 @@ describe("puedeVer", () => {
     expect(puedeVer(SUPERVISOR, "/usuarios")).toBe(false);
   });
 
+  it("los reportes de la agenda solo los abre dueño o administrador (la base los niega al supervisor)", () => {
+    for (const r of ["/reportes/citas", "/reportes/ocupacion"]) {
+      expect(puedeVer(SUPERVISOR, r)).toBe(false);
+      expect(puedeVer(ADMIN, r)).toBe(true);
+      expect(puedeVer(DUENO, r)).toBe(true);
+    }
+  });
+
   it("las subrutas heredan el mínimo de su sección", () => {
     expect(puedeVer(SUPERVISOR, "/configuracion/cajas")).toBe(false);
     expect(puedeVer(ADMIN, "/configuracion/cajas")).toBe(true);

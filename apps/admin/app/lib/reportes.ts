@@ -1006,3 +1006,100 @@ export function disponiblesDe(
     agenda: moduloActivo(ef, "agenda"),
   };
 }
+
+// ── Agenda (belleza, 0227): citas y faltas, ocupación ─────────────────────────────────────────
+
+/**
+ * Recorta el rango a lo que acepta la base (`dias` como máximo, contando ambos extremos): se
+ * quedan los últimos días, que son los que se están mirando. `recortado` = hay que avisarlo.
+ */
+export function recortarRango(desde: string, hasta: string, dias: number): { desde: string; hasta: string; recortado: boolean } {
+  const minimo = sumarDias(hasta, -(dias - 1));
+  return desde < minimo ? { desde: minimo, hasta, recortado: true } : { desde, hasta, recortado: false };
+}
+
+/** Tasa de falta en %: no llegó / total. 0 sin citas. */
+export const tasaFalta = (noLlego: number, total: number): number => (total > 0 ? (noLlego / total) * 100 : 0);
+
+/** Ocupación en %: agendado / horario. `null` sin horario (se pinta «—»). */
+export const pctOcupacion = (agendados: number, horario: number): number | null => (horario > 0 ? (agendados / horario) * 100 : null);
+
+export type CanalCitas = "" | "CAJA" | "EN_LINEA";
+export type AgruparCitas = "colaborador" | "servicio";
+export type RenglonCitas = {
+  usuario_id: string | null; colaborador: string | null; producto_id: string; servicio: string;
+  atendidas: number; canceladas_clienta: number; canceladas_negocio: number; no_llego: number; total: number;
+};
+export type FilaCitas = {
+  clave: string; nombre: string; atendidas: number; canceladasClienta: number; canceladasNegocio: number;
+  noLlego: number; total: number; tasa: number;
+};
+
+export const SIN_COLABORADOR = "Sin colaborador";
+
+/** Renglones (colaborador × servicio) → filas por colaborador o por servicio. Pura para poder probarla. */
+export function agruparCitas(renglones: RenglonCitas[], por: AgruparCitas): FilaCitas[] {
+  const m = new Map<string, FilaCitas>();
+  for (const r of renglones) {
+    const k = por === "colaborador" ? r.usuario_id ?? "" : r.producto_id;
+    const nombre = por === "colaborador" ? (r.usuario_id ? r.colaborador ?? "—" : SIN_COLABORADOR) : r.servicio;
+    const f = m.get(k) ?? { clave: k, nombre, atendidas: 0, canceladasClienta: 0, canceladasNegocio: 0, noLlego: 0, total: 0, tasa: 0 };
+    f.atendidas += r.atendidas; f.canceladasClienta += r.canceladas_clienta; f.canceladasNegocio += r.canceladas_negocio;
+    f.noLlego += r.no_llego; f.total += r.total;
+    m.set(k, f);
+  }
+  return [...m.values()].map((f) => ({ ...f, tasa: tasaFalta(f.noLlego, f.total) })).sort((a, b) => b.total - a.total);
+}
+
+export async function leerReporteCitas(desde: string, hasta: string, canal: CanalCitas): Promise<RenglonCitas[]> {
+  const { data, error } = await supabase.rpc("agenda_reporte_citas", { p_desde: desde, p_hasta: hasta, ...(canal ? { p_canal: canal } : {}) });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((f: Record<string, unknown>) => ({
+    usuario_id: f.usuario_id ? String(f.usuario_id) : null, colaborador: f.colaborador ? String(f.colaborador) : null, producto_id: String(f.producto_id), servicio: String(f.servicio ?? "—"),
+    atendidas: num(f.atendidas), canceladas_clienta: num(f.canceladas_clienta), canceladas_negocio: num(f.canceladas_negocio),
+    no_llego: num(f.no_llego), total: num(f.total),
+  }));
+}
+
+export type AgruparOcupacion = "colaborador" | "dia";
+export type RenglonOcupacion = { usuario_id: string; colaborador: string; dia: string; minutos_horario: number; minutos_agendados: number };
+export type FilaOcupacion = { clave: string; colaborador: string; dia: string | null; horario: number; agendados: number; pct: number | null };
+
+/**
+ * Por colaborador (suma del rango) o por colaborador y día. Por día se omiten los días sin
+ * horario ni citas: un rango de 93 días con cinco colaboradores son 465 renglones, casi todos vacíos.
+ */
+export function agruparOcupacion(renglones: RenglonOcupacion[], por: AgruparOcupacion): FilaOcupacion[] {
+  if (por === "dia") {
+    return renglones
+      .filter((r) => r.minutos_horario > 0 || r.minutos_agendados > 0)
+      .map((r) => ({
+        clave: `${r.usuario_id}|${r.dia}`, colaborador: r.colaborador, dia: r.dia, horario: r.minutos_horario,
+        agendados: r.minutos_agendados, pct: pctOcupacion(r.minutos_agendados, r.minutos_horario),
+      }));
+  }
+  // El % solo cuenta lo agendado en días con horario: un día sin horario no tiene tope y lo subiría de 100.
+  const m = new Map<string, FilaOcupacion & { enHorario: number }>();
+  for (const r of renglones) {
+    const f = m.get(r.usuario_id) ?? { clave: r.usuario_id, colaborador: r.colaborador, dia: null, horario: 0, agendados: 0, pct: null, enHorario: 0 };
+    f.horario += r.minutos_horario; f.agendados += r.minutos_agendados;
+    if (r.minutos_horario > 0) f.enHorario += r.minutos_agendados;
+    m.set(r.usuario_id, f);
+  }
+  return [...m.values()].map(({ enHorario, ...f }) => ({ ...f, pct: pctOcupacion(enHorario, f.horario) }));
+}
+
+export async function leerOcupacion(desde: string, hasta: string): Promise<RenglonOcupacion[]> {
+  const { data, error } = await supabase.rpc("agenda_ocupacion", { p_desde: desde, p_hasta: hasta });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((f: Record<string, unknown>) => ({
+    usuario_id: String(f.usuario_id), colaborador: String(f.colaborador ?? "—"), dia: String(f.dia),
+    minutos_horario: num(f.minutos_horario), minutos_agendados: num(f.minutos_agendados),
+  }));
+}
+
+/** % de ocupación de todo el rango (la fila de totales), con el mismo criterio que por colaborador. */
+export function ocupacionTotal(renglones: RenglonOcupacion[]): number | null {
+  const conHorario = renglones.filter((r) => r.minutos_horario > 0);
+  return pctOcupacion(conHorario.reduce((s, r) => s + r.minutos_agendados, 0), conHorario.reduce((s, r) => s + r.minutos_horario, 0));
+}
