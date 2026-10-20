@@ -75,6 +75,14 @@ Rama `feat/terminal-clip` (ADR 0050). Nada de esto se ha visto con un lector.
 - El cuerpo de `POST /devices`.
 - Propina elegida en el lector: cómo regresan `tip_amount` y `amount_paid`.
 - Si Clip reintenta el aviso tras un 500.
+- El valor de `payment_method.type` en débito (el código espera `debit_card`).
+- Qué guardar como autorización en `terminal_aprobacion`: `receipt_no` o `transaction_id`.
+- Dónde llega `ERR10_04` en la respuesta: `code` o `error_code`.
+- Que el `id` del aviso sea el `pinpad_request_id` (de eso depende recuperar un cobro creado sin
+  respuesta de Clip).
+- Qué hace el lector con `timeout_seg: 0` (espera de 1 minuto): ¿vence al instante o nunca?
+- Con `is_retry_enabled`, si una intención puede pasar por `FAILED` y luego quedar `COMPLETED`.
+- Si un 5xx al crear deja la intención creada en el lector (hoy se trata como sin respuesta).
 
 **Antes de producción (no necesitan lector):**
 

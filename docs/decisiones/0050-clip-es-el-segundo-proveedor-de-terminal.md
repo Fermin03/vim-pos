@@ -41,7 +41,8 @@ seguro que pedirle a Clip que se identifique. Cancelar antes de rechazar evita e
 
 ## Alternativas descartadas
 
-- **Un proveedor por negocio.** Una caja puede tener otro proveedor que la de al lado.
+- **Un proveedor por negocio.** El proveedor va por sucursal: una sucursal puede cobrar con Clip y
+  otra del mismo negocio con Mercado Pago. Dentro de una sucursal, todas sus cajas usan la misma cuenta.
 - **Una tabla propia para las llaves de Clip.** Vault ya hacía el trabajo.
 - **Creer el aviso si trae el estado.** Sin firma, cualquiera puede mandarlo.
 - **Rechazar el cobro sin cancelar por serie.** Un cobro que sí pasó se cobraría dos veces.
@@ -49,7 +50,8 @@ seguro que pedirle a Clip que se identifique. Cancelar antes de rechazar evita e
 ## Pospuesto a propósito
 
 - **Propina elegida en el lector.** No sabemos cómo regresan `tip_amount` y `amount_paid` hasta ver
-  un cobro real. Hoy el lector muestra los porcentajes; la propina de la cuenta se cobra como siempre.
+  un cobro real. Hoy los porcentajes solo se guardan: el cobro va con `is_tip_enabled: false` y el
+  lector no los muestra; la propina de la cuenta se cobra como siempre.
 - **Cobro de prueba de $1 al conectar.** Hasta tener lector.
 - **Guía con `curl` y skill `clip-pinpad`.** Salen de la sesión con lector.
 

@@ -34,11 +34,12 @@ Aquí va solo lo que Clip cambia.
 
 ## 1. Lo que se comparte tal cual
 
-- La interfaz del adaptador (`crearCobro`, `cancelarCobro`, `reembolsar`, `consultar`,
-  `listarTerminales`, `normalizarAviso`): Clip es `_shared/pagos-terminal/clip.ts`.
-- Las tablas `terminal_conexiones`, `terminal_credenciales`, `terminal_dispositivos`,
-  `terminal_config_sucursal`, `terminal_cobros`, `terminal_eventos`. `proveedor` pasa a aceptar
-  `CLIP`.
+- La interfaz del adaptador: `Proveedor` en `_shared/terminal/proveedor.ts` (`crear`, `consultar`,
+  `cancelar`, `reembolsar`, `lectorListo`); Clip es `_shared/terminal/clip.ts`. (La propuesta
+  original decía `_shared/pagos-terminal/` y otros nombres de métodos: lo construido manda.)
+- Las tablas `terminal_conexiones`, `terminal_dispositivos`, `terminal_config_sucursal`,
+  `terminal_cobros`, `terminal_eventos`. `proveedor` pasa a aceptar `CLIP`. Las claves van en
+  Vault, como los tokens de Mercado Pago (ADR 0050); no hay tabla `terminal_credenciales`.
 - La función `terminal-cobro` y **todo lo que ve la caja**: el paso «cobra en la terminal», los
   estados (`EN_TERMINAL`, `APROBADO`, `RECHAZADO`, `CANCELADO`, `VENCIDO`, `REVISAR`, `DEVUELTO`),
   la recuperación tras un apagón, la salida manual sin internet, el PIN para aceptar un cobro
@@ -55,7 +56,7 @@ Admin → Integraciones → Terminal de tarjetas → **Clip**.
    (*Panel de Desarrollador > Credenciales > Crear credencial*) y pide pegar **API key** y
    **clave secreta**. Avisa que la clave secreta solo se ve una vez.
 2. `terminal-clip-conexion` las recibe por HTTPS, **las prueba** llamando a `devices/status`, y
-   solo si responde las guarda en `terminal_credenciales`. Nunca regresan al navegador: después
+   solo si responde las guarda en Vault (`terminal_guardar_tokens`). Nunca regresan al navegador: después
    de guardarlas, el admin solo ve «conectado» y los últimos 4 caracteres de la API key.
 3. Con esa misma respuesta se listan los lectores de la cuenta; el dueño asigna cada uno a una
    caja. Si la lista viene vacía, la pantalla dice que falta pedirle a Clip la app PinPad y da el
