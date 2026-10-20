@@ -2,10 +2,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, LogoVim } from "@vim/ui/styles";
-import { supabase, establecerPassword, salir } from "../lib/supabase";
+import { supabase, establecerPassword, leerSesion, salir } from "../lib/supabase";
 import { enlaceMiAgenda, tieneAgenda } from "../lib/acceso-celular";
-import { cargarPerfil } from "../lib/perfil";
-import { JERARQUIA_MINIMA_PANEL } from "../lib/acceso";
 import { mensajeError } from "../lib/errores";
 import { pedirBienvenida } from "../lib/bienvenida";
 
@@ -67,8 +65,8 @@ export default function EstablecerAccesoPage() {
     try {
       await establecerPassword(pass);
       if (await tieneAgenda()) {
-        const perfil = await cargarPerfil();
-        const panel = (perfil?.jerarquia ?? 0) >= JERARQUIA_MINIMA_PANEL;
+        // El hook decide con la jerarquía en el negocio DEL TOKEN: sin panel, role = colaborador_web.
+        const panel = (await leerSesion())?.rol !== "colaborador_web";
         // Quien no entra al panel no se queda con su sesión abierta aquí.
         if (!panel) await salir();
         setConPanel(panel);

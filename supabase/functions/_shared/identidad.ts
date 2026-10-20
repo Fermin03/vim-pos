@@ -29,8 +29,16 @@ export function claimsDe(token: string): Record<string, unknown> {
   }
 }
 
-/** El tenant del claim `tenant_id`, si es un uuid; si no, null. */
+/**
+ * La sesión web del colaborador (0228): el hook le pone role = colaborador_web y solo sirve para
+ * las RPC de /mi-agenda. Ninguna función actúa por ella: `servir` la rechaza antes del manejador y,
+ * como segunda capa, `tenantDeClaims` no le reconoce negocio.
+ */
+export const esColaboradorWeb = (claims: Record<string, unknown>) => claims.role === "colaborador_web";
+
+/** El tenant del claim `tenant_id`, si es un uuid y la sesión no es del colaborador web; si no, null. */
 export function tenantDeClaims(claims: Record<string, unknown>): string | null {
+  if (esColaboradorWeb(claims)) return null;
   const t = claims.tenant_id;
   return typeof t === "string" && UUID.test(t) ? t.toLowerCase() : null;
 }

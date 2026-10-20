@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync, readdirSync } from "node:fs";
+import path from "node:path";
 import {
-  LLAVE_SESION_COLABORADOR, MENSAJE_CREDENCIALES, MENSAJE_SIN_AGENDA, enlaceRecuperar, mensajeEntrada, validarEntrada,
+  LLAVE_SESION_COLABORADOR, MENSAJE_CREDENCIALES, clienteColaborador, MENSAJE_SIN_AGENDA, enlaceRecuperar, mensajeEntrada, validarEntrada,
 } from "../sesion-colaborador";
 
 describe("entrada de /mi-agenda", () => {
@@ -32,7 +34,28 @@ describe("entrada de /mi-agenda", () => {
 });
 
 describe("la caja no se ve afectada", () => {
-  it("la sesión del colaborador se guarda aparte de la del dispositivo", () => {
-    expect(LLAVE_SESION_COLABORADOR).not.toBe("vimpos.device.session");
+  it("cada sesión en su llave: el cliente del colaborador no lee la del dispositivo ni al revés", async () => {
+    const { deviceClient } = await import("../supabase");
+    const llave = (c: unknown) => (c as { auth: { storageKey: string } }).auth.storageKey;
+    expect(llave(deviceClient)).toBe("vimpos.device.session");
+    expect(llave(clienteColaborador())).toBe(LLAVE_SESION_COLABORADOR);
+    expect(clienteColaborador()).not.toBe(deviceClient);
+  });
+
+  it("solo /mi-agenda usa la sesión del colaborador; la caja, el PIN y el dispositivo no la tocan", () => {
+    const app = path.resolve(__dirname, "../..");
+    const usan: string[] = [];
+    const recorrer = (dir: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) { if (e.name !== "__tests__") recorrer(p); continue; }
+        if (/\.tsx?$/.test(e.name) && readFileSync(p, "utf8").includes("sesion-colaborador")) usan.push(path.relative(app, p).split(path.sep).join("/"));
+      }
+    };
+    recorrer(app);
+    expect(usan.sort()).toEqual(["mi-agenda/entrada.tsx", "mi-agenda/page.tsx"]);
+    // Y ella no importa nada de la caja (credenciales del dispositivo, PIN, cliente del empleado).
+    const src = readFileSync(path.join(app, "lib/sesion-colaborador.ts"), "utf8");
+    expect(src).not.toMatch(/from ".\/(supabase|device-creds|autorizacion)"/);
   });
 });

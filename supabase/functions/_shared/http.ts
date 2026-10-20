@@ -3,6 +3,7 @@
 // un navegador, y contesta texto plano.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "./cors.ts";
+import { bearerDe, claimsDe, esColaboradorWeb } from "./identidad.ts";
 
 const SIN_SESION = { auth: { persistSession: false } };
 
@@ -28,6 +29,8 @@ export function servir(manejar: (req: Request, json: Json) => Response | Promise
 
     if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
     if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
+    // La sesión del celular del colaborador (0228) no usa ninguna función; solo sus RPC.
+    if (esColaboradorWeb(claimsDe(bearerDe(req)))) return json({ error: "SIN_PERMISO" }, 403);
     return manejar(req, json);
   });
 }

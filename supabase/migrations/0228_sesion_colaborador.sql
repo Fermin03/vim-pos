@@ -198,6 +198,9 @@ SET search_path = public, pg_temp
 AS $$
 BEGIN
   PERFORM _mi_colaborador_tenant();
+  IF p_desde IS NULL OR p_hasta IS NULL OR p_hasta < p_desde OR p_hasta - p_desde > 92 THEN
+    RAISE EXCEPTION 'DATOS_INVALIDOS: el rango va de 1 a 93 días.' USING ERRCODE = '22023';
+  END IF;
   RETURN QUERY SELECT c.* FROM comisiones_periodo(p_desde, p_hasta) c WHERE c.usuario_id = auth.uid();
 END;
 $$;

@@ -183,6 +183,11 @@ BEGIN
   IF v_n <> 1 THEN RAISE EXCEPTION 'C10: mi_periodo_comisiones'; END IF;
   SELECT count(*) INTO v_n FROM mis_comisiones('2030-01-14', '2030-01-20') c WHERE c.usuario_id <> v_pers;
   IF v_n <> 0 THEN RAISE EXCEPTION 'C10: mis_comisiones trae % filas ajenas', v_n; END IF;
+  BEGIN
+    PERFORM mis_comisiones('2030-01-01', '2030-04-30');
+    RAISE EXCEPTION 'C10: mis_comisiones aceptó 120 días';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL;
+  END;
   FOREACH v_x IN ARRAY ARRAY[
     format('SELECT guardar_cita(%L::jsonb)', jsonb_build_object('sucursal_id', v_suc)),
     format('SELECT cancelar_cita(%L, %L)', gen_random_uuid(), 'x'),

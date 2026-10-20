@@ -292,8 +292,9 @@ BEGIN
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_diego, 'role', 'authenticated', 'tenant_id', v_t)::text, true);
   SELECT count(*) FILTER (WHERE colaborador_id <> v_diego), count(*) INTO v_n, v_x FROM vw_comisiones_renglon;
   IF v_n <> 0 OR v_x <> 5 THEN RAISE EXCEPTION 'B13: Diego ve % ajenos de %', v_n, v_x; END IF;
-  SELECT count(*) INTO v_n FROM comisiones_periodo(v_desde, v_hasta);
-  IF v_n <> 1 THEN RAISE EXCEPTION 'B13: Diego ve % filas en comisiones_periodo', v_n; END IF;
+  -- Supervisor (jerarquía 3, no admin): una sola fila y es la suya; la vista ya acota los renglones.
+  SELECT count(*), count(*) FILTER (WHERE usuario_id <> v_diego) INTO v_n, v_x FROM comisiones_periodo(v_desde, v_hasta);
+  IF v_n <> 1 OR v_x <> 0 THEN RAISE EXCEPTION 'B13: Diego ve % filas (% ajenas) en comisiones_periodo', v_n, v_x; END IF;
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria, 'role', 'authenticated', 'tenant_id', v_t)::text, true);
   PERFORM pg_temp.debe_fallar(format('UPDATE configuracion_tenant SET agenda_comision_base = %L WHERE tenant_id = %L', 'LISTA', v_t),
     'Solo el dueño%', 'B13 cajero cambia la base');
