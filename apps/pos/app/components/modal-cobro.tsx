@@ -245,10 +245,15 @@ function VistaSelector({
   // El mensaje pide encender el lector: al tocar «Tarjeta» otra vez se pregunta de nuevo, y solo si
   // sigue sin estar listo se abre lo manual.
   const [revisando, setRevisando] = useState(false);
+  // Si la cajera ya salió del selector (eligió efectivo, dividió o cerró), la respuesta tardía no
+  // la regresa a la terminal: mandaría el monto al lector a media venta.
+  const montado = useRef(true);
+  useEffect(() => { montado.current = true; return () => { montado.current = false; }; }, []);
   async function revisarTerminal() {
     if (revisando) return;
     setRevisando(true);
     const lista = await onRevisarTerminal().catch(() => false);
+    if (!montado.current) return;
     setRevisando(false);
     if (lista) onElegir("terminal");
     else setAMano(true);
