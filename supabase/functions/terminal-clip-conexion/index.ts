@@ -118,14 +118,21 @@ servir(async (req, json) => {
       const l = await lectoresDeClip(c.clip, "CONEXION_INVALIDA");
       if (l.fallo) return l.fallo;
       if (!l.lectores.some((x) => x.serie === serie)) return json({ error: "LECTOR_NO_ES_DE_LA_CUENTA" }, 409);
-      // terminal_id_externo es UNIQUE: si el lector estaba en otra caja de este negocio, se le quita
-      // (un lector cobra para una sola caja). Si lo tiene otro negocio, no se toca: error.
-      const { data: o } = await admin.from("terminal_dispositivos").select("caja_id, tenant_id").eq("terminal_id_externo", serie).maybeSingle();
-      const otra = o as { caja_id: string; tenant_id: string } | null;
-      if (otra && otra.tenant_id !== tenantId) return json({ error: "LECTOR_EN_OTRO_NEGOCIO" }, 409);
+      // terminal_id_externo es UNIQUE: si el lector estaba en otra caja (de este negocio, o de otro que
+      // ya lo soltó: fila inactiva o conexión DESCONECTADA), se le quita; un lector cobra para una sola
+      // caja. Solo un lector activo en otro negocio bloquea.
+      const { data: o, error: eOtra } = await admin.from("terminal_dispositivos").select("caja_id, tenant_id, activa, conexion_id")
+        .eq("terminal_id_externo", serie).maybeSingle();
+      if (eOtra) throw eOtra;
+      const otra = o as { caja_id: string; tenant_id: string; activa: boolean; conexion_id: string } | null;
+      if (otra && otra.tenant_id !== tenantId && otra.activa) {
+        const { data: cx, error: eCx } = await admin.from("terminal_conexiones").select("estado").eq("id", otra.conexion_id).maybeSingle();
+        if (eCx) throw eCx;
+        if ((cx as { estado: string } | null)?.estado !== "DESCONECTADA") return json({ error: "LECTOR_EN_OTRO_NEGOCIO" }, 409);
+      }
       if (otra && otra.caja_id !== caja.id) {
         const { error } = await admin.from("terminal_dispositivos").update({ terminal_id_externo: null, activa: false })
-          .eq("caja_id", otra.caja_id).eq("tenant_id", tenantId);
+          .eq("caja_id", otra.caja_id).eq("tenant_id", otra.tenant_id);
         if (error) throw error;
       }
       const { error } = await admin.from("terminal_dispositivos").upsert({
@@ -163,14 +170,18 @@ servir(async (req, json) => {
     }
 
     if (b.accion === "desconectar") {
-      // Clip no tiene modo «PDV» que apagar: basta con soltar los lectores y borrar las claves.
+      // Clip no tiene modo «PDV» que apagar: se sueltan los lectores (sin serie, para que otra cuenta
+      // o negocio pueda ligarlos) y se borran las claves. La conexión se marca DESCONECTADA ANTES de
+      // borrar Vault: nunca queda una ACTIVA sin credencial.
       const c = await conexionDe(b.conexion_id);
       if (!c) return json({ error: "CONEXION_NO_EXISTE" }, 404);
-      const { error } = await admin.from("terminal_dispositivos").update({ activa: false }).eq("tenant_id", tenantId).eq("conexion_id", c.id);
+      const { error } = await admin.from("terminal_dispositivos").update({ activa: false, terminal_id_externo: null })
+        .eq("tenant_id", tenantId).eq("conexion_id", c.id);
       if (error) throw error;
+      const { error: eCx } = await admin.from("terminal_conexiones").update({ estado: "DESCONECTADA" }).eq("id", c.id);
+      if (eCx) throw eCx;
       const { error: eTok } = await admin.rpc("terminal_borrar_tokens", { p_conexion: c.id });
       if (eTok) throw eTok;
-      await admin.from("terminal_conexiones").update({ estado: "DESCONECTADA" }).eq("id", c.id);
       return json({ ok: true });
     }
 
