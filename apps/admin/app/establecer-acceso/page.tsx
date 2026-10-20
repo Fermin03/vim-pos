@@ -2,7 +2,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, LogoVim } from "@vim/ui/styles";
-import { supabase, establecerPassword } from "../lib/supabase";
+import { supabase, establecerPassword, salir } from "../lib/supabase";
+import { enlaceMiAgenda, tieneAgenda } from "../lib/acceso-celular";
+import { cargarPerfil } from "../lib/perfil";
+import { JERARQUIA_MINIMA_PANEL } from "../lib/acceso";
 import { mensajeError } from "../lib/errores";
 import { pedirBienvenida } from "../lib/bienvenida";
 
@@ -11,17 +14,19 @@ const inputCls =
 
 /**
  * Aterrizaje del link de invitación / recuperación. El link de Supabase ya dejó
- * una sesión (detectSessionInUrl). Aquí el dueño fija su contraseña y entra al panel.
+ * una sesión (detectSessionInUrl). Aquí el dueño fija su contraseña y entra al panel. Un
+ * colaborador de la agenda («Dar acceso a su celular») ve a dónde entrar: /mi-agenda del POS.
  */
 export default function EstablecerAccesoPage() {
   const router = useRouter();
-  const [estado, setEstado] = useState<"validando" | "listo" | "invalido">("validando");
+  const [estado, setEstado] = useState<"validando" | "listo" | "invalido" | "agenda">("validando");
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [pass2, setPass2] = useState("");
   const [ver, setVer] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [conPanel, setConPanel] = useState(false);
 
   // El link establece la sesión vía la URL. Esperamos a que aparezca.
   useEffect(() => {
@@ -61,6 +66,15 @@ export default function EstablecerAccesoPage() {
     setGuardando(true);
     try {
       await establecerPassword(pass);
+      if (await tieneAgenda()) {
+        const perfil = await cargarPerfil();
+        const panel = (perfil?.jerarquia ?? 0) >= JERARQUIA_MINIMA_PANEL;
+        // Quien no entra al panel no se queda con su sesión abierta aquí.
+        if (!panel) await salir();
+        setConPanel(panel);
+        setEstado("agenda");
+        return;
+      }
       // Ya tiene acceso: sale el correo de bienvenida (0146). Aquí también llega quien restablece
       // su contraseña; a ese el servidor no le manda nada (no es un negocio recién llegado).
       void pedirBienvenida();
@@ -86,6 +100,22 @@ export default function EstablecerAccesoPage() {
             <h1 className="mb-1.5 font-display text-24 font-semibold tracking-tight">Enlace no válido o expirado</h1>
             <p className="mb-6 text-sm text-ink-2">Pídele a VIM que te reenvíe la invitación, o entra con tu correo y contraseña si ya la creaste.</p>
             <Button onClick={() => router.replace("/")}>Ir a iniciar sesión</Button>
+          </div>
+        )}
+
+        {estado === "agenda" && (
+          <div className="text-center">
+            <h1 className="mb-1.5 font-display text-24 font-semibold tracking-tight">Listo</h1>
+            <p className="mb-6 text-15 text-ink-2">
+              Entra a tu agenda en <a href={enlaceMiAgenda(window.location.hostname)} className="break-all font-semibold text-ink underline">{enlaceMiAgenda(window.location.hostname)}</a>
+            </p>
+            <div className="flex flex-col gap-2">
+              <a href={enlaceMiAgenda(window.location.hostname)}
+                className="inline-flex min-h-[44px] items-center justify-center rounded bg-ink px-5 text-15 font-semibold text-white transition-transform active:scale-[.97]">
+                Abrir mi agenda
+              </a>
+              {conPanel && <Button variant="ghost" onClick={() => router.replace("/dashboard")}>Ir al panel</Button>}
+            </div>
           </div>
         )}
 

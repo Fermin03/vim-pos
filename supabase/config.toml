@@ -9,6 +9,10 @@ major_version = 15
 [auth]
 enable_signup = true
 # El POS usa PIN (Edge Function pin-login, doc 1F §5); el admin usa email+password.
+# Solo desarrollo: los enlaces de los correos (recuperar, «Dar acceso a su celular») regresan a
+# /establecer-acceso del admin en :3001. Sin esto caen en site_url (:3000, el POS). Toma efecto
+# al reiniciar el stack local. Producción tiene su propia lista en el panel de Supabase.
+additional_redirect_urls = ["https://127.0.0.1:3000", "http://localhost:3001/**", "http://127.0.0.1:3001/**"]
 
 # Custom Access Token Hook — inyecta tenant_id y tipo_identidad en el JWT (doc 1F §3).
 # Es el cimiento del que depende TODO el RLS.

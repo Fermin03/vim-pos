@@ -16,6 +16,7 @@ import { listarSucursales, type Sucursal } from "../../../lib/configuracion";
 import { listarUsuarios, type Usuario } from "../../../lib/usuarios";
 import { mensajeError } from "../../../lib/errores";
 import { limpiarPrecio } from "../../../lib/numeros";
+import { botonAcceso, darAccesoCelular, enlaceMiAgenda, listarAccesos, type AccesoColaborador } from "../../../lib/acceso-celular";
 
 const hora = "h-10 w-[7.5rem] rounded border border-line-strong px-2.5 text-sm tabular-nums outline-none focus:border-ink";
 
@@ -61,11 +62,15 @@ export default function ColaboradoresPage() {
   const [sel, setSel] = useState<string | null>(null);
   const [detalle, setDetalle] = useState<Detalle | null>(null);
   const [ausencia, setAusencia] = useState({ desde: "", hasta: "", motivo: "" });
+  const [accesos, setAccesos] = useState<Map<string, AccesoColaborador> | null>(null);
+  const [enviados, setEnviados] = useState<Set<string>>(new Set());
 
   async function recargar() {
     try {
       const [c, u, s, sv] = await Promise.all([listarColaboradores(), listarUsuarios(), listarSucursales(), listarServicios()]);
       setColaboradores(c); setEmpleados(u.filter((x) => x.activo)); setSucursales(s.filter((x) => x.activa)); setServicios(sv);
+      // Sin los accesos (o sin permiso para verlos) la página sirve igual, sin el bloque del celular.
+      listarAccesos().then(setAccesos, () => setAccesos(null));
       return { c, sv };
     } catch (e) {
       setError(mensajeError(e, "No se pudieron leer los colaboradores"));
@@ -160,11 +165,19 @@ export default function ColaboradoresPage() {
     void escribir(() => actualizarColaborador(c.usuarioId, { activo: !c.activo }), c.activo ? "Quitado de la agenda." : "De vuelta en la agenda.");
   }
 
+  async function darAcceso(usuarioId: string, email: string) {
+    if (await escribir(() => darAccesoCelular(email), `Le mandamos un correo a ${email} para que ponga su contraseña.`)) {
+      setEnviados((e) => new Set(e).add(usuarioId));
+    }
+  }
+
   const cambiarDia = (dia: number, cambio: Partial<DiaEditado>) =>
     detalle && setDetalle({ ...detalle, dias: { ...detalle.dias, [dia]: { ...detalle.dias[dia]!, ...cambio } } });
 
   const actual = colaboradores?.find((c) => c.usuarioId === sel) ?? null;
   const sueldoOk = !detalle || sueldoValido(detalle.sueldo);
+  const accesoActual = actual ? accesos?.get(actual.usuarioId) : undefined;
+  const boton = actual && accesos ? botonAcceso(actual.activo, accesoActual, enviados.has(actual.usuarioId)) : null;
 
   return (
     <>
@@ -265,6 +278,21 @@ export default function ColaboradoresPage() {
                         Lo fijo de cada periodo de comisiones (semanal o quincenal, en <Link href="/configuracion/agenda" className="font-semibold text-ink underline">Configuración</Link>). 0 si solo gana comisión.
                       </p>
                     </div>
+                    {boton?.visible && (
+                      <div className="flex flex-col gap-3 border-t border-line pt-4 sm:flex-row sm:items-center">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-14 font-semibold">Su agenda en el celular</p>
+                          <p className="text-13 text-ink-2">
+                            Le llega un correo para poner su contraseña y entra en <span className="break-all font-medium text-ink">{enlaceMiAgenda(typeof window === "undefined" ? "" : window.location.hostname)}</span>. Ve solo sus citas.
+                          </p>
+                          <p className="mt-1 text-12 text-ink-3">{boton.ultimo}</p>
+                        </div>
+                        <Button variant="ghost" disabled={guardando || !boton.habilitado}
+                          onClick={() => accesoActual && void darAcceso(actual.usuarioId, accesoActual.email)}>
+                          {boton.texto}
+                        </Button>
+                      </div>
+                    )}
                     <div className="flex items-center gap-2 border-t border-line pt-4">
                       <AccionFila peligro={actual.activo} disabled={guardando} onClick={() => void cambiarActivo(actual)}>
                         {actual.activo ? "Quitar de la agenda" : "Volver a la agenda"}
