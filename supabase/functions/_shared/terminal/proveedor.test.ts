@@ -143,6 +143,21 @@ test("Clip crear sin respuesta y sin cancelación confirmada queda en REVISAR (r
   }
 });
 
+test("Clip crear con 5xx es tan ambiguo como sin respuesta: cancela por serie y solo cierra si Clip lo confirma", async () => {
+  for (const status of [500, 502, 503, 504]) {
+    const f = falso({ status }, { status: 200, cuerpo: {} });
+    const r = await proveedorDe("CLIP", CLIP, BASE, f.pedir)!.crear({ ...COBRO, terminal: "P82" });
+    assert.deepEqual(r, { ok: false, codigo: "SIN_RESPUESTA", sinRespuesta: true }, String(status));
+    assert.equal(f.llamadas[1].url, "https://api.payclip.io/f2f/pinpad/v1/payment/serial-number/P82");
+  }
+  for (const cancelacion of [{ status: 500 }, "sin_respuesta"] as const) {
+    const f = falso({ status: 502 }, cancelacion);
+    const r = await proveedorDe("CLIP", CLIP, BASE, f.pedir)!.crear({ ...COBRO, terminal: "P82" });
+    assert.equal(r.ok, true);
+    if (r.ok) assert.deepEqual([r.datos.estado, r.datos.detalle, r.datos.orden_id_externo], ["REVISAR", "SIN_RESPUESTA", null]);
+  }
+});
+
 test("Clip: crear + cancelar por serie caben de sobra en los 25 s del puente de la caja", () => {
   assert.ok(ESPERA_CLIP.crear + ESPERA_CLIP.cancelarPorSerie <= 20_000);
   assert.ok(ESPERA_CLIP.lectores <= 5_000);

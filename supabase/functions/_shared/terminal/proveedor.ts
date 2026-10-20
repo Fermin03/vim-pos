@@ -89,13 +89,15 @@ function clip(apiKey: string, secreto: string, base: string, pedir: typeof fetch
       // tenga el lector. Solo si Clip confirma la cancelación el cobro se cierra (reintentar = otro
       // cobro con otro id). Si no, el lector quizá aún lo muestra y reintentar podría cobrar dos
       // veces: queda en REVISAR y la caja pide mirar la terminal (y el PIN para darlo por bueno).
-      // Un 200 sin `pinpad_request_id` tampoco se puede seguir: mismo trato. SIN VERIFICAR que ocurra.
-      if (r.status === 0 || ((r.status === 200 || r.status === 201) && !datos.orden_id_externo)) {
-        const codigo = r.status === 0 ? "SIN_RESPUESTA" : "NO_SE_PUDO_CREAR";
+      // Un 5xx es igual de ambiguo (la pasarela pudo cortar después de que Clip la creara), y un 200
+      // sin `pinpad_request_id` tampoco se puede seguir: mismo trato. SIN VERIFICAR que ocurran.
+      const sinRespuesta = r.status === 0 || r.status >= 500;
+      if (sinRespuesta || ((r.status === 200 || r.status === 201) && !datos.orden_id_externo)) {
+        const codigo = sinRespuesta ? "SIN_RESPUESTA" : "NO_SE_PUDO_CREAR";
         if (r.status === 0) registrarError("terminal-cobro", codigo, "Clip no contestó al crear");
         else log(codigo, r);
         const x = await con(ESPERA_CLIP.cancelarPorSerie).cancelarPorSerie(c.terminal);
-        if (x.status >= 200 && x.status < 300) return { ok: false, codigo, ...(r.status === 0 ? { sinRespuesta: true } : {}) };
+        if (x.status >= 200 && x.status < 300) return { ok: false, codigo, ...(sinRespuesta ? { sinRespuesta: true } : {}) };
         log("CANCELAR_POR_SERIE", x);
         return { ok: true, datos: { ...datosDeIntencion(null), estado: "REVISAR", detalle: codigo } };
       }

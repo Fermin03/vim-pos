@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { clienteClip, codigoDeErrorClip, datosDeIntencion, estadoDeIntencion, lectoresDe } from "./clip.ts";
+import { aceptaCambioClip, clienteClip, codigoDeErrorClip, datosDeIntencion, estadoDeIntencion, lectoresDe } from "./clip.ts";
 
 // Ejemplo de referencia-api/get_payment.md, con los valores que pide el caso.
 const resultado = (o: Record<string, unknown> = {}) => ({
@@ -151,4 +151,15 @@ test("reembolsar pega a api.payclip.com/refunds", async () => {
   assert.equal(url, "https://api.payclip.com/refunds");
   assert.equal((init.headers as Record<string, string>)["idempotency-key"], "reembolso-t-1");
   assert.deepEqual(JSON.parse(String(init.body)), { reference: { type: "transaction", id: "t-1" }, amount: 24 });
+});
+
+test("aviso de Clip: un cobro cerrado solo se reabre si se pagó; lo demás, como aceptaCambio", () => {
+  for (const cerrado of ["RECHAZADO", "CANCELADO", "VENCIDO"] as const) {
+    assert.equal(aceptaCambioClip(cerrado, "APROBADO"), true);
+    for (const nuevo of ["REVISAR", "EN_TERMINAL", "RECHAZADO", "CANCELADO", "VENCIDO"] as const) assert.equal(aceptaCambioClip(cerrado, nuevo), false, `${cerrado}→${nuevo}`);
+  }
+  assert.equal(aceptaCambioClip("EN_TERMINAL", "REVISAR"), true);
+  assert.equal(aceptaCambioClip("REVISAR", "APROBADO"), true);
+  assert.equal(aceptaCambioClip("APROBADO", "REVISAR"), false);
+  assert.equal(aceptaCambioClip("DEVUELTO", "APROBADO"), false);
 });

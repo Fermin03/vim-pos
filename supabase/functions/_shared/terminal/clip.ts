@@ -8,7 +8,7 @@
 //     cancela por número de serie). Por eso un timeout o fallo de red no lanza: devuelve status 0.
 //   · El aviso del webhook no trae firma ni datos: solo dice «algo cambió». Siempre se confirma con `consultar`.
 //   · La propina puede venir aparte en `tip_amount` (SIN VERIFICAR si `paid_amount` la incluye).
-import { type DatosCobro, type EstadoCobro, montoTexto, obj, txt } from "./comun.ts";
+import { aceptaCambio, type DatosCobro, type EstadoCobro, montoTexto, obj, txt } from "./comun.ts";
 
 const API = "https://api.payclip.io/f2f/pinpad/v1";
 const API_REEMBOLSOS = "https://api.payclip.com/refunds"; // otro dominio (.com), según post_refunds.md
@@ -26,6 +26,16 @@ export function estadoDeIntencion(status: unknown, aprobadas: number): EstadoCob
     case "FAILED": return "RECHAZADO"; // SIN VERIFICAR
     default: return "REVISAR";
   }
+}
+
+/**
+ * Para el aviso de Clip: como aceptaCambio, y además un cobro ya cerrado (RECHAZADO, CANCELADO,
+ * VENCIDO) solo se reabre si Clip dice que se pagó. Un estado desconocido tras cancelar desde la
+ * caja (→ REVISAR) no lo reabre. Mercado Pago sigue con aceptaCambio tal cual.
+ */
+export function aceptaCambioClip(actual: EstadoCobro, nuevo: EstadoCobro): boolean {
+  if (actual === "RECHAZADO" || actual === "CANCELADO" || actual === "VENCIDO") return nuevo === "APROBADO";
+  return aceptaCambio(actual, nuevo);
 }
 
 /** La documentación muestra los montos de `detail.results[]` como número y como texto: se aceptan los dos. */
