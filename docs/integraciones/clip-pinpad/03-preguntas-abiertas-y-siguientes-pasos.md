@@ -62,3 +62,24 @@ Solo con lector:
 3. Con lector y app instalada: la entrega 1 del documento 02 (recorrer la API a mano y escribir
    la skill `clip-pinpad`). Sus hallazgos corrigen `01-resumen-api.md`.
 4. Adaptador de Clip sobre lo ya construido.
+
+## E. Construido en local (20 oct 2026): lo que falta comprobar
+
+Rama `feat/terminal-clip` (ADR 0050). Nada de esto se ha visto con un lector.
+
+**Con lector:**
+
+- Todos los estados distintos de `COMPLETED` (rechazo, cancelación, vencimiento).
+- Que cancelar con 200 deje el cobro en `CANCELADO`.
+- Devoluciones con transacciones de PinPad.
+- El cuerpo de `POST /devices`.
+- Propina elegida en el lector: cómo regresan `tip_amount` y `amount_paid`.
+- Si Clip reintenta el aviso tras un 500.
+
+**Antes de producción (no necesitan lector):**
+
+- `deno check` real de las funciones y prueba con `supabase functions serve`.
+- Correr el pgTAP 0039 (escrito, no ejecutado: pide Docker y Vault).
+- Regenerar tipos con `pnpm db:types` (hoy están editados a mano).
+- Ver el admin y la caja en vivo, con capturas (MP con terminal virtual; Clip con lector apagado).
+- Aplicar la migración 0260 con `--include-all` (las ramas locales traen 0188–0250).

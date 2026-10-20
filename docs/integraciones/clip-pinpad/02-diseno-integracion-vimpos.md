@@ -1,7 +1,11 @@
 # Cómo entra Clip PinPad en el cobro con terminal de VIM POS
 
-**Estado:** propuesta de diseño (8 oct 2026) con las decisiones del dueño de ese día ya
-incorporadas (documento 03 §B). Nada está construido. Este documento **no repite**
+**Estado (20 oct 2026):** construido en local, rama `feat/terminal-clip`, sin producción y sin
+lector probado. Decisión: [ADR 0050](../../decisiones/0050-clip-es-el-segundo-proveedor-de-terminal.md).
+Lo pendiente con lector está en el documento 03 §E. Quedó fuera a propósito: propina elegida en el
+lector (no sabemos cómo regresan `tip_amount` y `amount_paid`), cobro de prueba de $1 y la guía con
+`curl` con su skill `clip-pinpad`; los tres necesitan un cobro real. Este documento nació como
+propuesta (8 oct 2026) con las decisiones del dueño del documento 03 §B. Este documento **no repite**
 el diseño general: la arquitectura, las tablas, el flujo en la caja y las decisiones del dueño
 están en [`../mercado-pago-point/02-diseno-integracion-vimpos.md`](../mercado-pago-point/02-diseno-integracion-vimpos.md).
 Aquí va solo lo que Clip cambia.
