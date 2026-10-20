@@ -20,6 +20,7 @@ ALTER TABLE terminal_config_sucursal ADD COLUMN propina_opciones smallint[] NULL
 ALTER TABLE terminal_config_sucursal ADD CONSTRAINT terminal_config_propina_opciones_validas CHECK (
   propina_opciones IS NULL OR (
     cardinality(propina_opciones) BETWEEN 1 AND 3
+    AND array_position(propina_opciones, NULL) IS NULL
     AND 1 <= ALL (propina_opciones) AND 100 >= ALL (propina_opciones)
   ));
 

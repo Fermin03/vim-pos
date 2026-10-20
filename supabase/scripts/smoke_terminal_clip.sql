@@ -21,6 +21,10 @@ BEGIN
   EXCEPTION WHEN check_violation THEN NULL; END;
   BEGIN UPDATE terminal_config_sucursal SET propina_opciones = '{0}'; RAISE EXCEPTION 'pasó 0';
   EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN UPDATE terminal_config_sucursal SET propina_opciones = '{10,NULL}'; RAISE EXCEPTION 'pasó NULL';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  BEGIN UPDATE terminal_config_sucursal SET propina_opciones = '{}'; RAISE EXCEPTION 'pasó vacío';
+  EXCEPTION WHEN check_violation THEN NULL; END;
   BEGIN UPDATE terminal_config_sucursal SET propina_opciones = '{101}'; RAISE EXCEPTION 'pasó 101';
   EXCEPTION WHEN check_violation THEN NULL; END;
   BEGIN INSERT INTO terminal_conexiones (tenant_id, proveedor, cuenta_id_externo) VALUES (v_t, 'NETPAY', 'x'); RAISE EXCEPTION 'pasó NETPAY';

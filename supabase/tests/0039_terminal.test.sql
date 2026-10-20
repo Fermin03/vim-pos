@@ -3,7 +3,7 @@
 -- tokens de Mercado Pago solo se alcanzan como service_role (viven en Vault).
 -- ============================================================================
 begin;
-select plan(15);
+select plan(17);
 
 \set t      '99999999-0000-0000-0000-0000000000aa'
 \set cajero '99999999-0000-0000-0000-000000000001'
@@ -38,6 +38,8 @@ select c.sucursal_id, :'t', :'con' from cajas c where c.tenant_id = :'t' limit 1
 select lives_ok($$ update terminal_config_sucursal set propina_opciones = '{10,15,20}' $$, 'tres porcentajes pasan');
 select throws_ok($$ update terminal_config_sucursal set propina_opciones = '{10,15,20,25}' $$, '23514', null, 'cuatro porcentajes no');
 select throws_ok($$ update terminal_config_sucursal set propina_opciones = '{0}' $$, '23514', null, 'el 0 % no');
+select throws_ok($$ update terminal_config_sucursal set propina_opciones = '{10,NULL}' $$, '23514', null, 'un elemento NULL no');
+select throws_ok($$ update terminal_config_sucursal set propina_opciones = '{}' $$, '23514', null, 'la lista vacía no');
 
 -- Como el cajero.
 set local role authenticated;
