@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
-import { BrandMark } from "../components/topbar-pos";
-import { salirColaborador, sesionColaborador } from "../lib/sesion-colaborador";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { MENSAJE_SESION_TERMINO } from "../lib/mi-agenda";
+import { MENSAJE_SIN_AGENDA, clienteColaborador, salirColaborador, sesionColaborador } from "../lib/sesion-colaborador";
+import { Agenda } from "./agenda";
 import { Entrada } from "./entrada";
 
 /**
@@ -11,23 +12,36 @@ import { Entrada } from "./entrada";
 export default function MiAgendaPage() {
   // undefined = leyendo la sesión guardada; null = sin sesión.
   const [email, setEmail] = useState<string | null | undefined>(undefined);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const saliendo = useRef(false);
+  const conSesion = useRef(false);
+  conSesion.current = typeof email === "string";
 
   const leer = () => void sesionColaborador().then(setEmail, () => setEmail(null));
   useEffect(leer, []);
 
-  if (email === undefined) return <main className="min-h-[100dvh]" aria-busy="true" />;
-  if (email === null) return <Entrada alEntrar={leer} />;
+  // Un refresh que falla cierra la sesión sin que nadie toque «Cerrar sesión»: regresa a la entrada.
+  useEffect(() => {
+    const { data } = clienteColaborador().auth.onAuthStateChange((evento) => {
+      // Solo con la agenda abierta: la entrada también cierra sesión cuando la cuenta no tiene agenda.
+      if (evento !== "SIGNED_OUT" || !conSesion.current) return;
+      if (!saliendo.current) setAviso(MENSAJE_SESION_TERMINO);
+      saliendo.current = false;
+      setEmail(null);
+    });
+    return () => data.subscription.unsubscribe();
+  }, []);
 
-  return (
-    <main className="flex min-h-[100dvh] flex-col">
-      <header className="flex h-14 items-center gap-3 border-b border-line px-4">
-        <BrandMark size={28} />
-        <span className="min-w-0 flex-1 truncate text-14 text-ink-2">{email}</span>
-        <button type="button" onClick={() => void salirColaborador().then(() => setEmail(null))}
-          className="min-h-[44px] rounded px-3 text-14 font-semibold text-ink-2 transition-transform active:scale-[.97]">
-          Cerrar sesión
-        </button>
-      </header>
-    </main>
-  );
+  const salir = useCallback((motivo: string | null) => {
+    saliendo.current = true;
+    setAviso(motivo);
+    void salirColaborador().finally(() => { saliendo.current = false; setEmail(null); });
+  }, []);
+
+  const alVencer = useCallback(
+    (tipo: "sesion" | "sin_agenda") => salir(tipo === "sesion" ? MENSAJE_SESION_TERMINO : MENSAJE_SIN_AGENDA), [salir]);
+
+  if (email === undefined) return <main className="min-h-[100dvh]" aria-busy="true" />;
+  if (email === null) return <Entrada key={aviso ?? ""} aviso={aviso} alEntrar={() => { setAviso(null); leer(); }} />;
+  return <Agenda sb={clienteColaborador()} alVencer={alVencer} alSalir={() => salir(null)} />;
 }

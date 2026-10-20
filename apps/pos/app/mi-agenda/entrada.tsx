@@ -8,10 +8,10 @@ const campo =
   "h-12 rounded border border-line-strong bg-surface px-3 text-16 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink";
 
 /** Entrada de /mi-agenda: correo y contraseña del colaborador (nunca el PIN de la caja). */
-export function Entrada({ alEntrar }: { alEntrar: () => void }) {
+export function Entrada({ alEntrar, aviso = null }: { alEntrar: () => void; aviso?: string | null }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(aviso);
   const [cargando, setCargando] = useState(false);
 
   async function enviar(e: React.FormEvent) {
