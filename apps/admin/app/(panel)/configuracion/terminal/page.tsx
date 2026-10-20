@@ -174,6 +174,7 @@ function SucursalTerminal({ sucursal, cajas, t, ocupado, correr, setError }: {
   const cfg: ConfigSucursal | undefined = t.config.find((c) => c.sucursal_id === sucursal.id);
   const [conexionId, setConexionId] = useState(t.conexiones[0]?.id ?? "");
   const [mapa, setMapa] = useState("");
+  const [pasarAClip, setPasarAClip] = useState(false);
 
   const esClip = t.conexiones.find((c) => c.id === conexionId)?.proveedor === "CLIP";
   const nombreCuenta = (c: ConexionTerminal) => c.cuenta_nombre ?? (c.proveedor === "CLIP" ? "Cuenta de Clip" : "Cuenta de Mercado Pago");
@@ -223,9 +224,33 @@ function SucursalTerminal({ sucursal, cajas, t, ocupado, correr, setError }: {
 
   const cuenta = t.conexiones.find((c) => c.id === cfg.conexion_id);
   if (cuenta?.proveedor === "CLIP") return <ClipSucursal sucursal={sucursal} cajas={cajas} cfg={cfg} t={t} ocupado={ocupado} correr={correr} setError={setError} />;
+  // Una sucursal en Mercado Pago puede pasarse a Clip (al revés, no por ahora).
+  const clip = t.conexiones.find((c) => c.proveedor === "CLIP");
   return (
     <Tarjeta titulo={sucursal.nombre} descripcion={<>Cobra en <b className="text-ink">{cuenta?.cuenta_nombre ?? "tu cuenta de Mercado Pago"}</b>.</>}>
       <div className="flex flex-col gap-4">
+        {clip && (
+          <div>
+            <Button variant="ghost" disabled={ocupado} onClick={() => setPasarAClip(true)}>Usar la cuenta de Clip</Button>
+            {pasarAClip && (
+              <DialogoPeligro
+                titulo={`¿Cobrar con Clip en ${sucursal.nombre}?`}
+                consecuencia={
+                  <>
+                    Las terminales de Mercado Pago de esta sucursal dejarán de recibir el cobro desde la caja. Si las vas a
+                    seguir usando, antes pulsa «Volver a teclear el monto» en cada caja. Después liga el lector de Clip de cada caja.
+                  </>
+                }
+                boton="Usar Clip"
+                ocupado={ocupado}
+                textoOcupado="Cambiando…"
+                ancho="sm"
+                onConfirmar={() => void correr({ accion: "sucursal", conexion_id: clip.id, sucursal_id: sucursal.id }, `${sucursal.nombre} ya usa Clip. Liga el lector de cada caja.`, "terminal-clip-conexion").finally(() => setPasarAClip(false))}
+                onCerrar={() => setPasarAClip(false)}
+              />
+            )}
+          </div>
+        )}
         <Interruptor
           etiqueta="La terminal imprime su comprobante"
           descripcion={cfg.imprime_terminal ? "Imprime su comprobante después de cada cobro." : "No imprime nada; el ticket lo da la caja."}

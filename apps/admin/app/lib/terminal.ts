@@ -14,7 +14,7 @@ const CLAVE_STATE = "vimpos.mp.state";
 
 export type ConexionTerminal = { id: string; proveedor: "MERCADO_PAGO" | "CLIP"; cuenta_nombre: string | null; de_prueba: boolean; estado: "ACTIVA" | "ERROR" | "DESCONECTADA"; ultimo_error: string | null };
 export type ConfigSucursal = { sucursal_id: string; conexion_id: string; sucursal_id_externo: string | null; imprime_terminal: boolean; espera_segundos: number; propina_en_terminal: boolean; propina_opciones: number[] | null };
-export type DispositivoTerminal = { caja_id: string; sucursal_id: string; terminal_id_externo: string | null; modo: string | null; activa: boolean };
+export type DispositivoTerminal = { caja_id: string; sucursal_id: string; conexion_id: string; terminal_id_externo: string | null; modo: string | null; activa: boolean };
 export type EstadoTerminal = { conexiones: ConexionTerminal[]; config: ConfigSucursal[]; dispositivos: DispositivoTerminal[] };
 
 /** Lo que el negocio tiene conectado (RLS). Las cuentas desconectadas no se muestran. */
@@ -22,7 +22,7 @@ export async function leerTerminal(): Promise<EstadoTerminal> {
   const [c, g, d] = await Promise.all([
     supabase.from("terminal_conexiones").select("id, proveedor, cuenta_nombre, de_prueba, estado, ultimo_error").neq("estado", "DESCONECTADA").order("conectada_at"),
     supabase.from("terminal_config_sucursal").select("sucursal_id, conexion_id, sucursal_id_externo, imprime_terminal, espera_segundos, propina_en_terminal, propina_opciones"),
-    supabase.from("terminal_dispositivos").select("caja_id, sucursal_id, terminal_id_externo, modo, activa"),
+    supabase.from("terminal_dispositivos").select("caja_id, sucursal_id, conexion_id, terminal_id_externo, modo, activa"),
   ]);
   const error = c.error ?? g.error ?? d.error;
   if (error) throw new Error(error.message);

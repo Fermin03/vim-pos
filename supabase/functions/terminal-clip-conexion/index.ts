@@ -100,6 +100,11 @@ servir(async (req, json) => {
       const { error } = await admin.from("terminal_config_sucursal").upsert(
         { sucursal_id: sucursalId, tenant_id: tenantId, conexion_id: c.id }, { onConflict: "sucursal_id" });
       if (error) throw error;
+      // Si venía de otra cuenta (Mercado Pago), sus terminales dejan de recibir el cobro desde la caja.
+      // La fila se queda (con su terminal) por si se regresa; la caja liga después su lector de Clip.
+      const { error: eDisp } = await admin.from("terminal_dispositivos").update({ activa: false })
+        .eq("tenant_id", tenantId).eq("sucursal_id", sucursalId).neq("conexion_id", c.id);
+      if (eDisp) throw eDisp;
       return json({ ok: true });
     }
 

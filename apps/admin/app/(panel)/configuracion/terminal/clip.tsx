@@ -72,7 +72,8 @@ export function ClipSucursal({ sucursal, cajas, cfg, t, ocupado, correr, setErro
 
   const configurar = (cambios: Partial<Pick<ConfigSucursal, "imprime_terminal" | "espera_segundos" | "propina_opciones">>) => correr({
     accion: "configurar", sucursal_id: sucursal.id, imprime_terminal: cfg.imprime_terminal,
-    espera_segundos: cfg.espera_segundos, propina_opciones: cfg.propina_opciones, ...cambios,
+    // Lo guardado puede venir de Mercado Pago (desde 30 s); Clip pide al menos 60.
+    espera_segundos: Math.max(60, cfg.espera_segundos), propina_opciones: cfg.propina_opciones, ...cambios,
   }, (r) => r.aviso === "LECTORES_SIN_CONFIGURAR" ? "Guardado, pero Clip no recibió el tiempo de espera en los lectores. Vuelve a guardar en un momento." : "Guardado.", "terminal-clip-conexion");
 
   function guardarPropinas() {
@@ -129,7 +130,8 @@ export function ClipSucursal({ sucursal, cajas, cfg, t, ocupado, correr, setErro
           {cajas.length === 0 && <p className="text-sm text-ink-2">Esta sucursal no tiene cajas activas.</p>}
           <ul className="flex flex-col divide-y divide-line">
             {cajas.map((c) => {
-              const actual = t.dispositivos.find((x) => x.caja_id === c.id)?.terminal_id_externo ?? null;
+              // Si la sucursal venía de Mercado Pago, la caja aún tiene su terminal (inactiva): no es un lector de Clip.
+              const actual = t.dispositivos.find((x) => x.caja_id === c.id && x.conexion_id === cfg.conexion_id)?.terminal_id_externo ?? null;
               const serie = elegido[c.id] ?? "";
               return (
                 <li key={c.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
