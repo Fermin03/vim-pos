@@ -15262,6 +15262,7 @@ export type Database = {
       }
     }
     Functions: {
+      _agenda_admin_tenant: { Args: never; Returns: string }
       _agenda_cadena: {
         Args: {
           p_excluir_cita?: string
@@ -15533,6 +15534,7 @@ export type Database = {
         Args: { p_sucursales: string[]; p_tenant: string }
         Returns: undefined
       }
+      _mi_colaborador_tenant: { Args: never; Returns: string }
       _nombre_corto: { Args: { p_usuario: string }; Returns: string }
       _nombre_variante: {
         Args: { p_ejes: string[]; p_nombre: string; p_valores: Json }
@@ -15943,7 +15945,31 @@ export type Database = {
         Args: { p_enlace_hash: string; p_inicia: string; p_tenant: string }
         Returns: Json
       }
+      agenda_ocupacion: {
+        Args: { p_desde: string; p_hasta: string }
+        Returns: {
+          colaborador: string
+          dia: string
+          minutos_agendados: number
+          minutos_horario: number
+          usuario_id: string
+        }[]
+      }
       agenda_recordatorios_encolar: { Args: never; Returns: number }
+      agenda_reporte_citas: {
+        Args: { p_canal?: string; p_desde: string; p_hasta: string }
+        Returns: {
+          atendidas: number
+          canceladas_clienta: number
+          canceladas_negocio: number
+          colaborador: string
+          no_llego: number
+          producto_id: string
+          servicio: string
+          total: number
+          usuario_id: string
+        }[]
+      }
       agenda_reservar_en_linea: {
         Args: { p: Json; p_tenant: string }
         Returns: Json
@@ -16849,6 +16875,9 @@ export type Database = {
         Returns: undefined
       }
       mi_acceso: { Args: never; Returns: Json }
+      mi_agenda: { Args: { p_desde: string; p_hasta: string }; Returns: Json }
+      mi_cita_empezar: { Args: { p_cita: string }; Returns: undefined }
+      mi_cita_terminar: { Args: { p_cita: string }; Returns: string }
       modificar_reservacion: {
         Args: {
           p_cliente_nombre?: string
