@@ -1,5 +1,5 @@
 // Lo que la caja le pide a terminal-cobro. Módulo puro (node --test).
-import { montoTexto } from "./mercado-pago.ts";
+import { montoTexto } from "./comun.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const uuid = (v: unknown): string | null => (typeof v === "string" && UUID.test(v) ? v.toLowerCase() : null);
