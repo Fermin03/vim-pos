@@ -72,6 +72,9 @@ describe("cobro con terminal", () => {
     expect(await terminalDeCaja("tok", "caja-1")).toEqual({ hay: true, lista: true, proveedor: "MERCADO_PAGO" });
     responde(200, { ok: true, terminal: true, lista: false, proveedor: "CLIP" });
     expect(await terminalDeCaja("tok", "caja-1")).toEqual({ hay: true, lista: false, proveedor: "CLIP" });
+    // Un proveedor que la caja no conoce no se cree: cae al texto de siempre.
+    responde(200, { ok: true, terminal: true, lista: true, proveedor: "OTRO" });
+    expect(await terminalDeCaja("tok", "caja-1")).toEqual({ hay: true, lista: true, proveedor: null });
     // Una nube sin `lista` (anterior a Clip) es Mercado Pago: lista.
     responde(200, { ok: true, terminal: true });
     expect(await terminalDeCaja("tok", "caja-1")).toEqual({ hay: true, lista: true, proveedor: null });

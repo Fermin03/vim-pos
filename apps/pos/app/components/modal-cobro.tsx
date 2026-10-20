@@ -224,6 +224,7 @@ function VistaSelector({
   totales,
   conTerminal,
   terminalLista,
+  onRevisarTerminal,
   error,
   onElegir,
   onCerrar,
@@ -233,13 +234,26 @@ function VistaSelector({
   conTerminal: boolean;
   /** El lector puede recibir el cobro (Clip apagado o con la app cerrada = no): si no, «Tarjeta» abre el registro a mano. */
   terminalLista: boolean;
+  /** Vuelve a preguntar por el lector; true si ya puede cobrar. */
+  onRevisarTerminal: () => Promise<boolean>;
   error: string | null;
   onElegir: (m: MetodoPago | "dividido" | "terminal") => void;
   onCerrar: () => void;
 }) {
   // El registro a mano se queda como salida (sin internet, terminal descompuesta), pero escondido.
   const [aMano, setAMano] = useState(false);
-  const filas: { cfg: MetodoConfig; elegir: () => void; clave: string }[] = [];
+  // El mensaje pide encender el lector: al tocar «Tarjeta» otra vez se pregunta de nuevo, y solo si
+  // sigue sin estar listo se abre lo manual.
+  const [revisando, setRevisando] = useState(false);
+  async function revisarTerminal() {
+    if (revisando) return;
+    setRevisando(true);
+    const lista = await onRevisarTerminal().catch(() => false);
+    setRevisando(false);
+    if (lista) onElegir("terminal");
+    else setAMano(true);
+  }
+  const filas: { cfg: MetodoConfig; elegir: () => void; clave: string; aviso?: boolean }[] = [];
   for (const m of METODOS) {
     const esTarjeta = m.valor === "TARJETA_DEBITO" || m.valor === "TARJETA_CREDITO";
     if (!conTerminal || !esTarjeta) { filas.push({ cfg: m, elegir: () => onElegir(m.valor), clave: m.valor }); continue; }
@@ -247,9 +261,10 @@ function VistaSelector({
       filas.push({
         cfg: {
           ...metodoCfg("TARJETA_CREDITO"), etiqueta: "Tarjeta",
-          sub: terminalLista ? "Débito o crédito · se cobra en la terminal" : "Terminal no disponible: enciéndela y abre Clip PinPad",
+          sub: terminalLista ? "Débito o crédito · se cobra en la terminal"
+            : revisando ? "Revisando la terminal…" : "Terminal no disponible: enciéndela y abre Clip PinPad",
         },
-        elegir: terminalLista ? () => onElegir("terminal") : () => setAMano(true), clave: "terminal",
+        elegir: terminalLista ? () => onElegir("terminal") : revisarTerminal, clave: "terminal", aviso: !terminalLista,
       });
     }
     if (aMano) {
@@ -271,11 +286,12 @@ function VistaSelector({
 
       {/* Lista de métodos */}
       <div className="border border-line rounded-lg overflow-hidden">
-        {filas.map(({ cfg: m, elegir, clave }, i) => (
+        {filas.map(({ cfg: m, elegir, clave, aviso }, i) => (
           <button
             key={clave}
             type="button"
             onClick={elegir}
+            aria-busy={aviso && revisando}
             className={[
               "w-full flex items-center gap-4 px-[18px] py-[15px] cursor-pointer transition-colors hover:bg-hover text-left",
               i < filas.length - 1 ? "border-b border-line" : "",
@@ -289,7 +305,7 @@ function VistaSelector({
             </span>
             <span className="flex-1 min-w-0">
               <span className="block text-16 font-semibold text-ink">{m.etiqueta}</span>
-              <span className="block text-13 text-ink-3 mt-[1px]">{m.sub}</span>
+              <span className={`block text-13 mt-[1px] ${aviso ? "text-warning" : "text-ink-3"}`} role={aviso ? "status" : undefined}>{m.sub}</span>
             </span>
             <IcoChevron cls="w-5 h-5 text-ink-3 flex-shrink-0" />
           </button>
@@ -571,11 +587,13 @@ function VistaOtro({
 function ModalAgregarPago({
   pendiente,
   conTerminal,
+  terminalNoLista,
   onAgregar,
   onCerrar,
 }: {
   pendiente: number;
   conTerminal: boolean;
+  terminalNoLista: boolean;
   onAgregar: (metodo: MetodoPago, monto: number, terminal: boolean) => void;
   onCerrar: () => void;
 }) {
@@ -638,6 +656,9 @@ function ModalAgregarPago({
               </button>
             ))}
           </div>
+          {terminalNoLista && (
+            <p className="-mt-3 mb-5 text-13 text-warning" role="status">Terminal no disponible: enciéndela y abre Clip PinPad</p>
+          )}
 
           {/* Monto */}
           <div className="text-13 font-bold uppercase tracking-widest text-ink-2 mb-3">Monto</div>
@@ -678,6 +699,8 @@ function ModalAgregarPago({
 function VistaDividida({
   totales,
   conTerminal,
+  terminalLista,
+  onRevisarTerminal,
   procesando,
   error,
   onAplicarPagos,
@@ -685,6 +708,9 @@ function VistaDividida({
 }: {
   totales: TotalesTicket;
   conTerminal: boolean;
+  /** Como en el selector: sin lector listo no se ofrece cobrar en la terminal y se dice por qué. */
+  terminalLista: boolean;
+  onRevisarTerminal: () => Promise<boolean>;
   procesando: boolean;
   error: string | null;
   /** Aplica TODOS los pagos divididos de una (secuencial en el padre, no en paralelo) y devuelve
@@ -800,7 +826,11 @@ function VistaDividida({
 
         <button
           type="button"
-          onClick={() => setMostrarModal(true)}
+          onClick={() => {
+            // Se vuelve a preguntar: si el lector se encendió, la opción aparece en el diálogo al contestar.
+            if (conTerminal && !terminalLista) void onRevisarTerminal().catch(() => false);
+            setMostrarModal(true);
+          }}
           disabled={cubierto}
           className="w-full inline-flex items-center justify-center gap-[9px] font-sans text-15 font-semibold text-ink bg-surface border border-line-strong py-[14px] rounded cursor-pointer transition-all hover:border-ink hover:bg-hover disabled:opacity-45 disabled:cursor-default"
         >
@@ -836,7 +866,8 @@ function VistaDividida({
       {mostrarModal && (
         <ModalAgregarPago
           pendiente={restante}
-          conTerminal={conTerminal}
+          conTerminal={conTerminal && terminalLista}
+          terminalNoLista={conTerminal && !terminalLista}
           onAgregar={agregarPago}
           onCerrar={() => setMostrarModal(false)}
         />
@@ -1145,13 +1176,22 @@ export function ModalCobro({
   }, [vista]);
 
   // ── Cobro con terminal (ADR 0033) ──────────────────────────────────────────────────────────
-  // Lo último que se supo de esta caja evita que el selector cambie de botones al abrir.
+  // Lo último que se supo de esta caja evita que el selector cambie de botones al abrir. Solo se
+  // guarda `hay`: `lista` arranca en true y, si el lector no lo está, `crear` responde
+  // TERMINAL_NO_DISPONIBLE (seguro) hasta que contesta `disponible`.
   const [terminal, setTerminal] = useState<TerminalCaja>(() => {
     let hay = false;
     try { hay = sessionStorage.getItem("vimpos.terminal") === "1"; } catch { /* sin almacén no hay recuerdo */ }
     return { hay, lista: true, proveedor: null };
   });
   const conTerminal = terminal.hay;
+
+  /** Vuelve a preguntar por el lector (la cajera lo encendió con el cobro abierto); true si ya puede cobrar. */
+  async function revisarTerminal(): Promise<boolean> {
+    const t = await terminalDeCaja(token, cajaId);
+    setTerminal(t);
+    return t.hay && t.lista;
+  }
 
   /**
    * La terminal ya cobró: el pago entra al ticket como débito o crédito, con su referencia. El id del
@@ -1329,6 +1369,7 @@ export function ModalCobro({
             totales={totalesEf}
             conTerminal={conTerminal}
             terminalLista={terminal.lista}
+            onRevisarTerminal={revisarTerminal}
             error={error}
             onElegir={elegirMetodo}
             onCerrar={onCerrar}
@@ -1370,7 +1411,9 @@ export function ModalCobro({
         {vista === "dividido" && (
           <VistaDividida
             totales={totalesEf}
-            conTerminal={conTerminal && terminal.lista}
+            conTerminal={conTerminal}
+            terminalLista={terminal.lista}
+            onRevisarTerminal={revisarTerminal}
             procesando={procesando}
             error={error}
             onAplicarPagos={aplicarPagosDivididos}

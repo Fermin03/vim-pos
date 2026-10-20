@@ -26,7 +26,7 @@ type Peticion =
   | { accion: "reembolsar"; ticket_id: string };
 
 type Respuesta = {
-  ok?: boolean; error?: string; terminal?: boolean; lista?: boolean; proveedor?: ProveedorTerminal | null; cobro?: CobroTerminal; cobros?: CobroTerminal[];
+  ok?: boolean; error?: string; terminal?: boolean; lista?: boolean; proveedor?: unknown; cobro?: CobroTerminal; cobros?: CobroTerminal[];
   cancelacion?: "HECHA" | "PEDIDA" | "FALLO";
   /** De `reembolsar`: cuántos pagos de ese ticket pasaron por la terminal y cuánto regresó. */
   n_cobros?: number; devuelto_mxn?: string;
@@ -53,7 +53,10 @@ export async function pedirCobro(token: string, cajaId: string, p: Peticion): Pr
 /** ¿Esta caja tiene terminal, y está lista? Cualquier fallo (sin internet, sin nube) es «no»: queda el registro manual. */
 export async function terminalDeCaja(token: string, cajaId: string): Promise<TerminalCaja> {
   return pedirCobro(token, cajaId, { accion: "disponible" })
-    .then((r) => ({ hay: r.terminal === true, lista: r.lista !== false, proveedor: r.proveedor ?? null }))
+    .then((r): TerminalCaja => ({
+      hay: r.terminal === true, lista: r.lista !== false,
+      proveedor: r.proveedor === "CLIP" || r.proveedor === "MERCADO_PAGO" ? r.proveedor : null,
+    }))
     .catch(() => ({ hay: false, lista: false, proveedor: null }));
 }
 
