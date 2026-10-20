@@ -26,9 +26,9 @@ describe("moduloActivo", () => {
 });
 
 describe("catálogo", () => {
-  it("los doce giros que se ofrecen, y los retirados con nombre para leer datos viejos", () => {
+  it("los diecisiete giros que se ofrecen, y los retirados con nombre para leer datos viejos", () => {
     expect(GIROS.filter((g) => g.ofrecido).map((g) => g.codigo)).toEqual(
-      ["QUICK_SERVICE", "FULL_SERVICE", "TAQUERIA", "CAFETERIA", "BAR", "DARK_KITCHEN", "FOODTRUCK", "RETAIL", "ABARROTES", "FRUTERIA", "FERRETERIA", "VINOS"]);
+      ["QUICK_SERVICE", "FULL_SERVICE", "TAQUERIA", "CAFETERIA", "BAR", "DARK_KITCHEN", "FOODTRUCK", "RETAIL", "ABARROTES", "FRUTERIA", "FERRETERIA", "VINOS", "SALON", "SPA", "PELUQUERIA", "BARBERIA", "TATUAJES"]);
     expect(nombreGiro("RETAIL")).toBe("Tienda de ropa o calzado");
     expect(nombreGiro("ABARROTES")).toBe("Tienda de abarrotes o supermercado");
     expect(nombreGiro("FRUTERIA")).toBe("Frutería y verdulería");
@@ -52,10 +52,10 @@ describe("catálogo", () => {
 });
 
 describe("belleza", () => {
-  it("los cinco giros existen, con nombre, y no se ofrecen todavía", () => {
+  it("los cinco giros existen, con nombre, y se ofrecen", () => {
     expect(GIROS_BELLEZA).toEqual(["SALON", "SPA", "PELUQUERIA", "BARBERIA", "TATUAJES"]);
     for (const g of GIROS_BELLEZA) {
-      expect(GIROS.find((x) => x.codigo === g)?.ofrecido).toBe(false);
+      expect(GIROS.find((x) => x.codigo === g)?.ofrecido).toBe(true);
       expect(esGiroBelleza(g)).toBe(true);
     }
     expect(nombreGiro("TATUAJES")).toBe("Tatuajes y piercings");

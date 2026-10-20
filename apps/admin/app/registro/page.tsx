@@ -25,6 +25,11 @@ const VERTICALES = [
   { v: "FRUTERIA", l: "Frutería y verdulería" },
   { v: "FERRETERIA", l: "Ferretería" },
   { v: "VINOS", l: "Vinos y licores" },
+  { v: "SALON", l: "Salón de belleza" },
+  { v: "SPA", l: "Spa" },
+  { v: "PELUQUERIA", l: "Peluquería" },
+  { v: "BARBERIA", l: "Barbería" },
+  { v: "TATUAJES", l: "Tatuajes y piercings" },
 ];
 
 /** «Knock-Out Burger» → «knock-out-burger»: sin acentos, minúsculas y guiones. */

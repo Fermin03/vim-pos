@@ -10,19 +10,28 @@ DECLARE
   v_op jsonb;
   v_belleza jsonb := '{"mostrador":true,"comedor":false,"meseros":false,"domicilio":false,"repartidores":false,"kds":false,"reservaciones":false,"marcas":false,"eventos":false,"cuentas_barra":false,"existencias":true,"agenda":true}';
   v_tenant uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_antes jsonb; v_giro vertical_tipo;
 BEGIN
+  SELECT operacion, vertical_principal INTO v_antes, v_giro FROM tenants WHERE id = v_tenant;
   FOREACH g IN ARRAY ARRAY['SALON','SPA','PELUQUERIA','BARBERIA','TATUAJES'] LOOP
     IF juego_inicial_de_giro(g::vertical_tipo) IS DISTINCT FROM v_belleza THEN
       RAISE EXCEPTION '1: juego de % incorrecto: %', g, juego_inicial_de_giro(g::vertical_tipo);
     END IF;
     IF NOT es_giro_belleza(g::vertical_tipo) THEN RAISE EXCEPTION '1: % no es belleza', g; END IF;
-    BEGIN
-      PERFORM cambiar_giro(v_tenant, g::vertical_tipo, false);
-      RAISE EXCEPTION '1: cambiar_giro aceptó %', g;
-    EXCEPTION WHEN invalid_parameter_value THEN
-      IF SQLERRM NOT LIKE 'GIRO_NO_DISPONIBLE%' THEN RAISE; END IF;
-    END;
+    PERFORM cambiar_giro(v_tenant, g::vertical_tipo, false);
   END LOOP;
+
+  -- 0230: los cinco giros ya cambian; con reaplicar deja el juego inicial. BAR sigue bloqueado.
+  PERFORM cambiar_giro(v_tenant, 'SALON'::vertical_tipo, true);
+  SELECT operacion INTO v_op FROM tenants WHERE id = v_tenant;
+  IF v_op IS DISTINCT FROM v_belleza THEN RAISE EXCEPTION '1: SALON reaplicado dejó %', v_op; END IF;
+  UPDATE tenants SET operacion = v_antes, vertical_principal = v_giro WHERE id = v_tenant;
+  BEGIN
+    PERFORM cambiar_giro(v_tenant, 'BAR'::vertical_tipo, false);
+    RAISE EXCEPTION '1: cambiar_giro aceptó BAR';
+  EXCEPTION WHEN invalid_parameter_value THEN
+    IF SQLERRM NOT LIKE 'GIRO_NO_DISPONIBLE%' THEN RAISE; END IF;
+  END;
 
   FOREACH g IN ARRAY ARRAY['QUICK_SERVICE','FULL_SERVICE','RETAIL','VINOS','BAR'] LOOP
     IF (juego_inicial_de_giro(g::vertical_tipo)->>'agenda') IS DISTINCT FROM 'false' THEN
@@ -390,6 +399,24 @@ BEGIN
     RAISE EXCEPTION 'A11d: con «No llegó», la compañera siguió marcada'; END IF;
 
   RAISE NOTICE 'belleza agenda OK';
+END $$;
+
+-- 0230: un alta nueva como SALON nace con mostrador, existencias y agenda; sin comedor ni cocina.
+DO $$
+DECLARE v_owner uuid := gen_random_uuid(); v_tenant uuid; v_op jsonb;
+BEGIN
+  PERFORM set_config('request.jwt.claims', '', true);
+  INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_app_meta_data, raw_user_meta_data)
+  VALUES (v_owner, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+          'owner-' || substr(v_owner::text, 1, 8) || '@smoke.dev', crypt('smokepass', gen_salt('bf')),
+          now(), now(), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb);
+  v_tenant := crear_tenant_con_owner(v_owner, 'smoke-salon-' || substr(v_owner::text, 1, 8), 'Salón Smoke', 'Dueño Smoke',
+                                     '4770000000', 'SALON'::vertical_tipo, 'ESENCIAL', 'TRIAL'::tenant_estado, 'smoke 0230');
+  SELECT operacion INTO v_op FROM tenants WHERE id = v_tenant;
+  IF NOT ((v_op->>'mostrador')::boolean AND (v_op->>'existencias')::boolean AND (v_op->>'agenda')::boolean)
+     OR (v_op->>'comedor')::boolean OR (v_op->>'kds')::boolean THEN
+    RAISE EXCEPTION '6: el salón nació con %', v_op; END IF;
+  RAISE NOTICE 'belleza alta como SALON OK';
 END $$;
 
 ROLLBACK;

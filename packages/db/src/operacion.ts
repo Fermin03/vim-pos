@@ -22,12 +22,12 @@ export const GIROS: readonly { codigo: CodigoGiro; nombre: string; ofrecido: boo
   { codigo: "FRUTERIA", nombre: "Frutería y verdulería", ofrecido: true },
   { codigo: "FERRETERIA", nombre: "Ferretería", ofrecido: true },
   { codigo: "VINOS", nombre: "Vinos y licores", ofrecido: true },
-  // Belleza: se abren en la entrega 4 (cambiar_giro los rechaza hasta entonces).
-  { codigo: "SALON", nombre: "Salón de belleza", ofrecido: false },
-  { codigo: "SPA", nombre: "Spa", ofrecido: false },
-  { codigo: "PELUQUERIA", nombre: "Peluquería", ofrecido: false },
-  { codigo: "BARBERIA", nombre: "Barbería", ofrecido: false },
-  { codigo: "TATUAJES", nombre: "Tatuajes y piercings", ofrecido: false },
+  // Belleza (ADR 0038).
+  { codigo: "SALON", nombre: "Salón de belleza", ofrecido: true },
+  { codigo: "SPA", nombre: "Spa", ofrecido: true },
+  { codigo: "PELUQUERIA", nombre: "Peluquería", ofrecido: true },
+  { codigo: "BARBERIA", nombre: "Barbería", ofrecido: true },
+  { codigo: "TATUAJES", nombre: "Tatuajes y piercings", ofrecido: true },
   // Retirados: se quedan para nombrar a quien ya los tiene.
   { codigo: "CAFE_BAR", nombre: "Cafetería o bar", ofrecido: false },
   { codigo: "ENTERPRISE", nombre: "Cadena", ofrecido: false },
