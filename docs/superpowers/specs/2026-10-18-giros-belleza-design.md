@@ -403,3 +403,58 @@ lo apruebe.
   `CAPTCHA_OPCIONAL=1` y sin `TURNSTILE_SECRET_KEY`; la app sin `NEXT_PUBLIC_TURNSTILE_SITE_KEY`.
   Deno no está instalado: las pruebas de las funciones no corren aquí.
 - **Recordar:** nada sale hasta tener todos los servicios (entrega 4).
+
+## Entrega 4 (celular, reportes y liberar), hecha (20 oct)
+
+Mi agenda en el celular del colaborador, reportes de citas y ocupación, primera vez de un salón, y la
+liberación de los giros. Todo en local. Diseño: `docs/diseno/pos-belleza.md` y `docs/diseno/admin.md`;
+decisión: ADR 0041.
+
+**Migraciones**
+
+- **0227:** `mi_agenda`, `mi_cita_empezar`, `mi_cita_terminar` y los reportes de citas y ocupación.
+- **0228:** sesión del colaborador: rol `colaborador_web` (solo cinco RPC), hook del token, capa RLS
+  `es_sesion_web_limitada()`, `agenda_accesos_colaboradores()` y las envolturas `mis_comisiones` /
+  `mi_periodo_comisiones`.
+- **0229:** prospectos de belleza.
+- **0230:** libera los giros de belleza. **Corre después de publicar el instalador**, nunca antes.
+
+**Rulings de este plan (Fermín puede corregirlos)**
+
+- El colaborador entra con correo y contraseña a `/mi-agenda`; el dueño le manda el acceso. Sin PIN ni caja.
+- En el celular solo marca «Llegó» y «Terminé». Cancelar, mover, «No llegó» y cobrar siguen en recepción.
+- No ve el teléfono ni el correo de la clienta.
+- Con varios colaboradores en una cita, se termina cuando la termina el del último servicio.
+- El rol del token queda fijo hasta renovarlo (aceptado, ADR 0041). La sesión en un navegador compartido
+  persiste hasta «Cerrar sesión».
+- El % de ocupación ignora los días sin horario.
+
+## Lanzamiento del grupo belleza
+
+**Nada sale a producción hasta que esté el grupo de servicios (talleres automotrices): regla de Fermín.**
+Cuando llegue ese momento, en este orden:
+
+1. **Pasos de dominio, antes del merge:** los de `docs/operacion/mudanza-online.md` (DNS de `online`,
+   dominio `online` + `pedidos` en el proyecto `vim-tienda` de Vercel, hostname en Turnstile,
+   `TURNSTILE_HOSTNAMES`, `VIM_TIENDA_URL` y `VIM_TIENDA_SECRET`). El merge despliega el redirect 308 de
+   `pedidos` a `online`: si va primero, la tienda pública se cae.
+2. **Migraciones 0188–0229 a la nube, a mano y en orden**, cada archivo en su propia transacción (0216 y
+   0220 son solo `ADD VALUE`). 0230 no entra aquí.
+3. **Comprobar en la nube** que `GRANT colaborador_web TO authenticator` se aplicó y que GoTrue acepta el
+   rol personalizado que pone el hook. Agregar `https://admin.vimpos.com.mx/establecer-acceso` a las
+   redirect URLs de Auth.
+4. **Desplegar las funciones:** `tienda`, `tienda-correos`, `tienda-webhook-mp` y todas las demás, porque
+   `servir()` de `_shared/http.ts` cambió (rechaza `colaborador_web`) y toca a todas.
+5. **Merge.**
+6. **UN instalador** con 0188–0229 (retail y belleza juntos).
+7. **0230 después de publicar ese instalador** (y la liberación de retail, 0215, si aún no corrió). Así
+   no existe un salón con una caja sin las migraciones de belleza.
+
+**Para Fermín (pendientes)**
+
+- Textos para James: reservas, correos, panel y «Mi agenda».
+- Borrador legal de reservas: revisarlo antes de enlazarlo.
+- Reembolsos fallidos: se resuelven a mano en Mercado Pago, sin botón.
+- Clave SAT de belleza: definir cuál queda por defecto.
+- Sitio y PDF de prospectos de belleza: al final.
+- Local: para probar el enlace de acceso, `supabase stop && supabase start` carga `additional_redirect_urls`.

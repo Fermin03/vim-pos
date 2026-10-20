@@ -96,3 +96,27 @@ preferencias).
 
 Las tres capas (ficha, modal de cita, espera) ceden en la pila compartida: Escape cierra la de arriba.
 Fuera del Calendario, Escape regresa al Calendario.
+
+## Mi agenda (celular del colaborador, entrega 4; ADR 0041)
+
+Ruta `/mi-agenda` del POS, pensada para el celular. No es la caja: no hay PIN ni dispositivo vinculado.
+
+- **Entrada.** Correo y contraseña (con etiqueta cada campo). El dueño le manda el acceso desde
+  Colaboradores. Si la cuenta no tiene agenda: «Esta cuenta no tiene agenda. Pídele acceso al negocio.».
+  Si la sesión vence: «Tu sesión terminó. Entra de nuevo.». «Cerrar sesión» está arriba, siempre; en un
+  celular compartido hay que usarlo al terminar.
+- **Agenda.** Encabezado «Hola, {nombre}» con el día. Tira de 7 días desde hoy (con un punto si el día
+  tiene citas) y una tarjeta por servicio suyo: hora de inicio y fin, clienta y nota, servicio «en
+  {espacio}» y su estado. «Actualizar» y refresco solo al volver a la app. Vacío: «No tienes citas este día.».
+  **No se ve el teléfono ni el correo de la clienta.**
+- **Botones por estado** (h-14, ancho completo):
+  - Agendada: **«Llegó · empezar»**.
+  - En curso: **«Terminé»** si es su último servicio de la cita; **«Terminé mi parte»** si faltan
+    servicios de otros. La cita se termina cuando la termina el colaborador del último servicio; con
+    «Terminé mi parte» la cita sigue en curso y se avisa a la recepción.
+  - Cualquier otro estado: sin botón.
+  Cancelar, mover, «No llegó» y cobrar siguen en la recepción.
+- **Mis comisiones.** Segunda pestaña, tres bloques: hoy, periodo actual y periodo anterior. Servicios,
+  ventas sin IVA, comisión y total; el sueldo solo aparece en un periodo completo. Solo ve lo suyo.
+- **Errores.** Una sola región con aviso (`aria-live`): sin conexión, sesión vencida o dato inválido.
+  Si una acción falla, la agenda se relee.

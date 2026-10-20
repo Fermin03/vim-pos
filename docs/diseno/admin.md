@@ -454,6 +454,36 @@ Los dos son de todo el negocio (la vista no filtra por sucursal) y aparecen en �
 - **Ventas por colaborador** (`/reportes/ventas-colaborador`). Agrupa por colaborador o por servicio:
   vendidos, tickets, ventas sin IVA y %.
 
+### Dar acceso a su celular (Colaboradores, entrega 4; ADR 0041)
+
+En el detalle de un colaborador activo, bloque «Su agenda en el celular»: botón **«Dar acceso a su
+celular»**. Manda al correo del colaborador el enlace para poner su contraseña (es el correo de
+«recuperar contraseña»; hoy no hay plantilla propia). Después se lee «Correo enviado a …» y «Último
+acceso: …» o «Aún no ha entrado». Solo dueño y administrador; si la lectura falla, el bloque no aparece.
+Límite de un correo por minuto (se avisa). El enlace abre `/establecer-acceso`, que usa la sesión del
+enlace y no la que ya esté abierta en ese navegador; al terminar, «Listo» y «Abrir mi agenda» (POS).
+
+### Citas y faltas y Ocupación (belleza)
+
+Dos reportes más en «Cómo va la operación»; solo dueño y administrador (el supervisor no los ve) y solo
+con agenda.
+
+- **Citas y faltas** (`/reportes/citas`). Por colaborador o por servicio, canal Todas / En caja / En
+  línea. Atendidas, Canceló la clienta, Canceló el negocio, No llegó, Total y Tasa de falta (con fila de
+  totales). Una espera cancelada sin colaborador sale como «Sin colaborador». Más de 367 días: se usan
+  los últimos 367 y un aviso lo dice. Descarga en Excel.
+- **Ocupación** (`/reportes/ocupacion`). Por colaborador (suma del rango) o por día. Horas agendadas,
+  Horas de horario y Ocupación % con barra; «—» si no hay horario. **El % ignora los días sin horario:
+  solo cuenta lo agendado en días con horario.** Por eso «Horas agendadas» puede mostrar más horas de las
+  que explica el % (p. ej. 5 h agendadas y 8 h de horario pueden dar 50 %, con más horas en un día sin
+  horario). Una Nota en la pantalla lo explica. Más de 93 días: los últimos 93 con aviso.
+
+### Primera vez de un salón (`/bienvenida`)
+
+Con un giro de belleza la lista cambia a seis pasos: Tus servicios, Tu equipo, Colaboradores y horarios
+(se marca con al menos un horario de un colaborador activo), Tu caja, Vincula tu caja y Facturación
+(opcional). Restaurante y tienda no cambian.
+
 ## Piezas que se repiten en el panel
 
 Viven en `apps/admin/app/components` y se usan en vez de volver a escribir el marcado:
