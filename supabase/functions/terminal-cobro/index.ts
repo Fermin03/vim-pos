@@ -30,13 +30,17 @@ type Cobro = {
 /** Lo que ve la caja: nada de ids internos de la conexión. */
 const publico = ({ conexion_id: _c, updated_at: _u, caja_id: _k, ...c }: Cobro) => c;
 
+async function nombreDeConexion(conexionId: string): Promise<NombreProveedor> {
+  const { data, error } = await admin.from("terminal_conexiones").select("proveedor").eq("id", conexionId).single();
+  if (error) throw error;
+  return (data as { proveedor: NombreProveedor }).proveedor;
+}
+
 /** El proveedor de una conexión con su credencial de Vault; `prov` es null si falta la credencial. */
-async function proveedorDeConexion(conexionId: string): Promise<{ nombre: NombreProveedor; prov: Proveedor | null }> {
-  const { data: con, error: eC } = await admin.from("terminal_conexiones").select("proveedor").eq("id", conexionId).single();
-  if (eC) throw eC;
+async function proveedorDeConexion(conexionId: string, nombre?: NombreProveedor): Promise<{ nombre: NombreProveedor; prov: Proveedor | null }> {
+  nombre ??= await nombreDeConexion(conexionId);
   const { data, error } = await admin.rpc("terminal_leer_tokens", { p_conexion: conexionId });
   if (error) throw error;
-  const nombre = (con as { proveedor: NombreProveedor }).proveedor;
   const cred = (data as Credencial[] | null)?.[0] ?? { access_token: null, refresh_token: null };
   return { nombre, prov: proveedorDe(nombre, cred, BASE) };
 }
@@ -128,9 +132,14 @@ servir(async (req, json) => {
       if (!disp) return json({ ok: true, terminal: false, lista: false, proveedor: null });
       // Un tropiezo al leer la conexión o sin credencial no tapa la terminal (antes ni se leía): crear
       // dirá CONEXION_INVALIDA, como siempre.
-      const p = await proveedorDeConexion(disp.conexion_id).catch((e) => { registrarError("terminal-cobro", "DISPONIBLE", textoDeError(e)); return null; });
-      const lista = p?.prov ? await p.prov.lectorListo(disp.terminal_id_externo) : true;
-      return json({ ok: true, terminal: true, lista, proveedor: p?.nombre ?? null });
+      // Mercado Pago siempre está listo: no se lee Vault.
+      const p = await (async () => {
+        const nombre = await nombreDeConexion(disp.conexion_id);
+        if (nombre === "MERCADO_PAGO") return { nombre, lista: true };
+        const { prov } = await proveedorDeConexion(disp.conexion_id, nombre);
+        return { nombre, lista: prov ? await prov.lectorListo(disp.terminal_id_externo) : true };
+      })().catch((e) => { registrarError("terminal-cobro", "DISPONIBLE", textoDeError(e)); return null; });
+      return json({ ok: true, terminal: true, lista: p?.lista ?? true, proveedor: p?.nombre ?? null });
     }
 
     if (b.accion === "pendientes") {

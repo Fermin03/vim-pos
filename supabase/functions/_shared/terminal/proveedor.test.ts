@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { proveedorDe } from "./proveedor.ts";
+import { ESPERA_CLIP, proveedorDe } from "./proveedor.ts";
 
 type Llamada = { url: string; init: RequestInit };
 /** `pedir` falso: responde en orden lo que se le da (o lanza, para simular sin respuesta). */
@@ -131,6 +131,21 @@ test("Clip crear sin respuesta cancela por número de serie y no se reintenta", 
   assert.equal(f.llamadas.length, 2);
   assert.equal(f.llamadas[1].init.method, "DELETE");
   assert.equal(f.llamadas[1].url, "https://api.payclip.io/f2f/pinpad/v1/payment/serial-number/P82");
+});
+
+test("Clip crear sin respuesta y sin cancelación confirmada queda en REVISAR (reintentar podría cobrar dos veces)", async () => {
+  for (const cancelacion of [{ status: 500 }, "sin_respuesta"] as const) {
+    const f = falso("sin_respuesta", cancelacion);
+    const r = await proveedorDe("CLIP", CLIP, BASE, f.pedir)!.crear({ ...COBRO, terminal: "P82" });
+    assert.equal(f.llamadas.length, 2);
+    assert.equal(r.ok, true);
+    if (r.ok) assert.deepEqual([r.datos.estado, r.datos.detalle, r.datos.orden_id_externo, r.datos.pagado_mxn], ["REVISAR", "SIN_RESPUESTA", null, null]);
+  }
+});
+
+test("Clip: crear + cancelar por serie caben de sobra en los 25 s del puente de la caja", () => {
+  assert.ok(ESPERA_CLIP.crear + ESPERA_CLIP.cancelarPorSerie <= 20_000);
+  assert.ok(ESPERA_CLIP.lectores <= 5_000);
 });
 
 test("Clip crear: lector apagado, clave mala, o 200 sin id", async () => {

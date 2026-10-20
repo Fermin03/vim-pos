@@ -67,27 +67,37 @@ function mercadoPago(token: string, pedir: typeof fetch): Proveedor {
   };
 }
 
+/**
+ * Esperas de Clip (ms). El puente de la caja instalada corta terminal-cobro a los 25 s
+ * (desktop/src/gateway.mjs): crear + cancelar por serie tiene que caber de sobra, o la caja
+ * reintenta con otro id mientras el primero queda en REVISAR.
+ */
+export const ESPERA_CLIP = { crear: 10_000, cancelarPorSerie: 8_000, lectores: 5_000, resto: 15_000 };
+
 function clip(apiKey: string, secreto: string, base: string, pedir: typeof fetch): Proveedor {
-  const api = clienteClip(apiKey, secreto, pedir);
+  const con = (ms: number) => clienteClip(apiKey, secreto, pedir, ms);
+  const api = con(ESPERA_CLIP.resto);
   return {
     async crear(c) {
       // La espera no va por cobro: es el `timeout_seg` del lector, que se manda al guardar la configuración.
-      const r = await api.crearIntencion({
+      const r = await con(ESPERA_CLIP.crear).crearIntencion({
         cobroId: c.cobroId, monto: c.monto, serie: c.terminal, imprime: c.imprime,
         webhookUrl: `${base}/functions/v1/terminal-webhook-clip?c=${encodeURIComponent(c.cobroId)}`,
       });
       const datos = datosDeIntencion(r.cuerpo);
       // Sin respuesta no se sabe si Clip la recibió y no hay llave de idempotencia: se cancela lo que
-      // tenga el lector y el cobro se cierra, para que reintentar sea otro cobro con otro id.
+      // tenga el lector. Solo si Clip confirma la cancelación el cobro se cierra (reintentar = otro
+      // cobro con otro id). Si no, el lector quizá aún lo muestra y reintentar podría cobrar dos
+      // veces: queda en REVISAR y la caja pide mirar la terminal (y el PIN para darlo por bueno).
       // Un 200 sin `pinpad_request_id` tampoco se puede seguir: mismo trato. SIN VERIFICAR que ocurra.
       if (r.status === 0 || ((r.status === 200 || r.status === 201) && !datos.orden_id_externo)) {
-        await api.cancelarPorSerie(c.terminal);
-        if (r.status === 0) {
-          registrarError("terminal-cobro", "SIN_RESPUESTA", "Clip no contestó al crear");
-          return { ok: false, codigo: "SIN_RESPUESTA", sinRespuesta: true };
-        }
-        log("NO_SE_PUDO_CREAR", r);
-        return { ok: false, codigo: "NO_SE_PUDO_CREAR" };
+        const codigo = r.status === 0 ? "SIN_RESPUESTA" : "NO_SE_PUDO_CREAR";
+        if (r.status === 0) registrarError("terminal-cobro", codigo, "Clip no contestó al crear");
+        else log(codigo, r);
+        const x = await con(ESPERA_CLIP.cancelarPorSerie).cancelarPorSerie(c.terminal);
+        if (x.status >= 200 && x.status < 300) return { ok: false, codigo, ...(r.status === 0 ? { sinRespuesta: true } : {}) };
+        log("CANCELAR_POR_SERIE", x);
+        return { ok: true, datos: { ...datosDeIntencion(null), estado: "REVISAR", detalle: codigo } };
       }
       // La respuesta solo trae el id y la referencia: el cobro queda esperando en el lector.
       if (r.status === 200 || r.status === 201) return { ok: true, datos: { ...datos, estado: "EN_TERMINAL" } };
@@ -103,8 +113,9 @@ function clip(apiKey: string, secreto: string, base: string, pedir: typeof fetch
     },
     async cancelar(ordenId) {
       const r = await api.cancelar(ordenId);
-      // La documentación dice que el 200 es «Pago cancelado exitosamente». Si el cliente ya había
-      // pagado, aceptaCambio deja que el aviso o el respaldo lo pasen a APROBADO.
+      // SIN VERIFICAR con el lector: la documentación dice que el 200 es «Pago cancelado
+      // exitosamente». Si el cliente ya había pagado, aceptaCambio deja que el aviso o el respaldo
+      // lo pasen a APROBADO.
       if (r.status === 200) {
         return { cancelacion: "HECHA", datos: { ...datosDeIntencion(r.cuerpo), estado: "CANCELADO", detalle: "cancelado_desde_caja" } };
       }
@@ -121,7 +132,7 @@ function clip(apiKey: string, secreto: string, base: string, pedir: typeof fetch
     async lectorListo(terminal) {
       // Si la consulta falla, o el lector no sale en la lista, no se tapa la terminal por un
       // tropiezo: el error al crear lo dirá.
-      const r = await api.estadoLectores();
+      const r = await con(ESPERA_CLIP.lectores).estadoLectores();
       if (r.status !== 200) return true;
       const lector = lectoresDe(r.cuerpo).find((l) => l.serie === terminal);
       return lector ? lector.estado === "active" : true;
