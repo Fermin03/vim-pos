@@ -118,6 +118,7 @@ existía:
 | Pick-up | siempre | la lista de pedidos para recoger |
 | Domicilio | con el módulo, o mientras quede alguna cuenta abierta | la lista de domicilio, con repartidores |
 | En línea | si el negocio tiene tienda en línea o apps (Uber) | los pedidos en línea |
+| Barra | con el módulo de cuentas en barra, o mientras quede alguna abierta | la lista de cuentas de barra |
 | Cuentas de mesa | solo si queda alguna abierta | la lista para cobrarlas, sin abrir nuevas |
 
 - Si se venció un pedido en línea sin aceptar, arriba sale un aviso rojo («Se venció 1 pedido en línea sin
@@ -141,8 +142,8 @@ necesita mesas, cambia su giro a servicio completo.
 
 Igual que servicio rápido (pregunta siempre, «Comer aquí», comanda al cobrar, sin mesas), con la barra sin
 **Pedidos**. Lo que en los otros dos vive en Pedidos, en la cafetería vive en **Más**, en un grupo
-**«Pedidos»** arriba de todo: En espera, Para llevar abiertas, Pick-up, Domicilio, En línea y Cuentas de
-mesa, con las mismas reglas de cuándo aparece cada una y su número en el globo de la tarjeta. El aviso rojo
+**«Pedidos»** arriba de todo: En espera, Para llevar abiertas, Pick-up, Domicilio, En línea, Barra y
+Cuentas de mesa, con las mismas reglas de cuándo aparece cada una y su número en el globo de la tarjeta. El aviso rojo
 de pedidos en línea vencidos sale arriba de Más, y el globo de Pedidos se pinta sobre **Más**. Al salir de
 una lista se regresa a Más. Para un pedido nuevo para recoger, Pick-up › «Nueva orden».
 

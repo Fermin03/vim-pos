@@ -66,9 +66,9 @@ food truck tenían comedor y meseros como cualquier restaurante.
   Inventario · Transacciones · Notificaciones · Más** (Inventario solo con existencias). Es la sección de
   la tienda, sin cambios: alertas de existencias (con el módulo, que ahora se lee también fuera de
   Inventario para el globo) y avisos de VIM.
-- **Cuentas de barra (`cuentas_barra`):** la cafetería no las ofrece, como servicio rápido no ofrece mesas;
-  el módulo nace apagado para ella (0180). Pendiente conocido: una cuenta de barra (`BARRA`) que quedara
-  abierta no entra en «Cuentas de mesa» (que lista `MESA` y `COMER_AQUI`), igual que hoy en servicio rápido.
+- **Cuentas de barra (`cuentas_barra`):** sin pantalla de inicio, su lista se abre desde la tarjeta
+  **«Barra»** de Pedidos (en la cafetería, de Más), que sale con el módulo o mientras quede alguna cuenta de
+  barra abierta. Vale para los tres giros.
 
 ## Lo que aceptamos
 

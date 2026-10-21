@@ -106,6 +106,8 @@ import { MenuGeneral } from "./menu-general";
 import { ContenidoMenu } from "./contenido-menu";
 import { BarraTienda } from "./barra-tienda";
 import { AvisoVencidos, SeccionPedidos, tarjetasPedidos } from "./seccion-pedidos";
+import { useSoporte } from "../lib/soporte";
+import { enlaceWhatsapp } from "@vim/db/soporte";
 import { SeccionCalendario } from "./seccion-calendario";
 import { SeccionClientes } from "./seccion-clientes";
 import { ModalCita, type AbrirCita } from "./modal-cita";
@@ -675,6 +677,8 @@ export function HomePos({
   /** Cafetería: sin «Pedidos» en la barra, sus tarjetas van en «Más». */
   const pedidosEnMas = comidaRapida && seccionDePedidos(caja) === "configuracion";
   const conExistencias = moduloActivo(modulos, "existencias");
+  // El aviso de Inventario sin existencias nombra «Ayuda por WhatsApp» solo si Más la enseña (mismo criterio que ContenidoMenu).
+  const waSoporte = enlaceWhatsapp(useSoporte().soporte.whatsapp, "") != null;
   const [nCuentasMesa, setNCuentasMesa] = useState(0);
   // Sube al volver de una lista a «Pedidos»: los conteos se releen en ese momento, sin esperar al sondeo.
   const [pedidosVersion, setPedidosVersion] = useState(0);
@@ -3691,6 +3695,9 @@ export function HomePos({
               nDomicilio={nDomicilioPedidos}
               nEnLinea={nPedidosApps}
               nMesa={nCuentasMesa}
+              barra={moduloActivo(modulos, "cuentas_barra")}
+              nBarra={cuentasAbiertas.barra}
+              onBarra={() => setEnBarra(true)}
               onEnEspera={() => { setEsperaError(null); setEsperaListaAbierta(true); }}
               onParaLlevar={() => { setLlevarError(null); setLlevarListaAbierta(true); }}
               onPickup={() => setEnPickup(true)}
@@ -3746,6 +3753,7 @@ export function HomePos({
                   pedidos={pedidosEnMas ? tarjetasPedidos({
                     domicilio: moduloActivo(modulos, "domicilio"), enLinea: hayEnLinea,
                     nEnEspera, nParaLlevar: nAbiertasLlevar, nPickup: nPickupPedidos, nDomicilio: nDomicilioPedidos, nEnLinea: nPedidosApps, nMesa: nCuentasMesa,
+                    barra: moduloActivo(modulos, "cuentas_barra"), nBarra: cuentasAbiertas.barra, onBarra: () => setEnBarra(true),
                     onEnEspera: () => { setEsperaError(null); setEsperaListaAbierta(true); },
                     onParaLlevar: () => { setLlevarError(null); setLlevarListaAbierta(true); },
                     onPickup: () => setEnPickup(true),
@@ -3800,7 +3808,7 @@ export function HomePos({
               </div>
               <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
                 <p className="font-display text-18 font-semibold">Tu negocio no lleva existencias</p>
-                <p className="max-w-md text-15 text-ink-2">Para ver cuánto te queda de cada producto y recibir mercancía, pide que te las activemos desde Más › Ayuda por WhatsApp.</p>
+                <p className="max-w-md text-15 text-ink-2">Para ver cuánto te queda de cada producto y recibir mercancía, pide a VIM que te las active{waSoporte ? " desde Más › Ayuda por WhatsApp" : ""}.</p>
               </div>
             </div>
           ) : seccionTienda === "inventario" ? (

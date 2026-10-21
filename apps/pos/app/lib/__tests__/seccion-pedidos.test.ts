@@ -11,9 +11,9 @@ import type { DatosCaja } from "../turno";
 
 const nada = () => {};
 const base = {
-  domicilio: false, enLinea: false, expiradosEnLinea: 0,
-  nEnEspera: 0, nParaLlevar: 0, nPickup: 0, nDomicilio: 0, nEnLinea: 0, nMesa: 0,
-  onEnEspera: nada, onParaLlevar: nada, onPickup: nada, onDomicilio: nada, onEnLinea: nada, onMesa: nada,
+  domicilio: false, enLinea: false, barra: false, expiradosEnLinea: 0,
+  nEnEspera: 0, nParaLlevar: 0, nPickup: 0, nDomicilio: 0, nEnLinea: 0, nMesa: 0, nBarra: 0,
+  onEnEspera: nada, onParaLlevar: nada, onPickup: nada, onDomicilio: nada, onEnLinea: nada, onMesa: nada, onBarra: nada,
   onNuevoRecoger: nada, onNuevoDomicilio: nada,
 };
 const pintar = (p: Partial<typeof base> = {}) => renderToStaticMarkup(React.createElement(SeccionPedidos, { ...base, ...p }));
@@ -41,6 +41,12 @@ describe("sección Pedidos de comida rápida", () => {
   it("«Cuentas de mesa» solo si hay alguna abierta", () => {
     expect(tarjetas(pintar()).some((t) => t.startsWith("Cuentas de mesa"))).toBe(false);
     expect(tarjetas(pintar({ nMesa: 2 }))).toContain("Cuentas de mesa 2");
+  });
+
+  it("Barra con el módulo cuentas_barra, o mientras quede alguna cuenta de barra abierta", () => {
+    expect(tarjetas(pintar()).some((t) => t.startsWith("Barra"))).toBe(false);
+    expect(tarjetas(pintar({ barra: true }))).toContain("Barra 0");
+    expect(tarjetas(pintar({ nBarra: 2 }))).toContain("Barra 2");
   });
 
   it("«Nuevo a domicilio» solo con el módulo; «Nuevo para recoger» siempre", () => {

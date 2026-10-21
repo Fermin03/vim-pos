@@ -8,14 +8,16 @@ import { Button, Icono, type NombreIcono } from "@vim/ui/styles";
  * entra. «Nuevo para recoger» y «Nuevo a domicilio» abren la cuenta nueva de esas mismas pantallas.
  */
 export function SeccionPedidos({
-  domicilio, enLinea, expiradosEnLinea,
-  nEnEspera, nParaLlevar, nPickup, nDomicilio, nEnLinea, nMesa,
-  onEnEspera, onParaLlevar, onPickup, onDomicilio, onEnLinea, onMesa, onNuevoRecoger, onNuevoDomicilio,
+  domicilio, enLinea, barra, expiradosEnLinea,
+  nEnEspera, nParaLlevar, nPickup, nDomicilio, nEnLinea, nMesa, nBarra,
+  onEnEspera, onParaLlevar, onPickup, onDomicilio, onEnLinea, onMesa, onBarra, onNuevoRecoger, onNuevoDomicilio,
 }: {
   /** Módulo `domicilio`. Sin él, la tarjeta sigue mientras quede alguna cuenta suya abierta. */
   domicilio: boolean;
   /** Tienda en línea o apps de delivery encendidas. */
   enLinea: boolean;
+  /** Módulo `cuentas_barra`. Sin él, la tarjeta sigue mientras quede alguna cuenta de barra abierta. */
+  barra: boolean;
   /** Pedidos en línea vencidos sin aceptar que nadie ha visto (el aviso rojo del inicio). */
   expiradosEnLinea: number;
   nEnEspera: number;
@@ -25,16 +27,18 @@ export function SeccionPedidos({
   nEnLinea: number;
   /** Cuentas de comedor abiertas (de antes de pasar a comida rápida): solo se cobran, no se abren nuevas. */
   nMesa: number;
+  nBarra: number;
   onEnEspera: () => void;
   onParaLlevar: () => void;
   onPickup: () => void;
   onDomicilio: () => void;
   onEnLinea: () => void;
   onMesa: () => void;
+  onBarra: () => void;
   onNuevoRecoger: () => void;
   onNuevoDomicilio: () => void;
 }) {
-  const tarjetas = tarjetasPedidos({ domicilio, enLinea, nEnEspera, nParaLlevar, nPickup, nDomicilio, nEnLinea, nMesa, onEnEspera, onParaLlevar, onPickup, onDomicilio, onEnLinea, onMesa });
+  const tarjetas = tarjetasPedidos({ domicilio, enLinea, barra, nEnEspera, nParaLlevar, nPickup, nDomicilio, nEnLinea, nMesa, nBarra, onEnEspera, onParaLlevar, onPickup, onDomicilio, onEnLinea, onMesa, onBarra });
   return (
     <section aria-label="Pedidos" className="flex min-h-0 flex-1 flex-col bg-bg">
       <div className="flex flex-shrink-0 items-center gap-2 border-b border-line bg-surface px-4 py-3">
@@ -81,9 +85,9 @@ export type TarjetaPedidos = { etiqueta: string; icono: NombreIcono; n: number; 
 
 /** Las tarjetas de «Pedidos»; la cafetería, que no tiene esa sección, las pinta en «Más». */
 export function tarjetasPedidos(p: {
-  domicilio: boolean; enLinea: boolean;
-  nEnEspera: number; nParaLlevar: number; nPickup: number; nDomicilio: number; nEnLinea: number; nMesa: number;
-  onEnEspera: () => void; onParaLlevar: () => void; onPickup: () => void; onDomicilio: () => void; onEnLinea: () => void; onMesa: () => void;
+  domicilio: boolean; enLinea: boolean; barra: boolean;
+  nEnEspera: number; nParaLlevar: number; nPickup: number; nDomicilio: number; nEnLinea: number; nMesa: number; nBarra: number;
+  onEnEspera: () => void; onParaLlevar: () => void; onPickup: () => void; onDomicilio: () => void; onEnLinea: () => void; onMesa: () => void; onBarra: () => void;
 }): TarjetaPedidos[] {
   return [
     { etiqueta: "En espera", icono: "reloj", n: p.nEnEspera, onClick: p.onEnEspera },
@@ -91,6 +95,7 @@ export function tarjetasPedidos(p: {
     { etiqueta: "Pick-up", icono: "bolsa", n: p.nPickup, onClick: p.onPickup },
     ...(p.domicilio || p.nDomicilio > 0 ? [{ etiqueta: "Domicilio", icono: "moto" as const, n: p.nDomicilio, onClick: p.onDomicilio }] : []),
     ...(p.enLinea ? [{ etiqueta: "En línea", icono: "celular" as const, n: p.nEnLinea, onClick: p.onEnLinea }] : []),
+    ...(p.barra || p.nBarra > 0 ? [{ etiqueta: "Barra", icono: "vaso" as const, n: p.nBarra, onClick: p.onBarra }] : []),
     ...(p.nMesa > 0 ? [{ etiqueta: "Cuentas de mesa", icono: "mesa" as const, n: p.nMesa, onClick: p.onMesa }] : []),
   ];
 }
