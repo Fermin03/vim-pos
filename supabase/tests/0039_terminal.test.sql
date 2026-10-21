@@ -3,7 +3,7 @@
 -- tokens de Mercado Pago solo se alcanzan como service_role (viven en Vault).
 -- ============================================================================
 begin;
-select plan(10);
+select plan(17);
 
 \set t      '99999999-0000-0000-0000-0000000000aa'
 \set cajero '99999999-0000-0000-0000-000000000001'
@@ -26,12 +26,27 @@ select terminal_guardar_tokens(:'con', 'acc-2', 'ref-2', now() + interval '180 d
 select is((select access_token || '/' || refresh_token from terminal_leer_tokens(:'con')), 'acc-2/ref-2', 'renovar reemplaza los dos');
 select is((select count(*)::int from terminal_leer_tokens(:'con2') where access_token is not null), 0, 'otra conexión no trae los de esta');
 
+-- 0260) Clip: conexión CLIP, config sin coordenadas, porcentajes de propina, proveedor ajeno.
+select lives_ok(
+  format($$ insert into terminal_conexiones (tenant_id, proveedor, cuenta_id_externo) values (%L, 'CLIP', 'clip-1') $$, :'t'),
+  'se guarda una conexión de Clip');
+select throws_ok(
+  format($$ insert into terminal_conexiones (tenant_id, proveedor, cuenta_id_externo) values (%L, 'NETPAY', 'x') $$, :'t'),
+  '23514', null, 'un proveedor desconocido no entra');
+insert into terminal_config_sucursal (sucursal_id, tenant_id, conexion_id)
+select c.sucursal_id, :'t', :'con' from cajas c where c.tenant_id = :'t' limit 1;
+select lives_ok($$ update terminal_config_sucursal set propina_opciones = '{10,15,20}' $$, 'tres porcentajes pasan');
+select throws_ok($$ update terminal_config_sucursal set propina_opciones = '{10,15,20,25}' $$, '23514', null, 'cuatro porcentajes no');
+select throws_ok($$ update terminal_config_sucursal set propina_opciones = '{0}' $$, '23514', null, 'el 0 % no');
+select throws_ok($$ update terminal_config_sucursal set propina_opciones = '{10,NULL}' $$, '23514', null, 'un elemento NULL no');
+select throws_ok($$ update terminal_config_sucursal set propina_opciones = '{}' $$, '23514', null, 'la lista vacía no');
+
 -- Como el cajero.
 set local role authenticated;
 select set_config('request.jwt.claims', json_build_object('sub', :'cajero', 'role', 'authenticated', 'tenant_id', :'t')::text, true);
 
 -- 4-5) Ve lo de su negocio y no lo ajeno.
-select is((select count(*)::int from terminal_conexiones), 1, 'solo la conexión de su negocio');
+select is((select count(*)::int from terminal_conexiones), 2, 'solo las conexiones de su negocio');
 select is((select count(*)::int from terminal_cobros), 1, 'solo los cobros de su negocio');
 
 -- 6-8) No escribe nada.

@@ -6,10 +6,19 @@ const ID = "11111111-1111-4111-8111-111111111111";
 
 test("crear exige cobro, ticket y un monto válido", () => {
   const r = validarCuerpo({ accion: "crear", cobro_id: ID, ticket_id: ID, monto: "348", folio: "A-12" });
-  assert.deepEqual(r, { ok: true, cuerpo: { accion: "crear", cobro_id: ID, ticket_id: ID, folio: "A-12", monto: "348.00", caja_id: null, usuario_id: null } });
+  assert.deepEqual(r, { ok: true, cuerpo: { accion: "crear", cobro_id: ID, ticket_id: ID, folio: "A-12", monto: "348.00", caja_id: null, usuario_id: null, propina_en_lector: false } });
   assert.deepEqual(validarCuerpo({ accion: "crear", cobro_id: ID, ticket_id: ID, monto: "0" }), { ok: false, error: "MONTO_INVALIDO" });
   assert.deepEqual(validarCuerpo({ accion: "crear", cobro_id: ID, monto: "5" }), { ok: false, error: "TICKET_ID_INVALIDO" });
   assert.deepEqual(validarCuerpo({ accion: "crear", cobro_id: "x", ticket_id: ID, monto: "5" }), { ok: false, error: "COBRO_ID_INVALIDO" });
+});
+
+test("propina_en_lector solo con un true de verdad", () => {
+  const lector = (v: unknown) => {
+    const r = validarCuerpo({ accion: "crear", cobro_id: ID, ticket_id: ID, monto: "5", propina_en_lector: v });
+    return r.ok && r.cuerpo.accion === "crear" && r.cuerpo.propina_en_lector;
+  };
+  assert.equal(lector(true), true);
+  for (const v of [undefined, false, "true", 1, null]) assert.equal(lector(v), false, String(v));
 });
 
 test("un folio con algo que no es folio no viaja a Mercado Pago", () => {
