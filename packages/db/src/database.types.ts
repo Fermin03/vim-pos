@@ -3203,6 +3203,7 @@ export type Database = {
           pac_credenciales_encrypted: string | null
           pac_proveedor: string | null
           pantalla_cliente_segundos: number
+          pedir_nombre_cliente: boolean
           pie_ticket: string | null
           politica_cobro_cocina: string
           propina_permite_otro_monto: boolean
@@ -3212,6 +3213,7 @@ export type Database = {
           reimpresion_comanda_requiere_pin: boolean
           reimpresion_ticket_requiere_pin: boolean
           tenant_id: string
+          tiene_donde_comer: boolean
           umbral_sangria_sin_pin_mxn: number
           updated_at: string
           updated_by: string | null
@@ -3260,6 +3262,7 @@ export type Database = {
           pac_credenciales_encrypted?: string | null
           pac_proveedor?: string | null
           pantalla_cliente_segundos?: number
+          pedir_nombre_cliente?: boolean
           pie_ticket?: string | null
           politica_cobro_cocina?: string
           propina_permite_otro_monto?: boolean
@@ -3269,6 +3272,7 @@ export type Database = {
           reimpresion_comanda_requiere_pin?: boolean
           reimpresion_ticket_requiere_pin?: boolean
           tenant_id: string
+          tiene_donde_comer?: boolean
           umbral_sangria_sin_pin_mxn?: number
           updated_at?: string
           updated_by?: string | null
@@ -3317,6 +3321,7 @@ export type Database = {
           pac_credenciales_encrypted?: string | null
           pac_proveedor?: string | null
           pantalla_cliente_segundos?: number
+          pedir_nombre_cliente?: boolean
           pie_ticket?: string | null
           politica_cobro_cocina?: string
           propina_permite_otro_monto?: boolean
@@ -3326,6 +3331,7 @@ export type Database = {
           reimpresion_comanda_requiere_pin?: boolean
           reimpresion_ticket_requiere_pin?: boolean
           tenant_id?: string
+          tiene_donde_comer?: boolean
           umbral_sangria_sin_pin_mxn?: number
           updated_at?: string
           updated_by?: string | null
@@ -15601,6 +15607,7 @@ export type Database = {
           pac_credenciales_encrypted: string | null
           pac_proveedor: string | null
           pantalla_cliente_segundos: number
+          pedir_nombre_cliente: boolean
           pie_ticket: string | null
           politica_cobro_cocina: string
           propina_permite_otro_monto: boolean
@@ -15610,6 +15617,7 @@ export type Database = {
           reimpresion_comanda_requiere_pin: boolean
           reimpresion_ticket_requiere_pin: boolean
           tenant_id: string
+          tiene_donde_comer: boolean
           umbral_sangria_sin_pin_mxn: number
           updated_at: string
           updated_by: string | null

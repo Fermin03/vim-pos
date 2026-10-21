@@ -7,6 +7,7 @@ import { useModulos, usePerfil } from "../../../components/admin-shell";
 import { leerNegocio } from "../../../lib/configuracion";
 import { leerAyuda, type AyudaAdmin } from "../../../lib/soporte";
 import { conExistencias, mensajeCambiarModulos } from "../../../lib/operacion";
+import { casillasMostrador, guardarConfigMostrador, leerConfigMostrador, type ConfigMostrador } from "../../../lib/mostrador";
 
 /**
  * Lo que este negocio usa en VIM POS (ADR 0034). Solo se consulta: los módulos los ajusta VIM a
@@ -21,6 +22,19 @@ export default function OperacionPage() {
     leerNegocio().then((n) => setGiro(n?.vertical_principal ?? null)).catch(() => {});
     leerAyuda().then(setAyuda).catch(() => {});
   }, []);
+  const [mostrador, setMostrador] = useState<ConfigMostrador | null>(null);
+  const [errorMostrador, setErrorMostrador] = useState<string | null>(null);
+  const casillas = casillasMostrador(giro);
+  useEffect(() => {
+    if (casillas.nombre) leerConfigMostrador().then(setMostrador).catch(() => {});
+  }, [casillas.nombre]);
+  async function cambiarMostrador(c: Partial<ConfigMostrador>) {
+    if (!mostrador) return;
+    const antes = mostrador;
+    setMostrador({ ...mostrador, ...c });
+    setErrorMostrador(null);
+    try { await guardarConfigMostrador(c); } catch { setMostrador(antes); setErrorMostrador("No se pudo guardar. Intenta de nuevo."); }
+  }
   const efectivos = m && m !== "error" ? m.efectivos : null;
   const wa = ayuda
     ? enlaceWhatsapp(ayuda.soporte.whatsapp, mensajeCambiarModulos({ usuario: perfil?.nombre, negocio: ayuda.negocio, codigo: ayuda.codigo }))
@@ -52,6 +66,24 @@ export default function OperacionPage() {
                 );
               })}
             </ul>
+          )}
+          {casillas.nombre && (
+            <section className="mt-6">
+              <h2 className="mb-2 text-14 font-semibold text-ink">Mostrador</h2>
+              <div className="flex flex-col divide-y divide-line rounded-lg border border-line bg-surface">
+                <label className="flex min-h-[44px] items-center gap-3 p-4 text-14 text-ink">
+                  <input type="checkbox" className="h-4 w-4 accent-ink" disabled={!mostrador} checked={mostrador?.pedirNombre ?? false} onChange={(e) => cambiarMostrador({ pedirNombre: e.target.checked })} />
+                  Pedir el nombre del cliente al cobrar
+                </label>
+                {casillas.dondeComer && (
+                  <label className="flex min-h-[44px] items-center gap-3 p-4 text-14 text-ink">
+                    <input type="checkbox" className="h-4 w-4 accent-ink" disabled={!mostrador} checked={mostrador?.tieneDondeComer ?? false} onChange={(e) => cambiarMostrador({ tieneDondeComer: e.target.checked })} />
+                    Tiene dónde comer (pregunta «¿para llevar o para comer aquí?»)
+                  </label>
+                )}
+              </div>
+              {errorMostrador && <p role="alert" className="mt-2 text-13 text-danger">{errorMostrador}</p>}
+            </section>
           )}
           <p className="mt-4 text-13 text-ink-2">
             ¿Necesitas algo que está apagado o quieres quitar algo que no usas?{" "}

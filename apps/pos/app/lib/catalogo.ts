@@ -109,6 +109,16 @@ export async function leerComboUpsellActivo(token: string): Promise<boolean> {
   return (data as { combo_upsell_activo: boolean | null }).combo_upsell_activo !== false;
 }
 
+/**
+ * Mostrador de comida rápida (0242). Sin fila, con error o en una caja vieja sin las columnas
+ * se asume todo apagado: es el default de la base.
+ */
+export async function leerConfigMostrador(token: string): Promise<{ pedirNombre: boolean; tieneDondeComer: boolean }> {
+  const { data, error } = await employeeClient(token).from("configuracion_tenant").select("pedir_nombre_cliente, tiene_donde_comer").maybeSingle();
+  const f = (error ? null : data) as { pedir_nombre_cliente?: boolean | null; tiene_donde_comer?: boolean | null } | null;
+  return { pedirNombre: f?.pedir_nombre_cliente === true, tieneDondeComer: f?.tiene_donde_comer === true };
+}
+
 // Paleta de fallback si la categoría no tiene color asignado
 const PALETA_FALLBACK: Record<string, { bg: string; ink: string }> = {
   blue: { bg: "#E6ECF5", ink: "#2C5AA0" },
