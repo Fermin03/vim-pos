@@ -97,8 +97,9 @@ servir(async (req, json) => {
       if (!c) return json({ error: "CONEXION_NO_EXISTE" }, 404);
       const { data: s } = await admin.from("sucursales").select("id").eq("id", sucursalId).eq("tenant_id", tenantId).maybeSingle();
       if (!s) return json({ error: "SUCURSAL_NO_EXISTE" }, 404);
+      // La propina en el lector se enciende en la sección de Clip: no se hereda la de Mercado Pago.
       const { error } = await admin.from("terminal_config_sucursal").upsert(
-        { sucursal_id: sucursalId, tenant_id: tenantId, conexion_id: c.id }, { onConflict: "sucursal_id" });
+        { sucursal_id: sucursalId, tenant_id: tenantId, conexion_id: c.id, propina_en_terminal: false }, { onConflict: "sucursal_id" });
       if (error) throw error;
       // Si venía de otra cuenta (Mercado Pago), sus terminales dejan de recibir el cobro desde la caja.
       // La fila se queda (con su terminal) por si se regresa; la caja liga después su lector de Clip.

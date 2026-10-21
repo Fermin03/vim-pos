@@ -155,7 +155,7 @@ servir(async (req, json) => {
         const { prov } = await proveedorDeConexion(disp.conexion_id, nombre);
         return {
           nombre, lista: prov ? await prov.lectorListo(disp.terminal_id_externo) : true,
-          propina: propinasDelLector(nombre, await configDeSucursal(sucursalId)) !== null,
+          propina: propinasDelLector(nombre, await configDeSucursal(sucursalId).catch(() => null)) !== null,
         };
       })().catch((e) => { registrarError("terminal-cobro", "DISPONIBLE", textoDeError(e)); return null; });
       return json({ ok: true, terminal: true, lista: p?.lista ?? true, proveedor: p?.nombre ?? null, propina_en_lector: p?.propina ?? false });

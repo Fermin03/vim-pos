@@ -141,6 +141,9 @@ function metodoCfg(v: MetodoPago): MetodoConfig {
 
 type Vista = "propina" | "selector" | "efectivo" | "otro" | "dividido" | "atajo" | "terminal";
 
+/** Lo más que la propina espera a saber si el lector la pregunta; después sale la de VIM. */
+const ESPERA_LECTOR_MS = 4000;
+
 // ─── Tipos locales ───────────────────────────────────────────────────────────
 
 /** Pago dividido capturado. Su `clientId` se fija al agregarlo y viaja a `aplicar_pago` (B2-2). */
@@ -1084,11 +1087,12 @@ export function ModalCobro({
       .then((s) => {
         if (!activo) return;
         setSug(s);
-        if (!s.capturar) setVista(atajo ? "atajo" : "selector"); // sucursal sin propina → salta el paso
+        if (!s.capturar) { setTrasPropina(null); setVista(atajo ? "atajo" : "selector"); } // sucursal sin propina → salta el paso
       })
       .catch(() => {
         if (!activo) return;
         setSug({ porcentajes: [10, 15, 20], capturar: false, libre: true, sin: true });
+        setTrasPropina(null);
         setVista(atajo ? "atajo" : "selector");
       });
     return () => { activo = false; };
@@ -1202,7 +1206,8 @@ export function ModalCobro({
   const conTerminal = terminal.hay;
   // El cobro va al lector con la propina por elegir solo si VIM no tiene ya una (ni de esta vez ni
   // guardada en el ticket): nunca dos propinas.
-  const propinaEnLector = terminal.propina_en_lector && propina === 0 && !((totales.propina ?? 0) > 0);
+  // Si VIM ya la preguntó (aunque fuera «sin propina»), el lector no la vuelve a preguntar.
+  const propinaEnLector = terminal.propina_en_lector && propina === 0 && !propinaPreguntada && !((totales.propina ?? 0) > 0);
 
   /** Vuelve a preguntar por el lector (la cajera lo encendió con el cobro abierto); true si ya puede cobrar. */
   async function revisarTerminal(): Promise<boolean> {
@@ -1254,8 +1259,14 @@ export function ModalCobro({
   // (la caja se apagó o perdió la red a medio cobro), se registra ahora.
   useEffect(() => {
     let activo = true;
+    // «Cargando…» tiene tope: con la red atorada, a los 4 s sale la propina de VIM de siempre (y
+    // la respuesta tardía ya no cambia la pantalla). Solo si el lector preguntaba la propina.
+    let vencio = false;
+    const tope = recuerdo.current === "2" && !atajo
+      ? setTimeout(() => { vencio = true; setTerminalSabida(true); }, ESPERA_LECTOR_MS) : undefined;
     (async () => {
       const t = await terminalDeCaja(token, cajaId);
+      clearTimeout(tope);
       const tiene = t.hay;
       if (!activo) return;
       setTerminal(t);
@@ -1264,7 +1275,7 @@ export function ModalCobro({
       // Con lector listo que pregunta la propina, el cobro abre en el selector (solo si la propina
       // de VIM aún esperaba ese dato: no se le quita la pantalla a la cajera). Una propina que ya
       // estaba en el ticket se respeta: entra al «a cobrar» y el lector no pregunta otra.
-      if (recuerdo.current === "2" && !atajo && t.hay && t.lista && t.propina_en_lector) {
+      if (!vencio && recuerdo.current === "2" && !atajo && t.hay && t.lista && t.propina_en_lector) {
         setPropinaAlElegir(true);
         setPropina(totales.propina ?? 0);
         setVista((v) => (v === "propina" ? "selector" : v));
@@ -1274,7 +1285,7 @@ export function ModalCobro({
       const suyo = r?.cobros?.find((c) => c.ticket_id === totales.ticketId);
       if (activo && suyo) void aplicarCobroTerminal(suyo);
     })();
-    return () => { activo = false; };
+    return () => { activo = false; clearTimeout(tope); };
     // Solo al abrir el cobro.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
