@@ -24,8 +24,8 @@ type Vista =
       tocalo: boolean;
       /** El ancla está debajo de otro modal: sin oscurecer, el globo se va a la esquina. */
       tapado: boolean;
-      /** Se ilumina el botón para regresar al inicio; esta es la instrucción. */
-      regreso?: string;
+      /** Lo que se ilumina no es el ancla (regresar al inicio, o la segunda mitad del paso): esta es la instrucción. */
+      instruccion?: string;
     };
 
 const TOTAL = 17;
@@ -137,9 +137,13 @@ export function Guia({ fin }: { fin?: ReactNode }) {
         ? REGRESO_AL_INICIO.flatMap((r) => [...document.querySelectorAll(r.ancla)].map((el) => ({ ...r, el }))).find((r) => seVe(r.el))
         : undefined;
       if (regreso?.el) {
-        return setVista({ tipo: "paso", i, paso, rect: regreso.el.getBoundingClientRect(), tocalo: true, tapado: false, regreso: regreso.texto });
+        return setVista({ tipo: "paso", i, paso, rect: regreso.el.getBoundingClientRect(), tocalo: true, tapado: false, instruccion: regreso.texto });
       }
       return setVista({ tipo: "paso", i, paso, rect: null, tocalo: false, tapado: false });
+    }
+    const luego = paso.luego?.cuando(document) ? document.querySelector(paso.luego.ancla) : null;
+    if (luego && paso.luego) {
+      return setVista({ tipo: "paso", i, paso, rect: luego.getBoundingClientRect(), tocalo: true, tapado: false, instruccion: paso.luego.texto });
     }
     const ancla = document.querySelector(paso.ancla);
     const el = ancla ?? document.querySelector(paso.abrir ?? paso.ancla);
@@ -232,7 +236,7 @@ export function Guia({ fin }: { fin?: ReactNode }) {
     );
   }
 
-  const { i, paso, rect, tocalo, tapado, regreso } = vista;
+  const { i, paso, rect, tocalo, tapado, instruccion } = vista;
   const conRecuadro = rect && !tapado;
   const ancho = Math.min(340, window.innerWidth - MARGEN * 2);
   const alto = globo.current?.offsetHeight ?? 200;
@@ -271,7 +275,7 @@ export function Guia({ fin }: { fin?: ReactNode }) {
         </h2>
         <p className="text-14 leading-snug text-ink-2">{paso.texto}</p>
         {pideRegresar && <p className="text-13 font-semibold text-ink">Regresa {regresaA} para seguir con la guía.</p>}
-        {regreso && <p className="text-13 font-semibold text-ink">{regreso}</p>}
+        {instruccion && <p className="text-13 font-semibold text-ink">{instruccion}</p>}
         {/* Dos botones y «Salir» no caben en un renglón de 340 px: los del paso 12 van arriba. */}
         {paso.numero === 12 && (
           <div className="mt-1 flex gap-2">

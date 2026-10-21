@@ -145,6 +145,17 @@ describe("guía «Hazlo tú»", () => {
     expect(puntoDeRetorno(PASOS, 9)).toBe(9);
   });
 
+  it("paso 15: con el efectivo escrito, pasa a señalar Generar corte", () => {
+    const p15 = PASOS.find((p) => p.numero === 15)!;
+    const conValor = (value: string): Raiz => ({
+      querySelector: ((s: string) => (s.endsWith(" input") ? ({ value } as HTMLInputElement) : null)) as Raiz["querySelector"],
+      querySelectorAll: (() => ({ length: 0 })) as unknown as Raiz["querySelectorAll"],
+    });
+    expect(p15.luego?.cuando(conValor(""))).toBe(false);
+    expect(p15.luego?.cuando(conValor("644"))).toBe(true);
+    expect(p15.luego?.ancla).toBe(t("generar-corte"));
+  });
+
   it("slugTour: minúsculas y espacios a guiones", () => {
     expect(slugTour("Refresco 600 ml")).toBe("refresco-600-ml");
     expect(slugTour("Crazy Clásica")).toBe("crazy-clásica");

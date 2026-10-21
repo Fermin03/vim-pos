@@ -17,6 +17,8 @@ export type Paso = {
   tipo: "hazlo" | "explica"; // "explica" lleva botón Entendido
   /** Si falta `ancla`, se ilumina este selector con «Tócalo» (lo que hay que tocar para llegar). */
   abrir?: string;
+  /** Segunda mitad del paso: cuando `cuando` se cumple, se ilumina `ancla` con «Tócalo» y esta instrucción. */
+  luego?: { cuando: (r: Raiz) => boolean; ancla: string; texto: string };
   listo: (r: Raiz) => boolean;
 };
 /** Paso 12, «Hacer otra venta»: primero espera a que cierre el cobro de la venta guiada y luego al siguiente. */
@@ -132,7 +134,12 @@ export const PASOS: Paso[] = [
   {
     numero: 15, etapa: "Cerrar turno", tipo: "hazlo", ancla: t("conteo-efectivo"),
     titulo: "Cuenta $20 de menos",
-    texto: "Escribe en Efectivo el fondo más lo que cobraste en efectivo, pero con $20 menos, a propósito. Llena lo de tarjeta y toca Generar corte.",
+    texto: "Escribe en Efectivo el fondo más lo que cobraste en efectivo, pero con $20 menos, a propósito. Si cobraste con tarjeta, llena lo de tarjeta.",
+    luego: {
+      cuando: (r) => !!(r.querySelector(`${t("conteo-efectivo")} input`) as HTMLInputElement | null)?.value,
+      ancla: t("generar-corte"),
+      texto: "Cuando termines de contar, toca Generar corte.",
+    },
     listo: (r) => hay(r, t("corte")),
   },
   {

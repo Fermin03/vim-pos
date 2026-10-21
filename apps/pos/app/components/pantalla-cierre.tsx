@@ -523,7 +523,7 @@ export function PantallaCierre({
                   Este turno ya tiene un conteo registrado. Contar de nuevo pide autorización de un supervisor.
                 </p>
               )}
-              <Button className="w-full" onClick={() => void generarCorte()} disabled={!puedeGenerar || procesando}>
+              <Button data-tour="generar-corte" className="w-full" onClick={() => void generarCorte()} disabled={!puedeGenerar || procesando}>
                 {procesando ? "Generando…" : necesitaAutorizacion ? "Autorizar y generar corte" : "Generar corte"}
               </Button>
             </div>
