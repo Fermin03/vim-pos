@@ -162,6 +162,18 @@ export function puntoDeRetorno(pasos: Paso[], indice: number): number {
   return 0;
 }
 
+/** Los pasos del monitor y del cierre se hacen desde el inicio, no desde la venta. */
+export const esDelInicio = (p: Paso) => p.etapa === "Monitor de ventas" || p.etapa === "Cerrar turno";
+
+/**
+ * Qué tocar para regresar al inicio, en orden: con el ticket del cobro en pantalla primero hay que
+ * cerrarlo; luego, el «Volver» que comparten todas las pantallas.
+ */
+export const REGRESO_AL_INICIO = [
+  { ancla: t("nuevo-ticket"), texto: "Toca Nuevo ticket y luego Volver para regresar al inicio." },
+  { ancla: t("volver"), texto: "Toca Volver para regresar al inicio." },
+];
+
 /** "perdida" si en pantalla no está ni el ancla ni lo que la abre: la persona se fue a otra parte. */
 export function estadoDelPaso(p: Paso, r: Raiz): "visible" | "perdida" {
   return hay(r, p.ancla) || (p.abrir !== undefined && hay(r, p.abrir)) ? "visible" : "perdida";

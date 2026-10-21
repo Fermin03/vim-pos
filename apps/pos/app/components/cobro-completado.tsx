@@ -122,6 +122,7 @@ export function CobroCompletado({
           </button>
           <button
             type="button"
+            data-tour="nuevo-ticket"
             onClick={onNuevoTicket}
             className="h-14 min-w-0 flex-1 rounded-lg bg-accent font-display text-18 font-bold text-white transition-[transform,background-color] duration-150 ease-vim hover:bg-accent-hover active:scale-[.98]"
           >

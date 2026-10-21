@@ -76,7 +76,7 @@ export function ReciboPreview({
           <div className="flex gap-2">
             <button type="button" onClick={() => onImprimir(enCocina ? "cocina" : "cliente")} className="rounded border border-white/40 px-3 py-1.5 text-13 font-semibold text-white hover:bg-white/10">Imprimir</button>
             {onNuevoTicket ? (
-              <button type="button" onClick={onNuevoTicket} className="rounded bg-accent px-3 py-1.5 text-13 font-semibold text-white hover:bg-accent-hover">Nuevo ticket</button>
+              <button type="button" data-tour="nuevo-ticket" onClick={onNuevoTicket} className="rounded bg-accent px-3 py-1.5 text-13 font-semibold text-white hover:bg-accent-hover">Nuevo ticket</button>
             ) : (
               <button type="button" onClick={onCerrar} className="rounded bg-white px-3 py-1.5 text-13 font-semibold text-ink hover:bg-hover">{etiquetaCerrar}</button>
             )}

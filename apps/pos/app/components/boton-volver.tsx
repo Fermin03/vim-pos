@@ -15,6 +15,7 @@ export function BotonVolver({ onClick, etiqueta = "Volver" }: { onClick: () => v
   return (
     <button
       type="button"
+      data-tour="volver"
       onClick={onClick}
       className="flex h-10 flex-shrink-0 items-center gap-2 rounded border border-line-strong px-3 text-14 font-semibold text-ink transition hover:border-ink hover:bg-hover"
     >

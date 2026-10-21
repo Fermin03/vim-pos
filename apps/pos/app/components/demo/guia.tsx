@@ -2,7 +2,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@vim/ui/styles";
 import { LLAVE_GUIA } from "../../lib/demo";
-import { PASOS, estadoDelPaso, pasoActual, puntoDeRetorno, seguirPausa, type Pausa, type Paso } from "../../lib/demo-guia";
+import {
+  PASOS, REGRESO_AL_INICIO, esDelInicio, estadoDelPaso, pasoActual, puntoDeRetorno, seguirPausa, type Pausa, type Paso,
+} from "../../lib/demo-guia";
 import { deviceClient, deviceSignOut } from "../../lib/supabase";
 
 type Guardado = { activa: boolean; indice: number; pausa?: Pausa };
@@ -22,6 +24,8 @@ type Vista =
       tocalo: boolean;
       /** El ancla está debajo de otro modal: sin oscurecer, el globo se va a la esquina. */
       tapado: boolean;
+      /** Se ilumina el botón para regresar al inicio; esta es la instrucción. */
+      regreso?: string;
     };
 
 const TOTAL = 17;
@@ -122,6 +126,19 @@ export function Guia({ fin }: { fin?: ReactNode }) {
     if (!paso) return setVista({ tipo: "fin" });
 
     if (estadoDelPaso(paso, document) === "perdida") {
+      // «Regresa al inicio» solo no basta: se ilumina el botón que lleva ahí.
+      // El primero que se vea: con el ticket del cobro encima, el «Nuevo ticket ahora» de abajo está tapado.
+      const seVe = (el: Element) => {
+        const r = el.getBoundingClientRect();
+        const arriba = document.elementsFromPoint(r.left + r.width / 2, r.top + r.height / 2).find((x) => !raiz.current?.contains(x) && !globo.current?.contains(x));
+        return !!arriba && el.contains(arriba);
+      };
+      const regreso = esDelInicio(paso)
+        ? REGRESO_AL_INICIO.flatMap((r) => [...document.querySelectorAll(r.ancla)].map((el) => ({ ...r, el }))).find((r) => seVe(r.el))
+        : undefined;
+      if (regreso?.el) {
+        return setVista({ tipo: "paso", i, paso, rect: regreso.el.getBoundingClientRect(), tocalo: true, tapado: false, regreso: regreso.texto });
+      }
       return setVista({ tipo: "paso", i, paso, rect: null, tocalo: false, tapado: false });
     }
     const ancla = document.querySelector(paso.ancla);
@@ -215,14 +232,14 @@ export function Guia({ fin }: { fin?: ReactNode }) {
     );
   }
 
-  const { i, paso, rect, tocalo, tapado } = vista;
+  const { i, paso, rect, tocalo, tapado, regreso } = vista;
   const conRecuadro = rect && !tapado;
   const ancho = Math.min(340, window.innerWidth - MARGEN * 2);
   const alto = globo.current?.offsetHeight ?? 200;
   const lugar = lugarDelGlobo(conRecuadro ? rect : null, ancho, alto, raiz.current);
   // Solo lo que pide una acción tiene a dónde regresar; una explicación se lee donde esté.
   const pideRegresar = !rect && (paso.tipo === "hazlo" || paso.abrir !== undefined);
-  const regresaA = paso.etapa === "Monitor de ventas" || paso.etapa === "Cerrar turno" ? "al inicio" : "a la pantalla de venta";
+  const regresaA = esDelInicio(paso) ? "al inicio" : "a la pantalla de venta";
 
   return (
     <div ref={raiz} className="pointer-events-none fixed inset-0 z-[100]">
@@ -254,6 +271,7 @@ export function Guia({ fin }: { fin?: ReactNode }) {
         </h2>
         <p className="text-14 leading-snug text-ink-2">{paso.texto}</p>
         {pideRegresar && <p className="text-13 font-semibold text-ink">Regresa {regresaA} para seguir con la guía.</p>}
+        {regreso && <p className="text-13 font-semibold text-ink">{regreso}</p>}
         {/* Dos botones y «Salir» no caben en un renglón de 340 px: los del paso 12 van arriba. */}
         {paso.numero === 12 && (
           <div className="mt-1 flex gap-2">
