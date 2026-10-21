@@ -90,6 +90,23 @@ export async function leerEstadoOnboarding(): Promise<EstadoOnboarding> {
   };
 }
 
+/**
+ * ¿El inicio enseña los pasos? Mientras el negocio no esté en operación (la misma regla de fase que
+ * el aviso de antes) y solo a quien puede hacerlos: todos llevan a páginas de jerarquía 4.
+ */
+export function debeMostrarPasos(fase: OnboardingFase, jerarquia: number | null): boolean {
+  return fase !== "GO_LIVE" && jerarquia !== null && jerarquia >= 4;
+}
+
+/** Lo que pinta el bloque de pasos. Solo un paso opcional se puede ignorar. */
+export function resumenPasos(e: EstadoOnboarding, ignorados: ReadonlySet<string>): { visibles: PasoOnboarding[]; siguiente: string | null; listo: boolean } {
+  return {
+    visibles: e.pasos.filter((p) => !(p.opcional && ignorados.has(p.clave))),
+    siguiente: e.pasos.find((p) => !p.completo && !p.opcional)?.clave ?? null,
+    listo: e.listoParaVender,
+  };
+}
+
 /** Avanza la fase de onboarding (INVITADO → EN_CONFIGURACION → GO_LIVE) vía RPC. */
 export async function actualizarFase(fase: OnboardingFase, faseWizard?: number): Promise<void> {
   const { error } = await supabase.rpc("onboarding_actualizar_fase", {

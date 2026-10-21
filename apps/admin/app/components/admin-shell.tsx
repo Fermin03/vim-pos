@@ -1,6 +1,6 @@
 "use client";
-import { LogoVim, Icono, type NombreIcono } from "@vim/ui/styles";
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { LogoVim, Icono } from "@vim/ui/styles";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { leerSesion } from "../lib/supabase";
@@ -12,8 +12,13 @@ import { leerAcceso, ACCESO_OK, type Acceso } from "../lib/acceso-tenant";
 import { enlaceWhatsapp, mensajeAyudaAdmin, SOPORTE_POR_DEFECTO, textoHorario } from "@vim/db/soporte";
 import { leerAyuda, type AyudaAdmin } from "../lib/soporte";
 import { leerModulos } from "../lib/modulos";
-import { filtrarSecciones, rutasOcultas } from "../lib/operacion";
+import { rutasOcultas } from "../lib/operacion";
 import { estadoInventario, rutaEsDeInventario, type ModulosLeidos } from "../lib/inventario-plan";
+import { estadoTienda } from "../lib/tienda-plan";
+import { leerReportesDisponibles, type ReportesDisponibles } from "../lib/reportes";
+import { idsGruposVisibles } from "../lib/reportes-grupos";
+import { MENU, filtrarMenu } from "../lib/menu-admin";
+import { MenuLateral } from "./menu-lateral";
 
 const PerfilCtx = createContext<Perfil | null>(null);
 export const usePerfil = () => useContext(PerfilCtx);
@@ -29,35 +34,6 @@ export const useAccesoTenant = () => useContext(AccesoCtx);
  */
 const ModulosCtx = createContext<ModulosLeidos | "error" | null>(null);
 export const useModulos = () => useContext(ModulosCtx);
-
-type Item = { label: string; href: string; icon: NombreIcono };
-type Seccion = { titulo: string; items: Item[] };
-
-const NAV: Seccion[] = [
-  {
-    titulo: "Operación",
-    items: [
-      { label: "Panel", href: "/dashboard", icon: "panel" },
-      { label: "Catálogo", href: "/catalogo", icon: "catalogo" },
-      { label: "Promociones", href: "/promociones", icon: "etiqueta" },
-      { label: "Inventario", href: "/inventario", icon: "caja" },
-      { label: "Clientes", href: "/clientes", icon: "persona" },
-      { label: "Lealtad", href: "/lealtad", icon: "estrella" },
-      { label: "Tienda en línea", href: "/tienda", icon: "bolsa" },
-      { label: "Reservaciones", href: "/reservaciones", icon: "calendario" },
-      { label: "Conciliación apps", href: "/conciliacion", icon: "transferencia" },
-    ],
-  },
-  {
-    titulo: "Administración",
-    items: [
-      { label: "Usuarios", href: "/usuarios", icon: "persona" },
-      { label: "Facturación", href: "/facturacion", icon: "recibo" },
-      { label: "Configuración", href: "/configuracion", icon: "engrane" },
-      { label: "Reportes", href: "/reportes", icon: "grafica" },
-    ],
-  },
-];
 
 /** Lo que ve quien llega a una sección que su rol no alcanza. */
 function SinAcceso({ rol }: { rol: string }) {
@@ -93,6 +69,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [ayuda, setAyuda] = useState<AyudaAdmin>({ soporte: SOPORTE_POR_DEFECTO, negocio: null, codigo: null });
   // Módulos que el plan (o una excepción de VIM) le permite. Hoy lo usa Inventario (0148).
   const [modulos, setModulos] = useState<ModulosLeidos | "error" | null>(null);
+  // Qué grupos de reportes enseña el índice: el submenú de Informes enseña los mismos.
+  const [reportes, setReportes] = useState<ReportesDisponibles | null>(null);
   // Cajón lateral: solo existe por debajo de `lg`. En escritorio el <aside> es estático.
   const [menuAbierto, setMenuAbierto] = useState(false);
 
@@ -142,6 +120,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
       setListo(true);
       leerAyuda().then(setAyuda).catch(() => {});
       leerModulos().then(setModulos).catch(() => setModulos("error"));
+      leerReportesDisponibles().then(setReportes).catch(() => {});
       // El selector del sidebar muestra la sucursal real del tenant (antes decía "León Centro"
       // fijo, que es el dato del mockup: cualquier cliente nuevo veía el nombre equivocado).
       listarSucursales()
@@ -153,6 +132,23 @@ export function AdminShell({ children }: { children: ReactNode }) {
         .catch(() => {});
     })();
   }, [router]);
+
+  // El menú filtrado se recalcula solo cuando cambia lo que lo decide: si no, el acordeón se
+  // reiniciaría en cada render.
+  const jerMenu = perfil?.jerarquia ?? null;
+  const menu = useMemo(() => {
+    const ocultas = new Set(rutasOcultas(modulos));
+    // Sin el add-on concedido (ADR 0014) se esconde la conexión, no la conciliación. Mientras carga
+    // también: esconder de más es recuperable (misma regla que tenía Configuración).
+    if (!(modulos !== null && modulos !== "error" && modulos.permitidos.delivery_apps === true)) ocultas.add("/configuracion/integraciones");
+    const tienda = estadoTienda(modulos);
+    return filtrarMenu(MENU, {
+      jerarquia: jerMenu,
+      ocultas,
+      tiendaContratada: tienda === "cargando" ? null : tienda !== "sin_contratar",
+      gruposInformes: reportes ? idsGruposVisibles(reportes, jerMenu) : null,
+    });
+  }, [modulos, reportes, jerMenu]);
 
   if (listo && sinAcceso && altaIncompleta) {
     // Sin tenant la RPC de soporte no devuelve nada: va el número oficial de fábrica.
@@ -257,7 +253,6 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const horarioAyuda = textoHorario(ayuda.soporte);
   // Inventario sigue en el menú aunque el plan no lo incluya: se marca, no se esconde (0148).
   const sinInventario = estadoInventario(modulos) === "no_incluido";
-  const navVisible = filtrarSecciones(NAV, rutasOcultas(modulos));
 
   return (
     <PerfilCtx.Provider value={perfil}>
@@ -297,55 +292,22 @@ export function AdminShell({ children }: { children: ReactNode }) {
             </button>
           </div>
 
-          <div className="mx-3 mb-2 mt-4 flex items-center gap-2.5 rounded border border-[#2C2C32] bg-[#1E1E23] px-3 py-2.5">
+          {/* El negocio arriba, como en Square. Solo texto: la sucursal se elige en cada página. */}
+          <div className="mx-3 mt-4 flex items-center gap-2.5 rounded border border-[#2C2C32] bg-[#1E1E23] px-3 py-2.5">
             <div className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-md bg-[#2A2A30]">
               <Icono nombre="edificio" className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-14 font-semibold text-white">{sucursales?.nombre ?? "—"}</div>
-              <div className="mt-px text-12 text-[#76767E]">
-                {sucursales ? `1 de ${sucursales.total} ${sucursales.total === 1 ? "sucursal" : "sucursales"}` : "Cargando…"}
+              <div className="truncate text-14 font-semibold text-white">{ayuda.negocio ?? sucursales?.nombre ?? "—"}</div>
+              <div className="mt-px truncate text-12 text-[#76767E]">
+                {sucursales
+                  ? `${ayuda.negocio ? `${sucursales.nombre} · ` : ""}1 de ${sucursales.total} ${sucursales.total === 1 ? "sucursal" : "sucursales"}`
+                  : "Cargando…"}
               </div>
             </div>
           </div>
 
-          <nav className="flex flex-1 flex-col gap-px overflow-y-auto px-3 pb-4 pt-3">
-            {navVisible.map((sec) => {
-              const items = sec.items.filter((it) => puedeVer(jer, it.href));
-              if (items.length === 0) return null;
-              return (
-                <div key={sec.titulo} className="contents">
-                  <div className="px-3 pb-2 pt-4 text-11 font-bold uppercase tracking-[0.07em] text-[#76767E] first:pt-2">
-                    {sec.titulo}
-                  </div>
-                  {items.map((it) => {
-                    const active = pathname === it.href || pathname.startsWith(it.href + "/");
-                    return (
-                      <Link
-                        key={it.href}
-                        href={it.href}
-                        aria-current={active ? "page" : undefined}
-                        className={[
-                          "flex min-h-[44px] items-center gap-[11px] rounded px-3 py-[9px] text-sm font-medium transition-colors lg:min-h-0 [&_svg]:h-[18px] [&_svg]:w-[18px] [&_svg]:flex-shrink-0 [&_svg]:stroke-current",
-                          active
-                            ? "bg-white font-semibold text-ink"
-                            : "text-[#C8C8CC] hover:bg-[#1E1E23] hover:text-white",
-                        ].join(" ")}
-                      >
-                        <Icono nombre={it.icon} />
-                        {it.label}
-                        {sinInventario && rutaEsDeInventario(it.href) && (
-                          <span className={["ml-auto rounded-full border px-1.5 py-px text-11 font-semibold", active ? "border-line-strong text-ink-2" : "border-[#3A3A42] text-[#9A9AA2]"].join(" ")}>
-                            Plan Negocio
-                          </span>
-                        )}
-                      </Link>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </nav>
+          <MenuLateral menu={menu} pathname={pathname} marcaPlan={(href) => sinInventario && rutaEsDeInventario(href)} alNavegar={() => setMenuAbierto(false)} />
 
           {/* Ayuda por WhatsApp (0142): fuera de las secciones porque no es una pantalla, y a la
               vista en el cajón del celular igual que en el escritorio. Abre en otra pestaña. */}
