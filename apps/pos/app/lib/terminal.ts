@@ -12,21 +12,27 @@ export type CobroTerminal = {
   id: string; ticket_id: string; monto_mxn: number; estado: EstadoCobro; detalle: string | null;
   tipo_tarjeta: string | null; marca: string | null; referencia: string | null; aplicado_at: string | null;
   tarjeta_ultimos4?: string | null;
+  /** La propina que el cliente eligió en el lector (Clip), aparte de `monto_mxn`. */
+  propina_mxn?: number | string | null;
 };
 
 export type ProveedorTerminal = "MERCADO_PAGO" | "CLIP";
-/** `lista`: el lector puede recibir el cobro ahora (Clip lo pregunta; Mercado Pago siempre lo está). */
-export type TerminalCaja = { hay: boolean; lista: boolean; proveedor: ProveedorTerminal | null };
+/**
+ * `lista`: el lector puede recibir el cobro ahora (Clip lo pregunta; Mercado Pago siempre lo está).
+ * `propina_en_lector`: el lector de Clip le pregunta la propina al cliente (Mercado Pago, nunca).
+ */
+export type TerminalCaja = { hay: boolean; lista: boolean; proveedor: ProveedorTerminal | null; propina_en_lector: boolean };
 
 type Peticion =
   | { accion: "disponible" | "pendientes" }
-  | { accion: "crear"; cobro_id: string; ticket_id: string; folio: string | null; monto: string }
+  | { accion: "crear"; cobro_id: string; ticket_id: string; folio: string | null; monto: string; propina_en_lector?: boolean }
   | { accion: "estado" | "cancelar"; cobro_id: string }
   | { accion: "confirmar"; cobro_id: string; autorizo_id?: string }
   | { accion: "reembolsar"; ticket_id: string };
 
 type Respuesta = {
-  ok?: boolean; error?: string; terminal?: boolean; lista?: boolean; proveedor?: unknown; cobro?: CobroTerminal; cobros?: CobroTerminal[];
+  ok?: boolean; error?: string; terminal?: boolean; lista?: boolean; proveedor?: unknown; propina_en_lector?: boolean;
+  cobro?: CobroTerminal; cobros?: CobroTerminal[];
   cancelacion?: "HECHA" | "PEDIDA" | "FALLO";
   /** De `reembolsar`: cuántos pagos de ese ticket pasaron por la terminal y cuánto regresó. */
   n_cobros?: number; devuelto_mxn?: string;
@@ -56,8 +62,9 @@ export async function terminalDeCaja(token: string, cajaId: string): Promise<Ter
     .then((r): TerminalCaja => ({
       hay: r.terminal === true, lista: r.lista !== false,
       proveedor: r.proveedor === "CLIP" || r.proveedor === "MERCADO_PAGO" ? r.proveedor : null,
+      propina_en_lector: r.terminal === true && r.proveedor === "CLIP" && r.propina_en_lector === true,
     }))
-    .catch(() => ({ hay: false, lista: false, proveedor: null }));
+    .catch(() => ({ hay: false, lista: false, proveedor: null, propina_en_lector: false }));
 }
 
 const MARCAS: Record<string, string> = {
@@ -73,13 +80,22 @@ export function etiquetaTarjeta(c: Pick<CobroTerminal, "marca" | "tarjeta_ultimo
   return `${MARCAS[c.marca ?? ""] ?? "Tarjeta"} **** ${c.tarjeta_ultimos4}`;
 }
 
+const centavos = (v: unknown): number => Math.round(Number(v ?? 0) * 100) || 0;
+
+/** La propina que el cliente eligió en el lector (0 si no hubo), a dos decimales. */
+export function propinaDeCobro(c: Pick<CobroTerminal, "propina_mxn">): number {
+  return Math.max(centavos(c.propina_mxn), 0) / 100;
+}
+
 /**
  * Cómo entra al ticket un cobro de terminal: la tarjeta en `referencia` y la autorización del
  * banco en `terminal_aprobacion`, que es para lo que nacieron esas dos columnas de `pagos` (0008).
+ * `propina`: la del lector, que el pago trae además del monto (ya fijada en el ticket); se suma en
+ * centavos.
  */
-export function pagoDeCobro(c: CobroTerminal): { metodo: MetodoPago; monto: number; referencia?: string; terminalAprobacion?: string } {
+export function pagoDeCobro(c: CobroTerminal, propina = 0): { metodo: MetodoPago; monto: number; referencia?: string; terminalAprobacion?: string } {
   return {
-    metodo: metodoDeTarjeta(c.tipo_tarjeta), monto: Number(c.monto_mxn),
+    metodo: metodoDeTarjeta(c.tipo_tarjeta), monto: (centavos(c.monto_mxn) + centavos(propina)) / 100,
     referencia: etiquetaTarjeta(c) ?? undefined, terminalAprobacion: c.referencia ?? undefined,
   };
 }

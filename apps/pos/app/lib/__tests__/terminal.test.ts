@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { terminalDeCaja, etiquetaTarjeta, pagoDeCobro, mensajeErrorCobro, mensajeFinal, metodoDeTarjeta, montoTexto, motivoReembolso, pedirCobro, reembolsarTicket } from "../terminal";
+import { terminalDeCaja, etiquetaTarjeta, pagoDeCobro, propinaDeCobro, mensajeErrorCobro, mensajeFinal, metodoDeTarjeta, montoTexto, motivoReembolso, pedirCobro, reembolsarTicket } from "../terminal";
 
 afterEach(() => vi.unstubAllGlobals());
 const responde = (status: number, cuerpo: unknown) =>
@@ -64,19 +64,38 @@ describe("cobro con terminal", () => {
 
   it("sin internet o sin nube, la caja no ofrece terminal", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("failed to fetch"); }));
-    const sin = { hay: false, lista: false, proveedor: null };
+    const sin = { hay: false, lista: false, proveedor: null, propina_en_lector: false };
     expect(await terminalDeCaja("tok", "caja-1")).toEqual(sin);
     responde(503, { error: "FUNCION_REQUIERE_NUBE" });
     expect(await terminalDeCaja("tok", "caja-1")).toEqual(sin);
     responde(200, { ok: true, terminal: true, lista: true, proveedor: "MERCADO_PAGO" });
-    expect(await terminalDeCaja("tok", "caja-1")).toEqual({ hay: true, lista: true, proveedor: "MERCADO_PAGO" });
+    expect(await terminalDeCaja("tok", "caja-1")).toEqual({ hay: true, lista: true, proveedor: "MERCADO_PAGO", propina_en_lector: false });
     responde(200, { ok: true, terminal: true, lista: false, proveedor: "CLIP" });
-    expect(await terminalDeCaja("tok", "caja-1")).toEqual({ hay: true, lista: false, proveedor: "CLIP" });
+    expect(await terminalDeCaja("tok", "caja-1")).toEqual({ hay: true, lista: false, proveedor: "CLIP", propina_en_lector: false });
     // Un proveedor que la caja no conoce no se cree: cae al texto de siempre.
     responde(200, { ok: true, terminal: true, lista: true, proveedor: "OTRO" });
-    expect(await terminalDeCaja("tok", "caja-1")).toEqual({ hay: true, lista: true, proveedor: null });
+    expect(await terminalDeCaja("tok", "caja-1")).toEqual({ hay: true, lista: true, proveedor: null, propina_en_lector: false });
     // Una nube sin `lista` (anterior a Clip) es Mercado Pago: lista.
     responde(200, { ok: true, terminal: true });
-    expect(await terminalDeCaja("tok", "caja-1")).toEqual({ hay: true, lista: true, proveedor: null });
+    expect(await terminalDeCaja("tok", "caja-1")).toEqual({ hay: true, lista: true, proveedor: null, propina_en_lector: false });
+  });
+
+  it("la propina en el lector solo vale con Clip", async () => {
+    responde(200, { ok: true, terminal: true, lista: true, proveedor: "CLIP", propina_en_lector: true });
+    expect((await terminalDeCaja("tok", "caja-1")).propina_en_lector).toBe(true);
+    responde(200, { ok: true, terminal: true, lista: true, proveedor: "MERCADO_PAGO", propina_en_lector: true });
+    expect((await terminalDeCaja("tok", "caja-1")).propina_en_lector).toBe(false);
+    responde(200, { ok: true, terminal: true, lista: true, proveedor: "CLIP", propina_en_lector: "true" });
+    expect((await terminalDeCaja("tok", "caja-1")).propina_en_lector).toBe(false);
+  });
+
+  it("la propina del lector se suma al pago en centavos; sin propina, el monto de siempre", () => {
+    const c = { id: "c", ticket_id: "t", monto_mxn: 100.1, estado: "APROBADO" as const, detalle: null, aplicado_at: null, tipo_tarjeta: null, marca: null, referencia: null };
+    expect(propinaDeCobro({ propina_mxn: "10.20" })).toBe(10.2);
+    expect(propinaDeCobro({ propina_mxn: null })).toBe(0);
+    expect(propinaDeCobro({})).toBe(0);
+    expect(propinaDeCobro({ propina_mxn: -5 })).toBe(0);
+    expect(pagoDeCobro(c, 10.2).monto).toBe(110.3); // 100.1 + 10.2 = 110.29999999999998 en float
+    expect(pagoDeCobro({ ...c, propina_mxn: "10.20" }).monto).toBe(100.1); // sin pasarla, no se suma
   });
 });

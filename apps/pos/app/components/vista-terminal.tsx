@@ -22,9 +22,11 @@ type Fase =
  * se sale con Escape; se sale cancelando.
  */
 export function VistaTerminal({
-  token, cajaId, turnoId, ejecutaNombre, ticketId, folio, monto, proveedor, onAprobado, onVolver,
+  token, cajaId, turnoId, ejecutaNombre, ticketId, folio, monto, proveedor, propinaEnLector = false, onAprobado, onVolver,
 }: {
   token: string; cajaId: string; turnoId: string; ejecutaNombre: string;
+  /** El lector le pregunta la propina al cliente (Clip); llega aparte en `propina_mxn`. `monto` va sin ella. */
+  propinaEnLector?: boolean;
   /** Cambia la instrucción mientras espera; null = la de Mercado Pago, como siempre. */
   proveedor: ProveedorTerminal | null;
   ticketId: string; folio: string | null; monto: number;
@@ -70,7 +72,10 @@ export function VistaTerminal({
     };
 
     setFase({ t: "enviando" });
-    pedirCobro(token, cajaId, { accion: "crear", cobro_id: id, ticket_id: ticketId, folio, monto: montoTexto(monto) })
+    pedirCobro(token, cajaId, {
+      accion: "crear", cobro_id: id, ticket_id: ticketId, folio, monto: montoTexto(monto),
+      ...(propinaEnLector ? { propina_en_lector: true } : {}),
+    })
       .then((r) => { if (vivo && r.cobro && !atender(r.cobro)) preguntar(); })
       .catch((e) => { if (vivo) setFase({ t: "error", mensaje: mensajeErrorCobro(e) }); });
     return () => { vivo = false; clearTimeout(reloj); };

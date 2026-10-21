@@ -15,7 +15,7 @@ import {
 } from "../lib/cobro";
 import { nuevoClientId } from "../lib/carrito";
 import { aplicarPagosEnOrden, pagoEntroPeseAlError, ventaQuedoPagada, type PagoPorAplicar } from "../lib/cobro-pagos";
-import { pagoDeCobro, pedirCobro, terminalDeCaja, type CobroTerminal, type TerminalCaja } from "../lib/terminal";
+import { pagoDeCobro, pedirCobro, propinaDeCobro, terminalDeCaja, type CobroTerminal, type TerminalCaja } from "../lib/terminal";
 import { VistaTerminal } from "./vista-terminal";
 
 // ─── Íconos SVG inline (calcan los mockups) ────────────────────────────────
@@ -1072,6 +1072,11 @@ export function ModalCobro({
   // Propina (P-075): se captura antes de elegir método. El "a cobrar" pasa a total + propina.
   const [propina, setPropina] = useState(0);
   const [sug, setSug] = useState<SugerenciasPropina | null>(null);
+  // Con la propina en el lector de Clip el modal abre en el selector: la propina de VIM se pregunta
+  // solo si se cobra con otra cosa (`propinaAlElegir`), una vez, y luego sigue el método elegido.
+  const [propinaAlElegir, setPropinaAlElegir] = useState(false);
+  const [propinaPreguntada, setPropinaPreguntada] = useState(false);
+  const [trasPropina, setTrasPropina] = useState<MetodoPago | "dividido" | null>(null);
 
   useEffect(() => {
     let activo = true;
@@ -1108,7 +1113,9 @@ export function ModalCobro({
     try {
       await establecerPropina(token, totales.ticketId, monto);
       setPropina(monto);
-      setVista(atajo ? "atajo" : "selector");
+      setPropinaPreguntada(true);
+      if (trasPropina) { setTrasPropina(null); irAMetodo(trasPropina); }
+      else setVista(atajo ? "atajo" : "selector");
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo fijar la propina");
     } finally {
@@ -1184,12 +1191,18 @@ export function ModalCobro({
   // Lo último que se supo de esta caja evita que el selector cambie de botones al abrir. Solo se
   // guarda `hay`: `lista` arranca en true y, si el lector no lo está, `crear` responde
   // TERMINAL_NO_DISPONIBLE (seguro) hasta que contesta `disponible`.
+  // "2" = hay terminal y su lector pregunta la propina: mientras contesta `disponible`, la propina de
+  // VIM espera («Cargando…») en vez de preguntarse para luego saltarla.
+  const recuerdo = useRef<string | null>(null);
   const [terminal, setTerminal] = useState<TerminalCaja>(() => {
-    let hay = false;
-    try { hay = sessionStorage.getItem("vimpos.terminal") === "1"; } catch { /* sin almacén no hay recuerdo */ }
-    return { hay, lista: true, proveedor: null };
+    try { recuerdo.current = sessionStorage.getItem("vimpos.terminal"); } catch { /* sin almacén no hay recuerdo */ }
+    return { hay: recuerdo.current === "1" || recuerdo.current === "2", lista: true, proveedor: null, propina_en_lector: false };
   });
+  const [terminalSabida, setTerminalSabida] = useState(false);
   const conTerminal = terminal.hay;
+  // El cobro va al lector con la propina por elegir solo si VIM no tiene ya una (ni de esta vez ni
+  // guardada en el ticket): nunca dos propinas.
+  const propinaEnLector = terminal.propina_en_lector && propina === 0 && !((totales.propina ?? 0) > 0);
 
   /** Vuelve a preguntar por el lector (la cajera lo encendió con el cobro abierto); true si ya puede cobrar. */
   async function revisarTerminal(): Promise<boolean> {
@@ -1201,14 +1214,23 @@ export function ModalCobro({
   /**
    * La terminal ya cobró: el pago entra al ticket como débito o crédito, con su referencia. El id del
    * cobro es el `client_id_local`, así que repetirlo (caja apagada a medias, doble aviso) no duplica.
+   * Si el cliente dejó propina en el lector, primero se fija en el ticket (absoluta: repetirla da lo
+   * mismo) y el pago la lleva además del monto; si no se pudo fijar, no se aplica el pago y al volver
+   * a abrir se hace todo otra vez. Aceptado a mano con PIN (`autorizoId`): solo el monto.
    */
   async function aplicarCobroTerminal(c: CobroTerminal, autorizoId?: string) {
     setError(null);
     setProcesando(true);
+    const propinaLector = autorizoId ? 0 : propinaDeCobro(c);
     try {
+      if (propinaLector > 0) {
+        await establecerPropina(token, totales.ticketId, propinaLector);
+        setPropina(propinaLector);
+        setPropinaPreguntada(true);
+      }
       const t = await aplicarPago(
         token, totales.ticketId,
-        pagoDeCobro(c),
+        pagoDeCobro(c, propinaLector),
         c.id,
       );
       // Si este aviso no llega, el cobro sigue «sin aplicar» en la nube y se reintenta al abrir el
@@ -1237,7 +1259,16 @@ export function ModalCobro({
       const tiene = t.hay;
       if (!activo) return;
       setTerminal(t);
-      try { sessionStorage.setItem("vimpos.terminal", tiene ? "1" : "0"); } catch { /* sin almacén no hay recuerdo */ }
+      setTerminalSabida(true);
+      try { sessionStorage.setItem("vimpos.terminal", !tiene ? "0" : t.propina_en_lector ? "2" : "1"); } catch { /* sin almacén no hay recuerdo */ }
+      // Con lector listo que pregunta la propina, el cobro abre en el selector (solo si la propina
+      // de VIM aún esperaba ese dato: no se le quita la pantalla a la cajera). Una propina que ya
+      // estaba en el ticket se respeta: entra al «a cobrar» y el lector no pregunta otra.
+      if (recuerdo.current === "2" && !atajo && t.hay && t.lista && t.propina_en_lector) {
+        setPropinaAlElegir(true);
+        setPropina(totales.propina ?? 0);
+        setVista((v) => (v === "propina" ? "selector" : v));
+      }
       if (!tiene) return;
       const r = await pedirCobro(token, cajaId, { accion: "pendientes" }).catch(() => null);
       const suyo = r?.cobros?.find((c) => c.ticket_id === totales.ticketId);
@@ -1298,6 +1329,16 @@ export function ModalCobro({
 
   function elegirMetodo(m: MetodoPago | "dividido" | "terminal") {
     setError(null);
+    // Propina en el lector: si se cobra con otra cosa, antes va la propina de VIM (una vez).
+    if (m !== "terminal" && propinaAlElegir && !propinaPreguntada && sug?.capturar !== false) {
+      setTrasPropina(m);
+      setVista("propina");
+      return;
+    }
+    irAMetodo(m);
+  }
+
+  function irAMetodo(m: MetodoPago | "dividido" | "terminal") {
     if (m === "terminal") {
       setVista("terminal");
     } else if (m === "dividido") {
@@ -1322,9 +1363,11 @@ export function ModalCobro({
       // Con el cobro en la terminal tampoco: de ahí se sale cancelándolo, no por reflejo.
       [procesando || vista === "atajo" || vista === "terminal", () => {}],
       [vista === "efectivo" || vista === "otro" || vista === "dividido", () => { setError(null); setVista("selector"); }],
+      // La propina que se pregunta al elegir otro método regresa al selector, como su «Atrás».
+      [vista === "propina" && trasPropina !== null, () => { setError(null); setTrasPropina(null); setVista("selector"); }],
       [true, () => cerrarRef.current()],
     ]),
-    [procesando, vista],
+    [procesando, vista, trasPropina],
   );
   useEscape(alEscapar);
 
@@ -1349,7 +1392,8 @@ export function ModalCobro({
         ].join(" ")}
       >
         {vista === "propina" && (
-          sug ? (
+          // Si el lector de esta caja preguntaba la propina, se espera a saber si sigue así.
+          sug && !(recuerdo.current === "2" && !terminalSabida && !atajo && trasPropina === null) ? (
             <VistaPropina
               totalBase={totales.total}
               ticketId={totales.ticketId}
@@ -1357,7 +1401,7 @@ export function ModalCobro({
               procesando={procesando}
               error={error}
               onConfirmar={confirmarPropina}
-              onAtras={onCerrar}
+              onAtras={trasPropina ? () => { setError(null); setTrasPropina(null); setVista("selector"); } : onCerrar}
             />
           ) : (
             <div className="flex items-center justify-center py-16 text-sm text-ink-3">Cargando…</div>
@@ -1390,6 +1434,7 @@ export function ModalCobro({
             folio={totales.folio}
             monto={totalesEf.pendiente}
             proveedor={terminal.proveedor}
+            propinaEnLector={propinaEnLector}
             onAprobado={aplicarCobroTerminal}
             onVolver={() => { setError(null); setVista("selector"); }}
           />
