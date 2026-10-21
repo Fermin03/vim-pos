@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PASOS, estadoDelPaso, pasoActual, seguirPausa, slugTour, type Raiz } from "../demo-guia";
+import { PASOS, estadoDelPaso, pasoActual, puntoDeRetorno, seguirPausa, slugTour, type Raiz } from "../demo-guia";
 
 /** Un DOM de mentira: `querySelector` responde según los selectores presentes (con su cuenta). */
 function raizCon(presentes: Record<string, number> | string[]): Raiz {
@@ -132,6 +132,14 @@ describe("guía «Hazlo tú»", () => {
       // En el inicio (Cerrar turno visible) la pausa sigue: ahí se vuelve a vender.
       expect(seguirPausa(p, raizCon([t("cerrar-turno")]))).toBe("cobro");
     }
+  });
+
+  it("al recargar: vuelve a medir desde 0, salvo explicaciones ya leídas", () => {
+    // Paso 9 (índice 7) con la caja recién recargada: pide entrar como Ana otra vez, no «Toca Cobrar».
+    expect(puntoDeRetorno(PASOS, 7)).toBe(0);
+    expect(pasoActual(PASOS, puntoDeRetorno(PASOS, 7), raizCon([]))).toBe(0);
+    // Ya en el cierre (paso 15): no repite el monitor (13) ni el ticket (11).
+    expect(PASOS[puntoDeRetorno(PASOS, 13)]!.numero).toBe(14);
   });
 
   it("slugTour: minúsculas y espacios a guiones", () => {

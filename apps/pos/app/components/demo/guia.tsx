@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@vim/ui/styles";
 import { LLAVE_GUIA } from "../../lib/demo";
-import { PASOS, estadoDelPaso, pasoActual, seguirPausa, type Pausa, type Paso } from "../../lib/demo-guia";
+import { PASOS, estadoDelPaso, pasoActual, puntoDeRetorno, seguirPausa, type Pausa, type Paso } from "../../lib/demo-guia";
 import { deviceClient } from "../../lib/supabase";
 
 type Guardado = { activa: boolean; indice: number; pausa?: Pausa };
@@ -46,18 +46,42 @@ function registrar(numero: number) {
   Promise.resolve(deviceClient.rpc("demo_registrar_paso", { p_paso: numero })).catch(() => {});
 }
 
-/** Dónde va el globo: debajo, arriba, a un lado del recuadro o, si no cabe, en la esquina. */
-function lugarDelGlobo(rect: DOMRect | null, ancho: number, alto: number): { x: number; y: number } {
+const TOCABLE = "button, a, input, textarea, select, [role='button'], [role='switch']";
+
+/** ¿Taparía el globo en (x, y) algo que la persona tenga que tocar? Muestrea una rejilla de 4×3. */
+function tapaAlgo(x: number, y: number, ancho: number, alto: number, guia: HTMLElement | null): boolean {
+  for (let c = 0; c < 4; c++) {
+    for (let f = 0; f < 3; f++) {
+      const px = x + (ancho * (c + 0.5)) / 4;
+      const py = y + (alto * (f + 0.5)) / 3;
+      const debajo = document.elementsFromPoint(px, py).find((el) => !guia?.contains(el));
+      if (debajo?.closest(TOCABLE)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Dónde va el globo: debajo, arriba o a un lado del recuadro, y si no cabe (o la persona se fue
+ * a otra pantalla), en una esquina. Gana el primer lugar que no tape un botón ni un campo: en un
+ * iPad el globo no cabe junto a los modales grandes y tapaba justo lo que el paso pide tocar.
+ */
+function lugarDelGlobo(rect: DOMRect | null, ancho: number, alto: number, guia: HTMLElement | null): { x: number; y: number } {
   const W = window.innerWidth;
   const H = window.innerHeight;
-  if (!rect) return { x: MARGEN, y: H - alto - MARGEN };
-  const x = Math.min(Math.max(rect.left, MARGEN), W - ancho - MARGEN);
-  const y = Math.min(Math.max(rect.top, MARGEN), H - alto - MARGEN);
-  if (rect.bottom + HUECO + alto <= H - MARGEN) return { x, y: rect.bottom + HUECO };
-  if (rect.top - HUECO - alto >= MARGEN) return { x, y: rect.top - HUECO - alto };
-  if (rect.right + HUECO + ancho <= W - MARGEN) return { x: rect.right + HUECO, y };
-  if (rect.left - HUECO - ancho >= MARGEN) return { x: rect.left - HUECO - ancho, y };
-  return { x: MARGEN, y: H - alto - MARGEN };
+  const derecha = W - ancho - MARGEN;
+  const abajo = H - alto - MARGEN;
+  const lugares: { x: number; y: number }[] = [];
+  if (rect) {
+    const x = Math.min(Math.max(rect.left, MARGEN), derecha);
+    const y = Math.min(Math.max(rect.top, MARGEN), abajo);
+    if (rect.bottom + HUECO + alto <= H - MARGEN) lugares.push({ x, y: rect.bottom + HUECO });
+    if (rect.top - HUECO - alto >= MARGEN) lugares.push({ x, y: rect.top - HUECO - alto });
+    if (rect.right + HUECO + ancho <= W - MARGEN) lugares.push({ x: rect.right + HUECO, y });
+    if (rect.left - HUECO - ancho >= MARGEN) lugares.push({ x: rect.left - HUECO - ancho, y });
+  }
+  lugares.push({ x: MARGEN, y: abajo }, { x: MARGEN, y: MARGEN }, { x: derecha, y: abajo }, { x: derecha, y: MARGEN });
+  return lugares.find((l) => !tapaAlgo(l.x, l.y, ancho, alto, guia)) ?? lugares[0]!;
 }
 
 /**
@@ -108,6 +132,8 @@ export function Guia({ fin }: { fin?: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    const g = leer();
+    if (g?.activa && !g.pausa) guardar({ ...g, indice: puntoDeRetorno(PASOS, g.indice) });
     revisar();
     const id = setInterval(revisar, 300);
     window.addEventListener("resize", revisar);
@@ -166,11 +192,7 @@ export function Guia({ fin }: { fin?: ReactNode }) {
   const conRecuadro = rect && !tapado;
   const ancho = Math.min(340, window.innerWidth - MARGEN * 2);
   const alto = globo.current?.offsetHeight ?? 200;
-  const lugar = conRecuadro
-    ? lugarDelGlobo(rect, ancho, alto)
-    : rect
-      ? lugarDelGlobo(null, ancho, alto)
-      : { x: (window.innerWidth - ancho) / 2, y: (window.innerHeight - alto) / 2 };
+  const lugar = lugarDelGlobo(conRecuadro ? rect : null, ancho, alto, raiz.current);
   // Solo lo que pide una acción tiene a dónde regresar; una explicación se lee donde esté.
   const pideRegresar = !rect && (paso.tipo === "hazlo" || paso.abrir !== undefined);
   const regresaA = paso.etapa === "Monitor de ventas" || paso.etapa === "Cerrar turno" ? "al inicio" : "a la pantalla de venta";
@@ -205,16 +227,16 @@ export function Guia({ fin }: { fin?: ReactNode }) {
         </h2>
         <p className="text-14 leading-snug text-ink-2">{paso.texto}</p>
         {pideRegresar && <p className="text-13 font-semibold text-ink">Regresa {regresaA} para seguir con la guía.</p>}
+        {/* Dos botones y «Salir» no caben en un renglón de 340 px: los del paso 12 van arriba. */}
+        {paso.numero === 12 && (
+          <div className="mt-1 flex gap-2">
+            <Button className="flex-1" onClick={() => cambiar((g) => ({ ...g, indice: i, pausa: "cerrar" }))}>Hacer otra venta</Button>
+            <Button className="flex-1" variant="ghost" onClick={siguiente}>Seguir con la guía</Button>
+          </div>
+        )}
         <div className="mt-1 flex items-center justify-between gap-3">
           {botonSalir}
-          {paso.numero === 12 ? (
-            <div className="flex gap-2">
-              <Button variant="ghost" onClick={siguiente}>Seguir con la guía</Button>
-              <Button onClick={() => cambiar((g) => ({ ...g, indice: i, pausa: "cerrar" }))}>Hacer otra venta</Button>
-            </div>
-          ) : (
-            paso.tipo === "explica" && !tocalo && <Button onClick={siguiente}>Entendido</Button>
-          )}
+          {paso.tipo === "explica" && paso.numero !== 12 && !tocalo && <Button onClick={siguiente}>Entendido</Button>}
         </div>
       </section>
     </div>

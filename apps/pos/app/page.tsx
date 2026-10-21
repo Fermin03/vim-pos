@@ -23,7 +23,7 @@ import { PantallaBloqueada } from "./components/pantalla-bloqueada";
 import { PantallaCliente } from "./components/pantalla-cliente";
 import { olvidarNegocio } from "./lib/pantalla-cliente/negocio";
 import { PantallaKds } from "@vim/kds-core";
-import { MODO_DEMO } from "./lib/demo";
+import { LLAVE_GUIA, MODO_DEMO, demoCaducada } from "./lib/demo";
 import { BienvenidaDemo } from "./components/demo/bienvenida-demo";
 import { AvisoPantalla } from "./components/demo/aviso-pantalla";
 import { Guia } from "./components/demo/guia";
@@ -65,6 +65,15 @@ function PaginaPos() {
       // vinculación, que ya viene con el correo puesto.
       const email = await deviceEmail();
       if (!activo) return;
+      if (email && MODO_DEMO && (await demoCaducada())) {
+        // Volvió al enlace después de las 24 h: de vuelta a la bienvenida, sin rastro del anterior.
+        await deviceSignOut();
+        await cacheLimpiar();
+        olvidarNegocio();
+        try { window.localStorage.removeItem(LLAVE_GUIA); } catch { /* sin almacenamiento no hay guía vieja */ }
+        if (activo) setEstado({ paso: "vincular" });
+        return;
+      }
       if (email) {
         const cid = cajaIdFromEmail(email);
         setCajaId(cid);

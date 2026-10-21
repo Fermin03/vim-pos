@@ -150,6 +150,15 @@ export function pasoActual(pasos: Paso[], desde: number, r: Raiz): number {
   return i;
 }
 
+/**
+ * Desde dónde recalcular al recargar: la caja olvida el PIN y el ticket a medio armar, así que el
+ * avance se vuelve a medir con lo que hay en pantalla. Solo no se repite una explicación ya leída.
+ */
+export function puntoDeRetorno(pasos: Paso[], indice: number): number {
+  for (let i = Math.min(indice, pasos.length) - 1; i >= 0; i--) if (pasos[i]!.tipo === "explica") return i + 1;
+  return 0;
+}
+
 /** "perdida" si en pantalla no está ni el ancla ni lo que la abre: la persona se fue a otra parte. */
 export function estadoDelPaso(p: Paso, r: Raiz): "visible" | "perdida" {
   return hay(r, p.ancla) || (p.abrir !== undefined && hay(r, p.abrir)) ? "visible" : "perdida";
