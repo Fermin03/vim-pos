@@ -1,6 +1,6 @@
 "use client";
 import { Icono } from "@vim/ui/styles";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { buscarEnMenu, caminoDe, rutaActiva, type Grupo, type MenuAdmin, type Nodo } from "../lib/menu-admin";
@@ -34,6 +34,13 @@ export function MenuLateral({ menu, pathname, marcaPlan, alNavegar }: {
   }, [camino, activa]);
 
   const navegado = () => { setTexto(""); alNavegar?.(); };
+
+  // Con la ventana baja el menú hace scroll: al llegar a una página, su opción se trae a la vista.
+  // Solo al navegar; abrir otro grupo no debe mover el menú.
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    navRef.current?.querySelector("[aria-current=page]")?.scrollIntoView({ block: "nearest" });
+  }, [activa]);
 
   const alternar = (grupo: Grupo, hermanos: Nodo[]) => {
     setAbiertos((prev) => {
@@ -70,9 +77,11 @@ export function MenuLateral({ menu, pathname, marcaPlan, alNavegar }: {
       </div>
 
       <nav
+        ref={navRef}
         aria-label="Menú del panel"
         onClick={(e) => { if ((e.target as Element).closest("a")) navegado(); }}
-        className="flex flex-1 flex-col gap-px overflow-y-auto px-3 pb-4 pt-2"
+        // Hace scroll, pero sin barra visible (decisión de Fermín, 21 oct).
+        className="scroll-x-limpio flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-3 pb-4 pt-2"
       >
         {texto.trim() ? (
           resultados.length === 0 ? (
@@ -90,7 +99,7 @@ export function MenuLateral({ menu, pathname, marcaPlan, alNavegar }: {
         ) : (
           <>
             <Rama nodos={menu.principal} hermanos={raiz} nivel={0} abiertos={abiertos} activa={activa} alternar={alternar} marcaPlan={marcaPlan} />
-            {menu.canales.length > 0 && <div role="separator" className="mx-3 my-2 border-t border-[#2C2C32]" />}
+            {menu.canales.length > 0 && <div role="separator" className="mx-3 my-2 flex-shrink-0 border-t border-[#2C2C32]" />}
             <Rama nodos={menu.canales} hermanos={raiz} nivel={0} abiertos={abiertos} activa={activa} alternar={alternar} marcaPlan={marcaPlan} />
           </>
         )}
@@ -107,7 +116,8 @@ const sangria = ["px-3", "pl-[42px] pr-3", "pl-[54px] pr-3"];
 
 function claseHoja(activa: boolean, nivel: number) {
   return [
-    "flex min-h-[44px] items-center gap-[11px] rounded py-[9px] text-sm font-medium transition-colors lg:min-h-0",
+    // flex-shrink-0: con el menú desplegado, las opciones no se aplastan; el menú hace scroll.
+    "flex min-h-[44px] flex-shrink-0 items-center gap-[11px] rounded py-[9px] text-sm font-medium transition-colors lg:min-h-0",
     "[&_svg]:h-[18px] [&_svg]:w-[18px] [&_svg]:flex-shrink-0 [&_svg]:stroke-current",
     sangria[nivel] ?? sangria[2],
     nivel > 0 && "lg:py-[7px]",

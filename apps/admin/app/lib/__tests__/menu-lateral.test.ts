@@ -16,6 +16,8 @@ import { MENU, filtrarMenu, type ContextoMenu } from "../menu-admin";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 (globalThis as { React?: typeof React }).React = React;
+// jsdom no implementa scrollIntoView (el menú lo usa para enseñar la opción activa).
+Element.prototype.scrollIntoView = () => {};
 
 const CTX: ContextoMenu = { jerarquia: 5, ocultas: new Set(), tiendaContratada: true, gruposInformes: null };
 
