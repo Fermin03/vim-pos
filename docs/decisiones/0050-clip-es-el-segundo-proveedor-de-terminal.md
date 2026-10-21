@@ -52,6 +52,9 @@ seguro que pedirle a Clip que se identifique. Cancelar antes de rechazar evita e
 - **Propina elegida en el lector.** No sabemos cómo regresan `tip_amount` y `amount_paid` hasta ver
   un cobro real. Hoy los porcentajes solo se guardan: el cobro va con `is_tip_enabled: false` y el
   lector no los muestra; la propina de la cuenta se cobra como siempre.
+  **Ya construida (21 oct 2026):** Clip confirmó que la propina llega aparte en `tip_amount`. Con el
+  interruptor del admin encendido, la caja manda el cobro con `is_tip_enabled` y `tip_options`, fija
+  la propina en el ticket y aplica monto + propina. Falta verla con un lector (doc 03 §E).
 - **Cobro de prueba de $1 al conectar.** Hasta tener lector.
 - **Guía con `curl` y skill `clip-pinpad`.** Salen de la sesión con lector.
 

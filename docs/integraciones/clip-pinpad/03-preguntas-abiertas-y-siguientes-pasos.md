@@ -49,7 +49,6 @@ Solo con lector:
 
 - Cuánto tarda el lector en despertar y si despierta estando bloqueado o con la pantalla apagada.
 - Qué devuelve la consulta tras un rechazo, una cancelación en el lector y un vencimiento.
-- Cómo llega la propina cuando el cliente la elige: ¿`amount_paid` = monto + propina?
 - Qué pasa con el cobro si el lector pierde el WiFi a medio pago.
 - Si el minuto fijo antes del `timeout_seg` es tal cual lo describen.
 - Si una devolución a primera hora, sin ventas del día, se rechaza por falta de saldo.
@@ -81,6 +80,8 @@ Rama `feat/terminal-clip` (ADR 0050). Nada de esto se ha visto con un lector.
 - Qué hace el lector con `timeout_seg: 0` (espera de 1 minuto): ¿vence al instante o nunca?
 - Con `is_retry_enabled`, si una intención puede pasar por `FAILED` y luego quedar `COMPLETED`.
 - Si un 5xx al crear deja la intención creada en el lector (hoy se trata como sin respuesta).
+- Propina en el lector (construida): que `tip_amount` llegue en la consulta de cada transacción
+  aprobada y que el lector muestre los porcentajes de `tip_options`.
 
 **Antes de producción (no necesitan lector):**
 
@@ -107,5 +108,5 @@ Por correo, de Amilcar Navarro (Integrations Specialist de Clip). Ya aplicadas e
 - **`amount`:** número.
 - **Un solo lector:** `GET /devices/status/?serial_number=<serie>`.
 - **Propina en el lector:** llega aparte en `tip_amount`. Con esto ya se puede construir la propina
-  elegida en el lector.
+  elegida en el lector (ya construida: §E).
 - **Modelos:** Total 3, Ultra, Clip PinPad y Clip Stand 2.
