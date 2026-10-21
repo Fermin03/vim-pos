@@ -8,23 +8,26 @@ export type CajaKds = {
   sucursal_id: string;
   nombre: string;
   sucursalNombre: string;
+  /** Giro del negocio (`tenants.vertical_principal`): comida rápida nombra distinto `COMER_AQUI`. */
+  giro?: string | null;
 };
 
 /** Lee la caja (para saber su sucursal y nombre). RLS por tenant. */
 export async function leerCaja(token: string, cajaId: string): Promise<CajaKds> {
   const { data, error } = await clienteConToken(token)
     .from("cajas")
-    .select("tenant_id, sucursal_id, nombre, sucursal:sucursales(nombre)")
+    .select("tenant_id, sucursal_id, nombre, sucursal:sucursales(nombre), tenant:tenants(vertical_principal)")
     .eq("id", cajaId)
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Caja no encontrada");
-  type Fila = { tenant_id: string; sucursal_id: string; nombre: string; sucursal: { nombre: string } | null };
+  type Fila = { tenant_id: string; sucursal_id: string; nombre: string; sucursal: { nombre: string } | null; tenant: { vertical_principal: string | null } | null };
   const f = data as unknown as Fila;
   return {
     tenant_id: f.tenant_id,
     sucursal_id: f.sucursal_id,
     nombre: f.nombre,
     sucursalNombre: f.sucursal?.nombre ?? "—",
+    giro: f.tenant?.vertical_principal ?? null,
   };
 }

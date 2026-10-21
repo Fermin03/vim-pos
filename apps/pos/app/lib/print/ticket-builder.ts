@@ -202,6 +202,7 @@ function formatoFecha(iso: string): string {
  * tres veces en dos días: la 0.4.39 la puso en todos los modos y la 0.4.40 la quitó de todos.
  * Escondida dentro de un `if` en la pantalla, cada giro costaba una versión y un servicio.
  */
-export function debeImprimirTicketAlCobrar(modo: string): boolean {
-  return modo === "PARA_LLEVAR";
+export function debeImprimirTicketAlCobrar(modo: string, comidaRapida = false): boolean {
+  // Comida rápida: Comer aquí también se cobra en el mostrador, sin cuenta previa donde imprimirlo.
+  return modo === "PARA_LLEVAR" || (comidaRapida && modo === "COMER_AQUI");
 }

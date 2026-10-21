@@ -6,9 +6,9 @@ import { etiquetaModo } from "@vim/db/modos-servicio";
 export type EstadoCocina = "EN_COCINA" | "LISTO" | "ENTREGADO" | "EN_RUTA" | "ENTREGADO_DOMICILIO" | "SIN_ENVIAR";
 
 /** Nombre del modo de servicio. La lista vive en `@vim/db/modos-servicio`: aquí había solo cuatro
- *  de los doce, y la cocina leía `APP_UBEREATS` en crudo. */
-export function labelModo(m: string): string {
-  return etiquetaModo(m);
+ *  de los doce, y la cocina leía `APP_UBEREATS` en crudo. Con el giro, comida rápida dice «Comer aquí». */
+export function labelModo(m: string, giro?: string | null): string {
+  return etiquetaModo(m, giro);
 }
 
 /** Minutos transcurridos desde que entró a cocina (para el cronómetro y la alerta de vencido). */

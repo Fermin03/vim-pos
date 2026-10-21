@@ -121,7 +121,11 @@ export function construirComandaJob(d: DatosComanda): PrintJob {
  * La segunda condición es de hardware: si la cocina no tiene impresora propia, la comanda saldría
  * por la de caja, justo detrás del ticket que acaba de imprimirse. Sería papel duplicado, no aviso.
  */
-export function debeImprimirComandaAlCobrar(modo: string, hayEstacionDedicada: boolean): boolean {
+export function debeImprimirComandaAlCobrar(modo: string, hayEstacionDedicada: boolean, comidaRapida = false): boolean {
+  // Comida rápida no tiene «Enviar a cocina» en el mostrador: Para llevar y Comer aquí van del
+  // carrito al cobro, y la comanda sale aunque haya una sola impresora (detrás del ticket): el
+  // «Orden #» es lo que la cocina canta; el ticket es del cliente.
+  if (comidaRapida) return modo === "PARA_LLEVAR" || modo === "COMER_AQUI";
   return modo === "PARA_LLEVAR" && hayEstacionDedicada;
 }
 

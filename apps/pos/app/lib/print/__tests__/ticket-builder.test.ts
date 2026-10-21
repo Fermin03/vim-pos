@@ -501,3 +501,11 @@ describe("construirTicketJob — colaborador de belleza", () => {
     expect(b[j + 1]).not.toMatchObject({ t: "texto" });
   });
 });
+
+describe("debeImprimirTicketAlCobrar — comida rápida", () => {
+  it("Comer aquí también imprime: se cobra en el mostrador, sin cuenta previa", () => {
+    expect(debeImprimirTicketAlCobrar("COMER_AQUI", true)).toBe(true);
+    expect(debeImprimirTicketAlCobrar("PARA_LLEVAR", true)).toBe(true);
+    expect(debeImprimirTicketAlCobrar("DRIVE_THRU", true)).toBe(false);
+  });
+});

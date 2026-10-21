@@ -1649,6 +1649,8 @@ export function HomePos({
         cajero: datos.meta.cajero,
         caja: datos.meta.caja,
         fechaIso: datos.meta.fechaIso,
+        // Comida rápida: el nombre que se pidió al cobrar, el mismo que lleva la comanda impresa.
+        cliente: comidaRapida ? datos.meta.nombreCliente ?? null : null,
         lineas: lineasCom,
         ancho: 80,
       };
@@ -1659,7 +1661,7 @@ export function HomePos({
       // Solo "Para llevar": es el único modo que va del carrito al cobro sin pasar por la
       // lista de cuentas, así que no hay un momento anterior para imprimirlo. La regla y su
       // historia están en `debeImprimirTicketAlCobrar`.
-      if (debeImprimirTicketAlCobrar(datos.meta.modo)) {
+      if (debeImprimirTicketAlCobrar(datos.meta.modo, comidaRapida)) {
         try {
           const job = construirTicketJob(datos, await logoParaTicket(datos.ancho));
           await obtenerImpresora("CAJA", { onMostrar: () => setMostrarRecibo(true) }).imprimir(job);
@@ -1682,7 +1684,19 @@ export function HomePos({
       // Y solo si la estación de cocina es una impresora distinta de la de caja: con una
       // sola impresora, el ticket que acaba de salir ya es el papel.
       // Una tienda no tiene cocina: aunque haya estaciones configuradas, no sale comanda.
-      if (!datos.tienda && debeImprimirComandaAlCobrar(datos.meta.modo, hayEstacionDeCocinaDedicada())) {
+      //
+      // Comida rápida: la venta se manda a cocina AQUÍ (llega al KDS) y la comanda lleva solo lo que
+      // ese envío marcó. Si ya se había mandado (una cuenta en espera, un reintento), no hay renglones
+      // nuevos y no sale otra: una comanda por venta. Con una sola impresora sale detrás del ticket.
+      if (comidaRapida) {
+        if (debeImprimirComandaAlCobrar(datos.meta.modo, hayEstacionDeCocinaDedicada(), true)) {
+          try {
+            await imprimirComandaCocina(ticketId, await enviarACocina(token, ticketId), false);
+          } catch {
+            setError("La venta se cobró, pero no se pudo mandar a cocina. Avísales a mano.");
+          }
+        }
+      } else if (!datos.tienda && debeImprimirComandaAlCobrar(datos.meta.modo, hayEstacionDeCocinaDedicada())) {
         // También repartida: en Para llevar la bebida va a la barra igual que en el resto.
         imprimirComandaPorAreas(datosCom, lineasCom, { ticketId, evento: "IMPRESION_INICIAL" }).catch(() => {});
       }
@@ -1738,7 +1752,7 @@ export function HomePos({
     } catch {
       setEstadoTicket("error");
     }
-  }, [token, empleado, caja.nombre, imprimirComandaPorAreas, logoParaTicket, comidaRapida]);
+  }, [token, empleado, caja.nombre, imprimirComandaPorAreas, imprimirComandaCocina, logoParaTicket, comidaRapida]);
 
   /** Cuenta retomada de «en espera» cuyo tipo de servicio ya se contestó: cerrar el cobro y volver a
    *  cobrar no pregunta dos veces. */
