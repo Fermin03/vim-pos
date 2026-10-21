@@ -3,13 +3,15 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { Button } from "@vim/ui/styles";
 import { LLAVE_GUIA } from "../../lib/demo";
 import { PASOS, estadoDelPaso, pasoActual, puntoDeRetorno, seguirPausa, type Pausa, type Paso } from "../../lib/demo-guia";
-import { deviceClient } from "../../lib/supabase";
+import { deviceClient, deviceSignOut } from "../../lib/supabase";
 
 type Guardado = { activa: boolean; indice: number; pausa?: Pausa };
 
 type Vista =
   | { tipo: "fin" }
   | { tipo: "pausa" }
+  /** Guía apagada (salió o eligió explorar solo): queda a la mano para retomarla o empezar de nuevo. */
+  | { tipo: "apagada" }
   | {
       tipo: "paso";
       i: number;
@@ -97,7 +99,8 @@ export function Guia({ fin }: { fin?: ReactNode }) {
 
   const revisar = useCallback(() => {
     let g = leer();
-    if (!g?.activa) return setVista(null);
+    // Sin guardado = bienvenida o demo recién limpiada: ahí no hay nada que retomar.
+    if (!g?.activa) return setVista(g ? { tipo: "apagada" } : null);
 
     if (g.pausa) {
       const sigue = seguirPausa(g.pausa, document);
@@ -173,6 +176,30 @@ export function Guia({ fin }: { fin?: ReactNode }) {
           </section>
         </div>
       )
+    );
+  }
+
+  if (vista.tipo === "apagada") {
+    const caja = globo.current;
+    const lugar = lugarDelGlobo(null, caja?.offsetWidth ?? 320, caja?.offsetHeight ?? 52, caja);
+    const retomar = () => cambiar((g) => ({ activa: true, indice: puntoDeRetorno(PASOS, g.indice) }));
+    // Otro negocio de ejemplo: sin sesión, el arranque de la caja limpia todo y muestra la bienvenida.
+    const empezarDeNuevo = async () => {
+      if (!window.confirm("¿Empezar de nuevo? Se abre otro negocio de ejemplo y este se descarta.")) return;
+      await deviceSignOut();
+      try { window.localStorage.removeItem(LLAVE_GUIA); } catch { /* el arranque la borra igual */ }
+      window.location.reload();
+    };
+    return (
+      <aside
+        ref={globo}
+        aria-label="Guía de la demo"
+        className="fixed left-0 top-0 z-[100] flex items-center gap-2 rounded-lg border border-line bg-surface p-2 shadow-xl"
+        style={{ transform: `translate(${lugar.x}px, ${lugar.y}px)` }}
+      >
+        <Button onClick={retomar}>Retomar la guía</Button>
+        <Button variant="ghost" onClick={empezarDeNuevo}>Empezar de nuevo</Button>
+      </aside>
     );
   }
 
