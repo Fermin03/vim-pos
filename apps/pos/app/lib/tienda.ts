@@ -55,7 +55,7 @@ export type SeccionTienda = "panel" | "inventario" | "transacciones" | "notifica
 export type Destino = { seccion: SeccionTienda; etiqueta: string; icono: NombreIcono };
 
 const DESTINOS_TIENDA: Destino[] = [
-  { seccion: "panel", etiqueta: "Cobrar", icono: "caja" },
+  { seccion: "panel", etiqueta: "Cobrar", icono: "carrito" },
   { seccion: "inventario", etiqueta: "Inventario", icono: "etiqueta" },
   { seccion: "transacciones", etiqueta: "Transacciones", icono: "recibo" },
   { seccion: "notificaciones", etiqueta: "Notificaciones", icono: "megafono" },
@@ -64,7 +64,7 @@ const DESTINOS_TIENDA: Destino[] = [
 
 const DESTINOS_BELLEZA: Destino[] = [
   { seccion: "calendario", etiqueta: "Calendario", icono: "calendario" },
-  { seccion: "panel", etiqueta: "Cobrar", icono: "caja" },
+  { seccion: "panel", etiqueta: "Cobrar", icono: "carrito" },
   { seccion: "clientes", etiqueta: "Clientes", icono: "personas" },
   { seccion: "transacciones", etiqueta: "Transacciones", icono: "recibo" },
   { seccion: "configuracion", etiqueta: "Más", icono: "menu" },
@@ -72,7 +72,7 @@ const DESTINOS_BELLEZA: Destino[] = [
 
 /** Comida rápida y food truck: «Pedidos» junta lo que espera atención; Inventario solo con el módulo `existencias`. */
 const DESTINOS_COMIDA: Destino[] = [
-  { seccion: "panel", etiqueta: "Cobrar", icono: "caja" },
+  { seccion: "panel", etiqueta: "Cobrar", icono: "carrito" },
   { seccion: "pedidos", etiqueta: "Pedidos", icono: "para-llevar" },
   { seccion: "inventario", etiqueta: "Inventario", icono: "etiqueta" },
   { seccion: "transacciones", etiqueta: "Transacciones", icono: "recibo" },

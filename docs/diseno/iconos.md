@@ -114,6 +114,7 @@ import { Icono, IconoCategoria } from "@vim/ui/styles";
 | 38 | Recibo | `recibo` | tickets, corte X, ticket vacío, consultar cuentas, facturación |
 | 39 | Cajón de dinero | `cajon` | abrir cajón, caja del día |
 | 40 | Casilla palomeada | `casilla` | cerrar turno |
+| 71 | Carrito | `carrito` | «Cobrar» en la barra de abajo (tiendas, belleza, comida rápida y cafetería) |
 
 ### Servicio y operación
 
