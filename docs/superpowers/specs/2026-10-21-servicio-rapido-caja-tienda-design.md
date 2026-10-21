@@ -1,6 +1,6 @@
 # Servicio rápido y food truck con la caja de tienda: diseño
 
-**Fecha:** 21 oct 2026 · **Estado:** para aprobación de Fermín · **Grupo:** alimentos y bebidas, antes del
+**Fecha:** 21 oct 2026 · **Estado:** hecho en local (21 oct), ver §9 · **Grupo:** alimentos y bebidas, antes del
 lanzamiento conjunto (retail ✔ → belleza ✔ → servicios ✔ → **alimentos y bebidas**).
 
 ## 1. Para qué
@@ -128,3 +128,54 @@ Fermín: «esos lugares quedarían igual. Solo cambiaría servicio rápido y foo
 - «Comer aquí» se pregunta siempre en servicio rápido; en food truck solo si el dueño lo activa (muchos no
   tienen dónde sentarse).
 - Las cuentas de mesa abiertas al actualizar se pueden terminar desde «Pedidos», pero no se abren nuevas.
+
+## 9. Hecho (21 oct)
+
+Servicio rápido y food truck con la caja de tienda, en local, en la rama `feat/alimentos-rapido`. Diseño:
+`docs/diseno/pos-comida-rapida.md`; decisión: ADR 0045 (el 0044 ya lo usa la demo autoguiada en su rama).
+
+**Migración**
+
+- **0242:** `configuracion_tenant.pedir_nombre_cliente` y `tiene_donde_comer`, apagadas por defecto. Las lee
+  la caja y las cambia el admin en Configuración › Operación › Mostrador. Bajan a la caja instalada por el sync
+  genérico, sin cambio en el escritorio. Smoke: `supabase/scripts/smoke_comida_rapida.sql`.
+
+**Lo construido**
+
+- Caja que abre en Cobrar, con la barra Cobrar · Pedidos · Inventario · Transacciones · Más y «Consultar
+  cuentas» en Más.
+- La pregunta «¿Es para llevar o para comer aquí?» y el nombre del cliente, antes de guardar la venta.
+- «Comer aquí» en el ticket, la comanda, la caja, Consultar cuentas y la pantalla de cocina.
+- A cocina y comanda al cobrar, también con una sola impresora, una vez por venta.
+- La sección Pedidos con su globo; las cuentas de mesa viejas se cobran ahí sin abrir nuevas.
+- «Asignar cliente» (y la lealtad) en el menú «⋯» del ticket.
+
+**Desviaciones del spec:** el ticket de «Comer aquí» también se imprime al cobrar (no había otro momento);
+comedor y meseros no se apagan en la base, la caja simplemente no los ofrece.
+
+**El lugar en el lanzamiento conjunto**
+
+Va con retail, belleza y servicios, en el mismo orden que ellos:
+
+1. **Instalador con la 0242**, desde un checkout completo (RUNBOOK «Antes de empaquetar»), con el OK de Fermín.
+   Ninguna caja debe descargar el código nuevo sin la columna; si pasa, se comporta con los valores por
+   defecto (pregunta en servicio rápido, sin nombre).
+2. **0242 a la nube, a mano y antes del merge.**
+3. **Merge.** No hay interruptor: los negocios de servicio rápido y food truck **cambian solos al actualizar**
+   su caja. Avisarles antes que la caja abrirá en Cobrar, que las mesas ya no están y dónde quedó cada cosa.
+
+**Pendientes conocidos (menores, para después)**
+
+- El monitor de ventas y la lista de cuentas abiertas todavía dicen «Comedor» para «Comer aquí».
+- Admin: si falla la lectura del Mostrador no se muestra mensaje; dos toques rápidos pueden revertir al valor
+  viejo si falla el guardado. El smoke no prueba que un negocio no pueda cambiar la configuración de otro (sí que
+  no la lee).
+- Si se apaga el módulo de existencias con Inventario abierto, la sección sigue a la vista hasta cambiar de
+  pestaña.
+- El foco de la ventana de la pregunta cuando no se pide nombre.
+- El mensaje «no se pudo mandar a cocina» no dice por qué.
+- Los números de Pedidos se leen por sondeo (15 a 20 s), no en vivo.
+- La pantalla de cocina dedicada ahora lee `tenants` para saber el giro; no se probó con el usuario de una pantalla
+  de cocina dedicada.
+- Faltan pruebas de render de la caja (home-pos, la ventana de la pregunta, la página del admin) y una del
+  camino completo cobro → cocina → comanda.

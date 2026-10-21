@@ -45,6 +45,7 @@ Cada archivo dice **qué decía el plan, qué hacemos hoy y por qué**. Manda lo
 | [0039](0039-la-comision-se-congela-en-el-renglon.md) | La comisión se congela en el renglón y se calcula al leer; el anticipo es un pago que no se declara | 19/10/2026 |
 | [0040](0040-la-reserva-en-linea-usa-la-tienda.md) | La reserva en línea usa la tienda: misma app y slug, un complemento «En línea» y el pago de la cita en `tienda_pagos` | 19/10/2026 |
 | [0041](0041-el-colaborador-entra-con-su-correo.md) | El colaborador entra con su correo: rol `colaborador_web` de cinco RPC, capa RLS y rechazo en las funciones | 20/10/2026 |
+| [0045](0045-comida-rapida-con-caja-de-tienda.md) | Servicio rápido y food truck usan la navegación de tienda con el cobro de restaurante: pregunta al cobrar, comanda al cobrar también con una impresora y sin mesas | 21/10/2026 |
 
 ## Pendientes de escribir
 
