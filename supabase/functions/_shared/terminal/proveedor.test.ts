@@ -119,7 +119,7 @@ test("Clip crear manda la intención con el aviso del cobro y queda en la termin
   const cuerpo = JSON.parse(String(f.llamadas[0].init.body));
   assert.equal(f.llamadas[0].url, "https://api.payclip.io/f2f/pinpad/v1/payment");
   assert.equal(cuerpo.webhook_url, "https://x.supabase.co/functions/v1/terminal-webhook-clip?c=c-1");
-  assert.deepEqual([cuerpo.reference, cuerpo.amount, cuerpo.serial_number_pos], ["c-1", "348.00", "P82"]);
+  assert.deepEqual([cuerpo.reference, cuerpo.amount, cuerpo.serial_number_pos], ["c-1", 348, "P82"]);
   assert.equal(r.ok, true);
   if (r.ok) assert.deepEqual([r.datos.estado, r.datos.orden_id_externo], ["EN_TERMINAL", "pinpad-1"]);
 });

@@ -134,7 +134,7 @@ function clip(apiKey: string, secreto: string, base: string, pedir: typeof fetch
     async lectorListo(terminal) {
       // Si la consulta falla, o el lector no sale en la lista, no se tapa la terminal por un
       // tropiezo: el error al crear lo dirá.
-      const r = await con(ESPERA_CLIP.lectores).estadoLectores();
+      const r = await con(ESPERA_CLIP.lectores).estadoLectores(terminal);
       if (r.status !== 200) return true;
       const lector = lectoresDe(r.cuerpo).find((l) => l.serie === terminal);
       return lector ? lector.estado === "active" : true;

@@ -7,23 +7,28 @@
 //   · No hay llave de idempotencia al crear: una petición sin respuesta NO se reintenta (quien llama
 //     cancela por número de serie). Por eso un timeout o fallo de red no lanza: devuelve status 0.
 //   · El aviso del webhook no trae firma ni datos: solo dice «algo cambió». Siempre se confirma con `consultar`.
-//   · La propina puede venir aparte en `tip_amount` (SIN VERIFICAR si `paid_amount` la incluye).
+//   · La propina llega aparte en `tip_amount`: `paid_amount` no la incluye (Clip, correo del 21 oct 2026).
+//
+// Confirmado por Clip por correo (Amilcar Navarro, 21 oct 2026): los estados de la intención, que
+// `amount` va como número, el filtro `serial_number` de devices/status, que /refunds acepta cobros de
+// PinPad, que el aviso no se puede firmar y que se reintenta (5 veces en 1–5 s, luego cada 2–3 min).
 import { aceptaCambio, type DatosCobro, type EstadoCobro, montoTexto, obj, txt } from "./comun.ts";
 
 const API = "https://api.payclip.io/f2f/pinpad/v1";
 const API_REEMBOLSOS = "https://api.payclip.com/refunds"; // otro dominio (.com), según post_refunds.md
 
 /**
- * Los estados de la intención no están enumerados en la documentación: solo aparecen COMPLETED,
- * PENDING, PAYMENT_PENDING y FAILED. Todo menos COMPLETED es SIN VERIFICAR (cómo se ve un cobro
- * cancelado o pagado a medias, no se sabe). Uno desconocido, o un COMPLETED sin ninguna transacción
- * aprobada, nunca es APROBADO: es REVISAR.
+ * Estados de la intención según Clip (sin kiosco ni pago dividido): PENDING, IN_PROCESS, CANCELED
+ * (en el lector o por API), REJECTED (falló, o el operador lo canceló en el lector) y APPROVED.
+ * COMPLETED sale en el ejemplo de la documentación y se trata igual que APPROVED. Uno desconocido,
+ * o un aprobado sin ninguna transacción aprobada, nunca es APROBADO: es REVISAR.
  */
 export function estadoDeIntencion(status: unknown, aprobadas: number): EstadoCobro {
   switch (status) {
-    case "COMPLETED": return aprobadas > 0 ? "APROBADO" : "REVISAR";
-    case "PENDING": case "PAYMENT_PENDING": return "EN_TERMINAL"; // SIN VERIFICAR
-    case "FAILED": return "RECHAZADO"; // SIN VERIFICAR
+    case "APPROVED": case "COMPLETED": return aprobadas > 0 ? "APROBADO" : "REVISAR";
+    case "PENDING": case "IN_PROCESS": return "EN_TERMINAL";
+    case "CANCELED": return "CANCELADO";
+    case "REJECTED": return "RECHAZADO";
     default: return "REVISAR";
   }
 }
@@ -46,7 +51,7 @@ const dinero = (c: number): string | null => (c > 0 ? (c / 100).toFixed(2) : nul
 export function datosDeIntencion(intencion: unknown): DatosCobro {
   const i = obj(intencion);
   const resultados = obj(i.detail).results;
-  const aprobados = (Array.isArray(resultados) ? resultados : []).map(obj).filter((r) => r.status === "approved");
+  const aprobados = (Array.isArray(resultados) ? resultados : []).map(obj).filter((r) => String(r.status).toLowerCase() === "approved"); // SIN VERIFICAR: en minúsculas en la documentación
   const p = aprobados[0] ?? {};
   const medio = obj(p.payment_method);
   const suma = (k: string) => dinero(aprobados.reduce((s, r) => s + centavos(r[k]), 0));
@@ -109,10 +114,13 @@ export function clienteClip(apiKey: string, secreto: string, pedir: typeof fetch
   const ruta = (r: string) => API + r;
 
   return {
-    /** Responde `pinpad_request_id`. SIN VERIFICAR: qué pasa con una `reference` repetida. */
+    /**
+     * Responde `pinpad_request_id`. Una `reference` repetida no se rechaza y confunde los estados
+     * (Clip): cada intento lleva un id de cobro nuevo. `amount` va como número (Clip).
+     */
     crearIntencion: (c: { cobroId: string; monto: string; serie: string; webhookUrl: string; imprime: boolean }) =>
       llamar("POST", ruta("/payment"), {
-        amount: c.monto,
+        amount: Number(c.monto),
         reference: c.cobroId,
         serial_number_pos: c.serie,
         webhook_url: c.webhookUrl,
@@ -132,16 +140,18 @@ export function clienteClip(apiKey: string, secreto: string, pedir: typeof fetch
     /** Cancela lo que tenga ese lector (para una creación sin respuesta, cuando no se conoce el id). */
     cancelarPorSerie: (serie: string) => llamar("DELETE", ruta(`/payment/serial-number/${encodeURIComponent(serie)}`)),
 
-    /** Arreglo de lectores con `serial_number` y `status` (active, inactive, expired, unknown). Ver `lectoresDe`. */
-    estadoLectores: () => llamar("GET", ruta("/devices/status")),
+    /** Arreglo de lectores con `serial_number` y `status` (active, inactive, expired, unknown). Ver `lectoresDe`. Con `serie`, solo ese lector. */
+    estadoLectores: (serie?: string) =>
+      llamar("GET", ruta(`/devices/status${serie ? `?serial_number=${encodeURIComponent(serie)}` : ""}`)),
 
     /** Hasta 25 lectores por petición. `timeoutSeg: null` desactiva el timeout de inactividad. SIN VERIFICAR: que baste mandar solo `timeout_seg`. */
     configurarLectores: (series: string[], timeoutSeg: number | null) =>
       llamar("POST", ruta("/devices"), { devices: series, preferences: { timeout_seg: timeoutSeg } }),
 
     /**
-     * Total o parcial, hasta 180 días. SIN VERIFICAR: que aplique a cobros de PinPad y que baste el
-     * `transaction_id`. La llave dura 1 minuto. Requiere «balance» del día en la cuenta Clip.
+     * Total o parcial, hasta 180 días. Acepta cobros de PinPad (Clip); recomiendan el id de la
+     * transacción sobre `receipt_no` (SIN VERIFICAR que ese id sea `transaction_id`). La llave dura
+     * 1 minuto. Requiere «balance» del día en la cuenta Clip.
      */
     reembolsar: (transactionId: string, monto: string) =>
       llamar("POST", API_REEMBOLSOS, { reference: { type: "transaction", id: transactionId }, amount: Number(monto) },

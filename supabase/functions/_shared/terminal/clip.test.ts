@@ -55,9 +55,14 @@ test("estados", () => {
   assert.equal(estadoDeIntencion("ALGO_NUEVO", 1), "REVISAR");
   assert.equal(estadoDeIntencion("COMPLETED", 0), "REVISAR");
   assert.equal(estadoDeIntencion("PENDING", 0), "EN_TERMINAL");
-  assert.equal(estadoDeIntencion("PAYMENT_PENDING", 0), "EN_TERMINAL");
-  assert.equal(estadoDeIntencion("FAILED", 0), "RECHAZADO");
+  assert.equal(estadoDeIntencion("IN_PROCESS", 0), "EN_TERMINAL");
+  assert.equal(estadoDeIntencion("CANCELED", 0), "CANCELADO");
+  assert.equal(estadoDeIntencion("REJECTED", 0), "RECHAZADO");
+  assert.equal(estadoDeIntencion("APPROVED", 1), "APROBADO");
+  assert.equal(estadoDeIntencion("APPROVED", 0), "REVISAR");
+  assert.equal(estadoDeIntencion("FAILED", 0), "REVISAR");
   assert.equal(estadoDeIntencion("PENDING", 1), "EN_TERMINAL");
+  assert.equal(datosDeIntencion(intencion("APPROVED", [resultado({ status: "APPROVED" })])).estado, "APROBADO");
   assert.equal(datosDeIntencion(intencion("COMPLETED", [])).estado, "REVISAR");
   assert.equal(datosDeIntencion(null).estado, "REVISAR");
 });
@@ -86,7 +91,7 @@ test("crearIntencion arma la petición", async () => {
   assert.equal(init.method, "POST");
   assert.equal((init.headers as Record<string, string>).Authorization, "Basic " + btoa("k:s"));
   const b = JSON.parse(String(init.body));
-  assert.equal(b.amount, "348.00");
+  assert.equal(b.amount, 348);
   assert.equal(b.reference, "c1");
   assert.equal(b.serial_number_pos, "P82");
   assert.equal(b.webhook_url, "https://x/w?c=c1");
@@ -123,7 +128,9 @@ test("lectores y su configuración", async () => {
   const c = clienteClip("k", "s", f.pedir);
   const r = await c.estadoLectores();
   await c.configurarLectores(["P82"], null);
+  await c.estadoLectores("AA61B 1");
   assert.equal(f.llamadas[0].url, "https://api.payclip.io/f2f/pinpad/v1/devices/status");
+  assert.equal(f.llamadas[2].url, "https://api.payclip.io/f2f/pinpad/v1/devices/status?serial_number=AA61B%201");
   assert.equal(f.llamadas[1].url, "https://api.payclip.io/f2f/pinpad/v1/devices");
   assert.deepEqual(JSON.parse(String(f.llamadas[1].init.body)), { devices: ["P82"], preferences: { timeout_seg: null } });
   assert.deepEqual(lectoresDe(r.cuerpo), [{ serie: "P82", estado: "active" }]);

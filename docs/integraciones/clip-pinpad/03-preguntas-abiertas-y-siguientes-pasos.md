@@ -69,12 +69,10 @@ Rama `feat/terminal-clip` (ADR 0050). Nada de esto se ha visto con un lector.
 
 **Con lector:**
 
-- Todos los estados distintos de `COMPLETED` (rechazo, cancelación, vencimiento).
+- Ver en la consulta los estados que Clip confirmó (§F) y si la transacción dice `approved` o `APPROVED`.
 - Que cancelar con 200 deje el cobro en `CANCELADO`.
-- Devoluciones con transacciones de PinPad.
+- Una devolución real, y qué «ID» de la transacción recomienda Clip (el código usa `transaction_id`).
 - El cuerpo de `POST /devices`.
-- Propina elegida en el lector: cómo regresan `tip_amount` y `amount_paid`.
-- Si Clip reintenta el aviso tras un 500.
 - El valor de `payment_method.type` en débito (el código espera `debit_card`).
 - Qué guardar como autorización en `terminal_aprobacion`: `receipt_no` o `transaction_id`.
 - Dónde llega `ERR10_04` en la respuesta: `code` o `error_code`.
@@ -91,3 +89,23 @@ Rama `feat/terminal-clip` (ADR 0050). Nada de esto se ha visto con un lector.
 - Regenerar tipos con `pnpm db:types` (hoy están editados a mano).
 - Ver el admin y la caja en vivo, con capturas (MP con terminal virtual; Clip con lector apagado).
 - Aplicar la migración 0260 con `--include-all` (las ramas locales traen 0188–0250).
+
+## F. Respuestas de Clip (21 oct 2026)
+
+Por correo, de Amilcar Navarro (Integrations Specialist de Clip). Ya aplicadas en `clip.ts`.
+
+- **Instalación de PinPad:** unos 3 minutos desde que Clip confirma el envío, con el lector encendido
+  y buen WiFi. Se puede pedir para muchos lectores a la vez.
+- **Integradores:** no hay esquema. Cada comercio crea su cuenta y su API key (así se le deposita a él).
+- **Aviso:** no se puede firmar; sí restringir por la IP de origen. Se reintenta 5 veces en 1–5 s y
+  luego cada 2–3 min.
+- **Estados de la intención** (sin kiosco ni pago dividido): `PENDING` (raro: la API borra sola lo que
+  no llegó al lector), `IN_PROCESS`, `CANCELED` (en el lector o por API), `REJECTED` (falló, o el
+  operador lo canceló en el lector) y `APPROVED`.
+- **`reference` repetida:** no se rechaza y confunde los estados. Mandar siempre una nueva (ya se hace).
+- **Devoluciones:** aceptan cobros de PinPad; recomiendan el ID de la transacción sobre `receipt_no`.
+- **`amount`:** número.
+- **Un solo lector:** `GET /devices/status/?serial_number=<serie>`.
+- **Propina en el lector:** llega aparte en `tip_amount`. Con esto ya se puede construir la propina
+  elegida en el lector.
+- **Modelos:** Total 3, Ultra, Clip PinPad y Clip Stand 2.
