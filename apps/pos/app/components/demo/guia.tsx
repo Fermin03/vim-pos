@@ -154,6 +154,9 @@ export function Guia({ fin }: { fin?: ReactNode }) {
     return (
       <aside aria-label="Guía de la demo" className="fixed bottom-4 left-4 z-[100] flex items-center gap-4 rounded-lg border border-line bg-surface px-4 py-3 shadow-xl">
         <span className="text-14 text-ink-2">Guía en pausa: cobra tu otra venta y seguimos.</span>
+        <Button variant="ghost" onClick={() => cambiar((g) => ({ activa: true, indice: g.indice + 1 }))}>
+          Seguir con la guía
+        </Button>
         {botonSalir}
       </aside>
     );

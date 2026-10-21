@@ -4,8 +4,14 @@ import { PASOS, estadoDelPaso, pasoActual, seguirPausa, slugTour, type Raiz } fr
 /** Un DOM de mentira: `querySelector` responde según los selectores presentes (con su cuenta). */
 function raizCon(presentes: Record<string, number> | string[]): Raiz {
   const cuenta = Array.isArray(presentes) ? Object.fromEntries(presentes.map((s) => [s, 1])) : presentes;
+  // `[data-tour^="x"]` (prefijo) coincide con cualquier `[data-tour="x…"]` presente, como en el DOM.
+  const prefijo = (s: string) => s.match(/^\[data-tour\^="(.*)"\]$/)?.[1];
+  const existe = (s: string) => {
+    const p = prefijo(s);
+    return p === undefined ? !!cuenta[s] : Object.keys(cuenta).some((k) => k.startsWith(`[data-tour="${p}`));
+  };
   return {
-    querySelector: ((s: string) => (cuenta[s] ? ({} as Element) : null)) as Raiz["querySelector"],
+    querySelector: ((s: string) => (existe(s) ? ({} as Element) : null)) as Raiz["querySelector"],
     querySelectorAll: ((s: string) => ({ length: cuenta[s] ?? 0 })) as unknown as Raiz["querySelectorAll"],
   };
 }
@@ -49,8 +55,25 @@ describe("guía «Hazlo tú»", () => {
     expect(pasoActual(PASOS, 0, raizCon([]))).toBe(0);
   });
 
-  it("se adelantó: con 0–3 listos salta al 4", () => {
-    expect(pasoActual(PASOS, 0, conListos([0, 1, 2, 3]))).toBe(4);
+  it("se adelantó: con el turno abierto y la hamburguesa en el ticket, desde 0 va a la bebida", () => {
+    const i8 = PASOS.findIndex((p) => p.numero === 8);
+    expect(pasoActual(PASOS, 0, raizCon([t("cerrar-turno"), t("ticket-item")]))).toBe(i8);
+  });
+
+  it("índice viejo al recargar: en la venta con producto en pantalla salta a la hamburguesa", () => {
+    const i6 = PASOS.findIndex((p) => p.numero === 6);
+    expect(pasoActual(PASOS, 0, raizCon([t("producto-crazy-clásica"), t("cobrar")]))).toBe(i6);
+  });
+
+  it("índice viejo al recargar: en el inicio con turno abierto salta a Para llevar", () => {
+    const i5 = PASOS.findIndex((p) => p.numero === 5);
+    expect(pasoActual(PASOS, 1, raizCon([t("cerrar-turno"), t("para-llevar"), t("monitor")]))).toBe(i5);
+  });
+
+  it("índice viejo al recargar: ya cobró → se detiene en la explicación del ticket", () => {
+    const i11 = PASOS.findIndex((p) => p.numero === 11);
+    expect(pasoActual(PASOS, 0, raizCon([t("cobro-completado"), t("ticket")]))).toBe(i11);
+    expect(pasoActual(PASOS, 2, raizCon([t("monitor-pantalla")]))).toBe(i11);
   });
 
   it("al recargar no retrocede: desde 6 se queda en 6 aunque 0–5 no se cumplan", () => {
@@ -99,6 +122,16 @@ describe("guía «Hazlo tú»", () => {
     expect(seguirPausa("cerrar", sin)).toBe("cobro");
     expect(seguirPausa("cobro", sin)).toBe("cobro");
     expect(seguirPausa("cobro", con)).toBeNull();
+  });
+
+  it("pausa: si se va al monitor, al cierre o al corte sin cobrar, la guía sigue", () => {
+    for (const p of ["cerrar", "cobro"] as const) {
+      for (const id of ["monitor-pantalla", "conteo-efectivo", "corte"]) {
+        expect(seguirPausa(p, raizCon([t(id)]))).toBeNull();
+      }
+      // En el inicio (Cerrar turno visible) la pausa sigue: ahí se vuelve a vender.
+      expect(seguirPausa(p, raizCon([t("cerrar-turno")]))).toBe("cobro");
+    }
   });
 
   it("slugTour: minúsculas y espacios a guiones", () => {

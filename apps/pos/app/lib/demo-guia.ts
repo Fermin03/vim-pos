@@ -32,63 +32,78 @@ const hay = (r: Raiz, sel: string) => r.querySelector(sel) !== null;
 const HAMBURGUESA = t(`producto-${slugTour("Crazy Clásica")}`);
 const BEBIDA = t(`producto-${slugTour("Refresco 600 ml")}`);
 const COBRO_COMPLETADO = t("cobro-completado");
+const RENGLON = t("ticket-item");
+
+// Evidencia acumulada de los pasos «hazlo» 2–10: cada una vale también si ya hay señal de un paso
+// posterior. Así, con un índice viejo (recarga) y la persona varias pantallas adelante, la guía
+// salta hasta donde está y no se queda en «perdida» esperando un ancla que ya pasó.
+const tras = (r: Raiz) => hay(r, t("monitor-pantalla")) || hay(r, t("conteo-efectivo")) || hay(r, t("corte"));
+const cobrado = (r: Raiz) => hay(r, COBRO_COMPLETADO) || tras(r);
+const enCobro = (r: Raiz) => hay(r, t("cobro")) || cobrado(r);
+const conBebida = (r: Raiz) => r.querySelectorAll(RENGLON).length >= 2 || enCobro(r);
+const conHamburguesa = (r: Raiz) => (hay(r, RENGLON) && !hay(r, t("modificadores"))) || conBebida(r);
+const eligiendo = (r: Raiz) => hay(r, t("modificadores")) || hay(r, RENGLON) || conHamburguesa(r);
+// «Para llevar» exige turno abierto, así que estar en la venta prueba que el turno ya se abrió.
+const enVenta = (r: Raiz) => hay(r, '[data-tour^="producto-"]') || eligiendo(r);
+const turnoAbierto = (r: Raiz) => hay(r, t("cerrar-turno")) || enVenta(r);
+const enInicio = (r: Raiz) => hay(r, t("abrir-turno")) || turnoAbierto(r);
 
 export const PASOS: Paso[] = [
   {
     numero: 2, etapa: "Abrir turno", tipo: "hazlo", ancla: t("empleado-ana"),
     titulo: "Elige a Ana",
     texto: "Cada empleado entra con su nombre. Toca a Ana, la cajera.",
-    listo: (r) => hay(r, t("pin")),
+    listo: (r) => hay(r, t("pin")) || enInicio(r),
   },
   {
     numero: 3, etapa: "Abrir turno", tipo: "hazlo", ancla: t("pin"),
     titulo: "Teclea su PIN: 1234",
     texto: "Con el PIN la caja sabe quién cobró qué.",
     // Llegó al inicio, con o sin turno.
-    listo: (r) => hay(r, t("abrir-turno")) || hay(r, t("cerrar-turno")),
+    listo: enInicio,
   },
   {
     numero: 4, etapa: "Abrir turno", tipo: "hazlo", ancla: t("fondo"), abrir: t("abrir-turno"),
     titulo: "Abre el turno",
     texto: "Toca Abrir turno, escribe $500 de fondo de caja y confírmalo.",
     // El acceso «Cerrar turno» solo existe con el turno abierto.
-    listo: (r) => hay(r, t("cerrar-turno")),
+    listo: turnoAbierto,
   },
   {
     numero: 5, etapa: "Hacer una venta", tipo: "hazlo", ancla: t("para-llevar"),
     titulo: "Elige el tipo de pedido",
     texto: "Toca Para llevar. Del tipo de pedido dependen el ticket y la comanda.",
-    listo: (r) => hay(r, HAMBURGUESA),
+    listo: (r) => hay(r, HAMBURGUESA) || enVenta(r),
   },
   {
     numero: 6, etapa: "Hacer una venta", tipo: "hazlo", ancla: HAMBURGUESA,
     titulo: "Toca una hamburguesa",
     texto: "Toca Crazy Clásica. Te pedirá el término y no deja seguir sin él.",
-    listo: (r) => hay(r, t("modificadores")) || hay(r, t("ticket-item")),
+    listo: eligiendo,
   },
   {
     numero: 7, etapa: "Hacer una venta", tipo: "hazlo", ancla: t("modificadores"),
     titulo: "Término, extra y nota",
     texto: "Elige el término, agrega un extra con precio y escribe la nota «sin cebolla». Luego agrégala.",
-    listo: (r) => hay(r, t("ticket-item")) && !hay(r, t("modificadores")),
+    listo: conHamburguesa,
   },
   {
     numero: 8, etapa: "Hacer una venta", tipo: "hazlo", ancla: BEBIDA, abrir: t("categoria-bebidas"),
     titulo: "Agrega una bebida",
     texto: "Abre Bebidas y toca Refresco 600 ml. A la derecha ves cómo se arma el ticket.",
-    listo: (r) => r.querySelectorAll(t("ticket-item")).length >= 2,
+    listo: conBebida,
   },
   {
     numero: 9, etapa: "Hacer una venta", tipo: "hazlo", ancla: t("cobrar"),
     titulo: "Cobra",
     texto: "Toca Cobrar para pasar a la pantalla de cobro.",
-    listo: (r) => hay(r, t("cobro")) || hay(r, COBRO_COMPLETADO),
+    listo: enCobro,
   },
   {
     numero: 10, etapa: "Hacer una venta", tipo: "hazlo", ancla: t("cobro"),
     titulo: "Pago dividido",
     texto: "Agrega propina si quieres. Luego toca Pago dividido: una parte en efectivo y otra con tarjeta.",
-    listo: (r) => hay(r, COBRO_COMPLETADO),
+    listo: cobrado,
   },
   {
     numero: 11, etapa: "Hacer una venta", tipo: "explica", ancla: t("ticket"),
@@ -140,9 +155,13 @@ export function estadoDelPaso(p: Paso, r: Raiz): "visible" | "perdida" {
   return hay(r, p.ancla) || (p.abrir !== undefined && hay(r, p.abrir)) ? "visible" : "perdida";
 }
 
-/** Siguiente estado de la pausa del paso 12; `null` = ya cobró otra venta, la guía sigue. */
+/**
+ * Siguiente estado de la pausa del paso 12; `null` = la guía sigue: ya cobró otra venta, o se fue
+ * al monitor, al cierre o al corte sin cobrarla (la pausa no puede dejarla fuera del final).
+ */
 export function seguirPausa(p: Pausa, r: Raiz): Pausa | null {
-  const cobrado = hay(r, COBRO_COMPLETADO);
-  if (p === "cerrar") return cobrado ? "cerrar" : "cobro";
-  return cobrado ? null : "cobro";
+  if (tras(r)) return null;
+  const hayCobro = hay(r, COBRO_COMPLETADO);
+  if (p === "cerrar") return hayCobro ? "cerrar" : "cobro";
+  return hayCobro ? null : "cobro";
 }
