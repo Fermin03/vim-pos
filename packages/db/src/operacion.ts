@@ -43,6 +43,11 @@ export const GIROS_BELLEZA: readonly CodigoGiro[] = ["SALON", "SPA", "PELUQUERIA
 
 export const esGiroBelleza = (g: string | null | undefined): boolean => GIROS_BELLEZA.some((b) => b === g);
 
+/** Comida rápida y food truck: su caja navega con la barra de abajo, como la tienda, y cobra como restaurante. */
+export const GIROS_COMIDA_RAPIDA: readonly CodigoGiro[] = ["QUICK_SERVICE", "FOODTRUCK"];
+
+export const esGiroComidaRapida = (g: string | null | undefined): boolean => GIROS_COMIDA_RAPIDA.some((c) => c === g);
+
 export const nombreGiro = (codigo: string | null | undefined): string =>
   GIROS.find((g) => g.codigo === codigo)?.nombre ?? codigo ?? "—";
 

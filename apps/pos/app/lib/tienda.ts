@@ -1,6 +1,6 @@
 "use client";
 import { deviceClient, employeeClient } from "./supabase";
-import { esGiroBelleza, esGiroTienda } from "@vim/db/operacion";
+import { esGiroBelleza, esGiroComidaRapida, esGiroTienda } from "@vim/db/operacion";
 import type { NombreIcono } from "@vim/ui/styles";
 import type { Producto } from "./catalogo";
 import type { DatosCaja } from "./turno";
@@ -14,8 +14,14 @@ export const esBelleza = (caja: DatosCaja | null): boolean => esGiroBelleza(caja
 /** La caja de belleza vende como la de tienda (Venta, devoluciones por renglón, cuentas). */
 export const comoTienda = (caja: DatosCaja | null): boolean => esTienda(caja) || esBelleza(caja);
 
-/** Destinos de la barra inferior de la caja de tienda (pos-retail.md, «Versión 2») y de la de belleza. */
-export type SeccionTienda = "panel" | "inventario" | "transacciones" | "notificaciones" | "configuracion" | "calendario" | "clientes";
+/** Comida rápida y food truck: la barra de abajo de la tienda, pero ticket, comanda y cobro de restaurante (no son `comoTienda`). */
+export const esComidaRapida = (caja: DatosCaja | null): boolean => esGiroComidaRapida(caja?.giro);
+
+/** Navegación: la barra de abajo en vez de la pantalla de inicio. El ticket y el cobro los decide `comoTienda`. */
+export const conBarraAbajo = (caja: DatosCaja | null): boolean => comoTienda(caja) || esComidaRapida(caja);
+
+/** Destinos de la barra inferior de la caja de tienda (pos-retail.md, «Versión 2»), la de belleza y la de comida rápida. */
+export type SeccionTienda = "panel" | "inventario" | "transacciones" | "notificaciones" | "configuracion" | "calendario" | "clientes" | "pedidos";
 
 export type Destino = { seccion: SeccionTienda; etiqueta: string; icono: NombreIcono };
 
@@ -35,13 +41,26 @@ const DESTINOS_BELLEZA: Destino[] = [
   { seccion: "configuracion", etiqueta: "Más", icono: "menu" },
 ];
 
+/** Comida rápida: «Pedidos» junta lo que espera atención; Inventario solo con el módulo `existencias`. */
+const DESTINOS_COMIDA: Destino[] = [
+  { seccion: "panel", etiqueta: "Cobrar", icono: "caja" },
+  { seccion: "pedidos", etiqueta: "Pedidos", icono: "para-llevar" },
+  { seccion: "inventario", etiqueta: "Inventario", icono: "etiqueta" },
+  { seccion: "transacciones", etiqueta: "Transacciones", icono: "recibo" },
+  { seccion: "configuracion", etiqueta: "Más", icono: "menu" },
+];
+const DESTINOS_COMIDA_SIN_INVENTARIO = DESTINOS_COMIDA.filter((d) => d.seccion !== "inventario");
+
 /**
  * La barra de belleza solo con el módulo `agenda` encendido (`moduloActivo(modulos, "agenda")`): sin
- * él, la caja de belleza es una caja de tienda y no enseña Calendario ni Clientes.
+ * él, la caja de belleza es una caja de tienda y no enseña Calendario ni Clientes. `existencias` (el
+ * módulo) solo cuenta en comida rápida: la tienda siempre lleva Inventario.
  */
-export const destinosDe = (caja: DatosCaja | null, agenda: boolean): Destino[] => (esBelleza(caja) && agenda ? DESTINOS_BELLEZA : DESTINOS_TIENDA);
+export const destinosDe = (caja: DatosCaja | null, agenda: boolean, existencias: boolean): Destino[] =>
+  esComidaRapida(caja) ? (existencias ? DESTINOS_COMIDA : DESTINOS_COMIDA_SIN_INVENTARIO)
+    : esBelleza(caja) && agenda ? DESTINOS_BELLEZA : DESTINOS_TIENDA;
 
-/** Donde abre la caja y a donde regresa Escape: el calendario en belleza con agenda, el Panel en tienda. */
+/** Donde abre la caja y a donde regresa Escape: el calendario en belleza con agenda, el Panel (Cobrar) en tienda y en comida rápida. */
 export const seccionInicial = (caja: DatosCaja | null, agenda: boolean): SeccionTienda => (esBelleza(caja) && agenda ? "calendario" : "panel");
 
 /** Con un cobro o un diálogo encima la barra no navega: sería trabajo que se pierde de vista. */

@@ -8,7 +8,7 @@ import type { Destino, SeccionTienda } from "../lib/tienda";
  * `bloqueada` (un cobro o un diálogo encima) la deja sin responder.
  */
 export function BarraTienda({ destinos, seccion, onCambiar, pendientes, bloqueada }: {
-  /** `destinosDe(caja, agenda)`: la barra de tienda o la de belleza. */
+  /** `destinosDe(caja, agenda, existencias)`: la barra de tienda, la de belleza o la de comida rápida. */
   destinos: Destino[];
   seccion: SeccionTienda;
   onCambiar: (s: SeccionTienda) => void;

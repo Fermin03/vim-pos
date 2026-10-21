@@ -30,6 +30,7 @@ export function ContenidoMenu({
   onMovimientoCaja,
   onCreditos,
   onCotizaciones,
+  onConsultarCuentas,
   onSalir,
   ayuda,
 }: {
@@ -59,6 +60,8 @@ export function ContenidoMenu({
   onCreditos?: () => void;
   /** Solo la tienda, con el módulo de cotizaciones. */
   onCotizaciones?: () => void;
+  /** Comida rápida, que no tiene inicio: su acceso «Consultar cuentas». */
+  onConsultarCuentas?: () => void;
   onSalir?: () => void;
   /** Para el mensaje de "Ayuda por WhatsApp": desde qué negocio, sucursal y caja se escribe. */
   ayuda?: { negocio?: string | null; sucursal?: string | null; caja?: string | null; cajero?: string | null };
@@ -125,7 +128,7 @@ export function ContenidoMenu({
         )}
       </SeccionMenu>
       )}
-      {(onKds || onDevoluciones || onCorteX || onEnEspera || onAbrirCajon || onMovimientoCaja) && (
+      {(onKds || onDevoluciones || onCorteX || onEnEspera || onAbrirCajon || onMovimientoCaja || onConsultarCuentas) && (
       <SeccionMenu titulo="Operación">
         {onKds && moduloActivo(modulos, "kds") && (
           <TileMenu label="Cocina" onClick={con(onKds)} icon={<Icono nombre="megafono" className="h-8 w-8" />} />
@@ -137,6 +140,9 @@ export function ContenidoMenu({
             puerta: se podía dejar un pedido en espera pero ya no recuperarlo. */}
         {onCorteX && (
           <TileMenu label="Corte caja X" onClick={con(onCorteX)} icon={<Icono nombre="recibo" className="h-8 w-8" />} />
+        )}
+        {onConsultarCuentas && (
+          <TileMenu label="Consultar cuentas" onClick={con(onConsultarCuentas)} icon={<Icono nombre="recibo" className="h-8 w-8" />} />
         )}
         {onEnEspera && (
           <TileMenu label="Pedidos en espera" badge={nEnEspera} onClick={con(onEnEspera)} icon={<Icono nombre="reloj" className="h-8 w-8" />} />

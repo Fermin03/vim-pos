@@ -94,7 +94,7 @@ import { fijarContextoErrores, reportarErrorSinEsperar } from "../lib/reportar-e
 import { BotonVolver } from "./boton-volver";
 import { CatalogoProductos } from "./catalogo-productos";
 import { PanelVentaRetail, type AvisoEscaneo } from "./venta-retail";
-import { destinosDe, esBelleza, esTienda, seccionInicial, puedeRecibirMercancia, leerExistencias, leerSucursales, pasoConLimite, puedeCambiarSeccion, renglonTienda, sinExistencia, type Existencia, type PadreTienda, type SeccionTienda } from "../lib/tienda";
+import { comoTienda, conBarraAbajo, destinosDe, esComidaRapida, esBelleza, seccionInicial, puedeRecibirMercancia, leerExistencias, leerSucursales, pasoConLimite, puedeCambiarSeccion, renglonTienda, sinExistencia, type Existencia, type PadreTienda, type SeccionTienda } from "../lib/tienda";
 import { leerEstadoSync } from "../lib/estado-sync";
 import { ModalAgregarProductos } from "./modal-agregar-productos";
 import { ModalNumeroMesa } from "./modal-numero-mesa";
@@ -209,8 +209,8 @@ export function HomePos({
   >(null);
   const [enKds, setEnKds] = useState(false);
   // El POS arranca en la pantalla de inicio: el cajero elige primero a qué viene.
-  // Una tienda (y la caja de belleza) no: su barra inferior reemplaza al inicio.
-  const [enInicio, setEnInicio] = useState(() => !(esTienda(caja) || esBelleza(caja)));
+  // Una tienda (y la caja de belleza, y la de comida rápida) no: su barra inferior reemplaza al inicio.
+  const [enInicio, setEnInicio] = useState(() => !conBarraAbajo(caja));
   const [enMonitor, setEnMonitor] = useState(false);
   const [cuentasAbiertas, setCuentasAbiertas] = useState<CuentasAbiertasPorModo>({ comedor: 0, pickup: 0, domicilio: 0, barra: 0 });
   const [enMesas, setEnMesas] = useState(false);
@@ -332,8 +332,8 @@ export function HomePos({
   const [categorias, setCategorias] = useState<Categoria[] | null>(null);
   const [productos, setProductos] = useState<Producto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Una tienda no tiene inicio: abre directo en la venta (modo Para llevar), pos-retail.md «Versión 2».
-  const [carrito, dispatch] = useReducer(reducerCarrito, estadoInicial, (e) => (esTienda(caja) || esBelleza(caja) ? { ...e, modoServicio: "PARA_LLEVAR" as const } : e));
+  // Una tienda (o comida rápida) no tiene inicio: abre directo en la venta (modo Para llevar), pos-retail.md «Versión 2».
+  const [carrito, dispatch] = useReducer(reducerCarrito, estadoInicial, (e) => (conBarraAbajo(caja) ? { ...e, modoServicio: "PARA_LLEVAR" as const } : e));
   // `edicion`: el renglón del ticket que se reabrió para cambiarle los modificadores.
   const [modGrupos, setModGrupos] = useState<{ producto: Producto; grupos: GrupoModificadores[]; edicion?: LineaCarrito; /** La pesada de la tienda: entra con esta cantidad. */ cantidad?: number } | null>(null);
   // ADR 0015 — combos: catálogo de defs con slots resueltos, y el drawer de armado abierto (si hay).
@@ -622,7 +622,13 @@ export function HomePos({
   // ── Venta de tienda (giro RETAIL): solo cambia el panel izquierdo de la captura en Para llevar.
   // Un restaurante no pasa por nada de esto (pos-retail.md). La caja de belleza es la de tienda con
   // su barra (Calendario · Cobrar · Clientes · Transacciones · Más) y abre en el calendario.
-  const tienda = esTienda(caja) || esBelleza(caja);
+  const tienda = comoTienda(caja);
+  /**
+   * Navegación de tienda (barra abajo, sin inicio): la tienda y comida rápida. Comida rápida cobra
+   * como restaurante: `tienda` (ticket «Venta», sin comanda, panel de tienda) sigue apagado para ella.
+   */
+  const barraAbajo = conBarraAbajo(caja);
+  const comidaRapida = esComidaRapida(caja);
   const seccionInicio = seccionInicial(caja, agenda);
   /** La cuenta cargada es la venta de un cambio: no se le ofrece canje de lealtad (como no suma, 0200).
    *  `null` mientras se lee o si falla la lectura: tampoco se ofrece. */
@@ -735,7 +741,7 @@ export function HomePos({
    */
   const [avisosTodos, setAvisosTodos] = useState<Aviso[]>([]);
   useEffect(() => {
-    if (!tienda) return;
+    if (!barraAbajo) return;
     let vivo = true;
     const guardados = leerAvisos(turno.caja_id);
     setAvisosTodos(unirAvisos(guardados, []));
@@ -748,7 +754,7 @@ export function HomePos({
       guardarAvisos(turno.caja_id, todos);
     }).catch(() => {});
     return () => { vivo = false; };
-  }, [tienda, turno.caja_id]);
+  }, [barraAbajo, turno.caja_id]);
   const capturaTienda = tienda && carrito.modoServicio === "PARA_LLEVAR" && !cerrando && !enInicio && !enKds && !enMonitor
     && !enConsultaCuentas && !enDevoluciones && !enPedidosApps && !enDelivery && !enPickup && !enMesas && !enBarra;
   /** Selector de talla y color abierto y franja del escáner: estado de aquí para que su Escape viva en la pila. */
@@ -787,15 +793,17 @@ export function HomePos({
   /** Hora del último pull de la caja instalada; `null` en el POS web (lee la nube «al momento»). */
   const [actualizadoA, setActualizadoA] = useState<string | null>(null);
   useEffect(() => {
-    if (!tienda) return;
+    if (!barraAbajo) return;
     let vivo = true;
     leerSucursales(token).then((s) => { if (vivo) setSucursalesTienda(s); }).catch(() => { /* sin la fila de sucursales, solo se ve la propia */ });
     return () => { vivo = false; };
-  }, [tienda, token]);
+  }, [barraAbajo, token]);
+  // Comida rápida no lleva existencias en la venta (su captura es la de restaurante): solo en Inventario.
+  const leerExistenciasAhora = capturaTienda || (comidaRapida && seccionTienda === "inventario");
   // Existencias al entrar a la venta, tras cada cobro (`cuentasVersion` sube al pagar) y cada 60 s.
   // Si una lectura falla se quedan las de antes: una cifra de hace un minuto sirve más que ninguna.
   useEffect(() => {
-    if (!capturaTienda) return;
+    if (!leerExistenciasAhora) return;
     let vivo = true;
     const leer = () => {
       leerExistencias(token).then((x) => { if (vivo) setExistencias(x); }).catch(() => {});
@@ -804,7 +812,7 @@ export function HomePos({
     leer();
     const id = setInterval(leer, 60_000);
     return () => { vivo = false; clearInterval(id); };
-  }, [capturaTienda, token, cuentasVersion]);
+  }, [leerExistenciasAhora, token, cuentasVersion]);
   useEffect(() => {
     if (!capturaTienda) { setSelectorRetail(null); setCantidadRetail(null); setAvisoRetail(null); setUltimoTienda(null); }
   }, [capturaTienda]);
@@ -951,14 +959,14 @@ export function HomePos({
     setEnPickup(volverA === "pickup");
     setEnDelivery(volverA === "domicilio");
     setEnBarra(volverA === "barra");
-    setEnInicio(!tienda && volverA === "inicio");
-  }, [salirNavegacion, volverA, tienda]);
+    setEnInicio(!barraAbajo && volverA === "inicio");
+  }, [salirNavegacion, volverA, barraAbajo]);
 
   /** Vuelve a la pantalla de inicio dejando la caja limpia (sale de la cuenta de mesa si la hubiera). */
   const volverAlInicio = useCallback(() => {
     // La tienda vuelve a su barra, no a un inicio: el ticket del Panel sigue ahí y no se suelta
     // (a estas pantallas se entra desde «Más», con la venta a medias detrás).
-    if (!tienda) salirNavegacion();
+    if (!barraAbajo) salirNavegacion();
     setEnMesas(false);
     setEnPickup(false);
     setEnDelivery(false);
@@ -969,8 +977,8 @@ export function HomePos({
     setEnPedidosApps(false);
     setEnMonitor(false);
     // Una tienda regresa a su barra inferior, en la sección donde estaba (p. ej. «Más» tras el corte X).
-    setEnInicio(!tienda);
-  }, [salirNavegacion, tienda]);
+    setEnInicio(!barraAbajo);
+  }, [salirNavegacion, barraAbajo]);
 
   /**
    * El mapa de mesas y las reservaciones viven SOLO dentro de la rama de listas (Comedor, Para
@@ -2200,7 +2208,7 @@ export function HomePos({
     const capaSelector: CapaEscape = [selectorRetail != null, () => setSelectorRetail(null)];
     // La franja vive en el Panel: oculto el Panel, no se come el Escape de otra sección.
     const capaAvisoRetail: CapaEscape = [avisoRetail != null && (!tienda || seccionTienda === "panel"), () => setAvisoRetail(null)];
-    const capaConsultaInv: CapaEscape = [tienda && seccionTienda === "inventario" && cerrarConsultaInv != null, () => cerrarConsultaInv?.()];
+    const capaConsultaInv: CapaEscape = [barraAbajo && seccionTienda === "inventario" && cerrarConsultaInv != null, () => cerrarConsultaInv?.()];
     const capas: CapaEscape[] = [
       // Modificadores y combo: overlays sobre la rejilla de captura, por encima de todo lo demás.
       // El de modificadores va primero porque se pinta encima del de combo cuando ambos aplican.
@@ -2283,10 +2291,10 @@ export function HomePos({
       // atiende el suyo (regresa un paso).
       // En la tienda no hay a dónde volver desde el Panel; desde otra sección, Escape regresa al Panel
       // (en belleza, al calendario).
-      [enCaptura && !tienda, () => intentarSalirDeCaptura("atras")],
+      [enCaptura && !barraAbajo, () => intentarSalirDeCaptura("atras")],
       // Transacciones: Escape deja primero la búsqueda. Aquí y no en `capas`: no tapa la barra ni el escáner.
-      [enCaptura && tienda && seccionTienda === "transacciones" && cerrarBusquedaTx != null, () => cerrarBusquedaTx?.()],
-      [enCaptura && tienda && seccionTienda !== seccionInicio, () => void irASeccion(seccionInicio)],
+      [enCaptura && barraAbajo && seccionTienda === "transacciones" && cerrarBusquedaTx != null, () => cerrarBusquedaTx?.()],
+      [enCaptura && barraAbajo && seccionTienda !== seccionInicio, () => void irASeccion(seccionInicio)],
     ];
     return {
       // El aviso grande de la tienda va encima de TODO y CEDE: lo cierra su propio `Modal`.
@@ -2306,7 +2314,7 @@ export function HomePos({
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
       salidaPendiente, confirmandoCierre, menuGeneralAbierto, cerrando, enInicio, enKds, enMonitor,
       enConsultaCuentas, enDevoluciones, enCambioTalla, enPedidosApps, enDelivery, enPickup, enMesas, enBarra, nuevoTicket,
-      intentarSalirDeCaptura, tienda, seccionTienda, seccionInicio, reabriendoTx, cambiandoPagoTx, cerrarBusquedaTx, cerrarConsultaInv, irASeccion, avisosVim, confirmandoVenta, salirCajaAbierto, modalCita, fichaCita, esperaAgendaAbierta, eligiendoColaborador, servicioPorAgregar]);
+      intentarSalirDeCaptura, tienda, barraAbajo, seccionTienda, seccionInicio, reabriendoTx, cambiandoPagoTx, cerrarBusquedaTx, cerrarConsultaInv, irASeccion, avisosVim, confirmandoVenta, salirCajaAbierto, modalCita, fichaCita, esperaAgendaAbierta, eligiendoColaborador, servicioPorAgregar]);
   useEscape(alEscapar);
 
   // ── Cotizaciones (retail 2, entrega 3) ────────────────────────────────────────────────────
@@ -3196,8 +3204,8 @@ export function HomePos({
         </div>
       )}
       {/* La tienda no tiene inicio: su aviso de suspensión y su barra de estado van aquí, arriba. */}
-      {tienda && acceso.nivel === "gracia" && <BandaAcceso mensaje={acceso.mensaje} desde={acceso.desde} />}
-      {tienda && <BarraEstadoCaja caja={caja} online={online} turno={turno} arriba />}
+      {barraAbajo && acceso.nivel === "gracia" && <BandaAcceso mensaje={acceso.mensaje} desde={acceso.desde} />}
+      {barraAbajo && <BarraEstadoCaja caja={caja} online={online} turno={turno} arriba />}
       {/* Barra de captura: aquí no van menú, KDS ni cuentas. El cajero está anotando un pedido y
           cada ícono de más es una salida en falso; todo eso vive en el inicio.
 
@@ -3210,8 +3218,9 @@ export function HomePos({
           Va a la derecha, opuesto a "Volver": son acciones distintas y pegarlas invitaría a
           pulsar la equivocada con prisa. */}
       {/* La tienda no tiene esta fila: su barra inferior reemplaza a Volver, y el cliente y Limpiar
-          van chicos arriba del ticket (pos-retail.md, «Versión 2»). */}
-      {!tienda && (
+          van chicos arriba del ticket (pos-retail.md, «Versión 2»). Comida rápida tampoco: sus cuentas
+          abiertas y en espera viven en «Pedidos». */}
+      {!barraAbajo && (
       <div className="flex flex-shrink-0 items-center gap-3 border-b border-line bg-surface px-3 py-2">
         <BotonVolver onClick={() => intentarSalirDeCaptura("atras")} />
         {admiteClienteCuenta(carrito.modoServicio) && (
@@ -3337,7 +3346,7 @@ export function HomePos({
         </div>
       )}
 
-      {cuentaImpresa && (!tienda || seccionTienda === "panel") && (
+      {cuentaImpresa && (!barraAbajo || seccionTienda === "panel") && (
         <p className="flex-shrink-0 bg-warning-soft px-4 py-2 text-13 font-medium text-ink" role="status">
           El ticket de esta cuenta ya se imprimió. Para agregarle o quitarle algo, reábrela desde su lista con «Reabrir cuenta».
         </p>
@@ -3362,7 +3371,7 @@ export function HomePos({
       )}
 
       {/* Oculto y no desmontado fuera del Panel: nada se reinicia al volver. */}
-      <div className={tienda && seccionTienda !== "panel" ? "hidden" : "flex min-h-0 flex-1"}>
+      <div className={barraAbajo && seccionTienda !== "panel" ? "hidden" : "flex min-h-0 flex-1"}>
           {capturaTienda && agenda ? (
             // Belleza (boceto 2): Citas de hoy · Servicios · Productos. Servicios y Productos son la
             // misma rejilla de la tienda, partida por lo que se agenda y lo que no.
@@ -3526,9 +3535,12 @@ export function HomePos({
           procesando={procesandoCobro || guardandoCotizacion}
         />
       </div>
-      {tienda && seccionTienda !== "panel" && (
+      {barraAbajo && seccionTienda !== "panel" && (
         <div className="flex min-h-0 flex-1 flex-col">
-          {seccionTienda === "calendario" ? (
+          {seccionTienda === "pedidos" ? (
+            // Comida rápida: el contenedor de «Pedidos»; sus listas llegan en la entrega siguiente.
+            <section aria-label="Pedidos" className="min-h-0 flex-1 overflow-y-auto bg-bg" />
+          ) : seccionTienda === "calendario" ? (
             <SeccionCalendario
               token={token}
               sucursalId={caja.sucursal_id}
@@ -3576,8 +3588,10 @@ export function HomePos({
                   onEnEspera={nEnEspera > 0 ? () => { setEsperaError(null); setEsperaListaAbierta(true); } : undefined}
                   onAbrirCajon={() => setAbrirCajaAbierto(true)}
                   onMovimientoCaja={() => setMovimientoAbierto(true)}
-                  onCreditos={() => setEnCreditos(true)}
-                  onCotizaciones={() => setEnCotizaciones(true)}
+                  // Créditos y cotizaciones son de la venta de tienda; comida rápida cobra como restaurante.
+                  onCreditos={tienda ? () => setEnCreditos(true) : undefined}
+                  onCotizaciones={tienda ? () => setEnCotizaciones(true) : undefined}
+                  onConsultarCuentas={comidaRapida ? () => setEnConsultaCuentas(true) : undefined}
                   nEnEspera={nEnEspera}
                   onCambiarCajero={conVentaSuelta(onCambiarCajero)}
                   onBloquear={conVentaSuelta(onBloquear)}
@@ -3633,9 +3647,9 @@ export function HomePos({
           )}
         </div>
       )}
-      {tienda && (
+      {barraAbajo && (
         <BarraTienda
-          destinos={destinosDe(caja, agenda)}
+          destinos={destinosDe(caja, agenda, moduloActivo(modulos, "existencias"))}
           seccion={seccionTienda}
           onCambiar={(s) => { setProductoInventario(null); void irASeccion(s); }}
           pendientes={vistas ? sinVer(notificaciones, vistas) : 0}

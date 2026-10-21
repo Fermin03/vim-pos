@@ -7,9 +7,9 @@ import type { DatosCaja } from "../turno";
 
 (globalThis as { React?: unknown }).React = React;
 
-const etiquetas = (giro: string, agenda = true) => {
+const etiquetas = (giro: string, agenda = true, existencias = false) => {
   const html = renderToStaticMarkup(
-    React.createElement(BarraTienda, { destinos: destinosDe({ giro } as DatosCaja, agenda), seccion: "panel", onCambiar: () => {}, pendientes: 0, bloqueada: false }),
+    React.createElement(BarraTienda, { destinos: destinosDe({ giro } as DatosCaja, agenda, existencias), seccion: "panel", onCambiar: () => {}, pendientes: 0, bloqueada: false }),
   );
   return [...html.matchAll(/<span class="max-w-full[^>]*>(.*?)<\/span>/g)].map((m) => m[1]);
 };
@@ -38,5 +38,23 @@ describe("barra de belleza", () => {
   it("sin el módulo agenda, la caja de belleza es una caja de tienda", () => {
     expect(etiquetas("SALON", false)).toEqual(["Cobrar", "Inventario", "Transacciones", "Notificaciones", "Más"]);
     expect(seccionInicial({ giro: "SALON" } as DatosCaja, false)).toBe("panel");
+  });
+});
+
+describe("barra de comida rápida", () => {
+  it("dice Cobrar, Pedidos, Inventario, Transacciones y Más; Inventario solo con existencias", () => {
+    for (const giro of ["QUICK_SERVICE", "FOODTRUCK"]) {
+      expect(etiquetas(giro, false, true)).toEqual(["Cobrar", "Pedidos", "Inventario", "Transacciones", "Más"]);
+      expect(etiquetas(giro, false, false)).toEqual(["Cobrar", "Pedidos", "Transacciones", "Más"]);
+    }
+  });
+
+  it("abre en Cobrar", () => {
+    expect(seccionInicial({ giro: "QUICK_SERVICE" } as DatosCaja, false)).toBe("panel");
+    expect(seccionInicial({ giro: "FOODTRUCK" } as DatosCaja, false)).toBe("panel");
+  });
+
+  it("existencias no cambia la barra de la tienda", () => {
+    expect(etiquetas("RETAIL", false, false)).toEqual(["Cobrar", "Inventario", "Transacciones", "Notificaciones", "Más"]);
   });
 });

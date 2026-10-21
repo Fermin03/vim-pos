@@ -68,4 +68,12 @@ describe("menú general", () => {
     const resto = leer(renderToStaticMarkup(React.createElement(MenuGeneral, { onCerrar: nada, ...opciones })));
     expect(resto).not.toContain("# Ventas");
   });
+
+  it("comida rápida suma Consultar cuentas a Operación; el restaurante y la tienda no la tienen en Más", () => {
+    const { onDevoluciones: _sinDevoluciones, ...tienda } = opciones;
+    const l = leer(renderToStaticMarkup(React.createElement(ContenidoMenu, { enPagina: true, ...tienda, onMovimientoCaja: nada, onConsultarCuentas: nada })));
+    expect(l.slice(l.indexOf("# Operación"), l.indexOf("# Cuenta"))).toContain("Consultar cuentas");
+    expect(leer(renderToStaticMarkup(React.createElement(ContenidoMenu, { enPagina: true, ...tienda, onMovimientoCaja: nada })))).not.toContain("Consultar cuentas");
+    expect(leer(renderToStaticMarkup(React.createElement(MenuGeneral, { onCerrar: nada, ...opciones })))).not.toContain("Consultar cuentas");
+  });
 });
