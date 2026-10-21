@@ -145,7 +145,7 @@ export const PASOS: Paso[] = [
   {
     numero: 16, etapa: "Ver el corte", tipo: "explica", ancla: t("corte"),
     titulo: "El corte",
-    texto: "Lo que marca el sistema contra lo que contaste, con los $20 de faltante a la vista. Esto es lo que revisas cada noche.",
+    texto: "Lo que marca el sistema contra lo que contaste, con cualquier diferencia a la vista. Esto es lo que revisas cada noche.",
     listo: () => false,
   },
 ];

@@ -64,7 +64,7 @@ export function FinDemo() {
             Así de fácil es un turno con VIM POS
           </h2>
           <p className="text-14 leading-snug text-ink-2">
-            Abriste caja, cobraste con pago dividido y el corte te enseñó los $20 que faltaban. ¿Platicamos cómo quedaría con tu menú?
+            Abriste caja, cobraste con pago dividido y cerraste el turno con su corte. ¿Platicamos cómo quedaría con tu menú?
           </p>
         </header>
 
