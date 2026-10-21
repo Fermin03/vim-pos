@@ -7,7 +7,8 @@
 //   · No hay llave de idempotencia al crear: una petición sin respuesta NO se reintenta (quien llama
 //     cancela por número de serie). Por eso un timeout o fallo de red no lanza: devuelve status 0.
 //   · El aviso del webhook no trae firma ni datos: solo dice «algo cambió». Siempre se confirma con `consultar`.
-//   · La propina llega aparte en `tip_amount`: `paid_amount` no la incluye (Clip, correo del 21 oct 2026).
+//   · La propina llega en `tip_amount`, y `paid_amount`/`amount_paid` YA la incluyen (VERIFICADO 21 oct:
+//     amount 1, tip_amount 0.2, paid_amount 1.2). `amount` es el monto sin propina.
 //
 // Confirmado por Clip por correo (Amilcar Navarro, 21 oct 2026): los estados de la intención, que
 // `amount` va como número, el filtro `serial_number` de devices/status, que /refunds acepta cobros de

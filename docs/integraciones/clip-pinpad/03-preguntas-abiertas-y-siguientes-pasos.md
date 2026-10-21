@@ -122,6 +122,7 @@ Total 3 `AA61B532662500612` (modelo `K1352`, PinPad 1.27.1), con `prueba.ts` dir
 | 1 y 2 | Sin contacto, tarjeta que exige chip | `REJECTED`, `error.code` `CD-PROCESS-AS-CHIP` |
 | 3 | Chip insertado, tarjeta bloqueada | `REJECTED`, `error.code` `TX-CANCELLED-BY-PAUSE` (así reporta Clip una tarjeta bloqueada; el nombre engaña) |
 | 4 | Sin contacto, débito Visa Banorte | `PENDING` → `IN_PROCESS` → `APPROVED` en ~15 s |
+| 5 | Propina 10/15/20 en el lector, débito Mastercard, eligió 20 % | `IN_PROCESS` ~8 min (sin `timeout_seg` no vence) → `APPROVED`: `amount` 1, `tip_amount` 0.2, `paid_amount` 1.2 |
 
 Lo aprendido, ya en el código:
 
@@ -132,4 +133,7 @@ Lo aprendido, ya en el código:
 - **Devolución:** con el `id` del resultado → 404 `CL1301`; con `transaction_id` → 201 `approved` («Cancelled», mismo día). El código ya usa `transaction_id`.
 - La consulta trae datos personales de más (`private_data`: correo del cajero, dirección, afiliación). No se guardan: `terminal_eventos` solo registra `{id, event_type}` del aviso.
 
-Falta con el lector: cancelar en el lector, propina en el lector, el aviso (webhook) real y el cobro completo desde VIM.
+- **La propina SÍ va dentro de `paid_amount`** (contra lo que entendimos del correo). La caja cobra monto + propina y la devolución usa lo cobrado (`pagado_mxn`): devolvió $1.20 completo.
+- Sin `timeout_seg` configurado, un cobro se queda en `IN_PROCESS` indefinidamente; el admin lo manda al guardar la sucursal.
+
+Falta con el lector: cancelar en el lector, el aviso (webhook) real y el cobro completo desde VIM.

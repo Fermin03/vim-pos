@@ -117,16 +117,19 @@ servir(async (req, json) => {
       let devuelto = 0;
       const fallos: string[] = [];
       for (const c of (lista ?? []) as (Cobro & { pago_id_externo: string | null })[]) {
-        if (c.estado === "DEVUELTO") { devuelto += Number(c.monto_mxn); continue; } // ya estaba: repetir no devuelve dos veces
+        // Lo que cobró la terminal: con Clip incluye la propina elegida en el lector (VERIFICADO 21 oct:
+        // paid_amount 1.20 = 1.00 + 0.20). En Mercado Pago es igual al monto.
+        const total = Number(c.pagado_mxn ?? c.monto_mxn);
+        if (c.estado === "DEVUELTO") { devuelto += total; continue; } // ya estaba: repetir no devuelve dos veces
         const { prov } = await proveedorDeConexion(c.conexion_id);
         const r = prov
-          ? await prov.reembolsar({ ordenId: c.orden_id_externo!, pagoId: c.pago_id_externo, monto: Number(c.monto_mxn).toFixed(2) })
+          ? await prov.reembolsar({ ordenId: c.orden_id_externo!, pagoId: c.pago_id_externo, monto: total.toFixed(2) })
           : { ok: false as const, motivo: "CONEXION_INVALIDA" };
         if (r.ok) {
           const { error } = await admin.from("terminal_cobros")
-            .update({ estado: "DEVUELTO", detalle: "refunded", reembolsado_mxn: c.monto_mxn }).eq("id", c.id);
+            .update({ estado: "DEVUELTO", detalle: "refunded", reembolsado_mxn: total.toFixed(2) }).eq("id", c.id);
           if (error) throw error;
-          devuelto += Number(c.monto_mxn);
+          devuelto += total;
         } else {
           registrarError("terminal-cobro", "REEMBOLSO", `${c.id}: ${r.motivo}`);
           fallos.push(r.motivo);
