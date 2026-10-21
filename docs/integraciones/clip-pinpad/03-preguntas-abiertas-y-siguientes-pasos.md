@@ -124,6 +124,7 @@ Total 3 `AA61B532662500612` (modelo `K1352`, PinPad 1.27.1), con `prueba.ts` dir
 | 4 | Sin contacto, débito Visa Banorte | `PENDING` → `IN_PROCESS` → `APPROVED` en ~15 s |
 | 5 | Propina 10/15/20 en el lector, débito Mastercard, eligió 20 % | `IN_PROCESS` ~8 min (sin `timeout_seg` no vence) → `APPROVED`: `amount` 1, `tip_amount` 0.2, `paid_amount` 1.2 |
 | 6 | Cancelado en el lector | `IN_PROCESS` → `CANCELED` en ~13 s, sin `error`: la caja dice «El cobro se canceló» |
+| 7 | Cancelado por API con el cobro ya en el lector | `DELETE` → 400 `PAYMENT_REQUEST_ISSUE` («removed or taken by CLIP POS»); sigue `IN_PROCESS`. La caja dice «Cancélalo en la terminal» (cancelación FALLO), como se diseñó |
 
 Lo aprendido, ya en el código:
 
@@ -137,4 +138,4 @@ Lo aprendido, ya en el código:
 - **La propina SÍ va dentro de `paid_amount`** (contra lo que entendimos del correo). La caja cobra monto + propina y la devolución usa lo cobrado (`pagado_mxn`): devolvió $1.20 completo.
 - Sin `timeout_seg` configurado, un cobro se queda en `IN_PROCESS` indefinidamente; el admin lo manda al guardar la sucursal.
 
-Falta con el lector: cancelar desde la caja con el cobro ya en el lector, el aviso (webhook) real y el cobro completo desde VIM.
+Falta con el lector: el aviso (webhook) real y el cobro completo desde VIM.
