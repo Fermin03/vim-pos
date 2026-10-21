@@ -130,7 +130,7 @@ import { cacheGet, cachePut } from "../lib/outbox";
 import { claveCatalogo, esErrorDeRed } from "../lib/catalogo-cache";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
 import { capaVisible, type CapaEscape } from "../lib/escape";
-import { borrarCuentaVacia, leerTicketImpreso, listarCuentasAbiertas } from "../lib/cuentas-abiertas";
+import { borrarCuentaVacia, contarCuentasDeMesa, leerTicketImpreso, listarCuentasAbiertas } from "../lib/cuentas-abiertas";
 import { abrirCuentaBarra, moverCuentaABarra, moverCuentaAMesa } from "../lib/cuenta-barra";
 import { useEscape } from "../lib/use-escape";
 import { aGranel } from "../lib/unidades";
@@ -672,6 +672,9 @@ export function HomePos({
   const [seccionTienda, setSeccionTienda] = useState<SeccionTienda>(() => seccionInicial(caja, agenda));
   // Comida rápida no tiene inicio: los conteos del inicio se leen mientras «Pedidos» está a la vista.
   const viendoPedidos = comidaRapida && seccionTienda === "pedidos";
+  const [nCuentasMesa, setNCuentasMesa] = useState(0);
+  // Sube al volver de una lista a «Pedidos»: los conteos se releen en ese momento, sin esperar al sondeo.
+  const [pedidosVersion, setPedidosVersion] = useState(0);
   // Agenda de belleza: la ficha de una cita, la cita nueva o en edición, la lista de espera, y la
   // versión que relee el calendario al guardar, mover o cancelar.
   const [fichaCita, setFichaCita] = useState<string | null>(null);
@@ -1607,6 +1610,8 @@ export function HomePos({
 
   /** Lo que sigue a una venta cobrada: limpiar la pantalla, «Cobro completado», el ticket impreso,
    *  la comanda de Para llevar y el cierre del reparto. Del cobro, y de «Cobrar» con saldo 0. */
+  /** El ticket que el último cobro guardó desde el carrito (venta nueva): `cobroTerminado` no lee si ya se imprimió. */
+  const ticketNuevoDelCobro = useRef<string | null>(null);
   const cobroTerminado = useCallback(async (ticketId: string, folio: string | null, cambio: number, total: number | null, aCredito = false) => {
     // Lealtad: una cuenta cobrada ya no puede terminar un canje a medias; si quedó uno
     // guardado en este dispositivo, se limpia para que no viva para siempre. Nunca estorba al cobro.
@@ -1666,7 +1671,8 @@ export function HomePos({
       // historia están en `debeImprimirTicketAlCobrar`.
       // Comida rápida: una cuenta que ya imprimió su ticket desde la lista no saca otro. Si la
       // lectura falla, se imprime: mejor un papel de más que un cliente sin comprobante.
-      const yaImpreso = comidaRapida && await leerTicketImpreso(token, ticketId).catch(() => false);
+      // Una venta que nació en este mismo cobro no pudo imprimirse antes: no se pregunta.
+      const yaImpreso = comidaRapida && ticketNuevoDelCobro.current !== ticketId && await leerTicketImpreso(token, ticketId).catch(() => false);
       if (debeImprimirTicketAlCobrar(datos.meta.modo, comidaRapida, yaImpreso)) {
         try {
           const job = construirTicketJob(datos, await logoParaTicket(datos.ancho));
@@ -1841,6 +1847,7 @@ export function HomePos({
     setError(null);
     try {
       const totales = await persistirCarrito(c);
+      ticketNuevoDelCobro.current = totales.ticketId;
       /* EL TICKET YA EXISTE, CON FOLIO. La pantalla tiene que saberlo desde este instante.
 
          Antes solo se guardaba en `totalesCobro` (para el modal), y `ticketBd` se quedaba en
@@ -2069,7 +2076,7 @@ export function HomePos({
     refrescar();
     const id = setInterval(refrescar, 20_000);
     return () => { vivo = false; clearInterval(id); };
-  }, [tienda, enInicio, carrito.modoServicio, viendoPedidos, ticketBd?.ticketId, token, caja.sucursal_id, refrescarEspera]);
+  }, [tienda, enInicio, carrito.modoServicio, viendoPedidos, pedidosVersion, ticketBd?.ticketId, token, caja.sucursal_id, refrescarEspera]);
 
   /** Abre una cuenta de Para llevar desde su lista, para cobrarla (o cancelarla) aquí mismo. */
   const abrirCuentaLlevar = useCallback(async (ticketId: string) => {
@@ -2095,11 +2102,18 @@ export function HomePos({
       contarCuentasAbiertasPorModo(token, turno.id)
         .then((c) => { if (vivo) setCuentasAbiertas(c); })
         .catch(() => { /* el badge es informativo; su fallo no debe romper el inicio */ });
+      // «Cuentas de mesa» cuenta lo mismo que su lista (MESA y COMER_AQUI de la sucursal, sin espera):
+      // el badge de Comedor del inicio cuenta otra cosa y se queda como está.
+      if (viendoPedidos) {
+        contarCuentasDeMesa(token, caja.sucursal_id)
+          .then((n) => { if (vivo) setNCuentasMesa(n); })
+          .catch(() => { /* informativo */ });
+      }
     };
     cargar();
     const id = setInterval(cargar, 15000);
     return () => { vivo = false; clearInterval(id); };
-  }, [enInicio, viendoPedidos, token, turno.id]);
+  }, [enInicio, viendoPedidos, pedidosVersion, token, turno.id, caja.sucursal_id]);
 
   // ADR 0011 — pedidos de apps: se consultan SIEMPRE (no solo en el inicio) porque un pedido de
   // Uber tiene minutos para aceptarse y el cajero puede estar en medio de una venta. Una consulta
@@ -2929,6 +2943,7 @@ export function HomePos({
   const salirDeLista = () => {
     volverAlInicio();
     setSeccionTienda((s) => seccionTrasLista(caja, s));
+    if (comidaRapida) { setPedidosVersion((v) => v + 1); releerEnLinea.current(); }
   };
 
   if (enKds) {
@@ -3660,7 +3675,7 @@ export function HomePos({
               nPickup={cuentasAbiertas.pickup + porAceptarTienda.pickup + cuentasPagadasEnLinea(pedidosTienda, "DRIVE_THRU").length}
               nDomicilio={cuentasAbiertas.domicilio + porAceptarTienda.domicilio + cuentasPagadasEnLinea(pedidosTienda, "DELIVERY_PROPIO").length}
               nEnLinea={nPedidosApps}
-              nMesa={cuentasAbiertas.comedor}
+              nMesa={nCuentasMesa}
               onEnEspera={() => { setEsperaError(null); setEsperaListaAbierta(true); }}
               onParaLlevar={() => { setLlevarError(null); setLlevarListaAbierta(true); }}
               onPickup={() => setEnPickup(true)}
@@ -3783,7 +3798,7 @@ export function HomePos({
           seccion={seccionTienda}
           onCambiar={(s) => { setProductoInventario(null); void irASeccion(s); }}
           pendientes={vistas ? sinVer(notificaciones, vistas) : 0}
-          pendientesPedidos={comidaRapida ? globoPedidos(nPedidosApps, porAceptarTienda, nEnEspera) : 0}
+          pendientesPedidos={comidaRapida ? globoPedidos(hayEnLinea ? nPedidosApps : 0, porAceptarTienda, nEnEspera) : 0}
           bloqueada={!puedeCambiarSeccion(algoAbierto || avisoTiendaVisible, totalesCobro != null)}
         />
       )}

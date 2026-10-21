@@ -3,6 +3,7 @@ import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { SeccionPedidos } from "../../components/seccion-pedidos";
 import { BarraTienda } from "../../components/barra-tienda";
+import { copiaDeLista } from "../../components/pantalla-cuentas-modo";
 import { destinosDe, globoPedidos, seccionTrasLista } from "../tienda";
 import type { DatosCaja } from "../turno";
 
@@ -67,6 +68,16 @@ describe("globo de Pedidos", () => {
       destinos: destinosDe({ giro: "QUICK_SERVICE" } as DatosCaja, false, false), seccion: "panel", onCambiar: nada, pendientes: 0, pendientesPedidos: 7, bloqueada: false,
     }));
     expect(html).toMatch(/>7<\/span>.*Pedidos/);
+  });
+});
+
+describe("lista de cuentas de mesa", () => {
+  it("en comida rápida se titula «Cuentas de mesa» y su vacío no manda abrir una mesa", () => {
+    const c = copiaDeLista("COMER_AQUI", true);
+    expect(c.titulo).toBe("Cuentas de mesa");
+    expect(c.vacioTexto).not.toMatch(/mesa/i);
+    expect(copiaDeLista("COMER_AQUI", false).titulo).toBe("Comedor");
+    expect(copiaDeLista("DRIVE_THRU", true).titulo).toBe("Pick-up");
   });
 });
 

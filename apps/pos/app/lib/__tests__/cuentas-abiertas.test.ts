@@ -19,7 +19,7 @@ const falso = vi.hoisted(() => {
 });
 vi.mock("../supabase", () => ({ employeeClient: () => falso.cliente }));
 
-import { listarCuentasAbiertas } from "../cuentas-abiertas";
+import { contarCuentasDeMesa, listarCuentasAbiertas, MODOS_MESA } from "../cuentas-abiertas";
 
 const porCaja = (f: [string, unknown, unknown][]) => f.filter(([m, col]) => m === "eq" && col === "caja_id");
 
@@ -31,5 +31,18 @@ describe("cuentas abiertas", () => {
   it("con caja, solo las de esa caja (el pago se asienta en la caja del ticket)", async () => {
     await listarCuentasAbiertas("t", "s1", "PARA_LLEVAR", [], "c1");
     expect(porCaja(falso.filtros.at(-1)!)).toEqual([["eq", "caja_id", "c1"]]);
+  });
+});
+
+describe("cuentas de mesa (comida rápida)", () => {
+  it("cuenta exactamente lo que lista Comedor: MESA y COMER_AQUI, sin las de espera, de toda la sucursal", async () => {
+    await listarCuentasAbiertas("t", "s1", MODOS_MESA);
+    const lista = falso.filtros.at(-1)!.filter(([m]) => m === "eq" || m === "in" || m === "is");
+    expect(await contarCuentasDeMesa("t", "s1")).toBe(0);
+    const cuenta = falso.filtros.at(-1)!;
+    for (const filtro of lista) expect(cuenta).toContainEqual(filtro);
+    expect(cuenta).toContainEqual(["in", "modo_servicio", ["MESA", "COMER_AQUI"]]);
+    expect(cuenta).toContainEqual(["eq", "en_espera", false]);
+    expect(cuenta).toContainEqual(["in", "estado_fiscal", ["BORRADOR", "ABIERTO"]]);
   });
 });

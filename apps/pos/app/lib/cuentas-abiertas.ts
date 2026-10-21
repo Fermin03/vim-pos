@@ -37,6 +37,27 @@ function nombreClienteFila(c: unknown): string | null {
 
 /** Cuentas abiertas de un modo en la SUCURSAL (Pick-up: DRIVE_THRU, Domicilio: DELIVERY_PROPIO).
  *  Sucursal-wide para que cualquier caja pueda completarlas. */
+/** Los modos de la lista de Comedor (ver `listarCuentasAbiertas`). */
+export const MODOS_MESA = ["MESA", "COMER_AQUI"] as const;
+
+/**
+ * Comida rápida, tarjeta «Cuentas de mesa»: cuántas cuentas mostraría la lista de Comedor (mismos
+ * filtros que `listarCuentasAbiertas` con `MODOS_MESA`). Sin las de espera: la lista no las enseña, y
+ * una tarjeta con 1 que abre una lista vacía es peor que no tenerla.
+ */
+export async function contarCuentasDeMesa(token: string, sucursalId: string): Promise<number> {
+  const { count, error } = await employeeClient(token)
+    .from("tickets")
+    .select("id", { count: "exact", head: true })
+    .eq("sucursal_id", sucursalId)
+    .in("modo_servicio", [...MODOS_MESA])
+    .is("deleted_at", null)
+    .eq("en_espera", false)
+    .in("estado_fiscal", ["BORRADOR", "ABIERTO"]);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
 /**
  * Cuentas abiertas de uno o varios modos.
  *

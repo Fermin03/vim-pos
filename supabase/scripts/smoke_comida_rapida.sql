@@ -44,7 +44,7 @@ BEGIN
   v_ticket := abrir_ticket(v_suc, v_caja, v_turno, 'COMER_AQUI'::modo_servicio, NULL, NULL, 'smoke-0242-1', v_cajero);
   PERFORM agregar_item_a_ticket(v_ticket, v_prod, 1, NULL, '[]'::jsonb, 'smoke-0242-item');
   PERFORM aplicar_pago(v_ticket, 'EFECTIVO'::metodo_pago, 120, 120, NULL, NULL, NULL, false, NULL, 'smoke-0242-pago');
-  IF (SELECT estado_fiscal FROM tickets WHERE id = v_ticket) <> 'PAGADO' THEN RAISE EXCEPTION '3: la venta debía quedar PAGADA'; END IF;
+  IF (SELECT estado_fiscal FROM tickets WHERE id = v_ticket) IS DISTINCT FROM 'PAGADO' THEN RAISE EXCEPTION '3: la venta debía quedar PAGADA'; END IF;
   EXECUTE 'SET LOCAL ROLE authenticated';
   UPDATE ticket_items SET enviado_cocina_at = now()
    WHERE ticket_id = v_ticket AND cancelado = false AND enviado_cocina_at IS NULL AND cargo_tipo IS NULL;
