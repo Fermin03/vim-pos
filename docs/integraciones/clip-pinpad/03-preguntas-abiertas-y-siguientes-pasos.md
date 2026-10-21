@@ -120,7 +120,7 @@ Total 3 `AA61B532662500612` (modelo `K1352`, PinPad 1.27.1), con `prueba.ts` dir
 | Intento | Cómo se pagó | Resultado |
 |---|---|---|
 | 1 y 2 | Sin contacto, tarjeta que exige chip | `REJECTED`, `error.code` `CD-PROCESS-AS-CHIP` |
-| 3 | Chip insertado | `REJECTED`, `error.code` `TX-CANCELLED-BY-PAUSE` (sin causa clara: preguntado a Clip) |
+| 3 | Chip insertado, tarjeta bloqueada | `REJECTED`, `error.code` `TX-CANCELLED-BY-PAUSE` (así reporta Clip una tarjeta bloqueada; el nombre engaña) |
 | 4 | Sin contacto, débito Visa Banorte | `PENDING` → `IN_PROCESS` → `APPROVED` en ~15 s |
 
 Lo aprendido, ya en el código:

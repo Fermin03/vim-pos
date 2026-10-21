@@ -121,7 +121,7 @@ const RECHAZOS: Record<string, string> = {
   SIN_RESPUESTA: "La terminal no contestó. Vuelve a intentar.",
   // Clip (vistos con el lector, 21 oct 2026).
   "CD-PROCESS-AS-CHIP": "Esa tarjeta pide chip: que el cliente la inserte en la terminal.",
-  "TX-CANCELLED-BY-PAUSE": "La app de la terminal se cerró a medio cobro. Déjala abierta y vuelve a intentar.",
+  "TX-CANCELLED-BY-PAUSE": "La terminal no aceptó la tarjeta. Revisa su pantalla o prueba con otra tarjeta.",
 };
 
 /** Lo que se le dice a la cajera cuando el cobro terminó sin pagarse. */

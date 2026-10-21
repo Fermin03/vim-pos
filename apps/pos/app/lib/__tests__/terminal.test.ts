@@ -41,7 +41,7 @@ describe("cobro con terminal", () => {
     expect(mensajeFinal({ estado: "RECHAZADO", detalle: "SIN_RESPUESTA" })).toBe("La terminal no contestó. Vuelve a intentar.");
     expect(mensajeFinal({ estado: "RECHAZADO", detalle: "high_risk" })).not.toContain("Mercado Pago");
     expect(mensajeFinal({ estado: "RECHAZADO", detalle: "CD-PROCESS-AS-CHIP" })).toContain("chip");
-    expect(mensajeFinal({ estado: "RECHAZADO", detalle: "TX-CANCELLED-BY-PAUSE" })).toContain("abierta");
+    expect(mensajeFinal({ estado: "RECHAZADO", detalle: "TX-CANCELLED-BY-PAUSE" })).toContain("otra tarjeta");
     expect(mensajeErrorCobro(new Error("CONEXION_INVALIDA"))).not.toContain("Mercado Pago");
     expect(mensajeErrorCobro(new Error("ERROR_INTERNO"))).toBe("No se pudo mandar el cobro a la terminal. Vuelve a intentar.");
   });
