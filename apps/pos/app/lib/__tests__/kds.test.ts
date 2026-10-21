@@ -272,7 +272,8 @@ describe("kds — Comer aquí en comida rápida", () => {
   it("con giro de comida rápida COMER_AQUI es «Comer aquí»; los demás giros siguen en «Comedor»", () => {
     expect(labelModo("COMER_AQUI", "QUICK_SERVICE")).toBe("Comer aquí");
     expect(labelModo("COMER_AQUI", "FOODTRUCK")).toBe("Comer aquí");
-    expect(labelModo("COMER_AQUI", "CAFETERIA")).toBe("Comedor");
+    expect(labelModo("COMER_AQUI", "CAFETERIA")).toBe("Comer aquí");
+    expect(labelModo("COMER_AQUI", "FULL_SERVICE")).toBe("Comedor");
     expect(labelModo("COMER_AQUI", null)).toBe("Comedor");
     expect(labelModo("PARA_LLEVAR", "QUICK_SERVICE")).toBe("Para llevar");
   });

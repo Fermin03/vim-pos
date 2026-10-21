@@ -18,14 +18,20 @@ describe("preguntaServicio — «¿Es para llevar o para comer aquí?» al cobra
     expect(preguntaServicio("FOODTRUCK", CON_NOMBRE, "PARA_LLEVAR")).toBe("NOMBRE");
   });
 
+  it("la cafetería pregunta siempre, aunque no marque «Tiene dónde comer»", () => {
+    expect(preguntaServicio("CAFETERIA", APAGADO, "PARA_LLEVAR")).toBe("PREGUNTA");
+    expect(preguntaServicio("CAFETERIA", CON_NOMBRE, "COMER_AQUI")).toBe("PREGUNTA");
+    expect(preguntaServicio("CAFETERIA", CON_NOMBRE, "DRIVE_THRU")).toBeNull();
+  });
+
   it("pick-up, domicilio y apps ya traen su modo: no se pregunta", () => {
     for (const modo of ["DRIVE_THRU", "DELIVERY_PROPIO"] as const) {
       expect(preguntaServicio("QUICK_SERVICE", CON_NOMBRE, modo)).toBeNull();
     }
   });
 
-  it("café, servicio completo, bar y la tienda no ven la ventana", () => {
-    for (const giro of ["CAFETERIA", "FULL_SERVICE", "BAR", "TAQUERIA", "RETAIL", null]) {
+  it("servicio completo, bar y la tienda no ven la ventana", () => {
+    for (const giro of ["FULL_SERVICE", "BAR", "TAQUERIA", "RETAIL", null]) {
       expect(preguntaServicio(giro, { pedirNombre: true, tieneDondeComer: true }, "PARA_LLEVAR")).toBeNull();
     }
   });
@@ -35,9 +41,10 @@ describe("etiquetaModo por giro", () => {
   it("comida rápida dice «Comer aquí»", () => {
     expect(etiquetaModo("COMER_AQUI", "QUICK_SERVICE")).toBe("Comer aquí");
     expect(etiquetaModo("COMER_AQUI", "FOODTRUCK")).toBe("Comer aquí");
+    expect(etiquetaModo("COMER_AQUI", "CAFETERIA")).toBe("Comer aquí");
   });
   it("los demás siguen con «Comedor», y los otros modos no cambian", () => {
-    expect(etiquetaModo("COMER_AQUI", "CAFETERIA")).toBe("Comedor");
+    expect(etiquetaModo("COMER_AQUI", "FULL_SERVICE")).toBe("Comedor");
     expect(etiquetaModo("COMER_AQUI")).toBe("Comedor");
     expect(etiquetaModo("PARA_LLEVAR", "QUICK_SERVICE")).toBe("Para llevar");
   });

@@ -34,14 +34,7 @@ export function SeccionPedidos({
   onNuevoRecoger: () => void;
   onNuevoDomicilio: () => void;
 }) {
-  const tarjetas: { etiqueta: string; icono: NombreIcono; n: number; onClick: () => void }[] = [
-    { etiqueta: "En espera", icono: "reloj", n: nEnEspera, onClick: onEnEspera },
-    { etiqueta: "Para llevar abiertas", icono: "recibo", n: nParaLlevar, onClick: onParaLlevar },
-    { etiqueta: "Pick-up", icono: "bolsa", n: nPickup, onClick: onPickup },
-    ...(domicilio || nDomicilio > 0 ? [{ etiqueta: "Domicilio", icono: "moto" as const, n: nDomicilio, onClick: onDomicilio }] : []),
-    ...(enLinea ? [{ etiqueta: "En línea", icono: "celular" as const, n: nEnLinea, onClick: onEnLinea }] : []),
-    ...(nMesa > 0 ? [{ etiqueta: "Cuentas de mesa", icono: "mesa" as const, n: nMesa, onClick: onMesa }] : []),
-  ];
+  const tarjetas = tarjetasPedidos({ domicilio, enLinea, nEnEspera, nParaLlevar, nPickup, nDomicilio, nEnLinea, nMesa, onEnEspera, onParaLlevar, onPickup, onDomicilio, onEnLinea, onMesa });
   return (
     <section aria-label="Pedidos" className="flex min-h-0 flex-1 flex-col bg-bg">
       <div className="flex flex-shrink-0 items-center gap-2 border-b border-line bg-surface px-4 py-3">
@@ -57,17 +50,7 @@ export function SeccionPedidos({
           </Button>
         )}
       </div>
-      {enLinea && expiradosEnLinea > 0 && (
-        <button
-          type="button"
-          onClick={onEnLinea}
-          role="alert"
-          className="mx-4 mt-3 flex min-h-[44px] flex-shrink-0 items-center gap-2 rounded border border-danger bg-danger-soft px-3 py-2.5 text-left text-14 font-semibold text-danger"
-        >
-          <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-danger" />
-          {expiradosEnLinea === 1 ? "Se venció 1 pedido en línea sin aceptar." : `Se vencieron ${expiradosEnLinea} pedidos en línea sin aceptar.`} Toca para verlos.
-        </button>
-      )}
+      {enLinea && expiradosEnLinea > 0 && <AvisoVencidos n={expiradosEnLinea} onClick={onEnLinea} className="mx-4 mt-3" />}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
         <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
           {tarjetas.map((t) => (
@@ -91,5 +74,38 @@ export function SeccionPedidos({
         </div>
       </div>
     </section>
+  );
+}
+
+export type TarjetaPedidos = { etiqueta: string; icono: NombreIcono; n: number; onClick: () => void };
+
+/** Las tarjetas de «Pedidos»; la cafetería, que no tiene esa sección, las pinta en «Más». */
+export function tarjetasPedidos(p: {
+  domicilio: boolean; enLinea: boolean;
+  nEnEspera: number; nParaLlevar: number; nPickup: number; nDomicilio: number; nEnLinea: number; nMesa: number;
+  onEnEspera: () => void; onParaLlevar: () => void; onPickup: () => void; onDomicilio: () => void; onEnLinea: () => void; onMesa: () => void;
+}): TarjetaPedidos[] {
+  return [
+    { etiqueta: "En espera", icono: "reloj", n: p.nEnEspera, onClick: p.onEnEspera },
+    { etiqueta: "Para llevar abiertas", icono: "recibo", n: p.nParaLlevar, onClick: p.onParaLlevar },
+    { etiqueta: "Pick-up", icono: "bolsa", n: p.nPickup, onClick: p.onPickup },
+    ...(p.domicilio || p.nDomicilio > 0 ? [{ etiqueta: "Domicilio", icono: "moto" as const, n: p.nDomicilio, onClick: p.onDomicilio }] : []),
+    ...(p.enLinea ? [{ etiqueta: "En línea", icono: "celular" as const, n: p.nEnLinea, onClick: p.onEnLinea }] : []),
+    ...(p.nMesa > 0 ? [{ etiqueta: "Cuentas de mesa", icono: "mesa" as const, n: p.nMesa, onClick: p.onMesa }] : []),
+  ];
+}
+
+/** El aviso rojo de pedidos en línea vencidos sin aceptar: lleva a En línea. */
+export function AvisoVencidos({ n, onClick, className = "" }: { n: number; onClick: () => void; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      role="alert"
+      className={`flex min-h-[44px] flex-shrink-0 items-center gap-2 rounded border border-danger bg-danger-soft px-3 py-2.5 text-left text-14 font-semibold text-danger ${className}`}
+    >
+      <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-danger" />
+      {n === 1 ? "Se venció 1 pedido en línea sin aceptar." : `Se vencieron ${n} pedidos en línea sin aceptar.`} Toca para verlos.
+    </button>
   );
 }

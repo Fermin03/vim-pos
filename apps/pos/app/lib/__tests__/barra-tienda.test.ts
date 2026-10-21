@@ -42,16 +42,21 @@ describe("barra de belleza", () => {
 });
 
 describe("barra de comida rápida", () => {
-  it("dice Cobrar, Pedidos, Inventario, Transacciones y Más; Inventario solo con existencias", () => {
+  it("dice Cobrar, Pedidos, Inventario, Transacciones, Notificaciones y Más; Inventario solo con existencias", () => {
     for (const giro of ["QUICK_SERVICE", "FOODTRUCK"]) {
-      expect(etiquetas(giro, false, true)).toEqual(["Cobrar", "Pedidos", "Inventario", "Transacciones", "Más"]);
-      expect(etiquetas(giro, false, false)).toEqual(["Cobrar", "Pedidos", "Transacciones", "Más"]);
+      expect(etiquetas(giro, false, true)).toEqual(["Cobrar", "Pedidos", "Inventario", "Transacciones", "Notificaciones", "Más"]);
+      expect(etiquetas(giro, false, false)).toEqual(["Cobrar", "Pedidos", "Transacciones", "Notificaciones", "Más"]);
+    }
+  });
+
+  it("la cafetería no lleva Pedidos y siempre lleva Inventario", () => {
+    for (const existencias of [true, false]) {
+      expect(etiquetas("CAFETERIA", false, existencias)).toEqual(["Cobrar", "Inventario", "Transacciones", "Notificaciones", "Más"]);
     }
   });
 
   it("abre en Cobrar", () => {
-    expect(seccionInicial({ giro: "QUICK_SERVICE" } as DatosCaja, false)).toBe("panel");
-    expect(seccionInicial({ giro: "FOODTRUCK" } as DatosCaja, false)).toBe("panel");
+    for (const giro of ["QUICK_SERVICE", "FOODTRUCK", "CAFETERIA"]) expect(seccionInicial({ giro } as DatosCaja, false)).toBe("panel");
   });
 
   it("existencias no cambia la barra de la tienda", () => {

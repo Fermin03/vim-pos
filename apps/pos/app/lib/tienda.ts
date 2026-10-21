@@ -15,7 +15,7 @@ export const esBelleza = (caja: DatosCaja | null): boolean => esGiroBelleza(caja
 /** La caja de belleza vende como la de tienda (Venta, devoluciones por renglón, cuentas). */
 export const comoTienda = (caja: DatosCaja | null): boolean => esTienda(caja) || esBelleza(caja);
 
-/** Comida rápida y food truck: la barra de abajo de la tienda, pero ticket, comanda y cobro de restaurante (no son `comoTienda`). */
+/** Comida rápida, food truck y cafetería: la barra de abajo de la tienda, pero ticket, comanda y cobro de restaurante (no son `comoTienda`). */
 export const esComidaRapida = (caja: DatosCaja | null): boolean => esGiroComidaRapida(caja?.giro);
 
 /**
@@ -29,7 +29,7 @@ export function preguntaServicio(
   modoActual: ModoServicio,
 ): "PREGUNTA" | "NOMBRE" | null {
   if (!esGiroComidaRapida(giro) || (modoActual !== "PARA_LLEVAR" && modoActual !== "COMER_AQUI")) return null;
-  if (giro === "QUICK_SERVICE" || cfg.tieneDondeComer) return "PREGUNTA";
+  if (giro !== "FOODTRUCK" || cfg.tieneDondeComer) return "PREGUNTA";
   return cfg.pedirNombre ? "NOMBRE" : null;
 }
 
@@ -67,24 +67,29 @@ const DESTINOS_BELLEZA: Destino[] = [
   { seccion: "configuracion", etiqueta: "Más", icono: "menu" },
 ];
 
-/** Comida rápida: «Pedidos» junta lo que espera atención; Inventario solo con el módulo `existencias`. */
+/** Comida rápida y food truck: «Pedidos» junta lo que espera atención; Inventario solo con el módulo `existencias`. */
 const DESTINOS_COMIDA: Destino[] = [
   { seccion: "panel", etiqueta: "Cobrar", icono: "caja" },
   { seccion: "pedidos", etiqueta: "Pedidos", icono: "para-llevar" },
   { seccion: "inventario", etiqueta: "Inventario", icono: "etiqueta" },
   { seccion: "transacciones", etiqueta: "Transacciones", icono: "recibo" },
+  { seccion: "notificaciones", etiqueta: "Notificaciones", icono: "megafono" },
   { seccion: "configuracion", etiqueta: "Más", icono: "menu" },
 ];
 const DESTINOS_COMIDA_SIN_INVENTARIO = DESTINOS_COMIDA.filter((d) => d.seccion !== "inventario");
 
+/** La cafetería no lleva «Pedidos»: lo de esa sección vive en «Más». Su barra es la de la tienda (Inventario siempre). */
+const esCafeteria = (caja: DatosCaja | null): boolean => caja?.giro === "CAFETERIA";
+
 /**
  * La barra de belleza solo con el módulo `agenda` encendido (`moduloActivo(modulos, "agenda")`): sin
  * él, la caja de belleza es una caja de tienda y no enseña Calendario ni Clientes. `existencias` (el
- * módulo) solo cuenta en comida rápida: la tienda siempre lleva Inventario.
+ * módulo) solo cuenta en comida rápida y food truck: la tienda y la cafetería siempre llevan Inventario.
  */
 export const destinosDe = (caja: DatosCaja | null, agenda: boolean, existencias: boolean): Destino[] =>
-  esComidaRapida(caja) ? (existencias ? DESTINOS_COMIDA : DESTINOS_COMIDA_SIN_INVENTARIO)
-    : esBelleza(caja) && agenda ? DESTINOS_BELLEZA : DESTINOS_TIENDA;
+  esCafeteria(caja) ? DESTINOS_TIENDA
+    : esComidaRapida(caja) ? (existencias ? DESTINOS_COMIDA : DESTINOS_COMIDA_SIN_INVENTARIO)
+      : esBelleza(caja) && agenda ? DESTINOS_BELLEZA : DESTINOS_TIENDA;
 
 /** Donde abre la caja y a donde regresa Escape: el calendario en belleza con agenda, el Panel (Cobrar) en tienda y en comida rápida. */
 export const seccionInicial = (caja: DatosCaja | null, agenda: boolean): SeccionTienda => (esBelleza(caja) && agenda ? "calendario" : "panel");
@@ -94,10 +99,15 @@ export const seccionInicial = (caja: DatosCaja | null, agenda: boolean): Seccion
 export const globoPedidos = (nApps: number, porAceptarTienda: { pickup: number; domicilio: number }, nEnEspera: number): number =>
   nApps + porAceptarTienda.pickup + porAceptarTienda.domicilio + nEnEspera;
 
+/** Dónde viven las listas de pedidos (en espera, para llevar, pick-up, domicilio, en línea, mesas):
+ *  «Pedidos» en comida rápida y food truck, «Más» en la cafetería; `null` en los demás giros. */
+export const seccionDePedidos = (caja: DatosCaja | null): SeccionTienda | null =>
+  esCafeteria(caja) ? "configuracion" : esComidaRapida(caja) ? "pedidos" : null;
+
 /** Al salir de una lista de pantalla completa (pick-up, domicilio, en línea, mesas): comida rápida
- *  vuelve a «Pedidos», de donde se entró; los demás se quedan en su sección. */
+ *  vuelve a «Pedidos» (la cafetería a «Más»), de donde se entró; los demás se quedan en su sección. */
 export const seccionTrasLista = (caja: DatosCaja | null, actual: SeccionTienda): SeccionTienda =>
-  esComidaRapida(caja) ? "pedidos" : actual;
+  seccionDePedidos(caja) ?? actual;
 
 /** Con un cobro o un diálogo encima la barra no navega: sería trabajo que se pierde de vista. */
 export const puedeCambiarSeccion = (capasAbiertas: boolean, cobroAbierto: boolean): boolean => !capasAbiertas && !cobroAbierto;

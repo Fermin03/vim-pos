@@ -20,12 +20,13 @@ import { casillasMostrador, guardarConfigMostrador, leerConfigMostrador } from "
 beforeEach(() => { doble.upsert.mockClear(); doble.fila = null; });
 
 describe("casillasMostrador", () => {
-  it("el nombre se ofrece en comida rápida y food truck; «dónde comer» solo en food truck", () => {
+  it("el nombre se ofrece en comida rápida, food truck y cafetería; «dónde comer» solo en food truck", () => {
     expect(casillasMostrador("QUICK_SERVICE")).toEqual({ nombre: true, dondeComer: false });
     expect(casillasMostrador("FOODTRUCK")).toEqual({ nombre: true, dondeComer: true });
+    expect(casillasMostrador("CAFETERIA")).toEqual({ nombre: true, dondeComer: false });
   });
   it("los demás giros no ven nada", () => {
-    for (const g of ["FULL_SERVICE", "CAFETERIA", "BAR", "TAQUERIA", "RETAIL", null]) {
+    for (const g of ["FULL_SERVICE", "BAR", "TAQUERIA", "RETAIL", null]) {
       expect(casillasMostrador(g)).toEqual({ nombre: false, dondeComer: false });
     }
   });

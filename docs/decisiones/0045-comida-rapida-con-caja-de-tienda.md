@@ -52,6 +52,24 @@ food truck tenían comedor y meseros como cualquier restaurante.
   flujo: se mandan a cocina antes de cobrar y no se pregunta nada.
 - **Sin interruptor de migración:** los negocios con estos giros cambian solos al actualizar la caja.
 
+## Adenda (21 oct 2026): cafetería y Notificaciones
+
+- **La cafetería (`CAFETERIA`) entra a comida rápida.** Fermín: la cafetería adopta el diseño del food
+  truck. Está en `GIROS_COMIDA_RAPIDA`, así que hereda todo: barra abajo, sin inicio, ticket y cobro de
+  restaurante, comanda al cobrar, «Comer aquí» y el panel sin Subtotal ni Total. Pregunta **siempre**
+  «¿Es para llevar o para comer aquí?», como servicio rápido; en el admin ve «Pedir el nombre del
+  cliente», no «Tiene dónde comer».
+- **Su barra no lleva Pedidos:** **Cobrar · Inventario · Transacciones · Notificaciones · Más**, con
+  Inventario siempre (sin el módulo de existencias enseña que no lleva existencias). Las tarjetas de
+  Pedidos, el aviso de vencidos en línea y el globo viven en **Más** (`seccionDePedidos(caja)`).
+- **Notificaciones entra a la barra de los tres giros.** Servicio rápido y food truck: **Cobrar · Pedidos ·
+  Inventario · Transacciones · Notificaciones · Más** (Inventario solo con existencias). Es la sección de
+  la tienda, sin cambios: alertas de existencias (con el módulo, que ahora se lee también fuera de
+  Inventario para el globo) y avisos de VIM.
+- **Cuentas de barra (`cuentas_barra`):** la cafetería no las ofrece, como servicio rápido no ofrece mesas;
+  el módulo nace apagado para ella (0180). Pendiente conocido: una cuenta de barra (`BARRA`) que quedara
+  abierta no entra en «Cuentas de mesa» (que lista `MESA` y `COMER_AQUI`), igual que hoy en servicio rápido.
+
 ## Lo que aceptamos
 
 - **Si el envío a cocina falla después de cobrar,** la venta queda cobrada y la caja pide avisar a mano. No se

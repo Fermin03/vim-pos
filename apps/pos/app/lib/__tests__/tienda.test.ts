@@ -26,8 +26,8 @@ describe("esTienda", () => {
     expect(comoTienda({ giro: "SALON" } as DatosCaja)).toBe(true);
     expect(comoTienda({ giro: "RESTAURANTE" } as DatosCaja)).toBe(false);
   });
-  it("comida rápida navega como tienda pero no es comoTienda: su ticket y su comanda son de restaurante", () => {
-    for (const giro of ["QUICK_SERVICE", "FOODTRUCK"]) {
+  it("comida rápida, food truck y cafetería navegan como tienda pero no son comoTienda: su ticket y su comanda son de restaurante", () => {
+    for (const giro of ["QUICK_SERVICE", "FOODTRUCK", "CAFETERIA"]) {
       const caja = { giro } as DatosCaja;
       expect(esComidaRapida(caja)).toBe(true);
       expect(conBarraAbajo(caja)).toBe(true);
@@ -36,8 +36,8 @@ describe("esTienda", () => {
     expect(conBarraAbajo({ giro: "RETAIL" } as DatosCaja)).toBe(true);
     expect(conBarraAbajo({ giro: "SALON" } as DatosCaja)).toBe(true);
   });
-  it("café, servicio completo, bar, taquería y dark kitchen siguen con su pantalla de inicio", () => {
-    for (const giro of ["CAFETERIA", "FULL_SERVICE", "BAR", "TAQUERIA", "DARK_KITCHEN"]) {
+  it("servicio completo, bar, taquería y dark kitchen siguen con su pantalla de inicio", () => {
+    for (const giro of ["FULL_SERVICE", "BAR", "TAQUERIA", "DARK_KITCHEN"]) {
       expect(esComidaRapida({ giro } as DatosCaja)).toBe(false);
       expect(conBarraAbajo({ giro } as DatosCaja)).toBe(false);
     }

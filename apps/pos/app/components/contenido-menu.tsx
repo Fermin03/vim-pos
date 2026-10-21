@@ -7,6 +7,7 @@ import { enlaceWhatsapp, mensajeAyudaCaja, textoHorario } from "@vim/db/soporte"
 import { useSoporte } from "../lib/soporte";
 import { moduloActivo } from "@vim/db/operacion";
 import { useAcceso } from "./banda-acceso";
+import type { TarjetaPedidos } from "./seccion-pedidos";
 
 /**
  * Las opciones del menú general. Las pinta `MenuGeneral` dentro de su diálogo (restaurante) y la
@@ -31,6 +32,7 @@ export function ContenidoMenu({
   onCreditos,
   onCotizaciones,
   onConsultarCuentas,
+  pedidos,
   onSalir,
   ayuda,
 }: {
@@ -62,6 +64,8 @@ export function ContenidoMenu({
   onCotizaciones?: () => void;
   /** Comida rápida, que no tiene inicio: su acceso «Consultar cuentas». */
   onConsultarCuentas?: () => void;
+  /** Cafetería, que no tiene «Pedidos» en su barra: esas tarjetas, aquí arriba. */
+  pedidos?: TarjetaPedidos[];
   onSalir?: () => void;
   /** Para el mensaje de "Ayuda por WhatsApp": desde qué negocio, sucursal y caja se escribe. */
   ayuda?: { negocio?: string | null; sucursal?: string | null; caja?: string | null; cajero?: string | null };
@@ -118,6 +122,13 @@ export function ContenidoMenu({
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-9">
+      {pedidos && (
+      <SeccionMenu titulo="Pedidos">
+        {pedidos.map((t) => (
+          <TileMenu key={t.etiqueta} label={t.etiqueta} badge={t.n} onClick={con(t.onClick)} icon={<Icono nombre={t.icono} className="h-8 w-8" />} />
+        ))}
+      </SeccionMenu>
+      )}
       {(creditos || cotizaciones) && (
       <SeccionMenu titulo="Ventas">
         {cotizaciones && (

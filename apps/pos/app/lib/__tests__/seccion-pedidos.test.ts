@@ -69,6 +69,14 @@ describe("globo de Pedidos", () => {
     }));
     expect(html).toMatch(/>7<\/span>.*Pedidos/);
   });
+
+  it("en la cafetería, sin Pedidos, lo pinta sobre Más", () => {
+    const html = renderToStaticMarkup(React.createElement(BarraTienda, {
+      destinos: destinosDe({ giro: "CAFETERIA" } as DatosCaja, false, false), seccion: "panel", onCambiar: nada, pendientes: 0, pendientesPedidos: 7, bloqueada: false,
+    }));
+    expect(html).toMatch(/>7<\/span>.*Más/);
+    expect(html).not.toContain("Pedidos");
+  });
 });
 
 describe("lista de cuentas de mesa", () => {
@@ -85,6 +93,7 @@ describe("salir de una lista", () => {
   it("comida rápida regresa a Pedidos; los demás se quedan donde estaban", () => {
     expect(seccionTrasLista({ giro: "QUICK_SERVICE" } as DatosCaja, "panel")).toBe("pedidos");
     expect(seccionTrasLista({ giro: "FOODTRUCK" } as DatosCaja, "configuracion")).toBe("pedidos");
+    expect(seccionTrasLista({ giro: "CAFETERIA" } as DatosCaja, "panel")).toBe("configuracion");
     expect(seccionTrasLista({ giro: "RETAIL" } as DatosCaja, "configuracion")).toBe("configuracion");
   });
 });

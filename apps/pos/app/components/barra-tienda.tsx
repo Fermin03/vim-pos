@@ -14,15 +14,17 @@ export function BarraTienda({ destinos, seccion, onCambiar, pendientes, pendient
   onCambiar: (s: SeccionTienda) => void;
   /** Avisos sin ver: el globo de Notificaciones. */
   pendientes: number;
-  /** Comida rápida: lo que espera atención en «Pedidos» (`globoPedidos`). */
+  /** Comida rápida: lo que espera atención en «Pedidos» (`globoPedidos`); en la cafetería, sobre «Más». */
   pendientesPedidos?: number;
   bloqueada: boolean;
 }) {
+  // La cafetería no tiene «Pedidos»: sus listas viven en «Más», y ahí va el globo.
+  const conPedidos: SeccionTienda = destinos.some((d) => d.seccion === "pedidos") ? "pedidos" : "configuracion";
   return (
     <nav aria-label="Secciones de la caja" className="flex flex-shrink-0 border-t border-line bg-surface">
       {destinos.map((d) => {
         const elegido = d.seccion === seccion;
-        const globo = d.seccion === "notificaciones" ? pendientes : d.seccion === "pedidos" ? pendientesPedidos : 0;
+        const globo = d.seccion === "notificaciones" ? pendientes : d.seccion === conPedidos ? pendientesPedidos : 0;
         return (
           <button
             key={d.seccion}

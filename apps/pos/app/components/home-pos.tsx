@@ -98,14 +98,14 @@ import { fijarContextoErrores, reportarErrorSinEsperar } from "../lib/reportar-e
 import { BotonVolver } from "./boton-volver";
 import { CatalogoProductos } from "./catalogo-productos";
 import { PanelVentaRetail, type AvisoEscaneo } from "./venta-retail";
-import { comoTienda, conBarraAbajo, destinosDe, esComidaRapida, globoPedidos, seccionTrasLista, preguntaServicio, faltaPreguntarServicio, esBelleza, seccionInicial, puedeRecibirMercancia, leerExistencias, leerSucursales, pasoConLimite, puedeCambiarSeccion, renglonTienda, sinExistencia, type Existencia, type PadreTienda, type SeccionTienda } from "../lib/tienda";
+import { comoTienda, conBarraAbajo, destinosDe, esComidaRapida, globoPedidos, seccionDePedidos, seccionTrasLista, preguntaServicio, faltaPreguntarServicio, esBelleza, seccionInicial, puedeRecibirMercancia, leerExistencias, leerSucursales, pasoConLimite, puedeCambiarSeccion, renglonTienda, sinExistencia, type Existencia, type PadreTienda, type SeccionTienda } from "../lib/tienda";
 import { leerEstadoSync } from "../lib/estado-sync";
 import { ModalAgregarProductos } from "./modal-agregar-productos";
 import { ModalNumeroMesa } from "./modal-numero-mesa";
 import { MenuGeneral } from "./menu-general";
 import { ContenidoMenu } from "./contenido-menu";
 import { BarraTienda } from "./barra-tienda";
-import { SeccionPedidos } from "./seccion-pedidos";
+import { AvisoVencidos, SeccionPedidos, tarjetasPedidos } from "./seccion-pedidos";
 import { SeccionCalendario } from "./seccion-calendario";
 import { SeccionClientes } from "./seccion-clientes";
 import { ModalCita, type AbrirCita } from "./modal-cita";
@@ -670,8 +670,11 @@ export function HomePos({
    * solo se oculta, así el carrito, el ticket guardado y la fila de agregados siguen donde estaban.
    */
   const [seccionTienda, setSeccionTienda] = useState<SeccionTienda>(() => seccionInicial(caja, agenda));
-  // Comida rápida no tiene inicio: los conteos del inicio se leen mientras «Pedidos» está a la vista.
-  const viendoPedidos = comidaRapida && seccionTienda === "pedidos";
+  // Comida rápida no tiene inicio: los conteos del inicio se leen mientras «Pedidos» (en la cafetería, «Más») está a la vista.
+  const viendoPedidos = seccionTienda === seccionDePedidos(caja);
+  /** Cafetería: sin «Pedidos» en la barra, sus tarjetas van en «Más». */
+  const pedidosEnMas = comidaRapida && seccionDePedidos(caja) === "configuracion";
+  const conExistencias = moduloActivo(modulos, "existencias");
   const [nCuentasMesa, setNCuentasMesa] = useState(0);
   // Sube al volver de una lista a «Pedidos»: los conteos se releen en ese momento, sin esperar al sondeo.
   const [pedidosVersion, setPedidosVersion] = useState(0);
@@ -802,17 +805,17 @@ export function HomePos({
   const [vistas, setVistas] = useState<string[] | null>(null);
   const [productoInventario, setProductoInventario] = useState<string | null>(null);
   const notificaciones = useMemo(
-    () => (tienda ? notificacionesTienda(existencias, productos ?? [], caja.sucursal_id, avisosTodos) : []),
-    [tienda, existencias, productos, caja.sucursal_id, avisosTodos],
+    () => (barraAbajo ? notificacionesTienda(existencias, productos ?? [], caja.sucursal_id, avisosTodos) : []),
+    [barraAbajo, existencias, productos, caja.sucursal_id, avisosTodos],
   );
-  useEffect(() => { if (tienda) setVistas(leerVistas(turno.caja_id)); }, [tienda, turno.caja_id]);
+  useEffect(() => { if (barraAbajo) setVistas(leerVistas(turno.caja_id)); }, [barraAbajo, turno.caja_id]);
   // Abrir la pestaña marca como visto lo que está en la lista, y lo que llegue mientras está abierta.
   useEffect(() => {
-    if (!tienda || seccionTienda !== "notificaciones") return;
+    if (!barraAbajo || seccionTienda !== "notificaciones") return;
     const ids = notificaciones.map((n) => n.id);
     setVistas(ids);
     guardarVistas(turno.caja_id, ids);
-  }, [tienda, seccionTienda, notificaciones, turno.caja_id]);
+  }, [barraAbajo, seccionTienda, notificaciones, turno.caja_id]);
   /** Producto del último agregado: su renglón queda marcado hasta la siguiente acción. */
   const [ultimoTienda, setUltimoTienda] = useState<string | null>(null);
   const [sucursalesTienda, setSucursalesTienda] = useState<{ id: string; nombre: string }[]>([]);
@@ -824,8 +827,9 @@ export function HomePos({
     leerSucursales(token).then((s) => { if (vivo) setSucursalesTienda(s); }).catch(() => { /* sin la fila de sucursales, solo se ve la propia */ });
     return () => { vivo = false; };
   }, [barraAbajo, token]);
-  // Comida rápida no lleva existencias en la venta (su captura es la de restaurante): solo en Inventario.
-  const leerExistenciasAhora = capturaTienda || (comidaRapida && seccionTienda === "inventario");
+  // Comida rápida no lleva existencias en la venta (su captura es la de restaurante), pero con el módulo
+  // se leen igual: Inventario y las alertas de Notificaciones (y su globo) las necesitan.
+  const leerExistenciasAhora = capturaTienda || (comidaRapida && conExistencias);
   // Existencias al entrar a la venta, tras cada cobro (`cuentasVersion` sube al pagar) y cada 60 s.
   // Si una lectura falla se quedan las de antes: una cifra de hace un minuto sirve más que ninguna.
   useEffect(() => {
@@ -3316,6 +3320,9 @@ export function HomePos({
 
   // Comida rápida: los pedidos de la tienda por aceptar, para «Pedidos» y su globo.
   const porAceptarTienda = contarPorAceptar(pedidosTienda, { cajaId: turno.caja_id, enEscritorio: esEscritorio(), ahora: Date.now() });
+  // Pick-up y domicilio de «Pedidos» (o de «Más» en la cafetería): abiertas, por aceptar y pagadas en línea.
+  const nPickupPedidos = cuentasAbiertas.pickup + porAceptarTienda.pickup + cuentasPagadasEnLinea(pedidosTienda, "DRIVE_THRU").length;
+  const nDomicilioPedidos = cuentasAbiertas.domicilio + porAceptarTienda.domicilio + cuentasPagadasEnLinea(pedidosTienda, "DELIVERY_PROPIO").length;
   return (
     <div className="flex h-screen flex-col">
       {!online && (
@@ -3680,8 +3687,8 @@ export function HomePos({
               expiradosEnLinea={expiradosApps}
               nEnEspera={nEnEspera}
               nParaLlevar={nAbiertasLlevar}
-              nPickup={cuentasAbiertas.pickup + porAceptarTienda.pickup + cuentasPagadasEnLinea(pedidosTienda, "DRIVE_THRU").length}
-              nDomicilio={cuentasAbiertas.domicilio + porAceptarTienda.domicilio + cuentasPagadasEnLinea(pedidosTienda, "DELIVERY_PROPIO").length}
+              nPickup={nPickupPedidos}
+              nDomicilio={nDomicilioPedidos}
               nEnLinea={nPedidosApps}
               nMesa={nCuentasMesa}
               onEnEspera={() => { setEsperaError(null); setEsperaListaAbierta(true); }}
@@ -3732,13 +3739,24 @@ export function HomePos({
                 <h1 className="font-display text-20 font-semibold tracking-tight">Más</h1>
               </div>
               {acceso.actualizacion && acceso.nivel !== "bloqueado" && <BandaActualizacion version={acceso.actualizacion} />}
+              {pedidosEnMas && hayEnLinea && expiradosApps > 0 && <AvisoVencidos n={expiradosApps} onClick={() => setEnPedidosApps(true)} className="mx-8 mt-4" />}
               <div className="min-h-0 flex-1 overflow-y-auto px-8 py-8">
                 <ContenidoMenu
                   enPagina
+                  pedidos={pedidosEnMas ? tarjetasPedidos({
+                    domicilio: moduloActivo(modulos, "domicilio"), enLinea: hayEnLinea,
+                    nEnEspera, nParaLlevar: nAbiertasLlevar, nPickup: nPickupPedidos, nDomicilio: nDomicilioPedidos, nEnLinea: nPedidosApps, nMesa: nCuentasMesa,
+                    onEnEspera: () => { setEsperaError(null); setEsperaListaAbierta(true); },
+                    onParaLlevar: () => { setLlevarError(null); setLlevarListaAbierta(true); },
+                    onPickup: () => setEnPickup(true),
+                    onDomicilio: () => setEnDelivery(true),
+                    onEnLinea: () => setEnPedidosApps(true),
+                    onMesa: () => setEnMesas(true),
+                  }) : undefined}
                   onCorteX={() => setEnMonitor(true)}
                   onKds={() => setEnKds(true)}
                   // Sin «Devoluciones»: en la tienda vive en Transacciones, con la venta elegida.
-                  onEnEspera={nEnEspera > 0 ? () => { setEsperaError(null); setEsperaListaAbierta(true); } : undefined}
+                  onEnEspera={nEnEspera > 0 && !pedidosEnMas ? () => { setEsperaError(null); setEsperaListaAbierta(true); } : undefined}
                   onAbrirCajon={() => setAbrirCajaAbierto(true)}
                   onMovimientoCaja={() => setMovimientoAbierto(true)}
                   // Créditos y cotizaciones son de la venta de tienda; comida rápida cobra como restaurante.
@@ -3774,6 +3792,17 @@ export function HomePos({
               onCambiarPago={setCambiandoPagoTx}
               version={txVersion}
             />
+          ) : seccionTienda === "inventario" && comidaRapida && !conExistencias ? (
+            // Cafetería sin el módulo: Inventario siempre está en su barra, pero sin existencias no hay qué contar ni recibir.
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="flex flex-shrink-0 items-center gap-4 border-b border-line bg-surface px-4 py-3">
+                <h1 className="font-display text-20 font-semibold tracking-tight">Inventario</h1>
+              </div>
+              <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
+                <p className="font-display text-18 font-semibold">Tu negocio no lleva existencias</p>
+                <p className="max-w-md text-15 text-ink-2">Para ver cuánto te queda de cada producto y recibir mercancía, pide que te las activemos desde Más › Ayuda por WhatsApp.</p>
+              </div>
+            </div>
           ) : seccionTienda === "inventario" ? (
             <SeccionInventario
               productos={productos ?? []}
@@ -3802,7 +3831,7 @@ export function HomePos({
       )}
       {barraAbajo && (
         <BarraTienda
-          destinos={destinosDe(caja, agenda, moduloActivo(modulos, "existencias"))}
+          destinos={destinosDe(caja, agenda, conExistencias)}
           seccion={seccionTienda}
           onCambiar={(s) => { setProductoInventario(null); void irASeccion(s); }}
           pendientes={vistas ? sinVer(notificaciones, vistas) : 0}

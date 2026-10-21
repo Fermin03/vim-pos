@@ -1,12 +1,13 @@
 "use client";
 import { supabase } from "./supabase";
 import { tenantId } from "./datos";
+import { esGiroComidaRapida } from "@vim/db/operacion";
 
 export type ConfigMostrador = { pedirNombre: boolean; tieneDondeComer: boolean };
 
-/** Qué casillas del mostrador ve cada giro: solo comida rápida; «dónde comer» solo el food truck. */
+/** Qué casillas del mostrador ve cada giro: comida rápida, food truck y cafetería; «dónde comer» solo el food truck (los otros dos siempre preguntan). */
 export function casillasMostrador(giro: string | null): { nombre: boolean; dondeComer: boolean } {
-  return { nombre: giro === "QUICK_SERVICE" || giro === "FOODTRUCK", dondeComer: giro === "FOODTRUCK" };
+  return { nombre: esGiroComidaRapida(giro), dondeComer: giro === "FOODTRUCK" };
 }
 
 export async function leerConfigMostrador(): Promise<ConfigMostrador> {
