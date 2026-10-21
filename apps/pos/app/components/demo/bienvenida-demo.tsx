@@ -31,22 +31,22 @@ export function BienvenidaDemo({ onListo }: { onListo: (conGuia: boolean) => voi
     <main className="flex min-h-screen flex-col items-center justify-center gap-7 p-6">
       <header className="flex max-w-md flex-col items-center gap-2 text-center">
         <BrandMark size={44} />
-        <h1 className="mt-1 font-display text-xl font-semibold tracking-tight">Prueba VIM POS</h1>
+        <h1 className="mt-1 font-display text-xl font-semibold tracking-tight">Cobra un turno en Crazy Burgers</h1>
         <p className="text-sm text-ink-3">
-          Vas a operar un turno completo de Crazy Burgers, un negocio de ejemplo. Tarda unos 10 minutos.
+          Vas a operar un turno completo en Crazy Burgers, un negocio de ejemplo: abres caja, cobras y haces el corte. Son unos 10 minutos.
         </p>
       </header>
       <div className="flex w-full max-w-sm flex-col gap-3">
         <Button size="lg" disabled={cargando} onClick={() => entrar(true)}>Iniciar demo</Button>
         <Button size="lg" variant="ghost" disabled={cargando} onClick={() => entrar(false)}>Prefiero explorar solo</Button>
-        {cargando && <p className="text-center text-sm font-medium text-ink-2" role="status">Preparando tu negocio…</p>}
+        {cargando && <p className="text-center text-sm font-medium text-ink-2" role="status">Preparando tu negocio de ejemplo…</p>}
         {error === "CUPO" && (
-          <p className="text-center text-sm font-medium text-danger" role="alert">Ya iniciaste varias demos. Intenta en una hora.</p>
+          <p className="text-center text-sm font-medium text-danger" role="alert">Ya abriste varias demos desde aquí. Intenta de nuevo en una hora.</p>
         )}
         {error && error !== "CUPO" && (
           <p className="text-center text-sm font-medium text-danger" role="alert">
-            La demo no está disponible ahora.{" "}
-            <a href={WHATSAPP} className="underline" target="_blank" rel="noreferrer">Escríbenos por WhatsApp.</a>
+            La demo no abrió esta vez. Intenta en unos minutos o{" "}
+            <a href={WHATSAPP} className="underline" target="_blank" rel="noreferrer">escríbenos por WhatsApp.</a>
           </p>
         )}
       </div>

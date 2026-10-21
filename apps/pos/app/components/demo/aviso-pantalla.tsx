@@ -5,11 +5,11 @@ export function AvisoPantalla() {
   return (
     <>
       <div role="alert" className={`${CAPA} max-[599px]:flex`}>
-        <p className="font-display text-xl font-semibold tracking-tight">Ábrela en una tableta o computadora</p>
-        <p className="text-sm text-ink-3">La demo de la caja necesita una pantalla más grande.</p>
+        <p className="font-display text-xl font-semibold tracking-tight">La caja necesita más pantalla.</p>
+        <p className="text-sm text-ink-3">Abre este enlace en una tableta o computadora.</p>
       </div>
       <div role="alert" className={`${CAPA} min-[600px]:portrait:flex`}>
-        <p className="font-display text-xl font-semibold tracking-tight">Gira tu tableta</p>
+        <p className="font-display text-xl font-semibold tracking-tight">Gira tu tableta.</p>
         <p className="text-sm text-ink-3">La caja se usa en horizontal.</p>
       </div>
     </>

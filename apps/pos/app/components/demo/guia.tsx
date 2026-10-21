@@ -204,12 +204,12 @@ export function Guia({ fin }: { fin?: ReactNode }) {
           {tocalo && <span className="ml-2 rounded-full bg-accent px-2 py-0.5 align-middle text-12 font-semibold text-white">Tócalo</span>}
         </h2>
         <p className="text-14 leading-snug text-ink-2">{paso.texto}</p>
-        {pideRegresar && <p className="text-13 font-semibold text-ink">Regresa {regresaA} para seguir.</p>}
+        {pideRegresar && <p className="text-13 font-semibold text-ink">Regresa {regresaA} para seguir con la guía.</p>}
         <div className="mt-1 flex items-center justify-between gap-3">
           {botonSalir}
           {paso.numero === 12 ? (
             <div className="flex gap-2">
-              <Button variant="ghost" onClick={siguiente}>Saltar</Button>
+              <Button variant="ghost" onClick={siguiente}>Seguir con la guía</Button>
               <Button onClick={() => cambiar((g) => ({ ...g, indice: i, pausa: "cerrar" }))}>Hacer otra venta</Button>
             </div>
           ) : (
