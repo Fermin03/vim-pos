@@ -9,11 +9,15 @@ export const LLAVE_GUIA = "vimpos.demo.guia";
 
 /**
  * El negocio de ejemplo de esta caja ya se borró (demo_limpiar, a las 24 h): la sesión guardada
- * sigue en el navegador, pero su usuario ya no existe. Un fallo de red no cuenta como caducada.
+ * sigue en el navegador, pero su usuario ya no existe. Un fallo de red o un 429 no cuentan.
  */
 export async function demoCaducada(): Promise<boolean> {
-  const { error } = await deviceClient.auth.getUser();
-  return !!error?.status && error.status >= 400 && error.status < 500;
+  try {
+    const { error } = await deviceClient.auth.getUser();
+    return error?.status === 401 || error?.status === 403 || error?.status === 404;
+  } catch {
+    return false;
+  }
 }
 
 /** Pide un negocio de ejemplo nuevo y abre la sesión del dispositivo. Rechaza con CUPO, DEMO_LLENA o DEMO_ERROR. */

@@ -65,8 +65,9 @@ function PaginaPos() {
       // vinculación, que ya viene con el correo puesto.
       const email = await deviceEmail();
       if (!activo) return;
-      if (email && MODO_DEMO && (await demoCaducada())) {
-        // Volvió al enlace después de las 24 h: de vuelta a la bienvenida, sin rastro del anterior.
+      if (MODO_DEMO && (!email || (await demoCaducada()))) {
+        // Sin demo viva (primera visita, o volvió después de las 24 h y la sesión ya no se pudo
+        // renovar): a la bienvenida, sin rastro del negocio ni de la guía anteriores.
         await deviceSignOut();
         await cacheLimpiar();
         olvidarNegocio();

@@ -14,7 +14,7 @@ type Vista =
       tipo: "paso";
       i: number;
       paso: Paso;
-      /** Recuadro a iluminar; null = la persona se fue a otra pantalla (globo al centro). */
+      /** Recuadro a iluminar; null = la persona se fue a otra pantalla (globo en una esquina libre). */
       rect: DOMRect | null;
       /** Se ilumina `abrir` y no el ancla: lo que hay que tocar para llegar. */
       tocalo: boolean;

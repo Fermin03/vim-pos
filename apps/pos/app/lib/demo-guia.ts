@@ -152,9 +152,12 @@ export function pasoActual(pasos: Paso[], desde: number, r: Raiz): number {
 
 /**
  * Desde dónde recalcular al recargar: la caja olvida el PIN y el ticket a medio armar, así que el
- * avance se vuelve a medir con lo que hay en pantalla. Solo no se repite una explicación ya leída.
+ * avance se vuelve a medir con lo que hay en pantalla. Solo no se repite una explicación ya leída,
+ * y una explicación a medio leer se queda: su «Entendido» sigue funcionando (el corte ya cerró el
+ * turno; regresar al paso 14 dejaría a la persona sin la pantalla final).
  */
 export function puntoDeRetorno(pasos: Paso[], indice: number): number {
+  if (pasos[indice]?.tipo === "explica") return indice;
   for (let i = Math.min(indice, pasos.length) - 1; i >= 0; i--) if (pasos[i]!.tipo === "explica") return i + 1;
   return 0;
 }

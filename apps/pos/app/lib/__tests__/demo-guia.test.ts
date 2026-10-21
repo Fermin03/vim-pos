@@ -140,6 +140,9 @@ describe("guía «Hazlo tú»", () => {
     expect(pasoActual(PASOS, puntoDeRetorno(PASOS, 7), raizCon([]))).toBe(0);
     // Ya en el cierre (paso 15): no repite el monitor (13) ni el ticket (11).
     expect(PASOS[puntoDeRetorno(PASOS, 13)]!.numero).toBe(14);
+    // En una explicación se queda: tras el corte (16) el turno ya cerró y solo falta «Entendido».
+    expect(puntoDeRetorno(PASOS, 14)).toBe(14);
+    expect(puntoDeRetorno(PASOS, 9)).toBe(9);
   });
 
   it("slugTour: minúsculas y espacios a guiones", () => {
