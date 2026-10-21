@@ -63,7 +63,7 @@ type Accion =
   | { accion: "lectores"; conexion_id: string }
   | { accion: "sucursal"; conexion_id: string; sucursal_id: string }
   | { accion: "caja"; caja_id: string; serie: string }
-  | { accion: "configurar"; sucursal_id: string; imprime_terminal: boolean; espera_segundos: number; propina_opciones: number[] | null }
+  | { accion: "configurar"; sucursal_id: string; imprime_terminal: boolean; espera_segundos: number; propina_opciones: number[] | null; propina_en_terminal: boolean }
   | { accion: "canjear"; code: string }
   | { accion: "sucursal"; conexion_id: string; sucursal_id: string; latitud: number; longitud: number }
   | { accion: "caja"; caja_id: string }
@@ -126,6 +126,7 @@ const MENSAJES: Record<string, string> = {
   CONEXION_INVALIDA: "Clip ya no acepta las claves de esta cuenta. Desconéctala y vuelve a conectarla con claves nuevas.",
   FALTAN_CAMPOS: "Faltan datos. Revisa lo que escribiste e inténtalo de nuevo.",
   PROPINA_INVALIDA: "Los porcentajes de propina deben ser números enteros del 1 al 100 (hasta tres).",
+  PROPINA_SIN_PORCENTAJES: "Para que el cliente elija la propina en la terminal, escribe al menos un porcentaje.",
   LECTOR_NO_ES_DE_LA_CUENTA: "Ese lector no pertenece a la cuenta de Clip conectada. Elige uno de la lista.",
   LECTOR_EN_OTRO_NEGOCIO: "Ese lector ya lo usa otro negocio en VIM POS. Si es tuyo, escríbenos a soporte.",
   MP_NO_CONFIGURADO: "La conexión con Mercado Pago no está disponible por ahora. Escríbenos a soporte.",

@@ -4,7 +4,7 @@ import { Button } from "@vim/ui/styles";
 import { Tarjeta } from "../../../components/tarjeta";
 import { Interruptor } from "../../../components/interruptor";
 import { input, label } from "../../../components/campos";
-import type { Caja, Sucursal } from "../../../lib/configuracion";
+import { leerPropinas, type Caja, type Sucursal } from "../../../lib/configuracion";
 import { accionTerminal, mensajeErrorTerminal, type ConfigSucursal, type EstadoTerminal } from "../../../lib/terminal";
 
 export const ESPERAS = [[60, "1 minuto"], [180, "3 minutos"], [300, "5 minutos"], [600, "10 minutos"]] as const;
@@ -61,6 +61,22 @@ export function ClipSucursal({ sucursal, cajas, cfg, t, ocupado, correr, setErro
   const [fallo, setFallo] = useState(false);
   const [elegido, setElegido] = useState<Record<string, string>>({});
   const [propinas, setPropinas] = useState<string[]>(() => [0, 1, 2].map((i) => String(cfg.propina_opciones?.[i] ?? "")));
+  // Lo que se guardó desde Mercado Pago puede traer el interruptor sin porcentajes: eso es apagado.
+  const enLector = cfg.propina_en_terminal && Boolean(cfg.propina_opciones?.length);
+  const sinGuardadas = !cfg.propina_opciones?.length;
+
+  // Sin porcentajes guardados para el lector se proponen los de la propina de la caja (hasta tres).
+  useEffect(() => {
+    if (!sinGuardadas) return;
+    let vivo = true;
+    leerPropinas(sucursal.id)
+      .then((p) => {
+        const sug = (p?.porcentajes_sugeridos ?? [10, 15, 20]).filter((n) => Number.isInteger(n) && n >= 1 && n <= 100).slice(0, 3);
+        if (vivo && sug.length) setPropinas((act) => (act.every((x) => x.trim() === "") ? [0, 1, 2].map((i) => String(sug[i] ?? "")) : act));
+      })
+      .catch(() => { /* sin propuesta: los campos quedan vacíos */ });
+    return () => { vivo = false; };
+  }, [sinGuardadas, sucursal.id]);
 
   useEffect(() => {
     let vivo = true;
@@ -70,19 +86,31 @@ export function ClipSucursal({ sucursal, cajas, cfg, t, ocupado, correr, setErro
     return () => { vivo = false; };
   }, [cfg.conexion_id, setError]);
 
-  const configurar = (cambios: Partial<Pick<ConfigSucursal, "imprime_terminal" | "espera_segundos" | "propina_opciones">>) => correr({
+  const configurar = (cambios: Partial<Pick<ConfigSucursal, "imprime_terminal" | "espera_segundos" | "propina_opciones" | "propina_en_terminal">>) => correr({
     accion: "configurar", sucursal_id: sucursal.id, imprime_terminal: cfg.imprime_terminal,
     // Lo guardado puede venir de Mercado Pago (desde 30 s); Clip pide al menos 60.
-    espera_segundos: Math.max(60, cfg.espera_segundos), propina_opciones: cfg.propina_opciones, ...cambios,
+    espera_segundos: Math.max(60, cfg.espera_segundos), propina_opciones: cfg.propina_opciones, propina_en_terminal: enLector, ...cambios,
   }, (r) => r.aviso === "LECTORES_SIN_CONFIGURAR" ? "Guardado, pero Clip no recibió el tiempo de espera en los lectores. Vuelve a guardar en un momento." : "Guardado.", "terminal-clip-conexion");
 
-  function guardarPropinas() {
+  /** Los porcentajes escritos, o null (con el error a la vista) si alguno no vale o, con el lector encendido, no hay ninguno. */
+  function porcentajes(conLector: boolean): number[] | null {
     const nums = propinas.map((p) => p.trim()).filter((p) => p !== "").map(Number);
-    if (nums.some((n) => !Number.isInteger(n) || n < 1 || n > 100)) {
-      setError(mensajeErrorTerminal("PROPINA_INVALIDA"));
-      return;
-    }
-    void configurar({ propina_opciones: nums.length ? nums : null });
+    const error = nums.some((n) => !Number.isInteger(n) || n < 1 || n > 100) ? "PROPINA_INVALIDA"
+      : conLector && nums.length === 0 ? "PROPINA_SIN_PORCENTAJES" : null;
+    if (error) { setError(mensajeErrorTerminal(error)); return null; }
+    return nums;
+  }
+
+  function guardarPropinas() {
+    const nums = porcentajes(enLector);
+    if (nums) void configurar({ propina_opciones: nums.length ? nums : null });
+  }
+
+  function cambiarPropinaEnLector(v: boolean) {
+    if (!v) { void configurar({ propina_en_terminal: false }); return; }
+    // Al encender se guardan también los porcentajes a la vista (pueden ser los propuestos).
+    const nums = porcentajes(true);
+    if (nums) void configurar({ propina_en_terminal: true, propina_opciones: nums });
   }
 
   const cuenta = t.conexiones.find((c) => c.id === cfg.conexion_id);
@@ -107,6 +135,12 @@ export function ClipSucursal({ sucursal, cajas, cfg, t, ocupado, correr, setErro
           <p className="mt-1.5 text-13 text-ink-3">Si el cliente no paga en ese tiempo, el cobro se cancela solo.</p>
         </div>
 
+        <Interruptor
+          etiqueta="El cliente elige la propina en la terminal"
+          descripcion={enLector ? "Al pagar con tarjeta, el lector le ofrece estos porcentajes. La caja ya no la pregunta." : "El lector no pregunta la propina."}
+          encendido={enLector} ocupado={ocupado}
+          onCambiar={cambiarPropinaEnLector}
+        />
         <div>
           <span className={label}>Porcentajes de propina</span>
           <div className="flex flex-wrap items-center gap-2">
@@ -119,7 +153,9 @@ export function ClipSucursal({ sucursal, cajas, cfg, t, ocupado, correr, setErro
             ))}
             <Button variant="ghost" disabled={ocupado} onClick={guardarPropinas}>Guardar</Button>
           </div>
-          <p className="mt-1.5 text-13 text-ink-3">Pronto: el cliente elegirá la propina en la terminal.</p>
+          <p className="mt-1.5 text-13 text-ink-3">
+            {sinGuardadas ? "Propuestos a partir de las propinas de la caja. Hasta tres, del 1 al 100." : "Hasta tres, del 1 al 100."}
+          </p>
         </div>
 
         <div>
