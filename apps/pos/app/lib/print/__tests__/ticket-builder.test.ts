@@ -508,4 +508,10 @@ describe("debeImprimirTicketAlCobrar — comida rápida", () => {
     expect(debeImprimirTicketAlCobrar("PARA_LLEVAR", true)).toBe(true);
     expect(debeImprimirTicketAlCobrar("DRIVE_THRU", true)).toBe(false);
   });
+
+  it("una cuenta con su ticket ya impreso (mesa vieja, en espera) no saca otro al cobrar", () => {
+    expect(debeImprimirTicketAlCobrar("COMER_AQUI", true, true)).toBe(false);
+    expect(debeImprimirTicketAlCobrar("PARA_LLEVAR", true, true)).toBe(false);
+    expect(debeImprimirTicketAlCobrar("COMER_AQUI", true, false)).toBe(true);
+  });
 });

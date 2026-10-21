@@ -79,6 +79,16 @@ export const destinosDe = (caja: DatosCaja | null, agenda: boolean, existencias:
 /** Donde abre la caja y a donde regresa Escape: el calendario en belleza con agenda, el Panel (Cobrar) en tienda y en comida rápida. */
 export const seccionInicial = (caja: DatosCaja | null, agenda: boolean): SeccionTienda => (esBelleza(caja) && agenda ? "calendario" : "panel");
 
+/** Globo de «Pedidos» (comida rápida): lo que espera atención. Apps por aceptar, pedidos de la tienda
+ *  por aceptar (pick-up y domicilio; `porAceptarTienda.apps` ya va en `nApps`) y cuentas en espera. */
+export const globoPedidos = (nApps: number, porAceptarTienda: { pickup: number; domicilio: number }, nEnEspera: number): number =>
+  nApps + porAceptarTienda.pickup + porAceptarTienda.domicilio + nEnEspera;
+
+/** Al salir de una lista de pantalla completa (pick-up, domicilio, en línea, mesas): comida rápida
+ *  vuelve a «Pedidos», de donde se entró; los demás se quedan en su sección. */
+export const seccionTrasLista = (caja: DatosCaja | null, actual: SeccionTienda): SeccionTienda =>
+  esComidaRapida(caja) ? "pedidos" : actual;
+
 /** Con un cobro o un diálogo encima la barra no navega: sería trabajo que se pierde de vista. */
 export const puedeCambiarSeccion = (capasAbiertas: boolean, cobroAbierto: boolean): boolean => !capasAbiertas && !cobroAbierto;
 

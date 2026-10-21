@@ -136,8 +136,9 @@ export function PantallaCuentasModo({
    *  domicilio no reservan mesa, y un botón muerto ahí sería ruido. */
   onVerReservaciones?: () => void;
   /** Abre una cuenta NUEVA en este modo (entra al catálogo con el modo ya fijado). Recibe las
-   *  cuentas listadas: Barra las necesita para no repetir un nombre. */
-  onAbrirCuenta: (cuentas: readonly CuentaAbierta[]) => void;
+   *  cuentas listadas: Barra las necesita para no repetir un nombre. Sin ella no hay botón: las
+   *  cuentas de mesa de comida rápida solo se cobran (ya no se abren mesas). */
+  onAbrirCuenta?: (cuentas: readonly CuentaAbierta[]) => void;
   /** Carga la cuenta en el carrito para agregarle productos (sale a la pantalla de venta). */
   onAgregarProductos: (ticketId: string) => void;
   /** Carga la cuenta y abre el cobro. */
@@ -420,10 +421,12 @@ export function PantallaCuentasModo({
               Reservaciones
             </button>
           )}
+          {onAbrirCuenta && (
           <Button onClick={() => onAbrirCuenta(items ?? [])}>
             <Icono nombre="mas" className="h-[17px] w-[17px]" />
             {copia.nuevaCuenta}
           </Button>
+          )}
         </div>
       </header>
 

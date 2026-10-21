@@ -98,13 +98,14 @@ import { fijarContextoErrores, reportarErrorSinEsperar } from "../lib/reportar-e
 import { BotonVolver } from "./boton-volver";
 import { CatalogoProductos } from "./catalogo-productos";
 import { PanelVentaRetail, type AvisoEscaneo } from "./venta-retail";
-import { comoTienda, conBarraAbajo, destinosDe, esComidaRapida, preguntaServicio, esBelleza, seccionInicial, puedeRecibirMercancia, leerExistencias, leerSucursales, pasoConLimite, puedeCambiarSeccion, renglonTienda, sinExistencia, type Existencia, type PadreTienda, type SeccionTienda } from "../lib/tienda";
+import { comoTienda, conBarraAbajo, destinosDe, esComidaRapida, globoPedidos, seccionTrasLista, preguntaServicio, esBelleza, seccionInicial, puedeRecibirMercancia, leerExistencias, leerSucursales, pasoConLimite, puedeCambiarSeccion, renglonTienda, sinExistencia, type Existencia, type PadreTienda, type SeccionTienda } from "../lib/tienda";
 import { leerEstadoSync } from "../lib/estado-sync";
 import { ModalAgregarProductos } from "./modal-agregar-productos";
 import { ModalNumeroMesa } from "./modal-numero-mesa";
 import { MenuGeneral } from "./menu-general";
 import { ContenidoMenu } from "./contenido-menu";
 import { BarraTienda } from "./barra-tienda";
+import { SeccionPedidos } from "./seccion-pedidos";
 import { SeccionCalendario } from "./seccion-calendario";
 import { SeccionClientes } from "./seccion-clientes";
 import { ModalCita, type AbrirCita } from "./modal-cita";
@@ -669,6 +670,8 @@ export function HomePos({
    * solo se oculta, así el carrito, el ticket guardado y la fila de agregados siguen donde estaban.
    */
   const [seccionTienda, setSeccionTienda] = useState<SeccionTienda>(() => seccionInicial(caja, agenda));
+  // Comida rápida no tiene inicio: los conteos del inicio se leen mientras «Pedidos» está a la vista.
+  const viendoPedidos = comidaRapida && seccionTienda === "pedidos";
   // Agenda de belleza: la ficha de una cita, la cita nueva o en edición, la lista de espera, y la
   // versión que relee el calendario al guardar, mover o cancelar.
   const [fichaCita, setFichaCita] = useState<string | null>(null);
@@ -1661,7 +1664,10 @@ export function HomePos({
       // Solo "Para llevar": es el único modo que va del carrito al cobro sin pasar por la
       // lista de cuentas, así que no hay un momento anterior para imprimirlo. La regla y su
       // historia están en `debeImprimirTicketAlCobrar`.
-      if (debeImprimirTicketAlCobrar(datos.meta.modo, comidaRapida)) {
+      // Comida rápida: una cuenta que ya imprimió su ticket desde la lista no saca otro. Si la
+      // lectura falla, se imprime: mejor un papel de más que un cliente sin comprobante.
+      const yaImpreso = comidaRapida && await leerTicketImpreso(token, ticketId).catch(() => false);
+      if (debeImprimirTicketAlCobrar(datos.meta.modo, comidaRapida, yaImpreso)) {
         try {
           const job = construirTicketJob(datos, await logoParaTicket(datos.ancho));
           await obtenerImpresora("CAJA", { onMostrar: () => setMostrarRecibo(true) }).imprimir(job);
@@ -2052,7 +2058,7 @@ export function HomePos({
   // o se salió de él) y cada 20 s: la lista es de toda la sucursal y otra caja puede moverla.
   // La tienda no pinta esos botones: Transacciones lee su propia lista.
   useEffect(() => {
-    if (tienda || enInicio || carrito.modoServicio !== "PARA_LLEVAR") return;
+    if (tienda || enInicio || (carrito.modoServicio !== "PARA_LLEVAR" && !viendoPedidos)) return;
     let vivo = true;
     const refrescar = () => {
       listarCuentasParaLlevar(token, caja.sucursal_id)
@@ -2063,7 +2069,7 @@ export function HomePos({
     refrescar();
     const id = setInterval(refrescar, 20_000);
     return () => { vivo = false; clearInterval(id); };
-  }, [tienda, enInicio, carrito.modoServicio, ticketBd?.ticketId, token, caja.sucursal_id, refrescarEspera]);
+  }, [tienda, enInicio, carrito.modoServicio, viendoPedidos, ticketBd?.ticketId, token, caja.sucursal_id, refrescarEspera]);
 
   /** Abre una cuenta de Para llevar desde su lista, para cobrarla (o cancelarla) aquí mismo. */
   const abrirCuentaLlevar = useCallback(async (ticketId: string) => {
@@ -2083,7 +2089,7 @@ export function HomePos({
   // Badges del inicio: sólo se refrescan mientras el inicio está a la vista, para no consultar
   // la BD cada 15 s mientras el cajero está capturando una venta.
   useEffect(() => {
-    if (!enInicio) return;
+    if (!enInicio && !viendoPedidos) return;
     let vivo = true;
     const cargar = () => {
       contarCuentasAbiertasPorModo(token, turno.id)
@@ -2093,7 +2099,7 @@ export function HomePos({
     cargar();
     const id = setInterval(cargar, 15000);
     return () => { vivo = false; clearInterval(id); };
-  }, [enInicio, token, turno.id]);
+  }, [enInicio, viendoPedidos, token, turno.id]);
 
   // ADR 0011 — pedidos de apps: se consultan SIEMPRE (no solo en el inicio) porque un pedido de
   // Uber tiene minutos para aceptarse y el cajero puede estar en medio de una venta. Una consulta
@@ -2892,6 +2898,39 @@ export function HomePos({
     </>
   );
 
+  /** Cuenta nueva de un modo con lista (Comedor, Pick-up, Domicilio): se fija el modo y se entra al
+   *  catálogo con el carrito limpio. Desde la lista del modo y desde «Pedidos» de comida rápida. */
+  const abrirCuentaNueva = (modo: "DRIVE_THRU" | "DELIVERY_PROPIO" | "COMER_AQUI") => {
+    const abrir = () => {
+      dispatch({ tipo: "limpiar" });
+      dispatch({ tipo: "modo", modo });
+      setTicketBd(null);
+      setItemsPersistidos([]);
+      setCocinaEnviada(false);
+      setVolverA(modo === "DRIVE_THRU" ? "pickup" : modo === "COMER_AQUI" ? "mesas" : "domicilio");
+      // Comedor NO entra al catálogo todavía: primero hay que saber a qué mesa. El modal se
+      // encarga y, al resolverla, abre la cuenta y entra.
+      if (modo === "COMER_AQUI") { setPidiendoMesa(true); return; }
+      setEnPickup(false);
+      setEnDelivery(false);
+      // Comida rápida: la captura vive en «Cobrar».
+      if (comidaRapida) setSeccionTienda("panel");
+      // Domicilio: lo primero que se pregunta por teléfono es a nombre de quién y a dónde
+      // va, antes de anotar qué quiere. Se abre el modal de una vez para no obligar al
+      // cajero a acordarse de asignarlo después (y que el pedido salga sin dirección).
+      if (modo === "DRIVE_THRU") setNombreCuentaAbierto(true);
+      if (modo === "DELIVERY_PROPIO") setClienteDomAbierto(true);
+    };
+    // Comida rápida: en «Cobrar» puede haber una venta a medias; se suelta (o se pregunta) antes.
+    if (comidaRapida) conVentaSuelta(abrir)(); else abrir();
+  };
+
+  /** Salir de una lista de pantalla completa: comida rápida vuelve a «Pedidos», de donde se entró. */
+  const salirDeLista = () => {
+    volverAlInicio();
+    setSeccionTienda((s) => seccionTrasLista(caja, s));
+  };
+
   if (enKds) {
     return <><PantallaKds token={token} caja={caja} onSalir={() => setEnKds(false)} />{capaTienda}</>;
   }
@@ -2993,33 +3032,18 @@ export function HomePos({
         turno={turno}
         empleado={empleado}
         modo={modo}
-        onSalir={volverAlInicio}
+        onSalir={salirDeLista}
         // Solo Comedor: pick-up y domicilio no apartan mesa, y un botón muerto ahí sería ruido.
         onVerReservaciones={modo === "COMER_AQUI" && moduloActivo(modulos, "reservaciones") ? () => setViendoReservaciones(true) : undefined}
-        onAbrirCuenta={(cuentas) => {
+        // Comida rápida: las cuentas de mesa que quedaron se cobran, pero ya no se abren mesas nuevas.
+        onAbrirCuenta={comidaRapida && modo === "COMER_AQUI" ? undefined : (cuentas) => {
           // Barra: el ticket nace con su nombre ANTES de capturar (el nombre es único y lo valida la
           // base), así que primero el nombre y después se entra a la cuenta ya abierta.
           if (modo === "BARRA") {
             setNombreBarra({ enUso: cuentas.flatMap((c) => (c.cliente ? [c.cliente] : [])), clientIdLocal: `cuenta-${nuevoClientId()}` });
             return;
           }
-          // Cuenta nueva: se fija el modo y se entra al catálogo con el carrito limpio.
-          dispatch({ tipo: "limpiar" });
-          dispatch({ tipo: "modo", modo });
-          setTicketBd(null);
-          setItemsPersistidos([]);
-          setCocinaEnviada(false);
-          setVolverA(modo === "DRIVE_THRU" ? "pickup" : modo === "COMER_AQUI" ? "mesas" : "domicilio");
-          // Comedor NO entra al catálogo todavía: primero hay que saber a qué mesa. El modal se
-          // encarga y, al resolverla, abre la cuenta y entra.
-          if (modo === "COMER_AQUI") { setPidiendoMesa(true); return; }
-          setEnPickup(false);
-          setEnDelivery(false);
-          // Domicilio: lo primero que se pregunta por teléfono es a nombre de quién y a dónde
-          // va, antes de anotar qué quiere. Se abre el modal de una vez para no obligar al
-          // cajero a acordarse de asignarlo después (y que el pedido salga sin dirección).
-          if (modo === "DRIVE_THRU") setNombreCuentaAbierto(true);
-          if (modo === "DELIVERY_PROPIO") setClienteDomAbierto(true);
+          abrirCuentaNueva(modo);
         }}
         onAgregarProductos={(ticketId: string) => setAgregandoA(ticketId)}
         onCanjear={lealtadActiva ? (c) => { if (c.clienteId) setCanjeDe({ ticketId: c.ticketId, clienteId: c.clienteId, origen: "lista" }); } : undefined}
@@ -3248,7 +3272,7 @@ export function HomePos({
     return (
       <>
         <PantallaPedidosApps token={token} caja={caja} hayApps={hayDelivery} hayTienda={hayTienda} cajaSinActualizar={cajaSinActualizar}
-          onCambio={() => releerEnLinea.current()} onSalir={volverAlInicio} />
+          onCambio={() => releerEnLinea.current()} onSalir={salirDeLista} />
         {capaTienda}
       </>
     );
@@ -3268,6 +3292,8 @@ export function HomePos({
     );
   }
 
+  // Comida rápida: los pedidos de la tienda por aceptar, para «Pedidos» y su globo.
+  const porAceptarTienda = contarPorAceptar(pedidosTienda, { cajaId: turno.caja_id, enEscritorio: esEscritorio(), ahora: Date.now() });
   return (
     <div className="flex h-screen flex-col">
       {!online && (
@@ -3624,8 +3650,26 @@ export function HomePos({
       {barraAbajo && seccionTienda !== "panel" && (
         <div className="flex min-h-0 flex-1 flex-col">
           {seccionTienda === "pedidos" ? (
-            // Comida rápida: el contenedor de «Pedidos»; sus listas llegan en la entrega siguiente.
-            <section aria-label="Pedidos" className="min-h-0 flex-1 overflow-y-auto bg-bg" />
+            // Comida rápida: cada tarjeta abre la pantalla de siempre; al salir de ella se vuelve aquí.
+            <SeccionPedidos
+              domicilio={moduloActivo(modulos, "domicilio")}
+              enLinea={hayEnLinea}
+              expiradosEnLinea={expiradosApps}
+              nEnEspera={nEnEspera}
+              nParaLlevar={nAbiertasLlevar}
+              nPickup={cuentasAbiertas.pickup + porAceptarTienda.pickup + cuentasPagadasEnLinea(pedidosTienda, "DRIVE_THRU").length}
+              nDomicilio={cuentasAbiertas.domicilio + porAceptarTienda.domicilio + cuentasPagadasEnLinea(pedidosTienda, "DELIVERY_PROPIO").length}
+              nEnLinea={nPedidosApps}
+              nMesa={cuentasAbiertas.comedor}
+              onEnEspera={() => { setEsperaError(null); setEsperaListaAbierta(true); }}
+              onParaLlevar={() => { setLlevarError(null); setLlevarListaAbierta(true); }}
+              onPickup={() => setEnPickup(true)}
+              onDomicilio={() => setEnDelivery(true)}
+              onEnLinea={() => setEnPedidosApps(true)}
+              onMesa={() => setEnMesas(true)}
+              onNuevoRecoger={() => abrirCuentaNueva("DRIVE_THRU")}
+              onNuevoDomicilio={() => abrirCuentaNueva("DELIVERY_PROPIO")}
+            />
           ) : seccionTienda === "calendario" ? (
             <SeccionCalendario
               token={token}
@@ -3739,6 +3783,7 @@ export function HomePos({
           seccion={seccionTienda}
           onCambiar={(s) => { setProductoInventario(null); void irASeccion(s); }}
           pendientes={vistas ? sinVer(notificaciones, vistas) : 0}
+          pendientesPedidos={comidaRapida ? globoPedidos(nPedidosApps, porAceptarTienda, nEnEspera) : 0}
           bloqueada={!puedeCambiarSeccion(algoAbierto || avisoTiendaVisible, totalesCobro != null)}
         />
       )}
