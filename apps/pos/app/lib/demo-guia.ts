@@ -133,8 +133,8 @@ export const PASOS: Paso[] = [
   },
   {
     numero: 15, etapa: "Cerrar turno", tipo: "hazlo", ancla: t("conteo-efectivo"),
-    titulo: "Cuenta $20 de menos",
-    texto: "Escribe en Efectivo el fondo más lo que cobraste en efectivo, pero con $20 menos, a propósito. Si cobraste con tarjeta, llena lo de tarjeta.",
+    titulo: "Cuenta el efectivo",
+    texto: "Cuenta lo que hay en el cajón, fondo incluido, y escríbelo en Efectivo. Si cobraste con tarjeta, llena lo de tarjeta.",
     luego: {
       cuando: (r) => !!(r.querySelector(`${t("conteo-efectivo")} input`) as HTMLInputElement | null)?.value,
       ancla: t("generar-corte"),
