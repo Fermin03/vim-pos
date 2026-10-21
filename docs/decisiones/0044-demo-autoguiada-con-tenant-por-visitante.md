@@ -1,7 +1,15 @@
 # 0044 — La demo autoguiada es la caja real en un proyecto aparte, con un negocio por visitante
 
-**Fecha:** 20 de octubre de 2026 · **Estado:** vigente · **Cumple** lo que dejó pendiente
-[0010](0010-el-demo-estatico-se-retira.md).
+**Fecha:** 20 de octubre de 2026 · **Estado:** vigente, con el cambio del 21 oct de abajo · **Cumple** lo
+que dejó pendiente [0010](0010-el-demo-estatico-se-retira.md).
+
+> **Cambio del 21 oct 2026 — la demo vive en el proyecto de producción.** Al publicarla, la cuenta ya tenía
+> sus 2 proyectos gratuitos (`vim-pos` y `tenis-union`) y Supabase no dejó crear un tercero. Fermín eligió,
+> sabiendo los riesgos de abajo, encenderla dentro de `vim-pos` (`VIM_DEMO=1`) en vez de abrir otra cuenta
+> o pagar. Para acotarlos: tope de **50** demos vivas (no 300) y limpieza **cada hora**. Los negocios de la
+> demo se llaman «Crazy Burgers», con código `demo-…`, y aparecen en el panel de plataforma hasta que se
+> borran. Lo de «proyecto aparte» de abajo queda como la salida si la demo crece o si algo del aislamiento
+> preocupa: es mover las variables de `pos-demo` a otro proyecto y apagar `VIM_DEMO` aquí.
 
 ## Qué había antes
 

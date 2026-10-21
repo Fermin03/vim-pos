@@ -92,8 +92,8 @@ BEGIN
   IF EXISTS (SELECT 1 FROM auth.users WHERE id = v_ana) THEN RAISE EXCEPTION 'la cuenta de Ana vencida sigue ahí'; END IF;
   IF NOT EXISTS (SELECT 1 FROM tenants WHERE id = v_tenant2) THEN RAISE EXCEPTION 'se borró el tenant de hace 1 hora'; END IF;
 
-  -- ── 6) Con 300 demos vivas, la siguiente no entra ────────────────────────────
-  WHILE (SELECT count(*) FROM demo_sesiones) < 300 LOOP
+  -- ── 6) Con 50 demos vivas, la siguiente no entra ────────────────────────────
+  WHILE (SELECT count(*) FROM demo_sesiones) < 50 LOOP
     PERFORM demo_clonar(gen_random_uuid(), 'clave-prueba-123', NULL);
   END LOOP;
   v_ok := false;
@@ -101,9 +101,9 @@ BEGIN
     PERFORM demo_clonar(gen_random_uuid(), 'clave-prueba-123', NULL);
   EXCEPTION WHEN OTHERS THEN
     v_ok := SQLERRM LIKE 'DEMO_LLENA%';
-    IF NOT v_ok THEN RAISE EXCEPTION 'la demo 301 falló con otro error: %', SQLERRM; END IF;
+    IF NOT v_ok THEN RAISE EXCEPTION 'la demo 51 falló con otro error: %', SQLERRM; END IF;
   END;
-  IF NOT v_ok THEN RAISE EXCEPTION 'la demo 301 entró: el tope no funciona'; END IF;
+  IF NOT v_ok THEN RAISE EXCEPTION 'la demo 51 entró: el tope no funciona'; END IF;
 
   RAISE NOTICE 'SMOKE DEMO AUTOGUIADA OK';
 END $$;

@@ -41,7 +41,7 @@ SET search_path = public, extensions, pg_temp   -- 'extensions' por crypt()/gen_
 AS $$
 #variable_conflict use_column
 DECLARE
-  c_tope    CONSTANT int := 300;
+  c_tope    CONSTANT int := 50;   -- vive en producción (ADR 0044, 21 oct): poco para no tocar la capacidad de los clientes
   v_tenant  uuid := gen_random_uuid();
   v_suc     uuid := gen_random_uuid();
   v_ana     uuid := gen_random_uuid();
@@ -205,7 +205,7 @@ BEGIN
 END;
 $$;
 COMMENT ON FUNCTION demo_clonar(uuid, text, text) IS
-  'Clona Crazy Burgers en un tenant nuevo para un visitante de la demo autoguiada; devuelve el tenant y el correo de su caja. DEMO_LLENA con 300 demos vivas. Solo service_role (0261, ADR 0044).';
+  'Clona Crazy Burgers en un tenant nuevo para un visitante de la demo autoguiada; devuelve el tenant y el correo de su caja. DEMO_LLENA con 50 demos vivas. Solo service_role (0261, ADR 0044).';
 REVOKE ALL ON FUNCTION demo_clonar(uuid, text, text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION demo_clonar(uuid, text, text) TO service_role;
 
