@@ -2,7 +2,6 @@
 import { useRef, useState, type FormEvent } from "react";
 import { Button, botonClases } from "@vim/ui/styles";
 import { LLAVE_GUIA } from "../../lib/demo";
-import { encabezadosFuncion } from "../../lib/supabase";
 
 const WHATSAPP = "https://wa.me/525665083346";
 const PRECIOS = "https://vimpos.com.mx/precios";
@@ -32,7 +31,7 @@ export function FinDemo() {
     try {
       const res = await fetch(PROSPECTOS_URL, {
         method: "POST",
-        headers: encabezadosFuncion(),
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nombre: f.get("nombre"),
           whatsapp: f.get("whatsapp"),
