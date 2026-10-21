@@ -1,6 +1,7 @@
 "use client";
 import { z } from "zod";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { borrarSuave, tenantId } from "./datos";
 
 /**
  * Catálogo de repartidores del negocio.
@@ -12,12 +13,6 @@ import { supabase, leerSesion } from "./supabase";
  * Sin política DELETE en la tabla: la baja es lógica (`deleted_at`), porque los pedidos ya
  * repartidos siguen apuntando a la fila.
  */
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
 
 const S = (v: unknown) => (v == null ? "" : String(v));
 
@@ -87,13 +82,7 @@ export async function setActivoRepartidor(id: string, activo: boolean): Promise<
 }
 
 /** Baja definitiva del catálogo (lógica: los pedidos históricos siguen apuntando aquí). */
-export async function eliminarRepartidor(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("repartidores")
-    .update({ deleted_at: new Date().toISOString(), activo: false })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarRepartidor = (id: string): Promise<void> => borrarSuave("repartidores", id, { activo: false });
 
 /** El choque del índice único llega como jerga de Postgres; aquí se dice lo que pasó. */
 function traducir(mensaje: string): string {

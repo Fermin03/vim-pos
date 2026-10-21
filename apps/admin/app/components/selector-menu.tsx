@@ -9,7 +9,7 @@
  * nada que elegir y la franja no se pinta.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Button, DialogoPeligro } from "@vim/ui/styles";
+import { Button, DialogoPeligro, Icono } from "@vim/ui/styles";
 import { mensajeError } from "../lib/errores";
 import {
   MENU_GENERAL,
@@ -204,7 +204,7 @@ export function FranjaMenus({ menu, nota }: { menu: MenuCatalogo; nota?: string 
             </>
           )}
           <Button variant="ghost" onClick={() => setModal("nuevo")}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-[16px] w-[16px]" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+            <Icono nombre="mas" className="h-[16px] w-[16px]" />
             Nuevo menú
           </Button>
         </span>

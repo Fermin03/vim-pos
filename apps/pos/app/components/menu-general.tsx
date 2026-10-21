@@ -1,10 +1,12 @@
 "use client";
-import { LogoVim } from "@vim/ui/styles";
+import { LogoVim, Icono } from "@vim/ui/styles";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { buscarActualizacion, esEscritorio } from "../lib/actualizacion";
 import { pedirActualizacionCatalogo } from "../lib/catalogo-eventos";
 import { enlaceWhatsapp, mensajeAyudaCaja, textoHorario } from "@vim/db/soporte";
 import { useSoporte } from "../lib/soporte";
+import { moduloActivo } from "@vim/db/operacion";
+import { useAcceso } from "./banda-acceso";
 
 /**
  * Menú de pantalla completa del POS.
@@ -49,6 +51,7 @@ export function MenuGeneral({
   /** Para el mensaje de "Ayuda por WhatsApp": desde qué negocio, sucursal y caja se escribe. */
   ayuda?: { negocio?: string | null; sucursal?: string | null; caja?: string | null; cajero?: string | null };
 }) {
+  const { modulos } = useAcceso();
   // Actualizar solo aplica dentro de la app de escritorio; se resuelve en efecto porque el
   // export estático se prerenderiza sin window.
   const [enEscritorio, setEnEscritorio] = useState(false);
@@ -106,7 +109,7 @@ export function MenuGeneral({
           aria-label="Cerrar menú"
           className="flex h-10 w-10 items-center justify-center rounded-lg border border-line-strong text-ink-2 transition hover:border-ink hover:text-ink"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-5 w-5"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          <Icono nombre="cerrar" className="h-5 w-5" />
         </button>
       </div>
 
@@ -114,46 +117,46 @@ export function MenuGeneral({
         <div className="mx-auto flex max-w-4xl flex-col gap-9">
           {(onKds || onDevoluciones || onCorteX || onEnEspera || onAbrirCajon) && (
           <SeccionMenu titulo="Operación">
-            {onKds && (
-              <TileMenu label="Cocina" onClick={con(onKds)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M3 11l18-5v12L3 14v-3z" /><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" /></svg>} />
+            {onKds && moduloActivo(modulos, "kds") && (
+              <TileMenu label="Cocina" onClick={con(onKds)} icon={<Icono nombre="megafono" className="h-8 w-8" />} />
             )}
             {onDevoluciones && (
-              <TileMenu label="Devoluciones" onClick={con(onDevoluciones)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M9 14l-4-4 4-4M5 10h11a4 4 0 0 1 0 8h-1" /></svg>} />
+              <TileMenu label="Devoluciones" onClick={con(onDevoluciones)} icon={<Icono nombre="devolver" className="h-8 w-8" />} />
             )}
             {/* Estas dos vivían en el topbar de la pantalla de venta. Al quitarlo se quedaron sin
                 puerta: se podía dejar un pedido en espera pero ya no recuperarlo. */}
             {onCorteX && (
-              <TileMenu label="Corte caja X" onClick={con(onCorteX)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2z" /><path d="M9 7h6M9 11h6M9 15h3" /></svg>} />
+              <TileMenu label="Corte caja X" onClick={con(onCorteX)} icon={<Icono nombre="recibo" className="h-8 w-8" />} />
             )}
             {onEnEspera && (
-              <TileMenu label="Pedidos en espera" badge={nEnEspera} onClick={con(onEnEspera)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>} />
+              <TileMenu label="Pedidos en espera" badge={nEnEspera} onClick={con(onEnEspera)} icon={<Icono nombre="reloj" className="h-8 w-8" />} />
             )}
             {onAbrirCajon && (
-              <TileMenu label="Abrir cajón" onClick={con(onAbrirCajon)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><rect x="3" y="8" width="18" height="11" rx="1.5" /><path d="M3 12h18M10 15.5h4" /><path d="M7 8V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2" /></svg>} />
+              <TileMenu label="Abrir cajón" onClick={con(onAbrirCajon)} icon={<Icono nombre="cajon" className="h-8 w-8" />} />
             )}
           </SeccionMenu>
           )}
           <SeccionMenu titulo="Cuenta">
-            <TileMenu label="Cambiar cajero" onClick={con(onCambiarCajero)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M16 3.13a4 4 0 0 1 0 7.75" /><path d="M21 21v-2a4 4 0 0 0-3-3.87" /><circle cx="9" cy="7" r="4" /><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" /></svg>} />
-            <TileMenu label="Bloquear pantalla" onClick={con(onBloquear)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><rect x="4" y="11" width="16" height="9" rx="1.5" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>} />
-            <TileMenu label="Cambiar mi PIN" onClick={con(onCambiarPin)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><circle cx="7.5" cy="15.5" r="4.5" /><path d="m10.5 12.5 8-8" /><path d="m16 7 2 2" /><path d="m19 4 2 2" /></svg>} />
-            {onMisPropinas && (
-              <TileMenu label="Mis propinas" onClick={con(onMisPropinas)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><circle cx="12" cy="12" r="9" /><path d="M14.5 9.5a2.5 2.5 0 0 0-2.5-1.5c-1.4 0-2.5.8-2.5 2s1.1 1.6 2.5 2 2.5.9 2.5 2-1.1 2-2.5 2a2.5 2.5 0 0 1-2.5-1.5M12 6.5v1M12 16.5v1" /></svg>} />
+            <TileMenu label="Cambiar cajero" onClick={con(onCambiarCajero)} icon={<Icono nombre="personas" className="h-8 w-8" />} />
+            <TileMenu label="Bloquear pantalla" onClick={con(onBloquear)} icon={<Icono nombre="candado" className="h-8 w-8" />} />
+            <TileMenu label="Cambiar mi PIN" onClick={con(onCambiarPin)} icon={<Icono nombre="llave" className="h-8 w-8" />} />
+            {onMisPropinas && moduloActivo(modulos, "meseros") && (
+              <TileMenu label="Mis propinas" onClick={con(onMisPropinas)} icon={<Icono nombre="moneda" className="h-8 w-8" />} />
             )}
           </SeccionMenu>
           <SeccionMenu titulo="Ajustes">
-            <TileMenu label="Configurar impresoras y pantallas" onClick={con(onImpresora)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" /></svg>} />
+            <TileMenu label="Configurar impresoras y pantallas" onClick={con(onImpresora)} icon={<Icono nombre="impresora" className="h-8 w-8" />} />
             {enEscritorio && (
               <>
             <TileMenu
               label={bajandoMenu ? "Actualizando…" : "Actualizar menú"}
               onClick={() => { if (!bajandoMenu) actualizarMenu(); }}
-              icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M4 6h13a3 3 0 0 1 0 6H7a3 3 0 0 0 0 6h13" /><path d="m17 3 3 3-3 3" /><path d="m7 15-3 3 3 3" /></svg>}
+              icon={<Icono nombre="actualizar-menu" className="h-8 w-8" />}
             />
               <TileMenu
                 label={buscandoUpd ? "Buscando…" : "Buscar actualizaciones"}
                 onClick={() => { if (!buscandoUpd) revisarActualizacion(); }}
-                icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 3v5h-5" /><path d="M12 8v5" /><path d="m9.5 11 2.5 2.5 2.5-2.5" /></svg>}
+                icon={<Icono nombre="buscar-actualizacion" className="h-8 w-8" />}
               />
               </>
             )}
@@ -162,11 +165,11 @@ export function MenuGeneral({
                 label="Ayuda por WhatsApp"
                 detalle={textoHorario(soporte)}
                 href={waAyuda}
-                icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M20 11.5a8 8 0 0 1-11.8 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5z" /><path d="M9.5 9.5a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 3.5M12 16h.01" /></svg>}
+                icon={<Icono nombre="chat" className="h-8 w-8" />}
               />
             )}
             {onCerrarTurno && (
-              <TileMenu label="Cerrar turno" onClick={con(onCerrarTurno)} peligro icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>} />
+              <TileMenu label="Cerrar turno" onClick={con(onCerrarTurno)} peligro icon={<Icono nombre="casilla" className="h-8 w-8" />} />
             )}
           </SeccionMenu>
           {avisoUpd && <p className="-mt-4 text-13 font-medium text-ink-2" role="status">{avisoUpd}</p>}

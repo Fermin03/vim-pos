@@ -1,0 +1,447 @@
+"use client";
+// Lo que el admin lee y escribe de la tienda en línea (tablas de 0161/0163), siempre bajo RLS con la
+// sesión del dueño. Las reglas puras (dirección, horario, lista de revisión) viven en tienda-reglas.ts.
+import { z } from "zod";
+import { supabase } from "./supabase";
+import { tenantId } from "./datos";
+import { combosNoComprables, type ComboNoComprable, type ComboParaRevisar } from "./tienda-combos";
+import { filaOculta, type CambioMenu, type CategoriaCatalogo, type Ocultos, type ProductoCatalogo } from "./tienda-menu";
+import { ofertaTienda, type OfertaTienda } from "./tienda-plan";
+import { estadoDePago, type CajaDeTienda } from "./tienda-cobro";
+import { errorDeDireccion, errorDeHorario, leerHorario, mensajeTienda, type EnvioSucursal, type SucursalTienda, type TramoTienda } from "./tienda-reglas";
+
+const SOLO_ADMIN = "Solo el dueño o un administrador puede cambiar esto.";
+
+const fallo = (error: { message: string; code?: string }, porDefecto: string): Error => new Error(mensajeTienda(error, porDefecto));
+
+// ── Configuración ─────────────────────────────────────────────────────────────
+
+export type ConfigTienda = {
+  /** En la base es la columna `slug`; al dueño siempre se le dice «dirección». */
+  direccion: string; color: string; descripcion: string;
+  /** Ruta dentro del almacén público `productos`; la base guarda la ruta, no la URL. */
+  logoRuta: string | null; logoUrl: string | null;
+  aceptacion: "MANUAL" | "AUTO"; minutosAceptacion: number; pagoEfectivo: boolean; pagoTarjeta: boolean;
+  /** El dueño ofrece pagar en línea. Que de verdad se ofrezca en una sucursal lo decide la base (cuenta activa y caja al día). */
+  pagoEnLinea: boolean;
+};
+export type DatosConfigTienda = Omit<ConfigTienda, "logoRuta" | "logoUrl">;
+/** Los dos bloques de la página que guardan en la fila de la tienda: «Tu tienda» y «Pedidos». */
+export type BloqueConfig = "datos" | "pedidos";
+
+const configSchema = z.object({
+  direccion: z.string().superRefine((d, ctx) => {
+    const e = errorDeDireccion(d);
+    if (e) ctx.addIssue({ code: "custom", message: e });
+  }),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "El color no es válido."),
+  descripcion: z.string().max(200, "La descripción puede tener hasta 200 caracteres."),
+  aceptacion: z.enum(["MANUAL", "AUTO"]),
+  minutosAceptacion: z.number().int("Los minutos van en números enteros.").min(3, "Los minutos para aceptar van de 3 a 15.").max(15, "Los minutos para aceptar van de 3 a 15."),
+  pagoEfectivo: z.boolean(),
+  pagoTarjeta: z.boolean(),
+  pagoEnLinea: z.boolean(),
+}).refine((d) => d.pagoEfectivo || d.pagoTarjeta || d.pagoEnLinea, { message: "Deja activa al menos una forma de pago.", path: ["pagoEfectivo"] });
+
+/** La dirección pública del logo a partir de su ruta en el almacén. */
+export const urlDelLogo = (ruta: string | null): string | null =>
+  ruta ? supabase.storage.from("productos").getPublicUrl(ruta).data.publicUrl : null;
+
+/** null = todavía no hay tienda configurada. */
+export async function leerConfigTienda(): Promise<ConfigTienda | null> {
+  const tid = await tenantId();
+  const { data, error } = await supabase
+    .from("tienda_config")
+    .select("slug, color, descripcion, logo_ruta, aceptacion, minutos_aceptacion, pago_efectivo, pago_tarjeta, pago_en_linea")
+    .eq("tenant_id", tid)
+    .maybeSingle();
+  if (error) throw fallo(error, "No se pudo leer la tienda");
+  if (!data) return null;
+  const c = data as Record<string, unknown>;
+  const logoRuta = typeof c.logo_ruta === "string" && c.logo_ruta !== "" ? c.logo_ruta : null;
+  return {
+    direccion: String(c.slug), color: String(c.color), descripcion: String(c.descripcion ?? ""),
+    logoRuta, logoUrl: urlDelLogo(logoRuta),
+    aceptacion: c.aceptacion === "AUTO" ? "AUTO" : "MANUAL", minutosAceptacion: Number(c.minutos_aceptacion),
+    pagoEfectivo: c.pago_efectivo === true, pagoTarjeta: c.pago_tarjeta === true, pagoEnLinea: c.pago_en_linea === true,
+  };
+}
+
+/**
+ * ¿La tienda está en MODO DE PRUEBA (`tienda_config.pago_de_prueba`, 0178)? Solo se lee: la marca la
+ * pone VIM, y el dueño no tiene permiso de escribirla. Aparte de `leerConfigTienda` a propósito: si
+ * esta lectura falla (la columna aún no existe en esa base), la página carga igual y no es modo de prueba.
+ */
+export async function leerModoDePrueba(): Promise<boolean> {
+  const tid = await tenantId();
+  const { data, error } = await supabase.from("tienda_config").select("pago_de_prueba").eq("tenant_id", tid).maybeSingle();
+  return !error && (data as { pago_de_prueba?: unknown } | null)?.pago_de_prueba === true;
+}
+
+/**
+ * Crea la fila la primera vez (con todo, para que nazca completa); después cada bloque actualiza
+ * SOLO sus columnas: la página arma `d` con lo que tiene en memoria, y una pestaña vieja que guarda
+ * «Pedidos» pisaría la dirección que otra pestaña (u otro administrador) acaba de guardar.
+ * Nunca escribe `logo_ruta` (lo maneja el logo).
+ */
+export async function guardarConfigTienda(d: DatosConfigTienda, bloque: BloqueConfig): Promise<void> {
+  const v = configSchema.safeParse(d);
+  if (!v.success) throw new Error(v.error.issues[0]?.message ?? "Revisa los datos de la tienda.");
+  const tid = await tenantId();
+  const columnas = {
+    datos: { slug: d.direccion, color: d.color, descripcion: d.descripcion.trim() === "" ? null : d.descripcion },
+    pedidos: { aceptacion: d.aceptacion, minutos_aceptacion: d.minutosAceptacion, pago_efectivo: d.pagoEfectivo, pago_tarjeta: d.pagoTarjeta, pago_en_linea: d.pagoEnLinea },
+  };
+  const { data: existe, error: errLectura } = await supabase.from("tienda_config").select("tenant_id").eq("tenant_id", tid).maybeSingle();
+  if (errLectura) throw fallo(errLectura, "No se pudo guardar la tienda");
+  if (!existe) {
+    const { error } = await supabase.from("tienda_config").insert({ tenant_id: tid, ...columnas.datos, ...columnas.pedidos });
+    if (error) throw fallo(error, "No se pudo guardar la tienda");
+    return;
+  }
+  const { data, error } = await supabase
+    .from("tienda_config").update({ ...columnas[bloque], updated_at: new Date().toISOString() }).eq("tenant_id", tid).select("tenant_id");
+  if (error) throw fallo(error, "No se pudo guardar la tienda");
+  // La RLS no contesta con error a un UPDATE ajeno: simplemente no encuentra la fila.
+  if (!data || data.length === 0) throw new Error(SOLO_ADMIN);
+}
+
+// ── Sucursales ────────────────────────────────────────────────────────────────
+
+/**
+ * Todas las sucursales vivas, participen o no, con sus zonas activas contadas en una sola consulta y
+ * su envío (0185). Las zonas de los tramos por distancia no cuentan como zonas: no las elige el
+ * cliente. Su precio sí sale de ellas (un tramo es una zona); un tramo cuya zona ya no existe no se pinta.
+ */
+export async function leerSucursalesTienda(): Promise<SucursalTienda[]> {
+  const [suc, tienda, zonas] = await Promise.all([
+    supabase.from("sucursales").select("id, nombre, telefono, activa, geo_lat, geo_lng").is("deleted_at", null).order("nombre", { ascending: true }),
+    supabase.from("tienda_sucursales").select("sucursal_id, participa, recoger, domicilio, horario, conexion_id, cobro_envio, tramos_envio"),
+    supabase.from("zonas_envio").select("id, sucursal_id, costo_mxn, activa").is("deleted_at", null),
+  ]);
+  if (suc.error) throw fallo(suc.error, "No se pudieron leer las sucursales");
+  if (tienda.error) throw fallo(tienda.error, "No se pudieron leer las sucursales de la tienda");
+  if (zonas.error) throw fallo(zonas.error, "No se pudieron leer las zonas de envío");
+  const deTienda = new Map(((tienda.data ?? []) as Record<string, unknown>[]).map((f) => [String(f.sucursal_id), f]));
+  const filasDeZonas = (zonas.data ?? []) as { id: string; sucursal_id: string; costo_mxn: number | string; activa: boolean }[];
+  const costoDe = new Map(filasDeZonas.map((z) => [z.id, Number(z.costo_mxn).toFixed(2)]));
+  const deTramos = new Set<string>();
+  const tramosDe = (crudo: unknown): TramoTienda[] => (Array.isArray(crudo) ? crudo : []).flatMap((x) => {
+    const o = (typeof x === "object" && x !== null ? x : {}) as Record<string, unknown>;
+    const zona = typeof o.zona_id === "string" ? o.zona_id : "";
+    const costo = costoDe.get(zona);
+    if (zona) deTramos.add(zona);
+    return typeof o.hasta_km === "string" && costo !== undefined ? [{ hastaKm: o.hasta_km.replace(/\.0$/, ""), costo }] : [];
+  });
+  const envios = new Map<string, EnvioSucursal>();
+  for (const s of (suc.data ?? []) as { id: string; geo_lat: number | string | null; geo_lng: number | string | null }[]) {
+    const t = deTienda.get(s.id);
+    envios.set(s.id, {
+      cobro: t?.cobro_envio === "DISTANCIA" ? "DISTANCIA" : "ZONAS",
+      tramos: tramosDe(t?.tramos_envio),
+      punto: s.geo_lat != null && s.geo_lng != null ? { lat: Number(s.geo_lat), lng: Number(s.geo_lng) } : null,
+    });
+  }
+  const nZonas = new Map<string, number>();
+  for (const z of filasDeZonas) if (z.activa && !deTramos.has(z.id)) nZonas.set(z.sucursal_id, (nZonas.get(z.sucursal_id) ?? 0) + 1);
+  return ((suc.data ?? []) as { id: string; nombre: string; telefono: string | null; activa: boolean }[]).map((s) => {
+    const t = deTienda.get(s.id);
+    return {
+      id: s.id, nombre: s.nombre, telefono: s.telefono ?? "", activa: s.activa,
+      participa: t?.participa === true, recoger: t ? t.recoger === true : true, domicilio: t?.domicilio === true,
+      horario: leerHorario(t?.horario), zonasActivas: nZonas.get(s.id) ?? 0,
+      envio: envios.get(s.id) ?? { cobro: "ZONAS", tramos: [], punto: null },
+      conexionId: typeof t?.conexion_id === "string" ? t.conexion_id : null,
+    };
+  });
+}
+
+/** No toca `pausa_hasta`: esa la pone la caja. */
+export async function guardarSucursalTienda(
+  id: string,
+  d: Pick<SucursalTienda, "participa" | "recoger" | "domicilio" | "horario">,
+): Promise<void> {
+  const e = errorDeHorario(d.horario);
+  if (e) throw new Error(e);
+  const tid = await tenantId();
+  const { data, error } = await supabase
+    .from("tienda_sucursales")
+    .upsert(
+      { sucursal_id: id, tenant_id: tid, participa: d.participa, recoger: d.recoger, domicilio: d.domicilio, horario: d.horario, updated_at: new Date().toISOString() },
+      { onConflict: "sucursal_id" },
+    )
+    .select("sucursal_id");
+  if (error) throw fallo(error, "No se pudo guardar la sucursal");
+  if (!data || data.length === 0) throw new Error(SOLO_ADMIN);
+}
+
+/**
+ * «Envío a domicilio» de una sucursal (0185): cómo cobra la tienda, los tramos y el punto de la
+ * sucursal, en una sola llamada (`tienda_guardar_envio`, que valida todo otra vez y crea, cambia o da
+ * de baja las zonas de los tramos). Su error trae ya la frase para el dueño, después del código.
+ */
+export async function guardarEnvioSucursal(sucursalId: string, e: EnvioSucursal): Promise<void> {
+  const { error } = await supabase.rpc("tienda_guardar_envio", {
+    p_sucursal: sucursalId, p_cobro: e.cobro,
+    p_tramos: e.tramos.map((t) => ({ hasta_km: t.hastaKm.trim(), costo_mxn: t.costo.trim() })),
+    p_punto: e.punto,
+  });
+  if (!error) return;
+  const propio = /^(TRAMOS_INVALIDOS|DISTANCIA_INCOMPLETA|ZONA_OCUPADA|UBICACION_INVALIDA|COBRO_INVALIDO|SUCURSAL_INVALIDA): (.+)$/.exec(error.message);
+  if (propio) throw new Error(propio[2]!.charAt(0).toUpperCase() + propio[2]!.slice(1) + ".");
+  if (error.message.startsWith("NO_AUTORIZADO")) throw new Error(SOLO_ADMIN);
+  throw fallo(error, "No se pudo guardar el envío");
+}
+
+/**
+ * Qué cuenta de Mercado Pago cobra los pedidos en línea de una sucursal (0173); null = la única
+ * activa del negocio. Solo en una sucursal que ya está en la tienda: no crea la fila.
+ */
+export async function guardarCuentaDeSucursal(sucursalId: string, conexionId: string | null): Promise<void> {
+  const { data, error } = await supabase
+    .from("tienda_sucursales").update({ conexion_id: conexionId, updated_at: new Date().toISOString() }).eq("sucursal_id", sucursalId).select("sucursal_id");
+  if (error) throw fallo(error, "No se pudo guardar la cuenta");
+  if (!data || data.length === 0) throw new Error(SOLO_ADMIN);
+}
+
+// ── Pagos en línea ────────────────────────────────────────────────────────────
+
+/**
+ * Las cajas del negocio con lo que la tienda necesita saber de ellas: si están en uso y si DECLARAN
+ * que atienden pedidos pagados en línea (`cajas.espejo_pago_en_linea_at`, 0173). Lectura propia y
+ * no `listarCajas`: esa columna nace con la 0173, y así un admin desplegado antes no rompe otras pantallas.
+ */
+export async function leerCajasDeTienda(): Promise<CajaDeTienda[]> {
+  const { data, error } = await supabase.from("cajas").select("sucursal_id, activa, ultimo_latido, espejo_pago_en_linea_at");
+  if (error) throw fallo(error, "No se pudieron leer las cajas");
+  return ((data ?? []) as Record<string, unknown>[]).map((f) => ({
+    sucursal_id: String(f.sucursal_id), activa: f.activa === true,
+    ultimoLatido: typeof f.ultimo_latido === "string" ? f.ultimo_latido : null,
+    declaraPagoEnLinea: typeof f.espejo_pago_en_linea_at === "string",
+  }));
+}
+
+/** Un pago en línea como lo ve el dueño. `folio` null = el pedido nunca se pagó (la base no lo enseña). */
+export type PagoTienda = {
+  id: string; fecha: string; folio: string | null; monto: number; propina: number;
+  estado: ReturnType<typeof estadoDePago>;
+  /** El número de la orden en Mercado Pago, para buscarla allá; null si nadie llegó a pagar. */
+  pagoMp: string | null;
+};
+export const PAGOS_A_LA_VISTA = 30;
+
+/** Los últimos pagos en línea del negocio, solo lectura (RLS: dueño o administrador). */
+export async function leerPagosTienda(): Promise<PagoTienda[]> {
+  const { data, error } = await supabase
+    .from("tienda_pagos")
+    .select("id, created_at, monto_mxn, propina_mxn, estado, orden_id_externo, pedido:delivery_pedidos(folio_corto)")
+    .order("created_at", { ascending: false })
+    .limit(PAGOS_A_LA_VISTA);
+  if (error) throw fallo(error, "No se pudieron leer los pagos");
+  return ((data ?? []) as Record<string, unknown>[]).map((f) => {
+    const folio = (f.pedido as { folio_corto?: unknown } | null)?.folio_corto;
+    return {
+      id: String(f.id), fecha: String(f.created_at), folio: typeof folio === "string" ? folio : null,
+      monto: Number(f.monto_mxn), propina: Number(f.propina_mxn), estado: estadoDePago(String(f.estado)),
+      pagoMp: typeof f.orden_id_externo === "string" ? f.orden_id_externo : null,
+    };
+  });
+}
+
+// ── Interruptor ───────────────────────────────────────────────────────────────
+
+/**
+ * El interruptor CRUDO de la base. Ojo: un complemento que vence por fecha deja
+ * `modulo_tienda_activo = true`, así que la página NO debe fiarse solo de esto: lo combina con los
+ * módulos efectivos que ya tiene antes de decir «encendida».
+ * Sin fila en `configuracion_tenant` está apagada.
+ */
+export async function leerTiendaEncendida(): Promise<boolean> {
+  const tid = await tenantId();
+  const { data, error } = await supabase.from("configuracion_tenant").select("modulo_tienda_activo").eq("tenant_id", tid).maybeSingle();
+  if (error) throw fallo(error, "No se pudo leer si la tienda está encendida");
+  return (data as { modulo_tienda_activo?: boolean } | null)?.modulo_tienda_activo === true;
+}
+
+/** Mismo upsert que la lealtad: casi ningún negocio tiene fila en `configuracion_tenant` al inicio. */
+export async function encenderTienda(encendida: boolean): Promise<void> {
+  const tid = await tenantId();
+  const { error } = await supabase
+    .from("configuracion_tenant")
+    .upsert({ tenant_id: tid, modulo_tienda_activo: encendida }, { onConflict: "tenant_id" });
+  if (error) throw fallo(error, "No se pudo cambiar");
+}
+
+// ── Pendientes del catálogo ───────────────────────────────────────────────────
+
+/** Productos vivos, visibles y no pausados a los que les falta algo para lucir en la tienda. */
+export async function contarPendientesDeCatalogo(): Promise<{ sinFoto: number; sinDescripcion: number; enCategoriaInactiva: number }> {
+  const productos = () =>
+    supabase.from("productos").select("id", { count: "exact", head: true })
+      .is("deleted_at", null).eq("visible_en_pos", true).neq("estado", "PAUSADO");
+  const contar = async (q: PromiseLike<{ count: number | null; error: { message: string; code?: string } | null }>) => {
+    const { count, error } = await q;
+    if (error) throw fallo(error, "No se pudo revisar el catálogo");
+    return count ?? 0;
+  };
+  const { data: cats, error } = await supabase.from("categorias").select("id, activa, deleted_at");
+  if (error) throw fallo(error, "No se pudo revisar el catálogo");
+  const inactivas = ((cats ?? []) as { id: string; activa: boolean; deleted_at: string | null }[])
+    .filter((c) => !c.activa || c.deleted_at != null).map((c) => c.id);
+  // El catálogo guarda lo vacío como NULL (`descripcion || null`), por eso basta `.is(…, null)`.
+  const [sinFoto, sinDescripcion, enCategoriaInactiva] = await Promise.all([
+    contar(productos().is("imagen_url", null)),
+    contar(productos().is("descripcion", null)),
+    inactivas.length === 0 ? 0 : contar(productos().in("categoria_id", inactivas)),
+  ]);
+  return { sinFoto, sinDescripcion, enCategoriaInactiva };
+}
+
+// ── Combos que la tienda no puede vender ──────────────────────────────────────
+
+/** PostgREST corta en 1000 filas: con el catálogo cortado las opciones saldrían incompletas y el aviso mentiría. */
+const TOPE_FILAS = 1000;
+
+/**
+ * Los combos que no se pueden comprar en la tienda. Qué es opción de un paso sale de lo mismo que
+ * valida la venta (0165, `slots`): en un paso por categoría, los productos de la categoría menos los
+ * excluidos (fila con `activa = false`); sin categoría, solo las filas activas. Ignora los menús
+ * propios por sucursal (ADR 0029). Si el catálogo no cabe en una consulta, no avisa.
+ */
+export async function leerCombosNoComprables(): Promise<ComboNoComprable[]> {
+  const [prods, pasos, filas] = await Promise.all([
+    supabase.from("productos").select("id, nombre, categoria_id, es_combo").is("deleted_at", null).eq("visible_en_pos", true).neq("estado", "PAUSADO"),
+    supabase.from("combo_grupos").select("id, combo_producto_id, nombre, categoria_id").is("deleted_at", null).eq("activo", true).gte("minimo_selecciones", 1),
+    supabase.from("combo_opciones").select("grupo_id, producto_id, activa").is("deleted_at", null),
+  ]);
+  if (prods.error) throw fallo(prods.error, "No se pudieron revisar los combos");
+  if (pasos.error) throw fallo(pasos.error, "No se pudieron revisar los combos");
+  if (filas.error) throw fallo(filas.error, "No se pudieron revisar los combos");
+  const productos = (prods.data ?? []) as { id: string; nombre: string; categoria_id: string; es_combo: boolean }[];
+  const opciones = (filas.data ?? []) as { grupo_id: string; producto_id: string; activa: boolean }[];
+  if (productos.length >= TOPE_FILAS || opciones.length >= TOPE_FILAS) return [];
+  const porId = new Map(productos.map((p) => [p.id, p]));
+  const combos = new Map<string, ComboParaRevisar>();
+  for (const c of productos.filter((p) => p.es_combo)) combos.set(c.id, { nombre: c.nombre, slots: [] });
+  for (const g of (pasos.data ?? []) as { id: string; combo_producto_id: string; nombre: string; categoria_id: string | null }[]) {
+    const combo = combos.get(g.combo_producto_id);
+    if (!combo) continue;
+    const suyas = opciones.filter((o) => o.grupo_id === g.id);
+    const ids = g.categoria_id
+      ? productos.filter((p) => p.categoria_id === g.categoria_id && !p.es_combo && !suyas.some((o) => o.producto_id === p.id && !o.activa)).map((p) => p.id)
+      : suyas.filter((o) => o.activa && porId.get(o.producto_id)?.es_combo === false).map((o) => o.producto_id);
+    combo.slots.push({ nombre: g.nombre, obligatorio: true, opciones: ids.map((id) => ({ productoId: id, nombre: porId.get(id)?.nombre ?? "" })) });
+  }
+  return combosNoComprables([...combos.values()]);
+}
+
+// ── Menú de la tienda (0168) ──────────────────────────────────────────────────
+
+export type MenuTiendaLeido = { categorias: CategoriaCatalogo[]; productos: ProductoCatalogo[]; ocultos: Ocultos };
+
+type Respuesta = { data: unknown; error: { message: string; code?: string } | null };
+const NO_SE_GUARDO = "No se pudo guardar el cambio";
+
+/** PostgREST corta en 1000 filas: se pide por páginas hasta que una venga incompleta. */
+async function todasLasFilas<T>(pagina: (desde: number, hasta: number) => PromiseLike<Respuesta>): Promise<T[]> {
+  const filas: T[] = [];
+  for (let desde = 0; ; desde += TOPE_FILAS) {
+    const { data, error } = await pagina(desde, desde + TOPE_FILAS - 1);
+    if (error) throw fallo(error, "No se pudo leer tu catálogo");
+    const lote = (data ?? []) as T[];
+    filas.push(...lote);
+    if (lote.length < TOPE_FILAS) return filas;
+  }
+}
+
+/**
+ * El catálogo como lo ve UNA sucursal y lo que esa sucursal tiene escondido. Trae también los
+ * productos que la tienda no enseña por otra razón (no visibles en el POS, pausados, no se venden
+ * ahí): el bloque los pinta con su nota. Las categorías, solo las activas.
+ */
+export async function leerMenuTienda(sucursalId: string): Promise<MenuTiendaLeido> {
+  const [cats, prods, deSucursal, ocultos] = await Promise.all([
+    supabase.from("categorias").select("id, nombre, orden_visualizacion").is("deleted_at", null).eq("activa", true),
+    todasLasFilas<{ id: string; nombre: string; categoria_id: string; orden_visualizacion: number | null; es_combo: boolean; precio_base_mxn: number | string; visible_en_pos: boolean; estado: string }>(
+      (desde, hasta) => supabase.from("productos")
+        .select("id, nombre, categoria_id, orden_visualizacion, es_combo, precio_base_mxn, visible_en_pos, estado")
+        .is("deleted_at", null).order("id", { ascending: true }).range(desde, hasta)),
+    todasLasFilas<{ producto_id: string; disponible: boolean | null; precio_mxn: number | string | null }>(
+      (desde, hasta) => supabase.from("productos_sucursal")
+        .select("producto_id, disponible, precio_mxn").eq("sucursal_id", sucursalId).order("producto_id", { ascending: true }).range(desde, hasta)),
+    todasLasFilas<{ categoria_id: string | null; producto_id: string | null }>(
+      (desde, hasta) => supabase.from("tienda_ocultos")
+        .select("categoria_id, producto_id").eq("sucursal_id", sucursalId).order("id", { ascending: true }).range(desde, hasta)),
+  ]);
+  if (cats.error) throw fallo(cats.error, "No se pudo leer tu catálogo");
+  const aqui = new Map(deSucursal.map((f) => [f.producto_id, f]));
+  return {
+    categorias: ((cats.data ?? []) as { id: string; nombre: string; orden_visualizacion: number | null }[])
+      .map((c) => ({ id: c.id, nombre: c.nombre, orden: c.orden_visualizacion ?? 0 })),
+    productos: prods.map((p) => {
+      const s = aqui.get(p.id);
+      return {
+        id: p.id, nombre: p.nombre, categoriaId: p.categoria_id, orden: p.orden_visualizacion ?? 0, esCombo: p.es_combo === true,
+        precio: Number(s?.precio_mxn ?? p.precio_base_mxn),
+        visibleEnPos: p.visible_en_pos === true, pausado: p.estado === "PAUSADO", seVendeAqui: s?.disponible !== false,
+      };
+    }),
+    ocultos: {
+      categorias: new Set(ocultos.flatMap((o) => (o.categoria_id ? [o.categoria_id] : []))),
+      productos: new Set(ocultos.flatMap((o) => (o.producto_id ? [o.producto_id] : []))),
+    },
+  };
+}
+
+/**
+ * Vuelve a mostrar: borra las filas de esa columna en la sucursal. La RLS no contesta con error a un
+ * DELETE ajeno, solo no borra nada; tampoco borra nada si otra pestaña ya lo había mostrado. Lo que
+ * distingue los dos casos es si alguna fila sigue ahí.
+ */
+async function borrarOcultos(sucursalId: string, columna: "categoria_id" | "producto_id", ids: string[]): Promise<void> {
+  const { data, error } = await supabase.from("tienda_ocultos").delete().eq("sucursal_id", sucursalId).in(columna, ids).select("id");
+  if (error) throw fallo(error, NO_SE_GUARDO);
+  if (data && data.length > 0) return;
+  const { data: sigue, error: errLectura } = await supabase.from("tienda_ocultos").select("id").eq("sucursal_id", sucursalId).in(columna, ids).limit(1);
+  if (errLectura) throw fallo(errLectura, NO_SE_GUARDO);
+  if (sigue && sigue.length > 0) throw new Error(SOLO_ADMIN);
+}
+
+/**
+ * Esconde (inserta la fila) o vuelve a mostrar (la borra) una categoría o un producto en una
+ * sucursal. Repetir lo ya hecho no es un error: otra pestaña pudo adelantarse.
+ */
+export async function cambiarMenuTienda(sucursalId: string, c: CambioMenu): Promise<void> {
+  if (!c.escondido) return borrarOcultos(sucursalId, c.tipo === "categoria" ? "categoria_id" : "producto_id", [c.id]);
+  const { error } = await supabase.from("tienda_ocultos").insert(filaOculta(await tenantId(), sucursalId, c));
+  // 23505: ya estaba escondido.
+  if (error && error.code !== "23505") throw fallo(error, NO_SE_GUARDO);
+}
+
+/** «Mostrar todos»: borra de un golpe las filas de esos productos en la sucursal. */
+export async function mostrarProductosTienda(sucursalId: string, productoIds: string[]): Promise<void> {
+  // Por tandas: los ids viajan en la dirección de la petición y cientos no caben.
+  for (let i = 0; i < productoIds.length; i += 100) await borrarOcultos(sucursalId, "producto_id", productoIds.slice(i, i + 100));
+}
+
+// ── La invitación (quien todavía no la tiene) ─────────────────────────────────
+
+/**
+ * Lo que la invitación necesita: si VIM ya ofrece el complemento, cuánto cuesta y si el plan del
+ * negocio lo incluye. `addons` y `planes` son catálogo de lectura abierta (0002). Nunca lanza: si algo
+ * falla devuelve null y la invitación se queda con el texto de siempre.
+ */
+export async function leerOfertaTienda(): Promise<OfertaTienda | null> {
+  try {
+    const tid = await tenantId();
+    const [a, t] = await Promise.all([
+      supabase.from("addons").select("activo, precio_mensual_mxn").eq("codigo", "TIENDA").maybeSingle(),
+      supabase.from("tenants").select("plan:planes(features_incluidos)").eq("id", tid).maybeSingle(),
+    ]);
+    if (a.error || t.error) return null;
+    const plan = (t.data as { plan?: { features_incluidos?: unknown } | null } | null)?.plan;
+    return ofertaTienda(a.data, plan?.features_incluidos);
+  } catch {
+    return null;
+  }
+}

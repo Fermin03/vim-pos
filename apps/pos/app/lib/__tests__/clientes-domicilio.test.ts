@@ -31,7 +31,7 @@ function consulta(tabla: string) {
 
 vi.mock("../supabase", () => ({ employeeClient: () => ({ from: consulta }) }));
 
-import { filtroBusquedaDomicilio, registrarClienteDomicilio } from "../clientes-domicilio";
+import { filtroBusquedaDomicilio, registrarClienteDomicilio, planColonia, type DireccionInput } from "../clientes-domicilio";
 import { normalizarTelefono } from "../telefono";
 
 const DIR = { etiqueta: "Casa", calle: "Hidalgo", numeroExterior: "12", colonia: "Centro", referencias: "", zona: null };
@@ -63,6 +63,25 @@ describe("teléfono de un cliente de domicilio", () => {
     await registrarClienteDomicilio("tk", { nombre: "Sin Tel", telefono: "  ", tenantId: "t", sucursalId: "s", dir: DIR as never }).catch(() => {});
     expect(tablas.clientes.find((f) => f.nombre === "Sin Tel")?.telefono).toBeNull();
   });
+});
+
+const zA = { id: "a", nombre: "A", costoMxn: 20 }, zB = { id: "b", nombre: "B", costoMxn: 30 };
+const base: DireccionInput = { etiqueta: "Casa", calle: "x", numero: "1", colonia: "Las Joyas", referencias: "", zona: zA, coloniaCatalogo: null, codigoPostal: null, guardarZonaEnColonia: false };
+
+describe("planColonia", () => {
+  it("sin catálogo no hace nada", () => expect(planColonia(base, false)).toEqual({ tipo: "nada" }));
+  it("texto que no está en el catálogo se da de alta", () => expect(planColonia(base, true)).toEqual({ tipo: "crear" }));
+  it("colonia sin zona: se le asigna la del pedido", () =>
+    expect(planColonia({ ...base, coloniaCatalogo: { id: "c", nombre: "Las Joyas", codigoPostal: null, zona: null } }, true)).toEqual({ tipo: "asignar", coloniaId: "c" }));
+  it("zona distinta sin la casilla: solo el pedido", () =>
+    expect(planColonia({ ...base, zona: zB, coloniaCatalogo: { id: "c", nombre: "Las Joyas", codigoPostal: null, zona: zA } }, true)).toEqual({ tipo: "nada" }));
+  it("zona distinta con la casilla: cambiarla (pide PIN)", () =>
+    expect(planColonia({ ...base, zona: zB, guardarZonaEnColonia: true, coloniaCatalogo: { id: "c", nombre: "Las Joyas", codigoPostal: null, zona: zA } }, true)).toEqual({ tipo: "cambiar", coloniaId: "c" }));
+  it("sin zona en el pedido no toca el catálogo salvo el alta", () =>
+    expect(planColonia({ ...base, zona: null, coloniaCatalogo: { id: "c", nombre: "Las Joyas", codigoPostal: null, zona: null } }, true)).toEqual({ tipo: "nada" }));
+  it("homónimas en el catálogo y escrita a mano: no se da de alta otra", () =>
+    expect(planColonia({ ...base, coloniaAmbigua: true }, true)).toEqual({ tipo: "nada" }));
+  it("colonia en blanco: nada", () => expect(planColonia({ ...base, colonia: "  " }, true)).toEqual({ tipo: "nada" }));
 });
 
 describe("búsqueda de clientes de domicilio", () => {

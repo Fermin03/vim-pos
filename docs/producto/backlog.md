@@ -121,7 +121,7 @@ ya es idempotente (todas las RPCs aceptan `p_client_id_local`).
 
 Cobrarle a los **tenants** (no a sus clientes). Stripe Checkout + webhooks + estados de suscripción
 (TRIAL/ACTIVO/SUSPENDIDO) que ya existen en `tenants`. Servicio externo, se scaffoldea con adaptador
-`@sin-verificar` igual que Facturapi. Necesario antes de vender masivamente; no bloquea el piloto.
+`@sin-verificar`. Necesario antes de vender masivamente; no bloquea el piloto.
 
 ---
 

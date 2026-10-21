@@ -17,16 +17,15 @@ import {
 } from "../../lib/promociones";
 import { mensajeError } from "../../lib/errores";
 import { aDatetimeLocal } from "../../lib/fechas";
-
-const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-13 font-medium text-ink-2";
+import { input, label } from "../../components/campos";
+import { AccionFila, Segmentos } from "../../components/controles";
 
 type FormDatos = { nombre: string; descripcion: string; tipo: TipoPromo; valor: string; fecha_inicio: string; fecha_fin: string };
 const VACIO = (): FormDatos => ({ nombre: "", descripcion: "", tipo: "PORCENTAJE", valor: "", fecha_inicio: aDatetimeLocal(), fecha_fin: "" });
 
 const COLOR_ESTADO: Record<EstadoPromo, string> = {
   ACTIVA: "bg-success-soft text-success", PAUSADA: "bg-warning-soft text-warning",
-  EXPIRADA: "bg-[#F2F2F0] text-ink-3", AGOTADA: "bg-danger-soft text-danger",
+  EXPIRADA: "bg-hover text-ink-3", AGOTADA: "bg-danger-soft text-danger",
 };
 
 /**
@@ -41,7 +40,7 @@ function estadoVista(p: { estado: EstadoPromo; fechaInicio: string }): EstadoVis
   if (p.estado === "ACTIVA" && new Date(p.fechaInicio).getTime() > Date.now()) return "PROGRAMADA";
   return p.estado;
 }
-const COLOR_VISTA: Record<EstadoVista, string> = { ...COLOR_ESTADO, PROGRAMADA: "bg-[#EAEFF7] text-info" };
+const COLOR_VISTA: Record<EstadoVista, string> = { ...COLOR_ESTADO, PROGRAMADA: "bg-info-soft text-info" };
 const LABEL_VISTA: Record<EstadoVista, string> = {
   ACTIVA: "Activa", PAUSADA: "Pausada", EXPIRADA: "Expirada", AGOTADA: "Agotada", PROGRAMADA: "Programada",
 };
@@ -140,23 +139,17 @@ export default function PromocionesPage() {
         {promos && promos.length > 0 && (
           <div className="overflow-hidden rounded-lg border border-line bg-surface">
             <div className="border-b border-line px-4 py-3">
-              <div className="scroll-x-limpio inline-flex max-w-full gap-0.5 overflow-x-auto rounded border border-line bg-hover p-[3px] lg:max-w-none lg:overflow-x-visible">
-                {([
+              <Segmentos
+                etiqueta="Qué promociones ver"
+                opciones={[
                   { v: "TODAS", l: "Todas" },
                   { v: "ACTIVAS", l: "Activas" },
                   { v: "PROGRAMADAS", l: "Programadas" },
                   { v: "INACTIVAS", l: "Inactivas" },
-                ] as { v: FiltroPromo; l: string }[]).map((t) => (
-                  <button
-                    key={t.v}
-                    type="button"
-                    onClick={() => setFiltro(t.v)}
-                    className={["flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-[11px] text-13 font-semibold transition lg:py-1.5", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
-                  >
-                    {t.l}
-                  </button>
-                ))}
-              </div>
+                ]}
+                valor={filtro}
+                onCambiar={setFiltro}
+              />
             </div>
             <div className="tabla-caja">
               <table className="w-full text-14">
@@ -173,9 +166,9 @@ export default function PromocionesPage() {
                       </td>
                       <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-11 font-bold ${COLOR_VISTA[estadoVista(p)]}`}>{LABEL_VISTA[estadoVista(p)]}</span></td>
                       <td className="px-4 py-2.5 text-right">
-                        <button type="button" onClick={() => setEditando({ id: p.id, datos: { nombre: p.nombre, descripcion: p.descripcion, tipo: p.tipo, valor: p.valorTexto.replace(/[^0-9.]/g, ""), fecha_inicio: aDatetimeLocal(p.fechaInicio), fecha_fin: p.fechaFin ? aDatetimeLocal(p.fechaFin) : "" } })} className="text-13 font-semibold text-ink-2 hover:text-ink">Editar</button>
-                        {(p.estado === "ACTIVA" || p.estado === "PAUSADA") && <button type="button" onClick={() => alternar(p)} className="ml-3 text-13 font-semibold text-ink-3 hover:text-ink">{p.estado === "ACTIVA" ? "Pausar" : "Activar"}</button>}
-                        <button type="button" onClick={() => borrar(p)} className="ml-3 text-13 font-semibold text-ink-3 hover:text-danger">Eliminar</button>
+                        <AccionFila onClick={() => setEditando({ id: p.id, datos: { nombre: p.nombre, descripcion: p.descripcion, tipo: p.tipo, valor: p.valorTexto.replace(/[^0-9.]/g, ""), fecha_inicio: aDatetimeLocal(p.fechaInicio), fecha_fin: p.fechaFin ? aDatetimeLocal(p.fechaFin) : "" } })}>Editar</AccionFila>
+                        {(p.estado === "ACTIVA" || p.estado === "PAUSADA") && <AccionFila className="ml-3" onClick={() => alternar(p)}>{p.estado === "ACTIVA" ? "Pausar" : "Activar"}</AccionFila>}
+                        <AccionFila peligro className="ml-3" onClick={() => borrar(p)}>Eliminar</AccionFila>
                       </td>
                     </tr>
                   ))}

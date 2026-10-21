@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, Modal } from "@vim/ui/styles";
+import { Button, Modal, Icono } from "@vim/ui/styles";
 import { EpsonEposAdapter } from "../lib/print/epson-epos-adapter";
 import { RawSocketAdapter } from "../lib/print/raw-socket-adapter";
 import { ColaWindowsAdapter, listarImpresorasWindows, type ImpresoraWindows } from "../lib/print/cola-windows-adapter";
@@ -53,7 +53,8 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
     // no es motivo para impedir configurar la impresora.
     listarAreasCocina(token, sucursalId).then(setAreas).catch(() => setAreas([]));
   }, [token, sucursalId]);
-  const [prueba, setPrueba] = useState<string | null>(null);
+  /** `ok: null` = aviso sin veredicto (falta un dato, estado desconocido): sin icono. */
+  const [prueba, setPrueba] = useState<{ ok: boolean | null; texto: string } | null>(null);
   const [probando, setProbando] = useState(false);
 
   const actual = cfg.estaciones[estacionActiva];
@@ -89,25 +90,25 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
   async function probar() {
     const ip = (actual.ip ?? "").trim();
     const ancho = actual.ancho ?? 80;
-    if (esRed && !ip) { setPrueba("Indica la IP de la impresora."); return; }
-    if (esWindows && !actual.nombre) { setPrueba("Elige una impresora de la lista."); return; }
+    if (esRed && !ip) { setPrueba({ ok: null, texto: "Indica la IP de la impresora." }); return; }
+    if (esWindows && !actual.nombre) { setPrueba({ ok: null, texto: "Elige una impresora de la lista." }); return; }
     setProbando(true); setPrueba(null);
     try {
       if (actual.tipo === "windows" && actual.nombre) {
         // "Enviado" y no "impreso": Windows acepta el trabajo aunque la impresora esté apagada.
         const r = await new ColaWindowsAdapter(actual.nombre, ancho).imprimir(jobPrueba(ancho, NOMBRE_ESTACION[estacionActiva]));
-        setPrueba(r.ok ? "✓ Enviado a Windows. Revisa que haya salido el ticket de prueba." : r.motivo === "OFFLINE" ? "✗ Windows no encontró esa impresora. Elígela de nuevo en la lista." : "✗ Windows no pudo imprimir. Revisa la impresora en el panel de Windows.");
+        setPrueba({ ok: r.ok, texto: r.ok ? "Enviado a Windows. Revisa que haya salido el ticket de prueba." : r.motivo === "OFFLINE" ? "Windows no encontró esa impresora. Elígela de nuevo en la lista." : "Windows no pudo imprimir. Revisa la impresora en el panel de Windows." });
       } else if (actual.tipo === "generica") {
         // Prueba real: imprime un ticket. Es la única forma fiable de saber si el 9100 responde.
         const imp = new RawSocketAdapter(ip, actual.puerto ?? PUERTO_RAW, ancho);
         const r = await imp.imprimir(jobPrueba(ancho, NOMBRE_ESTACION[estacionActiva]));
-        setPrueba(r.ok ? "✓ Enviado. Revisa que haya salido el ticket de prueba." : r.motivo === "OFFLINE" ? "✗ No se pudo conectar (revisa IP, puerto y que esté en la misma red)." : "✗ Error al imprimir.");
+        setPrueba({ ok: r.ok, texto: r.ok ? "Enviado. Revisa que haya salido el ticket de prueba." : r.motivo === "OFFLINE" ? "No se pudo conectar (revisa IP, puerto y que esté en la misma red)." : "Error al imprimir." });
       } else if (actual.tipo === "epson") {
         const estado = await new EpsonEposAdapter(ip, ancho).estado();
-        setPrueba(estado === "LISTO" ? "✓ Impresora lista." : estado === "OFFLINE" ? "✗ Sin conexión (revisa IP/red)." : `Estado: ${estado}`);
+        setPrueba(estado === "LISTO" ? { ok: true, texto: "Impresora lista." } : estado === "OFFLINE" ? { ok: false, texto: "Sin conexión (revisa IP/red)." } : { ok: null, texto: `Estado: ${estado}` });
       }
     } catch {
-      setPrueba("✗ No se pudo contactar la impresora.");
+      setPrueba({ ok: false, texto: "No se pudo contactar la impresora." });
     } finally { setProbando(false); }
   }
 
@@ -201,7 +202,12 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
               </div>
             </div>
             <Button variant="ghost" onClick={probar} disabled={probando}>{probando ? "Probando…" : actual.tipo === "epson" ? "Probar conexión" : "Imprimir prueba"}</Button>
-            {prueba && <p className={`text-13 font-medium ${prueba.startsWith("✓") ? "text-success" : "text-danger"}`}>{prueba}</p>}
+            {prueba && (
+              <p className={`flex items-center gap-1.5 text-13 font-medium ${prueba.ok ? "text-success" : "text-danger"}`}>
+                {prueba.ok !== null && <Icono nombre={prueba.ok ? "palomita" : "cerrar"} className="h-4 w-4 flex-shrink-0" />}
+                {prueba.texto}
+              </p>
+            )}
           </>
         )}
 
@@ -213,8 +219,8 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
         {/* Qué imprime cada estación */}
         <div className="rounded border border-line p-3">
           <p className="mb-2 text-13 font-semibold text-ink-2">¿Qué imprime cada estación?</p>
-          <AsignacionRow label="Tickets y cortes (caja)" destino="CAJA" valor={cfg.asignacion.CAJA} onCambiar={(e) => asignar("CAJA", e)} />
-          <AsignacionRow label="Comandas (cocina)" destino="COCINA" valor={cfg.asignacion.COCINA} onCambiar={(e) => asignar("COCINA", e)} />
+          <AreaRow label="Tickets y cortes (caja)" valor={cfg.asignacion.CAJA} onCambiar={(e) => asignar("CAJA", e)} />
+          <AreaRow label="Comandas (cocina)" valor={cfg.asignacion.COCINA} onCambiar={(e) => asignar("COCINA", e)} />
           {cfg.asignacion.CAJA === cfg.asignacion.COCINA && (
             <p className="mt-2 text-12 text-ink-3">Con la misma estación para ambos, la comanda no se manda sola al cobrar (evita duplicar en el mismo papel); se imprime solo si la pides manualmente.</p>
           )}
@@ -252,23 +258,8 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
   );
 }
 
-/** Misma fila que AsignacionRow pero para un área de preparación (la clave es su id, no un destino). */
+/** A qué impresora va algo: un destino (caja, cocina) o un área de preparación. */
 function AreaRow({ label, valor, onCambiar }: { label: string; valor: IdEstacion; onCambiar: (e: IdEstacion) => void }) {
-  return (
-    <div className="mb-1.5 flex items-center justify-between gap-2 last:mb-0">
-      <span className="text-13 text-ink-2">{label}</span>
-      <div className="flex gap-1">
-        {ESTACIONES.map((e) => (
-          <button key={e} type="button" onClick={() => onCambiar(e)} className={["rounded border px-2 py-1 text-12 font-semibold transition", valor === e ? "border-ink bg-ink text-white" : "border-line-strong text-ink-2 hover:border-ink"].join(" ")}>
-            {NOMBRE_ESTACION[e]}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function AsignacionRow({ label, valor, onCambiar }: { label: string; destino: Destino; valor: IdEstacion; onCambiar: (e: IdEstacion) => void }) {
   return (
     <div className="mb-1.5 flex items-center justify-between gap-2 last:mb-0">
       <span className="text-13 text-ink-2">{label}</span>

@@ -92,21 +92,6 @@ export async function listarRepartidores(token: string): Promise<Repartidor[]> {
   }));
 }
 
-/** Asigna el pedido a un repartidor del catálogo. */
-export async function asignarRepartidor(
-  token: string,
-  args: { ticketId: string; repartidorId: string; montoALiquidar: number; tiempoPromesa?: number | null },
-): Promise<string> {
-  const { data, error } = await employeeClient(token).rpc("asignar_delivery_repartidor", {
-    p_ticket_id: args.ticketId,
-    p_repartidor_id: args.repartidorId,
-    p_monto_a_liquidar_mxn: args.montoALiquidar,
-    p_tiempo_promesa_minutos: args.tiempoPromesa ?? null,
-  });
-  if (error) throw new Error(error.message);
-  return String(data);
-}
-
 /**
  * Asigna uno o varios pedidos al mismo repartidor y los deja en reparto.
  *
@@ -162,33 +147,6 @@ export async function crearRepartidor(
   return { id: String(r.id), nombre: String(r.nombre), telefono: (r.telefono as string) ?? null };
 }
 
-/**
- * Asignación contra una CUENTA de usuario. No se usa hoy —los repartidores no entran al sistema—
- * y se conserva para cuando exista la app del repartidor, que sí tendrá cuentas propias.
- */
-export async function asignarDelivery(
-  token: string,
-  args: { ticketId: string; repartidorId: string; montoALiquidar: number; tiempoPromesa?: number | null },
-): Promise<string> {
-  const { data, error } = await employeeClient(token).rpc("asignar_delivery", {
-    p_ticket_id: args.ticketId,
-    p_repartidor_id: args.repartidorId,
-    p_monto_a_liquidar_mxn: args.montoALiquidar,
-    p_tiempo_promesa_minutos: args.tiempoPromesa ?? null,
-    p_destino_lat: null,
-    p_destino_lng: null,
-    p_distancia_km_estimada: null,
-    p_client_id_local: null,
-  });
-  if (error) throw new Error(error.message);
-  return String(data);
-}
-
-export async function confirmarSalida(token: string, asignacionId: string): Promise<void> {
-  const { error } = await employeeClient(token).rpc("confirmar_salida_delivery", { p_asignacion_id: asignacionId });
-  if (error) throw new Error(error.message);
-}
-
 export async function confirmarEntrega(token: string, asignacionId: string, propina = 0): Promise<void> {
   const { error } = await employeeClient(token).rpc("confirmar_entrega_delivery", {
     p_asignacion_id: asignacionId,
@@ -209,27 +167,6 @@ export async function liquidarDelivery(
     p_liquidacion_nota: args.nota ?? null,
   });
   if (error) throw new Error(error.message);
-}
-
-// "En reparto", no "En ruta": es como lo dice el negocio. El valor del enum en la base sigue siendo
-// EN_RUTA — renombrarlo arrastraría migración, la vista vw_cumplimiento_tiempos_delivery y el
-// espejo de escritorio por una palabra que solo se lee en pantalla.
-const ESTADO_LABEL: Record<DeliveryEstado, string> = {
-  ASIGNADO: "Asignado", EN_RUTA: "En reparto", EN_DESTINO: "En destino", ENTREGADO: "Entregado",
-  NO_ENTREGADO: "No entregado", EN_REGRESO: "En regreso", LIQUIDADO: "Liquidado", CANCELADO: "Cancelado",
-};
-export function labelDeliveryEstado(e: DeliveryEstado): string {
-  return ESTADO_LABEL[e] ?? e;
-}
-
-/** El siguiente paso del repartidor según el estado (para el botón de acción). */
-export function siguienteAccionDelivery(e: DeliveryEstado): { destino: "salida" | "entrega" | "liquidar"; label: string } | null {
-  if (e === "ASIGNADO") return { destino: "salida", label: "Marcar salida" };
-  if (e === "EN_RUTA" || e === "EN_DESTINO") return { destino: "entrega", label: "Confirmar entrega" };
-  if (e === "ENTREGADO") return { destino: "liquidar", label: "Liquidar" };
-  // liquidar_delivery también acepta NO_ENTREGADO y EN_REGRESO; sin esto quedaban colgados sin acción.
-  if (e === "NO_ENTREGADO" || e === "EN_REGRESO") return { destino: "liquidar", label: "Liquidar" };
-  return null;
 }
 
 /** La asignación viva de un ticket, si la tiene. Null si el pedido salió sin repartidor. */

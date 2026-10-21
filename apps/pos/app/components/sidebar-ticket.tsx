@@ -1,4 +1,5 @@
 "use client";
+import { Icono } from "@vim/ui/styles";
 import { useState } from "react";
 import type { EstadoCarrito, LineaCarrito } from "../lib/carrito";
 import { etiquetaModo } from "@vim/db/modos-servicio";
@@ -12,18 +13,7 @@ import { RenglonItem } from "./renglon-item";
 /* ── Íconos SVG inline (del mockup P-066) ────────────────────── */
 function IconoTicket() {
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-[46px] w-[46px] text-line-strong"
-    >
-      <path d="M4 4h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" />
-      <path d="M8 4v14M16 4v14" />
-    </svg>
+    <Icono nombre="recibo" className="h-[46px] w-[46px] text-line-strong" />
   );
 }
 
@@ -64,13 +54,11 @@ export function SidebarTicket({
   onEfectivoExacto,
   cambioAnterior = null,
   titulo,
+  modoTexto,
   accionSecundaria,
-  onEnviarCocina,
   onEnviarCocinaAbierto,
   onPonerEnEspera,
   folioCuenta,
-  cocinaEnviada = false,
-  enviandoCocina = false,
   onAplicarDescuento,
   descuentoMxn = 0,
   totalConDescuento,
@@ -117,10 +105,10 @@ export function SidebarTicket({
   cambioAnterior?: number | null;
   /** Sustituye el título de la cabecera. Sin esto: "Cuenta <folio>" o "Ticket nuevo". */
   titulo?: string;
+  /** Sustituye la etiqueta del modo (p. ej. "Barra", que el carrito trata como comedor). */
+  modoTexto?: string;
   /** Botón extra bajo la acción principal del pie (p. ej. "Guardar sin mandar"). */
   accionSecundaria?: { etiqueta: string; onClick: () => void; deshabilitado?: boolean };
-  /** B1 Full Service — enviar la mesa a cocina antes de cobrar (solo en cuenta de mesa). */
-  onEnviarCocina?: () => void;
   /** Pick-up / Domicilio — envía a cocina y deja la cuenta ABIERTA (sin cobrar); se cobra después
    *  desde "Ver cuentas". Cuando se pasa, es la acción principal del pie. */
   onEnviarCocinaAbierto?: () => void;
@@ -128,8 +116,6 @@ export function SidebarTicket({
   onPonerEnEspera?: () => void;
   /** Folio de la cuenta que se está editando. Ausente = ticket nuevo. */
   folioCuenta?: string | null;
-  cocinaEnviada?: boolean;
-  enviandoCocina?: boolean;
   onAplicarDescuento?: () => void;
   /** Monto de descuento ya aplicado en BD (autoritativo). 0 = sin descuento. */
   descuentoMxn?: number;
@@ -168,9 +154,6 @@ export function SidebarTicket({
    * pregunta cuánto cuesta algo en cualquiera de los cuatro modos.
    */
   const seCobraDespues = onEnviarCocinaAbierto != null;
-  // "En espera" vive en la fila secundaria solo en el pie de Cobrar; en el de mesa (Enviar a
-  // cocina) no existe, igual que antes.
-  const enEsperaEnFila = !seCobraDespues && !onEnviarCocina;
   // No depende de `bloqueado`: en cuenta de mesa los renglones que no han salido a cocina sí se
   // editan (0119). Quien pasa `onEditar` decide qué renglón se abre y avisa del que no.
   const editable = onEditar != null && !procesando;
@@ -222,7 +205,7 @@ export function SidebarTicket({
               desmarcar, y no es un botón. */}
           <div className="flex items-center justify-between gap-2">
             <span className="inline-flex h-8 min-w-0 items-center rounded-md bg-hover px-2.5 text-14 font-semibold text-ink-2">
-              <span className="truncate">{etiquetaModo(estado.modoServicio)}</span>
+              <span className="truncate">{modoTexto ?? etiquetaModo(estado.modoServicio)}</span>
             </span>
             <span className="flex-shrink-0 text-13 font-semibold text-ink-3">
               {totalProductos} {totalProductos === 1 ? "producto" : "productos"}
@@ -244,7 +227,7 @@ export function SidebarTicket({
               onClick={() => onEditarCliente?.()}
               className="mt-2 flex w-full items-start gap-2 rounded-md border border-line-strong bg-sel px-3 py-2 text-left transition hover:border-ink disabled:opacity-60"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mt-0.5 h-4 w-4 flex-shrink-0 text-ink-3"><path d="M12 2a8 8 0 0 0-8 8c0 5.5 8 12 8 12s8-6.5 8-12a8 8 0 0 0-8-8z" /><circle cx="12" cy="10" r="3" /></svg>
+              <Icono nombre="pin" className="mt-0.5 h-4 w-4 flex-shrink-0 text-ink-3" />
               {estado.clienteDomicilio ? (
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-13 font-semibold">{estado.clienteDomicilio.nombre || "Cliente"}</span>
@@ -265,7 +248,8 @@ export function SidebarTicket({
                 estado.notaOrden ? "border-warning/50 text-warning" : "border-line-strong text-ink-2 hover:border-ink hover:text-ink",
               ].join(" ")}
             >
-              {estado.notaOrden ? "✎ Nota de la orden" : "+ Nota de la orden"}
+              <Icono nombre={estado.notaOrden ? "editar" : "mas"} className="mr-1.5 h-4 w-4 flex-shrink-0" />
+              Nota de la orden
             </button>
           )}
           {/* Nota de cocina de TODA la orden (va a tickets.nota_general → KDS y comanda) */}
@@ -349,7 +333,7 @@ export function SidebarTicket({
                       onClick={() => onCantidad(l.clientId, l.cantidad - 1)}
                       className={BOTON_STEPPER}
                     >
-                      −
+                      <Icono nombre="menos" className="h-4 w-4" />
                     </button>
                     <span className="min-w-[28px] text-center font-display text-16 font-bold tabular-nums">
                       {l.cantidad}
@@ -361,7 +345,7 @@ export function SidebarTicket({
                       onClick={() => onCantidad(l.clientId, l.cantidad + 1)}
                       className={BOTON_STEPPER}
                     >
-                      +
+                      <Icono nombre="mas" className="h-4 w-4" />
                     </button>
                   </span>
                   {bloqueado && onDescuentoItem && (
@@ -516,7 +500,8 @@ export function SidebarTicket({
           <span className="truncate">Descuento</span>
         </button>
         )}
-        {enEsperaEnFila && (
+        {/* "En espera" solo existe en el pie de Cobrar, igual que Descuento. */}
+        {!seCobraDespues && (
           <button
             type="button"
             disabled={vacio || procesando || !onPonerEnEspera}
@@ -544,7 +529,7 @@ export function SidebarTicket({
               className={BOTON_PRINCIPAL}
             >
               {procesando ? "Enviando…" : (
-                <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M3 11l19-9-9 19-2-8-8-2z" /></svg> Enviar a cocina</>
+                <><Icono nombre="enviar" className="h-5 w-5" /> Enviar a cocina</>
               )}
             </button>
             {accionSecundaria && (
@@ -575,38 +560,17 @@ export function SidebarTicket({
             </>
           )}
         </button>
-        {onEnviarCocina ? (
-          /* B1 Full Service — enviar la mesa a cocina antes de cobrar */
-          <button
-            type="button"
-            disabled={vacio || enviandoCocina || cocinaEnviada}
-            onClick={onEnviarCocina}
-            className={[
-              BOTON_PIE,
-              cocinaEnviada
-                ? "border-success/40 bg-success-soft text-success disabled:opacity-100"
-                : "border-line-strong bg-surface text-ink hover:border-ink disabled:opacity-[.45]",
-            ].join(" ")}
-          >
-            {cocinaEnviada ? (
-              <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4"><path d="M20 6 9 17l-5-5" /></svg> Enviado a cocina</>
-            ) : enviandoCocina ? "Enviando…" : (
-              <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 11l19-9-9 19-2-8-8-2z" /></svg> Enviar a cocina</>
-            )}
-          </button>
-        ) : (
-          /* Efectivo exacto: un toque en vez de cinco (Cobrar → Efectivo → Pago exacto → Cobrar).
-             Es el cobro más común de mostrador. Borde de tinta: es la segunda acción del pie, no
-             una más de las grises. */
-          <button
-            type="button"
-            disabled={vacio || procesando || !onEfectivoExacto}
-            onClick={() => onEfectivoExacto?.()}
-            className="flex h-12 w-full items-center justify-center rounded-lg border border-ink bg-surface text-16 font-bold text-ink transition-[transform,background-color] duration-150 ease-vim hover:bg-hover active:scale-[.98] disabled:cursor-default disabled:border-line-strong disabled:opacity-[.45] disabled:active:scale-100"
-          >
-            Efectivo exacto
-          </button>
-        )}
+        {/* Efectivo exacto: un toque en vez de cinco (Cobrar → Efectivo → Pago exacto → Cobrar).
+            Es el cobro más común de mostrador. Borde de tinta: es la segunda acción del pie, no
+            una más de las grises. */}
+        <button
+          type="button"
+          disabled={vacio || procesando || !onEfectivoExacto}
+          onClick={() => onEfectivoExacto?.()}
+          className="flex h-12 w-full items-center justify-center rounded-lg border border-ink bg-surface text-16 font-bold text-ink transition-[transform,background-color] duration-150 ease-vim hover:bg-hover active:scale-[.98] disabled:cursor-default disabled:border-line-strong disabled:opacity-[.45] disabled:active:scale-100"
+        >
+          Efectivo exacto
+        </button>
         </>
         )}
       </div>

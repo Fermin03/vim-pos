@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BotonVolver } from "./boton-volver";
 import { useEscape } from "../lib/use-escape";
-import { Button, DialogoPeligro, LogoVim } from "@vim/ui/styles";
+import { Button, DialogoPeligro, LogoVim, Icono } from "@vim/ui/styles";
 import { type DatosCaja, type Turno, fmtMxn } from "../lib/turno";
 import { type Empleado } from "../lib/supabase";
 import {
@@ -18,7 +18,8 @@ import {
 } from "../lib/devoluciones";
 import { autorizacionPropia, type Autorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
-import { AvisoAutorizacion, MotivoChips } from "./motivo-y-autorizacion";
+import { motivoReembolso, reembolsarTicket } from "../lib/terminal";
+import { AvisoAutorizacion, MotivoChips, etiquetaMotivo } from "./motivo-y-autorizacion";
 import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
 import { obtenerImpresora } from "../lib/print/adapter";
 import { construirDevolucionJob, type DatosDevolucion } from "../lib/print/devolucion-builder";
@@ -86,7 +87,7 @@ export function PantallaDevoluciones({
         {ventas === null && <p className="text-center text-ink-3">Cargando ventas…</p>}
         {ventas !== null && ventas.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-ink-3">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-12 w-12"><path d="M9 14l-4-4 4-4M5 10h11a4 4 0 0 1 0 8h-1" /></svg>
+            <Icono nombre="devolver" className="h-12 w-12" />
             <p className="text-18 font-semibold text-ink-2">No hay ventas en el turno</p>
             <p className="text-13">Las ventas cobradas aparecerán aquí para poder devolverlas.</p>
           </div>
@@ -165,17 +166,29 @@ function ModalDevolucion({
   const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
   const [pidiendoPin, setPidiendoPin] = useState(false);
+  // La devolución ya quedó en VIM pero el proveedor de la terminal no devolvió el dinero: se reintenta solo eso.
+  const [reembolsoFallo, setReembolsoFallo] = useState<{ motivo: string; recibo?: DatosDevolucion } | null>(null);
 
   const tienePermiso = ROLES_DEVOLUCION.includes(empleado.rol);
+
+  /** Regresa el dinero a la tarjeta si ese ticket se cobró en la terminal (ADR 0033). */
+  async function reembolsar(recibo?: DatosDevolucion) {
+    setProcesando(true);
+    try {
+      await reembolsarTicket(token, turno.caja_id, venta.ticketId);
+      onHecho(recibo);
+    } catch (e) {
+      setReembolsoFallo({ motivo: motivoReembolso(e), recibo });
+      setProcesando(false);
+      setPidiendoPin(false);
+    }
+  }
 
   useEffect(() => {
     leerItemsVenta(token, venta.ticketId).then(setItems).catch(() => setError("No se pudieron leer los ítems"));
   }, [token, venta.ticketId]);
 
-  function labelMotivo(): string {
-    if (motivo === "OTRO") return motivoTexto.trim() || "Otro";
-    return MOTIVOS_DEV.find((m) => m.codigo === motivo)?.label ?? motivo;
-  }
+  const labelMotivo = () => etiquetaMotivo(MOTIVOS_DEV, motivo, motivoTexto);
 
   async function ejecutar(a: Autorizacion) {
     if (!items) return;
@@ -209,11 +222,13 @@ function ModalDevolucion({
           items: datos.lineas.map((l) => ({ cantidad: l.cantidad, nombre: l.nombre, totalMxn: l.totalMxn })),
           motivo: labelMotivo(),
           medio: MEDIOS_DEV.find((m) => m.codigo === medio)?.label ?? medio,
+          tarjetas: medio === "MISMO_METODO_PAGO" ? datos.pagos.flatMap((p) => (p.tarjeta ? [p.tarjeta] : [])) : [],
           totalReembolso: venta.total,
           ancho: 80,
         };
       } catch { /* recibo opcional */ }
-      onHecho(dDev);
+      if (medio === "MISMO_METODO_PAGO") await reembolsar(dDev);
+      else onHecho(dDev);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo devolver");
       setProcesando(false);
@@ -250,20 +265,28 @@ function ModalDevolucion({
     }
   }
 
+  if (reembolsoFallo) {
+    return (
+      <DialogoPeligro
+        titulo="El dinero no regresó a la tarjeta"
+        contexto={`${venta.folio} · ${fmtMxn(venta.total)}`}
+        consecuencia={`La devolución ya quedó registrada, pero el dinero no regresó a la tarjeta: ${reembolsoFallo.motivo}. Vuelve a intentar, o devuélvelo desde la app de tu terminal.`}
+        boton="Volver a intentar"
+        ocupado={procesando}
+        textoOcupado="Devolviendo…"
+        onConfirmar={() => void reembolsar(reembolsoFallo.recibo)}
+        onCerrar={() => onHecho(reembolsoFallo.recibo)}
+      />
+    );
+  }
+
   if (pidiendoPin) {
     return (
       <ModalAutorizacionPin
         token={token}
-        accion="devolucion"
-        permisoCodigo="venta.devolucion"
+        payload={{ accion: "devolucion", permisoCodigo: "venta.devolucion", entidadTipo: "ticket", entidadId: venta.ticketId, monto: venta.total, motivo: labelMotivo(), cajaId: turno.caja_id, turnoId: turno.id }}
         descripcion={`Devolución de ${venta.folio} · ${labelMotivo()}`}
         ejecutaNombre={empleado.nombre}
-        monto={venta.total}
-        entidadTipo="ticket"
-        entidadId={venta.ticketId}
-        cajaId={turno.caja_id}
-        turnoId={turno.id}
-        motivo={labelMotivo()}
         onAutorizado={(a) => ejecutar(a)}
         onCancelar={() => setPidiendoPin(false)}
       />

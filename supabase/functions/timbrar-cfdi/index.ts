@@ -14,40 +14,28 @@
 // de otro cliente de VIM (auditoría 30/09/2026, C1-1).
 //
 // Local: supabase functions serve timbrar-cfdi --env-file supabase/functions/.env
-import { createClient } from "jsr:@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
-import { timbrarConFailover, obtenerFacturama } from "../_shared/pac/index.ts";
-import { armarConceptos, ConceptosIncoherentes, type LineaTicket } from "../_shared/pac/conceptos.ts";
+import { clienteAdmin, clienteDe, servir } from "../_shared/http.ts";
+import { bearerDe } from "../_shared/identidad.ts";
+import { timbrar, obtenerFacturama } from "../_shared/pac/index.ts";
+import { armarConceptos, ConceptosIncoherentes, filaALinea, type LineaTicket } from "../_shared/pac/conceptos.ts";
 import { archivarCfdi, subidorSupabase } from "../_shared/pac/archivo.ts";
 import { resolverEmisorVerificado } from "../_shared/pac/emisor.ts";
 import { COLUMNAS_NEGOCIO, negocioPuedeTimbrar, NEGOCIO_DADO_DE_BAJA } from "../_shared/pac/negocio.ts";
 
 const ROLES_FACTURA = ["DUENO", "ADMIN"];
 
-Deno.serve(async (req) => {
-  const cors = corsHeaders(req);
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
-
-  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+servir(async (req, json) => {
+  const token = bearerDe(req);
   if (!token) return json({ error: "NO_AUTH" }, 401);
 
   // Cliente con el JWT del llamante: respeta RLS y auth.uid() resuelve al admin.
-  const url = Deno.env.get("SUPABASE_URL")!;
-  const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
-  const sb = createClient(url, anon, {
-    auth: { persistSession: false },
-    global: { headers: { Authorization: `Bearer ${token}` } },
-  });
+  const sb = clienteDe(token);
 
   const { data: u, error: uErr } = await sb.auth.getUser(token);
   if (uErr || !u?.user) return json({ error: "AUTH_INVALIDA" }, 401);
   // Escrituras de lo que respondió el PAC: con service_role (ver cabecera). Solo se usa DESPUÉS de
   // comprobar con el cliente del usuario que el CFDI es de su tenant y que es DUEÑO/ADMIN ahí.
-  const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+  const admin = clienteAdmin();
 
   let body: { cfdi_id?: string };
   try {
@@ -211,24 +199,7 @@ Deno.serve(async (req) => {
     .order("orden_visualizacion", { ascending: true });
   if (iErr) return json({ error: "ITEMS_ERROR", detalle: iErr.message }, 500);
 
-  const lineas: LineaTicket[] = ((filas ?? []) as unknown as Record<string, unknown>[]).map((f) => ({
-    id: String(f.id),
-    parentId: (f.parent_item_id as string) ?? null,
-    comboRol: (f.combo_rol as "PADRE" | "HIJO" | null) ?? null,
-    cargoTipo: (f.cargo_tipo as string | null) ?? null,
-    descripcion: String(f.producto_nombre_snapshot),
-    cantidad: num(f.cantidad),
-    claveSat: (f.clave_sat_snapshot as string) ?? null,
-    unidadSat: (f.unidad_sat_snapshot as string) ?? null,
-    tasaIva: num(f.tasa_iva_snapshot),
-    ivaIncluidoEnPrecio: Boolean(f.iva_incluido_en_precio_snapshot),
-    subtotalBrutoMxn: num(f.subtotal_bruto_mxn),
-    montoModificadoresMxn: num(f.monto_modificadores_mxn),
-    descuentoItemMxn: num(f.descuento_item_mxn),
-    promocionItemMxn: num(f.promocion_item_mxn),
-    ivaItemMxn: num(f.iva_item_mxn),
-    totalItemMxn: num(f.total_item_mxn),
-  }));
+  const lineas: LineaTicket[] = ((filas ?? []) as unknown as Record<string, unknown>[]).map(filaALinea);
 
   // ---------------------------------------------------------------------------------------------
   // Compuerta de folios.
@@ -282,7 +253,7 @@ Deno.serve(async (req) => {
   // primera comprobación y esta el negocio pudo darse de baja. Después de aquí ya no hay vuelta.
   if (!await negocioPuedeTimbrar(estadoDelNegocio)) return json(NEGOCIO_DADO_DE_BAJA, 403);
 
-  const res = await timbrarConFailover({
+  const res = await timbrar({
     cfdiId: String(c.id),
     tipoComprobante: String(c.tipo_comprobante),
     emisor: {
@@ -319,7 +290,7 @@ Deno.serve(async (req) => {
       p_cfdi_id: cfdiId,
       p_codigo_error: res.codigoError,
       p_mensaje_error: res.mensajeError,
-      p_request_payload: { pac: res.pacUsado, failover: res.failover, usuario_id: u.user.id },
+      p_request_payload: { pac: res.pacUsado, usuario_id: u.user.id },
       p_response_payload: res.responsePayload,
     });
     return json({ ok: false, estado: "ERROR_TIMBRADO", error: res.codigoError, mensaje: res.mensajeError }, 502);
@@ -341,7 +312,7 @@ Deno.serve(async (req) => {
     p_pdf_storage_path: pdfPath,
     p_pac_referencia: res.pacReferencia,
     p_pac_costo_centavos: res.costoCentavos,
-    p_request_payload: { pac: res.pacUsado, failover: res.failover, usuario_id: u.user.id },
+    p_request_payload: { pac: res.pacUsado, usuario_id: u.user.id },
     p_response_payload: res.responsePayload,
   });
   if (tErr) return json({ error: "MARCAR_TIMBRADO_ERROR", detalle: tErr.message }, 500);
@@ -365,9 +336,7 @@ Deno.serve(async (req) => {
     if (!envio.ok) console.error(`[cfdi] ${cfdiId} timbrado pero sin enviar a ${correoReceptor}: ${envio.mensaje}`);
   }
 
-  // Dejar constancia del PAC que REALMENTE timbró. Importa cuando entra el failover: el borrador
-  // se creó apuntando al principal y el comprobante lo acabó sellando el respaldo, así que sin
-  // esto el registro diría el equivocado justo en el caso raro que alguien va a investigar.
+  // Dejar constancia del PAC que REALMENTE timbró.
   //
   // El mock no está en el enum de la base (es una herramienta de desarrollo, no un PAC), así que
   // cae en OTRO en vez de reventar el update.
@@ -399,6 +368,5 @@ Deno.serve(async (req) => {
     serie: res.serie,
     folio_fiscal: res.folioFiscal,
     pac: res.pacUsado,
-    failover: res.failover,
   });
 });

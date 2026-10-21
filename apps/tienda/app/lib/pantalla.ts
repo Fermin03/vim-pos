@@ -1,0 +1,181 @@
+// Lo que las pantallas del menú y del carrito DECIDEN sin pintar nada: qué sucursal toca, con qué
+// carrito se arranca, qué chip de categoría va activo, cómo se marca una opción, a qué renglón
+// pertenece un error de la función y la espera antes de recotizar. Puro, para poder probarlo.
+import type { Resultado } from "./api";
+import { carritoNuevo, type Carrito, type CuerpoCarrito } from "./carrito";
+import type { ColoniaSugerida, Cotizacion, Modo, Negocio, Sucursal } from "./contrato";
+import { textoDeError } from "./textos";
+import { aCentavos, formato } from "./dinero";
+
+/**
+ * La sucursal de la página. Con una sola no se pregunta (decisión 6); con varias viaja en `?s=<id>`
+ * y, si no viene una válida, es null: toca preguntar.
+ */
+export function sucursalElegida(negocio: Negocio, s: string | undefined): Sucursal | null {
+  if (negocio.sucursales.length <= 1) return negocio.sucursales[0] ?? null;
+  return negocio.sucursales.find((x) => x.id === s?.toLowerCase()) ?? null;
+}
+
+/** Los modos que la sucursal ofrece. Con uno solo no se pregunta (decisión 6). */
+export function modosDe(sucursal: Sucursal): Modo[] {
+  return [...(sucursal.recoger ? ["RECOGER" as const] : []), ...(sucursal.domicilio ? ["DOMICILIO" as const] : [])];
+}
+
+/** Por qué no se puede pedir ahora en ese modo (para `textoCerrada`), o null si sí se puede. */
+export function motivoDeCierre(sucursal: Sucursal, modo: Modo): string | null {
+  if (!modosDe(sucursal).includes(modo)) return "MODO_NO_DISPONIBLE";
+  return modo === "RECOGER" ? sucursal.estado.recoger : sucursal.estado.domicilio;
+}
+
+/**
+ * El carrito con el que arranca la página de una sucursal. El guardado se usa solo si es de ESA
+ * sucursal (el carrito es por sucursal); su modo se corrige si el negocio ya no lo ofrece. La zona
+ * no es del carrito: a domicilio la da la colonia en «Tus datos» (0187 §6).
+ */
+export function carritoPara(sucursal: Sucursal, guardado: Carrito | null): Carrito {
+  const modos = modosDe(sucursal);
+  const base = guardado?.sucursalId === sucursal.id ? guardado : carritoNuevo(sucursal.id, modos[0] ?? "RECOGER");
+  const modo = modos.includes(base.modo) ? base.modo : modos[0] ?? base.modo;
+  return modo === base.modo ? base : { ...base, modo };
+}
+
+/**
+ * El chip que va activo mientras se recorre el menú: la última sección cuyo borde superior ya cruzó
+ * la línea (el borde inferior de la barra pegajosa). Antes de la primera, la primera; con la página
+ * al fondo, la última (una categoría corta nunca llegaría a la línea).
+ */
+export function categoriaActiva(secciones: { id: string; top: number }[], linea: number, alFinal = false): string | null {
+  if (alFinal) return secciones.at(-1)?.id ?? null;
+  let activa = secciones[0]?.id ?? null;
+  for (const s of secciones) if (s.top <= linea) activa = s.id;
+  return activa;
+}
+
+/**
+ * Tocar una opción de un grupo (o de un slot). `delGrupo` son los ids de sus opciones; lo elegido
+ * en otros grupos no se toca.
+ *  · Ya estaba: se quita, salvo en «elige 1» obligatorio (un radio no se desmarca).
+ *  · Máximo 1: reemplaza a la que hubiera.
+ *  · Ya se llegó al máximo: no pasa nada (la pantalla deshabilita las demás).
+ */
+export function alternar<T>(
+  elegidos: T[], idDe: (t: T) => string, delGrupo: string[], nuevo: T, regla: { minimo: number; maximo: number | null },
+): T[] {
+  const id = idDe(nuevo), esDelGrupo = (t: T) => delGrupo.includes(idDe(t));
+  if (elegidos.some((t) => idDe(t) === id)) {
+    return regla.minimo === 1 && regla.maximo === 1 ? elegidos : elegidos.filter((t) => idDe(t) !== id);
+  }
+  if (regla.maximo === 1) return [...elegidos.filter((t) => !esDelGrupo(t)), nuevo];
+  if (regla.maximo !== null && elegidos.filter(esDelGrupo).length >= regla.maximo) return elegidos;
+  return [...elegidos, nuevo];
+}
+
+const DE_RENGLON = new Set(["PRODUCTO_NO_DISPONIBLE", "MODIFICADORES_INVALIDOS", "COMBO_INVALIDO"]);
+
+/**
+ * Los renglones que señala un error de `cotizar` o `pedir`: `{ [renglon.id]: aviso }`. Esos tres
+ * códigos traen en `detalle` el id del producto; se marcan todos sus renglones. Vacío = el error no
+ * es de un renglón (o no se sabe de cuál) y se enseña como aviso general.
+ */
+export function renglonesDelError(carrito: Carrito, e: { error: string; detalle: string | null }): Record<string, string> {
+  if (!DE_RENGLON.has(e.error) || !e.detalle) return {};
+  const t = textoDeError(e.error);
+  return Object.fromEntries(carrito.renglones.filter((r) => r.productoId === e.detalle).map((r) => [r.id, `${t.texto} ${t.hacer}`]));
+}
+
+/**
+ * Cotiza tras una espera corta, para no preguntar por cada toque de «+». Devuelve cómo cancelar:
+ * durante la espera no se llama; con la llamada en vuelo se aborta y su respuesta no se entrega.
+ * Quien llama cancela la anterior antes de pedir otra (la limpieza de un efecto).
+ */
+export function cotizarConEspera(
+  cotizar: (cuerpo: CuerpoCarrito, signal: AbortSignal) => Promise<Resultado<Cotizacion>>,
+  cuerpo: CuerpoCarrito, alResultado: (r: Resultado<Cotizacion>) => void, esperaMs = 400,
+): () => void {
+  const corte = new AbortController();
+  const reloj = setTimeout(async () => {
+    const r = await cotizar(cuerpo, corte.signal);
+    if (corte.signal.aborted || (!r.ok && r.error === "CANCELADA")) return;
+    alResultado(r);
+  }, esperaMs);
+  return () => { clearTimeout(reloj); corte.abort(); };
+}
+
+/**
+ * El aviso del costo de envío por distancia antes de poner el pin: «El envío puede costar entre $0.00 y
+ * $50.00, según la distancia.» Con un solo tramo, o todos al mismo precio, no hay rango que avisar (null).
+ */
+export function rangoDeEnvio(tramos: { costo_mxn: string }[]): string | null {
+  const costos = tramos.map((z) => aCentavos(z.costo_mxn)).filter((c): c is number => c !== null);
+  if (costos.length < 2) return null;
+  const min = Math.min(...costos), max = Math.max(...costos);
+  // TEXTO PROVISIONAL (James).
+  return min === max ? null : `El envío puede costar entre ${formato(min)} y ${formato(max)}, según la distancia.`;
+}
+
+/**
+ * La búsqueda en el catálogo de la colonia escrita en «Tus datos»: null = no se ha buscado (o se
+ * escribió encima), `en_vuelo`, `lista` (contestó, esté o no), `fallo` (no contestó; «Continuar»
+ * reintenta una vez) y `sin_respuesta` (tampoco al reintentar: el servidor decide al enviar).
+ */
+export type BusquedaDeColonia = "en_vuelo" | "lista" | "fallo" | "sin_respuesta" | null;
+/**
+ * El CP al escribir encima de la colonia. Si ese CP lo puso la colonia de antes (`autollenado`, de una
+ * sugerencia o de lo escrito que coincidió) y nadie lo cambió, se borra: era de la otra colonia y
+ * haría fallar la búsqueda de la nueva. El que escribió el cliente se queda.
+ */
+export const cpTrasEscribirColonia = (cp: string, autollenado: string | null): string => autollenado && cp === autollenado ? "" : cp;
+/** La colonia escrita que cuenta para el envío: solo la que el catálogo ya contestó; si no, "" (pendiente). */
+export const coloniaContestada = (busqueda: BusquedaDeColonia, texto: string): string => busqueda === "lista" ? texto : "";
+
+/**
+ * Qué enseña «Tus datos», a domicilio, sobre el envío (catálogo de colonias, 0187):
+ *  · `colonia`: la colonia elegida tiene zona y ella fija el envío, cobre como cobre la sucursal. Lo
+ *    dice la cotización; mientras llega, la sugerencia elegida (`con_zona`).
+ *  · `mapa`: «Por distancia» y la colonia no decide: el pin de siempre.
+ *  · `sin_cobertura`: «Por zonas» y la colonia (elegida sin zona, o escrita y fuera del catálogo) no
+ *    tiene envío. La zona nunca la elige el cliente (0187 §6): ahí no se entrega.
+ *  · `pendiente`: «Por zonas» sin colonia todavía. `coloniaEscrita` llega vacía mientras el catálogo
+ *    no contesta por ella (`coloniaContestada`), para no avisar «sin cobertura» antes de saberlo.
+ */
+export function envioEnDatos(
+  sucursal: Sucursal, cotizacion: Cotizacion | null, colonia: ColoniaSugerida | null, coloniaEscrita = "",
+): "colonia" | "mapa" | "sin_cobertura" | "pendiente" {
+  if (cotizacion ? cotizacion.por_colonia : colonia?.con_zona) return "colonia";
+  if (sucursal.envio.cobro === "DISTANCIA") return "mapa";
+  return colonia || coloniaEscrita.trim() ? "sin_cobertura" : "pendiente";
+}
+
+/**
+ * Para búsquedas que pueden llegar tarde: solo vale la última. `pedir()` da con qué preguntar, al
+ * llegar la respuesta, si sigue vigente; `descartar()` invalida la que esté en vuelo (el cliente
+ * escribió encima, cambió de dirección o eligió otra cosa).
+ */
+export function ultimaVigente(): { pedir: () => () => boolean; descartar: () => void } {
+  let turno = 0;
+  return { pedir: () => { const mio = ++turno; return () => mio === turno; }, descartar: () => { turno++; } };
+}
+
+/** Para comparar colonias: sin acentos, mayúsculas ni espacios de más. */
+const normal = (s: string): string => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/\s+/g, " ").trim();
+/**
+ * La colonia del catálogo que es EXACTAMENTE la escrita (una dirección guardada, o tecleada sin tocar la
+ * sugerencia), o null. Mismo nombre y, si hay CP escrito, mismo CP. Sin CP vale solo si es la única con
+ * ese nombre: con homónimas no se adivina.
+ */
+export function coloniaQueCoincide(lista: readonly ColoniaSugerida[], nombre: string, cp: string): ColoniaSugerida | null {
+  const mismas = lista.filter((c) => normal(c.nombre) === normal(nombre) && (!cp.trim() || (c.codigo_postal ?? "") === cp.trim()));
+  return mismas.length === 1 ? mismas[0]! : null;
+}
+
+/** Cuántos renglones de una lista larga de «Mi cuenta» (pedidos, direcciones) se ven antes de «Mostrar más». */
+export const TOPE_DE_LISTA = 3;
+/**
+ * Una lista que empieza corta: los primeros `tope` y cuántos quedan por enseñar («Mostrar más» solo
+ * existe si queda alguno). Con `todos`, la lista entera. Quien la usa la pasa ya en el orden en que
+ * se lee (lo más reciente primero).
+ */
+export function listaCorta<T>(lista: readonly T[], todos: boolean, tope: number = TOPE_DE_LISTA): { visibles: T[]; restantes: number } {
+  const visibles = todos ? [...lista] : lista.slice(0, tope);
+  return { visibles, restantes: lista.length - visibles.length };
+}

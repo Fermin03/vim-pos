@@ -2,7 +2,7 @@
 import { Nota, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
 import { useSucursalReporte } from "../../../components/selector-sucursal";
 import { leerTiemposCocina, type FilaTiempos } from "../../../lib/reportes";
-import { etiquetaModo } from "../../../lib/modo-servicio";
+import { etiquetaModo } from "@vim/db/modos-servicio";
 import type { Columna } from "../../../lib/reporte-tabla";
 
 /**

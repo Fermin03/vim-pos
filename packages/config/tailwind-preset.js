@@ -41,23 +41,6 @@ module.exports = {
         line: { DEFAULT: token("line"), strong: token("line-strong") },
         hover: token("hover"),
         sel: token("sel"),
-        // Paleta funcional de categorías / gráficas (NUNCA el color de marca)
-        cat: {
-          blue: token("cat-blue"),
-          green: token("cat-green"),
-          teal: token("cat-teal"),
-          violet: token("cat-violet"),
-          amber: token("cat-amber"),
-          wine: token("cat-wine"),
-        },
-        // KDS (tema oscuro, doc 14) — colores aclarados para fondo negro
-        kds: {
-          bg: token("kds-bg"),
-          surface: token("kds-surface"),
-          text: token("kds-text"),
-          warning: token("kds-warning"),
-          danger: token("kds-danger"),
-        },
       },
       fontFamily: {
         sans: ["'Inter Tight'", "system-ui", "sans-serif"],
@@ -99,8 +82,6 @@ module.exports = {
       // Las curvas viven en tokens.css (--ease-*), igual que los colores.
       transitionTimingFunction: {
         vim: "var(--ease-out)",
-        "vim-in-out": "var(--ease-in-out)",
-        "vim-drawer": "var(--ease-drawer)",
       },
       animation: {
         "vim-shake": "vim-shake .3s var(--ease-in-out)",

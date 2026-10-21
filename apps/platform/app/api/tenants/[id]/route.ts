@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { autorizar, auditar } from "../../../lib/server";
 import { hoyMx, sumarMeses } from "@vim/fecha";
 import { MODULOS } from "@vim/db/modulos";
+import { GIROS } from "@vim/db/operacion";
 import { esExtra, EXTRAS_MAXIMO } from "@vim/db/cobro";
 import { fechaBloqueo, mensajeBloqueoPorDefecto } from "../../../lib/bloqueo";
 import { decidirAltaAddon, precioAltaAddon, type FilaAddon } from "../../../lib/addons";
@@ -470,6 +471,53 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     await auditar(sb, { accion: `tenant.suscripcion_${nuevo.toLowerCase()}`, tenantId: id, motivo: (body.motivo as string | undefined)?.trim() || null });
     return NextResponse.json({ ok: true });
+  }
+
+  // ── Módulos de operación y giro (0180, ADR 0034) ───────────────────────────────────────────
+  // Solo VIM los mueve. Las reglas (dependencias, cuentas abiertas, giros que las cajas aún no
+  // conocen) viven en la base; aquí se traducen sus rechazos a algo que el operador entienda.
+  const RECHAZOS_OPERACION: Record<string, { status: number; texto: (n: string) => string }> = {
+    MESEROS_REQUIERE_COMEDOR: { status: 409, texto: () => "Para encender Meseros, primero enciende Comedor." },
+    REPARTIDORES_REQUIERE_DOMICILIO: { status: 409, texto: () => "Para encender Repartidores, primero enciende Domicilio." },
+    CUENTAS_ABIERTAS_COMEDOR: { status: 409, texto: (n) => `Tiene ${n} cuentas de mesa abiertas. Se puede apagar cuando las cierren.` },
+    CUENTAS_ABIERTAS_BARRA: { status: 409, texto: (n) => `Tiene ${n} cuentas en barra abiertas. Se puede apagar cuando las cierren.` },
+    GIRO_NO_DISPONIBLE: { status: 409, texto: () => "Ese giro todavía no se puede asignar a un negocio que ya existe: sus cajas deben actualizarse primero." },
+    GIRO_RETIRADO: { status: 400, texto: () => "Ese giro ya no se ofrece." },
+    MODULO_DESCONOCIDO: { status: 400, texto: () => "Ese módulo no existe." },
+    MODULO_NO_BOOLEANO: { status: 400, texto: () => "Cada módulo va encendido o apagado." },
+    CAMBIOS_INVALIDOS: { status: 400, texto: () => "No hay cambios que aplicar." },
+    TENANT_NO_EXISTE: { status: 404, texto: () => "Ese negocio no existe." },
+  };
+  const rechazo = (message: string) => {
+    const m = /^([A-Z_]+)(?::\s*(.*))?$/.exec(message.trim());
+    const codigo = m?.[1] ?? "";
+    const r = RECHAZOS_OPERACION[codigo];
+    return r
+      ? NextResponse.json({ error: codigo, detalle: r.texto(m?.[2] ?? "") }, { status: r.status })
+      : NextResponse.json({ error: message }, { status: 500 });
+  };
+
+  if (accion === "operacion") {
+    const cambios = body.cambios;
+    if (typeof cambios !== "object" || cambios === null || Array.isArray(cambios)) {
+      return NextResponse.json({ error: "CAMBIOS_INVALIDOS", detalle: "No hay cambios que aplicar." }, { status: 400 });
+    }
+    if (!motivoDe()) return faltaMotivo();
+    const { data, error } = await sb.rpc("operacion_cambiar", { p_tenant: id, p_cambios: cambios });
+    if (error) return rechazo(error.message);
+    await auditar(sb, { accion: "tenant.operacion", tenantId: id, motivo: motivoDe(), payload: { cambios, resultado: data } });
+    return NextResponse.json({ ok: true, ...((data ?? {}) as Record<string, unknown>) });
+  }
+
+  if (accion === "cambiar_giro") {
+    const giro = String(body.giro ?? "");
+    if (!GIROS.some((g) => g.codigo === giro)) return NextResponse.json({ error: "GIRO_INVALIDO", detalle: "Elige un giro de la lista." }, { status: 400 });
+    if (!motivoDe()) return faltaMotivo();
+    const reaplicar = body.reaplicar === true;
+    const { data, error } = await sb.rpc("cambiar_giro", { p_tenant: id, p_giro: giro, p_reaplicar: reaplicar });
+    if (error) return rechazo(error.message);
+    await auditar(sb, { accion: "tenant.cambiar_giro", tenantId: id, motivo: motivoDe(), payload: { giro, reaplicar, resultado: data } });
+    return NextResponse.json({ ok: true, ...((data ?? {}) as Record<string, unknown>) });
   }
 
   // ── Módulos por excepción (tenant_feature_flags) ──────────────────────────────────────────

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, Modal } from "@vim/ui/styles";
+import { Button, Modal, Icono } from "@vim/ui/styles";
 import { type Empleado } from "../lib/supabase";
 import { type DatosCaja, type Turno, fmtMxn } from "../lib/turno";
 import { registrarMovimiento, TIPOS_MOVIMIENTO, type DefMovimiento, type TipoMovimiento } from "../lib/movimientos";
@@ -17,16 +17,12 @@ const OTRO = "__otro__";
 
 function IconoRetiro() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[22px] w-[22px]">
-      <path d="M12 19V5M5 12l7 7 7-7" />
-    </svg>
+    <Icono nombre="flecha-abajo" className="h-[22px] w-[22px]" />
   );
 }
 function IconoDeposito() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[22px] w-[22px]">
-      <path d="M12 5v14M5 12l7-7 7 7" />
-    </svg>
+    <Icono nombre="flecha-arriba" className="h-[22px] w-[22px]" />
   );
 }
 
@@ -164,16 +160,9 @@ export function ModalMovimientoCaja({
     return (
       <ModalAutorizacionPin
         token={token}
-        accion={payload().accion}
-        permisoCodigo={def.permiso}
+        payload={payload()}
         descripcion={`${def.label} · ${fmtMxn(monto)} · ${motivo}`}
         ejecutaNombre={empleado.nombre}
-        monto={monto}
-        entidadTipo="movimiento_caja"
-        entidadId={null}
-        cajaId={turno.caja_id}
-        turnoId={turno.id}
-        motivo={motivo}
         onAutorizado={(a) => ejecutarConAutorizacion(a)}
         onCancelar={() => setPidiendoPin(false)}
       />

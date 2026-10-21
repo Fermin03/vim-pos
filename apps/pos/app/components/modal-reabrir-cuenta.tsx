@@ -91,16 +91,9 @@ export function ModalReabrirCuenta({
     return (
       <ModalAutorizacionPin
         token={token}
-        accion="reabrir_cuenta"
-        permisoCodigo={PERMISO}
+        payload={payload()}
         descripcion={`Reabrir cuenta · folio ${folio ?? ""} · ${fmtMxn(total)}`}
         ejecutaNombre={empleado.nombre}
-        monto={total}
-        entidadTipo="ticket"
-        entidadId={ticketId}
-        cajaId={cajaId}
-        turnoId={turnoId}
-        motivo={motivoFinal}
         onAutorizado={(a) => ejecutar(a)}
         onCancelar={() => setPidiendoPin(false)}
       />

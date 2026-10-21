@@ -1,0 +1,129 @@
+// Mercado Pago Point (Orders API) para el cobro con terminal. ADR 0033.
+// Fuente: docs/integraciones/mercado-pago-point/. Lo marcado VERIFICADO se probó el 9 oct 2026 contra
+// la cuenta de prueba y la terminal virtual (`…__SBX0000001`); lo demás es lo que dice la documentación.
+//
+// Con terminal real (Point Smart 2 de Knock-Out, 9 oct 2026, cobro de $10 devuelto):
+//   · El cobro aparece en la terminal ~15 s después de crearlo y hay que tocar «Tarjeta» para avanzar.
+//   · En modo PDV la terminal NO pregunta propina: `total_paid_amount` = `amount`. La propina se
+//     captura en VIM y se manda el total.
+//   · El aviso real llega ~2 s después del pago, firmado con la clave de la aplicación de VIM.
+//   · La devolución total (POST /v1/orders/{id}/refund sin cuerpo) responde 201 con `refunded` al instante.
+//   · La consulta de la order trae además `card.last_digits` y `card.first_digits`: no se guardan.
+//
+// Mercado Pago nunca manda la propina por separado: `propina_mxn` queda sin definir (equivale a null).
+// Lo común con Clip (estados, montos, cambios de cobro) vive en comun.ts y se reexporta desde aquí.
+import { type DatosCobro, type EstadoCobro, montoTexto, obj, txt } from "./comun.ts";
+import { hmacSha256Hex, igualesEnTiempoConstante } from "../delivery/firma.ts";
+
+const API = "https://api.mercadopago.com";
+
+export { aceptaCambio, cambiosDeCobro, type DatosCobro, type EstadoCobro, montoTexto } from "./comun.ts";
+
+const ESTADOS: Record<string, EstadoCobro> = {
+  created: "EN_TERMINAL", at_terminal: "EN_TERMINAL", processed: "APROBADO", failed: "RECHAZADO",
+  canceled: "CANCELADO", expired: "VENCIDO", action_required: "REVISAR", refunded: "DEVUELTO",
+};
+
+/** Un estado que no conocemos se trata como «mira la terminal»: nunca como aprobado ni como rechazado. */
+export const estadoDeOrden = (status: unknown): EstadoCobro => ESTADOS[String(status)] ?? "REVISAR";
+
+/**
+ * Lo que guardamos de una order, venga de la respuesta de la API o del `data` de un aviso (el aviso
+ * no trae `id` dentro de data y manda la referencia como `reference.id`; la consulta, `reference_id`).
+ */
+export function datosDeOrden(orden: unknown, idOrden?: string): DatosCobro {
+  const o = obj(orden);
+  const pagos = obj(o.transactions).payments;
+  const p = obj(Array.isArray(pagos) ? pagos[0] : null);
+  const medio = obj(p.payment_method);
+  const reembolsos = obj(o.transactions).refunds;
+  const reembolsado = Array.isArray(reembolsos)
+    ? reembolsos.reduce((s, r) => s + (Number(obj(r).amount) || 0), 0)
+    : Number(p.refunded_amount) || 0;
+  return {
+    estado: estadoDeOrden(o.status),
+    detalle: txt(o.status_detail),
+    cobro_id: txt(o.external_reference),
+    orden_id_externo: txt(o.id) ?? idOrden ?? null,
+    pago_id_externo: txt(p.id),
+    tipo_tarjeta: txt(medio.type),
+    marca: txt(medio.id),
+    mensualidades: Number.isInteger(medio.installments) ? medio.installments as number : null,
+    referencia: txt(p.reference_id) ?? txt(obj(p.reference).id),
+    pagado_mxn: montoTexto(o.total_paid_amount) ?? montoTexto(p.paid_amount),
+    reembolsado_mxn: reembolsado > 0 ? reembolsado.toFixed(2) : null,
+    // VERIFICADO con un cobro real: llega en la CONSULTA de la order (`card.last_digits`), no en el aviso.
+    tarjeta_ultimos4: /^\d{4}$/.test(String(obj(p.card).last_digits ?? "")) ? String(obj(p.card).last_digits) : null,
+  };
+}
+
+/**
+ * Firma de un aviso: `x-signature: ts=…,v1=…`, HMAC-SHA256 de `id:<data.id>;request-id:<x-request-id>;ts:<ts>;`
+ * con la clave secreta de la aplicación. VERIFICADO con avisos reales (9 oct 2026): `data.id` va en
+ * MINÚSCULAS aunque en la query llegue en mayúsculas (el validador del SDK oficial no lo baja: se lo
+ * deja a quien llama), y Supabase no toca `x-request-id`.
+ * Los avisos de la cuenta de prueba los firma SU aplicación gemela, con otra clave: la que se ve
+ * entrando al panel de desarrolladores con el usuario de prueba, no la del panel de VIM.
+ */
+export async function firmaValida(
+  e: { firma: string | null; requestId: string | null; dataId: string | null; secreto: string },
+): Promise<boolean> {
+  const partes = Object.fromEntries((e.firma ?? "").split(",").map((x) => x.trim().split("=", 2)));
+  if (!partes.ts || !partes.v1 || !e.dataId || !e.secreto) return false;
+  const manifiesto = `id:${e.dataId.toLowerCase()};${e.requestId ? `request-id:${e.requestId};` : ""}ts:${partes.ts};`;
+  return igualesEnTiempoConstante(String(partes.v1).toLowerCase(), await hmacSha256Hex(e.secreto, manifiesto));
+}
+
+export type RespuestaMp = { status: number; cuerpo: unknown; codigo: string | null };
+
+/** Cliente mínimo. `token` es el Access Token del restaurante (o el de prueba). */
+export function clienteMp(token: string, pedir: typeof fetch = fetch) {
+  const llamar = async (metodo: string, ruta: string, cuerpo?: unknown, extra: Record<string, string> = {}): Promise<RespuestaMp> => {
+    const r = await pedir(API + ruta, {
+      method: metodo,
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...extra },
+      body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
+      signal: AbortSignal.timeout(15000),
+    });
+    const texto = await r.text();
+    let json: unknown = null;
+    try { json = texto ? JSON.parse(texto) : null; } catch { /* cuerpo no JSON */ }
+    const errores = obj(json).errors;
+    return { status: r.status, cuerpo: json, codigo: txt(obj(Array.isArray(errores) ? errores[0] : null).code) };
+  };
+
+  return {
+    /** VERIFICADO: 201 con la order en `created`; la terminal virtual la toma sola a los ~3 s. */
+    crearOrden: (c: { cobroId: string; monto: string; terminalId: string; descripcion: string; esperaSeg: number; imprime: boolean }) =>
+      llamar("POST", "/v1/orders", {
+        type: "point",
+        external_reference: c.cobroId,
+        expiration_time: `PT${c.esperaSeg}S`,
+        transactions: { payments: [{ amount: c.monto }] },
+        config: { point: { terminal_id: c.terminalId, print_on_terminal: c.imprime ? "seller_ticket" : "no_ticket" } },
+        description: c.descripcion.slice(0, 150),
+      }, { "X-Idempotency-Key": c.cobroId }),
+
+    /** VERIFICADO. Mercado Pago pide no consultarla seguido: es el respaldo del aviso. */
+    consultarOrden: (ordenId: string) => llamar("GET", `/v1/orders/${encodeURIComponent(ordenId)}`),
+
+    /**
+     * 200 si estaba en `created`; 202 (no definitivo hasta el aviso) si ya estaba en la terminal.
+     * VERIFICADO: con la terminal virtual responde 403 forbidden_checking_device_owner, así que
+     * cancelar solo se puede probar con una terminal real.
+     */
+    cancelarOrden: (ordenId: string) =>
+      llamar("POST", `/v1/orders/${encodeURIComponent(ordenId)}/cancel`, undefined,
+        { "X-Idempotency-Key": crypto.randomUUID(), "x-allow-cancelable-status": "at_terminal" }),
+
+    /**
+     * Devolución TOTAL (sin cuerpo). VERIFICADO con dinero real: 201 con `status: refunded` al
+     * instante. Hasta 90 días después del pago. La llave de idempotencia es la order: pedirla dos
+     * veces no devuelve dos veces. Un pago SIMULADO no se puede devolver
+     * (`refund_not_possible_simulation_payment`), y una order creada con el token de otra aplicación
+     * no se ve (`order_not_found`): la devolución solo se prueba con un pago real.
+     */
+    reembolsarOrden: (ordenId: string) =>
+      llamar("POST", `/v1/orders/${encodeURIComponent(ordenId)}/refund`, undefined, { "X-Idempotency-Key": `reembolso-${ordenId}` }),
+  };
+}

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, Modal } from "@vim/ui/styles";
+import { Button, Modal, Icono } from "@vim/ui/styles";
 import { asignarLote, crearRepartidor, leerDeliveries, listarRepartidores, type Repartidor } from "../lib/delivery";
 import { listarCuentasAbiertas, type CuentaAbierta } from "../lib/cuentas-abiertas";
 import { fmtMxn } from "../lib/turno";
@@ -156,7 +156,7 @@ export function ModalAsignarRepartidor({
                     ].join(" ")}
                     aria-hidden
                   >
-                    {activo ? "✓" : ""}
+                    {activo && <Icono nombre="palomita" className="h-3.5 w-3.5" strokeWidth={2.5} />}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-14 font-semibold text-ink">{r.nombre}</span>
@@ -243,7 +243,7 @@ export function ModalAsignarRepartidor({
                     ].join(" ")}
                     aria-hidden
                   >
-                    {activo ? "✓" : ""}
+                    {activo && <Icono nombre="palomita" className="h-3.5 w-3.5" strokeWidth={2.5} />}
                   </span>
                   <span className="min-w-0 flex-1 truncate text-14 font-semibold text-ink">
                     {o.cliente ?? o.folio ?? "Cuenta"}

@@ -2,7 +2,7 @@
 import { Barra, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
 import { useSucursalReporte } from "../../../components/selector-sucursal";
 import { leerVentasPorModo, type FilaModo } from "../../../lib/reportes";
-import { etiquetaModo } from "../../../lib/modo-servicio";
+import { etiquetaModo } from "@vim/db/modos-servicio";
 import { formatear, type Columna } from "../../../lib/reporte-tabla";
 
 export default function VentasPorModoServicioPage() {

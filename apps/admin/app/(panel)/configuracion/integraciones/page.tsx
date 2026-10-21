@@ -285,7 +285,7 @@ export default function IntegracionesPage() {
                   </tbody>
                 </table>
                 {sucursales.length === 0 && (
-                  <div className="px-6 py-12 text-center text-sm text-ink-2">Primero crea una sucursal en Configuración › Sucursales.</div>
+                  <div className="px-6 py-12 text-center text-sm text-ink-2">Primero crea una sucursal en Configuración → Sucursales.</div>
                 )}
               </div>
             )}
@@ -326,7 +326,7 @@ function Estado({ estado }: { estado: EstadoConexion }) {
   const activa = estado === "ACTIVA";
   const alerta = estado === "ERROR";
   const pausada = estado === "PAUSADA";
-  const clase = activa ? "bg-success-soft text-success" : alerta ? "bg-[#FBE9E7] text-danger" : pausada ? "bg-warning-soft text-warning" : "bg-hover text-ink-3";
+  const clase = activa ? "bg-success-soft text-success" : alerta ? "bg-danger-soft text-danger" : pausada ? "bg-warning-soft text-warning" : "bg-hover text-ink-3";
   const punto = activa ? "bg-success" : alerta ? "bg-danger" : pausada ? "bg-warning" : "bg-ink-3";
   return (
     <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-13 font-semibold", clase].join(" ")}>

@@ -1,5 +1,5 @@
 "use client";
-import { LogoVim } from "@vim/ui/styles";
+import { LogoVim, Icono } from "@vim/ui/styles";
 import { useCallback, useEffect, useState } from "react";
 import { BotonVolver } from "./boton-volver";
 import { useEscape } from "../lib/use-escape";
@@ -13,6 +13,7 @@ import { ModalCambiarPago } from "./modal-cambiar-pago";
 import { ModalReabrirCuenta } from "./modal-reabrir-cuenta";
 import { METODOS_PAGO } from "../lib/cuentas-acciones";
 import { hoyMx } from "@vim/fecha";
+import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
 
 function fechaCorta(iso: string | null): string {
   if (!iso) return "—";
@@ -64,6 +65,8 @@ export function PantallaConsultaCuentas({
   // enum para prellenar/filtrar el modal de cambio de pago (null si no está en la lista conocida).
   const etiquetaPago = detalle?.pagos[0]?.metodo ?? null;
   const metodoActual = METODOS_PAGO.find((m) => m.label === etiquetaPago)?.codigo ?? null;
+  // Pagada en línea (tienda): ni se le cambia el pago ni se reabre; la base tampoco lo deja (0173).
+  const pagadaEnLinea = (detalle?.pagos ?? []).some((p) => p.metodo === etiquetaMetodoPago("PAGO_EN_LINEA"));
 
   const recargar = useCallback(async () => {
     try {
@@ -125,7 +128,7 @@ export function PantallaConsultaCuentas({
             </div>
           )}
           <button type="button" onClick={recargar} className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-13 font-semibold text-ink-2 transition hover:border-ink hover:text-ink">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M23 4v6h-6M1 20v-6h6" /><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15" /></svg>
+            <Icono nombre="actualizar" className="h-4 w-4" />
             Actualizar
           </button>
         </div>
@@ -184,17 +187,18 @@ export function PantallaConsultaCuentas({
                     onClick={reimprimir}
                     className="flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-line-strong px-4 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:opacity-60"
                   >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" /></svg>
+                    <Icono nombre="impresora" className="h-4 w-4" />
                     {imprimiendo ? "Imprimiendo…" : "Reimprimir"}
                   </button>
                   {cuentaSel?.estado === "PAGADO" && (
                     <>
+                      {!pagadaEnLinea && <>
                       <button
                         type="button"
                         onClick={() => setCambiandoPago(cuentaSel)}
                         className="flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-line-strong px-4 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
                       >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><rect x="2" y="6" width="20" height="12" rx="2" /><path d="M2 10h20M7 15h4" /></svg>
+                        <Icono nombre="tarjeta" className="h-4 w-4" />
                         Cambiar pago
                       </button>
                       <button
@@ -202,15 +206,16 @@ export function PantallaConsultaCuentas({
                         onClick={() => setReabriendo(cuentaSel)}
                         className="flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-line-strong px-4 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
                       >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5" /></svg>
+                        <Icono nombre="actualizar" className="h-4 w-4" />
                         Reabrir
                       </button>
+                      </>}
                       <button
                         type="button"
                         onClick={() => setCancelando(cuentaSel)}
                         className="flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-danger/40 px-4 text-14 font-semibold text-danger transition hover:border-danger hover:bg-danger/[0.06]"
                       >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                        <Icono nombre="cerrar" className="h-4 w-4" />
                         Cancelar folio
                       </button>
                     </>
@@ -278,6 +283,8 @@ export function PantallaConsultaCuentas({
           cajaId={turno.caja_id}
           turnoId={turno.id}
           pagada
+          enLinea={pagadaEnLinea}
+          cuentaDesde={cancelando.fechaIso}
           onCancelado={() => { setCancelando(null); setSel(null); setDetalle(null); recargar(); }}
           onCerrar={() => setCancelando(null)}
         />

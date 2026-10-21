@@ -1,6 +1,7 @@
 "use client";
 import { z } from "zod";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { borrarSuave, tenantId } from "./datos";
 
 /**
  * Zonas de envío por sucursal (0116_zonas_envio): a qué colonias reparte cada sucursal y cuánto
@@ -11,12 +12,6 @@ import { supabase, leerSesion } from "./supabase";
  * aquí no se usa: tickets y direcciones de cliente apuntan a la zona, así que la baja es lógica
  * (`deleted_at`) para no romper esas referencias ni el historial.
  */
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
 
 const S = (v: unknown) => (v == null ? "" : String(v));
 
@@ -44,16 +39,26 @@ function payload(d: ZonaInput) {
   };
 }
 
+/**
+ * Las zonas que el dueño administra aquí. Las de los tramos del envío por distancia de la tienda
+ * (0185) no salen: las crea y las cambia «Tienda en línea → Envío a domicilio», y tocarlas aquí
+ * desarmaría esos tramos. (El POS sí las enseña: sirven para un pedido por teléfono.)
+ */
 export async function listarZonas(sucursalId: string): Promise<Zona[]> {
-  const { data, error } = await supabase
-    .from("zonas_envio")
-    .select("id, sucursal_id, nombre, costo_mxn, orden, activa")
-    .eq("sucursal_id", sucursalId)
-    .is("deleted_at", null)
-    .order("orden", { ascending: true })
-    .order("nombre", { ascending: true });
+  const [{ data, error }, tienda] = await Promise.all([
+    supabase
+      .from("zonas_envio")
+      .select("id, sucursal_id, nombre, costo_mxn, orden, activa")
+      .eq("sucursal_id", sucursalId)
+      .is("deleted_at", null)
+      .order("orden", { ascending: true })
+      .order("nombre", { ascending: true }),
+    supabase.from("tienda_sucursales").select("tramos_envio").eq("sucursal_id", sucursalId).maybeSingle(),
+  ]);
   if (error) throw new Error(error.message);
-  return ((data ?? []) as Record<string, unknown>[]).map((z) => ({
+  const tramos = (tienda.data as { tramos_envio?: unknown } | null)?.tramos_envio;
+  const deTramos = new Set((Array.isArray(tramos) ? tramos : []).map((t) => String((t as { zona_id?: unknown } | null)?.zona_id ?? "")));
+  return ((data ?? []) as Record<string, unknown>[]).filter((z) => !deTramos.has(String(z.id))).map((z) => ({
     id: String(z.id),
     sucursalId: String(z.sucursal_id),
     nombre: S(z.nombre),
@@ -89,13 +94,7 @@ export async function setActivaZona(id: string, activa: boolean): Promise<void> 
 }
 
 /** Baja lógica: tickets y direcciones de cliente siguen apuntando a la zona. */
-export async function eliminarZona(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("zonas_envio")
-    .update({ deleted_at: new Date().toISOString(), activa: false })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarZona = (id: string): Promise<void> => borrarSuave("zonas_envio", id, { activa: false });
 
 /** El choque del índice único llega como jerga de Postgres; aquí se dice lo que pasó. */
 function traducir(mensaje: string): string {

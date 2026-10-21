@@ -83,8 +83,8 @@ Estado actual en producción: `tenant_cfdi_emisor` tiene el RFC de el dueño com
 - **Caducidad de CSD**: aviso al dueño 60 días antes (pendiente de construir; hoy manual).
 - **Datos e incidentes**: el XML y el PDF son datos fiscales del cliente y de su receptor; el
   aviso de privacidad ya cubre facturación. Si Facturama tiene incidente, la cola `tickets_cfdi`
-  reintenta; el failover a Facturapi solo aplica a fallos de transporte, y Facturapi no es
-  multi-tenant, así que en la práctica el respaldo es esperar.
+  reintenta; no hay PAC de respaldo ([ADR 0031](../../decisiones/0031-facturama-es-el-unico-pac.md)),
+  así que el respaldo es esperar.
 
 ## 6. Qué dice el sitio
 

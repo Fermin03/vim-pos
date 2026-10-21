@@ -4,44 +4,44 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/nosotros
 
-VIM POS es un sistema de punto de venta para restaurantes hecho en [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon). Lo instalamos, capacitamos a tu equipo y respondemos por él.
+VIM POS es un sistema de punto de venta para restaurantes hecho en [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon).
 
 ## Quién construye VIM POS
 
-**VIM POS**, persona física con actividad empresarial, en Guanajuato, México. Es la misma que aparece en el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) y en los [términos del servicio](https://vimpos.com.mx/terminos): no hay una razón social distinta escondida en la letra chica. Los datos fiscales completos van en el contrato.
+**VIM POS**, persona física con actividad empresarial, en Guanajuato, México. Es la misma del [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) y de los [términos del servicio](https://vimpos.com.mx/terminos).
 
-Atendemos restaurantes de toda la República. La demostración es en persona, en tu propio mostrador, en León y alrededores; si estás fuera, puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro).
+Atendemos restaurantes de toda la República. La demo es en tu mostrador, en León y alrededores; fuera de ahí, puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro).
 
 ## Por qué existe
 
-Porque un restaurante mexicano hoy escoge entre un sistema de fuera, caro y en dólares; uno de los de siempre, que vive en una sola computadora sin respaldo; o el cuaderno, que aguanta hasta que hay dos cajas o un socio. Ninguno está pensado para él.
+VIM POS está pensado para ese emprendedor que quiere saber cómo administrar su restaurante de verdad.
 
-VIM POS es el intento de que no haya que escoger: el sistema completo vive en la computadora de tu caja —así que cobra aunque se caiga el internet— y la nube es el respaldo y el panel, no el motor.
+El sistema completo vive en la computadora de tu caja y cobra aunque se caiga el internet.
 
 ![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=3)
 
-_La caja, tal como la ve quien cobra. Todo lo que hay en este sitio son capturas del sistema funcionando, no dibujos._
+_La caja, tal como la ve quien cobra._
 
 ## Cómo trabajamos
 
-Competimos contra marcas con veinticinco años encima, y ahí no se gana con promesas. Somos concretos donde el resto es vago:
+Todo claro desde el principio, sin letra chica:
 
-- **El precio va de frente.** Los tres planes, los extras y los paquetes de folios están en la [página de precios](https://vimpos.com.mx/precios). No hay «contáctanos para conocer el precio».
-- **No hay pago inicial.** En ningún plan. Desde Negocio cargamos tu menú, dejamos lo fiscal configurado y capacitamos a tu equipo; en Esencial lo haces tú con nuestra guía.
-- **No vendemos equipo.** Te decimos qué computadora, qué impresora y qué cajón buscar, y los compras donde te salga mejor.
-- **No cobramos comisión por venta.** El cobro con tarjeta se hace en tu terminal bancaria de siempre; el dinero no pasa por nosotros.
-- **Los límites están escritos.** No hay app de mesero en tableta, no hay terminal bancaria integrada y la liquidación de las apps de reparto se pega a mano. Está en la [página de funciones](https://vimpos.com.mx/funciones), no en una nota al pie.
-- **No hay contrato forzoso.** Es mes a mes y se cancela cuando quieras, sin penalización.
+- **El precio va de frente.** Planes, extras y folios están en la [página de precios](https://vimpos.com.mx/precios).
+- **No hay pago inicial.** En ningún plan. Desde Negocio cargamos tu menú y capacitamos a tu equipo.
+- **No vendemos equipo.** Te decimos qué buscar y lo compras donde te salga mejor.
+- **No cobramos comisión por venta.** Lo que cobras con tarjeta no pasa por nosotros.
+- **Los límites están escritos.** No hay app de mesero en tableta, el cobro con tarjeta desde la caja solo funciona con la terminal Mercado Pago Point Smart 2 y la liquidación de las apps de reparto se pega a mano. Están en [funciones](https://vimpos.com.mx/funciones).
+- **No hay contrato forzoso.** Es mes a mes y cancelas cuando quieras, sin penalización.
 
 ## En qué punto está el producto
 
-La facturación electrónica —factura global, timbrado individual y portal de autofacturación por QR— está disponible desde septiembre de 2026. Mientras no estuvo encendida, en la página de precios decía «muy pronto» y no una fecha inventada; esa misma regla aplica a todo lo que anunciemos de aquí en adelante.
+La facturación electrónica está disponible desde septiembre de 2026: factura global, timbrado individual y autofacturación por QR. Lo que aún no está listo, lo decimos sin inventar fechas.
 
 ## Cómo hablar con nosotros
 
-Por [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx). Contestamos el mismo día hábil. Si prefieres que te escribamos nosotros, [pide una demo](https://vimpos.com.mx/demo) y te buscamos.
+Escríbenos a [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx) y te contestamos el mismo día hábil. O [pide una demo](https://vimpos.com.mx/demo) y te buscamos nosotros.
 
-Todas las formas de contacto, con qué canal sirve para qué, están en la [página de contacto](https://vimpos.com.mx/contacto).
+Las demás formas de contacto están en la [página de contacto](https://vimpos.com.mx/contacto).
 
 ---
 

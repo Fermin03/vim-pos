@@ -128,3 +128,5 @@ export function haceCuanto(valor: string | null | undefined, ahora: number = Dat
   if (d < 30) return d === 1 ? "hace 1 día" : `hace ${d} días`;
   return fechaLegible(valor);
 }
+
+export { DIAS, cruzaMedianoche, horaValida, leerHorario, type Dia, type Horario } from "./horario";

@@ -24,8 +24,8 @@
 // borraba en la cuenta compartida el sello del RFC escrito, que podía ser el de otro cliente.
 //
 // Local: supabase functions serve cargar-csd --env-file supabase/functions/.env
-import { createClient } from "jsr:@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
+import { clienteAdmin, clienteDe, servir } from "../_shared/http.ts";
+import { bearerDe } from "../_shared/identidad.ts";
 import { obtenerFacturama } from "../_shared/pac/index.ts";
 import { CertificadoIlegible, esDelRfc, estaVigente, leerCertificado } from "../_shared/pac/certificado.ts";
 import { igualesEnTiempoConstante } from "../_shared/delivery/firma.ts";
@@ -40,14 +40,7 @@ const ROLES_CSD = ["DUENO", "ADMIN"];
 /** Un CSD del SAT ronda los 2 KB; la llave, algo menos. El tope corta cargas absurdas temprano. */
 const MAX_BASE64 = 32 * 1024;
 
-Deno.serve(async (req) => {
-  const cors = corsHeaders(req);
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
-
+servir(async (req, json) => {
   const internoRecibido = (req.headers.get("x-vim-interno") ?? "").trim();
   if (internoRecibido !== "") {
     if (INTERNO === "" || !igualesEnTiempoConstante(internoRecibido, INTERNO)) return json({ error: "INTERNO_INVALIDO" }, 401);
@@ -59,13 +52,10 @@ Deno.serve(async (req) => {
     return json({ ok: true, ...(await pacInterno.verificarCuenta()) });
   }
 
-  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const token = bearerDe(req);
   if (!token) return json({ error: "NO_AUTH" }, 401);
 
-  const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-    auth: { persistSession: false },
-    global: { headers: { Authorization: `Bearer ${token}` } },
-  });
+  const sb = clienteDe(token);
 
   const { data: u, error: uErr } = await sb.auth.getUser(token);
   if (uErr || !u?.user) return json({ error: "AUTH_INVALIDA" }, 401);
@@ -123,9 +113,7 @@ Deno.serve(async (req) => {
 
   // Escrituras de `rfc_verificado` y `csd_*`: solo service_role (0135). Se usa después de
   // comprobar arriba, con el JWT del llamante, que es DUEÑO/ADMIN de ESTE tenant.
-  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
-    auth: { persistSession: false },
-  });
+  const admin = clienteAdmin();
 
   // ── Baja del sello (offboarding) ────────────────────────────────────────────────────────────
   // Solo el sello que ESTE tenant demostró suyo. El RFC escrito en la configuración no cuenta: con

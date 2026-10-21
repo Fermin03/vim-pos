@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { PageHeader, PageBody } from "../../../../components/page-header";
-import { CatalogoTabs } from "../../../../components/catalogo-tabs";
 import { GrupoForm } from "../../../../components/grupo-form";
 import { OpcionesEditor } from "../../../../components/opciones-editor";
 import { AsignacionMasivaGrupo } from "../../../../components/asignacion-masiva-grupo";
@@ -28,7 +27,6 @@ export default function EditarGrupoPage() {
           { label: grupo ? grupo.nombre : "Editar" },
         ]}
       />
-      <CatalogoTabs />
       <PageBody>
         {grupo === undefined && <p className="text-sm text-ink-3">Cargando…</p>}
         {grupo === null && <p className="text-sm text-danger">Grupo no encontrado.</p>}

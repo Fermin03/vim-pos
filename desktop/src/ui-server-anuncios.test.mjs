@@ -7,6 +7,7 @@ import os from "node:os";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { startUiServer } from "./ui-server.mjs";
+import { puertoLibre } from "./puerto-libre.mjs";
 import { rutaDeAnuncio } from "./anuncios.mjs";
 
 const UI_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "pos-ui");
@@ -15,12 +16,12 @@ const ARCHIVO = `${ID}.jpg`;
 const BYTES = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 const LISTA = { segundos: 10, anuncios: [{ id: ID, url: `/__anuncios/${ARCHIVO}`, segundos: 10 }] };
 
-/** Servidor real en un puerto al azar, con una carpeta temporal que tiene un anuncio conocido. */
+/** Servidor real en un puerto libre, con una carpeta temporal que tiene un anuncio conocido. */
 async function conServidor(extra, fn) {
   const dir = mkdtempSync(path.join(os.tmpdir(), "anuncios-ui-"));
   writeFileSync(path.join(dir, ARCHIVO), BYTES);
   const pedidos = [];
-  const port = 55000 + Math.floor(Math.random() * 41);
+  const port = await puertoLibre();
   const opts = { archivoAnuncio: (n) => { pedidos.push(n); return rutaDeAnuncio(dir, n); }, ...extra };
   const server = await startUiServer(UI_DIR, port, 54350, "127.0.0.1", opts);
   try { await fn({ base: `http://127.0.0.1:${port}`, dir, pedidos }); }
@@ -110,7 +111,7 @@ test("no se sale de la carpeta", async () => {
 test("en modo cocina la lista no se sirve (cae al estático)", async () => {
   let llamadas = 0;
   const dir = mkdtempSync(path.join(os.tmpdir(), "anuncios-kds-"));
-  const port = 55000 + Math.floor(Math.random() * 41);
+  const port = await puertoLibre();
   const server = await startUiServer(UI_DIR, port, 54350, "127.0.0.1", { kds: true, hub: "http://192.168.1.50:54350", anuncios: async () => { llamadas++; return LISTA; }, archivoAnuncio: () => { llamadas++; return null; } });
   try {
     const r = await fetch(`http://127.0.0.1:${port}/__anuncios`);
@@ -131,7 +132,7 @@ test("una petición desde otra dirección de la red recibe 403 y no llega al gan
   const lan = Object.values(os.networkInterfaces()).flat().find((i) => i && (i.family === "IPv4" || i.family === 4) && !i.internal);
   if (!lan) return t.skip("esta máquina no tiene una IPv4 que no sea de loopback: no hay forma de simular a otra computadora");
   let llamadas = 0;
-  const port = 55100 + Math.floor(Math.random() * 41);
+  const port = await puertoLibre("0.0.0.0");
   const server = await startUiServer(UI_DIR, port, 54350, "0.0.0.0", { anuncios: async () => { llamadas++; return LISTA; }, archivoAnuncio: () => { llamadas++; return null; } });
   try {
     for (const ruta of ["/__anuncios", `/__anuncios/${ARCHIVO}`]) {

@@ -16,6 +16,8 @@ export type PagoInput = {
   monto: number;
   montoRecibido?: number; // solo efectivo
   referencia?: string;
+  /** Número de autorización del banco, cuando el cobro pasó por la terminal integrada. */
+  terminalAprobacion?: string;
 };
 
 export type TotalesTicket = {
@@ -35,6 +37,8 @@ export type TotalesTicket = {
   pendiente: number;
   estadoFiscal: string;
   folio: string | null;
+  /** La propina ya fijada en el ticket (va aparte: `total` y `pendiente` no la incluyen). */
+  propina?: number;
 };
 
 type CtxCobro = {
@@ -187,7 +191,7 @@ export async function persistirTicket(
 export async function leerTotales(token: string, ticketId: string): Promise<TotalesTicket> {
   const { data, error } = await employeeClient(token)
     .from("tickets")
-    .select("id, subtotal_mxn, iva_mxn, descuentos_manuales_mxn, promociones_mxn, lealtad_mxn, total_mxn, monto_pagado_mxn, cambio_mxn, monto_pendiente_mxn, estado_fiscal, folio_completo")
+    .select("id, subtotal_mxn, iva_mxn, descuentos_manuales_mxn, promociones_mxn, lealtad_mxn, total_mxn, monto_pagado_mxn, cambio_mxn, monto_pendiente_mxn, estado_fiscal, folio_completo, propina_mxn")
     .eq("id", ticketId)
     .single();
   if (error) throw new Error(error.message);
@@ -195,7 +199,7 @@ export async function leerTotales(token: string, ticketId: string): Promise<Tota
     id: string; subtotal_mxn: string | number; iva_mxn: string | number;
     descuentos_manuales_mxn: string | number; promociones_mxn: string | number; lealtad_mxn: string | number; total_mxn: string | number;
     monto_pagado_mxn: string | number; cambio_mxn: string | number; monto_pendiente_mxn: string | number;
-    estado_fiscal: string; folio_completo: string | null;
+    estado_fiscal: string; folio_completo: string | null; propina_mxn: string | number | null;
   };
   return {
     ticketId: t.id,
@@ -210,6 +214,7 @@ export async function leerTotales(token: string, ticketId: string): Promise<Tota
     pendiente: Number(t.monto_pendiente_mxn),
     estadoFiscal: t.estado_fiscal,
     folio: t.folio_completo,
+    propina: Number(t.propina_mxn ?? 0),
   };
 }
 
@@ -287,6 +292,7 @@ export async function aplicarPago(
     p_monto_mxn: pago.monto,
     p_monto_recibido_mxn: pago.metodo === "EFECTIVO" ? (pago.montoRecibido ?? pago.monto) : null,
     p_referencia: pago.referencia ?? null,
+    p_terminal_aprobacion: pago.terminalAprobacion ?? null,
     p_client_id_local: pagoClientId,
   });
   if (error) throw new Error(error.message);

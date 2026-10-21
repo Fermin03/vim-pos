@@ -8,7 +8,9 @@
     "SUPABASE_ANON_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
     "PLATFORM_PROVISION_KEY",
-    "ADMIN_APP_URL"
+    "ADMIN_APP_URL",
+    "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
+    "VIM_TIENDA_SECRET"
   ],
   "tasks": {
     "dev": {
@@ -19,7 +21,6 @@
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
-    "lint": {},
     "typecheck": {
       "dependsOn": ["^build"]
     },

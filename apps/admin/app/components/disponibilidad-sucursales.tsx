@@ -32,7 +32,7 @@ export function DisponibilidadSucursales({
                 <td className="px-3 py-2 font-medium">
                   {f.nombre}
                   {f.agotadoAuto && (
-                    <span className="ml-2 rounded-full bg-[#FBF1EF] px-2 py-0.5 text-11 font-semibold text-danger">Agotado por inventario</span>
+                    <span className="ml-2 rounded-full bg-danger-soft px-2 py-0.5 text-11 font-semibold text-danger">Agotado por inventario</span>
                   )}
                 </td>
                 <td className="px-1 py-0">

@@ -259,3 +259,23 @@ describe("cargos", () => {
     expect(lineasParaComanda(lineas)).toEqual([]);
   });
 });
+
+describe("construirComandaJob — nota del pedido (tienda en línea)", () => {
+  const nota = "Efectivo, paga con $500.00 · Sin cebolla";
+  it("la imprime completa, después de los productos", () => {
+    const job = construirComandaJob({ ...D, notaPedido: nota });
+    const i = job.bloques.findIndex((b) => b.t === "texto" && b.valor.startsWith("Nota del pedido"));
+    expect(job.bloques[i]).toEqual({ t: "texto", valor: "Nota del pedido: Efectivo, paga con $500.00 - Sin cebolla", size: 1, bold: true });
+    expect(i).toBeGreaterThan(job.bloques.findIndex((b) => b.t === "texto" && b.valor === "2x Papas Gajo"));
+  });
+  it("sin nota, la comanda sale idéntica", () => {
+    const sin = construirComandaJob(D);
+    expect(construirComandaJob({ ...D, notaPedido: null })).toEqual(sin);
+    expect(construirComandaJob({ ...D, notaPedido: "  " })).toEqual(sin);
+    expect(sin.bloques.some((b) => b.t === "texto" && b.valor.startsWith("Nota del pedido"))).toBe(false);
+  });
+  it("una comanda de cancelación no la lleva: ahí solo cabe NO PREPARAR", () => {
+    const job = construirComandaJob({ ...D, esCancelacion: true, notaPedido: nota });
+    expect(job.bloques.some((b) => b.t === "texto" && b.valor.startsWith("Nota del pedido"))).toBe(false);
+  });
+});

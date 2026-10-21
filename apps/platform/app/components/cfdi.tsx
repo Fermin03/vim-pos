@@ -1,8 +1,9 @@
 "use client";
 import { StatusChip, type TonoEstado } from "@vim/ui/styles";
 import { useCallback, useEffect, useState } from "react";
-import type { Api } from "../lib/tipos";
+import type { Api, Paquete } from "../lib/tipos";
 import { hace } from "../lib/tipos";
+import { fechaCorta, fmtInt, fmtMxn } from "../lib/formato";
 
 /**
  * Cartera de facturación electrónica: quién tiene el add-on CFDI y cuántos folios le quedan.
@@ -38,20 +39,7 @@ type Cliente = {
   ultimaRecarga: Recarga | null;
   sinFilaDeSaldo: boolean;
 };
-type Paquete = { id: string; codigo: string; nombre: string; cantidad_folios: number; precio_mxn: number };
 type Totales = { clientes: number; agotados: number; pocos: number; foliosDisponibles: number; mrr: number };
-
-const fmtMxn = (v: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(v || 0);
-const fmtInt = (v: number) => new Intl.NumberFormat("es-MX").format(v || 0);
-
-/** Fecha corta y legible. Las de contrato son `date` (sin hora), así que se parte el ISO en vez de
- *  pasarlo por `new Date`, que interpretaría "2026-08-26" como UTC y en México restaría un día. */
-function fechaCorta(iso: string | null): string {
-  if (!iso) return "—";
-  const [a, m, d] = iso.slice(0, 10).split("-");
-  if (!a || !m || !d) return "—";
-  return `${d}/${m}/${a}`;
-}
 
 const NIVEL: Record<Cliente["nivel"], { tono: TonoEstado; texto: string }> = {
   agotado: { tono: "danger", texto: "Sin folios" },

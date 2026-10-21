@@ -2,9 +2,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@vim/ui/styles";
+import { Button, Icono } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
-import { CatalogoTabs } from "../../../components/catalogo-tabs";
 import { FranjaMenus, useMenuCatalogo } from "../../../components/selector-menu";
 import { CasillaMenu } from "../../../components/casilla-menu";
 import { activarComboUpsell, leerComboUpsellActivo, listarCombos, type ComboResumen } from "../../../lib/combos";
@@ -27,7 +26,7 @@ import {
 const ESTADO: Record<string, { txt: string; cls: string; dot: string }> = {
   ACTIVO: { txt: "Activo", cls: "bg-success-soft text-success", dot: "bg-success" },
   PAUSADO: { txt: "Pausado", cls: "bg-hover text-ink-3", dot: "bg-ink-3" },
-  AGOTADO: { txt: "Agotado", cls: "bg-[#FBF1EF] text-danger", dot: "bg-danger" },
+  AGOTADO: { txt: "Agotado", cls: "bg-danger-soft text-danger", dot: "bg-danger" },
   NO_SE_VENDE: { txt: "No se vende aquí", cls: "bg-hover text-ink-2", dot: "bg-ink-3" },
 };
 const SIN_FILAS: Map<string, FilaDeMenu> = new Map();
@@ -218,15 +217,12 @@ export default function CombosPage() {
         migas={[{ label: "Catálogo" }, { label: "Combos" }]}
         right={
           <Button onClick={() => router.push(hrefConMenu("/catalogo/combos/nuevo", menuHref))}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-[17px] w-[17px]">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
+            <Icono nombre="mas" className="h-[17px] w-[17px]" />
             Nuevo combo
           </Button>
         }
       />
       <FranjaMenus menu={menu} />
-      <CatalogoTabs />
       <PageBody>
         {okMsg && <p className="mb-3 text-sm font-medium text-success">{okMsg}</p>}
         {error && (

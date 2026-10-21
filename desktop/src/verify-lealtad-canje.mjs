@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { startBackend } from "./backend.mjs";
+import { abrirTurno, entrarComoCajero, exigir, j } from "./verify-sesion.mjs";
 
 const GW_PORT = 54372;
 const NUBE_PORT = 54373;
@@ -19,8 +20,6 @@ const DEVICE_PASS = "vim-device-dev";
 const CAJA = "99999999-0000-0000-0000-0000000000cc";
 const TELEFONO = "4775550199";
 
-const j = async (r) => ({ status: r.status, body: await r.json().catch(() => ({})) });
-const exigir = (cond, msg) => { if (!cond) throw new Error(msg); };
 const dir = mkdtempSync(path.join(tmpdir(), "vim-verify-lc-"));
 let backend, nube;
 
@@ -66,28 +65,8 @@ try {
   const q = async (sql, p) => (await backend.pool.query(sql, p)).rows;
 
   // Sesiones: la de la caja (dispositivo) y la de un cajero (PIN), como hace el POS.
-  const dev = await j(await fetch(`${GW}/auth/v1/token?grant_type=password`, {
-    method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: DEVICE_EMAIL, password: DEVICE_PASS }),
-  }));
-  exigir(dev.body.access_token, `device sign-in falló: ${JSON.stringify(dev.body)}`);
-  const tenant = dev.body.user.app_metadata.tenant_id;
-  const accesos = await j(await fetch(`${GW}/rest/v1/usuarios_acceso?select=usuario_id,rol:roles(codigo)&activo=eq.true`, {
-    headers: { Authorization: `Bearer ${dev.body.access_token}`, apikey: "anon" },
-  }));
-  const cajero = accesos.body.find((a) => a.rol?.codigo === "CAJERO");
-  exigir(cajero, "no hay CAJERO en el seed");
-  const emp = await j(await fetch(`${GW}/functions/v1/pin-login`, {
-    method: "POST", headers: { "content-type": "application/json", Authorization: `Bearer ${dev.body.access_token}` },
-    body: JSON.stringify({ usuario_id: cajero.usuario_id, pin: "1234", caja_id: CAJA }),
-  }));
-  exigir(emp.body.access_token, `pin-login falló: ${emp.status} ${JSON.stringify(emp.body)}`);
-  const hdr = { "content-type": "application/json", Authorization: `Bearer ${emp.body.access_token}`, apikey: "anon" };
-  const rpc = async (fn, args) => {
-    const r = await j(await fetch(`${GW}/rest/v1/rpc/${fn}`, { method: "POST", headers: hdr, body: JSON.stringify(args) }));
-    exigir(r.status < 300, `${fn} → ${r.status} ${JSON.stringify(r.body)}`);
-    return r.body;
-  };
+  const s = await entrarComoCajero(GW, { email: DEVICE_EMAIL, password: DEVICE_PASS, caja: CAJA });
+  const { hdr, rpc, tenant } = s;
   const lealtad = async (cuerpo, cabeceras = hdr) =>
     j(await fetch(`${GW}/functions/v1/lealtad-canje`, { method: "POST", headers: cabeceras, body: JSON.stringify(cuerpo) }));
 
@@ -96,22 +75,14 @@ try {
   const cliente = (await q("INSERT INTO clientes (tenant_id, nombre, telefono) VALUES ($1, 'Clienta Verify', $2) RETURNING id", [tenant, TELEFONO]))[0].id;
   estado.clienteId = cliente;
   await q("SELECT lealtad_registrar_movimiento(NULL, $1, $2, 'GANADO', 100, 1)", [tenant, cliente]);
-  // Turno: lo abre la apertura de caja del POS; aquí por conexión directa, como verify-ticket-impreso.
-  const c = await backend.pool.connect();
-  await c.query("BEGIN");
-  await c.query("SELECT set_config('request.jwt.claims',$1,true)", [JSON.stringify({ sub: cajero.usuario_id, tenant_id: tenant, role: "authenticated" })]);
-  const suc = (await c.query("SELECT sucursal_id FROM cajas WHERE id=$1", [CAJA])).rows[0].sucursal_id;
-  await c.query("UPDATE turnos SET estado='CERRADO', fecha_cierre=now() WHERE caja_id=$1 AND estado='ABIERTO'", [CAJA]);
-  const turno = (await c.query(
-    `INSERT INTO turnos(tenant_id,sucursal_id,caja_id,codigo_turno,dia_contable,usuario_apertura_id,fondo_inicial_mxn,fondo_modo)
-     VALUES($1,$2,$3,'VERIFY-LC',CURRENT_DATE,$4,500,'TOTAL') RETURNING id`, [tenant, suc, CAJA, cajero.usuario_id])).rows[0].id;
-  await c.query("COMMIT"); c.release();
+  // Turno: lo abre la apertura de caja del POS; aquí por conexión directa.
+  const { suc, turno } = await abrirTurno(backend.pool, s, "VERIFY-LC");
 
   // Una cuenta de esa clienta con un producto que cueste más que el canje.
   const prod = (await q("SELECT id FROM productos WHERE tenant_id = $1 AND precio_base_mxn >= 50 AND NOT es_combo AND deleted_at IS NULL ORDER BY precio_base_mxn LIMIT 1", [tenant]))[0];
   exigir(prod, "el seed no trae un producto de $50 o más");
   const abrir = async (clave) => {
-    const id = await rpc("abrir_ticket", { p_sucursal_id: suc, p_caja_id: CAJA, p_turno_id: turno, p_modo_servicio: "PARA_LLEVAR", p_cliente_id: cliente, p_marca_virtual_id: null, p_client_id_local: clave, p_usuario_id: cajero.usuario_id });
+    const id = await rpc("abrir_ticket", { p_sucursal_id: suc, p_caja_id: CAJA, p_turno_id: turno, p_modo_servicio: "PARA_LLEVAR", p_cliente_id: cliente, p_marca_virtual_id: null, p_client_id_local: clave, p_usuario_id: s.cajeroId });
     await rpc("agregar_item_a_ticket", { p_ticket_id: id, p_producto_id: prod.id, p_cantidad: 1, p_nota_cocina: null, p_modificadores: [], p_client_id_local: `${clave}-item` });
     return id;
   };
@@ -120,7 +91,7 @@ try {
   console.log(`· cuenta abierta por $${totalAntes} a nombre de la clienta`);
 
   // 1) La cuenta de la CAJA (antes del PIN) no canjea: solo un empleado.
-  const sinEmpleado = await lealtad({ accion: "saldo", telefono: TELEFONO }, { ...hdr, Authorization: `Bearer ${dev.body.access_token}` });
+  const sinEmpleado = await lealtad({ accion: "saldo", telefono: TELEFONO }, { ...hdr, Authorization: `Bearer ${s.deviceToken}` });
   exigir(sinEmpleado.status === 403 && sinEmpleado.body.error === "SOLO_EMPLEADO", `la sesión de la caja debía dar 403 SOLO_EMPLEADO y dio ${sinEmpleado.status} ${JSON.stringify(sinEmpleado.body)}`);
   exigir(estado.llamadas.length === 0, "la sesión de la caja no debía llegar a la nube");
 
@@ -130,7 +101,7 @@ try {
   exigir(c1.status === 200 && c1.body.ok === true, `canjear → ${c1.status} ${JSON.stringify(c1.body)}`);
   const visto = estado.llamadas.at(-1);
   exigir(visto.auth === "Bearer token-del-dispositivo", "a la nube debe ir el token del dispositivo, no el del empleado");
-  exigir(visto.cuerpo.usuario_id === cajero.usuario_id, "el empleado sale de la sesión local, no del navegador");
+  exigir(visto.cuerpo.usuario_id === s.cajeroId, "el empleado sale de la sesión local, no del navegador");
   exigir(!("tenant_id" in visto.cuerpo), "el negocio no viaja desde el navegador");
   exigir((await q("SELECT count(*)::int AS n FROM ticket_canjes_lealtad WHERE ticket_id = $1", [ticket]))[0].n === 0, "canjear NO toca la base local");
   console.log("· canjear: reenviado con la identidad correcta, sin tocar la caja");
@@ -139,7 +110,7 @@ try {
   const a1 = await lealtad({ accion: "asentar", canje_id: canje, ticket_id: ticket });
   exigir(a1.status === 200 && a1.body.ok === true, `asentar → ${a1.status} ${JSON.stringify(a1.body)}`);
   const fila = (await q("SELECT cliente_id, puntos, monto_descontado_mxn, created_by, revertido FROM ticket_canjes_lealtad WHERE id = $1", [canje]))[0];
-  exigir(fila && fila.cliente_id === cliente && fila.puntos === 40 && Number(fila.monto_descontado_mxn) === 40 && fila.created_by === cajero.usuario_id && fila.revertido === false,
+  exigir(fila && fila.cliente_id === cliente && fila.puntos === 40 && Number(fila.monto_descontado_mxn) === 40 && fila.created_by === s.cajeroId && fila.revertido === false,
     `el canje asentado no es el esperado: ${JSON.stringify(fila)}`);
   const t = (await q("SELECT total_mxn, lealtad_mxn FROM tickets WHERE id = $1", [ticket]))[0];
   exigir(Number(t.lealtad_mxn) === 40, `la cuenta debía llevar $40 de lealtad y lleva ${t.lealtad_mxn}`);

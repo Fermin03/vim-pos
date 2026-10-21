@@ -41,6 +41,7 @@ export function registrarNegocio(d: {
   codigo: string;
   nombre_comercial: string;
   vertical: string;
+  varias_sucursales: boolean;
   nombre_owner: string;
   telefono_owner: string;
   email_owner: string;

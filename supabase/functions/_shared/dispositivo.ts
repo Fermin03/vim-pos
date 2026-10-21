@@ -9,7 +9,10 @@
 // `supabase/scripts/migrar-dominio-dispositivos.mjs`. Mientras tanto se aceptan los dos:
 // dejar de reconocer el viejo antes de mover las cuentas dejaría a las cajas sin entrar.
 //
-// Módulo puro (se prueba con `node --test`); lo usan pin-login, el latido y provisionar-dispositivo.
+// Módulo puro salvo por el cliente que recibe `cajaEnRegla` (se prueba con `node --test`); lo usan
+// pin-login, el latido, la sincronización y provisionar-dispositivo.
+
+import type { SupabaseClient } from "jsr:@supabase/supabase-js@2";
 
 export const DOMINIO_DISPOSITIVOS = "dispositivos.vimpos.com.mx";
 export const DOMINIO_DISPOSITIVOS_VIEJO = "dispositivos.vimpos.mx";
@@ -30,4 +33,20 @@ export function cajaIdDeEmail(email: string | null | undefined): string | null {
 /** ¿Este correo es de una cuenta de caja con el dominio viejo? */
 export function esDominioViejo(email: string | null | undefined): boolean {
   return cajaIdDeEmail(email) !== null && String(email).toLowerCase().endsWith("@" + DOMINIO_DISPOSITIVOS_VIEJO);
+}
+
+/**
+ * La caja tiene que existir, ser de este tenant y estar activa.
+ *
+ * Esto ANTES NO SE COMPROBABA: con getUser bastaba que el usuario del dispositivo siguiera vivo
+ * en auth, así que una caja desactivada seguía subiendo ventas y bajando el catálogo, y la única
+ * forma de pararla era borrarle el usuario a mano. Ahora `activa = false` corta en el acto — que
+ * además es lo correcto para el límite del plan: desactivar una caja libera su lugar (0103), y
+ * sin este candado se podían operar dos con un plan de una.
+ */
+export async function cajaEnRegla(admin: SupabaseClient, cajaId: string, tenantId: string): Promise<boolean> {
+  const { data } = await admin.from("cajas").select("id")
+    .eq("id", cajaId).eq("tenant_id", tenantId).eq("activa", true).is("deleted_at", null)
+    .maybeSingle();
+  return Boolean(data);
 }

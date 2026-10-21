@@ -11,11 +11,11 @@ Monorepo (pnpm + Turborepo). La **especificación completa** vive en
 ```
 vim-pos/
 ├─ apps/
-│  ├─ pos/         # POS operativo — offline-first, Dexie, tablet Android (→ Capacitor Fase 3)
+│  ├─ pos/         # POS operativo — offline-first, Dexie, tablet Android
 │  ├─ admin/       # Admin del tenant — online, Server Components
 │  └─ platform/    # Panel super-admin de VIM — service_role (Fase 2)
 ├─ packages/
-│  ├─ db/          # tipos generados de Supabase, factories de cliente, Zod
+│  ├─ db/          # tipos generados de Supabase, reglas compartidas, Zod
 │  ├─ ui/          # design system (tokens + componentes) extraído de los mockups
 │  └─ config/      # tsconfig base, preset Tailwind (tokens), ESLint
 └─ supabase/

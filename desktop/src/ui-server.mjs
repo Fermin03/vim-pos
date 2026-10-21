@@ -157,10 +157,17 @@ async function leerCuerpo(req, max = TOPE_CUERPO_UI) {
   return body;
 }
 
-function responder413(res) {
-  res.writeHead(413, { "Content-Type": "application/json", Connection: "close" });
-  return res.end(JSON.stringify({ ok: false, error: "Cuerpo demasiado grande." }));
+const JSON_TIPO = { "Content-Type": "application/json" };
+const SIN_CACHE = { ...JSON_TIPO, "Cache-Control": "no-store" };
+
+/** Contesta JSON. El cuerpo se serializa ANTES de mandar cabeceras: si no se puede, todavía cabe otra respuesta. */
+function json(res, status, cuerpo, cabeceras = JSON_TIPO) {
+  const texto = JSON.stringify(cuerpo);
+  res.writeHead(status, cabeceras);
+  return res.end(texto);
 }
+
+const responder413 = (res) => json(res, 413, { ok: false, error: "Cuerpo demasiado grande." }, { ...JSON_TIPO, Connection: "close" });
 
 // Freno del botón "Actualizar menú". Diez segundos: suficiente para que un doble clic o un
 // cliente impaciente no encadenen descargas del catálogo entero, y corto de más para que nadie
@@ -189,8 +196,7 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
       // la cocina cargan la interfaz desde este mismo servidor y no tienen preload.
       // Solo lectura y sin datos sensibles: nombres de fechas, nada del negocio.
       if (!kds && req.method === "GET" && req.url.startsWith("/__estado-sync")) {
-        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-        return res.end(JSON.stringify(opts.estadoSync ? opts.estadoSync() : { disponible: false }));
+        return json(res, 200, opts.estadoSync ? opts.estadoSync() : { disponible: false }, SIN_CACHE);
       }
 
       // CAJA: lo que la nube dice que este negocio puede hacer (ADR 0014). Va por HTTP y no por
@@ -198,8 +204,7 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
       // interfaz desde este servidor y no tienen preload. Solo lo que el cajero ya vería en
       // pantalla; nada del negocio.
       if (!kds && req.method === "GET" && req.url.startsWith("/__directivas")) {
-        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-        return res.end(JSON.stringify(opts.directivas ? opts.directivas() : { disponible: false }));
+        return json(res, 200, opts.directivas ? opts.directivas() : { disponible: false }, SIN_CACHE);
       }
 
       // CAJA: el cajero cerró un aviso de VIM. Se anota localmente y viaja en el siguiente
@@ -211,14 +216,8 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
         // caja y la cocina, sin esto cualquiera en el WiFi del restaurante podía leer los ids en
         // /__directivas y marcarlos como vistos, dejando al cajero sin ver un aviso de
         // suspensión y mintiéndole al panel sobre quién lo leyó.
-        if (!LOCALES.has(req.socket.remoteAddress ?? "")) {
-          res.writeHead(403, { "Content-Type": "application/json" });
-          return res.end(JSON.stringify({ ok: false, error: "Solo desde la caja." }));
-        }
-        if (!mismaProcedencia(req, port)) {
-          res.writeHead(403, { "Content-Type": "application/json" });
-          return res.end(JSON.stringify({ ok: false, error: "Origen no permitido." }));
-        }
+        if (!LOCALES.has(req.socket.remoteAddress ?? "")) return json(res, 403, { ok: false, error: "Solo desde la caja." });
+        if (!mismaProcedencia(req, port)) return json(res, 403, { ok: false, error: "Origen no permitido." });
         const body = await leerCuerpo(req);
         if (body === null) return responder413(res);
         let id = null;
@@ -226,8 +225,7 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
         opts.avisoVisto?.(id);
         // Siempre 200: que no se pueda anotar el acuse no debe dejar al cajero con el aviso
         // abierto. Lo peor que pasa es que lo vuelva a ver en el siguiente turno.
-        res.writeHead(200, { "Content-Type": "application/json" });
-        return res.end(JSON.stringify({ ok: true }));
+        return json(res, 200, { ok: true });
       }
 
       // CAJA: folios de facturación que le quedan al negocio.
@@ -239,12 +237,11 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
       // Va por aquí y no desde la página porque el token de nube del dispositivo vive en el main.
       // Solo lectura y solo dos números; nada que no vea ya el propio negocio.
       if (!kds && req.method === "GET" && req.url.startsWith("/__folios")) {
-        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
         try {
           const r = await opts.onFolios?.();
-          return res.end(JSON.stringify(r ?? { ok: false, aplica: false }));
+          return json(res, 200, r ?? { ok: false, aplica: false }, SIN_CACHE);
         } catch (e) {
-          return res.end(JSON.stringify({ ok: false, error: e?.message ?? "No se pudo consultar" }));
+          return json(res, 200, { ok: false, error: e?.message ?? "No se pudo consultar" }, SIN_CACHE);
         }
       }
 
@@ -260,65 +257,47 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
       // el botón —o un script en el WiFi del local— pondría a la caja a bajar el catálogo entero en
       // bucle contra la nube.
       if (!kds && req.method === "POST" && req.url.startsWith("/__sincronizar-catalogo")) {
-        if (!mismaProcedencia(req, port, { exigirJson: false })) {
-          res.writeHead(403, { "Content-Type": "application/json" });
-          return res.end(JSON.stringify({ ok: false, error: "Origen no permitido." }));
-        }
+        if (!mismaProcedencia(req, port, { exigirJson: false })) return json(res, 403, { ok: false, error: "Origen no permitido." });
         const ahora = ahoraMs();
-        if (ahora - ultimoCatalogoManual < ESPERA_CATALOGO_MANUAL_MS) {
-          res.writeHead(429, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-          return res.end(JSON.stringify({ ok: false, error: "El menú se acaba de actualizar." }));
-        }
+        if (ahora - ultimoCatalogoManual < ESPERA_CATALOGO_MANUAL_MS) return json(res, 429, { ok: false, error: "El menú se acaba de actualizar." }, SIN_CACHE);
         ultimoCatalogoManual = ahora;
-        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
         try {
           const ok = (await opts.onSincronizarCatalogo?.()) === true;
-          return res.end(JSON.stringify(ok
+          return json(res, 200, ok
             ? { ok: true }
-            : { ok: false, error: "No se pudo contactar a la nube." }));
+            : { ok: false, error: "No se pudo contactar a la nube." }, SIN_CACHE);
         } catch (e) {
-          return res.end(JSON.stringify({ ok: false, error: e?.message ?? "No se pudo actualizar" }));
+          return json(res, 200, { ok: false, error: e?.message ?? "No se pudo actualizar" }, SIN_CACHE);
         }
       }
 
       // COCINA: recibir la IP del hub desde la pantalla de setup.
       if (kds && req.method === "POST" && req.url.startsWith("/__set-hub")) {
-        if (!mismaProcedencia(req, port)) {
-          res.writeHead(403, { "Content-Type": "application/json" });
-          return res.end(JSON.stringify({ ok: false, error: "Origen no permitido." }));
-        }
+        if (!mismaProcedencia(req, port)) return json(res, 403, { ok: false, error: "Origen no permitido." });
         const body = await leerCuerpo(req);
         if (body === null) return responder413(res);
         let url = null;
         try { url = normalizarHub(JSON.parse(body || "{}").ip, gatewayPort); } catch { /* */ }
-        if (!url) { res.writeHead(400, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ ok: false, error: "Dirección inválida." })); }
+        if (!url) return json(res, 400, { ok: false, error: "Dirección inválida." });
         // Verificar que la caja responde antes de guardar.
         const ok = await fetch(`${url}/health`, { signal: AbortSignal.timeout(4000) }).then((r) => r.ok).catch(() => false);
-        if (!ok) { res.writeHead(200, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ ok: false, error: "La caja no responde en esa dirección. Revisa la IP y que VIM POS esté abierto en la caja." })); }
+        if (!ok) return json(res, 200, { ok: false, error: "La caja no responde en esa dirección. Revisa la IP y que VIM POS esté abierto en la caja." });
         hub = url;
         try { opts.onSetHub?.(url); } catch { /* */ }
-        res.writeHead(200, { "Content-Type": "application/json" });
-        return res.end(JSON.stringify({ ok: true }));
+        return json(res, 200, { ok: true });
       }
 
       // CAJA: el menú del POS pide un chequeo de actualización. Solo desde la propia caja: el
       // servidor escucha en la LAN y esto abre diálogos modales sobre la pantalla de cobro.
       if (!kds && req.method === "POST" && req.url.startsWith("/__actualizar")) {
-        if (!LOCALES.has(req.socket.remoteAddress ?? "")) {
-          res.writeHead(403, { "Content-Type": "application/json" });
-          return res.end(JSON.stringify({ ok: false, error: "Solo desde la caja." }));
-        }
+        if (!LOCALES.has(req.socket.remoteAddress ?? "")) return json(res, 403, { ok: false, error: "Solo desde la caja." });
         // Sin cuerpo: el cliente no manda Content-Type, así que aquí no se exige (SEC CN-020).
-        if (!mismaProcedencia(req, port, { exigirJson: false })) {
-          res.writeHead(403, { "Content-Type": "application/json" });
-          return res.end(JSON.stringify({ ok: false, error: "Origen no permitido." }));
-        }
-        res.writeHead(200, { "Content-Type": "application/json" });
+        if (!mismaProcedencia(req, port, { exigirJson: false })) return json(res, 403, { ok: false, error: "Origen no permitido." });
         try {
           const r = await opts.onActualizar?.();
-          return res.end(JSON.stringify({ ok: true, ...(r ?? { estado: "no-disponible" }) }));
+          return json(res, 200, { ok: true, ...(r ?? { estado: "no-disponible" }) });
         } catch (e) {
-          return res.end(JSON.stringify({ ok: false, error: e?.message ?? "No se pudo revisar" }));
+          return json(res, 200, { ok: false, error: e?.message ?? "No se pudo revisar" });
         }
       }
 
@@ -326,58 +305,37 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
       // lectura incluida: la lista de monitores es de ESTA computadora y a la segunda caja de la
       // LAN no le dice nada; y el POST mueve una ventana frente al cliente.
       if (!kds && req.url.startsWith("/__pantalla-cliente") && (req.method === "GET" || req.method === "POST")) {
-        if (!LOCALES.has(req.socket.remoteAddress ?? "")) {
-          res.writeHead(403, { "Content-Type": "application/json" });
-          return res.end(JSON.stringify({ ok: false, error: "Solo desde la caja." }));
-        }
-        if (req.method === "GET") {
-          res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-          return res.end(JSON.stringify(opts.pantallaCliente ? opts.pantallaCliente() : { disponible: false }));
-        }
-        if (!mismaProcedencia(req, port)) {
-          res.writeHead(403, { "Content-Type": "application/json" });
-          return res.end(JSON.stringify({ ok: false, error: "Origen no permitido." }));
-        }
+        if (!LOCALES.has(req.socket.remoteAddress ?? "")) return json(res, 403, { ok: false, error: "Solo desde la caja." });
+        if (req.method === "GET") return json(res, 200, opts.pantallaCliente ? opts.pantallaCliente() : { disponible: false }, SIN_CACHE);
+        if (!mismaProcedencia(req, port)) return json(res, 403, { ok: false, error: "Origen no permitido." });
         const body = await leerCuerpo(req);
         if (body === null) return responder413(res);
         let cambio;
         try { cambio = JSON.parse(body || "{}"); } catch {
-          res.writeHead(400, { "Content-Type": "application/json" });
-          return res.end(JSON.stringify({ ok: false, error: "Cuerpo inválido." }));
+          return json(res, 400, { ok: false, error: "Cuerpo inválido." });
         }
-        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
         try {
           const estado = opts.onPantallaCliente?.(cambio);
-          return res.end(JSON.stringify(estado ? { ok: true, ...estado } : { ok: false, disponible: false }));
+          return json(res, 200, estado ? { ok: true, ...estado } : { ok: false, disponible: false }, SIN_CACHE);
         } catch (e) {
-          return res.end(JSON.stringify({ ok: false, error: e?.message ?? "No se pudo guardar" }));
+          return json(res, 200, { ok: false, error: e?.message ?? "No se pudo guardar" }, SIN_CACHE);
         }
       }
 
       // CAJA: anuncios de la pantalla del cliente. La lista y las imágenes que la caja ya bajó a
       // disco. Solo desde la propia caja: quien las pide es la ventana del segundo monitor.
       if (!kds && req.method === "GET" && req.url.startsWith("/__anuncios")) {
-        if (!LOCALES.has(req.socket.remoteAddress ?? "")) {
-          res.writeHead(403, { "Content-Type": "application/json" });
-          return res.end(JSON.stringify({ ok: false, error: "Solo desde la caja." }));
-        }
+        if (!LOCALES.has(req.socket.remoteAddress ?? "")) return json(res, 403, { ok: false, error: "Solo desde la caja." });
         const ruta = new URL(req.url, "http://x").pathname;
         if (ruta === "/__anuncios" || ruta === "/__anuncios/") {
           // Sin gancho (un POS sin escritorio detrás) de verdad no hay anuncios: lista vacía.
-          if (!opts.anuncios) {
-            res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-            return res.end(JSON.stringify({ segundos: 8, anuncios: [] }));
-          }
+          if (!opts.anuncios) return json(res, 200, { segundos: 8, anuncios: [] }, SIN_CACHE);
           // Con gancho, null o una excepción es una lectura FALLIDA, no "no hay anuncios": un 503 hace
           // que la pantalla conserve la lista que ya tenía en vez de quitar el carrusel (ADR 0026).
           let lista = null;
           try { lista = await opts.anuncios(); } catch { /* se contesta 503 abajo */ }
-          if (!lista) {
-            res.writeHead(503, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-            return res.end(JSON.stringify({ ok: false, error: "No se pudo leer la lista de anuncios." }));
-          }
-          res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
-          return res.end(JSON.stringify(lista));
+          if (!lista) return json(res, 503, { ok: false, error: "No se pudo leer la lista de anuncios." }, SIN_CACHE);
+          return json(res, 200, lista, SIN_CACHE);
         }
         // El nombre lo valida quien conoce la carpeta (rutaDeAnuncio): aquí no se arma ninguna ruta.
         let nombre = "";
@@ -394,16 +352,12 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
       // CAJA: impresoras instaladas en Windows, para elegir una en vez de capturar una IP. Solo
       // desde la propia caja: la lista es de ESTA computadora y dice qué hay conectado en el local.
       if (!kds && req.method === "GET" && req.url.startsWith("/__impresoras")) {
-        if (!LOCALES.has(req.socket.remoteAddress ?? "")) {
-          res.writeHead(403, { "Content-Type": "application/json" });
-          return res.end(JSON.stringify({ ok: false, error: "Solo desde la caja." }));
-        }
-        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+        if (!LOCALES.has(req.socket.remoteAddress ?? "")) return json(res, 403, { ok: false, error: "Solo desde la caja." });
         try {
           const impresoras = await opts.onListarImpresoras?.();
-          return res.end(JSON.stringify(impresoras ? { ok: true, impresoras } : { ok: false, error: "No disponible." }));
+          return json(res, 200, impresoras ? { ok: true, impresoras } : { ok: false, error: "No disponible." }, SIN_CACHE);
         } catch (e) {
-          return res.end(JSON.stringify({ ok: false, error: e?.message ?? "No se pudo leer la lista." }));
+          return json(res, 200, { ok: false, error: e?.message ?? "No se pudo leer la lista." }, SIN_CACHE);
         }
       }
 
@@ -411,40 +365,32 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
       // main sí. La UI arma los bytes ESC/POS y los manda aquí; el main los escribe a la impresora
       // en ip:9100, o a la cola de Windows si el cuerpo trae `impresoraWindows`. Solo local.
       if (!kds && req.method === "POST" && req.url.startsWith("/__imprimir")) {
-        if (!LOCALES.has(req.socket.remoteAddress ?? "") || !mismaProcedencia(req, port)) {
-          res.writeHead(403, { "Content-Type": "application/json" });
-          return res.end(JSON.stringify({ ok: false, error: "Solo desde la caja." }));
-        }
+        if (!LOCALES.has(req.socket.remoteAddress ?? "") || !mismaProcedencia(req, port)) return json(res, 403, { ok: false, error: "Solo desde la caja." });
         const body = await leerCuerpo(req);
         if (body === null) return responder413(res);
         let p = {};
         try { p = JSON.parse(body || "{}"); } catch { /* */ }
-        res.writeHead(200, { "Content-Type": "application/json" });
         try {
           const r = await opts.onImprimir?.(p);
-          return res.end(JSON.stringify(r ?? { ok: false, motivo: "ERROR" }));
+          return json(res, 200, r ?? { ok: false, motivo: "ERROR" });
         } catch (e) {
-          return res.end(JSON.stringify({ ok: false, motivo: "ERROR", error: e?.message }));
+          return json(res, 200, { ok: false, motivo: "ERROR", error: e?.message });
         }
       }
 
       // CAJA: alta de la caja contra la nube (valida credenciales del dispositivo y baja el
       // tenant al Postgres local). Lo hace el main porque el navegador no puede escribir en la BD.
       if (!kds && req.method === "POST" && req.url.startsWith("/__vincular-nube")) {
-        if (!LOCALES.has(req.socket.remoteAddress ?? "") || !mismaProcedencia(req, port)) {
-          res.writeHead(403, { "Content-Type": "application/json" });
-          return res.end(JSON.stringify({ ok: false, error: "Solo desde la caja." }));
-        }
+        if (!LOCALES.has(req.socket.remoteAddress ?? "") || !mismaProcedencia(req, port)) return json(res, 403, { ok: false, error: "Solo desde la caja." });
         const body = await leerCuerpo(req);
         if (body === null) return responder413(res);
         let p = {};
         try { p = JSON.parse(body || "{}"); } catch { /* */ }
-        res.writeHead(200, { "Content-Type": "application/json" });
         try {
           const r = await opts.onVincularNube?.(p);
-          return res.end(JSON.stringify(r ?? { ok: false, error: "No disponible." }));
+          return json(res, 200, r ?? { ok: false, error: "No disponible." });
         } catch (e) {
-          return res.end(JSON.stringify({ ok: false, error: e?.message ?? "Falló el alta" }));
+          return json(res, 200, { ok: false, error: e?.message ?? "Falló el alta" });
         }
       }
 

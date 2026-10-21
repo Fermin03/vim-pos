@@ -1,16 +1,11 @@
 "use client";
 import { z } from "zod";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { borrarSuave, tenantId } from "./datos";
 
 // Tier1 — Inventario. Tablas insumos / insumo_stock_sucursal / movimientos_inventario (RLS *_tenant).
 // Las unidades_medida se siembran server-side (migración 0035). El stock por sucursal lo mantiene
 // el trigger del RPC aplicar_movimiento_inventario.
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
 
 async function usuarioActualId(): Promise<string | null> {
   const { data } = await supabase.auth.getUser();
@@ -120,10 +115,7 @@ export async function actualizarInsumo(id: string, input: InsumoInput): Promise<
   if (error) throw new Error(error.message);
 }
 
-export async function eliminarInsumo(id: string): Promise<void> {
-  const { error } = await supabase.from("insumos").update({ deleted_at: new Date().toISOString() }).eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarInsumo = (id: string): Promise<void> => borrarSuave("insumos", id);
 
 export type TipoMovimientoUI = "MERMA" | "AJUSTE_POSITIVO" | "AJUSTE_NEGATIVO";
 export const TIPOS_MOV: { v: TipoMovimientoUI; l: string }[] = [

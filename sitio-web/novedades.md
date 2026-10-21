@@ -6,6 +6,70 @@
 
 ## Octubre de 2026
 
+13 de octubre Caja · 0.10.2
+
+### El ticket dice con qué tarjeta se cobró
+
+#### Mejoras
+
+- Cuando cobras con tu terminal de Mercado Pago, el ticket imprime la terminación de la tarjeta y el número de autorización.
+- El comprobante de devolución dice a qué tarjeta regresó el dinero.
+
+13 de octubre Caja · 0.10.0
+
+### Devoluciones a la tarjeta, pago dividido con terminal y pedidos ya pagados
+
+#### Nuevo
+
+- **La devolución regresa el dinero a la tarjeta.** Si la cuenta se cobró en tu terminal de Mercado Pago desde la caja, al devolverla con **Mismo método** el dinero vuelve solo a la tarjeta del cliente. La encuentras en **Menú → Devoluciones**.
+- **Pago dividido con la terminal.** En **Pago dividido → Agregar pago** puedes elegir **Tarjeta**: esa parte se cobra en la terminal y el resto como tú decidas.
+- **Pedidos de la tienda en línea ya pagados.** Si el cliente pagó con tarjeta en tu tienda en línea, el pedido llega a la caja ya cobrado: al entregarlo tocas **Listo**.
+
+11 de octubre Caja · 0.9.0
+
+### Cobro con tarjeta desde la caja
+
+#### Nuevo
+
+- **La caja le manda el cobro a tu terminal de Mercado Pago.** Al cobrar eliges **Tarjeta**, el monto aparece solo en la terminal y, cuando el cliente paga, el pago queda registrado en la cuenta como débito o crédito. Ya no se teclea el monto dos veces.
+- La terminal se conecta una sola vez desde el panel de administración, en **Configuración → Terminal de tarjetas**, con tu cuenta de Mercado Pago. El dinero cae directo en tu cuenta.
+- Si se va el internet o la terminal falla, puedes seguir cobrando como antes: **La cobré en otra terminal**, en la misma pantalla de cobro.
+
+8 de octubre Caja · 0.7.0
+
+### El corte Z con arqueo de efectivo
+
+#### Nuevo
+
+- **El corte Z incluye el arqueo de efectivo:** lo esperado, lo que contaste y la diferencia. Lo ves al cerrar turno, en **Menú → Cerrar turno**.
+- Si repartes propinas, el corte dice cuánto le tocó a cada persona.
+
+#### Correcciones
+
+- A veces la caja no abría al primer intento y había que abrirla otra vez; ya abre sola.
+
+7 de octubre Caja · 0.6.0
+
+### Cuentas impresas, tecla Escape y apertura de turno
+
+#### Nuevo
+
+- **La cuenta impresa queda cerrada a cambios.** En Comedor, Pick-up y Domicilio, después de imprimir el ticket ya no se le agregan ni se le quitan productos. Para modificarla usa **Reabrir cuenta**, que pide el PIN de un supervisor.
+- La tecla **Escape** cierra o regresa en todas las pantallas de la caja. En el cobro te devuelve al paso anterior en vez de cerrarlo todo.
+
+#### Mejoras
+
+- Abrir turno es una ventana donde solo escribes el efectivo inicial.
+- El menú abre aunque no haya turno: puedes cambiar de cajero, tu PIN o las impresoras antes de empezar.
+- **Mis propinas** muestra las del turno en curso, también en ventas para llevar.
+- Retiro / Depósito ya no muestra cuánto efectivo hay en la caja.
+- «App externa» ya no aparece entre las formas de pago al cobrar.
+
+#### Correcciones
+
+- Después de tocar **Cobrar** o aplicar un descuento puedes seguir agregando productos a la venta.
+- **Cambiar mi PIN** y **Mis propinas** abren desde el menú a la primera.
+
 7 de octubre Caja · 0.5.0
 
 ### Programa de lealtad

@@ -86,7 +86,7 @@ export const MOTIVOS_DEV: { codigo: MotivoDevolucion; label: string }[] = [
 // pasivo sin registro: el cliente queda con saldo y el sistema no lo guarda).
 export const MEDIOS_DEV: { codigo: MedioDevolucion; label: string; nota?: string }[] = [
   { codigo: "EFECTIVO", label: "Efectivo" },
-  { codigo: "MISMO_METODO_PAGO", label: "Mismo método", nota: "Procesa el reembolso en la terminal de pago." },
+  { codigo: "MISMO_METODO_PAGO", label: "Mismo método", nota: "Si se cobró con la terminal desde la caja, el dinero regresa solo a la tarjeta. Si no, procesa el reembolso en la terminal de pago." },
 ];
 
 /**
@@ -131,8 +131,4 @@ export async function devolverVenta(
     p_usuario_id: args.autorizoId,
   });
   if (e2) throw new Error(e2.message);
-}
-
-export function labelMotivoDev(m: MotivoDevolucion): string {
-  return MOTIVOS_DEV.find((x) => x.codigo === m)?.label ?? m;
 }

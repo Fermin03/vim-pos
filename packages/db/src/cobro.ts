@@ -224,9 +224,6 @@ export function textoLimiteCajas(d: { base: number | null | undefined; adicional
 
 // ── Prueba gratis (0141) ───────────────────────────────────────────────────────────────────────
 
-/** Días de prueba desde el alta. El número lo pone la base (trigger de `tenants`); este es su eco. */
-export const DIAS_PRUEBA = 30;
-
 /** Días antes del fin de la prueba en que se empieza a avisar. */
 export const AVISO_PRUEBA_DIAS = 5;
 

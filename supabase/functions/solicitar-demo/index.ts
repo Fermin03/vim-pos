@@ -57,12 +57,11 @@
 //     responde, se deja pasar (fail-open): un lead vale más, y sin base el insert fallaría igual.
 //     El día que haya spam de verdad, la respuesta es un captcha o el WAF de delante.
 
-import { createClient } from "jsr:@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
+import { clienteAdmin, servir } from "../_shared/http.ts";
 import { consumirCupo, ipDeLaPeticion } from "../_shared/limite.ts";
 import { enviarCorreo, esc, soloAscii } from "../_shared/correo.ts";
 
-const GIROS = ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "CAFE_BAR", "DARK_KITCHEN", "ENTERPRISE"];
+const GIROS = ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "CAFE_BAR", "DARK_KITCHEN", "ENTERPRISE", "BAR", "CAFETERIA", "TAQUERIA"];
 
 const GIRO_ETIQUETA: Record<string, string> = {
   FOODTRUCK: "Food truck",
@@ -71,6 +70,9 @@ const GIRO_ETIQUETA: Record<string, string> = {
   CAFE_BAR: "Cafetería o bar",
   DARK_KITCHEN: "Cocina fantasma / solo reparto",
   ENTERPRISE: "Cadena",
+  BAR: "Bar",
+  CAFETERIA: "Cafetería",
+  TAQUERIA: "Taquería o cocina económica",
 };
 
 const MIN_SEGUNDOS_LLENADO = 3;
@@ -95,14 +97,7 @@ function entero(v: unknown): number | null {
   return Number.isInteger(n) ? n : null;
 }
 
-Deno.serve(async (req) => {
-  const cors = corsHeaders(req);
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
-
+servir(async (req, json) => {
   let b: Record<string, unknown>;
   try {
     b = await req.json();
@@ -120,9 +115,7 @@ Deno.serve(async (req) => {
   const segundos = abierto === null ? -1 : (Date.now() - abierto) / 1000;
   if (segundos < MIN_SEGUNDOS_LLENADO) return json({ ok: true });
 
-  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
-    auth: { persistSession: false },
-  });
+  const admin = clienteAdmin();
 
   // ── Límite por IP ─────────────────────────────────────────────────────────
   const ip = ipDeLaPeticion(req);

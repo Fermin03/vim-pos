@@ -64,34 +64,6 @@ export async function leerMesas(token: string, sucursalId: string): Promise<Mesa
   }));
 }
 
-/** Asigna una mesa a un ticket (mesa → OCUPADA vía trigger). RPC asignar_mesa_a_ticket. */
-export async function asignarMesa(token: string, ticketId: string, mesaId: string): Promise<void> {
-  const { error } = await employeeClient(token).rpc("asignar_mesa_a_ticket", {
-    p_ticket_id: ticketId,
-    p_mesa_id: mesaId,
-    p_es_principal: true,
-    p_client_id_local: null,
-  });
-  if (error) throw new Error(error.message);
-}
-
-/** Transfiere el ticket de su mesa actual a otra (la anterior se libera). */
-export async function transferirMesa(
-  token: string,
-  ticketId: string,
-  mesaNuevaId: string,
-  motivo: string,
-  autorizacionPinId?: string | null,
-): Promise<void> {
-  const { error } = await employeeClient(token).rpc("transferir_mesa", {
-    p_ticket_id: ticketId,
-    p_mesa_nueva_id: mesaNuevaId,
-    p_motivo: motivo,
-    p_autorizacion_pin_id: autorizacionPinId ?? null,
-  });
-  if (error) throw new Error(error.message);
-}
-
 const ESTADO_LABEL: Record<MesaEstado, string> = {
   LIBRE: "Libre",
   OCUPADA: "Ocupada",

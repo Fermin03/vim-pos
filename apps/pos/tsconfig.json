@@ -6,11 +6,6 @@
         "name": "next"
       }
     ],
-    "paths": {
-      "@/*": [
-        "./*"
-      ]
-    },
     "allowJs": true
   },
   "include": [

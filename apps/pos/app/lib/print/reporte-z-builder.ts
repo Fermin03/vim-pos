@@ -60,7 +60,7 @@ export type DatosReporteZ = {
   // ── Devoluciones ──
   devolucionesCantidad: number;
   devolucionesMonto: number;
-  // ── Propinas distribuidas (legado de P-226; queda para auditoría) ──
+  // ── Propinas repartidas: a quién le tocó cuánto (vacío si el turno no repartió) ──
   propinasDistribuidas: { nombre: string; monto: number }[];
   // ── Declaración de cajero (por método) + arqueo ──
   declaracionPorMetodo: { metodo: string; declarado: number }[];
@@ -96,6 +96,11 @@ function fmtFechaCompleta(iso: string): string {
   return `${String(f.getDate()).padStart(2, "0")}/${String(f.getMonth() + 1).padStart(2, "0")}/${f.getFullYear()} ${String(f.getHours()).padStart(2, "0")}:${String(f.getMinutes()).padStart(2, "0")}:${String(f.getSeconds()).padStart(2, "0")}`;
 }
 
+/** Importe con signo, para las diferencias del arqueo: "+$65.00", "-$20.00", "$0.00". */
+function conSigno(n: number): string {
+  return n === 0 ? pesos(0) : `${n > 0 ? "+" : "-"}${pesos(Math.abs(n))}`;
+}
+
 function tit(valor: string): Bloque {
   return { t: "texto", valor, align: "centro", bold: true, size: 1 };
 }
@@ -111,8 +116,7 @@ export function construirReporteZJob(d: DatosReporteZ): PrintJob {
   const totalFormasPagoPropina = round2(d.pagosPropinaPorMetodo.reduce((s, p) => s + p.total, 0));
   const subtotalSinIva = round2(d.ventaNeta - d.iva);
   const ventaConImp = d.ventaNeta;
-  const diff = d.diferenciaTotal;
-  const diffTxt = diff === 0 ? pesos(0) : `${diff > 0 ? "+" : "-"}${pesos(Math.abs(diff))}`;
+  const diffTxt = conSigno(d.diferenciaTotal);
 
   const b: Bloque[] = [];
 
@@ -155,6 +159,12 @@ export function construirReporteZJob(d: DatosReporteZ): PrintJob {
   // 5) FORMA DE PAGO PROPINA
   b.push(tit("FORMA DE PAGO PROPINA"));
   b.push({ t: "fila", izq: "TOTAL FORMAS PAGO PROPINA", der: pesos(totalFormasPagoPropina), bold: true });
+  // A quién se repartieron. Solo sale si el turno repartió algo: un título sin renglones hace
+  // pensar que faltó imprimir.
+  if (d.propinasDistribuidas.length > 0) {
+    b.push(tit("PROPINAS REPARTIDAS"));
+    for (const p of d.propinasDistribuidas) b.push({ t: "fila", izq: `${p.nombre}:`, der: pesos(p.monto) });
+  }
 
   b.push({ t: "separador", estilo: "solido" });
 
@@ -212,6 +222,14 @@ export function construirReporteZJob(d: DatosReporteZ): PrintJob {
   for (const p of d.declaracionPorMetodo) b.push({ t: "fila", izq: `${p.metodo}:`, der: pesos(p.declarado) });
   b.push({ t: "fila", izq: "TOTAL:", der: pesos(d.totalDeclarado), bold: true });
   b.push({ t: "fila", izq: "SOBRANTE(+) O FALTANTE(-):", der: diffTxt, bold: true });
+
+  // Arqueo del efectivo: lo que el sistema esperaba en el cajón contra lo que se contó. El
+  // conteo es ciego (0127), así que este papel es donde el cajero y el gerente ven el esperado.
+  b.push({ t: "separador", estilo: "punteado" });
+  b.push(tit("ARQUEO DE EFECTIVO"));
+  b.push({ t: "fila", izq: "ESPERADO:", der: pesos(d.efectivoEsperado) });
+  b.push({ t: "fila", izq: "DECLARADO:", der: pesos(d.efectivoDeclarado) });
+  b.push({ t: "fila", izq: "DIFERENCIA:", der: conSigno(d.diferenciaEfectivo), bold: true });
 
   b.push({ t: "separador", estilo: "solido" });
 

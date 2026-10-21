@@ -16,6 +16,12 @@ export function AvisoAutorizacion({ propia, texto }: { propia: boolean; texto?: 
   );
 }
 
+/** El motivo como se asienta en la autorización: lo escrito si es "Otro", si no su etiqueta. */
+export function etiquetaMotivo(opciones: ReadonlyArray<{ codigo: string; label: string }>, motivo: string, texto: string): string {
+  if (motivo === "OTRO") return texto.trim() || "Otro";
+  return opciones.find((m) => m.codigo === motivo)?.label ?? motivo;
+}
+
 const campo =
   "h-11 w-full rounded border border-line-strong px-3 text-14 outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 

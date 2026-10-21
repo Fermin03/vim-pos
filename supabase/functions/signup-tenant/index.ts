@@ -29,8 +29,7 @@
 // ficha en el aviso, por defecto https://platform.vimpos.com.mx), TURNSTILE_SECRET_KEY, TURNSTILE_HOSTNAMES (por defecto admin.vimpos.com.mx), CAPTCHA_OPCIONAL (solo local), VIM_SMTP_*,
 // VIM_AVISOS_A. La configuración de Auth que esto necesita está en docs/operacion/registro-publico.md.
 
-import { createClient } from "jsr:@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
+import { clienteAdmin, servir } from "../_shared/http.ts";
 import { consumirCupos, ipDeLaPeticion, type Cupo } from "../_shared/limite.ts";
 import { hostnamesPermitidos, verificarTurnstile } from "../_shared/turnstile.ts";
 import { enSegundoPlano, enviarCorreo } from "../_shared/correo.ts";
@@ -49,17 +48,8 @@ async function huella(s: string): Promise<string> {
   return Array.from(new Uint8Array(h).slice(0, 16), (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-Deno.serve(async (req) => {
-  const cors = corsHeaders(req);
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
-
-  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
-    auth: { persistSession: false },
-  });
+servir(async (req, json) => {
+  const admin = clienteAdmin();
 
   let b: Record<string, unknown>;
   try {

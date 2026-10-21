@@ -13,6 +13,12 @@ test("las acciones de pedido NO exigen el módulo: hay que poder despachar lo ya
   }
 });
 
+test("las de la tienda en línea propia (enlinea_*, estado) NO exigen el módulo de apps: tienen el suyo", () => {
+  for (const a of ["enlinea_estado", "enlinea_pausar", "enlinea_reanudar", "enlinea_presente", "estado"]) {
+    assert.equal(accionExigeModulo(a), false, a);
+  }
+});
+
 test("una acción ausente o desconocida no exige módulo: la valida quien la despacha", () => {
   assert.equal(accionExigeModulo(undefined), false);
   assert.equal(accionExigeModulo(""), false);

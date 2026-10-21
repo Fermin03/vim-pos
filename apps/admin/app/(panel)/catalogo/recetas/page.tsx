@@ -3,7 +3,6 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { PageBody, PageHeader, TablaScroll } from "../../../components/page-header";
-import { CatalogoTabs } from "../../../components/catalogo-tabs";
 import { FranjaMenus, useMenuCatalogo } from "../../../components/selector-menu";
 import { listarRecetasResumen, margen, type RecetaResumen } from "../../../lib/recetas";
 import { mensajeError } from "../../../lib/errores";
@@ -19,7 +18,7 @@ function estadoDe(r: RecetaResumen): Estado {
 }
 const BADGE: Record<Estado, { texto: string; clase: string }> = {
   CON: { texto: "Con receta", clase: "bg-success-soft text-success" },
-  PAUSADA: { texto: "Receta pausada", clase: "bg-[#FDF3E2] text-warning" },
+  PAUSADA: { texto: "Receta pausada", clase: "bg-warning-soft text-warning" },
   SIN: { texto: "Sin receta", clase: "bg-hover text-ink-3" },
 };
 
@@ -58,7 +57,6 @@ function Recetas() {
         migas={[{ label: "Catálogo" }, { label: "Recetas" }]}
       />
       <FranjaMenus menu={menu} nota={menu.esGeneral ? undefined : "Las recetas son las mismas en todos los menús. El margen se calcula con el precio del menú General."} />
-      <CatalogoTabs />
       <PageBody>
         {error && <p role="alert" className="mb-3 text-sm font-medium text-danger">{error}</p>}
         <div className="mb-4 flex flex-wrap items-center gap-3">

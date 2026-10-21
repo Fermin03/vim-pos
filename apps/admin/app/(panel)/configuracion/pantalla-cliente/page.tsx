@@ -18,13 +18,13 @@ import {
   type Anuncio,
 } from "../../../lib/anuncios-pantalla";
 import { mensajeError } from "../../../lib/errores";
+import { label } from "../../../components/campos";
 
 // 16 px en celular: con menos, iOS hace zoom al enfocar el campo (nucleo.md §2).
 // `cn` solo une clases, no resuelve conflictos: el ancho y el color del borde los pone quien la usa.
 const input =
   "h-11 rounded border bg-surface px-3 text-16 outline-none focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)] lg:text-14";
 const bordeCampo = "border-line-strong focus:border-ink";
-const label = "mb-1.5 block text-13 font-medium text-ink-2";
 const foco = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
 // Botón de renglón. 44 px: esta página se usa también desde el celular, con el dedo.
 const botonFila = cn(

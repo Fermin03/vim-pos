@@ -25,6 +25,9 @@ export type DatosComanda = {
    * lo levanta no sabe si le falta algo o si el resto salió en otra impresora.
    */
   area?: string | null;
+  /** Nota de un pedido de la tienda en línea (lo que escribió el cliente, con su forma de pago).
+   *  Nadie la tecleó en la caja: si no va en el papel, la cocina no la ve. */
+  notaPedido?: string | null;
   /** true si el pedido ya estaba en cocina y esto es un agregado posterior. */
   esAgregado?: boolean;
   /**
@@ -89,6 +92,12 @@ export function construirComandaJob(d: DatosComanda): PrintJob {
     if (l.notaCocina && l.notaCocina.trim().length > 0) {
       b.push({ t: "texto", valor: `  > ${l.notaCocina.trim()}`, size: 1, bold: true });
     }
+  }
+
+  // Nota del pedido de la tienda, completa (el " · " no existe en la impresora: va como guion).
+  // En una cancelación no: ese papel solo dice qué NO preparar.
+  if (d.notaPedido?.trim() && !d.esCancelacion) {
+    b.push({ t: "texto", valor: `Nota del pedido: ${d.notaPedido.trim().replaceAll(" · ", " - ")}`, size: 1, bold: true });
   }
 
   b.push({ t: "separador", estilo: "solido" });

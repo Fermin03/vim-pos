@@ -8,7 +8,7 @@ Mapa entre la documentación capturada y el código. Estado: 3 de septiembre de 
 | Pieza | Ruta | Qué hace |
 |---|---|---|
 | Adaptador Facturama | `supabase/functions/_shared/pac/facturama.ts` | `timbrar`, `descargar`, `cancelar`, `enviarPorCorreo`, `descargarAcuse`, `cargarSello`, `borrarSello` |
-| Contrato y selección de PAC | `_shared/pac/{tipos,seleccion,index}.ts` | Interfaz `PacAdapter`; `elegirPac()` toma Facturama cuando hay `FACTURAMA_API_USER/PASSWORD`; failover solo ante fallo de transporte |
+| Contrato y selección de PAC | `_shared/pac/{tipos,seleccion,index}.ts` | Interfaz `PacAdapter`; `elegirPac()` toma Facturama cuando hay `FACTURAMA_API_USER/PASSWORD`; sin PAC de respaldo ([ADR 0031](../../decisiones/0031-facturama-es-el-unico-pac.md)) |
 | Conceptos | `_shared/pac/conceptos.ts` | Ticket → `Items` (impuestos por renglón, descuento absorbido en tasa 0) |
 | Certificado | `_shared/pac/certificado.ts` | Lee número, vigencia y RFC del `.cer` sin llamar a `GET /api-lite/csds` |
 | Edge Functions | `timbrar-cfdi`, `timbrar-global`, `cancelar-cfdi`, `cargar-csd`, `autofacturar` | Orquestación, cola `tickets_cfdi`, folios |

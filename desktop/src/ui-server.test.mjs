@@ -10,12 +10,13 @@ import path from "node:path";
 import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { startUiServer, ESPERA_CATALOGO_MANUAL_MS } from "./ui-server.mjs";
+import { puertoLibre } from "./puerto-libre.mjs";
 
 const UI_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "pos-ui");
 
 /** Levanta un servidor en un puerto libre y devuelve con qué hablarle. */
 async function conServidor(opts, fn) {
-  const port = 54800 + Math.floor(Math.random() * 150);
+  const port = await puertoLibre();
   const server = await startUiServer(UI_DIR, port, 54350, "127.0.0.1", opts);
   const pedir = (cabeceras = {}) =>
     fetch(`http://127.0.0.1:${port}/__sincronizar-catalogo`, {
@@ -144,5 +145,14 @@ test("D4: un cuerpo gigante en una ruta que escribe se corta con 413", async () 
     });
     assert.equal(r.status, 413);
     assert.equal(llamadas, 0);
+  });
+});
+
+test("si la lectura del estado revienta, se contesta 500 en vez de dejar la petición colgada", async () => {
+  // Antes las cabeceras 200 salían ANTES de leer: al fallar la lectura ya no se podía contestar
+  // otra cosa, el error escapaba del manejador y el POS se quedaba esperando.
+  await conServidor({ estadoSync: () => { throw new Error("sin ciclo"); } }, async ({ port }) => {
+    const r = await fetch(`http://127.0.0.1:${port}/__estado-sync`, { signal: AbortSignal.timeout(3000) });
+    assert.equal(r.status, 500);
   });
 });

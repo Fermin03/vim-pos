@@ -332,6 +332,41 @@ export function crearGateway(backend) {
         }
         return send(up.status, await up.text());
       }
+      if (p === "/functions/v1/terminal-cobro") {
+        // Cobro con terminal (ADR 0033): la nube habla con Mercado Pago y dice en qué va el cobro; el
+        // pago lo aplica el POS a su ticket local. Se valida la sesión LOCAL y a la nube va el
+        // dispositivo. El empleado sale de la sesión, nunca del cuerpo. Sin nube → 503: el POS
+        // ofrece el registro manual.
+        const u = await getUser(pool, secret, bearer(req));
+        if (u.error) return send(u.error, u.body);
+        const crudo = (await readBody(req)).toString() || "{}";
+        let cuerpo;
+        try { cuerpo = JSON.parse(crudo); } catch { return send(400, { error: "BAD_JSON" }); }
+        if (!cuerpo || typeof cuerpo !== "object" || Array.isArray(cuerpo)) return send(400, { error: "BAD_JSON" });
+        if (cuerpo.accion === "reembolsar") {
+          // El dinero solo regresa a la tarjeta si esta caja ya tiene la devolución CONFIRMADA de ese
+          // ticket «al mismo método» (la que pidió PIN). La nube no puede comprobarlo: el ticket
+          // puede no haber subido. Sin esto, cualquier sesión abierta podría pedir un reembolso.
+          const { rows } = await pool.query(
+            "SELECT 1 FROM devoluciones WHERE ticket_original_id::text = $1 AND estado = 'CONFIRMADA' AND medio_devolucion = 'MISMO_METODO_PAGO' LIMIT 1",
+            [String(cuerpo.ticket_id ?? "")],
+          );
+          if (rows.length === 0) return send(409, { ok: false, error: "SIN_DEVOLUCION" });
+        }
+        const nube = typeof backend.nube === "function" ? await backend.nube().catch(() => null) : null;
+        if (!nube) return send(503, { error: "FUNCION_REQUIERE_NUBE", funcion: "terminal-cobro" });
+        let up;
+        try {
+          up = await fetch(`${nube.cloudUrl}/functions/v1/terminal-cobro`, {
+            method: "POST", body: JSON.stringify({ ...cuerpo, usuario_id: u.body.id }),
+            headers: { apikey: nube.anonKey, Authorization: `Bearer ${nube.deviceToken}`, "Content-Type": "application/json" },
+            signal: AbortSignal.timeout(25000),
+          });
+        } catch (e) {
+          return send(503, { error: "SIN_RED", detalle: String(e?.message ?? e) });
+        }
+        return send(up.status, await up.text());
+      }
       if (p === "/functions/v1/lealtad-canje") {
         // Lealtad (ADR 0030): la nube autoriza el canje; la caja lo asienta en su ticket. Ver
         // lealtad-puente.mjs. Se valida la sesión LOCAL del empleado (getUser ya exige su acceso

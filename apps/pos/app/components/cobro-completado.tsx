@@ -1,4 +1,5 @@
 "use client";
+import { Icono } from "@vim/ui/styles";
 import { useCallback, useEffect, useState } from "react";
 import { fmtMxn } from "../lib/turno";
 
@@ -76,9 +77,7 @@ export function CobroCompletado({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" role="dialog" aria-modal="true" aria-labelledby="cobro-completado-titulo">
       <section className="flex w-full max-w-[560px] flex-col items-center gap-1.5 rounded-lg bg-surface px-8 pb-6 pt-8 text-center shadow-xl">
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-success-soft text-success">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="h-7 w-7" aria-hidden="true">
-            <path d="M20 6 9 17l-5-5" />
-          </svg>
+          <Icono nombre="palomita" className="h-7 w-7" />
         </div>
         <h2 id="cobro-completado-titulo" className="mt-2.5 font-display text-24 font-semibold tracking-[-0.02em]">
           Cobro completado

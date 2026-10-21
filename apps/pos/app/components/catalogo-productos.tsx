@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { colorCategoria, ICONOS_POS, type Categoria, type Producto } from "../lib/catalogo";
+import { IconoCategoria } from "@vim/ui/styles";
+import { colorCategoria, type Categoria, type Producto } from "../lib/catalogo";
 import { menuVisible } from "../lib/catalogo-sucursal";
 import { usePreciosVisibles } from "../lib/precios-visibles";
 import {
@@ -190,9 +191,7 @@ export function CatalogoProductos({
                   className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded"
                   style={active ? { background: "rgba(255,255,255,0.15)", color: "#fff" } : { background: col.bg, color: col.ink }}
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
-                    <path d={ICONOS_POS[c.icono ?? "tag"] ?? ICONOS_POS.tag} />
-                  </svg>
+                  <IconoCategoria icono={c.icono} className="h-3.5 w-3.5" strokeWidth={2.5} />
                 </span>
               ) : (
                 <span aria-hidden="true" className="h-2.5 w-2.5 flex-shrink-0 rounded-[3px]" style={{ background: col.ink }} />

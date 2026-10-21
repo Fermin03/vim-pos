@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { obtenerImpresora } from "../lib/print/adapter";
 import { Button, Modal } from "@vim/ui/styles";
+import { moduloActivo } from "@vim/db/operacion";
+import { useAcceso } from "./banda-acceso";
 import { abrirTurno, eventosRecientes, fmtMxn, type Turno } from "../lib/turno";
 
 const SUGERENCIAS = [200, 500, 1000, 1500];
@@ -19,15 +21,12 @@ export function ModalAbrirTurno({
   token,
   cajaId,
   cajaNumero,
-  vertical,
   onTurnoAbierto,
   onCerrar,
 }: {
   token: string;
   cajaId: string;
   cajaNumero: number;
-  /** Vertical del negocio: decide si se ofrece el bloque de evento (solo foodtruck). */
-  vertical?: string | null;
   onTurnoAbierto: (t: Turno) => void;
   /** Cierra sin abrir nada. */
   onCerrar: () => void;
@@ -41,9 +40,11 @@ export function ModalAbrirTurno({
   const [eventoNotas, setEventoNotas] = useState("");
   const [sugerenciasEvento, setSugerenciasEvento] = useState<string[]>([]);
 
-  /* El bloque de evento es de la vertical FOODTRUCK (Flujos B3 §4): un camión que hoy
-     vende en una feria y mañana en otra. A un local fijo no le aplica nunca. */
-  const ofreceEvento = vertical === "FOODTRUCK";
+  /* El bloque de evento lo enciende VIM con el módulo `eventos` (ADR 0034): un camión que hoy
+     vende en una feria y mañana en otra. Arranca de lo último que se supo en esta carga de la app;
+     la primera vez, hasta leer las directivas cuenta como apagado y al food truck le aparece al cargar. */
+  const { modulos } = useAcceso();
+  const ofreceEvento = moduloActivo(modulos, "eventos");
 
   useEffect(() => {
     if (!ofreceEvento) return;

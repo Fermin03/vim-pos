@@ -1,0 +1,33 @@
+import { moduloActivo, type CodigoOperacion } from "@vim/db/operacion";
+import { mensajeAyudaAdmin } from "@vim/db/soporte";
+import type { ModulosLeidos } from "./inventario-plan";
+
+/** Pantalla del admin → el módulo de operación que la gobierna (ADR 0034). */
+const RUTA_DE_MODULO: readonly [string, CodigoOperacion][] = [
+  ["/configuracion/mesas", "comedor"],
+  ["/reportes/ventas-mesero", "meseros"],
+  ["/configuracion/envios", "domicilio"],
+  ["/usuarios/repartidores", "repartidores"],
+  ["/reservaciones", "reservaciones"],
+  ["/configuracion/marcas", "marcas"],
+];
+
+/**
+ * Las rutas que este negocio no usa. Mientras carga o si la lectura falló no se esconde nada: un
+ * menú que se encoge un segundo después de abrir salta a la vista, y esconder no es un candado
+ * (eso lo decide VIM con el módulo, no el admin).
+ */
+export function rutasOcultas(m: ModulosLeidos | "error" | null): ReadonlySet<string> {
+  if (m === null || m === "error") return new Set();
+  return new Set(RUTA_DE_MODULO.filter(([, codigo]) => !moduloActivo(m.efectivos, codigo)).map(([ruta]) => ruta));
+}
+
+export function filtrarSecciones<T extends { items: { href: string }[] }>(secciones: readonly T[], ocultas: ReadonlySet<string>): T[] {
+  return secciones
+    .map((s) => ({ ...s, items: s.items.filter((it) => !ocultas.has(it.href)) }))
+    .filter((s) => s.items.length > 0);
+}
+
+/** El WhatsApp ya escrito para pedir que VIM cambie los módulos. */
+export const mensajeCambiarModulos = (d: { usuario?: string | null; negocio?: string | null; codigo?: string | null }): string =>
+  mensajeAyudaAdmin(d).replace(/Necesito ayuda con VIM POS\.$/, "Quiero cambiar lo que mi negocio usa en VIM POS.");

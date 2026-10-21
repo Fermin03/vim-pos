@@ -1,19 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { urlAutorizacionUber, normalizarTiendasUber, cuerpoPosData, transicionConexion } from "./uber-activacion.ts";
-
-test("urlAutorizacionUber: sandbox y producción usan su dominio y llevan state y scope", () => {
-  const u = new URL(urlAutorizacionUber({ entorno: "sandbox", clientId: "cid", redirectUri: "http://localhost:3001/cb", state: "abc" }));
-  assert.equal(u.origin, "https://sandbox-login.uber.com");
-  assert.equal(u.pathname, "/oauth/v2/authorize");
-  assert.equal(u.searchParams.get("client_id"), "cid");
-  assert.equal(u.searchParams.get("response_type"), "code");
-  assert.equal(u.searchParams.get("redirect_uri"), "http://localhost:3001/cb");
-  assert.equal(u.searchParams.get("scope"), "eats.pos_provisioning");
-  assert.equal(u.searchParams.get("state"), "abc");
-  const p = new URL(urlAutorizacionUber({ entorno: "produccion", clientId: "cid", redirectUri: "https://admin.vimpos.com.mx/cb", state: "s" }));
-  assert.equal(p.origin, "https://auth.uber.com");
-});
+import { normalizarTiendasUber, cuerpoPosData, transicionConexion } from "./uber-activacion.ts";
 
 test("normalizarTiendasUber: toma id, nombre y dirección; tolera campos faltantes", () => {
   const t = normalizarTiendasUber({ stores: [

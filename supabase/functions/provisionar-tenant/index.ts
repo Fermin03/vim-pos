@@ -26,29 +26,19 @@
 //      mientras sirva para el arranque del panel (server.ts).
 //
 // Local: supabase functions serve provisionar-tenant --env-file supabase/functions/.env
-import { createClient } from "jsr:@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
+import { clienteAdmin, servir } from "../_shared/http.ts";
 import { consumirCupo, cupoAgotado, ipDeLaPeticion, type Cupo } from "../_shared/limite.ts";
 import { cabeceraDeModo, igualSeguro, modoProvision } from "../_shared/provision.ts";
 
-const VERTICALES = ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "CAFE_BAR", "DARK_KITCHEN", "ENTERPRISE"];
+const VERTICALES = ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "DARK_KITCHEN", "BAR", "CAFETERIA", "TAQUERIA"];
 
 /** Fallos de secreto por IP. Con un secreto de 256 bits la fuerza bruta no es el riesgo real: esto
  *  corta el ruido y deja rastro. No hay tope GLOBAL de fallos a propósito: permitiría que
  *  cualquiera bloqueara el alta de clientes de VIM con peticiones basura. */
 const fallosPorIp = (ip: string): Cupo => ({ clave: `provision:fallo:${ip}`, ventanaSeg: 15 * 60, max: 10 });
 
-Deno.serve(async (req) => {
-  const cors = corsHeaders(req);
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
-
-  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
-    auth: { persistSession: false },
-  });
+servir(async (req, json) => {
+  const admin = clienteAdmin();
 
   // Gate por secreto de servidor (fail-closed si no hay ninguno configurado).
   const interno = Deno.env.get("PROVISION_INTERNAL_SECRET") ?? "";
@@ -94,7 +84,7 @@ Deno.serve(async (req) => {
     return json({ error: "FALTAN_CAMPOS" }, 400);
   }
   if (!/^[a-z0-9-]+$/.test(codigo)) return json({ error: "CODIGO_INVALIDO", detalle: "minúsculas, números y guiones" }, 400);
-  if (!VERTICALES.includes(vertical)) return json({ error: "VERTICAL_INVALIDA" }, 400);
+  if (!VERTICALES.includes(vertical)) return json({ error: "VERTICAL_INVALIDA", detalle: "Elige un giro de la lista." }, 400);
 
   // 1) Invitar al dueño por correo: crea la cuenta y envía un email con un link para que
   //    el dueño fije SU contraseña (página /establecer-acceso del admin). No viaja ninguna

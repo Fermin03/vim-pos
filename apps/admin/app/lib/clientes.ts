@@ -1,13 +1,8 @@
 "use client";
 import { z } from "zod";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { borrarSuave, tenantId } from "./datos";
 import { CLIENTES_POR_PAGINA, filtroBusqueda, rangoPagina, ticketPromedio } from "./clientes-paginacion";
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
 
 // Tier1 — Clientes / CRM. Tabla `clientes` (RLS clientes_tenant FOR ALL). Datos fiscales para
 // factura a cliente frecuente. nombre es lo único obligatorio.
@@ -157,7 +152,4 @@ export async function cambiarEstadoCliente(
   if (error) throw new Error(error.message);
 }
 
-export async function eliminarCliente(id: string): Promise<void> {
-  const { error } = await supabase.from("clientes").update({ deleted_at: new Date().toISOString() }).eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarCliente = (id: string): Promise<void> => borrarSuave("clientes", id);

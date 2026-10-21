@@ -17,6 +17,14 @@ export const NORMAL_MS = 30_000;
 /** Hay una ventana de aceptación corriendo: cada segundo cuenta para que la comanda entre a cocina. */
 export const RAPIDA_MS = 10_000;
 
+/**
+ * Hasta cuándo un pedido de la tienda que atiende la caja sigue acelerando el sondeo. Uno más viejo
+ * está atascado (la caja que lo aceptó se apagó, o nunca reportó su final) y, sin este tope, dejaba
+ * a todas las cajas de la sucursal preguntando cada 10 s para siempre. 6 h, como el tope de pedidos
+ * vivos por teléfono de `tienda_crear_pedido`.
+ */
+export const TIENDA_VIVO_MS = 6 * 3600_000;
+
 /** Estados de conexión por los que todavía pueden entrar pedidos (0090). */
 const CONEXION_VIVA = new Set(["ACTIVA", "PENDIENTE"]);
 
@@ -26,16 +34,99 @@ const CONEXION_VIVA = new Set(["ACTIVA", "PENDIENTE"]);
  *                     COMPLETOS, nunca desde el delta — si el ritmo se calculara con las filas
  *                     que cambiaron, un pedido RECIBIDO que lleva 20 s quieto dejaría de contar
  *                     y la caja frenaría justo mientras corre su ventana de aceptación.
+ * @param tienda       La sucursal vende en la tienda en línea y esta caja la entiende. Sin una
+ *                     conexión de app nada más la sacaría del reposo, y con sondeos cada 300 s la
+ *                     señal de caja lista (ventana de 90 s) no se cumpliría nunca.
+ * @param ahora        El instante contra el que se mide la edad de un pedido (ms). Inyectable para probar.
  */
 export function cadenciaEspejo(
-  { conexiones = [], pedidosVivos = [] }: {
+  { conexiones = [], pedidosVivos = [], tienda = false, ahora = Date.now() }: {
     conexiones?: { estado?: string | null }[];
-    pedidosVivos?: { estado?: string | null }[];
+    pedidosVivos?: { estado?: string | null; canal?: string | null; gestion?: string | null; recibido_at?: string | null }[];
+    tienda?: boolean;
+    ahora?: number;
   },
 ): number {
-  if (pedidosVivos.some((p) => p.estado === "RECIBIDO")) return RAPIDA_MS;
-  if (conexiones.some((c) => CONEXION_VIVA.has(String(c.estado ?? "")))) return NORMAL_MS;
+  // Un pedido vivo de la TIENDA que atiende la caja (gestión ESCRITORIO) acelera en cualquier
+  // estado, no solo por aceptar: su cliente mira el seguimiento y «listo» o «entregado» le tienen
+  // que llegar en segundos. Los de gestión NUBE no: nadie escribe su estado de vuelta, se quedan
+  // en ACEPTADO para siempre y dejarían a la caja sondeando cada 10 s sin fin. Los de APP, como siempre.
+  // Y solo mientras sea reciente (TIENDA_VIVO_MS): uno atascado deja de contar, esté en el estado que
+  // esté. Sin fecha legible cuenta, como antes de existir el tope: no se frena a ciegas.
+  const acelera = (p: (typeof pedidosVivos)[number]): boolean => {
+    if (p.canal !== "TIENDA" || p.gestion !== "ESCRITORIO") return p.estado === "RECIBIDO";
+    const recibido = Date.parse(p.recibido_at ?? "");
+    return Number.isNaN(recibido) || ahora - recibido <= TIENDA_VIVO_MS;
+  };
+  if (pedidosVivos.some(acelera)) return RAPIDA_MS;
+  if (tienda || conexiones.some((c) => CONEXION_VIVA.has(String(c.estado ?? "")))) return NORMAL_MS;
   return REPOSO_MS;
+}
+
+/**
+ * El filtro (`or` de PostgREST) que deja fuera de lo que baja a una caja los pedidos de la tienda
+ * que se pagan en línea y ella no debe ver (migración 0173):
+ *   · NINGUNA caja recibe uno que no se ha pagado (`pagado_at` nulo): ni el que espera su pago ni
+ *     el que venció sin pagarse existen para quien atiende;
+ *   · y solo los recibe, ya pagados, la caja que declara `pago_en_linea: true` (desde la 0.9.0).
+ *     Una anterior no admite `EN_LINEA` en su tabla local —el espejo ENTERO fallaría en cada
+ *     vuelta, pedidos de Uber incluidos— y le crearía la cuenta sin el pago.
+ * Solo un `true` estricto cuenta. `pago_al_recibir` es nulo en los pedidos de apps: pasan siempre.
+ * La rama de la caja que NO lo declara no nombra `pagado_at`: así esta función se puede desplegar
+ * antes de aplicar la 0173 sin romperle el espejo a las cajas que hoy están en servicio.
+ */
+export function filtroPagoEnLinea(cuerpo: { pago_en_linea?: unknown }): string {
+  const sinEnLinea = "pago_al_recibir.is.null,pago_al_recibir.neq.EN_LINEA";
+  return cuerpo.pago_en_linea === true ? `${sinEnLinea},pagado_at.not.is.null` : sinEnLinea;
+}
+
+/**
+ * Qué le toca a esta caja en este sondeo.
+ *
+ * `conTienda` exige las dos cosas: que el negocio tenga la tienda encendida Y que la caja diga que
+ * la entiende (`tienda: true` en el cuerpo, que solo mandan las cajas desde la 0.8.0). Sin lo
+ * segundo, una caja vieja recibiría pedidos con `conexion_id` nulo que su tabla local rechaza, y
+ * el espejo entero —pedidos de Uber incluidos— fallaría en cada vuelta.
+ *
+ * Solo un `true` estricto cuenta: nada del cuerpo se da por bueno sin mirarlo.
+ */
+export function alcanceEspejo(
+  { efectivos, cuerpo }: {
+    efectivos: Record<string, unknown>;
+    cuerpo: { tienda?: unknown; turno_abierto?: unknown };
+  },
+): { conApps: boolean; conTienda: boolean; canales: ("APP" | "TIENDA")[]; turnoAbierto: boolean } {
+  const conApps = efectivos.delivery_apps === true;
+  const conTienda = efectivos.tienda === true && cuerpo.tienda === true;
+  const canales: ("APP" | "TIENDA")[] = [];
+  if (conApps) canales.push("APP");
+  if (conTienda) canales.push("TIENDA");
+  return { conApps, conTienda, canales, turnoAbierto: cuerpo.turno_abierto === true };
+}
+
+/**
+ * Lo que el sondeo escribe en `cajas`: siempre el latido y, solo si la caja declara la tienda Y
+ * reporta turno abierto, la marca `espejo_turno_abierto_at` que lee `sucursal_recibe_pedidos`
+ * (mig. 0161 §6).
+ *
+ * Es una marca de tiempo para que falle cerrada: quien deja de afirmar el turno no escribe nada y
+ * la marca envejece sola. Y una caja que no declara la tienda manda el UPDATE de siempre, así que
+ * las que hoy están en servicio no dependen de que la columna exista.
+ *
+ * Y la caja que declara `pago_en_linea: true` (sabe atender un pedido ya pagado: la cuenta nace
+ * cobrada) sella `espejo_pago_en_linea_at` (0173). De esa marca —no del número de versión del
+ * instalador— depende que la tienda ofrezca el pago en línea en su sucursal y que un pedido pagado
+ * se le encargue a una caja. Misma idea: quien deja de declararlo no escribe nada y la marca envejece.
+ */
+export function selloLatido(
+  cuerpo: { tienda?: unknown; turno_abierto?: unknown; pago_en_linea?: unknown },
+  ahora: string,
+): Record<string, string> {
+  return {
+    espejo_apps_at: ahora,
+    ...(cuerpo.tienda === true && cuerpo.turno_abierto === true && { espejo_turno_abierto_at: ahora }),
+    ...(cuerpo.pago_en_linea === true && { espejo_pago_en_linea_at: ahora }),
+  };
 }
 
 /** Tope de filas por respuesta: una ráfaga rara no debe convertirse en un paquete enorme. */

@@ -138,7 +138,7 @@ describe("canje de dinero recortado antes de cobrar", () => {
       accion: "COBRAR",
       totales: {
         ticketId: "tk-1", subtotal: 68.97, iva: 11.03, descuentos: 0, promociones: 0, lealtad: 30, total: 50,
-        montoPagado: 0, cambio: 0, pendiente: 50, estadoFiscal: "ABIERTO", folio: "KC-1",
+        montoPagado: 0, cambio: 0, pendiente: 50, estadoFiscal: "ABIERTO", folio: "KC-1", propina: 0,
       },
     });
   });

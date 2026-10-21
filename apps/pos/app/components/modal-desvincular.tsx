@@ -50,17 +50,10 @@ export function ModalDesvincular({
     return (
       <ModalAutorizacionPin
         token={token}
-        accion="desvincular_dispositivo"
-        permisoCodigo={PERMISO}
+        payload={{ accion: "desvincular_dispositivo", permisoCodigo: PERMISO, entidadTipo: "caja", entidadId: cajaId, monto: null, motivo: "Desvincular el dispositivo desde la pantalla de acceso", cajaId, turnoId: null }}
         descripcion="Desvincular esta caja"
         ejecutaNombre="la caja"
         quienAutoriza="un administrador o el dueño"
-        monto={null}
-        entidadTipo="caja"
-        entidadId={cajaId}
-        cajaId={cajaId}
-        turnoId={null}
-        motivo="Desvincular el dispositivo desde la pantalla de acceso"
         onAutorizado={onDesvincular}
         onCancelar={onCerrar}
       />

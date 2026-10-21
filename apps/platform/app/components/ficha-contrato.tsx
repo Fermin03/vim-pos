@@ -1,4 +1,5 @@
 "use client";
+import { Icono } from "@vim/ui/styles";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { fechaLegible, hoyMx, sumarDias, sumarMeses } from "@vim/fecha";
 import { cantidadDeExtra, esExtra, estadoPrueba, EXTRAS, EXTRAS_MAXIMO, limiteConExtras, textoLimiteCajas, textoPrecio, totalMensual, type CodigoExtra, type PrecioSuscripcion } from "@vim/db/cobro";
@@ -24,6 +25,7 @@ const CONSECUENCIA_BAJA: Record<string, string> = {
   DELIVERY: "Se pausan sus tiendas en Uber Eats y la caja deja de recibir pedidos de apps.",
   LEALTAD: "Se apaga su programa de lealtad: sus clientes dejan de ganar y de canjear. Los saldos se conservan por si lo retoma.",
   CFDI: "Deja de poder facturar: se apagan la sección de facturas del admin, el QR del ticket y el portal de autofactura.",
+  TIENDA: "Se apaga su tienda en línea: sus clientes dejan de poder pedir. Su configuración se conserva por si la retoma.",
 };
 
 type Pendiente =
@@ -52,7 +54,7 @@ function Cambio({ antes, despues }: { antes: ReactNode; despues: ReactNode }) {
   return (
     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded border border-line bg-sel px-3 py-2.5 text-13">
       <div>{antes}</div>
-      <span className="text-ink-2" aria-hidden="true">→</span>
+      <Icono nombre="flecha-derecha" className="h-4 w-4 text-ink-2" />
       <div className="font-semibold">{despues}</div>
     </div>
   );
@@ -113,7 +115,7 @@ export function FichaContrato({ d, planes, accion, busy, accesoDueno }: { d: Det
   }));
   const precioPlanNum = precioPlan.trim() === "" ? null : precioValido(precioPlan);
   const vista = elegido
-    ? vistaPreviaCambioPlan({ nuevo: elegido, addons: addonsTenant, foliosAntes: d.foliosBase?.mensuales ?? null, suscripcion, precio: precioPlanNum, hoy, excepcion: d.limites?.excepcion ?? null })
+    ? vistaPreviaCambioPlan({ nuevo: elegido, addons: addonsTenant, foliosAntes: d.foliosBase?.mensuales ?? null, suscripcion, precio: precioPlanNum, hoy, excepcion: d.limites?.excepcion ?? null, catalogoActivo: d.catalogoAddons.map((a) => a.codigo) })
     : null;
 
   // ── Extras por cantidad (0147, ADR 0024) ────────────────────────────────────────────────
@@ -408,7 +410,7 @@ export function FichaContrato({ d, planes, accion, busy, accesoDueno }: { d: Det
                     <li key={`c-${c}`}>Gana <b className="text-ink">{nombreAddon(c)}</b>, incluido a $0{vista.dejaDePagar.some((x) => x.codigo === c) ? ` (deja de pagar ${fmtMxn(vista.dejaDePagar.find((x) => x.codigo === c)?.precio ?? 0)} aparte)` : ""}.</li>
                   ))}
                   {vista.retira.map((c) => (
-                    <li key={`r-${c}`} className="text-danger">Pierde <b>{nombreAddon(c)}</b>: lo tenía por el plan.{c === "DELIVERY" ? " Se pausan sus tiendas en Uber Eats." : c === "LEALTAD" ? " Se apaga su programa de lealtad; los saldos se conservan." : ""}</li>
+                    <li key={`r-${c}`} className="text-danger">Pierde <b>{nombreAddon(c)}</b>: lo tenía por el plan.{c === "DELIVERY" ? " Se pausan sus tiendas en Uber Eats." : c === "LEALTAD" ? " Se apaga su programa de lealtad; los saldos se conservan." : c === "TIENDA" ? " Se apaga su tienda en línea; su configuración se conserva." : ""}</li>
                   ))}
                   {vista.retiraExtras.map((x) => (
                     <li key={`x-${x.codigo}`} className="text-danger">

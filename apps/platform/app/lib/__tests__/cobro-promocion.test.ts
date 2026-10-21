@@ -168,6 +168,53 @@ describe("vistaPreviaCambioPlan (espejo de cambiar_plan_tenant)", () => {
     });
     expect(baja.retira).toContain("LEALTAD");
   });
+
+  // Entrega 7 de la tienda. La base solo sincroniza TIENDA cuando el complemento está activo en el
+  // catálogo (0167); la vista previa lo sabe por el catálogo que el panel ya lee con activo = true.
+  describe("la tienda en línea", () => {
+    const esencial = { ...ESENCIAL, features_incluidos: { ...ESENCIAL.features_incluidos, tienda_incluida: false } };
+    const negocio = { ...NEGOCIO, features_incluidos: { ...NEGOCIO.features_incluidos, tienda_incluida: true } };
+    const suscripcion = { precio_mensual_mxn: 699, precio_promocional_mxn: null, promocion_hasta: null, promocion_nombre: null };
+
+    it("REGLA DE ORO: con el complemento inactivo, la vista previa es la de hoy: ni la concede ni la retira", () => {
+      for (const catalogoActivo of [undefined, [], ["CFDI", "DELIVERY", "LEALTAD"]]) {
+        const sube = vistaPreviaCambioPlan({ nuevo: negocio, foliosAntes: 10, addons: [], suscripcion, hoy: "2026-11-15", catalogoActivo });
+        expect(sube.concede).toEqual(["CFDI", "DELIVERY"]);
+        expect(sube.dejaDePagar).toEqual([]);
+        const baja = vistaPreviaCambioPlan({
+          nuevo: esencial, foliosAntes: 20, suscripcion, hoy: "2026-11-15", catalogoActivo,
+          addons: [{ codigo: "TIENDA", activo: true, precio: 0, incluidoEnPlan: true }],
+        });
+        expect(baja.retira).toEqual([]);
+      }
+    });
+
+    it("con el complemento activo entra y sale con el plan, como los demás", () => {
+      const catalogoActivo = ["CFDI", "DELIVERY", "LEALTAD", "TIENDA"];
+      const sube = vistaPreviaCambioPlan({
+        nuevo: negocio, foliosAntes: 10, suscripcion, hoy: "2026-11-15", catalogoActivo,
+        addons: [{ codigo: "TIENDA", activo: true, precio: 100, incluidoEnPlan: false }],
+      });
+      expect(sube.concede).toEqual(["CFDI", "DELIVERY", "TIENDA"]);
+      expect(sube.dejaDePagar).toEqual([{ codigo: "TIENDA", precio: 100 }]);
+
+      const baja = vistaPreviaCambioPlan({
+        nuevo: esencial, foliosAntes: 20, suscripcion, hoy: "2026-11-15", catalogoActivo,
+        addons: [{ codigo: "TIENDA", activo: true, precio: 0, incluidoEnPlan: true }],
+      });
+      expect(baja.retira).toEqual(["TIENDA"]);
+      // Pagada aparte o de cortesía: se queda.
+      expect(vistaPreviaCambioPlan({
+        nuevo: esencial, foliosAntes: 20, suscripcion, hoy: "2026-11-15", catalogoActivo,
+        addons: [{ codigo: "TIENDA", activo: true, precio: 100, incluidoEnPlan: false }],
+      }).retira).toEqual([]);
+    });
+
+    it("los demás complementos no dependen del catálogo: la base no les pregunta si están activos", () => {
+      const v = vistaPreviaCambioPlan({ nuevo: negocio, foliosAntes: 10, addons: [], suscripcion, hoy: "2026-11-15", catalogoActivo: [] });
+      expect(v.concede).toEqual(["CFDI", "DELIVERY"]);
+    });
+  });
 });
 
 describe("montoPeriodos", () => {

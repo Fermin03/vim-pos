@@ -16,8 +16,11 @@ un gateway compatible con supabase-js. El POS escribe directo por RPC bajo RLS, 
 local, y la sincronización con la nube es por **snapshot** (`sync_pull_snapshot` /
 `sync_push_snapshot`), no un registro de operaciones.
 
-El outbox web está **congelado** (`apps/pos/app/lib/outbox.ts`, marcado `@deprecated`). El único
-Dexie que queda es el caché de lectura del catálogo.
+El outbox web se **congeló** entonces y su código se **retiró el 7 de octubre de 2026** (la cola
+de `outbox.ts`, `sync.ts` y `cobro-offline.ts`). El único Dexie que queda es el caché de lectura
+del catálogo, en `apps/pos/app/lib/outbox.ts`; la base del navegador conserva su esquema para no
+migrar las cajas instaladas. En la nube, `sync_procesar_push` sigue sin aplicar lo que llegue de
+una tablet vieja: lo guarda en `sync_conflictos` (0138).
 
 ## Por qué
 

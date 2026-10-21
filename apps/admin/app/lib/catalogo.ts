@@ -1,6 +1,7 @@
 "use client";
 import { z } from "zod";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { borrarSuave, tenantId } from "./datos";
 
 // Paleta funcional de categorías (del design system; NUNCA el naranja de marca).
 export const COLORES: { hex: string; bg: string }[] = [
@@ -15,17 +16,6 @@ export const COLORES: { hex: string; bg: string }[] = [
 export function bgDe(hex: string | null): string {
   return COLORES.find((c) => c.hex === hex)?.bg ?? "#F6F6F4";
 }
-
-// Íconos disponibles (nombre → path SVG, viewBox 24). Subset curado para QSR.
-export const ICONOS: Record<string, string> = {
-  star: "M12 2l2.9 6.3 6.6.7-4.9 4.5 1.4 6.5L12 17.3 5.9 20.5 7.3 14 2.4 9.5l6.6-.7z",
-  burger: "M4 11h16M4 11a8 8 0 0 1 16 0M5 15h14a2 2 0 0 1 0 4H5a2 2 0 0 1 0-4z",
-  fries: "M6 9l1.5 11h9L18 9M6 9h12M9 9V4M12 9V3M15 9V5",
-  cup: "M6 8h12l-1 12a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 8zM8 8V5a4 4 0 0 1 8 0v3",
-  cake: "M4 21h16M5 21v-7a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v7M12 8V4M9 6h6",
-  tag: "M3 7v5l9 9 5-5-9-9H3zM7 7h.01",
-};
-export const ICONO_DEFAULT = "tag";
 
 export const categoriaSchema = z.object({
   nombre: z.string().trim().min(1, "El nombre es obligatorio").max(40, "Máximo 40 caracteres"),
@@ -70,12 +60,6 @@ export async function listarCategorias(): Promise<Categoria[]> {
     activa: f.activa,
     nProductos: f.productos?.[0]?.count ?? 0,
   }));
-}
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
 }
 
 export async function crearCategoria(input: CategoriaInput): Promise<void> {
@@ -134,19 +118,8 @@ export async function reordenarCategorias(lista: { id: string; orden_visualizaci
   }
 }
 
-export async function toggleActiva(id: string, activa: boolean): Promise<void> {
-  const { error } = await supabase.from("categorias").update({ activa }).eq("id", id);
-  if (error) throw new Error(error.message);
-}
-
 /** Soft delete (set deleted_at). El POS y la lista filtran deleted_at IS NULL. */
-export async function eliminarCategoria(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("categorias")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarCategoria = (id: string): Promise<void> => borrarSuave("categorias", id);
 
 // ── Categorías (versión simple para selects) ─────────────────────────────────
 export type CategoriaOpcion = { id: string; nombre: string };
@@ -210,6 +183,8 @@ export type Producto = {
   nombre: string;
   descripcion: string | null;
   codigo_interno: string | null;
+  /** La foto que ve el cliente en la tienda en línea: URL pública completa. La escribe foto-producto.ts, no este formulario. */
+  imagen_url: string | null;
   precio_base_mxn: number;
   categoria_id: string;
   categoriaNombre: string;
@@ -235,7 +210,7 @@ export async function listarProductos(): Promise<Producto[]> {
   const { data, error } = await supabase
     .from("productos")
     .select(
-      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, en_menu_general, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
+      "id, nombre, descripcion, codigo_interno, imagen_url, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, en_menu_general, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
     )
     .is("deleted_at", null)
     .order("orden_visualizacion", { ascending: true });
@@ -245,6 +220,7 @@ export async function listarProductos(): Promise<Producto[]> {
     nombre: f.nombre,
     descripcion: f.descripcion,
     codigo_interno: f.codigo_interno,
+    imagen_url: f.imagen_url || null,
     precio_base_mxn: Number(f.precio_base_mxn),
     categoria_id: f.categoria_id,
     categoriaNombre: f.categoria?.nombre ?? "—",
@@ -266,7 +242,7 @@ export async function obtenerProducto(id: string): Promise<Producto | null> {
   const { data, error } = await supabase
     .from("productos")
     .select(
-      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, en_menu_general, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
+      "id, nombre, descripcion, codigo_interno, imagen_url, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, en_menu_general, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
     )
     .eq("id", id)
     .is("deleted_at", null)
@@ -279,6 +255,7 @@ export async function obtenerProducto(id: string): Promise<Producto | null> {
     nombre: f.nombre,
     descripcion: f.descripcion,
     codigo_interno: f.codigo_interno,
+    imagen_url: f.imagen_url || null,
     precio_base_mxn: Number(f.precio_base_mxn),
     categoria_id: f.categoria_id,
     categoriaNombre: f.categoria?.nombre ?? "—",
@@ -363,13 +340,7 @@ export async function actualizarProducto(id: string, input: ProductoInput): Prom
   if (error) throw new Error(error.message);
 }
 
-export async function eliminarProducto(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("productos")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarProducto = (id: string): Promise<void> => borrarSuave("productos", id);
 
 export function precioMxn(n: number): string {
   return n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });

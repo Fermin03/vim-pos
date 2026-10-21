@@ -95,16 +95,9 @@ export function ModalCambiarPago({
     return (
       <ModalAutorizacionPin
         token={token}
-        accion="cambiar_forma_pago"
-        permisoCodigo={PERMISO}
+        payload={payload()}
         descripcion={`Cambiar forma de pago · folio ${folio ?? ""} · ${fmtMxn(total)} → ${labelMetodoPago(metodo)}`}
         ejecutaNombre={empleado.nombre}
-        monto={total}
-        entidadTipo="ticket"
-        entidadId={ticketId}
-        cajaId={cajaId}
-        turnoId={turnoId}
-        motivo={`Cambio de forma de pago a ${labelMetodoPago(metodo)}`}
         onAutorizado={(a) => ejecutar(a)}
         onCancelar={() => setPidiendoPin(false)}
       />

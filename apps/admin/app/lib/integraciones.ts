@@ -1,5 +1,4 @@
 "use client";
-import { etiquetaApp as etiquetaAppCompartida } from "@vim/db/metodos-pago";
 import { supabase, leerSesion } from "./supabase";
 
 // Apps de delivery (spec F1b): estado de las conexiones por sucursal y el flujo OAuth con Uber.
@@ -159,10 +158,6 @@ export function mensajeErrorIntegracion(e: unknown): string {
 
 export function etiquetaEstado(estado: EstadoConexion): string {
   return { SIN_CONECTAR: "Sin conectar", PENDIENTE: "Pendiente", ACTIVA: "Activa", PAUSADA: "Pausada", ERROR: "Con error", DESCONECTADA: "Desconectada" }[estado];
-}
-
-export function etiquetaApp(app: AppDelivery): string {
-  return etiquetaAppCompartida(app);
 }
 
 export function horaCorta(iso: string | null, zona = "America/Mexico_City"): string | null {

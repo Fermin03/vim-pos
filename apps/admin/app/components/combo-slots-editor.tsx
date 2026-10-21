@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { Button, DialogoPeligro, Modal } from "@vim/ui/styles";
+import { Button, DialogoPeligro, Modal, Icono } from "@vim/ui/styles";
 import {
   MODO_PRECIO,
   actualizarSlot,
@@ -21,15 +21,13 @@ import { listarCategoriasOpciones, listarProductos, precioMxn, type CategoriaOpc
 import { mensajeError } from "../lib/errores";
 import { estadoGeneral } from "../lib/menu-sucursal";
 import { limpiarPrecio } from "../lib/numeros";
+import { input, label } from "./campos";
 
 // En pantalla, un "slot" es un PASO: lo que la caja va preguntando al vender el combo (qué
 // hamburguesa, qué acompañamiento, qué bebida). En el código y en la base sigue llamándose slot.
 
-const input =
-  "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 const inputSm =
   "h-9 w-24 rounded border border-line-strong px-2 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-13 font-medium text-ink-2";
 
 const MODO_CORTO: Record<ModoPrecio, string> = {
   DELTA: "Incluido en el combo",
@@ -47,7 +45,7 @@ function reglaSlot(min: number, max: number): string {
 // producto agotado hoy sigue siendo parte del combo, así que aquí solo se avisa, no se oculta.
 function BadgeAgotado() {
   return (
-    <span className="ml-2 inline-flex items-center gap-1.5 rounded-full bg-[#FBF1EF] px-2 py-0.5 text-11 font-semibold text-danger">
+    <span className="ml-2 inline-flex items-center gap-1.5 rounded-full bg-danger-soft px-2 py-0.5 text-11 font-semibold text-danger">
       <span className="h-1.5 w-1.5 rounded-full bg-danger" />
       Agotado
     </span>
@@ -312,9 +310,7 @@ function ListaOpciones({
                     onClick={() => onQuitar(f.productoId)}
                     className="ml-auto flex h-11 w-11 items-center justify-center rounded border border-transparent text-ink-2 transition-colors hover:border-danger-line hover:text-danger lg:ml-0 lg:h-9 lg:w-9"
                   >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" aria-hidden="true">
-                      <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                    </svg>
+                    <Icono nombre="eliminar" className="h-4 w-4" />
                   </button>
                 )}
               </div>
@@ -580,9 +576,7 @@ export function ComboSlotsEditor({ comboId, onCambio }: { comboId: string; onCam
           <p className="text-13 text-ink-2">Lo que la caja va preguntando: qué hamburguesa, qué acompañamiento, qué bebida.</p>
         </div>
         <Button variant="ghost" onClick={() => setModal({ slot: null })}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-[15px] w-[15px]">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
+          <Icono nombre="mas" className="h-[15px] w-[15px]" />
           Agregar paso
         </Button>
       </div>
@@ -615,9 +609,7 @@ export function ComboSlotsEditor({ comboId, onCambio }: { comboId: string; onCam
                     className="flex min-h-[44px] min-w-full flex-1 items-center gap-3 text-left sm:min-w-0"
                     aria-expanded={abierto}
                   >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" className={"h-4 w-4 flex-shrink-0 text-ink-2 transition-transform duration-150 ease-vim " + (abierto ? "rotate-90" : "")}>
-                      <path d="M9 6l6 6-6 6" />
-                    </svg>
+                    <Icono nombre="chevron-derecha" className={"h-4 w-4 flex-shrink-0 text-ink-2 transition-transform duration-150 ease-vim " + (abierto ? "rotate-90" : "")} />
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span className="text-15 font-semibold">{s.nombre}</span>
@@ -631,16 +623,16 @@ export function ComboSlotsEditor({ comboId, onCambio }: { comboId: string; onCam
                   </button>
                   <span className="ml-auto flex flex-shrink-0 gap-1">
                     <button type="button" title="Subir" aria-label={`Subir ${s.nombre}`} disabled={i === 0} onClick={() => mover(s, -1)} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-hover hover:text-ink disabled:opacity-30">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+                      <Icono nombre="flecha-arriba" className="h-4 w-4" />
                     </button>
                     <button type="button" title="Bajar" aria-label={`Bajar ${s.nombre}`} disabled={i === slots.length - 1} onClick={() => mover(s, 1)} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-hover hover:text-ink disabled:opacity-30">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M12 5v14M5 12l7 7 7-7" /></svg>
+                      <Icono nombre="flecha-abajo" className="h-4 w-4" />
                     </button>
                     <button type="button" title="Editar" aria-label={`Editar ${s.nombre}`} onClick={() => setModal({ slot: s })} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-hover hover:text-ink">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                      <Icono nombre="editar" className="h-4 w-4" />
                     </button>
                     <button type="button" title="Quitar" aria-label={`Quitar ${s.nombre}`} onClick={() => setBorrar(s)} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-danger-line hover:text-danger">
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
+                      <Icono nombre="eliminar" className="h-4 w-4" />
                     </button>
                   </span>
                 </div>

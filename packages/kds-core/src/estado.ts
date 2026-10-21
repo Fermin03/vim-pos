@@ -1,5 +1,5 @@
-// Helpers PUROS del KDS (sin dependencias de cliente/red, testeables). Máquina de estados de
-// cocina y cálculos de tiempo. comandas.ts (que sí habla con Supabase) los reexporta.
+// Helpers PUROS del KDS (sin dependencias de cliente/red, testeables). Estados de cocina y
+// cálculos de tiempo. comandas.ts (que sí habla con Supabase) los reexporta.
 
 import { etiquetaModo } from "@vim/db/modos-servicio";
 
@@ -9,13 +9,6 @@ export type EstadoCocina = "EN_COCINA" | "LISTO" | "ENTREGADO" | "EN_RUTA" | "EN
  *  de los doce, y la cocina leía `APP_UBEREATS` en crudo. */
 export function labelModo(m: string): string {
   return etiquetaModo(m);
-}
-
-/** El siguiente estado al que avanza una comanda desde el KDS (null si ya está fuera de cocina). */
-export function siguienteEstado(estado: EstadoCocina): EstadoCocina | null {
-  if (estado === "EN_COCINA") return "LISTO";
-  if (estado === "LISTO") return "ENTREGADO";
-  return null;
 }
 
 /** Minutos transcurridos desde que entró a cocina (para el cronómetro y la alerta de vencido). */

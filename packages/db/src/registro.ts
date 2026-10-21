@@ -18,8 +18,6 @@ export function telefonoMx10(v: string): string | null {
   return /^[0-9]{10}$/.test(d) ? d : null;
 }
 
-export const CODIGO_NEGOCIO = /^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])$/;
-
 /** Paso 2 del formulario: el dueño. Los mensajes van tal cual a la pantalla. */
 export const EsquemaDuenoRegistro = z.object({
   nombre_owner: z.string().trim().min(2, "Escribe tu nombre.").max(150, "El nombre es muy largo."),
@@ -35,8 +33,6 @@ export const EsquemaDuenoRegistro = z.object({
   password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres.").max(72, "La contraseña es muy larga."),
   acepta_terminos: z.literal(true, { error: "Para crear tu cuenta, acepta los términos y el aviso de privacidad." }),
 });
-
-export type DuenoRegistro = z.infer<typeof EsquemaDuenoRegistro>;
 
 /** Primer mensaje de error del esquema, o null si todo está bien. */
 export function errorDeRegistro(d: unknown): string | null {

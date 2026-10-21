@@ -1,14 +1,10 @@
 "use client";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { tenantId } from "./datos";
 
 // Recetas con costeo (ADR 0012, spec 2026-09-03 §4.3 y §6). La cantidad operativa de un
 // componente va SIEMPRE en la unidad del insumo; aquí se convierte lo que el cocinero captura.
 
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
 const num = (v: unknown) => Number(v ?? 0);
 const S = (v: unknown) => (v == null ? "" : String(v));
 const redondear = (n: number, dec: number) => Math.round(n * 10 ** dec) / 10 ** dec;

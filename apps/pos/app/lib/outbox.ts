@@ -1,32 +1,21 @@
 "use client";
-// @deprecated PARCIAL (Remediación Fase 3) — el outbox de ESCRITURA (op-log de cobros que subía
-// sync_procesar_push) quedó CONGELADO: el escritorio persiste en Postgres local y sube por
-// sync-push. SÍ se conserva el CACHE DE LECTURA (cachePut/cacheGet), que modificadores.ts usa para
-// recargar el catálogo sin red. No agregar escrituras nuevas al op-log.
+// Cache de LECTURA offline del POS (catálogo, combos, modificadores): clave → valor en IndexedDB,
+// vía Dexie. Sirve para pintar el menú cuando no hay red.
+//
+// El archivo y la base se llaman "outbox" por historia. Aquí vivía también la cola de cobros
+// offline del POS web (un op-log que subía `sync_procesar_push`). Se congeló en la remediación
+// Fase 3 —el offline lo da el escritorio, ADR 0004— y su código se retiró el 7 oct 2026.
 import Dexie, { type Table } from "dexie";
-
-// Fase 3 · outbox offline-first. Cola persistente (IndexedDB vía Dexie) de operaciones
-// hechas sin conexión; el motor de sync (lib/sync) las empuja a sync_procesar_push cuando
-// vuelve la red. La idempotencia la garantiza client_id_local (PK aquí y en el servidor).
-
-export type OperacionOffline = {
-  /** Idempotencia: igual aquí y en el servidor. PK. */
-  clientIdLocal: string;
-  tabla: string;
-  operacion: "INSERT" | "UPDATE" | "DELETE";
-  entidadIdLocal: string | null;
-  payload: Record<string, unknown>;
-  fechaOperacion: string; // ISO; el servidor ordena cronológicamente por esto
-  intentos: number;
-};
 
 type EntradaCache = { clave: string; valor: unknown; guardadoAt: string };
 
 class OutboxDB extends Dexie {
-  operaciones!: Table<OperacionOffline, string>;
   cache!: Table<EntradaCache, string>;
   constructor() {
     super("vimpos_outbox");
+    // EL ESQUEMA NO SE TOCA. La tabla `operaciones` era la cola retirada y sigue declarada tal
+    // cual: quitarla obligaría a Dexie a migrar la base de cada navegador y de cada caja ya
+    // instalada, a cambio de nada. Ya no hay código que la lea ni la escriba.
     this.version(1).stores({ operaciones: "clientIdLocal, fechaOperacion" });
     // v2 — cache de lectura offline (catálogo, modificadores): clave→valor.
     this.version(2).stores({ operaciones: "clientIdLocal, fechaOperacion", cache: "clave" });
@@ -39,33 +28,6 @@ function db(): OutboxDB {
   if (!_db) _db = new OutboxDB();
   return _db;
 }
-
-export async function encolar(op: Omit<OperacionOffline, "intentos">): Promise<void> {
-  await db().operaciones.put({ ...op, intentos: 0 });
-}
-
-export async function pendientes(): Promise<OperacionOffline[]> {
-  return db().operaciones.orderBy("fechaOperacion").toArray();
-}
-
-export async function contarPendientes(): Promise<number> {
-  try { return await db().operaciones.count(); } catch { return 0; }
-}
-
-export async function quitarEnviadas(clientIds: string[]): Promise<void> {
-  if (clientIds.length > 0) await db().operaciones.bulkDelete(clientIds);
-}
-
-export async function marcarIntento(clientIds: string[]): Promise<void> {
-  await db().transaction("rw", db().operaciones, async () => {
-    for (const id of clientIds) {
-      const o = await db().operaciones.get(id);
-      if (o) await db().operaciones.put({ ...o, intentos: o.intentos + 1 });
-    }
-  });
-}
-
-// ── Cache de lectura offline (catálogo, modificadores) ───────────────────────
 
 export async function cachePut(clave: string, valor: unknown): Promise<void> {
   try { await db().cache.put({ clave, valor, guardadoAt: new Date().toISOString() }); } catch { /* cache best-effort */ }

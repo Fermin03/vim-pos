@@ -22,7 +22,7 @@
 
   --ink: #16161A;
   --ink-2: #5A5A60;
-  --ink-3: #8E8E94;
+  --ink-3: #6E6E74;
 
   --success: #2E7D52;
   --warning: #9A6B12;
@@ -295,10 +295,16 @@ a { color: var(--ink); text-underline-offset: 3px; }
   letter-spacing: -0.02em;
 }
 
-.nav-enlaces { display: none; gap: var(--sp-5); align-items: center; }
+/* `stretch` y no `center`: cada entrada mide los 64 px de la barra. Así el
+   disparador de un panel toca el borde de abajo y el mouse pasa de él al panel
+   sin cruzar un hueco que lo cierre. */
+.nav-enlaces { display: none; gap: var(--sp-5); align-items: stretch; align-self: stretch; }
 @media (min-width: 900px) { .nav-enlaces { display: flex; } }
 
 .nav-enlace {
+  display: inline-flex; align-items: center; gap: var(--sp-1);
+  padding: 0; border: 0; background: none; cursor: pointer;
+  font-family: var(--font); letter-spacing: inherit;
   color: var(--ink-2);
   text-decoration: none;
   font-size: var(--t-15);
@@ -308,7 +314,93 @@ a { color: var(--ink); text-underline-offset: 3px; }
 @media (hover: hover) and (pointer: fine) {
   .nav-enlace:hover { color: var(--ink); }
 }
-.nav-enlace[aria-current="page"] { color: var(--ink); }
+.nav-enlace[aria-current="page"],
+.nav-grupo[data-actual] .nav-enlace,
+.nav-grupo[data-abierto="true"] .nav-enlace { color: var(--ink); }
+
+/* ---- Paneles del menú (Producto, Recursos) --------------------------------
+   Tres enlaces dejaban fuera más de la mitad del sitio: Sin internet, las
+   guías, Novedades y las páginas por giro solo se alcanzaban desde el pie.
+
+   El panel cuelga de `.nav` —que es sticky y por eso ya es su bloque
+   contenedor— y ocupa todo el ancho: blanco, letra grande y líneas finas, sin
+   fotos. Entra en 180 ms y sale en 120: al abrir hay que ver de dónde viene, al
+   cerrar ya se decidió.
+
+   Sin JavaScript abre con el mouse encima o con el foco dentro; vim.js marca
+   `data-js` y desde ahí manda él (clic, Escape, y el `aria-expanded`). */
+.nav-grupo { display: flex; }
+
+.nav-flecha { width: 14px; height: 14px; transition: transform var(--v-corta) var(--sal); }
+.nav-grupo[data-abierto="true"] .nav-flecha { transform: rotate(180deg); }
+
+.nav-panel {
+  position: absolute;
+  inset: 100% 0 auto 0;
+  background: var(--bg);
+  border-block: 1px solid var(--line);
+  box-shadow: 0 24px 40px -28px rgba(22, 22, 26, .22);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 120ms ease, transform 120ms ease, visibility 0s linear 120ms;
+}
+.nav-grupo[data-abierto="true"] .nav-panel,
+.nav-enlaces:not([data-js]) .nav-grupo:is(:hover, :focus-within) .nav-panel {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: opacity var(--v-corta) var(--sal), transform var(--v-corta) var(--sal), visibility 0s;
+}
+/* De un panel al de al lado no hay entrada: el segundo ya «estaba abierto». */
+.nav-enlaces[data-instante] .nav-panel { transition-duration: 0s; }
+
+.nav-panel-rejilla {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-8);
+  padding-block: var(--sp-6) var(--sp-8);
+}
+.nav-panel-titulo {
+  font-family: var(--font-mono);
+  font-size: var(--t-12);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  margin: 0 0 var(--sp-3);
+  max-width: none;
+}
+.nav-panel-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-1); }
+.nav-panel-lista a {
+  display: block;
+  padding: var(--sp-2) var(--sp-3);
+  margin-inline: calc(-1 * var(--sp-3));     /* el fondo del hover sobresale; el texto queda alineado con el título */
+  border-radius: var(--r);
+  text-decoration: none;
+  transition: background-color var(--v-corta) ease;
+}
+.nav-panel-lista b {
+  display: block;
+  font-family: var(--font-display); font-size: var(--t-18); font-weight: 600;
+  letter-spacing: -0.01em; color: var(--ink);
+}
+.nav-panel-lista span { display: block; font-size: var(--t-13); color: var(--ink-2); }
+.nav-panel-lista a[aria-current="page"] b { color: var(--accent-hover); }
+@media (hover: hover) and (pointer: fine) {
+  .nav-panel-lista a:hover { background: var(--hover); }
+}
+.nav-panel-destacado {
+  align-self: start;
+  padding: var(--sp-5);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nav-panel, .nav-grupo[data-abierto="true"] .nav-panel, .nav-flecha { transition: none; transform: none; }
+}
 
 .nav-acciones { display: flex; align-items: center; gap: var(--sp-3); }
 
@@ -423,7 +515,8 @@ body[data-menu-abierto="true"]::before {
   gap: var(--sp-1);
   padding: var(--sp-10) var(--sp-5) var(--sp-5);   /* arriba, hueco para el botón de cerrar */
 }
-.nav-movil-lista a {
+.nav-movil-lista > a,
+.nav-movil-lista summary {
   padding: var(--sp-3) 0;
   color: var(--ink);
   text-decoration: none;
@@ -431,8 +524,31 @@ body[data-menu-abierto="true"]::before {
   font-weight: 500;
   border-bottom: 1px solid var(--line);
 }
-.nav-movil-lista a:last-child { border-bottom: 0; }
+.nav-movil-lista > a:last-child { border-bottom: 0; }
 .nav-movil-lista a[aria-current="page"] { color: var(--accent-hover); }
+
+/* Los grupos del cajón son <details> a secas: abrir y cerrar lo hace el
+   navegador, con teclado incluido, y sin una línea de JavaScript. El signo es
+   el mismo «+» que gira del acordeón. */
+.nav-movil-lista summary {
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; list-style: none;
+}
+.nav-movil-lista summary::-webkit-details-marker { display: none; }
+.nav-movil-lista summary::after {
+  content: "+";
+  font-size: var(--t-24); font-weight: 400; line-height: 1; color: var(--ink-3);
+  transition: transform var(--v-media) var(--sal);
+}
+.nav-movil-lista details[open] > summary::after { transform: rotate(45deg); }
+.nav-movil-lista details a {
+  display: block;
+  padding: var(--sp-3) 0 var(--sp-3) var(--sp-4);
+  color: var(--ink-2);
+  text-decoration: none;
+  font-size: var(--t-15);
+}
+.nav-movil-lista details[open] { border-bottom: 1px solid var(--line); padding-bottom: var(--sp-2); }
 
 /* El botón de cerrar vive dentro del cajón: con el menú abierto, la
    hamburguesa del encabezado queda debajo del velo y no se puede tocar. */
@@ -455,7 +571,7 @@ body[data-menu-abierto="true"]::before {
 body[data-menu-abierto="true"] { overflow: hidden; }
 
 @media (prefers-reduced-motion: reduce) {
-  .nav-movil, body::before, .nav-cerrar { transition: none; }
+  .nav-movil, body::before, .nav-cerrar, .nav-movil-lista summary::after { transition: none; }
 }
 
 /* El cajón se apaga en el MISMO punto en que desaparece la hamburguesa (900).
@@ -544,6 +660,28 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 .prueba-social::before {
   content: ""; width: 6px; height: 6px; border-radius: 50%;
   background: var(--success); flex-shrink: 0;
+}
+
+/* El escenario de la captura del hero. El marco blanco con borde gris claro
+   sobre fondo blanco se leía como una miniatura; sobre el azul suave se
+   despega sin necesitar sombra más fuerte ni un fondo oscuro, que en la web no
+   se usa. En pantallas anchas crece hacia el margen derecho —hasta 160 px— y
+   es de ahí de donde la captura saca su tamaño. */
+.hero-escenario {
+  background: var(--accent-soft);
+  border-radius: var(--r-lg);
+  padding: clamp(var(--sp-4), 2.4vw, var(--sp-6));
+  /* Un solo momento de entrada en toda la primera pantalla; lo demás aparece
+     quieto. `backwards` sostiene el estado inicial durante el retraso. */
+  animation: hero-entra var(--v-media) var(--sal) 80ms backwards;
+}
+@media (min-width: 980px) {
+  .hero-escenario { margin-right: calc(-1 * clamp(0px, (100vw - var(--ancho)) / 2, 160px)); }
+}
+@keyframes hero-entra { from { opacity: 0; transform: scale(0.98); } }
+@keyframes hero-entra-fundido { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .hero-escenario { animation-name: hero-entra-fundido; }
 }
 
 /* ==========================================================================
@@ -663,6 +801,9 @@ body[data-menu-abierto="true"] { overflow: hidden; }
   transition: height var(--v-media) var(--sal);
 }
 .acordeon-panel > div { padding-bottom: var(--sp-5); }
+/* Una fila que llega abierta desde el HTML: su alto es el de su contenido.
+   Cuando vim.js la abre o la cierra escribe el alto en línea, que gana a esto. */
+.acordeon-item[data-abierto="true"] > .acordeon-panel { height: auto; }
 
 @media (prefers-reduced-motion: reduce) {
   .acordeon-signo, .acordeon-panel { transition: none; }
@@ -995,17 +1136,16 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 @media (min-width: 860px) { .pasos-columna { grid-template-columns: 1fr; } }
 
 /* ==========================================================================
-   Nota de contraste (medida el 25-ago-2026)
+   Nota de contraste (medida el 25-ago-2026, `--ink-3` al día el 12-oct-2026)
 
-   `--ink-3` (#8E8E94) sobre blanco da 3.26:1. Eso NO pasa AA para texto
-   normal —hace falta 4.5— y solo vale para texto grande. El token no se
-   cambia porque se copia de `packages/ui/tokens.css` y dos fuentes de verdad
-   para el color ya costaron caro una vez.
+   `--ink-3` era #8E8E94 y sobre blanco daba 3.26:1, que no pasa AA. El núcleo
+   lo cambió a #6E6E74 en septiembre (5.07:1) y aquí se quedó el viejo un mes:
+   el token se copia a mano de `packages/ui/tokens.css`, y nada avisa cuando
+   allá cambia. Si vuelve a moverse, este archivo se revisa en el mismo cambio.
 
-   La regla es de USO, no de valor: `--ink-3` se queda para lo decorativo
-   —marcadores de lista, texto de relleno del hueco de una captura, el
-   placeholder de un campo— y NO se usa en nada que el visitante tenga que
-   leer. Para eso está `--ink-2` (6.85:1).
+   La regla de USO se queda: `--ink-3` es para lo de apoyo —marcadores de
+   lista, el placeholder de un campo, lo inactivo— y el texto que se lee va en
+   `--ink-2` (6.85:1).
 
    El resto de los pares del sistema están medidos y pasan; el más justo es el
    azul de los enlaces y de los botones, a 4.64.
@@ -1440,3 +1580,145 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 .novedad-cuerpo a { color: var(--accent); }
 .novedad-cuerpo h4 { margin: 0; }
 .novedad-cuerpo h4[data-tipo="nuevo"] { color: var(--accent); }
+
+/* ==========================================================================
+   Cuatro cosas, con una sola captura (portada)
+
+   A la izquierda, el acordeón de siempre con las cuatro funciones; a la
+   derecha, la captura de la fila abierta. Se emparejan por posición con
+   `:has()`: la fila 2 abierta enseña la captura 2. No hay JavaScript propio.
+
+   En pantalla ancha las cuatro capturas ocupan la misma celda y se relevan con
+   un fundido: miden lo mismo, así que deslizarlas sería mover la misma caja
+   para nada. En el teléfono miden distinto —dos van recortadas a 4:5—, y
+   apiladas dejarían un hueco bajo las cortas; ahí se enseña una y las demás no
+   ocupan sitio.
+   ========================================================================== */
+
+.cosas { display: grid; gap: var(--sp-6); align-items: start; }
+
+.cosas-capturas > .monitor { display: none; }
+.cosas:has(.acordeon-item:nth-child(1)[data-abierto="true"]) .cosas-capturas > :nth-child(1),
+.cosas:has(.acordeon-item:nth-child(2)[data-abierto="true"]) .cosas-capturas > :nth-child(2),
+.cosas:has(.acordeon-item:nth-child(3)[data-abierto="true"]) .cosas-capturas > :nth-child(3),
+.cosas:has(.acordeon-item:nth-child(4)[data-abierto="true"]) .cosas-capturas > :nth-child(4) { display: block; }
+
+@media (min-width: 900px) {
+  .cosas { grid-template-columns: 5fr 7fr; gap: var(--sp-10); }
+  .cosas-capturas { display: grid; }
+  .cosas-capturas > .monitor {
+    display: block;
+    grid-area: 1 / 1;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--v-corta) ease, visibility 0s linear var(--v-corta);
+  }
+  .cosas:has(.acordeon-item:nth-child(1)[data-abierto="true"]) .cosas-capturas > :nth-child(1),
+  .cosas:has(.acordeon-item:nth-child(2)[data-abierto="true"]) .cosas-capturas > :nth-child(2),
+  .cosas:has(.acordeon-item:nth-child(3)[data-abierto="true"]) .cosas-capturas > :nth-child(3),
+  .cosas:has(.acordeon-item:nth-child(4)[data-abierto="true"]) .cosas-capturas > :nth-child(4) {
+    opacity: 1;
+    visibility: visible;
+    transition: opacity var(--v-corta) ease, visibility 0s;
+  }
+}
+
+/* Lo que el producto ya hace y la portada no enseñaba. Lista y no tarjetas: son
+   seis renglones de apoyo debajo de las cuatro cosas, no otra sección. Dos
+   columnas en el teléfono para que quepan sin carrusel. */
+.ademas {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: var(--sp-5) var(--sp-6);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 800px) { .ademas { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.ademas li { display: flex; flex-direction: column; gap: var(--sp-1); }
+.ademas a {
+  font-family: var(--font-display); font-size: var(--t-18); font-weight: 600;
+  letter-spacing: -0.01em; text-decoration: none; width: fit-content;
+  transition: color var(--v-corta) ease;
+}
+@media (hover: hover) and (pointer: fine) { .ademas a:hover { color: var(--accent); } }
+.ademas p { font-size: var(--t-15); }
+
+/* ==========================================================================
+   Tarjeta que es enlace
+
+   El enlace vive en el título —así su nombre para un lector de pantalla es
+   «Negocio» y no la tarjeta entera— y su `::after` cubre la tarjeta. El borde
+   responde al mouse: sin eso nada decía que se podía entrar.
+   ========================================================================== */
+
+.plan { position: relative; transition: border-color var(--v-corta) ease; }
+.enlace-tarjeta { color: inherit; text-decoration: none; }
+.enlace-tarjeta::after { content: ""; position: absolute; inset: 0; }
+.enlace-tarjeta:focus-visible { outline: none; }
+.plan:has(.enlace-tarjeta:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .plan:has(.enlace-tarjeta):hover { border-color: var(--accent); }
+}
+
+/* ==========================================================================
+   Entrada al bajar
+
+   Cada bloque de una sección sube 12 px y aparece, una sola vez. Las clases las
+   pone vim.js y SOLO a lo que está por debajo de la pantalla al cargar: sin
+   script todo se ve, y lo que ya estaba a la vista no parpadea. Al terminar se
+   las quita, para que el `transition` de cada pieza vuelva a ser el suyo.
+
+   En las rejillas de tarjetas entra cada una 60 ms después de la anterior.
+   ========================================================================== */
+
+.por-entrar, .por-entrar-grupo > * { opacity: 0; transform: translateY(12px); }
+.por-entrar.entro, .por-entrar-grupo.entro > * {
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--v-media) var(--sal), transform var(--v-media) var(--sal);
+}
+.por-entrar-grupo.entro > :nth-child(2) { transition-delay: 60ms; }
+.por-entrar-grupo.entro > :nth-child(3) { transition-delay: 120ms; }
+.por-entrar-grupo.entro > :nth-child(4) { transition-delay: 180ms; }
+.por-entrar-grupo.entro > :nth-child(5) { transition-delay: 240ms; }
+.por-entrar-grupo.entro > :nth-child(n+6) { transition-delay: 300ms; }
+
+/* Con movimiento reducido queda el fundido y se va el desplazamiento. */
+@media (prefers-reduced-motion: reduce) {
+  .por-entrar, .por-entrar-grupo > * { transform: none; }
+}
+/* En papel no hay scroll que lo destape. */
+@media print {
+  .por-entrar, .por-entrar-grupo > * { opacity: 1; transform: none; }
+}
+
+/* ==========================================================================
+   Barra de secciones (Funciones, Precios)
+
+   Son las dos páginas más largas del sitio. La barra se queda pegada bajo el
+   encabezado —65 px: sus 64 y la línea— con las secciones de la página. En el
+   teléfono se desliza de lado.
+   ========================================================================== */
+
+.subnav {
+  position: sticky;
+  top: 65px;
+  z-index: 40;                             /* bajo el encabezado (50) y sus paneles */
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+}
+.subnav-fila {
+  display: flex; gap: var(--sp-5);
+  overflow-x: auto; overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.subnav-fila::-webkit-scrollbar { display: none; }
+.subnav a {
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; height: 44px;
+  color: var(--ink-2); text-decoration: none; white-space: nowrap;
+  font-size: var(--t-13); font-weight: 500;
+  transition: color var(--v-corta) ease;
+}
+@media (hover: hover) and (pointer: fine) { .subnav a:hover { color: var(--ink); } }
+/* El destino de un ancla tiene ahora dos barras encima, no una. */
+body:has(.subnav) :target { scroll-margin-top: calc(65px + 44px + var(--sp-5)); }

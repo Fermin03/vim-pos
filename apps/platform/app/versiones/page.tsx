@@ -1,5 +1,5 @@
 "use client";
-import { StatusChip } from "@vim/ui/styles";
+import { StatusChip, Icono } from "@vim/ui/styles";
 import { compararVersiones } from "../lib/fechas-panel";
 import { useCallback, useMemo, useState } from "react";
 import { hoyMx } from "@vim/fecha";
@@ -307,7 +307,7 @@ export default function VersionesPage() {
             <div className="flex flex-col gap-2 text-13">
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded border border-line bg-sel px-3 py-2.5">
                 <div>{vigente ?? "ninguna"}</div>
-                <span className="text-ink-2" aria-hidden="true">→</span>
+                <Icono nombre="flecha-derecha" className="h-4 w-4 text-ink-2" />
                 <div className="font-semibold">{nueva.version}</div>
               </div>
               <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-ink-2">

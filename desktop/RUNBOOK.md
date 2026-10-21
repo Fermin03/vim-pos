@@ -208,7 +208,7 @@ sin necesitar certificado de firma. La integridad está garantizada por el hash 
 los datos (`pgdata` en `userData`/`VIM_DATA_DIR`) se conservan al actualizar, y las **migraciones de
 BD nuevas se aplican solas** al arrancar. Al arrancar (caja y cocina) revisa el feed; si hay update:
 notificación + (en la caja) ítem en la bandeja "⬇ Actualización vX — instalar". Verificado headless
-(`npm run verify:updater`): detección de versión + descarga con SHA-512 + rechazo de descarga corrupta.
+(`src/updater.test.mjs`, corre en el CI): detección de versión + descarga con SHA-512 + rechazo de descarga corrupta.
 
 **Publicar una versión nueva:**
 
@@ -364,6 +364,38 @@ escribe Postgres, reintenta hasta 3 veces con 3 s y limpieza entre intentos
 (`arranque: Postgres no arrancó (intento 1/3): el puerto de Postgres sigue ocupado…`). Si a un
 cliente le vuelve a pasar, pedir `%APPDATA%\vim-pos-desktop\vim-pos.log` y buscar `arranque:`.
 
+### El otro "no abre a la primera": PostgREST que muere al nacer
+
+Síntoma (cinco veces en el log de una caja, ago–oct 2026, 5 de 120 arranques): Postgres arranca
+bien, `postgrest.log` se queda en dos líneas («Starting PostgREST», «API server listening») y a los
+60 s el arranque muere con `Boot falló: PostgREST no respondió`. Al abrir la app otra vez, funciona.
+
+Lo que se sabe: el proceso de PostgREST deja de existir menos de un segundo después de arrancar,
+sin escribir error y sin que Windows ni el antivirus registren nada. **No se sabe qué lo termina.**
+Lo que se descartó midiendo: que estuviera vivo pero lento (entonces registra cada sondeo con 503),
+que la base lo rechazara (escribe el error antes de salir) y el `done is not a function` que aparece
+cerca en el log (es ruido del gancho de salida de embedded-postgres al cerrarse cualquier instancia).
+
+Desde esta versión el arranque ya no espera a ciegas: nota en el acto que PostgREST (o Postgres) se
+cerró, lo anota y vuelve a levantar el backend entero, hasta 3 intentos — lo que antes hacía el
+cajero a mano. Queda en el log así, y **ese renglón es el dato que faltaba** para saber la causa:
+
+```
+arranque: el backend no arrancó (intento 1/3), se vuelve a intentar: PostgREST no respondió:
+PostgREST se cerró solo (código 1) tras ECONNREFUSED ×1. ⏎ Lo último de PostgREST: ⏎ …
+```
+
+Si vuelve a pasar, buscar `se vuelve a intentar` en el log y mirar el código de salida y lo último
+que escribió PostgREST. Solo NO se reintenta cuando Postgres y PostgREST viven y PostgREST contesta
+503 el minuto entero: ahí el problema está en la base y repetir solo alarga la espera.
+
+**El puerto de PostgREST con dueño.** En Windows un segundo PostgREST enlaza sin error un puerto
+donde ya escucha otro (Warp pone `SO_REUSEADDR`) y no recibe nada: las peticiones se las queda el
+primero, que contesta 503 si su base ya no existe. Pasa con un PostgREST que quedó vivo de una
+sesión anterior o de otra copia de la app. El arranque ahora pregunta antes (`puertoOcupado`) y, si
+el 54331 tiene dueño, usa un puerto libre: es interno, solo lo usa el gateway. En el log:
+`el puerto 54331 de PostgREST ya está ocupado: se usa el <N>`.
+
 ## Endurecimiento de la auditoría integral (30/09/2026)
 
 - **Privilegios de la BD local.** El arranque ya NO hace `GRANT … ON ALL TABLES` (deshacía los
@@ -394,6 +426,143 @@ La caja vinculada a la nube corre un agente (`src/delivery-espejo.mjs`, log `· 
 Uber (`delivery-accion` → `aceptar`). El gateway reenvía `POST /functions/v1/delivery-accion` a la
 nube con el token de dispositivo (`backend.nube`), así la pantalla del POS no cambia. Pruebas:
 `pnpm test:escritorio` (planificador + agente con nube y base falsas).
+
+### La tienda en línea propia (canal `TIENDA`) — entrega 4, caja 0.8.0
+
+> Solo la caja **0.8.0 o posterior** lo hace. Una caja anterior no declara la tienda en su sondeo,
+> así que la nube no sella su turno y la tienda de esa sucursal sale «sin turno abierto»
+> (`CAJA_NO_LISTA`) mientras ningún POS web tenga turno. La 0.8.0 **no está publicada**: ver
+> [`../docs/operacion/instalador-0.8.0-pendiente.md`](../docs/operacion/instalador-0.8.0-pendiente.md).
+
+Los pedidos de la tienda son filas de `delivery_pedidos` con `canal = 'TIENDA'` y `conexion_id`
+NULL (`app` = `DRIVE_THRU` para recoger, `DELIVERY_PROPIO` a domicilio). Viajan por el mismo agente
+y el mismo sondeo que Uber; la rama se decide siempre por `canal`, nunca por `app`.
+
+- **El agente arranca** si el cliente tiene `delivery_apps` **o** `tienda` (`debeSondearApps` →
+  `directivas.mjs`). Un negocio solo con tienda ya no queda sin espejo.
+- **Qué manda en cada sondeo** (`delivery-espejo`): `{desde, tienda: true, turno_abierto}`.
+  `turno_abierto` sale de una consulta local por vuelta (turno `ABIERTO` en la sucursal de ESTA
+  caja). Con `tienda: true` y `turno_abierto: true` la nube sella `cajas.espejo_turno_abierto_at`;
+  esa marca es lo que lee `sucursal_recibe_pedidos`, que da por buena la caja **90 s**. Si la caja
+  deja de reportar turno abierto, la marca envejece sola y la tienda de la sucursal se cierra.
+  La respuesta trae la clave `tienda` (`{participa, aceptacion, pausa_hasta}`; `null` si el negocio
+  no tiene el módulo o la nube es anterior) y `siguiente_en_ms`: **10 s** mientras haya un pedido
+  `RECIBIDO` o uno de la tienda de gestión `ESCRITORIO` vivo; 30 s con la tienda o Uber conectados
+  sin pedidos; 300 s en reposo.
+- **Cuándo acepta sola.** Solo si `tienda.aceptacion === 'AUTO'`, hay turno abierto y el pedido
+  está `RECIBIDO` con gestión `ESCRITORIO` (de esta caja o sin reclamar). Con `MANUAL` (o sin la
+  clave `tienda`) nunca: acepta el cajero en la pantalla «Pedidos en línea» y la caja ve el
+  `ACEPTADO` en el sondeo siguiente. Los pedidos de gestión `NUBE` no son de la caja: los atiende el
+  POS web (`delivery-accion` le contesta `409 ACCION_INVALIDA` a una caja que intente aceptarlos, y
+  el agente ni lo intenta). En la pantalla de la caja salen como informativos («Se atiende desde el
+  POS web.»): sin botones, sin timbre y sin contar en el mosaico. Tampoco los reporta: su estado lo
+  pone la nube sola mirando el ticket (`tienda_sincronizar_estados_nube`, 0164, dentro de
+  `delivery_marcar_expirados`, cada minuto, con la misma tabla de abajo), y `estado` sobre un
+  pedido que no es de gestión `ESCRITORIO` responde `409 ACCION_INVALIDA`.
+- **Cómo crea el ticket.** `reclamar` (`delivery-accion`) → `SELECT crear_ticket_desde_tienda($1)`
+  en la base local → si el pedido estaba `RECIBIDO`, `aceptar` en la nube **sin** `tiempo_prep_min`.
+  Va en ese orden a propósito: primero el ticket (la cocina ya lo tiene), luego el aviso al cliente.
+  Si el `aceptar` falla se reintenta cada vuelta (`aAceptar`), igual que con Uber. Si la nube
+  contesta `ACCION_INVALIDA` la respuesta trae el `estado` en que quedó el pedido: si sigue vivo
+  (lo aceptó otra pantalla en el mismo instante) se da por aceptado; si ya no (se rechazó o venció
+  justo antes), queda en el pedido el aviso «El pedido en línea se canceló: cancela el ticket en caja».
+- **Qué estados reporta y de dónde los saca.** El cajero no marca nada. En cada vuelta, para los
+  pedidos `TIENDA` de gestión `ESCRITORIO` con ticket local en `ACEPTADO / EN_PREPARACION / LISTO` (con tope de 48 h desde
+  `recibido_at`), se mira el **ticket local** y el estado local del pedido (`estadoAReportar`), de arriba abajo:
+
+  | Ticket local | Se reporta (`delivery-accion` → `estado`) |
+  |---|---|
+  | `estado_fiscal = CANCELADO` | `CANCELADO` |
+  | `PAGADO` o `FACTURADO` | `ENTREGADO` |
+  | `ticket_impreso_at` no nulo, o con repartidor asignado (`delivery_asignaciones`) | `LISTO` |
+  | abierto, sin imprimir y sin repartidor, con el pedido local todavía en `ACEPTADO` | `EN_PREPARACION` (el «ya lo tengo», desde la 0.8.0) |
+  | cualquier otro | nada |
+
+  **«Ya lo tengo».** `EN_PREPARACION` le dice a la nube que la caja ya creó la cuenta del pedido.
+  Sale en la misma vuelta en que se crea el ticket si el pedido ya venía `ACEPTADO` (lo aceptó el
+  cajero); si lo aceptó la caja sola, en la vuelta siguiente, cuando el sondeo trae el `ACEPTADO`.
+  Sin ese aviso la nube cancela el pedido a los **15 minutos** de aceptado (caja apagada o sin
+  turno). Si al reportar cualquier estado de un ticket abierto la nube contesta `CANCELADO`, queda
+  en el pedido el aviso «El pedido en línea se canceló: cancela el ticket en caja». Una nube
+  anterior a la 0167 contesta `ESTADO_INVALIDO` (400): cae en la regla de los 5 minutos de abajo, y
+  al imprimir o cobrar se reporta `LISTO` / `ENTREGADO` como siempre.
+
+  La nube (`tienda_reportar_estado`, 0164) solo **avanza** estados y contesta en cuál quedó el
+  pedido; eso es lo que la caja guarda. Si no coincide con lo reportado (p. ej. reportó `LISTO` y
+  quedó `RECIBIDO` porque el `aceptar` falló), no se insiste cada 10 s: se anota en memoria y se
+  repite pasados **5 min** o cuando cambie el ticket. Una nube caída o un token vencido (≥ 500 o
+  401) sí se reintenta en la vuelta siguiente. Un pedido en `ERROR` no se reporta.
+- **Un pedido que no se puede convertir en ticket.** `crear_ticket_desde_tienda` puede fallar por
+  cosas que reintentar arregla y por cosas que no. Lo desconocido se reintenta a propósito: no se
+  cancela un pedido por un error que no entendemos. La tabla es la misma en la caja
+  (`fallaDeTicket`, `delivery-espejo-plan.mjs`) y en la nube (`enlinea.ts`); si cambia una, cambia la
+  otra. Se reconoce con `includes` sobre el mensaje, en este orden (lo no reintentable manda):
+
+  | El mensaje trae | Código | ¿Reintenta? |
+  |---|---|---|
+  | `TOTAL_NO_COINCIDE`, `ENVIO_NO_COINCIDE`, `DIRECCION_INVALIDA`, `CLIENTE_BLOQUEADO`, `PRODUCTO_DE_OTRO_NEGOCIO`, `OPCION_DE_OTRO_NEGOCIO`, `ITEM_SIN_MAPEAR`, `COMBO_ELECCION_SIN_MAPEAR`, `COMBO_ELECCION_AMBIGUA`, `SUCURSAL_DE_OTRO_NEGOCIO` | el mismo | no |
+  | «no existe o está eliminado» | `PRODUCTO_NO_EXISTE` | no, con gracia |
+  | «Opción de modificador» | `OPCION_NO_EXISTE` | no, con gracia |
+  | «Zona de envío» | `ZONA_NO_DISPONIBLE` | no, con gracia |
+  | «no está disponible», «está agotado o pausado», «no se vende en esta sucursal», «no es un combo de este negocio», «no es válido como componente», «requiere entre», «está excluido del slot», «no es opción del slot», «no pertenece al combo» | `PRODUCTO_NO_DISPONIBLE` | no |
+  | `SIN_TURNO_ABIERTO` | `SIN_TURNO_ABIERTO` | sí |
+  | código de Postgres `23505` (dos cajas crearon al mismo cliente a la vez) | `DUPLICADO` | sí |
+  | cualquier otro (turno que se cerró en la carrera, `23503`, timeout, backend reiniciándose) | `RPC_ERROR` | sí |
+
+  **La gracia de 3 minutos** (`GRACIA_CATALOGO_MS`, solo en la caja): «no existe» puede querer decir
+  «el catálogo local todavía no bajó» (se sondea cada minuto, a veces más). Mientras el pedido
+  tenga menos de 3 min desde `recibido_at`, `PRODUCTO_NO_EXISTE`, `OPCION_NO_EXISTE` y
+  `ZONA_NO_DISPONIBLE` se reintentan; a partir de ahí cancelan. Los demás no esperan. La nube
+  (pedidos de gestión `NUBE`) no tiene gracia.
+
+  Lo no reintentable **cancela el pedido solo**: `rechazar` (motivo `OTRO`) si la nube lo tiene
+  `RECIBIDO`; `estado CANCELADO` si ya estaba `ACEPTADO`. Solo cuando la nube confirmó la baja se
+  escribe en el pedido el texto para el cajero («Este pedido se canceló solo: el precio cambió…
+  Avísale al cliente.», sin códigos internos). Si la nube no la toma, se reintenta en la vuelta
+  siguiente. Un fallo reintentable no llama a la nube: deja el código en `ultimo_error` y la caja
+  vuelve a los 10 s.
+- **Qué buscar en el log** (`vim-pos.log`, todo con el prefijo `· [espejo]`):
+
+  | Renglón | Qué quiere decir |
+  |---|---|
+  | `pedido T101: no se pudo crear el ticket local (SIN_TURNO_ABIERTO)` | Reintentable. Sin turno en esta caja; se arregla abriendo turno. |
+  | `pedido T101: no se pudo crear el ticket local (RPC_ERROR…)` | Error desconocido; se reintenta cada vuelta. Si no se va, es un bug: el mensaje de Postgres sigue en `ultimo_error`. |
+  | `pedido T101: no se puede pasar a caja (TOTAL_NO_COINCIDE); se canceló` | Cancelación automática, ya confirmada por la nube. |
+  | `…; la nube no tomó la cancelación (…); se reintenta` | La baja falló (nube caída, 5xx). Vuelve a intentar sola. |
+  | `pedido T101: accept en la nube falló (…); se reintenta` | El ticket existe y la nube no lo tomó; no es de Uber. |
+  | `pedido T101: la nube ya lo había cerrado y aquí ya tiene ticket…` | Se rechazó o venció justo antes de crear el ticket. El cajero ve el aviso de cancelar. |
+  | `pedido T101: no se pudo reportar LISTO (…); se reintenta` | La nube respondió ≥ 500 o 401. |
+  | `pedido T101: la nube no tomó el estado LISTO (quedó RECIBIDO); se reintenta en 5 min` | Contestó y no lo tomó. Mira el estado del pedido en la nube. |
+  | `pedido T101: la nube no tomó el estado EN_PREPARACION (ESTADO_INVALIDO); se reintenta en 5 min` | La nube todavía no conoce el «ya lo tengo» (funciones sin desplegar). No estorba al resto. |
+  | `reporte de estados de la tienda falló: …` | Error local al leer el reporte; no cuenta como sondeo fallido de Uber. |
+  | `pedido T101: RECLAMADO_POR_OTRA_CAJA (no es de esta caja)` | Otra caja de la sucursal lo tomó; no es un error. |
+  | `espejo HTTP 403 CAJA_NO_EXISTE` | Caja desactivada o ya no es de ese negocio. |
+  | `· [espejo] omitido (el cliente no tiene apps de delivery ni tienda en línea)` | El agente no arrancó: el negocio no tiene ninguno de los dos módulos. |
+  | `· [espejo] retención: no se pudieron anonimizar los pedidos viejos de esta caja (…)` | Falló el borrado a 30 días de la copia local (abajo). Sale una sola vez por arranque; se reintenta a las 24 h o al reiniciar. |
+- **El borrado a 30 días, en la copia de la caja** (`crearRetencion`, `delivery-espejo.mjs`; desde
+  la 0.8.0). La nube anonimiza los pedidos en línea de más de 30 días con su cron diario, pero el
+  espejo solo trae lo que cambió en las últimas 24 h, así que esa limpieza nunca llegaba a la base
+  local. La caja ejecuta en su Postgres `SELECT delivery_anonimizar_pedidos_viejos(30)` **al
+  arrancar y cada 24 h** (la función es la de la 0167: no usa `cron` ni `net`). No depende del
+  agente de espejo: corre también en un negocio que ya no tiene apps ni tienda, que es justo el que
+  se quedaría con pedidos viejos. Para comprobarlo en una caja:
+  `SELECT count(*) FROM delivery_pedidos WHERE recibido_at < now() - interval '31 days' AND cliente_telefono IS NOT NULL`
+  debe dar 0. **Lo que la función no toca** (igual que en la nube): una copia que se quedó en
+  `RECIBIDO`, y las de Uber en `ACEPTADO` o `EN_PREPARACION`. En la nube esos estados no duran; en
+  una caja que estuvo apagada más de 24 h mientras el pedido se cerraba, la copia local sí puede
+  quedarse así. Pendiente conocido.
+
+  Para ver el pedido: `delivery_pedidos` (`estado`, `ultimo_error`, `ticket_id`) en la base de la
+  caja y en la nube; el seguimiento del cliente lee `tienda_seguimiento`.
+- **La comanda y el timbre, en el POS de la caja.** La comanda sale sola una vez; si no salió, el
+  detalle de esa cuenta en Pick-up o Domicilio avisa «La comanda no se imprimió» y ofrece **Imprimir comanda** (no se
+  reintenta sola). El timbre solo suena por pedidos que esta caja puede aceptar: no por los que
+  tomó otra caja (`gestion_caja_id` ajeno) ni pasada su `vence_aceptacion`, aunque la copia local
+  siga en `RECIBIDO` por falta de internet. La nota del pedido (pantalla, ticket y comanda) sale solo
+  en tickets nacidos de la tienda (`origen_creacion = 'API_EXTERNA'` en Pick-up o Domicilio).
+- **El latido del POS web.** Sin caja instalada, el POS web con turno abierto avisa cada 30 s
+  (`enlinea_presente` con su `caja_id`) y la nube sella la marca de esa caja. Dentro de la caja
+  instalada no corre: ahí lo sella el sondeo.
 
 ## Hub del local — KDS en tiempo real por LAN (Fase 2)
 

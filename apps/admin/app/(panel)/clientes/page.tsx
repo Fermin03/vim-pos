@@ -19,10 +19,8 @@ import { CLIENTES_POR_PAGINA, paginasTotales, textoRango } from "../../lib/clien
 import { mensajeError } from "../../lib/errores";
 import { useModulos } from "../../components/admin-shell";
 import { ClienteLealtad } from "../../components/cliente-lealtad";
-
-const input =
-  "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-13 font-medium text-ink-2";
+import { input, label } from "../../components/campos";
+import { AccionFila, Segmentos } from "../../components/controles";
 
 type FormDatos = {
   nombre: string; apellido_paterno: string; telefono: string; email: string; rfc: string;
@@ -103,7 +101,6 @@ export default function ClientesPage() {
 
   /** Vuelve a pedir la página actual y los indicadores (tras guardar, bloquear o eliminar). */
   const recargar = () => setVersion((v) => v + 1);
-
 
   function nuevo() {
     setError(null);
@@ -205,22 +202,16 @@ export default function ClientesPage() {
         )}
 
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <div className="scroll-x-limpio inline-flex max-w-full gap-0.5 overflow-x-auto rounded border border-line bg-hover p-[3px] lg:max-w-none lg:overflow-x-visible">
-            {([
+          <Segmentos
+            etiqueta="Qué clientes ver"
+            opciones={[
               { v: "TODOS", l: "Todos los clientes" },
               { v: "CON_RFC", l: "Con factura (RFC)" },
               { v: "RECURRENTES", l: "Recurrentes (3+)" },
-            ] as { v: FiltroCliente; l: string }[]).map((t) => (
-              <button
-                key={t.v}
-                type="button"
-                onClick={() => setFiltro(t.v)}
-                className={["flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-[11px] text-13 font-semibold transition lg:py-1.5", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
-              >
-                {t.l}
-              </button>
-            ))}
-          </div>
+            ]}
+            valor={filtro}
+            onCambiar={setFiltro}
+          />
           <input
             className="h-9 max-w-sm flex-1 rounded border border-line-strong px-3 text-13 outline-none focus:border-ink"
             value={busqueda}
@@ -273,12 +264,11 @@ export default function ClientesPage() {
                     <td className="px-4 py-2.5 text-ink-2">{fmtVisita(c.ultimaVisita)}</td>
                     <td className="px-4 py-2.5 text-right whitespace-nowrap">
                       {conLealtad && (
-                        <button type="button" onClick={() => setLealtadDe({ id: c.id, nombre: [c.nombre, c.apellido_paterno].filter(Boolean).join(" "), saldo: c.lealtadSaldo, venceEl: c.lealtadVenceEl })}
-                          className="mr-3 text-13 font-semibold text-ink-2 hover:text-ink">Lealtad</button>
+                        <AccionFila className="mr-3" onClick={() => setLealtadDe({ id: c.id, nombre: [c.nombre, c.apellido_paterno].filter(Boolean).join(" "), saldo: c.lealtadSaldo, venceEl: c.lealtadVenceEl })}>Lealtad</AccionFila>
                       )}
-                      <button type="button" onClick={() => editar(c)} className="text-13 font-semibold text-ink-2 hover:text-ink">Editar</button>
-                      <button type="button" onClick={() => alternarBloqueo(c)} className="ml-3 text-13 font-semibold text-ink-3 hover:text-ink">{c.estado === "ACTIVO" ? "Bloquear" : "Activar"}</button>
-                      <button type="button" onClick={() => borrar(c)} className="ml-3 text-13 font-semibold text-ink-3 hover:text-danger">Eliminar</button>
+                      <AccionFila onClick={() => editar(c)}>Editar</AccionFila>
+                      <AccionFila className="ml-3" onClick={() => alternarBloqueo(c)}>{c.estado === "ACTIVO" ? "Bloquear" : "Activar"}</AccionFila>
+                      <AccionFila peligro className="ml-3" onClick={() => borrar(c)}>Eliminar</AccionFila>
                     </td>
                   </tr>
                 ))}

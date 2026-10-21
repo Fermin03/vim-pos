@@ -63,6 +63,10 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
     if (d.entrega.referencias) b.push({ t: "texto", valor: `Ref: ${d.entrega.referencias}`, size: 1 });
     if (d.entrega.notasRepartidor) b.push({ t: "texto", valor: `Nota: ${d.entrega.notasRepartidor}`, size: 1 });
   }
+  // 2.c Nota del pedido: con cuánto paga el cliente y lo que pidió por escrito. Quien entrega la
+  //      necesita junto a la dirección. El " · " con que la base une las partes no existe en la
+  //      impresora (saldría "?"), así que va como guion.
+  if (d.notaPedido?.trim()) b.push({ t: "texto", valor: `Nota del pedido: ${d.notaPedido.trim().replaceAll(" · ", " - ")}`, size: 1, bold: true });
 
   b.push({ t: "separador", estilo: "punteado" });
 
@@ -112,6 +116,8 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
   // 5. Pago(s) — misma info que ReciboTicket: forma de pago, y si es efectivo, recibido/cambio.
   for (const p of d.pagos) {
     b.push({ t: "fila", izq: "Forma de pago", der: p.metodo });
+    if (p.tarjeta) b.push({ t: "fila", izq: "", der: p.tarjeta });
+    if (p.autorizacion) b.push({ t: "fila", izq: "Autorización", der: p.autorizacion });
     if (p.recibidoMxn != null) {
       b.push({ t: "fila", izq: "Recibido", der: pesos(p.recibidoMxn) });
       b.push({ t: "fila", izq: "Cambio", der: pesos(p.cambioMxn) });

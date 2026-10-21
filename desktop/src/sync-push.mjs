@@ -190,6 +190,9 @@ async function asegurarTabla(pool) {
   // puede darlas de alta (el cajero necesita cobrar un domicilio a una colonia nueva sin esperar al
   // panel). Pero van por HUELLA, no "una sola vez por id": ver `asegurarLibretaZonas`.
   await asegurarLibretaZonas(pool);
+  // Colonias (0187): la caja las captura al tomar un domicilio y les asigna zona. Mismo mecanismo
+  // y mismo motivo que las zonas. Sin siembra: ninguna caja anterior a la 0187 tiene colonias.
+  await asegurarLibretaColonias(pool);
 
   // Clientes y sus direcciones: el POS los da de alta al tomar un domicilio y NUNCA subían. El
   // padrón se quedaba en la caja: /admin/clientes vacío y los tickets de la nube apuntando a
@@ -223,7 +226,7 @@ export const HUELLA_ZONA = "md5(to_jsonb(x)::text)";
  *
  * Se exporta aparte de `ZONA_PENDIENTE` porque `pullSnapshot` (sync-pull.mjs) la reusa con un
  * propósito distinto: no decidir qué subir, sino qué fila entrante de la nube HAY que descartar
- * para no pisar ese cambio local antes de que el push lo suba (ver `separarZonasPendientes`).
+ * para no pisar ese cambio local antes de que el push lo suba (ver `separarPendientes`).
  * Ahí SÍ importa distinguir "cambiada" de "nunca confirmada" (`o.zona_id IS NULL`): una fila que
  * nunca pasó por la libreta y coincide de id con la nube es una zona genuinamente nueva de allá,
  * no una edición local que proteger.
@@ -234,10 +237,23 @@ export const HUELLA_ZONA = "md5(to_jsonb(x)::text)";
 export const ZONA_EDITADA_LOCAL = `(o.huella IS NOT NULL AND o.huella IS DISTINCT FROM ${HUELLA_ZONA})`;
 
 /**
- * Zonas de envío que hay que mandar: las que la nube nunca confirmó, y las que CAMBIARON desde la
- * última vez que la nube y la caja coincidieron. `x` es `zonas_envio`; `o`, la libreta.
+ * Catálogos que la caja edita y que viajan por HUELLA, con su libreta. Las zonas cuentan el porqué
+ * (ver `asegurarLibretaZonas`); las colonias (0187) heredan el mismo riesgo: una colonia a la que
+ * el cajero le asigna zona ya está en la libreta, y sin huella el pull se la quitaba.
  */
-const ZONA_PENDIENTE = `(o.zona_id IS NULL OR ${ZONA_EDITADA_LOCAL})`;
+export const LIBRETAS = {
+  zonas_envio: { libreta: "_vim_zonas_ok", col: "zona_id" },
+  colonias: { libreta: "_vim_colonias_ok", col: "colonia_id" },
+};
+
+/**
+ * Filas de `tabla` que hay que mandar: las que la nube nunca confirmó, y las que CAMBIARON desde la
+ * última vez que la nube y la caja coincidieron. `x` es la tabla; `o`, su libreta.
+ */
+function pendiente(tabla) {
+  return `(o.${LIBRETAS[tabla].col} IS NULL OR ${ZONA_EDITADA_LOCAL})`;
+}
+const ZONA_PENDIENTE = pendiente("zonas_envio");
 
 /**
  * Crea (o migra) la libreta `_vim_zonas_ok` y rellena las huellas que falten.
@@ -257,12 +273,20 @@ const ZONA_PENDIENTE = `(o.zona_id IS NULL OR ${ZONA_EDITADA_LOCAL})`;
  *
  * Idempotente y barata: la llaman el arranque, cada push y cada pull.
  */
-export async function asegurarLibretaZonas(db) {
-  await db.query("CREATE TABLE IF NOT EXISTS _vim_zonas_ok (zona_id uuid PRIMARY KEY, huella text NULL, subido_at timestamptz DEFAULT now())");
-  await db.query("ALTER TABLE _vim_zonas_ok ADD COLUMN IF NOT EXISTS huella text NULL");
-  await db.query(`UPDATE _vim_zonas_ok o SET huella = ${HUELLA_ZONA}
-                    FROM zonas_envio x WHERE x.id = o.zona_id AND o.huella IS NULL`);
+export async function asegurarLibreta(db, tabla) {
+  const { libreta, col } = LIBRETAS[tabla];
+  await db.query(`CREATE TABLE IF NOT EXISTS ${libreta} (${col} uuid PRIMARY KEY, huella text NULL, subido_at timestamptz DEFAULT now())`);
+  await db.query(`ALTER TABLE ${libreta} ADD COLUMN IF NOT EXISTS huella text NULL`);
+  await db.query(`UPDATE ${libreta} o SET huella = ${HUELLA_ZONA}
+                    FROM ${tabla} x WHERE x.id = o.${col} AND o.huella IS NULL`);
 }
+export const asegurarLibretaZonas = (db) => asegurarLibreta(db, "zonas_envio");
+/**
+ * La huella de una colonia incluye `nombre_busqueda` (columna generada) y la fila de la nube baja
+ * sin ella. No importa: la huella siempre se calcula sobre la fila LOCAL —la recién escrita por el
+ * pull y la actual en el push—, así que las dos traen la columna y coinciden.
+ */
+export const asegurarLibretaColonias = (db) => asegurarLibreta(db, "colonias");
 
 /**
  * Sube los cortes que se quedaron atrapados en esta caja. UNA sola vez por caja.
@@ -314,7 +338,8 @@ async function rescatarCortesUnaVez(pool) {
 }
 
 /**
- * Siembra `_vim_repartidores_ok` con el catálogo que ya está en la caja. UNA sola vez por caja, EN
+ * Siembra una libreta de catálogo (`_vim_repartidores_ok`, `_vim_zonas_ok`) con lo que ya está en la
+ * caja; el razonamiento va contado con la de repartidores. UNA sola vez por caja, EN
  * EL ARRANQUE — la llama `startLocalBackend` (runtime.mjs) justo después de aplicar migraciones.
  *
  * QUÉ SIEMBRA Y POR QUÉ ES SEGURO
@@ -359,13 +384,14 @@ async function rescatarCortesUnaVez(pool) {
  * por una libreta de sincronización. Solo se protege el `INSERT` de la siembra: si fallara la
  * escritura del marcador, que aborte — de todos modos abortaría en los GRANT de doce líneas abajo.
  */
-export async function sembrarRepartidoresUnaVez(db, log = () => {}) {
-  await db.query("CREATE TABLE IF NOT EXISTS _vim_repartidores_ok (repartidor_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
+async function sembrarLibretaUnaVez(db, log, { que, libreta, clave, asegurar, siembra }) {
+  // Fuera del try de abajo a propósito: sin la libreta nada del push de ese catálogo funciona.
+  await asegurar();
   await db.query(
     "CREATE TABLE IF NOT EXISTS _vim_migraciones_sync (clave text PRIMARY KEY, aplicada_at timestamptz DEFAULT now())",
   );
   const { rowCount: yaCorrio } = await db.query(
-    "SELECT 1 FROM _vim_migraciones_sync WHERE clave = 'siembra_repartidores_0114'",
+    `SELECT 1 FROM _vim_migraciones_sync WHERE clave = '${clave}'`,
   );
   if (yaCorrio) return 0;
 
@@ -376,27 +402,25 @@ export async function sembrarRepartidoresUnaVez(db, log = () => {}) {
   // arreglo. Pasa en las máquinas de desarrollo que corrieron la build anterior de esta rama (a
   // ninguna caja de cliente le llegó), y el plan de pruebas a mano hace justo ese recorrido.
   // No sembrar es seguro: lo único que se pierde es la protección contra una subida del catálogo.
-  const { rowCount: yaTieneFilas } = await db.query("SELECT 1 FROM _vim_repartidores_ok LIMIT 1");
+  const { rowCount: yaTieneFilas } = await db.query(`SELECT 1 FROM ${libreta} LIMIT 1`);
 
   await db.query(
-    "INSERT INTO _vim_migraciones_sync(clave) VALUES ('siembra_repartidores_0114') ON CONFLICT DO NOTHING",
+    `INSERT INTO _vim_migraciones_sync(clave) VALUES ('${clave}') ON CONFLICT DO NOTHING`,
   );
 
   // Se marca igual, para no volver a mirarlo en cada arranque.
   if (yaTieneFilas) {
-    log("libreta de repartidores ya tenía anotaciones: no se siembra (marcaría un alta local sin subir)");
+    log(`libreta de ${que} ya tenía anotaciones: no se siembra (marcaría un alta local sin subir)`);
     return 0;
   }
 
   try {
-    const { rowCount: n } = await db.query(
-      "INSERT INTO _vim_repartidores_ok (repartidor_id) SELECT id FROM repartidores ON CONFLICT DO NOTHING",
-    );
-    if (n > 0) log(`libreta de repartidores sembrada con ${n} del catálogo (bajaron de la nube: no vuelven a subir)`);
+    const { rowCount: n } = await db.query(siembra);
+    if (n > 0) log(`libreta de ${que} sembrada con ${n} del catálogo (bajaron de la nube: no vuelven a subir)`);
     return n;
   } catch (e) {
     // Ruidoso pero no fatal: la caja abre. El siguiente push subirá el catálogo entero una vez.
-    const aviso = `no se pudo sembrar la libreta de repartidores (${e.message}). La caja abre igual;`
+    const aviso = `no se pudo sembrar la libreta de ${que} (${e.message}). La caja abre igual;`
       + " el próximo push subirá el catálogo completo una vez y puede pisar ediciones recientes del panel.";
     log(`⚠ ${aviso}`);
     console.error("· [sync]", aviso);
@@ -404,59 +428,29 @@ export async function sembrarRepartidoresUnaVez(db, log = () => {}) {
   }
 }
 
+export function sembrarRepartidoresUnaVez(db, log = () => {}) {
+  return sembrarLibretaUnaVez(db, log, {
+    que: "repartidores", libreta: "_vim_repartidores_ok", clave: "siembra_repartidores_0114",
+    asegurar: () => db.query("CREATE TABLE IF NOT EXISTS _vim_repartidores_ok (repartidor_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())"),
+    siembra: "INSERT INTO _vim_repartidores_ok (repartidor_id) SELECT id FROM repartidores ON CONFLICT DO NOTHING",
+  });
+}
+
 /**
  * Siembra `_vim_zonas_ok` con el catálogo que ya está en la caja. UNA sola vez por caja, EN EL
  * ARRANQUE — la llama `startLocalBackend` (runtime.mjs) justo después de `sembrarRepartidoresUnaVez`.
  *
- * Es la misma función que la de arriba, copiada para `zonas_envio`: mismo riesgo en los dos
- * sentidos (marcar de más pierde un alta local para siempre; marcar de menos pisa el nombre, el
- * costo y el `activa` que se acaban de editar en el panel), mismo motivo para sembrar en el
- * arranque y no en el primer push (el arranque no depende de la nube), y misma razón para marcar el
- * marcador ANTES de sembrar y para que un fallo aquí no tumbe la caja. El razonamiento completo,
- * comentario por comentario, está en `sembrarRepartidoresUnaVez` — no se repite aquí.
+ * Es la misma siembra que la de arriba, para `zonas_envio`: mismo riesgo en los dos sentidos
+ * (marcar de más pierde un alta local para siempre; marcar de menos pisa el nombre, el costo y el
+ * `activa` que se acaban de editar en el panel). Lo único propio es la libreta, que lleva huella:
+ * `asegurarLibretaZonas` la migra y rellena en cada arranque; la siembra, en cambio, una sola vez.
  */
-export async function sembrarZonasUnaVez(db, log = () => {}) {
-  // Fuera del try de abajo a propósito, igual que antes el CREATE: sin la libreta nada del push de
-  // zonas funciona. Migra y rellena huellas en cada arranque; la siembra, en cambio, una sola vez.
-  await asegurarLibretaZonas(db);
-  await db.query(
-    "CREATE TABLE IF NOT EXISTS _vim_migraciones_sync (clave text PRIMARY KEY, aplicada_at timestamptz DEFAULT now())",
-  );
-  const { rowCount: yaCorrio } = await db.query(
-    "SELECT 1 FROM _vim_migraciones_sync WHERE clave = 'siembra_zonas_0116'",
-  );
-  if (yaCorrio) return 0;
-
-  // Libreta con filas y sin marcador: la escribió el pull, o una siembra anterior. El catálogo
-  // local YA puede traer un alta hecha en la caja y sin subir; sembrar ahora la marcaría como
-  // enviada — la misma pérdida que esta función existe para impedir. No sembrar es seguro: lo
-  // único que se pierde es la protección contra una subida del catálogo.
-  const { rowCount: yaTieneFilas } = await db.query("SELECT 1 FROM _vim_zonas_ok LIMIT 1");
-
-  await db.query(
-    "INSERT INTO _vim_migraciones_sync(clave) VALUES ('siembra_zonas_0116') ON CONFLICT DO NOTHING",
-  );
-
-  // Se marca igual, para no volver a mirarlo en cada arranque.
-  if (yaTieneFilas) {
-    log("libreta de zonas ya tenía anotaciones: no se siembra (marcaría un alta local sin subir)");
-    return 0;
-  }
-
-  try {
-    const { rowCount: n } = await db.query(
-      `INSERT INTO _vim_zonas_ok (zona_id, huella) SELECT x.id, ${HUELLA_ZONA} FROM zonas_envio x ON CONFLICT DO NOTHING`,
-    );
-    if (n > 0) log(`libreta de zonas sembrada con ${n} del catálogo (bajaron de la nube: no vuelven a subir)`);
-    return n;
-  } catch (e) {
-    // Ruidoso pero no fatal: la caja abre. El siguiente push subirá el catálogo entero una vez.
-    const aviso = `no se pudo sembrar la libreta de zonas (${e.message}). La caja abre igual;`
-      + " el próximo push subirá el catálogo completo una vez y puede pisar ediciones recientes del panel.";
-    log(`⚠ ${aviso}`);
-    console.error("· [sync]", aviso);
-    return 0;
-  }
+export function sembrarZonasUnaVez(db, log = () => {}) {
+  return sembrarLibretaUnaVez(db, log, {
+    que: "zonas", libreta: "_vim_zonas_ok", clave: "siembra_zonas_0116",
+    asegurar: () => asegurarLibretaZonas(db),
+    siembra: `INSERT INTO _vim_zonas_ok (zona_id, huella) SELECT x.id, ${HUELLA_ZONA} FROM zonas_envio x ON CONFLICT DO NOTHING`,
+  });
 }
 
 /**
@@ -583,6 +577,10 @@ export async function listarPendientes(pool) {
       (SELECT array_agg(x.id) FROM zonas_envio x
          LEFT JOIN _vim_zonas_ok o ON o.zona_id = x.id
         WHERE ${ZONA_PENDIENTE}) AS zonas,
+      -- Colonias capturadas o reasignadas en la caja (0187), mismo motivo que las zonas.
+      (SELECT array_agg(x.id) FROM colonias x
+         LEFT JOIN _vim_colonias_ok o ON o.colonia_id = x.id
+        WHERE ${pendiente("colonias")}) AS colonias,
       -- Clientes y direcciones nuevos o modificados en la caja (ver _vim_clientes_ok en
       -- asegurarTabla). En orden de alta: si hay más que el techo, suben primero los más viejos.
       (SELECT array_agg(x.id ORDER BY x.created_at) FROM clientes x
@@ -595,7 +593,7 @@ export async function listarPendientes(pool) {
   return {
     ids: rows[0].ids ?? [], turnosCambiados: rows[0].turnos ?? [], mesaIds: rows[0].mesas ?? [],
     movimientoIds: rows[0].movimientos ?? [], repartidorIds: rows[0].repartidores ?? [],
-    zonaIds: rows[0].zonas ?? [],
+    zonaIds: rows[0].zonas ?? [], coloniaIds: rows[0].colonias ?? [],
     clienteIds: rows[0].clientes ?? [], direccionIds: rows[0].direcciones ?? [],
     lealtadIds: rows[0].lealtad ?? [],
   };
@@ -687,6 +685,8 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
       -- vuelve a subir en el siguiente ciclo.
       (SELECT jsonb_agg(jsonb_build_object('id', x.id, 'huella', ${HUELLA_ZONA})) FROM zonas_envio x
          LEFT JOIN _vim_zonas_ok o ON o.zona_id = x.id WHERE ${ZONA_PENDIENTE}) AS zonas,
+      (SELECT jsonb_agg(jsonb_build_object('id', x.id, 'huella', ${HUELLA_ZONA})) FROM colonias x
+         LEFT JOIN _vim_colonias_ok o ON o.colonia_id = x.id WHERE ${pendiente("colonias")}) AS colonias,
       (SELECT jsonb_agg(jsonb_build_object('id', id, 'huella', huella)) FROM cl) AS clientes,
       (SELECT jsonb_agg(jsonb_build_object('id', id, 'huella', huella)) FROM dr) AS direcciones,
       jsonb_strip_nulls(jsonb_build_object(
@@ -728,6 +728,10 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
         'zonas_envio',                (SELECT jsonb_agg(to_jsonb(x)) FROM zonas_envio x
                                          LEFT JOIN _vim_zonas_ok o ON o.zona_id = x.id
                                         WHERE ${ZONA_PENDIENTE}),
+        -- 0187: las colonias capturadas o reasignadas en la caja. Sin la columna generada.
+        'colonias',                   (SELECT jsonb_agg(to_jsonb(x) - 'nombre_busqueda') FROM colonias x
+                                         LEFT JOIN _vim_colonias_ok o ON o.colonia_id = x.id
+                                        WHERE ${pendiente("colonias")}),
 
         -- EL CIERRE DEL TURNO. Se quedaba en la caja.
         --
@@ -761,7 +765,7 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
     snapshot: rows[0].snapshot ?? {}, ids: rows[0].ids ?? [], turnos: rows[0].turnos ?? [],
     tickets: rows[0].tickets_huella ?? [], mesas: rows[0].mesas ?? [],
     movimientos: rows[0].movimientos ?? [], repartidores: rows[0].repartidores ?? [],
-    zonas: rows[0].zonas ?? [],
+    zonas: rows[0].zonas ?? [], colonias: rows[0].colonias ?? [],
     clientes: rows[0].clientes ?? [], direcciones: rows[0].direcciones ?? [],
     lealtad: rows[0].lealtad ?? [],
   };
@@ -831,36 +835,31 @@ export async function marcarRepartidoresSubidos(pool, ids) {
 }
 
 /**
- * Anota las zonas de envío que la nube ya aplicó, con la huella que viajó. Se ACTUALIZA en
- * conflicto, como los turnos: una zona repreciada vuelve a subir y lo que importa es la última
- * versión que la nube recibió. `zonas` es `[{ id, huella }]`.
+ * Anota en una libreta `(col, huella)` las filas que la nube ya aplicó, con la huella que viajó
+ * (`[{ id, huella }]`). Se ACTUALIZA en conflicto, como los turnos: una zona repreciada o un
+ * cliente editado vuelven a subir y lo que importa es la última versión que la nube recibió.
  */
-export async function marcarZonasSubidas(pool, zonas) {
-  if (!zonas?.length) return;
+async function anotarHuellas(pool, tabla, col, filas) {
+  if (!filas?.length) return;
   await pool.query(
-    `INSERT INTO _vim_zonas_ok (zona_id, huella)
+    `INSERT INTO ${tabla} (${col}, huella)
      SELECT (x->>'id')::uuid, x->>'huella' FROM jsonb_array_elements($1::jsonb) AS x
-     ON CONFLICT (zona_id) DO UPDATE SET huella = EXCLUDED.huella, subido_at = now()`,
-    [JSON.stringify(zonas)],
+     ON CONFLICT (${col}) DO UPDATE SET huella = EXCLUDED.huella, subido_at = now()`,
+    [JSON.stringify(filas)],
   );
 }
 
-/**
- * Anota los clientes y las direcciones que la nube ya aplicó, con la huella que viajó. Se ACTUALIZA
- * en conflicto, como las zonas: lo que importa es la última versión que la nube recibió.
- */
+export function marcarZonasSubidas(pool, zonas) {
+  return anotarHuellas(pool, "_vim_zonas_ok", "zona_id", zonas);
+}
+
+export function marcarColoniasSubidas(pool, colonias) {
+  return anotarHuellas(pool, "_vim_colonias_ok", "colonia_id", colonias);
+}
+
 export async function marcarClientesSubidos(pool, clientes, direcciones) {
-  const anotar = async (tabla, col, filas) => {
-    if (!filas?.length) return;
-    await pool.query(
-      `INSERT INTO ${tabla} (${col}, huella)
-       SELECT (x->>'id')::uuid, x->>'huella' FROM jsonb_array_elements($1::jsonb) AS x
-       ON CONFLICT (${col}) DO UPDATE SET huella = EXCLUDED.huella, subido_at = now()`,
-      [JSON.stringify(filas)],
-    );
-  };
-  await anotar("_vim_clientes_ok", "cliente_id", clientes);
-  await anotar("_vim_direcciones_ok", "direccion_id", direcciones);
+  await anotarHuellas(pool, "_vim_clientes_ok", "cliente_id", clientes);
+  await anotarHuellas(pool, "_vim_direcciones_ok", "direccion_id", direcciones);
 }
 
 /**
@@ -899,11 +898,11 @@ function rechazadosPorTicket(errores, snapshot) {
       // reintentándose para siempre si la asignación nunca puede aplicarse.
       continue;
     } else if (e.tabla === "repartidores") {
-      // Un repartidor rechazado se reintenta solo (ver repartidoresRechazados); no cuelga de
+      // Un repartidor rechazado se reintenta solo (ver filasRechazadas); no cuelga de
       // ningún ticket, igual que delivery_asignaciones: que no suba el catálogo no invalida ventas.
       continue;
-    } else if (e.tabla === "zonas_envio") {
-      // Igual que un repartidor rechazado: la zona se reintenta sola (ver zonasRechazadas), no
+    } else if (e.tabla === "zonas_envio" || e.tabla === "colonias") {
+      // Igual que un repartidor rechazado: la zona se reintenta sola (ver filasRechazadas), no
       // cuelga de ningún ticket.
       continue;
     } else if (e.tabla === "clientes" || e.tabla === "direcciones_cliente") {
@@ -926,7 +925,7 @@ function rechazadosPorTicket(errores, snapshot) {
       const dev = item && (snapshot.devoluciones ?? []).find((x) => x.id === item.devolucion_id);
       if (dev?.ticket_original_id) fuera.add(dev.ticket_original_id);
     } else if (e.tabla === "movimientos_inventario") {
-      // Un movimiento rechazado se reintenta solo (ver movimientosRechazados); no invalida la venta.
+      // Un movimiento rechazado se reintenta solo (ver filasRechazadas); no invalida la venta.
       continue;
     } else if (e.tabla === "lealtad_movimientos") {
       // Se reintenta solo (no se marca en _vim_lealtad_mov_ok); no invalida la venta.
@@ -943,32 +942,13 @@ function rechazadosPorTicket(errores, snapshot) {
   return fuera;
 }
 
-/** Ids de movimientos de inventario que la nube rechazó: no se marcan y se reintentan. */
-function movimientosRechazados(errores) {
-  return new Set((errores ?? []).filter((e) => e?.tabla === "movimientos_inventario" && e.id).map((e) => e.id));
-}
-
 /**
- * Ids de repartidores que la nube rechazó: no se marcan en _vim_repartidores_ok.
+ * Ids de filas de `tabla` que la nube rechazó: no se anotan en su libreta y se reintentan.
  *
- * Marcar un rechazado lo perdería para siempre — por diseño un repartidor confirmado nunca vuelve
- * a viajar, así que si se marca sin haber llegado de verdad, esa alta no existirá jamás en la nube.
+ * Marcar una rechazada la perdería para siempre. Un repartidor confirmado nunca vuelve a viajar, y
+ * una zona o un cliente con su huella anotada dejan de estar pendientes: si se marcan sin haber
+ * llegado de verdad, esa alta (o ese precio) no existirá jamás en la nube.
  */
-function repartidoresRechazados(errores) {
-  return new Set((errores ?? []).filter((e) => e?.tabla === "repartidores" && e.id).map((e) => e.id));
-}
-
-/**
- * Ids de zonas de envío que la nube rechazó: no se marcan en _vim_zonas_ok.
- *
- * Marcar una rechazada la perdería: con su huella anotada deja de estar pendiente y, si nadie la
- * vuelve a tocar, esa alta (o ese precio) no existirá jamás en la nube.
- */
-function zonasRechazadas(errores) {
-  return new Set((errores ?? []).filter((e) => e?.tabla === "zonas_envio" && e.id).map((e) => e.id));
-}
-
-/** Ids de filas de `tabla` que la nube rechazó: no se anotan en su libreta y se reintentan. */
 function filasRechazadas(errores, tabla) {
   return new Set((errores ?? []).filter((e) => e?.tabla === tabla && e.id).map((e) => e.id));
 }
@@ -982,7 +962,7 @@ function filasRechazadas(errores, tabla) {
  * en pocas vueltas y no necesita saber cuál es el límite del otro lado.
  */
 async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds, turnoIds, movimientoIds = [], clienteIds = [], direccionIds = [], lealtadIds = [], conMesas = false, maxBytes }, log) {
-  const { snapshot, ids, tickets, turnos, movimientos, repartidores, zonas, clientes, direcciones, mesas, lealtad } =
+  const { snapshot, ids, tickets, turnos, movimientos, repartidores, zonas, colonias, clientes, direcciones, mesas, lealtad } =
     await construirSnapshotPush(pool, { ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds, conMesas, lealtadIds });
   const cuerpo = JSON.stringify({ snapshot });
   const bytes = Buffer.byteLength(cuerpo);
@@ -1030,12 +1010,17 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
   const mesaFuera = filasRechazadas(errores, "mesas_estado");
   await marcarMesasSubidas(pool, mesas.filter((m) => !mesaFuera.has(m.id)));
   await marcarTurnosPushed(pool, turnos.filter((t) => !fuera.has(t.id)));
-  const movFuera = movimientosRechazados(errores);
+  const movFuera = filasRechazadas(errores, "movimientos_inventario");
   await marcarMovimientosPushed(pool, movimientos.filter((id) => !movFuera.has(id)));
-  const repFuera = repartidoresRechazados(errores);
+  const repFuera = filasRechazadas(errores, "repartidores");
   await marcarRepartidoresSubidos(pool, repartidores.filter((id) => !repFuera.has(id)));
-  const zonaFuera = zonasRechazadas(errores);
+  const zonaFuera = filasRechazadas(errores, "zonas_envio");
   await marcarZonasSubidas(pool, zonas.filter((z) => !zonaFuera.has(z.id)));
+  const colFuera = filasRechazadas(errores, "colonias");
+  // Igual que lealtad abajo: una nube sin la 0187 ignora la tabla y anotarlas las perdería.
+  if (!(respuesta?.resultado?._ignoradas ?? []).includes("colonias")) {
+    await marcarColoniasSubidas(pool, colonias.filter((c) => !colFuera.has(c.id)));
+  }
   const cliFuera = filasRechazadas(errores, "clientes");
   const dirFuera = filasRechazadas(errores, "direcciones_cliente");
   await marcarClientesSubidos(pool, clientes.filter((c) => !cliFuera.has(c.id)), direcciones.filter((d) => !dirFuera.has(d.id)));
@@ -1070,7 +1055,7 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   const maxClientes = cfg.maxClientesPorPush ?? MAX_CLIENTES_POR_PUSH;
 
   const pendientes = await listarPendientes(pool);
-  const { ids, turnosCambiados, movimientoIds: movimientoIdsTodos, repartidorIds, zonaIds, mesaIds = [] } = pendientes;
+  const { ids, turnosCambiados, movimientoIds: movimientoIdsTodos, repartidorIds, zonaIds, coloniaIds = [], mesaIds = [] } = pendientes;
   const clienteIds = pendientes.clienteIds.slice(0, maxClientes);
   const direccionIds = pendientes.direccionIds.slice(0, maxClientes);
   if (pendientes.clienteIds.length > clienteIds.length || pendientes.direccionIds.length > direccionIds.length) {
@@ -1095,7 +1080,7 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   // pasar — en silencio, sin error, contra el motivo de tener el catálogo aquí.
   // Lo mismo con un cliente registrado sin que la venta se haya cobrado todavía.
   // Y con una mesa que se liberó sin que se cobrara nada (una cuenta vacía cancelada, 0104).
-  if (!ids.length && !turnosCambiados.length && !movimientoIds.length && !repartidorIds.length && !zonaIds.length
+  if (!ids.length && !turnosCambiados.length && !movimientoIds.length && !repartidorIds.length && !zonaIds.length && !coloniaIds.length
       && !clienteIds.length && !direccionIds.length && !mesaIds.length && !lealtadIds.length) { log("nada pendiente por subir"); return { subidos: 0, turnos: 0, movimientos: 0, rechazados: 0, lotes: 0 }; }
 
   const parte = [
@@ -1104,6 +1089,7 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
     movimientoIds.length ? `${movimientoIds.length} movimiento(s) de inventario` : null,
     repartidorIds.length ? `${repartidorIds.length} repartidor(es)` : null,
     zonaIds.length ? `${zonaIds.length} zona(s) de envío` : null,
+    coloniaIds.length ? `${coloniaIds.length} colonia(s)` : null,
     clienteIds.length ? `${clienteIds.length} cliente(s)` : null,
     direccionIds.length ? `${direccionIds.length} dirección(es) de cliente` : null,
     lealtadIds.length ? `${lealtadIds.length} movimiento(s) de lealtad` : null,

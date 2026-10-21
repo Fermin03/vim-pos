@@ -1,8 +1,8 @@
 "use client";
 import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@vim/ui/styles";
-import { employeeClient, type Empleado } from "../lib/supabase";
+import { Button, Icono } from "@vim/ui/styles";
+import { employeeClient, listarEmpleados, type Empleado } from "../lib/supabase";
 import { fmtMxn, registrarComisionEvento, type DatosCaja, type Turno } from "../lib/turno";
 import { notificarEventoCritico } from "../lib/push-eventos";
 import {
@@ -35,6 +35,7 @@ const METODO_LABEL_SOFT_MAP: Record<string, string> = {
   TARJETA_DEBITO: "TARJETA",
   TRANSFERENCIA: "TRANSFERENCIA",
   APP_RAPPI: "RAPPI", APP_UBEREATS: "UBER EATS", APP_DIDI: "DIDI", APP_IFOOD: "IFOOD", APP_OTRO: "APP EXTERNA",
+  PAGO_EN_LINEA: "PAGO EN LINEA",
 };
 const labelSoft = (m: string) => METODO_LABEL_SOFT_MAP[m] ?? m.toUpperCase();
 
@@ -70,6 +71,8 @@ export function PantallaCierre({
   const [fiscales, setFiscales] = useState<DatosFiscales | null>(null);
   const [stats, setStats] = useState<EstadisticasTurno | null>(null);
   const [movs, setMovs] = useState<MovimientosTurno | null>(null);
+  /** id → nombre de la plantilla, para rotular el reparto de propinas del corte (la base solo da ids). */
+  const [nombres, setNombres] = useState<Map<string, string>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [paso, setPaso] = useState<Paso>("arqueo");
   const [declarado, setDeclarado] = useState<Record<string, string>>({});
@@ -106,9 +109,12 @@ export function PantallaCierre({
       leerEstadisticasTurno(token, turno.id),
       leerMovimientosTurno(token, turno.id),
       contarTicketsAbiertos(token, turno.id),
+      // Si no se pueden leer los nombres, el corte sale igual: el reparto dirá "Empleado".
+      listarEmpleados().catch(() => []),
     ])
-      .then(([x, ten, fis, st, mv, abiertos]) => {
+      .then(([x, ten, fis, st, mv, abiertos, plantilla]) => {
         if (!activo) return;
+        setNombres(new Map(plantilla.map((e) => [e.id, e.nombre])));
         setResumen(x);
         setNegocio(((ten.data as { nombre_comercial?: string } | null)?.nombre_comercial) ?? "Negocio");
         setFiscales(fis);
@@ -270,7 +276,8 @@ export function PantallaCierre({
     const dev = (p.devoluciones ?? {}) as Record<string, unknown>;
     const propinasDist = ((p.propinas_distribuidas ?? []) as Record<string, unknown>[])
       .map((d) => ({
-        nombre: String(d.nombre ?? d.usuario_nombre ?? d.usuario_id ?? "—"),
+        // Nunca el id: en el papel un uuid no le dice nada a nadie.
+        nombre: String(d.nombre ?? d.usuario_nombre ?? nombres.get(String(d.usuario_id)) ?? "Empleado"),
         monto: Number(d.monto_mxn ?? d.monto ?? 0),
       }));
     const sello = cierre.reporteZId.replace(/-/g, "").slice(0, 12);
@@ -379,7 +386,7 @@ export function PantallaCierre({
       <div className="flex h-14 flex-shrink-0 items-center justify-between border-b border-line bg-surface px-6">
         <div className="flex items-center gap-3">
           <button type="button" onClick={onCancelar} className="flex h-9 w-9 items-center justify-center rounded border border-line-strong text-ink-2 hover:border-ink hover:text-ink">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><polyline points="15 18 9 12 15 6" /></svg>
+            <Icono nombre="chevron-izquierda" className="h-4 w-4" />
           </button>
           <h1 className="font-display text-18 font-semibold tracking-tight">{paso === "resultado" ? "Resultado del corte" : "Arqueo / Cierre de turno"}</h1>
         </div>
@@ -411,7 +418,10 @@ export function PantallaCierre({
                         <div className="text-15 font-semibold">{label(f.metodo)}</div>
                         {f.metodo === "EFECTIVO"
                           ? <div className="text-12 text-ink-3">Cuenta todo lo que hay en el cajón, fondo incluido</div>
-                          : <div className="text-12 text-ink-3">Del sistema: confírmalo con el cierre de tu terminal</div>}
+                          : f.metodo === "PAGO_EN_LINEA"
+                            // Ni cajón ni terminal: lo cobró Mercado Pago en la tienda en línea. No se cuenta. (Texto provisional, James.)
+                            ? <div className="text-12 text-ink-3">Ya cobrado en tu tienda en línea. Está en tu cuenta de Mercado Pago, no en el cajón ni en la terminal</div>
+                            : <div className="text-12 text-ink-3">Del sistema: confírmalo con el cierre de tu terminal</div>}
                       </td>
                       <td className="py-4 text-right">
                         <input
@@ -419,6 +429,7 @@ export function PantallaCierre({
                           inputMode="decimal"
                           placeholder="$0.00"
                           value={declarado[f.metodo] ?? ""}
+                          readOnly={f.metodo === "PAGO_EN_LINEA"}
                           onChange={(e) => setDeclarado((s) => ({ ...s, [f.metodo]: e.target.value.replace(/[^0-9.]/g, "") }))}
                         />
                       </td>
@@ -463,7 +474,7 @@ export function PantallaCierre({
               {ticketsAbiertos > 0 && (
                 <div className="mb-3 rounded-lg border border-danger/30 bg-danger/5 px-3.5 py-3" role="alert">
                   <div className="flex items-start gap-2.5">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="mt-px h-[18px] w-[18px] flex-shrink-0 text-danger"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg>
+                    <Icono nombre="alerta" className="mt-px h-[18px] w-[18px] flex-shrink-0 text-danger" />
                     <div className="text-13 leading-snug">
                       <span className="font-semibold text-danger">{ticketsAbiertos} {ticketsAbiertos === 1 ? "cuenta abierta" : "cuentas abiertas"} sin cobrar.</span>
                       <span className="text-ink-2"> Cóbralas o cancélalas antes de cerrar el turno; si no, quedarían sin registrar y la mesa trabada.</span>
@@ -525,7 +536,7 @@ export function PantallaCierre({
           <div className="w-full max-w-[560px] rounded-lg border border-line bg-surface p-6">
             <div className="mb-4 text-center">
               <div className={["mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full", corte.diferenciaTotal === 0 ? "bg-success/10 text-success" : "bg-warning/10 text-warning"].join(" ")}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" className="h-6 w-6"><path d="M20 6 9 17l-5-5" /></svg>
+                <Icono nombre="palomita" className="h-6 w-6" />
               </div>
               <h2 className="font-display text-20 font-semibold">Corte generado</h2>
             </div>
@@ -566,16 +577,9 @@ export function PantallaCierre({
       {pidiendoPinGenerar && (
         <ModalAutorizacionPin
           token={token}
-          accion="recontar_arqueo"
-          permisoCodigo="turno.recontar_arqueo"
+          payload={{ ...payloadRecuento(), monto: null }}
           descripcion={`Contar de nuevo el arqueo del turno ${turno.codigo_turno}`}
           ejecutaNombre={empleado.nombre}
-          monto={null}
-          entidadTipo="turno"
-          entidadId={turno.id}
-          cajaId={turno.caja_id}
-          turnoId={turno.id}
-          motivo="Volver a contar el arqueo"
           onAutorizado={(a) => { setPidiendoPinGenerar(false); void generarCorte(a.autorizacionPinId); }}
           onCancelar={() => setPidiendoPinGenerar(false)}
         />
@@ -583,16 +587,9 @@ export function PantallaCierre({
       {pidiendoPinRecuento && (
         <ModalAutorizacionPin
           token={token}
-          accion="recontar_arqueo"
-          permisoCodigo="turno.recontar_arqueo"
+          payload={payloadRecuento()}
           descripcion={`Volver a contar el arqueo del turno ${turno.codigo_turno}`}
           ejecutaNombre={empleado.nombre}
-          monto={corte?.diferenciaTotal ?? null}
-          entidadTipo="turno"
-          entidadId={turno.id}
-          cajaId={turno.caja_id}
-          turnoId={turno.id}
-          motivo="Volver a contar el arqueo"
           onAutorizado={volverAContar}
           onCancelar={() => setPidiendoPinRecuento(false)}
         />
@@ -600,16 +597,9 @@ export function PantallaCierre({
       {pidiendoPin && (
         <ModalAutorizacionPin
           token={token}
-          accion="cerrar_turno"
-          permisoCodigo="turno.cerrar_propio"
+          payload={payloadCierre()}
           descripcion={`Cerrar el turno ${turno.codigo_turno}`}
           ejecutaNombre={empleado.nombre}
-          monto={null}
-          entidadTipo="turno"
-          entidadId={turno.id}
-          cajaId={turno.caja_id}
-          turnoId={turno.id}
-          motivo="Cierre de turno"
           onAutorizado={ejecutarCierre}
           onCancelar={() => setPidiendoPin(false)}
         />

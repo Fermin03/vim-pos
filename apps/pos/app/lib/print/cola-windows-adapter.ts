@@ -1,6 +1,4 @@
-import type { PrinterAdapter } from "./adapter";
-import type { PrintJob, PrintResult } from "./tipos";
-import { jobAEscpos, bytesCajon } from "./escpos";
+import { RelayAdapter } from "./raw-socket-adapter";
 
 export type ImpresoraWindows = { nombre: string; predeterminada: boolean };
 
@@ -14,41 +12,9 @@ export type ImpresoraWindows = { nombre: string; predeterminada: boolean };
  * OJO: aquí `ok` significa que la COLA aceptó el trabajo. Con la impresora apagada Windows lo deja
  * encolado y no avisa — no hay forma de saber desde aquí si salió papel.
  */
-export class ColaWindowsAdapter implements PrinterAdapter {
-  nombre = "Impresora de Windows";
-  constructor(private impresora: string, private ancho: 58 | 80 = 80) {}
-
-  private async enviar(datos: Uint8Array, soloConectar = false): Promise<PrintResult> {
-    let bin = "";
-    for (const b of datos) bin += String.fromCharCode(b);
-    const datosB64 = typeof btoa === "function" ? btoa(bin) : "";
-    try {
-      const res = await fetch("/__imprimir", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ impresoraWindows: this.impresora, datosB64, soloConectar }),
-      });
-      const j: unknown = await res.json().catch(() => ({}));
-      const o = (typeof j === "object" && j !== null ? j : {}) as Record<string, unknown>;
-      if (o.ok === true) return { ok: true };
-      return { ok: false, motivo: o.motivo === "OFFLINE" ? "OFFLINE" : "ERROR" };
-    } catch {
-      // No hay relay (navegador normal) o el ui-server no respondió.
-      return { ok: false, motivo: "OFFLINE" };
-    }
-  }
-
-  async imprimir(job: PrintJob): Promise<PrintResult> {
-    return this.enviar(jobAEscpos({ ...job, ancho: this.ancho }));
-  }
-
-  async estado(): Promise<"LISTO" | "SIN_PAPEL" | "OFFLINE" | "ERROR"> {
-    const r = await this.enviar(new Uint8Array(), true);
-    return r.ok ? "LISTO" : r.motivo === "OFFLINE" ? "OFFLINE" : "ERROR";
-  }
-
-  async abrirCajon(): Promise<PrintResult> {
-    return this.enviar(bytesCajon());
+export class ColaWindowsAdapter extends RelayAdapter {
+  constructor(impresora: string, ancho: 58 | 80 = 80) {
+    super("Impresora de Windows", { impresoraWindows: impresora }, ancho);
   }
 }
 

@@ -34,6 +34,13 @@ Cada archivo dice **qué decía el plan, qué hacemos hoy y por qué**. Manda lo
 | [0028](0028-eliminar-a-un-empleado-libera-el-correo-y-conserva-el-historial.md) | Eliminar a un empleado libera su correo y conserva el historial: la cuenta se vacía, no se borra | 04/10/2026 |
 | [0029](0029-el-menu-es-de-quien-administra.md) | El menú es de quien administra; la caja lee lo proyectado | 05/10/2026 |
 | [0030](0030-la-lealtad-viaja-por-movimientos.md) | La lealtad viaja por movimientos y el canje lo autoriza la nube | 05/10/2026 |
+| [0031](0031-facturama-es-el-unico-pac.md) | Facturama es el único PAC: se retira Facturapi y la conmutación | 07/10/2026 |
+| [0032](0032-la-tienda-es-un-canal-y-sus-clientes-no-viven-en-auth.md) | La tienda en línea es un canal de `delivery_pedidos` y sus clientes no viven en Supabase Auth | 09/10/2026 |
+| [0033](0033-el-cobro-con-terminal-lo-aplica-la-caja.md) | El cobro con terminal (Mercado Pago Point) lo aplica la caja, y los tokens del restaurante viven en Vault | 09/10/2026 |
+| [0034](0034-el-giro-arma-el-juego-inicial-y-vim-lo-ajusta.md) | El giro arma el juego inicial de módulos de operación, y después solo VIM lo ajusta | 14/10/2026 |
+| [0035](0035-el-envio-por-distancia-es-una-zona-por-tramo.md) | El envío por distancia de la tienda: lo calcula la base desde el pin del cliente, y cada tramo es una zona de envío | 14/10/2026 |
+| [0036](0036-la-colonia-sugiere-la-zona.md) | La colonia sugiere la zona de envío; el domicilio la guarda | 15/10/2026 |
+| [0050](0050-clip-es-el-segundo-proveedor-de-terminal.md) | Clip es el segundo proveedor de terminal, y la conexión de la caja decide quién cobra | 20/10/2026 |
 
 ## Pendientes de escribir
 

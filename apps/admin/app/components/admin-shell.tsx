@@ -1,6 +1,6 @@
 "use client";
-import { LogoVim } from "@vim/ui/styles";
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { LogoVim, Icono } from "@vim/ui/styles";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { leerSesion } from "../lib/supabase";
@@ -12,7 +12,13 @@ import { leerAcceso, ACCESO_OK, type Acceso } from "../lib/acceso-tenant";
 import { enlaceWhatsapp, mensajeAyudaAdmin, SOPORTE_POR_DEFECTO, textoHorario } from "@vim/db/soporte";
 import { leerAyuda, type AyudaAdmin } from "../lib/soporte";
 import { leerModulos } from "../lib/modulos";
+import { rutasOcultas } from "../lib/operacion";
 import { estadoInventario, rutaEsDeInventario, type ModulosLeidos } from "../lib/inventario-plan";
+import { estadoTienda } from "../lib/tienda-plan";
+import { leerReportesDisponibles, type ReportesDisponibles } from "../lib/reportes";
+import { idsGruposVisibles } from "../lib/reportes-grupos";
+import { MENU, filtrarMenu } from "../lib/menu-admin";
+import { MenuLateral } from "./menu-lateral";
 
 const PerfilCtx = createContext<Perfil | null>(null);
 export const usePerfil = () => useContext(PerfilCtx);
@@ -29,54 +35,12 @@ export const useAccesoTenant = () => useContext(AccesoCtx);
 const ModulosCtx = createContext<ModulosLeidos | "error" | null>(null);
 export const useModulos = () => useContext(ModulosCtx);
 
-type Item = { label: string; href: string; icon: ReactNode };
-type Seccion = { titulo: string; items: Item[] };
-
-const I = {
-  panel: (
-    <svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>
-  ),
-  catalogo: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><path d="M3 7h18M3 12h18M3 17h18" /></svg>,
-  inventario: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><path d="M20 7l-8-4-8 4 8 4 8-4zM4 7v10l8 4 8-4V7" /></svg>,
-  clientes: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><circle cx="12" cy="8" r="4" /><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1" /></svg>,
-  usuarios: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20v-1a5 5 0 0 1 5-5h3a5 5 0 0 1 5 5v1" /></svg>,
-  config: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.5-2.4 1a7 7 0 0 0-1.7-1L16.5 3h-4l-.4 2.5a7 7 0 0 0-1.7 1l-2.4-1-2 3.5L5.1 11a7 7 0 0 0 0 2l-2 1.5 2 3.5 2.4-1a7 7 0 0 0 1.7 1l.4 2.5h4l.4-2.5a7 7 0 0 0 1.7-1l2.4 1 2-3.5-2-1.5a7 7 0 0 0 .1-1z" /></svg>,
-  reportes: <svg viewBox="0 0 24 24" fill="none" strokeWidth="2"><path d="M3 3v18h18" /><path d="M7 16l4-5 3 3 5-7" /></svg>,
-};
-
-const NAV: Seccion[] = [
-  {
-    titulo: "Operación",
-    items: [
-      { label: "Panel", href: "/dashboard", icon: I.panel },
-      { label: "Catálogo", href: "/catalogo", icon: I.catalogo },
-      { label: "Promociones", href: "/promociones", icon: I.catalogo },
-      { label: "Inventario", href: "/inventario", icon: I.inventario },
-      { label: "Clientes", href: "/clientes", icon: I.clientes },
-      { label: "Lealtad", href: "/lealtad", icon: I.clientes },
-      { label: "Reservaciones", href: "/reservaciones", icon: I.clientes },
-      { label: "Conciliación apps", href: "/conciliacion", icon: I.reportes },
-    ],
-  },
-  {
-    titulo: "Administración",
-    items: [
-      { label: "Usuarios", href: "/usuarios", icon: I.usuarios },
-      { label: "Facturación", href: "/facturacion", icon: I.reportes },
-      { label: "Configuración", href: "/configuracion", icon: I.config },
-      { label: "Reportes", href: "/reportes", icon: I.reportes },
-    ],
-  },
-];
-
 /** Lo que ve quien llega a una sección que su rol no alcanza. */
 function SinAcceso({ rol }: { rol: string }) {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-warning-soft text-warning">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true">
-          <rect x="4" y="11" width="16" height="9" rx="1.5" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
-        </svg>
+        <Icono nombre="candado" className="h-6 w-6" />
       </div>
       <h1 className="font-display text-20 font-semibold tracking-tight">Esta sección no está disponible para ti</h1>
       <p className="max-w-sm text-14 leading-snug text-ink-2">
@@ -105,6 +69,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [ayuda, setAyuda] = useState<AyudaAdmin>({ soporte: SOPORTE_POR_DEFECTO, negocio: null, codigo: null });
   // Módulos que el plan (o una excepción de VIM) le permite. Hoy lo usa Inventario (0148).
   const [modulos, setModulos] = useState<ModulosLeidos | "error" | null>(null);
+  // Qué grupos de reportes enseña el índice: el submenú de Informes enseña los mismos.
+  const [reportes, setReportes] = useState<ReportesDisponibles | null>(null);
   // Cajón lateral: solo existe por debajo de `lg`. En escritorio el <aside> es estático.
   const [menuAbierto, setMenuAbierto] = useState(false);
 
@@ -154,6 +120,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
       setListo(true);
       leerAyuda().then(setAyuda).catch(() => {});
       leerModulos().then(setModulos).catch(() => setModulos("error"));
+      leerReportesDisponibles().then(setReportes).catch(() => {});
       // El selector del sidebar muestra la sucursal real del tenant (antes decía "León Centro"
       // fijo, que es el dato del mockup: cualquier cliente nuevo veía el nombre equivocado).
       listarSucursales()
@@ -166,6 +133,23 @@ export function AdminShell({ children }: { children: ReactNode }) {
     })();
   }, [router]);
 
+  // El menú filtrado se recalcula solo cuando cambia lo que lo decide: si no, el acordeón se
+  // reiniciaría en cada render.
+  const jerMenu = perfil?.jerarquia ?? null;
+  const menu = useMemo(() => {
+    const ocultas = new Set(rutasOcultas(modulos));
+    // Sin el add-on concedido (ADR 0014) se esconde la conexión, no la conciliación. Mientras carga
+    // también: esconder de más es recuperable (misma regla que tenía Configuración).
+    if (!(modulos !== null && modulos !== "error" && modulos.permitidos.delivery_apps === true)) ocultas.add("/configuracion/integraciones");
+    const tienda = estadoTienda(modulos);
+    return filtrarMenu(MENU, {
+      jerarquia: jerMenu,
+      ocultas,
+      tiendaContratada: tienda === "cargando" ? null : tienda !== "sin_contratar",
+      gruposInformes: reportes ? idsGruposVisibles(reportes, jerMenu) : null,
+    });
+  }, [modulos, reportes, jerMenu]);
+
   if (listo && sinAcceso && altaIncompleta) {
     // Sin tenant la RPC de soporte no devuelve nada: va el número oficial de fábrica.
     const wa = enlaceWhatsapp(
@@ -176,7 +160,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     return (
       <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 px-6 py-10 text-center">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-warning-soft text-warning">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
+          <Icono nombre="info" className="h-6 w-6" />
         </div>
         <h1 className="font-display text-24 font-semibold tracking-tight">Tu cuenta no terminó de crearse</h1>
         <p className="max-w-md text-14 leading-relaxed text-ink-3">
@@ -203,7 +187,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     return (
       <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 px-6 py-10 text-center">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-warning-soft text-warning">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6"><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
+          <Icono nombre="info" className="h-6 w-6" />
         </div>
         <h1 className="font-display text-24 font-semibold tracking-tight">Tu correo no tiene acceso todavía</h1>
         <p className="max-w-md text-14 leading-relaxed text-ink-3">
@@ -242,9 +226,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     return (
       <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 px-6 py-10 text-center">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-warning-soft text-warning">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true">
-            <rect x="4" y="11" width="16" height="9" rx="1.5" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
-          </svg>
+          <Icono nombre="candado" className="h-6 w-6" />
         </div>
         <h1 className="font-display text-24 font-semibold tracking-tight">Este panel es para la administración</h1>
         <p className="max-w-md text-14 leading-relaxed text-ink-3">
@@ -306,59 +288,26 @@ export function AdminShell({ children }: { children: ReactNode }) {
               onClick={() => setMenuAbierto(false)}
               className="-mr-2 ml-auto flex h-11 w-11 items-center justify-center rounded text-[#76767E] transition-colors hover:text-white lg:hidden"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5"><path d="M18 6L6 18M6 6l12 12" /></svg>
+              <Icono nombre="cerrar" className="h-5 w-5" />
             </button>
           </div>
 
-          <div className="mx-3 mb-2 mt-4 flex items-center gap-2.5 rounded border border-[#2C2C32] bg-[#1E1E23] px-3 py-2.5">
+          {/* El negocio arriba, como en Square. Solo texto: la sucursal se elige en cada página. */}
+          <div className="mx-3 mt-4 flex items-center gap-2.5 rounded border border-[#2C2C32] bg-[#1E1E23] px-3 py-2.5">
             <div className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-md bg-[#2A2A30]">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-3" /></svg>
+              <Icono nombre="edificio" className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-14 font-semibold text-white">{sucursales?.nombre ?? "—"}</div>
-              <div className="mt-px text-12 text-[#76767E]">
-                {sucursales ? `1 de ${sucursales.total} ${sucursales.total === 1 ? "sucursal" : "sucursales"}` : "Cargando…"}
+              <div className="truncate text-14 font-semibold text-white">{ayuda.negocio ?? sucursales?.nombre ?? "—"}</div>
+              <div className="mt-px truncate text-12 text-[#76767E]">
+                {sucursales
+                  ? `${ayuda.negocio ? `${sucursales.nombre} · ` : ""}1 de ${sucursales.total} ${sucursales.total === 1 ? "sucursal" : "sucursales"}`
+                  : "Cargando…"}
               </div>
             </div>
           </div>
 
-          <nav className="flex flex-1 flex-col gap-px overflow-y-auto px-3 pb-4 pt-3">
-            {NAV.map((sec) => {
-              const items = sec.items.filter((it) => puedeVer(jer, it.href));
-              if (items.length === 0) return null;
-              return (
-                <div key={sec.titulo} className="contents">
-                  <div className="px-3 pb-2 pt-4 text-11 font-bold uppercase tracking-[0.07em] text-[#76767E] first:pt-2">
-                    {sec.titulo}
-                  </div>
-                  {items.map((it) => {
-                    const active = pathname === it.href || pathname.startsWith(it.href + "/");
-                    return (
-                      <Link
-                        key={it.href}
-                        href={it.href}
-                        aria-current={active ? "page" : undefined}
-                        className={[
-                          "flex min-h-[44px] items-center gap-[11px] rounded px-3 py-[9px] text-sm font-medium transition-colors lg:min-h-0 [&_svg]:h-[18px] [&_svg]:w-[18px] [&_svg]:flex-shrink-0 [&_svg]:stroke-current",
-                          active
-                            ? "bg-white font-semibold text-ink"
-                            : "text-[#C8C8CC] hover:bg-[#1E1E23] hover:text-white",
-                        ].join(" ")}
-                      >
-                        {it.icon}
-                        {it.label}
-                        {sinInventario && rutaEsDeInventario(it.href) && (
-                          <span className={["ml-auto rounded-full border px-1.5 py-px text-11 font-semibold", active ? "border-line-strong text-ink-2" : "border-[#3A3A42] text-[#9A9AA2]"].join(" ")}>
-                            Plan Negocio
-                          </span>
-                        )}
-                      </Link>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </nav>
+          <MenuLateral menu={menu} pathname={pathname} marcaPlan={(href) => sinInventario && rutaEsDeInventario(href)} alNavegar={() => setMenuAbierto(false)} />
 
           {/* Ayuda por WhatsApp (0142): fuera de las secciones porque no es una pantalla, y a la
               vista en el cajón del celular igual que en el escritorio. Abre en otra pestaña. */}
@@ -369,9 +318,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
               rel="noopener noreferrer"
               className="mx-3 mb-3 flex min-h-[44px] items-center gap-[11px] rounded border border-[#2C2C32] px-3 py-2 text-sm font-medium text-[#C8C8CC] transition-colors hover:bg-[#1E1E23] hover:text-white lg:min-h-0"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[18px] w-[18px] flex-shrink-0" aria-hidden="true">
-                <path d="M20 11.5a8 8 0 0 1-11.8 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5z" />
-              </svg>
+              <Icono nombre="chat" className="h-[18px] w-[18px] flex-shrink-0" />
               <span className="min-w-0">
                 <span className="block">Ayuda por WhatsApp</span>
                 {horarioAyuda && <span className="block text-12 font-normal text-[#76767E]">{horarioAyuda}</span>}
@@ -396,7 +343,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
               }}
               className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded text-[#76767E] transition-colors hover:text-white lg:h-auto lg:w-auto"
             >
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
+              <Icono nombre="salir" width="17" height="17" />
             </button>
           </div>
         </aside>
@@ -413,7 +360,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
               onClick={() => setMenuAbierto(true)}
               className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded text-white transition-colors hover:bg-[#1E1E23]"
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[22px] w-[22px]"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
+              <Icono nombre="menu" className="h-[22px] w-[22px]" />
             </button>
             <LogoVim className="h-7 w-7 flex-shrink-0" />
             <div className="min-w-0 flex-1">

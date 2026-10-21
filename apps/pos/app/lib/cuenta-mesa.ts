@@ -145,7 +145,7 @@ export async function reconstruirCarrito(
   ticketId: string,
   productos: Producto[],
   combos: ComboDef[] = [],
-): Promise<{ lineas: LineaCarrito[]; modoServicio: ModoServicio; envio: EnvioCarrito | null; clienteCuenta: ClienteCuenta | null }> {
+): Promise<{ lineas: LineaCarrito[]; modoServicio: ModoServicio; envio: EnvioCarrito | null; clienteCuenta: ClienteCuenta | null; esBarra: boolean }> {
   const sb = employeeClient(token);
   const { data: ticket } = await sb.from("tickets").select("modo_servicio, zona_envio_id, zonas_envio(nombre), cliente:clientes(id, nombre, apellido_paterno, telefono)").eq("id", ticketId).maybeSingle();
   const modo = mapearModo((ticket?.modo_servicio as string) ?? "MESA");
@@ -166,6 +166,8 @@ export async function reconstruirCarrito(
     // El cliente de la cuenta, para que al retomarla siga viéndose a quién está asignada.
     // Domicilio no: su cliente con dirección se lee aparte (leerEntregaCuenta).
     clienteCuenta: admiteClienteCuenta(modo) ? clienteDeTicket(ticket?.cliente) : null,
+    // El carrito ve BARRA como COMER_AQUI (mapearModo); esto es solo para rotular la cuenta.
+    esBarra: ticket?.modo_servicio === "BARRA",
   };
 }
 

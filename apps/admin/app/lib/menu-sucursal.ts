@@ -138,7 +138,7 @@ export async function leerMenuDeProducto(productoId: string): Promise<FilaMenuSu
 export async function guardarAgotado(filas: { producto_id: string; sucursal_id: string; agotado_manual: boolean }[]): Promise<void> {
   if (filas.length === 0) return;
   const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
+  if (!s?.tenantId) throw new Error("Tu sesión expiró. Vuelve a iniciar sesión.");
   const tenantId = s.tenantId;
   const { error } = await supabase
     .from("productos_sucursal")

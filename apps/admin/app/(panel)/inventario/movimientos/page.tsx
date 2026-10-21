@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Aviso } from "@vim/ui/styles";
+import { Aviso, Icono } from "@vim/ui/styles";
 import { Nota, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
 import { formatear, type Columna } from "../../../lib/reporte-tabla";
 import { leerModuloInventario, listarSucursalesOpciones, type SucursalOpcion } from "../../../lib/inventario";
@@ -227,13 +227,13 @@ export default function MovimientosInventarioPage() {
           {paginas > 1 && (
             <div className="flex items-center gap-1">
               <button type="button" className={botonPagina} onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pagina === 1 || consulta.cargando} aria-label="Página anterior">
-                ‹
+                <Icono nombre="chevron-izquierda" className="h-4 w-4" />
               </button>
               <span className="px-2 text-13 font-semibold tabular-nums">
                 {pagina} / {paginas}
               </span>
               <button type="button" className={botonPagina} onClick={() => setPagina((p) => Math.min(paginas, p + 1))} disabled={pagina === paginas || consulta.cargando} aria-label="Página siguiente">
-                ›
+                <Icono nombre="chevron-derecha" className="h-4 w-4" />
               </button>
             </div>
           )}

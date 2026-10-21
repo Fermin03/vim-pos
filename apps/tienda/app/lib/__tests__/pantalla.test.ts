@@ -1,0 +1,302 @@
+// Lo que las pantallas deciden sin pintar: qué sucursal toca, con qué carrito se arranca, qué chip
+// de categoría va activo, cómo se marca una opción, a qué renglón pertenece un error y la espera
+// de la recotización.
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Resultado } from "../api";
+import { agregar, carritoNuevo, seleccionInicial, type Carrito, type CuerpoCarrito } from "../carrito";
+import { cotizacionDe, menuDe, negocioDe, type ColoniaSugerida, type Cotizacion, type Menu, type Negocio, type Sucursal } from "../contrato";
+import {
+  alternar, carritoPara, categoriaActiva, coloniaContestada, coloniaQueCoincide, cotizarConEspera, cpTrasEscribirColonia, envioEnDatos, modosDe, motivoDeCierre, renglonesDelError, sucursalElegida, ultimaVigente,
+} from "../pantalla";
+import { ID, cotizacionCruda, menuCrudo, negocioCrudo, u } from "./datos";
+
+const negocio = negocioDe(negocioCrudo()) as Negocio;
+const centro = negocio.sucursales[0]!;
+const con = (cambios: Partial<Sucursal>): Sucursal => ({ ...centro, ...cambios });
+const norte = con({ id: u(5), nombre: "Norte" });
+const dos: Negocio = { ...negocio, sucursales: [centro, norte] };
+const menu = menuDe(menuCrudo()) as Menu;
+const refresco = menu.categorias[0]!.productos[1]!;
+const conRefresco = (c: Carrito): Carrito => agregar(c, refresco, seleccionInicial(refresco), 1, "");
+
+describe("sucursalElegida", () => {
+  it("con una sola sucursal no se pregunta, diga lo que diga la URL", () => {
+    expect(sucursalElegida(negocio, undefined)).toBe(centro);
+    expect(sucursalElegida(negocio, "basura")).toBe(centro);
+  });
+  it("con varias, la de la URL; sin una válida, ninguna (se pregunta)", () => {
+    expect(sucursalElegida(dos, norte.id)).toBe(norte);
+    expect(sucursalElegida(dos, norte.id.toUpperCase())).toBe(norte);
+    expect(sucursalElegida(dos, undefined)).toBeNull();
+    expect(sucursalElegida(dos, u(99))).toBeNull();
+  });
+  it("sin sucursales, ninguna", () => {
+    expect(sucursalElegida({ ...negocio, sucursales: [] }, undefined)).toBeNull();
+  });
+});
+
+describe("modos y cierre", () => {
+  it("solo los modos que la sucursal ofrece", () => {
+    expect(modosDe(centro)).toEqual(["RECOGER", "DOMICILIO"]);
+    expect(modosDe(con({ recoger: false }))).toEqual(["DOMICILIO"]);
+    expect(modosDe(con({ recoger: false, domicilio: false }))).toEqual([]);
+  });
+  it("el motivo de cierre es el del modo; un modo que no se ofrece no está disponible", () => {
+    expect(motivoDeCierre(centro, "RECOGER")).toBeNull();
+    expect(motivoDeCierre(centro, "DOMICILIO")).toBe("FUERA_DE_HORARIO");
+    expect(motivoDeCierre(con({ domicilio: false }), "DOMICILIO")).toBe("MODO_NO_DISPONIBLE");
+  });
+});
+
+describe("carritoPara", () => {
+  it("sin nada guardado: carrito nuevo en el primer modo que se ofrece", () => {
+    expect(carritoPara(centro, null)).toMatchObject({ sucursalId: centro.id, modo: "RECOGER", renglones: [] });
+    expect(carritoPara(centro, null)).not.toHaveProperty("zonaId");
+    expect(carritoPara(con({ recoger: false }), null).modo).toBe("DOMICILIO");
+  });
+  it("el guardado de la misma sucursal se conserva con sus renglones", () => {
+    const g = conRefresco(carritoNuevo(centro.id, "DOMICILIO"));
+    expect(carritoPara(centro, g)).toEqual(g);
+  });
+  it("si el modo guardado ya no se ofrece, se corrige sin perder renglones", () => {
+    const g = conRefresco(carritoNuevo(centro.id, "DOMICILIO"));
+    const c = carritoPara(con({ domicilio: false }), g);
+    expect(c.modo).toBe("RECOGER");
+    expect(c.renglones).toEqual(g.renglones);
+  });
+  it("el guardado de otra sucursal no se mezcla", () => {
+    const g = conRefresco(carritoNuevo(norte.id, "RECOGER"));
+    expect(carritoPara(centro, g).renglones).toEqual([]);
+  });
+});
+
+describe("categoriaActiva", () => {
+  const s = [{ id: "a", top: -300 }, { id: "b", top: 40 }, { id: "c", top: 500 }];
+  it("la última sección que ya cruzó la línea", () => {
+    expect(categoriaActiva(s, 60)).toBe("b");
+    expect(categoriaActiva(s, 39)).toBe("a");
+    expect(categoriaActiva(s, 40)).toBe("b");
+  });
+  it("antes de la primera, la primera; al final de la página, la última", () => {
+    expect(categoriaActiva([{ id: "a", top: 200 }, { id: "b", top: 900 }], 60)).toBe("a");
+    expect(categoriaActiva(s, 60, true)).toBe("c");
+  });
+  it("sin secciones, ninguna", () => {
+    expect(categoriaActiva([], 60)).toBeNull();
+  });
+});
+
+describe("alternar", () => {
+  const id = (x: string) => x;
+  const grupo = ["a", "b", "c"];
+  it("obligatorio de uno: elegir otro lo reemplaza y no se puede quitar", () => {
+    const r = { minimo: 1, maximo: 1 };
+    expect(alternar(["a", "x"], id, grupo, "b", r)).toEqual(["x", "b"]);
+    expect(alternar(["a"], id, grupo, "a", r)).toEqual(["a"]);
+  });
+  it("opcional de uno: se reemplaza y sí se puede quitar", () => {
+    const r = { minimo: 0, maximo: 1 };
+    expect(alternar(["a"], id, grupo, "b", r)).toEqual(["b"]);
+    expect(alternar(["a"], id, grupo, "a", r)).toEqual([]);
+  });
+  it("varios: se agrega hasta el máximo y ni uno más; lo de otros grupos no cuenta", () => {
+    const r = { minimo: 0, maximo: 2 };
+    expect(alternar(["a", "x", "y"], id, grupo, "b", r)).toEqual(["a", "x", "y", "b"]);
+    expect(alternar(["a", "b"], id, grupo, "c", r)).toEqual(["a", "b"]);
+    expect(alternar(["a", "b"], id, grupo, "b", r)).toEqual(["a"]);
+  });
+  it("sin tope se agrega siempre", () => {
+    expect(alternar(["a", "b"], id, grupo, "c", { minimo: 0, maximo: null })).toEqual(["a", "b", "c"]);
+  });
+});
+
+describe("renglonesDelError", () => {
+  const carrito = conRefresco(carritoNuevo(centro.id, "RECOGER"));
+  const renglon = carrito.renglones[0]!;
+  it("un error de renglón marca los renglones de ese producto, con qué hacer", () => {
+    for (const error of ["PRODUCTO_NO_DISPONIBLE", "MODIFICADORES_INVALIDOS", "COMBO_INVALIDO"]) {
+      const avisos = renglonesDelError(carrito, { error, detalle: ID.refresco });
+      expect(Object.keys(avisos)).toEqual([renglon.id]);
+      expect(avisos[renglon.id]).toMatch(/Quítalo/);
+    }
+  });
+  it("otro código, sin detalle o un producto que no está en el carrito: no marca nada", () => {
+    expect(renglonesDelError(carrito, { error: "ZONA_INVALIDA", detalle: ID.refresco })).toEqual({});
+    expect(renglonesDelError(carrito, { error: "PRODUCTO_NO_DISPONIBLE", detalle: null })).toEqual({});
+    expect(renglonesDelError(carrito, { error: "PRODUCTO_NO_DISPONIBLE", detalle: ID.combo })).toEqual({});
+  });
+});
+
+describe("cotizarConEspera", () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+  const cuerpo: CuerpoCarrito = { sucursal_id: centro.id, modo: "RECOGER", zona_id: null, items: [] };
+  const lista: Resultado<Cotizacion> = { ok: true, datos: cotizacionDe(cotizacionCruda()) as Cotizacion };
+
+  it("espera antes de cotizar y entrega el resultado", async () => {
+    const cotizar = vi.fn(async () => lista), alResultado = vi.fn();
+    cotizarConEspera(cotizar, cuerpo, alResultado, 400);
+    await vi.advanceTimersByTimeAsync(399);
+    expect(cotizar).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(cotizar).toHaveBeenCalledTimes(1);
+    expect(alResultado).toHaveBeenCalledWith(lista);
+  });
+  it("cancelada durante la espera, no cotiza", async () => {
+    const cotizar = vi.fn(async () => lista), alResultado = vi.fn();
+    const cancelar = cotizarConEspera(cotizar, cuerpo, alResultado, 400);
+    await vi.advanceTimersByTimeAsync(200);
+    cancelar();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(cotizar).not.toHaveBeenCalled();
+    expect(alResultado).not.toHaveBeenCalled();
+  });
+  it("cancelada con la cotización en vuelo: aborta la señal y la respuesta tardía no se entrega", async () => {
+    let senal: AbortSignal | undefined;
+    let soltar: (r: Resultado<Cotizacion>) => void = () => {};
+    const cotizar = vi.fn((_c: CuerpoCarrito, s: AbortSignal) => { senal = s; return new Promise<Resultado<Cotizacion>>((ok) => { soltar = ok; }); });
+    const alResultado = vi.fn();
+    const cancelar = cotizarConEspera(cotizar, cuerpo, alResultado, 400);
+    await vi.advanceTimersByTimeAsync(400);
+    expect(senal?.aborted).toBe(false);
+    cancelar();
+    expect(senal?.aborted).toBe(true);
+    soltar(lista);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(alResultado).not.toHaveBeenCalled();
+  });
+  it("un error llega tal cual; una cancelada no se entrega", async () => {
+    const error: Resultado<Cotizacion> = { ok: false, error: "ZONA_INVALIDA", detalle: null };
+    const alResultado = vi.fn();
+    cotizarConEspera(async () => error, cuerpo, alResultado, 0);
+    cotizarConEspera(async () => ({ ok: false, error: "CANCELADA", detalle: null }), cuerpo, alResultado, 0);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(alResultado).toHaveBeenCalledTimes(1);
+    expect(alResultado).toHaveBeenCalledWith(error);
+  });
+});
+
+import { rangoDeEnvio } from "../pantalla";
+
+describe("rangoDeEnvio", () => {
+  it("dice el mínimo y el máximo de los tramos", () => {
+    expect(rangoDeEnvio([{ costo_mxn: "35.00" }, { costo_mxn: "0.00" }, { costo_mxn: "20.00" }]))
+      .toBe("El envío puede costar entre $0.00 y $35.00, según la distancia.");
+  });
+  it("sin rango que avisar: un solo tramo, ninguno, o todos al mismo precio", () => {
+    expect(rangoDeEnvio([])).toBeNull();
+    expect(rangoDeEnvio([{ costo_mxn: "35.00" }])).toBeNull();
+    expect(rangoDeEnvio([{ costo_mxn: "35.00" }, { costo_mxn: "35.00" }])).toBeNull();
+  });
+  it("un costo ilegible no cuenta", () => {
+    expect(rangoDeEnvio([{ costo_mxn: "x" }, { costo_mxn: "35.00" }])).toBeNull();
+  });
+});
+
+describe("listaCorta: las listas de «Mi cuenta» empiezan con tres", () => {
+  const de = (n: number) => Array.from({ length: n }, (_, i) => i + 1);
+  it("con tres o menos se ven todos y no hay «Mostrar más»", async () => {
+    const { listaCorta } = await import("../pantalla");
+    for (const n of [0, 1, 2, 3]) expect(listaCorta(de(n), false)).toEqual({ visibles: de(n), restantes: 0 });
+  });
+  it("con más de tres se ven los tres primeros y se dice cuántos faltan", async () => {
+    const { listaCorta, TOPE_DE_LISTA } = await import("../pantalla");
+    expect(TOPE_DE_LISTA).toBe(3);
+    expect(listaCorta(de(4), false)).toEqual({ visibles: [1, 2, 3], restantes: 1 });
+    expect(listaCorta(de(20), false)).toEqual({ visibles: [1, 2, 3], restantes: 17 });
+  });
+  it("tras «Mostrar más» se ven todos, en su orden, y ya no hay botón", async () => {
+    const { listaCorta } = await import("../pantalla");
+    expect(listaCorta(de(5), true)).toEqual({ visibles: [1, 2, 3, 4, 5], restantes: 0 });
+  });
+  it("no toca la lista que recibe", async () => {
+    const { listaCorta } = await import("../pantalla");
+    const lista = de(5);
+    listaCorta(lista, false).visibles.push(99);
+    expect(lista).toEqual([1, 2, 3, 4, 5]);
+  });
+});
+
+describe("envioEnDatos", () => {
+  const cot = (por_colonia: boolean): Cotizacion => ({ ...(cotizacionDe(cotizacionCruda()) as Cotizacion), por_colonia });
+  const distancia = con({ envio: { cobro: "DISTANCIA", tramos: [{ hasta_km: "3.0", costo_mxn: "30.00" }], punto: { lat: 21, lng: -101 } } });
+  const dosZonas = [centro.zonas[0]!, { id: u(9), nombre: "Norte", costo_mxn: "50.00" }];
+  const conZona: ColoniaSugerida = { id: u(20), nombre: "Centro", codigo_postal: "37000", con_zona: true };
+  it("la colonia que fijó el envío gana, también «Por distancia»", () => {
+    expect(envioEnDatos(con({ colonias: true, zonas: dosZonas }), cot(true), null)).toBe("colonia");
+    expect(envioEnDatos({ ...distancia, colonias: true }, cot(true), null)).toBe("colonia");
+  });
+  it("mientras se cotiza, una colonia con zona ya decide; con cotización, manda la cotización", () => {
+    expect(envioEnDatos({ ...distancia, colonias: true }, null, conZona)).toBe("colonia");
+    expect(envioEnDatos({ ...distancia, colonias: true }, cot(false), conZona)).toBe("mapa");
+  });
+  it("«Por distancia» sin colonia que decida: el mapa, con colonia escrita o sin ella", () => {
+    expect(envioEnDatos(distancia, cot(false), null)).toBe("mapa");
+    expect(envioEnDatos({ ...distancia, colonias: true }, null, { ...conZona, con_zona: false }, "Centro")).toBe("mapa");
+    expect(envioEnDatos(distancia, null, null, "Una que no está")).toBe("mapa");
+  });
+  it("«Por zonas»: una colonia sin zona, o escrita y fuera del catálogo, no tiene cobertura", () => {
+    expect(envioEnDatos(con({ colonias: true, zonas: dosZonas }), null, { ...conZona, con_zona: false }, "Centro")).toBe("sin_cobertura");
+    expect(envioEnDatos(con({ colonias: true }), null, null, "Una que no está")).toBe("sin_cobertura");
+  });
+  it("«Por zonas» sin colonia todavía: pendiente (también con la búsqueda en vuelo, que llega vacía)", () => {
+    expect(envioEnDatos(con({ colonias: true, zonas: dosZonas }), null, null, "")).toBe("pendiente");
+    expect(envioEnDatos(con({ colonias: true }), null, null, "   ")).toBe("pendiente");
+    expect(envioEnDatos(con({ colonias: true }), null, null)).toBe("pendiente");
+  });
+  it("lo escrito solo cuenta cuando el catálogo ya contestó: sin buscar, en vuelo o sin respuesta es pendiente", () => {
+    const zonas = con({ colonias: true });
+    for (const b of [null, "en_vuelo", "fallo", "sin_respuesta"] as const) {
+      expect(envioEnDatos(zonas, null, null, coloniaContestada(b, "Centro")), String(b)).toBe("pendiente");
+    }
+    expect(envioEnDatos(zonas, null, null, coloniaContestada("lista", "Centro"))).toBe("sin_cobertura");
+  });
+});
+
+describe("ultimaVigente", () => {
+  it("solo la última búsqueda vale; descartar invalida la que esté en vuelo", () => {
+    const v = ultimaVigente();
+    const primera = v.pedir();
+    expect(primera()).toBe(true);
+    const segunda = v.pedir();
+    expect(primera()).toBe(false);
+    expect(segunda()).toBe(true);
+    // El cliente escribe encima: la respuesta que venía ya no se usa.
+    v.descartar();
+    expect(segunda()).toBe(false);
+  });
+});
+
+describe("cpTrasEscribirColonia", () => {
+  it("escribir sobre una colonia que llenó el CP lo borra: ese CP era de la otra colonia", () => {
+    expect(cpTrasEscribirColonia("37390", "37390")).toBe("");
+  });
+  it("un CP que escribió el cliente (o que ya cambió) se queda", () => {
+    expect(cpTrasEscribirColonia("37390", null)).toBe("37390");
+    expect(cpTrasEscribirColonia("37320", "37390")).toBe("37320");
+    expect(cpTrasEscribirColonia("", null)).toBe("");
+  });
+});
+
+describe("coloniaQueCoincide", () => {
+  const lista: ColoniaSugerida[] = [
+    { id: u(21), nombre: "Jardines del Moral", codigo_postal: "37160", con_zona: true },
+    { id: u(22), nombre: "León Moderno", codigo_postal: "37480", con_zona: true },
+  ];
+  it("mismo nombre (sin importar acentos, mayúsculas ni espacios) y mismo CP", () => {
+    expect(coloniaQueCoincide(lista, "  leon   moderno ", "37480")?.id).toBe(u(22));
+  });
+  it("otro CP, o un nombre que solo se parece: ninguna", () => {
+    expect(coloniaQueCoincide(lista, "León Moderno", "37000")).toBeNull();
+    expect(coloniaQueCoincide(lista, "Jardines", "37160")).toBeNull();
+  });
+  it("sin CP escrito (colonia tecleada sin tocar la sugerencia): la única con ese nombre", () => {
+    expect(coloniaQueCoincide(lista, "leon moderno", "")?.id).toBe(u(22));
+    expect(coloniaQueCoincide(lista, "León Moderno", "  ")?.id).toBe(u(22));
+  });
+  it("sin CP y con homónimas: ninguna (no se adivina); con CP, la de ese CP", () => {
+    const conHomonimas: ColoniaSugerida[] = [...lista, { id: u(23), nombre: "Leon Moderno", codigo_postal: "37490", con_zona: false }];
+    expect(coloniaQueCoincide(conHomonimas, "León Moderno", "")).toBeNull();
+    expect(coloniaQueCoincide(conHomonimas, "León Moderno", "37490")?.id).toBe(u(23));
+  });
+});

@@ -1,0 +1,31 @@
+{
+  "name": "@vim/tienda",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3005",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@vim/fecha": "workspace:*",
+    "@vim/ui": "workspace:*",
+    "next": "^15.5.25",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vim/config": "workspace:*",
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.5.26",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.2.7"
+  }
+}

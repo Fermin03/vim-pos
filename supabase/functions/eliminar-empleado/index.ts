@@ -9,17 +9,12 @@
 // Todas las reglas (desactivado antes, nunca el dueño, nunca uno mismo) las impone la base dentro
 // de la misma transacción que escribe; aquí solo se identifica a quien llama.
 
-import { createClient } from "jsr:@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
+import { clienteAdmin, servir } from "../_shared/http.ts";
 import { registrarError } from "../_shared/errores.ts";
-import { tenantDelToken } from "../_shared/identidad.ts";
+import { bearerDe, tenantDelToken } from "../_shared/identidad.ts";
 
 // Cliente service_role: corre server-side, nunca se expone al cliente.
-const admin = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  { auth: { persistSession: false } },
-);
+const admin = clienteAdmin();
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -35,15 +30,8 @@ const ESTADO_POR_CODIGO: Record<string, number> = {
   SIGUE_ACTIVO: 409,
 };
 
-Deno.serve(async (req) => {
-  const cors = corsHeaders(req);
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
-
-  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+servir(async (req, json) => {
+  const token = bearerDe(req);
   if (!token) return json({ error: "NO_AUTH" }, 401);
   const { data: userResp, error: userErr } = await admin.auth.getUser(token);
   if (userErr || !userResp?.user) return json({ error: "AUTH_INVALIDA" }, 401);

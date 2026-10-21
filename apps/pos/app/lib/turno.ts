@@ -1,5 +1,7 @@
 "use client";
 import { employeeClient } from "./supabase";
+import { subDeToken } from "./autorizacion";
+import { hoyLocal } from "./reservaciones";
 
 export type Turno = {
   id: string;
@@ -38,17 +40,13 @@ export type DatosCaja = {
   /** Logo del negocio como data URI, o null. Viaja embebido en `tenants` (mig. 0066) para
    *  que la caja pueda mostrarlo e imprimirlo sin conexión. */
   logoUrl: string | null;
-  /** Vertical del negocio. La caja la usa para no enseñar campos de una vertical
-   *  a otra: el bloque de "evento o ubicación especial" al abrir turno solo tiene
-   *  sentido en un foodtruck, y a una hamburguesería fija le sobraba en pantalla. */
-  vertical: string | null;
 };
 
 /** Lee datos completos de la caja (caja + sucursal). Usa RLS por tenant. */
 export async function leerCaja(token: string, cajaId: string): Promise<DatosCaja> {
   const { data, error } = await employeeClient(token)
     .from("cajas")
-    .select("tenant_id, sucursal_id, numero, nombre, sucursal:sucursales(nombre), tenant:tenants(nombre_comercial, logo_url, vertical_principal)")
+    .select("tenant_id, sucursal_id, numero, nombre, sucursal:sucursales(nombre), tenant:tenants(nombre_comercial, logo_url)")
     .eq("id", cajaId)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -56,7 +54,7 @@ export async function leerCaja(token: string, cajaId: string): Promise<DatosCaja
   type Fila = {
     tenant_id: string; sucursal_id: string; numero: number; nombre: string;
     sucursal: { nombre: string } | null;
-    tenant: { nombre_comercial: string | null; logo_url: string | null; vertical_principal: string | null } | null;
+    tenant: { nombre_comercial: string | null; logo_url: string | null } | null;
   };
   const f = data as unknown as Fila;
   return {
@@ -67,19 +65,9 @@ export async function leerCaja(token: string, cajaId: string): Promise<DatosCaja
     sucursalNombre: f.sucursal?.nombre ?? "—",
     negocioNombre: f.tenant?.nombre_comercial ?? f.sucursal?.nombre ?? "—",
     logoUrl: f.tenant?.logo_url ?? null,
-    vertical: f.tenant?.vertical_principal ?? null,
   };
 }
 
-/** Día contable hoy. Simplificación: usa el día local del navegador. El backend
- *  refinará el cómputo con la hora de cierre del tenant cuando se migre a RPC. */
-function diaContableHoy(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
 
 /** Próximo correlativo del día para la caja (contar turnos abiertos del día). */
 async function siguienteCorrelativoDelDia(token: string, cajaId: string, dia: string): Promise<number> {
@@ -131,7 +119,9 @@ export async function abrirTurno(token: string, input: AbrirTurnoInput): Promise
   const caja = await leerCaja(token, input.cajaId);
   const tenant_id = caja.tenant_id;
   const sucursal_id = caja.sucursal_id;
-  const dia = diaContableHoy();
+  // Día contable. Simplificación: el día local de la caja; el backend refinará el cómputo con la
+  // hora de cierre del tenant cuando se migre a RPC.
+  const dia = hoyLocal();
   const correlativo = await siguienteCorrelativoDelDia(token, input.cajaId, dia);
   const codigo = `${dia}-C${String(input.cajaNumero).padStart(2, "0")}-${String(correlativo).padStart(2, "0")}`;
 
@@ -161,23 +151,13 @@ export async function abrirTurno(token: string, input: AbrirTurnoInput): Promise
   return { ...data, fondo_inicial_mxn: Number(data.fondo_inicial_mxn) } as Turno;
 }
 
-function subDeToken(token: string): string {
-  try {
-    const payload = token.split(".")[1];
-    if (!payload) throw new Error();
-    const claims = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
-    return claims.sub as string;
-  } catch {
-    throw new Error("TOKEN_INVALIDO");
-  }
-}
 
 export function fmtMxn(n: number): string {
   return n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
 }
 
 /** Cuentas ABIERTAS (sin cobrar) del turno, agrupadas por modo de servicio. */
-export type CuentasAbiertasPorModo = { comedor: number; pickup: number; domicilio: number };
+export type CuentasAbiertasPorModo = { comedor: number; pickup: number; domicilio: number; barra: number };
 
 /**
  * Cuenta las cuentas vivas de cada modo para los badges de la pantalla de inicio.
@@ -201,5 +181,6 @@ export async function contarCuentasAbiertasPorModo(token: string, turnoId: strin
     comedor: n("COMER_AQUI"),
     pickup: n("DRIVE_THRU"),
     domicilio: n("DELIVERY_PROPIO"),
+    barra: n("BARRA"),
   };
 }

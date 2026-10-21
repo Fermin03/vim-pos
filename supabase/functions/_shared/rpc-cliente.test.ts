@@ -21,6 +21,7 @@ const SOLO_SERVICE_ROLE = new Set([
   "verificar_autorizacion_pin", "resetear_pin_empleado", "crear_perfil_con_pin",
   "crear_tenant_con_owner", "activar_suscripcion", "registrar_pago_suscripcion",
   "anular_pago_suscripcion", "caja_latido", "delivery_pedido_transicion", "alta_autoservicio",
+  "operacion_cambiar", "cambiar_giro", "operacion_cuentas_abiertas",
 ]);
 
 // fileURLToPath y no `.pathname`: en Windows `.pathname` da "/D:/…" con espacios como %20.

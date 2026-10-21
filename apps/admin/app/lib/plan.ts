@@ -93,7 +93,7 @@ export function desgloseMensual(
 
 export async function leerPlanYPagos(): Promise<PlanYPagos> {
   const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
+  if (!s?.tenantId) throw new Error("Tu sesión expiró. Vuelve a iniciar sesión.");
   const tid = s.tenantId;
 
   const [t, sub, pag, dp, ad, lim] = await Promise.all([

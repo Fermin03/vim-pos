@@ -135,8 +135,9 @@ Una sola vez, el dueño:
 3. Los dispositivos que deben recibir el aviso activan notificaciones en el admin
    (Configuración → Notificaciones).
 
-Prueba: `select delivery_avisar_expirados('<tenant>', '<sucursal>', 1);` en el SQL editor debe
-devolver `true` y llegar la notificación; `select * from net._http_response order by id desc limit 3`
+Prueba: `select delivery_avisar_expirados('<tenant>', '<sucursal>', 1, 'APP');` en el SQL editor debe
+devolver `true` y llegar la notificación (desde la 0164 lleva un cuarto argumento, el canal: `'APP'`
+para Uber, `'TIENDA'` para la tienda en línea, que cambia el título y la ruta del aviso); `select * from net._http_response order by id desc limit 3`
 muestra la respuesta de `enviar-push` (200 con `enviadas`).
 
 ## 4. Prueba de punta a punta

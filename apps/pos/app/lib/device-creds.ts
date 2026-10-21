@@ -12,12 +12,14 @@
 // arranca con su sesión y no vuelve a pedir credenciales. Si la sesión sí se pierde (caja apagada
 // más allá del refresh), la pantalla de vinculación aparece con el correo puesto y solo hay que
 // teclear la contraseña — que es exactamente lo que debe costar recuperar una credencial de nube.
+//
+// Guardar, olvidar y el prellenado de DEV son los de la cocina (`@vim/kds-core`): misma llave de
+// localStorage. Lo único propio de la caja es `leerIdent`, que además limpia la contraseña vieja.
+import { guardarIdent, type DeviceCreds, type DeviceIdent } from "@vim/kds-core";
+
+export { guardarIdent, olvidarCreds, CREDS_DEV_FIXTURE, type DeviceCreds, type DeviceIdent } from "@vim/kds-core";
 
 const KEY = "vimpos.device.creds";
-
-export type DeviceCreds = { email: string; password: string };
-/** Lo que SÍ se persiste. La contraseña nunca toca el almacenamiento del navegador. */
-export type DeviceIdent = { email: string };
 
 /**
  * Email del dispositivo vinculado, si lo hay.
@@ -37,24 +39,3 @@ export function leerIdent(): DeviceIdent | null {
     return null;
   }
 }
-
-export function guardarIdent(ident: DeviceIdent): void {
-  window.localStorage.setItem(KEY, JSON.stringify({ email: ident.email }));
-}
-
-export function olvidarCreds(): void {
-  window.localStorage.removeItem(KEY);
-}
-
-/**
- * Prellenado SOLO para DEV: la cuenta de dispositivo del fixture (seed.sql).
- * SEC CN-011 (Cyber Neo): en producción es `null` para que la credencial del fixture
- * nunca viaje en el bundle. El gate por NODE_ENV permite tree-shaking del literal.
- */
-export const CREDS_DEV_FIXTURE: DeviceCreds | null =
-  process.env.NODE_ENV === "production"
-    ? null
-    : {
-        email: "caja-99999999-0000-0000-0000-0000000000cc@dispositivos.vimpos.com.mx",
-        password: "vim-device-dev",
-      };

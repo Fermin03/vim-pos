@@ -7,7 +7,7 @@
 // poder probarlo en cualquier runtime.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { armarConceptos, armarConceptosGlobal, ConceptosIncoherentes, type LineaTicket } from "./conceptos.ts";
+import { armarConceptos, armarConceptosGlobal, ConceptosIncoherentes, filaALinea, type LineaTicket } from "./conceptos.ts";
 
 /** Un renglón con los valores que `recalcular_totales_ticket` habría dejado. */
 function linea(p: Partial<LineaTicket> & { totalItemMxn: number; ivaItemMxn: number }): LineaTicket {
@@ -540,4 +540,21 @@ test("la global que no cuadra dice qué folio la bloquea", () => {
     () => armarConceptosGlobal([sano, roto]),
     (e: unknown) => e instanceof ConceptosIncoherentes && e.message.includes("A-0002"),
   );
+});
+
+test("filaALinea: los numéricos de PostgREST llegan como texto o null y salen como número", () => {
+  const l = filaALinea({
+    id: "i1", parent_item_id: null, combo_rol: "PADRE", cargo_tipo: null,
+    producto_nombre_snapshot: "Combo clásico", cantidad: "2", clave_sat_snapshot: "90101501", unidad_sat_snapshot: null,
+    tasa_iva_snapshot: "16.00", iva_incluido_en_precio_snapshot: true, subtotal_bruto_mxn: "232.00",
+    monto_modificadores_mxn: null, descuento_item_mxn: "0", promocion_item_mxn: null, iva_item_mxn: "32.00", total_item_mxn: "232.00",
+  });
+  assert.deepEqual(l, {
+    id: "i1", parentId: null, comboRol: "PADRE", cargoTipo: null,
+    descripcion: "Combo clásico", cantidad: 2, claveSat: "90101501", unidadSat: null,
+    tasaIva: 16, ivaIncluidoEnPrecio: true, subtotalBrutoMxn: 232,
+    montoModificadoresMxn: 0, descuentoItemMxn: 0, promocionItemMxn: 0, ivaItemMxn: 32, totalItemMxn: 232,
+  });
+  // Y lo que arma con eso cuadra con el total cobrado.
+  assert.equal(armarConceptos([l], 232).total, 232);
 });

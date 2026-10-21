@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { capaVisible } from "../lib/escape";
 import { useEscape } from "../lib/use-escape";
-import { Button } from "@vim/ui/styles";
+import { Button, Icono } from "@vim/ui/styles";
 import { fmtMxn } from "../lib/turno";
 import {
   aplicarPago,
@@ -15,105 +15,74 @@ import {
 } from "../lib/cobro";
 import { nuevoClientId } from "../lib/carrito";
 import { aplicarPagosEnOrden, pagoEntroPeseAlError, ventaQuedoPagada, type PagoPorAplicar } from "../lib/cobro-pagos";
+import { pagoDeCobro, pedirCobro, propinaDeCobro, terminalDeCaja, type CobroTerminal, type TerminalCaja } from "../lib/terminal";
+import { VistaTerminal } from "./vista-terminal";
 
 // ─── Íconos SVG inline (calcan los mockups) ────────────────────────────────
 
 function IcoEfectivo({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="6" width="20" height="12" rx="2"/>
-      <circle cx="12" cy="12" r="2.5"/>
-      <path d="M6 12h.01M18 12h.01"/>
-    </svg>
+    <Icono nombre="billete" className={cls} />
   );
 }
 
 function IcoDebito({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="5" width="20" height="14" rx="2"/>
-      <path d="M2 10h20"/>
-      <path d="M7 15h2M14 15h3"/>
-    </svg>
+    <Icono nombre="tarjeta" className={cls} />
   );
 }
 
 function IcoCredito({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="5" width="20" height="14" rx="2"/>
-      <path d="M2 10h20"/>
-    </svg>
+    <Icono nombre="tarjeta" className={cls} />
   );
 }
 
 function IcoTransferencia({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 8h14l-3-3M21 16H7l3 3"/>
-    </svg>
+    <Icono nombre="transferencia" className={cls} />
   );
 }
 
 function IcoDividido({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 3v18"/>
-      <path d="M7 7H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2M17 7h2a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-2"/>
-    </svg>
+    <Icono nombre="pago-dividido" className={cls} />
   );
 }
 
 function IcoBack({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="19" y1="12" x2="5" y2="12"/>
-      <polyline points="12 19 5 12 12 5"/>
-    </svg>
+    <Icono nombre="flecha-izquierda" className={cls} />
   );
 }
 
 function IcoChevron({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="9 18 15 12 9 6"/>
-    </svg>
+    <Icono nombre="chevron-derecha" className={cls} />
   );
 }
 
 function IcoBackspace({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 5H8l-5 7 5 7h13a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1Z"/>
-      <path d="m15 9-4 4M11 9l4 4"/>
-    </svg>
+    <Icono nombre="retroceso" className={cls} />
   );
 }
 
 function IcoTrash({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="3 6 5 6 21 6"/>
-      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
-    </svg>
+    <Icono nombre="eliminar" className={cls} />
   );
 }
 
 function IcoPlus({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="5" x2="12" y2="19"/>
-      <line x1="5" y1="12" x2="19" y2="12"/>
-    </svg>
+    <Icono nombre="mas" className={cls} />
   );
 }
 
 function IcoClose({ cls }: { cls?: string }) {
   return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="18" y1="6" x2="6" y2="18"/>
-      <line x1="6" y1="6" x2="18" y2="18"/>
-    </svg>
+    <Icono nombre="cerrar" className={cls} />
   );
 }
 
@@ -170,7 +139,10 @@ function metodoCfg(v: MetodoPago): MetodoConfig {
 
 // ─── Sub-vistas ──────────────────────────────────────────────────────────────
 
-type Vista = "propina" | "selector" | "efectivo" | "otro" | "dividido" | "atajo";
+type Vista = "propina" | "selector" | "efectivo" | "otro" | "dividido" | "atajo" | "terminal";
+
+/** Lo más que la propina espera a saber si el lector la pregunta; después sale la de VIM. */
+const ESPERA_LECTOR_MS = 4000;
 
 // ─── Tipos locales ───────────────────────────────────────────────────────────
 
@@ -253,13 +225,60 @@ function Numpad({
 
 function VistaSelector({
   totales,
+  conTerminal,
+  terminalLista,
+  onRevisarTerminal,
+  error,
   onElegir,
   onCerrar,
 }: {
   totales: TotalesTicket;
-  onElegir: (m: MetodoPago | "dividido") => void;
+  /** La caja tiene terminal ligada: Débito y Crédito se vuelven un solo «Tarjeta» que cobra en ella. */
+  conTerminal: boolean;
+  /** El lector puede recibir el cobro (Clip apagado o con la app cerrada = no): si no, «Tarjeta» abre el registro a mano. */
+  terminalLista: boolean;
+  /** Vuelve a preguntar por el lector; true si ya puede cobrar. */
+  onRevisarTerminal: () => Promise<boolean>;
+  error: string | null;
+  onElegir: (m: MetodoPago | "dividido" | "terminal") => void;
   onCerrar: () => void;
 }) {
+  // El registro a mano se queda como salida (sin internet, terminal descompuesta), pero escondido.
+  const [aMano, setAMano] = useState(false);
+  // El mensaje pide encender el lector: al tocar «Tarjeta» otra vez se pregunta de nuevo, y solo si
+  // sigue sin estar listo se abre lo manual.
+  const [revisando, setRevisando] = useState(false);
+  // Si la cajera ya salió del selector (eligió efectivo, dividió o cerró), la respuesta tardía no
+  // la regresa a la terminal: mandaría el monto al lector a media venta.
+  const montado = useRef(true);
+  useEffect(() => { montado.current = true; return () => { montado.current = false; }; }, []);
+  async function revisarTerminal() {
+    if (revisando) return;
+    setRevisando(true);
+    const lista = await onRevisarTerminal().catch(() => false);
+    if (!montado.current) return;
+    setRevisando(false);
+    if (lista) onElegir("terminal");
+    else setAMano(true);
+  }
+  const filas: { cfg: MetodoConfig; elegir: () => void; clave: string; aviso?: boolean }[] = [];
+  for (const m of METODOS) {
+    const esTarjeta = m.valor === "TARJETA_DEBITO" || m.valor === "TARJETA_CREDITO";
+    if (!conTerminal || !esTarjeta) { filas.push({ cfg: m, elegir: () => onElegir(m.valor), clave: m.valor }); continue; }
+    if (m.valor === "TARJETA_DEBITO") {
+      filas.push({
+        cfg: {
+          ...metodoCfg("TARJETA_CREDITO"), etiqueta: "Tarjeta",
+          sub: terminalLista ? "Débito o crédito · se cobra en la terminal"
+            : revisando ? "Revisando la terminal…" : "Terminal no disponible: enciéndela y abre Clip PinPad",
+        },
+        elegir: terminalLista ? () => onElegir("terminal") : revisarTerminal, clave: "terminal", aviso: !terminalLista,
+      });
+    }
+    if (aMano) {
+      filas.push({ cfg: { ...m, etiqueta: `${m.etiqueta} · a mano`, sub: "Ya se cobró en otra terminal" }, elegir: () => onElegir(m.valor), clave: m.valor });
+    }
+  }
   return (
     <div className="flex flex-col h-full">
       {/* Total a cobrar */}
@@ -270,18 +289,20 @@ function VistaSelector({
         </div>
       </div>
 
+      {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
       <div className="text-15 font-semibold text-ink-2 mb-3">¿Cómo paga el cliente?</div>
 
       {/* Lista de métodos */}
       <div className="border border-line rounded-lg overflow-hidden">
-        {METODOS.map((m, i) => (
+        {filas.map(({ cfg: m, elegir, clave, aviso }, i) => (
           <button
-            key={m.valor}
+            key={clave}
             type="button"
-            onClick={() => onElegir(m.valor)}
+            onClick={elegir}
+            aria-busy={aviso && revisando}
             className={[
               "w-full flex items-center gap-4 px-[18px] py-[15px] cursor-pointer transition-colors hover:bg-hover text-left",
-              i < METODOS.length - 1 ? "border-b border-line" : "",
+              i < filas.length - 1 ? "border-b border-line" : "",
             ].join(" ")}
           >
             <span
@@ -292,7 +313,7 @@ function VistaSelector({
             </span>
             <span className="flex-1 min-w-0">
               <span className="block text-16 font-semibold text-ink">{m.etiqueta}</span>
-              <span className="block text-13 text-ink-3 mt-[1px]">{m.sub}</span>
+              <span className={`block text-13 mt-[1px] ${aviso ? "text-warning" : "text-ink-3"}`} role={aviso ? "status" : undefined}>{m.sub}</span>
             </span>
             <IcoChevron cls="w-5 h-5 text-ink-3 flex-shrink-0" />
           </button>
@@ -332,7 +353,13 @@ function VistaSelector({
           <IcoBack cls="w-4 h-4" />
           Volver al ticket
         </button>
-        <span className="text-13 text-ink-3">Efectivo es el más usado</span>
+        {conTerminal && !aMano ? (
+          <button type="button" onClick={() => setAMano(true)} className="min-h-[44px] px-2 text-13 font-semibold text-ink-2 underline underline-offset-2 hover:text-ink">
+            La cobré en otra terminal
+          </button>
+        ) : (
+          <span className="text-13 text-ink-3">Efectivo es el más usado</span>
+        )}
       </div>
     </div>
   );
@@ -567,14 +594,28 @@ function VistaOtro({
 
 function ModalAgregarPago({
   pendiente,
+  conTerminal,
+  terminalNoLista,
   onAgregar,
   onCerrar,
 }: {
   pendiente: number;
-  onAgregar: (metodo: MetodoPago, monto: number) => void;
+  conTerminal: boolean;
+  terminalNoLista: boolean;
+  onAgregar: (metodo: MetodoPago, monto: number, terminal: boolean) => void;
   onCerrar: () => void;
 }) {
   const [metodo, setMetodo] = useState<MetodoPago>("EFECTIVO");
+  const [terminal, setTerminal] = useState(false);
+  // Con terminal: «Tarjeta» (se cobra en ella) y, aparte, Débito y Crédito a mano.
+  const opciones: { cfg: MetodoConfig; terminal: boolean; clave: string }[] = METODOS.flatMap((m) => {
+    const esTarjeta = m.valor === "TARJETA_DEBITO" || m.valor === "TARJETA_CREDITO";
+    if (!conTerminal || !esTarjeta) return [{ cfg: m, terminal: false, clave: m.valor }];
+    const aMano = { cfg: { ...m, etiqueta: `${m.etiqueta} · a mano` }, terminal: false, clave: m.valor };
+    return m.valor === "TARJETA_DEBITO"
+      ? [{ cfg: { ...metodoCfg("TARJETA_CREDITO"), etiqueta: "Tarjeta" }, terminal: true, clave: "terminal" }, aMano]
+      : [aMano];
+  });
   const [buffer, setBuffer] = useState<string>("");
   // Se monta encima del cobro, así que queda arriba en la pila: Escape cierra solo este diálogo.
   useEscape(onCerrar);
@@ -583,7 +624,7 @@ function ModalAgregarPago({
 
   function handleAgregar() {
     if (monto <= 0) return;
-    onAgregar(metodo, Math.min(monto, pendiente));
+    onAgregar(metodo, Math.min(monto, pendiente), terminal);
   }
 
   return (
@@ -604,14 +645,14 @@ function ModalAgregarPago({
           {/* Método */}
           <div className="text-13 font-bold uppercase tracking-widest text-ink-2 mb-3">Método</div>
           <div className="grid grid-cols-2 gap-2 mb-5">
-            {METODOS.map((m) => (
+            {opciones.map(({ cfg: m, terminal: enTerminal, clave }) => (
               <button
-                key={m.valor}
+                key={clave}
                 type="button"
-                onClick={() => setMetodo(m.valor)}
+                onClick={() => { setMetodo(m.valor); setTerminal(enTerminal); }}
                 className={[
                   "flex items-center gap-[10px] px-[13px] py-[12px] border rounded cursor-pointer transition-all",
-                  metodo === m.valor
+                  metodo === m.valor && terminal === enTerminal
                     ? "border-ink bg-sel shadow-[inset_0_0_0_1.5px_#16161A]"
                     : "border-line bg-surface hover:border-line-strong",
                 ].join(" ")}
@@ -623,6 +664,9 @@ function ModalAgregarPago({
               </button>
             ))}
           </div>
+          {terminalNoLista && (
+            <p className="-mt-3 mb-5 text-13 text-warning" role="status">Terminal no disponible: enciéndela y abre Clip PinPad</p>
+          )}
 
           {/* Monto */}
           <div className="text-13 font-bold uppercase tracking-widest text-ink-2 mb-3">Monto</div>
@@ -662,12 +706,19 @@ function ModalAgregarPago({
 
 function VistaDividida({
   totales,
+  conTerminal,
+  terminalLista,
+  onRevisarTerminal,
   procesando,
   error,
   onAplicarPagos,
   onVolver,
 }: {
   totales: TotalesTicket;
+  conTerminal: boolean;
+  /** Como en el selector: sin lector listo no se ofrece cobrar en la terminal y se dice por qué. */
+  terminalLista: boolean;
+  onRevisarTerminal: () => Promise<boolean>;
   procesando: boolean;
   error: string | null;
   /** Aplica TODOS los pagos divididos de una (secuencial en el padre, no en paralelo) y devuelve
@@ -684,9 +735,9 @@ function VistaDividida({
   const cubierto = restante <= 0 && pagos.length > 0;
   const pct = Math.min(100, pendiente > 0 ? (pagado / pendiente) * 100 : 0);
 
-  function agregarPago(metodo: MetodoPago, monto: number) {
+  function agregarPago(metodo: MetodoPago, monto: number, terminal: boolean) {
     // El id de idempotencia nace AQUÍ y no cambia entre reintentos (B2-2).
-    setPagos((prev) => [...prev, { clientId: nuevoClientId(), metodo, monto }]);
+    setPagos((prev) => [...prev, { clientId: nuevoClientId(), metodo, monto, ...(terminal ? { terminal } : {}) }]);
     setMostrarModal(false);
   }
 
@@ -765,7 +816,7 @@ function VistaDividida({
                   <span className="w-9 h-9 rounded-[9px] flex items-center justify-center flex-shrink-0" style={{ background: cfg.icoBg, color: cfg.icoColor }}>
                     <cfg.icoFn cls="w-[19px] h-[19px]" />
                   </span>
-                  <span className="flex-1 text-15 font-semibold text-ink">{cfg.etiqueta}</span>
+                  <span className="flex-1 text-15 font-semibold text-ink">{p.terminal ? "Tarjeta · en la terminal" : cfg.etiqueta}</span>
                   <span className="font-display text-16 font-semibold text-ink tabular-nums">{fmtMxn(p.monto)}</span>
                   <button
                     type="button"
@@ -783,7 +834,11 @@ function VistaDividida({
 
         <button
           type="button"
-          onClick={() => setMostrarModal(true)}
+          onClick={() => {
+            // Se vuelve a preguntar: si el lector se encendió, la opción aparece en el diálogo al contestar.
+            if (conTerminal && !terminalLista) void onRevisarTerminal().catch(() => false);
+            setMostrarModal(true);
+          }}
           disabled={cubierto}
           className="w-full inline-flex items-center justify-center gap-[9px] font-sans text-15 font-semibold text-ink bg-surface border border-line-strong py-[14px] rounded cursor-pointer transition-all hover:border-ink hover:bg-hover disabled:opacity-45 disabled:cursor-default"
         >
@@ -819,6 +874,8 @@ function VistaDividida({
       {mostrarModal && (
         <ModalAgregarPago
           pendiente={restante}
+          conTerminal={conTerminal && terminalLista}
+          terminalNoLista={conTerminal && !terminalLista}
           onAgregar={agregarPago}
           onCerrar={() => setMostrarModal(false)}
         />
@@ -913,9 +970,7 @@ function VistaPropina({
               onClick={() => setMode("none")}
               className={[altBase, mode === "none" ? altOn : altOff].join(" ")}
             >
-              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
+              <Icono nombre="menos" className="h-4 w-4" />
               Sin propina
             </button>
           )}
@@ -981,6 +1036,9 @@ function VistaPropina({
 export function ModalCobro({
   token,
   sucursalId,
+  cajaId,
+  turnoId,
+  ejecutaNombre,
   totalesIniciales,
   atajo = null,
   onPagado,
@@ -989,6 +1047,10 @@ export function ModalCobro({
 }: {
   token: string;
   sucursalId: string;
+  /** Para el cobro con terminal: de qué caja es y quién cobra (lo pide la autorización con PIN). */
+  cajaId: string;
+  turnoId: string;
+  ejecutaNombre: string;
   totalesIniciales: TotalesTicket;
   /**
    * Avisa el monto que la cajera tiene a la vista como pendiente de cobrar (con propina y pagos
@@ -1013,6 +1075,11 @@ export function ModalCobro({
   // Propina (P-075): se captura antes de elegir método. El "a cobrar" pasa a total + propina.
   const [propina, setPropina] = useState(0);
   const [sug, setSug] = useState<SugerenciasPropina | null>(null);
+  // Con la propina en el lector de Clip el modal abre en el selector: la propina de VIM se pregunta
+  // solo si se cobra con otra cosa (`propinaAlElegir`), una vez, y luego sigue el método elegido.
+  const [propinaAlElegir, setPropinaAlElegir] = useState(false);
+  const [propinaPreguntada, setPropinaPreguntada] = useState(false);
+  const [trasPropina, setTrasPropina] = useState<MetodoPago | "dividido" | null>(null);
 
   useEffect(() => {
     let activo = true;
@@ -1020,11 +1087,12 @@ export function ModalCobro({
       .then((s) => {
         if (!activo) return;
         setSug(s);
-        if (!s.capturar) setVista(atajo ? "atajo" : "selector"); // sucursal sin propina → salta el paso
+        if (!s.capturar) { setTrasPropina(null); setVista(atajo ? "atajo" : "selector"); } // sucursal sin propina → salta el paso
       })
       .catch(() => {
         if (!activo) return;
         setSug({ porcentajes: [10, 15, 20], capturar: false, libre: true, sin: true });
+        setTrasPropina(null);
         setVista(atajo ? "atajo" : "selector");
       });
     return () => { activo = false; };
@@ -1049,7 +1117,9 @@ export function ModalCobro({
     try {
       await establecerPropina(token, totales.ticketId, monto);
       setPropina(monto);
-      setVista(atajo ? "atajo" : "selector");
+      setPropinaPreguntada(true);
+      if (trasPropina) { setTrasPropina(null); irAMetodo(trasPropina); }
+      else setVista(atajo ? "atajo" : "selector");
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo fijar la propina");
     } finally {
@@ -1121,6 +1191,129 @@ export function ModalCobro({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vista]);
 
+  // ── Cobro con terminal (ADR 0033) ──────────────────────────────────────────────────────────
+  // Lo último que se supo de esta caja evita que el selector cambie de botones al abrir. Solo se
+  // guarda `hay`: `lista` arranca en true y, si el lector no lo está, `crear` responde
+  // TERMINAL_NO_DISPONIBLE (seguro) hasta que contesta `disponible`.
+  // "2" = hay terminal y su lector pregunta la propina: mientras contesta `disponible`, la propina de
+  // VIM espera («Cargando…») en vez de preguntarse para luego saltarla.
+  const recuerdo = useRef<string | null>(null);
+  const [terminal, setTerminal] = useState<TerminalCaja>(() => {
+    try { recuerdo.current = sessionStorage.getItem("vimpos.terminal"); } catch { /* sin almacén no hay recuerdo */ }
+    return { hay: recuerdo.current === "1" || recuerdo.current === "2", lista: true, proveedor: null, propina_en_lector: false };
+  });
+  const [terminalSabida, setTerminalSabida] = useState(false);
+  const conTerminal = terminal.hay;
+  // El cobro va al lector con la propina por elegir solo si VIM no tiene ya una (ni de esta vez ni
+  // guardada en el ticket): nunca dos propinas.
+  // Si VIM ya la preguntó (aunque fuera «sin propina»), el lector no la vuelve a preguntar.
+  const propinaEnLector = terminal.propina_en_lector && propina === 0 && !propinaPreguntada && !((totales.propina ?? 0) > 0);
+
+  /** Vuelve a preguntar por el lector (la cajera lo encendió con el cobro abierto); true si ya puede cobrar. */
+  async function revisarTerminal(): Promise<boolean> {
+    const t = await terminalDeCaja(token, cajaId);
+    setTerminal(t);
+    return t.hay && t.lista;
+  }
+
+  /**
+   * La terminal ya cobró: el pago entra al ticket como débito o crédito, con su referencia. El id del
+   * cobro es el `client_id_local`, así que repetirlo (caja apagada a medias, doble aviso) no duplica.
+   * Si el cliente dejó propina en el lector, primero se fija en el ticket (absoluta: repetirla da lo
+   * mismo) y el pago la lleva además del monto; si no se pudo fijar, no se aplica el pago y al volver
+   * a abrir se hace todo otra vez. Aceptado a mano con PIN (`autorizoId`): solo el monto.
+   */
+  async function aplicarCobroTerminal(c: CobroTerminal, autorizoId?: string) {
+    setError(null);
+    setProcesando(true);
+    const propinaLector = autorizoId ? 0 : propinaDeCobro(c);
+    try {
+      if (propinaLector > 0) {
+        await establecerPropina(token, totales.ticketId, propinaLector);
+        setPropina(propinaLector);
+        setPropinaPreguntada(true);
+      }
+      const t = await aplicarPago(
+        token, totales.ticketId,
+        pagoDeCobro(c, propinaLector),
+        c.id,
+      );
+      // Si este aviso no llega, el cobro sigue «sin aplicar» en la nube y se reintenta al abrir el
+      // cobro otra vez; aplicar_pago ya lo tiene, así que no pasa nada.
+      await pedirCobro(token, cajaId, { accion: "confirmar", cobro_id: c.id, autorizo_id: autorizoId }).catch(() => {});
+      setTotales(t);
+      if (t.estadoFiscal === "PAGADO") onPagado(t.folio, t.cambio, t.total);
+      else setVista("selector");
+    } catch (e) {
+      const t = await trasFalloDeCobro(e);
+      if (!ventaQuedoPagada(t)) {
+        setError("El cobro sí pasó en la terminal, pero no se pudo registrar en el ticket. Cierra el cobro y vuelve a abrirlo: se registra solo.");
+        setVista("selector");
+      }
+    } finally {
+      setProcesando(false);
+    }
+  }
+
+  // Al abrir: ¿la caja tiene terminal?, y si quedó un cobro aprobado de ESTE ticket sin registrar
+  // (la caja se apagó o perdió la red a medio cobro), se registra ahora.
+  useEffect(() => {
+    let activo = true;
+    // «Cargando…» tiene tope: con la red atorada, a los 4 s sale la propina de VIM de siempre (y
+    // la respuesta tardía ya no cambia la pantalla). Solo si el lector preguntaba la propina.
+    let vencio = false;
+    const tope = recuerdo.current === "2" && !atajo
+      ? setTimeout(() => { vencio = true; setTerminalSabida(true); }, ESPERA_LECTOR_MS) : undefined;
+    (async () => {
+      const t = await terminalDeCaja(token, cajaId);
+      clearTimeout(tope);
+      const tiene = t.hay;
+      if (!activo) return;
+      setTerminal(t);
+      setTerminalSabida(true);
+      try { sessionStorage.setItem("vimpos.terminal", !tiene ? "0" : t.propina_en_lector ? "2" : "1"); } catch { /* sin almacén no hay recuerdo */ }
+      // Con lector listo que pregunta la propina, el cobro abre en el selector (solo si la propina
+      // de VIM aún esperaba ese dato: no se le quita la pantalla a la cajera). Una propina que ya
+      // estaba en el ticket se respeta: entra al «a cobrar» y el lector no pregunta otra.
+      if (!vencio && recuerdo.current === "2" && !atajo && t.hay && t.lista && t.propina_en_lector) {
+        setPropinaAlElegir(true);
+        setPropina(totales.propina ?? 0);
+        setVista((v) => (v === "propina" ? "selector" : v));
+      }
+      if (!tiene) return;
+      const r = await pedirCobro(token, cajaId, { accion: "pendientes" }).catch(() => null);
+      const suyo = r?.cobros?.find((c) => c.ticket_id === totales.ticketId);
+      if (activo && suyo) void aplicarCobroTerminal(suyo);
+    })();
+    return () => { activo = false; clearTimeout(tope); };
+    // Solo al abrir el cobro.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** El pago dividido que está esperando a la terminal; al aprobarse o abandonarse se resuelve. */
+  const [esperaDividido, setEsperaDividido] = useState<{
+    clave: string; monto: number; aprobado: (c: CobroTerminal, autorizoId?: string) => void; abandonar: () => void;
+  } | null>(null);
+
+  /** Cobra en la terminal una parte del pago dividido y la registra. Rechaza si la cajera la abandona. */
+  function cobrarParteEnTerminal(p: PagoPorAplicar): Promise<TotalesTicket> {
+    return new Promise<TotalesTicket>((resolver, rechazar) => {
+      setEsperaDividido({
+        clave: p.clientId, monto: p.monto,
+        abandonar: () => rechazar(new Error("El cobro con tarjeta no se completó. Quita ese pago o vuelve a intentar.")),
+        aprobado: (c, autorizoId) => {
+          aplicarPago(token, totales.ticketId,
+            pagoDeCobro(c), c.id)
+            .then(async (t) => {
+              await pedirCobro(token, cajaId, { accion: "confirmar", cobro_id: c.id, autorizo_id: autorizoId }).catch(() => {});
+              resolver(t);
+            })
+            .catch(rechazar);
+        },
+      });
+    }).finally(() => setEsperaDividido(null));
+  }
+
   /** Aplica una lista de pagos divididos SECUENCIALMENTE (no en paralelo). Navega solo al final. */
   async function aplicarPagosDivididos(lista: PagoPorAplicar[]): Promise<string[]> {
     setError(null);
@@ -1130,7 +1323,7 @@ export function ModalCobro({
       const ticketId = totales.ticketId;
       const r = await aplicarPagosEnOrden(
         lista,
-        (p) => aplicarPago(token, ticketId, { metodo: p.metodo, monto: p.monto }, p.clientId),
+        (p) => (p.terminal ? cobrarParteEnTerminal(p) : aplicarPago(token, ticketId, { metodo: p.metodo, monto: p.monto }, p.clientId)),
         () => leerTotales(token, ticketId),
       );
       if (r.totales) setTotales(r.totales);
@@ -1145,9 +1338,21 @@ export function ModalCobro({
     }
   }
 
-  function elegirMetodo(m: MetodoPago | "dividido") {
+  function elegirMetodo(m: MetodoPago | "dividido" | "terminal") {
     setError(null);
-    if (m === "dividido") {
+    // Propina en el lector: si se cobra con otra cosa, antes va la propina de VIM (una vez).
+    if (m !== "terminal" && propinaAlElegir && !propinaPreguntada && sug?.capturar !== false) {
+      setTrasPropina(m);
+      setVista("propina");
+      return;
+    }
+    irAMetodo(m);
+  }
+
+  function irAMetodo(m: MetodoPago | "dividido" | "terminal") {
+    if (m === "terminal") {
+      setVista("terminal");
+    } else if (m === "dividido") {
       setVista("dividido");
     } else if (m === "EFECTIVO") {
       setMetodo(m);
@@ -1166,11 +1371,14 @@ export function ModalCobro({
   cerrarRef.current = onCerrar;
   const alEscapar = useMemo(
     () => capaVisible([
-      [procesando || vista === "atajo", () => {}],
+      // Con el cobro en la terminal tampoco: de ahí se sale cancelándolo, no por reflejo.
+      [procesando || vista === "atajo" || vista === "terminal", () => {}],
       [vista === "efectivo" || vista === "otro" || vista === "dividido", () => { setError(null); setVista("selector"); }],
+      // La propina que se pregunta al elegir otro método regresa al selector, como su «Atrás».
+      [vista === "propina" && trasPropina !== null, () => { setError(null); setTrasPropina(null); setVista("selector"); }],
       [true, () => cerrarRef.current()],
     ]),
-    [procesando, vista],
+    [procesando, vista, trasPropina],
   );
   useEscape(alEscapar);
 
@@ -1195,7 +1403,8 @@ export function ModalCobro({
         ].join(" ")}
       >
         {vista === "propina" && (
-          sug ? (
+          // Si el lector de esta caja preguntaba la propina, se espera a saber si sigue así.
+          sug && !(recuerdo.current === "2" && !terminalSabida && !atajo && trasPropina === null) ? (
             <VistaPropina
               totalBase={totales.total}
               ticketId={totales.ticketId}
@@ -1203,7 +1412,7 @@ export function ModalCobro({
               procesando={procesando}
               error={error}
               onConfirmar={confirmarPropina}
-              onAtras={onCerrar}
+              onAtras={trasPropina ? () => { setError(null); setTrasPropina(null); setVista("selector"); } : onCerrar}
             />
           ) : (
             <div className="flex items-center justify-center py-16 text-sm text-ink-3">Cargando…</div>
@@ -1218,8 +1427,27 @@ export function ModalCobro({
         {vista === "selector" && (
           <VistaSelector
             totales={totalesEf}
+            conTerminal={conTerminal}
+            terminalLista={terminal.lista}
+            onRevisarTerminal={revisarTerminal}
+            error={error}
             onElegir={elegirMetodo}
             onCerrar={onCerrar}
+          />
+        )}
+        {vista === "terminal" && (
+          <VistaTerminal
+            token={token}
+            cajaId={cajaId}
+            turnoId={turnoId}
+            ejecutaNombre={ejecutaNombre}
+            ticketId={totales.ticketId}
+            folio={totales.folio}
+            monto={totalesEf.pendiente}
+            proveedor={terminal.proveedor}
+            propinaEnLector={propinaEnLector}
+            onAprobado={aplicarCobroTerminal}
+            onVolver={() => { setError(null); setVista("selector"); }}
           />
         )}
         {vista === "efectivo" && (
@@ -1244,6 +1472,9 @@ export function ModalCobro({
         {vista === "dividido" && (
           <VistaDividida
             totales={totalesEf}
+            conTerminal={conTerminal}
+            terminalLista={terminal.lista}
+            onRevisarTerminal={revisarTerminal}
             procesando={procesando}
             error={error}
             onAplicarPagos={aplicarPagosDivididos}
@@ -1251,6 +1482,25 @@ export function ModalCobro({
           />
         )}
       </div>
+      {esperaDividido && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/40 p-4">
+          <div className="w-full max-w-[560px] rounded-lg bg-surface p-6 shadow-xl">
+            <VistaTerminal
+              key={esperaDividido.clave}
+              token={token}
+              cajaId={cajaId}
+              turnoId={turnoId}
+              ejecutaNombre={ejecutaNombre}
+              ticketId={totales.ticketId}
+              folio={totales.folio}
+              monto={esperaDividido.monto}
+              proveedor={terminal.proveedor}
+              onAprobado={esperaDividido.aprobado}
+              onVolver={esperaDividido.abandonar}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

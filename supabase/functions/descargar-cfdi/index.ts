@@ -8,29 +8,18 @@
 //
 // Entrada:  { cfdi_id, formato: "xml" | "pdf" | "acuse" }
 // Salida:   { ok: true, formato, content_type, nombre, base64 }
-import { createClient } from "jsr:@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
+import { clienteAdmin, clienteDe, servir } from "../_shared/http.ts";
+import { bearerDe } from "../_shared/identidad.ts";
 import { obtenerFacturama } from "../_shared/pac/index.ts";
 import { archivarCfdi, bytesABase64, objetoArchivoCfdi, rutaArchivoCfdi, subidorSupabase, type TipoArchivoCfdi } from "../_shared/pac/archivo.ts";
 
 const FORMATOS: TipoArchivoCfdi[] = ["xml", "pdf", "acuse"];
 
-Deno.serve(async (req) => {
-  const cors = corsHeaders(req);
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
-
-  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+servir(async (req, json) => {
+  const token = bearerDe(req);
   if (!token) return json({ error: "NO_AUTH" }, 401);
 
-  const url = Deno.env.get("SUPABASE_URL")!;
-  const sb = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, {
-    auth: { persistSession: false },
-    global: { headers: { Authorization: `Bearer ${token}` } },
-  });
+  const sb = clienteDe(token);
   const { data: u, error: uErr } = await sb.auth.getUser(token);
   if (uErr || !u?.user) return json({ error: "AUTH_INVALIDA" }, 401);
 
@@ -54,7 +43,7 @@ Deno.serve(async (req) => {
   };
   if (!c.uuid_fiscal) return json({ error: "SIN_TIMBRAR", mensaje: "Este comprobante no está timbrado" }, 409);
 
-  const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+  const admin = clienteAdmin();
   const ruta = rutaArchivoCfdi(cfdiId, formato);
   // El objeto se deriva del id, NO de `*_storage_path`: esa columna la podía reescribir cualquier
   // usuario del tenant y aquí se lee con service_role — era leer cualquier objeto de cualquier

@@ -53,6 +53,9 @@ export type PagoImpresion = {
   montoMxn: number;
   recibidoMxn: number | null; // solo efectivo
   cambioMxn: number;
+  /** «Mastercard **** 1447» y la autorización del banco: solo si se cobró en la terminal integrada. */
+  tarjeta?: string | null;
+  autorizacion?: string | null;
 };
 
 /** Lo que el repartidor necesita para llegar y para que le abran la puerta, y quién lo lleva. */
@@ -96,6 +99,9 @@ export type DatosTicketImpresion = {
   };
   /** Datos del cliente para el repartidor. Solo se llena en DOMICILIO; null en el resto. */
   entrega: DatosEntrega | null;
+  /** Nota de un pedido de la tienda en línea (forma de pago y lo que escribió el cliente). Solo se
+   *  llena en tickets nacidos de la tienda (`notaPedidoDe`); ausente = no se imprime. */
+  notaPedido?: string | null;
   lineas: LineaImpresion[];
   /** `lealtad` = lo descontado por canje (tickets.lealtad_mxn). Opcional: no todos los que arman estos datos lo conocen. */
   totales: { subtotal: number; descuentos: number; iva: number; total: number; propina: number; lealtad?: number };

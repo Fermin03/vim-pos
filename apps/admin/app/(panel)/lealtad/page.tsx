@@ -8,10 +8,8 @@ import {
   FORM_PROGRAMA_INICIAL, activarModuloLealtad, ejemploPrograma, formDePrograma, guardarPrograma, leerLealtadEncendida, leerProgramaAdmin, mensajeLealtad,
   type FormPrograma,
 } from "../../lib/lealtad";
+import { input, label } from "../../components/campos";
 
-const input =
-  "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-13 font-medium text-ink-2";
 const ayuda = "mt-1 text-12 text-ink-3";
 
 const MECANICAS: { codigo: Mecanica; titulo: string; detalle: string }[] = [

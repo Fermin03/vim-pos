@@ -7,3 +7,5 @@ export { DialogoPeligro, type DialogoPeligroProps } from "./components/dialogo-p
 export { Aviso, type TonoAviso } from "./components/aviso";
 export { StatusChip, type TonoEstado } from "./components/status-chip";
 export { LogoVim } from "./components/logo-vim";
+export { Icono, IconoCategoria, ICONOS_CATEGORIA, type NombreIcono } from "./components/icono";
+export { Captcha, SITE_KEY_TURNSTILE, type AccionCaptcha } from "./components/captcha";

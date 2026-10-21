@@ -1,4 +1,5 @@
 "use client";
+import { Icono } from "@vim/ui/styles";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Producto } from "../lib/catalogo";
 import type { ComboDef, ComponenteSel, SlotCombo } from "../lib/combos";
@@ -48,12 +49,12 @@ type Props = {
 
 function IconCheck({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+    <Icono nombre="palomita" className={className} />
   );
 }
 function IconBack({ className }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
+    <Icono nombre="flecha-izquierda" className={className} />
   );
 }
 
@@ -359,9 +360,9 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
               <div className="mt-5 flex items-center justify-between">
                 <b className="text-15 font-bold">Cantidad</b>
                 <span className="inline-flex items-center overflow-hidden rounded border border-line-strong">
-                  <button type="button" aria-label="Menos" onClick={() => setCantidad((n) => Math.max(1, n - 1))} className="flex h-11 w-11 items-center justify-center text-20 text-ink-2 hover:bg-hover">−</button>
+                  <button type="button" aria-label="Menos" onClick={() => setCantidad((n) => Math.max(1, n - 1))} className="flex h-11 w-11 items-center justify-center text-ink-2 hover:bg-hover"><Icono nombre="menos" className="h-4 w-4" /></button>
                   <span className="font-display min-w-[44px] text-center text-18 font-semibold tabular-nums">{cantidad}</span>
-                  <button type="button" aria-label="Más" onClick={() => setCantidad((n) => n + 1)} className="flex h-11 w-11 items-center justify-center text-20 text-ink-2 hover:bg-hover">+</button>
+                  <button type="button" aria-label="Más" onClick={() => setCantidad((n) => n + 1)} className="flex h-11 w-11 items-center justify-center text-ink-2 hover:bg-hover"><Icono nombre="mas" className="h-4 w-4" /></button>
                 </span>
               </div>
               )}

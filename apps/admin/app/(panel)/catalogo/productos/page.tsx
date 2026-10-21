@@ -1,9 +1,8 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, DialogoPeligro } from "@vim/ui/styles";
+import { Button, DialogoPeligro, Icono } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
-import { CatalogoTabs } from "../../../components/catalogo-tabs";
 import { FranjaMenus, useMenuCatalogo } from "../../../components/selector-menu";
 import { AvisoCajasMenu } from "../../../components/aviso-cajas-menu";
 import { CasillaMenu } from "../../../components/casilla-menu";
@@ -22,6 +21,7 @@ import {
   type FilaDeMenu,
   type MenuId,
 } from "../../../lib/menus";
+import { Segmentos } from "../../../components/controles";
 
 type Filtro = "all" | EstadoEnSucursal;
 const SIN_FILAS: Map<string, FilaDeMenu> = new Map();
@@ -29,7 +29,7 @@ const SIN_FILAS: Map<string, FilaDeMenu> = new Map();
 const BADGE: Record<EstadoEnSucursal, { txt: string; cls: string; dot: string }> = {
   ACTIVO: { txt: "Activo", cls: "bg-success-soft text-success", dot: "bg-success" },
   PAUSADO: { txt: "Pausado", cls: "bg-hover text-ink-3", dot: "bg-ink-3" },
-  AGOTADO: { txt: "Agotado", cls: "bg-[#FBF1EF] text-danger", dot: "bg-danger" },
+  AGOTADO: { txt: "Agotado", cls: "bg-danger-soft text-danger", dot: "bg-danger" },
   NO_SE_VENDE: { txt: "No se vende aquí", cls: "bg-hover text-ink-2", dot: "bg-ink-3" },
 };
 const NOMBRE_FILTRO: Record<Filtro, string> = {
@@ -224,29 +224,23 @@ export default function ProductosPage() {
         right={
           <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={() => router.push(hrefConMenu("/catalogo/importar", menuHref))}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[16px] w-[16px]"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+              <Icono nombre="descargar" className="h-[16px] w-[16px]" />
               Importar menú
             </Button>
             <Button onClick={() => router.push(hrefConMenu("/catalogo/productos/nuevo", menuHref))}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-[17px] w-[17px]">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
+              <Icono nombre="mas" className="h-[17px] w-[17px]" />
               Nuevo producto
             </Button>
           </div>
         }
       />
       <FranjaMenus menu={menu} />
-      <CatalogoTabs />
       <PageBody>
         <AvisoCajasMenu cajas={cajasViejas} />
 
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative w-full flex-1 sm:max-w-[340px]">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="pointer-events-none absolute left-[13px] top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-ink-3">
-              <circle cx="11" cy="11" r="7" />
-              <path d="M21 21l-4.3-4.3" />
-            </svg>
+            <Icono nombre="buscar" className="pointer-events-none absolute left-[13px] top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-ink-3" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -255,21 +249,7 @@ export default function ProductosPage() {
               className="h-10 w-full rounded border border-line-strong pl-[38px] pr-3 text-sm outline-none focus:border-ink"
             />
           </div>
-          <div className="scroll-x-limpio inline-flex max-w-full gap-0.5 overflow-x-auto rounded border border-line bg-hover p-[3px] lg:max-w-none lg:overflow-x-visible">
-            {filtros.map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFiltro(f)}
-                className={[
-                  "flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-2.5 text-13 font-semibold transition lg:py-[7px]",
-                  filtro === f ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink",
-                ].join(" ")}
-              >
-                {NOMBRE_FILTRO[f]}
-              </button>
-            ))}
-          </div>
+          <Segmentos etiqueta="Qué productos ver" opciones={filtros.map((f) => ({ v: f, l: NOMBRE_FILTRO[f] }))} valor={filtro} onCambiar={setFiltro} />
         </div>
 
         {modoMenu && (
@@ -379,7 +359,7 @@ export default function ProductosPage() {
                             onClick={() => router.push(editarHref)}
                             className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink"
                           >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                            <Icono nombre="editar" className="h-4 w-4" />
                           </button>
                           <button
                             type="button"
@@ -388,7 +368,7 @@ export default function ProductosPage() {
                             onClick={() => setBorrar(p)}
                             className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-danger-line hover:text-danger"
                           >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
+                            <Icono nombre="eliminar" className="h-4 w-4" />
                           </button>
                         </span>
                       </td>

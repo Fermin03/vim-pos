@@ -34,6 +34,31 @@ enabled = true
 [functions.pin-login]
 verify_jwt = false
 
+# Avisos de Mercado Pago Point: sin JWT, la autenticidad la da x-signature (ADR 0033).
+[functions.terminal-webhook-mp]
+verify_jwt = false
+
+# Avisos de Clip PinPad: sin JWT ni firma; el aviso es solo una pista y la función consulta a Clip.
+[functions.terminal-webhook-clip]
+verify_jwt = false
+
+# Avisos de órdenes de Mercado Pago (pago en línea de la tienda, Orders API) y la puerta interna de su barrido: sin JWT.
+# El aviso es solo una pista: la firma es obligatoria y la función consulta la orden con el token del restaurante.
+[functions.tienda-webhook-mp]
+verify_jwt = false
+
+# La llama la base (pg_cron → pg_net, 0171) con x-vim-interno: no hay usuario ni JWT.
+[functions.terminal-mp-renovar]
+verify_jwt = false
+
+# Lo mismo para los permisos de la tienda en línea (0173): la llama la base con x-vim-interno.
+[functions.tienda-mp-renovar]
+verify_jwt = false
+
+# Los correos de estado de los pedidos de la tienda (0176): la llama la base con x-vim-interno.
+[functions.tienda-correos]
+verify_jwt = false
+
 [functions.signup-tenant]
 verify_jwt = false
 
@@ -47,6 +72,11 @@ verify_jwt = false
 # (sb_publishable_…), que NO es un JWT. Faltaba aquí y un `functions deploy` sin
 # `--no-verify-jwt` lo dejó respondiendo "Invalid JWT" en producción (25 sep 2026).
 [functions.autofacturar]
+verify_jwt = false
+
+# La llama el servidor de la tienda en línea, no el navegador: se autentica con el secreto
+# x-vim-tienda, no con un JWT. Sin esto el gateway responde "Invalid JWT" antes de llegar.
+[functions.tienda]
 verify_jwt = false
 
 # Webhook de Uber Eats (ADR 0011): sin JWT, la autenticidad la da X-Uber-Signature.

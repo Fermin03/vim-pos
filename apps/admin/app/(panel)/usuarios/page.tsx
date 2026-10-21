@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Button, DialogoPeligro, Modal } from "@vim/ui/styles";
+import { Button, DialogoPeligro, Modal, Icono } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../components/page-header";
 import { ModalNuevoUsuario } from "../../components/modal-nuevo-usuario";
 import { ModalResetearPin } from "../../components/modal-resetear-pin";
@@ -16,6 +16,9 @@ import {
   type Usuario,
 } from "../../lib/usuarios";
 import { mensajeError } from "../../lib/errores";
+import { Segmentos } from "../../components/controles";
+import { useModulos } from "../../components/admin-shell";
+import { rutasOcultas } from "../../lib/operacion";
 
 const ROLES_FILTRO = ["all", "DUENO", "ADMIN", "SUPERVISOR", "CAJERO", "PERSONAL"] as const;
 type RolFiltro = (typeof ROLES_FILTRO)[number];
@@ -30,6 +33,7 @@ function iniciales(nombre: string): string {
 }
 
 export default function UsuariosPage() {
+  const modulos = useModulos();
   const [usuarios, setUsuarios] = useState<Usuario[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -114,16 +118,16 @@ export default function UsuariosPage() {
         migas={[{ label: "Administración" }, { label: "Usuarios" }]}
         right={
           <>
-            <Link
-              href="/usuarios/repartidores"
-              className="flex h-11 items-center rounded border border-line-strong px-3.5 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
-            >
-              Repartidores
-            </Link>
+            {!rutasOcultas(modulos).has("/usuarios/repartidores") && (
+              <Link
+                href="/usuarios/repartidores"
+                className="flex h-11 items-center rounded border border-line-strong px-3.5 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+              >
+                Repartidores
+              </Link>
+            )}
             <Button onClick={() => setNuevo(true)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-[17px] w-[17px]">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
+              <Icono nombre="mas" className="h-[17px] w-[17px]" />
               Nuevo usuario
             </Button>
           </>
@@ -159,10 +163,7 @@ export default function UsuariosPage() {
         {/* Toolbar */}
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <div className="relative w-full flex-1 sm:max-w-[340px]">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="pointer-events-none absolute left-[13px] top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-ink-3">
-              <circle cx="11" cy="11" r="7" />
-              <path d="M21 21l-4.3-4.3" />
-            </svg>
+            <Icono nombre="buscar" className="pointer-events-none absolute left-[13px] top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-ink-3" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -180,21 +181,12 @@ export default function UsuariosPage() {
               <option key={r} value={r}>{ROL_LABEL[r]}</option>
             ))}
           </select>
-          <div className="scroll-x-limpio inline-flex max-w-full gap-0.5 overflow-x-auto rounded border border-line bg-hover p-[3px] lg:max-w-none lg:overflow-x-visible">
-            {(["all", "activos", "inactivos"] as const).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setEstado(s)}
-                className={[
-                  "flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-2.5 text-13 font-semibold transition lg:py-[7px]",
-                  estado === s ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink",
-                ].join(" ")}
-              >
-                {s === "all" ? "Todos" : s === "activos" ? "Activos" : "Inactivos"}
-              </button>
-            ))}
-          </div>
+          <Segmentos
+            etiqueta="Qué usuarios ver"
+            opciones={[{ v: "all", l: "Todos" }, { v: "activos", l: "Activos" }, { v: "inactivos", l: "Inactivos" }]}
+            valor={estado}
+            onCambiar={setEstado}
+          />
         </div>
 
         {error && (
@@ -245,7 +237,7 @@ export default function UsuariosPage() {
                           disabled={u.rolCodigo === "DUENO"}
                           className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink disabled:opacity-30 disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:text-ink-3"
                         >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20v-1a5 5 0 0 1 5-5h3a5 5 0 0 1 5 5v1M17 7a3 3 0 0 1 0 6" /></svg>
+                          <Icono nombre="persona" className="h-4 w-4" />
                         </button>
                         <button
                           type="button"
@@ -253,7 +245,7 @@ export default function UsuariosPage() {
                           onClick={() => setReset(u)}
                           className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink"
                         >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><rect x="4" y="11" width="16" height="9" rx="1.5" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+                          <Icono nombre="candado" className="h-4 w-4" />
                         </button>
                         <button
                           type="button"
@@ -263,9 +255,9 @@ export default function UsuariosPage() {
                           className={["flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-surface", u.activo ? "hover:text-danger" : "hover:text-success", "disabled:opacity-30 disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:text-ink-3"].join(" ")}
                         >
                           {u.activo ? (
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><circle cx="12" cy="12" r="9" /><path d="M4.5 4.5l15 15" /></svg>
+                            <Icono nombre="prohibido" className="h-4 w-4" />
                           ) : (
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><polyline points="20 6 9 17 4 12" /></svg>
+                            <Icono nombre="palomita" className="h-4 w-4" />
                           )}
                         </button>
                         {/* Solo sobre quien ya está desactivado: eliminar es el segundo paso de la baja. */}
@@ -276,7 +268,7 @@ export default function UsuariosPage() {
                             onClick={() => setEliminar(u)}
                             className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-danger"
                           >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a1.5 1.5 0 0 0 1.5 1.5h7A1.5 1.5 0 0 0 17 19l1-12M9 7V4.5h6V7" /></svg>
+                            <Icono nombre="eliminar" className="h-4 w-4" />
                           </button>
                         )}
                       </span>

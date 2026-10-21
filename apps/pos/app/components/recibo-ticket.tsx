@@ -75,6 +75,7 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
           </div>
         </>
       )}
+      {datos.notaPedido?.trim() && <div className="mt-1 text-[10.5px] font-bold">Nota del pedido: {datos.notaPedido.trim()}</div>}
 
       <DividerDashed />
 
@@ -157,6 +158,8 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
         {datos.pagos.map((p, i) => (
           <div key={i}>
             <PayRow label="Forma de pago:" value={p.metodo} />
+            {p.tarjeta && <PayRow label="" value={p.tarjeta} />}
+            {p.autorizacion && <PayRow label="Autorización:" value={p.autorizacion} />}
             {p.recibidoMxn != null && (
               <>
                 <PayRow label="Recibido:" value={fmt(p.recibidoMxn)} />
@@ -217,7 +220,7 @@ function ReciboPapel({ children }: { children: React.ReactNode }) {
 }
 
 /** Borde dentado de papel térmico (P-222/P-223). */
-function PaperEdge({ top }: { top?: boolean }) {
+export function PaperEdge({ top }: { top?: boolean }) {
   return (
     <div
       aria-hidden

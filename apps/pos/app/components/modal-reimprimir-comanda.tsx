@@ -9,7 +9,7 @@ import {
   type MotivoReimpresionComanda,
 } from "../lib/impresiones";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
-import { AvisoAutorizacion, MotivoChips } from "./motivo-y-autorizacion";
+import { AvisoAutorizacion, MotivoChips, etiquetaMotivo } from "./motivo-y-autorizacion";
 
 const PERMISO = "cocina.reimprimir_comanda";
 
@@ -48,10 +48,7 @@ export function ModalReimprimirComanda({
 
   const tienePermisoRol = ROLES_REIMPRIMIR_COMANDA.includes(empleado.rol);
 
-  function labelMotivo(): string {
-    if (motivo === "OTRO") return motivoTexto.trim() || "Otro";
-    return MOTIVOS_REIMPRESION_COMANDA.find((m) => m.codigo === motivo)?.label ?? motivo;
-  }
+  const labelMotivo = () => etiquetaMotivo(MOTIVOS_REIMPRESION_COMANDA, motivo, motivoTexto);
 
   function payload(): PayloadAutorizacion {
     return {
@@ -90,16 +87,9 @@ export function ModalReimprimirComanda({
     return (
       <ModalAutorizacionPin
         token={token}
-        accion="reimprimir_comanda"
-        permisoCodigo={PERMISO}
+        payload={payload()}
         descripcion={`Reimprimir la comanda ${folio ?? ""} · ${labelMotivo()}`}
         ejecutaNombre={empleado.nombre}
-        monto={null}
-        entidadTipo="ticket"
-        entidadId={ticketId}
-        cajaId={cajaId}
-        turnoId={turnoId}
-        motivo={labelMotivo()}
         capa="z-[70]"
         onAutorizado={(a) => onAutorizado({ motivo: labelMotivo(), autorizacionPinId: a.autorizacionPinId })}
         onCancelar={() => setPidiendoPin(false)}

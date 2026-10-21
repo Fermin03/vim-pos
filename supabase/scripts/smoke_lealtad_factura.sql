@@ -14,7 +14,9 @@ DECLARE
   v_premio uuid; v_solo uuid; v_dinero uuid; v_item uuid; v_item2 uuid;
   v_abierta uuid; v_item3 uuid;
   v_pagado uuid; v_auth uuid; v_dev uuid; v_global uuid;
-  v_hoy    date := (now() AT TIME ZONE 'America/Mexico_City')::date;
+  -- El día CONTABLE, no la fecha del reloj: entre medianoche y la hora de cierre del negocio el
+  -- ticket cae en el día anterior y la global de 'hoy' no lo traía (rojo solo de madrugada).
+  v_hoy    date := calcular_dia_contable('99999999-0000-0000-0000-0000000000aa');
   v_fallo  boolean;
 BEGIN
   PERFORM set_config('request.jwt.claims',

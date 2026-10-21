@@ -4,22 +4,17 @@
 // del tenant (los dispositivos que activaron notificaciones en el admin).
 // Payload: { titulo, cuerpo, url? }
 
-import { createClient } from "jsr:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
-import { corsHeaders } from "../_shared/cors.ts";
+import { clienteAdmin, servir } from "../_shared/http.ts";
 import { registrarError } from "../_shared/errores.ts";
-import { tenantDelToken } from "../_shared/identidad.ts";
+import { bearerDe, tenantDelToken } from "../_shared/identidad.ts";
 import { igualesEnTiempoConstante } from "../_shared/delivery/firma.ts";
 
 // Camino interno (0097): la base de datos avisa desde pg_cron/pg_net con el secreto compartido
 // `x-vim-interno` (Vault `vim_interno` = secret VIM_INTERNO_SECRET) y dice el tenant en el cuerpo.
 const INTERNO = Deno.env.get("VIM_INTERNO_SECRET") ?? "";
 
-const admin = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  { auth: { persistSession: false } },
-);
+const admin = clienteAdmin();
 
 webpush.setVapidDetails(
   Deno.env.get("VAPID_SUBJECT") ?? "mailto:no-reply@vimpos.com.mx",
@@ -27,14 +22,7 @@ webpush.setVapidDetails(
   Deno.env.get("VAPID_PRIVATE_KEY")!,
 );
 
-Deno.serve(async (req) => {
-  const cors = corsHeaders(req);
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
-
+servir(async (req, json) => {
   // 2) Payload (se lee primero: el camino interno trae el tenant en el cuerpo)
   let body: { titulo?: string; cuerpo?: string; url?: string; tenant_id?: string };
   try { body = await req.json(); } catch { return json({ error: "BAD_JSON" }, 400); }
@@ -47,7 +35,7 @@ Deno.serve(async (req) => {
     if (typeof body.tenant_id !== "string" || !/^[0-9a-f-]{36}$/i.test(body.tenant_id)) return json({ error: "FALTA_TENANT" }, 400);
     tenantId = body.tenant_id;
   } else {
-    const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+    const token = bearerDe(req);
     if (!token) return json({ error: "NO_AUTH" }, 401);
     const { data: userResp, error: userErr } = await admin.auth.getUser(token);
     if (userErr || !userResp?.user) return json({ error: "AUTH_INVALIDA" }, 401);

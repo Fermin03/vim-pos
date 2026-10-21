@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { use } from "react";
-import { Button, LogoVim } from "@vim/ui/styles";
+import { Button, LogoVim, Icono } from "@vim/ui/styles";
 import { fechaLegible } from "@vim/fecha";
 import {
   buscarNegocio, buscarTicket, descargar, enviarPorCorreo, recuperar, timbrar, ErrorPortal,
@@ -523,9 +523,7 @@ function FacturaLista({ timbrado, onEnviar }: { timbrado: TimbradoConRfc; onEnvi
       <div className="text-center">
         {/* Una sola vez, al llegar: confirma un momento de nervios. Nunca desde scale(0). */}
         <div className="mx-auto flex h-16 w-16 animate-vim-pop items-center justify-center rounded-full bg-success-soft motion-reduce:animate-none">
-          <svg viewBox="0 0 24 24" className="h-8 w-8 text-success" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
-            <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <Icono nombre="palomita" className="h-8 w-8 text-success" />
         </div>
         <h1 className="mt-5 font-display text-28 font-semibold tracking-tight">Tu factura está lista</h1>
         <p className="mt-1.5 text-16 text-ink-2">
@@ -687,10 +685,7 @@ function BarraAccion({ children }: { children: React.ReactNode }) {
 
 function Girando() {
   return (
-    <svg viewBox="0 0 24 24" className="h-4 w-4 animate-spin" fill="none" aria-hidden="true">
-      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" />
-      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-    </svg>
+    <Icono nombre="cargando" className="h-4 w-4 animate-spin" />
   );
 }
 

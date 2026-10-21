@@ -9,11 +9,9 @@ import { AYUDA_IVA, OPCIONES_IVA } from "./producto-form";
 import { mensajeError } from "../lib/errores";
 import { guardarFilaDeMenu, hrefConMenu } from "../lib/menus";
 import { useMenuCatalogo } from "./selector-menu";
+import { input, label } from "./campos";
 
 // Mismas clases que producto-form.tsx: misma app, mismo look.
-const input =
-  "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-13 font-medium text-ink-2";
 
 /**
  * Alta de un combo. Solo crea (no hay edición aquí): una vez creado, los campos propios del

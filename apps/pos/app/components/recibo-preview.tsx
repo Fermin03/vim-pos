@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { QRCodeSVG } from "qrcode.react";
-import type { Bloque, DatosTicketImpresion, PrintJob } from "../lib/print/tipos";
+import type { DatosTicketImpresion } from "../lib/print/tipos";
 import type { DatosComanda } from "../lib/print/comanda-builder";
 import type { DatosReporteZ } from "../lib/print/reporte-z-builder";
 import { ReciboTicket } from "./recibo-ticket";
@@ -9,20 +8,17 @@ import { ReciboComanda } from "./recibo-comanda";
 import { ReciboZ } from "./recibo-z";
 
 /**
- * Overlay del recibo en pantalla. Hay dos caminos:
- *   1) Cliente/Cocina con datos crudos → renderiza componentes fieles a P-222/P-223
- *      (vía ReciboTicket / ReciboComanda). Toggle visible si hay datosComanda.
- *   2) Fallback `job` (PrintJob): renderiza bloque a bloque (estilo genérico).
- *      Lo usa el Reporte Z (que aún no tiene componente fiel a P-226).
+ * Overlay del recibo en pantalla: renderiza componentes fieles a P-222/P-223/P-226
+ * (ReciboTicket / ReciboComanda / ReciboZ) con los datos crudos. Toggle Cliente|Cocina
+ * visible si hay datosComanda.
  *
  * El PrintJob/escpos sigue intacto para impresión real; este componente es solo
- * lo que ve el cajero en pantalla. Ambos caminos parten de la misma fuente de datos.
+ * lo que ve el cajero en pantalla. Ambos parten de la misma fuente de datos.
  */
 export function ReciboPreview({
   datosTicket,
   datosComanda,
   datosZ,
-  job,
   onImprimir,
   onCerrar,
   onNuevoTicket,
@@ -35,8 +31,6 @@ export function ReciboPreview({
   datosComanda?: DatosComanda;
   /** Reporte Z fiel (P-226). Si se provee, se renderiza directamente. */
   datosZ?: DatosReporteZ;
-  /** Fallback genérico — usado solo si no hay datos fieles. */
-  job?: PrintJob;
   /** Recibe la vista activa para que el caller imprima ticket o comanda según el toggle. */
   onImprimir: (vista: "cliente" | "cocina") => void;
   onCerrar: () => void;
@@ -117,48 +111,9 @@ export function ReciboPreview({
               ? (enCocina && datosComanda
                   ? <ReciboComanda datos={datosComanda} />
                   : <ReciboTicket datos={datosTicket!} />)
-              : job
-                ? <PrintJobFallback job={job} />
-                : null}
+              : null}
         </div>
       </div>
     </div>
   );
-}
-
-// ─── Fallback genérico desde PrintJob (Reporte Z, etc.) ──────────────────────
-
-function PrintJobFallback({ job }: { job: PrintJob }) {
-  return (
-    <div className="mx-auto w-[302px] bg-white px-5 py-6 font-mono text-[#1a1a1a] shadow-[0_4px_24px_rgba(0,0,0,.25)]">
-      {job.bloques.map((bl, i) => <BloqueView key={i} bl={bl} />)}
-    </div>
-  );
-}
-
-function BloqueView({ bl }: { bl: Bloque }) {
-  switch (bl.t) {
-    case "texto": {
-      const align = bl.align === "centro" ? "text-center" : bl.align === "der" ? "text-right" : "text-left";
-      const size = bl.size === 3 ? "text-[18px]" : bl.size === 2 ? "text-[15px]" : "text-[10px]";
-      return <div className={`${align} ${bl.bold ? "font-bold" : ""} ${size} whitespace-pre-wrap leading-snug`}>{bl.valor}</div>;
-    }
-    case "fila":
-      return (
-        <div className="flex justify-between gap-2 text-[11px]">
-          <span className="whitespace-pre-wrap">{bl.izq}</span>
-          <span className="whitespace-nowrap font-semibold">{bl.der}</span>
-        </div>
-      );
-    case "separador":
-      return <div className={`my-2 border-t ${bl.estilo === "solido" ? "border-[#888]" : "border-dashed border-[#B0B0B0]"}`} />;
-    case "qr":
-      return (
-        <div className="my-2 flex justify-center">
-          <QRCodeSVG value={bl.valor} size={92} level="M" />
-        </div>
-      );
-    case "corte":
-      return <div className="mt-3 text-center text-[9px] tracking-[0.3em] text-[#999]">— — — — — — — —</div>;
-  }
 }

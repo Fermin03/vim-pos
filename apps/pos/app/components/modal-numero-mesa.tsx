@@ -24,15 +24,24 @@ export function ModalNumeroMesa({
   onMesaElegida,
   onVerMesas,
   onCerrar,
+  textoConfirmar = "Abrir cuenta",
+  textoCrear = "Crearla y abrir cuenta",
+  ayudaOcupada,
 }: {
   token: string;
   tenantId: string;
   sucursalId: string;
-  /** Mesa resuelta (existente o recién creada), lista para abrirle cuenta. */
-  onMesaElegida: (mesaId: string, numero: string) => void;
+  /** Mesa resuelta (existente o recién creada), lista para abrirle cuenta. Si devuelve una promesa
+   *  y falla, el error se enseña aquí mismo y el modal sigue abierto. */
+  onMesaElegida: (mesaId: string, numero: string) => void | Promise<void>;
   /** Abre el mapa de mesas. Opcional: si no se pasa, no se muestra el botón. */
   onVerMesas?: () => void;
   onCerrar: () => void;
+  /** Textos del botón principal y del de crear; por omisión, los de abrir cuenta de comedor. */
+  textoConfirmar?: string;
+  textoCrear?: string;
+  /** Aviso cuando la mesa está ocupada; por omisión, buscarla en la lista para agregarle productos. */
+  ayudaOcupada?: string;
 }) {
   const [numero, setNumero] = useState("");
   const [buscando, setBuscando] = useState(false);
@@ -67,16 +76,16 @@ export function ModalNumeroMesa({
       if (mesa.estado === "OCUPADA") {
         // Retomar una cuenta ya abierta se hace desde la lista, no abriendo otra: dos cuentas
         // en la misma mesa es justo el enredo que se paga al cobrar.
-        setError(`La mesa ${n} ya está ocupada. Búscala en la lista para agregarle productos.`);
+        setError(ayudaOcupada ?? `La mesa ${n} ya está ocupada. Búscala en la lista para agregarle productos.`);
         return;
       }
-      onMesaElegida(mesa.id, mesa.numero);
+      await onMesaElegida(mesa.id, mesa.numero);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo buscar la mesa");
     } finally {
       setBuscando(false);
     }
-  }, [numero, token, sucursalId, onMesaElegida]);
+  }, [numero, token, sucursalId, onMesaElegida, ayudaOcupada]);
 
   const crear = useCallback(async () => {
     if (!ofrecerCrear) return;
@@ -84,7 +93,7 @@ export function ModalNumeroMesa({
     setError(null);
     try {
       const mesa = await crearMesaConNumero(token, { tenantId, sucursalId, numero: ofrecerCrear });
-      onMesaElegida(mesa.id, mesa.numero);
+      await onMesaElegida(mesa.id, mesa.numero);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo crear la mesa");
     } finally {
@@ -129,7 +138,7 @@ export function ModalNumeroMesa({
               disabled={buscando}
               className="mt-2 h-9 rounded bg-ink px-3 text-13 font-semibold text-white disabled:opacity-50"
             >
-              Crearla y abrir cuenta
+              {textoCrear}
             </button>
           </div>
         )}
@@ -155,7 +164,7 @@ export function ModalNumeroMesa({
               Cancelar
             </button>
             <Button onClick={confirmar} disabled={numero.trim().length === 0 || buscando || ofrecerCrear !== null}>
-              {buscando ? "Buscando…" : "Abrir cuenta"}
+              {buscando ? "Buscando…" : textoConfirmar}
             </Button>
           </div>
         </div>

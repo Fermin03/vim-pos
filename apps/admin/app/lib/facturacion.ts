@@ -2,9 +2,10 @@
 import { z } from "zod";
 import { hoyMx } from "@vim/fecha";
 import { leerSesion, supabase } from "./supabase";
+import { tenantId } from "./datos";
 
 // Facturación de tickets (doc 13 §CFDI). El backend completo existía (cfdi_crear_borrador,
-// timbrar-cfdi con failover multi-PAC, tickets_cfdi con RLS); esta lib es el punto de
+// timbrar-cfdi, tickets_cfdi con RLS); esta lib es el punto de
 // entrada de UI que faltaba: buscar ticket PAGADO → capturar receptor → borrador → timbrar.
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -128,7 +129,7 @@ export async function facturarTicket(ticketId: string, receptor: ReceptorInput):
   const token = sess.session?.access_token;
   if (!token) return { ok: false, cfdiId: null, error: "Sesión expirada; vuelve a entrar." };
   const s = await leerSesion();
-  if (!s?.tenantId) return { ok: false, cfdiId: null, error: "Sesión sin tenant." };
+  if (!s?.tenantId) return { ok: false, cfdiId: null, error: "Tu sesión expiró. Vuelve a iniciar sesión." };
   const tid = s.tenantId;
   const [{ data: ten, error: e1 }, { data: emi, error: e2 }] = await Promise.all([
     supabase.from("tenants").select("rfc, razon_social, regimen_fiscal, codigo_postal_fiscal").eq("id", tid).maybeSingle(),
@@ -171,7 +172,7 @@ export async function facturarTicket(ticketId: string, receptor: ReceptorInput):
   if (eB) return { ok: false, cfdiId: null, error: eB.message };
   const id = String(cfdiId);
 
-  // Timbrar vía Edge Function (failover multi-PAC server-side).
+  // Timbrar vía Edge Function (el PAC se llama server-side).
   const res = await fetch(`${SB_URL}/functions/v1/timbrar-cfdi`, {
     method: "POST",
     headers: { apikey: SB_ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -185,12 +186,6 @@ export async function facturarTicket(ticketId: string, receptor: ReceptorInput):
     return { ok: false, cfdiId: id, error: data.mensaje ?? data.detalle ?? data.error ?? `HTTP ${res.status}` };
   }
   return { ok: true, cfdiId: id, uuidFiscal: data.uuid_fiscal, serie: data.serie ?? null, folioFiscal: data.folio_fiscal ?? null };
-}
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
 }
 
 // ── Factura global (fase 6) ──────────────────────────────────────────────────

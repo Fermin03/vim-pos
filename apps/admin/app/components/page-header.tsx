@@ -50,10 +50,15 @@ export function PageHeader({
   );
 }
 
-/** Cuerpo scrolleable de página (mockup §body). */
+/**
+ * Cuerpo scrolleable de página (mockup §body).
+ * `relative`: lo posicionado en absoluto de adentro (los `sr-only` de un campo, un estado para lector de
+ * pantalla) se ancla y se recorta AQUÍ. Sin él se anclaba al documento, quedaba «debajo» de la pantalla
+ * a la altura del contenido desplazado y le daba a la página un segundo scroll con un hueco en blanco.
+ */
 export function PageBody({ children }: { children: ReactNode }) {
   return (
-    <div className="flex-1 overflow-y-auto px-4 pb-[max(24px,env(safe-area-inset-bottom))] pt-5 lg:px-8 lg:pb-8 lg:pt-6">
+    <div className="relative flex-1 overflow-y-auto px-4 pb-[max(24px,env(safe-area-inset-bottom))] pt-5 lg:px-8 lg:pb-8 lg:pt-6">
       <div className="mx-auto max-w-[1140px]">{children}</div>
     </div>
   );

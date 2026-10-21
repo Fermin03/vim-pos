@@ -5,7 +5,7 @@ import { type Empleado } from "../lib/supabase";
 import { cancelarItem, MOTIVOS_CANCELACION, type MotivoCancelacion } from "../lib/cancelacion";
 import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
-import { AvisoAutorizacion, MotivoChips } from "./motivo-y-autorizacion";
+import { AvisoAutorizacion, MotivoChips, etiquetaMotivo } from "./motivo-y-autorizacion";
 import { fmtMxn } from "../lib/turno";
 
 /** Roles que tienen `venta.cancelar_abierta` por defecto (matriz §2.2). */
@@ -48,10 +48,7 @@ export function ModalCancelarItem({
   // Si el item está en cocina, SIEMPRE pide PIN (lo exige la RPC); si no, autorización propia.
   const requierePin = enCocina || !tienePermisoRol;
 
-  function labelMotivo(): string {
-    if (motivo === "OTRO") return motivoTexto.trim() || "Otro";
-    return MOTIVOS_CANCELACION.find((m) => m.codigo === motivo)?.label ?? motivo;
-  }
+  const labelMotivo = () => etiquetaMotivo(MOTIVOS_CANCELACION, motivo, motivoTexto);
 
   function payload(): PayloadAutorizacion {
     return {
@@ -107,16 +104,9 @@ export function ModalCancelarItem({
     return (
       <ModalAutorizacionPin
         token={token}
-        accion="cancelar_item"
-        permisoCodigo="venta.cancelar_abierta"
+        payload={payload()}
         descripcion={`Cancelar ${cantidad}× ${productoNombre} · ${fmtMxn(totalItem)} · ${labelMotivo()}`}
         ejecutaNombre={empleado.nombre}
-        monto={totalItem}
-        entidadTipo="ticket_item"
-        entidadId={ticketItemId}
-        cajaId={cajaId}
-        turnoId={turnoId}
-        motivo={labelMotivo()}
         onAutorizado={(a) => ejecutarConAutorizacion(a)}
         onCancelar={() => setPidiendoPin(false)}
       />

@@ -22,14 +22,12 @@ export function PantallaTurno({
   cajaId,
   onBloquear,
   onCambiarCajero,
-  onSimularExpiracion: _onSimularExpiracion,
 }: {
   empleado: Empleado;
   token: string;
   cajaId: string;
   onBloquear: () => void;
   onCambiarCajero: () => void;
-  onSimularExpiracion: () => void;
 }) {
   const [caja, setCaja] = useState<DatosCaja | null | undefined>(undefined);
   const [turno, setTurno] = useState<Turno | null | undefined>(undefined);
@@ -114,6 +112,8 @@ export function PantallaTurno({
           onParaLlevar={abrir}
           onPickup={abrir}
           onDomicilio={abrir}
+          onBarra={abrir}
+          nCuentasBarra={0}
           onMonitorVentas={abrir}
           onConsultarCuentas={abrir}
           onMovimientoCaja={abrir}
@@ -142,7 +142,6 @@ export function PantallaTurno({
             token={token}
             cajaId={cajaId}
             cajaNumero={caja.numero}
-            vertical={caja.vertical}
             onTurnoAbierto={(t) => { setAbriendoTurno(false); setTurno(t); }}
             onCerrar={() => setAbriendoTurno(false)}
           />

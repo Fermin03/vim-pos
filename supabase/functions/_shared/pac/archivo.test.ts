@@ -1,15 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { archivarCfdi, base64ABytes, bytesABase64, partirRutaLogica, rutaArchivoCfdi, type Subidor } from "./archivo.ts";
+import { archivarCfdi, base64ABytes, bytesABase64, rutaArchivoCfdi, type Subidor } from "./archivo.ts";
 
 test("rutas: coinciden con lo que ya guarda tickets_cfdi (cfdi/<id>.xml)", () => {
   assert.deepEqual(rutaArchivoCfdi("abc", "xml"), { bucket: "cfdi", nombre: "abc.xml", contentType: "application/xml", rutaLogica: "cfdi/abc.xml" });
   assert.equal(rutaArchivoCfdi("abc", "pdf").contentType, "application/pdf");
   assert.equal(rutaArchivoCfdi("abc", "acuse").rutaLogica, "cfdi/abc-acuse.xml");
-  assert.deepEqual(partirRutaLogica("cfdi/abc.pdf"), { bucket: "cfdi", nombre: "abc.pdf" });
-  assert.equal(partirRutaLogica(null), null);
-  assert.equal(partirRutaLogica("sinbarra"), null);
-  assert.equal(partirRutaLogica("cfdi/"), null);
 });
 
 test("base64 ida y vuelta, incluso grande (más de un bloque)", () => {

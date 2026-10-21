@@ -1,4 +1,5 @@
 "use client";
+import { Icono } from "@vim/ui/styles";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useState } from "react";
@@ -18,6 +19,7 @@ import { AccesoDueno } from "../../components/acceso-dueno";
 import { FichaPagos } from "../../components/ficha-pagos";
 import { FichaFacturacion } from "../../components/ficha-facturacion";
 import { ModulosLimites } from "../../components/modulos-limites";
+import { OperacionGiro } from "../../components/operacion-giro";
 import { ZonaPeligrosa } from "../../components/zona-peligrosa";
 import { DialogoConfirmar } from "../../components/dialogo-confirmar";
 
@@ -112,7 +114,7 @@ export default function FichaCliente() {
   return (
     <>
       <div className="sticky top-0 z-10 -mx-4 -mt-5 mb-6 border-b border-line bg-bg/95 px-4 pb-3 pt-4 backdrop-blur lg:-mx-8 lg:-mt-7 lg:px-8">
-        <Link href="/clientes" className="text-13 font-semibold text-ink-2 hover:text-ink">← Clientes</Link>
+        <Link href="/clientes" className="inline-flex items-center gap-1 text-13 font-semibold text-ink-2 hover:text-ink"><Icono nombre="flecha-izquierda" className="h-4 w-4 flex-shrink-0" />Clientes</Link>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="font-display text-24 font-bold tracking-tight">{nombre}</h1>
@@ -171,6 +173,7 @@ export default function FichaCliente() {
           <FichaContrato d={d} planes={planes} accion={accion} busy={busy} accesoDueno={<AccesoDueno api={api} tenantId={id} dueno={d.dueno} onCambio={recargar} />} />
           <FichaPagos api={api} tenantId={id} suscripcion={suscripcion} addonsAlMes={totalAddons(d.addons, hoyMx())} onCambio={recargar} />
           <ModulosLimites d={d} nombre={nombre} accion={accion} busy={busy} />
+          <OperacionGiro d={d} nombre={nombre} accion={accion} busy={busy} />
         </Seccion>
 
         <Seccion id="facturacion" titulo="Facturación" descripcion="Datos fiscales y folios CFDI.">

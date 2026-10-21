@@ -187,8 +187,206 @@ costo dentro de un hijo (p. ej. "Extra queso") sí se imprime con su importe, po
 más, y la nota de cocina de ESE hijo también sale ahí, un nivel más adentro que la del renglón
 normal, para que quien lo recibe sepa qué llevaba ese componente y no solo la cocina.
 
+### El corte de turno: se cuenta a ciegas y el papel dice el resultado
+
+El arqueo solo pide lo contado; lo que el sistema esperaba no se ve hasta generar el corte (0127).
+Por eso el **corte Z** es donde queda escrito:
+
+- **Arqueo de efectivo**, después de la declaración del cajero: *esperado*, *declarado* y
+  *diferencia*, siempre con signo. En pantalla el faltante va en rojo y el sobrante en ámbar; en el
+  papel no hay color, así que el signo es lo que manda.
+- **Propinas repartidas**, bajo la forma de pago de la propina: un renglón por persona con su nombre.
+  Solo sale si el turno repartió algo (el reparto va por mesero); nunca un título sin renglones ni
+  un identificador en lugar del nombre.
+
+La vista en pantalla (`recibo-z.tsx`) y el papel (`reporte-z-builder.ts`) llevan las mismas
+secciones en el mismo orden: lo que se cambia en uno se cambia en el otro.
+
+### Pedidos en línea: la tienda llega a su canal; Uber, a su pantalla
+
+Lo que llega por internet se atiende en dos sitios, según de dónde venga:
+
+| Qué | Dónde llega | Dónde se cuenta |
+|---|---|---|
+| Pedido de la tienda propia, para recoger | Lista de **Pick-up**, arriba de las cuentas | Contador de Pick-up |
+| Pedido de la tienda propia, a domicilio | Lista de **Domicilio**, arriba de las cuentas | Contador de Domicilio |
+| Pedido de Uber Eats (y las demás apps) | Pantalla **Pedidos en línea**, en tarjetas | Contador del mosaico «Pedidos en línea» |
+
+Antes los pedidos de la tienda vivían en tarjetas junto a los de Uber y, una vez aceptados, había
+que ir a buscarlos a otra pantalla para cobrarlos. Ahora nacen donde se van a cobrar.
+
+**En la lista del canal**, lo que está por aceptar va arriba, bajo el rótulo «De tu tienda en línea
+· por aceptar», del más antiguo al más nuevo. Cada tarjeta lleva borde azul (rojo con menos de dos
+minutos), el cliente, el total, «Por aceptar» y la cuenta atrás hasta que vence. El subtítulo de
+la pantalla los cuenta primero («1 por aceptar · 2 órdenes por recolectar»). Al tocarla, el
+panel derecho muestra el pedido completo: «Tienda en línea · Para recoger» (o «A domicilio»), el
+folio, el cliente con su teléfono (se toca para llamar; dentro de la caja instalada va como texto),
+la dirección con sus referencias, los productos con modificadores y notas, la nota del cliente, el
+envío, el total y la forma de pago.
+
+- **Aceptar es la acción principal y Rechazar va lejos de ella**, al otro extremo de la fila.
+  Rechazar pide uno de cuatro motivos («Producto agotado», «Cocina saturada», «Ya cerramos», «Otro
+  motivo»): el cliente los ve en su seguimiento, así que la lista es cerrada y no hay texto libre.
+- **Al aceptar**, el pedido deja de estar por aceptar, su cuenta aparece en la misma lista como
+  cualquier otra y queda seleccionada. Desde el POS web es inmediato; en la caja instalada la
+  cuenta la abre la propia caja en unos segundos, y mientras el panel dice «Aceptado. Su cuenta
+  aparece aquí en un momento.»
+- **Un pedido aceptado no tiene tarjeta propia**: es una cuenta normal de Pick-up o de Domicilio.
+- **Sin botones cuando este dispositivo no puede atenderlo**, y dice por qué: «Se atiende desde el
+  POS web.» (dentro de la caja instalada, un pedido que lleva el POS del navegador), «Otra caja ya
+  tomó este pedido.» o «Se venció sin aceptar.». Esos tampoco cuentan en el contador ni timbran.
+- **No hay «Marcar listo» en la tienda** (decisión 2 de la entrega 4). El estado sale de lo que el
+  cajero ya hace: imprimir el ticket o asignar repartidor es «listo», cobrar es «entregado»,
+  cancelar el ticket es «cancelado». Una tarjeta de Uber sí lo conserva, tal como estaba.
+  En una caja instalada lo reporta la caja; un pedido atendido desde el POS web (sin caja) lo pone
+  al día la nube sola, **cada minuto**.
+- **Lo que se cerró solo se dice en su canal**, en una franja roja arriba de la lista que se cierra
+  con la ×: «El pedido T1234 se venció sin aceptar.», o lo que la caja dejó dicho al cancelarlo
+  («Pedido T1234: …»). Ahí queda también el pedido que se canceló **al intentar aceptarlo** («ya no
+  coincide con tu menú o tus zonas de envío…»), se haya aceptado desde la lista o desde el aviso
+  grande: hay que avisarle al cliente, y eso no cabe en un aviso de seis segundos.
+- **Los errores dicen qué hacer, sin códigos:** «Abre un turno para aceptar pedidos.», «Este pedido
+  ya fue atendido.», «Este pedido ya no coincide con tu menú o tus zonas de envío. Se canceló y tu
+  cliente ya lo sabe.»
+
+**El aviso grande.** Cuando llega un pedido de la tienda que este dispositivo puede aceptar, aparece
+una capa centrada **encima de lo que haya** —el inicio, la venta, un cobro, la cocina— con «Pedido
+nuevo de tu tienda en línea», **Para recoger / A domicilio** en el tamaño más grande de la capa, el
+folio, el tiempo que queda para aceptarlo, el cliente, los productos (cinco renglones y «y N
+productos más»), el total y la forma de pago. Botones: **Aceptar** (el único azul), **Rechazar**
+(los mismos cuatro motivos, dentro de la misma capa), **Ver orden** y la ×.
+
+- **Sale una vez por pedido.** Cerrarlo (×, Escape o tocar fuera) no lo hace reaparecer; el timbre
+  sigue sonando cada 20 segundos y el contador del canal sigue ahí hasta que alguien lo atienda.
+- **Con varios, van en fila**, del más antiguo al más nuevo, y dice «1 de 3».
+- **Se quita solo** si el pedido deja de estar por aceptar: lo aceptó o rechazó otra pantalla, lo
+  tomó otra caja o venció.
+- **No rompe lo de abajo.** Es una capa: al cerrarla, el cobro a medias sigue como estaba y el foco
+  vuelve a donde estaba.
+- **El foco cae en la ×, nunca en Aceptar ni en Rechazar**, y vuelve a la × al pasar al siguiente
+  pedido de la fila. El cajero puede estar tecleando un importe: un Enter que iba para el cobro no
+  debe aceptar ni rechazar un pedido.
+- **Mientras está abierto, el teclado es suyo.** El teclado numérico del cobro y el del PIN escuchan
+  las teclas de toda la ventana; con el aviso encima, Enter cobraría por detrás y los dígitos
+  seguirían entrando al importe tapado. El aviso corta las teclas antes de que lleguen a lo de
+  abajo; pasan solo Escape (cerrar) y Tab (recorrer sus botones).
+- **«Ver orden» lleva a Pick-up o a Domicilio con ese pedido seleccionado.** Si hay un cobro, un
+  diálogo o un pedido a medias en pantalla, no navega: avisa «Termina lo que tienes abierto. El
+  pedido te espera en Pick-up.» y el pedido se queda en su canal. Cuentan también los diálogos de la
+  propia lista de cuentas (cancelar, descuento, PIN, asignar repartidor, reservaciones).
+- **Tras «Ver orden», el resto de la fila espera.** El siguiente aviso no cae encima del detalle que
+  el cajero acaba de abrir: la fila continúa cuando ese pedido deja de estar por aceptar (se
+  aceptó, se rechazó o venció) o cuando el cajero sale de ese canal.
+- No aparece durante el cierre de turno (quien cuenta la caja ya no atiende pedidos; el timbre sí).
+- Escape lo atiende el propio aviso (`Modal`); `home-pos` lo declara como capa que cede.
+
+**El aviso breve.** Una franja oscura arriba, sin botones, que se quita sola a los seis segundos.
+Sale cuando un pedido entra a su canal sin que el cajero lo haya aceptado ahí —la tienda acepta en
+automático, o lo aceptó otra pantalla—: «Pedido nuevo en Pick-up · T1234». También dice a dónde fue
+el que se aceptó desde el aviso grande («Pedido aceptado. Está en Pick-up.») y por qué no se pudo
+atender uno. Con aceptación automática en el POS web el aviso grande no aplica: el pedido se acepta
+solo y basta con el breve.
+
+**El timbre se repite.** Un pedido nuevo suena al llegar, **desde cualquier pantalla** del POS, y
+vuelve a sonar **cada 20 segundos** mientras quede alguno por aceptar: un pedido que nadie atiende
+no puede depender de que el cajero haya estado mirando justo en ese momento. Al abrir el POS con un
+pedido ya pendiente suena enseguida. Vale para los dos canales (Uber también). Si el navegador
+bloquea el audio, los contadores siguen ahí; el timbre nunca estorba al cobro.
+**Solo suena por lo que este dispositivo puede aceptar:** no por un pedido que ya tomó otra caja,
+ni por uno cuya hora de aceptar ya pasó (una caja sin internet conserva el pedido «por aceptar»
+hasta que vuelve la red; el timbre calla al vencer la ventana), ni por uno que llega ya cancelado.
+
+**La pantalla «Pedidos en línea» queda para Uber y para pausar.** Lista las tarjetas de las apps
+(con su Aceptar, Rechazar y «Marcar listo», como siempre) y lleva arriba las dos barras: la de la
+tienda propia y, debajo, la de Uber. Ya no lista pedidos de la tienda; lo dice en una línea: «Tus
+pedidos en línea llegan a Pick-up y a Domicilio.» Si el negocio solo tiene la tienda (sin Uber), la
+pantalla sigue existiendo por la barra de pausa, con esa misma línea al centro. El aviso del inicio
+de pedidos vencidos sin aceptar sigue llevando aquí.
+
+**La barra de pausa de la tienda** dice en una línea cómo está — «Tienda: recibiendo pedidos»
+(verde), «en pausa hasta las 2:30 p. m.», «fuera de horario», «sin turno abierto» o «apagada» (en
+ámbar) — y ofrece **Pausar…** (30 minutos, 1 hora o «Hasta que la reanude») o **Reanudar**. Los
+botones solo aparecen si la sucursal vende en la tienda; sin datos, la barra lo dice y no ofrece
+nada. «Sin turno abierto» no es un error de la tienda: es que no hay caja con turno que pueda
+cocinar el pedido.
+
+**La nota del pedido viaja con la cuenta.** El pedido de la tienda trae lo que el cliente pidió por
+escrito y la forma de pago, y eso se guarda en la nota de la cuenta. El panel de detalle de
+**Pick-up** y de **Domicilio** muestra una franja «Nota del pedido: …»; el ticket impreso la lleva
+en negritas, bajo los datos de entrega y antes de los productos, y la comanda de cocina también.
+En el papel, la separación « · » sale como « - »: la impresora cambia lo que no es ASCII por «?».
+**Solo en tickets nacidos de la tienda** (`notaPedidoDe`: creados por la tienda y en modo Pick-up o
+Domicilio), en los tres lugares: pantalla, ticket y comanda. El recado a cocina que teclea el cajero
+en una cuenta normal es la misma columna, y no sale ahí: una cuenta que no es de la tienda se ve y
+se imprime exactamente como antes. La tienda ya no pregunta con cuánto paga el cliente; si un
+pedido lo trae, se sigue mostrando («Efectivo, paga con $500.00»).
+
+**La comanda sale sola al aceptar**, una vez, por áreas. Si la impresora falla, **no se reintenta
+sola**: una comanda duplicada en la cocina cuesta más que una que el cajero manda a mano. En su
+lugar, la tarjeta de esa cuenta en la lista de Pick-up o de Domicilio lleva la marca roja «Comanda
+sin imprimir» (se nota sin abrirla) y su detalle muestra una alerta —«La comanda no se imprimió.
+Revisa la impresora.»— con el botón **Imprimir comanda**, que la manda desde ese dispositivo sin
+pedir PIN (es la primera impresión, no una reimpresión). La alerta aparece pasados
+unos 20 segundos sin comanda y se quita cuando sale el papel.
+
+### Pedido pagado en línea: una marca, y «Listo» en vez de «Cobrar» (0173)
+
+Un pedido de la tienda que el cliente ya pagó lleva **una sola marca, siempre igual**: «PAGADO EN
+LÍNEA, no cobrar», en verde lleno (`bg-success`, texto blanco; el mismo molde que «Comanda sin
+imprimir» en rojo). Sale en el aviso grande (arriba del detalle, tamaño 15), en la tarjeta del
+pedido por aceptar y en la tarjeta de su cuenta (tamaño 12), y como franja `success-soft` bajo el
+encabezado de la cuenta, con «Cuando lo entregues, toca «Listo».». No se inventa otro color ni
+otro texto para lo mismo.
+
+- La cuenta nace cobrada y **se queda en la lista** de Pick-up o Domicilio hasta «Listo».
+- Su fila de acciones es otra: Imprimir ticket · (Asignar repartidor) · **Cancelar cuenta** ·
+  **Listo** (la principal, a la derecha, donde iría «Cobrar»). No hay Agregar producto,
+  Descuento, Canjear ni «Eliminar» por renglón: el cliente pagó exactamente eso.
+- «Cancelar cuenta» abre directo el diálogo de peligro, y la consecuencia dice **antes de
+  confirmar** que el pago se le devuelve completo al cliente y que de la caja no sale efectivo.
+- En Consultar cuentas, una cuenta pagada en línea no ofrece «Cambiar pago» ni «Reabrir».
+- **Cancelar tarde.** Pasadas 48 horas (la ventana en la que la caja reporta la cancelación y el
+  pago se devuelve solo), el mismo diálogo ya no cancela: se titula «Esta cuenta ya no se cancela
+  aquí», dice que el sistema ya no puede devolver ese pago y manda a devolverlo desde la cuenta de
+  Mercado Pago del negocio; el botón queda apagado. Nunca se promete una devolución que no va a pasar.
+- **La nube canceló el pedido** (la caja estuvo sin internet tras aceptarlo): el pago ya se devolvió
+  y aquí queda una cuenta cobrada. El aviso rojo del canal lo dice («…el pago ya se le devolvió al
+  cliente: cancela esta cuenta. Si ya lo entregaste, cóbralo de otra forma»), la cuenta **sigue en
+  la lista** hasta que se cancela, su franja pasa de verde a `danger-soft` con ese mismo mensaje y
+  «Listo» queda apagado.
+
 ## Lo que NO se hereda de otras apps
 
 - **La densidad del admin.** Aquí el scroll es tiempo frente a un cliente, pero apretar de más
   produce toques equivocados. Prefiere menos elementos antes que elementos más chicos.
 - **El tema oscuro del KDS.** Está calibrado para una pantalla lejana en una cocina.
+
+## Cobro con terminal (ADR 0033)
+
+- **Un solo botón «Tarjeta»** cuando la caja tiene terminal ligada: sustituye a Débito y Crédito. La
+  cajera no elige el tipo; lo dice Mercado Pago y así se registra el pago.
+- **La propina se captura antes, en la caja.** En modo integrado la terminal no la pregunta: se le
+  manda el total ya con propina.
+- **«Cobra en la terminal»** muestra el monto y la instrucción («toca Tarjeta y acerca o inserta la
+  tarjeta»). De ahí no se sale con Escape: se sale con «Cancelar cobro».
+- **Si no pasa** (rechazo, tiempo agotado, cancelado): el motivo en rojo, «Volver a intentar» y
+  «Cambiar forma de pago».
+- **Si no se sabe si pasó**: «¿Dice que el pago fue aprobado?». Aceptarlo pide PIN de supervisor o
+  admin (permiso `venta.editar_post_cobro`) y queda escrito quién lo autorizó.
+- **«La cobré en otra terminal»**, al pie del selector, destapa «Débito · a mano» y «Crédito · a
+  mano»: el registro de siempre, para cuando no hay internet o la terminal falla.
+- **Sin internet o sin terminal ligada** el selector queda como antes, con Débito y Crédito.
+- **Caja apagada a medio cobro:** al volver a abrir el cobro de esa cuenta, el pago aprobado se
+  registra solo.
+- **El ticket dice con qué tarjeta se cobró.** Debajo de «Forma de pago» van la marca y la terminación
+  («Mastercard **** 1447», con asteriscos: la impresora no tiene el punto medio) y, en otro renglón,
+  «Autorización» con el número del banco. Solo en cobros hechos en la terminal desde la caja; una
+  tarjeta registrada a mano sale como siempre. El comprobante de devolución añade «Devuelto a:».
+- **Devolución «Mismo método»:** si la cuenta se cobró en la terminal desde la caja, al confirmar la
+  devolución el dinero regresa solo a la tarjeta. Si Mercado Pago no lo devuelve, la devolución ya
+  quedó registrada y la caja lo dice: «El dinero no regresó a la tarjeta», con «Volver a intentar».
+  Lo que se cobró en otra terminal se sigue devolviendo en esa terminal.
+- **Pago dividido:** en «Agregar pago», «Tarjeta» cobra en la terminal y «Débito · a mano» /
+  «Crédito · a mano» solo registran. Al completar el cobro los pagos entran uno por uno; al llegar a
+  uno de terminal se abre «Cobra en la terminal» encima, por ese monto. Si ese cobro no se completa,
+  lo ya cobrado se queda y la lista conserva lo que falta.

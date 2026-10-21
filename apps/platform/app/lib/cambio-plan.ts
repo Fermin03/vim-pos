@@ -2,17 +2,28 @@
 //
 // ESPEJO de `cambiar_plan_tenant()` + `_sincronizar_addons_del_plan()` en
 // supabase/migrations/0141_cobro_promocion_prueba_plan.sql (`_sincronizar_addons_del_plan` se redefinió en la 0159 para
-// incluir LEALTAD). La base es la que decide; esto solo le
+// incluir LEALTAD y en la 0167 para TIENDA). La base es la que decide; esto solo le
 // enseña al operador, ANTES de confirmar, lo que la base va a hacer: folios del mes, add-ons que
 // entran o salen y el precio del cobro. Si cambias la regla allá, cámbiala aquí.
 import { EXTRAS, precioVigente, promocionVigente, type CodigoExtra } from "@vim/db/cobro";
 
-/** Qué bandera de `planes.features_incluidos` dice que el plan incluye cada add-on. */
+/**
+ * Qué bandera de `planes.features_incluidos` dice que el plan incluye cada add-on. Las mismas parejas
+ * que recorre la base: `addons-del-plan-sql.test.ts` las compara con el SQL vigente.
+ */
 export const ADDONS_DEL_PLAN = [
   { codigo: "CFDI", bandera: "cfdi_incluido" },
   { codigo: "DELIVERY", bandera: "delivery_incluido" },
   { codigo: "LEALTAD", bandera: "lealtad_incluido" },
+  { codigo: "TIENDA", bandera: "tienda_incluida" },
 ] as const;
+
+/**
+ * Parejas que la base solo sincroniza si el complemento está activo en el catálogo (`addons.activo`,
+ * 0167): mientras VIM no encienda la tienda, cambiar de plan ni la concede ni la retira. Las demás
+ * se sincronizan siempre, esté como esté el catálogo.
+ */
+const SOLO_CON_CATALOGO_ACTIVO: ReadonlySet<string> = new Set(["TIENDA"]);
 
 export type PlanParaCambio = {
   id: string;
@@ -70,12 +81,15 @@ export function vistaPreviaCambioPlan(args: {
   hoy: string;
   /** Excepción de límites vigente del cliente; con ella la base no es el plan. */
   excepcion?: ExcepcionLimites | null;
+  /** Códigos de los add-ons activos en el catálogo (lo que la ficha ya lee con `activo = true`). Sin dato, ninguno. */
+  catalogoActivo?: readonly string[];
 }): VistaPreviaPlan {
   const { nuevo, addons, suscripcion } = args;
   const concede: string[] = [];
   const dejaDePagar: { codigo: string; precio: number }[] = [];
   const retira: string[] = [];
   for (const { codigo, bandera } of ADDONS_DEL_PLAN) {
+    if (SOLO_CON_CATALOGO_ACTIVO.has(codigo) && !args.catalogoActivo?.includes(codigo)) continue;
     const activo = addons.find((a) => a.codigo === codigo && a.activo);
     if (incluye(nuevo, bandera)) {
       if (activo && activo.incluidoEnPlan && activo.precio === 0) continue;

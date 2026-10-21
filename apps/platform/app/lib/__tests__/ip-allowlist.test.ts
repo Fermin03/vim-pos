@@ -74,4 +74,12 @@ describe("no da acceso de más ante entradas raras", () => {
   it("ignora los corchetes que a veces trae una IPv6", () => {
     expect(coincide(`[${IPV6}]`, "2806:2f0:6001:ed67::/64")).toBe(true);
   });
+
+  it("lo que no es una dirección no coincide, aunque se le parezca", () => {
+    // El analizador hecho a mano aceptaba las dos primeras: `:::` pasaba por `::` y abría todo IPv6.
+    expect(coincide(IPV6, ":::/0")).toBe(false);
+    expect(coincide("01.2.3.4", "1.2.3.4")).toBe(false);
+    // `isIP` da por válida una IPv6 con zona; aquí no.
+    expect(coincide("fe80::1%eth0", "fe80::/10")).toBe(false);
+  });
 });

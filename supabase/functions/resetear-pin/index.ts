@@ -2,27 +2,16 @@
 // Requiere JWT de un admin (DUENO/ADMIN) del mismo tenant que el empleado.
 // Payload: { usuario_id, pin_nuevo }
 
-import { createClient } from "jsr:@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
+import { clienteAdmin, servir } from "../_shared/http.ts";
+import { bearerDe } from "../_shared/identidad.ts";
 import { registrarError } from "../_shared/errores.ts";
 
-const admin = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  { auth: { persistSession: false } },
-);
+const admin = clienteAdmin();
 
 const ROLES_ADMINISTRADORES = ["DUENO", "ADMIN"];
 
-Deno.serve(async (req) => {
-  const cors = corsHeaders(req);
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
-
-  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+servir(async (req, json) => {
+  const token = bearerDe(req);
   if (!token) return json({ error: "NO_AUTH" }, 401);
 
   const { data: userResp, error: userErr } = await admin.auth.getUser(token);

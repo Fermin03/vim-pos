@@ -29,6 +29,8 @@ export const ETIQUETA_METODO_PAGO: Record<MetodoPago, string> = {
   APP_IFOOD: ETIQUETA_MODO.APP_IFOOD,
   APP_OTRO: ETIQUETA_MODO.APP_OTRO,
   PAGO_AL_RECIBIR: "Pago al recibir",
+  /** Pedido de la tienda en línea que el cliente pagó con Mercado Pago antes de llegar a la caja. */
+  PAGO_EN_LINEA: "Pago en línea",
   OTRO: "Otro",
 };
 

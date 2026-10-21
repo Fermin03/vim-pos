@@ -11,10 +11,8 @@ import {
   type Marca,
 } from "../../../lib/configuracion";
 import { mensajeError } from "../../../lib/errores";
-
-const input =
-  "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-13 font-medium text-ink-2";
+import { input, label } from "../../../components/campos";
+import { AccionFila } from "../../../components/controles";
 
 const VACIA = { codigo: "", nombre: "", descripcion: "", color_primario_hex: "#E8502E", activa: true };
 
@@ -117,8 +115,8 @@ export default function MarcasPage() {
                 </div>
                 {m.descripcion && <p className="mt-2 line-clamp-2 text-13 text-ink-3">{m.descripcion}</p>}
                 <div className="mt-3 flex gap-2 border-t border-line pt-3">
-                  <button type="button" onClick={() => editar(m)} className="text-13 font-semibold text-ink-2 hover:text-ink">Editar</button>
-                  <button type="button" onClick={() => borrar(m)} className="ml-auto text-13 font-semibold text-ink-3 hover:text-danger">Eliminar</button>
+                  <AccionFila onClick={() => editar(m)}>Editar</AccionFila>
+                  <AccionFila peligro className="ml-auto" onClick={() => borrar(m)}>Eliminar</AccionFila>
                 </div>
               </div>
             ))}

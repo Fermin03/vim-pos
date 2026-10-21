@@ -30,14 +30,15 @@ try {
   backend = await startBackend({ log: () => {} });
   const antes = (await backend.pool.query("SELECT count(*)::int n FROM tenants")).rows[0].n;
   console.log(`  caja arriba, ${antes} tenant(s)`);
+  const pass = backend.pgPassword; // la copia conserva la contraseña del clúster original
   await backend.stop(); backend = null; // Postgres detenido → copia consistente
   const dest = respaldar(path.join(root, "pgdata"), backupsDir, 7, (m) => console.log("  ·", m));
   if (!dest || !existsSync(path.join(dest, "PG_VERSION"))) fail("el respaldo no se creó / sin PG_VERSION");
   else {
     // Arrancar un Postgres SOBRE la copia (otro puerto) y consultar → prueba que es válido.
-    const pgCopia = new EmbeddedPostgres({ databaseDir: dest, user: "postgres", password: backend?.pgPassword ?? passRespaldo, port: 54339, persistent: true });
+    const pgCopia = new EmbeddedPostgres({ databaseDir: dest, user: "postgres", password: pass, port: 54339, persistent: true });
     await pgCopia.start();
-    const c = new pg.Client({ host: "127.0.0.1", port: 54339, user: "postgres", password: backend?.pgPassword ?? passRespaldo, database: "vimpos" });
+    const c = new pg.Client({ host: "127.0.0.1", port: 54339, user: "postgres", password: pass, database: "vimpos" });
     await c.connect();
     const despues = (await c.query("SELECT count(*)::int n FROM tenants")).rows[0].n;
     await c.end(); await pgCopia.stop();

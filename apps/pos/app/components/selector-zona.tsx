@@ -1,4 +1,5 @@
 "use client";
+import { Icono } from "@vim/ui/styles";
 import { useState } from "react";
 import { crearZona, cambiarCostoZona, validarCostoZona, type ZonaEnvio } from "../lib/zonas-envio";
 import { fmtMxn } from "../lib/turno";
@@ -62,7 +63,7 @@ export function SelectorZona({
     }
   }
 
-  /** El ✎ solo abre el campo de costo. Nada de PIN todavía: no hay número que autorizar aún. */
+  /** El lápiz solo abre el campo de costo. Nada de PIN todavía: no hay número que autorizar aún. */
   function empezarRepreciar(z: ZonaEnvio) {
     setRepreciando({ zona: z, costo: String(z.costoMxn) });
     setError(null);
@@ -112,9 +113,9 @@ export function SelectorZona({
               className={[chip, valor === z.id ? "bg-ink text-white" : "bg-sel text-ink-2 hover:bg-hover"].join(" ")}>
               {z.nombre} · {fmtMxn(z.costoMxn)}
             </button>
-            <button type="button" title="Cambiar el costo (pide PIN)"
+            <button type="button" title="Cambiar el costo (pide PIN)" aria-label={`Cambiar el costo de ${z.nombre}`}
               onClick={() => empezarRepreciar(z)}
-              className="text-11 text-ink-3 hover:text-ink">✎</button>
+              className="text-ink-3 hover:text-ink"><Icono nombre="editar" className="h-3.5 w-3.5" strokeWidth={2.5} /></button>
           </span>
         ))}
         {!alta && (
@@ -153,16 +154,9 @@ export function SelectorZona({
       {pinAbierto && repreciando && (
         <ModalAutorizacionPin
           token={token}
-          accion="editar_zona_envio"
-          permisoCodigo="descuento.override_precio"
+          payload={{ accion: "editar_zona_envio", permisoCodigo: "descuento.override_precio", entidadTipo: "zona_envio", entidadId: repreciando.zona.id, monto: costoNuevo, motivo: `Cambio de costo de la zona ${repreciando.zona.nombre}: de ${fmtMxn(repreciando.zona.costoMxn)} a ${fmtMxn(costoNuevo)}`, cajaId, turnoId }}
           descripcion={`Cambiar el costo de ${repreciando.zona.nombre} de ${fmtMxn(repreciando.zona.costoMxn)} a ${fmtMxn(costoNuevo)}`}
           ejecutaNombre={empleadoNombre}
-          monto={costoNuevo}
-          entidadTipo="zona_envio"
-          entidadId={repreciando.zona.id}
-          motivo={`Cambio de costo de la zona ${repreciando.zona.nombre}: de ${fmtMxn(repreciando.zona.costoMxn)} a ${fmtMxn(costoNuevo)}`}
-          cajaId={cajaId}
-          turnoId={turnoId}
           onAutorizado={(a) => void aplicarNuevoCosto(a)}
           onCancelar={() => setPinAbierto(false)}
         />

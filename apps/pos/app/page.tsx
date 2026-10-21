@@ -200,7 +200,6 @@ function PaginaPos() {
           cajaId={cajaId}
           onBloquear={() => setEstado({ paso: "bloqueo", empleado: estado.empleado })}
           onCambiarCajero={() => setEstado({ paso: "selector", pinPara: null })}
-          onSimularExpiracion={() => setEstado({ paso: "expirada", empleado: estado.empleado })}
         />
       );
 

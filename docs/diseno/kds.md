@@ -20,10 +20,15 @@ de las lámparas.
 `warning` y `danger` van aclarados respecto al resto del producto (`#D4A017`, `#E04040`): sobre
 fondo negro, los tonos del tema claro se apagan.
 
-> **Deuda:** hoy `[data-theme="kds"]` no se aplica en ninguna parte. La pantalla usa `bg-white`
-> y estilos en línea, así que el tema vive en `tokens.css` sin que nadie lo encienda. Desde la
-> unificación de tokens ([`0008`](../decisiones/0008-una-sola-fuente-de-tokens.md)) basta con
-> poner el atributo en el contenedor para que TODAS las clases compartidas se retematicen.
+Los valores viven en `packages/kds-core/src/pantalla-kds.tsx` —`TEMA_NORMAL`, y `TEMA_CONTRASTE`
+para el modo de alto contraste— y la pantalla los aplica con estilos en línea. `tokens.css` solo
+conserva `--kds-bg` y `--kds-text`, que `apps/kds/app/globals.css` usa para el fondo y el texto
+base de la app.
+
+> **Si el KDS empieza a usar componentes compartidos de `@vim/ui`** (hoy no usa ninguno), saldrán
+> con los colores claros. Para eso existió un bloque `[data-theme="kds"]` en `tokens.css` que
+> redefinía los tokens de superficie y tinta ([`0008`](../decisiones/0008-una-sola-fuente-de-tokens.md)).
+> Nunca se aplicó y se retiró el 7 oct 2026; es el mecanismo a recuperar llegado el caso.
 
 ## El color es tiempo, no decoración
 

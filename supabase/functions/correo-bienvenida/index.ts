@@ -25,8 +25,7 @@
 //
 // La plantilla y el flujo viven en _shared/bienvenida.ts (probados con `node --test`).
 
-import { createClient } from "jsr:@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
+import { clienteAdmin, servir } from "../_shared/http.ts";
 import { consumirCupos } from "../_shared/limite.ts";
 import { enSegundoPlano, enviarCorreo } from "../_shared/correo.ts";
 import { bearerDe, tenantDelToken } from "../_shared/identidad.ts";
@@ -36,17 +35,8 @@ const MAX_POR_USUARIO = 6;   // por hora: confirmar, recargar, el doble clic… 
 const MAX_GLOBAL = 120;      // por hora, de todo el mundo
 const HORA = 60 * 60;
 
-Deno.serve(async (req) => {
-  const cors = corsHeaders(req);
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
-
-  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
-    auth: { persistSession: false },
-  });
+servir(async (req, json) => {
+  const admin = clienteAdmin();
   const token = bearerDe(req);
 
   const deps: DepsBienvenida = {

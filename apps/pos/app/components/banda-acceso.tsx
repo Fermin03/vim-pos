@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { actualizacionPendiente, evaluarAcceso, leerDirectivas, type MotivoBloqueo, type NivelAcceso } from "../lib/directivas";
+import { leerDirectivas, type MotivoBloqueo, type NivelAcceso } from "../lib/directivas";
 import { buscarActualizacion } from "../lib/actualizacion";
+import { accesoDe, recordarDirectivas, ultimasDirectivas } from "../lib/acceso-recordado";
 
 export type Acceso = {
   nivel: NivelAcceso;
@@ -23,14 +24,21 @@ export type Acceso = {
  * Relee cada 60 s. Quien refresca de verdad la directiva es el latido del escritorio, cada 10
  * minutos; esto solo vuelve a mirar el archivo, así que es barato y hace que reactivar a un
  * cliente se note en menos de un minuto desde que llega la directiva nueva.
+ *
+ * Arranca de lo último que se supo en esta carga de la app (`acceso-recordado.ts`): la pantalla
+ * de inicio se vuelve a montar cada vez que el cajero regresa, y sin eso mostraría por un
+ * instante accesos que el negocio tiene apagados.
  */
 export function useAcceso(): Acceso {
-  const [r, setR] = useState<Acceso>({ nivel: "ok", mensaje: "", desde: null, motivo: "suscripcion", modulos: {}, actualizacion: null });
+  const [r, setR] = useState<Acceso>(() => accesoDe(ultimasDirectivas()));
   useEffect(() => {
     let vivo = true;
     const cargar = () => {
       leerDirectivas()
-        .then((d) => { if (vivo) setR({ ...evaluarAcceso(d), modulos: d?.modulos ?? {}, actualizacion: actualizacionPendiente(d) }); })
+        .then((d) => {
+          recordarDirectivas(d);
+          if (vivo) setR(accesoDe(d));
+        })
         .catch(() => {});
     };
     cargar();

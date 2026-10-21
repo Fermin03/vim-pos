@@ -8,10 +8,7 @@ import {
   type Sucursal,
 } from "../lib/configuracion";
 import { mensajeError } from "../lib/errores";
-
-const input =
-  "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-13 font-medium text-ink-2";
+import { input, label } from "./campos";
 
 export function ModalSucursal({
   sucursal,
@@ -28,6 +25,7 @@ export function ModalSucursal({
   const [calle, setCalle] = useState(sucursal?.direccion_calle ?? "");
   const [ciudad, setCiudad] = useState(sucursal?.ciudad ?? "");
   const [estadoGeo, setEstadoGeo] = useState(sucursal?.estado_geo ?? "");
+  const [cp, setCp] = useState(sucursal?.codigo_postal ?? "");
   const [tel, setTel] = useState(sucursal?.telefono ?? "");
   const [activa, setActiva] = useState(sucursal?.activa ?? true);
   const [error, setError] = useState<string | null>(null);
@@ -41,6 +39,7 @@ export function ModalSucursal({
       direccion_calle: calle,
       ciudad,
       estado_geo: estadoGeo,
+      codigo_postal: cp,
       telefono: tel,
       activa,
     });
@@ -114,6 +113,10 @@ export function ModalSucursal({
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className={label} htmlFor="s-cp">Código postal</label>
+          <input id="s-cp" className={input} value={cp} maxLength={5} inputMode="numeric" onChange={(e) => setCp(e.target.value.replace(/\D/g, ""))} placeholder="37000" />
+        </div>
         <div>
           <label className={label} htmlFor="s-tel">Teléfono <span className="text-ink-3">· opcional</span></label>
           <input id="s-tel" className={input} value={tel} maxLength={20} onChange={(e) => setTel(e.target.value)} placeholder="477 123 4567" />

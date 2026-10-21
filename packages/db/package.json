@@ -4,8 +4,6 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./client": "./src/client.browser.ts",
-    "./server": "./src/client.server.ts",
     "./service": "./src/client.service.ts",
     "./types": "./src/database.types.ts",
     "./modulos": "./src/modulos.ts",
@@ -17,14 +15,14 @@
     "./dispositivo": "./src/dispositivo.ts",
     "./fixtures-combos": "./src/fixtures-combos.ts",
     "./soporte": "./src/soporte.ts",
-    "./registro": "./src/registro.ts"
+    "./registro": "./src/registro.ts",
+    "./operacion": "./src/operacion.ts"
   },
   "scripts": {
     "gen-types": "supabase gen types typescript --local > src/database.types.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
-    "@supabase/ssr": "^0.5.0",
     "zod": "^4.6.5"
   }
 }

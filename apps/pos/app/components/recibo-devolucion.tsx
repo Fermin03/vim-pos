@@ -55,6 +55,7 @@ export function ReciboDevolucion({ d }: { d: DatosDevolucion }) {
       </div>
       <div className="text-[10.5px] leading-[1.7]">
         <Row label="Medio:" value={d.medio} />
+        {(d.tarjetas ?? []).map((t) => <Row key={t} label="Devuelto a:" value={t} />)}
         <Row label="Motivo:" value={d.motivo} />
       </div>
 

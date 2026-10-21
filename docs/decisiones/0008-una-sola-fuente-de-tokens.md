@@ -50,6 +50,8 @@ solo color.
   redefinía las variables pero las clases de Tailwind traían el hexadecimal quemado, así que
   dentro del KDS un `bg-surface` salía blanco igual. Ahora el atributo retematiza de verdad
   cualquier componente compartido. Nadie lo aplica todavía; está anotado en `diseno/kds.md`.
+  *(7 oct 2026: el bloque se retiró sin haberse aplicado nunca. El KDS pinta con sus propios
+  temas en `pantalla-kds.tsx`; ver `diseno/kds.md`.)*
 - Se arreglaron de paso dos sombras de `modal-modificadores.tsx` que usaban
   `theme(colors.ink)` — una forma que Tailwind rechaza, así que llevaban tiempo sin dibujarse.
 - **El sitio web sigue fuera.** Es HTML estático sin build: no consume ni el preset ni el CSS, y

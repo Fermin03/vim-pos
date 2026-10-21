@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Modal } from "@vim/ui/styles";
+import { Modal, Icono } from "@vim/ui/styles";
 import { type Empleado } from "../lib/supabase";
 import type { Autorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
@@ -52,16 +52,9 @@ export function ModalAbrirCaja({
     return (
       <ModalAutorizacionPin
         token={token}
-        accion="abrir_cajon"
-        permisoCodigo={PERMISO}
+        payload={{ accion: "abrir_cajon", permisoCodigo: PERMISO, entidadTipo: "caja", entidadId: cajaId, monto: null, motivo: "Apertura manual del cajón", cajaId, turnoId }}
         descripcion="Abrir cajón de dinero"
         ejecutaNombre={empleado.nombre}
-        monto={null}
-        entidadTipo="caja"
-        entidadId={cajaId}
-        cajaId={cajaId}
-        turnoId={turnoId}
-        motivo="Apertura manual del cajón"
         onAutorizado={onAutorizado}
         onCancelar={onCerrar}
       />
@@ -82,7 +75,7 @@ export function ModalAbrirCaja({
       {estado === "abierta" && (
         <div className="flex flex-col items-center gap-2 py-1">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-success/10 text-success">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" className="h-6 w-6"><path d="M20 6 9 17l-5-5" /></svg>
+            <Icono nombre="palomita" className="h-6 w-6" />
           </div>
           <p className="font-display text-base font-semibold text-success">Cajón abierto</p>
         </div>
@@ -91,7 +84,7 @@ export function ModalAbrirCaja({
       {estado === "error" && (
         <div className="flex flex-col items-center gap-3 py-1">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-danger/10 text-danger">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6"><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
+            <Icono nombre="info" className="h-6 w-6" />
           </div>
           <p className="text-14 font-medium text-ink-2">{error}</p>
           <button type="button" onClick={onCerrar} className="text-13 font-semibold text-ink-2 hover:text-ink">Cerrar</button>

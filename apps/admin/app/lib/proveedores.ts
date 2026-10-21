@@ -1,14 +1,10 @@
 "use client";
 import { z } from "zod";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { borrarSuave, tenantId } from "./datos";
 
 // Catálogo de proveedores (ADR 0012). Tabla proveedores con RLS por tenant y baja lógica.
 
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
 const S = (v: unknown) => (v == null ? "" : String(v));
 const opc = (v: unknown) => (v == null || v === "" ? null : String(v));
 
@@ -64,10 +60,7 @@ export async function actualizarProveedor(id: string, input: ProveedorInput): Pr
   if (error) throw new Error(error.message);
 }
 
-export async function eliminarProveedor(id: string): Promise<void> {
-  const { error } = await supabase.from("proveedores").update({ deleted_at: new Date().toISOString(), activo: false }).eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarProveedor = (id: string): Promise<void> => borrarSuave("proveedores", id, { activo: false });
 
 export async function buscarProveedorPorRfc(rfc: string): Promise<Proveedor | null> {
   const { data, error } = await supabase

@@ -1,9 +1,10 @@
 "use client";
 import { useState } from "react";
-import { Button } from "@vim/ui/styles";
+import { Button, Icono } from "@vim/ui/styles";
 import { deviceSignIn } from "../lib/supabase";
 import { guardarIdent, leerIdent, CREDS_DEV_FIXTURE } from "../lib/device-creds";
-import { darDeAltaDesdeNube, esEscritorio } from "../lib/alta-nube";
+import { darDeAltaDesdeNube } from "../lib/alta-nube";
+import { esEscritorio } from "../lib/actualizacion";
 import { BrandMark } from "./topbar-pos";
 
 /**
@@ -89,7 +90,7 @@ export function VincularDispositivo({
 
       {motivo === "sesion-invalida" && (
         <div className="flex w-full max-w-sm items-start gap-2.5 rounded border border-warning-line bg-warning-soft px-3 py-2.5 text-13 text-ink-2" role="status">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mt-px h-4 w-4 flex-shrink-0 text-warning"><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
+          <Icono nombre="info" className="mt-px h-4 w-4 flex-shrink-0 text-warning" />
           <span>
             ¿No tienes la clave? Se genera de nuevo desde el panel: <b>Configuración → Cajas → Generar credenciales</b>.
           </span>

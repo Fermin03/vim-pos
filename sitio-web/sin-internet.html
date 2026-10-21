@@ -37,7 +37,7 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="/assets/css/vim.css?v=22">
+<link rel="stylesheet" href="/assets/css/vim.css?v=24">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
@@ -63,9 +63,77 @@
         <span>VIM POS</span>
       </a>
       <nav class="nav-enlaces" aria-label="Principal">
-        <a class="nav-enlace" href="/funciones">Funciones</a>
+        <div class="nav-grupo" data-nav-grupo data-abierto="false">
+          <button class="nav-enlace" type="button" aria-expanded="false" aria-controls="panel-producto">
+            Producto
+            <svg class="nav-flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="nav-panel" id="panel-producto">
+            <div class="contenedor nav-panel-rejilla">
+              <div>
+                <p class="nav-panel-titulo">Lo de todos los días</p>
+                <ul class="nav-panel-lista">
+                  <li><a href="/funciones#caja"><b>Caja y cobro</b><span>Vender, cobrar y dar cambio</span></a></li>
+                  <li><a href="/funciones#cocina"><b>Cocina</b><span>Comandas impresas o en pantalla</span></a></li>
+                  <li><a href="/funciones#mesas"><b>Mesas</b><span>Mapa, cuentas abiertas y propinas</span></a></li>
+                  <li><a href="/funciones#domicilio"><b>A domicilio</b><span>Repartidor, zona de envío y Uber Eats</span></a></li>
+                </ul>
+              </div>
+              <div>
+                <p class="nav-panel-titulo">Lo del dueño</p>
+                <ul class="nav-panel-lista">
+                  <li><a href="/funciones#inventario"><b>Inventario</b><span>Cuánto insumo se fue de verdad</span></a></li>
+                  <li><a href="/funciones#reportes"><b>Corte y reportes</b><span>El corte que ya conoces y quince reportes</span></a></li>
+                  <li><a href="/funciones#lealtad"><b>Lealtad</b><span>Puntos o sellos para que vuelvan</span></a></li>
+                  <li><a href="/funciones#migracion"><b>Cambiar de sistema</b><span>Tu menú se pega y ya</span></a></li>
+                </ul>
+              </div>
+              <div class="nav-panel-destacado">
+                <p class="nav-panel-titulo">Por qué es distinto</p>
+                <ul class="nav-panel-lista">
+                  <li><a href="/sin-internet"><b>Sin internet</b><span>Se cae la señal y sigues cobrando</span></a></li>
+                  <li><a href="/funciones"><b>Todas las funciones</b><span>Sección por sección, con capturas</span></a></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
         <a class="nav-enlace" href="/facturacion-cfdi">Facturación</a>
         <a class="nav-enlace" href="/precios">Precios</a>
+        <div class="nav-grupo" data-nav-grupo data-abierto="false">
+          <button class="nav-enlace" type="button" aria-expanded="false" aria-controls="panel-recursos">
+            Recursos
+            <svg class="nav-flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="nav-panel" id="panel-recursos">
+            <div class="contenedor nav-panel-rejilla">
+              <div>
+                <p class="nav-panel-titulo">Guías</p>
+                <ul class="nav-panel-lista">
+                  <li><a href="/como-elegir-sistema-restaurante"><b>Cómo elegir sistema</b><span>Nueve preguntas antes de firmar</span></a></li>
+                  <li><a href="/cuanto-cuesta-un-sistema-para-restaurante"><b>Cuánto cuesta</b><span>Las tres formas de cobrarte, con cuentas</span></a></li>
+                  <li><a href="/factura-global-restaurantes"><b>Factura global</b><span>Qué es y cómo se emite</span></a></li>
+                </ul>
+              </div>
+              <div>
+                <p class="nav-panel-titulo">Por giro y ciudad</p>
+                <ul class="nav-panel-lista">
+                  <li><a href="/punto-de-venta-hamburgueserias"><b>Hamburgueserías</b><span>Término, extras, combo y para llevar</span></a></li>
+                  <li><a href="/punto-de-venta-restaurantes-leon"><b>Restaurantes en León</b><span>La demo es en tu mostrador</span></a></li>
+                  <li><a href="/#giros"><b>Los seis giros</b><span>Del food truck a la cadena</span></a></li>
+                </ul>
+              </div>
+              <div>
+                <p class="nav-panel-titulo">VIM POS</p>
+                <ul class="nav-panel-lista">
+                  <li><a href="/novedades"><b>Novedades</b><span>Qué cambió y cuándo</span></a></li>
+                  <li><a href="/nosotros"><b>Nosotros</b><span>Quién está detrás</span></a></li>
+                  <li><a href="/contacto"><b>Contacto</b><span>Contesta una persona</span></a></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
       </nav>
       <div class="nav-acciones">
         <a class="btn btn-fantasma nav-prueba" href="https://admin.vimpos.com.mx/registro">Pruébalo 30 días gratis</a>
@@ -91,9 +159,31 @@
     </button>
     <nav aria-label="Menú">
       <div class="nav-movil-lista">
-          <a href="/funciones">Funciones</a>
+          <details>
+            <summary>Producto</summary>
+            <a href="/funciones">Todas las funciones</a>
+            <a href="/funciones#caja">Caja y cobro</a>
+            <a href="/funciones#cocina">Cocina</a>
+            <a href="/funciones#mesas">Mesas</a>
+            <a href="/funciones#domicilio">A domicilio</a>
+            <a href="/funciones#inventario">Inventario</a>
+            <a href="/funciones#reportes">Corte y reportes</a>
+            <a href="/funciones#lealtad">Lealtad</a>
+            <a href="/sin-internet">Sin internet</a>
+          </details>
           <a href="/facturacion-cfdi">Facturación</a>
           <a href="/precios">Precios</a>
+          <details>
+            <summary>Recursos</summary>
+            <a href="/como-elegir-sistema-restaurante">Cómo elegir sistema</a>
+            <a href="/cuanto-cuesta-un-sistema-para-restaurante">Cuánto cuesta</a>
+            <a href="/factura-global-restaurantes">Factura global</a>
+            <a href="/punto-de-venta-hamburgueserias">Hamburgueserías</a>
+            <a href="/punto-de-venta-restaurantes-leon">Restaurantes en León</a>
+            <a href="/novedades">Novedades</a>
+            <a href="/nosotros">Nosotros</a>
+            <a href="/contacto">Contacto</a>
+          </details>
           <a href="/demo">Pide una demo</a>
           <a href="https://admin.vimpos.com.mx/registro">Pruébalo 30 días gratis</a>
       </div>
@@ -111,7 +201,7 @@
       <p class="eyebrow">El diferenciador</p>
       <h1>Se cae el internet y tú sigues cobrando</h1>
       <p class="entradilla">
-        El sistema vive en tu caja, no en internet. Aquí está qué pasa cuando se va la señal y cuando vuelve.
+        El sistema vive en tu caja, no en internet.
       </p>
       <div class="fila">
         <a class="btn btn-primario btn-hero" href="/demo">Pide una demo</a>
@@ -132,10 +222,7 @@
         <p class="eyebrow">La comparación honesta</p>
         <h2>Contra el que vive en internet y contra el de siempre</h2>
         <p>
-          Hay dos formas de vender punto de venta en México, y las dos tienen un problema. Los
-          sistemas que viven en internet se detienen cuando se cae la señal. Los sistemas de
-          siempre no se detienen, pero te obligan a ir al local para ver cómo va el día y el
-          respaldo es el que tú te acuerdes de hacer.
+          Con VIM POS sigues vendiendo sin internet y ves cómo va el día desde tu celular.
         </p>
       </div>
 
@@ -195,9 +282,7 @@
       </div>
 
       <p style="font-size:var(--t-13);color:var(--ink-2)">
-        La columna de en medio existe porque es honesta: hay sistemas instalados que tampoco se
-        detienen sin internet. Ahí no ganamos por seguir vendiendo — ganamos por el resto de la
-        tabla.
+        Hay sistemas instalados que tampoco se detienen sin internet. La diferencia está en el resto de la tabla.
       </p>
     </div>
   </section>
@@ -214,10 +299,7 @@
         <p class="eyebrow">Por qué funciona</p>
         <h2>El sistema no está en internet. Está en tu caja.</h2>
         <p>
-          Un punto de venta en internet es una ventana: lo que ves en pantalla vive en otro lado y
-          cada cobro tiene que viajar hasta allá y volver. Si el camino se corta, la ventana se
-          queda en blanco. Aquí el sistema completo está instalado en la computadora de tu caja,
-          así que el cobro no viaja a ningún lado: se hace ahí mismo.
+          Está instalado en la computadora de tu caja, así que el cobro se hace ahí mismo y no depende del internet.
         </p>
       </div>
 
@@ -229,29 +311,26 @@
             <img src="/assets/img/capturas/pos-sin-conexion.webp?v=3" alt="La caja con el aviso de que no hay conexión, con el ticket y el catálogo funcionando igual."
                  width="1600" height="1000" fetchpriority="high" decoding="async">
           </div>
-          <figcaption>La caja avisa que no hay internet y sigue cobrando. No hay pantalla de error ni «reintentando»: el aviso es informativo y el turno no se detiene.</figcaption>
+          <figcaption>La caja avisa que no hay internet y sigue cobrando.</figcaption>
         </figure>
 
       <div class="tres">
         <div class="tarjeta pila pila-3">
           <h3>No es un modo reducido</h3>
           <p>
-            No hay «versión sin conexión» con la mitad de las cosas apagadas. Es el mismo sistema,
-            con tu menú, tus precios, tus descuentos y tus impuestos, haya señal o no.
+            Es el mismo sistema, con tu menú y tus precios, haya señal o no.
           </p>
         </div>
         <div class="tarjeta pila pila-3">
           <h3>Nada se queda a medias</h3>
           <p>
-            El ticket se cierra, se cobra y se imprime completo en el momento. No queda una venta
-            «pendiente de subir» que puedas perder si se apaga la computadora antes.
+            El ticket se cierra, se cobra y se imprime completo en el momento.
           </p>
         </div>
         <div class="tarjeta pila pila-3">
           <h3>La cocina tampoco se entera</h3>
           <p>
-            Las comandas van de la caja a la impresora y a la <a href="/funciones#cocina">pantalla de cocina</a> por la red de tu
-            local. Nunca salen a internet, ni siquiera cuando lo hay.
+            Las comandas llegan a la impresora y a la <a href="/funciones#cocina">pantalla de cocina</a> por la red de tu local, sin salir a internet.
           </p>
         </div>
       </div>
@@ -268,10 +347,7 @@
         <p class="eyebrow">Cómo se acomoda en tu local</p>
         <h2>Una computadora manda, las demás cuelgan de ella</h2>
         <p>
-          La caja principal hace de centro. La pantalla de cocina, las impresoras de las distintas
-          áreas y la segunda caja se conectan a ella por la red del local (cuántas cajas trae cada plan está en <a href="/precios">precios</a>) — el mismo módem que ya
-          tienes, sin salir a internet. Por eso todo el conjunto sigue trabajando cuando la señal
-          se va: nunca dependía de ella.
+          La pantalla de cocina, las impresoras y la segunda caja se conectan a la caja principal por la red de tu local, con el módem que ya tienes. Cuántas cajas trae cada plan está en <a href="/precios">precios</a>.
         </p>
       </div>
 
@@ -288,9 +364,9 @@
 
   <style>
     .a-t-titulo { font: 600 15px 'Inter Tight', system-ui, sans-serif; fill: var(--ink, #16161A); }
-    .a-t-sub    { font: 400 12.5px 'Inter Tight', system-ui, sans-serif; fill: var(--ink-3, #8E8E94); }
+    .a-t-sub    { font: 400 12.5px 'Inter Tight', system-ui, sans-serif; fill: var(--ink-3, #6E6E74); }
     .a-t-etq    { font: 600 10px 'JetBrains Mono', ui-monospace, monospace;
-                  letter-spacing: .12em; fill: var(--ink-3, #8E8E94); }
+                  letter-spacing: .12em; fill: var(--ink-3, #6E6E74); }
 
     .a-local   { fill: var(--accent-soft, #EAF3FB); stroke: none; }
     .a-tarjeta { fill: var(--bg, #FFFFFF); stroke: var(--line-strong, #DDDDD9); stroke-width: 1; }
@@ -298,7 +374,7 @@
     .a-hilo    { stroke: var(--accent, #0078C9); stroke-width: 1.25; fill: none; opacity: .45; }
 
     .a-fuera   { fill: none; stroke: var(--line-strong, #DDDDD9); stroke-width: 1; }
-    .a-enlace  { stroke: var(--ink-3, #8E8E94); stroke-width: 1.25; stroke-dasharray: 4 4; fill: none; }
+    .a-enlace  { stroke: var(--ink-3, #6E6E74); stroke-width: 1.25; stroke-dasharray: 4 4; fill: none; }
 
     .a-corte { opacity: 0; }
     .a-nube-grupo, .a-enlace, .a-corte { transition: opacity 240ms cubic-bezier(0.23, 1, 0.32, 1); }
@@ -411,36 +487,31 @@
         <p class="eyebrow">Cuando vuelve la señal</p>
         <h2>Sube solo, y sube tal cual quedó</h2>
         <p>
-          Ésta es la parte donde los sistemas con «modo sin conexión» fallan de verdad: al
-          reconectarse vuelven a numerar los tickets, recalculan totales y te dejan dos folios con
-          el mismo número. Aquí lo que sube es exactamente lo que se imprimió.
+          Cuando vuelve la señal, tus ventas suben solas, con el mismo folio y el mismo total que se imprimieron.
         </p>
       </div>
 
       <ol class="pasos">
         <li class="paso">
           <h3>Vuelve la señal</h3>
-          <p>La caja lo nota sola. Nadie tiene que apretar nada ni volver a entrar.</p>
+          <p>La caja lo nota sola. Nadie tiene que apretar nada.</p>
         </li>
         <li class="paso">
           <h3>Sube lo del día</h3>
           <p>
-            Cada pocos minutos manda lo nuevo. Si el internet vuelve a irse a medias, reintenta
-            y espera cada vez un poco más, en lugar de insistir hasta atorarse.
+            Cada pocos minutos manda lo nuevo. Si el internet se va otra vez, reintenta sola.
           </p>
         </li>
         <li class="paso">
           <h3>Los folios no se tocan</h3>
           <p>
-            El número de ticket, los totales y el estado de la venta suben tal cual se generaron.
-            No se vuelven a calcular al llegar.
+            El número de ticket y los totales suben tal cual se generaron.
           </p>
         </li>
         <li class="paso">
           <h3>Si algo choca, se aparta</h3>
           <p>
-            Una venta con un problema no detiene a las demás: se aparta sola y la revisas desde el
-            panel cuando puedas.
+            Una venta con un problema no detiene a las demás: se aparta sola y la revisas en el panel.
           </p>
         </li>
       </ol>
@@ -454,8 +525,7 @@
         <p class="eyebrow">Si algo falla</p>
         <h2>Lo que pasa a las once de la noche, cuando no hay a quién llamar</h2>
         <p>
-          Un sistema que vive en tu local también puede fallar. La diferencia está en si se
-          arregla solo o si tienes que cerrar la caja hasta que llegue alguien.
+          Un sistema que vive en tu local también puede fallar. La caja está hecha para resolverlo sola, sin que tengas que cerrar.
         </p>
       </div>
 
@@ -467,37 +537,32 @@
             <img src="/assets/img/capturas/pos-arqueo.webp?v=3" alt="Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón."
                  width="1600" height="1000" loading="lazy" decoding="async">
           </div>
-          <figcaption>El arqueo al cerrar el turno: lo que dice el sistema, lo que hay en el cajón y la diferencia. Sale igual haya habido internet o no.</figcaption>
+          <figcaption>El arqueo al cerrar el turno sale igual, haya habido internet o no.</figcaption>
         </figure>
 
       <div class="dos">
         <div class="tarjeta pila pila-3">
           <h3>Se revisa a sí mismo</h3>
           <p>
-            La caja comprueba cada pocos segundos que todo responda. Si algo se cayó, lo levanta
-            sola y sigue. Nadie del turno de noche tiene que saber qué pasó.
+            La caja se revisa cada pocos segundos. Si algo se cayó, lo levanta sola y sigue.
           </p>
         </div>
         <div class="tarjeta pila pila-3">
           <h3>Siete copias, siempre</h3>
           <p>
-            Guarda sola una copia completa cada día —cuando la caja está quieta, sin turno abierto— y
-            conserva las siete más recientes en la misma computadora. Tus ventas, además, suben a la
-            nube cuando hay internet: si se muere la computadora, lo vendido y ya subido no se pierde.
+            Guarda sola una copia diaria y conserva las siete más recientes en la misma computadora. Tus ventas, además, suben a la nube cuando hay internet.
           </p>
         </div>
         <div class="tarjeta pila pila-3">
           <h3>No se apaga por accidente</h3>
           <p>
-            Si alguien cierra la ventana en plena hora pico, la caja sigue trabajando: se queda
-            junto al reloj de Windows. Para apagarla de verdad hay que decirlo a propósito.
+            Si alguien cierra la ventana en plena hora pico, la caja sigue trabajando.
           </p>
         </div>
         <div class="tarjeta pila pila-3">
           <h3>Se actualiza sin visita</h3>
           <p>
-            La caja te avisa cuando hay una versión nueva y la instalas con un clic. Se comprueba
-            antes de instalarse, para que lo que entra a tu caja sea lo que mandamos y nada más. No tienes que agendar a un técnico.
+            La caja te avisa cuando hay una versión nueva y la instalas con un clic, sin agendar a un técnico.
           </p>
         </div>
       </div>
@@ -513,13 +578,10 @@
     <div class="contenedor pila pila-5">
       <div class="letra-chica">
         <p>
-          Todo lo de esta página lo hace el programa que se instala en la computadora de tu caja,
-          con Windows. Si abres el punto de venta desde el navegador y se cae el internet, te
-          avisa en pantalla, pero ahí no cobra sin conexión.
+          Todo esto aplica al programa instalado en la computadora de tu caja, con Windows. Desde el navegador no se cobra sin internet.
         </p>
         <p>
-          El panel para ver el negocio desde fuera sí necesita internet, porque está fuera. Que no
-          lo tengas no detiene la caja: solo no ves el reporte hasta que vuelva.
+          El panel para ver tu negocio desde fuera sí necesita internet. La caja no.
         </p>
       </div>
     </div>
@@ -531,8 +593,7 @@
       <div class="cierre pila pila-5" style="align-items:center">
         <h2>Pruébalo cortándole el internet</h2>
         <p style="max-width:52ch">
-          Es la demo que pedimos que nos hagas: desconecta el cable delante de nosotros y sigue
-          cobrando. Si no pasa, no compres.
+          En la demo, desconecta el cable delante de nosotros y sigue cobrando. Si no pasa, no compres.
         </p>
         <div class="fila" style="justify-content:center">
           <a class="btn btn-primario btn-hero" href="/demo">Pide una demo</a>
@@ -596,7 +657,7 @@
   </div>
 </footer>
 
-<script src="/assets/js/vim.js?v=15" defer></script>
+<script src="/assets/js/vim.js?v=17" defer></script>
 <!-- Medición sin cookies (Vercel Web Analytics). Se sirve desde este dominio y
      solo existe si está encendida en el proyecto de Vercel; si no, es un 404
      inofensivo. Los eventos se mandan desde vim.js. -->
