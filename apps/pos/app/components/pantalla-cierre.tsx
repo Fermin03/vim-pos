@@ -413,7 +413,7 @@ export function PantallaCierre({
                     corte. La diferencia sale en el resultado, cuando ya no se puede acomodar. */}
                 {filas.map((f) => {
                   return (
-                    <tr key={f.metodo} className="border-b border-line">
+                    <tr key={f.metodo} data-tour={f.metodo === "EFECTIVO" ? "conteo-efectivo" : undefined} className="border-b border-line">
                       <td className="py-4">
                         <div className="text-15 font-semibold">{label(f.metodo)}</div>
                         {f.metodo === "EFECTIVO"
@@ -533,7 +533,7 @@ export function PantallaCierre({
 
       {resumen && paso === "resultado" && corte && (
         <div className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto p-6">
-          <div className="w-full max-w-[560px] rounded-lg border border-line bg-surface p-6">
+          <div data-tour="corte" className="w-full max-w-[560px] rounded-lg border border-line bg-surface p-6">
             <div className="mb-4 text-center">
               <div className={["mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full", corte.diferenciaTotal === 0 ? "bg-success/10 text-success" : "bg-warning/10 text-warning"].join(" ")}>
                 <Icono nombre="palomita" className="h-6 w-6" />

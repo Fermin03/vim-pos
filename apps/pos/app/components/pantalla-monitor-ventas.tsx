@@ -85,7 +85,7 @@ export function PantallaMonitorVentas({
         {x && stats && (
           <div className="mx-auto max-w-4xl">
             {/* Titular: lo que se vendió en el turno */}
-            <div className="mb-5 rounded-xl border border-line bg-ink p-6 text-white">
+            <div data-tour="monitor-pantalla" className="mb-5 rounded-xl border border-line bg-ink p-6 text-white">
               <div className="text-12 font-semibold uppercase tracking-[0.06em] text-white/60">Venta del turno</div>
               <div className="mt-1.5 font-display text-40 font-bold leading-none tabular-nums">{fmtMxn(x.ventaNeta)}</div>
               <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-13 text-white/70">

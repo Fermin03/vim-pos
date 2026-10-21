@@ -211,7 +211,7 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
 
 function ReciboPapel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="relative mx-auto w-[302px] bg-white px-5 pb-[26px] pt-[22px] font-mono text-[#1A1A1A] shadow-[0_4px_24px_rgba(0,0,0,.25)]">
+    <div data-tour="ticket" className="relative mx-auto w-[302px] bg-white px-5 pb-[26px] pt-[22px] font-mono text-[#1A1A1A] shadow-[0_4px_24px_rgba(0,0,0,.25)]">
       <PaperEdge top />
       {children}
       <PaperEdge />

@@ -104,6 +104,7 @@ export function ModalAbrirTurno({
       hideTitle
       className="w-[420px] max-w-full rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
     >
+      <div data-tour="fondo">
       <h2 className="font-display text-xl font-semibold tracking-tight">Abrir turno</h2>
       <label className="mt-1 block text-13 text-ink-3" htmlFor="fondo">
         Efectivo con el que arranca la caja
@@ -194,6 +195,7 @@ export function ModalAbrirTurno({
         <Button onClick={() => void abrir()} disabled={!valido || abriendo}>
           {abriendo ? "Abriendo…" : "Abrir turno"}
         </Button>
+      </div>
       </div>
     </Modal>
   );

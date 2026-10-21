@@ -237,6 +237,7 @@ export function ModalModificadores({
     >
       {/* Panel centrado al 80% de la pantalla en los dos ejes */}
       <aside
+        data-tour="modificadores"
         className="flex h-[80vh] w-[80vw] flex-col overflow-hidden rounded-lg border border-line-strong bg-surface shadow-[0_24px_60px_rgba(22,22,26,.18)]"
         onClick={(e) => e.stopPropagation()}
       >

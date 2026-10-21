@@ -26,6 +26,7 @@ import { PantallaKds } from "@vim/kds-core";
 import { MODO_DEMO } from "./lib/demo";
 import { BienvenidaDemo } from "./components/demo/bienvenida-demo";
 import { AvisoPantalla } from "./components/demo/aviso-pantalla";
+import { Guia } from "./components/demo/guia";
 
 // Etiquetas de la sucursal/caja para vistas previas a la sesión real (selector,
 // lock). En F5.0+ el POS operativo ya las lee de la BD vía PantallaTurno.
@@ -254,6 +255,7 @@ export default function Page() {
     <>
       <PaginaPos />
       {MODO_DEMO && <AvisoPantalla />}
+      {MODO_DEMO && <Guia />}
     </>
   );
 }

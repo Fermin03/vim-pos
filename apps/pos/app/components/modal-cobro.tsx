@@ -1284,6 +1284,7 @@ export function ModalCobro({
       aria-modal="true"
     >
       <div
+        data-tour="cobro"
         className={[
           "bg-surface rounded-lg shadow-xl overflow-hidden flex flex-col",
           vista === "efectivo"

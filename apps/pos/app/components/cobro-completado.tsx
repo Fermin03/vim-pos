@@ -75,7 +75,7 @@ export function CobroCompletado({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" role="dialog" aria-modal="true" aria-labelledby="cobro-completado-titulo">
-      <section className="flex w-full max-w-[560px] flex-col items-center gap-1.5 rounded-lg bg-surface px-8 pb-6 pt-8 text-center shadow-xl">
+      <section data-tour="cobro-completado" className="flex w-full max-w-[560px] flex-col items-center gap-1.5 rounded-lg bg-surface px-8 pb-6 pt-8 text-center shadow-xl">
         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-success-soft text-success">
           <Icono nombre="palomita" className="h-7 w-7" />
         </div>

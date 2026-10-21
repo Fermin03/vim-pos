@@ -288,7 +288,7 @@ export function SidebarTicket({
         ) : (
           <ul>
             {estado.lineas.map((l: LineaCarrito) => (
-              <li key={l.clientId} className="border-b border-line py-2.5">
+              <li key={l.clientId} data-tour="ticket-item" className="border-b border-line py-2.5">
                 {/* Tocar el renglón lo reabre en su modal de modificadores o de combo. Quien llama
                     decide si hay algo que editar: un producto sin modificadores no abre nada. */}
                 <div
@@ -549,6 +549,7 @@ export function SidebarTicket({
           type="button"
           disabled={vacio || procesando || !onCobrar}
           onClick={() => onCobrar?.()}
+          data-tour="cobrar"
           className={BOTON_PRINCIPAL}
         >
           {procesando ? (

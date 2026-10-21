@@ -76,6 +76,7 @@ export function ModalPin({
         </div>
       </div>
 
+      <div data-tour="pin">
       <p className="mb-4 text-center text-13 text-ink-2">
         {okMsg ?? "Ingresa tu PIN de 4 dígitos"}
       </p>
@@ -89,6 +90,7 @@ export function ModalPin({
         clearSignal={clearSignal}
         className="w-full"
       />
+      </div>
     </Modal>
   );
 }

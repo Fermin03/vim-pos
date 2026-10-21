@@ -210,7 +210,7 @@ export function PantallaInicio({
             icon={<Icono nombre="vaso" />} />
         )}
         {ver.paraLlevar && (
-          <Acceso label="Para llevar" onClick={onParaLlevar} requiereTurno={sinTurno} destacado
+          <Acceso label="Para llevar" tour="para-llevar" onClick={onParaLlevar} requiereTurno={sinTurno} destacado
             icon={<Icono nombre="para-llevar" />} />
         )}
         {ver.pickup && (
@@ -232,16 +232,16 @@ export function PantallaInicio({
           icon={<Icono nombre="billete" />} />
         <Acceso label="Consultar ctas." badge={nEnEspera} onClick={onConsultarCuentas} requiereTurno={sinTurno}
           icon={<Icono nombre="recibo" />} />
-        <Acceso label="Monitor ventas" onClick={onMonitorVentas} requiereTurno={sinTurno}
+        <Acceso label="Monitor ventas" tour="monitor" onClick={onMonitorVentas} requiereTurno={sinTurno}
           icon={<Icono nombre="grafica" />} />
 
         <span className="w-px flex-shrink-0 bg-line-strong" aria-hidden="true" />
 
         {sinTurno ? (
-          <Acceso label="Abrir turno" onClick={onAbrirTurno} resaltado
+          <Acceso label="Abrir turno" tour="abrir-turno" onClick={onAbrirTurno} resaltado
             icon={<Icono nombre="candado" />} />
         ) : (
-          <Acceso label="Cerrar turno" onClick={onCerrarTurno} peligro
+          <Acceso label="Cerrar turno" tour="cerrar-turno" onClick={onCerrarTurno} peligro
             icon={<Icono nombre="casilla" />} />
         )}
 
@@ -416,9 +416,11 @@ export function PantallaInicio({
  * sin importar el tamaño, y el contenido escala con la altura disponible.
  */
 function Acceso({
-  label, icon, onClick, badge, requiereTurno, destacado, peligro, resaltado,
+  label, icon, onClick, badge, requiereTurno, destacado, peligro, resaltado, tour,
 }: {
   label: string;
+  /** Ancla de la guía de la demo (`data-tour`). */
+  tour?: string;
   icon: ReactNode;
   onClick: () => void;
   badge?: number;
@@ -439,6 +441,7 @@ function Acceso({
     <button
       type="button"
       onClick={onClick}
+      data-tour={tour}
       title={requiereTurno ? `${label} · abre el turno primero` : label}
       className={[
         "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-[clamp(0.4rem,1.4vh,0.7rem)] transition",

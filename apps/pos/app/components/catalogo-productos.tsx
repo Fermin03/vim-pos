@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { IconoCategoria } from "@vim/ui/styles";
 import { colorCategoria, type Categoria, type Producto } from "../lib/catalogo";
 import { menuVisible } from "../lib/catalogo-sucursal";
+import { slugTour } from "../lib/demo-guia";
 import { usePreciosVisibles } from "../lib/precios-visibles";
 import {
   calcularBarraCategorias,
@@ -172,6 +173,7 @@ export function CatalogoProductos({
               key={c.id}
               type="button"
               onClick={() => setElegida(c.id)}
+              data-tour={`categoria-${slugTour(c.nombre)}`}
               aria-current={active ? "true" : undefined}
               style={{ height: ALTO_PASTILLA, fontSize: pxEtiqueta }}
               // Borde line-strong y tinta plena en reposo: con `line` y ink-2 las pastillas
@@ -248,6 +250,7 @@ export function CatalogoProductos({
                   type="button"
                   disabled={p.agotado || bloqueado}
                   onClick={() => onTapProducto(p)}
+                  data-tour={`producto-${slugTour(p.nombre)}`}
                   style={{ fontSize: pxNombre }}
                   // Solo transform y borde: es el botón que más se toca del turno, así que el
                   // apachurrón es la única animación y dura lo que un toque.
