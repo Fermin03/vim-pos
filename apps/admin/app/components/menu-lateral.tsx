@@ -80,7 +80,8 @@ export function MenuLateral({ menu, pathname, marcaPlan, alNavegar }: {
         ref={navRef}
         aria-label="Menú del panel"
         onClick={(e) => { if ((e.target as Element).closest("a")) navegado(); }}
-        className="flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-3 pb-4 pt-2"
+        // Hace scroll, pero sin barra visible (decisión de Fermín, 21 oct).
+        className="scroll-x-limpio flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-3 pb-4 pt-2"
       >
         {texto.trim() ? (
           resultados.length === 0 ? (
