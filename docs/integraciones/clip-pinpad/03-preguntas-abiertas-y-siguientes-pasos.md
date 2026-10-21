@@ -90,6 +90,8 @@ Rama `feat/terminal-clip` (ADR 0050). Nada de esto se ha visto con un lector.
 - Regenerar tipos con `pnpm db:types` (hoy están editados a mano).
 - Ver el admin y la caja en vivo, con capturas (MP con terminal virtual; Clip con lector apagado).
 - Aplicar la migración 0260 con `--include-all` (las ramas locales traen 0188–0250).
+- Desplegar `terminal-clip-conexion` junto con el admin (o el admin primero): ahora exige `propina_en_terminal`.
+- Volver a asignar una sucursal a Clip apaga la propina en el lector: el dueño la vuelve a encender.
 
 ## F. Respuestas de Clip (21 oct 2026)
 
