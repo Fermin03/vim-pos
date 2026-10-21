@@ -98,7 +98,7 @@ import { fijarContextoErrores, reportarErrorSinEsperar } from "../lib/reportar-e
 import { BotonVolver } from "./boton-volver";
 import { CatalogoProductos } from "./catalogo-productos";
 import { PanelVentaRetail, type AvisoEscaneo } from "./venta-retail";
-import { comoTienda, conBarraAbajo, destinosDe, esComidaRapida, globoPedidos, seccionDePedidos, seccionTrasLista, preguntaServicio, faltaPreguntarServicio, esBelleza, seccionInicial, puedeRecibirMercancia, leerExistencias, leerSucursales, pasoConLimite, puedeCambiarSeccion, renglonTienda, sinExistencia, type Existencia, type PadreTienda, type SeccionTienda } from "../lib/tienda";
+import { comoTienda, esRopa, conBarraAbajo, destinosDe, esComidaRapida, globoPedidos, seccionDePedidos, seccionTrasLista, preguntaServicio, faltaPreguntarServicio, esBelleza, seccionInicial, puedeRecibirMercancia, leerExistencias, leerSucursales, pasoConLimite, puedeCambiarSeccion, renglonTienda, sinExistencia, type Existencia, type PadreTienda, type SeccionTienda } from "../lib/tienda";
 import { leerEstadoSync } from "../lib/estado-sync";
 import { ModalAgregarProductos } from "./modal-agregar-productos";
 import { ModalNumeroMesa } from "./modal-numero-mesa";
@@ -3615,7 +3615,10 @@ export function HomePos({
             sinExistencia: (l) => sinExistencia(l.producto, carrito.lineas.filter((x) => x.producto.id === l.producto.id).reduce((s, x) => s + x.cantidad, 0), existencias, caja.sucursal_id),
             ultimoProductoId: ultimoTienda,
             // Belleza no hace cambios de talla y su ticket vacío invita a elegir una cita.
-            ...(esBelleza(caja) ? { textoVacio: "Elige una cita, un servicio o escanea un producto" } : { onCambioTalla: () => abrirCambioTalla() }),
+            ...(esBelleza(caja) ? { textoVacio: "Elige una cita, un servicio o escanea un producto" }
+              : esRopa(caja) ? { onCambioTalla: () => abrirCambioTalla() }
+                // Abarrotes, frutería, ferretería y vinos: sin cambio de talla ni «prenda».
+                : { textoVacio: "Escanea un producto para empezar" }),
             simple: true,
             onAsignarCliente: admiteClienteCuenta(carrito.modoServicio) ? () => setClienteCuentaAbierto(true) : undefined,
             // Una cita sin clienta registrada trae su nombre en la cuenta.
@@ -3794,7 +3797,7 @@ export function HomePos({
               onAbrirCuenta={(id) => abrirDesdeTransacciones(id)}
               onRetomar={(id, etiqueta) => abrirDesdeTransacciones(id, etiqueta)}
               onDevolver={(id) => { setVentaElegida(id); setEnDevoluciones(true); }}
-              onCambio={tienda ? (id) => abrirCambioTalla(id) : undefined}
+              onCambio={esRopa(caja) ? (id) => abrirCambioTalla(id) : undefined}
               onReimprimir={(id) => reimprimirCuenta(id, { origen: "CONSULTA" })}
               onReabrir={setReabriendoTx}
               onCambiarPago={setCambiandoPagoTx}

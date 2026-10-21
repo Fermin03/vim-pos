@@ -198,7 +198,7 @@ export function PantallaDevoluciones({
           </Button>
         </form>
       )}
-      {tienda && <p className="mx-auto mt-1.5 w-full max-w-[680px] px-6 text-12 text-ink-3">O escanea la etiqueta de la prenda para ver las ventas de los últimos 30 días que la llevan.</p>}
+      {tienda && <p className="mx-auto mt-1.5 w-full max-w-[680px] px-6 text-12 text-ink-3">O escanea un código para ver las ventas de los últimos 30 días que lo llevan.</p>}
 
       {error && <div className="mx-6 mt-3 rounded border border-danger-line bg-danger-soft px-3 py-2 text-13 font-medium text-danger" role="alert">{error}</div>}
 
@@ -217,7 +217,7 @@ export function PantallaDevoluciones({
                   {/* La caja instalada solo tiene sus propias ventas; el POS web, las del negocio. */}
                   {esEscritorio()
                     ? "Aquí salen las ventas cobradas en esta caja. Si se cobró en otra caja o sucursal, devuélvela desde la caja que la cobró o desde el POS web."
-                    : "Revisa el folio impreso en el ticket, o escanea otra prenda."}
+                    : "Revisa el folio impreso en el ticket, o escanea otro código."}
                 </p>
               </div>
             ) : (

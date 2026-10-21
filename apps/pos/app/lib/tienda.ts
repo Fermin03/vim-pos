@@ -9,6 +9,9 @@ import type { DatosCaja } from "./turno";
 /** La caja de tienda es para los giros de tienda; todo lo demás queda como estaba. */
 export const esTienda = (caja: DatosCaja | null): boolean => esGiroTienda(caja?.giro);
 
+/** Ropa y calzado: el único giro con «Cambio de talla» y textos de prenda. */
+export const esRopa = (caja: DatosCaja | null): boolean => caja?.giro === "RETAIL";
+
 /** La caja de belleza (agenda, 0218) es la de tienda con su propia barra y el calendario. */
 export const esBelleza = (caja: DatosCaja | null): boolean => esGiroBelleza(caja?.giro);
 

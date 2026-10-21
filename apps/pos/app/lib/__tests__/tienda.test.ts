@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { Producto } from "../catalogo";
 import type { DatosCaja } from "../turno";
-import { agruparTienda, buscarPorCodigo, decidirEscaneo, destinoInventario, buscarVitrina, puedeRecibirMercancia, esTienda, comoTienda, conBarraAbajo, esComidaRapida, estadoExistencia, etiquetaExistencia, matrizVariantes, pasoConLimite, filasCuentas, puedeCambiarSeccion, renglonTienda, renglonVenta, resumenVitrina, sinExistencia, type Existencia } from "../tienda";
+import { agruparTienda, buscarPorCodigo, decidirEscaneo, destinoInventario, buscarVitrina, puedeRecibirMercancia, esTienda, esRopa, comoTienda, conBarraAbajo, esComidaRapida, estadoExistencia, etiquetaExistencia, matrizVariantes, pasoConLimite, filasCuentas, puedeCambiarSeccion, renglonTienda, renglonVenta, resumenVitrina, sinExistencia, type Existencia } from "../tienda";
 
 const prod = (id: string, extra: Partial<Producto> = {}): Producto => ({
   id, nombre: id, descripcion: null, precio_base_mxn: 100, categoria_id: "c", agotado: false, esCombo: false, seVendeAqui: true, ...extra,
@@ -12,6 +12,14 @@ const h = (id: string, talla: string, color: string, precio = 100, extra: Partia
 const hijas = [h("h1", "M", "Negro"), h("h2", "L", "Negro"), h("h3", "M", "Rojo")];
 const suelto = prod("S");
 const ex = (producto_id: string, cantidad: number, minimo: number | null = null): Existencia => ({ producto_id, sucursal_id: "s1", cantidad, minimo });
+
+describe("esRopa", () => {
+  it("solo ropa y calzado lleva «Cambio de talla»; las demás tiendas y la belleza no", () => {
+    expect(esRopa({ giro: "RETAIL" } as DatosCaja)).toBe(true);
+    for (const giro of ["ABARROTES", "FRUTERIA", "FERRETERIA", "VINOS", "SALON", "CAFETERIA"]) expect(esRopa({ giro } as DatosCaja)).toBe(false);
+    expect(esRopa(null)).toBe(false);
+  });
+});
 
 describe("esTienda", () => {
   it("los cinco giros de tienda, y un restaurante no", () => {
