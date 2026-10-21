@@ -77,6 +77,7 @@ export function SidebarTicket({
   onEditar,
   tienda,
   clienteCuenta,
+  mostrador = false,
 }: {
   estado: EstadoCarrito;
   onCantidad: (clientId: string, cantidad: number) => void;
@@ -148,6 +149,9 @@ export function SidebarTicket({
   procesando: boolean;
   /** Comida rápida: «Asignar cliente» en un menú «⋯» que reemplaza a «Limpiar» (que pasa adentro). */
   clienteCuenta?: { nombre: string | null; onAsignar: () => void };
+  /** Comida rápida (Fermín, 20 oct): sin «Para llevar» arriba —el modo se pregunta al cobrar— y,
+   *  donde se cobra aquí, sin Subtotal, Total ni «Efectivo exacto»: el total va en «Cobrar». */
+  mostrador?: boolean;
   /** Giro RETAIL: variante y SKU en el renglón, «Sin existencia» y el último agregado marcado. */
   tienda?: {
     /** Nombre del padre y «M · Negra · SKU» de la línea. */
@@ -197,6 +201,9 @@ export function SidebarTicket({
    * pregunta cuánto cuesta algo en cualquiera de los cuatro modos.
    */
   const seCobraDespues = onEnviarCocinaAbierto != null;
+  // Pick-up y Domicilio no tienen «Cobrar $…»: ahí el Total se queda.
+  const sinTotales = mostrador && !seCobraDespues;
+  const sinEtiquetaModo = mostrador && estado.modoServicio === "PARA_LLEVAR";
   // No depende de `bloqueado`: en cuenta de mesa los renglones que no han salido a cocina sí se
   // editan (0119). Quien pasa `onEditar` decide qué renglón se abre y avisa del que no.
   const editable = onEditar != null && !procesando;
@@ -324,7 +331,7 @@ export function SidebarTicket({
               desmarcar, y no es un botón. */}
           <div className="flex items-center justify-between gap-2">
             {/* Tienda: en lugar de la etiqueta del modo, el cliente asignado (si hay). */}
-            {simple ? <span className="min-w-0 truncate text-13 font-semibold text-ink-2">{tienda?.cliente ?? ""}</span> : (
+            {simple ? <span className="min-w-0 truncate text-13 font-semibold text-ink-2">{tienda?.cliente ?? ""}</span> : sinEtiquetaModo ? null : (
               <span className="inline-flex h-8 min-w-0 items-center rounded-md bg-hover px-2.5 text-14 font-semibold text-ink-2">
                 <span className="truncate">{modoTexto ?? etiquetaModo(estado.modoServicio)}</span>
               </span>
@@ -604,10 +611,12 @@ export function SidebarTicket({
             <span className="tabular-nums font-medium text-ink">{fmtMxn(estado.envio.costoMxn)}</span>
           </button>
         )}
-        <div className="mb-1 flex justify-between text-13 text-ink-2">
-          <span>Subtotal</span>
-          <span className="tabular-nums font-medium text-ink">{fmtMxn(totales.subtotal)}</span>
-        </div>
+        {!sinTotales && (
+          <div className="mb-1 flex justify-between text-13 text-ink-2">
+            <span>Subtotal</span>
+            <span className="tabular-nums font-medium text-ink">{fmtMxn(totales.subtotal)}</span>
+          </div>
+        )}
         <div className="mb-1 flex justify-between text-13 text-ink-2">
           <span>IVA (16%)</span>
           <span className="tabular-nums font-medium text-ink">{fmtMxn(totales.iva)}</span>
@@ -630,14 +639,16 @@ export function SidebarTicket({
             <span className="tabular-nums">−{fmtMxn(descuentoMxn)}</span>
           </div>
         )}
-        <div className="mt-1.5 flex items-baseline justify-between gap-2">
-          <span className="text-15 font-bold uppercase tracking-[0.04em] text-ink">
-            Total
-          </span>
-          <span className="font-display text-28 font-bold leading-none tabular-nums tracking-[-0.02em] text-ink">
-            {fmtMxn(totalFinal)}
-          </span>
-        </div>
+        {!sinTotales && (
+          <div className="mt-1.5 flex items-baseline justify-between gap-2">
+            <span className="text-15 font-bold uppercase tracking-[0.04em] text-ink">
+              Total
+            </span>
+            <span className="font-display text-28 font-bold leading-none tabular-nums tracking-[-0.02em] text-ink">
+              {fmtMxn(totalFinal)}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* ── Acciones secundarias ──────────────────────────────── */}
@@ -728,7 +739,7 @@ export function SidebarTicket({
         {/* Efectivo exacto: un toque en vez de cinco (Cobrar → Efectivo → Pago exacto → Cobrar).
             Es el cobro más común de mostrador. Borde de tinta: es la segunda acción del pie, no
             una más de las grises. En la tienda no va: Fermín prefirió el espacio para los renglones. */}
-        {!simple && <button
+        {!simple && !sinTotales && <button
           type="button"
           disabled={vacio || procesando || !onEfectivoExacto}
           onClick={() => onEfectivoExacto?.()}

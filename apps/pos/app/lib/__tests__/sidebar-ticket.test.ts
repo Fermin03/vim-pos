@@ -39,6 +39,15 @@ describe("SidebarTicket", () => {
     expect(restaurante).not.toContain('aria-label="Más opciones"');
   });
 
+  it("comida rápida: sin «Para llevar», Subtotal, Total ni Efectivo exacto; IVA y Cobrar se quedan", () => {
+    const html = pintar({ mostrador: true, modoTexto: "Para llevar" });
+    for (const t of [">Para llevar<", ">Subtotal<", ">Total<", "Efectivo exacto"]) expect(html).not.toContain(t);
+    for (const t of ["IVA (16%)", "Cobrar"]) expect(html).toContain(t);
+    expect(pintar({ mostrador: true, modoTexto: "Comer aquí", estado: { ...base.estado, modoServicio: "COMER_AQUI" } })).toContain(">Comer aquí<");
+    // Pick-up no tiene «Cobrar $…»: conserva su Total.
+    expect(pintar({ mostrador: true, onEnviarCocinaAbierto: nada, estado: { ...base.estado, modoServicio: "DRIVE_THRU" } })).toContain(">Total<");
+  });
+
   it("con la cuenta guardada, el renglón de la tienda no lleva el botón de descuento", () => {
     const linea = { clientId: "l1", producto: { id: "p1", nombre: "Polo", precio: 100 }, cantidad: 1, modificadores: [], notaCocina: null };
     const estado = { ...base.estado, lineas: [linea] } as unknown as typeof base.estado;

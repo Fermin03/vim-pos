@@ -3587,6 +3587,7 @@ export function HomePos({
         <SidebarTicket
           estado={carrito}
           modoTexto={ticketBd?.ticketId === cuentaBarraId ? "Barra" : capturaTienda ? "Venta" : etiquetaModo(carrito.modoServicio, caja.giro)}
+          mostrador={comidaRapida}
           // Comida rápida no tiene la fila de arriba con «Asignar cliente»: va en el menú «⋯» del ticket (la lealtad lo necesita).
           clienteCuenta={comidaRapida && admiteClienteCuenta(carrito.modoServicio)
             ? { nombre: carrito.clienteCuenta?.nombre ?? null, onAsignar: () => setClienteCuentaAbierto(true) }
