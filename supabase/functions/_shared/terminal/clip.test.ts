@@ -116,8 +116,10 @@ test("crearIntencion con propinas: el lector las ofrece; lo demás igual", async
 });
 
 test("crearIntencion sin respuesta no lanza", async () => {
+  // El timer de AbortSignal.timeout no sostiene el proceso: sin este, en Linux la prueba termina antes de abortar.
   const lento = ((_u: string, init: RequestInit) => new Promise((_, rechaza) => {
-    init.signal?.addEventListener("abort", () => rechaza(new Error("abortado")));
+    const vivo = setTimeout(() => {}, 1000);
+    init.signal?.addEventListener("abort", () => { clearTimeout(vivo); rechaza(new Error("abortado")); });
   })) as unknown as typeof fetch;
   const r = await clienteClip("k", "s", lento, 20).crearIntencion({ cobroId: "c1", monto: "1.00", serie: "S", webhookUrl: "u", imprime: false });
   assert.deepEqual(r, { status: 0, cuerpo: null, codigo: null });
