@@ -25,11 +25,11 @@ servir(async (req, json) => {
 
   const admin = clienteAdmin();
   const ip = ipDeLaPeticion(req);
-  const cupo = await consumirCupos(admin, [
-    { clave: `demo-iniciar:ip:${ip}`, ventanaSeg: HORA, max: MAX_POR_IP },
-    { clave: "demo-iniciar:global", ventanaSeg: HORA, max: MAX_GLOBAL },
-  ], "cerrar");
-  if (!cupo.permitido) return json({ error: "CUPO" }, 429);
+  // Por separado: «ya abriste varias desde aquí» solo cuando es esta IP; el tope global es «demo llena».
+  const porIp = await consumirCupos(admin, [{ clave: `demo-iniciar:ip:${ip}`, ventanaSeg: HORA, max: MAX_POR_IP }], "cerrar");
+  if (!porIp.permitido) return json({ error: "CUPO" }, 429);
+  const global = await consumirCupos(admin, [{ clave: "demo-iniciar:global", ventanaSeg: HORA, max: MAX_GLOBAL }], "cerrar");
+  if (!global.permitido) return json({ error: "DEMO_LLENA" }, 503);
 
   const clave = claveAleatoria();
   const { data, error } = await admin.rpc("demo_clonar", { p_caja_id: crypto.randomUUID(), p_clave: clave, p_ip: ip });

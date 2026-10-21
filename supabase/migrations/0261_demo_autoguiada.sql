@@ -3,7 +3,7 @@
 -- Cada visitante de la demo pública recibe su propio Crazy Burgers: un tenant nuevo, clonado aquí,
 -- en un proyecto de Supabase APARTE (solo para la demo). La Edge Function `demo-iniciar` llama a
 -- `demo_clonar` con service_role; la caja llama a `demo_registrar_paso` con su sesión; pg_cron
--- llama cada noche a `demo_limpiar`.
+-- llama cada hora a `demo_limpiar`.
 --
 -- En producción y en las cajas de escritorio esto queda inerte: la tabla vacía, `demo_clonar` y
 -- `demo_limpiar` solo para service_role, y nadie las llama. El job de limpieza se programa también
@@ -248,7 +248,7 @@ BEGIN
     SELECT s.tenant_id FROM demo_sesiones s
      WHERE s.creado_en < now() - interval '24 hours'
      ORDER BY s.creado_en
-     LIMIT 100   -- ponytail: tope por corrida; con más de 100 diarias, correr el job más seguido
+     LIMIT 100   -- tope por corrida; corre cada hora: hasta 2,400 al día, más que el límite de 60/h
   LOOP
     BEGIN
       UPDATE tenants
@@ -277,6 +277,6 @@ BEGIN
     IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'demo-limpiar') THEN
       PERFORM cron.unschedule('demo-limpiar');
     END IF;
-    PERFORM cron.schedule('demo-limpiar', '40 4 * * *', 'SELECT public.demo_limpiar()');
+    PERFORM cron.schedule('demo-limpiar', '40 * * * *', 'SELECT public.demo_limpiar()');
   END IF;
 END $$;

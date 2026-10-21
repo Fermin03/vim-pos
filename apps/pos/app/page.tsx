@@ -47,6 +47,13 @@ type Estado =
  *  entra directo a Cocina con la sesión de DISPOSITIVO, sin PIN de empleado). */
 const MODO_KDS = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("kds");
 
+/** Demo: borra lo que quedó del negocio de ejemplo anterior (menú, logo y avance de la guía). */
+async function olvidarDemo() {
+  await cacheLimpiar();
+  olvidarNegocio();
+  try { window.localStorage.removeItem(LLAVE_GUIA); } catch { /* sin almacenamiento no hay guía vieja */ }
+}
+
 function PaginaPos() {
   const [estado, setEstado] = useState<Estado>({ paso: "boot" });
   const [cajaId, setCajaId] = useState<string | null>(null);
@@ -69,9 +76,7 @@ function PaginaPos() {
         // Sin demo viva (primera visita, o volvió después de las 24 h y la sesión ya no se pudo
         // renovar): a la bienvenida, sin rastro del negocio ni de la guía anteriores.
         await deviceSignOut();
-        await cacheLimpiar();
-        olvidarNegocio();
-        try { window.localStorage.removeItem(LLAVE_GUIA); } catch { /* sin almacenamiento no hay guía vieja */ }
+        await olvidarDemo();
         if (activo) setEstado({ paso: "vincular" });
         return;
       }
@@ -124,6 +129,8 @@ function PaginaPos() {
    */
   const sesionDispositivoInvalida = useCallback(async () => {
     await deviceSignOut();
+    // En la demo es el negocio que se borró con la pestaña abierta: la bienvenida, sin la guía vieja encima.
+    if (MODO_DEMO) await olvidarDemo();
     setCajaId(null);
     setEstado({ paso: "vincular", motivo: "sesion-invalida" });
   }, []);

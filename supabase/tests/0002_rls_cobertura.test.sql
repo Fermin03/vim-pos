@@ -35,7 +35,8 @@ insert into _rls_exentas (tabla) values
   ('tienda_recuperaciones'),    -- Enlaces de recuperación de contraseña, de un solo uso (mig. 0161).
   ('tienda_direcciones'),       -- Direcciones guardadas por el cliente de la tienda (mig. 0161).
   ('tienda_correos'),           -- Cola de correos de estado del pedido; la llenan disparadores y la vacía la función `tienda-correos` (mig. 0176).
-  ('tienda_enlaces');           -- Código de seguimiento cifrado para esos correos, 48 h; solo la Edge Function (mig. 0176).
+  ('tienda_enlaces'),           -- Código de seguimiento cifrado para esos correos, 48 h; solo la Edge Function (mig. 0176).
+  ('demo_sesiones');            -- Demo autoguiada; solo la tocan demo_clonar, demo_registrar_paso y demo_limpiar, definer (mig. 0261, ADR 0044).
 
 -- #2 — CRÍTICA: ninguna tabla con tenant_id tiene RLS deshabilitado.
 select is_empty($$

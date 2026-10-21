@@ -34,6 +34,8 @@ insert into _secdef_solo_service (fn, motivo) values
   ('verificar_autorizacion_pin', 'permite fuerza bruta del PIN de un supervisor'),
   ('sync_pull_snapshot',         'devuelve el snapshot del tenant, incluidos pin_hash y auth.users'),
   ('sync_push_snapshot',         'escribe verbatim la rebanada operativa, sin disparar triggers'),
+  ('demo_clonar',                'crea un negocio de demo completo con su dispositivo (0261)'),
+  ('demo_limpiar',               'borra negocios de demo con eliminar_tenant (0261)'),
   ('registrar_pago_suscripcion', 'marca como pagado a cualquier negocio y le recorre la fecha de cobro (0130)'),
   ('activar_suscripcion',        'crea/expira suscripciones de cualquier negocio (0137, promoción en 0141)'),
   ('cambiar_plan_tenant',        'cambia plan, folios, add-ons y precio de cualquier negocio (0141)'),
