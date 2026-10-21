@@ -50,6 +50,8 @@ export const NOMBRE_ESTACION: Record<IdEstacion, string> = { estacion1: "Estaci�
 /** Puerto RAW por defecto de las impresoras de tickets (JetDirect/RAW). */
 export const PUERTO_RAW = 9100;
 
+import { MODO_DEMO } from "../demo";
+
 const KEY = "vim_impresora";
 
 const CONFIG_POR_DEFECTO: ConfigImpresoras = {
@@ -72,7 +74,7 @@ function normalizar(c: unknown): ConfigImpresora {
 /** Lee la config de las 2 estaciones + asignación. Migra sola la config previa (una sola
  *  impresora, sin "estaciones") a Estación 1 usada por ambos destinos. */
 export function leerConfigImpresoras(): ConfigImpresoras {
-  if (typeof window === "undefined") return CONFIG_POR_DEFECTO;
+  if (MODO_DEMO || typeof window === "undefined") return CONFIG_POR_DEFECTO; // demo: siempre vista previa en pantalla
   try {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) return CONFIG_POR_DEFECTO;

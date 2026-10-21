@@ -190,9 +190,9 @@ export function urlFuncion(nombre: string): string {
   return `${URL}/functions/v1/${nombre}`;
 }
 
-/** Encabezados para llamar una Edge Function como el empleado que tiene la sesión. */
-export function encabezadosFuncion(token: string): Record<string, string> {
-  return { apikey: ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+/** Encabezados para llamar una Edge Function como el empleado que tiene la sesión (sin token: llamada pública). */
+export function encabezadosFuncion(token?: string): Record<string, string> {
+  return { apikey: ANON, ...(token ? { Authorization: `Bearer ${token}` } : {}), "Content-Type": "application/json" };
 }
 
 /** C2 — el propio cajero cambia su PIN (verifica el actual). Errores: PIN_ACTUAL_INCORRECTO, PIN_INVALIDO, PIN_IGUAL. */

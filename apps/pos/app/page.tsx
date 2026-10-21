@@ -23,6 +23,9 @@ import { PantallaBloqueada } from "./components/pantalla-bloqueada";
 import { PantallaCliente } from "./components/pantalla-cliente";
 import { olvidarNegocio } from "./lib/pantalla-cliente/negocio";
 import { PantallaKds } from "@vim/kds-core";
+import { MODO_DEMO } from "./lib/demo";
+import { BienvenidaDemo } from "./components/demo/bienvenida-demo";
+import { AvisoPantalla } from "./components/demo/aviso-pantalla";
 
 // Etiquetas de la sucursal/caja para vistas previas a la sesión real (selector,
 // lock). En F5.0+ el POS operativo ya las lee de la BD vía PantallaTurno.
@@ -154,7 +157,11 @@ function PaginaPos() {
       );
 
     case "vincular":
-      return <VincularDispositivo onVinculado={trasVincular} motivo={estado.motivo} />;
+      return MODO_DEMO ? (
+        <BienvenidaDemo onListo={trasVincular} />
+      ) : (
+        <VincularDispositivo onVinculado={trasVincular} motivo={estado.motivo} />
+      );
 
     case "kds":
       // Pantalla de cocina dedicada (Fase 2). "Salir" vuelve al POS normal (quita ?kds).
@@ -242,5 +249,11 @@ export default function Page() {
     setModo(new URLSearchParams(window.location.search).has("cliente") ? "cliente" : "pos");
   }, []);
   if (modo === null) return <main className="h-screen bg-bg" />;
-  return modo === "cliente" ? <PantallaCliente /> : <PaginaPos />;
+  if (modo === "cliente") return <PantallaCliente />;
+  return (
+    <>
+      <PaginaPos />
+      {MODO_DEMO && <AvisoPantalla />}
+    </>
+  );
 }

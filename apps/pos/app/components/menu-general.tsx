@@ -7,6 +7,7 @@ import { enlaceWhatsapp, mensajeAyudaCaja, textoHorario } from "@vim/db/soporte"
 import { useSoporte } from "../lib/soporte";
 import { moduloActivo } from "@vim/db/operacion";
 import { useAcceso } from "./banda-acceso";
+import { MODO_DEMO } from "../lib/demo";
 
 /**
  * Menú de pantalla completa del POS.
@@ -131,7 +132,7 @@ export function MenuGeneral({
             {onEnEspera && (
               <TileMenu label="Pedidos en espera" badge={nEnEspera} onClick={con(onEnEspera)} icon={<Icono nombre="reloj" className="h-8 w-8" />} />
             )}
-            {onAbrirCajon && (
+            {onAbrirCajon && !MODO_DEMO && (
               <TileMenu label="Abrir cajón" onClick={con(onAbrirCajon)} icon={<Icono nombre="cajon" className="h-8 w-8" />} />
             )}
           </SeccionMenu>
@@ -139,13 +140,17 @@ export function MenuGeneral({
           <SeccionMenu titulo="Cuenta">
             <TileMenu label="Cambiar cajero" onClick={con(onCambiarCajero)} icon={<Icono nombre="personas" className="h-8 w-8" />} />
             <TileMenu label="Bloquear pantalla" onClick={con(onBloquear)} icon={<Icono nombre="candado" className="h-8 w-8" />} />
-            <TileMenu label="Cambiar mi PIN" onClick={con(onCambiarPin)} icon={<Icono nombre="llave" className="h-8 w-8" />} />
+            {!MODO_DEMO && (
+              <TileMenu label="Cambiar mi PIN" onClick={con(onCambiarPin)} icon={<Icono nombre="llave" className="h-8 w-8" />} />
+            )}
             {onMisPropinas && moduloActivo(modulos, "meseros") && (
               <TileMenu label="Mis propinas" onClick={con(onMisPropinas)} icon={<Icono nombre="moneda" className="h-8 w-8" />} />
             )}
           </SeccionMenu>
           <SeccionMenu titulo="Ajustes">
-            <TileMenu label="Configurar impresoras y pantallas" onClick={con(onImpresora)} icon={<Icono nombre="impresora" className="h-8 w-8" />} />
+            {!MODO_DEMO && (
+              <TileMenu label="Configurar impresoras y pantallas" onClick={con(onImpresora)} icon={<Icono nombre="impresora" className="h-8 w-8" />} />
+            )}
             {enEscritorio && (
               <>
             <TileMenu
