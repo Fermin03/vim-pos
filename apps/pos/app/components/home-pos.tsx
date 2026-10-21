@@ -3615,7 +3615,7 @@ export function HomePos({
               onAbrirCuenta={(id) => abrirDesdeTransacciones(id)}
               onRetomar={(id, etiqueta) => abrirDesdeTransacciones(id, etiqueta)}
               onDevolver={(id) => { setVentaElegida(id); setEnDevoluciones(true); }}
-              onCambio={(id) => abrirCambioTalla(id)}
+              onCambio={tienda ? (id) => abrirCambioTalla(id) : undefined}
               onReimprimir={(id) => reimprimirCuenta(id, { origen: "CONSULTA" })}
               onReabrir={setReabriendoTx}
               onCambiarPago={setCambiandoPagoTx}

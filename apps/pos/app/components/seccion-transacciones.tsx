@@ -34,7 +34,8 @@ export function AccionesVenta({ venta, imprimiendo, onReimprimir, onDevolver, on
   imprimiendo: boolean;
   onReimprimir: () => void;
   onDevolver: () => void;
-  onCambio: () => void;
+  /** «Cambio de talla»: solo la venta de tienda (`comoTienda`); sin él no se pinta. */
+  onCambio?: () => void;
   onReabrir: () => void;
   onCambiarPago: () => void;
 }) {
@@ -48,7 +49,7 @@ export function AccionesVenta({ venta, imprimiendo, onReimprimir, onDevolver, on
           {imprimiendo ? "Imprimiendo…" : "Reimprimir"}
         </Button>
         <Button variant="ghost" className="flex-1" onClick={onDevolver}>Devolver</Button>
-        {!venta.facturada && <Button variant="ghost" className="flex-1" onClick={onCambio}>Cambio de talla</Button>}
+        {!venta.facturada && onCambio && <Button variant="ghost" className="flex-1" onClick={onCambio}>Cambio de talla</Button>}
       </div>
       {(reabrible || cambiable) && (
         <div className="flex gap-2">
@@ -95,7 +96,8 @@ export function SeccionTransacciones({
   /** Una cuenta en espera de antes: se retoma como siempre. */
   onRetomar: (ticketId: string, etiqueta: string) => Promise<void>;
   onDevolver: (ticketId: string) => void;
-  onCambio: (ticketId: string) => void;
+  /** Solo la venta de tienda; comida rápida no hace cambios de talla. */
+  onCambio?: (ticketId: string) => void;
   onReimprimir: (ticketId: string) => Promise<void>;
   /** Abren los modales de home-pos (los mismos de Cuentas cobradas). */
   onReabrir: (venta: VentaDevolvible) => void;
@@ -361,7 +363,7 @@ export function SeccionTransacciones({
                   imprimiendo={imprimiendo}
                   onReimprimir={() => void reimprimir(detalle.ticketId)}
                   onDevolver={() => onDevolver(detalle.ticketId)}
-                  onCambio={() => onCambio(detalle.ticketId)}
+                  onCambio={onCambio ? () => onCambio(detalle.ticketId) : undefined}
                   onReabrir={() => onReabrir(detalle)}
                   onCambiarPago={() => onCambiarPago(detalle)}
                 />

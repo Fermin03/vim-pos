@@ -142,7 +142,7 @@ export function ContenidoMenu({
           <TileMenu label="Corte caja X" onClick={con(onCorteX)} icon={<Icono nombre="recibo" className="h-8 w-8" />} />
         )}
         {onConsultarCuentas && (
-          <TileMenu label="Consultar cuentas" onClick={con(onConsultarCuentas)} icon={<Icono nombre="recibo" className="h-8 w-8" />} />
+          <TileMenu label="Consultar cuentas" onClick={con(onConsultarCuentas)} icon={<Icono nombre="buscar" className="h-8 w-8" />} />
         )}
         {onEnEspera && (
           <TileMenu label="Pedidos en espera" badge={nEnEspera} onClick={con(onEnEspera)} icon={<Icono nombre="reloj" className="h-8 w-8" />} />

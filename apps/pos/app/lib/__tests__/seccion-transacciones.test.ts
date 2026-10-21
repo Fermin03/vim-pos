@@ -19,6 +19,15 @@ describe("Acciones del detalle de una venta (Transacciones)", () => {
     for (const t of [">Reimprimir<", ">Devolver<", ">Cambio de talla<", ">Reabrir<", ">Cambiar pago<"]) expect(html).toContain(t);
   });
 
+  it("comida rápida (sin onCambio) no ofrece «Cambio de talla»; la tienda sí", () => {
+    const sinCambio = renderToStaticMarkup(React.createElement(AccionesVenta, {
+      venta, imprimiendo: false, onReimprimir: nada, onDevolver: nada, onReabrir: nada, onCambiarPago: nada,
+    }));
+    expect(sinCambio).not.toContain(">Cambio de talla<");
+    expect(sinCambio).toContain(">Devolver<");
+    expect(pintar(venta)).toContain(">Cambio de talla<");
+  });
+
   it("sin pago que cambiar (dividido, o pagada con la prenda) no se pinta «Cambiar pago»", () => {
     const html = pintar({ ...venta, pagoCambiable: null });
     expect(html).toContain(">Reabrir<");
