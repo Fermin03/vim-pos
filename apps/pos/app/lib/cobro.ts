@@ -269,6 +269,22 @@ export async function cambiarZonaDePedido(
   return leerTotales(token, ticketId);
 }
 
+/**
+ * Comida rápida: fija el tipo de servicio (y el nombre) contestado al cobrar una cuenta YA guardada
+ * (retomada de «en espera», que se guardó con el PARA_LLEVAR por defecto sin preguntar). Solo si la
+ * cuenta sigue ABIERTA; si no actualizó nada, falla y no se abre el cobro.
+ */
+export async function fijarServicioTicket(token: string, ticketId: string, modo: ModoServicio, nombre: string | null): Promise<void> {
+  const { data, error } = await employeeClient(token)
+    .from("tickets")
+    .update({ modo_servicio: modo, nombre_cliente: nombre?.trim().slice(0, 100) || null })
+    .eq("id", ticketId)
+    .eq("estado_fiscal", "ABIERTO")
+    .select("id");
+  if (error) throw new Error(`No se guardó el tipo de servicio: ${error.message}`);
+  if (!data?.length) throw new Error("No se guardó el tipo de servicio: la cuenta ya no está abierta.");
+}
+
 /** F5.2b — fija la propina del ticket (RPC establecer_propina_ticket, bajo RLS). */
 export async function establecerPropina(token: string, ticketId: string, monto: number): Promise<void> {
   const { error } = await employeeClient(token).rpc("establecer_propina_ticket", {

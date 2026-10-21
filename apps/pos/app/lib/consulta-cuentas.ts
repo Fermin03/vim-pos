@@ -45,6 +45,6 @@ export async function listarCuentas(token: string, filtro: FiltroCuentas): Promi
   }));
 }
 
-export function labelModoCuenta(m: string): string {
-  return etiquetaModo(m);
+export function labelModoCuenta(m: string, giro?: string | null): string {
+  return etiquetaModo(m, giro);
 }

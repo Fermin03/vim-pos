@@ -29,7 +29,7 @@ import {
 } from "../lib/carrito";
 import { listarCombos, combosQueAdmiten, diferencialCombo, type ComboDef } from "../lib/combos";
 import { obtenerGruposDeProducto, type GrupoModificadores } from "../lib/modificadores";
-import { persistirTicket, leerTotales, cambiarZonaDePedido, cerrarSiYaCubierta, cuentaYaCubierta, ErrorEnvioNoFijado, ErrorTicketParcial, type TotalesTicket } from "../lib/cobro";
+import { fijarServicioTicket, persistirTicket, leerTotales, cambiarZonaDePedido, cerrarSiYaCubierta, cuentaYaCubierta, ErrorEnvioNoFijado, ErrorTicketParcial, type TotalesTicket } from "../lib/cobro";
 import { SidebarTicket } from "./sidebar-ticket";
 import { ModalModificadores } from "./modal-modificadores";
 import { ModalCombo } from "./modal-combo";
@@ -637,12 +637,16 @@ export function HomePos({
    */
   const barraAbajo = conBarraAbajo(caja);
   const comidaRapida = esComidaRapida(caja);
-  // Mostrador de comida rápida (0242): mientras se lee, o si falla, todo apagado (el default de la base).
-  const [configMostrador, setConfigMostrador] = useState({ pedirNombre: false, tieneDondeComer: false });
+  // Mostrador de comida rápida (0242). `null` mientras se lee: el cobro no se abre hasta que termine
+  // (si no, un food truck con dónde comer cobraría PARA_LLEVAR sin preguntar). Si la lectura falla,
+  // todo apagado (el default de la base), pero ya leída.
+  const [configMostrador, setConfigMostrador] = useState<{ pedirNombre: boolean; tieneDondeComer: boolean } | null>(null);
   useEffect(() => {
     if (!comidaRapida) return;
     let vivo = true;
-    void leerConfigMostrador(token).then((c) => { if (vivo) setConfigMostrador(c); }).catch(() => {});
+    void leerConfigMostrador(token)
+      .catch(() => ({ pedirNombre: false, tieneDondeComer: false }))
+      .then((c) => { if (vivo) setConfigMostrador(c); });
     return () => { vivo = false; };
   }, [comidaRapida, token]);
   const seccionInicio = seccionInicial(caja, agenda);
@@ -1736,15 +1740,21 @@ export function HomePos({
     }
   }, [token, empleado, caja.nombre, imprimirComandaPorAreas, logoParaTicket, comidaRapida]);
 
+  /** Cuenta retomada de «en espera» cuyo tipo de servicio ya se contestó: cerrar el cobro y volver a
+   *  cobrar no pregunta dos veces. */
+  const servicioContestado = useRef<string | null>(null);
   /** `elegido`: el carrito con el modo (y el nombre) que se acaba de contestar en «¿Para llevar o comer aquí?». */
   const iniciarCobro = useCallback(async (atajo: "EFECTIVO_EXACTO" | null = null, elegido?: EstadoCarrito) => {
     const c = elegido ?? carrito;
     if (c.lineas.length === 0) return;
     if (revisandoCobro.current) return;
-    // Comida rápida: antes de guardar el ticket se pregunta el tipo de servicio (y el nombre). Solo con
-    // la venta sin guardar: una cuenta ya guardada (retomada, a medias) trae su modo en la base.
+    // Comida rápida: antes de guardar el ticket se pregunta el tipo de servicio (y el nombre). Con la
+    // venta sin guardar, o con una cuenta retomada de «en espera» (se guardó con el PARA_LLEVAR por
+    // defecto, sin preguntar). Una cuenta guardada al cobrar ya lo contestó.
     // Cancelar la ventana deja la venta como estaba: sin ticket y sin abrir el cajón.
-    if (!ticketBd && !elegido) {
+    if (comidaRapida && !configMostrador) return;
+    const retomadaSinContestar = !!ticketBd && retomadoEspera?.ticketId === ticketBd.ticketId && servicioContestado.current !== ticketBd.ticketId;
+    if (configMostrador && !elegido && (!ticketBd || retomadaSinContestar)) {
       const p = preguntaServicio(caja.giro, configMostrador, c.modoServicio);
       if (p) { setPreguntaCobro({ tipo: p, atajo }); return; }
     }
@@ -1827,16 +1837,27 @@ export function HomePos({
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, caja.giro, turno.caja_id, turno.id, online, adoptarTicketSiQuedoAbierto, lealtadActiva, programa, cobroTerminado, configMostrador]);
+  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, caja.giro, turno.caja_id, turno.id, online, adoptarTicketSiQuedoAbierto, lealtadActiva, programa, cobroTerminado, configMostrador, comidaRapida, retomadoEspera]);
 
   /** Respuesta de «¿Para llevar o comer aquí?»: fija modo y nombre, y sigue el cobro con ese carrito. */
-  const elegirServicio = useCallback((modo: "PARA_LLEVAR" | "COMER_AQUI", nombre: string | null) => {
+  /** Con la cuenta ya guardada (retomada de «en espera»), primero se guarda en la base; si falla, no
+   *  se abre el cobro. */
+  const elegirServicio = useCallback(async (modo: "PARA_LLEVAR" | "COMER_AQUI", nombre: string | null) => {
     const atajo = preguntaCobro?.atajo ?? null;
     const accion = { tipo: "modo", modo, nombre: nombre ?? carrito.nombreCuenta ?? null } as const;
-    dispatch(accion);
     setPreguntaCobro(null);
+    if (ticketBd) {
+      try {
+        await fijarServicioTicket(token, ticketBd.ticketId, modo, accion.nombre);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "No se guardó el tipo de servicio");
+        return;
+      }
+      servicioContestado.current = ticketBd.ticketId;
+    }
+    dispatch(accion);
     void iniciarCobro(atajo, reducerCarrito(carrito, accion));
-  }, [preguntaCobro, carrito, iniciarCobro]);
+  }, [preguntaCobro, carrito, iniciarCobro, ticketBd, token]);
 
   /**
    * Ronda de arreglos 1/5 (Task 7) — cambiar la zona de ESTE pedido desde el renglón de envío.
@@ -2346,7 +2367,7 @@ export function HomePos({
       escaneoIgnorado: avisoTiendaVisible || capas.some((c) => c[0] && ![capaCobro, capaSelector, capaAvisoRetail, capaConsultaInv, capaRecibo, capaConfirmacion].includes(c)),
       cerrarAlEscanear: confirmacion != null ? nuevoTicket : mostrarRecibo ? cerrarVistaRecibo : null,
     };
-  }, [selectorRetail, cantidadRetail, avisoRetail, descuentoAbierto, llevarListaAbierta, preguntaCobro,avisoTiendaVisible, modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, vistaCotizacion, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
+  }, [selectorRetail, cantidadRetail, avisoRetail, descuentoAbierto, llevarListaAbierta, preguntaCobro, avisoTiendaVisible, modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, vistaCotizacion, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
       agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto, nombreBarra, pasandoAMesa,
       clienteDomAbierto, clienteCuentaAbierto, zonaPedidoAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
@@ -3361,7 +3382,7 @@ export function HomePos({
       )}
       {preguntaCobro && (
         <ModalServicioComida
-          pedirNombre={configMostrador.pedirNombre}
+          pedirNombre={configMostrador?.pedirNombre ?? false}
           soloNombre={preguntaCobro.tipo === "NOMBRE"}
           nombreInicial={carrito.nombreCuenta ?? ""}
           onElegir={elegirServicio}

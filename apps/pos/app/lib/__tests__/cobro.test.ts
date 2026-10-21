@@ -6,10 +6,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // ESTA tarea —cuándo se llama a `fijar_envio_ticket` y cuándo no— sin levantar Supabase, se
 // sustituye el módulo entero por un doble mínimo que solo entiende las llamadas que
 // `persistirTicket` hace de verdad (rpc + el select de `leerTotales`).
-const { rpcMock, singleMock, updateMock } = vi.hoisted(() => ({
+const { rpcMock, singleMock, updateMock, filtrosMock } = vi.hoisted(() => ({
   rpcMock: vi.fn(),
   singleMock: vi.fn(),
   updateMock: vi.fn(),
+  filtrosMock: vi.fn(),
 }));
 
 vi.mock("../supabase", () => ({
@@ -17,12 +18,21 @@ vi.mock("../supabase", () => ({
     rpc: rpcMock,
     from: () => ({
       select: () => ({ eq: () => ({ single: singleMock }) }),
-      update: (valores: Record<string, unknown>) => ({ eq: () => updateMock(valores) }),
+      // `update().eq()` se espera directo; `fijarServicioTicket` encadena `.eq().eq().select()`.
+      update: (valores: Record<string, unknown>) => {
+        const filtros: [string, unknown][] = [];
+        const q = {
+          eq: (k: string, v: unknown) => { filtros.push([k, v]); return q; },
+          select: () => { filtrosMock(filtros); return updateMock(valores); },
+          then: (ok: (v: unknown) => unknown, mal: (e: unknown) => unknown) => Promise.resolve(updateMock(valores)).then(ok, mal),
+        };
+        return q;
+      },
     }),
   }),
 }));
 
-import { persistirTicket, cambiarZonaDePedido, cerrarSiYaCubierta, cuentaYaCubierta, ErrorEnvioNoFijado, ErrorTicketParcial, type TotalesTicket } from "../cobro";
+import { fijarServicioTicket, persistirTicket, cambiarZonaDePedido, cerrarSiYaCubierta, cuentaYaCubierta, ErrorEnvioNoFijado, ErrorTicketParcial, type TotalesTicket } from "../cobro";
 import type { LineaCarrito } from "../carrito";
 import type { Producto } from "../catalogo";
 
@@ -301,5 +311,29 @@ describe("persistirTicket — comida rápida: comer aquí con nombre", () => {
     await persistirTicket(ctx, "COMER_AQUI", [], "cli-3", null, null, null, "  Ana  ");
     expect(rpcMock.mock.calls.find((c) => c[0] === "abrir_ticket")?.[1]).toMatchObject({ p_modo_servicio: "COMER_AQUI" });
     expect(updateMock).toHaveBeenCalledWith({ nombre_cliente: "Ana" });
+  });
+});
+
+describe("fijarServicioTicket — cuenta retomada de «en espera» (comida rápida)", () => {
+  beforeEach(() => { updateMock.mockReset(); filtrosMock.mockReset(); });
+
+  it("cambia modo y nombre solo de la cuenta ABIERTA", async () => {
+    updateMock.mockImplementation(async () => ({ data: [{ id: "ticket-1" }], error: null }));
+    await fijarServicioTicket("t", "ticket-1", "COMER_AQUI", "  Ana  ");
+    expect(updateMock).toHaveBeenCalledWith({ modo_servicio: "COMER_AQUI", nombre_cliente: "Ana" });
+    expect(filtrosMock).toHaveBeenCalledWith([["id", "ticket-1"], ["estado_fiscal", "ABIERTO"]]);
+  });
+
+  it("sin nombre lo deja vacío", async () => {
+    updateMock.mockImplementation(async () => ({ data: [{ id: "ticket-1" }], error: null }));
+    await fijarServicioTicket("t", "ticket-1", "PARA_LLEVAR", "  ");
+    expect(updateMock).toHaveBeenCalledWith({ modo_servicio: "PARA_LLEVAR", nombre_cliente: null });
+  });
+
+  it("falla si la cuenta ya no está abierta o si la base responde error", async () => {
+    updateMock.mockImplementation(async () => ({ data: [], error: null }));
+    await expect(fijarServicioTicket("t", "ticket-1", "COMER_AQUI", null)).rejects.toThrow(/ya no está abierta/);
+    updateMock.mockImplementation(async () => ({ data: null, error: { message: "rls" } }));
+    await expect(fijarServicioTicket("t", "ticket-1", "COMER_AQUI", null)).rejects.toThrow(/rls/);
   });
 });
