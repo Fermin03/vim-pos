@@ -34,7 +34,9 @@ test("montos como número", () => {
   assert.equal(d.propina_mxn, "34.80");
 });
 
-test("receipt_no gana a transaction_id como referencia", () => {
+test("la autorización del banco gana a receipt_no, y receipt_no a transaction_id", () => {
+  const conAut = resultado({ receipt_no: "Pk9RoQul", private_data: { psp_data: { authorization_id: "000154" } } });
+  assert.equal(datosDeIntencion(intencion("APPROVED", [conAut])).referencia, "000154");
   const d = datosDeIntencion(intencion("COMPLETED", [resultado({ receipt_no: "R-9" })]));
   assert.equal(d.referencia, "R-9");
   assert.equal(d.pago_id_externo, "f473b6eb");
@@ -65,6 +67,9 @@ test("estados", () => {
   assert.equal(datosDeIntencion(intencion("APPROVED", [resultado({ status: "APPROVED" })])).estado, "APROBADO");
   assert.equal(datosDeIntencion(intencion("COMPLETED", [])).estado, "REVISAR");
   assert.equal(datosDeIntencion(null).estado, "REVISAR");
+  // Visto con el lector real: el motivo de un REJECTED llega en error.code.
+  const chip = datosDeIntencion({ ...intencion("REJECTED", []), error: { code: "CD-PROCESS-AS-CHIP", detail: "x" } });
+  assert.deepEqual([chip.estado, chip.detalle], ["RECHAZADO", "CD-PROCESS-AS-CHIP"]);
 });
 
 test("últimos 4 dígitos inválidos", () => {

@@ -15,6 +15,7 @@ describe("cobro con terminal", () => {
 
   it("la tarjeta se imprime como marca y terminación; sin terminación no se inventa nada", () => {
     expect(etiquetaTarjeta({ marca: "debmaster", tarjeta_ultimos4: "1447" })).toBe("Mastercard **** 1447");
+    expect(etiquetaTarjeta({ marca: "deb_visa", tarjeta_ultimos4: "0214" })).toBe("Visa **** 0214"); // Clip
     expect(etiquetaTarjeta({ marca: "naranja", tarjeta_ultimos4: "0001" })).toBe("Tarjeta **** 0001");
     expect(etiquetaTarjeta({ marca: "visa", tarjeta_ultimos4: null })).toBeNull();
     const base = { id: "c", ticket_id: "t", monto_mxn: 110, estado: "APROBADO" as const, detalle: null, aplicado_at: null };
@@ -39,6 +40,8 @@ describe("cobro con terminal", () => {
     expect(mensajeErrorCobro(new Error("SIN_RESPUESTA"))).toBe("La terminal no contestó. Vuelve a intentar.");
     expect(mensajeFinal({ estado: "RECHAZADO", detalle: "SIN_RESPUESTA" })).toBe("La terminal no contestó. Vuelve a intentar.");
     expect(mensajeFinal({ estado: "RECHAZADO", detalle: "high_risk" })).not.toContain("Mercado Pago");
+    expect(mensajeFinal({ estado: "RECHAZADO", detalle: "CD-PROCESS-AS-CHIP" })).toContain("chip");
+    expect(mensajeFinal({ estado: "RECHAZADO", detalle: "TX-CANCELLED-BY-PAUSE" })).toContain("abierta");
     expect(mensajeErrorCobro(new Error("CONEXION_INVALIDA"))).not.toContain("Mercado Pago");
     expect(mensajeErrorCobro(new Error("ERROR_INTERNO"))).toBe("No se pudo mandar el cobro a la terminal. Vuelve a intentar.");
   });

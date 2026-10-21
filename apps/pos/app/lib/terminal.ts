@@ -77,7 +77,8 @@ const MARCAS: Record<string, string> = {
  */
 export function etiquetaTarjeta(c: Pick<CobroTerminal, "marca" | "tarjeta_ultimos4">): string | null {
   if (!c.tarjeta_ultimos4) return null;
-  return `${MARCAS[c.marca ?? ""] ?? "Tarjeta"} **** ${c.tarjeta_ultimos4}`;
+  // Débito llega como «debvisa» (Mercado Pago) o «deb_visa» (Clip): se quita el prefijo.
+  return `${MARCAS[(c.marca ?? "").replace(/^deb_?/, "")] ?? "Tarjeta"} **** ${c.tarjeta_ultimos4}`;
 }
 
 const centavos = (v: unknown): number => Math.round(Number(v ?? 0) * 100) || 0;
@@ -118,6 +119,9 @@ const RECHAZOS: Record<string, string> = {
   amount_limit_exceeded: "El monto supera el límite de la tarjeta.",
   bad_filled_card_data: "La terminal no pudo leer la tarjeta.",
   SIN_RESPUESTA: "La terminal no contestó. Vuelve a intentar.",
+  // Clip (vistos con el lector, 21 oct 2026).
+  "CD-PROCESS-AS-CHIP": "Esa tarjeta pide chip: que el cliente la inserte en la terminal.",
+  "TX-CANCELLED-BY-PAUSE": "La app de la terminal se cerró a medio cobro. Déjala abierta y vuelve a intentar.",
 };
 
 /** Lo que se le dice a la cajera cuando el cobro terminó sin pagarse. */

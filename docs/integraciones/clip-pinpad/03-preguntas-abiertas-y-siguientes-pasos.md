@@ -112,3 +112,24 @@ Por correo, de Amilcar Navarro (Integrations Specialist de Clip). Ya aplicadas e
 - **Propina en el lector:** llega aparte en `tip_amount`. Con esto ya se puede construir la propina
   elegida en el lector (ya construida: §E).
 - **Modelos:** Total 3, Ultra, Clip PinPad y Clip Stand 2.
+
+## G. Pruebas con el lector de Knock-Out (21 oct 2026)
+
+Total 3 `AA61B532662500612` (modelo `K1352`, PinPad 1.27.1), con `prueba.ts` directo a la API (sin VIM).
+
+| Intento | Cómo se pagó | Resultado |
+|---|---|---|
+| 1 y 2 | Sin contacto, tarjeta que exige chip | `REJECTED`, `error.code` `CD-PROCESS-AS-CHIP` |
+| 3 | Chip insertado | `REJECTED`, `error.code` `TX-CANCELLED-BY-PAUSE` (sin causa clara: preguntado a Clip) |
+| 4 | Sin contacto, débito Visa Banorte | `PENDING` → `IN_PROCESS` → `APPROVED` en ~15 s |
+
+Lo aprendido, ya en el código:
+
+- El motivo de un rechazo llega en `error.code` y se guarda como `detalle`; la caja tiene mensaje para los dos vistos.
+- La transacción aprobada dice `status: "approved"` (minúsculas); `amount_paid` y `paid_amount` = $1, `tip_amount` 0.
+- La autorización del banco está en `private_data.psp_data.authorization_id` («000154»): es la que va al ticket.
+- Marca de débito: `deb_visa` (la caja quita el prefijo para imprimir «Visa»).
+- **Devolución:** con el `id` del resultado → 404 `CL1301`; con `transaction_id` → 201 `approved` («Cancelled», mismo día). El código ya usa `transaction_id`.
+- La consulta trae datos personales de más (`private_data`: correo del cajero, dirección, afiliación). No se guardan: `terminal_eventos` solo registra `{id, event_type}` del aviso.
+
+Falta con el lector: cancelar en el lector, propina en el lector, el aviso (webhook) real y el cobro completo desde VIM.

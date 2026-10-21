@@ -58,16 +58,18 @@ export function datosDeIntencion(intencion: unknown): DatosCobro {
   const ultimos4 = String(obj(medio.card).last_digits ?? "");
   return {
     estado: estadoDeIntencion(i.status, aprobados.length),
-    detalle: txt(i.status),
+    // VERIFICADO (21 oct): un REJECTED trae el motivo en `error.code` (CD-PROCESS-AS-CHIP,
+    // TX-CANCELLED-BY-PAUSE); la caja lo traduce para la cajera.
+    detalle: txt(obj(i.error).code) ?? txt(i.status),
     cobro_id: txt(i.reference),
     orden_id_externo: txt(i.pinpad_request_id),
     pago_id_externo: txt(p.transaction_id),
     tipo_tarjeta: txt(medio.type),
     marca: txt(medio.id),
     mensualidades: Number.isInteger(p.installments) ? p.installments as number : null,
-    // SIN VERIFICAR: la intención no trae número de autorización; `receipt_no` es el de conciliación
-    // de Clip y no sale en este ejemplo, así que se cae al id de la transacción.
-    referencia: txt(p.receipt_no) ?? txt(p.transaction_id),
+    // VERIFICADO con un cobro real (21 oct): la autorización del banco viene en
+    // `private_data.psp_data.authorization_id` («000154»); si falta, el recibo de Clip.
+    referencia: txt(obj(obj(p.private_data).psp_data).authorization_id) ?? txt(p.receipt_no) ?? txt(p.transaction_id),
     pagado_mxn: suma("paid_amount"),
     reembolsado_mxn: suma("amount_refunded"),
     propina_mxn: suma("tip_amount"),
@@ -151,8 +153,9 @@ export function clienteClip(apiKey: string, secreto: string, pedir: typeof fetch
       llamar("POST", ruta("/devices"), { devices: series, preferences: { timeout_seg: timeoutSeg } }),
 
     /**
-     * Total o parcial, hasta 180 días. Acepta cobros de PinPad (Clip); recomiendan el id de la
-     * transacción sobre `receipt_no` (SIN VERIFICAR que ese id sea `transaction_id`). La llave dura
+     * Total o parcial, hasta 180 días. Acepta cobros de PinPad. VERIFICADO (21 oct, $1 real):
+     * con `transaction_id` responde 201 `approved` («Cancelled» el mismo día); con el `id` del
+     * resultado responde 404 CL1301. La llave dura
      * 1 minuto. Requiere «balance» del día en la cuenta Clip.
      */
     reembolsar: (transactionId: string, monto: string) =>
