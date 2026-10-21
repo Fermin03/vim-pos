@@ -22,7 +22,7 @@ varios clientes restauranteros pidió un enlace que cualquiera abra en tableta o
 - **La misma app `apps/pos`**, desplegada en `demo.vimpos.com.mx` y apuntada al proyecto de demo por
   variables de entorno. Una bandera de compilación activa la guía «Hazlo tú», fuerza la vista previa de
   impresión y oculta lo que no aplica. Un solo código, no una imitación.
-- **Migración** `NNNN_demo_autoguiada.sql` (número en la Task 1).
+- **Migración** `0261_demo_autoguiada.sql` (número en la Task 1).
 
 El diseño completo está en `docs/superpowers/specs/2026-10-20-demo-autoguiada-design.md`.
 
