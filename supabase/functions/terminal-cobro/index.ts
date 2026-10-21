@@ -19,13 +19,28 @@ const RECHAZO: Record<NombreProveedor, string> = { MERCADO_PAGO: "Mercado Pago r
 // Sin aviso en este tiempo, se le pregunta al proveedor (Mercado Pago pide no hacerlo seguido). Como la
 // consulta sella updated_at, es a lo sumo una cada RESPALDO_MS por cobro.
 const RESPALDO_MS = 15_000;
-const CAMPOS = "id, caja_id, ticket_id, monto_mxn, estado, detalle, orden_id_externo, tipo_tarjeta, marca, mensualidades, referencia, pagado_mxn, tarjeta_ultimos4, aplicado_at, conexion_id, updated_at";
+const CAMPOS = "id, caja_id, ticket_id, monto_mxn, estado, detalle, orden_id_externo, tipo_tarjeta, marca, mensualidades, referencia, pagado_mxn, tarjeta_ultimos4, propina_mxn, aplicado_at, conexion_id, updated_at";
 
 type Cobro = {
   id: string; caja_id: string; ticket_id: string; monto_mxn: number; estado: EstadoCobro; detalle: string | null;
   orden_id_externo: string | null; tipo_tarjeta: string | null; marca: string | null; mensualidades: number | null;
   referencia: string | null; pagado_mxn: number | null; tarjeta_ultimos4: string | null; aplicado_at: string | null; conexion_id: string; updated_at: string;
+  /** La propina que el cliente eligió en el lector (Clip), aparte de `monto_mxn`. */
+  propina_mxn: number | null;
 };
+
+type ConfigSucursal = { imprime_terminal: boolean; espera_segundos: number; propina_en_terminal: boolean; propina_opciones: number[] | null };
+
+/** Los porcentajes que el lector le ofrece al cliente, o null si esa sucursal no pide la propina en el lector. Solo Clip. */
+const propinasDelLector = (nombre: NombreProveedor | null | undefined, cfg: ConfigSucursal | null): number[] | null =>
+  nombre === "CLIP" && cfg?.propina_en_terminal && cfg.propina_opciones?.length ? cfg.propina_opciones : null;
+
+async function configDeSucursal(sucursalId: string): Promise<ConfigSucursal | null> {
+  const { data, error } = await admin.from("terminal_config_sucursal")
+    .select("imprime_terminal, espera_segundos, propina_en_terminal, propina_opciones").eq("sucursal_id", sucursalId).maybeSingle();
+  if (error) throw error;
+  return data as ConfigSucursal | null;
+}
 
 /** Lo que ve la caja: nada de ids internos de la conexión. */
 const publico = ({ conexion_id: _c, updated_at: _u, caja_id: _k, ...c }: Cobro) => c;
@@ -129,17 +144,21 @@ servir(async (req, json) => {
       const { data } = await admin.from("terminal_dispositivos").select("conexion_id, terminal_id_externo")
         .eq("caja_id", cajaId).eq("tenant_id", tenantId).eq("activa", true).not("terminal_id_externo", "is", null).maybeSingle();
       const disp = data as { conexion_id: string; terminal_id_externo: string } | null;
-      if (!disp) return json({ ok: true, terminal: false, lista: false, proveedor: null });
+      if (!disp) return json({ ok: true, terminal: false, lista: false, proveedor: null, propina_en_lector: false });
       // Un tropiezo al leer la conexión o sin credencial no tapa la terminal (antes ni se leía): crear
       // dirá CONEXION_INVALIDA, como siempre.
       // Mercado Pago siempre está listo: no se lee Vault.
+      // `propina_en_lector`: el lector de Clip le pregunta la propina al cliente (Mercado Pago, nunca).
       const p = await (async () => {
         const nombre = await nombreDeConexion(disp.conexion_id);
-        if (nombre === "MERCADO_PAGO") return { nombre, lista: true };
+        if (nombre === "MERCADO_PAGO") return { nombre, lista: true, propina: false };
         const { prov } = await proveedorDeConexion(disp.conexion_id, nombre);
-        return { nombre, lista: prov ? await prov.lectorListo(disp.terminal_id_externo) : true };
+        return {
+          nombre, lista: prov ? await prov.lectorListo(disp.terminal_id_externo) : true,
+          propina: propinasDelLector(nombre, await configDeSucursal(sucursalId)) !== null,
+        };
       })().catch((e) => { registrarError("terminal-cobro", "DISPONIBLE", textoDeError(e)); return null; });
-      return json({ ok: true, terminal: true, lista: p?.lista ?? true, proveedor: p?.nombre ?? null });
+      return json({ ok: true, terminal: true, lista: p?.lista ?? true, proveedor: p?.nombre ?? null, propina_en_lector: p?.propina ?? false });
     }
 
     if (b.accion === "pendientes") {
@@ -165,9 +184,9 @@ servir(async (req, json) => {
         .eq("caja_id", cajaId).eq("tenant_id", tenantId).eq("activa", true).maybeSingle();
       const d = disp as { conexion_id: string; terminal_id_externo: string | null } | null;
       if (!d?.terminal_id_externo) return json({ ok: false, error: "SIN_TERMINAL" }, 409);
-      const { data: cfg } = await admin.from("terminal_config_sucursal").select("imprime_terminal, espera_segundos")
-        .eq("sucursal_id", sucursalId).maybeSingle();
-      const config = (cfg as { imprime_terminal: boolean; espera_segundos: number } | null) ?? { imprime_terminal: true, espera_segundos: 180 };
+      // Como antes: si no se puede leer, se cobra con lo de siempre (y sin propina en el lector).
+      const cfg = await configDeSucursal(sucursalId).catch(() => null);
+      const config = cfg ?? { imprime_terminal: true, espera_segundos: 180 };
       const { nombre: proveedor, prov } = await proveedorDeConexion(d.conexion_id);
       if (!prov) return json({ ok: false, error: "CONEXION_INVALIDA" }, 409);
 
@@ -195,6 +214,8 @@ servir(async (req, json) => {
       const r = await prov.crear({
         cobroId: b.cobro_id, monto: b.monto, terminal: d.terminal_id_externo, folio: b.folio,
         esperaSeg: config.espera_segundos, imprime: config.imprime_terminal,
+        // Solo si la caja lo pide Y es Clip Y la sucursal lo tiene encendido con porcentajes.
+        propinas: b.propina_en_lector ? propinasDelLector(proveedor, cfg) : null,
       });
       if (r.ok) return json({ ok: true, cobro: publico(await aplicarDatos(nuevo as Cobro, r.datos)) });
 

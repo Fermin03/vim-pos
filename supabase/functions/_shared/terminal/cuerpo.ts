@@ -5,7 +5,8 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const uuid = (v: unknown): string | null => (typeof v === "string" && UUID.test(v) ? v.toLowerCase() : null);
 
 export type Cuerpo =
-  | { accion: "crear"; cobro_id: string; ticket_id: string; folio: string | null; monto: string; caja_id: string | null; usuario_id: string | null }
+  // `propina_en_lector`: la caja pide que el lector le pregunte la propina al cliente (solo Clip, si la sucursal lo permite).
+  | { accion: "crear"; cobro_id: string; ticket_id: string; folio: string | null; monto: string; caja_id: string | null; usuario_id: string | null; propina_en_lector: boolean }
   | { accion: "estado" | "cancelar"; cobro_id: string; caja_id: string | null }
   // `autorizo_id`: quién dio su PIN para aceptar a mano un cobro que quedó en REVISAR.
   | { accion: "confirmar"; cobro_id: string; caja_id: string | null; autorizo_id: string | null }
@@ -32,5 +33,5 @@ export function validarCuerpo(crudo: unknown): { ok: true; cuerpo: Cuerpo } | { 
   if (!monto) return { ok: false, error: "MONTO_INVALIDO" };
   // El folio va a la descripción del cobro en Mercado Pago: solo lo que parece un folio, sin datos personales.
   const folio = typeof b.folio === "string" && /^[A-Za-z0-9 #-]{1,30}$/.test(b.folio) ? b.folio : null;
-  return { ok: true, cuerpo: { accion: "crear", cobro_id, ticket_id, folio, monto, caja_id, usuario_id: uuid(b.usuario_id) } };
+  return { ok: true, cuerpo: { accion: "crear", cobro_id, ticket_id, folio, monto, caja_id, usuario_id: uuid(b.usuario_id), propina_en_lector: b.propina_en_lector === true } };
 }

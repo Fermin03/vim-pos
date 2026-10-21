@@ -11,19 +11,30 @@ export function validarCredenciales(crudo: unknown): { ok: true; api_key: string
   return clave(b.api_key) && clave(b.secreto) ? { ok: true, api_key: b.api_key, secreto: b.secreto } : { ok: false, error: "FALTAN_CAMPOS" };
 }
 
-export type Configuracion = { sucursal_id: string; imprime_terminal: boolean; espera_segundos: number; propina_opciones: number[] | null };
+export type Configuracion = {
+  sucursal_id: string; imprime_terminal: boolean; espera_segundos: number; propina_opciones: number[] | null;
+  /** El cliente elige la propina en el lector (con `propina_opciones`). */
+  propina_en_terminal: boolean;
+};
 
-/** Espera de 60 s (el minuto que Clip suma solo) a 3 h. Propinas: de 1 a 3 porcentajes enteros de 1 a 100, o null. */
+/**
+ * Espera de 60 s (el minuto que Clip suma solo) a 3 h. Propinas: de 1 a 3 porcentajes enteros de 1 a
+ * 100, o null; la propina en el lector no se enciende sin al menos un porcentaje.
+ */
 export function validarConfiguracion(crudo: unknown): ({ ok: true } & Configuracion) | { ok: false; error: string } {
   const b = (crudo && typeof crudo === "object" ? crudo : {}) as Record<string, unknown>;
   const sucursal_id = uuid(b.sucursal_id);
   const espera = b.espera_segundos;
-  if (!sucursal_id || typeof b.imprime_terminal !== "boolean" || typeof espera !== "number"
+  if (!sucursal_id || typeof b.imprime_terminal !== "boolean" || typeof b.propina_en_terminal !== "boolean" || typeof espera !== "number"
     || !Number.isInteger(espera) || espera < 60 || espera > 10800) return { ok: false, error: "FALTAN_CAMPOS" };
   const p = b.propina_opciones ?? null;
   if (p !== null && !(Array.isArray(p) && p.length >= 1 && p.length <= 3
     && p.every((x) => typeof x === "number" && Number.isInteger(x) && x >= 1 && x <= 100))) return { ok: false, error: "PROPINA_INVALIDA" };
-  return { ok: true, sucursal_id, imprime_terminal: b.imprime_terminal, espera_segundos: espera, propina_opciones: p as number[] | null };
+  if (b.propina_en_terminal && p === null) return { ok: false, error: "PROPINA_SIN_PORCENTAJES" };
+  return {
+    ok: true, sucursal_id, imprime_terminal: b.imprime_terminal, espera_segundos: espera,
+    propina_opciones: p as number[] | null, propina_en_terminal: b.propina_en_terminal,
+  };
 }
 
 /** Clip suma un minuto fijo al `timeout_seg` del lector. */

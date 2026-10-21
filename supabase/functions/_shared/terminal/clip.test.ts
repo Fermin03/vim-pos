@@ -101,6 +101,15 @@ test("crearIntencion arma la petición", async () => {
   });
 });
 
+test("crearIntencion con propinas: el lector las ofrece; lo demás igual", async () => {
+  const f = falso(200, { pinpad_request_id: "pinpad-1" });
+  await clienteClip("k", "s", f.pedir).crearIntencion({ cobroId: "c1", monto: "348.00", serie: "P82", webhookUrl: "u", imprime: false, propinas: [10, 15, 20] });
+  assert.deepEqual(JSON.parse(String(f.llamadas[0].init.body)).preferences, {
+    is_tip_enabled: true, tip_options: [10, 15, 20], is_msi_enabled: false, is_mci_enabled: false, is_dcc_enabled: false, is_retry_enabled: true,
+    is_split_payment_enabled: false, is_share_enabled: false, is_auto_return_enabled: true, is_auto_print_receipt_enabled: false,
+  });
+});
+
 test("crearIntencion sin respuesta no lanza", async () => {
   const lento = ((_u: string, init: RequestInit) => new Promise((_, rechaza) => {
     init.signal?.addEventListener("abort", () => rechaza(new Error("abortado")));

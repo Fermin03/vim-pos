@@ -16,7 +16,8 @@ export type ResultadoCrear = { ok: true; datos: DatosCobro } | { ok: false; codi
 export type ResultadoCancelar = { cancelacion: "HECHA" | "PEDIDA" | "FALLO"; datos: DatosCobro | null };
 
 export interface Proveedor {
-  crear(c: { cobroId: string; monto: string; terminal: string; folio: string | null; esperaSeg: number; imprime: boolean }): Promise<ResultadoCrear>;
+  /** `propinas`: solo Clip, los porcentajes que el lector ofrece (null = no pregunta propina). Mercado Pago lo ignora. */
+  crear(c: { cobroId: string; monto: string; terminal: string; folio: string | null; esperaSeg: number; imprime: boolean; propinas?: number[] | null }): Promise<ResultadoCrear>;
   /** null si el proveedor no contestó bien (queda en el log). */
   consultar(ordenId: string): Promise<DatosCobro | null>;
   cancelar(ordenId: string): Promise<ResultadoCancelar>;
@@ -81,7 +82,7 @@ function clip(apiKey: string, secreto: string, base: string, pedir: typeof fetch
     async crear(c) {
       // La espera no va por cobro: es el `timeout_seg` del lector, que se manda al guardar la configuración.
       const r = await con(ESPERA_CLIP.crear).crearIntencion({
-        cobroId: c.cobroId, monto: c.monto, serie: c.terminal, imprime: c.imprime,
+        cobroId: c.cobroId, monto: c.monto, serie: c.terminal, imprime: c.imprime, propinas: c.propinas,
         webhookUrl: `${base}/functions/v1/terminal-webhook-clip?c=${encodeURIComponent(c.cobroId)}`,
       });
       const datos = datosDeIntencion(r.cuerpo);

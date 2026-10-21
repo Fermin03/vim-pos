@@ -14,10 +14,18 @@ test("credenciales: vacías, con espacios o de más de 200 caracteres no pasan",
   assert.deepEqual(validarCredenciales(null), { ok: false, error: "FALTAN_CAMPOS" });
 });
 
-const config = (c: Record<string, unknown>) => validarConfiguracion({ sucursal_id: ID, imprime_terminal: true, espera_segundos: 180, propina_opciones: [10, 15, 20], ...c });
+const config = (c: Record<string, unknown>) => validarConfiguracion({ sucursal_id: ID, imprime_terminal: true, espera_segundos: 180, propina_opciones: [10, 15, 20], propina_en_terminal: false, ...c });
+
+test("configurar: propina en el lector, booleana y nunca sin porcentajes", () => {
+  assert.deepEqual(config({ propina_en_terminal: true }), { ok: true, sucursal_id: ID, imprime_terminal: true, espera_segundos: 180, propina_opciones: [10, 15, 20], propina_en_terminal: true });
+  assert.equal(config({ propina_en_terminal: true, propina_opciones: [5] }).ok, true);
+  assert.deepEqual(config({ propina_en_terminal: true, propina_opciones: null }), { ok: false, error: "PROPINA_SIN_PORCENTAJES" });
+  assert.equal(config({ propina_en_terminal: false, propina_opciones: null }).ok, true);
+  for (const malo of [undefined, null, "true", 1]) assert.deepEqual(config({ propina_en_terminal: malo }), { ok: false, error: "FALTAN_CAMPOS" }, String(malo));
+});
 
 test("configurar: propina_opciones de 1 a 3 enteros entre 1 y 100, o nada", () => {
-  assert.deepEqual(config({}), { ok: true, sucursal_id: ID, imprime_terminal: true, espera_segundos: 180, propina_opciones: [10, 15, 20] });
+  assert.deepEqual(config({}), { ok: true, sucursal_id: ID, imprime_terminal: true, espera_segundos: 180, propina_opciones: [10, 15, 20], propina_en_terminal: false });
   assert.equal(config({ propina_opciones: null }).ok, true);
   assert.equal(config({ propina_opciones: undefined }).ok, true);
   for (const malo of [[], [10, 101], [0], [10, 15, 20, 25], [10.5], ["10"], [null], "10"]) {

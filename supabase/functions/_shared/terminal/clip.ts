@@ -117,15 +117,17 @@ export function clienteClip(apiKey: string, secreto: string, pedir: typeof fetch
     /**
      * Responde `pinpad_request_id`. Una `reference` repetida no se rechaza y confunde los estados
      * (Clip): cada intento lleva un id de cobro nuevo. `amount` va como número (Clip).
+     * `propinas`: los porcentajes que el lector le ofrece al cliente; sin ellos no pregunta propina.
      */
-    crearIntencion: (c: { cobroId: string; monto: string; serie: string; webhookUrl: string; imprime: boolean }) =>
+    crearIntencion: (c: { cobroId: string; monto: string; serie: string; webhookUrl: string; imprime: boolean; propinas?: number[] | null }) =>
       llamar("POST", ruta("/payment"), {
         amount: Number(c.monto),
         reference: c.cobroId,
         serial_number_pos: c.serie,
         webhook_url: c.webhookUrl,
         preferences: {
-          is_tip_enabled: false, is_msi_enabled: false, is_mci_enabled: false, is_dcc_enabled: false,
+          ...(c.propinas?.length ? { is_tip_enabled: true, tip_options: c.propinas } : { is_tip_enabled: false }),
+          is_msi_enabled: false, is_mci_enabled: false, is_dcc_enabled: false,
           is_retry_enabled: true, is_split_payment_enabled: false, is_share_enabled: false,
           is_auto_return_enabled: true, is_auto_print_receipt_enabled: c.imprime,
         },

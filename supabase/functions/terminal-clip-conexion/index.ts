@@ -156,7 +156,10 @@ servir(async (req, json) => {
       const c = g ? await conexionDe((g as { conexion_id: string }).conexion_id) : null;
       if (!c) return json({ error: "SUCURSAL_SIN_CONECTAR" }, 409);
       const { error } = await admin.from("terminal_config_sucursal")
-        .update({ espera_segundos: v.espera_segundos, imprime_terminal: v.imprime_terminal, propina_opciones: v.propina_opciones })
+        .update({
+          espera_segundos: v.espera_segundos, imprime_terminal: v.imprime_terminal,
+          propina_opciones: v.propina_opciones, propina_en_terminal: v.propina_en_terminal,
+        })
         .eq("sucursal_id", v.sucursal_id).eq("tenant_id", tenantId);
       if (error) throw error;
       // La espera vive en el lector (`timeout_seg`), no en cada cobro. Si Clip falla, lo guardado

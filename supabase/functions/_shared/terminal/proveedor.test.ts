@@ -45,6 +45,14 @@ test("MP crear manda la misma order de siempre y aplica la respuesta", async () 
   if (r.ok) assert.deepEqual([r.datos.estado, r.datos.orden_id_externo, r.datos.detalle], ["EN_TERMINAL", "ORD1", null]);
 });
 
+test("MP crear ignora las propinas del lector: la order es la misma", async () => {
+  const sin = falso({ status: 201, cuerpo: { id: "ORD1" } });
+  const con = falso({ status: 201, cuerpo: { id: "ORD1" } });
+  await proveedorDe("MERCADO_PAGO", MP, BASE, sin.pedir)!.crear(COBRO);
+  await proveedorDe("MERCADO_PAGO", MP, BASE, con.pedir)!.crear({ ...COBRO, propinas: [10, 15, 20] });
+  assert.equal(con.llamadas[0].init.body, sin.llamadas[0].init.body);
+});
+
 test("MP crear sin folio dice «Cobro en caja» e imprime el ticket del vendedor", async () => {
   const f = falso({ status: 201, cuerpo: { id: "ORD1", status: "created" } });
   await proveedorDe("MERCADO_PAGO", MP, BASE, f.pedir)!.crear({ ...COBRO, folio: null, imprime: true, esperaSeg: 300 });
@@ -122,6 +130,20 @@ test("Clip crear manda la intención con el aviso del cobro y queda en la termin
   assert.deepEqual([cuerpo.reference, cuerpo.amount, cuerpo.serial_number_pos], ["c-1", 348, "P82"]);
   assert.equal(r.ok, true);
   if (r.ok) assert.deepEqual([r.datos.estado, r.datos.orden_id_externo], ["EN_TERMINAL", "pinpad-1"]);
+});
+
+test("Clip crear: el lector pregunta la propina solo si vienen porcentajes", async () => {
+  const preferencias = async (propinas?: number[] | null) => {
+    const f = falso({ status: 200, cuerpo: { pinpad_request_id: "pinpad-1" } });
+    await proveedorDe("CLIP", CLIP, BASE, f.pedir)!.crear({ ...COBRO, terminal: "P82", propinas });
+    return JSON.parse(String(f.llamadas[0].init.body)).preferences;
+  };
+  const con = await preferencias([10, 15]);
+  assert.deepEqual([con.is_tip_enabled, con.tip_options], [true, [10, 15]]);
+  for (const sin of [undefined, null, []]) {
+    const p = await preferencias(sin);
+    assert.deepEqual([p.is_tip_enabled, "tip_options" in p], [false, false], JSON.stringify(sin));
+  }
 });
 
 test("Clip crear sin respuesta cancela por número de serie y no se reintenta", async () => {
