@@ -16677,6 +16677,14 @@ export type Database = {
         Args: { p_minimo: number; p_producto: string; p_sucursal: string }
         Returns: undefined
       }
+      fijar_servicio_ticket: {
+        Args: {
+          p_modo: Database["public"]["Enums"]["modo_servicio"]
+          p_nombre?: string
+          p_ticket_id: string
+        }
+        Returns: undefined
+      }
       generar_codigo_interno: { Args: never; Returns: string }
       generar_folio: {
         Args: {

@@ -91,7 +91,10 @@ export type AccionCarrito =
   | { tipo: "cargar_cita"; citaId: string; lineas: LineaCarrito[]; cliente: ClienteCuenta | null; nombre: string | null }
   /** Belleza: quién hizo el renglón (null = nadie); `precio` = el suyo con esa persona. */
   | { tipo: "fijar_colaborador"; clientId: string; colaboradorId: string | null; precio?: number }
-  | { tipo: "limpiar" };
+  | { tipo: "limpiar" }
+  /** Comida rápida: un carrito VACÍO que se quedó en Pick-up o Domicilio vuelve a Para llevar (sin
+   *  envío, cliente ni nombre). Con renglones, o ya en mostrador, no cambia nada. */
+  | { tipo: "volver_a_mostrador" };
 
 export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): EstadoCarrito {
   const r = reducirCarrito(estado, accion);
@@ -167,6 +170,9 @@ function reducirCarrito(estado: EstadoCarrito, accion: AccionCarrito): EstadoCar
       // del mismo cliente sin cargo de envío. El cliente de la cuenta, en cambio, se suelta: en
       // mostrador el siguiente pedido es de otra persona.
       return { modoServicio: estado.modoServicio, lineas: [], clienteDomicilio: estado.clienteDomicilio ?? null, notaOrden: null, nombreCuenta: null, envio: estado.envio ?? null, clienteCuenta: null };
+    case "volver_a_mostrador":
+      if (estado.lineas.length > 0 || estado.modoServicio === "PARA_LLEVAR" || estado.modoServicio === "COMER_AQUI") return estado;
+      return reducerCarrito(estado, { tipo: "modo", modo: "PARA_LLEVAR" });
     default:
       return estado;
   }

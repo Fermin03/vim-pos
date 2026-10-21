@@ -271,18 +271,18 @@ export async function cambiarZonaDePedido(
 
 /**
  * Comida rápida: fija el tipo de servicio (y el nombre) contestado al cobrar una cuenta YA guardada
- * (retomada de «en espera», que se guardó con el PARA_LLEVAR por defecto sin preguntar). Solo si la
- * cuenta sigue ABIERTA; si no actualizó nada, falla y no se abre el cobro.
+ * (retomada de «en espera», o guardada antes por un descuento o un canje, con el PARA_LLEVAR por
+ * defecto sin preguntar). Va por la RPC `fijar_servicio_ticket` (0243): la guardia de escritura
+ * directa no deja cambiar `modo_servicio` por REST. La RPC exige la cuenta ABIERTA y solo cambia
+ * entre PARA_LLEVAR y COMER_AQUI; si falla, no se abre el cobro.
  */
 export async function fijarServicioTicket(token: string, ticketId: string, modo: ModoServicio, nombre: string | null): Promise<void> {
-  const { data, error } = await employeeClient(token)
-    .from("tickets")
-    .update({ modo_servicio: modo, nombre_cliente: nombre?.trim().slice(0, 100) || null })
-    .eq("id", ticketId)
-    .eq("estado_fiscal", "ABIERTO")
-    .select("id");
+  const { error } = await employeeClient(token).rpc("fijar_servicio_ticket", {
+    p_ticket_id: ticketId,
+    p_modo: modo,
+    p_nombre: nombre?.trim().slice(0, 100) || undefined, // sin nombre: el DEFAULT NULL de la RPC
+  });
   if (error) throw new Error(`No se guardó el tipo de servicio: ${error.message}`);
-  if (!data?.length) throw new Error("No se guardó el tipo de servicio: la cuenta ya no está abierta.");
 }
 
 /** F5.2b — fija la propina del ticket (RPC establecer_propina_ticket, bajo RLS). */

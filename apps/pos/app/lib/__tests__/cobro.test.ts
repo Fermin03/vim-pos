@@ -6,11 +6,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // ESTA tarea —cuándo se llama a `fijar_envio_ticket` y cuándo no— sin levantar Supabase, se
 // sustituye el módulo entero por un doble mínimo que solo entiende las llamadas que
 // `persistirTicket` hace de verdad (rpc + el select de `leerTotales`).
-const { rpcMock, singleMock, updateMock, filtrosMock } = vi.hoisted(() => ({
+const { rpcMock, singleMock, updateMock } = vi.hoisted(() => ({
   rpcMock: vi.fn(),
   singleMock: vi.fn(),
   updateMock: vi.fn(),
-  filtrosMock: vi.fn(),
 }));
 
 vi.mock("../supabase", () => ({
@@ -18,16 +17,7 @@ vi.mock("../supabase", () => ({
     rpc: rpcMock,
     from: () => ({
       select: () => ({ eq: () => ({ single: singleMock }) }),
-      // `update().eq()` se espera directo; `fijarServicioTicket` encadena `.eq().eq().select()`.
-      update: (valores: Record<string, unknown>) => {
-        const filtros: [string, unknown][] = [];
-        const q = {
-          eq: (k: string, v: unknown) => { filtros.push([k, v]); return q; },
-          select: () => { filtrosMock(filtros); return updateMock(valores); },
-          then: (ok: (v: unknown) => unknown, mal: (e: unknown) => unknown) => Promise.resolve(updateMock(valores)).then(ok, mal),
-        };
-        return q;
-      },
+      update: (valores: Record<string, unknown>) => ({ eq: () => updateMock(valores) }),
     }),
   }),
 }));
@@ -315,25 +305,22 @@ describe("persistirTicket — comida rápida: comer aquí con nombre", () => {
 });
 
 describe("fijarServicioTicket — cuenta retomada de «en espera» (comida rápida)", () => {
-  beforeEach(() => { updateMock.mockReset(); filtrosMock.mockReset(); });
+  beforeEach(() => { rpcMock.mockReset(); });
 
-  it("cambia modo y nombre solo de la cuenta ABIERTA", async () => {
-    updateMock.mockImplementation(async () => ({ data: [{ id: "ticket-1" }], error: null }));
+  it("guarda modo y nombre por la RPC fijar_servicio_ticket (el UPDATE directo lo rechaza la guardia)", async () => {
+    rpcMock.mockResolvedValue({ data: null, error: null });
     await fijarServicioTicket("t", "ticket-1", "COMER_AQUI", "  Ana  ");
-    expect(updateMock).toHaveBeenCalledWith({ modo_servicio: "COMER_AQUI", nombre_cliente: "Ana" });
-    expect(filtrosMock).toHaveBeenCalledWith([["id", "ticket-1"], ["estado_fiscal", "ABIERTO"]]);
+    expect(rpcMock).toHaveBeenCalledWith("fijar_servicio_ticket", { p_ticket_id: "ticket-1", p_modo: "COMER_AQUI", p_nombre: "Ana" });
   });
 
-  it("sin nombre lo deja vacío", async () => {
-    updateMock.mockImplementation(async () => ({ data: [{ id: "ticket-1" }], error: null }));
+  it("sin nombre lo manda vacío", async () => {
+    rpcMock.mockResolvedValue({ data: null, error: null });
     await fijarServicioTicket("t", "ticket-1", "PARA_LLEVAR", "  ");
-    expect(updateMock).toHaveBeenCalledWith({ modo_servicio: "PARA_LLEVAR", nombre_cliente: null });
+    expect(rpcMock).toHaveBeenCalledWith("fijar_servicio_ticket", { p_ticket_id: "ticket-1", p_modo: "PARA_LLEVAR", p_nombre: undefined });
   });
 
-  it("falla si la cuenta ya no está abierta o si la base responde error", async () => {
-    updateMock.mockImplementation(async () => ({ data: [], error: null }));
-    await expect(fijarServicioTicket("t", "ticket-1", "COMER_AQUI", null)).rejects.toThrow(/ya no está abierta/);
-    updateMock.mockImplementation(async () => ({ data: null, error: { message: "rls" } }));
-    await expect(fijarServicioTicket("t", "ticket-1", "COMER_AQUI", null)).rejects.toThrow(/rls/);
+  it("falla con el mensaje de la base (p. ej. la cuenta ya no está abierta)", async () => {
+    rpcMock.mockResolvedValue({ data: null, error: { message: "La cuenta ya no está abierta (estado actual: PAGADO)" } });
+    await expect(fijarServicioTicket("t", "ticket-1", "COMER_AQUI", null)).rejects.toThrow(/No se guardó el tipo de servicio: La cuenta ya no está abierta/);
   });
 });

@@ -98,7 +98,7 @@ import { fijarContextoErrores, reportarErrorSinEsperar } from "../lib/reportar-e
 import { BotonVolver } from "./boton-volver";
 import { CatalogoProductos } from "./catalogo-productos";
 import { PanelVentaRetail, type AvisoEscaneo } from "./venta-retail";
-import { comoTienda, conBarraAbajo, destinosDe, esComidaRapida, globoPedidos, seccionTrasLista, preguntaServicio, esBelleza, seccionInicial, puedeRecibirMercancia, leerExistencias, leerSucursales, pasoConLimite, puedeCambiarSeccion, renglonTienda, sinExistencia, type Existencia, type PadreTienda, type SeccionTienda } from "../lib/tienda";
+import { comoTienda, conBarraAbajo, destinosDe, esComidaRapida, globoPedidos, seccionTrasLista, preguntaServicio, faltaPreguntarServicio, esBelleza, seccionInicial, puedeRecibirMercancia, leerExistencias, leerSucursales, pasoConLimite, puedeCambiarSeccion, renglonTienda, sinExistencia, type Existencia, type PadreTienda, type SeccionTienda } from "../lib/tienda";
 import { leerEstadoSync } from "../lib/estado-sync";
 import { ModalAgregarProductos } from "./modal-agregar-productos";
 import { ModalNumeroMesa } from "./modal-numero-mesa";
@@ -970,7 +970,9 @@ export function HomePos({
     setSeccionTienda(destino);
     setEnCreditos(false); // tocar «Más» otra vez vuelve a su menú
     setEnCotizaciones(false);
-  }, [confirmarDescarteRecepcion]);
+    // Comida rápida: volver a «Cobrar» sin venta guardada y con el carrito vacío es una venta de mostrador.
+    if (destino === "panel" && comidaRapida && !ticketBd) dispatch({ tipo: "volver_a_mostrador" });
+  }, [confirmarDescarteRecepcion, comidaRapida, ticketBd]);
 
   // Se cobró, se canceló o se volvió a poner en espera a mano: el ticket ya no está en pantalla y
   // no hay nada que devolver a espera.
@@ -1766,8 +1768,8 @@ export function HomePos({
     }
   }, [token, empleado, caja.nombre, imprimirComandaPorAreas, imprimirComandaCocina, logoParaTicket, comidaRapida]);
 
-  /** Cuenta retomada de «en espera» cuyo tipo de servicio ya se contestó: cerrar el cobro y volver a
-   *  cobrar no pregunta dos veces. */
+  /** Cuenta de mostrador ya guardada cuyo tipo de servicio ya se contestó (o se guardó al cobrar,
+   *  después de contestarlo): cerrar el cobro y volver a cobrar no pregunta dos veces. */
   const servicioContestado = useRef<string | null>(null);
   /** `elegido`: el carrito con el modo (y el nombre) que se acaba de contestar en «¿Para llevar o comer aquí?». */
   const iniciarCobro = useCallback(async (atajo: "EFECTIVO_EXACTO" | null = null, elegido?: EstadoCarrito) => {
@@ -1775,12 +1777,12 @@ export function HomePos({
     if (c.lineas.length === 0) return;
     if (revisandoCobro.current) return;
     // Comida rápida: antes de guardar el ticket se pregunta el tipo de servicio (y el nombre). Con la
-    // venta sin guardar, o con una cuenta retomada de «en espera» (se guardó con el PARA_LLEVAR por
-    // defecto, sin preguntar). Una cuenta guardada al cobrar ya lo contestó.
-    // Cancelar la ventana deja la venta como estaba: sin ticket y sin abrir el cajón.
+    // venta sin guardar, o con una cuenta de mostrador que se guardó antes con el PARA_LLEVAR por
+    // defecto sin preguntar: retomada de «en espera», o guardada por un descuento o un canje. Una
+    // cuenta abierta desde una lista (mesa, pick-up, domicilio) no se pregunta, y una guardada al
+    // cobrar ya lo contestó. Cancelar la ventana deja la venta como estaba: sin cobro y sin cajón.
     if (comidaRapida && !configMostrador) return;
-    const retomadaSinContestar = !!ticketBd && retomadoEspera?.ticketId === ticketBd.ticketId && servicioContestado.current !== ticketBd.ticketId;
-    if (configMostrador && !elegido && (!ticketBd || retomadaSinContestar)) {
+    if (configMostrador && !elegido && faltaPreguntarServicio(ticketBd?.ticketId ?? null, servicioContestado.current, enModoMesa, retomadoEspera?.ticketId ?? null)) {
       const p = preguntaServicio(caja.giro, configMostrador, c.modoServicio);
       if (p) { setPreguntaCobro({ tipo: p, atajo }); return; }
     }
@@ -1848,6 +1850,7 @@ export function HomePos({
     try {
       const totales = await persistirCarrito(c);
       ticketNuevoDelCobro.current = totales.ticketId;
+      servicioContestado.current = totales.ticketId; // se guardó con lo contestado (o sin pregunta)
       /* EL TICKET YA EXISTE, CON FOLIO. La pantalla tiene que saberlo desde este instante.
 
          Antes solo se guardaba en `totalesCobro` (para el modal), y `ticketBd` se quedaba en
@@ -1864,11 +1867,11 @@ export function HomePos({
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, caja.giro, turno.caja_id, turno.id, online, adoptarTicketSiQuedoAbierto, lealtadActiva, programa, cobroTerminado, configMostrador, comidaRapida, retomadoEspera]);
+  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, caja.giro, turno.caja_id, turno.id, online, adoptarTicketSiQuedoAbierto, lealtadActiva, programa, cobroTerminado, configMostrador, comidaRapida, retomadoEspera, enModoMesa]);
 
   /** Respuesta de «¿Para llevar o comer aquí?»: fija modo y nombre, y sigue el cobro con ese carrito. */
-  /** Con la cuenta ya guardada (retomada de «en espera»), primero se guarda en la base; si falla, no
-   *  se abre el cobro. */
+  /** Con la cuenta ya guardada (retomada de «en espera», o por un descuento o un canje), primero se
+   *  guarda en la base; si falla, no se abre el cobro. */
   const elegirServicio = useCallback(async (modo: "PARA_LLEVAR" | "COMER_AQUI", nombre: string | null) => {
     const atajo = preguntaCobro?.atajo ?? null;
     const accion = { tipo: "modo", modo, nombre: nombre ?? carrito.nombreCuenta ?? null } as const;
@@ -1975,6 +1978,9 @@ export function HomePos({
       const enviados = await enviarACocina(token, bd.ticketId);
       await imprimirComandaCocina(bd.ticketId, enviados, cocinaEnviada);
       dispatch({ tipo: "limpiar" });
+      // Comida rápida: «Cobrar» no tiene inicio para volver a Para llevar; sin esto la siguiente venta
+      // quedaba en Pick-up o Domicilio (con el envío y el cliente de este pedido) y sin botón Cobrar.
+      if (comidaRapida) dispatch({ tipo: "volver_a_mostrador" });
       setTicketBd(null);
       setItemsPersistidos([]);
       setCocinaEnviada(false);
@@ -1985,7 +1991,7 @@ export function HomePos({
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, turno.caja_id, turno.id, cocinaEnviada, imprimirComandaCocina, volverAtras, adoptarTicketSiQuedoAbierto]);
+  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, turno.caja_id, turno.id, cocinaEnviada, imprimirComandaCocina, volverAtras, adoptarTicketSiQuedoAbierto, comidaRapida]);
 
   /**
    * Reimprime la comanda completa de un ticket, repartida por estación como la original, ya con
@@ -2347,7 +2353,8 @@ export function HomePos({
       capaConsultaInv,
       [viendoMapaMesas, () => { setViendoMapaMesas(false); setPidiendoMesa(true); }],
       [pidiendoMesa, () => setPidiendoMesa(false)],
-      [nombreCuentaAbierto, () => setNombreCuentaAbierto(false)],
+      // Comida rápida: cancelar el nombre de «Nuevo para recoger» (carrito vacío) cancela el pick-up.
+      [nombreCuentaAbierto, () => { setNombreCuentaAbierto(false); if (comidaRapida && !ticketBd) dispatch({ tipo: "volver_a_mostrador" }); }],
       [nombreBarra != null, () => setNombreBarra(null)],
       [pasandoAMesa != null, () => setPasandoAMesa(null)],
       [clienteDomAbierto, () => setClienteDomAbierto(false)],
@@ -2402,7 +2409,7 @@ export function HomePos({
       cerrarAlEscanear: confirmacion != null ? nuevoTicket : mostrarRecibo ? cerrarVistaRecibo : null,
     };
   }, [selectorRetail, cantidadRetail, avisoRetail, descuentoAbierto, llevarListaAbierta, preguntaCobro, avisoTiendaVisible, modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, vistaCotizacion, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
-      agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto, nombreBarra, pasandoAMesa,
+      agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto, comidaRapida, ticketBd, nombreBarra, pasandoAMesa,
       clienteDomAbierto, clienteCuentaAbierto, zonaPedidoAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
       salidaPendiente, confirmandoCierre, menuGeneralAbierto, cerrando, enInicio, enKds, enMonitor,
@@ -3660,7 +3667,7 @@ export function HomePos({
           // La venta de un cambio, reabierta, ya trae el pago de la prenda: «Cobrar» pide solo lo que falta.
           pendienteMxn={capturaTienda && totalAutoritativo != null && ticketBd?.estadoFiscal === "ABIERTO" && ticketBd.montoPagado > 0 ? ticketBd.pendiente : undefined}
           bloqueado={bloqueado}
-          procesando={procesandoCobro || guardandoCotizacion}
+          procesando={procesandoCobro || guardandoCotizacion || (comidaRapida && !configMostrador)} // comida rápida: sin la config del mostrador el cobro aún no puede preguntar
         />
       </div>
       {barraAbajo && seccionTienda !== "panel" && (

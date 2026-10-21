@@ -290,3 +290,32 @@ describe("belleza: cargar la cita y fijar el colaborador", () => {
     expect(e.lineas.map((l) => [l.clientId, l.cantidad])).toEqual([["a", 2], ["b", 1]]);
   });
 });
+
+describe("volver_a_mostrador (comida rápida)", () => {
+  const cliente: ClienteDomicilio = { clienteId: "c1", nombre: "Ana", telefono: "477", direccionId: "d1", direccionPreview: "Madero 10", zona: null };
+  const linea: LineaCarrito = { clientId: "l1", producto: prod("p1", "Hamburguesa", 120), cantidad: 1, modificadores: [], notaCocina: null };
+
+  it("un carrito vacío de domicilio vuelve a Para llevar sin envío ni cliente", () => {
+    const con = reducerCarrito(
+      { ...estadoInicial, modoServicio: "DELIVERY_PROPIO", clienteDomicilio: cliente },
+      { tipo: "zona", envio: { zonaId: "z1", nombre: "Zona Norte", costoMxn: 35 } },
+    );
+    const e = reducerCarrito(reducerCarrito(con, { tipo: "limpiar" }), { tipo: "volver_a_mostrador" });
+    expect(e.modoServicio).toBe("PARA_LLEVAR");
+    expect(e.envio).toBeNull();
+    expect(e.clienteDomicilio).toBeNull();
+  });
+
+  it("un carrito vacío de pick-up vuelve a Para llevar sin el nombre", () => {
+    const e = reducerCarrito({ ...estadoInicial, modoServicio: "DRIVE_THRU", nombreCuenta: "Luis" }, { tipo: "volver_a_mostrador" });
+    expect(e.modoServicio).toBe("PARA_LLEVAR");
+    expect(e.nombreCuenta).toBeNull();
+  });
+
+  it("con renglones, o ya en mostrador, no cambia nada", () => {
+    const conLineas = { ...estadoInicial, modoServicio: "DRIVE_THRU" as const, lineas: [linea] };
+    expect(reducerCarrito(conLineas, { tipo: "volver_a_mostrador" })).toBe(conLineas);
+    const comerAqui = { ...estadoInicial, modoServicio: "COMER_AQUI" as const };
+    expect(reducerCarrito(comerAqui, { tipo: "volver_a_mostrador" })).toBe(comerAqui);
+  });
+});

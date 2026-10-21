@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { etiquetaModo } from "@vim/db/modos-servicio";
-import { preguntaServicio } from "../tienda";
+import { faltaPreguntarServicio, preguntaServicio } from "../tienda";
 import { estadoInicial, reducerCarrito } from "../carrito";
 
 const APAGADO = { pedirNombre: false, tieneDondeComer: false };
@@ -52,5 +52,24 @@ describe("carrito — modo con nombre", () => {
   it("sin nombre, el cambio de modo lo sigue borrando como antes", () => {
     const e = reducerCarrito({ ...estadoInicial, nombreCuenta: "Ana" }, { tipo: "modo", modo: "PARA_LLEVAR" });
     expect(e.nombreCuenta).toBeNull();
+  });
+});
+
+describe("faltaPreguntarServicio — cuándo sale la pregunta con la cuenta ya guardada", () => {
+  it("venta sin guardar: siempre", () => {
+    expect(faltaPreguntarServicio(null, null, false, null)).toBe(true);
+  });
+  it("guardada por un descuento o un canje (mostrador, sin contestar): sí", () => {
+    expect(faltaPreguntarServicio("t1", null, false, null)).toBe(true);
+  });
+  it("ya contestada o guardada al cobrar: no", () => {
+    expect(faltaPreguntarServicio("t1", "t1", false, null)).toBe(false);
+  });
+  it("retomada de «en espera» (entra en modo cuenta): sí, hasta contestarla", () => {
+    expect(faltaPreguntarServicio("t1", null, true, "t1")).toBe(true);
+    expect(faltaPreguntarServicio("t1", "t1", true, "t1")).toBe(false);
+  });
+  it("abierta desde una lista (mesa, pick-up, domicilio): no", () => {
+    expect(faltaPreguntarServicio("t1", null, true, null)).toBe(false);
   });
 });

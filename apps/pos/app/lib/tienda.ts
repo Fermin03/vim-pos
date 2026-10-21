@@ -33,6 +33,16 @@ export function preguntaServicio(
   return cfg.pedirNombre ? "NOMBRE" : null;
 }
 
+/**
+ * Comida rápida: ¿falta preguntar el tipo de servicio de esta venta? Sí si aún no se guardó, o si es
+ * una cuenta de mostrador guardada sin contestar (retomada de «en espera», o guardada por un
+ * descuento o un canje). Una cuenta abierta desde una lista (mesa, pick-up, domicilio) no.
+ */
+export function faltaPreguntarServicio(ticketId: string | null, contestado: string | null, desdeLista: boolean, retomadoId: string | null): boolean {
+  if (!ticketId) return true;
+  return contestado !== ticketId && (!desdeLista || retomadoId === ticketId);
+}
+
 /** Navegación: la barra de abajo en vez de la pantalla de inicio. El ticket y el cobro los decide `comoTienda`. */
 export const conBarraAbajo = (caja: DatosCaja | null): boolean => comoTienda(caja) || esComidaRapida(caja);
 

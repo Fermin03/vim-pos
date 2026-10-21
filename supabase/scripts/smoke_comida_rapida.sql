@@ -59,6 +59,49 @@ BEGIN
    WHERE ticket_id = v_ticket AND cancelado = false AND enviado_cocina_at IS NULL AND cargo_tipo IS NULL;
   GET DIAGNOSTICS v_n = ROW_COUNT;
   IF v_n <> 0 THEN RAISE EXCEPTION '3: el segundo envío volvió a marcar renglones (%)', v_n; END IF;
+
+  -- 4) 0243 · «Comer aquí» en una cuenta ABIERTA retomada de espera, por la ruta de PostgREST
+  --    (con `request.path` fijado, la guardia de 0133 sí actúa).
+  EXECUTE 'RESET ROLE';
+  v_ticket := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smoke-0243-1', v_cajero);
+  PERFORM agregar_item_a_ticket(v_ticket, v_prod, 1, NULL, '[]'::jsonb, 'smoke-0243-item');
+  UPDATE tickets SET estado_fiscal = 'ABIERTO' WHERE id = v_ticket AND estado_fiscal = 'BORRADOR';
+  EXECUTE 'SET LOCAL ROLE authenticated';
+  -- 4a) El UPDATE directo por REST lo rechaza la guardia.
+  PERFORM set_config('request.path', '/tickets', true);
+  BEGIN
+    UPDATE tickets SET modo_servicio = 'COMER_AQUI' WHERE id = v_ticket;
+    RAISE EXCEPTION '4a: la guardia dejó cambiar modo_servicio por REST directo';
+  EXCEPTION WHEN insufficient_privilege THEN NULL;
+  END;
+  -- 4b) Por la RPC sí, con el nombre recortado.
+  PERFORM set_config('request.path', '/rpc/fijar_servicio_ticket', true);
+  PERFORM fijar_servicio_ticket(v_ticket, 'COMER_AQUI', '  Ana  ');
+  IF (SELECT modo_servicio::text || '|' || coalesce(nombre_cliente, '') FROM tickets WHERE id = v_ticket) <> 'COMER_AQUI|Ana' THEN
+    RAISE EXCEPTION '4b: la RPC no guardó el servicio y el nombre';
+  END IF;
+  -- 4c) Solo PARA_LLEVAR ↔ COMER_AQUI.
+  BEGIN
+    PERFORM fijar_servicio_ticket(v_ticket, 'DELIVERY_PROPIO', NULL);
+    RAISE EXCEPTION '4c: la RPC dejó pasar a DELIVERY_PROPIO';
+  EXCEPTION WHEN invalid_parameter_value THEN NULL;
+  END;
+  -- 4d) Una cuenta ya PAGADA no se toca.
+  BEGIN
+    PERFORM fijar_servicio_ticket((SELECT id FROM tickets WHERE client_id_local = 'smoke-0242-1'), 'PARA_LLEVAR', NULL);
+    RAISE EXCEPTION '4d: la RPC cambió una cuenta pagada';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM NOT LIKE '%ya no está abierta%' THEN RAISE; END IF;
+  END;
+  -- 4e) La cuenta de otro negocio no existe para quien llama.
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_cajero, 'role', 'authenticated', 'tenant_id', v_otro)::text, true);
+  BEGIN
+    PERFORM fijar_servicio_ticket(v_ticket, 'PARA_LLEVAR', NULL);
+    RAISE EXCEPTION '4e: otro negocio cambió la cuenta';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM NOT LIKE '%no existe%' THEN RAISE; END IF;
+  END;
+  PERFORM set_config('request.path', '', true);
   RAISE NOTICE 'smoke_comida_rapida OK';
 END $$;
 ROLLBACK;
