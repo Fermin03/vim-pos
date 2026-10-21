@@ -286,3 +286,20 @@ describe("persistirTicket — belleza: colaborador por renglón y la cita", () =
     expect(rpcMock.mock.calls.map((c) => c[0])).not.toContain("agregar_item_a_ticket");
   });
 });
+
+describe("persistirTicket — comida rápida: comer aquí con nombre", () => {
+  beforeEach(() => {
+    updateMock.mockReset();
+    updateMock.mockImplementation(async () => ({ error: null }));
+    rpcMock.mockReset();
+    rpcMock.mockImplementation(async () => ({ data: "ticket-1", error: null }));
+    singleMock.mockReset();
+    singleMock.mockImplementation(async () => ({ data: TOTALES_ROW, error: null }));
+  });
+
+  it("abre el ticket COMER_AQUI y le pone el nombre del cliente", async () => {
+    await persistirTicket(ctx, "COMER_AQUI", [], "cli-3", null, null, null, "  Ana  ");
+    expect(rpcMock.mock.calls.find((c) => c[0] === "abrir_ticket")?.[1]).toMatchObject({ p_modo_servicio: "COMER_AQUI" });
+    expect(updateMock).toHaveBeenCalledWith({ nombre_cliente: "Ana" });
+  });
+});

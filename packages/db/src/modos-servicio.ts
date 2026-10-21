@@ -10,6 +10,7 @@
  * obliga a que estén los doce: un modo nuevo en el enum no compila hasta tener nombre.
  */
 import type { Database } from "./database.types";
+import { esGiroComidaRapida } from "./operacion";
 
 export type ModoServicio = Database["public"]["Enums"]["modo_servicio"];
 
@@ -29,7 +30,9 @@ export const ETIQUETA_MODO: Record<ModoServicio, string> = {
 };
 
 /** Nombre legible de un modo. Acepta `string` porque las vistas SQL y los select anidados lo
- *  devuelven sin tipar; un valor que no existe se devuelve tal cual antes que romper la pantalla. */
-export function etiquetaModo(modo: string): string {
+ *  devuelven sin tipar; un valor que no existe se devuelve tal cual antes que romper la pantalla.
+ *  Con el giro: comida rápida y food truck no tienen comedor de mesas; su `COMER_AQUI` es «Comer aquí». */
+export function etiquetaModo(modo: string, giro?: string | null): string {
+  if (modo === "COMER_AQUI" && esGiroComidaRapida(giro)) return "Comer aquí";
   return ETIQUETA_MODO[modo as ModoServicio] ?? modo;
 }

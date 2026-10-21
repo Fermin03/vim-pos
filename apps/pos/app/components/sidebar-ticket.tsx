@@ -76,6 +76,7 @@ export function SidebarTicket({
   procesando,
   onEditar,
   tienda,
+  clienteCuenta,
 }: {
   estado: EstadoCarrito;
   onCantidad: (clientId: string, cantidad: number) => void;
@@ -145,6 +146,8 @@ export function SidebarTicket({
   /** El ticket ya está comprometido en BD: bloquea edición del carrito para evitar desincronización. */
   bloqueado?: boolean;
   procesando: boolean;
+  /** Comida rápida: «Asignar cliente» en un menú «⋯» que reemplaza a «Limpiar» (que pasa adentro). */
+  clienteCuenta?: { nombre: string | null; onAsignar: () => void };
   /** Giro RETAIL: variante y SKU en el renglón, «Sin existencia» y el último agregado marcado. */
   tienda?: {
     /** Nombre del padre y «M · Negra · SKU» de la línea. */
@@ -207,7 +210,10 @@ export function SidebarTicket({
   // El ticket se cobró, se canceló o se vació: la elección no pasa al siguiente.
   useEffect(() => { if (vacio) setEligiendoDescuento(false); }, [vacio]);
   const descuentoProducto = tienda?.onDescuentoProducto;
-  const opcionesMenu = [
+  const opcionCliente = clienteCuenta
+    ? { texto: `${clienteCuenta.nombre ? "Cambiar" : "Asignar"} cliente`, hacer: clienteCuenta.onAsignar, activa: true }
+    : { texto: tienda?.cliente ? "Cambiar cliente" : "Asignar cliente", hacer: () => tienda?.onAsignarCliente?.(), activa: !!tienda?.onAsignarCliente };
+  const opcionesTienda = [
     { texto: estado.notaOrden ? "Editar nota" : "Nota", hacer: () => setNotaOrdenAbierta(true), activa: !!onNotaOrden && !bloqueado },
     ...(seCobraDespues ? [] : [
       {
@@ -217,7 +223,7 @@ export function SidebarTicket({
       },
       { texto: "Descuento general", hacer: () => onAplicarDescuento?.(), activa: !vacio && !hayDescuento && !procesando && !!onAplicarDescuento },
     ]),
-    { texto: tienda?.cliente ? "Cambiar cliente" : "Asignar cliente", hacer: () => tienda?.onAsignarCliente?.(), activa: !!tienda?.onAsignarCliente },
+    opcionCliente,
     ...(tienda?.onGuardarCotizacion
       ? [{ texto: "Guardar como cotización", hacer: tienda.onGuardarCotizacion, activa: !procesando && !tienda.motivoSinCotizacion, detalle: tienda.motivoSinCotizacion ?? undefined }]
       : []),
@@ -229,6 +235,8 @@ export function SidebarTicket({
       peligro: true,
     },
   ];
+  // Fuera del Panel de la tienda la nota y los descuentos ya tienen su botón: el menú lleva cliente y Limpiar.
+  const opcionesMenu = simple ? opcionesTienda : [opcionCliente, opcionesTienda.at(-1)!];
   const menuTienda = (
     <div className="relative -mr-2.5 flex-shrink-0">
       <button
@@ -306,7 +314,7 @@ export function SidebarTicket({
           <span className="truncate font-display text-18 font-semibold leading-tight tracking-[-0.02em]">
             {titulo ?? (folioCuenta ? `Cuenta ${folioCuenta}` : "Ticket nuevo")}
           </span>
-          {simple ? menuTienda : botonLimpiar}
+          {simple || clienteCuenta ? menuTienda : botonLimpiar}
         </div>
         {/* Modo de servicio — SOLO LECTURA. El modo se elige en la pantalla de inicio (una venta
             no cambia de modo a media captura); aquí se muestra para que el cajero no pierda de
@@ -321,6 +329,7 @@ export function SidebarTicket({
                 <span className="truncate">{modoTexto ?? etiquetaModo(estado.modoServicio)}</span>
               </span>
             )}
+            {!simple && clienteCuenta?.nombre && <span className="min-w-0 flex-1 truncate text-13 font-semibold text-ink-2">{clienteCuenta.nombre}</span>}
             <span className="flex-shrink-0 text-13 font-semibold text-ink-3">
               {totalProductos} {totalProductos === 1 ? "producto" : "productos"}
             </span>

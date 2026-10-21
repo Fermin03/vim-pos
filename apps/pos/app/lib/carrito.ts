@@ -77,7 +77,8 @@ export type AccionCarrito =
   | { tipo: "editar"; clientId: string; editada: LineaCarrito; alcance: AlcanceEdicion }
   | { tipo: "cantidad"; clientId: string; cantidad: number }
   | { tipo: "quitar"; clientId: string }
-  | { tipo: "modo"; modo: ModoServicio }
+  /** `nombre` (comida rápida, al cobrar): el nombre de la cuenta, que el cambio de modo borraría. */
+  | { tipo: "modo"; modo: ModoServicio; nombre?: string | null }
   | { tipo: "cliente"; cliente: ClienteDomicilio | null }
   | { tipo: "cliente_cuenta"; cliente: ClienteCuenta | null }
   | { tipo: "nota_linea"; clientId: string; nota: string | null }
@@ -144,7 +145,7 @@ function reducirCarrito(estado: EstadoCarrito, accion: AccionCarrito): EstadoCar
       return { ...estado, lineas: estado.lineas.filter((l) => l.clientId !== accion.clientId) };
     case "modo":
       // Al salir de Domicilio se limpia el cliente asociado y el envío.
-      return { ...estado, modoServicio: accion.modo, clienteDomicilio: accion.modo === "DELIVERY_PROPIO" ? estado.clienteDomicilio ?? null : null, nombreCuenta: accion.modo === "DRIVE_THRU" ? estado.nombreCuenta ?? null : null, envio: accion.modo === "DELIVERY_PROPIO" ? estado.envio ?? null : null, clienteCuenta: admiteClienteCuenta(accion.modo) ? estado.clienteCuenta ?? null : null };
+      return { ...estado, modoServicio: accion.modo, clienteDomicilio: accion.modo === "DELIVERY_PROPIO" ? estado.clienteDomicilio ?? null : null, nombreCuenta: accion.nombre !== undefined ? accion.nombre : accion.modo === "DRIVE_THRU" ? estado.nombreCuenta ?? null : null, envio: accion.modo === "DELIVERY_PROPIO" ? estado.envio ?? null : null, clienteCuenta: admiteClienteCuenta(accion.modo) ? estado.clienteCuenta ?? null : null };
     case "cliente":
       return { ...estado, clienteDomicilio: accion.cliente };
     case "cliente_cuenta":

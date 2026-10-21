@@ -5,6 +5,7 @@ import {
   listarCategoriasPos,
   listarProductosPos,
   leerComboUpsellActivo,
+  leerConfigMostrador,
   type Categoria,
   type Producto,
 } from "../lib/catalogo";
@@ -20,6 +21,7 @@ import {
   admiteClienteCuenta,
   clienteIdParaTicket,
   calcularTotalesDisplay,
+  type EstadoCarrito,
   type LineaCarrito,
   type ModificadorSel,
   type EnvioCarrito,
@@ -85,6 +87,8 @@ import { CapaPedidosTienda, type AccionTienda, type ListoTienda } from "./pedido
 import { esEscritorio } from "../lib/actualizacion";
 import { BandaAcceso, BandaActualizacion, useAcceso } from "./banda-acceso";
 import { moduloActivo } from "@vim/db/operacion";
+import { etiquetaModo } from "@vim/db/modos-servicio";
+import { ModalServicioComida } from "./modal-servicio-comida";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalDescuentoItem } from "./modal-descuento-item";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
@@ -94,7 +98,7 @@ import { fijarContextoErrores, reportarErrorSinEsperar } from "../lib/reportar-e
 import { BotonVolver } from "./boton-volver";
 import { CatalogoProductos } from "./catalogo-productos";
 import { PanelVentaRetail, type AvisoEscaneo } from "./venta-retail";
-import { comoTienda, conBarraAbajo, destinosDe, esComidaRapida, esBelleza, seccionInicial, puedeRecibirMercancia, leerExistencias, leerSucursales, pasoConLimite, puedeCambiarSeccion, renglonTienda, sinExistencia, type Existencia, type PadreTienda, type SeccionTienda } from "../lib/tienda";
+import { comoTienda, conBarraAbajo, destinosDe, esComidaRapida, preguntaServicio, esBelleza, seccionInicial, puedeRecibirMercancia, leerExistencias, leerSucursales, pasoConLimite, puedeCambiarSeccion, renglonTienda, sinExistencia, type Existencia, type PadreTienda, type SeccionTienda } from "../lib/tienda";
 import { leerEstadoSync } from "../lib/estado-sync";
 import { ModalAgregarProductos } from "./modal-agregar-productos";
 import { ModalNumeroMesa } from "./modal-numero-mesa";
@@ -399,24 +403,26 @@ export function HomePos({
   const ticketClientIdRef = useRef<string | null>(null);
   const idTicketDelCarrito = (): string => (ticketClientIdRef.current ??= nuevoClientId());
   /** Guarda el carrito como ticket (abrir, renglones y envío). Reintentable: lleva el mismo id local. */
-  const persistirCarrito = () => {
+  // `c`: comida rápida guarda el carrito recién elegido en «¿Para llevar o comer aquí?», que todavía
+  // no llega al estado de React cuando se llama.
+  const persistirCarrito = (c: EstadoCarrito = carrito) => {
     // Belleza: un servicio sin quien lo hizo no se cobra (su comisión no tendría dueño).
-    if (agenda && carrito.lineas.length > 0 && !servicioIdsRef.current) {
+    if (agenda && c.lineas.length > 0 && !servicioIdsRef.current) {
       return Promise.reject(new Error("Todavía no se leen los servicios de la agenda: revisa la conexión en «Citas de hoy» y vuelve a intentar."));
     }
-    const falta = agenda && servicioIdsRef.current ? servicioSinColaborador(carrito.lineas, servicioIdsRef.current) : undefined;
+    const falta = agenda && servicioIdsRef.current ? servicioSinColaborador(c.lineas, servicioIdsRef.current) : undefined;
     if (falta) return Promise.reject(new Error(`Elige quién hizo «${falta.producto.nombre}» antes de cobrar.`));
     return persistirTicket(
       { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
-      carrito.modoServicio,
-      carrito.lineas,
+      c.modoServicio,
+      c.lineas,
       idTicketDelCarrito(),
-      clienteIdParaTicket(carrito),
-      carrito.clienteDomicilio?.direccionId ?? null,
-      carrito.notaOrden ?? null,
-      carrito.nombreCuenta ?? null,
-      carrito.envio?.zonaId ?? null,
-      carrito.citaId ?? null,
+      clienteIdParaTicket(c),
+      c.clienteDomicilio?.direccionId ?? null,
+      c.notaOrden ?? null,
+      c.nombreCuenta ?? null,
+      c.envio?.zonaId ?? null,
+      c.citaId ?? null,
     );
   };
   /**
@@ -446,6 +452,8 @@ export function HomePos({
   const [clienteDomAbierto, setClienteDomAbierto] = useState(false);
   // Cliente (opcional) de la cuenta en Comedor, Para llevar y Pick-up. Ver ModalClienteCuenta.
   const [clienteCuentaAbierto, setClienteCuentaAbierto] = useState(false);
+  /** Comida rápida: «¿Para llevar o comer aquí?» abierta al presionar Cobrar (o solo el nombre). */
+  const [preguntaCobro, setPreguntaCobro] = useState<{ tipo: "PREGUNTA" | "NOMBRE"; atajo: "EFECTIVO_EXACTO" | null } | null>(null);
   // Task 7 — cambiar la zona de reparto de ESTE pedido desde el renglón de envío del ticket
   // lateral (no reabre la búsqueda de cliente ni toca `direcciones_cliente`).
   const [zonaPedidoAbierto, setZonaPedidoAbierto] = useState(false);
@@ -629,6 +637,14 @@ export function HomePos({
    */
   const barraAbajo = conBarraAbajo(caja);
   const comidaRapida = esComidaRapida(caja);
+  // Mostrador de comida rápida (0242): mientras se lee, o si falla, todo apagado (el default de la base).
+  const [configMostrador, setConfigMostrador] = useState({ pedirNombre: false, tieneDondeComer: false });
+  useEffect(() => {
+    if (!comidaRapida) return;
+    let vivo = true;
+    void leerConfigMostrador(token).then((c) => { if (vivo) setConfigMostrador(c); }).catch(() => {});
+    return () => { vivo = false; };
+  }, [comidaRapida, token]);
   const seccionInicio = seccionInicial(caja, agenda);
   /** La cuenta cargada es la venta de un cambio: no se le ofrece canje de lealtad (como no suma, 0200).
    *  `null` mientras se lee o si falla la lectura: tampoco se ofrece. */
@@ -1607,6 +1623,8 @@ export function HomePos({
     setEnModoMesa(false);
     setCocinaEnviada(false);
     dispatch({ tipo: "limpiar" });
+    // Comida rápida: la venta siguiente es de mostrador aunque esta fuera comer aquí, pick-up o domicilio.
+    if (comidaRapida) dispatch({ tipo: "modo", modo: "PARA_LLEVAR" });
     setCuentasVersion((v) => v + 1); // la cuenta pagada ya no va en la lista
     setAgendaVersion((v) => v + 1); // belleza: la cita cobrada pasa a «Cobradas hoy»
     setConfirmacion({ folio, cambio, total, ...(aCredito ? { aCredito } : {}) });
@@ -1716,11 +1734,20 @@ export function HomePos({
     } catch {
       setEstadoTicket("error");
     }
-  }, [token, empleado, caja.nombre, imprimirComandaPorAreas, logoParaTicket]);
+  }, [token, empleado, caja.nombre, imprimirComandaPorAreas, logoParaTicket, comidaRapida]);
 
-  const iniciarCobro = useCallback(async (atajo: "EFECTIVO_EXACTO" | null = null) => {
-    if (carrito.lineas.length === 0) return;
+  /** `elegido`: el carrito con el modo (y el nombre) que se acaba de contestar en «¿Para llevar o comer aquí?». */
+  const iniciarCobro = useCallback(async (atajo: "EFECTIVO_EXACTO" | null = null, elegido?: EstadoCarrito) => {
+    const c = elegido ?? carrito;
+    if (c.lineas.length === 0) return;
     if (revisandoCobro.current) return;
+    // Comida rápida: antes de guardar el ticket se pregunta el tipo de servicio (y el nombre). Solo con
+    // la venta sin guardar: una cuenta ya guardada (retomada, a medias) trae su modo en la base.
+    // Cancelar la ventana deja la venta como estaba: sin ticket y sin abrir el cajón.
+    if (!ticketBd && !elegido) {
+      const p = preguntaServicio(caja.giro, configMostrador, c.modoServicio);
+      if (p) { setPreguntaCobro({ tipo: p, atajo }); return; }
+    }
     // Lealtad: antes de abrir el cobro de una cuenta que ya existe se revisa (a) que no tenga un
     // canje a medias y (b) que su canje de dinero no haya quedado recortado. La revisión es la misma
     // que usa la lista de cuentas (`revisarLealtadAntesDeCobrar`) y decide con totales RECIÉN LEÍDOS,
@@ -1783,7 +1810,7 @@ export function HomePos({
     setProcesandoCobro(true);
     setError(null);
     try {
-      const totales = await persistirCarrito();
+      const totales = await persistirCarrito(c);
       /* EL TICKET YA EXISTE, CON FOLIO. La pantalla tiene que saberlo desde este instante.
 
          Antes solo se guardaba en `totalesCobro` (para el modal), y `ticketBd` se quedaba en
@@ -1800,7 +1827,16 @@ export function HomePos({
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, turno.caja_id, turno.id, online, adoptarTicketSiQuedoAbierto, lealtadActiva, programa, cobroTerminado]);
+  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, caja.giro, turno.caja_id, turno.id, online, adoptarTicketSiQuedoAbierto, lealtadActiva, programa, cobroTerminado, configMostrador]);
+
+  /** Respuesta de «¿Para llevar o comer aquí?»: fija modo y nombre, y sigue el cobro con ese carrito. */
+  const elegirServicio = useCallback((modo: "PARA_LLEVAR" | "COMER_AQUI", nombre: string | null) => {
+    const atajo = preguntaCobro?.atajo ?? null;
+    const accion = { tipo: "modo", modo, nombre: nombre ?? carrito.nombreCuenta ?? null } as const;
+    dispatch(accion);
+    setPreguntaCobro(null);
+    void iniciarCobro(atajo, reducerCarrito(carrito, accion));
+  }, [preguntaCobro, carrito, iniciarCobro]);
 
   /**
    * Ronda de arreglos 1/5 (Task 7) — cambiar la zona de ESTE pedido desde el renglón de envío.
@@ -2245,6 +2281,8 @@ export function HomePos({
       // Reabrir y Cambiar pago (Transacciones): los cierra su propio `Modal`, también su PIN.
       [reabriendoTx != null || cambiandoPagoTx != null, null],
       [llevarListaAbierta, null],
+      // Comida rápida: «¿Para llevar o comer aquí?» cancela con su propio `useEscape`.
+      [preguntaCobro != null, null],
       // Venta de tienda: la ventana de cantidad la cierra su propio `useEscape`; el selector, también
       // su `Modal`; la franja del escáner, aquí. La cantidad cuenta en `escaneoIgnorado`: no se escanea encima.
       [cantidadRetail != null, null],
@@ -2308,7 +2346,7 @@ export function HomePos({
       escaneoIgnorado: avisoTiendaVisible || capas.some((c) => c[0] && ![capaCobro, capaSelector, capaAvisoRetail, capaConsultaInv, capaRecibo, capaConfirmacion].includes(c)),
       cerrarAlEscanear: confirmacion != null ? nuevoTicket : mostrarRecibo ? cerrarVistaRecibo : null,
     };
-  }, [selectorRetail, cantidadRetail, avisoRetail, descuentoAbierto, llevarListaAbierta, avisoTiendaVisible, modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, vistaCotizacion, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
+  }, [selectorRetail, cantidadRetail, avisoRetail, descuentoAbierto, llevarListaAbierta, preguntaCobro,avisoTiendaVisible, modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, vistaCotizacion, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
       agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto, nombreBarra, pasandoAMesa,
       clienteDomAbierto, clienteCuentaAbierto, zonaPedidoAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
@@ -3321,6 +3359,15 @@ export function HomePos({
           onCerrar={() => setZonaPedidoAbierto(false)}
         />
       )}
+      {preguntaCobro && (
+        <ModalServicioComida
+          pedirNombre={configMostrador.pedirNombre}
+          soloNombre={preguntaCobro.tipo === "NOMBRE"}
+          nombreInicial={carrito.nombreCuenta ?? ""}
+          onElegir={elegirServicio}
+          onCancelar={() => setPreguntaCobro(null)}
+        />
+      )}
       {nombreCuentaAbierto && (
         <ModalNombreCuenta
           onListo={(n) => { dispatch({ tipo: "nombre_cuenta", nombre: n }); setNombreCuentaAbierto(false); }}
@@ -3463,7 +3510,11 @@ export function HomePos({
           )}
         <SidebarTicket
           estado={carrito}
-          modoTexto={ticketBd?.ticketId === cuentaBarraId ? "Barra" : capturaTienda ? "Venta" : undefined}
+          modoTexto={ticketBd?.ticketId === cuentaBarraId ? "Barra" : capturaTienda ? "Venta" : etiquetaModo(carrito.modoServicio, caja.giro)}
+          // Comida rápida no tiene la fila de arriba con «Asignar cliente»: va en el menú «⋯» del ticket (la lealtad lo necesita).
+          clienteCuenta={comidaRapida && admiteClienteCuenta(carrito.modoServicio)
+            ? { nombre: carrito.clienteCuenta?.nombre ?? null, onAsignar: () => setClienteCuentaAbierto(true) }
+            : undefined}
           tienda={capturaTienda ? {
             renglon: (l) => renglonTienda(l.producto, productos ?? []),
             sinExistencia: (l) => sinExistencia(l.producto, carrito.lineas.filter((x) => x.producto.id === l.producto.id).reduce((s, x) => s + x.cantidad, 0), existencias, caja.sucursal_id),

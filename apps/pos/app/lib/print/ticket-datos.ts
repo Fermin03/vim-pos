@@ -387,7 +387,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       fechaIso: (tk.fecha_pago as string) ?? (tk.created_at as string) ?? new Date().toISOString(),
       cajero: ctx.cajeroNombre,
       caja: ctx.cajaNombre,
-      modoServicio: etiquetaModo((tk.modo_servicio as string) ?? ""),
+      modoServicio: etiquetaModo((tk.modo_servicio as string) ?? "", tn.vertical_principal as string | null),
       modo: (tk.modo_servicio as string) ?? "",
       nombreCliente: (tk.nombre_cliente as string) ?? null,
     },

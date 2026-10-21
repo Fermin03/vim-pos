@@ -3,6 +3,7 @@ import { deviceClient, employeeClient } from "./supabase";
 import { esGiroBelleza, esGiroComidaRapida, esGiroTienda } from "@vim/db/operacion";
 import type { NombreIcono } from "@vim/ui/styles";
 import type { Producto } from "./catalogo";
+import type { ModoServicio } from "./carrito";
 import type { DatosCaja } from "./turno";
 
 /** La caja de tienda es para los giros de tienda; todo lo demás queda como estaba. */
@@ -16,6 +17,21 @@ export const comoTienda = (caja: DatosCaja | null): boolean => esTienda(caja) ||
 
 /** Comida rápida y food truck: la barra de abajo de la tienda, pero ticket, comanda y cobro de restaurante (no son `comoTienda`). */
 export const esComidaRapida = (caja: DatosCaja | null): boolean => esGiroComidaRapida(caja?.giro);
+
+/**
+ * Al cobrar en comida rápida: «PREGUNTA» abre «¿Es para llevar o para comer aquí?», «NOMBRE» solo pide
+ * el nombre (food truck sin dónde comer, con `pedirNombre`) y `null` cobra directo. Pick-up, domicilio
+ * y apps ya traen su modo: no se pregunta. Los demás giros nunca ven la ventana.
+ */
+export function preguntaServicio(
+  giro: string | null | undefined,
+  cfg: { pedirNombre: boolean; tieneDondeComer: boolean },
+  modoActual: ModoServicio,
+): "PREGUNTA" | "NOMBRE" | null {
+  if (!esGiroComidaRapida(giro) || (modoActual !== "PARA_LLEVAR" && modoActual !== "COMER_AQUI")) return null;
+  if (giro === "QUICK_SERVICE" || cfg.tieneDondeComer) return "PREGUNTA";
+  return cfg.pedirNombre ? "NOMBRE" : null;
+}
 
 /** Navegación: la barra de abajo en vez de la pantalla de inicio. El ticket y el cobro los decide `comoTienda`. */
 export const conBarraAbajo = (caja: DatosCaja | null): boolean => comoTienda(caja) || esComidaRapida(caja);
