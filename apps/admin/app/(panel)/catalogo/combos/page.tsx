@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Icono } from "@vim/ui/styles";
+import { Cargando, Button, Icono } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { FranjaMenus, useMenuCatalogo } from "../../../components/selector-menu";
 import { CasillaMenu } from "../../../components/casilla-menu";
@@ -251,7 +251,7 @@ export default function CombosPage() {
           </div>
         </div>
 
-        {combos === null && <p className="text-sm text-ink-2">Cargando…</p>}
+        {combos === null && <Cargando />}
 
         {/* En el celular, tarjetas; en lg, tabla. Antes era una fila con onClick: solo se abría
             con el mouse, ni con el teclado ni con un lector de pantalla. Ahora el nombre es un

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BotonVolver } from "./boton-volver";
 import { RenglonItem } from "./renglon-item";
-import { Aviso, Button, DialogoPeligro, LogoVim, Modal, Icono } from "@vim/ui/styles";
+import { Aviso, Button, DialogoPeligro, LogoVim, Modal, Icono, Cargando } from "@vim/ui/styles";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
 import { borrarCuentaVacia, leerEntregaCuenta, listarCuentasAbiertas, MODOS_MESA, leerRenglonesCuenta, marcarTicketImpreso, minutosAbierta, reabrirCuentaImpresa, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
 import { leerTotales, type TotalesTicket } from "../lib/cobro";
@@ -495,7 +495,7 @@ export function PantallaCuentasModo({
                 })}
               </section>
             )}
-            {items === null && <p className="p-3 text-sm text-ink-3">Cargando…</p>}
+            {items === null && <Cargando />}
             {items?.length === 0 && porAceptar.length === 0 && (
               <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
                 <p className="text-14 font-semibold text-ink-2">{copia.vacioTitulo}</p>
@@ -758,7 +758,7 @@ export function PantallaCuentasModo({
 
               {/* Lo que se ordenó */}
               <div className="min-h-0 flex-1 overflow-y-auto p-4">
-                {detalle === null && <p className="text-sm text-ink-3">Cargando productos…</p>}
+                {detalle === null && <Cargando texto="Cargando productos" />}
                 {detalle?.length === 0 && <p className="text-sm text-ink-3">Esta cuenta no tiene productos.</p>}
                 <div className="flex flex-col divide-y divide-line">
                   {detalle?.map((it) => (

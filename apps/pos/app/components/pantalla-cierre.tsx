@@ -1,7 +1,7 @@
 "use client";
 import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
 import { useEffect, useMemo, useState } from "react";
-import { Button, Icono } from "@vim/ui/styles";
+import { Button, Icono, Cargando } from "@vim/ui/styles";
 import { employeeClient, listarEmpleados, type Empleado } from "../lib/supabase";
 import { fmtMxn, registrarComisionEvento, type DatosCaja, type Turno } from "../lib/turno";
 import { notificarEventoCritico } from "../lib/push-eventos";
@@ -398,7 +398,7 @@ export function PantallaCierre({
       </div>
 
       {error && <p className="mx-6 mt-3 text-sm font-medium text-danger" role="alert">{error}</p>}
-      {!resumen && <p className="p-6 text-sm text-ink-3">Cargando turno…</p>}
+      {!resumen && <Cargando texto="Cargando turno" />}
 
       {resumen && paso === "arqueo" && (
         <div className="flex min-h-0 flex-1">

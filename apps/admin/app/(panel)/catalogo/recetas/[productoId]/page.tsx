@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Button } from "@vim/ui/styles";
+import { Cargando, Button } from "@vim/ui/styles";
 import { PageBody, PageHeader, TablaScroll } from "../../../../components/page-header";
 import { obtenerProducto, type Producto } from "../../../../lib/catalogo";
 import {
@@ -124,7 +124,7 @@ export default function EditorRecetaPage() {
         right={<Button variant="ghost" onClick={() => router.push("/catalogo/recetas")}>Volver</Button>}
       />
       <PageBody>
-        {producto === undefined && <p className="text-sm text-ink-3">Cargando…</p>}
+        {producto === undefined && <Cargando />}
         {producto === null && <p className="text-sm text-danger">Producto no encontrado.</p>}
         {producto && receta && (
           <div className="grid gap-5">

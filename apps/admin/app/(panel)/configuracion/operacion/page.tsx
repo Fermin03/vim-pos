@@ -1,4 +1,5 @@
 "use client";
+import { Cargando } from "@vim/ui/styles";
 import { useEffect, useState } from "react";
 import { OPERACION, moduloActivo, nombreGiro } from "@vim/db/operacion";
 import { enlaceWhatsapp } from "@vim/db/soporte";
@@ -48,7 +49,7 @@ export default function OperacionPage() {
         <div className="max-w-[640px]">
           <p className="mb-4 text-14 text-ink-2">Giro: <b className="text-ink">{nombreGiro(giro)}</b></p>
           {m === null ? (
-            <p className="text-sm text-ink-3">Cargando…</p>
+            <Cargando />
           ) : (
             <ul className="flex flex-col divide-y divide-line rounded-lg border border-line bg-surface">
               {OPERACION.filter((mod) => mod.codigo !== "existencias" || conExistencias(m)).map((mod) => {

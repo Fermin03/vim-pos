@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Button, useConfirmar } from "@vim/ui/styles";
+import { Cargando, Button, useConfirmar } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
 import {
   actualizarCliente,
@@ -245,7 +245,7 @@ export default function ClientesPage() {
           />
         </div>
 
-        {clientes === null && <p className="text-sm text-ink-3">Cargando…</p>}
+        {clientes === null && <Cargando />}
         {clientes && kpis?.total === 0 && !editando && (
           <div className="rounded-lg border border-line bg-surface p-8 text-center text-ink-3">
             <p className="text-15 font-semibold text-ink-2">{busqueda ? "Sin coincidencias" : "Sin clientes todavía"}</p>
@@ -392,7 +392,7 @@ export default function ClientesPage() {
                   {!editando.id ? (
                     <p className="text-13 text-ink-2">Guarda primero al cliente y luego ábrelo para darle crédito.</p>
                   ) : credito === null ? (
-                    <p className="text-13 text-ink-3">Cargando…</p>
+                    <Cargando en="linea" />
                   ) : credito === "error" ? (
                     <p className="text-13 font-medium text-danger">No se pudo leer su crédito. Ciérralo y vuelve a abrirlo; al guardar no se cambia.</p>
                   ) : (

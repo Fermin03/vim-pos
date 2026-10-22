@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Button, Modal, useConfirmar } from "@vim/ui/styles";
+import { Cargando, Button, Modal, useConfirmar } from "@vim/ui/styles";
 import { PageBody, PageHeader, TablaScroll } from "../../../components/page-header";
 import {
   actualizarProveedor, crearProveedor, eliminarProveedor, listarProveedores, proveedorSchema, type Proveedor,
@@ -69,7 +69,7 @@ export default function ProveedoresPage() {
       <PageBody>
         {error && !editando && <p role="alert" className="mb-3 text-sm font-medium text-danger">{error}</p>}
         {okMsg && <p className="mb-3 text-sm font-medium text-success">{okMsg}</p>}
-        {filas === null && <p className="text-sm text-ink-3">Cargando…</p>}
+        {filas === null && <Cargando />}
         {filas !== null && (
           <TablaScroll min={720}>
             <table className="w-full text-14">

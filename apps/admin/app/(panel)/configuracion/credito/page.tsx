@@ -1,4 +1,5 @@
 "use client";
+import { Cargando } from "@vim/ui/styles";
 import { useEffect, useState } from "react";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { Tarjeta } from "../../../components/tarjeta";
@@ -44,7 +45,7 @@ export default function CreditoConfigPage() {
       <PageBody>
         {error && <p className="mb-4 text-sm font-medium text-danger" role="alert">{error}</p>}
         {config === null ? (
-          !error && <p className="text-sm text-ink-3">Cargando…</p>
+          !error && <Cargando />
         ) : (
           <div className="flex flex-col gap-5">
             <Tarjeta titulo="Vender a crédito">

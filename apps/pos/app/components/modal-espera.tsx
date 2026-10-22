@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, Modal } from "@vim/ui/styles";
+import { Button, Modal, Cargando } from "@vim/ui/styles";
 import { fmtMxn } from "../lib/turno";
 import { listarTicketsEnEspera, minutosEnEspera, type TicketEnEspera } from "../lib/espera";
 
@@ -108,7 +108,7 @@ export function ModalListaTickets({ titulo, vacio, verbo, filas, error, errorCar
   return (
     <Modal open onClose={onCerrar} title={titulo} className="w-full max-w-lg rounded-lg bg-surface p-6 shadow-xl">
       {(error ?? errorCarga) && <p className="mb-3 text-13 font-medium text-danger" role="alert">{error ?? errorCarga}</p>}
-      {filas === null && !errorCarga && <p className="py-6 text-center text-sm text-ink-3">Cargando…</p>}
+      {filas === null && !errorCarga && <Cargando />}
       {filas !== null && filas.length === 0 && <p className="py-6 text-center text-sm text-ink-3">{vacio}</p>}
       {filas !== null && filas.length > 0 && (
         <div className="max-h-[55vh] overflow-y-auto rounded border border-line">

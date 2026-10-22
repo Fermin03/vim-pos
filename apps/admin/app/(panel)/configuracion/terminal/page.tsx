@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Button, DialogoPeligro } from "@vim/ui/styles";
+import { Cargando, Button, DialogoPeligro } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { Tarjeta } from "../../../components/tarjeta";
 import { Interruptor } from "../../../components/interruptor";
@@ -87,7 +87,7 @@ export default function TerminalPage() {
           {error && <p className="mb-4 text-sm font-medium text-danger" role="alert">{error}</p>}
           {aviso && <p className="mb-4 text-sm font-medium text-success" role="status">{aviso}</p>}
         </div>
-        {!datos && !error && <p className="text-sm text-ink-3">Cargando…</p>}
+        {!datos && !error && <Cargando />}
 
         {datos && t && (
           <div className="flex flex-col gap-5">

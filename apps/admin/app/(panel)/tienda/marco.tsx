@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, type ReactNode } from "react";
-import { Aviso, Button, DialogoPeligro } from "@vim/ui/styles";
+import { Cargando, Aviso, Button, DialogoPeligro } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
 import { useAccesoTenant, useModulos } from "../../components/admin-shell";
 import { textoDeAviso } from "../../lib/tienda-cobro";
@@ -42,7 +42,7 @@ export function TiendaMarco({ children }: { children: (c: Tienda) => ReactNode }
             </button>
           </div>
         ) : t.leido === null ? (
-          <p className="text-sm text-ink-3">Cargando…</p>
+          <Cargando />
         ) : (
           <div className="flex flex-col gap-6">
             {/* TEXTOS PROVISIONALES (los revisa James). */}

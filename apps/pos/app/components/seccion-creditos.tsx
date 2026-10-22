@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Icono, Modal } from "@vim/ui/styles";
+import { Icono, Modal, Cargando } from "@vim/ui/styles";
 import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
 import { fmtMxn } from "../lib/turno";
 import { fechaCorta } from "../lib/lealtad-reglas";
@@ -105,7 +105,7 @@ export function SeccionCreditos({ token, cajaId, turnoId, onVolver }: {
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             {deudores === null ? (
-              <p className="p-4 text-14 text-ink-3">Cargando…</p>
+              <Cargando />
             ) : lista.length === 0 ? (
               <p className="p-4 text-14 text-ink-3">{texto ? "Nadie con ese nombre o teléfono debe." : "Nadie debe nada."}</p>
             ) : (
@@ -161,7 +161,7 @@ export function SeccionCreditos({ token, cajaId, turnoId, onVolver }: {
               <div className="overflow-hidden rounded-lg border border-line">
                 <div className="border-b border-line bg-sel px-4 py-2.5 text-12 font-bold uppercase tracking-widest text-ink-3">Ventas con saldo que se abonan aquí</div>
                 {ventas === null ? (
-                  <p className="px-4 py-3 text-14 text-ink-3">Cargando…</p>
+                  <Cargando en="linea" className="px-4 py-3" />
                 ) : ventas.length === 0 ? (
                   <p className="px-4 py-3 text-14 text-ink-3">No hay ventas con saldo que se abonen aquí.</p>
                 ) : (

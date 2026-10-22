@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, Modal, useConfirmar, Icono } from "@vim/ui/styles";
+import { Cargando, Button, Modal, useConfirmar, Icono } from "@vim/ui/styles";
 import {
   actualizarOpcion,
   crearOpcion,
@@ -124,7 +124,7 @@ export function OpcionesEditor({ grupoId }: { grupoId: string }) {
       </div>
 
       {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
-      {opciones === null && <p className="text-sm text-ink-3">Cargando…</p>}
+      {opciones === null && <Cargando />}
 
       {opciones && opciones.length === 0 && (
         <div className="rounded-lg border border-dashed border-line-strong p-6 text-center text-sm text-ink-3">

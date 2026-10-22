@@ -95,4 +95,5 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-vim-pop { animation-name: vim-fade !important; }
   .animate-vim-shake { animation: none !important; }
+  .animate-vim-pulso { animation: none !important; opacity: 0; }
 }

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, DialogoPeligro, Icono } from "@vim/ui/styles";
+import { Cargando, Button, DialogoPeligro, Icono } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { FranjaMenus, useMenuCatalogo } from "../../../components/selector-menu";
 import { TIPO_SELECCION, eliminarGrupo, listarGrupos, type Grupo } from "../../../lib/modificadores";
@@ -63,7 +63,7 @@ export default function ModificadoresPage() {
             {error}
           </p>
         )}
-        {grupos === null && <p className="text-sm text-ink-3">Cargando…</p>}
+        {grupos === null && <Cargando />}
 
         {grupos !== null && (
           <div className="tabla-caja overflow-hidden rounded-lg border border-line bg-surface">

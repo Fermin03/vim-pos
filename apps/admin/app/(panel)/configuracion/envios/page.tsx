@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, DialogoPeligro, Modal } from "@vim/ui/styles";
+import { Cargando, Button, DialogoPeligro, Modal } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { EnviosPestanas } from "../../../components/envios-pestanas";
 import { listarSucursales, type Sucursal } from "../../../lib/configuracion";
@@ -146,7 +146,7 @@ export default function ZonasEnvioPage() {
                 {error}
               </p>
             )}
-            {zonas === null && <p className="text-sm text-ink-3">Cargando…</p>}
+            {zonas === null && <Cargando />}
 
             {zonas !== null && zonas.length === 0 && (
               <div className="rounded-lg border border-dashed border-line-strong p-12 text-center">

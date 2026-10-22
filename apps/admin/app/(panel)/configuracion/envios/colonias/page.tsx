@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { Button, DialogoPeligro, Modal } from "@vim/ui/styles";
+import { Cargando, Button, DialogoPeligro, Modal } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../../components/page-header";
 import { EnviosPestanas } from "../../../../components/envios-pestanas";
 import { listarSucursales, type Sucursal } from "../../../../lib/configuracion";
@@ -167,7 +167,7 @@ export default function ColoniasPage() {
 
             {error && !nueva && !borrar && <p className="mb-4 text-sm font-medium text-danger" role="alert">{error}</p>}
             {aviso && <p className="mb-4 rounded-lg border border-line bg-surface px-4 py-3 text-13 text-ink-2" role="status">{aviso}</p>}
-            {conteo === null && <p className="text-sm text-ink-3">Cargando…</p>}
+            {conteo === null && <Cargando />}
 
             {vacio && (
               <div className="rounded-lg border border-dashed border-line-strong p-12 text-center">

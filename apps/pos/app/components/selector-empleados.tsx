@@ -1,4 +1,5 @@
 "use client";
+import { Cargando } from "@vim/ui/styles";
 import { useEffect, useState } from "react";
 import { TopbarPos } from "./topbar-pos";
 import { ModalDesvincular } from "./modal-desvincular";
@@ -92,7 +93,7 @@ export function SelectorEmpleados({
           )}
 
           {empleados === null && !error && (
-            <p className="text-center text-sm text-ink-3">Cargando empleados…</p>
+            <Cargando texto="Cargando empleados" />
           )}
 
           {empleados && empleados.length === 0 && (

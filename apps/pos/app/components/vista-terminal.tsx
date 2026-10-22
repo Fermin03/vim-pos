@@ -141,8 +141,11 @@ export function VistaTerminal({
       <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
         {cobrando ? (
           <>
-            <div className="mb-7 flex h-24 w-24 items-center justify-center rounded-full bg-accent-soft" aria-hidden>
-              <span className="h-10 w-10 rounded-full bg-accent" />
+            {/* Pulso: dos ondas desfasadas que salen del círculo mientras la terminal espera la tarjeta. */}
+            <div className="relative mb-7 flex h-24 w-24 items-center justify-center rounded-full bg-accent-soft" aria-hidden>
+              <span className="absolute inset-0 animate-vim-pulso rounded-full bg-accent/35" />
+              <span className="absolute inset-0 animate-vim-pulso rounded-full bg-accent/35 [animation-delay:.9s]" />
+              <span className="relative h-10 w-10 rounded-full bg-accent" />
             </div>
             <div className="font-display text-[88px] font-bold leading-none tabular-nums text-ink">{fmtMxn(monto)}</div>
             {fase.t === "enviando" ? (

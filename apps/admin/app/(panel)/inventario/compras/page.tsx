@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Button } from "@vim/ui/styles";
+import { Cargando, Button } from "@vim/ui/styles";
 import { useRouter } from "next/navigation";
 import { PageBody, PageHeader, TablaScroll } from "../../../components/page-header";
 import { listarCompras, type CompraResumen } from "../../../lib/compras";
@@ -59,7 +59,7 @@ export default function ComprasPage() {
           {rangoInvalido && <span className="text-12 text-danger">{rangoInvalido}</span>}
         </div>
         {error && <p role="alert" className="mb-3 text-sm font-medium text-danger">{error}</p>}
-        {filas === null && <p className="text-sm text-ink-3">Cargando…</p>}
+        {filas === null && <Cargando />}
         {filas !== null && (
           <TablaScroll min={800}>
             <table className="w-full text-14">

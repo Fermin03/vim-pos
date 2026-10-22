@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button } from "@vim/ui/styles";
+import { Cargando, Button } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { Tarjeta } from "../../../components/tarjeta";
 import { Interruptor } from "../../../components/interruptor";
@@ -86,7 +86,7 @@ export default function AgendaConfigPage() {
         {error && <p className="mb-4 text-sm font-medium text-danger" role="alert">{error}</p>}
         {okMsg && <p className="mb-4 text-sm font-medium text-success">{okMsg}</p>}
         {!actual || !b ? (
-          !error && <p className="text-sm text-ink-3">Cargando…</p>
+          !error && <Cargando />
         ) : (
           <div className="flex max-w-[720px] flex-col gap-5">
             <Tolerancia b={b} actual={actual} guardando={guardando} cambiar={cambiar}

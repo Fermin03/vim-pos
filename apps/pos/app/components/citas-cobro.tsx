@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { hoyMx } from "@vim/fecha";
-import { Icono, Modal } from "@vim/ui/styles";
+import { Icono, Modal, Cargando } from "@vim/ui/styles";
 import { ETIQUETA_ESTADO_CITA, horaCorta } from "@vim/db/agenda";
 import { TEXTO_ANTICIPO } from "../lib/anticipos";
 import { citasConAnticipoPendiente, citasEnEspera, citasParaCobrar, diaCita, gruposCitasCobro, nombreCorto, totalCita, type CitaDia } from "../lib/agenda";
@@ -109,7 +109,7 @@ export function CitasCobro({ token, sucursalId, version, activa, ventaActual, bl
           </div>
         )}
         {!grupos ? (
-          !error && <p className="p-4 text-14 text-ink-3">Cargando citas…</p>
+          !error && <Cargando texto="Cargando citas" />
         ) : nada ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
             <p className="font-display text-18 font-semibold">{texto.trim() ? "Nada coincide con la búsqueda" : "Sin citas por cobrar"}</p>

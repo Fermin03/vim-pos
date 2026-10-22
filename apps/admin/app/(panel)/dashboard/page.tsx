@@ -12,7 +12,7 @@ import { PasosConfiguracion } from "../../components/pasos-configuracion";
 import { mensajeError } from "../../lib/errores";
 import { leerPrueba } from "../../lib/plan";
 import { AvisoPrueba } from "../../components/aviso-prueba";
-import { Aviso, Icono } from "@vim/ui/styles";
+import { Cargando, Aviso, Icono } from "@vim/ui/styles";
 import { AvisosFacturacion } from "../../components/avisos-facturacion";
 import { useAvisoCerrado } from "../../components/aviso-cerrado";
 import { SelectorSucursal, useSucursalReporte } from "../../components/selector-sucursal";
@@ -438,7 +438,7 @@ export default function DashboardPage() {
           <PasosConfiguracion estado={onb} tenantId={tenantId} onTerminar={terminarConfiguracion} />
         )}
 
-        {data === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
+        {data === null && !error && <Cargando />}
 
         {/* Con los pasos a la vista, "sin ventas" es lo esperado: una línea, sin competir con ellos. */}
         {sinVentas && mostrarPasos && (

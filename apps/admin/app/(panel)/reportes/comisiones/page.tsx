@@ -1,4 +1,5 @@
 "use client";
+import { Cargando } from "@vim/ui/styles";
 import { useEffect, useRef, useState } from "react";
 import { useModulos } from "../../../components/admin-shell";
 import { Segmentos } from "../../../components/controles";
@@ -16,7 +17,7 @@ const TITULO = "Comisiones";
 /** Reporte de belleza: un negocio sin agenda que llega por enlace directo no lee nada de él. */
 export default function ComisionesPage() {
   const modulos = useModulos();
-  if (modulos === null) return <PageBody><p className="text-13 text-ink-3">Cargando…</p></PageBody>;
+  if (modulos === null) return <PageBody><Cargando /></PageBody>;
   if (!conAgenda(modulos)) {
     return (
       <>
@@ -146,7 +147,7 @@ function Reporte() {
           {errorRenglones ? (
             <p role="alert" className="text-14 font-medium text-danger">{errorRenglones}</p>
           ) : !rango || renglones?.de !== clave(sel!, rango.desde, rango.hasta) ? (
-            <p className="text-14 text-ink-2">Cargando…</p>
+            <Cargando />
           ) : (
             <Tabla columnas={columnasRenglon} filas={renglones.filas} clave={(r) => r.clave} orden={{ id: "fecha", dir: "asc" }} vacio="Sin ventas en estas fechas." />
           )}

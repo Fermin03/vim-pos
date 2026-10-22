@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Aviso, Button, botonClases, cn } from "@vim/ui/styles";
+import { Cargando, Aviso, Button, botonClases, cn } from "@vim/ui/styles";
 import { BotonCopiar } from "./boton-copiar";
 import { label } from "./campos";
 import { Interruptor } from "./interruptor";
@@ -68,7 +68,7 @@ export function ReservasEnLinea({ direccion, soloLectura }: {
   const mensajeDe = (b: Bloque) => (mensaje?.bloque === b ? mensaje.m : null);
 
   if (falloLectura) return <p className="text-sm font-medium text-danger" role="alert">{falloLectura}</p>;
-  if (!config) return <p className="text-sm text-ink-3">Cargando…</p>;
+  if (!config) return <Cargando />;
 
   async function cambiarEncendido(activo: boolean) {
     if (await escribir("estado", () => encenderReservas(activo), null)) setConfig((c) => c && { ...c, activo });

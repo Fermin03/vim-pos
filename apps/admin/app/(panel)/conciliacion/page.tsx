@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, Modal, StatusChip } from "@vim/ui/styles";
+import { Cargando, Button, Modal, StatusChip } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../components/page-header";
 import {
   listarLiquidaciones, crearLiquidacion, conciliarLiquidacion, leerItemsConciliados,
@@ -50,7 +50,7 @@ export default function ConciliacionPage() {
         </div>
         {error && <p className="mb-3 text-sm font-medium text-danger">{error}</p>}
         {!list ? (
-          <p className="text-sm text-ink-3">Cargando…</p>
+          <Cargando />
         ) : list.length === 0 ? (
           <div className="rounded-lg border border-dashed border-line-strong py-16 text-center">
             <p className="text-15 font-semibold">Sin liquidaciones aún</p>
@@ -202,7 +202,7 @@ function ModalDetalle({ liq, items, onCerrar }: { liq: Liquidacion; items: ItemC
         <EstadoChip estado={liq.estado} />
       </div>
       {!items ? (
-        <p className="py-6 text-center text-13 text-ink-3">Cargando…</p>
+        <Cargando />
       ) : (
         <>
           {/* Desglose del cuadre (P-210): a dónde se fue cada peso de la liquidación. */}

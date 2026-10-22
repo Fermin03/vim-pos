@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Button, Icono } from "@vim/ui/styles";
+import { Button, Icono, Cargando } from "@vim/ui/styles";
 import { ZONA_MX } from "@vim/fecha";
 import type { Producto } from "../lib/catalogo";
 import { buscarVentaPorFolio, buscarVentasConProducto, leerVentaDevolvible, leerVentasTurno, type VentaDevolvible, type VentaTurno } from "../lib/devoluciones";
@@ -291,7 +291,7 @@ export function SeccionTransacciones({
             <>
               <h2 className="text-13 font-semibold text-ink-3">Cuentas abiertas</h2>
               {cuentas === null ? (
-                <p className="text-13 text-ink-3">Cargando…</p>
+                <Cargando en="linea" />
               ) : cuentas.length === 0 ? (
                 <p className="text-13 text-ink-3">No hay cuentas abiertas.</p>
               ) : (
@@ -312,7 +312,7 @@ export function SeccionTransacciones({
               )}
               <h2 className="mt-4 text-13 font-semibold text-ink-3">Ventas del turno</h2>
               {ventas === null ? (
-                <p className="text-13 text-ink-3">Cargando…</p>
+                <Cargando en="linea" />
               ) : ventas.length === 0 ? (
                 <p className="text-13 text-ink-3">Todavía no hay ventas en este turno.</p>
               ) : (
@@ -329,7 +329,7 @@ export function SeccionTransacciones({
               <p className="text-15">Toca una venta para ver su detalle.</p>
             </div>
           ) : !detalle ? (
-            <p className="p-6 text-13 text-ink-3">Cargando venta…</p>
+            <Cargando texto="Cargando venta" />
           ) : (
             <>
               <div className="flex flex-shrink-0 items-baseline justify-between gap-3 border-b border-line px-5 py-4">

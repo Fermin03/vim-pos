@@ -1,4 +1,5 @@
 "use client";
+import { Cargando } from "@vim/ui/styles";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -24,7 +25,7 @@ const BADGE: Record<Estado, { texto: string; clase: string }> = {
 
 export default function RecetasPage() {
   return (
-    <Suspense fallback={<PageBody><p className="text-sm text-ink-3">Cargando…</p></PageBody>}>
+    <Suspense fallback={<PageBody><Cargando /></PageBody>}>
       <Recetas />
     </Suspense>
   );
@@ -68,7 +69,7 @@ function Recetas() {
             Solo sin receta ({sinReceta})
           </label>
         </div>
-        {filas === null && <p className="text-sm text-ink-3">Cargando…</p>}
+        {filas === null && <Cargando />}
         {filas !== null && (
           <TablaScroll min={760}>
             <table className="w-full text-14">

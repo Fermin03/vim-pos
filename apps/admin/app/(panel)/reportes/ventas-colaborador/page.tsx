@@ -1,4 +1,5 @@
 "use client";
+import { Cargando } from "@vim/ui/styles";
 import { useState } from "react";
 import { useModulos } from "../../../components/admin-shell";
 import { Segmentos } from "../../../components/controles";
@@ -14,7 +15,7 @@ const TITULO = "Ventas por colaborador";
 /** Reporte de belleza: un negocio sin agenda que llega por enlace directo no lee nada de él. */
 export default function VentasPorColaboradorPage() {
   const modulos = useModulos();
-  if (modulos === null) return <PageBody><p className="text-13 text-ink-3">Cargando…</p></PageBody>;
+  if (modulos === null) return <PageBody><Cargando /></PageBody>;
   if (!conAgenda(modulos)) {
     return (
       <>

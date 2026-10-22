@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Button, Icono, Modal } from "@vim/ui/styles";
+import { Cargando, Button, Icono, Modal } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
 import { ExistenciasTabs } from "../../components/existencias-tabs";
 import { SelectorSucursal, useSucursalReporte } from "../../components/selector-sucursal";
@@ -153,7 +153,7 @@ export default function ExistenciasPage() {
 
         <SelectorSucursal sucursal={sucursal} className="mb-5 w-full lg:w-auto" />
 
-        {consulta.datos === null && !consulta.error && <p className="text-14 text-ink-2">Cargando…</p>}
+        {consulta.datos === null && !consulta.error && <Cargando />}
 
         {consulta.datos !== null && todas.length === 0 && (
           <p className="max-w-xl text-14 text-ink-2">

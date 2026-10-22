@@ -1,4 +1,5 @@
 "use client";
+import { Cargando } from "@vim/ui/styles";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { PageHeader, PageBody } from "../../../../components/page-header";
@@ -28,7 +29,7 @@ export default function EditarGrupoPage() {
         ]}
       />
       <PageBody>
-        {grupo === undefined && <p className="text-sm text-ink-3">Cargando…</p>}
+        {grupo === undefined && <Cargando />}
         {grupo === null && <p className="text-sm text-danger">Grupo no encontrado.</p>}
         {grupo && (
           <>

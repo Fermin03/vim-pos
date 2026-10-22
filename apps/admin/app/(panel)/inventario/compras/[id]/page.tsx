@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Button, DialogoPeligro } from "@vim/ui/styles";
+import { Cargando, Button, DialogoPeligro } from "@vim/ui/styles";
 import { PageBody, PageHeader, TablaScroll } from "../../../../components/page-header";
 import { anularCompra, obtenerCompra, type CompraDetalle } from "../../../../lib/compras";
 import { mensajeError } from "../../../../lib/errores";
@@ -42,7 +42,7 @@ export default function CompraDetallePage() {
         right={<div className="flex gap-2"><Button variant="ghost" onClick={() => router.push("/inventario/compras")}>Volver</Button>{compra?.estado === "CONFIRMADA" && <Button variant="danger" onClick={() => { setError(null); setAnulando(true); }}>Anular compra</Button>}</div>}
       />
       <PageBody>
-        {compra === undefined && <p className="text-sm text-ink-3">Cargando…</p>}
+        {compra === undefined && <Cargando />}
         {compra === null && <p className="text-sm text-danger">Compra no encontrada.</p>}
         {error && !anulando && <p role="alert" className="mb-3 text-sm font-medium text-danger">{error}</p>}
         {compra && (

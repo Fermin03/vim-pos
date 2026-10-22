@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, DialogoPeligro, Icono } from "@vim/ui/styles";
+import { Cargando, Button, DialogoPeligro, Icono } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { FranjaMenus, useMenuCatalogo } from "../../../components/selector-menu";
 import { AvisoCajasMenu } from "../../../components/aviso-cajas-menu";
@@ -264,7 +264,7 @@ export default function ProductosPage() {
           </p>
         )}
 
-        {prods === null && <p className="text-sm text-ink-3">Cargando…</p>}
+        {prods === null && <Cargando />}
 
         {prods !== null && (
           <div className="tabla-caja overflow-hidden rounded-lg border border-line bg-surface">

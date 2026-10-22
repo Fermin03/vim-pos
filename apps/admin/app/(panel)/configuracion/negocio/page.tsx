@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button } from "@vim/ui/styles";
+import { Cargando, Button } from "@vim/ui/styles";
 import { nombreGiro } from "@vim/db/operacion";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { actualizarNegocio, guardarLogoNegocio, leerNegocio, negocioSchema, LOGO_MAX_BYTES, type Negocio } from "../../../lib/configuracion";
@@ -81,7 +81,7 @@ export default function NegocioPage() {
         migas={[{ label: "Configuración" }, { label: "Datos del negocio" }]}
       />
       <PageBody>
-        {neg === undefined && <p className="text-sm text-ink-3">Cargando…</p>}
+        {neg === undefined && <Cargando />}
         {neg === null && error && <p className="text-sm font-medium text-danger">{error}</p>}
         {neg && (
           <div className="max-w-[640px]">

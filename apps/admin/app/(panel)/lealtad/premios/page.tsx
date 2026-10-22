@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Button, DialogoPeligro, Modal } from "@vim/ui/styles";
+import { Cargando, Button, DialogoPeligro, Modal } from "@vim/ui/styles";
 import { cantidad, type Mecanica } from "@vim/db/lealtad";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { LealtadPestanas } from "../../../components/lealtad-pestanas";
@@ -149,7 +149,7 @@ export default function PremiosLealtadPage() {
             <button type="button" className={`${accion} mt-3`} onClick={reintentar}>Reintentar</button>
           </div>
         )}
-        {((premios === null && !falloPremios) || mecanica === undefined) && <p className="text-sm text-ink-3">Cargando…</p>}
+        {((premios === null && !falloPremios) || mecanica === undefined) && <Cargando />}
 
         {mecanica === null && !falloPrograma && premios !== null && (
           <p className="max-w-[640px] rounded-lg border border-line bg-surface px-4 py-3 text-14 text-ink-2">

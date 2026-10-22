@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, Icono } from "@vim/ui/styles";
+import { Cargando, Button, Icono } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { listarConflictosPendientes, resolverConflicto, type ConflictoSync } from "../../../lib/sync-conflictos";
 import { mensajeError } from "../../../lib/errores";
@@ -67,7 +67,7 @@ export default function SincronizacionPage() {
       <PageBody>
           {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
           {msg && <p className="mb-3 text-sm font-medium text-success">{msg}</p>}
-          {conflictos === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
+          {conflictos === null && !error && <Cargando />}
 
           {conflictos !== null && conflictos.length === 0 && (
             <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-line bg-surface py-16 text-center">

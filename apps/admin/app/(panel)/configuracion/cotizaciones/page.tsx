@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button } from "@vim/ui/styles";
+import { Cargando, Button } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { Tarjeta } from "../../../components/tarjeta";
 import { Interruptor } from "../../../components/interruptor";
@@ -48,7 +48,7 @@ export default function CotizacionesConfigPage() {
       <PageBody>
         {error && <p className="mb-4 text-sm font-medium text-danger" role="alert">{error}</p>}
         {config === null ? (
-          !error && <p className="text-sm text-ink-3">Cargando…</p>
+          !error && <Cargando />
         ) : (
           <div className="flex flex-col gap-5">
             <Tarjeta titulo="Hacer cotizaciones">

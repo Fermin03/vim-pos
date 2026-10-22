@@ -1,4 +1,5 @@
 "use client";
+import { Cargando } from "@vim/ui/styles";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { PageHeader, PageBody } from "../../../../components/page-header";
@@ -33,7 +34,7 @@ export default function EditarComboPage() {
         migas={[{ label: "Catálogo" }, { label: "Combos", href: "/catalogo/combos" }, { label: combo ? combo.nombre : "Editar" }]}
       />
       <PageBody>
-        {combo === undefined && <p className="text-sm text-ink-2">Cargando…</p>}
+        {combo === undefined && <Cargando />}
         {combo === null && <p className="text-sm text-danger">Combo no encontrado.</p>}
         {combo && !combo.es_combo && <p className="text-sm text-danger">Este producto no es un combo.</p>}
         {combo && combo.es_combo && (

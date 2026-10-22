@@ -1,4 +1,5 @@
 "use client";
+import { Cargando } from "@vim/ui/styles";
 import { useEffect, useState } from "react";
 import { type Empleado } from "../lib/supabase";
 import { ModalAbrirTurno } from "./abrir-turno";
@@ -64,7 +65,7 @@ export function PantallaTurno({
   if (caja === undefined || turno === undefined) {
     return (
       <main className="flex h-screen items-center justify-center">
-        <p className="text-sm text-ink-3">Cargando turno…</p>
+        <Cargando texto="Cargando turno" />
       </main>
     );
   }

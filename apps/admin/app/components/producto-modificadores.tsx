@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Button } from "@vim/ui/styles";
+import { Cargando, Button } from "@vim/ui/styles";
 import {
   asignarGruposAProducto, gruposDeProducto, listarGrupos, TIPO_SELECCION, type Grupo,
 } from "../lib/modificadores";
@@ -78,7 +78,7 @@ export function ProductoModificadores({
       </p>
 
       {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
-      {grupos === null && !error && <p className="text-sm text-ink-2">Cargando grupos…</p>}
+      {grupos === null && !error && <Cargando texto="Cargando grupos" />}
       {grupos !== null && grupos.length === 0 && (
         <p className="text-sm text-ink-2">
           Aún no tienes grupos de modificadores. <Link href="/catalogo/modificadores/nuevo" className="font-semibold text-ink underline underline-offset-2">Crea el primero</Link> (por ejemplo «Término de la carne» o «Extras»).

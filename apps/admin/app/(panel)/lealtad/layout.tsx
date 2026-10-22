@@ -1,4 +1,5 @@
 "use client";
+import { Cargando } from "@vim/ui/styles";
 import type { ReactNode } from "react";
 import { PageBody } from "../../components/page-header";
 import { useModulos } from "../../components/admin-shell";
@@ -11,7 +12,7 @@ import { estadoLealtad } from "../../lib/lealtad-plan";
  */
 export default function LealtadLayout({ children }: { children: ReactNode }) {
   const estado = estadoLealtad(useModulos());
-  if (estado === "cargando") return <PageBody><p className="text-13 text-ink-3">Cargando…</p></PageBody>;
+  if (estado === "cargando") return <PageBody><Cargando /></PageBody>;
   if (estado === "sin_contratar") return <LealtadSinContratar />;
   return <>{children}</>;
 }

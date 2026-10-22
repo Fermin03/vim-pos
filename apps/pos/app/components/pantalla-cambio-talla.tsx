@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Icono, LogoVim } from "@vim/ui/styles";
+import { Button, Icono, LogoVim, Cargando } from "@vim/ui/styles";
 import { ZONA_MX } from "@vim/fecha";
 import { BotonVolver } from "./boton-volver";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
@@ -373,7 +373,7 @@ export function PantallaCambioTalla({
               ) : (
                 <>
                   <h2 className="mt-2 text-15 font-semibold text-ink">Ventas del turno</h2>
-                  {ventasTurno === null && <p className="text-14 text-ink-3">Cargando ventas…</p>}
+                  {ventasTurno === null && <Cargando en="linea" texto="Cargando ventas" />}
                   {ventasTurno?.length === 0 && <p className="text-14 text-ink-3">Aún no hay ventas en el turno. Busca por folio o escanea la prenda.</p>}
                   {ventasTurno?.map((v) => (
                     <FilaVenta key={v.ticketId} folio={v.folio} total={v.total}

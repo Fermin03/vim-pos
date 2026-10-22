@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Button, Icono } from "@vim/ui/styles";
+import { Button, Icono, Cargando } from "@vim/ui/styles";
 import { diaLargo } from "@vim/db/agenda";
 import { citasDeCliente, faltasCliente, guardarNotasCliente, leerFichaCliente, visitasCliente, type CitaDia, type FichaCliente } from "../lib/agenda";
 import { telefonoLegible } from "../lib/telefono";
@@ -117,7 +117,7 @@ function Ficha({ token, id, lealtad, version, onAgendar }: {
     }
   }
 
-  if (!ficha || !citas) return <p className="p-8 text-14 text-ink-3" role={error ? "alert" : undefined}>{error ?? "Cargando…"}</p>;
+  if (!ficha || !citas) return error ? <p className="p-8 text-14 text-ink-3" role="alert">{error}</p> : <Cargando />;
   const visitas = visitasCliente(citas);
   const cambiaron = notas.trim() !== (ficha.notas ?? "").trim();
   const dato = "rounded-lg border border-line px-4 py-3";

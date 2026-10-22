@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, useConfirmar } from "@vim/ui/styles";
+import { Cargando, Button, useConfirmar } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import {
   asignarFranquicia, crearFranquicia, eliminarFranquicia, listarFranquicias,
@@ -67,7 +67,7 @@ export default function FranquiciasPage() {
           </div>
 
           {/* Lista */}
-          {franquicias === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
+          {franquicias === null && !error && <Cargando />}
           {franquicias !== null && (
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
               <div className="rounded-lg border border-line bg-surface">

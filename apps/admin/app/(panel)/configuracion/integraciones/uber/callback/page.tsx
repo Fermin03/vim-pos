@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Button } from "@vim/ui/styles";
+import { Cargando, Button } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../../../components/page-header";
 import { listarSucursales, type Sucursal } from "../../../../../lib/configuracion";
 import { accionConexion, mensajeErrorIntegracion, validarState, type TiendaUber } from "../../../../../lib/integraciones";
@@ -16,7 +16,7 @@ type Asignacion = { sucursal_id: string; auto_aceptar: boolean; tiempo_prep_min:
 
 export default function CallbackUberPage() {
   return (
-    <Suspense fallback={<PageBody><p className="text-sm text-ink-3">Cargando…</p></PageBody>}>
+    <Suspense fallback={<PageBody><Cargando /></PageBody>}>
       <Callback />
     </Suspense>
   );

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Button, DialogoPeligro, Modal, Icono } from "@vim/ui/styles";
+import { Cargando, Button, DialogoPeligro, Modal, Icono } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../components/page-header";
 import { ModalNuevoUsuario } from "../../components/modal-nuevo-usuario";
 import { ModalResetearPin } from "../../components/modal-resetear-pin";
@@ -193,7 +193,7 @@ export default function UsuariosPage() {
           <p className="mb-4 text-sm font-medium text-danger" role="alert">{error}</p>
         )}
 
-        {usuarios === null && <p className="text-sm text-ink-3">Cargando…</p>}
+        {usuarios === null && <Cargando />}
 
         {usuarios !== null && (
           <div className="tabla-caja overflow-hidden rounded-lg border border-line bg-surface">

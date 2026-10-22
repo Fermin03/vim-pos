@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Button, useConfirmar } from "@vim/ui/styles";
+import { Cargando, Button, useConfirmar } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { ExistenciasTabs } from "../../../components/existencias-tabs";
 import { SelectorSucursal, useSucursalReporte } from "../../../components/selector-sucursal";
@@ -121,7 +121,7 @@ export default function RecibirPage() {
           </div>
         )}
 
-        {productos === null && !errorCarga && <p className="text-14 text-ink-2">Cargando…</p>}
+        {productos === null && !errorCarga && <Cargando />}
 
         {productos !== null && (
           <div className="max-w-3xl">

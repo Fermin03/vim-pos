@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, Modal, Icono } from "@vim/ui/styles";
+import { Button, Modal, Icono, Cargando } from "@vim/ui/styles";
 import { asignarLote, crearRepartidor, leerDeliveries, listarRepartidores, type Repartidor } from "../lib/delivery";
 import { listarCuentasAbiertas, type CuentaAbierta } from "../lib/cuentas-abiertas";
 import { fmtMxn } from "../lib/turno";
@@ -132,7 +132,7 @@ export function ModalAsignarRepartidor({
       </p>
 
       <div className="mt-4">
-        {repartidores === null && <p className="text-13 text-ink-3">Cargando repartidores…</p>}
+        {repartidores === null && <Cargando texto="Cargando repartidores" />}
 
         {repartidores !== null && repartidores.length > 0 && (
           <div className="max-h-[240px] overflow-y-auto rounded border border-line">

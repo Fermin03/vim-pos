@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Button, cn, useConfirmar } from "@vim/ui/styles";
+import { Cargando, Button, cn, useConfirmar } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { Tarjeta } from "../../../components/tarjeta";
 import { AccionFila } from "../../../components/controles";
@@ -228,7 +228,7 @@ export default function ColaboradoresPage() {
           </div>
         )}
 
-        {colaboradores === null && <p className="text-sm text-ink-3">Cargando…</p>}
+        {colaboradores === null && <Cargando />}
         {colaboradores && colaboradores.length === 0 && !alta && (
           <div className="max-w-[720px] rounded-lg border border-line bg-surface p-8 text-center text-ink-3">
             <p className="text-15 font-semibold text-ink-2">Nadie en la agenda todavía</p>

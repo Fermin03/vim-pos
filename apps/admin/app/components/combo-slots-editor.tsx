@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { Button, DialogoPeligro, Modal, Icono } from "@vim/ui/styles";
+import { Cargando, Button, DialogoPeligro, Modal, Icono } from "@vim/ui/styles";
 import {
   MODO_PRECIO,
   actualizarSlot,
@@ -475,7 +475,7 @@ function PanelOpciones({ slot, productos, onCambio }: { slot: Slot; productos: P
       )}
 
       {explicitas === null ? (
-        <p className="text-sm text-ink-2">Cargando…</p>
+        <Cargando />
       ) : (
         <div className="rounded-lg border border-line bg-surface">
           <ListaOpciones
@@ -586,7 +586,7 @@ export function ComboSlotsEditor({ comboId, onCambio }: { comboId: string; onCam
           {error}
         </p>
       )}
-      {slots === null && <p className="text-sm text-ink-2">Cargando…</p>}
+      {slots === null && <Cargando />}
 
       {slots && slots.length === 0 && (
         <div className="rounded-lg border border-dashed border-line-strong p-6 text-center text-sm text-ink-2">
