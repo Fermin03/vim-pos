@@ -365,6 +365,27 @@ otro texto para lo mismo.
   produce toques equivocados. Prefiere menos elementos antes que elementos más chicos.
 - **El tema oscuro del KDS.** Está calibrado para una pantalla lejana en una cocina.
 
+## Cobro a pantalla completa (oct 2026)
+
+Diseño completo en `docs/superpowers/specs/2026-10-21-cobro-pantalla-completa-design.md`. Lo que
+cualquier pantalla nueva del cobro tiene que cumplir:
+
+- **Cada paso ocupa toda la caja** y mide lo mismo que los demás: se arma sobre `PantallaCobro`
+  (`apps/pos/app/components/cobro/pantalla-cobro.tsx`), nunca como ventana flotante.
+- **Cabecera de 72 px**: regresar a la izquierda (círculo de 56 px; `✕` en «¿Cómo paga?»), el
+  contexto al centro en `ink-3` («Efectivo · Ticket #…»), y a la derecha solo una acción secundaria
+  si el paso la tiene («Dividir pago»).
+- **Una sola acción azul**, de 72 px de alto, en el pie.
+- **La cifra del paso es lo más grande** (el total, lo recibido, el cambio, lo que falta).
+- **Sin animación entre pasos**: el cobro se usa cientos de veces al día.
+- **La propina se pregunta después de elegir el método.** Regresar desde la propina a «¿Cómo
+  paga?» la deshace; regresar desde un método vuelve a la propina. Cuando ya entró un pago, la
+  propina queda firme. Si la terminal Clip pregunta la propina y se cobra con «Tarjeta», VIM no la
+  pregunta. Las reglas viven en `apps/pos/app/lib/cobro-flujo.ts`, con pruebas.
+- **Escape hace lo mismo que el botón de regresar**, y no hace nada mientras se registra un pago o
+  la terminal está cobrando.
+- **Transferencia y tarjeta a mano se registran por el total**: un pago parcial es un pago dividido.
+
 ## Cobro con terminal (ADR 0033)
 
 - **Un solo botón «Tarjeta»** cuando la caja tiene terminal ligada: sustituye a Débito y Crédito. La
