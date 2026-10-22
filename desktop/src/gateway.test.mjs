@@ -177,6 +177,38 @@ test("terminal-cobro: va a la nube como el dispositivo y con el empleado de la s
   }
 });
 
+test("enviar-ticket: va a la nube como el dispositivo, solo con sesión local, y el resultado pasa tal cual", async () => {
+  const recibidas = [];
+  const nube = http.createServer((req, res) => {
+    let b = ""; req.on("data", (c) => (b += c));
+    req.on("end", () => { recibidas.push({ url: req.url, auth: req.headers.authorization, b: JSON.parse(b) }); res.writeHead(200); res.end('{"ok":true}'); });
+  });
+  await new Promise((r) => nube.listen(0, "127.0.0.1", r));
+  const vivo = { restPort: 1, secret: SECRET, pool: poolFalso({ usuario: { id: "u1", email: "maria@x", tenant_id: "t", rol: "CAJERO" } }) };
+  const server = crearGateway(opcionesGateway(vivo, {}));
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  const port = server.address().port;
+  const tok = jwt.sign({ sub: "u1", role: "authenticated" }, SECRET, { algorithm: "HS256", expiresIn: 60 });
+  const cuerpo = { correo: "c@x.com", ticket_id: "b212d6f4-46fd-45d7-b25f-c1fbe339bfd2", bloques: [{ t: "texto", valor: "Hola" }] };
+  const enviar = (headers = { Authorization: `Bearer ${tok}` }) => pedir(port, {
+    method: "POST", path: "/functions/v1/enviar-ticket", headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify(cuerpo),
+  });
+  try {
+    vivo.nube = async () => ({ cloudUrl: `http://127.0.0.1:${nube.address().port}`, anonKey: "anon", deviceToken: "DEV" });
+    assert.equal((await enviar({})).status, 401, "sin sesión local no se reenvía nada");
+    assert.equal(recibidas.length, 0);
+    const r = await enviar();
+    assert.equal(r.status, 200, r.text);
+    assert.equal(recibidas[0].url, "/functions/v1/enviar-ticket");
+    assert.equal(recibidas[0].auth, "Bearer DEV", "reenvía con el token de dispositivo");
+    assert.deepEqual(recibidas[0].b, cuerpo);
+  } finally {
+    await new Promise((r) => server.close(r));
+    await new Promise((r) => nube.close(r));
+  }
+});
+
 test("terminal-cobro: el reembolso solo sale de la caja si la devolución de ese ticket ya está confirmada", async () => {
   let llegaron = 0;
   const nube = http.createServer((req, res) => { req.resume(); req.on("end", () => { llegaron++; res.writeHead(200); res.end('{"ok":true,"n_cobros":1}'); }); });

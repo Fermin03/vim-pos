@@ -367,6 +367,27 @@ export function crearGateway(backend) {
         }
         return send(up.status, await up.text());
       }
+      if (p === "/functions/v1/enviar-ticket") {
+        // El ticket por correo (cobro sin impresora): la nube manda el correo con los renglones que
+        // el POS ya armó de su ticket LOCAL (puede no haber subido). Se valida la sesión local; a la
+        // nube va el dispositivo. La forma del cuerpo la valida la nube. Sin nube → 503.
+        const u = await getUser(pool, secret, bearer(req));
+        if (u.error) return send(u.error, u.body);
+        const crudo = (await readBody(req)).toString() || "{}";
+        const nube = typeof backend.nube === "function" ? await backend.nube().catch(() => null) : null;
+        if (!nube) return send(503, { error: "FUNCION_REQUIERE_NUBE", funcion: "enviar-ticket" });
+        let up;
+        try {
+          up = await fetch(`${nube.cloudUrl}/functions/v1/enviar-ticket`, {
+            method: "POST", body: crudo,
+            headers: { apikey: nube.anonKey, Authorization: `Bearer ${nube.deviceToken}`, "Content-Type": "application/json" },
+            signal: AbortSignal.timeout(25000),
+          });
+        } catch (e) {
+          return send(503, { error: "SIN_RED", detalle: String(e?.message ?? e) });
+        }
+        return send(up.status, await up.text());
+      }
       if (p === "/functions/v1/lealtad-canje") {
         // Lealtad (ADR 0030): la nube autoriza el canje; la caja lo asienta en su ticket. Ver
         // lealtad-puente.mjs. Se valida la sesión LOCAL del empleado (getUser ya exige su acceso
