@@ -5,10 +5,6 @@
 \set ON_ERROR_STOP on
 BEGIN;
 
--- En la base del CI `postgres` crea el rol (ADMIN) pero no es miembro: sin esto `SET ROLE colaborador_web`
--- da «permission denied». Producción no lo necesita (lo usa `authenticator`); el ROLLBACK lo deshace.
-GRANT colaborador_web TO current_user;
-
 -- Claims como los de PostgREST. p_web = token de GoTrue (trae session_id); sin él, el de pin-login.
 CREATE FUNCTION pg_temp.como(p_usuario uuid, p_tenant uuid, p_web boolean, p_tipo text) RETURNS void LANGUAGE sql AS $f$
   SELECT set_config('request.jwt.claims', (jsonb_build_object('sub', p_usuario, 'tenant_id', p_tenant,
@@ -178,7 +174,13 @@ BEGIN
   IF v_n <> 0 THEN RAISE EXCEPTION 'C9: colaborador_web tiene privilegios en % tablas', v_n; END IF;
 
   -- 10) Como PostgREST con ese token: su agenda y sus comisiones sí; la caja y las tablas no.
-  EXECUTE 'SET LOCAL ROLE colaborador_web';
+  BEGIN
+    EXECUTE 'SET LOCAL ROLE colaborador_web';
+  EXCEPTION WHEN insufficient_privilege THEN
+    -- En el CI `postgres` no es miembro del rol: se entra como PostgREST, por `authenticator`.
+    EXECUTE 'SET LOCAL ROLE authenticator';
+    EXECUTE 'SET LOCAL ROLE colaborador_web';
+  END;
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_pers, 'tenant_id', v_t, 'role', 'colaborador_web',
     'tipo_identidad', 'EMPLEADO', 'session_id', gen_random_uuid())::text, true);
   v_j := mi_agenda('2030-01-14', '2030-01-14');
