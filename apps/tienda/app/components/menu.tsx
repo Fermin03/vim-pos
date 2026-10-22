@@ -31,7 +31,7 @@ function Tarjeta({ producto, enPedido, alElegir }: { producto: Producto; enPedid
     )}><IconoMas /></span>
   );
   return (
-    // La línea entre renglones va metida al margen del texto; lo que responde al toque llega a las orillas.
+    // La línea entre renglones va metida al margen del texto; lo que responde al toque llega a las orillas del bloque.
     <li className="mx-4 border-t border-line first:border-t-0">
       <button type="button" disabled={producto.agotado}
         // Safari no enfoca un botón al tocarlo: sin esto, al cerrar la hoja el foco no tendría a dónde volver.
@@ -41,12 +41,14 @@ function Tarjeta({ producto, enPedido, alElegir }: { producto: Producto; enPedid
         <span className={cn("flex min-w-0 flex-1 flex-col gap-1", PARTE, producto.agotado && "opacity-50")}>
           <span className="text-16 font-semibold leading-snug text-ink">{producto.nombre}</span>
           {producto.descripcion && <span className="line-clamp-2 text-14 leading-snug text-ink-2">{producto.descripcion}</span>}
+          {/* El precio en texto normal: la única negrita del renglón es el nombre. */}
           <span className="mt-1 flex flex-wrap items-center gap-2">
-            <span className="font-display text-16 font-semibold tabular-nums text-ink">{formatoMxn(producto.precio_final_mxn)}</span>
+            <span className="text-15 tabular-nums text-ink">{formatoMxn(producto.precio_final_mxn)}</span>
             {enPedido > 0 && <span className="rounded-full bg-accent-soft px-2 py-1 text-12 font-semibold leading-none text-ink">{enPedido} en tu pedido</span>}
           </span>
         </span>
         {producto.agotado && <StatusChip className="flex-shrink-0">Agotado</StatusChip>}
+        {/* Con foto, la foto con el «+» en su esquina; sin foto no se reserva cuadro: solo el «+». */}
         {foto ? (
           <span className="relative flex-shrink-0">
             <Foto src={foto} alt={`Foto de ${producto.nombre}`} lado={[96, 96]} className={cn("h-24 w-24 rounded-lg", producto.agotado && "opacity-50 grayscale")} />
@@ -118,14 +120,21 @@ export function MenuDeLaTienda({ menu, enPedido, alElegir }: {
           </ul>
         </nav>
       )}
-      {categorias.map((c) => (
-        <section key={c.id} id={`cat-${c.id}`} aria-labelledby={`cat-t-${c.id}`} className="scroll-mt-12">
-          <h2 id={`cat-t-${c.id}`} className={cn("px-4 pb-1 pt-8 font-display text-20 font-semibold leading-tight tracking-tight", PARTE)}>{c.nombre}</h2>
-          <ul>
-            {c.productos.map((p) => <Tarjeta key={p.id} producto={p} enPedido={enPedido.get(p.id) ?? 0} alElegir={alElegir} />)}
-          </ul>
-        </section>
-      ))}
+      {/* Grupos en tarjeta: el fondo gris y cada categoría un bloque blanco, con su título afuera. Así una
+          categoría nunca se confunde con un producto. */}
+      <div className="bg-hover pb-6">
+        {categorias.map((c) => (
+          <section key={c.id} id={`cat-${c.id}`} aria-labelledby={`cat-t-${c.id}`} className="scroll-mt-12">
+            <h2 id={`cat-t-${c.id}`} className={cn("flex items-baseline gap-2 px-4 pb-3 pt-7 font-display text-20 font-semibold leading-tight tracking-tight", PARTE)}>
+              {c.nombre}
+              <span className="font-sans text-14 font-normal tracking-normal text-ink-2">{c.productos.length}</span>
+            </h2>
+            <ul className="mx-3 overflow-hidden rounded-lg border border-line bg-surface">
+              {c.productos.map((p) => <Tarjeta key={p.id} producto={p} enPedido={enPedido.get(p.id) ?? 0} alElegir={alElegir} />)}
+            </ul>
+          </section>
+        ))}
+      </div>
     </>
   );
 }
