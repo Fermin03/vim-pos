@@ -7,7 +7,8 @@ import { clienteAdmin, servir } from "../_shared/http.ts";
 import { enviarCorreo, soloAscii } from "../_shared/correo.ts";
 import { registrarError } from "../_shared/errores.ts";
 import { bearerDe, claimsDe, tenantDeClaims } from "../_shared/identidad.ts";
-import { htmlDeTicket, validarEnvioTicket } from "../_shared/ticket-correo.ts";
+import { consumirCupos } from "../_shared/limite.ts";
+import { cuposDeEnvio, htmlDeTicket, negocioPuedeEnviar, validarEnvioTicket } from "../_shared/ticket-correo.ts";
 
 const admin = clienteAdmin();
 
@@ -38,11 +39,21 @@ servir(async (req, json) => {
         .eq("id", ticket_id).eq("tenant_id", tenantId).maybeSingle();
       if (!tk) return json({ error: "TICKET_NO_ENCONTRADO" }, 404);
     }
-    // ponytail: sin tope de envíos por negocio; hace falta una sesión de empleado o de caja de un
-    // negocio activo. Si se abusa, contar envíos por tenant en una tabla.
 
-    const { data: tn } = await admin.from("tenants").select("nombre_comercial").eq("id", tenantId).maybeSingle();
-    const negocio = (tn as { nombre_comercial: string | null } | null)?.nombre_comercial ?? "tu compra";
+    // 3) Solo un negocio activo (o en prueba vigente) y sin bloqueo manda desde el buzón de VIM.
+    const { data: tn } = await admin.from("tenants")
+      .select("nombre_comercial, estado, deleted_at, bloqueo_desde, prueba_hasta").eq("id", tenantId).maybeSingle();
+    const t = tn as { nombre_comercial: string | null; estado: string; deleted_at: string | null; bloqueo_desde: string | null; prueba_hasta: string | null } | null;
+    if (!negocioPuedeEnviar(t, new Date())) return json({ ok: false, error: "NEGOCIO_INACTIVO" }, 403);
+    const negocio = t?.nombre_comercial ?? "tu compra";
+
+    // 4) Topes (por ticket, por negocio y global). Si la base no responde, no se envía: el buzón
+    //    es el mismo de las altas y los avisos de VIM.
+    const cupo = await consumirCupos(admin, cuposDeEnvio(tenantId, ticket_id), "cerrar");
+    if (!cupo.permitido) {
+      registrarError("enviar-ticket", "SIN_CUPO", `${cupo.motivo} (tenant ${tenantId}, ticket ${ticket_id})`);
+      return json({ ok: false, error: "SIN_CUPO" }, 429);
+    }
 
     const r = await enviarCorreo({ to: correo, subject: soloAscii(`Tu ticket de ${negocio}`), html: htmlDeTicket(bloques, negocio) });
     if (!r.enviado) {

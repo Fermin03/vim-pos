@@ -383,8 +383,8 @@ export function crearGateway(backend) {
             headers: { apikey: nube.anonKey, Authorization: `Bearer ${nube.deviceToken}`, "Content-Type": "application/json" },
             signal: AbortSignal.timeout(25000),
           });
-        } catch (e) {
-          return send(503, { error: "SIN_RED", detalle: String(e?.message ?? e) });
+        } catch {
+          return send(503, { error: "SIN_RED" });
         }
         return send(up.status, await up.text());
       }

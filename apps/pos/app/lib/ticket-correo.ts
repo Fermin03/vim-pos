@@ -15,6 +15,7 @@ export const bloquesParaCorreo = (bloques: Bloque[]) => bloques.filter((b) => b.
 export function mensajeEnvioTicket(codigo: string): string {
   if (codigo === "SIN_RED" || codigo === "FUNCION_REQUIERE_NUBE") return "No se pudo enviar: la caja no tiene internet.";
   if (codigo === "CORREO_INVALIDO") return "Revisa el correo: parece que está mal escrito.";
+  if (codigo === "SIN_CUPO") return "Ya se mandaron muchos tickets por correo. Intenta más tarde.";
   return "No se pudo enviar el correo. Intenta otra vez.";
 }
 

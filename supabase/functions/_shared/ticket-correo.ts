@@ -7,6 +7,7 @@
 // escapado, y el único enlace posible es el de VIM (el QR para facturar). Puro: se prueba con
 // node --test (ticket-correo.test.ts).
 import { esc } from "./correo.ts";
+import type { Cupo } from "./limite.ts";
 
 export type BloqueCorreo =
   | { t: "texto"; valor: string; align?: "izq" | "centro" | "der"; size?: number; bold?: boolean }
@@ -16,7 +17,8 @@ export type BloqueCorreo =
 
 export type EnvioTicket = { correo: string; ticket_id: string; bloques: BloqueCorreo[] };
 
-const MAX_BLOQUES = 400;
+// 200 y no más: el gateway de la caja instalada corta los cuerpos en 64 KB.
+const MAX_BLOQUES = 200;
 const MAX_TEXTO = 200;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -24,6 +26,8 @@ const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SOLO_PAPEL = new Set(["raster", "corte"]);
 
 const texto = (v: unknown): v is string => typeof v === "string" && v.length <= MAX_TEXTO;
+/** Sin caracteres de control ni invisibles (U+202E y compañía disfrazan texto en un phishing). */
+const limpio = (v: string) => v.replace(/[\p{Cc}\p{Cf}]/gu, "");
 const alineacion = (v: unknown) => (v === "centro" || v === "der" || v === "izq" ? v : undefined);
 
 function bloque(b: unknown): BloqueCorreo | null | "papel" {
@@ -32,9 +36,9 @@ function bloque(b: unknown): BloqueCorreo | null | "papel" {
   if (typeof o.t === "string" && SOLO_PAPEL.has(o.t)) return "papel";
   switch (o.t) {
     case "texto":
-      return texto(o.valor) ? { t: "texto", valor: o.valor, align: alineacion(o.align), size: typeof o.size === "number" ? o.size : 1, bold: o.bold === true } : null;
+      return texto(o.valor) ? { t: "texto", valor: limpio(o.valor), align: alineacion(o.align), size: typeof o.size === "number" ? o.size : 1, bold: o.bold === true } : null;
     case "fila":
-      return texto(o.izq) && texto(o.der) ? { t: "fila", izq: o.izq, der: o.der, bold: o.bold === true } : null;
+      return texto(o.izq) && texto(o.der) ? { t: "fila", izq: limpio(o.izq), der: limpio(o.der), bold: o.bold === true } : null;
     case "separador":
       return { t: "separador" };
     case "qr":
@@ -60,12 +64,12 @@ export function validarEnvioTicket(c: unknown): { ok: true; cuerpo: EnvioTicket 
   return { ok: true, cuerpo: { correo, ticket_id: o.ticket_id, bloques } };
 }
 
-/** El único enlace que puede llevar el correo: una dirección https de VIM (el portal para facturar). */
+/** El único enlace que puede llevar el correo: el portal de facturación de VIM. Otros subdominios
+ *  (la tienda en línea, la demo) muestran contenido de cada negocio: no sirven de anzuelo. */
 function enlaceDeVim(v: string): string | null {
   try {
     const u = new URL(v);
-    const propio = u.hostname === "vimpos.com.mx" || u.hostname.endsWith(".vimpos.com.mx");
-    return u.protocol === "https:" && propio ? u.href : null;
+    return u.protocol === "https:" && u.hostname === "factura.vimpos.com.mx" ? u.href : null;
   } catch {
     return null;
   }
@@ -102,4 +106,35 @@ ${filas}
 </table>
 <p style="text-align:center;font-family:Arial,sans-serif;font-size:12px;color:#6E6E74;margin-top:16px">Ticket de ${esc(negocio)} · enviado con VIM POS</p>
 </body></html>`;
+}
+
+/**
+ * ¿Este negocio puede mandar correos desde el buzón de VIM? Activo o interno, o en prueba vigente,
+ * y sin bloqueo por falta de pago. Un negocio dado de baja no.
+ */
+export function negocioPuedeEnviar(
+  t: { estado: string; deleted_at: string | null; bloqueo_desde: string | null; prueba_hasta: string | null } | null,
+  ahora: Date,
+): boolean {
+  if (!t || t.deleted_at) return false;
+  if (t.bloqueo_desde && new Date(t.bloqueo_desde) <= ahora) return false;
+  if (t.estado === "ACTIVO" || t.estado === "INTERNO") return true;
+  return t.estado === "TRIAL" && (!t.prueba_hasta || new Date(t.prueba_hasta) >= ahora);
+}
+
+const HORA = 3600;
+const DIA = 86400;
+
+/**
+ * Topes del envío (auditoría de seguridad, 21 oct 2026): el contenido lo arma la caja y sale del
+ * buzón de VIM, por el que también salen las altas y los avisos. Un negocio de prueba se crea
+ * gratis: sin tope, sería un relevo de spam que quemaría la reputación de todo el correo de VIM.
+ */
+export function cuposDeEnvio(tenantId: string, ticketId: string): Cupo[] {
+  return [
+    { clave: `ticket-correo:ticket:${ticketId}`, ventanaSeg: DIA, max: 3 },
+    { clave: `ticket-correo:tenant:${tenantId}:h`, ventanaSeg: HORA, max: 30 },
+    { clave: `ticket-correo:tenant:${tenantId}:d`, ventanaSeg: DIA, max: 150 },
+    { clave: "ticket-correo:global", ventanaSeg: HORA, max: 300 },
+  ];
 }

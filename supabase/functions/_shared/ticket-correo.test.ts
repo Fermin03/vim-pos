@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { htmlDeTicket, validarEnvioTicket } from "./ticket-correo.ts";
+import { cuposDeEnvio, htmlDeTicket, negocioPuedeEnviar, validarEnvioTicket } from "./ticket-correo.ts";
 
 const ID = "b212d6f4-46fd-45d7-b25f-c1fbe339bfd2";
 const ok = { correo: "cliente@ejemplo.com", ticket_id: ID, bloques: [{ t: "texto", valor: "Hola" }] };
@@ -24,7 +24,7 @@ test("rechaza un ticket que no es uuid", () => {
 test("rechaza bloques vacíos, de más, desconocidos o con texto enorme", () => {
   const malos = [
     [],
-    Array.from({ length: 401 }, () => ({ t: "texto", valor: "x" })),
+    Array.from({ length: 201 }, () => ({ t: "texto", valor: "x" })),
     [{ t: "script", valor: "x" }],
     [{ t: "texto", valor: "x".repeat(201) }],
     [{ t: "fila", izq: "a", der: 5 }],
@@ -50,6 +50,8 @@ test("el HTML escapa todo lo que viene de la caja", () => {
 test("el QR solo se vuelve enlace si apunta a VIM", () => {
   const propio = htmlDeTicket([{ t: "qr", valor: "https://factura.vimpos.com.mx/t/abc" }], "N");
   assert.ok(propio.includes('href="https://factura.vimpos.com.mx/t/abc"'));
+  const otroSub = htmlDeTicket([{ t: "qr", valor: "https://pedidos.vimpos.com.mx/tienda-ajena" }], "N");
+  assert.ok(!otroSub.includes("href="), "solo el portal de facturación, no otros subdominios");
   const ajeno = htmlDeTicket([{ t: "qr", valor: "https://vimpos.com.mx.evil.com/x" }], "N");
   assert.ok(!ajeno.includes("href="));
   const raro = htmlDeTicket([{ t: "qr", valor: "javascript:alert(1)" }], "N");
@@ -63,4 +65,34 @@ test("en el correo no se pide escanear: el texto antes del QR se vuelve una preg
   ], "N");
   assert.ok(!html.includes("Escanea"));
   assert.ok(html.includes("¿Necesitas factura?"));
+});
+
+test("los caracteres invisibles y de control se quitan del texto", () => {
+  const r = validarEnvioTicket({ ...ok, bloques: [{ t: "texto", valor: "Ho‮la​" }] });
+  assert.equal(r.ok, true);
+  if (r.ok && r.cuerpo.bloques[0]?.t === "texto") assert.equal(r.cuerpo.bloques[0].valor, "Hola");
+});
+
+test("solo envía un negocio activo, interno o en prueba vigente, y sin bloqueo", () => {
+  const ahora = new Date("2026-10-21T12:00:00Z");
+  const base = { estado: "ACTIVO", deleted_at: null, bloqueo_desde: null, prueba_hasta: null };
+  assert.equal(negocioPuedeEnviar(base, ahora), true);
+  assert.equal(negocioPuedeEnviar({ ...base, estado: "INTERNO" }, ahora), true);
+  assert.equal(negocioPuedeEnviar({ ...base, estado: "TRIAL", prueba_hasta: "2026-10-30" }, ahora), true);
+  assert.equal(negocioPuedeEnviar({ ...base, estado: "TRIAL", prueba_hasta: "2026-10-01" }, ahora), false);
+  assert.equal(negocioPuedeEnviar({ ...base, estado: "SUSPENDIDO" }, ahora), false);
+  assert.equal(negocioPuedeEnviar({ ...base, deleted_at: "2026-10-01" }, ahora), false);
+  assert.equal(negocioPuedeEnviar({ ...base, bloqueo_desde: "2026-10-20T00:00:00Z" }, ahora), false);
+  assert.equal(negocioPuedeEnviar({ ...base, bloqueo_desde: "2026-11-01T00:00:00Z" }, ahora), true);
+  assert.equal(negocioPuedeEnviar(null, ahora), false);
+});
+
+test("los cupos: por ticket, por negocio (hora y día) y uno global", () => {
+  const c = cuposDeEnvio("t1", "k1");
+  assert.deepEqual(c.map((x) => [x.clave, x.ventanaSeg, x.max]), [
+    ["ticket-correo:ticket:k1", 86400, 3],
+    ["ticket-correo:tenant:t1:h", 3600, 30],
+    ["ticket-correo:tenant:t1:d", 86400, 150],
+    ["ticket-correo:global", 3600, 300],
+  ]);
 });

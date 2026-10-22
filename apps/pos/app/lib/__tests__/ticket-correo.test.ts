@@ -8,6 +8,8 @@ describe("mensajeEnvioTicket", () => {
   });
   it("un correo mal escrito pide revisarlo", () =>
     expect(mensajeEnvioTicket("CORREO_INVALIDO")).toBe("Revisa el correo: parece que está mal escrito."));
+  it("con el tope lleno dice que espere", () =>
+    expect(mensajeEnvioTicket("SIN_CUPO")).toBe("Ya se mandaron muchos tickets por correo. Intenta más tarde."));
   it("cualquier otra cosa invita a intentar de nuevo", () =>
     expect(mensajeEnvioTicket("NO_ENVIADO")).toBe("No se pudo enviar el correo. Intenta otra vez."));
 });
