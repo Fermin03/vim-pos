@@ -1,6 +1,6 @@
 "use client";
 // «Tus datos», en pantallas: (1) quién recibe o recoge, a dónde y la nota; (2) cómo paga y, en línea,
-// la propina; (3) la tarjeta. Viven dentro de la hoja del carrito. Aquí solo se pinta: qué pantallas
+// la propina; (3) la tarjeta. Viven en una hoja a pantalla completa (tienda.tsx). Aquí solo se pinta: qué pantallas
 // hay y a cuál se va está en lib/pasos.ts, las reglas de los campos en lib/cliente.ts, la propina en
 // lib/pago.ts y qué hacer con cada respuesta de la función en lib/envio.ts.
 //
@@ -31,7 +31,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Aviso, Captcha, SITE_KEY_TURNSTILE, botonClases, cn, Icono } from "@vim/ui/styles";
 import { colonias, cotizar, guardarDireccion, intento, pedir, verificacion, type DireccionDePedido } from "../lib/api";
-import { TOPES, aCuerpo, type Carrito } from "../lib/carrito";
+import { TOPES, aCuerpo, contarPiezas, type Carrito } from "../lib/carrito";
 import {
   CAMPOS, DE_DIRECCION, FORMULARIO_VACIO, LIMITES, datosDelPedido, erroresDe, guardarCliente, leerCliente, olvidarCliente,
   type Campo, type Formulario,
@@ -52,7 +52,7 @@ import { CampoDeTexto } from "./campo";
 import { CampoColonia } from "./campo-colonia";
 import { CamposDeTarjeta, type ManejoDeTarjeta } from "./tarjeta";
 import { Linea } from "./carrito";
-import { COLUMNA, CUERPO, PIE } from "./hoja";
+import { BOTON_DE_BARRA, COLUMNA, CUERPO, PIE } from "./hoja";
 import { FOCO, PARTE, PRINCIPAL } from "./piezas";
 import { Propina } from "./propina";
 import { MarcoDelReto } from "./reto";
@@ -100,13 +100,44 @@ type AvisoDeEnvio = Extract<Desenlace, { tipo: "aviso" }>;
 /** Si el antirobot no entrega su comprobación en este tiempo, se deja de esperar y se dice. */
 const ESPERA_DEL_ANTIROBOT_MS = 20_000;
 
-const TITULO = "font-display text-16 font-semibold";
+/** Lo que separa los bloques de la pantalla: una franja gruesa, no una línea. */
+const BANDA = "border-t-8 border-line px-4 py-5";
+const TITULO = "font-display text-18 font-semibold tracking-tight";
 const GHOST = cn(botonClases({ variant: "ghost" }), "h-12 w-full");
 const DE_TEXTO = cn("inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-4", FOCO);
 
 /** «Otra dirección»: la que se escribe a mano, en vez de una guardada en la cuenta. */
 const OTRA = "otra";
 const TOPE_DE_DIRECCIONES = 5;
+/** Las filas de «Finalizar pedido» que abren su propia subpantalla. */
+type Seccion = "contacto" | "direccion" | "nota";
+const DE_CONTACTO = ["nombre", "telefono", "email"] as const satisfies readonly Campo[];
+/** TEXTO PROVISIONAL (James): el título de la barra en cada subpantalla. */
+const TITULO_DE: Record<Seccion, string> = { contacto: "Tus datos", direccion: "Dirección de entrega", nota: "Nota" };
+
+/** Una fila con icono, como en un resumen: lo que hay (o lo que falta) y, si se puede cambiar, la flecha. */
+function Fila({ id, icono, titulo, detalle, error = false, alTocar, deshabilitado = false }: {
+  id?: string; icono: Parameters<typeof Icono>[0]["nombre"]; titulo: string; detalle?: string | null; error?: boolean;
+  alTocar?: () => void; deshabilitado?: boolean;
+}) {
+  const contenido = (
+    <>
+      <Icono nombre={icono} className="h-6 w-6 flex-shrink-0 text-ink-2" />
+      <span className={cn("min-w-0 flex-1", PARTE)}>
+        <span className="block text-16 font-medium leading-snug">{titulo}</span>
+        {detalle && <span className={cn("mt-0.5 block text-14 leading-snug", error ? "font-medium text-danger" : "text-ink-2")}>{detalle}</span>}
+      </span>
+      {alTocar && <Icono nombre="chevron-derecha" className="h-5 w-5 flex-shrink-0 text-ink-2" />}
+    </>
+  );
+  const clases = "flex min-h-16 w-full items-center gap-4 py-3 text-left";
+  return alTocar ? (
+    <button id={id} type="button" onClick={alTocar} disabled={deshabilitado}
+      className={cn(clases, "-mx-2 w-[calc(100%+1rem)] rounded px-2 transition-colors duration-150 hover:bg-hover active:bg-hover disabled:opacity-40", FOCO)}>
+      {contenido}
+    </button>
+  ) : <div className={clases}>{contenido}</div>;
+}
 const esDeDireccion = (c: string): boolean => (DE_DIRECCION as readonly string[]).includes(c);
 /** Los campos de dirección de «Tus datos» con lo de una guardada (su etiqueta no es de este formulario). */
 const camposDe = (d: DireccionGuardada): Partial<Formulario> => {
@@ -149,6 +180,7 @@ export function PasoDeDatos({
   const formas = formasDePago(negocio, sucursal);
   const aDomicilio = carrito.modo === "DOMICILIO";
   const tel = enlaceTel(sucursal.telefono);
+  const piezas = contarPiezas(carrito);
 
   const [f, setF] = useState<Formulario>(borrador?.f ?? FORMULARIO_VACIO);
   /** La dirección elegida: el id de una guardada, `OTRA`, o "" mientras no se sabe si hay guardadas. */
@@ -210,6 +242,8 @@ export function PasoDeDatos({
   const [vista, setVista] = useState<{ paso: Paso; foco: string | null }>({ paso: "datos", foco: null });
   /** Ya se llegó a la pantalla de la tarjeta: desde aquí sus campos se quedan montados. */
   const [conTarjeta, setConTarjeta] = useState(false);
+  /** La subpantalla abierta desde una fila (null = la pantalla con las filas). */
+  const [seccion, setSeccion] = useState<Seccion | null>(null);
   /** Los campos de la tarjeta (solo al pagar en línea): de ahí sale el token de cada intento. */
   const tarjeta = useRef<ManejoDeTarjeta>(null);
   /** Lo que el banco (o la librería de Mercado Pago) dijo de la tarjeta en el último intento. */
@@ -313,17 +347,29 @@ export function PasoDeDatos({
     return () => clearTimeout(reloj);
   }, [finDePausa]);
 
-  const pasos = pasosDe(formas, pago);
+  const pasos = pasosDe(pago);
   const paso: Paso = pasos.includes(vista.paso) ? vista.paso : pasos[pasos.length - 1]!;
   const accion = accionDe(pasos, paso, pago);
   const enLaUltima = accion === "enviar" || accion === "pagar";
-  const idDelTitulo = `${id}-titulo-${reto ? "reto" : preguntando ? "propina" : paso}`;
+  const idDelTitulo = `${id}-titulo-${reto ? "reto" : preguntando ? "propina" : seccion ?? paso}`;
+  const enDatos = paso === "datos" && !preguntando && reto === null;
+  /** La fila que guarda ese dato (por el id del campo al que se manda el foco); null = la pantalla de las filas. */
+  const seccionDe = (foco: string | null): Seccion | null => {
+    const c = foco?.slice(id.length + 1) ?? "";
+    if ((DE_CONTACTO as readonly string[]).includes(c)) return "contacto";
+    if (esDeDireccion(c) || ["ubicacion", "cobertura", "etiqueta"].includes(c)) return "direccion";
+    return c === "nota" ? "nota" : null;
+  };
 
   const irA = (p: Paso, foco: string | null = null) => {
     if (p === "tarjeta") setConTarjeta(true);
     setPreguntando(false);
+    setSeccion(p === "datos" ? seccionDe(foco) : null);
     setVista({ paso: p, foco });
   };
+  const abrir = (cual: Seccion) => { setSeccion(cual); setVista({ paso: "datos", foco: null }); };
+  /** De la subpantalla a las filas, con el foco en la suya. */
+  const cerrarSeccion = () => { const cual = seccion; setSeccion(null); setVista({ paso: "datos", foco: `${id}-fila-${cual}` }); };
 
   // Al llegar a una pantalla el foco va a su título, no a un campo: el teclado no debe taparle la
   // pantalla a nadie, y un lector de pantalla oye dónde está. Si se llegó por un dato que corregir,
@@ -336,7 +382,7 @@ export function PasoDeDatos({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al cambiar de pantalla (o al pedir el foco otra vez)
   // (También cuando el marco del reto se quita —terminó o se canceló—: el foco estaba dentro de él
   // o en «Cancelar», y sin esto se perdería fuera de la hoja.)
-  }, [vista, preguntando, reto === null, reto?.esperando]);
+  }, [vista, preguntando, seccion, reto === null, reto?.esperando]);
 
   // Sin sesión: lo recordado en el teléfono (se lee después de hidratar: el servidor no lo tiene).
   // Con sesión no se toca. Si la sesión termina a medio pedido, desde ahí es un invitado más.
@@ -637,7 +683,7 @@ export function PasoDeDatos({
     const a = avanzar({ pasos, paso, primerError: CAMPOS.find((c) => errores[c]), enLinea, propina, otroValido: libre?.ok ?? false, yaPreguntada: preguntada });
     if (a.tipo === "campo") { setTocados(new Set(CAMPOS)); alCampo(a.campo); }
     // Se queda en la pregunta si es ahí donde lo está escribiendo; si no, a la pantalla del pago.
-    else if (a.tipo === "otro-monto") { setOtroTocado(true); setVista({ paso: "pago", foco: `${id}-otro` }); }
+    else if (a.tipo === "otro-monto") { setOtroTocado(true); setVista({ paso: "datos", foco: `${id}-otro` }); }
     else if (a.tipo === "preguntar") { setPreguntada(true); setPreguntando(true); }
     else if (a.tipo === "paso") irA(a.paso);
     // Con el pago en línea en pausa no sale otro cobro, ni con Enter: el servidor lo rechazaría igual.
@@ -650,21 +696,33 @@ export function PasoDeDatos({
     const otra = otrasFormas[0];
     if (!otra || ocupado) return;
     setPago(otra); setConTarjeta(false); setRechazo((r) => ({ ...r, pago: undefined }));
-    irA("pago", `${id}-pago`);
+    irA("datos", `${id}-pago`);
   };
 
   /** La flecha: a la pantalla anterior (o al carrito desde la primera). Nada de lo escrito se pierde. */
   const regresar = () => {
     if (ocupado || envioDeLaPagina.ocupado()) return;
     if (preguntando) { setPreguntando(false); return; }
+    if (seccion) { cerrarSeccion(); return; }
     const anterior = pasos[pasos.indexOf(paso) - 1];
     if (anterior) irA(anterior); else alVolver();
+  };
+
+  /** «Listo» de una subpantalla: si a lo suyo le falta algo, lo dice ahí mismo; si no, vuelve a las filas. */
+  const listo = () => {
+    const grupo: readonly Campo[] = seccion === "contacto" ? DE_CONTACTO : seccion === "direccion" && !elegida ? DE_DIRECCION : [];
+    setTocados((t) => new Set([...t, ...grupo]));
+    const mal = grupo.find((c) => rechazo[c] ?? errores[c]);
+    if (mal) { setVista({ paso: "datos", foco: `${id}-${mal}` }); return; }
+    if (seccion === "direccion" && faltaUbicacion) { setUbicacionTocada(true); setVista({ paso: "datos", foco: `${id}-ubicacion` }); return; }
+    if (seccion === "direccion" && coloniaPorBuscar) buscarLaEscrita();
+    cerrarSeccion();
   };
 
   const elegirPropina = (p: Porcentaje | "otro") => {
     setPropina(p);
     // «Otro monto» abre su campo y le da el foco: aquí el teclado sí se pidió.
-    if (p === "otro") setVista({ paso: "pago", foco: `${id}-otro` });
+    if (p === "otro") setVista({ paso: "datos", foco: `${id}-otro` });
     // En la pregunta, un porcentaje contesta y sigue a la tarjeta.
     else if (preguntando) irA("tarjeta");
   };
@@ -699,8 +757,8 @@ export function PasoDeDatos({
       {ocupado ? estado : <><span>{etiqueta}</span><span className="tabular-nums">{importe ? formatoMxn(importe) : ""}</span></>}
     </button>
   );
-  const titulo = (texto: string, cual: Paso | "propina" | "reto") => (
-    <h3 id={`${id}-titulo-${cual}`} tabIndex={-1} aria-describedby={pasos.length > 1 && cual !== "reto" ? `${id}-paso` : undefined} className={cn(TITULO, "outline-none")}>{texto}</h3>
+  const titulo = (texto: string, cual: Paso | Seccion | "propina" | "reto") => (
+    <h3 id={`${id}-titulo-${cual}`} tabIndex={-1} className={cn(TITULO, "outline-none")}>{texto}</h3>
   );
   const propinaDeLaPantalla = (modo: "elegir" | "preguntar") => (
     <Propina id={id} modo={modo} propina={propina} alElegir={elegirPropina} montoDe={montoDe} tope={subtotal} montoDeOtro={libre?.ok ? libre.monto : null} deshabilitado={ocupado}
@@ -717,18 +775,28 @@ export function PasoDeDatos({
     </>
   );
   const notaDeTarjeta = pago === "TARJETA" && <p className="text-15 text-ink-2">{aDomicilio ? "Paga con tarjeta al recibir: el restaurante lleva la terminal." : "Paga con tarjeta al recoger tu pedido."}</p>;
+  const contactoError = DE_CONTACTO.some((c) => errorDe(c));
+  const contactoDetalle = [f.telefono.trim() && formatoTelefono(f.telefono.trim()), f.email.trim()].filter(Boolean).join(" · ") || "Nombre y teléfono para tu pedido";
+  const escrita = !elegida && f.calle.trim() ? `${f.calle.trim()} ${f.numeroExterior.trim()}`.trim() : null;
+  const dirTitulo = elegida ? elegida.etiqueta : escrita ?? "Agrega tu dirección";
+  const dirDetalle = elegida ? direccionEnUnaLinea(elegida) : escrita ? [f.colonia, f.ciudad].map((x) => x.trim()).filter(Boolean).join(", ") || null : "Para calcular el envío";
+  const dirError = (!elegida && DE_DIRECCION.some((c) => errorDe(c))) || !!rechazo.ubicacion || (ubicacionTocada && faltaUbicacion) || sinCobertura || coberturaRechazada;
   const errorDePago = rechazo.pago && <p id={`${id}-pago-error`} role="alert" className="text-14 font-medium text-danger">{rechazo.pago}</p>;
 
   return (
-    <form noValidate className={COLUMNA} onSubmit={(e) => { e.preventDefault(); if (!enReto && (!enLaUltima || preguntando || seOfreceEnviar)) alBoton(total); }}>
-      <div ref={cuerpo} className={CUERPO}>
-        {/* Con el reto del banco a la vista no hay a dónde regresar (se sale con «Cancelar»): la franja se quita y el banco gana ese lugar. */}
-        {!enReto && <div className="flex items-center justify-between gap-3 px-4 pt-1">
-          <button type="button" onClick={regresar} disabled={ocupado} className={cn("-ml-2 inline-flex h-11 items-center gap-1 rounded px-2 text-15 font-medium text-ink-2 hover:bg-hover hover:text-ink disabled:pointer-events-none disabled:opacity-40", FOCO)}>
-            <IconoAtras />{paso === "datos" ? "Tu pedido" : "Regresar"}
+    <form noValidate className={COLUMNA} onSubmit={(e) => { e.preventDefault(); if (seccion && enDatos) listo(); else if (!enReto && (!enLaUltima || preguntando || seOfreceEnviar)) alBoton(total); }}>
+      {/* La única barra de arriba: regresar y el título, al centro. Con el reto del banco a la vista no
+          hay a dónde regresar (se sale con «Cancelar»): la flecha se quita. */}
+      <header className="barra grid flex-none grid-cols-[2.75rem_1fr_2.75rem] items-center border-b border-transparent px-1 py-1 transition-colors duration-150">
+        {enReto ? <span /> : (
+          <button type="button" onClick={regresar} disabled={ocupado} aria-label={paso === "datos" && !preguntando && !seccion ? "Volver a tu pedido" : "Regresar"} className={BOTON_DE_BARRA}>
+            <IconoAtras />
           </button>
-          {pasos.length > 1 && <p id={`${id}-paso`} className="text-13 tabular-nums text-ink-2">Paso {pasos.indexOf(paso) + 1} de {pasos.length}</p>}
-        </div>}
+        )}
+        {/* TEXTO PROVISIONAL (James). */}
+        <h2 id={`${id}-titulo-datos`} tabIndex={-1} data-foco-inicial className="min-w-0 truncate text-center font-display text-16 font-semibold tracking-tight outline-none">{seccion ? TITULO_DE[seccion] : "Finalizar pedido"}</h2>
+      </header>
+      <div ref={cuerpo} className={CUERPO}>
 
         {/* Modo de prueba: fija arriba de la pantalla de la tarjeta (y del reto del banco, que la reemplaza). No se cierra. */}
         {negocio.pago_de_prueba && enLinea && (paso === "tarjeta" || enReto) && (
@@ -741,7 +809,7 @@ export function PasoDeDatos({
 
         {/* El reto del banco ocupa el lugar de la pantalla en la que se estaba; la tarjeta sigue montada, oculta. */}
         {reto && (
-          <section className={cn("flex min-w-0 flex-col gap-3 pt-3", reto.esperando && "pb-5")}>
+          <section className={cn("flex min-w-0 flex-col gap-3 pt-4", reto.esperando && "pb-5")}>
             <div className="flex flex-col gap-1 px-4">
               {/* Terminó o se canceló: el marco se quita (se queda en blanco) y lo que sigue es esperar; el aviso del pie dice qué hacer. */}
               {titulo(reto.cancelado ? RETO.cancelando : reto.esperando ? RETO.confirmando : RETO.titulo, "reto")}
@@ -751,147 +819,228 @@ export function PasoDeDatos({
           </section>
         )}
 
-        {paso === "datos" && !enReto && (
+        {/* Las subpantallas de las filas: se abren tocando la fila (o al señalar un dato que corregir) y vuelven con «Listo». */}
+        {enDatos && seccion === "contacto" && (
+          <section className="flex flex-col gap-4 px-4 pb-5 pt-4">
+            {titulo(aDomicilio ? "¿Quién recibe?" : "¿Quién recoge?", "contacto")}
+            {campo("nombre", "Nombre", { autoComplete: "name", autoCapitalize: "words" })}
+            {campo("telefono", "Teléfono", { type: "tel", inputMode: "tel", autoComplete: "tel-national", ayuda: "10 dígitos. El restaurante te llama si hay alguna duda con tu pedido." })}
+            {campo("email", "Correo", { type: "email", inputMode: "email", autoComplete: "email", autoCapitalize: "none", spellCheck: false, opcional: !enLinea, ayuda: enLinea ? "Ahí te llega la confirmación de tu pago y el enlace de tu pedido." : "Para mandarte el enlace de tu pedido." })}
+          </section>
+        )}
+        {enDatos && seccion === "direccion" && (
+          <section className="flex flex-col gap-4 px-4 pb-5 pt-4">
+            <div>
+              {titulo("¿A dónde lo llevamos?", "direccion")}
+              {envio === "colonia" ? (
+                // TEXTO PROVISIONAL (James).
+                <p className={cn("mt-1 text-14 text-ink-2", PARTE)}>
+                  Envío a {colonia?.nombre ?? f.colonia}{cotizacion?.por_colonia && <>: <span className="font-semibold tabular-nums text-ink">{formatoMxn(cotizacion.envio_total_mxn)}</span></>}
+                </p>
+              ) : null}
+            </div>
+            {distancia && (
+              <UbicacionDeEntrega id={id} sucursal={distancia.punto} tramos={distancia.tramos} punto={punto} cotizacion={cotizacion}
+                alCambiar={(p) => { alCambiarPunto(p); setRechazo((r) => ({ ...r, ubicacion: undefined })); }}
+                puedeRecoger={sucursal.recoger} alRecoger={() => alCambiarModo("RECOGER")} deshabilitado={ocupado}
+                error={rechazo.ubicacion ?? (ubicacionTocada && faltaUbicacion && !pin ? textoDeError("UBICACION_INVALIDA").hacer : undefined)} />
+            )}
+            {/* Con direcciones guardadas se elige una; los campos solo aparecen para «Otra dirección». */}
+            {guardadas.length > 0 && (
+              <ul role="radiogroup" aria-label="Tus direcciones guardadas" className="flex flex-col">
+                {[...guardadas, null].map((d) => (
+                  <li key={d?.id ?? OTRA}>
+                    <label className="flex min-h-12 cursor-pointer items-center gap-3 py-2 text-16">
+                      <input type="radio" name={`${id}-direccion`} checked={d ? elegida?.id === d.id : !elegida} onChange={() => elegirDireccion(d?.id ?? OTRA)} className="h-6 w-6 flex-shrink-0 accent-ink" />
+                      {d ? (
+                        <span className={cn("min-w-0", PARTE)}>
+                          <span className="block font-medium">{d.etiqueta}</span>
+                          <span className="block text-14 text-ink-2">{direccionEnUnaLinea(d)}</span>
+                        </span>
+                      ) : "Otra dirección"}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {!elegida && (
+              <>
+                {campo("calle", "Calle", { autoComplete: "address-line1" })}
+                <div className="grid grid-cols-2 gap-3">
+                  {campo("numeroExterior", "Núm. exterior")}
+                  {campo("numeroInterior", "Núm. interior", { opcional: true })}
+                </div>
+                {sucursal.colonias ? (
+                  <CampoColonia negocio={negocio.slug} sucursalId={sucursal.id} id={`${id}-colonia`} valor={f.colonia} error={errorDe("colonia")} maxLength={LIMITES.colonia}
+                    alSalir={() => {
+                      setTocados((t) => new Set(t).add("colonia"));
+                      // Tecleada sin tocar la sugerencia: se busca igual que una dirección guardada.
+                      if (coloniaPorBuscar && busqueda === null) buscarLaEscrita();
+                    }}
+                    alEscribir={(v) => {
+                      // El CP que puso la colonia de antes es de esa colonia: se va con ella (lib/pantalla.ts).
+                      const autollenado = cpAutollenado.current;
+                      setF((a) => ({ ...a, colonia: v, codigoPostal: cpTrasEscribirColonia(a.codigoPostal, autollenado) }));
+                      setRechazo((r) => ({ ...r, colonia: undefined }));
+                      // Escribir encima ya no es la colonia elegida, ni la que se estaba buscando.
+                      soltarColonia();
+                    }}
+                    alElegir={(c) => {
+                      vigencia.descartar(); setBusqueda(null); setDeSugerencia(true);
+                      cpAutollenado.current = c.codigo_postal || null;
+                      setF((a) => ({ ...a, colonia: c.nombre, ...(c.codigo_postal && { codigoPostal: c.codigo_postal }) }));
+                      setRechazo((r) => ({ ...r, colonia: undefined, codigoPostal: undefined }));
+                      alCambiarColonia(c);
+                    }} />
+                ) : campo("colonia", "Colonia", { autoComplete: "address-level3" })}
+                <div className="grid grid-cols-[8rem_1fr] gap-3">
+                  {campo("codigoPostal", "Código postal", { inputMode: "numeric", autoComplete: "postal-code" })}
+                  {campo("ciudad", "Ciudad", { autoComplete: "address-level2" })}
+                </div>
+                {campo("estado", "Estado", { autoComplete: "address-level1" })}
+                {campo("referencias", "Referencias", { multilinea: true, opcional: true, ayuda: "Entre qué calles, color de la casa, con quién dejarlo." })}
+                {/* Solo con la cuenta ya leída y con lugar: son hasta 5. Se guarda cuando el pedido entra. */}
+                {cuenta && guardadas.length < TOPE_DE_DIRECCIONES && (
+                  <div className="flex flex-col gap-3">
+                    <label className="flex min-h-12 cursor-pointer items-center gap-3 text-16">
+                      <input type="checkbox" checked={guardar} onChange={(e) => setGuardar(e.target.checked)} className="h-6 w-6 flex-shrink-0 accent-ink" />
+                      Guardar esta dirección en mi cuenta
+                    </label>
+                    {guardar && (
+                      <CampoDeTexto id={`${id}-etiqueta`} etiqueta="Nombre para guardarla" value={etiqueta} maxLength={LIMITES_DE_CUENTA.etiqueta} autoComplete="off"
+                        ayuda="Para reconocerla la próxima vez: Casa, Oficina…" alCambiar={setEtiqueta} alSalir={() => {}} />
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+            {/* «Por zonas» y esa colonia no tiene envío: no hay zona que elegir (0187 §6), se ofrece recoger. */}
+            {/* También cuando lo dijo el servidor (SIN_COBERTURA marcado en la colonia): ahí el texto ya está en el campo. */}
+            {(sinCobertura || coberturaRechazada) && (
+              <div id={`${id}-cobertura`} tabIndex={-1} className="flex flex-col gap-3 outline-none">
+                {/* TEXTO PROVISIONAL (James). */}
+                {sinCobertura && <Aviso tono="warning" role="status" className="!text-14">{textoDeError("SIN_COBERTURA").texto}</Aviso>}
+                {sucursal.recoger && (
+                  // TEXTO PROVISIONAL (James).
+                  <button type="button" onClick={() => alCambiarModo("RECOGER")} disabled={ocupado} className={cn(botonClases({ variant: "ghost" }), "h-12 self-start")}>
+                    Pedir para recoger
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
+        )}
+        {enDatos && seccion === "nota" && (
+          <section className="flex flex-col gap-4 px-4 pb-5 pt-4">
+            {titulo("Nota para el restaurante", "nota")}
+            {/* TEXTO PROVISIONAL (James). */}
+            <CampoDeTexto id={`${id}-nota`} etiqueta="Tu nota" opcional multilinea value={nota} maxLength={TOPES.nota}
+              ayuda="Por ejemplo: sin cebolla, la salsa aparte." alCambiar={alCambiarNota} alSalir={() => {}} />
+          </section>
+        )}
+
+        {enDatos && !seccion && (
           <>
             {/* Para quien ya tiene cuenta (o la quiere): una franja que no estorba al invitado. El carrito
                 vive en el teléfono, así que lo espera a la vuelta. Mientras se envía no se sale de aquí. */}
             {!conSesion && (
-              <p className={cn("mx-4 mt-1 flex flex-wrap items-center gap-x-4 rounded bg-hover px-3 text-14 text-ink-2", ocupado && "pointer-events-none opacity-40")}>
+              <p className={cn("mx-4 mt-4 flex flex-wrap items-center gap-x-4 rounded bg-hover px-3 text-14 text-ink-2", ocupado && "pointer-events-none opacity-40")}>
                 ¿Ya tienes cuenta?
                 <Link href={enlaceDeAcceso(negocio.slug, "entrar", deVuelta)} className={DE_TEXTO}>Iniciar sesión</Link>
                 <Link href={enlaceDeAcceso(negocio.slug, "registro", deVuelta)} className={DE_TEXTO}>Crear cuenta</Link>
               </p>
             )}
 
-            <section className="flex flex-col gap-4 px-4 pb-5 pt-2">
-              {titulo(aDomicilio ? "¿Quién recibe?" : "¿Quién recoge?", "datos")}
-              {campo("nombre", "Nombre", { autoComplete: "name", autoCapitalize: "words" })}
-              {campo("telefono", "Teléfono", { type: "tel", inputMode: "tel", autoComplete: "tel-national", ayuda: "10 dígitos. El restaurante te llama si hay alguna duda con tu pedido." })}
-              {campo("email", "Correo", { type: "email", inputMode: "email", autoComplete: "email", autoCapitalize: "none", spellCheck: false, opcional: !enLinea, ayuda: enLinea ? "Ahí te llega la confirmación de tu pago y el enlace de tu pedido." : "Para mandarte el enlace de tu pedido." })}
+            {/* Lo de este pedido en filas, como un resumen: cada una abre lo suyo. TEXTOS PROVISIONALES (James). */}
+            <ul className="flex flex-col divide-y divide-line px-4 pb-2 pt-2">
+              <li>
+                {aDomicilio
+                  ? <Fila id={`${id}-fila-direccion`} icono="pin" titulo={dirTitulo} detalle={dirError ? "Revisa tu dirección" : dirDetalle} error={dirError} alTocar={() => abrir("direccion")} deshabilitado={ocupado} />
+                  : <Fila icono="edificio" titulo={`Recoges en ${sucursal.nombre}`} detalle={sucursal.direccion} />}
+              </li>
+              <li>
+                <Fila id={`${id}-fila-contacto`} icono="persona" titulo={f.nombre.trim() || "Agrega tus datos"} detalle={contactoError ? "Revisa tus datos" : contactoDetalle}
+                  error={contactoError} alTocar={() => abrir("contacto")} deshabilitado={ocupado} />
+              </li>
+              <li>
+                <Fila id={`${id}-fila-nota`} icono="chat" titulo={nota.trim() ? "Nota para el restaurante" : "Agregar nota"} detalle={nota.trim() || null}
+                  alTocar={() => abrir("nota")} deshabilitado={ocupado} />
+              </li>
+            </ul>
+
+            {/* El resumen: los productos (plegados) y la cuenta. Sin envío todavía (falta la dirección o el pin) no hay total. */}
+            <section className={cn(BANDA, "flex flex-col gap-3")}>
+              <h3 className={TITULO}>Resumen del pedido</h3>
+              <details className="group">
+                <summary className={cn("flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded text-16 [&::-webkit-details-marker]:hidden", FOCO)}>
+                  <span>{piezas} {piezas === 1 ? "producto" : "productos"}</span>
+                  <Icono nombre="chevron-abajo" className="h-5 w-5 text-ink-2 transition-transform duration-150 ease-vim group-open:rotate-180" />
+                </summary>
+                <ul className="flex flex-col gap-2 pb-2 pt-1 text-15">
+                  {carrito.renglones.map((r, i) => {
+                    const cot = cotizacion?.renglones.length === carrito.renglones.length ? cotizacion.renglones[i] : null;
+                    return (
+                      <li key={r.id} className="flex items-baseline justify-between gap-3">
+                        <span className={cn("min-w-0", PARTE)}>
+                          {r.cantidad} × {r.nombre}
+                          {cot?.detalle && <span className="block text-14 text-ink-2">{cot.detalle}</span>}
+                        </span>
+                        {cot && <span className="flex-shrink-0 tabular-nums">{formatoMxn(cot.total_mxn)}</span>}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </details>
+              <dl className="flex flex-col gap-2">
+                <Linea concepto="Subtotal" importe={cotizacion ? formatoMxn(cotizacion.subtotal_mxn) : "—"} estimado={!cotizacion} />
+                {/* TEXTO PROVISIONAL (James): el envío que aún depende de la dirección. */}
+                {aDomicilio && <Linea concepto="Envío" importe={aPagar && cotizacion ? formatoMxn(cotizacion.envio_total_mxn) : "Con tu dirección"} estimado={!aPagar} />}
+                {enLinea && montoDePropina && Number(montoDePropina) > 0 && <Linea concepto="Propina" importe={formatoMxn(montoDePropina)} estimado={false} />}
+                <Linea concepto="Total" importe={aPagar ? formatoMxn(aPagar) : "—"} estimado={!aPagar} fuerte />
+              </dl>
             </section>
 
-            <section className="flex flex-col gap-4 border-t border-line px-4 py-5">
-              {aDomicilio ? (
+            {/* Cómo paga, y la propina si es en línea. Con una sola forma (o ninguna) se dice, no se pregunta. */}
+            <section id={`${id}-pago`} role="group" tabIndex={-1} aria-labelledby={`${id}-titulo-pago`} aria-describedby={rechazo.pago ? `${id}-pago-error` : undefined}
+              className={cn(BANDA, "flex min-w-0 flex-col gap-3 outline-none")}>
+              <h3 id={`${id}-titulo-pago`} className={TITULO}>¿Cómo pagas?</h3>
+              {formas.length > 1 ? (
                 <>
-                  <div>
-                    <h3 className={TITULO}>¿A dónde lo llevamos?</h3>
-                    {envio === "colonia" ? (
-                      // TEXTO PROVISIONAL (James).
-                      <p className={cn("mt-1 text-14 text-ink-2", PARTE)}>
-                        Envío a {colonia?.nombre ?? f.colonia}{cotizacion?.por_colonia && <>: <span className="font-semibold tabular-nums text-ink">{formatoMxn(cotizacion.envio_total_mxn)}</span></>}
-                      </p>
-                    ) : null}
-                  </div>
-                  {distancia && (
-                    <UbicacionDeEntrega id={id} sucursal={distancia.punto} tramos={distancia.tramos} punto={punto} cotizacion={cotizacion}
-                      alCambiar={(p) => { alCambiarPunto(p); setRechazo((r) => ({ ...r, ubicacion: undefined })); }}
-                      puedeRecoger={sucursal.recoger} alRecoger={() => alCambiarModo("RECOGER")} deshabilitado={ocupado}
-                      error={rechazo.ubicacion ?? (ubicacionTocada && faltaUbicacion && !pin ? textoDeError("UBICACION_INVALIDA").hacer : undefined)} />
-                  )}
-                  {/* Con direcciones guardadas se elige una; los campos solo aparecen para «Otra dirección». */}
-                  {guardadas.length > 0 && (
-                    <ul role="radiogroup" aria-label="Tus direcciones guardadas" className="flex flex-col">
-                      {[...guardadas, null].map((d) => (
-                        <li key={d?.id ?? OTRA}>
-                          <label className="flex min-h-12 cursor-pointer items-center gap-3 py-2 text-16">
-                            <input type="radio" name={`${id}-direccion`} checked={d ? elegida?.id === d.id : !elegida} onChange={() => elegirDireccion(d?.id ?? OTRA)} className="h-6 w-6 flex-shrink-0 accent-ink" />
-                            {d ? (
-                              <span className={cn("min-w-0", PARTE)}>
-                                <span className="block font-medium">{d.etiqueta}</span>
-                                <span className="block text-14 text-ink-2">{direccionEnUnaLinea(d)}</span>
-                              </span>
-                            ) : "Otra dirección"}
-                          </label>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {!elegida && (
-                    <>
-                      {campo("calle", "Calle", { autoComplete: "address-line1" })}
-                      <div className="grid grid-cols-2 gap-3">
-                        {campo("numeroExterior", "Núm. exterior")}
-                        {campo("numeroInterior", "Núm. interior", { opcional: true })}
-                      </div>
-                      {sucursal.colonias ? (
-                        <CampoColonia negocio={negocio.slug} sucursalId={sucursal.id} id={`${id}-colonia`} valor={f.colonia} error={errorDe("colonia")} maxLength={LIMITES.colonia}
-                          alSalir={() => {
-                            setTocados((t) => new Set(t).add("colonia"));
-                            // Tecleada sin tocar la sugerencia: se busca igual que una dirección guardada.
-                            if (coloniaPorBuscar && busqueda === null) buscarLaEscrita();
-                          }}
-                          alEscribir={(v) => {
-                            // El CP que puso la colonia de antes es de esa colonia: se va con ella (lib/pantalla.ts).
-                            const autollenado = cpAutollenado.current;
-                            setF((a) => ({ ...a, colonia: v, codigoPostal: cpTrasEscribirColonia(a.codigoPostal, autollenado) }));
-                            setRechazo((r) => ({ ...r, colonia: undefined }));
-                            // Escribir encima ya no es la colonia elegida, ni la que se estaba buscando.
-                            soltarColonia();
-                          }}
-                          alElegir={(c) => {
-                            vigencia.descartar(); setBusqueda(null); setDeSugerencia(true);
-                            cpAutollenado.current = c.codigo_postal || null;
-                            setF((a) => ({ ...a, colonia: c.nombre, ...(c.codigo_postal && { codigoPostal: c.codigo_postal }) }));
-                            setRechazo((r) => ({ ...r, colonia: undefined, codigoPostal: undefined }));
-                            alCambiarColonia(c);
-                          }} />
-                      ) : campo("colonia", "Colonia", { autoComplete: "address-level3" })}
-                      <div className="grid grid-cols-[8rem_1fr] gap-3">
-                        {campo("codigoPostal", "Código postal", { inputMode: "numeric", autoComplete: "postal-code" })}
-                        {campo("ciudad", "Ciudad", { autoComplete: "address-level2" })}
-                      </div>
-                      {campo("estado", "Estado", { autoComplete: "address-level1" })}
-                      {campo("referencias", "Referencias", { multilinea: true, opcional: true, ayuda: "Entre qué calles, color de la casa, con quién dejarlo." })}
-                      {/* Solo con la cuenta ya leída y con lugar: son hasta 5. Se guarda cuando el pedido entra. */}
-                      {cuenta && guardadas.length < TOPE_DE_DIRECCIONES && (
-                        <div className="flex flex-col gap-3">
-                          <label className="flex min-h-12 cursor-pointer items-center gap-3 text-16">
-                            <input type="checkbox" checked={guardar} onChange={(e) => setGuardar(e.target.checked)} className="h-6 w-6 flex-shrink-0 accent-ink" />
-                            Guardar esta dirección en mi cuenta
-                          </label>
-                          {guardar && (
-                            <CampoDeTexto id={`${id}-etiqueta`} etiqueta="Nombre para guardarla" value={etiqueta} maxLength={LIMITES_DE_CUENTA.etiqueta} autoComplete="off"
-                              ayuda="Para reconocerla la próxima vez: Casa, Oficina…" alCambiar={setEtiqueta} alSalir={() => {}} />
-                          )}
-                        </div>
-                      )}
-                    </>
-                  )}
-                  {/* «Por zonas» y esa colonia no tiene envío: no hay zona que elegir (0187 §6), se ofrece recoger. */}
-                  {/* También cuando lo dijo el servidor (SIN_COBERTURA marcado en la colonia): ahí el texto ya está en el campo. */}
-                  {(sinCobertura || coberturaRechazada) && (
-                    <div id={`${id}-cobertura`} tabIndex={-1} className="flex flex-col gap-3 outline-none">
-                      {/* TEXTO PROVISIONAL (James). */}
-                      {sinCobertura && <Aviso tono="warning" role="status" className="!text-14">{textoDeError("SIN_COBERTURA").texto}</Aviso>}
-                      {sucursal.recoger && (
-                        // TEXTO PROVISIONAL (James).
-                        <button type="button" onClick={() => alCambiarModo("RECOGER")} disabled={ocupado} className={cn(botonClases({ variant: "ghost" }), "h-12 self-start")}>
-                          Pedir para recoger
-                        </button>
-                      )}
-                    </div>
-                  )}
+                  <p className="text-14 text-ink-2">{apoyoDePago(pago)}</p>
+                  <ul role="radiogroup" aria-labelledby={`${id}-titulo-pago`} className="flex flex-col">
+                    {formas.map((p) => (
+                      <li key={p}>
+                        <label className={cn("flex min-h-12 items-center gap-3 py-2 text-16", p === "EN_LINEA" && pausa ? "text-ink-3" : "cursor-pointer")}>
+                          <input type="radio" name={`${id}-forma`} checked={pago === p} disabled={ocupado || (p === "EN_LINEA" && pausa !== null)} className="h-6 w-6 flex-shrink-0 accent-ink"
+                            aria-describedby={p === "EN_LINEA" && pausa ? `${id}-pausa` : undefined}
+                            onChange={() => {
+                              setPago(p); setRechazo((r) => ({ ...r, pago: undefined }));
+                              // Si ya no paga en línea, la tarjeta se desmonta: volver a elegirlo no la carga hasta llegar a su pantalla.
+                              if (p !== "EN_LINEA") setConTarjeta(false);
+                            }} />
+                          {p === "EN_LINEA" && pausa ? (
+                            <span className="min-w-0">
+                              {nombreDePago(p, true)}
+                              <span id={`${id}-pausa`} className="block text-14 text-ink-2">{lineaDePausa(pausa.hasta)}</span>
+                            </span>
+                          ) : nombreDePago(p, formas.includes("EN_LINEA"))}
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
                 </>
-              ) : (
-                <div className={PARTE}>
-                  <h3 className={TITULO}>Recoges en {sucursal.nombre}</h3>
-                  {sucursal.direccion && <p className="mt-1 text-15 text-ink-2">{sucursal.direccion}</p>}
-                </div>
+              ) : unaSolaForma}
+              {notaDeTarjeta}
+              {errorDePago}
+              {/* La propina: solo al pagar en línea. El mismo selector de «Para recoger / A domicilio». */}
+              {enLinea && (
+                <fieldset role="radiogroup" aria-describedby={`${id}-propina-apoyo`} className="mt-2 min-w-0">
+                  <legend className="text-15 font-semibold">Propina</legend>
+                  <p id={`${id}-propina-apoyo`} className="mb-2 mt-1 text-14 text-ink-2">{apoyoDePropina}</p>
+                  {propinaDeLaPantalla("elegir")}
+                </fieldset>
               )}
-              <CampoDeTexto id={`${id}-nota`} etiqueta="Nota para el restaurante" opcional multilinea value={nota} maxLength={TOPES.nota}
-                alCambiar={alCambiarNota} alSalir={() => {}} />
             </section>
-
-            {/* Sin pantalla de pago (una sola forma, al recibir, o ninguna): cómo se paga se dice aquí. */}
-            {pasos.length === 1 && (
-              <section id={`${id}-pago`} role="group" tabIndex={-1} aria-labelledby={`${id}-pago-titulo`} aria-describedby={rechazo.pago ? `${id}-pago-error` : undefined}
-                className="flex min-w-0 flex-col gap-3 border-t border-line px-4 py-5 outline-none">
-                <h3 id={`${id}-pago-titulo`} className={TITULO}>¿Cómo pagas?</h3>
-                {unaSolaForma}
-                {notaDeTarjeta}
-                {errorDePago}
-              </section>
-            )}
 
             <div className="flex flex-col gap-2 border-t border-line px-4 py-5 text-13 leading-relaxed text-ink-2">
               <p>
@@ -916,52 +1065,9 @@ export function PasoDeDatos({
           </>
         )}
 
-        {paso === "pago" && !preguntando && !enReto && (
-          <section id={`${id}-pago`} role="group" tabIndex={-1} aria-labelledby={`${id}-titulo-pago`} aria-describedby={rechazo.pago ? `${id}-pago-error` : undefined}
-            className="flex min-w-0 flex-col gap-3 px-4 pb-3 pt-2 outline-none">
-            {titulo("¿Cómo pagas?", "pago")}
-            {formas.length > 1 ? (
-              <>
-                <p className="text-14 text-ink-2">{apoyoDePago(pago)}</p>
-                <ul role="radiogroup" aria-labelledby={`${id}-titulo-pago`} className="flex flex-col">
-                  {formas.map((p) => (
-                    <li key={p}>
-                      <label className={cn("flex min-h-12 items-center gap-3 py-2 text-16", p === "EN_LINEA" && pausa ? "text-ink-3" : "cursor-pointer")}>
-                        <input type="radio" name={`${id}-forma`} checked={pago === p} disabled={ocupado || (p === "EN_LINEA" && pausa !== null)} className="h-6 w-6 flex-shrink-0 accent-ink"
-                          aria-describedby={p === "EN_LINEA" && pausa ? `${id}-pausa` : undefined}
-                          onChange={() => {
-                            setPago(p); setRechazo((r) => ({ ...r, pago: undefined }));
-                            // Si ya no paga en línea, la tarjeta se desmonta: volver a elegirlo no la carga hasta llegar a su pantalla.
-                            if (p !== "EN_LINEA") setConTarjeta(false);
-                          }} />
-                        {p === "EN_LINEA" && pausa ? (
-                          <span className="min-w-0">
-                            {nombreDePago(p, true)}
-                            <span id={`${id}-pausa`} className="block text-14 text-ink-2">{lineaDePausa(pausa.hasta)}</span>
-                          </span>
-                        ) : nombreDePago(p, formas.includes("EN_LINEA"))}
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            ) : unaSolaForma}
-            {notaDeTarjeta}
-            {errorDePago}
-            {/* La propina: solo al pagar en línea. El mismo selector de «Para recoger / A domicilio». */}
-            {enLinea && (
-              <fieldset role="radiogroup" aria-describedby={`${id}-propina-apoyo`} className="min-w-0">
-                <legend className="text-15 font-semibold">Propina</legend>
-                <p id={`${id}-propina-apoyo`} className="mb-2 mt-1 text-14 text-ink-2">{apoyoDePropina}</p>
-                {propinaDeLaPantalla("elegir")}
-              </fieldset>
-            )}
-          </section>
-        )}
-
         {/* La pregunta, una vez por pedido, a quien va a pagar en línea sin haber elegido propina. */}
         {preguntando && !enReto && (
-          <section className="flex min-w-0 flex-col gap-3 px-4 pb-5 pt-2">
+          <section className="flex min-w-0 flex-col gap-3 px-4 pb-5 pt-4">
             {titulo("¿Gustas dejar una propina?", "propina")}
             <p className="text-14 text-ink-2">{apoyoDePropina}</p>
             {propinaDeLaPantalla("preguntar")}
@@ -973,7 +1079,7 @@ export function PasoDeDatos({
             envoltura no lleva clases de `display`: le ganarían al atributo `hidden`. */}
         {enLinea && conTarjeta && sucursal.public_key && (
           <div hidden={paso !== "tarjeta" || enReto}>
-            <section className="flex min-w-0 flex-col gap-4 px-4 pb-5 pt-2">
+            <section className="flex min-w-0 flex-col gap-4 px-4 pb-5 pt-4">
               {titulo("Tu tarjeta", "tarjeta")}
               {/* La cuenta de lo que se va a cobrar, en la tarjeta de resumen de la casa. */}
               {total && aPagar && (
@@ -1001,7 +1107,9 @@ export function PasoDeDatos({
           </Aviso>
         )}
         {duda === "sin-respuesta" && <button type="button" onClick={() => void comprobar.current()} className={GHOST}>Volver a comprobar</button>}
-        {reto ? (
+        {seccion && enDatos ? (
+          <button key="listo" type="submit" disabled={ocupado} className={cn(PRINCIPAL, "h-14 w-full justify-center px-5 text-16")}>Listo</button>
+        ) : reto ? (
           // La acción de esta pantalla está dentro del marco (la del banco). Aquí, solo salir de él; y
           // una vez que terminó o se canceló, esperar: no se ofrece pagar otra vez hasta saber cómo quedó.
           <>

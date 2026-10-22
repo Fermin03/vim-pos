@@ -3,8 +3,8 @@
 // el render: el servidor no lo tiene y el HTML no coincidiría), lo guarda con cada cambio y lo
 // reparte al menú, a la hoja de producto, a la barra y al carrito.
 //
-// El paso «Tus datos / enviar» (components/datos.tsx) se pinta dentro de la hoja del carrito cuando
-// `paso === "datos"`; lo que necesita de aquí es `PropsDelPasoDeDatos`.
+// El paso «Tus datos / enviar» (components/datos.tsx) se pinta en su propia hoja, a pantalla completa,
+// cuando `paso === "datos"`; lo que necesita de aquí es `PropsDelPasoDeDatos`.
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Aviso, StatusChip, botonClases, cn } from "@vim/ui/styles";
@@ -258,8 +258,21 @@ export function Tienda({ negocio, sucursal, menu, ahora, conSesion }: {
         {producto && <ProductoPorAgregar key={producto.turno} producto={producto.p} alAgregar={alAgregar} />}
       </Hoja>
 
-      <Hoja abierta={paso !== "menu" && !ajeno} fija={enviando || retenida} alCerrar={() => pasar("menu")} titulo={paso === "datos" ? "Tus datos" : "Tu pedido"}>
-        {paso === "datos" ? (
+      {/* «Ver pedido» es una hoja; con «Continuar» el checkout («Tus datos») pasa a pantalla completa. */}
+      <Hoja abierta={paso === "carrito" && !ajeno} fija={enviando || retenida} alCerrar={() => pasar("menu")} titulo="Tu pedido">
+        {noEntro && (
+          <div className="px-4 pt-3" aria-live="polite">
+            <Aviso tono="warning" className="!text-14" onCerrar={() => setNoEntro(null)}>{noEntro}</Aviso>
+          </div>
+        )}
+        <VistaDelCarrito sucursal={sucursal} carrito={carrito} menu={menu} ahora={ahora} avisos={avisos} cotizado={cotizado}
+          alCambiarCantidad={(id, n) => cambiar((c) => cambiarCantidad(c, id, n))} alQuitar={(id) => cambiar((c) => quitar(c, id))}
+          alCambiarModo={(modo) => cambiar((c) => ({ ...c, modo }))}
+          alContinuar={() => pasar("datos")} alCerrar={() => pasar("menu")} />
+      </Hoja>
+
+      <Hoja completa abierta={paso === "datos" && !ajeno} fija={enviando || retenida} alCerrar={() => pasar("menu")} titulo="Tus datos">
+        {paso === "datos" && (
           <PasoDeDatos negocio={negocio} sucursal={sucursal} carrito={carrito} nota={nota} alCambiarNota={setNota}
             cotizacion={cotizado.resultado?.ok ? cotizado.resultado.datos : null}
             alVolver={() => pasar("carrito")}
@@ -274,18 +287,6 @@ export function Tienda({ negocio, sucursal, menu, ahora, conSesion }: {
             // «Mejor recojo mi pedido» (fuera del área, o una colonia sin cobertura): el pedido no cambia,
             // solo cómo se recibe; se ve otra vez en el carrito.
             alCambiarModo={(modo) => { cambiar((c) => ({ ...c, modo })); setPaso("carrito"); }} />
-        ) : (
-          <>
-          {noEntro && (
-            <div className="px-4 pt-3" aria-live="polite">
-              <Aviso tono="warning" className="!text-14" onCerrar={() => setNoEntro(null)}>{noEntro}</Aviso>
-            </div>
-          )}
-          <VistaDelCarrito sucursal={sucursal} carrito={carrito} menu={menu} ahora={ahora} avisos={avisos} cotizado={cotizado}
-            alCambiarCantidad={(id, n) => cambiar((c) => cambiarCantidad(c, id, n))} alQuitar={(id) => cambiar((c) => quitar(c, id))}
-            alCambiarModo={(modo) => cambiar((c) => ({ ...c, modo }))}
-            alContinuar={() => pasar("datos")} alCerrar={() => pasar("menu")} />
-          </>
         )}
       </Hoja>
 
