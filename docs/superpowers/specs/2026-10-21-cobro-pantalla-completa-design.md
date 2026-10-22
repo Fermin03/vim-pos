@@ -227,3 +227,19 @@ preguntar (comportamiento actual).
 - La regla exacta de los montos sugeridos de efectivo, mientras sean hasta cuatro, mayores al total y
   redondos.
 - El texto de ayuda de cada pantalla, siempre corto y sin jerga.
+
+## Agregado el 21 oct: sin vista previa del ticket y «Enviar por correo»
+
+Pedido de Fermín a media construcción:
+
+- **Al terminar la venta ya no se abre la vista previa del ticket**, en ningún giro. Con impresora
+  configurada se imprime como siempre; sin impresora no se muestra nada.
+- **Sin impresora, «Cobro completado» ofrece «Enviar por correo»** (en lugar de «Imprimir copia»),
+  como en Square. Abre una pantalla completa con el correo del cliente y «Enviar». Al enviarse,
+  «Cobro completado» dice «Ticket enviado a …». El correo del cliente no se guarda.
+- **Cómo viaja:** la caja manda los mismos renglones que imprimiría (`construirTicketJob`, sin logo
+  ni corte) a la función `enviar-ticket`, que los valida, los escapa y los manda con el SMTP de VIM
+  (`_shared/ticket-correo.ts`). Así el correo sale igual que el papel y la caja de escritorio —cuyo
+  ticket puede no haber subido— funciona igual: su gateway reenvía a la nube como el dispositivo.
+  El único enlace posible en el correo es el de VIM para facturar.
+- **Sin internet** la caja dice «No se pudo enviar: la caja no tiene internet».
