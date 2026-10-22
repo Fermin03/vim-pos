@@ -34,7 +34,7 @@ DECLARE
   v_pers   uuid := '22800000-0000-0000-0000-0000000000b1';   -- PERSONAL; colaboradora
   v_cat    uuid := 'a0000000-0000-0000-0000-0000000000c1';
   v_corte  uuid := '22800000-0000-0000-0000-0000000000a1';
-  v_vis text; v_j jsonb; v_n integer; v_x text;
+  v_vis text; v_j jsonb; v_n integer; v_x text; v_rol boolean;
 BEGIN
   UPDATE tenants SET vertical_principal = 'SALON', operacion = operacion || '{"agenda":true}' WHERE id = v_t;
   INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data)
@@ -174,12 +174,17 @@ BEGIN
   IF v_n <> 0 THEN RAISE EXCEPTION 'C9: colaborador_web tiene privilegios en % tablas', v_n; END IF;
 
   -- 10) Como PostgREST con ese token: su agenda y sus comisiones sí; la caja y las tablas no.
+  -- En la base nueva del CI `postgres` no es miembro de `colaborador_web` ni de `authenticator`, y no
+  -- hay cómo serlo: `GRANT colaborador_web TO current_user` TUMBÓ el servidor del CI (22 oct 2026,
+  -- «server closed the connection unexpectedly» y la base en recuperación para los smokes de después).
+  -- Ahí se prueba con los mismos claims lo que sí le funciona; que lo demás no lo pueda ejecutar ya lo
+  -- comprueba el paso 9 con has_function_privilege / has_table_privilege, que no necesitan el rol.
   BEGIN
     EXECUTE 'SET LOCAL ROLE colaborador_web';
+    v_rol := true;
   EXCEPTION WHEN insufficient_privilege THEN
-    -- En el CI `postgres` no es miembro del rol: se entra como PostgREST, por `authenticator`.
-    EXECUTE 'SET LOCAL ROLE authenticator';
-    EXECUTE 'SET LOCAL ROLE colaborador_web';
+    v_rol := false;
+    RAISE NOTICE 'C10: sin membresía en colaborador_web; lo prohibido queda cubierto por C9';
   END;
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_pers, 'tenant_id', v_t, 'role', 'colaborador_web',
     'tipo_identidad', 'EMPLEADO', 'session_id', gen_random_uuid())::text, true);
@@ -194,7 +199,7 @@ BEGIN
     RAISE EXCEPTION 'C10: mis_comisiones aceptó 120 días';
   EXCEPTION WHEN invalid_parameter_value THEN NULL;
   END;
-  FOREACH v_x IN ARRAY ARRAY[
+  IF v_rol THEN FOREACH v_x IN ARRAY ARRAY[
     format('SELECT guardar_cita(%L::jsonb)', jsonb_build_object('sucursal_id', v_suc)),
     format('SELECT cancelar_cita(%L, %L)', gen_random_uuid(), 'x'),
     format('SELECT marcar_no_llego(%L)', gen_random_uuid()),
@@ -205,7 +210,7 @@ BEGIN
       RAISE EXCEPTION 'C10: colaborador_web pudo: %', v_x;
     EXCEPTION WHEN insufficient_privilege THEN NULL;
     END;
-  END LOOP;
+  END LOOP; END IF;
   EXECUTE 'RESET ROLE';
 END $$;
 
