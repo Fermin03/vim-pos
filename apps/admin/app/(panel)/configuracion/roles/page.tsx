@@ -1,6 +1,6 @@
 "use client";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Button, Icono } from "@vim/ui/styles";
+import { Cargando, Button, Icono } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import {
   asignarPermisosUsuario, leerMatriz, permisosDeUsuario, quitarPermiso, restaurarPermiso,
@@ -88,7 +88,7 @@ export default function RolesPermisosPage() {
       <PageHeader titulo="Roles y permisos" subtitulo="Ajusta qué puede hacer cada rol en tu negocio (solo restringir) y los permisos de usuarios personalizados." migas={[{ label: "Configuración" }, { label: "Roles y permisos" }]} />
       <PageBody>
           {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
-          {matriz === null && !error && <p className="text-sm text-ink-3">Cargando matriz…</p>}
+          {matriz === null && !error && <Cargando texto="Cargando matriz" />}
 
           {matriz && (
             <>

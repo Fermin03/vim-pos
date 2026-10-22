@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { cn, Icono } from "@vim/ui/styles";
+import { Cargando, cn, Icono } from "@vim/ui/styles";
 import { Interruptor } from "./interruptor";
 import { Tarjeta } from "./tarjeta";
 import { LineaMensaje } from "./tienda-mensaje";
@@ -121,7 +121,7 @@ export function TiendaMenu({ sucursales, soloLectura }: { sucursales: SucursalTi
               <button type="button" onClick={() => setIntento((n) => n + 1)} className={cn(boton, "mt-3")}>Reintentar</button>
             </div>
           ) : menu === null ? (
-            <p className="text-13 text-ink-3">Cargando…</p>
+            <Cargando en="linea" />
           ) : arbol.length === 0 ? (
             <p className="text-13 text-ink-2">
               Tu catálogo todavía no tiene productos.{" "}

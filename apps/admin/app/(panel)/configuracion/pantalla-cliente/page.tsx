@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { Button, DialogoPeligro, botonClases, cn } from "@vim/ui/styles";
+import { Cargando, Button, DialogoPeligro, botonClases, cn } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import {
   MAX_ANUNCIOS,
@@ -286,7 +286,7 @@ export default function PantallaClientePage() {
           <p className="text-13 font-medium text-success" role="status" aria-live="polite">{aviso}</p>
         </div>
 
-        {anuncios === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
+        {anuncios === null && !error && <Cargando />}
         {anuncios === null && error && (
           <Button variant="ghost" onClick={() => { setError(null); recargar(); }}>Volver a intentar</Button>
         )}

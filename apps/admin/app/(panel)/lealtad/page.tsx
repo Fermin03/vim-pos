@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, DialogoPeligro } from "@vim/ui/styles";
+import { Cargando, Button, DialogoPeligro } from "@vim/ui/styles";
 import type { Mecanica } from "@vim/db/lealtad";
 import { PageBody, PageHeader } from "../../components/page-header";
 import { LealtadPestanas } from "../../components/lealtad-pestanas";
@@ -118,7 +118,7 @@ export default function ProgramaLealtadPage() {
             </button>
           </div>
         ) : existe === undefined ? (
-          <p className="text-sm text-ink-3">Cargando…</p>
+          <Cargando />
         ) : (
           <>
             {/* El interruptor vive aquí, no en Configuración: solo afecta a la lealtad. */}

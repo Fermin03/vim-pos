@@ -1,4 +1,5 @@
 "use client";
+import { Cargando } from "@vim/ui/styles";
 import { useEffect, useMemo, useState } from "react";
 import { label, input } from "./campos";
 import { AccionFila } from "./controles";
@@ -84,7 +85,7 @@ export function ProductoVariantes({ producto, onPendiente }: {
       <h2 id="titulo-variantes" className="text-14 font-semibold">Tallas y colores</h2>
       <p className="mb-3 text-13 text-ink-2">Escribe los ejes y sus valores separados por coma. Cada combinación se vende y se cuenta por separado.</p>
       {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
-      {filas === null && !error && <p className="text-sm text-ink-2">Cargando…</p>}
+      {filas === null && !error && <Cargando />}
       {filas !== null && (
         <>
           <div className="grid gap-3 md:grid-cols-2">

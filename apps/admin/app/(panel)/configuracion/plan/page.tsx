@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Aviso, StatusChip, type TonoEstado } from "@vim/ui/styles";
+import { Cargando, Aviso, StatusChip, type TonoEstado } from "@vim/ui/styles";
 import { fechaLegible, hoyMx } from "@vim/fecha";
 import { ETIQUETA_METODO_COBRO, estadoCobro, precioVigente, promocionVigente, textoEstadoCobro, type EstadoCobro } from "@vim/db/cobro";
 import { PageHeader, PageBody } from "../../../components/page-header";
@@ -46,7 +46,7 @@ export default function PlanPage() {
       <PageHeader titulo="Plan y pagos" subtitulo="Tu plan de VIM POS, cuándo toca pagar y tus pagos." migas={[{ label: "Configuración" }, { label: "Plan y pagos" }]} />
       <PageBody>
         {error && <Aviso tono="danger" role="alert" className="max-w-[640px]">{error}</Aviso>}
-        {!d && !error && <p className="text-13 text-ink-3">Cargando…</p>}
+        {!d && !error && <Cargando />}
         {d && (
           <div className="flex max-w-[640px] flex-col gap-4">
             <section className="rounded-lg border border-line bg-surface p-5">

@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { Aviso, Button, DialogoPeligro, Modal, useConfirmar } from "@vim/ui/styles";
+import { Cargando, Aviso, Button, DialogoPeligro, Modal, useConfirmar } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
 import { RangoFechas } from "../../components/rango-fechas";
 import { fmtMxn, rangoUltimosDias } from "../../lib/reportes";
@@ -110,7 +110,7 @@ export default function FacturacionPage() {
           {/* No se emite sola: la emite el dueño, un periodo a la vez. Aquí salen TODOS los periodos
               cerrados con ventas sin amparar, el más viejo primero — es el que más urge. */}
           {!avisos.cargado ? (
-            <p className="text-13 text-ink-3">Cargando…</p>
+            <Cargando en="linea" />
           ) : !avisos.factura ? (
             <p className="text-13 text-ink-3">Configura tus datos fiscales y carga tu sello para emitir la global.</p>
           ) : avisos.pendientes.length === 0 ? (
@@ -177,7 +177,7 @@ export default function FacturacionPage() {
         </div>
 
         {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
-        {tickets === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
+        {tickets === null && !error && <Cargando />}
         {tickets !== null && (
           <div className="tabla-caja overflow-hidden rounded-lg border border-line bg-surface">
             <table className="w-full text-13">

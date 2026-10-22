@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button } from "@vim/ui/styles";
+import { Cargando, Button } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import {
   guardarPropinas,
@@ -115,7 +115,7 @@ export default function PropinasPage() {
             </div>
 
             {cargandoConfig ? (
-              <p className="text-sm text-ink-3">Cargando configuración…</p>
+              <Cargando texto="Cargando configuración" />
             ) : (
               <div className="flex flex-col gap-5 rounded-lg border border-line bg-surface p-5">
                 <label className="flex items-start gap-2.5">

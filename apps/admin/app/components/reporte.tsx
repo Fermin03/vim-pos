@@ -7,7 +7,7 @@
  * volvía a 30 días al cambiar de reporte y ninguna forma de exportar ni de ordenar.
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Button, Icono } from "@vim/ui/styles";
+import { Cargando, Button, Icono } from "@vim/ui/styles";
 import { hoyMx } from "@vim/fecha";
 import { PageBody, PageHeader, TablaScroll, type Miga } from "./page-header";
 import { RangoFechas } from "./rango-fechas";
@@ -363,7 +363,7 @@ export function ReporteMarco<D, T>({
           </div>
         )}
 
-        {datos === null && !error && <p className="text-14 text-ink-2">Cargando…</p>}
+        {datos === null && !error && <Cargando />}
 
         {datos !== null && (
           <div aria-busy={cargando} className={`transition-opacity duration-150 ${cargando ? "opacity-60" : ""}`}>

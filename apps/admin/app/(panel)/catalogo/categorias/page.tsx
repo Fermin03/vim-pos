@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, DialogoPeligro, Icono, IconoCategoria } from "@vim/ui/styles";
+import { Cargando, Button, DialogoPeligro, Icono, IconoCategoria } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { FranjaMenus, useMenuCatalogo } from "../../../components/selector-menu";
 import { ModalCategoria } from "../../../components/modal-categoria";
@@ -266,7 +266,7 @@ export default function CategoriasPage() {
           </p>
         )}
 
-        {cats === null && <p className="text-sm text-ink-3">Cargando…</p>}
+        {cats === null && <Cargando />}
 
         {cats !== null && (
           <div className="tabla-caja overflow-hidden rounded-lg border border-line bg-surface">

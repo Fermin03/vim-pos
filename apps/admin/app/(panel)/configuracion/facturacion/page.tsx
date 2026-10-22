@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Button, useConfirmar, Icono } from "@vim/ui/styles";
+import { Cargando, Button, useConfirmar, Icono } from "@vim/ui/styles";
 import { fechaLegible } from "@vim/fecha";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import {
@@ -309,7 +309,7 @@ export default function FacturacionPage() {
         migas={[{ label: "Configuración" }, { label: "Facturación" }]}
       />
       <PageBody>
-        {(datos === undefined || emisor === undefined) && !errorCarga && <p className="text-sm text-ink-2">Cargando…</p>}
+        {(datos === undefined || emisor === undefined) && !errorCarga && <Cargando />}
         {errorCarga && <p className="text-sm font-medium text-danger" role="alert">{errorCarga}</p>}
 
         {datos && emisor && estado && (

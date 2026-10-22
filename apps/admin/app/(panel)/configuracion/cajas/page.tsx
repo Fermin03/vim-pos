@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Button, DialogoPeligro, Modal, useConfirmar, Icono } from "@vim/ui/styles";
+import { Cargando, Button, DialogoPeligro, Modal, useConfirmar, Icono } from "@vim/ui/styles";
 import { haceCuanto } from "@vim/fecha";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { ModalCaja } from "../../../components/modal-caja";
@@ -127,7 +127,7 @@ export default function CajasPage() {
       />
       <PageBody>
         {error && <p className="mb-4 text-sm font-medium text-danger" role="alert">{error}</p>}
-        {list === null && <p className="text-sm text-ink-3">Cargando…</p>}
+        {list === null && <Cargando />}
 
         {list !== null && list.length === 0 && (
           <div className="rounded-lg border border-dashed border-line-strong p-12 text-center">

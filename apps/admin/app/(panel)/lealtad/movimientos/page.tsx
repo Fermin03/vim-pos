@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@vim/ui/styles";
+import { Cargando, Button } from "@vim/ui/styles";
 import { cantidad, type Mecanica } from "@vim/db/lealtad";
 import { PageBody, PageHeader, TablaScroll } from "../../../components/page-header";
 import { LealtadPestanas } from "../../../components/lealtad-pestanas";
@@ -156,7 +156,7 @@ export default function MovimientosLealtadPage() {
           </p>
         )}
         {libro === null ? (
-          cargandoLibro ? <p className="text-sm text-ink-3">Cargando…</p> : null
+          cargandoLibro ? <Cargando /> : null
         ) : libro.filas.length === 0 ? (
           <div className="rounded-lg border border-line bg-surface p-8 text-center text-ink-3">
             <p className="text-15 font-semibold text-ink-2">Sin movimientos</p>

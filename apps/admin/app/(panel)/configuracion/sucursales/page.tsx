@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, DialogoPeligro, Icono } from "@vim/ui/styles";
+import { Cargando, Button, DialogoPeligro, Icono } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { ModalSucursal } from "../../../components/modal-sucursal";
 import { eliminarSucursal, listarSucursales, type Sucursal } from "../../../lib/configuracion";
@@ -54,7 +54,7 @@ export default function SucursalesPage() {
       />
       <PageBody>
         {error && <p className="mb-4 text-sm font-medium text-danger" role="alert">{error}</p>}
-        {list === null && <p className="text-sm text-ink-3">Cargando…</p>}
+        {list === null && <Cargando />}
 
         {list !== null && (
           <div className="tabla-caja overflow-hidden rounded-lg border border-line bg-surface">

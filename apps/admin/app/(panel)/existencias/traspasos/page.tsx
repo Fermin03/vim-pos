@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Button, StatusChip, useConfirmar, type TonoEstado } from "@vim/ui/styles";
+import { Cargando, Button, StatusChip, useConfirmar, type TonoEstado } from "@vim/ui/styles";
 import { fechaLegible, ZONA_MX } from "@vim/fecha";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { ExistenciasTabs } from "../../../components/existencias-tabs";
@@ -148,7 +148,7 @@ export default function TraspasosPage() {
           </div>
         )}
 
-        {sucursales === null && !errorCarga && <p className="text-14 text-ink-2">Cargando…</p>}
+        {sucursales === null && !errorCarga && <Cargando />}
 
         {sucursales !== null && sucursales.length <= 1 && (
           <p className="text-14 text-ink-2">Los traspasos son entre sucursales; tu negocio tiene una.</p>

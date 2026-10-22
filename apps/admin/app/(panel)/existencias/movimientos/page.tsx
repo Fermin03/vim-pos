@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { Button, Icono } from "@vim/ui/styles";
+import { Cargando, Button, Icono } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { ExistenciasTabs } from "../../../components/existencias-tabs";
 import { RangoFechas } from "../../../components/rango-fechas";
@@ -145,7 +145,7 @@ export default function MovimientosExistenciasPage() {
           </div>
         )}
 
-        {consulta.datos === null && !consulta.error && <p className="text-14 text-ink-2">Cargando…</p>}
+        {consulta.datos === null && !consulta.error && <Cargando />}
 
         {consulta.datos !== null && (
           <div aria-busy={consulta.cargando} className={`transition-opacity duration-150 ${consulta.cargando ? "opacity-60" : ""}`}>

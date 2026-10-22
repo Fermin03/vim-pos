@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, useConfirmar } from "@vim/ui/styles";
+import { Cargando, Button, useConfirmar } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { Tarjeta } from "../../../components/tarjeta";
 import { AccionFila } from "../../../components/controles";
@@ -94,7 +94,7 @@ export default function EspaciosPage() {
       />
       <PageBody>
         {error && <p className="mb-4 text-sm font-medium text-danger" role="alert">{error}</p>}
-        {tipos === null ? <p className="text-sm text-ink-3">Cargando…</p> : (
+        {tipos === null ? <Cargando /> : (
           <div className="flex flex-col gap-5">
             <Tarjeta titulo="Tipos de espacio" descripcion="Lo que pide un servicio. Un corte pide «Sillón»; un facial, «Cabina».">
               {tipos.length > 0 && (

@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { Button } from "@vim/ui/styles";
+import { Cargando, Button } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
 import {
   cancelarReservacion,
@@ -112,7 +112,7 @@ export default function ReservacionesPage() {
           <span className="text-13 text-ink-3">{lista?.length ?? 0} reservaciones</span>
         </div>
 
-        {lista === null && <p className="text-sm text-ink-3">Cargando…</p>}
+        {lista === null && <Cargando />}
         {lista && lista.length === 0 && !creando && (
           <div className="rounded-lg border border-line bg-surface p-8 text-center text-ink-3">
             <p className="text-15 font-semibold text-ink-2">Sin reservaciones este día</p>

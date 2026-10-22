@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, Modal } from "@vim/ui/styles";
+import { Cargando, Button, Modal } from "@vim/ui/styles";
 import { cantidad, type Mecanica } from "@vim/db/lealtad";
 import { leerProgramaAdmin, mensajeLealtad } from "../lib/lealtad";
 import { ajustarSaldo, ajusteSchema, etiquetaTipo, historialCliente, type MovimientoLibro } from "../lib/lealtad-libro";
@@ -87,7 +87,7 @@ export function ClienteLealtad({
         {historial === null ? (
           errorHistorial
             ? <p className="p-3 text-13 font-medium text-danger" role="alert">{errorHistorial}</p>
-            : <p className="p-3 text-13 text-ink-3">Cargando…</p>
+            : <Cargando en="linea" className="p-3" />
         ) : historial.length === 0 ? (
           <p className="p-3 text-13 text-ink-3">Todavía no tiene movimientos.</p>
         ) : (

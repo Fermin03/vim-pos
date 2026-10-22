@@ -1,4 +1,5 @@
 "use client";
+import { Cargando } from "@vim/ui/styles";
 import { useEffect, useState } from "react";
 import { PageBody, PageHeader } from "./page-header";
 import { PedirModulo } from "./pedir-modulo";
@@ -14,7 +15,7 @@ export function TiendaSinContratar() {
   const [oferta, setOferta] = useState<OfertaTienda | null | undefined>(undefined);
   useEffect(() => { leerOfertaTienda().then(setOferta); }, []);
 
-  if (oferta === undefined) return <PageBody><p className="text-13 text-ink-3">Cargando…</p></PageBody>;
+  if (oferta === undefined) return <PageBody><Cargando /></PageBody>;
   const invitacion = invitacionTienda(oferta);
   return (
     <>

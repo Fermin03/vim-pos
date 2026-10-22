@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Button, Modal, useConfirmar, Icono } from "@vim/ui/styles";
+import { Cargando, Button, Modal, useConfirmar, Icono } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
 import {
   activarModuloInventario,
@@ -254,7 +254,7 @@ export default function InventarioPage() {
           )}
         </div>
 
-        {insumos === null && <p className="text-sm text-ink-3">Cargando…</p>}
+        {insumos === null && <Cargando />}
 
         {insumos && insumos.length > 0 && (
           <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">

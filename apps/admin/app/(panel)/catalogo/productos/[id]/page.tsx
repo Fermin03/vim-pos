@@ -1,4 +1,5 @@
 "use client";
+import { Cargando } from "@vim/ui/styles";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -47,7 +48,7 @@ export default function EditarProductoPage() {
         right={prod ? <Link className="text-sm font-semibold text-ink underline underline-offset-2" href={`/catalogo/recetas/${prod.id}`}>Receta y costo</Link> : undefined}
       />
       <PageBody>
-        {prod === undefined && <p className="text-sm text-ink-2">Cargando…</p>}
+        {prod === undefined && <Cargando />}
         {prod === null && <p className="text-sm text-danger">Producto no encontrado.</p>}
         {prod && (
           <ProductoForm

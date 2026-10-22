@@ -1,4 +1,5 @@
 "use client";
+import { Cargando } from "@vim/ui/styles";
 import type { ReactNode } from "react";
 import { useModulos } from "../../components/admin-shell";
 import { PageBody, PageHeader } from "../../components/page-header";
@@ -11,7 +12,7 @@ import { conExistencias } from "../../lib/operacion";
  */
 export default function ExistenciasLayout({ children }: { children: ReactNode }) {
   const modulos = useModulos();
-  if (modulos === null) return <PageBody><p className="text-13 text-ink-3">Cargando…</p></PageBody>;
+  if (modulos === null) return <PageBody><Cargando /></PageBody>;
   if (!conExistencias(modulos)) {
     return (
       <>

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Button, DialogoPeligro, Modal } from "@vim/ui/styles";
+import { Cargando, Button, DialogoPeligro, Modal } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import {
   crearRepartidor,
@@ -120,7 +120,7 @@ export default function RepartidoresPage() {
             {error}
           </p>
         )}
-        {repartidores === null && <p className="text-sm text-ink-3">Cargando…</p>}
+        {repartidores === null && <Cargando />}
 
         {repartidores !== null && repartidores.length === 0 && (
           <div className="rounded-lg border border-dashed border-line-strong p-12 text-center">

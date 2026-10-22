@@ -1,4 +1,5 @@
 "use client";
+import { Cargando } from "@vim/ui/styles";
 import type { ReactNode } from "react";
 import { PageBody } from "../../components/page-header";
 import { useModulos } from "../../components/admin-shell";
@@ -11,7 +12,7 @@ import { estadoTienda } from "../../lib/tienda-plan";
  */
 export default function TiendaLayout({ children }: { children: ReactNode }) {
   const estado = estadoTienda(useModulos());
-  if (estado === "cargando") return <PageBody><p className="text-13 text-ink-3">Cargando…</p></PageBody>;
+  if (estado === "cargando") return <PageBody><Cargando /></PageBody>;
   if (estado === "sin_contratar") return <TiendaSinContratar />;
   return <>{children}</>;
 }

@@ -1,4 +1,5 @@
 "use client";
+import { Cargando } from "@vim/ui/styles";
 import type { ReactNode } from "react";
 import { PageBody, PageHeader } from "./page-header";
 import { PedirModulo } from "./pedir-modulo";
@@ -36,7 +37,7 @@ export function InventarioDesdeNegocio({ enRecetas = false }: { /** Desde Catál
  */
 export function SoloConInventario({ children, enRecetas = false }: { children: ReactNode; enRecetas?: boolean }) {
   const estado = estadoInventario(useModulos());
-  if (estado === "cargando") return <PageBody><p className="text-13 text-ink-3">Cargando…</p></PageBody>;
+  if (estado === "cargando") return <PageBody><Cargando /></PageBody>;
   if (estado === "no_incluido") return <InventarioDesdeNegocio enRecetas={enRecetas} />;
   return <>{children}</>;
 }

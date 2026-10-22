@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, useConfirmar } from "@vim/ui/styles";
+import { Cargando, Button, useConfirmar } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import {
   actualizarMarca,
@@ -94,7 +94,7 @@ export default function MarcasPage() {
         {okMsg && <p className="mb-3 text-sm font-medium text-success">{okMsg}</p>}
         {error && !editando && <p className="mb-3 text-sm font-medium text-danger">{error}</p>}
 
-        {marcas === null && <p className="text-sm text-ink-3">Cargando…</p>}
+        {marcas === null && <Cargando />}
         {marcas && marcas.length === 0 && !editando && (
           <div className="rounded-lg border border-line bg-surface p-8 text-center text-ink-3">
             <p className="text-15 font-semibold text-ink-2">Sin marcas todavía</p>

@@ -1,5 +1,5 @@
 "use client";
-import { LogoVim, Icono } from "@vim/ui/styles";
+import { Cargando, LogoVim, Icono } from "@vim/ui/styles";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -213,7 +213,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   if (!listo) {
     return (
       <main className="flex h-[100dvh] items-center justify-center">
-        <p className="text-sm text-ink-3">Cargando…</p>
+        <Cargando />
       </main>
     );
   }

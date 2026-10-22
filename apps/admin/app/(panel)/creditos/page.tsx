@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Button, Modal } from "@vim/ui/styles";
+import { Cargando, Button, Modal } from "@vim/ui/styles";
 import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
 import { PageBody, PageHeader } from "../../components/page-header";
 import { useModulos } from "../../components/admin-shell";
@@ -35,7 +35,7 @@ export default function CreditosPage() {
       <PageHeader titulo="Créditos" subtitulo="Quién te debe, cuánto y desde cuándo." />
       <PageBody>
         {modulos === null ? (
-          <p className="text-sm text-ink-3">Cargando…</p>
+          <Cargando />
         ) : !encendido ? (
           <div className="max-w-[640px] rounded-lg border border-line bg-surface p-5">
             <p className="text-14 font-semibold text-ink">La venta a crédito está apagada</p>
@@ -47,7 +47,7 @@ export default function CreditosPage() {
           <>
             {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
             {deudores === null ? (
-              !error && <p className="text-sm text-ink-3">Cargando…</p>
+              !error && <Cargando />
             ) : deudores.length === 0 ? (
               <div className="rounded-lg border border-line bg-surface p-8 text-center text-ink-3">
                 <p className="text-15 font-semibold text-ink-2">Nadie te debe</p>
@@ -136,7 +136,7 @@ function DetalleCliente({ deudor, onCerrar }: { deudor: Deudor; onCerrar: () => 
         {error ? (
           <p className="text-13 font-medium text-danger" role="alert">{error}</p>
         ) : ventas === null ? (
-          <p className="text-13 text-ink-3">Cargando…</p>
+          <Cargando en="linea" />
         ) : ventas.length === 0 ? (
           <p className="text-13 text-ink-3">No tiene ventas a crédito.</p>
         ) : (

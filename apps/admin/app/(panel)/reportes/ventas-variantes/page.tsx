@@ -1,4 +1,5 @@
 "use client";
+import { Cargando } from "@vim/ui/styles";
 import { useModulos } from "../../../components/admin-shell";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { Nota, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
@@ -12,7 +13,7 @@ const TITULO = "Ventas por talla y color";
 /** Reporte del giro tienda: un restaurante que llega por enlace directo no lee nada de él. */
 export default function VentasPorVariantePage() {
   const modulos = useModulos();
-  if (modulos === null) return <PageBody><p className="text-13 text-ink-3">Cargando…</p></PageBody>;
+  if (modulos === null) return <PageBody><Cargando /></PageBody>;
   if (!conExistencias(modulos)) {
     return (
       <>

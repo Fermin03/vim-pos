@@ -1,4 +1,5 @@
 "use client";
+import { Cargando } from "@vim/ui/styles";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PageBody, PageHeader } from "../../components/page-header";
@@ -43,7 +44,7 @@ export default function CotizacionesPage() {
       <PageHeader titulo="Cotizaciones" subtitulo="Lo que se ha cotizado y lo que se volvió venta." />
       <PageBody>
         {modulos === null ? (
-          <p className="text-sm text-ink-3">Cargando…</p>
+          <Cargando />
         ) : !encendido ? (
           <div className="max-w-[640px] rounded-lg border border-line bg-surface p-5">
             <p className="text-14 font-semibold text-ink">Las cotizaciones están apagadas</p>
@@ -55,7 +56,7 @@ export default function CotizacionesPage() {
           <>
             {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
             {datos === null || totales === null ? (
-              !error && <p className="text-sm text-ink-3">Cargando…</p>
+              !error && <Cargando />
             ) : datos.cotizaciones.length === 0 ? (
               <div className="rounded-lg border border-line bg-surface p-8 text-center text-ink-3">
                 <p className="text-15 font-semibold text-ink-2">Aún no hay cotizaciones</p>

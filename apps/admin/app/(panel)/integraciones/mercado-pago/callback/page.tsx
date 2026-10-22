@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button } from "@vim/ui/styles";
+import { Cargando, Button } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../../components/page-header";
 import { accionTerminal, mensajeErrorTerminal, validarStateMp } from "../../../../lib/terminal";
 import { accionConexionTienda, esStateDeTienda, mensajeErrorConexionTienda, REGRESO_TIENDA, validarStateTienda } from "../../../../lib/tienda-conexion";
@@ -16,7 +16,7 @@ import { accionConexionTienda, esStateDeTienda, mensajeErrorConexionTienda, REGR
  */
 export default function RegresoMercadoPagoPage() {
   return (
-    <Suspense fallback={<PageBody><p className="text-sm text-ink-3">Cargando…</p></PageBody>}>
+    <Suspense fallback={<PageBody><Cargando /></PageBody>}>
       <Regreso />
     </Suspense>
   );

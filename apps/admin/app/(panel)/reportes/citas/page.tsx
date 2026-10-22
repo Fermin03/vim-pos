@@ -1,4 +1,5 @@
 "use client";
+import { Cargando } from "@vim/ui/styles";
 import { useState } from "react";
 import { rangoLegible } from "@vim/fecha";
 import { useModulos } from "../../../components/admin-shell";
@@ -18,7 +19,7 @@ const DIAS_MAX = 367;
 /** Reporte de belleza: un negocio sin agenda que llega por enlace directo no lee nada de él. */
 export default function CitasPage() {
   const modulos = useModulos();
-  if (modulos === null) return <PageBody><p className="text-13 text-ink-3">Cargando…</p></PageBody>;
+  if (modulos === null) return <PageBody><Cargando /></PageBody>;
   if (!conAgenda(modulos)) {
     return (
       <>

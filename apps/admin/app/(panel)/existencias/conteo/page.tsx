@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button, Modal, useConfirmar } from "@vim/ui/styles";
+import { Cargando, Button, Modal, useConfirmar } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { ExistenciasTabs } from "../../../components/existencias-tabs";
 import { SelectorSucursal, useSucursalReporte } from "../../../components/selector-sucursal";
@@ -129,7 +129,7 @@ export default function ConteoPage() {
           </div>
         )}
 
-        {!enTodas && consulta.datos === null && !consulta.error && <p className="text-14 text-ink-2">Cargando…</p>}
+        {!enTodas && consulta.datos === null && !consulta.error && <Cargando />}
 
         {!enTodas && consulta.datos !== null && (
           <div className="max-w-3xl">

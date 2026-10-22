@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@vim/ui/styles";
+import { Cargando, Button } from "@vim/ui/styles";
 import { listarProductos, type Producto } from "../lib/catalogo";
 import { asignarGrupoEnMasa, quitarGrupoEnMasa, productosConGrupo } from "../lib/modificadores";
 import { mensajeError } from "../lib/errores";
@@ -105,7 +105,7 @@ export function AsignacionMasivaGrupo({ grupoId, grupoNombre }: { grupoId: strin
 
       {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
       {msg && <p className="mb-3 text-sm font-medium text-success">{msg}</p>}
-      {productos === null && !error && <p className="text-sm text-ink-3">Cargando productos…</p>}
+      {productos === null && !error && <Cargando texto="Cargando productos" />}
 
       {productos !== null && (
         <div className="max-h-[360px] overflow-y-auto rounded border border-line">

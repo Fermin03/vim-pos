@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Button, DialogoPeligro, Modal, Icono } from "@vim/ui/styles";
+import { Cargando, Button, DialogoPeligro, Modal, Icono } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import {
   actualizarMesa,
@@ -101,7 +101,7 @@ export default function MesasPage() {
       />
       <PageBody>
         {error && !editando && <p className="mb-4 text-sm font-medium text-danger" role="alert">{error}</p>}
-        {mesas === null && <p className="text-sm text-ink-3">Cargando…</p>}
+        {mesas === null && <Cargando />}
 
         {/* Sin sucursal, el botón de alta salía deshabilitado sin decir por qué. */}
         {mesas !== null && sucursales.length === 0 && (
