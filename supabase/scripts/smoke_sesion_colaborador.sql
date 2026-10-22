@@ -5,6 +5,10 @@
 \set ON_ERROR_STOP on
 BEGIN;
 
+-- En la base del CI `postgres` crea el rol (ADMIN) pero no es miembro: sin esto `SET ROLE colaborador_web`
+-- da «permission denied». Producción no lo necesita (lo usa `authenticator`); el ROLLBACK lo deshace.
+GRANT colaborador_web TO current_user;
+
 -- Claims como los de PostgREST. p_web = token de GoTrue (trae session_id); sin él, el de pin-login.
 CREATE FUNCTION pg_temp.como(p_usuario uuid, p_tenant uuid, p_web boolean, p_tipo text) RETURNS void LANGUAGE sql AS $f$
   SELECT set_config('request.jwt.claims', (jsonb_build_object('sub', p_usuario, 'tenant_id', p_tenant,
