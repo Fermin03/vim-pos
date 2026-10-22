@@ -1069,6 +1069,8 @@ export function ModalCobro({
 }) {
   const [totales, setTotales] = useState<TotalesTicket>(totalesIniciales);
   const [vista, setVista] = useState<Vista>("propina");
+  const vistaRef = useRef(vista);
+  vistaRef.current = vista;
   const [metodo, setMetodo] = useState<MetodoPago>("EFECTIVO");
   const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
@@ -1262,7 +1264,7 @@ export function ModalCobro({
     // «Cargando…» tiene tope: con la red atorada, a los 4 s sale la propina de VIM de siempre (y
     // la respuesta tardía ya no cambia la pantalla). Solo si el lector preguntaba la propina.
     let vencio = false;
-    const tope = recuerdo.current === "2" && !atajo
+    const tope = !atajo
       ? setTimeout(() => { vencio = true; setTerminalSabida(true); }, ESPERA_LECTOR_MS) : undefined;
     (async () => {
       const t = await terminalDeCaja(token, cajaId);
@@ -1272,13 +1274,14 @@ export function ModalCobro({
       setTerminal(t);
       setTerminalSabida(true);
       try { sessionStorage.setItem("vimpos.terminal", !tiene ? "0" : t.propina_en_lector ? "2" : "1"); } catch { /* sin almacén no hay recuerdo */ }
-      // Con lector listo que pregunta la propina, el cobro abre en el selector (solo si la propina
-      // de VIM aún esperaba ese dato: no se le quita la pantalla a la cajera). Una propina que ya
-      // estaba en el ticket se respeta: entra al «a cobrar» y el lector no pregunta otra.
-      if (!vencio && recuerdo.current === "2" && !atajo && t.hay && t.lista && t.propina_en_lector) {
+      // Con lector listo que pregunta la propina, el cobro abre en el selector. También la primera
+      // vez (sin recuerdo «2»): si la respuesta llega en los primeros 4 s y la cajera sigue en la
+      // propina de VIM sin contestarla, se pasa al selector. Una propina que ya estaba en el ticket
+      // se respeta: entra al «a cobrar» y el lector no pregunta otra.
+      if (!vencio && !atajo && t.hay && t.lista && t.propina_en_lector && vistaRef.current === "propina") {
         setPropinaAlElegir(true);
         setPropina(totales.propina ?? 0);
-        setVista((v) => (v === "propina" ? "selector" : v));
+        setVista("selector");
       }
       if (!tiene) return;
       const r = await pedirCobro(token, cajaId, { accion: "pendientes" }).catch(() => null);
