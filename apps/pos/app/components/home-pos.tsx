@@ -48,6 +48,7 @@ import { CobroCompletado } from "./cobro-completado";
 import { ModalDescuento } from "./modal-descuento";
 import { obtenerImpresora, obtenerImpresoraDeEstacion } from "../lib/print/adapter";
 import { estacionParaArea, hayEstacionDeCocinaDedicada } from "../lib/print/config";
+import { encolarComanda, leerCola, vaciarCola } from "../lib/print/cola-comandas";
 import { ModalConfigImpresora } from "./modal-config-impresora";
 import { ModalClienteDomicilio } from "./modal-cliente-domicilio";
 import { IconoAsignarCliente, IconoClienteAsignado, ModalClienteCuenta } from "./modal-cliente-cuenta";
@@ -60,7 +61,7 @@ import { ModalMisPropinas } from "./modal-mis-propinas";
 import { leerAreasDeItems, leerTicketParaImpresion } from "../lib/print/ticket-datos";
 import { construirTicketJob, debeImprimirTicketAlCobrar } from "../lib/print/ticket-builder";
 import { rasterizarImagen } from "../lib/print/rasterizar";
-import { agruparComandaPorArea, construirComandaJob, debeImprimirComandaAlCobrar, lineasParaComanda, type DatosComanda, type LineaConArea } from "../lib/print/comanda-builder";
+import { agruparComandaPorArea, construirComandaJob, debeImprimirComandaAlCobrar, lineasParaComanda, type DatosComanda, type LineaComanda, type LineaConArea } from "../lib/print/comanda-builder";
 import { ReciboPreview } from "./recibo-preview";
 import { PantallaCierre } from "./pantalla-cierre";
 import { PantallaKds } from "@vim/kds-core";
@@ -1335,46 +1336,56 @@ export function HomePos({
    * ticket que acaba de salir por la misma impresora; aquí no hay nada que duplicar, y en un
    * local de una sola impresora la comanda debe salir igual.
    */
+  /** Lo que una comanda en cola guarda para la bitácora (0126) cuando por fin sale. */
+  type RegistroCola = RegistroComanda & { areaId: string | null; lineas: LineaComanda[] };
   /**
    * Imprime la comanda repartida por estación de preparación.
    *
    * Las bebidas salían en el mismo papel que la comida, así que la barra tenía que leer la comanda
    * entera para encontrar lo suyo. Ahora cada estación recibe solo sus renglones, en su impresora.
    *
-   * Se imprime en SERIE, no en paralelo: son dos impresoras de red y lanzarlas a la vez multiplica
-   * los tiempos de espera cuando una no responde. Un fallo no cancela las demás — que la barra se
-   * quede sin papel no es razón para que la cocina tampoco lo reciba.
+   * Cada papel entra a la cola de su estación (`cola-comandas`), que lo imprime en orden y, si la
+   * impresora no responde, lo reintenta sola hasta que salga. Un fallo no detiene a las demás
+   * estaciones — que la barra se quede sin papel no es razón para que la cocina tampoco lo reciba.
    *
-   * Devuelve los nombres de las estaciones cuyo papel NO salió, para avisarle al cajero cuál falta.
+   * Devuelve los nombres de las estaciones cuyo papel se quedó esperando, para avisarle al cajero.
    */
   const imprimirComandaPorAreas = useCallback(async (dc: DatosComanda, lineas: LineaConArea[], registro?: RegistroComanda): Promise<string[]> => {
-    const fallidas: string[] = [];
-    for (const g of agruparComandaPorArea(lineas)) {
-      const job = construirComandaJob({ ...dc, area: g.areaNombre, lineas: g.lineas });
+    const ids = agruparComandaPorArea(lineas).map((g) => encolarComanda<RegistroCola>({
+      estacion: estacionParaArea(g.areaId),
+      area: g.areaNombre ?? "cocina",
+      job: construirComandaJob({ ...dc, area: g.areaNombre, lineas: g.lineas }),
+      registro: registro && { ...registro, areaId: g.areaId, lineas: g.lineas },
+    }));
+    await vaciarComandasRef.current();
+    return leerCola().filter((c) => ids.includes(c.id)).map((c) => c.area);
+  }, []);
+
+  /**
+   * Una pasada por la cola de comandas. La bitácora (0126) anota el primer intento de cada papel,
+   * salga o no, y otra vez cuando por fin sale; los reintentos fallidos no, para no llenarla.
+   */
+  const vaciarComandas = useCallback(() => vaciarCola<RegistroCola>(
+    async (c) => {
       // onMostrar vacío: si la estación no está configurada (adaptador de preview) no se abre
       // ningún diálogo encima del cajero; simplemente no hay papel.
-      const estacion = estacionParaArea(g.areaId);
-      const imp = obtenerImpresoraDeEstacion(estacion, { onMostrar: () => {} });
-      let resultado: "OK" | "IMPRESORA_OFFLINE" | "ERROR_DESCONOCIDO" = "OK";
-      let errorDetalle: string | null = null;
-      try {
-        const r = await imp.imprimir(job);
-        if (!r.ok) { fallidas.push(g.areaNombre ?? "cocina"); resultado = "IMPRESORA_OFFLINE"; }
-      } catch (e) {
-        fallidas.push(g.areaNombre ?? "cocina");
-        resultado = "ERROR_DESCONOCIDO";
-        errorDetalle = e instanceof Error ? e.message : null;
-      }
-      // Bitácora de cocina (0126): cada papel, salga o no. Sin `await`: registrar nunca retrasa
-      // el papel de la siguiente estación.
-      if (registro) {
-        void registrarImpresionComanda(token, {
-          ...registro, areaId: g.areaId, impresora: estacion, lineas: g.lineas, resultado, errorDetalle,
-        });
-      }
-    }
-    return fallidas;
-  }, [token]);
+      const r = await obtenerImpresoraDeEstacion(c.estacion, { onMostrar: () => {} }).imprimir(c.job);
+      return r.ok;
+    },
+    (c, salio) => {
+      if (!c.registro) return;
+      void registrarImpresionComanda(token, {
+        ...c.registro, impresora: c.estacion, resultado: salio ? "OK" : "IMPRESORA_OFFLINE",
+      });
+    },
+  ), [token]);
+  // Por ref: el reintento corre en un intervalo y debe usar siempre el token vigente.
+  const vaciarComandasRef = useRef(vaciarComandas);
+  vaciarComandasRef.current = vaciarComandas;
+  useEffect(() => {
+    const id = setInterval(() => { if (leerCola().length > 0) void vaciarComandasRef.current(); }, 10_000);
+    return () => clearInterval(id);
+  }, []);
 
   /**
    * `soloItems = null` manda TODAS las líneas del ticket (un pedido de la tienda recién aceptado).
@@ -1401,7 +1412,7 @@ export function HomePos({
       // El pedido YA está en cocina (KDS): un fallo de papel no debe deshacer nada ni bloquear.
       // Pero tampoco se calla: si nadie avisa, la cocina se queda sin comanda y nadie se entera.
       if (fallidas.length > 0) {
-        setError(`El pedido se envió a cocina, pero no se pudo imprimir la comanda de ${fallidas.join(" y ")}.`);
+        setError(`El pedido se envió a cocina, pero la impresora de ${fallidas.join(" y ")} no responde. La comanda saldrá sola en cuanto vuelva.`);
         return "sin_papel";
       }
       return "ok";
@@ -1449,7 +1460,7 @@ export function HomePos({
       const conArea: LineaConArea[] = lineas.map((l) => ({ ...l, ...(areas.get(l.ticketItemId) ?? {}) }));
       const fallidas = await imprimirComandaPorAreas(dc, conArea, { ticketId, evento: "ANULACION_COMANDA" });
       if (fallidas.length > 0) {
-        setError(`Los productos se cancelaron, pero NO se pudo avisar a ${fallidas.join(" y ")}. Avísales a mano.`);
+        setError(`Los productos se cancelaron, pero la impresora de ${fallidas.join(" y ")} no responde. Avísales a mano; el aviso saldrá en cuanto vuelva.`);
       }
     } catch {
       setError("Los productos se cancelaron, pero NO se pudo avisar a cocina. Avísales a mano.");
@@ -2012,7 +2023,7 @@ export function HomePos({
       if (lineas.length === 0) return;
       const dc = comandaDe(datos, lineas);
       const fallidas = await imprimirComandaPorAreas(dc, lineas, { ticketId, evento: "REIMPRESION_CAJERO", razon: motivo, autorizacionPinId });
-      if (fallidas.length > 0) setError(`No se pudo reimprimir la comanda de ${fallidas.join(" y ")}.`);
+      if (fallidas.length > 0) setError(`La impresora de ${fallidas.join(" y ")} no responde. La comanda saldrá sola en cuanto vuelva.`);
     } catch {
       setError("No se pudo reimprimir la comanda.");
     }

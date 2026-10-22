@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, DialogoPeligro, Icono } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
-import { CatalogoTabs } from "../../../components/catalogo-tabs";
 import { FranjaMenus, useMenuCatalogo } from "../../../components/selector-menu";
 import { TIPO_SELECCION, eliminarGrupo, listarGrupos, type Grupo } from "../../../lib/modificadores";
 import { mensajeError } from "../../../lib/errores";
@@ -58,7 +57,6 @@ export default function ModificadoresPage() {
         }
       />
       <FranjaMenus menu={menu} nota={menu.esGeneral ? undefined : "Los modificadores son los mismos en todos los menús."} />
-      <CatalogoTabs />
       <PageBody>
         {error && (
           <p className="mb-4 text-sm font-medium text-danger" role="alert">

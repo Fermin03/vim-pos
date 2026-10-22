@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Button, botonClases, Icono } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../../components/page-header";
-import { CatalogoTabs } from "../../../components/catalogo-tabs";
 import { useModulos } from "../../../components/admin-shell";
 import { precioMxn } from "../../../lib/catalogo";
 import { mensajeError } from "../../../lib/errores";
@@ -85,7 +84,6 @@ export default function ImportarTiendaPage() {
         subtitulo="Sube tu catálogo en Excel o CSV: productos, variantes, códigos y existencias."
         migas={[{ label: "Catálogo", href: "/catalogo" }, { label: "Importar tienda" }]}
       />
-      <CatalogoTabs />
       <PageBody>
         {modulos !== null && !tienda && <p className="text-sm text-ink-2">Esta sección es para tiendas.</p>}
         {tienda && !resultado && (

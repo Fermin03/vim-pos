@@ -344,7 +344,7 @@ function ModalDevolucion({
   const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
   const [pidiendoPin, setPidiendoPin] = useState(false);
-  // La devolución ya quedó en VIM pero Mercado Pago no devolvió el dinero: se reintenta solo eso.
+  // La devolución ya quedó en VIM pero el proveedor de la terminal no devolvió el dinero: se reintenta solo eso.
   const [reembolsoFallo, setReembolsoFallo] = useState<{ motivo: string; recibo?: DatosDevolucion } | null>(null);
 
   const tienePermiso = ROLES_DEVOLUCION.includes(empleado.rol);
@@ -448,7 +448,7 @@ function ModalDevolucion({
       <DialogoPeligro
         titulo="El dinero no regresó a la tarjeta"
         contexto={`${venta.folio} · ${fmtMxn(venta.total)}`}
-        consecuencia={`La devolución ya quedó registrada, pero el dinero no regresó a la tarjeta: ${reembolsoFallo.motivo}. Vuelve a intentar, o devuélvelo desde la app de Mercado Pago.`}
+        consecuencia={`La devolución ya quedó registrada, pero el dinero no regresó a la tarjeta: ${reembolsoFallo.motivo}. Vuelve a intentar, o devuélvelo desde la app de tu terminal.`}
         boton="Volver a intentar"
         ocupado={procesando}
         textoOcupado="Devolviendo…"

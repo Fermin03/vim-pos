@@ -47,7 +47,7 @@ servir(async (req, json) => {
       const cid = uuid(id);
       if (!cid) return null;
       const { data } = await admin.from("terminal_conexiones").select("id, cuenta_id_externo, estado")
-        .eq("id", cid).eq("tenant_id", tenantId).maybeSingle();
+        .eq("id", cid).eq("tenant_id", tenantId).eq("proveedor", "MERCADO_PAGO").maybeSingle();
       const cx = data as Conexion | null;
       if (!cx || cx.estado === "DESCONECTADA") return null;
       const { data: tk, error } = await admin.rpc("terminal_leer_tokens", { p_conexion: cx.id });

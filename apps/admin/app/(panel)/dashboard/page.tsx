@@ -6,7 +6,9 @@ import { PageHeader, PageBody } from "../../components/page-header";
 import { usePerfil } from "../../components/admin-shell";
 import { leerDashboard, variacionPct, type Dashboard, type ResumenDia } from "../../lib/reportes";
 import { type ResumenCaja } from "../../lib/dashboard-calculos";
-import { leerEstadoOnboarding, type EstadoOnboarding } from "../../lib/onboarding";
+import { actualizarFase, debeMostrarPasos, leerEstadoOnboarding, type EstadoOnboarding } from "../../lib/onboarding";
+import { leerSesion } from "../../lib/supabase";
+import { PasosConfiguracion } from "../../components/pasos-configuracion";
 import { mensajeError } from "../../lib/errores";
 import { leerPrueba } from "../../lib/plan";
 import { AvisoPrueba } from "../../components/aviso-prueba";
@@ -254,6 +256,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [onb, setOnb] = useState<EstadoOnboarding | null>(null);
+  const [tenantId, setTenantId] = useState<string | null>(null);
   /* De qué sucursal es el panel: una por defecto (la última que se eligió), "Todas" a elección.
      Es el mismo selector de los reportes y recuerda lo mismo: elegir aquí se respeta allá. */
   const suc = useSucursalReporte();
@@ -316,13 +319,25 @@ export default function DashboardPage() {
 
   useEffect(() => {
     leerEstadoOnboarding().then(setOnb).catch(() => {});
+    leerSesion().then((s) => setTenantId(s?.tenantId ?? null)).catch(() => {});
     // La prueba gratis (0141): un aviso que no bloquea; si la lectura falla, simplemente no sale.
     leerPrueba().then(setPrueba).catch(() => {});
   }, []);
 
-  // Hasta que el dueño termine la configuración; con todo listo, el aviso lo manda a terminarla.
-  const mostrarOnboarding = onb && onb.fase !== "GO_LIVE";
-  const faltanOnb = onb ? onb.obligatoriosTotal - onb.obligatoriosHechos : 0;
+  // Los pasos de configuración viven aquí (antes en /bienvenida), hasta que el dueño la termine.
+  const mostrarPasos = !!onb && debeMostrarPasos(onb.fase, perfil?.jerarquia ?? null);
+  // Plataforma lee la fase ("Alta estancada"): verlos por primera vez es empezar a configurar.
+  useEffect(() => {
+    if (mostrarPasos && onb?.fase === "INVITADO") actualizarFase("EN_CONFIGURACION", 1).catch(() => {});
+  }, [mostrarPasos, onb?.fase]);
+  const terminarConfiguracion = async () => {
+    try {
+      await actualizarFase("GO_LIVE");
+      setOnb(await leerEstadoOnboarding());
+    } catch (e) {
+      setError(mensajeError(e, "No se pudo terminar la configuración"));
+    }
+  };
 
   const hoy: ResumenDia | undefined = data?.hoy;
   const ayer = data?.ayer ?? null;
@@ -419,26 +434,17 @@ export default function DashboardPage() {
             2026: no es forzosa ni debe insistir); su recordatorio vive solo en Facturación. */}
         <AvisosFacturacion className="mb-6" />
 
-        {mostrarOnboarding && onb && (
-          <Link href="/bienvenida" className="mb-6 flex items-center gap-4 rounded-lg border border-warning-line bg-warning-soft p-4 transition hover:border-accent">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-accent text-white">
-              <Icono nombre="flecha-derecha" className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-15 font-semibold">{onb.listoParaVender ? "Ya puedes vender" : "Termina de configurar tu negocio"}</div>
-              <div className="text-13 text-ink-2">
-                {onb.listoParaVender
-                  ? "Completaste los pasos. Entra para terminar la configuración."
-                  : `${onb.obligatoriosHechos} de ${onb.obligatoriosTotal} pasos · ${faltanOnb === 1 ? "te falta 1" : `te faltan ${faltanOnb}`} para empezar a vender.`}
-              </div>
-            </div>
-            <span className="inline-flex items-center gap-1 text-13 font-semibold text-accent">Continuar <Icono nombre="flecha-derecha" className="h-4 w-4 flex-shrink-0" /></span>
-          </Link>
+        {mostrarPasos && onb && tenantId && (
+          <PasosConfiguracion estado={onb} tenantId={tenantId} onTerminar={terminarConfiguracion} />
         )}
 
         {data === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
 
-        {sinVentas && (
+        {/* Con los pasos a la vista, "sin ventas" es lo esperado: una línea, sin competir con ellos. */}
+        {sinVentas && mostrarPasos && (
+          <p className="mb-6 text-14 text-ink-2">Aún no hay ventas. Las métricas aparecen con la primera venta en tu caja.</p>
+        )}
+        {sinVentas && !mostrarPasos && (
           <div className="mb-6 rounded-lg border border-line bg-surface p-5">
             <h2 className="font-display text-base font-semibold">Aún no hay ventas registradas</h2>
             <p className="mt-1 max-w-xl text-sm text-ink-2">

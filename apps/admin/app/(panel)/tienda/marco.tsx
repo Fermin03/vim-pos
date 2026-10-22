@@ -3,7 +3,6 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Aviso, Button, DialogoPeligro } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
 import { useAccesoTenant, useModulos } from "../../components/admin-shell";
-import { Pestanas } from "../../components/pestanas";
 import { textoDeAviso } from "../../lib/tienda-cobro";
 import { seccionEnLinea } from "../../lib/tienda-plan";
 import { useTienda } from "./use-tienda";
@@ -11,11 +10,11 @@ import { useTienda } from "./use-tienda";
 export type Tienda = { t: ReturnType<typeof useTienda>; ocupado: boolean; soloLectura: boolean };
 
 /**
- * Lo común a las pestañas de la Tienda en línea: encabezado, sub-menú, lectura, avisos de cobro y
- * los diálogos de confirmación. Cada pestaña solo pinta sus bloques con lo que recibe. El layout ya
+ * Lo común a las secciones de la Tienda en línea (cada una con su entrada en el menú lateral): encabezado, lectura, avisos de cobro y
+ * los diálogos de confirmación. Cada sección solo pinta sus bloques con lo que recibe. El layout ya
  * decidió que el negocio tiene el complemento.
  *
- * El estado vive en `use-tienda.ts` y cada pestaña lo vuelve a leer al entrar.
+ * El estado vive en `use-tienda.ts` y cada sección lo vuelve a leer al entrar.
  */
 export function TiendaMarco({ children }: { children: (c: Tienda) => ReactNode }) {
   const t = useTienda();
@@ -33,7 +32,6 @@ export function TiendaMarco({ children }: { children: (c: Tienda) => ReactNode }
     <>
       <PageHeader titulo={seccion.titulo} subtitulo={seccion.subtitulo} />
       <PageBody>
-        <Pestanas etiqueta={`Secciones de ${seccion.titulo.toLowerCase()}`} pestanas={seccion.pestanas} />
         {t.falloLectura ? (
           <div className="max-w-[720px] rounded-lg border border-line bg-surface p-5" role="alert">
             <p className="text-sm font-medium text-danger">{t.falloLectura}</p>

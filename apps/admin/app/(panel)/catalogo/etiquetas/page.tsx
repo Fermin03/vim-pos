@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../../components/page-header";
-import { CatalogoTabs } from "../../../components/catalogo-tabs";
 import { Segmentos } from "../../../components/controles";
 import { useModulos } from "../../../components/admin-shell";
 import { BarrasEan13, formatoEtiqueta, type Formato } from "../../../components/barras-ean13";
@@ -100,7 +99,6 @@ export default function EtiquetasPage() {
         migas={[{ label: "Catálogo", href: "/catalogo" }, { label: "Etiquetas" }]}
         right={tienda ? <Button onClick={() => setImprimiendo(true)} disabled={total === 0}>{total > 0 ? `Imprimir ${total}` : "Imprimir"}</Button> : undefined}
       />
-      <CatalogoTabs />
       <PageBody>
         {modulos !== null && !tienda && <p className="text-sm text-ink-2">Esta sección es para tiendas.</p>}
         {tienda && (

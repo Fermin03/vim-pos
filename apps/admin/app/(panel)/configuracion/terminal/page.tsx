@@ -6,14 +6,13 @@ import { Tarjeta } from "../../../components/tarjeta";
 import { Interruptor } from "../../../components/interruptor";
 import { AccionFila } from "../../../components/controles";
 import { input, label } from "../../../components/campos";
+import { ClipSucursal, ConectarClip, ESPERAS, type Correr } from "./clip";
 import { listarCajas, listarSucursales, type Caja, type Sucursal } from "../../../lib/configuracion";
 import { mensajeError } from "../../../lib/errores";
 import {
   accionTerminal, coordenadasDe, iniciarConexionMp, leerTerminal, mensajeErrorTerminal,
   type ConexionTerminal, type ConfigSucursal, type EstadoTerminal,
 } from "../../../lib/terminal";
-
-const ESPERAS = [[60, "1 minuto"], [180, "3 minutos"], [300, "5 minutos"], [600, "10 minutos"]] as const;
 
 /**
  * Terminal de tarjetas (ADR 0033). El dueño conecta su cuenta de Mercado Pago, dice qué cuenta usa
@@ -25,6 +24,7 @@ export default function TerminalPage() {
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  const [formClip, setFormClip] = useState(false);
   const [desconectar, setDesconectar] = useState<ConexionTerminal | null>(null);
   // Los botones están más abajo que los mensajes: al salir uno, se trae a la vista.
   const mensajes = useRef<HTMLDivElement>(null);
@@ -45,19 +45,25 @@ export default function TerminalPage() {
     recargar();
   }, []);
 
-  /** Corre una acción contra Mercado Pago, avisa y vuelve a leer. */
-  async function correr(cuerpo: Parameters<typeof accionTerminal>[0], hecho: string) {
+  /** Corre una acción contra Mercado Pago (o Clip), avisa y vuelve a leer. Devuelve la respuesta, o null si falló. */
+  const correr: Correr = async (cuerpo, hecho, funcion) => {
     setOcupado(true); setError(null); setAviso(null);
     try {
-      await accionTerminal(cuerpo);
-      setAviso(hecho);
+      const r = await accionTerminal(cuerpo, funcion);
+      setAviso(typeof hecho === "string" ? hecho : hecho(r));
       await recargar();
+      return r;
     } catch (e) {
       setError(mensajeErrorTerminal(e));
+      return null;
     } finally {
       setOcupado(false);
       setDesconectar(null);
     }
+  };
+
+  async function conectarClip(api_key: string, secreto: string) {
+    if (await correr({ accion: "conectar", api_key, secreto }, "Clip conectado. Ahora elige qué sucursal lo usa.", "terminal-clip-conexion")) setFormClip(false);
   }
 
   const conectar = () => { window.location.href = iniciarConexionMp(); };
@@ -67,9 +73,14 @@ export default function TerminalPage() {
     <>
       <PageHeader
         titulo="Terminal de tarjetas"
-        subtitulo="Cobra con tarjeta desde la caja: el monto llega solo a tu terminal de Mercado Pago y el pago regresa al ticket."
+        subtitulo="Cobra con tarjeta desde la caja: el monto llega solo a tu terminal de Mercado Pago o Clip y el pago regresa al ticket."
         migas={[{ label: "Configuración" }, { label: "Terminal de tarjetas" }]}
-        right={<Button onClick={conectar} disabled={ocupado}>Conectar Mercado Pago</Button>}
+        right={
+          <div className="flex gap-2">
+            <Button onClick={conectar} disabled={ocupado}>Conectar Mercado Pago</Button>
+            <Button variant="ghost" onClick={() => setFormClip(true)} disabled={ocupado || formClip}>Conectar Clip</Button>
+          </div>
+        }
       />
       <PageBody>
         <div ref={mensajes}>
@@ -80,17 +91,18 @@ export default function TerminalPage() {
 
         {datos && t && (
           <div className="flex flex-col gap-5">
+            {formClip && <ConectarClip ocupado={ocupado} onConectar={conectarClip} onCerrar={() => setFormClip(false)} />}
             <Tarjeta
               titulo="Cuentas de Mercado Pago"
               descripcion="El dinero de cada cobro cae directo en tu cuenta. VIM no lo toca ni ve los datos de las tarjetas."
             >
-              {t.conexiones.length === 0 && (
+              {!t.conexiones.some((c) => c.proveedor === "MERCADO_PAGO") && (
                 <p className="text-sm text-ink-2">
                   Todavía no hay ninguna. Pulsa «Conectar Mercado Pago», entra con la cuenta del restaurante y autoriza a VIM POS.
                 </p>
               )}
               <ul className="flex flex-col divide-y divide-line">
-                {t.conexiones.map((c) => (
+                {t.conexiones.filter((c) => c.proveedor === "MERCADO_PAGO").map((c) => (
                   <li key={c.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5">
                     <span className="text-15 font-semibold">{c.cuenta_nombre ?? "Cuenta de Mercado Pago"}</span>
                     {c.de_prueba && <span className="rounded-full bg-info-soft px-2.5 py-0.5 text-12 font-semibold text-info">De prueba</span>}
@@ -105,6 +117,24 @@ export default function TerminalPage() {
               </ul>
             </Tarjeta>
 
+            {t.conexiones.some((c) => c.proveedor === "CLIP") && (
+              <Tarjeta titulo="Cuentas de Clip" descripcion="El dinero de cada cobro cae directo en tu cuenta de Clip. VIM no lo toca ni ve los datos de las tarjetas.">
+                <ul className="flex flex-col divide-y divide-line">
+                  {t.conexiones.filter((c) => c.proveedor === "CLIP").map((c) => (
+                    <li key={c.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5">
+                      <span className="text-15 font-semibold">{c.cuenta_nombre ?? "Cuenta de Clip"}</span>
+                      {c.estado === "ERROR" && (
+                        <span className="rounded-full bg-danger-soft px-2.5 py-0.5 text-12 font-semibold text-danger">
+                          Hay que volver a conectarla
+                        </span>
+                      )}
+                      <AccionFila peligro className="ml-auto" disabled={ocupado} onClick={() => setDesconectar(c)}>Desconectar</AccionFila>
+                    </li>
+                  ))}
+                </ul>
+              </Tarjeta>
+            )}
+
             {t.conexiones.length > 0 && datos.sucursales.map((s) => (
               <SucursalTerminal
                 key={s.id} sucursal={s} cajas={datos.cajas.filter((c) => c.sucursal_id === s.id)} t={t}
@@ -117,7 +147,7 @@ export default function TerminalPage() {
 
       {desconectar && (
         <DialogoPeligro
-          titulo="¿Desconectar Mercado Pago?"
+          titulo={`¿Desconectar ${desconectar.proveedor === "CLIP" ? "Clip" : "Mercado Pago"}?`}
           consecuencia={
             <>
               Las cajas que usan <b className="text-ink">{desconectar.cuenta_nombre ?? "esta cuenta"}</b> dejarán de mandar el
@@ -128,7 +158,7 @@ export default function TerminalPage() {
           ocupado={ocupado}
           textoOcupado="Desconectando…"
           ancho="sm"
-          onConfirmar={() => correr({ accion: "desconectar", conexion_id: desconectar.id }, "Cuenta desconectada.")}
+          onConfirmar={() => correr({ accion: "desconectar", conexion_id: desconectar.id }, "Cuenta desconectada.", desconectar.proveedor === "CLIP" ? "terminal-clip-conexion" : undefined)}
           onCerrar={() => setDesconectar(null)}
         />
       )}
@@ -138,14 +168,22 @@ export default function TerminalPage() {
 
 function SucursalTerminal({ sucursal, cajas, t, ocupado, correr, setError }: {
   sucursal: Sucursal; cajas: Caja[]; t: EstadoTerminal; ocupado: boolean;
-  correr: (cuerpo: Parameters<typeof accionTerminal>[0], hecho: string) => Promise<void>;
+  correr: Correr;
   setError: (e: string | null) => void;
 }) {
   const cfg: ConfigSucursal | undefined = t.config.find((c) => c.sucursal_id === sucursal.id);
   const [conexionId, setConexionId] = useState(t.conexiones[0]?.id ?? "");
   const [mapa, setMapa] = useState("");
+  const [pasarAClip, setPasarAClip] = useState(false);
+
+  const esClip = t.conexiones.find((c) => c.id === conexionId)?.proveedor === "CLIP";
+  const nombreCuenta = (c: ConexionTerminal) => c.cuenta_nombre ?? (c.proveedor === "CLIP" ? "Cuenta de Clip" : "Cuenta de Mercado Pago");
 
   function ligar() {
+    if (esClip) {
+      void correr({ accion: "sucursal", conexion_id: conexionId, sucursal_id: sucursal.id }, `${sucursal.nombre} ya usa Clip. Sigue con sus cajas.`, "terminal-clip-conexion");
+      return;
+    }
     const coords = coordenadasDe(mapa);
     if (!coords) {
       setError("No pude leer la ubicación. En Google Maps, haz clic derecho sobre tu local, copia los números que aparecen arriba (algo como 21.12345, -101.67890) y pégalos aquí.");
@@ -164,30 +202,55 @@ function SucursalTerminal({ sucursal, cajas, t, ocupado, correr, setError }: {
         <div className="flex flex-col gap-4">
           {t.conexiones.length > 1 && (
             <div>
-              <label className={label} htmlFor={`cuenta-${sucursal.id}`}>Cuenta de Mercado Pago</label>
+              <label className={label} htmlFor={`cuenta-${sucursal.id}`}>{t.conexiones.some((c) => c.proveedor === "CLIP") ? "Cuenta" : "Cuenta de Mercado Pago"}</label>
               <select id={`cuenta-${sucursal.id}`} className={input} value={conexionId} onChange={(e) => setConexionId(e.target.value)}>
-                {t.conexiones.map((c) => <option key={c.id} value={c.id}>{c.cuenta_nombre ?? "Cuenta de Mercado Pago"}</option>)}
+                {t.conexiones.map((c) => <option key={c.id} value={c.id}>{nombreCuenta(c)}</option>)}
               </select>
             </div>
           )}
-          <div>
+          {!esClip && <div>
             <label className={label} htmlFor={`mapa-${sucursal.id}`}>Ubicación del local</label>
             <input
               id={`mapa-${sucursal.id}`} className={input} value={mapa} onChange={(e) => setMapa(e.target.value)}
               placeholder="21.12345, -101.67890 o el enlace de Google Maps"
             />
             <p className="mt-1.5 text-13 text-ink-3">Mercado Pago la pide para registrar la sucursal. En Google Maps: clic derecho sobre tu local y copia los números.</p>
-          </div>
-          <div><Button disabled={ocupado || !conexionId || mapa.trim() === ""} onClick={ligar}>Usar terminal en esta sucursal</Button></div>
+          </div>}
+          <div><Button disabled={ocupado || !conexionId || (!esClip && mapa.trim() === "")} onClick={ligar}>Usar terminal en esta sucursal</Button></div>
         </div>
       </Tarjeta>
     );
   }
 
   const cuenta = t.conexiones.find((c) => c.id === cfg.conexion_id);
+  if (cuenta?.proveedor === "CLIP") return <ClipSucursal sucursal={sucursal} cajas={cajas} cfg={cfg} t={t} ocupado={ocupado} correr={correr} setError={setError} />;
+  // Una sucursal en Mercado Pago puede pasarse a Clip (al revés, no por ahora).
+  const clip = t.conexiones.find((c) => c.proveedor === "CLIP");
   return (
     <Tarjeta titulo={sucursal.nombre} descripcion={<>Cobra en <b className="text-ink">{cuenta?.cuenta_nombre ?? "tu cuenta de Mercado Pago"}</b>.</>}>
       <div className="flex flex-col gap-4">
+        {clip && (
+          <div>
+            <Button variant="ghost" disabled={ocupado} onClick={() => setPasarAClip(true)}>Usar la cuenta de Clip</Button>
+            {pasarAClip && (
+              <DialogoPeligro
+                titulo={`¿Cobrar con Clip en ${sucursal.nombre}?`}
+                consecuencia={
+                  <>
+                    Las terminales de Mercado Pago de esta sucursal dejarán de recibir el cobro desde la caja. Si las vas a
+                    seguir usando, antes pulsa «Volver a teclear el monto» en cada caja. Después liga el lector de Clip de cada caja.
+                  </>
+                }
+                boton="Usar Clip"
+                ocupado={ocupado}
+                textoOcupado="Cambiando…"
+                ancho="sm"
+                onConfirmar={() => void correr({ accion: "sucursal", conexion_id: clip.id, sucursal_id: sucursal.id }, `${sucursal.nombre} ya usa Clip. Liga el lector de cada caja.`, "terminal-clip-conexion").finally(() => setPasarAClip(false))}
+                onCerrar={() => setPasarAClip(false)}
+              />
+            )}
+          </div>
+        )}
         <Interruptor
           etiqueta="La terminal imprime su comprobante"
           descripcion={cfg.imprime_terminal ? "Imprime su comprobante después de cada cobro." : "No imprime nada; el ticket lo da la caja."}

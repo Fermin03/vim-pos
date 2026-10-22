@@ -10726,6 +10726,7 @@ export type Database = {
           pagado_mxn: number | null
           pago_id_externo: string | null
           reembolsado_mxn: number
+          propina_mxn: number | null
           referencia: string | null
           sucursal_id: string
           tarjeta_ultimos4: string | null
@@ -10752,6 +10753,7 @@ export type Database = {
           pagado_mxn?: number | null
           pago_id_externo?: string | null
           reembolsado_mxn?: number
+          propina_mxn?: number | null
           referencia?: string | null
           sucursal_id: string
           tarjeta_ultimos4?: string | null
@@ -10778,6 +10780,7 @@ export type Database = {
           pagado_mxn?: number | null
           pago_id_externo?: string | null
           reembolsado_mxn?: number
+          propina_mxn?: number | null
           referencia?: string | null
           sucursal_id?: string
           tarjeta_ultimos4?: string | null
@@ -10880,6 +10883,7 @@ export type Database = {
           espera_segundos: number
           imprime_terminal: boolean
           propina_en_terminal: boolean
+          propina_opciones: number[] | null
           sucursal_id: string
           sucursal_id_externo: string | null
           tenant_id: string
@@ -10890,6 +10894,7 @@ export type Database = {
           espera_segundos?: number
           imprime_terminal?: boolean
           propina_en_terminal?: boolean
+          propina_opciones?: number[] | null
           sucursal_id: string
           sucursal_id_externo?: string | null
           tenant_id: string
@@ -10900,6 +10905,7 @@ export type Database = {
           espera_segundos?: number
           imprime_terminal?: boolean
           propina_en_terminal?: boolean
+          propina_opciones?: number[] | null
           sucursal_id?: string
           sucursal_id_externo?: string | null
           tenant_id?: string
@@ -10940,7 +10946,7 @@ export type Database = {
         Row: {
           activa: boolean
           caja_id: string
-          caja_id_externo: string
+          caja_id_externo: string | null
           conexion_id: string
           modo: string | null
           sucursal_id: string
@@ -10951,7 +10957,7 @@ export type Database = {
         Insert: {
           activa?: boolean
           caja_id: string
-          caja_id_externo: string
+          caja_id_externo?: string | null
           conexion_id: string
           modo?: string | null
           sucursal_id: string
@@ -10962,7 +10968,7 @@ export type Database = {
         Update: {
           activa?: boolean
           caja_id?: string
-          caja_id_externo?: string
+          caja_id_externo?: string | null
           conexion_id?: string
           modo?: string | null
           sucursal_id?: string

@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { PageHeader, PageBody } from "../../../../components/page-header";
-import { CatalogoTabs } from "../../../../components/catalogo-tabs";
 import { ProductoForm } from "../../../../components/producto-form";
 import { ProductoModificadores } from "../../../../components/producto-modificadores";
 import { ProductoVariantes } from "../../../../components/producto-variantes";
@@ -47,7 +46,6 @@ export default function EditarProductoPage() {
         ]}
         right={prod ? <Link className="text-sm font-semibold text-ink underline underline-offset-2" href={`/catalogo/recetas/${prod.id}`}>Receta y costo</Link> : undefined}
       />
-      <CatalogoTabs />
       <PageBody>
         {prod === undefined && <p className="text-sm text-ink-2">Cargando…</p>}
         {prod === null && <p className="text-sm text-danger">Producto no encontrado.</p>}

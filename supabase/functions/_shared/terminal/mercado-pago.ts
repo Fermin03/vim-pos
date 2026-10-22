@@ -10,12 +10,14 @@
 //   · La devolución total (POST /v1/orders/{id}/refund sin cuerpo) responde 201 con `refunded` al instante.
 //   · La consulta de la order trae además `card.last_digits` y `card.first_digits`: no se guardan.
 //
-// No hay interfaz de «proveedor»: hoy solo existe este. Cuando llegue Clip se extrae de aquí.
+// Mercado Pago nunca manda la propina por separado: `propina_mxn` queda sin definir (equivale a null).
+// Lo común con Clip (estados, montos, cambios de cobro) vive en comun.ts y se reexporta desde aquí.
+import { type DatosCobro, type EstadoCobro, montoTexto, obj, txt } from "./comun.ts";
 import { hmacSha256Hex, igualesEnTiempoConstante } from "../delivery/firma.ts";
 
 const API = "https://api.mercadopago.com";
 
-export type EstadoCobro = "EN_TERMINAL" | "APROBADO" | "RECHAZADO" | "CANCELADO" | "VENCIDO" | "REVISAR" | "DEVUELTO";
+export { aceptaCambio, cambiosDeCobro, type DatosCobro, type EstadoCobro, montoTexto } from "./comun.ts";
 
 const ESTADOS: Record<string, EstadoCobro> = {
   created: "EN_TERMINAL", at_terminal: "EN_TERMINAL", processed: "APROBADO", failed: "RECHAZADO",
@@ -24,24 +26,6 @@ const ESTADOS: Record<string, EstadoCobro> = {
 
 /** Un estado que no conocemos se trata como «mira la terminal»: nunca como aprobado ni como rechazado. */
 export const estadoDeOrden = (status: unknown): EstadoCobro => ESTADOS[String(status)] ?? "REVISAR";
-
-/** El monto viaja como texto con hasta 2 decimales; nunca como float. null si no es un monto válido. */
-export function montoTexto(v: unknown): string | null {
-  const s = typeof v === "number" ? String(v) : typeof v === "string" ? v.trim() : "";
-  return /^\d{1,7}(\.\d{1,2})?$/.test(s) && Number(s) > 0 ? Number(s).toFixed(2) : null;
-}
-
-export type DatosCobro = {
-  estado: EstadoCobro; detalle: string | null; cobro_id: string | null;
-  orden_id_externo: string | null; pago_id_externo: string | null;
-  tipo_tarjeta: string | null; marca: string | null; mensualidades: number | null;
-  referencia: string | null; pagado_mxn: string | null; reembolsado_mxn: string | null;
-  /** Solo los últimos cuatro dígitos. Mercado Pago manda también los primeros ocho: no se leen. */
-  tarjeta_ultimos4: string | null;
-};
-
-const txt = (v: unknown): string | null => (typeof v === "string" && v !== "" ? v : null);
-const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? v as Record<string, unknown> : {});
 
 /**
  * Lo que guardamos de una order, venga de la respuesta de la API o del `data` de un aviso (el aviso
@@ -142,23 +126,4 @@ export function clienteMp(token: string, pedir: typeof fetch = fetch) {
     reembolsarOrden: (ordenId: string) =>
       llamar("POST", `/v1/orders/${encodeURIComponent(ordenId)}/refund`, undefined, { "X-Idempotency-Key": `reembolso-${ordenId}` }),
   };
-}
-
-/**
- * Los avisos pueden llegar tarde o desordenados: lo que pasó en la terminal gana y un cobro pagado
- * no se «despaga» por un aviso viejo. De APROBADO solo se sale a DEVUELTO; de DEVUELTO, a nada.
- */
-export function aceptaCambio(actual: EstadoCobro, nuevo: EstadoCobro): boolean {
-  if (actual === "DEVUELTO") return false;
-  if (actual === "APROBADO") return nuevo === "APROBADO" || nuevo === "DEVUELTO";
-  return true;
-}
-
-/** Las columnas de terminal_cobros que salen de una order (sin pisar con null lo que ya se sabía). */
-export function cambiosDeCobro(d: DatosCobro): Record<string, unknown> {
-  const c: Record<string, unknown> = { estado: d.estado, detalle: d.detalle };
-  for (const k of ["orden_id_externo", "pago_id_externo", "tipo_tarjeta", "marca", "mensualidades", "referencia", "pagado_mxn", "reembolsado_mxn", "tarjeta_ultimos4"] as const) {
-    if (d[k] !== null) c[k] = d[k];
-  }
-  return c;
 }

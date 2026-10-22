@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, DialogoPeligro, Icono } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
-import { CatalogoTabs } from "../../../components/catalogo-tabs";
 import { FranjaMenus, useMenuCatalogo } from "../../../components/selector-menu";
 import { AvisoCajasMenu } from "../../../components/aviso-cajas-menu";
 import { CasillaMenu } from "../../../components/casilla-menu";
@@ -236,7 +235,6 @@ export default function ProductosPage() {
         }
       />
       <FranjaMenus menu={menu} />
-      <CatalogoTabs />
       <PageBody>
         <AvisoCajasMenu cajas={cajasViejas} />
 

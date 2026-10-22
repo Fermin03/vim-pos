@@ -42,6 +42,8 @@ export type TotalesTicket = {
   pendiente: number;
   estadoFiscal: string;
   folio: string | null;
+  /** La propina ya fijada en el ticket (va aparte: `total` y `pendiente` no la incluyen). */
+  propina?: number;
 };
 
 type CtxCobro = {
@@ -205,7 +207,7 @@ export async function persistirTicket(
 export async function leerTotales(token: string, ticketId: string): Promise<TotalesTicket> {
   const { data, error } = await employeeClient(token)
     .from("tickets")
-    .select("id, subtotal_mxn, iva_mxn, descuentos_manuales_mxn, promociones_mxn, lealtad_mxn, total_mxn, monto_pagado_mxn, cambio_mxn, monto_pendiente_mxn, estado_fiscal, folio_completo")
+    .select("id, subtotal_mxn, iva_mxn, descuentos_manuales_mxn, promociones_mxn, lealtad_mxn, total_mxn, monto_pagado_mxn, cambio_mxn, monto_pendiente_mxn, estado_fiscal, folio_completo, propina_mxn")
     .eq("id", ticketId)
     .single();
   if (error) throw new Error(error.message);
@@ -213,7 +215,7 @@ export async function leerTotales(token: string, ticketId: string): Promise<Tota
     id: string; subtotal_mxn: string | number; iva_mxn: string | number;
     descuentos_manuales_mxn: string | number; promociones_mxn: string | number; lealtad_mxn: string | number; total_mxn: string | number;
     monto_pagado_mxn: string | number; cambio_mxn: string | number; monto_pendiente_mxn: string | number;
-    estado_fiscal: string; folio_completo: string | null;
+    estado_fiscal: string; folio_completo: string | null; propina_mxn: string | number | null;
   };
   return {
     ticketId: t.id,
@@ -228,6 +230,7 @@ export async function leerTotales(token: string, ticketId: string): Promise<Tota
     pendiente: Number(t.monto_pendiente_mxn),
     estadoFiscal: t.estado_fiscal,
     folio: t.folio_completo,
+    propina: Number(t.propina_mxn ?? 0),
   };
 }
 

@@ -13,7 +13,7 @@ export type PagoPorAplicar = {
   clientId: string;
   metodo: MetodoPago;
   monto: number;
-  /** Se cobra en la terminal (ADR 0033): el método real (débito o crédito) lo dice Mercado Pago. */
+  /** Se cobra en la terminal (ADR 0033): el método real (débito o crédito) lo dice la terminal. */
   terminal?: boolean;
 };
 
