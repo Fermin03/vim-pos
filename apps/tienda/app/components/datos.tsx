@@ -31,7 +31,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Aviso, Captcha, SITE_KEY_TURNSTILE, botonClases, cn, Icono } from "@vim/ui/styles";
 import { colonias, cotizar, guardarDireccion, intento, pedir, verificacion, type DireccionDePedido } from "../lib/api";
-import { TOPES, aCuerpo, type Carrito } from "../lib/carrito";
+import { TOPES, aCuerpo, contarPiezas, type Carrito } from "../lib/carrito";
 import {
   CAMPOS, DE_DIRECCION, FORMULARIO_VACIO, LIMITES, datosDelPedido, erroresDe, guardarCliente, leerCliente, olvidarCliente,
   type Campo, type Formulario,
@@ -52,7 +52,7 @@ import { CampoDeTexto } from "./campo";
 import { CampoColonia } from "./campo-colonia";
 import { CamposDeTarjeta, type ManejoDeTarjeta } from "./tarjeta";
 import { Linea } from "./carrito";
-import { COLUMNA, CUERPO, PIE } from "./hoja";
+import { BOTON_DE_BARRA, COLUMNA, CUERPO, PIE } from "./hoja";
 import { FOCO, PARTE, PRINCIPAL } from "./piezas";
 import { Propina } from "./propina";
 import { MarcoDelReto } from "./reto";
@@ -100,7 +100,9 @@ type AvisoDeEnvio = Extract<Desenlace, { tipo: "aviso" }>;
 /** Si el antirobot no entrega su comprobación en este tiempo, se deja de esperar y se dice. */
 const ESPERA_DEL_ANTIROBOT_MS = 20_000;
 
-const TITULO = "font-display text-16 font-semibold";
+/** Lo que separa los bloques de la pantalla: una franja gruesa, no una línea. */
+const BANDA = "border-t-8 border-line px-4 py-5";
+const TITULO = "font-display text-18 font-semibold tracking-tight";
 const GHOST = cn(botonClases({ variant: "ghost" }), "h-12 w-full");
 const DE_TEXTO = cn("inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-4", FOCO);
 
@@ -149,6 +151,7 @@ export function PasoDeDatos({
   const formas = formasDePago(negocio, sucursal);
   const aDomicilio = carrito.modo === "DOMICILIO";
   const tel = enlaceTel(sucursal.telefono);
+  const piezas = contarPiezas(carrito);
 
   const [f, setF] = useState<Formulario>(borrador?.f ?? FORMULARIO_VACIO);
   /** La dirección elegida: el id de una guardada, `OTRA`, o "" mientras no se sabe si hay guardadas. */
@@ -313,7 +316,7 @@ export function PasoDeDatos({
     return () => clearTimeout(reloj);
   }, [finDePausa]);
 
-  const pasos = pasosDe(formas, pago);
+  const pasos = pasosDe(pago);
   const paso: Paso = pasos.includes(vista.paso) ? vista.paso : pasos[pasos.length - 1]!;
   const accion = accionDe(pasos, paso, pago);
   const enLaUltima = accion === "enviar" || accion === "pagar";
@@ -637,7 +640,7 @@ export function PasoDeDatos({
     const a = avanzar({ pasos, paso, primerError: CAMPOS.find((c) => errores[c]), enLinea, propina, otroValido: libre?.ok ?? false, yaPreguntada: preguntada });
     if (a.tipo === "campo") { setTocados(new Set(CAMPOS)); alCampo(a.campo); }
     // Se queda en la pregunta si es ahí donde lo está escribiendo; si no, a la pantalla del pago.
-    else if (a.tipo === "otro-monto") { setOtroTocado(true); setVista({ paso: "pago", foco: `${id}-otro` }); }
+    else if (a.tipo === "otro-monto") { setOtroTocado(true); setVista({ paso: "datos", foco: `${id}-otro` }); }
     else if (a.tipo === "preguntar") { setPreguntada(true); setPreguntando(true); }
     else if (a.tipo === "paso") irA(a.paso);
     // Con el pago en línea en pausa no sale otro cobro, ni con Enter: el servidor lo rechazaría igual.
@@ -650,7 +653,7 @@ export function PasoDeDatos({
     const otra = otrasFormas[0];
     if (!otra || ocupado) return;
     setPago(otra); setConTarjeta(false); setRechazo((r) => ({ ...r, pago: undefined }));
-    irA("pago", `${id}-pago`);
+    irA("datos", `${id}-pago`);
   };
 
   /** La flecha: a la pantalla anterior (o al carrito desde la primera). Nada de lo escrito se pierde. */
@@ -664,7 +667,7 @@ export function PasoDeDatos({
   const elegirPropina = (p: Porcentaje | "otro") => {
     setPropina(p);
     // «Otro monto» abre su campo y le da el foco: aquí el teclado sí se pidió.
-    if (p === "otro") setVista({ paso: "pago", foco: `${id}-otro` });
+    if (p === "otro") setVista({ paso: "datos", foco: `${id}-otro` });
     // En la pregunta, un porcentaje contesta y sigue a la tarjeta.
     else if (preguntando) irA("tarjeta");
   };
@@ -700,7 +703,7 @@ export function PasoDeDatos({
     </button>
   );
   const titulo = (texto: string, cual: Paso | "propina" | "reto") => (
-    <h3 id={`${id}-titulo-${cual}`} tabIndex={-1} aria-describedby={pasos.length > 1 && cual !== "reto" ? `${id}-paso` : undefined} className={cn(TITULO, "outline-none")}>{texto}</h3>
+    <h3 id={`${id}-titulo-${cual}`} tabIndex={-1} className={cn(TITULO, "outline-none")}>{texto}</h3>
   );
   const propinaDeLaPantalla = (modo: "elegir" | "preguntar") => (
     <Propina id={id} modo={modo} propina={propina} alElegir={elegirPropina} montoDe={montoDe} tope={subtotal} montoDeOtro={libre?.ok ? libre.monto : null} deshabilitado={ocupado}
@@ -721,14 +724,18 @@ export function PasoDeDatos({
 
   return (
     <form noValidate className={COLUMNA} onSubmit={(e) => { e.preventDefault(); if (!enReto && (!enLaUltima || preguntando || seOfreceEnviar)) alBoton(total); }}>
-      <div ref={cuerpo} className={CUERPO}>
-        {/* Con el reto del banco a la vista no hay a dónde regresar (se sale con «Cancelar»): la franja se quita y el banco gana ese lugar. */}
-        {!enReto && <div className="flex items-center justify-between gap-3 px-4 pt-1">
-          <button type="button" onClick={regresar} disabled={ocupado} className={cn("-ml-2 inline-flex h-11 items-center gap-1 rounded px-2 text-15 font-medium text-ink-2 hover:bg-hover hover:text-ink disabled:pointer-events-none disabled:opacity-40", FOCO)}>
-            <IconoAtras />{paso === "datos" ? "Tu pedido" : "Regresar"}
+      {/* La única barra de arriba: regresar y el título, al centro. Con el reto del banco a la vista no
+          hay a dónde regresar (se sale con «Cancelar»): la flecha se quita. */}
+      <header className="barra grid flex-none grid-cols-[2.75rem_1fr_2.75rem] items-center border-b border-transparent px-1 py-1 transition-colors duration-150">
+        {enReto ? <span /> : (
+          <button type="button" onClick={regresar} disabled={ocupado} aria-label={paso === "datos" && !preguntando ? "Volver a tu pedido" : "Regresar"} className={BOTON_DE_BARRA}>
+            <IconoAtras />
           </button>
-          {pasos.length > 1 && <p id={`${id}-paso`} className="text-13 tabular-nums text-ink-2">Paso {pasos.indexOf(paso) + 1} de {pasos.length}</p>}
-        </div>}
+        )}
+        {/* TEXTO PROVISIONAL (James). */}
+        <h2 tabIndex={-1} data-foco-inicial className="min-w-0 truncate text-center font-display text-16 font-semibold tracking-tight outline-none">Finalizar pedido</h2>
+      </header>
+      <div ref={cuerpo} className={CUERPO}>
 
         {/* Modo de prueba: fija arriba de la pantalla de la tarjeta (y del reto del banco, que la reemplaza). No se cierra. */}
         {negocio.pago_de_prueba && enLinea && (paso === "tarjeta" || enReto) && (
@@ -741,7 +748,7 @@ export function PasoDeDatos({
 
         {/* El reto del banco ocupa el lugar de la pantalla en la que se estaba; la tarjeta sigue montada, oculta. */}
         {reto && (
-          <section className={cn("flex min-w-0 flex-col gap-3 pt-3", reto.esperando && "pb-5")}>
+          <section className={cn("flex min-w-0 flex-col gap-3 pt-4", reto.esperando && "pb-5")}>
             <div className="flex flex-col gap-1 px-4">
               {/* Terminó o se canceló: el marco se quita (se queda en blanco) y lo que sigue es esperar; el aviso del pie dice qué hacer. */}
               {titulo(reto.cancelado ? RETO.cancelando : reto.esperando ? RETO.confirmando : RETO.titulo, "reto")}
@@ -751,26 +758,26 @@ export function PasoDeDatos({
           </section>
         )}
 
-        {paso === "datos" && !enReto && (
+        {paso === "datos" && !preguntando && !enReto && (
           <>
             {/* Para quien ya tiene cuenta (o la quiere): una franja que no estorba al invitado. El carrito
                 vive en el teléfono, así que lo espera a la vuelta. Mientras se envía no se sale de aquí. */}
             {!conSesion && (
-              <p className={cn("mx-4 mt-1 flex flex-wrap items-center gap-x-4 rounded bg-hover px-3 text-14 text-ink-2", ocupado && "pointer-events-none opacity-40")}>
+              <p className={cn("mx-4 mt-4 flex flex-wrap items-center gap-x-4 rounded bg-hover px-3 text-14 text-ink-2", ocupado && "pointer-events-none opacity-40")}>
                 ¿Ya tienes cuenta?
                 <Link href={enlaceDeAcceso(negocio.slug, "entrar", deVuelta)} className={DE_TEXTO}>Iniciar sesión</Link>
                 <Link href={enlaceDeAcceso(negocio.slug, "registro", deVuelta)} className={DE_TEXTO}>Crear cuenta</Link>
               </p>
             )}
 
-            <section className="flex flex-col gap-4 px-4 pb-5 pt-2">
+            <section className="flex flex-col gap-4 px-4 pb-5 pt-4">
               {titulo(aDomicilio ? "¿Quién recibe?" : "¿Quién recoge?", "datos")}
               {campo("nombre", "Nombre", { autoComplete: "name", autoCapitalize: "words" })}
               {campo("telefono", "Teléfono", { type: "tel", inputMode: "tel", autoComplete: "tel-national", ayuda: "10 dígitos. El restaurante te llama si hay alguna duda con tu pedido." })}
               {campo("email", "Correo", { type: "email", inputMode: "email", autoComplete: "email", autoCapitalize: "none", spellCheck: false, opcional: !enLinea, ayuda: enLinea ? "Ahí te llega la confirmación de tu pago y el enlace de tu pedido." : "Para mandarte el enlace de tu pedido." })}
             </section>
 
-            <section className="flex flex-col gap-4 border-t border-line px-4 py-5">
+            <section className={cn(BANDA, "flex flex-col gap-4")}>
               {aDomicilio ? (
                 <>
                   <div>
@@ -882,16 +889,79 @@ export function PasoDeDatos({
                 alCambiar={alCambiarNota} alSalir={() => {}} />
             </section>
 
-            {/* Sin pantalla de pago (una sola forma, al recibir, o ninguna): cómo se paga se dice aquí. */}
-            {pasos.length === 1 && (
-              <section id={`${id}-pago`} role="group" tabIndex={-1} aria-labelledby={`${id}-pago-titulo`} aria-describedby={rechazo.pago ? `${id}-pago-error` : undefined}
-                className="flex min-w-0 flex-col gap-3 border-t border-line px-4 py-5 outline-none">
-                <h3 id={`${id}-pago-titulo`} className={TITULO}>¿Cómo pagas?</h3>
-                {unaSolaForma}
-                {notaDeTarjeta}
-                {errorDePago}
-              </section>
-            )}
+            {/* El resumen: los productos (plegados) y la cuenta. Sin envío todavía (falta la dirección o el pin) no hay total. */}
+            <section className={cn(BANDA, "flex flex-col gap-3")}>
+              <h3 className={TITULO}>Resumen del pedido</h3>
+              <details className="group">
+                <summary className={cn("flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded text-16 [&::-webkit-details-marker]:hidden", FOCO)}>
+                  <span>{piezas} {piezas === 1 ? "producto" : "productos"}</span>
+                  <Icono nombre="chevron-abajo" className="h-5 w-5 text-ink-2 transition-transform duration-150 ease-vim group-open:rotate-180" />
+                </summary>
+                <ul className="flex flex-col gap-2 pb-2 pt-1 text-15">
+                  {carrito.renglones.map((r, i) => {
+                    const cot = cotizacion?.renglones.length === carrito.renglones.length ? cotizacion.renglones[i] : null;
+                    return (
+                      <li key={r.id} className="flex items-baseline justify-between gap-3">
+                        <span className={cn("min-w-0", PARTE)}>
+                          {r.cantidad} × {r.nombre}
+                          {cot?.detalle && <span className="block text-14 text-ink-2">{cot.detalle}</span>}
+                        </span>
+                        {cot && <span className="flex-shrink-0 tabular-nums">{formatoMxn(cot.total_mxn)}</span>}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </details>
+              <dl className="flex flex-col gap-2">
+                <Linea concepto="Subtotal" importe={cotizacion ? formatoMxn(cotizacion.subtotal_mxn) : "—"} estimado={!cotizacion} />
+                {/* TEXTO PROVISIONAL (James): el envío que aún depende de la dirección. */}
+                {aDomicilio && <Linea concepto="Envío" importe={aPagar && cotizacion ? formatoMxn(cotizacion.envio_total_mxn) : "Con tu dirección"} estimado={!aPagar} />}
+                {enLinea && montoDePropina && Number(montoDePropina) > 0 && <Linea concepto="Propina" importe={formatoMxn(montoDePropina)} estimado={false} />}
+                <Linea concepto="Total" importe={aPagar ? formatoMxn(aPagar) : "—"} estimado={!aPagar} fuerte />
+              </dl>
+            </section>
+
+            {/* Cómo paga, y la propina si es en línea. Con una sola forma (o ninguna) se dice, no se pregunta. */}
+            <section id={`${id}-pago`} role="group" tabIndex={-1} aria-labelledby={`${id}-titulo-pago`} aria-describedby={rechazo.pago ? `${id}-pago-error` : undefined}
+              className={cn(BANDA, "flex min-w-0 flex-col gap-3 outline-none")}>
+              <h3 id={`${id}-titulo-pago`} className={TITULO}>¿Cómo pagas?</h3>
+              {formas.length > 1 ? (
+                <>
+                  <p className="text-14 text-ink-2">{apoyoDePago(pago)}</p>
+                  <ul role="radiogroup" aria-labelledby={`${id}-titulo-pago`} className="flex flex-col">
+                    {formas.map((p) => (
+                      <li key={p}>
+                        <label className={cn("flex min-h-12 items-center gap-3 py-2 text-16", p === "EN_LINEA" && pausa ? "text-ink-3" : "cursor-pointer")}>
+                          <input type="radio" name={`${id}-forma`} checked={pago === p} disabled={ocupado || (p === "EN_LINEA" && pausa !== null)} className="h-6 w-6 flex-shrink-0 accent-ink"
+                            aria-describedby={p === "EN_LINEA" && pausa ? `${id}-pausa` : undefined}
+                            onChange={() => {
+                              setPago(p); setRechazo((r) => ({ ...r, pago: undefined }));
+                              // Si ya no paga en línea, la tarjeta se desmonta: volver a elegirlo no la carga hasta llegar a su pantalla.
+                              if (p !== "EN_LINEA") setConTarjeta(false);
+                            }} />
+                          {p === "EN_LINEA" && pausa ? (
+                            <span className="min-w-0">
+                              {nombreDePago(p, true)}
+                              <span id={`${id}-pausa`} className="block text-14 text-ink-2">{lineaDePausa(pausa.hasta)}</span>
+                            </span>
+                          ) : nombreDePago(p, formas.includes("EN_LINEA"))}
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : unaSolaForma}
+              {notaDeTarjeta}
+              {errorDePago}
+              {/* La propina: solo al pagar en línea. El mismo selector de «Para recoger / A domicilio». */}
+              {enLinea && (
+                <fieldset role="radiogroup" aria-describedby={`${id}-propina-apoyo`} className="mt-2 min-w-0">
+                  <legend className="text-15 font-semibold">Propina</legend>
+                  <p id={`${id}-propina-apoyo`} className="mb-2 mt-1 text-14 text-ink-2">{apoyoDePropina}</p>
+                  {propinaDeLaPantalla("elegir")}
+                </fieldset>
+              )}
+            </section>
 
             <div className="flex flex-col gap-2 border-t border-line px-4 py-5 text-13 leading-relaxed text-ink-2">
               <p>
@@ -916,52 +986,9 @@ export function PasoDeDatos({
           </>
         )}
 
-        {paso === "pago" && !preguntando && !enReto && (
-          <section id={`${id}-pago`} role="group" tabIndex={-1} aria-labelledby={`${id}-titulo-pago`} aria-describedby={rechazo.pago ? `${id}-pago-error` : undefined}
-            className="flex min-w-0 flex-col gap-3 px-4 pb-3 pt-2 outline-none">
-            {titulo("¿Cómo pagas?", "pago")}
-            {formas.length > 1 ? (
-              <>
-                <p className="text-14 text-ink-2">{apoyoDePago(pago)}</p>
-                <ul role="radiogroup" aria-labelledby={`${id}-titulo-pago`} className="flex flex-col">
-                  {formas.map((p) => (
-                    <li key={p}>
-                      <label className={cn("flex min-h-12 items-center gap-3 py-2 text-16", p === "EN_LINEA" && pausa ? "text-ink-3" : "cursor-pointer")}>
-                        <input type="radio" name={`${id}-forma`} checked={pago === p} disabled={ocupado || (p === "EN_LINEA" && pausa !== null)} className="h-6 w-6 flex-shrink-0 accent-ink"
-                          aria-describedby={p === "EN_LINEA" && pausa ? `${id}-pausa` : undefined}
-                          onChange={() => {
-                            setPago(p); setRechazo((r) => ({ ...r, pago: undefined }));
-                            // Si ya no paga en línea, la tarjeta se desmonta: volver a elegirlo no la carga hasta llegar a su pantalla.
-                            if (p !== "EN_LINEA") setConTarjeta(false);
-                          }} />
-                        {p === "EN_LINEA" && pausa ? (
-                          <span className="min-w-0">
-                            {nombreDePago(p, true)}
-                            <span id={`${id}-pausa`} className="block text-14 text-ink-2">{lineaDePausa(pausa.hasta)}</span>
-                          </span>
-                        ) : nombreDePago(p, formas.includes("EN_LINEA"))}
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            ) : unaSolaForma}
-            {notaDeTarjeta}
-            {errorDePago}
-            {/* La propina: solo al pagar en línea. El mismo selector de «Para recoger / A domicilio». */}
-            {enLinea && (
-              <fieldset role="radiogroup" aria-describedby={`${id}-propina-apoyo`} className="min-w-0">
-                <legend className="text-15 font-semibold">Propina</legend>
-                <p id={`${id}-propina-apoyo`} className="mb-2 mt-1 text-14 text-ink-2">{apoyoDePropina}</p>
-                {propinaDeLaPantalla("elegir")}
-              </fieldset>
-            )}
-          </section>
-        )}
-
         {/* La pregunta, una vez por pedido, a quien va a pagar en línea sin haber elegido propina. */}
         {preguntando && !enReto && (
-          <section className="flex min-w-0 flex-col gap-3 px-4 pb-5 pt-2">
+          <section className="flex min-w-0 flex-col gap-3 px-4 pb-5 pt-4">
             {titulo("¿Gustas dejar una propina?", "propina")}
             <p className="text-14 text-ink-2">{apoyoDePropina}</p>
             {propinaDeLaPantalla("preguntar")}
@@ -973,7 +1000,7 @@ export function PasoDeDatos({
             envoltura no lleva clases de `display`: le ganarían al atributo `hidden`. */}
         {enLinea && conTarjeta && sucursal.public_key && (
           <div hidden={paso !== "tarjeta" || enReto}>
-            <section className="flex min-w-0 flex-col gap-4 px-4 pb-5 pt-2">
+            <section className="flex min-w-0 flex-col gap-4 px-4 pb-5 pt-4">
               {titulo("Tu tarjeta", "tarjeta")}
               {/* La cuenta de lo que se va a cobrar, en la tarjeta de resumen de la casa. */}
               {total && aPagar && (

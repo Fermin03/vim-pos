@@ -81,7 +81,7 @@ body {
   transition-duration: 250ms;
 }
 /* La línea bajo la cabecera solo existe mientras el cuerpo pasa por debajo (hoja.tsx). */
-.hoja[data-corrida] > header { border-color: rgb(var(--line)); }
+.hoja[data-corrida] > header, .hoja[data-corrida] .barra { border-color: rgb(var(--line)); }
 /* El velo va literal (es --ink): ::backdrop no hereda variables en navegadores de hace dos años. */
 .hoja::backdrop {
   background: rgb(22 22 26 / 0);

@@ -45,7 +45,7 @@ describe("lo que el servidor dice de la pausa", () => {
   });
 
   it("la pausa se queda en la pantalla en la que está: no manda a corregir ningún dato", () => {
-    expect(pasoDelDesenlace({ tipo: "pausa", hasta: HASTA, rechazado: true }, pasosDe(["EFECTIVO", "EN_LINEA"], "EN_LINEA"))).toBeNull();
+    expect(pasoDelDesenlace({ tipo: "pausa", hasta: HASTA, rechazado: true }, pasosDe("EN_LINEA"))).toBeNull();
   });
 
   it("`pedir` que contesta la pausa entrega ese desenlace y su código (el antirobot ya se gastó)", async () => {

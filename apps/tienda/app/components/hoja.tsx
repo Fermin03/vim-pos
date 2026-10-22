@@ -27,7 +27,9 @@ import { FOCO, IconoCerrar, PARTE } from "./piezas";
  */
 export const COLUMNA = "hoja-columna flex min-h-0 flex-initial flex-col";
 export const CUERPO = "hoja-cuerpo min-h-0 flex-initial overflow-y-auto overscroll-contain";
-export const PIE = "flex-none border-t border-line bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]";
+/** Un botón de icono de la cabecera («Cerrar», y «Regresar» en la barra del checkout). */
+export const BOTON_DE_BARRA = cn("flex h-11 w-11 flex-shrink-0 items-center justify-center rounded text-ink-2 transition-[background-color,transform] duration-150 ease-vim hover:bg-hover hover:text-ink active:scale-[.97] active:bg-hover active:duration-[60ms] disabled:pointer-events-none disabled:opacity-30", FOCO);
+export const PIE ="flex-none border-t border-line bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]";
 
 /**
  * ¿Lo último que hizo el cliente fue con el teclado? Al abrir, el foco cae en «Cerrar», y Safari
@@ -49,7 +51,11 @@ export function Hoja({ abierta, alCerrar, fija = false, completa = false, titulo
    * arrastrando. Salir a medio envío dejaba mandar el mismo pedido dos veces.
    */
   fija?: boolean;
-  /** Ocupa toda la pantalla (el checkout, «Tus datos»): sin asa ni arrastre, y el pie va abajo del todo (globals.css, `.completa`). */
+  /**
+   * Ocupa toda la pantalla (el checkout, «Tus datos»): sin asa ni arrastre, y el pie va abajo del
+   * todo (globals.css, `.completa`). La cabecera la pone el contenido (su barra con «Regresar»); al
+   * abrir, el foco va a lo que marque `data-foco-inicial`.
+   */
   completa?: boolean;
   titulo: string; children: ReactNode;
 }) {
@@ -68,7 +74,9 @@ export function Hoja({ abierta, alCerrar, fija = false, completa = false, titulo
       d.style.transitionDuration = "";
       d.removeAttribute("data-corrida");
       d.showModal();
+      if (completa) d.querySelector<HTMLElement>("[data-foco-inicial]")?.focus({ preventScroll: true });
     } else if (!abierta && d.open) d.close();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `completa` no cambia en una hoja
   }, [abierta]);
 
   // El teclado de iOS no encoge la página: se pone ENCIMA de lo que está pegado abajo, y con él el
@@ -149,7 +157,8 @@ export function Hoja({ abierta, alCerrar, fija = false, completa = false, titulo
       ref={ref}
       role="dialog"
       aria-modal="true"
-      aria-labelledby={idTitulo}
+      aria-labelledby={completa ? undefined : idTitulo}
+      aria-label={completa ? titulo : undefined}
       className={cn("hoja", completa && "completa")}
       // Escape pide cancelar; fija, se le dice que no.
       onCancel={(e) => { if (fija) e.preventDefault(); }}
@@ -166,11 +175,11 @@ export function Hoja({ abierta, alCerrar, fija = false, completa = false, titulo
         if (t.classList.contains("overflow-y-auto")) e.currentTarget.toggleAttribute("data-corrida", t.scrollTop > 0);
       }}
     >
-      <header
+      {!completa && <header
         className="relative flex flex-none touch-none items-center gap-2 border-b border-transparent pb-1 pl-4 pr-1 pt-4 transition-colors duration-150 sm:touch-auto sm:pt-1"
         onPointerDown={(e) => {
           // Un solo dedo: un segundo toque a medio arrastre no se lleva la hoja a otro lado.
-          if (arrastre.current || fija || completa || (e.target as HTMLElement).closest("button") || matchMedia("(min-width: 640px)").matches) return;
+          if (arrastre.current || fija || (e.target as HTMLElement).closest("button") || matchMedia("(min-width: 640px)").matches) return;
           arrastre.current = { y0: e.clientY, y: e.clientY, t: e.timeStamp, v: 0 };
           e.currentTarget.setPointerCapture(e.pointerId);
         }}
@@ -179,13 +188,12 @@ export function Hoja({ abierta, alCerrar, fija = false, completa = false, titulo
         onPointerCancel={soltar}
       >
         {/* El asa: dice que la hoja se puede bajar. Solo en teléfono. */}
-        {!completa && <span aria-hidden="true" className="absolute left-1/2 top-2 h-1 w-9 -translate-x-1/2 rounded-full bg-line-strong sm:hidden" />}
+        <span aria-hidden="true" className="absolute left-1/2 top-2 h-1 w-9 -translate-x-1/2 rounded-full bg-line-strong sm:hidden" />
         <h2 id={idTitulo} className={cn("line-clamp-2 min-w-0 flex-1 font-display text-18 font-semibold leading-snug tracking-tight", PARTE)}>{titulo}</h2>
-        <button ref={botonCerrar} type="button" onClick={cerrar} disabled={fija} aria-label="Cerrar"
-          className={cn("flex h-11 w-11 flex-shrink-0 items-center justify-center rounded text-ink-2 transition-[background-color,transform] duration-150 ease-vim hover:bg-hover hover:text-ink active:scale-[.97] active:bg-hover active:duration-[60ms] disabled:pointer-events-none disabled:opacity-30", FOCO)}>
+        <button ref={botonCerrar} type="button" onClick={cerrar} disabled={fija} aria-label="Cerrar" className={BOTON_DE_BARRA}>
           <IconoCerrar />
         </button>
-      </header>
+      </header>}
       <div className={COLUMNA}>{children}</div>
     </dialog>
   );

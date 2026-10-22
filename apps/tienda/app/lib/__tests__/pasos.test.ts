@@ -7,49 +7,34 @@ import { leerOtroMonto, type PropinaElegida } from "../pago";
 import { accionDe, avanzar, pasoDelDesenlace, pasosDe, type Paso } from "../pasos";
 import { ID } from "./datos";
 
-const TRES: Paso[] = ["datos", "pago", "tarjeta"], DOS: Paso[] = ["datos", "pago"], UNA: Paso[] = ["datos"];
+const DOS: Paso[] = ["datos", "tarjeta"], UNA: Paso[] = ["datos"];
 
 describe("qué pantallas hay", () => {
-  it("una sola forma de pago y es al recibir: no hay pantalla de pago", () => {
-    expect(pasosDe(["EFECTIVO"], "EFECTIVO")).toEqual(UNA);
-    expect(pasosDe(["TARJETA"], "TARJETA")).toEqual(UNA);
+  it("se paga al recibir (o no hay formas de pago): una sola pantalla, con todo", () => {
+    expect(pasosDe("EFECTIVO")).toEqual(UNA);
+    expect(pasosDe("TARJETA")).toEqual(UNA);
+    expect(pasosDe(null)).toEqual(UNA);
   });
-  it("sin formas de pago: solo la primera (que dice que no se puede pagar por aquí)", () => {
-    expect(pasosDe([], null)).toEqual(UNA);
-  });
-  it("varias formas y paga al recibir: dos pantallas, también si entre ellas está el pago en línea", () => {
-    expect(pasosDe(["EFECTIVO", "TARJETA"], "EFECTIVO")).toEqual(DOS);
-    expect(pasosDe(["EFECTIVO", "TARJETA", "EN_LINEA"], "TARJETA")).toEqual(DOS);
-  });
-  it("paga en línea: tres, aunque sea la única forma (la segunda enseña solo la propina)", () => {
-    expect(pasosDe(["EFECTIVO", "EN_LINEA"], "EN_LINEA")).toEqual(TRES);
-    expect(pasosDe(["EN_LINEA"], "EN_LINEA")).toEqual(TRES);
+  it("paga en línea: la de los datos y la de la tarjeta", () => {
+    expect(pasosDe("EN_LINEA")).toEqual(DOS);
   });
 });
 
 describe("qué hace el botón principal de cada pantalla", () => {
-  it("una sola pantalla: «Enviar pedido» desde la primera", () => {
+  it("al recibir: «Enviar pedido» desde la primera", () => {
     expect(accionDe(UNA, "datos", "EFECTIVO")).toBe("enviar");
+    expect(accionDe(UNA, "datos", "TARJETA")).toBe("enviar");
   });
-  it("al recibir: «Continuar» y luego «Enviar pedido»", () => {
-    expect(accionDe(DOS, "datos", "EFECTIVO")).toBe("continuar");
-    expect(accionDe(DOS, "pago", "TARJETA")).toBe("enviar");
-  });
-  it("en línea: «Continuar», «Ir a pagar» y «Pagar»", () => {
-    expect(accionDe(TRES, "datos", "EN_LINEA")).toBe("continuar");
-    expect(accionDe(TRES, "pago", "EN_LINEA")).toBe("ir-a-pagar");
-    expect(accionDe(TRES, "tarjeta", "EN_LINEA")).toBe("pagar");
+  it("en línea: «Ir a pagar» y luego «Pagar»", () => {
+    expect(accionDe(DOS, "datos", "EN_LINEA")).toBe("ir-a-pagar");
+    expect(accionDe(DOS, "tarjeta", "EN_LINEA")).toBe("pagar");
   });
 });
 
 describe("el toque en el botón principal", () => {
-  const base = { pasos: TRES, paso: "pago" as Paso, primerError: undefined, enLinea: true, propina: 10 as PropinaElegida, otroValido: false, yaPreguntada: false };
+  const base = { pasos: DOS, paso: "datos" as Paso, primerError: undefined, enLinea: true, propina: 10 as PropinaElegida, otroValido: false, yaPreguntada: false };
   it("un dato del cliente con error manda a ese campo, desde cualquier pantalla", () => {
-    for (const paso of TRES) expect(avanzar({ ...base, paso, primerError: "email" })).toEqual({ tipo: "campo", campo: "email" });
-  });
-  it("de la primera a la segunda sin preguntar nada de propina", () => {
-    expect(avanzar({ ...base, paso: "datos", propina: null })).toEqual({ tipo: "paso", paso: "pago" });
-    expect(avanzar({ ...base, paso: "datos", propina: "otro" })).toEqual({ tipo: "paso", paso: "pago" });
+    for (const paso of DOS) expect(avanzar({ ...base, paso, primerError: "email" })).toEqual({ tipo: "campo", campo: "email" });
   });
   it("«Ir a pagar» sin haber elegido propina pregunta UNA vez", () => {
     expect(avanzar({ ...base, propina: null })).toEqual({ tipo: "preguntar" });
@@ -67,24 +52,21 @@ describe("el toque en el botón principal", () => {
   });
   it("la última pantalla envía; en la tarjeta nunca se pregunta la propina", () => {
     expect(avanzar({ ...base, paso: "tarjeta", propina: null })).toEqual({ tipo: "enviar" });
-    expect(avanzar({ ...base, pasos: DOS, enLinea: false, propina: null })).toEqual({ tipo: "enviar" });
-    expect(avanzar({ ...base, pasos: UNA, paso: "datos", enLinea: false, propina: null })).toEqual({ tipo: "enviar" });
+    expect(avanzar({ ...base, pasos: UNA, enLinea: false, propina: null })).toEqual({ tipo: "enviar" });
   });
   it("al recibir no importa la propina que haya quedado de antes", () => {
-    expect(avanzar({ ...base, pasos: DOS, enLinea: false, propina: "otro" })).toEqual({ tipo: "enviar" });
+    expect(avanzar({ ...base, pasos: UNA, enLinea: false, propina: "otro" })).toEqual({ tipo: "enviar" });
   });
 });
 
 describe("a qué pantalla regresa cada respuesta del servidor", () => {
   const c = { telefono: "4771234567", horario: {}, otrasFormas: true };
-  const de = (error: string, detalle: string | null = null, pasos: Paso[] = TRES) => pasoDelDesenlace(desenlaceDelError({ error, detalle }, c), pasos);
-  it("los datos del cliente y la dirección viven en la primera", () => {
+  const de = (error: string, detalle: string | null = null, pasos: Paso[] = DOS) => pasoDelDesenlace(desenlaceDelError({ error, detalle }, c), pasos);
+  it("los datos del cliente, la dirección y la forma de pago viven en la primera", () => {
     expect(de("CLIENTE_INVALIDO")).toBe("datos");
     expect(de("DIRECCION_INVALIDA")).toBe("datos");
-  });
-  it("la forma de pago, en la segunda; sin pantalla de pago, en la primera", () => {
-    expect(de("PAGO_INVALIDO")).toBe("pago");
-    expect(de("PAGO_NO_DISPONIBLE")).toBe("pago");
+    expect(de("PAGO_INVALIDO")).toBe("datos");
+    expect(de("PAGO_NO_DISPONIBLE")).toBe("datos");
     expect(de("PAGO_INVALIDO", null, UNA)).toBe("datos");
   });
   it("lo que dijo el banco, en la tarjeta", () => {

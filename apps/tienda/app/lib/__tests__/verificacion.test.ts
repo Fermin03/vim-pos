@@ -110,7 +110,7 @@ describe("`pedir` contesta que el banco quiere verificar", () => {
     const r = await enviarPedido({ cotizar: async () => cotizada, pedir: async () => creado({ estado: "VERIFICACION", url: URL_RETO }), totalVisto: cotizada.datos.total_mxn }, c);
     expect(r).toEqual({ desenlace: { tipo: "verificar", codigo: CODIGO, url: URL_RETO }, pidio: true, error: null });
     // No manda a ninguna pantalla: el reto se abre donde se está.
-    expect(pasoDelDesenlace(r.desenlace, ["datos", "pago", "tarjeta"])).toBeNull();
+    expect(pasoDelDesenlace(r.desenlace, ["datos", "tarjeta"])).toBeNull();
   });
 });
 
