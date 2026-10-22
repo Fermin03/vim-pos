@@ -78,6 +78,11 @@ module.exports = {
           from: { opacity: "0", transform: "translateY(8px) scale(.98)" },
           to: { opacity: "1", transform: "none" },
         },
+        // La caja espera algo de afuera (la terminal): una onda que crece y se desvanece.
+        "vim-pulso": {
+          from: { opacity: ".5", transform: "scale(1)" },
+          to: { opacity: "0", transform: "scale(1.8)" },
+        },
       },
       // Las curvas viven en tokens.css (--ease-*), igual que los colores.
       transitionTimingFunction: {
@@ -87,6 +92,7 @@ module.exports = {
         "vim-shake": "vim-shake .3s var(--ease-in-out)",
         "vim-fade": "vim-fade .18s ease",
         "vim-pop": "vim-pop .2s var(--ease-out)",
+        "vim-pulso": "vim-pulso 1.8s var(--ease-out) infinite",
       },
     },
   },
