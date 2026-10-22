@@ -368,6 +368,13 @@ export function HomePos({
   const [pidiendoMesa, setPidiendoMesa] = useState(false);
   const [viendoMapaMesas, setViendoMapaMesas] = useState(false);
   const [procesandoCobro, setProcesandoCobro] = useState(false);
+  /* Escape mientras el cobro se prepara (se guarda la cuenta, se revisa la lealtad, se leen los
+     totales): cancela la apertura. Antes la tecla se perdía —el cobro aún no estaba en pantalla— y
+     el cobro se abría después y se quedaba abierto. La cuenta que ya se guardó queda guardada,
+     igual que si se abriera el cobro y se cerrara. */
+  const [abriendoCobro, setAbriendoCobro] = useState(false);
+  const aperturaCancelada = useRef(false);
+  const empezarApertura = () => { aperturaCancelada.current = false; setAbriendoCobro(true); };
   // La revisión previa al cobro (lealtad) es asíncrona: mientras corre, un segundo toque en Cobrar
   // no lanza otra revisión ni abre el cajón dos veces. Es un ref y no estado porque dos toques
   // seguidos pueden llegar antes de que React vuelva a pintar el botón apagado.
@@ -1817,78 +1824,84 @@ export function HomePos({
     // Se revisa siempre, sin fiarse de `canjeVivo`: si esa lectura falló una vez, la revisión se
     // saltaría en todos los cobros de la cuenta.
     let cuenta = ticketBd;
-    if (lealtadActiva && programa && ticketBd && !ticketIncompleto) {
-      revisandoCobro.current = true;
-      setProcesandoCobro(true);
-      try {
-        const r = await revisarLealtadAntesDeCobrar(token, ticketBd.ticketId, programa.mecanica, almacenLocal());
-        if (r.accion === "AVISAR") {
-          if (r.totales) setTicketBd(r.totales);
-          // El canje pudo irse aunque `lealtad_mxn` no se mueva (ya estaba en 0): se fuerza la relectura.
-          setCanjeVersion((v) => v + 1);
-          setAvisoReparto({ titulo: r.titulo, texto: r.texto });
-          return;
-        }
-        // La base manda: si otro dispositivo movió la cuenta, la pantalla se pone al día y se cobra
-        // con lo recién leído.
-        if (r.totales.total !== ticketBd.total) setTicketBd(r.totales);
-        cuenta = r.totales;
-      } catch {
-        /* se cobra con lo que hay */
-      } finally {
-        revisandoCobro.current = false;
-        setProcesandoCobro(false);
-      }
-    }
-    // Una cuenta que ya no debe nada (el cambio sin diferencia, reabierto): se cierra y se da por
-    // cobrada, sin cobro ni cajón. Si la base no la cierra, sigue por el cobro de siempre.
-    if (cuenta && !ticketIncompleto && cuentaYaCubierta(cuenta)) {
-      revisandoCobro.current = true;
-      setProcesandoCobro(true);
-      try {
-        const cerrada = await cerrarSiYaCubierta(token, cuenta.ticketId);
-        // Sin total: no se cobró nada aquí, y «Cobro completado» no debe anunciarlo como cobrado.
-        if (cerrada) { await cobroTerminado(cerrada.ticketId, cerrada.folio, cerrada.cambio, null); return; }
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "No se pudo cerrar la cuenta");
-        return;
-      } finally {
-        revisandoCobro.current = false;
-        setProcesandoCobro(false);
-      }
-    }
-    abrirCajonParaCobrar();
-    setAtajoCobro(atajo);
-    // Si el ticket ya se persistió (flujo de descuento), reusarlo: nada de re-abrir. Uno incompleto
-    // (B2-3) no se cobra así: se vuelve a persistir abajo, que lo completa sin abrir otro.
-    if (cuenta && !ticketIncompleto) {
-      setTotalesCobro(cuenta);
-      return;
-    }
-    // El cobro usa siempre la ruta online (persistirTicket + aplicarPago). El offline lo da el
-    // escritorio, que siempre habla con su gateway local (ADR 0004); el cobro offline por outbox
-    // web se retiró.
-    setProcesandoCobro(true);
-    setError(null);
+    empezarApertura();
     try {
-      const totales = await persistirCarrito(c);
-      ticketNuevoDelCobro.current = totales.ticketId;
-      servicioContestado.current = totales.ticketId; // se guardó con lo contestado (o sin pregunta)
-      /* EL TICKET YA EXISTE, CON FOLIO. La pantalla tiene que saberlo desde este instante.
+      if (lealtadActiva && programa && ticketBd && !ticketIncompleto) {
+        revisandoCobro.current = true;
+        setProcesandoCobro(true);
+        try {
+          const r = await revisarLealtadAntesDeCobrar(token, ticketBd.ticketId, programa.mecanica, almacenLocal());
+          if (r.accion === "AVISAR") {
+            if (r.totales) setTicketBd(r.totales);
+            // El canje pudo irse aunque `lealtad_mxn` no se mueva (ya estaba en 0): se fuerza la relectura.
+            setCanjeVersion((v) => v + 1);
+            setAvisoReparto({ titulo: r.titulo, texto: r.texto });
+            return;
+          }
+          // La base manda: si otro dispositivo movió la cuenta, la pantalla se pone al día y se cobra
+          // con lo recién leído.
+          if (r.totales.total !== ticketBd.total) setTicketBd(r.totales);
+          cuenta = r.totales;
+        } catch {
+          /* se cobra con lo que hay */
+        } finally {
+          revisandoCobro.current = false;
+          setProcesandoCobro(false);
+        }
+      }
+      // Una cuenta que ya no debe nada (el cambio sin diferencia, reabierto): se cierra y se da por
+      // cobrada, sin cobro ni cajón. Si la base no la cierra, sigue por el cobro de siempre.
+      if (cuenta && !ticketIncompleto && cuentaYaCubierta(cuenta)) {
+        revisandoCobro.current = true;
+        setProcesandoCobro(true);
+        try {
+          const cerrada = await cerrarSiYaCubierta(token, cuenta.ticketId);
+          // Sin total: no se cobró nada aquí, y «Cobro completado» no debe anunciarlo como cobrado.
+          if (cerrada) { await cobroTerminado(cerrada.ticketId, cerrada.folio, cerrada.cambio, null); return; }
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "No se pudo cerrar la cuenta");
+          return;
+        } finally {
+          revisandoCobro.current = false;
+          setProcesandoCobro(false);
+        }
+      }
+      if (aperturaCancelada.current) return;
+      abrirCajonParaCobrar();
+      setAtajoCobro(atajo);
+      // Si el ticket ya se persistió (flujo de descuento), reusarlo: nada de re-abrir. Uno incompleto
+      // (B2-3) no se cobra así: se vuelve a persistir abajo, que lo completa sin abrir otro.
+      if (cuenta && !ticketIncompleto) {
+        setTotalesCobro(cuenta);
+        return;
+      }
+      // El cobro usa siempre la ruta online (persistirTicket + aplicarPago). El offline lo da el
+      // escritorio, que siempre habla con su gateway local (ADR 0004); el cobro offline por outbox
+      // web se retiró.
+      setProcesandoCobro(true);
+      setError(null);
+      try {
+        const totales = await persistirCarrito(c);
+        ticketNuevoDelCobro.current = totales.ticketId;
+        servicioContestado.current = totales.ticketId; // se guardó con lo contestado (o sin pregunta)
+        /* EL TICKET YA EXISTE, CON FOLIO. La pantalla tiene que saberlo desde este instante.
 
-         Antes solo se guardaba en `totalesCobro` (para el modal), y `ticketBd` se quedaba en
-         null. Si el cajero cerraba el cobro sin pagar —el cliente se arrepintió, era para la
-         otra sucursal—, la pantalla creía que no había nada guardado y "Volver" se iba sin
-         preguntar. El ticket quedaba ABIERTO en la base; en "Para llevar", que no tiene lista
-         de cuentas, era invisible en todas partes y reaparecía días después trabando el corte.
-         Y la guarda de salida, que existe justo para eso, miraba `ticketBd`... en null. */
-      setTicketBd(totales);
-      setTicketIncompleto(false);
-      setTotalesCobro(totales);
-    } catch (e) {
-      setError(await adoptarTicketSiQuedoAbierto(e, "Error al abrir el ticket"));
+           Antes solo se guardaba en `totalesCobro` (para el modal), y `ticketBd` se quedaba en
+           null. Si el cajero cerraba el cobro sin pagar —el cliente se arrepintió, era para la
+           otra sucursal—, la pantalla creía que no había nada guardado y "Volver" se iba sin
+           preguntar. El ticket quedaba ABIERTO en la base; en "Para llevar", que no tiene lista
+           de cuentas, era invisible en todas partes y reaparecía días después trabando el corte.
+           Y la guarda de salida, que existe justo para eso, miraba `ticketBd`... en null. */
+        setTicketBd(totales);
+        setTicketIncompleto(false);
+        if (!aperturaCancelada.current) setTotalesCobro(totales);
+      } catch (e) {
+        setError(await adoptarTicketSiQuedoAbierto(e, "Error al abrir el ticket"));
+      } finally {
+        setProcesandoCobro(false);
+      }
     } finally {
-      setProcesandoCobro(false);
+      setAbriendoCobro(false);
     }
   }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, caja.giro, turno.caja_id, turno.id, online, adoptarTicketSiQuedoAbierto, lealtadActiva, programa, cobroTerminado, configMostrador, comidaRapida, retomadoEspera, enModoMesa]);
 
@@ -2357,6 +2370,8 @@ export function HomePos({
       // modificador abierto sobre la tanda) y cada uno atiende su Escape. Antes los cerraba esta
       // lista de un golpe: Escape en el teclado de efectivo tiraba el cobro entero, y con un
       // modificador abierto se llevaba la tanda completa sin guardar.
+      // Mientras el cobro se prepara, Escape cancela la apertura (ver `aperturaCancelada`).
+      [abriendoCobro && totalesCobro == null, () => { aperturaCancelada.current = true; setAbriendoCobro(false); }],
       capaCobro,
       [agregandoA != null, null],
       // Descuento de la cuenta (puede pedir PIN) y la lista de cuentas de Para llevar: los cierra
@@ -2431,7 +2446,7 @@ export function HomePos({
       escaneoIgnorado: avisoTiendaVisible || capas.some((c) => c[0] && ![capaCobro, capaSelector, capaAvisoRetail, capaConsultaInv, capaRecibo, capaConfirmacion].includes(c)),
       cerrarAlEscanear: confirmacion != null ? nuevoTicket : mostrarRecibo ? cerrarVistaRecibo : null,
     };
-  }, [selectorRetail, cantidadRetail, avisoRetail, descuentoAbierto, llevarListaAbierta, preguntaCobro, avisoTiendaVisible, modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, vistaCotizacion, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
+  }, [abriendoCobro, selectorRetail, cantidadRetail, avisoRetail, descuentoAbierto, llevarListaAbierta, preguntaCobro, avisoTiendaVisible, modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, vistaCotizacion, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
       agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto, comidaRapida, ticketBd, nombreBarra, pasandoAMesa,
       clienteDomAbierto, clienteCuentaAbierto, zonaPedidoAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
@@ -3102,6 +3117,7 @@ export function HomePos({
           // Mientras se leen los totales (y se revisa la lealtad), un segundo toque no hace nada.
           if (revisandoCobro.current) return;
           revisandoCobro.current = true;
+          empezarApertura();
           try {
             setAtajoCobro(null);
             let totales: TotalesTicket | null = null;
@@ -3122,6 +3138,7 @@ export function HomePos({
               } catch { /* la revisión falló: se cobra con lo que se lea abajo */ }
             }
             totales ??= await leerTotales(token, ticketId);
+            if (aperturaCancelada.current) return;
             // El cajón se abre hasta aquí, cuando ya se sabe que la cuenta sí se va a cobrar.
             abrirCajonParaCobrar();
             setTotalesCobro(totales);
@@ -3129,6 +3146,7 @@ export function HomePos({
             setError(e instanceof Error ? e.message : "No se pudo abrir el cobro");
           } finally {
             revisandoCobro.current = false;
+            setAbriendoCobro(false);
           }
         }}
         onImprimirTicket={(id, r) => reimprimirCuenta(id, r ? { origen: "CUENTAS", autorizacionPinId: r.autorizacionPinId } : undefined)}
