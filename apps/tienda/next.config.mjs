@@ -48,6 +48,16 @@ function origenDeSupabase() {
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ["@vim/ui", "@vim/config", "@vim/fecha"],
+  // La tienda se mudó de pedidos.vimpos.com.mx a online.vimpos.com.mx (ADR 0032, nota): los enlaces viejos
+  // (correos, redes) siguen funcionando con un 308 a la misma ruta. Solo aplica a ese host.
+  async redirects() {
+    return [{
+      source: "/:path*",
+      has: [{ type: "host", value: "pedidos.vimpos.com.mx" }],
+      destination: "https://online.vimpos.com.mx/:path*",
+      permanent: true,
+    }];
+  },
   async headers() {
     return [
       { source: "/:path*", headers: cabecerasSeguridad({
@@ -56,10 +66,10 @@ const nextConfig = {
         // «Usar mi ubicación» (envío por distancia): solo esta página, ningún marco ajeno.
         geolocalizacion: true,
       }) },
-      // El enlace de seguimiento ES la llave del pedido: no sale en ningún Referer ni en buscadores.
+      // El enlace de seguimiento ES la llave del pedido (y el de la cita, la de la cita): no sale en ningún Referer ni en buscadores.
       // Va después a propósito: en Next, la última regla que coincide gana para la misma cabecera.
       {
-        source: "/:negocio/pedido/:path*",
+        source: "/:negocio/:cual(pedido|cita)/:path*",
         headers: [
           { key: "Referrer-Policy", value: "no-referrer" },
           { key: "X-Robots-Tag", value: "noindex, nofollow" },

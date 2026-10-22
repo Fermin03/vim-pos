@@ -28,6 +28,7 @@ const dibujar = () => ({
   editar: <path d="M4 20l1.2-4.8L16.4 4a2.1 2.1 0 0 1 3 0l.6.6a2.1 2.1 0 0 1 0 3L8.8 18.8 4 20zM14 6.4l3.6 3.6" />,
   eliminar: <path d="M4 7h16M9.5 7V5A1.5 1.5 0 0 1 11 3.5h2A1.5 1.5 0 0 1 14.5 5v2M6 7l.9 12.2a2 2 0 0 0 2 1.8h6.2a2 2 0 0 0 2-1.8L18 7M10 11v6M14 11v6" />,
   buscar: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="M20 20l-4.8-4.8" /></>,
+  carrito: <><path d="M2.5 3.5h2.2l2.4 11.2a2 2 0 0 0 2 1.6h8.3a2 2 0 0 0 1.9-1.5l1.6-6.8H5.6" /><circle cx="9.5" cy="20" r="1.2" /><circle cx="17.5" cy="20" r="1.2" /></>,
   menu: <path d="M4 6.5h16M4 12h16M4 17.5h16" />,
   retroceso: <path d="M9 5h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9a2 2 0 0 1-1.6-.8L3 12l4.4-6.2A2 2 0 0 1 9 5zM12 9.5l5 5M17 9.5l-5 5" />,
   "flecha-izquierda": <path d="M20 12H4M10 6l-6 6 6 6" />,

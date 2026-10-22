@@ -17,6 +17,8 @@ export type EstadoSync = {
   vinculada?: boolean;
   sincronizando?: boolean;
   ultimaSincronizacion?: string | null;
+  /** Hora ISO del último pull completo: de cuándo son las existencias de otras sucursales (RETAIL). */
+  ultimoPull?: string | null;
   ultimoIntento?: string | null;
   fallos?: number;
 };

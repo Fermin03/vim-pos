@@ -1,5 +1,7 @@
 // Manda los correos de estado de los pedidos de la tienda en línea (0176): «en preparación»,
-// «listo para recoger» / «en camino», «cancelado» y «te devolvimos tu pago».
+// «listo para recoger» / «en camino», «cancelado» y «te devolvimos tu pago». Y, desde la 0226, los
+// de las citas reservadas en línea (agenda_correos, _shared/tienda/correo-cita.ts): confirmación,
+// recordatorio, cambio de horario y cancelación. Cada cola con su propio tope por hora.
 //
 //   POST /functions/v1/tienda-correos      x-vim-interno: <VIM_INTERNO_SECRET>
 //
@@ -24,6 +26,7 @@ import { enSegundoPlano, enviarCorreo } from "../_shared/correo.ts";
 import { secretoInternoValido } from "../_shared/delivery/interno.ts";
 import { type Deps, mandarCorreosDeEstado, type Pendiente, topePorHora } from "../_shared/tienda/correo-estado.ts";
 import { descifrarCodigo } from "../_shared/tienda/enlace.ts";
+import { type DepsCita, mandarCorreosDeCita, type PendienteCita } from "../_shared/tienda/correo-cita.ts";
 
 const FN = "tienda-correos";
 const admin = clienteAdmin();
@@ -44,12 +47,26 @@ const deps: Deps = {
   topeHora: topePorHora(Deno.env.get("VIM_CORREOS_ESTADO_POR_HORA")),
 };
 
+const depsCita: DepsCita = {
+  tomar: async (max, topeHora) => (await rpc("agenda_correos_tomar", { p_max: max, p_tope_hora: topeHora }) as PendienteCita[] | null) ?? [],
+  descifrar: deps.descifrar,
+  enviar: enviarCorreo,
+  resultado: async (id, r) => (await rpc("agenda_correo_resultado", { p_id: id, p_resultado: r })) as string | null,
+  alMorir: (id) => registrarError(FN, "CORREO_MUERTO", `renglón ${id} de agenda_correos`),
+  base: deps.base,
+  topeHora: deps.topeHora,
+};
+
+async function barrido(): Promise<void> {
+  const avisa = (c: { FALLO: number }, que: string) => { if (c.FALLO > 0) console.warn(`[${FN}] ${c.FALLO} correo(s) de ${que} no salieron; se reintentan.`); };
+  await mandarCorreosDeEstado(deps).then((c) => avisa(c, "pedidos")).catch((e) => registrarError(FN, "BARRIDO", e));
+  await mandarCorreosDeCita(depsCita).then((c) => avisa(c, "citas")).catch((e) => registrarError(FN, "BARRIDO_CITAS", e));
+}
+
 Deno.serve((req) => {
   if (req.method !== "POST") return new Response("method not allowed", { status: 405 });
   const interno = (req.headers.get("x-vim-interno") ?? "").trim();
   if (!secretoInternoValido(interno, (Deno.env.get("VIM_INTERNO_SECRET") ?? "").trim())) return new Response("unauthorized", { status: 401 });
-  enSegundoPlano(mandarCorreosDeEstado(deps)
-    .then((c) => { if (c.FALLO > 0) console.warn(`[${FN}] ${c.FALLO} correo(s) no salieron; se reintentan.`); })
-    .catch((e) => registrarError(FN, "BARRIDO", e)));
+  enSegundoPlano(barrido());
   return new Response("", { status: 202 });
 });

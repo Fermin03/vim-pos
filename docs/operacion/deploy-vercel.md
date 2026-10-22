@@ -9,7 +9,7 @@ y desde el mismo repo de GitHub `Fermin03/vim-pos`.
 | `apps/admin` | `admin` | `admin.vimpos.com.mx` | creado |
 | `apps/platform` | `platform` | `platform.vimpos.com.mx` | creado |
 | `apps/factura` | `vim-factura` | — | creado |
-| `apps/tienda` | `vim-tienda` | `pedidos.vimpos.com.mx` | **PENDIENTE de crear**: pasos en [`tienda-publica-salida.md`](tienda-publica-salida.md) |
+| `apps/tienda` | `vim-tienda` | `online.vimpos.com.mx` | **PENDIENTE de crear**: pasos en [`tienda-publica-salida.md`](tienda-publica-salida.md) |
 
 ## Gotcha del monorepo (resuelto)
 La CLI `vercel deploy` **desde `apps/pos`** sube SOLO esa carpeta y usa `npm install` → falla

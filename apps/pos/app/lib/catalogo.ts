@@ -1,5 +1,6 @@
 "use client";
 import { employeeClient } from "./supabase";
+import type { TipoVenta } from "./unidades";
 import { aplicarSucursal, type FilaProductoSucursal } from "./catalogo-sucursal";
 
 export type Categoria = {
@@ -23,6 +24,16 @@ export type Producto = {
    * cuentas lo necesita— pero no se pinta. `precio_base_mxn` y `agotado` ya son los de la sucursal.
    */
   seVendeAqui: boolean;
+  // Giro RETAIL (opcionales: el cache de Dexie guarda formas anteriores).
+  producto_padre_id?: string | null;
+  variante_ejes?: string[] | null;
+  variante_valores?: Record<string, string> | null;
+  controla_existencias?: boolean;
+  codigo_barras?: string | null;
+  codigo_interno?: string | null;
+  imagen_url?: string | null;
+  /** Pieza, kilo, metro o litro (0206). Sin él, pieza. */
+  tipoVenta?: TipoVenta;
 };
 
 /** Lista de categorías activas del tenant, ordenadas. RLS por tenant. */
@@ -52,11 +63,12 @@ export async function listarProductosPos(token: string, sucursalId: string): Pro
   const [{ data, error }, { data: filas, error: errorFilas }] = await Promise.all([
     sb
       .from("productos")
-      .select("id, nombre, descripcion, precio_base_mxn, categoria_id, estado, visible_en_pos, es_combo")
+      .select("id, nombre, descripcion, precio_base_mxn, categoria_id, estado, visible_en_pos, es_combo, producto_padre_id, variante_ejes, variante_valores, controla_existencias, codigo_barras, codigo_interno, imagen_url, tipo_venta")
       .is("deleted_at", null)
       .eq("visible_en_pos", true)
       .in("estado", ["ACTIVO", "AGOTADO"])
-      .order("orden_visualizacion", { ascending: true }),
+      .order("orden_visualizacion", { ascending: true })
+      .order("created_at", { ascending: true }), // hijas: el orden en que el admin las guardó
     sb
       .from("productos_sucursal")
       .select("producto_id, disponible, precio_mxn, agotado_manual, agotado_automatico")
@@ -77,6 +89,14 @@ export async function listarProductosPos(token: string, sucursalId: string): Pro
       agotado: p.estado === "AGOTADO",
       esCombo: Boolean(p.es_combo),
       seVendeAqui: true,
+      producto_padre_id: (p.producto_padre_id as string) ?? null,
+      variante_ejes: (p.variante_ejes as string[]) ?? null,
+      variante_valores: (p.variante_valores as Record<string, string>) ?? null,
+      controla_existencias: Boolean(p.controla_existencias),
+      codigo_barras: (p.codigo_barras as string) ?? null,
+      codigo_interno: (p.codigo_interno as string) ?? null,
+      imagen_url: (p.imagen_url as string) ?? null,
+      tipoVenta: (p.tipo_venta as TipoVenta) ?? "UNIDAD",
     };
   });
   return aplicarSucursal(base, (filas ?? []) as FilaProductoSucursal[]);
@@ -87,6 +107,16 @@ export async function leerComboUpsellActivo(token: string): Promise<boolean> {
   const { data, error } = await employeeClient(token).from("configuracion_tenant").select("combo_upsell_activo").maybeSingle();
   if (error || !data) return true;
   return (data as { combo_upsell_activo: boolean | null }).combo_upsell_activo !== false;
+}
+
+/**
+ * Mostrador de comida rápida (0242). Sin fila, con error o en una caja vieja sin las columnas
+ * se asume todo apagado: es el default de la base.
+ */
+export async function leerConfigMostrador(token: string): Promise<{ pedirNombre: boolean; tieneDondeComer: boolean }> {
+  const { data, error } = await employeeClient(token).from("configuracion_tenant").select("pedir_nombre_cliente, tiene_donde_comer").maybeSingle();
+  const f = (error ? null : data) as { pedir_nombre_cliente?: boolean | null; tiene_donde_comer?: boolean | null } | null;
+  return { pedirNombre: f?.pedir_nombre_cliente === true, tieneDondeComer: f?.tiene_donde_comer === true };
 }
 
 // Paleta de fallback si la categoría no tiene color asignado

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { correoDeEstado, type Deps, FRASES_DE_LA_PAGINA, leerSeguimiento, mandarCorreosDeEstado, type Pendiente, type Resultado, type Seguimiento, TIPOS, topePorHora } from "./correo-estado.ts";
 
-const ENLACE = "https://pedidos.vimpos.com.mx/knockout/pedido/AAAAAAAAAAAAAAAAAAAAAA";
+const ENLACE = "https://online.vimpos.com.mx/knockout/pedido/AAAAAAAAAAAAAAAAAAAAAA";
 const seg = (x: Partial<Seguimiento> = {}): Seguimiento => ({ folio_corto: "T12345", modo: "RECOGER", estado: "EN_PREPARACION", motivo: null, pago_estado: null, ...x });
 const correo = (tipo: typeof TIPOS[number], s: Partial<Seguimiento> = {}, enlace: string | null = ENLACE, negocio = "Knock-Out Burger") =>
   correoDeEstado({ tipo, negocio, enlace, seg: seg(s) });
@@ -158,7 +158,7 @@ function banco(cola: Pendiente[], x: Partial<Deps> = {}) {
     enviar: (c) => { enviados.push(c); return Promise.resolve({ enviado: true }); },
     resultado: (id, r) => { resultados.push([id, r]); return Promise.resolve(r === "ENVIADO" ? "ENVIADO" : "PENDIENTE"); },
     alMorir: (id) => { muertos.push(id); },
-    base: "https://pedidos.vimpos.com.mx", topeHora: 30, ...x,
+    base: "https://online.vimpos.com.mx", topeHora: 30, ...x,
   };
   return { deps, enviados, resultados, muertos, tomas };
 }
@@ -170,7 +170,7 @@ test("manda al correo del pedido, con el enlace del código descifrado, y lo rep
   assert.deepEqual(b.tomas, [[10, 30]]);
   assert.equal(b.enviados.length, 1);
   assert.equal(b.enviados[0]!.to, "ana@example.com");
-  assert.ok(b.enviados[0]!.html.includes('href="https://pedidos.vimpos.com.mx/knockout/pedido/AAAAAAAAAAAAAAAAAAAAAA"'));
+  assert.ok(b.enviados[0]!.html.includes('href="https://online.vimpos.com.mx/knockout/pedido/AAAAAAAAAAAAAAAAAAAAAA"'));
   assert.deepEqual(b.resultados, [[1, "ENVIADO"]]);
 });
 test("sin código (pedido anterior, enlace borrado o sin VIM_TIENDA_URL) sale sin botón", async () => {

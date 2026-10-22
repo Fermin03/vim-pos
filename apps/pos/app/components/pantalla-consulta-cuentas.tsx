@@ -157,7 +157,7 @@ export function PantallaConsultaCuentas({
                     <span className="font-display text-14 font-bold tabular-nums">{c.folio ?? c.ticketId.slice(-6)}</span>
                     {c.estado === "CANCELADO" && <span className="rounded-full bg-danger/10 px-2 py-0.5 text-11 font-bold text-danger">Cancelada</span>}
                   </span>
-                  <span className="block truncate text-12 text-ink-3">{fechaCorta(c.fechaIso)} · {labelModoCuenta(c.modo)}{c.cliente ? ` · ${c.cliente}` : ""}</span>
+                  <span className="block truncate text-12 text-ink-3">{fechaCorta(c.fechaIso)} · {labelModoCuenta(c.modo, caja.giro)}{c.cliente ? ` · ${c.cliente}` : ""}</span>
                 </span>
                 <span className={`font-display text-14 font-bold tabular-nums ${c.estado === "CANCELADO" ? "text-ink-3 line-through" : "text-ink"}`}>{fmtMxn(c.total)}</span>
               </button>

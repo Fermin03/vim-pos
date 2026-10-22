@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   baseDeLealtad, canjeRecortado, cantidad, esFalloAmbiguo, fechaCorta, franjaLealtad, inicioDelDiaMexico,
-  maximoCanjeDinero, mensajeErrorLealtad, premiosConFaltante, puntosPorCompra, unidad, type Programa,
+  maximoCanjeDinero, mensajeErrorLealtad, ofreceCanje, premiosConFaltante, puntosPorCompra, unidad, type Programa,
 } from "../lealtad-reglas";
 
 const P = (x: Partial<Programa>): Programa => ({
@@ -163,5 +163,21 @@ describe("errores del canje", () => {
   it("ambiguo = no se sabe si la nube alcanzó a descontar; se reintenta con el mismo canje", () => {
     for (const c of ["SIN_RED", "RESPUESTA_INVALIDA", "ERROR_INTERNO", "HTTP_502", "HTTP_500"]) expect(esFalloAmbiguo(c)).toBe(true);
     for (const c of ["SALDO_INSUFICIENTE", "FUNCION_REQUIERE_NUBE", "SIN_MODULO_LEALTAD", "HTTP_403", "CANJE_REVERTIDO"]) expect(esFalloAmbiguo(c)).toBe(false);
+  });
+});
+
+describe("ofreceCanje", () => {
+  const base = { admite: true, hayLineas: true, impresa: false, ventaDeCambio: false as boolean | null };
+  it("se ofrece en una venta normal con productos, sin imprimir", () => {
+    expect(ofreceCanje(base)).toBe(true);
+  });
+  it("nunca en la venta de un cambio, ni mientras no se sabe si lo es", () => {
+    expect(ofreceCanje({ ...base, ventaDeCambio: true })).toBe(false);
+    expect(ofreceCanje({ ...base, ventaDeCambio: null })).toBe(false);
+  });
+  it("tampoco sin cliente admitido, sin productos o con la cuenta impresa", () => {
+    expect(ofreceCanje({ ...base, admite: false })).toBe(false);
+    expect(ofreceCanje({ ...base, hayLineas: false })).toBe(false);
+    expect(ofreceCanje({ ...base, impresa: true })).toBe(false);
   });
 });

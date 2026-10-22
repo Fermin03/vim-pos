@@ -3,15 +3,20 @@
 //
 // La sucursal viaja en la URL (`?s=<id>`) cuando hay más de una: así el menú correcto sale del
 // servidor, el enlace se puede compartir y «atrás» funciona. Con una sola no hay parámetro.
+//
+// Un negocio con reservas en línea (belleza) ve su sitio de reservas en lugar del menú; los
+// restaurantes y las tiendas siguen igual.
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { hoyMx } from "@vim/fecha";
 import { Fallo } from "../components/piezas";
+import { SitioReservas } from "../components/reservas/sitio";
 import { Tienda } from "../components/tienda";
 import { momentoMx } from "../lib/horario";
 import { urlDeLogo } from "../lib/imagen";
 import { modosDe, motivoDeCierre, sucursalElegida } from "../lib/pantalla";
-import { leerMenu, negocioDeLaPeticion } from "../lib/servidor/funcion";
+import { leerMenu, negocioDeLaPeticion, reservasDeLaPeticion } from "../lib/servidor/funcion";
 import { haySesion } from "../lib/servidor/sesion";
 import { textoCerrada } from "../lib/textos";
 
@@ -20,7 +25,16 @@ type Props = { params: Promise<{ negocio: string }>; searchParams: Promise<{ s?:
 // Lo que ve un buscador y lo que sale al compartir el enlace: el negocio, no VIM. La dirección
 // canónica es la del negocio sin sucursal: `?s=` no crea páginas distintas para un buscador.
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const leido = await negocioDeLaPeticion((await params).negocio);
+  const slugPedido = (await params).negocio;
+  const reservas = await reservasDeLaPeticion(slugPedido);
+  if (reservas.estado === "ok") {
+    const { slug, nombre, descripcion, logo_ruta } = reservas.datos;
+    const title = `${nombre} · Reserva en línea`, description = descripcion ?? `Reserva tu cita en línea en ${nombre}.`;
+    const logo = urlDeLogo(logo_ruta);
+    return { title, description, alternates: { canonical: `/${slug}` },
+      openGraph: { type: "website", locale: "es_MX", siteName: nombre, title, description, url: `/${slug}`, ...(logo && { images: [{ url: logo, alt: `Logo de ${nombre}` }] }) } };
+  }
+  const leido = await negocioDeLaPeticion(slugPedido);
   if (leido.estado !== "ok") return {};
   const { slug, nombre, descripcion, logo_ruta } = leido.datos;
   const title = `${nombre} · Pide en línea`;
@@ -35,7 +49,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function PaginaDelNegocio({ params, searchParams }: Props) {
   const [{ negocio: slug }, { s }] = await Promise.all([params, searchParams]);
+  const reservas = await reservasDeLaPeticion(slug);
+  if (reservas.estado === "ok") {
+    return <main><SitioReservas reservas={reservas.datos} hoy={hoyMx()} sucursalInicial={typeof s === "string" ? s : undefined} /></main>;
+  }
   const leido = await negocioDeLaPeticion(slug);
+  // Las reservas no contestaron y no hay tienda: puede ser un salón con la función caída, no un 404.
+  if (leido.estado === "no-existe" && reservas.estado === "no-disponible") return <Fallo titulo="No pudimos cargar la página" hacer="Vuelve a intentar en unos minutos." reintentar={`/${slug}`} />;
   if (leido.estado === "no-existe") notFound();
   if (leido.estado === "no-disponible") return <Fallo titulo="No pudimos cargar la tienda" hacer="Vuelve a intentar en unos minutos." reintentar={`/${slug}`} />;
   const negocio = leido.datos;

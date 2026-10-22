@@ -5,7 +5,7 @@ import { correoDePedido } from "./correo-pedido.ts";
 const base = {
   negocio: "Knock-Out Burger", folio: "TAB12C", total: "305.00", modo: "DOMICILIO" as const,
   renglones: [{ nombre: "Hamburguesa Clásica", cantidad: 2, detalle: "Extra queso" }],
-  enlace: "https://pedidos.vimpos.com.mx/knockout/pedido/AAAAAAAAAAAAAAAAAAAAAA",
+  enlace: "https://online.vimpos.com.mx/knockout/pedido/AAAAAAAAAAAAAAAAAAAAAA",
 };
 
 test("el asunto va sin acentos y con el folio", () => {

@@ -66,3 +66,19 @@ describe("resumirPropinas", () => {
     expect(resumirPropinas([])).toEqual({ totalMxn: 0, totalVendidoMxn: 0, ticketsConPropina: 0, promedioMxn: 0 });
   });
 });
+
+describe("una sola comanda por venta (comida rápida al cobrar)", () => {
+  beforeEach(() => {
+    tablas.ticket_items = [
+      { id: "i1", ticket_id: "t2", cancelado: false, enviado_cocina_at: null, cargo_tipo: null },
+      { id: "i2", ticket_id: "t2", cancelado: true, enviado_cocina_at: null, cargo_tipo: null },
+    ];
+    tablas.tickets = [{ id: "t2", estado_cocina: "SIN_ENVIAR" }];
+  });
+
+  it("el primer envío marca lo pendiente y pone la venta EN_COCINA; el segundo no trae nada que imprimir", async () => {
+    expect(await enviarACocina("tk", "t2")).toEqual(["i1"]);
+    expect(tablas.tickets[0].estado_cocina).toBe("EN_COCINA");
+    expect(await enviarACocina("tk", "t2")).toEqual([]);
+  });
+});

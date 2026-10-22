@@ -39,18 +39,28 @@ export const MENU: MenuAdmin = {
       h("Recetas", "/catalogo/recetas", ["insumos"]),
       h("Promociones", "/promociones", ["descuento"]),
       h("Importar menú", "/catalogo/importar", ["excel", "subir"]),
+      h("Importar tienda", "/catalogo/importar-tienda", ["excel", "subir", "productos"]),
+      h("Etiquetas", "/catalogo/etiquetas", ["codigo de barras", "precios"]),
     ], "catalogo"),
     g("inventario", "Inventario", [
       h("Existencias", "/inventario", ["insumos", "stock"]),
       h("Compras", "/inventario/compras"),
       h("Proveedores", "/inventario/proveedores"),
       h("Movimientos", "/inventario/movimientos", ["mermas", "ajustes"]),
+      h("Existencias de la tienda", "/existencias", ["conteo", "traspasos", "recibir", "stock"]),
     ], "caja"),
     g("clientes", "Clientes", [
       h("Directorio", "/clientes", ["clientes"]),
+      h("Créditos", "/creditos", ["fiado", "deuda"]),
+      h("Cotizaciones", "/cotizaciones", ["presupuesto"]),
       h("Lealtad", "/lealtad", ["puntos", "premios"]),
       h("Reservaciones", "/reservaciones", ["reservas"]),
     ], "personas"),
+    g("agenda", "Agenda", [
+      h("Servicios", "/agenda/servicios", ["citas"]),
+      h("Colaboradores", "/agenda/colaboradores", ["estilistas", "comisiones"]),
+      h("Espacios", "/agenda/espacios", ["cabinas", "sillas"]),
+    ], "calendario"),
     g("informes", "Informes", [
       h("Todos los informes", "/reportes", ["reportes"]),
       h("Qué se vende", "/reportes#que-se-vende", ["ventas"]),
@@ -75,6 +85,9 @@ export const MENU: MenuAdmin = {
         h("Sucursales", "/configuracion/sucursales"),
         h("Mesas", "/configuracion/mesas", ["salon", "comedor"]),
         h("Propinas", "/configuracion/propinas"),
+        h("Venta a crédito", "/configuracion/credito", ["fiado"]),
+        h("Cotizaciones", "/configuracion/cotizaciones", ["presupuesto"]),
+        h("Agenda", "/configuracion/agenda", ["citas", "anticipo", "comisiones"]),
         h("Zonas de envío", "/configuracion/envios", ["domicilio", "colonias"]),
         h("Marcas virtuales", "/configuracion/marcas"),
         h("Franquicias", "/configuracion/franquicias"),
@@ -107,6 +120,16 @@ export const MENU: MenuAdmin = {
     ], "moto"),
   ],
 };
+
+/** El grupo de la Tienda con el nombre y las opciones de `seccionEnLinea` (con agenda: «En línea», con Reservas). */
+export function conSeccionEnLinea(menu: MenuAdmin, s: { titulo: string; pestanas: { label: string; href: string }[] }): MenuAdmin {
+  return {
+    ...menu,
+    canales: menu.canales.map((n) => (n.tipo === "grupo" && n.id === "tienda"
+      ? { ...n, label: s.titulo, hijos: s.pestanas.map((p) => h(p.label, p.href)) }
+      : n)),
+  };
+}
 
 const sinAncla = (href: string) => href.split("#")[0]!;
 const ancla = (href: string) => href.split("#")[1];

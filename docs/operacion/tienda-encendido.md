@@ -107,7 +107,7 @@ sabiendas. Aquí están en llano, para que las aceptes o pidas cerrarlas.
   [`tienda-vigilancia.md`](tienda-vigilancia.md). Si le pasa a alguien, se le sube el tope o se
   bloquea al atacante.
 - **Una dirección de tienda que un negocio suelta, la puede tomar otro.** Las direcciones
-  (`pedidos.vimpos.com.mx/el-nombre`) son del primero que las pide. Si un negocio cambia la suya o
+  (`online.vimpos.com.mx/el-nombre`) son del primero que las pide. Si un negocio cambia la suya o
   se da de baja, la anterior queda libre, y si otro negocio la toma, **los QR y los enlaces ya
   impresos del primero llevan a la tienda del segundo**. Por eso el paso 5.3 insiste en elegirla
   bien. Mientras sean pocos negocios se cuida a mano; reservar las direcciones soltadas es trabajo
@@ -169,14 +169,14 @@ qué valor) está en [`tienda-publica-salida.md`](tienda-publica-salida.md); aqu
 **El orden importa:** 1.1 y 1.2 van antes que 1.5. Si el dominio existe antes, el primer cliente
 que pida recibe «No pudimos comprobar que eres una persona.»
 
-- [ ] **1.1 Antirobot (Cloudflare Turnstile): añadir `pedidos.vimpos.com.mx` al widget que ya
+- [ ] **1.1 Antirobot (Cloudflare Turnstile): añadir `online.vimpos.com.mx` al widget que ya
       existe.** · Fermín. (Paso 1 de la guía.)
       *Comprobar:* el widget lista tres dominios: `admin.vimpos.com.mx`, `localhost` y el nuevo.
       *Deshacer:* quitar el dominio del widget. No crear un widget nuevo ni cambiar llaves.
 - [ ] **1.2 Claves en Supabase.** · Claude, con tu visto bueno. (Paso 2 de la guía.)
-      - `TURNSTILE_HOSTNAMES` con **los dos** dominios (`admin.vimpos.com.mx,pedidos.vimpos.com.mx`).
+      - `TURNSTILE_HOSTNAMES` con **los dos** dominios (`admin.vimpos.com.mx,online.vimpos.com.mx`).
         Con uno solo se rompe el registro de negocios.
-      - `VIM_TIENDA_URL=https://pedidos.vimpos.com.mx`.
+      - `VIM_TIENDA_URL=https://online.vimpos.com.mx`.
       - Que existan `VIM_TIENDA_SECRET`, `TURNSTILE_SECRET_KEY` y los `VIM_SMTP_*`.
       - Que **no** exista `CAPTCHA_OPCIONAL`.
 
@@ -190,9 +190,9 @@ que pida recibe «No pudimos comprobar que eres una persona.»
       La clave de la tienda sale de `C:\Users\Fermi\.vim-pos-llaves\tienda-secret.txt` y nunca se
       pega en el chat. *Comprobar:* las tres en la lista; el despliegue termina en «Ready».
       *Deshacer:* borrar las variables.
-- [ ] **1.5 Dominio `pedidos.vimpos.com.mx` y su registro DNS.** · Fermín. (Paso 5.)
-      *Comprobar:* `https://pedidos.vimpos.com.mx/` carga una página que dice «Pedidos en línea», y
-      `https://pedidos.vimpos.com.mx/nadie-existe` dice «No encontramos esta página».
+- [ ] **1.5 Dominio `online.vimpos.com.mx` y su registro DNS.** · Fermín. (Paso 5.)
+      *Comprobar:* `https://online.vimpos.com.mx/` carga una página que dice «Pedidos en línea», y
+      `https://online.vimpos.com.mx/nadie-existe` dice «No encontramos esta página».
       *Deshacer:* quitar el dominio en Vercel: la tienda sale de internet en minutos.
 - [ ] **1.6 Comprobar qué red ve el servidor (una sola vez).** · Claude, con tu visto bueno, después
       del paso 2.2 (hace falta una tienda encendida, la de VIM Pruebas). Desde una conexión cuya
@@ -450,7 +450,7 @@ De lo más pequeño a lo más grande. Ninguno borra pedidos, clientes ni configu
 | Un negocio está rebasado en este momento | **Pausar** la tienda desde la caja (Pedidos en línea → Pausar: 30 minutos, 1 hora o hasta reanudar) | El cajero | Al instante |
 | Un negocio tiene un problema con su tienda | **Apagar su interruptor**: su admin → Tienda en línea | El dueño, o tú entrando a su admin | Al instante |
 | Hay que quitarle la tienda a un negocio | Panel de VIM → ficha del cliente → Add-ons → Tienda en línea → **Dar de baja…**. Su tienda se apaga sola | Fermín | Al instante |
-| La tienda pública falla para todos (no carga, cobra mal, se ve rota) | **Quitar el dominio** `pedidos.vimpos.com.mx` en Vercel → vim-tienda → Settings → Domains. Nadie puede entrar a ninguna tienda; las cajas y el POS siguen vendiendo normal | Fermín | Minutos |
+| La tienda pública falla para todos (no carga, cobra mal, se ve rota) | **Quitar el dominio** `online.vimpos.com.mx` en Vercel → vim-tienda → Settings → Domains. Nadie puede entrar a ninguna tienda; las cajas y el POS siguen vendiendo normal | Fermín | Minutos |
 | Hay que apagar **todas** las tiendas ya, sin esperar al dominio | Apagar todos los interruptores desde la base (abajo). Cada dueño tendrá que volver a encender el suyo | Claude, con tu visto bueno | Al instante |
 | No quieres que se conceda a nadie más | Apagar el complemento en el catálogo (primer «deshacer» de la fase 4) | Claude, con tu visto bueno | Al instante |
 | La caja 0.8.0 salió mal | No se baja de versión: se detiene el aviso de actualización y se corrige con una versión más alta. Es una urgencia: no espera al martes | Claude, con tu visto bueno | Horas |

@@ -95,6 +95,9 @@ cajera **María G. PIN 1234**; dueño `dueno@knockout.dev` / `devadmin`.
 Si cualquiera falla, **no se publica**. Un instalador incompleto deja al cliente sin caja y sin
 forma de recibir el arreglo por el actualizador.
 
+**La 0203 (liberar RETAIL) NO se aplica con un db push en bloque: va DESPUÉS de publicar el
+instalador que trae la 0188 (spec §13).**
+
 ```bash
 npm run build:ui                                   # exporta el POS a pos-ui/
 ELECTRON_CACHE=D:/electron-cache ELECTRON_BUILDER_CACHE=D:/electron-builder-cache \

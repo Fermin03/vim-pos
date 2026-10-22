@@ -10,6 +10,7 @@ import { SidebarTicket } from "./sidebar-ticket";
 import { agregarComboAlTicket, agregarItemAlTicket } from "../lib/cuenta-mesa";
 import type { ComboDef } from "../lib/combos";
 import { obtenerGruposDeProducto } from "../lib/modificadores";
+import { aGranel } from "../lib/unidades";
 import { aplicarEdicion, nuevoClientId, type AlcanceEdicion, type LineaCarrito, type ModificadorSel, type ModoServicio } from "../lib/carrito";
 import type { Categoria, Producto } from "../lib/catalogo";
 import type { GrupoModificadores } from "../lib/modificadores";
@@ -250,7 +251,7 @@ export function ModalAgregarProductos({
           producto={modGrupos.producto}
           grupos={modGrupos.grupos}
           inicial={modGrupos.edicion ? { modificadores: modGrupos.edicion.modificadores, nota: modGrupos.edicion.notaCocina } : null}
-          cantidadLinea={modGrupos.edicion?.cantidad ?? 1}
+          cantidadLinea={modGrupos.edicion && !aGranel(modGrupos.edicion.producto.tipoVenta) ? modGrupos.edicion.cantidad : 1}
           onConfirmar={(mods, nota, alcance) => {
             const { producto: p, edicion } = modGrupos;
             setModGrupos(null);

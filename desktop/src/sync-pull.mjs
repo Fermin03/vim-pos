@@ -6,7 +6,7 @@
 // generadas, y hace INSERT ... ON CONFLICT (pk) DO UPDATE. Corre en modo réplica para no
 // disparar triggers (misma semántica que la replicación lógica). Reusable con cualquier fuente.
 
-import { asegurarLibreta, LIBRETAS, ZONA_EDITADA_LOCAL, HUELLA_FILA } from "./sync-push.mjs";
+import { asegurarLibreta, LIBRETAS, ZONA_EDITADA_LOCAL, HUELLA_FILA, LIBRETAS_POR_ID, marcarPorId } from "./sync-push.mjs";
 
 // Orden de FKs: padres antes que hijos. Solo se procesan las tablas presentes en el snapshot.
 export const PULL_ORDER = [
@@ -26,6 +26,9 @@ export const PULL_ORDER = [
   { t: "categorias" },
   { t: "grupos_modificadores" },
   { t: "productos" },
+  // RETAIL (0195 §3): existencia por (sucursal, producto). Llave compuesta, como productos_sucursal.
+  // Luego se le resta lo que la caja movió y aún no sube (corregirExistenciasProductoPorPendientes).
+  { t: "producto_existencias" },
   // Menú por sucursal (0152): FK a productos y a sucursales, que ya bajaron. Llave compuesta
   // (producto_id, sucursal_id): upsertTabla arma el ON CONFLICT con ella, sin CLAVES_NATURALES.
   { t: "productos_sucursal" },
@@ -44,6 +47,15 @@ export const PULL_ORDER = [
   { t: "lealtad_programa" },
   { t: "lealtad_premios" },
   { t: "lealtad_saldos" },
+  // Crédito (0210): el que dio el admin, y los abonos y el saldo a favor que la caja necesita para
+  // mostrar la deuda y cobrar. Abonos y saldo a favor apuntan a ventas y turnos que pueden no estar
+  // en esta caja (modo réplica: sin FK). Se anotan en su libreta para no subir de vuelta.
+  { t: "clientes_credito" },
+  { t: "abonos_credito" },
+  { t: "saldo_favor_movimientos" },
+  // La deuda de otras cajas (0210 §0): el saldo de cada venta a crédito según la nube. Se REEMPLAZA
+  // entera (ver pullSnapshot): una venta que se liquidó ya no viene y no debe quedar aquí.
+  { t: "creditos_resumen_nube" },
   // Inventario (ADR 0013): unidades antes que insumos; existencias, recetas y componentes después.
   // La caja lo necesita para descontar al vender; los movimientos que genera suben por el push.
   { t: "unidades_medida" },
@@ -59,6 +71,20 @@ export const PULL_ORDER = [
   { t: "users", schema: "auth" },
   { t: "usuarios_perfil" },
   { t: "usuarios_acceso" },
+  // Agenda (0219): después de productos, clientes y empleados, a los que apunta. El catálogo solo
+  // lo edita el admin: se reemplaza entero (CLAVES_NATURALES, porPadre). Las citas van por huella
+  // como las zonas (LIBRETAS): una con cambio local pendiente no se pisa, ni sus tramos.
+  { t: "tipos_espacio" },
+  { t: "espacios" },
+  { t: "servicios_agenda" },
+  { t: "colaboradores_agenda" },
+  { t: "servicio_colaborador" },
+  { t: "horarios_colaborador" },
+  { t: "ausencias_colaborador" },
+  { t: "citas" },
+  { t: "citas_servicios" },
+  // Anticipos (0223): de las citas que bajan, por huella como ellas.
+  { t: "anticipos_cita" },
 ];
 
 /**
@@ -253,8 +279,11 @@ const CLAVES_NATURALES = {
     dependientes: [
       { tabla: "lealtad_saldos", col: "cliente_id" },
       { tabla: "_vim_clientes_ok", col: "cliente_id" },
+      // 0210: UNIQUE (tenant_id, cliente_id), igual que lealtad_saldos: no se muda; el crédito del
+      // cliente real baja de la nube en este mismo pull.
+      { tabla: "clientes_credito", col: "cliente_id" },
     ],
-    reapuntarFk: { tabla: "clientes", excepto: ["lealtad_saldos"] },
+    reapuntarFk: { tabla: "clientes", excepto: ["lealtad_saldos", "clientes_credito"] },
     antesDeReapuntar: dejarUnaDireccionPrincipal,
     // El duplicado se bloquea antes de mudarlo: una venta en vuelo que le asigna ese cliente a un
     // ticket no puede quedar apuntando a un id que se borra.
@@ -271,7 +300,24 @@ const CLAVES_NATURALES = {
   // Una configuración de propinas por sucursal (UNIQUE sucursal_id, 0184): si llega con otro id,
   // chocaría con propinas_config_sucursal_unica y tumbaría el pull entero. Nadie apunta a su id.
   sucursal_propinas_config: { claves: ["sucursal_id"], dependientes: [] },
+  // Agenda (0219): el catálogo es solo del admin y el pull no trae lo que se borró en la nube (un
+  // colaborador que ya no hace un servicio, una ausencia cancelada). Se borra lo del negocio y entra
+  // lo de la nube; de paso no chocan sus llaves naturales (nombre del tipo, día del horario). En
+  // réplica, borrar no arrastra las citas que apuntan a un espacio o a un colaborador.
+  tipos_espacio: { porPadre: "tenant_id" },
+  espacios: { porPadre: "tenant_id" },
+  servicios_agenda: { porPadre: "tenant_id" },
+  colaboradores_agenda: { porPadre: "tenant_id" },
+  servicio_colaborador: { porPadre: "tenant_id" },
+  horarios_colaborador: { porPadre: "tenant_id" },
+  ausencias_colaborador: { porPadre: "tenant_id" },
+  // Editar una cita le da ids nuevos a sus tramos (guardar_cita borra y vuelve a insertar): se
+  // reemplazan los de cada cita que baja.
+  citas_servicios: { porPadre: "cita_id" },
 };
+
+const CATALOGO_AGENDA = new Set(["tipos_espacio", "espacios", "servicios_agenda", "colaboradores_agenda",
+  "servicio_colaborador", "horarios_colaborador", "ausencias_colaborador"]);
 
 const fkCache = new Map();
 /**
@@ -422,6 +468,50 @@ export async function corregirExistenciasPorPendientes(client, log = () => {}, f
 }
 
 /**
+ * Lo mismo para las existencias por producto (RETAIL, 0195): a lo que bajó se le suma lo que la caja
+ * movió y la nube aún no sabe (sin anotar en _vim_mov_producto_ok). La cantidad ya trae su signo.
+ * Solo sobre los pares que trajo este pull (I1).
+ */
+export async function corregirExistenciasProductoPorPendientes(client, log = () => {}, filasAplicadas = []) {
+  if (!filasAplicadas.length) return 0;
+  await client.query("CREATE TABLE IF NOT EXISTS _vim_mov_producto_ok (id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
+  const { rowCount } = await client.query(`
+    UPDATE producto_existencias e SET cantidad = e.cantidad + d.delta
+      FROM (SELECT m.sucursal_id, m.producto_id, sum(m.cantidad) AS delta
+              FROM movimientos_producto m
+             WHERE NOT EXISTS (SELECT 1 FROM _vim_mov_producto_ok ok WHERE ok.id = m.id)
+             GROUP BY 1, 2) d
+     WHERE e.sucursal_id = d.sucursal_id AND e.producto_id = d.producto_id AND d.delta <> 0
+       AND (e.sucursal_id, e.producto_id) IN (
+             SELECT (f->>'sucursal_id')::uuid, (f->>'producto_id')::uuid FROM jsonb_array_elements($1::jsonb) f)`,
+    [JSON.stringify(filasAplicadas.map(({ sucursal_id, producto_id }) => ({ sucursal_id, producto_id })))]);
+  if (rowCount) log(`  producto_existencias: ${rowCount} existencia(s) corregida(s) por movimientos pendientes`);
+  return rowCount;
+}
+
+/** Hora ISO del último pull completo por pool: se lee de _vim_sync una vez y luego la pone pullSnapshot. */
+const ultimoPullDe = new WeakMap();
+
+/**
+ * Hora ISO del último pull completo, o null si nunca hubo. Solo la primera llamada por pool consulta
+ * la base (`_vim_sync`); después responde de memoria, así el sondeo de /__estado-sync no ocupa una
+ * conexión cada vez ni se cuelga con el pool saturado.
+ */
+export async function leerUltimoPull(pool) {
+  if (ultimoPullDe.has(pool)) return ultimoPullDe.get(pool);
+  try {
+    const { rows } = await pool.query("SELECT at FROM _vim_sync WHERE clave = 'last_pull'");
+    const iso = rows[0]?.at ? new Date(rows[0].at).toISOString() : null;
+    ultimoPullDe.set(pool, iso);
+    return iso;
+  } catch (e) {
+    // Sin tabla todavía: la caja nunca bajó nada (el primer pull la crea y anota la hora).
+    if (e?.code === "42P01") ultimoPullDe.set(pool, null);
+    return null; // base detenida un instante: se vuelve a leer en la siguiente llamada
+  }
+}
+
+/**
  * Anota en la libreta del PUSH los repartidores que acaban de bajar del pull.
  *
  * `_vim_repartidores_ok` (ver `asegurarTabla` en sync-push.mjs) dice qué repartidores NO hay que
@@ -502,7 +592,7 @@ export const marcarZonasDelPull = (client, filas, log) => marcarDelPull(client, 
 async function separarPendientes(client, tabla, filas) {
   const ids = [...new Set((filas ?? []).map((f) => f?.id).filter((id) => id != null))];
   if (!ids.length) return { aplicar: filas ?? [], descartadas: [] };
-  const { libreta, col } = LIBRETAS[tabla];
+  const { libreta, col, sinLibretaEsLocal } = LIBRETAS[tabla];
   await asegurarLibreta(client, tabla);
   // Candado ANTES de mirar la huella, y en su propia sentencia: un `cambiarCostoZona` en vuelo (su
   // UPDATE hecho, sin COMMIT) haría que esta consulta viera la versión vieja, la diera por no
@@ -517,9 +607,12 @@ async function separarPendientes(client, tabla, filas) {
   // Las colonias (0187) van por aquí igual: asignarles zona en la caja es el mismo UPDATE en vuelo.
   await client.query(`SELECT 1 FROM ${tabla} WHERE id = ANY($1::uuid[]) FOR NO KEY UPDATE`, [ids]);
   const { rows } = await client.query(
-    `SELECT o.${col} AS id FROM ${libreta} o
-       JOIN ${tabla} x ON x.id = o.${col}
-      WHERE o.${col} = ANY($1::uuid[]) AND ${ZONA_EDITADA_LOCAL}`,
+    // 0219: una cita que existe aquí y que la nube nunca confirmó es de esta caja (las que bajan se
+    // anotan al bajar): no se pisa aunque la nube ya tenga una versión (un envío que rechazó).
+    `SELECT x.id FROM ${tabla} x
+       LEFT JOIN ${libreta} o ON o.${col} = x.id
+      WHERE x.id = ANY($1::uuid[])
+        AND (${ZONA_EDITADA_LOCAL}${sinLibretaEsLocal ? ` OR o.${col} IS NULL` : ""})`,
     [ids]);
   const pendientes = new Set(rows.map((r) => r.id));
   if (!pendientes.size) return { aplicar: filas, descartadas: [] };
@@ -559,6 +652,21 @@ async function liberarClavesUnicasClientes(client, filas) {
   await soltar("telefono", [...soltadas.values()].filter((g) => g.relTel).map((g) => g.id));
   await soltar("rfc", [...soltadas.values()].filter((g) => g.relRfc).map((g) => g.id));
   return soltadas;
+}
+
+/**
+ * productos (0189): sus índices únicos (variante por padre, código de barras y SKU con existencias)
+ * se revisan aun en réplica, y el snapshot trae las filas sin orden: si la nube intercambió el
+ * código de dos variantes, la primera que entra choca con la segunda todavía vieja. Antes del
+ * upsert se marcan como borradas las copias locales de las filas que van a bajar y que participan
+ * en esos índices; el upsert les devuelve el `deleted_at` de la nube en la misma transacción.
+ */
+async function soltarClavesProductos(client, filas) {
+  const ids = filas.map((f) => f?.id).filter(Boolean);
+  if (!ids.length) return;
+  await client.query(
+    "UPDATE productos SET deleted_at = COALESCE(deleted_at, now()) WHERE id = ANY($1::uuid[]) AND (producto_padre_id IS NOT NULL OR controla_existencias)",
+    [ids]);
 }
 
 /**
@@ -731,17 +839,26 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
   const resumen = {};
   const fusionados = new Map(); // clientes destino de una fusión en este pull (id → tenant)
   let saldosCorregidos = false;
+  let citasFuera = new Set(); // 0219: citas que este pull no escribió; sus tramos tampoco se tocan
   try {
     await client.query("BEGIN");
     await client.query("SET LOCAL session_replication_role = replica"); // no disparar triggers/audit
+    // 0210: foto completa, no upsert. Solo si la nube la mandó (una sin la 0210 no la trae).
+    if (Array.isArray(snapshot.creditos_resumen_nube)) await client.query("DELETE FROM creditos_resumen_nube");
     for (const { t, schema = "public" } of PULL_ORDER) {
       let filas = snapshot[t] ?? snapshot[`${schema}.${t}`];
+      // 0219: el catálogo de la agenda se borra a mano en el admin. Una lista vacía (el último horario,
+      // la última ausencia) también reemplaza: se vacía lo del negocio, como creditos_resumen_nube.
+      if (Array.isArray(filas) && !filas.length && CATALOGO_AGENDA.has(t) && snapshot.tenants?.[0]?.id) {
+        await client.query(`DELETE FROM ${schema}."${t}" WHERE tenant_id = $1`, [snapshot.tenants[0].id]);
+      }
       if (!filas?.length) continue;
       if (LIBRETAS[t]) {
         const { aplicar, descartadas } = await separarPendientes(client, t, filas);
         if (descartadas.length) {
           log(`  ${t}: ${descartadas.length} con cambio local pendiente de subir, no se pisan`);
         }
+        if (t === "citas") citasFuera = new Set(descartadas.map((f) => f.id));
         filas = aplicar;
         if (!filas.length) continue;
       }
@@ -786,18 +903,37 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
           },
         };
       } else {
+        if (t === "citas_servicios") {
+          filas = filas.filter((f) => !citasFuera.has(f.cita_id));
+          if (!filas.length) continue;
+        }
         await reconciliarCatalogo(client, t, filas, log);
+        if (t === "productos") await soltarClavesProductos(client, filas);
+        // 0210: una fila que choque (p. ej. con la llave client_id_local) se salta sola, no tumba el pull.
+        if (LIBRETAS_POR_ID[t] || t === "citas" || t === "citas_servicios" || t === "anticipos_cita") opcionesFila = { aislarFilas: true, fallidas, log };
       }
-      const n = await upsertTabla(client, schema, t, filas, opcionesFila);
+      let n = await upsertTabla(client, schema, t, filas, opcionesFila);
+      if (t === "citas_servicios" && fallidas.some((x) => x.error?.code === "23P01")) {
+        // Choca con una cita de esta caja que aún no sube: entra marcada (el EXCLUDE no ve los tramos
+        // con empalme). El push de esa cita marca a las dos en la nube y el pull siguiente lo trae.
+        const choques = fallidas.filter((x) => x.error?.code === "23P01");
+        const otras = fallidas.filter((x) => x.error?.code !== "23P01");
+        fallidas.length = 0;
+        fallidas.push(...otras);
+        n += await upsertTabla(client, schema, t, choques.map((x) => ({ ...x.fila, empalme: true })), { aislarFilas: true, fallidas, log });
+      }
+      if (t === "citas") for (const x of fallidas) citasFuera.add(x.fila.id);
       if (fallidas.length) {
-        await restaurarClavesClientes(client, fallidas, soltadas, log);
+        if (soltadas) await restaurarClavesClientes(client, fallidas, soltadas, log);
         const malas = new Set(fallidas.map((x) => x.fila.id));
         filas = filas.filter((x) => !malas.has(x.id)); // no se anotan en la libreta del push
       }
       resumen[t] = n;
       if (n) log(`  ${schema}.${t}: ${n}`);
       if (t === "insumo_stock_sucursal") await corregirExistenciasPorPendientes(client, log, filas);
+      if (t === "producto_existencias") await corregirExistenciasProductoPorPendientes(client, log, filas);
       if (t === "repartidores") await marcarRepartidoresDelPull(client, filas, log);
+      if (LIBRETAS_POR_ID[t]) await marcarPorId(client, LIBRETAS_POR_ID[t], filas.map((x) => x.id));
       if (LIBRETAS[t]) await marcarDelPull(client, t, filas, log);
       if (t === "clientes") await marcarClientesDelPull(client, filas, log);
       if (t === "lealtad_saldos" && n) { await corregirSaldosLealtadPorPendientes(client, log, filas, fusionados); saldosCorregidos = true; }
@@ -821,6 +957,7 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
          ON CONFLICT (clave) DO UPDATE SET valor=EXCLUDED.valor, at=now()`, [String(tenantDelSnapshot)]);
     }
     await client.query("COMMIT");
+    ultimoPullDe.set(pool, new Date().toISOString());
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});
     throw e;

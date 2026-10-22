@@ -1,10 +1,11 @@
 "use client";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { Button, Icono } from "@vim/ui/styles";
+import { Button, Icono, useConfirmar } from "@vim/ui/styles";
 import {
   listarCategoriasPos,
   listarProductosPos,
   leerComboUpsellActivo,
+  leerConfigMostrador,
   type Categoria,
   type Producto,
 } from "../lib/catalogo";
@@ -15,10 +16,12 @@ import {
   reducerCarrito,
   estadoInicial,
   nuevoClientId,
+  lineaSuelta,
   lineasDeEdicion,
   admiteClienteCuenta,
   clienteIdParaTicket,
   calcularTotalesDisplay,
+  type EstadoCarrito,
   type LineaCarrito,
   type ModificadorSel,
   type EnvioCarrito,
@@ -26,12 +29,21 @@ import {
 } from "../lib/carrito";
 import { listarCombos, combosQueAdmiten, diferencialCombo, type ComboDef } from "../lib/combos";
 import { obtenerGruposDeProducto, type GrupoModificadores } from "../lib/modificadores";
-import { persistirTicket, leerTotales, cambiarZonaDePedido, ErrorEnvioNoFijado, ErrorTicketParcial, type TotalesTicket } from "../lib/cobro";
+import { fijarServicioTicket, persistirTicket, leerTotales, cambiarZonaDePedido, cerrarSiYaCubierta, cuentaYaCubierta, ErrorEnvioNoFijado, ErrorTicketParcial, type TotalesTicket } from "../lib/cobro";
 import { SidebarTicket } from "./sidebar-ticket";
 import { ModalModificadores } from "./modal-modificadores";
 import { ModalCombo } from "./modal-combo";
 import { HojaCombo } from "./hoja-combo";
 import { ModalCobro } from "./modal-cobro";
+import { SeccionCreditos } from "./seccion-creditos";
+import { SeccionCotizaciones } from "./seccion-cotizaciones";
+import { OverlayReciboCotizacion } from "./recibo-cotizacion";
+import { hoyMx } from "@vim/fecha";
+import { construirCotizacionJob } from "../lib/print/cotizacion-builder";
+import {
+  anotarPorMarcar, avisosConversion, enlaceWhatsappCotizacion, guardarCotizacion, leerCotizacion, leerEncabezado, lineasDeCotizacion,
+  marcarConvertida, marcarPendientes, estadoCotizar, textoWhatsappCotizacion, urlCotizacion, type Cotizacion, type Encabezado,
+} from "../lib/cotizaciones";
 import { CobroCompletado } from "./cobro-completado";
 import { ModalDescuento } from "./modal-descuento";
 import { obtenerImpresora, obtenerImpresoraDeEstacion } from "../lib/print/adapter";
@@ -57,6 +69,15 @@ import { PantallaMesas } from "./pantalla-mesas";
 import { PantallaReservaciones } from "./pantalla-reservaciones";
 import { PantallaConsultaCuentas } from "./pantalla-consulta-cuentas";
 import { PantallaDevoluciones } from "./pantalla-devoluciones";
+import { PantallaCambioTalla } from "./pantalla-cambio-talla";
+import { SeccionTransacciones } from "./seccion-transacciones";
+import { ModalReabrirCuenta } from "./modal-reabrir-cuenta";
+import { ModalCambiarPago } from "./modal-cambiar-pago";
+import { esVentaDeCambio } from "../lib/cambio-talla";
+import type { VentaDevolvible } from "../lib/devoluciones";
+import { SeccionInventario } from "./seccion-inventario";
+import { SeccionNotificaciones } from "./seccion-notificaciones";
+import { guardarAvisos, guardarVistas, leerAvisos, leerVistas, notificacionesTienda, sinVer, unirAvisos } from "../lib/notificaciones-tienda";
 import { PantallaPedidosApps } from "./pantalla-pedidos-apps";
 import { accionPedidoApp, hayExpiradosSinVer, leerExpiradosHoy, leerPedidosApps, type PedidoApp, type PedidoAppEstado } from "../lib/pedidos-apps";
 import {
@@ -65,8 +86,10 @@ import {
 } from "../lib/pedidos-en-linea";
 import { CapaPedidosTienda, type AccionTienda, type ListoTienda } from "./pedido-tienda";
 import { esEscritorio } from "../lib/actualizacion";
-import { useAcceso } from "./banda-acceso";
+import { BandaAcceso, BandaActualizacion, useAcceso } from "./banda-acceso";
 import { moduloActivo } from "@vim/db/operacion";
+import { etiquetaModo } from "@vim/db/modos-servicio";
+import { ModalServicioComida } from "./modal-servicio-comida";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalDescuentoItem } from "./modal-descuento-item";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
@@ -75,10 +98,28 @@ import { ModalAbrirCaja } from "./modal-abrir-caja";
 import { fijarContextoErrores, reportarErrorSinEsperar } from "../lib/reportar-error";
 import { BotonVolver } from "./boton-volver";
 import { CatalogoProductos } from "./catalogo-productos";
+import { PanelVentaRetail, type AvisoEscaneo } from "./venta-retail";
+import { comoTienda, esRopa, conBarraAbajo, destinosDe, esComidaRapida, globoPedidos, seccionDePedidos, seccionTrasLista, preguntaServicio, faltaPreguntarServicio, esBelleza, seccionInicial, puedeRecibirMercancia, leerExistencias, leerSucursales, pasoConLimite, puedeCambiarSeccion, renglonTienda, sinExistencia, type Existencia, type PadreTienda, type SeccionTienda } from "../lib/tienda";
+import { leerEstadoSync } from "../lib/estado-sync";
 import { ModalAgregarProductos } from "./modal-agregar-productos";
 import { ModalNumeroMesa } from "./modal-numero-mesa";
 import { MenuGeneral } from "./menu-general";
-import { PantallaInicio } from "./pantalla-inicio";
+import { ContenidoMenu } from "./contenido-menu";
+import { BarraTienda } from "./barra-tienda";
+import { AvisoVencidos, SeccionPedidos, tarjetasPedidos } from "./seccion-pedidos";
+import { useSoporte } from "../lib/soporte";
+import { enlaceWhatsapp } from "@vim/db/soporte";
+import { SeccionCalendario } from "./seccion-calendario";
+import { SeccionClientes } from "./seccion-clientes";
+import { ModalCita, type AbrirCita } from "./modal-cita";
+import { FichaCita } from "./ficha-cita";
+import { configCobroAgenda } from "../lib/anticipos";
+import { PanelEspera } from "./panel-espera";
+import { CitasCobro, ElegirColaborador } from "./citas-cobro";
+import { colaboradorDeLaCita, colaboradoresDelDia, lineasDeCita, nombreCorto, precioEnCaja, servicioSinColaborador, serviciosAgenda, type CitaDia, type ColaboradorDia, type ServicioAgenda } from "../lib/agenda";
+import { DialogoAvisos } from "./dialogo-avisos";
+import { avisosDe, leerDirectivas, type Aviso } from "../lib/directivas";
+import { BarraEstadoCaja, ConfirmarSalirCaja, PantallaInicio } from "./pantalla-inicio";
 import { Accion, PantallaCuentasModo } from "./pantalla-cuentas-modo";
 import { PantallaMonitorVentas } from "./pantalla-monitor-ventas";
 import { listarTicketsEnEspera, ponerTicketEnEspera, retomarTicketEnEspera } from "../lib/espera";
@@ -92,15 +133,16 @@ import { cacheGet, cachePut } from "../lib/outbox";
 import { claveCatalogo, esErrorDeRed } from "../lib/catalogo-cache";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
 import { capaVisible, type CapaEscape } from "../lib/escape";
-import { leerTicketImpreso, listarCuentasAbiertas } from "../lib/cuentas-abiertas";
+import { borrarCuentaVacia, contarCuentasDeMesa, leerTicketImpreso, listarCuentasAbiertas } from "../lib/cuentas-abiertas";
 import { abrirCuentaBarra, moverCuentaABarra, moverCuentaAMesa } from "../lib/cuenta-barra";
 import { useEscape } from "../lib/use-escape";
+import { aGranel } from "../lib/unidades";
 import { ModalAsignarRepartidor } from "./modal-asignar-repartidor";
 import type { LineaCancelada } from "./modal-cancelar-items";
 import { cerrarRepartoAlCobrar } from "../lib/delivery";
 import { registrarImpresionComanda, registrarReimpresionTicket, type OrigenReimpresionTicket, type RegistroComanda } from "../lib/impresiones";
 import { ModalReimprimirComanda } from "./modal-reimprimir-comanda";
-import { baseDeLealtad, franjaLealtad, type Programa } from "../lib/lealtad-reglas";
+import { baseDeLealtad, franjaLealtad, ofreceCanje, type Programa } from "../lib/lealtad-reglas";
 import { comprasQueSumanHoy, leerCanjeDelTicket, leerPrograma, leerSaldoLocal, type CanjeVivo, type SaldoCliente } from "../lib/lealtad";
 import { almacenLocal, borrarPendiente, leerPendiente, motivoNoCambiarCliente } from "../lib/lealtad-canje";
 import { revisarLealtadAntesDeCobrar } from "../lib/lealtad-cobro";
@@ -175,7 +217,8 @@ export function HomePos({
   >(null);
   const [enKds, setEnKds] = useState(false);
   // El POS arranca en la pantalla de inicio: el cajero elige primero a qué viene.
-  const [enInicio, setEnInicio] = useState(true);
+  // Una tienda (y la caja de belleza, y la de comida rápida) no: su barra inferior reemplaza al inicio.
+  const [enInicio, setEnInicio] = useState(() => !conBarraAbajo(caja));
   const [enMonitor, setEnMonitor] = useState(false);
   const [cuentasAbiertas, setCuentasAbiertas] = useState<CuentasAbiertasPorModo>({ comedor: 0, pickup: 0, domicilio: 0, barra: 0 });
   const [enMesas, setEnMesas] = useState(false);
@@ -198,6 +241,18 @@ export function HomePos({
   /** Ticket abierto que es cuenta de barra: solo para rotularlo «Barra» (el carrito lo ve como comedor). */
   const [cuentaBarraId, setCuentaBarraId] = useState<string | null>(null);
   const [enDevoluciones, setEnDevoluciones] = useState(false);
+  /** Tienda: «Créditos» abierto dentro de «Más» (quién debe y abonos). */
+  const [enCreditos, setEnCreditos] = useState(false);
+  /** Tienda: «Cotizaciones» abierto dentro de «Más». */
+  const [enCotizaciones, setEnCotizaciones] = useState(false);
+  /** La vista de una cotización (al guardarla o al reimprimirla), con el encabezado del papel. */
+  const [vistaCotizacion, setVistaCotizacion] = useState<{ c: Cotizacion; e: Encabezado } | null>(null);
+  /** Franja del Panel: lo que cambió al convertir una cotización, o cómo armar una nueva. */
+  const [avisoCotizacion, setAvisoCotizacion] = useState<string | null>(null);
+  const [guardandoCotizacion, setGuardandoCotizacion] = useState(false);
+  /** Llave del guardado: se reusa si el intento falla, así un reintento no duplica la cotización. */
+  const llaveCotizacion = useRef<string | null>(null);
+  const encabezadoCotizacion = useRef<Encabezado | null>(null);
   // ADR 0011 — pedidos de apps de delivery: pantalla, badge del inicio y sonido al llegar uno nuevo.
   const [enPedidosApps, setEnPedidosApps] = useState(false);
   const [nPedidosApps, setNPedidosApps] = useState(0);
@@ -206,11 +261,14 @@ export function HomePos({
   // Add-on de delivery: el módulo manda sobre la pantalla y sobre el badge. `useAcceso` ya lee
   // las directivas para la banda de gracia y el bloqueo (ADR 0014); se reutiliza esa lectura en
   // vez de abrir una consulta nueva solo para saber si el módulo está prendido.
-  const { modulos } = useAcceso();
+  const acceso = useAcceso();
+  const { modulos } = acceso;
   const hayDelivery = modulos?.delivery_apps === true;
   // Tienda en línea propia: comparte pantalla, sondeo y timbre con las apps («Pedidos en línea»).
   const hayTienda = modulos?.tienda === true;
   const hayEnLinea = hayDelivery || hayTienda;
+  /** Caja de belleza con la agenda encendida: Calendario y Clientes. Sin el módulo es una caja de tienda. */
+  const agenda = esBelleza(caja) && moduloActivo(modulos, "agenda");
   const ultimoTimbre = useRef<number | null>(null);
   /** Hasta cuándo timbrar por lo que este dispositivo puede aceptar (`timbrarHasta`); null = nada. */
   const timbreHasta = useRef<number | null>(null);
@@ -282,9 +340,10 @@ export function HomePos({
   const [categorias, setCategorias] = useState<Categoria[] | null>(null);
   const [productos, setProductos] = useState<Producto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [carrito, dispatch] = useReducer(reducerCarrito, estadoInicial);
+  // Una tienda (o comida rápida) no tiene inicio: abre directo en la venta (modo Para llevar), pos-retail.md «Versión 2».
+  const [carrito, dispatch] = useReducer(reducerCarrito, estadoInicial, (e) => (conBarraAbajo(caja) ? { ...e, modoServicio: "PARA_LLEVAR" as const } : e));
   // `edicion`: el renglón del ticket que se reabrió para cambiarle los modificadores.
-  const [modGrupos, setModGrupos] = useState<{ producto: Producto; grupos: GrupoModificadores[]; edicion?: LineaCarrito } | null>(null);
+  const [modGrupos, setModGrupos] = useState<{ producto: Producto; grupos: GrupoModificadores[]; edicion?: LineaCarrito; /** La pesada de la tienda: entra con esta cantidad. */ cantidad?: number } | null>(null);
   // ADR 0015 — combos: catálogo de defs con slots resueltos, y el drawer de armado abierto (si hay).
   const [combos, setCombos] = useState<ComboDef[]>([]);
   const [comboAbierto, setComboAbierto] = useState<{ combo: ComboDef; linea?: LineaCarrito | null; preset?: { producto: Producto; modificadores: ModificadorSel[]; notaCocina?: string | null } | null } | null>(null);
@@ -311,7 +370,7 @@ export function HomePos({
   // no lanza otra revisión ni abre el cajón dos veces. Es un ref y no estado porque dos toques
   // seguidos pueden llegar antes de que React vuelva a pintar el botón apagado.
   const revisandoCobro = useRef(false);
-  const [confirmacion, setConfirmacion] = useState<{ folio: string | null; cambio: number; total: number | null } | null>(null);
+  const [confirmacion, setConfirmacion] = useState<{ folio: string | null; cambio: number; total: number | null; aCredito?: boolean } | null>(null);
   /**
    * El cambio de la venta anterior, para el encabezado del ticket nuevo. "Cobro completado" se
    * cierra solo a los 5 s, y a veces la cajera todavía está contando el dinero: así no lo pierde.
@@ -348,18 +407,28 @@ export function HomePos({
   const ticketClientIdRef = useRef<string | null>(null);
   const idTicketDelCarrito = (): string => (ticketClientIdRef.current ??= nuevoClientId());
   /** Guarda el carrito como ticket (abrir, renglones y envío). Reintentable: lleva el mismo id local. */
-  const persistirCarrito = () =>
-    persistirTicket(
+  // `c`: comida rápida guarda el carrito recién elegido en «¿Para llevar o comer aquí?», que todavía
+  // no llega al estado de React cuando se llama.
+  const persistirCarrito = (c: EstadoCarrito = carrito) => {
+    // Belleza: un servicio sin quien lo hizo no se cobra (su comisión no tendría dueño).
+    if (agenda && c.lineas.length > 0 && !servicioIdsRef.current) {
+      return Promise.reject(new Error("Todavía no se leen los servicios de la agenda: revisa la conexión en «Citas de hoy» y vuelve a intentar."));
+    }
+    const falta = agenda && servicioIdsRef.current ? servicioSinColaborador(c.lineas, servicioIdsRef.current) : undefined;
+    if (falta) return Promise.reject(new Error(`Elige quién hizo «${falta.producto.nombre}» antes de cobrar.`));
+    return persistirTicket(
       { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
-      carrito.modoServicio,
-      carrito.lineas,
+      c.modoServicio,
+      c.lineas,
       idTicketDelCarrito(),
-      clienteIdParaTicket(carrito),
-      carrito.clienteDomicilio?.direccionId ?? null,
-      carrito.notaOrden ?? null,
-      carrito.nombreCuenta ?? null,
-      carrito.envio?.zonaId ?? null,
+      clienteIdParaTicket(c),
+      c.clienteDomicilio?.direccionId ?? null,
+      c.notaOrden ?? null,
+      c.nombreCuenta ?? null,
+      c.envio?.zonaId ?? null,
+      c.citaId ?? null,
     );
+  };
   /**
    * El `ticketBd` adoptado tras un `ErrorTicketParcial` que NO es de envío: el ticket existe pero le
    * falta algo (un renglón, la nota…). Mientras sea `true` el carrito sigue bloqueado —para que el
@@ -387,6 +456,8 @@ export function HomePos({
   const [clienteDomAbierto, setClienteDomAbierto] = useState(false);
   // Cliente (opcional) de la cuenta en Comedor, Para llevar y Pick-up. Ver ModalClienteCuenta.
   const [clienteCuentaAbierto, setClienteCuentaAbierto] = useState(false);
+  /** Comida rápida: «¿Para llevar o comer aquí?» abierta al presionar Cobrar (o solo el nombre). */
+  const [preguntaCobro, setPreguntaCobro] = useState<{ tipo: "PREGUNTA" | "NOMBRE"; atajo: "EFECTIVO_EXACTO" | null } | null>(null);
   // Task 7 — cambiar la zona de reparto de ESTE pedido desde el renglón de envío del ticket
   // lateral (no reabre la búsqueda de cliente ni toca `direcciones_cliente`).
   const [zonaPedidoAbierto, setZonaPedidoAbierto] = useState(false);
@@ -560,6 +631,227 @@ export function HomePos({
     };
   }, [recargarCatalogo]);
 
+  // ── Venta de tienda (giro RETAIL): solo cambia el panel izquierdo de la captura en Para llevar.
+  // Un restaurante no pasa por nada de esto (pos-retail.md). La caja de belleza es la de tienda con
+  // su barra (Calendario · Cobrar · Clientes · Transacciones · Más) y abre en el calendario.
+  const tienda = comoTienda(caja);
+  /**
+   * Navegación de tienda (barra abajo, sin inicio): la tienda y comida rápida. Comida rápida cobra
+   * como restaurante: `tienda` (ticket «Venta», sin comanda, panel de tienda) sigue apagado para ella.
+   */
+  const barraAbajo = conBarraAbajo(caja);
+  const comidaRapida = esComidaRapida(caja);
+  // Mostrador de comida rápida (0242). `null` mientras se lee: el cobro no se abre hasta que termine
+  // (si no, un food truck con dónde comer cobraría PARA_LLEVAR sin preguntar). Si la lectura falla,
+  // todo apagado (el default de la base), pero ya leída.
+  const [configMostrador, setConfigMostrador] = useState<{ pedirNombre: boolean; tieneDondeComer: boolean } | null>(null);
+  useEffect(() => {
+    if (!comidaRapida) return;
+    let vivo = true;
+    void leerConfigMostrador(token)
+      .catch(() => ({ pedirNombre: false, tieneDondeComer: false }))
+      .then((c) => { if (vivo) setConfigMostrador(c); });
+    return () => { vivo = false; };
+  }, [comidaRapida, token]);
+  const seccionInicio = seccionInicial(caja, agenda);
+  /** La cuenta cargada es la venta de un cambio: no se le ofrece canje de lealtad (como no suma, 0200).
+   *  `null` mientras se lee o si falla la lectura: tampoco se ofrece. */
+  const [ventaDeCambio, setVentaDeCambio] = useState<boolean | null>(false);
+  useEffect(() => {
+    if (!tienda || !lealtadActiva || !ticketBdId) { setVentaDeCambio(false); return; }
+    let vivo = true;
+    setVentaDeCambio(null);
+    esVentaDeCambio(token, ticketBdId).then((s) => { if (vivo) setVentaDeCambio(s); }).catch(() => { if (vivo) setVentaDeCambio(null); });
+    return () => { vivo = false; };
+  }, [tienda, lealtadActiva, ticketBdId, token]);
+  // Transacciones: «Reabrir» y «Cambiar pago» abren los modales de Cuentas cobradas.
+  const [reabriendoTx, setReabriendoTx] = useState<VentaDevolvible | null>(null);
+  const [cambiandoPagoTx, setCambiandoPagoTx] = useState<VentaDevolvible | null>(null);
+  const [txVersion, setTxVersion] = useState(0);
+  /**
+   * Sección de la barra inferior de la tienda. El Panel (la venta) nunca se desmonta al cambiar:
+   * solo se oculta, así el carrito, el ticket guardado y la fila de agregados siguen donde estaban.
+   */
+  const [seccionTienda, setSeccionTienda] = useState<SeccionTienda>(() => seccionInicial(caja, agenda));
+  // Comida rápida no tiene inicio: los conteos del inicio se leen mientras «Pedidos» (en la cafetería, «Más») está a la vista.
+  const viendoPedidos = seccionTienda === seccionDePedidos(caja);
+  /** Cafetería: sin «Pedidos» en la barra, sus tarjetas van en «Más». */
+  const pedidosEnMas = comidaRapida && seccionDePedidos(caja) === "configuracion";
+  const conExistencias = moduloActivo(modulos, "existencias");
+  // El aviso de Inventario sin existencias nombra «Ayuda por WhatsApp» solo si Más la enseña (mismo criterio que ContenidoMenu).
+  const waSoporte = enlaceWhatsapp(useSoporte().soporte.whatsapp, "") != null;
+  const [nCuentasMesa, setNCuentasMesa] = useState(0);
+  // Sube al volver de una lista a «Pedidos»: los conteos se releen en ese momento, sin esperar al sondeo.
+  const [pedidosVersion, setPedidosVersion] = useState(0);
+  // Agenda de belleza: la ficha de una cita, la cita nueva o en edición, la lista de espera, y la
+  // versión que relee el calendario al guardar, mover o cancelar.
+  const [fichaCita, setFichaCita] = useState<string | null>(null);
+  /** La ficha abre ofreciendo el anticipo de la cita recién agendada. */
+  const [ofrecerAnticipo, setOfrecerAnticipo] = useState(false);
+  const [modalCita, setModalCita] = useState<AbrirCita | null>(null);
+  const [esperaAgendaAbierta, setEsperaAgendaAbierta] = useState(false);
+  const [agendaVersion, setAgendaVersion] = useState(0);
+  const agendaCambio = useCallback(() => setAgendaVersion((v) => v + 1), []);
+  // Cobrar de belleza (entrega 2): pestaña del lado izquierdo, servicios y colaboradores activos de la
+  // sucursal (para el precio y el nombre del renglón) y el renglón al que se le elige quién lo hizo.
+  const [pestanaCobro, setPestanaCobro] = useState<"citas" | "servicios" | "productos">("citas");
+  // null = todavía no se leen (o falló): la guarda de colaborador falla cerrada y «Citas de hoy» lo dice.
+  const [serviciosCobro, setServiciosCobro] = useState<ServicioAgenda[] | null>(null);
+  const [colaboradoresCobro, setColaboradoresCobro] = useState<ColaboradorDia[] | null>(null);
+  const [errorAgendaCobro, setErrorAgendaCobro] = useState<string | null>(null);
+  const [eligiendoColaborador, setEligiendoColaborador] = useState<string | null>(null);
+  /** Servicio que se agrega a una venta ya guardada sin saber quién lo hizo: se pregunta antes de guardarlo. */
+  const [servicioPorAgregar, setServicioPorAgregar] = useState<{ producto: Producto; mods: ModificadorSel[]; nota: string | null; cantidad: number } | null>(null);
+  useEffect(() => {
+    if (!agenda) return;
+    let vivo = true;
+    Promise.all([serviciosAgenda(token), colaboradoresDelDia(token, caja.sucursal_id, hoyMx())])
+      .then(([s, c]) => { if (vivo) { setServiciosCobro(s); setColaboradoresCobro(c); setErrorAgendaCobro(null); } })
+      .catch((e) => { if (vivo) setErrorAgendaCobro(`No se pudieron leer los servicios y colaboradores: ${e instanceof Error ? e.message : "sin conexión"}. Sin ellos no se cobran servicios.`); });
+    return () => { vivo = false; };
+  }, [agenda, token, caja.sucursal_id, agendaVersion]);
+  const servicioIds = useMemo(() => new Set((serviciosCobro ?? []).map((s) => s.productoId)), [serviciosCobro]);
+  // Los usan `persistirCarrito` y la fila de agregados, que pueden correr con un cierre viejo.
+  const servicioIdsRef = useRef<ReadonlySet<string> | null>(null);
+  servicioIdsRef.current = serviciosCobro ? servicioIds : null;
+  /**
+   * Lo agregado a mano lo hizo el colaborador de la cita cargada (o, sin ella, el del primer servicio de la
+   * venta), con su precio; se cambia en el renglón. Sale de los renglones: también sirve con la venta guardada.
+   */
+  const delColaboradorDeLaCita = useRef((p: Producto): Pick<LineaCarrito, "producto" | "colaboradorId"> => ({ producto: p }));
+  // `recargarCuenta` relee la venta guardada sin la cita: la conserva para que lo agregado siga siendo de ella.
+  const citaIdRef = useRef<string | null>(null);
+  citaIdRef.current = carrito.citaId ?? null;
+  delColaboradorDeLaCita.current = (p) => {
+    const colab = agenda ? colaboradorDeLaCita(carrito, servicioIds) : undefined;
+    if (!colab) return { producto: p };
+    return { producto: { ...p, precio_base_mxn: precioEnCaja(p, serviciosCobro?.find((s) => s.productoId === p.id), colab) }, colaboradorId: colab };
+  };
+  /** Tocar una cita de «Termina pronto»: la venta pasa a ser la suya, con su clienta. Con otra venta, pregunta antes. */
+  const cargarCita = (c: CitaDia) => {
+    if (carrito.citaId === c.id || !colaboradoresCobro || !serviciosCobro) return;
+    const activos = new Set(colaboradoresCobro.map((x) => x.usuarioId));
+    const cargar = () => {
+      const { lineas, faltan } = lineasDeCita(c, productos ?? [], serviciosCobro, activos);
+      if (lineas.length === 0) { setError("Ningún servicio de esta cita se vende hoy: revisa el catálogo."); return; }
+      nuevoTicket(); // «Cobro completado» y el recibo de la venta anterior se cierran
+      setUltimoTienda(null);
+      dispatch({
+        tipo: "cargar_cita", citaId: c.id, lineas, nombre: c.clienteNombre,
+        cliente: c.clienteId ? { clienteId: c.clienteId, nombre: c.clienteNombre, telefono: c.clienteTelefono } : null,
+      });
+      setError(faltan.length ? `No se cargó ${faltan.join(", ")}: ya no se vende.` : null);
+    };
+    if (ticketBd || carrito.lineas.length > 0) conVentaSuelta(cargar)();
+    else cargar();
+  };
+  /** Quién hizo un renglón: su precio se recalcula como lo hará la base (el propio del colaborador o el del catálogo). */
+  const fijarColaborador = (clientId: string, usuarioId: string | null) => {
+    const l = carrito.lineas.find((x) => x.clientId === clientId);
+    setEligiendoColaborador(null);
+    if (!l) return;
+    const p = productos?.find((x) => x.id === l.producto.id) ?? l.producto;
+    dispatch({ tipo: "fijar_colaborador", clientId, colaboradorId: usuarioId, precio: precioEnCaja(p, serviciosCobro?.find((s) => s.productoId === p.id), usuarioId) });
+  };
+  // El módulo puede llegar después (primera lectura de directivas) o apagarse con la caja abierta:
+  // se va a la sección de inicio que toque si se está en una que ya no es de esta barra.
+  useEffect(() => {
+    setSeccionTienda((s) => (!agenda && (s === "calendario" || s === "clientes") ? "panel" : agenda && s === "panel" ? "calendario" : s));
+    // Apagada, sus capas se cierran: si no, se quedarían «abiertas» en la pila sin pintarse.
+    if (!agenda) { setFichaCita(null); setModalCita(null); setEsperaAgendaAbierta(false); setEligiendoColaborador(null); setServicioPorAgregar(null); }
+  }, [agenda]);
+  /** Salir de la venta desde «Más» (bloquear, cambiar cajero, cerrar turno, salir) con productos sin guardar. */
+  const [confirmar, dialogoConfirmar] = useConfirmar();
+  const [confirmandoVenta, setConfirmandoVenta] = useState(false);
+  /** «Salir» de la caja: la tienda no tiene inicio, así que vive en «Más». Solo con el preload de escritorio. */
+  const [salirCajaAbierto, setSalirCajaAbierto] = useState(false);
+  const [puedeSalir, setPuedeSalir] = useState(false);
+  useEffect(() => { setPuedeSalir(typeof window.__VIM_SALIR === "function"); }, []);
+  /** Avisos de VIM: el inicio los enseña al entrar; la tienda, que no tiene inicio, aquí. */
+  const [avisosVim, setAvisosVim] = useState<Aviso[] | null>(null);
+  /**
+   * Los mismos avisos, que el diálogo de entrada vacía al cerrarse: Notificaciones los conserva para
+   * releerlos. La nube ya no manda los que esta caja acusó, así que se unen con los guardados (R7).
+   */
+  const [avisosTodos, setAvisosTodos] = useState<Aviso[]>([]);
+  useEffect(() => {
+    if (!barraAbajo) return;
+    let vivo = true;
+    const guardados = leerAvisos(turno.caja_id);
+    setAvisosTodos(unirAvisos(guardados, []));
+    leerDirectivas().then((d) => {
+      if (!vivo) return;
+      const a = avisosDe(d);
+      const todos = unirAvisos(guardados, a);
+      setAvisosVim(a);
+      setAvisosTodos(todos);
+      guardarAvisos(turno.caja_id, todos);
+    }).catch(() => {});
+    return () => { vivo = false; };
+  }, [barraAbajo, turno.caja_id]);
+  const capturaTienda = tienda && carrito.modoServicio === "PARA_LLEVAR" && !cerrando && !enInicio && !enKds && !enMonitor
+    && !enConsultaCuentas && !enDevoluciones && !enPedidosApps && !enDelivery && !enPickup && !enMesas && !enBarra;
+  /** Selector de talla y color abierto y franja del escáner: estado de aquí para que su Escape viva en la pila. */
+  const [selectorRetail, setSelectorRetail] = useState<PadreTienda | null>(null);
+  const [cantidadRetail, setCantidadRetail] = useState<Producto | null>(null);
+  const [avisoRetail, setAvisoRetail] = useState<AvisoEscaneo | null>(null);
+  /** Pantalla «Cambio de talla» (pos-retail.md): se entra desde la cabecera o el ticket vacío. */
+  const [enCambioTalla, setEnCambioTalla] = useState(false);
+  /** La venta elegida en Transacciones: Devolver o Cambio de talla arrancan con ella. */
+  const [ventaElegida, setVentaElegida] = useState<string | null>(null);
+  /** Transacciones con resultados de búsqueda: cómo cerrarlos (Escape regresa a «Ventas del turno»). */
+  const [cerrarBusquedaTx, setCerrarBusquedaTx] = useState<(() => void) | null>(null);
+  /** Inventario con una consulta a la vista (matriz o lista por sucursal): cómo cerrarla. */
+  const [cerrarConsultaInv, setCerrarConsultaInv] = useState<(() => void) | null>(null);
+  /** Venta nueva de un cambio con saldo: al cargarse en el carrito se abre su cobro. */
+  const [cobrarCambio, setCobrarCambio] = useState<string | null>(null);
+  const [existencias, setExistencias] = useState<Existencia[] | null>(null);
+  /** Notificaciones (decisión 4): ids ya vistos en esta caja; `null` = aún no se leyeron (el globo no cuenta). */
+  const [vistas, setVistas] = useState<string[] | null>(null);
+  const [productoInventario, setProductoInventario] = useState<string | null>(null);
+  const notificaciones = useMemo(
+    () => (barraAbajo ? notificacionesTienda(existencias, productos ?? [], caja.sucursal_id, avisosTodos) : []),
+    [barraAbajo, existencias, productos, caja.sucursal_id, avisosTodos],
+  );
+  useEffect(() => { if (barraAbajo) setVistas(leerVistas(turno.caja_id)); }, [barraAbajo, turno.caja_id]);
+  // Abrir la pestaña marca como visto lo que está en la lista, y lo que llegue mientras está abierta.
+  useEffect(() => {
+    if (!barraAbajo || seccionTienda !== "notificaciones") return;
+    const ids = notificaciones.map((n) => n.id);
+    setVistas(ids);
+    guardarVistas(turno.caja_id, ids);
+  }, [barraAbajo, seccionTienda, notificaciones, turno.caja_id]);
+  /** Producto del último agregado: su renglón queda marcado hasta la siguiente acción. */
+  const [ultimoTienda, setUltimoTienda] = useState<string | null>(null);
+  const [sucursalesTienda, setSucursalesTienda] = useState<{ id: string; nombre: string }[]>([]);
+  /** Hora del último pull de la caja instalada; `null` en el POS web (lee la nube «al momento»). */
+  const [actualizadoA, setActualizadoA] = useState<string | null>(null);
+  useEffect(() => {
+    if (!barraAbajo) return;
+    let vivo = true;
+    leerSucursales(token).then((s) => { if (vivo) setSucursalesTienda(s); }).catch(() => { /* sin la fila de sucursales, solo se ve la propia */ });
+    return () => { vivo = false; };
+  }, [barraAbajo, token]);
+  // Comida rápida no lleva existencias en la venta (su captura es la de restaurante), pero con el módulo
+  // se leen igual: Inventario y las alertas de Notificaciones (y su globo) las necesitan.
+  const leerExistenciasAhora = capturaTienda || (comidaRapida && conExistencias);
+  // Existencias al entrar a la venta, tras cada cobro (`cuentasVersion` sube al pagar) y cada 60 s.
+  // Si una lectura falla se quedan las de antes: una cifra de hace un minuto sirve más que ninguna.
+  useEffect(() => {
+    if (!leerExistenciasAhora) return;
+    let vivo = true;
+    const leer = () => {
+      leerExistencias(token).then((x) => { if (vivo) setExistencias(x); }).catch(() => {});
+      leerEstadoSync().then((e) => { if (vivo) setActualizadoA(e.disponible ? e.ultimoPull ?? "" : null); });
+    };
+    leer();
+    const id = setInterval(leer, 60_000);
+    return () => { vivo = false; clearInterval(id); };
+  }, [leerExistenciasAhora, token, cuentasVersion]);
+  useEffect(() => {
+    if (!capturaTienda) { setSelectorRetail(null); setCantidadRetail(null); setAvisoRetail(null); setUltimoTienda(null); }
+  }, [capturaTienda]);
+
   // El escritorio avisa cuando termina de bajar un menú nuevo (sondeo del minuto o botón
   // "Actualizar menú"). Se relee en el sitio, sin recargar la página: el carrito, la cuenta de
   // mesa abierta y el turno siguen donde estaban. Un fallo aquí se traga a propósito — que no se
@@ -629,6 +921,68 @@ export function HomePos({
     }
   }, [cerrarRecibo, enModoMesa, retomadoEspera, token, turno.caja_id]);
 
+  /**
+   * Tienda: suelta la cuenta guardada que está en el Panel sin cobrarla ni cancelarla. Queda abierta
+   * (en Transacciones) o, si se había retomado de espera, vuelve a espera. El Panel queda en una venta
+   * nueva. También suelta la cuenta que se guardó al abrir un cobro, que no entra en «modo cuenta».
+   */
+  const dejarCuentaAbierta = useCallback(() => {
+    salirNavegacion();
+    dispatch({ tipo: "limpiar" });
+    dispatch({ tipo: "modo", modo: "PARA_LLEVAR" });
+    setTicketBd(null);
+    setItemsPersistidos([]);
+    setEnModoMesa(false);
+    setCocinaEnviada(false);
+    setCuentaImpresa(false);
+    setCuentaBarraId(null);
+    setTicketIncompleto(false);
+    setUltimoTienda(null);
+  }, [salirNavegacion]);
+
+  /**
+   * Tienda: antes de dejar la venta desde «Más». Una cuenta guardada se suelta; productos sin
+   * guardar se borran solo si el cajero lo confirma. `false` = se queda donde estaba.
+   */
+  const soltarVentaTienda = useCallback(async (): Promise<boolean> => {
+    if (ticketBd) { dejarCuentaAbierta(); return true; }
+    const n = carrito.lineas.reduce((s, l) => s + l.cantidad, 0);
+    if (n === 0) return true;
+    setConfirmandoVenta(true);
+    const ok = await confirmar({
+      titulo: "¿Salir de la venta?",
+      mensaje: `Se borra la venta sin guardar (${n} ${n === 1 ? "producto" : "productos"}).`,
+      boton: "Borrar la venta",
+    });
+    setConfirmandoVenta(false);
+    if (ok) dispatch({ tipo: "limpiar" });
+    return ok;
+  }, [ticketBd, carrito.lineas, dejarCuentaAbierta, confirmar]);
+  const conVentaSuelta = (fn: () => void) => () => { void soltarVentaTienda().then((ok) => { if (ok) fn(); }); };
+
+  /** Inventario · Recibir: renglones capturados sin recibir. Salir de la sección o de la pestaña los tira. */
+  const recepcionPendiente = useRef(0);
+  const confirmarDescarteRecepcion = useCallback(async (n: number): Promise<boolean> => {
+    setConfirmandoVenta(true); // mientras pregunta, Escape no navega: lo atiende el diálogo
+    const ok = await confirmar({
+      titulo: "¿Descartar la recepción?",
+      mensaje: `Llevas ${n} ${n === 1 ? "producto capturado" : "productos capturados"}.`,
+      boton: "Descartar",
+    });
+    setConfirmandoVenta(false);
+    return ok;
+  }, [confirmar]);
+  /** Cambio de sección de la tienda: con una recepción a medias, pregunta antes de salir de Inventario. */
+  const irASeccion = useCallback(async (destino: SeccionTienda) => {
+    const n = recepcionPendiente.current;
+    if (destino !== "inventario" && n > 0 && !(await confirmarDescarteRecepcion(n))) return;
+    setSeccionTienda(destino);
+    setEnCreditos(false); // tocar «Más» otra vez vuelve a su menú
+    setEnCotizaciones(false);
+    // Comida rápida: volver a «Cobrar» sin venta guardada y con el carrito vacío es una venta de mostrador.
+    if (destino === "panel" && comidaRapida && !ticketBd) dispatch({ tipo: "volver_a_mostrador" });
+  }, [confirmarDescarteRecepcion, comidaRapida, ticketBd]);
+
   // Se cobró, se canceló o se volvió a poner en espera a mano: el ticket ya no está en pantalla y
   // no hay nada que devolver a espera.
   useEffect(() => {
@@ -642,22 +996,26 @@ export function HomePos({
     setEnPickup(volverA === "pickup");
     setEnDelivery(volverA === "domicilio");
     setEnBarra(volverA === "barra");
-    setEnInicio(volverA === "inicio");
-  }, [salirNavegacion, volverA]);
+    setEnInicio(!barraAbajo && volverA === "inicio");
+  }, [salirNavegacion, volverA, barraAbajo]);
 
   /** Vuelve a la pantalla de inicio dejando la caja limpia (sale de la cuenta de mesa si la hubiera). */
   const volverAlInicio = useCallback(() => {
-    salirNavegacion();
+    // La tienda vuelve a su barra, no a un inicio: el ticket del Panel sigue ahí y no se suelta
+    // (a estas pantallas se entra desde «Más», con la venta a medias detrás).
+    if (!barraAbajo) salirNavegacion();
     setEnMesas(false);
     setEnPickup(false);
     setEnDelivery(false);
     setEnBarra(false);
     setEnConsultaCuentas(false);
     setEnDevoluciones(false);
+    setEnCambioTalla(false);
     setEnPedidosApps(false);
     setEnMonitor(false);
-    setEnInicio(true);
-  }, [salirNavegacion]);
+    // Una tienda regresa a su barra inferior, en la sección donde estaba (p. ej. «Más» tras el corte X).
+    setEnInicio(!barraAbajo);
+  }, [salirNavegacion, barraAbajo]);
 
   /**
    * El mapa de mesas y las reservaciones viven SOLO dentro de la rama de listas (Comedor, Para
@@ -718,7 +1076,7 @@ export function HomePos({
         reconstruirCarrito(token, tId, productos ?? [], combos),
         leerItemsPersistidos(token, tId).catch(() => [] as ItemTicket[]),
       ]);
-      dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas, envio: recon.envio, clienteCuenta: recon.clienteCuenta } });
+      dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas, envio: recon.envio, clienteCuenta: recon.clienteCuenta, ...(citaIdRef.current ? { citaId: citaIdRef.current } : {}) } });
       setTicketBd(bd);
       // Un renglón agregado después del primer envío deja el botón habilitado otra vez: si no,
       // lo nuevo se queda sin mandar y la cocina nunca se entera.
@@ -738,15 +1096,22 @@ export function HomePos({
 
   /** Agrega el producto suelto, sin ofrecer combo: mesa (llama al servidor) o venta rápida (reducer). */
   const agregarSuelto = useCallback(
-    async (p: Producto, mods: ModificadorSel[], nota: string | null) => {
+    async (p: Producto, mods: ModificadorSel[], nota: string | null, cantidad = 1, colaboradorElegido?: string) => {
+      const deBelleza = delColaboradorDeLaCita.current(p);
       if (ticketBd) {
-        await agregarItemAlTicket(token, { ticketId: ticketBd.ticketId, productoId: p.id, cantidad: 1, modificadores: mods, nota });
+        const colaboradorId = colaboradorElegido ?? deBelleza.colaboradorId;
+        // Belleza: un servicio nunca se guarda sin quien lo hizo (después ya no se puede cambiar).
+        if (agenda && !colaboradorId) {
+          if (!servicioIdsRef.current) throw new Error("Todavía no se leen los servicios de la agenda: revisa la conexión en «Citas de hoy».");
+          if (servicioIdsRef.current.has(p.id)) { setServicioPorAgregar({ producto: p, mods, nota, cantidad }); return; }
+        }
+        await agregarItemAlTicket(token, { ticketId: ticketBd.ticketId, productoId: p.id, cantidad, modificadores: mods, nota, ...(colaboradorId ? { colaboradorId } : {}) });
         await recargarCuenta();
         return;
       }
-      dispatch({ tipo: "agregar", linea: { clientId: nuevoClientId(), producto: p, cantidad: 1, modificadores: mods, notaCocina: nota } });
+      dispatch({ tipo: "agregar", linea: { ...lineaSuelta(p, mods, nota, cantidad), ...deBelleza } });
     },
-    [ticketBd, token, recargarCuenta],
+    [ticketBd, token, recargarCuenta, agenda],
   );
 
   /** Decide entre ofrecer "¿Lo hacemos combo?" o agregar el producto suelto de una vez (spec §6.5). */
@@ -784,6 +1149,47 @@ export function HomePos({
   );
 
   /**
+   * Agregar en la venta de tienda: la ruta de `agregarSuelto`, sin combo ni hoja «¿Lo hacemos
+   * combo?». Con grupos de modificadores sigue el camino de siempre. Un padre nunca entra al ticket
+   * (la base lo rechaza con PRODUCTO_CON_VARIANTES). La misma pieza otra vez suma a su renglón; a
+   * granel llega con su cantidad y cada pesada es su propio renglón.
+   *
+   * Los agregados van en FILA (`colaTienda`): dos escaneos rápidos con una cuenta guardada harían
+   * dos `agregar_item_a_ticket` y dos relecturas cruzadas, y la que llega última podía pintar 1.
+   * En fila, cada pieza entra y se relee antes de la siguiente.
+   */
+  const colaTienda = useRef<Promise<void>>(Promise.resolve());
+  const agregarTienda = useCallback(
+    (p: Producto, cantidad = 1) => {
+      if (p.variante_ejes?.length) return;
+      setSelectorRetail(null);
+      // Agotado a mano en la sucursal: no entra, como en el restaurante (R7). El agotado por
+      // existencia en cero sí se vende.
+      if (p.agotado) { setAvisoRetail({ tipo: "no-se-vende" }); return; }
+      setAvisoRetail(null);
+      // Cada paso tiene 8 s: si la red se cuelga, el aviso sale y la fila sigue con la pieza
+      // siguiente; la respuesta tardía ya no agrega esta (`vigente`). Un agregado a la cuenta
+      // guardada que ya salió no se puede retirar: si la base lo guardó, aparece al releer.
+      colaTienda.current = colaTienda.current.then(async () => {
+        try {
+          const aTiempo = await pasoConLimite(async (vigente) => {
+            const grupos = await obtenerGruposDeProducto(token, p.id);
+            if (!vigente()) return;
+            if (grupos.length > 0) { setModGrupos({ producto: p, grupos, ...(aGranel(p.tipoVenta) ? { cantidad } : {}) }); return; }
+            if (ticketBd) await agregarSuelto(p, [], null, cantidad);
+            else dispatch({ tipo: "agregar", sumarSiIgual: !aGranel(p.tipoVenta), linea: { clientId: nuevoClientId(), cantidad, modificadores: [], notaCocina: null, ...delColaboradorDeLaCita.current(p) } });
+            if (vigente()) setUltimoTienda(p.id);
+          });
+          if (!aTiempo) setError(`No se pudo agregar ${p.nombre}: la conexión tardó demasiado. Vuelve a escanearla.`);
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "No se pudo agregar el producto");
+        }
+      });
+    },
+    [token, ticketBd, agregarSuelto],
+  );
+
+  /**
    * Guarda la edición de un renglón de la cuenta de mesa: la base cancela el renglón (motivo
    * EDITADO) y pone en su lugar las mismas líneas que el carrito local pondría en pantalla.
    */
@@ -809,6 +1215,7 @@ export function HomePos({
       if (!modGrupos) return;
       const prod = modGrupos.producto;
       const edicion = modGrupos.edicion;
+      const pesada = modGrupos.cantidad;
       setModGrupos(null);
       if (edicion) {
         // Edición de un renglón ya capturado: no se ofrece combo, solo se cambia (o se separa).
@@ -818,12 +1225,14 @@ export function HomePos({
         return;
       }
       try {
-        await ofrecerCombo(prod, mods, nota);
+        // Una pesada no ofrece combo: entra suelta con su cantidad (también a la cuenta guardada).
+        if (pesada !== undefined) await agregarSuelto(prod, mods, nota, pesada);
+        else await ofrecerCombo(prod, mods, nota);
       } catch (e) {
         setError(e instanceof Error ? e.message : "No se pudo agregar el ítem");
       }
     },
-    [modGrupos, ofrecerCombo, ticketBd, guardarEdicionEnCuenta],
+    [modGrupos, ofrecerCombo, agregarSuelto, ticketBd, guardarEdicionEnCuenta],
   );
 
   /** Confirmación del drawer de combo: agrega (o reemplaza, si venía de "Editar") la línea. */
@@ -868,7 +1277,9 @@ export function HomePos({
   }, [carrito.lineas, token, ticketBd, itemsPersistidos, canjeVivo]);
 
   /** Entra en modo cuenta de mesa: carga el ticket persistido al carrito para seguir editando. */
-  const entrarCuenta = useCallback(async (ticketId: string, origen: Origen = "inicio") => {
+  const entrarCuenta = useCallback(async (ticketId: string, origen: Origen = "inicio"): Promise<boolean | "cancelado"> => {
+    // Abrir una cuenta lleva al Panel: con una recepción a medias, pregunta antes (el cajero puede quedarse).
+    if (recepcionPendiente.current > 0 && !(await confirmarDescarteRecepcion(recepcionPendiente.current))) return "cancelado" as const;
     // Se arranca en "no enviado" y la consulta de abajo lo corrige. Dejar el valor de la cuenta
     // anterior hacía que una cuenta nueva apareciera como ya enviada, con el botón inutilizable.
     setCocinaEnviada(false);
@@ -884,6 +1295,7 @@ export function HomePos({
       setTicketBd(bd);
       setItemsPersistidos(items);
       setEnModoMesa(true);
+      setSeccionTienda("panel"); // tienda: la cuenta se ve en el Panel, se haya pedido desde donde sea
       setEnMesas(false);
       setEnPickup(false);
       setEnDelivery(false);
@@ -898,7 +1310,7 @@ export function HomePos({
       setError(e instanceof Error ? e.message : "No se pudo cargar la cuenta");
       return false;
     }
-  }, [token, productos, combos]);
+  }, [token, productos, combos, confirmarDescarteRecepcion]);
 
   const onAbrirCuentaMesa = useCallback(async (mesaId: string) => {
     try {
@@ -1087,6 +1499,18 @@ export function HomePos({
    */
   const adoptarTicketSiQuedoAbierto = useCallback(async (e: unknown, porDefecto: string): Promise<string> => {
     if (!(e instanceof ErrorTicketParcial)) return e instanceof Error ? e.message : porDefecto;
+    // Belleza: la cita ya está en otra venta abierta. El ticket recién abierto sigue vacío: se borra y la
+    // venta se suelta, en vez de quedar «a medias» con un reintento que nunca pasa.
+    if (e.fase === "cita") {
+      try {
+        await borrarCuentaVacia(token, e.ticketId, empleado.id);
+        setTicketBd(null);
+        setTicketIncompleto(false);
+        dispatch({ tipo: "limpiar" });
+        setAgendaVersion((v) => v + 1);
+        return `${e.message} No se guardó nada: toca la cita en «Citas de hoy» para retomar la venta donde ya está.`;
+      } catch { /* si no se pudo borrar, se adopta como cualquier ticket a medias */ }
+    }
     const bd = e.totales ?? await leerTotales(token, e.ticketId).catch(() => null);
     if (bd) setTicketBd(bd);
     if (e instanceof ErrorEnvioNoFijado) {
@@ -1097,7 +1521,7 @@ export function HomePos({
     }
     setTicketIncompleto(true);
     return `El pedido quedó guardado a medias. ${e.message}. Vuelve a intentarlo: se completa el mismo ticket, no se abre otro.`;
-  }, [token]);
+  }, [token, empleado.id]);
 
   // Carrito vacío = venta terminada (cobrada, cancelada, en espera o limpiada): el siguiente
   // carrito es otra venta y lleva su propio `client_id_local`.
@@ -1123,8 +1547,11 @@ export function HomePos({
     setClienteCuentaAbierto(false);
   }, [ticketBd, token, carrito.clienteCuenta?.clienteId]);
 
-  /** Persiste el ticket si aún no existe; abre el modal de descuento sobre ese ticket. */
-  const onAplicarDescuento = useCallback(async () => {
+  /**
+   * Persiste el ticket si aún no existe; abre el modal de descuento sobre ese ticket. Con `clientId`
+   * (menú «⋯» de la tienda) abre el descuento de ese renglón en vez del general.
+   */
+  const onAplicarDescuento = useCallback(async (clientId?: string) => {
     if (carrito.lineas.length === 0) return;
     setProcesandoCobro(true);
     setError(null);
@@ -1136,8 +1563,14 @@ export function HomePos({
         setTicketIncompleto(false);
       }
       // Cargar items persistidos (mapping clientId ↔ ticket_item_id real para cancelaciones F6).
-      try { setItemsPersistidos(await leerItemsPersistidos(token, bd.ticketId)); } catch { /* no bloquear */ }
-      setDescuentoAbierto(true);
+      let items: Awaited<ReturnType<typeof leerItemsPersistidos>> = [];
+      try { items = await leerItemsPersistidos(token, bd.ticketId); setItemsPersistidos(items); } catch { /* no bloquear */ }
+      if (clientId === undefined) setDescuentoAbierto(true);
+      else {
+        const it = items.find((x) => x.clientId === clientId);
+        if (it) setDescuentoItem(it);
+        else setError("No se pudo abrir el descuento de ese producto. Intenta de nuevo.");
+      }
     } catch (e) {
       setError(await adoptarTicketSiQuedoAbierto(e, "Error al preparar el descuento"));
     } finally {
@@ -1184,9 +1617,194 @@ export function HomePos({
     obtenerImpresora("CAJA", { onMostrar: () => {} }).abrirCajon().catch(() => {});
   }, []);
 
-  const iniciarCobro = useCallback(async (atajo: "EFECTIVO_EXACTO" | null = null) => {
-    if (carrito.lineas.length === 0) return;
+  /** Logo del negocio listo para la térmica. Se rasteriza al vuelo (es rápido y evita
+   *  guardar estado que se desincronice si cambian el logo desde el panel). Si no hay logo
+   *  o la imagen falla, devuelve null y el ticket sale sin él. */
+  const logoParaTicket = useCallback(async (ancho: 58 | 80) => {
+    if (!caja.logoUrl) return null;
+    return rasterizarImagen(caja.logoUrl, ancho);
+  }, [caja.logoUrl]);
+
+  /** La cotización convertida en la venta del Panel y su ticket: `cobroTerminado` no depende del carrito. */
+  const cotizacionDeVenta = useRef<{ cotizacionId: string | null; ticketId: string | null }>({ cotizacionId: null, ticketId: null });
+  cotizacionDeVenta.current = { cotizacionId: carrito.cotizacionId ?? null, ticketId: ticketBd?.ticketId ?? null };
+
+  /** Lo que sigue a una venta cobrada: limpiar la pantalla, «Cobro completado», el ticket impreso,
+   *  la comanda de Para llevar y el cierre del reparto. Del cobro, y de «Cobrar» con saldo 0. */
+  /** El ticket que el último cobro guardó desde el carrito (venta nueva): `cobroTerminado` no lee si ya se imprimió. */
+  const ticketNuevoDelCobro = useRef<string | null>(null);
+  const cobroTerminado = useCallback(async (ticketId: string, folio: string | null, cambio: number, total: number | null, aCredito = false) => {
+    // Lealtad: una cuenta cobrada ya no puede terminar un canje a medias; si quedó uno
+    // guardado en este dispositivo, se limpia para que no viva para siempre. Nunca estorba al cobro.
+    try {
+      const almacen = almacenLocal();
+      if (leerPendiente(almacen, ticketId)) borrarPendiente(almacen, ticketId);
+    } catch { /* un almacén lleno o negado no detiene lo que sigue */ }
+    // Cotización convertida (0212): ya cobrada, se marca CONVERTIDA. Si falla no detiene el cobro:
+    // queda anotada y se reintenta en el siguiente cobro o al abrir Cotizaciones.
+    try {
+      const almacen = almacenLocal();
+      const v = cotizacionDeVenta.current;
+      if (v.cotizacionId && v.ticketId === ticketId) anotarPorMarcar(almacen, { cotizacionId: v.cotizacionId, ticketId });
+      void marcarPendientes(almacen, (p) => marcarConvertida(token, p));
+    } catch { /* igual: nunca estorba al cobro */ }
+    setAvisoCotizacion(null);
+    setTotalesCobro(null);
+    setAtajoCobro(null);
+    setCambioAnterior(cambio > 0 ? cambio : null);
+    setTicketBd(null);
+    setEnModoMesa(false);
+    setCocinaEnviada(false);
+    dispatch({ tipo: "limpiar" });
+    // Comida rápida: la venta siguiente es de mostrador aunque esta fuera comer aquí, pick-up o domicilio.
+    if (comidaRapida) dispatch({ tipo: "modo", modo: "PARA_LLEVAR" });
+    setCuentasVersion((v) => v + 1); // la cuenta pagada ya no va en la lista
+    setAgendaVersion((v) => v + 1); // belleza: la cita cobrada pasa a «Cobradas hoy»
+    setConfirmacion({ folio, cambio, total, ...(aCredito ? { aCredito } : {}) });
+    // Armar el ticket e IMPRIMIR automáticamente. Con PreviewAdapter abre el recibo
+    // en pantalla; al activar EpsonEposAdapter, ese mismo llamado imprime en papel.
+    try {
+      const datos = await leerTicketParaImpresion(ticketId, {
+        token,
+        cajeroNombre: empleado.nombre,
+        cajaNombre: caja.nombre,
+      });
+      // Combos (ADR 0015): igual que en `imprimirComandaCocina` — el padre no se imprime,
+      // cada hijo se manda a su estación con "Combo #n" como contexto.
+      const lineasCom = lineasParaComanda(datos.lineas);
+      const datosCom: DatosComanda = {
+        folio: datos.meta.folio,
+        modoServicio: datos.meta.modoServicio,
+        cajero: datos.meta.cajero,
+        caja: datos.meta.caja,
+        fechaIso: datos.meta.fechaIso,
+        // Comida rápida: el nombre que se pidió al cobrar, el mismo que lleva la comanda impresa.
+        cliente: comidaRapida ? datos.meta.nombreCliente ?? null : null,
+        lineas: lineasCom,
+        ancho: 80,
+      };
+      setDatosTicket(datos);
+      setTicketImpresoId(ticketId);
+      setDatosComanda(datos.tienda ? null : datosCom);
+      setEstadoTicket("lista");
+      // Solo "Para llevar": es el único modo que va del carrito al cobro sin pasar por la
+      // lista de cuentas, así que no hay un momento anterior para imprimirlo. La regla y su
+      // historia están en `debeImprimirTicketAlCobrar`.
+      // Comida rápida: una cuenta que ya imprimió su ticket desde la lista no saca otro. Si la
+      // lectura falla, se imprime: mejor un papel de más que un cliente sin comprobante.
+      // Una venta que nació en este mismo cobro no pudo imprimirse antes: no se pregunta.
+      const yaImpreso = comidaRapida && ticketNuevoDelCobro.current !== ticketId && await leerTicketImpreso(token, ticketId).catch(() => false);
+      if (debeImprimirTicketAlCobrar(datos.meta.modo, comidaRapida, yaImpreso)) {
+        try {
+          const job = construirTicketJob(datos, await logoParaTicket(datos.ancho));
+          await obtenerImpresora("CAJA", { onMostrar: () => setMostrarRecibo(true) }).imprimir(job);
+        } catch {
+          // Un fallo de la impresora no puede llevarse por delante lo que viene después:
+          // la comanda, el cajón y la liquidación del reparto van detrás.
+          setEstadoTicket("error");
+        }
+      }
+      // Comanda automática a la estación de cocina.
+      //
+      // SOLO en "Para llevar". Es el único modo donde el pedido va del carrito al cobro sin
+      // pasar por "Enviar a cocina": si no saliera aquí, la cocina no se enteraría nunca.
+      //
+      // En comedor, Pick-up y Domicilio la comanda YA salió al enviar el pedido, y volver a
+      // imprimirla al cobrar hacía que la cocina recibiera dos veces lo mismo —con el riesgo
+      // real de que alguien prepare el pedido otra vez, además del papel de más. Al cobrar,
+      // esos modos imprimen únicamente el ticket del cliente.
+      //
+      // Y solo si la estación de cocina es una impresora distinta de la de caja: con una
+      // sola impresora, el ticket que acaba de salir ya es el papel.
+      // Una tienda no tiene cocina: aunque haya estaciones configuradas, no sale comanda.
+      //
+      // Comida rápida: la venta se manda a cocina AQUÍ (llega al KDS) y la comanda lleva solo lo que
+      // ese envío marcó. Si ya se había mandado (una cuenta en espera, un reintento), no hay renglones
+      // nuevos y no sale otra: una comanda por venta. Con una sola impresora sale detrás del ticket.
+      if (comidaRapida) {
+        if (debeImprimirComandaAlCobrar(datos.meta.modo, hayEstacionDeCocinaDedicada(), true)) {
+          try {
+            await imprimirComandaCocina(ticketId, await enviarACocina(token, ticketId), false);
+          } catch {
+            setError("La venta se cobró, pero no se pudo mandar a cocina. Avísales a mano.");
+          }
+        }
+      } else if (!datos.tienda && debeImprimirComandaAlCobrar(datos.meta.modo, hayEstacionDeCocinaDedicada())) {
+        // También repartida: en Para llevar la bebida va a la barra igual que en el resto.
+        imprimirComandaPorAreas(datosCom, lineasCom, { ticketId, evento: "IMPRESION_INICIAL" }).catch(() => {});
+      }
+      // Reparto a domicilio: se cierra con lo que de verdad entró. Best-effort — la venta
+      // ya quedó cobrada y un fallo aquí no debe deshacerla.
+      if (datos.meta.modo === "DELIVERY_PROPIO") {
+        const efectivo = datos.pagos.filter((p) => p.metodo === "Efectivo").reduce((a, p) => a + p.montoMxn, 0);
+        const otros = datos.pagos.filter((p) => p.metodo !== "Efectivo").reduce((a, p) => a + p.montoMxn, 0);
+        const r = await cerrarRepartoAlCobrar(token, {
+          ticketId, efectivo, tarjeta: otros, liquidadoPorId: empleado.id,
+        });
+        // "Sin asignación" YA NO SE CALLA.
+        //
+        // Se silenciaba porque asignar repartidor era opcional: un domicilio podía salir
+        // sin nadie anotado y no había nada que reportar. Desde la 0114 asignar es
+        // obligatorio, así que este caso dejó de ser normal — y callarlo borraba la única
+        // señal de que la regla se rompió.
+        //
+        // Y no es hipotético: `listarCuentasAbiertas` solo trae BORRADOR/ABIERTO, así que
+        // un ticket cobrado se sale de "En el local" y ya no aparece en ninguna de las dos
+        // pestañas; `asignar_delivery_lote` lo rechaza con "ya está cerrado". En un pedido
+        // PREPAGADO —tarjeta o transferencia al tomar la orden, cuando todavía no hay
+        // repartidor a quién asignárselo— cobrar antes de asignar es la ÚNICA secuencia
+        // posible, o sea el camino normal, no un descuido raro.
+        //
+        // Se avisa DESPUÉS del cobro y nunca antes: el dinero ya entró, y una confirmación
+        // previa saldría en cada prepago para hacer una pregunta que el cajero no puede
+        // contestar de otra manera. Lo que sí necesita es enterarse, porque ese pedido no
+        // va a poder cuadrarse contra ningún repartidor.
+        if (!r.liquidada) {
+          setAvisoReparto(
+            r.motivo === "sin asignación"
+              ? {
+                  titulo: "Pedido sin repartidor",
+                  texto: "Este pedido se cobró sin repartidor asignado, y ya cerrado no se le puede asignar uno. Anota por fuera quién lo lleva: el sistema ya no va a poder decir de quién fue.",
+                }
+              : {
+                  titulo: "El reparto quedó sin cerrar",
+                  texto: `El cobro sí se registró, pero no se pudo cerrar el reparto: ${r.motivo ?? "error"}. Revisa a mano la liquidación del repartidor.`,
+                },
+          );
+        }
+      }
+      // El cajón NO se abre aquí. Ya se abrió al presionar "Cobrar" (`abrirCajonParaCobrar`),
+      // que es lo que la caja pidió: contar el cambio empieza al abrir la gaveta, no al
+      // cerrar la venta. Esta segunda apertura es de cuando era la única, y desde la 0.4.36
+      // convivían las dos: el cajón se abría, el cajero lo cerraba, y al imprimirse el
+      // ticket se volvía a abrir solo.
+      //
+      // Los dos caminos que llegan al cobro —capturar y cobrar, o cobrar desde la lista de
+      // cuentas— abren el cajón antes, así que quitarlo de aquí no deja ningún flujo sin
+      // apertura.
+    } catch {
+      setEstadoTicket("error");
+    }
+  }, [token, empleado, caja.nombre, imprimirComandaPorAreas, imprimirComandaCocina, logoParaTicket, comidaRapida]);
+
+  /** Cuenta de mostrador ya guardada cuyo tipo de servicio ya se contestó (o se guardó al cobrar,
+   *  después de contestarlo): cerrar el cobro y volver a cobrar no pregunta dos veces. */
+  const servicioContestado = useRef<string | null>(null);
+  /** `elegido`: el carrito con el modo (y el nombre) que se acaba de contestar en «¿Para llevar o comer aquí?». */
+  const iniciarCobro = useCallback(async (atajo: "EFECTIVO_EXACTO" | null = null, elegido?: EstadoCarrito) => {
+    const c = elegido ?? carrito;
+    if (c.lineas.length === 0) return;
     if (revisandoCobro.current) return;
+    // Comida rápida: antes de guardar el ticket se pregunta el tipo de servicio (y el nombre). Con la
+    // venta sin guardar, o con una cuenta de mostrador que se guardó antes con el PARA_LLEVAR por
+    // defecto sin preguntar: retomada de «en espera», o guardada por un descuento o un canje. Una
+    // cuenta abierta desde una lista (mesa, pick-up, domicilio) no se pregunta, y una guardada al
+    // cobrar ya lo contestó. Cancelar la ventana deja la venta como estaba: sin cobro y sin cajón.
+    if (comidaRapida && !configMostrador) return;
+    if (configMostrador && !elegido && faltaPreguntarServicio(ticketBd?.ticketId ?? null, servicioContestado.current, enModoMesa, retomadoEspera?.ticketId ?? null)) {
+      const p = preguntaServicio(caja.giro, configMostrador, c.modoServicio);
+      if (p) { setPreguntaCobro({ tipo: p, atajo }); return; }
+    }
     // Lealtad: antes de abrir el cobro de una cuenta que ya existe se revisa (a) que no tenga un
     // canje a medias y (b) que su canje de dinero no haya quedado recortado. La revisión es la misma
     // que usa la lista de cuentas (`revisarLealtadAntesDeCobrar`) y decide con totales RECIÉN LEÍDOS,
@@ -1218,6 +1836,23 @@ export function HomePos({
         setProcesandoCobro(false);
       }
     }
+    // Una cuenta que ya no debe nada (el cambio sin diferencia, reabierto): se cierra y se da por
+    // cobrada, sin cobro ni cajón. Si la base no la cierra, sigue por el cobro de siempre.
+    if (cuenta && !ticketIncompleto && cuentaYaCubierta(cuenta)) {
+      revisandoCobro.current = true;
+      setProcesandoCobro(true);
+      try {
+        const cerrada = await cerrarSiYaCubierta(token, cuenta.ticketId);
+        // Sin total: no se cobró nada aquí, y «Cobro completado» no debe anunciarlo como cobrado.
+        if (cerrada) { await cobroTerminado(cerrada.ticketId, cerrada.folio, cerrada.cambio, null); return; }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "No se pudo cerrar la cuenta");
+        return;
+      } finally {
+        revisandoCobro.current = false;
+        setProcesandoCobro(false);
+      }
+    }
     abrirCajonParaCobrar();
     setAtajoCobro(atajo);
     // Si el ticket ya se persistió (flujo de descuento), reusarlo: nada de re-abrir. Uno incompleto
@@ -1232,7 +1867,9 @@ export function HomePos({
     setProcesandoCobro(true);
     setError(null);
     try {
-      const totales = await persistirCarrito();
+      const totales = await persistirCarrito(c);
+      ticketNuevoDelCobro.current = totales.ticketId;
+      servicioContestado.current = totales.ticketId; // se guardó con lo contestado (o sin pregunta)
       /* EL TICKET YA EXISTE, CON FOLIO. La pantalla tiene que saberlo desde este instante.
 
          Antes solo se guardaba en `totalesCobro` (para el modal), y `ticketBd` se quedaba en
@@ -1249,7 +1886,27 @@ export function HomePos({
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, turno.caja_id, turno.id, online, adoptarTicketSiQuedoAbierto, lealtadActiva, programa]);
+  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, caja.giro, turno.caja_id, turno.id, online, adoptarTicketSiQuedoAbierto, lealtadActiva, programa, cobroTerminado, configMostrador, comidaRapida, retomadoEspera, enModoMesa]);
+
+  /** Respuesta de «¿Para llevar o comer aquí?»: fija modo y nombre, y sigue el cobro con ese carrito. */
+  /** Con la cuenta ya guardada (retomada de «en espera», o por un descuento o un canje), primero se
+   *  guarda en la base; si falla, no se abre el cobro. */
+  const elegirServicio = useCallback(async (modo: "PARA_LLEVAR" | "COMER_AQUI", nombre: string | null) => {
+    const atajo = preguntaCobro?.atajo ?? null;
+    const accion = { tipo: "modo", modo, nombre: nombre ?? carrito.nombreCuenta ?? null } as const;
+    setPreguntaCobro(null);
+    if (ticketBd) {
+      try {
+        await fijarServicioTicket(token, ticketBd.ticketId, modo, accion.nombre);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "No se guardó el tipo de servicio");
+        return;
+      }
+      servicioContestado.current = ticketBd.ticketId;
+    }
+    dispatch(accion);
+    void iniciarCobro(atajo, reducerCarrito(carrito, accion));
+  }, [preguntaCobro, carrito, iniciarCobro, ticketBd, token]);
 
   /**
    * Ronda de arreglos 1/5 (Task 7) — cambiar la zona de ESTE pedido desde el renglón de envío.
@@ -1340,6 +1997,9 @@ export function HomePos({
       const enviados = await enviarACocina(token, bd.ticketId);
       await imprimirComandaCocina(bd.ticketId, enviados, cocinaEnviada);
       dispatch({ tipo: "limpiar" });
+      // Comida rápida: «Cobrar» no tiene inicio para volver a Para llevar; sin esto la siguiente venta
+      // quedaba en Pick-up o Domicilio (con el envío y el cliente de este pedido) y sin botón Cobrar.
+      if (comidaRapida) dispatch({ tipo: "volver_a_mostrador" });
       setTicketBd(null);
       setItemsPersistidos([]);
       setCocinaEnviada(false);
@@ -1350,15 +2010,7 @@ export function HomePos({
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, turno.caja_id, turno.id, cocinaEnviada, imprimirComandaCocina, volverAtras, adoptarTicketSiQuedoAbierto]);
-
-  /** Logo del negocio listo para la térmica. Se rasteriza al vuelo (es rápido y evita
-   *  guardar estado que se desincronice si cambian el logo desde el panel). Si no hay logo
-   *  o la imagen falla, devuelve null y el ticket sale sin él. */
-  const logoParaTicket = useCallback(async (ancho: 58 | 80) => {
-    if (!caja.logoUrl) return null;
-    return rasterizarImagen(caja.logoUrl, ancho);
-  }, [caja.logoUrl]);
+  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, turno.caja_id, turno.id, cocinaEnviada, imprimirComandaCocina, volverAtras, adoptarTicketSiQuedoAbierto, comidaRapida]);
 
   /**
    * Reimprime la comanda completa de un ticket, repartida por estación como la original, ya con
@@ -1407,16 +2059,20 @@ export function HomePos({
     // cajero a media comanda podía perder lo capturado sin un solo aviso. Se avisa en vez de
     // sustituir: lo que está a medias es trabajo que nadie más puede rehacer.
     if (carrito.lineas.length > 0) {
-      setEsperaError("Tienes un pedido a medias. Cóbralo o déjalo en espera antes de retomar otro.");
+      setEsperaError(tienda
+        ? `Tienes una venta a medias. Cóbrala o ${ticketBd ? "déjala abierta" : "límpiala"} antes de retomar otra.`
+        : "Tienes un pedido a medias. Cóbralo o déjalo en espera antes de retomar otro.");
       return;
     }
     setEsperaProcesando(true);
     setEsperaError(null);
     try {
       await retomarTicketEnEspera(token, ticketId);
-      if (!(await entrarCuenta(ticketId))) {
+      const abierta = await entrarCuenta(ticketId);
+      if (abierta !== true) {
         // No se pudo cargar: sin esto quedaría fuera de espera y sin pantalla que lo muestre.
         await ponerTicketEnEspera(token, ticketId, etiqueta).catch(() => {});
+        if (abierta === "cancelado") return; // el cajero dijo que no: sin aviso de error
         throw new Error("No se pudo cargar el pedido. Sigue en espera; intenta de nuevo.");
       }
       setRetomadoEspera({ ticketId, etiqueta });
@@ -1427,13 +2083,14 @@ export function HomePos({
     } finally {
       setEsperaProcesando(false);
     }
-  }, [carrito.lineas.length, token, entrarCuenta, refrescarEspera]);
+  }, [carrito.lineas.length, token, entrarCuenta, refrescarEspera, tienda, ticketBd]);
 
   // Contadores de los dos botones de Para llevar (cuentas abiertas y en espera). Se recalculan al
   // entrar a la captura, cada vez que cambia el ticket en pantalla (se guardó, se cobró, se canceló
   // o se salió de él) y cada 20 s: la lista es de toda la sucursal y otra caja puede moverla.
+  // La tienda no pinta esos botones: Transacciones lee su propia lista.
   useEffect(() => {
-    if (enInicio || carrito.modoServicio !== "PARA_LLEVAR") return;
+    if (tienda || enInicio || (carrito.modoServicio !== "PARA_LLEVAR" && !viendoPedidos)) return;
     let vivo = true;
     const refrescar = () => {
       listarCuentasParaLlevar(token, caja.sucursal_id)
@@ -1444,7 +2101,7 @@ export function HomePos({
     refrescar();
     const id = setInterval(refrescar, 20_000);
     return () => { vivo = false; clearInterval(id); };
-  }, [enInicio, carrito.modoServicio, ticketBd?.ticketId, token, caja.sucursal_id, refrescarEspera]);
+  }, [tienda, enInicio, carrito.modoServicio, viendoPedidos, pedidosVersion, ticketBd?.ticketId, token, caja.sucursal_id, refrescarEspera]);
 
   /** Abre una cuenta de Para llevar desde su lista, para cobrarla (o cancelarla) aquí mismo. */
   const abrirCuentaLlevar = useCallback(async (ticketId: string) => {
@@ -1454,8 +2111,9 @@ export function HomePos({
       return;
     }
     setLlevarError(null);
-    if (await entrarCuenta(ticketId)) setLlevarListaAbierta(false);
-    else setLlevarError("No se pudo abrir la cuenta. Intenta de nuevo.");
+    const abierta = await entrarCuenta(ticketId);
+    if (abierta === true) setLlevarListaAbierta(false);
+    else if (abierta === false) setLlevarError("No se pudo abrir la cuenta. Intenta de nuevo.");
   }, [carrito.lineas.length, entrarCuenta]);
 
   /** Descarta el overlay de confirmación/recibo (sin tocar el carrito en curso).
@@ -1463,17 +2121,24 @@ export function HomePos({
   // Badges del inicio: sólo se refrescan mientras el inicio está a la vista, para no consultar
   // la BD cada 15 s mientras el cajero está capturando una venta.
   useEffect(() => {
-    if (!enInicio) return;
+    if (!enInicio && !viendoPedidos) return;
     let vivo = true;
     const cargar = () => {
       contarCuentasAbiertasPorModo(token, turno.id)
         .then((c) => { if (vivo) setCuentasAbiertas(c); })
         .catch(() => { /* el badge es informativo; su fallo no debe romper el inicio */ });
+      // «Cuentas de mesa» cuenta lo mismo que su lista (MESA y COMER_AQUI de la sucursal, sin espera):
+      // el badge de Comedor del inicio cuenta otra cosa y se queda como está.
+      if (viendoPedidos) {
+        contarCuentasDeMesa(token, caja.sucursal_id)
+          .then((n) => { if (vivo) setNCuentasMesa(n); })
+          .catch(() => { /* informativo */ });
+      }
     };
     cargar();
     const id = setInterval(cargar, 15000);
     return () => { vivo = false; clearInterval(id); };
-  }, [enInicio, token, turno.id]);
+  }, [enInicio, viendoPedidos, pedidosVersion, token, turno.id, caja.sucursal_id]);
 
   // ADR 0011 — pedidos de apps: se consultan SIEMPRE (no solo en el inicio) porque un pedido de
   // Uber tiene minutos para aceptarse y el cajero puede estar en medio de una venta. Una consulta
@@ -1650,7 +2315,16 @@ export function HomePos({
    * No cierra nada mientras un cobro está en curso: interrumpir a media aplicación de pago es
    * justo lo que no debe poder hacerse por reflejo.
    */
-  const { alEscapar, algoAbierto } = useMemo(() => {
+  const { alEscapar, algoAbierto, escaneoIgnorado, cerrarAlEscanear } = useMemo(() => {
+    const enCaptura = !enInicio && !enKds && !enMonitor && !enConsultaCuentas && !enDevoluciones && !enCambioTalla && !enPedidosApps
+      && !enDelivery && !enPickup && !enMesas && !enBarra;
+    const capaCobro: CapaEscape = [totalesCobro != null, null];
+    const capaRecibo: CapaEscape = [mostrarRecibo, cerrarVistaRecibo];
+    const capaConfirmacion: CapaEscape = [confirmacion != null, nuevoTicket];
+    const capaSelector: CapaEscape = [selectorRetail != null, () => setSelectorRetail(null)];
+    // La franja vive en el Panel: oculto el Panel, no se come el Escape de otra sección.
+    const capaAvisoRetail: CapaEscape = [avisoRetail != null && (!tienda || seccionTienda === "panel"), () => setAvisoRetail(null)];
+    const capaConsultaInv: CapaEscape = [barraAbajo && seccionTienda === "inventario" && cerrarConsultaInv != null, () => cerrarConsultaInv?.()];
     const capas: CapaEscape[] = [
       // Modificadores y combo: overlays sobre la rejilla de captura, por encima de todo lo demás.
       // El de modificadores va primero porque se pinta encima del de combo cuando ambos aplican.
@@ -1672,17 +2346,34 @@ export function HomePos({
       // El aviso del reparto se pinta encima del recibo y de la confirmación de cobro, así que
       // Escape tiene que cerrarlo a él primero.
       [avisoReparto != null, () => setAvisoReparto(null)],
-      [mostrarRecibo, cerrarVistaRecibo],
-      [confirmacion != null, nuevoTicket],
+      [vistaCotizacion != null, () => setVistaCotizacion(null)],
+      capaRecibo,
+      capaConfirmacion,
       // El cobro y «Agregar productos» CEDEN: tienen pasos internos (efectivo → selector, un
       // modificador abierto sobre la tanda) y cada uno atiende su Escape. Antes los cerraba esta
       // lista de un golpe: Escape en el teclado de efectivo tiraba el cobro entero, y con un
       // modificador abierto se llevaba la tanda completa sin guardar.
-      [totalesCobro != null, null],
+      capaCobro,
       [agregandoA != null, null],
+      // Descuento de la cuenta (puede pedir PIN) y la lista de cuentas de Para llevar: los cierra
+      // su propio modal; aquí están para que la pila sepa que hay algo abierto.
+      [descuentoAbierto, null],
+      // Reabrir y Cambiar pago (Transacciones): los cierra su propio `Modal`, también su PIN.
+      [reabriendoTx != null || cambiandoPagoTx != null, null],
+      [llevarListaAbierta, null],
+      // Comida rápida: «¿Para llevar o comer aquí?» cancela con su propio `useEscape`.
+      [preguntaCobro != null, null],
+      // Venta de tienda: la ventana de cantidad la cierra su propio `useEscape`; el selector, también
+      // su `Modal`; la franja del escáner, aquí. La cantidad cuenta en `escaneoIgnorado`: no se escanea encima.
+      [cantidadRetail != null, null],
+      capaSelector,
+      capaAvisoRetail,
+      // Inventario: la consulta de una prenda la cierra también su `Modal`.
+      capaConsultaInv,
       [viendoMapaMesas, () => { setViendoMapaMesas(false); setPidiendoMesa(true); }],
       [pidiendoMesa, () => setPidiendoMesa(false)],
-      [nombreCuentaAbierto, () => setNombreCuentaAbierto(false)],
+      // Comida rápida: cancelar el nombre de «Nuevo para recoger» (carrito vacío) cancela el pick-up.
+      [nombreCuentaAbierto, () => { setNombreCuentaAbierto(false); if (comidaRapida && !ticketBd) dispatch({ tipo: "volver_a_mostrador" }); }],
       [nombreBarra != null, () => setNombreBarra(null)],
       [pasandoAMesa != null, () => setPasandoAMesa(null)],
       [clienteDomAbierto, () => setClienteDomAbierto(false)],
@@ -1699,28 +2390,169 @@ export function HomePos({
       [confirmandoCierre, () => setConfirmandoCierre(false)],
       [menuGeneralAbierto, () => setMenuGeneralAbierto(false)],
       [cerrando, () => setCerrando(false)],
+      // Avisos de VIM de la tienda: los cierra su propio diálogo.
+      [(avisosVim?.length ?? 0) > 0, null],
+      // Confirmaciones de la sección «Más» de la tienda: las cierra su propio diálogo.
+      [confirmandoVenta, null],
+      [salirCajaAbierto, null],
+      // Agenda de belleza: los cierra su propio `Modal` (el de más arriba primero); aquí, para que la
+      // pila sepa que hay algo abierto y la barra no navegue debajo.
+      [modalCita != null, null],
+      [fichaCita != null, null],
+      [esperaAgendaAbierta, null],
+      [eligiendoColaborador != null, null],
+      [servicioPorAgregar != null, null],
     ];
     const pantallas: CapaEscape[] = [
       // La pantalla de cocina no conoce la pila del POS (vive en su propio paquete).
       [enKds, () => setEnKds(false)],
-      // Nada abierto: Escape equivale al botón Volver de la pantalla de captura.
-      [!enInicio && !enKds && !enMonitor && !enConsultaCuentas && !enDevoluciones && !enPedidosApps
-        && !enDelivery && !enPickup && !enMesas && !enBarra, () => intentarSalirDeCaptura("atras")],
+      // Nada abierto: Escape equivale al botón Volver de la pantalla de captura. «Cambio de talla»
+      // atiende el suyo (regresa un paso).
+      // En la tienda no hay a dónde volver desde el Panel; desde otra sección, Escape regresa al Panel
+      // (en belleza, al calendario).
+      [enCaptura && !barraAbajo, () => intentarSalirDeCaptura("atras")],
+      // Transacciones: Escape deja primero la búsqueda. Aquí y no en `capas`: no tapa la barra ni el escáner.
+      [enCaptura && barraAbajo && seccionTienda === "transacciones" && cerrarBusquedaTx != null, () => cerrarBusquedaTx?.()],
+      [enCaptura && barraAbajo && seccionTienda !== seccionInicio, () => void irASeccion(seccionInicio)],
     ];
     return {
       // El aviso grande de la tienda va encima de TODO y CEDE: lo cierra su propio `Modal`.
       alEscapar: capaVisible([[avisoTiendaVisible, null], ...capas, ...pantallas]),
       // Hay algo abierto encima de la pantalla (un cobro, un modal): «Ver orden» no se lo lleva.
-      algoAbierto: capas.some(([visible]) => visible),
+      // La franja del escáner no tapa nada: no cuenta como «algo abierto».
+      algoAbierto: capas.some((c) => c[0] && c !== capaAvisoRetail),
+      // El escáner de la tienda se ignora bajo el aviso de un pedido, un PIN u otro diálogo. No
+      // cuentan el cobro (avisa «Termina el cobro…»), el selector y la franja (el escaneo los
+      // cierra) ni «Cobro completado» y el recibo: esos se cierran y la pieza abre la venta nueva (R6).
+      escaneoIgnorado: avisoTiendaVisible || capas.some((c) => c[0] && ![capaCobro, capaSelector, capaAvisoRetail, capaConsultaInv, capaRecibo, capaConfirmacion].includes(c)),
+      cerrarAlEscanear: confirmacion != null ? nuevoTicket : mostrarRecibo ? cerrarVistaRecibo : null,
     };
-  }, [avisoTiendaVisible, modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
-      agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto, nombreBarra, pasandoAMesa,
+  }, [selectorRetail, cantidadRetail, avisoRetail, descuentoAbierto, llevarListaAbierta, preguntaCobro, avisoTiendaVisible, modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, vistaCotizacion, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
+      agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto, comidaRapida, ticketBd, nombreBarra, pasandoAMesa,
       clienteDomAbierto, clienteCuentaAbierto, zonaPedidoAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
       salidaPendiente, confirmandoCierre, menuGeneralAbierto, cerrando, enInicio, enKds, enMonitor,
-      enConsultaCuentas, enDevoluciones, enPedidosApps, enDelivery, enPickup, enMesas, enBarra, nuevoTicket,
-      intentarSalirDeCaptura]);
+      enConsultaCuentas, enDevoluciones, enCambioTalla, enPedidosApps, enDelivery, enPickup, enMesas, enBarra, nuevoTicket,
+      intentarSalirDeCaptura, tienda, barraAbajo, seccionTienda, seccionInicio, reabriendoTx, cambiandoPagoTx, cerrarBusquedaTx, cerrarConsultaInv, irASeccion, avisosVim, confirmandoVenta, salirCajaAbierto, modalCita, fichaCita, esperaAgendaAbierta, eligiendoColaborador, servicioPorAgregar]);
   useEscape(alEscapar);
+
+  // ── Cotizaciones (retail 2, entrega 3) ────────────────────────────────────────────────────
+  /** El encabezado del papel, leído una vez. Si falla, sale solo con el nombre del negocio. */
+  const encabezado = async (): Promise<Encabezado> => {
+    try {
+      return (encabezadoCotizacion.current ??= await leerEncabezado(token, caja.tenant_id, caja.sucursal_id, caja.negocioNombre));
+    } catch {
+      return { negocio: caja.negocioNombre, rfc: null, direccion: null, telefono: null };
+    }
+  };
+  const whatsappCotizacion = (c: Cotizacion) => enlaceWhatsappCotizacion(
+    c.cliente?.telefono,
+    textoWhatsappCotizacion({ folio: c.folio, negocio: caja.negocioNombre, total: c.total, vigenteHasta: c.vigenteHasta, url: urlCotizacion(c.token) }),
+  );
+  /** Con la vista previa, `onMostrar` enseña la cotización en pantalla; con la térmica, sale el papel. */
+  const imprimirCotizacion = async (c: Cotizacion, onMostrar: (e: Encabezado) => void) => {
+    const e = await encabezado();
+    await obtenerImpresora("CAJA", { onMostrar: () => onMostrar(e) }).imprimir(construirCotizacionJob(c, e, 80));
+  };
+  const cotizar = estadoCotizar({ modulo: modulos?.cotizaciones === true, lineas: carrito.lineas, guardada: ticketBd != null });
+  // La llave es de ESTE carrito: si cambia tras una respuesta perdida, es otra cotización.
+  useEffect(() => { llaveCotizacion.current = null; }, [carrito.lineas]);
+  /** «Guardar como cotización»: la base pone precios, IVA, folio y vigencia; el carrito se limpia y se abre la vista. */
+  const guardarComoCotizacion = async () => {
+    if (guardandoCotizacion) return;
+    setGuardandoCotizacion(true);
+    setError(null);
+    try {
+      llaveCotizacion.current ??= `cot-${nuevoClientId()}`;
+      const id = await guardarCotizacion(token, {
+        sucursalId: caja.sucursal_id, cajaId: turno.caja_id, clienteId: carrito.clienteCuenta?.clienteId ?? null,
+        lineas: carrito.lineas, clientId: llaveCotizacion.current,
+      });
+      llaveCotizacion.current = null;
+      setUltimoTienda(null);
+      setAvisoCotizacion(null);
+      dispatch({ tipo: "limpiar" });
+      try {
+        const [c, e] = await Promise.all([leerCotizacion(token, id), encabezado()]);
+        setVistaCotizacion({ c, e });
+      } catch {
+        setError("La cotización se guardó, pero no se pudo abrir. Búscala en Más › Cotizaciones.");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar la cotización");
+    } finally {
+      setGuardandoCotizacion(false);
+    }
+  };
+  /** «Convertir en venta»: el carrito con el catálogo de HOY; se marca CONVERTIDA al cobrarse (`cobroTerminado`). */
+  const convertirCotizacion = (c: Cotizacion) => {
+    if (carrito.lineas.length > 0 || ticketBd) {
+      setError(`Tienes una venta a medias. Cóbrala o ${ticketBd ? "déjala abierta" : "límpiala"} antes de convertir una cotización.`);
+      return;
+    }
+    const r = lineasDeCotizacion(c.items, productos ?? []);
+    if (r.lineas.length === 0) {
+      setError("Ningún producto de esta cotización se vende hoy: ya no existen o están agotados.");
+      return;
+    }
+    setError(null);
+    dispatch({ tipo: "cargar", estado: { ...estadoInicial, modoServicio: "PARA_LLEVAR", lineas: r.lineas, clienteCuenta: c.cliente, cotizacionId: c.id } });
+    setAvisoCotizacion([`Cotización ${c.folio} en la venta.`, ...avisosConversion({ ...r, vigenteHasta: c.vigenteHasta, hoy: hoyMx() })].join(" "));
+    void irASeccion("panel");
+  };
+
+  // ── Cambio de talla (giro RETAIL) ─────────────────────────────────────────────────────────
+  /** Entra a la pantalla. Con un ticket a medias no: al final el cambio puede cargar su venta al carrito. */
+  /** `ventaId`: la venta ya elegida en Transacciones (arranca en «Qué regresa»). */
+  const abrirCambioTalla = (ventaId?: string) => {
+    if (carrito.lineas.length > 0 || ticketBd) {
+      setError(`Tienes una venta a medias. Cóbrala o ${ticketBd ? "déjala abierta" : "límpiala"} antes de hacer un cambio.`);
+      return;
+    }
+    setError(null);
+    nuevoTicket(); // «Cobro completado» y el recibo de la venta anterior se cierran
+    setVentaElegida(ventaId ?? null);
+    setEnCambioTalla(true);
+  };
+  /** Cambio con saldo: su venta nueva quedó ABIERTA. Se carga como una cuenta y se abre su cobro. */
+  const cobrarCambioTalla = async (ticketId: string, saldo: number) => {
+    setEnCambioTalla(false);
+    setVentaElegida(null);
+    setCuentasVersion((v) => v + 1);
+    const abierta = await entrarCuenta(ticketId);
+    if (abierta === true) setCobrarCambio(ticketId);
+    else if (abierta === false) setError(`El cambio quedó registrado, pero no se pudo abrir su cobro. Queda en Transacciones: cóbrale ${fmtMxn(saldo)} desde ahí.`);
+  };
+  /**
+   * Transacciones: una cuenta abierta (o una en espera de antes) se carga en el Panel. Lo que está
+   * en el Panel se suelta como al salir de la venta: la cuenta guardada sigue abierta, y productos
+   * sin guardar solo se borran si el cajero lo confirma. `entrarCuenta` pasa al Panel.
+   */
+  const abrirDesdeTransacciones = async (ticketId: string, etiquetaEspera?: string) => {
+    if (!(await soltarVentaTienda())) return;
+    if (etiquetaEspera === undefined) { await entrarCuenta(ticketId); return; }
+    try {
+      await retomarTicketEnEspera(token, ticketId);
+      const abierta = await entrarCuenta(ticketId);
+      if (abierta !== true) {
+        // Mismo resguardo que `retomarEspera`: sin cargar, no se queda fuera de espera.
+        await ponerTicketEnEspera(token, ticketId, etiquetaEspera).catch(() => {});
+        if (abierta === false) setError("No se pudo cargar el pedido. Sigue en espera; intenta de nuevo.");
+        return;
+      }
+      setRetomadoEspera({ ticketId, etiqueta: etiquetaEspera });
+      refrescarEspera();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo retomar el pedido");
+    }
+  };
+
+  // `iniciarCobro` lee el carrito y la cuenta recién cargados: por eso espera a que estén.
+  useEffect(() => {
+    if (!cobrarCambio || ticketBd?.ticketId !== cobrarCambio || carrito.lineas.length === 0) return;
+    setCobrarCambio(null);
+    void iniciarCobro();
+  }, [cobrarCambio, ticketBd, carrito.lineas.length, iniciarCobro]);
 
   /** Aceptar o rechazar un pedido de la tienda desde este dispositivo: siempre por `delivery-accion`. */
   const atenderPedidoTienda: AccionTienda = async (p, accion, motivo) => {
@@ -1767,7 +2599,8 @@ export function HomePos({
     // mismo canal los dejaba abiertos sobre la cuenta recién aceptada.
     const capturando = !enInicio && !enKds && !enMonitor && !enConsultaCuentas && !enDevoluciones && !enPedidosApps && !enDelivery && !enPickup && !enMesas && !enBarra;
     const enLista = listaConDialogo.current || asignandoRepartidor != null || viendoReservaciones;
-    if (algoAbierto || enLista || (capturando && (carrito.lineas.length > 0 || ticketBd !== null))) {
+    // Una recepción a medias en Inventario también: salir de la sección la tira.
+    if (algoAbierto || enLista || enCambioTalla || recepcionPendiente.current > 0 || (capturando && (carrito.lineas.length > 0 || ticketBd !== null))) {
       avisarBreveTienda(`Termina lo que tienes abierto. El pedido te espera en ${aDomicilio ? "Domicilio" : "Pick-up"}.`);
       return;
     }
@@ -1869,6 +2702,34 @@ export function HomePos({
 
   const modalesCobro = (
     <>
+      {reabriendoTx && (
+        <ModalReabrirCuenta
+          token={token}
+          empleado={empleado}
+          ticketId={reabriendoTx.ticketId}
+          folio={reabriendoTx.folio}
+          total={reabriendoTx.total}
+          pagoInterno={reabriendoTx.pagoInterno}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          onReabierto={() => { const id = reabriendoTx.ticketId; setReabriendoTx(null); setTxVersion((v) => v + 1); void abrirDesdeTransacciones(id); }}
+          onCerrar={() => setReabriendoTx(null)}
+        />
+      )}
+      {cambiandoPagoTx && (
+        <ModalCambiarPago
+          token={token}
+          empleado={empleado}
+          ticketId={cambiandoPagoTx.ticketId}
+          folio={cambiandoPagoTx.folio}
+          total={cambiandoPagoTx.total}
+          metodoActual={cambiandoPagoTx.pagoCambiable?.metodo ?? null}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          onCambiado={() => { setCambiandoPagoTx(null); setTxVersion((v) => v + 1); }}
+          onCerrar={() => setCambiandoPagoTx(null)}
+        />
+      )}
       {totalesCobro && (
         <ModalCobro
           token={token}
@@ -1878,130 +2739,10 @@ export function HomePos({
           ejecutaNombre={empleado.nombre}
           totalesIniciales={totalesCobro}
           atajo={atajoCobro}
+          moduloCredito={modulos?.credito === true}
+          conCitas={agenda}
           onMontoACobrar={setMontoCobro}
-          onPagado={async (folio, cambio, total) => {
-            const ticketId = totalesCobro.ticketId;
-            // Lealtad: una cuenta cobrada ya no puede terminar un canje a medias; si quedó uno
-            // guardado en este dispositivo, se limpia para que no viva para siempre. Nunca estorba al cobro.
-            try {
-              const almacen = almacenLocal();
-              if (leerPendiente(almacen, ticketId)) borrarPendiente(almacen, ticketId);
-            } catch { /* un almacén lleno o negado no detiene lo que sigue */ }
-            setTotalesCobro(null);
-            setAtajoCobro(null);
-            setCambioAnterior(cambio > 0 ? cambio : null);
-            setTicketBd(null);
-            setEnModoMesa(false);
-            setCocinaEnviada(false);
-            dispatch({ tipo: "limpiar" });
-            setCuentasVersion((v) => v + 1); // la cuenta pagada ya no va en la lista
-            setConfirmacion({ folio, cambio, total });
-            // Armar el ticket e IMPRIMIR automáticamente. Con PreviewAdapter abre el recibo
-            // en pantalla; al activar EpsonEposAdapter, ese mismo llamado imprime en papel.
-            try {
-              const datos = await leerTicketParaImpresion(ticketId, {
-                token,
-                cajeroNombre: empleado.nombre,
-                cajaNombre: caja.nombre,
-              });
-              // Combos (ADR 0015): igual que en `imprimirComandaCocina` — el padre no se imprime,
-              // cada hijo se manda a su estación con "Combo #n" como contexto.
-              const lineasCom = lineasParaComanda(datos.lineas);
-              const datosCom: DatosComanda = {
-                folio: datos.meta.folio,
-                modoServicio: datos.meta.modoServicio,
-                cajero: datos.meta.cajero,
-                caja: datos.meta.caja,
-                fechaIso: datos.meta.fechaIso,
-                lineas: lineasCom,
-                ancho: 80,
-              };
-              setDatosTicket(datos);
-              setTicketImpresoId(ticketId);
-              setDatosComanda(datosCom);
-              setEstadoTicket("lista");
-              // Solo "Para llevar": es el único modo que va del carrito al cobro sin pasar por la
-              // lista de cuentas, así que no hay un momento anterior para imprimirlo. La regla y su
-              // historia están en `debeImprimirTicketAlCobrar`.
-              if (debeImprimirTicketAlCobrar(datos.meta.modo)) {
-                try {
-                  const job = construirTicketJob(datos, await logoParaTicket(datos.ancho));
-                  await obtenerImpresora("CAJA", { onMostrar: () => setMostrarRecibo(true) }).imprimir(job);
-                } catch {
-                  // Un fallo de la impresora no puede llevarse por delante lo que viene después:
-                  // la comanda, el cajón y la liquidación del reparto van detrás.
-                  setEstadoTicket("error");
-                }
-              }
-              // Comanda automática a la estación de cocina.
-              //
-              // SOLO en "Para llevar". Es el único modo donde el pedido va del carrito al cobro sin
-              // pasar por "Enviar a cocina": si no saliera aquí, la cocina no se enteraría nunca.
-              //
-              // En comedor, Pick-up y Domicilio la comanda YA salió al enviar el pedido, y volver a
-              // imprimirla al cobrar hacía que la cocina recibiera dos veces lo mismo —con el riesgo
-              // real de que alguien prepare el pedido otra vez, además del papel de más. Al cobrar,
-              // esos modos imprimen únicamente el ticket del cliente.
-              //
-              // Y solo si la estación de cocina es una impresora distinta de la de caja: con una
-              // sola impresora, el ticket que acaba de salir ya es el papel.
-              if (debeImprimirComandaAlCobrar(datos.meta.modo, hayEstacionDeCocinaDedicada())) {
-                // También repartida: en Para llevar la bebida va a la barra igual que en el resto.
-                imprimirComandaPorAreas(datosCom, lineasCom, { ticketId, evento: "IMPRESION_INICIAL" }).catch(() => {});
-              }
-              // Reparto a domicilio: se cierra con lo que de verdad entró. Best-effort — la venta
-              // ya quedó cobrada y un fallo aquí no debe deshacerla.
-              if (datos.meta.modo === "DELIVERY_PROPIO") {
-                const efectivo = datos.pagos.filter((p) => p.metodo === "Efectivo").reduce((a, p) => a + p.montoMxn, 0);
-                const otros = datos.pagos.filter((p) => p.metodo !== "Efectivo").reduce((a, p) => a + p.montoMxn, 0);
-                const r = await cerrarRepartoAlCobrar(token, {
-                  ticketId, efectivo, tarjeta: otros, liquidadoPorId: empleado.id,
-                });
-                // "Sin asignación" YA NO SE CALLA.
-                //
-                // Se silenciaba porque asignar repartidor era opcional: un domicilio podía salir
-                // sin nadie anotado y no había nada que reportar. Desde la 0114 asignar es
-                // obligatorio, así que este caso dejó de ser normal — y callarlo borraba la única
-                // señal de que la regla se rompió.
-                //
-                // Y no es hipotético: `listarCuentasAbiertas` solo trae BORRADOR/ABIERTO, así que
-                // un ticket cobrado se sale de "En el local" y ya no aparece en ninguna de las dos
-                // pestañas; `asignar_delivery_lote` lo rechaza con "ya está cerrado". En un pedido
-                // PREPAGADO —tarjeta o transferencia al tomar la orden, cuando todavía no hay
-                // repartidor a quién asignárselo— cobrar antes de asignar es la ÚNICA secuencia
-                // posible, o sea el camino normal, no un descuido raro.
-                //
-                // Se avisa DESPUÉS del cobro y nunca antes: el dinero ya entró, y una confirmación
-                // previa saldría en cada prepago para hacer una pregunta que el cajero no puede
-                // contestar de otra manera. Lo que sí necesita es enterarse, porque ese pedido no
-                // va a poder cuadrarse contra ningún repartidor.
-                if (!r.liquidada) {
-                  setAvisoReparto(
-                    r.motivo === "sin asignación"
-                      ? {
-                          titulo: "Pedido sin repartidor",
-                          texto: "Este pedido se cobró sin repartidor asignado, y ya cerrado no se le puede asignar uno. Anota por fuera quién lo lleva: el sistema ya no va a poder decir de quién fue.",
-                        }
-                      : {
-                          titulo: "El reparto quedó sin cerrar",
-                          texto: `El cobro sí se registró, pero no se pudo cerrar el reparto: ${r.motivo ?? "error"}. Revisa a mano la liquidación del repartidor.`,
-                        },
-                  );
-                }
-              }
-              // El cajón NO se abre aquí. Ya se abrió al presionar "Cobrar" (`abrirCajonParaCobrar`),
-              // que es lo que la caja pidió: contar el cambio empieza al abrir la gaveta, no al
-              // cerrar la venta. Esta segunda apertura es de cuando era la única, y desde la 0.4.36
-              // convivían las dos: el cajón se abría, el cajero lo cerraba, y al imprimirse el
-              // ticket se volvía a abrir solo.
-              //
-              // Los dos caminos que llegan al cobro —capturar y cobrar, o cobrar desde la lista de
-              // cuentas— abren el cajón antes, así que quitarlo de aquí no deja ningún flujo sin
-              // apertura.
-            } catch {
-              setEstadoTicket("error");
-            }
-          }}
+          onPagado={(folio, cambio, total, aCredito) => cobroTerminado(totalesCobro.ticketId, folio, cambio, total, aCredito)}
           onCerrar={() => { setTotalesCobro(null); setAtajoCobro(null); }}
         />
       )}
@@ -2010,6 +2751,7 @@ export function HomePos({
           folio={confirmacion.folio}
           cambio={confirmacion.cambio}
           total={confirmacion.total}
+          aCredito={confirmacion.aCredito}
           estadoTicket={estadoTicket}
           puedeImprimir={datosTicket != null}
           pausa={mostrarRecibo || avisoReparto != null}
@@ -2196,6 +2938,40 @@ export function HomePos({
     </>
   );
 
+  /** Cuenta nueva de un modo con lista (Comedor, Pick-up, Domicilio): se fija el modo y se entra al
+   *  catálogo con el carrito limpio. Desde la lista del modo y desde «Pedidos» de comida rápida. */
+  const abrirCuentaNueva = (modo: "DRIVE_THRU" | "DELIVERY_PROPIO" | "COMER_AQUI") => {
+    const abrir = () => {
+      dispatch({ tipo: "limpiar" });
+      dispatch({ tipo: "modo", modo });
+      setTicketBd(null);
+      setItemsPersistidos([]);
+      setCocinaEnviada(false);
+      setVolverA(modo === "DRIVE_THRU" ? "pickup" : modo === "COMER_AQUI" ? "mesas" : "domicilio");
+      // Comedor NO entra al catálogo todavía: primero hay que saber a qué mesa. El modal se
+      // encarga y, al resolverla, abre la cuenta y entra.
+      if (modo === "COMER_AQUI") { setPidiendoMesa(true); return; }
+      setEnPickup(false);
+      setEnDelivery(false);
+      // Comida rápida: la captura vive en «Cobrar».
+      if (comidaRapida) setSeccionTienda("panel");
+      // Domicilio: lo primero que se pregunta por teléfono es a nombre de quién y a dónde
+      // va, antes de anotar qué quiere. Se abre el modal de una vez para no obligar al
+      // cajero a acordarse de asignarlo después (y que el pedido salga sin dirección).
+      if (modo === "DRIVE_THRU") setNombreCuentaAbierto(true);
+      if (modo === "DELIVERY_PROPIO") setClienteDomAbierto(true);
+    };
+    // Comida rápida: en «Cobrar» puede haber una venta a medias; se suelta (o se pregunta) antes.
+    if (comidaRapida) conVentaSuelta(abrir)(); else abrir();
+  };
+
+  /** Salir de una lista de pantalla completa: comida rápida vuelve a «Pedidos», de donde se entró. */
+  const salirDeLista = () => {
+    volverAlInicio();
+    setSeccionTienda((s) => seccionTrasLista(caja, s));
+    if (comidaRapida) { setPedidosVersion((v) => v + 1); releerEnLinea.current(); }
+  };
+
   if (enKds) {
     return <><PantallaKds token={token} caja={caja} onSalir={() => setEnKds(false)} />{capaTienda}</>;
   }
@@ -2297,33 +3073,18 @@ export function HomePos({
         turno={turno}
         empleado={empleado}
         modo={modo}
-        onSalir={volverAlInicio}
+        onSalir={salirDeLista}
         // Solo Comedor: pick-up y domicilio no apartan mesa, y un botón muerto ahí sería ruido.
         onVerReservaciones={modo === "COMER_AQUI" && moduloActivo(modulos, "reservaciones") ? () => setViendoReservaciones(true) : undefined}
-        onAbrirCuenta={(cuentas) => {
+        // Comida rápida: las cuentas de mesa que quedaron se cobran, pero ya no se abren mesas nuevas.
+        onAbrirCuenta={comidaRapida && modo === "COMER_AQUI" ? undefined : (cuentas) => {
           // Barra: el ticket nace con su nombre ANTES de capturar (el nombre es único y lo valida la
           // base), así que primero el nombre y después se entra a la cuenta ya abierta.
           if (modo === "BARRA") {
             setNombreBarra({ enUso: cuentas.flatMap((c) => (c.cliente ? [c.cliente] : [])), clientIdLocal: `cuenta-${nuevoClientId()}` });
             return;
           }
-          // Cuenta nueva: se fija el modo y se entra al catálogo con el carrito limpio.
-          dispatch({ tipo: "limpiar" });
-          dispatch({ tipo: "modo", modo });
-          setTicketBd(null);
-          setItemsPersistidos([]);
-          setCocinaEnviada(false);
-          setVolverA(modo === "DRIVE_THRU" ? "pickup" : modo === "COMER_AQUI" ? "mesas" : "domicilio");
-          // Comedor NO entra al catálogo todavía: primero hay que saber a qué mesa. El modal se
-          // encarga y, al resolverla, abre la cuenta y entra.
-          if (modo === "COMER_AQUI") { setPidiendoMesa(true); return; }
-          setEnPickup(false);
-          setEnDelivery(false);
-          // Domicilio: lo primero que se pregunta por teléfono es a nombre de quién y a dónde
-          // va, antes de anotar qué quiere. Se abre el modal de una vez para no obligar al
-          // cajero a acordarse de asignarlo después (y que el pedido salga sin dirección).
-          if (modo === "DRIVE_THRU") setNombreCuentaAbierto(true);
-          if (modo === "DELIVERY_PROPIO") setClienteDomAbierto(true);
+          abrirCuentaNueva(modo);
         }}
         onAgregarProductos={(ticketId: string) => setAgregandoA(ticketId)}
         onCanjear={lealtadActiva ? (c) => { if (c.clienteId) setCanjeDe({ ticketId: c.ticketId, clienteId: c.clienteId, origen: "lista" }); } : undefined}
@@ -2541,7 +3302,8 @@ export function HomePos({
   }
 
   if (enDevoluciones) {
-    return <><PantallaDevoluciones token={token} caja={caja} turno={turno} empleado={empleado} onSalir={volverAlInicio} />{capaTienda}</>;
+    return <><PantallaDevoluciones token={token} caja={caja} turno={turno} empleado={empleado} productos={productos ?? undefined} escaneoIgnorado={avisoTiendaVisible}
+      ventaInicial={ventaElegida ?? undefined} onSalir={() => { setVentaElegida(null); volverAlInicio(); }} />{capaTienda}</>;
   }
 
   // `hayEnLinea` manda incluso sobre el estado de navegación: si el módulo se apagó mientras el
@@ -2551,12 +3313,31 @@ export function HomePos({
     return (
       <>
         <PantallaPedidosApps token={token} caja={caja} hayApps={hayDelivery} hayTienda={hayTienda} cajaSinActualizar={cajaSinActualizar}
-          onCambio={() => releerEnLinea.current()} onSalir={volverAlInicio} />
+          onCambio={() => releerEnLinea.current()} onSalir={salirDeLista} />
         {capaTienda}
       </>
     );
   }
 
+  if (enCambioTalla) {
+    return (
+      <>
+        <PantallaCambioTalla token={token} caja={caja} turno={turno} empleado={empleado} productos={productos ?? []}
+          existencias={existencias} sucursales={sucursalesTienda} actualizadoA={actualizadoA} escaneoIgnorado={avisoTiendaVisible}
+          ventaInicial={ventaElegida ?? undefined}
+          onSalir={() => { setEnCambioTalla(false); setVentaElegida(null); setCuentasVersion((v) => v + 1); }}
+          onCobrar={(id, saldo) => void cobrarCambioTalla(id, saldo)}
+          onImprimir={(id) => reimprimirCuenta(id)} />
+        {capaTienda}
+      </>
+    );
+  }
+
+  // Comida rápida: los pedidos de la tienda por aceptar, para «Pedidos» y su globo.
+  const porAceptarTienda = contarPorAceptar(pedidosTienda, { cajaId: turno.caja_id, enEscritorio: esEscritorio(), ahora: Date.now() });
+  // Pick-up y domicilio de «Pedidos» (o de «Más» en la cafetería): abiertas, por aceptar y pagadas en línea.
+  const nPickupPedidos = cuentasAbiertas.pickup + porAceptarTienda.pickup + cuentasPagadasEnLinea(pedidosTienda, "DRIVE_THRU").length;
+  const nDomicilioPedidos = cuentasAbiertas.domicilio + porAceptarTienda.domicilio + cuentasPagadasEnLinea(pedidosTienda, "DELIVERY_PROPIO").length;
   return (
     <div className="flex h-screen flex-col">
       {!online && (
@@ -2565,6 +3346,9 @@ export function HomePos({
           Sin internet: la caja sigue cobrando igual. Las ventas suben solas cuando vuelva la señal.
         </div>
       )}
+      {/* La tienda no tiene inicio: su aviso de suspensión y su barra de estado van aquí, arriba. */}
+      {barraAbajo && acceso.nivel === "gracia" && <BandaAcceso mensaje={acceso.mensaje} desde={acceso.desde} />}
+      {barraAbajo && <BarraEstadoCaja caja={caja} online={online} turno={turno} arriba />}
       {/* Barra de captura: aquí no van menú, KDS ni cuentas. El cajero está anotando un pedido y
           cada ícono de más es una salida en falso; todo eso vive en el inicio.
 
@@ -2576,6 +3360,10 @@ export function HomePos({
 
           Va a la derecha, opuesto a "Volver": son acciones distintas y pegarlas invitaría a
           pulsar la equivocada con prisa. */}
+      {/* La tienda no tiene esta fila: su barra inferior reemplaza a Volver, y el cliente y Limpiar
+          van chicos arriba del ticket (pos-retail.md, «Versión 2»). Comida rápida tampoco: sus cuentas
+          abiertas y en espera viven en «Pedidos». */}
+      {!barraAbajo && (
       <div className="flex flex-shrink-0 items-center gap-3 border-b border-line bg-surface px-3 py-2">
         <BotonVolver onClick={() => intentarSalirDeCaptura("atras")} />
         {admiteClienteCuenta(carrito.modoServicio) && (
@@ -2585,7 +3373,8 @@ export function HomePos({
             type="button"
             onClick={() => setClienteCuentaAbierto(true)}
             className={[
-              "ml-auto flex h-10 max-w-[240px] flex-shrink-0 items-center gap-2 rounded border px-3 text-14 font-semibold transition hover:border-ink hover:bg-hover",
+              "ml-auto",
+              "flex h-10 max-w-[240px] flex-shrink-0 items-center gap-2 rounded border px-3 text-14 font-semibold transition hover:border-ink hover:bg-hover",
               carrito.clienteCuenta ? "border-accent text-ink" : "border-line-strong text-ink",
             ].join(" ")}
           >
@@ -2628,6 +3417,7 @@ export function HomePos({
           </button>
         )}
       </div>
+      )}
       {configImpresoraAbierto && <ModalConfigImpresora token={token} sucursalId={caja.sucursal_id} onCerrar={() => setConfigImpresoraAbierto(false)} />}
       {clienteCuentaAbierto && (
         <ModalClienteCuenta
@@ -2674,6 +3464,15 @@ export function HomePos({
           onCerrar={() => setZonaPedidoAbierto(false)}
         />
       )}
+      {preguntaCobro && (
+        <ModalServicioComida
+          pedirNombre={configMostrador?.pedirNombre ?? false}
+          soloNombre={preguntaCobro.tipo === "NOMBRE"}
+          nombreInicial={carrito.nombreCuenta ?? ""}
+          onElegir={elegirServicio}
+          onCancelar={() => setPreguntaCobro(null)}
+        />
+      )}
       {nombreCuentaAbierto && (
         <ModalNombreCuenta
           onListo={(n) => { dispatch({ tipo: "nombre_cuenta", nombre: n }); setNombreCuentaAbierto(false); }}
@@ -2699,34 +3498,165 @@ export function HomePos({
         </div>
       )}
 
-      {cuentaImpresa && (
+      {cuentaImpresa && (!barraAbajo || seccionTienda === "panel") && (
         <p className="flex-shrink-0 bg-warning-soft px-4 py-2 text-13 font-medium text-ink" role="status">
           El ticket de esta cuenta ya se imprimió. Para agregarle o quitarle algo, reábrela desde su lista con «Reabrir cuenta».
         </p>
       )}
 
-      <div className="flex min-h-0 flex-1">
-          <CatalogoProductos
-            categorias={categorias}
-            productos={productos}
-            bloqueado={menuBloqueado}
-            onTapProducto={onTapProducto}
-          />
+      {avisoCotizacion && tienda && seccionTienda === "panel" && (
+        <p className="flex flex-shrink-0 items-center gap-3 bg-warning-soft px-4 py-1 text-13 font-medium text-ink" role="status">
+          <span className="min-w-0 flex-1">{avisoCotizacion}</span>
+          <button type="button" onClick={() => setAvisoCotizacion(null)} aria-label="Cerrar aviso" className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded text-ink-2 transition hover:bg-ink/5">
+            <Icono nombre="cerrar" className="h-4 w-4" />
+          </button>
+        </p>
+      )}
+      {vistaCotizacion && (
+        <OverlayReciboCotizacion
+          c={vistaCotizacion.c}
+          e={vistaCotizacion.e}
+          whatsapp={whatsappCotizacion(vistaCotizacion.c)}
+          onImprimir={() => { imprimirCotizacion(vistaCotizacion.c, () => window.print()).catch(() => setError("No se pudo imprimir la cotización")); }}
+          onCerrar={() => setVistaCotizacion(null)}
+        />
+      )}
+
+      {/* Oculto y no desmontado fuera del Panel: nada se reinicia al volver. */}
+      <div className={barraAbajo && seccionTienda !== "panel" ? "hidden" : "flex min-h-0 flex-1"}>
+          {capturaTienda && agenda ? (
+            // Belleza (boceto 2): Citas de hoy · Servicios · Productos. Servicios y Productos son la
+            // misma rejilla de la tienda, partida por lo que se agenda y lo que no.
+            <div className="flex min-w-0 flex-1 flex-col">
+              <div role="tablist" aria-label="Qué cobrar" className="flex h-14 flex-shrink-0 items-stretch gap-2 border-b border-line bg-surface px-4">
+                {([["citas", "Citas de hoy"], ["servicios", "Servicios"], ["productos", "Productos"]] as const).map(([id, texto]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    aria-selected={pestanaCobro === id}
+                    onClick={() => setPestanaCobro(id)}
+                    className={`-mb-px border-b-2 px-3 text-15 font-semibold transition-[color,border-color] duration-150 ease-vim ${pestanaCobro === id ? "border-accent text-accent" : "border-transparent text-ink-2 hover:text-ink"}`}
+                  >
+                    {texto}
+                  </button>
+                ))}
+              </div>
+              {pestanaCobro === "citas" ? (
+                <CitasCobro
+                  token={token}
+                  sucursalId={caja.sucursal_id}
+                  version={agendaVersion}
+                  activa={carrito.citaId ?? null}
+                  ventaActual={ticketBd?.ticketId ?? null}
+                  bloqueado={menuBloqueado || totalesCobro != null || !colaboradoresCobro || !serviciosCobro}
+                  errorExterno={errorAgendaCobro}
+                  onReintentar={agendaCambio}
+                  onCobrar={cargarCita}
+                  onRetomar={(v) => void abrirDesdeTransacciones(v.id, v.etiquetaEspera ?? undefined)}
+                  onAtender={() => setEsperaAgendaAbierta(true)}
+                  onAbrirCita={setFichaCita}
+                />
+              ) : (
+                <div className="flex min-h-0 flex-1">
+                  <PanelVentaRetail
+                    key={pestanaCobro}
+                    productos={productos && productos.filter((p) => servicioIds.has(p.id) === (pestanaCobro === "servicios"))}
+                    categorias={categorias && productos && categorias.filter((c) => productos.some((p) => p.categoria_id === c.id && servicioIds.has(p.id) === (pestanaCobro === "servicios")))}
+                    existencias={existencias}
+                    sucursalId={caja.sucursal_id}
+                    sucursales={sucursalesTienda}
+                    actualizadoA={actualizadoA}
+                    cobroAbierto={totalesCobro != null}
+                    escaneoIgnorado={escaneoIgnorado}
+                    oculto={seccionTienda !== "panel"}
+                    cerrarAlEscanear={cerrarAlEscanear}
+                    bloqueado={menuBloqueado}
+                    selector={selectorRetail}
+                    onSelector={setSelectorRetail}
+                    cantidad={cantidadRetail}
+                    onCantidad={setCantidadRetail}
+                    aviso={avisoRetail}
+                    onAviso={setAvisoRetail}
+                    onAgregar={agregarTienda}
+                  />
+                </div>
+              )}
+            </div>
+          ) : capturaTienda ? (
+            <PanelVentaRetail
+              productos={productos}
+              categorias={categorias}
+              existencias={existencias}
+              sucursalId={caja.sucursal_id}
+              sucursales={sucursalesTienda}
+              actualizadoA={actualizadoA}
+              cobroAbierto={totalesCobro != null}
+              escaneoIgnorado={escaneoIgnorado}
+              // Fuera del Panel el lector no se escucha aquí: cada sección decide qué hace con el código.
+              oculto={seccionTienda !== "panel"}
+              cerrarAlEscanear={cerrarAlEscanear}
+              bloqueado={menuBloqueado}
+              selector={selectorRetail}
+              onSelector={setSelectorRetail}
+              cantidad={cantidadRetail}
+              onCantidad={setCantidadRetail}
+              aviso={avisoRetail}
+              onAviso={setAvisoRetail}
+              onAgregar={agregarTienda}
+            />
+          ) : (
+            <CatalogoProductos
+              categorias={categorias}
+              productos={productos}
+              bloqueado={menuBloqueado}
+              onTapProducto={onTapProducto}
+            />
+          )}
         <SidebarTicket
           estado={carrito}
-          modoTexto={ticketBd?.ticketId === cuentaBarraId ? "Barra" : undefined}
-          onCantidad={(id, c) => dispatch({ tipo: "cantidad", clientId: id, cantidad: c })}
-          onQuitar={(id) => dispatch({ tipo: "quitar", clientId: id })}
+          modoTexto={ticketBd?.ticketId === cuentaBarraId ? "Barra" : capturaTienda ? "Venta" : etiquetaModo(carrito.modoServicio, caja.giro)}
+          mostrador={comidaRapida}
+          // Comida rápida no tiene la fila de arriba con «Asignar cliente»: va en el menú «⋯» del ticket (la lealtad lo necesita).
+          clienteCuenta={comidaRapida && admiteClienteCuenta(carrito.modoServicio)
+            ? { nombre: carrito.clienteCuenta?.nombre ?? null, onAsignar: () => setClienteCuentaAbierto(true) }
+            : undefined}
+          tienda={capturaTienda ? {
+            renglon: (l) => renglonTienda(l.producto, productos ?? []),
+            sinExistencia: (l) => sinExistencia(l.producto, carrito.lineas.filter((x) => x.producto.id === l.producto.id).reduce((s, x) => s + x.cantidad, 0), existencias, caja.sucursal_id),
+            ultimoProductoId: ultimoTienda,
+            // Belleza no hace cambios de talla y su ticket vacío invita a elegir una cita.
+            ...(esBelleza(caja) ? { textoVacio: "Elige una cita, un servicio o escanea un producto" }
+              : esRopa(caja) ? { onCambioTalla: () => abrirCambioTalla() }
+                // Abarrotes, frutería, ferretería y vinos: sin cambio de talla ni «prenda».
+                : { textoVacio: "Escanea un producto para empezar" }),
+            simple: true,
+            onAsignarCliente: admiteClienteCuenta(carrito.modoServicio) ? () => setClienteCuentaAbierto(true) : undefined,
+            // Una cita sin clienta registrada trae su nombre en la cuenta.
+            cliente: carrito.clienteCuenta?.nombre ?? (carrito.citaId ? carrito.nombreCuenta ?? null : null),
+            // Belleza: quién hizo cada renglón; se cambia tocándolo mientras la venta no esté guardada.
+            ...(agenda ? {
+              colaborador: (l: LineaCarrito) => l.colaboradorId
+                ? { texto: nombreCorto(colaboradoresCobro?.find((c) => c.usuarioId === l.colaboradorId)?.nombre ?? "Colaborador"), falta: false }
+                : servicioIds.has(l.producto.id) ? { texto: "Elige quién lo hizo", falta: true } : { texto: "Sin colaborador", falta: false },
+              onColaborador: ticketBd ? undefined : setEligiendoColaborador,
+            } : {}),
+            onDescuentoProducto: cuentaImpresa ? undefined : (id) => void onAplicarDescuento(id),
+            onGuardarCotizacion: cotizar.ofrecer ? () => void guardarComoCotizacion() : undefined,
+            motivoSinCotizacion: cotizar.motivo,
+          } : undefined}
+          onCantidad={(id, c) => { setUltimoTienda(null); dispatch({ tipo: "cantidad", clientId: id, cantidad: c }); }}
+          onQuitar={(id) => { setUltimoTienda(null); dispatch({ tipo: "quitar", clientId: id }); }}
           // Cuenta con el ticket impreso: nada que cambie el total hasta reabrirla desde su lista.
           onCancelarItemPersistido={ticketBd && !cuentaImpresa ? onCancelarItemPersistido : undefined}
           onDescuentoItem={ticketBd && !cuentaImpresa ? onDescuentoItemSolicitado : undefined}
-          onLimpiar={!ticketBd ? () => dispatch({ tipo: "limpiar" }) : undefined}
+          onLimpiar={!ticketBd ? () => { setUltimoTienda(null); dispatch({ tipo: "limpiar" }); } : undefined}
           onCancelarTicket={ticketBd && !cuentaImpresa ? () => setCancelandoTicket(true) : undefined}
           onEditarCliente={() => setClienteDomAbierto(true)}
           onCambiarZona={() => setZonaPedidoAbierto(true)}
           onNotaLinea={(id, nota) => dispatch({ tipo: "nota_linea", clientId: id, nota })}
           onNotaOrden={(nota) => dispatch({ tipo: "nota_orden", nota })}
-          onCobrar={() => void iniciarCobro()}
+          onCobrar={() => { setUltimoTienda(null); void iniciarCobro(); }}
           onEfectivoExacto={() => void iniciarCobro("EFECTIVO_EXACTO")}
           cambioAnterior={cambioAnterior}
           // También en cuenta de mesa: lo que no ha salido a cocina se edita en la base (0119).
@@ -2746,7 +3676,7 @@ export function HomePos({
                 : undefined
           }
           folioCuenta={ticketBd?.folio ?? null}
-          onAplicarDescuento={cuentaImpresa ? undefined : onAplicarDescuento}
+          onAplicarDescuento={cuentaImpresa ? undefined : () => void onAplicarDescuento()}
           descuentoMxn={ticketBd?.descuentos ?? 0}
             promocionMxn={ticketBd?.promociones ?? 0}
           lealtadMxn={ticketBd?.lealtad ?? 0}
@@ -2755,14 +3685,267 @@ export function HomePos({
             ? {
                 nombre: clienteLealtad.nombre.split(" ")[0] ?? clienteLealtad.nombre,
                 franja,
-                onAbrir: admiteClienteCuenta(carrito.modoServicio) && carrito.lineas.length > 0 && !cuentaImpresa ? () => void onAbrirLealtad() : undefined,
+                onAbrir: ofreceCanje({ admite: admiteClienteCuenta(carrito.modoServicio), hayLineas: carrito.lineas.length > 0, impresa: cuentaImpresa, ventaDeCambio }) ? () => void onAbrirLealtad() : undefined,
               }
             : null}
           totalConDescuento={totalAutoritativo ?? undefined}
+          // La venta de un cambio, reabierta, ya trae el pago de la prenda: «Cobrar» pide solo lo que falta.
+          pendienteMxn={capturaTienda && totalAutoritativo != null && ticketBd?.estadoFiscal === "ABIERTO" && ticketBd.montoPagado > 0 ? ticketBd.pendiente : undefined}
           bloqueado={bloqueado}
-          procesando={procesandoCobro}
+          procesando={procesandoCobro || guardandoCotizacion || (comidaRapida && !configMostrador)} // comida rápida: sin la config del mostrador el cobro aún no puede preguntar
         />
       </div>
+      {barraAbajo && seccionTienda !== "panel" && (
+        <div className="flex min-h-0 flex-1 flex-col">
+          {seccionTienda === "pedidos" ? (
+            // Comida rápida: cada tarjeta abre la pantalla de siempre; al salir de ella se vuelve aquí.
+            <SeccionPedidos
+              domicilio={moduloActivo(modulos, "domicilio")}
+              enLinea={hayEnLinea}
+              expiradosEnLinea={expiradosApps}
+              nEnEspera={nEnEspera}
+              nParaLlevar={nAbiertasLlevar}
+              nPickup={nPickupPedidos}
+              nDomicilio={nDomicilioPedidos}
+              nEnLinea={nPedidosApps}
+              nMesa={nCuentasMesa}
+              barra={moduloActivo(modulos, "cuentas_barra")}
+              nBarra={cuentasAbiertas.barra}
+              onBarra={() => setEnBarra(true)}
+              onEnEspera={() => { setEsperaError(null); setEsperaListaAbierta(true); }}
+              onParaLlevar={() => { setLlevarError(null); setLlevarListaAbierta(true); }}
+              onPickup={() => setEnPickup(true)}
+              onDomicilio={() => setEnDelivery(true)}
+              onEnLinea={() => setEnPedidosApps(true)}
+              onMesa={() => setEnMesas(true)}
+              onNuevoRecoger={() => abrirCuentaNueva("DRIVE_THRU")}
+              onNuevoDomicilio={() => abrirCuentaNueva("DELIVERY_PROPIO")}
+            />
+          ) : seccionTienda === "calendario" ? (
+            <SeccionCalendario
+              token={token}
+              sucursalId={caja.sucursal_id}
+              version={agendaVersion}
+              onAbrirCita={setFichaCita}
+              onNuevaCita={(inicio, usuarioId) => setModalCita({ inicio, usuarioId })}
+              onAbrirEspera={() => setEsperaAgendaAbierta(true)}
+            />
+          ) : seccionTienda === "clientes" ? (
+            <SeccionClientes
+              token={token}
+              lealtad={lealtadActiva}
+              version={agendaVersion}
+              onAgendar={(cliente) => setModalCita({ cliente })}
+            />
+          ) : seccionTienda === "configuracion" && enCotizaciones ? (
+            <SeccionCotizaciones
+              token={token}
+              cajaId={turno.caja_id}
+              whatsapp={whatsappCotizacion}
+              onReimprimir={(c) => { imprimirCotizacion(c, (e) => setVistaCotizacion({ c, e })).catch(() => setError("No se pudo imprimir la cotización")); }}
+              onConvertir={convertirCotizacion}
+              onNueva={conVentaSuelta(() => { void irASeccion("panel"); setAvisoCotizacion("Arma la cotización y guárdala desde ⋯."); })}
+              onVolver={() => setEnCotizaciones(false)}
+            />
+          ) : seccionTienda === "configuracion" && enCreditos ? (
+            <SeccionCreditos
+              token={token}
+              cajaId={turno.caja_id}
+              turnoId={turno.id}
+              onVolver={() => setEnCreditos(false)}
+            />
+          ) : seccionTienda === "configuracion" ? (
+            <>
+              <div className="flex flex-shrink-0 items-center gap-4 border-b border-line bg-surface px-4 py-3">
+                <h1 className="font-display text-20 font-semibold tracking-tight">Más</h1>
+              </div>
+              {acceso.actualizacion && acceso.nivel !== "bloqueado" && <BandaActualizacion version={acceso.actualizacion} />}
+              {pedidosEnMas && hayEnLinea && expiradosApps > 0 && <AvisoVencidos n={expiradosApps} onClick={() => setEnPedidosApps(true)} className="mx-8 mt-4" />}
+              <div className="min-h-0 flex-1 overflow-y-auto px-8 py-8">
+                <ContenidoMenu
+                  enPagina
+                  pedidos={pedidosEnMas ? tarjetasPedidos({
+                    domicilio: moduloActivo(modulos, "domicilio"), enLinea: hayEnLinea,
+                    nEnEspera, nParaLlevar: nAbiertasLlevar, nPickup: nPickupPedidos, nDomicilio: nDomicilioPedidos, nEnLinea: nPedidosApps, nMesa: nCuentasMesa,
+                    barra: moduloActivo(modulos, "cuentas_barra"), nBarra: cuentasAbiertas.barra, onBarra: () => setEnBarra(true),
+                    onEnEspera: () => { setEsperaError(null); setEsperaListaAbierta(true); },
+                    onParaLlevar: () => { setLlevarError(null); setLlevarListaAbierta(true); },
+                    onPickup: () => setEnPickup(true),
+                    onDomicilio: () => setEnDelivery(true),
+                    onEnLinea: () => setEnPedidosApps(true),
+                    onMesa: () => setEnMesas(true),
+                  }) : undefined}
+                  onCorteX={() => setEnMonitor(true)}
+                  onKds={() => setEnKds(true)}
+                  // Sin «Devoluciones»: en la tienda vive en Transacciones, con la venta elegida.
+                  onEnEspera={nEnEspera > 0 && !pedidosEnMas ? () => { setEsperaError(null); setEsperaListaAbierta(true); } : undefined}
+                  onAbrirCajon={() => setAbrirCajaAbierto(true)}
+                  onMovimientoCaja={() => setMovimientoAbierto(true)}
+                  // Créditos y cotizaciones son de la venta de tienda; comida rápida cobra como restaurante.
+                  onCreditos={tienda ? () => setEnCreditos(true) : undefined}
+                  onCotizaciones={tienda ? () => setEnCotizaciones(true) : undefined}
+                  onConsultarCuentas={comidaRapida ? () => setEnConsultaCuentas(true) : undefined}
+                  nEnEspera={nEnEspera}
+                  onCambiarCajero={conVentaSuelta(onCambiarCajero)}
+                  onBloquear={conVentaSuelta(onBloquear)}
+                  onCambiarPin={() => setCambiarPinAbierto(true)}
+                  onMisPropinas={() => setMisPropinasAbierto(true)}
+                  onImpresora={() => setConfigImpresoraAbierto(true)}
+                  onCerrarTurno={conVentaSuelta(() => setConfirmandoCierre(true))}
+                  onSalir={puedeSalir ? conVentaSuelta(() => setSalirCajaAbierto(true)) : undefined}
+                  ayuda={{ negocio: caja.negocioNombre, sucursal: caja.sucursalNombre, caja: caja.nombre, cajero: empleado.nombre }}
+                />
+              </div>
+            </>
+          ) : seccionTienda === "transacciones" ? (
+            <SeccionTransacciones
+              caja={caja}
+              turno={turno}
+              token={token}
+              productos={productos ?? []}
+              escaneoIgnorado={escaneoIgnorado}
+              onBusqueda={(cerrar) => setCerrarBusquedaTx(() => cerrar)}
+              onAbrirCuenta={(id) => abrirDesdeTransacciones(id)}
+              onRetomar={(id, etiqueta) => abrirDesdeTransacciones(id, etiqueta)}
+              onDevolver={(id) => { setVentaElegida(id); setEnDevoluciones(true); }}
+              onCambio={esRopa(caja) ? (id) => abrirCambioTalla(id) : undefined}
+              onReimprimir={(id) => reimprimirCuenta(id, { origen: "CONSULTA" })}
+              onReabrir={setReabriendoTx}
+              onCambiarPago={setCambiandoPagoTx}
+              version={txVersion}
+            />
+          ) : seccionTienda === "inventario" && comidaRapida && !conExistencias ? (
+            // Cafetería sin el módulo: Inventario siempre está en su barra, pero sin existencias no hay qué contar ni recibir.
+            <div className="flex min-h-0 flex-1 flex-col">
+              <div className="flex flex-shrink-0 items-center gap-4 border-b border-line bg-surface px-4 py-3">
+                <h1 className="font-display text-20 font-semibold tracking-tight">Inventario</h1>
+              </div>
+              <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
+                <p className="font-display text-18 font-semibold">Tu negocio no lleva existencias</p>
+                <p className="max-w-md text-15 text-ink-2">Para ver cuánto te queda de cada producto y recibir mercancía, pide a VIM que te las active{waSoporte ? " desde Más › Ayuda por WhatsApp" : ""}.</p>
+              </div>
+            </div>
+          ) : seccionTienda === "inventario" ? (
+            <SeccionInventario
+              productos={productos ?? []}
+              existencias={existencias}
+              sucursalId={caja.sucursal_id}
+              sucursales={sucursalesTienda}
+              actualizadoA={actualizadoA}
+              escaneoIgnorado={escaneoIgnorado}
+              // Recibir mueve existencias: lo pide el permiso de productos (config.productos), que aquí se infiere del rol.
+              puedeRecibir={puedeRecibirMercancia(empleado.rol)}
+              token={token}
+              onRecibido={() => { leerExistencias(token).then(setExistencias).catch(() => {}); }}
+              onPendiente={(n) => { recepcionPendiente.current = n; }}
+              confirmarDescarte={confirmarDescarteRecepcion}
+              onCambiarCajero={conVentaSuelta(onCambiarCajero)}
+              onAbierto={(cerrar) => setCerrarConsultaInv(() => cerrar)}
+              productoInicial={productoInventario}
+            />
+          ) : (
+            <SeccionNotificaciones
+              notificaciones={notificaciones}
+              onAbrirProducto={(id) => { setProductoInventario(id); void irASeccion("inventario"); }}
+            />
+          )}
+        </div>
+      )}
+      {barraAbajo && (
+        <BarraTienda
+          destinos={destinosDe(caja, agenda, conExistencias)}
+          seccion={seccionTienda}
+          onCambiar={(s) => { setProductoInventario(null); void irASeccion(s); }}
+          pendientes={vistas ? sinVer(notificaciones, vistas) : 0}
+          pendientesPedidos={comidaRapida ? globoPedidos(hayEnLinea ? nPedidosApps : 0, porAceptarTienda, nEnEspera) : 0}
+          bloqueada={!puedeCambiarSeccion(algoAbierto || avisoTiendaVisible, totalesCobro != null)}
+        />
+      )}
+      {avisosVim && avisosVim.length > 0 && (
+        <DialogoAvisos
+          avisos={avisosVim}
+          onCerrar={() => {
+            // Acusados aquí: el globo de Notificaciones ya no los cuenta.
+            const ids = [...new Set([...(vistas ?? leerVistas(turno.caja_id)), ...avisosVim.map((a) => a.id)])];
+            setVistas(ids);
+            guardarVistas(turno.caja_id, ids);
+            setAvisosVim([]);
+          }}
+        />
+      )}
+      {salirCajaAbierto && <ConfirmarSalirCaja onCancelar={() => setSalirCajaAbierto(false)} />}
+      {dialogoConfirmar}
+      {agenda && esperaAgendaAbierta && (
+        <PanelEspera
+          token={token}
+          sucursalId={caja.sucursal_id}
+          version={agendaVersion}
+          onAbrirCita={setFichaCita}
+          onAgregar={() => setModalCita({ espera: true })}
+          onAtendida={agendaCambio}
+          onCerrar={() => setEsperaAgendaAbierta(false)}
+        />
+      )}
+      {agenda && eligiendoColaborador && (() => {
+        const l = carrito.lineas.find((x) => x.clientId === eligiendoColaborador);
+        return l ? (
+          <ElegirColaborador
+            servicio={l.producto.nombre}
+            colaboradores={colaboradoresCobro ?? []}
+            actual={l.colaboradorId ?? null}
+            permiteNadie={!servicioIds.has(l.producto.id)}
+            onElegir={(id) => fijarColaborador(l.clientId, id)}
+            onCerrar={() => setEligiendoColaborador(null)}
+          />
+        ) : null;
+      })()}
+      {agenda && servicioPorAgregar && (
+        <ElegirColaborador
+          servicio={servicioPorAgregar.producto.nombre}
+          colaboradores={colaboradoresCobro ?? []}
+          actual={null}
+          permiteNadie={false}
+          onElegir={(id) => {
+            const x = servicioPorAgregar;
+            setServicioPorAgregar(null);
+            if (id) void agregarSuelto(x.producto, x.mods, x.nota, x.cantidad, id).catch((e) => setError(e instanceof Error ? e.message : "No se pudo agregar el servicio"));
+          }}
+          onCerrar={() => setServicioPorAgregar(null)}
+        />
+      )}
+      {agenda && fichaCita && (
+        <FichaCita
+          token={token}
+          citaId={fichaCita}
+          negocio={caja.negocioNombre}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          ejecutaNombre={empleado.nombre}
+          ofrecerAnticipo={ofrecerAnticipo}
+          onMover={(cita) => setModalCita({ cita })}
+          onCambio={agendaCambio}
+          onCerrar={() => { setFichaCita(null); setOfrecerAnticipo(false); }}
+        />
+      )}
+      {agenda && modalCita && (
+        <ModalCita
+          token={token}
+          tenantId={caja.tenant_id}
+          sucursalId={caja.sucursal_id}
+          abrir={modalCita}
+          onGuardada={(nuevaId) => {
+            // Mover cierra también la ficha: la cita cambió de lugar y se ve en el calendario.
+            if (modalCita.cita) setFichaCita(null);
+            setModalCita(null);
+            agendaCambio();
+            // Cita nueva en un negocio que cobra por adelantado: la ficha abre «Cobrar anticipo».
+            if (nuevaId) void configCobroAgenda(token).then((c) => {
+              if (c.modo !== "AL_FINAL") { setOfrecerAnticipo(true); setFichaCita(nuevaId); }
+            }).catch((e) => setError(`La cita se guardó, pero no se pudo saber si cobra anticipo: ${e instanceof Error ? e.message : "error"}. Ábrela para cobrarlo.`));
+          }}
+          onCerrar={() => setModalCita(null)}
+        />
+      )}
 
       {esperaPidiendoEtiqueta && (
         <ModalEtiquetaEspera
@@ -2781,7 +3964,7 @@ export function HomePos({
           producto={modGrupos.producto}
           grupos={modGrupos.grupos}
           inicial={modGrupos.edicion ? { modificadores: modGrupos.edicion.modificadores, nota: modGrupos.edicion.notaCocina } : null}
-          cantidadLinea={modGrupos.edicion?.cantidad ?? 1}
+          cantidadLinea={modGrupos.edicion && !aGranel(modGrupos.edicion.producto.tipoVenta) ? modGrupos.edicion.cantidad : 1}
           onConfirmar={confirmarModificadores}
           onCancelar={() => setModGrupos(null)}
         />
@@ -2847,6 +4030,7 @@ export function HomePos({
           totalActual={ticketBd.total}
           cajaId={turno.caja_id}
           turnoId={turno.id}
+          tienda={tienda}
           onCancelado={() => {
             // Resetear todo: carrito local, ticketBd, items persistidos.
             dispatch({ tipo: "limpiar" });
@@ -2867,6 +4051,7 @@ export function HomePos({
           ticketItemId={descuentoItem.id}
           productoNombre={descuentoItem.productoNombre}
           cantidad={descuentoItem.cantidad}
+          tipoVenta={descuentoItem.tipoVenta}
           totalItem={descuentoItem.totalItemMxn}
           cajaId={turno.caja_id}
           turnoId={turno.id}

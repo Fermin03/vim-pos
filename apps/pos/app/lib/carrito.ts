@@ -5,6 +5,7 @@ import type { ClienteDomicilio } from "./clientes-domicilio";
 import type { ClienteCuenta } from "./clientes-cuenta";
 import type { ComboDef, ComponenteSel } from "./combos";
 import { redondearCentavos } from "./dinero";
+import { aGranel } from "./unidades";
 
 export type ModoServicio = "COMER_AQUI" | "PARA_LLEVAR" | "DRIVE_THRU" | "DELIVERY_PROPIO";
 
@@ -28,6 +29,10 @@ export type LineaCarrito = {
   /** Solo líneas de combo: el padre es `producto`, los hijos son `componentes`. `precioUnitario` se
    *  congela al confirmar (precioCombo) para que la línea no dependa del catálogo después. */
   combo?: { def: ComboDef; componentes: ComponenteSel[]; precioUnitario: number };
+  /** Belleza: quien lo hizo (`usuario_id`). Va a `agregar_item_a_ticket(p_colaborador_id)`. */
+  colaboradorId?: string;
+  /** Belleza: el tramo de la cita de donde salió el renglón. */
+  citaServicioId?: string;
 };
 
 export type EstadoCarrito = {
@@ -46,6 +51,10 @@ export type EstadoCarrito = {
    * (`clienteDomicilio`). No confundir con `nombreCuenta`, que es un nombre suelto sin registro.
    */
   clienteCuenta?: ClienteCuenta | null;
+  /** La cotización que se convirtió en esta venta (0212): al quedar PAGADO se marca CONVERTIDA. «Limpiar» la suelta. */
+  cotizacionId?: string | null;
+  /** Belleza: la cita que se cobra con esta venta (`vincular_cita_ticket`); al pagarse queda COBRADA. */
+  citaId?: string | null;
 };
 
 /** Los modos donde se puede asignar un cliente a la cuenta (domicilio va aparte). */
@@ -62,12 +71,14 @@ export function clienteIdParaTicket(e: EstadoCarrito): string | null {
 export const estadoInicial: EstadoCarrito = { modoServicio: "COMER_AQUI", lineas: [], clienteDomicilio: null, notaOrden: null, nombreCuenta: null, envio: null, clienteCuenta: null };
 
 export type AccionCarrito =
-  | { tipo: "agregar"; linea: LineaCarrito }
+  /** `sumarSiIgual` (solo la tienda): la misma pieza suelta suma a su renglón en vez de abrir otro. */
+  | { tipo: "agregar"; linea: LineaCarrito; sumarSiIgual?: boolean }
   | { tipo: "reemplazar"; linea: LineaCarrito }
   | { tipo: "editar"; clientId: string; editada: LineaCarrito; alcance: AlcanceEdicion }
   | { tipo: "cantidad"; clientId: string; cantidad: number }
   | { tipo: "quitar"; clientId: string }
-  | { tipo: "modo"; modo: ModoServicio }
+  /** `nombre` (comida rápida, al cobrar): el nombre de la cuenta, que el cambio de modo borraría. */
+  | { tipo: "modo"; modo: ModoServicio; nombre?: string | null }
   | { tipo: "cliente"; cliente: ClienteDomicilio | null }
   | { tipo: "cliente_cuenta"; cliente: ClienteCuenta | null }
   | { tipo: "nota_linea"; clientId: string; nota: string | null }
@@ -75,12 +86,35 @@ export type AccionCarrito =
   | { tipo: "nombre_cuenta"; nombre: string | null }
   | { tipo: "zona"; envio: EnvioCarrito | null }
   | { tipo: "cargar"; estado: EstadoCarrito }
-  | { tipo: "limpiar" };
+  /** Belleza: la venta pasa a ser la de la cita (reemplaza el carrito; quien llama pregunta antes).
+   *  Sin clienta registrada, su nombre queda como nombre de la cuenta. */
+  | { tipo: "cargar_cita"; citaId: string; lineas: LineaCarrito[]; cliente: ClienteCuenta | null; nombre: string | null }
+  /** Belleza: quién hizo el renglón (null = nadie); `precio` = el suyo con esa persona. */
+  | { tipo: "fijar_colaborador"; clientId: string; colaboradorId: string | null; precio?: number }
+  | { tipo: "limpiar" }
+  /** Comida rápida: un carrito VACÍO que se quedó en Pick-up o Domicilio vuelve a Para llevar (sin
+   *  envío, cliente ni nombre). Con renglones, o ya en mostrador, no cambia nada. */
+  | { tipo: "volver_a_mostrador" };
 
 export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): EstadoCarrito {
+  const r = reducirCarrito(estado, accion);
+  // Vaciado renglón por renglón (sin «Limpiar»): lo que se capture después ya no es la venta de la
+  // cotización, y marcarla CONVERTIDA con ese ticket sería mentir.
+  // Lo mismo con la cita: ligarla a una venta sin sus servicios la marcaría COBRADA sin serlo.
+  return r.lineas.length === 0 && (r.cotizacionId || r.citaId) ? { ...r, cotizacionId: null, citaId: null } : r;
+}
+
+function reducirCarrito(estado: EstadoCarrito, accion: AccionCarrito): EstadoCarrito {
   switch (accion.tipo) {
-    case "agregar":
-      return { ...estado, lineas: [...estado.lineas, accion.linea] };
+    case "agregar": {
+      const l = accion.linea;
+      // A granel cada pesada es su propio renglón: nunca se suma.
+      const simple = (x: LineaCarrito) => !x.combo && x.modificadores.length === 0 && !x.notaCocina && !aGranel(x.producto.tipoVenta);
+      // Se decide aquí, sobre el estado vigente: dos escaneos seguidos suman 2 aunque lleguen juntos.
+      const igual = accion.sumarSiIgual && simple(l) ? estado.lineas.find((x) => x.producto.id === l.producto.id && x.colaboradorId === l.colaboradorId && simple(x)) : undefined;
+      if (igual) return { ...estado, lineas: estado.lineas.map((x) => (x === igual ? { ...x, cantidad: x.cantidad + l.cantidad } : x)) };
+      return { ...estado, lineas: [...estado.lineas, l] };
+    }
     case "reemplazar":
       // Sustituye la línea EN SU LUGAR (edición de combo desde el ticket): no se debe reordenar.
       return { ...estado, lineas: estado.lineas.map((l) => (l.clientId === accion.linea.clientId ? accion.linea : l)) };
@@ -89,6 +123,20 @@ export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): Es
     case "cargar":
       // T2 — reemplaza el carrito completo (reconstrucción desde un ticket persistido de mesa).
       return accion.estado;
+    case "cargar_cita":
+      return { ...estadoInicial, modoServicio: "PARA_LLEVAR", lineas: accion.lineas, clienteCuenta: accion.cliente, nombreCuenta: accion.cliente ? null : accion.nombre, citaId: accion.citaId };
+    case "fijar_colaborador":
+      return {
+        ...estado,
+        lineas: estado.lineas.map((l) => {
+          if (l.clientId !== accion.clientId) return l;
+          const producto = accion.precio === undefined ? l.producto : { ...l.producto, precio_base_mxn: accion.precio };
+          const nueva: LineaCarrito = { ...l, producto };
+          if (accion.colaboradorId) nueva.colaboradorId = accion.colaboradorId;
+          else delete nueva.colaboradorId;
+          return nueva;
+        }),
+      };
     case "cantidad":
       return {
         ...estado,
@@ -100,7 +148,7 @@ export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): Es
       return { ...estado, lineas: estado.lineas.filter((l) => l.clientId !== accion.clientId) };
     case "modo":
       // Al salir de Domicilio se limpia el cliente asociado y el envío.
-      return { ...estado, modoServicio: accion.modo, clienteDomicilio: accion.modo === "DELIVERY_PROPIO" ? estado.clienteDomicilio ?? null : null, nombreCuenta: accion.modo === "DRIVE_THRU" ? estado.nombreCuenta ?? null : null, envio: accion.modo === "DELIVERY_PROPIO" ? estado.envio ?? null : null, clienteCuenta: admiteClienteCuenta(accion.modo) ? estado.clienteCuenta ?? null : null };
+      return { ...estado, modoServicio: accion.modo, clienteDomicilio: accion.modo === "DELIVERY_PROPIO" ? estado.clienteDomicilio ?? null : null, nombreCuenta: accion.nombre !== undefined ? accion.nombre : accion.modo === "DRIVE_THRU" ? estado.nombreCuenta ?? null : null, envio: accion.modo === "DELIVERY_PROPIO" ? estado.envio ?? null : null, clienteCuenta: admiteClienteCuenta(accion.modo) ? estado.clienteCuenta ?? null : null };
     case "cliente":
       return { ...estado, clienteDomicilio: accion.cliente };
     case "cliente_cuenta":
@@ -122,6 +170,9 @@ export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): Es
       // del mismo cliente sin cargo de envío. El cliente de la cuenta, en cambio, se suelta: en
       // mostrador el siguiente pedido es de otra persona.
       return { modoServicio: estado.modoServicio, lineas: [], clienteDomicilio: estado.clienteDomicilio ?? null, notaOrden: null, nombreCuenta: null, envio: estado.envio ?? null, clienteCuenta: null };
+    case "volver_a_mostrador":
+      if (estado.lineas.length > 0 || estado.modoServicio === "PARA_LLEVAR" || estado.modoServicio === "COMER_AQUI") return estado;
+      return reducerCarrito(estado, { tipo: "modo", modo: "PARA_LLEVAR" });
     default:
       return estado;
   }
@@ -179,7 +230,8 @@ export function aplicarEdicion(
  * La primera línea conserva el `clientId` de la original; la separada lleva uno nuevo.
  */
 export function lineasDeEdicion(original: LineaCarrito, editada: LineaCarrito, alcance: AlcanceEdicion): LineaCarrito[] | null {
-  if (alcance === "una" && original.cantidad > 1) {
+  // Un renglón a granel es UNA pesada: se edita completo (1.25 kg no se parte en 0.25 + 1).
+  if (alcance === "una" && original.cantidad > 1 && !aGranel(original.producto.tipoVenta)) {
     if (mismaLinea(original, editada)) return null;
     return [{ ...original, cantidad: original.cantidad - 1 }, { ...editada, clientId: nuevoClientId(), cantidad: 1 }];
   }
@@ -247,6 +299,10 @@ export function nuevoClientId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
   return uuidV4Respaldo();
 }
+
+/** Un renglón suelto (sin combo). Una pesada a granel lleva su cantidad, también con modificadores. */
+export const lineaSuelta = (producto: Producto, modificadores: ModificadorSel[], notaCocina: string | null, cantidad = 1): LineaCarrito =>
+  ({ clientId: nuevoClientId(), producto, cantidad, modificadores, notaCocina });
 
 /** uuid v4 sin `crypto.randomUUID`. Usa `getRandomValues` (sí existe fuera de https) y, si ni eso,
  *  `Math.random`: para un id de idempotencia basta con que no choque, no con que sea secreto. */

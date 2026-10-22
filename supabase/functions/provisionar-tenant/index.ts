@@ -30,7 +30,7 @@ import { clienteAdmin, servir } from "../_shared/http.ts";
 import { consumirCupo, cupoAgotado, ipDeLaPeticion, type Cupo } from "../_shared/limite.ts";
 import { cabeceraDeModo, igualSeguro, modoProvision } from "../_shared/provision.ts";
 
-const VERTICALES = ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "DARK_KITCHEN", "BAR", "CAFETERIA", "TAQUERIA"];
+const VERTICALES = ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "DARK_KITCHEN", "BAR", "CAFETERIA", "TAQUERIA", "RETAIL", "ABARROTES", "FRUTERIA", "FERRETERIA", "VINOS", "SALON", "SPA", "PELUQUERIA", "BARBERIA", "TATUAJES"];
 
 /** Fallos de secreto por IP. Con un secreto de 256 bits la fuerza bruta no es el riesgo real: esto
  *  corta el ruido y deja rastro. No hay tope GLOBAL de fallos a propósito: permitiría que

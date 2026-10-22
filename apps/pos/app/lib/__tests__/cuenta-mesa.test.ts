@@ -82,3 +82,14 @@ describe("envioReconstruido", () => {
     expect(envioReconstruido([], null)).toBeNull();
   });
 });
+
+describe("agruparPadresHijos — belleza", () => {
+  it("una venta guardada retomada conserva quién hizo cada renglón", () => {
+    const lineas = agruparPadresHijos([
+      fila({ id: "A", producto_id: "p1", client_id_local: "a", colaborador_id: "diego" }),
+      fila({ id: "B", producto_id: "a1", client_id_local: "b", colaborador_id: null }),
+    ], porId, []);
+    expect(lineas[0]).toMatchObject({ clientId: "a", colaboradorId: "diego" });
+    expect(lineas[1]).not.toHaveProperty("colaboradorId");
+  });
+});

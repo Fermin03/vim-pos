@@ -7,6 +7,7 @@ import { tamanoCifra, tamanoNombre } from "../lib/pantalla-cliente/medidas";
 import { CLAVE_NEGOCIO, negocioAlAbrir, queEnsenaReposo, recordarNegocio } from "../lib/pantalla-cliente/negocio";
 import type { Negocio, RenglonCliente, VistaCliente } from "../lib/pantalla-cliente/vista";
 import { fmtMxn } from "../lib/turno";
+import { cantidadRenglon } from "../lib/unidades";
 import { CarruselAnuncios } from "./carrusel-anuncios";
 
 /*
@@ -235,7 +236,7 @@ function Pagado({ cambio }: { cambio: number }) {
  *  vista tendría que cruzar medio monitor del nombre al importe); en vertical ocupa todo. */
 const COLUMNA = "mx-auto w-full max-w-[130vmin] px-[5vmin]";
 const RENGLON = "flex items-baseline gap-[2.5vmin] border-t border-line py-[2vmin] text-[4vmin] leading-tight first:border-t-0";
-const CANTIDAD = "min-w-[8vmin] shrink-0 text-right font-display font-semibold tabular-nums text-ink-2";
+const CANTIDAD = "min-w-[8vmin] shrink-0 whitespace-nowrap text-right font-display font-semibold tabular-nums text-ink-2";
 const IMPORTE = "shrink-0 whitespace-nowrap font-display font-semibold tabular-nums";
 
 function Cuenta({ renglones, envio, total }: { renglones: RenglonCliente[]; envio: { nombre: string; importe: number } | null; total: number }) {
@@ -262,7 +263,7 @@ function Cuenta({ renglones, envio, total }: { renglones: RenglonCliente[]; envi
         <ul className={`${COLUMNA} flex-1 overflow-hidden pt-[4vmin]`}>
           {renglones.map((r) => (
             <li key={r.id} className={`${RENGLON} ${deEntrada.has(r.id) ? "" : ENTRADA_RENGLON}`}>
-              <span className={CANTIDAD}>{r.cantidad}×</span>
+              <span className={CANTIDAD}>{cantidadRenglon(r.cantidad, r.tipoVenta)}</span>
               <span className="min-w-0 flex-1">
                 <span className="block break-words font-medium">{r.nombre}</span>
                 {r.detalle.length > 0 && <span className="mt-[0.6vmin] block break-words text-[2.8vmin] leading-snug text-ink-2">{r.detalle.join(" · ")}</span>}

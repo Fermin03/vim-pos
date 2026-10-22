@@ -26,6 +26,7 @@ export function CobroCompletado({
   folio,
   cambio,
   total,
+  aCredito = false,
   estadoTicket,
   puedeImprimir,
   pausa,
@@ -34,7 +35,10 @@ export function CobroCompletado({
 }: {
   folio: string | null;
   cambio: number;
+  /** null = la cuenta se cerró sin cobrar nada (ya estaba cubierta): «Sin cobro». */
   total: number | null;
+  /** Venta a crédito: no entró dinero, y en vez de «Sin cobro» dice «A crédito». */
+  aCredito?: boolean;
   estadoTicket: "idle" | "lista" | "error";
   /** El recibo ya se armó. */
   puedeImprimir: boolean;
@@ -97,9 +101,9 @@ export function CobroCompletado({
             )}
           </>
         ) : (
-          total != null && (
-            <div className="mt-2 text-16 font-medium tabular-nums text-ink-2">Total {fmtMxn(total)} · sin cambio</div>
-          )
+          <div className="mt-2 text-16 font-medium tabular-nums text-ink-2">
+            {total != null ? `Total ${fmtMxn(total)} · sin cambio` : aCredito ? "A crédito" : "Sin cobro"}
+          </div>
         )}
 
         {estadoTicket === "error" && (

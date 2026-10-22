@@ -13,6 +13,8 @@ import {
   leerDatosFiscales,
   leerEstadisticasTurno,
   leerMovimientosTurno,
+  filasDeclarables,
+  filasAnticipos,
   type ReporteXResumen,
   type CorteResultado,
   type CierreZ,
@@ -22,6 +24,7 @@ import {
 } from "../lib/cierre";
 import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
+import { esBelleza } from "../lib/tienda";
 import { construirReporteZJob, type DatosReporteZ } from "../lib/print/reporte-z-builder";
 import { obtenerImpresora } from "../lib/print/adapter";
 import { ReciboPreview } from "./recibo-preview";
@@ -66,6 +69,8 @@ export function PantallaCierre({
   /** Lleva a la cuenta que bloquea el corte, para cobrarla o cancelarla ahí mismo. */
   onIrACuenta?: (ticketId: string) => void;
 }) {
+  // Belleza: las cuatro cifras de anticipos van siempre, también en $0 (informativas, no se declaran).
+  const belleza = esBelleza(caja);
   const [resumen, setResumen] = useState<ReporteXResumen | null>(null);
   const [negocio, setNegocio] = useState("");
   const [fiscales, setFiscales] = useState<DatosFiscales | null>(null);
@@ -123,7 +128,7 @@ export function PantallaCierre({
         setTicketsAbiertos(abiertos);
         // Prellenar declarado de métodos no-efectivo con su esperado (verificable)
         const pre: Record<string, string> = {};
-        for (const p of x.pagosPorMetodo) if (p.metodo !== "EFECTIVO") pre[p.metodo] = String(p.total);
+        for (const f of filasDeclarables(x)) if (f.metodo !== "EFECTIVO") pre[f.metodo] = String(f.esperado);
         setDeclarado(pre);
       })
       .catch((e) => activo && setError(e instanceof Error ? e.message : "Error al leer el turno"));
@@ -132,8 +137,7 @@ export function PantallaCierre({
 
   const filas = useMemo<Fila[]>(() => {
     if (!resumen) return [];
-    const noEfectivo = resumen.pagosPorMetodo.filter((p) => p.metodo !== "EFECTIVO").map((p) => ({ metodo: p.metodo, esperado: p.total }));
-    return [{ metodo: "EFECTIVO", esperado: resumen.efectivoEsperado }, ...noEfectivo];
+    return filasDeclarables(resumen);
   }, [resumen]);
 
   // Qué cuentas bloquean, no solo cuántas. Se cargan solo cuando estorban: si el corte sale
@@ -447,6 +451,11 @@ export function PantallaCierre({
               <Row l="Tickets pagados" v={String(resumen.ticketsPagados)} />
               <Row l="Tickets cancelados" v={String(resumen.ticketsCancelados)} />
               <Row l="Fondo de apertura" v={fmtMxn(resumen.fondoApertura)} />
+              {/* Crédito (0208/0209): no entró dinero, así que no se cuenta. Solo para saberlo. */}
+              {resumen.ventasACredito > 0 && <Row l="Vendido a crédito" v={fmtMxn(resumen.ventasACredito)} />}
+              {resumen.pagadoConSaldoFavor > 0 && <Row l="Pagado con saldo a favor" v={fmtMxn(resumen.pagadoConSaldoFavor)} />}
+              {/* Anticipos de cita (0222): informativos, nunca se declaran. */}
+              {belleza && filasAnticipos(resumen).map((f) => <Row key={f.l} l={f.l} v={fmtMxn(f.v)} />)}
               {/* Venta, propinas y efectivo esperado se ven en el resultado: con ellos a la vista
                   se puede sacar la cuenta del cajón y el conteo deja de ser ciego. */}
               <p className="mt-4 rounded border border-line bg-sel px-3 py-2.5 text-13 leading-snug text-ink-2">
@@ -560,6 +569,13 @@ export function PantallaCierre({
                 </span>
               </div>
             </div>
+            {(resumen.ventasACredito > 0 || resumen.pagadoConSaldoFavor > 0 || belleza) && (
+              <div className="mt-3 px-1 text-14">
+                {resumen.ventasACredito > 0 && <Row l="Vendido a crédito (no se cuenta)" v={fmtMxn(resumen.ventasACredito)} />}
+                {resumen.pagadoConSaldoFavor > 0 && <Row l="Pagado con saldo a favor (no se cuenta)" v={fmtMxn(resumen.pagadoConSaldoFavor)} />}
+                {belleza && filasAnticipos(resumen).map((f) => <Row key={f.l} l={f.l} v={fmtMxn(f.v)} />)}
+              </div>
+            )}
             <div className="mt-5 flex items-center justify-between gap-3">
               {/* Sin diferencia no hay nada que recontar. Con diferencia, volver pide autorización:
                   si no, el corte ciego se vuelve "ver la cifra y corregir". */}

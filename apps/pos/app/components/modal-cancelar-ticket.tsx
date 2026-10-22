@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DialogoPeligro } from "@vim/ui/styles";
 import { type Empleado } from "../lib/supabase";
 import { cancelarTicket, MOTIVOS_TICKET, type MotivoTicket } from "../lib/cancelacion";
@@ -8,6 +8,7 @@ import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
 import { AvisoAutorizacion, MotivoChips, etiquetaMotivo } from "./motivo-y-autorizacion";
 import { fmtMxn } from "../lib/turno";
 import { devolucionFueraDePlazo, HORAS_PARA_DEVOLVER_EN_LINEA } from "../lib/pedidos-en-linea";
+import { pagoInternoDelCambio } from "../lib/cambio-talla";
 
 /** Roles con `venta.cancelar_abierta` por defecto (matriz §2.2). */
 const ROLES_CANCELAR = ["CAJERO", "SUPERVISOR", "ADMIN", "DUENO"];
@@ -29,6 +30,7 @@ export function ModalCancelarTicket({
   pagada = false,
   enLinea = false,
   cuentaDesde,
+  tienda = false,
   onCancelado,
   onCerrar,
 }: {
@@ -47,6 +49,8 @@ export function ModalCancelarTicket({
   enLinea?: boolean;
   /** Con `enLinea`: cuándo nació la cuenta (ya cobrada). Pasado el plazo, cancelar ya no devuelve el pago: no se cancela aquí. */
   cuentaDesde?: string | null;
+  /** Giro RETAIL: si es la venta abierta de un cambio, avisa el efectivo que se le regresa (0196). */
+  tienda?: boolean;
   onCancelado: () => void;
   onCerrar: () => void;
 }) {
@@ -57,6 +61,15 @@ export function ModalCancelarTicket({
   const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
   const [pidiendoPin, setPidiendoPin] = useState(false);
+  /** Efectivo que se le regresa: el pago interno de la venta de un cambio (solo tienda, sin cobrar). */
+  const [regresa, setRegresa] = useState(0);
+
+  useEffect(() => {
+    if (!tienda || pagada) return;
+    let vivo = true;
+    pagoInternoDelCambio(token, ticketId).then((m) => { if (vivo) setRegresa(m); }).catch(() => { /* sin el dato, el texto de siempre */ });
+    return () => { vivo = false; };
+  }, [tienda, pagada, token, ticketId]);
 
   const tienePermisoRol = rolesPermiso.includes(empleado.rol);
 
@@ -156,6 +169,8 @@ export function ModalCancelarTicket({
         ? <>Esta cuenta <b className="text-ink">se pagó en línea</b>. Al cancelarla, <b className="text-ink">el pago se le devuelve completo al cliente</b> por Mercado Pago, con todo y propina. De la caja no sale efectivo. <b className="text-ink">No se puede deshacer.</b> El inventario regresa al stock.</>
         : pagada
         ? <>Se registra una <b className="text-ink">devolución total</b> (el dinero se devuelve) y la cuenta queda cancelada. <b className="text-ink">No se puede deshacer.</b> El inventario regresa al stock.</>
+        : regresa > 0
+        ? <>Es la venta de un cambio. <b className="text-ink">Le regresas {fmtMxn(regresa)} en efectivo.</b> <b className="text-ink">No se puede deshacer.</b></>
         : <>Se cancela el ticket completo. <b className="text-ink">No se puede deshacer.</b> El inventario regresa al stock.</>}
       error={error}
       boton={pagada ? "Cancelar folio" : "Cancelar ticket"}

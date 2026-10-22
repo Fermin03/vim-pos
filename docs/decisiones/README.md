@@ -40,6 +40,12 @@ Cada archivo dice **qué decía el plan, qué hacemos hoy y por qué**. Manda lo
 | [0034](0034-el-giro-arma-el-juego-inicial-y-vim-lo-ajusta.md) | El giro arma el juego inicial de módulos de operación, y después solo VIM lo ajusta | 14/10/2026 |
 | [0035](0035-el-envio-por-distancia-es-una-zona-por-tramo.md) | El envío por distancia de la tienda: lo calcula la base desde el pin del cliente, y cada tramo es una zona de envío | 14/10/2026 |
 | [0036](0036-la-colonia-sugiere-la-zona.md) | La colonia sugiere la zona de envío; el domicilio la guarda | 15/10/2026 |
+| [0037](0037-el-stock-de-una-tienda-vive-en-el-producto.md) | El stock de una tienda vive en el producto, no en una receta | 15/10/2026 |
+| [0038](0038-la-cita-es-un-ticket-por-venir.md) | La cita es un ticket por venir; el candado de empalmes vive en la base | 18/10/2026 |
+| [0039](0039-la-comision-se-congela-en-el-renglon.md) | La comisión se congela en el renglón y se calcula al leer; el anticipo es un pago que no se declara | 19/10/2026 |
+| [0040](0040-la-reserva-en-linea-usa-la-tienda.md) | La reserva en línea usa la tienda: misma app y slug, un complemento «En línea» y el pago de la cita en `tienda_pagos` | 19/10/2026 |
+| [0041](0041-el-colaborador-entra-con-su-correo.md) | El colaborador entra con su correo: rol `colaborador_web` de cinco RPC, capa RLS y rechazo en las funciones | 20/10/2026 |
+| [0045](0045-comida-rapida-con-caja-de-tienda.md) | Servicio rápido y food truck usan la navegación de tienda con el cobro de restaurante: pregunta al cobrar, comanda al cobrar también con una impresora y sin mesas | 21/10/2026 |
 | [0050](0050-clip-es-el-segundo-proveedor-de-terminal.md) | Clip es el segundo proveedor de terminal, y la conexión de la caja decide quién cobra | 20/10/2026 |
 
 ## Pendientes de escribir

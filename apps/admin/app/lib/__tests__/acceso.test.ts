@@ -41,6 +41,14 @@ describe("puedeVer", () => {
     expect(puedeVer(SUPERVISOR, "/usuarios")).toBe(false);
   });
 
+  it("los reportes de la agenda solo los abre dueño o administrador (la base los niega al supervisor)", () => {
+    for (const r of ["/reportes/citas", "/reportes/ocupacion"]) {
+      expect(puedeVer(SUPERVISOR, r)).toBe(false);
+      expect(puedeVer(ADMIN, r)).toBe(true);
+      expect(puedeVer(DUENO, r)).toBe(true);
+    }
+  });
+
   it("las subrutas heredan el mínimo de su sección", () => {
     expect(puedeVer(SUPERVISOR, "/configuracion/cajas")).toBe(false);
     expect(puedeVer(ADMIN, "/configuracion/cajas")).toBe(true);
@@ -51,6 +59,13 @@ describe("puedeVer", () => {
     expect(puedeVer(SUPERVISOR, "/reportes/costo-ventas")).toBe(false);
     expect(puedeVer(ADMIN, "/reportes/costo-ventas")).toBe(true);
     expect(puedeVer(DUENO, "/reportes/costo-ventas")).toBe(true);
+    expect(puedeVer(SUPERVISOR, "/reportes/ventas-variantes")).toBe(false);
+    expect(puedeVer(ADMIN, "/reportes/ventas-variantes")).toBe(true);
+    // Existencias enseña costos y el valor del inventario, como /inventario y /catalogo.
+    expect(puedeVer(SUPERVISOR, "/existencias")).toBe(false);
+    expect(puedeVer(SUPERVISOR, "/existencias/movimientos")).toBe(false);
+    expect(puedeVer(ADMIN, "/existencias")).toBe(true);
+    expect(puedeVer(DUENO, "/existencias/traspasos")).toBe(true);
     // El historial de movimientos vive en Inventario y hereda su mínimo.
     expect(puedeVer(SUPERVISOR, "/inventario/movimientos")).toBe(false);
     expect(puedeVer(ADMIN, "/inventario/movimientos")).toBe(true);

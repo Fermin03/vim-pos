@@ -17,6 +17,17 @@ import { nuevoClientId } from "../lib/carrito";
 import { aplicarPagosEnOrden, pagoEntroPeseAlError, ventaQuedoPagada, type PagoPorAplicar } from "../lib/cobro-pagos";
 import { pagoDeCobro, pedirCobro, propinaDeCobro, terminalDeCaja, type CobroTerminal, type TerminalCaja } from "../lib/terminal";
 import { VistaTerminal } from "./vista-terminal";
+import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
+import {
+  leerCuentaCredito,
+  opcionesCredito,
+  pagarACredito,
+  pagarConSaldoFavor,
+  pideAutorizacionCredito,
+  type CreditoCliente,
+  type CuentaCredito,
+} from "../lib/credito";
+import { cobroEsperaAnticipo, leerAnticipoVenta, pagarConAnticipo, resumenAnticipoCobro, TEXTO_ANTICIPO, type AnticipoVenta } from "../lib/anticipos";
 
 // ─── Íconos SVG inline (calcan los mockups) ────────────────────────────────
 
@@ -137,9 +148,27 @@ function metodoCfg(v: MetodoPago): MetodoConfig {
   return METODOS.find((m) => m.valor === v) ?? (METODOS[0] as MetodoConfig);
 }
 
+// Solo en el selector, y solo con el módulo de crédito (retail): no se combinan en el pago dividido.
+const CFG_CREDITO: MetodoConfig = {
+  valor: "CREDITO",
+  etiqueta: "A crédito",
+  sub: "",
+  icoFn: ({ cls }) => <Icono nombre="calendario" className={cls} />,
+  icoBg: "#F6EFE3",
+  icoColor: "#8A5A12",
+};
+const CFG_SALDO_FAVOR: MetodoConfig = {
+  valor: "SALDO_FAVOR",
+  etiqueta: "Saldo a favor",
+  sub: "",
+  icoFn: ({ cls }) => <Icono nombre="moneda" className={cls} />,
+  icoBg: "#E7F2EC",
+  icoColor: "#2E7D52",
+};
+
 // ─── Sub-vistas ──────────────────────────────────────────────────────────────
 
-type Vista = "propina" | "selector" | "efectivo" | "otro" | "dividido" | "atajo" | "terminal";
+type Vista = "propina" | "selector" | "efectivo" | "otro" | "dividido" | "atajo" | "terminal" | "credito" | "saldo";
 
 /** Lo más que la propina espera a saber si el lector la pregunta; después sale la de VIM. */
 const ESPERA_LECTOR_MS = 4000;
@@ -226,6 +255,10 @@ function Numpad({
 function VistaSelector({
   totales,
   conTerminal,
+  extras = [],
+  anticipo = 0,
+  onCobrarConAnticipo,
+  procesando = false,
   terminalLista,
   onRevisarTerminal,
   error,
@@ -233,8 +266,15 @@ function VistaSelector({
   onCerrar,
 }: {
   totales: TotalesTicket;
+  /** Lo que esta venta ya pagó con el anticipo de su cita (belleza): «Anticipo −$X» y «Por cobrar». */
+  anticipo?: number;
+  /** El anticipo cubre todo: en vez de las formas de pago, un solo botón que lo confirma. */
+  onCobrarConAnticipo?: () => void;
+  procesando?: boolean;
   /** La caja tiene terminal ligada: Débito y Crédito se vuelven un solo «Tarjeta» que cobra en ella. */
   conTerminal: boolean;
+  /** «A crédito» y «Saldo a favor», ya con su detalle (módulo de crédito). Vacío = como siempre. */
+  extras?: MetodoConfig[];
   /** El lector puede recibir el cobro (Clip apagado o con la app cerrada = no): si no, «Tarjeta» abre el registro a mano. */
   terminalLista: boolean;
   /** Vuelve a preguntar por el lector; true si ya puede cobrar. */
@@ -279,17 +319,45 @@ function VistaSelector({
       filas.push({ cfg: { ...m, etiqueta: `${m.etiqueta} · a mano`, sub: "Ya se cobró en otra terminal" }, elegir: () => onElegir(m.valor), clave: m.valor });
     }
   }
+  for (const m of extras) filas.push({ cfg: m, elegir: () => onElegir(m.valor), clave: m.valor });
   return (
     <div className="flex flex-col h-full">
       {/* Total a cobrar */}
-      <div className="text-center px-6 py-5 border border-line rounded-lg bg-sel mb-5">
-        <div className="text-12 font-bold uppercase tracking-widest text-ink-3 mt-3">Total a cobrar</div>
-        <div className="font-display text-40 font-bold tracking-tight text-ink tabular-nums leading-none mt-1 mb-1">
-          {fmtMxn(totales.total)}
+      {anticipo > 0 ? (
+        <div className="border border-line rounded-lg bg-sel mb-5 px-5 py-4">
+          <div className="flex items-baseline justify-between text-15 text-ink-2">
+            <span>Total</span>
+            <span className="tabular-nums">{fmtMxn(totales.total)}</span>
+          </div>
+          <div className="mt-1 flex items-baseline justify-between text-15 text-ink-2">
+            <span>{TEXTO_ANTICIPO.lineaCobro}</span>
+            <span className="tabular-nums">−{fmtMxn(anticipo)}</span>
+          </div>
+          <div className="mt-3 flex items-baseline justify-between border-t border-line pt-3">
+            <span className="font-display text-20 font-bold text-ink">{TEXTO_ANTICIPO.porCobrar}</span>
+            <span className="font-display text-32 font-bold tracking-tight text-ink tabular-nums leading-none">{fmtMxn(totales.pendiente)}</span>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="text-center px-6 py-5 border border-line rounded-lg bg-sel mb-5">
+          <div className="text-12 font-bold uppercase tracking-widest text-ink-3 mt-3">Total a cobrar</div>
+          <div className="font-display text-40 font-bold tracking-tight text-ink tabular-nums leading-none mt-1 mb-1">
+            {fmtMxn(totales.total)}
+          </div>
+        </div>
+      )}
 
       {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
+      {onCobrarConAnticipo ? (
+        <button
+          type="button"
+          onClick={() => { if (!procesando) onCobrarConAnticipo(); }}
+          disabled={procesando}
+          className="h-14 w-full rounded bg-accent text-16 font-bold text-white shadow-sm transition-[transform,background-color] duration-150 ease-vim hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong"
+        >
+          {procesando ? "Aplicando…" : `Cobrar con anticipo ${fmtMxn(anticipo)}`}
+        </button>
+      ) : (<>
       <div className="text-15 font-semibold text-ink-2 mb-3">¿Cómo paga el cliente?</div>
 
       {/* Lista de métodos */}
@@ -342,6 +410,7 @@ function VistaSelector({
           <IcoChevron cls="w-5 h-5 text-ink-3 flex-shrink-0" />
         </button>
       </div>
+      </>)}
 
       {/* Footer */}
       <div className="mt-auto pt-5 flex items-center justify-between gap-4">
@@ -1031,6 +1100,119 @@ function VistaPropina({
   );
 }
 
+// ─── Vista: a crédito / saldo a favor (retail 2, entrega 2) ─────────────────
+
+/** Cabecera y pie compartidos por las dos vistas de crédito: mismo molde que el resto del cobro. */
+function MarcoCredito({ cfg, children, error, procesando, etiqueta, onConfirmar, onVolver }: {
+  cfg: MetodoConfig;
+  children: React.ReactNode;
+  error: string | null;
+  procesando: boolean;
+  etiqueta: React.ReactNode;
+  onConfirmar: () => void;
+  onVolver: () => void;
+}) {
+  return (
+    <div className="flex flex-col">
+      <div className="mb-5 flex items-center gap-3">
+        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[11px]" style={{ background: cfg.icoBg, color: cfg.icoColor }}>
+          <cfg.icoFn cls="w-[22px] h-[22px]" />
+        </span>
+        <h1 className="font-display text-xl font-semibold tracking-tight">{cfg.etiqueta}</h1>
+      </div>
+      <div className="overflow-hidden rounded-lg border border-line">{children}</div>
+      {error && <p className="mt-3 text-sm font-medium text-danger" role="alert">{error}</p>}
+      <div className="mt-5 flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={onVolver}
+          disabled={procesando}
+          className="inline-flex min-h-[44px] items-center gap-2 rounded border border-line-strong px-[20px] py-[14px] text-15 font-semibold text-ink-2 transition-colors hover:bg-hover hover:text-ink disabled:opacity-50"
+        >
+          <IcoBack cls="w-4 h-4" />
+          Cambiar método
+        </button>
+        <button
+          type="button"
+          onClick={() => { if (!procesando) onConfirmar(); }}
+          disabled={procesando}
+          className="inline-flex min-h-[44px] items-center gap-[9px] rounded bg-accent px-[30px] py-[14px] text-15 font-bold text-white shadow-sm transition-[transform,background-color] duration-150 ease-vim hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong"
+        >
+          {procesando ? "Aplicando…" : etiqueta}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Renglon({ l, v, tono }: { l: string; v: string; tono?: "fuerte" }) {
+  return (
+    <div className={["flex items-center justify-between border-b border-line px-[18px] py-[13px] last:border-b-0", tono ? "bg-sel" : ""].join(" ")}>
+      <span className={tono ? "text-15 font-bold text-ink" : "text-15 text-ink-2"}>{l}</span>
+      <span className={["font-display tabular-nums text-ink", tono ? "text-24 font-bold" : "text-16 font-semibold"].join(" ")}>{v}</span>
+    </div>
+  );
+}
+
+function VistaCredito({ total, credito, procesando, error, onConfirmar, onVolver }: {
+  total: number;
+  credito: CreditoCliente;
+  procesando: boolean;
+  error: string | null;
+  onConfirmar: () => void;
+  onVolver: () => void;
+}) {
+  // La base decide; esto solo avisa antes de tocar el botón que va a pedir el PIN.
+  const pasa = Math.round((total - credito.disponible) * 100) / 100;
+  const aviso = credito.tieneVencido
+    ? "Tiene pagos vencidos. Se pide el PIN de un supervisor."
+    : pasa > 0
+      ? `Pasa del límite por ${fmtMxn(pasa)}. Se pide el PIN de un supervisor.`
+      : null;
+  return (
+    <MarcoCredito
+      cfg={CFG_CREDITO}
+      error={error}
+      procesando={procesando}
+      etiqueta={<>Vender a crédito <span className="font-display tabular-nums opacity-90">{fmtMxn(total)}</span></>}
+      onConfirmar={onConfirmar}
+      onVolver={onVolver}
+    >
+      <Renglon l="Ya debe" v={fmtMxn(credito.deuda)} />
+      <Renglon l="Disponible" v={fmtMxn(credito.disponible)} />
+      <Renglon l="Esta venta" v={fmtMxn(total)} tono="fuerte" />
+      {aviso && <p className="border-t border-warning-line bg-warning-soft px-[18px] py-3 text-14 font-medium text-warning">{aviso}</p>}
+      <p className="border-t border-line px-[18px] py-3 text-13 text-ink-3">Va la venta completa. Paga en {credito.plazoDias} días.</p>
+    </MarcoCredito>
+  );
+}
+
+function VistaSaldoFavor({ pendiente, monto, procesando, error, onConfirmar, onVolver }: {
+  pendiente: number;
+  /** Lo que se usa: el saldo, hasta lo que falta. */
+  monto: number;
+  procesando: boolean;
+  error: string | null;
+  onConfirmar: () => void;
+  onVolver: () => void;
+}) {
+  const resto = Math.round((pendiente - monto) * 100) / 100;
+  return (
+    <MarcoCredito
+      cfg={CFG_SALDO_FAVOR}
+      error={error}
+      procesando={procesando}
+      etiqueta={<>Usar <span className="font-display tabular-nums opacity-90">{fmtMxn(monto)}</span></>}
+      onConfirmar={onConfirmar}
+      onVolver={onVolver}
+    >
+      <Renglon l="Por cobrar" v={fmtMxn(pendiente)} />
+      <Renglon l="Se usa del saldo a favor" v={fmtMxn(monto)} tono="fuerte" />
+      {resto > 0 && <p className="border-t border-line px-[18px] py-3 text-13 text-ink-3">Los {fmtMxn(resto)} que faltan se cobran después con otra forma de pago.</p>}
+    </MarcoCredito>
+  );
+}
+
 // ─── Componente principal ────────────────────────────────────────────────────
 
 export function ModalCobro({
@@ -1041,6 +1223,8 @@ export function ModalCobro({
   ejecutaNombre,
   totalesIniciales,
   atajo = null,
+  moduloCredito = false,
+  conCitas = false,
   onPagado,
   onCerrar,
   onMontoACobrar,
@@ -1064,7 +1248,12 @@ export function ModalCobro({
    * vista de efectivo normal con el error a la vista.
    */
   atajo?: "EFECTIVO_EXACTO" | null;
-  onPagado: (folio: string | null, cambio: number, total: number) => void;
+  /** Módulo de crédito encendido (`modulos.credito`): «A crédito» y «Saldo a favor» para el cliente de la cuenta. */
+  moduloCredito?: boolean;
+  /** Caja de belleza: si la venta es de una cita con anticipo vigente, se aplica primero (0222). */
+  conCitas?: boolean;
+  /** `aCredito`: no entró dinero; «Cobro completado» dice «A crédito» y no anuncia un total cobrado. */
+  onPagado: (folio: string | null, cambio: number, total: number | null, aCredito?: boolean) => void;
   onCerrar: () => void;
 }) {
   const [totales, setTotales] = useState<TotalesTicket>(totalesIniciales);
@@ -1102,12 +1291,71 @@ export function ModalCobro({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, sucursalId]);
 
-  // Total autoritativo (BD) + propina capturada en cliente; la propina ya quedó persistida.
+  // ── Anticipo de la cita (belleza, 0222) ─────────────────────────────────────────────────────
+  // Se lee al abrir y se enseña desde el principio («Anticipo −$X», «Por cobrar»), pero se APLICA
+  // solo al confirmar el primer pago (asegurarAnticipo), justo antes de cobrar el resto. Salir del
+  // cobro no deja nada aplicado. Fuera de belleza no se lee nada.
+  const [anticipoVenta, setAnticipoVenta] = useState<AnticipoVenta | null>(null);
+  const [anticipoLeido, setAnticipoLeido] = useState(false);
+  const anticipoListo = !cobroEsperaAnticipo(conCitas, anticipoLeido);
+  /** No se pudo leer: falla cerrado (nunca se cobra el total completo si pudo haber anticipo). */
+  const [errorAnticipo, setErrorAnticipo] = useState<string | null>(null);
+  const [intentoAnticipo, setIntentoAnticipo] = useState(0);
+  useEffect(() => {
+    if (!conCitas) return;
+    let activo = true;
+    setErrorAnticipo(null);
+    leerAnticipoVenta(token, totalesIniciales.ticketId)
+      .then((a) => { if (activo) { setAnticipoVenta(a); setAnticipoLeido(true); } })
+      .catch((e) => { if (activo) setErrorAnticipo(e instanceof Error ? e.message : "error"); });
+    return () => { activo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conCitas, token, intentoAnticipo]);
+
+  // Total autoritativo (BD) + propina capturada en cliente; la propina ya quedó persistida. El
+  // pendiente ya descuenta el anticipo por aplicar: todas las vistas cobran solo el resto.
+  const anticipoCobro = resumenAnticipoCobro(anticipoVenta, Math.round((totales.pendiente + propina) * 100) / 100);
   const totalesEf: TotalesTicket = {
     ...totales,
     total: Math.round((totales.total + propina) * 100) / 100,
-    pendiente: Math.round((totales.pendiente + propina) * 100) / 100,
+    pendiente: anticipoCobro.porCobrar,
   };
+
+  const pagoAnticipoId = useRef<string | null>(null);
+  /**
+   * Aplica el anticipo por aplicar (si hay) antes de cobrar el resto; devuelve los totales releídos
+   * (null si no había nada que aplicar). El pendiente a la vista no cambia: ya lo descontaba.
+   */
+  async function asegurarAnticipo(): Promise<TotalesTicket | null> {
+    if (!anticipoVenta || anticipoCobro.porAplicar <= 0) return null;
+    const aplicado = await pagarConAnticipo(token, totales.ticketId, anticipoVenta.citaId, (pagoAnticipoId.current ??= nuevoClientId()));
+    const t = await leerTotales(token, totales.ticketId);
+    pagoAnticipoId.current = null;   // hasta aquí: si la relectura falla, el reintento reusa la llave
+
+    // Juntos (mismo render): el pendiente a la vista no brinca.
+    setTotales(t);
+    setAnticipoVenta((a) => a && {
+      ...a,
+      vigente: Math.round((a.vigente - aplicado) * 100) / 100,
+      aplicado: Math.round((a.aplicado + aplicado) * 100) / 100,
+    });
+    return t;
+  }
+
+  /** El anticipo cubre todo: se confirma y la venta queda pagada solo con ANTICIPO. */
+  async function cobrarSoloConAnticipo() {
+    setError(null);
+    setProcesando(true);
+    try {
+      const t = await asegurarAnticipo();
+      if (ventaQuedoPagada(t)) onPagado(t.folio, 0, t.total);
+      else setError("El anticipo no cubrió la venta; cobra el resto con otra forma de pago.");
+    } catch (e) {
+      await trasFalloDeCobro(e);
+    } finally {
+      setProcesando(false);
+    }
+  }
 
   useEffect(() => {
     onMontoACobrar?.(totalesEf.pendiente);
@@ -1141,11 +1389,12 @@ export function ModalCobro({
    * pendiente viejo) y, si el ticket ya quedó PAGADO, da la venta por cobrada en vez de mostrar
    * un error que invita a cobrar otra vez (B2-1). Devuelve los totales releídos.
    */
-  async function trasFalloDeCobro(e: unknown): Promise<TotalesTicket | null> {
+  async function trasFalloDeCobro(e: unknown, aCredito = false): Promise<TotalesTicket | null> {
     const t = await leerTotales(token, totales.ticketId).catch(() => null);
     if (t) setTotales(t);
     if (ventaQuedoPagada(t)) {
-      onPagado(t.folio, t.cambio, t.total);
+      if (aCredito) onPagado(t.folio, 0, null, true);
+      else onPagado(t.folio, t.cambio, t.total);
       return t;
     }
     setError(e instanceof Error ? e.message : "Error al cobrar");
@@ -1156,9 +1405,10 @@ export function ModalCobro({
     setError(null);
     if (!(monto > 0)) { setError("Monto inválido"); return; }
     setProcesando(true);
-    const antes = totales;
+    let antes = totales;
     const clientId = (pagoUnicoId.current ??= nuevoClientId());
     try {
+      antes = (await asegurarAnticipo()) ?? antes;
       const t = await aplicarPago(
         token,
         totales.ticketId,
@@ -1186,12 +1436,74 @@ export function ModalCobro({
 
   // Efectivo exacto: se aplica UNA vez al llegar a su vista (después de la propina, si la hubo).
   const atajoAplicado = useRef(false);
+  // Con anticipo, el atajo espera a leerlo; si el anticipo cubre todo, se confirma en el selector.
   useEffect(() => {
-    if (vista !== "atajo" || atajoAplicado.current) return;
+    if (vista !== "atajo" || atajoAplicado.current || !anticipoListo) return;
     atajoAplicado.current = true;
+    if (anticipoCobro.porAplicar > 0 && totalesEf.pendiente <= 0) { setVista("selector"); return; }
     void aplicarUnPago("EFECTIVO", totalesEf.pendiente, totalesEf.pendiente);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vista]);
+  }, [vista, anticipoListo]);
+
+
+  // ── A crédito y saldo a favor (retail 2, entrega 2) ─────────────────────────────────────────
+  // Con el módulo apagado no se lee nada: un restaurante cobra exactamente como antes.
+  const [cuentaCredito, setCuentaCredito] = useState<CuentaCredito | null>(null);
+  useEffect(() => {
+    if (!moduloCredito) return;
+    let activo = true;
+    leerCuentaCredito(token, totales.ticketId)
+      .then((c) => { if (activo) setCuentaCredito(c); })
+      .catch(() => { /* sin el dato, el cobro de siempre */ });
+    return () => { activo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moduloCredito, token, totales.ticketId]);
+  const opciones = opcionesCredito({ moduloCredito, cuenta: cuentaCredito, pendiente: totalesEf.pendiente, montoPagado: totales.montoPagado + anticipoCobro.porAplicar });
+  const extras: MetodoConfig[] = [
+    ...(opciones.aCredito ? [{ ...CFG_CREDITO, sub: `Disponible: ${fmtMxn(opciones.aCredito.disponible)}` }] : []),
+    ...(opciones.saldoFavor > 0 ? [{ ...CFG_SALDO_FAVOR, sub: `Tiene ${fmtMxn(cuentaCredito?.saldoFavor ?? 0)} a favor` }] : []),
+  ];
+  /** La base pidió el PIN de `venta.credito_excedido`: su motivo, para el diálogo. */
+  const [pinCredito, setPinCredito] = useState<string | null>(null);
+  /** `client_id_local` del pago a crédito / con saldo en curso: un reintento no lo duplica (B2-2). */
+  const pagoCreditoId = useRef<string | null>(null);
+
+  async function cobrarConCredito(pagar: (clientId: string) => Promise<void>, alQuedarPendiente?: () => void) {
+    setError(null);
+    setProcesando(true);
+    let antes = totales;
+    const clientId = (pagoCreditoId.current ??= nuevoClientId());
+    try {
+      antes = (await asegurarAnticipo()) ?? antes;
+      await pagar(clientId);
+      pagoCreditoId.current = null;
+      const t = await leerTotales(token, totales.ticketId);
+      setTotales(t);
+      if (t.estadoFiscal === "PAGADO") {
+        if (vista === "credito") onPagado(t.folio, 0, null, true);
+        else onPagado(t.folio, t.cambio, t.total);
+      }
+      else { alQuedarPendiente?.(); setVista("selector"); }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      if (vista === "credito" && pideAutorizacionCredito(msg)) { setPinCredito(msg); return; }
+      // La venta a crédito pudo entrar aunque la respuesta se perdiera: tampoco se anuncia un total cobrado.
+      const t = await trasFalloDeCobro(e, vista === "credito");
+      if (pagoEntroPeseAlError(antes, t)) pagoCreditoId.current = null;
+    } finally {
+      setProcesando(false);
+    }
+  }
+
+  const venderACredito = (autorizacionPinId: string | null) =>
+    cobrarConCredito((id) => pagarACredito(token, totales.ticketId, autorizacionPinId, id));
+  const usarSaldoFavor = () => {
+    const monto = opciones.saldoFavor;
+    return cobrarConCredito(
+      (id) => pagarConSaldoFavor(token, totales.ticketId, monto, id),
+      () => setCuentaCredito((c) => (c ? { ...c, saldoFavor: Math.round((c.saldoFavor - monto) * 100) / 100 } : c)),
+    );
+  };
 
   // ── Cobro con terminal (ADR 0033) ──────────────────────────────────────────────────────────
   // Lo último que se supo de esta caja evita que el selector cambie de botones al abrir. Solo se
@@ -1230,6 +1542,7 @@ export function ModalCobro({
     setProcesando(true);
     const propinaLector = autorizoId ? 0 : propinaDeCobro(c);
     try {
+      await asegurarAnticipo();
       if (propinaLector > 0) {
         await establecerPropina(token, totales.ticketId, propinaLector);
         setPropina(propinaLector);
@@ -1323,6 +1636,12 @@ export function ModalCobro({
     if (lista.length === 0) return [];
     setProcesando(true);
     try {
+      try {
+        await asegurarAnticipo();
+      } catch (e) {
+        await trasFalloDeCobro(e);
+        return [];
+      }
       const ticketId = totales.ticketId;
       const r = await aplicarPagosEnOrden(
         lista,
@@ -1357,6 +1676,10 @@ export function ModalCobro({
       setVista("terminal");
     } else if (m === "dividido") {
       setVista("dividido");
+    } else if (m === "CREDITO") {
+      setVista("credito");
+    } else if (m === "SALDO_FAVOR") {
+      setVista("saldo");
     } else if (m === "EFECTIVO") {
       setMetodo(m);
       setVista("efectivo");
@@ -1375,13 +1698,13 @@ export function ModalCobro({
   const alEscapar = useMemo(
     () => capaVisible([
       // Con el cobro en la terminal tampoco: de ahí se sale cancelándolo, no por reflejo.
-      [procesando || vista === "atajo" || vista === "terminal", () => {}],
-      [vista === "efectivo" || vista === "otro" || vista === "dividido", () => { setError(null); setVista("selector"); }],
+      [procesando || pinCredito !== null || vista === "atajo" || vista === "terminal", () => {}],
+      [vista === "efectivo" || vista === "otro" || vista === "dividido" || vista === "credito" || vista === "saldo", () => { setError(null); setVista("selector"); }],
       // La propina que se pregunta al elegir otro método regresa al selector, como su «Atrás».
       [vista === "propina" && trasPropina !== null, () => { setError(null); setTrasPropina(null); setVista("selector"); }],
       [true, () => cerrarRef.current()],
     ]),
-    [procesando, vista, trasPropina],
+    [procesando, vista, pinCredito, trasPropina],
   );
   useEscape(alEscapar);
 
@@ -1421,16 +1744,32 @@ export function ModalCobro({
             <div className="flex items-center justify-center py-16 text-sm text-ink-3">Cargando…</div>
           )
         )}
-        {vista === "atajo" && (
+        {vista === "atajo" && !errorAnticipo && (
           <div className="flex flex-col items-center gap-2 py-10 text-center" role="status">
             <div className="font-display text-24 font-semibold">Cobrando en efectivo exacto…</div>
             <div className="font-display text-32 font-bold tabular-nums">{fmtMxn(totalesEf.pendiente)}</div>
           </div>
         )}
-        {vista === "selector" && (
+        {(vista === "selector" || vista === "atajo") && errorAnticipo && (
+          <div className="flex flex-col items-center gap-4 py-10 text-center" role="alert">
+            <p className="max-w-sm text-15 font-medium text-danger">No se pudo saber si la cita dejó anticipo: {errorAnticipo}. No se cobra hasta saberlo.</p>
+            <div className="flex gap-2">
+              <Button variant="ghost" className="h-12" onClick={onCerrar}>Volver al ticket</Button>
+              <Button className="h-12" onClick={() => setIntentoAnticipo((n) => n + 1)}>Reintentar</Button>
+            </div>
+          </div>
+        )}
+        {vista === "selector" && !anticipoListo && !errorAnticipo && (
+          <div className="flex items-center justify-center py-16 text-sm text-ink-3">Cargando…</div>
+        )}
+        {vista === "selector" && anticipoListo && (
           <VistaSelector
             totales={totalesEf}
             conTerminal={conTerminal}
+            extras={extras}
+            anticipo={anticipoCobro.anticipo}
+            procesando={procesando}
+            onCobrarConAnticipo={anticipoCobro.porAplicar > 0 && totalesEf.pendiente <= 0 ? () => void cobrarSoloConAnticipo() : undefined}
             terminalLista={terminal.lista}
             onRevisarTerminal={revisarTerminal}
             error={error}
@@ -1450,6 +1789,26 @@ export function ModalCobro({
             proveedor={terminal.proveedor}
             propinaEnLector={propinaEnLector}
             onAprobado={aplicarCobroTerminal}
+            onVolver={() => { setError(null); setVista("selector"); }}
+          />
+        )}
+        {vista === "credito" && opciones.aCredito && (
+          <VistaCredito
+            total={totalesEf.pendiente}
+            credito={opciones.aCredito}
+            procesando={procesando}
+            error={error}
+            onConfirmar={() => void venderACredito(null)}
+            onVolver={() => { setError(null); setVista("selector"); }}
+          />
+        )}
+        {vista === "saldo" && opciones.saldoFavor > 0 && (
+          <VistaSaldoFavor
+            pendiente={totalesEf.pendiente}
+            monto={opciones.saldoFavor}
+            procesando={procesando}
+            error={error}
+            onConfirmar={() => void usarSaldoFavor()}
             onVolver={() => { setError(null); setVista("selector"); }}
           />
         )}
@@ -1485,6 +1844,26 @@ export function ModalCobro({
           />
         )}
       </div>
+      {pinCredito !== null && (
+        <ModalAutorizacionPin
+          token={token}
+          capa="z-[70]"
+          payload={{
+            accion: "venta_credito_excedido",
+            permisoCodigo: "venta.credito_excedido",
+            entidadTipo: "ticket",
+            entidadId: totales.ticketId,
+            monto: totalesEf.pendiente,
+            motivo: pinCredito,
+            cajaId,
+            turnoId,
+          }}
+          descripcion={`Venta a crédito de ${fmtMxn(totalesEf.pendiente)}: ${pinCredito}`}
+          ejecutaNombre={ejecutaNombre}
+          onAutorizado={(a) => { setPinCredito(null); void venderACredito(a.autorizacionPinId); }}
+          onCancelar={() => setPinCredito(null)}
+        />
+      )}
       {esperaDividido && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/40 p-4">
           <div className="w-full max-w-[560px] rounded-lg bg-surface p-6 shadow-xl">

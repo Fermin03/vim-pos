@@ -1,15 +1,16 @@
 # Textos legales de la tienda en línea — léeme primero
 
-Fermín: en esta carpeta hay **tres borradores**. Ninguno está publicado y ninguno debe publicarse
+Fermín: en esta carpeta hay **cuatro borradores**. Ninguno está publicado y ninguno debe publicarse
 hasta que lo lea una persona con criterio legal (un abogado, o alguien que sepa de protección de
 datos y de consumo). Los escribió Claude a partir de cómo funciona el sistema de verdad; lo que
 pueden tener mal no es lo que dicen que hace el sistema, sino si eso basta para cumplir la ley.
 
 | Archivo | Para quién es | Dónde se publicaría |
 |---|---|---|
-| [`tienda-aviso-de-privacidad.md`](tienda-aviso-de-privacidad.md) | El comensal que pide en la tienda de un restaurante | En cada tienda: `pedidos.vimpos.com.mx/<negocio>/privacidad` |
-| [`tienda-terminos-para-el-comensal.md`](tienda-terminos-para-el-comensal.md) | El mismo comensal | En cada tienda: `pedidos.vimpos.com.mx/<negocio>/terminos` |
+| [`tienda-aviso-de-privacidad.md`](tienda-aviso-de-privacidad.md) | El comensal que pide en la tienda de un restaurante | En cada tienda: `online.vimpos.com.mx/<negocio>/privacidad` |
+| [`tienda-terminos-para-el-comensal.md`](tienda-terminos-para-el-comensal.md) | El mismo comensal | En cada tienda: `online.vimpos.com.mx/<negocio>/terminos` |
 | [`vimpos-terminos-seccion-tienda.md`](vimpos-terminos-seccion-tienda.md) | El restaurante que contrata VIM POS | Sección nueva en `vimpos.com.mx/terminos` |
+| [`reservas-terminos-para-la-clienta.md`](reservas-terminos-para-la-clienta.md) | La clienta que reserva en línea en un salón, spa o barbería | En cada negocio con reservas: `online.vimpos.com.mx/<negocio>/terminos`, cuando Fermín lo apruebe |
 
 **Qué hay hoy en la tienda, mientras tanto.** Dos páginas cortas, veraces y marcadas como
 provisionales: «Aviso de privacidad» y «Condiciones para pedir», enlazadas al pie de cada tienda.

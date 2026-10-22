@@ -22,7 +22,7 @@ vi.mock("../supabase", () => ({
   }),
 }));
 
-import { persistirTicket, cambiarZonaDePedido, ErrorEnvioNoFijado, ErrorTicketParcial } from "../cobro";
+import { fijarServicioTicket, persistirTicket, cambiarZonaDePedido, cerrarSiYaCubierta, cuentaYaCubierta, ErrorEnvioNoFijado, ErrorTicketParcial, type TotalesTicket } from "../cobro";
 import type { LineaCarrito } from "../carrito";
 import type { Producto } from "../catalogo";
 
@@ -224,5 +224,103 @@ describe("persistirTicket — un corte a medias lleva el ticket (auditoría 30/0
     const e = new ErrorEnvioNoFijado("zona", "t", null);
     expect(e).toBeInstanceOf(ErrorTicketParcial);
     expect(e.fase).toBe("envio");
+  });
+});
+
+describe("Cobrar una cuenta que ya no debe nada (cambio sin diferencia reabierto)", () => {
+  const t: TotalesTicket = { ticketId: "ticket-1", subtotal: 349, iva: 0, descuentos: 0, promociones: 0, lealtad: 0, total: 349, montoPagado: 349, cambio: 0, pendiente: 0, estadoFiscal: "ABIERTO", folio: "A-9" };
+
+  it("solo una cuenta ABIERTA, con total y sin saldo, se cierra sin abrir el cobro", () => {
+    expect(cuentaYaCubierta(t)).toBe(true);
+    expect(cuentaYaCubierta({ ...t, pendiente: 50, montoPagado: 299 })).toBe(false);
+    // Total 0 (todo de descuento): cerrar_ticket_si_pagado no la cierra; va por el cobro de siempre.
+    expect(cuentaYaCubierta({ ...t, total: 0, montoPagado: 0 })).toBe(false);
+    expect(cuentaYaCubierta({ ...t, estadoFiscal: "PAGADO" })).toBe(false);
+  });
+
+  it("llama a cerrar_ticket_si_pagado y relee los totales; si la base no la cerró, null", async () => {
+    rpcMock.mockReset();
+    singleMock.mockReset();
+    singleMock.mockImplementation(async () => ({ data: { ...TOTALES_ROW, estado_fiscal: "PAGADO", monto_pendiente_mxn: "0" }, error: null }));
+    rpcMock.mockImplementation(async () => ({ data: true, error: null }));
+    expect((await cerrarSiYaCubierta("tok", "ticket-1"))?.estadoFiscal).toBe("PAGADO");
+    expect(rpcMock).toHaveBeenCalledWith("cerrar_ticket_si_pagado", { p_ticket_id: "ticket-1" });
+    rpcMock.mockImplementation(async () => ({ data: false, error: null }));
+    expect(await cerrarSiYaCubierta("tok", "ticket-1")).toBeNull();
+    rpcMock.mockImplementation(async () => ({ data: null, error: { message: "sin red" } }));
+    await expect(cerrarSiYaCubierta("tok", "ticket-1")).rejects.toThrow("sin red");
+  });
+});
+
+describe("persistirTicket — belleza: colaborador por renglón y la cita", () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+    rpcMock.mockImplementation(async () => ({ data: "ticket-1", error: null }));
+    singleMock.mockReset();
+    singleMock.mockImplementation(async () => ({ data: TOTALES_ROW, error: null }));
+  });
+
+  it("manda p_colaborador_id solo en el renglón que lo trae (sin él, la firma de siempre)", async () => {
+    await persistirTicket(ctx, "PARA_LLEVAR", [{ ...linea("l1", "Corte"), colaboradorId: "diego" }, linea("l2", "Shampoo")], "cli-1");
+    const renglones = rpcMock.mock.calls.filter((c) => c[0] === "agregar_item_a_ticket").map((c) => c[1]);
+    expect(renglones[0]).toMatchObject({ p_client_id_local: "l1", p_colaborador_id: "diego" });
+    expect(renglones[1]).not.toHaveProperty("p_colaborador_id");
+  });
+
+  it("liga la cita al ticket recién abierto, antes de los renglones", async () => {
+    await persistirTicket(ctx, "PARA_LLEVAR", [linea("l1", "Corte")], "cli-1", null, null, null, null, null, "cita-7");
+    expect(rpcMock.mock.calls.map((c) => c[0])).toEqual(["abrir_ticket", "vincular_cita_ticket", "agregar_item_a_ticket"]);
+    expect(rpcMock.mock.calls[1]![1]).toEqual({ p_cita: "cita-7", p_ticket: "ticket-1" });
+  });
+
+  it("sin cita no se liga nada; si la base la rechaza, el ticket abierto viaja en el error", async () => {
+    await persistirTicket(ctx, "PARA_LLEVAR", [], "cli-1");
+    expect(rpcMock.mock.calls.map((c) => c[0])).not.toContain("vincular_cita_ticket");
+    rpcMock.mockImplementation(async (n: string) =>
+      n === "vincular_cita_ticket" ? { data: null, error: { message: "la cita ya está en otra venta abierta." } } : { data: "ticket-1", error: null });
+    const e = await persistirTicket(ctx, "PARA_LLEVAR", [], "cli-1", null, null, null, null, null, "cita-7").catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(ErrorTicketParcial);
+    expect((e as ErrorTicketParcial).ticketId).toBe("ticket-1");
+    // Fase propia: quien llama borra la venta vacía en vez de reintentar sin fin.
+    expect((e as ErrorTicketParcial).fase).toBe("cita");
+    expect(rpcMock.mock.calls.map((c) => c[0])).not.toContain("agregar_item_a_ticket");
+  });
+});
+
+describe("persistirTicket — comida rápida: comer aquí con nombre", () => {
+  beforeEach(() => {
+    updateMock.mockReset();
+    updateMock.mockImplementation(async () => ({ error: null }));
+    rpcMock.mockReset();
+    rpcMock.mockImplementation(async () => ({ data: "ticket-1", error: null }));
+    singleMock.mockReset();
+    singleMock.mockImplementation(async () => ({ data: TOTALES_ROW, error: null }));
+  });
+
+  it("abre el ticket COMER_AQUI y le pone el nombre del cliente", async () => {
+    await persistirTicket(ctx, "COMER_AQUI", [], "cli-3", null, null, null, "  Ana  ");
+    expect(rpcMock.mock.calls.find((c) => c[0] === "abrir_ticket")?.[1]).toMatchObject({ p_modo_servicio: "COMER_AQUI" });
+    expect(updateMock).toHaveBeenCalledWith({ nombre_cliente: "Ana" });
+  });
+});
+
+describe("fijarServicioTicket — cuenta retomada de «en espera» (comida rápida)", () => {
+  beforeEach(() => { rpcMock.mockReset(); });
+
+  it("guarda modo y nombre por la RPC fijar_servicio_ticket (el UPDATE directo lo rechaza la guardia)", async () => {
+    rpcMock.mockResolvedValue({ data: null, error: null });
+    await fijarServicioTicket("t", "ticket-1", "COMER_AQUI", "  Ana  ");
+    expect(rpcMock).toHaveBeenCalledWith("fijar_servicio_ticket", { p_ticket_id: "ticket-1", p_modo: "COMER_AQUI", p_nombre: "Ana" });
+  });
+
+  it("sin nombre lo manda vacío", async () => {
+    rpcMock.mockResolvedValue({ data: null, error: null });
+    await fijarServicioTicket("t", "ticket-1", "PARA_LLEVAR", "  ");
+    expect(rpcMock).toHaveBeenCalledWith("fijar_servicio_ticket", { p_ticket_id: "ticket-1", p_modo: "PARA_LLEVAR", p_nombre: undefined });
+  });
+
+  it("falla con el mensaje de la base (p. ej. la cuenta ya no está abierta)", async () => {
+    rpcMock.mockResolvedValue({ data: null, error: { message: "La cuenta ya no está abierta (estado actual: PAGADO)" } });
+    await expect(fijarServicioTicket("t", "ticket-1", "COMER_AQUI", null)).rejects.toThrow(/No se guardó el tipo de servicio: La cuenta ya no está abierta/);
   });
 });

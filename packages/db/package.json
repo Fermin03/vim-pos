@@ -16,7 +16,9 @@
     "./fixtures-combos": "./src/fixtures-combos.ts",
     "./soporte": "./src/soporte.ts",
     "./registro": "./src/registro.ts",
-    "./operacion": "./src/operacion.ts"
+    "./operacion": "./src/operacion.ts",
+    "./agenda": "./src/agenda.ts",
+    "./apps": "./src/apps.ts"
   },
   "scripts": {
     "gen-types": "supabase gen types typescript --local > src/database.types.ts"

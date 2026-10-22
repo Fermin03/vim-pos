@@ -2,8 +2,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Aviso, Button, DialogoPeligro } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
-import { useAccesoTenant } from "../../components/admin-shell";
+import { useAccesoTenant, useModulos } from "../../components/admin-shell";
 import { textoDeAviso } from "../../lib/tienda-cobro";
+import { seccionEnLinea } from "../../lib/tienda-plan";
 import { useTienda } from "./use-tienda";
 
 export type Tienda = { t: ReturnType<typeof useTienda>; ocupado: boolean; soloLectura: boolean };
@@ -17,6 +18,7 @@ export type Tienda = { t: ReturnType<typeof useTienda>; ocupado: boolean; soloLe
  */
 export function TiendaMarco({ children }: { children: (c: Tienda) => ReactNode }) {
   const t = useTienda();
+  const seccion = seccionEnLinea(useModulos());
   // Servicio suspendido: el panel queda en solo lectura (ADR 0014).
   const soloLectura = useAccesoTenant().nivel === "bloqueado";
   const escribiendo = t.ocupado !== null;
@@ -28,7 +30,7 @@ export function TiendaMarco({ children }: { children: (c: Tienda) => ReactNode }
 
   return (
     <>
-      <PageHeader titulo="Tienda en línea" subtitulo="Recibe los pedidos de tus clientes en tu caja." />
+      <PageHeader titulo={seccion.titulo} subtitulo={seccion.subtitulo} />
       <PageBody>
         {t.falloLectura ? (
           <div className="max-w-[720px] rounded-lg border border-line bg-surface p-5" role="alert">

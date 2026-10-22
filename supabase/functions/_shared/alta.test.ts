@@ -167,8 +167,8 @@ test("reenvío con el límite de GoTrue = 429 ESPERA_UN_MINUTO (nunca 'listo')",
   assert.equal((await procesarReenvio({ email: "ana@tacos.mx" }, d2)).status, 429);
 });
 
-test("los siete giros que se ofrecen pasan; los retirados no (formulario viejo en caché)", () => {
-  for (const v of ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "DARK_KITCHEN", "BAR", "CAFETERIA", "TAQUERIA"]) {
+test("los diecisiete giros que se ofrecen pasan; los retirados no (formulario viejo en caché)", () => {
+  for (const v of ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "DARK_KITCHEN", "BAR", "CAFETERIA", "TAQUERIA", "RETAIL", "ABARROTES", "FRUTERIA", "FERRETERIA", "VINOS", "SALON", "SPA", "PELUQUERIA", "BARBERIA", "TATUAJES"]) {
     assert.equal(validarAlta({ ...BUENO, vertical: v }).ok, true, v);
   }
   for (const v of ["CAFE_BAR", "ENTERPRISE"]) {

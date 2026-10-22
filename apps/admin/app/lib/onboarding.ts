@@ -1,4 +1,5 @@
 "use client";
+import { esGiroBelleza, esGiroTienda } from "@vim/db/operacion";
 import { supabase } from "./supabase";
 
 // Tier1 — Wizard de onboarding. En vez de un contador de clics, autodetecta qué pasos están
@@ -44,13 +45,30 @@ async function contarCajasVinculadas(): Promise<number> {
   return count ?? 0;
 }
 
+/** Servicios de la agenda activos (belleza). La tabla no tiene id ni deleted_at: se cuenta por su llave. */
+async function contarServiciosAgenda(): Promise<number> {
+  const { count, error } = await supabase.from("servicios_agenda").select("producto_id", { count: "exact", head: true }).eq("activo", true);
+  if (error) return 0;
+  return count ?? 0;
+}
+
+/** Horarios de colaboradores activos: con uno ya hay alguien a quien agendarle. */
+async function contarHorariosColaborador(): Promise<number> {
+  const { count, error } = await supabase
+    .from("horarios_colaborador")
+    .select("id, colaboradores_agenda!inner(activo)", { count: "exact", head: true })
+    .eq("colaboradores_agenda.activo", true);
+  if (error) return 0;
+  return count ?? 0;
+}
+
 export async function leerEstadoOnboarding(): Promise<EstadoOnboarding> {
   // Fase actual (puede no existir fila → tratamos como INVITADO).
   const { data: ob } = await supabase.from("tenant_onboarding_estado").select("fase").maybeSingle();
   const fase = ((ob?.fase as OnboardingFase) ?? "INVITADO") as OnboardingFase;
 
   // Señales reales de completitud.
-  const { data: negocio } = await supabase.from("tenants").select("nombre_comercial, razon_social, rfc, codigo_postal_fiscal").maybeSingle();
+  const { data: negocio } = await supabase.from("tenants").select("nombre_comercial, razon_social, rfc, codigo_postal_fiscal, vertical_principal").maybeSingle();
   const tieneRfcYCp = !!(negocio?.rfc && negocio?.codigo_postal_fiscal);
   const tieneNegocio = !!(negocio?.nombre_comercial && String(negocio.nombre_comercial).trim());
   const { data: emisor } = await supabase.from("tenant_cfdi_emisor").select("estado, csd_numero_certificado").maybeSingle();
@@ -65,18 +83,37 @@ export async function leerEstadoOnboarding(): Promise<EstadoOnboarding> {
     contarCajasVinculadas(),
   ]);
 
-  const pasos: PasoOnboarding[] = [
+  const giro = negocio?.vertical_principal as string | undefined;
+  const ropa = giro === "RETAIL";
+  const tienda = esGiroTienda(giro);
+
+  let pasos: PasoOnboarding[] = [
     { clave: "negocio", titulo: "Datos del negocio", descripcion: "Nombre, zona horaria y hora de corte.", href: "/configuracion/negocio", completo: tieneNegocio, opcional: false },
-    { clave: "catalogo", titulo: "Tu menú", descripcion: "Importa o captura tus productos y categorías.", href: "/catalogo/importar", completo: productos > 0, opcional: false },
+    { clave: "catalogo", ...(tienda
+      ? { titulo: "Tus productos", descripcion: ropa ? "Importa tus prendas con tallas y colores, o captúralas." : "Importa tus productos o captúralos.", href: "/catalogo/importar-tienda" }
+      : { titulo: "Tu menú", descripcion: "Importa o captura tus productos y categorías.", href: "/catalogo/importar" }), completo: productos > 0, opcional: false },
     { clave: "caja", titulo: "Tu caja", descripcion: "Da de alta tu punto de cobro; tu sucursal se crea con ella.", href: "/configuracion/cajas", completo: cajas > 0, opcional: false },
     // Dar de alta la caja en el admin no es vender: falta conectar la computadora. Antes el
     // asistente decía «listo» sin que ninguna caja hubiera mandado señal.
     { clave: "vincular", titulo: "Conecta la computadora de tu caja", descripcion: "Descarga VIM POS en ella y captura una vez la clave que te damos.", href: "/configuracion/cajas/descargar", completo: cajasVinculadas > 0, opcional: false },
-    { clave: "equipo", titulo: "Tu equipo", descripcion: "Crea cajeros y cocina con su PIN.", href: "/usuarios", completo: usuarios > 1, opcional: false },
+    { clave: "equipo", titulo: "Tu equipo", descripcion: tienda ? "Crea a tus cajeros con su PIN." : "Crea cajeros y cocina con su PIN.", href: "/usuarios", completo: usuarios > 1, opcional: false },
     // Completo con la facturación ACTIVA, no con la pura razón social: antes se marcaba hecho
     // sin que el negocio pudiera emitir una sola factura.
     { clave: "fiscal", titulo: "Facturación", descripcion: "Solo si vas a facturar: tus datos fiscales y tu sello digital.", href: "/configuracion/facturacion", completo: facturacionActiva, opcional: true },
   ];
+
+  // Un salón no tiene menú ni cocina: servicios, equipo y quién atiende en qué horario (belleza, entrega 4).
+  if (esGiroBelleza(giro)) {
+    const [servicios, horarios] = await Promise.all([contarServiciosAgenda(), contarHorariosColaborador()]);
+    pasos = [
+      { clave: "servicios", titulo: "Tus servicios", descripcion: "Da de alta lo que ofreces, cuánto dura y cuánto cuesta.", href: "/agenda/servicios", completo: servicios > 0, opcional: false },
+      { clave: "equipo", titulo: "Tu equipo", descripcion: "Crea a tus empleados con su PIN.", href: "/usuarios", completo: usuarios > 1, opcional: false },
+      { clave: "colaboradores", titulo: "Colaboradores y horarios", descripcion: "Elige quién atiende y en qué horario, para poder agendarle citas.", href: "/agenda/colaboradores", completo: horarios > 0, opcional: false },
+      { clave: "caja", titulo: "Tu caja", descripcion: "Da de alta tu punto de cobro; tu sucursal se crea con ella.", href: "/configuracion/cajas", completo: cajas > 0, opcional: false },
+      { clave: "vincular", titulo: "Vincula tu caja", descripcion: "Descarga VIM POS en la computadora de tu caja y captura una vez la clave que te damos.", href: "/configuracion/cajas/descargar", completo: cajasVinculadas > 0, opcional: false },
+      pasos.find((p) => p.clave === "fiscal")!,
+    ];
+  }
 
   const obligatorios = pasos.filter((p) => !p.opcional);
   const obligatoriosHechos = obligatorios.filter((p) => p.completo).length;

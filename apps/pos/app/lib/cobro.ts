@@ -9,7 +9,12 @@ export type MetodoPago =
   | "TARJETA_CREDITO"
   | "TARJETA_DEBITO"
   | "TRANSFERENCIA"
-  | "APP_OTRO";
+  | "APP_OTRO"
+  /** Venta a crédito y saldo a favor (0208/0209): van por su RPC (`lib/credito.ts`), no por `aplicar_pago`. */
+  | "CREDITO"
+  | "SALDO_FAVOR"
+  /** Anticipo de una cita de belleza (0220): lo registra la agenda, no `aplicar_pago`. */
+  | "ANTICIPO";
 
 export type PagoInput = {
   metodo: MetodoPago;
@@ -49,7 +54,8 @@ type CtxCobro = {
 };
 
 /** En qué paso de `persistirTicket` se cortó un ticket que YA se abrió. */
-export type FaseTicketParcial = "encabezado" | "renglones" | "envio";
+/** "cita": la base no dejó ligar la cita (ya está en otra venta abierta); el ticket sigue vacío. */
+export type FaseTicketParcial = "encabezado" | "cita" | "renglones" | "envio";
 
 /**
  * `abrir_ticket` ya devolvió un id —el ticket EXISTE en la base— pero un paso posterior de
@@ -110,6 +116,8 @@ export async function persistirTicket(
   /** Zona de reparto del pedido. El cargo entra como renglón, después de los productos: la RPC
    *  hereda la política de IVA del primer renglón, así que los productos tienen que existir ya. */
   envioZonaId?: string | null,
+  /** Belleza: la cita que se cobra con esta venta. Se liga al abrir el ticket (reintentable). */
+  citaId?: string | null,
 ): Promise<TotalesTicket> {
   const sb = employeeClient(ctx.token);
 
@@ -151,6 +159,12 @@ export async function persistirTicket(
     if (error) await parcial(`No se guardó la nota de la orden: ${error.message}`, "encabezado");
   }
 
+  // Ligar la misma cita al mismo ticket otra vez no falla: el reintento pasa por aquí sin problema.
+  if (citaId) {
+    const { error } = await sb.rpc("vincular_cita_ticket", { p_cita: citaId, p_ticket: tid });
+    if (error) await parcial(`No se pudo ligar la cita a la venta: ${error.message}`, "cita");
+  }
+
   for (const l of lineas) {
     const { error } = l.combo
       ? await sb.rpc("agregar_combo_a_ticket", {
@@ -169,6 +183,8 @@ export async function persistirTicket(
           p_nota_cocina: l.notaCocina,
           p_modificadores: modifsJsonb(l),
           p_client_id_local: l.clientId,
+          // Sin colaborador no se manda: la firma vieja sigue sirviendo a restaurantes y tiendas.
+          ...(l.colaboradorId ? { p_colaborador_id: l.colaboradorId } : {}),
         });
     if (error) await parcial(`No se guardó «${l.producto.nombre}»: ${error.message}`, "renglones");
   }
@@ -219,6 +235,20 @@ export async function leerTotales(token: string, ticketId: string): Promise<Tota
 }
 
 /**
+ * Una cuenta ABIERTA que ya no debe nada: la venta de un cambio sin diferencia, reabierta (0201),
+ * conserva su pago interno. «Cobrar» la cierra sin abrir el cobro. Con total 0 no:
+ * `cerrar_ticket_si_pagado` no la cerraría y va por el cobro de siempre.
+ */
+export const cuentaYaCubierta = (t: TotalesTicket) => t.estadoFiscal === "ABIERTO" && t.total > 0 && t.pendiente <= 0;
+
+/** `cerrar_ticket_si_pagado` (como cierra registrar_cambio_talla) y los totales ya cerrados; `null` si la base no la cerró. */
+export async function cerrarSiYaCubierta(token: string, ticketId: string): Promise<TotalesTicket | null> {
+  const { data, error } = await employeeClient(token).rpc("cerrar_ticket_si_pagado", { p_ticket_id: ticketId });
+  if (error) throw new Error(error.message);
+  return data === true ? leerTotales(token, ticketId) : null;
+}
+
+/**
  * Cambia (o quita, con `zonaId` null) la zona de reparto de un pedido que YA tiene ticket, y
  * relee los totales autoritativos — para que el renglón de envío del ticket lateral y el total
  * del pie se muevan juntos (Task 7, ronda de arreglos 1/5).
@@ -240,6 +270,22 @@ export async function cambiarZonaDePedido(
   if (!ticketId) return null;
   await fijarEnvioTicket(token, ticketId, zonaId);
   return leerTotales(token, ticketId);
+}
+
+/**
+ * Comida rápida: fija el tipo de servicio (y el nombre) contestado al cobrar una cuenta YA guardada
+ * (retomada de «en espera», o guardada antes por un descuento o un canje, con el PARA_LLEVAR por
+ * defecto sin preguntar). Va por la RPC `fijar_servicio_ticket` (0243): la guardia de escritura
+ * directa no deja cambiar `modo_servicio` por REST. La RPC exige la cuenta ABIERTA y solo cambia
+ * entre PARA_LLEVAR y COMER_AQUI; si falla, no se abre el cobro.
+ */
+export async function fijarServicioTicket(token: string, ticketId: string, modo: ModoServicio, nombre: string | null): Promise<void> {
+  const { error } = await employeeClient(token).rpc("fijar_servicio_ticket", {
+    p_ticket_id: ticketId,
+    p_modo: modo,
+    p_nombre: nombre?.trim().slice(0, 100) || undefined, // sin nombre: el DEFAULT NULL de la RPC
+  });
+  if (error) throw new Error(`No se guardó el tipo de servicio: ${error.message}`);
 }
 
 /** F5.2b — fija la propina del ticket (RPC establecer_propina_ticket, bajo RLS). */

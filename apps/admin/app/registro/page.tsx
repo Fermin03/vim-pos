@@ -20,6 +20,16 @@ const VERTICALES = [
   { v: "BAR", l: "Bar" },
   { v: "DARK_KITCHEN", l: "Cocina solo para apps de entrega" },
   { v: "FOODTRUCK", l: "Food truck" },
+  { v: "RETAIL", l: "Tienda de ropa o calzado" },
+  { v: "ABARROTES", l: "Tienda de abarrotes o supermercado" },
+  { v: "FRUTERIA", l: "Frutería y verdulería" },
+  { v: "FERRETERIA", l: "Ferretería" },
+  { v: "VINOS", l: "Vinos y licores" },
+  { v: "SALON", l: "Salón de belleza" },
+  { v: "SPA", l: "Spa" },
+  { v: "PELUQUERIA", l: "Peluquería" },
+  { v: "BARBERIA", l: "Barbería" },
+  { v: "TATUAJES", l: "Tatuajes y piercings" },
 ];
 
 /** «Knock-Out Burger» → «knock-out-burger»: sin acentos, minúsculas y guiones. */

@@ -159,7 +159,7 @@ export function TiendaCobro({
               {pagos.map((p) => (
                 <li key={p.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 py-2.5">
                   <div className="min-w-0">
-                    <div className="text-14 font-medium">{p.folio ? `Pedido ${p.folio}` : "Pedido sin pagar"}</div>
+                    <div className="text-14 font-medium">{p.cita ? "Anticipo de cita" : p.folio ? `Pedido ${p.folio}` : "Pedido sin pagar"}</div>
                     <div className="text-12 text-ink-3">{fechaHoraMx(p.fecha)}</div>
                     {p.propina > 0 && <div className="text-12 tabular-nums text-ink-3">Incluye {precioMxn(p.propina)} de propina</div>}
                     {p.pagoMp && <div className="font-mono text-12 text-ink-3 [overflow-wrap:anywhere]">Mercado Pago: {p.pagoMp}</div>}

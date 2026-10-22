@@ -1,7 +1,10 @@
 "use client";
+import type { TipoVenta } from "./unidades";
 import { z } from "zod";
 import { supabase } from "./supabase";
 import { borrarSuave, tenantId } from "./datos";
+import { leerTodas } from "./reportes";
+import { claveSatSchema } from "./clave-sat";
 
 // Paleta funcional de categorías (del design system; NUNCA el naranja de marca).
 export const COLORES: { hex: string; bg: string }[] = [
@@ -153,6 +156,8 @@ export const productoSchema = z.object({
   precio_base_mxn: z.number({ error: "Precio inválido" }).min(0, "El precio no puede ser negativo"),
   descripcion: z.string().trim().max(500).optional().or(z.literal("")),
   codigo_interno: z.string().trim().max(50).optional().or(z.literal("")),
+  codigo_barras: z.string().trim().max(50).optional().or(z.literal("")),
+  costo_mxn: z.number({ error: "Costo inválido" }).min(0, "El costo no puede ser negativo").optional(),
   estado: z.enum(["ACTIVO", "PAUSADO"]),
   agotado: z.boolean(),
   visible_en_pos: z.boolean(),
@@ -167,7 +172,7 @@ export const productoSchema = z.object({
    * Clave del catálogo c_ClaveProdServ del SAT. Vacía = el CFDI usa la genérica del giro
    * (90101500, servicios de restaurantes), que es lo que un contador pondría de todos modos.
    */
-  clave_sat: z.string().trim().regex(/^\d{8}$/, "La clave del SAT son 8 dígitos").optional().or(z.literal("")),
+  clave_sat: claveSatSchema.optional().or(z.literal("")),
   /**
    * Tasa de IVA del producto. No es siempre 16: la comida para llevar va a tasa 0, y hasta que
    * esto se pudo capturar el CFDI declaraba 16 % de todo.
@@ -202,59 +207,37 @@ export type Producto = {
   iva_incluido_en_precio: boolean;
   /** true = producto padre de un combo (ADR 0015); se administra desde combos.ts, no desde este formulario. */
   es_combo: boolean;
+  /** Campos de tienda (giro RETAIL); en un restaurante quedan vacíos. */
+  codigo_barras: string | null;
+  costo_mxn: number | null;
+  controla_existencias: boolean;
+  tipo_venta: TipoVenta;
+  /** Ejes de la variante de un padre (p. ej. ["Talla","Color"]); null si no tiene variantes. */
+  variante_ejes: string[] | null;
+  /** Cuántas variantes vivas tiene este padre. */
+  variantes: number;
+  /** Códigos de barras y SKU de sus variantes vivas, separados por espacio: para que la búsqueda los encuentre. */
+  codigosVariantes: string;
 };
 
-type FilaProd = Omit<Producto, "categoriaNombre"> & { categoria: { nombre: string } | null };
+type FilaProd = Omit<Producto, "categoriaNombre" | "variantes" | "codigosVariantes"> & { categoria: { nombre: string } | null };
 
-export async function listarProductos(): Promise<Producto[]> {
-  const { data, error } = await supabase
-    .from("productos")
-    .select(
-      "id, nombre, descripcion, codigo_interno, imagen_url, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, en_menu_general, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
-    )
-    .is("deleted_at", null)
-    .order("orden_visualizacion", { ascending: true });
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as unknown as FilaProd[]).map((f) => ({
-    id: f.id,
-    nombre: f.nombre,
-    descripcion: f.descripcion,
-    codigo_interno: f.codigo_interno,
-    imagen_url: f.imagen_url || null,
-    precio_base_mxn: Number(f.precio_base_mxn),
-    categoria_id: f.categoria_id,
-    categoriaNombre: f.categoria?.nombre ?? "—",
-    estado: f.estado,
-    agotado_manual: f.agotado_manual,
-    agotado_automatico: f.agotado_automatico,
-    visible_en_pos: f.visible_en_pos,
-    en_menu_general: f.en_menu_general !== false,
-    marca_virtual_id: f.marca_virtual_id ?? null,
-    area_cocina_id: f.area_cocina_id ?? null,
-    clave_sat: f.clave_sat ?? null,
-    tasa_iva: Number(f.tasa_iva),
-    iva_incluido_en_precio: f.iva_incluido_en_precio,
-    es_combo: Boolean(f.es_combo),
-  }));
-}
+const COLUMNAS_PRODUCTO =
+  "id, nombre, descripcion, codigo_interno, codigo_barras, costo_mxn, controla_existencias, tipo_venta, variante_ejes, imagen_url, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, en_menu_general, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)";
 
-export async function obtenerProducto(id: string): Promise<Producto | null> {
-  const { data, error } = await supabase
-    .from("productos")
-    .select(
-      "id, nombre, descripcion, codigo_interno, imagen_url, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, en_menu_general, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
-    )
-    .eq("id", id)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) return null;
-  const f = data as unknown as FilaProd;
+function aProducto(f: FilaProd, variantes = 0, codigosVariantes = ""): Producto {
   return {
     id: f.id,
     nombre: f.nombre,
     descripcion: f.descripcion,
     codigo_interno: f.codigo_interno,
+    codigo_barras: f.codigo_barras ?? null,
+    costo_mxn: f.costo_mxn == null ? null : Number(f.costo_mxn),
+    controla_existencias: Boolean(f.controla_existencias),
+    tipo_venta: f.tipo_venta ?? "UNIDAD",
+    variante_ejes: f.variante_ejes ?? null,
+    variantes,
+    codigosVariantes,
     imagen_url: f.imagen_url || null,
     precio_base_mxn: Number(f.precio_base_mxn),
     categoria_id: f.categoria_id,
@@ -273,6 +256,48 @@ export async function obtenerProducto(id: string): Promise<Producto | null> {
   };
 }
 
+export async function listarProductos(): Promise<Producto[]> {
+  const { data, error } = await supabase
+    .from("productos")
+    .select(COLUMNAS_PRODUCTO)
+    .is("deleted_at", null)
+    .is("producto_padre_id", null)
+    .order("orden_visualizacion", { ascending: true });
+  if (error) throw new Error(error.message);
+  // Las variantes vivas de cada padre: cuántas son y sus códigos (solo tiendas; en un restaurante
+  // sale vacío). Paginado: una tienda pasa de las 1000 filas que corta PostgREST.
+  const hijas = (await leerTodas((a, b) =>
+    supabase
+      .from("productos")
+      .select("producto_padre_id, codigo_barras, codigo_interno")
+      .is("deleted_at", null)
+      .not("producto_padre_id", "is", null)
+      .order("id")
+      .range(a, b),
+  )) as { producto_padre_id: string; codigo_barras: string | null; codigo_interno: string | null }[];
+  const cuenta = new Map<string, number>();
+  const codigos = new Map<string, string[]>();
+  for (const h of hijas) {
+    cuenta.set(h.producto_padre_id, (cuenta.get(h.producto_padre_id) ?? 0) + 1);
+    const c = codigos.get(h.producto_padre_id) ?? [];
+    codigos.set(h.producto_padre_id, c);
+    for (const x of [h.codigo_barras, h.codigo_interno]) if (x) c.push(x);
+  }
+  return ((data ?? []) as unknown as FilaProd[]).map((f) => aProducto(f, cuenta.get(f.id) ?? 0, (codigos.get(f.id) ?? []).join(" ")));
+}
+
+export async function obtenerProducto(id: string): Promise<Producto | null> {
+  const { data, error } = await supabase
+    .from("productos")
+    .select(COLUMNAS_PRODUCTO)
+    .eq("id", id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return aProducto(data as unknown as FilaProd);
+}
+
 // El agotado vive por sucursal (0152, ADR 0027): el producto solo guarda ACTIVO o PAUSADO, y sus
 // columnas agotado_* las deriva la base («agotado en todas»). `input.agotado` lo guarda el
 // formulario en la fila de cada sucursal (menu-sucursal.ts).
@@ -280,7 +305,11 @@ function resolverEstado(input: ProductoInput): EstadoProducto {
   return input.estado;
 }
 
-export async function crearProducto(input: ProductoInput, opciones: { enMenuGeneral?: boolean } = {}): Promise<string> {
+export type DatosTienda = { codigo_barras: string; costo_mxn: number | null; controla_existencias: boolean; tipo_venta: TipoVenta };
+const columnasTienda = (t?: DatosTienda) =>
+  t ? { codigo_barras: t.codigo_barras.trim() || null, costo_mxn: t.costo_mxn, controla_existencias: t.controla_existencias, tipo_venta: t.tipo_venta } : {};
+
+export async function crearProducto(input: ProductoInput, opciones: { enMenuGeneral?: boolean; tienda?: DatosTienda } = {}): Promise<string> {
   const datos = productoSchema.parse(input);
   const tid = await tenantId();
   const estado = resolverEstado(datos);
@@ -310,6 +339,7 @@ export async function crearProducto(input: ProductoInput, opciones: { enMenuGene
       tasa_iva: datos.tasa_iva,
       iva_incluido_en_precio: datos.iva_incluido_en_precio,
       orden_visualizacion: orden,
+      ...columnasTienda(opciones.tienda),
     })
     .select("id")
     .single();
@@ -317,7 +347,7 @@ export async function crearProducto(input: ProductoInput, opciones: { enMenuGene
   return String((creado as { id: string }).id);
 }
 
-export async function actualizarProducto(id: string, input: ProductoInput): Promise<void> {
+export async function actualizarProducto(id: string, input: ProductoInput, tienda?: DatosTienda): Promise<void> {
   const datos = productoSchema.parse(input);
   const estado = resolverEstado(datos);
   const { error } = await supabase
@@ -335,6 +365,7 @@ export async function actualizarProducto(id: string, input: ProductoInput): Prom
       clave_sat: datos.clave_sat || null,
       tasa_iva: datos.tasa_iva,
       iva_incluido_en_precio: datos.iva_incluido_en_precio,
+      ...columnasTienda(tienda),
     })
     .eq("id", id);
   if (error) throw new Error(error.message);

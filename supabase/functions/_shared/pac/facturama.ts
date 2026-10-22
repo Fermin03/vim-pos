@@ -13,6 +13,7 @@
 // El detalle de rutas, payloads y trampas está en la habilidad `facturama-cfdi` del proyecto.
 import type { PacAdapter, PacTimbradoRequest, PacTimbradoResult } from "./tipos.ts";
 import { normalizarFechaPac } from "./fechas.ts";
+import { normalizarClavesSat, type ClaveSat } from "./catalogo-sat.ts";
 
 /** Sandbox por defecto: si alguien despliega sin configurar la URL, que timbre en pruebas y no en
  *  producción. Equivocarse hacia el lado inofensivo. */
@@ -166,6 +167,15 @@ export class FacturamaPac implements PacAdapter {
     if (!res.ok) return null;
     const d = await res.json().catch(() => null);
     return (d && typeof d.Content === "string") ? d.Content : null; // base64
+  }
+
+  /** Busca en el catálogo c_ClaveProdServ del SAT (mínimo 3 letras). */
+  async buscarClavesSat(texto: string): Promise<ClaveSat[]> {
+    const res = await fetch(`${this.baseUrl}/Catalogs/ProductsOrServices?keyword=${encodeURIComponent(texto)}`, {
+      headers: { Authorization: this.autorizacion, Accept: "application/json" },
+    });
+    if (!res.ok) throw new Error(`Facturama respondió ${res.status} al buscar claves SAT`);
+    return normalizarClavesSat(await res.json());
   }
 
   /**

@@ -33,6 +33,7 @@ DECLARE
   v_suc_b uuid; v_caja_b uuid; v_turno_b uuid; v_tb uuid;
   v_lprem uuid; v_litem uuid; v_lcanje uuid := gen_random_uuid(); v_lj jsonb; v_lver integer; v_cli_vecino uuid;
   v_antes jsonb; v_despues jsonb; v_previa jsonb; v_res jsonb; r jsonb; v_arch tenants_eliminados%ROWTYPE;
+  v_rcat uuid; v_rprod uuid; v_rsuc uuid; v_rtk uuid;
   v_n bigint; v_msg text; v_tabla record; v_quedan text; v_bitacora bigint;
 BEGIN
   SELECT codigo INTO v_codigo FROM tenants WHERE id = v_tenant;
@@ -112,6 +113,19 @@ BEGIN
     p_emisor_rfc := 'XAXX010101000', p_emisor_razon_social := 'EMISOR DE PRUEBA', p_emisor_regimen_fiscal := '601',
     p_emisor_lugar_expedicion := '37000', p_metodo_pago_sat := 'PUE', p_forma_pago_sat := '01',
     p_pac_proveedor := 'FACTURAPI'::cfdi_proveedor_pac);
+
+  -- Venta de un producto con existencias (antes del Z: el turno se cierra ahí).
+  INSERT INTO categorias(tenant_id, nombre) VALUES (v_tenant, 'Ropa smoke') RETURNING id INTO v_rcat;
+  INSERT INTO productos(tenant_id, nombre, categoria_id, precio_base_mxn, codigo_interno, controla_existencias, costo_mxn)
+  VALUES (v_tenant, 'Playera smoke', v_rcat, 100, 'SMK-RT-1', true, 40) RETURNING id INTO v_rprod;
+  INSERT INTO movimientos_producto(tenant_id, sucursal_id, producto_id, tipo, cantidad, costo_unitario_mxn, motivo)
+  VALUES (v_tenant, v_suc, v_rprod, 'ENTRADA', 10, 40, 'smoke');
+  v_rtk := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smk-elim-ret', v_maria);
+  PERFORM agregar_item_a_ticket(v_rtk, v_rprod, 1, NULL, '[]'::jsonb, 'smk-elim-ret-i');
+  SELECT total_mxn INTO v_n FROM tickets WHERE id = v_rtk;
+  PERFORM aplicar_pago(v_rtk, 'EFECTIVO'::metodo_pago, v_n, v_n, NULL, NULL, NULL, false, NULL, 'smk-elim-ret-p');
+  IF NOT EXISTS (SELECT 1 FROM movimientos_producto WHERE ticket_id = v_rtk AND tipo = 'VENTA') THEN
+    RAISE EXCEPTION 'el fixture de existencias: la venta no descontó'; END IF;
 
   -- Mesa con cuenta abierta.
   INSERT INTO mesas(tenant_id, sucursal_id, numero, nombre, capacidad, estado, forma)
@@ -207,6 +221,16 @@ BEGIN
   INSERT INTO lealtad_programa(tenant_id, mecanica, porcentaje) VALUES (v_vecino, 'PUNTOS_DINERO', 5);
   INSERT INTO lealtad_saldos(cliente_id, tenant_id, saldo, programa_version) VALUES (v_cli_vecino, v_vecino, 40, 1);
 
+  -- Existencias por producto (0189): un producto con existencias, una venta que lo descuenta y un
+  -- traspaso a una segunda sucursal. Los movimientos apuntan a ticket, renglón, traspaso y sucursales
+  -- con RESTRICT: borrar el negocio tiene que resolver ese orden solo.
+  UPDATE tenants SET operacion = operacion || '{"existencias":true}'::jsonb WHERE id = v_tenant;
+  INSERT INTO tenant_limites (tenant_id, max_sucursales) VALUES (v_tenant, 5)
+    ON CONFLICT (tenant_id) DO UPDATE SET max_sucursales = 5;
+  INSERT INTO sucursales(tenant_id, codigo, nombre) VALUES (v_tenant, 'RT', 'Sucursal retail') RETURNING id INTO v_rsuc;
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_dueno::text, 'tenant_id', v_tenant::text)::text, true);
+  PERFORM enviar_traspaso_producto(v_suc, v_rsuc, jsonb_build_array(jsonb_build_object('producto_id', v_rprod, 'cantidad', 2)));
+
   PERFORM set_config('request.jwt.claims', '', true);
 
   -- Que el fixture sea de verdad "realista": estas tablas tienen que traer filas.
@@ -219,7 +243,8 @@ BEGIN
       'delivery_conexiones', 'delivery_pedidos', 'insumos', 'insumo_stock_sucursal', 'movimientos_inventario',
       'proveedores', 'compras', 'compra_lineas', 'tenant_addons', 'suscripciones', 'pagos_suscripcion',
       'tickets_cfdi', 'menus', 'menu_productos', 'productos_sucursal',
-      'lealtad_programa', 'lealtad_premios', 'lealtad_movimientos', 'lealtad_saldos', 'ticket_canjes_lealtad', 'clientes_alias']) AS t
+      'lealtad_programa', 'lealtad_premios', 'lealtad_movimientos', 'lealtad_saldos', 'ticket_canjes_lealtad', 'clientes_alias',
+      'producto_existencias', 'movimientos_producto', 'traspasos_producto']) AS t
   LOOP
     IF NOT v_antes ? v_tabla.t THEN RAISE EXCEPTION 'el fixture no dejó filas en %', v_tabla.t; END IF;
   END LOOP;
@@ -312,7 +337,7 @@ BEGIN
   -- ── 3) Vista previa y eliminación ──────────────────────────────────────────────────────────
   v_previa := eliminar_tenant_vista_previa(v_tenant);
   IF NOT (v_previa->>'puede_eliminar')::boolean THEN RAISE EXCEPTION 'debería poderse: %', v_previa->'bloqueos'; END IF;
-  IF (v_previa->'resumen'->>'tickets')::int <> 4 OR (v_previa->'resumen'->>'cfdi')::int <> 1
+  IF (v_previa->'resumen'->>'tickets')::int <> 5 OR (v_previa->'resumen'->>'cfdi')::int <> 1
      OR (v_previa->'resumen'->>'pagos_suscripcion')::int <> 2 OR (v_previa->'resumen'->>'cuentas')::int <> 2
      OR (v_previa->'resumen'->>'cuentas_conservadas')::int <> 3 THEN
     RAISE EXCEPTION 'vista previa inesperada: %', v_previa->'resumen';
@@ -438,7 +463,7 @@ BEGIN
   IF jsonb_array_length(v_arch.suscripciones) < 1 THEN RAISE EXCEPTION 'no se archivó la suscripción'; END IF;
   IF v_arch.archivos_pendientes <> '[]'::jsonb THEN RAISE EXCEPTION 'sin archivos en Storage no debe quedar nada pendiente: %', v_arch.archivos_pendientes; END IF;
   IF v_arch.contacto->>'email' IS NULL THEN RAISE EXCEPTION 'no se archivó el contacto del dueño: %', v_arch.contacto; END IF;
-  IF (v_arch.conteos->'resumen'->>'tickets')::int <> 4 OR v_arch.conteos->'tablas' <> v_antes THEN
+  IF (v_arch.conteos->'resumen'->>'tickets')::int <> 5 OR v_arch.conteos->'tablas' <> v_antes THEN
     RAISE EXCEPTION 'conteos archivados inesperados: %', v_arch.conteos->'resumen';
   END IF;
   -- Bitácora: las filas del negocio siguen (sin llave, con su nombre) y hay una de la eliminación.

@@ -87,7 +87,7 @@ el servicio. En concreto:
 de tus clientes para molestarlos o para dárselos a otros; hacerte pasar por otro negocio; o usar la
 tienda para engañar a quien te pide. Si pasa, podemos apagar tu tienda, avisándote antes salvo que
 sea urgente o la ley nos obligue a otra cosa. La dirección de tu tienda
-(`pedidos.vimpos.com.mx/tu-negocio`) la eliges tú entre las que estén libres; no puede usar el
+(`online.vimpos.com.mx/tu-negocio`) la eliges tú entre las que estén libres; no puede usar el
 nombre de otro negocio.
 
 **Disponibilidad.** Aplica lo mismo que al resto del servicio: hacemos nuestro mejor esfuerzo y no

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { MENU, filtrarMenu, rutaActiva, caminoDe, buscarEnMenu, type ContextoMenu, type MenuAdmin, type Nodo } from "../menu-admin";
+import { MENU, conSeccionEnLinea, filtrarMenu, rutaActiva, caminoDe, buscarEnMenu, type ContextoMenu, type MenuAdmin, type Nodo } from "../menu-admin";
 
 const BASE: ContextoMenu = { jerarquia: 5, ocultas: new Set(), tiendaContratada: true, gruposInformes: null };
 
@@ -92,5 +92,14 @@ describe("buscarEnMenu", () => {
 
   it("texto vacío no da resultados", () => {
     expect(buscarEnMenu(MENU, "  ")).toEqual([]);
+  });
+});
+
+describe("conSeccionEnLinea", () => {
+  it("con agenda el grupo de la tienda se llama «En línea» y lleva Reservas", () => {
+    const m = conSeccionEnLinea(MENU, { titulo: "En línea", pestanas: [{ label: "General", href: "/tienda" }, { label: "Reservas", href: "/tienda/reservas" }] });
+    const t = m.canales.find((n) => n.tipo === "grupo" && n.id === "tienda");
+    expect(t).toMatchObject({ label: "En línea" });
+    expect(hojas(t ? [t] : [])).toEqual(["/tienda", "/tienda/reservas"]);
   });
 });

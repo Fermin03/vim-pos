@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { leerConfigImpresoras, guardarConfigImpresoras, leerConfigParaDestino, hayEstacionDeCocinaDedicada } from "../config";
+import { leerConfigImpresoras, guardarConfigImpresoras, leerConfigParaDestino, hayEstacionDeCocinaDedicada, estacionParaArea } from "../config";
 
 /** Fake mínimo de localStorage + window para probar el módulo en entorno "node" (sin jsdom). */
 function fakeWindow() {
@@ -48,5 +48,20 @@ describe("config de impresoras (2 estaciones)", () => {
     expect(leerConfigParaDestino("CAJA")).toEqual({ tipo: "generica", ip: "192.168.0.21", puerto: 9100, ancho: 80 });
     expect(leerConfigParaDestino("COCINA")).toEqual({ tipo: "generica", ip: "192.168.0.22", puerto: 9100, ancho: 58 });
     expect(hayEstacionDeCocinaDedicada()).toBe(true);
+  });
+});
+
+describe("comanda con una sola impresora", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("COCINA en la misma estación que CAJA: la comanda (con o sin área) cae en la impresora de caja", () => {
+    vi.stubGlobal("window", fakeWindow());
+    guardarConfigImpresoras({
+      estaciones: { estacion1: { tipo: "generica", ip: "192.168.0.21", puerto: 9100, ancho: 80 }, estacion2: { tipo: "preview" } },
+      asignacion: { CAJA: "estacion1", COCINA: "estacion1" },
+    });
+    expect(hayEstacionDeCocinaDedicada()).toBe(false);
+    expect(estacionParaArea(null)).toBe("estacion1");
+    expect(estacionParaArea("area-sin-mapear")).toBe("estacion1");
   });
 });

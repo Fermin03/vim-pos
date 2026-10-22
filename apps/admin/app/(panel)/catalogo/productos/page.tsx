@@ -126,7 +126,7 @@ export default function ProductosPage() {
     return (prods ?? []).filter((p) => {
       const estado = estadoDe(p, filasVista.get(p.id));
       if (filtro !== "all" && estado !== filtro) return false;
-      if (query && !p.nombre.toLowerCase().includes(query.toLowerCase())) return false;
+      if (query && !`${p.nombre} ${p.codigo_barras ?? ""} ${p.codigosVariantes}`.toLowerCase().includes(query.toLowerCase())) return false;
       return true;
     });
   }, [prods, filtro, query, modoMenu, filasVista]);
@@ -298,6 +298,7 @@ export default function ProductosPage() {
                         <div className="flex items-center gap-2">
                           <span className="text-15 font-semibold">{p.nombre}</span>
                           {p.es_combo && <span className="rounded-full bg-accent-soft px-2 py-0.5 text-11 font-semibold text-accent">Combo</span>}
+                          {p.variantes > 0 && <span className="rounded-full bg-hover px-2 py-px text-13 text-ink-2">{p.variantes} variantes</span>}
                         </div>
                         {p.codigo_interno && <div className="mt-px text-13 text-ink-3">{p.codigo_interno}</div>}
                       </td>

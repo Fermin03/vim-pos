@@ -1,5 +1,9 @@
 import { fechaCorta } from "../lealtad-reglas";
+import { aGranel, fmtCantidad, precioConUnidad, tipoDesdeSat } from "../unidades";
 import type { Bloque, DatosTicketImpresion, PrintJob } from "./tipos";
+
+/** El ticket es de una venta a crédito que aún debe algo. */
+export const conSaldoPorPagar = (d: Pick<DatosTicketImpresion, "pagos">) => d.pagos.some((p) => (p.porPagar?.montoMxn ?? 0) > 0);
 
 /** Formatea pesos sin depender de módulos cliente (testeable en node). */
 export function pesos(n: number): string {
@@ -44,7 +48,7 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
   // antes de asignar: imprimir y asignar son acciones sueltas y ese orden es válido.
   if (d.entrega?.repartidor) b.push({ t: "fila", izq: "Repartidor", der: d.entrega.repartidor, bold: true });
   b.push({ t: "fila", izq: "Caja", der: d.meta.caja });
-  if (d.meta.modoServicio) b.push({ t: "fila", izq: "Servicio", der: d.meta.modoServicio });
+  if (d.meta.modoServicio) b.push({ t: "fila", izq: "Servicio", der: d.tienda ? "Venta" : d.meta.modoServicio });
   // Nombre suelto de la cuenta (Pick-up): es como se identifica el pedido al entregarlo.
   if (d.meta.nombreCliente) b.push({ t: "fila", izq: "Cliente", der: d.meta.nombreCliente, bold: true });
 
@@ -70,6 +74,12 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
 
   b.push({ t: "separador", estilo: "punteado" });
 
+  // 2.d Cambio de talla: la prenda que regresó, antes de lo que se lleva.
+  if (d.cambio) {
+    for (const r of d.cambio.regresa) b.push({ t: "fila", izq: `Regresa: ${r.nombre} x${r.cantidad}`, der: pesos(r.total) });
+    b.push({ t: "separador", estilo: "punteado" });
+  }
+
   // 3. Líneas
   //
   // Combos (ADR 0015, spec §7): el PADRE es un renglón normal —cobra, con su precio, hijos
@@ -94,7 +104,12 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
       }
       continue;
     }
-    b.push({ t: "fila", izq: `${l.cantidad}x ${l.nombre}`, der: pesos(l.totalMxn) });
+    // A granel: «1.250 kg Jitomate» (como en pantalla) y debajo «$28.00/kg». Una pieza, como siempre: «2x Playera».
+    const tipo = tipoDesdeSat(l.unidadSat);
+    b.push({ t: "fila", izq: `${aGranel(tipo) ? fmtCantidad(l.cantidad, tipo) : `${l.cantidad}x`} ${l.nombre}`, der: pesos(l.totalMxn) });
+    if (aGranel(tipo)) b.push({ t: "texto", valor: `   ${precioConUnidad(pesos(l.precioUnitario ?? 0), tipo)}`, size: 1 });
+    if (l.colaborador) b.push({ t: "texto", valor: `   ${l.colaborador}`, size: 1 });
+    if (d.tienda && l.sku) b.push({ t: "texto", valor: `   SKU ${l.sku}`, size: 1 });
     for (const m of l.modificadores) b.push({ t: "texto", valor: `  + ${m}`, size: 1 });
     if (l.notaCocina && l.notaCocina.trim().length > 0) {
       b.push({ t: "texto", valor: `  > ${l.notaCocina.trim()}`, size: 1 });
@@ -110,6 +125,8 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
   if ((d.totales.lealtad ?? 0) > 0) b.push({ t: "fila", izq: "Lealtad", der: `-${pesos(d.totales.lealtad ?? 0)}` });
   b.push({ t: "fila", izq: "IVA (16%)", der: pesos(d.totales.iva) });
   b.push({ t: "fila", izq: "TOTAL", der: pesos(d.totales.total), bold: true });
+  // Cambio de talla: qué pasó con el dinero, con palabras («El cliente paga $50.00»).
+  if (d.cambio) b.push({ t: "texto", valor: d.cambio.texto, bold: true });
 
   b.push({ t: "separador", estilo: "punteado" });
 
@@ -118,6 +135,10 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
     b.push({ t: "fila", izq: "Forma de pago", der: p.metodo });
     if (p.tarjeta) b.push({ t: "fila", izq: "", der: p.tarjeta });
     if (p.autorizacion) b.push({ t: "fila", izq: "Autorización", der: p.autorizacion });
+    if (p.porPagar) {
+      b.push({ t: "fila", izq: "Por pagar", der: pesos(p.porPagar.montoMxn), bold: true });
+      b.push({ t: "fila", izq: "Fecha límite", der: fechaCorta(p.porPagar.fechaLimite) });
+    }
     if (p.recibidoMxn != null) {
       b.push({ t: "fila", izq: "Recibido", der: pesos(p.recibidoMxn) });
       b.push({ t: "fila", izq: "Cambio", der: pesos(p.cambioMxn) });
@@ -143,7 +164,10 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
   b.push({ t: "texto", valor: "¡Gracias por su compra!", align: "centro" });
   // El QR solo si el negocio lo activó. Imprimir "¿Necesitas factura?" sin portal detrás es
   // prometerle algo al cliente que nadie puede cumplir.
-  if (d.qrUrl) {
+  // Una venta a crédito con saldo no se factura hasta liquidarse (0209): ni QR ni invitación.
+  if (d.qrUrl && conSaldoPorPagar(d)) {
+    b.push({ t: "texto", valor: "Se factura al liquidarse.", align: "centro", size: 1 });
+  } else if (d.qrUrl) {
     b.push({ t: "texto", valor: "¿Necesitas factura? Escanea el código:", align: "centro", size: 1 });
     b.push({ t: "qr", valor: d.qrUrl });
     b.push({ t: "texto", valor: d.qrUrl.replace(/^https?:\/\//, ""), align: "centro", size: 1 });
@@ -178,6 +202,10 @@ function formatoFecha(iso: string): string {
  * tres veces en dos días: la 0.4.39 la puso en todos los modos y la 0.4.40 la quitó de todos.
  * Escondida dentro de un `if` en la pantalla, cada giro costaba una versión y un servicio.
  */
-export function debeImprimirTicketAlCobrar(modo: string): boolean {
-  return modo === "PARA_LLEVAR";
+export function debeImprimirTicketAlCobrar(modo: string, comidaRapida = false, yaImpreso = false): boolean {
+  // Comida rápida: Comer aquí también se cobra en el mostrador, sin cuenta previa donde imprimirlo.
+  // Salvo que la cuenta ya tenga su ticket (`ticket_impreso_at`): una mesa vieja o una cuenta en
+  // espera que lo imprimió desde su lista no saca un segundo papel al cobrar.
+  if (yaImpreso) return false;
+  return modo === "PARA_LLEVAR" || (comidaRapida && modo === "COMER_AQUI");
 }

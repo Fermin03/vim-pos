@@ -12,8 +12,8 @@ import { ModalListaTickets } from "./modal-espera";
  *
  * Solo las que tienen folio: un BORRADOR sin folio es un carrito que nunca llegó a ser cuenta.
  */
-export async function listarCuentasParaLlevar(token: string, sucursalId: string): Promise<CuentaAbierta[]> {
-  return (await listarCuentasAbiertas(token, sucursalId, "PARA_LLEVAR")).filter((c) => c.folio !== null);
+export async function listarCuentasParaLlevar(token: string, sucursalId: string, cajaId?: string): Promise<CuentaAbierta[]> {
+  return (await listarCuentasAbiertas(token, sucursalId, "PARA_LLEVAR", [], cajaId)).filter((c) => c.folio !== null);
 }
 
 export function ModalCuentasParaLlevar({

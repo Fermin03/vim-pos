@@ -5,7 +5,8 @@
  */
 export type CodigoGiro =
   | "QUICK_SERVICE" | "FULL_SERVICE" | "TAQUERIA" | "CAFETERIA" | "BAR" | "DARK_KITCHEN" | "FOODTRUCK"
-  | "CAFE_BAR" | "ENTERPRISE";
+  | "RETAIL" | "ABARROTES" | "FRUTERIA" | "FERRETERIA" | "VINOS"
+  | "SALON" | "SPA" | "PELUQUERIA" | "BARBERIA" | "TATUAJES" | "CAFE_BAR" | "ENTERPRISE";
 
 export const GIROS: readonly { codigo: CodigoGiro; nombre: string; ofrecido: boolean }[] = [
   { codigo: "QUICK_SERVICE", nombre: "Comida rápida", ofrecido: true },
@@ -15,17 +16,44 @@ export const GIROS: readonly { codigo: CodigoGiro; nombre: string; ofrecido: boo
   { codigo: "BAR", nombre: "Bar", ofrecido: true },
   { codigo: "DARK_KITCHEN", nombre: "Cocina solo para apps", ofrecido: true },
   { codigo: "FOODTRUCK", nombre: "Food truck", ofrecido: true },
+  // Tienda (ADR 0037).
+  { codigo: "RETAIL", nombre: "Tienda de ropa o calzado", ofrecido: true },
+  { codigo: "ABARROTES", nombre: "Tienda de abarrotes o supermercado", ofrecido: true },
+  { codigo: "FRUTERIA", nombre: "Frutería y verdulería", ofrecido: true },
+  { codigo: "FERRETERIA", nombre: "Ferretería", ofrecido: true },
+  { codigo: "VINOS", nombre: "Vinos y licores", ofrecido: true },
+  // Belleza (ADR 0038).
+  { codigo: "SALON", nombre: "Salón de belleza", ofrecido: true },
+  { codigo: "SPA", nombre: "Spa", ofrecido: true },
+  { codigo: "PELUQUERIA", nombre: "Peluquería", ofrecido: true },
+  { codigo: "BARBERIA", nombre: "Barbería", ofrecido: true },
+  { codigo: "TATUAJES", nombre: "Tatuajes y piercings", ofrecido: true },
   // Retirados: se quedan para nombrar a quien ya los tiene.
   { codigo: "CAFE_BAR", nombre: "Cafetería o bar", ofrecido: false },
   { codigo: "ENTERPRISE", nombre: "Cadena", ofrecido: false },
 ];
+
+/** Giros de tienda: espejo de `es_giro_tienda` en la base (0206). */
+export const GIROS_TIENDA: readonly CodigoGiro[] = ["RETAIL", "ABARROTES", "FRUTERIA", "FERRETERIA", "VINOS"];
+
+export const esGiroTienda = (g: string | null | undefined): boolean => GIROS_TIENDA.some((t) => t === g);
+
+/** Giros de belleza: espejo de `es_giro_belleza` en la base (0217). */
+export const GIROS_BELLEZA: readonly CodigoGiro[] = ["SALON", "SPA", "PELUQUERIA", "BARBERIA", "TATUAJES"];
+
+export const esGiroBelleza = (g: string | null | undefined): boolean => GIROS_BELLEZA.some((b) => b === g);
+
+/** Comida rápida, food truck y cafetería: su caja navega con la barra de abajo, como la tienda, y cobra como restaurante. */
+export const GIROS_COMIDA_RAPIDA: readonly CodigoGiro[] = ["QUICK_SERVICE", "FOODTRUCK", "CAFETERIA"];
+
+export const esGiroComidaRapida = (g: string | null | undefined): boolean => GIROS_COMIDA_RAPIDA.some((c) => c === g);
 
 export const nombreGiro = (codigo: string | null | undefined): string =>
   GIROS.find((g) => g.codigo === codigo)?.nombre ?? codigo ?? "—";
 
 export type CodigoOperacion =
   | "mostrador" | "comedor" | "meseros" | "domicilio" | "repartidores"
-  | "kds" | "reservaciones" | "marcas" | "eventos" | "cuentas_barra";
+  | "kds" | "reservaciones" | "marcas" | "eventos" | "cuentas_barra" | "existencias" | "agenda";
 
 /** Lo que se enseña en el admin y en /platform. */
 export const OPERACION: readonly { codigo: CodigoOperacion; nombre: string; descripcion: string; requiere?: CodigoOperacion }[] = [
@@ -39,14 +67,28 @@ export const OPERACION: readonly { codigo: CodigoOperacion; nombre: string; desc
   { codigo: "marcas", nombre: "Marcas virtuales", descripcion: "Varias marcas desde la misma cocina." },
   { codigo: "eventos", nombre: "Eventos", descripcion: "Abrir el turno en una feria o un evento." },
   { codigo: "cuentas_barra", nombre: "Cuentas en barra", descripcion: "Cuentas a nombre de una persona, sin mesa." },
+  { codigo: "existencias", nombre: "Existencias", descripcion: "Existencias por producto: piezas, kilos, metros o litros." },
+  { codigo: "agenda", nombre: "Agenda", descripcion: "Calendario de citas por colaborador." },
 ];
 
 /**
  * ¿Está encendido? Lo que diga la base manda. Si la llave no llegó (caja con directivas viejas,
- * todavía cargando) se enseña lo de siempre: todo, menos eventos y cuentas en barra, que antes de
- * los giros nadie veía (eventos solo un food truck).
+ * todavía cargando) se enseña lo de siempre: todo, menos eventos, cuentas en barra, existencias y agenda,
+ * que antes nadie veía (eventos solo un food truck; existencias es de tienda, ADR 0037).
  */
 export function moduloActivo(modulos: Record<string, boolean> | null | undefined, codigo: CodigoOperacion): boolean {
   const v = modulos?.[codigo];
-  return typeof v === "boolean" ? v : codigo !== "eventos" && codigo !== "cuentas_barra";
+  return typeof v === "boolean" ? v : codigo !== "eventos" && codigo !== "cuentas_barra" && codigo !== "existencias" && codigo !== "agenda";
 }
+
+/** Unidad de venta de un producto (`productos.tipo_venta`, 0206). La clave SAT la deriva la base. */
+export const TIPOS_VENTA = ["UNIDAD", "PESO", "LONGITUD", "VOLUMEN"] as const;
+export type TipoVenta = (typeof TIPOS_VENTA)[number];
+
+/** La tabla de unidades del admin y de la caja: decimales que admite y título de la ventana de cantidad. */
+export const UNIDADES_VENTA: Record<TipoVenta, { sat: string; nombre: string; abrev: string; decimales: number; titulo: string }> = {
+  UNIDAD: { sat: "H87", nombre: "Pieza", abrev: "pz", decimales: 0, titulo: "Piezas" },
+  PESO: { sat: "KGM", nombre: "Kilogramo", abrev: "kg", decimales: 3, titulo: "Peso" },
+  LONGITUD: { sat: "MTR", nombre: "Metro", abrev: "m", decimales: 2, titulo: "Metros" },
+  VOLUMEN: { sat: "LTR", nombre: "Litro", abrev: "l", decimales: 2, titulo: "Litros" },
+};

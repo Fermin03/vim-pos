@@ -19,7 +19,7 @@ describe("direcciones", () => {
     expect([...DIRECCIONES_RESERVADAS].sort()).toEqual([...deSql].sort());
   });
 
-  it("la base de la tienda", () => expect(BASE_TIENDA).toBe("pedidos.vimpos.com.mx"));
+  it("la base de la tienda", () => expect(BASE_TIENDA).toBe("online.vimpos.com.mx"));
 
   it("sugiere desde el nombre del negocio", () => {
     expect(sugerirDireccion("Knock-Out Burger León")).toBe("knock-out-burger-leon");

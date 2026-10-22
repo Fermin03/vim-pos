@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { idsGruposVisibles, reporteVisible, GRUPOS } from "../reportes-grupos";
 import type { ReportesDisponibles } from "../reportes";
 
-const TODO_DISPONIBLE: ReportesDisponibles = { marcas: true, eventos: true, reservaciones: true, apps: true, variasSucursales: true, inventario: true, meseros: true };
+const TODO_DISPONIBLE: ReportesDisponibles = { marcas: true, eventos: true, reservaciones: true, apps: true, variasSucursales: true, inventario: true, meseros: true, existencias: true, agenda: true };
 
 describe("idsGruposVisibles", () => {
   it("un supervisor no ve Inventario y costos (costo de ventas y movimientos piden 4)", () => {
@@ -27,5 +27,17 @@ describe("reporteVisible", () => {
     expect(reporteVisible(consolidado, sinSucursales, 5, true)).toBe(true);
     const costo = GRUPOS.flatMap((g) => g.reportes).find((r) => r.href === "/reportes/costo-ventas")!;
     expect(reporteVisible(costo, TODO_DISPONIBLE, 3, true)).toBe(false);
+  });
+});
+
+describe("reporteVisible — tienda y belleza", () => {
+  const variantes = GRUPOS.flatMap((g) => g.reportes).find((r) => r.href === "/reportes/ventas-variantes")!;
+  const comisiones = GRUPOS.flatMap((g) => g.reportes).find((r) => r.href === "/reportes/comisiones")!;
+  it("solo con el módulo confirmado: ni cargando ni con «Verlos»", () => {
+    expect(reporteVisible(variantes, null, 5)).toBe(false);
+    expect(reporteVisible(variantes, { ...TODO_DISPONIBLE, existencias: false }, 5, true)).toBe(false);
+    expect(reporteVisible(variantes, TODO_DISPONIBLE, 5)).toBe(true);
+    expect(reporteVisible(comisiones, { ...TODO_DISPONIBLE, agenda: false }, 5, true)).toBe(false);
+    expect(reporteVisible(comisiones, TODO_DISPONIBLE, 5)).toBe(true);
   });
 });

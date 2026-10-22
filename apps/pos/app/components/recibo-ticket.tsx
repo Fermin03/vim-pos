@@ -2,8 +2,9 @@
 import { LogoVim } from "@vim/ui/styles";
 import { QRCodeSVG } from "qrcode.react";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
-import { cantidadLealtad } from "../lib/print/ticket-builder";
+import { cantidadLealtad, conSaldoPorPagar } from "../lib/print/ticket-builder";
 import { fechaCorta } from "../lib/lealtad-reglas";
+import { aGranel, cantidadRenglon, precioConUnidad, tipoDesdeSat } from "../lib/unidades";
 
 /**
  * Render fiel del ticket de venta P-222 desde los datos crudos del ticket.
@@ -55,7 +56,7 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
             construirTicketJob: si aquí falta, la pantalla y el papel dicen cosas distintas. */}
         {datos.entrega?.repartidor && <MetaRow label="Repartidor:" value={datos.entrega.repartidor} />}
         <MetaRow label="Caja:" value={datos.meta.caja} />
-        {datos.meta.modoServicio && <MetaRow label="Servicio:" value={datos.meta.modoServicio} />}
+        {datos.meta.modoServicio && <MetaRow label="Servicio:" value={datos.tienda ? "Venta" : datos.meta.modoServicio} />}
         {datos.meta.nombreCliente && <MetaRow label="Cliente:" value={datos.meta.nombreCliente} />}
       </div>
 
@@ -78,6 +79,21 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
       {datos.notaPedido?.trim() && <div className="mt-1 text-[10.5px] font-bold">Nota del pedido: {datos.notaPedido.trim()}</div>}
 
       <DividerDashed />
+
+      {/* Cambio de talla: la prenda que regresó. Espejo de construirTicketJob (2.d). */}
+      {datos.cambio && (
+        <>
+          <div className="text-[11px]">
+            {datos.cambio.regresa.map((r, i) => (
+              <div key={i} className="flex items-start justify-between gap-2">
+                <span className="flex-1">Regresa: {r.nombre} x{r.cantidad}</span>
+                <span className="whitespace-nowrap font-bold">{fmt(r.total)}</span>
+              </div>
+            ))}
+          </div>
+          <DividerDashed />
+        </>
+      )}
 
       {/* Items */}
       <div className="text-[11px]">
@@ -114,14 +130,20 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
               </div>
             );
           }
+          const tipo = tipoDesdeSat(l.unidadSat);
           return (
             <div key={i} className="mb-[9px]">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1">
-                  <span className="font-bold">{l.cantidad}×</span> {l.nombre}
+                  <span className="font-bold">{cantidadRenglon(l.cantidad, tipo)}</span> {l.nombre}
                 </div>
                 <span className="whitespace-nowrap font-bold">{fmt(l.totalMxn)}</span>
               </div>
+              {aGranel(tipo) && (
+                <div className="pl-[18px] text-[10px] leading-[1.45] text-[#555]">{precioConUnidad(fmt(l.precioUnitario ?? 0), tipo)}</div>
+              )}
+              {l.colaborador && <div className="pl-[18px] text-[10px] leading-[1.45] text-[#555]">{l.colaborador}</div>}
+              {datos.tienda && l.sku && <div className="pl-[18px] text-[10px] leading-[1.45] text-[#555]">SKU {l.sku}</div>}
               {l.modificadores.map((m, j) => (
                 <div key={j} className="pl-[18px] text-[10px] leading-[1.45] text-[#555]">+ {m}</div>
               ))}
@@ -149,6 +171,7 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
           <span className="font-sans text-[15px] font-bold">TOTAL</span>
           <span className="font-sans text-[19px] font-bold tabular-nums">{fmt(datos.totales.total)}</span>
         </div>
+        {datos.cambio && <div className="font-bold">{datos.cambio.texto}</div>}
       </div>
 
       <DividerDashed />
@@ -160,6 +183,12 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
             <PayRow label="Forma de pago:" value={p.metodo} />
             {p.tarjeta && <PayRow label="" value={p.tarjeta} />}
             {p.autorizacion && <PayRow label="Autorización:" value={p.autorizacion} />}
+            {p.porPagar && (
+              <>
+                <PayRow label="Por pagar:" value={fmt(p.porPagar.montoMxn)} />
+                <PayRow label="Fecha límite:" value={fechaCorta(p.porPagar.fechaLimite)} />
+              </>
+            )}
             {p.recibidoMxn != null && (
               <>
                 <PayRow label="Recibido:" value={fmt(p.recibidoMxn)} />
@@ -190,7 +219,9 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
       {/* Pie + QR fiscal */}
       <div className="text-center">
         <div className="mb-2.5 font-sans text-[12.5px] font-semibold">¡Gracias por su compra!</div>
-        {datos.qrUrl && (
+        {datos.qrUrl && conSaldoPorPagar(datos) ? (
+          <div className="text-[9.5px] leading-[1.5] text-[#555]">Se factura al liquidarse.</div>
+        ) : datos.qrUrl && (
           <>
             <div className="mb-2 text-[9.5px] leading-[1.5] text-[#555]">
               ¿Necesitas factura? Escanea el código<br />o visita el portal con tu folio.

@@ -15,7 +15,7 @@ import { esc, soloAscii } from "./correo.ts";
  */
 export const TERMINOS_VERSION = "2026-10-01"; // sin días de tolerancia en el pago
 
-export const VERTICALES = ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "DARK_KITCHEN", "BAR", "CAFETERIA", "TAQUERIA"] as const;
+export const VERTICALES = ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "DARK_KITCHEN", "BAR", "CAFETERIA", "TAQUERIA", "RETAIL", "ABARROTES", "FRUTERIA", "FERRETERIA", "VINOS", "SALON", "SPA", "PELUQUERIA", "BARBERIA", "TATUAJES"] as const;
 export type Vertical = (typeof VERTICALES)[number];
 
 export const GIRO_ETIQUETA: Record<Vertical, string> = {
@@ -26,6 +26,16 @@ export const GIRO_ETIQUETA: Record<Vertical, string> = {
   BAR: "Bar",
   CAFETERIA: "Cafetería",
   TAQUERIA: "Taquería o cocina económica",
+  RETAIL: "Tienda de ropa o calzado",
+  ABARROTES: "Tienda de abarrotes o supermercado",
+  FRUTERIA: "Frutería y verdulería",
+  FERRETERIA: "Ferretería",
+  VINOS: "Vinos y licores",
+  SALON: "Salón de belleza",
+  SPA: "Spa",
+  PELUQUERIA: "Peluquería",
+  BARBERIA: "Barbería",
+  TATUAJES: "Tatuajes y piercings",
 };
 
 /** Una cadena es un plan, no un giro (ADR 0034): quien dice tener varias sucursales empieza en Cadena. */

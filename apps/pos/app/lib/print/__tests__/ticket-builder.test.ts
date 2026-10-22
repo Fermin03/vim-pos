@@ -48,6 +48,29 @@ describe("construirTicketJob", () => {
     expect(job.bloques[job.bloques.length - 1]).toEqual({ t: "corte" });
   });
 
+  it("venta a crédito: «A crédito» y debajo «Por pagar» con la fecha límite", () => {
+    const d = { ...DATOS, pagos: [{ metodo: "A crédito", montoMxn: 108, recibidoMxn: null, cambioMxn: 0, porPagar: { montoMxn: 108, fechaLimite: "2026-11-02" } }] };
+    const filas = construirTicketJob(d).bloques.filter((b) => b.t === "fila");
+    const i = filas.findIndex((b) => b.t === "fila" && b.izq === "Forma de pago" && b.der === "A crédito");
+    expect(i).toBeGreaterThanOrEqual(0);
+    expect(filas[i + 1]).toEqual({ t: "fila", izq: "Por pagar", der: "$108.00", bold: true });
+    expect(filas[i + 2]).toEqual({ t: "fila", izq: "Fecha límite", der: "02/11/2026" });
+  });
+
+  it("venta a crédito con saldo: «Se factura al liquidarse.» en lugar del QR", () => {
+    const d = { ...DATOS, pagos: [{ metodo: "A crédito", montoMxn: 108, recibidoMxn: null, cambioMxn: 0, porPagar: { montoMxn: 108, fechaLimite: "2026-11-02" } }] };
+    const job = construirTicketJob(d);
+    expect(job.bloques).toContainEqual({ t: "texto", valor: "Se factura al liquidarse.", align: "centro", size: 1 });
+    expect(job.bloques.find((b) => b.t === "qr")).toBeUndefined();
+    expect(job.bloques.find((b) => b.t === "texto" && b.valor.startsWith("¿Necesitas factura?"))).toBeUndefined();
+    // Sin QR del negocio, tampoco se promete factura.
+    expect(construirTicketJob({ ...d, qrUrl: null }).bloques.find((b) => b.t === "texto" && b.valor === "Se factura al liquidarse.")).toBeUndefined();
+  });
+
+  it("sin crédito no hay renglón «Por pagar»", () => {
+    expect(construirTicketJob(DATOS).bloques.find((b) => b.t === "fila" && b.izq === "Por pagar")).toBeUndefined();
+  });
+
   it("omite la línea de descuento cuando es 0", () => {
     const sinDesc = { ...DATOS, totales: { ...DATOS.totales, descuentos: 0 } };
     const job = construirTicketJob(sinDesc);
@@ -372,5 +395,123 @@ describe("pago con la terminal integrada", () => {
     const filas = filasDePago([{ metodo: "Tarjeta de crédito", montoMxn: 108, recibidoMxn: null, cambioMxn: 0, tarjeta: null, autorizacion: null }]);
     expect(filas[0]).toEqual({ t: "fila", izq: "Forma de pago", der: "Tarjeta de crédito" });
     expect(filas.some((x) => x.t === "fila" && x.izq === "Autorización")).toBe(false);
+  });
+});
+
+describe("construirTicketJob — SKU de tienda", () => {
+  const conSku = (tienda: boolean | undefined): DatosTicketImpresion => ({
+    ...DATOS,
+    tienda,
+    lineas: [{ cantidad: 1, nombre: "Playera Polo M Negra", totalMxn: 349, modificadores: [], notaCocina: null, sku: "POL-M-NEG" }],
+  });
+
+  it("tienda: renglón con SKU imprime la línea SKU debajo", () => {
+    const b = construirTicketJob(conSku(true)).bloques;
+    const i = b.findIndex((x) => x.t === "fila" && x.izq === "1x Playera Polo M Negra");
+    expect(i).toBeGreaterThan(-1);
+    expect(b[i + 1]).toEqual({ t: "texto", valor: "   SKU POL-M-NEG", size: 1 });
+  });
+
+  it("tienda sin SKU en el renglón no imprime la línea", () => {
+    const d = conSku(true);
+    d.lineas[0]!.sku = null;
+    expect(JSON.stringify(construirTicketJob(d).bloques)).not.toContain("SKU");
+  });
+
+  it("restaurante con SKU queda igual que antes", () => {
+    const sinSku = { ...conSku(undefined), lineas: [{ ...conSku(undefined).lineas[0]!, sku: undefined }] };
+    expect(construirTicketJob(conSku(false))).toEqual(construirTicketJob(sinSku));
+    expect(construirTicketJob(conSku(undefined))).toEqual(construirTicketJob(sinSku));
+  });
+});
+
+describe("construirTicketJob — Servicio en una tienda", () => {
+  it("tienda: la fila Servicio dice Venta; restaurante conserva su modo", () => {
+    expect(construirTicketJob({ ...DATOS, tienda: true }).bloques).toContainEqual({ t: "fila", izq: "Servicio", der: "Venta" });
+    expect(construirTicketJob(DATOS).bloques).toContainEqual({ t: "fila", izq: "Servicio", der: "Para llevar" });
+  });
+});
+
+describe("construirTicketJob — cambio de talla", () => {
+  const CAMBIO: DatosTicketImpresion = {
+    ...DATOS,
+    tienda: true,
+    lineas: [{ cantidad: 1, nombre: "Playera Polo G Negra", totalMxn: 399, modificadores: [], notaCocina: null, sku: "POL-G-NEG" }],
+    totales: { subtotal: 343.97, descuentos: 0, iva: 55.03, total: 399, propina: 0 },
+    pagos: [
+      { metodo: "Prenda que regresa", montoMxn: 349, recibidoMxn: null, cambioMxn: 0 },
+      { metodo: "Efectivo", montoMxn: 50, recibidoMxn: 50, cambioMxn: 0 },
+    ],
+    qrUrl: null,
+    cambio: { regresa: [{ nombre: "Playera Polo M Negra", cantidad: 1, total: 349 }], diferencia: 50, texto: "El cliente paga $50.00" },
+  };
+
+  it("dice qué regresa antes de los productos y qué pasa con el dinero bajo el total", () => {
+    const b = construirTicketJob(CAMBIO).bloques;
+    const regresa = b.findIndex((x) => x.t === "fila" && x.izq === "Regresa: Playera Polo M Negra x1");
+    const producto = b.findIndex((x) => x.t === "fila" && x.izq === "1x Playera Polo G Negra");
+    const total = b.findIndex((x) => x.t === "fila" && x.izq === "TOTAL");
+    expect(b[regresa]).toEqual({ t: "fila", izq: "Regresa: Playera Polo M Negra x1", der: "$349.00" });
+    expect(regresa).toBeGreaterThan(-1);
+    expect(regresa).toBeLessThan(producto);
+    expect(b[total + 1]).toEqual({ t: "texto", valor: "El cliente paga $50.00", bold: true });
+    expect(b).toContainEqual({ t: "fila", izq: "Forma de pago", der: "Prenda que regresa" });
+  });
+
+  it("sin cambio (un restaurante) el ticket sale idéntico, bloque por bloque", () => {
+    expect(construirTicketJob({ ...DATOS, cambio: null })).toEqual(construirTicketJob(DATOS));
+    expect(construirTicketJob({ ...DATOS, cambio: undefined })).toEqual(construirTicketJob(DATOS));
+    expect(JSON.stringify(construirTicketJob(DATOS).bloques)).not.toMatch(/Regresa|Prenda que regresa|Sin diferencia/);
+  });
+});
+
+describe("construirTicketJob — cantidades con unidad (tienda)", () => {
+  const job = construirTicketJob({
+    ...DATOS,
+    lineas: [
+      { cantidad: 1.25, nombre: "Jitomate", totalMxn: 35, modificadores: [], notaCocina: null, precioUnitario: 28, unidadSat: "KGM" },
+      { cantidad: 2, nombre: "Playera", totalMxn: 300, modificadores: [], notaCocina: null, precioUnitario: 150, unidadSat: "H87" },
+    ],
+  } as DatosTicketImpresion);
+  it("a granel: «1.250 kg Jitomate» y debajo el precio por kilo", () => {
+    const i = job.bloques.findIndex((b) => b.t === "fila" && b.izq === "1.250 kg Jitomate" && b.der === "$35.00");
+    expect(i).toBeGreaterThan(-1);
+    expect(job.bloques[i + 1]).toEqual({ t: "texto", valor: "   $28.00/kg", size: 1 });
+  });
+  it("una pieza se imprime como siempre, sin precio por unidad", () => {
+    const i = job.bloques.findIndex((b) => b.t === "fila" && b.izq === "2x Playera");
+    expect(i).toBeGreaterThan(-1);
+    expect(job.bloques).not.toContainEqual({ t: "texto", valor: "   $150.00", size: 1 });
+  });
+});
+
+describe("construirTicketJob — colaborador de belleza", () => {
+  it("imprime quién lo hizo debajo del servicio; el producto sin colaborador, igual que siempre", () => {
+    const b = construirTicketJob({
+      ...DATOS,
+      tienda: true,
+      lineas: [
+        { cantidad: 1, nombre: "Corte de cabello", totalMxn: 180, modificadores: [], notaCocina: null, colaborador: "Diego R." },
+        { cantidad: 1, nombre: "Shampoo", totalMxn: 240, modificadores: [], notaCocina: null, colaborador: null },
+      ],
+    }).bloques;
+    const i = b.findIndex((x) => x.t === "fila" && x.izq === "1x Corte de cabello");
+    expect(b[i + 1]).toEqual({ t: "texto", valor: "   Diego R.", size: 1 });
+    const j = b.findIndex((x) => x.t === "fila" && x.izq === "1x Shampoo");
+    expect(b[j + 1]).not.toMatchObject({ t: "texto" });
+  });
+});
+
+describe("debeImprimirTicketAlCobrar — comida rápida", () => {
+  it("Comer aquí también imprime: se cobra en el mostrador, sin cuenta previa", () => {
+    expect(debeImprimirTicketAlCobrar("COMER_AQUI", true)).toBe(true);
+    expect(debeImprimirTicketAlCobrar("PARA_LLEVAR", true)).toBe(true);
+    expect(debeImprimirTicketAlCobrar("DRIVE_THRU", true)).toBe(false);
+  });
+
+  it("una cuenta con su ticket ya impreso (mesa vieja, en espera) no saca otro al cobrar", () => {
+    expect(debeImprimirTicketAlCobrar("COMER_AQUI", true, true)).toBe(false);
+    expect(debeImprimirTicketAlCobrar("PARA_LLEVAR", true, true)).toBe(false);
+    expect(debeImprimirTicketAlCobrar("COMER_AQUI", true, false)).toBe(true);
   });
 });

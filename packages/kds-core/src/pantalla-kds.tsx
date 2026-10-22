@@ -554,7 +554,7 @@ export function PantallaKds({
           style={{ width: anchoTarjeta }}
         >
           {comandasFiltradas.map((c) => (
-            <Tarjeta key={c.ticketId} c={c} ahora={ahora} tema={tema} areaSel={areaSel} medir />
+            <Tarjeta key={c.ticketId} c={c} giro={caja.giro} ahora={ahora} tema={tema} areaSel={areaSel} medir />
           ))}
         </div>
 
@@ -575,6 +575,7 @@ export function PantallaKds({
               <Tarjeta
                 key={c.ticketId}
                 c={c}
+                giro={caja.giro}
                 ahora={ahora}
                 tema={tema}
                 areaSel={areaSel}
@@ -705,6 +706,7 @@ export function PantallaKds({
  */
 function Tarjeta({
   c,
+  giro,
   ahora,
   tema,
   areaSel,
@@ -714,6 +716,7 @@ function Tarjeta({
   onListo,
 }: {
   c: ComandaVista;
+  giro?: string | null;
   ahora: number;
   tema: Tema;
   areaSel: string;
@@ -727,7 +730,7 @@ function Tarjeta({
   const f = FRANJA[estado];
   const nueva = c.fechaEnvio != null && ahora - new Date(c.fechaEnvio).getTime() < NUEVA_MS;
   // "Mesa · Mesa 1" dice lo mismo dos veces: con el número de mesa basta.
-  const modo = labelModo(c.modoServicio);
+  const modo = labelModo(c.modoServicio, giro);
   const origen = c.detalle?.startsWith("Mesa ") && modo === "Mesa" ? c.detalle : [modo, c.detalle].filter(Boolean).join(" · ");
   const etiquetaListo = areaSel === TODAS ? "LISTO" : `LISTO · ${areaSel}`;
   const claseListo =

@@ -7,7 +7,7 @@
 //     Solo con `CAPTCHA_OPCIONAL=1` (local y desarrollo, NUNCA en producción) se omite.
 //   · Con el secreto: token ausente, inválido, vencido o reusado → rechazo. También si Cloudflare
 //     no responde, y si el token se emitió para OTRO dominio (`TURNSTILE_HOSTNAMES`) o para otra
-//     acción ("registro" / "reenvio" / "tienda_pedido" / "tienda_registro" / "tienda_recuperar"): un token resuelto en otro sitio o para otra acción no sirve
+//     acción ("registro" / "reenvio" / "tienda_pedido" / "tienda_registro" / "tienda_recuperar" / "tienda_reserva"): un token resuelto en otro sitio o para otra acción no sirve
 //     para dar de alta.
 //
 // Cómo crear las llaves: docs/operacion/registro-publico.md.
@@ -15,7 +15,7 @@
 export const TURNSTILE_VERIFICAR = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 export const HOSTNAMES_POR_DEFECTO = ["admin.vimpos.com.mx"];
 
-export type AccionCaptcha = "registro" | "reenvio" | "tienda_pedido" | "tienda_registro" | "tienda_recuperar";
+export type AccionCaptcha = "registro" | "reenvio" | "tienda_pedido" | "tienda_registro" | "tienda_recuperar" | "tienda_reserva";
 
 export type ResultadoCaptcha =
   | { ok: true; omitido: boolean }

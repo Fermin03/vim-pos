@@ -56,7 +56,7 @@ function crearPoolFalso({
       // Migración de la libreta de zonas a huella (C3): columna y relleno. Aquí no hay huellas que
       // rellenar; lo que hacen de verdad lo prueba el bloque con Postgres real al final del archivo.
       if (sql.startsWith("ALTER TABLE")) return { rows: [], rowCount: 0 };
-      if (sql.startsWith("UPDATE _vim_zonas_ok") || sql.startsWith("UPDATE _vim_colonias_ok")) return { rows: [], rowCount: 0 };
+      if (sql.startsWith("UPDATE _vim_zonas_ok") || sql.startsWith("UPDATE _vim_colonias_ok") || sql.startsWith("UPDATE _vim_cotizaciones_ok") || sql.startsWith("UPDATE _vim_citas_ok") || sql.startsWith("UPDATE _vim_anticipos_ok")) return { rows: [], rowCount: 0 };
 
       // `_vim_migraciones_sync`: el marcador de "esto ya corrió una vez en esta caja".
       if (sql.includes("_vim_migraciones_sync")) {
@@ -903,6 +903,395 @@ describe("ventas que cambian después de subir, y el piso de las mesas (Postgres
     await enReplica("UPDATE turnos SET efectivo_contado_mxn = 999 WHERE id = $1", [nuevo]);
     assert.ok((await pend()).turnosCambiados.includes(nuevo), "la huella es de la fila completa: cualquier cambio lo detecta");
   });
+
+  // ── Crédito (0210): los abonos y el saldo a favor viajan con su turno, no con su venta ────────
+  /** Un turno nuevo de esta caja (cierra el que esté abierto), sin subir. */
+  const turnoNuevo = async (codigo) => {
+    await enReplica("UPDATE turnos SET estado = 'CERRADO', fecha_cierre = now() WHERE caja_id = $1 AND estado = 'ABIERTO'", [CAJA]);
+    const { rows: [{ id }] } = await enReplica(
+      `INSERT INTO turnos (tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable, usuario_apertura_id, fondo_inicial_mxn, fondo_modo)
+       VALUES ($1, $2, $3, $4, CURRENT_DATE, $5, 0, 'TOTAL') RETURNING id`, [TENANT, SUC, CAJA, codigo, MARIA]);
+    return id;
+  };
+  /** Un abono como lo deja registrar_abono en la caja. */
+  const abonar = async (turnoId, ticketId, clave) => {
+    const { rows: [{ id }] } = await enReplica(
+      `INSERT INTO abonos_credito (tenant_id, sucursal_id, caja_id, turno_id, cliente_id, ticket_id, tipo, metodo_pago, monto_mxn, client_id_local)
+       VALUES ($1, $2, $3, $4, gen_random_uuid(), $5, 'ABONO', 'EFECTIVO', 100, $6) RETURNING id`, [TENANT, SUC, CAJA, turnoId, ticketId, clave]);
+    return id;
+  };
+
+  test("crédito: un abono a una venta de hace 90 días sube en el lote de su turno; confirmado, no se repite", async () => {
+    await subir();
+    await enReplica("UPDATE tickets SET fecha_apertura = now() - interval '90 days' WHERE id = $1", [ticket]);
+    const tn = await turnoNuevo("PRUEBA-CR-1");
+    const ab = await abonar(tn, ticket, "cr-ab-1");
+    const { rows: [{ id: sf }] } = await enReplica(
+      `INSERT INTO saldo_favor_movimientos (tenant_id, cliente_id, tipo, monto_mxn, ticket_id, turno_id, client_id_local)
+       VALUES ($1, gen_random_uuid(), 'ENTRADA_CANCELACION', 30, $2, $3, 'cr-sf-1') RETURNING id`, [TENANT, ticket, tn]);
+
+    const p = await pend();
+    assert.ok(!p.ids.includes(ticket), "la venta vieja no está pendiente");
+    assert.ok(p.abonos.some((a) => a.id === ab), "el abono sí");
+    assert.ok(p.saldoFavor.some((s) => s.id === sf), "y el movimiento de saldo a favor");
+
+    const [snap] = await subir({ resultado: { abonos_credito: 1, saldo_favor_movimientos: 1 } });
+    assert.ok((snap?.abonos_credito ?? []).some((a) => a.id === ab), "el abono viaja");
+    assert.ok((snap?.saldo_favor_movimientos ?? []).some((s) => s.id === sf), "el saldo a favor viaja");
+    assert.ok((snap?.turnos ?? []).some((t) => t.id === tn), "con su turno");
+    assert.ok(!(snap?.tickets ?? []).some((t) => t.id === ticket), "sin la venta vieja");
+    const p2 = await pend();
+    assert.ok(!p2.abonos.some((a) => a.id === ab) && !p2.saldoFavor.some((s) => s.id === sf), "confirmados, no se repiten");
+    const [otra] = await subir();
+    assert.equal((otra?.abonos_credito ?? []).length, 0, "el siguiente push no lo vuelve a mandar");
+  });
+
+  test("crédito: un abono rechazado, o que una nube sin la 0210 no confirma, se reintenta", async () => {
+    const tn = await turnoNuevo("PRUEBA-CR-2");
+    const ab = await abonar(tn, ticket, "cr-ab-2");
+    await subir({ resultado: { abonos_credito: 0, _errores: [{ tabla: "abonos_credito", id: ab, error: "x" }] } });
+    assert.ok((await pend()).abonos.some((a) => a.id === ab), "rechazado: sigue pendiente");
+    await subir({ resultado: { _ignoradas: ["abonos_credito"] } });
+    assert.ok((await pend()).abonos.some((a) => a.id === ab), "ignorado: sigue pendiente");
+    await subir({ resultado: { abonos_credito: 1 } });
+    assert.ok(!(await pend()).abonos.some((a) => a.id === ab), "confirmado: ya no");
+  });
+
+  test("crédito: el abono de una venta que aún no sube viaja en el lote de esa venta, no antes", async () => {
+    await subir();
+    const tn = await turnoNuevo("PRUEBA-CR-3");
+    turno = tn; // crearVenta abre las ventas en este turno
+    const v1 = await crearVenta("cr-v1");
+    const v2 = await crearVenta("cr-v2");
+    await enReplica("UPDATE tickets SET estado_fiscal = 'PAGADO', fecha_apertura = now() WHERE id = ANY($1::uuid[])", [[v1, v2]]);
+    const ab = await abonar(tn, v2, "cr-ab-3");
+    const nube = nubeFalsa({ resultado: { abonos_credito: 1 } });
+    try {
+      await pushToCloud(db, OPTS, () => {}, { maxVentasPorLote: 1 });
+    } finally { nube.restaurar(); }
+    const lote = nube.peticiones.findIndex((x) => (x.snapshot?.abonos_credito ?? []).some((a) => a.id === ab));
+    assert.ok(lote >= 0, "el abono viajó");
+    assert.ok((nube.peticiones[lote].snapshot.tickets ?? []).some((t) => t.id === v2), "en el mismo lote que su venta");
+    assert.equal(nube.peticiones.filter((x) => (x.snapshot?.abonos_credito ?? []).length).length, 1, "una sola vez");
+  });
+
+  // ── Cotizaciones (0213): suben por huella, con sus renglones ───────────────────────────────
+  /** Una cotización como la deja guardar_cotizacion en la caja. */
+  const cotizar = async (clave) => {
+    await db.query(`INSERT INTO configuracion_tenant (tenant_id, modulo_cotizaciones_activo) VALUES ($1, true)
+                    ON CONFLICT (tenant_id) DO UPDATE SET modulo_cotizaciones_activo = true`, [TENANT]);
+    const c = await db.connect();
+    try {
+      await c.query("SELECT set_config('request.jwt.claims', $1, false)", [JSON.stringify({ sub: MARIA, tenant_id: TENANT })]);
+      const { rows: [{ j }] } = await c.query(
+        `SELECT guardar_cotizacion($1, $2, NULL, jsonb_build_array(
+           jsonb_build_object('producto_id', (SELECT id FROM productos WHERE tenant_id = $3 AND nombre = 'Hamburguesa Clásica' LIMIT 1), 'cantidad', 2),
+           jsonb_build_object('producto_id', (SELECT id FROM productos WHERE tenant_id = $3 AND nombre = 'Hamburguesa Clásica' LIMIT 1), 'cantidad', 1)),
+           $4) AS j`, [SUC, CAJA, TENANT, clave]);
+      return j.id;
+    } finally { c.release(); }
+  };
+  const cotPend = async (id) => (await pend()).cotizaciones.some((x) => x.id === id);
+
+  test("cotizaciones: sube una vez con sus renglones; al cancelarla vuelve a subir", async () => {
+    await subir();
+    const cot = await cotizar("cot-1");
+    assert.ok(await cotPend(cot), "recién hecha, está pendiente");
+
+    const [snap] = await subir({ resultado: { cotizaciones: 1, cotizacion_items: 2 } });
+    assert.ok((snap?.cotizaciones ?? []).some((x) => x.id === cot), "la cotización viaja");
+    assert.equal((snap?.cotizacion_items ?? []).filter((x) => x.cotizacion_id === cot).length, 2, "con sus dos renglones");
+    assert.ok(!(await cotPend(cot)), "confirmada, no se repite");
+    const [otra] = await subir();
+    assert.equal((otra?.cotizaciones ?? []).length, 0, "el siguiente push no la vuelve a mandar");
+
+    await enReplica("UPDATE cotizaciones SET estado = 'CANCELADA', updated_at = now() WHERE id = $1", [cot]);
+    assert.ok(await cotPend(cot), "cancelarla la deja pendiente");
+    const [snap2] = await subir({ resultado: { cotizaciones: 1, cotizacion_items: 0 } });
+    assert.equal((snap2?.cotizaciones ?? []).find((x) => x.id === cot)?.estado, "CANCELADA", "viaja cancelada");
+    assert.ok(!(await cotPend(cot)), "confirmada, ya no");
+  });
+
+  test("cotizaciones: rechazada, con un renglón rechazado o sin la 0213 en la nube, se reintenta", async () => {
+    const cot = await cotizar("cot-2");
+    await subir({ resultado: { cotizaciones: 0, cotizacion_items: 0, _errores: [{ tabla: "cotizaciones", id: cot, error: "x" }] } });
+    assert.ok(await cotPend(cot), "rechazada: sigue pendiente");
+    const { rows: [{ id: item }] } = await db.query("SELECT id FROM cotizacion_items WHERE cotizacion_id = $1 LIMIT 1", [cot]);
+    await subir({ resultado: { cotizaciones: 1, cotizacion_items: 1, _errores: [{ tabla: "cotizacion_items", id: item, error: "x" }] } });
+    assert.ok(await cotPend(cot), "un renglón rechazado: la cotización sigue pendiente");
+    await subir({ resultado: { _ignoradas: ["cotizaciones", "cotizacion_items"] } });
+    assert.ok(await cotPend(cot), "ignorada: sigue pendiente");
+    await subir({ resultado: { cotizaciones: 1, cotizacion_items: 2 } });
+    assert.ok(!(await cotPend(cot)), "confirmada: ya no");
+  });
+
+  test("cotizaciones: una convertida viaja en el lote de su venta, no antes", async () => {
+    await subir();
+    const cot = await cotizar("cot-3");
+    await subir({ resultado: { cotizaciones: 1, cotizacion_items: 2 } });
+    const v1 = await crearVenta("cot-v1");
+    const v2 = await crearVenta("cot-v2");
+    await enReplica("UPDATE tickets SET estado_fiscal = 'PAGADO', fecha_apertura = now() WHERE id = ANY($1::uuid[])", [[v1, v2]]);
+    await enReplica("UPDATE cotizaciones SET estado = 'CONVERTIDA', ticket_id = $2, updated_at = now() WHERE id = $1", [cot, v2]);
+    const nube = nubeFalsa({ resultado: { cotizaciones: 1, cotizacion_items: 0 } });
+    try {
+      await pushToCloud(db, OPTS, () => {}, { maxVentasPorLote: 1 });
+    } finally { nube.restaurar(); }
+    const lotes = nube.peticiones.filter((x) => (x.snapshot?.cotizaciones ?? []).some((c) => c.id === cot));
+    assert.equal(lotes.length, 1, "una sola vez");
+    assert.ok((lotes[0].snapshot.tickets ?? []).some((t) => t.id === v2), "en el mismo lote que su venta");
+    assert.ok(!(await cotPend(cot)), "confirmada, ya no");
+  });
+
+  // ── Citas (0219): suben por huella, con sus tramos; las de la nube no rebotan ──────────────
+  const SERVICIO = "21900000-0000-0000-0000-0000000000d1";
+  const DIEGO = "99999999-0000-0000-0000-0000000000f1";
+  /** Una cita como la deja guardar_cita en la caja; con `id`, la edita. */
+  const agendar = async (clave, hora, id = null) => {
+    await db.query(`UPDATE tenants SET operacion = operacion || '{"agenda":true}' WHERE id = $1`, [TENANT]);
+    await db.query(`INSERT INTO productos (id, tenant_id, categoria_id, nombre, precio_base_mxn) VALUES ($1, $2, 'a0000000-0000-0000-0000-0000000000c1', 'Corte caja', 250) ON CONFLICT DO NOTHING`, [SERVICIO, TENANT]);
+    await db.query(`INSERT INTO servicios_agenda (producto_id, tenant_id, duracion_min) VALUES ($1, $2, 60) ON CONFLICT DO NOTHING`, [SERVICIO, TENANT]);
+    await db.query(`INSERT INTO colaboradores_agenda (usuario_id, tenant_id, sucursal_id, color_hex) VALUES ($1, $2, $3, '#0F766E') ON CONFLICT DO NOTHING`, [DIEGO, TENANT, SUC]);
+    const c = await db.connect();
+    try {
+      await c.query("SELECT set_config('request.jwt.claims', $1, false)", [JSON.stringify({ sub: MARIA, tenant_id: TENANT })]);
+      const { rows: [{ id: cita }] } = await c.query("SELECT guardar_cita($1) AS id", [JSON.stringify({
+        id, sucursal_id: SUC, cliente_nombre: "Clienta caja", inicia: `2030-01-07 ${hora}-06`, client_id_local: id ? null : clave,
+        servicios: [{ producto_id: SERVICIO, usuario_id: DIEGO }] })]);
+      return cita;
+    } finally { c.release(); }
+  };
+  const citaPend = async (id) => (await pend()).citas.some((x) => x.id === id);
+
+  test("citas: sube una vez con su tramo; editada en la caja vuelve a subir; sin cambio no", async () => {
+    await subir();
+    const cita = await agendar("cita-1", "10:00");
+    assert.ok(await citaPend(cita), "recién agendada, está pendiente");
+    const [snap] = await subir({ resultado: { citas: 1, citas_servicios: 1 } });
+    assert.ok((snap?.citas ?? []).some((x) => x.id === cita), "la cita viaja");
+    assert.equal((snap?.citas_servicios ?? []).filter((x) => x.cita_id === cita).length, 1, "con su tramo");
+    assert.ok(!(await citaPend(cita)), "confirmada, no se repite");
+    const [otra] = await subir();
+    assert.equal((otra?.citas ?? []).length, 0, "sin cambio no se reenvía");
+
+    await agendar(null, "12:00", cita);
+    assert.ok(await citaPend(cita), "editada en la caja, vuelve a estar pendiente");
+    const [snap2] = await subir({ resultado: { citas: 1, citas_servicios: 1 } });
+    const tramo = (snap2?.citas_servicios ?? []).find((x) => x.cita_id === cita);
+    assert.equal(new Date(tramo?.inicia).toISOString(), "2030-01-07T18:00:00.000Z", "viaja con la hora nueva");
+    assert.ok(!(await citaPend(cita)), "confirmada, ya no");
+  });
+
+  test("citas: con un tramo rechazado o sin la 0219 en la nube, se reintenta", async () => {
+    const cita = await agendar("cita-2", "14:00");
+    const { rows: [{ id: tramo }] } = await db.query("SELECT id FROM citas_servicios WHERE cita_id = $1", [cita]);
+    await subir({ resultado: { citas: 1, citas_servicios: 0, _errores: [{ tabla: "citas_servicios", id: tramo, error: "x" }] } });
+    assert.ok(await citaPend(cita), "un tramo rechazado: la cita sigue pendiente");
+    await subir({ resultado: { _ignoradas: ["citas", "citas_servicios"] } });
+    assert.ok(await citaPend(cita), "ignorada: sigue pendiente");
+    await subir({ resultado: { citas: 1, citas_servicios: 1 } });
+    assert.ok(!(await citaPend(cita)), "confirmada: ya no");
+  });
+
+  test("citas: lo que baja del pull no vuelve a subir ni pisa una edición local pendiente", async () => {
+    await subir();
+    const cita = await agendar("cita-3", "16:00");
+    await subir({ resultado: { citas: 1, citas_servicios: 1 } });
+    const fila = async () => (await db.query("SELECT to_jsonb(c) AS f FROM citas c WHERE id = $1", [cita])).rows[0].f;
+    const tramos = async () => (await db.query("SELECT jsonb_agg(to_jsonb(s)) AS f FROM citas_servicios s WHERE cita_id = $1", [cita])).rows[0].f;
+    // La nube la tiene con empalme (chocó con otra al subir): baja así y no rebota.
+    const nube = { ...(await fila()), empalme: true };
+    const nubeTramos = (await tramos()).map((t) => ({ ...t, empalme: true }));
+    await pullSnapshot(db, { citas: [nube], citas_servicios: nubeTramos });
+    const { rows: [r] } = await db.query(
+      "SELECT c.empalme AS cita, bool_and(s.empalme) AS tramos FROM citas c JOIN citas_servicios s ON s.cita_id = c.id WHERE c.id = $1 GROUP BY c.empalme", [cita]);
+    assert.deepEqual(r, { cita: true, tramos: true }, "el pull trae la marca de empalme");
+    assert.ok(!(await citaPend(cita)), "lo que bajó no sube de vuelta");
+
+    await agendar(null, "17:00", cita);   // editada en la caja: queda sin marca y pendiente
+    await pullSnapshot(db, { citas: [nube], citas_servicios: nubeTramos });
+    const { rows: [l] } = await db.query("SELECT empalme FROM citas WHERE id = $1", [cita]);
+    assert.equal(l.empalme, false, "el pull no pisa la edición local");
+    assert.equal(new Date((await tramos())[0].inicia).toISOString(), "2030-01-07T23:00:00.000Z", "ni sus tramos");
+    assert.ok(await citaPend(cita), "y sigue pendiente de subir");
+  });
+
+  test("citas: rechazada por la nube, el pull no la pisa y el siguiente push la reintenta", async () => {
+    await subir();
+    const cita = await agendar("cita-5", "06:00");
+    await subir({ resultado: { citas: 0, citas_servicios: 0, _errores: [{ tabla: "citas", id: cita, error: "x" }] } });
+    assert.ok(await citaPend(cita), "rechazada: sigue pendiente");
+    const { rows: [{ c, s }] } = await db.query(
+      `SELECT (SELECT to_jsonb(x) || '{"cliente_nombre":"Versión de la nube"}'::jsonb FROM citas x WHERE id = $1) AS c,
+              (SELECT jsonb_agg(to_jsonb(x)) FROM citas_servicios x WHERE cita_id = $1) AS s`, [cita]);
+    await pullSnapshot(db, { citas: [c], citas_servicios: s });
+    const { rows: [l] } = await db.query("SELECT cliente_nombre FROM citas WHERE id = $1", [cita]);
+    assert.equal(l.cliente_nombre, "Clienta caja", "el pull no pisa una cita de la caja sin confirmar");
+    const [snap] = await subir({ resultado: { citas: 1, citas_servicios: 1 } });
+    assert.ok((snap?.citas ?? []).some((x) => x.id === cita), "el siguiente push la reintenta");
+    assert.ok(!(await citaPend(cita)), "confirmada: ya no");
+  });
+
+  // ── Anticipos (0223): por huella, como las citas ─────────────────────────────────────────────
+  test("anticipos: sube una vez con su turno; resuelto vuelve a subir; lo que baja no rebota", async () => {
+    await subir();
+    const cita = await agendar("cita-ant", "04:00");
+    await subir({ resultado: { citas: 1, citas_servicios: 1 } });
+    const tn = await turnoNuevo("PRUEBA-ANT");
+    const { rows: [{ id: ant }] } = await enReplica(
+      `INSERT INTO anticipos_cita (tenant_id, sucursal_id, caja_id, turno_id, cita_id, metodo_pago, monto_mxn, client_id_local)
+       VALUES ($1, $2, $3, $4, $5, 'EFECTIVO', 200, 'ant-1') RETURNING id`, [TENANT, SUC, CAJA, tn, cita]);
+    const antPend = async () => (await pend()).anticipos.some((x) => x.id === ant);
+    assert.ok(await antPend(), "recién recibido, está pendiente");
+
+    await subir({ resultado: { anticipos_cita: 0, _errores: [{ tabla: "anticipos_cita", id: ant, error: "x" }] } });
+    assert.ok(await antPend(), "rechazado: sigue pendiente");
+    await subir({ resultado: { _ignoradas: ["anticipos_cita"] } });
+    assert.ok(await antPend(), "una nube sin la 0223: sigue pendiente");
+
+    const [snap] = await subir({ resultado: { anticipos_cita: 1 } });
+    assert.equal((snap?.anticipos_cita ?? []).filter((x) => x.id === ant).length, 1, "viaja una vez");
+    assert.ok((snap?.turnos ?? []).some((t) => t.id === tn), "con su turno");
+    assert.ok(!(await antPend()), "confirmado, no se repite");
+    const [otra] = await subir();
+    assert.equal((otra?.anticipos_cita ?? []).length, 0, "el siguiente push no lo vuelve a mandar");
+
+    await enReplica("UPDATE anticipos_cita SET estado = 'RETENIDO', turno_resuelve_id = $2, resuelto_at = now() WHERE id = $1", [ant, tn]);
+    assert.ok(await antPend(), "resuelto en la caja, vuelve a estar pendiente");
+    const [snap2] = await subir({ resultado: { anticipos_cita: 1 } });
+    assert.equal((snap2?.anticipos_cita ?? []).find((x) => x.id === ant)?.estado, "RETENIDO", "viaja resuelto");
+    assert.ok(!(await antPend()), "confirmado, ya no");
+
+    // La versión de la nube baja y no rebota.
+    const { rows: [{ f }] } = await db.query("SELECT to_jsonb(a) || '{\"referencia_devolucion\":\"nube\"}'::jsonb AS f FROM anticipos_cita a WHERE id = $1", [ant]);
+    await pullSnapshot(db, { anticipos_cita: [f] });
+    const { rows: [l] } = await db.query("SELECT referencia_devolucion FROM anticipos_cita WHERE id = $1", [ant]);
+    assert.equal(l.referencia_devolucion, "nube", "el pull lo trae");
+    assert.ok(!(await antPend()), "lo que bajó no sube de vuelta");
+  });
+
+  /** Un anticipo VIGENTE como lo deja registrar_anticipo, en un turno nuevo. */
+  const anticipar = async (cita, clave) => {
+    const tn = await turnoNuevo(`PRUEBA-${clave}`);
+    const { rows: [{ id }] } = await enReplica(
+      `INSERT INTO anticipos_cita (tenant_id, sucursal_id, caja_id, turno_id, cita_id, metodo_pago, monto_mxn, client_id_local)
+       VALUES ($1, $2, $3, $4, $5, 'EFECTIVO', 200, $6) RETURNING id`, [TENANT, SUC, CAJA, tn, cita, clave]);
+    return { id, tn };
+  };
+  const antPendiente = async (id) => (await pend()).anticipos.some((x) => x.id === id);
+
+  test("anticipos: el pull no pisa uno con cambio local pendiente", async () => {
+    await subir();
+    const cita = await agendar("cita-ant2", "03:00");
+    const { id: ant, tn } = await anticipar(cita, "ant-2");
+    await subir({ resultado: { citas: 1, citas_servicios: 1, anticipos_cita: 1 } });
+    const { rows: [{ f }] } = await db.query("SELECT to_jsonb(a) AS f FROM anticipos_cita a WHERE id = $1", [ant]);
+    await enReplica("UPDATE anticipos_cita SET estado = 'RETENIDO', turno_resuelve_id = $2, resuelto_at = now() WHERE id = $1", [ant, tn]);
+    await pullSnapshot(db, { anticipos_cita: [f] });   // la nube aún lo tiene VIGENTE
+    const { rows: [l] } = await db.query("SELECT estado FROM anticipos_cita WHERE id = $1", [ant]);
+    assert.equal(l.estado, "RETENIDO", "el pull no regresa el anticipo resuelto en la caja");
+    assert.ok(await antPendiente(ant), "y sigue pendiente de subir");
+  });
+
+  test("anticipos: uno aplicado viaja en el lote de su venta", async () => {
+    await subir();
+    const cita = await agendar("cita-ant3", "02:00");
+    const { id: ant, tn } = await anticipar(cita, "ant-3");
+    turno = tn; // crearVenta abre las ventas en este turno
+    const v1 = await crearVenta("ant-v1");
+    const v2 = await crearVenta("ant-v2");
+    await enReplica("UPDATE tickets SET estado_fiscal = 'PAGADO', fecha_apertura = now() WHERE id = ANY($1::uuid[])", [[v1, v2]]);
+    await enReplica("UPDATE citas SET ticket_id = $2, estado = 'COBRADA' WHERE id = $1", [cita, v2]);
+    await enReplica("UPDATE anticipos_cita SET estado = 'APLICADO', ticket_id = $2, turno_resuelve_id = $3, resuelto_at = now() WHERE id = $1", [ant, v2, tn]);
+    const nube = nubeFalsa({ resultado: { citas: 1, citas_servicios: 1, anticipos_cita: 1 } });
+    try {
+      await pushToCloud(db, OPTS, () => {}, { maxVentasPorLote: 1 });
+    } finally { nube.restaurar(); }
+    const lotes = nube.peticiones.filter((x) => (x.snapshot?.anticipos_cita ?? []).some((a) => a.id === ant));
+    assert.equal(lotes.length, 1, "una sola vez");
+    assert.ok((lotes[0].snapshot.tickets ?? []).some((t) => t.id === v2), "en el mismo lote que su venta");
+    assert.ok(!(await antPendiente(ant)), "confirmado, ya no");
+  });
+
+  test("anticipos: un conflicto de la nube se da por subido y queda en la bitácora", async () => {
+    await subir();
+    const cita = await agendar("cita-ant4", "01:00");
+    const { id: ant } = await anticipar(cita, "ant-4");
+    const bitacora = [];
+    const nube = nubeFalsa({ resultado: { citas: 1, citas_servicios: 1, anticipos_cita: 0,
+      _conflictos: [{ tabla: "anticipos_cita", id: ant, nube: "APLICADO", caja: "DEVUELTO", error: "anticipo resuelto dos veces" }] } });
+    try {
+      await pushToCloud(db, OPTS, (m) => bitacora.push(m));
+    } finally { nube.restaurar(); }
+    assert.ok(!(await antPendiente(ant)), "no se reintenta");
+    assert.ok(bitacora.some((m) => m.includes("resuelta(s) dos veces") && m.includes(String(ant).slice(0, 8))), "queda en la bitácora");
+  });
+
+  test("citas: el catálogo vacío en la nube vacía el de la caja", async () => {
+    await agendar("cita-cat", "21:00");   // asegura el colaborador
+    const { rows: [{ t }] } = await db.query("SELECT to_jsonb(x) AS t FROM tenants x WHERE id = $1", [TENANT]);
+    const aus = { id: "21900000-0000-0000-0000-0000000000e1", tenant_id: TENANT, usuario_id: DIEGO, desde: "2030-01-01", hasta: "2030-01-31", motivo: "Vacaciones" };
+    await pullSnapshot(db, { tenants: [t], ausencias_colaborador: [aus] });
+    const cuenta = async () => (await db.query("SELECT count(*)::int AS n FROM ausencias_colaborador WHERE tenant_id = $1", [TENANT])).rows[0].n;
+    assert.equal(await cuenta(), 1, "bajó la ausencia");
+    await pullSnapshot(db, { tenants: [t] });
+    assert.equal(await cuenta(), 1, "sin la clave (nube vieja) no se toca");
+    await pullSnapshot(db, { tenants: [t], ausencias_colaborador: [] });
+    assert.equal(await cuenta(), 0, "cancelada la última en la nube, se borra aquí");
+  });
+
+  test("citas: un tramo de la nube que choca con una cita local aún sin subir entra con empalme, no tumba el pull", async () => {
+    await agendar("cita-local", "08:00");   // Diego 8:00–9:00, sin subir
+    const otra = await agendar("cita-nube", "20:00");
+    const { rows: [{ c, s }] } = await db.query(
+      `SELECT (SELECT to_jsonb(x) FROM citas x WHERE id = $1) AS c,
+              (SELECT jsonb_agg(to_jsonb(x) || '{"inicia":"2030-01-07T14:30:00Z","termina":"2030-01-07T15:30:00Z"}'::jsonb) FROM citas_servicios x WHERE cita_id = $1) AS s`, [otra]);
+    await db.query("DELETE FROM citas WHERE id = $1", [otra]);   // así la «nube» la tiene y la caja no
+    await pullSnapshot(db, { citas: [c], citas_servicios: s });
+    const { rows: [r] } = await db.query("SELECT activa, empalme FROM citas_servicios WHERE cita_id = $1", [otra]);
+    assert.deepEqual(r, { activa: true, empalme: true }, "entra activa y marcada");
+  });
+
+  test("crédito: lo que baja del pull se guarda y no vuelve a subir", async () => {
+    const { rows: [{ id: cliente }] } = await db.query(
+      "INSERT INTO clientes (tenant_id, nombre, telefono) VALUES ($1, 'Crédito Nube', '4770009901') RETURNING id", [TENANT]);
+    const { rows: [{ id: tn }] } = await db.query("SELECT id FROM turnos WHERE caja_id = $1 ORDER BY created_at DESC LIMIT 1", [CAJA]);
+    const abNube = { id: "99999999-0000-0000-0000-00000000c0a1", tenant_id: TENANT, sucursal_id: SUC, caja_id: CAJA, turno_id: tn,
+      cliente_id: cliente, ticket_id: ticket, tipo: "ABONO", metodo_pago: "TARJETA_DEBITO", monto_mxn: "50.00", estado: "APLICADO",
+      client_id_local: "nube-ab-1", usuario_id: null, created_at: new Date().toISOString() };
+    const sfNube = { id: "99999999-0000-0000-0000-00000000c0f1", tenant_id: TENANT, cliente_id: cliente, tipo: "ENTRADA_CANCELACION",
+      monto_mxn: "20.00", ticket_id: ticket, turno_id: null, client_id_local: "nube-sf-1", created_at: new Date().toISOString() };
+    const credito = { id: "99999999-0000-0000-0000-00000000c0c1", tenant_id: TENANT, cliente_id: cliente, limite_mxn: "1000.00",
+      plazo_dias: 30, activo: true, created_at: new Date().toISOString(), created_by: null, updated_at: new Date().toISOString(), updated_by: null };
+    await pullSnapshot(db, { clientes_credito: [credito], abonos_credito: [abNube], saldo_favor_movimientos: [sfNube] });
+    const { rows: [n] } = await db.query(
+      `SELECT (SELECT count(*) FROM clientes_credito WHERE id = $1)::int AS c, (SELECT count(*) FROM abonos_credito WHERE id = $2)::int AS a,
+              (SELECT count(*) FROM saldo_favor_movimientos WHERE id = $3)::int AS s`, [credito.id, abNube.id, sfNube.id]);
+    assert.deepEqual(n, { c: 1, a: 1, s: 1 }, "el pull guarda crédito, abono y saldo a favor");
+    const p = await pend();
+    assert.ok(!p.abonos.some((a) => a.id === abNube.id) && !p.saldoFavor.some((s) => s.id === sfNube.id), "lo de la nube no sube de vuelta");
+    // Un segundo pull con lo mismo no truena (idempotente).
+    await pullSnapshot(db, { clientes_credito: [credito], abonos_credito: [abNube], saldo_favor_movimientos: [sfNube] });
+  });
+
+  test("crédito: la deuda de otras cajas se reemplaza entera en cada pull y cuenta en la vista", async () => {
+    const { rows: [{ id: cliente }] } = await db.query(
+      "INSERT INTO clientes (tenant_id, nombre, telefono) VALUES ($1, 'Otra Caja', '4770009902') RETURNING id", [TENANT]);
+    await db.query("INSERT INTO clientes_credito (tenant_id, cliente_id, limite_mxn, plazo_dias) VALUES ($1, $2, 500, 30)", [TENANT, cliente]);
+    const fila = (n, saldo) => ({ ticket_id: `99999999-0000-0000-0000-00000000d0${n}0`, tenant_id: TENANT, cliente_id: cliente,
+      saldo_mxn: saldo, fecha_venta: new Date().toISOString(), sincronizado_at: new Date().toISOString() });
+    const deuda = async () => (await db.query(
+      "SELECT deuda_mxn::text AS d, deuda_otras_cajas_mxn::text AS o FROM vw_creditos_cliente WHERE cliente_id = $1", [cliente])).rows[0];
+
+    await pullSnapshot(db, { creditos_resumen_nube: [fila(1, "300.00"), fila(2, "100.00")] });
+    assert.deepEqual(await deuda(), { d: "400.00", o: "400.00" }, "la vista suma lo de otras cajas");
+    await pullSnapshot(db, { creditos_resumen_nube: [fila(1, "250.00")] });
+    assert.deepEqual(await deuda(), { d: "250.00", o: "250.00" }, "lo liquidado allá ya no viene y se borra aquí");
+    await pullSnapshot(db, { tenants: [] });
+    assert.deepEqual(await deuda(), { d: "250.00", o: "250.00" }, "un snapshot sin la clave (nube sin la 0210) no la toca");
+    await pullSnapshot(db, { creditos_resumen_nube: [] });
+    assert.deepEqual(await deuda(), { d: "0.00", o: "0.00" }, "una lista vacía la deja vacía");
+  });
 });
 
 // ── El arranque sobrevive a un PostgREST que muere al nacer (Postgres real) ───────────────────
@@ -1039,7 +1428,7 @@ test("lealtad: el snapshot lleva el canje de TODO ticket del lote, atado a los t
   const snap = consultas.find((c) => c.sql.includes("WITH tk AS"));
   assert.match(snap.sql, /'ticket_canjes_lealtad',\s+\(SELECT jsonb_agg\(to_jsonb\(x\)\) FROM ticket_canjes_lealtad x WHERE x\.ticket_id IN \(SELECT id FROM tk\)\)/);
   assert.match(snap.sql, /'lealtad_movimientos'/);
-  assert.equal(snap.params.length, 8, "$8 son los movimientos de lealtad");
+  assert.equal(snap.params.length, 14, "$8 son los movimientos de lealtad; $9, los de producto; $10 y $11, los del crédito (0210); $12, las cotizaciones (0213); $13, las citas (0219); $14, los anticipos (0223)");
   assert.deepEqual(snap.params[7], [B]);
 });
 
@@ -1222,4 +1611,129 @@ test("lealtad: un fallo al re-anotar no tumba el arranque y no deja el marcador 
   assert.equal(await reanotarHuellasClientes0156UnaVez(pool, (m) => lineas.push(m)), 0);
   assert.ok(!pool.marcadores.has("reanotar_huellas_clientes_0156"));
   assert.ok(lineas.length >= 1);
+});
+
+// ── RETAIL (0195 §3): movimientos_producto suben como los de inventario ────────────────────────
+
+/**
+ * Un pool con las ventas `tickets` y los movimientos de producto `movs` (`[{ id, ticket_id }]`, el
+ * ticket ya resuelto como lo hace listarPendientes) pendientes. El armado devuelve exactamente lo
+ * que se le pidió ($2 ventas, $9 movimientos de producto) y apunta cada petición en `armados`.
+ */
+function poolConMovProducto({ tickets = [], movs = [] } = {}) {
+  const base = crearPoolFalso();
+  const anotado = { tickets: [], movProducto: [], armados: [] };
+  return {
+    anotado,
+    async query(sql, params = []) {
+      if (sql.includes("ORDER BY x.fecha_apertura")) {
+        return { rows: [{ ids: tickets.length ? tickets : null, turnos: null, movimientos: null, repartidores: null, zonas: null, movimientos_producto: movs.length ? movs : null }] };
+      }
+      if (sql.includes("WITH tk AS")) {
+        const ids = params[1] ?? [];
+        const mp = params[8] ?? [];
+        anotado.armados.push({ tickets: ids, movProducto: mp });
+        return { rows: [{
+          ids, tickets_huella: ids.map((id) => ({ id, huella: "h" })), turnos: null, movimientos: null,
+          repartidores: null, zonas: null, movimientos_producto: mp,
+          snapshot: { tickets: ids.map((id) => ({ id })), movimientos_producto: mp.map((id) => ({ id })) },
+        }] };
+      }
+      if (sql.includes("INSERT INTO _vim_push_ok")) {
+        for (const f of JSON.parse(params[0])) anotado.tickets.push(f.id);
+        return { rows: [], rowCount: 1 };
+      }
+      if (sql.includes("INSERT INTO _vim_mov_producto_ok")) {
+        anotado.movProducto.push(...params[0]);
+        return { rows: [], rowCount: params[0].length };
+      }
+      return base.query(sql, params);
+    },
+  };
+}
+
+const T1 = "11111111-0000-0000-0000-0000000000f1";
+const T2 = "22222222-0000-0000-0000-0000000000f2";
+const MP1 = "33333333-0000-0000-0000-0000000000a1";
+const MP2 = "44444444-0000-0000-0000-0000000000a2";
+
+test("retail: manda movimientos_producto pendientes y los marca", async () => {
+  const pool = poolConMovProducto({ tickets: [T1], movs: [{ id: MP1, ticket_id: T1 }, { id: MP2, ticket_id: null }] });
+  const nube = nubeFalsa({ resultado: { movimientos_producto: 1, _errores: [{ tabla: "movimientos_producto", id: MP2, error: "x" }] } });
+  try {
+    await pushToCloud(pool, OPTS, () => {});
+    assert.deepEqual(nube.peticiones[0].snapshot.movimientos_producto.map((m) => m.id), [MP1, MP2], "viajan los dos");
+    assert.deepEqual(pool.anotado.movProducto, [MP1], "el rechazado no se anota: se reintenta");
+    assert.deepEqual(pool.anotado.tickets, [T1], "un movimiento rechazado no retiene la venta");
+  } finally { nube.restaurar(); }
+});
+
+test("retail: no los marca si la nube ignoró la llave", async () => {
+  const pool = poolConMovProducto({ movs: [{ id: MP1, ticket_id: null }] });
+  const lineas = [];
+  const nube = nubeFalsa({ resultado: { _ignoradas: ["movimientos_producto"] } });
+  try {
+    await pushToCloud(pool, OPTS, (m) => lineas.push(m));
+    assert.equal(nube.peticiones.length, 1, "solo movimientos de producto bastan para subir");
+    assert.deepEqual(pool.anotado.movProducto, [], "la nube sin la 0195 no los guardó");
+    assert.ok(lineas.some((l) => /movimientos_producto/.test(l) && /no confirmó/i.test(l)));
+  } finally { nube.restaurar(); }
+});
+
+test("retail: un 200 vacío o ilegible no marca movimientos_producto", async () => {
+  // Vacío: la nube respondió sin la cuenta.
+  let pool = poolConMovProducto({ movs: [{ id: MP1, ticket_id: null }] });
+  let nube = nubeFalsa({});
+  try {
+    await pushToCloud(pool, OPTS, () => {});
+    assert.deepEqual(pool.anotado.movProducto, [], "sin la cuenta no se dan por subidos");
+  } finally { nube.restaurar(); }
+  // Ilegible: el cuerpo no es JSON.
+  pool = poolConMovProducto({ movs: [{ id: MP1, ticket_id: null }] });
+  const original = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, status: 200, async json() { throw new SyntaxError("no es JSON"); }, async text() { return "<html>"; } });
+  try {
+    await pushToCloud(pool, OPTS, () => {});
+    assert.deepEqual(pool.anotado.movProducto, [], "un cuerpo ilegible no marca nada");
+  } finally { globalThis.fetch = original; }
+});
+
+test("retail: los movimientos viajan en el lote de su ticket", async () => {
+  // R4: la nube valida la FK y el negocio del ticket (y de la devolución). Un movimiento cuyo ticket
+  // viaja en un lote posterior se rechazaría.
+  const MA = "55555555-0000-0000-0000-0000000000b1"; // ticket T2: segundo lote
+  const MB = "66666666-0000-0000-0000-0000000000b2"; // sin ticket (ajuste): primer lote
+  const MC = "77777777-0000-0000-0000-0000000000b3"; // ticket T1: primer lote
+  const MD = "88888888-0000-0000-0000-0000000000b4"; // ticket que ya subió antes: primer lote
+  const movs = [
+    { id: MA, ticket_id: T2 }, { id: MB, ticket_id: null },
+    { id: MC, ticket_id: T1 }, { id: MD, ticket_id: "99999999-0000-0000-0000-0000000000b9" },
+  ];
+  // Por lotes de una venta.
+  let pool = poolConMovProducto({ tickets: [T1, T2], movs });
+  let nube = nubeFalsa({ resultado: { movimientos_producto: 4 } });
+  try {
+    await pushToCloud(pool, OPTS, () => {}, { maxVentasPorLote: 1 });
+    assert.deepEqual(pool.anotado.armados, [
+      { tickets: [T1], movProducto: [MB, MC, MD] },
+      { tickets: [T2], movProducto: [MA] },
+    ]);
+    assert.deepEqual(pool.anotado.movProducto.sort(), [MA, MB, MC, MD].sort());
+  } finally { nube.restaurar(); }
+  // Y al partir un lote por tamaño, cada mitad se lleva los de sus ventas.
+  pool = poolConMovProducto({ tickets: [T1, T2], movs });
+  nube = nubeFalsa({ resultado: { movimientos_producto: 4 } });
+  try {
+    await pushToCloud(pool, OPTS, () => {}, { maxBytesPorLote: 10 });
+    const enviados = pool.anotado.armados.slice(1); // el primero es el lote entero, que se partió
+    assert.deepEqual(enviados, [
+      { tickets: [T1], movProducto: [MB, MC, MD] },
+      { tickets: [T2], movProducto: [MA] },
+    ]);
+  } finally { nube.restaurar(); }
+  // El ticket de una devolución se resuelve en listarPendientes: el de la venta original.
+  const consultas = [];
+  const base = crearPoolFalso();
+  await listarPendientes({ query: async (sql, params) => { consultas.push(sql); return sql.includes("ORDER BY x.fecha_apertura") ? { rows: [{}] } : base.query(sql, params); } });
+  assert.match(consultas.find((s) => s.includes("ORDER BY x.fecha_apertura")), /COALESCE\(m\.ticket_id, d\.ticket_original_id\)[\s\S]*LEFT JOIN devoluciones d ON d\.id = m\.devolucion_id/);
 });

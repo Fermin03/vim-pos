@@ -30,7 +30,7 @@ export default function ReportesHub() {
     leerReportesDisponibles()
       .then(setDisponibles)
       // Sin respuesta se muestran todos: esconder un reporte que sí usa confunde más.
-      .catch(() => setDisponibles({ marcas: true, eventos: true, reservaciones: true, apps: true, variasSucursales: true, inventario: true, meseros: true }));
+      .catch(() => setDisponibles({ marcas: true, eventos: true, reservaciones: true, apps: true, variasSucursales: true, inventario: true, meseros: true, existencias: false, agenda: false }));
   }, []);
 
   // Sin perfil todavía se muestran todas: el guardián de rutas es quien decide al entrar.

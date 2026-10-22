@@ -48,7 +48,12 @@ export type FilaPago = {
   freno_clave: string | null;
 };
 
-export type Aplicado = { estado: string; pedido_estado: string; recien_aprobado: boolean };
+/**
+ * Lo que dice tienda_pago_aplicar. Un pago es de un pedido o de una cita (el anticipo de una reserva
+ * en línea, 0225): el de cita trae `pedido_estado` null y `cita_estado`. El flujo no los distingue:
+ * todo va por el id del pago, y lo que cada uno mueve lo decide la base.
+ */
+export type Aplicado = { estado: string; pedido_estado: string | null; cita_estado?: string | null; recien_aprobado: boolean };
 /** RETO_VIEJO: un reto abandonado cumplió 48 horas con su orden todavía pendiente; último vistazo y aviso. */
 export type Tarea = { id: string; tarea: "DEVOLVER" | "CONCILIAR" | "RETO_VIEJO"; conexion_id: string; orden_id_externo: string | null };
 type Resultado = { resultado: "APROBADO" | "RECHAZADO" | "DEVUELTO"; ordenIdExterno: string; pagoIdExterno: string | null; monto: string | null;
@@ -501,6 +506,18 @@ export function topesDelAviso(ref: string, esNuestra: boolean): Tope[] {
     { clave: `mp-tienda:aviso:${ref.toLowerCase()}`, ventanaSeg: 3600, max: 40 },
     { clave: "mp-tienda:avisos", ventanaSeg: 3600, max: 3000 },
   ];
+}
+
+/**
+ * Cómo se nombra un pago de cita (0225) en los correos internos, donde un pedido lleva su folio:
+ * «Cita de Ana López, 26/10 13:15» (día y hora de México). Sin cita conocida, "".
+ */
+export function referenciaDeCita(c: { cliente_nombre?: string | null; inicia?: string | null } | null | undefined): string {
+  if (!c?.inicia) return "";
+  const cuando = new Intl.DateTimeFormat("es-MX", {
+    timeZone: "America/Mexico_City", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).format(new Date(c.inicia)).replace(",", "");
+  return `Cita de ${(c.cliente_nombre ?? "").trim() || "clienta"}, ${cuando}`;
 }
 
 /**

@@ -5,6 +5,7 @@ import { textoLimiteCajas } from "@vim/db/cobro";
 import type { Detalle, LimitesTrio } from "../lib/tipos";
 import { input, label } from "../lib/formato";
 import { DialogoConfirmar } from "./dialogo-confirmar";
+import { nombreDeAddon } from "../lib/addons";
 
 type Accion = (b: Record<string, unknown>) => Promise<void>;
 type Campos = Record<keyof LimitesTrio, string>;
@@ -76,7 +77,7 @@ export function ModulosLimites({ d, nombre, accion, busy }: { d: Detalle; nombre
                   <div className="min-w-0">
                     <div className="text-13 font-semibold">{m.nombre}</div>
                     <div className={["text-12", m.porAddon ? (permitido ? "text-success" : "text-ink-3") : o.clase].join(" ")}>
-                      {m.porAddon ? (permitido ? `Por el add-on ${m.nombre}` : `Sin add-on ${m.nombre} · se activa arriba, en Add-ons`) : o.texto}
+                      {m.porAddon ? (permitido ? `Por el add-on ${nombreDeAddon(m.codigo.toUpperCase(), m.nombre)}` : `Sin add-on ${nombreDeAddon(m.codigo.toUpperCase(), m.nombre)} · se activa arriba, en Add-ons`) : o.texto}
                     </div>
                     {permitido && !efectivo && m.interruptorDueno && (
                       <div className="text-12 text-ink-3">Permitido, pero el dueño no lo ha encendido en su admin.</div>

@@ -22,6 +22,7 @@ const PAPEL = [
   "apps/pos/app/components/recibo-z.tsx",
   "apps/pos/app/components/recibo-comanda.tsx",
   "apps/pos/app/components/recibo-devolucion.tsx",
+  "apps/pos/app/components/recibo-cotizacion.tsx",
   "apps/pos/app/components/recibo-preview.tsx",
 ];
 

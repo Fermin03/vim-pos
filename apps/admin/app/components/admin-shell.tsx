@@ -13,11 +13,12 @@ import { enlaceWhatsapp, mensajeAyudaAdmin, SOPORTE_POR_DEFECTO, textoHorario } 
 import { leerAyuda, type AyudaAdmin } from "../lib/soporte";
 import { leerModulos } from "../lib/modulos";
 import { rutasOcultas } from "../lib/operacion";
+import { seccionEnLinea } from "../lib/tienda-plan";
 import { estadoInventario, rutaEsDeInventario, type ModulosLeidos } from "../lib/inventario-plan";
 import { estadoTienda } from "../lib/tienda-plan";
 import { leerReportesDisponibles, type ReportesDisponibles } from "../lib/reportes";
 import { idsGruposVisibles } from "../lib/reportes-grupos";
-import { MENU, filtrarMenu } from "../lib/menu-admin";
+import { MENU, conSeccionEnLinea, filtrarMenu } from "../lib/menu-admin";
 import { MenuLateral } from "./menu-lateral";
 
 const PerfilCtx = createContext<Perfil | null>(null);
@@ -34,6 +35,9 @@ export const useAccesoTenant = () => useContext(AccesoCtx);
  */
 const ModulosCtx = createContext<ModulosLeidos | "error" | null>(null);
 export const useModulos = () => useContext(ModulosCtx);
+/** Vuelve a leer los módulos: tras encender un interruptor del dueño, el menú cambia sin recargar. */
+const RecargarModulosCtx = createContext<() => void>(() => {});
+export const useRecargarModulos = () => useContext(RecargarModulosCtx);
 
 /** Lo que ve quien llega a una sección que su rol no alcanza. */
 function SinAcceso({ rol }: { rol: string }) {
@@ -142,7 +146,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
     // también: esconder de más es recuperable (misma regla que tenía Configuración).
     if (!(modulos !== null && modulos !== "error" && modulos.permitidos.delivery_apps === true)) ocultas.add("/configuracion/integraciones");
     const tienda = estadoTienda(modulos);
-    return filtrarMenu(MENU, {
+    // Con agenda (belleza) la tienda también lleva las reservas: se llama «En línea».
+    return filtrarMenu(conSeccionEnLinea(MENU, seccionEnLinea(modulos)), {
       jerarquia: jerMenu,
       ocultas,
       tiendaContratada: tienda === "cargando" ? null : tienda !== "sin_contratar",
@@ -257,6 +262,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   return (
     <PerfilCtx.Provider value={perfil}>
      <ModulosCtx.Provider value={modulos}>
+     <RecargarModulosCtx.Provider value={() => { leerModulos().then(setModulos).catch(() => {}); }}>
      <AccesoCtx.Provider value={acceso}>
       <div className="flex h-[100dvh] lg:h-screen">
         {/* Velo del cajón (solo móvil/tablet). */}
@@ -398,6 +404,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         </div>
       </div>
      </AccesoCtx.Provider>
+     </RecargarModulosCtx.Provider>
      </ModulosCtx.Provider>
     </PerfilCtx.Provider>
   );

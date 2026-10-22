@@ -1,0 +1,79 @@
+import { describe, it, expect, vi } from "vitest";
+import * as React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { MenuGeneral } from "../../components/menu-general";
+import { ContenidoMenu } from "../../components/contenido-menu";
+
+// Los módulos del negocio salen de useAcceso (contexto de la nube): aquí se fijan a mano.
+let modulosPrueba: Record<string, boolean> = {};
+vi.mock("../../components/banda-acceso", async (orig) => ({
+  ...(await orig<typeof import("../../components/banda-acceso")>()),
+  useAcceso: () => ({ modulos: modulosPrueba }),
+}));
+
+// Los .tsx se transforman con JSX clásico en las pruebas: piden `React` global.
+(globalThis as { React?: unknown }).React = React;
+
+const nada = () => {};
+const opciones = {
+  onKds: nada, onDevoluciones: nada, onCorteX: nada, onEnEspera: nada, onAbrirCajon: nada, nEnEspera: 2,
+  onCambiarCajero: nada, onBloquear: nada, onCambiarPin: nada, onMisPropinas: nada, onImpresora: nada, onCerrarTurno: nada,
+};
+
+/** Textos de un trozo de HTML, sin etiquetas ni globos numéricos. */
+const textos = (html: string) => html.split(/<[^>]+>/).map((t) => t.trim()).filter((t) => t && !/^\d+$/.test(t));
+/** Títulos de sección («# …») y la etiqueta de cada opción (`role="menuitem"`), en el orden en que se pintan. */
+const leer = (html: string) =>
+  [...html.matchAll(/<h3[^>]*>(.*?)<\/h3>|role="menuitem"[^>]*>(.*?)<\/(?:button|a)>/g)]
+    .map((m) => (m[1] != null ? `# ${textos(m[1])[0]}` : textos(m[2] ?? "")[0]));
+
+describe("menú general", () => {
+  it("el restaurante ve el mismo menú de siempre, con Cerrar turno en Ajustes", () => {
+    const html = renderToStaticMarkup(React.createElement(MenuGeneral, { onCerrar: nada, ...opciones }));
+    expect(html).toContain('role="dialog"');
+    expect(leer(html)).toEqual([
+      "# Operación", "Cocina", "Devoluciones", "Corte caja X", "Pedidos en espera", "Abrir cajón",
+      "# Cuenta", "Cambiar cajero", "Bloquear pantalla", "Cambiar mi PIN", "Mis propinas",
+      "# Ajustes", "Configurar impresoras y pantallas", "Ayuda por WhatsApp", "Cerrar turno",
+    ]);
+  });
+
+  it("en la página de Configuración, Cerrar turno va aparte, al final", () => {
+    const html = renderToStaticMarkup(React.createElement(ContenidoMenu, { enPagina: true, ...opciones }));
+    expect(html).not.toContain('role="dialog"');
+    expect(leer(html).slice(-5)).toEqual(["# Ajustes", "Configurar impresoras y pantallas", "Ayuda por WhatsApp", "# Turno", "Cerrar turno"]);
+  });
+
+  it("la tienda suma Retiro / Depósito a Operación, y Salir a Turno; Devoluciones vive en Transacciones y el monitor se abre con Corte caja X", () => {
+    // Las mismas opciones que pasa home-pos en la Configuración de la tienda: sin onDevoluciones.
+    const { onDevoluciones: _sinDevoluciones, ...tienda } = opciones;
+    const html = renderToStaticMarkup(React.createElement(ContenidoMenu, { enPagina: true, ...tienda, onMovimientoCaja: nada, onSalir: nada }));
+    const l = leer(html);
+    expect(l).not.toContain("Devoluciones");
+    expect(l).not.toContain("Monitor ventas");
+    expect(l.slice(l.indexOf("Abrir cajón"), l.indexOf("# Cuenta"))).toEqual(["Abrir cajón", "Retiro / Depósito"]);
+    expect(l.slice(-3)).toEqual(["# Turno", "Cerrar turno", "Salir"]);
+  });
+
+  it("la tienda con crédito y cotizaciones los pone primero, en Ventas; sin módulos o en el restaurante no aparece", () => {
+    const { onDevoluciones: _sinDevoluciones, ...tienda } = opciones;
+    const con = { ...tienda, enPagina: true, onCreditos: nada, onCotizaciones: nada };
+    modulosPrueba = { credito: true, cotizaciones: true };
+    const l = leer(renderToStaticMarkup(React.createElement(ContenidoMenu, con)));
+    expect(l.slice(0, 3)).toEqual(["# Ventas", "Cotizaciones", "Créditos"]);
+    expect(l.indexOf("Cotizaciones")).toBeLessThan(l.indexOf("# Operación"));
+    modulosPrueba = {};
+    const sin = leer(renderToStaticMarkup(React.createElement(ContenidoMenu, con)));
+    expect(sin).not.toContain("# Ventas");
+    const resto = leer(renderToStaticMarkup(React.createElement(MenuGeneral, { onCerrar: nada, ...opciones })));
+    expect(resto).not.toContain("# Ventas");
+  });
+
+  it("comida rápida suma Consultar cuentas a Operación; el restaurante y la tienda no la tienen en Más", () => {
+    const { onDevoluciones: _sinDevoluciones, ...tienda } = opciones;
+    const l = leer(renderToStaticMarkup(React.createElement(ContenidoMenu, { enPagina: true, ...tienda, onMovimientoCaja: nada, onConsultarCuentas: nada })));
+    expect(l.slice(l.indexOf("# Operación"), l.indexOf("# Cuenta"))).toContain("Consultar cuentas");
+    expect(leer(renderToStaticMarkup(React.createElement(ContenidoMenu, { enPagina: true, ...tienda, onMovimientoCaja: nada })))).not.toContain("Consultar cuentas");
+    expect(leer(renderToStaticMarkup(React.createElement(MenuGeneral, { onCerrar: nada, ...opciones })))).not.toContain("Consultar cuentas");
+  });
+});

@@ -1,9 +1,13 @@
 "use client";
 import { employeeClient } from "../supabase";
+import { esGiroBelleza, esGiroTienda } from "@vim/db/operacion";
+import { nombreCorto } from "../agenda";
 import { etiquetaModo } from "@vim/db/modos-servicio";
 import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
 import { leerPrograma } from "../lealtad";
 import { puntosPorCompra, type Programa } from "../lealtad-reglas";
+import { resumenCambio } from "../cambio-talla";
+import { fechaLimiteCredito } from "../credito";
 import type { DatosEntrega, DatosTicketImpresion, LealtadImpresion, LineaImpresion, PagoImpresion } from "./tipos";
 
 
@@ -24,8 +28,11 @@ type Ctx = {
  * mostrarle el envío a la cocina, en silencio.
  */
 export const SELECCION_TICKET_ITEMS_IMPRESION =
-  "id, producto_nombre_snapshot, cantidad, total_item_mxn, nota_cocina, cargo_tipo, " +
+  "id, producto_nombre_snapshot, producto_sku_snapshot, cantidad, total_item_mxn, nota_cocina, cargo_tipo, " +
+  "precio_unitario_snapshot, unidad_sat_snapshot, " +
   "parent_item_id, combo_rol, combo_grupo_nombre_snapshot, " +
+  // Belleza: quien hizo el renglón, para imprimirlo bajo el servicio.
+  "colaborador:usuarios_perfil!ticket_items_colaborador_id_fkey(nombre), " +
   "ticket_item_modificadores(opcion_nombre_snapshot, precio_extra_snapshot, cantidad), " +
   // El área se resuelve aquí, con el ticket: producto primero, categoría si el producto no
   // tiene. Traerla en la misma consulta evita una segunda vuelta por renglón en hora pico.
@@ -60,6 +67,22 @@ export function foldearHijosEnPadre(lineas: LineaImpresion[]): LineaImpresion[] 
   });
 }
 
+/** Origen del portal público: la autofactura y, desde la 0212, el enlace de una cotización (`/c/<token>`). */
+export const PORTAL_FACTURA = "https://factura.vimpos.com.mx";
+
+/** Lo que se lee de la sucursal para el encabezado impreso. */
+export const COLUMNAS_SUCURSAL = "nombre, direccion_calle, direccion_numero, direccion_colonia, ciudad, estado_geo, codigo_postal, telefono";
+
+/** La dirección de la sucursal en una línea, como sale en el ticket. */
+export function direccionSucursal(s: Record<string, string | null>): string | null {
+  return [
+    [s.direccion_calle, s.direccion_numero].filter(Boolean).join(" "),
+    s.direccion_colonia,
+    [s.ciudad, s.estado_geo].filter(Boolean).join(", "),
+    s.codigo_postal ? `CP ${s.codigo_postal}` : null,
+  ].filter(Boolean).join(", ") || null;
+}
+
 /**
  * URL del QR de autofactura. Pura, con pruebas.
  *
@@ -71,7 +94,7 @@ export function foldearHijosEnPadre(lineas: LineaImpresion[]): LineaImpresion[] 
 export function urlAutofactura(codigoNegocio: string | null, folio: string | null, token: string | null): string {
   const q = new URLSearchParams({ folio: folio ?? "" });
   if (token && /^[A-Za-z0-9_-]{16}$/.test(token)) q.set("t", token);
-  return `https://factura.vimpos.com.mx/${encodeURIComponent(codigoNegocio ?? "negocio")}?${q.toString()}`;
+  return `${PORTAL_FACTURA}/${encodeURIComponent(codigoNegocio ?? "negocio")}?${q.toString()}`;
 }
 
 type MovimientoLealtad = { tipo: string; puntos: number; saldo_visto: number | null; programa_version: number; fecha: string };
@@ -189,7 +212,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
 
   const { data: t, error: e1 } = await sb
     .from("tickets")
-    .select("folio_completo, modo_servicio, cliente_id, direccion_entrega_id, nombre_cliente, nota_general, origen_creacion, subtotal_mxn, descuentos_manuales_mxn, iva_mxn, total_mxn, propina_mxn, fecha_pago, created_at, sucursal_id, tenant_id, lealtad_mxn, estado_fiscal")
+    .select("folio_completo, modo_servicio, cliente_id, direccion_entrega_id, nombre_cliente, nota_general, origen_creacion, subtotal_mxn, descuentos_manuales_mxn, iva_mxn, total_mxn, propina_mxn, fecha_pago, created_at, sucursal_id, tenant_id, lealtad_mxn, estado_fiscal, client_id_local")
     .eq("id", ticketId)
     .single();
   if (e1 || !t) throw new Error(e1?.message ?? "Ticket no encontrado");
@@ -211,10 +234,10 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
     // `as unknown as`: con el select anidado supabase-js no infiere la forma y devuelve su tipo
     // de error genérico. La forma real es la de abajo.
     const r = it as unknown as {
-      id: string; producto_nombre_snapshot: string; cantidad: number; total_item_mxn: string | number; nota_cocina: string | null;
-      cargo_tipo: string | null;
+      id: string; producto_nombre_snapshot: string; producto_sku_snapshot: string | null; cantidad: number; total_item_mxn: string | number; nota_cocina: string | null;
+      cargo_tipo: string | null; precio_unitario_snapshot: string | number | null; unidad_sat_snapshot: string | null;
       parent_item_id: string | null; combo_rol: "PADRE" | "HIJO" | null; combo_grupo_nombre_snapshot: string | null;
-      ticket_item_modificadores: Mod[] | null; producto: Prod;
+      ticket_item_modificadores: Mod[] | null; producto: Prod; colaborador: { nombre: string } | null;
     };
     const prod = r.producto;
     // El producto manda sobre la categoría: la categoría es el valor por defecto y el producto la
@@ -225,6 +248,9 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       id: r.id,
       cantidad: Number(r.cantidad),
       nombre: r.producto_nombre_snapshot,
+      sku: r.producto_sku_snapshot ?? null,
+      precioUnitario: Number(r.precio_unitario_snapshot ?? 0),
+      unidadSat: r.unidad_sat_snapshot ?? null,
       totalMxn: Number(r.total_item_mxn),
       modificadores: (r.ticket_item_modificadores ?? []).map((m) => m.opcion_nombre_snapshot),
       notaCocina: r.nota_cocina ?? null,
@@ -234,6 +260,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       parentId: (r.parent_item_id as string) ?? null,
       grupoNombre: (r.combo_grupo_nombre_snapshot as string) ?? null,
       cargoTipo: (r.cargo_tipo as string) ?? null,
+      colaborador: r.colaborador ? nombreCorto(r.colaborador.nombre) : null,
       extras: (r.ticket_item_modificadores ?? [])
         .filter((m) => Number(m.precio_extra_snapshot ?? 0) > 0)
         .map((m) => ({ nombre: m.opcion_nombre_snapshot, importeMxn: Number(m.precio_extra_snapshot) * Number(m.cantidad ?? 1) * Number(r.cantidad) })),
@@ -248,15 +275,19 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
 
   const { data: pagos, error: e3 } = await sb
     .from("pagos")
-    .select("metodo_pago, monto_mxn, monto_recibido_mxn, cambio_mxn, referencia, terminal_aprobacion")
+    .select("metodo_pago, monto_mxn, monto_recibido_mxn, cambio_mxn, referencia, terminal_aprobacion, client_id_local")
     .eq("ticket_id", ticketId)
     .is("deleted_at", null)
     .order("created_at", { ascending: true });
   if (e3) throw new Error(e3.message);
-  const pagosImp: PagoImpresion[] = (pagos ?? []).map((p) => {
+  // Venta a crédito: debajo de «A crédito», lo que falta por pagar y la fecha límite.
+  const porPagar = (pagos ?? []).some((p) => (p as { metodo_pago: string }).metodo_pago === "CREDITO")
+    ? await leerPorPagar(sb, ticketId, (tk.cliente_id as string | null) ?? null, (tk.fecha_pago as string) ?? (tk.created_at as string))
+    : null;
+  const pagosImp: (PagoImpresion & { clientId: string | null })[] = (pagos ?? []).map((p) => {
     const r = p as {
       metodo_pago: string; monto_mxn: string | number; monto_recibido_mxn: string | number | null; cambio_mxn: string | number;
-      referencia: string | null; terminal_aprobacion: string | null;
+      referencia: string | null; terminal_aprobacion: string | null; client_id_local: string | null;
     };
     // Solo un cobro de la terminal integrada llena `terminal_aprobacion`; con ella, `referencia` es la
     // tarjeta. Sin ella `referencia` puede ser otra cosa (un folio de transferencia) y no se imprime.
@@ -268,21 +299,18 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       montoMxn: Number(r.monto_mxn),
       recibidoMxn: r.monto_recibido_mxn == null ? null : Number(r.monto_recibido_mxn),
       cambioMxn: Number(r.cambio_mxn),
+      clientId: r.client_id_local,
+      ...(r.metodo_pago === "CREDITO" && porPagar ? { porPagar } : {}),
     };
   });
 
   const { data: suc } = await sb
     .from("sucursales")
-    .select("nombre, direccion_calle, direccion_numero, direccion_colonia, ciudad, estado_geo, codigo_postal, telefono")
+    .select(COLUMNAS_SUCURSAL)
     .eq("id", tk.sucursal_id as string)
     .single();
   const s = (suc ?? {}) as Record<string, string | null>;
-  const direccion = [
-    [s.direccion_calle, s.direccion_numero].filter(Boolean).join(" "),
-    s.direccion_colonia,
-    [s.ciudad, s.estado_geo].filter(Boolean).join(", "),
-    s.codigo_postal ? `CP ${s.codigo_postal}` : null,
-  ].filter(Boolean).join(", ") || null;
+  const direccion = direccionSucursal(s);
 
   // Datos de entrega: solo en domicilio. El repartidor necesita a quién buscar, dónde y con
   // qué referencias; sin esto el ticket no le sirve para entregar. En los demás modos no se
@@ -326,7 +354,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
 
   const { data: ten } = await sb
     .from("tenants")
-    .select("codigo, nombre_comercial, razon_social, rfc, logo_url")
+    .select("codigo, nombre_comercial, razon_social, rfc, logo_url, vertical_principal")
     .eq("id", tk.tenant_id as string)
     .single();
   const tn = (ten ?? {}) as Record<string, string | null>;
@@ -345,6 +373,12 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
         baseComida: Math.max(0, Math.round((Number(tk.total_mxn) - cargos) * 100) / 100),
       });
 
+  // Belleza imprime como tienda (Venta, SKU, cambio de talla).
+  const tienda = esGiroTienda(tn.vertical_principal as string) || esGiroBelleza(tn.vertical_principal as string);
+  const cambio = tienda ? await leerCambioTalla(sb, tk.tenant_id as string, (tk.client_id_local as string | null) ?? null, Number(tk.total_mxn)) : null;
+  // El pago interno del cambio (0195: llave del ticket + "-pago") no es efectivo que entró: es la prenda.
+  const pagoPrenda = cambio ? `${tk.client_id_local as string}-pago` : null;
+
   return {
     negocio: { nombre: tn.nombre_comercial ?? "Negocio", razonSocial: tn.razon_social ?? null, rfc: tn.rfc ?? null, logoUrl: tn.logo_url ?? null },
     sucursal: { nombre: (s.nombre as string) ?? ctx.cajaNombre, direccion, telefono: s.telefono ?? null },
@@ -353,7 +387,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       fechaIso: (tk.fecha_pago as string) ?? (tk.created_at as string) ?? new Date().toISOString(),
       cajero: ctx.cajeroNombre,
       caja: ctx.cajaNombre,
-      modoServicio: etiquetaModo((tk.modo_servicio as string) ?? ""),
+      modoServicio: etiquetaModo((tk.modo_servicio as string) ?? "", tn.vertical_principal as string | null),
       modo: (tk.modo_servicio as string) ?? "",
       nombreCliente: (tk.nombre_cliente as string) ?? null,
     },
@@ -365,14 +399,62 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       iva: Number(tk.iva_mxn), total: Number(tk.total_mxn), propina: Number(tk.propina_mxn),
       lealtad: Number(tk.lealtad_mxn ?? 0),
     },
-    pagos: pagosImp,
+    pagos: pagosImp.map(({ clientId, ...p }) =>
+      clientId !== null && clientId === pagoPrenda ? { ...p, metodo: "Prenda que regresa", recibidoMxn: null } : p),
     // Dominio .com.mx: el que VIM tiene registrado. Antes decía `factura.vimpos.mx`, sin el
     // `.com`, que es de alguien más — cada ticket impreso habría mandado a los clientes del
     // restaurante a una dirección ajena en cuanto se encendiera el QR.
     qrUrl: qrActivo && !conPremio ? urlAutofactura(tn.codigo ?? null, (tk.folio_completo as string | null) ?? null, tokenQr) : null,
     lealtad,
+    tienda,
+    cambio,
     ancho: 80,
   };
+}
+
+/**
+ * ¿Es la venta nueva de un cambio de talla? 0195 crea la devolución (motivo CAMBIO_TALLA) y el ticket
+ * nuevo con la MISMA `client_id_local`. Nunca lanza: si algo falla, el ticket sale como venta normal.
+ */
+async function leerCambioTalla(sb: ReturnType<typeof employeeClient>, tenantId: string, clientId: string | null, totalTicket: number): Promise<DatosTicketImpresion["cambio"]> {
+  if (!clientId) return null;
+  try {
+    const { data: dev } = await sb
+      .from("devoluciones")
+      .select("id, total_devuelto_mxn")
+      .eq("tenant_id", tenantId).eq("client_id_local", clientId).eq("motivo", "CAMBIO_TALLA")
+      .maybeSingle();
+    if (!dev) return null;
+    const { data: items } = await sb
+      .from("devolucion_items")
+      .select("producto_nombre_snapshot, cantidad_devuelta, total_devuelto_mxn")
+      .eq("devolucion_id", dev.id);
+    const { diferencia, texto } = resumenCambio(Number(dev.total_devuelto_mxn), totalTicket);
+    return {
+      regresa: (items ?? []).map((i) => ({ nombre: i.producto_nombre_snapshot, cantidad: Number(i.cantidad_devuelta), total: Number(i.total_devuelto_mxn) })),
+      diferencia,
+      texto,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Saldo de la venta a crédito y su fecha límite. Nunca lanza: sin el dato, el ticket sale sin el renglón. */
+async function leerPorPagar(sb: ReturnType<typeof employeeClient>, ticketId: string, clienteId: string | null, fechaVenta: string): Promise<PagoImpresion["porPagar"]> {
+  if (!clienteId) return null;
+  try {
+    const [{ data: saldo }, { data: cc }] = await Promise.all([
+      sb.rpc("credito_saldo_ticket", { p_ticket: ticketId }),
+      sb.from("clientes_credito").select("plazo_dias").eq("cliente_id", clienteId).maybeSingle(),
+    ]);
+    const monto = Number(saldo ?? 0);
+    const plazo = (cc as { plazo_dias: number } | null)?.plazo_dias;
+    if (!(monto > 0) || !plazo) return null;
+    return { montoMxn: monto, fechaLimite: fechaLimiteCredito(fechaVenta, plazo) };
+  } catch {
+    return null;
+  }
 }
 
 /** Cliente + dirección de entrega. Si algo falla, el ticket sale igual: entregar sin

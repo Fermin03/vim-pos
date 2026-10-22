@@ -855,3 +855,12 @@ describe("fondoDelCarrusel", () => {
     expect(fondoDelCarrusel({ actual: B, anterior: A }, null)).toBe(false);
   });
 });
+
+describe("construirVista: tienda a granel", () => {
+  it("el renglón a granel lleva su unidad y el mensaje se sigue entendiendo; la pieza no la lleva", () => {
+    const jitomate = { ...linea("j", "Jitomate", 28, 1.25), producto: { ...producto("Jitomate", 28), tipoVenta: "PESO" as const } };
+    const v = construirVista(entrada({ lineas: [jitomate, linea("p", "Playera", 150)] }));
+    expect(v.fase === "cuenta" && v.renglones.map((r) => r.tipoVenta)).toEqual(["PESO", undefined]);
+    expect(leerMensaje({ tipo: "estado", v: 1, vista: v })).not.toBeNull();
+  });
+});

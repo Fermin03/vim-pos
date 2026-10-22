@@ -5,19 +5,43 @@ import { disponiblesDe } from "../reportes";
 const con = (efectivos: Record<string, boolean>) => ({ permitidos: {}, efectivos });
 
 describe("rutasOcultas", () => {
-  it("cargando o con error no esconde nada (esconder de más y luego mostrar salta a la vista)", () => {
-    expect(rutasOcultas(null).size).toBe(0);
-    expect(rutasOcultas("error").size).toBe(0);
+  const TIENDA = ["/catalogo/importar-tienda", "/catalogo/etiquetas", "/existencias", "/reportes/ventas-variantes"];
+  // Crédito (0208): apagado mientras no se lea encendido; su configuración, solo en tiendas.
+  const CREDITO = ["/creditos", "/configuracion/credito", "/cotizaciones", "/configuracion/cotizaciones"];
+  // Agenda (0218): de belleza; apagada mientras no se lea encendida.
+  const AGENDA = ["/agenda/servicios", "/agenda/colaboradores", "/agenda/espacios", "/configuracion/agenda", "/reportes/comisiones", "/reportes/ventas-colaborador", "/reportes/citas", "/reportes/ocupacion"];
+  it("cargando o con error no esconde nada de restaurante (esconder de más y luego mostrar salta a la vista)", () => {
+    expect(rutasOcultas(null)).toEqual(new Set([...TIENDA, ...CREDITO, ...AGENDA]));
+    expect(rutasOcultas("error")).toEqual(new Set([...TIENDA, ...CREDITO, ...AGENDA]));
   });
-  it("un negocio de siempre (todo encendido o sin llaves) ve todo", () => {
-    expect(rutasOcultas(con({})).size).toBe(0);
+  it("Existencias falla cerrado: solo se ve con el módulo leído y encendido", () => {
+    expect(rutasOcultas(null).has("/existencias")).toBe(true);
+    expect(rutasOcultas("error").has("/existencias")).toBe(true);
+    expect(rutasOcultas(con({ existencias: false })).has("/existencias")).toBe(true);
+    expect(rutasOcultas(con({ existencias: true })).has("/existencias")).toBe(false);
+  });
+  it("un negocio de siempre (todo encendido) ve todo; lo de tienda solo con existencias", () => {
+    expect(rutasOcultas(con({ existencias: true, credito: true, cotizaciones: true, agenda: true })).size).toBe(0);
+    expect([...rutasOcultas(con({ existencias: true }))]).toEqual(["/creditos", "/cotizaciones", ...AGENDA]);
+  });
+  it("las rutas de tienda se esconden salvo con existencias", () => {
+    expect(rutasOcultas(con({}))).toEqual(new Set([...TIENDA, ...CREDITO, ...AGENDA]));
+    const tienda = rutasOcultas(con({ existencias: true }));
+    for (const r of ["/catalogo/importar-tienda", "/catalogo/etiquetas", "/existencias", "/reportes/ventas-variantes"]) expect(tienda.has(r)).toBe(false);
   });
   it("food truck: sin mesas, envíos, repartidores, reservaciones, marcas ni reporte de meseros", () => {
-    const m = con({ comedor: false, meseros: false, domicilio: false, repartidores: false, reservaciones: false, marcas: false });
+    const m = con({ existencias: true, credito: true, cotizaciones: true, agenda: true, comedor: false, meseros: false, domicilio: false, repartidores: false, reservaciones: false, marcas: false });
     expect([...rutasOcultas(m)].sort()).toEqual([
       "/configuracion/envios", "/configuracion/marcas", "/configuracion/mesas",
       "/reportes/ventas-mesero", "/reservaciones", "/usuarios/repartidores",
     ]);
+  });
+  it("la agenda solo se ve con el módulo leído y encendido", () => {
+    expect(rutasOcultas(null).has("/agenda/servicios")).toBe(true);
+    expect(rutasOcultas("error").has("/agenda/servicios")).toBe(true);
+    expect(rutasOcultas(con({ existencias: true })).has("/agenda/servicios")).toBe(true);
+    expect(rutasOcultas(con({ agenda: false })).has("/configuracion/agenda")).toBe(true);
+    for (const r of AGENDA) expect(rutasOcultas(con({ agenda: true })).has(r)).toBe(false);
   });
   it("las estaciones no se esconden sin pantalla de cocina: reparten las comandas impresas", () => {
     expect(rutasOcultas(con({ kds: false })).has("/configuracion/areas")).toBe(false);
@@ -39,6 +63,14 @@ describe("disponiblesDe — ventas por mesero", () => {
   it("apagado y sin historial, no se ve; con historial sí (no se le esconde a nadie su historia)", () => {
     expect(disponiblesDe({ meseros: false }, hay).meseros).toBe(false);
     expect(disponiblesDe({ meseros: false }, { ...hay, meseros: true }).meseros).toBe(true);
+  });
+  it("ventas por talla y color sigue solo al módulo existencias (apagado por omisión)", () => {
+    expect(disponiblesDe({}, hay).existencias).toBe(false);
+    expect(disponiblesDe({ existencias: true }, hay).existencias).toBe(true);
+  });
+  it("comisiones y ventas por colaborador siguen solo al módulo agenda", () => {
+    expect(disponiblesDe({}, hay).agenda).toBe(false);
+    expect(disponiblesDe({ agenda: true }, hay).agenda).toBe(true);
   });
 });
 

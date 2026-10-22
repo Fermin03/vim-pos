@@ -3,7 +3,7 @@ import { cabecerasSeguridad } from "@vim/config/cabeceras-seguridad.mjs";
 
 const nextConfig = {
   reactStrictMode: true,
-  transpilePackages: ["@vim/ui", "@vim/config"],
+  transpilePackages: ["@vim/ui", "@vim/db", "@vim/config"],
   async headers() {
     return [{ source: "/:path*", headers: cabecerasSeguridad() }];
   },

@@ -1,6 +1,6 @@
 "use client";
-import { Icono } from "@vim/ui/styles";
-import { useState } from "react";
+import { Button, Icono } from "@vim/ui/styles";
+import { useEffect, useState } from "react";
 import type { EstadoCarrito, LineaCarrito } from "../lib/carrito";
 import { etiquetaModo } from "@vim/db/modos-servicio";
 import { calcularTotalesDisplay, totalLinea } from "../lib/carrito";
@@ -8,6 +8,8 @@ import { setPreciosVisibles, usePreciosVisibles } from "../lib/precios-visibles"
 import { fmtMxn } from "../lib/turno";
 import type { FranjaLealtad } from "../lib/lealtad-reglas";
 import { RenglonItem } from "./renglon-item";
+import { useEscape } from "../lib/use-escape";
+import { aGranel, contarProductos } from "../lib/unidades";
 
 /* ── helpers ─────────────────────────────────────────────────── */
 /* ── Íconos SVG inline (del mockup P-066) ────────────────────── */
@@ -38,6 +40,9 @@ const BOTON_PIE =
   "flex h-11 w-full items-center justify-center gap-2 rounded-md border px-4 text-14 font-semibold transition-[transform,background-color,border-color,color] duration-150 ease-vim active:scale-[.98] disabled:cursor-default disabled:active:scale-100";
 
 /* ── Componente principal ─────────────────────────────────────── */
+/** Panel de la tienda: «Quitar» saca UNA pieza de un renglón con varias. Una pesada se quita completa. */
+export const quitaUna = (l: LineaCarrito, simple: boolean): boolean => simple && l.cantidad > 1 && !aGranel(l.producto.tipoVenta);
+
 export function SidebarTicket({
   estado,
   onCantidad,
@@ -62,6 +67,7 @@ export function SidebarTicket({
   onAplicarDescuento,
   descuentoMxn = 0,
   totalConDescuento,
+  pendienteMxn,
   promocionMxn = 0,
   lealtad = null,
   lealtadMxn = 0,
@@ -69,6 +75,9 @@ export function SidebarTicket({
   bloqueado = false,
   procesando,
   onEditar,
+  tienda,
+  clienteCuenta,
+  mostrador = false,
 }: {
   estado: EstadoCarrito;
   onCantidad: (clientId: string, cantidad: number) => void;
@@ -121,6 +130,9 @@ export function SidebarTicket({
   descuentoMxn?: number;
   /** Total autoritativo de la BD cuando el ticket ya está persistido; si falta, se usa el display. */
   totalConDescuento?: number;
+  /** Saldo de una cuenta abierta que ya trae pagos (la venta de un cambio, reabierta): «Cobrar»
+   *  enseña lo que falta y, en 0, «Cerrar venta». Sin esto, el total. */
+  pendienteMxn?: number;
   /** Rebajado por promociones del negocio. Renglón propio: si se sumara al descuento, el
    *  cliente vería bajar el total sin que nada en pantalla diga por qué. */
   promocionMxn?: number;
@@ -135,10 +147,45 @@ export function SidebarTicket({
   /** El ticket ya está comprometido en BD: bloquea edición del carrito para evitar desincronización. */
   bloqueado?: boolean;
   procesando: boolean;
+  /** Comida rápida: «Asignar cliente» en un menú «⋯» que reemplaza a «Limpiar» (que pasa adentro). */
+  clienteCuenta?: { nombre: string | null; onAsignar: () => void };
+  /** Comida rápida (Fermín, 20 oct): sin «Para llevar» arriba —el modo se pregunta al cobrar— y,
+   *  donde se cobra aquí, sin Subtotal, Total ni «Efectivo exacto»: el total va en «Cobrar». */
+  mostrador?: boolean;
+  /** Giro RETAIL: variante y SKU en el renglón, «Sin existencia» y el último agregado marcado. */
+  tienda?: {
+    /** Nombre del padre y «M · Negra · SKU» de la línea. */
+    renglon: (l: LineaCarrito) => { nombre: string; detalle: string | undefined };
+    sinExistencia: (l: LineaCarrito) => boolean;
+    /** Producto del último agregado; se marca hasta la siguiente acción. */
+    ultimoProductoId: string | null;
+    /** Con el ticket vacío llega quien viene a cambiar algo: el botón va grande ahí mismo. */
+    onCambioTalla?: () => void;
+    /** Panel de la tienda (pos-retail.md, «Versión 2»): sin «Precios», «En espera» ni botones
+     *  arriba del ticket; nota, descuentos, cliente y Limpiar viven en el menú «⋯». */
+    simple?: boolean;
+    /** Abre el cliente de la cuenta (la lealtad lo necesita). Sin esto no se ofrece. */
+    onAsignarCliente?: () => void;
+    /** Nombre del cliente asignado; null = sin cliente. */
+    cliente?: string | null;
+    /** Descuento de un renglón; quien llama guarda la cuenta antes si hace falta. */
+    onDescuentoProducto?: (clientId: string) => void;
+    /** «Guardar como cotización»: solo lo pasa quien tiene el módulo, renglones y un carrito suelto (`puedeCotizar`). */
+    onGuardarCotizacion?: () => void;
+    /** Con la opción a la vista pero apagada: por qué (extras o combos). */
+    motivoSinCotizacion?: string | null;
+    /** Belleza: quién hizo el renglón («Diego R.») o `falta` si es un servicio sin nadie (no se cobra así). */
+    colaborador?: (l: LineaCarrito) => { texto: string; falta: boolean };
+    /** Belleza: elegir quién lo hizo. Sin esto (venta ya guardada) el nombre solo se lee. */
+    onColaborador?: (clientId: string) => void;
+    /** Ticket vacío: lo que invita a empezar. Sin esto, el de la tienda. */
+    textoVacio?: string;
+  };
 }) {
   const totales = calcularTotalesDisplay(estado.lineas, 16, estado.envio?.costoMxn ?? 0);
   const vacio = estado.lineas.length === 0;
-  const totalProductos = estado.lineas.reduce((s, l) => s + l.cantidad, 0);
+  const ultimoEnTicket = tienda?.ultimoProductoId ?? null;
+  const totalProductos = contarProductos(estado.lineas.map((l) => ({ cantidad: l.cantidad, tipo: l.producto.tipoVenta })));
   // Notas de cocina: qué línea se está editando + si el input de nota de orden está abierto.
   const [editandoNota, setEditandoNota] = useState<string | null>(null);
   const [notaOrdenAbierta, setNotaOrdenAbierta] = useState(false);
@@ -154,9 +201,104 @@ export function SidebarTicket({
    * pregunta cuánto cuesta algo en cualquiera de los cuatro modos.
    */
   const seCobraDespues = onEnviarCocinaAbierto != null;
+  // Pick-up y Domicilio no tienen «Cobrar $…»: ahí el Total se queda.
+  const sinTotales = mostrador && !seCobraDespues;
+  const sinEtiquetaModo = mostrador && estado.modoServicio === "PARA_LLEVAR";
   // No depende de `bloqueado`: en cuenta de mesa los renglones que no han salido a cocina sí se
   // editan (0119). Quien pasa `onEditar` decide qué renglón se abre y avisa del que no.
   const editable = onEditar != null && !procesando;
+  const simple = tienda?.simple === true;
+  // Menú «⋯» del Panel de la tienda: nota, descuentos, cliente y Limpiar (Fermín, 18 oct).
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  useEscape(() => setMenuAbierto(false), menuAbierto);
+  // «Descuento por producto» con varios renglones: el siguiente toque en el ticket elige cuál.
+  const [eligiendoDescuento, setEligiendoDescuento] = useState(false);
+  useEscape(() => setEligiendoDescuento(false), eligiendoDescuento);
+  // El ticket se cobró, se canceló o se vació: la elección no pasa al siguiente.
+  useEffect(() => { if (vacio) setEligiendoDescuento(false); }, [vacio]);
+  const descuentoProducto = tienda?.onDescuentoProducto;
+  const opcionCliente = clienteCuenta
+    ? { texto: `${clienteCuenta.nombre ? "Cambiar" : "Asignar"} cliente`, hacer: clienteCuenta.onAsignar, activa: true }
+    : { texto: tienda?.cliente ? "Cambiar cliente" : "Asignar cliente", hacer: () => tienda?.onAsignarCliente?.(), activa: !!tienda?.onAsignarCliente };
+  const opcionesTienda = [
+    { texto: estado.notaOrden ? "Editar nota" : "Nota", hacer: () => setNotaOrdenAbierta(true), activa: !!onNotaOrden && !bloqueado },
+    ...(seCobraDespues ? [] : [
+      {
+        texto: "Descuento por producto",
+        hacer: () => (estado.lineas.length === 1 ? descuentoProducto?.(estado.lineas[0]!.clientId) : setEligiendoDescuento(true)),
+        activa: !vacio && !procesando && !!descuentoProducto,
+      },
+      { texto: "Descuento general", hacer: () => onAplicarDescuento?.(), activa: !vacio && !hayDescuento && !procesando && !!onAplicarDescuento },
+    ]),
+    opcionCliente,
+    ...(tienda?.onGuardarCotizacion
+      ? [{ texto: "Guardar como cotización", hacer: tienda.onGuardarCotizacion, activa: !procesando && !tienda.motivoSinCotizacion, detalle: tienda.motivoSinCotizacion ?? undefined }]
+      : []),
+    // Sin el botón de arriba, esta es la única salida de una cuenta guardada que no se va a cobrar.
+    {
+      texto: bloqueado && onCancelarTicket ? "Cancelar cuenta" : "Limpiar",
+      hacer: () => (bloqueado && onCancelarTicket ? onCancelarTicket() : onLimpiar?.()),
+      activa: !procesando && (bloqueado ? !!onCancelarTicket : !vacio && !!onLimpiar),
+      peligro: true,
+    },
+  ];
+  // Fuera del Panel de la tienda la nota y los descuentos ya tienen su botón: el menú lleva cliente y Limpiar.
+  const opcionesMenu = simple ? opcionesTienda : [opcionCliente, opcionesTienda.at(-1)!];
+  const menuTienda = (
+    <div className="relative -mr-2.5 flex-shrink-0">
+      <button
+        type="button"
+        aria-label="Más opciones"
+        aria-haspopup="menu"
+        aria-expanded={menuAbierto}
+        onClick={() => setMenuAbierto((v) => !v)}
+        className={`h-11 w-11 rounded-md font-display text-20 font-bold leading-none text-ink-2 transition-colors hover:bg-hover hover:text-ink ${menuAbierto ? "bg-hover text-ink" : ""}`}
+      >
+        ⋯
+      </button>
+      {menuAbierto && (
+        <>
+          {/* Tocar fuera cierra, como Escape. */}
+          <button type="button" aria-label="Cerrar opciones" tabIndex={-1} className="fixed inset-0 z-10 cursor-default" onClick={() => setMenuAbierto(false)} />
+          <div role="menu" className="absolute right-0 top-full z-20 mt-1 min-w-max rounded-lg border border-line bg-surface p-1 shadow-lg">
+            {opcionesMenu.map((o) => (
+              <button
+                key={o.texto}
+                type="button"
+                role="menuitem"
+                disabled={!o.activa}
+                onClick={() => { setMenuAbierto(false); o.hacer(); }}
+                className={`flex min-h-[44px] w-full flex-col items-start justify-center whitespace-nowrap rounded-md px-3 text-left text-15 font-semibold transition-colors disabled:cursor-default disabled:text-ink-3 disabled:hover:bg-transparent ${"peligro" in o ? "mt-1 text-danger hover:bg-danger-soft" : "text-ink hover:bg-hover"}`}
+              >
+                {o.texto}
+                {"detalle" in o && o.detalle && <span className="text-12 font-medium text-ink-3">{o.detalle}</span>}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+  /* Dos botones en uno: con la cuenta ya guardada en BD esto CANCELA la cuenta; con un
+     carrito suelto solo lo vacía. Se dice cuál de los dos es, porque no se deshacen igual.
+
+     El `vacio` solo aplica al carrito suelto. Antes deshabilitaba también el otro caso, y
+     eso dejaba sin salida justo a la mesa que más la necesita: la que se abrió por error y
+     no tiene ni un producto. Su ticket ya existe (BORRADOR) y tiene la mesa ocupada; si el
+     único botón que la cancela está gris, la mesa se queda ocupada para siempre.
+
+     Rojo desde el principio, no solo al pasar el mouse: en una pantalla táctil no hay
+     mouse, y era gris hasta el momento de tocarlo. Gris solo cuando no hace nada. */
+  const botonLimpiar = (
+    <button
+      type="button"
+      disabled={procesando || (bloqueado ? !onCancelarTicket : vacio || !onLimpiar)}
+      onClick={() => (bloqueado && onCancelarTicket ? onCancelarTicket() : onLimpiar?.())}
+      className={`${simple ? "text-13" : "-mr-2.5 text-14"} h-11 flex-shrink-0 rounded-md px-2.5 font-semibold text-danger transition-colors hover:bg-danger-soft disabled:cursor-default disabled:text-ink-3 disabled:opacity-60 disabled:hover:bg-transparent`}
+    >
+      {bloqueado && onCancelarTicket ? "Cancelar cuenta" : "Limpiar"}
+    </button>
+  );
 
   // Ancho del carrito: era fijo en 404px, y en una caja de 1024px se comía el 40% de la pantalla
   // dejando el catálogo apretado. Ahora escala con topes: nunca menos de 288px —por debajo no cabe
@@ -166,7 +308,8 @@ export function SidebarTicket({
   // catálogo es el que tiene que caber sin scroll. En 1366 le devuelve ~90px —una columna más de
   // productos—; en 1024 es la diferencia entre 3 y 4 columnas.
   return (
-    <aside className="flex w-[clamp(18rem,26vw,26.25rem)] flex-shrink-0 flex-col border-l border-line bg-surface">
+    // En el Panel de la tienda, mitad y mitad con el catálogo (Fermín, 18 oct).
+    <aside className={`flex ${simple ? "w-1/2" : "w-[clamp(18rem,26vw,26.25rem)]"} flex-shrink-0 flex-col border-l border-line bg-surface`}>
 
       {/* ── Cabecera ─────────────────────────────────────────── */}
       <div className="flex-shrink-0 border-b border-line px-4 pb-3 pt-1.5">
@@ -178,24 +321,7 @@ export function SidebarTicket({
           <span className="truncate font-display text-18 font-semibold leading-tight tracking-[-0.02em]">
             {titulo ?? (folioCuenta ? `Cuenta ${folioCuenta}` : "Ticket nuevo")}
           </span>
-          {/* Dos botones en uno: con la cuenta ya guardada en BD esto CANCELA la cuenta; con un
-              carrito suelto solo lo vacía. Se dice cuál de los dos es, porque no se deshacen igual.
-
-              El `vacio` solo aplica al carrito suelto. Antes deshabilitaba también el otro caso, y
-              eso dejaba sin salida justo a la mesa que más la necesita: la que se abrió por error y
-              no tiene ni un producto. Su ticket ya existe (BORRADOR) y tiene la mesa ocupada; si el
-              único botón que la cancela está gris, la mesa se queda ocupada para siempre.
-
-              Rojo desde el principio, no solo al pasar el mouse: en una pantalla táctil no hay
-              mouse, y era gris hasta el momento de tocarlo. Gris solo cuando no hace nada. */}
-          <button
-            type="button"
-            disabled={procesando || (bloqueado ? !onCancelarTicket : vacio || !onLimpiar)}
-            onClick={() => (bloqueado && onCancelarTicket ? onCancelarTicket() : onLimpiar?.())}
-            className="-mr-2.5 h-11 flex-shrink-0 rounded-md px-2.5 text-14 font-semibold text-danger transition-colors hover:bg-danger-soft disabled:cursor-default disabled:text-ink-3 disabled:opacity-60 disabled:hover:bg-transparent"
-          >
-            {bloqueado && onCancelarTicket ? "Cancelar cuenta" : "Limpiar"}
-          </button>
+          {simple || clienteCuenta ? menuTienda : botonLimpiar}
         </div>
         {/* Modo de servicio — SOLO LECTURA. El modo se elige en la pantalla de inicio (una venta
             no cambia de modo a media captura); aquí se muestra para que el cajero no pierda de
@@ -204,9 +330,13 @@ export function SidebarTicket({
           {/* Sin palomita y en gris neutro: con ella parecía una opción marcada que se podía
               desmarcar, y no es un botón. */}
           <div className="flex items-center justify-between gap-2">
-            <span className="inline-flex h-8 min-w-0 items-center rounded-md bg-hover px-2.5 text-14 font-semibold text-ink-2">
-              <span className="truncate">{modoTexto ?? etiquetaModo(estado.modoServicio)}</span>
-            </span>
+            {/* Tienda: en lugar de la etiqueta del modo, el cliente asignado (si hay). */}
+            {simple ? <span className="min-w-0 truncate text-13 font-semibold text-ink-2">{tienda?.cliente ?? ""}</span> : sinEtiquetaModo ? null : (
+              <span className="inline-flex h-8 min-w-0 items-center rounded-md bg-hover px-2.5 text-14 font-semibold text-ink-2">
+                <span className="truncate">{modoTexto ?? etiquetaModo(estado.modoServicio)}</span>
+              </span>
+            )}
+            {!simple && clienteCuenta?.nombre && <span className="min-w-0 flex-1 truncate text-13 font-semibold text-ink-2">{clienteCuenta.nombre}</span>}
             <span className="flex-shrink-0 text-13 font-semibold text-ink-3">
               {totalProductos} {totalProductos === 1 ? "producto" : "productos"}
             </span>
@@ -239,7 +369,7 @@ export function SidebarTicket({
             </button>
           )}
           {/* Era un texto de 12.5px sin caja: se tocaba a ciegas. */}
-          {onNotaOrden && !bloqueado && (
+          {onNotaOrden && !bloqueado && !simple && (
             <button
               type="button"
               onClick={() => setNotaOrdenAbierta((v) => !v)}
@@ -258,7 +388,7 @@ export function SidebarTicket({
               autoFocus
               defaultValue={estado.notaOrden ?? ""}
               maxLength={300}
-              placeholder="Nota para cocina de toda la orden…"
+              placeholder={simple ? "Nota de la venta…" : "Nota para cocina de toda la orden…"}
               className="mt-1.5 h-10 w-full rounded border border-line-strong px-3 text-13 outline-none focus:border-ink"
               onBlur={(e) => { onNotaOrden?.(e.target.value.trim() || null); setNotaOrdenAbierta(false); }}
               onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
@@ -279,35 +409,55 @@ export function SidebarTicket({
           <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-ink-3">
             <IconoTicket />
             <p className="text-15 font-semibold text-ink-2">
-              Agrega productos para empezar
+              {tienda ? tienda.textoVacio ?? "Escanea una prenda para empezar" : "Agrega productos para empezar"}
             </p>
-            <span className="text-13">
-              Toca un producto del catálogo para iniciar el ticket.
-            </span>
+            {tienda?.onCambioTalla && (
+              <Button variant="ghost" size="lg" onClick={tienda.onCambioTalla} className="mt-2 w-full">Cambio de talla</Button>
+            )}
+            {!tienda && (
+              <span className="text-13">
+                Toca un producto del catálogo para iniciar el ticket.
+              </span>
+            )}
           </div>
         ) : (
           <ul>
-            {estado.lineas.map((l: LineaCarrito) => (
-              <li key={l.clientId} className="border-b border-line py-2.5">
-                {/* Tocar el renglón lo reabre en su modal de modificadores o de combo. Quien llama
-                    decide si hay algo que editar: un producto sin modificadores no abre nada. */}
+            {eligiendoDescuento && (
+              <li className="-mx-4 flex items-center justify-between gap-2 bg-sel px-4 py-1.5 text-14 font-semibold text-ink">
+                Toca el producto al que le harás descuento
+                <button type="button" onClick={() => setEligiendoDescuento(false)} className="h-11 flex-shrink-0 rounded-md px-2.5 text-ink-2 transition-colors hover:bg-hover">
+                  Cancelar
+                </button>
+              </li>
+            )}
+            {estado.lineas.map((l: LineaCarrito) => {
+              // Tocar el renglón lo reabre en su modal de modificadores o de combo (quien llama decide si
+              // hay algo que editar); eligiendo descuento, lo elige.
+              const alTocar = eligiendoDescuento
+                ? () => { setEligiendoDescuento(false); descuentoProducto?.(l.clientId); }
+                : editable ? () => onEditar!(l.clientId) : undefined;
+              return (
+              <li key={l.clientId} className={`border-b border-line py-2.5 ${tienda && l.producto.id === ultimoEnTicket ? "-mx-2 bg-sel px-2" : ""}`}>
                 <div
-                  role={editable ? "button" : undefined}
-                  tabIndex={editable ? 0 : undefined}
-                  aria-label={editable ? `Editar ${l.producto.nombre}` : undefined}
-                  onClick={editable ? () => onEditar!(l.clientId) : undefined}
+                  role={alTocar ? "button" : undefined}
+                  tabIndex={alTocar ? 0 : undefined}
+                  aria-label={alTocar ? `${eligiendoDescuento ? "Descuento a" : "Editar"} ${l.producto.nombre}` : undefined}
+                  onClick={alTocar}
                   onKeyDown={
-                    editable
+                    alTocar
                       ? (e) => {
-                          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEditar!(l.clientId); }
+                          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); alTocar(); }
                         }
                       : undefined
                   }
-                  className={editable ? "-mx-2 -my-1 cursor-pointer rounded-md px-2 py-1 outline-none transition-[transform,background-color] duration-150 ease-vim hover:bg-hover focus-visible:ring-2 focus-visible:ring-ink active:scale-[.99]" : undefined}
+                  className={alTocar ?"-mx-2 -my-1 cursor-pointer rounded-md px-2 py-1 outline-none transition-[transform,background-color] duration-150 ease-vim hover:bg-hover focus-visible:ring-2 focus-visible:ring-ink active:scale-[.99]" : undefined}
                 >
                   <RenglonItem
                     cantidad={l.cantidad}
-                    nombre={l.producto.nombre}
+                    unidad={l.producto.tipoVenta}
+                    nombre={tienda ? tienda.renglon(l).nombre : l.producto.nombre}
+                    detalle={tienda?.renglon(l).detalle}
+                    sinExistencia={tienda?.sinExistencia(l)}
                     modificadores={l.modificadores.map((m) => m.opcionNombre)}
                     notaCocina={l.notaCocina}
                     totalMxn={l.clientId === premioClientId ? 0 : totalLinea(l)}
@@ -325,7 +475,23 @@ export function SidebarTicket({
                     no queda un toque libre para seleccionar. Sin sangría: a 288px de ancho es la
                     única forma de que quepan stepper, Nota y Quitar a 44px. */}
                 <div className="mt-2 flex items-center gap-1.5">
-                  <span className="inline-flex items-center rounded-md border border-line-strong bg-surface">
+                  {tienda?.colaborador && (() => {
+                    const c = tienda.colaborador(l);
+                    const tono = c.falta ? "font-semibold text-warning" : "text-ink-2";
+                    return tienda.onColaborador ? (
+                      <button
+                        type="button"
+                        onClick={() => tienda.onColaborador?.(l.clientId)}
+                        aria-label={`${c.texto}: cambiar quién hizo ${l.producto.nombre}`}
+                        className={`-ml-2.5 flex h-11 min-w-0 items-center gap-1 rounded-md px-2.5 text-14 transition-[transform,background-color] duration-150 ease-vim hover:bg-hover active:scale-[.97] ${tono}`}
+                      >
+                        <span className="truncate">{c.texto}</span>
+                        <Icono nombre="chevron-abajo" className="h-4 w-4 flex-shrink-0" />
+                      </button>
+                    ) : <span className={`min-w-0 truncate text-14 ${tono}`}>{c.texto}</span>;
+                  })()}
+                  {/* La tienda no lleva cantidad ni nota por renglón: cada escaneo es una pieza (Fermín, 18 oct). */}
+                  {!simple && <span className="inline-flex items-center rounded-md border border-line-strong bg-surface">
                     <button
                       type="button"
                       aria-label="Menos"
@@ -347,8 +513,8 @@ export function SidebarTicket({
                     >
                       <Icono nombre="mas" className="h-4 w-4" />
                     </button>
-                  </span>
-                  {bloqueado && onDescuentoItem && (
+                  </span>}
+                  {bloqueado && onDescuentoItem && !simple && (
                     <button
                       type="button"
                       onClick={() => onDescuentoItem(l.clientId)}
@@ -359,7 +525,7 @@ export function SidebarTicket({
                       %
                     </button>
                   )}
-                  {!bloqueado && onNotaLinea && (
+                  {!bloqueado && onNotaLinea && !simple && (
                     <button
                       type="button"
                       onClick={() => setEditandoNota(editandoNota === l.clientId ? null : l.clientId)}
@@ -377,7 +543,9 @@ export function SidebarTicket({
                   <button
                     type="button"
                     disabled={bloqueado && !onCancelarItemPersistido}
-                    onClick={() => (bloqueado && onCancelarItemPersistido ? onCancelarItemPersistido(l.clientId) : onQuitar(l.clientId))}
+                    // Sin «−» en la tienda, dos escaneos de la misma prenda quedan en «2×»: Quitar saca una (una pesada, completa).
+                    onClick={() => (bloqueado && onCancelarItemPersistido ? onCancelarItemPersistido(l.clientId)
+                      : quitaUna(l, simple) ? onCantidad(l.clientId, l.cantidad - 1) : onQuitar(l.clientId))}
                     className={`${BOTON_RENGLON} -mr-2.5 ml-auto text-danger hover:bg-danger-soft disabled:cursor-default disabled:text-ink-3 disabled:opacity-60 disabled:hover:bg-transparent`}
                   >
                     Quitar
@@ -398,7 +566,7 @@ export function SidebarTicket({
                   </div>
                 )}
               </li>
-            ))}
+            );})}
           </ul>
         )}
       </div>
@@ -443,10 +611,12 @@ export function SidebarTicket({
             <span className="tabular-nums font-medium text-ink">{fmtMxn(estado.envio.costoMxn)}</span>
           </button>
         )}
-        <div className="mb-1 flex justify-between text-13 text-ink-2">
-          <span>Subtotal</span>
-          <span className="tabular-nums font-medium text-ink">{fmtMxn(totales.subtotal)}</span>
-        </div>
+        {!sinTotales && (
+          <div className="mb-1 flex justify-between text-13 text-ink-2">
+            <span>Subtotal</span>
+            <span className="tabular-nums font-medium text-ink">{fmtMxn(totales.subtotal)}</span>
+          </div>
+        )}
         <div className="mb-1 flex justify-between text-13 text-ink-2">
           <span>IVA (16%)</span>
           <span className="tabular-nums font-medium text-ink">{fmtMxn(totales.iva)}</span>
@@ -469,14 +639,16 @@ export function SidebarTicket({
             <span className="tabular-nums">−{fmtMxn(descuentoMxn)}</span>
           </div>
         )}
-        <div className="mt-1.5 flex items-baseline justify-between gap-2">
-          <span className="text-15 font-bold uppercase tracking-[0.04em] text-ink">
-            Total
-          </span>
-          <span className="font-display text-28 font-bold leading-none tabular-nums tracking-[-0.02em] text-ink">
-            {fmtMxn(totalFinal)}
-          </span>
-        </div>
+        {!sinTotales && (
+          <div className="mt-1.5 flex items-baseline justify-between gap-2">
+            <span className="text-15 font-bold uppercase tracking-[0.04em] text-ink">
+              Total
+            </span>
+            <span className="font-display text-28 font-bold leading-none tabular-nums tracking-[-0.02em] text-ink">
+              {fmtMxn(totalFinal)}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* ── Acciones secundarias ──────────────────────────────── */}
@@ -485,6 +657,7 @@ export function SidebarTicket({
           ("+ Nota de la orden"). Ocupaba la mitad del renglón para no hacer nada. */}
       {/* "En espera" subió aquí desde el pie: su lugar bajo Cobrar es ahora "Efectivo exacto", que se
           usa en casi cada venta. Tres botones iguales; a 288px no cabe un icono más. */}
+      {!simple && (
       <div className="flex flex-shrink-0 gap-1.5 px-4 pt-2.5">
         <InterruptorPrecios />
         {!seCobraDespues && (
@@ -513,6 +686,7 @@ export function SidebarTicket({
           </button>
         )}
       </div>
+      )}
 
       {/* ── Pie: Cobrar + Efectivo exacto ─────────────────────── */}
       {/* Pie compactado (mockup: pt-4 pb-5, Cobrar py-18px). "Cobrar" conserva un alto cómodo para
@@ -553,24 +727,26 @@ export function SidebarTicket({
         >
           {procesando ? (
             "Procesando…"
+          ) : pendienteMxn != null && pendienteMxn <= 0 ? (
+            "Cerrar venta"
           ) : (
             <>
               Cobrar{" "}
-              <span className="font-display tabular-nums">{fmtMxn(totalFinal)}</span>
+              <span className="font-display tabular-nums">{fmtMxn(pendienteMxn ?? totalFinal)}</span>
             </>
           )}
         </button>
         {/* Efectivo exacto: un toque en vez de cinco (Cobrar → Efectivo → Pago exacto → Cobrar).
             Es el cobro más común de mostrador. Borde de tinta: es la segunda acción del pie, no
-            una más de las grises. */}
-        <button
+            una más de las grises. En la tienda no va: Fermín prefirió el espacio para los renglones. */}
+        {!simple && !sinTotales && <button
           type="button"
           disabled={vacio || procesando || !onEfectivoExacto}
           onClick={() => onEfectivoExacto?.()}
           className="flex h-12 w-full items-center justify-center rounded-lg border border-ink bg-surface text-16 font-bold text-ink transition-[transform,background-color] duration-150 ease-vim hover:bg-hover active:scale-[.98] disabled:cursor-default disabled:border-line-strong disabled:opacity-[.45] disabled:active:scale-100"
         >
           Efectivo exacto
-        </button>
+        </button>}
         </>
         )}
       </div>

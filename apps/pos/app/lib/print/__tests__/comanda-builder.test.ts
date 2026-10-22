@@ -279,3 +279,23 @@ describe("construirComandaJob — nota del pedido (tienda en línea)", () => {
     expect(job.bloques.some((b) => b.t === "texto" && b.valor.startsWith("Nota del pedido"))).toBe(false);
   });
 });
+
+describe("debeImprimirComandaAlCobrar — comida rápida", () => {
+  it("Para llevar y Comer aquí imprimen, con o sin estación de cocina propia", () => {
+    for (const modo of ["PARA_LLEVAR", "COMER_AQUI"]) {
+      expect(debeImprimirComandaAlCobrar(modo, true, true)).toBe(true);
+      expect(debeImprimirComandaAlCobrar(modo, false, true)).toBe(true);
+    }
+  });
+
+  it("Pick-up, domicilio, mesa y apps no: esas cuentas se mandan a cocina desde Pedidos", () => {
+    for (const modo of ["MESA", "DRIVE_THRU", "DELIVERY_PROPIO", "APP_UBEREATS", ""]) {
+      expect(debeImprimirComandaAlCobrar(modo, true, true)).toBe(false);
+    }
+  });
+
+  it("café (sin comida rápida): venta para llevar con una sola impresora sigue sin comanda", () => {
+    expect(debeImprimirComandaAlCobrar("PARA_LLEVAR", false)).toBe(false);
+    expect(debeImprimirComandaAlCobrar("COMER_AQUI", false)).toBe(false);
+  });
+});

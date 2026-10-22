@@ -5,6 +5,7 @@ import { LABEL_APP, type AppExterna } from "./conciliacion";
 import { resumirCaja, serieHoraria, type ResumenCaja, type TurnoDia } from "./dashboard-calculos";
 import { leerModulos } from "./modulos";
 import { moduloActivo } from "@vim/db/operacion";
+import { varianteDe } from "./existencias";
 
 // F13 — Reportes y analítica. Las vistas SQL ya existen (0011/0012); el admin solo las
 // consume bajo RLS (heredan del tenant_id de las tablas base). Rangos por día_contable.
@@ -433,6 +434,104 @@ export async function leerVentasPorProducto(desde: string, hasta: string, sucurs
   return [...agg.values()].sort((a, b) => b.total_mxn - a.total_mxn);
 }
 
+// ── Ventas por talla y color (giro tienda) ─────────────────────────────────
+export type FilaVariante = {
+  producto_id: string;
+  producto: string;
+  variante: string;
+  sku: string | null;
+  unidades: number;
+  /** Con IVA, como se cobró. */
+  venta_mxn: number;
+  /** Venta sin IVA, ya con los descuentos del renglón: total − IVA. */
+  neto_mxn: number;
+  /** unidades × costo de hoy; `null` sin costo. */
+  costo_mxn: number | null;
+  margen_mxn: number | null;
+  margen_pct: number | null;
+};
+export type VentaDiaProducto = { producto_id: string; unidades_vendidas: number; total_mxn: number; iva_mxn: number };
+export type ProductoVariante = {
+  id: string;
+  nombre: string;
+  padre_nombre: string | null;
+  variante_ejes: string[] | null;
+  variante_valores: Record<string, string> | null;
+  codigo_interno: string | null;
+  costo_mxn: number | null;
+  controla_existencias: boolean;
+};
+
+const centavos = (v: number) => Math.round(v * 100) / 100;
+
+/**
+ * Suma los días por producto, solo los que llevan existencias. Margen = venta sin IVA (total − IVA,
+ * ya con descuentos del renglón) − unidades × costo de hoy. No se usa `subtotal_mxn` de la vista:
+ * es bruto (antes de descuentos) y, con precios con IVA incluido, lo trae dentro.
+ */
+export function agruparVentasVariantes(ventas: VentaDiaProducto[], productos: ProductoVariante[]): FilaVariante[] {
+  const porId = new Map(productos.filter((p) => p.controla_existencias).map((p) => [p.id, p]));
+  const agg = new Map<string, { p: ProductoVariante; unidades: number; venta: number; neto: number }>();
+  for (const v of ventas) {
+    const p = porId.get(v.producto_id);
+    if (!p) continue;
+    const x = agg.get(p.id) ?? { p, unidades: 0, venta: 0, neto: 0 };
+    x.unidades += v.unidades_vendidas;
+    x.venta += v.total_mxn;
+    x.neto += v.total_mxn - v.iva_mxn;
+    agg.set(p.id, x);
+  }
+  return [...agg.values()]
+    .map(({ p, unidades, venta, neto: suma }) => {
+      const neto = centavos(suma);
+      const costo = p.costo_mxn === null ? null : centavos(unidades * p.costo_mxn);
+      const margen = costo === null ? null : centavos(neto - costo);
+      return {
+        producto_id: p.id,
+        producto: p.padre_nombre ?? p.nombre,
+        variante: varianteDe(p.variante_ejes, p.variante_valores),
+        sku: p.codigo_interno,
+        unidades,
+        venta_mxn: centavos(venta),
+        neto_mxn: neto,
+        costo_mxn: costo,
+        margen_mxn: margen,
+        margen_pct: margen === null || neto <= 0 ? null : (margen / neto) * 100,
+      };
+    })
+    .sort((a, b) => b.venta_mxn - a.venta_mxn);
+}
+
+export async function leerVentasPorVariante(desde: string, hasta: string, sucursalId: string | null = null): Promise<FilaVariante[]> {
+  const [ventas, productos] = await Promise.all([
+    leerVista("vw_ventas_por_producto", "producto_id, unidades_vendidas, total_mxn, iva_mxn, dia_contable", desde, hasta, ["sucursal_id", "producto_id", "producto_nombre"], { sucursalId }),
+    leerTodas((a, b) =>
+      supabase
+        .from("productos")
+        .select("id, nombre, codigo_interno, costo_mxn, controla_existencias, variante_valores, padre:productos!producto_padre_id(nombre, variante_ejes)")
+        .eq("controla_existencias", true)
+        .order("id")
+        .range(a, b),
+    ),
+  ]);
+  return agruparVentasVariantes(
+    ventas.map((r) => ({ producto_id: String(r.producto_id), unidades_vendidas: num(r.unidades_vendidas), total_mxn: num(r.total_mxn), iva_mxn: num(r.iva_mxn) })),
+    productos.map((r) => {
+      const padre = r.padre as { nombre: string; variante_ejes: string[] | null } | null;
+      return {
+        id: String(r.id),
+        nombre: String(r.nombre ?? "—"),
+        padre_nombre: padre?.nombre ?? null,
+        variante_ejes: padre?.variante_ejes ?? null,
+        variante_valores: (r.variante_valores as Record<string, string> | null) ?? null,
+        codigo_interno: (r.codigo_interno as string | null) ?? null,
+        costo_mxn: r.costo_mxn == null ? null : num(r.costo_mxn),
+        controla_existencias: true,
+      };
+    }),
+  );
+}
+
 // ── Ventas por categoría (P-184) ────────────────────────────────────────────
 export type FilaCategoria = {
   categoria: string;
@@ -525,6 +624,100 @@ export async function leerVentasPorMesero(desde: string, hasta: string, sucursal
     map.set(k, cur);
   }
   return [...map.values()].map((m) => ({ ...m, promedio: m.tickets > 0 ? m.total / m.tickets : 0 })).sort((a, b) => b.total - a.total);
+}
+
+// ── Belleza (0221): comisiones y ventas por colaborador. Montos SIN IVA. ──────────────────────
+// Las dos leen vw_comisiones_renglon, que no tiene sucursal: el reporte es de todo el negocio, y
+// un colaborador que no administra solo ve lo suyo (lo acota la vista).
+
+export type Periodo = { desde: string; hasta: string };
+
+async function periodoDe(fecha: string): Promise<Periodo> {
+  const { data, error } = await supabase.rpc("periodo_comisiones", { p_fecha: fecha });
+  if (error) throw new Error(error.message);
+  const p = data?.[0];
+  if (!p) throw new Error("No se pudo calcular el periodo de comisiones");
+  return { desde: p.desde, hasta: p.hasta };
+}
+
+/** El periodo de comisiones que corre hoy y el anterior (semanal o quincenal, según el negocio). */
+export async function leerPeriodosComision(): Promise<{ actual: Periodo; anterior: Periodo }> {
+  const actual = await periodoDe(hoyMx());
+  return { actual, anterior: await periodoDe(sumarDias(actual.desde, -1)) };
+}
+
+export type FilaComision = {
+  clave: string; nombre: string; servicios: number; ventas: number;
+  comisionServicios: number; comisionProductos: number; sueldo: number; total: number;
+};
+
+/**
+ * Una fila por colaborador. `esPeriodo`: el rango es exactamente un periodo del negocio; solo
+ * entonces la base suma el sueldo (con otro rango sale en 0).
+ */
+export async function leerComisiones(desde: string, hasta: string): Promise<{ filas: FilaComision[]; esPeriodo: boolean }> {
+  const [r, p] = await Promise.all([supabase.rpc("comisiones_periodo", { p_desde: desde, p_hasta: hasta }), periodoDe(desde)]);
+  if (r.error) throw new Error(r.error.message);
+  return { filas: (r.data ?? []).map(filaComision), esPeriodo: p.desde === desde && p.hasta === hasta };
+}
+
+export function filaComision(f: Record<string, unknown>): FilaComision {
+  return {
+    clave: String(f.usuario_id), nombre: String(f.nombre ?? "—"), servicios: num(f.servicios), ventas: num(f.ventas_mxn),
+    comisionServicios: num(f.comision_servicios_mxn), comisionProductos: num(f.comision_productos_mxn),
+    sueldo: num(f.sueldo_mxn), total: num(f.total_mxn),
+  };
+}
+
+export type RenglonComision = {
+  clave: string; ticketId: string; fecha: string; producto: string; esServicio: boolean; venta: number; base: number; comision: number;
+};
+
+/** Los renglones de un colaborador en el rango: de dónde sale su comisión. */
+export async function leerRenglonesComision(colaboradorId: string, desde: string, hasta: string): Promise<RenglonComision[]> {
+  const filas = await leerTodas((a, b) => supabase.from("vw_comisiones_renglon")
+    .select("ticket_item_id, ticket_id, fecha_negocio, producto_nombre, es_servicio, venta_mxn, base_mxn, comision_mxn")
+    .eq("colaborador_id", colaboradorId).gte("fecha_negocio", desde).lte("fecha_negocio", hasta)
+    .order("fecha_negocio").order("ticket_item_id").range(a, b) as unknown as RespuestaPagina);
+  return filas.map((f) => ({
+    clave: String(f.ticket_item_id), ticketId: String(f.ticket_id), fecha: String(f.fecha_negocio), producto: String(f.producto_nombre ?? "—"),
+    esServicio: f.es_servicio === true, venta: num(f.venta_mxn), base: num(f.base_mxn), comision: num(f.comision_mxn),
+  }));
+}
+
+export type AgruparColaborador = "colaborador" | "servicio";
+export type FilaVentaColaborador = { clave: string; nombre: string; veces: number; tickets: number; ventas: number; comision: number };
+
+/**
+ * Renglones → filas por colaborador o por servicio (o producto). `veces` = renglones vendidos;
+ * `tickets` = tickets distintos. Pura para poder probarla.
+ */
+export function agruparVentasColaborador(
+  renglones: { colaborador_id: string; producto_nombre: string; ticket_id: string; venta_mxn: number; comision_mxn: number }[],
+  por: AgruparColaborador,
+  nombres: ReadonlyMap<string, string>,
+): FilaVentaColaborador[] {
+  const m = new Map<string, FilaVentaColaborador & { ids: Set<string> }>();
+  for (const r of renglones) {
+    const k = por === "colaborador" ? r.colaborador_id : r.producto_nombre;
+    const cur = m.get(k) ?? { clave: k, nombre: por === "colaborador" ? nombres.get(k) ?? "Empleado dado de baja" : k, veces: 0, tickets: 0, ventas: 0, comision: 0, ids: new Set<string>() };
+    cur.veces += 1; cur.ventas += r.venta_mxn; cur.comision += r.comision_mxn; cur.ids.add(r.ticket_id);
+    m.set(k, cur);
+  }
+  return [...m.values()]
+    .map(({ ids, ...f }) => ({ ...f, tickets: ids.size, ventas: Math.round(f.ventas * 100) / 100, comision: Math.round(f.comision * 100) / 100 }))
+    .sort((a, b) => b.ventas - a.ventas);
+}
+
+export async function leerVentasPorColaborador(desde: string, hasta: string): Promise<{ colaborador_id: string; producto_nombre: string; ticket_id: string; venta_mxn: number; comision_mxn: number }[]> {
+  const filas = await leerTodas((a, b) => supabase.from("vw_comisiones_renglon")
+    .select("ticket_item_id, colaborador_id, producto_nombre, ticket_id, venta_mxn, comision_mxn")
+    .gte("fecha_negocio", desde).lte("fecha_negocio", hasta)
+    .order("fecha_negocio").order("ticket_item_id").range(a, b) as unknown as RespuestaPagina);
+  return filas.map((f) => ({
+    colaborador_id: String(f.colaborador_id), producto_nombre: String(f.producto_nombre ?? "—"), ticket_id: String(f.ticket_id),
+    venta_mxn: num(f.venta_mxn), comision_mxn: num(f.comision_mxn),
+  }));
 }
 
 // Ventas por área de cocina (P-187)
@@ -766,7 +959,7 @@ export async function leerNoShows(desde: string, hasta: string, sucursalId: stri
 }
 
 // ── Qué reportes le sirven a este negocio ──────────────────────────────────────────────────
-export type ReportesDisponibles = { marcas: boolean; eventos: boolean; reservaciones: boolean; apps: boolean; variasSucursales: boolean; inventario: boolean; meseros: boolean };
+export type ReportesDisponibles = { marcas: boolean; eventos: boolean; reservaciones: boolean; apps: boolean; variasSucursales: boolean; inventario: boolean; meseros: boolean; existencias: boolean; agenda: boolean };
 
 /**
  * Los reportes de módulos que el negocio no usa se esconden del índice: antes aparecían
@@ -807,5 +1000,106 @@ export function disponiblesDe(
     variasSucursales: hay.sucursales,
     inventario: hay.movimientos || !!ef.recetas,
     meseros: hay.meseros || moduloActivo(ef, "meseros"),
+    // Solo el módulo: un restaurante no ve el reporte de tienda ni por tener datos.
+    existencias: moduloActivo(ef, "existencias"),
+    // Comisiones y ventas por colaborador (belleza): igual, solo con la agenda.
+    agenda: moduloActivo(ef, "agenda"),
   };
+}
+
+// ── Agenda (belleza, 0227): citas y faltas, ocupación ─────────────────────────────────────────
+
+/**
+ * Recorta el rango a lo que acepta la base (`dias` como máximo, contando ambos extremos): se
+ * quedan los últimos días, que son los que se están mirando. `recortado` = hay que avisarlo.
+ */
+export function recortarRango(desde: string, hasta: string, dias: number): { desde: string; hasta: string; recortado: boolean } {
+  const minimo = sumarDias(hasta, -(dias - 1));
+  return desde < minimo ? { desde: minimo, hasta, recortado: true } : { desde, hasta, recortado: false };
+}
+
+/** Tasa de falta en %: no llegó / total. 0 sin citas. */
+export const tasaFalta = (noLlego: number, total: number): number => (total > 0 ? (noLlego / total) * 100 : 0);
+
+/** Ocupación en %: agendado / horario. `null` sin horario (se pinta «—»). */
+export const pctOcupacion = (agendados: number, horario: number): number | null => (horario > 0 ? (agendados / horario) * 100 : null);
+
+export type CanalCitas = "" | "CAJA" | "EN_LINEA";
+export type AgruparCitas = "colaborador" | "servicio";
+export type RenglonCitas = {
+  usuario_id: string | null; colaborador: string | null; producto_id: string; servicio: string;
+  atendidas: number; canceladas_clienta: number; canceladas_negocio: number; no_llego: number; total: number;
+};
+export type FilaCitas = {
+  clave: string; nombre: string; atendidas: number; canceladasClienta: number; canceladasNegocio: number;
+  noLlego: number; total: number; tasa: number;
+};
+
+export const SIN_COLABORADOR = "Sin colaborador";
+
+/** Renglones (colaborador × servicio) → filas por colaborador o por servicio. Pura para poder probarla. */
+export function agruparCitas(renglones: RenglonCitas[], por: AgruparCitas): FilaCitas[] {
+  const m = new Map<string, FilaCitas>();
+  for (const r of renglones) {
+    const k = por === "colaborador" ? r.usuario_id ?? "" : r.producto_id;
+    const nombre = por === "colaborador" ? (r.usuario_id ? r.colaborador ?? "—" : SIN_COLABORADOR) : r.servicio;
+    const f = m.get(k) ?? { clave: k, nombre, atendidas: 0, canceladasClienta: 0, canceladasNegocio: 0, noLlego: 0, total: 0, tasa: 0 };
+    f.atendidas += r.atendidas; f.canceladasClienta += r.canceladas_clienta; f.canceladasNegocio += r.canceladas_negocio;
+    f.noLlego += r.no_llego; f.total += r.total;
+    m.set(k, f);
+  }
+  return [...m.values()].map((f) => ({ ...f, tasa: tasaFalta(f.noLlego, f.total) })).sort((a, b) => b.total - a.total);
+}
+
+export async function leerReporteCitas(desde: string, hasta: string, canal: CanalCitas): Promise<RenglonCitas[]> {
+  const { data, error } = await supabase.rpc("agenda_reporte_citas", { p_desde: desde, p_hasta: hasta, ...(canal ? { p_canal: canal } : {}) });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((f: Record<string, unknown>) => ({
+    usuario_id: f.usuario_id ? String(f.usuario_id) : null, colaborador: f.colaborador ? String(f.colaborador) : null, producto_id: String(f.producto_id), servicio: String(f.servicio ?? "—"),
+    atendidas: num(f.atendidas), canceladas_clienta: num(f.canceladas_clienta), canceladas_negocio: num(f.canceladas_negocio),
+    no_llego: num(f.no_llego), total: num(f.total),
+  }));
+}
+
+export type AgruparOcupacion = "colaborador" | "dia";
+export type RenglonOcupacion = { usuario_id: string; colaborador: string; dia: string; minutos_horario: number; minutos_agendados: number };
+export type FilaOcupacion = { clave: string; colaborador: string; dia: string | null; horario: number; agendados: number; pct: number | null };
+
+/**
+ * Por colaborador (suma del rango) o por colaborador y día. Por día se omiten los días sin
+ * horario ni citas: un rango de 93 días con cinco colaboradores son 465 renglones, casi todos vacíos.
+ */
+export function agruparOcupacion(renglones: RenglonOcupacion[], por: AgruparOcupacion): FilaOcupacion[] {
+  if (por === "dia") {
+    return renglones
+      .filter((r) => r.minutos_horario > 0 || r.minutos_agendados > 0)
+      .map((r) => ({
+        clave: `${r.usuario_id}|${r.dia}`, colaborador: r.colaborador, dia: r.dia, horario: r.minutos_horario,
+        agendados: r.minutos_agendados, pct: pctOcupacion(r.minutos_agendados, r.minutos_horario),
+      }));
+  }
+  // El % solo cuenta lo agendado en días con horario: un día sin horario no tiene tope y lo subiría de 100.
+  const m = new Map<string, FilaOcupacion & { enHorario: number }>();
+  for (const r of renglones) {
+    const f = m.get(r.usuario_id) ?? { clave: r.usuario_id, colaborador: r.colaborador, dia: null, horario: 0, agendados: 0, pct: null, enHorario: 0 };
+    f.horario += r.minutos_horario; f.agendados += r.minutos_agendados;
+    if (r.minutos_horario > 0) f.enHorario += r.minutos_agendados;
+    m.set(r.usuario_id, f);
+  }
+  return [...m.values()].map(({ enHorario, ...f }) => ({ ...f, pct: pctOcupacion(enHorario, f.horario) }));
+}
+
+export async function leerOcupacion(desde: string, hasta: string): Promise<RenglonOcupacion[]> {
+  const { data, error } = await supabase.rpc("agenda_ocupacion", { p_desde: desde, p_hasta: hasta });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((f: Record<string, unknown>) => ({
+    usuario_id: String(f.usuario_id), colaborador: String(f.colaborador ?? "—"), dia: String(f.dia),
+    minutos_horario: num(f.minutos_horario), minutos_agendados: num(f.minutos_agendados),
+  }));
+}
+
+/** % de ocupación de todo el rango (la fila de totales), con el mismo criterio que por colaborador. */
+export function ocupacionTotal(renglones: RenglonOcupacion[]): number | null {
+  const conHorario = renglones.filter((r) => r.minutos_horario > 0);
+  return pctOcupacion(conHorario.reduce((s, r) => s + r.minutos_agendados, 0), conHorario.reduce((s, r) => s + r.minutos_horario, 0));
 }

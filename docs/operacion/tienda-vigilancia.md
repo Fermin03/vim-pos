@@ -223,7 +223,7 @@ SELECT t.nombre_comercial AS negocio,
 ```
 
 - `tienda_encendida = true` y `direccion` con valor: su tienda está en
-  `pedidos.vimpos.com.mx/<direccion>`.
+  `online.vimpos.com.mx/<direccion>`.
 - `tienda_encendida = false`: tiene permiso y no la ha encendido (lo normal al principio).
 
 El estado del complemento en el catálogo (antes de encender debe decir `activo = false`):

@@ -132,3 +132,12 @@ export function mensajeErrorLealtad(codigo: string): string {
 export function esFalloAmbiguo(codigo: string): boolean {
   return codigo === "SIN_RED" || codigo === "RESPUESTA_INVALIDA" || codigo === "ERROR_INTERNO" || /^HTTP_5\d\d$/.test(codigo);
 }
+
+/**
+ * ¿La franja ofrece «Canjear»? En un modo que admite cliente, con productos y la cuenta sin
+ * imprimir. Nunca en la venta de un cambio (como no suma, 0200): `ventaDeCambio` es `null`
+ * mientras se lee o si falla la lectura, y tampoco se ofrece.
+ */
+export function ofreceCanje(c: { admite: boolean; hayLineas: boolean; impresa: boolean; ventaDeCambio: boolean | null }): boolean {
+  return c.admite && c.hayLineas && !c.impresa && c.ventaDeCambio === false;
+}

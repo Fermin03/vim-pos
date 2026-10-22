@@ -14,6 +14,7 @@ export const GRUPOS: GrupoReportes[] = [
     ayuda: "La venta desglosada por producto, por categoría y por canal.",
     reportes: [
       { href: "/reportes/ventas-producto", titulo: "Ventas por producto", descripcion: "Qué se vende más: unidades, venta y la parte que aporta cada producto." },
+      { href: "/reportes/ventas-variantes", titulo: "Ventas por talla y color", descripcion: "Qué talla y color se vende más y cuánto te deja cada uno.", modulo: "existencias" },
       { href: "/reportes/ventas-categoria", titulo: "Ventas por categoría", descripcion: "La venta repartida por las categorías de tu menú." },
       { href: "/reportes/modo-servicio", titulo: "Ventas por tipo de servicio", descripcion: "Comer aquí, para llevar, a domicilio y apps: cuánto aporta cada uno." },
       { href: "/reportes/apps-externas", titulo: "Ventas por apps de delivery", descripcion: "Uber Eats, Rappi y DiDi: venta, comisión y lo que depositó cada app.", modulo: "apps" },
@@ -28,6 +29,10 @@ export const GRUPOS: GrupoReportes[] = [
     reportes: [
       { href: "/reportes/z-historico", titulo: "Cortes de turno", descripcion: "Cada cierre de caja: lo vendido, el efectivo esperado contra el contado y quién cerró." },
       { href: "/reportes/ventas-mesero", titulo: "Ventas por mesero", descripcion: "Tickets, venta y propinas de cada mesero.", modulo: "meseros" },
+      { href: "/reportes/comisiones", titulo: "Comisiones", descripcion: "Cuánto se le paga a cada colaborador en el periodo: comisiones y sueldo.", modulo: "agenda" },
+      { href: "/reportes/ventas-colaborador", titulo: "Ventas por colaborador", descripcion: "Qué vende cada colaborador y qué servicios se venden más.", modulo: "agenda" },
+      { href: "/reportes/citas", titulo: "Citas y faltas", descripcion: "Citas atendidas, canceladas y clientas que no llegaron, por colaborador y por servicio.", modulo: "agenda" },
+      { href: "/reportes/ocupacion", titulo: "Ocupación", descripcion: "Qué parte del horario de cada colaborador estuvo agendada.", modulo: "agenda" },
       { href: "/reportes/ventas-area", titulo: "Ventas por estación", descripcion: "Cuánto prepara y cuánto vende cada estación de la cocina." },
       { href: "/reportes/tiempos-cocina", titulo: "Tiempos de cocina", descripcion: "Cuánto tarda en salir la comida contra tu objetivo." },
     ],
@@ -62,9 +67,12 @@ export const GRUPOS: GrupoReportes[] = [
 ];
 
 /** La regla del índice: el rol lo puede abrir y, salvo `verTodos`, su módulo está en uso. Sin
- *  jerarquía (perfil cargando) o sin disponibilidad (lectura fallida) no se esconde nada. */
+ *  jerarquía (perfil cargando) o sin disponibilidad (lectura fallida) no se esconde nada. Lo de
+ *  tienda y de belleza es la excepción: solo con el módulo confirmado, ni cargando ni con «Verlos». */
 export function reporteVisible(r: Reporte, disponibles: ReportesDisponibles | null, jerarquia: number | null, verTodos = false): boolean {
-  const permitido = jerarquia === null || puedeVer(jerarquia, r.href);
+  const permitido = (jerarquia === null || puedeVer(jerarquia, r.href))
+    && (r.modulo !== "existencias" || disponibles?.existencias === true)
+    && (r.modulo !== "agenda" || disponibles?.agenda === true);
   return permitido && (verTodos || !r.modulo || !disponibles || disponibles[r.modulo]);
 }
 

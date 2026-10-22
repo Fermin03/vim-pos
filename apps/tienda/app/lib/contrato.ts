@@ -157,7 +157,7 @@ export type PedidoDeCuenta = {
  * `hasta`: solo con el pago en línea en pausa tras un rechazo por riesgo (`PAGO_EN_PAUSA`, o
  * `PAGO_RECHAZADO` con detalle `RIESGO`): hasta cuándo, en ISO. Ausente o null en todo lo demás.
  */
-export type ErrorDeTienda = { error: string; detalle: string | null; hasta?: string | null };
+export type ErrorDeTienda = { error: string; detalle: string | null; hasta?: string | null; /** Solo en reservas: el texto para la clienta (HUECO_OCUPADO, DATOS_INVALIDOS, LIMITE_*…). */ mensaje?: string };
 
 export const FORMA_SLUG = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/;
 export const FORMA_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -354,6 +354,8 @@ export function errorDe(x: unknown, porDefecto = "SERVICIO_NO_DISPONIBLE"): Erro
     error: o.error, detalle: typeof o.detalle === "string" && /^[A-Za-z0-9_.-]{1,64}$/.test(o.detalle) ? o.detalle : null,
     // Solo una fecha con la forma que manda la función (ISO en UTC): cualquier otra cosa no es una hora.
     ...(typeof o.hasta === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$/.test(o.hasta) && { hasta: o.hasta }),
+    // Reservas: el texto que la base escribe PARA la clienta («Ese horario ya no está disponible»). Una línea, acotado.
+    ...(typeof o.mensaje === "string" && /^[^\u0000-\u001f\u007f]{1,200}$/.test(o.mensaje) && { mensaje: o.mensaje }),
   };
 }
 
@@ -413,3 +415,130 @@ export const pedidosDe = lector((x): PedidoDeCuenta[] => lista(obj(x).pedidos, (
     total_mxn: importe(p.total_mxn), renglones: lista(p.renglones, renglon), items: itemsDe(p.items),
   };
 }));
+
+// ── Reservas en línea (belleza, entrega 3). Nunca sale el id del negocio. ───────────────────────
+export type ServicioReservable = {
+  producto_id: string; nombre: string; categoria: string | null; precio: string; duracion_min: number;
+  /** Lo que se paga en línea al reservar este servicio (sobre el precio base); "0.00" = nada. El de la cita es el que manda. */
+  anticipo_mxn: string;
+};
+export type SucursalDeReservas = {
+  id: string; nombre: string; direccion: string | null; ubicacion: { lat: number; lng: number } | null;
+  /** Dígitos del teléfono de la sucursal, para el enlace de WhatsApp; null si no tiene. */
+  whatsapp: string | null;
+  /** Ahí se puede cobrar el anticipo en línea, con esta llave pública de Mercado Pago. */
+  pago_en_linea: boolean; public_key: string | null;
+  /** De la primera entrada a la última salida de sus colaboradores, por día (1 = lunes … 7 = domingo). */
+  horario: Horario;
+};
+/** `nombre_corto`: nombre e inicial del apellido («Diego R.»). Nunca el nombre completo. */
+export type ColaboradorDeReservas = { id: string; nombre_corto: string; sucursal_id: string; servicios: string[] };
+export const COBRO_MODOS = ["AL_FINAL", "ANTICIPO", "TODO"] as const;
+export type Reservas = {
+  slug: string; nombre: string; logo_ruta: string | null; color: string; descripcion: string | null; whatsapp: string | null;
+  pago_de_prueba: boolean;
+  sucursales: SucursalDeReservas[]; servicios: ServicioReservable[]; colaboradores: ColaboradorDeReservas[];
+  reglas: {
+    cancelar_horas: number; dias_reserva: number; intervalo_min: number; aviso_min_horas: number;
+    cobro_modo: (typeof COBRO_MODOS)[number]; pago_en_linea_disponible: boolean;
+  };
+};
+/** Las horas (ISO UTC) en que puede empezar la cadena de servicios ese día. */
+export type Huecos = { dia: string; huecos: string[] };
+
+export const ESTADOS_DE_CITA = ["AGENDADA", "EN_ESPERA", "EN_CURSO", "TERMINADA", "NO_LLEGO", "CANCELADA", "COBRADA"] as const;
+export type Cita = {
+  /** ISO. `dia` (YYYY-MM-DD) y `hora` (HH:MM) ya en la hora de México. */
+  inicia: string; termina: string | null; dia: string; hora: string;
+  sucursal: { id: string; nombre: string; direccion: string | null };
+  servicios: { producto_id: string; nombre: string; colaborador_id: string; colaborador: string; inicia: string; precio: string }[];
+  colaborador: string | null; total_mxn: string;
+  estado: (typeof ESTADOS_DE_CITA)[number];
+  /** Solo cancelada: «Cancelada por ti», «No se completó el pago» o «Cancelada por el negocio». */
+  cancelada_motivo: string | null;
+  anticipo_mxn: string; anticipo_pagado_mxn: string;
+  /** Mientras espera el pago del anticipo: hasta cuándo se aparta el lugar. */
+  pago_hasta: string | null;
+  /** Se puede cancelar o cambiar en línea (faltan más de `cancelar_horas`). Si no, «comunícate con el negocio» por `whatsapp`. */
+  puede_cambiar: boolean; cancelar_horas: number; whatsapp: string | null;
+  reembolso: { estado: "EN_PROCESO" | "DEVUELTO"; mensaje: string } | null;
+};
+/**
+ * Lo que contesta `reservar`. `codigo`: el del enlace `/<negocio>/cita/<codigo>` (null si no se pudo
+ * recuperar en un reintento: llega en el correo). `pago`: null sin anticipo; POR_PAGAR si hay anticipo
+ * y no vino tarjeta (la cita espera el pago 15 min: reservar otra vez con la MISMA clave y la tarjeta);
+ * o el estado del cobro, como en un pedido. Un cobro rechazado es un error (`PAGO_RECHAZADO`).
+ */
+export type Reserva = {
+  codigo: string | null; cita: Cita | null; anticipo_mxn: string; total_a_pagar_mxn: string | null;
+  pago: { estado: "POR_PAGAR" } | Verificacion | null;
+};
+
+const enteroONull = (x: unknown): number | null => (x === null || x === undefined ? null : entero(x));
+
+export const reservasDe = lector((x): Reservas => {
+  const n = obj(x), r = obj(n.reglas);
+  return {
+    slug: con(FORMA_SLUG)(n.slug), nombre: txt(n.nombre), logo_ruta: txtONull(n.logo_ruta),
+    color: con(/^#[0-9a-fA-F]{6}$/)(n.color), descripcion: txtONull(n.descripcion), whatsapp: txtONull(n.whatsapp),
+    pago_de_prueba: n.pago_de_prueba === true,
+    sucursales: lista(n.sucursales, (y) => {
+      const s = obj(y);
+      return {
+        id: uuid(s.id), nombre: txt(s.nombre), direccion: txtONull(s.direccion), ubicacion: puntoDe(s.ubicacion),
+        whatsapp: txtONull(s.whatsapp), pago_en_linea: s.pago_en_linea === true,
+        public_key: typeof s.public_key === "string" && /^[A-Za-z0-9_-]{20,100}$/.test(s.public_key) ? s.public_key : null,
+        horario: leerHorario(s.horario),
+      };
+    }),
+    servicios: lista(n.servicios, (y) => {
+      const s = obj(y);
+      return { producto_id: uuid(s.producto_id), nombre: txt(s.nombre), categoria: txtONull(s.categoria), precio: importe(s.precio),
+               duracion_min: entero(s.duracion_min), anticipo_mxn: importe(s.anticipo_mxn) };
+    }),
+    colaboradores: lista(n.colaboradores, (y) => {
+      const c = obj(y);
+      return { id: uuid(c.id), nombre_corto: txt(c.nombre_corto), sucursal_id: uuid(c.sucursal_id), servicios: lista(c.servicios, uuid) };
+    }),
+    reglas: {
+      cancelar_horas: entero(r.cancelar_horas), dias_reserva: entero(r.dias_reserva), intervalo_min: entero(r.intervalo_min),
+      aviso_min_horas: entero(r.aviso_min_horas), cobro_modo: uno(r.cobro_modo, COBRO_MODOS), pago_en_linea_disponible: r.pago_en_linea_disponible === true,
+    },
+  };
+});
+
+export const huecosDe = lector((x): Huecos => {
+  const h = obj(x);
+  return { dia: con(/^\d{4}-\d{2}-\d{2}$/)(h.dia), huecos: lista(h.huecos, con(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?Z$/)) };
+});
+
+export const citaDe = lector((x): Cita => {
+  const c = obj(x), s = obj(c.sucursal);
+  const reembolso = c.reembolso === null || c.reembolso === undefined ? null : obj(c.reembolso);
+  return {
+    inicia: txt(c.inicia), termina: txtONull(c.termina), dia: con(/^\d{4}-\d{2}-\d{2}$/)(c.dia), hora: con(/^\d{2}:\d{2}$/)(c.hora),
+    sucursal: { id: uuid(s.id), nombre: txt(s.nombre), direccion: txtONull(s.direccion) },
+    servicios: lista(c.servicios, (y) => {
+      const v = obj(y);
+      return { producto_id: uuid(v.producto_id), nombre: txt(v.nombre), colaborador_id: uuid(v.colaborador_id), colaborador: txt(v.colaborador),
+               inicia: txt(v.inicia), precio: importe(v.precio) };
+    }),
+    colaborador: txtONull(c.colaborador), total_mxn: importe(c.total_mxn), estado: uno(c.estado, ESTADOS_DE_CITA),
+    cancelada_motivo: txtONull(c.cancelada_motivo), anticipo_mxn: importe(c.anticipo_mxn), anticipo_pagado_mxn: importe(c.anticipo_pagado_mxn),
+    pago_hasta: txtONull(c.pago_hasta), puede_cambiar: bool(c.puede_cambiar), cancelar_horas: enteroONull(c.cancelar_horas) ?? 24,
+    whatsapp: txtONull(c.whatsapp),
+    reembolso: reembolso && { estado: uno(reembolso.estado, ["EN_PROCESO", "DEVUELTO"] as const), mensaje: txt(reembolso.mensaje) },
+  };
+});
+
+/** Una cita que no se pudo leer no tumba la reserva: existe, y con el código se ve en su página. */
+export const reservaDe = lector((x): Reserva => {
+  const r = obj(x);
+  const pago = r.pago === null || r.pago === undefined ? null : obj(r.pago);
+  return {
+    codigo: r.codigo === null ? null : con(FORMA_CODIGO)(r.codigo),
+    cita: citaDe(r.cita), anticipo_mxn: importe(r.anticipo_mxn),
+    total_a_pagar_mxn: r.total_a_pagar_mxn === null || r.total_a_pagar_mxn === undefined ? null : importe(r.total_a_pagar_mxn),
+    pago: pago === null ? null : pago.estado === "POR_PAGAR" ? { estado: "POR_PAGAR" } : pagoDe(pago),
+  };
+});

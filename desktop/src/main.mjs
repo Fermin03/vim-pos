@@ -12,7 +12,7 @@ import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { startBackend } from "./backend.mjs";
 import { startUiServer } from "./ui-server.mjs";
-import { pullFromCloud } from "./sync-pull.mjs";
+import { pullFromCloud, leerUltimoPull } from "./sync-pull.mjs";
 import { cajaIdDeEmail, loginDispositivoNube } from "./dispositivo.mjs";
 import { pushToCloud } from "./sync-push.mjs";
 import { respaldar, respaldarAsync, hacerSitio } from "./backup.mjs";
@@ -314,6 +314,8 @@ async function bootCaja() {
   backend = await startBackend(opcionesBackend);
   backupsDir = path.join(backend.dataRoot, "backups");
   console.log(`· [backend] gateway local: ${backend.url}`);
+  // La hora del último pull se lee una vez aquí; luego la lleva pullSnapshot en memoria (sync-pull.mjs).
+  void leerUltimoPull(backend.pool);
 
   // Adónde puede navegar la ventana de la caja: el POS local (por localhost o 127.0.0.1), el POS de
   // desarrollo si se pidió con VIM_POS_URL, y el POS desplegado, que es el respaldo cuando no hay
@@ -336,6 +338,7 @@ async function bootCaja() {
   let posUrl = process.env.VIM_POS_URL;
   if (!posUrl && existsSync(path.join(UI_DIR, "index.html"))) {
     uiServer = await startUiServer(UI_DIR, UI_PORT, backend.gatewayPort, "0.0.0.0", {
+      cloudUrl: CLOUD_URL,
       onActualizar: () => buscarActualizacionManual(),
       // Con `impresoraWindows` el trabajo va a la cola del sistema (USB, serial…); si no, al 9100.
       onImprimir: (p) => (p?.impresoraWindows
@@ -343,7 +346,7 @@ async function bootCaja() {
         : imprimirRaw(p)),
       onListarImpresoras: async () => resumirImpresoras(await win.webContents.getPrintersAsync()),
       onVincularNube: (p) => vincularConNube(p),
-      estadoSync: () => ({ disponible: true, vinculada: leerNube() !== null, ...ciclo.estado() }),
+      estadoSync: async () => ({ disponible: true, vinculada: leerNube() !== null, ...ciclo.estado(), ultimoPull: await leerUltimoPull(backend?.pool) }),
       onFolios: () => consultarFolios(),
       onSincronizarCatalogo: () => bajarCatalogoAhora("botón"),
       avisoVisto: (id) => directivas.marcarVisto(id),

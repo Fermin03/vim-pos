@@ -46,6 +46,13 @@ export type LineaImpresion = {
   extras?: { nombre: string; importeMxn: number }[];
   /** 'ENVIO' = cargo, no comida: se imprime en el ticket del cliente pero nunca en la comanda. */
   cargoTipo?: string | null;
+  /** SKU del renglón (`producto_sku_snapshot`). Solo lo imprime una tienda: un restaurante también lo tiene. */
+  sku?: string | null;
+  /** Tienda a granel: `precio_unitario_snapshot` y `unidad_sat_snapshot` (KGM, MTR, LTR), para «$28.00/kg». */
+  precioUnitario?: number;
+  unidadSat?: string | null;
+  /** Belleza: quien hizo el renglón, ya corto («Diego R.»). Va debajo del servicio. */
+  colaborador?: string | null;
 };
 
 export type PagoImpresion = {
@@ -56,6 +63,8 @@ export type PagoImpresion = {
   /** «Mastercard **** 1447» y la autorización del banco: solo si se cobró en la terminal integrada. */
   tarjeta?: string | null;
   autorizacion?: string | null;
+  /** Venta a crédito (0208): lo que falta por pagar y hasta cuándo (YYYY-MM-DD, venta + plazo). */
+  porPagar?: { montoMxn: number; fechaLimite: string } | null;
 };
 
 /** Lo que el repartidor necesita para llegar y para que le abran la puerta, y quién lo lleva. */
@@ -110,5 +119,12 @@ export type DatosTicketImpresion = {
   qrUrl: string | null;
   /** Pie de lealtad. null o ausente = sin cliente, módulo apagado o no se pudo leer: el ticket sale sin él. */
   lealtad?: LealtadImpresion | null;
+  /** Giro RETAIL: el ticket imprime el SKU bajo cada renglón y no sale comanda al cobrar. */
+  tienda?: boolean;
+  /**
+   * Venta nueva de un cambio de talla (0195): lo que el cliente regresó, arriba de los productos,
+   * y qué pasó con el dinero (`resumenCambio`), debajo del total. Ausente en todo lo demás.
+   */
+  cambio?: { regresa: { nombre: string; cantidad: number; total: number }[]; diferencia: number; texto: string } | null;
   ancho: 58 | 80;
 };

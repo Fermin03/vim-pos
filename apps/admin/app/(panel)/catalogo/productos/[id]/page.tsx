@@ -5,6 +5,9 @@ import Link from "next/link";
 import { PageHeader, PageBody } from "../../../../components/page-header";
 import { ProductoForm } from "../../../../components/producto-form";
 import { ProductoModificadores } from "../../../../components/producto-modificadores";
+import { ProductoVariantes } from "../../../../components/producto-variantes";
+import { useModulos } from "../../../../components/admin-shell";
+import { conExistencias } from "../../../../lib/operacion";
 import { obtenerProducto, type Producto } from "../../../../lib/catalogo";
 
 export default function EditarProductoPage() {
@@ -15,9 +18,16 @@ export default function EditarProductoPage() {
   const registrarPendiente = useCallback((fn: (() => Promise<void>) | null) => {
     modsPendientes.current = fn;
   }, []);
-  const guardarMods = useCallback(async () => {
-    await modsPendientes.current?.();
+  // Las variantes (tallas y colores) se guardan igual, después de los modificadores.
+  const varPendientes = useRef<(() => Promise<void>) | null>(null);
+  const registrarVariantes = useCallback((fn: (() => Promise<void>) | null) => {
+    varPendientes.current = fn;
   }, []);
+  const guardarTodo = useCallback(async () => {
+    await modsPendientes.current?.();
+    await varPendientes.current?.();
+  }, []);
+  const tienda = conExistencias(useModulos());
 
   useEffect(() => {
     obtenerProducto(params.id)
@@ -42,8 +52,13 @@ export default function EditarProductoPage() {
         {prod && (
           <ProductoForm
             producto={prod}
-            guardarTambien={guardarMods}
-            extra={<ProductoModificadores productoId={prod.id} onPendiente={registrarPendiente} />}
+            guardarTambien={guardarTodo}
+            extra={
+              <>
+                {tienda && !prod.controla_existencias && <ProductoVariantes producto={prod} onPendiente={registrarVariantes} />}
+                <ProductoModificadores productoId={prod.id} onPendiente={registrarPendiente} />
+              </>
+            }
           />
         )}
       </PageBody>

@@ -64,9 +64,9 @@ export type PasoDelReto =
 export function pasoDelReto(r: Resultado<Verificacion>): PasoDelReto {
   if (r.ok) return r.datos.estado === "VERIFICACION" ? { tipo: "sigue", url: r.datos.url } : { tipo: "pedido" };
   if (r.error === "PAGO_RECHAZADO") return { tipo: "rechazado", detalle: r.detalle, ...(r.hasta && { hasta: r.hasta }) };
-  // El pedido ya no existe: solo se borra cuando el cobro no pasó (lo descartó otra respuesta, que
+  // El pedido (o la cita) ya no existe: solo se borra cuando el cobro no pasó (lo descartó otra respuesta, que
   // no llegó). Es lo mismo que le contesta `intento` a quien pregunta por esa clave.
-  if (r.error === "PEDIDO_NO_ENCONTRADO") return { tipo: "rechazado", detalle: "SIN_VERIFICAR" };
+  if (r.error === "PEDIDO_NO_ENCONTRADO" || r.error === "CITA_NO_ENCONTRADA") return { tipo: "rechazado", detalle: "SIN_VERIFICAR" };
   return { tipo: "sin-respuesta" };
 }
 

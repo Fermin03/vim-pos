@@ -37,6 +37,27 @@ function nombreClienteFila(c: unknown): string | null {
 
 /** Cuentas abiertas de un modo en la SUCURSAL (Pick-up: DRIVE_THRU, Domicilio: DELIVERY_PROPIO).
  *  Sucursal-wide para que cualquier caja pueda completarlas. */
+/** Los modos de la lista de Comedor (ver `listarCuentasAbiertas`). */
+export const MODOS_MESA = ["MESA", "COMER_AQUI"] as const;
+
+/**
+ * Comida rápida, tarjeta «Cuentas de mesa»: cuántas cuentas mostraría la lista de Comedor (mismos
+ * filtros que `listarCuentasAbiertas` con `MODOS_MESA`). Sin las de espera: la lista no las enseña, y
+ * una tarjeta con 1 que abre una lista vacía es peor que no tenerla.
+ */
+export async function contarCuentasDeMesa(token: string, sucursalId: string): Promise<number> {
+  const { count, error } = await employeeClient(token)
+    .from("tickets")
+    .select("id", { count: "exact", head: true })
+    .eq("sucursal_id", sucursalId)
+    .in("modo_servicio", [...MODOS_MESA])
+    .is("deleted_at", null)
+    .eq("en_espera", false)
+    .in("estado_fiscal", ["BORRADOR", "ABIERTO"]);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
 /**
  * Cuentas abiertas de uno o varios modos.
  *
@@ -46,18 +67,22 @@ function nombreClienteFila(c: unknown): string | null {
  *
  * `pagadasEnLinea`: tickets de pedidos de la tienda pagados en línea que siguen sin entregar
  * (`cuentasPagadasEnLinea`). Ya están cobrados, pero se listan hasta que alguien toca «Listo».
+ *
+ * `cajaId`: solo las de esa caja (la tienda). `aplicar_pago` asienta el pago en la caja y el turno
+ * del ticket: cobrar aquí la cuenta de otra caja metería el efectivo en el corte equivocado.
  */
 export async function listarCuentasAbiertas(
   token: string,
   sucursalId: string,
   modo: ModoServicio | readonly string[],
   pagadasEnLinea: readonly string[] = [],
+  cajaId?: string,
 ): Promise<CuentaAbierta[]> {
   const abiertas = "estado_fiscal.in.(BORRADOR,ABIERTO)";
   // Solo ids con forma de uuid entran al filtro: viajan en la dirección de la consulta.
   const ids = pagadasEnLinea.filter((id) => /^[0-9a-f-]{36}$/i.test(id));
   const modos = typeof modo === "string" ? [modo] : [...modo];
-  const { data, error } = await employeeClient(token)
+  let q = employeeClient(token)
     .from("tickets")
     // `mesas!mesa_id` NO es opcional: tickets_mesas tiene DOS llaves foráneas a mesas
     // (`mesa_id` y `mesa_anterior_id`, esta última para transferencias). Sin la pista,
@@ -68,8 +93,9 @@ export async function listarCuentasAbiertas(
     .in("modo_servicio", modos)
     .is("deleted_at", null)
     .eq("en_espera", false)
-    .or(ids.length ? `${abiertas},and(estado_fiscal.in.(PAGADO,FACTURADO),id.in.(${ids.join(",")}))` : abiertas)
-    .order("fecha_apertura", { ascending: true });
+    .or(ids.length ? `${abiertas},and(estado_fiscal.in.(PAGADO,FACTURADO),id.in.(${ids.join(",")}))` : abiertas);
+  if (cajaId) q = q.eq("caja_id", cajaId);
+  const { data, error } = await q.order("fecha_apertura", { ascending: true });
   if (error) throw new Error(error.message);
   return ((data ?? []) as unknown as Record<string, unknown>[]).map((t) => ({
     ticketId: String(t.id),

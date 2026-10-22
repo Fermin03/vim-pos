@@ -4,12 +4,13 @@ import { BotonVolver } from "./boton-volver";
 import { RenglonItem } from "./renglon-item";
 import { Aviso, Button, DialogoPeligro, LogoVim, Modal, Icono } from "@vim/ui/styles";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
-import { borrarCuentaVacia, leerEntregaCuenta, listarCuentasAbiertas, leerRenglonesCuenta, marcarTicketImpreso, minutosAbierta, reabrirCuentaImpresa, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
+import { borrarCuentaVacia, leerEntregaCuenta, listarCuentasAbiertas, MODOS_MESA, leerRenglonesCuenta, marcarTicketImpreso, minutosAbierta, reabrirCuentaImpresa, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
 import { leerTotales, type TotalesTicket } from "../lib/cobro";
 import { leerDeliveries } from "../lib/delivery";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalCancelarItems, type LineaCancelada } from "./modal-cancelar-items";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
+import { comoTienda, esComidaRapida } from "../lib/tienda";
 import { ModalDescuento } from "./modal-descuento";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
 import type { Empleado } from "../lib/supabase";
@@ -93,6 +94,19 @@ const COPIA: Record<"DRIVE_THRU" | "DELIVERY_PROPIO" | "COMER_AQUI" | "BARRA", C
   },
 };
 
+/** Comida rápida ya no abre mesas: la lista de Comedor solo junta las cuentas de mesa que quedaron. */
+const COPIA_MESAS_COMIDA_RAPIDA: Copia = {
+  ...COPIA.COMER_AQUI,
+  titulo: "Cuentas de mesa",
+  subtitulo: (n) => `${n} ${n === 1 ? "cuenta por cobrar" : "cuentas por cobrar"}`,
+  vacioTitulo: "Sin cuentas de mesa",
+  vacioTexto: "Ya se cobraron todas. Las ventas nuevas se hacen desde Cobrar.",
+};
+
+/** Los textos de la lista según el modo; en comida rápida, Comedor es «Cuentas de mesa». */
+export const copiaDeLista = (modo: keyof typeof COPIA, comidaRapida: boolean): Copia =>
+  comidaRapida && modo === "COMER_AQUI" ? COPIA_MESAS_COMIDA_RAPIDA : COPIA[modo];
+
 /**
  * Cuentas abiertas de un modo (Pick-up / Domicilio), en maestro-detalle.
  *
@@ -135,8 +149,9 @@ export function PantallaCuentasModo({
    *  domicilio no reservan mesa, y un botón muerto ahí sería ruido. */
   onVerReservaciones?: () => void;
   /** Abre una cuenta NUEVA en este modo (entra al catálogo con el modo ya fijado). Recibe las
-   *  cuentas listadas: Barra las necesita para no repetir un nombre. */
-  onAbrirCuenta: (cuentas: readonly CuentaAbierta[]) => void;
+   *  cuentas listadas: Barra las necesita para no repetir un nombre. Sin ella no hay botón: las
+   *  cuentas de mesa de comida rápida solo se cobran (ya no se abren mesas). */
+  onAbrirCuenta?: (cuentas: readonly CuentaAbierta[]) => void;
   /** Carga la cuenta en el carrito para agregarle productos (sale a la pantalla de venta). */
   onAgregarProductos: (ticketId: string) => void;
   /** Carga la cuenta y abre el cobro. */
@@ -158,7 +173,7 @@ export function PantallaCuentasModo({
    *  medias que `home-pos` no ve: con uno abierto, «Ver orden» del aviso grande no se lo lleva. */
   alTenerDialogo?: (abierto: boolean) => void;
 }) {
-  const copia = COPIA[modo];
+  const copia = copiaDeLista(modo, esComidaRapida(caja));
   const esComedor = modo === "COMER_AQUI";
   const [items, setItems] = useState<CuentaAbierta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -206,7 +221,7 @@ export function PantallaCuentasModo({
   const recargar = useCallback(async () => {
     setError(null);
     try {
-      setItems(await listarCuentasAbiertas(token, caja.sucursal_id, esComedor ? ["MESA", "COMER_AQUI"] : [modo], pagadasEnLinea.current));
+      setItems(await listarCuentasAbiertas(token, caja.sucursal_id, esComedor ? MODOS_MESA : [modo], pagadasEnLinea.current));
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudieron cargar las cuentas");
       setItems([]);
@@ -419,10 +434,12 @@ export function PantallaCuentasModo({
               Reservaciones
             </button>
           )}
+          {onAbrirCuenta && (
           <Button onClick={() => onAbrirCuenta(items ?? [])}>
             <Icono nombre="mas" className="h-[17px] w-[17px]" />
             {copia.nuevaCuenta}
           </Button>
+          )}
         </div>
       </header>
 
@@ -926,6 +943,7 @@ export function PantallaCuentasModo({
           pagada={sel.pagadaEnLinea}
           enLinea={sel.pagadaEnLinea}
           cuentaDesde={sel.desdeIso}
+          tienda={comoTienda(caja)}
           onCancelado={async () => {
             setCancelandoCuenta(false);
             setSelId(null); // la cuenta ya no existe: no dejar el detalle colgado

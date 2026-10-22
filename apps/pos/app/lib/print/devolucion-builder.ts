@@ -1,6 +1,7 @@
 // C4 — Comprobante de devolución/reembolso (P-228). Mismo modelo de impresión que el ticket
 // (PrintJob de tipos.ts) para que el preview y la Epson compartan fuente.
 import type { Bloque, PrintJob } from "./tipos";
+import { cantidadRenglon, tipoDesdeSat } from "../unidades";
 
 export type DatosDevolucion = {
   negocio: { nombre: string; rfc: string | null };
@@ -10,7 +11,8 @@ export type DatosDevolucion = {
   cajero: string;
   caja: string;
   autorizo: string | null;
-  items: { cantidad: number; nombre: string; totalMxn: number }[];
+  /** `unidadSat`: a granel se imprime «1.250 kg Jitomate»; una pieza, «2× Playera». */
+  items: { cantidad: number; nombre: string; totalMxn: number; unidadSat?: string | null }[];
   motivo: string;
   medio: string;
   /** Tarjetas a las que regresó el dinero («Mastercard **** 1447»), cuando la devolución fue al mismo método. */
@@ -38,7 +40,7 @@ export function construirDevolucionJob(d: DatosDevolucion): PrintJob {
     { t: "fila", izq: "Caja:", der: d.caja },
     ...(d.autorizo ? [{ t: "fila", izq: "Autorizó:", der: d.autorizo } as Bloque] : []),
     { t: "separador", estilo: "punteado" },
-    ...d.items.map((i) => ({ t: "fila", izq: `${i.cantidad}× ${i.nombre}`, der: fmt(i.totalMxn) }) as Bloque),
+    ...d.items.map((i) => ({ t: "fila", izq: `${cantidadRenglon(i.cantidad, tipoDesdeSat(i.unidadSat))} ${i.nombre}`, der: fmt(i.totalMxn) }) as Bloque),
     { t: "separador", estilo: "solido" },
     { t: "fila", izq: "REEMBOLSO", der: fmt(d.totalReembolso) },
     { t: "fila", izq: "Medio:", der: d.medio },

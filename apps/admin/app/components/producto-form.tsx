@@ -8,16 +8,22 @@ import {
   listarCategoriasOpciones,
   listarMarcasOpciones,
   productoSchema,
+  type DatosTienda,
   type CategoriaOpcion,
   type MarcaOpcion,
   type Producto,
 } from "../lib/catalogo";
 import { listarAreasCocina, type AreaCocina } from "../lib/areas-cocina";
 import { mensajeError } from "../lib/errores";
+import { conExistencias } from "../lib/operacion";
+import { generarCodigoInterno } from "../lib/variantes";
+import { normalizarEan } from "../lib/codigo-barras";
 import { ponerFotoProducto, quitarFotoProducto } from "../lib/foto-producto";
 import { ofreceFotoDeProducto } from "../lib/tienda-plan";
 import { limpiarPrecio } from "../lib/numeros";
+import { TIPOS_VENTA, UNIDADES, type TipoVenta } from "../lib/unidades";
 import { Plegable } from "./plegable";
+import { Interruptor } from "./interruptor";
 import { CampoImagen } from "./campo-imagen";
 import { useModulos } from "./admin-shell";
 import { AvisoCajasMenu } from "./aviso-cajas-menu";
@@ -37,6 +43,7 @@ import { guardarFilaDeMenu, hrefConMenu, leerFilaDeMenu } from "../lib/menus";
 import { useMenuCatalogo } from "./selector-menu";
 import type { Caja } from "../lib/configuracion";
 import { input, label } from "./campos";
+import { BuscadorClaveSat } from "./buscador-clave-sat";
 
 const ayuda = "mt-1 text-13 text-ink-2";
 
@@ -121,6 +128,14 @@ export function ProductoForm({
   const cargando = !menuCat.listo || !!menuCat.error || (editar && enMenu && !filaMenuLista);
   // De vuelta a la lista, en el menú que se estaba editando.
   const destino = hrefConMenu(volverA, enMenu ? menuCat.id : null);
+  // Bloque «Tienda» (retail): solo con el módulo de existencias. Sin él nada de esto se muestra ni se guarda.
+  const tienda = conExistencias(useModulos());
+  const esPadre = (producto?.variante_ejes?.length ?? 0) > 0;
+  const [barras, setBarras] = useState(producto?.codigo_barras ?? "");
+  const [costo, setCosto] = useState(producto?.costo_mxn == null ? "" : String(producto.costo_mxn));
+  const [llevaExistencias, setLlevaExistencias] = useState(producto?.controla_existencias ?? false);
+  const [tipoVenta, setTipoVenta] = useState<TipoVenta>(producto?.tipo_venta ?? "UNIDAD");
+  const [generando, setGenerando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   // La foto se sube al momento y solo toca `imagen_url`: no entra en «cambios sin guardar» ni espera
@@ -146,7 +161,7 @@ export function ProductoForm({
 
   // ¿Hay cambios sin guardar? Se compara contra lo que había al abrir (o al último guardado). De las
   // sucursales solo cuenta el agotado: su precio y «se vende» los proyecta la base y cambian solos.
-  const valores = JSON.stringify([nombre, categoriaId, marcaId, areaId, precio, descripcion, codigo, estado, agotado, visible, claveSat, tasaIva, ivaIncluido, seVende, agotados.map((f) => [f.sucursalId, f.agotado])]);
+  const valores = JSON.stringify([nombre, categoriaId, marcaId, areaId, precio, descripcion, codigo, estado, agotado, visible, claveSat, tasaIva, ivaIncluido, seVende, barras, costo, llevaExistencias, agotados.map((f) => [f.sucursalId, f.agotado])]);
   const [base, setBase] = useState(valores);
   const sucio = valores !== base;
 
@@ -247,6 +262,13 @@ export function ProductoForm({
       setError(parsed.error.issues[0]?.message ?? "Revisa los datos del producto.");
       return;
     }
+    const datosTienda: DatosTienda | undefined = tienda
+      ? { codigo_barras: barras, costo_mxn: costo.trim() === "" ? null : Number(costo), controla_existencias: !esPadre && llevaExistencias, tipo_venta: tipoVenta }
+      : undefined;
+    if (datosTienda && datosTienda.costo_mxn !== null && !(Number.isFinite(datosTienda.costo_mxn) && datosTienda.costo_mxn >= 0)) {
+      setError("Costo inválido");
+      return;
+    }
     // Antes de tocar la base: un «.» suelto (que limpiarPrecio deja en «0.») no es precio.
     const precioMenu = precioValido(precio);
     if (precioMenu === null || precioMenu === "invalido") {
@@ -263,7 +285,7 @@ export function ProductoForm({
         // En un menú propio el precio tecleado es el del menú, no el del General: al producto se le
         // manda el suyo de siempre (solo si ya existía antes de abrir el formulario).
         const datos = enPropio && producto ? { ...parsed.data, precio_base_mxn: producto.precio_base_mxn } : parsed.data;
-        await actualizarProducto(idPrevio, datos);
+        await actualizarProducto(idPrevio, datos, datosTienda);
         id = idPrevio;
         if (enMenu) {
           await guardarFilaDeMenu(
@@ -273,7 +295,7 @@ export function ProductoForm({
           );
         }
       } else {
-        id = await crearProducto(parsed.data, enPropio ? { enMenuGeneral: false } : {});
+        id = await crearProducto(parsed.data, enPropio ? { enMenuGeneral: false, tienda: datosTienda } : { tienda: datosTienda });
         setIdCreado(id);
         // Nace en todos los menús al precio tecleado; aquí se ajusta el menú elegido.
         const ajuste = enPropio ? { disponible: seVende, precio_mxn: precioMenu } : !seVende ? { disponible: false } : null;
@@ -369,7 +391,7 @@ export function ProductoForm({
           <div>
             <div className="flex items-baseline justify-between gap-2">
               <label className={label} htmlFor="precio">
-                Precio
+                {tienda ? UNIDADES[tipoVenta].precio : "Precio"}
               </label>
               {enMenu && <span className="mb-1.5 truncate text-13 text-ink-2">en {menuCat.nombre}</span>}
             </div>
@@ -390,6 +412,20 @@ export function ProductoForm({
               {ivaIncluido ? `Con IVA de ${tasa}% incluido.` : `Al cobrar se le suma ${tasa}% de IVA.`}
             </p>
           </div>
+          {tienda && (
+            <div>
+              <label className={label} htmlFor="se-vende-por">
+                Se vende por
+              </label>
+              <select id="se-vende-por" className={input} value={tipoVenta} onChange={(e) => setTipoVenta(e.target.value as TipoVenta)}>
+                {TIPOS_VENTA.map((t) => (
+                  <option key={t} value={t}>
+                    {UNIDADES[t].opcion}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label className={label} htmlFor="categoria">
               Categoría
@@ -579,8 +615,9 @@ export function ProductoForm({
               />
             </div>
           </div>
+          <BuscadorClaveSat onElegir={setClaveSat} />
           <p className="-mt-1 text-13 text-ink-2">
-            {AYUDA_IVA} Sin clave, se factura como servicio de restaurante.
+            {AYUDA_IVA} {tienda ? "Cada producto necesita su clave para facturar; búscala arriba." : "Sin clave, se factura como servicio de restaurante."}
           </p>
           <label className="flex min-h-[44px] items-center gap-2.5">
             <input type="checkbox" className="h-5 w-5 accent-ink" checked={ivaIncluido} onChange={(e) => setIvaIncluido(e.target.checked)} />
@@ -589,6 +626,66 @@ export function ProductoForm({
             </span>
           </label>
         </Plegable>
+
+        {tienda && (
+          <Plegable titulo="Tienda" resumen={!esPadre && llevaExistencias ? "lleva existencias" : "sin existencias"} abierto>
+            {esPadre ? (
+              <p className="text-13 text-ink-2">Código y costo van en cada talla y color.</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className={label} htmlFor="codigo-barras">
+                    Código de barras <span className="font-normal text-ink-2">· opcional</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      id="codigo-barras"
+                      className={input}
+                      value={barras}
+                      maxLength={50}
+                      onChange={(e) => setBarras(e.target.value.trim())}
+                      placeholder="El de la etiqueta del proveedor"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={generando}
+                      onClick={async () => {
+                        setGenerando(true);
+                        try {
+                          setBarras(await generarCodigoInterno());
+                        } catch (e) {
+                          setError(mensajeError(e, "No se pudo generar el código"));
+                        } finally {
+                          setGenerando(false);
+                        }
+                      }}
+                    >
+                      {generando ? "Generando…" : "Generar"}
+                    </Button>
+                  </div>
+                  {barras && !normalizarEan(barras) && (
+                    <p className={ayuda}>No es un EAN-13: se puede escanear si tu lector lo lee, pero la etiqueta saldrá sin barras.</p>
+                  )}
+                </div>
+                <div>
+                  <label className={label} htmlFor="costo">
+                    Costo <span className="font-normal text-ink-2">· lo que te cuesta a ti</span>
+                  </label>
+                  <input id="costo" className={input} inputMode="decimal" value={costo} onChange={(e) => setCosto(e.target.value)} placeholder="0.00" />
+                </div>
+              </div>
+            )}
+            {!esPadre && (
+              <Interruptor
+                etiqueta="Lleva existencias"
+                encendido={llevaExistencias}
+                onCambiar={setLlevaExistencias}
+                descripcion={llevaExistencias ? "La caja descuenta cada venta." : "Se vende sin contar cuántos quedan."}
+              />
+            )}
+          </Plegable>
+        )}
 
         {extra}
 

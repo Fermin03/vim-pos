@@ -18,12 +18,20 @@ export const MIN_JERARQUIA: { prefijo: string; min: number }[] = [
   { prefijo: "/catalogo", min: 4 },
   { prefijo: "/promociones", min: 4 },
   { prefijo: "/inventario", min: 4 },
+  // Existencias enseña costos y el valor del inventario, igual que /inventario.
+  { prefijo: "/existencias", min: 4 },
   { prefijo: "/clientes", min: 4 },
+  // Quién le debe al negocio y cuánto: lo mismo que Clientes.
+  { prefijo: "/creditos", min: 4 },
+  // Cotizaciones: precios y clientes del negocio, igual que Clientes.
+  { prefijo: "/cotizaciones", min: 4 },
   // El programa de lealtad reparte dinero del negocio: lo configura dueño o administrador.
   { prefijo: "/lealtad", min: 4 },
   // La tienda en línea recibe pedidos y fija precios y horarios del negocio: dueño o administrador.
   { prefijo: "/tienda", min: 4 },
   { prefijo: "/reservaciones", min: 3 },
+  // El catálogo de la agenda (servicios, colaboradores, espacios) solo lo escriben dueño o administrador (0218).
+  { prefijo: "/agenda", min: 4 },
   { prefijo: "/conciliacion", min: 3 },
   { prefijo: "/usuarios", min: 4 },
   { prefijo: "/facturacion", min: 4 },
@@ -32,6 +40,10 @@ export const MIN_JERARQUIA: { prefijo: string; min: number }[] = [
   // Costos y márgenes son cosa del dueño y del administrador, igual que las recetas con su costo
   // (/catalogo): un supervisor ve la venta, no cuánto le queda al negocio de cada producto.
   { prefijo: "/reportes/costo-ventas", min: 4 },
+  { prefijo: "/reportes/ventas-variantes", min: 4 },
+  // Los reportes de la agenda los lee solo dueño o administrador (0227, es_admin_del_tenant).
+  { prefijo: "/reportes/citas", min: 4 },
+  { prefijo: "/reportes/ocupacion", min: 4 },
   { prefijo: "/bienvenida", min: 0 },
 ];
 

@@ -2,8 +2,8 @@
 // Nunca lanza: cada llamada devuelve `ok` con los datos ya validados, o `error` con un código (para
 // `textoDeError`) y su detalle. Un 200 que no tiene la forma del contrato es un error, no datos.
 import {
-  coloniasDe, cotizacionDe, cuentaDe, direccionesDe, errorDe, FORMA_CODIGO, miCuentaDe, okDe, pedidoDe, pedidosDe, registroDe, seguimientoDe, verificacionDe,
-  type ColoniaSugerida, type Cotizacion, type Cuenta, type DireccionGuardada, type MiCuenta, type Pago, type PedidoCreado, type PedidoDeCuenta, type Registro, type Seguimiento, type Verificacion,
+  citaDe, coloniasDe, cotizacionDe, cuentaDe, huecosDe, reservaDe, direccionesDe, errorDe, FORMA_CODIGO, miCuentaDe, okDe, pedidoDe, pedidosDe, registroDe, seguimientoDe, verificacionDe,
+  type Cita, type ColoniaSugerida, type Cotizacion, type Huecos, type Reserva, type Cuenta, type DireccionGuardada, type MiCuenta, type Pago, type PedidoCreado, type PedidoDeCuenta, type Registro, type Seguimiento, type Verificacion,
 } from "./contrato";
 import type { CuerpoCarrito } from "./carrito";
 import type { TarjetaDePedido } from "./tarjeta";
@@ -14,7 +14,7 @@ import type { TarjetaDePedido } from "./tarjeta";
  *  · `SIN_CONFIRMAR` — solo en `pedir`: no se supo si el pedido entró. Reintentar con la MISMA `clave` es seguro.
  *  · `CANCELADA`     — quien llamó abortó con su `signal`. No se enseña nada.
  */
-export type Resultado<T> = { ok: true; datos: T } | { ok: false; error: string; detalle: string | null; /** Ver `ErrorDeTienda`. */ hasta?: string | null };
+export type Resultado<T> = { ok: true; datos: T } | { ok: false; error: string; detalle: string | null; /** Ver `ErrorDeTienda`. */ hasta?: string | null; /** Reservas: el texto de la base para la clienta. */ mensaje?: string };
 
 export type DireccionDePedido = {
   calle: string; numero_exterior: string; numero_interior: string | null; colonia: string;
@@ -44,7 +44,7 @@ export type CuerpoPedido = CuerpoCarrito & {
 };
 
 const LIMITE_MS = 20_000;   // el servidor corta a los 10 s; esto es por si la red del teléfono se cuelga
-const fallo = (error: string, detalle: string | null = null, hasta?: string | null) => ({ ok: false as const, error, detalle, ...(hasta && { hasta }) });
+const fallo = (error: string, detalle: string | null = null, hasta?: string | null, mensaje?: string) => ({ ok: false as const, error, detalle, ...(hasta && { hasta }), ...(mensaje && { mensaje }) });
 
 /** `sinRespuesta`: el código cuando no se sabe qué pasó (sin red, o una respuesta que no es del contrato). */
 async function llamar<T>(cuerpo: unknown, lector: (x: unknown) => T | null, sinRespuesta: { red: string; ilegible: string }, signal?: AbortSignal): Promise<Resultado<T>> {
@@ -61,7 +61,7 @@ async function llamar<T>(cuerpo: unknown, lector: (x: unknown) => T | null, sinR
     const json: unknown = await r.json().catch(() => null);
     if (r.status !== 200) {
       const e = errorDe(json, sinRespuesta.ilegible);
-      return fallo(e.error, e.detalle, e.hasta);
+      return fallo(e.error, e.detalle, e.hasta, e.mensaje);
     }
     const datos = lector(json);
     return datos === null ? fallo(sinRespuesta.ilegible) : { ok: true, datos };
@@ -176,3 +176,37 @@ export const borrarDireccion = (negocio: string, id: string): Promise<Resultado<
 export const misPedidos = (negocio: string, signal?: AbortSignal): Promise<Resultado<PedidoDeCuenta[]>> => deCuenta("mis_pedidos", negocio, {}, pedidosDe, signal);
 /** Con `ok` la cuenta ya no existe y la cookie se borró. `CREDENCIALES_INVALIDAS` = la contraseña no es. */
 export const eliminarCuenta = (negocio: string, password: string): Promise<Resultado<true>> => deCuenta("eliminar_cuenta", negocio, { password }, okDe);
+
+// ── Reservas en línea (belleza, entrega 3). Sin sesión. Los errores con texto para la clienta traen `mensaje`. ──
+/** Un servicio de la cadena, en orden: el producto y quién lo hace (null = quien esté libre). */
+export type ServicioDeCadena = { producto_id: string; usuario_id: string | null };
+export type CuerpoReserva = {
+  sucursal_id: string; inicia: string; servicios: ServicioDeCadena[];
+  cliente: { nombre: string; telefono: string; email: string }; nota: string | null;
+  /** Antirobot, acción `tienda_reserva`. Sirve UNA vez: uno nuevo en cada llamada. */
+  captcha: string;
+  /** La del intento: reintentar con la misma devuelve la misma cita (y su pago). */
+  clave: string;
+  /** Solo para pagar el anticipo (tras `POR_PAGAR`): el token de un solo uso de la tarjeta. */
+  tarjeta?: TarjetaDePedido;
+};
+
+/** Las horas en que cabe la cadena ese día. `codigo`: el de la cita que se cambia (sus tramos no tapan). */
+export const huecos = (negocio: string, d: { sucursal_id: string; dia: string; servicios: ServicioDeCadena[]; codigo?: string }, signal?: AbortSignal): Promise<Resultado<Huecos>> =>
+  llamar({ accion: "huecos", negocio, ...d }, huecosDe, LECTURA, signal);
+
+/** Aparta la cita (y cobra el anticipo si viene la tarjeta). Sin respuesta = `SIN_CONFIRMAR`: reintentar con la MISMA clave es seguro. */
+export async function reservar(negocio: string, cuerpo: CuerpoReserva): Promise<Resultado<Reserva>> {
+  const r = await llamar({ accion: "reservar", negocio, ...cuerpo }, reservaDe, { red: "SIN_CONFIRMAR", ilegible: "SIN_CONFIRMAR" });
+  return !r.ok && r.error === "SERVICIO_NO_DISPONIBLE" && r.detalle === "SIN_RESPUESTA" ? fallo("SIN_CONFIRMAR") : r;
+}
+
+export const verCita = (negocio: string, codigo: string, signal?: AbortSignal): Promise<Resultado<Cita>> => llamar({ accion: "cita", negocio, codigo }, citaDe, LECTURA, signal);
+/** La cita, preguntándole antes a Mercado Pago por su anticipo si hace falta. */
+export const confirmarPagoDeCita = (negocio: string, codigo: string, signal?: AbortSignal): Promise<Resultado<Cita>> =>
+  llamar({ accion: "confirmar_pago", negocio, codigo, cita: true }, citaDe, LECTURA, signal);
+/** Como `verificacion`, para el anticipo de una cita. */
+export const verificacionDeCita = (negocio: string, codigo: string, cancelar: boolean, signal?: AbortSignal): Promise<Resultado<Verificacion>> =>
+  llamar({ accion: "verificacion", negocio, codigo, cita: true, ...(cancelar && { cancelar: true }) }, verificacionDe, LECTURA, signal);
+export const cancelarCita = (negocio: string, codigo: string): Promise<Resultado<Cita>> => llamar({ accion: "cita_cancelar", negocio, codigo }, citaDe, LECTURA);
+export const moverCita = (negocio: string, codigo: string, inicia: string): Promise<Resultado<Cita>> => llamar({ accion: "cita_mover", negocio, codigo, inicia }, citaDe, LECTURA);

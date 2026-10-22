@@ -1,6 +1,10 @@
 # Diseño — POS (`apps/pos`)
 
 > Hereda todo de [`nucleo.md`](nucleo.md). Aquí va solo lo que es cierto **en una caja**.
+>
+> Para una tienda de ropa o calzado (giro RETAIL), la caja cambia (barra inferior con cinco secciones, tarjetas con foto) en [`pos-retail.md`](pos-retail.md).
+>
+> Para servicio rápido y food truck (QUICK_SERVICE, FOODTRUCK), la caja abre en Cobrar con la barra de tienda, pregunta «¿Es para llevar o para comer aquí?» al cobrar y saca la comanda en ese momento: [`pos-comida-rapida.md`](pos-comida-rapida.md).
 
 ## Quién y dónde
 

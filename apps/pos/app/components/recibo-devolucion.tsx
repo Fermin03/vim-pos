@@ -1,6 +1,7 @@
 "use client";
 import { LogoVim } from "@vim/ui/styles";
 import type { DatosDevolucion } from "../lib/print/devolucion-builder";
+import { cantidadRenglon, tipoDesdeSat } from "../lib/unidades";
 
 const fmt = (n: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
 
@@ -41,7 +42,7 @@ export function ReciboDevolucion({ d }: { d: DatosDevolucion }) {
       <div className="text-[11px]">
         {d.items.map((i, idx) => (
           <div key={idx} className="mb-[7px] flex items-start justify-between gap-2">
-            <div className="flex-1"><span className="font-bold">{i.cantidad}×</span> {i.nombre}</div>
+            <div className="flex-1"><span className="font-bold">{cantidadRenglon(i.cantidad, tipoDesdeSat(i.unidadSat))}</span> {i.nombre}</div>
             <span className="whitespace-nowrap font-bold">{fmt(i.totalMxn)}</span>
           </div>
         ))}

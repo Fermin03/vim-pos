@@ -1,5 +1,6 @@
 "use client";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { RUTA_ENLACE } from "./enlace-acceso";
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -15,6 +16,8 @@ export const supabase: SupabaseClient = createClient(URL, ANON, {
     persistSession: true,
     autoRefreshToken: true,
     storageKey: "vimpos.admin.session",
+    // /establecer-acceso abre la sesión del enlace por su cuenta (lib/enlace-acceso.ts).
+    detectSessionInUrl: (url) => url.pathname !== RUTA_ENLACE,
   },
 });
 
@@ -23,6 +26,8 @@ export type Sesion = {
   userId: string;
   tenantId: string | null;
   tipoIdentidad: string | null;
+  /** `role` del JWT: `colaborador_web` = sesión de /mi-agenda, sin panel (0228). */
+  rol: string | null;
   /** La cuenta nació en el registro público (user_metadata.onboarding_self_service). */
   autoservicio: boolean;
 };
@@ -34,18 +39,20 @@ export async function leerSesion(): Promise<Sesion | null> {
   if (!s) return null;
   let tenantId: string | null = null;
   let tipoIdentidad: string | null = null;
+  let rol: string | null = null;
   try {
     const payload = s.access_token.split(".")[1];
     if (payload) {
       const c = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
       tenantId = c.tenant_id ?? null;
       tipoIdentidad = c.tipo_identidad ?? null;
+      rol = c.role ?? null;
     }
   } catch {
     /* ignore */
   }
   const autoservicio = (s.user.user_metadata as Record<string, unknown> | undefined)?.onboarding_self_service === true;
-  return { email: s.user.email ?? "", userId: s.user.id, tenantId, tipoIdentidad, autoservicio };
+  return { email: s.user.email ?? "", userId: s.user.id, tenantId, tipoIdentidad, rol, autoservicio };
 }
 
 /**

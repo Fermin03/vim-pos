@@ -31,7 +31,9 @@ const CASOS: Caso[] = [
     mensaje: "No tienes permiso para hacer esto. Pídeselo a un administrador de tu negocio.",
   },
 
-  // Integridad de datos.
+  // Integridad de datos. Los índices únicos que el dueño entiende, antes del caso genérico.
+  { patron: /productos_codigo_barras_unico/, mensaje: "Ese código de barras ya lo tiene otro producto." },
+  { patron: /productos_sku_existencias_unico/, mensaje: "Ese SKU ya lo tiene otro producto." },
   { patron: /duplicate key|already exists|unique constraint|23505/i, mensaje: "Ya existe un registro con esos datos." },
   {
     patron: /violates foreign key|23503|still referenced/i,
@@ -51,7 +53,8 @@ const CASOS: Caso[] = [
  * @param porDefecto qué decir si no se reconoce nada (ej. "No se pudo guardar")
  */
 export function mensajeError(e: unknown, porDefecto = "Algo salió mal. Inténtalo de nuevo."): string {
-  const crudo = e instanceof Error ? e.message : typeof e === "string" ? e : "";
+  // Sin el código de las funciones SQL ("DATOS_INVALIDOS: …"): al dueño solo le sirve el porqué.
+  const crudo = (e instanceof Error ? e.message : typeof e === "string" ? e : "").replace(/^[A-Z_]+: /, "");
   if (!crudo) return porDefecto;
 
   const caso = CASOS.find((c) => c.patron.test(crudo));

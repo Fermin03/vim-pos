@@ -62,6 +62,11 @@ Todo reporte lleva rango de fechas, y el rango **nunca deja elegir el futuro** n
 posterior al fin: se deshabilita Aplicar y se dice por qué. Un reporte vacío por un rango
 invertido parece un negocio sin ventas.
 
+**Excepción: los periodos de Comisiones.** «Periodo actual» pone la semana o la quincena completa,
+que termina después de hoy: es lo que se va a pagar, y solo con el periodo exacto se suma el sueldo.
+Ese fin futuro lo pone el botón (o una URL que es exactamente un periodo, que no se recorta al
+recargar); escrito a mano, un fin después de hoy sigue sin poder aplicarse.
+
 El día contable no es el día natural. Cuando un reporte usa día contable, lo dice.
 
 ## Gráficas
@@ -259,7 +264,7 @@ plan. Escríbenos para contratarla.»). En los tres la acción es escribir por W
 Los bloques, en este orden, cada uno en su `Tarjeta`:
 
 1. **Estado** — el interruptor «Tienda en línea» y, debajo, la lista de revisión.
-2. **Tu tienda** — dirección (`pedidos.vimpos.com.mx/` + lo que escriba), logo, color y una
+2. **Tu tienda** — dirección (`online.vimpos.com.mx/` + lo que escriba), logo, color y una
    descripción de hasta 200 caracteres.
 3. **Pedidos** — aceptación «A mano» o «Automática», minutos de espera (3 a 15, solo en «A mano») y
    formas de pago: «Pago en línea», «Efectivo al recibir» y «Tarjeta al recibir» (al menos una; la
@@ -375,6 +380,141 @@ producto nuevo aparece solo y quien nunca toca el bloque no nota nada.
 Aquí los controles **sí miden 44 px** (`h-11`): el dueño abre esta página desde el celular, con el
 teléfono en una mano y el local enfrente. En celular la dirección se parte en dos renglones (el
 prefijo arriba, el campo abajo a todo el ancho).
+
+## Tienda (giro RETAIL)
+
+Todo esto aparece solo cuando el negocio tiene el módulo de existencias. A un restaurante no se le
+muestra nada: ni en el producto, ni en el menú del Catálogo, y la fila «Existencias» de Configuración
+→ Operación tampoco sale. Quien entra por enlace directo lee «Esta sección es para tiendas».
+
+- **Bloque «Tienda» del producto** (`producto-form.tsx`). Un `Plegable` más, abierto, como sus
+  hermanos «Más datos» y «Fiscal». Lleva el código de barras con su botón «Generar» (crea uno
+  interno), el costo («lo que te cuesta a ti») y el interruptor «Lleva existencias». Si el código no
+  es un EAN-13 lo avisa, porque la etiqueta saldría sin barras. En un producto con variantes el
+  interruptor no se ofrece: las existencias son de cada variante.
+- **Tallas y colores** (`producto-variantes.tsx`). Una tarjeta en la ficha del producto con dos ejes,
+  por ejemplo «Talla» y «Color», y sus valores separados por coma. De ahí sale una tabla con un
+  renglón por combinación (SKU, código de barras, precio, costo y existencia inicial), separados por
+  una línea. «Quitar» va en rojo desde el reposo; lo quitado se junta abajo en «Quitadas» con su
+  «Restaurar». Una vez guardada cualquier variante, los nombres de los ejes ya no se cambian; los
+  valores sí. No tiene botón propio: se guarda con el «Guardar cambios» del producto y lo dice. Si
+  el producto se guardó pero las variantes no, el error empieza con «El producto se guardó, pero no
+  las tallas y colores».
+- **Lista de productos.** Un producto con variantes lleva la pastilla «N variantes» junto al nombre,
+  y la búsqueda de la lista también encuentra por código de barras.
+- **Importar tienda** (Catálogo → Importar tienda). Se sube un Excel o CSV, o se pega el texto; la
+  plantilla se descarga con BOM para que Excel respete los acentos. «Revisar» enseña cómo quedará
+  cada renglón en una vista previa; los errores salen por línea («Línea 7: …») y mientras haya uno
+  no se puede importar: es todo o nada. La coma decimal se rechaza (se escribe 12.50). Si un SKU ya
+  existe se actualizan su nombre, precio, costo y código; la existencia solo cuenta al crear.
+- **Etiquetas** (Catálogo → Etiquetas). Se marcan productos, se elige cuántas de cada una (de entrada,
+  lo que hay en existencia) y se imprime en hoja carta de 3×10 o en rollo con ancho y alto en mm. El
+  código EAN-13 se dibuja como SVG en negro puro: es la única excepción a los tokens, porque la
+  impresión no lee el tema y un gris no se escanea. En la impresión el texto va en Arial, una letra
+  que toda impresora trae. La zona que se imprime existe solo mientras se imprime (se monta aparte en
+  la página), para no tener miles de dibujos ocultos. El PDF sale de «Imprimir» → «Guardar como PDF».
+- **Clave del SAT** (campo «Clave de producto SAT», en Fiscal). Debajo del campo hay un buscador
+  («camisa, pantalón, tenis…») que llena la clave al elegir un resultado. Es para todos los negocios,
+  no solo tiendas, y la clave se puede seguir escribiendo a mano.
+- **Existencias** (menú «Existencias», 0192–0194). Solo la ven el dueño y el administrador, porque
+  enseña costos y valor. Lleva cinco pestañas (`existencias-tabs.tsx`): Existencias, Recibir, Conteo,
+  Traspasos y Movimientos.
+  - *Existencias.* Una tabla por producto y sucursal con existencia, mínimo, costo y valor. Arriba
+    van piezas, «Valor del inventario» («con el costo de hoy»), bajo mínimo y en negativo. Se filtra
+    por Todas, Bajo mínimo, Agotadas y Negativas, y se descarga en Excel. «Mínimo» y «Ajustar» abren
+    un modal; con «Todas las sucursales» quedan apagados y se pide elegir una.
+  - *Captura* (`captura-productos.tsx`, en Recibir, Conteo y Traspasos). Un solo campo para el
+    escáner o el teclado. Con el código exacto (barras o SKU) agrega el producto y se limpia; si no,
+    enseña hasta 8 por nombre. Escanear el mismo producto otra vez suma 1 a su renglón.
+  - *Recibir.* Sucursal, proveedor opcional y referencia («Ej. F-1234»). El costo de cada renglón es
+    opcional; vacío, el costo del producto no cambia. Cambiar de sucursal con algo capturado
+    pregunta antes de descartarlo.
+  - *Conteo.* Solo se tocan los productos capturados. «Revisar diferencias» vuelve a leer la
+    existencia (pudo venderse algo mientras se contaba) y enseña sistema, contado y diferencia antes
+    de «Confirmar conteo». Cambiar de sucursal con algo contado pregunta antes de descartarlo.
+  - *Traspasos.* Origen, destino y renglones; la mercancía sale del origen al enviar. En «Historial»,
+    uno en camino se puede «Recibir» o «Cancelar» (en rojo); al cancelar, la mercancía regresa al
+    origen. Ambos piden confirmación. Si el destino está eliminado no se ofrece «Recibir»; si el
+    origen lo está, no se ofrece «Cancelar».
+  - *Movimientos.* Todo lo que entró y salió, por fechas, tipo y producto, con descarga en Excel.
+    Lo que regresa de un traspaso cancelado se nombra «Regresa (traspaso cancelado)».
+- **Ventas por talla y color** (Reportes, solo con existencias). Piezas, venta, costo y margen por
+  variante. El margen usa la venta sin IVA, ya con descuentos por producto, y el costo de hoy (el
+  pie lo dice); los descuentos a toda la cuenta no se restan.
+
+## Agenda: cobro y comisiones (belleza, entrega 2; ADR 0039)
+
+Solo con el módulo `agenda`. Sin él, las rutas y las tarjetas de reportes se ocultan y un enlace
+directo dice «Este reporte es para negocios con agenda.».
+
+### Configuración › Agenda (`/configuracion/agenda`)
+
+Tres tarjetas, cada una con su propio Guardar:
+
+- **Tolerancia**, como antes.
+- **Cobro:** «Al final», «Anticipo al apartar» o «Todo por adelantado», y el límite para cancelar con
+  devolución (de 0 a 168 h).
+- **Comisiones:** la base, «Sobre lo cobrado (con descuentos, sin IVA)» o «Sobre el precio de lista
+  (sin IVA)» (la de lista no incluye modificadores); un interruptor «Comisión por vender productos»
+  con su %; y el periodo, Semanal o Quincenal. Cambiar la base o el % no mueve las ventas ya hechas:
+  la regla se congela en cada renglón.
+
+### Servicios (`/agenda/servicios`)
+
+- El formulario trae **Comisión** y **Anticipo**, cada uno con «Sin…», «Porcentaje (%)» o «Monto fijo
+  ($)» y su valor, y la **clave SAT**: se escribe o se busca (buscador con ejemplos «corte de cabello,
+  manicure, masaje…»). Sin clave, la factura sigue saliendo como servicios de restaurante (90101500).
+  Una clave vieja con otro formato no impide guardar si no se toca.
+- En «Quién lo hace», cada colaborador puede tener su comisión propia; vacía = la del servicio.
+- La tabla suma las columnas Comisión y Anticipo.
+
+### Colaboradores (`/agenda/colaboradores`)
+
+**Sueldo por periodo** va en la tarjeta del colaborador y se guarda con su Guardar. Vacío no es válido:
+se escribe 0.
+
+### Reportes
+
+Los dos son de todo el negocio (la vista no filtra por sucursal) y aparecen en «Cómo va la operación».
+
+- **Comisiones** (`/reportes/comisiones`). Abre siempre en el periodo actual; «Periodo actual» y
+  «Periodo anterior» ponen el periodo completo y el rango también se puede elegir libre. Cuatro cifras
+  y una fila por colaborador: servicios, ventas sin IVA, comisión de servicios, comisión de productos,
+  sueldo y total. Tocar un nombre abre sus renglones. **El sueldo solo se suma con un periodo
+  exacto**; en un rango libre sale $0 y un aviso lo explica. Si falla el cálculo de periodos, un aviso
+  pide elegir las fechas a mano. Un supervisor que no es administrador solo ve sus renglones.
+- **Ventas por colaborador** (`/reportes/ventas-colaborador`). Agrupa por colaborador o por servicio:
+  vendidos, tickets, ventas sin IVA y %.
+
+### Dar acceso a su celular (Colaboradores, entrega 4; ADR 0041)
+
+En el detalle de un colaborador activo, bloque «Su agenda en el celular»: botón **«Dar acceso a su
+celular»**. Manda al correo del colaborador el enlace para poner su contraseña (es el correo de
+«recuperar contraseña»; hoy no hay plantilla propia). Después se lee «Correo enviado a …» y «Último
+acceso: …» o «Aún no ha entrado». Solo dueño y administrador; si la lectura falla, el bloque no aparece.
+Límite de un correo por minuto (se avisa). El enlace abre `/establecer-acceso`, que usa la sesión del
+enlace y no la que ya esté abierta en ese navegador; al terminar, «Listo» y «Abrir mi agenda» (POS).
+
+### Citas y faltas y Ocupación (belleza)
+
+Dos reportes más en «Cómo va la operación»; solo dueño y administrador (el supervisor no los ve) y solo
+con agenda.
+
+- **Citas y faltas** (`/reportes/citas`). Por colaborador o por servicio, canal Todas / En caja / En
+  línea. Atendidas, Canceló la clienta, Canceló el negocio, No llegó, Total y Tasa de falta (con fila de
+  totales). Una espera cancelada sin colaborador sale como «Sin colaborador». Más de 367 días: se usan
+  los últimos 367 y un aviso lo dice. Descarga en Excel.
+- **Ocupación** (`/reportes/ocupacion`). Por colaborador (suma del rango) o por día. Horas agendadas,
+  Horas de horario y Ocupación % con barra; «—» si no hay horario. **El % ignora los días sin horario:
+  solo cuenta lo agendado en días con horario.** Por eso «Horas agendadas» puede mostrar más horas de las
+  que explica el % (p. ej. 5 h agendadas y 8 h de horario pueden dar 50 %, con más horas en un día sin
+  horario). Una Nota en la pantalla lo explica. Más de 93 días: los últimos 93 con aviso.
+
+### Primera vez de un salón (`/bienvenida`)
+
+Con un giro de belleza la lista cambia a seis pasos: Tus servicios, Tu equipo, Colaboradores y horarios
+(se marca con al menos un horario de un colaborador activo), Tu caja, Vincula tu caja y Facturación
+(opcional). Restaurante y tienda no cambian.
 
 ## Piezas que se repiten en el panel
 
