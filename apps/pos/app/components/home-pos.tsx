@@ -47,6 +47,7 @@ import {
 import { CobroCompletado } from "./cobro-completado";
 import { ModalDescuento } from "./modal-descuento";
 import { obtenerImpresora, obtenerImpresoraDeEstacion } from "../lib/print/adapter";
+import { PreviewAdapter } from "../lib/print/preview-adapter";
 import { estacionParaArea, hayEstacionDeCocinaDedicada } from "../lib/print/config";
 import { encolarComanda, leerCola, vaciarCola } from "../lib/print/cola-comandas";
 import { ModalConfigImpresora } from "./modal-config-impresora";
@@ -1661,8 +1662,8 @@ export function HomePos({
     setCuentasVersion((v) => v + 1); // la cuenta pagada ya no va en la lista
     setAgendaVersion((v) => v + 1); // belleza: la cita cobrada pasa a «Cobradas hoy»
     setConfirmacion({ folio, cambio, total, ...(aCredito ? { aCredito } : {}) });
-    // Armar el ticket e IMPRIMIR automáticamente. Con PreviewAdapter abre el recibo
-    // en pantalla; al activar EpsonEposAdapter, ese mismo llamado imprime en papel.
+    // Armar el ticket e IMPRIMIR automáticamente. Sin impresora (PreviewAdapter) no se muestra
+    // nada; con una configurada, ese mismo llamado imprime en papel.
     try {
       const datos = await leerTicketParaImpresion(ticketId, {
         token,
@@ -1697,7 +1698,9 @@ export function HomePos({
       if (debeImprimirTicketAlCobrar(datos.meta.modo, comidaRapida, yaImpreso)) {
         try {
           const job = construirTicketJob(datos, await logoParaTicket(datos.ancho));
-          await obtenerImpresora("CAJA", { onMostrar: () => setMostrarRecibo(true) }).imprimir(job);
+          // Sin impresora ya no se abre el recibo en pantalla al cobrar (pedido de Fermín, 21 oct
+          // 2026, todos los giros): «Cobro completado» ofrece mandarlo por correo.
+          await obtenerImpresora("CAJA", { onMostrar: () => {} }).imprimir(job);
         } catch {
           // Un fallo de la impresora no puede llevarse por delante lo que viene después:
           // la comanda, el cajón y la liquidación del reparto van detrás.
@@ -2754,6 +2757,7 @@ export function HomePos({
           aCredito={confirmacion.aCredito}
           estadoTicket={estadoTicket}
           puedeImprimir={datosTicket != null}
+          sinImpresora={obtenerImpresora("CAJA", { onMostrar: () => {} }) instanceof PreviewAdapter}
           pausa={mostrarRecibo || avisoReparto != null}
           onImprimirCopia={() => { setImprimirCopia(true); setMostrarRecibo(true); }}
           onNuevoTicket={nuevoTicket}

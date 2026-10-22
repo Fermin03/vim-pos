@@ -2,7 +2,7 @@
 // Marco común del cobro a pantalla completa (spec 2026-10-21): cabecera de 72 px con el botón de
 // regresar SIEMPRE en el mismo sitio, cuerpo y pie. Sin animación entre pasos: el cobro se usa
 // cientos de veces al día (tokens.css, regla de frecuencia).
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icono } from "@vim/ui/styles";
 
 // El numpad trabaja en CENTAVOS (estándar POS): cada dígito desplaza los decimales, así se
@@ -20,8 +20,16 @@ export function PantallaCobro({ regresar, contexto, derecha, children, pie }: {
   children: React.ReactNode;
   pie?: React.ReactNode;
 }) {
+  // Cada paso tapa toda la caja, y sus botones quedan justo donde estaba lo que se tocó para llegar
+  // («Cobrar» abajo a la derecha → «Más»). El clic que trae a este paso, o un doble toque, no debe
+  // caer en él: los primeros 250 ms no se reciben toques.
+  const [recibe, setRecibe] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setRecibe(true), 250);
+    return () => clearTimeout(t);
+  }, []);
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-surface" role="dialog" aria-modal="true">
+    <div className={`fixed inset-0 z-50 flex flex-col bg-surface ${recibe ? "" : "pointer-events-none"}`} role="dialog" aria-modal="true">
       <header className="grid h-[72px] flex-shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-line px-6">
         <div>
           {regresar && (

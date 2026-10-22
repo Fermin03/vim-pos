@@ -29,6 +29,7 @@ export function CobroCompletado({
   aCredito = false,
   estadoTicket,
   puedeImprimir,
+  sinImpresora = false,
   pausa,
   onImprimirCopia,
   onNuevoTicket,
@@ -42,6 +43,8 @@ export function CobroCompletado({
   estadoTicket: "idle" | "lista" | "error";
   /** El recibo ya se armó. */
   puedeImprimir: boolean;
+  /** La caja no tiene impresora: no hay copia que sacar (y ya no se abre el recibo en pantalla). */
+  sinImpresora?: boolean;
   /** Algo se abrió encima (recibo, aviso): la cuenta se detiene. */
   pausa: boolean;
   onImprimirCopia: () => void;
@@ -90,18 +93,22 @@ export function CobroCompletado({
               El ticket del cliente no se pudo armar.
             </p>
           )}
-          <div className="grid grid-cols-2 gap-3">
-            <BotonSecundario
-              onClick={() => {
-                setDetenida(true);
-                onImprimirCopia();
-              }}
-              disabled={!puedeImprimir}
-            >
-              {puedeImprimir || estadoTicket === "error" ? "Imprimir copia" : "Preparando…"}
-            </BotonSecundario>
+          {sinImpresora ? (
             <BotonPrincipal onClick={onNuevoTicket}>Nueva venta</BotonPrincipal>
-          </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <BotonSecundario
+                onClick={() => {
+                  setDetenida(true);
+                  onImprimirCopia();
+                }}
+                disabled={!puedeImprimir}
+              >
+                {puedeImprimir || estadoTicket === "error" ? "Imprimir copia" : "Preparando…"}
+              </BotonSecundario>
+              <BotonPrincipal onClick={onNuevoTicket}>Nueva venta</BotonPrincipal>
+            </div>
+          )}
           {!parada && !pausa && (
             <div className="mt-4 flex flex-col gap-2">
               <div className="h-1 overflow-hidden rounded-sm bg-line">
