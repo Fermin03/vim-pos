@@ -25,8 +25,8 @@ import { FOCO, IconoCerrar, PARTE } from "./piezas";
  * altura de la hoja y en el iPhone solo se veía la cabecera (oct 2026). Sin porcentajes en la cadena
  * no hay nada que un navegador pueda resolver distinto.
  */
-export const COLUMNA = "flex min-h-0 flex-initial flex-col";
-export const CUERPO = "min-h-0 flex-initial overflow-y-auto overscroll-contain";
+export const COLUMNA = "hoja-columna flex min-h-0 flex-initial flex-col";
+export const CUERPO = "hoja-cuerpo min-h-0 flex-initial overflow-y-auto overscroll-contain";
 export const PIE = "flex-none border-t border-line bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]";
 
 /**
@@ -42,13 +42,15 @@ if (typeof document !== "undefined") {
 /** Menos que esto no es un teclado: es la barra del navegador entrando o saliendo. */
 const MINIMO_DE_TECLADO = 60;
 
-export function Hoja({ abierta, alCerrar, fija = false, titulo, children }: {
+export function Hoja({ abierta, alCerrar, fija = false, completa = false, titulo, children }: {
   abierta: boolean; alCerrar: () => void;
   /**
    * No se puede cerrar ahora (hay un pedido enviándose): ni Escape, ni el velo, ni «Cerrar», ni
    * arrastrando. Salir a medio envío dejaba mandar el mismo pedido dos veces.
    */
   fija?: boolean;
+  /** Ocupa toda la pantalla (el checkout, «Tus datos»): sin asa ni arrastre, y el pie va abajo del todo (globals.css, `.completa`). */
+  completa?: boolean;
   titulo: string; children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -148,11 +150,12 @@ export function Hoja({ abierta, alCerrar, fija = false, titulo, children }: {
       role="dialog"
       aria-modal="true"
       aria-labelledby={idTitulo}
-      className="hoja"
+      className={cn("hoja", completa && "completa")}
       // Escape pide cancelar; fija, se le dice que no.
       onCancel={(e) => { if (fija) e.preventDefault(); }}
       // Chrome no deja impedir un segundo Escape seguido: si aun así se cerró estando fija, se reabre.
-      onClose={() => { if (fija && abierta) ref.current?.showModal(); else alCerrar(); }}
+      // Cerrada desde fuera (`abierta` ya en false, p. ej. del carrito a «Tus datos») no es «Cerrar»: no se avisa.
+      onClose={() => { if (fija && abierta) ref.current?.showModal(); else if (abierta) alCerrar(); }}
       // El velo es el propio <dialog>: un toque que cae en él y no en su contenido es «afuera».
       onClick={(e) => { if (e.target === e.currentTarget) cerrar(); }}
       // En cuanto se usa el teclado, el anillo de «Cerrar» vuelve a ser el de siempre.
@@ -167,7 +170,7 @@ export function Hoja({ abierta, alCerrar, fija = false, titulo, children }: {
         className="relative flex flex-none touch-none items-center gap-2 border-b border-transparent pb-1 pl-4 pr-1 pt-4 transition-colors duration-150 sm:touch-auto sm:pt-1"
         onPointerDown={(e) => {
           // Un solo dedo: un segundo toque a medio arrastre no se lleva la hoja a otro lado.
-          if (arrastre.current || fija || (e.target as HTMLElement).closest("button") || matchMedia("(min-width: 640px)").matches) return;
+          if (arrastre.current || fija || completa || (e.target as HTMLElement).closest("button") || matchMedia("(min-width: 640px)").matches) return;
           arrastre.current = { y0: e.clientY, y: e.clientY, t: e.timeStamp, v: 0 };
           e.currentTarget.setPointerCapture(e.pointerId);
         }}
@@ -176,7 +179,7 @@ export function Hoja({ abierta, alCerrar, fija = false, titulo, children }: {
         onPointerCancel={soltar}
       >
         {/* El asa: dice que la hoja se puede bajar. Solo en teléfono. */}
-        <span aria-hidden="true" className="absolute left-1/2 top-2 h-1 w-9 -translate-x-1/2 rounded-full bg-line-strong sm:hidden" />
+        {!completa && <span aria-hidden="true" className="absolute left-1/2 top-2 h-1 w-9 -translate-x-1/2 rounded-full bg-line-strong sm:hidden" />}
         <h2 id={idTitulo} className={cn("line-clamp-2 min-w-0 flex-1 font-display text-18 font-semibold leading-snug tracking-tight", PARTE)}>{titulo}</h2>
         <button ref={botonCerrar} type="button" onClick={cerrar} disabled={fija} aria-label="Cerrar"
           className={cn("flex h-11 w-11 flex-shrink-0 items-center justify-center rounded text-ink-2 transition-[background-color,transform] duration-150 ease-vim hover:bg-hover hover:text-ink active:scale-[.97] active:bg-hover active:duration-[60ms] disabled:pointer-events-none disabled:opacity-30", FOCO)}>

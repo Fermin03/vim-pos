@@ -1,6 +1,6 @@
 "use client";
 // «Tus datos», en pantallas: (1) quién recibe o recoge, a dónde y la nota; (2) cómo paga y, en línea,
-// la propina; (3) la tarjeta. Viven dentro de la hoja del carrito. Aquí solo se pinta: qué pantallas
+// la propina; (3) la tarjeta. Viven en una hoja a pantalla completa (tienda.tsx). Aquí solo se pinta: qué pantallas
 // hay y a cuál se va está en lib/pasos.ts, las reglas de los campos en lib/cliente.ts, la propina en
 // lib/pago.ts y qué hacer con cada respuesta de la función en lib/envio.ts.
 //

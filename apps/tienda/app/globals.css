@@ -106,6 +106,21 @@ body {
   }
   .hoja[open] { opacity: 1; transition-duration: 200ms; }
 }
+/* A pantalla completa (el checkout, hoja.tsx `completa`): ocupa todo, sin esquinas, y la altura sí
+   es conocida (100dvh), así que la columna y el cuerpo pueden crecer y el pie queda abajo del todo.
+   En escritorio el contenido no se estira: una columna centrada. Entra igual que la hoja. */
+.hoja.completa {
+  inset: 0;
+  translate: none;
+  max-width: none;
+  height: 100vh;
+  height: 100dvh;
+  max-height: none;
+  border-radius: 0;
+  padding-top: env(safe-area-inset-top);
+}
+.hoja.completa :is(.hoja-columna, .hoja-cuerpo) { flex-grow: 1; }
+.hoja.completa > * { width: 100%; max-width: 40rem; margin-inline: auto; }
 /* Con una hoja abierta, el menú de atrás no se desplaza. En Safari de iOS esto funciona desde la
    16 (antes ignoraba `overflow: hidden` en la raíz); lo demás lo hace `overscroll-behavior` arriba. */
 html:has(dialog.hoja[open]) { overflow: hidden; }
