@@ -29,7 +29,7 @@ export function PantallaCobro({ regresar, contexto, derecha, children, pie }: {
     return () => clearTimeout(t);
   }, []);
   return (
-    <div className={`fixed inset-0 z-50 flex flex-col bg-surface ${recibe ? "" : "pointer-events-none"}`} role="dialog" aria-modal="true">
+    <div className={`fixed inset-0 z-50 flex flex-col bg-surface ${recibe ? "" : "pointer-events-none"}`} role="dialog" aria-modal="true" aria-label="Cobro">
       <header className="grid h-[72px] flex-shrink-0 grid-cols-[1fr_auto_1fr] items-center border-b border-line px-6">
         <div>
           {regresar && (
@@ -141,8 +141,11 @@ export function Numpad({
     function onKey(e: KeyboardEvent) {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
-      if (e.key >= "0" && e.key <= "9") { e.preventDefault(); onChangeRef.current((bufferRef.current + e.key).slice(0, 8)); }
-      else if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); onChangeRef.current(bufferRef.current.slice(0, -1)); }
+      // El ref se adelanta al render: teclas seguidas (o un lector de códigos) parten del último
+      // valor, no del que alcanzó a pintarse; si no, se comían dígitos.
+      const poner = (b: string) => { bufferRef.current = b; onChangeRef.current(b); };
+      if (e.key >= "0" && e.key <= "9") { e.preventDefault(); poner((bufferRef.current + e.key).slice(0, 8)); }
+      else if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); poner(bufferRef.current.slice(0, -1)); }
       else if (e.key === "Enter") { e.preventDefault(); onEnterRef.current?.(); }
     }
     window.addEventListener("keydown", onKey);

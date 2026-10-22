@@ -40,3 +40,17 @@ export function vistaAlRegresar(
   if (vista === "propina" || vista === "mas") return "selector";
   return p.preguntoPropinaAqui ? "propina" : "selector";
 }
+
+/** Lo que pagó el cliente: el total de la base NO trae la propina (`TotalesTicket.propina` va aparte). */
+export function totalCobrado(t: { total: number; propina?: number }): number {
+  return Math.round((t.total + (t.propina ?? 0)) * 100) / 100;
+}
+
+/**
+ * Al volver a «¿Cómo paga?», ¿la propina ya está contestada? Sí si venía en el ticket o si ya entró
+ * un pago con ella (firme, aunque sea $0): preguntarla otra vez —VIM o el lector— sumaría una
+ * propina nueva a una cuenta que ya empezó a cobrarse.
+ */
+export function propinaPreguntadaAlVolver(p: { firme: boolean; inicial: number }): boolean {
+  return p.firme || p.inicial > 0;
+}

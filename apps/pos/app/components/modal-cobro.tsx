@@ -20,7 +20,7 @@ import {
 import { nuevoClientId } from "../lib/carrito";
 import { aplicarPagosEnOrden, pagoEntroPeseAlError, ventaQuedoPagada, type PagoPorAplicar } from "../lib/cobro-pagos";
 import { pagoDeCobro, pedirCobro, propinaDeCobro, terminalDeCaja, type CobroTerminal, type TerminalCaja } from "../lib/terminal";
-import { debePreguntarPropina, montosSugeridosEfectivo, vistaAlRegresar, type DestinoMetodo, type VistaCobro } from "../lib/cobro-flujo";
+import { debePreguntarPropina, montosSugeridosEfectivo, propinaPreguntadaAlVolver, totalCobrado, vistaAlRegresar, type DestinoMetodo, type VistaCobro } from "../lib/cobro-flujo";
 import { VistaTerminal } from "./vista-terminal";
 import { aBuffer, aMonto, BotonPrincipal, BotonSecundario, FilaOpcion, Numpad, PantallaCobro } from "./cobro/pantalla-cobro";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
@@ -216,6 +216,7 @@ function VistaPropina({ totalBase, contexto, sugerencias, procesando, error, onC
     const tip = aMonto(buffer);
     return (
       <PantallaCobro
+        key="libre"
         regresar={{ icono: "atras", onClick: () => setLibre(false), disabled: procesando }}
         contexto={contexto}
         pie={
@@ -782,7 +783,7 @@ export function ModalCobro({
     setProcesando(true);
     try {
       const t = await asegurarAnticipo();
-      if (ventaQuedoPagada(t)) onPagado(t.folio, 0, t.total);
+      if (ventaQuedoPagada(t)) onPagado(t.folio, 0, totalCobrado(t));
       else setError("El anticipo no cubrió la venta; cobra el resto con otra forma de pago.");
     } catch (e) {
       await trasFalloDeCobro(e);
@@ -799,8 +800,10 @@ export function ModalCobro({
    * Ya entró dinero con esta propina: queda firme. Regresar ya no la deshace y no se vuelve a
    * preguntar (`propinaPreguntada` ya es true).
    */
+  const propinaEsFirme = useRef(false);
   function propinaFirme() {
     propinaInicial.current = propinaRef.current;
+    propinaEsFirme.current = true;
     setPreguntoAqui(false);
   }
 
@@ -843,7 +846,7 @@ export function ModalCobro({
     if (t) setTotales(t);
     if (ventaQuedoPagada(t)) {
       if (aCredito) onPagado(t.folio, 0, null, true);
-      else onPagado(t.folio, t.cambio, t.total);
+      else onPagado(t.folio, t.cambio, totalCobrado(t));
       return t;
     }
     setError(e instanceof Error ? e.message : "Error al cobrar");
@@ -867,7 +870,7 @@ export function ModalCobro({
       );
       pagoUnicoId.current = null;
       setTotales(t);
-      if (t.estadoFiscal === "PAGADO") onPagado(t.folio, t.cambio, t.total);
+      if (t.estadoFiscal === "PAGADO") onPagado(t.folio, t.cambio, totalCobrado(t));
       else quedaPendiente();
     } catch (e) {
       const t = await trasFalloDeCobro(e);
@@ -927,7 +930,7 @@ export function ModalCobro({
       setTotales(t);
       if (t.estadoFiscal === "PAGADO") {
         if (vista === "credito") onPagado(t.folio, 0, null, true);
-        else onPagado(t.folio, t.cambio, t.total);
+        else onPagado(t.folio, t.cambio, totalCobrado(t));
       }
       else { alQuedarPendiente?.(); quedaPendiente(); }
     } catch (e) {
@@ -1007,7 +1010,7 @@ export function ModalCobro({
       // cobro otra vez; aplicar_pago ya lo tiene, así que no pasa nada.
       await pedirCobro(token, cajaId, { accion: "confirmar", cobro_id: c.id, autorizo_id: autorizoId }).catch(() => {});
       setTotales(t);
-      if (t.estadoFiscal === "PAGADO") onPagado(t.folio, t.cambio, t.total);
+      if (t.estadoFiscal === "PAGADO") onPagado(t.folio, t.cambio, totalCobrado(t));
       else quedaPendiente();
     } catch (e) {
       const t = await trasFalloDeCobro(e);
@@ -1085,7 +1088,7 @@ export function ModalCobro({
       if (r.totales) setTotales(r.totales);
       // PAGADO manda aunque un pago haya fallado: con propina, el primero podía cerrar el ticket y
       // el segundo rebotaba con "estado PAGADO" — la venta estaba cobrada y la pantalla decía error.
-      if (ventaQuedoPagada(r.totales)) onPagado(r.totales.folio, r.totales.cambio, r.totales.total);
+      if (ventaQuedoPagada(r.totales)) onPagado(r.totales.folio, r.totales.cambio, totalCobrado(r.totales));
       else if (r.error !== null) setError(r.error instanceof Error ? r.error.message : "Error al cobrar");
       else setError("Los pagos no cubrieron el total del ticket.");
       if (r.aplicados.length > 0) propinaFirme();
@@ -1143,14 +1146,18 @@ export function ModalCobro({
       try {
         await establecerPropina(token, totales.ticketId, inicial);
       } catch (e) {
-        setError(e instanceof Error ? e.message : "No se pudo quitar la propina");
+        // La propina sigue en el ticket: se queda a la vista y no se vuelve a preguntar (no se suma otra).
+        setError(e instanceof Error ? `No se pudo quitar la propina: ${e.message}` : "No se pudo quitar la propina");
+        setPreguntoAqui(false);
+        setTrasPropina(null);
+        setVista("selector");
         return;
       } finally {
         setProcesando(false);
       }
       setPropina(inicial);
     }
-    setPropinaPreguntada(inicial > 0);
+    setPropinaPreguntada(propinaPreguntadaAlVolver({ firme: propinaEsFirme.current, inicial }));
     setPreguntoAqui(false);
     setTrasPropina(null);
     setVista("selector");
@@ -1205,8 +1212,6 @@ export function ModalCobro({
         </p>
       </PantallaMensaje>
     );
-  } else if (procesando && (vista === "efectivo" || vista === "otro" || vista === "atajo" || vista === "credito" || vista === "saldo")) {
-    pantalla = <PantallaRegistrando cambio={enCurso.cambio} recibido={enCurso.recibido} />;
   } else if (vista === "atajo" || (vista === "selector" && (!sug || !anticipoListo))) {
     pantalla = (
       <PantallaMensaje contexto={ctx()} onCerrar={onCerrar}>
@@ -1328,7 +1333,7 @@ export function ModalCobro({
   } else {
     // Una vista sin sus datos (p. ej. «A crédito» que dejó de aplicar): de vuelta al selector.
     pantalla = (
-      <PantallaMensaje contexto={ctx()} onCerrar={() => setVista("selector")}>
+      <PantallaMensaje contexto={ctx()} onCerrar={() => void volverAlSelector()}>
         <p className="text-18 text-ink-3">Esta forma de pago ya no está disponible.</p>
       </PantallaMensaje>
     );
@@ -1337,6 +1342,10 @@ export function ModalCobro({
   return (
     <>
       {pantalla}
+      {/* Encima y sin desmontar la vista: si el pago falla, lo capturado (lo recibido) sigue ahí. */}
+      {procesando && (vista === "efectivo" || vista === "otro" || vista === "atajo" || vista === "credito" || vista === "saldo") && (
+        <PantallaRegistrando cambio={enCurso.cambio} recibido={enCurso.recibido} />
+      )}
       {pinCredito !== null && (
         <ModalAutorizacionPin
           token={token}

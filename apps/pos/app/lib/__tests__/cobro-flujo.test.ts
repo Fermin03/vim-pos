@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { debePreguntarPropina, montosSugeridosEfectivo, vistaAlRegresar } from "../cobro-flujo";
+import { debePreguntarPropina, montosSugeridosEfectivo, propinaPreguntadaAlVolver, totalCobrado, vistaAlRegresar } from "../cobro-flujo";
 
 describe("montosSugeridosEfectivo", () => {
   it("616 → 620, 650, 700, 1000", () => expect(montosSugeridosEfectivo(616)).toEqual([620, 650, 700, 1000]));
@@ -46,4 +46,20 @@ describe("vistaAlRegresar", () => {
     expect(vistaAlRegresar("mas", libre)).toBe("selector");
   });
   it("selector → cerrar", () => expect(vistaAlRegresar("selector", libre)).toBe("cerrar"));
+});
+
+describe("totalCobrado", () => {
+  it("suma la propina, que el total de la base no trae", () =>
+    expect(totalCobrado({ total: 250, propina: 25 })).toBe(275));
+  it("sin propina es el total", () => expect(totalCobrado({ total: 55 })).toBe(55));
+  it("redondea a centavos", () => expect(totalCobrado({ total: 0.1, propina: 0.2 })).toBe(0.3));
+});
+
+describe("propinaPreguntadaAlVolver", () => {
+  it("con un pago ya registrado la propina es firme aunque sea $0: no se vuelve a preguntar", () =>
+    expect(propinaPreguntadaAlVolver({ firme: true, inicial: 0 })).toBe(true));
+  it("propina que venía en el ticket: no se pregunta", () =>
+    expect(propinaPreguntadaAlVolver({ firme: false, inicial: 20 })).toBe(true));
+  it("sin pago ni propina previa: se vuelve a preguntar con el método nuevo", () =>
+    expect(propinaPreguntadaAlVolver({ firme: false, inicial: 0 })).toBe(false));
 });
