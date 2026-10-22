@@ -4,6 +4,7 @@ import { fmtMxn } from "../lib/turno";
 import { nuevoClientId } from "../lib/carrito";
 import { mensajeErrorCobro, mensajeFinal, montoTexto, pedirCobro, type CobroTerminal, type ProveedorTerminal } from "../lib/terminal";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
+import { BotonPrincipal, BotonSecundario, PantallaCobro } from "./cobro/pantalla-cobro";
 
 const CADA_MS = 2500;
 // Aceptar a mano un cobro que la terminal no confirmó es corregir un pago: mismo permiso.
@@ -22,8 +23,10 @@ type Fase =
  * se sale con Escape; se sale cancelando.
  */
 export function VistaTerminal({
-  token, cajaId, turnoId, ejecutaNombre, ticketId, folio, monto, proveedor, propinaEnLector = false, onAprobado, onVolver,
+  token, cajaId, turnoId, ejecutaNombre, ticketId, folio, monto, proveedor, propinaEnLector = false, contexto, onAprobado, onVolver,
 }: {
+  /** Centro de la cabecera («Tarjeta · Ticket #…»). */
+  contexto?: string;
   token: string; cajaId: string; turnoId: string; ejecutaNombre: string;
   /** El lector le pregunta la propina al cliente (Clip); llega aparte en `propina_mxn`. `monto` va sin ella. */
   propinaEnLector?: boolean;
@@ -94,66 +97,86 @@ export function VistaTerminal({
     // El resultado (cancelado, o pagado si el cliente se adelantó) llega por la pregunta de siempre.
   }
 
-  const boton = "w-full rounded-lg py-[16px] font-sans text-16 font-bold transition-colors";
-  const primario = `${boton} bg-accent text-white hover:bg-accent-hover`;
-  const secundario = `${boton} border border-line-strong text-ink-2 hover:bg-hover hover:text-ink`;
+  const pin = fase.t === "revisar" && fase.pin && (
+    <ModalAutorizacionPin
+      token={token}
+      capa="z-[70]"
+      descripcion={`Registrar ${fmtMxn(monto)} con tarjeta sin la confirmación de la terminal`}
+      ejecutaNombre={ejecutaNombre}
+      payload={{
+        accion: "aceptar_cobro_terminal", permisoCodigo: PERMISO_ACEPTAR, entidadTipo: "ticket", entidadId: ticketId,
+        monto, motivo: "La terminal mostró aprobado y la caja no recibió la confirmación", cajaId, turnoId,
+      }}
+      onAutorizado={(a) => aprobado.current(fase.cobro, a.autorizoId)}
+      onCancelar={() => setFase({ t: "revisar", cobro: fase.cobro })}
+    />
+  );
+
+  // Enviando o esperando: sin botón de regresar; de aquí se sale con «Cancelar cobro» (pos.md, ADR 0033).
+  const cobrando = fase.t === "enviando" || fase.t === "esperando";
+  const dos = (a: React.ReactNode, b: React.ReactNode) => <div className="grid grid-cols-2 gap-3">{a}{b}</div>;
 
   return (
-    <div className="flex flex-col items-center gap-2 py-4 text-center">
-      <div className="text-12 font-bold uppercase tracking-widest text-ink-3">Cobro con tarjeta</div>
-      <div className="font-display text-40 font-bold tabular-nums leading-none">{fmtMxn(monto)}</div>
-
-      {fase.t === "enviando" && <p className="mt-4 text-15 text-ink-2" role="status">Mandando el cobro a la terminal…</p>}
-
-      {fase.t === "esperando" && (
-        <>
-          <p className="mt-4 font-display text-20 font-semibold" role="status">Cobra en la terminal</p>
-          <p className="max-w-[380px] text-15 text-ink-2">
-            {proveedor === "CLIP"
-              ? "Pide al cliente que acerque o inserte su tarjeta en la terminal."
-              : "En la terminal, toca «Tarjeta» y acerca o inserta la tarjeta del cliente."}
-          </p>
-          {fase.aviso && <p className="mt-2 text-14 font-medium text-warning" role="status">{fase.aviso}</p>}
-          <div className="mt-6 w-full max-w-[380px]">
-            <button type="button" className={secundario} onClick={cancelar} disabled={fase.aviso === "Cancelando…"}>Cancelar cobro</button>
+    <PantallaCobro
+      regresar={cobrando ? null : { icono: "atras", onClick: onVolver }}
+      contexto={contexto ?? "Tarjeta"}
+      pie={
+        cobrando ? (
+          <div className="mx-auto w-[360px]">
+            <BotonSecundario onClick={cancelar} disabled={fase.t === "enviando" || fase.aviso === "Cancelando…"}>Cancelar cobro</BotonSecundario>
           </div>
-        </>
-      )}
-
-      {(fase.t === "fin" || fase.t === "error") && (
-        <>
-          <p className="mt-4 max-w-[420px] text-15 font-medium text-danger" role="alert">{fase.mensaje}</p>
-          <div className="mt-6 flex w-full max-w-[380px] flex-col gap-2">
-            <button type="button" className={primario} onClick={() => setIntento((n) => n + 1)}>Volver a intentar</button>
-            <button type="button" className={secundario} onClick={onVolver}>Cambiar forma de pago</button>
-          </div>
-        </>
-      )}
-
-      {fase.t === "revisar" && (
-        <>
-          <p className="mt-4 font-display text-20 font-semibold" role="alert">No pudimos confirmar el cobro</p>
-          <p className="max-w-[420px] text-15 text-ink-2">Mira la pantalla de la terminal. ¿Dice que el pago fue aprobado?</p>
-          <div className="mt-6 flex w-full max-w-[380px] flex-col gap-2">
-            <button type="button" className={primario} onClick={() => setFase({ ...fase, pin: true })}>Sí, dice aprobado</button>
-            <button type="button" className={secundario} onClick={onVolver}>No pasó, cambiar forma de pago</button>
-          </div>
-          {fase.pin && (
-            <ModalAutorizacionPin
-              token={token}
-              capa="z-[70]"
-              descripcion={`Registrar ${fmtMxn(monto)} con tarjeta sin la confirmación de la terminal`}
-              ejecutaNombre={ejecutaNombre}
-              payload={{
-                accion: "aceptar_cobro_terminal", permisoCodigo: PERMISO_ACEPTAR, entidadTipo: "ticket", entidadId: ticketId,
-                monto, motivo: "La terminal mostró aprobado y la caja no recibió la confirmación", cajaId, turnoId,
-              }}
-              onAutorizado={(a) => aprobado.current(fase.cobro, a.autorizoId)}
-              onCancelar={() => setFase({ t: "revisar", cobro: fase.cobro })}
-            />
-          )}
-        </>
-      )}
-    </div>
+        ) : fase.t === "revisar" ? (
+          dos(
+            <BotonSecundario onClick={onVolver}>No pasó, cambiar forma de pago</BotonSecundario>,
+            <BotonPrincipal onClick={() => setFase({ ...fase, pin: true })}>Sí, dice aprobado</BotonPrincipal>,
+          )
+        ) : (
+          dos(
+            <BotonSecundario onClick={onVolver}>Cambiar forma de pago</BotonSecundario>,
+            <BotonPrincipal onClick={() => setIntento((n) => n + 1)}>Volver a intentar</BotonPrincipal>,
+          )
+        )
+      }
+    >
+      <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+        {cobrando ? (
+          <>
+            <div className="mb-7 flex h-24 w-24 items-center justify-center rounded-full bg-accent-soft" aria-hidden>
+              <span className="h-10 w-10 rounded-full bg-accent" />
+            </div>
+            <div className="font-display text-[88px] font-bold leading-none tabular-nums text-ink">{fmtMxn(monto)}</div>
+            {fase.t === "enviando" ? (
+              <p className="mt-5 text-20 text-ink-2" role="status">Mandando el cobro a la terminal…</p>
+            ) : (
+              <>
+                <p className="mt-5 font-display text-28 font-bold text-ink" role="status">Cobra en la terminal</p>
+                <p className="mt-2 max-w-[520px] text-18 text-ink-3">
+                  {proveedor === "CLIP"
+                    ? "Pide al cliente que acerque o inserte su tarjeta en la terminal."
+                    : "En la terminal, toca «Tarjeta» y acerca o inserta la tarjeta del cliente."}
+                </p>
+                {fase.aviso && <p className="mt-3 text-16 font-medium text-warning" role="status">{fase.aviso}</p>}
+              </>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="font-display text-40 font-bold tabular-nums text-ink-3">{fmtMxn(monto)}</div>
+            {fase.t === "revisar" ? (
+              <>
+                <p className="mt-4 font-display text-32 font-bold text-ink" role="alert">No pudimos confirmar el cobro</p>
+                <p className="mt-2 max-w-[520px] text-18 text-ink-3">Mira la pantalla de la terminal. ¿Dice que el pago fue aprobado?</p>
+              </>
+            ) : (
+              <>
+                <p className="mt-4 font-display text-32 font-bold text-danger">El cobro no pasó</p>
+                <p className="mt-2 max-w-[560px] text-18 text-ink-3" role="alert">{fase.mensaje}</p>
+              </>
+            )}
+          </>
+        )}
+      </div>
+      {pin}
+    </PantallaCobro>
   );
 }

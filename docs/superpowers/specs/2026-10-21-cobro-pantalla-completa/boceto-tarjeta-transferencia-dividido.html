@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Cobro a pantalla completa</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --accent:#0078C9; --accent-soft:#EAF3FB;
+    --ink:#16161A; --ink-2:#5A5A60; --ink-3:#6E6E74;
+    --success:#2E7D52; --success-soft:#E7F2EC;
+    --line:#ECECE9; --line-strong:#DDDDD9; --hover:#F6F6F4; --sel:#FBFBFA;
+    --r:6px; --r-lg:8px;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{font-family:'Inter Tight',system-ui,sans-serif;background:#E9E9E6;color:var(--ink);padding:32px 24px 64px}
+  .intro{max-width:1024px;margin:0 auto 24px}
+  .intro h1{font-family:Sora;font-size:22px}
+  .intro p{color:var(--ink-2);margin-top:6px;line-height:1.45}
+  .paso{max-width:1024px;margin:0 auto 12px;font-weight:600;color:var(--ink-2);font-size:14px;letter-spacing:.02em}
+  .paso b{color:var(--ink)}
+  .pantalla{width:1024px;height:768px;margin:0 auto 40px;background:#fff;border-radius:10px;box-shadow:0 1px 0 var(--line-strong),0 10px 30px rgba(0,0,0,.08);display:flex;flex-direction:column;overflow:hidden;position:relative}
+  .money{font-family:Sora;font-weight:700;font-variant-numeric:tabular-nums}
+  /* cabecera: Volver siempre en el mismo sitio */
+  .cab{height:72px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid var(--line)}
+  .btn-volver{width:56px;height:56px;border-radius:50%;border:1px solid var(--line-strong);background:#fff;display:grid;place-items:center;font-size:22px;color:var(--ink)}
+  .cab .centro{font-size:14px;color:var(--ink-3)}
+  .link{font-weight:600;color:var(--ink);text-decoration:underline;text-underline-offset:4px;font-size:16px}
+  .btn-circ{width:56px;height:56px;border-radius:50%;background:var(--hover);display:grid;place-items:center;font-size:20px}
+  /* selector */
+  .hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+  .hero .total{font-size:96px;line-height:1}
+  .hero .sub{color:var(--ink-3);font-size:18px;margin-top:12px}
+  .lista{padding:0 24px 24px}
+  .fila{height:72px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--line);font-size:20px;font-weight:600;padding:0 8px}
+  .fila:last-child{border-bottom:1px solid var(--line)}
+  .fila small{display:block;font-weight:400;font-size:14px;color:var(--ink-3);margin-top:2px}
+  .chev{color:var(--ink-3);font-size:26px;font-weight:400}
+  /* efectivo */
+  .cuerpo{flex:1;display:grid;grid-template-columns:1fr 360px;gap:32px;padding:24px 32px}
+  .cifras{display:flex;flex-direction:column;justify-content:center;gap:28px}
+  .etq{font-size:15px;color:var(--ink-3);font-weight:500}
+  .recibido{font-size:80px;line-height:1.05}
+  .cambio{font-size:36px;color:var(--success)}
+  .billetes{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{height:56px;padding:0 18px;border:1px solid var(--line-strong);border-radius:var(--r-lg);display:grid;place-items:center;font-family:Sora;font-weight:600;font-variant-numeric:tabular-nums;font-size:17px;background:#fff}
+  .chip.exacto{background:var(--sel)}
+  .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-content:center}
+  .tecla{height:76px;border-radius:var(--r-lg);background:var(--hover);display:grid;place-items:center;font-family:Sora;font-weight:600;font-size:26px}
+  .pie{padding:0 32px 24px}
+  .primario{height:72px;border-radius:var(--r-lg);background:var(--accent);color:#fff;display:grid;place-items:center;font-size:20px;font-weight:600}
+  .secundario{height:72px;border-radius:var(--r-lg);background:#fff;border:1px solid var(--line-strong);display:grid;place-items:center;font-size:20px;font-weight:600}
+  /* registrando */
+  .spin{width:56px;height:56px;border-radius:50%;border:4px solid var(--line);border-top-color:var(--accent);margin-bottom:24px}
+  /* completado */
+  .ok{width:64px;height:64px;border-radius:50%;background:var(--success-soft);color:var(--success);display:grid;place-items:center;font-size:30px;margin-bottom:20px}
+  .gran-cambio{font-size:88px;color:var(--success);line-height:1.05}
+  .dos{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .cuenta{height:4px;background:var(--line);border-radius:2px;margin-top:16px;overflow:hidden}
+  .cuenta i{display:block;width:60%;height:100%;background:var(--ink-3)}
+  /* propina */
+  .props{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:0 32px}
+  .prop{height:128px;border:1px solid var(--line-strong);border-radius:var(--r-lg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:#fff}
+  .prop .pct{font-family:Sora;font-weight:700;font-size:32px}
+  .prop .mto{font-family:Sora;font-weight:600;font-variant-numeric:tabular-nums;font-size:17px;color:var(--ink-2)}
+  .nota{max-width:1024px;margin:-28px auto 40px;font-size:14px;color:var(--ink-2);line-height:1.5}
+</style>
+</head>
+<body>
+<style>
+  .pulso{width:96px;height:96px;border-radius:50%;background:var(--accent-soft);display:grid;place-items:center;margin-bottom:28px}
+  .pulso i{width:40px;height:40px;border-radius:50%;background:var(--accent)}
+  .aviso{margin:0 32px;padding:14px 16px;border:1px solid var(--line-strong);border-radius:var(--r-lg);background:var(--sel);color:var(--ink-2);font-size:15px}
+  .error-t{font-family:Sora;font-weight:700;font-size:36px}
+  .barra{height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin:16px 0 6px}
+  .barra i{display:block;height:100%;width:49%;background:var(--success)}
+  .pago{display:flex;justify-content:space-between;align-items:center;height:56px;border-top:1px solid var(--line);font-size:17px;font-weight:600;padding:0 12px}
+  .pago .q{color:var(--ink-3);font-size:22px;font-weight:400;width:44px;height:44px;display:grid;place-items:center}
+  .seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}
+  .seg div{height:56px;border:1px solid var(--line-strong);border-radius:var(--r-lg);display:grid;place-items:center;font-weight:600;font-size:16px}
+  .seg .on{border-color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--ink);background:var(--sel)}
+  .pad.chico .tecla{height:60px;font-size:22px}
+  .apagado{background:var(--line);color:var(--ink-3)}
+</style>
+
+<div class="intro">
+  <h1>Cobro a pantalla completa · boceto 3</h1>
+  <p>Tarjeta con terminal, transferencia y pago dividido, con las mismas reglas que el boceto 2: pantalla completa del mismo tamaño, regresar siempre arriba a la izquierda, un solo botón azul. La propina se pregunta antes de llegar a cualquiera de estas.</p>
+</div>
+
+<!-- A. Tarjeta esperando -->
+<div class="paso"><b>A · Tarjeta — cobra en la terminal</b> — aquí no hay botón de regresar arriba: de esta pantalla solo se sale con «Cancelar cobro» (regla actual)</div>
+<div class="pantalla">
+  <div class="cab">
+    <div style="width:56px"></div>
+    <div class="centro">Tarjeta · Ticket #A-0142</div>
+    <div style="width:56px"></div>
+  </div>
+  <div class="hero">
+    <div class="pulso"><i></i></div>
+    <div class="money total" style="font-size:88px">$616.00</div>
+    <div style="font-family:Sora;font-weight:700;font-size:28px;margin-top:20px">Cobra en la terminal</div>
+    <div class="sub">Toca «Tarjeta» y acerca o inserta la tarjeta</div>
+  </div>
+  <div class="pie" style="display:flex;justify-content:center">
+    <div class="secundario" style="width:360px">Cancelar cobro</div>
+  </div>
+</div>
+
+<!-- B. Tarjeta no pasó -->
+<div class="paso"><b>B · Tarjeta — no pasó</b> — mismo lugar, mismo monto; cambia solo el mensaje y los botones</div>
+<div class="pantalla">
+  <div class="cab">
+    <div class="btn-volver">←</div>
+    <div class="centro">Tarjeta · Ticket #A-0142</div>
+    <div style="width:56px"></div>
+  </div>
+  <div class="hero">
+    <div class="money" style="font-size:40px;color:var(--ink-3)">$616.00</div>
+    <div class="error-t" style="margin-top:16px;color:var(--danger, #C0392B)">El cobro no pasó</div>
+    <div class="sub">La terminal dice: fondos insuficientes</div>
+  </div>
+  <div class="pie">
+    <div class="dos">
+      <div class="secundario">Cambiar forma de pago</div>
+      <div class="primario">Volver a intentar</div>
+    </div>
+  </div>
+</div>
+<p class="nota">Si la caja no logra confirmar el resultado («No pudimos confirmar el cobro»), se usa esta misma pantalla con «Sí, dice aprobado» y «No pasó, cambiar forma de pago», como hoy.</p>
+
+<!-- C. Transferencia -->
+<div class="paso"><b>C · Transferencia</b> — propuesta: sin teclado; se registra por el total</div>
+<div class="pantalla">
+  <div class="cab">
+    <div class="btn-volver">←</div>
+    <div class="centro">Transferencia · Ticket #A-0142</div>
+    <div style="width:56px"></div>
+  </div>
+  <div class="hero">
+    <div class="money total" style="font-size:88px">$616.00</div>
+    <div class="sub">Revisa que la transferencia ya llegó antes de registrarla</div>
+  </div>
+  <div class="pie"><div class="primario">Registrar transferencia por $616.00</div></div>
+</div>
+<p class="nota">Hoy transferencia y tarjeta «a mano» abren un teclado para escribir el monto. Casi siempre es el total, así que lo quitaría: si pagan solo una parte, eso es un pago dividido. Lo mismo aplicaría a «Débito / Crédito a mano» desde «Más».</p>
+
+<!-- D. Pago dividido -->
+<div class="paso"><b>D · Pago dividido</b> — se abre con «Dividir pago»; ya no hay ventana encima para agregar cada pago</div>
+<div class="pantalla">
+  <div class="cab">
+    <div class="btn-volver">←</div>
+    <div class="centro">Pago dividido · Ticket #A-0142</div>
+    <div style="width:56px"></div>
+  </div>
+  <div class="cuerpo" style="grid-template-columns:1fr 380px">
+    <div style="display:flex;flex-direction:column">
+      <div class="etq">Falta por cobrar</div>
+      <div class="money" style="font-size:72px;line-height:1.05">$316.00</div>
+      <div class="barra"><i></i></div>
+      <div class="etq">Pagado $300.00 de $616.00</div>
+      <div style="margin-top:28px">
+        <div class="etq" style="margin-bottom:6px">Pagos</div>
+        <div class="pago"><span>Efectivo</span><span style="display:flex;align-items:center;gap:8px"><span class="money">$200.00</span><span class="q">✕</span></span></div>
+        <div class="pago" style="border-bottom:1px solid var(--line)"><span>Transferencia</span><span style="display:flex;align-items:center;gap:8px"><span class="money">$100.00</span><span class="q">✕</span></span></div>
+      </div>
+    </div>
+    <div>
+      <div class="etq" style="margin-bottom:8px">Siguiente pago</div>
+      <div class="seg"><div>Efectivo</div><div class="on">Tarjeta</div><div>Transferencia</div></div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin:4px 0 10px">
+        <span class="money" style="font-size:36px">$316.00</span>
+        <span class="chip" style="height:44px;font-size:14px">Todo lo que falta</span>
+      </div>
+      <div class="pad chico">
+        <div class="tecla">1</div><div class="tecla">2</div><div class="tecla">3</div>
+        <div class="tecla">4</div><div class="tecla">5</div><div class="tecla">6</div>
+        <div class="tecla">7</div><div class="tecla">8</div><div class="tecla">9</div>
+        <div class="tecla">00</div><div class="tecla">0</div><div class="tecla">⌫</div>
+      </div>
+    </div>
+  </div>
+  <div class="pie">
+    <div class="dos">
+      <div class="primario">Agregar $316.00 con tarjeta</div>
+      <div class="secundario apagado">Completar cobro</div>
+    </div>
+  </div>
+</div>
+<p class="nota">«Completar cobro» se pone azul cuando ya no falta nada (y «Agregar» deja de ser el principal). Los pagos con tarjeta se mandan a la terminal al completar, uno por uno, y se ve la pantalla A por cada uno, como hoy.</p>
+
+</body>
+</html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Cobro a pantalla completa</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --accent:#0078C9; --accent-soft:#EAF3FB;
+    --ink:#16161A; --ink-2:#5A5A60; --ink-3:#6E6E74;
+    --success:#2E7D52; --success-soft:#E7F2EC;
+    --line:#ECECE9; --line-strong:#DDDDD9; --hover:#F6F6F4; --sel:#FBFBFA;
+    --r:6px; --r-lg:8px;
+  }
+  *{box-sizing:border-box;margin:0}
+  body{font-family:'Inter Tight',system-ui,sans-serif;background:#E9E9E6;color:var(--ink);padding:32px 24px 64px}
+  .intro{max-width:1024px;margin:0 auto 24px}
+  .intro h1{font-family:Sora;font-size:22px}
+  .intro p{color:var(--ink-2);margin-top:6px;line-height:1.45}
+  .paso{max-width:1024px;margin:0 auto 12px;font-weight:600;color:var(--ink-2);font-size:14px;letter-spacing:.02em}
+  .paso b{color:var(--ink)}
+  .pantalla{width:1024px;height:768px;margin:0 auto 40px;background:#fff;border-radius:10px;box-shadow:0 1px 0 var(--line-strong),0 10px 30px rgba(0,0,0,.08);display:flex;flex-direction:column;overflow:hidden;position:relative}
+  .money{font-family:Sora;font-weight:700;font-variant-numeric:tabular-nums}
+  /* cabecera: Volver siempre en el mismo sitio */
+  .cab{height:72px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid var(--line)}
+  .btn-volver{width:56px;height:56px;border-radius:50%;border:1px solid var(--line-strong);background:#fff;display:grid;place-items:center;font-size:22px;color:var(--ink)}
+  .cab .centro{font-size:14px;color:var(--ink-3)}
+  .link{font-weight:600;color:var(--ink);text-decoration:underline;text-underline-offset:4px;font-size:16px}
+  .btn-circ{width:56px;height:56px;border-radius:50%;background:var(--hover);display:grid;place-items:center;font-size:20px}
+  /* selector */
+  .hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+  .hero .total{font-size:96px;line-height:1}
+  .hero .sub{color:var(--ink-3);font-size:18px;margin-top:12px}
+  .lista{padding:0 24px 24px}
+  .fila{height:72px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--line);font-size:20px;font-weight:600;padding:0 8px}
+  .fila:last-child{border-bottom:1px solid var(--line)}
+  .fila small{display:block;font-weight:400;font-size:14px;color:var(--ink-3);margin-top:2px}
+  .chev{color:var(--ink-3);font-size:26px;font-weight:400}
+  /* efectivo */
+  .cuerpo{flex:1;display:grid;grid-template-columns:1fr 360px;gap:32px;padding:24px 32px}
+  .cifras{display:flex;flex-direction:column;justify-content:center;gap:28px}
+  .etq{font-size:15px;color:var(--ink-3);font-weight:500}
+  .recibido{font-size:80px;line-height:1.05}
+  .cambio{font-size:36px;color:var(--success)}
+  .billetes{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{height:56px;padding:0 18px;border:1px solid var(--line-strong);border-radius:var(--r-lg);display:grid;place-items:center;font-family:Sora;font-weight:600;font-variant-numeric:tabular-nums;font-size:17px;background:#fff}
+  .chip.exacto{background:var(--sel)}
+  .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-content:center}
+  .tecla{height:76px;border-radius:var(--r-lg);background:var(--hover);display:grid;place-items:center;font-family:Sora;font-weight:600;font-size:26px}
+  .pie{padding:0 32px 24px}
+  .primario{height:72px;border-radius:var(--r-lg);background:var(--accent);color:#fff;display:grid;place-items:center;font-size:20px;font-weight:600}
+  .secundario{height:72px;border-radius:var(--r-lg);background:#fff;border:1px solid var(--line-strong);display:grid;place-items:center;font-size:20px;font-weight:600}
+  /* registrando */
+  .spin{width:56px;height:56px;border-radius:50%;border:4px solid var(--line);border-top-color:var(--accent);margin-bottom:24px}
+  /* completado */
+  .ok{width:64px;height:64px;border-radius:50%;background:var(--success-soft);color:var(--success);display:grid;place-items:center;font-size:30px;margin-bottom:20px}
+  .gran-cambio{font-size:88px;color:var(--success);line-height:1.05}
+  .dos{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .cuenta{height:4px;background:var(--line);border-radius:2px;margin-top:16px;overflow:hidden}
+  .cuenta i{display:block;width:60%;height:100%;background:var(--ink-3)}
+  /* propina */
+  .props{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:0 32px}
+  .prop{height:128px;border:1px solid var(--line-strong);border-radius:var(--r-lg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:#fff}
+  .prop .pct{font-family:Sora;font-weight:700;font-size:32px}
+  .prop .mto{font-family:Sora;font-weight:600;font-variant-numeric:tabular-nums;font-size:17px;color:var(--ink-2)}
+  .nota{max-width:1024px;margin:-28px auto 40px;font-size:14px;color:var(--ink-2);line-height:1.5}
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>Cobro a pantalla completa · boceto 2</h1>
+  <p>La idea de Square con el design system de VIM: fondo blanco, azul solo en la acción principal, dinero en Sora bold. Cada paso ocupa toda la pantalla de la caja (1024×768) y no cambia de tamaño. Arriba a la izquierda siempre está el mismo botón para regresar.</p>
+</div>
+
+<!-- 1. Elegir método -->
+<div class="paso"><b>1 · ¿Cómo paga?</b> — se abre al tocar «Cobrar»</div>
+<div class="pantalla">
+  <div class="cab">
+    <div class="btn-volver">✕</div>
+    <div class="centro">Ticket #A-0142 · Mesa 4</div>
+    <div class="link">Dividir pago</div>
+  </div>
+  <div class="hero">
+    <div class="money total">$560.00</div>
+    <div class="sub">Elige cómo paga el cliente</div>
+  </div>
+  <div class="lista">
+    <div class="fila"><span>Efectivo</span><span class="chev">›</span></div>
+    <div class="fila"><span>Tarjeta<small>Terminal Clip lista</small></span><span class="chev">›</span></div>
+    <div class="fila"><span>Transferencia</span><span class="chev">›</span></div>
+    <div class="fila"><span>Más<small>Débito o crédito a mano · la cobré en otra terminal</small></span><span class="chev">›</span></div>
+  </div>
+</div>
+
+<!-- 2. Propina -->
+<div class="paso"><b>2 · Propina</b> — siempre después de elegir el método (con efectivo, tarjeta o transferencia por igual)</div>
+<div class="pantalla">
+  <div class="cab">
+    <div class="btn-volver">←</div>
+    <div class="centro">Efectivo · Ticket #A-0142</div>
+    <div style="width:56px"></div>
+  </div>
+  <div class="hero" style="flex:0;padding:56px 0 40px">
+    <div style="font-family:Sora;font-weight:700;font-size:40px">¿Agregar propina?</div>
+    <div class="sub">Sobre <span class="money" style="color:var(--ink)">$560.00</span></div>
+  </div>
+  <div class="props">
+    <div class="prop"><div class="pct">10%</div><div class="mto">$56.00</div></div>
+    <div class="prop"><div class="pct">15%</div><div class="mto">$84.00</div></div>
+    <div class="prop"><div class="pct">20%</div><div class="mto">$112.00</div></div>
+  </div>
+  <div style="flex:1"></div>
+  <div class="pie">
+    <div class="dos">
+      <div class="secundario">Otro monto</div>
+      <div class="secundario">Sin propina</div>
+    </div>
+  </div>
+</div>
+<p class="nota">Tocar una opción avanza directo al siguiente paso, sin botón de «Confirmar». «Otro monto» abre el mismo teclado del efectivo. Si la terminal Clip es la que pregunta la propina, con «Tarjeta» esta pantalla se salta.</p>
+
+<!-- 3. Efectivo -->
+<div class="paso"><b>3 · Efectivo</b> — lo que hoy se siente revuelto, separado en dos zonas: cifras a la izquierda, teclado a la derecha</div>
+<div class="pantalla">
+  <div class="cab">
+    <div class="btn-volver">←</div>
+    <div class="centro">Total con propina <span class="money" style="color:var(--ink);font-size:18px">$616.00</span></div>
+    <div style="width:56px"></div>
+  </div>
+  <div class="cuerpo">
+    <div class="cifras">
+      <div>
+        <div class="etq">Recibido</div>
+        <div class="money recibido">$1,000.00</div>
+      </div>
+      <div>
+        <div class="etq">Cambio</div>
+        <div class="money cambio">$384.00</div>
+      </div>
+      <div class="billetes">
+        <div class="chip exacto">Exacto</div>
+        <div class="chip">$620</div>
+        <div class="chip">$650</div>
+        <div class="chip">$700</div>
+        <div class="chip">$1,000</div>
+      </div>
+    </div>
+    <div class="pad">
+      <div class="tecla">1</div><div class="tecla">2</div><div class="tecla">3</div>
+      <div class="tecla">4</div><div class="tecla">5</div><div class="tecla">6</div>
+      <div class="tecla">7</div><div class="tecla">8</div><div class="tecla">9</div>
+      <div class="tecla">00</div><div class="tecla">0</div><div class="tecla">⌫</div>
+    </div>
+  </div>
+  <div class="pie"><div class="primario">Cobrar y dar $384.00 de cambio</div></div>
+</div>
+<p class="nota">Cambio respecto a hoy: los billetes ya no son una rejilla de 6 sino atajos que la caja sugiere según el total (exacto, siguiente billete redondo…), como hace Square. Una sola cifra grande: lo recibido.</p>
+
+<!-- 3. Registrando -->
+<div class="paso"><b>4 · Registrando</b> — dura menos de un segundo; el cambio ya se ve para ir contando</div>
+<div class="pantalla">
+  <div class="cab" style="border:0;justify-content:center">
+    <div style="text-align:center"><div class="money" style="font-size:28px">Cambio $384.00</div><div class="etq">de $1,000.00</div></div>
+  </div>
+  <div class="hero">
+    <div class="spin"></div>
+    <div style="font-family:Sora;font-weight:700;font-size:32px">Registrando pago</div>
+  </div>
+</div>
+
+<!-- 4. Completado -->
+<div class="paso"><b>5 · Cobro completado</b> — reemplaza al modal actual de «Cobro completado»</div>
+<div class="pantalla">
+  <div class="cab" style="border:0">
+    <div style="width:56px"></div>
+    <div class="centro">Ticket #A-0142</div>
+    <div style="width:56px"></div>
+  </div>
+  <div class="hero">
+    <div class="money" style="font-size:28px;color:var(--ink-2)">Recibió $1,000.00</div>
+    <div class="money gran-cambio">$384.00 de cambio</div>
+  </div>
+  <div class="pie">
+    <div class="dos">
+      <div class="secundario">Imprimir ticket</div>
+      <div class="primario">Nueva venta</div>
+    </div>
+    <div class="cuenta"><i></i></div>
+    <div class="etq" style="text-align:center;margin-top:8px">Nueva venta en 3 s</div>
+  </div>
+</div>
+
+</body>
+</html>
