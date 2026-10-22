@@ -75,9 +75,12 @@ const ALINEA = { izq: "left", centro: "center", der: "right" } as const;
 
 /** El ticket como correo: una columna angosta en letra de ticket, como el papel. */
 export function htmlDeTicket(bloques: BloqueCorreo[], negocio: string): string {
-  const filas = bloques.map((b) => {
+  const filas = bloques.map((b, i) => {
     switch (b.t) {
       case "texto": {
+        // El renglón que en papel dice «Escanea el código» va justo antes del QR: en el correo el QR
+        // es un enlace, así que no se pide escanear nada.
+        if (bloques[i + 1]?.t === "qr") return `<tr><td colspan="2" style="text-align:center;padding:4px 0 0">¿Necesitas factura?</td></tr>`;
         const tam = b.size && b.size > 1 ? 18 : 13;
         return `<tr><td colspan="2" style="text-align:${ALINEA[b.align ?? "izq"]};font-size:${tam}px;${b.bold ? "font-weight:bold;" : ""}padding:1px 0">${esc(b.valor)}</td></tr>`;
       }

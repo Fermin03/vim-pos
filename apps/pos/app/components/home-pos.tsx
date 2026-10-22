@@ -48,6 +48,7 @@ import { CobroCompletado } from "./cobro-completado";
 import { ModalDescuento } from "./modal-descuento";
 import { obtenerImpresora, obtenerImpresoraDeEstacion } from "../lib/print/adapter";
 import { PreviewAdapter } from "../lib/print/preview-adapter";
+import { enviarTicketPorCorreo } from "../lib/ticket-correo";
 import { estacionParaArea, hayEstacionDeCocinaDedicada } from "../lib/print/config";
 import { encolarComanda, leerCola, vaciarCola } from "../lib/print/cola-comandas";
 import { ModalConfigImpresora } from "./modal-config-impresora";
@@ -2760,6 +2761,9 @@ export function HomePos({
           sinImpresora={obtenerImpresora("CAJA", { onMostrar: () => {} }) instanceof PreviewAdapter}
           pausa={mostrarRecibo || avisoReparto != null}
           onImprimirCopia={() => { setImprimirCopia(true); setMostrarRecibo(true); }}
+          onEnviarCorreo={datosTicket && ticketImpresoId ? (correo) => enviarTicketPorCorreo(token, {
+            correo, ticketId: ticketImpresoId, bloques: construirTicketJob(datosTicket).bloques,
+          }) : undefined}
           onNuevoTicket={nuevoTicket}
         />
       )}

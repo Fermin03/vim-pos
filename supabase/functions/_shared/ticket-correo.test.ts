@@ -55,3 +55,12 @@ test("el QR solo se vuelve enlace si apunta a VIM", () => {
   const raro = htmlDeTicket([{ t: "qr", valor: "javascript:alert(1)" }], "N");
   assert.ok(!raro.includes("href="));
 });
+
+test("en el correo no se pide escanear: el texto antes del QR se vuelve una pregunta", () => {
+  const html = htmlDeTicket([
+    { t: "texto", valor: "¿Necesitas factura? Escanea el código:" },
+    { t: "qr", valor: "https://factura.vimpos.com.mx/x" },
+  ], "N");
+  assert.ok(!html.includes("Escanea"));
+  assert.ok(html.includes("¿Necesitas factura?"));
+});

@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { fmtMxn } from "../lib/turno";
+import { correoValido } from "../lib/ticket-correo";
+import { useEscape } from "../lib/use-escape";
 import { BotonPrincipal, BotonSecundario, PantallaCobro } from "./cobro/pantalla-cobro";
 
 /** Segundos antes de abrir el ticket nuevo solo. */
@@ -32,6 +34,7 @@ export function CobroCompletado({
   sinImpresora = false,
   pausa,
   onImprimirCopia,
+  onEnviarCorreo,
   onNuevoTicket,
 }: {
   folio: string | null;
@@ -48,8 +51,34 @@ export function CobroCompletado({
   /** Algo se abrió encima (recibo, aviso): la cuenta se detiene. */
   pausa: boolean;
   onImprimirCopia: () => void;
+  /** Sin impresora: manda el ticket al correo del cliente. Lanza un Error con el mensaje para el cajero. */
+  onEnviarCorreo?: (correo: string) => Promise<void>;
   onNuevoTicket: () => void;
 }) {
+  // Sin impresora, el comprobante va por correo, como en Square. La cuenta regresiva se detiene en
+  // cuanto el cajero abre la pantalla del correo.
+  const [escribiendo, setEscribiendo] = useState(false);
+  const [correo, setCorreo] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [errorCorreo, setErrorCorreo] = useState<string | null>(null);
+  const [enviadoA, setEnviadoA] = useState<string | null>(null);
+  // Escape en la pantalla del correo regresa a «Cobro completado», no abre una venta nueva.
+  useEscape(escribiendo && !enviando ? () => setEscribiendo(false) : null);
+
+  async function enviar() {
+    if (!onEnviarCorreo || enviando || !correoValido(correo)) return;
+    setEnviando(true);
+    setErrorCorreo(null);
+    try {
+      await onEnviarCorreo(correo.trim());
+      setEnviadoA(correo.trim());
+      setEscribiendo(false);
+    } catch (e) {
+      setErrorCorreo(e instanceof Error ? e.message : "No se pudo enviar el correo. Intenta otra vez.");
+    } finally {
+      setEnviando(false);
+    }
+  }
   const [restante, setRestante] = useState(SEGUNDOS_REGRESO);
   const [detenida, setDetenida] = useState(false);
   const parada = detenida || estadoTicket === "error";
@@ -80,6 +109,40 @@ export function CobroCompletado({
 
   const conCambio = cambio > 0;
 
+  if (escribiendo) {
+    return (
+      <PantallaCobro
+        regresar={{ icono: "atras", onClick: () => setEscribiendo(false), disabled: enviando }}
+        contexto="Enviar ticket por correo"
+        pie={
+          <BotonPrincipal onClick={() => void enviar()} disabled={enviando || !correoValido(correo)}>
+            {enviando ? "Enviando…" : "Enviar"}
+          </BotonPrincipal>
+        }
+      >
+        <form
+          className="mx-auto flex w-full max-w-[640px] flex-1 flex-col justify-center px-8"
+          onSubmit={(e) => { e.preventDefault(); void enviar(); }}
+        >
+          <label htmlFor="correo-ticket" className="mb-2 text-16 font-semibold text-ink">Correo del cliente</label>
+          <input
+            id="correo-ticket"
+            type="email"
+            inputMode="email"
+            autoComplete="off"
+            autoFocus
+            value={correo}
+            onChange={(e) => { setCorreo(e.target.value); setErrorCorreo(null); }}
+            placeholder="ejemplo@correo.com"
+            className="h-16 rounded-lg border-2 border-ink px-4 text-24 text-ink outline-none placeholder:text-ink-3"
+          />
+          <p className="mt-3 text-15 text-ink-3">Le llega su ticket a este correo. VIM no lo guarda.</p>
+          {errorCorreo && <p className="mt-3 text-16 font-medium text-danger" role="alert">{errorCorreo}</p>}
+        </form>
+      </PantallaCobro>
+    );
+  }
+
   // Pantalla completa como el resto del cobro (spec 2026-10-21): sin palomita y sin botón arriba a
   // la derecha (pedido de Fermín); el cambio es lo más grande de la pantalla.
   return (
@@ -93,8 +156,23 @@ export function CobroCompletado({
               El ticket del cliente no se pudo armar.
             </p>
           )}
+          {enviadoA && (
+            <p className="mb-3 text-center text-16 font-medium text-success" role="status">Ticket enviado a {enviadoA}</p>
+          )}
           {sinImpresora ? (
-            <BotonPrincipal onClick={onNuevoTicket}>Nueva venta</BotonPrincipal>
+            onEnviarCorreo && !enviadoA ? (
+              <div className="grid grid-cols-2 gap-3">
+                <BotonSecundario
+                  onClick={() => { setDetenida(true); setEscribiendo(true); }}
+                  disabled={!puedeImprimir}
+                >
+                  {puedeImprimir || estadoTicket === "error" ? "Enviar por correo" : "Preparando…"}
+                </BotonSecundario>
+                <BotonPrincipal onClick={onNuevoTicket}>Nueva venta</BotonPrincipal>
+              </div>
+            ) : (
+              <BotonPrincipal onClick={onNuevoTicket}>Nueva venta</BotonPrincipal>
+            )
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <BotonSecundario
