@@ -17,6 +17,7 @@ import { nuevoClientId } from "../lib/carrito";
 import { aplicarPagosEnOrden, pagoEntroPeseAlError, ventaQuedoPagada, type PagoPorAplicar } from "../lib/cobro-pagos";
 import { pagoDeCobro, pedirCobro, propinaDeCobro, terminalDeCaja, type CobroTerminal, type TerminalCaja } from "../lib/terminal";
 import { VistaTerminal } from "./vista-terminal";
+import { aBuffer, aMonto, BotonPrincipal, BotonSecundario, FilaOpcion, Numpad, PantallaCobro } from "./cobro/pantalla-cobro";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
 import {
   leerCuentaCredito,
@@ -70,12 +71,6 @@ function IcoBack({ cls }: { cls?: string }) {
 function IcoChevron({ cls }: { cls?: string }) {
   return (
     <Icono nombre="chevron-derecha" className={cls} />
-  );
-}
-
-function IcoBackspace({ cls }: { cls?: string }) {
-  return (
-    <Icono nombre="retroceso" className={cls} />
   );
 }
 
@@ -177,78 +172,6 @@ const ESPERA_LECTOR_MS = 4000;
 
 /** Pago dividido capturado. Su `clientId` se fija al agregarlo y viaja a `aplicar_pago` (B2-2). */
 type PagoAplicado = PagoPorAplicar;
-
-// El numpad trabaja en CENTAVOS (estándar POS): cada dígito desplaza los decimales, así se
-// capturan totales fraccionarios (p.ej. $49.50 tras un % de descuento) sin tecla de punto.
-const aMonto = (buf: string) => (buf ? parseInt(buf, 10) : 0) / 100; // buffer de centavos → pesos
-const aBuffer = (v: number) => String(Math.round(v * 100));          // pesos → buffer de centavos
-
-// ─── Numpad mini ─────────────────────────────────────────────────────────────
-
-function Numpad({
-  buffer,
-  onChange,
-  compact = false,
-  grande = false,
-  onEnter,
-  capturarTeclado = true,
-}: {
-  buffer: string;
-  onChange: (b: string) => void;
-  compact?: boolean;
-  /** Teclas de 64px: las del cobro en efectivo, el teclado que más se usa del turno. */
-  grande?: boolean;
-  /** Enter confirma (p. ej. cobrar). */
-  onEnter?: () => void;
-  /** Si es false, no escucha el teclado (por si convivieran dos numpads). */
-  capturarTeclado?: boolean;
-}) {
-  const nkBase = grande
-    ? "border border-line-strong rounded-lg bg-surface font-display text-2xl font-semibold cursor-pointer h-16 flex items-center justify-center text-ink transition-[transform,background-color] duration-150 ease-vim hover:bg-hover active:scale-[.97] active:bg-line"
-    : compact
-    ? "border border-line-strong rounded bg-surface font-display text-xl font-semibold cursor-pointer min-h-[48px] flex items-center justify-center text-ink transition-colors hover:bg-hover active:bg-line"
-    : "border border-line-strong rounded bg-surface font-display text-2xl font-semibold cursor-pointer min-h-[56px] flex items-center justify-center text-ink transition-colors hover:bg-hover active:bg-line";
-
-  function press(key: string) {
-    if (key === "back") onChange(buffer.slice(0, -1));
-    else if (key === "00") onChange((buffer + "00").slice(0, 8));
-    else onChange((buffer + key).slice(0, 8));
-  }
-
-  // Teclado físico además del táctil: números + Backspace (+ Enter para confirmar). El buffer es en
-  // CENTAVOS, así que teclear "4950" = $49.50 igual que tocando; se ignoran '.'/','. Refs para no
-  // re-registrar el listener en cada cambio de buffer.
-  const onChangeRef = useRef(onChange);
-  const bufferRef = useRef(buffer);
-  const onEnterRef = useRef(onEnter);
-  onChangeRef.current = onChange;
-  bufferRef.current = buffer;
-  onEnterRef.current = onEnter;
-  useEffect(() => {
-    if (!capturarTeclado) return;
-    function onKey(e: KeyboardEvent) {
-      const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
-      if (e.key >= "0" && e.key <= "9") { e.preventDefault(); onChangeRef.current((bufferRef.current + e.key).slice(0, 8)); }
-      else if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); onChangeRef.current(bufferRef.current.slice(0, -1)); }
-      else if (e.key === "Enter") { e.preventDefault(); onEnterRef.current?.(); }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [capturarTeclado]);
-
-  const keys = ["1","2","3","4","5","6","7","8","9","00","0","back"];
-
-  return (
-    <div className="grid grid-cols-3 gap-2">
-      {keys.map((k) => (
-        <button key={k} type="button" className={nkBase} onClick={() => press(k)} aria-label={k === "back" ? "Borrar" : undefined}>
-          {k === "back" ? <IcoBackspace cls="w-6 h-6 text-ink-2" /> : k}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 // ─── Vista: selector de método (P-069) ──────────────────────────────────────
 
