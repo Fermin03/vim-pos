@@ -1,8 +1,12 @@
 "use client";
+// Cobro a pantalla completa (spec docs/superpowers/specs/2026-10-21-cobro-pantalla-completa-design.md):
+// cada paso ocupa toda la caja, del mismo tamaño, con el botón de regresar siempre arriba a la
+// izquierda. El orden de los pasos (propina después del método, a dónde lleva regresar) vive en
+// `lib/cobro-flujo.ts`; el dinero, en `lib/cobro.ts` y `lib/cobro-pagos.ts`, sin cambios.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { capaVisible } from "../lib/escape";
 import { useEscape } from "../lib/use-escape";
-import { Button, Icono } from "@vim/ui/styles";
+import { Icono } from "@vim/ui/styles";
 import { fmtMxn } from "../lib/turno";
 import {
   aplicarPago,
@@ -16,6 +20,7 @@ import {
 import { nuevoClientId } from "../lib/carrito";
 import { aplicarPagosEnOrden, pagoEntroPeseAlError, ventaQuedoPagada, type PagoPorAplicar } from "../lib/cobro-pagos";
 import { pagoDeCobro, pedirCobro, propinaDeCobro, terminalDeCaja, type CobroTerminal, type TerminalCaja } from "../lib/terminal";
+import { debePreguntarPropina, montosSugeridosEfectivo, vistaAlRegresar, type DestinoMetodo, type VistaCobro } from "../lib/cobro-flujo";
 import { VistaTerminal } from "./vista-terminal";
 import { aBuffer, aMonto, BotonPrincipal, BotonSecundario, FilaOpcion, Numpad, PantallaCobro } from "./cobro/pantalla-cobro";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
@@ -30,685 +35,351 @@ import {
 } from "../lib/credito";
 import { cobroEsperaAnticipo, leerAnticipoVenta, pagarConAnticipo, resumenAnticipoCobro, TEXTO_ANTICIPO, type AnticipoVenta } from "../lib/anticipos";
 
-// ─── Íconos SVG inline (calcan los mockups) ────────────────────────────────
+// ─── Nombres de los métodos ──────────────────────────────────────────────────
 
-function IcoEfectivo({ cls }: { cls?: string }) {
-  return (
-    <Icono nombre="billete" className={cls} />
-  );
-}
-
-function IcoDebito({ cls }: { cls?: string }) {
-  return (
-    <Icono nombre="tarjeta" className={cls} />
-  );
-}
-
-function IcoCredito({ cls }: { cls?: string }) {
-  return (
-    <Icono nombre="tarjeta" className={cls} />
-  );
-}
-
-function IcoTransferencia({ cls }: { cls?: string }) {
-  return (
-    <Icono nombre="transferencia" className={cls} />
-  );
-}
-
-function IcoDividido({ cls }: { cls?: string }) {
-  return (
-    <Icono nombre="pago-dividido" className={cls} />
-  );
-}
-
-function IcoBack({ cls }: { cls?: string }) {
-  return (
-    <Icono nombre="flecha-izquierda" className={cls} />
-  );
-}
-
-function IcoChevron({ cls }: { cls?: string }) {
-  return (
-    <Icono nombre="chevron-derecha" className={cls} />
-  );
-}
-
-function IcoTrash({ cls }: { cls?: string }) {
-  return (
-    <Icono nombre="eliminar" className={cls} />
-  );
-}
-
-function IcoPlus({ cls }: { cls?: string }) {
-  return (
-    <Icono nombre="mas" className={cls} />
-  );
-}
-
-function IcoClose({ cls }: { cls?: string }) {
-  return (
-    <Icono nombre="cerrar" className={cls} />
-  );
-}
-
-// ─── Config de métodos ───────────────────────────────────────────────────────
-
-type MetodoConfig = {
-  valor: MetodoPago;
-  etiqueta: string;
-  sub: string;
-  icoFn: (p: { cls?: string }) => React.ReactElement;
-  // inline styles para el ícono (colores de paleta no incluidos en tokens)
-  icoBg: string;
-  icoColor: string;
+const NOMBRE: Partial<Record<MetodoPago, string>> = {
+  EFECTIVO: "Efectivo",
+  TARJETA_DEBITO: "Débito",
+  TARJETA_CREDITO: "Crédito",
+  TRANSFERENCIA: "Transferencia",
+  CREDITO: "A crédito",
+  SALDO_FAVOR: "Saldo a favor",
 };
 
-const METODOS: MetodoConfig[] = [
-  {
-    valor: "EFECTIVO",
-    etiqueta: "Efectivo",
-    sub: "Captura el monto recibido y calcula el cambio",
-    icoFn: IcoEfectivo,
-    icoBg: "#E7F2EC",
-    icoColor: "#2E7D52",
-  },
-  {
-    valor: "TARJETA_DEBITO",
-    etiqueta: "Débito",
-    sub: "Se cobra en terminal de pago",
-    icoFn: IcoDebito,
-    icoBg: "#EAF0F8",
-    icoColor: "#2C5AA0",
-  },
-  {
-    valor: "TARJETA_CREDITO",
-    etiqueta: "Crédito",
-    sub: "Crédito · se cobra en terminal",
-    icoFn: IcoCredito,
-    icoBg: "#EAF0F8",
-    icoColor: "#2C5AA0",
-  },
-  {
-    valor: "TRANSFERENCIA",
-    etiqueta: "Transferencia",
-    sub: "Captura la referencia y verifica recepción",
-    icoFn: IcoTransferencia,
-    icoBg: "#E2F0F1",
-    icoColor: "#1F7A82",
-  },
-];
+const nombreMetodo = (m: MetodoPago) => NOMBRE[m] ?? m;
 
-function metodoCfg(v: MetodoPago): MetodoConfig {
-  return METODOS.find((m) => m.valor === v) ?? (METODOS[0] as MetodoConfig);
+/** «A crédito» y «Saldo a favor» en el selector (módulo de crédito); no se combinan en el pago dividido. */
+type Extra = { valor: MetodoPago; etiqueta: string; sub: string };
+
+/** Lo que va al centro de la cabecera: «Efectivo · Ticket #A-0142 · Mesa 4». */
+function cabecera(partes: (string | null | undefined)[]) {
+  return partes.filter(Boolean).join(" · ");
 }
 
-// Solo en el selector, y solo con el módulo de crédito (retail): no se combinan en el pago dividido.
-const CFG_CREDITO: MetodoConfig = {
-  valor: "CREDITO",
-  etiqueta: "A crédito",
-  sub: "",
-  icoFn: ({ cls }) => <Icono nombre="calendario" className={cls} />,
-  icoBg: "#F6EFE3",
-  icoColor: "#8A5A12",
-};
-const CFG_SALDO_FAVOR: MetodoConfig = {
-  valor: "SALDO_FAVOR",
-  etiqueta: "Saldo a favor",
-  sub: "",
-  icoFn: ({ cls }) => <Icono nombre="moneda" className={cls} />,
-  icoBg: "#E7F2EC",
-  icoColor: "#2E7D52",
-};
+const dinero = "font-display font-bold tabular-nums";
 
-// ─── Sub-vistas ──────────────────────────────────────────────────────────────
-
-type Vista = "propina" | "selector" | "efectivo" | "otro" | "dividido" | "atajo" | "terminal" | "credito" | "saldo";
-
-/** Lo más que la propina espera a saber si el lector la pregunta; después sale la de VIM. */
-const ESPERA_LECTOR_MS = 4000;
-
-// ─── Tipos locales ───────────────────────────────────────────────────────────
-
-/** Pago dividido capturado. Su `clientId` se fija al agregarlo y viaja a `aplicar_pago` (B2-2). */
-type PagoAplicado = PagoPorAplicar;
-
-// ─── Vista: selector de método (P-069) ──────────────────────────────────────
+// ─── «¿Cómo paga?» (P-069) ───────────────────────────────────────────────────
 
 function VistaSelector({
   totales,
+  contexto,
   conTerminal,
-  extras = [],
-  anticipo = 0,
-  onCobrarConAnticipo,
-  procesando = false,
+  terminalSabida,
   terminalLista,
-  onRevisarTerminal,
+  extras,
+  anticipo,
+  onCobrarConAnticipo,
+  procesando,
   error,
+  onRevisarTerminal,
   onElegir,
+  onMas,
   onCerrar,
 }: {
   totales: TotalesTicket;
-  /** Lo que esta venta ya pagó con el anticipo de su cita (belleza): «Anticipo −$X» y «Por cobrar». */
-  anticipo?: number;
-  /** El anticipo cubre todo: en vez de las formas de pago, un solo botón que lo confirma. */
-  onCobrarConAnticipo?: () => void;
-  procesando?: boolean;
+  contexto: string;
   /** La caja tiene terminal ligada: Débito y Crédito se vuelven un solo «Tarjeta» que cobra en ella. */
   conTerminal: boolean;
-  /** «A crédito» y «Saldo a favor», ya con su detalle (módulo de crédito). Vacío = como siempre. */
-  extras?: MetodoConfig[];
-  /** El lector puede recibir el cobro (Clip apagado o con la app cerrada = no): si no, «Tarjeta» abre el registro a mano. */
+  /** Ya contestó la nube si el lector está listo (y si pregunta la propina). */
+  terminalSabida: boolean;
   terminalLista: boolean;
+  extras: Extra[];
+  /** Lo que esta venta ya pagó con el anticipo de su cita (belleza): «Anticipo −$X» y «Por cobrar». */
+  anticipo: number;
+  /** El anticipo cubre todo: en vez de las formas de pago, un solo botón que lo confirma. */
+  onCobrarConAnticipo?: () => void;
+  procesando: boolean;
+  error: string | null;
   /** Vuelve a preguntar por el lector; true si ya puede cobrar. */
   onRevisarTerminal: () => Promise<boolean>;
-  error: string | null;
-  onElegir: (m: MetodoPago | "dividido" | "terminal") => void;
+  onElegir: (d: DestinoMetodo) => void;
+  /** «Más»: débito y crédito a mano (solo con terminal). */
+  onMas: () => void;
   onCerrar: () => void;
 }) {
-  // El registro a mano se queda como salida (sin internet, terminal descompuesta), pero escondido.
-  const [aMano, setAMano] = useState(false);
-  // El mensaje pide encender el lector: al tocar «Tarjeta» otra vez se pregunta de nuevo, y solo si
-  // sigue sin estar listo se abre lo manual.
   const [revisando, setRevisando] = useState(false);
-  // Si la cajera ya salió del selector (eligió efectivo, dividió o cerró), la respuesta tardía no
-  // la regresa a la terminal: mandaría el monto al lector a media venta.
+  // Si la cajera ya salió del selector, la respuesta tardía no la regresa a la terminal: mandaría el
+  // monto al lector a media venta.
   const montado = useRef(true);
   useEffect(() => { montado.current = true; return () => { montado.current = false; }; }, []);
-  async function revisarTerminal() {
+  async function tarjeta() {
+    if (terminalSabida && terminalLista) { onElegir("terminal"); return; }
     if (revisando) return;
     setRevisando(true);
     const lista = await onRevisarTerminal().catch(() => false);
     if (!montado.current) return;
     setRevisando(false);
+    // Sin lector listo, el registro a mano (sin internet, terminal descompuesta).
     if (lista) onElegir("terminal");
-    else setAMano(true);
+    else onMas();
   }
-  const filas: { cfg: MetodoConfig; elegir: () => void; clave: string; aviso?: boolean }[] = [];
-  for (const m of METODOS) {
-    const esTarjeta = m.valor === "TARJETA_DEBITO" || m.valor === "TARJETA_CREDITO";
-    if (!conTerminal || !esTarjeta) { filas.push({ cfg: m, elegir: () => onElegir(m.valor), clave: m.valor }); continue; }
-    if (m.valor === "TARJETA_DEBITO") {
-      filas.push({
-        cfg: {
-          ...metodoCfg("TARJETA_CREDITO"), etiqueta: "Tarjeta",
-          sub: terminalLista ? "Débito o crédito · se cobra en la terminal"
-            : revisando ? "Revisando la terminal…" : "Terminal no disponible: enciéndela y abre Clip PinPad",
-        },
-        elegir: terminalLista ? () => onElegir("terminal") : revisarTerminal, clave: "terminal", aviso: !terminalLista,
-      });
-    }
-    if (aMano) {
-      filas.push({ cfg: { ...m, etiqueta: `${m.etiqueta} · a mano`, sub: "Ya se cobró en otra terminal" }, elegir: () => onElegir(m.valor), clave: m.valor });
-    }
-  }
-  for (const m of extras) filas.push({ cfg: m, elegir: () => onElegir(m.valor), clave: m.valor });
+  const subTarjeta = revisando || !terminalSabida
+    ? "Revisando la terminal…"
+    : terminalLista ? "Débito o crédito · se cobra en la terminal" : "Terminal no disponible: enciéndela y abre Clip PinPad";
+
   return (
-    <div className="flex flex-col h-full">
-      {/* Total a cobrar */}
-      {anticipo > 0 ? (
-        <div className="border border-line rounded-lg bg-sel mb-5 px-5 py-4">
-          <div className="flex items-baseline justify-between text-15 text-ink-2">
-            <span>Total</span>
-            <span className="tabular-nums">{fmtMxn(totales.total)}</span>
-          </div>
-          <div className="mt-1 flex items-baseline justify-between text-15 text-ink-2">
-            <span>{TEXTO_ANTICIPO.lineaCobro}</span>
-            <span className="tabular-nums">−{fmtMxn(anticipo)}</span>
-          </div>
-          <div className="mt-3 flex items-baseline justify-between border-t border-line pt-3">
-            <span className="font-display text-20 font-bold text-ink">{TEXTO_ANTICIPO.porCobrar}</span>
-            <span className="font-display text-32 font-bold tracking-tight text-ink tabular-nums leading-none">{fmtMxn(totales.pendiente)}</span>
-          </div>
-        </div>
-      ) : (
-        <div className="text-center px-6 py-5 border border-line rounded-lg bg-sel mb-5">
-          <div className="text-12 font-bold uppercase tracking-widest text-ink-3 mt-3">Total a cobrar</div>
-          <div className="font-display text-40 font-bold tracking-tight text-ink tabular-nums leading-none mt-1 mb-1">
-            {fmtMxn(totales.total)}
-          </div>
-        </div>
-      )}
-
-      {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
-      {onCobrarConAnticipo ? (
-        <button
-          type="button"
-          onClick={() => { if (!procesando) onCobrarConAnticipo(); }}
-          disabled={procesando}
-          className="h-14 w-full rounded bg-accent text-16 font-bold text-white shadow-sm transition-[transform,background-color] duration-150 ease-vim hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong"
-        >
-          {procesando ? "Aplicando…" : `Cobrar con anticipo ${fmtMxn(anticipo)}`}
-        </button>
-      ) : (<>
-      <div className="text-15 font-semibold text-ink-2 mb-3">¿Cómo paga el cliente?</div>
-
-      {/* Lista de métodos */}
-      <div className="border border-line rounded-lg overflow-hidden">
-        {filas.map(({ cfg: m, elegir, clave, aviso }, i) => (
-          <button
-            key={clave}
-            type="button"
-            onClick={elegir}
-            aria-busy={aviso && revisando}
-            className={[
-              "w-full flex items-center gap-4 px-[18px] py-[15px] cursor-pointer transition-colors hover:bg-hover text-left",
-              i < filas.length - 1 ? "border-b border-line" : "",
-            ].join(" ")}
-          >
-            <span
-              className="w-[46px] h-[46px] rounded-[11px] flex items-center justify-center flex-shrink-0"
-              style={{ background: m.icoBg, color: m.icoColor }}
-            >
-              <m.icoFn cls="w-[25px] h-[25px]" />
-            </span>
-            <span className="flex-1 min-w-0">
-              <span className="block text-16 font-semibold text-ink">{m.etiqueta}</span>
-              <span className={`block text-13 mt-[1px] ${aviso ? "text-warning" : "text-ink-3"}`} role={aviso ? "status" : undefined}>{m.sub}</span>
-            </span>
-            <IcoChevron cls="w-5 h-5 text-ink-3 flex-shrink-0" />
-          </button>
-        ))}
-
-        {/* Separador dividido */}
-        <div className="px-[18px] py-[9px] text-11 font-bold uppercase tracking-widest text-ink-3 bg-sel border-t border-line">
-          Combinar formas de pago
-        </div>
-
+    <PantallaCobro
+      regresar={{ icono: "cerrar", onClick: onCerrar, disabled: procesando }}
+      contexto={contexto}
+      derecha={!onCobrarConAnticipo && (
         <button
           type="button"
           onClick={() => onElegir("dividido")}
-          className="w-full flex items-center gap-4 px-[18px] py-[15px] cursor-pointer transition-colors hover:bg-hover text-left"
+          className="min-h-[56px] px-2 text-16 font-semibold text-ink underline underline-offset-4"
         >
-          <span
-            className="w-[46px] h-[46px] rounded-[11px] flex items-center justify-center flex-shrink-0"
-            style={{ background: "#EFEAF6", color: "#6B4FA0" }}
-          >
-            <IcoDividido cls="w-[25px] h-[25px]" />
-          </span>
-          <span className="flex-1 min-w-0">
-            <span className="block text-16 font-semibold text-ink">Pago dividido</span>
-            <span className="block text-13 text-ink-3 mt-[1px]">Combina efectivo, tarjeta u otros en un mismo ticket</span>
-          </span>
-          <IcoChevron cls="w-5 h-5 text-ink-3 flex-shrink-0" />
+          Dividir pago
         </button>
-      </div>
-      </>)}
-
-      {/* Footer */}
-      <div className="mt-auto pt-5 flex items-center justify-between gap-4">
-        <button
-          type="button"
-          onClick={onCerrar}
-          className="inline-flex items-center gap-2 text-15 font-semibold text-ink-2 border border-line-strong rounded px-[22px] py-[14px] hover:bg-hover hover:text-ink transition-colors"
-        >
-          <IcoBack cls="w-4 h-4" />
-          Volver al ticket
-        </button>
-        {conTerminal && !aMano ? (
-          <button type="button" onClick={() => setAMano(true)} className="min-h-[44px] px-2 text-13 font-semibold text-ink-2 underline underline-offset-2 hover:text-ink">
-            La cobré en otra terminal
-          </button>
+      )}
+      pie={onCobrarConAnticipo && (
+        <BotonPrincipal onClick={() => { if (!procesando) onCobrarConAnticipo(); }} disabled={procesando}>
+          {procesando ? "Aplicando…" : `Cobrar con anticipo ${fmtMxn(anticipo)}`}
+        </BotonPrincipal>
+      )}
+    >
+      <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+        <div className={`${dinero} text-[96px] leading-none text-ink`}>{fmtMxn(totales.pendiente)}</div>
+        {anticipo > 0 ? (
+          <div className="mt-4 text-18 text-ink-3">
+            Total <span className="tabular-nums">{fmtMxn(totales.total)}</span> · {TEXTO_ANTICIPO.lineaCobro}{" "}
+            <span className="tabular-nums">−{fmtMxn(anticipo)}</span>
+          </div>
         ) : (
-          <span className="text-13 text-ink-3">Efectivo es el más usado</span>
+          !onCobrarConAnticipo && <div className="mt-3 text-18 text-ink-3">Elige cómo paga el cliente</div>
         )}
+        {error && <p className="mt-4 max-w-[640px] text-16 font-medium text-danger" role="alert">{error}</p>}
       </div>
-    </div>
+      {!onCobrarConAnticipo && (
+        <div className="px-6 pb-6">
+          <FilaOpcion titulo="Efectivo" onClick={() => onElegir("EFECTIVO")} />
+          {conTerminal ? (
+            <FilaOpcion
+              titulo="Tarjeta"
+              sub={subTarjeta}
+              aviso={terminalSabida && !terminalLista && !revisando}
+              ocupado={revisando}
+              onClick={() => void tarjeta()}
+            />
+          ) : (
+            <>
+              <FilaOpcion titulo="Débito" onClick={() => onElegir("TARJETA_DEBITO")} />
+              <FilaOpcion titulo="Crédito" onClick={() => onElegir("TARJETA_CREDITO")} />
+            </>
+          )}
+          <FilaOpcion titulo="Transferencia" onClick={() => onElegir("TRANSFERENCIA")} />
+          {extras.map((x) => <FilaOpcion key={x.valor} titulo={x.etiqueta} sub={x.sub} onClick={() => onElegir(x.valor)} />)}
+          {conTerminal && <FilaOpcion titulo="Más" sub="Débito o crédito a mano" onClick={onMas} />}
+        </div>
+      )}
+    </PantallaCobro>
   );
 }
 
-// ─── Vista: pago efectivo (P-070) ────────────────────────────────────────────
+// ─── «Más»: tarjeta cobrada en otra terminal ─────────────────────────────────
 
-function VistaEfectivo({
-  totales,
-  procesando,
-  error,
-  onAplicar,
-  onVolver,
-}: {
+function VistaMas({ totales, contexto, onElegir, onRegresar }: {
   totales: TotalesTicket;
+  contexto: string;
+  onElegir: (m: MetodoPago) => void;
+  onRegresar: () => void;
+}) {
+  return (
+    <PantallaCobro regresar={{ icono: "atras", onClick: onRegresar }} contexto={contexto}>
+      <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+        <div className={`${dinero} text-[96px] leading-none text-ink`}>{fmtMxn(totales.pendiente)}</div>
+        <div className="mt-3 text-18 text-ink-3">Otra forma de pago</div>
+      </div>
+      <div className="px-6 pb-6">
+        <FilaOpcion titulo="Débito · a mano" sub="La cobraste en otra terminal" onClick={() => onElegir("TARJETA_DEBITO")} />
+        <FilaOpcion titulo="Crédito · a mano" sub="La cobraste en otra terminal" onClick={() => onElegir("TARJETA_CREDITO")} />
+      </div>
+    </PantallaCobro>
+  );
+}
+
+// ─── Propina (P-075): después de elegir el método ────────────────────────────
+
+function VistaPropina({ totalBase, contexto, sugerencias, procesando, error, onConfirmar, onRegresar }: {
+  totalBase: number;
+  contexto: string;
+  sugerencias: SugerenciasPropina;
+  procesando: boolean;
+  error: string | null;
+  onConfirmar: (monto: number) => void;
+  onRegresar: () => void;
+}) {
+  const [libre, setLibre] = useState(false);
+  const [buffer, setBuffer] = useState("");
+  const calcTip = (p: number) => Math.round(totalBase * p) / 100; // totalBase * p/100, a 2 decimales
+  const confirmar = (m: number) => { if (!procesando) onConfirmar(m); };
+
+  if (libre) {
+    const tip = aMonto(buffer);
+    return (
+      <PantallaCobro
+        regresar={{ icono: "atras", onClick: () => setLibre(false), disabled: procesando }}
+        contexto={contexto}
+        pie={
+          <BotonPrincipal onClick={() => confirmar(tip)} disabled={procesando}>
+            {procesando ? "Guardando…" : `Continuar · ${fmtMxn(Math.round((totalBase + tip) * 100) / 100)}`}
+          </BotonPrincipal>
+        }
+      >
+        <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8">
+          <div className="text-center">
+            <div className="text-16 font-medium text-ink-3">Propina</div>
+            <div className={`${dinero} text-[72px] leading-none ${tip > 0 ? "text-ink" : "text-ink-3"}`}>{fmtMxn(tip)}</div>
+          </div>
+          <div className="w-[360px]">
+            <Numpad buffer={buffer} onChange={setBuffer} onEnter={() => confirmar(tip)} compact />
+          </div>
+          {error && <p className="text-16 font-medium text-danger" role="alert">{error}</p>}
+        </div>
+      </PantallaCobro>
+    );
+  }
+
+  return (
+    <PantallaCobro
+      regresar={{ icono: "atras", onClick: onRegresar, disabled: procesando }}
+      contexto={contexto}
+      pie={(sugerencias.libre || sugerencias.sin) && (
+        <div className={`grid gap-3 ${sugerencias.libre && sugerencias.sin ? "grid-cols-2" : "grid-cols-1"}`}>
+          {sugerencias.libre && <BotonSecundario onClick={() => { setBuffer(""); setLibre(true); }} disabled={procesando}>Otro monto</BotonSecundario>}
+          {sugerencias.sin && <BotonSecundario onClick={() => confirmar(0)} disabled={procesando}>Sin propina</BotonSecundario>}
+        </div>
+      )}
+    >
+      <div className="flex flex-1 flex-col justify-center px-8">
+        <div className="mb-10 text-center">
+          <h1 className="font-display text-40 font-bold text-ink">¿Agregar propina?</h1>
+          <p className="mt-2 text-18 text-ink-3">Sobre <span className={`${dinero} text-ink`}>{fmtMxn(totalBase)}</span></p>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          {sugerencias.porcentajes.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => confirmar(calcTip(p))}
+              disabled={procesando}
+              className="flex h-32 flex-col items-center justify-center gap-1.5 rounded-lg border border-line-strong bg-surface transition-[transform,background-color] duration-150 ease-vim hover:bg-hover active:scale-[.98] disabled:opacity-50"
+            >
+              <span className="font-display text-32 font-bold text-ink">{p}%</span>
+              <span className="font-display text-18 font-semibold tabular-nums text-ink-2">{fmtMxn(calcTip(p))}</span>
+            </button>
+          ))}
+        </div>
+        {error && <p className="mt-4 text-center text-16 font-medium text-danger" role="alert">{error}</p>}
+      </div>
+    </PantallaCobro>
+  );
+}
+
+// ─── Efectivo (P-070) ────────────────────────────────────────────────────────
+
+function VistaEfectivo({ totales, conPropina, procesando, error, onAplicar, onRegresar }: {
+  totales: TotalesTicket;
+  conPropina: boolean;
   procesando: boolean;
   error: string | null;
   onAplicar: (monto: number, recibido: number) => void;
-  onVolver: () => void;
+  onRegresar: () => void;
 }) {
   const pendiente = totales.pendiente;
-  const [buffer, setBuffer] = useState<string>(aBuffer(pendiente));
-  const [recibBuffer, setRecibBuffer] = useState<string>("");
-
-  // Billetes en pesos. Se SUMAN: $200 + $100 = $300, que es como llega el dinero en la mano. El de
-  // $20 faltaba, y es el más común en una cuenta chica.
-  const billetes = [20, 50, 100, 200, 500, 1000];
-  function addDenom(d: number) {
-    const cur = recibBuffer ? parseInt(recibBuffer, 10) : 0;
-    setRecibBuffer(String(cur + d * 100));
-  }
-
-  const monto = aMonto(buffer);
+  const [recibBuffer, setRecibBuffer] = useState("");
   const recibido = aMonto(recibBuffer);
-  const cambio = recibido > 0 ? recibido - monto : 0;
-  const puedeCobrar = recibido >= monto && monto > 0;
-
-  function handleCobrar() {
-    if (!puedeCobrar || procesando) return;
-    onAplicar(monto, recibido);
-  }
-
+  const cambio = Math.round((recibido - pendiente) * 100) / 100;
+  const puedeCobrar = recibido >= pendiente && pendiente > 0;
   const falta = recibido > 0 && cambio < 0;
 
-  // El botón dice lo que va a pasar, con el número que la cajera tiene que contar: "Cobrar y dar
-  // $125.00 de cambio". Antes decía "Cobrar $375.00" pasara lo que pasara.
-  const etiquetaCobrar = procesando
-    ? "Aplicando…"
-    : !puedeCobrar
-      ? `Cobrar ${fmtMxn(pendiente)}`
-      : cambio > 0
-        ? `Cobrar y dar ${fmtMxn(cambio)} de cambio`
-        : `Cobrar ${fmtMxn(pendiente)} exacto`;
+  function cobrar() {
+    if (!puedeCobrar || procesando) return;
+    onAplicar(pendiente, recibido);
+  }
+
+  // El botón dice lo que va a pasar, con el número que la cajera tiene que contar.
+  const etiqueta = !puedeCobrar
+    ? `Cobrar ${fmtMxn(pendiente)}`
+    : cambio > 0 ? `Cobrar y dar ${fmtMxn(cambio)} de cambio` : `Cobrar ${fmtMxn(pendiente)} exacto`;
+
+  const chip = "h-14 rounded-lg border border-line-strong px-5 font-display text-18 font-semibold tabular-nums text-ink transition-[transform,background-color] duration-150 ease-vim hover:bg-hover active:scale-[.97]";
 
   return (
-    <div className="flex flex-col gap-4 p-6">
-      <div className="flex items-baseline justify-between gap-4">
-        <h1 className="font-display text-24 font-semibold tracking-[-0.02em]">Cobro en efectivo</h1>
-        <div className="text-16 font-semibold text-ink-2">
-          Total{" "}
-          <span className="font-display text-24 font-bold tabular-nums text-ink">{fmtMxn(pendiente)}</span>
-        </div>
-      </div>
-
-      <div className="flex gap-5">
-        <div className="flex min-w-0 flex-1 flex-col gap-3">
-          {/* Recibido y cambio ARRIBA y en grande: son los dos números que se miran mientras se
-              cuenta el dinero. El cambio iba abajo, lejos de los billetes. */}
-          <div className="flex items-center justify-between gap-3 rounded-lg border-2 border-ink px-4 py-3.5">
-            <span className="text-16 font-semibold text-ink-2">Recibido</span>
-            <span className={["font-display text-40 font-bold leading-none tracking-[-0.02em] tabular-nums", recibido > 0 ? "text-ink" : "text-ink-3"].join(" ")}>
-              {fmtMxn(recibido)}
-            </span>
+    <PantallaCobro
+      regresar={{ icono: "atras", onClick: onRegresar, disabled: procesando }}
+      contexto={<>{conPropina ? "Total con propina" : "Total"} <span className={`${dinero} text-18 text-ink`}>{fmtMxn(pendiente)}</span></>}
+      pie={<BotonPrincipal onClick={cobrar} disabled={!puedeCobrar || procesando}><span className="truncate">{etiqueta}</span></BotonPrincipal>}
+    >
+      <div className="grid flex-1 grid-cols-[1fr_360px] gap-8 px-8 py-6">
+        <div className="flex flex-col justify-center gap-7">
+          <div>
+            <div className="text-15 font-medium text-ink-3">Recibido</div>
+            <div className={`${dinero} text-[80px] leading-tight ${recibido > 0 ? "text-ink" : "text-ink-3"}`}>{fmtMxn(recibido)}</div>
           </div>
-          <div
-            className={[
-              "flex items-center justify-between gap-3 rounded-lg px-4 py-3.5",
-              falta ? "bg-warning-soft" : recibido > 0 ? "bg-success-soft" : "bg-hover",
-            ].join(" ")}
-          >
-            <span className={["text-16 font-semibold", falta ? "text-warning" : recibido > 0 ? "text-success" : "text-ink-3"].join(" ")}>
-              {falta ? "Falta" : "Entrega de cambio"}
-            </span>
-            <span
-              className={[
-                "font-display text-40 font-bold leading-none tracking-[-0.02em] tabular-nums",
-                falta ? "text-warning" : recibido > 0 ? "text-success" : "text-ink-3",
-              ].join(" ")}
-            >
-              {fmtMxn(Math.abs(cambio))}
-            </span>
+          <div>
+            <div className={`text-15 font-medium ${falta ? "text-warning" : "text-ink-3"}`}>{falta ? "Falta" : "Cambio"}</div>
+            <div className={`${dinero} text-[36px] ${falta ? "text-warning" : recibido > 0 ? "text-success" : "text-ink-3"}`}>
+              {fmtMxn(recibido > 0 ? Math.abs(cambio) : 0)}
+            </div>
           </div>
-
-          <div className="grid grid-cols-3 gap-2">
-            {billetes.map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => addDenom(d)}
-                className="h-14 rounded-lg border border-line-strong bg-surface font-display text-18 font-bold tabular-nums text-ink transition-[transform,background-color,border-color] duration-150 ease-vim hover:border-ink active:scale-[.97] active:bg-hover"
-              >
-                ${d >= 1000 ? "1,000" : d}
-              </button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={`${chip} bg-sel`} onClick={() => setRecibBuffer(aBuffer(pendiente))}>Exacto</button>
+            {montosSugeridosEfectivo(pendiente).map((m) => (
+              <button key={m} type="button" className={`${chip} bg-surface`} onClick={() => setRecibBuffer(aBuffer(m))}>{fmtMxn(m)}</button>
             ))}
           </div>
-          <button
-            type="button"
-            onClick={() => setRecibBuffer(aBuffer(pendiente))}
-            className="h-12 rounded-lg border border-line-strong bg-surface text-16 font-bold tabular-nums text-ink transition-[transform,border-color] duration-150 ease-vim hover:border-ink active:scale-[.98]"
-          >
-            Pago exacto · {fmtMxn(pendiente)}
-          </button>
-          {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
+          {error && <p className="text-16 font-medium text-danger" role="alert">{error}</p>}
         </div>
-
-        <div className="w-64 flex-shrink-0">
-          <Numpad buffer={recibBuffer} onChange={setRecibBuffer} onEnter={handleCobrar} grande />
+        <div className="flex flex-col justify-center">
+          <Numpad buffer={recibBuffer} onChange={setRecibBuffer} onEnter={cobrar} grande />
         </div>
       </div>
-
-      <div className="flex gap-2.5">
-        <button
-          type="button"
-          onClick={onVolver}
-          disabled={procesando}
-          className="h-14 w-40 flex-shrink-0 rounded-lg border border-line-strong bg-surface text-16 font-semibold text-ink transition-[transform,border-color] duration-150 ease-vim hover:border-ink active:scale-[.98] disabled:opacity-50"
-        >
-          Volver
-        </button>
-        <button
-          type="button"
-          onClick={handleCobrar}
-          disabled={!puedeCobrar || procesando}
-          className="h-14 min-w-0 flex-1 rounded-lg bg-accent px-4 font-display text-18 font-bold tabular-nums text-white shadow-sm transition-[transform,background-color] duration-150 ease-vim hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none disabled:active:scale-100"
-        >
-          <span className="block truncate">{etiquetaCobrar}</span>
-        </button>
-      </div>
-    </div>
+    </PantallaCobro>
   );
 }
 
-// ─── Vista: pago otro (tarjeta/transferencia/app) ────────────────────────────
+// ─── Transferencia y tarjeta a mano: se registran por el total ───────────────
 
-function VistaOtro({
-  totales,
-  metodo,
-  procesando,
-  error,
-  onAplicar,
-  onVolver,
-}: {
+function VistaOtro({ totales, metodo, contexto, procesando, error, onAplicar, onRegresar }: {
   totales: TotalesTicket;
   metodo: MetodoPago;
+  contexto: string;
   procesando: boolean;
   error: string | null;
   onAplicar: (monto: number) => void;
-  onVolver: () => void;
+  onRegresar: () => void;
 }) {
   const pendiente = totales.pendiente;
-  const [buffer, setBuffer] = useState<string>(aBuffer(pendiente));
-  const cfg = metodoCfg(metodo);
-  const monto = aMonto(buffer);
-
+  const transferencia = metodo === "TRANSFERENCIA";
   return (
-    <div className="flex h-full min-h-0">
-      {/* Izquierda: resumen */}
-      <div className="flex-1 min-w-0 flex flex-col border-r border-line px-8 py-6">
-        <div className="flex items-center gap-3 mb-5">
-          <span className="w-10 h-10 rounded-[11px] flex items-center justify-center flex-shrink-0" style={{ background: cfg.icoBg, color: cfg.icoColor }}>
-            <cfg.icoFn cls="w-[22px] h-[22px]" />
-          </span>
-          <div>
-            <h1 className="font-display text-xl font-semibold tracking-tight">{cfg.etiqueta}</h1>
-            <p className="text-13 text-ink-3">Ticket #{totales.ticketId.slice(-6)}</p>
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <div className="flex items-baseline justify-between py-3 border-b border-line">
-            <span className="text-15 text-ink-2 font-medium">Total pendiente</span>
-            <span className="font-display text-24 font-semibold text-ink tabular-nums">{fmtMxn(pendiente)}</span>
-          </div>
-          <div className="flex items-baseline justify-between py-3">
-            <span className="text-15 text-ink-2 font-medium">A aplicar</span>
-            <span className="font-display text-28 font-bold text-ink tabular-nums">
-              {monto > 0 ? fmtMxn(monto) : "$0.00"}
-            </span>
-          </div>
-        </div>
-
-        {error && <p className="mt-4 text-sm font-medium text-danger" role="alert">{error}</p>}
-      </div>
-
-      {/* Derecha: numpad + cobrar */}
-      <div className="w-[440px] flex-shrink-0 flex flex-col px-6 py-6">
-        <div className="mb-3">
-          <button
-            type="button"
-            onClick={() => setBuffer(aBuffer(pendiente))}
-            className="w-full py-[13px] border border-dashed border-line-strong bg-surface rounded font-sans text-15 font-semibold text-ink-2 cursor-pointer transition-all hover:text-ink hover:bg-hover tabular-nums"
-          >
-            Monto exacto · {fmtMxn(pendiente)}
-          </button>
-        </div>
-        <div className="flex-1">
-          <Numpad buffer={buffer} onChange={setBuffer} onEnter={() => { if (monto > 0 && !procesando) onAplicar(monto); }} />
-        </div>
-        <button
-          type="button"
-          onClick={() => { if (monto > 0 && !procesando) onAplicar(monto); }}
-          disabled={monto <= 0 || procesando}
-          className="mt-3 w-full font-sans text-18 font-bold text-white bg-accent border-none py-[18px] rounded-lg cursor-pointer transition-colors hover:bg-accent-hover disabled:bg-line-strong disabled:cursor-not-allowed flex items-center justify-center gap-[10px] shadow-sm"
-        >
-          {procesando ? "Aplicando…" : <>Aplicar pago <span className="font-display tabular-nums opacity-90">{monto > 0 ? fmtMxn(monto) : ""}</span></>}
-        </button>
-        <button
-          type="button"
-          onClick={onVolver}
-          disabled={procesando}
-          className="mt-2 flex items-center justify-center gap-[7px] font-sans text-14 font-semibold text-ink-3 bg-transparent border-none cursor-pointer py-2 px-3 rounded transition-colors hover:text-ink"
-        >
-          <IcoBack cls="w-[15px] h-[15px]" />
-          Cambiar método de pago
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Modal "Agregar pago" (sub-modal de P-074) ───────────────────────────────
-
-function ModalAgregarPago({
-  pendiente,
-  conTerminal,
-  terminalNoLista,
-  onAgregar,
-  onCerrar,
-}: {
-  pendiente: number;
-  conTerminal: boolean;
-  terminalNoLista: boolean;
-  onAgregar: (metodo: MetodoPago, monto: number, terminal: boolean) => void;
-  onCerrar: () => void;
-}) {
-  const [metodo, setMetodo] = useState<MetodoPago>("EFECTIVO");
-  const [terminal, setTerminal] = useState(false);
-  // Con terminal: «Tarjeta» (se cobra en ella) y, aparte, Débito y Crédito a mano.
-  const opciones: { cfg: MetodoConfig; terminal: boolean; clave: string }[] = METODOS.flatMap((m) => {
-    const esTarjeta = m.valor === "TARJETA_DEBITO" || m.valor === "TARJETA_CREDITO";
-    if (!conTerminal || !esTarjeta) return [{ cfg: m, terminal: false, clave: m.valor }];
-    const aMano = { cfg: { ...m, etiqueta: `${m.etiqueta} · a mano` }, terminal: false, clave: m.valor };
-    return m.valor === "TARJETA_DEBITO"
-      ? [{ cfg: { ...metodoCfg("TARJETA_CREDITO"), etiqueta: "Tarjeta" }, terminal: true, clave: "terminal" }, aMano]
-      : [aMano];
-  });
-  const [buffer, setBuffer] = useState<string>("");
-  // Se monta encima del cobro, así que queda arriba en la pila: Escape cierra solo este diálogo.
-  useEscape(onCerrar);
-
-  const monto = aMonto(buffer);
-
-  function handleAgregar() {
-    if (monto <= 0) return;
-    onAgregar(metodo, Math.min(monto, pendiente), terminal);
-  }
-
-  return (
-    <div
-      className="fixed inset-0 bg-ink/30 flex items-center justify-center p-6 z-[60] animate-vim-fade"
-      onClick={(e) => { if (e.target === e.currentTarget) onCerrar(); }}
+    <PantallaCobro
+      regresar={{ icono: "atras", onClick: onRegresar, disabled: procesando }}
+      contexto={contexto}
+      pie={
+        <BotonPrincipal onClick={() => { if (!procesando && pendiente > 0) onAplicar(pendiente); }} disabled={procesando || !(pendiente > 0)}>
+          Registrar {transferencia ? "transferencia" : nombreMetodo(metodo).toLowerCase()} por {fmtMxn(pendiente)}
+        </BotonPrincipal>
+      }
     >
-      <div className="w-[440px] max-h-[90vh] bg-surface border border-line rounded-lg shadow-xl flex flex-col animate-vim-pop">
-        {/* Cabecera */}
-        <div className="flex items-center justify-between px-5 py-5 border-b border-line">
-          <h2 className="font-display text-18 font-semibold">Agregar pago</h2>
-          <button type="button" onClick={onCerrar} className="w-[34px] h-[34px] border border-line-strong bg-surface rounded flex items-center justify-center text-ink-2 hover:border-ink hover:text-ink transition-colors">
-            <IcoClose cls="w-[17px] h-[17px]" />
-          </button>
+      <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+        <div className={`${dinero} text-[88px] leading-none text-ink`}>{fmtMxn(pendiente)}</div>
+        <div className="mt-4 text-18 text-ink-3">
+          {transferencia ? "Revisa que la transferencia ya llegó antes de registrarla" : "Registra el pago que cobraste en otra terminal"}
         </div>
-
-        <div className="px-5 py-5 overflow-y-auto">
-          {/* Método */}
-          <div className="text-13 font-bold uppercase tracking-widest text-ink-2 mb-3">Método</div>
-          <div className="grid grid-cols-2 gap-2 mb-5">
-            {opciones.map(({ cfg: m, terminal: enTerminal, clave }) => (
-              <button
-                key={clave}
-                type="button"
-                onClick={() => { setMetodo(m.valor); setTerminal(enTerminal); }}
-                className={[
-                  "flex items-center gap-[10px] px-[13px] py-[12px] border rounded cursor-pointer transition-all",
-                  metodo === m.valor && terminal === enTerminal
-                    ? "border-ink bg-sel shadow-[inset_0_0_0_1.5px_#16161A]"
-                    : "border-line bg-surface hover:border-line-strong",
-                ].join(" ")}
-              >
-                <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.icoBg, color: m.icoColor }}>
-                  <m.icoFn cls="w-[18px] h-[18px]" />
-                </span>
-                <span className="text-14 font-semibold text-ink">{m.etiqueta}</span>
-              </button>
-            ))}
-          </div>
-          {terminalNoLista && (
-            <p className="-mt-3 mb-5 text-13 text-warning" role="status">Terminal no disponible: enciéndela y abre Clip PinPad</p>
-          )}
-
-          {/* Monto */}
-          <div className="text-13 font-bold uppercase tracking-widest text-ink-2 mb-3">Monto</div>
-          <div className="text-center font-display text-40 font-bold text-ink tabular-nums mb-2">
-            {monto > 0 ? fmtMxn(monto) : "$0.00"}
-          </div>
-          <div className="text-center text-13 text-ink-3 mb-4">
-            Restante por cubrir: <span className="tabular-nums">{fmtMxn(pendiente)}</span>
-            <button
-              type="button"
-              onClick={() => setBuffer(aBuffer(pendiente))}
-              className="ml-[6px] border-none bg-hover text-ink-2 font-sans text-12 font-semibold px-[11px] py-[4px] rounded-full cursor-pointer hover:bg-line hover:text-ink transition-colors"
-            >
-              Usar todo el restante
-            </button>
-          </div>
-
-          <Numpad buffer={buffer} onChange={setBuffer} compact />
-        </div>
-
-        <div className="px-5 py-4 border-t border-line">
-          <button
-            type="button"
-            onClick={handleAgregar}
-            disabled={monto <= 0}
-            className="w-full font-sans text-15 font-bold text-white bg-ink border-none py-[14px] rounded cursor-pointer transition-opacity hover:opacity-90 disabled:bg-line-strong disabled:cursor-not-allowed"
-          >
-            Agregar pago
-          </button>
-        </div>
+        {error && <p className="mt-4 text-16 font-medium text-danger" role="alert">{error}</p>}
       </div>
-    </div>
+    </PantallaCobro>
   );
 }
 
-// ─── Vista: pago dividido (P-074) ────────────────────────────────────────────
+// ─── Pago dividido (P-074): una sola pantalla ────────────────────────────────
 
-function VistaDividida({
-  totales,
-  conTerminal,
-  terminalLista,
-  onRevisarTerminal,
-  procesando,
-  error,
-  onAplicarPagos,
-  onVolver,
-}: {
+type OpcionDividida = { metodo: MetodoPago; terminal: boolean; etiqueta: string };
+
+function VistaDividida({ totales, contexto, conTerminal, terminalLista, onRevisarTerminal, procesando, error, onAplicarPagos, onRegresar }: {
   totales: TotalesTicket;
+  contexto: string;
   conTerminal: boolean;
-  /** Como en el selector: sin lector listo no se ofrece cobrar en la terminal y se dice por qué. */
+  /** Sin lector listo no se ofrece cobrar en la terminal y se dice por qué. */
   terminalLista: boolean;
   onRevisarTerminal: () => Promise<boolean>;
   procesando: boolean;
@@ -716,374 +387,186 @@ function VistaDividida({
   /** Aplica TODOS los pagos divididos de una (secuencial en el padre, no en paralelo) y devuelve
    *  los `clientId` que entraron, para quitarlos de la lista. */
   onAplicarPagos: (pagos: PagoPorAplicar[]) => Promise<string[]>;
-  onVolver: () => void;
+  onRegresar: () => void;
 }) {
-  const [pagos, setPagos] = useState<PagoAplicado[]>([]);
-  const [mostrarModal, setMostrarModal] = useState(false);
-
+  const [pagos, setPagos] = useState<PagoPorAplicar[]>([]);
   const pendiente = totales.pendiente;
-  const pagado = pagos.reduce((s, p) => s + p.monto, 0);
-  const restante = Math.max(0, +(pendiente - pagado).toFixed(2));
+  const pagado = Math.round(pagos.reduce((s, p) => s + p.monto, 0) * 100) / 100;
+  const restante = Math.max(0, Math.round((pendiente - pagado) * 100) / 100);
   const cubierto = restante <= 0 && pagos.length > 0;
   const pct = Math.min(100, pendiente > 0 ? (pagado / pendiente) * 100 : 0);
 
-  function agregarPago(metodo: MetodoPago, monto: number, terminal: boolean) {
-    // El id de idempotencia nace AQUÍ y no cambia entre reintentos (B2-2).
-    setPagos((prev) => [...prev, { clientId: nuevoClientId(), metodo, monto, ...(terminal ? { terminal } : {}) }]);
-    setMostrarModal(false);
+  // Con terminal: «Tarjeta» (se cobra en ella) y, aparte, Débito y Crédito a mano.
+  const opciones: OpcionDividida[] = conTerminal
+    ? [
+        { metodo: "EFECTIVO", terminal: false, etiqueta: "Efectivo" },
+        { metodo: "TARJETA_CREDITO", terminal: true, etiqueta: "Tarjeta" },
+        { metodo: "TRANSFERENCIA", terminal: false, etiqueta: "Transferencia" },
+        { metodo: "TARJETA_DEBITO", terminal: false, etiqueta: "Débito · a mano" },
+        { metodo: "TARJETA_CREDITO", terminal: false, etiqueta: "Crédito · a mano" },
+      ]
+    : (["EFECTIVO", "TARJETA_DEBITO", "TARJETA_CREDITO", "TRANSFERENCIA"] as const).map((m) => ({ metodo: m, terminal: false, etiqueta: nombreMetodo(m) }));
+  const [sel, setSel] = useState<OpcionDividida>(opciones[0]!);
+  const [buffer, setBuffer] = useState(aBuffer(pendiente));
+  const monto = Math.min(aMonto(buffer), restante);
+  const terminalNoLista = sel.terminal && !terminalLista;
+
+  function elegir(o: OpcionDividida) {
+    setSel(o);
+    // Se vuelve a preguntar: si el lector se encendió, la opción queda lista al contestar.
+    if (o.terminal && !terminalLista) void onRevisarTerminal().catch(() => false);
   }
 
-  function quitarPago(clientId: string) {
-    setPagos((prev) => prev.filter((p) => p.clientId !== clientId));
+  function agregar() {
+    if (!(monto > 0) || terminalNoLista) return;
+    // El id de idempotencia nace AQUÍ y no cambia entre reintentos (B2-2).
+    setPagos((prev) => [...prev, { clientId: nuevoClientId(), metodo: sel.metodo, monto, ...(sel.terminal ? { terminal: true } : {}) }]);
+    setBuffer(aBuffer(Math.max(0, Math.round((restante - monto) * 100) / 100)));
+  }
+
+  function quitar(p: PagoPorAplicar) {
+    setPagos((prev) => prev.filter((x) => x.clientId !== p.clientId));
+    setBuffer(aBuffer(Math.round((restante + p.monto) * 100) / 100));
   }
 
   function completar() {
     if (!cubierto || procesando) return;
-    // FIX (auditoría): se enviaban N pagos en paralelo (carrera en la ruta de dinero).
-    // Ahora se manda la lista completa y el padre los aplica SECUENCIALMENTE. Los que entran se
-    // quitan de la lista: si uno falla, el reintento manda solo los que faltan (B2-2), y el total
-    // de arriba ya viene releído de la base con lo cobrado descontado.
+    // El padre los aplica SECUENCIALMENTE. Los que entran se quitan de la lista: si uno falla, el
+    // reintento manda solo los que faltan (B2-2).
     void onAplicarPagos(pagos).then((aplicados) => {
       if (aplicados.length > 0) setPagos((prev) => prev.filter((p) => !aplicados.includes(p.clientId)));
     });
   }
 
   return (
-    <div className="flex flex-col h-full min-h-0">
-      <div className="flex-1 min-h-0 overflow-y-auto px-8 py-6">
-        {/* Cabecera */}
-        <div className="flex items-center gap-3 mb-5">
-          <span className="w-10 h-10 rounded-[11px] flex items-center justify-center flex-shrink-0" style={{ background: "#EFEAF6", color: "#6B4FA0" }}>
-            <IcoDividido cls="w-[22px] h-[22px]" />
-          </span>
-          <div>
-            <h1 className="font-display text-xl font-semibold tracking-tight">Pago dividido</h1>
-            <p className="text-13 text-ink-3">Cubre el total con varios métodos</p>
-          </div>
+    <PantallaCobro
+      regresar={{ icono: "atras", onClick: onRegresar, disabled: procesando }}
+      contexto={contexto}
+      pie={cubierto ? (
+        <BotonPrincipal onClick={completar} disabled={procesando}>{procesando ? "Procesando…" : "Completar cobro"}</BotonPrincipal>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <BotonSecundario disabled>Completar cobro</BotonSecundario>
+          <BotonPrincipal onClick={agregar} disabled={!(monto > 0) || terminalNoLista || procesando}>
+            <span className="truncate">Agregar {fmtMxn(monto)} con {sel.etiqueta.toLowerCase()}</span>
+          </BotonPrincipal>
         </div>
-
-        {/* Barra de progreso */}
-        <div className="border border-line rounded-lg p-5 mb-5 bg-sel">
-          <div className="flex justify-between gap-4">
-            <div className="text-center flex-1">
-              <div className="text-12 font-bold uppercase tracking-widest text-ink-3">Total</div>
-              <div className="font-display text-24 font-semibold text-ink tabular-nums mt-[3px]">{fmtMxn(pendiente)}</div>
-            </div>
-            <div className="w-px bg-line" />
-            <div className="text-center flex-1">
-              <div className="text-12 font-bold uppercase tracking-widest text-ink-3">Pagado</div>
-              <div className="font-display text-24 font-semibold text-ink tabular-nums mt-[3px]">{fmtMxn(pagado)}</div>
-            </div>
-            <div className="w-px bg-line" />
-            <div className="text-center flex-1">
-              <div className={["text-12 font-bold uppercase tracking-widest", cubierto ? "text-success" : "text-accent"].join(" ")}>
-                {cubierto ? "Cubierto" : "Restante"}
-              </div>
-              <div className={["font-display font-bold tabular-nums mt-[3px]", cubierto ? "text-24 text-success" : "text-32 text-accent"].join(" ")}>
-                {fmtMxn(restante)}
-              </div>
-            </div>
+      )}
+    >
+      <div className="grid flex-1 grid-cols-[1fr_380px] gap-8 px-8 py-6">
+        <div className="flex min-w-0 flex-col">
+          <div className="text-15 font-medium text-ink-3">{cubierto ? "Cubierto" : "Falta por cobrar"}</div>
+          <div className={`${dinero} text-[72px] leading-tight ${cubierto ? "text-success" : "text-ink"}`}>{fmtMxn(restante)}</div>
+          <div className="mb-1.5 mt-4 h-2 overflow-hidden rounded-full bg-line">
+            <div className="h-full rounded-full bg-success" style={{ width: `${pct}%` }} />
           </div>
-          {/* barra */}
-          <div className="h-2 rounded-full bg-line overflow-hidden mt-4">
-            <div
-              className={["h-full rounded-full transition-[width] duration-300", cubierto ? "bg-success" : "bg-ink"].join(" ")}
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Lista de pagos */}
-        <div className="text-13 font-bold text-ink mb-3">Pagos agregados</div>
-        <div className="flex flex-col gap-2 mb-4">
+          <div className="text-15 text-ink-3">Pagado <span className="tabular-nums">{fmtMxn(pagado)}</span> de <span className="tabular-nums">{fmtMxn(pendiente)}</span></div>
+          <div className="mt-7 text-15 font-medium text-ink-3">Pagos</div>
           {pagos.length === 0 ? (
-            <div className="text-center py-5 text-14 text-ink-3 border border-dashed border-line-strong rounded">
-              Aún no hay pagos. Toca "Agregar pago" para empezar.
-            </div>
+            <p className="mt-2 text-16 text-ink-3">Aún no hay pagos.</p>
           ) : (
-            pagos.map((p) => {
-              const cfg = metodoCfg(p.metodo);
-              return (
-                <div key={p.clientId} className="flex items-center gap-3 px-[14px] py-[12px] border border-line rounded animate-vim-fade">
-                  <span className="w-9 h-9 rounded-[9px] flex items-center justify-center flex-shrink-0" style={{ background: cfg.icoBg, color: cfg.icoColor }}>
-                    <cfg.icoFn cls="w-[19px] h-[19px]" />
+            <ul className="mt-2">
+              {pagos.map((p) => (
+                <li key={p.clientId} className="flex h-14 items-center justify-between gap-3 border-t border-line px-3 last:border-b">
+                  <span className="truncate text-[17px] font-semibold text-ink">{p.terminal ? "Tarjeta · en la terminal" : nombreMetodo(p.metodo)}</span>
+                  <span className="flex items-center gap-2">
+                    <span className={`${dinero} text-18 text-ink`}>{fmtMxn(p.monto)}</span>
+                    <button
+                      type="button"
+                      onClick={() => quitar(p)}
+                      disabled={procesando}
+                      aria-label="Quitar pago"
+                      className="flex h-11 w-11 items-center justify-center rounded text-ink-3 hover:bg-hover hover:text-danger"
+                    >
+                      <Icono nombre="cerrar" className="h-5 w-5" />
+                    </button>
                   </span>
-                  <span className="flex-1 text-15 font-semibold text-ink">{p.terminal ? "Tarjeta · en la terminal" : cfg.etiqueta}</span>
-                  <span className="font-display text-16 font-semibold text-ink tabular-nums">{fmtMxn(p.monto)}</span>
-                  <button
-                    type="button"
-                    onClick={() => quitarPago(p.clientId)}
-                    className="w-8 h-8 border-none bg-transparent rounded flex items-center justify-center text-ink-3 hover:bg-hover hover:text-danger transition-colors flex-shrink-0"
-                    title="Quitar"
-                  >
-                    <IcoTrash cls="w-4 h-4" />
-                  </button>
-                </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          {error && <p className="mt-4 text-16 font-medium text-danger" role="alert">{error}</p>}
+        </div>
+        <div className={`flex flex-col ${cubierto ? "pointer-events-none opacity-40" : ""}`} aria-disabled={cubierto}>
+          <div className="mb-2 text-15 font-medium text-ink-3">Siguiente pago</div>
+          <div className="mb-3 grid grid-cols-3 gap-1.5">
+            {opciones.map((o) => {
+              const on = o.metodo === sel.metodo && o.terminal === sel.terminal;
+              return (
+                <button
+                  key={`${o.metodo}-${o.terminal}`}
+                  type="button"
+                  onClick={() => elegir(o)}
+                  className={`min-h-[56px] rounded-lg border px-2 text-14 font-semibold leading-tight ${on ? "border-ink bg-sel text-ink ring-1 ring-inset ring-ink" : "border-line-strong bg-surface text-ink-2 hover:bg-hover"}`}
+                >
+                  {o.etiqueta}
+                </button>
               );
-            })
-          )}
+            })}
+          </div>
+          {terminalNoLista && <p className="mb-2 text-14 text-warning" role="status">Terminal no disponible: enciéndela y abre Clip PinPad</p>}
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <span className={`${dinero} text-[36px] text-ink`}>{fmtMxn(monto)}</span>
+            <button
+              type="button"
+              onClick={() => setBuffer(aBuffer(restante))}
+              className="h-11 rounded-lg border border-line-strong px-3 text-14 font-semibold text-ink hover:bg-hover"
+            >
+              Todo lo que falta
+            </button>
+          </div>
+          <Numpad buffer={buffer} onChange={setBuffer} onEnter={agregar} compact capturarTeclado={!cubierto} />
         </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            // Se vuelve a preguntar: si el lector se encendió, la opción aparece en el diálogo al contestar.
-            if (conTerminal && !terminalLista) void onRevisarTerminal().catch(() => false);
-            setMostrarModal(true);
-          }}
-          disabled={cubierto}
-          className="w-full inline-flex items-center justify-center gap-[9px] font-sans text-15 font-semibold text-ink bg-surface border border-line-strong py-[14px] rounded cursor-pointer transition-all hover:border-ink hover:bg-hover disabled:opacity-45 disabled:cursor-default"
-        >
-          <IcoPlus cls="w-[17px] h-[17px]" />
-          Agregar pago
-        </button>
-
-        {error && <p className="mt-3 text-sm font-medium text-danger" role="alert">{error}</p>}
       </div>
-
-      {/* Footer */}
-      <div className="flex-shrink-0 flex items-center gap-3 px-8 py-4 border-t border-line bg-surface">
-        <button
-          type="button"
-          onClick={onVolver}
-          disabled={procesando}
-          className="inline-flex items-center gap-2 text-15 font-semibold text-ink-2 border border-line-strong rounded px-[20px] py-[14px] hover:bg-hover hover:text-ink transition-colors disabled:opacity-50"
-        >
-          <IcoBack cls="w-4 h-4" />
-          Cambiar método
-        </button>
-        <span className="flex-1" />
-        <Button
-          onClick={completar}
-          disabled={!cubierto || procesando}
-          size="lg"
-          className="px-[30px]"
-        >
-          {procesando ? "Procesando…" : "Completar cobro"}
-        </Button>
-      </div>
-
-      {mostrarModal && (
-        <ModalAgregarPago
-          pendiente={restante}
-          conTerminal={conTerminal && terminalLista}
-          terminalNoLista={conTerminal && !terminalLista}
-          onAgregar={agregarPago}
-          onCerrar={() => setMostrarModal(false)}
-        />
-      )}
-    </div>
+    </PantallaCobro>
   );
 }
 
-// ─── Vista: propina (P-075) ──────────────────────────────────────────────────
-
-function VistaPropina({
-  totalBase,
-  ticketId,
-  sugerencias,
-  procesando,
-  error,
-  onConfirmar,
-  onAtras,
-}: {
-  totalBase: number;
-  ticketId: string;
-  sugerencias: SugerenciasPropina;
-  procesando: boolean;
-  error: string | null;
-  onConfirmar: (monto: number) => void;
-  onAtras: () => void;
-}) {
-  const [mode, setMode] = useState<"none" | "pct" | "free">(sugerencias.sin ? "none" : "pct");
-  const [pctSel, setPctSel] = useState<number>(sugerencias.porcentajes[0] ?? 10);
-  const [freeBuffer, setFreeBuffer] = useState<string>("");
-
-  const calcTip = (p: number) => Math.round(totalBase * p) / 100; // totalBase * p/100, a 2 decimales
-  const tip =
-    mode === "pct" ? calcTip(pctSel) : mode === "free" ? (aMonto(freeBuffer)) : 0;
-  const grand = Math.round((totalBase + tip) * 100) / 100;
-
-  const altBase =
-    "inline-flex items-center justify-center gap-2 px-[13px] py-[13px] border rounded text-15 font-semibold cursor-pointer transition-all";
-  const altOn = "border-ink bg-sel text-ink shadow-[inset_0_0_0_1.5px_#16161A]";
-  const altOff = "border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink";
-
-  return (
-    <div className="flex flex-col">
-      {/* Prompt */}
-      <div className="mb-5 text-center">
-        <div className="mb-1.5 text-12 font-bold uppercase tracking-[0.07em] text-ink-3">
-          Cobro · Ticket #{ticketId.slice(-6)}
-        </div>
-        <h1 className="font-display text-24 font-semibold tracking-tight">¿Agregar propina?</h1>
-        <p className="mt-1 text-14 text-ink-2">Se calcula sobre el total de {fmtMxn(totalBase)}</p>
-      </div>
-
-      {/* Porcentajes sugeridos */}
-      <div className="mb-3 grid grid-cols-3 gap-3">
-        {sugerencias.porcentajes.map((p) => {
-          const on = mode === "pct" && pctSel === p;
-          return (
-            <button
-              key={p}
-              type="button"
-              onClick={() => { setMode("pct"); setPctSel(p); }}
-              className={[
-                "flex flex-col items-center gap-1 rounded-lg border px-2 py-[18px] transition-all",
-                on ? "border-ink bg-sel shadow-[inset_0_0_0_1.5px_#16161A]" : "border-line bg-surface hover:border-line-strong",
-              ].join(" ")}
-            >
-              <span className="font-display text-24 font-bold text-ink">{p}%</span>
-              <span className={["text-13 font-semibold tabular-nums", on ? "text-ink-2" : "text-ink-3"].join(" ")}>
-                {fmtMxn(calcTip(p))}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Monto libre / Sin propina */}
-      {(sugerencias.libre || sugerencias.sin) && (
-        <div className={["mb-5 grid gap-3", sugerencias.libre && sugerencias.sin ? "grid-cols-2" : "grid-cols-1"].join(" ")}>
-          {sugerencias.libre && (
-            <button
-              type="button"
-              onClick={() => { setMode("free"); setFreeBuffer(""); }}
-              className={[altBase, mode === "free" ? altOn : altOff].join(" ")}
-            >
-              <IcoEfectivo cls="w-4 h-4" />
-              Monto libre
-            </button>
-          )}
-          {sugerencias.sin && (
-            <button
-              type="button"
-              onClick={() => setMode("none")}
-              className={[altBase, mode === "none" ? altOn : altOff].join(" ")}
-            >
-              <Icono nombre="menos" className="h-4 w-4" />
-              Sin propina
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Numpad de monto libre */}
-      {mode === "free" && (
-        <div className="mb-5">
-          <div className="mb-3 text-center font-display text-32 font-bold tabular-nums text-ink">
-            {fmtMxn(aMonto(freeBuffer))}
-          </div>
-          <div className="mx-auto max-w-[300px]">
-            <Numpad buffer={freeBuffer} onChange={setFreeBuffer} compact />
-          </div>
-        </div>
-      )}
-
-      {/* Resumen */}
-      <div className="overflow-hidden rounded-lg border border-line">
-        <div className="flex items-center justify-between border-b border-line px-[18px] py-[13px]">
-          <span className="text-15 text-ink-2">Total del ticket</span>
-          <span className="font-display text-16 font-semibold tabular-nums text-ink">{fmtMxn(totalBase)}</span>
-        </div>
-        <div className="flex items-center justify-between border-b border-line px-[18px] py-[13px]">
-          <span className="text-15 font-semibold text-success">Propina</span>
-          <span className="font-display text-16 font-semibold tabular-nums text-success">{fmtMxn(tip)}</span>
-        </div>
-        <div className="flex items-center justify-between bg-sel px-[18px] py-[13px]">
-          <span className="text-15 font-bold uppercase tracking-[0.03em] text-ink">Total a cobrar</span>
-          <span className="font-display text-28 font-bold tabular-nums tracking-[-0.02em] text-ink">{fmtMxn(grand)}</span>
-        </div>
-      </div>
-
-      {error && <p className="mt-3 text-sm font-medium text-danger" role="alert">{error}</p>}
-
-      {/* Footer */}
-      <div className="mt-5 flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={onAtras}
-          disabled={procesando}
-          className="inline-flex items-center gap-2 rounded border border-line-strong px-[20px] py-[14px] text-15 font-semibold text-ink-2 transition-colors hover:bg-hover hover:text-ink disabled:opacity-50"
-        >
-          <IcoBack cls="w-4 h-4" />
-          Atrás
-        </button>
-        <button
-          type="button"
-          onClick={() => { if (!procesando) onConfirmar(tip); }}
-          disabled={procesando}
-          className="inline-flex items-center gap-[9px] rounded bg-accent px-[30px] py-[14px] text-15 font-bold text-white shadow-sm transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong"
-        >
-          {procesando ? "Guardando…" : <>Confirmar <span className="font-display tabular-nums opacity-90">{fmtMxn(grand)}</span></>}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ─── Vista: a crédito / saldo a favor (retail 2, entrega 2) ─────────────────
+// ─── A crédito / saldo a favor (retail 2, entrega 2) ─────────────────────────
 
 /** Cabecera y pie compartidos por las dos vistas de crédito: mismo molde que el resto del cobro. */
-function MarcoCredito({ cfg, children, error, procesando, etiqueta, onConfirmar, onVolver }: {
-  cfg: MetodoConfig;
+function MarcoCredito({ contexto, cifra, children, error, procesando, etiqueta, onConfirmar, onRegresar }: {
+  contexto: string;
+  cifra: number;
   children: React.ReactNode;
   error: string | null;
   procesando: boolean;
-  etiqueta: React.ReactNode;
+  etiqueta: string;
   onConfirmar: () => void;
-  onVolver: () => void;
+  onRegresar: () => void;
 }) {
   return (
-    <div className="flex flex-col">
-      <div className="mb-5 flex items-center gap-3">
-        <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[11px]" style={{ background: cfg.icoBg, color: cfg.icoColor }}>
-          <cfg.icoFn cls="w-[22px] h-[22px]" />
-        </span>
-        <h1 className="font-display text-xl font-semibold tracking-tight">{cfg.etiqueta}</h1>
+    <PantallaCobro
+      regresar={{ icono: "atras", onClick: onRegresar, disabled: procesando }}
+      contexto={contexto}
+      pie={<BotonPrincipal onClick={() => { if (!procesando) onConfirmar(); }} disabled={procesando}>{procesando ? "Aplicando…" : etiqueta}</BotonPrincipal>}
+    >
+      <div className="flex flex-1 flex-col items-center justify-center px-8">
+        <div className={`${dinero} text-[88px] leading-none text-ink`}>{fmtMxn(cifra)}</div>
+        <div className="mt-8 w-full max-w-[560px] overflow-hidden rounded-lg border border-line">{children}</div>
+        {error && <p className="mt-4 text-16 font-medium text-danger" role="alert">{error}</p>}
       </div>
-      <div className="overflow-hidden rounded-lg border border-line">{children}</div>
-      {error && <p className="mt-3 text-sm font-medium text-danger" role="alert">{error}</p>}
-      <div className="mt-5 flex items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={onVolver}
-          disabled={procesando}
-          className="inline-flex min-h-[44px] items-center gap-2 rounded border border-line-strong px-[20px] py-[14px] text-15 font-semibold text-ink-2 transition-colors hover:bg-hover hover:text-ink disabled:opacity-50"
-        >
-          <IcoBack cls="w-4 h-4" />
-          Cambiar método
-        </button>
-        <button
-          type="button"
-          onClick={() => { if (!procesando) onConfirmar(); }}
-          disabled={procesando}
-          className="inline-flex min-h-[44px] items-center gap-[9px] rounded bg-accent px-[30px] py-[14px] text-15 font-bold text-white shadow-sm transition-[transform,background-color] duration-150 ease-vim hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong"
-        >
-          {procesando ? "Aplicando…" : etiqueta}
-        </button>
-      </div>
-    </div>
+    </PantallaCobro>
   );
 }
 
-function Renglon({ l, v, tono }: { l: string; v: string; tono?: "fuerte" }) {
+function Renglon({ l, v }: { l: string; v: string }) {
   return (
-    <div className={["flex items-center justify-between border-b border-line px-[18px] py-[13px] last:border-b-0", tono ? "bg-sel" : ""].join(" ")}>
-      <span className={tono ? "text-15 font-bold text-ink" : "text-15 text-ink-2"}>{l}</span>
-      <span className={["font-display tabular-nums text-ink", tono ? "text-24 font-bold" : "text-16 font-semibold"].join(" ")}>{v}</span>
+    <div className="flex items-center justify-between border-b border-line px-5 py-3.5 last:border-b-0">
+      <span className="text-16 text-ink-2">{l}</span>
+      <span className={`${dinero} text-18 text-ink`}>{v}</span>
     </div>
   );
 }
 
-function VistaCredito({ total, credito, procesando, error, onConfirmar, onVolver }: {
+function VistaCredito({ total, credito, contexto, procesando, error, onConfirmar, onRegresar }: {
   total: number;
   credito: CreditoCliente;
+  contexto: string;
   procesando: boolean;
   error: string | null;
   onConfirmar: () => void;
-  onVolver: () => void;
+  onRegresar: () => void;
 }) {
   // La base decide; esto solo avisa antes de tocar el botón que va a pedir el PIN.
   const pasa = Math.round((total - credito.disponible) * 100) / 100;
@@ -1094,45 +577,77 @@ function VistaCredito({ total, credito, procesando, error, onConfirmar, onVolver
       : null;
   return (
     <MarcoCredito
-      cfg={CFG_CREDITO}
+      contexto={contexto}
+      cifra={total}
       error={error}
       procesando={procesando}
-      etiqueta={<>Vender a crédito <span className="font-display tabular-nums opacity-90">{fmtMxn(total)}</span></>}
+      etiqueta={`Vender a crédito ${fmtMxn(total)}`}
       onConfirmar={onConfirmar}
-      onVolver={onVolver}
+      onRegresar={onRegresar}
     >
       <Renglon l="Ya debe" v={fmtMxn(credito.deuda)} />
       <Renglon l="Disponible" v={fmtMxn(credito.disponible)} />
-      <Renglon l="Esta venta" v={fmtMxn(total)} tono="fuerte" />
-      {aviso && <p className="border-t border-warning-line bg-warning-soft px-[18px] py-3 text-14 font-medium text-warning">{aviso}</p>}
-      <p className="border-t border-line px-[18px] py-3 text-13 text-ink-3">Va la venta completa. Paga en {credito.plazoDias} días.</p>
+      {aviso && <p className="border-b border-warning-line bg-warning-soft px-5 py-3 text-15 font-medium text-warning">{aviso}</p>}
+      <p className="px-5 py-3 text-14 text-ink-3">Va la venta completa. Paga en {credito.plazoDias} días.</p>
     </MarcoCredito>
   );
 }
 
-function VistaSaldoFavor({ pendiente, monto, procesando, error, onConfirmar, onVolver }: {
+function VistaSaldoFavor({ pendiente, monto, contexto, procesando, error, onConfirmar, onRegresar }: {
   pendiente: number;
   /** Lo que se usa: el saldo, hasta lo que falta. */
   monto: number;
+  contexto: string;
   procesando: boolean;
   error: string | null;
   onConfirmar: () => void;
-  onVolver: () => void;
+  onRegresar: () => void;
 }) {
   const resto = Math.round((pendiente - monto) * 100) / 100;
   return (
     <MarcoCredito
-      cfg={CFG_SALDO_FAVOR}
+      contexto={contexto}
+      cifra={monto}
       error={error}
       procesando={procesando}
-      etiqueta={<>Usar <span className="font-display tabular-nums opacity-90">{fmtMxn(monto)}</span></>}
+      etiqueta={`Usar ${fmtMxn(monto)}`}
       onConfirmar={onConfirmar}
-      onVolver={onVolver}
+      onRegresar={onRegresar}
     >
       <Renglon l="Por cobrar" v={fmtMxn(pendiente)} />
-      <Renglon l="Se usa del saldo a favor" v={fmtMxn(monto)} tono="fuerte" />
-      {resto > 0 && <p className="border-t border-line px-[18px] py-3 text-13 text-ink-3">Los {fmtMxn(resto)} que faltan se cobran después con otra forma de pago.</p>}
+      <Renglon l="Se usa del saldo a favor" v={fmtMxn(monto)} />
+      {resto > 0 && <p className="px-5 py-3 text-14 text-ink-3">Los {fmtMxn(resto)} que faltan se cobran después con otra forma de pago.</p>}
     </MarcoCredito>
+  );
+}
+
+// ─── Pantallas de espera ─────────────────────────────────────────────────────
+
+/** Mientras se registra el pago. En efectivo con cambio, el cambio ya se ve para ir contando. */
+function PantallaRegistrando({ cambio, recibido }: { cambio: number; recibido: number }) {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-surface" role="dialog" aria-modal="true" aria-busy="true">
+      <div className="flex h-24 flex-shrink-0 flex-col items-center justify-end">
+        {cambio > 0 && (
+          <>
+            <div className={`${dinero} text-28 text-ink`}>Cambio {fmtMxn(cambio)}</div>
+            <div className="text-15 text-ink-3">de {fmtMxn(recibido)}</div>
+          </>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col items-center justify-center" role="status">
+        <span className="mb-6 h-14 w-14 animate-spin rounded-full border-4 border-line border-t-accent" aria-hidden />
+        <div className="font-display text-32 font-bold text-ink">Registrando pago</div>
+      </div>
+    </div>
+  );
+}
+
+function PantallaMensaje({ contexto, onCerrar, children, pie }: { contexto: string; onCerrar: () => void; children: React.ReactNode; pie?: React.ReactNode }) {
+  return (
+    <PantallaCobro regresar={{ icono: "cerrar", onClick: onCerrar }} contexto={contexto} pie={pie}>
+      <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">{children}</div>
+    </PantallaCobro>
   );
 }
 
@@ -1145,6 +660,7 @@ export function ModalCobro({
   turnoId,
   ejecutaNombre,
   totalesIniciales,
+  contexto: contextoCuenta,
   atajo = null,
   moduloCredito = false,
   conCitas = false,
@@ -1159,6 +675,8 @@ export function ModalCobro({
   turnoId: string;
   ejecutaNombre: string;
   totalesIniciales: TotalesTicket;
+  /** La mesa o el nombre de la cuenta, para la cabecera. Sin él, solo «Ticket #folio». */
+  contexto?: string;
   /**
    * Avisa el monto que la cajera tiene a la vista como pendiente de cobrar (con propina y pagos
    * parciales ya aplicados). La pantalla del cliente lo muestra para ver el mismo número que la
@@ -1180,38 +698,31 @@ export function ModalCobro({
   onCerrar: () => void;
 }) {
   const [totales, setTotales] = useState<TotalesTicket>(totalesIniciales);
-  const [vista, setVista] = useState<Vista>("propina");
-  const vistaRef = useRef(vista);
-  vistaRef.current = vista;
+  const [vista, setVista] = useState<VistaCobro>("selector");
   const [metodo, setMetodo] = useState<MetodoPago>("EFECTIVO");
   const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
-  // Propina (P-075): se captura antes de elegir método. El "a cobrar" pasa a total + propina.
-  const [propina, setPropina] = useState(0);
+  // Propina (P-075): se pregunta DESPUÉS de elegir el método. El "a cobrar" pasa a total + propina.
+  // Una propina que ya venía en el ticket se respeta: entra al «a cobrar» y no se vuelve a preguntar.
+  const propinaInicial = useRef(totalesIniciales.propina ?? 0);
+  const [propina, setPropina] = useState(propinaInicial.current);
+  const propinaRef = useRef(propina);
+  propinaRef.current = propina;
+  const [propinaPreguntada, setPropinaPreguntada] = useState(propinaInicial.current > 0);
+  /** Se contestó la pantalla de propina en ESTE cobro: regresar desde el método vuelve a ella. */
+  const [preguntoAqui, setPreguntoAqui] = useState(false);
+  /** El método elegido; la propina lleva a él al confirmarse. */
+  const [trasPropina, setTrasPropina] = useState<DestinoMetodo | null>(null);
   const [sug, setSug] = useState<SugerenciasPropina | null>(null);
-  // Con la propina en el lector de Clip el modal abre en el selector: la propina de VIM se pregunta
-  // solo si se cobra con otra cosa (`propinaAlElegir`), una vez, y luego sigue el método elegido.
-  const [propinaAlElegir, setPropinaAlElegir] = useState(false);
-  const [propinaPreguntada, setPropinaPreguntada] = useState(false);
-  const [trasPropina, setTrasPropina] = useState<MetodoPago | "dividido" | null>(null);
+  /** Lo que se está registrando en efectivo, para enseñar el cambio mientras tanto. */
+  const [enCurso, setEnCurso] = useState<{ cambio: number; recibido: number }>({ cambio: 0, recibido: 0 });
 
   useEffect(() => {
     let activo = true;
     leerSugerenciasPropina(token, sucursalId)
-      .then((s) => {
-        if (!activo) return;
-        setSug(s);
-        if (!s.capturar) { setTrasPropina(null); setVista(atajo ? "atajo" : "selector"); } // sucursal sin propina → salta el paso
-      })
-      .catch(() => {
-        if (!activo) return;
-        setSug({ porcentajes: [10, 15, 20], capturar: false, libre: true, sin: true });
-        setTrasPropina(null);
-        setVista(atajo ? "atajo" : "selector");
-      });
+      .then((s) => { if (activo) setSug(s); })
+      .catch(() => { if (activo) setSug({ porcentajes: [10, 15, 20], capturar: false, libre: true, sin: true }); });
     return () => { activo = false; };
-    // El atajo se fija al abrir el modal y no cambia mientras está abierto.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, sucursalId]);
 
   // ── Anticipo de la cita (belleza, 0222) ─────────────────────────────────────────────────────
@@ -1284,6 +795,21 @@ export function ModalCobro({
     onMontoACobrar?.(totalesEf.pendiente);
   }, [totalesEf.pendiente, onMontoACobrar]);
 
+  /**
+   * Ya entró dinero con esta propina: queda firme. Regresar ya no la deshace y no se vuelve a
+   * preguntar (`propinaPreguntada` ya es true).
+   */
+  function propinaFirme() {
+    propinaInicial.current = propinaRef.current;
+    setPreguntoAqui(false);
+  }
+
+  /** Quedó saldo por cobrar tras un pago: de vuelta a «¿Cómo paga?» con la propina firme. */
+  function quedaPendiente() {
+    propinaFirme();
+    setVista("selector");
+  }
+
   async function confirmarPropina(monto: number) {
     setError(null);
     setProcesando(true);
@@ -1291,8 +817,8 @@ export function ModalCobro({
       await establecerPropina(token, totales.ticketId, monto);
       setPropina(monto);
       setPropinaPreguntada(true);
-      if (trasPropina) { setTrasPropina(null); irAMetodo(trasPropina); }
-      else setVista(atajo ? "atajo" : "selector");
+      setPreguntoAqui(true);
+      if (trasPropina) irAMetodo(trasPropina);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo fijar la propina");
     } finally {
@@ -1327,6 +853,7 @@ export function ModalCobro({
   async function aplicarUnPago(m: MetodoPago, monto: number, recibido?: number) {
     setError(null);
     if (!(monto > 0)) { setError("Monto inválido"); return; }
+    setEnCurso({ cambio: recibido ? Math.round((recibido - monto) * 100) / 100 : 0, recibido: recibido ?? 0 });
     setProcesando(true);
     let antes = totales;
     const clientId = (pagoUnicoId.current ??= nuevoClientId());
@@ -1340,12 +867,8 @@ export function ModalCobro({
       );
       pagoUnicoId.current = null;
       setTotales(t);
-      if (t.estadoFiscal === "PAGADO") {
-        onPagado(t.folio, t.cambio, t.total);
-      } else {
-        // queda pendiente: resetea a selector para siguiente pago
-        setVista("selector");
-      }
+      if (t.estadoFiscal === "PAGADO") onPagado(t.folio, t.cambio, t.total);
+      else quedaPendiente();
     } catch (e) {
       const t = await trasFalloDeCobro(e);
       if (pagoEntroPeseAlError(antes, t)) pagoUnicoId.current = null;
@@ -1368,7 +891,6 @@ export function ModalCobro({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vista, anticipoListo]);
 
-
   // ── A crédito y saldo a favor (retail 2, entrega 2) ─────────────────────────────────────────
   // Con el módulo apagado no se lee nada: un restaurante cobra exactamente como antes.
   const [cuentaCredito, setCuentaCredito] = useState<CuentaCredito | null>(null);
@@ -1382,9 +904,9 @@ export function ModalCobro({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moduloCredito, token, totales.ticketId]);
   const opciones = opcionesCredito({ moduloCredito, cuenta: cuentaCredito, pendiente: totalesEf.pendiente, montoPagado: totales.montoPagado + anticipoCobro.porAplicar });
-  const extras: MetodoConfig[] = [
-    ...(opciones.aCredito ? [{ ...CFG_CREDITO, sub: `Disponible: ${fmtMxn(opciones.aCredito.disponible)}` }] : []),
-    ...(opciones.saldoFavor > 0 ? [{ ...CFG_SALDO_FAVOR, sub: `Tiene ${fmtMxn(cuentaCredito?.saldoFavor ?? 0)} a favor` }] : []),
+  const extras: Extra[] = [
+    ...(opciones.aCredito ? [{ valor: "CREDITO" as MetodoPago, etiqueta: "A crédito", sub: `Disponible: ${fmtMxn(opciones.aCredito.disponible)}` }] : []),
+    ...(opciones.saldoFavor > 0 ? [{ valor: "SALDO_FAVOR" as MetodoPago, etiqueta: "Saldo a favor", sub: `Tiene ${fmtMxn(cuentaCredito?.saldoFavor ?? 0)} a favor` }] : []),
   ];
   /** La base pidió el PIN de `venta.credito_excedido`: su motivo, para el diálogo. */
   const [pinCredito, setPinCredito] = useState<string | null>(null);
@@ -1393,6 +915,7 @@ export function ModalCobro({
 
   async function cobrarConCredito(pagar: (clientId: string) => Promise<void>, alQuedarPendiente?: () => void) {
     setError(null);
+    setEnCurso({ cambio: 0, recibido: 0 });
     setProcesando(true);
     let antes = totales;
     const clientId = (pagoCreditoId.current ??= nuevoClientId());
@@ -1406,7 +929,7 @@ export function ModalCobro({
         if (vista === "credito") onPagado(t.folio, 0, null, true);
         else onPagado(t.folio, t.cambio, t.total);
       }
-      else { alQuedarPendiente?.(); setVista("selector"); }
+      else { alQuedarPendiente?.(); quedaPendiente(); }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "";
       if (vista === "credito" && pideAutorizacionCredito(msg)) { setPinCredito(msg); return; }
@@ -1432,24 +955,26 @@ export function ModalCobro({
   // Lo último que se supo de esta caja evita que el selector cambie de botones al abrir. Solo se
   // guarda `hay`: `lista` arranca en true y, si el lector no lo está, `crear` responde
   // TERMINAL_NO_DISPONIBLE (seguro) hasta que contesta `disponible`.
-  // "2" = hay terminal y su lector pregunta la propina: mientras contesta `disponible`, la propina de
-  // VIM espera («Cargando…») en vez de preguntarse para luego saltarla.
-  const recuerdo = useRef<string | null>(null);
-  const [terminal, setTerminal] = useState<TerminalCaja>(() => {
-    try { recuerdo.current = sessionStorage.getItem("vimpos.terminal"); } catch { /* sin almacén no hay recuerdo */ }
-    return { hay: recuerdo.current === "1" || recuerdo.current === "2", lista: true, proveedor: null, propina_en_lector: false };
+  const [terminal, setTerminalEstado] = useState<TerminalCaja>(() => {
+    let recuerdo: string | null = null;
+    try { recuerdo = sessionStorage.getItem("vimpos.terminal"); } catch { /* sin almacén no hay recuerdo */ }
+    return { hay: recuerdo === "1" || recuerdo === "2", lista: true, proveedor: null, propina_en_lector: false };
   });
+  // La propina se decide al elegir «Tarjeta», a veces justo después de volver a preguntar por el
+  // lector: el ref tiene lo último aunque el render todavía no llegue.
+  const terminalRef = useRef(terminal);
+  function setTerminal(t: TerminalCaja) { terminalRef.current = t; setTerminalEstado(t); }
   const [terminalSabida, setTerminalSabida] = useState(false);
   const conTerminal = terminal.hay;
   // El cobro va al lector con la propina por elegir solo si VIM no tiene ya una (ni de esta vez ni
   // guardada en el ticket): nunca dos propinas.
-  // Si VIM ya la preguntó (aunque fuera «sin propina»), el lector no la vuelve a preguntar.
   const propinaEnLector = terminal.propina_en_lector && propina === 0 && !propinaPreguntada && !((totales.propina ?? 0) > 0);
 
   /** Vuelve a preguntar por el lector (la cajera lo encendió con el cobro abierto); true si ya puede cobrar. */
   async function revisarTerminal(): Promise<boolean> {
     const t = await terminalDeCaja(token, cajaId);
     setTerminal(t);
+    setTerminalSabida(true);
     return t.hay && t.lista;
   }
 
@@ -1462,6 +987,7 @@ export function ModalCobro({
    */
   async function aplicarCobroTerminal(c: CobroTerminal, autorizoId?: string) {
     setError(null);
+    setEnCurso({ cambio: 0, recibido: 0 });
     setProcesando(true);
     const propinaLector = autorizoId ? 0 : propinaDeCobro(c);
     try {
@@ -1469,6 +995,7 @@ export function ModalCobro({
       if (propinaLector > 0) {
         await establecerPropina(token, totales.ticketId, propinaLector);
         setPropina(propinaLector);
+        propinaRef.current = propinaLector;
         setPropinaPreguntada(true);
       }
       const t = await aplicarPago(
@@ -1481,7 +1008,7 @@ export function ModalCobro({
       await pedirCobro(token, cajaId, { accion: "confirmar", cobro_id: c.id, autorizo_id: autorizoId }).catch(() => {});
       setTotales(t);
       if (t.estadoFiscal === "PAGADO") onPagado(t.folio, t.cambio, t.total);
-      else setVista("selector");
+      else quedaPendiente();
     } catch (e) {
       const t = await trasFalloDeCobro(e);
       if (!ventaQuedoPagada(t)) {
@@ -1497,34 +1024,18 @@ export function ModalCobro({
   // (la caja se apagó o perdió la red a medio cobro), se registra ahora.
   useEffect(() => {
     let activo = true;
-    // «Cargando…» tiene tope: con la red atorada, a los 4 s sale la propina de VIM de siempre (y
-    // la respuesta tardía ya no cambia la pantalla). Solo si el lector preguntaba la propina.
-    let vencio = false;
-    const tope = !atajo
-      ? setTimeout(() => { vencio = true; setTerminalSabida(true); }, ESPERA_LECTOR_MS) : undefined;
     (async () => {
       const t = await terminalDeCaja(token, cajaId);
-      clearTimeout(tope);
-      const tiene = t.hay;
       if (!activo) return;
       setTerminal(t);
       setTerminalSabida(true);
-      try { sessionStorage.setItem("vimpos.terminal", !tiene ? "0" : t.propina_en_lector ? "2" : "1"); } catch { /* sin almacén no hay recuerdo */ }
-      // Con lector listo que pregunta la propina, el cobro abre en el selector. También la primera
-      // vez (sin recuerdo «2»): si la respuesta llega en los primeros 4 s y la cajera sigue en la
-      // propina de VIM sin contestarla, se pasa al selector. Una propina que ya estaba en el ticket
-      // se respeta: entra al «a cobrar» y el lector no pregunta otra.
-      if (!vencio && !atajo && t.hay && t.lista && t.propina_en_lector && vistaRef.current === "propina") {
-        setPropinaAlElegir(true);
-        setPropina(totales.propina ?? 0);
-        setVista("selector");
-      }
-      if (!tiene) return;
+      try { sessionStorage.setItem("vimpos.terminal", !t.hay ? "0" : t.propina_en_lector ? "2" : "1"); } catch { /* sin almacén no hay recuerdo */ }
+      if (!t.hay) return;
       const r = await pedirCobro(token, cajaId, { accion: "pendientes" }).catch(() => null);
       const suyo = r?.cobros?.find((c) => c.ticket_id === totales.ticketId);
       if (activo && suyo) void aplicarCobroTerminal(suyo);
-    })();
-    return () => { activo = false; clearTimeout(tope); };
+    })().catch(() => { if (activo) setTerminalSabida(true); });
+    return () => { activo = false; };
     // Solo al abrir el cobro.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1577,196 +1088,255 @@ export function ModalCobro({
       if (ventaQuedoPagada(r.totales)) onPagado(r.totales.folio, r.totales.cambio, r.totales.total);
       else if (r.error !== null) setError(r.error instanceof Error ? r.error.message : "Error al cobrar");
       else setError("Los pagos no cubrieron el total del ticket.");
+      if (r.aplicados.length > 0) propinaFirme();
       return r.aplicados;
     } finally {
       setProcesando(false);
     }
   }
 
-  function elegirMetodo(m: MetodoPago | "dividido" | "terminal") {
+  /** Elegir método: la propina va primero si toca preguntarla (spec: siempre después del método). */
+  function elegirMetodo(d: DestinoMetodo) {
     setError(null);
-    // Propina en el lector: si se cobra con otra cosa, antes va la propina de VIM (una vez).
-    if (m !== "terminal" && propinaAlElegir && !propinaPreguntada && sug?.capturar !== false) {
-      setTrasPropina(m);
+    setTrasPropina(d);
+    const t = terminalRef.current;
+    if (debePreguntarPropina({
+      capturar: sug?.capturar ?? false,
+      propinaFijada: propinaPreguntada,
+      destino: d,
+      propinaEnLector: t.hay && t.lista && t.propina_en_lector,
+    })) {
       setVista("propina");
       return;
     }
-    irAMetodo(m);
+    irAMetodo(d);
   }
 
-  function irAMetodo(m: MetodoPago | "dividido" | "terminal") {
-    if (m === "terminal") {
-      setVista("terminal");
-    } else if (m === "dividido") {
-      setVista("dividido");
-    } else if (m === "CREDITO") {
-      setVista("credito");
-    } else if (m === "SALDO_FAVOR") {
-      setVista("saldo");
-    } else if (m === "EFECTIVO") {
-      setMetodo(m);
-      setVista("efectivo");
-    } else {
-      setMetodo(m);
-      setVista("otro");
+  function irAMetodo(d: DestinoMetodo) {
+    if (d === "terminal") setVista("terminal");
+    else if (d === "atajo") setVista("atajo");
+    else if (d === "dividido") setVista("dividido");
+    else if (d === "CREDITO") setVista("credito");
+    else if (d === "SALDO_FAVOR") setVista("saldo");
+    else if (d === "EFECTIVO") { setMetodo(d); setVista("efectivo"); }
+    else { setMetodo(d); setVista("otro"); }
+  }
+
+  // El atajo «Efectivo exacto» entra como cualquier método, en cuanto se sabe si hay que preguntar
+  // la propina.
+  const atajoElegido = useRef(false);
+  useEffect(() => {
+    if (!atajo || !sug || atajoElegido.current) return;
+    atajoElegido.current = true;
+    elegirMetodo("atajo");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sug]);
+
+  /**
+   * De vuelta a «¿Cómo paga?». Deshace la propina elegida en este cobro (si cambió): la propina va
+   * atada al método con el que se paga, y al elegir otro se pregunta de nuevo.
+   */
+  async function volverAlSelector() {
+    const inicial = propinaInicial.current;
+    if (propinaRef.current !== inicial) {
+      setProcesando(true);
+      try {
+        await establecerPropina(token, totales.ticketId, inicial);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "No se pudo quitar la propina");
+        return;
+      } finally {
+        setProcesando(false);
+      }
+      setPropina(inicial);
     }
+    setPropinaPreguntada(inicial > 0);
+    setPreguntoAqui(false);
+    setTrasPropina(null);
+    setVista("selector");
   }
 
-  /* Escape hace lo que el botón de salida de la vista que está en pantalla: «Volver» en efectivo,
-     tarjeta o dividido regresa al selector; en la propina y el selector cierra el cobro. Con un
-     pago aplicándose (o el atajo de efectivo exacto corriendo) no hace nada: interrumpir a media
-     aplicación de pago es justo lo que no debe poder hacerse por reflejo. */
-  const cerrarRef = useRef(onCerrar);
-  cerrarRef.current = onCerrar;
+  /** Regresar: botón de la cabecera y Escape hacen lo mismo. */
+  async function regresar() {
+    const d = vistaAlRegresar(vista, {
+      ocupado: procesando || esperaDividido !== null || pinCredito !== null,
+      preguntoPropinaAqui: preguntoAqui,
+    });
+    if (d === null) return;
+    setError(null);
+    if (d === "cerrar") onCerrar();
+    else if (d === "selector" && vista === "propina") await volverAlSelector();
+    else setVista(d);
+  }
+
+  /* Escape hace lo mismo que el botón de regresar de la pantalla. Con un pago aplicándose, el
+     atajo corriendo o la terminal cobrando no hace nada (`vistaAlRegresar` → null). */
+  const regresarRef = useRef(regresar);
+  regresarRef.current = regresar;
   const alEscapar = useMemo(
     () => capaVisible([
-      // Con el cobro en la terminal tampoco: de ahí se sale cancelándolo, no por reflejo.
-      [procesando || pinCredito !== null || vista === "atajo" || vista === "terminal", () => {}],
-      [vista === "efectivo" || vista === "otro" || vista === "dividido" || vista === "credito" || vista === "saldo", () => { setError(null); setVista("selector"); }],
-      // La propina que se pregunta al elegir otro método regresa al selector, como su «Atrás».
-      [vista === "propina" && trasPropina !== null, () => { setError(null); setTrasPropina(null); setVista("selector"); }],
-      [true, () => cerrarRef.current()],
+      [pinCredito !== null, () => {}],
+      [true, () => void regresarRef.current()],
     ]),
-    [procesando, vista, pinCredito, trasPropina],
+    [pinCredito],
   );
   useEscape(alEscapar);
 
-  // Tamaño del modal según la vista activa. El efectivo mide lo que su contenido (80 % de la
-  // pantalla con tope de 960px): al 80 % de 1920 mediría 1536 y los números quedarían perdidos.
-  const esFullscreen = vista === "otro" || vista === "dividido";
+  // ── Pantallas ────────────────────────────────────────────────────────────────────────────
+  const ticket = `Ticket #${totales.folio ?? totales.ticketId.slice(-6)}`;
+  const ctx = (metodoTexto?: string) => cabecera([metodoTexto, ticket, contextoCuenta]);
+  const atras = () => void regresar();
+
+  let pantalla: React.ReactNode;
+  if (errorAnticipo && (vista === "selector" || vista === "atajo")) {
+    pantalla = (
+      <PantallaMensaje
+        contexto={ctx()}
+        onCerrar={onCerrar}
+        pie={
+          <div className="grid grid-cols-2 gap-3">
+            <BotonSecundario onClick={onCerrar}>Volver al ticket</BotonSecundario>
+            <BotonPrincipal onClick={() => setIntentoAnticipo((n) => n + 1)}>Reintentar</BotonPrincipal>
+          </div>
+        }
+      >
+        <p className="max-w-[560px] text-20 font-medium text-danger" role="alert">
+          No se pudo saber si la cita dejó anticipo: {errorAnticipo}. No se cobra hasta saberlo.
+        </p>
+      </PantallaMensaje>
+    );
+  } else if (procesando && (vista === "efectivo" || vista === "otro" || vista === "atajo" || vista === "credito" || vista === "saldo")) {
+    pantalla = <PantallaRegistrando cambio={enCurso.cambio} recibido={enCurso.recibido} />;
+  } else if (vista === "atajo" || (vista === "selector" && (!sug || !anticipoListo))) {
+    pantalla = (
+      <PantallaMensaje contexto={ctx()} onCerrar={onCerrar}>
+        <p className="text-18 text-ink-3" role="status">Cargando…</p>
+      </PantallaMensaje>
+    );
+  } else if (vista === "selector") {
+    pantalla = (
+      <VistaSelector
+        totales={totalesEf}
+        contexto={ctx()}
+        conTerminal={conTerminal}
+        terminalSabida={terminalSabida}
+        terminalLista={terminal.lista}
+        extras={extras}
+        anticipo={anticipoCobro.anticipo}
+        onCobrarConAnticipo={anticipoCobro.porAplicar > 0 && totalesEf.pendiente <= 0 ? () => void cobrarSoloConAnticipo() : undefined}
+        procesando={procesando}
+        error={error}
+        onRevisarTerminal={revisarTerminal}
+        onElegir={elegirMetodo}
+        onMas={() => { setError(null); setVista("mas"); }}
+        onCerrar={onCerrar}
+      />
+    );
+  } else if (vista === "mas") {
+    pantalla = <VistaMas totales={totalesEf} contexto={ctx()} onElegir={elegirMetodo} onRegresar={atras} />;
+  } else if (vista === "propina" && sug) {
+    const nombre = trasPropina === "terminal" ? "Tarjeta" : trasPropina === "dividido" ? "Pago dividido" : trasPropina === "atajo" ? "Efectivo exacto" : trasPropina ? nombreMetodo(trasPropina) : undefined;
+    pantalla = (
+      <VistaPropina
+        totalBase={totales.total}
+        contexto={ctx(nombre)}
+        sugerencias={sug}
+        procesando={procesando}
+        error={error}
+        onConfirmar={(m) => void confirmarPropina(m)}
+        onRegresar={atras}
+      />
+    );
+  } else if (vista === "terminal") {
+    pantalla = (
+      <VistaTerminal
+        token={token}
+        cajaId={cajaId}
+        turnoId={turnoId}
+        ejecutaNombre={ejecutaNombre}
+        ticketId={totales.ticketId}
+        folio={totales.folio}
+        monto={totalesEf.pendiente}
+        proveedor={terminal.proveedor}
+        propinaEnLector={propinaEnLector}
+        contexto={ctx("Tarjeta")}
+        onAprobado={aplicarCobroTerminal}
+        onVolver={() => { setError(null); void volverAlSelector(); }}
+      />
+    );
+  } else if (vista === "credito" && opciones.aCredito) {
+    pantalla = (
+      <VistaCredito
+        total={totalesEf.pendiente}
+        credito={opciones.aCredito}
+        contexto={ctx("A crédito")}
+        procesando={procesando}
+        error={error}
+        onConfirmar={() => void venderACredito(null)}
+        onRegresar={atras}
+      />
+    );
+  } else if (vista === "saldo" && opciones.saldoFavor > 0) {
+    pantalla = (
+      <VistaSaldoFavor
+        pendiente={totalesEf.pendiente}
+        monto={opciones.saldoFavor}
+        contexto={ctx("Saldo a favor")}
+        procesando={procesando}
+        error={error}
+        onConfirmar={() => void usarSaldoFavor()}
+        onRegresar={atras}
+      />
+    );
+  } else if (vista === "efectivo") {
+    pantalla = (
+      <VistaEfectivo
+        totales={totalesEf}
+        conPropina={propina > 0}
+        procesando={procesando}
+        error={error}
+        onAplicar={(monto, recibido) => void aplicarUnPago("EFECTIVO", monto, recibido)}
+        onRegresar={atras}
+      />
+    );
+  } else if (vista === "otro") {
+    pantalla = (
+      <VistaOtro
+        totales={totalesEf}
+        metodo={metodo}
+        contexto={ctx(metodo === "TRANSFERENCIA" ? "Transferencia" : `${nombreMetodo(metodo)} · a mano`)}
+        procesando={procesando}
+        error={error}
+        onAplicar={(monto) => void aplicarUnPago(metodo, monto)}
+        onRegresar={atras}
+      />
+    );
+  } else if (vista === "dividido") {
+    pantalla = (
+      <VistaDividida
+        totales={totalesEf}
+        contexto={ctx("Pago dividido")}
+        conTerminal={conTerminal}
+        terminalLista={terminal.lista}
+        onRevisarTerminal={revisarTerminal}
+        procesando={procesando}
+        error={error}
+        onAplicarPagos={aplicarPagosDivididos}
+        onRegresar={atras}
+      />
+    );
+  } else {
+    // Una vista sin sus datos (p. ej. «A crédito» que dejó de aplicar): de vuelta al selector.
+    pantalla = (
+      <PantallaMensaje contexto={ctx()} onCerrar={() => setVista("selector")}>
+        <p className="text-18 text-ink-3">Esta forma de pago ya no está disponible.</p>
+      </PantallaMensaje>
+    );
+  }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div
-        className={[
-          "bg-surface rounded-lg shadow-xl overflow-hidden flex flex-col",
-          vista === "efectivo"
-            ? "w-[min(960px,80vw)] max-h-full overflow-y-auto"
-            : esFullscreen
-              ? "w-full max-w-[920px] h-full max-h-[700px]"
-              : "w-full max-w-[560px] max-h-[90vh] overflow-y-auto p-6",
-        ].join(" ")}
-      >
-        {vista === "propina" && (
-          // Si el lector de esta caja preguntaba la propina, se espera a saber si sigue así.
-          sug && !(recuerdo.current === "2" && !terminalSabida && !atajo && trasPropina === null) ? (
-            <VistaPropina
-              totalBase={totales.total}
-              ticketId={totales.ticketId}
-              sugerencias={sug}
-              procesando={procesando}
-              error={error}
-              onConfirmar={confirmarPropina}
-              onAtras={trasPropina ? () => { setError(null); setTrasPropina(null); setVista("selector"); } : onCerrar}
-            />
-          ) : (
-            <div className="flex items-center justify-center py-16 text-sm text-ink-3">Cargando…</div>
-          )
-        )}
-        {vista === "atajo" && !errorAnticipo && (
-          <div className="flex flex-col items-center gap-2 py-10 text-center" role="status">
-            <div className="font-display text-24 font-semibold">Cobrando en efectivo exacto…</div>
-            <div className="font-display text-32 font-bold tabular-nums">{fmtMxn(totalesEf.pendiente)}</div>
-          </div>
-        )}
-        {(vista === "selector" || vista === "atajo") && errorAnticipo && (
-          <div className="flex flex-col items-center gap-4 py-10 text-center" role="alert">
-            <p className="max-w-sm text-15 font-medium text-danger">No se pudo saber si la cita dejó anticipo: {errorAnticipo}. No se cobra hasta saberlo.</p>
-            <div className="flex gap-2">
-              <Button variant="ghost" className="h-12" onClick={onCerrar}>Volver al ticket</Button>
-              <Button className="h-12" onClick={() => setIntentoAnticipo((n) => n + 1)}>Reintentar</Button>
-            </div>
-          </div>
-        )}
-        {vista === "selector" && !anticipoListo && !errorAnticipo && (
-          <div className="flex items-center justify-center py-16 text-sm text-ink-3">Cargando…</div>
-        )}
-        {vista === "selector" && anticipoListo && (
-          <VistaSelector
-            totales={totalesEf}
-            conTerminal={conTerminal}
-            extras={extras}
-            anticipo={anticipoCobro.anticipo}
-            procesando={procesando}
-            onCobrarConAnticipo={anticipoCobro.porAplicar > 0 && totalesEf.pendiente <= 0 ? () => void cobrarSoloConAnticipo() : undefined}
-            terminalLista={terminal.lista}
-            onRevisarTerminal={revisarTerminal}
-            error={error}
-            onElegir={elegirMetodo}
-            onCerrar={onCerrar}
-          />
-        )}
-        {vista === "terminal" && (
-          <VistaTerminal
-            token={token}
-            cajaId={cajaId}
-            turnoId={turnoId}
-            ejecutaNombre={ejecutaNombre}
-            ticketId={totales.ticketId}
-            folio={totales.folio}
-            monto={totalesEf.pendiente}
-            proveedor={terminal.proveedor}
-            propinaEnLector={propinaEnLector}
-            onAprobado={aplicarCobroTerminal}
-            onVolver={() => { setError(null); setVista("selector"); }}
-          />
-        )}
-        {vista === "credito" && opciones.aCredito && (
-          <VistaCredito
-            total={totalesEf.pendiente}
-            credito={opciones.aCredito}
-            procesando={procesando}
-            error={error}
-            onConfirmar={() => void venderACredito(null)}
-            onVolver={() => { setError(null); setVista("selector"); }}
-          />
-        )}
-        {vista === "saldo" && opciones.saldoFavor > 0 && (
-          <VistaSaldoFavor
-            pendiente={totalesEf.pendiente}
-            monto={opciones.saldoFavor}
-            procesando={procesando}
-            error={error}
-            onConfirmar={() => void usarSaldoFavor()}
-            onVolver={() => { setError(null); setVista("selector"); }}
-          />
-        )}
-        {vista === "efectivo" && (
-          <VistaEfectivo
-            totales={totalesEf}
-            procesando={procesando}
-            error={error}
-            onAplicar={(monto, recibido) => aplicarUnPago("EFECTIVO", monto, recibido)}
-            onVolver={() => { setError(null); setVista("selector"); }}
-          />
-        )}
-        {vista === "otro" && (
-          <VistaOtro
-            totales={totalesEf}
-            metodo={metodo}
-            procesando={procesando}
-            error={error}
-            onAplicar={(monto) => aplicarUnPago(metodo, monto)}
-            onVolver={() => { setError(null); setVista("selector"); }}
-          />
-        )}
-        {vista === "dividido" && (
-          <VistaDividida
-            totales={totalesEf}
-            conTerminal={conTerminal}
-            terminalLista={terminal.lista}
-            onRevisarTerminal={revisarTerminal}
-            procesando={procesando}
-            error={error}
-            onAplicarPagos={aplicarPagosDivididos}
-            onVolver={() => { setError(null); setVista("selector"); }}
-          />
-        )}
-      </div>
+    <>
+      {pantalla}
       {pinCredito !== null && (
         <ModalAutorizacionPin
           token={token}
@@ -1787,25 +1357,25 @@ export function ModalCobro({
           onCancelar={() => setPinCredito(null)}
         />
       )}
+      {/* Una parte del pago dividido cobrándose en la terminal: pantalla completa encima. */}
       {esperaDividido && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/40 p-4">
-          <div className="w-full max-w-[560px] rounded-lg bg-surface p-6 shadow-xl">
-            <VistaTerminal
-              key={esperaDividido.clave}
-              token={token}
-              cajaId={cajaId}
-              turnoId={turnoId}
-              ejecutaNombre={ejecutaNombre}
-              ticketId={totales.ticketId}
-              folio={totales.folio}
-              monto={esperaDividido.monto}
-              proveedor={terminal.proveedor}
-              onAprobado={esperaDividido.aprobado}
-              onVolver={esperaDividido.abandonar}
-            />
-          </div>
+        <div className="fixed inset-0 z-[60]">
+          <VistaTerminal
+            key={esperaDividido.clave}
+            token={token}
+            cajaId={cajaId}
+            turnoId={turnoId}
+            ejecutaNombre={ejecutaNombre}
+            ticketId={totales.ticketId}
+            folio={totales.folio}
+            monto={esperaDividido.monto}
+            proveedor={terminal.proveedor}
+            contexto={ctx("Pago dividido · Tarjeta")}
+            onAprobado={esperaDividido.aprobado}
+            onVolver={esperaDividido.abandonar}
+          />
         </div>
       )}
-    </div>
+    </>
   );
 }
