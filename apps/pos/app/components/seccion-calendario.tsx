@@ -2,7 +2,7 @@
 import { TEXTO_ANTICIPO } from "../lib/anticipos";
 import { useEffect, useMemo, useState } from "react";
 import { hoyMx, sumarDias } from "@vim/fecha";
-import { Icono } from "@vim/ui/styles";
+import { Icono, Cargando } from "@vim/ui/styles";
 import { ETIQUETA_ESTADO_CITA, horaCorta, pasoTolerancia } from "@vim/db/agenda";
 import {
   ALTO_MIN,
@@ -153,7 +153,7 @@ export function SeccionCalendario({ token, sucursalId, version, onAbrirCita, onN
       {error && <p className="flex-shrink-0 px-4 py-2.5 text-14 font-medium text-danger" role="alert">{error}</p>}
 
       {!vigentes || !rango ? (
-        <p className="p-4 text-14 text-ink-3">{error ? "" : "Cargando…"}</p>
+        !error && <Cargando />
       ) : columnas.length === 0 ? (
         <p className="p-8 text-15 text-ink-2">No hay colaboradores en esta sucursal. Dalos de alta en el admin, en Agenda › Colaboradores.</p>
       ) : (

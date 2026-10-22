@@ -1,4 +1,5 @@
 "use client";
+import { Cargando } from "@vim/ui/styles";
 import { useCallback, useEffect, useState } from "react";
 import { BotonVolver } from "./boton-volver";
 import { useEscape } from "../lib/use-escape";
@@ -79,7 +80,7 @@ export function PantallaMonitorVentas({
       </header>
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
-        {cargando && !x && <p className="text-sm text-ink-3">Cargando ventas…</p>}
+        {cargando && !x && <Cargando texto="Cargando ventas" />}
         {error && <p className="mb-4 text-sm font-medium text-danger" role="alert">{error}</p>}
 
         {x && stats && (

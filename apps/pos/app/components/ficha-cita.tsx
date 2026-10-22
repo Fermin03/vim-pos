@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { Button, DialogoPeligro, Icono, Modal, botonClases, useConfirmar } from "@vim/ui/styles";
+import { Button, DialogoPeligro, Icono, Modal, botonClases, useConfirmar, Cargando } from "@vim/ui/styles";
 import { ETIQUETA_ESTADO_CITA, diaLargo, horaCorta, pasoTolerancia } from "@vim/db/agenda";
 import {
   accionesCita, atenderCita, cancelarCita, duracionTexto, enlaceRecordatorio, faltasCliente, leerCita,
@@ -156,7 +156,7 @@ export function FichaCita({ token, citaId, negocio, cajaId, turnoId, ejecutaNomb
         </div>
 
         {!cita ? (
-          <p className="p-6 text-14 text-ink-3" role={error ? "alert" : undefined}>{error ?? "Cargando…"}</p>
+          error ? <p className="p-6 text-14 text-ink-3" role="alert">{error}</p> : <Cargando />
         ) : (
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:flex-row md:overflow-hidden">
             <div className="flex flex-col p-6 md:min-h-0 md:flex-1 md:overflow-y-auto">

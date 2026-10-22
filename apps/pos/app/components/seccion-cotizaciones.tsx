@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { hoyMx } from "@vim/fecha";
-import { Icono, Modal } from "@vim/ui/styles";
+import { Icono, Modal, Cargando } from "@vim/ui/styles";
 import { fmtMxn } from "../lib/turno";
 import { fechaCorta } from "../lib/lealtad-reglas";
 import { useEscape } from "../lib/use-escape";
@@ -87,7 +87,7 @@ export function SeccionCotizaciones({ token, cajaId, whatsapp, onReimprimir, onC
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
             {lista === null ? (
-              <p className="p-4 text-14 text-ink-3">Cargando…</p>
+              <Cargando />
             ) : visibles.length === 0 ? (
               <p className="p-4 text-14 text-ink-3">{texto ? "Ninguna cotización con ese folio o cliente." : "No hay cotizaciones vigentes en esta caja."}</p>
             ) : (

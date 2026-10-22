@@ -1,5 +1,5 @@
 "use client";
-import { LogoVim, Icono } from "@vim/ui/styles";
+import { LogoVim, Icono, Cargando } from "@vim/ui/styles";
 import { useCallback, useEffect, useState } from "react";
 import { BotonVolver } from "./boton-volver";
 import { useEscape } from "../lib/use-escape";
@@ -143,7 +143,7 @@ export function PantallaConsultaCuentas({
             <span>Folio · Fecha</span><span>Total</span>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
-            {cuentas === null && <p className="p-6 text-center text-13 text-ink-3">Cargando…</p>}
+            {cuentas === null && <Cargando />}
             {cuentas !== null && cuentas.length === 0 && <p className="p-6 text-center text-13 text-ink-3">Sin cuentas en este filtro.</p>}
             {cuentas?.map((c) => (
               <button
@@ -168,7 +168,7 @@ export function PantallaConsultaCuentas({
         {/* Detalle */}
         <div className="flex min-h-0 flex-1 flex-col p-5">
           {!sel && <div className="flex flex-1 items-center justify-center text-center text-13 text-ink-3">Elige una cuenta de la lista para ver su detalle.</div>}
-          {sel && cargandoDet && <div className="flex flex-1 items-center justify-center text-center text-ink-3">Cargando detalle…</div>}
+          {sel && cargandoDet && <Cargando texto="Cargando detalle" className="flex-1" />}
           {sel && detalle && (
             <div className="flex min-h-0 flex-1 flex-col">
               {/* Encabezado — fijo. Los datos de la cuenta arriba y los botones en una fila debajo,

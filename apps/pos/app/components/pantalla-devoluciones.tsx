@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BotonVolver } from "./boton-volver";
 import { useEscape } from "../lib/use-escape";
-import { Button, DialogoPeligro, LogoVim, Icono } from "@vim/ui/styles";
+import { Button, DialogoPeligro, LogoVim, Icono, Cargando } from "@vim/ui/styles";
 import { type DatosCaja, type Turno, fmtMxn } from "../lib/turno";
 import { type Empleado } from "../lib/supabase";
 import {
@@ -242,7 +242,7 @@ export function PantallaDevoluciones({
         </div>
       ) : (
       <div className="min-h-0 flex-1 overflow-y-auto p-6">
-        {ventas === null && <p className="text-center text-ink-3">Cargando ventas…</p>}
+        {ventas === null && <Cargando texto="Cargando ventas" />}
         {ventas !== null && ventas.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-ink-3">
             <Icono nombre="devolver" className="h-12 w-12" />
@@ -485,7 +485,7 @@ function ModalDevolucion({
       onCerrar={onCerrar}
     >
       {items === null ? (
-        <p className="text-sm text-ink-3">Cargando ítems…</p>
+        <Cargando en="linea" texto="Cargando ítems" />
       ) : (
         <div className="max-h-32 overflow-y-auto rounded border border-line bg-sel p-3 text-13 text-ink-2">
           {items.map((i) => (

@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { IconoCategoria } from "@vim/ui/styles";
+import { IconoCategoria, Cargando } from "@vim/ui/styles";
 import { colorCategoria, type Categoria, type Producto } from "../lib/catalogo";
 import { menuVisible } from "../lib/catalogo-sucursal";
 import { usePreciosVisibles } from "../lib/precios-visibles";
@@ -163,7 +163,7 @@ export function CatalogoProductos({
         className="grid flex-shrink-0 gap-2 border-b border-line bg-surface px-4 py-3"
         style={{ gridTemplateColumns: `repeat(${barra.columnas}, minmax(0, 1fr))` }}
       >
-        {categorias === null && <p className="text-sm text-ink-3">Cargando…</p>}
+        {categorias === null && <Cargando en="linea" />}
         {categorias?.map((c, i) => {
           const col = colorCategoria(c, i);
           const active = catSel === c.id;
@@ -227,7 +227,7 @@ export function CatalogoProductos({
         {/* El hueco se mide AQUÍ, en un elemento sin padding: así el número que entra al cálculo
             es el mismo que el ancho real de la cuadrícula. */}
         <div ref={zonaRef} className="h-full w-full">
-          {productos === null && <p className="text-sm text-ink-3">Cargando productos…</p>}
+          {productos === null && <Cargando texto="Cargando productos" />}
           {productos !== null && visibles.length === 0 && (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
               <p className="font-display text-lg font-semibold">Sin productos en esta categoría</p>

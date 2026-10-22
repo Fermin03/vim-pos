@@ -1,5 +1,5 @@
 "use client";
-import { Icono } from "@vim/ui/styles";
+import { Icono, Cargando } from "@vim/ui/styles";
 // «Pedidos en línea»: lo que llega de Uber Eats / DiDi / Rappi (ADR 0011), y desde dónde se pausa
 // cada tienda (la de Uber y la propia). Polling cada 10 s como el resto del POS. Cada tarjeta muestra
 // de dónde viene, el folio, el cliente, los ítems y un contador hasta que el pedido se cancele por
@@ -248,7 +248,7 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, cajaSinAc
       {!hayApps ? (
         <p className="m-auto max-w-sm px-4 text-center text-15 text-ink-2">{conTiendaPropia ? DONDE_LLEGAN : "Sin pedidos en línea por ahora."}</p>
       ) : pedidos === null ? (
-        <p className="m-auto text-14 text-ink-3">Cargando…</p>
+        <Cargando className="m-auto" />
       ) : pedidos.length === 0 ? (
         <p className="m-auto text-center text-15 text-ink-3">
           {/* Sin tienda propia, el texto de siempre: quien solo usa Uber no nota ningún cambio. */}

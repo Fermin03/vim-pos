@@ -1,5 +1,5 @@
 "use client";
-import { LogoVim, Icono } from "@vim/ui/styles";
+import { LogoVim, Icono, Cargando } from "@vim/ui/styles";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BotonVolver } from "./boton-volver";
 import { capaVisible } from "../lib/escape";
@@ -161,7 +161,7 @@ export function PantallaReservaciones({
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto p-6">
-        {lista === null && <p className="text-center text-ink-3">Cargando…</p>}
+        {lista === null && <Cargando />}
 
         {lista !== null && lista.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-ink-3">

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Modal } from "@vim/ui/styles";
+import { Modal, Cargando } from "@vim/ui/styles";
 import { fmtMxn } from "../lib/turno";
 import { misPropinas, type MisPropinas } from "../lib/mesero";
 
@@ -26,7 +26,7 @@ export function ModalMisPropinas({ token, meseroId, meseroNombre, turnoId, onCer
       {error ? (
         <p className="py-6 text-center text-sm text-danger">{error}</p>
       ) : !datos ? (
-        <p className="py-6 text-center text-13 text-ink-3">Cargando…</p>
+        <Cargando />
       ) : (
         <>
           <div className="rounded-xl border border-line bg-[#EAF3FB] px-5 py-6 text-center">

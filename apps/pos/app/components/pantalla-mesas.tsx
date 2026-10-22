@@ -1,5 +1,5 @@
 "use client";
-import { LogoVim, Icono } from "@vim/ui/styles";
+import { LogoVim, Icono, Cargando } from "@vim/ui/styles";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BotonVolver } from "./boton-volver";
 import { type DatosCaja } from "../lib/turno";
@@ -138,7 +138,7 @@ export function PantallaMesas({
 
       {/* Cuerpo */}
       <div className="min-h-0 flex-1 overflow-y-auto p-6">
-        {mesas === null && <p className="text-center text-ink-3">Cargando mesas…</p>}
+        {mesas === null && <Cargando texto="Cargando mesas" />}
         {mesas !== null && mesas.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-ink-3">
             <Icono nombre="plano" className="h-12 w-12" />

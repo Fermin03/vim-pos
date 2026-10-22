@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Icono } from "@vim/ui/styles";
+import { Icono, Cargando } from "@vim/ui/styles";
 import { colorCategoria, type Categoria, type Producto } from "../lib/catalogo";
 import { menuVisible } from "../lib/catalogo-sucursal";
 import { calcularBarraCategorias, calcularRejilla, clampPagina, tamanoEtiqueta } from "../lib/rejilla";
@@ -258,7 +258,7 @@ export function PanelVentaRetail({
 
       <div className="min-h-0 flex-1 overflow-hidden bg-bg p-4">
         <div ref={zonaRef} className="h-full w-full">
-          {productos === null && <p className="text-14 text-ink-3">Cargando productos…</p>}
+          {productos === null && <Cargando texto="Cargando productos" />}
           {productos !== null && visibles.length === 0 && (
             <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
               <p className="font-display text-18 font-semibold">{texto.trim() ? "Nada coincide con la búsqueda" : "Sin productos en esta categoría"}</p>

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { hoyMx } from "@vim/fecha";
-import { Button, Icono, Modal } from "@vim/ui/styles";
+import { Button, Icono, Modal, Cargando } from "@vim/ui/styles";
 import { horaCorta } from "@vim/db/agenda";
 import {
   atenderCita, citasEnEspera, colaboradoresDelDia, serviciosAgenda,
@@ -82,7 +82,7 @@ export function PanelEspera({ token, sucursalId, version, onAbrirCita, onAgregar
       <div className="min-h-0 flex-1 overflow-y-auto">
         {error && <p className="px-6 pt-4 text-14 font-medium text-danger" role="alert">{error}</p>}
         {!espera ? (
-          <p className="p-6 text-14 text-ink-3">{error ? "" : "Cargando…"}</p>
+          !error && <Cargando />
         ) : espera.length === 0 ? (
           <p className="p-6 text-15 text-ink-2">Nadie espera. Si llega alguien sin cita, agrégalo a la espera.</p>
         ) : (
