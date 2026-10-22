@@ -119,7 +119,7 @@ export function Numpad({
   /** Si es false, no escucha el teclado (por si convivieran dos numpads). */
   capturarTeclado?: boolean;
 }) {
-  const alto = grande ? "h-[76px] text-[26px]" : compact ? "h-[60px] text-[22px]" : "h-16 text-24";
+  const alto = grande ? "h-[76px] text-24" : compact ? "h-[60px] text-20" : "h-16 text-24";
 
   function press(key: string) {
     if (key === "back") onChange(buffer.slice(0, -1));

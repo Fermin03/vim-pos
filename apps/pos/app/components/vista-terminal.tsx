@@ -164,12 +164,12 @@ export function VistaTerminal({
             <div className="font-display text-40 font-bold tabular-nums text-ink-3">{fmtMxn(monto)}</div>
             {fase.t === "revisar" ? (
               <>
-                <p className="mt-4 font-display text-[36px] font-bold text-ink" role="alert">No pudimos confirmar el cobro</p>
+                <p className="mt-4 font-display text-32 font-bold text-ink" role="alert">No pudimos confirmar el cobro</p>
                 <p className="mt-2 max-w-[520px] text-18 text-ink-3">Mira la pantalla de la terminal. ¿Dice que el pago fue aprobado?</p>
               </>
             ) : (
               <>
-                <p className="mt-4 font-display text-[36px] font-bold text-danger">El cobro no pasó</p>
+                <p className="mt-4 font-display text-32 font-bold text-danger">El cobro no pasó</p>
                 <p className="mt-2 max-w-[560px] text-18 text-ink-3" role="alert">{fase.mensaje}</p>
               </>
             )}

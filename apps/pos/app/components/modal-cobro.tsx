@@ -318,7 +318,7 @@ function VistaEfectivo({ totales, conPropina, procesando, error, onAplicar, onRe
           </div>
           <div>
             <div className={`text-15 font-medium ${falta ? "text-warning" : "text-ink-3"}`}>{falta ? "Falta" : "Cambio"}</div>
-            <div className={`${dinero} text-[36px] ${falta ? "text-warning" : recibido > 0 ? "text-success" : "text-ink-3"}`}>
+            <div className={`${dinero} text-32 ${falta ? "text-warning" : recibido > 0 ? "text-success" : "text-ink-3"}`}>
               {fmtMxn(recibido > 0 ? Math.abs(cambio) : 0)}
             </div>
           </div>
@@ -469,7 +469,7 @@ function VistaDividida({ totales, contexto, conTerminal, terminalLista, onRevisa
             <ul className="mt-2">
               {pagos.map((p) => (
                 <li key={p.clientId} className="flex h-14 items-center justify-between gap-3 border-t border-line px-3 last:border-b">
-                  <span className="truncate text-[17px] font-semibold text-ink">{p.terminal ? "Tarjeta · en la terminal" : nombreMetodo(p.metodo)}</span>
+                  <span className="truncate text-16 font-semibold text-ink">{p.terminal ? "Tarjeta · en la terminal" : nombreMetodo(p.metodo)}</span>
                   <span className="flex items-center gap-2">
                     <span className={`${dinero} text-18 text-ink`}>{fmtMxn(p.monto)}</span>
                     <button
@@ -507,7 +507,7 @@ function VistaDividida({ totales, contexto, conTerminal, terminalLista, onRevisa
           </div>
           {terminalNoLista && <p className="mb-2 text-14 text-warning" role="status">Terminal no disponible: enciéndela y abre Clip PinPad</p>}
           <div className="mb-3 flex items-center justify-between gap-2">
-            <span className={`${dinero} text-[36px] text-ink`}>{fmtMxn(monto)}</span>
+            <span className={`${dinero} text-32 text-ink`}>{fmtMxn(monto)}</span>
             <button
               type="button"
               onClick={() => setBuffer(aBuffer(restante))}
