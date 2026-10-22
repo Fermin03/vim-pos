@@ -44,3 +44,6 @@ sitio-web/_capturas/diag*.mjs
 # Imagenes capturadas de los portales de delivery (40 MB de GIF): quedan en disco, no en git
 docs/integraciones/delivery/didi-food/adjuntos/imagenes/*
 !docs/integraciones/delivery/didi-food/adjuntos/imagenes/_urls.txt
+
+# Bocetos y registro de avance de las skills de superpowers
+.superpowers/
