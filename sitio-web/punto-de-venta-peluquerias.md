@@ -10,6 +10,12 @@ Citas, lista de espera y cobro en una sola caja.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
+![La caja de VIM POS en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-entera.webp)
+
+![La impresora de tickets junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-izq.webp)
+
+![La terminal de cobro junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-der.webp)
+
 ## Sin perder un cliente por esperar
 
 ![La lista de espera con los clientes sin cita, cuánto llevan esperando y su barbero o quien esté libre.](https://vimpos.com.mx/assets/img/capturas/giros/barberia-lista-espera.webp?v=1)
@@ -78,17 +84,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
+
+![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
+![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+
 ### Terminal Mercado Pago
 
 Cobra con tarjeta desde la caja con la Point Smart 2.
+
+![Cajón de dinero bajo la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-cajon.webp)
 
 ### Cajón de dinero
 

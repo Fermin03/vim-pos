@@ -1637,6 +1637,12 @@ Una caja rápida para la hora pico, que sigue cobrando aunque se caiga el intern
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
+![La caja de VIM POS en el mostrador de una cafetería.](https://vimpos.com.mx/assets/img/fotos/cafeteria-entera.webp)
+
+![La impresora de tickets junto a la caja, en el mostrador de una cafetería.](https://vimpos.com.mx/assets/img/fotos/cafeteria-izq.webp)
+
+![La terminal de cobro junto a la caja, en el mostrador de una cafetería.](https://vimpos.com.mx/assets/img/fotos/cafeteria-der.webp)
+
 ## Menos espera en la barra, más clientes que vuelven
 
 ![Un latte de vainilla abierto en la caja: grande, con leche de avena y shot extra, cada opción con su precio.](https://vimpos.com.mx/assets/img/capturas/giros/cafeteria-modificadores.webp?v=1)
@@ -1713,17 +1719,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
+
+![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
+![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+
 ### Terminal Mercado Pago
 
 Cobra con tarjeta desde la caja con la Point Smart 2.
+
+![La pantalla que ve el cliente con su pedido y el total.](https://vimpos.com.mx/assets/img/capturas/giros/cafeteria-pantalla-cliente.webp?v=1)
 
 ### Pantalla del cliente
 
@@ -1862,6 +1876,12 @@ Combos, extras y comandas a cocina en segundos, aunque se caiga el internet.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
+![La caja de VIM POS en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-entera.webp)
+
+![La impresora de tickets junto a la caja, en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-izq.webp)
+
+![La terminal de cobro junto a la caja, en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-der.webp)
+
 ## Órdenes completas, cocina al día y la fila avanzando
 
 ![El catálogo de hamburguesas y un ticket con un combo, una hamburguesa con su término y aros de cebolla.](https://vimpos.com.mx/assets/img/capturas/giros/servicio-rapido-catalogo.webp?v=1)
@@ -1938,17 +1958,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
+
+![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
+![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+
 ### Terminal Mercado Pago
 
 Cobra con tarjeta desde la caja con la Point Smart 2.
+
+![Pantalla de cocina con las comandas activas y su tiempo.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
 
 ### Pantalla de cocina
 
@@ -2087,6 +2115,12 @@ Del mapa de mesas a la cocina, sin papelitos y sin perder una orden.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
+![La caja de VIM POS en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-entera.webp)
+
+![La impresora de tickets junto a la caja, en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-izq.webp)
+
+![La terminal de cobro junto a la caja, en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-der.webp)
+
 ## El servicio en orden, de la mesa a la cocina
 
 ![El mapa de mesas por sección, con los minutos y el consumo de cada mesa ocupada.](https://vimpos.com.mx/assets/img/capturas/giros/servicio-completo-mesas.webp?v=1)
@@ -2163,17 +2197,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
+
+![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
+![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+
 ### Terminal Mercado Pago
 
 Cobra con tarjeta desde la caja con la Point Smart 2.
+
+![Pantalla de cocina con las comandas activas y su tiempo.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
 
 ### Pantalla de cocina
 
@@ -2312,6 +2354,12 @@ Cuentas en la barra y en mesa, con propinas, en una caja que no se detiene.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
+![La caja de VIM POS en el mostrador de una cafetería.](https://vimpos.com.mx/assets/img/fotos/cafeteria-entera.webp)
+
+![La impresora de tickets junto a la caja, en el mostrador de una cafetería.](https://vimpos.com.mx/assets/img/fotos/cafeteria-izq.webp)
+
+![La terminal de cobro junto a la caja, en el mostrador de una cafetería.](https://vimpos.com.mx/assets/img/fotos/cafeteria-der.webp)
+
 ## La noche entera, sin perder una cuenta
 
 ![Las cuentas abiertas en la barra, cada una con el nombre del cliente, su total y sus minutos.](https://vimpos.com.mx/assets/img/capturas/giros/bar-cuentas.webp?v=1)
@@ -2388,17 +2436,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
+
+![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
+![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+
 ### Terminal Mercado Pago
 
 Cobra con tarjeta desde la caja con la Point Smart 2.
+
+![Pantalla de cocina con las comandas activas y su tiempo.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
 
 ### Pantalla de cocina
 
@@ -2537,6 +2593,12 @@ Una caja rápida para la fila del evento, con la venta de cada turno por separad
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
+![La caja de VIM POS en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-entera.webp)
+
+![La impresora de tickets junto a la caja, en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-izq.webp)
+
+![La terminal de cobro junto a la caja, en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-der.webp)
+
 ## Lista para la fila, en cualquier lugar
 
 ![La caja del food truck cobrando con el aviso de que no hay internet.](https://vimpos.com.mx/assets/img/capturas/giros/food-truck-sin-conexion.webp?v=1)
@@ -2613,17 +2675,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
+
+![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
+![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+
 ### Terminal Mercado Pago
 
 Cobra con tarjeta desde la caja con la Point Smart 2.
+
+![Cajón de dinero bajo la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-cajon.webp)
 
 ### Cajón de dinero
 
@@ -2762,6 +2832,12 @@ Vende con lector de código de barras, cambia tallas y sabe qué tienes en el an
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
+![La caja de VIM POS en el mostrador de una tienda de ropa.](https://vimpos.com.mx/assets/img/fotos/ropa-entera.webp)
+
+![La impresora de tickets junto a la caja, en el mostrador de una tienda de ropa.](https://vimpos.com.mx/assets/img/fotos/ropa-izq.webp)
+
+![La terminal de cobro junto a la caja, en el mostrador de una tienda de ropa.](https://vimpos.com.mx/assets/img/fotos/ropa-der.webp)
+
 ## Vende rápido y sabe siempre qué te queda
 
 ![La caja con el selector de talla y color de unos jeans, con las piezas de cada combinación.](https://vimpos.com.mx/assets/img/capturas/giros/tienda-ropa-talla-color.webp?v=1)
@@ -2826,17 +2902,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
+
+![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
+![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+
 ### Terminal Mercado Pago
 
 Cobra con tarjeta desde la caja con la Point Smart 2.
+
+![Lector de código de barras junto a la caja.](https://vimpos.com.mx/assets/img/fotos/ropa-lector.webp)
 
 ### Lector de código de barras
 
@@ -2979,6 +3063,12 @@ Código de barras, existencias con aviso de mínimo y cotizaciones, en una caja 
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
+![La caja de VIM POS en el mostrador de una tienda de abarrotes.](https://vimpos.com.mx/assets/img/fotos/minisuper-entera.webp)
+
+![La impresora de tickets junto a la caja, en el mostrador de una tienda de abarrotes.](https://vimpos.com.mx/assets/img/fotos/minisuper-izq.webp)
+
+![La terminal de cobro junto a la caja, en el mostrador de una tienda de abarrotes.](https://vimpos.com.mx/assets/img/fotos/minisuper-der.webp)
+
 ## Menos faltantes y ventas más rápidas
 
 ![La caja de la vinatería con la categoría de tequila y mezcal y un ticket en curso.](https://vimpos.com.mx/assets/img/capturas/giros/vinos-caja.webp?v=1)
@@ -3035,17 +3125,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
+
+![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
+![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+
 ### Terminal Mercado Pago
 
 Cobra con tarjeta desde la caja con la Point Smart 2.
+
+![Lector de código de barras junto a la caja.](https://vimpos.com.mx/assets/img/fotos/minisuper-lector.webp)
 
 ### Lector de código de barras
 
@@ -3184,6 +3282,12 @@ La fruta por kilo, lo empaquetado por pieza y el fiado de tus clientes, en una s
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
+![La caja de VIM POS en el mostrador de una tienda de abarrotes.](https://vimpos.com.mx/assets/img/fotos/minisuper-entera.webp)
+
+![La impresora de tickets junto a la caja, en el mostrador de una tienda de abarrotes.](https://vimpos.com.mx/assets/img/fotos/minisuper-izq.webp)
+
+![La terminal de cobro junto a la caja, en el mostrador de una tienda de abarrotes.](https://vimpos.com.mx/assets/img/fotos/minisuper-der.webp)
+
 ## Todo lo de la tienda, sin libreta ni calculadora
 
 ![El teclado de peso con 1.250 kg de jitomate a $28.00 el kilo.](https://vimpos.com.mx/assets/img/capturas/giros/abarrotes-venta-kg.webp?v=1)
@@ -3252,17 +3356,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
+
+![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
+![Lector de código de barras junto a la caja.](https://vimpos.com.mx/assets/img/fotos/minisuper-lector.webp)
+
 ### Lector de código de barras
 
 Uno USB, de los que venden en cualquier lado.
+
+![La caja vendiendo jitomate por kilo.](https://vimpos.com.mx/assets/img/capturas/giros/abarrotes-venta-kg.webp?v=1)
 
 ### Tu báscula de siempre
 
@@ -3405,6 +3517,12 @@ Citas, cobro y comisiones de tu equipo en una sola pantalla.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
+![La caja de VIM POS en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-entera.webp)
+
+![La impresora de tickets junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-izq.webp)
+
+![La terminal de cobro junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-der.webp)
+
 ## Menos huecos en la agenda y cero cuentas a mano
 
 ![El calendario del salón con las citas del día de tres colaboradoras.](https://vimpos.com.mx/assets/img/capturas/giros/salon-calendario.webp?v=1)
@@ -3481,17 +3599,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
+
+![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
+![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+
 ### Terminal Mercado Pago
 
 Cobra con tarjeta desde la caja con la Point Smart 2.
+
+![Cajón de dinero bajo la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-cajon.webp)
 
 ### Cajón de dinero
 
@@ -3630,6 +3756,12 @@ Agenda por terapeuta y por cabina, con anticipos y comisiones.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
+![La caja de VIM POS en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-entera.webp)
+
+![La impresora de tickets junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-izq.webp)
+
+![La terminal de cobro junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-der.webp)
+
 ## Tu spa lleno, en orden y sin cuentas a mano
 
 ![El calendario del spa con las citas de cuatro terapeutas, cada una con su cabina.](https://vimpos.com.mx/assets/img/capturas/giros/spa-calendario.webp?v=1)
@@ -3706,17 +3838,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
+
+![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
+![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+
 ### Terminal Mercado Pago
 
 Cobra con tarjeta desde la caja con la Point Smart 2.
+
+![Cajón de dinero bajo la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-cajon.webp)
 
 ### Cajón de dinero
 
@@ -3855,6 +3995,12 @@ Citas, lista de espera y cobro en una sola caja.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
+![La caja de VIM POS en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-entera.webp)
+
+![La impresora de tickets junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-izq.webp)
+
+![La terminal de cobro junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-der.webp)
+
 ## Sin perder un cliente por esperar
 
 ![La lista de espera con los clientes sin cita, cuánto llevan esperando y su barbero o quien esté libre.](https://vimpos.com.mx/assets/img/capturas/giros/barberia-lista-espera.webp?v=1)
@@ -3923,17 +4069,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
+
+![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
+![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+
 ### Terminal Mercado Pago
 
 Cobra con tarjeta desde la caja con la Point Smart 2.
+
+![Cajón de dinero bajo la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-cajon.webp)
 
 ### Cajón de dinero
 
@@ -4072,6 +4226,12 @@ Aparta la fecha, cobra la sesión y reparte las comisiones.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
+![La caja de VIM POS en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-entera.webp)
+
+![La impresora de tickets junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-izq.webp)
+
+![La terminal de cobro junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-der.webp)
+
 ## Tu estudio en orden, de la cita al cobro
 
 ![La ficha de una cita de tatuaje con su anticipo pagado.](https://vimpos.com.mx/assets/img/capturas/giros/tatuajes-cita-anticipo.webp?v=1)
@@ -4140,17 +4300,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
+
+![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
+![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+
 ### Terminal Mercado Pago
 
 Cobra con tarjeta desde la caja con la Point Smart 2.
+
+![Cajón de dinero bajo la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-cajon.webp)
 
 ### Cajón de dinero
 
@@ -4289,6 +4457,12 @@ Citas, órdenes de servicio, refacciones y cobro en una sola caja.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
+![La caja de VIM POS en la recepción de un taller mecánico.](https://vimpos.com.mx/assets/img/fotos/taller-entera.webp)
+
+![La impresora de tickets junto a la caja, en la recepción de un taller mecánico.](https://vimpos.com.mx/assets/img/fotos/taller-izq.webp)
+
+![La terminal de cobro junto a la caja, en la recepción de un taller mecánico.](https://vimpos.com.mx/assets/img/fotos/taller-der.webp)
+
 ## Del diagnóstico al cobro, sin papeles sueltos
 
 _La orden de servicio del auto._
@@ -4349,17 +4523,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
+
+![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
+![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+
 ### Terminal Mercado Pago
 
 Cobra con tarjeta desde la caja con la Point Smart 2.
+
+![Lector de código de barras junto a la caja.](https://vimpos.com.mx/assets/img/fotos/ropa-lector.webp)
 
 ### Lector de código de barras
 
@@ -4498,6 +4680,12 @@ Citas, anticipos, cobro de la consulta y comisiones de cada especialista.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
+![La caja de VIM POS en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-entera.webp)
+
+![La impresora de tickets junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-izq.webp)
+
+![La terminal de cobro junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-der.webp)
+
 ## Menos citas perdidas y cobros en orden
 
 _Las citas del día, por especialista._
@@ -4558,17 +4746,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
+
+![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
+![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+
 ### Terminal Mercado Pago
 
 Cobra con tarjeta desde la caja con la Point Smart 2.
+
+![Cajón de dinero bajo la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-cajon.webp)
 
 ### Cajón de dinero
 

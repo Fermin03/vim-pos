@@ -10,6 +10,12 @@ Combos, extras y comandas a cocina en segundos, aunque se caiga el internet.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
+![La caja de VIM POS en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-entera.webp)
+
+![La impresora de tickets junto a la caja, en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-izq.webp)
+
+![La terminal de cobro junto a la caja, en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-der.webp)
+
 ## Órdenes completas, cocina al día y la fila avanzando
 
 ![El catálogo de hamburguesas y un ticket con un combo, una hamburguesa con su término y aros de cebolla.](https://vimpos.com.mx/assets/img/capturas/giros/servicio-rapido-catalogo.webp?v=1)
@@ -86,17 +92,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
+
+![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
+![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+
 ### Terminal Mercado Pago
 
 Cobra con tarjeta desde la caja con la Point Smart 2.
+
+![Pantalla de cocina con las comandas activas y su tiempo.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
 
 ### Pantalla de cocina
 

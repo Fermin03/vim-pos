@@ -10,6 +10,12 @@ Vende con lector de código de barras, cambia tallas y sabe qué tienes en el an
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
+![La caja de VIM POS en el mostrador de una tienda de ropa.](https://vimpos.com.mx/assets/img/fotos/ropa-entera.webp)
+
+![La impresora de tickets junto a la caja, en el mostrador de una tienda de ropa.](https://vimpos.com.mx/assets/img/fotos/ropa-izq.webp)
+
+![La terminal de cobro junto a la caja, en el mostrador de una tienda de ropa.](https://vimpos.com.mx/assets/img/fotos/ropa-der.webp)
+
 ## Vende rápido y sabe siempre qué te queda
 
 ![La caja con el selector de talla y color de unos jeans, con las piezas de cada combinación.](https://vimpos.com.mx/assets/img/capturas/giros/tienda-ropa-talla-color.webp?v=1)
@@ -74,17 +80,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
+
+![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
+![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+
 ### Terminal Mercado Pago
 
 Cobra con tarjeta desde la caja con la Point Smart 2.
+
+![Lector de código de barras junto a la caja.](https://vimpos.com.mx/assets/img/fotos/ropa-lector.webp)
 
 ### Lector de código de barras
 

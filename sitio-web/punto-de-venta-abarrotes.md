@@ -10,6 +10,12 @@ La fruta por kilo, lo empaquetado por pieza y el fiado de tus clientes, en una s
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
+![La caja de VIM POS en el mostrador de una tienda de abarrotes.](https://vimpos.com.mx/assets/img/fotos/minisuper-entera.webp)
+
+![La impresora de tickets junto a la caja, en el mostrador de una tienda de abarrotes.](https://vimpos.com.mx/assets/img/fotos/minisuper-izq.webp)
+
+![La terminal de cobro junto a la caja, en el mostrador de una tienda de abarrotes.](https://vimpos.com.mx/assets/img/fotos/minisuper-der.webp)
+
 ## Todo lo de la tienda, sin libreta ni calculadora
 
 ![El teclado de peso con 1.250 kg de jitomate a $28.00 el kilo.](https://vimpos.com.mx/assets/img/capturas/giros/abarrotes-venta-kg.webp?v=1)
@@ -78,17 +84,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
+
+![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
+![Lector de código de barras junto a la caja.](https://vimpos.com.mx/assets/img/fotos/minisuper-lector.webp)
+
 ### Lector de código de barras
 
 Uno USB, de los que venden en cualquier lado.
+
+![La caja vendiendo jitomate por kilo.](https://vimpos.com.mx/assets/img/capturas/giros/abarrotes-venta-kg.webp?v=1)
 
 ### Tu báscula de siempre
 
