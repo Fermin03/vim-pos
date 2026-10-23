@@ -106,9 +106,9 @@ Térmica de 80 mm, de red o USB.
 
 ![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
 
-### Terminal Mercado Pago
+### Terminal de cobro
 
-Cobra con tarjeta desde la caja con la Point Smart 2.
+Cobra con tarjeta desde la caja, o registra el pago de la tuya.
 
 ![Cajón de dinero bajo la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-cajon.webp)
 
@@ -219,7 +219,7 @@ Sí: cobras, imprimes y llevas el corte sin señal. Al volver la conexión, todo
 
 ### ¿Puedo cobrar con tarjeta desde la caja?
 
-Sí, con la terminal Mercado Pago Point Smart 2. Con otra terminal, registras el pago y el corte cuadra igual.
+Sí, con la terminal compatible conectada a la caja. Con cualquier otra, registras el pago y el corte cuadra igual.
 
 ### ¿Tengo que capturar todo mi menú?
 

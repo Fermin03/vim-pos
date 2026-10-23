@@ -94,9 +94,9 @@ Térmica de 80 mm, de red o USB.
 
 ![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
 
-### Terminal Mercado Pago
+### Terminal de cobro
 
-Cobra con tarjeta desde la caja con la Point Smart 2.
+Cobra con tarjeta desde la caja, o registra el pago de la tuya.
 
 ![Lector de código de barras junto a la caja.](https://vimpos.com.mx/assets/img/fotos/ropa-lector.webp)
 
