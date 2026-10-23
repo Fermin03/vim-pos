@@ -111,7 +111,7 @@ export function FichaCita({ token, citaId, negocio, cajaId, turnoId, ejecutaNomb
   async function noLlego() {
     const ok = await confirmar({
       titulo: "¿Marcar que no llegó?",
-      mensaje: "Su lugar se libera en el calendario y se le cuenta una falta. No se puede deshacer.",
+      mensaje: "La cita se libera y cuenta como falta. No se puede deshacer.",
       boton: "No llegó · liberar lugar",
     });
     if (ok && await hacer(() => marcarNoLlego(token, citaId)) && anticipoVigente > 0) preguntarAnticipo("NO_LLEGO");
@@ -168,7 +168,7 @@ export function FichaCita({ token, citaId, negocio, cajaId, turnoId, ejecutaNomb
               {a?.empalme && (
                 <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-danger-line bg-danger-soft px-4 py-3" role="alert">
                   <p className="min-w-0 flex-1 text-14 text-danger">
-                    Choca con otra cita: se agendó en dos lugares a la vez. Muévela o cancela una de las dos.
+                    Esta cita choca con otra. Muévela o cancela una de las dos.
                   </p>
                   <Button variant="ghost" className="h-11 bg-surface" disabled={ocupado} onClick={() => void hacer(() => resolverEmpalme(token, citaId))}>Ya lo moví</Button>
                 </div>

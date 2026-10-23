@@ -692,8 +692,8 @@ export function PantallaCuentasModo({
                   detrás. Texto provisional (James). */}
               {porCancelar && (
                 <p className="border-b border-danger-line bg-danger-soft px-4 py-2.5 text-15 font-bold text-danger" role="alert">
-                  Este pedido se canceló y el pago ya se le devolvió al cliente.
-                  <span className="ml-2 font-medium text-ink-2">Cancela esta cuenta. Si ya lo entregaste, cóbralo de otra forma.</span>
+                  Este pedido se canceló y se reembolsó.
+                  <span className="ml-2 font-medium text-ink-2">Cancela la cuenta.</span>
                 </p>
               )}
               {sel.pagadaEnLinea && !porCancelar && (
@@ -870,7 +870,7 @@ export function PantallaCuentasModo({
           consecuencia={<>
             {sel.mesa ? `Mesa ${sel.mesa}` : (sel.cliente ?? sel.folio ?? "La cuenta")} está vacía y desaparecerá de la lista. Si es de
             comedor, la mesa queda libre.
-            <span className="mt-2 block text-13 text-ink-3">No es una cancelación: al no tener productos, no ensucia el corte con un folio cancelado.</span>
+            <span className="mt-2 block text-13 text-ink-3">No cuenta como cancelación porque la cuenta está vacía.</span>
           </>}
           ancho="sm"
           error={error}

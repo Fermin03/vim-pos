@@ -172,7 +172,7 @@ export function PantallaDevoluciones({
           <LogoVim className="h-8 w-8" />
           <div>
             <div className="font-display text-16 font-bold leading-tight">Devoluciones · {caja.nombre}</div>
-            <div className="text-12 text-ink-3">Selecciona la venta a devolver. La venta queda en el historial; el reembolso sale de la caja.</div>
+            <div className="text-12 text-ink-3">Elige la venta a devolver. El reembolso sale de la caja.</div>
           </div>
         </div>
       </header>
@@ -198,7 +198,7 @@ export function PantallaDevoluciones({
           </Button>
         </form>
       )}
-      {tienda && <p className="mx-auto mt-1.5 w-full max-w-[680px] px-6 text-12 text-ink-3">O escanea un código para ver las ventas de los últimos 30 días que lo llevan.</p>}
+      {tienda && <p className="mx-auto mt-1.5 w-full max-w-[680px] px-6 text-12 text-ink-3">O escanea un código para ver sus ventas recientes.</p>}
 
       {error && <div className="mx-6 mt-3 rounded border border-danger-line bg-danger-soft px-3 py-2 text-13 font-medium text-danger" role="alert">{error}</div>}
 
@@ -216,7 +216,7 @@ export function PantallaDevoluciones({
                 <p className="max-w-[440px] text-13">
                   {/* La caja instalada solo tiene sus propias ventas; el POS web, las del negocio. */}
                   {esEscritorio()
-                    ? "Aquí salen las ventas cobradas en esta caja. Si se cobró en otra caja o sucursal, devuélvela desde la caja que la cobró o desde el POS web."
+                    ? "Aquí solo salen ventas de esta caja. Las demás, en el POS web."
                     : "Revisa el folio impreso en el ticket, o escanea otro código."}
                 </p>
               </div>
@@ -448,7 +448,7 @@ function ModalDevolucion({
       <DialogoPeligro
         titulo="El dinero no regresó a la tarjeta"
         contexto={`${venta.folio} · ${fmtMxn(venta.total)}`}
-        consecuencia={`La devolución ya quedó registrada, pero el dinero no regresó a la tarjeta: ${reembolsoFallo.motivo}. Vuelve a intentar, o devuélvelo desde la app de tu terminal.`}
+        consecuencia={`El dinero no regresó a la tarjeta: ${reembolsoFallo.motivo}. Reintenta o usa tu terminal.`}
         boton="Volver a intentar"
         ocupado={procesando}
         textoOcupado="Devolviendo…"
@@ -693,7 +693,7 @@ function ModalDevolucionTienda({
         peligrosa={false}
         titulo="Falta regresar el dinero a la tarjeta"
         contexto={`${venta.folio} · ${fmtMxn(pendiente.total)}`}
-        consecuencia={`La devolución ya quedó registrada, pero por partes el dinero no regresa solo a la tarjeta: ${dondeReembolsar}, por ${fmtMxn(pendiente.total)}.`}
+        consecuencia={`La devolución se registró, pero el dinero no regresa solo: ${dondeReembolsar}, por ${fmtMxn(pendiente.total)}.`}
         boton="Listo"
         onConfirmar={() => onHecho(pendiente.recibo)}
         onCerrar={() => onHecho(pendiente.recibo)}
@@ -706,7 +706,7 @@ function ModalDevolucionTienda({
       <DialogoPeligro
         titulo="El dinero no regresó a la tarjeta"
         contexto={venta.folio}
-        consecuencia={`La devolución ya quedó registrada, pero el dinero no regresó a la tarjeta: ${reembolsoFallo.motivo}. Vuelve a intentar, o devuélvelo desde la app de Mercado Pago.`}
+        consecuencia={`El dinero no regresó a la tarjeta: ${reembolsoFallo.motivo}. Reintenta o usa Mercado Pago.`}
         boton="Volver a intentar"
         ocupado={procesando}
         textoOcupado="Devolviendo…"
@@ -741,7 +741,7 @@ function ModalDevolucionTienda({
       titulo="Devolver productos"
       contexto={`${venta.folio}${venta.fechaCobro ? ` · ${fechaHora(venta.fechaCobro)}` : ""}`}
       consecuencia={hayGranel
-        ? "Elige qué regresa el cliente. Lo que se vende por kilo, metro o litro se devuelve completo. La venta queda en el historial."
+        ? "Elige qué regresa el cliente."
         : "Elige qué regresa el cliente y cuántas piezas. La venta queda en el historial."}
       error={error}
       nota={falta}

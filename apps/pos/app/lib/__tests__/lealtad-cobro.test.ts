@@ -95,9 +95,8 @@ describe("canje a medias antes de cobrar", () => {
     expect(r.accion).toBe("AVISAR");
     expect(r).toMatchObject({ titulo: "Hay un canje a medias", totales: null });
     expect(r.accion === "AVISAR" && r.texto).toMatch(/40 puntos/);
-    expect(r.accion === "AVISAR" && r.texto).toMatch(/ya se le hayan descontado/);
-    expect(r.accion === "AVISAR" && r.texto).toMatch(/Reintentar/);
-    expect(r.accion === "AVISAR" && r.texto).toMatch(/desc[aá]rtalo/);
+    expect(r.accion === "AVISAR" && r.texto).toMatch(/Hay un canje de 40 puntos pendiente/);
+    expect(r.accion === "AVISAR" && r.texto).toMatch(/Resuélvelo en Lealtad antes de cobrar/);
     expect(rpcs).toEqual([]);
     expect(sigueVivo()).toBe(true);
     expect(fallas.lecturasDeTickets).toBe(0);
@@ -127,7 +126,7 @@ describe("canje de dinero recortado antes de cobrar", () => {
     expect(rpcs).toEqual([{ nombre: "quitar_canje_lealtad", args: { p_ticket_id: "tk-1" } }]);
     expect(r).toMatchObject({ accion: "AVISAR", titulo: "Se quitó el canje de lealtad", totales: { ticketId: "tk-1", total: 80, lealtad: 0 } });
     expect(r.accion === "AVISAR" && r.texto).toMatch(/50 puntos/);
-    expect(r.accion === "AVISAR" && r.texto).toMatch(/volvieron/);
+    expect(r.accion === "AVISAR" && r.texto).toMatch(/regresaron al cliente/);
   });
 
   it("un canje que entra completo no se toca: se cobra con los totales recién leídos", async () => {
@@ -175,7 +174,7 @@ describe("canje de dinero recortado antes de cobrar", () => {
     const r = await revisarLealtadAntesDeCobrar("tk", "tk-1", "PUNTOS_DINERO", alm);
     expect(rpcs.map((x) => x.nombre)).toEqual(["quitar_canje_lealtad"]);
     expect(r).toMatchObject({ accion: "AVISAR", titulo: "El total de la cuenta cambió", totales: null });
-    expect(r.accion === "AVISAR" && r.texto).toMatch(/Revisa el total y vuelve a cobrar/);
+    expect(r.accion === "AVISAR" && r.texto).toMatch(/Revisa el total y cobra/);
   });
 });
 

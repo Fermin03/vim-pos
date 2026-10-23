@@ -131,7 +131,7 @@ export function ModalClienteDomicilio({
     setAvisoZonas(null);
     listarZonas(token, sucursalId)
       .then(setZonas)
-      .catch(() => setAvisoZonas("No se pudieron cargar las zonas de reparto. Si el negocio ya tiene zonas, revisa la conexión antes de continuar."));
+      .catch(() => setAvisoZonas("No se cargaron las zonas de reparto. Revisa la conexión."));
   }, [token, sucursalId]);
 
   /** Alta o repreciado de zona: upsert por id en el catálogo local del modal. Sin reordenar: la

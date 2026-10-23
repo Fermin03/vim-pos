@@ -359,7 +359,7 @@ export function PantallaCambioTalla({
                       <p className="text-18 font-semibold text-ink-2">{busqueda.vacio}</p>
                       <p className="max-w-[440px] text-13">
                         {esEscritorio()
-                          ? "Aquí salen las ventas cobradas en esta caja. Si se cobró en otra caja o sucursal, haz el cambio desde la caja que la cobró o desde el POS web."
+                          ? "Aquí solo salen ventas de esta caja. Las demás, en el POS web."
                           : "Revisa el folio impreso en el ticket, o escanea otra prenda."}
                       </p>
                     </div>

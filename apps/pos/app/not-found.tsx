@@ -8,7 +8,7 @@ export default function NotFound() {
     <PantallaEstado
       codigo="404"
       titulo="No encontramos esta página"
-      texto="La página que buscas no existe o fue movida. Revisa la dirección o vuelve al inicio para continuar."
+      texto="Esta página no existe. Revisa la dirección o vuelve al inicio."
       acciones={<Link href="/" className={btnAccent}>Volver al inicio</Link>}
       pie={<>¿Crees que es un error? <a href="mailto:soporte@vimpos.com.mx" className="font-semibold text-accent hover:underline">Avísale a soporte</a>.</>}
     />

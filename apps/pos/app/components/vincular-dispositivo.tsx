@@ -83,8 +83,8 @@ export function VincularDispositivo({
         </h1>
         <p className="text-sm text-ink-3">
           {motivo === "sesion-invalida"
-            ? "La sesión guardada de esta caja dejó de ser válida tras actualizar. Vuelve a capturar la clave del dispositivo para reconectarla; no se pierde ninguna venta."
-            : "Conecta esta caja a tu sucursal una sola vez. Después, tu equipo entra con su PIN."}
+            ? "La sesión venció. Vuelve a capturar la clave del dispositivo."
+            : "Conecta la caja una vez. Después, tu equipo entra con su PIN."}
         </p>
       </header>
 
@@ -92,7 +92,7 @@ export function VincularDispositivo({
         <div className="flex w-full max-w-sm items-start gap-2.5 rounded border border-warning-line bg-warning-soft px-3 py-2.5 text-13 text-ink-2" role="status">
           <Icono nombre="info" className="mt-px h-4 w-4 flex-shrink-0 text-warning" />
           <span>
-            ¿No tienes la clave? Se genera de nuevo desde el panel: <b>Configuración → Cajas → Generar credenciales</b>.
+            ¿No tienes la clave? Genérala en el panel, en <b>Configuración → Cajas</b>.
           </span>
         </div>
       )}
@@ -145,7 +145,7 @@ export function VincularDispositivo({
       <p className="max-w-sm text-center text-xs text-ink-3">
         {CREDS_DEV_FIXTURE
           ? "DEV: prellenado con la caja del fixture."
-          : "¿No tienes estas credenciales? Genéralas en tu panel de administración, en Configuración → Cajas → botón del dispositivo."}
+          : "¿No tienes la clave? Genérala en el panel, en Configuración → Cajas."}
       </p>
     </main>
   );

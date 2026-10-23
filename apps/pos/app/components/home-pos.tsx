@@ -421,7 +421,7 @@ export function HomePos({
   const persistirCarrito = (c: EstadoCarrito = carrito) => {
     // Belleza: un servicio sin quien lo hizo no se cobra (su comisión no tendría dueño).
     if (agenda && c.lineas.length > 0 && !servicioIdsRef.current) {
-      return Promise.reject(new Error("Todavía no se leen los servicios de la agenda: revisa la conexión en «Citas de hoy» y vuelve a intentar."));
+      return Promise.reject(new Error("No se cargaron los servicios. Revisa la conexión en «Citas de hoy»."));
     }
     const falta = agenda && servicioIdsRef.current ? servicioSinColaborador(c.lineas, servicioIdsRef.current) : undefined;
     if (falta) return Promise.reject(new Error(`Elige quién hizo «${falta.producto.nombre}» antes de cobrar.`));
@@ -1093,7 +1093,7 @@ export function HomePos({
       setItemsPersistidos(items);
       // Aviso si la reconstrucción no cuadra (producto fuera de catálogo): el total es autoritativo.
       if (items.length > recon.lineas.length) {
-        setError("Algunos ítems de la cuenta no se muestran (producto fuera de catálogo), pero el total sí los incluye.");
+        setError("Algunos productos no se ven, pero el total sí los incluye.");
       } else {
         setError(null);
       }
@@ -1111,7 +1111,7 @@ export function HomePos({
         const colaboradorId = colaboradorElegido ?? deBelleza.colaboradorId;
         // Belleza: un servicio nunca se guarda sin quien lo hizo (después ya no se puede cambiar).
         if (agenda && !colaboradorId) {
-          if (!servicioIdsRef.current) throw new Error("Todavía no se leen los servicios de la agenda: revisa la conexión en «Citas de hoy».");
+          if (!servicioIdsRef.current) throw new Error("No se cargaron los servicios. Revisa la conexión en «Citas de hoy».");
           if (servicioIdsRef.current.has(p.id)) { setServicioPorAgregar({ producto: p, mods, nota, cantidad }); return; }
         }
         await agregarItemAlTicket(token, { ticketId: ticketBd.ticketId, productoId: p.id, cantidad, modificadores: mods, nota, ...(colaboradorId ? { colaboradorId } : {}) });
@@ -1421,7 +1421,7 @@ export function HomePos({
       // El pedido YA está en cocina (KDS): un fallo de papel no debe deshacer nada ni bloquear.
       // Pero tampoco se calla: si nadie avisa, la cocina se queda sin comanda y nadie se entera.
       if (fallidas.length > 0) {
-        setError(`El pedido se envió a cocina, pero la impresora de ${fallidas.join(" y ")} no responde. La comanda saldrá sola en cuanto vuelva.`);
+        setError(`La impresora de ${fallidas.join(" y ")} no responde. La comanda saldrá cuando vuelva.`);
         return "sin_papel";
       }
       return "ok";
@@ -1469,7 +1469,7 @@ export function HomePos({
       const conArea: LineaConArea[] = lineas.map((l) => ({ ...l, ...(areas.get(l.ticketItemId) ?? {}) }));
       const fallidas = await imprimirComandaPorAreas(dc, conArea, { ticketId, evento: "ANULACION_COMANDA" });
       if (fallidas.length > 0) {
-        setError(`Los productos se cancelaron, pero la impresora de ${fallidas.join(" y ")} no responde. Avísales a mano; el aviso saldrá en cuanto vuelva.`);
+        setError(`La impresora de ${fallidas.join(" y ")} no responde. Avisa a mano lo cancelado.`);
       }
     } catch {
       setError("Los productos se cancelaron, pero NO se pudo avisar a cocina. Avísales a mano.");
@@ -1517,7 +1517,7 @@ export function HomePos({
         setTicketIncompleto(false);
         dispatch({ tipo: "limpiar" });
         setAgendaVersion((v) => v + 1);
-        return `${e.message} No se guardó nada: toca la cita en «Citas de hoy» para retomar la venta donde ya está.`;
+        return `${e.message} No se guardó nada. Retoma la venta desde «Citas de hoy».`;
       } catch { /* si no se pudo borrar, se adopta como cualquier ticket a medias */ }
     }
     const bd = e.totales ?? await leerTotales(token, e.ticketId).catch(() => null);
@@ -1526,10 +1526,10 @@ export function HomePos({
       // Los renglones sí entraron: si venía de un intento incompleto, ya no lo está.
       setTicketIncompleto(false);
       setEnvioSinFijar(true);
-      return `El pedido se guardó, pero sin envío: ${e.message}. Toca el renglón de envío para elegir otra zona.`;
+      return `El pedido se guardó sin envío: ${e.message}. Elige otra zona.`;
     }
     setTicketIncompleto(true);
-    return `El pedido quedó guardado a medias. ${e.message}. Vuelve a intentarlo: se completa el mismo ticket, no se abre otro.`;
+    return `El pedido quedó a medias. ${e.message}. Vuelve a intentarlo.`;
   }, [token, empleado.id]);
 
   // Carrito vacío = venta terminada (cobrada, cancelada, en espera o limpiada): el siguiente
@@ -1775,11 +1775,11 @@ export function HomePos({
             r.motivo === "sin asignación"
               ? {
                   titulo: "Pedido sin repartidor",
-                  texto: "Este pedido se cobró sin repartidor asignado, y ya cerrado no se le puede asignar uno. Anota por fuera quién lo lleva: el sistema ya no va a poder decir de quién fue.",
+                  texto: "Ya no se puede asignar repartidor. Anota por fuera quién lo lleva.",
                 }
               : {
                   titulo: "El reparto quedó sin cerrar",
-                  texto: `El cobro sí se registró, pero no se pudo cerrar el reparto: ${r.motivo ?? "error"}. Revisa a mano la liquidación del repartidor.`,
+                  texto: `Se cobró, pero no se cerró el reparto: ${r.motivo ?? "error"}. Revisa la liquidación.`,
                 },
           );
         }
@@ -2540,7 +2540,7 @@ export function HomePos({
     setCuentasVersion((v) => v + 1);
     const abierta = await entrarCuenta(ticketId);
     if (abierta === true) setCobrarCambio(ticketId);
-    else if (abierta === false) setError(`El cambio quedó registrado, pero no se pudo abrir su cobro. Queda en Transacciones: cóbrale ${fmtMxn(saldo)} desde ahí.`);
+    else if (abierta === false) setError(`El cambio se registró. Cóbrale ${fmtMxn(saldo)} desde Transacciones.`);
   };
   /**
    * Transacciones: una cuenta abierta (o una en espera de antes) se carga en el Panel. Lo que está
@@ -2707,7 +2707,7 @@ export function HomePos({
             // quedaría en la cuenta sin que cocina ni el cajero se enteraran.
             setAvisoReparto({
               titulo: "El premio no llegó a cocina",
-              texto: `El premio ya está en la cuenta, pero no se pudo mandar a cocina${e instanceof Error ? ` (${e.message})` : ""}. Abre la cuenta y envíalo a cocina desde ahí.`,
+              texto: `El premio no llegó a cocina${e instanceof Error ? ` (${e.message})` : ""}. Mándalo desde la cuenta.`,
             });
           }
         }
@@ -2862,8 +2862,8 @@ export function HomePos({
               {ticketBd?.folio ? <><span className="font-semibold">{ticketBd.folio}</span> · </> : null}
               {fmtMxn(ticketBd?.total ?? 0)}.{" "}
               {carrito.modoServicio === "PARA_LLEVAR"
-                ? "Si sales sin resolverla, queda abierta en «Cuentas abiertas» de Para llevar, sin cobrar, y no te deja cerrar el turno hasta que la resuelvas."
-                : "Si sales sin resolverla, queda abierta en la lista como si fuera un pedido real, y aparece en el corte como cuenta sin cobrar."}
+                ? "Si sales, queda en «Cuentas abiertas» y no podrás cerrar el turno."
+                : "Si sales, quedará como cuenta sin cobrar en el corte."}
             </p>
             <div className="mt-5 flex flex-col gap-2">
               {/* En espera solo tiene sentido donde hay lista de espera: "Para llevar". En los
@@ -2902,8 +2902,7 @@ export function HomePos({
           <div className="w-full max-w-md rounded-xl bg-surface p-6 shadow-xl">
             <div className="font-display text-20 font-semibold">¿Cerrar el turno actual?</div>
             <p className="mt-2 text-14 leading-snug text-ink-2">
-              Vas a pasar al arqueo de caja: contar el efectivo, declararlo y generar el corte.
-              El turno queda cerrado y hay que abrir uno nuevo para seguir vendiendo.
+              Vas al corte de caja. Después tendrás que abrir otro turno.
             </p>
             <div className="mt-5 flex gap-2">
               <button
@@ -3526,7 +3525,7 @@ export function HomePos({
 
       {cuentaImpresa && (!barraAbajo || seccionTienda === "panel") && (
         <p className="flex-shrink-0 bg-warning-soft px-4 py-2 text-13 font-medium text-ink" role="status">
-          El ticket de esta cuenta ya se imprimió. Para agregarle o quitarle algo, reábrela desde su lista con «Reabrir cuenta».
+          El ticket ya se imprimió. Para cambiarlo, usa «Reabrir cuenta».
         </p>
       )}
 
@@ -3848,7 +3847,7 @@ export function HomePos({
               </div>
               <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
                 <p className="font-display text-18 font-semibold">Tu negocio no lleva existencias</p>
-                <p className="max-w-md text-15 text-ink-2">Para ver cuánto te queda de cada producto y recibir mercancía, pide a VIM que te las active{waSoporte ? " desde Más › Ayuda por WhatsApp" : ""}.</p>
+                <p className="max-w-md text-15 text-ink-2">Para ver inventario y recibir mercancía, pide a VIM que las active{waSoporte ? " desde Más › Ayuda por WhatsApp" : ""}.</p>
               </div>
             </div>
           ) : seccionTienda === "inventario" ? (
@@ -3967,7 +3966,7 @@ export function HomePos({
             // Cita nueva en un negocio que cobra por adelantado: la ficha abre «Cobrar anticipo».
             if (nuevaId) void configCobroAgenda(token).then((c) => {
               if (c.modo !== "AL_FINAL") { setOfrecerAnticipo(true); setFichaCita(nuevaId); }
-            }).catch((e) => setError(`La cita se guardó, pero no se pudo saber si cobra anticipo: ${e instanceof Error ? e.message : "error"}. Ábrela para cobrarlo.`));
+            }).catch((e) => setError(`La cita se guardó, pero sin revisar el anticipo: ${e instanceof Error ? e.message : "error"}. Ábrela.`));
           }}
           onCerrar={() => setModalCita(null)}
         />

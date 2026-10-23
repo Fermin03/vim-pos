@@ -178,7 +178,7 @@ export function ModalAbrirTurno({
             placeholder="Notas del evento · opcional (contacto, stand, condiciones)"
           />
           <p className="mt-1.5 text-12 text-ink-3">
-            Si el organizador cobra comisión, la capturas al cerrar el turno. Las ventas se reportan por evento.
+            Si hay comisión del organizador, captúrala al cerrar el turno.
           </p>
         </div>
       )}

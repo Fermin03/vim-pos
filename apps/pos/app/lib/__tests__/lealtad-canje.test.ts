@@ -79,7 +79,7 @@ describe("canje de dinero", () => {
     const t = ops({ asentar: () => ({ ok: false, error: "SIN_RED" }) });
     const r = await avanzarCanje(t.o, alm, dinero);
     expect(r.estado).toBe("A_MEDIAS");
-    expect(r.estado === "A_MEDIAS" && r.mensaje).toMatch(/no se descuentan dos veces/);
+    expect(r.estado === "A_MEDIAS" && r.mensaje).toMatch(/no se descuentan doble/);
     const guardado = leerPendiente(alm, "tk-1") as Pendiente;
     expect(guardado.paso).toBe("ASENTAR");
 
@@ -95,12 +95,12 @@ describe("canje de dinero", () => {
       expect(leerPendiente(alm, "tk-1")?.paso).toBe("ASENTAR");
     });
 
-  it("la cuenta rechaza el asiento para siempre: lo dice claro, con las 48 horas, y limpia", async () => {
+  it("la cuenta rechaza el asiento para siempre: lo dice claro, que los puntos regresan solos, y limpia", async () => {
     const t = ops({ asentar: () => ({ ok: false, error: "TICKET_NO_ABIERTO" }) });
     const r = await avanzarCanje(t.o, alm, dinero);
     expect(r.estado).toBe("PUNTOS_GASTADOS");
     expect(r.estado === "PUNTOS_GASTADOS" && r.mensaje).toMatch(/50 puntos/);
-    expect(r.estado === "PUNTOS_GASTADOS" && r.mensaje).toMatch(/48 horas/);
+    expect(r.estado === "PUNTOS_GASTADOS" && r.mensaje).toMatch(/Regresarán solos al cliente/);
     expect(leerPendiente(alm, "tk-1")).toBeNull();
   });
 
@@ -108,7 +108,7 @@ describe("canje de dinero", () => {
     const t = ops({ asentar: () => ({ ok: false, error: "CANJE_NO_EXISTE" }) });
     const r = await avanzarCanje(t.o, alm, { ...dinero, paso: "ASENTAR" });
     expect(r.estado).toBe("RECHAZADO");
-    expect(r.estado === "RECHAZADO" && r.mensaje).toMatch(/no se descontó nada/);
+    expect(r.estado === "RECHAZADO" && r.mensaje).toMatch(/no se descontó nada/i);
     expect(leerPendiente(alm, "tk-1")).toBeNull();
   });
 
@@ -149,7 +149,7 @@ describe("canje de premio", () => {
   it("si el renglón no se pudo cancelar (ya está en cocina), avisa que se quedó a su precio", async () => {
     const t = ops({ canjear: () => ({ ok: false, error: "SALDO_INSUFICIENTE" }), cancelar: async () => { throw new Error("requiere PIN"); } });
     const r = await avanzarCanje(t.o, alm, premio);
-    expect(r.estado === "RECHAZADO" && r.mensaje).toMatch(/Hamburguesa quedó en la cuenta a su precio/);
+    expect(r.estado === "RECHAZADO" && r.mensaje).toMatch(/Hamburguesa se cobra a su precio/);
   });
 
   it("sin red al canjear: a medias, con el renglón ya anotado para no agregarlo dos veces", async () => {
@@ -168,7 +168,7 @@ describe("canje de premio", () => {
     const t = ops({ asentar: () => ({ ok: false, error: "RENGLON_NO_ES_PREMIO" }) });
     const r = await avanzarCanje(t.o, alm, premio);
     expect(r.estado === "PUNTOS_GASTADOS" && r.mensaje).toMatch(/6 sellos/);
-    expect(r.estado === "PUNTOS_GASTADOS" && r.mensaje).toMatch(/Hamburguesa quedó en la cuenta a su precio/);
+    expect(r.estado === "PUNTOS_GASTADOS" && r.mensaje).toMatch(/Hamburguesa se cobra a su precio/);
   });
 });
 
@@ -190,10 +190,10 @@ describe("las garantías del orden", () => {
     expect(visto.asentar).toMatchObject({ canjeId: dinero.canjeId, paso: "ASENTAR", puntos: 50 });
   });
 
-  it("sin red al canjear, el aviso dice que los puntos pudieron descontarse y que no se cobre así", async () => {
+  it("sin red al canjear, el aviso pide reintentar antes de cobrar", async () => {
     const t = ops({ canjear: () => ({ ok: false, error: "SIN_RED" }) });
     const r = await avanzarCanje(t.o, alm, dinero);
-    expect(r.estado === "A_MEDIAS" && r.mensaje).toMatch(/Puede que la nube ya haya descontado 50 puntos: no cobres sin resolverlo/);
+    expect(r.estado === "A_MEDIAS" && r.mensaje).toMatch(/Toca Reintentar antes de cobrar/);
   });
 
   it("reanudar un PREMIO desde ASENTAR solo asienta, sobre su renglón: ni agrega ni vuelve a canjear", async () => {

@@ -9,9 +9,9 @@ export default function Mantenimiento() {
     <PantallaEstado
       icono={<Icono nombre="llave-inglesa" className="h-7 w-7" />}
       titulo="Estamos en mantenimiento"
-      texto="Estamos mejorando VIM POS para ti. El servicio volverá pronto — no necesitas hacer nada, tus datos están a salvo."
+      texto="Estamos mejorando VIM POS. Volvemos pronto; tus datos están a salvo."
       acciones={<button type="button" onClick={() => window.location.reload()} className={btnAccent}>Comprobar de nuevo</button>}
-      pie="Si necesitas operar con urgencia, el modo sin conexión sigue disponible en tus dispositivos. Para dudas, contacta a soporte."
+      pie="Si te urge vender, tus dispositivos siguen funcionando sin conexión."
     />
   );
 }

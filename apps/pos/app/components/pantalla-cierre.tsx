@@ -424,7 +424,7 @@ export function PantallaCierre({
                           ? <div className="text-12 text-ink-3">Cuenta todo lo que hay en el cajón, fondo incluido</div>
                           : f.metodo === "PAGO_EN_LINEA"
                             // Ni cajón ni terminal: lo cobró Mercado Pago en la tienda en línea. No se cuenta. (Texto provisional, James.)
-                            ? <div className="text-12 text-ink-3">Ya cobrado en tu tienda en línea. Está en tu cuenta de Mercado Pago, no en el cajón ni en la terminal</div>
+                            ? <div className="text-12 text-ink-3">Ya se cobró en línea. El dinero está en tu Mercado Pago.</div>
                             : <div className="text-12 text-ink-3">Del sistema: confírmalo con el cierre de tu terminal</div>}
                       </td>
                       <td className="py-4 text-right">
@@ -486,7 +486,7 @@ export function PantallaCierre({
                     <Icono nombre="alerta" className="mt-px h-[18px] w-[18px] flex-shrink-0 text-danger" />
                     <div className="text-13 leading-snug">
                       <span className="font-semibold text-danger">{ticketsAbiertos} {ticketsAbiertos === 1 ? "cuenta abierta" : "cuentas abiertas"} sin cobrar.</span>
-                      <span className="text-ink-2"> Cóbralas o cancélalas antes de cerrar el turno; si no, quedarían sin registrar y la mesa trabada.</span>
+                      <span className="text-ink-2"> Cóbralas o cancélalas antes de cerrar el turno.</span>
                     </div>
                   </div>
 
@@ -497,7 +497,7 @@ export function PantallaCierre({
                     <div className="mt-2.5 pl-[26px] text-12 text-ink-3">Buscando cuáles son…</div>
                   ) : bloqueantes.length === 0 ? (
                     <div className="mt-2.5 pl-[26px] text-12 text-ink-3">
-                      No se pudo listar cuáles. Revisa las cuentas abiertas de cada modo y los pedidos en espera.
+                      No se pudieron mostrar. Revisa cuentas abiertas y pedidos en espera.
                     </div>
                   ) : (
                     <ul className="mt-2.5 flex flex-col gap-1.5 pl-[26px]">

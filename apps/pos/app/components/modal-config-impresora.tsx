@@ -151,12 +151,12 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
         {esWindows && (
           <>
             <p className="rounded border border-line bg-hover px-3 py-2 text-12 text-ink-2">
-              Para una impresora que ya está dada de alta en esta computadora (por USB o con su propio driver). Tiene que ser de tickets (ESC/POS).
+              Para una impresora de tickets ya instalada en esta computadora.
             </p>
             <div>
               <label htmlFor="impresora-windows" className="mb-1.5 block text-13 font-medium text-ink-2">Impresora</label>
               {instaladas === null ? (
-                <p className="text-13 text-danger">No se pudo leer la lista de impresoras. Esta opción solo funciona en la app de la caja.</p>
+                <p className="text-13 text-danger">No se pudieron leer las impresoras. Solo funciona en la caja.</p>
               ) : (
                 <select id="impresora-windows" className={input} value={actual.nombre ?? ""} disabled={instaladas === undefined} onChange={(e) => actualizarEstacion({ nombre: e.target.value })}>
                   <option value="">{instaladas === undefined ? "Buscando impresoras…" : instaladas.length === 0 ? "No hay impresoras instaladas" : "Elige una impresora"}</option>
@@ -172,7 +172,7 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
 
         {actual.tipo === "generica" && (
           <p className="rounded border border-line bg-hover px-3 py-2 text-12 text-ink-2">
-            Impresora ESC/POS de red por el puerto 9100 (Soluciones MyPOS, Xprinter, 3nStar, etc.). La IP y el puerto salen del <b>self-test</b> de la impresora.
+            Impresora de tickets en red. La IP sale en su hoja de prueba.
           </p>
         )}
 
@@ -222,7 +222,7 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
           <AreaRow label="Tickets y cortes (caja)" valor={cfg.asignacion.CAJA} onCambiar={(e) => asignar("CAJA", e)} />
           <AreaRow label="Comandas (cocina)" valor={cfg.asignacion.COCINA} onCambiar={(e) => asignar("COCINA", e)} />
           {cfg.asignacion.CAJA === cfg.asignacion.COCINA && (
-            <p className="mt-2 text-12 text-ink-3">Con la misma estación para ambos, la comanda no se manda sola al cobrar (evita duplicar en el mismo papel); se imprime solo si la pides manualmente.</p>
+            <p className="mt-2 text-12 text-ink-3">Con esta opción, la comanda no sale sola; imprímela cuando la necesites.</p>
           )}
         </div>
 
@@ -232,8 +232,7 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
           <div className="rounded border border-line p-3">
             <p className="mb-1 text-13 font-semibold text-ink-2">¿Dónde imprime cada estación de preparación?</p>
             <p className="mb-2 text-12 leading-snug text-ink-3">
-              Las bebidas pueden salir en la impresora de la caja y la comida en la de cocina. Cada
-              pedido se parte en un papel por estación.
+              Puedes mandar bebidas a una impresora y comida a otra.
             </p>
             {areas.map((a) => (
               <AreaRow

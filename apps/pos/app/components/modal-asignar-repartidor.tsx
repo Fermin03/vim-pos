@@ -171,9 +171,7 @@ export function ModalAsignarRepartidor({
 
       {repartidores !== null && repartidores.length === 0 && !altaAbierta && (
         <p className="mt-4 rounded border border-line bg-bg px-3 py-2.5 text-13 leading-snug text-ink-2">
-          No hay repartidores dados de alta. Dale de alta a quien se lo lleve para que el pedido
-          pueda salir; después se administran en el panel, en{" "}
-          <span className="font-semibold">Usuarios → Repartidores</span>.
+          No hay repartidores. Da de alta a quien lleva el pedido.
         </p>
       )}
 

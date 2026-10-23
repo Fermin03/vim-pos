@@ -262,7 +262,7 @@ export function SeccionTransacciones({
           <Button type="submit" variant="ghost" disabled={buscando || folio.trim() === ""}>{buscando ? "Buscando…" : "Buscar"}</Button>
         </form>
       </div>
-      <p className="flex-shrink-0 px-6 pt-1.5 text-right text-12 text-ink-3">O escanea un código para ver las ventas de los últimos 30 días que lo llevan.</p>
+      <p className="flex-shrink-0 px-6 pt-1.5 text-right text-12 text-ink-3">O escanea un código para ver sus ventas recientes.</p>
       {error && <div className="mx-6 mt-3 flex-shrink-0 rounded border border-danger-line bg-danger-soft px-3 py-2 text-13 font-medium text-danger" role="alert">{error}</div>}
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-6 px-6 pb-6 pt-4">
@@ -279,7 +279,7 @@ export function SeccionTransacciones({
                   <p className="max-w-[400px] text-13">
                     {/* La caja instalada solo tiene sus propias ventas; el POS web, las del negocio. */}
                     {esEscritorio()
-                      ? "Aquí salen las ventas cobradas en esta caja. Si se cobró en otra caja o sucursal, búscala en la caja que la cobró o en el POS web."
+                      ? "Aquí solo salen ventas de esta caja. Las demás, en el POS web."
                       : "Revisa el folio impreso en el ticket, o escanea otro código."}
                   </p>
                 </div>

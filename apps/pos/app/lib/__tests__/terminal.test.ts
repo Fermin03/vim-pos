@@ -36,7 +36,7 @@ describe("cobro con terminal", () => {
     expect(mensajeFinal({ estado: "RECHAZADO", detalle: "algo_nuevo" })).toBe("La terminal rechazó el cobro.");
     expect(mensajeFinal({ estado: "VENCIDO", detalle: "expired" })).toContain("tiempo");
     expect(mensajeErrorCobro(new Error("TERMINAL_OCUPADA"))).toContain("otro cobro");
-    expect(mensajeErrorCobro(new Error("TERMINAL_NO_DISPONIBLE"))).toBe("La terminal no está lista. Revisa que esté encendida, con internet y con Clip PinPad abierta.");
+    expect(mensajeErrorCobro(new Error("TERMINAL_NO_DISPONIBLE"))).toBe("La terminal no está lista. Revisa que esté encendida y con Clip PinPad abierta.");
     expect(mensajeErrorCobro(new Error("SIN_RESPUESTA"))).toBe("La terminal no contestó. Vuelve a intentar.");
     expect(mensajeFinal({ estado: "RECHAZADO", detalle: "SIN_RESPUESTA" })).toBe("La terminal no contestó. Vuelve a intentar.");
     expect(mensajeFinal({ estado: "RECHAZADO", detalle: "high_risk" })).not.toContain("Mercado Pago");

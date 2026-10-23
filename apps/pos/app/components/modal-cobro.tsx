@@ -1015,7 +1015,7 @@ export function ModalCobro({
     } catch (e) {
       const t = await trasFalloDeCobro(e);
       if (!ventaQuedoPagada(t)) {
-        setError("El cobro sí pasó en la terminal, pero no se pudo registrar en el ticket. Cierra el cobro y vuelve a abrirlo: se registra solo.");
+        setError("El cobro pasó pero no se registró. Cierra y vuelve a abrirlo.");
         setVista("selector");
       }
     } finally {
