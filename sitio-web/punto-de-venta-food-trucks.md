@@ -10,11 +10,11 @@ Una caja rápida para la fila del evento, con la venta de cada turno por separad
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-entera.webp)
+![Un food truck con su barra de servicio abierta.](https://vimpos.com.mx/assets/img/fotos/food-trucks-1.webp)
 
-![La impresora de tickets junto a la caja, en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-izq.webp)
+![Clientes pidiendo en la ventanilla de un food truck.](https://vimpos.com.mx/assets/img/fotos/food-trucks-2.webp)
 
-![La terminal de cobro junto a la caja, en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-der.webp)
+![Un cliente recogiendo su pedido en la ventanilla.](https://vimpos.com.mx/assets/img/fotos/food-trucks-3.webp)
 
 ## Lista para la fila, en cualquier lugar
 

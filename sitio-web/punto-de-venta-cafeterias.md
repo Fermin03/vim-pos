@@ -10,11 +10,11 @@ Una caja rápida para la hora pico, que sigue cobrando aunque se caiga el intern
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en el mostrador de una cafetería.](https://vimpos.com.mx/assets/img/fotos/cafeteria-entera.webp)
+![Clientes en la barra de una cafetería.](https://vimpos.com.mx/assets/img/fotos/cafeterias-1.webp)
 
-![La impresora de tickets junto a la caja, en el mostrador de una cafetería.](https://vimpos.com.mx/assets/img/fotos/cafeteria-izq.webp)
+![Un latte con arte en la espuma junto a la máquina de espresso.](https://vimpos.com.mx/assets/img/fotos/cafeterias-2.webp)
 
-![La terminal de cobro junto a la caja, en el mostrador de una cafetería.](https://vimpos.com.mx/assets/img/fotos/cafeteria-der.webp)
+![Una barista sirviendo leche en un café.](https://vimpos.com.mx/assets/img/fotos/cafeterias-3.webp)
 
 ## Menos espera en la barra, más clientes que vuelven
 

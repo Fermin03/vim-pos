@@ -10,11 +10,11 @@ Vende con lector de código de barras, cambia tallas y sabe qué tienes en el an
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en el mostrador de una tienda de ropa.](https://vimpos.com.mx/assets/img/fotos/ropa-entera.webp)
+![Una vendedora mostrando ropa a una clienta en el probador.](https://vimpos.com.mx/assets/img/fotos/tiendas-de-ropa-1.webp)
 
-![La impresora de tickets junto a la caja, en el mostrador de una tienda de ropa.](https://vimpos.com.mx/assets/img/fotos/ropa-izq.webp)
+![El mostrador de una tienda de ropa.](https://vimpos.com.mx/assets/img/fotos/tiendas-de-ropa-2.webp)
 
-![La terminal de cobro junto a la caja, en el mostrador de una tienda de ropa.](https://vimpos.com.mx/assets/img/fotos/ropa-der.webp)
+![Una clienta pagando en la caja de una tienda de ropa.](https://vimpos.com.mx/assets/img/fotos/tiendas-de-ropa-3.webp)
 
 ## Vende rápido y sabe siempre qué te queda
 

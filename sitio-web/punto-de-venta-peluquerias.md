@@ -10,11 +10,11 @@ Citas, lista de espera y cobro en una sola caja.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-entera.webp)
+![Un barbero peinando a un cliente.](https://vimpos.com.mx/assets/img/fotos/peluquerias-1.webp)
 
-![La impresora de tickets junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-izq.webp)
+![Tijeras y máquina de cortar sobre la mesa del barbero.](https://vimpos.com.mx/assets/img/fotos/peluquerias-2.webp)
 
-![La terminal de cobro junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-der.webp)
+![Una barbería con clientes y barberos trabajando.](https://vimpos.com.mx/assets/img/fotos/peluquerias-3.webp)
 
 ## Sin perder un cliente por esperar
 

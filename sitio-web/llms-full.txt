@@ -1637,11 +1637,11 @@ Una caja rápida para la hora pico, que sigue cobrando aunque se caiga el intern
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en el mostrador de una cafetería.](https://vimpos.com.mx/assets/img/fotos/cafeteria-entera.webp)
+![Clientes en la barra de una cafetería.](https://vimpos.com.mx/assets/img/fotos/cafeterias-1.webp)
 
-![La impresora de tickets junto a la caja, en el mostrador de una cafetería.](https://vimpos.com.mx/assets/img/fotos/cafeteria-izq.webp)
+![Un latte con arte en la espuma junto a la máquina de espresso.](https://vimpos.com.mx/assets/img/fotos/cafeterias-2.webp)
 
-![La terminal de cobro junto a la caja, en el mostrador de una cafetería.](https://vimpos.com.mx/assets/img/fotos/cafeteria-der.webp)
+![Una barista sirviendo leche en un café.](https://vimpos.com.mx/assets/img/fotos/cafeterias-3.webp)
 
 ## Menos espera en la barra, más clientes que vuelven
 
@@ -1876,11 +1876,11 @@ Combos, extras y comandas a cocina en segundos, aunque se caiga el internet.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-entera.webp)
+![Un cliente haciendo su pedido en el mostrador.](https://vimpos.com.mx/assets/img/fotos/servicio-rapido-1.webp)
 
-![La impresora de tickets junto a la caja, en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-izq.webp)
+![Papas con queso y tocino junto a una hamburguesa.](https://vimpos.com.mx/assets/img/fotos/servicio-rapido-2.webp)
 
-![La terminal de cobro junto a la caja, en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-der.webp)
+![Una malteada servida en la barra.](https://vimpos.com.mx/assets/img/fotos/servicio-rapido-3.webp)
 
 ## Órdenes completas, cocina al día y la fila avanzando
 
@@ -2115,11 +2115,11 @@ Del mapa de mesas a la cocina, sin papelitos y sin perder una orden.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-entera.webp)
+![El comedor de un restaurante.](https://vimpos.com.mx/assets/img/fotos/restaurantes-servicio-completo-1.webp)
 
-![La impresora de tickets junto a la caja, en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-izq.webp)
+![Un cocinero terminando un platillo.](https://vimpos.com.mx/assets/img/fotos/restaurantes-servicio-completo-2.webp)
 
-![La terminal de cobro junto a la caja, en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-der.webp)
+![Una mesa puesta con copas, lista para el servicio.](https://vimpos.com.mx/assets/img/fotos/restaurantes-servicio-completo-3.webp)
 
 ## El servicio en orden, de la mesa a la cocina
 
@@ -2354,11 +2354,11 @@ Cuentas en la barra y en mesa, con propinas, en una caja que no se detiene.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en el mostrador de una cafetería.](https://vimpos.com.mx/assets/img/fotos/cafeteria-entera.webp)
+![Amigos brindando en la barra de un bar.](https://vimpos.com.mx/assets/img/fotos/bares-1.webp)
 
-![La impresora de tickets junto a la caja, en el mostrador de una cafetería.](https://vimpos.com.mx/assets/img/fotos/cafeteria-izq.webp)
+![La barra de un bar con clientes.](https://vimpos.com.mx/assets/img/fotos/bares-2.webp)
 
-![La terminal de cobro junto a la caja, en el mostrador de una cafetería.](https://vimpos.com.mx/assets/img/fotos/cafeteria-der.webp)
+![Un bar con su barra y clientes de pie.](https://vimpos.com.mx/assets/img/fotos/bares-3.webp)
 
 ## La noche entera, sin perder una cuenta
 
@@ -2593,11 +2593,11 @@ Una caja rápida para la fila del evento, con la venta de cada turno por separad
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-entera.webp)
+![Un food truck con su barra de servicio abierta.](https://vimpos.com.mx/assets/img/fotos/food-trucks-1.webp)
 
-![La impresora de tickets junto a la caja, en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-izq.webp)
+![Clientes pidiendo en la ventanilla de un food truck.](https://vimpos.com.mx/assets/img/fotos/food-trucks-2.webp)
 
-![La terminal de cobro junto a la caja, en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-der.webp)
+![Un cliente recogiendo su pedido en la ventanilla.](https://vimpos.com.mx/assets/img/fotos/food-trucks-3.webp)
 
 ## Lista para la fila, en cualquier lugar
 
@@ -2832,11 +2832,11 @@ Vende con lector de código de barras, cambia tallas y sabe qué tienes en el an
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en el mostrador de una tienda de ropa.](https://vimpos.com.mx/assets/img/fotos/ropa-entera.webp)
+![Una vendedora mostrando ropa a una clienta en el probador.](https://vimpos.com.mx/assets/img/fotos/tiendas-de-ropa-1.webp)
 
-![La impresora de tickets junto a la caja, en el mostrador de una tienda de ropa.](https://vimpos.com.mx/assets/img/fotos/ropa-izq.webp)
+![El mostrador de una tienda de ropa.](https://vimpos.com.mx/assets/img/fotos/tiendas-de-ropa-2.webp)
 
-![La terminal de cobro junto a la caja, en el mostrador de una tienda de ropa.](https://vimpos.com.mx/assets/img/fotos/ropa-der.webp)
+![Una clienta pagando en la caja de una tienda de ropa.](https://vimpos.com.mx/assets/img/fotos/tiendas-de-ropa-3.webp)
 
 ## Vende rápido y sabe siempre qué te queda
 
@@ -3063,11 +3063,11 @@ Código de barras, existencias con aviso de mínimo y cotizaciones, en una caja 
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en el mostrador de una tienda de abarrotes.](https://vimpos.com.mx/assets/img/fotos/minisuper-entera.webp)
+![Un cliente recorriendo los anaqueles de una vinatería.](https://vimpos.com.mx/assets/img/fotos/vinaterias-1.webp)
 
-![La impresora de tickets junto a la caja, en el mostrador de una tienda de abarrotes.](https://vimpos.com.mx/assets/img/fotos/minisuper-izq.webp)
+![Botellas de vino acomodadas en un exhibidor.](https://vimpos.com.mx/assets/img/fotos/vinaterias-2.webp)
 
-![La terminal de cobro junto a la caja, en el mostrador de una tienda de abarrotes.](https://vimpos.com.mx/assets/img/fotos/minisuper-der.webp)
+![El aparador iluminado de una tienda de vinos y licores.](https://vimpos.com.mx/assets/img/fotos/vinaterias-3.webp)
 
 ## Menos faltantes y ventas más rápidas
 
@@ -3282,11 +3282,11 @@ La fruta por kilo, lo empaquetado por pieza y el fiado de tus clientes, en una s
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en el mostrador de una tienda de abarrotes.](https://vimpos.com.mx/assets/img/fotos/minisuper-entera.webp)
+![Pasillo de una tienda con refrigeradores y anaqueles.](https://vimpos.com.mx/assets/img/fotos/abarrotes-1.webp)
 
-![La impresora de tickets junto a la caja, en el mostrador de una tienda de abarrotes.](https://vimpos.com.mx/assets/img/fotos/minisuper-izq.webp)
+![Anaqueles con jugos, bebidas y fruta.](https://vimpos.com.mx/assets/img/fotos/abarrotes-2.webp)
 
-![La terminal de cobro junto a la caja, en el mostrador de una tienda de abarrotes.](https://vimpos.com.mx/assets/img/fotos/minisuper-der.webp)
+![Un cliente pagando con tarjeta en la caja.](https://vimpos.com.mx/assets/img/fotos/abarrotes-3.webp)
 
 ## Todo lo de la tienda, sin libreta ni calculadora
 
@@ -3517,11 +3517,11 @@ Citas, cobro y comisiones de tu equipo en una sola pantalla.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-entera.webp)
+![Una estilista atendiendo a una clienta en el salón.](https://vimpos.com.mx/assets/img/fotos/salones-de-belleza-1.webp)
 
-![La impresora de tickets junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-izq.webp)
+![Productos y brochas de maquillaje en el tocador.](https://vimpos.com.mx/assets/img/fotos/salones-de-belleza-2.webp)
 
-![La terminal de cobro junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-der.webp)
+![Una clienta pagando con tarjeta en la recepción del salón.](https://vimpos.com.mx/assets/img/fotos/salones-de-belleza-3.webp)
 
 ## Menos huecos en la agenda y cero cuentas a mano
 
@@ -3756,11 +3756,11 @@ Agenda por terapeuta y por cabina, con anticipos y comisiones.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-entera.webp)
+![La recepción de un spa.](https://vimpos.com.mx/assets/img/fotos/spa-1.webp)
 
-![La impresora de tickets junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-izq.webp)
+![Una sala de espera del spa con sillones de mimbre.](https://vimpos.com.mx/assets/img/fotos/spa-2.webp)
 
-![La terminal de cobro junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-der.webp)
+![Detalles de una cabina de spa junto a la ventana.](https://vimpos.com.mx/assets/img/fotos/spa-3.webp)
 
 ## Tu spa lleno, en orden y sin cuentas a mano
 
@@ -3995,11 +3995,11 @@ Citas, lista de espera y cobro en una sola caja.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-entera.webp)
+![Un barbero peinando a un cliente.](https://vimpos.com.mx/assets/img/fotos/peluquerias-1.webp)
 
-![La impresora de tickets junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-izq.webp)
+![Tijeras y máquina de cortar sobre la mesa del barbero.](https://vimpos.com.mx/assets/img/fotos/peluquerias-2.webp)
 
-![La terminal de cobro junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-der.webp)
+![Una barbería con clientes y barberos trabajando.](https://vimpos.com.mx/assets/img/fotos/peluquerias-3.webp)
 
 ## Sin perder un cliente por esperar
 
@@ -4226,11 +4226,11 @@ Aparta la fecha, cobra la sesión y reparte las comisiones.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-entera.webp)
+![Un artista tatuando el brazo de un cliente.](https://vimpos.com.mx/assets/img/fotos/estudios-de-tatuajes-1.webp)
 
-![La impresora de tickets junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-izq.webp)
+![Detalle de una máquina de tatuar sobre la piel.](https://vimpos.com.mx/assets/img/fotos/estudios-de-tatuajes-2.webp)
 
-![La terminal de cobro junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-der.webp)
+![Un estudio de tatuajes con el artista trabajando en la camilla.](https://vimpos.com.mx/assets/img/fotos/estudios-de-tatuajes-3.webp)
 
 ## Tu estudio en orden, de la cita al cobro
 

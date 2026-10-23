@@ -10,11 +10,11 @@ La fruta por kilo, lo empaquetado por pieza y el fiado de tus clientes, en una s
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en el mostrador de una tienda de abarrotes.](https://vimpos.com.mx/assets/img/fotos/minisuper-entera.webp)
+![Pasillo de una tienda con refrigeradores y anaqueles.](https://vimpos.com.mx/assets/img/fotos/abarrotes-1.webp)
 
-![La impresora de tickets junto a la caja, en el mostrador de una tienda de abarrotes.](https://vimpos.com.mx/assets/img/fotos/minisuper-izq.webp)
+![Anaqueles con jugos, bebidas y fruta.](https://vimpos.com.mx/assets/img/fotos/abarrotes-2.webp)
 
-![La terminal de cobro junto a la caja, en el mostrador de una tienda de abarrotes.](https://vimpos.com.mx/assets/img/fotos/minisuper-der.webp)
+![Un cliente pagando con tarjeta en la caja.](https://vimpos.com.mx/assets/img/fotos/abarrotes-3.webp)
 
 ## Todo lo de la tienda, sin libreta ni calculadora
 

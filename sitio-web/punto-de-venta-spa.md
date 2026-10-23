@@ -10,11 +10,11 @@ Agenda por terapeuta y por cabina, con anticipos y comisiones.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-entera.webp)
+![La recepción de un spa.](https://vimpos.com.mx/assets/img/fotos/spa-1.webp)
 
-![La impresora de tickets junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-izq.webp)
+![Una sala de espera del spa con sillones de mimbre.](https://vimpos.com.mx/assets/img/fotos/spa-2.webp)
 
-![La terminal de cobro junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-der.webp)
+![Detalles de una cabina de spa junto a la ventana.](https://vimpos.com.mx/assets/img/fotos/spa-3.webp)
 
 ## Tu spa lleno, en orden y sin cuentas a mano
 
