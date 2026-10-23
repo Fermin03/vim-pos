@@ -10,7 +10,8 @@ La solapa es 2.6 mm más angosta porque se dobla hacia adentro; su reverso es el
 derecho del interior.
 
 Las capturas salen de `sitio-web/assets/img/capturas` (las mismas del sitio, de los
-negocios de prueba). Aquí solo se recortan al detalle que cuenta la función.
+negocios de prueba) y van completas, en un marco de tableta o de teléfono. No se recortan:
+un pedazo de pantalla se lee como un error, no como el producto.
 
 Uso:  python3 generar.py && node render.mjs
 """
@@ -23,7 +24,7 @@ from PIL import Image
 AQUI = pathlib.Path(__file__).parent
 RAIZ = AQUI.parent.parent
 CAPTURAS = RAIZ / "sitio-web/assets/img/capturas"
-RECORTES = AQUI / "recortes"
+CAPTURAS_FOLLETO = AQUI / "capturas"
 
 # Los iconos, el logotipo, el QR y el zigzag son los mismos de los volantes.
 _spec = importlib.util.spec_from_file_location("volantes", AQUI.parent / "volantes/generar.py")
@@ -32,8 +33,8 @@ _spec.loader.exec_module(V)
 svg, logo, qr = V.svg, V.logo, V.qr
 
 # ---------------------------------------------------------------- contenido
-# Cada función: (captura, recorte x0 y0 x1 y1 en fracción, título, una línea).
-# Sin captura (None): se dibuja el icono grande en su lugar.
+# Cada función: (captura, título, una línea). La captura va completa, en su marco de
+# pantalla. «icono:<nombre>» dibuja el icono grande donde todavía no hay captura.
 FOLLETOS = [
     {
         "archivo": "alimentos-y-bebidas",
@@ -41,12 +42,12 @@ FOLLETOS = [
         "giros": "Cafés · Bares · Restaurantes · Food trucks",
         "rejilla": V.VOLANTES[0]["rejilla"],
         "funciones": [
-            ("giros/servicio-completo-mesas", (0, .08, .555, .66), "Mesas a la vista", "Quién está libre, quién ocupado y cuánto lleva."),
-            ("giros/servicio-rapido-kds", (0, 0, .5, .5), "Directo a cocina", "La comanda llega a la pantalla o a la impresora."),
-            ("giros/cafeteria-modificadores", (.105, .085, .6, .66), "Como lo pidieron", "Tamaño, leche y extras en un toque."),
-            ("giros/servicio-rapido-combo", (.1, .1, .6, .45), "Combos", "Arma el combo y el precio sale solo."),
-            ("giros/bar-propina", (.3, .18, .7, .9), "Propinas claras", "10, 15 o 20 % y queda registrada."),
-            ("giros/cafeteria-pantalla-cliente", (.04, .04, .97, .98), "Tu cliente lo ve", "Una segunda pantalla con su orden y el total."),
+            ("giros/servicio-completo-mesas", "Mesas a la vista", "Quién está libre, quién ocupado y cuánto lleva."),
+            ("giros/servicio-rapido-kds", "Directo a cocina", "La comanda llega a la pantalla o a la impresora."),
+            ("giros/cafeteria-modificadores", "Como lo pidieron", "Tamaño, leche y extras en un toque."),
+            ("giros/servicio-rapido-combo", "Combos", "Arma el combo y el precio sale solo."),
+            ("giros/bar-propina", "Propinas claras", "10, 15 o 20 % y queda registrada."),
+            ("giros/cafeteria-pantalla-cliente", "Tu cliente lo ve", "Una segunda pantalla con su orden y el total."),
         ],
     },
     {
@@ -55,12 +56,12 @@ FOLLETOS = [
         "giros": "Ropa · Abarrotes · Vinos y licores",
         "rejilla": V.VOLANTES[1]["rejilla"],
         "funciones": [
-            ("giros/tienda-ropa-talla-color", (.24, .31, .77, .69), "Talla y color", "Cada combinación con su existencia."),
-            ("giros/abarrotes-venta-kg", (.36, .18, .63, .82), "Por kilo o por pieza", "Captura el peso y cobra."),
-            ("giros/tienda-ropa-etiquetas", (.17, .02, .6, .52), "Etiquetas con código", "Imprímelas y cobra escaneando."),
-            ("giros/vinos-existencias-minimo", (.18, .03, .7, .72), "Existencias al día", "Y aviso cuando algo llega al mínimo."),
-            ("giros/abarrotes-venta-a-credito", (.3, .27, .7, .73), "Crédito sin cuaderno", "Quién te debe y cuánto, a la vista."),
-            ("giros/abarrotes-cotizacion-publica-movil", None, "Cotizaciones", "Se mandan por WhatsApp con un enlace."),
+            ("giros/tienda-ropa-talla-color", "Talla y color", "Cada combinación con su existencia."),
+            ("giros/abarrotes-venta-kg", "Por kilo o por pieza", "Captura el peso y cobra."),
+            ("giros/tienda-ropa-etiquetas", "Etiquetas con código", "Imprímelas y cobra escaneando."),
+            ("giros/vinos-existencias-minimo", "Existencias al día", "Y aviso cuando algo llega al mínimo."),
+            ("giros/abarrotes-venta-a-credito", "Crédito sin cuaderno", "Quién te debe y cuánto, a la vista."),
+            ("giros/abarrotes-cotizacion-publica-movil", "Cotizaciones", "Se mandan por WhatsApp con un enlace."),
         ],
     },
     {
@@ -69,12 +70,12 @@ FOLLETOS = [
         "giros": "Talleres · Consultorios · Reparaciones",
         "rejilla": V.VOLANTES[2]["rejilla"],
         "funciones": [
-            (None, "lista", "Una orden por trabajo", "Lo que pidió el cliente y lo que se hizo."),
-            (None, "chat", "Cotiza por WhatsApp", "Empieza cuando el cliente diga que sí."),
-            (None, "caja", "Refacciones e insumos", "Lo que usas sale del inventario."),
-            (None, "billete", "Anticipos y crédito", "Pide un anticipo o da crédito."),
-            (None, "calendario", "Citas", "La agenda de todo tu equipo."),
-            (None, "pesos", "Comisión por técnico", "Cada trabajo con quien lo hizo."),
+            ("icono:lista", "Una orden por trabajo", "Lo que pidió el cliente y lo que se hizo."),
+            ("icono:chat", "Cotiza por WhatsApp", "Empieza cuando el cliente diga que sí."),
+            ("icono:caja", "Refacciones e insumos", "Lo que usas sale del inventario."),
+            ("icono:billete", "Anticipos y crédito", "Pide un anticipo o da crédito."),
+            ("icono:calendario", "Citas", "La agenda de todo tu equipo."),
+            ("icono:pesos", "Comisión por técnico", "Cada trabajo con quien lo hizo."),
         ],
     },
     {
@@ -83,12 +84,12 @@ FOLLETOS = [
         "giros": "Salón · Barbería · Spa · Tatuajes",
         "rejilla": V.VOLANTES[3]["rejilla"],
         "funciones": [
-            ("giros/salon-calendario", (0, 0, .6, .92), "La agenda del equipo", "Cada quien con sus citas, en una vista."),
-            ("giros/salon-ficha-cita", (.36, .1, .9, .6), "Cobra la cita", "Llega, se atiende y se cobra en un toque."),
-            ("giros/salon-cobro-anticipo", (.3, .08, .7, .62), "Anticipos", "Lo que dejó pagado se descuenta solo."),
-            ("giros/salon-comisiones", (.18, .03, .75, .6), "Comisiones claras", "Lo de cada colaboradora, sin calculadora."),
-            ("giros/barberia-lista-espera", (.28, .3, .72, .68), "Sin cita, a la lista", "Quien llega sin cita no se pierde."),
-            ("giros/salon-servicios", (.18, 0, .68, .55), "Servicios", "Cada uno con su precio, duración y comisión."),
+            ("giros/salon-calendario", "La agenda del equipo", "Cada quien con sus citas, en una vista."),
+            ("giros/salon-ficha-cita", "Cobra la cita", "Llega, se atiende y se cobra en un toque."),
+            ("giros/salon-cobro-anticipo", "Anticipos", "Lo que dejó pagado se descuenta solo."),
+            ("giros/salon-comisiones", "Comisiones claras", "Lo de cada colaboradora, sin calculadora."),
+            ("giros/barberia-lista-espera", "Sin cita, a la lista", "Quien llega sin cita no se pierde."),
+            ("giros/salon-servicios", "Servicios", "Cada uno con su precio, duración y comisión."),
         ],
     },
 ]
@@ -106,50 +107,18 @@ PLANES = [
     ("Cadena", "$1,999", "3 sucursales · cajas sin límite"),
 ]
 
-# ---------------------------------------------------------------- recortes
+# ---------------------------------------------------------------- capturas
 
 
-# Capturas de ventanas que en la caja aparecen sobre la pantalla oscurecida. Su recorte
-# se ajusta solo al borde de la ventana para no arrastrar ese gris al papel.
-VENTANAS = {
-    "cafeteria-modificadores", "servicio-rapido-combo", "bar-propina", "tienda-ropa-talla-color",
-    "abarrotes-venta-kg", "abarrotes-venta-a-credito", "salon-ficha-cita", "salon-cobro-anticipo",
-    "barberia-lista-espera",
-}
-
-
-def al_borde_de_la_ventana(im: Image.Image) -> Image.Image:
-    """Recorta a las filas y columnas que son casi todas blancas: la ventana, sin el fondo."""
-    gris = im.convert("L")
-    w, h = gris.size
-    datos = gris.load()
-
-    def blanca(n: int, largo: int, pixel) -> bool:
-        return sum(1 for i in range(0, largo, 4) if pixel(n, i) >= 248) / (largo / 4) > 0.45
-
-    cols = [x for x in range(w) if blanca(x, h, lambda x, y: datos[x, y])]
-    filas = [y for y in range(h) if blanca(y, w, lambda y, x: datos[x, y])]
-    if not cols or not filas:
-        return im
-    return im.crop((cols[0], filas[0], cols[-1] + 1, filas[-1] + 1))
-
-
-def recorte(captura: str, caja) -> str:
-    """Recorta la captura al detalle y devuelve la ruta relativa al HTML."""
-    RECORTES.mkdir(exist_ok=True)
-    nombre = pathlib.Path(captura).name
-    origen = CAPTURAS / f"{captura}.png"
-    destino = RECORTES / f"{nombre}.png"
-    im = Image.open(origen).convert("RGB")
-    if caja:
-        w, h = im.size
-        im = im.crop((round(caja[0] * w), round(caja[1] * h), round(caja[2] * w), round(caja[3] * h)))
-    if nombre in VENTANAS:
-        im = al_borde_de_la_ventana(im)
+def captura(ruta: str) -> tuple[str, bool]:
+    """Copia la captura completa (reducida para imprenta) y dice si es de teléfono."""
+    CAPTURAS_FOLLETO.mkdir(exist_ok=True)
+    destino = CAPTURAS_FOLLETO / f"{pathlib.Path(ruta).name}.png"
+    im = Image.open(CAPTURAS / f"{ruta}.png").convert("RGB")
     if im.width > 1800:
         im = im.resize((1800, round(im.height * 1800 / im.width)), Image.LANCZOS)
     im.save(destino, optimize=True)
-    return f"recortes/{destino.name}"
+    return f"capturas/{destino.name}", im.height > im.width
 
 
 # ---------------------------------------------------------------- piezas
@@ -224,14 +193,8 @@ h2 { font-size: 17pt; font-weight: 600; line-height: 1.1; margin-top: 2mm; }
 .portada .logo { height: 9mm; width: auto; display: block; margin-top: auto; }
 
 /* ---- Solapa: qué es ---- */
-.telefono {
-  width: 40mm; height: 58mm; margin: 0 auto 7mm; flex: none;
-  border: 1.6mm solid var(--ink); border-bottom: none; border-radius: 6mm 6mm 0 0;
-  overflow: hidden; background: #fff;
-}
-.telefono img { width: 100%; display: block; }
-.escenario.cel { background: var(--accent-soft); border-radius: 2.5mm; padding-top: 7mm; margin-bottom: 7mm; }
-.escenario.cel .telefono { margin-bottom: 0; }
+.escenario.solapa-cel { height: auto; padding: 5mm; margin-bottom: 7mm; }
+.escenario.solapa-cel .pantalla.cel img { height: 54mm; }
 .solapa p.lema { font-size: 9.5pt; color: var(--ink-2); line-height: 1.35; margin-top: 2.5mm; }
 .pilares { display: grid; gap: 4.5mm; margin-top: 7mm; }
 .pilar { display: grid; grid-template-columns: 9mm 1fr; gap: 3.5mm; align-items: center; }
@@ -268,33 +231,36 @@ h2 { font-size: 17pt; font-weight: 600; line-height: 1.1; margin-top: 2mm; }
 .contacto .logo { height: 8mm; width: auto; margin-top: 7mm; }
 
 /* ---- Interior: funciones ---- */
-.funcion + .funcion { margin-top: 9mm; }
+.funcion + .funcion { margin-top: 15mm; }
 .escenario {
-  height: 68mm; background: var(--accent-soft); border-radius: 2.5mm;
-  display: grid; place-items: center; padding: 5mm; overflow: hidden;
+  height: 60mm; background: var(--accent-soft); border-radius: 2.5mm;
+  display: grid; place-items: center; padding: 4mm;
 }
-.escenario img {
-  max-width: 100%; max-height: 58mm; display: block; background: #fff;
-  border-radius: 1.5mm; border: .25mm solid var(--line-strong);  /* sin sombra: en PDF se vuelve un bloque gris */
-}
-.escenario .tel-chico { height: 100%; border: 1.2mm solid var(--ink); border-radius: 4mm; overflow: hidden; background: #fff; }
-.escenario .tel-chico img { height: 100%; width: auto; max-width: none; max-height: none; border-radius: 0; border: none; }
+/* Marco de pantalla. Sin sombra: en el PDF se vuelve un bloque gris. */
+.pantalla { background: var(--ink); border: 1.2mm solid var(--ink); border-radius: 2.5mm; overflow: hidden; }
+.pantalla img { display: block; }
+.pantalla.tableta img { width: 66mm; height: auto; }
+.pantalla.cel { border-width: 1.2mm; border-radius: 4mm; }
+.pantalla.cel img { height: 45mm; width: auto; }
 .escenario.icono { color: var(--accent); }
-.escenario.icono .ic { width: 26mm; height: 26mm; }
+.escenario.icono .ic { width: 24mm; height: 24mm; }
 .funcion .num { font-family: 'JetBrains Mono', monospace; font-size: 7pt; color: var(--accent); margin-top: 4.5mm; display: block; }
 .funcion h3 { font-size: 12pt; font-weight: 600; margin-top: 1.2mm; }
 .funcion p { font-size: 8.5pt; color: var(--ink-2); margin-top: 1.2mm; line-height: 1.35; }
 """
 
 
+def marco(ruta: str) -> str:
+    src, es_cel = captura(ruta)
+    return f'<div class="pantalla {"cel" if es_cel else "tableta"}"><img src="{src}" alt=""></div>'
+
+
 def funcion(i: int, f) -> str:
-    captura, caja, titulo, linea = f
-    if captura is None:
-        escena = f'<div class="escenario icono">{svg(caja, "ic")}</div>'
-    elif caja is None:  # captura de teléfono: va en su marco
-        escena = f'<div class="escenario"><div class="tel-chico"><img src="{recorte(captura, None)}" alt=""></div></div>'
+    imagen, titulo, linea = f
+    if imagen.startswith("icono:"):
+        escena = f'<div class="escenario icono">{svg(imagen[6:], "ic")}</div>'
     else:
-        escena = f'<div class="escenario"><img src="{recorte(captura, caja)}" alt=""></div>'
+        escena = f'<div class="escenario">{marco(imagen)}</div>'
     return (
         f'<article class="funcion">{escena}<span class="num">{i:02d}</span>'
         f"<h3>{titulo}</h3><p>{linea}</p></article>"
@@ -317,7 +283,6 @@ def folleto(d: dict) -> str:
     )
     fs = [funcion(i + 1, f) for i, f in enumerate(d["funciones"])]
     url = f"https://{V.WEB}/?utm_source=folleto&utm_campaign={d['archivo']}"
-    tel = recorte("admin-dashboard-movil", (0, 0, 1, .62))
     return f"""<!doctype html>
 <html lang="es"><head><meta charset="utf-8">
 <title>Folleto · {d['titulo']}</title>
@@ -325,7 +290,7 @@ def folleto(d: dict) -> str:
 <body>
 <section class="hoja exterior">
   <div class="panel solapa">
-    <div class="escenario cel"><div class="telefono"><img src="{tel}" alt=""></div></div>
+    <div class="escenario solapa-cel">{marco("admin-dashboard-movil")}</div>
     <p class="eyebrow">Qué es</p>
     <h2>VIM POS</h2>
     <p class="lema">El punto de venta para cobrar, controlar y facturar tu negocio.</p>

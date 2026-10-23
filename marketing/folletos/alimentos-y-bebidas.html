@@ -71,14 +71,8 @@ h2 { font-size: 17pt; font-weight: 600; line-height: 1.1; margin-top: 2mm; }
 .portada .logo { height: 9mm; width: auto; display: block; margin-top: auto; }
 
 /* ---- Solapa: qué es ---- */
-.telefono {
-  width: 40mm; height: 58mm; margin: 0 auto 7mm; flex: none;
-  border: 1.6mm solid var(--ink); border-bottom: none; border-radius: 6mm 6mm 0 0;
-  overflow: hidden; background: #fff;
-}
-.telefono img { width: 100%; display: block; }
-.escenario.cel { background: var(--accent-soft); border-radius: 2.5mm; padding-top: 7mm; margin-bottom: 7mm; }
-.escenario.cel .telefono { margin-bottom: 0; }
+.escenario.solapa-cel { height: auto; padding: 5mm; margin-bottom: 7mm; }
+.escenario.solapa-cel .pantalla.cel img { height: 54mm; }
 .solapa p.lema { font-size: 9.5pt; color: var(--ink-2); line-height: 1.35; margin-top: 2.5mm; }
 .pilares { display: grid; gap: 4.5mm; margin-top: 7mm; }
 .pilar { display: grid; grid-template-columns: 9mm 1fr; gap: 3.5mm; align-items: center; }
@@ -115,19 +109,19 @@ h2 { font-size: 17pt; font-weight: 600; line-height: 1.1; margin-top: 2mm; }
 .contacto .logo { height: 8mm; width: auto; margin-top: 7mm; }
 
 /* ---- Interior: funciones ---- */
-.funcion + .funcion { margin-top: 9mm; }
+.funcion + .funcion { margin-top: 15mm; }
 .escenario {
-  height: 68mm; background: var(--accent-soft); border-radius: 2.5mm;
-  display: grid; place-items: center; padding: 5mm; overflow: hidden;
+  height: 60mm; background: var(--accent-soft); border-radius: 2.5mm;
+  display: grid; place-items: center; padding: 4mm;
 }
-.escenario img {
-  max-width: 100%; max-height: 58mm; display: block; background: #fff;
-  border-radius: 1.5mm; border: .25mm solid var(--line-strong);  /* sin sombra: en PDF se vuelve un bloque gris */
-}
-.escenario .tel-chico { height: 100%; border: 1.2mm solid var(--ink); border-radius: 4mm; overflow: hidden; background: #fff; }
-.escenario .tel-chico img { height: 100%; width: auto; max-width: none; max-height: none; border-radius: 0; border: none; }
+/* Marco de pantalla. Sin sombra: en el PDF se vuelve un bloque gris. */
+.pantalla { background: var(--ink); border: 1.2mm solid var(--ink); border-radius: 2.5mm; overflow: hidden; }
+.pantalla img { display: block; }
+.pantalla.tableta img { width: 66mm; height: auto; }
+.pantalla.cel { border-width: 1.2mm; border-radius: 4mm; }
+.pantalla.cel img { height: 45mm; width: auto; }
 .escenario.icono { color: var(--accent); }
-.escenario.icono .ic { width: 26mm; height: 26mm; }
+.escenario.icono .ic { width: 24mm; height: 24mm; }
 .funcion .num { font-family: 'JetBrains Mono', monospace; font-size: 7pt; color: var(--accent); margin-top: 4.5mm; display: block; }
 .funcion h3 { font-size: 12pt; font-weight: 600; margin-top: 1.2mm; }
 .funcion p { font-size: 8.5pt; color: var(--ink-2); margin-top: 1.2mm; line-height: 1.35; }
@@ -135,7 +129,7 @@ h2 { font-size: 17pt; font-weight: 600; line-height: 1.1; margin-top: 2mm; }
 <body>
 <section class="hoja exterior">
   <div class="panel solapa">
-    <div class="escenario cel"><div class="telefono"><img src="recortes/admin-dashboard-movil.png" alt=""></div></div>
+    <div class="escenario solapa-cel"><div class="pantalla cel"><img src="capturas/admin-dashboard-movil.png" alt=""></div></div>
     <p class="eyebrow">Qué es</p>
     <h2>VIM POS</h2>
     <p class="lema">El punto de venta para cobrar, controlar y facturar tu negocio.</p>
@@ -213,8 +207,8 @@ h2 { font-size: 17pt; font-weight: 600; line-height: 1.1; margin-top: 2mm; }
   </div>
 </section>
 <section class="hoja interior">
-  <div class="panel"><article class="funcion"><div class="escenario"><img src="recortes/servicio-completo-mesas.png" alt=""></div><span class="num">01</span><h3>Mesas a la vista</h3><p>Quién está libre, quién ocupado y cuánto lleva.</p></article><article class="funcion"><div class="escenario"><img src="recortes/servicio-rapido-kds.png" alt=""></div><span class="num">02</span><h3>Directo a cocina</h3><p>La comanda llega a la pantalla o a la impresora.</p></article></div>
-  <div class="panel"><article class="funcion"><div class="escenario"><img src="recortes/cafeteria-modificadores.png" alt=""></div><span class="num">03</span><h3>Como lo pidieron</h3><p>Tamaño, leche y extras en un toque.</p></article><article class="funcion"><div class="escenario"><img src="recortes/servicio-rapido-combo.png" alt=""></div><span class="num">04</span><h3>Combos</h3><p>Arma el combo y el precio sale solo.</p></article></div>
-  <div class="panel"><article class="funcion"><div class="escenario"><img src="recortes/bar-propina.png" alt=""></div><span class="num">05</span><h3>Propinas claras</h3><p>10, 15 o 20 % y queda registrada.</p></article><article class="funcion"><div class="escenario"><img src="recortes/cafeteria-pantalla-cliente.png" alt=""></div><span class="num">06</span><h3>Tu cliente lo ve</h3><p>Una segunda pantalla con su orden y el total.</p></article></div>
+  <div class="panel"><article class="funcion"><div class="escenario"><div class="pantalla tableta"><img src="capturas/servicio-completo-mesas.png" alt=""></div></div><span class="num">01</span><h3>Mesas a la vista</h3><p>Quién está libre, quién ocupado y cuánto lleva.</p></article><article class="funcion"><div class="escenario"><div class="pantalla tableta"><img src="capturas/servicio-rapido-kds.png" alt=""></div></div><span class="num">02</span><h3>Directo a cocina</h3><p>La comanda llega a la pantalla o a la impresora.</p></article></div>
+  <div class="panel"><article class="funcion"><div class="escenario"><div class="pantalla tableta"><img src="capturas/cafeteria-modificadores.png" alt=""></div></div><span class="num">03</span><h3>Como lo pidieron</h3><p>Tamaño, leche y extras en un toque.</p></article><article class="funcion"><div class="escenario"><div class="pantalla tableta"><img src="capturas/servicio-rapido-combo.png" alt=""></div></div><span class="num">04</span><h3>Combos</h3><p>Arma el combo y el precio sale solo.</p></article></div>
+  <div class="panel"><article class="funcion"><div class="escenario"><div class="pantalla tableta"><img src="capturas/bar-propina.png" alt=""></div></div><span class="num">05</span><h3>Propinas claras</h3><p>10, 15 o 20 % y queda registrada.</p></article><article class="funcion"><div class="escenario"><div class="pantalla tableta"><img src="capturas/cafeteria-pantalla-cliente.png" alt=""></div></div><span class="num">06</span><h3>Tu cliente lo ve</h3><p>Una segunda pantalla con su orden y el total.</p></article></div>
 </section>
 </body></html>
