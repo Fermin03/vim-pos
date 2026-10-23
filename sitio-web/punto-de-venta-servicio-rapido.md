@@ -86,36 +86,6 @@ Tu cliente se factura solo con su ticket. Incluida desde Negocio.
 
 Revisa ventas y cortes desde donde estés.
 
-_Equipo_
-
-## Funciona con lo que ya tienes
-
-Sin equipo especial: lo compras donde quieras.
-
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
-
-### Computadora con Windows
-
-Windows 10 u 11. Es tu caja.
-
-![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
-
-### Impresora de tickets
-
-Térmica de 80 mm, de red o USB.
-
-![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
-
-### Terminal Mercado Pago
-
-Cobra con tarjeta desde la caja con la Point Smart 2.
-
-![Pantalla de cocina con las comandas activas y su tiempo.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
-
-### Pantalla de cocina
-
-Una pantalla o tablet en cada estación.
-
 _Precios_
 
 ## Un plan para cada tamaño de negocio

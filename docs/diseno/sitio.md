@@ -106,11 +106,10 @@ por giro de un punto de venta de referencia y pasada a la identidad de VIM:
 2. **Rasgos:** cinco como máximo. En la PC la imagen se queda pegada a la izquierda y cambia con
    un fundido al llegar a cada rasgo; en el teléfono cada rasgo lleva su imagen arriba.
 3. **Para el dueño:** tarjetas con imagen arriba (cortada a 16:10).
-4. **Equipo:** cuatro tarjetas con foto.
-5. **Precios:** tarjetas que listan lo principal de cada plan **para ese giro**, con el precio de
+4. **Precios:** tarjetas que listan lo principal de cada plan **para ese giro**, con el precio de
    lo que va aparte. Las filas se alinean entre planes con subgrid.
-6. **Guías**, **Preguntas** (también como FAQPage en JSON-LD) y **Cierre**.
-7. **Barra fija** con los dos botones en el teléfono: aparece al salir del hero y se va al llegar al
+5. **Guías**, **Preguntas** (también como FAQPage en JSON-LD) y **Cierre**.
+6. **Barra fija** con los dos botones en el teléfono: aparece al salir del hero y se va al llegar al
    cierre.
 
 **Fotos:** cada hueco rayado «Foto pendiente» dice qué toma va ahí. Es la lista de la sesión de

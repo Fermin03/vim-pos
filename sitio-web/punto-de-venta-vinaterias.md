@@ -66,36 +66,6 @@ Lo que llega se escanea en la caja y entra a las existencias.
 
 Revisa ventas y cortes desde donde estés.
 
-_Equipo_
-
-## Funciona con lo que ya tienes
-
-Sin equipo especial: lo compras donde quieras.
-
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
-
-### Computadora con Windows
-
-Windows 10 u 11. Es tu caja.
-
-![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
-
-### Impresora de tickets
-
-Térmica de 80 mm, de red o USB.
-
-![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
-
-### Terminal Mercado Pago
-
-Cobra con tarjeta desde la caja con la Point Smart 2.
-
-![Lector de código de barras junto a la caja.](https://vimpos.com.mx/assets/img/fotos/minisuper-lector.webp)
-
-### Lector de código de barras
-
-Uno USB, de los que venden en cualquier lado.
-
 _Precios_
 
 ## Un plan para cada tamaño de vinatería

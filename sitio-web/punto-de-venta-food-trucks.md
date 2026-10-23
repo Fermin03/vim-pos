@@ -86,36 +86,6 @@ Tu cliente se factura solo con su ticket. Incluida desde Negocio.
 
 Revisa ventas y cortes desde donde estés.
 
-_Equipo_
-
-## Funciona con lo que ya tienes
-
-Sin equipo especial: lo compras donde quieras.
-
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
-
-### Computadora con Windows
-
-Windows 10 u 11. Es tu caja.
-
-![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
-
-### Impresora de tickets
-
-Térmica de 80 mm, de red o USB.
-
-![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
-
-### Terminal Mercado Pago
-
-Cobra con tarjeta desde la caja con la Point Smart 2.
-
-![Cajón de dinero bajo la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-cajon.webp)
-
-### Cajón de dinero
-
-El de siempre, para el efectivo.
-
 _Precios_
 
 ## Un plan para cada tamaño de food truck
@@ -219,7 +189,7 @@ Sí: cobras, imprimes y llevas el corte sin señal. Al volver la conexión, todo
 
 ### ¿Puedo cobrar con tarjeta desde la caja?
 
-Sí, con la terminal Mercado Pago Point Smart 2. Con otra terminal, registras el pago y el corte cuadra igual.
+Sí, con la terminal compatible conectada a la caja. Con cualquier otra, registras el pago y el corte cuadra igual.
 
 ### ¿Tengo que capturar todo mi menú?
 
