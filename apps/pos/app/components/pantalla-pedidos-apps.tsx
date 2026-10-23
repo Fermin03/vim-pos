@@ -15,7 +15,7 @@ import {
   reanudarTiendaUber, segundosRestantes, type DuracionPausa, type EstadoTiendaApp, type PedidoApp,
 } from "../lib/pedidos-apps";
 import { ErrorEnLinea, etiquetaEstadoEnLinea, leerEstadoEnLinea, mensajeErrorEnLinea, pausarEnLinea, reanudarEnLinea, type EstadoEnLinea } from "../lib/pedidos-en-linea";
-import { BotonVolver } from "./boton-volver";
+import { BotonVolver, ENCABEZADO_PANTALLA } from "./boton-volver";
 import { esUrgente, ListaItems, mmss, MOTIVOS_RECHAZO, type MotivoRechazo } from "./pedido-tienda";
 import { useEscape } from "../lib/use-escape";
 
@@ -182,7 +182,7 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, cajaSinAc
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="flex flex-shrink-0 items-center gap-3 border-b border-line bg-surface px-3 py-3.5">
+      <header className={`${ENCABEZADO_PANTALLA} bg-surface`}>
         <BotonVolver onClick={onSalir} />
         <h1 className="text-18 font-semibold text-ink">Pedidos en línea</h1>
         {pendientes.length > 0 && (

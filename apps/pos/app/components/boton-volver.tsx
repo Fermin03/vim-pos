@@ -11,6 +11,15 @@ import { Icono } from "@vim/ui/styles";
  *
  * La referencia es la barra de la pantalla de captura, que es la que más se usa.
  */
+
+/**
+ * La cabecera de Inicio y de las pantallas a las que se entra desde sus menús. Cada una tenía su
+ * alto y su margen (52, 60, 65 y 68 px), y al entrar y salir de Comedor todo brincaba. `min-h` y
+ * no `h`: Consultar cuentas envuelve sus filtros en dos renglones cuando no caben.
+ */
+export const ENCABEZADO_PANTALLA =
+  "flex min-h-[clamp(2.75rem,6.5vh,3.5rem)] flex-shrink-0 items-center justify-between gap-3 border-b border-line px-[clamp(0.75rem,2vw,1.25rem)]";
+
 export function BotonVolver({ onClick, etiqueta = "Volver" }: { onClick: () => void; etiqueta?: string }) {
   return (
     <button

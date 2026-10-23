@@ -1,7 +1,7 @@
 "use client";
 import { Cargando } from "@vim/ui/styles";
 import { useCallback, useEffect, useState } from "react";
-import { BotonVolver } from "./boton-volver";
+import { BotonVolver, ENCABEZADO_PANTALLA } from "./boton-volver";
 import { useEscape } from "../lib/use-escape";
 import { etiquetaModo } from "@vim/db/modos-servicio";
 import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
@@ -68,11 +68,11 @@ export function PantallaMonitorVentas({
 
   return (
     <main className="flex h-screen flex-col bg-bg">
-      <header className="flex h-[68px] flex-shrink-0 items-center justify-between gap-3 border-b border-line px-3">
+      <header className={ENCABEZADO_PANTALLA}>
         <BotonVolver onClick={onSalir} />
         <div className="mr-auto">
-          <h1 className="font-display text-20 font-semibold tracking-tight">Monitor de ventas</h1>
-          <p className="text-13 text-ink-3">
+          <h1 className="font-display text-15 font-semibold tracking-tight">Monitor de ventas</h1>
+          <p className="text-12 text-ink-3">
             {caja.nombre} · Turno {turno.codigo_turno}
             {x?.fechaApertura ? ` · desde las ${new Date(x.fechaApertura).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false })}` : ""}
           </p>
