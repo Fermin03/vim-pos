@@ -12,6 +12,9 @@ export type DireccionCliente = {
   id: string;
   etiqueta: string;
   preview: string;
+  /** Calle y número por separado: los pide el formulario al editar la dirección. */
+  calle: string;
+  numero: string;
   colonia: string;
   referencias: string | null;
   /**
@@ -59,6 +62,8 @@ function mapDir(d: FilaDir): DireccionCliente {
     id: d.id,
     etiqueta: d.etiqueta || "Principal",
     preview: `${d.calle} ${d.numero_exterior}, ${d.colonia}`,
+    calle: d.calle,
+    numero: d.numero_exterior,
     colonia: d.colonia,
     referencias: d.referencias ?? null,
     zona: mapZonaEmbed(d.zona),
@@ -97,6 +102,8 @@ export function filtroBusquedaDomicilio(q: string): string {
   return partes.join(",");
 }
 
+const SELECT_CLIENTE = "id, nombre, apellido_paterno, telefono, direcciones:direcciones_cliente(id, etiqueta, calle, numero_exterior, colonia, referencias, zona:zonas_envio(id, nombre, costo_mxn))";
+
 /** Busca clientes del tenant por teléfono o nombre (mínimo 2 caracteres), con TODAS sus direcciones. */
 export async function buscarClientesDomicilio(token: string, q: string): Promise<ClienteDomicilio[]> {
   const term = q.trim();
@@ -104,12 +111,19 @@ export async function buscarClientesDomicilio(token: string, q: string): Promise
   const sb = employeeClient(token);
   const { data, error } = await sb
     .from("clientes")
-    .select("id, nombre, apellido_paterno, telefono, direcciones:direcciones_cliente(id, etiqueta, calle, numero_exterior, colonia, referencias, zona:zonas_envio(id, nombre, costo_mxn))")
+    .select(SELECT_CLIENTE)
     .or(filtroBusquedaDomicilio(term))
     .is("deleted_at", null)
     .limit(8);
   if (error) throw new Error(error.message);
   return ((data ?? []) as unknown as FilaCliente[]).map(armar);
+}
+
+/** Un cliente con todas sus direcciones: el del pedido, cuando se abre el modal para cambiar su entrega. */
+export async function leerClienteDomicilio(token: string, clienteId: string): Promise<ClienteDomicilio | null> {
+  const { data, error } = await employeeClient(token).from("clientes").select(SELECT_CLIENTE).eq("id", clienteId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? armar(data as unknown as FilaCliente) : null;
 }
 
 export type DireccionInput = {
@@ -175,10 +189,56 @@ export async function agregarDireccionCliente(
     id: (data as { id: string }).id,
     etiqueta,
     preview: `${args.dir.calle.trim()} ${numero}, ${args.dir.colonia.trim()}`,
+    calle: args.dir.calle.trim(),
+    numero,
     colonia: args.dir.colonia.trim(),
     referencias: args.dir.referencias.trim() || null,
     zona: args.dir.zona ?? null,
   };
+}
+
+/**
+ * Corrige una dirección guardada. Cambia la del cliente, no solo la de este pedido: así sirve para
+ * los siguientes. Un pedido ya cobrado que la use la mostrará corregida si se reimprime (el ticket
+ * guarda qué dirección es, no una copia).
+ */
+export async function editarDireccionCliente(token: string, d: DireccionCliente, dir: DireccionInput): Promise<DireccionCliente> {
+  const numero = dir.numero.trim() || "S/N";
+  const etiqueta = dir.etiqueta.trim() || "Principal";
+  const { error } = await employeeClient(token)
+    .from("direcciones_cliente")
+    .update({
+      etiqueta,
+      calle: dir.calle.trim(),
+      numero_exterior: numero,
+      colonia: dir.colonia.trim(),
+      referencias: dir.referencias.trim() || null,
+      zona_envio_id: dir.zona?.id ?? null,
+      // Sin colonia del catálogo el CP se queda como estaba.
+      ...(dir.codigoPostal ? { codigo_postal: dir.codigoPostal } : {}),
+    })
+    .eq("id", d.id);
+  if (error) throw new Error(error.message);
+  return {
+    ...d,
+    etiqueta,
+    preview: `${dir.calle.trim()} ${numero}, ${dir.colonia.trim()}`,
+    calle: dir.calle.trim(),
+    numero,
+    colonia: dir.colonia.trim(),
+    referencias: dir.referencias.trim() || null,
+    zona: dir.zona ?? null,
+  };
+}
+
+/** Cliente y dirección de un pedido a domicilio ya abierto; el envío sigue a la zona (RPC 0262). */
+export async function cambiarEntregaTicket(token: string, ticketId: string, clienteId: string, direccionId: string): Promise<void> {
+  const { error } = await employeeClient(token).rpc("cambiar_entrega_ticket", {
+    p_ticket_id: ticketId,
+    p_cliente_id: clienteId,
+    p_direccion_id: direccionId,
+  });
+  if (error) throw new Error(error.message);
 }
 
 /**
