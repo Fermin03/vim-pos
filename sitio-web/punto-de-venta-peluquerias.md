@@ -78,36 +78,6 @@ El ticket dice qué hizo cada barbero y cómo se pagó.
 
 Revisa ventas y cortes desde donde estés.
 
-_Equipo_
-
-## Funciona con lo que ya tienes
-
-Sin equipo especial: lo compras donde quieras.
-
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
-
-### Computadora con Windows
-
-Windows 10 u 11. Es tu caja.
-
-![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
-
-### Impresora de tickets
-
-Térmica de 80 mm, de red o USB.
-
-![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
-
-### Terminal de cobro
-
-Cobra con tarjeta desde la caja, o registra el pago de la tuya.
-
-![Cajón de dinero abierto.](https://vimpos.com.mx/assets/img/fotos/equipo-cajon.webp)
-
-### Cajón de dinero
-
-El de siempre, para el efectivo.
-
 _Precios_
 
 ## Un plan para cada tamaño de peluquería

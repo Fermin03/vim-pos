@@ -1830,9 +1830,6 @@ body:has(.subnav) :target { scroll-margin-top: calc(65px + 44px + var(--sp-5)); 
   .tarjeta-media:has(.enlace-tarjeta):hover { border-color: var(--accent); }
 }
 
-.cuatro { display: grid; gap: var(--sp-5); }
-@media (min-width: 640px) { .cuatro { grid-template-columns: repeat(2, 1fr); } }
-@media (min-width: 1040px) { .cuatro { grid-template-columns: repeat(4, 1fr); } }
 
 /* ---- Barra fija de acciones (solo teléfono y tableta) -------------------
    Aparece cuando el hero sale de la pantalla y se quita cuando llega el

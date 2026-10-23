@@ -78,36 +78,6 @@ Sus ventas a crédito, sus abonos y su saldo.
 
 Revisa ventas y cortes desde donde estés.
 
-_Equipo_
-
-## Funciona con lo que ya tienes
-
-Sin equipo especial: lo compras donde quieras.
-
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
-
-### Computadora con Windows
-
-Windows 10 u 11. Es tu caja.
-
-![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
-
-### Impresora de tickets
-
-Térmica de 80 mm, de red o USB.
-
-![Lector de código de barras.](https://vimpos.com.mx/assets/img/fotos/equipo-lector.webp)
-
-### Lector de código de barras
-
-Uno USB, de los que venden en cualquier lado.
-
-![Báscula con el peso, el precio por kilo y el total.](https://vimpos.com.mx/assets/img/fotos/equipo-bascula.webp)
-
-### Tu báscula de siempre
-
-Pesas como siempre y tecleas el peso.
-
 _Precios_
 
 ## Un plan para cada tamaño de tienda

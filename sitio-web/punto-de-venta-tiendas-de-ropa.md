@@ -74,36 +74,6 @@ Treinta por hoja, con su precio y su código de barras.
 
 Revisa ventas y cortes desde donde estés.
 
-_Equipo_
-
-## Funciona con lo que ya tienes
-
-Sin equipo especial: lo compras donde quieras.
-
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
-
-### Computadora con Windows
-
-Windows 10 u 11. Es tu caja.
-
-![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
-
-### Impresora de tickets
-
-Térmica de 80 mm, de red o USB.
-
-![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
-
-### Terminal de cobro
-
-Cobra con tarjeta desde la caja, o registra el pago de la tuya.
-
-![Lector de código de barras.](https://vimpos.com.mx/assets/img/fotos/equipo-lector.webp)
-
-### Lector de código de barras
-
-Uno USB, de los que venden en cualquier lado.
-
 _Precios_
 
 ## Un plan para cada tamaño de tienda

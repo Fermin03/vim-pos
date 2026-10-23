@@ -1713,36 +1713,6 @@ Tu cliente se factura solo con su ticket. Incluida desde Negocio.
 
 Revisa ventas y cortes desde donde estés.
 
-_Equipo_
-
-## Funciona con lo que ya tienes
-
-Sin equipo especial: lo compras donde quieras.
-
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
-
-### Computadora con Windows
-
-Windows 10 u 11. Es tu caja.
-
-![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
-
-### Impresora de tickets
-
-Térmica de 80 mm, de red o USB.
-
-![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
-
-### Terminal de cobro
-
-Cobra con tarjeta desde la caja, o registra el pago de la tuya.
-
-![La pantalla que ve el cliente con su pedido y el total.](https://vimpos.com.mx/assets/img/fotos/equipo-pantalla-cliente.webp)
-
-### Pantalla del cliente
-
-Un segundo monitor para que vea su pedido.
-
 _Precios_
 
 ## Un plan para cada tamaño de cafetería
@@ -1951,36 +1921,6 @@ Tu cliente se factura solo con su ticket. Incluida desde Negocio.
 ### [La venta del día en tu celular](https://vimpos.com.mx/funciones#reportes)
 
 Revisa ventas y cortes desde donde estés.
-
-_Equipo_
-
-## Funciona con lo que ya tienes
-
-Sin equipo especial: lo compras donde quieras.
-
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
-
-### Computadora con Windows
-
-Windows 10 u 11. Es tu caja.
-
-![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
-
-### Impresora de tickets
-
-Térmica de 80 mm, de red o USB.
-
-![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
-
-### Terminal de cobro
-
-Cobra con tarjeta desde la caja, o registra el pago de la tuya.
-
-![Pantalla de cocina con las comandas activas y su tiempo.](https://vimpos.com.mx/assets/img/fotos/equipo-pantalla-cocina.webp)
-
-### Pantalla de cocina
-
-Una pantalla o tablet en cada estación.
 
 _Precios_
 
@@ -2191,36 +2131,6 @@ Tu cliente se factura solo con su ticket. Incluida desde Negocio.
 
 Revisa ventas y cortes desde donde estés.
 
-_Equipo_
-
-## Funciona con lo que ya tienes
-
-Sin equipo especial: lo compras donde quieras.
-
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
-
-### Computadora con Windows
-
-Windows 10 u 11. Es tu caja.
-
-![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
-
-### Impresora de tickets
-
-Térmica de 80 mm, de red o USB.
-
-![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
-
-### Terminal de cobro
-
-Cobra con tarjeta desde la caja, o registra el pago de la tuya.
-
-![Pantalla de cocina con las comandas activas y su tiempo.](https://vimpos.com.mx/assets/img/fotos/equipo-pantalla-cocina.webp)
-
-### Pantalla de cocina
-
-Una pantalla o tablet en cada estación.
-
 _Precios_
 
 ## Un plan para cada tamaño de restaurante
@@ -2429,36 +2339,6 @@ Tu cliente se factura solo con su ticket. Incluida desde Negocio.
 ### [La venta del día en tu celular](https://vimpos.com.mx/funciones#reportes)
 
 Revisa ventas y cortes desde donde estés.
-
-_Equipo_
-
-## Funciona con lo que ya tienes
-
-Sin equipo especial: lo compras donde quieras.
-
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
-
-### Computadora con Windows
-
-Windows 10 u 11. Es tu caja.
-
-![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
-
-### Impresora de tickets
-
-Térmica de 80 mm, de red o USB.
-
-![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
-
-### Terminal de cobro
-
-Cobra con tarjeta desde la caja, o registra el pago de la tuya.
-
-![Pantalla de cocina con las comandas activas y su tiempo.](https://vimpos.com.mx/assets/img/fotos/equipo-pantalla-cocina.webp)
-
-### Pantalla de cocina
-
-Una pantalla o tablet en cada estación.
 
 _Precios_
 
@@ -2669,36 +2549,6 @@ Tu cliente se factura solo con su ticket. Incluida desde Negocio.
 
 Revisa ventas y cortes desde donde estés.
 
-_Equipo_
-
-## Funciona con lo que ya tienes
-
-Sin equipo especial: lo compras donde quieras.
-
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
-
-### Computadora con Windows
-
-Windows 10 u 11. Es tu caja.
-
-![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
-
-### Impresora de tickets
-
-Térmica de 80 mm, de red o USB.
-
-![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
-
-### Terminal de cobro
-
-Cobra con tarjeta desde la caja, o registra el pago de la tuya.
-
-![Cajón de dinero abierto.](https://vimpos.com.mx/assets/img/fotos/equipo-cajon.webp)
-
-### Cajón de dinero
-
-El de siempre, para el efectivo.
-
 _Precios_
 
 ## Un plan para cada tamaño de food truck
@@ -2896,36 +2746,6 @@ Treinta por hoja, con su precio y su código de barras.
 
 Revisa ventas y cortes desde donde estés.
 
-_Equipo_
-
-## Funciona con lo que ya tienes
-
-Sin equipo especial: lo compras donde quieras.
-
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
-
-### Computadora con Windows
-
-Windows 10 u 11. Es tu caja.
-
-![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
-
-### Impresora de tickets
-
-Térmica de 80 mm, de red o USB.
-
-![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
-
-### Terminal de cobro
-
-Cobra con tarjeta desde la caja, o registra el pago de la tuya.
-
-![Lector de código de barras.](https://vimpos.com.mx/assets/img/fotos/equipo-lector.webp)
-
-### Lector de código de barras
-
-Uno USB, de los que venden en cualquier lado.
-
 _Precios_
 
 ## Un plan para cada tamaño de tienda
@@ -3118,36 +2938,6 @@ Lo que llega se escanea en la caja y entra a las existencias.
 ### [La venta del día en tu celular](https://vimpos.com.mx/funciones#reportes)
 
 Revisa ventas y cortes desde donde estés.
-
-_Equipo_
-
-## Funciona con lo que ya tienes
-
-Sin equipo especial: lo compras donde quieras.
-
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
-
-### Computadora con Windows
-
-Windows 10 u 11. Es tu caja.
-
-![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
-
-### Impresora de tickets
-
-Térmica de 80 mm, de red o USB.
-
-![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
-
-### Terminal de cobro
-
-Cobra con tarjeta desde la caja, o registra el pago de la tuya.
-
-![Lector de código de barras.](https://vimpos.com.mx/assets/img/fotos/equipo-lector.webp)
-
-### Lector de código de barras
-
-Uno USB, de los que venden en cualquier lado.
 
 _Precios_
 
@@ -3349,36 +3139,6 @@ Sus ventas a crédito, sus abonos y su saldo.
 ### [La venta del día en tu celular](https://vimpos.com.mx/funciones#reportes)
 
 Revisa ventas y cortes desde donde estés.
-
-_Equipo_
-
-## Funciona con lo que ya tienes
-
-Sin equipo especial: lo compras donde quieras.
-
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
-
-### Computadora con Windows
-
-Windows 10 u 11. Es tu caja.
-
-![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
-
-### Impresora de tickets
-
-Térmica de 80 mm, de red o USB.
-
-![Lector de código de barras.](https://vimpos.com.mx/assets/img/fotos/equipo-lector.webp)
-
-### Lector de código de barras
-
-Uno USB, de los que venden en cualquier lado.
-
-![Báscula con el peso, el precio por kilo y el total.](https://vimpos.com.mx/assets/img/fotos/equipo-bascula.webp)
-
-### Tu báscula de siempre
-
-Pesas como siempre y tecleas el peso.
 
 _Precios_
 
@@ -3593,36 +3353,6 @@ El ticket dice qué hizo cada colaboradora y cómo se pagó.
 
 Revisa ventas y cortes desde donde estés.
 
-_Equipo_
-
-## Funciona con lo que ya tienes
-
-Sin equipo especial: lo compras donde quieras.
-
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
-
-### Computadora con Windows
-
-Windows 10 u 11. Es tu caja.
-
-![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
-
-### Impresora de tickets
-
-Térmica de 80 mm, de red o USB.
-
-![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
-
-### Terminal de cobro
-
-Cobra con tarjeta desde la caja, o registra el pago de la tuya.
-
-![Cajón de dinero abierto.](https://vimpos.com.mx/assets/img/fotos/equipo-cajon.webp)
-
-### Cajón de dinero
-
-El de siempre, para el efectivo.
-
 _Precios_
 
 ## Un plan para cada tamaño de salón
@@ -3832,36 +3562,6 @@ El ticket dice qué hizo cada terapeuta y cómo se pagó.
 
 Revisa ventas y cortes desde donde estés.
 
-_Equipo_
-
-## Funciona con lo que ya tienes
-
-Sin equipo especial: lo compras donde quieras.
-
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
-
-### Computadora con Windows
-
-Windows 10 u 11. Es tu caja.
-
-![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
-
-### Impresora de tickets
-
-Térmica de 80 mm, de red o USB.
-
-![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
-
-### Terminal de cobro
-
-Cobra con tarjeta desde la caja, o registra el pago de la tuya.
-
-![Cajón de dinero abierto.](https://vimpos.com.mx/assets/img/fotos/equipo-cajon.webp)
-
-### Cajón de dinero
-
-El de siempre, para el efectivo.
-
 _Precios_
 
 ## Un plan para cada tamaño de spa
@@ -4063,36 +3763,6 @@ El ticket dice qué hizo cada barbero y cómo se pagó.
 
 Revisa ventas y cortes desde donde estés.
 
-_Equipo_
-
-## Funciona con lo que ya tienes
-
-Sin equipo especial: lo compras donde quieras.
-
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
-
-### Computadora con Windows
-
-Windows 10 u 11. Es tu caja.
-
-![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
-
-### Impresora de tickets
-
-Térmica de 80 mm, de red o USB.
-
-![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
-
-### Terminal de cobro
-
-Cobra con tarjeta desde la caja, o registra el pago de la tuya.
-
-![Cajón de dinero abierto.](https://vimpos.com.mx/assets/img/fotos/equipo-cajon.webp)
-
-### Cajón de dinero
-
-El de siempre, para el efectivo.
-
 _Precios_
 
 ## Un plan para cada tamaño de peluquería
@@ -4293,36 +3963,6 @@ El ticket dice qué hizo cada artista y cómo se pagó.
 ### [La venta del día en tu celular](https://vimpos.com.mx/funciones#reportes)
 
 Revisa ventas y cortes desde donde estés.
-
-_Equipo_
-
-## Funciona con lo que ya tienes
-
-Sin equipo especial: lo compras donde quieras.
-
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
-
-### Computadora con Windows
-
-Windows 10 u 11. Es tu caja.
-
-![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
-
-### Impresora de tickets
-
-Térmica de 80 mm, de red o USB.
-
-![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
-
-### Terminal de cobro
-
-Cobra con tarjeta desde la caja, o registra el pago de la tuya.
-
-![Cajón de dinero abierto.](https://vimpos.com.mx/assets/img/fotos/equipo-cajon.webp)
-
-### Cajón de dinero
-
-El de siempre, para el efectivo.
 
 _Precios_
 
