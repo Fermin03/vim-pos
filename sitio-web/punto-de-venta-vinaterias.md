@@ -72,25 +72,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
 
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
 
-![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
+![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
-![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
 
 ### Terminal de cobro
 
 Cobra con tarjeta desde la caja, o registra el pago de la tuya.
 
-![Lector de código de barras junto a la caja.](https://vimpos.com.mx/assets/img/fotos/minisuper-lector.webp)
+![Lector de código de barras.](https://vimpos.com.mx/assets/img/fotos/equipo-lector.webp)
 
 ### Lector de código de barras
 

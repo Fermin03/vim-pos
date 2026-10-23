@@ -1719,25 +1719,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
 
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
 
-![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
+![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
-![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
 
 ### Terminal de cobro
 
 Cobra con tarjeta desde la caja, o registra el pago de la tuya.
 
-![La pantalla que ve el cliente con su pedido y el total.](https://vimpos.com.mx/assets/img/capturas/giros/cafeteria-pantalla-cliente.webp?v=1)
+![La pantalla que ve el cliente con su pedido y el total.](https://vimpos.com.mx/assets/img/fotos/equipo-pantalla-cliente.webp)
 
 ### Pantalla del cliente
 
@@ -1958,25 +1958,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
 
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
 
-![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
+![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
-![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
 
 ### Terminal de cobro
 
 Cobra con tarjeta desde la caja, o registra el pago de la tuya.
 
-![Pantalla de cocina con las comandas activas y su tiempo.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
+![Pantalla de cocina con las comandas activas y su tiempo.](https://vimpos.com.mx/assets/img/fotos/equipo-pantalla-cocina.webp)
 
 ### Pantalla de cocina
 
@@ -2197,25 +2197,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
 
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
 
-![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
+![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
-![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
 
 ### Terminal de cobro
 
 Cobra con tarjeta desde la caja, o registra el pago de la tuya.
 
-![Pantalla de cocina con las comandas activas y su tiempo.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
+![Pantalla de cocina con las comandas activas y su tiempo.](https://vimpos.com.mx/assets/img/fotos/equipo-pantalla-cocina.webp)
 
 ### Pantalla de cocina
 
@@ -2436,25 +2436,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
 
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
 
-![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
+![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
-![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
 
 ### Terminal de cobro
 
 Cobra con tarjeta desde la caja, o registra el pago de la tuya.
 
-![Pantalla de cocina con las comandas activas y su tiempo.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
+![Pantalla de cocina con las comandas activas y su tiempo.](https://vimpos.com.mx/assets/img/fotos/equipo-pantalla-cocina.webp)
 
 ### Pantalla de cocina
 
@@ -2675,25 +2675,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
 
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
 
-![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
+![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
-![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
 
 ### Terminal de cobro
 
 Cobra con tarjeta desde la caja, o registra el pago de la tuya.
 
-![Cajón de dinero bajo la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-cajon.webp)
+![Cajón de dinero abierto.](https://vimpos.com.mx/assets/img/fotos/equipo-cajon.webp)
 
 ### Cajón de dinero
 
@@ -2902,25 +2902,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
 
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
 
-![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
+![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
-![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
 
 ### Terminal de cobro
 
 Cobra con tarjeta desde la caja, o registra el pago de la tuya.
 
-![Lector de código de barras junto a la caja.](https://vimpos.com.mx/assets/img/fotos/ropa-lector.webp)
+![Lector de código de barras.](https://vimpos.com.mx/assets/img/fotos/equipo-lector.webp)
 
 ### Lector de código de barras
 
@@ -3125,25 +3125,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
 
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
 
-![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
+![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
-![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
 
 ### Terminal de cobro
 
 Cobra con tarjeta desde la caja, o registra el pago de la tuya.
 
-![Lector de código de barras junto a la caja.](https://vimpos.com.mx/assets/img/fotos/minisuper-lector.webp)
+![Lector de código de barras.](https://vimpos.com.mx/assets/img/fotos/equipo-lector.webp)
 
 ### Lector de código de barras
 
@@ -3356,25 +3356,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
 
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
 
-![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
+![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
-![Lector de código de barras junto a la caja.](https://vimpos.com.mx/assets/img/fotos/minisuper-lector.webp)
+![Lector de código de barras.](https://vimpos.com.mx/assets/img/fotos/equipo-lector.webp)
 
 ### Lector de código de barras
 
 Uno USB, de los que venden en cualquier lado.
 
-![La caja vendiendo jitomate por kilo.](https://vimpos.com.mx/assets/img/capturas/giros/abarrotes-venta-kg.webp?v=1)
+![Báscula con el peso, el precio por kilo y el total.](https://vimpos.com.mx/assets/img/fotos/equipo-bascula.webp)
 
 ### Tu báscula de siempre
 
@@ -3599,25 +3599,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
 
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
 
-![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
+![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
-![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
 
 ### Terminal de cobro
 
 Cobra con tarjeta desde la caja, o registra el pago de la tuya.
 
-![Cajón de dinero bajo la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-cajon.webp)
+![Cajón de dinero abierto.](https://vimpos.com.mx/assets/img/fotos/equipo-cajon.webp)
 
 ### Cajón de dinero
 
@@ -3838,25 +3838,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
 
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
 
-![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
+![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
-![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
 
 ### Terminal de cobro
 
 Cobra con tarjeta desde la caja, o registra el pago de la tuya.
 
-![Cajón de dinero bajo la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-cajon.webp)
+![Cajón de dinero abierto.](https://vimpos.com.mx/assets/img/fotos/equipo-cajon.webp)
 
 ### Cajón de dinero
 
@@ -4069,25 +4069,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
 
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
 
-![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
+![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
-![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
 
 ### Terminal de cobro
 
 Cobra con tarjeta desde la caja, o registra el pago de la tuya.
 
-![Cajón de dinero bajo la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-cajon.webp)
+![Cajón de dinero abierto.](https://vimpos.com.mx/assets/img/fotos/equipo-cajon.webp)
 
 ### Cajón de dinero
 
@@ -4300,25 +4300,25 @@ _Equipo_
 
 Sin equipo especial: lo compras donde quieras.
 
-![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/cafeteria-monitor.webp)
+![La caja de VIM POS en un monitor táctil.](https://vimpos.com.mx/assets/img/fotos/equipo-computadora.webp)
 
 ### Computadora con Windows
 
 Windows 10 u 11. Es tu caja.
 
-![Impresora térmica de tickets junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-impresora.webp)
+![Impresora térmica sacando un ticket de VIM POS.](https://vimpos.com.mx/assets/img/fotos/equipo-impresora.webp)
 
 ### Impresora de tickets
 
 Térmica de 80 mm, de red o USB.
 
-![Terminal de cobro con tarjeta junto a la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-terminal.webp)
+![Terminal de cobro con tarjeta.](https://vimpos.com.mx/assets/img/fotos/equipo-terminal.webp)
 
 ### Terminal de cobro
 
 Cobra con tarjeta desde la caja, o registra el pago de la tuya.
 
-![Cajón de dinero bajo la caja.](https://vimpos.com.mx/assets/img/fotos/cafeteria-cajon.webp)
+![Cajón de dinero abierto.](https://vimpos.com.mx/assets/img/fotos/equipo-cajon.webp)
 
 ### Cajón de dinero
 
