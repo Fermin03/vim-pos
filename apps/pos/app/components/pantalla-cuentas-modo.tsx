@@ -126,6 +126,7 @@ export function PantallaCuentasModo({
   empleado,
   modo,
   onSalir,
+  tapada = false,
   onVerReservaciones,
   onAbrirCuenta,
   onAgregarProductos,
@@ -145,6 +146,10 @@ export function PantallaCuentasModo({
   // existe como lista, por eso va aparte del `Extract`.
   modo: Extract<ModoServicio, "DRIVE_THRU" | "DELIVERY_PROPIO" | "COMER_AQUI"> | "BARRA";
   onSalir: () => void;
+  /** Hay algo de la caja pintado encima (el cobro, un modal, las reservaciones): la lista cede
+   *  Escape. `onSalir` llega nuevo en cada render y, sin esto, la lista se volvía a registrar
+   *  ENCIMA del modal y Escape la cerraba a ella en vez del cobro. */
+  tapada?: boolean;
   /** Agenda de reservaciones del día. Solo llega con valor en Comedor: Pick-up y
    *  domicilio no reservan mesa, y un botón muerto ahí sería ruido. */
   onVerReservaciones?: () => void;
@@ -373,7 +378,7 @@ export function PantallaCuentasModo({
     ];
     return capaVisible(capas);
   }, [rechazando, selPedidoId, clienteDe, eligiendoCancelacion, cancelandoItems, borrandoCuenta, cancelandoCuenta, descontando, pidiendoPinReimpresion, pidiendoPinReabrir, selId, onSalir]);
-  useEscape(alEscapar);
+  useEscape(alEscapar, !tapada);
 
   const vacia = detalle === null ? null : detalle.length === 0;
   const hayDescuento = (totales?.descuentos ?? 0) > 0;
