@@ -42,7 +42,7 @@ Apartas el pedido y lo retomas después, sin volver a capturarlo.
 
 ### Las formas de pago de verdad
 
-Efectivo, débito, crédito, transferencia, vales y apps de reparto. La tarjeta se cobra desde la caja solo con la terminal Mercado Pago Point Smart 2, y te ayudamos a vincularla. Con cualquier otra, cobras en ella y registras el pago en la caja para que el corte cuadre.
+Efectivo, débito, crédito, transferencia, vales y apps de reparto. La tarjeta se cobra desde la caja con la terminal compatible, y te ayudamos a vincularla. Con cualquier otra, cobras en ella y registras el pago en la caja para que el corte cuadre.
 
 ### Se puede dividir
 
@@ -227,7 +227,7 @@ _Los límites_
 ## Lo que VIM POS no hace
 
 - **No hay app de mesero en tableta.** El comedor se opera desde la caja.
-- **La tarjeta desde la caja solo funciona con la terminal Mercado Pago Point Smart 2.** Con otra terminal, cobras en ella y registras el pago en la caja.
+- **La tarjeta desde la caja solo funciona con la terminal compatible.** Con otra terminal, cobras en ella y registras el pago en la caja.
 - **La liquidación de las apps se pega a mano.** Todavía no se sube el archivo.
 - **DiDi y Rappi no entran solos a la caja.** Hoy solo Uber Eats.
 - **No vendemos equipo.** Te decimos qué comprar y lo compras donde te salga mejor.
