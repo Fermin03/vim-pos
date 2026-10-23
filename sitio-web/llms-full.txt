@@ -241,7 +241,7 @@ Sí. Cada sucursal opera con su propia caja y su propio turno, y el panel suma t
 
 ### ¿Puedo cobrar con tarjeta desde el sistema?
 
-Sí, y te ayudamos con el proceso de vinculación. Actualmente funciona solo con la terminal Mercado Pago Point Smart 2.
+Sí, con la terminal compatible, y te ayudamos a vincularla. Con cualquier otra, registras el pago en la caja.
 
 ## Te lo enseñamos en media hora, con tu menú.
 
@@ -299,7 +299,7 @@ Apartas el pedido y lo retomas después, sin volver a capturarlo.
 
 ### Las formas de pago de verdad
 
-Efectivo, débito, crédito, transferencia, vales y apps de reparto. La tarjeta se cobra desde la caja solo con la terminal Mercado Pago Point Smart 2, y te ayudamos a vincularla. Con cualquier otra, cobras en ella y registras el pago en la caja para que el corte cuadre.
+Efectivo, débito, crédito, transferencia, vales y apps de reparto. La tarjeta se cobra desde la caja con la terminal compatible, y te ayudamos a vincularla. Con cualquier otra, cobras en ella y registras el pago en la caja para que el corte cuadre.
 
 ### Se puede dividir
 
@@ -484,7 +484,7 @@ _Los límites_
 ## Lo que VIM POS no hace
 
 - **No hay app de mesero en tableta.** El comedor se opera desde la caja.
-- **La tarjeta desde la caja solo funciona con la terminal Mercado Pago Point Smart 2.** Con otra terminal, cobras en ella y registras el pago en la caja.
+- **La tarjeta desde la caja solo funciona con la terminal compatible.** Con otra terminal, cobras en ella y registras el pago en la caja.
 - **La liquidación de las apps se pega a mano.** Todavía no se sube el archivo.
 - **DiDi y Rappi no entran solos a la caja.** Hoy solo Uber Eats.
 - **No vendemos equipo.** Te decimos qué comprar y lo compras donde te salga mejor.
@@ -969,7 +969,7 @@ Necesitas una computadora con Windows 10 u 11, una impresora térmica de tickets
 
 ### La terminal de tarjetas
 
-No viene incluida: no vendemos equipo. El cobro con tarjeta desde la caja funciona solo con la terminal Mercado Pago Point Smart 2, y te ayudamos a vincularla. Con cualquier otra, cobras en ella y el pago se registra en la caja.
+No viene incluida: no vendemos equipo. El cobro con tarjeta desde la caja funciona con la terminal compatible, y te ayudamos a vincularla. Con cualquier otra, cobras en ella y el pago se registra en la caja.
 
 _Preguntas_
 
@@ -1021,7 +1021,7 @@ Dinos cuántas cajas y sucursales tienes y te decimos tu plan. Contestamos el mi
 
 #### Mejoras
 
-- Cuando cobras con tu terminal de Mercado Pago, el ticket imprime la terminación de la tarjeta y el número de autorización.
+- Cuando cobras con tu terminal de cobro, el ticket imprime la terminación de la tarjeta y el número de autorización.
 - El comprobante de devolución dice a qué tarjeta regresó el dinero.
 
 13 de octubre Caja · 0.10.0
@@ -1030,7 +1030,7 @@ Dinos cuántas cajas y sucursales tienes y te decimos tu plan. Contestamos el mi
 
 #### Nuevo
 
-- **La devolución regresa el dinero a la tarjeta.** Si la cuenta se cobró en tu terminal de Mercado Pago desde la caja, al devolverla con **Mismo método** el dinero vuelve solo a la tarjeta del cliente. La encuentras en **Menú → Devoluciones**.
+- **La devolución regresa el dinero a la tarjeta.** Si la cuenta se cobró en tu terminal de cobro desde la caja, al devolverla con **Mismo método** el dinero vuelve solo a la tarjeta del cliente. La encuentras en **Menú → Devoluciones**.
 - **Pago dividido con la terminal.** En **Pago dividido → Agregar pago** puedes elegir **Tarjeta**: esa parte se cobra en la terminal y el resto como tú decidas.
 - **Pedidos de la tienda en línea ya pagados.** Si el cliente pagó con tarjeta en tu tienda en línea, el pedido llega a la caja ya cobrado: al entregarlo tocas **Listo**.
 
@@ -1040,8 +1040,8 @@ Dinos cuántas cajas y sucursales tienes y te decimos tu plan. Contestamos el mi
 
 #### Nuevo
 
-- **La caja le manda el cobro a tu terminal de Mercado Pago.** Al cobrar eliges **Tarjeta**, el monto aparece solo en la terminal y, cuando el cliente paga, el pago queda registrado en la cuenta como débito o crédito. Ya no se teclea el monto dos veces.
-- La terminal se conecta una sola vez desde el panel de administración, en **Configuración → Terminal de tarjetas**, con tu cuenta de Mercado Pago. El dinero cae directo en tu cuenta.
+- **La caja le manda el cobro a tu terminal de cobro.** Al cobrar eliges **Tarjeta**, el monto aparece solo en la terminal y, cuando el cliente paga, el pago queda registrado en la cuenta como débito o crédito. Ya no se teclea el monto dos veces.
+- La terminal se conecta una sola vez desde el panel de administración, en **Configuración → Terminal de tarjetas**, con la cuenta de tu terminal. El dinero cae directo en tu cuenta.
 - Si se va el internet o la terminal falla, puedes seguir cobrando como antes: **La cobré en otra terminal**, en la misma pantalla de cobro.
 
 8 de octubre Caja · 0.7.0
@@ -1308,7 +1308,7 @@ Eso _no_ es malo por sí solo: comisión de tarjeta vas a pagar igual, la cobre 
 
 ![Pantalla de cobro con las formas de pago: efectivo, débito, crédito, transferencia, app externa y pago dividido.](https://vimpos.com.mx/assets/img/capturas/pos-pago.webp?v=3)
 
-_Las formas de pago en la caja de VIM POS. La tarjeta se cobra desde la caja con la terminal Mercado Pago Point Smart 2, o en cualquier otra terminal y se registra para que el corte cuadre. En los dos casos no cobramos comisión por venta: el precio del sistema no crece con tu venta._
+_Las formas de pago en la caja de VIM POS. La tarjeta se cobra desde la caja con la terminal compatible, o en cualquier otra terminal y se registra para que el corte cuadre. En los dos casos no cobramos comisión por venta: el precio del sistema no crece con tu venta._
 
 ### La aritmética, con tus números
 
@@ -1329,9 +1329,9 @@ _Dónde queda VIM POS_
 
 ## Licencia fija, cero comisión, y lo que no incluye
 
-Somos el primer modelo. El precio está [a la vista](https://vimpos.com.mx/precios); no hay pago inicial, y desde Negocio la carga de tu menú y la capacitación van incluidas; y no nos llevamos ni un peso de tus ventas, porque el dinero no pasa por nosotros: cobras con tarjeta desde la caja con la terminal Mercado Pago Point Smart 2, o en cualquier otra terminal y registras el pago en la caja para que el corte cuadre.
+Somos el primer modelo. El precio está [a la vista](https://vimpos.com.mx/precios); no hay pago inicial, y desde Negocio la carga de tu menú y la capacitación van incluidas; y no nos llevamos ni un peso de tus ventas, porque el dinero no pasa por nosotros: cobras con tarjeta desde la caja con la terminal compatible, o en cualquier otra terminal y registras el pago en la caja para que el corte cuadre.
 
-**Y dónde no conviene.** Si tienes una sola caja, sin inventario y sin empleados que controlar, el modelo gratuito te sale más barato y no vamos a fingir lo contrario. Tampoco somos la opción si necesitas que el mesero capture en tableta o cobrar la tarjeta desde la caja con una terminal distinta de la Mercado Pago Point Smart 2: eso y el resto de los límites están en [la guía de compra](https://vimpos.com.mx/como-elegir-sistema-restaurante).
+**Y dónde no conviene.** Si tienes una sola caja, sin inventario y sin empleados que controlar, el modelo gratuito te sale más barato y no vamos a fingir lo contrario. Tampoco somos la opción si necesitas que el mesero capture en tableta o cobrar la tarjeta desde la caja con una terminal que no sea compatible: eso y el resto de los límites están en [la guía de compra](https://vimpos.com.mx/como-elegir-sistema-restaurante).
 
 ## Haz la cuenta con tus números
 
@@ -1421,7 +1421,7 @@ No hay app de mesero. La orden se captura en la caja. Si tu operación depende d
 
 ### Si quieres cobrar la tarjeta desde el mismo sistema
 
-Se puede, pero solo con la terminal Mercado Pago Point Smart 2; nosotros te ayudamos a vincularla. Con cualquier otra terminal cobras en ella y el pago se registra en la caja para que el corte cuadre, que es un paso más para el cajero. En los dos casos el dinero no pasa por nosotros y no cobramos comisión por venta.
+Se puede con la terminal compatible; nosotros te ayudamos a vincularla. Con cualquier otra terminal cobras en ella y el pago se registra en la caja para que el corte cuadre, que es un paso más para el cajero. En los dos casos el dinero no pasa por nosotros y no cobramos comisión por venta.
 
 ### Si vives de las apps de reparto y quieres todo automático
 
@@ -4195,7 +4195,7 @@ Todo claro desde el principio, sin letra chica:
 - **No hay pago inicial.** En ningún plan. Desde Negocio cargamos tu menú y capacitamos a tu equipo.
 - **No vendemos equipo.** Te decimos qué buscar y lo compras donde te salga mejor.
 - **No cobramos comisión por venta.** Lo que cobras con tarjeta no pasa por nosotros.
-- **Los límites están escritos.** No hay app de mesero en tableta, el cobro con tarjeta desde la caja solo funciona con la terminal Mercado Pago Point Smart 2 y la liquidación de las apps de reparto se pega a mano. Están en [funciones](https://vimpos.com.mx/funciones).
+- **Los límites están escritos.** No hay app de mesero en tableta, el cobro con tarjeta desde la caja solo funciona con la terminal compatible y la liquidación de las apps de reparto se pega a mano. Están en [funciones](https://vimpos.com.mx/funciones).
 - **No hay contrato forzoso.** Es mes a mes y cancelas cuando quieras, sin penalización.
 
 ## En qué punto está el producto

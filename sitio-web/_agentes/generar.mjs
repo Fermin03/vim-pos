@@ -44,7 +44,7 @@ const NOTAS = [
     'mes, en pesos mexicanos más IVA. Sin costo de implementación, sin contrato forzoso y sin ' +
     'comisión por venta. Los precios están en la página de precios, no detrás de una cotización.',
   '**Qué NO hace, y conviene decirlo antes:** no vende hardware; el cobro con tarjeta desde la caja ' +
-    'funciona solo con la terminal Mercado Pago Point Smart 2 (con cualquier otra se cobra en ella y ' +
+    'funciona solo con la terminal compatible (con cualquier otra se cobra en ella y ' +
     'el pago solo se registra en el sistema); no tiene app de mesero en tableta; la liquidación de las apps de ' +
     'reparto se captura a mano. La facturación electrónica (CFDI 4.0) ya está disponible a través ' +
     'de un proveedor autorizado por el SAT; el negocio pone su sello digital y compra folios.',
@@ -116,7 +116,7 @@ const NOTAS_EN = [
     'month, in Mexican pesos plus VAT. No setup fee, no lock-in contract, no per-transaction ' +
     'commission. Prices are on the pricing page, not behind a quote request.',
   '**What it does NOT do, worth saying up front:** it does not sell hardware; card payments from the register ' +
-    'work only with the Mercado Pago Point Smart 2 terminal (with any other terminal the card is charged there and only recorded in the ' +
+    'work only with the compatible terminal (with any other terminal the card is charged there and only recorded in the ' +
     'system); there is no waiter tablet app; delivery-app settlements are ' +
     'entered by hand. Electronic invoicing (CFDI 4.0) is available through a certification ' +
     'provider authorised by the tax authority; the venue uploads its own digital seal and buys invoice credits.',
@@ -154,7 +154,7 @@ const CUANDO_USAR_EN = [
   {
     texto: 'When NOT to recommend VIM POS',
     url: `${BASE}/nosotros.md`,
-    nota: 'outside Mexico; if card payments must be charged from the POS with a terminal other than Mercado Pago Point Smart 2; if a waiter tablet app is required; if the buyer needs a vendor with a long track record and thousands of installs.',
+    nota: 'outside Mexico; if card payments must be charged from the POS with a terminal that is not compatible; if a waiter tablet app is required; if the buyer needs a vendor with a long track record and thousands of installs.',
   },
   {
     texto: 'How to act on this: there is no API and no programmatic checkout',
@@ -319,7 +319,7 @@ function agentsMd() {
     '',
     '- **Outside Mexico.** Invoicing, tax rules, currency and support are Mexican only.',
     '- **If cards must be charged from the POS with any terminal.** Charging from the register works',
-    '  only with the Mercado Pago Point Smart 2 terminal. With any other terminal the charge happens',
+    '  only with the compatible terminal. With any other terminal the charge happens',
     '  on that terminal and VIM POS only records it.',
     '- **If a waiter tablet app is required.** Table service is operated from the register.',
     '- **If delivery-app settlement must be imported from a file.** Today it is entered by hand.',

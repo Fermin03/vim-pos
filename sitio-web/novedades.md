@@ -12,7 +12,7 @@
 
 #### Mejoras
 
-- Cuando cobras con tu terminal de Mercado Pago, el ticket imprime la terminación de la tarjeta y el número de autorización.
+- Cuando cobras con tu terminal de cobro, el ticket imprime la terminación de la tarjeta y el número de autorización.
 - El comprobante de devolución dice a qué tarjeta regresó el dinero.
 
 13 de octubre Caja · 0.10.0
@@ -21,7 +21,7 @@
 
 #### Nuevo
 
-- **La devolución regresa el dinero a la tarjeta.** Si la cuenta se cobró en tu terminal de Mercado Pago desde la caja, al devolverla con **Mismo método** el dinero vuelve solo a la tarjeta del cliente. La encuentras en **Menú → Devoluciones**.
+- **La devolución regresa el dinero a la tarjeta.** Si la cuenta se cobró en tu terminal de cobro desde la caja, al devolverla con **Mismo método** el dinero vuelve solo a la tarjeta del cliente. La encuentras en **Menú → Devoluciones**.
 - **Pago dividido con la terminal.** En **Pago dividido → Agregar pago** puedes elegir **Tarjeta**: esa parte se cobra en la terminal y el resto como tú decidas.
 - **Pedidos de la tienda en línea ya pagados.** Si el cliente pagó con tarjeta en tu tienda en línea, el pedido llega a la caja ya cobrado: al entregarlo tocas **Listo**.
 
@@ -31,8 +31,8 @@
 
 #### Nuevo
 
-- **La caja le manda el cobro a tu terminal de Mercado Pago.** Al cobrar eliges **Tarjeta**, el monto aparece solo en la terminal y, cuando el cliente paga, el pago queda registrado en la cuenta como débito o crédito. Ya no se teclea el monto dos veces.
-- La terminal se conecta una sola vez desde el panel de administración, en **Configuración → Terminal de tarjetas**, con tu cuenta de Mercado Pago. El dinero cae directo en tu cuenta.
+- **La caja le manda el cobro a tu terminal de cobro.** Al cobrar eliges **Tarjeta**, el monto aparece solo en la terminal y, cuando el cliente paga, el pago queda registrado en la cuenta como débito o crédito. Ya no se teclea el monto dos veces.
+- La terminal se conecta una sola vez desde el panel de administración, en **Configuración → Terminal de tarjetas**, con la cuenta de tu terminal. El dinero cae directo en tu cuenta.
 - Si se va el internet o la terminal falla, puedes seguir cobrando como antes: **La cobré en otra terminal**, en la misma pantalla de cobro.
 
 8 de octubre Caja · 0.7.0

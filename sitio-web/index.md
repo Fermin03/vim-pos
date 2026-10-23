@@ -229,7 +229,7 @@ Sí. Cada sucursal opera con su propia caja y su propio turno, y el panel suma t
 
 ### ¿Puedo cobrar con tarjeta desde el sistema?
 
-Sí, y te ayudamos con el proceso de vinculación. Actualmente funciona solo con la terminal Mercado Pago Point Smart 2.
+Sí, con la terminal compatible, y te ayudamos a vincularla. Con cualquier otra, registras el pago en la caja.
 
 ## Te lo enseñamos en media hora, con tu menú.
 

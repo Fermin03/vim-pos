@@ -30,7 +30,7 @@ Todo claro desde el principio, sin letra chica:
 - **No hay pago inicial.** En ningún plan. Desde Negocio cargamos tu menú y capacitamos a tu equipo.
 - **No vendemos equipo.** Te decimos qué buscar y lo compras donde te salga mejor.
 - **No cobramos comisión por venta.** Lo que cobras con tarjeta no pasa por nosotros.
-- **Los límites están escritos.** No hay app de mesero en tableta, el cobro con tarjeta desde la caja solo funciona con la terminal Mercado Pago Point Smart 2 y la liquidación de las apps de reparto se pega a mano. Están en [funciones](https://vimpos.com.mx/funciones).
+- **Los límites están escritos.** No hay app de mesero en tableta, el cobro con tarjeta desde la caja solo funciona con la terminal compatible y la liquidación de las apps de reparto se pega a mano. Están en [funciones](https://vimpos.com.mx/funciones).
 - **No hay contrato forzoso.** Es mes a mes y cancelas cuando quieras, sin penalización.
 
 ## En qué punto está el producto

@@ -74,7 +74,7 @@ No hay app de mesero. La orden se captura en la caja. Si tu operación depende d
 
 ### Si quieres cobrar la tarjeta desde el mismo sistema
 
-Se puede, pero solo con la terminal Mercado Pago Point Smart 2; nosotros te ayudamos a vincularla. Con cualquier otra terminal cobras en ella y el pago se registra en la caja para que el corte cuadre, que es un paso más para el cajero. En los dos casos el dinero no pasa por nosotros y no cobramos comisión por venta.
+Se puede con la terminal compatible; nosotros te ayudamos a vincularla. Con cualquier otra terminal cobras en ella y el pago se registra en la caja para que el corte cuadre, que es un paso más para el cajero. En los dos casos el dinero no pasa por nosotros y no cobramos comisión por venta.
 
 ### Si vives de las apps de reparto y quieres todo automático
 

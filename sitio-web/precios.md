@@ -234,7 +234,7 @@ Necesitas una computadora con Windows 10 u 11, una impresora térmica de tickets
 
 ### La terminal de tarjetas
 
-No viene incluida: no vendemos equipo. El cobro con tarjeta desde la caja funciona solo con la terminal Mercado Pago Point Smart 2, y te ayudamos a vincularla. Con cualquier otra, cobras en ella y el pago se registra en la caja.
+No viene incluida: no vendemos equipo. El cobro con tarjeta desde la caja funciona con la terminal compatible, y te ayudamos a vincularla. Con cualquier otra, cobras en ella y el pago se registra en la caja.
 
 _Preguntas_
 
