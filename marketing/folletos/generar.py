@@ -109,15 +109,43 @@ PLANES = [
 # ---------------------------------------------------------------- recortes
 
 
+# Capturas de ventanas que en la caja aparecen sobre la pantalla oscurecida. Su recorte
+# se ajusta solo al borde de la ventana para no arrastrar ese gris al papel.
+VENTANAS = {
+    "cafeteria-modificadores", "servicio-rapido-combo", "bar-propina", "tienda-ropa-talla-color",
+    "abarrotes-venta-kg", "abarrotes-venta-a-credito", "salon-ficha-cita", "salon-cobro-anticipo",
+    "barberia-lista-espera",
+}
+
+
+def al_borde_de_la_ventana(im: Image.Image) -> Image.Image:
+    """Recorta a las filas y columnas que son casi todas blancas: la ventana, sin el fondo."""
+    gris = im.convert("L")
+    w, h = gris.size
+    datos = gris.load()
+
+    def blanca(n: int, largo: int, pixel) -> bool:
+        return sum(1 for i in range(0, largo, 4) if pixel(n, i) >= 248) / (largo / 4) > 0.45
+
+    cols = [x for x in range(w) if blanca(x, h, lambda x, y: datos[x, y])]
+    filas = [y for y in range(h) if blanca(y, w, lambda y, x: datos[x, y])]
+    if not cols or not filas:
+        return im
+    return im.crop((cols[0], filas[0], cols[-1] + 1, filas[-1] + 1))
+
+
 def recorte(captura: str, caja) -> str:
     """Recorta la captura al detalle y devuelve la ruta relativa al HTML."""
     RECORTES.mkdir(exist_ok=True)
+    nombre = pathlib.Path(captura).name
     origen = CAPTURAS / f"{captura}.png"
-    destino = RECORTES / f"{pathlib.Path(captura).name}.png"
+    destino = RECORTES / f"{nombre}.png"
     im = Image.open(origen).convert("RGB")
     if caja:
         w, h = im.size
         im = im.crop((round(caja[0] * w), round(caja[1] * h), round(caja[2] * w), round(caja[3] * h)))
+    if nombre in VENTANAS:
+        im = al_borde_de_la_ventana(im)
     if im.width > 1800:
         im = im.resize((1800, round(im.height * 1800 / im.width)), Image.LANCZOS)
     im.save(destino, optimize=True)
@@ -247,10 +275,10 @@ h2 { font-size: 17pt; font-weight: 600; line-height: 1.1; margin-top: 2mm; }
 }
 .escenario img {
   max-width: 100%; max-height: 58mm; display: block; background: #fff;
-  border-radius: 1.5mm; box-shadow: 0 .6mm 2.5mm rgba(22,22,26,.14), 0 0 0 .2mm rgba(22,22,26,.08);
+  border-radius: 1.5mm; border: .25mm solid var(--line-strong);  /* sin sombra: en PDF se vuelve un bloque gris */
 }
 .escenario .tel-chico { height: 100%; border: 1.2mm solid var(--ink); border-radius: 4mm; overflow: hidden; background: #fff; }
-.escenario .tel-chico img { height: 100%; width: auto; max-width: none; max-height: none; border-radius: 0; box-shadow: none; }
+.escenario .tel-chico img { height: 100%; width: auto; max-width: none; max-height: none; border-radius: 0; border: none; }
 .escenario.icono { color: var(--accent); }
 .escenario.icono .ic { width: 26mm; height: 26mm; }
 .funcion .num { font-family: 'JetBrains Mono', monospace; font-size: 7pt; color: var(--accent); margin-top: 4.5mm; display: block; }
