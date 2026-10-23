@@ -34,7 +34,10 @@ svg, logo, qr = V.svg, V.logo, V.qr
 
 # ---------------------------------------------------------------- contenido
 # Cada función: (captura, título, una línea). La captura va completa, en su marco de
-# pantalla. «icono:<nombre>» dibuja el icono grande donde todavía no hay captura.
+# pantalla. «icono:<nombre>» dibuja el icono grande donde todavía no hay captura, y
+# «maqueta:pedidos|reservas» un teléfono esquemático con la página del negocio: la tienda
+# en línea no tiene capturas todavía, y un dibujo no se hace pasar por una.
+# `negocio_incluye`: lo que el plan Negocio trae sin costo extra, dicho para ese giro.
 FOLLETOS = [
     {
         "archivo": "alimentos-y-bebidas",
@@ -45,10 +48,11 @@ FOLLETOS = [
             ("giros/servicio-completo-mesas", "Mesas a la vista", "Quién está libre, quién ocupado y cuánto lleva."),
             ("giros/servicio-rapido-kds", "Directo a cocina", "La comanda llega a la pantalla o a la impresora."),
             ("giros/cafeteria-modificadores", "Como lo pidieron", "Tamaño, leche y extras en un toque."),
-            ("giros/servicio-rapido-combo", "Combos", "Arma el combo y el precio sale solo."),
             ("giros/bar-propina", "Propinas claras", "10, 15 o 20 % y queda registrada."),
-            ("giros/cafeteria-pantalla-cliente", "Tu cliente lo ve", "Una segunda pantalla con su orden y el total."),
+            ("giros/cafeteria-lealtad", "Que vuelvan por otro", "Sellos o puntos que se canjean en la caja."),
+            ("maqueta:pedidos", "Tu tienda en línea", "Tu propia página para recibir pedidos, sin comisión."),
         ],
+        "negocio_incluye": "Factura, lealtad y tienda en línea",
     },
     {
         "archivo": "tiendas",
@@ -58,11 +62,12 @@ FOLLETOS = [
         "funciones": [
             ("giros/tienda-ropa-talla-color", "Talla y color", "Cada combinación con su existencia."),
             ("giros/abarrotes-venta-kg", "Por kilo o por pieza", "Captura el peso y cobra."),
-            ("giros/tienda-ropa-etiquetas", "Etiquetas con código", "Imprímelas y cobra escaneando."),
             ("giros/vinos-existencias-minimo", "Existencias al día", "Y aviso cuando algo llega al mínimo."),
             ("giros/abarrotes-venta-a-credito", "Crédito sin cuaderno", "Quién te debe y cuánto, a la vista."),
             ("giros/abarrotes-cotizacion-publica-movil", "Cotizaciones", "Se mandan por WhatsApp con un enlace."),
+            ("giros/cafeteria-lealtad-panel", "Que vuelvan", "Puntos o sellos: tú eliges cómo ganan."),
         ],
+        "negocio_incluye": "Factura y lealtad",
     },
     {
         "archivo": "servicios",
@@ -77,6 +82,7 @@ FOLLETOS = [
             ("icono:calendario", "Citas", "La agenda de todo tu equipo."),
             ("icono:pesos", "Comisión por técnico", "Cada trabajo con quien lo hizo."),
         ],
+        "negocio_incluye": "Factura",
     },
     {
         "archivo": "belleza",
@@ -88,9 +94,10 @@ FOLLETOS = [
             ("giros/salon-ficha-cita", "Cobra la cita", "Llega, se atiende y se cobra en un toque."),
             ("giros/salon-cobro-anticipo", "Anticipos", "Lo que dejó pagado se descuenta solo."),
             ("giros/salon-comisiones", "Comisiones claras", "Lo de cada colaboradora, sin calculadora."),
-            ("giros/barberia-lista-espera", "Sin cita, a la lista", "Quien llega sin cita no se pierde."),
-            ("giros/salon-servicios", "Servicios", "Cada uno con su precio, duración y comisión."),
+            ("maqueta:reservas", "Reservas en línea", "Tu propia página: tus clientas reservan solas."),
+            ("giros/cafeteria-lealtad-panel", "Que vuelvan", "Un sello por visita y un premio al juntarlos."),
         ],
+        "negocio_incluye": "Factura, lealtad y reservas en línea",
     },
 ]
 
@@ -103,8 +110,8 @@ QUE_ES = [
 
 PLANES = [
     ("Esencial", "$699", "1 sucursal · 1 caja"),
-    ("Negocio", "$999", "1 sucursal · 3 cajas · factura incluida"),
-    ("Cadena", "$1,999", "3 sucursales · cajas sin límite"),
+    ("Negocio", "$999", "1 sucursal · 3 cajas"),
+    ("Cadena", "$1,999", "3 sucursales · cajas sin límite · todo lo de Negocio"),
 ]
 
 # ---------------------------------------------------------------- capturas
@@ -242,6 +249,20 @@ h2 { font-size: 17pt; font-weight: 600; line-height: 1.1; margin-top: 2mm; }
 .pantalla.tableta img { width: 66mm; height: auto; }
 .pantalla.cel { border-width: 1.2mm; border-radius: 4mm; }
 .pantalla.cel img { height: 45mm; width: auto; }
+.maqueta {
+  width: 24mm; height: 45mm; background: #fff; padding: 2mm 2mm 2.2mm;
+  display: flex; flex-direction: column; gap: 1.6mm; font-size: 4.2pt; color: var(--ink);
+}
+.maqueta .url { font-family: 'JetBrains Mono', monospace; font-size: 3.2pt; color: var(--ink-3); text-align: center; border-bottom: .2mm solid var(--line); padding-bottom: 1.2mm; }
+.maqueta .negocio { display: flex; align-items: center; gap: 1.2mm; font-family: 'Sora', sans-serif; font-weight: 600; font-size: 5pt; }
+.maqueta .negocio span { width: 4mm; height: 4mm; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font-size: 4.5pt; }
+.maqueta .ilustra { height: 11mm; border-radius: 1.2mm; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; }
+.maqueta .ilustra .ic { width: 6.5mm; height: 6.5mm; }
+.maqueta .renglon { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; column-gap: 1mm; row-gap: .6mm; align-items: center; border-bottom: .2mm solid var(--line); padding-bottom: 1mm; }
+.maqueta .renglon i { display: block; height: .9mm; border-radius: .5mm; background: var(--line-strong); }
+.maqueta .renglon i.corto { width: 55%; background: var(--line); }
+.maqueta .renglon b { grid-row: 1 / 3; grid-column: 2; font-weight: 600; font-size: 4.2pt; color: var(--accent); }
+.maqueta .boton { margin-top: auto; background: var(--accent); color: #fff; border-radius: 1mm; text-align: center; padding: 1.3mm 0; font-weight: 600; font-size: 4.5pt; }
 .escenario.icono { color: var(--accent); }
 .escenario.icono .ic { width: 24mm; height: 24mm; }
 .funcion .num { font-family: 'JetBrains Mono', monospace; font-size: 7pt; color: var(--accent); margin-top: 4.5mm; display: block; }
@@ -255,10 +276,30 @@ def marco(ruta: str) -> str:
     return f'<div class="pantalla {"cel" if es_cel else "tableta"}"><img src="{src}" alt=""></div>'
 
 
+def maqueta(tipo: str) -> str:
+    """Un teléfono esquemático con la página del negocio en online.vimpos.com.mx."""
+    if tipo == "reservas":
+        icono, boton = "calendario", "Reservar"
+        renglones = "".join('<div class="renglon"><i></i><i class="corto"></i><b>{}</b></div>'.format(h) for h in ("10:00", "11:30", "13:00"))
+    else:
+        icono, boton = "bolsa", "Hacer pedido"
+        renglones = "".join('<div class="renglon"><i></i><i class="corto"></i><b>+</b></div>' for _ in range(3))
+    return (
+        '<div class="pantalla cel"><div class="maqueta">'
+        '<div class="url">online.vimpos.com.mx</div>'
+        f'<div class="negocio"><span>T</span>Tu negocio</div>'
+        f'<div class="ilustra">{svg(icono, "ic")}</div>'
+        f'{renglones}<div class="boton">{boton}</div>'
+        "</div></div>"
+    )
+
+
 def funcion(i: int, f) -> str:
     imagen, titulo, linea = f
     if imagen.startswith("icono:"):
         escena = f'<div class="escenario icono">{svg(imagen[6:], "ic")}</div>'
+    elif imagen.startswith("maqueta:"):
+        escena = f'<div class="escenario">{maqueta(imagen[8:])}</div>'
     else:
         escena = f'<div class="escenario">{marco(imagen)}</div>'
     return (
@@ -276,9 +317,12 @@ def folleto(d: dict) -> str:
         f'<div class="pilar"><div class="burbuja">{svg(n, "ic")}</div><div><b>{t}</b><span>{l}</span></div></div>'
         for n, t, l in QUE_ES
     )
+    def linea(n: str, l: str) -> str:
+        return f"{l}<br>{d['negocio_incluye']} incluidas" if n == "Negocio" else l
+
     planes = "".join(
         f'<div class="plan{" destacado" if n == "Negocio" else ""}"><b>{n}</b>'
-        f'<span class="cifra">{p}<small> /mes</small></span><p class="linea">{l}</p></div>'
+        f'<span class="cifra">{p}<small> /mes</small></span><p class="linea">{linea(n, l)}</p></div>'
         for n, p, l in PLANES
     )
     fs = [funcion(i + 1, f) for i, f in enumerate(d["funciones"])]

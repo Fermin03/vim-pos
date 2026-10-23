@@ -120,6 +120,20 @@ h2 { font-size: 17pt; font-weight: 600; line-height: 1.1; margin-top: 2mm; }
 .pantalla.tableta img { width: 66mm; height: auto; }
 .pantalla.cel { border-width: 1.2mm; border-radius: 4mm; }
 .pantalla.cel img { height: 45mm; width: auto; }
+.maqueta {
+  width: 24mm; height: 45mm; background: #fff; padding: 2mm 2mm 2.2mm;
+  display: flex; flex-direction: column; gap: 1.6mm; font-size: 4.2pt; color: var(--ink);
+}
+.maqueta .url { font-family: 'JetBrains Mono', monospace; font-size: 3.2pt; color: var(--ink-3); text-align: center; border-bottom: .2mm solid var(--line); padding-bottom: 1.2mm; }
+.maqueta .negocio { display: flex; align-items: center; gap: 1.2mm; font-family: 'Sora', sans-serif; font-weight: 600; font-size: 5pt; }
+.maqueta .negocio span { width: 4mm; height: 4mm; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font-size: 4.5pt; }
+.maqueta .ilustra { height: 11mm; border-radius: 1.2mm; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; }
+.maqueta .ilustra .ic { width: 6.5mm; height: 6.5mm; }
+.maqueta .renglon { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto auto; column-gap: 1mm; row-gap: .6mm; align-items: center; border-bottom: .2mm solid var(--line); padding-bottom: 1mm; }
+.maqueta .renglon i { display: block; height: .9mm; border-radius: .5mm; background: var(--line-strong); }
+.maqueta .renglon i.corto { width: 55%; background: var(--line); }
+.maqueta .renglon b { grid-row: 1 / 3; grid-column: 2; font-weight: 600; font-size: 4.2pt; color: var(--accent); }
+.maqueta .boton { margin-top: auto; background: var(--accent); color: #fff; border-radius: 1mm; text-align: center; padding: 1.3mm 0; font-weight: 600; font-size: 4.5pt; }
 .escenario.icono { color: var(--accent); }
 .escenario.icono .ic { width: 24mm; height: 24mm; }
 .funcion .num { font-family: 'JetBrains Mono', monospace; font-size: 7pt; color: var(--accent); margin-top: 4.5mm; display: block; }
@@ -139,7 +153,7 @@ h2 { font-size: 17pt; font-weight: 600; line-height: 1.1; margin-top: 2mm; }
   <div class="panel contraportada">
     <p class="eyebrow">Precios</p>
     <h2>Desde $699 al mes</h2>
-    <div class="planes"><div class="plan"><b>Esencial</b><span class="cifra">$699<small> /mes</small></span><p class="linea">1 sucursal · 1 caja</p></div><div class="plan destacado"><b>Negocio</b><span class="cifra">$999<small> /mes</small></span><p class="linea">1 sucursal · 3 cajas · factura incluida</p></div><div class="plan"><b>Cadena</b><span class="cifra">$1,999<small> /mes</small></span><p class="linea">3 sucursales · cajas sin límite</p></div></div>
+    <div class="planes"><div class="plan"><b>Esencial</b><span class="cifra">$699<small> /mes</small></span><p class="linea">1 sucursal · 1 caja</p></div><div class="plan destacado"><b>Negocio</b><span class="cifra">$999<small> /mes</small></span><p class="linea">1 sucursal · 3 cajas<br>Factura incluidas</p></div><div class="plan"><b>Cadena</b><span class="cifra">$1,999<small> /mes</small></span><p class="linea">3 sucursales · cajas sin límite · todo lo de Negocio</p></div></div>
     <p class="notas">Más IVA · Sin pago inicial · Sin contrato forzoso</p>
     <div class="contacto">
       <svg class="qr-img" preserveAspectRatio="xMidYMid meet" viewBox="0 0 37 37" class="segno"><path class="qrline" stroke="#16161a" d="M0 0.5h7m1 0h1m1 0h2m3 0h2m1 0h2m1 0h1m1 0h3m4 0h7m-37 1h1m5 0h1m1 0h3m3 0h1m1 0h1m3 0h1m1 0h1m3 0h1m3 0h1m5 0h1m-37 1h1m1 0h3m1 0h1m1 0h2m1 0h2m2 0h2m3 0h3m1 0h3m1 0h1m1 0h1m1 0h3m1 0h1m-37 1h1m1 0h3m1 0h1m2 0h1m1 0h1m2 0h4m1 0h1m1 0h1m3 0h1m2 0h1m1 0h1m1 0h3m1 0h1m-37 1h1m1 0h3m1 0h1m1 0h3m1 0h2m1 0h1m1 0h4m5 0h1m1 0h1m1 0h1m1 0h3m1 0h1m-37 1h1m5 0h1m2 0h1m1 0h1m1 0h3m1 0h2m1 0h2m1 0h1m1 0h2m1 0h1m1 0h1m5 0h1m-37 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-26 1h1m1 0h1m2 0h1m2 0h1m1 0h1m3 0h4m-29 1h1m2 0h7m1 0h1m4 0h1m1 0h4m2 0h1m1 0h1m2 0h1m2 0h1m1 0h3m-37 1h1m2 0h1m1 0h1m2 0h1m4 0h2m5 0h3m2 0h3m3 0h3m1 0h1m-36 1h1m3 0h1m1 0h1m14 0h2m1 0h2m1 0h2m1 0h3m3 0h1m-37 1h3m1 0h1m2 0h1m1 0h1m1 0h1m2 0h2m1 0h2m7 0h1m2 0h1m3 0h4m-35 1h1m2 0h3m1 0h1m1 0h4m1 0h1m2 0h3m5 0h2m1 0h1m3 0h1m1 0h1m-37 1h1m2 0h1m1 0h1m2 0h1m2 0h1m1 0h1m1 0h1m1 0h2m3 0h2m2 0h2m4 0h2m-33 1h1m3 0h2m1 0h1m1 0h2m1 0h1m1 0h1m1 0h1m1 0h4m2 0h1m1 0h1m4 0h5m-35 1h2m1 0h1m4 0h1m3 0h2m1 0h4m2 0h1m3 0h5m1 0h2m1 0h1m-36 1h1m1 0h1m2 0h3m1 0h1m1 0h2m2 0h2m2 0h2m2 0h2m1 0h1m2 0h1m3 0h1m1 0h1m-36 1h1m3 0h1m5 0h1m1 0h1m2 0h1m1 0h1m1 0h2m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m-32 1h1m1 0h1m1 0h1m1 0h1m2 0h1m1 0h1m1 0h1m4 0h1m2 0h3m1 0h1m1 0h1m1 0h2m3 0h1m-35 1h2m1 0h1m3 0h3m2 0h1m7 0h1m1 0h2m1 0h1m1 0h5m2 0h1m-37 1h1m2 0h1m1 0h2m1 0h1m1 0h8m9 0h1m1 0h5m-34 1h2m5 0h4m4 0h1m2 0h2m1 0h1m1 0h2m1 0h2m4 0h1m1 0h2m-34 1h1m2 0h4m1 0h4m1 0h1m1 0h2m1 0h1m1 0h2m1 0h4m1 0h2m1 0h1m2 0h1m-36 1h3m6 0h5m2 0h1m1 0h1m1 0h2m3 0h2m3 0h4m1 0h1m-35 1h3m1 0h1m1 0h2m3 0h7m1 0h1m2 0h1m5 0h1m5 0h1m-37 1h3m2 0h1m3 0h3m4 0h2m1 0h2m3 0h1m1 0h3m3 0h1m-33 1h5m1 0h1m2 0h1m3 0h1m2 0h1m2 0h2m1 0h1m3 0h2m1 0h1m5 0h2m-37 1h1m1 0h3m3 0h2m1 0h1m2 0h2m2 0h1m1 0h1m2 0h2m1 0h1m2 0h3m1 0h2m1 0h1m-37 1h1m3 0h1m1 0h1m1 0h1m1 0h5m1 0h1m5 0h4m2 0h9m-29 1h1m1 0h3m2 0h1m2 0h3m1 0h1m1 0h2m2 0h1m3 0h1m1 0h1m-35 1h7m1 0h2m4 0h2m3 0h1m1 0h6m1 0h1m1 0h1m1 0h1m3 0h1m-37 1h1m5 0h1m1 0h1m2 0h2m1 0h1m1 0h4m2 0h1m1 0h2m1 0h2m3 0h1m-33 1h1m1 0h3m1 0h1m1 0h1m1 0h6m3 0h1m1 0h3m2 0h7m2 0h2m-37 1h1m1 0h3m1 0h1m1 0h3m1 0h3m1 0h3m2 0h1m1 0h1m1 0h2m1 0h3m3 0h1m1 0h1m-37 1h1m1 0h3m1 0h1m3 0h1m2 0h1m1 0h3m1 0h2m1 0h2m3 0h1m4 0h1m3 0h1m-37 1h1m5 0h1m3 0h5m1 0h5m5 0h2m4 0h5m-37 1h7m1 0h1m3 0h5m10 0h3m1 0h1m1 0h1m2 0h1"/></svg>
