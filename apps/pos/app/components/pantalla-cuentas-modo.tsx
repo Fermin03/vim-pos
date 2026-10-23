@@ -208,10 +208,8 @@ export function PantallaCuentasModo({
   // Cuenta a la que se le está asignando cliente. Solo Comedor y Pick-up: domicilio ya tiene el suyo.
   const [clienteDe, setClienteDe] = useState<CuentaAbierta | null>(null);
   const admiteCliente = modo !== "DELIVERY_PROPIO";
-  // Domicilio: corregir la dirección o pasar el pedido a otro cliente (RPC 0262). Si el ticket ya
-  // salió impreso o lleva repartidor, el papel que trae dice la dirección vieja: se avisa.
+  // Domicilio: corregir la dirección o pasar el pedido a otro cliente (RPC 0262).
   const [editandoEntrega, setEditandoEntrega] = useState(false);
-  const [avisoReimprimir, setAvisoReimprimir] = useState(false);
   // Domicilio: asignaciones vivas (con repartidor, todavía sin cobrar). Sirven para rotular cada
   // tarjeta con quién se lo lleva. El pedido NO se mueve de sitio al asignarlo: se probó sacándolo
   // a una pestaña aparte y el cajero acababa buscándolo en dos listas para cobrarlo.
@@ -341,7 +339,7 @@ export function PantallaCuentasModo({
   useEffect(() => {
     if (!selId) { setDetalle(null); setTotales(null); setEntrega(null); return; }
     let vivo = true;
-    setDetalle(null); setTotales(null); setEntrega(null); setAvisoReimprimir(false);
+    setDetalle(null); setTotales(null); setEntrega(null);
     recargarDetalle(selId).catch(() => { if (vivo) setDetalle([]); });
     return () => { vivo = false; };
   }, [selId, recargarDetalle]);
@@ -733,11 +731,6 @@ export function PantallaCuentasModo({
                   </div>
                   {entrega.direccion && <p className="mt-1 text-13 leading-snug text-ink-2">{entrega.direccion}</p>}
                   {entrega.referencias && <p className="mt-0.5 text-13 leading-snug text-ink-3">Referencias: {entrega.referencias}</p>}
-                  {avisoReimprimir && (
-                    <Aviso tono="warning" role="status" className="mt-2" onCerrar={() => setAvisoReimprimir(false)}>
-                      Cambió la entrega. Reimprime el ticket para el repartidor: el que trae dice la dirección anterior.
-                    </Aviso>
-                  )}
                   {entrega.notasRepartidor && (
                     <p className="mt-1 rounded border border-warning-line bg-warning-soft px-2 py-1 text-13 leading-snug text-ink-2">
                       Para el repartidor: {entrega.notasRepartidor}
@@ -1015,7 +1008,6 @@ export function PantallaCuentasModo({
             if (!c.direccionId) throw new Error("Elige una dirección de entrega.");
             await cambiarEntregaTicket(token, sel.ticketId, c.clienteId, c.direccionId);
             setEditandoEntrega(false);
-            setAvisoReimprimir(yaSeImprimio || entrega?.repartidor != null);
             await Promise.all([recargarDetalle(sel.ticketId), recargar()]);
           }}
           onCerrar={() => setEditandoEntrega(false)}
