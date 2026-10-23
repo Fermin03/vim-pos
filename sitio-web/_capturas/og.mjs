@@ -53,8 +53,9 @@ const TARJETAS = [
   { id: "spa", eyebrow: "Spas", titulo: "Cada cabina ocupada a su hora, sin empalmes." },
   { id: "peluquerias", eyebrow: "Peluquerías y barberías", titulo: "Cada silla con su turno y cada barbero con su comisión." },
   { id: "estudios-de-tatuajes", eyebrow: "Estudios de tatuajes", titulo: "Citas con anticipo y cada artista con su agenda." },
-  { id: "talleres-automotrices", eyebrow: "Talleres automotrices", titulo: "Cada auto con su orden y cada refacción cobrada." },
-  { id: "consultorios", eyebrow: "Servicios de salud", titulo: "Tu agenda de pacientes y cada consulta cobrada." },
+  // Servicios: escondidos hasta que salgan en la caja (se regeneran al volver).
+  // { id: "talleres-automotrices", eyebrow: "Talleres automotrices", titulo: "Cada auto con su orden y cada refacción cobrada." },
+  // { id: "consultorios", eyebrow: "Servicios de salud", titulo: "Tu agenda de pacientes y cada consulta cobrada." },
 ];
 
 /* El logotipo va incrustado como SVG y no como archivo: así la plantilla no

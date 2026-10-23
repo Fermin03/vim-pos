@@ -119,9 +119,9 @@ fotos y no se confunde con una foto terminada.
 **Capturas:** salen de la caja y del panel con un negocio de prueba por giro (semillas
 `sitio-web/_capturas/semilla-*.sql`). No se publica una captura que enseñe un defecto del producto.
 
-**Servicios:** talleres automotrices y servicios de salud todavía no existen en la caja. Sus
-páginas se hicieron completas por decisión de Fermín, con huecos donde irían las capturas.
-
+**Servicios:** talleres automotrices y servicios de salud se escondieron del menú y del sitio el
+22 oct 2026 (Fermín), hasta que esos giros salgan en la caja. Sus páginas están en el commit
+58b455b9 (`git show 58b455b9:sitio-web/punto-de-venta-talleres-automotrices.html`).
 ## Las cuatro funciones de la portada son un acordeón
 
 El mismo acordeón de las preguntas frecuentes, con una sola captura al lado: la de la fila
