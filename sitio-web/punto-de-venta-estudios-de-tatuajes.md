@@ -10,11 +10,11 @@ Aparta la fecha, cobra la sesión y reparte las comisiones.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-entera.webp)
+![Un artista tatuando el brazo de un cliente.](https://vimpos.com.mx/assets/img/fotos/estudios-de-tatuajes-1.webp)
 
-![La impresora de tickets junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-izq.webp)
+![Detalle de una máquina de tatuar sobre la piel.](https://vimpos.com.mx/assets/img/fotos/estudios-de-tatuajes-2.webp)
 
-![La terminal de cobro junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-der.webp)
+![Un estudio de tatuajes con el artista trabajando en la camilla.](https://vimpos.com.mx/assets/img/fotos/estudios-de-tatuajes-3.webp)
 
 ## Tu estudio en orden, de la cita al cobro
 

@@ -10,11 +10,11 @@ Citas, cobro y comisiones de tu equipo en una sola pantalla.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-entera.webp)
+![Una estilista atendiendo a una clienta en el salón.](https://vimpos.com.mx/assets/img/fotos/salones-de-belleza-1.webp)
 
-![La impresora de tickets junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-izq.webp)
+![Productos y brochas de maquillaje en el tocador.](https://vimpos.com.mx/assets/img/fotos/salones-de-belleza-2.webp)
 
-![La terminal de cobro junto a la caja, en la recepción de un salón de belleza.](https://vimpos.com.mx/assets/img/fotos/belleza-der.webp)
+![Una clienta pagando con tarjeta en la recepción del salón.](https://vimpos.com.mx/assets/img/fotos/salones-de-belleza-3.webp)
 
 ## Menos huecos en la agenda y cero cuentas a mano
 

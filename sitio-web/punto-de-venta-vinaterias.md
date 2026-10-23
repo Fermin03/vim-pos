@@ -10,11 +10,11 @@ Código de barras, existencias con aviso de mínimo y cotizaciones, en una caja 
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en el mostrador de una tienda de abarrotes.](https://vimpos.com.mx/assets/img/fotos/minisuper-entera.webp)
+![Un cliente recorriendo los anaqueles de una vinatería.](https://vimpos.com.mx/assets/img/fotos/vinaterias-1.webp)
 
-![La impresora de tickets junto a la caja, en el mostrador de una tienda de abarrotes.](https://vimpos.com.mx/assets/img/fotos/minisuper-izq.webp)
+![Botellas de vino acomodadas en un exhibidor.](https://vimpos.com.mx/assets/img/fotos/vinaterias-2.webp)
 
-![La terminal de cobro junto a la caja, en el mostrador de una tienda de abarrotes.](https://vimpos.com.mx/assets/img/fotos/minisuper-der.webp)
+![El aparador iluminado de una tienda de vinos y licores.](https://vimpos.com.mx/assets/img/fotos/vinaterias-3.webp)
 
 ## Menos faltantes y ventas más rápidas
 

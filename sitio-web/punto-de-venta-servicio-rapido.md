@@ -10,11 +10,11 @@ Combos, extras y comandas a cocina en segundos, aunque se caiga el internet.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-entera.webp)
+![Un cliente haciendo su pedido en el mostrador.](https://vimpos.com.mx/assets/img/fotos/servicio-rapido-1.webp)
 
-![La impresora de tickets junto a la caja, en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-izq.webp)
+![Papas con queso y tocino junto a una hamburguesa.](https://vimpos.com.mx/assets/img/fotos/servicio-rapido-2.webp)
 
-![La terminal de cobro junto a la caja, en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-der.webp)
+![Una malteada servida en la barra.](https://vimpos.com.mx/assets/img/fotos/servicio-rapido-3.webp)
 
 ## Órdenes completas, cocina al día y la fila avanzando
 

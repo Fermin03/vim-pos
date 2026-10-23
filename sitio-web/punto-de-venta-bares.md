@@ -10,11 +10,11 @@ Cuentas en la barra y en mesa, con propinas, en una caja que no se detiene.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en el mostrador de una cafetería.](https://vimpos.com.mx/assets/img/fotos/cafeteria-entera.webp)
+![Amigos brindando en la barra de un bar.](https://vimpos.com.mx/assets/img/fotos/bares-1.webp)
 
-![La impresora de tickets junto a la caja, en el mostrador de una cafetería.](https://vimpos.com.mx/assets/img/fotos/cafeteria-izq.webp)
+![La barra de un bar con clientes.](https://vimpos.com.mx/assets/img/fotos/bares-2.webp)
 
-![La terminal de cobro junto a la caja, en el mostrador de una cafetería.](https://vimpos.com.mx/assets/img/fotos/cafeteria-der.webp)
+![Un bar con su barra y clientes de pie.](https://vimpos.com.mx/assets/img/fotos/bares-3.webp)
 
 ## La noche entera, sin perder una cuenta
 

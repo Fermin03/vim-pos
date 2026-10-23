@@ -10,11 +10,11 @@ Del mapa de mesas a la cocina, sin papelitos y sin perder una orden.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La caja de VIM POS en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-entera.webp)
+![El comedor de un restaurante.](https://vimpos.com.mx/assets/img/fotos/restaurantes-servicio-completo-1.webp)
 
-![La impresora de tickets junto a la caja, en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-izq.webp)
+![Un cocinero terminando un platillo.](https://vimpos.com.mx/assets/img/fotos/restaurantes-servicio-completo-2.webp)
 
-![La terminal de cobro junto a la caja, en el mostrador de un restaurante de comida rápida.](https://vimpos.com.mx/assets/img/fotos/comida-rapida-der.webp)
+![Una mesa puesta con copas, lista para el servicio.](https://vimpos.com.mx/assets/img/fotos/restaurantes-servicio-completo-3.webp)
 
 ## El servicio en orden, de la mesa a la cocina
 
