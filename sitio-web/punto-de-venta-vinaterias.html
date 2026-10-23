@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Punto de venta para vinaterías y licorerías — VIM POS</title>
+<meta name="description" content="Código de barras, existencias con aviso de mínimo, cotizaciones y crédito a clientes. Para vinaterías y licorerías, desde $699 al mes más IVA.">
+<link rel="canonical" href="https://vimpos.com.mx/punto-de-venta-vinaterias">
+<link rel="alternate" type="text/markdown" href="https://vimpos.com.mx/punto-de-venta-vinaterias.md" title="Esta página en Markdown">
+
+<meta property="og:type" content="website">
+<meta property="og:locale" content="es_MX">
+<meta property="og:site_name" content="VIM POS">
+<meta property="og:title" content="Punto de venta para vinaterías y licorerías">
+<meta property="og:description" content="Código de barras, existencias con aviso de mínimo, cotizaciones y crédito a clientes. Para vinaterías y licorerías, desde $699 al mes más IVA.">
+<meta property="og:url" content="https://vimpos.com.mx/punto-de-venta-vinaterias">
+<meta property="og:image" content="https://vimpos.com.mx/assets/img/og/vinaterias.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="VIM POS, punto de venta para restaurantes en Mexico">
+<meta name="twitter:card" content="summary_large_image">
+
+<!-- Se precargan SOLO las dos familias que se ven en el primer pantallazo: el
+     titular (Sora) y el texto corrido (Inter Tight). JetBrains Mono aparece más
+     abajo y puede esperar; precargar las tres haría lo contrario de lo que se
+     busca — competirían entre ellas por el ancho de banda y ninguna llegaría
+     antes. Cada archivo es una fuente VARIABLE, así que precargarlo cubre todos
+     los pesos de su familia: no hay un archivo por peso que precargar. -->
+<link rel="preload" href="/assets/fonts/sora-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/inter-tight-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/css/fuentes.css?v=11">
+
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/assets/img/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon-1024.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0078C9">
+
+<link rel="stylesheet" href="/assets/css/vim.css?v=38">
+<!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
+     cosmético: los dos llevan `defer`, que respeta el orden del documento, y
+     Consent Mode descarta un estado por defecto que llegue después de que el
+     contenedor haya cargado. Invertir estas dos líneas hace que Google
+     Analytics mida la primera visita con los ajustes de fábrica. -->
+<script src="/assets/js/consentimiento.js?v=1" defer></script>
+<!-- Google Tag Manager (contenedor GTM-PRTJDNQ2). El fragmento en línea que da
+     Google no cabe aquí: la política de seguridad del sitio prohíbe los scripts
+     en línea, y uno bloqueado no avisa — la analítica parecería instalada y no
+     mediría nada. Por eso vive en un archivo propio, servido desde este mismo
+     dominio. El razonamiento entero está dentro de ese archivo. -->
+<script src="/assets/js/gtm.js?v=1" defer></script>
+</head>
+<body>
+
+<a href="#contenido" class="solo-lectores">Saltar al contenido</a>
+
+<header class="nav">
+  <div class="contenedor">
+    <div class="nav-fila">
+      <a href="/" class="nav-logo" aria-label="VIM POS, inicio">
+        <img src="/assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+        <span>VIM POS</span>
+      </a>
+      <nav class="nav-enlaces" aria-label="Principal">
+        <div class="nav-grupo" data-nav-grupo data-abierto="false">
+          <button class="nav-enlace" type="button" aria-expanded="false" aria-controls="panel-negocios">
+            Tipos de negocio
+            <svg class="nav-flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="nav-panel" id="panel-negocios">
+            <div class="contenedor">
+              <div class="nav-pantallas" data-pantallas>
+                <div class="nav-pantalla" data-pantalla="raiz">
+                  <ul class="nav-lista nav-lista-raiz">
+                    <li><button type="button" data-ir="negocios-alimentos">Alimentos y bebidas<svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+                    <li><button type="button" data-ir="negocios-tienda">Tienda<svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+                    <li><button type="button" data-ir="negocios-belleza">Belleza<svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+                  </ul>
+                </div>
+                <div class="nav-pantalla" data-pantalla="negocios-alimentos" role="group" aria-label="Alimentos y bebidas">
+                  <button class="nav-volver" type="button" data-volver aria-label="Volver: Alimentos y bebidas"><svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Alimentos y bebidas</button>
+                  <ul class="nav-lista">
+                    <li><a href="/punto-de-venta-cafeterias">Cafés</a></li>
+                    <li><a href="/punto-de-venta-servicio-rapido">Servicio rápido</a></li>
+                    <li><a href="/punto-de-venta-restaurantes-servicio-completo">Servicio completo</a></li>
+                    <li><a href="/punto-de-venta-bares">Bares y cervecerías</a></li>
+                    <li><a href="/punto-de-venta-food-trucks">Food trucks</a></li>
+                  </ul>
+                </div>
+                <div class="nav-pantalla" data-pantalla="negocios-tienda" role="group" aria-label="Tienda">
+                  <button class="nav-volver" type="button" data-volver aria-label="Volver: Tienda"><svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Tienda</button>
+                  <ul class="nav-lista">
+                    <li><a href="/punto-de-venta-tiendas-de-ropa">Ropa</a></li>
+                    <li><a href="/punto-de-venta-vinaterias">Vino y licor</a></li>
+                    <li><a href="/punto-de-venta-abarrotes">Abarrotes y fruterías</a></li>
+                  </ul>
+                </div>
+                <div class="nav-pantalla" data-pantalla="negocios-belleza" role="group" aria-label="Belleza">
+                  <button class="nav-volver" type="button" data-volver aria-label="Volver: Belleza"><svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Belleza</button>
+                  <ul class="nav-lista">
+                    <li><a href="/punto-de-venta-salones-de-belleza">Salón de belleza</a></li>
+                    <li><a href="/punto-de-venta-spa">Spa</a></li>
+                    <li><a href="/punto-de-venta-peluquerias">Peluquería</a></li>
+                    <li><a href="/punto-de-venta-estudios-de-tatuajes">Tatuajes</a></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="nav-grupo" data-nav-grupo data-abierto="false">
+          <button class="nav-enlace" type="button" aria-expanded="false" aria-controls="panel-producto">
+            Producto
+            <svg class="nav-flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="nav-panel" id="panel-producto">
+            <div class="contenedor">
+              <div class="nav-pantallas" data-pantallas>
+                <div class="nav-pantalla" data-pantalla="raiz">
+                  <ul class="nav-lista nav-lista-raiz">
+                    <li><a href="/funciones#caja">Caja y cobro</a></li>
+                    <li><a href="/funciones#cocina">Cocina</a></li>
+                    <li><a href="/funciones#mesas">Mesas</a></li>
+                    <li><a href="/funciones#domicilio">A domicilio</a></li>
+                    <li><a href="/funciones#inventario">Inventario</a></li>
+                    <li><a href="/funciones#reportes">Corte y reportes</a></li>
+                    <li><a href="/funciones#lealtad">Lealtad</a></li>
+                    <li><a href="/funciones#migracion">Cambiar de sistema</a></li>
+                    <li><a href="/sin-internet">Sin internet</a></li>
+                    <li><a href="/funciones">Todas las funciones</a></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <a class="nav-enlace" href="/facturacion-cfdi">Facturación</a>
+        <a class="nav-enlace" href="/precios">Precios</a>
+        <div class="nav-grupo" data-nav-grupo data-abierto="false">
+          <button class="nav-enlace" type="button" aria-expanded="false" aria-controls="panel-recursos">
+            Recursos
+            <svg class="nav-flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="nav-panel" id="panel-recursos">
+            <div class="contenedor">
+              <div class="nav-pantallas" data-pantallas>
+                <div class="nav-pantalla" data-pantalla="raiz">
+                  <ul class="nav-lista nav-lista-raiz">
+                    <li><a href="/como-elegir-sistema-restaurante">Cómo elegir sistema</a></li>
+                    <li><a href="/cuanto-cuesta-un-sistema-para-restaurante">Cuánto cuesta</a></li>
+                    <li><a href="/factura-global-restaurantes">Factura global</a></li>
+                    <li><a href="/punto-de-venta-restaurantes-leon">Restaurantes en León</a></li>
+                    <li><a href="/novedades">Novedades</a></li>
+                    <li><a href="/nosotros">Nosotros</a></li>
+                    <li><a href="/contacto">Contacto</a></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </nav>
+      <div class="nav-acciones">
+        <a class="nav-enlace nav-solo-pc" href="https://admin.vimpos.com.mx/">Iniciar sesión</a>
+        <a class="btn btn-fantasma nav-solo-pc nav-ventas" href="/contacto">Contactar ventas</a>
+        <a class="btn btn-primario nav-solo-pc" href="https://admin.vimpos.com.mx/registro">Comenzar</a>
+        <button class="nav-hamburguesa" data-menu-boton type="button"
+                aria-expanded="false" aria-controls="menu-movil" aria-label="Abrir menú">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+  <div class="nav-movil" id="menu-movil" data-menu data-abierto="false" inert>
+    <button class="nav-cerrar" data-menu-cerrar type="button" aria-label="Cerrar menú">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <path d="M6 6l12 12M18 6L6 18"/>
+      </svg>
+    </button>
+    <nav aria-label="Menú">
+      <div class="nav-pantallas" data-pantallas>
+        <div class="nav-pantalla" data-pantalla="raiz">
+          <ul class="nav-lista nav-lista-raiz">
+            <li><button type="button" data-ir="m-negocios">Tipos de negocio<svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+            <li><button type="button" data-ir="m-producto">Producto<svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+            <li><a href="/facturacion-cfdi">Facturación</a></li>
+            <li><a href="/precios">Precios</a></li>
+            <li><button type="button" data-ir="m-recursos">Recursos<svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+            <li><a href="https://admin.vimpos.com.mx/">Iniciar sesión</a></li>
+          </ul>
+        </div>
+        <div class="nav-pantalla" data-pantalla="m-negocios" role="group" aria-label="Tipos de negocio">
+          <button class="nav-volver" type="button" data-volver aria-label="Volver: Tipos de negocio"><svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Tipos de negocio</button>
+          <ul class="nav-lista">
+            <li><button type="button" data-ir="m-alimentos">Alimentos y bebidas<svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+            <li><button type="button" data-ir="m-tienda">Tienda<svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+            <li><button type="button" data-ir="m-belleza">Belleza<svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+          </ul>
+        </div>
+        <div class="nav-pantalla" data-pantalla="m-alimentos" role="group" aria-label="Alimentos y bebidas">
+          <button class="nav-volver" type="button" data-volver aria-label="Volver: Alimentos y bebidas"><svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Alimentos y bebidas</button>
+          <ul class="nav-lista">
+            <li><a href="/punto-de-venta-cafeterias">Cafés</a></li>
+            <li><a href="/punto-de-venta-servicio-rapido">Servicio rápido</a></li>
+            <li><a href="/punto-de-venta-restaurantes-servicio-completo">Servicio completo</a></li>
+            <li><a href="/punto-de-venta-bares">Bares y cervecerías</a></li>
+            <li><a href="/punto-de-venta-food-trucks">Food trucks</a></li>
+          </ul>
+        </div>
+        <div class="nav-pantalla" data-pantalla="m-tienda" role="group" aria-label="Tienda">
+          <button class="nav-volver" type="button" data-volver aria-label="Volver: Tienda"><svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Tienda</button>
+          <ul class="nav-lista">
+            <li><a href="/punto-de-venta-tiendas-de-ropa">Ropa</a></li>
+            <li><a href="/punto-de-venta-vinaterias">Vino y licor</a></li>
+            <li><a href="/punto-de-venta-abarrotes">Abarrotes y fruterías</a></li>
+          </ul>
+        </div>
+        <div class="nav-pantalla" data-pantalla="m-belleza" role="group" aria-label="Belleza">
+          <button class="nav-volver" type="button" data-volver aria-label="Volver: Belleza"><svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Belleza</button>
+          <ul class="nav-lista">
+            <li><a href="/punto-de-venta-salones-de-belleza">Salón de belleza</a></li>
+            <li><a href="/punto-de-venta-spa">Spa</a></li>
+            <li><a href="/punto-de-venta-peluquerias">Peluquería</a></li>
+            <li><a href="/punto-de-venta-estudios-de-tatuajes">Tatuajes</a></li>
+          </ul>
+        </div>
+        <div class="nav-pantalla" data-pantalla="m-producto" role="group" aria-label="Producto">
+          <button class="nav-volver" type="button" data-volver aria-label="Volver: Producto"><svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Producto</button>
+          <ul class="nav-lista">
+            <li><a href="/funciones#caja">Caja y cobro</a></li>
+            <li><a href="/funciones#cocina">Cocina</a></li>
+            <li><a href="/funciones#mesas">Mesas</a></li>
+            <li><a href="/funciones#domicilio">A domicilio</a></li>
+            <li><a href="/funciones#inventario">Inventario</a></li>
+            <li><a href="/funciones#reportes">Corte y reportes</a></li>
+            <li><a href="/funciones#lealtad">Lealtad</a></li>
+            <li><a href="/funciones#migracion">Cambiar de sistema</a></li>
+            <li><a href="/sin-internet">Sin internet</a></li>
+            <li><a href="/funciones">Todas las funciones</a></li>
+          </ul>
+        </div>
+        <div class="nav-pantalla" data-pantalla="m-recursos" role="group" aria-label="Recursos">
+          <button class="nav-volver" type="button" data-volver aria-label="Volver: Recursos"><svg class="nav-ir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Recursos</button>
+          <ul class="nav-lista">
+            <li><a href="/como-elegir-sistema-restaurante">Cómo elegir sistema</a></li>
+            <li><a href="/cuanto-cuesta-un-sistema-para-restaurante">Cuánto cuesta</a></li>
+            <li><a href="/factura-global-restaurantes">Factura global</a></li>
+            <li><a href="/punto-de-venta-restaurantes-leon">Restaurantes en León</a></li>
+            <li><a href="/novedades">Novedades</a></li>
+            <li><a href="/nosotros">Nosotros</a></li>
+            <li><a href="/contacto">Contacto</a></li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+    <div class="nav-movil-pie">
+      <a class="btn btn-fantasma" href="/contacto">Contactar ventas</a>
+      <a class="btn btn-primario" href="https://admin.vimpos.com.mx/registro">Comenzar</a>
+    </div>
+  </div>
+
+<!-- PÁGINA POR GIRO. Todo lo que afirma está en /funciones y /precios; las capturas son las de la semilla de demostración, que ya es una hamburguesería. No nombra al restaurante piloto. -->
+
+<main id="contenido">
+
+  <section class="giro-hero">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-6">
+        <h1><span class="eyebrow">Punto de venta para vinaterías y licorerías</span>Cada botella en su lugar y cada venta en segundos</h1>
+        <p class="entradilla" style="font-size:var(--t-18);max-width:52ch">Código de barras, existencias con aviso de mínimo y cotizaciones, en una caja que sigue sin internet.</p>
+        <div class="fila">
+          <a class="btn btn-fantasma btn-hero" href="/contacto">Contactar ventas</a>
+          <a class="btn btn-primario btn-hero" href="https://admin.vimpos.com.mx/registro">Comenzar</a>
+        </div>
+      </div>
+      <div class="giro-tira">
+        <figure class="foto" data-sin-markdown><img src="/assets/img/fotos/minisuper-entera.webp" alt="La caja de VIM POS en el mostrador de una tienda de abarrotes." decoding="async"></figure>
+        <figure class="foto" data-sin-markdown><img src="/assets/img/fotos/minisuper-izq.webp" alt="La impresora de tickets junto a la caja, en el mostrador de una tienda de abarrotes." decoding="async"></figure>
+        <figure class="foto" data-sin-markdown><img src="/assets/img/fotos/minisuper-der.webp" alt="La terminal de cobro junto a la caja, en el mostrador de una tienda de abarrotes." decoding="async"></figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion">
+    <div class="contenedor pila pila-10">
+      <h2 class="giro-rasgos-titulo">Menos faltantes y ventas más rápidas</h2>
+      <div class="giro-rasgos">
+        <div class="giro-rasgos-media" aria-hidden="true">
+          <figure class="figura" data-rasgo-media="0" data-activo>
+            <div class="monitor">
+              <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
+              <img src="/assets/img/capturas/giros/vinos-caja.webp?v=1" alt="La caja de la vinatería con la categoría de tequila y mezcal y un ticket en curso." width="1600" height="1000" loading="lazy" decoding="async">
+            </div>
+          </figure>
+          <figure class="figura" data-rasgo-media="1">
+            <div class="monitor">
+              <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
+              <img src="/assets/img/capturas/giros/vinos-alertas-caja.webp?v=1" alt="Los avisos de la caja con los productos que están por acabarse." width="1600" height="1000" loading="lazy" decoding="async">
+            </div>
+          </figure>
+          <figure class="figura" data-rasgo-media="2">
+            <div class="monitor">
+              <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
+              <img src="/assets/img/capturas/giros/vinos-recibir.webp?v=1" alt="Recibir mercancía en el panel: proveedor, factura y cada producto con su cantidad y su costo." width="1600" height="1000" loading="lazy" decoding="async">
+            </div>
+          </figure>
+          <figure class="figura" data-rasgo-media="3">
+            <div class="monitor">
+              <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
+              <img src="/assets/img/capturas/giros/vinos-existencias-minimo.webp?v=1" alt="Existencias en el panel filtradas por las que están bajo el mínimo." width="1600" height="1000" loading="lazy" decoding="async">
+            </div>
+          </figure>
+        </div>
+        <div class="pila">
+          <div class="giro-rasgo" data-rasgo="0">
+            <figure class="figura">
+              <div class="monitor">
+                <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
+                <img src="/assets/img/capturas/giros/vinos-caja.webp?v=1" alt="La caja de la vinatería con la categoría de tequila y mezcal y un ticket en curso." width="1600" height="1000" loading="lazy" decoding="async">
+              </div>
+              <figcaption>Las botellas, en el ticket.</figcaption>
+            </figure>
+            <h3>Escanea y cobra</h3>
+            <p>Cada botella entra al ticket con su código de barras, en un segundo.</p>
+          </div>
+          <div class="giro-rasgo" data-rasgo="1">
+            <figure class="figura">
+              <div class="monitor">
+                <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
+                <img src="/assets/img/capturas/giros/vinos-alertas-caja.webp?v=1" alt="Los avisos de la caja con los productos que están por acabarse." width="1600" height="1000" loading="lazy" decoding="async">
+              </div>
+              <figcaption>Lo que está por acabarse, a la vista.</figcaption>
+            </figure>
+            <h3>Avisos antes de que se acabe</h3>
+            <p>Fija un mínimo por producto y la caja te avisa cuando baja.</p>
+          </div>
+          <div class="giro-rasgo" data-rasgo="2">
+            <figure class="figura">
+              <div class="monitor">
+                <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
+                <img src="/assets/img/capturas/giros/vinos-recibir.webp?v=1" alt="Recibir mercancía en el panel: proveedor, factura y cada producto con su cantidad y su costo." width="1600" height="1000" loading="lazy" decoding="async">
+              </div>
+              <figcaption>La mercancía que entra, sumada.</figcaption>
+            </figure>
+            <h3>Recibe mercancía en minutos</h3>
+            <p>Al llegar el pedido sumas lo que entró, y queda en existencias.</p>
+          </div>
+          <div class="giro-rasgo" data-rasgo="3">
+            <figure class="figura">
+              <div class="monitor">
+                <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
+                <img src="/assets/img/capturas/giros/vinos-existencias-minimo.webp?v=1" alt="Existencias en el panel filtradas por las que están bajo el mínimo." width="1600" height="1000" loading="lazy" decoding="async">
+              </div>
+              <figcaption>Lo que hay que pedir.</figcaption>
+            </figure>
+            <h3>Lo que está bajo el mínimo</h3>
+            <p>Cada producto con su existencia contra su mínimo, para hacer el pedido a tiempo.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion destacada-suave">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Para el dueño</p>
+        <h2>Lo que necesitas para crecer</h2>
+      </div>
+      <div class="dos">
+        <div class="tarjeta tarjeta-media">
+          <div class="tarjeta-media-imagen"><figure class="figura">
+            <div class="monitor">
+              <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
+              <img src="/assets/img/capturas/giros/vinos-recibir-caja.webp?v=1" alt="Recibir mercancía desde la caja, escaneando cada producto." width="1600" height="1000" loading="lazy" decoding="async">
+            </div>
+          </figure></div>
+          <h3>Recibe desde la caja</h3>
+          <p>Lo que llega se escanea en la caja y entra a las existencias.</p>
+        </div>
+        <div class="tarjeta tarjeta-media">
+          <div class="tarjeta-media-imagen"><figure class="figura figura-papel">
+            <div class="monitor">
+              <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
+              <img src="/assets/img/capturas/admin-dashboard-movil.webp?v=3" alt="El panel del dueño en un celular." width="780" height="1688" loading="lazy" decoding="async">
+            </div>
+          </figure></div>
+          <h3><a class="enlace-tarjeta" href="/funciones#reportes">La venta del día en tu celular</a></h3>
+          <p>Revisa ventas y cortes desde donde estés.</p>
+          <span class="mas" aria-hidden="true">Ver el panel →</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Equipo</p>
+        <h2>Funciona con lo que ya tienes</h2>
+        <p>Sin equipo especial: lo compras donde quieras.</p>
+      </div>
+      <div class="cuatro">
+        <div class="tarjeta tarjeta-media">
+          <figure class="tarjeta-media-imagen foto" data-sin-markdown><img src="/assets/img/fotos/cafeteria-monitor.webp" alt="La caja de VIM POS en un monitor táctil." loading="lazy" decoding="async"></figure>
+          <h3 style="font-size:var(--t-18)">Computadora con Windows</h3>
+          <p>Windows 10 u 11. Es tu caja.</p>
+        </div>
+        <div class="tarjeta tarjeta-media">
+          <figure class="tarjeta-media-imagen foto" data-sin-markdown><img src="/assets/img/fotos/cafeteria-impresora.webp" alt="Impresora térmica de tickets junto a la caja." loading="lazy" decoding="async"></figure>
+          <h3 style="font-size:var(--t-18)">Impresora de tickets</h3>
+          <p>Térmica de 80 mm, de red o USB.</p>
+        </div>
+        <div class="tarjeta tarjeta-media">
+          <figure class="tarjeta-media-imagen foto" data-sin-markdown><img src="/assets/img/fotos/cafeteria-terminal.webp" alt="Terminal de cobro con tarjeta junto a la caja." loading="lazy" decoding="async"></figure>
+          <h3 style="font-size:var(--t-18)">Terminal Mercado Pago</h3>
+          <p>Cobra con tarjeta desde la caja con la Point Smart 2.</p>
+        </div>
+        <div class="tarjeta tarjeta-media">
+          <figure class="tarjeta-media-imagen foto" data-sin-markdown><img src="/assets/img/fotos/minisuper-lector.webp" alt="Lector de código de barras junto a la caja." loading="lazy" decoding="async"></figure>
+          <h3 style="font-size:var(--t-18)">Lector de código de barras</h3>
+          <p>Uno USB, de los que venden en cualquier lado.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion destacada-suave">
+    <div class="contenedor pila pila-8">
+      <div class="planes-giro-cabeza">
+        <div class="pila pila-4">
+          <p class="eyebrow">Precios</p>
+          <h2>Un plan para cada tamaño de vinatería</h2>
+          <p>Sin pago inicial y sin contrato forzoso.</p>
+        </div>
+        <a class="btn btn-fantasma" href="/precios">Ver precios</a>
+      </div>
+      <div class="planes">
+        <div class="plan-giro">
+          <div class="pila pila-3">
+            <div class="plan-giro-nombre"><h3>Esencial</h3></div>
+            <p class="plan-giro-desc">Para arrancar con una caja.</p>
+          </div>
+          <div class="plan-giro-precio"><strong>$699</strong><span>/mes</span></div>
+          <p class="plan-giro-alcance">1 sucursal · 1 caja · más IVA</p>
+          <a class="btn btn-fantasma" href="https://admin.vimpos.com.mx/registro">Comenzar</a>
+          <p class="plan-giro-titulo">Lo principal para una vinatería</p>
+          <ul class="plan-giro-lista">
+            <li>Existencias con aviso de mínimo, incluidas</li>
+            <li>Cotizaciones y crédito a clientes</li>
+            <li>Lector de código de barras</li>
+            <li>Facturación: $349 al mes aparte</li>
+          </ul>
+          <a class="plan-giro-mas" href="/precios">Ver todo lo que incluye</a>
+        </div>
+        <div class="plan-giro destacado">
+          <div class="pila pila-3">
+            <div class="plan-giro-nombre"><h3>Negocio</h3><span class="plan-giro-chip">El que recomendamos</span></div>
+            <p class="plan-giro-desc">Todo para un local, con tu menú cargado por nosotros.</p>
+          </div>
+          <div class="plan-giro-precio"><strong>$999</strong><span>/mes</span></div>
+          <p class="plan-giro-alcance">1 sucursal · 3 cajas · más IVA</p>
+          <a class="btn btn-primario" href="https://admin.vimpos.com.mx/registro">Comenzar</a>
+          <p class="plan-giro-titulo">Lo principal para una vinatería</p>
+          <ul class="plan-giro-lista">
+            <li>Hasta 3 cajas en la tienda</li>
+            <li>Facturación incluida, 20 folios al mes</li>
+            <li>Cargamos tu catálogo</li>
+            <li>Capacitamos a tu equipo</li>
+          </ul>
+          <a class="plan-giro-mas" href="/precios">Ver todo lo que incluye</a>
+        </div>
+        <div class="plan-giro">
+          <div class="pila pila-3">
+            <div class="plan-giro-nombre"><h3>Cadena</h3></div>
+            <p class="plan-giro-desc">Varias sucursales, vistas en un solo lugar.</p>
+          </div>
+          <div class="plan-giro-precio"><strong>$1,999</strong><span>/mes</span></div>
+          <p class="plan-giro-alcance">3 sucursales · cajas sin límite · más IVA</p>
+          <a class="btn btn-fantasma" href="/contacto">Contactar ventas</a>
+          <p class="plan-giro-titulo">Lo principal para una vinatería</p>
+          <ul class="plan-giro-lista">
+            <li>Cajas sin límite en cada sucursal</li>
+            <li>Traspasos de mercancía entre sucursales</li>
+            <li>Facturación incluida, 40 folios al mes</li>
+            <li>Vamos a tu local el día del arranque</li>
+          </ul>
+          <a class="plan-giro-mas" href="/precios">Ver todo lo que incluye</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Guías</p>
+        <h2>Antes de decidir</h2>
+      </div>
+      <div class="tres">
+        <div class="tarjeta tarjeta-media">
+          <div class="tarjeta-media-imagen"><img src="/assets/img/og/como-elegir.png" alt="" width="1200" height="630" loading="lazy" decoding="async"></div>
+          <h3 style="font-size:var(--t-18)"><a class="enlace-tarjeta" href="/como-elegir-sistema-restaurante">Cómo elegir sistema</a></h3>
+          <p>Nueve preguntas antes de firmar.</p>
+        </div>
+        <div class="tarjeta tarjeta-media">
+          <div class="tarjeta-media-imagen"><img src="/assets/img/og/cuanto-cuesta.png" alt="" width="1200" height="630" loading="lazy" decoding="async"></div>
+          <h3 style="font-size:var(--t-18)"><a class="enlace-tarjeta" href="/cuanto-cuesta-un-sistema-para-restaurante">Cuánto cuesta</a></h3>
+          <p>Las tres formas de cobrarte, con cuentas.</p>
+        </div>
+        <div class="tarjeta tarjeta-media">
+          <div class="tarjeta-media-imagen"><img src="/assets/img/og/factura-global.png" alt="" width="1200" height="630" loading="lazy" decoding="async"></div>
+          <h3 style="font-size:var(--t-18)"><a class="enlace-tarjeta" href="/factura-global-restaurantes">Factura global</a></h3>
+          <p>Qué es y cómo se emite.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Preguntas</p>
+        <h2>Lo que pregunta una vinatería</h2>
+      </div>
+      <div class="pila pila-6">
+        <div class="pila pila-3">
+          <h3>¿Sirve si solo tengo una caja?</h3>
+          <p>Sí. El plan Esencial es una sucursal y una caja, por $699 al mes más IVA. Los tres planes están en <a href="/precios">precios</a>.</p>
+        </div>
+        <div class="pila pila-3">
+          <h3>¿Funciona con mi lector de código de barras?</h3>
+          <p>Sí, con cualquier lector USB que escriba como teclado.</p>
+        </div>
+        <div class="pila pila-3">
+          <h3>¿Puedo vender a crédito?</h3>
+          <p>Sí. Le das límite y plazo a cada cliente y registras sus abonos. Se factura al liquidarse.</p>
+        </div>
+        <div class="pila pila-3">
+          <h3>¿Tengo que capturar todo mi catálogo?</h3>
+          <p>No. Lo subes desde una hoja de cálculo. Desde Negocio lo cargamos nosotros.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="cierre pila pila-5" style="align-items:center">
+        <h2>Pon tu vinatería a vender hoy</h2>
+        <p style="max-width:54ch">Empieza tú solo, o te lo enseñamos con tu catálogo.</p>
+        <div class="fila" style="justify-content:center">
+          <a class="btn btn-fantasma btn-hero" href="/contacto">Contactar ventas</a>
+          <a class="btn btn-primario btn-hero" href="https://admin.vimpos.com.mx/registro">Comenzar</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div class="barra-accion" data-barra-accion>
+  <a class="btn btn-fantasma " href="/contacto">Contactar ventas</a>
+  <a class="btn btn-primario " href="https://admin.vimpos.com.mx/registro">Comenzar</a>
+</div>
+
+<footer class="pie">
+  <div class="contenedor">
+    <div class="pie-rejilla">
+      <div class="pila pila-3">
+        <span class="nav-logo" style="pointer-events:none">
+          <img src="/assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+          <span>VIM POS</span>
+        </span>
+        <p style="font-size:var(--t-15)">
+          El sistema completo para tu restaurante: caja, cocina, mesas, inventario y
+          facturación. Hecho en León, Guanajuato.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="pie-titulo">Producto</h2>
+        <ul class="pie-lista">
+          <li><a href="/funciones">Funciones</a></li>
+          <li><a href="/sin-internet">Sin internet</a></li>
+          <li><a href="/facturacion-cfdi">Facturación CFDI</a></li>
+          <li><a href="/precios">Precios</a></li>
+          <li><a href="/novedades">Novedades</a></li>
+          <li><a href="/demo">Pide una demo</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <h2 class="pie-titulo">Guías</h2>
+        <ul class="pie-lista">
+          <li><a href="/como-elegir-sistema-restaurante">Cómo elegir sistema</a></li>
+          <li><a href="/cuanto-cuesta-un-sistema-para-restaurante">Cuánto cuesta</a></li>
+          <li><a href="/factura-global-restaurantes">Factura global</a></li>
+          <li><a href="/nosotros">Nosotros</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="pie-titulo">Contacto</h2>
+        <ul class="pie-lista">
+          <li><a href="/contacto">Contacto</a></li>
+          <li><a href="mailto:hola@vimpos.com.mx">hola@vimpos.com.mx</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="pie-legal">
+      <span>© 2026 VIM POS</span>
+      <span class="fila" style="gap:var(--sp-5)">
+        <a href="/aviso-privacidad" style="color:inherit">Aviso de privacidad</a>
+        <a href="/terminos" style="color:inherit">Términos</a>
+        <button type="button" class="pie-cookies" data-cookies-abrir hidden>Cookies</button>
+      </span>
+    </div>
+  </div>
+</footer>
+
+<script src="/assets/js/vim.js?v=22" defer></script>
+<!-- Medición sin cookies (Vercel Web Analytics). Se sirve desde este dominio y
+     solo existe si está encendida en el proyecto de Vercel; si no, es un 404
+     inofensivo. Los eventos se mandan desde vim.js. -->
+<script defer src="/_vercel/insights/script.js"></script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://vimpos.com.mx/punto-de-venta-vinaterias#pagina",
+      "url": "https://vimpos.com.mx/punto-de-venta-vinaterias",
+      "name": "Punto de venta para vinaterías y licorerías — VIM POS",
+      "description": "Código de barras, existencias con aviso de mínimo, cotizaciones y crédito a clientes. Para vinaterías y licorerías, desde $699 al mes más IVA.",
+      "inLanguage": "es-MX",
+      "isPartOf": {
+        "@id": "https://vimpos.com.mx/#sitio"
+      },
+      "about": {
+        "@id": "https://vimpos.com.mx/#producto"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://vimpos.com.mx/punto-de-venta-vinaterias#miga",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Inicio",
+          "item": "https://vimpos.com.mx/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Vinos y licores",
+          "item": "https://vimpos.com.mx/punto-de-venta-vinaterias"
+        }
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://vimpos.com.mx/punto-de-venta-vinaterias#preguntas",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "¿Sirve si solo tengo una caja?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sí. El plan Esencial es una sucursal y una caja, por $699 al mes más IVA. Los tres planes están en precios."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Funciona con mi lector de código de barras?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sí, con cualquier lector USB que escriba como teclado."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Puedo vender a crédito?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sí. Le das límite y plazo a cada cliente y registras sus abonos. Se factura al liquidarse."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "¿Tengo que capturar todo mi catálogo?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Lo subes desde una hoja de cálculo. Desde Negocio lo cargamos nosotros."
+          }
+        }
+      ]
+    }
+  ]
+}
+</script>
+</body>
+</html>

@@ -40,6 +40,22 @@ const TARJETAS = [
   { id: "factura-global", eyebrow: "Guía fiscal", titulo: "Factura global para restaurantes: qué es y cómo se emite." },
   { id: "hamburgueserias", eyebrow: "Hamburgueserías", titulo: "El término, los extras y el combo, sin detener la fila." },
   { id: "leon", eyebrow: "León, Guanajuato", titulo: "Punto de venta para restaurantes, hecho en León." },
+  // Páginas por giro (/punto-de-venta-<id>): el titular de cada una.
+  { id: "cafeterias", eyebrow: "Cafeterías", titulo: "Que la fila avance y cada café salga como lo pidieron." },
+  { id: "servicio-rapido", eyebrow: "Comida rápida", titulo: "Despacha la hora pico sin que se junte la fila." },
+  { id: "restaurantes-servicio-completo", eyebrow: "Restaurantes", titulo: "Cada mesa con su cuenta y cada mesero con su propina." },
+  { id: "bares", eyebrow: "Bares y cervecerías", titulo: "Abre la cuenta con un nombre y cóbrala cuando se vaya." },
+  { id: "food-trucks", eyebrow: "Food trucks", titulo: "Cobra donde estaciones, con o sin señal." },
+  { id: "tiendas-de-ropa", eyebrow: "Tiendas de ropa", titulo: "Cada talla y cada color, contados sin libreta." },
+  { id: "vinaterias", eyebrow: "Vinos y licores", titulo: "Cada botella en su lugar y cada venta en segundos." },
+  { id: "abarrotes", eyebrow: "Abarrotes y fruterías", titulo: "Vende por kilo, por pieza o a crédito, sin cuaderno." },
+  { id: "salones-de-belleza", eyebrow: "Salones de belleza", titulo: "Tu agenda llena y cada comisión, clara." },
+  { id: "spa", eyebrow: "Spas", titulo: "Cada cabina ocupada a su hora, sin empalmes." },
+  { id: "peluquerias", eyebrow: "Peluquerías y barberías", titulo: "Cada silla con su turno y cada barbero con su comisión." },
+  { id: "estudios-de-tatuajes", eyebrow: "Estudios de tatuajes", titulo: "Citas con anticipo y cada artista con su agenda." },
+  // Servicios: escondidos hasta que salgan en la caja (se regeneran al volver).
+  // { id: "talleres-automotrices", eyebrow: "Talleres automotrices", titulo: "Cada auto con su orden y cada refacción cobrada." },
+  // { id: "consultorios", eyebrow: "Servicios de salud", titulo: "Tu agenda de pacientes y cada consulta cobrada." },
 ];
 
 /* El logotipo va incrustado como SVG y no como archivo: así la plantilla no

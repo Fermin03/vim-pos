@@ -305,6 +305,7 @@ a { color: var(--ink); text-underline-offset: 3px; }
   display: inline-flex; align-items: center; gap: var(--sp-1);
   padding: 0; border: 0; background: none; cursor: pointer;
   font-family: var(--font); letter-spacing: inherit;
+  white-space: nowrap;
   color: var(--ink-2);
   text-decoration: none;
   font-size: var(--t-15);
@@ -355,60 +356,90 @@ a { color: var(--ink); text-underline-offset: 3px; }
 /* De un panel al de al lado no hay entrada: el segundo ya «estaba abierto». */
 .nav-enlaces[data-instante] .nav-panel { transition-duration: 0s; }
 
-.nav-panel-rejilla {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--sp-8);
-  padding-block: var(--sp-6) var(--sp-8);
+/* ---- Pantallas del menú -------------------------------------------------
+   Nada se despliega: un grupo con hijos abre otra pantalla que entra desde la
+   derecha, y «volver» la regresa. Todas comparten la misma celda de la
+   rejilla, así que el contenedor mide lo que la más alta y el panel no cambia
+   de alto al pasar de una a otra. vim.js marca `data-js` y el lado de cada
+   una; sin él se ven todas, una debajo de otra.
+
+   Una sola letra para todo el menú: la de la barra. En la PC la primera
+   pantalla de un panel va un 30 % más grande; en el teléfono todo mide igual. */
+.nav-pantallas { display: grid; overflow: hidden; }
+.nav-pantallas[data-js] > .nav-pantalla {
+  grid-area: 1 / 1;
+  transition: transform var(--v-media) var(--sal), opacity var(--v-media) var(--sal), visibility 0s;
 }
-.nav-panel-titulo {
-  font-family: var(--font-mono);
-  font-size: var(--t-12);
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-2);
-  margin: 0 0 var(--sp-3);
-  max-width: none;
+.nav-pantallas[data-js] > [data-lado] {
+  opacity: 0;
+  visibility: hidden;
+  transition: transform var(--v-media) var(--sal), opacity var(--v-media) var(--sal), visibility 0s linear var(--v-media);
 }
-.nav-panel-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-1); }
-.nav-panel-lista a {
-  display: block;
-  padding: var(--sp-2) var(--sp-3);
-  margin-inline: calc(-1 * var(--sp-3));     /* el fondo del hover sobresale; el texto queda alineado con el título */
-  border-radius: var(--r);
+.nav-pantallas > [data-lado="despues"] { transform: translateX(var(--entra, 48px)); }
+.nav-pantallas > [data-lado="antes"]   { transform: translateX(var(--sale, -48px)); }
+.nav-pantallas[data-instante] > .nav-pantalla { transition: none; }
+.nav-pantalla:focus { outline: none; }   /* recibe el foco solo tras un toque; con teclado va a la primera entrada */
+
+.nav-lista { list-style: none; margin: 0; padding: 0; }
+.nav-lista a,
+.nav-lista button,
+.nav-volver {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2);
+  width: 100%;
+  padding: var(--sp-2) 0;
+  border: 0; background: none; cursor: pointer; text-align: left;
+  font-family: var(--font); font-size: var(--t-15); font-weight: 500; letter-spacing: inherit; line-height: inherit;
+  color: var(--ink);
   text-decoration: none;
-  transition: background-color var(--v-corta) ease;
+  transition: color var(--v-corta) ease;
 }
-.nav-panel-lista b {
-  display: block;
-  font-family: var(--font-display); font-size: var(--t-18); font-weight: 600;
-  letter-spacing: -0.01em; color: var(--ink);
-}
-.nav-panel-lista span { display: block; font-size: var(--t-13); color: var(--ink-2); }
-.nav-panel-lista a[aria-current="page"] b { color: var(--accent-hover); }
+.nav-volver { justify-content: flex-start; width: auto; margin-bottom: var(--sp-2); color: var(--ink-2); }
+.nav-ir { width: 16px; height: 16px; flex: none; color: var(--ink-3); }
+.nav-lista a[aria-current="page"] { color: var(--accent-hover); }
 @media (hover: hover) and (pointer: fine) {
-  .nav-panel-lista a:hover { background: var(--hover); }
+  .nav-lista a:hover, .nav-lista button:hover, .nav-volver:hover { color: var(--accent-hover); }
 }
-.nav-panel-destacado {
-  align-self: start;
-  padding: var(--sp-5);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-lg);
-  background: var(--surface);
+
+/* En el panel de la PC las listas largas (Producto, Recursos) siguen en otra
+   columna a partir del quinto renglón. */
+.nav-panel .nav-pantallas { padding-block: var(--sp-6) var(--sp-8); }
+.nav-panel .nav-lista {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(5, auto);
+  grid-auto-columns: minmax(0, 300px);
+  column-gap: var(--sp-10);
 }
+.nav-panel .nav-lista :is(a, button) { justify-content: flex-start; }
+.nav-panel .nav-lista-raiz :is(a, button) { font-size: calc(var(--t-15) * 1.3); }
+
+/* En la PC el grupo se asoma a la derecha en vez de deslizarse: la raíz en la
+   primera columna y todas las pantallas de grupo apiladas en la segunda. Se
+   pasa por ellas decenas de veces, así que el cambio es instantáneo. */
+.nav-panel .nav-pantallas[data-js] {
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--sp-12);
+  --entra: 0px;
+}
+.nav-panel .nav-pantallas[data-js] > .nav-pantalla { grid-area: 1 / 2; transition: none; }
+.nav-panel .nav-pantallas[data-js] > [data-pantalla="raiz"] { grid-column: 1; }
+.nav-panel .nav-pantallas[data-js] .nav-volver { display: none; }
+.nav-panel .nav-lista-raiz [data-activo] { color: var(--accent-hover); }
+.nav-panel .nav-lista-raiz [data-activo] .nav-ir { color: currentColor; }
 
 @media (prefers-reduced-motion: reduce) {
   .nav-panel, .nav-grupo[data-abierto="true"] .nav-panel, .nav-flecha { transition: none; transform: none; }
+  .nav-pantallas > [data-lado] { transform: none; }        /* se queda el fundido, sin desplazamiento */
 }
 
 .nav-acciones { display: flex; align-items: center; gap: var(--sp-3); }
 
-/* La prueba gratis es la acción SECUNDARIA: fantasma, a la izquierda de la
-   demo, y solo cuando hay ancho de sobra. En el teléfono no cabe junto al logo
-   y la hamburguesa, así que vive en el cajón del menú. */
-.nav-prueba { display: none; }
-@media (min-width: 1024px) { .nav-prueba { display: inline-flex; } }
+/* En el teléfono y la tableta la barra solo lleva el logo y la hamburguesa:
+   las acciones viven en el pie del cajón. En la PC, «Contactar ventas» espera a
+   que haya ancho de sobra. */
+.nav-solo-pc { display: none; }
+@media (min-width: 900px) { .nav-solo-pc { display: inline-flex; } }
+@media (min-width: 900px) and (max-width: 1119px) { .nav-ventas { display: none; } }
 
 .nav-hamburguesa {
   display: inline-flex;
@@ -455,13 +486,10 @@ a { color: var(--ink); text-underline-offset: 3px; }
 
 .nav-movil {
   position: fixed;
-  inset: 0 0 0 auto;                    /* pegado a la derecha, de arriba abajo */
-  width: min(320px, 86vw);
+  inset: 0;                             /* pantalla completa en teléfono y tableta */
   z-index: 60;                          /* por encima del encabezado (50) */
 
   background: var(--bg);
-  border-left: 1px solid var(--line);
-  box-shadow: -24px 0 48px -24px rgba(22, 22, 26, .18);
 
   /* Fuera de pantalla del todo, y no a `scale(0)` ni a `opacity: 0`: un cajón
      se desliza, no aparece. */
@@ -509,46 +537,25 @@ body[data-menu-abierto="true"]::before {
   transition: opacity var(--v-media) ease, visibility 0s;
 }
 
-.nav-movil-lista {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
+/* En el cajón cada pantalla entra entera desde la derecha y la anterior se
+   corre un cuarto hacia la izquierda. */
+.nav-movil .nav-pantallas {
+  --entra: 100%;
+  --sale: -25%;
   padding: var(--sp-10) var(--sp-5) var(--sp-5);   /* arriba, hueco para el botón de cerrar */
 }
-.nav-movil-lista > a,
-.nav-movil-lista summary {
-  padding: var(--sp-3) 0;
-  color: var(--ink);
-  text-decoration: none;
-  font-size: var(--t-18);
-  font-weight: 500;
-  border-bottom: 1px solid var(--line);
+.nav-movil :is(.nav-lista a, .nav-lista button, .nav-volver) { font-size: var(--t-18); padding-block: var(--sp-3); }
+/* El pie del cajón se queda abajo en todas las pantallas: Contactar ventas a
+   la izquierda, Comenzar a la derecha. */
+.nav-movil { display: flex; flex-direction: column; }
+.nav-movil > nav { flex: 1; }
+.nav-movil-pie {
+  position: sticky; bottom: 0;
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5) calc(var(--sp-4) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--bg);
 }
-.nav-movil-lista > a:last-child { border-bottom: 0; }
-.nav-movil-lista a[aria-current="page"] { color: var(--accent-hover); }
-
-/* Los grupos del cajón son <details> a secas: abrir y cerrar lo hace el
-   navegador, con teclado incluido, y sin una línea de JavaScript. El signo es
-   el mismo «+» que gira del acordeón. */
-.nav-movil-lista summary {
-  display: flex; align-items: center; justify-content: space-between;
-  cursor: pointer; list-style: none;
-}
-.nav-movil-lista summary::-webkit-details-marker { display: none; }
-.nav-movil-lista summary::after {
-  content: "+";
-  font-size: var(--t-24); font-weight: 400; line-height: 1; color: var(--ink-3);
-  transition: transform var(--v-media) var(--sal);
-}
-.nav-movil-lista details[open] > summary::after { transform: rotate(45deg); }
-.nav-movil-lista details a {
-  display: block;
-  padding: var(--sp-3) 0 var(--sp-3) var(--sp-4);
-  color: var(--ink-2);
-  text-decoration: none;
-  font-size: var(--t-15);
-}
-.nav-movil-lista details[open] { border-bottom: 1px solid var(--line); padding-bottom: var(--sp-2); }
 
 /* El botón de cerrar vive dentro del cajón: con el menú abierto, la
    hamburguesa del encabezado queda debajo del velo y no se puede tocar. */
@@ -571,7 +578,7 @@ body[data-menu-abierto="true"]::before {
 body[data-menu-abierto="true"] { overflow: hidden; }
 
 @media (prefers-reduced-motion: reduce) {
-  .nav-movil, body::before, .nav-cerrar, .nav-movil-lista summary::after { transition: none; }
+  .nav-movil, body::before, .nav-cerrar { transition: none; }
 }
 
 /* El cajón se apaga en el MISMO punto en que desaparece la hamburguesa (900).
@@ -1722,3 +1729,170 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 @media (hover: hover) and (pointer: fine) { .subnav a:hover { color: var(--ink); } }
 /* El destino de un ancla tiene ahora dos barras encima, no una. */
 body:has(.subnav) :target { scroll-margin-top: calc(65px + 44px + var(--sp-5)); }
+
+/* ==========================================================================
+   Páginas por giro (/punto-de-venta-<giro>)
+
+   Una sola plantilla para los catorce giros: hero con tira de fotos, rasgos con
+   la imagen quieta a un lado, herramientas en tarjetas con imagen, equipo,
+   planes, guías, preguntas y cierre. Lo que cambia de un giro a otro es el
+   texto y las imágenes, no el orden.
+
+   Las fotos del local todavía no existen: cada una es un `.hueco` que dice qué
+   foto va ahí. Es la lista de tomas para la sesión de fotos, y como se ve
+   rayado no se confunde con una foto terminada.
+   ========================================================================== */
+
+.giro-hero { padding-block: clamp(var(--sp-10), 8vw, var(--sp-12)) var(--sp-8); }
+.giro-hero h1 { max-width: 20ch; }
+.giro-hero h1 .eyebrow { display: block; margin-bottom: var(--sp-4); }
+/* En el teléfono los dos botones van lado a lado y del mismo ancho, igual que
+   en la barra fija de abajo. */
+@media (max-width: 599px) {
+  .giro-hero .fila, main:has(.giro-hero) .cierre .fila { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+  .giro-hero .btn-hero, main:has(.giro-hero) .cierre .btn-hero { padding-inline: var(--sp-3); }
+  .giro-tira .hueco span { display: none; }   /* la toma se lee en la PC; aquí no cabe */
+}
+
+/* La tira de tres fotos bajo el hero. En el teléfono siguen siendo tres, más
+   bajitas: una sola foto grande empujaba el primer rasgo fuera de la pantalla. */
+.giro-tira {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: clamp(var(--sp-2), 1.2vw, var(--sp-4));
+}
+.foto {
+  margin: 0;
+  aspect-ratio: 4 / 5;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--hover);
+}
+.foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.foto .hueco { height: 100%; min-height: 0; padding: var(--sp-3); }
+.foto-ancha { aspect-ratio: 16 / 10; }
+
+/* ---- Rasgos: la imagen se queda y el texto pasa -------------------------
+   En la PC la columna de la imagen es pegajosa y cambia —solo un fundido— al
+   llegar a cada rasgo; vim.js marca cuál. En el teléfono cada rasgo lleva su
+   imagen arriba, y la columna pegajosa no existe. Sin script se ve la primera. */
+.giro-rasgos-titulo { text-align: center; max-width: 22ch; margin-inline: auto; }
+.giro-rasgos { display: grid; gap: var(--sp-10); }
+.giro-rasgos-media { display: none; }
+.giro-rasgos > .pila { gap: var(--sp-10); }
+.giro-rasgo { display: flex; flex-direction: column; gap: var(--sp-4); }
+.giro-rasgo h3 { font-size: clamp(var(--t-24), 2.6vw, var(--t-32)); }
+.giro-rasgo p { font-size: var(--t-18); }
+
+@media (min-width: 900px) {
+  .giro-rasgos { grid-template-columns: 1fr 1fr; gap: var(--sp-12); align-items: start; }
+  .giro-rasgos-media {
+    display: grid;
+    position: sticky; top: calc(65px + var(--sp-8));
+  }
+  .giro-rasgos-media > * {
+    grid-area: 1 / 1;
+    opacity: 0;
+    transition: opacity var(--v-media) ease;
+  }
+  .giro-rasgos-media > [data-activo] { opacity: 1; }
+  .giro-rasgos > .pila { gap: 0; }
+  .giro-rasgo { min-height: 70vh; justify-content: center; }
+  .giro-rasgo > .figura, .giro-rasgo > .foto { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .giro-rasgos-media > * { transition: none; }
+}
+
+/* ---- Tarjetas con imagen arriba (herramientas, equipo, guías) ------------ */
+.tarjeta-media {
+  position: relative;
+  display: flex; flex-direction: column; gap: var(--sp-4);
+  transition: border-color var(--v-corta) ease;
+}
+.tarjeta-media-imagen {
+  margin: calc(-1 * var(--sp-6)) calc(-1 * var(--sp-6)) 0;
+  padding: var(--sp-6) var(--sp-6) 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  overflow: hidden;
+  aspect-ratio: 16 / 10;              /* todas las tarjetas igual de altas; lo alto (ticket, celular) se corta abajo */
+}
+.tarjeta-media-imagen .figura-papel .monitor { max-width: 46%; }
+.tarjeta-media-imagen .monitor { border-radius: var(--r-lg) var(--r-lg) 0 0; border-bottom: 0; box-shadow: none; }
+.tarjeta-media-imagen.foto { aspect-ratio: 16 / 10; padding: 0; }
+.tarjeta-media-imagen > img { width: 100%; height: auto; display: block; border-radius: var(--r) var(--r) 0 0; }
+.tarjeta-media .mas { margin-top: auto; font-weight: 600; font-size: var(--t-15); }
+.tarjeta-media:has(.enlace-tarjeta:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .tarjeta-media:has(.enlace-tarjeta):hover { border-color: var(--accent); }
+}
+
+.cuatro { display: grid; gap: var(--sp-5); }
+@media (min-width: 640px) { .cuatro { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1040px) { .cuatro { grid-template-columns: repeat(4, 1fr); } }
+
+/* ---- Barra fija de acciones (solo teléfono y tableta) -------------------
+   Aparece cuando el hero sale de la pantalla y se quita cuando llega el
+   cierre, que ya trae los mismos dos botones. vim.js la marca. */
+.barra-accion {
+  position: fixed; inset: auto 0 0 0; z-index: 45;   /* bajo el encabezado (50) y el cajón (60) */
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-5) calc(var(--sp-3) + env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line);
+  transform: translateY(100%);
+  visibility: hidden;
+  transition: transform var(--v-media) var(--sal), visibility 0s linear var(--v-media);
+}
+.barra-accion[data-visible] {
+  transform: none; visibility: visible;
+  transition: transform var(--v-media) var(--sal), visibility 0s;
+}
+@media (min-width: 900px) { .barra-accion { display: none; } }
+@media (prefers-reduced-motion: reduce) { .barra-accion { transition: none; } }
+
+/* ---- Planes por giro ------------------------------------------------------
+   La tarjeta de precio de las páginas por giro: lo de arriba es igual en todos
+   los giros (plan, precio, botón) y la lista de abajo dice qué trae ese plan
+   para ESE giro, con el precio de lo que se cobra aparte. */
+.planes-giro-cabeza { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: var(--sp-4); }
+/* Subrejilla: las siete filas de cada tarjeta (encabezado, precio, alcance,
+   botón, título, lista, enlace) se alinean con las de las otras dos, aunque el
+   recomendado lleve chip o una descripción más larga. */
+.plan-giro {
+  display: grid; grid-row: span 7; grid-template-rows: subgrid; row-gap: var(--sp-5);
+  align-content: start;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: var(--sp-6);
+}
+.plan-giro.destacado { border: 2px solid var(--accent); padding: calc(var(--sp-6) - 1px); }
+.plan-giro-nombre { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); }
+.plan-giro-nombre h3 { font-size: var(--t-24); }
+.plan-giro-chip {
+  font-family: var(--font-mono); font-size: var(--t-12); font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--accent-hover); background: var(--accent-soft);
+  padding: var(--sp-1) var(--sp-2); border-radius: var(--r-sm);
+  white-space: nowrap;
+}
+.plan-giro-precio {
+  display: flex; align-items: baseline; gap: var(--sp-1);
+  padding-top: var(--sp-5); border-top: 1px solid var(--line);
+  font-family: var(--font-display); font-weight: 700; letter-spacing: -0.03em;
+}
+.plan-giro-precio strong { font-size: clamp(var(--t-44), 5vw, var(--t-60)); line-height: 1; }
+.plan-giro-precio span { font-size: var(--t-24); color: var(--ink-2); }
+.plan-giro-alcance { font-size: var(--t-15); margin-top: calc(-1 * var(--sp-3)); align-self: start; }
+.plan-giro .btn { width: 100%; justify-content: center; }
+.plan-giro-titulo { font-weight: 600; color: var(--ink); font-size: var(--t-15); }
+.plan-giro-lista { list-style: none; margin: calc(-1 * var(--sp-3)) 0 0; padding: 0; }
+.plan-giro-lista li {
+  padding-block: var(--sp-3);
+  border-top: 1px solid var(--line);
+  font-size: var(--t-15); color: var(--ink-2);
+}
+.plan-giro-mas { align-self: end; justify-self: start; font-weight: 600; font-size: var(--t-15); text-underline-offset: 4px; }

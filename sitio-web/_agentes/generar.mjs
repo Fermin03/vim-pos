@@ -211,9 +211,13 @@ function gemelo(pagina) {
     ? cuerpo.slice(0, i) + '\n\n' + cabecera + cuerpo.slice(i)
     : `# ${pagina.nombre}\n\n${cabecera}\n\n${cuerpo}`;
 
-  const otras = PAGINAS.filter((p) => p.ruta !== pagina.ruta)
-    .map((p) => `[${p.nombre}](${BASE}/${p.markdown})`)
-    .join(' · ');
+  // Las páginas por giro (/punto-de-venta-*) ya son más de una docena: listadas aquí inflaban cada
+  // gemelo (el 404 pasó del tope). Van juntas en un solo enlace a llms.txt, que las lista todas.
+  const otras = [
+    ...PAGINAS.filter((p) => p.ruta !== pagina.ruta && !p.ruta.startsWith('/punto-de-venta-'))
+      .map((p) => `[${p.nombre}](${BASE}/${p.markdown})`),
+    `[Por tipo de negocio](${BASE}/llms.txt)`,
+  ].join(' · ');
 
   const pie = [
     '---',

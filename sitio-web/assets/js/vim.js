@@ -82,6 +82,91 @@
        · Bloquear el scroll de fondo. Sin esto, deslizar sobre el velo mueve la
          página de debajo y al cerrar el menú ya no estás donde estabas.
        · Devolver el foco a la hamburguesa al cerrar. */
+  /* ---- Pantallas del menú -------------------------------------------------
+     Un botón con `data-ir` lleva a la pantalla de ese nombre dentro del mismo
+     contenedor y `data-volver` regresa a la anterior. Las que no se ven van
+     inertes, para que el foco no se meta en ellas. El foco pasa a la pantalla
+     nueva ANTES de marcar inerte la vieja: si no, el panel de la PC lo pierde,
+     cree que te saliste y se cierra. Con teclado el foco va a la primera
+     entrada; con un toque, a la pantalla misma, para no pintar el aro.
+
+     En el panel de la PC no hay deslizamiento: la lista de la izquierda se
+     queda y la pantalla del grupo bajo el cursor (o con el foco) se asoma a
+     su derecha. Al abrir se asoma la del primero, para que no quede vacío. */
+  function asomar(cont, ir) {
+    Array.prototype.forEach.call(cont.querySelectorAll("[data-ir]"), function (b) {
+      var p = cont.querySelector('[data-pantalla="' + b.getAttribute("data-ir") + '"]');
+      var este = b === ir;
+      b.toggleAttribute("data-activo", este);
+      if (este) p.removeAttribute("data-lado"); else p.setAttribute("data-lado", "despues");
+      p.inert = !este;
+    });
+  }
+
+  function reiniciarPantallas(cont) {
+    if (!cont) return;
+    cont.pila = [];
+    cont.setAttribute("data-instante", "");
+    Array.prototype.forEach.call(cont.children, function (p, i) {
+      if (i) p.setAttribute("data-lado", "despues"); else p.removeAttribute("data-lado");
+      p.inert = i > 0;
+      p.tabIndex = -1;
+    });
+    var primero = cont.querySelector("[data-ir]");
+    if (cont.closest(".nav-panel") && primero) asomar(cont, primero);
+    void cont.offsetHeight;
+    cont.removeAttribute("data-instante");
+  }
+
+  function mostrarPantalla(cont, destino, lado, teclado, foco) {
+    var actual = cont.querySelector(":scope > .nav-pantalla:not([data-lado])");
+    destino.removeAttribute("data-lado");
+    destino.inert = false;
+    (teclado ? foco || destino.querySelector("a, button") : destino).focus();
+    actual.setAttribute("data-lado", lado);
+    actual.inert = true;
+  }
+
+  document.querySelectorAll("[data-pantallas]").forEach(function (cont) {
+    cont.setAttribute("data-js", "");
+    reiniciarPantallas(cont);
+
+    if (cont.closest(".nav-panel")) {
+      /* Con el cursor, el cambio espera 100 ms y se cancela si antes llega a
+         la lista de la derecha: así, bajar en diagonal de «Alimentos» a «Food
+         trucks» no cambia la lista al cruzar «Tienda» y «Belleza». */
+      var pendiente = null;
+      cont.addEventListener("mouseover", function (e) {
+        clearTimeout(pendiente);
+        var ir = e.target.closest("[data-ir]");
+        if (ir) pendiente = setTimeout(function () { asomar(cont, ir); }, 100);
+      });
+      cont.addEventListener("focusin", function (e) {
+        var ir = e.target.closest("[data-ir]");
+        if (ir) asomar(cont, ir);
+      });
+      /* Un clic (o Enter) también asoma; con teclado, además, entra a la lista. */
+      cont.addEventListener("click", function (e) {
+        var ir = e.target.closest("[data-ir]");
+        if (!ir) return;
+        asomar(cont, ir);
+        if (e.detail === 0) cont.querySelector('[data-pantalla="' + ir.getAttribute("data-ir") + '"] a').focus();
+      });
+      return;
+    }
+
+    cont.addEventListener("click", function (e) {
+      var ir = e.target.closest("[data-ir]");
+      if (ir) {
+        cont.pila.push(ir);
+        mostrarPantalla(cont, cont.querySelector('[data-pantalla="' + ir.getAttribute("data-ir") + '"]'), "antes", e.detail === 0);
+      } else if (e.target.closest("[data-volver]") && cont.pila.length) {
+        var de = cont.pila.pop();
+        mostrarPantalla(cont, de.closest(".nav-pantalla"), "despues", e.detail === 0, de);
+      }
+    });
+  });
+
   var boton = document.querySelector("[data-menu-boton]");
   var menu = document.querySelector("[data-menu]");
   var botonCerrar = document.querySelector("[data-menu-cerrar]");
@@ -99,11 +184,11 @@
       boton.setAttribute("aria-expanded", "true");
       document.body.setAttribute("data-menu-abierto", "true");
 
-      /* A la primera entrada, no al botón de cerrar: quien abre el menú quiere
-         ir a algún sitio, no cerrarlo. La primera puede ser un grupo plegado,
-         así que se busca su `summary`: un enlace dentro de un <details>
-         cerrado no acepta el foco. */
-      var primero = menu.querySelector(".nav-movil-lista summary, .nav-movil-lista > a");
+      /* Siempre abre en la primera pantalla, y el foco va a su primera
+         entrada, no al botón de cerrar: quien abre el menú quiere ir a algún
+         sitio, no cerrarlo. */
+      reiniciarPantallas(menu.querySelector("[data-pantallas]"));
+      var primero = menu.querySelector(".nav-pantalla:not([data-lado]) :is(a, button)");
       if (primero) primero.focus();
     }
 
@@ -149,7 +234,8 @@
       if (e.key !== "Tab") return;
 
       /* El aro del foco: del último se salta al primero y al revés. */
-      var f = Array.prototype.slice.call(menu.querySelectorAll(FOCABLES));
+      var f = Array.prototype.slice.call(menu.querySelectorAll(FOCABLES))
+        .filter(function (el) { return !el.closest("[inert]"); });
       if (!f.length) return;
       var primero = f[0], ultimo = f[f.length - 1];
 
@@ -195,6 +281,7 @@
       if (previo === grupo) return;
       /* De un panel al de al lado no hay animación: ya había uno abierto. */
       enlaces.toggleAttribute("data-instante", !!(previo && grupo));
+      if (grupo) reiniciarPantallas(grupo.querySelector("[data-pantallas]"));
       grupos.forEach(function (g) {
         g.setAttribute("data-abierto", String(g === grupo));
         g.querySelector("button").setAttribute("aria-expanded", String(g === grupo));
@@ -584,7 +671,7 @@
      es exactamente el tipo de cosa que se olvida en la quinta página. */
   function ruta(p) { return p.replace(/\.html$/, "").replace(/\/+$/, "").replace(/^\/?index$/, "") || "/"; }
   var aqui = ruta(location.pathname);
-  document.querySelectorAll(".nav-enlace, .nav-panel a, .nav-movil-lista a").forEach(function (a) {
+  document.querySelectorAll(".nav-enlace, .nav-panel a, .nav-movil a").forEach(function (a) {
     var destino = a.getAttribute("href");
     if (!destino || destino.charAt(0) !== "/" || ruta(destino) !== aqui) return;
     a.setAttribute("aria-current", "page");
@@ -620,8 +707,44 @@
 
     document.querySelectorAll(".seccion > .contenedor > *").forEach(function (bloque) {
       if (bloque.getBoundingClientRect().top < window.innerHeight) return;
-      bloque.classList.add(bloque.matches(".tres, .dos, .tira, .planes") ? "por-entrar-grupo" : "por-entrar");
+      bloque.classList.add(bloque.matches(".tres, .dos, .tira, .planes, .cuatro, .giro-tira") ? "por-entrar-grupo" : "por-entrar");
       entrada.observe(bloque);
     });
+  }
+
+  /* ---- Páginas por giro: la imagen que acompaña a cada rasgo -----------------
+     En la PC la columna de la imagen se queda quieta y muestra la del rasgo que
+     cruza la mitad de la pantalla. La línea de disparo es una franja delgada en
+     el centro (rootMargin −50 %), así que solo un rasgo la toca a la vez. */
+  var rasgos = document.querySelectorAll("[data-rasgo]");
+  var medios = document.querySelectorAll("[data-rasgo-media]");
+  if (rasgos.length && medios.length && "IntersectionObserver" in window) {
+    var verRasgo = new IntersectionObserver(function (entradas) {
+      entradas.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        var n = e.target.getAttribute("data-rasgo");
+        medios.forEach(function (m) { m.toggleAttribute("data-activo", m.getAttribute("data-rasgo-media") === n); });
+      });
+    }, { rootMargin: "-50% 0px -50% 0px" });
+    rasgos.forEach(function (r) { verRasgo.observe(r); });
+  }
+
+  /* ---- Barra fija de acciones (teléfono) ------------------------------------
+     Sale cuando el hero ya no se ve y se va cuando aparece el cierre, que trae
+     los mismos botones. */
+  var barra = document.querySelector("[data-barra-accion]");
+  var heroGiro = document.querySelector(".giro-hero");
+  var cierreGiro = document.querySelector(".cierre");
+  if (barra && heroGiro && "IntersectionObserver" in window) {
+    var heroVisible = true, cierreVisible = false;
+    var pintarBarra = function () { barra.toggleAttribute("data-visible", !heroVisible && !cierreVisible); };
+    var verBarra = new IntersectionObserver(function (entradas) {
+      entradas.forEach(function (e) {
+        if (e.target === heroGiro) heroVisible = e.isIntersecting; else cierreVisible = e.isIntersecting;
+      });
+      pintarBarra();
+    });
+    verBarra.observe(heroGiro);
+    if (cierreGiro) verBarra.observe(cierreGiro);
   }
 })();
