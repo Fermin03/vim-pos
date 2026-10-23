@@ -174,7 +174,12 @@
   if (boton && menu) {
     var FOCABLES = 'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
-    function abrir() {
+    /* Con un toque, el foco va al cajón mismo (sin aro); el aro azul solo
+       aparece cuando se abre con el teclado. Safari en el iPhone pinta el aro
+       a todo `focus()` hecho por código, aunque lo haya pedido un dedo. */
+    menu.tabIndex = -1;
+
+    function abrir(teclado) {
       menu.setAttribute("data-abierto", "true");
       /* `inert` y no `aria-hidden`: aria-hidden lo esconde del lector de
          pantalla pero deja sus enlaces en el orden de tabulación, así que se
@@ -189,7 +194,7 @@
          sitio, no cerrarlo. */
       reiniciarPantallas(menu.querySelector("[data-pantallas]"));
       var primero = menu.querySelector(".nav-pantalla:not([data-lado]) :is(a, button)");
-      if (primero) primero.focus();
+      if (teclado && primero) primero.focus(); else menu.focus();
     }
 
     function cerrar(devolverFoco) {
@@ -205,11 +210,12 @@
 
     var abierto = function () { return menu.getAttribute("data-abierto") === "true"; };
 
-    boton.addEventListener("click", function () {
-      if (abierto()) cerrar(true); else abrir();
+    /* `e.detail === 0` es un clic hecho con el teclado (Enter o espacio). */
+    boton.addEventListener("click", function (e) {
+      if (abierto()) cerrar(e.detail === 0); else abrir(e.detail === 0);
     });
 
-    if (botonCerrar) botonCerrar.addEventListener("click", function () { cerrar(true); });
+    if (botonCerrar) botonCerrar.addEventListener("click", function (e) { cerrar(e.detail === 0); });
 
     /* Navegar cierra el cajón. */
     menu.addEventListener("click", function (e) {

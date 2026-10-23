@@ -548,6 +548,8 @@ body[data-menu-abierto="true"]::before {
 /* El pie del cajón se queda abajo en todas las pantallas: Contactar ventas a
    la izquierda, Comenzar a la derecha. */
 .nav-movil { display: flex; flex-direction: column; }
+/* Recibe el foco al abrirse con un toque (vim.js): sin aro, que en el iPhone enmarcaba la pantalla. */
+.nav-movil:focus, .nav-movil:focus-visible { outline: none; }
 .nav-movil > nav { flex: 1; }
 .nav-movil-pie {
   position: sticky; bottom: 0;
