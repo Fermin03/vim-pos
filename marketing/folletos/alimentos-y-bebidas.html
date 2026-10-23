@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<title>Folleto · Alimentos y bebidas</title>
+<style>
+@font-face { font-family: 'Inter Tight'; src: url('../../sitio-web/assets/fonts/inter-tight-var-latin.woff2') format('woff2'); font-weight: 100 900; }
+@font-face { font-family: 'Sora'; src: url('../../sitio-web/assets/fonts/sora-var-latin.woff2') format('woff2'); font-weight: 100 800; }
+@font-face { font-family: 'JetBrains Mono'; src: url('../../sitio-web/assets/fonts/jetbrains-mono-var-latin.woff2') format('woff2'); font-weight: 100 800; }
+
+/* Tokens copiados de packages/ui/tokens.css (vía sitio-web/assets/css/vim.css). */
+:root {
+  --accent: #0078C9;
+  --accent-soft: #EAF3FB;
+  --ink: #16161A;
+  --ink-2: #5A5A60;
+  --ink-3: #6E6E74;
+  --line: #ECECE9;
+  --line-strong: #DDDDD9;
+
+  --rebase: 3mm;
+  --seguro: 9mm;
+  --diente: 9mm;
+}
+
+@page { size: 285.4mm 221.9mm; margin: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #fff; }
+body {
+  font-family: 'Inter Tight', system-ui, sans-serif; color: var(--ink);
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.hoja {
+  width: 285.4mm; height: 221.9mm; overflow: hidden; position: relative;
+  display: grid; break-after: page; background: #fff;
+}
+.hoja.exterior { grid-template-columns: 94.4mm 94mm 97mm; }
+.hoja.interior { grid-template-columns: 97mm 94mm 94.4mm; }
+.panel {
+  position: relative; display: flex; flex-direction: column;
+  padding: calc(var(--rebase) + 11mm) var(--seguro) calc(var(--rebase) + 10mm);
+}
+.hoja.exterior .panel:first-child,
+.hoja.interior .panel:first-child { padding-left: calc(var(--rebase) + var(--seguro)); }
+.hoja.exterior .panel:last-child,
+.hoja.interior .panel:last-child { padding-right: calc(var(--rebase) + var(--seguro)); }
+
+.eyebrow {
+  font-family: 'JetBrains Mono', monospace; font-size: 7pt; font-weight: 500;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--accent);
+}
+h1, h2, h3, .cifra { font-family: 'Sora', sans-serif; letter-spacing: -.02em; }
+h2 { font-size: 17pt; font-weight: 600; line-height: 1.1; margin-top: 2mm; }
+
+/* ---- Portada: el ticket ---- */
+.portada { padding: 0; }
+.portada .ticket {
+  height: 128mm; flex: none; background: var(--accent); clip-path: polygon(0% 0%, 100% 0%, 100.000% calc(100% - var(--diente)), 90.000% 100%, 80.000% calc(100% - var(--diente)), 70.000% 100%, 60.000% calc(100% - var(--diente)), 50.000% 100%, 40.000% calc(100% - var(--diente)), 30.000% 100%, 20.000% calc(100% - var(--diente)), 10.000% 100%, 0% calc(100% - var(--diente)));
+  padding: calc(var(--rebase) + 6mm) calc(var(--rebase) + var(--seguro)) calc(var(--diente) + 4mm) var(--seguro);
+  display: grid; place-items: center;
+}
+.rejilla { display: grid; grid-template-columns: repeat(3, 18mm); grid-auto-rows: 18mm; gap: 6mm; color: #fff; }
+.celda { display: grid; place-items: center; }
+.celda .ic { width: 12mm; height: 12mm; }
+.celda.ficha { background: #fff; color: var(--accent); border-radius: 2.5mm; }
+.celda.ficha .ic { width: 10.5mm; height: 10.5mm; }
+.portada .texto {
+  flex: 1; display: flex; flex-direction: column;
+  padding: 9mm calc(var(--rebase) + var(--seguro)) calc(var(--rebase) + 10mm) var(--seguro);
+}
+.portada h1 { font-size: 23pt; font-weight: 600; line-height: 1.05; margin-top: 2mm; }
+.portada .giros { font-size: 9pt; color: var(--ink-2); margin-top: 2.5mm; }
+.portada .logo { height: 9mm; width: auto; display: block; margin-top: auto; }
+
+/* ---- Solapa: qué es ---- */
+.telefono {
+  width: 40mm; height: 58mm; margin: 0 auto 7mm; flex: none;
+  border: 1.6mm solid var(--ink); border-bottom: none; border-radius: 6mm 6mm 0 0;
+  overflow: hidden; background: #fff;
+}
+.telefono img { width: 100%; display: block; }
+.escenario.cel { background: var(--accent-soft); border-radius: 2.5mm; padding-top: 7mm; margin-bottom: 7mm; }
+.escenario.cel .telefono { margin-bottom: 0; }
+.solapa p.lema { font-size: 9.5pt; color: var(--ink-2); line-height: 1.35; margin-top: 2.5mm; }
+.pilares { display: grid; gap: 4.5mm; margin-top: 7mm; }
+.pilar { display: grid; grid-template-columns: 9mm 1fr; gap: 3.5mm; align-items: center; }
+.burbuja {
+  width: 9mm; height: 9mm; border-radius: 2mm; background: var(--accent-soft);
+  color: var(--accent); display: grid; place-items: center;
+}
+.burbuja .ic { width: 5mm; height: 5mm; }
+.pilar b { display: block; font-family: 'Sora', sans-serif; font-weight: 600; font-size: 9pt; }
+.pilar span { font-size: 8pt; color: var(--ink-2); }
+.sello {
+  margin-top: auto; display: flex; align-items: center; gap: 2mm;
+  background: var(--ink); color: #fff; border-radius: 2mm; padding: 3mm 3.5mm;
+  font-size: 8.5pt; font-weight: 500;
+}
+.sello .ic { width: 4.5mm; height: 4.5mm; flex: none; }
+
+/* ---- Contraportada: precios y contacto ---- */
+.planes { margin-top: 6mm; display: grid; gap: 3mm; }
+.plan {
+  border: .3mm solid var(--line-strong); border-radius: 2mm; padding: 3.5mm 4mm;
+  display: grid; grid-template-columns: 1fr auto; align-items: baseline; row-gap: .8mm;
+}
+.plan.destacado { border-color: var(--accent); background: var(--accent-soft); }
+.plan b { font-family: 'Sora', sans-serif; font-weight: 600; font-size: 10pt; }
+.plan .cifra { font-weight: 600; font-size: 14pt; font-variant-numeric: tabular-nums; }
+.plan .cifra small { font-family: 'Inter Tight', sans-serif; font-size: 7pt; font-weight: 500; color: var(--ink-3); letter-spacing: 0; }
+.plan .linea { grid-column: 1 / -1; font-size: 7.5pt; color: var(--ink-2); }
+.notas { margin-top: 3.5mm; font-size: 7.5pt; color: var(--ink-3); line-height: 1.5; }
+.contacto { margin-top: auto; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.qr-img { width: 30mm; height: 30mm; display: block; }
+.contacto .web { font-family: 'Sora', sans-serif; font-weight: 600; font-size: 11pt; margin-top: 3.5mm; }
+.contacto .wa { font-size: 8.5pt; color: var(--ink-2); margin-top: 1mm; }
+.contacto .logo { height: 8mm; width: auto; margin-top: 7mm; }
+
+/* ---- Interior: funciones ---- */
+.funcion + .funcion { margin-top: 9mm; }
+.escenario {
+  height: 68mm; background: var(--accent-soft); border-radius: 2.5mm;
+  display: grid; place-items: center; padding: 5mm; overflow: hidden;
+}
+.escenario img {
+  max-width: 100%; max-height: 58mm; display: block; background: #fff;
+  border-radius: 1.5mm; box-shadow: 0 .6mm 2.5mm rgba(22,22,26,.14), 0 0 0 .2mm rgba(22,22,26,.08);
+}
+.escenario .tel-chico { height: 100%; border: 1.2mm solid var(--ink); border-radius: 4mm; overflow: hidden; background: #fff; }
+.escenario .tel-chico img { height: 100%; width: auto; max-width: none; max-height: none; border-radius: 0; box-shadow: none; }
+.escenario.icono { color: var(--accent); }
+.escenario.icono .ic { width: 26mm; height: 26mm; }
+.funcion .num { font-family: 'JetBrains Mono', monospace; font-size: 7pt; color: var(--accent); margin-top: 4.5mm; display: block; }
+.funcion h3 { font-size: 12pt; font-weight: 600; margin-top: 1.2mm; }
+.funcion p { font-size: 8.5pt; color: var(--ink-2); margin-top: 1.2mm; line-height: 1.35; }
+</style></head>
+<body>
+<section class="hoja exterior">
+  <div class="panel solapa">
+    <div class="escenario cel"><div class="telefono"><img src="recortes/admin-dashboard-movil.png" alt=""></div></div>
+    <p class="eyebrow">Qué es</p>
+    <h2>VIM POS</h2>
+    <p class="lema">El punto de venta para cobrar, controlar y facturar tu negocio.</p>
+    <div class="pilares"><div class="pilar"><div class="burbuja"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="2"/><path d="M2.5 12.5h19M8.8 5.5v7M15.2 5.5v7M10.5 15.5h3"/></svg></div><div><b>Caja</b><span>Cobra en segundos.</span></div></div><div class="pilar"><div class="burbuja"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 7v10l8 4 8-4V7l-8-4zM4 7l8 4 8-4M12 11v10"/></svg></div><div><b>Inventario</b><span>Sabes qué tienes y qué falta.</span></div></div><div class="pilar"><div class="burbuja"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v14.5l-2 2-2-2-2 2-2-2-2 2-2-2z"/><path d="M9.5 7.5h5M9.5 11.5h5"/></svg></div><div><b>Factura CFDI</b><span>Desde la misma caja.</span></div></div><div class="pilar"><div class="burbuja"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18h3"/></svg></div><div><b>En tu celular</b><span>La venta del día, donde estés.</span></div></div></div>
+    <div class="sello"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 10.5A12 12 0 0 1 6 8.6M9.7 7.2a12 12 0 0 1 10.8 3.3M7.8 14.8a6 6 0 0 1 3.4-1.7M14.9 13.7a6 6 0 0 1 1.3 1.1M12 19h.01M4 4l16 16"/></svg>Sin internet, sigues cobrando</div>
+  </div>
+  <div class="panel contraportada">
+    <p class="eyebrow">Precios</p>
+    <h2>Desde $699 al mes</h2>
+    <div class="planes"><div class="plan"><b>Esencial</b><span class="cifra">$699<small> /mes</small></span><p class="linea">1 sucursal · 1 caja</p></div><div class="plan destacado"><b>Negocio</b><span class="cifra">$999<small> /mes</small></span><p class="linea">1 sucursal · 3 cajas · factura incluida</p></div><div class="plan"><b>Cadena</b><span class="cifra">$1,999<small> /mes</small></span><p class="linea">3 sucursales · cajas sin límite</p></div></div>
+    <p class="notas">Más IVA · Sin pago inicial · Sin contrato forzoso</p>
+    <div class="contacto">
+      <svg class="qr-img" preserveAspectRatio="xMidYMid meet" viewBox="0 0 37 37" class="segno"><path class="qrline" stroke="#16161a" d="M0 0.5h7m3 0h1m1 0h2m2 0h3m1 0h2m1 0h1m4 0h1m1 0h7m-37 1h1m5 0h1m2 0h1m2 0h1m3 0h1m2 0h1m1 0h2m2 0h1m1 0h2m1 0h1m5 0h1m-37 1h1m1 0h3m1 0h1m1 0h3m1 0h1m2 0h2m2 0h3m4 0h2m2 0h1m1 0h3m1 0h1m-37 1h1m1 0h3m1 0h1m1 0h2m3 0h1m1 0h1m1 0h1m1 0h2m1 0h2m1 0h2m3 0h1m1 0h3m1 0h1m-37 1h1m1 0h3m1 0h1m1 0h2m1 0h6m1 0h2m1 0h1m1 0h1m1 0h1m2 0h1m1 0h1m1 0h3m1 0h1m-37 1h1m5 0h1m1 0h1m5 0h2m2 0h1m1 0h1m5 0h2m2 0h1m5 0h1m-37 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-29 1h2m4 0h1m1 0h1m3 0h2m4 0h1m1 0h1m-29 1h1m1 0h5m3 0h1m2 0h1m1 0h1m2 0h1m3 0h1m1 0h3m3 0h5m-34 1h1m2 0h1m2 0h3m1 0h1m2 0h3m6 0h3m2 0h1m2 0h1m2 0h2m-34 1h2m2 0h3m2 0h3m3 0h1m3 0h2m2 0h3m1 0h3m3 0h2m-36 1h2m1 0h2m5 0h4m1 0h1m1 0h1m2 0h2m1 0h1m1 0h3m7 0h1m-37 1h1m2 0h4m1 0h1m1 0h1m1 0h2m3 0h1m3 0h3m1 0h2m2 0h4m2 0h2m-37 1h2m1 0h1m1 0h1m2 0h2m2 0h2m3 0h7m7 0h1m-30 1h2m1 0h6m1 0h6m2 0h3m3 0h3m2 0h3m1 0h2m-37 1h2m2 0h2m5 0h1m1 0h1m2 0h4m1 0h3m2 0h1m2 0h4m3 0h1m-36 1h2m2 0h2m2 0h3m4 0h1m5 0h2m1 0h3m1 0h2m1 0h1m1 0h3m-37 1h1m4 0h1m5 0h1m3 0h1m1 0h2m4 0h1m1 0h1m2 0h1m2 0h1m2 0h2m-36 1h2m1 0h2m1 0h2m1 0h1m2 0h6m2 0h1m1 0h1m3 0h3m5 0h3m-36 1h1m3 0h1m1 0h1m1 0h1m1 0h3m1 0h1m3 0h1m1 0h2m3 0h2m1 0h2m5 0h1m-35 1h3m1 0h2m1 0h2m2 0h3m1 0h1m4 0h2m1 0h1m1 0h4m1 0h3m-31 1h2m1 0h2m1 0h1m1 0h3m1 0h1m1 0h8m2 0h1m4 0h1m1 0h1m-36 1h1m4 0h2m3 0h1m1 0h1m1 0h2m2 0h1m6 0h9m1 0h2m-35 1h1m1 0h1m2 0h3m3 0h1m1 0h2m2 0h1m1 0h1m1 0h1m4 0h2m1 0h2m2 0h2m-35 1h2m2 0h1m2 0h3m1 0h3m2 0h1m1 0h1m1 0h5m2 0h4m1 0h3m-37 1h1m1 0h4m1 0h1m2 0h1m1 0h1m2 0h3m1 0h3m1 0h4m1 0h1m2 0h1m1 0h1m-34 1h1m1 0h2m2 0h1m2 0h3m8 0h1m4 0h5m1 0h1m2 0h3m-37 1h1m2 0h1m1 0h1m1 0h2m4 0h1m2 0h1m1 0h1m2 0h4m2 0h6m-33 1h1m5 0h1m2 0h2m1 0h3m1 0h2m2 0h1m1 0h1m1 0h3m1 0h7m-27 1h1m3 0h1m3 0h5m2 0h2m2 0h2m3 0h2m1 0h1m-36 1h7m2 0h1m1 0h7m2 0h2m2 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h3m-37 1h1m5 0h1m1 0h1m1 0h1m2 0h1m1 0h4m1 0h3m1 0h1m3 0h1m3 0h2m-34 1h1m1 0h3m1 0h1m1 0h6m1 0h2m5 0h2m1 0h8m1 0h3m-37 1h1m1 0h3m1 0h1m1 0h2m1 0h1m2 0h2m1 0h4m2 0h1m1 0h1m1 0h1m1 0h2m1 0h2m2 0h1m-37 1h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m2 0h2m5 0h1m3 0h2m1 0h1m5 0h2m-37 1h1m5 0h1m7 0h2m2 0h1m1 0h4m2 0h1m1 0h2m2 0h1m3 0h1m-37 1h7m1 0h8m1 0h1m2 0h1m1 0h2m1 0h3m4 0h5"/></svg>
+      <p class="web">vimpos.com.mx</p>
+      <p class="wa">WhatsApp 56 6508 3346</p>
+      <svg class="logo" id="Capa_1" data-name="Capa 1" xmlns="http://www.w3.org/2000/svg" viewBox="159.6 149.9 1600.8 780.3">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #fff;
+      }
+
+      .cls-2 {
+        fill: #0078c9;
+      }
+    </style>
+  </defs>
+  <g>
+    <polygon class="cls-2" points="159.62 149.87 159.62 823.03 271.82 930.13 384.01 823.03 496.2 930.13 608.4 823.03 720.59 930.13 832.79 823.03 832.79 149.87 159.62 149.87"/>
+    <path class="cls-1" d="M530.67,648.78c-6.46,15.62-22.62,21-34.47,21s-28.54-5.39-35-21l-132.48-303.19c-2.69-5.92-3.77-11.31-3.77-16.69,0-21.54,20.46-35.54,40.39-35.54,13.46,0,26.39,6.46,32.31,21.54l98.55,242.34,98.01-242.34c5.92-15.08,18.85-21.54,32.31-21.54,19.93,0,40.93,14.54,40.93,36.08,0,4.85-1.08,10.23-3.77,16.16l-133.02,303.19Z"/>
+  </g>
+  <g>
+    <path d="M1042.38,595.9l-34-108.6h28.6l32.6,108.6h-27.2ZM1050.58,595.9v-22.8h29.4v22.8h-29.4ZM1061.58,595.9l28-108.6h26.8l-29.4,108.6h-25.4Z"/>
+    <path d="M1127.38,508.1v-20.8h43v20.8h-43ZM1152.79,474.3c-5.47,0-9.5-1.4-12.1-4.2-2.6-2.8-3.9-6.47-3.9-11s1.3-8,3.9-10.8c2.6-2.8,6.63-4.2,12.1-4.2s9.47,1.4,12,4.2c2.53,2.8,3.8,6.4,3.8,10.8s-1.27,8.2-3.8,11c-2.53,2.8-6.53,4.2-12,4.2ZM1142.58,595.9v-108.6h27.8v108.6h-27.8Z"/>
+    <path d="M1202.38,595.9v-108.6h22v46.6h-2c0-10.93,1.4-20.1,4.2-27.5s6.97-13,12.5-16.8c5.53-3.8,12.43-5.7,20.7-5.7h1.2c8.4,0,15.37,1.9,20.9,5.7,5.53,3.8,9.67,9.4,12.4,16.8,2.73,7.4,4.1,16.57,4.1,27.5h-7c0-10.93,1.43-20.1,4.3-27.5,2.87-7.4,7.07-13,12.6-16.8,5.53-3.8,12.43-5.7,20.7-5.7h1.2c8.4,0,15.4,1.9,21,5.7,5.6,3.8,9.83,9.4,12.7,16.8,2.87,7.4,4.3,16.57,4.3,27.5v62h-27.8v-64.4c0-6.93-1.77-12.43-5.3-16.5-3.53-4.07-8.43-6.1-14.7-6.1s-11.53,2.1-15.4,6.3c-3.87,4.2-5.8,9.9-5.8,17.1v63.6h-27.8v-64.4c0-6.93-1.77-12.43-5.3-16.5-3.53-4.07-8.43-6.1-14.7-6.1s-11.53,2.1-15.4,6.3c-3.87,4.2-5.8,9.9-5.8,17.1v63.6h-27.8Z"/>
+    <path d="M1397.98,635.9v-148.6h22v46.8l-3.4-.2c.53-11.07,2.83-20.33,6.9-27.8,4.07-7.47,9.5-13.03,16.3-16.7,6.8-3.67,14.4-5.5,22.8-5.5,7.73,0,14.7,1.4,20.9,4.2,6.2,2.8,11.53,6.73,16,11.8,4.47,5.07,7.9,10.97,10.3,17.7,2.4,6.73,3.6,13.97,3.6,21.7v4.2c0,7.87-1.17,15.2-3.5,22-2.33,6.8-5.73,12.73-10.2,17.8-4.47,5.07-9.83,9.03-16.1,11.9-6.27,2.87-13.27,4.3-21,4.3-8.13,0-15.57-1.7-22.3-5.1-6.73-3.4-12.17-8.67-16.3-15.8-4.13-7.13-6.47-16.3-7-27.5l8.8,13.2v71.6h-27.8ZM1455.58,576.1c5.87,0,11.07-1.46,15.6-4.4,4.53-2.93,8.03-7.03,10.5-12.3,2.47-5.27,3.7-11.23,3.7-17.9s-1.23-12.77-3.7-17.9c-2.47-5.13-5.93-9.13-10.4-12-4.47-2.87-9.7-4.3-15.7-4.3-5.47,0-10.5,1.23-15.1,3.7-4.6,2.47-8.33,6-11.2,10.6-2.87,4.6-4.3,10.17-4.3,16.7v8c0,6.27,1.47,11.6,4.4,16,2.93,4.4,6.73,7.8,11.4,10.2,4.67,2.4,9.6,3.6,14.8,3.6Z"/>
+    <path d="M1589.98,599.7c-9.6,0-18.07-1.53-25.4-4.6-7.33-3.07-13.53-7.2-18.6-12.4-5.07-5.2-8.9-11.13-11.5-17.8-2.6-6.67-3.9-13.67-3.9-21v-4.2c0-7.47,1.33-14.57,4-21.3,2.67-6.73,6.57-12.73,11.7-18,5.13-5.27,11.4-9.4,18.8-12.4,7.4-3,15.7-4.5,24.9-4.5s17.47,1.5,24.8,4.5c7.33,3,13.57,7.13,18.7,12.4,5.13,5.27,9.03,11.27,11.7,18,2.67,6.73,4,13.83,4,21.3v4.2c0,7.33-1.3,14.33-3.9,21-2.6,6.67-6.43,12.6-11.5,17.8-5.07,5.2-11.27,9.33-18.6,12.4-7.33,3.07-15.73,4.6-25.2,4.6ZM1589.98,575.9c6.67,0,12.33-1.5,17-4.5,4.67-3,8.23-7.07,10.7-12.2,2.47-5.13,3.7-10.96,3.7-17.5s-1.27-12.4-3.8-17.6c-2.53-5.2-6.13-9.3-10.8-12.3-4.67-3-10.27-4.5-16.8-4.5s-12.17,1.5-16.9,4.5c-4.73,3-8.37,7.1-10.9,12.3-2.53,5.2-3.8,11.07-3.8,17.6s1.23,12.37,3.7,17.5c2.47,5.13,6.03,9.2,10.7,12.2,4.67,3,10.4,4.5,17.2,4.5Z"/>
+    <path d="M1712.98,599.3c-14.93,0-26.63-3.17-35.1-9.5-8.47-6.33-12.97-15.1-13.5-26.3h25.2c.4,3.73,2.47,7.13,6.2,10.2,3.73,3.07,9.6,4.6,17.6,4.6,6.53,0,11.8-1.2,15.8-3.6,4-2.4,6-5.67,6-9.8,0-3.47-1.5-6.27-4.5-8.4-3-2.13-8.17-3.6-15.5-4.4l-9.4-1c-12.27-1.2-21.67-4.63-28.2-10.3-6.53-5.67-9.8-13.17-9.8-22.5,0-7.47,1.87-13.73,5.6-18.8,3.73-5.07,8.9-8.9,15.5-11.5,6.6-2.6,14.23-3.9,22.9-3.9,13.33,0,24.13,2.93,32.4,8.8,8.27,5.87,12.6,14.53,13,26h-25c-.4-3.87-2.3-7.13-5.7-9.8-3.4-2.67-8.37-4-14.9-4-5.87,0-10.4,1.13-13.6,3.4-3.2,2.27-4.8,5.2-4.8,8.8s1.3,6.13,3.9,8c2.6,1.87,6.83,3.13,12.7,3.8l9.6,1c12.8,1.33,22.83,4.87,30.1,10.6,7.27,5.73,10.9,13.47,10.9,23.2,0,7.2-1.97,13.47-5.9,18.8-3.93,5.33-9.43,9.44-16.5,12.3-7.07,2.87-15.4,4.3-25,4.3Z"/>
+  </g>
+</svg>
+    </div>
+  </div>
+  <div class="panel portada">
+    <div class="ticket"><div class="rejilla"><div class="celda"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h12v5.5a5.5 5.5 0 0 1-5.5 5.5h-1A5.5 5.5 0 0 1 4 14.5zM16 10.5h1.5a2.5 2.5 0 0 1 0 5H16M8 3.5v2.5M12 3.5v2.5"/></svg></div><div class="celda"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 10h12l-1.4 9.4a2 2 0 0 1-2 1.6H9.4a2 2 0 0 1-2-1.6zM7.5 10V5.5h3V10M10.5 5.5V3h3v7M13.5 4.5h3V10"/></svg></div><div class="celda"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 8h10v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2zM15 10.5h2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2M5 8a2.5 2.5 0 0 1 2.5-4 3 3 0 0 1 5 0A2.5 2.5 0 0 1 15 8M8.5 12v5M11.5 12v5"/></svg></div><div class="celda"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="7.5" rx="9" ry="3.5"/><path d="M12 11v9.5M8 20.5h8"/></svg></div><div class="celda ficha"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5a8 6.5 0 0 1 16 0zM3.5 14h17M5 17.5h14v1a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z"/></svg></div><div class="celda"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="6.5" width="14" height="3" rx="1.5"/><path d="M6.8 9.5l.9 9.7a2 2 0 0 0 2 1.8h4.6a2 2 0 0 0 2-1.8l.9-9.7M12 6.5V3l3-1"/></svg></div><div class="celda"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20.5h16M5.5 20.5V14a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v6.5M5.5 16c1.1 0 1.1 1 2.2 1s1.1-1 2.15-1 1.1 1 2.15 1 1.1-1 2.15-1 1.1 1 2.15 1 1.1-1 2.2-1M12 12V8.5M12 5.5h.01"/></svg></div><div class="celda"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4h12l-1.4 15.2a2 2 0 0 1-2 1.8H9.4a2 2 0 0 1-2-1.8L6 4zM6.6 10h10.8"/></svg></div><div class="celda"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="17.75" r="2.5"/><circle cx="18.5" cy="17.75" r="2.5"/><rect x="3" y="5.5" width="5.5" height="4.5" rx="1.25"/><path d="M3 12.75h6c1.9 0 3.1.9 3.4 2.75h1.4l3.7-5.4M14.5 5h2.2l1.5 10.2"/></svg></div></div></div>
+    <div class="texto">
+      <p class="eyebrow">Punto de venta para</p>
+      <h1>Alimentos y bebidas</h1>
+      <p class="giros">Cafés · Bares · Restaurantes · Food trucks</p>
+      <svg class="logo" id="Capa_1" data-name="Capa 1" xmlns="http://www.w3.org/2000/svg" viewBox="159.6 149.9 1600.8 780.3">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #fff;
+      }
+
+      .cls-2 {
+        fill: #0078c9;
+      }
+    </style>
+  </defs>
+  <g>
+    <polygon class="cls-2" points="159.62 149.87 159.62 823.03 271.82 930.13 384.01 823.03 496.2 930.13 608.4 823.03 720.59 930.13 832.79 823.03 832.79 149.87 159.62 149.87"/>
+    <path class="cls-1" d="M530.67,648.78c-6.46,15.62-22.62,21-34.47,21s-28.54-5.39-35-21l-132.48-303.19c-2.69-5.92-3.77-11.31-3.77-16.69,0-21.54,20.46-35.54,40.39-35.54,13.46,0,26.39,6.46,32.31,21.54l98.55,242.34,98.01-242.34c5.92-15.08,18.85-21.54,32.31-21.54,19.93,0,40.93,14.54,40.93,36.08,0,4.85-1.08,10.23-3.77,16.16l-133.02,303.19Z"/>
+  </g>
+  <g>
+    <path d="M1042.38,595.9l-34-108.6h28.6l32.6,108.6h-27.2ZM1050.58,595.9v-22.8h29.4v22.8h-29.4ZM1061.58,595.9l28-108.6h26.8l-29.4,108.6h-25.4Z"/>
+    <path d="M1127.38,508.1v-20.8h43v20.8h-43ZM1152.79,474.3c-5.47,0-9.5-1.4-12.1-4.2-2.6-2.8-3.9-6.47-3.9-11s1.3-8,3.9-10.8c2.6-2.8,6.63-4.2,12.1-4.2s9.47,1.4,12,4.2c2.53,2.8,3.8,6.4,3.8,10.8s-1.27,8.2-3.8,11c-2.53,2.8-6.53,4.2-12,4.2ZM1142.58,595.9v-108.6h27.8v108.6h-27.8Z"/>
+    <path d="M1202.38,595.9v-108.6h22v46.6h-2c0-10.93,1.4-20.1,4.2-27.5s6.97-13,12.5-16.8c5.53-3.8,12.43-5.7,20.7-5.7h1.2c8.4,0,15.37,1.9,20.9,5.7,5.53,3.8,9.67,9.4,12.4,16.8,2.73,7.4,4.1,16.57,4.1,27.5h-7c0-10.93,1.43-20.1,4.3-27.5,2.87-7.4,7.07-13,12.6-16.8,5.53-3.8,12.43-5.7,20.7-5.7h1.2c8.4,0,15.4,1.9,21,5.7,5.6,3.8,9.83,9.4,12.7,16.8,2.87,7.4,4.3,16.57,4.3,27.5v62h-27.8v-64.4c0-6.93-1.77-12.43-5.3-16.5-3.53-4.07-8.43-6.1-14.7-6.1s-11.53,2.1-15.4,6.3c-3.87,4.2-5.8,9.9-5.8,17.1v63.6h-27.8v-64.4c0-6.93-1.77-12.43-5.3-16.5-3.53-4.07-8.43-6.1-14.7-6.1s-11.53,2.1-15.4,6.3c-3.87,4.2-5.8,9.9-5.8,17.1v63.6h-27.8Z"/>
+    <path d="M1397.98,635.9v-148.6h22v46.8l-3.4-.2c.53-11.07,2.83-20.33,6.9-27.8,4.07-7.47,9.5-13.03,16.3-16.7,6.8-3.67,14.4-5.5,22.8-5.5,7.73,0,14.7,1.4,20.9,4.2,6.2,2.8,11.53,6.73,16,11.8,4.47,5.07,7.9,10.97,10.3,17.7,2.4,6.73,3.6,13.97,3.6,21.7v4.2c0,7.87-1.17,15.2-3.5,22-2.33,6.8-5.73,12.73-10.2,17.8-4.47,5.07-9.83,9.03-16.1,11.9-6.27,2.87-13.27,4.3-21,4.3-8.13,0-15.57-1.7-22.3-5.1-6.73-3.4-12.17-8.67-16.3-15.8-4.13-7.13-6.47-16.3-7-27.5l8.8,13.2v71.6h-27.8ZM1455.58,576.1c5.87,0,11.07-1.46,15.6-4.4,4.53-2.93,8.03-7.03,10.5-12.3,2.47-5.27,3.7-11.23,3.7-17.9s-1.23-12.77-3.7-17.9c-2.47-5.13-5.93-9.13-10.4-12-4.47-2.87-9.7-4.3-15.7-4.3-5.47,0-10.5,1.23-15.1,3.7-4.6,2.47-8.33,6-11.2,10.6-2.87,4.6-4.3,10.17-4.3,16.7v8c0,6.27,1.47,11.6,4.4,16,2.93,4.4,6.73,7.8,11.4,10.2,4.67,2.4,9.6,3.6,14.8,3.6Z"/>
+    <path d="M1589.98,599.7c-9.6,0-18.07-1.53-25.4-4.6-7.33-3.07-13.53-7.2-18.6-12.4-5.07-5.2-8.9-11.13-11.5-17.8-2.6-6.67-3.9-13.67-3.9-21v-4.2c0-7.47,1.33-14.57,4-21.3,2.67-6.73,6.57-12.73,11.7-18,5.13-5.27,11.4-9.4,18.8-12.4,7.4-3,15.7-4.5,24.9-4.5s17.47,1.5,24.8,4.5c7.33,3,13.57,7.13,18.7,12.4,5.13,5.27,9.03,11.27,11.7,18,2.67,6.73,4,13.83,4,21.3v4.2c0,7.33-1.3,14.33-3.9,21-2.6,6.67-6.43,12.6-11.5,17.8-5.07,5.2-11.27,9.33-18.6,12.4-7.33,3.07-15.73,4.6-25.2,4.6ZM1589.98,575.9c6.67,0,12.33-1.5,17-4.5,4.67-3,8.23-7.07,10.7-12.2,2.47-5.13,3.7-10.96,3.7-17.5s-1.27-12.4-3.8-17.6c-2.53-5.2-6.13-9.3-10.8-12.3-4.67-3-10.27-4.5-16.8-4.5s-12.17,1.5-16.9,4.5c-4.73,3-8.37,7.1-10.9,12.3-2.53,5.2-3.8,11.07-3.8,17.6s1.23,12.37,3.7,17.5c2.47,5.13,6.03,9.2,10.7,12.2,4.67,3,10.4,4.5,17.2,4.5Z"/>
+    <path d="M1712.98,599.3c-14.93,0-26.63-3.17-35.1-9.5-8.47-6.33-12.97-15.1-13.5-26.3h25.2c.4,3.73,2.47,7.13,6.2,10.2,3.73,3.07,9.6,4.6,17.6,4.6,6.53,0,11.8-1.2,15.8-3.6,4-2.4,6-5.67,6-9.8,0-3.47-1.5-6.27-4.5-8.4-3-2.13-8.17-3.6-15.5-4.4l-9.4-1c-12.27-1.2-21.67-4.63-28.2-10.3-6.53-5.67-9.8-13.17-9.8-22.5,0-7.47,1.87-13.73,5.6-18.8,3.73-5.07,8.9-8.9,15.5-11.5,6.6-2.6,14.23-3.9,22.9-3.9,13.33,0,24.13,2.93,32.4,8.8,8.27,5.87,12.6,14.53,13,26h-25c-.4-3.87-2.3-7.13-5.7-9.8-3.4-2.67-8.37-4-14.9-4-5.87,0-10.4,1.13-13.6,3.4-3.2,2.27-4.8,5.2-4.8,8.8s1.3,6.13,3.9,8c2.6,1.87,6.83,3.13,12.7,3.8l9.6,1c12.8,1.33,22.83,4.87,30.1,10.6,7.27,5.73,10.9,13.47,10.9,23.2,0,7.2-1.97,13.47-5.9,18.8-3.93,5.33-9.43,9.44-16.5,12.3-7.07,2.87-15.4,4.3-25,4.3Z"/>
+  </g>
+</svg>
+    </div>
+  </div>
+</section>
+<section class="hoja interior">
+  <div class="panel"><article class="funcion"><div class="escenario"><img src="recortes/servicio-completo-mesas.png" alt=""></div><span class="num">01</span><h3>Mesas a la vista</h3><p>Quién está libre, quién ocupado y cuánto lleva.</p></article><article class="funcion"><div class="escenario"><img src="recortes/servicio-rapido-kds.png" alt=""></div><span class="num">02</span><h3>Directo a cocina</h3><p>La comanda llega a la pantalla o a la impresora.</p></article></div>
+  <div class="panel"><article class="funcion"><div class="escenario"><img src="recortes/cafeteria-modificadores.png" alt=""></div><span class="num">03</span><h3>Como lo pidieron</h3><p>Tamaño, leche y extras en un toque.</p></article><article class="funcion"><div class="escenario"><img src="recortes/servicio-rapido-combo.png" alt=""></div><span class="num">04</span><h3>Combos</h3><p>Arma el combo y el precio sale solo.</p></article></div>
+  <div class="panel"><article class="funcion"><div class="escenario"><img src="recortes/bar-propina.png" alt=""></div><span class="num">05</span><h3>Propinas claras</h3><p>10, 15 o 20 % y queda registrada.</p></article><article class="funcion"><div class="escenario"><img src="recortes/cafeteria-pantalla-cliente.png" alt=""></div><span class="num">06</span><h3>Tu cliente lo ve</h3><p>Una segunda pantalla con su orden y el total.</p></article></div>
+</section>
+</body></html>
