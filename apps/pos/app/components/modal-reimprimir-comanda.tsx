@@ -101,7 +101,7 @@ export function ModalReimprimirComanda({
     <DialogoPeligro
       titulo="Reimprimir comanda"
       contexto={folio ?? undefined}
-      consecuencia="La comanda vuelve a salir en cocina y en barra. Queda registrado quién la reimprimió y por qué."
+      consecuencia="La comanda vuelve a imprimirse y queda registrado quién la pidió."
       peligrosa={false}
       // Se abre sobre el recibo (z-[60]): sin esto el papel lo tapa.
       backdropClassName="z-[70]"

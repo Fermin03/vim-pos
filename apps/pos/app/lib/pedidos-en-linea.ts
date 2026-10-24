@@ -346,7 +346,7 @@ export function etiquetaEstadoEnLinea(e: EstadoEnLinea, ahora: Date, cajaSinActu
 export function mensajeErrorEnLinea(codigo: string, _causa?: string): string {
   switch (codigo) {
     case "SIN_TURNO_ABIERTO": return "Abre un turno para aceptar pedidos.";
-    case "PEDIDO_CANCELADO": return "Este pedido ya no coincide con tu menú o tus zonas de envío. Se canceló y tu cliente ya lo sabe.";
+    case "PEDIDO_CANCELADO": return "Este pedido se canceló y tu cliente ya fue avisado.";
     case "ACCION_INVALIDA": return "Este pedido ya fue atendido.";
     case "RECLAMADO_POR_OTRA_CAJA": return "Otra caja ya tomó este pedido.";
     case "SIN_RED": case "FUNCION_REQUIERE_NUBE": return "Sin internet no se pueden atender pedidos en línea.";

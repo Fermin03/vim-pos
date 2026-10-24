@@ -44,8 +44,7 @@ export function ModalMisPropinas({ token, meseroId, meseroNombre, turnoId, onCer
             </div>
           </div>
           <p className="mt-4 text-12 leading-relaxed text-ink-3">
-            Este es el total que <b className="text-ink-2">tú generaste</b>. El monto final que recibes se define en el
-            <b className="text-ink-2"> reparto al cierre del turno</b>, según la política del restaurante.
+            Esto es lo que <b className="text-ink-2">generaste</b>; el reparto final se hace <b className="text-ink-2">al cierre</b>.
           </p>
         </>
       )}

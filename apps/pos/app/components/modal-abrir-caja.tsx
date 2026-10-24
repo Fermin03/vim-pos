@@ -10,7 +10,7 @@ import type { PrintResult } from "../lib/print/tipos";
 const PERMISO = "caja.abrir_cajon";
 
 function mensajeFalla(r: Extract<PrintResult, { ok: false }>): string {
-  if (r.motivo === "OFFLINE") return "No se pudo conectar con la impresora del cajón. Revisa que esté encendida y en la red.";
+  if (r.motivo === "OFFLINE") return "Se perdió la conexión de la impresora. Revisa que esté encendida y conectada a la red.";
   return "El cajón no respondió. Inténtalo de nuevo.";
 }
 

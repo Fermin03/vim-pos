@@ -296,8 +296,7 @@ export function ConfirmarSalirCaja({ onCancelar }: { onCancelar: () => void }) {
           se quedan sin backend. Decirlo es la diferencia entre cerrar a propósito y descubrir
           a media comida que la cocina dejó de recibir comandas. */}
       <p className="mt-2 text-14 leading-snug text-ink-2">
-        La cocina y las demás pantallas conectadas a esta computadora dejarán de funcionar
-        hasta que la vuelvas a abrir.
+        Si cierras, la cocina y las demás pantallas dejarán de funcionar.
       </p>
       <p className="mt-2 text-13 leading-snug text-ink-3">
         Antes de cerrar se guarda un respaldo. No se pierde ninguna venta.

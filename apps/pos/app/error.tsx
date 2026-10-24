@@ -21,7 +21,7 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
     <PantallaEstado
       codigo="500"
       titulo="Algo salió mal de nuestro lado"
-      texto="No es por algo que hayas hecho. Tuvimos un problema técnico al procesar tu solicitud. Vuelve a intentarlo en un momento."
+      texto="Tuvimos un problema técnico. Vuelve a intentarlo en un momento."
       acciones={
         <>
           <button type="button" onClick={reset} className={btnAccent}>

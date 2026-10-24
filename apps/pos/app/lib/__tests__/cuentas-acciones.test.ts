@@ -15,7 +15,7 @@ describe("reabrirCuenta", () => {
     });
     const { reabrirCuenta } = await import("../cuentas-acciones");
     await expect(reabrirCuenta("tok", args)).rejects.toThrow(
-      new Error("Hay otra cuenta de barra abierta con ese nombre. Cóbrala o pásala a una mesa antes de reabrir esta."),
+      new Error("Otra cuenta de barra tiene ese nombre. Cóbrala o pásala a una mesa."),
     );
   });
 

@@ -570,7 +570,7 @@ const base: AjustePantalla = { disponible: true, modo: "auto", displayId: null, 
 
 describe("textoEstadoPantalla", () => {
   it("sin segundo monitor lo dice", () => {
-    expect(textoEstadoPantalla(base)).toBe("No hay un segundo monitor conectado. Revisa que Windows esté en «Extender» y no en «Duplicar».");
+    expect(textoEstadoPantalla(base)).toBe("No se detecta otro monitor. En Windows, elige «Extender», no «Duplicar».");
   });
   it("abierta dice en cuál", () => {
     expect(textoEstadoPantalla({ ...base, abierta: true, monitores: [M1, M2] })).toBe("Abierta en HDMI (1024×768).");

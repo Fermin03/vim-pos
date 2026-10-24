@@ -118,7 +118,7 @@ export function ModalReabrirCuenta({
       </div>
 
       <div className="mb-4 rounded border border-warning-line bg-warning-soft px-3 py-2 text-13 font-medium text-warning">
-        La cuenta vuelve a <b>abierta</b> para editarla o volver a cobrarla.{" "}
+        La cuenta se reabre para editarla o cobrarla.{" "}
         {aparte == null ? (
           <>Se <b>anula el pago</b> registrado y el efectivo deja de contar en el corte hasta que se cobre de nuevo.</>
         ) : aparte > 0 ? (
@@ -126,7 +126,7 @@ export function ModalReabrirCuenta({
         ) : (
           <>No se anula ningún pago: la prenda devuelta cubre la venta.</>
         )}{" "}
-        El folio se conserva.
+        Conserva su folio.
       </div>
 
       <label className="mb-1.5 block text-13 font-medium text-ink-2">Motivo (opcional)</label>

@@ -147,14 +147,14 @@ export async function avanzarCanje(ops: OpsCanje, almacen: Almacen, inicial: Pen
   if (guardado && guardado.canjeId !== inicial.canjeId) {
     return {
       estado: "A_MEDIAS", pendiente: guardado,
-      mensaje: "Esta cuenta ya tiene un canje a medias. Termínalo con Reintentar o descártalo antes de empezar otro.",
+      mensaje: "Ya hay un canje pendiente. Usa Reintentar o descártalo antes de otro.",
     };
   }
 
   let p = inicial;
   const cuanto = cantidad(p.mecanica, p.puntos);
   const renglonSeQueda = p.premio
-    ? ` ${p.premio.nombre} quedó en la cuenta a su precio: quítalo desde la cuenta si el cliente no lo quiere.`
+    ? ` ${p.premio.nombre} se cobra a su precio. Cancélalo si no lo quiere.`
     : "";
 
   // 0) El premio entra primero a la cuenta como renglón. Si esto falla, la nube no se ha tocado.
@@ -183,7 +183,7 @@ export async function avanzarCanje(ops: OpsCanje, almacen: Almacen, inicial: Pen
       if (esFalloAmbiguo(r.error)) {
         return {
           estado: "A_MEDIAS", pendiente: p,
-          mensaje: `No se pudo confirmar el canje con la nube. ${mensajeErrorLealtad(r.error)} Puede que la nube ya haya descontado ${cuanto}: no cobres sin resolverlo. Toca Reintentar.${p.premio ? ` Mientras tanto, ${p.premio.nombre} está en la cuenta a su precio.` : ""}`,
+          mensaje: `No se confirmó el canje. ${mensajeErrorLealtad(r.error)} Toca Reintentar antes de cobrar.${p.premio ? ` Mientras tanto, ${p.premio.nombre} está en la cuenta a su precio.` : ""}`,
         };
       }
       // Rechazo de negocio: no se descontó nada. El renglón del premio sobra; se intenta cancelar.
@@ -207,18 +207,18 @@ export async function avanzarCanje(ops: OpsCanje, almacen: Almacen, inicial: Pen
   if (asentarSePuedeReintentar(a.error)) {
     return {
       estado: "A_MEDIAS", pendiente: p,
-      mensaje: `La nube ya descontó ${cuanto}, pero falta aplicarlos a esta cuenta. ${mensajeErrorLealtad(a.error)} Toca Reintentar: no se descuentan dos veces.`,
+      mensaje: `Falta aplicar ${cuanto}. ${mensajeErrorLealtad(a.error)} Toca Reintentar; no se descuentan doble.`,
     };
   }
   borrarPendiente(almacen, p.ticketId);
   // La nube dice que ese canje nunca existió: entonces tampoco descontó nada. Decir «ya descontó»
   // aquí sería mentira (visto en la prueba manual con un pendiente que la nube no conocía).
   if (a.error === "CANJE_NO_EXISTE") {
-    return { estado: "RECHAZADO", mensaje: `La nube no tiene registrado ese canje: no se descontó nada. Si el cliente quiere canjear, empieza de nuevo.${renglonSeQueda}` };
+    return { estado: "RECHAZADO", mensaje: `No se descontó nada. Si el cliente quiere, canjea de nuevo.${renglonSeQueda}` };
   }
   return {
     estado: "PUNTOS_GASTADOS",
-    mensaje: `La nube ya descontó ${cuanto} y esta cuenta no los aceptó. ${mensajeErrorLealtad(a.error)} Vuelven solos al cliente en un máximo de 48 horas; desde la caja no se pueden devolver antes. Cobra la cuenta sin el canje.${renglonSeQueda}`,
+    mensaje: `No se aplicaron ${cuanto}. ${mensajeErrorLealtad(a.error)} Regresarán solos al cliente. Cobra sin el canje.${renglonSeQueda}`,
   };
 }
 
@@ -230,5 +230,5 @@ export async function avanzarCanje(ops: OpsCanje, almacen: Almacen, inicial: Pen
 export function motivoNoCambiarCliente(a: Almacen, ticketId: string | null, actualId: string | null, nuevoId: string | null): string | null {
   if (!ticketId || actualId === nuevoId) return null;
   if (!leerPendiente(a, ticketId)) return null;
-  return "Esta cuenta tiene un canje de puntos a medias. Termínalo o descártalo en «Canjear puntos» antes de cambiar al cliente.";
+  return "Antes de cambiar de cliente, resuelve el canje en «Canjear puntos».";
 }

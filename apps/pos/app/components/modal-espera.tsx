@@ -27,8 +27,7 @@ export function ModalEtiquetaEspera({
   return (
     <Modal open onClose={onCerrar} title="Poner pedido en espera">
       <p className="mb-3 text-13 leading-relaxed text-ink-2">
-        El pedido se guarda con su cuenta y lo retomas en cualquier momento desde <b>En espera</b>.
-        Ponle una etiqueta para identificar al cliente.
+        El pedido se guarda en <b>En espera</b>. Ponle una etiqueta para reconocerlo.
       </p>
       <input
         value={etiqueta}

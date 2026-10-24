@@ -49,7 +49,7 @@ export function PantallaBloqueada({
       // todavía no se publicó donde la caja lo busca. Decirlo es mejor que dejar el botón
       // girando: el cajero necesita saber a quién llamar.
       setEstado("error");
-      setDetalle("Esta computadora ya tiene la última versión que encuentra. Si es una segunda caja, actualiza primero la caja principal.");
+      setDetalle("Ya está actualizada. Si es segunda caja, actualiza primero la principal.");
       return;
     }
     setEstado("listo");
@@ -75,8 +75,7 @@ export function PantallaBloqueada({
           </button>
           {detalle && <p className="max-w-md text-13 text-danger">{detalle}</p>}
           <p className="max-w-md text-13 text-ink-3">
-            VIM POS se cerrará para instalar y volverá a abrirse solo. No pierdes nada de lo que
-            ya cobraste.
+            VIM POS se cerrará para actualizarse y volverá a abrir solo.
           </p>
         </>
       )}

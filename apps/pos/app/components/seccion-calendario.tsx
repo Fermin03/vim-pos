@@ -155,7 +155,7 @@ export function SeccionCalendario({ token, sucursalId, version, onAbrirCita, onN
       {!vigentes || !rango ? (
         !error && <Cargando />
       ) : columnas.length === 0 ? (
-        <p className="p-8 text-15 text-ink-2">No hay colaboradores en esta sucursal. Dalos de alta en el admin, en Agenda › Colaboradores.</p>
+        <p className="p-8 text-15 text-ink-2">No hay colaboradores. Agrégalos en el admin: Agenda › Colaboradores.</p>
       ) : (
         <div className="min-h-0 flex-1 overflow-auto">
           <div className="flex min-w-max">
