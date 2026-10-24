@@ -1,4 +1,4 @@
-# Punto de venta para tiendas de ropaCada talla y cada color, contados sin libreta
+# Punto de venta para tiendas de ropa. Cada talla y cada color, contados sin libreta
 
 > Tallas y colores con su existencia, lector de código de barras, cambios de talla y etiquetas. Para tiendas de ropa y calzado, desde $699 al mes más IVA.
 

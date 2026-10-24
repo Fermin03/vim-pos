@@ -1529,7 +1529,7 @@ En la demo cerramos un periodo y emitimos la global con tus datos de prueba.
 
 <!-- https://vimpos.com.mx/punto-de-venta-hamburgueserias -->
 
-# Punto de venta para hamburgueseríasCada hamburguesa sale como la pidieron
+# Punto de venta para hamburgueserías. Cada hamburguesa sale como la pidieron
 
 > El término de la carne, los extras con su precio y el combo sugerido en una sola caja. Para hamburgueserías, desde $699 al mes más IVA.
 
@@ -1738,7 +1738,7 @@ Empieza tú solo, o te lo enseñamos con tus hamburguesas.
 
 <!-- https://vimpos.com.mx/punto-de-venta-cafeterias -->
 
-# Punto de venta para cafeteríasQue la fila avance y cada café salga como lo pidieron
+# Punto de venta para cafeterías. Que la fila avance y cada café salga como lo pidieron
 
 > Cobra rápido en la barra, con el tamaño, la leche y el shot extra de cada bebida. Para cafeterías, desde $699 al mes más IVA.
 
@@ -1947,7 +1947,7 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 <!-- https://vimpos.com.mx/punto-de-venta-servicio-rapido -->
 
-# Punto de venta para comida rápidaDespacha la hora pico sin que se junte la fila
+# Punto de venta para comida rápida. Despacha la hora pico sin que se junte la fila
 
 > Combos, extras y comandas a cocina en segundos, para llevar o a domicilio. Para comida rápida, desde $699 al mes más IVA.
 
@@ -2156,7 +2156,7 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 <!-- https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo -->
 
-# Punto de venta para restaurantesCada mesa con su cuenta y cada mesero con su propina
+# Punto de venta para restaurantes. Cada mesa con su cuenta y cada mesero con su propina
 
 > Mapa de mesas, meseros, propinas y cocina por estación en una sola caja. Para restaurantes con servicio completo, desde $699 al mes más IVA.
 
@@ -2365,7 +2365,7 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 <!-- https://vimpos.com.mx/punto-de-venta-bares -->
 
-# Punto de venta para bares y cerveceríasAbre la cuenta con un nombre y cóbrala cuando se vaya
+# Punto de venta para bares y cervecerías. Abre la cuenta con un nombre y cóbrala cuando se vaya
 
 > Cuentas por nombre en la barra, mesas, propinas y un corte que cuadra. Para bares y cervecerías, desde $699 al mes más IVA.
 
@@ -2574,7 +2574,7 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 <!-- https://vimpos.com.mx/punto-de-venta-food-trucks -->
 
-# Punto de venta para food trucksCobra donde estaciones, con o sin señal
+# Punto de venta para food trucks. Cobra donde estaciones, con o sin señal
 
 > Cobra donde estaciones, con o sin señal, y lleva la venta de cada evento por separado. Para food trucks, desde $699 al mes más IVA.
 
@@ -2783,7 +2783,7 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 <!-- https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa -->
 
-# Punto de venta para tiendas de ropaCada talla y cada color, contados sin libreta
+# Punto de venta para tiendas de ropa. Cada talla y cada color, contados sin libreta
 
 > Tallas y colores con su existencia, lector de código de barras, cambios de talla y etiquetas. Para tiendas de ropa y calzado, desde $699 al mes más IVA.
 
@@ -2984,7 +2984,7 @@ Empieza tú solo, o te lo enseñamos con tu catálogo.
 
 <!-- https://vimpos.com.mx/punto-de-venta-vinaterias -->
 
-# Punto de venta para vinaterías y licoreríasCada botella en su lugar y cada venta en segundos
+# Punto de venta para vinaterías y licorerías. Cada botella en su lugar y cada venta en segundos
 
 > Código de barras, existencias con aviso de mínimo, cotizaciones y crédito a clientes. Para vinaterías y licorerías, desde $699 al mes más IVA.
 
@@ -3173,7 +3173,7 @@ Empieza tú solo, o te lo enseñamos con tu catálogo.
 
 <!-- https://vimpos.com.mx/punto-de-venta-abarrotes -->
 
-# Punto de venta para abarrotes y fruteríasVende por kilo, por pieza o a crédito, sin cuaderno
+# Punto de venta para abarrotes y fruterías. Vende por kilo, por pieza o a crédito, sin cuaderno
 
 > Venta por kilo o por pieza, crédito a clientes con abonos y cotizaciones. Para abarrotes y fruterías, desde $699 al mes más IVA.
 
@@ -3378,7 +3378,7 @@ Empieza tú solo, o te lo enseñamos con tu catálogo.
 
 <!-- https://vimpos.com.mx/punto-de-venta-salones-de-belleza -->
 
-# Punto de venta para salones de bellezaTu agenda llena y cada comisión, clara
+# Punto de venta para salones de belleza. Tu agenda llena y cada comisión, clara
 
 > Agenda de tu equipo, cobro de la cita, anticipos y comisiones. Para salones de belleza, desde $699 al mes más IVA.
 
@@ -3603,7 +3603,7 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 <!-- https://vimpos.com.mx/punto-de-venta-spa -->
 
-# Punto de venta para spasCada cabina ocupada a su hora, sin empalmes
+# Punto de venta para spas. Cada cabina ocupada a su hora, sin empalmes
 
 > Agenda por terapeuta y por cabina, anticipos, cobro de la cita y comisiones. Para spas, desde $699 al mes más IVA.
 
@@ -3828,7 +3828,7 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 <!-- https://vimpos.com.mx/punto-de-venta-peluquerias -->
 
-# Punto de venta para peluquerías y barberíasCada silla con su turno y cada barbero con su comisión
+# Punto de venta para peluquerías y barberías. Cada silla con su turno y cada barbero con su comisión
 
 > Citas y lista de espera, agenda por barbero, cobro y comisiones. Para peluquerías y barberías, desde $699 al mes más IVA.
 
@@ -4045,7 +4045,7 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 <!-- https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes -->
 
-# Punto de venta para estudios de tatuajesCitas con anticipo y cada artista con su agenda
+# Punto de venta para estudios de tatuajes. Citas con anticipo y cada artista con su agenda
 
 > Citas con anticipo, agenda por artista, cobro de la sesión y comisiones. Para estudios de tatuajes, desde $699 al mes más IVA.
 

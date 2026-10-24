@@ -1,4 +1,4 @@
-# Punto de venta para cafeteríasQue la fila avance y cada café salga como lo pidieron
+# Punto de venta para cafeterías. Que la fila avance y cada café salga como lo pidieron
 
 > Cobra rápido en la barra, con el tamaño, la leche y el shot extra de cada bebida. Para cafeterías, desde $699 al mes más IVA.
 

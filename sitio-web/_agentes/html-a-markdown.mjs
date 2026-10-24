@@ -221,7 +221,10 @@ export function convertir(html, { base = 'https://vimpos.com.mx' } = {}) {
 
     if (/^h[1-6]$/.test(n)) {
       ultimoNivel = Number(n[1]);
-      const t = limpiar(enLinea(nodo));
+      // Las páginas por giro llevan el eyebrow DENTRO del h1: sin un punto de por medio quedaba
+      // pegado al titular («Punto de venta para spasCada cabina…»).
+      const t = limpiar(nodo.hijos.map((h) =>
+        /\beyebrow\b/.test(h.atributos?.class || '') ? limpiar(enLinea(h)) + '. ' : enLinea(h)).join(''));
       return t ? ['#'.repeat(ultimoNivel) + ' ' + t] : [];
     }
 

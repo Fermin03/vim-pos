@@ -1,4 +1,4 @@
-# Punto de venta para restaurantesCada mesa con su cuenta y cada mesero con su propina
+# Punto de venta para restaurantes. Cada mesa con su cuenta y cada mesero con su propina
 
 > Mapa de mesas, meseros, propinas y cocina por estación en una sola caja. Para restaurantes con servicio completo, desde $699 al mes más IVA.
 

@@ -1,4 +1,4 @@
-# Punto de venta para peluquerías y barberíasCada silla con su turno y cada barbero con su comisión
+# Punto de venta para peluquerías y barberías. Cada silla con su turno y cada barbero con su comisión
 
 > Citas y lista de espera, agenda por barbero, cobro y comisiones. Para peluquerías y barberías, desde $699 al mes más IVA.
 

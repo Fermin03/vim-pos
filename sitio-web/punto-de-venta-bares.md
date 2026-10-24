@@ -1,4 +1,4 @@
-# Punto de venta para bares y cerveceríasAbre la cuenta con un nombre y cóbrala cuando se vaya
+# Punto de venta para bares y cervecerías. Abre la cuenta con un nombre y cóbrala cuando se vaya
 
 > Cuentas por nombre en la barra, mesas, propinas y un corte que cuadra. Para bares y cervecerías, desde $699 al mes más IVA.
 

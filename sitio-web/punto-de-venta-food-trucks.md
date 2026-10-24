@@ -1,4 +1,4 @@
-# Punto de venta para food trucksCobra donde estaciones, con o sin señal
+# Punto de venta para food trucks. Cobra donde estaciones, con o sin señal
 
 > Cobra donde estaciones, con o sin señal, y lleva la venta de cada evento por separado. Para food trucks, desde $699 al mes más IVA.
 
