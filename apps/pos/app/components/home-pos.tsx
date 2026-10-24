@@ -3097,6 +3097,7 @@ export function HomePos({
         empleado={empleado}
         modo={modo}
         onSalir={salirDeLista}
+        tapada={algoAbierto || viendoReservaciones}
         // Solo Comedor: pick-up y domicilio no apartan mesa, y un botón muerto ahí sería ruido.
         onVerReservaciones={modo === "COMER_AQUI" && moduloActivo(modulos, "reservaciones") ? () => setViendoReservaciones(true) : undefined}
         // Comida rápida: las cuentas de mesa que quedaron se cobran, pero ya no se abren mesas nuevas.

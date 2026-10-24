@@ -1,7 +1,7 @@
 "use client";
-import { LogoVim, Icono, Cargando } from "@vim/ui/styles";
+import { Icono, Cargando } from "@vim/ui/styles";
 import { useCallback, useEffect, useState } from "react";
-import { BotonVolver } from "./boton-volver";
+import { BotonVolver, ENCABEZADO_PANTALLA } from "./boton-volver";
 import { useEscape } from "../lib/use-escape";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
 import { type Empleado } from "../lib/supabase";
@@ -106,10 +106,9 @@ export function PantallaConsultaCuentas({
   return (
     <div className="flex h-screen flex-col bg-bg">
       {/* Encabezado */}
-      <header className="flex flex-shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line bg-surface px-3 py-3">
+      <header className={`${ENCABEZADO_PANTALLA} flex-wrap bg-surface py-1`}>
         <BotonVolver onClick={onSalir} />
         <div className="mr-auto flex items-center gap-3">
-          <LogoVim className="h-8 w-8" />
           <div>
             <div className="font-display text-16 font-bold leading-tight">Cuentas · {caja.nombre}</div>
             <div className="text-12 text-ink-3">{cuentas?.length ?? 0} cuentas</div>

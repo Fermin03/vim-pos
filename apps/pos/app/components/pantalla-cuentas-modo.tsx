@@ -1,8 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BotonVolver } from "./boton-volver";
+import { BotonVolver, ENCABEZADO_PANTALLA } from "./boton-volver";
 import { RenglonItem } from "./renglon-item";
-import { Aviso, Button, DialogoPeligro, LogoVim, Modal, Icono, Cargando } from "@vim/ui/styles";
+import { Aviso, Button, DialogoPeligro, Modal, Icono, Cargando } from "@vim/ui/styles";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
 import { borrarCuentaVacia, leerEntregaCuenta, listarCuentasAbiertas, MODOS_MESA, leerRenglonesCuenta, marcarTicketImpreso, minutosAbierta, reabrirCuentaImpresa, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
 import { leerTotales, type TotalesTicket } from "../lib/cobro";
@@ -126,6 +126,7 @@ export function PantallaCuentasModo({
   empleado,
   modo,
   onSalir,
+  tapada = false,
   onVerReservaciones,
   onAbrirCuenta,
   onAgregarProductos,
@@ -145,6 +146,10 @@ export function PantallaCuentasModo({
   // existe como lista, por eso va aparte del `Extract`.
   modo: Extract<ModoServicio, "DRIVE_THRU" | "DELIVERY_PROPIO" | "COMER_AQUI"> | "BARRA";
   onSalir: () => void;
+  /** Hay algo de la caja pintado encima (el cobro, un modal, las reservaciones): la lista cede
+   *  Escape. `onSalir` llega nuevo en cada render y, sin esto, la lista se volvía a registrar
+   *  ENCIMA del modal y Escape la cerraba a ella en vez del cobro. */
+  tapada?: boolean;
   /** Agenda de reservaciones del día. Solo llega con valor en Comedor: Pick-up y
    *  domicilio no reservan mesa, y un botón muerto ahí sería ruido. */
   onVerReservaciones?: () => void;
@@ -373,7 +378,7 @@ export function PantallaCuentasModo({
     ];
     return capaVisible(capas);
   }, [rechazando, selPedidoId, clienteDe, eligiendoCancelacion, cancelandoItems, borrandoCuenta, cancelandoCuenta, descontando, pidiendoPinReimpresion, pidiendoPinReabrir, selId, onSalir]);
-  useEscape(alEscapar);
+  useEscape(alEscapar, !tapada);
 
   const vacia = detalle === null ? null : detalle.length === 0;
   const hayDescuento = (totales?.descuentos ?? 0) > 0;
@@ -407,10 +412,9 @@ export function PantallaCuentasModo({
 
   return (
     <main className="flex h-screen flex-col bg-bg">
-      <header className="flex h-[clamp(3rem,7.5vh,4.25rem)] flex-shrink-0 items-center justify-between gap-3 border-b border-line px-3">
+      <header className={ENCABEZADO_PANTALLA}>
         <BotonVolver onClick={onSalir} />
         <div className="mr-auto flex min-w-0 items-center gap-3">
-          <LogoVim className="h-8 w-8 flex-shrink-0" />
           <div className="min-w-0">
             <div className="truncate font-display text-15 font-semibold tracking-tight">{copia.titulo} · {caja.nombre}</div>
             {/* Cuenta lo mismo que se ve debajo: en domicilio, `items` sin filtrar incluiría lo

@@ -1,5 +1,6 @@
 "use client";
 import { Button, LogoVim, Modal, Icono } from "@vim/ui/styles";
+import { ENCABEZADO_PANTALLA } from "./boton-volver";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useReloj } from "./topbar-pos";
 import { evaluarSync, leerEstadoSync, type NivelSync } from "../lib/estado-sync";
@@ -118,7 +119,7 @@ export function PantallaInicio({
       {acceso.actualizacion && acceso.nivel !== "bloqueado" && <BandaActualizacion version={acceso.actualizacion} />}
       {avisos && avisos.length > 0 && <DialogoAvisos avisos={avisos} onCerrar={() => setAvisos([])} />}
       {/* ── Barra superior: quién opera y dónde ─────────────────────────────── */}
-      <header className="flex h-[clamp(2.75rem,6.5vh,3.5rem)] flex-shrink-0 items-center justify-between gap-3 border-b border-line px-[clamp(0.75rem,2vw,1.25rem)]">
+      <header className={ENCABEZADO_PANTALLA}>
         <div className="flex min-w-0 items-center gap-3">
           <LogoVim className="h-8 w-8 flex-shrink-0" />
           <div className="min-w-0">
