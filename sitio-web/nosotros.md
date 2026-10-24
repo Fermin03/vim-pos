@@ -1,6 +1,6 @@
 # Quién está detrás de VIM POS
 
-> Quién construye VIM POS, el punto de venta para restaurantes hecho en León, Guanajuato: por qué existe y en qué punto está el producto hoy.
+> Quién construye VIM POS, el punto de venta para restaurantes, tiendas y belleza hecho en León, Guanajuato, y por qué existe.
 
 **VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/nosotros
 
@@ -10,11 +10,11 @@ VIM POS es un sistema de punto de venta para restaurantes hecho en [León, Guana
 
 **VIM POS**, persona física con actividad empresarial, en Guanajuato, México. Es la misma del [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) y de los [términos del servicio](https://vimpos.com.mx/terminos).
 
-Atendemos restaurantes de toda la República. La demo es en tu mostrador, en León y alrededores; fuera de ahí, puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro).
+Atendemos negocios de toda la República. La demo es en tu mostrador, en León y alrededores; fuera de ahí, puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro).
 
 ## Por qué existe
 
-VIM POS está pensado para ese emprendedor que quiere saber cómo administrar su restaurante de verdad.
+VIM POS está pensado para ese emprendedor que quiere saber cómo administrar su negocio de verdad.
 
 El sistema completo vive en la computadora de tu caja y cobra aunque se caiga el internet.
 
