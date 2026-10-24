@@ -42,7 +42,7 @@ export async function revisarLealtadAntesDeCobrar(
     return {
       accion: "AVISAR",
       titulo: "Hay un canje a medias",
-      texto: `Esta cuenta tiene un canje de ${cantidad(pendiente.mecanica, pendiente.puntos)} que quedó a medias. Puede que al cliente ya se le hayan descontado. Antes de cobrar, abre Lealtad en esta cuenta y termínalo con Reintentar, o descártalo.`,
+      texto: `Hay un canje de ${cantidad(pendiente.mecanica, pendiente.puntos)} pendiente. Resuélvelo en Lealtad antes de cobrar.`,
       totales: null,
     };
   }
@@ -56,14 +56,14 @@ export async function revisarLealtadAntesDeCobrar(
     return {
       accion: "AVISAR",
       titulo: "Se quitó el canje de lealtad",
-      texto: `Se quitó el canje de ${cantidad(mecanica, canje.puntos)} porque la cuenta bajó a menos de eso. Los puntos volvieron al cliente. Si los quiere usar, vuelve a canjear.`,
+      texto: `Se quitó el canje de ${cantidad(mecanica, canje.puntos)} y los puntos regresaron al cliente.`,
       totales: await leerTotales(token, ticketId),
     };
   } catch {
     return {
       accion: "AVISAR",
       titulo: "El total de la cuenta cambió",
-      texto: "Se quitó un canje de lealtad que ya no cabía en la cuenta y los puntos volvieron al cliente. Revisa el total y vuelve a cobrar.",
+      texto: "Se quitó un canje que no cabía. Revisa el total y cobra.",
       totales: null,
     };
   }

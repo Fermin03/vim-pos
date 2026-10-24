@@ -190,10 +190,10 @@ export function ModalCanjeLealtad({
             <>
               <p className="mt-2">
                 {pendiente.paso === "ASENTAR"
-                  ? `La nube ya descontó ${cantidad(pendiente.mecanica, pendiente.puntos)}. Si descartas, vuelven solos al cliente en un máximo de 48 horas; desde la caja no se pueden devolver antes.`
-                  : `Si la nube alcanzó a descontar ${cantidad(pendiente.mecanica, pendiente.puntos)}, vuelven solos al cliente en un máximo de 48 horas.`}
+                  ? `Ya se descontaron ${cantidad(pendiente.mecanica, pendiente.puntos)}. Si descartas, regresarán solos al cliente.`
+                  : `Si ya se descontaron ${cantidad(pendiente.mecanica, pendiente.puntos)}, regresarán solos al cliente.`}
                 {pendiente.premio?.ticketItemId
-                  ? ` ${pendiente.premio.nombre} se queda en la cuenta a su precio: cancélalo desde la cuenta si el cliente no lo quiere.`
+                  ? ` ${pendiente.premio.nombre} se cobra a su precio. Cancélalo si no lo quiere.`
                   : ""}
               </p>
               <div className="mt-2 flex gap-2">
@@ -238,7 +238,7 @@ export function ModalCanjeLealtad({
             <div className="mt-2 rounded border border-line bg-hover p-3">
               <p className="text-13 text-ink-2">
                 {cantidad(m, datos.canje.puntos)} vuelven a {datos.cliente.nombre} y la cuenta sube {fmtMxn(datos.canje.monto)}.
-                {nombrePremio ? ` ${nombrePremio} se queda en la cuenta a su precio: cancélalo desde la cuenta si ya no lo quiere.` : ""}
+                {nombrePremio ? ` ${nombrePremio} se cobra a su precio. Cancélalo si no lo quiere.` : ""}
               </p>
               <div className="mt-3 flex justify-end gap-2">
                 <Button variant="ghost" onClick={() => setConfirmandoQuitar(false)} disabled={ocupado}>Volver</Button>
@@ -299,7 +299,7 @@ export function ModalCanjeLealtad({
         <div className="mb-4">
           <div className={encabezado}>Premios</div>
           {datos.premios.length > 0 && (
-            <p className="mb-2 text-12 text-ink-3">El producto entra a la cuenta en $0.00. Una cuenta con premio no se factura de forma individual.</p>
+            <p className="mb-2 text-12 text-ink-3">El premio entra sin costo. Esta cuenta no admite factura individual.</p>
           )}
           {datos.premios.length === 0 && <p className="py-2 text-13 text-ink-3">El negocio todavía no tiene premios.</p>}
           <div className="flex max-h-[300px] flex-col gap-1.5 overflow-y-auto">

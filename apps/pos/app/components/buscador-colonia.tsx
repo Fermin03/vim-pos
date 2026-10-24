@@ -65,7 +65,7 @@ export function BuscadorColonia({ token, sucursalId, hayCatalogo, zonas, texto, 
       )}
       {hayCatalogo && texto.trim() && !elegida && (
         <p className="mt-1 text-12 text-ink-3">
-          {yaEsta ? `«${texto.trim()}» ya está en el catálogo: elígela de la lista para usar su CP y zona.`
+          {yaEsta ? `«${texto.trim()}» ya existe. Elígela de la lista.`
                   : `«${texto.trim()}» se agregará al catálogo de colonias.`}
         </p>
       )}

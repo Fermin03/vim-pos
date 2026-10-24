@@ -37,7 +37,7 @@ export function ModalAutorizacionPin({
 
   function mensajeError(codigo: string): string {
     if (codigo === "SIN_PERMISO")
-      return `Ese PIN es válido, pero pertenece a un rol que no puede autorizar esta operación. Pide el PIN de ${quienAutoriza ?? "un supervisor o administrador"}.`;
+      return `Ese PIN no puede autorizar esto. Pide el PIN de ${quienAutoriza ?? "un supervisor o administrador"}.`;
     if (codigo === "BLOQUEADO") return "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.";
     if (codigo === "PIN_INCORRECTO") return "PIN incorrecto. Inténtalo de nuevo.";
     return codigo;

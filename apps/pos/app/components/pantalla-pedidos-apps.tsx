@@ -15,7 +15,7 @@ import {
   reanudarTiendaUber, segundosRestantes, type DuracionPausa, type EstadoTiendaApp, type PedidoApp,
 } from "../lib/pedidos-apps";
 import { ErrorEnLinea, etiquetaEstadoEnLinea, leerEstadoEnLinea, mensajeErrorEnLinea, pausarEnLinea, reanudarEnLinea, type EstadoEnLinea } from "../lib/pedidos-en-linea";
-import { BotonVolver } from "./boton-volver";
+import { BotonVolver, ENCABEZADO_PANTALLA } from "./boton-volver";
 import { esUrgente, ListaItems, mmss, MOTIVOS_RECHAZO, type MotivoRechazo } from "./pedido-tienda";
 import { useEscape } from "../lib/use-escape";
 
@@ -31,10 +31,10 @@ const PAUSAS_EN_LINEA: { codigo: "30m" | "1h" | "indefinida"; label: string }[] 
 function mensajeError(codigo: string, detalle?: string): string {
   switch (codigo) {
     case "SIN_TURNO_ABIERTO": return "Abre el turno para poder aceptar pedidos de apps.";
-    case "ITEM_SIN_MAPEAR": return "El pedido trae un producto que no existe en el catálogo. Configura un producto genérico de apps o rechaza.";
+    case "ITEM_SIN_MAPEAR": return "El pedido trae un producto desconocido. Usa un producto genérico o recházalo.";
     case "YA_PROCESADA": return "La app ya cerró este pedido.";
     case "SIN_RED": return "Sin conexión con la nube. Reintenta en unos segundos.";
-    case "UBER_ERROR": return `No se pudo avisar a Uber Eats${detalle ? ` (${detalle})` : ""}. Reintenta; si sigue, revisa la conexión en el panel de administración.`;
+    case "UBER_ERROR": return `No se pudo avisar a Uber Eats${detalle ? ` (${detalle})` : ""}. Inténtalo de nuevo.`;
     default: return detalle ? `${codigo}: ${detalle}` : codigo;
   }
 }
@@ -182,7 +182,7 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, cajaSinAc
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="flex flex-shrink-0 items-center gap-3 border-b border-line bg-surface px-3 py-3.5">
+      <header className={`${ENCABEZADO_PANTALLA} bg-surface`}>
         <BotonVolver onClick={onSalir} />
         <h1 className="text-18 font-semibold text-ink">Pedidos en línea</h1>
         {pendientes.length > 0 && (
@@ -345,7 +345,7 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, cajaSinAc
         <div role="dialog" aria-modal="true" aria-label="Pausar la tienda en línea" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-sm rounded border border-line bg-surface p-4">
             <h2 className="mb-1 text-15 font-semibold text-ink">¿Cuánto tiempo pausamos tu tienda?</h2>
-            <p className="mb-3 text-13 text-ink-2">Tus clientes verán que por ahora no se reciben pedidos. Los que ya llegaron se atienden igual.</p>
+            <p className="mb-3 text-13 text-ink-2">Tus clientes no podrán pedir. Los que ya llegaron se atienden igual.</p>
             <div className="flex flex-col gap-2">
               {PAUSAS_EN_LINEA.map((o) => (
                 <button key={o.codigo} type="button" disabled={ocupadoEnLinea} onClick={() => accionEnLinea(() => pausarEnLinea(token, caja.sucursal_id, o.codigo))}

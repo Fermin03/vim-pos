@@ -1,8 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BotonVolver } from "./boton-volver";
+import { BotonVolver, ENCABEZADO_PANTALLA } from "./boton-volver";
 import { RenglonItem } from "./renglon-item";
-import { Aviso, Button, DialogoPeligro, LogoVim, Modal, Icono, Cargando } from "@vim/ui/styles";
+import { Aviso, Button, DialogoPeligro, Modal, Icono, Cargando } from "@vim/ui/styles";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
 import { borrarCuentaVacia, leerEntregaCuenta, listarCuentasAbiertas, MODOS_MESA, leerRenglonesCuenta, marcarTicketImpreso, minutosAbierta, reabrirCuentaImpresa, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
 import { leerTotales, type TotalesTicket } from "../lib/cobro";
@@ -19,6 +19,8 @@ import { capaVisible } from "../lib/escape";
 import { asignarClienteTicket } from "../lib/clientes-cuenta";
 import { almacenLocal, motivoNoCambiarCliente } from "../lib/lealtad-canje";
 import { IconoAsignarCliente, IconoClienteAsignado, ModalClienteCuenta } from "./modal-cliente-cuenta";
+import { ModalClienteDomicilio } from "./modal-cliente-domicilio";
+import { cambiarEntregaTicket } from "../lib/clientes-domicilio";
 import { useEscape } from "../lib/use-escape";
 import { esEscritorio } from "../lib/actualizacion";
 import { segundosRestantes, type PedidoApp } from "../lib/pedidos-apps";
@@ -126,6 +128,7 @@ export function PantallaCuentasModo({
   empleado,
   modo,
   onSalir,
+  tapada = false,
   onVerReservaciones,
   onAbrirCuenta,
   onAgregarProductos,
@@ -145,6 +148,10 @@ export function PantallaCuentasModo({
   // existe como lista, por eso va aparte del `Extract`.
   modo: Extract<ModoServicio, "DRIVE_THRU" | "DELIVERY_PROPIO" | "COMER_AQUI"> | "BARRA";
   onSalir: () => void;
+  /** Hay algo de la caja pintado encima (el cobro, un modal, las reservaciones): la lista cede
+   *  Escape. `onSalir` llega nuevo en cada render y, sin esto, la lista se volvía a registrar
+   *  ENCIMA del modal y Escape la cerraba a ella en vez del cobro. */
+  tapada?: boolean;
   /** Agenda de reservaciones del día. Solo llega con valor en Comedor: Pick-up y
    *  domicilio no reservan mesa, y un botón muerto ahí sería ruido. */
   onVerReservaciones?: () => void;
@@ -206,6 +213,8 @@ export function PantallaCuentasModo({
   // Cuenta a la que se le está asignando cliente. Solo Comedor y Pick-up: domicilio ya tiene el suyo.
   const [clienteDe, setClienteDe] = useState<CuentaAbierta | null>(null);
   const admiteCliente = modo !== "DELIVERY_PROPIO";
+  // Domicilio: corregir la dirección o pasar el pedido a otro cliente (RPC 0262).
+  const [editandoEntrega, setEditandoEntrega] = useState(false);
   // Domicilio: asignaciones vivas (con repartidor, todavía sin cobrar). Sirven para rotular cada
   // tarjeta con quién se lo lleva. El pedido NO se mueve de sitio al asignarlo: se probó sacándolo
   // a una pestaña aparte y el cajero acababa buscándolo en dos listas para cobrarlo.
@@ -248,7 +257,7 @@ export function PantallaCuentasModo({
   /** Cuentas (tickets) nacidas de la tienda cuya comanda no salió: se marcan en su tarjeta. */
   const cuentasSinComanda = new Set(enLinea ? pedidosTienda.filter((p) => enLinea.sinComanda.has(p.id)).map((p) => p.ticketId) : []);
 
-  const dialogoAbierto = rechazando || cancelando != null || clienteDe != null || eligiendoCancelacion || cancelandoItems || borrandoCuenta
+  const dialogoAbierto = rechazando || cancelando != null || clienteDe != null || editandoEntrega || eligiendoCancelacion || cancelandoItems || borrandoCuenta
     || cancelandoCuenta || descontando || pidiendoPinReimpresion || pidiendoPinReabrir;
   useEffect(() => {
     alTenerDialogo?.(dialogoAbierto);
@@ -360,6 +369,7 @@ export function PantallaCuentasModo({
     const capas: [boolean, () => void][] = [
       [rechazando, () => setRechazando(false)],
       [clienteDe != null, () => setClienteDe(null)],
+      [editandoEntrega, () => setEditandoEntrega(false)],
       [eligiendoCancelacion, () => setEligiendoCancelacion(false)],
       [cancelandoItems, () => setCancelandoItems(false)],
       [borrandoCuenta, () => setBorrandoCuenta(false)],
@@ -372,8 +382,8 @@ export function PantallaCuentasModo({
       [true, onSalir],
     ];
     return capaVisible(capas);
-  }, [rechazando, selPedidoId, clienteDe, eligiendoCancelacion, cancelandoItems, borrandoCuenta, cancelandoCuenta, descontando, pidiendoPinReimpresion, pidiendoPinReabrir, selId, onSalir]);
-  useEscape(alEscapar);
+  }, [rechazando, selPedidoId, clienteDe, editandoEntrega, eligiendoCancelacion, cancelandoItems, borrandoCuenta, cancelandoCuenta, descontando, pidiendoPinReimpresion, pidiendoPinReabrir, selId, onSalir]);
+  useEscape(alEscapar, !tapada);
 
   const vacia = detalle === null ? null : detalle.length === 0;
   const hayDescuento = (totales?.descuentos ?? 0) > 0;
@@ -407,10 +417,9 @@ export function PantallaCuentasModo({
 
   return (
     <main className="flex h-screen flex-col bg-bg">
-      <header className="flex h-[clamp(3rem,7.5vh,4.25rem)] flex-shrink-0 items-center justify-between gap-3 border-b border-line px-3">
+      <header className={ENCABEZADO_PANTALLA}>
         <BotonVolver onClick={onSalir} />
         <div className="mr-auto flex min-w-0 items-center gap-3">
-          <LogoVim className="h-8 w-8 flex-shrink-0" />
           <div className="min-w-0">
             <div className="truncate font-display text-15 font-semibold tracking-tight">{copia.titulo} · {caja.nombre}</div>
             {/* Cuenta lo mismo que se ve debajo: en domicilio, `items` sin filtrar incluiría lo
@@ -692,8 +701,8 @@ export function PantallaCuentasModo({
                   detrás. Texto provisional (James). */}
               {porCancelar && (
                 <p className="border-b border-danger-line bg-danger-soft px-4 py-2.5 text-15 font-bold text-danger" role="alert">
-                  Este pedido se canceló y el pago ya se le devolvió al cliente.
-                  <span className="ml-2 font-medium text-ink-2">Cancela esta cuenta. Si ya lo entregaste, cóbralo de otra forma.</span>
+                  Este pedido se canceló y se reembolsó.
+                  <span className="ml-2 font-medium text-ink-2">Cancela la cuenta.</span>
                 </p>
               )}
               {sel.pagadaEnLinea && !porCancelar && (
@@ -714,6 +723,14 @@ export function PantallaCuentasModo({
                       <a href={`tel:${entrega.telefono}`} className="text-13 font-semibold text-info underline-offset-2 hover:underline">
                         {entrega.telefono}
                       </a>
+                    )}
+                    {/* Cobrada en línea ya no se cambia: la cuenta está pagada. */}
+                    {modo === "DELIVERY_PROPIO" && !sel.pagadaEnLinea && (
+                      <button type="button" onClick={() => setEditandoEntrega(true)}
+                        className="ml-auto flex h-9 items-center gap-1.5 self-center rounded border border-line-strong bg-surface px-3 text-13 font-semibold text-ink-2 transition hover:border-ink hover:text-ink">
+                        <Icono nombre="editar" className="h-4 w-4" />
+                        Editar
+                      </button>
                     )}
                   </div>
                   {entrega.direccion && <p className="mt-1 text-13 leading-snug text-ink-2">{entrega.direccion}</p>}
@@ -870,7 +887,7 @@ export function PantallaCuentasModo({
           consecuencia={<>
             {sel.mesa ? `Mesa ${sel.mesa}` : (sel.cliente ?? sel.folio ?? "La cuenta")} está vacía y desaparecerá de la lista. Si es de
             comedor, la mesa queda libre.
-            <span className="mt-2 block text-13 text-ink-3">No es una cancelación: al no tener productos, no ensucia el corte con un folio cancelado.</span>
+            <span className="mt-2 block text-13 text-ink-3">No cuenta como cancelación porque la cuenta está vacía.</span>
           </>}
           ancho="sm"
           error={error}
@@ -980,6 +997,24 @@ export function PantallaCuentasModo({
             }
           }}
           onCancelar={() => setPidiendoPinReabrir(false)}
+        />
+      )}
+      {editandoEntrega && sel && (
+        <ModalClienteDomicilio
+          token={token}
+          tenantId={caja.tenant_id}
+          sucursalId={caja.sucursal_id}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          empleadoNombre={empleado.nombre}
+          clienteInicialId={sel.clienteId ?? null}
+          onSeleccionar={async (c) => {
+            if (!c.direccionId) throw new Error("Elige una dirección de entrega.");
+            await cambiarEntregaTicket(token, sel.ticketId, c.clienteId, c.direccionId);
+            setEditandoEntrega(false);
+            await Promise.all([recargarDetalle(sel.ticketId), recargar()]);
+          }}
+          onCerrar={() => setEditandoEntrega(false)}
         />
       )}
       {clienteDe && (

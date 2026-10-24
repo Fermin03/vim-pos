@@ -157,13 +157,13 @@ export function motivoReembolso(e: unknown): string {
 }
 
 const ERRORES: Record<string, string> = {
-  SIN_RED: "No hay internet. Cobra tecleando el monto en la terminal y registra el pago con «La cobré en otra terminal».",
-  FUNCION_REQUIERE_NUBE: "No hay internet. Cobra tecleando el monto en la terminal y registra el pago con «La cobré en otra terminal».",
-  TERMINAL_OCUPADA: "La terminal tiene otro cobro esperando. Termínalo o cancélalo en la terminal y vuelve a intentar.",
-  SIN_TERMINAL: "Esta caja ya no tiene una terminal ligada. Revísalo en el panel, en Terminal de tarjetas.",
-  CONEXION_INVALIDA: "La conexión de la terminal ya no es válida. El dueño tiene que volver a conectarla en el panel.",
+  SIN_RED: "No hay internet: cobra en la terminal y elige «La cobré en otra terminal».",
+  FUNCION_REQUIERE_NUBE: "No hay internet: cobra en la terminal y elige «La cobré en otra terminal».",
+  TERMINAL_OCUPADA: "La terminal tiene otro cobro pendiente. Termínalo o cancélalo y reintenta.",
+  SIN_TERMINAL: "Esta caja no tiene terminal. Revisa Terminal de tarjetas en el panel.",
+  CONEXION_INVALIDA: "La terminal se desconectó. Pide al dueño que la reconecte.",
   TERMINAL_AJENA: "La terminal ya no pertenece a la cuenta conectada. Revísalo en el panel.",
-  TERMINAL_NO_DISPONIBLE: "La terminal no está lista. Revisa que esté encendida, con internet y con Clip PinPad abierta.",
+  TERMINAL_NO_DISPONIBLE: "La terminal no está lista. Revisa que esté encendida y con Clip PinPad abierta.",
   SIN_RESPUESTA: "La terminal no contestó. Vuelve a intentar.",
 };
 

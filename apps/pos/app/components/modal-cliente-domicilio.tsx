@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button, Modal, Icono } from "@vim/ui/styles";
 import {
   buscarClientesDomicilio, registrarClienteDomicilio, agregarDireccionCliente, conDireccion,
+  editarDireccionCliente, leerClienteDomicilio,
   fijarZonaDireccion, ETIQUETAS_DIRECCION,
   planColonia, type ClienteDomicilio, type DireccionCliente, type DireccionInput,
 } from "../lib/clientes-domicilio";
@@ -77,7 +78,7 @@ export function CamposDireccion({
 }
 
 export function ModalClienteDomicilio({
-  token, tenantId, sucursalId, cajaId, turnoId, empleadoNombre, onSeleccionar, onCerrar,
+  token, tenantId, sucursalId, cajaId, turnoId, empleadoNombre, clienteInicialId, onSeleccionar, onCerrar,
 }: {
   token: string;
   tenantId: string;
@@ -86,7 +87,9 @@ export function ModalClienteDomicilio({
   cajaId: string;
   turnoId: string;
   empleadoNombre: string;
-  onSeleccionar: (c: ClienteDomicilio) => void;
+  /** Cambiar la entrega de un pedido ya abierto: el modal arranca mostrando a su cliente. */
+  clienteInicialId?: string | null;
+  onSeleccionar: (c: ClienteDomicilio) => void | Promise<void>;
   onCerrar: () => void;
 }) {
   const [modo, setModo] = useState<"buscar" | "registrar">("buscar");
@@ -112,9 +115,28 @@ export function ModalClienteDomicilio({
   const [dir, setDir] = useState<DireccionInput>(DIR_VACIA);
   const [guardando, setGuardando] = useState(false);
 
-  // agregar dirección a un cliente existente
+  /** `onSeleccionar` puede guardar (cambiar la entrega de un pedido): si falla, el error se ve aquí y el modal sigue abierto. */
+  async function seleccionar(c: ClienteDomicilio) {
+    try {
+      await onSeleccionar(c);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo guardar");
+      setGuardando(false);
+    }
+  }
+
+  // agregar (o editar, con `editando`) una dirección de un cliente existente
   const [agregandoA, setAgregandoA] = useState<ClienteDomicilio | null>(null);
+  const [editando, setEditando] = useState<DireccionCliente | null>(null);
   const [dirNueva, setDirNueva] = useState<DireccionInput>(DIR_VACIA);
+
+  // El cliente del pedido, a la vista mientras no se busque a otro.
+  const [inicial, setInicial] = useState<ClienteDomicilio | null>(null);
+  useEffect(() => {
+    if (!clienteInicialId) return;
+    leerClienteDomicilio(token, clienteInicialId).then(setInicial).catch(() => setInicial(null));
+  }, [token, clienteInicialId]);
+  const lista = q.trim().length >= 2 ? res : inicial ? [inicial] : [];
 
   // Elegir zona de una dirección guardada que no traía ninguna (de antes de esta entrega).
   const [zonaPendiente, setZonaPendiente] = useState<{ cliente: ClienteDomicilio; direccion: DireccionCliente } | null>(null);
@@ -131,7 +153,7 @@ export function ModalClienteDomicilio({
     setAvisoZonas(null);
     listarZonas(token, sucursalId)
       .then(setZonas)
-      .catch(() => setAvisoZonas("No se pudieron cargar las zonas de reparto. Si el negocio ya tiene zonas, revisa la conexión antes de continuar."));
+      .catch(() => setAvisoZonas("No se cargaron las zonas de reparto. Revisa la conexión."));
   }, [token, sucursalId]);
 
   /** Alta o repreciado de zona: upsert por id en el catálogo local del modal. Sin reordenar: la
@@ -215,7 +237,7 @@ export function ModalClienteDomicilio({
     try {
       const d = await resolverColonia(dir);
       const c = await registrarClienteDomicilio(token, { nombre, telefono, tenantId, sucursalId, dir: d });
-      await terminar(d, () => onSeleccionar(c));
+      await terminar(d, () => void seleccionar(c));
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo registrar");
       setGuardando(false);
@@ -230,8 +252,11 @@ export function ModalClienteDomicilio({
     setGuardando(true);
     try {
       const dn = await resolverColonia(dirNueva);
-      const d = await agregarDireccionCliente(token, { clienteId: agregandoA.clienteId, tenantId, sucursalId, dir: dn });
-      await terminar(dn, () => onSeleccionar(conDireccion({ ...agregandoA, direcciones: [...agregandoA.direcciones, d] }, d)));
+      const d = editando
+        ? await editarDireccionCliente(token, editando, dn)
+        : await agregarDireccionCliente(token, { clienteId: agregandoA.clienteId, tenantId, sucursalId, dir: dn });
+      const direcciones = editando ? agregandoA.direcciones.map((x) => (x.id === d.id ? d : x)) : [...agregandoA.direcciones, d];
+      await terminar(dn, () => void seleccionar(conDireccion({ ...agregandoA, direcciones }, d)));
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo guardar la dirección");
       setGuardando(false);
@@ -252,14 +277,14 @@ export function ModalClienteDomicilio({
       if (delCatalogo?.zona) {
         try {
           await fijarZonaDireccion(token, d.id, delCatalogo.zona.id);
-          onSeleccionar(conDireccion(c, { ...d, zona: delCatalogo.zona }));
+          void seleccionar(conDireccion(c, { ...d, zona: delCatalogo.zona }));
           return;
         } catch { /* no se pudo fijar: se pide la zona a mano */ }
       }
       setZonaPendiente({ cliente: c, direccion: { ...d, zona: null } });
       return;
     }
-    onSeleccionar(conDireccion(c, { ...d, zona: vigente }));
+    void seleccionar(conDireccion(c, { ...d, zona: vigente }));
   }
 
   async function confirmarZonaPendiente(z: ZonaEnvio) {
@@ -268,7 +293,7 @@ export function ModalClienteDomicilio({
     try {
       await fijarZonaDireccion(token, zonaPendiente.direccion.id, z.id);
       const dirConZona: DireccionCliente = { ...zonaPendiente.direccion, zona: z };
-      onSeleccionar(conDireccion(zonaPendiente.cliente, dirConZona));
+      void seleccionar(conDireccion(zonaPendiente.cliente, dirConZona));
       setZonaPendiente(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo guardar la zona");
@@ -280,7 +305,7 @@ export function ModalClienteDomicilio({
       className="w-[480px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="font-display text-xl font-semibold tracking-tight">
-          {zonaPendiente ? "Elige la zona de reparto" : agregandoA ? `Nueva dirección · ${agregandoA.nombre}` : "Cliente para domicilio"}
+          {zonaPendiente ? "Elige la zona de reparto" : agregandoA ? `${editando ? "Editar" : "Nueva"} dirección · ${agregandoA.nombre}` : "Cliente para domicilio"}
         </h2>
         {!agregandoA && !zonaPendiente && (
           <div className="flex gap-1 rounded-lg bg-sel p-0.5">
@@ -346,7 +371,7 @@ export function ModalClienteDomicilio({
               </div>
             )}
             <div className="flex flex-col gap-2">
-              {res.map((c) => (
+              {lista.map((c) => (
                 <div key={c.clienteId} className="rounded-lg border border-line bg-surface px-3 py-2.5">
                   <div className="flex w-full items-center justify-between">
                     <span className="text-14 font-semibold">{c.nombre || "Sin nombre"}</span>
@@ -356,13 +381,23 @@ export function ModalClienteDomicilio({
                   <div className="mt-1.5 flex flex-col gap-1">
                     {c.direcciones.length === 0 && <span className="text-12 text-ink-3">Sin domicilio registrado</span>}
                     {c.direcciones.map((d) => (
-                      <button key={d.id} type="button" onClick={() => void elegirDireccion(c, d)}
-                        className="flex items-center gap-2 rounded border border-line px-2.5 py-1.5 text-left transition hover:border-ink">
-                        <span className="rounded-full bg-sel px-2 py-0.5 text-11 font-bold text-ink-2">{d.etiqueta}</span>
-                        <span className="truncate text-13 text-ink-2">{d.preview}</span>
-                      </button>
+                      <div key={d.id} className="flex items-stretch gap-1.5">
+                        <button type="button" onClick={() => void elegirDireccion(c, d)}
+                          className="flex min-w-0 flex-1 items-center gap-2 rounded border border-line px-2.5 py-1.5 text-left transition hover:border-ink">
+                          <span className="rounded-full bg-sel px-2 py-0.5 text-11 font-bold text-ink-2">{d.etiqueta}</span>
+                          <span className="truncate text-13 text-ink-2">{d.preview}</span>
+                        </button>
+                        <button type="button" aria-label={`Editar ${d.etiqueta}: ${d.preview}`}
+                          onClick={() => {
+                            setAgregandoA(c); setEditando(d); setError(null);
+                            setDirNueva({ ...DIR_VACIA, etiqueta: d.etiqueta, calle: d.calle, numero: d.numero, colonia: d.colonia, referencias: d.referencias ?? "", zona: zonaVigente(d.zona, zonas) });
+                          }}
+                          className="flex-shrink-0 rounded border border-line px-2.5 text-12 font-semibold text-ink-2 transition hover:border-ink hover:text-ink">
+                          Editar
+                        </button>
+                      </div>
                     ))}
-                    <button type="button" onClick={() => { setAgregandoA(c); setDirNueva({ ...DIR_VACIA, etiqueta: "Oficina" }); setError(null); }}
+                    <button type="button" onClick={() => { setAgregandoA(c); setEditando(null); setDirNueva({ ...DIR_VACIA, etiqueta: "Oficina" }); setError(null); }}
                       className="self-start text-12 font-semibold text-accent hover:underline">
                       + Agregar otra dirección
                     </button>
@@ -394,7 +429,7 @@ export function ModalClienteDomicilio({
         {zonaPendiente ? (
           <button type="button" onClick={() => setZonaPendiente(null)} className="inline-flex items-center gap-1 text-13 font-medium text-ink-3 hover:text-ink-2"><Icono nombre="flecha-izquierda" className="h-4 w-4 flex-shrink-0" />Cancelar</button>
         ) : agregandoA ? (
-          <button type="button" onClick={() => { setAgregandoA(null); setError(null); }} className="inline-flex items-center gap-1 text-13 font-medium text-ink-3 hover:text-ink-2"><Icono nombre="flecha-izquierda" className="h-4 w-4 flex-shrink-0" />Volver a la búsqueda</button>
+          <button type="button" onClick={() => { setAgregandoA(null); setEditando(null); setError(null); }} className="inline-flex items-center gap-1 text-13 font-medium text-ink-3 hover:text-ink-2"><Icono nombre="flecha-izquierda" className="h-4 w-4 flex-shrink-0" />Volver a la búsqueda</button>
         ) : <span />}
         <div className="flex items-center gap-2">
           {avisoColonia ? (

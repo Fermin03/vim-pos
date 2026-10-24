@@ -137,7 +137,7 @@ describe("etiquetaEstadoEnLinea", () => {
 describe("mensajeErrorEnLinea", () => {
   it("mensajes", () => {
     expect(mensajeErrorEnLinea("SIN_TURNO_ABIERTO")).toBe("Abre un turno para aceptar pedidos.");
-    expect(mensajeErrorEnLinea("PEDIDO_CANCELADO")).toBe("Este pedido ya no coincide con tu menú o tus zonas de envío. Se canceló y tu cliente ya lo sabe.");
+    expect(mensajeErrorEnLinea("PEDIDO_CANCELADO")).toBe("Este pedido se canceló y tu cliente ya fue avisado.");
     expect(mensajeErrorEnLinea("ACCION_INVALIDA")).toBe("Este pedido ya fue atendido.");
     expect(mensajeErrorEnLinea("RECLAMADO_POR_OTRA_CAJA")).toBe("Otra caja ya tomó este pedido.");
     expect(mensajeErrorEnLinea("SIN_RED")).toBe("Sin internet no se pueden atender pedidos en línea.");

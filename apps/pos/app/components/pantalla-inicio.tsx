@@ -1,5 +1,6 @@
 "use client";
 import { Button, LogoVim, Modal, Icono } from "@vim/ui/styles";
+import { ENCABEZADO_PANTALLA } from "./boton-volver";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useReloj } from "./topbar-pos";
 import { evaluarSync, leerEstadoSync, type NivelSync } from "../lib/estado-sync";
@@ -118,7 +119,7 @@ export function PantallaInicio({
       {acceso.actualizacion && acceso.nivel !== "bloqueado" && <BandaActualizacion version={acceso.actualizacion} />}
       {avisos && avisos.length > 0 && <DialogoAvisos avisos={avisos} onCerrar={() => setAvisos([])} />}
       {/* ── Barra superior: quién opera y dónde ─────────────────────────────── */}
-      <header className="flex h-[clamp(2.75rem,6.5vh,3.5rem)] flex-shrink-0 items-center justify-between gap-3 border-b border-line px-[clamp(0.75rem,2vw,1.25rem)]">
+      <header className={ENCABEZADO_PANTALLA}>
         <div className="flex min-w-0 items-center gap-3">
           <LogoVim className="h-8 w-8 flex-shrink-0" />
           <div className="min-w-0">
@@ -295,8 +296,7 @@ export function ConfirmarSalirCaja({ onCancelar }: { onCancelar: () => void }) {
           se quedan sin backend. Decirlo es la diferencia entre cerrar a propósito y descubrir
           a media comida que la cocina dejó de recibir comandas. */}
       <p className="mt-2 text-14 leading-snug text-ink-2">
-        La cocina y las demás pantallas conectadas a esta computadora dejarán de funcionar
-        hasta que la vuelvas a abrir.
+        Si cierras, la cocina y las demás pantallas dejarán de funcionar.
       </p>
       <p className="mt-2 text-13 leading-snug text-ink-3">
         Antes de cerrar se guarda un respaldo. No se pierde ninguna venta.

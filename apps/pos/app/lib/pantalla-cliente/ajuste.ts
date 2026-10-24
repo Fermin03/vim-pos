@@ -37,7 +37,7 @@ export function textoEstadoPantalla(a: AjustePantalla): string {
   if (a.modo === "apagada") return "Apagada.";
   const otros = a.monitores.filter((m) => !m.esDeLaCaja);
   // En «Duplicar», Windows reporta un solo monitor aunque haya dos enchufados, y no se abre nada.
-  if (otros.length === 0) return "No hay un segundo monitor conectado. Revisa que Windows esté en «Extender» y no en «Duplicar».";
+  if (otros.length === 0) return "No se detecta otro monitor. En Windows, elige «Extender», no «Duplicar».";
   if (!a.abierta) return "Hay un segundo monitor, pero la pantalla no se abrió.";
   const m = otros.find((o) => o.id === a.displayId) ?? otros[0]!;
   return `Abierta en ${m.etiqueta} (${m.ancho}×${m.alto}).`;

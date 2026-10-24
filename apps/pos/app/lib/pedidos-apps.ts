@@ -340,7 +340,7 @@ export const OPCIONES_PAUSA: { codigo: DuracionPausa; label: string }[] = [
 export function mensajeErrorTienda(codigo: string, detalle?: string): string {
   switch (codigo) {
     case "SIN_CONEXION_UBER": return "Esta sucursal no tiene conectada su tienda de Uber Eats.";
-    case "TIENDA_ESTRATEGIA_UBER": return "Esta tienda solo se pausa desde Uber Eats Manager (Uber no permite hacerlo desde el POS).";
+    case "TIENDA_ESTRATEGIA_UBER": return "Esta tienda solo se pausa desde Uber Eats Manager.";
     case "PREP_FUERA_DE_RANGO": return "El tiempo de preparación debe estar entre 1 y 180 minutos.";
     case "SIN_RED": return "Sin conexión con la nube. Reintenta en unos segundos.";
     // Con el módulo apagado esta pantalla no se pinta; el caso real es una caja que la tenía

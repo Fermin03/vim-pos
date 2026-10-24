@@ -527,7 +527,7 @@ function ModalMesa({
     >
       {libres.length === 0 ? (
         <p className="rounded border border-line bg-sel p-5 text-center text-14 text-ink-2">
-          Ahora mismo no hay mesas libres. En cuanto se cobre una cuenta, la mesa aparece aquí.
+          No hay mesas libres. Aparecerán aquí cuando se cobre una cuenta.
         </p>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-2.5">
@@ -552,8 +552,7 @@ function ModalMesa({
         </div>
       )}
       <p className="mt-4 text-13 text-ink-3">
-        Al asignarla, la reservación queda como <b>llegó</b> y la mesa deja de aparecer libre en el mapa. La cuenta se
-        abre desde Comedor, como siempre.
+        La mesa quedará ocupada. Abre la cuenta desde Comedor, como siempre.
       </p>
       <div className="mt-4 flex justify-end">
         <button
@@ -616,7 +615,7 @@ function ModalCancelar({
         )}
       </div>
       <p className="mt-4 text-13 text-ink-3">
-        Si tenía mesa apartada, se libera. La reservación no se borra: queda cancelada con su motivo.
+        La reservación se cancela y, si tenía mesa, se libera.
       </p>
       <Pie
         ocupado={ocupado || texto.length === 0}
