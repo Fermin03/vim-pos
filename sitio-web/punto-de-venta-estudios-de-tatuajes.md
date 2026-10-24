@@ -50,27 +50,43 @@ _Las comisiones de cada quien, por periodo._
 
 Cada servicio con su comisión. Al cerrar el periodo, cada artista sabe lo suyo.
 
+_Hecho para estudios_
+
+## Lo de todos los días en un estudio, resuelto
+
+### Una pieza, varias sesiones
+
+Agenda cada sesión de la misma pieza con su artista y su duración.
+
+### Sesiones largas sin empalmes
+
+Cada sesión aparta al artista y a la camilla las horas que dure.
+
+### Recuerda la cita por WhatsApp
+
+Un botón abre WhatsApp con el recordatorio ya escrito.
+
 _Para el dueño_
 
 ## Lo que necesitas para crecer
 
 ![Reporte de comisiones de la quincena: servicios, comisión, sueldo y total a pagar por colaboradora.](https://vimpos.com.mx/assets/img/capturas/giros/salon-comisiones.webp?v=1)
 
-### Comisiones sin calculadora
+### Comisiones por artista
 
-Lo que le toca a cada artista por periodo, con los descuentos ya repartidos.
+Sueldo y comisión de cada artista por periodo, sin hacer cuentas.
 
 ![Los servicios en el panel con su duración, precio, comisión, anticipo y quién los hace.](https://vimpos.com.mx/assets/img/capturas/giros/salon-servicios.webp?v=1)
 
-### Servicios con su precio y su comisión
+### Tus servicios con su precio
 
-Duración, precio, comisión y anticipo de cada servicio, en un solo lugar.
+Sesión, retoque o piercing, con su duración, precio y comisión.
 
 ![Ticket de una cita con el nombre de quien atendió y sus formas de pago.](https://vimpos.com.mx/assets/img/capturas/giros/salon-ticket.webp?v=1)
 
-### Cada ticket con quien atendió
+### Cada ticket con su artista
 
-El ticket dice qué hizo cada artista y cómo se pagó.
+El ticket dice qué artista hizo la sesión y cómo se pagó.
 
 ![El panel del dueño en un celular.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard-movil.webp?v=3)
 
@@ -175,13 +191,13 @@ _Preguntas_
 
 Sí. El plan Esencial es una sucursal y una caja, por $699 al mes más IVA. Los tres planes están en [precios](https://vimpos.com.mx/precios).
 
-### ¿Qué pasa con el anticipo si cancelan?
+### ¿Puedo agendar una pieza en varias sesiones?
 
-Si cancelan dentro del plazo que tú fijas, se devuelve. Si no, tú decides si se retiene.
+Sí. Cada sesión se agenda aparte, con su artista, su duración y su anticipo si lo pides.
 
-### ¿Cómo se calculan las comisiones?
+### ¿Cada artista ve su agenda?
 
-Cada servicio lleva su comisión. El reporte suma lo de cada quien por periodo, con los descuentos ya repartidos.
+Sí. Cada artista entra desde su celular y ve solo sus citas y sus comisiones.
 
 ### ¿Qué pasa si se cae el internet?
 
