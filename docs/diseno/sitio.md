@@ -64,8 +64,8 @@ se replica en todas las páginas con un script de un solo uso, no a mano: diecio
 a mano son dieciocho oportunidades de que una quede distinta.
 
 Una entrada nueva en el panel tiene que llevar a una página que exista: la prueba «ningún enlace
-interno lleva a un 404» lo vigila. Hamburgueserías ya no está en el menú: se llega desde la página
-de servicio rápido.
+interno lleva a un 404» lo vigila. Hamburgueserías volvió al menú (23 oct 2026), después de
+Servicio rápido: fuera de él quedaba casi sin enlaces internos y los buscadores no le daban peso.
 
 ## Movimiento
 

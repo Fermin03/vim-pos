@@ -58,27 +58,43 @@ _Las comisiones de cada quien, por periodo._
 
 Cada servicio con su comisión. Al cerrar el periodo, cada terapeuta sabe lo suyo.
 
+_Hecho para spas_
+
+## Lo de todos los días en un spa, resuelto
+
+### Varios tratamientos en una visita
+
+Masaje y facial seguidos, cada uno con su terapeuta y su cabina.
+
+### Cobra como tú quieras
+
+Al final, con anticipo o todo por adelantado. Tú lo decides.
+
+### Aceites y cremas a la venta
+
+Vende productos en la misma cuenta, con su inventario al día.
+
 _Para el dueño_
 
 ## Lo que necesitas para crecer
 
 ![Reporte de comisiones de la quincena: servicios, comisión, sueldo y total a pagar por colaboradora.](https://vimpos.com.mx/assets/img/capturas/giros/salon-comisiones.webp?v=1)
 
-### Comisiones sin calculadora
+### Comisiones por terapeuta
 
-Lo que le toca a cada terapeuta por periodo, con los descuentos ya repartidos.
+Sueldo y comisión de cada terapeuta por periodo, sin hacer cuentas.
 
 ![Los servicios en el panel con su duración, precio, comisión, anticipo y quién los hace.](https://vimpos.com.mx/assets/img/capturas/giros/salon-servicios.webp?v=1)
 
-### Servicios con su precio y su comisión
+### Tu carta de tratamientos
 
-Duración, precio, comisión y anticipo de cada servicio, en un solo lugar.
+Masajes y faciales, cada uno con su duración, precio y comisión.
 
 ![Ticket de una cita con el nombre de quien atendió y sus formas de pago.](https://vimpos.com.mx/assets/img/capturas/giros/salon-ticket.webp?v=1)
 
-### Cada ticket con quien atendió
+### Cada ticket con su terapeuta
 
-El ticket dice qué hizo cada terapeuta y cómo se pagó.
+El ticket dice qué tratamiento hizo cada terapeuta y cómo se pagó.
 
 ![El panel del dueño en un celular.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard-movil.webp?v=3)
 
@@ -183,13 +199,13 @@ _Preguntas_
 
 Sí. El plan Esencial es una sucursal y una caja, por $699 al mes más IVA. Los tres planes están en [precios](https://vimpos.com.mx/precios).
 
-### ¿Qué pasa con el anticipo si cancelan?
+### ¿Puedo agendar dos tratamientos seguidos?
 
-Si cancelan dentro del plazo que tú fijas, se devuelve. Si no, tú decides si se retiene.
+Sí. Cada tratamiento de la cita lleva su terapeuta, su cabina y su duración.
 
-### ¿Cómo se calculan las comisiones?
+### ¿Puedo cobrar todo al reservar?
 
-Cada servicio lleva su comisión. El reporte suma lo de cada quien por periodo, con los descuentos ya repartidos.
+Sí. Eliges si cobras al final, pides un anticipo o cobras completo al reservar.
 
 ### ¿Qué pasa si se cae el internet?
 

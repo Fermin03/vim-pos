@@ -58,27 +58,43 @@ _La lista de espera, en la caja._
 
 La lista de espera dice quién sigue y con quién.
 
+_Hecho para salones_
+
+## Lo de todos los días en un salón, resuelto
+
+### Cada estilista con su precio
+
+Un mismo servicio puede costar distinto según quién lo haga.
+
+### Sillas y mesas de uñas sin empalmes
+
+Das de alta cada silla y cada mesa. La agenda no deja apartarlas dos veces.
+
+### Tintes y shampoo en la misma cuenta
+
+Vende productos junto con el servicio, con su inventario al día.
+
 _Para el dueño_
 
 ## Lo que necesitas para crecer
 
 ![Reporte de comisiones de la quincena: servicios, comisión, sueldo y total a pagar por colaboradora.](https://vimpos.com.mx/assets/img/capturas/giros/salon-comisiones.webp?v=1)
 
-### Comisiones sin calculadora
+### Sueldo y comisión de cada estilista
 
-Lo que le toca a cada colaboradora por periodo, con los descuentos ya repartidos.
+Lo que le toca a cada una por periodo, sin hacer cuentas a mano.
 
 ![Los servicios en el panel con su duración, precio, comisión, anticipo y quién los hace.](https://vimpos.com.mx/assets/img/capturas/giros/salon-servicios.webp?v=1)
 
-### Servicios con su precio y su comisión
+### Tu lista de servicios
 
-Duración, precio, comisión y anticipo de cada servicio, en un solo lugar.
+Corte, tinte o uñas, cada uno con su duración, precio, comisión y anticipo.
 
 ![Ticket de una cita con el nombre de quien atendió y sus formas de pago.](https://vimpos.com.mx/assets/img/capturas/giros/salon-ticket.webp?v=1)
 
-### Cada ticket con quien atendió
+### Cada ticket con su estilista
 
-El ticket dice qué hizo cada colaboradora y cómo se pagó.
+La clienta ve qué le hizo cada estilista y cómo pagó.
 
 ![El panel del dueño en un celular.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard-movil.webp?v=3)
 
@@ -183,13 +199,13 @@ _Preguntas_
 
 Sí. El plan Esencial es una sucursal y una caja, por $699 al mes más IVA. Los tres planes están en [precios](https://vimpos.com.mx/precios).
 
-### ¿Qué pasa con el anticipo si cancelan?
+### ¿Puedo cobrar distinto según la estilista?
 
-Si cancelan dentro del plazo que tú fijas, se devuelve. Si no, tú decides si se retiene.
+Sí. Cada servicio tiene su precio base y, si quieres, uno propio por estilista.
 
-### ¿Cómo se calculan las comisiones?
+### ¿Puedo vender productos en la misma cuenta?
 
-Cada servicio lleva su comisión. El reporte suma lo de cada quien por periodo, con los descuentos ya repartidos.
+Sí. Tintes, shampoo o cremas van en la cuenta de la clienta y descuentan inventario.
 
 ### ¿Qué pasa si se cae el internet?
 

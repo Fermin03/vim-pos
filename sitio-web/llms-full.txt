@@ -1529,57 +1529,182 @@ En la demo cerramos un periodo y emitimos la global con tus datos de prueba.
 
 <!-- https://vimpos.com.mx/punto-de-venta-hamburgueserias -->
 
-# Punto de venta para hamburgueserías
+# Punto de venta para hamburgueseríasCada hamburguesa sale como la pidieron
 
-> El término de la carne, los extras, los combos y el pedido para llevar en una sola caja. Para hamburgueserías, desde $699 al mes más IVA.
+> El término de la carne, los extras con su precio y el combo sugerido en una sola caja. Para hamburgueserías, desde $699 al mes más IVA.
 
 **VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-hamburgueserias
 
-El término, los extras, el combo y el pedido para llevar, sin que la fila se detenga.
+El término, los extras y el combo en una sola caja, aunque se caiga el internet.
 
-[Pide una demo](https://vimpos.com.mx/demo)
+[Contactar ventas](https://vimpos.com.mx/contacto)
 
-[Ver precios](https://vimpos.com.mx/precios)
+[Comenzar](https://admin.vimpos.com.mx/registro)
 
-_En la caja_
+![Mostrador de una hamburguesería con VIM POS en el monitor, la impresora de tickets y la terminal de pago.](https://vimpos.com.mx/assets/img/home/comida-rapida.webp)
 
-## La orden sale completa a la primera
+![Papas con queso y tocino junto a una hamburguesa.](https://vimpos.com.mx/assets/img/fotos/servicio-rapido-2.webp)
 
-![Un producto abierto con sus opciones: el término de la carne y los extras con su precio.](https://vimpos.com.mx/assets/img/capturas/pos-catalogo.webp?v=3)
+![Un cliente haciendo su pedido en el mostrador.](https://vimpos.com.mx/assets/img/fotos/servicio-rapido-1.webp)
 
-_Una hamburguesa con su término y sus extras._
+## Del mostrador a la plancha, sin errores
+
+![Una hamburguesa abierta en la caja con el término de la carne y los extras con su precio.](https://vimpos.com.mx/assets/img/capturas/pos-catalogo.webp?v=3)
+
+_El término y los extras, al tomar la orden._
 
 ### El término no se olvida
 
-Si la hamburguesa lleva término, la caja no la manda a cocina sin él.
+Si la hamburguesa lleva término, la caja no la manda a la plancha sin él.
+
+![La caja pregunta «¿Lo hacemos combo?» al agregar una hamburguesa, con lo que cuesta de más.](https://vimpos.com.mx/assets/img/capturas/giros/servicio-rapido-sugerir-combo.webp?v=1)
+
+_La caja ofrece el combo sola._
+
+### La caja ofrece el combo
+
+Al pedir la hamburguesa sola, pregunta si la hacen combo y cuánto sube.
+
+![Un combo armado: hamburguesa con tocino, papas con queso y limonada, cada cambio con su precio.](https://vimpos.com.mx/assets/img/capturas/giros/servicio-rapido-combo.webp?v=1)
+
+_Cada cambio del combo, con su precio._
 
 ### Extras que se cobran solos
 
 Queso, tocino o aguacate suman su precio. «Sin cebolla» llega escrito a la plancha.
 
-### Combos
-
-Hamburguesa, papas y refresco a un solo precio.
-
-_En la cocina_
-
-## La plancha ve lo suyo y la barra lo suyo
-
 ![Pantalla de cocina con las comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
 
-_Cada comanda con su tiempo, su término y sus extras. En pantalla o impresa en cada área._
+_La plancha ve el término y las notas._
 
-### Aquí, para llevar o a domicilio
+### La plancha ve lo suyo
 
-Lo eliges al tomar la orden. A domicilio, con repartidor y zona de envío.
+Cada comanda llega con su tiempo, su término y sus notas, en pantalla o impresa.
 
-### Uber Eats entra a la caja
+![Inventario con existencias y alertas de insumos.](https://vimpos.com.mx/assets/img/capturas/admin-inventario.webp?v=3)
 
-El pedido llega como ticket y su comanda sale a cocina. Incluido desde Negocio; detalle en [precios](https://vimpos.com.mx/precios).
+_La carne y el pan, al día._
 
 ### Cuánta carne se fue
 
-Con la receta cargada, cada hamburguesa vendida descuenta carne, pan y queso. Desde el plan Negocio.
+Con la receta cargada, cada hamburguesa descuenta carne, pan y queso. Desde Negocio.
+
+_Para el dueño_
+
+## Lo que necesitas para crecer
+
+![Conciliación de apps de reparto con la diferencia por pedido.](https://vimpos.com.mx/assets/img/capturas/admin-conciliacion.webp?v=3)
+
+### [Uber Eats entra a la caja](https://vimpos.com.mx/funciones#reparto)
+
+El pedido llega como ticket y al final cuadras lo que te paga la app. Incluido desde Negocio.
+
+![Panel con la venta del día, las horas pico y lo más vendido.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
+
+### [Tu hamburguesa más vendida](https://vimpos.com.mx/funciones#reportes)
+
+Qué sale más, a qué hora se llena el local y quién cobró.
+
+![Ticket de venta con el código para facturar.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp?v=3)
+
+### [El cliente se factura solo](https://vimpos.com.mx/facturacion-cfdi)
+
+Con el código de su ticket, sin detener la fila. Incluida desde Negocio.
+
+![El panel del dueño en un celular.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard-movil.webp?v=3)
+
+### [La venta del día en tu celular](https://vimpos.com.mx/funciones#reportes)
+
+Revisa ventas y cortes desde donde estés.
+
+_Precios_
+
+## Un plan para cada tamaño de hamburguesería
+
+Sin pago inicial y sin contrato forzoso.
+
+[Ver precios](https://vimpos.com.mx/precios)
+
+### Esencial
+
+Para arrancar con una caja.
+
+**$699**
+
+/mes
+
+1 sucursal · 1 caja · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal para una hamburguesería
+
+- Término y extras con su precio
+- Pantalla de cocina por estación
+- Pedidos de Uber Eats: $100 al mes aparte
+- Facturación: $349 al mes aparte
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+### Negocio
+
+El que recomendamos
+
+Todo para un local, con tu menú cargado por nosotros.
+
+**$999**
+
+/mes
+
+1 sucursal · 3 cajas · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal para una hamburguesería
+
+- Hasta 3 cajas para la hora pico
+- Uber Eats y facturación incluidos, 20 folios al mes
+- Inventario por receta: carne, pan y queso
+- Cargamos tu menú y capacitamos a tu equipo
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+### Cadena
+
+Varias sucursales, vistas en un solo lugar.
+
+**$1,999**
+
+/mes
+
+3 sucursales · cajas sin límite · más IVA
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+Lo principal para una hamburguesería
+
+- Cajas sin límite en cada sucursal
+- Un reporte que suma tus 3 sucursales
+- Uber Eats y facturación incluidos, 40 folios al mes
+- Vamos a tu local el día del arranque
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+_Guías_
+
+## Antes de decidir
+
+### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
+
+Nueve preguntas antes de firmar.
+
+### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
+
+Las tres formas de cobrarte, con cuentas.
+
+### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
+
+Qué es y cómo se emite.
 
 _Preguntas_
 
@@ -1589,21 +1714,25 @@ _Preguntas_
 
 Sí. El plan Esencial es una sucursal y una caja, por $699 al mes más IVA. Los tres planes están en [precios](https://vimpos.com.mx/precios).
 
+### ¿Se puede cobrar el queso o el tocino extra?
+
+Sí. Cada extra lleva su precio y se suma solo. Las notas, como «sin cebolla», van sin costo.
+
+### ¿Puedo vender combos?
+
+Sí. El combo tiene un solo precio y el cliente puede cambiar las papas o la bebida, cada cambio con su precio.
+
 ### ¿Qué pasa si se cae el internet en hora pico?
 
 Nada: sigues cobrando y mandando a cocina. [Así funciona](https://vimpos.com.mx/sin-internet).
 
-### ¿Tengo que capturar todo mi menú?
+## Pon tu hamburguesería a vender hoy
 
-No. Lo pegas desde tu sistema actual o desde una hoja de cálculo. Desde Negocio lo cargamos nosotros.
+Empieza tú solo, o te lo enseñamos con tus hamburguesas.
 
-## Míralo con tus hamburguesas
+[Contactar ventas](https://vimpos.com.mx/contacto)
 
-Media hora con tus productos, tus extras y tus precios cargados.
-
-[Pide una demo](https://vimpos.com.mx/demo)
-
-[Ver todas las funciones](https://vimpos.com.mx/funciones)
+[Comenzar](https://admin.vimpos.com.mx/registro)
 
 ---
 
@@ -3309,27 +3438,43 @@ _La lista de espera, en la caja._
 
 La lista de espera dice quién sigue y con quién.
 
+_Hecho para salones_
+
+## Lo de todos los días en un salón, resuelto
+
+### Cada estilista con su precio
+
+Un mismo servicio puede costar distinto según quién lo haga.
+
+### Sillas y mesas de uñas sin empalmes
+
+Das de alta cada silla y cada mesa. La agenda no deja apartarlas dos veces.
+
+### Tintes y shampoo en la misma cuenta
+
+Vende productos junto con el servicio, con su inventario al día.
+
 _Para el dueño_
 
 ## Lo que necesitas para crecer
 
 ![Reporte de comisiones de la quincena: servicios, comisión, sueldo y total a pagar por colaboradora.](https://vimpos.com.mx/assets/img/capturas/giros/salon-comisiones.webp?v=1)
 
-### Comisiones sin calculadora
+### Sueldo y comisión de cada estilista
 
-Lo que le toca a cada colaboradora por periodo, con los descuentos ya repartidos.
+Lo que le toca a cada una por periodo, sin hacer cuentas a mano.
 
 ![Los servicios en el panel con su duración, precio, comisión, anticipo y quién los hace.](https://vimpos.com.mx/assets/img/capturas/giros/salon-servicios.webp?v=1)
 
-### Servicios con su precio y su comisión
+### Tu lista de servicios
 
-Duración, precio, comisión y anticipo de cada servicio, en un solo lugar.
+Corte, tinte o uñas, cada uno con su duración, precio, comisión y anticipo.
 
 ![Ticket de una cita con el nombre de quien atendió y sus formas de pago.](https://vimpos.com.mx/assets/img/capturas/giros/salon-ticket.webp?v=1)
 
-### Cada ticket con quien atendió
+### Cada ticket con su estilista
 
-El ticket dice qué hizo cada colaboradora y cómo se pagó.
+La clienta ve qué le hizo cada estilista y cómo pagó.
 
 ![El panel del dueño en un celular.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard-movil.webp?v=3)
 
@@ -3434,13 +3579,13 @@ _Preguntas_
 
 Sí. El plan Esencial es una sucursal y una caja, por $699 al mes más IVA. Los tres planes están en [precios](https://vimpos.com.mx/precios).
 
-### ¿Qué pasa con el anticipo si cancelan?
+### ¿Puedo cobrar distinto según la estilista?
 
-Si cancelan dentro del plazo que tú fijas, se devuelve. Si no, tú decides si se retiene.
+Sí. Cada servicio tiene su precio base y, si quieres, uno propio por estilista.
 
-### ¿Cómo se calculan las comisiones?
+### ¿Puedo vender productos en la misma cuenta?
 
-Cada servicio lleva su comisión. El reporte suma lo de cada quien por periodo, con los descuentos ya repartidos.
+Sí. Tintes, shampoo o cremas van en la cuenta de la clienta y descuentan inventario.
 
 ### ¿Qué pasa si se cae el internet?
 
@@ -3518,27 +3663,43 @@ _Las comisiones de cada quien, por periodo._
 
 Cada servicio con su comisión. Al cerrar el periodo, cada terapeuta sabe lo suyo.
 
+_Hecho para spas_
+
+## Lo de todos los días en un spa, resuelto
+
+### Varios tratamientos en una visita
+
+Masaje y facial seguidos, cada uno con su terapeuta y su cabina.
+
+### Cobra como tú quieras
+
+Al final, con anticipo o todo por adelantado. Tú lo decides.
+
+### Aceites y cremas a la venta
+
+Vende productos en la misma cuenta, con su inventario al día.
+
 _Para el dueño_
 
 ## Lo que necesitas para crecer
 
 ![Reporte de comisiones de la quincena: servicios, comisión, sueldo y total a pagar por colaboradora.](https://vimpos.com.mx/assets/img/capturas/giros/salon-comisiones.webp?v=1)
 
-### Comisiones sin calculadora
+### Comisiones por terapeuta
 
-Lo que le toca a cada terapeuta por periodo, con los descuentos ya repartidos.
+Sueldo y comisión de cada terapeuta por periodo, sin hacer cuentas.
 
 ![Los servicios en el panel con su duración, precio, comisión, anticipo y quién los hace.](https://vimpos.com.mx/assets/img/capturas/giros/salon-servicios.webp?v=1)
 
-### Servicios con su precio y su comisión
+### Tu carta de tratamientos
 
-Duración, precio, comisión y anticipo de cada servicio, en un solo lugar.
+Masajes y faciales, cada uno con su duración, precio y comisión.
 
 ![Ticket de una cita con el nombre de quien atendió y sus formas de pago.](https://vimpos.com.mx/assets/img/capturas/giros/salon-ticket.webp?v=1)
 
-### Cada ticket con quien atendió
+### Cada ticket con su terapeuta
 
-El ticket dice qué hizo cada terapeuta y cómo se pagó.
+El ticket dice qué tratamiento hizo cada terapeuta y cómo se pagó.
 
 ![El panel del dueño en un celular.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard-movil.webp?v=3)
 
@@ -3643,13 +3804,13 @@ _Preguntas_
 
 Sí. El plan Esencial es una sucursal y una caja, por $699 al mes más IVA. Los tres planes están en [precios](https://vimpos.com.mx/precios).
 
-### ¿Qué pasa con el anticipo si cancelan?
+### ¿Puedo agendar dos tratamientos seguidos?
 
-Si cancelan dentro del plazo que tú fijas, se devuelve. Si no, tú decides si se retiene.
+Sí. Cada tratamiento de la cita lleva su terapeuta, su cabina y su duración.
 
-### ¿Cómo se calculan las comisiones?
+### ¿Puedo cobrar todo al reservar?
 
-Cada servicio lleva su comisión. El reporte suma lo de cada quien por periodo, con los descuentos ya repartidos.
+Sí. Eliges si cobras al final, pides un anticipo o cobras completo al reservar.
 
 ### ¿Qué pasa si se cae el internet?
 
@@ -3719,27 +3880,43 @@ _La cita con su anticipo._
 
 Pide un anticipo al agendar. Si cancelan a tiempo se devuelve; si no, tú decides.
 
+_Hecho para barberías_
+
+## Lo de todos los días en una barbería, resuelto
+
+### Su barbero o el que esté libre
+
+El cliente elige con quién pasa, o pasa con el primero que se desocupe.
+
+### El que no llegó libera la silla
+
+Pasada tu tolerancia, la cita se marca en rojo y la silla pasa al que espera.
+
+### Cada barbero ve su agenda
+
+Entra desde su celular y marca cuándo empieza y termina cada corte.
+
 _Para el dueño_
 
 ## Lo que necesitas para crecer
 
 ![Reporte de comisiones de la quincena: servicios, comisión, sueldo y total a pagar por colaboradora.](https://vimpos.com.mx/assets/img/capturas/giros/salon-comisiones.webp?v=1)
 
-### Comisiones sin calculadora
+### Sueldo y comisión de cada barbero
 
-Lo que le toca a cada barbero por periodo, con los descuentos ya repartidos.
+Al cerrar el periodo, cada barbero sabe lo suyo.
 
 ![Los servicios en el panel con su duración, precio, comisión, anticipo y quién los hace.](https://vimpos.com.mx/assets/img/capturas/giros/salon-servicios.webp?v=1)
 
-### Servicios con su precio y su comisión
+### Corte, barba y combo
 
-Duración, precio, comisión y anticipo de cada servicio, en un solo lugar.
+Cada servicio con su duración, su precio y su comisión.
 
 ![Ticket de una cita con el nombre de quien atendió y sus formas de pago.](https://vimpos.com.mx/assets/img/capturas/giros/salon-ticket.webp?v=1)
 
-### Cada ticket con quien atendió
+### Cada ticket con su barbero
 
-El ticket dice qué hizo cada barbero y cómo se pagó.
+El ticket dice quién hizo el corte y cómo se pagó.
 
 ![El panel del dueño en un celular.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard-movil.webp?v=3)
 
@@ -3844,13 +4021,13 @@ _Preguntas_
 
 Sí. El plan Esencial es una sucursal y una caja, por $699 al mes más IVA. Los tres planes están en [precios](https://vimpos.com.mx/precios).
 
-### ¿Qué pasa con el anticipo si cancelan?
+### ¿Puedo atender sin cita?
 
-Si cancelan dentro del plazo que tú fijas, se devuelve. Si no, tú decides si se retiene.
+Sí. Quien llega sin cita entra a la lista de espera, con su barbero o con el que esté libre.
 
-### ¿Cómo se calculan las comisiones?
+### ¿Qué pasa si un cliente no llega?
 
-Cada servicio lleva su comisión. El reporte suma lo de cada quien por periodo, con los descuentos ya repartidos.
+Pasada la tolerancia que tú fijas, liberas su lugar para el siguiente. Su ficha guarda las faltas.
 
 ### ¿Qué pasa si se cae el internet?
 
@@ -3920,27 +4097,43 @@ _Las comisiones de cada quien, por periodo._
 
 Cada servicio con su comisión. Al cerrar el periodo, cada artista sabe lo suyo.
 
+_Hecho para estudios_
+
+## Lo de todos los días en un estudio, resuelto
+
+### Una pieza, varias sesiones
+
+Agenda cada sesión de la misma pieza con su artista y su duración.
+
+### Sesiones largas sin empalmes
+
+Cada sesión aparta al artista y a la camilla las horas que dure.
+
+### Recuerda la cita por WhatsApp
+
+Un botón abre WhatsApp con el recordatorio ya escrito.
+
 _Para el dueño_
 
 ## Lo que necesitas para crecer
 
 ![Reporte de comisiones de la quincena: servicios, comisión, sueldo y total a pagar por colaboradora.](https://vimpos.com.mx/assets/img/capturas/giros/salon-comisiones.webp?v=1)
 
-### Comisiones sin calculadora
+### Comisiones por artista
 
-Lo que le toca a cada artista por periodo, con los descuentos ya repartidos.
+Sueldo y comisión de cada artista por periodo, sin hacer cuentas.
 
 ![Los servicios en el panel con su duración, precio, comisión, anticipo y quién los hace.](https://vimpos.com.mx/assets/img/capturas/giros/salon-servicios.webp?v=1)
 
-### Servicios con su precio y su comisión
+### Tus servicios con su precio
 
-Duración, precio, comisión y anticipo de cada servicio, en un solo lugar.
+Sesión, retoque o piercing, con su duración, precio y comisión.
 
 ![Ticket de una cita con el nombre de quien atendió y sus formas de pago.](https://vimpos.com.mx/assets/img/capturas/giros/salon-ticket.webp?v=1)
 
-### Cada ticket con quien atendió
+### Cada ticket con su artista
 
-El ticket dice qué hizo cada artista y cómo se pagó.
+El ticket dice qué artista hizo la sesión y cómo se pagó.
 
 ![El panel del dueño en un celular.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard-movil.webp?v=3)
 
@@ -4045,13 +4238,13 @@ _Preguntas_
 
 Sí. El plan Esencial es una sucursal y una caja, por $699 al mes más IVA. Los tres planes están en [precios](https://vimpos.com.mx/precios).
 
-### ¿Qué pasa con el anticipo si cancelan?
+### ¿Puedo agendar una pieza en varias sesiones?
 
-Si cancelan dentro del plazo que tú fijas, se devuelve. Si no, tú decides si se retiene.
+Sí. Cada sesión se agenda aparte, con su artista, su duración y su anticipo si lo pides.
 
-### ¿Cómo se calculan las comisiones?
+### ¿Cada artista ve su agenda?
 
-Cada servicio lleva su comisión. El reporte suma lo de cada quien por periodo, con los descuentos ya repartidos.
+Sí. Cada artista entra desde su celular y ve solo sus citas y sus comisiones.
 
 ### ¿Qué pasa si se cae el internet?
 
