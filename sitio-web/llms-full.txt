@@ -1,6 +1,6 @@
 # VIM POS — el sitio completo
 
-> VIM POS es un sistema de punto de venta para restaurantes en México. El programa completo se instala en la computadora de la caja, así que cobrar, imprimir tickets y mandar comandas a cocina funcionan sin conexión a internet; la nube sirve de respaldo y de panel para el dueño. Incluye caja, pantalla de cocina, mapa de mesas, inventario, reportes y facturación electrónica CFDI 4.0. Desde $699 MXN al mes más IVA, sin pago inicial; desde el plan Negocio, VIM carga el menú y capacita al equipo, y en Esencial el dueño arranca con una guía paso a paso.
+> VIM POS es un sistema de punto de venta para restaurantes, tiendas y salones de belleza en México. El programa completo se instala en la computadora de la caja, así que cobrar, imprimir tickets y mandar comandas a cocina funcionan sin conexión a internet; la nube sirve de respaldo y de panel para el dueño. Incluye caja, pantalla de cocina, mapa de mesas, inventario, agenda de citas, reportes y facturación electrónica CFDI 4.0. Desde $699 MXN al mes más IVA, sin pago inicial; desde el plan Negocio, VIM carga el catálogo y capacita al equipo, y en Esencial el dueño arranca con una guía paso a paso.
 
 Este archivo concatena las 28 páginas de https://vimpos.com.mx en Markdown. Es el
 contexto completo del producto en una sola descarga. El índice corto, con la guía de
@@ -10,199 +10,177 @@ cuándo recomendarlo, está en https://vimpos.com.mx/llms.txt
 
 <!-- https://vimpos.com.mx/ -->
 
-# Punto de venta para restaurantes, sin letra chica
+# El mejor punto de venta para tu negocio
 
-> Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Desde $699 al mes, sin pago inicial, y cobra sin internet. Hecho en León, Gto.
+> Caja, inventario, citas y facturación CFDI para restaurantes, tiendas y salones de belleza. Desde $699 al mes y cobra sin internet.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/
 
-VIM POS es un sistema de punto de venta para restaurantes en México: caja, cocina, mesas, inventario y facturación en uno solo.
+Controla las ventas de tu negocio con el punto de venta VIM POS.
 
-[Pide una demo](https://vimpos.com.mx/demo)
+[Contactar ventas](https://vimpos.com.mx/contacto)
 
-[Pruébalo 30 días gratis](https://admin.vimpos.com.mx/registro)
+[Comenzar](https://admin.vimpos.com.mx/registro)
 
-Desde **$699 al mes**, más IVA · sin contrato forzoso · [ver los tres planes](https://vimpos.com.mx/precios)
+![Mostrador de una hamburguesería con VIM POS en el monitor, la impresora de tickets, el cajón y la terminal de pago.](https://vimpos.com.mx/assets/img/home/comida-rapida.webp)
 
-+10 restaurantes ya se administran con VIM POS
+_Todo tu negocio_
 
-![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=3)
-
-Todo tu sistema vive en tu caja, no en internet
-
-Imprime en impresoras térmicas de tickets, de red o de USB
-
-El corte de caja cuadra contra lo que hay en el cajón
-
-Ves la venta del día desde tu celular
-
-_Lo que hace_
-
-## Cuatro cosas, bien
-
-### Vender
-
-Toma la orden y cobra.
-
-### Mandar a cocina
-
-La comanda se manda directo a cocina, ya sea impresa o en pantalla con VIM POS KDS.
-
-### Cerrar el turno
-
-Confirma que las ventas del día cuadren.
-
-### Ver tu negocio
-
-Revisa las operaciones de tu negocio desde tu celular, donde quiera que estés.
+## De la venta al corte, en un solo sistema
 
 ![Un producto abierto con sus opciones: término de la carne y extras con su precio.](https://vimpos.com.mx/assets/img/capturas/pos-catalogo.webp?v=3)
 
-![Pantalla de cocina con las comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
+### [Cobra en segundos](https://vimpos.com.mx/funciones#caja)
+
+Productos con sus opciones y su precio. Efectivo, tarjeta o las dos en la misma cuenta.
+
+![Existencias en el panel: piezas, valor del inventario y lo que está bajo el mínimo.](https://vimpos.com.mx/assets/img/capturas/giros/tienda-ropa-existencias.webp?v=1)
+
+### [Tu inventario, al día](https://vimpos.com.mx/funciones#inventario)
+
+Cada venta descuenta su existencia y te avisa lo que se está acabando. Desde Negocio.
+
+![El calendario del salón con las citas del día de tres colaboradoras.](https://vimpos.com.mx/assets/img/capturas/giros/salon-calendario.webp?v=1)
+
+### [Tu agenda de citas](https://vimpos.com.mx/punto-de-venta-salones-de-belleza)
+
+Las citas del día y quién atiende cada una.
 
 ![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp?v=3)
 
+### [Un corte que cuadra con el cajón](https://vimpos.com.mx/funciones#reportes)
+
+Lo que debe haber contra lo que hay, por turno.
+
 ![Panel del dueño con las ventas del día y el estado de las cajas.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
 
-### Y además
+### [La venta del día en tu celular](https://vimpos.com.mx/funciones#reportes)
 
-- [Inventario con recetas](https://vimpos.com.mx/funciones#inventario)
+Qué se vende, a qué hora y quién cobró.
 
-  Vendes una hamburguesa y bajan la carne, el pan y lo demás.
-- [Pedidos a domicilio](https://vimpos.com.mx/funciones#domicilio)
+**Todo esto desde $699 al mes.** Pruébalo 30 días gratis.
 
-  Con repartidor asignado y el envío cobrado por zona.
-- [Uber Eats, directo a la caja](https://vimpos.com.mx/funciones#domicilio)
+[Contactar ventas](https://vimpos.com.mx/contacto)
 
-  Cada pedido entra como un ticket y su comanda sale a cocina.
-- [Lealtad](https://vimpos.com.mx/funciones#lealtad)
-
-  Puntos o sellos: tu cliente gana al pagar y canjea en su siguiente visita.
-- [Combos](https://vimpos.com.mx/funciones#caja)
-
-  Un paquete con sus opciones a un solo precio.
-- [Pantalla del cliente](https://vimpos.com.mx/funciones#caja)
-
-  En un segundo monitor, tu cliente ve la cuenta, el total y el cambio.
-
-[Ver todas las funciones](https://vimpos.com.mx/funciones)
-
-_Cómo funciona_
-
-## Tu caja es el centro. La nube es el respaldo, no el motor.
-
-Casi todos los puntos de venta de hoy viven en internet: si se cae la señal, se cae tu negocio. Aquí es al revés — el sistema entero está en la computadora de tu mostrador, y lo que está fuera cuelga de un hilo que se puede cortar sin que pase nada.
-
-**Pruébalo:** se apaga la nube y el local sigue entero.
-
-### No es un «modo offline». Es que no depende del internet.
-
-Los sistemas que se anuncian con «modo sin conexión» guardan tus ventas a medias en el navegador y esperan a que suban después. Aquí no hay modo ni versión reducida: el sistema completo está en tu caja y hace exactamente lo mismo haya señal o no. Cuando vuelve, lo del día sube solo y conserva los folios que ya imprimiste.
-
-[Cómo funciona por dentro](https://vimpos.com.mx/sin-internet)
+[Comenzar](https://admin.vimpos.com.mx/registro)
 
 _Para tu giro_
 
-## Seis formas de vender comida, seis configuraciones
+## Configurado para como vendes tú
 
-Cambian los modos de servicio, las pantallas y lo que se imprime.
+Cambian las pantallas, lo que se imprime y cómo se cobra.
 
-### Comida rápida o de mostrador
+[Alimentos y bebidas Restaurantes, cafés, bares y food trucks](https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo)
 
-Excelente para los días con prisas.
+[Tienda Ropa, vinos y licores, abarrotes y fruterías](https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa)
 
-### Food truck
+[Belleza Salones, spas, peluquerías y tatuajes](https://vimpos.com.mx/punto-de-venta-salones-de-belleza)
 
-Turno por evento, para un mejor control.
+**¿No ves tu giro?** Cuéntanos cómo vendes y te decimos si te sirve.
 
-### Cafetería o bar
+[Contactar ventas](https://vimpos.com.mx/contacto)
 
-Cuentas abiertas en barra y mesas, modificadores, propinas y cortes por turno.
+[Comenzar](https://admin.vimpos.com.mx/registro)
 
-### Restaurante con meseros
+_Sin internet_
 
-Mapa de mesas, meseros y propinas.
+## Se cae el internet y tú sigues cobrando
 
-### Solo reparto (dark kitchen)
+El sistema completo vive en la computadora de tu caja. La nube es el respaldo, no el motor.
 
-Integra apps de reparto o usa tu propio servicio de repartidores.
+**Pruébalo:** se apaga la nube y el local sigue entero.
 
-### Cadena o franquicia
+**Cuando vuelve la señal, lo del día sube solo.** [Cómo funciona](https://vimpos.com.mx/sin-internet)
 
-Administra todas tus sucursales desde un solo panel.
+[Contactar ventas](https://vimpos.com.mx/contacto)
 
-_Por qué existe_
+[Comenzar](https://admin.vimpos.com.mx/registro)
 
-## VIM POS está pensado para ese emprendedor que quiere saber cómo administrar su restaurante de verdad.
-
-_Ventas_
-
-### ¿Cuánto vendí hoy?
-
-Tus ventas del día y lo que más se vende, desde tu celular.
-
-_Costos_
-
-### ¿Cuánto me cuesta cada platillo?
-
-Inventario con recetas: sabes qué insumo se fue y cuánto costó.
-
-_Caja_
-
-### ¿Cuadra mi caja?
-
-Corte por turno: lo que debe haber contra lo que hay en el cajón.
+![Importador mostrando los productos que se van a dar de alta antes de confirmar.](https://vimpos.com.mx/assets/img/capturas/admin-importador.webp?v=4)
 
 _Si ya usas otro_
 
-## Cambiar de punto de venta sin volver a capturar tu menú
+## Cámbiate sin volver a capturar tus productos
 
-![Importador de menú mostrando lo que se va a dar de alta antes de confirmar.](https://vimpos.com.mx/assets/img/capturas/admin-importador.webp?v=4)
+1. **Descarga tu catálogo** Del sistema que usas hoy o de una hoja de cálculo.
+2. **Pégalo y revísalo** Ves cómo queda antes de guardar nada.
+3. **Empieza a vender** Desde el plan Negocio cargamos tu catálogo y capacitamos a tu equipo.
 
-_Pegas tu menú y lo ves antes de aceptarlo. Nada se guarda hasta que tú lo confirmas._
+**Tu catálogo listo en un día.** Te ayudamos con el cambio.
 
-### Tu menú se pega y ya
+[Contactar ventas](https://vimpos.com.mx/contacto)
 
-Descargas tu menú del sistema que usas hoy y lo pegas aquí, sin recapturar nada a mano.
-
-### Tu corte se ve igual
-
-El corte Z tiene el formato que ya conoces.
-
-### La comanda se parte
-
-Bebidas en la barra y comida en cocina, cada una en su impresora.
+[Comenzar](https://admin.vimpos.com.mx/registro)
 
 _Precios_
 
-## Precios flexibles para cada tipo de restaurante
+## Un plan para cada tamaño de negocio
 
-Precio mensual, más IVA. Si tienes dudas o necesitas una cotización personalizada, [contacta a soporte por WhatsApp](https://wa.me/525665083346?text=Hola%2C%20quiero%20una%20cotizaci%C3%B3n%20de%20VIM%20POS).
+Sin pago inicial y sin contrato forzoso.
 
-### [Esencial](https://vimpos.com.mx/precios)
+[Ver precios](https://vimpos.com.mx/precios)
 
-$699
+### Esencial
 
-- 1 sucursal · 1 caja
-- Cocina, mesas, reportes y corte
+Para arrancar con una caja.
+
+**$699**
+
+/mes
+
+1 sucursal · 1 caja · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal
+
+- Caja, corte y reportes
+- La venta del día en tu celular
+- Facturación: $349 al mes aparte
 - Arrancas tú, con nuestra guía
 
-_El que recomendamos_
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
 
-### [Negocio](https://vimpos.com.mx/precios)
+### Negocio
 
-$999
+El que recomendamos
 
-- 1 sucursal · 3 cajas
-- Facturación incluida · 20 folios al mes
-- Cargamos tu menú y capacitamos a tu equipo
+Todo para un local, con tu catálogo cargado por nosotros.
 
-### [Cadena](https://vimpos.com.mx/precios)
+**$999**
 
-$1,999
+/mes
 
-- 3 sucursales · cajas sin límite
-- Un reporte que suma todas
+1 sucursal · 3 cajas · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal
+
+- Hasta 3 cajas en tu local
+- Facturación incluida, 20 folios al mes
+- Inventario con aviso de mínimos
+- Cargamos tu catálogo y capacitamos a tu equipo
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+### Cadena
+
+Varias sucursales, vistas en un solo lugar.
+
+**$1,999**
+
+/mes
+
+3 sucursales · cajas sin límite · más IVA
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+Lo principal
+
+- Cajas sin límite en cada sucursal
+- Un reporte que suma tus 3 sucursales
+- Facturación incluida, 40 folios al mes
 - Vamos a tu local el día del arranque
 
 [Ver todo lo que incluye](https://vimpos.com.mx/precios)
@@ -219,9 +197,9 @@ Sí. El programa se instala en la computadora de tu caja y trabaja ahí, así qu
 
 Una computadora con Windows 10 u 11, una impresora térmica de tickets de 80 mm compatible con ESC/POS —por ejemplo, una Epson TM-T20III o TM-m30; puede ir conectada a tu red (cable Ethernet o Wi-Fi) o por USB, instalada en Windows—, un cajón de dinero y el módem que ya tienes. VIM no vende equipo: te decimos qué buscar y lo compras donde te salga mejor.
 
-### ¿Puedo traer mi menú de otro sistema?
+### ¿Puedo traer mis productos de otro sistema?
 
-Sí. Descargas tu menú del sistema que usas hoy y lo pegas tal cual. Si el formato no cuadra, tráete el archivo a la demo y lo vemos juntos.
+Sí. Descargas tu catálogo del sistema que usas hoy y lo pegas tal cual. Si el formato no cuadra, tráete el archivo a la demo y lo vemos juntos.
 
 ### ¿Emite facturas?
 
@@ -243,13 +221,19 @@ Sí. Cada sucursal opera con su propia caja y su propio turno, y el panel suma t
 
 Sí, con la terminal compatible, y te ayudamos a vincularla. Con cualquier otra, registras el pago en la caja.
 
-## Te lo enseñamos en media hora, con tu menú.
+**¿Te quedó otra duda?** Te contestamos por WhatsApp.
 
-Sin presentación ni compromiso. Traes tu carta, la cargamos y ves cómo se ve tu propio negocio en pantalla.
+[Escríbenos](https://wa.me/525665083346?text=Hola%2C%20tengo%20una%20pregunta%20sobre%20VIM%20POS)
 
-[Pide una demo](https://vimpos.com.mx/demo)
+[Comenzar](https://admin.vimpos.com.mx/registro)
 
-[Escríbenos](mailto:hola@vimpos.com.mx)
+## Pon tu negocio a vender hoy
+
+Empieza tú solo, o te lo enseñamos en media hora con tus productos.
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
 
 ---
 
@@ -259,7 +243,7 @@ Sin presentación ni compromiso. Traes tu carta, la cargamos y ves cómo se ve t
 
 > Caja, cocina, mesas, inventario, reportes, facturación CFDI y conciliación de apps de reparto. Lo que hace el sistema, sección por sección, con capturas reales.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/funciones
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/funciones
 
 El punto de venta para restaurantes, sección por sección y con capturas del sistema real.
 
@@ -505,7 +489,7 @@ Media hora con tus productos y tus precios cargados. Sin presentación y sin com
 
 > Qué pasa exactamente en tu caja cuando se va la señal, qué pasa cuando vuelve, y qué hace el sistema si algo falla. Sin modo reducido y sin ventas a medias.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/sin-internet
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/sin-internet
 
 El sistema vive en tu caja, no en internet.
 
@@ -625,7 +609,7 @@ En la demo, desconecta el cable delante de nosotros y sigue cobrando. Si no pasa
 
 > Autofactura por QR desde el ticket y factura global del periodo con un botón. Qué necesitas dar, qué cuestan los folios y cómo se enciende.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/facturacion-cfdi
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/facturacion-cfdi
 
 Tu cliente se factura solo desde su ticket y tú emites la factura global con un botón.
 
@@ -737,7 +721,7 @@ Media hora con tus productos, tus precios y la facturación en modo de prueba. S
 
 > Tres planes en pesos más IVA: Esencial $699, Negocio $999 y Cadena $1,999 al mes. Sin pago inicial ni contrato forzoso.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/precios
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/precios
 
 Desde $699 al mes, en pesos y más IVA. Sin costo de instalación ni contrato forzoso.
 
@@ -1011,7 +995,7 @@ Dinos cuántas cajas y sucursales tienes y te decimos tu plan. Contestamos el mi
 
 > Qué cambió en VIM POS y cuándo: funciones nuevas, mejoras y correcciones de la caja y del panel, con fecha.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/novedades
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/novedades
 
 ## Octubre de 2026
 
@@ -1233,7 +1217,7 @@ Este registro empieza en septiembre de 2026. Si quieres ver todo esto funcionand
 
 > Dinos cuántas cajas y cuántas sucursales tienes y te enseñamos el sistema funcionando, con tus productos y tus precios. Contestamos el mismo día hábil.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/demo
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/demo
 
 Montamos un par de productos tuyos y cobras una venta de prueba en el sistema de verdad.
 
@@ -1272,7 +1256,7 @@ Tus datos son solo para contactarte por esto. No los vendemos ni los compartimos
 
 > Las tres formas de cobrarte: licencia fija, gratuito y porcentaje por venta. La aritmética para comparar cada una con tu venta real, y cuándo deja de convenir.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante
 
 Hay tres formas de cobrarte, y la que parece más barata casi nunca lo es. Aquí están las tres, con las cuentas.
 
@@ -1349,7 +1333,7 @@ Trae tu venta con tarjeta de un mes bueno y la calculamos juntos en la demo, sin
 
 > Nueve preguntas que hacerle a cualquier software para restaurantes antes de firmar, por qué importa cada una, y en qué casos VIM POS no es la respuesta.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/como-elegir-sistema-restaurante
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/como-elegir-sistema-restaurante
 
 Nueve preguntas para hacerle a cualquier proveedor antes de firmar. Sirven igual si contratas a otro.
 
@@ -1445,7 +1429,7 @@ Media hora con tus productos y tus precios cargados. Puedes traer esta lista y h
 
 > Qué es la factura global, cada cuándo se emite, qué datos lleva en CFDI 4.0 y los errores más comunes en un restaurante. Guía en lenguaje llano.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/factura-global-restaurantes
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/factura-global-restaurantes
 
 El comprobante que ampara las ventas por las que nadie pidió factura. Qué lleva, cada cuándo se emite y en qué se equivoca la mayoría.
 
@@ -1549,7 +1533,7 @@ En la demo cerramos un periodo y emitimos la global con tus datos de prueba.
 
 > El término de la carne, los extras, los combos y el pedido para llevar en una sola caja. Para hamburgueserías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-hamburgueserias
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-hamburgueserias
 
 El término, los extras, el combo y el pedido para llevar, sin que la fila se detenga.
 
@@ -1629,7 +1613,7 @@ Media hora con tus productos, tus extras y tus precios cargados.
 
 > Cobra rápido en la barra, con el tamaño, la leche y el shot extra de cada bebida. Para cafeterías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-cafeterias
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-cafeterias
 
 Una caja rápida para la hora pico, que sigue cobrando aunque se caiga el internet.
 
@@ -1838,7 +1822,7 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 > Combos, extras y comandas a cocina en segundos, para llevar o a domicilio. Para comida rápida, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-servicio-rapido
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-servicio-rapido
 
 Combos, extras y comandas a cocina en segundos, aunque se caiga el internet.
 
@@ -2047,7 +2031,7 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 > Mapa de mesas, meseros, propinas y cocina por estación en una sola caja. Para restaurantes con servicio completo, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo
 
 Del mapa de mesas a la cocina, sin papelitos y sin perder una orden.
 
@@ -2256,7 +2240,7 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 > Cuentas por nombre en la barra, mesas, propinas y un corte que cuadra. Para bares y cervecerías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-bares
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-bares
 
 Cuentas en la barra y en mesa, con propinas, en una caja que no se detiene.
 
@@ -2465,7 +2449,7 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 > Cobra donde estaciones, con o sin señal, y lleva la venta de cada evento por separado. Para food trucks, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-food-trucks
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-food-trucks
 
 Una caja rápida para la fila del evento, con la venta de cada turno por separado.
 
@@ -2674,7 +2658,7 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 > Tallas y colores con su existencia, lector de código de barras, cambios de talla y etiquetas. Para tiendas de ropa y calzado, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa
 
 Vende con lector de código de barras, cambia tallas y sabe qué tienes en el anaquel.
 
@@ -2875,7 +2859,7 @@ Empieza tú solo, o te lo enseñamos con tu catálogo.
 
 > Código de barras, existencias con aviso de mínimo, cotizaciones y crédito a clientes. Para vinaterías y licorerías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-vinaterias
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-vinaterias
 
 Código de barras, existencias con aviso de mínimo y cotizaciones, en una caja que sigue sin internet.
 
@@ -3064,7 +3048,7 @@ Empieza tú solo, o te lo enseñamos con tu catálogo.
 
 > Venta por kilo o por pieza, crédito a clientes con abonos y cotizaciones. Para abarrotes y fruterías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-abarrotes
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-abarrotes
 
 La fruta por kilo, lo empaquetado por pieza y el fiado de tus clientes, en una sola caja.
 
@@ -3269,7 +3253,7 @@ Empieza tú solo, o te lo enseñamos con tu catálogo.
 
 > Agenda de tu equipo, cobro de la cita, anticipos y comisiones. Para salones de belleza, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-salones-de-belleza
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-salones-de-belleza
 
 Citas, cobro y comisiones de tu equipo en una sola pantalla.
 
@@ -3478,7 +3462,7 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 > Agenda por terapeuta y por cabina, anticipos, cobro de la cita y comisiones. Para spas, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-spa
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-spa
 
 Agenda por terapeuta y por cabina, con anticipos y comisiones.
 
@@ -3687,7 +3671,7 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 > Citas y lista de espera, agenda por barbero, cobro y comisiones. Para peluquerías y barberías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-peluquerias
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-peluquerias
 
 Citas, lista de espera y cobro en una sola caja.
 
@@ -3888,7 +3872,7 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 > Citas con anticipo, agenda por artista, cobro de la sesión y comisiones. Para estudios de tatuajes, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes
 
 Aparta la fecha, cobra la sesión y reparte las comisiones.
 
@@ -4089,7 +4073,7 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 > VIM POS se hace en León. Si tu restaurante está en la zona, la demo es en tu mostrador y con tu menú. Desde $699 al mes más IVA, sin letra chica.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-restaurantes-leon
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-restaurantes-leon
 
 VIM POS se hace aquí: la demo es en tu mostrador y con tu menú.
 
@@ -4167,7 +4151,7 @@ Media hora, con tus productos y tus precios cargados.
 
 > Quién construye VIM POS, el punto de venta para restaurantes hecho en León, Guanajuato: por qué existe y en qué punto está el producto hoy.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/nosotros
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/nosotros
 
 VIM POS es un sistema de punto de venta para restaurantes hecho en [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon).
 
@@ -4216,7 +4200,7 @@ Las demás formas de contacto están en la [página de contacto](https://vimpos.
 
 > Escríbenos a hola@vimpos.com.mx. Contestamos el mismo día hábil, sin centro de llamadas ni número de folio de por medio.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/contacto
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/contacto
 
 Te contestamos el mismo día hábil.
 
@@ -4264,7 +4248,7 @@ Este sitio publica su contenido también en Markdown y describe qué es VIM POS 
 
 > Qué datos pedimos, para qué los usamos, cuánto los guardamos y cómo ejercer tus derechos ARCO. No vendemos ni rentamos tus datos.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/aviso-privacidad
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/aviso-privacidad
 
 Qué datos te pedimos, para qué los usamos y cómo pedirnos que los borremos.
 
@@ -4357,7 +4341,7 @@ Si cambia, se publica aquí con la fecha nueva arriba. Si el cambio afecta a par
 
 > Qué contratas, qué incluye, cómo se cobra, de quién son tus datos y cómo cancelar. Sin contrato forzoso ni penalización: cancelas cuando quieras.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/terminos
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/terminos
 
 Qué contratas, qué incluye, cómo se cobra y cómo cancelar.
 

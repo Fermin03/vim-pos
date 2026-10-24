@@ -2,7 +2,7 @@
 
 > Caja, cocina, mesas, inventario, reportes, facturación CFDI y conciliación de apps de reparto. Lo que hace el sistema, sección por sección, con capturas reales.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/funciones
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/funciones
 
 El punto de venta para restaurantes, sección por sección y con capturas del sistema real.
 

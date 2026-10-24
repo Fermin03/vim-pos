@@ -2,7 +2,7 @@
 
 > Las tres formas de cobrarte: licencia fija, gratuito y porcentaje por venta. La aritmética para comparar cada una con tu venta real, y cuándo deja de convenir.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante
 
 Hay tres formas de cobrarte, y la que parece más barata casi nunca lo es. Aquí están las tres, con las cuentas.
 

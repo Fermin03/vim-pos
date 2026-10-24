@@ -20,7 +20,7 @@ export const PAGINAS = [
   {
     ruta: '/',
     nombre: 'Inicio',
-    resumen: 'Qué es VIM POS, para quién es y qué lo distingue: el sistema completo vive en la caja del local, no en internet.',
+    resumen: 'Qué es VIM POS y para qué negocios —restaurantes, tiendas y belleza— y qué lo distingue: el sistema completo vive en la caja del local, no en internet.',
     enSitemap: true,
   },
   {

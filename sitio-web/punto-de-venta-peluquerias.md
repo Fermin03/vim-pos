@@ -2,7 +2,7 @@
 
 > Citas y lista de espera, agenda por barbero, cobro y comisiones. Para peluquerías y barberías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-peluquerias
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-peluquerias
 
 Citas, lista de espera y cobro en una sola caja.
 

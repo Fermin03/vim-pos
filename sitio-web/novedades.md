@@ -2,7 +2,7 @@
 
 > Qué cambió en VIM POS y cuándo: funciones nuevas, mejoras y correcciones de la caja y del panel, con fecha.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/novedades
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/novedades
 
 ## Octubre de 2026
 

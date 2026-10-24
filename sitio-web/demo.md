@@ -2,7 +2,7 @@
 
 > Dinos cuántas cajas y cuántas sucursales tienes y te enseñamos el sistema funcionando, con tus productos y tus precios. Contestamos el mismo día hábil.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/demo
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/demo
 
 Montamos un par de productos tuyos y cobras una venta de prueba en el sistema de verdad.
 

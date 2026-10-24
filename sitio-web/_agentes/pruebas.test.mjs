@@ -808,7 +808,7 @@ test('los acordeones conservan su título y lo oculto no viaja al Markdown', () 
   // botones se descartan. Sin esta excepción, el gemelo eran ocho respuestas
   // seguidas que empezaban con «Sí.» sin decir a qué contestaban.
   const portada = leer('index.md');
-  for (const titulo of ['### ¿De verdad funciona sin internet?', '### ¿Emite facturas?', '### Food truck', '### Cadena o franquicia']) {
+  for (const titulo of ['### ¿De verdad funciona sin internet?', '### ¿Emite facturas?', '### ¿Qué necesito comprar?', '### ¿Funciona con varias sucursales?']) {
     assert.ok(portada.includes(titulo), `index.md perdió el título de acordeón «${titulo}»`);
   }
   // Cuelgan un nivel por debajo del encabezado de su sección, sea h2 o h3.

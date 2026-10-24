@@ -2,7 +2,7 @@
 
 > El término de la carne, los extras, los combos y el pedido para llevar en una sola caja. Para hamburgueserías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-hamburgueserias
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-hamburgueserias
 
 El término, los extras, el combo y el pedido para llevar, sin que la fila se detenga.
 

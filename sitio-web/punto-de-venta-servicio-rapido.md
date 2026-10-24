@@ -2,7 +2,7 @@
 
 > Combos, extras y comandas a cocina en segundos, para llevar o a domicilio. Para comida rápida, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-servicio-rapido
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-servicio-rapido
 
 Combos, extras y comandas a cocina en segundos, aunque se caiga el internet.
 

@@ -2,7 +2,7 @@
 
 > Tres planes en pesos más IVA: Esencial $699, Negocio $999 y Cadena $1,999 al mes. Sin pago inicial ni contrato forzoso.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/precios
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/precios
 
 Desde $699 al mes, en pesos y más IVA. Sin costo de instalación ni contrato forzoso.
 

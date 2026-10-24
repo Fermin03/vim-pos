@@ -2,7 +2,7 @@
 
 > Agenda por terapeuta y por cabina, anticipos, cobro de la cita y comisiones. Para spas, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-spa
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-spa
 
 Agenda por terapeuta y por cabina, con anticipos y comisiones.
 

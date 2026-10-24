@@ -2,7 +2,7 @@
 
 > Cobra donde estaciones, con o sin señal, y lleva la venta de cada evento por separado. Para food trucks, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-food-trucks
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-food-trucks
 
 Una caja rápida para la fila del evento, con la venta de cada turno por separado.
 

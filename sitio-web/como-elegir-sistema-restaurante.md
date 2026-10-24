@@ -2,7 +2,7 @@
 
 > Nueve preguntas que hacerle a cualquier software para restaurantes antes de firmar, por qué importa cada una, y en qué casos VIM POS no es la respuesta.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/como-elegir-sistema-restaurante
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/como-elegir-sistema-restaurante
 
 Nueve preguntas para hacerle a cualquier proveedor antes de firmar. Sirven igual si contratas a otro.
 
