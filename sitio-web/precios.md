@@ -1,4 +1,4 @@
-# Precios flexibles para cada tipo de restaurante
+# Precios flexibles para cada tipo de negocio
 
 > Tres planes en pesos más IVA: Esencial $699, Negocio $999 y Cadena $1,999 al mes. Sin pago inicial ni contrato forzoso.
 

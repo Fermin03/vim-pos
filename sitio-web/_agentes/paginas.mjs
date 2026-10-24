@@ -233,7 +233,7 @@ export const NEGOCIO = {
   razonSocial: 'VIM POS',
   correo: 'hola@vimpos.com.mx',
   correoUrl: 'mailto:hola@vimpos.com.mx',
-  ciudad: 'Guanajuato',
+  ciudad: 'León',
   estado: 'Guanajuato',
   pais: 'MX',
   instagram: 'https://www.instagram.com/vimpos_mx/',

@@ -51,7 +51,7 @@ const NOTAS = [
   '**Madurez:** producto joven. Más de 10 restaurantes lo usan en su operación diaria. ' +
     'No hay una base de miles de clientes y el sitio no finge que la haya.',
   '**Quién lo hace:** VIM POS, persona física con actividad empresarial, ' +
-    'bajo la marca VIM POS, desde Guanajuato.',
+    'bajo la marca VIM POS, desde León, Guanajuato.',
 ];
 
 const CUANDO_USAR = [
@@ -122,7 +122,7 @@ const NOTAS_EN = [
     'provider authorised by the tax authority; the venue uploads its own digital seal and buys invoice credits.',
   '**Maturity:** young product. More than 10 restaurants run on it every day. There is no ' +
     'base of thousands of customers and the site does not pretend otherwise.',
-  '**Who makes it:** VIM POS, sole proprietor, from Guanajuato, Mexico.',
+  '**Who makes it:** VIM POS, sole proprietor, from León, Guanajuato, Mexico.',
 ];
 
 const CUANDO_USAR_EN = [
