@@ -1,6 +1,6 @@
 # VIM POS — el sitio completo
 
-> VIM POS es un sistema de punto de venta para restaurantes en México. El programa completo se instala en la computadora de la caja, así que cobrar, imprimir tickets y mandar comandas a cocina funcionan sin conexión a internet; la nube sirve de respaldo y de panel para el dueño. Incluye caja, pantalla de cocina, mapa de mesas, inventario, reportes y facturación electrónica CFDI 4.0. Desde $699 MXN al mes más IVA, sin pago inicial; desde el plan Negocio, VIM carga el menú y capacita al equipo, y en Esencial el dueño arranca con una guía paso a paso.
+> VIM POS es un sistema de punto de venta para restaurantes, tiendas y salones de belleza en México. El programa completo se instala en la computadora de la caja, así que cobrar, imprimir tickets y mandar comandas a cocina funcionan sin conexión a internet; la nube sirve de respaldo y de panel para el dueño. Incluye caja, pantalla de cocina, mapa de mesas, inventario, agenda de citas, reportes y facturación electrónica CFDI 4.0. Desde $699 MXN al mes más IVA, sin pago inicial; desde el plan Negocio, VIM carga el catálogo y capacita al equipo, y en Esencial el dueño arranca con una guía paso a paso.
 
 Este archivo concatena las 28 páginas de https://vimpos.com.mx en Markdown. Es el
 contexto completo del producto en una sola descarga. El índice corto, con la guía de
@@ -12,9 +12,9 @@ cuándo recomendarlo, está en https://vimpos.com.mx/llms.txt
 
 # El mejor punto de venta para tu negocio
 
-> Caja, inventario, citas y facturación CFDI para restaurantes, tiendas y salones de belleza. Desde $699 al mes, sin pago inicial, y cobra sin internet. Hecho en León, Gto.
+> Caja, inventario, citas y facturación CFDI para restaurantes, tiendas y salones de belleza. Desde $699 al mes y cobra sin internet.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/
 
 Controla las ventas de tu negocio con el punto de venta VIM POS.
 
@@ -243,7 +243,7 @@ Empieza tú solo, o te lo enseñamos en media hora con tus productos.
 
 > Caja, cocina, mesas, inventario, reportes, facturación CFDI y conciliación de apps de reparto. Lo que hace el sistema, sección por sección, con capturas reales.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/funciones
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/funciones
 
 El punto de venta para restaurantes, sección por sección y con capturas del sistema real.
 
@@ -489,7 +489,7 @@ Media hora con tus productos y tus precios cargados. Sin presentación y sin com
 
 > Qué pasa exactamente en tu caja cuando se va la señal, qué pasa cuando vuelve, y qué hace el sistema si algo falla. Sin modo reducido y sin ventas a medias.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/sin-internet
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/sin-internet
 
 El sistema vive en tu caja, no en internet.
 
@@ -609,7 +609,7 @@ En la demo, desconecta el cable delante de nosotros y sigue cobrando. Si no pasa
 
 > Autofactura por QR desde el ticket y factura global del periodo con un botón. Qué necesitas dar, qué cuestan los folios y cómo se enciende.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/facturacion-cfdi
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/facturacion-cfdi
 
 Tu cliente se factura solo desde su ticket y tú emites la factura global con un botón.
 
@@ -721,7 +721,7 @@ Media hora con tus productos, tus precios y la facturación en modo de prueba. S
 
 > Tres planes en pesos más IVA: Esencial $699, Negocio $999 y Cadena $1,999 al mes. Sin pago inicial ni contrato forzoso.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/precios
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/precios
 
 Desde $699 al mes, en pesos y más IVA. Sin costo de instalación ni contrato forzoso.
 
@@ -995,7 +995,7 @@ Dinos cuántas cajas y sucursales tienes y te decimos tu plan. Contestamos el mi
 
 > Qué cambió en VIM POS y cuándo: funciones nuevas, mejoras y correcciones de la caja y del panel, con fecha.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/novedades
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/novedades
 
 ## Octubre de 2026
 
@@ -1217,7 +1217,7 @@ Este registro empieza en septiembre de 2026. Si quieres ver todo esto funcionand
 
 > Dinos cuántas cajas y cuántas sucursales tienes y te enseñamos el sistema funcionando, con tus productos y tus precios. Contestamos el mismo día hábil.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/demo
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/demo
 
 Montamos un par de productos tuyos y cobras una venta de prueba en el sistema de verdad.
 
@@ -1256,7 +1256,7 @@ Tus datos son solo para contactarte por esto. No los vendemos ni los compartimos
 
 > Las tres formas de cobrarte: licencia fija, gratuito y porcentaje por venta. La aritmética para comparar cada una con tu venta real, y cuándo deja de convenir.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante
 
 Hay tres formas de cobrarte, y la que parece más barata casi nunca lo es. Aquí están las tres, con las cuentas.
 
@@ -1333,7 +1333,7 @@ Trae tu venta con tarjeta de un mes bueno y la calculamos juntos en la demo, sin
 
 > Nueve preguntas que hacerle a cualquier software para restaurantes antes de firmar, por qué importa cada una, y en qué casos VIM POS no es la respuesta.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/como-elegir-sistema-restaurante
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/como-elegir-sistema-restaurante
 
 Nueve preguntas para hacerle a cualquier proveedor antes de firmar. Sirven igual si contratas a otro.
 
@@ -1429,7 +1429,7 @@ Media hora con tus productos y tus precios cargados. Puedes traer esta lista y h
 
 > Qué es la factura global, cada cuándo se emite, qué datos lleva en CFDI 4.0 y los errores más comunes en un restaurante. Guía en lenguaje llano.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/factura-global-restaurantes
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/factura-global-restaurantes
 
 El comprobante que ampara las ventas por las que nadie pidió factura. Qué lleva, cada cuándo se emite y en qué se equivoca la mayoría.
 
@@ -1533,7 +1533,7 @@ En la demo cerramos un periodo y emitimos la global con tus datos de prueba.
 
 > El término de la carne, los extras, los combos y el pedido para llevar en una sola caja. Para hamburgueserías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-hamburgueserias
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-hamburgueserias
 
 El término, los extras, el combo y el pedido para llevar, sin que la fila se detenga.
 
@@ -1613,7 +1613,7 @@ Media hora con tus productos, tus extras y tus precios cargados.
 
 > Cobra rápido en la barra, con el tamaño, la leche y el shot extra de cada bebida. Para cafeterías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-cafeterias
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-cafeterias
 
 Una caja rápida para la hora pico, que sigue cobrando aunque se caiga el internet.
 
@@ -1822,7 +1822,7 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 > Combos, extras y comandas a cocina en segundos, para llevar o a domicilio. Para comida rápida, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-servicio-rapido
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-servicio-rapido
 
 Combos, extras y comandas a cocina en segundos, aunque se caiga el internet.
 
@@ -2031,7 +2031,7 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 > Mapa de mesas, meseros, propinas y cocina por estación en una sola caja. Para restaurantes con servicio completo, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo
 
 Del mapa de mesas a la cocina, sin papelitos y sin perder una orden.
 
@@ -2240,7 +2240,7 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 > Cuentas por nombre en la barra, mesas, propinas y un corte que cuadra. Para bares y cervecerías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-bares
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-bares
 
 Cuentas en la barra y en mesa, con propinas, en una caja que no se detiene.
 
@@ -2449,7 +2449,7 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 > Cobra donde estaciones, con o sin señal, y lleva la venta de cada evento por separado. Para food trucks, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-food-trucks
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-food-trucks
 
 Una caja rápida para la fila del evento, con la venta de cada turno por separado.
 
@@ -2658,7 +2658,7 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 > Tallas y colores con su existencia, lector de código de barras, cambios de talla y etiquetas. Para tiendas de ropa y calzado, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa
 
 Vende con lector de código de barras, cambia tallas y sabe qué tienes en el anaquel.
 
@@ -2859,7 +2859,7 @@ Empieza tú solo, o te lo enseñamos con tu catálogo.
 
 > Código de barras, existencias con aviso de mínimo, cotizaciones y crédito a clientes. Para vinaterías y licorerías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-vinaterias
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-vinaterias
 
 Código de barras, existencias con aviso de mínimo y cotizaciones, en una caja que sigue sin internet.
 
@@ -3048,7 +3048,7 @@ Empieza tú solo, o te lo enseñamos con tu catálogo.
 
 > Venta por kilo o por pieza, crédito a clientes con abonos y cotizaciones. Para abarrotes y fruterías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-abarrotes
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-abarrotes
 
 La fruta por kilo, lo empaquetado por pieza y el fiado de tus clientes, en una sola caja.
 
@@ -3253,7 +3253,7 @@ Empieza tú solo, o te lo enseñamos con tu catálogo.
 
 > Agenda de tu equipo, cobro de la cita, anticipos y comisiones. Para salones de belleza, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-salones-de-belleza
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-salones-de-belleza
 
 Citas, cobro y comisiones de tu equipo en una sola pantalla.
 
@@ -3462,7 +3462,7 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 > Agenda por terapeuta y por cabina, anticipos, cobro de la cita y comisiones. Para spas, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-spa
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-spa
 
 Agenda por terapeuta y por cabina, con anticipos y comisiones.
 
@@ -3671,7 +3671,7 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 > Citas y lista de espera, agenda por barbero, cobro y comisiones. Para peluquerías y barberías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-peluquerias
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-peluquerias
 
 Citas, lista de espera y cobro en una sola caja.
 
@@ -3872,7 +3872,7 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 > Citas con anticipo, agenda por artista, cobro de la sesión y comisiones. Para estudios de tatuajes, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes
 
 Aparta la fecha, cobra la sesión y reparte las comisiones.
 
@@ -4073,7 +4073,7 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 > VIM POS se hace en León. Si tu restaurante está en la zona, la demo es en tu mostrador y con tu menú. Desde $699 al mes más IVA, sin letra chica.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-restaurantes-leon
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-restaurantes-leon
 
 VIM POS se hace aquí: la demo es en tu mostrador y con tu menú.
 
@@ -4151,7 +4151,7 @@ Media hora, con tus productos y tus precios cargados.
 
 > Quién construye VIM POS, el punto de venta para restaurantes hecho en León, Guanajuato: por qué existe y en qué punto está el producto hoy.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/nosotros
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/nosotros
 
 VIM POS es un sistema de punto de venta para restaurantes hecho en [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon).
 
@@ -4200,7 +4200,7 @@ Las demás formas de contacto están en la [página de contacto](https://vimpos.
 
 > Escríbenos a hola@vimpos.com.mx. Contestamos el mismo día hábil, sin centro de llamadas ni número de folio de por medio.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/contacto
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/contacto
 
 Te contestamos el mismo día hábil.
 
@@ -4248,7 +4248,7 @@ Este sitio publica su contenido también en Markdown y describe qué es VIM POS 
 
 > Qué datos pedimos, para qué los usamos, cuánto los guardamos y cómo ejercer tus derechos ARCO. No vendemos ni rentamos tus datos.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/aviso-privacidad
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/aviso-privacidad
 
 Qué datos te pedimos, para qué los usamos y cómo pedirnos que los borremos.
 
@@ -4341,7 +4341,7 @@ Si cambia, se publica aquí con la fecha nueva arriba. Si el cambio afecta a par
 
 > Qué contratas, qué incluye, cómo se cobra, de quién son tus datos y cómo cancelar. Sin contrato forzoso ni penalización: cancelas cuando quieras.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/terminos
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/terminos
 
 Qué contratas, qué incluye, cómo se cobra y cómo cancelar.
 

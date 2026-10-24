@@ -2,7 +2,7 @@
 
 > Qué contratas, qué incluye, cómo se cobra, de quién son tus datos y cómo cancelar. Sin contrato forzoso ni penalización: cancelas cuando quieras.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/terminos
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/terminos
 
 Qué contratas, qué incluye, cómo se cobra y cómo cancelar.
 

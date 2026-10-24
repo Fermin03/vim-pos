@@ -2,7 +2,7 @@
 
 > Qué es la factura global, cada cuándo se emite, qué datos lleva en CFDI 4.0 y los errores más comunes en un restaurante. Guía en lenguaje llano.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/factura-global-restaurantes
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/factura-global-restaurantes
 
 El comprobante que ampara las ventas por las que nadie pidió factura. Qué lleva, cada cuándo se emite y en qué se equivoca la mayoría.
 

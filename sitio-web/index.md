@@ -1,8 +1,8 @@
 # El mejor punto de venta para tu negocio
 
-> Caja, inventario, citas y facturación CFDI para restaurantes, tiendas y salones de belleza. Desde $699 al mes, sin pago inicial, y cobra sin internet. Hecho en León, Gto.
+> Caja, inventario, citas y facturación CFDI para restaurantes, tiendas y salones de belleza. Desde $699 al mes y cobra sin internet.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/
 
 Controla las ventas de tu negocio con el punto de venta VIM POS.
 

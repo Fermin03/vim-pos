@@ -28,7 +28,7 @@ const SALIDA = path.resolve(import.meta.dirname, "../assets/img/og");
    para caber en una pestaña y en el resultado de Google, y aquí hay sitio para
    una frase de verdad. */
 const TARJETAS = [
-  { id: "home",         eyebrow: "Punto de venta para restaurantes", titulo: "Todo lo que tu restaurante necesita, sin letra chica." },
+  { id: "home",         eyebrow: "Punto de venta", titulo: "El mejor punto de venta para tu negocio." },
   { id: "funciones",    eyebrow: "Funciones",     titulo: "Qué hace, sección por sección." },
   { id: "sin-internet", eyebrow: "El diferenciador", titulo: "Se cae el internet y tú sigues cobrando." },
   { id: "precios",      eyebrow: "Precios",       titulo: "Precios flexibles para cada tipo de restaurante. Desde $699 al mes." },

@@ -2,7 +2,7 @@
 
 > Qué pasa exactamente en tu caja cuando se va la señal, qué pasa cuando vuelve, y qué hace el sistema si algo falla. Sin modo reducido y sin ventas a medias.
 
-**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/sin-internet
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/sin-internet
 
 El sistema vive en tu caja, no en internet.
 

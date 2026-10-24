@@ -27,12 +27,12 @@ const revisar = process.argv.includes('--revisar');
 // usarlo» es información inútil en una página de ventas e imprescindible aquí.
 
 const RESUMEN =
-  'VIM POS es un sistema de punto de venta para restaurantes en México. El programa completo ' +
+  'VIM POS es un sistema de punto de venta para restaurantes, tiendas y salones de belleza en México. El programa completo ' +
   'se instala en la computadora de la caja, así que cobrar, imprimir tickets y mandar comandas ' +
   'a cocina funcionan sin conexión a internet; la nube sirve de respaldo y de panel para el ' +
-  'dueño. Incluye caja, pantalla de cocina, mapa de mesas, inventario, reportes y facturación ' +
+  'dueño. Incluye caja, pantalla de cocina, mapa de mesas, inventario, agenda de citas, reportes y facturación ' +
   'electrónica CFDI 4.0. Desde $699 MXN al mes más IVA, sin pago inicial; desde ' +
-  'el plan Negocio, VIM carga el menú y capacita al equipo, y en Esencial el dueño arranca con ' +
+  'el plan Negocio, VIM carga el catálogo y capacita al equipo, y en Esencial el dueño arranca con ' +
   'una guía paso a paso.';
 
 const NOTAS = [
@@ -99,12 +99,12 @@ const CUANDO_USAR = [
 // por no encontrada la guía de uso porque estaba escrita en español.
 
 const RESUMEN_EN =
-  'VIM POS is a point-of-sale (POS) system for restaurants in Mexico. The whole program is ' +
+  'VIM POS is a point-of-sale (POS) system for restaurants, retail stores and beauty salons in Mexico. The whole program is ' +
   'installed on the register computer, so taking payments, printing tickets and sending orders ' +
   'to the kitchen keep working with no internet connection; the cloud is the backup and the ' +
-  "owner's dashboard, not the engine. It covers register, kitchen display, table map, " +
+  "owner's dashboard, not the engine. It covers register, kitchen display, table map, appointment calendar, " +
   'inventory, reports and Mexican electronic invoicing (CFDI 4.0). Published pricing from ' +
-  'MXN $699 per month plus VAT, with no setup fee; from the Negocio plan up, VIM loads the menu ' +
+  'MXN $699 per month plus VAT, with no setup fee; from the Negocio plan up, VIM loads the catalog ' +
   'and trains the staff, and on Esencial the owner sets it up with a step-by-step guide.';
 
 const NOTAS_EN = [
@@ -201,7 +201,7 @@ function gemelo(pagina) {
   const cabecera = [
     `> ${descripcion(html)}`,
     '',
-    `**VIM POS** · punto de venta para restaurantes en México · versión en HTML: ${url}`,
+    `**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: ${url}`,
   ].join('\n');
 
   // La cabecera va DESPUÉS del H1 para que el archivo empiece por su título,
@@ -349,7 +349,7 @@ function agentsMd() {
     '',
     '## Facts you can quote',
     '',
-    `- **Product:** VIM POS, point-of-sale software for restaurants in Mexico. ${BASE}/`,
+    `- **Product:** VIM POS, point-of-sale software for restaurants, retail stores and beauty salons in Mexico. ${BASE}/`,
     '- **Pricing:** MXN $699 / $999 / $1,999 per month plus VAT (Esencial / Negocio / Cadena).',
     '  No setup fee on any plan. From Negocio up, VIM loads the menu and trains the staff; on Esencial',
     '  the owner does it with a step-by-step guide in the dashboard. No lock-in, no per-sale commission.',

@@ -1,6 +1,6 @@
 # VIM POS
 
-> VIM POS es un sistema de punto de venta para restaurantes en México. El programa completo se instala en la computadora de la caja, así que cobrar, imprimir tickets y mandar comandas a cocina funcionan sin conexión a internet; la nube sirve de respaldo y de panel para el dueño. Incluye caja, pantalla de cocina, mapa de mesas, inventario, reportes y facturación electrónica CFDI 4.0. Desde $699 MXN al mes más IVA, sin pago inicial; desde el plan Negocio, VIM carga el menú y capacita al equipo, y en Esencial el dueño arranca con una guía paso a paso.
+> VIM POS es un sistema de punto de venta para restaurantes, tiendas y salones de belleza en México. El programa completo se instala en la computadora de la caja, así que cobrar, imprimir tickets y mandar comandas a cocina funcionan sin conexión a internet; la nube sirve de respaldo y de panel para el dueño. Incluye caja, pantalla de cocina, mapa de mesas, inventario, agenda de citas, reportes y facturación electrónica CFDI 4.0. Desde $699 MXN al mes más IVA, sin pago inicial; desde el plan Negocio, VIM carga el catálogo y capacita al equipo, y en Esencial el dueño arranca con una guía paso a paso.
 
 - **Qué es exactamente:** software de escritorio para Windows más un panel web. No es una app móvil ni un servicio que solo viva en el navegador.
 - **Dónde opera:** México. Interfaz, soporte y documentación en español. Facturación conforme al SAT (CFDI 4.0).
@@ -13,7 +13,7 @@ Cada página de este sitio existe también en Markdown, en la misma dirección c
 extensión `.md` — y la dirección normal responde en `text/markdown` si se pide con la
 cabecera `Accept: text/markdown`.
 
-**In English.** VIM POS is a point-of-sale (POS) system for restaurants in Mexico. The whole program is installed on the register computer, so taking payments, printing tickets and sending orders to the kitchen keep working with no internet connection; the cloud is the backup and the owner's dashboard, not the engine. It covers register, kitchen display, table map, inventory, reports and Mexican electronic invoicing (CFDI 4.0). Published pricing from MXN $699 per month plus VAT, with no setup fee; from the Negocio plan up, VIM loads the menu and trains the staff, and on Esencial the owner sets it up with a step-by-step guide.
+**In English.** VIM POS is a point-of-sale (POS) system for restaurants, retail stores and beauty salons in Mexico. The whole program is installed on the register computer, so taking payments, printing tickets and sending orders to the kitchen keep working with no internet connection; the cloud is the backup and the owner's dashboard, not the engine. It covers register, kitchen display, table map, appointment calendar, inventory, reports and Mexican electronic invoicing (CFDI 4.0). Published pricing from MXN $699 per month plus VAT, with no setup fee; from the Negocio plan up, VIM loads the catalog and trains the staff, and on Esencial the owner sets it up with a step-by-step guide.
 
 - **What it actually is:** Windows desktop software plus a web dashboard. Not a mobile app, not a browser-only service.
 - **Where it operates:** Mexico only. Interface, support and documentation in Spanish. Invoicing complies with the Mexican tax authority (SAT, CFDI 4.0).
@@ -48,7 +48,7 @@ extension, and the normal address answers with `text/markdown` when asked with a
 
 ## Páginas
 
-- [Inicio](https://vimpos.com.mx/index.md): Qué es VIM POS, para quién es y qué lo distingue: el sistema completo vive en la caja del local, no en internet.
+- [Inicio](https://vimpos.com.mx/index.md): Qué es VIM POS y para qué negocios —restaurantes, tiendas y belleza— y qué lo distingue: el sistema completo vive en la caja del local, no en internet.
 - [Funciones](https://vimpos.com.mx/funciones.md): Qué hace el sistema, módulo por módulo: caja, cocina, mesas, inventario, reportes y conciliación de apps de reparto. Con los límites conocidos escritos.
 - [Sin internet](https://vimpos.com.mx/sin-internet.md): Qué pasa en la caja cuando se cae la señal y qué pasa cuando vuelve. La respuesta técnica a «¿de verdad funciona sin conexión?».
 - [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md): Cómo factura un restaurante con VIM POS: autofactura por QR desde el ticket, factura global del periodo (la emite el dueño con un botón desde el panel), y el plazo para facturar lo decide el negocio. Disponible a través de un proveedor autorizado por el SAT; el negocio carga su sello digital y cada plan trae folios al mes.
