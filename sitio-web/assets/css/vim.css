@@ -53,6 +53,9 @@
   --t-32: 32px;
   --t-44: 44px;
   --t-60: 60px;
+  /* La barra y el menú: un punto más que el texto corrido, que a 15 px se
+     leían chicos y delgados junto a los botones (Fermín, 23-oct-2026). */
+  --t-nav: 17px;
 
   /* ---- Ritmo vertical ---- */
   --sp-1: 4px;  --sp-2: 8px;   --sp-3: 12px;  --sp-4: 16px;
@@ -277,6 +280,12 @@ a { color: var(--ink); text-underline-offset: 3px; }
   border-bottom: 1px solid var(--line);
 }
 
+/* La barra va más ancha que el contenido (Fermín, 23-oct-2026), como en Square:
+   el logo y los botones se abren hacia las orillas y los enlaces respiran. El panel
+   desplegable usa el mismo contenedor, así que se alinea con ella. */
+.nav .contenedor { max-width: 1440px; }
+@media (min-width: 900px) { .nav .contenedor { padding-inline: var(--sp-8); } }
+
 .nav-fila {
   display: flex;
   align-items: center;
@@ -298,8 +307,9 @@ a { color: var(--ink); text-underline-offset: 3px; }
 /* `stretch` y no `center`: cada entrada mide los 64 px de la barra. Así el
    disparador de un panel toca el borde de abajo y el mouse pasa de él al panel
    sin cruzar un hueco que lo cierre. */
-.nav-enlaces { display: none; gap: var(--sp-5); align-items: stretch; align-self: stretch; }
-@media (min-width: 900px) { .nav-enlaces { display: flex; } }
+.nav-enlaces { display: none; gap: var(--sp-4); align-items: stretch; align-self: stretch; }
+/* Los enlaces van pegados al logo y el hueco queda en medio, antes de los botones. */
+@media (min-width: 900px) { .nav-enlaces { display: flex; margin-right: auto; } }
 
 .nav-enlace {
   display: inline-flex; align-items: center; gap: var(--sp-1);
@@ -308,8 +318,8 @@ a { color: var(--ink); text-underline-offset: 3px; }
   white-space: nowrap;
   color: var(--ink-2);
   text-decoration: none;
-  font-size: var(--t-15);
-  font-weight: 500;
+  font-size: var(--t-nav);
+  font-weight: 600;
   transition: color var(--v-corta) ease;
 }
 @media (hover: hover) and (pointer: fine) {
@@ -332,7 +342,7 @@ a { color: var(--ink); text-underline-offset: 3px; }
    `data-js` y desde ahí manda él (clic, Escape, y el `aria-expanded`). */
 .nav-grupo { display: flex; }
 
-.nav-flecha { width: 14px; height: 14px; transition: transform var(--v-corta) var(--sal); }
+.nav-flecha { width: 14px; height: 14px; flex: none; transition: transform var(--v-corta) var(--sal); }
 .nav-grupo[data-abierto="true"] .nav-flecha { transform: rotate(180deg); }
 
 .nav-panel {
@@ -388,7 +398,7 @@ a { color: var(--ink); text-underline-offset: 3px; }
   width: 100%;
   padding: var(--sp-2) 0;
   border: 0; background: none; cursor: pointer; text-align: left;
-  font-family: var(--font); font-size: var(--t-15); font-weight: 500; letter-spacing: inherit; line-height: inherit;
+  font-family: var(--font); font-size: var(--t-nav); font-weight: 600; letter-spacing: inherit; line-height: inherit;
   color: var(--ink);
   text-decoration: none;
   transition: color var(--v-corta) ease;
@@ -411,7 +421,7 @@ a { color: var(--ink); text-underline-offset: 3px; }
   column-gap: var(--sp-10);
 }
 .nav-panel .nav-lista :is(a, button) { justify-content: flex-start; }
-.nav-panel .nav-lista-raiz :is(a, button) { font-size: calc(var(--t-15) * 1.3); }
+.nav-panel .nav-lista-raiz :is(a, button) { font-size: calc(var(--t-nav) * 1.3); }
 
 /* En la PC el grupo se asoma a la derecha en vez de deslizarse: la raíz en la
    primera columna y todas las pantallas de grupo apiladas en la segunda. Se
@@ -433,13 +443,18 @@ a { color: var(--ink); text-underline-offset: 3px; }
 }
 
 .nav-acciones { display: flex; align-items: center; gap: var(--sp-3); }
+.nav-acciones .btn, .nav-movil-pie .btn { font-size: var(--t-nav); }
 
 /* En el teléfono y la tableta la barra solo lleva el logo y la hamburguesa:
    las acciones viven en el pie del cajón. En la PC, «Contactar ventas» espera a
    que haya ancho de sobra. */
 .nav-solo-pc { display: none; }
 @media (min-width: 900px) { .nav-solo-pc { display: inline-flex; } }
+/* Debajo de 1120 px «Contactar ventas» no cabe y se esconde (sigue en el hero y
+   en cada bloque). Entre 900 y 999 tampoco caben los enlaces a 17 px: bajan a
+   16 y se aprietan. Medido con Playwright, 23-oct-2026. */
 @media (min-width: 900px) and (max-width: 1119px) { .nav-ventas { display: none; } }
+@media (min-width: 900px) and (max-width: 999px) { .nav { --t-nav: 16px; } .nav-enlaces { gap: var(--sp-3); } }
 
 .nav-hamburguesa {
   display: inline-flex;
@@ -544,7 +559,7 @@ body[data-menu-abierto="true"]::before {
   --sale: -25%;
   padding: var(--sp-10) var(--sp-5) var(--sp-5);   /* arriba, hueco para el botón de cerrar */
 }
-.nav-movil :is(.nav-lista a, .nav-lista button, .nav-volver) { font-size: var(--t-18); padding-block: var(--sp-3); }
+.nav-movil :is(.nav-lista a, .nav-lista button, .nav-volver) { font-size: 22px; padding-block: var(--sp-3); }
 /* El pie del cajón se queda abajo en todas las pantallas: Contactar ventas a
    la izquierda, Comenzar a la derecha. */
 .nav-movil { display: flex; flex-direction: column; }
@@ -1895,3 +1910,171 @@ body:has(.subnav) :target { scroll-margin-top: calc(65px + 44px + var(--sp-5)); 
   font-size: var(--t-15); color: var(--ink-2);
 }
 .plan-giro-mas { align-self: end; justify-self: start; font-weight: 600; font-size: var(--t-15); text-underline-offset: 4px; }
+
+/* ==========================================================================
+   Inicio (rediseño del 23-oct-2026)
+   Lo que el inicio no comparte con las páginas por giro: la foto del hero,
+   las tarjetas de giro con foto, los pasos y la franja que cierra
+   cada bloque con los dos botones. Rasgos y planes son los de los giros.
+   ========================================================================== */
+
+.inicio-hero { padding-block: clamp(var(--sp-8), 6vw, var(--sp-12)) var(--sp-10); }
+.inicio-hero-rejilla { display: grid; gap: var(--sp-8); align-items: center; }
+@media (min-width: 980px) { .inicio-hero-rejilla { grid-template-columns: 1fr 1fr; gap: var(--sp-10); } }
+.inicio-hero .entradilla { font-size: var(--t-18); max-width: 46ch; }
+@media (max-width: 599px) {
+  .inicio-hero .fila { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+  .inicio-hero .btn-hero { padding-inline: var(--sp-3); }
+}
+
+/* La foto del mostrador, recortada hacia el monitor, que es lo que importa. */
+.inicio-foto {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--hover);
+  animation: hero-entra var(--v-media) var(--sal) 80ms backwards;
+}
+@media (min-width: 980px) {
+  .inicio-foto { aspect-ratio: 5 / 6; margin-right: calc(-1 * clamp(0px, (100vw - var(--ancho)) / 2, 120px)); }
+}
+.inicio-foto img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 62%; }
+@media (prefers-reduced-motion: reduce) {
+  .inicio-foto { animation-name: hero-entra-fundido; }
+}
+
+/* ---- Hero en celular y tableta: la foto a pantalla completa y el texto encima ----
+   La foto ocupa todo el ancho y el alto de la pantalla, y el título y los
+   botones van sobre el techo del local, que es lo que queda arriba del monitor.
+   El alto mínimo de 800 px garantiza que el monitor (a ~38 % del alto de la
+   foto) empiece por debajo de los botones aun en un teléfono bajito; ahí el
+   hero mide un poco más que la pantalla. El degradado oscuro de arriba es lo
+   que deja leer el texto blanco sobre la foto. (Fermín, 23-oct-2026) */
+@media (max-width: 979px) {
+  .inicio-hero { padding-block: 0; }
+  .inicio-hero .contenedor { padding-inline: 0; }
+  .inicio-hero-rejilla { gap: 0; }
+  .inicio-hero-rejilla > * { grid-area: 1 / 1; }
+  .inicio-hero-rejilla > .pila {
+    position: relative; z-index: 1;
+    align-self: start;
+    padding: var(--sp-6) var(--sp-5) 0;
+  }
+  .inicio-hero h1 { color: #fff; }
+  .inicio-hero .entradilla { color: rgba(255,255,255,.88); }
+  .inicio-hero .btn-fantasma { color: #fff; border-color: rgba(255,255,255,.5); background: rgba(22,22,26,.25); }
+  .inicio-foto {
+    aspect-ratio: auto;
+    height: max(calc(100svh - 64px), 800px, 90vw);   /* 90vw: en pantallas anchas el monitor sale completo */
+    border-radius: 0;
+  }
+  .inicio-foto img { object-position: 50% 0; }   /* en pantallas anchas recorta abajo y deja el techo libre */
+  .inicio-foto::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(to bottom, rgba(22,22,26,.82) 0%, rgba(22,22,26,.6) 26%, rgba(22,22,26,0) 40%);
+  }
+}
+
+/* ---- Tarjetas de funciones en el celular ---------------------------------
+   Apiladas en vez de carrusel, y con la captura entera: en el carrusel la
+   tarjeta de al lado asomaba cortada y el marco de 16:10 recortaba la captura
+   por abajo (Fermín, 23-oct-2026). */
+@media (max-width: 799px) {
+  .inicio-funciones :is(.dos, .tres) {
+    display: grid; grid-auto-flow: row; grid-auto-columns: auto;
+    overflow: visible; margin-inline: 0; padding-inline: 0;
+  }
+  .inicio-funciones .tarjeta-media-imagen {
+    aspect-ratio: auto;
+    margin: calc(-1 * var(--sp-6)) calc(-1 * var(--sp-6)) 0;
+    padding: var(--sp-3) var(--sp-3) 0;
+  }
+  .inicio-funciones .puntos { display: none; }   /* ya no es carrusel */
+}
+
+/* ---- La franja que cierra cada bloque ------------------------------------
+   Una frase a la izquierda y los dos botones a la derecha. Es lo que hace
+   que cada pantalla del inicio termine en «contrata», no en un párrafo. */
+.cta-seccion {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: var(--sp-3);
+  padding-top: var(--sp-6);
+  border-top: 1px solid var(--line);
+}
+.cta-seccion p { margin-right: auto; font-size: var(--t-18); color: var(--ink-2); }
+.cta-seccion p strong { color: var(--ink); font-weight: 600; }
+@media (max-width: 599px) {
+  .cta-seccion { display: grid; grid-template-columns: 1fr 1fr; }
+  .cta-seccion p { grid-column: 1 / -1; }
+}
+
+/* ---- Bloque oscuro (giros) ---------------------------------------------
+   El único fondo oscuro del inicio fuera del cierre: las fotos se ven más
+   ricas sobre tinta, y parte la página a la mitad como en Square. */
+.inicio-oscura { background: var(--ink); }
+.inicio-oscura h2 { color: #fff; }
+.inicio-oscura p, .inicio-oscura .eyebrow { color: #B8B8B4; }
+.inicio-oscura .cta-seccion { border-top-color: rgba(255,255,255,.14); }
+.inicio-oscura .cta-seccion p strong { color: #fff; }
+.inicio-oscura .btn-fantasma { color: #fff; border-color: rgba(255,255,255,.28); }
+@media (hover: hover) and (pointer: fine) {
+  .inicio-oscura .btn-fantasma:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.4); }
+}
+
+/* ---- Tarjetas de giro con foto -----------------------------------------
+   Foto completa y toda la tarjeta es el enlace (Fermín, 23-oct-2026). El texto
+   va ARRIBA, sobre un degradado oscuro: así los tres títulos arrancan a la
+   misma altura aunque «Alimentos y bebidas» ocupe dos renglones, y se leen
+   sobre el techo del local en vez de sobre el monitor. */
+.giros-fotos { display: grid; gap: var(--sp-5); }
+@media (min-width: 980px) { .giros-fotos { grid-template-columns: repeat(3, 1fr); } }
+/* Una por renglón debajo de 980 px: en tres columnas angostas el texto caía
+   sobre el monitor. En tableta, más anchas que altas para no medir una pantalla. */
+@media (min-width: 600px) and (max-width: 979px) { .giros-fotos .giro-foto { aspect-ratio: 3 / 2; } .giros-fotos .giro-foto img { object-position: 50% 30%; } }
+.giro-foto {
+  position: relative; isolation: isolate;
+  aspect-ratio: 4 / 5;
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  padding: var(--sp-6);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  color: #fff; text-decoration: none;
+}
+.giro-foto img {
+  position: absolute; inset: 0; z-index: -2;
+  width: 100%; height: 100%; object-fit: cover; object-position: 50% 70%;
+  transition: transform 600ms var(--sal);
+}
+.giro-foto::before {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(to bottom, rgba(22,22,26,.9) 0%, rgba(22,22,26,.72) 30%, rgba(22,22,26,0) 58%);
+}
+.giro-foto h3 { color: #fff; font-size: clamp(var(--t-24), 2.6vw, var(--t-32)); }
+.inicio-oscura .giro-foto p { color: rgba(255,255,255,.9); font-size: var(--t-15); }
+.giro-foto .mas { margin-top: auto; align-self: flex-start; font-weight: 600; font-size: var(--t-15); padding: var(--sp-2) var(--sp-4); border-radius: 999px; background: rgba(255,255,255,.95); color: var(--ink); }
+.giro-foto:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+@media (hover: hover) and (pointer: fine) {
+  .giro-foto:hover img { transform: scale(1.03); }
+}
+@media (prefers-reduced-motion: reduce) { .giro-foto img { transition: none; } }
+
+/* ---- Imagen y texto lado a lado (cambiarte) --------------------------- */
+.inicio-dos { display: grid; gap: var(--sp-8); align-items: center; }
+@media (min-width: 900px) { .inicio-dos { grid-template-columns: 1.25fr 1fr; gap: var(--sp-10); } }
+
+.inicio-pasos { list-style: none; margin: 0; padding: 0; counter-reset: paso; display: grid; gap: var(--sp-5); }
+.inicio-pasos li {
+  counter-increment: paso;
+  display: grid; grid-template-columns: 40px 1fr; column-gap: var(--sp-4);
+  font-size: var(--t-15); color: var(--ink-2);
+}
+.inicio-pasos li::before {
+  content: counter(paso);
+  grid-row: span 2;
+  width: 40px; height: 40px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent-hover);
+  font: 600 var(--t-18) / 1 var(--font-display);
+}
+.inicio-pasos strong { color: var(--ink); font-size: var(--t-18); font-weight: 600; }

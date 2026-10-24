@@ -739,7 +739,7 @@
      Sale cuando el hero ya no se ve y se va cuando aparece el cierre, que trae
      los mismos botones. */
   var barra = document.querySelector("[data-barra-accion]");
-  var heroGiro = document.querySelector(".giro-hero");
+  var heroGiro = document.querySelector(".giro-hero, .inicio-hero");
   var cierreGiro = document.querySelector(".cierre");
   if (barra && heroGiro && "IntersectionObserver" in window) {
     var heroVisible = true, cierreVisible = false;

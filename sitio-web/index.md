@@ -1,196 +1,174 @@
-# Punto de venta para restaurantes, sin letra chica
+# El mejor punto de venta para tu negocio
 
-> Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Desde $699 al mes, sin pago inicial, y cobra sin internet. Hecho en León, Gto.
+> Caja, inventario, citas y facturación CFDI para restaurantes, tiendas y salones de belleza. Desde $699 al mes, sin pago inicial, y cobra sin internet. Hecho en León, Gto.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/
 
-VIM POS es un sistema de punto de venta para restaurantes en México: caja, cocina, mesas, inventario y facturación en uno solo.
+Controla las ventas de tu negocio con el punto de venta VIM POS.
 
-[Pide una demo](https://vimpos.com.mx/demo)
+[Contactar ventas](https://vimpos.com.mx/contacto)
 
-[Pruébalo 30 días gratis](https://admin.vimpos.com.mx/registro)
+[Comenzar](https://admin.vimpos.com.mx/registro)
 
-Desde **$699 al mes**, más IVA · sin contrato forzoso · [ver los tres planes](https://vimpos.com.mx/precios)
+![Mostrador de una hamburguesería con VIM POS en el monitor, la impresora de tickets, el cajón y la terminal de pago.](https://vimpos.com.mx/assets/img/home/comida-rapida.webp)
 
-+10 restaurantes ya se administran con VIM POS
+_Todo tu negocio_
 
-![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=3)
-
-Todo tu sistema vive en tu caja, no en internet
-
-Imprime en impresoras térmicas de tickets, de red o de USB
-
-El corte de caja cuadra contra lo que hay en el cajón
-
-Ves la venta del día desde tu celular
-
-_Lo que hace_
-
-## Cuatro cosas, bien
-
-### Vender
-
-Toma la orden y cobra.
-
-### Mandar a cocina
-
-La comanda se manda directo a cocina, ya sea impresa o en pantalla con VIM POS KDS.
-
-### Cerrar el turno
-
-Confirma que las ventas del día cuadren.
-
-### Ver tu negocio
-
-Revisa las operaciones de tu negocio desde tu celular, donde quiera que estés.
+## De la venta al corte, en un solo sistema
 
 ![Un producto abierto con sus opciones: término de la carne y extras con su precio.](https://vimpos.com.mx/assets/img/capturas/pos-catalogo.webp?v=3)
 
-![Pantalla de cocina con las comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
+### [Cobra en segundos](https://vimpos.com.mx/funciones#caja)
+
+Productos con sus opciones y su precio. Efectivo, tarjeta o las dos en la misma cuenta.
+
+![Existencias en el panel: piezas, valor del inventario y lo que está bajo el mínimo.](https://vimpos.com.mx/assets/img/capturas/giros/tienda-ropa-existencias.webp?v=1)
+
+### [Tu inventario, al día](https://vimpos.com.mx/funciones#inventario)
+
+Cada venta descuenta su existencia y te avisa lo que se está acabando. Desde Negocio.
+
+![El calendario del salón con las citas del día de tres colaboradoras.](https://vimpos.com.mx/assets/img/capturas/giros/salon-calendario.webp?v=1)
+
+### [Tu agenda de citas](https://vimpos.com.mx/punto-de-venta-salones-de-belleza)
+
+Las citas del día y quién atiende cada una.
 
 ![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp?v=3)
 
+### [Un corte que cuadra con el cajón](https://vimpos.com.mx/funciones#reportes)
+
+Lo que debe haber contra lo que hay, por turno.
+
 ![Panel del dueño con las ventas del día y el estado de las cajas.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
 
-### Y además
+### [La venta del día en tu celular](https://vimpos.com.mx/funciones#reportes)
 
-- [Inventario con recetas](https://vimpos.com.mx/funciones#inventario)
+Qué se vende, a qué hora y quién cobró.
 
-  Vendes una hamburguesa y bajan la carne, el pan y lo demás.
-- [Pedidos a domicilio](https://vimpos.com.mx/funciones#domicilio)
+**Todo esto desde $699 al mes.** Pruébalo 30 días gratis.
 
-  Con repartidor asignado y el envío cobrado por zona.
-- [Uber Eats, directo a la caja](https://vimpos.com.mx/funciones#domicilio)
+[Contactar ventas](https://vimpos.com.mx/contacto)
 
-  Cada pedido entra como un ticket y su comanda sale a cocina.
-- [Lealtad](https://vimpos.com.mx/funciones#lealtad)
-
-  Puntos o sellos: tu cliente gana al pagar y canjea en su siguiente visita.
-- [Combos](https://vimpos.com.mx/funciones#caja)
-
-  Un paquete con sus opciones a un solo precio.
-- [Pantalla del cliente](https://vimpos.com.mx/funciones#caja)
-
-  En un segundo monitor, tu cliente ve la cuenta, el total y el cambio.
-
-[Ver todas las funciones](https://vimpos.com.mx/funciones)
-
-_Cómo funciona_
-
-## Tu caja es el centro. La nube es el respaldo, no el motor.
-
-Casi todos los puntos de venta de hoy viven en internet: si se cae la señal, se cae tu negocio. Aquí es al revés — el sistema entero está en la computadora de tu mostrador, y lo que está fuera cuelga de un hilo que se puede cortar sin que pase nada.
-
-**Pruébalo:** se apaga la nube y el local sigue entero.
-
-### No es un «modo offline». Es que no depende del internet.
-
-Los sistemas que se anuncian con «modo sin conexión» guardan tus ventas a medias en el navegador y esperan a que suban después. Aquí no hay modo ni versión reducida: el sistema completo está en tu caja y hace exactamente lo mismo haya señal o no. Cuando vuelve, lo del día sube solo y conserva los folios que ya imprimiste.
-
-[Cómo funciona por dentro](https://vimpos.com.mx/sin-internet)
+[Comenzar](https://admin.vimpos.com.mx/registro)
 
 _Para tu giro_
 
-## Seis formas de vender comida, seis configuraciones
+## Configurado para como vendes tú
 
-Cambian los modos de servicio, las pantallas y lo que se imprime.
+Cambian las pantallas, lo que se imprime y cómo se cobra.
 
-### Comida rápida o de mostrador
+[Alimentos y bebidas Restaurantes, cafés, bares y food trucks](https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo)
 
-Excelente para los días con prisas.
+[Tienda Ropa, vinos y licores, abarrotes y fruterías](https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa)
 
-### Food truck
+[Belleza Salones, spas, peluquerías y tatuajes](https://vimpos.com.mx/punto-de-venta-salones-de-belleza)
 
-Turno por evento, para un mejor control.
+**¿No ves tu giro?** Cuéntanos cómo vendes y te decimos si te sirve.
 
-### Cafetería o bar
+[Contactar ventas](https://vimpos.com.mx/contacto)
 
-Cuentas abiertas en barra y mesas, modificadores, propinas y cortes por turno.
+[Comenzar](https://admin.vimpos.com.mx/registro)
 
-### Restaurante con meseros
+_Sin internet_
 
-Mapa de mesas, meseros y propinas.
+## Se cae el internet y tú sigues cobrando
 
-### Solo reparto (dark kitchen)
+El sistema completo vive en la computadora de tu caja. La nube es el respaldo, no el motor.
 
-Integra apps de reparto o usa tu propio servicio de repartidores.
+**Pruébalo:** se apaga la nube y el local sigue entero.
 
-### Cadena o franquicia
+**Cuando vuelve la señal, lo del día sube solo.** [Cómo funciona](https://vimpos.com.mx/sin-internet)
 
-Administra todas tus sucursales desde un solo panel.
+[Contactar ventas](https://vimpos.com.mx/contacto)
 
-_Por qué existe_
+[Comenzar](https://admin.vimpos.com.mx/registro)
 
-## VIM POS está pensado para ese emprendedor que quiere saber cómo administrar su restaurante de verdad.
-
-_Ventas_
-
-### ¿Cuánto vendí hoy?
-
-Tus ventas del día y lo que más se vende, desde tu celular.
-
-_Costos_
-
-### ¿Cuánto me cuesta cada platillo?
-
-Inventario con recetas: sabes qué insumo se fue y cuánto costó.
-
-_Caja_
-
-### ¿Cuadra mi caja?
-
-Corte por turno: lo que debe haber contra lo que hay en el cajón.
+![Importador mostrando los productos que se van a dar de alta antes de confirmar.](https://vimpos.com.mx/assets/img/capturas/admin-importador.webp?v=4)
 
 _Si ya usas otro_
 
-## Cambiar de punto de venta sin volver a capturar tu menú
+## Cámbiate sin volver a capturar tus productos
 
-![Importador de menú mostrando lo que se va a dar de alta antes de confirmar.](https://vimpos.com.mx/assets/img/capturas/admin-importador.webp?v=4)
+1. **Descarga tu catálogo** Del sistema que usas hoy o de una hoja de cálculo.
+2. **Pégalo y revísalo** Ves cómo queda antes de guardar nada.
+3. **Empieza a vender** Desde el plan Negocio cargamos tu catálogo y capacitamos a tu equipo.
 
-_Pegas tu menú y lo ves antes de aceptarlo. Nada se guarda hasta que tú lo confirmas._
+**Tu catálogo listo en un día.** Te ayudamos con el cambio.
 
-### Tu menú se pega y ya
+[Contactar ventas](https://vimpos.com.mx/contacto)
 
-Descargas tu menú del sistema que usas hoy y lo pegas aquí, sin recapturar nada a mano.
-
-### Tu corte se ve igual
-
-El corte Z tiene el formato que ya conoces.
-
-### La comanda se parte
-
-Bebidas en la barra y comida en cocina, cada una en su impresora.
+[Comenzar](https://admin.vimpos.com.mx/registro)
 
 _Precios_
 
-## Precios flexibles para cada tipo de restaurante
+## Un plan para cada tamaño de negocio
 
-Precio mensual, más IVA. Si tienes dudas o necesitas una cotización personalizada, [contacta a soporte por WhatsApp](https://wa.me/525665083346?text=Hola%2C%20quiero%20una%20cotizaci%C3%B3n%20de%20VIM%20POS).
+Sin pago inicial y sin contrato forzoso.
 
-### [Esencial](https://vimpos.com.mx/precios)
+[Ver precios](https://vimpos.com.mx/precios)
 
-$699
+### Esencial
 
-- 1 sucursal · 1 caja
-- Cocina, mesas, reportes y corte
+Para arrancar con una caja.
+
+**$699**
+
+/mes
+
+1 sucursal · 1 caja · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal
+
+- Caja, corte y reportes
+- La venta del día en tu celular
+- Facturación: $349 al mes aparte
 - Arrancas tú, con nuestra guía
 
-_El que recomendamos_
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
 
-### [Negocio](https://vimpos.com.mx/precios)
+### Negocio
 
-$999
+El que recomendamos
 
-- 1 sucursal · 3 cajas
-- Facturación incluida · 20 folios al mes
-- Cargamos tu menú y capacitamos a tu equipo
+Todo para un local, con tu catálogo cargado por nosotros.
 
-### [Cadena](https://vimpos.com.mx/precios)
+**$999**
 
-$1,999
+/mes
 
-- 3 sucursales · cajas sin límite
-- Un reporte que suma todas
+1 sucursal · 3 cajas · más IVA
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
+
+Lo principal
+
+- Hasta 3 cajas en tu local
+- Facturación incluida, 20 folios al mes
+- Inventario con aviso de mínimos
+- Cargamos tu catálogo y capacitamos a tu equipo
+
+[Ver todo lo que incluye](https://vimpos.com.mx/precios)
+
+### Cadena
+
+Varias sucursales, vistas en un solo lugar.
+
+**$1,999**
+
+/mes
+
+3 sucursales · cajas sin límite · más IVA
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+Lo principal
+
+- Cajas sin límite en cada sucursal
+- Un reporte que suma tus 3 sucursales
+- Facturación incluida, 40 folios al mes
 - Vamos a tu local el día del arranque
 
 [Ver todo lo que incluye](https://vimpos.com.mx/precios)
@@ -207,9 +185,9 @@ Sí. El programa se instala en la computadora de tu caja y trabaja ahí, así qu
 
 Una computadora con Windows 10 u 11, una impresora térmica de tickets de 80 mm compatible con ESC/POS —por ejemplo, una Epson TM-T20III o TM-m30; puede ir conectada a tu red (cable Ethernet o Wi-Fi) o por USB, instalada en Windows—, un cajón de dinero y el módem que ya tienes. VIM no vende equipo: te decimos qué buscar y lo compras donde te salga mejor.
 
-### ¿Puedo traer mi menú de otro sistema?
+### ¿Puedo traer mis productos de otro sistema?
 
-Sí. Descargas tu menú del sistema que usas hoy y lo pegas tal cual. Si el formato no cuadra, tráete el archivo a la demo y lo vemos juntos.
+Sí. Descargas tu catálogo del sistema que usas hoy y lo pegas tal cual. Si el formato no cuadra, tráete el archivo a la demo y lo vemos juntos.
 
 ### ¿Emite facturas?
 
@@ -231,13 +209,19 @@ Sí. Cada sucursal opera con su propia caja y su propio turno, y el panel suma t
 
 Sí, con la terminal compatible, y te ayudamos a vincularla. Con cualquier otra, registras el pago en la caja.
 
-## Te lo enseñamos en media hora, con tu menú.
+**¿Te quedó otra duda?** Te contestamos por WhatsApp.
 
-Sin presentación ni compromiso. Traes tu carta, la cargamos y ves cómo se ve tu propio negocio en pantalla.
+[Escríbenos](https://wa.me/525665083346?text=Hola%2C%20tengo%20una%20pregunta%20sobre%20VIM%20POS)
 
-[Pide una demo](https://vimpos.com.mx/demo)
+[Comenzar](https://admin.vimpos.com.mx/registro)
 
-[Escríbenos](mailto:hola@vimpos.com.mx)
+## Pon tu negocio a vender hoy
+
+Empieza tú solo, o te lo enseñamos en media hora con tus productos.
+
+[Contactar ventas](https://vimpos.com.mx/contacto)
+
+[Comenzar](https://admin.vimpos.com.mx/registro)
 
 ---
 
