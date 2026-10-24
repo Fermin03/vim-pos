@@ -1,4 +1,4 @@
-# Punto de venta para estudios de tatuajesCitas con anticipo y cada artista con su agenda
+# Punto de venta para estudios de tatuajes. Citas con anticipo y cada artista con su agenda
 
 > Citas con anticipo, agenda por artista, cobro de la sesión y comisiones. Para estudios de tatuajes, desde $699 al mes más IVA.
 

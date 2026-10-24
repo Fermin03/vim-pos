@@ -1,4 +1,4 @@
-# Punto de venta para comida rápidaDespacha la hora pico sin que se junte la fila
+# Punto de venta para comida rápida. Despacha la hora pico sin que se junte la fila
 
 > Combos, extras y comandas a cocina en segundos, para llevar o a domicilio. Para comida rápida, desde $699 al mes más IVA.
 

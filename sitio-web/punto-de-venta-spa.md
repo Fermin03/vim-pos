@@ -1,4 +1,4 @@
-# Punto de venta para spasCada cabina ocupada a su hora, sin empalmes
+# Punto de venta para spas. Cada cabina ocupada a su hora, sin empalmes
 
 > Agenda por terapeuta y por cabina, anticipos, cobro de la cita y comisiones. Para spas, desde $699 al mes más IVA.
 

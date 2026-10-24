@@ -1,4 +1,4 @@
-# Punto de venta para abarrotes y fruteríasVende por kilo, por pieza o a crédito, sin cuaderno
+# Punto de venta para abarrotes y fruterías. Vende por kilo, por pieza o a crédito, sin cuaderno
 
 > Venta por kilo o por pieza, crédito a clientes con abonos y cotizaciones. Para abarrotes y fruterías, desde $699 al mes más IVA.
 

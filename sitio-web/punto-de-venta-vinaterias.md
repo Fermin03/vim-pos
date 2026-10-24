@@ -1,4 +1,4 @@
-# Punto de venta para vinaterías y licoreríasCada botella en su lugar y cada venta en segundos
+# Punto de venta para vinaterías y licorerías. Cada botella en su lugar y cada venta en segundos
 
 > Código de barras, existencias con aviso de mínimo, cotizaciones y crédito a clientes. Para vinaterías y licorerías, desde $699 al mes más IVA.
 

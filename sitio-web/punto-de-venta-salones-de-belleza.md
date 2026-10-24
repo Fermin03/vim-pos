@@ -1,4 +1,4 @@
-# Punto de venta para salones de bellezaTu agenda llena y cada comisión, clara
+# Punto de venta para salones de belleza. Tu agenda llena y cada comisión, clara
 
 > Agenda de tu equipo, cobro de la cita, anticipos y comisiones. Para salones de belleza, desde $699 al mes más IVA.
 

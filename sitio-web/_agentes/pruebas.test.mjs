@@ -801,6 +801,8 @@ test('cada gemelo en Markdown lleva título, resumen y el contenido de su págin
     assert.ok(precios.includes(dato), `precios.md perdió «${dato}»`);
   }
   assert.ok(leer('precios.md').includes('| Sucursales | 1 | 1 | 3 |'), 'la tabla comparativa no sobrevivió');
+  // El eyebrow que va dentro del h1 de las páginas por giro no se pega al titular.
+  assert.match(leer('punto-de-venta-spa.md'), /^# Punto de venta para spas\. Cada cabina/);
 });
 
 test('los acordeones conservan su título y lo oculto no viaja al Markdown', () => {

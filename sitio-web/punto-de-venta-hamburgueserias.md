@@ -1,4 +1,4 @@
-# Punto de venta para hamburgueseríasCada hamburguesa sale como la pidieron
+# Punto de venta para hamburgueserías. Cada hamburguesa sale como la pidieron
 
 > El término de la carne, los extras con su precio y el combo sugerido en una sola caja. Para hamburgueserías, desde $699 al mes más IVA.
 
