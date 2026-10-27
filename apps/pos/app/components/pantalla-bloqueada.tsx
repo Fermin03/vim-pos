@@ -56,7 +56,7 @@ export function PantallaBloqueada({
   }
 
   return (
-    <main className="flex h-screen flex-col items-center justify-center gap-4 bg-sel px-8 text-center">
+    <main className="flex h-dvh flex-col items-center justify-center gap-4 bg-sel px-8 text-center">
       <LogoVim className="h-12 w-12" />
       {negocio && <div className="font-display text-15 font-semibold text-ink-2">{negocio}</div>}
       <h1 className="font-display text-28 font-bold tracking-tight text-danger">

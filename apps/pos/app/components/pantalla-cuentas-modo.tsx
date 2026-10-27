@@ -416,7 +416,7 @@ export function PantallaCuentasModo({
   }, [onImprimirTicket, token]);
 
   return (
-    <main className="flex h-screen flex-col bg-bg">
+    <main className="flex h-dvh flex-col bg-bg">
       <header className={ENCABEZADO_PANTALLA}>
         <BotonVolver onClick={onSalir} />
         <div className="mr-auto flex min-w-0 items-center gap-3">

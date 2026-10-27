@@ -181,7 +181,7 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, cajaSinAc
   const estadoEnLinea = enLinea ? etiquetaEstadoEnLinea(enLinea, ahora, cajaSinActualizar) : null;
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-dvh flex-col">
       <header className={`${ENCABEZADO_PANTALLA} bg-surface`}>
         <BotonVolver onClick={onSalir} />
         <h1 className="text-18 font-semibold text-ink">Pedidos en línea</h1>

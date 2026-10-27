@@ -209,6 +209,11 @@ export function SidebarTicket({
   const editable = onEditar != null && !procesando;
   const simple = tienda?.simple === true;
   // Menú «⋯» del Panel de la tienda: nota, descuentos, cliente y Limpiar (Fermín, 18 oct).
+  // Pantalla angosta (tableta de pie): el ticket no cabe junto al catálogo. Va como barra abajo y
+  // se abre encima al tocarla; al cobrarse o vaciarse, se cierra solo.
+  const [abiertoAngosto, setAbiertoAngosto] = useState(false);
+  useEscape(() => setAbiertoAngosto(false), abiertoAngosto);
+  useEffect(() => { if (vacio) setAbiertoAngosto(false); }, [vacio]);
   const [menuAbierto, setMenuAbierto] = useState(false);
   useEscape(() => setMenuAbierto(false), menuAbierto);
   // «Descuento por producto» con varios renglones: el siguiente toque en el ticket elige cuál.
@@ -307,9 +312,31 @@ export function SidebarTicket({
   // Bajó de 32vw a 26vw: cada punto porcentual de aquí es ancho que le falta al catálogo, y el
   // catálogo es el que tiene que caber sin scroll. En 1366 le devuelve ~90px —una columna más de
   // productos—; en 1024 es la diferencia entre 3 y 4 columnas.
+  //
+  // Por debajo de 800px (tableta de pie) el ticket se vuelve una barra debajo del catálogo; quien
+  // lo monta pone su fila en `max-[799px]:flex-col` para que la barra quede abajo.
   return (
-    // En el Panel de la tienda, mitad y mitad con el catálogo (Fermín, 18 oct).
-    <aside className={`flex ${simple ? "w-1/2" : "w-[clamp(18rem,26vw,26.25rem)]"} flex-shrink-0 flex-col border-l border-line bg-surface`}>
+    <>
+    <button
+      type="button"
+      onClick={() => setAbiertoAngosto(true)}
+      className="flex h-16 flex-shrink-0 items-center gap-3 border-t border-line bg-surface px-4 text-left min-[800px]:hidden"
+    >
+      <Icono nombre="recibo" className="h-6 w-6 text-ink-2" />
+      <span className="min-w-0 flex-1 truncate font-display text-18 font-semibold">
+        {titulo ?? (folioCuenta ? `Cuenta ${folioCuenta}` : "Ticket")}
+        <span className="ml-2 text-15 font-semibold text-ink-3">
+          {totalProductos} {totalProductos === 1 ? "producto" : "productos"}
+        </span>
+      </span>
+      <span className="font-display text-20 font-bold tabular-nums">{fmtMxn(totalFinal)}</span>
+      <span className="rounded-lg bg-ink px-4 py-2.5 text-16 font-bold text-white">Ver ticket</span>
+    </button>
+    {abiertoAngosto && (
+      <button type="button" aria-label="Cerrar ticket" tabIndex={-1} className="fixed inset-0 z-30 bg-black/30 min-[800px]:hidden" onClick={() => setAbiertoAngosto(false)} />
+    )}
+    {/* En el Panel de la tienda, mitad y mitad con el catálogo (Fermín, 18 oct). */}
+    <aside className={`flex ${simple ? "w-1/2" : "w-[clamp(18rem,26vw,26.25rem)]"} flex-shrink-0 flex-col border-l border-line bg-surface ${abiertoAngosto ? "max-[799px]:fixed max-[799px]:inset-y-0 max-[799px]:right-0 max-[799px]:z-30 max-[799px]:w-[min(26.25rem,92vw)] max-[799px]:shadow-xl" : "max-[799px]:hidden"}`}>
 
       {/* ── Cabecera ─────────────────────────────────────────── */}
       <div className="flex-shrink-0 border-b border-line px-4 pb-3 pt-1.5">
@@ -318,10 +345,15 @@ export function SidebarTicket({
           {/* El título decía siempre "Ticket nuevo", incluso editando una cuenta ya abierta:
               el cajero no tenía forma de saber si estaba agregando a un pedido existente o
               capturando uno nuevo, que es justo la diferencia entre mandar a cocina y cobrar. */}
-          <span className="truncate font-display text-18 font-semibold leading-tight tracking-[-0.02em]">
+          <span className="truncate font-display text-18 font-semibold leading-tight tracking-[-0.02em] max-[799px]:flex-1">
             {titulo ?? (folioCuenta ? `Cuenta ${folioCuenta}` : "Ticket nuevo")}
           </span>
           {simple || clienteCuenta ? menuTienda : botonLimpiar}
+          {abiertoAngosto && (
+            <button type="button" aria-label="Cerrar ticket" onClick={() => setAbiertoAngosto(false)} className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-md text-20 font-bold text-ink-2 hover:bg-hover min-[800px]:hidden">
+              ×
+            </button>
+          )}
         </div>
         {/* Modo de servicio — SOLO LECTURA. El modo se elige en la pantalla de inicio (una venta
             no cambia de modo a media captura); aquí se muestra para que el cajero no pierda de
@@ -751,6 +783,7 @@ export function SidebarTicket({
         )}
       </div>
     </aside>
+    </>
   );
 }
 

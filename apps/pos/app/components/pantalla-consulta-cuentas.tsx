@@ -104,7 +104,7 @@ export function PantallaConsultaCuentas({
   }, [sel, onReimprimir]);
 
   return (
-    <div className="flex h-screen flex-col bg-bg">
+    <div className="flex h-dvh flex-col bg-bg">
       {/* Encabezado */}
       <header className={`${ENCABEZADO_PANTALLA} flex-wrap bg-surface py-1`}>
         <BotonVolver onClick={onSalir} />

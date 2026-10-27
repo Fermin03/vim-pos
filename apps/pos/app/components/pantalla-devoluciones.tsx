@@ -165,7 +165,7 @@ export function PantallaDevoluciones({
   }, []);
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-dvh flex-col">
       <header className={`${ENCABEZADO_PANTALLA} bg-surface`}>
         <BotonVolver onClick={onSalir} />
         <div className="mr-auto flex items-center gap-3">

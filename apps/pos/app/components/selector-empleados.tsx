@@ -76,7 +76,7 @@ export function SelectorEmpleados({
   }, [onSesionInvalida]);
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-dvh flex-col">
       <TopbarPos negocio={negocio} sucursal={sucursal} caja={caja} />
 
       <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto p-8">

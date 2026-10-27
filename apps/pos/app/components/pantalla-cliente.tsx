@@ -111,7 +111,7 @@ export function PantallaCliente() {
   }, [probando, lista]);
 
   return (
-    <main className="flex h-screen w-screen cursor-none select-none flex-col overflow-hidden bg-bg text-ink" data-fase={vista.fase}>
+    <main className="flex h-dvh w-screen cursor-none select-none flex-col overflow-hidden bg-bg text-ink" data-fase={vista.fase}>
       {/* La `key` es la fase: al cambiar se monta de nuevo y vuelve a correr el fundido. Dentro de
           una misma fase nada se remonta, así que agregar un artículo no funde la pantalla. */}
       <div key={vista.fase} className={`flex min-h-0 flex-1 flex-col ${FUNDIDO_FASE}`}>

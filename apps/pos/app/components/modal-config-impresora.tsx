@@ -121,7 +121,7 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
       open
       onClose={onCerrar}
       title="Impresoras y pantallas de esta caja"
-      className="flex max-h-[calc(100vh-2rem)] w-[880px] max-w-[calc(100vw-2rem)] flex-col rounded-lg border border-line bg-surface p-6 shadow-xl"
+      className="flex max-h-[calc(100dvh-2rem)] w-[880px] max-w-[calc(100vw-2rem)] flex-col rounded-lg border border-line bg-surface p-6 shadow-xl"
     >
       <p className="mb-4 flex-shrink-0 text-13 text-ink-3">Las impresoras son por dispositivo: se guardan solo en esta caja.</p>
 

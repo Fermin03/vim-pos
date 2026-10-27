@@ -512,7 +512,7 @@ function ExistenciaSuelta({ producto, existencias, sucursalId, sucursales, actua
   // Sin la lista de sucursales (falló su lectura) queda al menos la propia.
   const filas = sucursales.length ? sucursales : [{ id: sucursalId, nombre: "Esta sucursal" }];
   return (
-    <Modal open onClose={onCerrar} title={producto.nombre} hideTitle className="flex max-h-[calc(100vh-32px)] w-full max-w-lg flex-col rounded-lg bg-surface shadow-xl">
+    <Modal open onClose={onCerrar} title={producto.nombre} hideTitle className="flex max-h-[calc(100dvh-32px)] w-full max-w-lg flex-col rounded-lg bg-surface shadow-xl">
       <div className="flex items-start gap-3 border-b border-line px-6 py-4">
         <div className="min-w-0 flex-1">
           <p className="font-display text-20 font-bold leading-tight text-ink">{producto.nombre}</p>

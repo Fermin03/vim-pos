@@ -176,7 +176,7 @@ function AvisoPedidoTienda({ p, posicion, total, ahora, ocupado, onAceptar, onRe
   return (
     <Modal open onClose={rechazando ? () => setRechazando(false) : onCerrar} title="Pedido nuevo de tu tienda en línea" hideTitle
       backdropClassName="z-[90]"
-      className="flex max-h-[calc(100vh-2rem)] w-[min(520px,calc(100vw-2rem))] flex-col rounded-lg border border-line bg-surface shadow-[0_18px_44px_rgba(22,22,26,.18)]">
+      className="flex max-h-[calc(100dvh-2rem)] w-[min(520px,calc(100vw-2rem))] flex-col rounded-lg border border-line bg-surface shadow-[0_18px_44px_rgba(22,22,26,.18)]">
       <div className="flex flex-shrink-0 items-start gap-3 border-b border-line py-3 pl-5 pr-2">
         {/* La × va primero en el documento (y a la derecha en pantalla): es donde cae el foco al abrir. */}
         <button ref={cerrar} type="button" onClick={onCerrar} aria-label="Cerrar aviso"

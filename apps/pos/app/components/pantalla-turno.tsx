@@ -64,7 +64,7 @@ export function PantallaTurno({
 
   if (caja === undefined || turno === undefined) {
     return (
-      <main className="flex h-screen items-center justify-center">
+      <main className="flex h-dvh items-center justify-center">
         <Cargando texto="Cargando turno" />
       </main>
     );
@@ -72,7 +72,7 @@ export function PantallaTurno({
 
   if (!caja) {
     return (
-      <main className="flex h-screen items-center justify-center p-6">
+      <main className="flex h-dvh items-center justify-center p-6">
         <p className="text-sm text-danger">{error ?? "No se pudo cargar la caja."}</p>
       </main>
     );

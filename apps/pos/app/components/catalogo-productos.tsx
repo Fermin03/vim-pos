@@ -7,10 +7,12 @@ import { usePreciosVisibles } from "../lib/precios-visibles";
 import {
   calcularBarraCategorias,
   calcularRejilla,
+  CELDA_TABLETA,
   clampPagina,
   tamanoEtiqueta,
   tamanoNombre,
 } from "../lib/rejilla";
+import { esTableta } from "../lib/tableta";
 import { fmtMxn } from "../lib/turno";
 import { useHueco } from "../lib/usar-hueco";
 import { Paginador } from "./paginador";
@@ -108,7 +110,7 @@ export function CatalogoProductos({
   const [pagina, setPagina] = useState(1);
 
   const rejilla = useMemo(
-    () => calcularRejilla({ ancho: hueco.ancho, alto: hueco.alto, total: visibles.length }),
+    () => calcularRejilla({ ancho: hueco.ancho, alto: hueco.alto, total: visibles.length, medidas: esTableta() ? CELDA_TABLETA : undefined }),
     [hueco.ancho, hueco.alto, visibles.length],
   );
 
@@ -196,7 +198,7 @@ export function CatalogoProductos({
               ) : (
                 <span aria-hidden="true" className="h-2.5 w-2.5 flex-shrink-0 rounded-[3px]" style={{ background: col.ink }} />
               )}
-              <span className="line-clamp-2 break-words">{c.nombre}</span>
+              <span className="line-clamp-2 break-words hyphens-auto">{c.nombre}</span>
             </button>
           );
         })}

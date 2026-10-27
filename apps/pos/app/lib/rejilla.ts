@@ -42,6 +42,13 @@ const CELDA_CATALOGO: Medidas = {
 };
 
 /**
+ * Celda del catálogo en tableta. La página ya va escalada a 1024 (`lib/tableta.ts`), pero aun así
+ * un píxel de una tableta de 11" mide menos que uno de la caja de 15": el piso sube para que una
+ * categoría con muchos productos pagine antes de dejar fichas que no se atinan con el dedo.
+ */
+export const CELDA_TABLETA: Medidas = { ...CELDA_CATALOGO, minAncho: 132, minAlto: 104 };
+
+/**
  * Celda de una OPCIÓN (un slot de combo, un modificador). Vive en un modal centrado al 80% de la
  * pantalla, y su contenido es más corto —"Bien cocido", "Queso cheddar +$15"—.
  *

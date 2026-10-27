@@ -75,7 +75,7 @@ export function VincularDispositivo({
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-7 p-6">
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-7 p-6">
       <header className="flex max-w-sm flex-col items-center gap-2 text-center">
         <BrandMark size={44} />
         <h1 className="mt-1 font-display text-xl font-semibold tracking-tight">

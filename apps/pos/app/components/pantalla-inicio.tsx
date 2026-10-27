@@ -110,7 +110,7 @@ export function PantallaInicio({
   }, []);
 
   return (
-    <main className="flex h-screen flex-col bg-bg">
+    <main className="flex h-dvh flex-col bg-bg">
       {/* Aviso de suspensión con gracia: el cajero puede seguir cobrando, pero el negocio tiene
           que enterarse antes de la fecha en que la caja deje de vender (ADR 0014). */}
       {acceso.nivel === "gracia" && <BandaAcceso mensaje={acceso.mensaje} desde={acceso.desde} />}
