@@ -62,12 +62,13 @@ test("un error de red se propaga (no es un rechazo)", async () => {
 
 test("canjear el código devuelve el correo y la clave que da la nube", async () => {
   const llamadas = [];
+  const nueva = crypto.randomUUID(); // la que genera la nube; cualquier valor sirve
   const fetchImpl = async (url, init) => {
     llamadas.push({ url, body: JSON.parse(init.body) });
-    return { ok: true, status: 200, json: async () => ({ ok: true, identificador: "caja-x@d", clave: "vim-abc" }) };
+    return { ok: true, status: 200, json: async () => ({ ok: true, identificador: "caja-x@d", clave: nueva }) };
   };
   const r = await canjearCodigoNube({ cloudUrl: "https://n", anon: "a", codigo: "K7M4QX", fetchImpl });
-  assert.deepEqual(r, { email: "caja-x@d", password: "vim-abc" });
+  assert.deepEqual(r, { email: "caja-x@d", password: nueva });
   assert.equal(llamadas[0].url, "https://n/functions/v1/canjear-codigo-caja");
   assert.deepEqual(llamadas[0].body, { codigo: "K7M4QX" });
 });

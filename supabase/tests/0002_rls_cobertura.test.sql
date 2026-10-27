@@ -38,7 +38,8 @@ insert into _rls_exentas (tabla) values
   ('tienda_enlaces'),           -- Código de seguimiento cifrado para esos correos, 48 h; solo la Edge Function (mig. 0176).
   ('codigos_internos_contador'),-- Contador de códigos de barras internos por negocio; solo funciones SECURITY DEFINER (mig. 0190).
   ('agenda_correos'),           -- Cola de correos de citas (belleza); sin correo ni nombre, solo service_role (mig. 0226).
-  ('agenda_enlaces');           -- Código cifrado del enlace de la cita para esos correos; solo la Edge Function `tienda` (mig. 0226).
+  ('agenda_enlaces'),           -- Código cifrado del enlace de la cita para esos correos; solo la Edge Function `tienda` (mig. 0226).
+  ('codigos_vinculacion_caja'); -- Código corto para vincular una caja; solo provisionar-dispositivo y canjear-codigo-caja (mig. 0285).
 
 -- #2 — CRÍTICA: ninguna tabla con tenant_id tiene RLS deshabilitado.
 select is_empty($$

@@ -23,4 +23,5 @@ CREATE TABLE IF NOT EXISTS codigos_vinculacion_caja (
 );
 
 ALTER TABLE codigos_vinculacion_caja ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON codigos_vinculacion_caja FROM anon, authenticated;
+REVOKE ALL ON codigos_vinculacion_caja FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON codigos_vinculacion_caja TO service_role;

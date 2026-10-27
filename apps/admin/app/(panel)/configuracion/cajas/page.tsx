@@ -256,7 +256,7 @@ export default function CajasPage() {
             Escríbelo en VIM POS, en la computadora de <b className="text-ink">{codigo.caja_nombre}</b>.
           </p>
           <div className="mt-4 flex items-center justify-center gap-3">
-            <code className="rounded border border-line-strong bg-sel px-5 py-3 font-mono text-[32px] font-bold tracking-[0.15em] tabular-nums">
+            <code className="rounded border border-line-strong bg-sel px-5 py-3 font-mono text-32 font-bold tracking-[0.15em] tabular-nums">
               {codigo.codigo.slice(0, 3)}-{codigo.codigo.slice(3)}
             </code>
           </div>
