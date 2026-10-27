@@ -60,6 +60,8 @@ function mintAccess(secret, { sub, tenant_id, tipo_identidad, ttl = 12 * 3600, s
   return { token: jwt.sign(payload, secret, { algorithm: "HS256" }), iat, ttl };
 }
 
+const acunarRefresh = (secret, sub) => jwt.sign({ sub, typ: "refresh" }, secret, { algorithm: "HS256", expiresIn: "7d" });
+
 function goTrueUser(row) {
   return {
     id: row.id, aud: "authenticated", role: "authenticated", email: row.email,
@@ -101,8 +103,9 @@ export async function deviceSignIn(pool, secret, { email, password } = {}) {
   // SEC CN-007 — 7 días, no 30. Todo el tráfico del hub viaja por HTTP plano en la LAN del local
   // (la solución de fondo es separar la red; ver el informe), así que este token es interceptable
   // con un portátil en el mismo Wi-Fi. Acortar la ventana no lo impide, pero reduce a una cuarta
-  // parte el tiempo que sirve uno capturado. La caja lo renueva sola en cada uso: no se nota.
-  const refresh = jwt.sign({ sub: row.id, typ: "refresh" }, secret, { algorithm: "HS256", expiresIn: "7d" });
+  // parte el tiempo que sirve uno capturado. refreshSession acuña uno nuevo en cada renovación, así
+  // que los 7 días cuentan desde el último uso: solo una caja apagada más de una semana se desvincula.
+  const refresh = acunarRefresh(secret, row.id);
   return {
     body: {
       access_token: token, token_type: "bearer", expires_in: ttl, expires_at: iat + ttl,
@@ -130,10 +133,13 @@ export async function refreshSession(pool, secret, refresh_token) {
   const row = rows[0];
   const tipo = row.rol === "DISPOSITIVO" ? "DISPOSITIVO" : "EMPLEADO";
   const { token, iat, ttl } = mintAccess(secret, { sub: row.id, tenant_id: row.tenant_id, tipo_identidad: tipo, sucursal_id: row.sucursal_id });
+  // Refresh NUEVO en cada renovación. Antes se devolvía el mismo, que vencía a los 7 días del
+  // vínculo aunque la caja se usara a diario: al octavo día la renovación fallaba, supabase-js
+  // borraba la sesión y la caja pedía vincularse otra vez.
   return {
     body: {
       access_token: token, token_type: "bearer", expires_in: ttl, expires_at: iat + ttl,
-      refresh_token, user: goTrueUser({ ...row, tipo_identidad: tipo }),
+      refresh_token: acunarRefresh(secret, row.id), user: goTrueUser({ ...row, tipo_identidad: tipo }),
     },
   };
 }

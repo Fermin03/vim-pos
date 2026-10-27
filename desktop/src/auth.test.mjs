@@ -57,6 +57,18 @@ test("un refresh acuñado para un humano ya no se renueva", { skip: omitir }, as
   });
 });
 
+test("renovar la sesión entrega un refresh nuevo, no el mismo que vence a los 7 días del vínculo", async () => {
+  const fila = { id: "d1", email: CAJA, tenant_id: "t1", sucursal_id: null, rol: "DISPOSITIVO" };
+  const pool = { query: async () => ({ rows: [fila] }) };
+  const haceSeisDias = Math.floor(Date.now() / 1000) - 6 * 86400;
+  const viejo = jwt.sign({ sub: "d1", typ: "refresh", iat: haceSeisDias }, SECRET, { algorithm: "HS256", expiresIn: "7d" });
+  const r = await refreshSession(pool, SECRET, viejo);
+  assert.notEqual(r.body.refresh_token, viejo);
+  const dec = jwt.verify(r.body.refresh_token, SECRET);
+  assert.equal(dec.typ, "refresh");
+  assert.ok(dec.exp - Math.floor(Date.now() / 1000) > 6 * 86400, "el nuevo vence a 7 días de HOY");
+});
+
 test("credenciales que no son texto no llegan a la BD", async () => {
   const pool = { query: async () => { throw new Error("no debió consultar"); } };
   assert.equal((await deviceSignIn(pool, SECRET, { email: ["a"], password: "x" })).error, 400);
