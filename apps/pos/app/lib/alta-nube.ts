@@ -9,28 +9,57 @@
 // Solo existe dentro de la app de escritorio (el endpoint lo sirve su ui-server).
 
 export type ResultadoAlta =
-  | { ok: true; tablas: number }
-  | { ok: false; motivo: "CREDENCIALES" | "RED" | "SIN_CONFIG" | "SIN_BACKEND" | "PULL" | "FALTAN_DATOS" | "NO_DISPONIBLE"; error: string };
+  | { ok: true; tablas: number; email?: string; password?: string }
+  | { ok: false; motivo: "CREDENCIALES" | "CODIGO" | "RED" | "SIN_CONFIG" | "SIN_BACKEND" | "PULL" | "FALTAN_DATOS" | "NO_DISPONIBLE"; error: string };
 
 function texto(v: unknown, fallback: string): string {
   return typeof v === "string" && v.trim() !== "" ? v : fallback;
 }
 
-/** Valida las credenciales del dispositivo contra la nube y baja los datos del negocio al local. */
-export async function darDeAltaDesdeNube(email: string, password: string): Promise<ResultadoAlta> {
+/**
+ * Valida contra la nube y baja los datos del negocio al local. Con `{ codigo }` (el código corto del
+ * panel), la nube lo cambia por el correo y la clave de la caja, y se devuelven para el login local.
+ */
+export async function darDeAltaDesdeNube(datos: { email: string; password: string } | { codigo: string }): Promise<ResultadoAlta> {
   try {
     const res = await fetch("/__vincular-nube", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(datos),
     });
     const j: unknown = await res.json().catch(() => ({}));
     const o = (typeof j === "object" && j !== null ? j : {}) as Record<string, unknown>;
-    if (o.ok === true) return { ok: true, tablas: Number(o.tablas ?? 0) };
+    if (o.ok === true) {
+      return { ok: true, tablas: Number(o.tablas ?? 0), email: texto(o.email, "") || undefined, password: texto(o.password, "") || undefined };
+    }
     const motivo = texto(o.motivo, "NO_DISPONIBLE") as Exclude<ResultadoAlta, { ok: true }>["motivo"];
     return { ok: false, motivo, error: texto(o.error, "No se pudo dar de alta la caja.") };
   } catch {
     // No hay endpoint (navegador normal) o el servidor local no respondió.
     return { ok: false, motivo: "NO_DISPONIBLE", error: "El alta por nube no está disponible en este dispositivo." };
+  }
+}
+
+/**
+ * Fuera del escritorio (la caja web): el código se canjea directo en la nube, que es también contra
+ * donde se hace el login. Devuelve el correo y la clave, o el texto del error.
+ */
+export async function canjearCodigoWeb(codigo: string): Promise<{ email: string; password: string } | { error: string }> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anon) return { error: "Esta caja no sabe dónde está la nube de VIM. Avisa a soporte." };
+  try {
+    const res = await fetch(`${url}/functions/v1/canjear-codigo-caja`, {
+      method: "POST",
+      headers: { apikey: anon, Authorization: `Bearer ${anon}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ codigo }),
+    });
+    const j = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (res.ok && typeof j.identificador === "string" && typeof j.clave === "string") return { email: j.identificador, password: j.clave };
+    if (res.status === 429) return { error: "Demasiados intentos. Espera unos minutos y vuelve a intentar." };
+    if (j.error === "CODIGO_INVALIDO") return { error: "Ese código no existe o ya venció. Genera otro en el panel." };
+    return { error: "No se pudo canjear el código. Vuelve a intentar." };
+  } catch {
+    return { error: "No se pudo contactar la nube de VIM. Revisa el internet." };
   }
 }

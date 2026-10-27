@@ -5,7 +5,7 @@ import { Cargando, Button, DialogoPeligro, Modal, useConfirmar, Icono } from "@v
 import { haceCuanto } from "@vim/fecha";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { ModalCaja } from "../../../components/modal-caja";
-import { eliminarCaja, listarCajas, provisionarDispositivo, type Caja, type CredencialesDispositivo } from "../../../lib/configuracion";
+import { codigoVinculacion, eliminarCaja, listarCajas, provisionarDispositivo, type Caja, type CodigoVinculacion, type CredencialesDispositivo } from "../../../lib/configuracion";
 import { mensajeError } from "../../../lib/errores";
 
 /** Una caja de escritorio late cada 10 min; si la última señal es más vieja que esto, no está
@@ -25,40 +25,47 @@ export default function CajasPage() {
   const [borrando, setBorrando] = useState(false);
   const [generando, setGenerando] = useState<string | null>(null);
   const [creds, setCreds] = useState<CredencialesDispositivo | null>(null);
+  const [codigo, setCodigo] = useState<(CodigoVinculacion & { cajaId: string }) | null>(null);
 
   /**
-   * Generar credenciales invalida al instante la clave anterior. En una caja que ya está en uso
-   * eso la deja sin sincronizar hasta que alguien capture la nueva ahí mismo — el modo de falla
-   * del incidente de Knock-Out del 8 sep. Antes era un ícono que solo aparecía al pasar el mouse
-   * y actuaba al primer clic (revisión de diseño, sep 2026).
+   * Da un código de 6 caracteres para vincular la caja. Generarlo no cambia nada: la clave de la
+   * caja se renueva cuando alguien CAPTURA el código. En una caja que ya está en uso eso la deja sin
+   * sincronizar hasta que se capture ahí mismo — el modo de falla del incidente de Knock-Out del
+   * 8 sep —, así que en ese caso se pregunta antes.
    */
   async function generarDispositivo(caja: Caja) {
-    const vinculada = caja.ultimoLatido !== null;
-    const ok = await confirmar(
-      vinculada
-        ? {
-            titulo: `¿Generar una clave nueva para ${caja.nombre}?`,
-            mensaje: (
-              <>
-                Esta caja ya está vinculada (última señal {haceCuanto(caja.ultimoLatido)}). La clave actual
-                deja de servir en este momento: <b className="text-ink">la caja dejará de sincronizar</b> hasta
-                que captures la nueva en ella.
-              </>
-            ),
-            boton: "Generar clave nueva",
-          }
-        : {
-            titulo: `¿Generar las credenciales de ${caja.nombre}?`,
-            mensaje: "Son el identificador y la clave para vincular la computadora de esta caja. Si ya se habían generado antes, las anteriores dejan de servir.",
-            boton: "Generar credenciales",
-            peligrosa: false,
-          },
-    );
-    if (!ok) return;
+    if (caja.ultimoLatido !== null) {
+      const ok = await confirmar({
+        titulo: `¿Vincular otra vez ${caja.nombre}?`,
+        mensaje: (
+          <>
+            Esta caja ya está vinculada (última señal {haceCuanto(caja.ultimoLatido)}). Cuando se capture el
+            código, <b className="text-ink">la computadora vinculada ahora dejará de sincronizar</b> hasta que
+            lo captures en ella.
+          </>
+        ),
+        boton: "Generar código",
+      });
+      if (!ok) return;
+    }
     setError(null);
     setGenerando(caja.id);
     try {
-      setCreds(await provisionarDispositivo(caja.id));
+      setCodigo({ ...(await codigoVinculacion(caja.id)), cajaId: caja.id });
+    } catch (e) {
+      setError(mensajeError(e, "No se pudo generar el código"));
+    } finally {
+      setGenerando(null);
+    }
+  }
+
+  /** Las credenciales largas: para cajas con una versión anterior y para la pantalla de cocina. */
+  async function mostrarCredenciales(cajaId: string) {
+    setCodigo(null);
+    setError(null);
+    setGenerando(cajaId);
+    try {
+      setCreds(await provisionarDispositivo(cajaId));
     } catch (e) {
       setError(mensajeError(e, "No se pudieron generar las credenciales"));
     } finally {
@@ -190,7 +197,7 @@ export default function CajasPage() {
                           <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                             <span className="inline-flex gap-1">
                               <button type="button" disabled={generando === c.id} onClick={() => { void generarDispositivo(c); }} className="h-9 rounded border border-line-strong px-3 text-13 font-semibold text-ink-2 transition-colors hover:border-ink hover:text-ink disabled:opacity-40">
-                                {generando === c.id ? "Generando…" : c.ultimoLatido === null ? "Vincular" : "Clave nueva"}
+                                {generando === c.id ? "Generando…" : c.ultimoLatido === null ? "Vincular" : "Vincular otra vez"}
                               </button>
                               <button type="button" title="Editar" aria-label={`Editar ${c.nombre}`} onClick={() => setModal({ caja: c })} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-9 lg:w-9 text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink">
                                 <Icono nombre="editar" className="h-4 w-4" />
@@ -241,6 +248,33 @@ export default function CajasPage() {
       )}
 
       {dialogoConfirmar}
+
+      {/* El código se puede volver a generar sin costo, así que este sí se cierra con Esc o clic afuera. */}
+      {codigo && (
+        <Modal open onClose={() => setCodigo(null)} title="Código para vincular" className="w-full max-w-[440px] rounded-lg border border-line bg-surface p-6 shadow-xl">
+          <p className="text-13 text-ink-2">
+            Escríbelo en VIM POS, en la computadora de <b className="text-ink">{codigo.caja_nombre}</b>.
+          </p>
+          <div className="mt-4 flex items-center justify-center gap-3">
+            <code className="rounded border border-line-strong bg-sel px-5 py-3 font-mono text-32 font-bold tracking-[0.15em] tabular-nums">
+              {codigo.codigo.slice(0, 3)}-{codigo.codigo.slice(3)}
+            </code>
+          </div>
+          <p className="mt-3 text-center text-13 text-ink-3">
+            Sirve una vez y vence a las {new Date(codigo.expira_en).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}.
+          </p>
+          <p className="mt-4 text-13 text-ink-2">
+            ¿Aún no instalas VIM POS en esa computadora?{" "}
+            <Link href="/configuracion/cajas/descargar" className="font-semibold text-ink underline underline-offset-2">Descárgalo aquí</Link>.
+          </p>
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+            <button type="button" onClick={() => { void mostrarCredenciales(codigo.cajaId); }} className="text-13 font-semibold text-ink-3 underline underline-offset-2 hover:text-ink">
+              ¿Te pide identificador y clave?
+            </button>
+            <Button onClick={() => { setCodigo(null); void recargar(); }}>Listo</Button>
+          </div>
+        </Modal>
+      )}
 
       {/* La clave se muestra UNA vez y la anterior ya no sirve: cerrarla por un Esc o un clic afuera
           dejaba la caja sin forma de vincularse. Solo se cierra con el botón. */}
