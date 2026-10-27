@@ -73,8 +73,8 @@ export default async function DescargarCajaPage() {
               <li>
                 Aquí en el panel, ve a{" "}
                 <Link href="/configuracion/cajas" className="font-semibold text-ink underline underline-offset-2">Configuración → Cajas</Link>,
-                presiona <b className="text-ink">Vincular</b> en tu caja y captura en VIM POS el <b className="text-ink">identificador</b> y la{" "}
-                <b className="text-ink">clave</b> que te mostramos. Solo se hace una vez.
+                presiona <b className="text-ink">Vincular</b> en tu caja y escribe en VIM POS el{" "}
+                <b className="text-ink">código de 6 caracteres</b> que te mostramos. Solo se hace una vez.
               </li>
             </ol>
           </section>

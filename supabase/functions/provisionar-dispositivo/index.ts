@@ -1,50 +1,19 @@
-// Edge Function: provisionar-dispositivo — el DUEÑO/ADMIN genera (o regenera) las credenciales
-// del dispositivo de una caja. Crea la cuenta sintética caja-{caja_id}@dispositivos.vimpos.com.mx
-// + usuarios_perfil + usuarios_acceso (rol DISPOSITIVO). Devuelve email + password UNA vez.
+// Edge Function: provisionar-dispositivo — el DUEÑO/ADMIN prepara la vinculación de una caja.
+//   · { caja_id, codigo: true } → un código de 6 caracteres que se canjea UNA vez, en 15 minutos,
+//     en canjear-codigo-caja. Generarlo no toca la cuenta de la caja: la clave cambia al canjearlo.
+//   · { caja_id }               → las credenciales largas (correo sintético + clave), al momento.
+//     Las siguen usando las cajas anteriores a la pantalla del código y la pantalla de cocina.
 // service_role server-side. Requiere JWT de un DUEÑO/ADMIN del tenant dueño de la caja.
 
 import { clienteAdmin, servir } from "../_shared/http.ts";
 import { registrarError } from "../_shared/errores.ts";
-import { cajaIdDeEmail, correoDispositivo } from "../_shared/dispositivo.ts";
+import { asegurarCuentaDispositivo, generarCodigo } from "../_shared/cuenta-dispositivo.ts";
 import { bearerDe, tenantDelToken } from "../_shared/identidad.ts";
 
 const admin = clienteAdmin();
 
 const ROLES_ADMINISTRADORES = ["DUENO", "ADMIN"];
-
-/** La cuenta de la caja entre las cuentas DISPOSITIVO del tenant (activas o no). "error" si falla. */
-async function cuentaDeCajaPorAcceso(tenantId: string, rolId: string, cajaId: string): Promise<string | null | "error"> {
-  const { data, error } = await admin.from("usuarios_acceso").select("usuario_id")
-    .eq("tenant_id", tenantId).eq("rol_id", rolId);
-  if (error) { registrarError("provisionar-dispositivo", "ERROR_LISTAR_AUTH", error); return "error"; }
-  const ids = [...new Set(((data ?? []) as { usuario_id: string }[]).map((a) => a.usuario_id))];
-  for (const id of ids) {
-    const { data: u } = await admin.auth.admin.getUserById(id);
-    if (u?.user && cajaIdDeEmail(u.user.email) === cajaId.toLowerCase()) return id;
-  }
-  return null;
-}
-
-/** Último recurso: recorre Auth completo, por páginas, buscando la cuenta de la caja. */
-async function cuentaDeCajaPaginando(cajaId: string): Promise<string | null | "error"> {
-  const POR_PAGINA = 1000;
-  for (let page = 1; page <= 200; page++) {
-    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: POR_PAGINA });
-    if (error) { registrarError("provisionar-dispositivo", "ERROR_LISTAR_AUTH", error); return "error"; }
-    const hallado = data.users.find((u) => cajaIdDeEmail(u.email) === cajaId.toLowerCase());
-    if (hallado) return hallado.id;
-    if (data.users.length < POR_PAGINA) return null;
-  }
-  return null;
-}
-
-function generarPassword(): string {
-  // Sin caracteres ambiguos (0/O/1/l/I) — el dueño lo teclea una vez en la tablet.
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-  const arr = new Uint32Array(12);
-  crypto.getRandomValues(arr);
-  return "vim-" + Array.from(arr, (n) => chars[n % chars.length]).join("");
-}
+const VIGENCIA_CODIGO_MIN = 15;
 
 servir(async (req, json) => {
   // 1) JWT del admin que llama
@@ -55,7 +24,7 @@ servir(async (req, json) => {
   const callerId = userResp.user.id;
 
   // 2) Body
-  let body: { caja_id?: string };
+  let body: { caja_id?: string; codigo?: boolean };
   try { body = await req.json(); } catch { return json({ error: "BAD_JSON" }, 400); }
   const cajaId = body.caja_id?.trim();
   if (!cajaId || !/^[0-9a-f-]{36}$/i.test(cajaId)) return json({ error: "CAJA_INVALIDA" }, 400);
@@ -77,68 +46,28 @@ servir(async (req, json) => {
   const { data: caja } = await admin
     .from("cajas").select("sucursal_id, nombre, tenant_id").eq("id", cajaId).maybeSingle();
   if (!caja || (caja as { tenant_id: string }).tenant_id !== tenantId) return json({ error: "CAJA_FORANEA" }, 403);
-  const sucursalId = (caja as { sucursal_id: string }).sucursal_id;
   const cajaNombre = (caja as { nombre: string }).nombre ?? "Caja";
 
-  const { data: rol } = await admin.from("roles").select("id").eq("codigo", "DISPOSITIVO").eq("es_sistema", true).maybeSingle();
-  if (!rol) return json({ error: "ROL_DISPOSITIVO_NO_ENCONTRADO" }, 500);
-  const rolId = (rol as { id: string }).id;
-
-  // 5) Cuenta de dispositivo: email sintético derivado del caja_id
-  const email = correoDispositivo(cajaId);
-  const password = generarPassword();
-
-  // Regenerar: la cuenta de esta caja ya existe, quizá con el dominio viejo (`vimpos.mx`, que no
-  // es de VIM; ver `_shared/dispositivo.ts`). Se busca por el id de caja, no por el correo, y se
-  // le pone la contraseña nueva y el correo bueno de una vez: la caja se vuelve a vincular con
-  // estas credenciales de todos modos. Buscar solo por el correo nuevo crearía una segunda cuenta
-  // para la misma caja.
-  //
-  // C2-8: antes se buscaba en `listUsers({ page: 1, perPage: 1000 })` — la PRIMERA página de TODO
-  // Auth. Con más de mil usuarios en el proyecto, la cuenta de la caja podía no estar ahí y se
-  // creaba una segunda (o fallaba el alta por correo duplicado). Ahora se busca entre las cuentas
-  // DISPOSITIVO de este tenant (una por caja: pocas), y solo si el alta choca con una cuenta que no
-  // tiene acceso (un alta anterior a medias) se recorre Auth paginando.
-  let uid: string | null = null;
-  let existente = await cuentaDeCajaPorAcceso(tenantId, rolId, cajaId);
-  if (existente === "error") return json({ error: "ERROR_LISTAR_AUTH" }, 500);
-  if (!existente) {
-    const { data: created, error: createErr } = await admin.auth.admin.createUser({
-      email, password, email_confirm: true, user_metadata: { nombre: cajaNombre, tipo: "DISPOSITIVO" },
-    });
-    if (created?.user) {
-      uid = created.user.id;
-    } else if (/already|exists|registered|duplicate/i.test(createErr?.message ?? "")) {
-      existente = await cuentaDeCajaPaginando(cajaId);
-      if (!existente || existente === "error") {
-        registrarError("provisionar-dispositivo", "ERROR_CREAR_AUTH", createErr);
-        return json({ error: "ERROR_CREAR_AUTH" }, 400);
-      }
-    } else {
-      registrarError("provisionar-dispositivo", "ERROR_CREAR_AUTH", createErr ?? "sin usuario");
-      return json({ error: "ERROR_CREAR_AUTH" }, 400);
+  // 5a) Código corto: reemplaza al que hubiera para esta caja.
+  if (body.codigo === true) {
+    const expira = new Date(Date.now() + VIGENCIA_CODIGO_MIN * 60_000).toISOString();
+    // Reintenta si el código ya lo tiene otra caja (UNIQUE): con 31^6 combinaciones casi nunca.
+    for (let i = 0; i < 3; i++) {
+      const codigo = generarCodigo();
+      const { error } = await admin.from("codigos_vinculacion_caja").upsert(
+        { caja_id: cajaId, tenant_id: tenantId, codigo, creado_por: callerId, expira_en: expira },
+        { onConflict: "caja_id" },
+      );
+      if (!error) return json({ ok: true, codigo, expira_en: expira, caja_nombre: cajaNombre });
+      if (error.code !== "23505") { registrarError("provisionar-dispositivo", "DB_ERROR", error); return json({ error: "DB_ERROR" }, 500); }
     }
-  }
-  if (existente) {
-    uid = existente;
-    const { error: updErr } = await admin.auth.admin.updateUserById(uid, { email, email_confirm: true, password });
-    if (updErr) { registrarError("provisionar-dispositivo", "ERROR_ACTUALIZAR", updErr); return json({ error: "ERROR_ACTUALIZAR" }, 500); }
-  }
-  if (!uid) return json({ error: "ERROR_CREAR_AUTH" }, 400);
-
-  // 6) Perfil del dispositivo (sin PIN) — upsert idempotente
-  const { error: perfErr } = await admin.from("usuarios_perfil")
-    .upsert({ id: uid, nombre: cajaNombre, estado: "ACTIVO" }, { onConflict: "id" });
-  if (perfErr) { registrarError("provisionar-dispositivo", "DB_ERROR", perfErr); return json({ error: "DB_ERROR" }, 500); }
-
-  // 7) Acceso con rol DISPOSITIVO (si no existe ya)
-  const { data: yaTiene } = await admin.from("usuarios_acceso").select("id").eq("usuario_id", uid).limit(1).maybeSingle();
-  if (!yaTiene) {
-    const { error: accInsErr } = await admin.from("usuarios_acceso").insert({
-      usuario_id: uid, tenant_id: tenantId, sucursal_id: sucursalId, rol_id: rolId, created_by: callerId,
-    });
-    if (accInsErr) { registrarError("provisionar-dispositivo", "DB_ERROR", accInsErr); return json({ error: "DB_ERROR" }, 500); }
+    return json({ error: "DB_ERROR" }, 500);
   }
 
-  return json({ ok: true, identificador: email, clave: password, caja_nombre: cajaNombre });
+  // 5b) Credenciales largas, al momento.
+  const r = await asegurarCuentaDispositivo(admin, {
+    id: cajaId, tenantId, sucursalId: (caja as { sucursal_id: string }).sucursal_id, nombre: cajaNombre,
+  }, callerId);
+  if ("error" in r) return json({ error: r.error }, r.status);
+  return json({ ok: true, identificador: r.email, clave: r.password, caja_nombre: cajaNombre });
 });

@@ -66,6 +66,10 @@ verify_jwt = false
 [functions.signup-tenant]
 verify_jwt = false
 
+# La caja canjea el código de vinculación antes de tener sesión (cupo por IP + código de un uso).
+[functions.canjear-codigo-caja]
+verify_jwt = false
+
 [functions.provisionar-tenant]
 verify_jwt = false
 

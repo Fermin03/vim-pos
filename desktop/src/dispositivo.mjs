@@ -60,3 +60,24 @@ export async function loginDispositivoNube({ cloudUrl, anon, email, pass, timeou
   const token2 = await intentar(otro);
   return token2 ? { token: token2, email: otro } : { token: null };
 }
+
+/**
+ * Canjea en la nube el código de 6 caracteres que dio el panel (Edge Function canjear-codigo-caja)
+ * por el correo y la clave de la caja. Sirve una vez: la clave que regresa es nueva.
+ *
+ * Devuelve `{ email, password }`, o `{ error }` con el texto para la pantalla si la nube dijo que no.
+ * Un error de red se propaga, igual que en loginDispositivoNube, para contarlo como red.
+ */
+export async function canjearCodigoNube({ cloudUrl, anon, codigo, timeoutMs = 15000, fetchImpl = fetch }) {
+  const r = await fetchImpl(`${cloudUrl}/functions/v1/canjear-codigo-caja`, {
+    method: "POST",
+    headers: { apikey: anon, Authorization: `Bearer ${anon}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ codigo }),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (r.ok && j?.identificador && j?.clave) return { email: j.identificador, password: j.clave };
+  if (r.status === 429) return { error: "Demasiados intentos. Espera unos minutos y vuelve a intentar." };
+  if (j?.error === "CODIGO_INVALIDO") return { error: "Ese código no existe o ya venció. Genera otro en el panel." };
+  return { error: "La nube no pudo canjear el código. Vuelve a intentar." };
+}

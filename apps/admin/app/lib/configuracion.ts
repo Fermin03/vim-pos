@@ -9,18 +9,31 @@ const SB_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export type CredencialesDispositivo = { identificador: string; clave: string; caja_nombre: string };
 
-/** Genera/regenera las credenciales del dispositivo de una caja (DUEÑO/ADMIN). Se muestran una vez. */
-export async function provisionarDispositivo(cajaId: string): Promise<CredencialesDispositivo> {
+export type CodigoVinculacion = { codigo: string; expira_en: string; caja_nombre: string };
+
+async function llamarProvisionar(body: Record<string, unknown>): Promise<Record<string, unknown>> {
   const { data: sess } = await supabase.auth.getSession();
   const token = sess.session?.access_token ?? SB_ANON;
   const res = await fetch(`${SB_URL}/functions/v1/provisionar-dispositivo`, {
     method: "POST",
     headers: { apikey: SB_ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ caja_id: cajaId }),
+    body: JSON.stringify(body),
   });
-  const data = (await res.json().catch(() => ({}))) as { identificador?: string; clave?: string; caja_nombre?: string; error?: string };
-  if (!res.ok || !data.identificador || !data.clave) throw new Error(data.error ?? `HTTP ${res.status}`);
-  return { identificador: data.identificador, clave: data.clave, caja_nombre: data.caja_nombre ?? "" };
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok || data.ok !== true) throw new Error(typeof data.error === "string" ? data.error : `HTTP ${res.status}`);
+  return data;
+}
+
+/** Genera/regenera las credenciales del dispositivo de una caja (DUEÑO/ADMIN). Se muestran una vez. */
+export async function provisionarDispositivo(cajaId: string): Promise<CredencialesDispositivo> {
+  const d = await llamarProvisionar({ caja_id: cajaId });
+  return { identificador: String(d.identificador), clave: String(d.clave), caja_nombre: String(d.caja_nombre ?? "") };
+}
+
+/** Código de 6 caracteres para vincular la caja: un uso, 15 minutos. No cambia nada hasta canjearlo. */
+export async function codigoVinculacion(cajaId: string): Promise<CodigoVinculacion> {
+  const d = await llamarProvisionar({ caja_id: cajaId, codigo: true });
+  return { codigo: String(d.codigo), expira_en: String(d.expira_en), caja_nombre: String(d.caja_nombre ?? "") };
 }
 
 // ── Negocio (P-162) ──────────────────────────────────────────────────────────

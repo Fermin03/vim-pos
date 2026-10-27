@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { startBackend } from "./backend.mjs";
 import { startUiServer } from "./ui-server.mjs";
 import { pullFromCloud, leerUltimoPull } from "./sync-pull.mjs";
-import { cajaIdDeEmail, loginDispositivoNube } from "./dispositivo.mjs";
+import { cajaIdDeEmail, canjearCodigoNube, loginDispositivoNube } from "./dispositivo.mjs";
 import { pushToCloud } from "./sync-push.mjs";
 import { respaldar, respaldarAsync, hacerSitio } from "./backup.mjs";
 import { crearGatewayDeEspera } from "./gateway.mjs";
@@ -127,6 +127,7 @@ let respaldando = false;
 let respaldoEnCurso = null;   // la promesa del respaldo con la caja encendida: salir la espera
 let reinicioEnCurso = null;   // la promesa del reinicio del watchdog: salir la espera también
 let vinculando = false;       // hay un PULL de vinculación escribiendo en la base local
+let canjeado = null;          // { codigo, email, password } del último código canjeado (vincularConNube)
 let respaldoDiario = null;    // temporizador del respaldo diario (respaldo-diario.mjs)
 // Última vez que alguien OPERÓ la caja (una escritura por el gateway). Arranca en "ahora": recién
 // abierta la app, lo prudente es suponer que alguien está por usarla.
@@ -215,12 +216,26 @@ function guardarNube({ cloudUrl, anon, email, pass }) {
  * vinculación ya encuentra al dispositivo. Es el puente que faltaba: las credenciales se crean en
  * el Admin de la nube, pero el POS valida contra su base local.
  */
-async function vincularConNube({ email, password } = {}) {
-  if (!email || !password) return { ok: false, motivo: "FALTAN_DATOS", error: "Faltan las credenciales del dispositivo." };
+async function vincularConNube({ email, password, codigo } = {}) {
   if (!CLOUD_ANON) {
     return { ok: false, motivo: "SIN_CONFIG", error: "Esta instalación no trae la llave pública de la nube (VIM_CLOUD_ANON). Avisa a soporte de VIM." };
   }
   if (!backend?.pool) return { ok: false, motivo: "SIN_BACKEND", error: "El backend local no está listo." };
+  // Código corto del panel: se cambia en la nube por el correo y la clave. Se recuerdan en memoria
+  // por si la bajada de abajo falla: el código ya se gastó, y reintentar con él debe funcionar.
+  if (codigo) {
+    if (canjeado?.codigo !== codigo) {
+      try {
+        const c = await canjearCodigoNube({ cloudUrl: CLOUD_URL, anon: CLOUD_ANON, codigo });
+        if (c.error) return { ok: false, motivo: "CODIGO", error: c.error };
+        canjeado = { codigo, ...c };
+      } catch (e) {
+        return { ok: false, motivo: "RED", error: `No se pudo contactar la nube de VIM: ${e?.message ?? "sin conexión"}` };
+      }
+    }
+    ({ email, password } = canjeado);
+  }
+  if (!email || !password) return { ok: false, motivo: "FALTAN_DATOS", error: "Faltan las credenciales del dispositivo." };
 
   let token;
   try {
@@ -249,7 +264,9 @@ async function vincularConNube({ email, password } = {}) {
     bajarAnuncios().catch(() => {}); // las imágenes de los anuncios, sin esperar
     const tablas = Object.keys(r ?? {}).length;
     console.log(`· [alta] OK: ${tablas} tablas sincronizadas; la caja ya puede vincularse.`);
-    return { ok: true, tablas };
+    // Con código, la pantalla no conoce la clave: se la devuelve para el login local (este
+    // endpoint solo responde a la propia caja, ver ui-server.mjs).
+    return codigo ? { ok: true, tablas, email, password } : { ok: true, tablas };
   } catch (e) {
     console.error("· [alta] falló la bajada de datos:", e.message);
     return { ok: false, motivo: "PULL", error: `Se validaron las credenciales, pero no se pudieron bajar los datos: ${e.message}` };
