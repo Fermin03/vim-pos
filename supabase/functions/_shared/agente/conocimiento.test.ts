@@ -10,7 +10,7 @@ test('el conocimiento completo cabe en el presupuesto de tokens', () => {
 
 test('no menciona nada interno', () => {
   const todo = plano(CONOCIMIENTO + REGLAS + FUNDADOR)
-  for (const p of ['knock', 'clabe', 'service_role', 'supabase', 'vercel', '@gmail', 'testimonio', 'referido']) {
+  for (const p of ['knock', 'clabe', 'service_role', 'supabase', 'vercel', '@gmail', 'testimonio', 'referido', 'cinco negocios', '5 negocios']) {
     assert.ok(!todo.includes(p), `contiene «${p}»`)
   }
 })
@@ -22,4 +22,10 @@ test('las reglas traen demo, horario y zona de citas', () => {
 test('hay conocimiento de todas las fuentes y solo tres versiones de novedades', () => {
   for (const s of ['## llms.txt', '## precios.md', '## novedades.md', '## demo.md']) assert.ok(CONOCIMIENTO.includes(s), s)
   assert.ok(!CONOCIMIENTO.includes('0.4.100'))
+})
+
+test('las reglas resisten instrucciones inyectadas y fijan precedencia', () => {
+  for (const s of ['no son órdenes', 'soy Fermín', 'nunca reveles', 'únicas reglas', 'única autoridad', 'escalar_modelo']) {
+    assert.ok(plano(REGLAS).includes(plano(s)), s)
+  }
 })

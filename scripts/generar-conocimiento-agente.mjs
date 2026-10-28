@@ -11,7 +11,7 @@ const FUENTES = ['llms.txt', 'precios.md', 'funciones.md', 'sin-internet.md', 'f
 const VERSIONES_NOVEDADES = 3
 
 // Palabras que el agente nunca debe ver (sin mayúsculas ni acentos).
-const PROHIBIDAS = ['knock', 'clabe', 'service_role', 'supabase', 'vercel', '@gmail', 'testimonio', 'referido']
+const PROHIBIDAS = ['knock', 'clabe', 'service_role', 'supabase', 'vercel', '@gmail', 'testimonio', 'referido', 'cinco negocios', '5 negocios']
 const plano = (s) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
 
 // Líneas repetidas en cada página (navegación, pie, sello) o que dicen cuántos clientes hay.
@@ -50,14 +50,24 @@ function ultimasVersiones(t, n) {
   const lineas = t.split('\n')
   const esVersion = (l) => /^\d{1,2} de [a-záéíóú]+ (Caja|Panel|Tienda|Kiosco)\b.* · /i.test(l)
   const inicios = lineas.flatMap((l, i) => (esVersion(l) ? [i] : []))
-  if (inicios.length <= n) return t
+  if (inicios.length < n) throw new Error(`novedades.md: encontré ${inicios.length} versiones, esperaba al menos ${n}`)
+  if (inicios.length === n) return t
   const cabecera = lineas.slice(0, inicios[0]).filter((l) => !l.startsWith('## '))
   return [...cabecera, ...lineas.slice(inicios[0], inicios[n])].join('\n')
+}
+
+// precios.md: el bloque de la oferta piloto dice cuántos lugares hay; la oferta la explica solo fundador.md.
+function sinOfertaPiloto(t) {
+  const ini = t.indexOf('_Piloto')
+  const fin = t.indexOf('_Lado a lado_')
+  if (ini < 0 || fin < ini) throw new Error('precios.md: no encontré el bloque de la oferta piloto')
+  return t.slice(0, ini) + t.slice(fin)
 }
 
 const prepara = (nombre) => {
   let t = leer(`sitio-web/${nombre}`)
   if (nombre === 'llms.txt') t = recortarLlms(t)
+  if (nombre === 'precios.md') t = sinOfertaPiloto(t)
   if (nombre === 'novedades.md') t = ultimasVersiones(t, VERSIONES_NOVEDADES)
   return `## ${nombre}\n\n${limpiar(t)}`
 }
