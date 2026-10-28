@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { revisarHerramientas, revisionesFijas } from './revisar.mjs'
+import { revisarHerramientas, revisionesFijas } from './revisar.ts'
 
 test('respuesta limpia: sin fallas', () => {
   assert.deepEqual(revisionesFijas('El plan *Esencial* cuesta $699 al mes más IVA. ¿Cuántas cajas tienes?'), [])
