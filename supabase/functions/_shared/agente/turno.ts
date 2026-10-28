@@ -1,13 +1,15 @@
-// Un turno del agente de WhatsApp: registra el mensaje, decide si contesta, llama al cerebro y envía.
+// Un turno del agente de WhatsApp: con el mensaje ya registrado (lo hace el webhook antes de
+// contestar 200), decide si contesta, llama al cerebro y envía.
 // Todo lo externo entra por `deps`, así que se prueba con node --test sin red ni base.
-import { type Herramientas, MENSAJE_FIJO, type responder, type Turno } from "./cerebro.ts"
+import { AVISO_PRIVACIDAD, type Herramientas, MENSAJE_FIJO, type responder, type Turno } from "./cerebro.ts"
 import type { Evento } from "../whatsapp/aviso-meta.ts"
 import type { ClienteRpc } from "../limite.ts"
 import { registrarError } from "../errores.ts"
 
 export type DepsTurno = {
   rpc: ClienteRpc["rpc"]
-  leerConversacion(id: string): Promise<{ historial: Turno["historial"]; modelo: "haiku" | "sonnet"; fundadorAbierta: boolean }>
+  /** `nueva`: el agente aún no ha escrito en la conversación (ningún mensaje AGENTE). */
+  leerConversacion(id: string): Promise<{ historial: Turno["historial"]; modelo: "haiku" | "sonnet"; fundadorAbierta: boolean; nueva: boolean }>
   responder: typeof responder
   enviar: (waId: string, texto: string) => Promise<{ ok: boolean; wamid: string | null; error?: string | null }>
   cupo: (waId: string) => Promise<boolean>
@@ -16,21 +18,36 @@ export type DepsTurno = {
   guardarModelo: (conversacionId: string, modelo: "sonnet") => Promise<void>
   herramientas: (conversacionId: string) => Herramientas
   topeUsd: number
+  /** WA_NUMERO_FERMIN: sus propios mensajes (p. ej. al contestar un aviso) se registran pero no se responden. */
+  numeroFermin: string
+  /** Espera de la ráfaga: si el cliente manda varios mensajes seguidos, solo contesta el turno del último. */
+  esperar: (ms: number) => Promise<void>
+  /** ¿Hay un mensaje CLIENTE más nuevo que `wamid` en la conversación? */
+  hayMasNuevo: (conversacionId: string, wamid: string) => Promise<boolean>
 }
 
 export const MENSAJE_AUDIO = "No puedo escuchar audios, ¿me lo escribes?"
+export const ESPERA_RAFAGA_MS = 4000
 
-export async function atenderMensaje(e: Extract<Evento, { tipo: "mensaje" }>, deps: DepsTurno): Promise<void> {
+const diez = (n: string) => n.replace(/\D/g, "").slice(-10)
+
+export async function atenderMensaje(
+  e: Extract<Evento, { tipo: "mensaje" }>,
+  r: { conversacion_id: string; responder: boolean },
+  deps: DepsTurno,
+): Promise<void> {
+  if (!r.responder) return
+  if (deps.numeroFermin && diez(e.waId) === diez(deps.numeroFermin)) return
+  const id = r.conversacion_id
+  await deps.esperar(ESPERA_RAFAGA_MS)
+  if (await deps.hayMasNuevo(id, e.wamid)) return
+  if (!await deps.cupo(e.waId)) { console.error("[whatsapp] cupo agotado", id); return }
+
   const rpc = async (fn: string, args: Record<string, unknown>) => {
     const { data, error } = await deps.rpc(fn, args)
     if (error) throw new Error(`${fn}: ${error.message}`)
     return data as any
   }
-  const r = await rpc("wa_registrar_entrante", { p_wa_id: e.waId, p_wamid: e.wamid, p_nombre: e.nombre, p_texto: e.texto })
-  if (!r.responder) return
-  if (!await deps.cupo(e.waId)) { console.error("[whatsapp] cupo agotado", e.waId); return }
-
-  const id: string = r.conversacion_id
   const desde = new Date()
   const pasar = (estado: string, motivo: string, resumen: string) =>
     rpc("wa_pasar_a_fermin", { p_conversacion_id: id, p_estado: estado, p_motivo: motivo, p_resumen: resumen })
@@ -42,12 +59,15 @@ export async function atenderMensaje(e: Extract<Evento, { tipo: "mensaje" }>, de
     }
     return Number(uso.usd_mes)
   }
+  const conv = await deps.leerConversacion(id)
   // Solo se calla si Fermín escribió DURANTE este turno; que el agente mismo pause (pasar_a_fermin) no lo calla.
+  // El primer mensaje del agente en la conversación lleva el aviso de privacidad, sea cual sea.
   const decir = async (texto: string) => {
+    if (conv.nueva) texto += "\n\n" + AVISO_PRIVACIDAD
     if (await deps.ferminEscribio(id, desde)) return
     const s = await deps.enviar(e.waId, texto)
     if (!s.ok) {
-      const motivo = (s.error ?? "error desconocido").slice(0, 200)
+      const motivo = [...(s.error ?? "error desconocido")].slice(0, 200).join("")
       registrarError("whatsapp-webhook", "ENVIO", motivo)
       await pasar("DUDA_SIN_RESPUESTA", "No se pudo enviar", `No se pudo enviar la respuesta por WhatsApp: ${motivo}`)
       return
@@ -64,10 +84,12 @@ export async function atenderMensaje(e: Extract<Evento, { tipo: "mensaje" }>, de
     return
   }
 
-  const conv = await deps.leerConversacion(id)
-  const t = await deps.responder({ ...conv, nueva: !!r.nueva }, deps.herramientas(id))
-  if (t.modelo === "sonnet" && conv.modelo !== "sonnet") await deps.guardarModelo(id, "sonnet")
-  await sumar(t.usd)
+  const t = await deps.responder(conv, deps.herramientas(id))
+  // Primero se envía: la contabilidad no debe tumbar la respuesta al cliente.
   await decir(t.texto)
+  try {
+    if (t.modelo === "sonnet" && conv.modelo !== "sonnet") await deps.guardarModelo(id, "sonnet")
+  } catch (err) { registrarError("whatsapp-webhook", "MODELO", err) }
+  try { await sumar(t.usd) } catch (err) { registrarError("whatsapp-webhook", "USO", err) }
   if (t.fallo) await pasar("DUDA_SIN_RESPUESTA", "El agente no pudo responder", "El agente no pudo responder; contestar a mano")
 }
