@@ -54,7 +54,7 @@ BEGIN
     RAISE NOTICE 'wa_aprender_cron: faltan secretos vim_interno / vim_functions_url en Vault, omitido'; RETURN;
   END IF;
   EXECUTE format(
-    'SELECT net.http_post(url := %L, body := %L::jsonb, headers := %L::jsonb, timeout_milliseconds := 5000)',
+    'SELECT net.http_post(url := %L, body := %L::jsonb, headers := %L::jsonb, timeout_milliseconds := 150000)',
     rtrim(v_base, '/') || '/whatsapp-aprender', '{}',
     jsonb_build_object('Content-Type', 'application/json', 'x-vim-interno', v_secreto)::text
   );
