@@ -143,7 +143,8 @@ export async function responder(
   const clave = (globalThis as { Deno?: { env: { get(k: string): string | undefined } } }).Deno?.env.get("ANTHROPIC_API_KEY") ?? ""
   const system: Record<string, unknown>[] = [REGLAS, CONOCIMIENTO, ...(t.fundadorAbierta ? [FUNDADOR] : [])].map((text) => ({ type: "text", text }))
   system[system.length - 1].cache_control = { type: "ephemeral", ttl: "1h" }
-  system.push({ type: "text", text: bloqueAhora(t.ahora ?? new Date()) })
+  system.push({ type: "text", text: bloqueAhora(t.ahora ?? new Date()) +
+    (t.fundadorAbierta ? "" : " La oferta «Negocio fundador» está CERRADA: no la menciones ni la ofrezcas.") })
   const hist = aMensajes(t.historial)
   const messages: { role: string; content: unknown }[] = hist
   let modelo = t.modelo

@@ -116,6 +116,7 @@ test('fundadorAbierta:false no incluye $499; el último bloque lleva cache 1h', 
   await responder(turno({ fundadorAbierta: false }), espia().h, a.f)
   assert.ok(a.cuerpos[0].system.every((b: any) => !b.text.includes('$499')))
   assert.equal(a.cuerpos[0].system.length, 3) // reglas, conocimiento, ahora
+  assert.match(a.cuerpos[0].system[2].text, /Negocio fundador» está CERRADA/) // y se le dice que no la ofrezca
   const b = falso([() => resp([{ type: 'text', text: 'x' }])])
   await responder(turno(), espia().h, b.f)
   assert.equal(b.cuerpos[0].system.length, 4)
