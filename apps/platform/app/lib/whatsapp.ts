@@ -44,3 +44,37 @@ export type ConversacionWa = {
 };
 
 export type MensajeWa = { id: string; autor: "CLIENTE" | "AGENTE" | "FERMIN"; texto: string | null; creado_en: string };
+
+// Lecciones que el agente aprende de las conversaciones (wa_lecciones, 0287). Aprobadas primero.
+export const ESTADOS_LECCION = ["APROBADA", "ENVIADA", "PENDIENTE", "DESCARTADA", "CADUCADA", "RETIRADA"] as const;
+export type EstadoLeccion = (typeof ESTADOS_LECCION)[number];
+
+const ETIQUETA_LECCION: Record<EstadoLeccion, string> = {
+  APROBADA: "Aprobada", ENVIADA: "Enviada", PENDIENTE: "Pendiente",
+  DESCARTADA: "Descartada", CADUCADA: "Caducada", RETIRADA: "Retirada",
+};
+const ETIQUETA_TIPO: Record<string, string> = { DUDA: "Duda técnica", TONO: "Tono", PREGUNTA: "Pregunta sin respuesta" };
+
+export const etiquetaLeccion = (e: string): string => ETIQUETA_LECCION[e as EstadoLeccion] ?? e;
+export const etiquetaTipo = (t: string): string => ETIQUETA_TIPO[t] ?? t;
+
+export const COLOR_LECCION: Record<EstadoLeccion, string> = {
+  APROBADA: "bg-success-soft text-success",
+  ENVIADA: "bg-info-soft text-info",
+  PENDIENTE: "bg-warning-soft text-warning",
+  DESCARTADA: "bg-sel text-ink-2",
+  CADUCADA: "bg-sel text-ink-2",
+  RETIRADA: "bg-sel text-ink-2",
+};
+
+export type LeccionWa = {
+  id: string;
+  tipo: string;
+  comercial: boolean;
+  pregunta: string | null;
+  texto: string;
+  evidencia: string;
+  estado: EstadoLeccion;
+  creado_en: string;
+  decidido_en: string | null;
+};

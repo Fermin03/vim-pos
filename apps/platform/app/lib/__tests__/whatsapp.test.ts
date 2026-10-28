@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agenteCallado, ESTADOS_WA, esUuid, etiquetaEstado } from "../whatsapp";
+import { agenteCallado, ESTADOS_LECCION, ESTADOS_WA, esUuid, etiquetaEstado, etiquetaLeccion, etiquetaTipo } from "../whatsapp";
 
 describe("etiquetaEstado", () => {
   it("nombra los 5 estados en palabras", () => {
@@ -24,5 +24,18 @@ describe("esUuid", () => {
   it("rechaza lo que no lo es", () => {
     expect(esUuid("abc")).toBe(false);
     expect(esUuid("")).toBe(false);
+  });
+});
+
+describe("etiquetaLeccion / etiquetaTipo", () => {
+  it("nombra los 6 estados con las aprobadas primero", () => {
+    expect(ESTADOS_LECCION.map(etiquetaLeccion)).toEqual(["Aprobada", "Enviada", "Pendiente", "Descartada", "Caducada", "Retirada"]);
+  });
+  it("nombra los 3 tipos", () => {
+    expect(["DUDA", "TONO", "PREGUNTA"].map(etiquetaTipo)).toEqual(["Duda técnica", "Tono", "Pregunta sin respuesta"]);
+  });
+  it("lo desconocido se enseña como llegó", () => {
+    expect(etiquetaLeccion("X")).toBe("X");
+    expect(etiquetaTipo("X")).toBe("X");
   });
 });

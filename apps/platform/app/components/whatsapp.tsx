@@ -7,9 +7,14 @@ import { textoActualizado, useRefresco } from "../lib/refresco";
 import {
   agenteCallado,
   COLOR_ESTADO_WA,
+  COLOR_LECCION,
+  ESTADOS_LECCION,
   ESTADOS_WA,
   etiquetaEstado,
+  etiquetaLeccion,
+  etiquetaTipo,
   type ConversacionWa,
+  type LeccionWa,
   type MensajeWa,
 } from "../lib/whatsapp";
 import { Seccion } from "./seccion";
@@ -41,6 +46,7 @@ export function Whatsapp({ api }: { api: Api }) {
   const [filas, setFilas] = useState<ConversacionWa[] | null>(null);
   const [conteo, setConteo] = useState<Record<string, number>>({});
   const [fundador, setFundador] = useState<boolean | null>(null);
+  const [aprendidas, setAprendidas] = useState(0);
   const [filtro, setFiltro] = useState<Filtro>("TODOS");
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -51,6 +57,7 @@ export function Whatsapp({ api }: { api: Api }) {
       setFilas((r.conversaciones ?? []) as ConversacionWa[]);
       setConteo((r.conteo ?? {}) as Record<string, number>);
       setFundador(r.fundador_abierta as boolean);
+      setAprendidas((r.lecciones_aprobadas ?? 0) as number);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
@@ -96,6 +103,11 @@ export function Whatsapp({ api }: { api: Api }) {
           </button>
         </div>
       </Seccion>
+
+      <p className="mt-4 text-13">
+        <Link href="/whatsapp/aprendido" className="font-semibold underline underline-offset-2">Aprendido ({aprendidas})</Link>
+        <span className="text-ink-2"> · lo que el agente aprendió de las conversaciones.</span>
+      </p>
 
       <div className="mb-4 mt-6 flex flex-wrap gap-1" role="group" aria-label="Filtrar por estado">
         {chips.map(([k, l]) => (
@@ -234,6 +246,87 @@ export function ConversacionWhatsapp({ api, id }: { api: Api; id: string }) {
           </ul>
         )}
       </Seccion>
+      <p className="mt-4 text-13 text-ink-2">{textoActualizado(haceCarga)}</p>
+    </div>
+  );
+}
+
+/** Lo que el agente aprendió: aprobadas primero, con «Quitar» para retirarlas. */
+export function Aprendido({ api }: { api: Api }) {
+  const [filas, setFilas] = useState<LeccionWa[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [ocupado, setOcupado] = useState<string | null>(null);
+
+  const cargar = useCallback(async () => {
+    try {
+      const r = await api("/api/whatsapp/lecciones");
+      setFilas((r.lecciones ?? []) as LeccionWa[]);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error");
+    }
+  }, [api]);
+  const { hace: haceCarga, recargar } = useRefresco(cargar);
+
+  const quitar = async (id: string) => {
+    setOcupado(id); setError(null);
+    try {
+      await api("/api/whatsapp/lecciones", { method: "POST", body: JSON.stringify({ accion: "quitar", id }) });
+      await recargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo quitar");
+    } finally {
+      setOcupado(null);
+    }
+  };
+
+  if (error && !filas) return <p className="text-13 text-danger" role="alert">{error}</p>;
+  if (!filas) return <p className="text-13 text-ink-2">Cargando…</p>;
+
+  // El sort es estable: dentro de cada estado se queda lo más reciente primero.
+  const lista = [...filas].sort((a, b) => ESTADOS_LECCION.indexOf(a.estado) - ESTADOS_LECCION.indexOf(b.estado));
+
+  return (
+    <div>
+      <Link href="/whatsapp" className="text-13 font-semibold text-ink-2 hover:text-ink">← WhatsApp</Link>
+      <h1 className="mb-1 mt-2 font-display text-20 font-bold tracking-tight">Aprendido</h1>
+      <p className="mb-4 text-13 text-ink-2">Lo que el agente aprendió de las conversaciones. Solo usa las aprobadas; «Quitar» lo deja de usar.</p>
+      {error && (
+        <p className="mb-3 rounded border border-warning/30 bg-warning-soft px-3 py-2 text-13 font-medium text-warning" role="alert">{error}</p>
+      )}
+
+      {lista.length === 0 ? (
+        <div className="rounded-lg border border-line bg-surface p-8 text-center">
+          <div className="font-display text-18 font-semibold">Todavía no hay lecciones</div>
+          <p className="mt-1 text-14 text-ink-2">Cada noche el agente revisa las conversaciones y propone lo que aprendió.</p>
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {lista.map((l) => (
+            <li key={l.id} className="rounded-lg border border-line bg-surface p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-14 font-semibold">{etiquetaTipo(l.tipo)}</span>
+                {l.comercial && <span className="rounded-full bg-sel px-2 py-0.5 text-12 font-semibold text-ink-2">Comercial</span>}
+                <span className={`rounded-full px-2 py-0.5 text-12 font-semibold ${COLOR_LECCION[l.estado] ?? "bg-sel text-ink-2"}`}>{etiquetaLeccion(l.estado)}</span>
+              </div>
+              {l.pregunta && <p className="mt-2 text-13 text-ink-2">Pregunta: {l.pregunta}</p>}
+              <p className="mt-2 whitespace-pre-wrap break-words text-14">{l.texto}</p>
+              <p className="mt-2 whitespace-pre-wrap break-words text-13 text-ink-2">Evidencia: {l.evidencia}</p>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-12 text-ink-3">
+                  Propuesta {fechaHoraMx(l.creado_en, "corto")}
+                  {l.decidido_en && <> · decidida {fechaHoraMx(l.decidido_en, "corto")}</>}
+                </p>
+                {l.estado === "APROBADA" && (
+                  <button type="button" onClick={() => void quitar(l.id)} disabled={ocupado !== null} className={btnFantasma}>
+                    {ocupado === l.id ? "Quitando…" : "Quitar"}
+                  </button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
       <p className="mt-4 text-13 text-ink-2">{textoActualizado(haceCarga)}</p>
     </div>
   );
