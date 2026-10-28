@@ -47,7 +47,7 @@ const rechazado = (s: number | null) => s !== null && s >= 400 && s < 500 && ![4
 /**
  * Manda los avisos en un solo mensaje. Si Meta rechaza el lote (4xx), reintenta cada aviso solo: los
  * que pasan quedan `enviados`; los que Meta rechaza solos quedan `rechazados` (se marcan igual, para
- * que uno malo no bloquee la cola), salvo que los rechace todos. 5xx o red: nada se marca y todo
+ * que uno malo no bloquee la cola), salvo que no pase ninguno. 5xx o red: nada se marca y todo
  * espera a la siguiente vuelta.
  */
 export async function repartirAvisos(
@@ -64,9 +64,10 @@ export async function repartirAvisos(
     if (r.ok) enviados.push(a.id);
     else if (rechazado(r.status)) rechazados.push(a.id);
   }
-  // Si Meta rechaza TODOS, la culpa no es de un aviso (plantilla sin aprobar o pausada, ritmo que Meta
-  // devuelve como 400…): no se marca nada. Un aviso malo de verdad se descarta en cuanto llega otro que sí pasa.
+  // Si no pasó NINGUNO, la culpa no es de un aviso (plantilla sin aprobar o pausada, ritmo que Meta
+  // devuelve como 400, Meta caído…): no se descarta nada. Un aviso malo de verdad se descarta en cuanto
+  // otro pasa en la misma vuelta (eso prueba que la plantilla y el canal funcionan).
   // ponytail: se reintenta cada 5 min mientras dure el problema; clasificar por error.code si eso molesta.
-  if (rechazados.length === avisos.length) return { enviados, rechazados: [] };
+  if (enviados.length === 0) return { enviados, rechazados: [] };
   return { enviados, rechazados };
 }

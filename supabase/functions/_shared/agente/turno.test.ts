@@ -67,6 +67,15 @@ test("audio al final de una ráfaga con texto: contesta el cerebro, no el mensaj
   await atenderMensaje(ev("[audio]"), R, deps)
   assert.deepEqual(llamadas, ["esperar:4000", "responder", "enviar:listo"])
 })
+test("lo que Fermín ya contestó no cuenta: un audio después de su mensaje pide texto", async () => {
+  const { deps, llamadas } = hacer({ historial: [
+    { autor: "CLIENTE", texto: "¿Cuánto cuesta?" },
+    { autor: "FERMIN", texto: "Te marco en un rato" },
+    { autor: "CLIENTE", texto: "[audio]" },
+  ] })
+  await atenderMensaje(ev("[audio]"), R, deps)
+  assert.deepEqual(llamadas, ["esperar:4000", "enviar:" + MENSAJE_AUDIO])
+})
 test("solo audios sin contestar: pide texto", async () => {
   const { deps, llamadas } = hacer({ historial: [
     { autor: "AGENTE", texto: "¡Hola!" },

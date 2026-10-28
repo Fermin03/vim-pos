@@ -94,6 +94,13 @@ test("repartirAvisos: si Meta rechaza todos (plantilla sin aprobar), no se desca
   assert.deepEqual(r, { enviados: [], rechazados: [] });
 });
 
+test("repartirAvisos: si no pasa ninguno (400 y un 503 en los reintentos), no se descarta ninguno", async () => {
+  let n = 0;
+  const estados = [400, 400, 503, 400];
+  const r = await repartirAvisos([av("1"), av("2"), av("3")], PANEL, async () => ({ ok: false, status: estados[n++] }));
+  assert.deepEqual(r, { enviados: [], rechazados: [] });
+});
+
 test("repartirAvisos: en el reintento, un 5xx deja ese aviso pendiente", async () => {
   let n = 0;
   const r = await repartirAvisos([av("1"), av("2")], PANEL, async () => (++n === 1 ? { ok: false, status: 400 } : n === 2 ? { ok: false, status: 503 } : { ok: true, status: 200 }));
