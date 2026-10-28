@@ -1,11 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { AVISO_PRIVACIDAD, costoUsd, MENSAJE_FIJO, responder } from './cerebro.ts'
+import { costoUsd, MENSAJE_FIJO, responder } from './cerebro.ts'
 
 // Sin Deno en node: se simula la clave para que el módulo la lea como en producción.
 ;(globalThis as any).Deno = { env: { get: (k: string) => (k === 'ANTHROPIC_API_KEY' ? 'sk-prueba' : undefined) } }
 const USO = { input_tokens: 1000, output_tokens: 100, cache_creation_input_tokens: 500, cache_read_input_tokens: 2000 }
-const turno = (o = {}) => ({ historial: [{ autor: 'CLIENTE' as const, texto: 'hola' }], modelo: 'haiku' as const, fundadorAbierta: true, nueva: false, ...o })
+const turno = (o = {}) => ({ historial: [{ autor: 'CLIENTE' as const, texto: 'hola' }], modelo: 'haiku' as const, fundadorAbierta: true, ...o })
 const resp = (content: unknown[], usage = USO, stop_reason = 'end_turn') => new Response(JSON.stringify({ content, usage, stop_reason }), { status: 200 })
 const espia = () => {
   const llamadas: { body: any; headers: any }[] = []
@@ -94,24 +94,35 @@ test('fetch que lanza, 529 o 5 vueltas sin texto: mensaje fijo', async () => {
   assert.equal(bucle.cuerpos.length, 5)
 })
 
-test('nueva agrega el aviso de privacidad', async () => {
-  const { f } = falso([() => resp([{ type: 'text', text: 'Hola' }])])
-  const r = await responder(turno({ nueva: true }), espia().h, f)
-  assert.ok(r.texto.endsWith(AVISO_PRIVACIDAD))
+test('el mensaje fijo no nombra a Fermín', () => {
+  assert.ok(!MENSAJE_FIJO.includes('Fermín'))
+  assert.match(MENSAJE_FIJO, /un agente/)
+})
+
+test('bloque «Ahora» sin caché, después del cacheado: fecha, hora de México y dentro/fuera de horario', async () => {
+  const fuera = falso([() => resp([{ type: 'text', text: 'x' }])])
+  await responder(turno({ ahora: new Date('2026-10-28T05:00:00Z') }), espia().h, fuera.f) // 23:00 del martes 27 en México
+  const sys = fuera.cuerpos[0].system
+  assert.ok(sys.at(-2).cache_control)
+  assert.equal(sys.at(-1).cache_control, undefined)
+  assert.equal(sys.at(-1).text, 'Ahora: martes 27 oct 2026, 23:00, hora del centro de México. Horario de atención de un agente: 9:00–18:00 (fuera del horario).')
+  const dentro = falso([() => resp([{ type: 'text', text: 'x' }])])
+  await responder(turno({ ahora: new Date('2026-10-27T16:00:00Z') }), espia().h, dentro.f) // 10:00
+  assert.match(dentro.cuerpos[0].system.at(-1).text, /, 10:00, .*\(dentro del horario\)/)
 })
 
 test('fundadorAbierta:false no incluye $499; el último bloque lleva cache 1h', async () => {
   const a = falso([() => resp([{ type: 'text', text: 'x' }])])
   await responder(turno({ fundadorAbierta: false }), espia().h, a.f)
   assert.ok(a.cuerpos[0].system.every((b: any) => !b.text.includes('$499')))
-  assert.equal(a.cuerpos[0].system.length, 2)
+  assert.equal(a.cuerpos[0].system.length, 3) // reglas, conocimiento, ahora
   const b = falso([() => resp([{ type: 'text', text: 'x' }])])
   await responder(turno(), espia().h, b.f)
-  assert.equal(b.cuerpos[0].system.length, 3)
-  assert.deepEqual(b.cuerpos[0].system.at(-1).cache_control, { type: 'ephemeral', ttl: '1h' })
+  assert.equal(b.cuerpos[0].system.length, 4)
+  assert.deepEqual(b.cuerpos[0].system.at(-2).cache_control, { type: 'ephemeral', ttl: '1h' })
 })
 
-test('historial: une roles iguales, prefija a Fermín y descarta turnos iniciales que no son del cliente', async () => {
+test('historial: une roles iguales, prefija al agente de VIM y descarta turnos iniciales que no son del cliente', async () => {
   const { f, cuerpos } = falso([() => resp([{ type: 'text', text: 'x' }])])
   await responder(turno({ historial: [
     { autor: 'FERMIN', texto: 'inicio' },
@@ -123,7 +134,7 @@ test('historial: une roles iguales, prefija a Fermín y descarta turnos iniciale
   ] }), espia().h, f)
   assert.deepEqual(cuerpos[0].messages, [
     { role: 'user', content: 'a\nb' },
-    { role: 'assistant', content: '(Fermín) c\nd' },
+    { role: 'assistant', content: '(Agente de VIM) c\nd' },
     { role: 'user', content: 'e' },
   ])
 })
@@ -163,14 +174,13 @@ test('entrada inválida: is_error con lo que falta y sin llamar al handler', asy
   }
 })
 
-test('texto largo: corta en el último fin de oración a ≤1500; sin fin, corte duro; el aviso va después', async () => {
+test('texto largo: corta en el último fin de oración a ≤1500; sin fin, corte duro', async () => {
   const a = falso([() => resp([{ type: 'text', text: 'Hola. ' + 'a'.repeat(1700) }])])
   assert.equal((await responder(turno(), espia().h, a.f)).texto, 'Hola.')
   const dura = falso([() => resp([{ type: 'text', text: 'b'.repeat(2000) }])])
   assert.equal((await responder(turno(), espia().h, dura.f)).texto.length, 1500)
   const n = falso([() => resp([{ type: 'text', text: 'c'.repeat(1400) + '. ' + 'd'.repeat(500) }])])
-  const r = await responder(turno({ nueva: true }), espia().h, n.f)
-  assert.equal(r.texto, 'c'.repeat(1400) + '.\n\n' + AVISO_PRIVACIDAD)
+  assert.equal((await responder(turno(), espia().h, n.f)).texto, 'c'.repeat(1400) + '.')
 })
 
 test('timeout (AbortError) va por fallo y el fetch lleva signal', async () => {
@@ -198,4 +208,15 @@ test('sin ANTHROPIC_API_KEY: fallo sin llamar a fetch', async () => {
     assert.equal((await responder(turno(), espia().h, f)).fallo, true)
     assert.equal(cuerpos.length, 0)
   } finally { (globalThis as any).Deno = D }
+})
+
+test('recortar no corta en el punto de un número ni de una URL, y no parte un emoji', async () => {
+  const num = falso([() => resp([{ type: 'text', text: 'Hola. Cuesta $1.500 ' + 'a'.repeat(1600) }])])
+  assert.equal((await responder(turno(), espia().h, num.f)).texto, 'Hola.')
+  const url = falso([() => resp([{ type: 'text', text: 'Mira https://vimpos.com.mx/precios?x=1 ' + 'a'.repeat(1600) }])])
+  assert.equal([...(await responder(turno(), espia().h, url.f)).texto].length, 1500) // sin «. »: corte duro
+  const borde = falso([() => resp([{ type: 'text', text: 'e'.repeat(1499) + '. ' + 'f'.repeat(100) }])])
+  assert.equal((await responder(turno(), espia().h, borde.f)).texto, 'e'.repeat(1499) + '.')
+  const emoji = falso([() => resp([{ type: 'text', text: '😀'.repeat(1600) }])])
+  assert.equal((await responder(turno(), espia().h, emoji.f)).texto, '😀'.repeat(1500))
 })

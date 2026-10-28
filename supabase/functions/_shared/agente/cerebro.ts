@@ -1,8 +1,9 @@
 // Un turno del agente de WhatsApp contra la Messages API de Claude, con herramientas.
 // Puro salvo el fetch (inyectable) y la clave leída del entorno; se prueba con node --test.
 import { CONOCIMIENTO, FUNDADOR, REGLAS } from "./conocimiento.gen.ts"
+import { enHorario } from "../whatsapp/avisos.ts"
 
-export const MENSAJE_FIJO = "¡Gracias por escribir! En breve te contesta Fermín."
+export const MENSAJE_FIJO = "¡Gracias por escribir! En breve un agente se comunica contigo."
 export const AVISO_PRIVACIDAD = "Tus datos se tratan según nuestro aviso de privacidad: https://vimpos.com.mx/aviso-privacidad"
 
 type Modelo = "haiku" | "sonnet"
@@ -17,7 +18,7 @@ export type Turno = {
   historial: { autor: "CLIENTE" | "AGENTE" | "FERMIN"; texto: string }[]
   modelo: Modelo
   fundadorAbierta: boolean
-  nueva: boolean
+  ahora?: Date // para pruebas; por defecto, new Date()
 }
 
 const IDS: Record<Modelo, string> = { haiku: "claude-haiku-5-5", sonnet: "claude-sonnet-5-5" }
@@ -46,7 +47,7 @@ const HERRAMIENTAS = [
   },
   {
     name: "pasar_a_fermin",
-    description: "Avisa a Fermín que esta conversación necesita a una persona.",
+    description: "Comunica esta conversación con un agente de VIM (una persona).",
     input_schema: {
       type: "object",
       properties: {
@@ -74,7 +75,7 @@ function aMensajes(h: Turno["historial"]) {
   const msgs: { role: "user" | "assistant"; content: string }[] = []
   for (const { autor, texto } of h) {
     const role = autor === "CLIENTE" ? "user" : "assistant"
-    const t = autor === "FERMIN" ? `(Fermín) ${texto}` : texto
+    const t = autor === "FERMIN" ? `(Agente de VIM) ${texto}` : texto
     if (!msgs.length && role !== "user") continue
     const ult = msgs.at(-1)
     if (ult?.role === role) ult.content += "\n" + t
@@ -85,12 +86,25 @@ function aMensajes(h: Turno["historial"]) {
 
 const LIMITE_TEXTO = 1500
 
-// Corta en el último fin de oración (. ! ?) a ≤1500 caracteres; sin fin de oración, corte duro.
+// Corta en el último fin de oración («. », «! », «? » o fin) a ≤1500 puntos de código; nunca en el
+// punto de un número o de una URL. Sin fin de oración, corte duro (sin partir un emoji).
 function recortar(t: string): string {
-  if (t.length <= LIMITE_TEXTO) return t
-  const corte = t.slice(0, LIMITE_TEXTO)
-  const i = Math.max(corte.lastIndexOf("."), corte.lastIndexOf("!"), corte.lastIndexOf("?"))
-  return i > 0 ? corte.slice(0, i + 1) : corte
+  const cp = [...t]
+  if (cp.length <= LIMITE_TEXTO) return t
+  const corte = cp.slice(0, LIMITE_TEXTO + 1).join("") // +1: ¿el signo del borde va seguido de espacio?
+  let i = -1
+  for (const m of corte.matchAll(/[.!?](?=\s)/g)) i = m.index
+  return i > 0 ? corte.slice(0, i + 1) : cp.slice(0, LIMITE_TEXTO).join("")
+}
+
+const TZ = "America/Mexico_City"
+// Bloque sin caché: la hora cambia en cada turno y no debe invalidar el caché de las reglas.
+export function bloqueAhora(ahora: Date): string {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("es-MX", {
+    timeZone: TZ, weekday: "long", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(ahora).map((x) => [x.type, x.value]))
+  return `Ahora: ${p.weekday} ${p.day} ${p.month} ${p.year}, ${p.hour}:${p.minute}, hora del centro de México. ` +
+    `Horario de atención de un agente: 9:00–18:00 (${enHorario(ahora) ? "dentro" : "fuera"} del horario).`
 }
 
 const txt = (v: unknown, max = 1000, min = 1) => typeof v === "string" && v.trim().length >= min && v.length <= max
@@ -124,6 +138,7 @@ export async function responder(
   const clave = (globalThis as { Deno?: { env: { get(k: string): string | undefined } } }).Deno?.env.get("ANTHROPIC_API_KEY") ?? ""
   const system: Record<string, unknown>[] = [REGLAS, CONOCIMIENTO, ...(t.fundadorAbierta ? [FUNDADOR] : [])].map((text) => ({ type: "text", text }))
   system[system.length - 1].cache_control = { type: "ephemeral", ttl: "1h" }
+  system.push({ type: "text", text: bloqueAhora(t.ahora ?? new Date()) })
   const hist = aMensajes(t.historial)
   const messages: { role: string; content: unknown }[] = hist
   let modelo = t.modelo
@@ -148,8 +163,7 @@ export async function responder(
       if (!usos.length) {
         const texto = r.content.filter((b) => b.type === "text").map((b) => b.text).join("").trim()
         if (!texto) return fallo()
-        const corto = recortar(texto)
-        return { texto: t.nueva ? corto + "\n\n" + AVISO_PRIVACIDAD : corto, modelo, usd, fallo: false }
+        return { texto: recortar(texto), modelo, usd, fallo: false }
       }
       messages.push({ role: "assistant", content: r.content })
       const resultados = []
