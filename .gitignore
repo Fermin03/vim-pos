@@ -47,3 +47,6 @@ docs/integraciones/delivery/didi-food/adjuntos/imagenes/*
 
 # Bocetos y registro de avance de las skills de superpowers
 .superpowers/
+
+# resultados de la evaluación del agente de WhatsApp (traen conversaciones de prueba)
+scripts/evals-agente/resultados/
