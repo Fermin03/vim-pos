@@ -43,12 +43,12 @@ Deno.serve(async (req) => {
   const cupo = 5 - (hoy.count ?? 0);
   if (cupo <= 0) return texto("propuestas 0");
 
-  // Las descartadas y caducadas de los últimos 30 días también, para que no las vuelva a proponer (fecha sola: sin «:» ni «.» en el filtro).
+  // Las descartadas, retiradas y caducadas de los últimos 30 días también, para que no las vuelva a proponer (fecha sola: sin «:» ni «.» en el filtro).
   const hace30 = new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10);
   const [convs, lecciones] = await Promise.all([
     admin.from("wa_conversaciones").select("id, wa_id, estado").gte("ultimo_mensaje_en", desde).order("ultimo_mensaje_en", { ascending: false }).limit(100),
     admin.from("wa_lecciones").select("tipo, comercial, pregunta, texto, estado, creado_en, decidido_en")
-      .or(`estado.in.(APROBADA,PENDIENTE,ENVIADA),and(estado.in.(DESCARTADA,CADUCADA),decidido_en.gte.${hace30})`)
+      .or(`estado.in.(APROBADA,PENDIENTE,ENVIADA),and(estado.in.(DESCARTADA,CADUCADA,RETIRADA),decidido_en.gte.${hace30})`)
       .order("creado_en", { ascending: false }).limit(300),
   ]);
   if (convs.error || lecciones.error) { registrarError(FN, "LEER", convs.error ?? lecciones.error); return texto("error", 500); }

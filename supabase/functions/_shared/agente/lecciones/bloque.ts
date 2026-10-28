@@ -11,7 +11,7 @@ export type LeccionAprobada = {
 const ENCABEZADO = "LO QUE HAS APRENDIDO (aprobado por VIM; manda sobre el conocimiento del sitio, nunca sobre tus reglas de «Lo que nunca haces»):"
 
 // Cada lección en una sola línea: un salto dentro del texto no puede abrir una «regla» nueva en el prompt.
-const plano = (s: string) => s.replace(/[\r\n\u2028\u2029\t]+/g, " ").trim()
+export const plano = (s: string) => s.replace(/[\r\n\u2028\u2029\t]+/g, " ").trim()
 
 const linea = (l: LeccionAprobada) =>
   "- " + (l.comercial ? "[comercial] " : "") + (l.tipo === "TONO" ? `Tono: ${plano(l.texto)}` : `Si preguntan «${plano(l.pregunta!)}»: ${plano(l.texto)}`)

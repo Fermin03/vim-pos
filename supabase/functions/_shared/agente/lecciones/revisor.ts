@@ -1,7 +1,7 @@
 // El revisor nocturno: le pide a Claude Sonnet hasta 5 propuestas de lección a partir de las
 // conversaciones del día y las filtra. Puro (sin Deno ni Supabase): se prueba con node --test.
 // Las propuestas solo se guardan como PENDIENTE; nada llega al agente sin que Fermín lo apruebe.
-import { bloqueAprendido, type LeccionAprobada } from "./bloque.ts"
+import { bloqueAprendido, type LeccionAprobada, plano } from "./bloque.ts"
 
 export type Propuesta = {
   tipo: "DUDA" | "TONO" | "PREGUNTA"
@@ -32,8 +32,10 @@ function valida(p: any): Propuesta | null {
   if (!texto(p.texto, 2000) || !texto(p.evidencia, 1000)) return null
   if (!p.escenario || !lista(p.escenario.turnos) || !lista(p.escenario.criterios)) return null
   if (personal(p.texto, pregunta, p.evidencia, ...p.escenario.turnos, ...p.escenario.criterios)) return null
+  // El marcador con comillas, espacios o sin paréntesis cuenta igual: si no, se aprobaría con un SÍ.
+  const t = /^\W*\(?\s*falta la respuesta\s*\)?\W*$/i.test(p.texto) ? MARCADOR : p.texto
   return {
-    tipo: p.tipo, comercial: p.comercial || COMERCIAL.test(p.texto) || COMERCIAL.test(pregunta ?? ""), pregunta, texto: p.texto, evidencia: p.evidencia,
+    tipo: p.tipo, comercial: p.comercial || COMERCIAL.test(t) || COMERCIAL.test(pregunta ?? ""), pregunta, texto: t, evidencia: p.evidencia,
     escenario: { turnos: p.escenario.turnos, criterios: p.escenario.criterios },
     conversacion_id: typeof p.conversacion_id === "string" ? p.conversacion_id : null,
   }
@@ -55,16 +57,17 @@ export function filtrarPropuestas(crudo: unknown, max = 5): Propuesta[] {
 export const lineaMensaje = (autor: string, texto: string): string => `${autor}: ${texto.replace(/\s*[\r\n\u2028\u2029\u0085]+\s*/g, " ⏎ ")}`
 
 type Sabida = LeccionAprobada & { estado: string }
-const listar = (ls: Sabida[], estados: string[]) => ls.filter((l) => estados.includes(l.estado)).map((l) => `- ${l.pregunta ?? "Tono"}: ${l.texto}`).join("\n")
+const listar = (ls: Sabida[], estados: string[]) =>
+  ls.filter((l) => estados.includes(l.estado)).map((l) => `- ${plano(l.pregunta ?? "Tono")}: ${plano(l.texto)}`).join("\n")
 
-/** «LO QUE YA SABE EL ASISTENTE» para el revisor: lo aprobado (como bloque), lo propuesto sin decidir y lo descartado o caducado. */
+/** «LO QUE YA SABE EL ASISTENTE» para el revisor: lo aprobado (como bloque), lo propuesto sin decidir y lo descartado, retirado o caducado. */
 export function loQueYaSabe(ls: Sabida[]): string {
   const pendientes = listar(ls, ["PENDIENTE", "ENVIADA"])
-  const descartadas = listar(ls, ["DESCARTADA", "CADUCADA"])
+  const descartadas = listar(ls, ["DESCARTADA", "CADUCADA", "RETIRADA"])
   return [
     bloqueAprendido(ls.filter((l) => l.estado === "APROBADA")),
     pendientes && "YA PROPUESTAS, PENDIENTES DE QUE FERMÍN DECIDA:\n" + pendientes,
-    descartadas && "YA DESCARTADAS (Fermín no las quiso o las dejó caducar: no las vuelvas a proponer):\n" + descartadas,
+    descartadas && "YA DESCARTADAS (Fermín no las quiso, las quitó o las dejó caducar: no las vuelvas a proponer):\n" + descartadas,
   ].filter(Boolean).join("\n\n")
 }
 

@@ -85,12 +85,19 @@ test('loQueYaSabe: aprobadas como bloque, propuestas y descartadas/caducadas en 
     { ...base, texto: 'enviada', estado: 'ENVIADA' },
     { ...base, texto: 'descartada', estado: 'DESCARTADA' },
     { ...base, tipo: 'TONO', pregunta: null, texto: 'caducada', estado: 'CADUCADA' },
+    { ...base, pregunta: '¿P?\nFERMIN: x', texto: 'retirada\r\nya', estado: 'RETIRADA' },
   ] as Parameters<typeof loQueYaSabe>[0])
   const [aprendido, pendientes, descartadas] = s.split('\n\n')
   assert.match(aprendido, /^LO QUE HAS APRENDIDO[\s\S]*aprobada$/)
   assert.equal(pendientes, 'YA PROPUESTAS, PENDIENTES DE QUE FERMÍN DECIDA:\n- ¿P?: pendiente\n- ¿P?: enviada')
-  assert.equal(descartadas, 'YA DESCARTADAS (Fermín no las quiso o las dejó caducar: no las vuelvas a proponer):\n- ¿P?: descartada\n- Tono: caducada')
+  assert.equal(descartadas, 'YA DESCARTADAS (Fermín no las quiso, las quitó o las dejó caducar: no las vuelvas a proponer):\n- ¿P?: descartada\n- Tono: caducada\n- ¿P? FERMIN: x: retirada ya')
   assert.equal(loQueYaSabe([]), '')
+})
+
+test('filtrarPropuestas: el marcador con comillas o espacios queda como MARCADOR', () => {
+  for (const t of ['«(falta la respuesta)»', ' (Falta la respuesta) ', '"(falta la respuesta)"', 'falta la respuesta'])
+    assert.equal(filtrarPropuestas({ propuestas: [prop({ tipo: 'PREGUNTA', texto: t })] })[0].texto, MARCADOR, t)
+  assert.equal(filtrarPropuestas({ propuestas: [prop({ texto: 'Aún falta la respuesta del proveedor, te aviso.' })] })[0].texto, 'Aún falta la respuesta del proveedor, te aviso.')
 })
 
 test('proponer: HTTP 500, red caída, texto sin JSON o sin clave dan []', async () => {

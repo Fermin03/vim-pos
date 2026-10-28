@@ -32,7 +32,7 @@ export async function POST(req: Request) {
   if (!esUuid(id)) return NextResponse.json({ error: "NO_EXISTE", detalle: "Esa lección ya no existe." }, { status: 404 });
 
   // Solo las aprobadas: si ya no lo está (retirada, caducada…) el update no toca nada.
-  const { data, error } = await sb.from("wa_lecciones").update({ estado: "RETIRADA" }).eq("id", id).eq("estado", "APROBADA").select("id");
+  const { data, error } = await sb.from("wa_lecciones").update({ estado: "RETIRADA", decidido_en: new Date().toISOString() }).eq("id", id).eq("estado", "APROBADA").select("id");
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data?.length) return NextResponse.json({ error: "NO_APROBADA", detalle: "Esa lección ya no está aprobada." }, { status: 409 });
 
