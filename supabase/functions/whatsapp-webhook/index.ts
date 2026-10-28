@@ -25,6 +25,8 @@ import { firmaMetaValida, leerAviso } from "../_shared/whatsapp/aviso-meta.ts";
 import { cuerpoTexto, enviar } from "../_shared/whatsapp/enviar.ts";
 import { type Herramientas, responder } from "../_shared/agente/cerebro.ts";
 import { atenderMensaje, type DepsTurno } from "../_shared/agente/turno.ts";
+import { atenderFermin, type DepsRevision } from "../_shared/agente/lecciones/revision.ts";
+import { bloqueAprendido } from "../_shared/agente/lecciones/bloque.ts";
 import { filaProspecto, sinNulos } from "../_shared/agente/prospecto.ts";
 
 const FN = "whatsapp-webhook";
@@ -83,20 +85,36 @@ async function contar(id: string, autor: "CLIENTE" | "AGENTE" | "FERMIN", desde?
   return count ?? 0;
 }
 
+const diez = (n: string) => n.replace(/\D/g, "").slice(-10);
+
+/** Revisión de lecciones: las respuestas de Fermín (SÍ / NO / corrección / QUITAR) llegan por aquí. */
+const depsRevision: DepsRevision = {
+  async lecciones(estados) {
+    return ok(await admin.from("wa_lecciones").select("id, tipo, comercial, pregunta, texto, evidencia, estado, orden, wamid_envio, wamid_confirmacion").in("estado", estados).order("creado_en", { ascending: true }));
+  },
+  async actualizar(id, cambios) {
+    ok(await admin.from("wa_lecciones").update(cambios).eq("id", id));
+  },
+  enviar: (texto) => enviar(cuerpoTexto(numeroFermin, texto)),
+  ahora: () => new Date(),
+};
+
 const deps = (waId: string): DepsTurno => ({
   rpc: (fn, args) => admin.rpc(fn, args),
   async leerConversacion(id) {
-    const [msgs, conv, cfg, delAgente] = await Promise.all([
+    const [msgs, conv, cfg, delAgente, aprobadas] = await Promise.all([
       admin.from("wa_mensajes").select("autor, texto").eq("conversacion_id", id).order("creado_en", { ascending: false }).limit(30),
       admin.from("wa_conversaciones").select("modelo").eq("id", id).single(),
       admin.from("wa_config").select("fundador_abierta").single(),
       contar(id, "AGENTE"),
+      admin.from("wa_lecciones").select("tipo, comercial, pregunta, texto, decidido_en").eq("estado", "APROBADA"),
     ]);
     return {
       historial: ok(msgs).reverse().map((m: { autor: "CLIENTE" | "AGENTE" | "FERMIN"; texto: string | null }) => ({ autor: m.autor, texto: m.texto ?? "" })),
       modelo: ok(conv).modelo,
       fundadorAbierta: ok(cfg).fundador_abierta,
       nueva: delAgente === 0,
+      aprendido: bloqueAprendido(ok(aprobadas)),
     };
   },
   responder,
@@ -155,7 +173,13 @@ Deno.serve(async (req) => {
         ok(await admin.rpc("wa_registrar_salida", { p_conversacion_id: id, p_wamid: e.wamid, p_autor: "FERMIN", p_texto: e.texto }));
       } else {
         const r = ok(await admin.rpc("wa_registrar_entrante", { p_wa_id: e.waId, p_wamid: e.wamid, p_nombre: e.nombre, p_texto: e.texto }));
-        enSegundoPlano(atenderMensaje(e, r, deps(e.waId)).catch((err) => registrarError(FN, "TURNO", err)));
+        // Fermín contesta aquí las lecciones; su mensaje no va al agente de ventas (turno.ts lo filtra también).
+        // Aunque su conversación esté pausada (`responder` false), la revisión sigue: solo se salta el duplicado.
+        if (numeroFermin && diez(e.waId) === diez(numeroFermin)) {
+          if (!r.duplicado) enSegundoPlano(atenderFermin(e, depsRevision).catch((err) => registrarError(FN, "REVISION", err)));
+        } else {
+          enSegundoPlano(atenderMensaje(e, r, deps(e.waId)).catch((err) => registrarError(FN, "TURNO", err)));
+        }
       }
     }
   } catch (err) {

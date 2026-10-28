@@ -9,7 +9,7 @@ import { registrarError } from "../errores.ts"
 export type DepsTurno = {
   rpc: ClienteRpc["rpc"]
   /** `nueva`: el agente aún no ha escrito en la conversación (ningún mensaje AGENTE). */
-  leerConversacion(id: string): Promise<{ historial: Turno["historial"]; modelo: "haiku" | "sonnet"; fundadorAbierta: boolean; nueva: boolean }>
+  leerConversacion(id: string): Promise<{ historial: Turno["historial"]; modelo: "haiku" | "sonnet"; fundadorAbierta: boolean; nueva: boolean; aprendido?: string }>
   responder: typeof responder
   enviar: (waId: string, texto: string) => Promise<{ ok: boolean; wamid: string | null; error?: string | null }>
   cupo: (waId: string) => Promise<boolean>
