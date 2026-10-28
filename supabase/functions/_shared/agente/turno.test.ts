@@ -10,6 +10,7 @@ type Opc = {
   nueva?: boolean; masNuevo?: boolean; cupo?: boolean; ferminEscribio?: boolean; usdMes?: number; cruzo80?: boolean
   fallo?: boolean; modelo?: "haiku" | "sonnet"; modeloConv?: "haiku" | "sonnet"; envio?: { ok: boolean; wamid: string | null; error?: string }
   durante?: (d: DepsTurno) => Promise<void> // lo que pasa "durante" responder (p. ej. una herramienta)
+  historial?: { autor: "CLIENTE" | "AGENTE" | "FERMIN"; texto: string }[]
 }
 
 function hacer(o: Opc = {}) {
@@ -23,7 +24,7 @@ function hacer(o: Opc = {}) {
       const data = fn === "wa_sumar_uso" ? { usd_mes: args.p_usd === 0 ? (o.usdMes ?? 0) : 1, cruzo_80: o.cruzo80 ?? false } : true
       return { data, error: null }
     },
-    leerConversacion: async () => ({ historial: [], modelo: o.modeloConv ?? "haiku", fundadorAbierta: true, nueva: o.nueva ?? false }),
+    leerConversacion: async () => ({ historial: o.historial ?? [], modelo: o.modeloConv ?? "haiku", fundadorAbierta: true, nueva: o.nueva ?? false }),
     responder: async (t) => {
       llamadas.push("responder"); turnos.push(t)
       await o.durante?.(deps)
@@ -54,6 +55,24 @@ test("cupo agotado no llama a responder", async () => {
 })
 test("audio: pide texto y no responde", async () => {
   const { deps, llamadas } = hacer()
+  await atenderMensaje(ev("[audio]"), R, deps)
+  assert.deepEqual(llamadas, ["esperar:4000", "enviar:" + MENSAJE_AUDIO])
+})
+test("audio al final de una ráfaga con texto: contesta el cerebro, no el mensaje de audio", async () => {
+  const { deps, llamadas } = hacer({ historial: [
+    { autor: "AGENTE", texto: "¡Hola!" },
+    { autor: "CLIENTE", texto: "¿Cuánto cuesta para una taquería?" },
+    { autor: "CLIENTE", texto: "[audio]" },
+  ] })
+  await atenderMensaje(ev("[audio]"), R, deps)
+  assert.deepEqual(llamadas, ["esperar:4000", "responder", "enviar:listo"])
+})
+test("solo audios sin contestar: pide texto", async () => {
+  const { deps, llamadas } = hacer({ historial: [
+    { autor: "AGENTE", texto: "¡Hola!" },
+    { autor: "CLIENTE", texto: "[audio]" },
+    { autor: "CLIENTE", texto: "[audio]" },
+  ] })
   await atenderMensaje(ev("[audio]"), R, deps)
   assert.deepEqual(llamadas, ["esperar:4000", "enviar:" + MENSAJE_AUDIO])
 })

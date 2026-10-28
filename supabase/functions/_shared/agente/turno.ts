@@ -76,7 +76,10 @@ export async function atenderMensaje(
     await rpc("wa_registrar_salida", { p_conversacion_id: id, p_wamid: s.wamid, p_autor: "AGENTE", p_texto: texto })
   }
 
-  if (e.texto === "[audio]") return decir(MENSAJE_AUDIO)
+  // Solo audios sin contestar → se pide que lo escriba. Si en la ráfaga también hubo texto, contesta el
+  // cerebro (que ve el «[audio]» en el historial): si no, el texto previo se quedaba sin respuesta.
+  const sinContestar = conv.historial.slice(conv.historial.findLastIndex((m) => m.autor !== "CLIENTE") + 1)
+  if (e.texto === "[audio]" && sinContestar.every((m) => m.texto === "[audio]")) return decir(MENSAJE_AUDIO)
 
   if (await sumar(0) >= deps.topeUsd) {
     await decir(MENSAJE_FIJO)

@@ -82,11 +82,16 @@ test("repartirAvisos: 5xx, red, 401 o 429 no marcan nada (siguiente vuelta)", as
   }
 });
 
-test("repartirAvisos: un solo aviso rechazado no se reenvía", async () => {
+test("repartirAvisos: un solo aviso rechazado no se reenvía ni se descarta", async () => {
   let n = 0;
   const r = await repartirAvisos([av("1")], PANEL, async () => { n++; return { ok: false, status: 400 }; });
-  assert.deepEqual(r, { enviados: [], rechazados: ["1"] });
+  assert.deepEqual(r, { enviados: [], rechazados: [] });
   assert.equal(n, 1);
+});
+
+test("repartirAvisos: si Meta rechaza todos (plantilla sin aprobar), no se descarta ninguno", async () => {
+  const r = await repartirAvisos([av("1"), av("2"), av("3")], PANEL, async () => ({ ok: false, status: 400 }));
+  assert.deepEqual(r, { enviados: [], rechazados: [] });
 });
 
 test("repartirAvisos: en el reintento, un 5xx deja ese aviso pendiente", async () => {
