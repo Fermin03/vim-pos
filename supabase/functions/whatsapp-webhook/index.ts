@@ -24,7 +24,7 @@ import { registrarError } from "../_shared/errores.ts";
 import { firmaMetaValida, leerAviso } from "../_shared/whatsapp/aviso-meta.ts";
 import { cuerpoTexto, enviar } from "../_shared/whatsapp/enviar.ts";
 import { type Herramientas, responder } from "../_shared/agente/cerebro.ts";
-import { atenderMensaje, type DepsTurno, diez } from "../_shared/agente/turno.ts";
+import { atenderMensaje, type DepsTurno, mismoNumero } from "../_shared/agente/turno.ts";
 import { atenderFermin, type DepsRevision } from "../_shared/agente/lecciones/revision.ts";
 import { bloqueAprendido } from "../_shared/agente/lecciones/bloque.ts";
 import { filaProspecto, sinNulos } from "../_shared/agente/prospecto.ts";
@@ -179,7 +179,7 @@ Deno.serve(async (req) => {
         const r = ok(await admin.rpc("wa_registrar_entrante", { p_wa_id: e.waId, p_wamid: e.wamid, p_nombre: e.nombre, p_texto: e.texto }));
         // Fermín contesta aquí las lecciones; su mensaje no va al agente de ventas (turno.ts lo filtra también).
         // Aunque su conversación esté pausada (`responder` false), la revisión sigue: solo se salta el duplicado.
-        if (numeroFermin && diez(e.waId) === diez(numeroFermin)) {
+        if (mismoNumero(e.waId, numeroFermin)) {
           if (!r.duplicado) enSegundoPlano(atenderFermin(e, depsRevision).catch((err) => registrarError(FN, "REVISION", err)));
         } else {
           enSegundoPlano(atenderMensaje(e, r, deps(e.waId)).catch((err) => registrarError(FN, "TURNO", err)));

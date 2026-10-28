@@ -29,7 +29,9 @@ export type DepsTurno = {
 export const MENSAJE_AUDIO = "No puedo escuchar audios, ¿me lo escribes?"
 export const ESPERA_RAFAGA_MS = 4000
 
-export const diez = (n: string) => n.replace(/\D/g, "").slice(-10)
+// Número completo, solo dígitos; el «1» de celular de México tras el 52 (formato viejo) no cuenta.
+const completo = (n: string) => n.replace(/\D/g, "").replace(/^521(\d{10})$/, "52$1")
+export const mismoNumero = (a: string, b: string) => completo(a) !== "" && completo(a) === completo(b)
 
 export async function atenderMensaje(
   e: Extract<Evento, { tipo: "mensaje" }>,
@@ -37,7 +39,7 @@ export async function atenderMensaje(
   deps: DepsTurno,
 ): Promise<void> {
   if (!r.responder) return
-  if (deps.numeroFermin && diez(e.waId) === diez(deps.numeroFermin)) return
+  if (mismoNumero(e.waId, deps.numeroFermin)) return
   const id = r.conversacion_id
   await deps.esperar(ESPERA_RAFAGA_MS)
   if (await deps.hayMasNuevo(id, e.wamid)) return

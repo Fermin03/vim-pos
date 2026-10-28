@@ -18,7 +18,7 @@ import { clienteAdmin } from "../_shared/http.ts";
 import { registrarError } from "../_shared/errores.ts";
 import { secretoInternoValido } from "../_shared/delivery/interno.ts";
 import { CONOCIMIENTO, FUNDADOR, REGLAS } from "../_shared/agente/conocimiento.gen.ts";
-import { diez } from "../_shared/agente/turno.ts";
+import { mismoNumero } from "../_shared/agente/turno.ts";
 import { bloqueAprendido } from "../_shared/agente/lecciones/bloque.ts";
 import { inicioDelDiaMX, lineaMensaje, proponer } from "../_shared/agente/lecciones/revisor.ts";
 
@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
   ]);
   if (convs.error || lecciones.error) { registrarError(FN, "LEER", convs.error ?? lecciones.error); return texto("error", 500); }
 
-  const activas = filas(convs).filter((c) => diez(c.wa_id as string) !== diez(fermin));
+  const activas = filas(convs).filter((c) => !mismoNumero(c.wa_id as string, fermin));
   const ids = activas.map((c) => c.id as string);
   if (ids.length === 0) return texto("propuestas 0");
   // Los últimos 30 mensajes de cada conversación activa, sea cual sea su fecha (el contexto de una duda puede ser de antier).
