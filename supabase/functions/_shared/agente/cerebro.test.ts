@@ -123,6 +123,22 @@ test('fundadorAbierta:false no incluye $499; el último bloque lleva cache 1h', 
   assert.deepEqual(b.cuerpos[0].system.at(-2).cache_control, { type: 'ephemeral', ttl: '1h' })
 })
 
+test('aprendido: bloque propio con cache 1h, penúltimo; sin él, igual que hoy', async () => {
+  const a = falso([() => resp([{ type: 'text', text: 'x' }])])
+  await responder(turno({ aprendido: 'X' }), espia().h, a.f)
+  const s = a.cuerpos[0].system
+  assert.equal(s.length, 5)
+  assert.equal(s.at(-2).text, 'X')
+  assert.deepEqual(s.at(-2).cache_control, { type: 'ephemeral', ttl: '1h' })
+  assert.match(s.at(-1).text, /Ahora/i)
+  const b = falso([() => resp([{ type: 'text', text: 'x' }])])
+  await responder(turno({ aprendido: 'X', fundadorAbierta: false }), espia().h, b.f)
+  assert.equal(b.cuerpos[0].system.length, 4)
+  const c = falso([() => resp([{ type: 'text', text: 'x' }])])
+  await responder(turno({ aprendido: '' }), espia().h, c.f)
+  assert.equal(c.cuerpos[0].system.length, 4)
+})
+
 test('historial: une roles iguales, prefija al agente de VIM y descarta turnos iniciales que no son del cliente', async () => {
   const { f, cuerpos } = falso([() => resp([{ type: 'text', text: 'x' }])])
   await responder(turno({ historial: [
