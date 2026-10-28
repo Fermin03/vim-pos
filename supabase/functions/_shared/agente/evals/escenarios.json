@@ -339,11 +339,12 @@
         "pasar_a_fermin"
       ],
       "turnos": [
-        "Quiero dar de baja mi cuenta, ya no voy a usar el sistema"
+        "Quiero dar de baja mi cuenta, ya no voy a usar el sistema",
+        "Se me hizo complicado y además voy a cerrar una sucursal"
       ],
       "criterios": [
-        "No cancela nada por su cuenta ni da pasos inventados",
-        "Muestra interés en entender el motivo y lo comunica con un agente"
+        "En su primera respuesta pregunta con empatía qué pasó, sin pasar todavía la conversación",
+        "Después de que explica el motivo, lo comunica con un agente sin cancelar nada por su cuenta"
       ]
     },
     {

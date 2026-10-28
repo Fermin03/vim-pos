@@ -16,6 +16,8 @@ export function revisionesFijas(texto: string): string[] {
   const fallas = PROHIBIDAS.filter((p) => t.includes(p)).map((p) => `dice «${p}»`)
   if (/\*\*/.test(texto) || /^#{1,6}\s/m.test(texto)) fallas.push('usa Markdown (** o #) en vez del formato de WhatsApp')
   if ([...texto].length > 1500) fallas.push('pasa de 1500 caracteres')
+  if (/\p{Extended_Pictographic}/u.test(texto)) fallas.push('usa emojis')
+  if (/^\s*¡/.test(texto)) fallas.push('abre con exclamación')
   return fallas
 }
 

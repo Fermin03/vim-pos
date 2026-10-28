@@ -70,15 +70,19 @@ export async function evaluarEscenario(esc: Escenario, clave: string): Promise<R
   try {
     const ahora = new Date(esc.ahora ?? AHORA_POR_DEFECTO)
     const llamadas: Llamada[] = [], historial: Mensaje[] = []
-    let modelo: "haiku" | "sonnet" = "haiku", usd = 0, fallos = 0
+    let modelo: "haiku" | "sonnet" = "haiku", usd = 0, fallos = 0, preguntaTrasPasar = 0
     for (const texto of esc.turnos) {
       historial.push({ autor: "CLIENTE", texto })
+      const antes = llamadas.length
       const r = await responder({ historial: [...historial], modelo, fundadorAbierta: esc.fundadorAbierta ?? true, ahora }, herramientasFalsas(llamadas, ahora))
       usd += r.usd; modelo = r.modelo
       if (r.fallo) fallos++
+      // Tras pasar la conversación a un agente no se cierra con una pregunta: el agente ya no contesta.
+      if (llamadas.slice(antes).some((l) => l.h === "pasar_a_fermin") && r.texto.trim().endsWith("?")) preguntaTrasPasar++
       historial.push({ autor: "AGENTE", texto: r.texto })
     }
     const fijas = [
+      ...(preguntaTrasPasar ? ["cierra con una pregunta después de pasar la conversación a un agente"] : []),
       ...historial.filter((m) => m.autor === "AGENTE").flatMap((m) => revisionesFijas(m.texto)),
       ...revisarHerramientas(esc, llamadas),
       ...(fallos ? [`cayó ${fallos} vez/veces en el mensaje de respaldo`] : []),

@@ -18,6 +18,12 @@ test('Markdown y largo', () => {
   assert.deepEqual(revisionesFijas('a'.repeat(1501)), ['pasa de 1500 caracteres'])
 })
 
+test('emojis y abrir con exclamación', () => {
+  assert.deepEqual(revisionesFijas('Va, te ayudo 🙌'), ['usa emojis'])
+  assert.deepEqual(revisionesFijas('¡Qué bien! Sí sirve.'), ['abre con exclamación'])
+  assert.deepEqual(revisionesFijas('Sí sirve. ¡Te va a gustar!'), [])
+})
+
 test('herramientas: debe / no_debe, con estado opcional', () => {
   const llamadas = [{ h: 'pasar_a_fermin', d: { estado: 'URGENTE_SOPORTE' } }]
   assert.deepEqual(revisarHerramientas({ debe: ['pasar_a_fermin:URGENTE_SOPORTE'] }, llamadas), [])
