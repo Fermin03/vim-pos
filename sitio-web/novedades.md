@@ -6,6 +6,118 @@
 
 ## Octubre de 2026
 
+27 de octubre Caja · 0.17.0
+
+### Vincula una caja con un código
+
+#### Nuevo
+
+- Para vincular una caja escribes un código de 6 caracteres. Lo generas en el panel, en **Configuración → Cajas → Vincular**.
+
+#### Correcciones
+
+- La caja ya no te pide vincularla otra vez cada semana.
+
+23 de octubre Caja · 0.16.0
+
+### Edita la dirección de un pedido a domicilio
+
+#### Nuevo
+
+- En **Domicilio** puedes cambiar la dirección o el cliente de un pedido con el botón **Editar**. El envío se ajusta solo.
+
+#### Mejoras
+
+- Los mensajes de la caja son más cortos y claros.
+- La parte de arriba de la pantalla ya no se mueve al cambiar de sección.
+
+#### Correcciones
+
+- Escape vuelve a cerrar el cobro cuando lo abres desde la lista de cuentas.
+
+22 de octubre Caja · 0.15.0 y 0.15.1
+
+### Cobro a pantalla completa y ticket por correo
+
+#### Nuevo
+
+- **El cobro ocupa toda la pantalla, paso por paso.** La propina se pregunta después de elegir cómo paga el cliente.
+- **Ticket por correo.** Si la caja no tiene impresora, al terminar puedes mandar el ticket al correo del cliente.
+- Siempre que algo carga en la caja y en el panel aparece un círculo que gira, y la pantalla **Cobra en la terminal** pulsa mientras espera la tarjeta.
+
+#### Mejoras
+
+- En efectivo, la caja sugiere montos según el total.
+- El pago dividido cabe en una sola pantalla.
+
+#### Correcciones
+
+- Si presionabas Escape justo al tocar **Cobrar**, el cobro se abría de todos modos. Ya no pasa.
+
+21 de octubre Caja · 0.14.0
+
+### Caja para tiendas, salones de belleza y comida rápida
+
+#### Nuevo
+
+- **Tiendas** de ropa, calzado, abarrotes, frutería, ferretería o vinos: la caja cobra con escáner, lleva tus existencias por sucursal y te deja vender a granel, fiar a tus clientes, hacer cotizaciones y, en ropa y calzado, cambiar una prenda por otra talla.
+- **Salones, spas, peluquerías, barberías y estudios de tatuajes:** agendas citas, cobras a nombre de cada colaborador con su comisión, recibes anticipos y aceptas reservas en línea. Cada colaborador ve su agenda en el celular, en **Mi agenda**.
+- **Comida rápida, food trucks y cafeterías:** la caja tiene la barra abajo, pregunta «¿para llevar o comer aquí?» al cobrar, manda la comanda a cocina en cuanto cobras y te muestra tus órdenes en **Pedidos** y tus avisos en **Notificaciones**.
+
+#### Mejoras
+
+- El botón **Cobrar** ahora lleva el ícono de un carrito.
+
+21 de octubre Caja · 0.13.0
+
+### Cobro con terminal Clip
+
+#### Nuevo
+
+- Puedes cobrar con tarjeta en tu terminal Clip desde la caja. Al elegir **Tarjeta**, el monto aparece solo en la terminal y, si lo activas, el cliente elige ahí la propina. La terminal se conecta en el panel, en **Configuración → Terminal de tarjetas**.
+
+#### Mejoras
+
+- Si la terminal rechaza una tarjeta, la caja te dice por qué.
+- El ticket muestra la marca de las tarjetas de débito.
+
+16 de octubre Caja · 0.12.1
+
+### La comanda espera a la impresora de cocina
+
+#### Mejoras
+
+- Si la impresora de cocina no responde, la comanda ya no se pierde: se queda esperando y sale sola en cuanto la impresora vuelve, en el orden en que se pidieron.
+
+15 de octubre Caja · 0.12.0
+
+### Colonias y zonas de envío automáticas
+
+#### Nuevo
+
+- Al tomar un pedido a domicilio, el campo **Colonia** te sugiere las colonias de tu sucursal y pone sola la zona de envío y el código postal. Las colonias se administran en el panel, en **Configuración → Envíos → Colonias**.
+
+#### Mejoras
+
+- Si escribes una colonia que no está, se guarda con la zona que elijas y la próxima vez sale sola.
+- Cambiar la zona de una colonia que ya tenía una pide el PIN de un supervisor.
+
+14 de octubre Caja · 0.11.0
+
+### Cuentas en barra y propinas del panel
+
+#### Nuevo
+
+- **Barra.** Si tu negocio lo pide a VIM, en el inicio de la caja aparece **Barra**, donde abres con **Nueva cuenta** una cuenta a nombre de una persona, sin mesa. Funciona igual que una mesa y el ticket dice «Servicio: Barra» con el nombre. Si la persona se sienta, la pasas con **Pasar a mesa**, y en Comedor una mesa pasa a barra con **Pasar a barra**.
+
+#### Mejoras
+
+- Los accesos del inicio y las opciones del menú aparecen según cómo trabaja tu negocio. Si ya usas VIM, ves lo mismo que antes. Para encender o apagar algo, escríbele a VIM.
+
+#### Correcciones
+
+- La caja ya no sugiere siempre propina de 10, 15 y 20 %: sigue lo que el dueño configuró en el panel, en **Configuración → Propinas**. Un cambio ahí llega a la caja en un minuto aproximadamente.
+
 13 de octubre Caja · 0.10.2
 
 ### El ticket dice con qué tarjeta se cobró
