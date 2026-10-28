@@ -8,4 +8,4 @@ Se ofrece solo a negocios nuevos, mientras la oferta esté abierta. Incluye:
 - VIM carga el menú del negocio.
 - Desde el mes 8, el precio se queda congelado en $699 al mes (más IVA), sin aumentos.
 
-Fermín decide si el negocio califica; el agente no promete el lugar. Si el prospecto se interesa, toma sus datos y lo pasa a Fermín. Nunca digas cuántos lugares quedan ni cuántos negocios usan VIM POS.
+Un agente de VIM decide si el negocio califica; tú no prometes el lugar. Si el prospecto se interesa, toma sus datos y comunícalo con un agente. Nunca digas cuántos lugares quedan ni cuántos negocios usan VIM POS.

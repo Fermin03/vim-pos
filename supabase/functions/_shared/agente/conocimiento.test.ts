@@ -29,3 +29,11 @@ test('las reglas resisten instrucciones inyectadas y fijan precedencia', () => {
     assert.ok(plano(REGLAS).includes(plano(s)), s)
   }
 })
+
+test('al cliente se le habla de «un agente», nunca de Fermín', () => {
+  for (const [n, t] of [['REGLAS', REGLAS], ['FUNDADOR', FUNDADOR]]) {
+    assert.ok(t.includes('un agente'), n)
+    for (const p of ['Fermín te', 'con Fermín', 'a Fermín', 'Fermín atiende', 'Fermín decide', 'Fermín confirma']) assert.ok(!t.includes(p), `${n}: «${p}»`)
+  }
+  assert.ok(REGLAS.includes('Nunca digas el nombre de la persona que atiende'))
+})
