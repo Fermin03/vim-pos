@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { fmtMxn } from "../lib/turno";
 import { correoValido } from "../lib/ticket-correo";
 import { useEscape } from "../lib/use-escape";
-import { BotonPrincipal, BotonSecundario, PantallaCobro } from "./cobro/pantalla-cobro";
+import { BotonPrincipal, BotonSecundario, PantallaCobro, PantallaEspera } from "./cobro/pantalla-cobro";
 
 /** Segundos antes de abrir el ticket nuevo solo. */
 export const SEGUNDOS_REGRESO = 5;
@@ -108,6 +108,10 @@ export function CobroCompletado({
   }, []);
 
   const conCambio = cambio > 0;
+
+  // Mientras sale el correo, la misma espera que al registrar el pago. Si falla, regresa al
+  // formulario con el correo escrito y el error.
+  if (enviando) return <PantallaEspera titulo="Enviando ticket" />;
 
   if (escribiendo) {
     return (

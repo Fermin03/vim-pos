@@ -53,6 +53,19 @@ export function PantallaCobro({ regresar, contexto, derecha, children, pie }: {
   );
 }
 
+/** Espera a pantalla completa con el círculo girando («Registrando pago», «Enviando ticket»). */
+export function PantallaEspera({ titulo, arriba }: { titulo: string; arriba?: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-surface" role="dialog" aria-modal="true" aria-busy="true">
+      <div className="flex h-24 flex-shrink-0 flex-col items-center justify-end">{arriba}</div>
+      <div className="flex flex-1 flex-col items-center justify-center" role="status">
+        <span className="mb-6 h-14 w-14 animate-spin rounded-full border-4 border-line border-t-accent" aria-hidden />
+        <div className="font-display text-32 font-bold text-ink">{titulo}</div>
+      </div>
+    </div>
+  );
+}
+
 type PropsBoton = React.ButtonHTMLAttributes<HTMLButtonElement>;
 
 export function BotonPrincipal({ className = "", ...p }: PropsBoton) {
