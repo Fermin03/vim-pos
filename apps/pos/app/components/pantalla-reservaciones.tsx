@@ -127,7 +127,7 @@ export function PantallaReservaciones({
     .reduce((s, r) => s + r.comensales, 0);
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-dvh flex-col">
       <header className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-3 py-3.5">
         <BotonVolver onClick={onSalir} />
         <div className="mr-auto flex items-center gap-3">

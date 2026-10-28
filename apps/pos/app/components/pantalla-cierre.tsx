@@ -385,7 +385,7 @@ export function PantallaCierre({
   const input = "h-11 w-[150px] rounded border border-line-strong px-3 text-right font-display text-18 font-bold outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 
   return (
-    <div className="flex h-screen flex-col bg-bg">
+    <div className="flex h-dvh flex-col bg-bg">
       {/* Subbar */}
       <div className="flex h-14 flex-shrink-0 items-center justify-between border-b border-line bg-surface px-6">
         <div className="flex items-center gap-3">

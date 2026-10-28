@@ -51,7 +51,7 @@ export function ModalSesionExpirada({
 
   if (handoff) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center gap-4">
+      <div className="flex h-dvh flex-col items-center justify-center gap-4">
         <span className="h-[22px] w-[22px] animate-spin rounded-full border-[2.5px] border-line-strong border-t-ink" />
         <p className="text-sm text-ink-2">Volviendo a donde estabas…</p>
       </div>

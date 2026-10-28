@@ -303,7 +303,7 @@ export function PantallaCambioTalla({
   const piezasTxt = (n: number) => (n === 1 ? "" : `${n} × `);
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-dvh flex-col">
       <header className="flex flex-shrink-0 items-center gap-3 border-b border-line bg-surface px-3 py-3.5">
         <BotonVolver onClick={atras} />
         <div className="mr-auto flex min-w-0 items-center gap-3">

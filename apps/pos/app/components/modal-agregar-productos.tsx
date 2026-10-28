@@ -218,7 +218,7 @@ export function ModalAgregarProductos({
         </p>
       )}
 
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1 max-[799px]:flex-col">
         <CatalogoProductos categorias={categorias} productos={productos} bloqueado={ocupado} onTapProducto={onTap} />
 
         <SidebarTicket

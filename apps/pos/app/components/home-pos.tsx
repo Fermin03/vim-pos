@@ -3365,7 +3365,7 @@ export function HomePos({
   const nPickupPedidos = cuentasAbiertas.pickup + porAceptarTienda.pickup + cuentasPagadasEnLinea(pedidosTienda, "DRIVE_THRU").length;
   const nDomicilioPedidos = cuentasAbiertas.domicilio + porAceptarTienda.domicilio + cuentasPagadasEnLinea(pedidosTienda, "DELIVERY_PROPIO").length;
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-dvh flex-col">
       {!online && (
         <div className="flex flex-shrink-0 items-center justify-center gap-2 bg-[#9A6B12] px-4 py-1.5 text-13 font-semibold text-white" role="status">
           <Icono nombre="sin-conexion" className="h-4 w-4" />
@@ -3549,7 +3549,7 @@ export function HomePos({
       )}
 
       {/* Oculto y no desmontado fuera del Panel: nada se reinicia al volver. */}
-      <div className={barraAbajo && seccionTienda !== "panel" ? "hidden" : "flex min-h-0 flex-1"}>
+      <div className={barraAbajo && seccionTienda !== "panel" ? "hidden" : "flex min-h-0 flex-1 max-[799px]:flex-col"}>
           {capturaTienda && agenda ? (
             // Belleza (boceto 2): Citas de hoy · Servicios · Productos. Servicios y Productos son la
             // misma rejilla de la tienda, partida por lo que se agenda y lo que no.

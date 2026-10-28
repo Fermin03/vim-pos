@@ -72,7 +72,7 @@ export function SelectorVariantes({
   const nombreViendo = sucursales.find((s) => s.id === viendo)?.nombre;
 
   return (
-    <Modal open onClose={onCerrar} title={padre.padre.nombre} hideTitle className="flex max-h-[calc(100vh-32px)] w-full max-w-3xl flex-col rounded-lg bg-surface shadow-xl">
+    <Modal open onClose={onCerrar} title={padre.padre.nombre} hideTitle className="flex max-h-[calc(100dvh-32px)] w-full max-w-3xl flex-col rounded-lg bg-surface shadow-xl">
       <div className="flex items-start gap-3 border-b border-line px-6 py-4">
         <div className="min-w-0 flex-1">
           <p className="font-display text-20 font-bold leading-tight text-ink">{padre.padre.nombre}</p>

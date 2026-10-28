@@ -23,7 +23,7 @@ export function PantallaEstado({
   pie?: ReactNode;
 }) {
   return (
-    <main className="flex min-h-screen flex-col bg-surface">
+    <main className="flex min-h-dvh flex-col bg-surface">
       <header className="flex h-[68px] flex-shrink-0 items-center gap-3 border-b border-line px-6">
         <BrandMark size={32} />
         <span className="font-display text-15 font-semibold tracking-tight">VIM POS</span>

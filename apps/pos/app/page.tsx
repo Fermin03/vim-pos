@@ -133,7 +133,7 @@ function PaginaPos() {
   }, [estado]);
 
   const sinCaja = (
-    <main className="flex h-screen items-center justify-center p-6">
+    <main className="flex h-dvh items-center justify-center p-6">
       <p className="text-sm text-danger">Dispositivo sin caja asociada. Re-vincula.</p>
     </main>
   );
@@ -148,7 +148,7 @@ function PaginaPos() {
   switch (estado.paso) {
     case "boot":
       return (
-        <main className="flex h-screen items-center justify-center p-6">
+        <main className="flex h-dvh items-center justify-center p-6">
           <p className="text-sm text-ink-3">Iniciando dispositivo…</p>
         </main>
       );
@@ -241,6 +241,6 @@ export default function Page() {
   useEffect(() => {
     setModo(new URLSearchParams(window.location.search).has("cliente") ? "cliente" : "pos");
   }, []);
-  if (modo === null) return <main className="h-screen bg-bg" />;
+  if (modo === null) return <main className="h-dvh bg-bg" />;
   return modo === "cliente" ? <PantallaCliente /> : <PaginaPos />;
 }

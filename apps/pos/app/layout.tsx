@@ -1,11 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { RegistrarSw } from "./components/registrar-sw";
+import { AjusteTableta } from "./components/ajuste-tableta";
 
 export const metadata: Metadata = {
   title: "VIM POS",
   description: "Punto de venta",
   manifest: "/manifest.webmanifest",
+  // iPad no usa el SVG del manifiesto al «Agregar a pantalla de inicio».
+  icons: { apple: "/apple-touch-icon.png" },
 };
 
 // width=device-width SIN maximum-scale → zoom permitido (a11y, doc 16).
@@ -24,6 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <RegistrarSw />
+        <AjusteTableta />
         {children}
       </body>
     </html>

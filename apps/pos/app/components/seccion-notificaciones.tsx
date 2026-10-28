@@ -50,7 +50,7 @@ export function SeccionNotificaciones({ notificaciones, onAbrirProducto }: {
         </ul>
       )}
       {aviso && (
-        <Modal open onClose={() => setAviso(null)} title={aviso.titulo} className="flex max-h-[calc(100vh-32px)] w-full max-w-lg flex-col rounded-lg bg-surface shadow-xl">
+        <Modal open onClose={() => setAviso(null)} title={aviso.titulo} className="flex max-h-[calc(100dvh-32px)] w-full max-w-lg flex-col rounded-lg bg-surface shadow-xl">
           <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
             <div className={["inline-block rounded px-2 py-1 text-12 font-semibold", ESTILO[aviso.nivel].chip].join(" ")}>{ESTILO[aviso.nivel].etiqueta}</div>
             <h2 className="mt-2 font-display text-20 font-bold tracking-tight">{aviso.titulo}</h2>

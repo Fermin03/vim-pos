@@ -67,7 +67,7 @@ export function PantallaMonitorVentas({
   }, [cargar]);
 
   return (
-    <main className="flex h-screen flex-col bg-bg">
+    <main className="flex h-dvh flex-col bg-bg">
       <header className={ENCABEZADO_PANTALLA}>
         <BotonVolver onClick={onSalir} />
         <div className="mr-auto">

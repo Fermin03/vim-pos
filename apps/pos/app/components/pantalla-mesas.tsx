@@ -97,7 +97,7 @@ export function PantallaMesas({
   const ocupadas = (mesas ?? []).filter((m) => m.estado === "OCUPADA").length;
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-dvh flex-col">
       {/* Topbar */}
       <header className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-3 py-3.5">
         <BotonVolver onClick={onSalir} />

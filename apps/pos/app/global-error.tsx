@@ -13,7 +13,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
   return (
     <html lang="es">
       <body style={{ margin: 0, fontFamily: "system-ui, -apple-system, Segoe UI, sans-serif", background: "#FFFFFF", color: "#16161A" }}>
-        <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 24 }}>
+        <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center", padding: 24 }}>
           {/* El isotipo va en línea y no como <LogoVim/>: esta pantalla es el último recurso cuando
               la app entera falló, así que no depende de ningún componente del paquete de UI. */}
           <svg viewBox="0 0 1080 1080" style={{ width: 36, height: 36, marginBottom: 20 }} role="img" aria-label="VIM POS">
