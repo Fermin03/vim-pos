@@ -6,7 +6,7 @@
 
 Qué datos te pedimos, para qué los usamos y cómo pedirnos que los borremos.
 
-Última actualización: 1 de octubre de 2026.
+Última actualización: 28 de octubre de 2026.
 
 ## Quién es responsable de tus datos
 
@@ -20,32 +20,53 @@ Para cualquier cosa de este aviso, y para ejercer tus derechos de acceso, rectif
 
 ## Qué datos recabamos
 
-Solo los que tú escribes en el formulario de demostración:
+Solo los que tú nos das.
+
+**Si llenas el formulario de demostración:**
 
 - Tu nombre.
 - Tu número de WhatsApp.
 - El nombre de tu negocio, cuántas cajas y cuántas sucursales tiene.
 - Opcionalmente, el giro y qué sistema usas hoy.
 
-No pedimos datos sensibles, ni datos financieros, ni tu RFC, ni nada de tus clientes. Si nos escribes por correo o por WhatsApp, tratamos lo que nos cuentes ahí con esta misma finalidad.
+**Si nos escribes por WhatsApp** (+52 56 6508 3346), primero te contesta un asistente automático con inteligencia artificial. Cuando hace falta, entra una persona de VIM. Y si tú prefieres hablar con una persona, pídelo en el chat en cualquier momento. De esa conversación guardamos:
+
+- Tu número y tu nombre de perfil de WhatsApp.
+- El texto de los mensajes.
+- Lo que nos cuentes de tu negocio: el nombre, el giro, la ciudad, cuántas cajas y cuántas sucursales tiene.
+
+No pedimos datos sensibles, ni tu RFC, ni nada de tus clientes. Por WhatsApp no te pedimos los datos de tu tarjeta: si eres cliente, tu mensualidad la pagas en Mercado Pago. Si nos escribes por correo, lo que nos cuentes ahí lo usamos para lo mismo.
 
 ## Para qué los usamos
 
-Para una sola cosa: contactarte y atender lo que pediste. En concreto:
+Para atender lo que nos pides. En concreto:
 
-- Escribirte por WhatsApp para agendar y dar la demostración.
+- Contestar tus dudas sobre VIM POS.
+- Agendar y dar la demostración, o la cita que nos pidas.
 - Prepararla con tu caso: cuántas cajas tienes decide qué te enseñamos.
-- Darte seguimiento si nos lo pides, y dejar de hacerlo si nos dices que paremos.
+- Darte seguimiento sobre lo que nos preguntaste, y dejar de hacerlo en cuanto nos digas que paremos.
+- Que una persona de VIM retome la conversación cuando haga falta, con lo que ya nos contaste.
+- Si ya eres cliente, cobrarte la mensualidad y confirmar que eres tú con un código que te mandamos por correo.
 
-**No te vamos a meter a una lista de correos** ni a mandarte publicidad que no pediste. Si algún día queremos hacerlo, te lo preguntaremos antes.
+**No te vamos a meter a una lista de correos** ni a mandarte publicidad que no pediste, y lo que platicas con nosotros por WhatsApp no lo usamos para mandar publicidad masiva. Si algún día queremos mandarte publicidad, te lo preguntaremos antes.
 
 ## Con quién los compartimos
 
-**No vendemos ni rentamos tus datos.** Los únicos terceros que los tocan son los proveedores que hacen funcionar el sitio y nuestro correo, y solo para eso:
+**No vendemos ni rentamos tus datos.** Los únicos terceros que los tocan son los proveedores que hacen funcionar el sitio, nuestro correo y la atención por WhatsApp, y solo para eso.
+
+Para el sitio y el correo:
 
 - El proveedor que aloja el sitio web.
 - El proveedor donde se guarda la solicitud, con servidores fuera de México.
 - El servicio con el que nos llega el aviso de que escribiste.
+
+Para la atención por WhatsApp:
+
+- Meta, dueña de WhatsApp: por ahí viajan los mensajes.
+- Anthropic, una empresa de Estados Unidos que da el servicio del asistente de inteligencia artificial. Recibe el texto de la conversación solo para generar la respuesta y lo procesa fuera de México.
+- Google, para anotar en Google Calendar las citas que agendas con nosotros.
+- Mercado Pago, para cobrar la mensualidad si eres cliente.
+- El servicio de correo con el que te mandamos el código para confirmar que eres tú, si eres cliente.
 
 Fuera de eso, solo los compartiríamos si nos lo exigiera una autoridad competente.
 
@@ -53,7 +74,7 @@ Fuera de eso, solo los compartiríamos si nos lo exigiera una autoridad competen
 
 ## Cuánto tiempo los guardamos
 
-Hasta **24 meses** desde que nos escribiste, salvo que te vuelvas cliente —entonces se conservan como parte de la relación comercial y de lo que la ley fiscal nos obliga a guardar—. Pasado ese plazo se borran. Si nos pides antes que los borremos, se borran antes.
+Hasta **24 meses** desde que nos escribiste, por el formulario o por WhatsApp, salvo que te vuelvas cliente —entonces se conservan como parte de la relación comercial y de lo que la ley fiscal nos obliga a guardar—. Pasado ese plazo se borran. Si nos pides antes que los borremos, se borran antes.
 
 ## Tus derechos ARCO
 
@@ -81,7 +102,7 @@ Google trata estos datos por cuenta nuestra y puede procesarlos fuera de México
 
 ## Seguridad
 
-Tu solicitud viaja cifrada y se guarda con el acceso cerrado: solo la abrimos nosotros. Ningún sistema es infalible, pero no guardamos de ti nada que no sea necesario, que es la única protección que de verdad no falla.
+Tu solicitud y tus conversaciones de WhatsApp viajan cifradas y se guardan con el acceso cerrado. Solo las abrimos nosotros; el asistente de inteligencia artificial lee el texto únicamente para contestarte. Ningún sistema es infalible, pero no guardamos de ti nada que no sea necesario, que es la única protección que de verdad no falla. Ayúdanos con eso: no nos mandes por WhatsApp contraseñas ni datos de tarjetas.
 
 ## Cambios a este aviso
 
