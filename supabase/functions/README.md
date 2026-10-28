@@ -295,3 +295,12 @@ Esperado: 200 vacío; una fila en `delivery_eventos` con `firma_valida = true`; 
 de Uber, una fila en `delivery_pedidos` y (si hay turno) un ticket PAGADO. Firma incorrecta → 401 y
 fila con `firma_valida = false`. Cómo se leen los errores: `delivery_eventos.error` y
 `delivery_pedidos.ultimo_error`.
+
+## `whatsapp-webhook` (agente de WhatsApp)
+
+Recibe los avisos de la WhatsApp Cloud API de Meta (sin JWT; firma `X-Hub-Signature-256`). `GET` es la
+verificación del webhook; `POST` corre un turno del agente en segundo plano y registra los ecos de
+Fermín (que pausan al agente 12 h). Tope por número: 30/h y 100/día.
+
+Secretos: `WA_APP_SECRET`, `WA_VERIFY_TOKEN`, `WA_TOKEN`, `WA_PHONE_NUMBER_ID`, `WA_GRAPH_VERSION`,
+`WA_TOPE_USD` (tope mensual de gasto de IA en USD, 100 por defecto), `ANTHROPIC_API_KEY`.

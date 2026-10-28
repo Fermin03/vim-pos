@@ -100,3 +100,8 @@ verify_jwt = false
 
 [functions.enviar-push]
 verify_jwt = false
+
+# Avisos de WhatsApp (Meta) para el agente de ventas: sin JWT. Meta no manda JWT de Supabase; la
+# autenticidad la da la firma X-Hub-Signature-256 (WA_APP_SECRET) y la verificacion GET (WA_VERIFY_TOKEN).
+[functions.whatsapp-webhook]
+verify_jwt = false
