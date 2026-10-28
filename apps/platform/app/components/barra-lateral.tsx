@@ -9,6 +9,7 @@ const NAV: { href: string; label: string }[] = [
   { href: "/atencion", label: "Atención" },
   { href: "/clientes", label: "Clientes" },
   { href: "/prospectos", label: "Prospectos" },
+  { href: "/whatsapp", label: "WhatsApp" },
   { href: "/avisos", label: "Avisos" },
   { href: "/versiones", label: "Versiones" },
   { href: "/cfdi", label: "Facturación" },
@@ -52,10 +53,12 @@ export function BarraLateral({ abierto = false, onCerrar = () => {} }: { abierto
   const [criticas, setCriticas] = useState<number>(0);
   // Prospectos de demo que nadie ha contestado (0145): la misma lectura de alertas los cuenta.
   const [prospectos, setProspectos] = useState<number>(0);
+  // Conversaciones de WhatsApp que esperan a Fermín: urgentes y prospectos calientes sin resolver.
+  const [whatsapp, setWhatsapp] = useState<number>(0);
 
   useEffect(() => {
     let vivo = true;
-    const carga = () =>
+    const carga = () => {
       api("/api/alertas")
         .then((r) => {
           if (!vivo) return;
@@ -63,6 +66,13 @@ export function BarraLateral({ abierto = false, onCerrar = () => {} }: { abierto
           setProspectos(Number(r.prospectosNuevos ?? 0));
         })
         .catch(() => {});
+      api("/api/whatsapp?solo=conteo")
+        .then((r) => {
+          const c = (r.conteo ?? {}) as Record<string, number>;
+          if (vivo) setWhatsapp((c.URGENTE_SOPORTE ?? 0) + (c.PROSPECTO_CALIENTE ?? 0));
+        })
+        .catch(() => {});
+    };
     carga();
     const id = setInterval(carga, 60_000);
     return () => { vivo = false; clearInterval(id); };
@@ -131,6 +141,14 @@ export function BarraLateral({ abierto = false, onCerrar = () => {} }: { abierto
                     aria-label={`${prospectos} sin contactar`}
                   >
                     {prospectos}
+                  </span>
+                )}
+                {n.href === "/whatsapp" && whatsapp > 0 && (
+                  <span
+                    className={["rounded-full px-1.5 py-0.5 text-12 font-bold tabular-nums", activo ? "bg-white text-ink" : "bg-warning-soft text-warning"].join(" ")}
+                    aria-label={`${whatsapp} esperando respuesta`}
+                  >
+                    {whatsapp}
                   </span>
                 )}
               </Link>

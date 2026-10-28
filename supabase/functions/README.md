@@ -295,3 +295,30 @@ Esperado: 200 vacío; una fila en `delivery_eventos` con `firma_valida = true`; 
 de Uber, una fila en `delivery_pedidos` y (si hay turno) un ticket PAGADO. Firma incorrecta → 401 y
 fila con `firma_valida = false`. Cómo se leen los errores: `delivery_eventos.error` y
 `delivery_pedidos.ultimo_error`.
+
+## `whatsapp-webhook` (agente de WhatsApp)
+
+Recibe los avisos de la WhatsApp Cloud API de Meta (sin JWT; firma `X-Hub-Signature-256`). `GET` es la
+verificación del webhook; `POST` corre un turno del agente en segundo plano y registra los ecos de
+Fermín (que pausan al agente 12 h). Tope por número: 30/h y 100/día.
+
+Secretos: `WA_APP_SECRET`, `WA_VERIFY_TOKEN`, `WA_TOKEN`, `WA_PHONE_NUMBER_ID`, `WA_GRAPH_VERSION`,
+`WA_TOPE_USD` (tope mensual de gasto de IA en USD, 100 por defecto), `ANTHROPIC_API_KEY`,
+`WA_NUMERO_FERMIN`.
+
+**Con el proveedor Kapso** (mientras VIM no sea Tech Provider): `WA_KAPSO_API_KEY` (clave de API del
+proyecto en Kapso; con ella todo el envío va por `api.kapso.ai` con `X-API-Key`), `WA_PHONE_NUMBER_ID` (el
+del número conectado en Kapso) y `WA_APP_SECRET` = el `secret_key` del webhook de Kapso en modo «Meta»
+(firma `X-Webhook-Signature`, hex sin prefijo). `WA_TOKEN` y `WA_VERIFY_TOKEN` no se usan.
+
+## `whatsapp-avisos` (avisos a Fermín)
+
+La llama pg_cron cada 5 minutos (`wa_avisos_cron`, con `x-vim-interno`; sin JWT). Solo entre 9:00 y
+18:00 hora de Ciudad de México lee `wa_avisos_por_enviar()`, manda UN mensaje con la plantilla
+`aviso_fermin` (un parámetro, todo en una línea: Meta no admite saltos de línea en parámetros) y
+marca los avisos solo si Meta contestó ok; si falla se reintenta en la siguiente vuelta.
+
+Secretos: `VIM_INTERNO_SECRET`, `WA_NUMERO_FERMIN` (solo dígitos, con lada: `5214771234567`),
+`PLATFORM_APP_URL` (base de los enlaces al panel; por defecto `https://platform.vimpos.com.mx`),
+`WA_TOKEN`, `WA_PHONE_NUMBER_ID`, `WA_GRAPH_VERSION` (o `WA_KAPSO_API_KEY` con Kapso). Sin los dos
+primeros, 503.
