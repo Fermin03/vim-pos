@@ -110,3 +110,8 @@ verify_jwt = false
 # cabecera x-vim-interno = VIM_INTERNO_SECRET, que la funcion valida.
 [functions.whatsapp-avisos]
 verify_jwt = false
+
+# Revisor nocturno del agente de WhatsApp: sin JWT. Lo dispara pg_cron (wa_aprender_cron, 2:00 de
+# Mexico) con la cabecera x-vim-interno = VIM_INTERNO_SECRET, que la funcion valida.
+[functions.whatsapp-aprender]
+verify_jwt = false

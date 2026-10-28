@@ -322,3 +322,16 @@ Secretos: `VIM_INTERNO_SECRET`, `WA_NUMERO_FERMIN` (solo dígitos, con lada: `52
 `PLATFORM_APP_URL` (base de los enlaces al panel; por defecto `https://platform.vimpos.com.mx`),
 `WA_TOKEN`, `WA_PHONE_NUMBER_ID`, `WA_GRAPH_VERSION` (o `WA_KAPSO_API_KEY` con Kapso). Sin los dos
 primeros, 503.
+
+## `whatsapp-aprender` (revisor nocturno del agente)
+
+La llama pg_cron a las 2:00 de México (`wa_aprender_cron`, migración 0287, con `x-vim-interno`; sin JWT),
+después de caducar las lecciones sin contestar en 3 días. Toma las conversaciones con actividad en las
+últimas 24 h (sin la de Fermín), sus pases a Fermín y las `wa_preguntas`, y le pide a Claude Sonnet hasta
+5 propuestas (`_shared/agente/lecciones/revisor.ts`): dudas que Fermín contestó, manejo de ánimo y
+preguntas sin respuesta. Las guarda como `PENDIENTE` en `wa_lecciones`; si guardó alguna y no hay
+lecciones `ENVIADA`, agenda en `wa_avisos_fermin` el aviso «N lecciones nuevas…» para las 9:00. Si el
+revisor falla no guarda nada (responde `propuestas 0`). Respuesta en texto plano: `propuestas N`.
+
+Secretos: `VIM_INTERNO_SECRET`, `WA_NUMERO_FERMIN` (solo dígitos, con lada), `ANTHROPIC_API_KEY`. Sin los
+dos primeros, 503.
