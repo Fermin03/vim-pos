@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { atenderFermin, interpretar, textoLeccion, type DepsRevision, type Leccion } from './revision.ts'
+import { atenderFermin, interpretar, TEXTO_NO_ENTIENDO, textoLeccion, type DepsRevision, type Leccion } from './revision.ts'
+import { MARCADOR } from './revisor.ts'
 
 const lec = (id: string, o: Partial<Leccion> = {}): Leccion => ({
   id, tipo: 'DUDA', comercial: false, pregunta: '¿Hacen envíos?', texto: 'Sí, en León.', evidencia: 'Cliente preguntó y no supimos.',
@@ -31,8 +32,24 @@ test('interpretar: cada forma', () => {
   assert.deepEqual(interpretar('SÍ 2'), { accion: 'SI', numero: 2 })
   assert.deepEqual(interpretar('2 sí'), { accion: 'SI', numero: 2 })
   assert.deepEqual(interpretar('no 3'), { accion: 'NO', numero: 3 })
-  assert.deepEqual(interpretar('2: Di que sí hay envíos'), { accion: 'CORRECCION', numero: 2, texto: 'Di que sí hay envíos' })
-  assert.deepEqual(interpretar('Mejor di que no'), { accion: 'CORRECCION', numero: null, texto: 'Mejor di que no' })
+  assert.deepEqual(interpretar('2: Di que sí hay envíos'), { accion: 'CORRECCION', numero: 2, texto: 'sí hay envíos' })
+  assert.deepEqual(interpretar('Mejor di que no cobramos envío'), { accion: 'CORRECCION', numero: null, texto: 'no cobramos envío' })
+})
+
+test('interpretar: SÍ/NO con cola que no es número ni cortesía no se guarda (Ruling H)', () => {
+  for (const t of ['Sí, solo León', 'Sí, me parece bien', 'No, eso fue solo para ese cliente', 'Claro que sí hacemos envíos', 'no hacemos envíos a domicilio'])
+    assert.deepEqual(interpretar(t), { accion: 'NO_ENTIENDO' }, t)
+  for (const t of ['Sí, por favor', 'sí porfa', 'ok va', 'Sí, gracias, porfa']) assert.deepEqual(interpretar(t), { accion: 'SI', numero: null }, t)
+  assert.deepEqual(interpretar('Sí, gracias 2'), { accion: 'SI', numero: 2 })
+})
+
+test('interpretar: «no, mejor/di que/dile que …» corrige; los prefijos se quitan en toda corrección (Ruling I)', () => {
+  assert.deepEqual(interpretar('no, di que enviamos a todo León'), { accion: 'CORRECCION', numero: null, texto: 'enviamos a todo León' })
+  assert.deepEqual(interpretar('No, dile que sí enviamos'), { accion: 'CORRECCION', numero: null, texto: 'sí enviamos' })
+  assert.deepEqual(interpretar('Dile que abrimos a las 9 de la mañana'), { accion: 'CORRECCION', numero: null, texto: 'abrimos a las 9 de la mañana' })
+  assert.deepEqual(interpretar('1: MEJOR DÍ QUE abrimos a las 9'), { accion: 'CORRECCION', numero: 1, texto: 'abrimos a las 9' })
+  assert.deepEqual(interpretar('Mejorar el horario los domingos'), { accion: 'CORRECCION', numero: null, texto: 'Mejorar el horario los domingos' })
+  for (const t of ['2: mejor', 'no, mejor', 'Mejor di que', 'no, dile que']) assert.deepEqual(interpretar(t), { accion: 'NO_ENTIENDO' }, t)
 })
 
 test('interpretar: palabras SÍ/NO ampliadas y colas cortas', () => {
@@ -43,10 +60,9 @@ test('interpretar: palabras SÍ/NO ampliadas y colas cortas', () => {
   assert.deepEqual(interpretar('no gracias 3'), { accion: 'NO', numero: 3 })
 })
 
-test('interpretar: «no, …» largo es corrección del texto tras la coma, sin «mejor di que»', () => {
+test('interpretar: «no, mejor di que …» corrige; otro «no, …» largo pregunta (Ruling L)', () => {
   assert.deepEqual(interpretar('No, mejor di que enviamos a todo León'), { accion: 'CORRECCION', numero: null, texto: 'enviamos a todo León' })
-  assert.deepEqual(interpretar('no, hacemos envíos solo en León'), { accion: 'CORRECCION', numero: null, texto: 'hacemos envíos solo en León' })
-  assert.deepEqual(interpretar('no hacemos envíos a domicilio'), { accion: 'CORRECCION', numero: null, texto: 'no hacemos envíos a domicilio' })
+  assert.deepEqual(interpretar('no, hacemos envíos solo en León'), { accion: 'NO_ENTIENDO' })
 })
 
 test('interpretar: 1–2 palabras no reconocidas no se guardan', () => {
@@ -59,12 +75,15 @@ test('interpretar: «9:00 a 18:00…» no es la lección 9; el número va de 1 a
   assert.deepEqual(interpretar('6: Di que sí hay envíos'), { accion: 'CORRECCION', numero: null, texto: '6: Di que sí hay envíos' })
 })
 
-test('textoLeccion: formato fijo', () => {
+test('textoLeccion: formato fijo, con la pregunta cuando la hay', () => {
   assert.equal(
     textoLeccion(lec('a', { tipo: 'PREGUNTA', comercial: true }), 2, 3),
-    '*Lección 2 de 3 · Pregunta sin respuesta · Comercial*\nCliente preguntó y no supimos.\nEl agente aprendería: «Sí, en León.»\nResponde *SÍ*, *NO* o escribe la corrección.',
+    '*Lección 2 de 3 · Pregunta sin respuesta · Comercial*\nCliente preguntó y no supimos.\nSi preguntan: «¿Hacen envíos?»\nEl agente diría: «Sí, en León.»\nResponde *SÍ*, *NO* o escribe la corrección.',
   )
-  assert.match(textoLeccion(lec('a', { tipo: 'TONO' }), 1, 1), /^\*Lección 1 de 1 · Tono\*\n/)
+  assert.equal(
+    textoLeccion(lec('a', { tipo: 'TONO', pregunta: null, texto: 'Tutea.' }), 1, 1),
+    '*Lección 1 de 1 · Tono*\nCliente preguntó y no supimos.\nEl agente diría: «Tutea.»\nResponde *SÍ*, *NO* o escribe la corrección.',
+  )
 })
 
 test('VER manda 3 mensajes y marca ENVIADA con orden 1..3', async () => {
@@ -75,14 +94,14 @@ test('VER manda 3 mensajes y marca ENVIADA con orden 1..3', async () => {
   assert.deepEqual(f.ls.map((l) => [l.estado, l.orden, l.wamid_envio]), [['ENVIADA', 1, 'out1'], ['ENVIADA', 2, 'out2'], ['ENVIADA', 3, 'out3']])
 })
 
-test('VER manda máximo 5 y sin pendientes no contesta', async () => {
+test('VER manda máximo 5 y sin pendientes lo dice', async () => {
   const f = fake(Array.from({ length: 7 }, (_, i) => lec('p' + i)))
   await atenderFermin(msg('VER'), f.deps)
   assert.equal(f.enviados.length, 5)
   assert.equal(f.ls.filter((l) => l.estado === 'PENDIENTE').length, 2)
-  const v = fake([])
+  const v = fake([lec('x', { estado: 'APROBADA' })])
   await atenderFermin(msg('VER'), v.deps)
-  assert.equal(v.enviados.length, 0)
+  assert.deepEqual(v.enviados, ['No hay lecciones pendientes.'])
 })
 
 test('sí deslizado aprueba la correcta; no descarta', async () => {
@@ -95,10 +114,69 @@ test('sí deslizado aprueba la correcta; no descarta', async () => {
   assert.equal(f.enviados.length, 0)
 })
 
-test('corrección aprueba con ese texto', async () => {
+test('corrección aprueba con ese texto (sin «mejor di que») y manda el eco con QUITAR', async () => {
   const f = fake(enviadas('a', 'b'))
   await atenderFermin(msg('Mejor di que enviamos a todo León', 'wa'), f.deps)
-  assert.deepEqual([f.ls[0].estado, f.ls[0].texto], ['APROBADA', 'Mejor di que enviamos a todo León'])
+  assert.deepEqual([f.ls[0].estado, f.ls[0].texto], ['APROBADA', 'enviamos a todo León'])
+  assert.deepEqual(f.enviados, ['Listo. Desde ahora digo: «enviamos a todo León». Para quitarlo, responde QUITAR a este mensaje.'])
+  assert.equal(f.ls[0].wamid_confirmacion, 'out1')
+  await atenderFermin(msg('quitar', 'out1'), f.deps)
+  assert.equal(f.ls[0].estado, 'RETIRADA')
+  assert.equal(f.enviados[1], 'Listo, ya no lo digo.')
+})
+
+test('con una sola ENVIADA sin deslizar: «ok», «va», «listo» piden deslizar; deslizando, «ok» aprueba', async () => {
+  for (const t of ['ok', 'va', 'listo', '👍']) {
+    const f = fake(enviadas('a'))
+    await atenderFermin(msg(t), f.deps)
+    assert.deepEqual([f.ls[0].estado, f.enviados], ['ENVIADA', [DESLIZA]], t)
+  }
+  for (const t of ['Sí, gracias', 'nel']) {
+    const f = fake(enviadas('a'))
+    await atenderFermin(msg(t), f.deps)
+    assert.notEqual(f.ls[0].estado, 'ENVIADA', t)
+  }
+  const g = fake(enviadas('a'))
+  await atenderFermin(msg('ok', 'wa'), g.deps)
+  assert.equal(g.ls[0].estado, 'APROBADA')
+})
+
+test('«Sí, solo León» deslizado no guarda nada y explica cómo corregir', async () => {
+  const f = fake(enviadas('a', 'b'))
+  await atenderFermin(msg('Sí, solo León', 'wa'), f.deps)
+  assert.deepEqual([f.ls[0].estado, f.ls[0].texto], ['ENVIADA', 'Sí, en León.'])
+  assert.deepEqual(f.enviados, [TEXTO_NO_ENTIENDO])
+})
+
+test('PREGUNTA con el marcador: SÍ no la aprueba; NO la descarta; corrección la aprueba con el texto', async () => {
+  const f = fake(enviadas('a', 'b', 'c'))
+  for (const l of f.ls) Object.assign(l, { tipo: 'PREGUNTA', texto: MARCADOR })
+  await atenderFermin(msg('sí', 'wa'), f.deps)
+  assert.deepEqual([f.ls[0].estado, f.enviados], ['ENVIADA', ['Escribe la respuesta para esa pregunta.']])
+  await atenderFermin(msg('no', 'wb'), f.deps)
+  assert.equal(f.ls[1].estado, 'DESCARTADA')
+  await atenderFermin(msg('Hacemos envíos en todo León', 'wc'), f.deps)
+  assert.deepEqual([f.ls[2].estado, f.ls[2].texto], ['APROBADA', 'Hacemos envíos en todo León'])
+})
+
+test('respondeA que no es de ninguna ENVIADA: vale el número del texto', async () => {
+  const f = fake(enviadas('a', 'b'))
+  await atenderFermin(msg('sí 2', 'otro'), f.deps)
+  assert.deepEqual(f.ls.map((l) => l.estado), ['ENVIADA', 'APROBADA'])
+})
+
+test('contestar a una lección ya decidida lo dice en vez de callar', async () => {
+  const f = fake([
+    ...enviadas('a'),
+    lec('b', { estado: 'APROBADA', wamid_envio: 'wb', wamid_confirmacion: 'cb' }),
+    lec('c', { estado: 'CADUCADA', wamid_envio: 'wc' }),
+    lec('d', { estado: 'RETIRADA', wamid_envio: 'wd', wamid_confirmacion: 'cd' }),
+  ])
+  await atenderFermin(msg('sí', 'wb'), f.deps)
+  await atenderFermin(msg('no', 'wc'), f.deps)
+  await atenderFermin(msg('QUITAR', 'cd'), f.deps)
+  assert.deepEqual(f.enviados, ['Esa lección ya está aprobada.', 'Esa lección ya está caducada.', 'Esa lección ya está retirada.'])
+  assert.deepEqual(f.ls.map((l) => l.estado), ['ENVIADA', 'APROBADA', 'CADUCADA', 'RETIRADA'])
 })
 
 test('«SÍ 2» sin deslizar aprueba la 2', async () => {
@@ -139,7 +217,7 @@ test('corrección larga sin deslizar ni número, con una sola ENVIADA, tampoco s
 test('corrección con número aplica sin deslizar', async () => {
   const f = fake(enviadas('a', 'b'))
   await atenderFermin(msg('2: Di que enviamos a todo León'), f.deps)
-  assert.deepEqual([f.ls[1].estado, f.ls[1].texto], ['APROBADA', 'Di que enviamos a todo León'])
+  assert.deepEqual([f.ls[1].estado, f.ls[1].texto], ['APROBADA', 'enviamos a todo León'])
 })
 
 test('VER con tanda abierta reenvía las ENVIADA (mismo orden, nuevo wamid) y no manda PENDIENTE', async () => {
@@ -169,6 +247,7 @@ test('aprobar comercial manda el aviso; QUITAR a ese aviso la retira', async () 
   assert.equal(f.ls[0].wamid_confirmacion, 'out1')
   await atenderFermin(msg('QUITAR', 'out1'), f.deps)
   assert.equal(f.ls[0].estado, 'RETIRADA')
+  assert.equal(f.enviados[1], 'Listo, ya no lo digo.')
 })
 
 test('corrección que menciona precio se marca comercial', async () => {
@@ -196,7 +275,8 @@ test('deslizado «9:00 a 18:00 de lunes a viernes» se guarda completo', async (
 test('2 palabras deslizadas no reconocidas no se guardan: pregunta y no cambia nada', async () => {
   const f = fake(enviadas('a', 'b'))
   await atenderFermin(msg('gracias', 'wa'), f.deps)
-  assert.deepEqual(f.enviados, ['¿SÍ, NO o escribe la corrección completa?'])
+  assert.deepEqual(f.enviados, [TEXTO_NO_ENTIENDO])
+  assert.match(TEXTO_NO_ENTIENDO, /di que/)
   assert.deepEqual(f.ls.map((l) => l.estado), ['ENVIADA', 'ENVIADA'])
 })
 
