@@ -5,7 +5,8 @@
 //        → lo llama pg_cron cada 5 minutos (wa_avisos_cron, migración 0286). La base solo devuelve
 //          los avisos cuyo `sale_en` ya pasó. Lee, envía la plantilla `aviso_fermin` y marca los
 //          que Meta aceptó. Si Meta rechaza el lote (4xx), reintenta uno por uno y marca también los
-//          que rechaza solos (al log, para que uno malo no bloquee la cola). 5xx o red: nada se marca
+//          que rechaza solos (al log, para que uno malo no bloquee la cola), salvo que no pase ninguno
+//          (plantilla sin aprobar, ritmo…): entonces no se descarta nada. 5xx o red: nada se marca
 //          y todo va en la siguiente vuelta (al menos una vez: puede repetir un aviso, nunca perderlo).
 //
 // Sin JWT (config.toml): la autenticidad la da `x-vim-interno`. Sin VIM_INTERNO_SECRET o sin
