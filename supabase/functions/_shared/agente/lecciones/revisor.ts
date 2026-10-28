@@ -19,7 +19,7 @@ const CORREO = /\S+@\S+\.\S+/
 
 const texto = (v: unknown, max: number): v is string => typeof v === "string" && v.trim() !== "" && v.length <= max
 const lista = (v: unknown): v is string[] => Array.isArray(v) && v.length > 0 && v.every((s) => texto(s, 1000))
-const COMERCIAL = /\$\s?\d|\d+\s?%|precio|descuento|promoci|mensualidad|cuesta|pesos/i // lo comercial se marca aunque el modelo no lo note
+const COMERCIAL = /\$\s?\d|\d+\s?%|precio|descuento|promoci|mensualidad|cuesta|pesos|\bplan(es)?\b|\d+\s*(al mes|mensual)/i // lo comercial se marca aunque el modelo no lo note
 const personal = (...vs: (string | null)[]) => vs.some((s) => s !== null && (TELEFONO.test(s) || CORREO.test(s)))
 
 function valida(p: any): Propuesta | null {
@@ -30,7 +30,7 @@ function valida(p: any): Propuesta | null {
   if (!p.escenario || !lista(p.escenario.turnos) || !lista(p.escenario.criterios)) return null
   if (personal(p.texto, pregunta, p.evidencia, ...p.escenario.turnos, ...p.escenario.criterios)) return null
   return {
-    tipo: p.tipo, comercial: p.comercial || COMERCIAL.test(p.texto), pregunta, texto: p.texto, evidencia: p.evidencia,
+    tipo: p.tipo, comercial: p.comercial || COMERCIAL.test(p.texto) || COMERCIAL.test(pregunta ?? ""), pregunta, texto: p.texto, evidencia: p.evidencia,
     escenario: { turnos: p.escenario.turnos, criterios: p.escenario.criterios },
     conversacion_id: typeof p.conversacion_id === "string" ? p.conversacion_id : null,
   }
@@ -49,7 +49,18 @@ export function filtrarPropuestas(crudo: unknown, max = 5): Propuesta[] {
 }
 
 /** Un mensaje en una sola línea: un cliente no puede fingir un «FERMIN: …» ni un encabezado con saltos de línea. */
-export const lineaMensaje = (autor: string, texto: string): string => `${autor}: ${texto.replace(/\s*\n\s*/g, " ⏎ ")}`
+export const lineaMensaje = (autor: string, texto: string): string => `${autor}: ${texto.replace(/\s*[\r\n\u2028\u2029\u0085]+\s*/g, " ⏎ ")}`
+
+/** Inicio (00:00, hora de México) del día de `ahora`, en ISO UTC: el tope de lecciones es por día calendario. */
+export function inicioDelDiaMX(ahora = new Date()): string {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Mexico_City", hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  }).formatToParts(ahora).map((x) => [x.type, x.value]));
+  const local = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second)
+  const desfase = local - Math.floor(ahora.getTime() / 1000) * 1000
+  return new Date(Date.UTC(+p.year, +p.month - 1, +p.day) - desfase).toISOString()
+}
 
 const instrucciones = (max: number) => `Eres el revisor nocturno del asistente de WhatsApp de VIM POS. Lees las conversaciones de las últimas 24 horas y propones hasta ${max} lecciones para que el asistente mejore. Fermín (el dueño) aprobará o corregirá cada una antes de que se use; tú solo propones.
 

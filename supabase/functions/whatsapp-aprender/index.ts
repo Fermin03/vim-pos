@@ -8,7 +8,7 @@
 //
 // La conversación de Fermín (WA_NUMERO_FERMIN) nunca se revisa. Si el revisor falla, no se inserta
 // nada y se responde `propuestas 0`: mañana vuelve a intentarlo con otras 24 h. Entre corridas del
-// mismo día el tope de 5 se comparte: lo creado en las últimas 24 h descuenta del cupo.
+// mismo día el tope de 5 se comparte: lo creado desde las 00:00 (México) descuenta del cupo.
 //
 // Sin JWT (config.toml): la autenticidad la da `x-vim-interno`. Sin VIM_INTERNO_SECRET o sin
 // WA_NUMERO_FERMIN, 503.
@@ -20,7 +20,7 @@ import { secretoInternoValido } from "../_shared/delivery/interno.ts";
 import { CONOCIMIENTO, FUNDADOR, REGLAS } from "../_shared/agente/conocimiento.gen.ts";
 import { diez } from "../_shared/agente/turno.ts";
 import { bloqueAprendido } from "../_shared/agente/lecciones/bloque.ts";
-import { lineaMensaje, proponer } from "../_shared/agente/lecciones/revisor.ts";
+import { inicioDelDiaMX, lineaMensaje, proponer } from "../_shared/agente/lecciones/revisor.ts";
 
 const FN = "whatsapp-aprender";
 const admin = clienteAdmin();
@@ -38,8 +38,8 @@ Deno.serve(async (req) => {
   if (!secretoInternoValido((req.headers.get("x-vim-interno") ?? "").trim(), secreto)) return texto("no autorizado", 401);
 
   const desde = new Date(Date.now() - 24 * 3600_000).toISOString();
-  // Tope de 5 por día entre corridas: lo que ya se propuso en las últimas 24 h descuenta.
-  const hoy = await admin.from("wa_lecciones").select("id", { count: "exact", head: true }).gte("creado_en", desde);
+  // Tope de 5 por día calendario de México entre corridas: lo propuesto hoy descuenta (la ventana de actividad sí es de 24 h).
+  const hoy = await admin.from("wa_lecciones").select("id", { count: "exact", head: true }).gte("creado_en", inicioDelDiaMX());
   if (hoy.error) { registrarError(FN, "LEER", hoy.error); return texto("error", 500); }
   const cupo = 5 - (hoy.count ?? 0);
   if (cupo <= 0) return texto("propuestas 0");
