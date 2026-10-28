@@ -63,3 +63,30 @@ test("textoDe", () => {
   assert.equal(textoDe({ type: "contacts" }), "[contacts]");
   assert.equal(textoDe({ type: "text", text: { body: "a".repeat(3000) } }).length, 2000);
 });
+
+test("reacciones, unsupported, system y errors no son mensajes", () => {
+  const aviso = envolver("messages", {
+    metadata: { phone_number_id: "PNID" },
+    messages: [
+      { from: "5214771234567", id: "wamid.R", type: "reaction", reaction: { message_id: "wamid.X", emoji: "👍" } },
+      { from: "5214771234567", id: "wamid.U", type: "unsupported", errors: [{ code: 131051 }] },
+      { from: "5214771234567", id: "wamid.S", type: "system", system: { body: "cambió de número" } },
+      { from: "5214771234567", id: "wamid.E", type: "errors" },
+      { from: "5214771234567", id: "wamid.T", type: "text", text: { body: "sí" } },
+    ],
+  });
+  assert.deepEqual(leerAviso(aviso).map((e) => e.wamid), ["wamid.T"]);
+});
+
+test("con numeroId, ignora avisos de otro número (mensajes y ecos)", () => {
+  const de = (pnid: string) => ({
+    object: "whatsapp_business_account",
+    entry: [{ id: "WABA", changes: [
+      { field: "messages", value: { metadata: { phone_number_id: pnid }, messages: [{ from: "521", id: "m-" + pnid, type: "text", text: { body: "x" } }] } },
+      { field: "smb_message_echoes", value: { metadata: { phone_number_id: pnid }, message_echoes: [{ to: "521", id: "e-" + pnid, type: "text", text: { body: "y" } }] } },
+    ] }],
+  });
+  assert.deepEqual(leerAviso(de("OTRO"), "PNID"), []);
+  assert.deepEqual(leerAviso(de("PNID"), "PNID").map((e) => e.wamid), ["m-PNID", "e-PNID"]);
+  assert.equal(leerAviso(de("OTRO")).length, 2); // sin la variable no filtra
+});

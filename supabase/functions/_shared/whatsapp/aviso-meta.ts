@@ -37,17 +37,22 @@ type J = Record<string, unknown>;
 const lista = (x: unknown): J[] => (Array.isArray(x) ? x.filter((i): i is J => !!i && typeof i === "object") : []);
 const obj = (x: unknown): J => (x && typeof x === "object" ? (x as J) : {});
 
-/** Nunca lanza: lo que no entiende, lo ignora (statuses incluidos). */
-export function leerAviso(json: unknown): Evento[] {
+// Tipos que no son algo que el cliente escribió: no disparan respuesta.
+const IGNORADOS = new Set(["reaction", "unsupported", "system", "errors"]);
+
+/** Nunca lanza: lo que no entiende, lo ignora (statuses incluidos). Con `numeroId` (WA_PHONE_NUMBER_ID),
+ *  ignora los avisos de otro número de la misma cuenta. */
+export function leerAviso(json: unknown, numeroId?: string): Evento[] {
   const eventos: Evento[] = [];
   for (const entry of lista(obj(json).entry)) {
     for (const cambio of lista(entry.changes)) {
       const v = obj(cambio.value);
+      if (numeroId && obj(v.metadata).phone_number_id !== numeroId) continue;
       if (cambio.field === "messages") {
         const n = obj(obj(lista(v.contacts)[0]).profile).name;
         const nombre = typeof n === "string" ? n : null;
         for (const m of lista(v.messages)) {
-          if (typeof m.from === "string" && typeof m.id === "string") {
+          if (typeof m.from === "string" && typeof m.id === "string" && !IGNORADOS.has(m.type as string)) {
             eventos.push({ tipo: "mensaje", waId: m.from, wamid: m.id, nombre, texto: textoDe(m as Msg) });
           }
         }
