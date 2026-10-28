@@ -111,6 +111,7 @@ BEGIN
                             'responder', v_pausa IS NULL OR v_pausa < now());
 END $$;
 
+-- Con un wamid ya registrado devuelve false y no toca nada: un eco de lo que mandó el agente no pausa.
 CREATE FUNCTION wa_registrar_salida(p_conversacion_id uuid, p_wamid text, p_autor text, p_texto text) RETURNS boolean
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE v_ins uuid;
@@ -136,9 +137,11 @@ BEGIN
   RETURN v_sale;
 END $$;
 
+-- Resolver cierra la conversación y descarta sus avisos pendientes (ya no hay nada que avisar).
 CREATE FUNCTION wa_resolver(p_conversacion_id uuid) RETURNS void
 LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS $$
-  UPDATE wa_conversaciones SET estado = 'RESUELTO', pausado_hasta = NULL WHERE id = p_conversacion_id
+  UPDATE wa_conversaciones SET estado = 'RESUELTO', pausado_hasta = NULL WHERE id = p_conversacion_id;
+  UPDATE wa_avisos_fermin SET enviado_en = now() WHERE conversacion_id = p_conversacion_id AND enviado_en IS NULL;
 $$;
 
 -- Suma gasto de IA del mes (hora de México). cruzo_80 es true solo la primera vez que pasa de 80 % del tope.

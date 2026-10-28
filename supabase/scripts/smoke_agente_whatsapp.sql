@@ -28,6 +28,9 @@ BEGIN
   ASSERT (r->>'responder')::boolean, '3c: sigue respondiendo';
   ASSERT wa_conversacion_de('5215500000001') = c, '3d: conversacion_de existente';
   ASSERT wa_conversacion_de('5215500000002') <> c, '3e: conversacion_de crea';
+  ASSERT NOT wa_registrar_salida(c, 'wamid.S1', 'FERMIN', 'hola Ana'), '3g: eco con wamid del agente = false';
+  ASSERT (SELECT pausado_hasta FROM wa_conversaciones WHERE id = c) IS NULL, '3h: el eco del agente no pausa';
+  ASSERT (SELECT autor FROM wa_mensajes WHERE wamid = 'wamid.S1') = 'AGENTE', '3i: sigue siendo del agente';
   PERFORM wa_registrar_salida(c, 'wamid.F1', 'FERMIN', 'yo le sigo');
   r := wa_registrar_entrante('5215500000001', 'wamid.C', NULL, 'ok');
   ASSERT NOT (r->>'responder')::boolean, '3f: pausada tras Fermín';
@@ -49,8 +52,12 @@ BEGIN
   PERFORM wa_marcar_avisos(ARRAY(SELECT id FROM wa_avisos_fermin WHERE conversacion_id = c));
   SELECT count(*) INTO v_n FROM wa_avisos_por_enviar();
   ASSERT v_n = 0, '4g: ya enviados';
+  PERFORM wa_pasar_a_fermin(c, 'DUDA_SIN_RESPUESTA', 'otra', 'pendiente');
+  PERFORM wa_pasar_a_fermin(NULL, 'ACTIVA', 'Gasto de IA', 'general');
   PERFORM wa_resolver(c);
   ASSERT (SELECT estado FROM wa_conversaciones WHERE id = c) = 'RESUELTO', '4h: RESUELTO';
+  ASSERT NOT EXISTS (SELECT 1 FROM wa_avisos_fermin WHERE conversacion_id = c AND enviado_en IS NULL), '4j: resolver descarta sus avisos pendientes';
+  ASSERT EXISTS (SELECT 1 FROM wa_avisos_fermin WHERE conversacion_id IS NULL AND resumen = 'general' AND enviado_en IS NULL), '4k: no toca avisos ajenos';
   r := wa_registrar_entrante('5215500000001', 'wamid.G', NULL, 'de nuevo');
   ASSERT (r->>'responder')::boolean AND (SELECT estado FROM wa_conversaciones WHERE id = c) = 'ACTIVA', '4i: reactiva';
 
