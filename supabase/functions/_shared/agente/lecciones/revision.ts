@@ -15,7 +15,7 @@ export type Leccion = {
 }
 
 export type DepsRevision = {
-  lecciones(estados: string[]): Promise<Leccion[]>
+  lecciones(estados: string[]): Promise<Leccion[]> // ordenadas por creado_en
   actualizar(id: string, cambios: Partial<Leccion> & { decidido_en?: string }): Promise<void>
   enviar(texto: string): Promise<{ ok: boolean; wamid: string | null }>
   ahora(): Date
@@ -59,7 +59,17 @@ export function interpretar(texto: string): Accion {
 const traeDatosDeCliente = (t: string) => /\d{10,}/.test(t.replace(/[\s\-().]/g, '')) || /\S+@\S+\.\S+/.test(t)
 const esComercial = (t: string) => /\$|precio|descuento|promo|\bplan/i.test(t)
 
-async function verPendientes(deps: DepsRevision) {
+async function ver(deps: DepsRevision) {
+  // Tanda abierta (hay ENVIADA): se reenvían esas mismas, con el mismo orden, y no se mandan PENDIENTE hasta cerrarla.
+  const tanda = (await deps.lecciones(['ENVIADA', 'APROBADA', 'DESCARTADA'])).filter((x) => x.orden !== null)
+  const abiertas = tanda.filter((x) => x.estado === 'ENVIADA').sort((x, y) => x.orden! - y.orden!)
+  if (abiertas.length) {
+    for (const l of abiertas) {
+      const r = await deps.enviar(textoLeccion(l, l.orden!, tanda.length))
+      if (r.ok) await deps.actualizar(l.id, { wamid_envio: r.wamid })
+    }
+    return
+  }
   const pendientes = (await deps.lecciones(['PENDIENTE'])).slice(0, MAX_POR_VER)
   for (const [k, l] of pendientes.entries()) {
     const r = await deps.enviar(textoLeccion(l, k + 1, pendientes.length))
@@ -69,7 +79,7 @@ async function verPendientes(deps: DepsRevision) {
 
 export async function atenderFermin(e: { wamid: string; texto: string; respondeA: string | null }, deps: DepsRevision): Promise<void> {
   const a = interpretar(e.texto)
-  if (a.accion === 'VER') return verPendientes(deps)
+  if (a.accion === 'VER') return ver(deps)
 
   const todas = await deps.lecciones(['ENVIADA', 'APROBADA'])
   const enviadas = todas.filter((l) => l.estado === 'ENVIADA')
@@ -85,7 +95,7 @@ export async function atenderFermin(e: { wamid: string; texto: string; respondeA
   let l: Leccion | undefined
   if (e.respondeA) l = enviadas.find((x) => x.wamid_envio === e.respondeA) // respondeA ajeno: mensaje normal, se ignora
   else if (a.numero !== null) l = enviadas.find((x) => x.orden === a.numero)
-  else if (enviadas.length === 1) l = enviadas[0]
+  else if (enviadas.length === 1 && a.accion !== 'CORRECCION') l = enviadas[0] // una corrección libre sin deslizar ni número no se aplica
   if (!l) {
     if (!e.respondeA && enviadas.length) await deps.enviar(TEXTO_DESLIZA)
     return

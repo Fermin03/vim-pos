@@ -89,14 +89,35 @@ test('«sí» sin deslizar con 2 esperando: pide deslizar y no cambia nada', asy
   assert.deepEqual(f.ls.map((l) => l.estado), ['ENVIADA', 'ENVIADA'])
 })
 
-test('«gracias» sin ENVIADA no envía nada; con una sola ENVIADA y sin deslizar, aplica a esa', async () => {
+test('«gracias» sin ENVIADA no envía nada', async () => {
   const f = fake([lec('a', { estado: 'APROBADA' })])
   await atenderFermin(msg('gracias'), f.deps)
-  await atenderFermin(msg('sí'), f.deps)
   assert.equal(f.enviados.length, 0)
+})
+
+test('con una sola ENVIADA: «sí» sin deslizar aprueba; «gracias» no cambia nada y pide deslizar', async () => {
   const g = fake(enviadas('a'))
+  await atenderFermin(msg('gracias'), g.deps)
+  assert.equal(g.ls[0].estado, 'ENVIADA')
+  assert.deepEqual(g.enviados, ['Desliza el mensaje de la lección y contesta ahí (o escribe el número: «SÍ 2»).'])
   await atenderFermin(msg('sí'), g.deps)
   assert.equal(g.ls[0].estado, 'APROBADA')
+})
+
+test('corrección con número aplica sin deslizar', async () => {
+  const f = fake(enviadas('a', 'b'))
+  await atenderFermin(msg('2: Di que enviamos a todo León'), f.deps)
+  assert.deepEqual([f.ls[1].estado, f.ls[1].texto], ['APROBADA', 'Di que enviamos a todo León'])
+})
+
+test('VER con tanda abierta reenvía las ENVIADA (mismo orden, nuevo wamid) y no manda PENDIENTE', async () => {
+  const f = fake([...enviadas('a', 'b', 'c'), lec('p')])
+  await atenderFermin(msg('sí', 'wa'), f.deps)
+  await atenderFermin(msg('VER'), f.deps)
+  assert.equal(f.enviados.length, 2)
+  assert.match(f.enviados[0], /^\*Lección 2 de 3/)
+  assert.match(f.enviados[1], /^\*Lección 3 de 3/)
+  assert.deepEqual(f.ls.map((l) => [l.estado, l.orden, l.wamid_envio]), [['APROBADA', 1, 'wa'], ['ENVIADA', 2, 'out1'], ['ENVIADA', 3, 'out2'], ['PENDIENTE', null, null]])
 })
 
 test('corrección con teléfono o correo no se guarda y avisa', async () => {
