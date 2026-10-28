@@ -84,7 +84,7 @@ test('escalar_modelo repite con sonnet y acumula el costo de ambos', async () =>
 
 test('fetch que lanza, 529 o 5 vueltas sin texto: mensaje fijo', async () => {
   const lanza = falso([() => { throw new Error('red') }])
-  assert.deepEqual(await responder(turno(), espia().h, lanza.f), { texto: MENSAJE_FIJO, modelo: 'haiku', usd: 0, fallo: true })
+  assert.deepEqual(await responder(turno(), espia().h, lanza.f), { texto: MENSAJE_FIJO, modelo: 'haiku', usd: 0, fallo: true, motivo: 'error Error' })
   const e529 = falso([() => new Response('{}', { status: 529 })])
   assert.equal((await responder(turno(), espia().h, e529.f)).fallo, true)
   const bucle = falso(Array.from({ length: 5 }, () => () => resp([{ type: 'tool_use', id: 'x', name: 'anotar_pregunta', input: { pregunta: 'q' } }])))
@@ -209,6 +209,21 @@ test('sin ANTHROPIC_API_KEY: fallo sin llamar a fetch', async () => {
     assert.equal((await responder(turno(), espia().h, f)).fallo, true)
     assert.equal(cuerpos.length, 0)
   } finally { (globalThis as any).Deno = D }
+})
+
+test('texto junto a una herramienta y luego respuesta vacía: se envía ese texto, no el respaldo', async () => {
+  const { f } = falso([
+    () => resp([{ type: 'text', text: 'Ya te comuniqué con un agente.' }, { type: 'tool_use', id: 't1', name: 'pasar_a_fermin', input: { estado: 'DUDA_SIN_RESPUESTA', motivo: 'pago', resumen: 'quiere pagar' } }], USO, 'tool_use'),
+    () => resp([], USO, 'end_turn'),
+  ])
+  const r = await responder(turno(), espia().h, f)
+  assert.deepEqual([r.texto, r.fallo], ['Ya te comuniqué con un agente.', false])
+})
+
+test('respaldo trae el motivo (para el log y la evaluación)', async () => {
+  const { f } = falso([() => new Response('{}', { status: 529 })])
+  const r = await responder(turno(), espia().h, f)
+  assert.deepEqual([r.fallo, r.motivo], [true, 'Anthropic HTTP 529'])
 })
 
 test('formato de WhatsApp: **negrita** pasa a *negrita* y se quitan los # de título', async () => {

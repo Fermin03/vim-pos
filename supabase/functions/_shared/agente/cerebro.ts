@@ -3,7 +3,7 @@
 import { CONOCIMIENTO, FUNDADOR, REGLAS } from "./conocimiento.gen.ts"
 import { enHorario } from "../whatsapp/avisos.ts"
 
-export const MENSAJE_FIJO = "¡Gracias por escribir! En breve un agente se comunica contigo."
+export const MENSAJE_FIJO = "Gracias por escribir. En breve un agente se comunica contigo."
 export const AVISO_PRIVACIDAD = "Tus datos se tratan según nuestro aviso de privacidad: https://vimpos.com.mx/aviso-privacidad"
 
 type Modelo = "haiku" | "sonnet"
@@ -139,7 +139,7 @@ export async function responder(
   t: Turno,
   h: Herramientas,
   f: typeof fetch = fetch,
-): Promise<{ texto: string; modelo: Modelo; usd: number; fallo: boolean }> {
+): Promise<{ texto: string; modelo: Modelo; usd: number; fallo: boolean; motivo?: string }> {
   const clave = (globalThis as { Deno?: { env: { get(k: string): string | undefined } } }).Deno?.env.get("ANTHROPIC_API_KEY") ?? ""
   const system: Record<string, unknown>[] = [REGLAS, CONOCIMIENTO, ...(t.fundadorAbierta ? [FUNDADOR] : [])].map((text) => ({ type: "text", text }))
   system[system.length - 1].cache_control = { type: "ephemeral", ttl: "1h" }
@@ -149,9 +149,11 @@ export async function responder(
   const messages: { role: string; content: unknown }[] = hist
   let modelo = t.modelo
   let usd = 0
-  const fallo = () => ({ texto: MENSAJE_FIJO, modelo, usd, fallo: true })
-  if (hist.at(-1)?.role !== "user") return fallo()
-  if (!clave) { console.error("falta ANTHROPIC_API_KEY"); return fallo() }
+  const fallo = (motivo: string) => ({ texto: MENSAJE_FIJO, modelo, usd, fallo: true, motivo })
+  // Texto que el modelo escribió junto a una herramienta: si después ya no agrega nada, ese es el mensaje.
+  let dicho = ""
+  if (hist.at(-1)?.role !== "user") return fallo("historial sin mensaje del cliente al final")
+  if (!clave) { console.error("falta ANTHROPIC_API_KEY"); return fallo("falta ANTHROPIC_API_KEY") }
 
   try {
     for (let vuelta = 0; vuelta < 5; vuelta++) {
@@ -164,18 +166,23 @@ export async function responder(
         body: JSON.stringify({ model: IDS[modelo], max_tokens: MAX_TOKENS, system, tools: HERRAMIENTAS, messages }),
         signal: AbortSignal.timeout(25_000),
       })
-      if (!res.ok) { console.error("Anthropic HTTP", res.status); return fallo() }
+      if (!res.ok) { console.error("Anthropic HTTP", res.status); return fallo(`Anthropic HTTP ${res.status}`) }
       const r = await res.json() as { stop_reason?: string; content: { type: string; [k: string]: any }[]; usage: Uso }
       usd += costoUsd(modelo, r.usage)
       const usos = r.content.filter((b) => b.type === "tool_use")
       // Sin texto ni herramienta útil: se deja la forma de la respuesta en el log (nunca el contenido).
-      const forma = () => console.error("Anthropic sin respuesta util", r.stop_reason, r.content.map((b) => b.type).join(","))
-      if (r.stop_reason === "max_tokens" && usos.length) { forma(); return fallo() } // la entrada pudo quedar cortada
-      if (!usos.length) {
-        const texto = r.content.filter((b) => b.type === "text").map((b) => b.text).join("").trim()
-        if (!texto) { forma(); return fallo() }
-        return { texto: recortar(aWhatsApp(texto)), modelo, usd, fallo: false }
+      const forma = () => {
+        const f = `sin respuesta útil: ${r.stop_reason} ${r.content.map((b) => b.type).join(",")}`
+        console.error("Anthropic " + f)
+        return f
       }
+      if (r.stop_reason === "max_tokens" && usos.length) return fallo(forma()) // la entrada pudo quedar cortada
+      const texto = r.content.filter((b) => b.type === "text").map((b) => b.text).join("").trim()
+      if (!usos.length) {
+        if (!texto && !dicho) return fallo(forma())
+        return { texto: recortar(aWhatsApp(texto || dicho)), modelo, usd, fallo: false }
+      }
+      if (texto) dicho = texto
       messages.push({ role: "assistant", content: r.content })
       const resultados = []
       for (const u of usos) {
@@ -200,8 +207,8 @@ export async function responder(
     }
   } catch (e) {
     console.error("Anthropic error", (e as Error)?.name)
-    return fallo()
+    return fallo(`error ${(e as Error)?.name}`)
   }
   console.error("Anthropic: 5 vueltas sin texto")
-  return fallo()
+  return fallo("5 vueltas sin texto")
 }
