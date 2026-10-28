@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { atenderMensaje, type DepsTurno, MENSAJE_AUDIO } from "./turno.ts"
 import { AVISO_PRIVACIDAD, MENSAJE_FIJO } from "./cerebro.ts"
 
-const ev = (texto = "hola", waId = "5214771234567") => ({ tipo: "mensaje" as const, waId, wamid: "w1", nombre: "Ana", texto })
+const ev = (texto = "hola", waId = "5214771234567") => ({ tipo: "mensaje" as const, waId, wamid: "w1", nombre: "Ana", texto, respondeA: null })
 const R = { conversacion_id: "c1", responder: true }
 
 type Opc = {

@@ -2,7 +2,7 @@
 // Puro: solo crypto.subtle, se prueba con node --test.
 
 export type Evento =
-  | { tipo: "mensaje"; waId: string; wamid: string; nombre: string | null; texto: string }
+  | { tipo: "mensaje"; waId: string; wamid: string; nombre: string | null; texto: string; respondeA: string | null }
   | { tipo: "eco"; waId: string; wamid: string; texto: string };
 
 type Msg = { type: string; text?: { body?: string }; [k: string]: unknown };
@@ -53,7 +53,8 @@ export function leerAviso(json: unknown, numeroId?: string): Evento[] {
         const nombre = typeof n === "string" ? n : null;
         for (const m of lista(v.messages)) {
           if (typeof m.from === "string" && typeof m.id === "string" && !IGNORADOS.has(m.type as string)) {
-            eventos.push({ tipo: "mensaje", waId: m.from, wamid: m.id, nombre, texto: textoDe(m as Msg) });
+            const ctx = obj(m.context).id;
+            eventos.push({ tipo: "mensaje", waId: m.from, wamid: m.id, nombre, texto: textoDe(m as Msg), respondeA: typeof ctx === "string" ? ctx : null });
           }
         }
       } else if (cambio.field === "smb_message_echoes") {
