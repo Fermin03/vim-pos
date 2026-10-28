@@ -2,9 +2,11 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { AVISO_PRIVACIDAD, costoUsd, MENSAJE_FIJO, responder } from './cerebro.ts'
 
+// Sin Deno en node: se simula la clave para que el módulo la lea como en producción.
+;(globalThis as any).Deno = { env: { get: (k: string) => (k === 'ANTHROPIC_API_KEY' ? 'sk-prueba' : undefined) } }
 const USO = { input_tokens: 1000, output_tokens: 100, cache_creation_input_tokens: 500, cache_read_input_tokens: 2000 }
 const turno = (o = {}) => ({ historial: [{ autor: 'CLIENTE' as const, texto: 'hola' }], modelo: 'haiku' as const, fundadorAbierta: true, nueva: false, ...o })
-const resp = (content: unknown[], usage = USO) => new Response(JSON.stringify({ content, usage }), { status: 200 })
+const resp = (content: unknown[], usage = USO, stop_reason = 'end_turn') => new Response(JSON.stringify({ content, usage, stop_reason }), { status: 200 })
 const espia = () => {
   const llamadas: { body: any; headers: any }[] = []
   const h = {
@@ -124,4 +126,74 @@ test('historial: une roles iguales, prefija a Fermín y descarta turnos iniciale
     { role: 'assistant', content: '(Fermín) c\nd' },
     { role: 'user', content: 'e' },
   ])
+})
+
+test('max_tokens con tool_use: no ejecuta y es fallo; con solo texto conserva el texto', async () => {
+  const { h, llamadas } = espia()
+  const datos = { nombre: 'Ana', negocio: 'T', cajas: 1, sucursales: 1 }
+  const a = falso([() => resp([{ type: 'tool_use', id: 't', name: 'guardar_prospecto', input: datos }], USO, 'max_tokens')])
+  const r = await responder(turno(), h, a.f)
+  assert.equal(r.fallo, true)
+  assert.equal(llamadas.length, 0)
+  const b = falso([() => resp([{ type: 'text', text: 'Corto' }], USO, 'max_tokens')])
+  const r2 = await responder(turno(), h, b.f)
+  assert.deepEqual([r2.texto, r2.fallo], ['Corto', false])
+})
+
+test('entrada inválida: is_error con lo que falta y sin llamar al handler', async () => {
+  const casos: [string, unknown][] = [
+    ['guardar_prospecto', { nombre: ' ', negocio: 'T', cajas: 1.5, sucursales: 100 }],
+    ['guardar_prospecto', { nombre: 'A', negocio: 'T', cajas: '2', sucursales: 0 }],
+    ['pasar_a_fermin', { estado: 'OTRO', motivo: '', resumen: 'x' }],
+    ['anotar_pregunta', { pregunta: 'x'.repeat(501) }],
+    ['anotar_pregunta', {}],
+  ]
+  for (const [name, input] of casos) {
+    const { f, cuerpos } = falso([() => resp([{ type: 'tool_use', id: 'i', name, input }]), () => resp([{ type: 'text', text: 'ok' }])])
+    let llamado = false
+    const h = { guardarProspecto: async () => { llamado = true; return '' }, pasarAFermin: async () => { llamado = true; return '' }, anotarPregunta: async () => { llamado = true; return '' } }
+    const r = await responder(turno(), h, f)
+    const tr = cuerpos[1].messages.at(-1).content[0]
+    assert.equal(tr.is_error, true)
+    assert.match(tr.content, /faltantes o inválidos/)
+    assert.equal(llamado, false)
+    assert.equal(r.fallo, false)
+  }
+})
+
+test('texto largo: corta en el último fin de oración a ≤1500; sin fin, corte duro; el aviso va después', async () => {
+  const a = falso([() => resp([{ type: 'text', text: 'Hola. ' + 'a'.repeat(1700) }])])
+  assert.equal((await responder(turno(), espia().h, a.f)).texto, 'Hola.')
+  const dura = falso([() => resp([{ type: 'text', text: 'b'.repeat(2000) }])])
+  assert.equal((await responder(turno(), espia().h, dura.f)).texto.length, 1500)
+  const n = falso([() => resp([{ type: 'text', text: 'c'.repeat(1400) + '. ' + 'd'.repeat(500) }])])
+  const r = await responder(turno({ nueva: true }), espia().h, n.f)
+  assert.equal(r.texto, 'c'.repeat(1400) + '.\n\n' + AVISO_PRIVACIDAD)
+})
+
+test('timeout (AbortError) va por fallo y el fetch lleva signal', async () => {
+  let signal: unknown
+  const f = (async (_u: string, init: RequestInit) => { signal = init.signal; throw new DOMException('t', 'AbortError') }) as unknown as typeof fetch
+  const r = await responder(turno(), espia().h, f)
+  assert.equal(r.fallo, true)
+  assert.ok(signal instanceof AbortSignal)
+})
+
+test('historial vacío o que no termina en CLIENTE: fallo sin llamar a la API', async () => {
+  for (const historial of [[], [{ autor: 'FERMIN' as const, texto: 'x' }], [{ autor: 'CLIENTE' as const, texto: 'a' }, { autor: 'AGENTE' as const, texto: 'b' }]]) {
+    const { f, cuerpos } = falso([])
+    const r = await responder(turno({ historial }), espia().h, f)
+    assert.equal(r.fallo, true)
+    assert.equal(cuerpos.length, 0)
+  }
+})
+
+test('sin ANTHROPIC_API_KEY: fallo sin llamar a fetch', async () => {
+  const D = (globalThis as any).Deno
+  ;(globalThis as any).Deno = { env: { get: () => undefined } }
+  try {
+    const { f, cuerpos } = falso([])
+    assert.equal((await responder(turno(), espia().h, f)).fallo, true)
+    assert.equal(cuerpos.length, 0)
+  } finally { (globalThis as any).Deno = D }
 })

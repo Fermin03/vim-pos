@@ -83,6 +83,39 @@ function aMensajes(h: Turno["historial"]) {
   return msgs
 }
 
+const LIMITE_TEXTO = 1500
+
+// Corta en el último fin de oración (. ! ?) a ≤1500 caracteres; sin fin de oración, corte duro.
+function recortar(t: string): string {
+  if (t.length <= LIMITE_TEXTO) return t
+  const corte = t.slice(0, LIMITE_TEXTO)
+  const i = Math.max(corte.lastIndexOf("."), corte.lastIndexOf("!"), corte.lastIndexOf("?"))
+  return i > 0 ? corte.slice(0, i + 1) : corte
+}
+
+const txt = (v: unknown, max = 1000) => typeof v === "string" && v.trim() !== "" && v.length <= max
+const ent = (v: unknown) => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 99
+const ESTADOS = ["PROSPECTO_CALIENTE", "URGENTE_SOPORTE", "DUDA_SIN_RESPUESTA"]
+
+// Devuelve lo que falta o está mal; "" si la entrada es válida. El mensaje vuelve al modelo.
+function invalido(nombre: string, i: Record<string, unknown> | null): string {
+  if (!i || typeof i !== "object") return "Datos faltantes o inválidos: todos."
+  const mal: string[] = []
+  if (nombre === "guardar_prospecto") {
+    if (!txt(i.nombre)) mal.push("nombre")
+    if (!txt(i.negocio)) mal.push("negocio")
+    if (!ent(i.cajas)) mal.push("cajas (entero 1 a 99)")
+    if (!ent(i.sucursales)) mal.push("sucursales (entero 1 a 99)")
+  } else if (nombre === "pasar_a_fermin") {
+    if (!ESTADOS.includes(i.estado as string)) mal.push("estado (" + ESTADOS.join("|") + ")")
+    if (!txt(i.motivo)) mal.push("motivo")
+    if (!txt(i.resumen)) mal.push("resumen")
+  } else if (nombre === "anotar_pregunta") {
+    if (!txt(i.pregunta, 500)) mal.push("pregunta (máx. 500 caracteres)")
+  }
+  return mal.length ? "Datos faltantes o inválidos: " + mal.join(", ") + ". Pídeselos al cliente si hace falta." : ""
+}
+
 export async function responder(
   t: Turno,
   h: Herramientas,
@@ -91,10 +124,13 @@ export async function responder(
   const clave = (globalThis as { Deno?: { env: { get(k: string): string | undefined } } }).Deno?.env.get("ANTHROPIC_API_KEY") ?? ""
   const system: Record<string, unknown>[] = [REGLAS, CONOCIMIENTO, ...(t.fundadorAbierta ? [FUNDADOR] : [])].map((text) => ({ type: "text", text }))
   system[system.length - 1].cache_control = { type: "ephemeral", ttl: "1h" }
-  const messages: { role: string; content: unknown }[] = aMensajes(t.historial)
+  const hist = aMensajes(t.historial)
+  const messages: { role: string; content: unknown }[] = hist
   let modelo = t.modelo
   let usd = 0
   const fallo = () => ({ texto: MENSAJE_FIJO, modelo, usd, fallo: true })
+  if (hist.at(-1)?.role !== "user") return fallo()
+  if (!clave) { console.error("falta ANTHROPIC_API_KEY"); return fallo() }
 
   try {
     for (let vuelta = 0; vuelta < 5; vuelta++) {
@@ -102,20 +138,28 @@ export async function responder(
         method: "POST",
         headers: { "content-type": "application/json", "anthropic-version": "2023-06-01", "x-api-key": clave },
         body: JSON.stringify({ model: IDS[modelo], max_tokens: 600, system, tools: HERRAMIENTAS, messages }),
+        signal: AbortSignal.timeout(25_000),
       })
-      if (!res.ok) return fallo()
-      const r = await res.json() as { content: { type: string; [k: string]: any }[]; usage: Uso }
+      if (!res.ok) { console.error("Anthropic HTTP", res.status); return fallo() }
+      const r = await res.json() as { stop_reason?: string; content: { type: string; [k: string]: any }[]; usage: Uso }
       usd += costoUsd(modelo, r.usage)
       const usos = r.content.filter((b) => b.type === "tool_use")
+      if (r.stop_reason === "max_tokens" && usos.length) return fallo() // la entrada pudo quedar cortada
       if (!usos.length) {
         const texto = r.content.filter((b) => b.type === "text").map((b) => b.text).join("").trim()
         if (!texto) return fallo()
-        return { texto: t.nueva ? texto + "\n\n" + AVISO_PRIVACIDAD : texto, modelo, usd, fallo: false }
+        const corto = recortar(texto)
+        return { texto: t.nueva ? corto + "\n\n" + AVISO_PRIVACIDAD : corto, modelo, usd, fallo: false }
       }
       messages.push({ role: "assistant", content: r.content })
       const resultados = []
       for (const u of usos) {
         try {
+          const falta = invalido(u.name, u.input)
+          if (falta) {
+            resultados.push({ type: "tool_result", tool_use_id: u.id, content: falta, is_error: true })
+            continue
+          }
           let out: string
           if (u.name === "guardar_prospecto") out = await h.guardarProspecto(u.input)
           else if (u.name === "pasar_a_fermin") out = await h.pasarAFermin(u.input)
@@ -129,7 +173,8 @@ export async function responder(
       }
       messages.push({ role: "user", content: resultados })
     }
-  } catch {
+  } catch (e) {
+    console.error("Anthropic error", (e as Error)?.name)
     return fallo()
   }
   return fallo()
