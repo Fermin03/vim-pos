@@ -88,6 +88,8 @@ const LIMITE_TEXTO = 1500
 
 // Corta en el último fin de oración («. », «! », «? » o fin) a ≤1500 puntos de código; nunca en el
 // punto de un número o de una URL. Sin fin de oración, corte duro (sin partir un emoji).
+export const MAX_TOKENS = 2048
+
 /** WhatsApp no es Markdown: negrita con un asterisco y sin almohadillas de título. */
 const aWhatsApp = (t: string) => t.replace(/\*\*(.+?)\*\*/g, "*$1*").replace(/^#{1,6}\s+/gm, "")
 
@@ -155,7 +157,10 @@ export async function responder(
       const res = await f("https://api.anthropic.com/v1/messages", {
         method: "POST",
         headers: { "content-type": "application/json", "anthropic-version": "2023-06-01", "x-api-key": clave },
-        body: JSON.stringify({ model: IDS[modelo], max_tokens: 600, system, tools: HERRAMIENTAS, messages }),
+        // El modelo piensa antes de responder (bloques «thinking») y eso gasta del mismo tope: con 600
+        // se cortaba antes de llegar al texto o a la herramienta. El largo del mensaje lo limitan las
+        // reglas (600 caracteres) y `recortar`, no este número.
+        body: JSON.stringify({ model: IDS[modelo], max_tokens: MAX_TOKENS, system, tools: HERRAMIENTAS, messages }),
         signal: AbortSignal.timeout(25_000),
       })
       if (!res.ok) { console.error("Anthropic HTTP", res.status); return fallo() }

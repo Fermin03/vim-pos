@@ -36,7 +36,7 @@ test('solo texto: devuelve el texto, haiku y el costo del usage', async () => {
   const r = await responder(turno(), espia().h, f)
   assert.deepEqual(r, { texto: 'Hola', modelo: 'haiku', usd: costoUsd('haiku', USO), fallo: false })
   assert.equal(cuerpos[0].model, 'claude-haiku-5-5')
-  assert.equal(cuerpos[0].max_tokens, 600)
+  assert.equal(cuerpos[0].max_tokens, 2048) // deja espacio al razonamiento («thinking») antes del texto
   assert.equal(cuerpos[0].tools.length, 4)
 })
 
