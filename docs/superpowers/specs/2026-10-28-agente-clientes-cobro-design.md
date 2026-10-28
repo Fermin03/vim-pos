@@ -1,6 +1,6 @@
 # Agente de WhatsApp — clientes: cobro, renovación y reactivación
 
-Fecha: 28 oct 2026 · Autor: Claude con Fermín · Estado: para aprobación de Fermín
+Fecha: 28 oct 2026 · Autor: Claude con Fermín · Estado: APROBADO por Fermín (28 oct 2026)
 
 Es la **fase 3** del diseño aprobado `2026-10-27-agente-whatsapp-design.md`; todo lo que este documento
 no cambia sigue como dice ése (sobre todo §Herramientas, §Identificar al cliente, §Cobro y renovación
