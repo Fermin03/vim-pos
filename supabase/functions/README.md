@@ -304,3 +304,14 @@ Fermín (que pausan al agente 12 h). Tope por número: 30/h y 100/día.
 
 Secretos: `WA_APP_SECRET`, `WA_VERIFY_TOKEN`, `WA_TOKEN`, `WA_PHONE_NUMBER_ID`, `WA_GRAPH_VERSION`,
 `WA_TOPE_USD` (tope mensual de gasto de IA en USD, 100 por defecto), `ANTHROPIC_API_KEY`.
+
+## `whatsapp-avisos` (avisos a Fermín)
+
+La llama pg_cron cada 5 minutos (`wa_avisos_cron`, con `x-vim-interno`; sin JWT). Solo entre 9:00 y
+18:00 hora de Ciudad de México lee `wa_avisos_por_enviar()`, manda UN mensaje con la plantilla
+`aviso_fermin` (un parámetro, todo en una línea: Meta no admite saltos de línea en parámetros) y
+marca los avisos solo si Meta contestó ok; si falla se reintenta en la siguiente vuelta.
+
+Secretos: `VIM_INTERNO_SECRET`, `WA_NUMERO_FERMIN` (solo dígitos, con lada: `5214771234567`),
+`PLATFORM_APP_URL` (base de los enlaces al panel; por defecto `https://platform.vimpos.com.mx`),
+`WA_TOKEN`, `WA_PHONE_NUMBER_ID`, `WA_GRAPH_VERSION`. Sin los dos primeros, 503.

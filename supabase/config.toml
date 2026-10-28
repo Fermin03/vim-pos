@@ -105,3 +105,8 @@ verify_jwt = false
 # autenticidad la da la firma X-Hub-Signature-256 (WA_APP_SECRET) y la verificacion GET (WA_VERIFY_TOKEN).
 [functions.whatsapp-webhook]
 verify_jwt = false
+
+# Avisos a Fermin por WhatsApp: sin JWT. Los dispara pg_cron (wa_avisos_cron, cada 5 min) con la
+# cabecera x-vim-interno = VIM_INTERNO_SECRET, que la funcion valida.
+[functions.whatsapp-avisos]
+verify_jwt = false
