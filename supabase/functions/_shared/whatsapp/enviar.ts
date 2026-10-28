@@ -14,11 +14,11 @@ export function cuerpoPlantilla(waId: string, nombre: string, parametros: string
   };
 }
 
-/** Nunca lanza: todo fallo vuelve como `{ ok: false, error }`. */
+/** Nunca lanza: todo fallo vuelve como `{ ok: false, error }`; `status` es el HTTP de Meta (null si no hubo respuesta). */
 export async function enviar(
   cuerpo: object,
   f: typeof fetch = fetch,
-): Promise<{ ok: boolean; wamid: string | null; error: string | null }> {
+): Promise<{ ok: boolean; wamid: string | null; error: string | null; status: number | null }> {
   try {
     const env = (globalThis as { Deno?: { env: { get(k: string): string | undefined } } }).Deno?.env;
     const res = await f(`https://graph.facebook.com/${env?.get("WA_GRAPH_VERSION")}/${env?.get("WA_PHONE_NUMBER_ID")}/messages`, {
@@ -27,9 +27,9 @@ export async function enviar(
       body: JSON.stringify(cuerpo),
     });
     const json = await res.json().catch(() => null) as { messages?: { id?: string }[]; error?: { message?: string } } | null;
-    if (!res.ok) return { ok: false, wamid: null, error: json?.error?.message ?? `HTTP ${res.status}` };
-    return { ok: true, wamid: json?.messages?.[0]?.id ?? null, error: null };
+    if (!res.ok) return { ok: false, wamid: null, error: json?.error?.message ?? `HTTP ${res.status}`, status: res.status };
+    return { ok: true, wamid: json?.messages?.[0]?.id ?? null, error: null, status: res.status };
   } catch (e) {
-    return { ok: false, wamid: null, error: e instanceof Error ? e.message : String(e) };
+    return { ok: false, wamid: null, error: e instanceof Error ? e.message : String(e), status: null };
   }
 }

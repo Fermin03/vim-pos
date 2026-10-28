@@ -26,7 +26,7 @@ test("enviar ok devuelve el wamid y llama a Graph con token", async () => {
   let url = "", init: RequestInit = {};
   const f = (async (u: string, i: RequestInit) => { url = u; init = i; return resp(200, { messages: [{ id: "wamid.Y" }] }); }) as unknown as typeof fetch;
   const r = await enviar(cuerpoTexto("521477", "Hola"), f);
-  assert.deepEqual(r, { ok: true, wamid: "wamid.Y", error: null });
+  assert.deepEqual(r, { ok: true, wamid: "wamid.Y", error: null, status: 200 });
   assert.equal(url, "https://graph.facebook.com/v21.0/PN1/messages");
   assert.equal(init.method, "POST");
   assert.equal((init.headers as Record<string, string>).Authorization, "Bearer tok");
@@ -34,7 +34,7 @@ test("enviar ok devuelve el wamid y llama a Graph con token", async () => {
 
 test("enviar con 400 devuelve el mensaje de Meta", async () => {
   const f = (async () => resp(400, { error: { message: "Número inválido" } })) as unknown as typeof fetch;
-  assert.deepEqual(await enviar({}, f), { ok: false, wamid: null, error: "Número inválido" });
+  assert.deepEqual(await enviar({}, f), { ok: false, wamid: null, error: "Número inválido", status: 400 });
 });
 
 test("enviar con fetch que lanza no lanza", async () => {
@@ -42,4 +42,5 @@ test("enviar con fetch que lanza no lanza", async () => {
   const r = await enviar({}, f);
   assert.equal(r.ok, false);
   assert.equal(r.error, "red caída");
+  assert.equal(r.status, null);
 });
