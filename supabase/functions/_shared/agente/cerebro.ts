@@ -93,7 +93,7 @@ function recortar(t: string): string {
   return i > 0 ? corte.slice(0, i + 1) : corte
 }
 
-const txt = (v: unknown, max = 1000) => typeof v === "string" && v.trim() !== "" && v.length <= max
+const txt = (v: unknown, max = 1000, min = 1) => typeof v === "string" && v.trim().length >= min && v.length <= max
 const ent = (v: unknown) => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 99
 const ESTADOS = ["PROSPECTO_CALIENTE", "URGENTE_SOPORTE", "DUDA_SIN_RESPUESTA"]
 
@@ -102,8 +102,8 @@ function invalido(nombre: string, i: Record<string, unknown> | null): string {
   if (!i || typeof i !== "object") return "Datos faltantes o inválidos: todos."
   const mal: string[] = []
   if (nombre === "guardar_prospecto") {
-    if (!txt(i.nombre)) mal.push("nombre")
-    if (!txt(i.negocio)) mal.push("negocio")
+    if (!txt(i.nombre, 120, 2)) mal.push("nombre (2 a 120 caracteres)")
+    if (!txt(i.negocio, 150, 2)) mal.push("negocio (2 a 150 caracteres)")
     if (!ent(i.cajas)) mal.push("cajas (entero 1 a 99)")
     if (!ent(i.sucursales)) mal.push("sucursales (entero 1 a 99)")
   } else if (nombre === "pasar_a_fermin") {

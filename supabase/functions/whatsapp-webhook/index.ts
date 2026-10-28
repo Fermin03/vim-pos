@@ -24,7 +24,16 @@ import { atenderMensaje, type DepsTurno } from "../_shared/agente/turno.ts";
 const FN = "whatsapp-webhook";
 const admin = clienteAdmin();
 const texto = (cuerpo: string, status: number): Response => new Response(cuerpo, { status });
-const topeUsd = Number(Deno.env.get("WA_TOPE_USD")) || 100;
+const tope = Number(Deno.env.get("WA_TOPE_USD"));
+const topeUsd = Number.isFinite(tope) && tope > 0 ? tope : 100; // vacío, no numérico o ≤ 0 → 100
+
+/** Comparación sin atajos por longitud ni por primer byte distinto (token de verificación). */
+function iguales(a: string, b: string): boolean {
+  const x = new TextEncoder().encode(a), y = new TextEncoder().encode(b);
+  let dif = x.length ^ y.length;
+  for (let i = 0; i < Math.max(x.length, y.length); i++) dif |= (x[i] ?? 0) ^ (y[i] ?? 0);
+  return dif === 0;
+}
 
 // Lista vigente del CHECK prospectos_giro_check: supabase/migrations/0229_prospectos_belleza.sql.
 // Si una migración nueva la amplía, se amplía aquí.
@@ -96,9 +105,14 @@ const deps = (waId: string): DepsTurno => ({
     ], "abrir");
     return r.permitido;
   },
-  async pausada(id) {
-    const { pausado_hasta } = ok(await admin.from("wa_conversaciones").select("pausado_hasta").eq("id", id).single());
-    return !!pausado_hasta && new Date(pausado_hasta) > new Date();
+  async ferminEscribio(id, desde) {
+    const { count, error } = await admin.from("wa_mensajes").select("id", { count: "exact", head: true })
+      .eq("conversacion_id", id).eq("autor", "FERMIN").gt("creado_en", desde.toISOString());
+    if (error) throw new Error(error.message);
+    return (count ?? 0) > 0;
+  },
+  async guardarModelo(id, modelo) {
+    ok(await admin.from("wa_conversaciones").update({ modelo }).eq("id", id));
   },
   herramientas: (id) => herramientas(id, waId),
   topeUsd,
@@ -109,7 +123,7 @@ Deno.serve(async (req) => {
     const token = Deno.env.get("WA_VERIFY_TOKEN") ?? "";
     if (!token) return texto("no configurado", 503);
     const q = new URL(req.url).searchParams;
-    return q.get("hub.mode") === "subscribe" && q.get("hub.verify_token") === token
+    return q.get("hub.mode") === "subscribe" && iguales(q.get("hub.verify_token") ?? "", token)
       ? texto(q.get("hub.challenge") ?? "", 200)
       : texto("prohibido", 403);
   }

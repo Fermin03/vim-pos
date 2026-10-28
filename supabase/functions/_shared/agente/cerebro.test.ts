@@ -130,7 +130,7 @@ test('historial: une roles iguales, prefija a Fermín y descarta turnos iniciale
 
 test('max_tokens con tool_use: no ejecuta y es fallo; con solo texto conserva el texto', async () => {
   const { h, llamadas } = espia()
-  const datos = { nombre: 'Ana', negocio: 'T', cajas: 1, sucursales: 1 }
+  const datos = { nombre: 'Ana', negocio: 'Tacos', cajas: 1, sucursales: 1 }
   const a = falso([() => resp([{ type: 'tool_use', id: 't', name: 'guardar_prospecto', input: datos }], USO, 'max_tokens')])
   const r = await responder(turno(), h, a.f)
   assert.equal(r.fallo, true)
@@ -144,6 +144,7 @@ test('entrada inválida: is_error con lo que falta y sin llamar al handler', asy
   const casos: [string, unknown][] = [
     ['guardar_prospecto', { nombre: ' ', negocio: 'T', cajas: 1.5, sucursales: 100 }],
     ['guardar_prospecto', { nombre: 'A', negocio: 'T', cajas: '2', sucursales: 0 }],
+    ['guardar_prospecto', { nombre: 'A', negocio: ' B ', cajas: 1, sucursales: 1 }],
     ['pasar_a_fermin', { estado: 'OTRO', motivo: '', resumen: 'x' }],
     ['anotar_pregunta', { pregunta: 'x'.repeat(501) }],
     ['anotar_pregunta', {}],
@@ -156,6 +157,7 @@ test('entrada inválida: is_error con lo que falta y sin llamar al handler', asy
     const tr = cuerpos[1].messages.at(-1).content[0]
     assert.equal(tr.is_error, true)
     assert.match(tr.content, /faltantes o inválidos/)
+    if (input && (input as any).nombre === 'A' && (input as any).negocio === ' B ') assert.match(tr.content, /nombre \(2 a 120 caracteres\), negocio \(2 a 150/)
     assert.equal(llamado, false)
     assert.equal(r.fallo, false)
   }
