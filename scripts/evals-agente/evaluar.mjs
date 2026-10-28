@@ -52,7 +52,7 @@ for (const r of resultados) {
 }
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'resultados')
 mkdirSync(dir, { recursive: true })
-const nombre = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')
+const nombre = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
 writeFileSync(path.join(dir, `${nombre}.md`), md)
 writeFileSync(path.join(dir, `${nombre}.json`), JSON.stringify(resultados, null, 2))
 console.log(`\n${pasan}/${resultados.length} pasan · US$${usd.toFixed(4)} · reporte: scripts/evals-agente/resultados/${nombre}.md`)

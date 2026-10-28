@@ -3,6 +3,7 @@
 // Lo usan el script local (scripts/evals-agente/evaluar.mjs) y la función interna whatsapp-evaluar,
 // que corre donde está la clave de Claude.
 import { type Herramientas, responder } from "../cerebro.ts"
+import { CONOCIMIENTO, FUNDADOR } from "../conocimiento.gen.ts"
 import { type Escenario, type Llamada, revisarHerramientas, revisionesFijas } from "./revisar.ts"
 import datos from "./escenarios.json" with { type: "json" }
 
@@ -50,7 +51,11 @@ async function juzgar(esc: Escenario, historial: Mensaje[], llamadas: Llamada[],
     headers: { "content-type": "application/json", "anthropic-version": "2023-06-01", "x-api-key": clave },
     body: JSON.stringify({
       model: JUEZ, max_tokens: 4096,
-      system: "Eres un evaluador estricto de un asistente de ventas y soporte por WhatsApp de VIM POS (punto de venta para negocios en México). Calificas una conversación contra criterios. Sé justo: un criterio que no aplica a esta conversación se da por cumplido. Responde SOLO con JSON válido.",
+      // El juez ve la misma información que el agente: «no inventa» se califica contra ella, no contra lo que el juez supone.
+      system: [
+        { type: "text", text: "Eres un evaluador estricto de un asistente de ventas y soporte por WhatsApp de VIM POS (punto de venta para negocios en México). Calificas una conversación contra criterios. Sé justo: un criterio que no aplica a esta conversación se da por cumplido. Para decidir si algo es inventado, compáralo con la INFORMACIÓN DEL ASISTENTE de abajo: si ahí está, no es inventado. Responde SOLO con JSON válido." },
+        { type: "text", text: `INFORMACIÓN DEL ASISTENTE (lo único que sabe):\n${CONOCIMIENTO}\n\n${esc.fundadorAbierta === false ? "(La oferta «Negocio fundador» está cerrada.)" : FUNDADOR}`, cache_control: { type: "ephemeral" } },
+      ],
       messages: [{ role: "user", content:
         `Hora de la conversación (CDMX): ${hora(ahora)}.\n\nConversación:\n${transcripcion}\n\nHerramientas que usó el agente:\n${usadas}\n\n` +
         `Criterios:\n${criterios.map((x, i) => `${i + 1}. ${x.t}`).join("\n")}\n\n` +
