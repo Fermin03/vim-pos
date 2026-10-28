@@ -33,7 +33,7 @@ export async function GET(req: Request) {
     .limit(LIMITE);
   if (estado) lista = lista.eq("estado", estado);
   const [{ data, error }, cfg] = await Promise.all([lista, sb.from("wa_config").select("fundador_abierta").eq("id", true).maybeSingle()]);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error ?? cfg.error) return NextResponse.json({ error: (error ?? cfg.error)!.message }, { status: 500 });
 
   return NextResponse.json({
     conversaciones: data ?? [],

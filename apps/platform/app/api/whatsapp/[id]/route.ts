@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { enlaceWhatsapp } from "@vim/db/soporte";
 import { autorizar, auditar } from "../../../lib/server";
+import { esUuid } from "../../../lib/whatsapp";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 const LIMITE = 200;
+const NO_EXISTE = () => NextResponse.json({ error: "NO_EXISTE", detalle: "Esa conversación ya no existe." }, { status: 404 });
 const COLUMNAS = "id, wa_id, nombre_perfil, estado, pausado_hasta, resumen, ultimo_mensaje_en, creado_en, prospecto:prospectos(id, negocio)";
 
 /** Una conversación con sus últimos 200 mensajes, del más viejo al más nuevo. */
@@ -12,6 +14,7 @@ export async function GET(req: Request, ctx: Ctx) {
   const auth = await autorizar(req);
   if ("error" in auth) return auth.error;
   const { id } = await ctx.params;
+  if (!esUuid(id)) return NO_EXISTE();
 
   const [conv, msgs] = await Promise.all([
     auth.sb.from("wa_conversaciones").select(COLUMNAS).eq("id", id).maybeSingle(),
@@ -19,7 +22,7 @@ export async function GET(req: Request, ctx: Ctx) {
   ]);
   if (conv.error || msgs.error) return NextResponse.json({ error: (conv.error ?? msgs.error)!.message }, { status: 500 });
   const conversacion = conv.data as unknown as { wa_id: string } | null;
-  if (!conversacion) return NextResponse.json({ error: "NO_EXISTE", detalle: "Esa conversación ya no existe." }, { status: 404 });
+  if (!conversacion) return NO_EXISTE();
 
   return NextResponse.json({
     conversacion: { ...conversacion, enlace: enlaceWhatsapp(conversacion.wa_id, "") },
@@ -33,6 +36,7 @@ export async function POST(req: Request, ctx: Ctx) {
   if ("error" in auth) return auth.error;
   const sb = auth.sb;
   const { id } = await ctx.params;
+  if (!esUuid(id)) return NO_EXISTE();
 
   const body = (await req.json().catch(() => null)) as { accion?: unknown } | null;
   if (body?.accion !== "resolver") return NextResponse.json({ error: "BAD_REQUEST", detalle: "La acción es «resolver»." }, { status: 400 });
@@ -40,7 +44,7 @@ export async function POST(req: Request, ctx: Ctx) {
   const { data, error: e1 } = await sb.from("wa_conversaciones").select("id, estado").eq("id", id).maybeSingle();
   if (e1) return NextResponse.json({ error: e1.message }, { status: 500 });
   const antes = data as { id: string; estado: string } | null;
-  if (!antes) return NextResponse.json({ error: "NO_EXISTE", detalle: "Esa conversación ya no existe." }, { status: 404 });
+  if (!antes) return NO_EXISTE();
 
   const { error } = await sb.rpc("wa_resolver", { p_conversacion_id: id });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

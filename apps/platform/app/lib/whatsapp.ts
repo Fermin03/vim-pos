@@ -22,6 +22,9 @@ export const COLOR_ESTADO_WA: Record<EstadoWa, string> = {
   RESUELTO: "bg-success-soft text-success",
 };
 
+/** Los ids de las rutas llegan de la URL: un texto que no es uuid haría fallar a Postgres con 500. */
+export const esUuid = (s: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+
 export const etiquetaEstado = (e: string): string => ETIQUETA[e as EstadoWa] ?? e;
 
 /** Mientras Fermín tiene la conversación, el agente no contesta (`pausado_hasta` en el futuro). */
