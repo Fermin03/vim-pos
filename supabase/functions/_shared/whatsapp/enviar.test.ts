@@ -37,6 +37,22 @@ test("enviar con 400 devuelve el mensaje de Meta", async () => {
   assert.deepEqual(await enviar({}, f), { ok: false, wamid: null, error: "Número inválido", status: 400 });
 });
 
+test("con WA_KAPSO_API_KEY va por Kapso con X-API-Key y lee la respuesta envuelta en data", async () => {
+  const antes = (globalThis as { Deno?: unknown }).Deno;
+  const vars: Record<string, string> = { WA_PHONE_NUMBER_ID: "PN1", WA_TOKEN: "tok", WA_KAPSO_API_KEY: "kap" };
+  (globalThis as { Deno?: unknown }).Deno = { env: { get: (k: string) => vars[k] } };
+  try {
+    let url = "", init: RequestInit = {};
+    const f = (async (u: string, i: RequestInit) => { url = u; init = i; return resp(200, { data: { messages: [{ id: "wamid.K" }] } }); }) as unknown as typeof fetch;
+    const r = await enviar(cuerpoTexto("521477", "Hola"), f);
+    assert.deepEqual(r, { ok: true, wamid: "wamid.K", error: null, status: 200 });
+    assert.equal(url, "https://api.kapso.ai/meta/whatsapp/v24.0/PN1/messages");
+    const h = init.headers as Record<string, string>;
+    assert.equal(h["X-API-Key"], "kap");
+    assert.equal(h.Authorization, undefined); // el token de Meta no viaja a Kapso
+  } finally { (globalThis as { Deno?: unknown }).Deno = antes; }
+});
+
 test("enviar con fetch que lanza no lanza", async () => {
   const f = (async () => { throw new Error("red caída"); }) as unknown as typeof fetch;
   const r = await enviar({}, f);

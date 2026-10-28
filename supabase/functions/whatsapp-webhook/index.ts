@@ -9,11 +9,14 @@
 //          plano; Meta reintenta si tarda.
 //
 // Pública y sin JWT (config.toml). La firma es obligatoria: sin WA_APP_SECRET, 503; firma mala, 401.
+// Directo de Meta (X-Hub-Signature-256, WA_APP_SECRET = clave secreta de la app) o reenviado por Kapso
+// en modo «Meta webhook» (X-Webhook-Signature, WA_APP_SECRET = el secret_key de ese webhook).
 // Tope por número: 30/hora y 100/día. Tope de gasto de IA del mes: WA_TOPE_USD (100 por defecto).
 // Con WA_PHONE_NUMBER_ID se ignoran avisos de otro número; lo que escribe WA_NUMERO_FERMIN no se contesta.
 //
 // SECRETOS: WA_APP_SECRET, WA_VERIFY_TOKEN, WA_TOKEN, WA_PHONE_NUMBER_ID, WA_GRAPH_VERSION,
-// WA_TOPE_USD, WA_NUMERO_FERMIN, ANTHROPIC_API_KEY.
+// WA_TOPE_USD, WA_NUMERO_FERMIN, ANTHROPIC_API_KEY; con Kapso, WA_KAPSO_API_KEY (y sobran WA_TOKEN
+// y WA_VERIFY_TOKEN).
 import { clienteAdmin } from "../_shared/http.ts";
 import { consumirCupos, leerCuerpoAcotado } from "../_shared/limite.ts";
 import { enSegundoPlano } from "../_shared/correo.ts";
@@ -134,7 +137,11 @@ Deno.serve(async (req) => {
   if (!secreto) return texto("no configurado", 503);
   const cuerpo = await leerCuerpoAcotado(req, 256_000);
   if (cuerpo === null) return texto("cuerpo demasiado grande", 413);
-  if (!await firmaMetaValida(cuerpo, req.headers.get("x-hub-signature-256"), secreto)) return texto("firma inválida", 401);
+  // Meta firma en X-Hub-Signature-256 («sha256=<hex>»); Kapso reenvía el mismo aviso y firma el cuerpo
+  // crudo en X-Webhook-Signature (el hex, sin prefijo) con el secreto que le pusimos.
+  const kapso = req.headers.get("x-webhook-signature");
+  const firma = req.headers.get("x-hub-signature-256") ?? (kapso ? `sha256=${kapso}` : null);
+  if (!await firmaMetaValida(cuerpo, firma, secreto)) return texto("firma inválida", 401);
 
   let json: unknown = null;
   try { json = JSON.parse(cuerpo); } catch { /* leerAviso ignora lo que no entiende */ }

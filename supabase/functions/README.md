@@ -303,7 +303,13 @@ verificación del webhook; `POST` corre un turno del agente en segundo plano y r
 Fermín (que pausan al agente 12 h). Tope por número: 30/h y 100/día.
 
 Secretos: `WA_APP_SECRET`, `WA_VERIFY_TOKEN`, `WA_TOKEN`, `WA_PHONE_NUMBER_ID`, `WA_GRAPH_VERSION`,
-`WA_TOPE_USD` (tope mensual de gasto de IA en USD, 100 por defecto), `ANTHROPIC_API_KEY`.
+`WA_TOPE_USD` (tope mensual de gasto de IA en USD, 100 por defecto), `ANTHROPIC_API_KEY`,
+`WA_NUMERO_FERMIN`.
+
+**Con el proveedor Kapso** (mientras VIM no sea Tech Provider): `WA_KAPSO_API_KEY` (clave de API del
+proyecto en Kapso; con ella todo el envío va por `api.kapso.ai` con `X-API-Key`), `WA_PHONE_NUMBER_ID` (el
+del número conectado en Kapso) y `WA_APP_SECRET` = el `secret_key` del webhook de Kapso en modo «Meta»
+(firma `X-Webhook-Signature`, hex sin prefijo). `WA_TOKEN` y `WA_VERIFY_TOKEN` no se usan.
 
 ## `whatsapp-avisos` (avisos a Fermín)
 
@@ -314,4 +320,5 @@ marca los avisos solo si Meta contestó ok; si falla se reintenta en la siguient
 
 Secretos: `VIM_INTERNO_SECRET`, `WA_NUMERO_FERMIN` (solo dígitos, con lada: `5214771234567`),
 `PLATFORM_APP_URL` (base de los enlaces al panel; por defecto `https://platform.vimpos.com.mx`),
-`WA_TOKEN`, `WA_PHONE_NUMBER_ID`, `WA_GRAPH_VERSION`. Sin los dos primeros, 503.
+`WA_TOKEN`, `WA_PHONE_NUMBER_ID`, `WA_GRAPH_VERSION` (o `WA_KAPSO_API_KEY` con Kapso). Sin los dos
+primeros, 503.
