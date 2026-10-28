@@ -25,13 +25,22 @@ export type Accion =
   | { accion: 'VER' }
   | { accion: 'SI' | 'NO' | 'QUITAR'; numero: number | null }
   | { accion: 'CORRECCION'; numero: number | null; texto: string }
+  | { accion: 'NO_ENTIENDO' } // 1–2 palabras que no son SÍ/NO/QUITAR: no se guardan como corrección
 
 const MAX_POR_VER = 5
 const TIPOS = { DUDA: 'Duda técnica', TONO: 'Tono', PREGUNTA: 'Pregunta sin respuesta' }
-const PALABRAS: Record<string, 'SI' | 'NO' | 'QUITAR'> = { si: 'SI', va: 'SI', ok: 'SI', no: 'NO', quitar: 'QUITAR' }
+const SI = ['si', 'va', 'ok', 'okay', 'okey', 'dale', 'sale', 'claro', 'perfecto', 'listo', 'correcto', 'de acuerdo', '👍', '✅']
+const NO = ['no', 'nel', 'nop', '❌', '👎']
+// Más largas primero para que «okay» gane a «ok» y «de acuerdo» a cualquier prefijo.
+const PALABRAS: [string, 'SI' | 'NO' | 'QUITAR'][] = [
+  ...SI.map((w) => [w, 'SI'] as [string, 'SI']),
+  ...NO.map((w) => [w, 'NO'] as [string, 'NO']),
+  ['quitar', 'QUITAR'] as [string, 'QUITAR'],
+].sort((a, b) => b[0].length - a[0].length)
 
 export const TEXTO_DESLIZA = 'Desliza el mensaje de la lección y contesta ahí (o escribe el número: «SÍ 2»).'
 export const TEXTO_DATOS_CLIENTE = 'Esa corrección trae datos de un cliente; escríbela sin teléfonos ni correos.'
+export const TEXTO_NO_ENTIENDO = '¿SÍ, NO o escribe la corrección completa?'
 export const textoAvisoComercial = (texto: string) =>
   `Listo. Ojo: desde ahora a todos los que pregunten les digo: «${texto}». Para quitarlo, responde QUITAR a este mensaje o entra a /platform.`
 export const textoConfirmacion = (a: number, d: number) => `Listo: ${a} aprendidas, ${d} descartadas.`
@@ -39,41 +48,69 @@ export const textoConfirmacion = (a: number, d: number) => `Listo: ${a} aprendid
 export const textoLeccion = (l: Leccion, i: number, n: number) =>
   `*Lección ${i} de ${n} · ${TIPOS[l.tipo]}${l.comercial ? ' · Comercial' : ''}*\n${l.evidencia}\nEl agente aprendería: «${l.texto}»\nResponde *SÍ*, *NO* o escribe la corrección.`
 
-const norm = (s: string) =>
-  s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim().replace(/^[¡¿]+|[.!?,;\s]+$/g, '')
+const sinAcentos = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+const norm = (s: string) => sinAcentos(s).trim().replace(/^[¡¿]+|[.!?,;\s]+$/g, '')
 
+// Reglas, en orden:
+// 1. «ver».  2. «N: texto» (N de 1 a 5, y sin dígito justo después de «:», para no partir «9:00 a 18:00…»).
+// 3. Empieza con palabra SÍ/NO/QUITAR (exacta, o seguida de «,» «.» o espacio): con cola de 0–2 palabras es esa acción
+//    (con el primer número de la cola si lo hay: «sí, 2», «2 sí»). «no, …» con cola más larga es una CORRECCION del
+//    texto tras «no,», sin un «mejor di que»/«mejor» inicial.
+// 4. Cualquier otra cosa de 1–2 palabras no se guarda (NO_ENTIENDO); más larga es CORRECCION sin número.
 export function interpretar(texto: string): Accion {
+  const t = texto.trim()
   const n = norm(texto)
   if (n === 'ver') return { accion: 'VER' }
-  if (PALABRAS[n]) return { accion: PALABRAS[n], numero: null }
-  const m = n.match(/^([a-z]+)\s+(\d+)$/) ?? n.match(/^(\d+)\s+([a-z]+)$/)
-  if (m) {
-    const [palabra, num] = /^\d/.test(m[1]) ? [m[2], m[1]] : [m[1], m[2]]
-    if (PALABRAS[palabra]) return { accion: PALABRAS[palabra], numero: Number(num) }
-  }
-  const c = texto.trim().match(/^(\d+)\s*:\s*([\s\S]+)$/)
+
+  const c = t.match(/^([1-5])\s*:\s*(?!\d)([\s\S]+)$/)
   if (c) return { accion: 'CORRECCION', numero: Number(c[1]), texto: c[2].trim() }
-  return { accion: 'CORRECCION', numero: null, texto: texto.trim() }
+
+  const pre = n.match(/^(\d+)\s+(.+)$/) // «2 sí»
+  const [num0, resto] = pre ? [Number(pre[1]), pre[2]] : [null, n]
+  for (const [w, accion] of PALABRAS) {
+    if (!resto.startsWith(w)) continue
+    const sep = resto[w.length]
+    if (sep !== undefined && !/[,.\s]/.test(sep)) continue
+    const cola = resto.slice(w.length).replace(/^[,.\s]+/, '')
+    const palabras = cola ? cola.split(/\s+/) : []
+    if (palabras.length <= 2) {
+      const num = cola.match(/\d+/)
+      return { accion, numero: num0 ?? (num ? Number(num[0]) : null) }
+    }
+    if (accion === 'NO' && sep === ',' && num0 === null) {
+      const corr = t.slice(t.indexOf(',') + 1).trim().replace(/^mejor(\s+di(le)?\s+que)?\s+/i, '')
+      return { accion: 'CORRECCION', numero: null, texto: corr }
+    }
+    break
+  }
+  if (t.split(/\s+/).length <= 2) return { accion: 'NO_ENTIENDO' }
+  return { accion: 'CORRECCION', numero: null, texto: t }
 }
 
 const traeDatosDeCliente = (t: string) => /\d{10,}/.test(t.replace(/[\s\-().]/g, '')) || /\S+@\S+\.\S+/.test(t)
-const esComercial = (t: string) => /\$|precio|descuento|promo|\bplan/i.test(t)
+const esComercial = (t: string) =>
+  /\$|%|precio|descuento|promo|\bplan|cuesta|costo|cobr|pesos|mxn|gratis|oferta|mensual|meses sin/.test(sinAcentos(t))
+
+const enviado = (r: { ok: boolean; wamid: string | null }) => r.ok && r.wamid !== null
 
 async function ver(deps: DepsRevision) {
+  const conOrden = (await deps.lecciones(['ENVIADA', 'APROBADA', 'DESCARTADA', 'CADUCADA', 'RETIRADA'])).filter((x) => x.orden !== null)
+  const abiertas = conOrden.filter((x) => x.estado === 'ENVIADA').sort((x, y) => x.orden! - y.orden!)
   // Tanda abierta (hay ENVIADA): se reenvían esas mismas, con el mismo orden, y no se mandan PENDIENTE hasta cerrarla.
-  const tanda = (await deps.lecciones(['ENVIADA', 'APROBADA', 'DESCARTADA'])).filter((x) => x.orden !== null)
-  const abiertas = tanda.filter((x) => x.estado === 'ENVIADA').sort((x, y) => x.orden! - y.orden!)
   if (abiertas.length) {
     for (const l of abiertas) {
-      const r = await deps.enviar(textoLeccion(l, l.orden!, tanda.length))
-      if (r.ok) await deps.actualizar(l.id, { wamid_envio: r.wamid })
+      const r = await deps.enviar(textoLeccion(l, l.orden!, conOrden.length))
+      if (enviado(r)) await deps.actualizar(l.id, { wamid_envio: r.wamid })
     }
     return
   }
+  // Sin ENVIADA: lo que quedó con orden es de una tanda que no cerró (p. ej. la última caducó); se limpia antes de numerar.
+  for (const x of conOrden) await deps.actualizar(x.id, { orden: null })
   const pendientes = (await deps.lecciones(['PENDIENTE'])).slice(0, MAX_POR_VER)
-  for (const [k, l] of pendientes.entries()) {
-    const r = await deps.enviar(textoLeccion(l, k + 1, pendientes.length))
-    if (r.ok) await deps.actualizar(l.id, { wamid_envio: r.wamid, orden: k + 1, estado: 'ENVIADA' })
+  let mandadas = 0
+  for (const l of pendientes) {
+    const r = await deps.enviar(textoLeccion(l, mandadas + 1, pendientes.length))
+    if (enviado(r)) await deps.actualizar(l.id, { wamid_envio: r.wamid, orden: ++mandadas, estado: 'ENVIADA' })
   }
 }
 
@@ -87,19 +124,21 @@ export async function atenderFermin(e: { wamid: string; texto: string; respondeA
 
   // QUITAR solo vale contestando al aviso comercial de una lección aprobada.
   if (a.accion === 'QUITAR') {
-    const l = e.respondeA && todas.find((x) => x.estado === 'APROBADA' && x.wamid_confirmacion === e.respondeA)
-    if (l) await deps.actualizar(l.id, { estado: 'RETIRADA', decidido_en })
+    const q = e.respondeA ? todas.find((x) => x.estado === 'APROBADA' && x.wamid_confirmacion === e.respondeA) : undefined
+    if (q) await deps.actualizar(q.id, { estado: 'RETIRADA', decidido_en })
+    else if (e.respondeA && enviadas.length) await deps.enviar(TEXTO_DESLIZA)
     return
   }
 
   let l: Leccion | undefined
-  if (e.respondeA) l = enviadas.find((x) => x.wamid_envio === e.respondeA) // respondeA ajeno: mensaje normal, se ignora
-  else if (a.numero !== null) l = enviadas.find((x) => x.orden === a.numero)
-  else if (enviadas.length === 1 && a.accion !== 'CORRECCION') l = enviadas[0] // una corrección libre sin deslizar ni número no se aplica
+  if (e.respondeA) l = enviadas.find((x) => x.wamid_envio === e.respondeA)
+  else if (a.accion !== 'NO_ENTIENDO' && a.numero !== null) l = enviadas.find((x) => x.orden === a.numero)
+  else if (enviadas.length === 1 && (a.accion === 'SI' || a.accion === 'NO')) l = enviadas[0] // una corrección libre sin deslizar ni número no se aplica
   if (!l) {
-    if (!e.respondeA && enviadas.length) await deps.enviar(TEXTO_DESLIZA)
+    if (enviadas.length) await deps.enviar(TEXTO_DESLIZA)
     return
   }
+  if (a.accion === 'NO_ENTIENDO') return void (await deps.enviar(TEXTO_NO_ENTIENDO))
 
   const cambios: Partial<Leccion> & { decidido_en: string } = { estado: a.accion === 'NO' ? 'DESCARTADA' : 'APROBADA', decidido_en }
   if (a.accion === 'CORRECCION') {
@@ -111,11 +150,12 @@ export async function atenderFermin(e: { wamid: string; texto: string; respondeA
 
   if (cambios.estado === 'APROBADA' && (l.comercial || cambios.comercial)) {
     const r = await deps.enviar(textoAvisoComercial(cambios.texto ?? l.texto))
-    if (r.ok) await deps.actualizar(l.id, { wamid_confirmacion: r.wamid })
+    if (enviado(r)) await deps.actualizar(l.id, { wamid_confirmacion: r.wamid }) // si falla el aviso, la aprobación se queda
   }
 
-  if (enviadas.length > 1) return
-  // Tanda = lecciones con orden asignado que ya no están ENVIADA; al cerrar la tanda se les limpia el orden.
+  // Se relee tras actualizar para no cerrar la tanda con una foto vieja.
+  if ((await deps.lecciones(['ENVIADA'])).length) return
+  // Tanda = lecciones con orden asignado que ya no están ENVIADA; al cerrarla se les limpia el orden.
   const tanda = (await deps.lecciones(['APROBADA', 'DESCARTADA'])).filter((x) => x.orden !== null)
   const aprendidas = tanda.filter((x) => x.estado === 'APROBADA').length
   await deps.enviar(textoConfirmacion(aprendidas, tanda.length - aprendidas))
