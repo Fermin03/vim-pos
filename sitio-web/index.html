@@ -55,7 +55,7 @@
 <link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="/assets/css/vim.css?v=40">
+<link rel="stylesheet" href="/assets/css/vim.css?v=44">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
@@ -320,74 +320,103 @@
   </section>
 
   <!-- ═══ 2 · Todo en un lugar ═══════════════════════════════════════════
-       Cinco tarjetas con su captura, todas a la vista: dos grandes arriba y
-       tres abajo. Son las tarjetas «Para el dueño» de las páginas por giro.
-       (Se probó el bloque de rasgos con la captura pegajosa: en el inicio
-       ocupaba cuatro pantallas para cinco frases.) -->
+       Como la sección «Todo tu negocio» de Square (Fermín, 28-oct-2026): el
+       título y un acordeón con las cinco funciones a la izquierda, y a la
+       derecha el video de la fila abierta (vim.css, «Todo tu negocio»).
+       `data-acordeon-siempre` deja siempre una fila abierta (vim.js).
+
+       Los videos van en el MISMO orden que las filas: se emparejan por
+       posición, así que mover una fila es mover también su video. Son
+       grabaciones de la caja y el panel reales con datos de prueba
+       (videos/sitio/ en el workspace). -->
   <section class="seccion">
     <div class="contenedor pila pila-8">
-      <div class="pila pila-4">
-        <p class="eyebrow">Todo tu negocio</p>
-        <h2>De la venta al corte, en un solo sistema</h2>
-      </div>
-      <div class="pila pila-6 inicio-funciones">
-        <div class="dos">
-          <div class="tarjeta tarjeta-media">
-            <div class="tarjeta-media-imagen"><figure class="figura">
-              <div class="monitor">
-                <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
-                <img src="/assets/img/capturas/pos-catalogo.webp?v=3" alt="Un producto abierto con sus opciones: término de la carne y extras con su precio." width="1600" height="1000" loading="lazy" decoding="async">
-              </div>
-            </figure></div>
-            <h3><a class="enlace-tarjeta" href="/funciones#caja">Cobra en segundos</a></h3>
-            <p>Productos con sus opciones y su precio. Efectivo, tarjeta o las dos en la misma cuenta.</p>
-            <span class="mas" aria-hidden="true">Ver la caja →</span>
-          </div>
-          <div class="tarjeta tarjeta-media">
-            <div class="tarjeta-media-imagen"><figure class="figura">
-              <div class="monitor">
-                <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
-                <img src="/assets/img/capturas/giros/tienda-ropa-existencias.webp?v=1" alt="Existencias en el panel: piezas, valor del inventario y lo que está bajo el mínimo." width="1600" height="1000" loading="lazy" decoding="async">
-              </div>
-            </figure></div>
-            <h3><a class="enlace-tarjeta" href="/funciones#inventario">Tu inventario, al día</a></h3>
-            <p>Cada venta descuenta su existencia y te avisa lo que se está acabando. Desde Negocio.</p>
-            <span class="mas" aria-hidden="true">Ver inventario →</span>
-          </div>
+      <div class="cosas" data-acordeon-siempre>
+        <div class="cosas-encabezado pila pila-4">
+          <p class="eyebrow">Todo tu negocio</p>
+          <h2>De la venta al corte, en un solo sistema</h2>
         </div>
-        <div class="tres">
-          <div class="tarjeta tarjeta-media">
-            <div class="tarjeta-media-imagen"><figure class="figura">
-              <div class="monitor">
-                <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
-                <img src="/assets/img/capturas/giros/salon-calendario.webp?v=1" alt="El calendario del salón con las citas del día de tres colaboradoras." width="1600" height="1000" loading="lazy" decoding="async">
-              </div>
-            </figure></div>
-            <h3 style="font-size:var(--t-18)"><a class="enlace-tarjeta" href="/punto-de-venta-salones-de-belleza">Tu agenda de citas</a></h3>
-            <p>Las citas del día y quién atiende cada una.</p>
+
+        <div class="cosas-capturas">
+          <div class="cosas-escena"><div class="monitor">
+              <video autoplay muted loop playsinline preload="metadata" poster="/assets/video/cobro-portada.webp" width="1280" height="800" aria-label="Se agrega un refresco al ticket y se cobra con débito: $269.00, cobro registrado.">
+                <source src="/assets/video/cobro.webm" type="video/webm">
+                <source src="/assets/video/cobro.mp4" type="video/mp4">
+              </video>
+          </div></div>
+          <div class="cosas-escena"><div class="monitor">
+              <video autoplay muted loop playsinline preload="metadata" poster="/assets/video/inventario-portada.webp" width="1280" height="800" aria-label="El inventario en el panel: insumos en nivel, en stock bajo y agotados, y el filtro de lo que conviene reabastecer.">
+                <source src="/assets/video/inventario.webm" type="video/webm">
+                <source src="/assets/video/inventario.mp4" type="video/mp4">
+              </video>
+          </div></div>
+          <div class="cosas-escena"><div class="monitor">
+              <video autoplay muted loop playsinline preload="metadata" poster="/assets/video/agenda-portada.webp" width="1280" height="800" aria-label="El calendario del salón con las citas del día de tres colaboradoras; se abre una cita por llegar.">
+                <source src="/assets/video/agenda.webm" type="video/webm">
+                <source src="/assets/video/agenda.mp4" type="video/mp4">
+              </video>
+          </div></div>
+          <div class="cosas-escena"><div class="monitor">
+              <img src="/assets/img/capturas/pos-arqueo.webp?v=3" alt="Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón." width="1600" height="1000" loading="lazy" decoding="async">
+          </div></div>
+          <div class="cosas-escena"><div class="telefono">
+              <video autoplay muted loop playsinline preload="metadata" poster="/assets/video/celular-portada.webp" width="780" height="1688" aria-label="El panel del dueño en el celular: ventas del día, ventas por hora y los productos más vendidos.">
+                <source src="/assets/video/celular.webm" type="video/webm">
+                <source src="/assets/video/celular.mp4" type="video/mp4">
+              </video>
+          </div></div>
+        </div>
+
+        <div class="acordeon">
+          <div class="acordeon-item" data-acordeon-item data-abierto="true">
+            <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="true">
+              Cobra en segundos
+              <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <div class="acordeon-panel" data-acordeon-panel><div>
+              <p>Productos con sus opciones y su precio. Efectivo, tarjeta o las dos en la misma cuenta.</p>
+              <a href="/funciones#caja">Ver la caja →</a>
+            </div></div>
           </div>
-          <div class="tarjeta tarjeta-media">
-            <div class="tarjeta-media-imagen"><figure class="figura">
-              <div class="monitor">
-                <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
-                <img src="/assets/img/capturas/pos-arqueo.webp?v=3" alt="Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón." width="1600" height="1000" loading="lazy" decoding="async">
-              </div>
-            </figure></div>
-            <h3 style="font-size:var(--t-18)"><a class="enlace-tarjeta" href="/funciones#reportes">Un corte que cuadra con el cajón</a></h3>
-            <p>Lo que debe haber contra lo que hay, por turno.</p>
+          <div class="acordeon-item" data-acordeon-item data-abierto="false">
+            <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+              Tu inventario, al día
+              <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <div class="acordeon-panel" data-acordeon-panel><div>
+              <p>Cada venta descuenta su existencia y te avisa lo que se está acabando. Desde Negocio.</p>
+              <a href="/funciones#inventario">Ver inventario →</a>
+            </div></div>
           </div>
-          <div class="tarjeta tarjeta-media">
-            <div class="tarjeta-media-imagen"><figure class="figura">
-              <div class="monitor">
-                <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
-                <picture>
-                  <source media="(max-width: 619px)" srcset="/assets/img/capturas/admin-dashboard-movil.webp?v=3" width="780" height="1688">
-                  <img src="/assets/img/capturas/admin-dashboard.webp?v=3" alt="Panel del dueño con las ventas del día y el estado de las cajas." width="1600" height="1000" loading="lazy" decoding="async">
-                </picture>
-              </div>
-            </figure></div>
-            <h3 style="font-size:var(--t-18)"><a class="enlace-tarjeta" href="/funciones#reportes">La venta del día en tu celular</a></h3>
-            <p>Qué se vende, a qué hora y quién cobró.</p>
+          <div class="acordeon-item" data-acordeon-item data-abierto="false">
+            <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+              Tu agenda de citas
+              <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <div class="acordeon-panel" data-acordeon-panel><div>
+              <p>Las citas del día y quién atiende cada una.</p>
+              <a href="/punto-de-venta-salones-de-belleza">Ver la agenda →</a>
+            </div></div>
+          </div>
+          <div class="acordeon-item" data-acordeon-item data-abierto="false">
+            <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+              Un corte que cuadra con el cajón
+              <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <div class="acordeon-panel" data-acordeon-panel><div>
+              <p>Lo que debe haber contra lo que hay, por turno.</p>
+              <a href="/funciones#reportes">Ver el corte →</a>
+            </div></div>
+          </div>
+          <div class="acordeon-item" data-acordeon-item data-abierto="false">
+            <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+              La venta del día en tu celular
+              <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </button>
+            <div class="acordeon-panel" data-acordeon-panel><div>
+              <p>Qué se vende, a qué hora y quién cobró.</p>
+              <a href="/funciones#reportes">Ver los reportes →</a>
+            </div></div>
           </div>
         </div>
       </div>
@@ -1072,7 +1101,7 @@
 }
 </script>
 
-<script src="/assets/js/vim.js?v=24" defer></script>
+<script src="/assets/js/vim.js?v=27" defer></script>
 <!-- Medición sin cookies (Vercel Web Analytics). Se sirve desde este dominio y
      solo existe si está encendida en el proyecto de Vercel; si no, es un 404
      inofensivo. Los eventos se mandan desde vim.js. -->
