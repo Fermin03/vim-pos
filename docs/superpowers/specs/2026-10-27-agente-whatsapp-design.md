@@ -1,6 +1,6 @@
 # Agente de WhatsApp de VIM — diseño
 
-Fecha: 27 oct 2026 · Estado: borrador para aprobación de Fermín
+Fecha: 27 oct 2026 · Estado: **aprobado por Fermín** (27 oct)
 
 ## Por qué
 
@@ -54,7 +54,7 @@ Fermín intervenga, y Fermín recibe pocas conversaciones, ya resumidas.
 | Número | El mismo de soporte; Fermín **sigue usándolo en la app del iPhone** (coexistencia app + Cloud API). |
 | Conexión a Meta | VIM se registra como **Tech Provider** de Meta (no BSP). |
 | Identidad del cliente | Pide el **correo registrado** y manda un **código de confirmación a ese correo**; el cliente lo escribe en el chat. |
-| Cobro | **Mercado Pago** (liga de pago, confirmación automática) como principal; **transferencia validada con Banxico (CEP)** como segunda opción. |
+| Cobro | **Solo Mercado Pago** (liga de pago, confirmación automática). Se descartó Banxico. |
 | Renovación | Automática al confirmarse el pago. |
 | Agenda | **Google Calendar** (cuenta Gmail de Fermín; lo ve en la app Calendario del iPhone). Lunes a viernes, 9:00–12:00. |
 | Citas presenciales | En el negocio del prospecto, solo **León, San Francisco del Rincón y Purísima del Rincón**. Fuera de ahí: llamada o videollamada. |
@@ -82,7 +82,7 @@ Fermín intervenga, y Fermín recibe pocas conversaciones, ya resumidas.
 - **Precios WhatsApp México (desde 1 oct 2026)**: lo que escribe el cliente es gratis; respuestas del
   agente dentro de 24 h: 1,000 gratis/mes por número, luego ~US$0.0085; plantilla de utilidad
   ~US$0.0085. Lo que Fermín manda desde la app es gratis.
-- **Banxico CEP no tiene API oficial** y la página tiene captcha. La librería `cepmex` (Python, de
+- (Por qué se descartó Banxico) **Banxico CEP no tiene API oficial** y la página tiene captcha. La librería `cepmex` (Python, de
   Cuenca) usa los endpoints internos de la página: funciona pero puede romperse y es zona gris. Sólo
   hay CEP para SPEI entre bancos distintos y una vez que el banco receptor abonó.
 - **Mercado Pago**: Checkout Pro sobre **Orders API** (`type:"online"`, `checkout_url`,
@@ -147,7 +147,6 @@ Todo vive en `vim-pos`, con el stack existente:
 | `verificar_codigo` | Valida el código; liga el número de WhatsApp al tenant | Un solo uso, expira (15 min), máx. intentos |
 | `consultar_adeudo` | Plan, monto vigente, próxima fecha de cobro, estado | Solo con número verificado |
 | `crear_liga_pago` | Orden de Mercado Pago por el adeudo; devuelve `checkout_url` | Solo verificado; `external_reference` = intento de pago |
-| `validar_transferencia` | Valida una SPEI con Banxico (CEP) | Ver §Cobro |
 | `horarios_disponibles` / `agendar_cita` | Google Calendar | Ver §Agenda |
 | `guardar_prospecto` | Crea/actualiza `prospectos` (negocio, giro, ciudad, cajas…) | — |
 | `pasar_a_fermin` | Marca estado, pausa al agente y avisa a Fermín | Ver §Pasar a Fermín |
@@ -165,7 +164,7 @@ Todo vive en `vim-pos`, con el stack existente:
 
 ### Cobro y renovación
 
-**Mercado Pago (principal)**
+**Mercado Pago**
 
 **Cuánto se cobra** (decisión de Fermín): `consultar_adeudo` lee de la base el plan vigente (con su
 promoción, p. ej. $499 de fundador), los extras contratados (`totalMensual` de
@@ -194,22 +193,13 @@ comprobante es el mensaje de confirmación con folio del pago (y el correo de Me
    cobro. Idempotente: el mismo pago nunca se registra dos veces. Toda reactivación queda en la
    auditoría de /platform y Fermín la ve en su resumen.
 
-**Transferencia con Banxico (segunda opción)**
+**Solo Mercado Pago** (decisión de Fermín, 27 oct: se descartó validar transferencias con Banxico)
 
-1. El agente comparte banco/CLABE de `datos_pago_plataforma()` y pide, tras transferir: fecha,
-   clave de rastreo, banco emisor y monto. Si mandan foto del comprobante, **el agente la lee solo
-   para prellenar** esos datos y los confirma con el cliente; la foto nunca es prueba.
-2. `validar_transferencia` consulta CEP. Se acepta solo si: el receptor es la CLABE de VIM, el monto
-   ≥ adeudo, la fecha es reciente, y **la clave de rastreo no se ha usado antes**.
-3. Validada → `registrar_pago_suscripcion(metodo='TRANSFERENCIA', referencia=<clave de rastreo>)`
-   y reactivación si estaba suspendido (igual que con MP). Si el monto es menor al total, no registra:
-   le dice cuánto falta y pasa a Fermín.
-4. **Si Banxico no responde o no hay CEP** (mismo banco, aún no abonado, la librería falla): el pago
-   queda «por confirmar», el agente le dice al cliente a qué hora se confirma (dentro del horario de
-   Fermín) y pasa a Fermín con estado «Pago por confirmar»; Fermín lo confirma con un clic en
-   /platform y eso dispara el registro y la reactivación. **Mi decisión**: con transferencia sin
-   validar el agente **no** reactiva (sería la puerta del comprobante falso); si el cliente está
-   bloqueado, se le sugiere la liga de Mercado Pago como camino inmediato.
+- El agente **solo cobra con la liga de Mercado Pago**. No comparte la CLABE ni pide comprobantes.
+- Si el cliente dice que ya transfirió o depositó por su cuenta (o manda un comprobante), el agente
+  **no lo valida ni reactiva**: le agradece, le dice a qué hora se confirma (dentro del horario de
+  Fermín) y pasa a Fermín con estado «Pago por confirmar». Fermín lo registra en /platform como hoy.
+  Si el cliente está bloqueado, le ofrece la liga de Mercado Pago como camino inmediato.
 
 ### Agenda
 
@@ -307,8 +297,7 @@ producción a mano **antes** del merge (regla del proyecto) y su despliegue de f
 2. **Agenda**: Google Calendar.
 3. **Clientes**: código por correo + `consultar_adeudo` + factura/comprobante + Mercado Pago +
    renovación + reactivación.
-4. **Transferencias**: Banxico + «confirmar pago con un clic» en /platform.
-5. **Pulido de /platform**: preguntas sin respuesta, facturas por emitir, interruptor de fundador,
+4. **Pulido de /platform**: preguntas sin respuesta, facturas por emitir, interruptor de fundador,
    métricas.
 
 Mientras Meta aprueba al Tech Provider, se puede desarrollar y probar con el **número de prueba** que
@@ -316,7 +305,6 @@ da Meta en la app de desarrollador.
 
 ## Lo que se deja al builder
 
-Nombres de tablas y funciones, esquema exacto, cómo empaquetar la base de conocimiento, cómo portar
-la consulta de CEP a Deno/TypeScript (o correrla en otro lado), cómo reusar `cobro.ts` desde Deno,
+Nombres de tablas y funciones, esquema exacto, cómo empaquetar la base de conocimiento, cómo reusar `cobro.ts` desde Deno,
 el usuario técnico que firma `registrado_por`, el texto exacto del prompt (James revisa el tono), y
 cómo se ve la bandeja en /platform (siguiendo `docs/diseno/` y tokens).
