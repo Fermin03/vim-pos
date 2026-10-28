@@ -327,11 +327,11 @@ primeros, 503.
 
 La llama pg_cron a las 2:00 de México (`wa_aprender_cron`, migración 0287, con `x-vim-interno`; sin JWT),
 después de caducar las lecciones sin contestar en 3 días. Toma las conversaciones con actividad en las
-últimas 24 h (sin la de Fermín), sus pases a Fermín y las `wa_preguntas`, y le pide a Claude Sonnet hasta
+últimas 24 h (sin la de Fermín; de cada una, sus últimos 30 mensajes sin importar la fecha), sus pases a Fermín y las `wa_preguntas`, y le pide a Claude Sonnet hasta
 5 propuestas (`_shared/agente/lecciones/revisor.ts`): dudas que Fermín contestó, manejo de ánimo y
 preguntas sin respuesta. Las guarda como `PENDIENTE` en `wa_lecciones`; si guardó alguna y no hay
 lecciones `ENVIADA`, agenda en `wa_avisos_fermin` el aviso «N lecciones nuevas…» para las 9:00. Si el
-revisor falla no guarda nada (responde `propuestas 0`). Respuesta en texto plano: `propuestas N`.
+revisor falla no guarda nada (responde `propuestas 0`). El tope de 5 es por 24 h entre corridas, y el aviso no se duplica si ya hay uno de lecciones sin salir. Respuesta en texto plano: `propuestas N`.
 
 Secretos: `VIM_INTERNO_SECRET`, `WA_NUMERO_FERMIN` (solo dígitos, con lada), `ANTHROPIC_API_KEY`. Sin los
 dos primeros, 503.

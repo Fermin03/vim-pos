@@ -7,7 +7,8 @@
 //          caduca las lecciones sin contestar en 3 días. Responde `propuestas N` en texto plano.
 //
 // La conversación de Fermín (WA_NUMERO_FERMIN) nunca se revisa. Si el revisor falla, no se inserta
-// nada y se responde `propuestas 0`: mañana vuelve a intentarlo con otras 24 h.
+// nada y se responde `propuestas 0`: mañana vuelve a intentarlo con otras 24 h. Entre corridas del
+// mismo día el tope de 5 se comparte: lo creado en las últimas 24 h descuenta del cupo.
 //
 // Sin JWT (config.toml): la autenticidad la da `x-vim-interno`. Sin VIM_INTERNO_SECRET o sin
 // WA_NUMERO_FERMIN, 503.
@@ -16,10 +17,10 @@
 import { clienteAdmin } from "../_shared/http.ts";
 import { registrarError } from "../_shared/errores.ts";
 import { secretoInternoValido } from "../_shared/delivery/interno.ts";
-import { CONOCIMIENTO, FUNDADOR } from "../_shared/agente/conocimiento.gen.ts";
+import { CONOCIMIENTO, FUNDADOR, REGLAS } from "../_shared/agente/conocimiento.gen.ts";
 import { diez } from "../_shared/agente/turno.ts";
 import { bloqueAprendido } from "../_shared/agente/lecciones/bloque.ts";
-import { proponer } from "../_shared/agente/lecciones/revisor.ts";
+import { lineaMensaje, proponer } from "../_shared/agente/lecciones/revisor.ts";
 
 const FN = "whatsapp-aprender";
 const admin = clienteAdmin();
@@ -37,33 +38,43 @@ Deno.serve(async (req) => {
   if (!secretoInternoValido((req.headers.get("x-vim-interno") ?? "").trim(), secreto)) return texto("no autorizado", 401);
 
   const desde = new Date(Date.now() - 24 * 3600_000).toISOString();
+  // Tope de 5 por día entre corridas: lo que ya se propuso en las últimas 24 h descuenta.
+  const hoy = await admin.from("wa_lecciones").select("id", { count: "exact", head: true }).gte("creado_en", desde);
+  if (hoy.error) { registrarError(FN, "LEER", hoy.error); return texto("error", 500); }
+  const cupo = 5 - (hoy.count ?? 0);
+  if (cupo <= 0) return texto("propuestas 0");
+
   const [convs, lecciones] = await Promise.all([
-    admin.from("wa_conversaciones").select("id, wa_id, estado, resumen").gte("ultimo_mensaje_en", desde).order("ultimo_mensaje_en", { ascending: false }).limit(200),
+    admin.from("wa_conversaciones").select("id, wa_id, estado").gte("ultimo_mensaje_en", desde).order("ultimo_mensaje_en", { ascending: false }).limit(100),
     admin.from("wa_lecciones").select("tipo, comercial, pregunta, texto, estado, creado_en, decidido_en").in("estado", ["APROBADA", "PENDIENTE", "ENVIADA"]).order("creado_en", { ascending: false }).limit(300),
   ]);
   if (convs.error || lecciones.error) { registrarError(FN, "LEER", convs.error ?? lecciones.error); return texto("error", 500); }
 
-  const ids = filas(convs).filter((c) => diez(c.wa_id as string) !== diez(fermin)).map((c) => c.id as string);
+  const activas = filas(convs).filter((c) => diez(c.wa_id as string) !== diez(fermin));
+  const ids = activas.map((c) => c.id as string);
   if (ids.length === 0) return texto("propuestas 0");
-  const [msgs, avisos, preguntas] = await Promise.all([
-    admin.from("wa_mensajes").select("conversacion_id, autor, texto").in("conversacion_id", ids).gte("creado_en", desde).order("creado_en", { ascending: true }).limit(3000),
+  // Los últimos 30 mensajes de cada conversación activa, sea cual sea su fecha (el contexto de una duda puede ser de antier).
+  const [hilos, avisos, preguntas] = await Promise.all([
+    Promise.all(ids.map((id) => admin.from("wa_mensajes").select("autor, texto").eq("conversacion_id", id).order("creado_en", { ascending: false }).limit(30))),
     admin.from("wa_avisos_fermin").select("conversacion_id, motivo, resumen").in("conversacion_id", ids).gte("sale_en", desde),
     admin.from("wa_preguntas").select("conversacion_id, pregunta").in("conversacion_id", ids).gte("creado_en", desde),
   ]);
-  if (msgs.error || avisos.error || preguntas.error) { registrarError(FN, "LEER", msgs.error ?? avisos.error ?? preguntas.error); return texto("error", 500); }
+  const malo = hilos.find((h) => h.error)?.error ?? avisos.error ?? preguntas.error;
+  if (malo) { registrarError(FN, "LEER", malo); return texto("error", 500); }
 
-  // Sin teléfonos ni nombres de perfil: la conversación se identifica solo por su id.
+  // Sin teléfonos ni nombres de perfil: la conversación se identifica solo por su id. Todo texto libre
+  // va en una sola línea (lineaMensaje): un cliente no puede fingir líneas de Fermín ni encabezados.
   let conversaciones = "";
-  for (const c of filas(convs).filter((c) => ids.includes(c.id as string))) {
-    const lineas = filas(msgs).filter((m) => m.conversacion_id === c.id && m.texto).map((m) => `${m.autor}: ${m.texto}`);
-    if (lineas.length === 0) continue;
-    const pases = filas(avisos).filter((a) => a.conversacion_id === c.id).map((a) => `Pasó a Fermín (${a.motivo}): ${a.resumen}`);
+  activas.forEach((c, i) => {
+    const lineas = filas(hilos[i]).reverse().filter((m) => m.texto).map((m) => lineaMensaje(String(m.autor), String(m.texto)));
+    if (lineas.length === 0) return;
+    const pases = filas(avisos).filter((a) => a.conversacion_id === c.id).map((a) => lineaMensaje(`PASÓ A FERMÍN (${a.motivo})`, String(a.resumen ?? "")));
     conversaciones += `\n[${c.id}] estado ${c.estado}\n${[...lineas, ...pases].join("\n")}\n`;
-  }
+  });
   if (conversaciones.length > MAX_TEXTO) conversaciones = conversaciones.slice(0, MAX_TEXTO);
-  const sinResponder = filas(preguntas).map((p) => `[${p.conversacion_id}] ${p.pregunta}`);
+  const sinResponder = filas(preguntas).map((p) => lineaMensaje(`[${p.conversacion_id}]`, String(p.pregunta)));
   if (!conversaciones.trim()) return texto("propuestas 0");
-  conversaciones = `CONVERSACIONES DE LAS ÚLTIMAS 24 HORAS:\n${conversaciones}\nPREGUNTAS SIN RESPONDER:\n${sinResponder.join("\n") || "(ninguna)"}`;
+  conversaciones = `CONVERSACIONES (últimos mensajes de las que tuvieron actividad en las últimas 24 horas):\n${conversaciones}\nPREGUNTAS SIN RESPONDER:\n${sinResponder.join("\n") || "(ninguna)"}`;
 
   // Lo aprobado (con su encabezado) más lo ya propuesto y sin decidir, para no repetir.
   const todas = filas(lecciones);
@@ -73,7 +84,7 @@ Deno.serve(async (req) => {
     pendientes.length ? "YA PROPUESTAS, PENDIENTES DE QUE FERMÍN DECIDA:\n" + pendientes.map((l) => `- ${l.pregunta ?? "Tono"}: ${l.texto}`).join("\n") : "",
   ].filter(Boolean).join("\n\n");
 
-  const propuestas = await proponer(conversaciones, { conocimiento: CONOCIMIENTO + "\n\n" + FUNDADOR, aprendido }, Deno.env.get("ANTHROPIC_API_KEY") ?? "");
+  const propuestas = await proponer(conversaciones, { conocimiento: CONOCIMIENTO + "\n\n" + FUNDADOR, aprendido, reglas: REGLAS }, Deno.env.get("ANTHROPIC_API_KEY") ?? "", fetch, cupo);
   if (propuestas.length === 0) return texto("propuestas 0");
 
   // Un id inventado por el modelo violaría la llave foránea: solo valen los que se le mostraron.
@@ -81,8 +92,10 @@ Deno.serve(async (req) => {
   const ins = await admin.from("wa_lecciones").insert(nuevas);
   if (ins.error) { registrarError(FN, "INSERTAR", ins.error); return texto("error", 500); }
 
-  // El aviso de las 9:00, salvo que ya haya lecciones enviadas sin contestar (no se insiste).
-  if (!todas.some((l) => l.estado === "ENVIADA")) {
+  // El aviso de las 9:00, salvo que ya haya lecciones enviadas sin contestar o un aviso de lecciones sin salir (no se insiste).
+  const avisoPuesto = await admin.from("wa_avisos_fermin").select("id").eq("motivo", "Lecciones").is("enviado_en", null).limit(1);
+  if (avisoPuesto.error) registrarError(FN, "AVISO", avisoPuesto.error);
+  if (!todas.some((l) => l.estado === "ENVIADA") && !avisoPuesto.error && filas(avisoPuesto).length === 0) {
     const horario = await admin.rpc("wa_siguiente_horario", { p_ts: new Date().toISOString() });
     if (horario.error) registrarError(FN, "HORARIO", horario.error);
     const n = nuevas.length;
