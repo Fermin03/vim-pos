@@ -1,4 +1,4 @@
-# Contacto: escríbenos y contesta una persona
+# Contacto: escríbenos por WhatsApp o correo
 
 > Escríbenos a hola@vimpos.com.mx. Contestamos el mismo día hábil, sin centro de llamadas ni número de folio de por medio.
 
