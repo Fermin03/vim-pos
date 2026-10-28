@@ -274,7 +274,10 @@ export function Aprendido({ api }: { api: Api }) {
       await api("/api/whatsapp/lecciones", { method: "POST", body: JSON.stringify({ accion: "quitar", id }) });
       await recargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo quitar");
+      // Se recarga igual (quizá ya estaba retirada por WhatsApp); el error se pone después porque cargar lo limpia.
+      const msg = e instanceof Error ? e.message : "No se pudo quitar";
+      await recargar();
+      setError(msg);
     } finally {
       setOcupado(null);
     }
@@ -318,7 +321,7 @@ export function Aprendido({ api }: { api: Api }) {
                   {l.decidido_en && <> · decidida {fechaHoraMx(l.decidido_en, "corto")}</>}
                 </p>
                 {l.estado === "APROBADA" && (
-                  <button type="button" onClick={() => void quitar(l.id)} disabled={ocupado !== null} className={btnFantasma}>
+                  <button type="button" onClick={() => void quitar(l.id)} disabled={ocupado === l.id} className={btnFantasma}>
                     {ocupado === l.id ? "Quitando…" : "Quitar"}
                   </button>
                 )}
