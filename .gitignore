@@ -50,3 +50,5 @@ docs/integraciones/delivery/didi-food/adjuntos/imagenes/*
 
 # resultados de la evaluación del agente de WhatsApp (traen conversaciones de prueba)
 scripts/evals-agente/resultados/
+# lecciones aprobadas exportadas de producción (traen datos reales)
+scripts/evals-agente/lecciones.json

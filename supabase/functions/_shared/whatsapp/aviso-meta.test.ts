@@ -29,8 +29,19 @@ test("mensaje de texto", () => {
     messages: [{ from: "5214771234567", id: "wamid.X", timestamp: "1700000000", type: "text", text: { body: "Hola" } }],
   });
   assert.deepEqual(leerAviso(aviso), [
-    { tipo: "mensaje", waId: "5214771234567", wamid: "wamid.X", nombre: "Ana", texto: "Hola" },
+    { tipo: "mensaje", waId: "5214771234567", wamid: "wamid.X", nombre: "Ana", texto: "Hola", respondeA: null },
   ]);
+});
+
+test("respondeA trae context.id del mensaje citado", () => {
+  const aviso = envolver("messages", {
+    metadata: { phone_number_id: "PNID" },
+    messages: [
+      { from: "1", id: "wamid.R", type: "text", text: { body: "ok" }, context: { id: "wamid.LECCION" } },
+      { from: "1", id: "wamid.S", type: "text", text: { body: "ok" }, context: {} },
+    ],
+  });
+  assert.deepEqual(leerAviso(aviso).map((e) => e.tipo === "mensaje" && e.respondeA), ["wamid.LECCION", null]);
 });
 
 test("solo statuses, null y basura dan []", () => {

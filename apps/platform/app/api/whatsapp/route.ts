@@ -32,13 +32,19 @@ export async function GET(req: Request) {
     .order("ultimo_mensaje_en", { ascending: false, nullsFirst: false })
     .limit(LIMITE);
   if (estado) lista = lista.eq("estado", estado);
-  const [{ data, error }, cfg] = await Promise.all([lista, sb.from("wa_config").select("fundador_abierta").eq("id", true).maybeSingle()]);
-  if (error ?? cfg.error) return NextResponse.json({ error: (error ?? cfg.error)!.message }, { status: 500 });
+  const [{ data, error }, cfg, lec] = await Promise.all([
+    lista,
+    sb.from("wa_config").select("fundador_abierta").eq("id", true).maybeSingle(),
+    sb.from("wa_lecciones").select("id", { count: "exact", head: true }).eq("estado", "APROBADA"),
+  ]);
+  const fallo2 = error ?? cfg.error ?? lec.error;
+  if (fallo2) return NextResponse.json({ error: fallo2.message }, { status: 500 });
 
   return NextResponse.json({
     conversaciones: data ?? [],
     conteo,
     fundador_abierta: (cfg.data as { fundador_abierta: boolean } | null)?.fundador_abierta ?? true,
+    lecciones_aprobadas: lec.count ?? 0,
     limite: LIMITE,
   });
 }

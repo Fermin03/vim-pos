@@ -18,6 +18,7 @@ export type Turno = {
   historial: { autor: "CLIENTE" | "AGENTE" | "FERMIN"; texto: string }[]
   modelo: Modelo
   fundadorAbierta: boolean
+  aprendido?: string // bloqueAprendido(...): lo que VIM aprobó; "" o ausente = nada
   ahora?: Date // para pruebas; por defecto, new Date()
 }
 
@@ -143,6 +144,7 @@ export async function responder(
   const clave = (globalThis as { Deno?: { env: { get(k: string): string | undefined } } }).Deno?.env.get("ANTHROPIC_API_KEY") ?? ""
   const system: Record<string, unknown>[] = [REGLAS, CONOCIMIENTO, ...(t.fundadorAbierta ? [FUNDADOR] : [])].map((text) => ({ type: "text", text }))
   system[system.length - 1].cache_control = { type: "ephemeral", ttl: "1h" }
+  if (t.aprendido) system.push({ type: "text", text: t.aprendido, cache_control: { type: "ephemeral", ttl: "1h" } })
   system.push({ type: "text", text: bloqueAhora(t.ahora ?? new Date()) +
     (t.fundadorAbierta ? "" : " La oferta «Negocio fundador» está CERRADA: no la menciones ni la ofrezcas.") })
   const hist = aMensajes(t.historial)

@@ -42,7 +42,7 @@ function herramientasFalsas(llamadas: Llamada[], ahora: Date): Herramientas {
   }
 }
 
-async function juzgar(esc: Escenario, historial: Mensaje[], llamadas: Llamada[], ahora: Date, clave: string): Promise<Criterio[]> {
+async function juzgar(esc: Escenario, historial: Mensaje[], llamadas: Llamada[], ahora: Date, clave: string, aprendido: string): Promise<Criterio[]> {
   const transcripcion = historial.map((m) => `${m.autor === "CLIENTE" ? "Cliente" : "Agente"}: ${m.texto}`).join("\n\n")
   const usadas = llamadas.map((l) => `${l.h} ${JSON.stringify(l.d)}`).join("\n") || "(ninguna)"
   const criterios = [...GENERALES.map((t) => ({ t, general: true })), ...(esc.criterios ?? []).map((t) => ({ t, general: false }))]
@@ -54,7 +54,9 @@ async function juzgar(esc: Escenario, historial: Mensaje[], llamadas: Llamada[],
       // El juez ve la misma información que el agente: «no inventa» se califica contra ella, no contra lo que el juez supone.
       system: [
         { type: "text", text: "Eres un evaluador estricto de un asistente de ventas y soporte por WhatsApp de VIM POS (punto de venta para negocios en México). Calificas una conversación contra criterios. Sé justo: un criterio que no aplica a esta conversación se da por cumplido. Para decidir si algo es inventado, compáralo con la INFORMACIÓN DEL ASISTENTE de abajo: si ahí está, no es inventado. Responde SOLO con JSON válido." },
-        { type: "text", text: `INFORMACIÓN DEL ASISTENTE (lo único que sabe):\n${CONOCIMIENTO}\n\n${esc.fundadorAbierta === false ? "(La oferta «Negocio fundador» está cerrada.)" : FUNDADOR}`, cache_control: { type: "ephemeral" } },
+        { type: "text", text: `INFORMACIÓN DEL ASISTENTE (lo único que sabe):\n${CONOCIMIENTO}\n\n${esc.fundadorAbierta === false ? "(La oferta «Negocio fundador» está cerrada.)" : FUNDADOR}${aprendido ? `
+
+${aprendido}` : ""}`, cache_control: { type: "ephemeral" } },
       ],
       messages: [{ role: "user", content:
         `Hora de la conversación (CDMX): ${hora(ahora)}.\n\nConversación:\n${transcripcion}\n\nHerramientas que usó el agente:\n${usadas}\n\n` +
@@ -71,7 +73,8 @@ async function juzgar(esc: Escenario, historial: Mensaje[], llamadas: Llamada[],
 }
 
 /** Corre y califica un escenario. Nunca lanza: un error queda en `error`. */
-export async function evaluarEscenario(esc: Escenario, clave: string): Promise<Resultado> {
+/** `aprendido` = bloqueAprendido(...): lo aprobado por VIM, que el agente y el juez conocen igual que en producción. */
+export async function evaluarEscenario(esc: Escenario, clave: string, aprendido = ""): Promise<Resultado> {
   try {
     const ahora = new Date(esc.ahora ?? AHORA_POR_DEFECTO)
     const llamadas: Llamada[] = [], historial: Mensaje[] = []
@@ -80,7 +83,7 @@ export async function evaluarEscenario(esc: Escenario, clave: string): Promise<R
     for (const texto of esc.turnos) {
       historial.push({ autor: "CLIENTE", texto })
       const antes = llamadas.length
-      const r = await responder({ historial: [...historial], modelo, fundadorAbierta: esc.fundadorAbierta ?? true, ahora }, herramientasFalsas(llamadas, ahora))
+      const r = await responder({ historial: [...historial], modelo, fundadorAbierta: esc.fundadorAbierta ?? true, ahora, aprendido }, herramientasFalsas(llamadas, ahora))
       usd += r.usd; modelo = r.modelo
       if (r.fallo) fallos.push(r.motivo ?? "sin motivo")
       // Tras pasar la conversación a un agente no se cierra con una pregunta: el agente ya no contesta.
@@ -93,7 +96,7 @@ export async function evaluarEscenario(esc: Escenario, clave: string): Promise<R
       ...revisarHerramientas(esc, llamadas),
       ...fallos.map((m) => `cayó en el mensaje de respaldo (${m})`),
     ]
-    const juicio = await juzgar(esc, historial, llamadas, ahora, clave)
+    const juicio = await juzgar(esc, historial, llamadas, ahora, clave, aprendido)
     return { id: esc.id, categoria: esc.categoria, ok: !fijas.length && juicio.every((x) => x.cumple), historial, llamadas, modelo, usd, fijas, juicio }
   } catch (e) {
     return { id: esc.id, categoria: esc.categoria, ok: false, error: e instanceof Error ? e.message : String(e) }

@@ -1,9 +1,9 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { atenderMensaje, type DepsTurno, MENSAJE_AUDIO } from "./turno.ts"
+import { atenderMensaje, type DepsTurno, MENSAJE_AUDIO, mismoNumero } from "./turno.ts"
 import { AVISO_PRIVACIDAD, MENSAJE_FIJO } from "./cerebro.ts"
 
-const ev = (texto = "hola", waId = "5214771234567") => ({ tipo: "mensaje" as const, waId, wamid: "w1", nombre: "Ana", texto })
+const ev = (texto = "hola", waId = "5214771234567") => ({ tipo: "mensaje" as const, waId, wamid: "w1", nombre: "Ana", texto, respondeA: null })
 const R = { conversacion_id: "c1", responder: true }
 
 type Opc = {
@@ -183,6 +183,16 @@ test("mensaje del propio número de Fermín (con o sin 1 tras el 52): se registr
     assert.deepEqual(llamadas, [])
     assert.equal(rpcs.length, 0)
   }
+  // Otro país con los mismos 10 dígitos finales sí se contesta.
+  const { deps, llamadas } = hacer()
+  await atenderMensaje(ev("hola", "14779999999"), R, deps)
+  assert.ok(llamadas.length > 0)
+})
+test("mismoNumero: compara el número completo; el 1 de celular de México tras el 52 no cuenta", () => {
+  assert.ok(mismoNumero("5215512345678", "525512345678"))
+  assert.ok(mismoNumero("+52 1 55 1234 5678", "5215512345678"))
+  assert.ok(!mismoNumero("15512345678", "525512345678"))
+  assert.ok(!mismoNumero("", ""))
 })
 test("conversación nueva: el aviso de privacidad va en la respuesta, en el audio y en el mensaje fijo", async () => {
   const a = hacer({ nueva: true }); await atenderMensaje(ev(), R, a.deps)
