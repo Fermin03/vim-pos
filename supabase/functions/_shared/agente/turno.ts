@@ -29,7 +29,7 @@ export type DepsTurno = {
 export const MENSAJE_AUDIO = "No puedo escuchar audios, ¿me lo escribes?"
 export const ESPERA_RAFAGA_MS = 4000
 
-const diez = (n: string) => n.replace(/\D/g, "").slice(-10)
+export const diez = (n: string) => n.replace(/\D/g, "").slice(-10)
 
 export async function atenderMensaje(
   e: Extract<Evento, { tipo: "mensaje" }>,

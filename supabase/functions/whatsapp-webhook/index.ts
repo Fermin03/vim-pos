@@ -24,7 +24,7 @@ import { registrarError } from "../_shared/errores.ts";
 import { firmaMetaValida, leerAviso } from "../_shared/whatsapp/aviso-meta.ts";
 import { cuerpoTexto, enviar } from "../_shared/whatsapp/enviar.ts";
 import { type Herramientas, responder } from "../_shared/agente/cerebro.ts";
-import { atenderMensaje, type DepsTurno } from "../_shared/agente/turno.ts";
+import { atenderMensaje, type DepsTurno, diez } from "../_shared/agente/turno.ts";
 import { atenderFermin, type DepsRevision } from "../_shared/agente/lecciones/revision.ts";
 import { bloqueAprendido } from "../_shared/agente/lecciones/bloque.ts";
 import { filaProspecto, sinNulos } from "../_shared/agente/prospecto.ts";
@@ -85,8 +85,6 @@ async function contar(id: string, autor: "CLIENTE" | "AGENTE" | "FERMIN", desde?
   return count ?? 0;
 }
 
-const diez = (n: string) => n.replace(/\D/g, "").slice(-10);
-
 /** Revisión de lecciones: las respuestas de Fermín (SÍ / NO / corrección / QUITAR) llegan por aquí. */
 const depsRevision: DepsRevision = {
   async lecciones(estados) {
@@ -95,7 +93,11 @@ const depsRevision: DepsRevision = {
   async actualizar(id, cambios) {
     ok(await admin.from("wa_lecciones").update(cambios).eq("id", id));
   },
-  enviar: (texto) => enviar(cuerpoTexto(numeroFermin, texto)),
+  async enviar(texto) {
+    const r = await enviar(cuerpoTexto(numeroFermin.replace(/\D/g, ""), texto));
+    if (!r.ok) registrarError(FN, "REVISION_ENVIO", r.error);
+    return r;
+  },
   ahora: () => new Date(),
 };
 
@@ -107,14 +109,16 @@ const deps = (waId: string): DepsTurno => ({
       admin.from("wa_conversaciones").select("modelo").eq("id", id).single(),
       admin.from("wa_config").select("fundador_abierta").single(),
       contar(id, "AGENTE"),
-      admin.from("wa_lecciones").select("tipo, comercial, pregunta, texto, decidido_en").eq("estado", "APROBADA"),
+      admin.from("wa_lecciones").select("tipo, comercial, pregunta, texto, decidido_en").eq("estado", "APROBADA").order("decidido_en", { ascending: false }).limit(200),
     ]);
+    // Lo aprendido es un extra: si falla su lectura, el cliente recibe respuesta igual.
+    if (aprobadas.error) registrarError(FN, "LECCIONES", aprobadas.error);
     return {
       historial: ok(msgs).reverse().map((m: { autor: "CLIENTE" | "AGENTE" | "FERMIN"; texto: string | null }) => ({ autor: m.autor, texto: m.texto ?? "" })),
       modelo: ok(conv).modelo,
       fundadorAbierta: ok(cfg).fundador_abierta,
       nueva: delAgente === 0,
-      aprendido: bloqueAprendido(ok(aprobadas)),
+      aprendido: aprobadas.error ? "" : bloqueAprendido(aprobadas.data),
     };
   },
   responder,
