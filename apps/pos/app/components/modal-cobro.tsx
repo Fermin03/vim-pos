@@ -22,7 +22,7 @@ import { aplicarPagosEnOrden, pagoEntroPeseAlError, ventaQuedoPagada, type PagoP
 import { pagoDeCobro, pedirCobro, propinaDeCobro, terminalDeCaja, type CobroTerminal, type TerminalCaja } from "../lib/terminal";
 import { debePreguntarPropina, montosSugeridosEfectivo, propinaPreguntadaAlVolver, totalCobrado, vistaAlRegresar, type DestinoMetodo, type VistaCobro } from "../lib/cobro-flujo";
 import { VistaTerminal } from "./vista-terminal";
-import { aBuffer, aMonto, BotonPrincipal, BotonSecundario, FilaOpcion, Numpad, PantallaCobro } from "./cobro/pantalla-cobro";
+import { aBuffer, aMonto, BotonPrincipal, BotonSecundario, FilaOpcion, Numpad, PantallaCobro, PantallaEspera } from "./cobro/pantalla-cobro";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
 import {
   leerCuentaCredito,
@@ -627,20 +627,15 @@ function VistaSaldoFavor({ pendiente, monto, contexto, procesando, error, onConf
 /** Mientras se registra el pago. En efectivo con cambio, el cambio ya se ve para ir contando. */
 function PantallaRegistrando({ cambio, recibido }: { cambio: number; recibido: number }) {
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-surface" role="dialog" aria-modal="true" aria-busy="true">
-      <div className="flex h-24 flex-shrink-0 flex-col items-center justify-end">
-        {cambio > 0 && (
-          <>
-            <div className={`${dinero} text-28 text-ink`}>Cambio {fmtMxn(cambio)}</div>
-            <div className="text-15 text-ink-3">de {fmtMxn(recibido)}</div>
-          </>
-        )}
-      </div>
-      <div className="flex flex-1 flex-col items-center justify-center" role="status">
-        <span className="mb-6 h-14 w-14 animate-spin rounded-full border-4 border-line border-t-accent" aria-hidden />
-        <div className="font-display text-32 font-bold text-ink">Registrando pago</div>
-      </div>
-    </div>
+    <PantallaEspera
+      titulo="Registrando pago"
+      arriba={cambio > 0 && (
+        <>
+          <div className={`${dinero} text-28 text-ink`}>Cambio {fmtMxn(cambio)}</div>
+          <div className="text-15 text-ink-3">de {fmtMxn(recibido)}</div>
+        </>
+      )}
+    />
   );
 }
 
