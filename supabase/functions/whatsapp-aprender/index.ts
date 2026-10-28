@@ -19,8 +19,7 @@ import { registrarError } from "../_shared/errores.ts";
 import { secretoInternoValido } from "../_shared/delivery/interno.ts";
 import { CONOCIMIENTO, FUNDADOR, REGLAS } from "../_shared/agente/conocimiento.gen.ts";
 import { mismoNumero } from "../_shared/agente/turno.ts";
-import { bloqueAprendido } from "../_shared/agente/lecciones/bloque.ts";
-import { inicioDelDiaMX, lineaMensaje, proponer } from "../_shared/agente/lecciones/revisor.ts";
+import { inicioDelDiaMX, lineaMensaje, loQueYaSabe, proponer } from "../_shared/agente/lecciones/revisor.ts";
 
 const FN = "whatsapp-aprender";
 const admin = clienteAdmin();
@@ -44,9 +43,13 @@ Deno.serve(async (req) => {
   const cupo = 5 - (hoy.count ?? 0);
   if (cupo <= 0) return texto("propuestas 0");
 
+  // Las descartadas y caducadas de los últimos 30 días también, para que no las vuelva a proponer (fecha sola: sin «:» ni «.» en el filtro).
+  const hace30 = new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10);
   const [convs, lecciones] = await Promise.all([
     admin.from("wa_conversaciones").select("id, wa_id, estado").gte("ultimo_mensaje_en", desde).order("ultimo_mensaje_en", { ascending: false }).limit(100),
-    admin.from("wa_lecciones").select("tipo, comercial, pregunta, texto, estado, creado_en, decidido_en").in("estado", ["APROBADA", "PENDIENTE", "ENVIADA"]).order("creado_en", { ascending: false }).limit(300),
+    admin.from("wa_lecciones").select("tipo, comercial, pregunta, texto, estado, creado_en, decidido_en")
+      .or(`estado.in.(APROBADA,PENDIENTE,ENVIADA),and(estado.in.(DESCARTADA,CADUCADA),decidido_en.gte.${hace30})`)
+      .order("creado_en", { ascending: false }).limit(300),
   ]);
   if (convs.error || lecciones.error) { registrarError(FN, "LEER", convs.error ?? lecciones.error); return texto("error", 500); }
 
@@ -76,13 +79,9 @@ Deno.serve(async (req) => {
   if (!conversaciones.trim()) return texto("propuestas 0");
   conversaciones = `CONVERSACIONES (últimos mensajes de las que tuvieron actividad en las últimas 24 horas):\n${conversaciones}\nPREGUNTAS SIN RESPONDER:\n${sinResponder.join("\n") || "(ninguna)"}`;
 
-  // Lo aprobado (con su encabezado) más lo ya propuesto y sin decidir, para no repetir.
+  // Lo aprobado (con su encabezado), lo ya propuesto sin decidir y lo descartado, para no repetir.
   const todas = filas(lecciones);
-  const pendientes = todas.filter((l) => l.estado !== "APROBADA");
-  const aprendido = [
-    bloqueAprendido(todas.filter((l) => l.estado === "APROBADA") as unknown as Parameters<typeof bloqueAprendido>[0]),
-    pendientes.length ? "YA PROPUESTAS, PENDIENTES DE QUE FERMÍN DECIDA:\n" + pendientes.map((l) => `- ${l.pregunta ?? "Tono"}: ${l.texto}`).join("\n") : "",
-  ].filter(Boolean).join("\n\n");
+  const aprendido = loQueYaSabe(todas as unknown as Parameters<typeof loQueYaSabe>[0]);
 
   const propuestas = await proponer(conversaciones, { conocimiento: CONOCIMIENTO + "\n\n" + FUNDADOR, aprendido, reglas: REGLAS }, Deno.env.get("ANTHROPIC_API_KEY") ?? "", fetch, cupo);
   if (propuestas.length === 0) return texto("propuestas 0");

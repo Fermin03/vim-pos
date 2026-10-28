@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { filtrarPropuestas, inicioDelDiaMX, lineaMensaje, proponer } from './revisor.ts'
+import { filtrarPropuestas, inicioDelDiaMX, lineaMensaje, loQueYaSabe, MARCADOR, proponer } from './revisor.ts'
 
 const prop = (o: Record<string, unknown> = {}) => ({
   tipo: 'DUDA', comercial: false, pregunta: '¿Hacen envíos?', texto: 'Sí, en León.', evidencia: 'Cliente preguntó y Fermín contestó.',
@@ -73,6 +73,24 @@ test('proponer: envía el modelo, el tope y la clave', async () => {
   assert.equal((visto!.init.headers as Record<string, string>)['x-api-key'], 'k')
   assert.ok(JSON.stringify(cuerpo).includes('SABER') && JSON.stringify(cuerpo).includes('APRENDIDO') && JSON.stringify(cuerpo).includes('CONVERSACIONES'))
   assert.ok(JSON.stringify(cuerpo).includes('NUNCA HACES'))
+  assert.ok(JSON.stringify(cuerpo).includes(MARCADOR) && !JSON.stringify(cuerpo).includes('Fermín debe escribir'))
+  assert.ok(JSON.stringify(cuerpo).includes('YA DESCARTADAS'))
+})
+
+test('loQueYaSabe: aprobadas como bloque, propuestas y descartadas/caducadas en su sección', () => {
+  const base = { tipo: 'DUDA', comercial: false, pregunta: '¿P?', decidido_en: '2026-10-01T00:00:00Z' }
+  const s = loQueYaSabe([
+    { ...base, texto: 'aprobada', estado: 'APROBADA' },
+    { ...base, texto: 'pendiente', estado: 'PENDIENTE' },
+    { ...base, texto: 'enviada', estado: 'ENVIADA' },
+    { ...base, texto: 'descartada', estado: 'DESCARTADA' },
+    { ...base, tipo: 'TONO', pregunta: null, texto: 'caducada', estado: 'CADUCADA' },
+  ] as Parameters<typeof loQueYaSabe>[0])
+  const [aprendido, pendientes, descartadas] = s.split('\n\n')
+  assert.match(aprendido, /^LO QUE HAS APRENDIDO[\s\S]*aprobada$/)
+  assert.equal(pendientes, 'YA PROPUESTAS, PENDIENTES DE QUE FERMÍN DECIDA:\n- ¿P?: pendiente\n- ¿P?: enviada')
+  assert.equal(descartadas, 'YA DESCARTADAS (Fermín no las quiso o las dejó caducar: no las vuelvas a proponer):\n- ¿P?: descartada\n- Tono: caducada')
+  assert.equal(loQueYaSabe([]), '')
 })
 
 test('proponer: HTTP 500, red caída, texto sin JSON o sin clave dan []', async () => {
