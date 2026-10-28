@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { atenderFermin, interpretar, TEXTO_NO_ENTIENDO, textoLeccion, type DepsRevision, type Leccion } from './revision.ts'
+import { atenderFermin, interpretar, TEXTO_COMO_QUITAR, TEXTO_NO_ENTIENDO, TEXTO_SIN_ESPERA, textoLeccion, type DepsRevision, type Leccion } from './revision.ts'
 import { MARCADOR } from './revisor.ts'
 
 const lec = (id: string, o: Partial<Leccion> = {}): Leccion => ({
@@ -152,7 +152,7 @@ test('PREGUNTA con el marcador: SÍ no la aprueba; NO la descarta; corrección l
   const f = fake(enviadas('a', 'b', 'c'))
   for (const l of f.ls) Object.assign(l, { tipo: 'PREGUNTA', texto: MARCADOR })
   await atenderFermin(msg('sí', 'wa'), f.deps)
-  assert.deepEqual([f.ls[0].estado, f.enviados], ['ENVIADA', ['Escribe la respuesta para esa pregunta.']])
+  assert.deepEqual([f.ls[0].estado, f.enviados], ['ENVIADA', ['Escribe la respuesta: desliza la lección y escríbela, o mándala como «1: texto».']])
   await atenderFermin(msg('no', 'wb'), f.deps)
   assert.equal(f.ls[1].estado, 'DESCARTADA')
   await atenderFermin(msg('Hacemos envíos en todo León', 'wc'), f.deps)
@@ -315,11 +315,69 @@ test('respondeA ajeno con ENVIADA vigentes pide deslizar; sin ENVIADA calla', as
   const f = fake(enviadas('a'))
   await atenderFermin(msg('sí', 'otro'), f.deps)
   await atenderFermin(msg('QUITAR', 'otro'), f.deps)
-  assert.deepEqual(f.enviados, [DESLIZA, DESLIZA])
+  assert.deepEqual(f.enviados, [DESLIZA, TEXTO_COMO_QUITAR])
   assert.equal(f.ls[0].estado, 'ENVIADA')
   const g = fake([])
   await atenderFermin(msg('sí', 'otro'), g.deps)
   assert.equal(g.enviados.length, 0)
+})
+
+// --- Ronda 2 ---
+
+test('«sí 2» y «2 sí» sin deslizar, con la 2 ya decidida y una sola ENVIADA: no deciden la otra', async () => {
+  for (const t of ['sí 2', '2 sí']) {
+    const f = fake([lec('a', { estado: 'ENVIADA', orden: 1, wamid_envio: 'wa' }), lec('b', { estado: 'APROBADA', orden: 2, wamid_envio: 'wb' })])
+    await atenderFermin(msg(t), f.deps)
+    assert.deepEqual([f.ls[0].estado, f.enviados], ['ENVIADA', [DESLIZA]], t)
+  }
+})
+
+test('deslizar un mensaje de una tanda vieja con «SÍ 2» dice que ya se decidió, no toca la 2 nueva', async () => {
+  const f = fake([lec('vieja', { estado: 'CADUCADA', wamid_envio: 'wv' }), ...enviadas('a', 'b')])
+  await atenderFermin(msg('SÍ 2', 'wv'), f.deps)
+  assert.deepEqual(f.ls.map((l) => l.estado), ['CADUCADA', 'ENVIADA', 'ENVIADA'])
+  assert.deepEqual(f.enviados, ['Esa lección ya está caducada.'])
+})
+
+test('«1: no» / «2: sí» deciden, no guardan «no»/«sí» como texto', async () => {
+  assert.deepEqual(interpretar('1: no'), { accion: 'NO', numero: 1 })
+  assert.deepEqual(interpretar('2: Sí, gracias'), { accion: 'SI', numero: 2 })
+  assert.deepEqual(interpretar('2: di que sí'), { accion: 'SI', numero: 2 })
+  assert.deepEqual(interpretar('2: no hacemos envíos'), { accion: 'CORRECCION', numero: 2, texto: 'no hacemos envíos' })
+  const f = fake(enviadas('a', 'b'))
+  await atenderFermin(msg('1: no'), f.deps)
+  await atenderFermin(msg('2: sí'), f.deps)
+  assert.deepEqual(f.ls.map((l) => [l.estado, l.texto]), [['DESCARTADA', 'Sí, en León.'], ['APROBADA', 'Sí, en León.']])
+})
+
+test('QUITAR deslizando el mensaje de una lección aprobada con SÍ (sin eco) la retira; sin coincidencia explica cómo', async () => {
+  const f = fake(enviadas('a', 'b'))
+  await atenderFermin(msg('sí', 'wa'), f.deps)
+  await atenderFermin(msg('QUITAR', 'wa'), f.deps)
+  assert.equal(f.ls[0].estado, 'RETIRADA')
+  assert.deepEqual(f.enviados, ['Listo, ya no lo digo.'])
+  await atenderFermin(msg('quitar', 'wb'), f.deps)
+  assert.equal(f.ls[1].estado, 'ENVIADA')
+  await atenderFermin(msg('QUITAR'), f.deps)
+  const g = fake([])
+  await atenderFermin(msg('QUITAR', 'otro'), g.deps)
+  assert.deepEqual(f.enviados.slice(1), ['Esa lección aún no está aprobada; responde NO para descartarla.', TEXTO_COMO_QUITAR])
+  assert.deepEqual(g.enviados, [TEXTO_COMO_QUITAR])
+})
+
+test('SÍ a la pregunta con marcador indica cómo escribir la respuesta, con su número', async () => {
+  const f = fake(enviadas('a', 'b'))
+  f.ls[1].texto = MARCADOR
+  await atenderFermin(msg('sí', 'wb'), f.deps)
+  assert.deepEqual(f.enviados, ['Escribe la respuesta: desliza la lección y escríbela, o mándala como «2: texto».'])
+})
+
+test('«N: texto» o corrección deslizada sin tanda abierta: avisa en vez de callar', async () => {
+  const f = fake([lec('x', { estado: 'APROBADA', wamid_envio: 'wx' })])
+  await atenderFermin(msg('2: Atendemos en León'), f.deps)
+  await atenderFermin(msg('Atendemos en León', 'otro'), f.deps)
+  await atenderFermin(msg('gracias'), f.deps)
+  assert.deepEqual(f.enviados, [TEXTO_SIN_ESPERA, TEXTO_SIN_ESPERA])
 })
 
 test('detección comercial ampliada', async () => {

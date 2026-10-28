@@ -42,8 +42,12 @@ const PALABRAS: [string, 'SI' | 'NO' | 'QUITAR'][] = [
 export const TEXTO_DESLIZA = 'Desliza el mensaje de la lección y contesta ahí (o escribe el número: «SÍ 2»).'
 export const TEXTO_DATOS_CLIENTE = 'Esa corrección trae datos de un cliente; escríbela sin teléfonos ni correos.'
 export const TEXTO_NO_ENTIENDO = 'No te entendí. Responde *SÍ*, *NO*, o escribe el texto nuevo así: «di que …».'
-export const TEXTO_FALTA_RESPUESTA = 'Escribe la respuesta para esa pregunta.'
+export const textoFaltaRespuesta = (n: number | null) =>
+  `Escribe la respuesta: desliza la lección y escríbela, o mándala como «${n ?? 'N'}: texto».`
 export const TEXTO_QUITADA = 'Listo, ya no lo digo.'
+export const TEXTO_COMO_QUITAR = 'Para quitar algo, desliza el mensaje de la lección o el «Listo…» y responde QUITAR, o entra a /platform.'
+export const TEXTO_NO_APROBADA = 'Esa lección aún no está aprobada; responde NO para descartarla.'
+export const TEXTO_SIN_ESPERA = 'No hay lecciones esperando respuesta. Responde VER para ver las nuevas.'
 export const textoAvisoComercial = (texto: string) =>
   `Listo. Ojo: desde ahora a todos los que pregunten les digo: «${texto}». Para quitarlo, responde QUITAR a este mensaje o entra a /platform.`
 export const textoEco = (texto: string) => `Listo. Desde ahora digo: «${texto}». Para quitarlo, responde QUITAR a este mensaje.`
@@ -60,26 +64,20 @@ const CORTESIA = new Set(['gracias', 'porfa', 'por', 'favor', 'ok', 'va'])
 // Lo único que decide sin deslizar con una sola ENVIADA: «ok», «listo», 👍… podrían ser para otro aviso.
 const EXPLICITAS = ['si', ...NO]
 
-// Una corrección sin «mejor», «di que», «dile que» al inicio; vacía no se guarda.
+// Una corrección sin «mejor», «di que», «dile que» al inicio; vacía no se guarda. Si lo que queda es solo
+// SÍ/NO («1: no», «2: di que sí») decide en vez de guardar «no» como texto.
 function correccion(numero: number | null, texto: string): Accion {
   const limpio = texto.trim().replace(/^(mejor(?=[\s,:]|$)[\s,:]*)?(d[ií](le)?\s+que(?=[\s,:]|$))?[\s,:]*/i, '')
+  const p = porPalabra(limpio)
+  if (p?.accion === 'SI' || p?.accion === 'NO') return { accion: p.accion, numero: numero ?? p.numero }
   return limpio ? { accion: 'CORRECCION', numero, texto: limpio } : { accion: 'NO_ENTIENDO' }
 }
 
-// Reglas, en orden:
-// 1. «ver».  2. «N: texto» (N de 1 a 5, y sin dígito justo después de «:», para no partir «9:00 a 18:00…»).
-// 3. Empieza con palabra SÍ/NO/QUITAR (exacta, o seguida de «,» «.» o espacio): si la cola es solo números y cortesía
-//    («sí, gracias 2», «2 sí») es esa acción. «no, mejor …» / «no, di que …» es CORRECCION. Cualquier otra cola
-//    («Sí, solo León») no se guarda: NO_ENTIENDO (ante la duda se pregunta).
-// 4. Cualquier otra cosa de 1–2 palabras no se guarda (NO_ENTIENDO); más larga es CORRECCION sin número.
-export function interpretar(texto: string): Accion {
-  const t = texto.trim()
-  const n = norm(texto)
-  if (n === 'ver') return { accion: 'VER' }
-
-  const c = t.match(/^([1-5])\s*:\s*(?!\d)([\s\S]+)$/)
-  if (c) return correccion(Number(c[1]), c[2])
-
+// Empieza con palabra SÍ/NO/QUITAR (exacta, o seguida de «,» «.» o espacio; «2 sí» = «sí 2»)? null si no.
+// Cola de solo números y cortesía («sí, gracias 2») → esa acción. «no, mejor …» / «no, di que …» → CORRECCION.
+// Cualquier otra cola («Sí, solo León») no se guarda: NO_ENTIENDO (ante la duda se pregunta).
+function porPalabra(t: string): Accion | null {
+  const n = norm(t)
   const pre = n.match(/^(\d+)\s+(.+)$/) // «2 sí»
   const [num0, resto] = pre ? [Number(pre[1]), pre[2]] : [null, n]
   for (const [w, accion] of PALABRAS) {
@@ -92,11 +90,20 @@ export function interpretar(texto: string): Accion {
       return { accion, numero: num0 ?? (num ? Number(num) : null) }
     }
     if (w === 'no' && num0 === null && /^(mejor|di(le)? que)( |$)/.test(cola.join(' ')))
-      return correccion(null, t.replace(/^[¡¿]*no[,.\s]+/i, ''))
+      return correccion(null, t.trim().replace(/^[¡¿]*no[,.\s]+/i, ''))
     return { accion: 'NO_ENTIENDO' }
   }
-  if (t.split(/\s+/).length <= 2) return { accion: 'NO_ENTIENDO' }
-  return correccion(null, t)
+  return null
+}
+
+// Reglas, en orden: 1. «ver».  2. «N: texto» (N de 1 a 5, y sin dígito justo después de «:», para no partir
+// «9:00 a 18:00…»).  3. porPalabra.  4. Cualquier otra cosa de 1–2 palabras no se guarda; más larga es CORRECCION.
+export function interpretar(texto: string): Accion {
+  const t = texto.trim()
+  if (norm(t) === 'ver') return { accion: 'VER' }
+  const c = t.match(/^([1-5])\s*:\s*(?!\d)([\s\S]+)$/)
+  if (c) return correccion(Number(c[1]), c[2])
+  return porPalabra(t) ?? (t.split(/\s+/).length <= 2 ? { accion: 'NO_ENTIENDO' } : correccion(null, t))
 }
 
 const traeDatosDeCliente = (t: string) => /\d{10,}/.test(t.replace(/[\s\-().]/g, '')) || /\S+@\S+\.\S+/.test(t)
@@ -137,31 +144,36 @@ export async function atenderFermin(e: { wamid: string; texto: string; respondeA
   const decidido_en = deps.ahora().toISOString()
   const yaEsta = (x: Leccion) => deps.enviar(`Esa lección ya está ${x.estado.toLowerCase()}.`)
 
-  // QUITAR solo vale contestando al eco o aviso comercial de una lección aprobada.
+  // La lección a la que contestó deslizando (su mensaje o su «Listo…»), en cualquier estado.
+  const deslizada = e.respondeA ? todas.find((x) => x.wamid_envio === e.respondeA || x.wamid_confirmacion === e.respondeA) : undefined
+
+  // QUITAR: deslizando el mensaje de una lección aprobada o su «Listo…».
   if (a.accion === 'QUITAR') {
-    const q = e.respondeA ? todas.find((x) => x.wamid_confirmacion === e.respondeA) : undefined
-    if (q?.estado === 'APROBADA') {
-      await deps.actualizar(q.id, { estado: 'RETIRADA', decidido_en })
+    if (deslizada?.estado === 'APROBADA') {
+      await deps.actualizar(deslizada.id, { estado: 'RETIRADA', decidido_en })
       await deps.enviar(TEXTO_QUITADA)
-    } else if (q) await yaEsta(q)
-    else if (e.respondeA && enviadas.length) await deps.enviar(TEXTO_DESLIZA)
+    } else if (deslizada?.estado === 'ENVIADA') await deps.enviar(TEXTO_NO_APROBADA)
+    else if (deslizada) await yaEsta(deslizada)
+    else await deps.enviar(TEXTO_COMO_QUITAR)
     return
   }
 
-  let l: Leccion | undefined
-  if (e.respondeA) l = enviadas.find((x) => x.wamid_envio === e.respondeA)
+  // Deslizó una lección ya decidida (aunque traiga número): se le dice, no se toca la de ese número en la tanda nueva.
+  if (deslizada && deslizada.estado !== 'ENVIADA') return void (await yaEsta(deslizada))
+  let l = deslizada
+  // El número solo cuenta si no deslizó ninguna lección.
   if (!l && a.accion !== 'NO_ENTIENDO' && a.numero !== null) l = enviadas.find((x) => x.orden === a.numero)
   // Sin deslizar ni número, con una sola esperando, solo «sí»/«no» explícitos; una corrección libre no se aplica.
-  if (!l && !e.respondeA && enviadas.length === 1 && (a.accion === 'SI' || a.accion === 'NO') && EXPLICITAS.includes(norm(e.texto).split(/[,.\s]+/)[0]))
+  if (!l && !e.respondeA && enviadas.length === 1 && (a.accion === 'SI' || a.accion === 'NO') && a.numero === null &&
+    EXPLICITAS.includes(norm(e.texto).split(/[,.\s]+/)[0]))
     l = enviadas[0]
   if (!l) {
-    const decidida = e.respondeA ? todas.find((x) => x.wamid_envio === e.respondeA) : undefined
-    if (decidida) await yaEsta(decidida)
-    else if (enviadas.length) await deps.enviar(TEXTO_DESLIZA)
+    if (enviadas.length) await deps.enviar(TEXTO_DESLIZA)
+    else if (a.accion === 'CORRECCION' || (a.accion !== 'NO_ENTIENDO' && a.numero !== null)) await deps.enviar(TEXTO_SIN_ESPERA)
     return
   }
   if (a.accion === 'NO_ENTIENDO') return void (await deps.enviar(TEXTO_NO_ENTIENDO))
-  if (a.accion === 'SI' && l.texto === MARCADOR) return void (await deps.enviar(TEXTO_FALTA_RESPUESTA))
+  if (a.accion === 'SI' && l.texto === MARCADOR) return void (await deps.enviar(textoFaltaRespuesta(l.orden)))
 
   const cambios: Partial<Leccion> & { decidido_en: string } = { estado: a.accion === 'NO' ? 'DESCARTADA' : 'APROBADA', decidido_en }
   if (a.accion === 'CORRECCION') {
