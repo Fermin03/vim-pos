@@ -210,6 +210,11 @@ test('sin ANTHROPIC_API_KEY: fallo sin llamar a fetch', async () => {
   } finally { (globalThis as any).Deno = D }
 })
 
+test('formato de WhatsApp: **negrita** pasa a *negrita* y se quitan los # de título', async () => {
+  const { f } = falso([() => resp([{ type: 'text', text: '## Planes\n- **Esencial:** $699\n- *Negocio*: $999' }])])
+  assert.equal((await responder(turno(), espia().h, f)).texto, 'Planes\n- *Esencial:* $699\n- *Negocio*: $999')
+})
+
 test('recortar no corta en el punto de un número ni de una URL, y no parte un emoji', async () => {
   const num = falso([() => resp([{ type: 'text', text: 'Hola. Cuesta $1.500 ' + 'a'.repeat(1600) }])])
   assert.equal((await responder(turno(), espia().h, num.f)).texto, 'Hola.')

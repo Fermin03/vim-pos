@@ -88,6 +88,9 @@ const LIMITE_TEXTO = 1500
 
 // Corta en el último fin de oración («. », «! », «? » o fin) a ≤1500 puntos de código; nunca en el
 // punto de un número o de una URL. Sin fin de oración, corte duro (sin partir un emoji).
+/** WhatsApp no es Markdown: negrita con un asterisco y sin almohadillas de título. */
+const aWhatsApp = (t: string) => t.replace(/\*\*(.+?)\*\*/g, "*$1*").replace(/^#{1,6}\s+/gm, "")
+
 function recortar(t: string): string {
   const cp = [...t]
   if (cp.length <= LIMITE_TEXTO) return t
@@ -159,11 +162,13 @@ export async function responder(
       const r = await res.json() as { stop_reason?: string; content: { type: string; [k: string]: any }[]; usage: Uso }
       usd += costoUsd(modelo, r.usage)
       const usos = r.content.filter((b) => b.type === "tool_use")
-      if (r.stop_reason === "max_tokens" && usos.length) return fallo() // la entrada pudo quedar cortada
+      // Sin texto ni herramienta útil: se deja la forma de la respuesta en el log (nunca el contenido).
+      const forma = () => console.error("Anthropic sin respuesta util", r.stop_reason, r.content.map((b) => b.type).join(","))
+      if (r.stop_reason === "max_tokens" && usos.length) { forma(); return fallo() } // la entrada pudo quedar cortada
       if (!usos.length) {
         const texto = r.content.filter((b) => b.type === "text").map((b) => b.text).join("").trim()
-        if (!texto) return fallo()
-        return { texto: recortar(texto), modelo, usd, fallo: false }
+        if (!texto) { forma(); return fallo() }
+        return { texto: recortar(aWhatsApp(texto)), modelo, usd, fallo: false }
       }
       messages.push({ role: "assistant", content: r.content })
       const resultados = []
@@ -191,5 +196,6 @@ export async function responder(
     console.error("Anthropic error", (e as Error)?.name)
     return fallo()
   }
+  console.error("Anthropic: 5 vueltas sin texto")
   return fallo()
 }
