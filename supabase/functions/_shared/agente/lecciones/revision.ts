@@ -65,11 +65,12 @@ const CORTESIA = new Set(['gracias', 'porfa', 'por', 'favor', 'ok', 'va'])
 const EXPLICITAS = ['si', ...NO]
 
 // Una corrección sin «mejor», «di que», «dile que» al inicio; vacía no se guarda. Si lo que queda es solo
-// SÍ/NO («1: no», «2: di que sí») decide en vez de guardar «no» como texto.
+// SÍ/NO solo («1: no», «2: sí») decide en vez de guardar «no» como texto. Tras quitar «di que»/«mejor»,
+// un «sí»/«no» suelto pide lo contrario del texto («No, di que sí»): no se decide ni se guarda, se pregunta.
 function correccion(numero: number | null, texto: string): Accion {
   const limpio = texto.trim().replace(/^(mejor(?=[\s,:]|$)[\s,:]*)?(d[ií](le)?\s+que(?=[\s,:]|$))?[\s,:]*/i, '')
   const p = porPalabra(limpio)
-  if (p?.accion === 'SI' || p?.accion === 'NO') return { accion: p.accion, numero: numero ?? p.numero }
+  if (p?.accion === 'SI' || p?.accion === 'NO') return limpio === texto.trim() ? { accion: p.accion, numero: numero ?? p.numero } : { accion: 'NO_ENTIENDO' }
   return limpio ? { accion: 'CORRECCION', numero, texto: limpio } : { accion: 'NO_ENTIENDO' }
 }
 

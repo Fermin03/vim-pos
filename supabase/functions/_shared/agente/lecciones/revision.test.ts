@@ -342,7 +342,8 @@ test('deslizar un mensaje de una tanda vieja con «SÍ 2» dice que ya se decidi
 test('«1: no» / «2: sí» deciden, no guardan «no»/«sí» como texto', async () => {
   assert.deepEqual(interpretar('1: no'), { accion: 'NO', numero: 1 })
   assert.deepEqual(interpretar('2: Sí, gracias'), { accion: 'SI', numero: 2 })
-  assert.deepEqual(interpretar('2: di que sí'), { accion: 'SI', numero: 2 })
+  // «di que sí» sobre una lección que dice «No…» pide lo contrario: no aprueba el original, pregunta.
+  for (const t of ['2: di que sí', 'No, di que sí', 'no, mejor di que sí', 'di que sí', 'mejor di que no']) assert.deepEqual(interpretar(t), { accion: 'NO_ENTIENDO' }, t)
   assert.deepEqual(interpretar('2: no hacemos envíos'), { accion: 'CORRECCION', numero: 2, texto: 'no hacemos envíos' })
   const f = fake(enviadas('a', 'b'))
   await atenderFermin(msg('1: no'), f.deps)
