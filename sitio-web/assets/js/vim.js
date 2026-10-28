@@ -753,4 +753,23 @@
     verBarra.observe(heroGiro);
     if (cierreGiro) verBarra.observe(cierreGiro);
   }
+
+  /* ---- Videos de las tarjetas ----------------------------------------------
+     Con «reducir movimiento» se quedan en su portada, que es un cuadro con los
+     datos completos. */
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    document.querySelectorAll("video[autoplay]").forEach(function (v) { v.removeAttribute("autoplay"); v.pause(); });
+  }
+
+  /* En «Todo tu negocio» el video de la fila que se abre arranca desde el
+     principio: el que estaba oculto venía corriendo y entraba a la mitad. */
+  document.querySelectorAll(".cosas").forEach(function (cosas) {
+    var capturas = cosas.querySelectorAll(".cosas-capturas > *");
+    cosas.querySelectorAll("[data-acordeon-boton]").forEach(function (boton, i) {
+      boton.addEventListener("click", function () {
+        var v = capturas[i] && capturas[i].querySelector("video");
+        if (v && v.autoplay) { v.currentTime = 0; v.play(); }
+      });
+    });
+  });
 })();
