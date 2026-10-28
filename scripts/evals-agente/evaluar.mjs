@@ -3,25 +3,33 @@
 // (núcleo en evals/nucleo.ts).
 //
 //   npm run agente:evaluar                          # todos los escenarios
-//   npm run agente:evaluar -- precio-basico enojo   # solo esos
+//   npm run agente:evaluar -- precio-basico enojo   # solo esos (por id o categoría)
+// Si existe scripts/evals-agente/lecciones.json (npm run agente:lecciones), suma lo aprendido.
 //
 // Necesita ANTHROPIC_API_KEY en el entorno. Cuesta centavos de dólar por corrida.
 // El reporte queda en scripts/evals-agente/resultados/ (no se versiona).
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ESCENARIOS, evaluarEscenario } from '../../supabase/functions/_shared/agente/evals/nucleo.ts'
+import { bloqueAprendido } from '../../supabase/functions/_shared/agente/lecciones/bloque.ts'
 
 const clave = process.env.ANTHROPIC_API_KEY
 if (!clave) { console.error('Falta ANTHROPIC_API_KEY en el entorno.'); process.exit(1) }
 globalThis.Deno = { env: { get: (k) => process.env[k] } } // cerebro.ts lee la clave como en Supabase
 
+// Lo aprendido (npm run agente:lecciones): si hay lecciones.json, el agente lo recibe y sus escenarios se suman.
+const archivoLecciones = path.join(path.dirname(fileURLToPath(import.meta.url)), 'lecciones.json')
+const { lecciones = [], escenarios: delAprendido = [] } = existsSync(archivoLecciones) ? JSON.parse(readFileSync(archivoLecciones, 'utf8')) : {}
+const aprendido = bloqueAprendido(lecciones)
+
 const pedidos = process.argv.slice(2)
-const lista = pedidos.length ? ESCENARIOS.filter((e) => pedidos.includes(e.id)) : ESCENARIOS
+const todos = [...ESCENARIOS, ...delAprendido]
+const lista = pedidos.length ? todos.filter((e) => pedidos.includes(e.id) || pedidos.includes(e.categoria)) : todos
 const resultados = []
 for (const esc of lista) {
   process.stdout.write(`${esc.id}… `)
-  const r = await evaluarEscenario(esc, clave)
+  const r = await evaluarEscenario(esc, clave, aprendido)
   resultados.push(r)
   console.log(r.error ? `ERROR: ${r.error}` : r.ok ? 'OK' : 'FALLA')
 }
