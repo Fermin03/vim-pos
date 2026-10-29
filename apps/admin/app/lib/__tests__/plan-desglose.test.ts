@@ -33,6 +33,15 @@ describe("desgloseMensual", () => {
     expect(d.hayExtras).toBe(true);
   });
 
+  it("el descuento de VIM (0289) sale como renglón en negativo y el total ya va rebajado", () => {
+    const s = { ...PILOTO, descuento_tipo: "PORCENTAJE", descuento_valor: 10, descuento_desde: "2026-09-15", descuento_hasta: "2027-01-31" };
+    const d = desgloseMensual({ nombre: "Esencial" }, s, [], HOY);
+    expect(d.renglones.at(-1)).toMatchObject({ clave: "descuento", concepto: "Descuento", importe: -49.9 });
+    expect(d.renglones.at(-1)?.detalle).toMatch(/^10 % hasta /);
+    expect(d.total).toBe(449.1);
+    expect(d.hayExtras).toBe(true);
+  });
+
   it("lo que el plan incluye sale como incluido, sin sumar", () => {
     const d = desgloseMensual({ nombre: "Negocio" }, { precio_mensual_mxn: 999 }, [
       addon({ incluido_en_plan: true }),

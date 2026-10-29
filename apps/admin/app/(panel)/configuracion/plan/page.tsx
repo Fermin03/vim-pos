@@ -79,7 +79,7 @@ export default function PlanPage() {
                           {r.concepto}
                           {r.detalle && <span className="text-ink-3"> · {r.detalle}</span>}
                         </span>
-                        <span className="tabular-nums text-ink-2">{r.importe > 0 ? `${mxn(r.importe)} al mes` : "—"}</span>
+                        <span className="tabular-nums text-ink-2">{r.importe > 0 ? `${mxn(r.importe)} al mes` : r.importe < 0 ? `−${mxn(-r.importe)} al mes` : "—"}</span>
                       </li>
                     ))}
                   </ul>

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { autorizar } from "../../lib/server";
 import { fechaLegible, hoyMx } from "@vim/fecha";
-import { AVISO_PRUEBA_DIAS, diasEntre, estadoPrueba, precioVigente, promocionVigente, totalAddons, type AddonCobro, type PrecioSuscripcion } from "@vim/db/cobro";
+import { AVISO_PRUEBA_DIAS, diasEntre, estadoPrueba, precioVigente, promocionVigente, rebajaDescuento, totalAddons, type AddonCobro, type PrecioSuscripcion } from "@vim/db/cobro";
 import { alertaDeSello } from "../../lib/alerta-sello";
 import { alertaProspectos } from "../../lib/prospectos";
 
@@ -90,7 +90,7 @@ export async function GET(req: Request) {
 
   const [cajasRes, subsRes, foliosRes, onbRes, ventasRes, syncRes, sellosRes, prospectosRes, addonsRes] = await Promise.all([
     sb.from("cajas").select("id, nombre, tenant_id, activa, bloqueada, bloqueo_motivo, ultimo_latido, version_app").is("deleted_at", null).limit(2000),
-    sb.from("suscripciones").select("tenant_id, estado, fecha_fin, proxima_fecha_cobro, precio_mensual_mxn, precio_promocional_mxn, promocion_hasta, promocion_nombre").limit(1000),
+    sb.from("suscripciones").select("tenant_id, estado, fecha_fin, proxima_fecha_cobro, precio_mensual_mxn, precio_promocional_mxn, promocion_hasta, promocion_nombre, descuento_tipo, descuento_valor, descuento_desde, descuento_hasta").limit(1000),
     sb.from("tenant_folios_saldo").select("tenant_id, folios_base_mensuales, folios_base_consumidos, saldo_paquetes, umbral_alerta").limit(1000),
     sb.from("tenant_onboarding_estado").select("tenant_id, fase, fecha_go_live, updated_at").limit(1000),
     // Una sola pasada por los tickets recientes: basta la fecha más nueva por tenant.
@@ -273,8 +273,11 @@ export async function GET(req: Request) {
     if (!s.proxima_fecha_cobro) continue;
     const vencido = diasEntre(s.proxima_fecha_cobro.slice(0, 10), hoy);
     if (vencido > 0) {
-      // El plan al precio de ESA fecha de cobro, más los add-ons y extras que paga hoy (0147).
-      const monto = Math.round((precioVigente(s, s.proxima_fecha_cobro.slice(0, 10)) + totalAddons(addonsDe.get(s.tenant_id) ?? [], hoy)) * 100) / 100;
+      // El plan al precio de ESA fecha de cobro, más los add-ons y extras que paga hoy (0147), menos
+      // el descuento que valía en esa fecha (0289).
+      const fCobro = s.proxima_fecha_cobro.slice(0, 10);
+      const bruto = precioVigente(s, fCobro) + totalAddons(addonsDe.get(s.tenant_id) ?? [], hoy);
+      const monto = Math.round((bruto - rebajaDescuento(s, bruto, fCobro)) * 100) / 100;
       alertas.push({
         id: `cobro-${s.tenant_id}`, severidad: vencido >= 7 ? "critica" : "alta", tipo: "Cobro vencido",
         tenantId: s.tenant_id, tenant,

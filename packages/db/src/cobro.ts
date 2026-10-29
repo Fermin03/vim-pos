@@ -68,7 +68,17 @@ export type PrecioSuscripcion = {
   precio_promocional_mxn?: number | string | null;
   promocion_hasta?: string | null;
   promocion_nombre?: string | null;
+  /** Descuento sobre el total del cobro (0289). Va encima de la promoción y de los add-ons. */
+  descuento_tipo?: string | null;
+  descuento_valor?: number | string | null;
+  descuento_desde?: string | null;
+  /** Último día que vale (inclusive). NULL = indefinido. */
+  descuento_hasta?: string | null;
+  descuento_motivo?: string | null;
 };
+
+export type TipoDescuento = "PORCENTAJE" | "IMPORTE";
+export type DescuentoSuscripcion = Pick<PrecioSuscripcion, "descuento_tipo" | "descuento_valor" | "descuento_desde" | "descuento_hasta" | "descuento_motivo">;
 
 /** La promoción, si sigue vigente en `fecha` (`YYYY-MM-DD`, hora de México); si no, null. */
 export function promocionVigente(
@@ -150,6 +160,42 @@ export function totalAddons(addons: AddonCobro[], fecha: string): number {
   return centavos(addons.filter((a) => addonVigente(a, fecha)).reduce((acc, a) => acc + importeAddon(a), 0));
 }
 
+// ── Descuento al cobro final (0289) ─────────────────────────────────────────────────────────────
+//
+// Lo pone VIM por cliente desde /platform: porcentaje o importe fijo, sobre el TOTAL que toca pagar
+// (plan ya con promoción + add-ons). Vale en las fechas de cobro entre `descuento_desde` y
+// `descuento_hasta` inclusive; sin `hasta`, para siempre. "Por N cobros" se guarda como un rango
+// que termina el día antes del cobro N+1, así que aquí solo hay dos formas: rango o indefinido.
+
+/** El descuento, si vale en `fecha` (`YYYY-MM-DD`, hora de México); si no, null. */
+export function descuentoVigente(
+  s: DescuentoSuscripcion,
+  fecha: string,
+): { tipo: TipoDescuento; valor: number; desde: string; hasta: string | null; motivo: string | null } | null {
+  if ((s.descuento_tipo !== "PORCENTAJE" && s.descuento_tipo !== "IMPORTE") || s.descuento_valor == null || !s.descuento_desde) return null;
+  const f = fecha.slice(0, 10);
+  const desde = s.descuento_desde.slice(0, 10);
+  const hasta = s.descuento_hasta ? s.descuento_hasta.slice(0, 10) : null;
+  if (f < desde || (hasta && f > hasta)) return null;
+  return { tipo: s.descuento_tipo, valor: Number(s.descuento_valor), desde, hasta, motivo: s.descuento_motivo ?? null };
+}
+
+/** Cuánto se rebaja de `monto` en `fecha`. Nunca más que el monto: el cobro no queda negativo. */
+export function rebajaDescuento(s: DescuentoSuscripcion, monto: number, fecha: string): number {
+  const d = descuentoVigente(s, fecha);
+  if (!d || monto <= 0) return 0;
+  return centavos(Math.min(monto, d.tipo === "PORCENTAJE" ? (monto * d.valor) / 100 : d.valor));
+}
+
+/** "20 %" o "$100.00", "hasta 31 ene 2027" o "sin fecha de fin". Formatea quien llama. */
+export function textoDescuento(
+  d: { tipo: TipoDescuento; valor: number; hasta: string | null },
+  fmt: { fecha: (iso: string) => string; mxn: (n: number) => string },
+): string {
+  const cuanto = d.tipo === "PORCENTAJE" ? `${d.valor} %` : fmt.mxn(d.valor);
+  return `${cuanto} ${d.hasta ? `hasta ${fmt.fecha(d.hasta)}` : "sin fecha de fin"}`;
+}
+
 /**
  * Lo que se paga al mes en `fecha`. Sin cobro activo (`s` null: en prueba, sin suscripción) el total
  * es cero, add-ons incluidos: mientras no se cobra el plan no se cobra nada.
@@ -158,11 +204,12 @@ export function totalMensual(
   s: PrecioSuscripcion | null | undefined,
   addons: AddonCobro[],
   fecha: string,
-): { suscripcion: number; addons: number; total: number } {
-  if (!s) return { suscripcion: 0, addons: 0, total: 0 };
+): { suscripcion: number; addons: number; descuento: number; total: number } {
+  if (!s) return { suscripcion: 0, addons: 0, descuento: 0, total: 0 };
   const suscripcion = precioVigente(s, fecha);
   const extras = totalAddons(addons, fecha);
-  return { suscripcion, addons: extras, total: centavos(suscripcion + extras) };
+  const descuento = rebajaDescuento(s, suscripcion + extras, fecha);
+  return { suscripcion, addons: extras, descuento, total: centavos(suscripcion + extras - descuento) };
 }
 
 // ── Extras por cantidad: sucursal y caja adicional (0147) ───────────────────────────────────────

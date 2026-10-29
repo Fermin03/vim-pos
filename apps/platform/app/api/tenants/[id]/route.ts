@@ -7,7 +7,7 @@ import { esExtra, EXTRAS_MAXIMO } from "@vim/db/cobro";
 import { fechaBloqueo, mensajeBloqueoPorDefecto } from "../../../lib/bloqueo";
 import { decidirAltaAddon, nombreDeAddon, precioAltaAddon, type FilaAddon } from "../../../lib/addons";
 import { precioValido } from "../../../lib/precio";
-import { fechaValida, leerPromocion } from "../../../lib/promocion";
+import { fechaValida, leerDescuento, leerPromocion } from "../../../lib/promocion";
 import { accesoDeDueno, type UsuarioAuth } from "../../../lib/acceso-dueno";
 import type { SbClient } from "../../../lib/server";
 
@@ -30,7 +30,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         "codigo_postal_fiscal, email_fiscal, fecha_alta, fecha_baja, motivo_baja, bloqueo_desde, bloqueo_mensaje, suspension_tipo, created_at, prueba_hasta, usuario_dueno_id, " +
         "plan:planes(id, codigo, nombre, precio_mensual_mxn, timbres_cfdi_mensuales, features_incluidos), " +
         "onboarding:tenant_onboarding_estado(fase, fase_wizard, fecha_invitacion, fecha_activacion, fecha_go_live, notas_internas, terminos_version, bienvenida_enviada_at), " +
-        "suscripcion:suscripciones(estado, precio_mensual_mxn, proxima_fecha_cobro, ciclo_facturacion, fecha_inicio, precio_promocional_mxn, promocion_hasta, promocion_nombre)",
+        "suscripcion:suscripciones(estado, precio_mensual_mxn, proxima_fecha_cobro, ciclo_facturacion, fecha_inicio, precio_promocional_mxn, promocion_hasta, promocion_nombre, descuento_tipo, descuento_valor, descuento_desde, descuento_hasta, descuento_motivo)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -479,6 +479,31 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     await auditar(sb, { accion: `tenant.suscripcion_${nuevo.toLowerCase()}`, tenantId: id, motivo: (body.motivo as string | undefined)?.trim() || null });
     return NextResponse.json({ ok: true });
+  }
+
+  if (accion === "descuento_fijar" || accion === "descuento_quitar") {
+    // Descuento al cobro final (0289): va en la suscripción vigente y lo leen el MRR, el monto
+    // sugerido al registrar un pago y "Plan y pagos" del dueño. Uno a la vez: fijar reemplaza.
+    if (!motivoDe()) return faltaMotivo();
+    const { data: sRaw } = await sb.from("suscripciones")
+      .select("id, fecha_inicio, proxima_fecha_cobro, ciclo_facturacion, descuento_tipo, descuento_valor, descuento_desde, descuento_hasta")
+      .eq("tenant_id", id).in("estado", ["ACTIVA", "PAUSADA"])
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const s = sRaw as { id: string; fecha_inicio: string; proxima_fecha_cobro: string | null; ciclo_facturacion: string | null } | null;
+    if (!s) return NextResponse.json({ error: "SIN_SUSCRIPCION", detalle: "Este cliente no tiene cobro activo. Actívalo antes de darle un descuento." }, { status: 400 });
+    let patch: Record<string, unknown>;
+    if (accion === "descuento_quitar") {
+      patch = { descuento_tipo: null, descuento_valor: null, descuento_desde: null, descuento_hasta: null, descuento_motivo: null };
+    } else {
+      const r = leerDescuento(body, s, hoyMx());
+      if (!r.ok) return NextResponse.json({ error: r.error, detalle: r.detalle }, { status: 400 });
+      const d = r.descuento;
+      patch = { descuento_tipo: d.tipo, descuento_valor: d.valor, descuento_desde: d.desde, descuento_hasta: d.hasta, descuento_motivo: motivoDe() };
+    }
+    const { error } = await sb.from("suscripciones").update(patch).eq("id", s.id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await auditar(sb, { accion: `tenant.${accion}`, tenantId: id, motivo: motivoDe(), payload: { antes: sRaw, despues: patch } });
+    return NextResponse.json({ ok: true, ...patch });
   }
 
   // ── Módulos de operación y giro (0180, ADR 0034) ───────────────────────────────────────────
