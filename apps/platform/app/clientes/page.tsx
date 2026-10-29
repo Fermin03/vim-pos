@@ -6,10 +6,11 @@ import { useSesion } from "../lib/sesion";
 import { textoActualizado, useRefresco } from "../lib/refresco";
 import { fechaCorta, fmtMxn, input, nombreFase, nombreVertical } from "../lib/formato";
 import { haceMinutos } from "../lib/fechas-panel";
-import type { Metricas, Tenant } from "../lib/tipos";
+import { suscripcionVigente, type Metricas, type Tenant } from "../lib/tipos";
 import { TarjetaCifra } from "../components/tarjeta-cifra";
 import { PastillaEstado } from "../components/pastilla-estado";
 import { CLAVE_AVISO_ELIMINADO } from "../components/eliminar-cliente";
+import { DescuentoCliente } from "../components/descuento-cliente";
 
 /** Cómo están sus cajas ahora, por latido. Lo que antes obligaba a abrir cada ficha. */
 function CeldaCajas({ c }: { c: Tenant["cajas"] }) {
@@ -94,7 +95,9 @@ export default function ClientesPage() {
 
       {m && (
         <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <TarjetaCifra titulo="MRR" valor={fmtMxn(m.mrr)} sub={(m.mrrAddons ?? 0) > 0 ? `planes ${fmtMxn(m.mrrSuscripciones ?? 0)} + extras ${fmtMxn(m.mrrAddons ?? 0)}` : "suscripciones activas"} />
+          <TarjetaCifra titulo="MRR" valor={fmtMxn(m.mrr)} sub={(m.mrrAddons ?? 0) > 0 || (m.mrrDescuentos ?? 0) > 0
+            ? `planes ${fmtMxn(m.mrrSuscripciones ?? 0)}${(m.mrrAddons ?? 0) > 0 ? ` + extras ${fmtMxn(m.mrrAddons ?? 0)}` : ""}${(m.mrrDescuentos ?? 0) > 0 ? ` − descuentos ${fmtMxn(m.mrrDescuentos ?? 0)}` : ""}`
+            : "suscripciones activas"} />
           <TarjetaCifra titulo="Clientes" valor={String(m.totalTenants)} sub={`${m.activos} activos · ${m.trial} en prueba`} />
           <TarjetaCifra titulo="Suspendidos / cancelados" valor={`${m.suspendidos} / ${m.cancelados}`} />
           <TarjetaCifra titulo="Folios vendidos" valor={String(m.foliosVendidos30d)} sub="últimos 30 días" />
@@ -131,7 +134,7 @@ export default function ClientesPage() {
       {tenants === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
       {tenants && (
         <div className="overflow-x-auto rounded-lg border border-line bg-surface">
-          <table className="w-full min-w-[760px] text-14">
+          <table className="w-full min-w-[880px] text-14">
             <thead>
               <tr className="border-b border-line bg-sel text-left text-12 font-semibold uppercase tracking-wide text-ink-2">
                 <th className="px-4 py-2.5">Cliente</th>
@@ -140,11 +143,12 @@ export default function ClientesPage() {
                 <th className="px-4 py-2.5">Plan</th>
                 <th className="px-4 py-2.5">Fase</th>
                 <th className="px-4 py-2.5">Estado</th>
+                <th className="px-4 py-2.5">Descuento</th>
               </tr>
             </thead>
             <tbody>
               {lista.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-6 text-center text-ink-2">{tenants.length === 0 ? "Sin clientes." : "Nada con ese filtro."}</td></tr>
+                <tr><td colSpan={7} className="px-4 py-6 text-center text-ink-2">{tenants.length === 0 ? "Sin clientes." : "Nada con ese filtro."}</td></tr>
               )}
               {lista.map((t) => {
                 const bloqueo = t.bloqueo_desde && new Date(t.bloqueo_desde).getTime() > ahora ? t.bloqueo_desde : null;
@@ -165,6 +169,10 @@ export default function ClientesPage() {
                     <td className="px-4 py-2.5">
                       <PastillaEstado estado={t.estado} />
                       {bloqueo && <div className="mt-0.5 text-11 font-semibold text-warning">bloquea el {fechaCorta(bloqueo)}</div>}
+                    </td>
+                    {/* Sin stopPropagation, cada clic del diálogo (va por portal, pero burbujea por React) abriría la ficha. */}
+                    <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                      <DescuentoCliente api={api} tenantId={t.id} nombre={t.nombre_comercial} s={suscripcionVigente(t)} onCambio={() => void cargar()} />
                     </td>
                   </tr>
                 );

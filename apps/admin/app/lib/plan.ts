@@ -1,5 +1,6 @@
 import { supabase, leerSesion } from "./supabase";
-import { addonVigente, importeAddon, precioVigente, textoLimiteCajas, totalMensual, type AddonCobro, type MetodoCobro, type PrecioSuscripcion } from "@vim/db/cobro";
+import { fechaLegible } from "@vim/fecha";
+import { addonVigente, descuentoVigente, importeAddon, precioVigente, textoDescuento, textoLimiteCajas, totalMensual, type AddonCobro, type MetodoCobro, type PrecioSuscripcion } from "@vim/db/cobro";
 import type { DatosPago } from "./datos-pago";
 import { nombreDeAddon } from "./tienda-plan";
 
@@ -89,7 +90,18 @@ export function desgloseMensual(
       importe,
     });
   }
-  return { renglones, total: totalMensual(suscripcion, addons, hoy).total, hayExtras: vigentes.some((a) => importeAddon(a) > 0) };
+  const t = totalMensual(suscripcion, addons, hoy);
+  // El descuento que le dio VIM (0289), como renglón en negativo: el total ya va rebajado.
+  const d = suscripcion ? descuentoVigente(suscripcion, hoy) : null;
+  if (d && t.descuento > 0) {
+    renglones.push({
+      clave: "descuento",
+      concepto: "Descuento",
+      detalle: textoDescuento(d, { fecha: fechaLegible, mxn: pesos }),
+      importe: -t.descuento,
+    });
+  }
+  return { renglones, total: t.total, hayExtras: vigentes.some((a) => importeAddon(a) > 0) || t.descuento > 0 };
 }
 
 export async function leerPlanYPagos(): Promise<PlanYPagos> {
@@ -101,7 +113,7 @@ export async function leerPlanYPagos(): Promise<PlanYPagos> {
     supabase.from("tenants").select("nombre_comercial, estado, prueba_hasta, plan:planes(nombre, precio_mensual_mxn)").eq("id", tid).maybeSingle(),
     supabase
       .from("suscripciones")
-      .select("estado, precio_mensual_mxn, precio_promocional_mxn, promocion_hasta, promocion_nombre, ciclo_facturacion, proxima_fecha_cobro, fecha_inicio")
+      .select("estado, precio_mensual_mxn, precio_promocional_mxn, promocion_hasta, promocion_nombre, ciclo_facturacion, proxima_fecha_cobro, fecha_inicio, descuento_tipo, descuento_valor, descuento_desde, descuento_hasta")
       .eq("tenant_id", tid)
       .in("estado", ["ACTIVA", "PAUSADA"])
       .order("created_at", { ascending: false })

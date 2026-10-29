@@ -46,7 +46,7 @@ describe("totalMensual", () => {
       addon({ precio_mensual_mxn: 249, cantidad: 2 }),          // dos cajas adicionales
       addon({ precio_mensual_mxn: 0 }),                         // CFDI incluido en el plan
     ], HOY);
-    expect(t).toEqual({ suscripcion: 499, addons: 1097, total: 1596 });
+    expect(t).toEqual({ suscripcion: 499, addons: 1097, descuento: 0, total: 1596 });
   });
 
   it("al terminar la promoción el total sube con ella", () => {
@@ -58,11 +58,11 @@ describe("totalMensual", () => {
       addon({ precio_mensual_mxn: 349, activo: false, fecha_fin: "2026-09-15" }),
       addon({ precio_mensual_mxn: 100, fecha_inicio: "2026-11-01" }),
     ], HOY);
-    expect(t).toEqual({ suscripcion: 999, addons: 0, total: 999 });
+    expect(t).toEqual({ suscripcion: 999, addons: 0, descuento: 0, total: 999 });
   });
 
   it("sin cobro activo no hay total: en prueba no se paga nada, ni los extras", () => {
-    expect(totalMensual(null, [addon({ precio_mensual_mxn: 599 })], HOY)).toEqual({ suscripcion: 0, addons: 0, total: 0 });
+    expect(totalMensual(null, [addon({ precio_mensual_mxn: 599 })], HOY)).toEqual({ suscripcion: 0, addons: 0, descuento: 0, total: 0 });
   });
 
   it("lo INCLUIDO en el plan nunca se cobra, aunque su fila traiga un precio por error", () => {
@@ -71,7 +71,7 @@ describe("totalMensual", () => {
     const colada = addon({ precio_mensual_mxn: 349, incluido_en_plan: true });
     expect(importeAddon(colada)).toBe(0);
     expect(totalMensual({ precio_mensual_mxn: 999 }, [colada, addon({ precio_mensual_mxn: 249, cantidad: 2 })], HOY))
-      .toEqual({ suscripcion: 999, addons: 498, total: 1497 });
+      .toEqual({ suscripcion: 999, addons: 498, descuento: 0, total: 1497 });
   });
 
   it("no arrastra centavos de coma flotante", () => {

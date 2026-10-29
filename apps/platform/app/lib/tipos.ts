@@ -1,6 +1,7 @@
 // Tipos y utilidades que comparten la página y los paneles nuevos (Atención, Salud, Bitácora).
 // Viven aquí y no en page.tsx para que los componentes se puedan importar sin arrastrar la
 // pantalla entera.
+import type { DescuentoSuscripcion } from "@vim/db/cobro";
 
 export type Api = (path: string, init?: RequestInit) => Promise<Record<string, unknown>>;
 
@@ -121,13 +122,25 @@ export type Tenant = {
   onboarding?: { fase: string; fecha_go_live: string | null } | null;
   /** Resumen de sus cajas por latido (ver api/tenants). */
   cajas?: { total: number; enLinea: number; calladaMin: number | null; sinReportar: number; version: string | null } | null;
+  /** Todas sus suscripciones; la vigente es la ACTIVA o PAUSADA más reciente (ver `suscripcionVigente`). */
+  suscripciones?: SuscripcionLista[] | null;
 };
+
+/** Lo que la lista de Clientes necesita de una suscripción: el cobro y su descuento (0289). */
+export type SuscripcionLista = DescuentoSuscripcion & {
+  estado: string; created_at: string; fecha_inicio: string; proxima_fecha_cobro: string | null; ciclo_facturacion: string | null;
+};
+
+export function suscripcionVigente(t: Tenant): SuscripcionLista | null {
+  return (t.suscripciones ?? []).filter((s) => s.estado === "ACTIVA" || s.estado === "PAUSADA")
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))[0] ?? null;
+}
 
 export type Metricas = {
   totalTenants: number; activos: number; trial: number; suspendidos: number; cancelados: number;
   porVertical: Record<string, number>; mrr: number; foliosVendidos30d: number;
   /** Desglose del MRR (0147): planes y add-ons pagados aparte. */
-  mrrSuscripciones?: number; mrrAddons?: number;
+  mrrSuscripciones?: number; mrrAddons?: number; mrrDescuentos?: number;
 };
 
 export type AddonCatalogo = { id: string; codigo: string; nombre: string; descripcion: string | null; precio_mensual_mxn: number };

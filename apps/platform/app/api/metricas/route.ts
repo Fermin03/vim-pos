@@ -30,7 +30,7 @@ export async function GET(req: Request) {
   // antes aquí solo se sumaba la suscripción y una sucursal adicional no existía para el panel.
   const [{ data: subs }, { data: addonsRaw }] = await Promise.all([
     sb.from("suscripciones")
-      .select("tenant_id, estado, precio_mensual_mxn, precio_promocional_mxn, promocion_hasta")
+      .select("tenant_id, estado, precio_mensual_mxn, precio_promocional_mxn, promocion_hasta, descuento_tipo, descuento_valor, descuento_desde, descuento_hasta")
       .limit(1000),
     sb.from("tenant_addons")
       .select("tenant_id, activo, precio_mensual_mxn, cantidad, fecha_inicio, fecha_fin, incluido_en_plan")
@@ -44,6 +44,7 @@ export async function GET(req: Request) {
   }
   let mrrSuscripciones = 0;
   let mrrAddons = 0;
+  let mrrDescuentos = 0;
   const yaSumados = new Set<string>();
   for (const s of (subs ?? []) as ({ tenant_id: string; estado: string } & PrecioSuscripcion)[]) {
     if (s.estado !== "ACTIVA") continue;
@@ -52,9 +53,10 @@ export async function GET(req: Request) {
     yaSumados.add(s.tenant_id);
     mrrSuscripciones += t.suscripcion;
     mrrAddons += t.addons;
+    mrrDescuentos += t.descuento;
   }
   const centavos = (n: number) => Math.round(n * 100) / 100;
-  const mrr = centavos(mrrSuscripciones + mrrAddons);
+  const mrr = centavos(mrrSuscripciones + mrrAddons - mrrDescuentos);
 
   // Folios vendidos (compras de paquetes) en los últimos 30 días.
   const hace30 = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
@@ -79,6 +81,7 @@ export async function GET(req: Request) {
     /** El desglose del MRR: planes y add-ons (extras, facturación, delivery) pagados aparte. */
     mrrSuscripciones: centavos(mrrSuscripciones),
     mrrAddons: centavos(mrrAddons),
+    mrrDescuentos: centavos(mrrDescuentos),
     foliosVendidos30d: foliosVendidos,
   });
 }

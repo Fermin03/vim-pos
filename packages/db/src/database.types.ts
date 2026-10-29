@@ -9994,6 +9994,11 @@ export type Database = {
           precio_promocional_mxn: number | null
           promocion_hasta: string | null
           promocion_nombre: string | null
+          descuento_desde: string | null
+          descuento_hasta: string | null
+          descuento_motivo: string | null
+          descuento_tipo: string | null
+          descuento_valor: number | null
           proxima_fecha_cobro: string | null
           tenant_id: string
           ultima_fecha_cobro: string | null
@@ -10014,6 +10019,11 @@ export type Database = {
           precio_promocional_mxn?: number | null
           promocion_hasta?: string | null
           promocion_nombre?: string | null
+          descuento_desde?: string | null
+          descuento_hasta?: string | null
+          descuento_motivo?: string | null
+          descuento_tipo?: string | null
+          descuento_valor?: number | null
           proxima_fecha_cobro?: string | null
           tenant_id: string
           ultima_fecha_cobro?: string | null
@@ -10034,6 +10044,11 @@ export type Database = {
           precio_promocional_mxn?: number | null
           promocion_hasta?: string | null
           promocion_nombre?: string | null
+          descuento_desde?: string | null
+          descuento_hasta?: string | null
+          descuento_motivo?: string | null
+          descuento_tipo?: string | null
+          descuento_valor?: number | null
           proxima_fecha_cobro?: string | null
           tenant_id?: string
           ultima_fecha_cobro?: string | null

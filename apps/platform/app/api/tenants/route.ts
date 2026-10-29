@@ -30,7 +30,8 @@ export async function GET(req: Request) {
       .select(
         "id, codigo, nombre_comercial, estado, vertical_principal, fecha_alta, bloqueo_desde, created_at, " +
           "plan:planes(codigo, nombre, precio_mensual_mxn), " +
-          "onboarding:tenant_onboarding_estado(fase, fecha_go_live)",
+          "onboarding:tenant_onboarding_estado(fase, fecha_go_live), " +
+          "suscripciones(estado, created_at, fecha_inicio, proxima_fecha_cobro, ciclo_facturacion, descuento_tipo, descuento_valor, descuento_desde, descuento_hasta, descuento_motivo)",
       )
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
