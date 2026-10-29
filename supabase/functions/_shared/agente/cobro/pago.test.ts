@@ -61,15 +61,12 @@ test("aplicado y reactivado: dice que la caja se desbloquea en unos minutos", as
   assert.equal(texto(f.envios[0]), "Listo, quedó tu pago. Tu próxima fecha de pago es el 28 de noviembre de 2026. Tu caja se desbloquea en unos minutos.");
 });
 
-test("con factura: avisa a Fermín sin pausar (wa_avisar_fermin) con RFC y razón social", async () => {
+test("con factura: le dice al cliente que le llega por correo (el aviso a Fermín lo deja wa_aplicar_pago)", async () => {
   const factura = { rfc: "KOB210101AB1", razon_social: "Knock Out Burger SA de CV", regimen: "601", codigo_postal: "37000", uso_cfdi: "G03" };
   const f = falsos(aplicado({ factura }));
   assert.equal(await atenderPago("123", f.d), "APLICADO");
-  const aviso = f.rpcs.find((r) => r.fn === "wa_avisar_fermin");
-  assert.ok(aviso);
-  assert.equal(aviso.args.p_conversacion_id, "conv-1");
-  for (const s of ["KOB210101AB1", "Knock Out Burger SA de CV", "601", "37000", "G03", "123"]) assert.ok(String(aviso.args.p_resumen).includes(s), s);
-  assert.ok(!f.rpcs.some((r) => r.fn === "wa_pasar_a_fermin"));
+  // Solo wa_aplicar_pago: el aviso va en su transacción (smoke_agente_cobro.sql, 6f).
+  assert.deepEqual(f.rpcs.map((r) => r.fn), ["wa_aplicar_pago"]);
   assert.ok(texto(f.envios[0]).endsWith(" Tu factura te llega por correo."));
   assert.ok(!texto(f.envios[0]).includes("Fermín"));
 });
@@ -100,12 +97,10 @@ test("MONTO_DISTINTO, FECHA_MOVIDA o sin_reactivar: pasa a Fermín como URGENTE_
     assert.equal(f.salidas.length, 0);
   }
 
+  // sin_reactivar: el URGENTE_SOPORTE lo deja wa_aplicar_pago en su transacción (smoke, 6g).
   const s = falsos(aplicado({ sin_reactivar: true }));
   assert.equal(await atenderPago("123", s.d), "APLICADO");
-  const pasa = s.rpcs.find((r) => r.fn === "wa_pasar_a_fermin");
-  assert.ok(pasa);
-  assert.equal(pasa.args.p_estado, "URGENTE_SOPORTE");
-  assert.ok(String(pasa.args.p_resumen).includes("123"));
+  assert.deepEqual(s.rpcs.map((r) => r.fn), ["wa_aplicar_pago"]);
   // El pago sí quedó: se confirma, pero sin prometer que la caja se desbloquea.
   assert.equal(s.envios.length, 1);
   assert.ok(texto(s.envios[0]).startsWith("Listo, quedó tu pago."));
@@ -128,4 +123,20 @@ test("si WhatsApp no da wamid, no se registra la salida", async () => {
   f.d.enviar = async () => ({ ok: false, wamid: null });
   assert.equal(await atenderPago("123", f.d), "APLICADO");
   assert.equal(f.salidas.length, 0);
+});
+
+test("ya aplicado, si WhatsApp o registrar la salida lanzan, igual devuelve APLICADO (un reintento sería DUPLICADO)", async () => {
+  const lanza = async () => { throw new Error("base caída"); };
+  const a = falsos(aplicado());
+  a.d.enviar = lanza;
+  assert.equal(await atenderPago("123", a.d), "APLICADO");
+  const b = falsos(aplicado());
+  b.d.registrarSalida = lanza;
+  assert.equal(await atenderPago("123", b.d), "APLICADO");
+});
+
+test("si la base falla al aplicar, lanza para que Mercado Pago reintente", async () => {
+  const f = falsos(aplicado());
+  f.d.rpc = async () => { throw new Error("conexión rechazada"); };
+  await assert.rejects(atenderPago("123", f.d), /conexión rechazada/);
 });

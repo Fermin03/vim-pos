@@ -1,9 +1,11 @@
 // Un pago de la liga de Checkout Pro de VIM: se relee en Mercado Pago, se aplica (wa_aplicar_pago
 // registra, renueva y reactiva) y se confirma al cliente por WhatsApp. Al cliente nunca se le nombra
-// a Fermín: «un agente». Lo que no cuadra (monto, fecha movida, cobro doble, suspendido por otra
-// razón) va a Fermín como URGENTE_SOPORTE.
+// a Fermín: «un agente». Lo que no cuadra (monto, fecha movida, cobro doble) va a Fermín como
+// URGENTE_SOPORTE desde aquí; la factura por emitir y el «pagó pero sigue suspendido» los avisa
+// wa_aplicar_pago en su misma transacción.
 import type { consultarPago } from "./mp-vim.ts";
 import { cuerpoPlantilla, cuerpoTexto } from "../../whatsapp/enviar.ts";
+import { registrarError, textoDeError } from "../../errores.ts";
 
 export type DepsPago = {
   consultar(pagoId: string): ReturnType<typeof consultarPago>;
@@ -13,8 +15,6 @@ export type DepsPago = {
   registrarSalida(conversacionId: string, wamid: string, texto: string): Promise<void>;
   ahora(): Date;
 };
-
-type Factura = { rfc: string; razon_social: string; regimen: string; codigo_postal: string; uso_cfdi: string };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DIA_MS = 24 * 3600_000;
@@ -51,30 +51,22 @@ export async function atenderPago(pagoId: string, d: DepsPago): Promise<"APLICAD
   }
   if (r.resultado !== "APLICADO") return r.resultado === "DUPLICADO" ? "DUPLICADO" : "IGNORADO";
 
-  const fecha = fechaLegible(r.proxima_fecha_cobro);
-  const factura = r.factura as Factura | null;
-  if (factura) {
-    await d.rpc("wa_avisar_fermin", {
-      p_conversacion_id: conv, p_motivo: "Factura por emitir",
-      p_resumen: `${pago}. Factura a ${factura.razon_social}, RFC ${factura.rfc}, régimen ${factura.regimen}, CP ${factura.codigo_postal}, uso ${factura.uso_cfdi}.`,
-    });
+  // Los avisos a Fermín (factura, pagado pero suspendido) ya los dejó wa_aplicar_pago en su transacción.
+  // De aquí en adelante nada lanza: el pago ya quedó y un reintento sería DUPLICADO.
+  try {
+    const fecha = fechaLegible(r.proxima_fecha_cobro);
+    const base = `Listo, quedó tu pago. Tu próxima fecha de pago es el ${fecha}.`;
+    const texto = base +
+      (r.reactivado ? " Tu caja se desbloquea en unos minutos." : "") +
+      (r.sin_reactivar ? " Un agente revisa tu cuenta y te escribe." : "") +
+      (r.factura ? " Tu factura te llega por correo." : "");
+    // Fuera de la ventana de 24 h, Meta solo deja mandar plantillas aprobadas.
+    const ultimo = r.ultimo_cliente_en ? new Date(r.ultimo_cliente_en).getTime() : 0;
+    const dentro = d.ahora().getTime() - ultimo < DIA_MS;
+    const s = await d.enviar(dentro ? cuerpoTexto(r.wa_id, texto) : cuerpoPlantilla(r.wa_id, "pago_confirmado", [fecha]));
+    if (s.wamid) await d.registrarSalida(conv, s.wamid, dentro ? texto : base); // la plantilla dice lo mismo que `base`
+  } catch (err) {
+    registrarError("cobro-vim-webhook", "CONFIRMACION", `pago ${pagoId} aplicado, sin confirmar al cliente: ${textoDeError(err)}`);
   }
-  if (r.sin_reactivar) {
-    await d.rpc("wa_pasar_a_fermin", {
-      p_conversacion_id: conv, p_estado: "URGENTE_SOPORTE", p_motivo: "Pagó pero sigue suspendido",
-      p_resumen: `${pago}: quedó registrado, pero el negocio está suspendido o cancelado por otra razón y no se reactivó.`,
-    });
-  }
-
-  const base = `Listo, quedó tu pago. Tu próxima fecha de pago es el ${fecha}.`;
-  const texto = base +
-    (r.reactivado ? " Tu caja se desbloquea en unos minutos." : "") +
-    (r.sin_reactivar ? " Un agente revisa tu cuenta y te escribe." : "") +
-    (factura ? " Tu factura te llega por correo." : "");
-  // Fuera de la ventana de 24 h, Meta solo deja mandar plantillas aprobadas.
-  const ultimo = r.ultimo_cliente_en ? new Date(r.ultimo_cliente_en).getTime() : 0;
-  const dentro = d.ahora().getTime() - ultimo < DIA_MS;
-  const s = await d.enviar(dentro ? cuerpoTexto(r.wa_id, texto) : cuerpoPlantilla(r.wa_id, "pago_confirmado", [fecha]));
-  if (s.wamid) await d.registrarSalida(conv, s.wamid, dentro ? texto : base); // la plantilla dice lo mismo que `base`
   return "APLICADO";
 }

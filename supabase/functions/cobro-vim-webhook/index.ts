@@ -6,8 +6,10 @@
 //        → el aviso es solo una pista: el pago se relee en Mercado Pago (consultarPago) y, si está
 //          approved en MXN con nuestra referencia, se aplica (wa_aplicar_pago: registra, renueva y
 //          reactiva si estaba suspendido por falta de pago) y se confirma al cliente por WhatsApp.
-//          Todo en línea antes del 200: si la base o Mercado Pago fallan, 500 y Mercado Pago reintenta
-//          (un pago ya aplicado vuelve como DUPLICADO y no se contesta dos veces).
+//          Todo en línea antes del 200: si la base o Mercado Pago fallan antes de aplicar, 500 y
+//          Mercado Pago reintenta (un pago ya aplicado vuelve como DUPLICADO y no se contesta dos
+//          veces). Los avisos a Fermín van dentro de wa_aplicar_pago; si después falla el WhatsApp
+//          al cliente, solo queda en el log y se contesta 200.
 //        → cualquier otro tipo (merchant_order, etc.): 200 sin hacer nada.
 //
 // Pública y sin JWT (config.toml). La firma es obligatoria: x-signature con la clave de la

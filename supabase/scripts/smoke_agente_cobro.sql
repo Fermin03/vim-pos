@@ -181,7 +181,15 @@ BEGIN
   ASSERT (SELECT proxima_fecha_cobro FROM suscripciones WHERE id = v_susc_a) = _fecha_cobro_siguiente(v_ini, v_prox, 2)
      AND (r->>'proxima_fecha_cobro')::date = _fecha_cobro_siguiente(v_ini, v_prox, 2), '6b: próxima avanza 2 meses';
   ASSERT (SELECT estado FROM wa_conversaciones WHERE id = v_conv) = 'ACTIVA', '6b: conversación ACTIVA';
+  -- Con factura: un aviso a Fermín en la misma transacción, sin pausar ni cambiar el estado.
+  ASSERT (SELECT count(*) FROM wa_avisos_fermin WHERE conversacion_id = v_conv) = 1
+     AND (SELECT count(*) FROM wa_avisos_fermin WHERE conversacion_id = v_conv AND motivo = 'Factura por emitir'
+            AND resumen LIKE '%mp-1%' AND resumen LIKE '%XAXX010101000%' AND resumen LIKE '%Tacos Uno%'
+            AND resumen LIKE '%1853.68%' AND sale_en = wa_siguiente_horario(now())) = 1,
+    format('6f: un aviso de factura, hay %s', (SELECT jsonb_agg(to_jsonb(a)) FROM wa_avisos_fermin a WHERE conversacion_id = v_conv));
+  ASSERT (SELECT pausado_hasta IS NULL FROM wa_conversaciones WHERE id = v_conv), '6f: la factura no pausa';
   ASSERT wa_aplicar_pago(v_int, 'mp-1', 1853.68, v_hoy)->>'resultado' = 'DUPLICADO', '6b: repetido = DUPLICADO';
+  ASSERT (SELECT count(*) FROM wa_avisos_fermin WHERE conversacion_id = v_conv) = 1, '6f: el duplicado no repite el aviso';
   ASSERT (SELECT count(*) FROM pagos_suscripcion WHERE referencia = 'mp-1') = 1, '6b: sigue un solo pago';
   -- Segundo cobro de la misma liga (otro pago_id): no es un aviso repetido, va a Fermín y no registra.
   r := wa_aplicar_pago(v_int, 'mp-2', 1853.68, v_hoy);
@@ -218,6 +226,10 @@ BEGIN
   ASSERT r->>'resultado' = 'APLICADO' AND NOT (r->>'reactivado')::boolean AND (r->>'sin_reactivar')::boolean,
     format('6d: otro motivo no reactiva, salió %s', r);
   ASSERT (SELECT estado FROM tenants WHERE id = v_b) = 'SUSPENDIDO', '6d: sigue SUSPENDIDO';
+  ASSERT (SELECT estado = 'URGENTE_SOPORTE' AND pausado_hasta IS NOT NULL FROM wa_conversaciones WHERE id = v_conv),
+    '6g: pagó y sigue suspendido → URGENTE_SOPORTE con pausa';
+  ASSERT (SELECT count(*) FROM wa_avisos_fermin WHERE conversacion_id = v_conv AND motivo = 'Pagó pero sigue suspendido'
+            AND resumen LIKE '%mp-b2%' AND resumen LIKE '%suspendido%') = 1, '6g: un aviso urgente';
 
   UPDATE tenants SET estado = 'ACTIVO', suspension_tipo = NULL WHERE id = v_b;
   v_int := (wa_crear_intento(v_conv, true)->>'intento_id')::uuid;
@@ -260,7 +272,7 @@ BEGIN
   SELECT estado, pausado_hasta INTO v_estado, v_pausa FROM wa_conversaciones WHERE id = v_conv;
   PERFORM wa_avisar_fermin(v_conv, 'Factura por emitir', 'RFC XAXX010101000');
   ASSERT (SELECT count(*) FROM wa_avisos_fermin WHERE conversacion_id = v_conv AND motivo = 'Factura por emitir'
-            AND sale_en = wa_siguiente_horario(now()) AND enviado_en IS NULL) = 1, '7c: aviso insertado';
+            AND resumen = 'RFC XAXX010101000' AND sale_en = wa_siguiente_horario(now()) AND enviado_en IS NULL) = 1, '7c: aviso insertado';
   ASSERT (SELECT estado = v_estado AND pausado_hasta IS NOT DISTINCT FROM v_pausa FROM wa_conversaciones WHERE id = v_conv),
     '7c: no toca estado ni pausa';
 

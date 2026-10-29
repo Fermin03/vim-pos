@@ -280,6 +280,8 @@ $$;
 -- Un intento ya PAGADO: el mismo pago_id es un aviso repetido (DUPLICADO); otro pago_id es un segundo
 -- cobro de la misma liga → FECHA_MOVIDA (va a Fermín como urgente) y el intento no se toca.
 -- Un intento vencido se aplica igual: el dinero ya entró.
+-- Al aplicar, en la misma transacción: con factura, aviso a Fermín sin pausar; pagado pero suspendido
+-- o cancelado por otra razón (sin_reactivar), URGENTE_SOPORTE con pausa (wa_pasar_a_fermin).
 CREATE FUNCTION wa_aplicar_pago(p_intento_id uuid, p_pago_id text, p_monto numeric, p_pagado_el date) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE
@@ -320,6 +322,19 @@ BEGIN
     UPDATE wa_intentos_pago SET estado = 'PAGADO', pago_id = p_pago_id, pagado_en = now() WHERE id = v_i.id;
     -- Solo sale de PAGO_PENDIENTE: un URGENTE_SOPORTE abierto sigue a la vista de Fermín.
     UPDATE wa_conversaciones SET estado = 'ACTIVA' WHERE id = v_i.conversacion_id AND estado = 'PAGO_PENDIENTE';
+    -- Los avisos a Fermín van en esta misma transacción: un reintento del webhook daría DUPLICADO y
+    -- ya no los repetiría.
+    IF jsonb_typeof(v_i.factura) = 'object' THEN
+      PERFORM wa_avisar_fermin(v_i.conversacion_id, 'Factura por emitir', format(
+        'Pago %s de $%s MXN de %s. Factura a %s, RFC %s, régimen %s, CP %s, uso %s.',
+        p_pago_id, to_char(v_i.total, 'FM999999990.00'), v_t.nombre_comercial, v_i.factura->>'razon_social',
+        v_i.factura->>'rfc', v_i.factura->>'regimen', v_i.factura->>'codigo_postal', v_i.factura->>'uso_cfdi'));
+    END IF;
+    IF v_sin THEN
+      PERFORM wa_pasar_a_fermin(v_i.conversacion_id, 'URGENTE_SOPORTE', 'Pagó pero sigue suspendido', format(
+        'Pago %s de $%s MXN de %s: quedó registrado, pero el negocio está %s por otra razón y no se reactivó.',
+        p_pago_id, to_char(v_i.total, 'FM999999990.00'), v_t.nombre_comercial, lower(v_t.estado::text)));
+    END IF;
     v_res := 'APLICADO';
   END IF;
   IF v_res IN ('MONTO_DISTINTO','FECHA_MOVIDA') AND v_i.estado <> 'PAGADO' THEN
