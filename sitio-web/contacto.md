@@ -28,7 +28,7 @@ _El panel que te enseñamos en la demo: cómo va tu día, desde el celular o la 
 
 **Dónde estamos:** Guanajuato, México. No hay mostrador al público: si quieres vernos en persona, agéndalo por correo. El domicilio fiscal va en el contrato.
 
-**Zona de servicio:** toda la República Mexicana. La demo es en tu local, en la [zona de León](https://vimpos.com.mx/punto-de-venta-restaurantes-leon) y alrededores; fuera de ahí, puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro). La visita el día del arranque va incluida en el plan Cadena.
+**Zona de servicio:** toda la República Mexicana. La demo es en tu local, en la [zona de León](https://vimpos.com.mx/restaurantes/leon) y alrededores; fuera de ahí, puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro). La visita el día del arranque va incluida en el plan Cadena.
 
 ## Qué te sirve más según lo que busques
 

@@ -2,7 +2,7 @@
 
 > Citas con anticipo, agenda por artista, cobro de la sesión y comisiones. Para estudios de tatuajes, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/belleza/tatuajes
 
 Aparta la fecha, cobra la sesión y reparte las comisiones.
 
@@ -201,4 +201,4 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 
-_Generado desde punto-de-venta-estudios-de-tatuajes.html. La versión en HTML es la fuente; este archivo no se edita a mano._
+_Generado desde belleza/tatuajes.html. La versión en HTML es la fuente; este archivo no se edita a mano._

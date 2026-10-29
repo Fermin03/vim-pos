@@ -39,7 +39,7 @@ const TARJETAS = [
   { id: "contacto",     eyebrow: "Contacto",      titulo: "Escríbenos y te contesta una persona." },
   { id: "nosotros",     eyebrow: "Nosotros",      titulo: "Un punto de venta hecho en León, Guanajuato." },
   { id: "leon", eyebrow: "León, Guanajuato", titulo: "Punto de venta para restaurantes, hecho en León." },
-  // Páginas por giro (/punto-de-venta-<id>): el titular de cada una.
+  // Páginas por giro (/restaurantes/*, /tiendas/*, /belleza/*): el titular de cada una.
   { id: "cafeterias", eyebrow: "Cafeterías", titulo: "Que la fila avance y cada café salga como lo pidieron." },
   { id: "servicio-rapido", eyebrow: "Comida rápida", titulo: "Despacha la hora pico sin que se junte la fila." },
   { id: "restaurantes-servicio-completo", eyebrow: "Restaurantes", titulo: "Cada mesa con su cuenta y cada mesero con su propina." },

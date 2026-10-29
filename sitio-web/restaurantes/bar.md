@@ -2,7 +2,7 @@
 
 > Cuentas por nombre en la barra, mesas, propinas y un corte que cuadra. Para bares y cervecerías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-bares
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/restaurantes/bar
 
 Cuentas en la barra y en mesa, con propinas, en una caja que no se detiene.
 
@@ -193,4 +193,4 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 
-_Generado desde punto-de-venta-bares.html. La versión en HTML es la fuente; este archivo no se edita a mano._
+_Generado desde restaurantes/bar.html. La versión en HTML es la fuente; este archivo no se edita a mano._

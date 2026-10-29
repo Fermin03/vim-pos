@@ -2,7 +2,7 @@
 
 > Código de barras, existencias con aviso de mínimo, cotizaciones y crédito a clientes. Para vinaterías y licorerías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-vinaterias
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/tiendas/vinateria
 
 Código de barras, existencias con aviso de mínimo y cotizaciones, en una caja que sigue sin internet.
 
@@ -173,4 +173,4 @@ Empieza tú solo, o te lo enseñamos con tu catálogo.
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 
-_Generado desde punto-de-venta-vinaterias.html. La versión en HTML es la fuente; este archivo no se edita a mano._
+_Generado desde tiendas/vinateria.html. La versión en HTML es la fuente; este archivo no se edita a mano._

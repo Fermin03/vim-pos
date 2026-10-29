@@ -1798,7 +1798,7 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 body:has(.subnav) :target { scroll-margin-top: calc(65px + 44px + var(--sp-5)); }
 
 /* ==========================================================================
-   Páginas por giro (/punto-de-venta-<giro>)
+   Páginas por giro (/<grupo>/<giro>)
 
    Una sola plantilla para los catorce giros: hero con tira de fotos, rasgos con
    la imagen quieta a un lado, herramientas en tarjetas con imagen, equipo,
@@ -2058,7 +2058,7 @@ body:has(.subnav) :target { scroll-margin-top: calc(65px + 44px + var(--sp-5)); 
 /* ---- Tarjetas de giro con foto -----------------------------------------
    Foto completa y toda la tarjeta es el enlace (Fermín, 23-oct-2026). El texto
    va ARRIBA, sobre un degradado oscuro: así los tres títulos arrancan a la
-   misma altura aunque «Alimentos y bebidas» ocupe dos renglones, y se leen
+   misma altura aunque «Restaurantes» ocupe dos renglones, y se leen
    sobre el techo del local en vez de sobre el monitor. */
 .giros-fotos { display: grid; gap: var(--sp-5); }
 @media (min-width: 980px) { .giros-fotos { grid-template-columns: repeat(3, 1fr); } }

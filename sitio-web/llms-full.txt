@@ -44,7 +44,7 @@ Cada venta descuenta su existencia y te avisa lo que se está acabando. Desde Ne
 
 Las citas del día y quién atiende cada una.
 
-[Ver la agenda →](https://vimpos.com.mx/punto-de-venta-salones-de-belleza)
+[Ver la agenda →](https://vimpos.com.mx/belleza/salon-de-belleza)
 
 ### Un corte que cuadra con el cajón
 
@@ -70,11 +70,11 @@ _Para tu giro_
 
 Cambian las pantallas, lo que se imprime y cómo se cobra.
 
-[Alimentos y bebidas Restaurantes, cafés, bares y food trucks](https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo)
+[Restaurantes Restaurantes, cafés, bares y food trucks](https://vimpos.com.mx/restaurantes/servicio-completo)
 
-[Tienda Ropa, vinos y licores, abarrotes y fruterías](https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa)
+[Tienda Ropa, vinos y licores, abarrotes y fruterías](https://vimpos.com.mx/tiendas/ropa)
 
-[Belleza Salones, spas, peluquerías y tatuajes](https://vimpos.com.mx/punto-de-venta-salones-de-belleza)
+[Belleza Salones, spas, peluquerías y tatuajes](https://vimpos.com.mx/belleza/salon-de-belleza)
 
 **¿No ves tu giro?** Cuéntanos cómo vendes y te decimos si te sirve.
 
@@ -1344,13 +1344,13 @@ Media hora con tus productos y tus precios cargados. Puedes traer esta lista y h
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-hamburgueserias -->
+<!-- https://vimpos.com.mx/restaurantes/hamburgueseria -->
 
 # Punto de venta para hamburgueserías. Cada hamburguesa sale como la pidieron
 
 > El término de la carne, los extras con su precio y el combo sugerido en una sola caja. Para hamburgueserías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-hamburgueserias
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/restaurantes/hamburgueseria
 
 El término, los extras y el combo en una sola caja, aunque se caiga el internet.
 
@@ -1537,13 +1537,13 @@ Empieza tú solo, o te lo enseñamos con tus hamburguesas.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-cafeterias -->
+<!-- https://vimpos.com.mx/restaurantes/cafeteria -->
 
 # Punto de venta para cafeterías. Que la fila avance y cada café salga como lo pidieron
 
 > Cobra rápido en la barra, con el tamaño, la leche y el shot extra de cada bebida. Para cafeterías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-cafeterias
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/restaurantes/cafeteria
 
 Una caja rápida para la hora pico, que sigue cobrando aunque se caiga el internet.
 
@@ -1730,13 +1730,13 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-servicio-rapido -->
+<!-- https://vimpos.com.mx/restaurantes/servicio-rapido -->
 
 # Punto de venta para comida rápida. Despacha la hora pico sin que se junte la fila
 
 > Combos, extras y comandas a cocina en segundos, para llevar o a domicilio. Para comida rápida, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-servicio-rapido
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/restaurantes/servicio-rapido
 
 Combos, extras y comandas a cocina en segundos, aunque se caiga el internet.
 
@@ -1911,7 +1911,7 @@ No. Lo pegas desde tu sistema actual o una hoja de cálculo. Desde Negocio lo ca
 
 ### ¿Tienen algo para hamburgueserías?
 
-Sí: el término de la carne y los extras, en [punto de venta para hamburgueserías](https://vimpos.com.mx/punto-de-venta-hamburgueserias).
+Sí: el término de la carne y los extras, en [punto de venta para hamburgueserías](https://vimpos.com.mx/restaurantes/hamburgueseria).
 
 ## Pon tu negocio a vender hoy
 
@@ -1923,13 +1923,13 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo -->
+<!-- https://vimpos.com.mx/restaurantes/servicio-completo -->
 
 # Punto de venta para restaurantes. Cada mesa con su cuenta y cada mesero con su propina
 
 > Mapa de mesas, meseros, propinas y cocina por estación en una sola caja. Para restaurantes con servicio completo, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/restaurantes/servicio-completo
 
 Del mapa de mesas a la cocina, sin papelitos y sin perder una orden.
 
@@ -2116,13 +2116,13 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-bares -->
+<!-- https://vimpos.com.mx/restaurantes/bar -->
 
 # Punto de venta para bares y cervecerías. Abre la cuenta con un nombre y cóbrala cuando se vaya
 
 > Cuentas por nombre en la barra, mesas, propinas y un corte que cuadra. Para bares y cervecerías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-bares
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/restaurantes/bar
 
 Cuentas en la barra y en mesa, con propinas, en una caja que no se detiene.
 
@@ -2309,13 +2309,13 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-food-trucks -->
+<!-- https://vimpos.com.mx/restaurantes/food-truck -->
 
 # Punto de venta para food trucks. Cobra donde estaciones, con o sin señal
 
 > Cobra donde estaciones, con o sin señal, y lleva la venta de cada evento por separado. Para food trucks, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-food-trucks
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/restaurantes/food-truck
 
 Una caja rápida para la fila del evento, con la venta de cada turno por separado.
 
@@ -2502,13 +2502,13 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa -->
+<!-- https://vimpos.com.mx/tiendas/ropa -->
 
 # Punto de venta para tiendas de ropa. Cada talla y cada color, contados sin libreta
 
 > Tallas y colores con su existencia, lector de código de barras, cambios de talla y etiquetas. Para tiendas de ropa y calzado, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/tiendas/ropa
 
 Vende con lector de código de barras, cambia tallas y sabe qué tienes en el anaquel.
 
@@ -2687,13 +2687,13 @@ Empieza tú solo, o te lo enseñamos con tu catálogo.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-vinaterias -->
+<!-- https://vimpos.com.mx/tiendas/vinateria -->
 
 # Punto de venta para vinaterías y licorerías. Cada botella en su lugar y cada venta en segundos
 
 > Código de barras, existencias con aviso de mínimo, cotizaciones y crédito a clientes. Para vinaterías y licorerías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-vinaterias
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/tiendas/vinateria
 
 Código de barras, existencias con aviso de mínimo y cotizaciones, en una caja que sigue sin internet.
 
@@ -2860,13 +2860,13 @@ Empieza tú solo, o te lo enseñamos con tu catálogo.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-abarrotes -->
+<!-- https://vimpos.com.mx/tiendas/abarrotes -->
 
 # Punto de venta para abarrotes y fruterías. Vende por kilo, por pieza o a crédito, sin cuaderno
 
 > Venta por kilo o por pieza, crédito a clientes con abonos y cotizaciones. Para abarrotes y fruterías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-abarrotes
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/tiendas/abarrotes
 
 La fruta por kilo, lo empaquetado por pieza y el fiado de tus clientes, en una sola caja.
 
@@ -3049,13 +3049,13 @@ Empieza tú solo, o te lo enseñamos con tu catálogo.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-salones-de-belleza -->
+<!-- https://vimpos.com.mx/belleza/salon-de-belleza -->
 
 # Punto de venta para salones de belleza. Tu agenda llena y cada comisión, clara
 
 > Agenda de tu equipo, cobro de la cita, anticipos y comisiones. Para salones de belleza, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-salones-de-belleza
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/belleza/salon-de-belleza
 
 Citas, cobro y comisiones de tu equipo en una sola pantalla.
 
@@ -3258,13 +3258,13 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-spa -->
+<!-- https://vimpos.com.mx/belleza/spa -->
 
 # Punto de venta para spas. Cada cabina ocupada a su hora, sin empalmes
 
 > Agenda por terapeuta y por cabina, anticipos, cobro de la cita y comisiones. Para spas, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-spa
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/belleza/spa
 
 Agenda por terapeuta y por cabina, con anticipos y comisiones.
 
@@ -3467,13 +3467,13 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-peluquerias -->
+<!-- https://vimpos.com.mx/belleza/peluqueria -->
 
 # Punto de venta para peluquerías y barberías. Cada silla con su turno y cada barbero con su comisión
 
 > Citas y lista de espera, agenda por barbero, cobro y comisiones. Para peluquerías y barberías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-peluquerias
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/belleza/peluqueria
 
 Citas, lista de espera y cobro en una sola caja.
 
@@ -3668,13 +3668,13 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes -->
+<!-- https://vimpos.com.mx/belleza/tatuajes -->
 
 # Punto de venta para estudios de tatuajes. Citas con anticipo y cada artista con su agenda
 
 > Citas con anticipo, agenda por artista, cobro de la sesión y comisiones. Para estudios de tatuajes, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/belleza/tatuajes
 
 Aparta la fecha, cobra la sesión y reparte las comisiones.
 
@@ -3869,13 +3869,13 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-restaurantes-leon -->
+<!-- https://vimpos.com.mx/restaurantes/leon -->
 
 # Punto de venta para restaurantes en León, Guanajuato
 
 > VIM POS se hace en León. Si tu restaurante está en la zona, la demo es en tu mostrador y con tu menú. Desde $699 al mes más IVA, sin letra chica.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-restaurantes-leon
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/restaurantes/leon
 
 VIM POS se hace aquí: la demo es en tu mostrador y con tu menú.
 
@@ -3955,7 +3955,7 @@ Media hora, con tus productos y tus precios cargados.
 
 **VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/nosotros
 
-VIM POS es un sistema de punto de venta para restaurantes hecho en [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon).
+VIM POS es un sistema de punto de venta para restaurantes hecho en [León, Guanajuato](https://vimpos.com.mx/restaurantes/leon).
 
 ## Quién construye VIM POS
 
@@ -4028,7 +4028,7 @@ _El panel que te enseñamos en la demo: cómo va tu día, desde el celular o la 
 
 **Dónde estamos:** Guanajuato, México. No hay mostrador al público: si quieres vernos en persona, agéndalo por correo. El domicilio fiscal va en el contrato.
 
-**Zona de servicio:** toda la República Mexicana. La demo es en tu local, en la [zona de León](https://vimpos.com.mx/punto-de-venta-restaurantes-leon) y alrededores; fuera de ahí, puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro). La visita el día del arranque va incluida en el plan Cadena.
+**Zona de servicio:** toda la República Mexicana. La demo es en tu local, en la [zona de León](https://vimpos.com.mx/restaurantes/leon) y alrededores; fuera de ahí, puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro). La visita el día del arranque va incluida en el plan Cadena.
 
 ## Qué te sirve más según lo que busques
 

@@ -2,7 +2,7 @@
 
 > VIM POS se hace en León. Si tu restaurante está en la zona, la demo es en tu mostrador y con tu menú. Desde $699 al mes más IVA, sin letra chica.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-restaurantes-leon
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/restaurantes/leon
 
 VIM POS se hace aquí: la demo es en tu mostrador y con tu menú.
 
@@ -78,4 +78,4 @@ Media hora, con tus productos y tus precios cargados.
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 
-_Generado desde punto-de-venta-restaurantes-leon.html. La versión en HTML es la fuente; este archivo no se edita a mano._
+_Generado desde restaurantes/leon.html. La versión en HTML es la fuente; este archivo no se edita a mano._

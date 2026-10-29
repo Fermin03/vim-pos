@@ -2,7 +2,7 @@
 
 > Venta por kilo o por pieza, crédito a clientes con abonos y cotizaciones. Para abarrotes y fruterías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-abarrotes
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/tiendas/abarrotes
 
 La fruta por kilo, lo empaquetado por pieza y el fiado de tus clientes, en una sola caja.
 
@@ -189,4 +189,4 @@ Empieza tú solo, o te lo enseñamos con tu catálogo.
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 
-_Generado desde punto-de-venta-abarrotes.html. La versión en HTML es la fuente; este archivo no se edita a mano._
+_Generado desde tiendas/abarrotes.html. La versión en HTML es la fuente; este archivo no se edita a mano._

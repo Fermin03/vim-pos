@@ -2,7 +2,7 @@
 
 > Agenda de tu equipo, cobro de la cita, anticipos y comisiones. Para salones de belleza, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-salones-de-belleza
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/belleza/salon-de-belleza
 
 Citas, cobro y comisiones de tu equipo en una sola pantalla.
 
@@ -209,4 +209,4 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 
-_Generado desde punto-de-venta-salones-de-belleza.html. La versión en HTML es la fuente; este archivo no se edita a mano._
+_Generado desde belleza/salon-de-belleza.html. La versión en HTML es la fuente; este archivo no se edita a mano._

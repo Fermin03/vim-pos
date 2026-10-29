@@ -32,7 +32,7 @@ Cada venta descuenta su existencia y te avisa lo que se está acabando. Desde Ne
 
 Las citas del día y quién atiende cada una.
 
-[Ver la agenda →](https://vimpos.com.mx/punto-de-venta-salones-de-belleza)
+[Ver la agenda →](https://vimpos.com.mx/belleza/salon-de-belleza)
 
 ### Un corte que cuadra con el cajón
 
@@ -58,11 +58,11 @@ _Para tu giro_
 
 Cambian las pantallas, lo que se imprime y cómo se cobra.
 
-[Alimentos y bebidas Restaurantes, cafés, bares y food trucks](https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo)
+[Restaurantes Restaurantes, cafés, bares y food trucks](https://vimpos.com.mx/restaurantes/servicio-completo)
 
-[Tienda Ropa, vinos y licores, abarrotes y fruterías](https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa)
+[Tienda Ropa, vinos y licores, abarrotes y fruterías](https://vimpos.com.mx/tiendas/ropa)
 
-[Belleza Salones, spas, peluquerías y tatuajes](https://vimpos.com.mx/punto-de-venta-salones-de-belleza)
+[Belleza Salones, spas, peluquerías y tatuajes](https://vimpos.com.mx/belleza/salon-de-belleza)
 
 **¿No ves tu giro?** Cuéntanos cómo vendes y te decimos si te sirve.
 

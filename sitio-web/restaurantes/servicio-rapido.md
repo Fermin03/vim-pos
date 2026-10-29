@@ -2,7 +2,7 @@
 
 > Combos, extras y comandas a cocina en segundos, para llevar o a domicilio. Para comida rápida, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-servicio-rapido
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/restaurantes/servicio-rapido
 
 Combos, extras y comandas a cocina en segundos, aunque se caiga el internet.
 
@@ -177,7 +177,7 @@ No. Lo pegas desde tu sistema actual o una hoja de cálculo. Desde Negocio lo ca
 
 ### ¿Tienen algo para hamburgueserías?
 
-Sí: el término de la carne y los extras, en [punto de venta para hamburgueserías](https://vimpos.com.mx/punto-de-venta-hamburgueserias).
+Sí: el término de la carne y los extras, en [punto de venta para hamburgueserías](https://vimpos.com.mx/restaurantes/hamburgueseria).
 
 ## Pon tu negocio a vender hoy
 
@@ -193,4 +193,4 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 
-_Generado desde punto-de-venta-servicio-rapido.html. La versión en HTML es la fuente; este archivo no se edita a mano._
+_Generado desde restaurantes/servicio-rapido.html. La versión en HTML es la fuente; este archivo no se edita a mano._

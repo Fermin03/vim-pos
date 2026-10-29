@@ -2,7 +2,7 @@
 
 > Cobra rápido en la barra, con el tamaño, la leche y el shot extra de cada bebida. Para cafeterías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-cafeterias
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/restaurantes/cafeteria
 
 Una caja rápida para la hora pico, que sigue cobrando aunque se caiga el internet.
 
@@ -193,4 +193,4 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 
-_Generado desde punto-de-venta-cafeterias.html. La versión en HTML es la fuente; este archivo no se edita a mano._
+_Generado desde restaurantes/cafeteria.html. La versión en HTML es la fuente; este archivo no se edita a mano._
