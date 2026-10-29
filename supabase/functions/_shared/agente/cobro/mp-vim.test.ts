@@ -4,7 +4,7 @@ import { consultarPago, crearPreferencia } from "./mp-vim.ts";
 
 const resp = (status: number, cuerpo: unknown) => new Response(JSON.stringify(cuerpo), { status });
 
-test("la preferencia solo acepta tarjeta, sin meses, y vence en 24 h", async () => {
+test("la preferencia acepta tarjeta sin meses, OXXO y SPEI, y vence en 24 h", async () => {
   let url = "", init: RequestInit = {};
   const f = (async (u: string, i: RequestInit) => {
     url = u; init = i;
@@ -23,12 +23,12 @@ test("la preferencia solo acepta tarjeta, sin meses, y vence en 24 h", async () 
   const b = JSON.parse(String(init.body));
   assert.equal(b.external_reference, "int-1");
   assert.deepEqual(b.items, [{ title: "VIM POS", quantity: 1, unit_price: 1853.68, currency_id: "MXN" }]);
-  assert.deepEqual(b.payment_methods, {
-    excluded_payment_types: [{ id: "ticket" }, { id: "atm" }, { id: "bank_transfer" }], installments: 1,
-  });
-  assert.equal(b.binary_mode, true);
+  // OXXO (ticket) y SPEI (bank_transfer) sí; depósito en banco (atm) no; sin meses.
+  assert.deepEqual(b.payment_methods, { excluded_payment_types: [{ id: "atm" }], installments: 1 });
+  assert.equal(b.binary_mode, undefined); // con binary_mode, OXXO y SPEI se rechazarían por quedar pendientes
   assert.equal(b.expires, true);
   assert.equal(b.expiration_date_to, "2026-10-29T14:05:00.000-06:00");
+  assert.equal(b.date_of_expiration, "2026-10-31T14:05:00.000-06:00");
   assert.equal(b.notification_url, "https://x.supabase.co/functions/v1/mp-vim-webhook");
 });
 

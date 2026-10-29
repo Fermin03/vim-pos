@@ -111,9 +111,10 @@ vigente para el mismo negocio y periodos se reusa en vez de crear otro.
 
 **Cómo se hace la liga** *(decisión del builder)*: **Checkout Pro con la API de preferencias**, que es
 lo que recomendó el estudio del repo (`docs/integraciones/mercado-pago-checkout-pro/`). La tienda en
-línea NO sirve de modelo: cobra con formulario propio (Secure Fields) sobre Orders API. La liga se
-limita a **tarjeta de crédito o débito, sin meses**, para que nada se apruebe días después (OXXO,
-SPEI y efectivo fuera). Necesita una **aplicación de Checkout Pro nueva** en la cuenta de Mercado
+línea NO sirve de modelo: cobra con formulario propio (Secure Fields) sobre Orders API. La liga acepta **tarjeta sin meses, OXXO y transferencia SPEI** (decisión de Fermín, 28 oct: al
+principio era solo tarjeta). OXXO y SPEI llegan pendientes y se aplican cuando Mercado Pago los aprueba,
+aunque la liga ya haya vencido; la ficha de OXXO vence 2 días después de la liga. Depósito en banco (`atm`)
+fuera. Necesita una **aplicación de Checkout Pro nueva** en la cuenta de Mercado
 Pago de VIM. La primera tarea del plan es probarlo en el modo de prueba de Mercado Pago antes de
 construir encima.
 

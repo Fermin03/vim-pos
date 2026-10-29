@@ -29,7 +29,8 @@ async function llamar(metodo: string, ruta: string, token: string, f: typeof fet
 /** Mismo instante en hora de México (-06:00 fijo: sin horario de verano desde 2022), como pide la API. */
 const enMexico = (d: Date) => new Date(d.getTime() - 6 * 3600_000).toISOString().replace("Z", "-06:00");
 
-/** Solo tarjeta, sin meses y sin pagos pendientes (`binary_mode`); el enlace caduca en `venceEn`. */
+/** Tarjeta (sin meses), OXXO/Paycash y transferencia SPEI; el enlace caduca en `venceEn` y la ficha de
+ *  efectivo 2 días después. Sin `binary_mode`: OXXO y SPEI llegan `pending` y se aplican al aprobarse. */
 export async function crearPreferencia(
   d: { intentoId: string; total: number; titulo: string; venceEn: Date; notificacion: string },
   token: string,
@@ -38,10 +39,10 @@ export async function crearPreferencia(
   const r = await llamar("POST", "/checkout/preferences", token, f, {
     external_reference: d.intentoId,
     items: [{ title: d.titulo, quantity: 1, unit_price: d.total, currency_id: "MXN" }],
-    payment_methods: { excluded_payment_types: [{ id: "ticket" }, { id: "atm" }, { id: "bank_transfer" }], installments: 1 },
-    binary_mode: true,
+    payment_methods: { excluded_payment_types: [{ id: "atm" }], installments: 1 },
     expires: true,
     expiration_date_to: enMexico(d.venceEn),
+    date_of_expiration: enMexico(new Date(d.venceEn.getTime() + 48 * 3600_000)),
     notification_url: d.notificacion,
   }, { "X-Idempotency-Key": d.intentoId });
   if (!r.ok) return r;

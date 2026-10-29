@@ -129,7 +129,7 @@ export function herramientasCobro(conversacionId: string, waId: string, d: DepsC
       }
       const total = pesos(r.total);
       if (r.reusado && r.preferencia_url) {
-        return `Liga de pago con tarjeta por ${total} (la misma de antes, sigue vigente): ${r.preferencia_url}`;
+        return `Liga de pago por ${total} (la misma de antes, sigue vigente): ${r.preferencia_url}`;
       }
       const venceEn = new Date(d.ahora().getTime() + 24 * 3600_000);
       const p = await d.preferencia({
@@ -137,7 +137,7 @@ export function herramientasCobro(conversacionId: string, waId: string, d: DepsC
       }, d.token);
       if (!p.ok) return `No se pudo crear la liga (Mercado Pago no respondió). ${AGENTE}`;
       await d.rpc("wa_fijar_preferencia", { p_intento_id: r.intento_id, p_preferencia_id: p.id, p_url: p.url });
-      return `Liga de pago con tarjeta por ${total}: ${p.url}\nVence el ${fechaHora(venceEn)}.`;
+      return `Liga de pago por ${total}: ${p.url}\nVence el ${fechaHora(venceEn)}.`;
     },
   };
 }

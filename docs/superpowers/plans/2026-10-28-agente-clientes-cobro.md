@@ -16,7 +16,7 @@
 - Cargar la skill `ponytail` antes de escribir código: lo mínimo que funcione, el estilo del archivo vecino (comentarios cortos en español). No recorta validación ni seguridad.
 - Monto = **plan vigente (con su promoción) + extras + IVA 16 %**, calculado en SQL; **cada periodo al precio de su fecha de inicio**; ANUAL = 12 × el total al mes; máx. **12** periodos por pago.
 - Código de verificación: **6 dígitos**, hash con `crypt()`, **15 min**, **un uso**, **5 intentos**. Cupos: **3 por número por hora**, **5 por correo por día**. Verificado **30 días**.
-- Liga: Checkout Pro (API de preferencias), **vence en 24 h**, **solo tarjeta de crédito/débito, sin meses** (`excluded_payment_types`: `ticket`, `atm`, `bank_transfer`; `installments: 1`), `binary_mode: true`.
+- Liga: Checkout Pro (API de preferencias), **vence en 24 h**; tarjeta sin meses, OXXO y SPEI (`excluded_payment_types`: `atm`; `installments: 1`), sin `binary_mode`, ficha de efectivo `date_of_expiration` = liga + 48 h. (Al principio era solo tarjeta; Fermín pidió OXXO y SPEI el 28 oct.)
 - Reactivación automática **solo** si el negocio está `SUSPENDIDO` con `suspension_tipo = 'FALTA_DE_PAGO'`. Las suspensiones viejas cuentan como **Otro motivo**. `CANCELADO` nunca.
 - El agente nunca nombra a Fermín: dice «un agente». Nunca revela nada del negocio antes de verificar. No comparte la CLABE.
 - Migración nueva **0288** (main llega a 0287; confirma con `ls supabase/migrations` que nadie la tomó). Va a producción a mano **antes** del merge.
