@@ -36,13 +36,6 @@ export const PAGINAS = [
     enSitemap: true,
   },
   {
-    ruta: '/facturacion-cfdi',
-    nombre: 'Facturación CFDI',
-    resumen:
-      'Cómo factura un restaurante con VIM POS: autofactura por QR desde el ticket, factura global del periodo (la emite el dueño con un botón desde el panel), y el plazo para facturar lo decide el negocio. Disponible a través de un proveedor autorizado por el SAT; el negocio carga su sello digital y cada plan trae folios al mes.',
-    enSitemap: true,
-  },
-  {
     ruta: '/precios',
     nombre: 'Precios',
     resumen: 'Los tres planes con su precio en pesos, la tabla comparativa, los extras y los paquetes de folios de factura.',
@@ -62,24 +55,10 @@ export const PAGINAS = [
     enSitemap: true,
   },
   {
-    ruta: '/cuanto-cuesta-un-sistema-para-restaurante',
-    nombre: 'Cuánto cuesta',
-    resumen:
-      'Los tres modelos con los que cobra un sistema para restaurante —licencia fija, gratuito con planes de pago, y porcentaje de cada venta—, la aritmética para comparar cada uno contra la venta real del negocio, y cuándo cada modelo deja de convenir. No nombra marcas: compara modelos.',
-    enSitemap: true,
-  },
-  {
     ruta: '/como-elegir-sistema-restaurante',
     nombre: 'Cómo elegir sistema',
     resumen:
       'Guía de compra: nueve preguntas que hacerle a cualquier software para restaurantes antes de firmar —internet, precio de frente, comisiones, datos, facturación, implementación, permanencia, soporte y equipo— y en qué casos VIM POS no es la respuesta.',
-    enSitemap: true,
-  },
-  {
-    ruta: '/factura-global-restaurantes',
-    nombre: 'Factura global',
-    resumen:
-      'Guía fiscal: qué es la factura global, cada cuándo se emite, qué datos lleva en CFDI 4.0 (RFC genérico, uso S01, periodo) y los errores más comunes en un restaurante. No es asesoría fiscal.',
     enSitemap: true,
   },
   {

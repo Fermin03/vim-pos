@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 const raiz = new URL('../', import.meta.url)
 const leer = (ruta) => readFileSync(fileURLToPath(new URL(ruta, raiz)), 'utf8')
 
-const FUENTES = ['llms.txt', 'precios.md', 'funciones.md', 'sin-internet.md', 'facturacion-cfdi.md', 'demo.md', 'novedades.md']
+const FUENTES = ['llms.txt', 'precios.md', 'funciones.md', 'sin-internet.md', 'demo.md', 'novedades.md']
 const VERSIONES_NOVEDADES = 8 // todo octubre: ahí están los giros de tienda, belleza y comida rápida, Clip, etc.
 
 // Palabras que el agente nunca debe ver (sin mayúsculas ni acentos).
