@@ -21,6 +21,10 @@ Prueba de punta a punta con VIM Pruebas (0288 y `cobro-vim-webhook` en producci�
 - El pago de prueba se anuló con `anular_pago_suscripcion` y se borraron la conversación, el intento y el aviso.
 
 - El checkout solo ofreció tarjeta (sin meses, sin OXXO/SPEI ni Mercado Crédito): no hace falta excluir `digital_currency`.
+- **OXXO (28 oct, tras abrir OXXO y SPEI):** la liga ofreció tarjeta, OXXO y transferencia; la ficha OXXO
+  quedó `pending` y su aviso firmado (con la clave nueva, tras regenerarla) respondió 200 sin aplicar nada.
+  Mercado Pago puso la ficha a vencer el 02/nov aunque `date_of_expiration` pedía 3 días. La aprobación de un
+  OXXO no se puede simular en modo de prueba; usa el mismo camino que la tarjeta, que sí se probó.
 
 Pendiente: cargar credenciales de producción; plantilla
 `pago_confirmado`.
