@@ -162,7 +162,7 @@ Dónde se hace cada cosa:
 - Cómo encender la tienda en línea
 - Cómo elegir el menú de la tienda
 - Cómo poner sucursales y horarios
-- Cómo recibir y atender los pedidos
+- Cómo recibir y atender los pedidos (y pausar la tienda)
 - Cómo cobrar en línea con tarjeta
 - Cómo compartir la liga de mi tienda
 
@@ -173,6 +173,7 @@ Dónde se hace cada cosa:
 - Cómo agendar una cita en la caja
 - Cómo atender a alguien sin cita (En espera)
 - Cómo cobrar una cita y un anticipo
+- Cómo marcar que una clienta no llegó o cancelar una cita
 - Cómo recibir reservas en línea
 - Cómo ve un colaborador su agenda
 - Cómo funcionan las comisiones

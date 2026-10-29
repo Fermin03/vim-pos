@@ -58,8 +58,9 @@ sale su saldo. Para cambiar de cliente, vuelve a abrir «Cliente de la cuenta».
   Solo ellos lo pueden activar en **Clientes → Directorio**.
 - No ves «Asignar cliente» → en restaurantes sale en Comedor, Para llevar y Pick-up. En Domicilio,
   los datos del cliente se piden aparte.
-- En belleza, la pestaña «Clientes» de la caja sirve para consultar visitas, faltas y notas.
-  [VERIFICAR: cómo se asigna la clienta a una venta en belleza]
+- En belleza, la clienta se elige en la cita, en **«Calendario»** → **«Nueva cita»**
+  ([Cómo agendar una cita en la caja](agenda.md#cómo-agendar-una-cita-en-la-caja)). La pestaña
+  «Clientes» de la caja sirve para consultar visitas, faltas y notas.
 **Relacionado:** [Cómo canjear puntos o un premio](#cómo-canjear-puntos-o-un-premio)
 
 ## Cómo activar el programa de lealtad
