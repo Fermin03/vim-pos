@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { atenderPago, type DepsPago } from "./pago.ts";
+import { atenderPago, PLANTILLA_PAGO_CONFIRMADO, type DepsPago } from "./pago.ts";
 
 const AHORA = new Date("2026-10-28T20:00:00.000Z");
 const INTENTO = "6f1c2a7e-3b4d-4e5f-8a9b-0c1d2e3f4a5b";
@@ -51,14 +51,14 @@ test("aplicado: confirma por WhatsApp con la próxima fecha", async () => {
   assert.deepEqual(f.rpcs, [{ fn: "wa_aplicar_pago", args: { p_intento_id: INTENTO, p_pago_id: "123", p_monto: 811.84, p_pagado_el: "2026-10-28" } }]);
   assert.equal(f.envios.length, 1);
   assert.equal((f.envios[0] as { to: string }).to, "5214771234567");
-  assert.equal(texto(f.envios[0]), "Listo, quedó tu pago. Tu próxima fecha de pago es el 28 de noviembre de 2026.");
+  assert.equal(texto(f.envios[0]), "Listo, ya quedó tu pago. Tu próxima fecha de pago es el 28 de noviembre de 2026.");
   assert.deepEqual(f.salidas, [{ conversacionId: "conv-1", wamid: "wamid.1", texto: texto(f.envios[0]) }]);
 });
 
 test("aplicado y reactivado: dice que la caja se desbloquea en unos minutos", async () => {
   const f = falsos(aplicado({ reactivado: true }));
   assert.equal(await atenderPago("123", f.d), "APLICADO");
-  assert.equal(texto(f.envios[0]), "Listo, quedó tu pago. Tu próxima fecha de pago es el 28 de noviembre de 2026. Tu caja se desbloquea en unos minutos.");
+  assert.equal(texto(f.envios[0]), "Listo, ya quedó tu pago. Tu próxima fecha de pago es el 28 de noviembre de 2026. Tu caja se desbloquea en unos minutos.");
 });
 
 test("con factura: le dice al cliente que le llega por correo (el aviso a Fermín lo deja wa_aplicar_pago)", async () => {
@@ -80,7 +80,9 @@ test("más de 24 h desde el último mensaje del cliente: usa la plantilla pago_c
       template: { name: "pago_confirmado", language: { code: "es_MX" }, components: [{ type: "body", parameters: [{ type: "text", text: "28 de noviembre de 2026" }] }] },
     });
     assert.equal(f.salidas.length, 1);
-    assert.ok(f.salidas[0].texto.includes("28 de noviembre de 2026"));
+    // La salida guarda lo que Meta mandó: el texto de la plantilla con la fecha puesta.
+    assert.equal(f.salidas[0].texto, PLANTILLA_PAGO_CONFIRMADO.replace("{{1}}", "28 de noviembre de 2026"));
+    assert.ok(!f.salidas[0].texto.includes("{{"));
   }
 });
 
@@ -103,8 +105,9 @@ test("MONTO_DISTINTO, FECHA_MOVIDA o sin_reactivar: pasa a Fermín como URGENTE_
   assert.deepEqual(s.rpcs.map((r) => r.fn), ["wa_aplicar_pago"]);
   // El pago sí quedó: se confirma, pero sin prometer que la caja se desbloquea.
   assert.equal(s.envios.length, 1);
-  assert.ok(texto(s.envios[0]).startsWith("Listo, quedó tu pago."));
-  assert.ok(!texto(s.envios[0]).includes("desbloquea"));
+  assert.ok(texto(s.envios[0]).startsWith("Listo, ya quedó tu pago."));
+  assert.ok(texto(s.envios[0]).endsWith(" Para desbloquear tu caja falta revisar algo más de tu cuenta. Un agente lo revisa y te escribe."));
+  assert.ok(!texto(s.envios[0]).includes("se desbloquea"));
   assert.ok(!texto(s.envios[0]).includes("Fermín"));
 });
 

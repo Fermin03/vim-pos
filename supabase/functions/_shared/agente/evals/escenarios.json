@@ -388,7 +388,7 @@
       "id": "pago-cambio-plan",
       "categoria": "Cliente: pago",
       "debe": [
-        "pasar_a_fermin"
+        "pasar_a_fermin:PROSPECTO_CALIENTE"
       ],
       "no_debe": [
         "crear_liga_pago"

@@ -312,5 +312,5 @@ Necesita a Fermín: cuenta de Mercado Pago de VIM con una **aplicación de Check
 1. Lista de lo que se publica → OK de Fermín.
 2. `0288` a producción con `db push` (copiar temporalmente la 0261 de la demo, como en 0286/0287) **antes** del merge.
 3. Desplegar `whatsapp-webhook` y `cobro-vim-webhook` con `--no-verify-jwt`; secretos de producción por el script.
-4. Plantilla `pago_confirmado` (Utility, es_MX), cuerpo: «Tu pago a VIM POS quedó registrado. Tu próxima fecha de pago es el {{1}}.» — la crea Fermín en Kapso/Meta.
+4. Plantilla `pago_confirmado` (Utility, es_MX), cuerpo: «Tu pago a VIM POS quedó registrado. Tu próxima fecha de pago es el {{1}}. Si tienes dudas, contesta este mensaje.» (constante `PLANTILLA_PAGO_CONFIRMADO` en `pago.ts`; es lo que se guarda como salida) — la crea Fermín en Kapso/Meta.
 5. PR con CI en verde → OK → merge. Primer cobro real pequeño con VIM Pruebas.

@@ -19,6 +19,10 @@ export type DepsPago = {
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DIA_MS = 24 * 3600_000;
 
+/** Texto de la plantilla `pago_confirmado` (Utility, es_MX) tal como se da de alta en Meta; {{1}} es la fecha. */
+export const PLANTILLA_PAGO_CONFIRMADO =
+  "Tu pago a VIM POS quedó registrado. Tu próxima fecha de pago es el {{1}}. Si tienes dudas, contesta este mensaje.";
+
 /** «2026-11-28» → «28 de noviembre de 2026», sin correr de día por la zona horaria. */
 const fechaLegible = (iso: string) =>
   new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
@@ -55,16 +59,16 @@ export async function atenderPago(pagoId: string, d: DepsPago): Promise<"APLICAD
   // De aquí en adelante nada lanza: el pago ya quedó y un reintento sería DUPLICADO.
   try {
     const fecha = fechaLegible(r.proxima_fecha_cobro);
-    const base = `Listo, quedó tu pago. Tu próxima fecha de pago es el ${fecha}.`;
+    const base = `Listo, ya quedó tu pago. Tu próxima fecha de pago es el ${fecha}.`;
     const texto = base +
       (r.reactivado ? " Tu caja se desbloquea en unos minutos." : "") +
-      (r.sin_reactivar ? " Un agente revisa tu cuenta y te escribe." : "") +
+      (r.sin_reactivar ? " Para desbloquear tu caja falta revisar algo más de tu cuenta. Un agente lo revisa y te escribe." : "") +
       (r.factura ? " Tu factura te llega por correo." : "");
     // Fuera de la ventana de 24 h, Meta solo deja mandar plantillas aprobadas.
     const ultimo = r.ultimo_cliente_en ? new Date(r.ultimo_cliente_en).getTime() : 0;
     const dentro = d.ahora().getTime() - ultimo < DIA_MS;
     const s = await d.enviar(dentro ? cuerpoTexto(r.wa_id, texto) : cuerpoPlantilla(r.wa_id, "pago_confirmado", [fecha]));
-    if (s.wamid) await d.registrarSalida(conv, s.wamid, dentro ? texto : base); // la plantilla dice lo mismo que `base`
+    if (s.wamid) await d.registrarSalida(conv, s.wamid, dentro ? texto : PLANTILLA_PAGO_CONFIRMADO.replace("{{1}}", fecha));
   } catch (err) {
     registrarError("cobro-vim-webhook", "CONFIRMACION", `pago ${pagoId} aplicado, sin confirmar al cliente: ${textoDeError(err)}`);
   }

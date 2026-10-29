@@ -60,7 +60,8 @@ export function herramientasCobro(conversacionId: string, waId: string, d: DepsC
       // El código y el correo nunca vuelven al modelo: la respuesta es igual exista o no el correo.
       if (r.enviar) {
         await d.correo(r.correo, soloAscii("Tu codigo de VIM POS"),
-          `<p>Tu código para el WhatsApp de VIM POS es <b>${esc(r.codigo)}</b>. Vence en 15 minutos.</p>` +
+          `<p>Tu código para el WhatsApp de VIM POS es <b>${esc(r.codigo)}</b>.</p>` +
+          `<p>Escríbelo en el chat. Vence en 15 minutos.</p>` +
           `<p>Si no lo pediste, ignora este correo.</p>`);
       }
       return "Si ese correo está registrado, le llegó un código de 6 dígitos que vence en 15 minutos. " +

@@ -37,7 +37,7 @@ test("pedirCodigo responde igual exista o no el correo", async () => {
   assert.equal(si.correos[0].subject, "Tu codigo de VIM POS");
   assert.match(si.correos[0].subject, /^[ -~]+$/);
   assert.ok(si.correos[0].html.includes("042517"));
-  assert.ok(si.correos[0].html.includes("Vence en 15 minutos"));
+  assert.ok(si.correos[0].html.includes("Escríbelo en el chat. Vence en 15 minutos."));
 });
 
 test("pedirCodigo respeta los cupos", async () => {
