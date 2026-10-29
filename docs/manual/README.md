@@ -123,7 +123,7 @@ Dónde se hace cada cosa:
 - Cómo conectar Uber Eats
 - Cómo llegan los pedidos de Uber Eats a la caja
 - Cómo pausar y reanudar los pedidos en línea
-- Cómo vender combos en Uber Eats
+- Cómo mandar mi menú y mis combos a Uber Eats
 - Cómo revisar lo que depositó cada app (Conciliación)
 
 ### 12. [Clientes y lealtad](clientes-y-lealtad.md)
