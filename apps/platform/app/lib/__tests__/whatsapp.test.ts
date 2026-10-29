@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { agenteCallado, ESTADOS_LECCION, ESTADOS_WA, esUuid, etiquetaEstado, etiquetaLeccion, etiquetaTipo } from "../whatsapp";
+import { agenteCallado, COLOR_ESTADO_WA, ESTADOS_LECCION, ESTADOS_WA, esUuid, etiquetaEstado, etiquetaIntento, etiquetaLeccion, etiquetaTipo } from "../whatsapp";
 
 describe("etiquetaEstado", () => {
-  it("nombra los 5 estados en palabras", () => {
+  it("nombra los 7 estados en palabras", () => {
     expect(ESTADOS_WA.map(etiquetaEstado)).toEqual([
-      "Activa", "Prospecto caliente", "Urgente: soporte", "Duda sin respuesta", "Resuelto",
+      "Activa", "Prospecto caliente", "Urgente: soporte", "Duda sin respuesta", "Resuelto", "Pago pendiente", "Pago por confirmar",
     ]);
+  });
+  it("los estados de pago tienen color: por confirmar en ámbar, pendiente neutro", () => {
+    expect(COLOR_ESTADO_WA.PAGO_POR_CONFIRMAR).toBe("bg-warning-soft text-warning");
+    expect(COLOR_ESTADO_WA.PAGO_PENDIENTE).toBe("bg-sel text-ink-2");
   });
   it("lo desconocido se enseña como llegó", () => {
     expect(etiquetaEstado("OTRO")).toBe("OTRO");
@@ -37,5 +41,11 @@ describe("etiquetaLeccion / etiquetaTipo", () => {
   it("lo desconocido se enseña como llegó", () => {
     expect(etiquetaLeccion("X")).toBe("X");
     expect(etiquetaTipo("X")).toBe("X");
+  });
+});
+
+describe("etiquetaIntento", () => {
+  it("nombra los 3 estados del intento y deja pasar lo desconocido", () => {
+    expect(["PENDIENTE", "PAGADO", "RECHAZADO", "X"].map(etiquetaIntento)).toEqual(["Pendiente", "Pagado", "Rechazado", "X"]);
   });
 });

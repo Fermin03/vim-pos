@@ -39,7 +39,9 @@ insert into _rls_exentas (tabla) values
   ('codigos_internos_contador'),-- Contador de códigos de barras internos por negocio; solo funciones SECURITY DEFINER (mig. 0190).
   ('agenda_correos'),           -- Cola de correos de citas (belleza); sin correo ni nombre, solo service_role (mig. 0226).
   ('agenda_enlaces'),           -- Código cifrado del enlace de la cita para esos correos; solo la Edge Function `tienda` (mig. 0226).
-  ('codigos_vinculacion_caja'); -- Código corto para vincular una caja; solo provisionar-dispositivo y canjear-codigo-caja (mig. 0285).
+  ('codigos_vinculacion_caja'), -- Código corto para vincular una caja; solo provisionar-dispositivo y canjear-codigo-caja (mig. 0285).
+  ('wa_conversaciones'),        -- Conversaciones del agente de WhatsApp de VIM; solo whatsapp-webhook y /platform con service_role (mig. 0288).
+  ('wa_intentos_pago');         -- Ligas de pago de la mensualidad por WhatsApp; solo las Edge Functions del agente (mig. 0288).
 
 -- #2 — CRÍTICA: ninguna tabla con tenant_id tiene RLS deshabilitado.
 select is_empty($$

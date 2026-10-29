@@ -7,26 +7,30 @@ type Ctx = { params: Promise<{ id: string }> };
 
 const LIMITE = 200;
 const NO_EXISTE = () => NextResponse.json({ error: "NO_EXISTE", detalle: "Esa conversación ya no existe." }, { status: 404 });
+const COLUMNAS_INTENTO = "id, estado, periodos, total, factura, preferencia_url, pagado_en, creado_en";
 const COLUMNAS = "id, wa_id, nombre_perfil, estado, pausado_hasta, resumen, ultimo_mensaje_en, creado_en, prospecto:prospectos(id, negocio)";
 
-/** Una conversación con sus últimos 200 mensajes, del más viejo al más nuevo. */
+/** Una conversación con sus últimos 200 mensajes (del más viejo al más nuevo) y sus intentos de pago (el más reciente primero). */
 export async function GET(req: Request, ctx: Ctx) {
   const auth = await autorizar(req);
   if ("error" in auth) return auth.error;
   const { id } = await ctx.params;
   if (!esUuid(id)) return NO_EXISTE();
 
-  const [conv, msgs] = await Promise.all([
+  const [conv, msgs, intentos] = await Promise.all([
     auth.sb.from("wa_conversaciones").select(COLUMNAS).eq("id", id).maybeSingle(),
     auth.sb.from("wa_mensajes").select("id, autor, texto, creado_en").eq("conversacion_id", id).order("creado_en", { ascending: false }).limit(LIMITE),
+    auth.sb.from("wa_intentos_pago").select(COLUMNAS_INTENTO).eq("conversacion_id", id).order("creado_en", { ascending: false }),
   ]);
-  if (conv.error || msgs.error) return NextResponse.json({ error: (conv.error ?? msgs.error)!.message }, { status: 500 });
+  const fallo = conv.error ?? msgs.error ?? intentos.error;
+  if (fallo) return NextResponse.json({ error: fallo.message }, { status: 500 });
   const conversacion = conv.data as unknown as { wa_id: string } | null;
   if (!conversacion) return NO_EXISTE();
 
   return NextResponse.json({
     conversacion: { ...conversacion, enlace: enlaceWhatsapp(conversacion.wa_id, "") },
     mensajes: (msgs.data ?? []).reverse(),
+    intentos: intentos.data ?? [],
   });
 }
 

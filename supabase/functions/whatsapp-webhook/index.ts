@@ -16,10 +16,13 @@
 //
 // SECRETOS: WA_APP_SECRET, WA_VERIFY_TOKEN, WA_TOKEN, WA_PHONE_NUMBER_ID, WA_GRAPH_VERSION,
 // WA_TOPE_USD, WA_NUMERO_FERMIN, ANTHROPIC_API_KEY; con Kapso, WA_KAPSO_API_KEY (y sobran WA_TOKEN
-// y WA_VERIFY_TOKEN).
+// y WA_VERIFY_TOKEN). Cobro a clientes: MP_VIM_ACCESS_TOKEN (sin él, el agente no crea ligas) y
+// VIM_SMTP_* para el código de verificación.
 import { clienteAdmin } from "../_shared/http.ts";
 import { consumirCupos, leerCuerpoAcotado } from "../_shared/limite.ts";
-import { enSegundoPlano } from "../_shared/correo.ts";
+import { enSegundoPlano, enviarCorreo } from "../_shared/correo.ts";
+import { crearPreferencia } from "../_shared/agente/cobro/mp-vim.ts";
+import { type DepsCobro, herramientasCobro } from "../_shared/agente/cobro/herramientas.ts";
 import { registrarError } from "../_shared/errores.ts";
 import { firmaMetaValida, leerAviso } from "../_shared/whatsapp/aviso-meta.ts";
 import { cuerpoTexto, enviar } from "../_shared/whatsapp/enviar.ts";
@@ -51,8 +54,28 @@ const ok = (r: { data: any; error: { message: string } | null }): any => {
   return r.data;
 };
 
+// Las fallas de correo y de Mercado Pago van al log; al modelo solo le llega qué hacer.
+const depsCobro: DepsCobro = {
+  rpc: async (fn, args) => ok(await admin.rpc(fn, args)),
+  cupo: async (claves) => (await consumirCupos(admin, claves, "abrir")).permitido,
+  async correo(to, subject, html) {
+    const r = await enviarCorreo({ to, subject, html });
+    if (!r.enviado) registrarError(FN, "CODIGO_CORREO", r.motivo);
+    return r;
+  },
+  async preferencia(d, token, f) {
+    const r = await crearPreferencia(d, token, f);
+    if (!r.ok) registrarError(FN, "MP_PREFERENCIA", r.error);
+    return r;
+  },
+  token: Deno.env.get("MP_VIM_ACCESS_TOKEN") ?? "",
+  notificacion: `${Deno.env.get("SUPABASE_URL")}/functions/v1/cobro-vim-webhook`,
+  ahora: () => new Date(),
+};
+
 function herramientas(conversacionId: string, waId: string): Herramientas {
   return {
+    ...herramientasCobro(conversacionId, waId, depsCobro),
     async guardarProspecto(d) {
       const fila = filaProspecto(d, waId);
       const { prospecto_id } = ok(await admin.from("wa_conversaciones").select("prospecto_id").eq("id", conversacionId).single());

@@ -1,8 +1,8 @@
 // Conversaciones del agente de WhatsApp (tablas wa_*, 0286). Solo las lee el servidor del panel
 // (service_role): las tablas niegan a todos por RLS.
 
-/** Los mismos del CHECK de `wa_conversaciones.estado` (0286). */
-export const ESTADOS_WA = ["ACTIVA", "PROSPECTO_CALIENTE", "URGENTE_SOPORTE", "DUDA_SIN_RESPUESTA", "RESUELTO"] as const;
+/** Los mismos del CHECK de `wa_conversaciones.estado` (0286; los de pago, 0288). */
+export const ESTADOS_WA = ["ACTIVA", "PROSPECTO_CALIENTE", "URGENTE_SOPORTE", "DUDA_SIN_RESPUESTA", "RESUELTO", "PAGO_PENDIENTE", "PAGO_POR_CONFIRMAR"] as const;
 export type EstadoWa = (typeof ESTADOS_WA)[number];
 
 const ETIQUETA: Record<EstadoWa, string> = {
@@ -11,6 +11,8 @@ const ETIQUETA: Record<EstadoWa, string> = {
   URGENTE_SOPORTE: "Urgente: soporte",
   DUDA_SIN_RESPUESTA: "Duda sin respuesta",
   RESUELTO: "Resuelto",
+  PAGO_PENDIENTE: "Pago pendiente",
+  PAGO_POR_CONFIRMAR: "Pago por confirmar",
 };
 
 /** Tokens de la paleta: lo urgente en rojo, lo que pide atención en ámbar, lo demás neutro. */
@@ -20,6 +22,8 @@ export const COLOR_ESTADO_WA: Record<EstadoWa, string> = {
   URGENTE_SOPORTE: "bg-danger-soft text-danger",
   DUDA_SIN_RESPUESTA: "bg-info-soft text-info",
   RESUELTO: "bg-success-soft text-success",
+  PAGO_PENDIENTE: "bg-sel text-ink-2",
+  PAGO_POR_CONFIRMAR: "bg-warning-soft text-warning",
 };
 
 /** Los ids de las rutas llegan de la URL: un texto que no es uuid haría fallar a Postgres con 500. */
@@ -78,3 +82,23 @@ export type LeccionWa = {
   creado_en: string;
   decidido_en: string | null;
 };
+
+// Intentos de cobro por WhatsApp (wa_intentos_pago, 0288).
+export type IntentoPagoWa = {
+  id: string;
+  estado: "PENDIENTE" | "PAGADO" | "RECHAZADO";
+  periodos: number;
+  total: number;
+  factura: { rfc?: string; razon_social?: string; regimen?: string; codigo_postal?: string; uso_cfdi?: string } | null;
+  preferencia_url: string | null;
+  pagado_en: string | null;
+  creado_en: string;
+};
+
+const ETIQUETA_INTENTO: Record<IntentoPagoWa["estado"], string> = { PENDIENTE: "Pendiente", PAGADO: "Pagado", RECHAZADO: "Rechazado" };
+export const COLOR_INTENTO: Record<IntentoPagoWa["estado"], string> = {
+  PENDIENTE: "bg-sel text-ink-2",
+  PAGADO: "bg-success-soft text-success",
+  RECHAZADO: "bg-danger-soft text-danger",
+};
+export const etiquetaIntento = (e: string): string => ETIQUETA_INTENTO[e as IntentoPagoWa["estado"]] ?? e;

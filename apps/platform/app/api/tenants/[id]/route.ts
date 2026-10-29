@@ -15,6 +15,7 @@ import type { SbClient } from "../../../lib/server";
 // Todo auditado en super_admin_accesos. service_role, gated por X-Platform-Key.
 
 const ESTADOS_VALIDOS = ["TRIAL", "ACTIVO", "SUSPENDIDO", "CANCELADO", "INTERNO"];
+const TIPOS_SUSPENSION = ["FALTA_DE_PAGO", "OTRO"];
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const auth = await autorizar(req);
@@ -26,7 +27,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     .from("tenants")
     .select(
       "id, codigo, nombre_comercial, estado, vertical_principal, razon_social, rfc, regimen_fiscal, " +
-        "codigo_postal_fiscal, email_fiscal, fecha_alta, fecha_baja, motivo_baja, bloqueo_desde, bloqueo_mensaje, created_at, prueba_hasta, usuario_dueno_id, " +
+        "codigo_postal_fiscal, email_fiscal, fecha_alta, fecha_baja, motivo_baja, bloqueo_desde, bloqueo_mensaje, suspension_tipo, created_at, prueba_hasta, usuario_dueno_id, " +
         "plan:planes(id, codigo, nombre, precio_mensual_mxn, timbres_cfdi_mensuales, features_incluidos), " +
         "onboarding:tenant_onboarding_estado(fase, fase_wizard, fecha_invitacion, fecha_activacion, fecha_go_live, notas_internas, terminos_version, bienvenida_enviada_at), " +
         "suscripcion:suscripciones(estado, precio_mensual_mxn, proxima_fecha_cobro, ciclo_facturacion, fecha_inicio, precio_promocional_mxn, promocion_hasta, promocion_nombre)",
@@ -136,7 +137,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     const esBaja = nuevo === "SUSPENDIDO" || nuevo === "CANCELADO";
     if (esBaja && (!motivo || motivo.length < 10)) return NextResponse.json({ error: "MOTIVO_REQUERIDO" }, { status: 400 });
 
-    const patch: Record<string, unknown> = { estado: nuevo };
+    // Por qué se suspende: el agente de WhatsApp solo reactiva lo que fue por falta de pago.
+    const tipo = String(body.tipo_suspension ?? "");
+    if (nuevo === "SUSPENDIDO" && !TIPOS_SUSPENSION.includes(tipo)) return NextResponse.json({ error: "TIPO_REQUERIDO" }, { status: 400 });
+
+    // El tipo solo vive mientras dura la suspensión: cancelar y reactivar lo borran.
+    const patch: Record<string, unknown> = { estado: nuevo, suspension_tipo: nuevo === "SUSPENDIDO" ? tipo : null };
     if (esBaja) {
       patch.fecha_baja = new Date().toISOString();
       patch.motivo_baja = motivo;
@@ -152,7 +158,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     }
     const { error } = await sb.from("tenants").update(patch).eq("id", id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    await auditar(sb, { accion: `tenant.${nuevo.toLowerCase()}`, tenantId: id, motivo, payload: { estado: nuevo, bloqueo_desde: patch.bloqueo_desde ?? null } });
+    await auditar(sb, { accion: `tenant.${nuevo.toLowerCase()}`, tenantId: id, motivo, payload: { estado: nuevo, bloqueo_desde: patch.bloqueo_desde ?? null, suspension_tipo: patch.suspension_tipo } });
     return NextResponse.json({ ok: true, bloqueo_desde: patch.bloqueo_desde ?? null });
   }
 

@@ -32,7 +32,20 @@ const enHorario = (d: Date) => { const h = Number(hora(d).slice(0, 2)); return h
 
 /** Herramientas que no tocan nada: anotan lo pedido y contestan como en producción. */
 function herramientasFalsas(llamadas: Llamada[], ahora: Date): Herramientas {
+  // Cobro con datos fijos: un negocio «Tacos Prueba» que debe un mes del Esencial. Como en producción,
+  // sin verificar no se da nada del negocio.
+  const verificado = () => llamadas.some((l) => l.h === "verificar_codigo")
+  const SIN_VERIFICAR = "No verificado: primero pide el correo (pedir_codigo) y el código (verificar_codigo)."
+  const cobro = (h: string, d: Record<string, unknown>, res: string) => { llamadas.push({ h, d }); return verificado() ? res : SIN_VERIFICAR }
   return {
+    pedirCodigo: async (correo) => { llamadas.push({ h: "pedir_codigo", d: { correo } }); return "Código enviado a ese correo si es el de un dueño; vence en 15 minutos." },
+    verificarCodigo: async (codigo) => { llamadas.push({ h: "verificar_codigo", d: { codigo } }); return "Verificado. Negocio: Tacos Prueba." },
+    elegirNegocio: async (nombre) => cobro("elegir_negocio", { nombre }, "Listo, seguimos con Tacos Prueba."),
+    consultarAdeudo: async (adelanto) => cobro("consultar_adeudo", { adelanto }, adelanto
+      ? "Tacos Prueba, al corriente. Adelantar 1 mes: plan Esencial $699.00 + IVA $111.84 = total $810.84; cubriría hasta el 28 dic 2026."
+      : "Tacos Prueba, vencido (no suspendido). 1 mes: plan Esencial $699.00 + IVA $111.84 = total $810.84; cubre hasta el 28 nov 2026."),
+    guardarDatosFactura: async (d) => cobro("guardar_datos_factura", d, "Datos de factura guardados."),
+    crearLigaPago: async (adelanto) => cobro("crear_liga_pago", { adelanto }, "Liga de pago por $810.84 (tarjeta, vence en 24 h): https://mpago.la/prueba810"),
     guardarProspecto: async (d) => { llamadas.push({ h: "guardar_prospecto", d }); return "Guardado." },
     pasarAFermin: async (d) => {
       llamadas.push({ h: "pasar_a_fermin", d })

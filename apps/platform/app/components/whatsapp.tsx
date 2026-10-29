@@ -2,18 +2,21 @@
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { hace, type Api } from "../lib/tipos";
-import { fechaHoraMx } from "../lib/formato";
+import { fechaHoraMx, fmtMxn } from "../lib/formato";
 import { textoActualizado, useRefresco } from "../lib/refresco";
 import {
   agenteCallado,
   COLOR_ESTADO_WA,
+  COLOR_INTENTO,
   COLOR_LECCION,
   ESTADOS_LECCION,
   ESTADOS_WA,
   etiquetaEstado,
+  etiquetaIntento,
   etiquetaLeccion,
   etiquetaTipo,
   type ConversacionWa,
+  type IntentoPagoWa,
   type LeccionWa,
   type MensajeWa,
 } from "../lib/whatsapp";
@@ -154,12 +157,17 @@ export function Whatsapp({ api }: { api: Api }) {
   );
 }
 
+const FACTURA: [keyof NonNullable<IntentoPagoWa["factura"]>, string][] = [
+  ["rfc", "RFC"], ["razon_social", "Razón social"], ["regimen", "Régimen"], ["codigo_postal", "Código postal"], ["uso_cfdi", "Uso del CFDI"],
+];
+
 const AUTOR: Record<MensajeWa["autor"], string> = { CLIENTE: "Cliente", AGENTE: "Agente", FERMIN: "Fermín" };
 
 /** Una conversación: el chat, quién lo lleva y el cierre. */
 export function ConversacionWhatsapp({ api, id }: { api: Api; id: string }) {
   const [conv, setConv] = useState<Detalle | null>(null);
   const [mensajes, setMensajes] = useState<MensajeWa[]>([]);
+  const [intentos, setIntentos] = useState<IntentoPagoWa[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
 
@@ -168,6 +176,7 @@ export function ConversacionWhatsapp({ api, id }: { api: Api; id: string }) {
       const r = await api(`/api/whatsapp/${id}`);
       setConv(r.conversacion as Detalle);
       setMensajes((r.mensajes ?? []) as MensajeWa[]);
+      setIntentos((r.intentos ?? []) as IntentoPagoWa[]);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
@@ -226,6 +235,41 @@ export function ConversacionWhatsapp({ api, id }: { api: Api; id: string }) {
         <div className="mb-4">
           <Seccion id="resumen" titulo="Resumen del agente">
             <p className="whitespace-pre-wrap text-14">{conv.resumen}</p>
+          </Seccion>
+        </div>
+      )}
+
+      {intentos.length > 0 && (
+        <div className="mb-4">
+          <Seccion id="pagos" titulo="Pagos por WhatsApp" descripcion="Cada cobro que el agente armó en esta conversación. Los datos de factura se seleccionan de un clic.">
+            <ul className="flex flex-col gap-3">
+              {intentos.map((i) => (
+                <li key={i.id} className="rounded-lg border border-line p-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-14 font-semibold">{fmtMxn(i.total)}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-12 font-semibold ${COLOR_INTENTO[i.estado] ?? "bg-sel text-ink-2"}`}>{etiquetaIntento(i.estado)}</span>
+                    <span className="text-13 text-ink-2">{i.periodos} {i.periodos === 1 ? "periodo" : "periodos"}</span>
+                  </div>
+                  <p className="mt-1 text-12 text-ink-3">
+                    Creado {fechaHoraMx(i.creado_en, "corto")}
+                    {i.pagado_en && <> · pagado {fechaHoraMx(i.pagado_en, "corto")}</>}
+                  </p>
+                  {i.estado === "PENDIENTE" && i.preferencia_url && (
+                    <a href={i.preferencia_url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-13 font-semibold underline underline-offset-2">Abrir enlace de pago</a>
+                  )}
+                  {i.factura && (
+                    <dl className="mt-2 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-0.5 text-13">
+                      {FACTURA.map(([k, l]) => (
+                        <div key={k} className="contents">
+                          <dt className="text-ink-2">{l}</dt>
+                          <dd className="select-all break-words">{i.factura?.[k] || "—"}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                </li>
+              ))}
+            </ul>
           </Seccion>
         </div>
       )}

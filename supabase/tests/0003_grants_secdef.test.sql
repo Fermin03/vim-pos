@@ -103,7 +103,17 @@ insert into _secdef_solo_service (fn, motivo) values
   ('tienda_pago_frenar',            'frena el pago en línea del cliente de una clave de freno, en cualquier negocio (0178)'),
   ('tienda_pago_frenado',           'dice si una clave de freno tiene frenado el pago en línea (0178)'),
   ('tienda_config_no_borrar_en_prueba', 'función de disparador: nadie con sesión borra la fila de una tienda en modo de prueba (0178)'),
-  ('tienda_pagos_frenar_por_riesgo', 'función de disparador: frena al cliente de un pago rechazado por riesgo (0178)');
+  ('tienda_pagos_frenar_por_riesgo', 'función de disparador: frena al cliente de un pago rechazado por riesgo (0178)'),
+  ('wa_agente_id',                  'usuario técnico del agente; firma pagos y auditoría (0288)'),
+  ('wa_pedir_codigo',               'devuelve en claro el código de verificación del correo de cualquier dueño (0288)'),
+  ('wa_verificar_codigo',           'verifica una conversación para los negocios de un dueño; fuerza bruta del código (0288)'),
+  ('wa_elegir_negocio',             'elige el negocio de una conversación verificada (0288)'),
+  ('wa_adeudo',                     'lee plan, estado y adeudo de cualquier negocio (0288)'),
+  ('wa_guardar_factura',            'escribe datos fiscales en cualquier conversación (0288)'),
+  ('wa_crear_intento',              'crea intentos de pago para cualquier negocio (0288)'),
+  ('wa_fijar_preferencia',          'cambia la liga de pago de cualquier intento (0288)'),
+  ('wa_aplicar_pago',               'registra un pago, renueva y reactiva a cualquier negocio (0288)'),
+  ('wa_avisar_fermin',              'crea avisos a Fermín (0288)');
 
 -- #2 — CRÍTICA: ninguna de ellas es ejecutable por `authenticated`.
 select is_empty($$

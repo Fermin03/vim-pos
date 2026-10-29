@@ -69,7 +69,7 @@ export function BarraLateral({ abierto = false, onCerrar = () => {} }: { abierto
       api("/api/whatsapp?solo=conteo")
         .then((r) => {
           const c = (r.conteo ?? {}) as Record<string, number>;
-          if (vivo) setWhatsapp((c.URGENTE_SOPORTE ?? 0) + (c.PROSPECTO_CALIENTE ?? 0));
+          if (vivo) setWhatsapp((c.URGENTE_SOPORTE ?? 0) + (c.PROSPECTO_CALIENTE ?? 0) + (c.PAGO_POR_CONFIRMAR ?? 0));
         })
         .catch(() => {});
     };
