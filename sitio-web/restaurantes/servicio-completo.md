@@ -2,7 +2,7 @@
 
 > Mapa de mesas, meseros, propinas y cocina por estación en una sola caja. Para restaurantes con servicio completo, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/restaurantes/servicio-completo
 
 Del mapa de mesas a la cocina, sin papelitos y sin perder una orden.
 
@@ -193,4 +193,4 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 
-_Generado desde punto-de-venta-restaurantes-servicio-completo.html. La versión en HTML es la fuente; este archivo no se edita a mano._
+_Generado desde restaurantes/servicio-completo.html. La versión en HTML es la fuente; este archivo no se edita a mano._

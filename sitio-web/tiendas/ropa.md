@@ -2,7 +2,7 @@
 
 > Tallas y colores con su existencia, lector de código de barras, cambios de talla y etiquetas. Para tiendas de ropa y calzado, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/tiendas/ropa
 
 Vende con lector de código de barras, cambia tallas y sabe qué tienes en el anaquel.
 
@@ -185,4 +185,4 @@ Empieza tú solo, o te lo enseñamos con tu catálogo.
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 
-_Generado desde punto-de-venta-tiendas-de-ropa.html. La versión en HTML es la fuente; este archivo no se edita a mano._
+_Generado desde tiendas/ropa.html. La versión en HTML es la fuente; este archivo no se edita a mano._

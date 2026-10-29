@@ -2,7 +2,7 @@
 
 > El término de la carne, los extras con su precio y el combo sugerido en una sola caja. Para hamburgueserías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-hamburgueserias
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/restaurantes/hamburgueseria
 
 El término, los extras y el combo en una sola caja, aunque se caiga el internet.
 
@@ -193,4 +193,4 @@ Empieza tú solo, o te lo enseñamos con tus hamburguesas.
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 
-_Generado desde punto-de-venta-hamburgueserias.html. La versión en HTML es la fuente; este archivo no se edita a mano._
+_Generado desde restaurantes/hamburgueseria.html. La versión en HTML es la fuente; este archivo no se edita a mano._

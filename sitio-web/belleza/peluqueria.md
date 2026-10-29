@@ -1,38 +1,46 @@
-# Punto de venta para spas. Cada cabina ocupada a su hora, sin empalmes
+# Punto de venta para peluquerías y barberías. Cada silla con su turno y cada barbero con su comisión
 
-> Agenda por terapeuta y por cabina, anticipos, cobro de la cita y comisiones. Para spas, desde $699 al mes más IVA.
+> Citas y lista de espera, agenda por barbero, cobro y comisiones. Para peluquerías y barberías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-spa
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/belleza/peluqueria
 
-Agenda por terapeuta y por cabina, con anticipos y comisiones.
+Citas, lista de espera y cobro en una sola caja.
 
 [Contactar ventas](https://vimpos.com.mx/contacto)
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-![La recepción de un spa.](https://vimpos.com.mx/assets/img/fotos/spa-1.webp)
+![Un barbero peinando a un cliente.](https://vimpos.com.mx/assets/img/fotos/peluquerias-1.webp)
 
-![Una sala de espera del spa con sillones de mimbre.](https://vimpos.com.mx/assets/img/fotos/spa-2.webp)
+![Tijeras y máquina de cortar sobre la mesa del barbero.](https://vimpos.com.mx/assets/img/fotos/peluquerias-2.webp)
 
-![Detalles de una cabina de spa junto a la ventana.](https://vimpos.com.mx/assets/img/fotos/spa-3.webp)
+![Una barbería con clientes y barberos trabajando.](https://vimpos.com.mx/assets/img/fotos/peluquerias-3.webp)
 
-## Tu spa lleno, en orden y sin cuentas a mano
+## Sin perder un cliente por esperar
 
-![El calendario del spa con las citas de cuatro terapeutas, cada una con su cabina.](https://vimpos.com.mx/assets/img/capturas/giros/spa-calendario.webp?v=1)
+![La lista de espera con los clientes sin cita, cuánto llevan esperando y su barbero o quien esté libre.](https://vimpos.com.mx/assets/img/capturas/giros/barberia-lista-espera.webp?v=1)
 
-_Cada cita con su cabina._
+_La lista de espera, en la caja._
 
-### Cabinas que no se empalman
+### Con cita o sin cita
 
-Cada cita aparta su cabina. La caja no deja dar la misma a la misma hora.
+Quien llega sin cita entra a la lista de espera, y la caja dice quién sigue.
 
-![Los espacios del spa en el panel: cabinas y suite de pareja.](https://vimpos.com.mx/assets/img/capturas/giros/spa-espacios.webp?v=1)
+![El cobro de una cita: el total, el anticipo descontado y lo que falta por cobrar.](https://vimpos.com.mx/assets/img/capturas/giros/salon-cobro-anticipo.webp?v=1)
 
-_Las cabinas y suites del spa._
+_El cobro de la cita, con el anticipo descontado._
 
-### Tus cabinas y suites
+### Cobra la cita en un toque
 
-Das de alta cada cabina y cada suite, y la agenda las reparte.
+Los servicios de la cita pasan al cobro con la persona que los hizo, y el anticipo ya descontado.
+
+![Reporte de comisiones por colaboradora en la quincena.](https://vimpos.com.mx/assets/img/capturas/giros/salon-comisiones.webp?v=1)
+
+_Las comisiones de cada quien, por periodo._
+
+### Comisiones claras
+
+Cada servicio con su comisión. Al cerrar el periodo, cada barbero sabe lo suyo.
 
 ![La ficha de una cita por llegar con su anticipo pagado.](https://vimpos.com.mx/assets/img/capturas/giros/salon-ficha-cita.webp?v=1)
 
@@ -42,37 +50,21 @@ _La cita con su anticipo._
 
 Pide un anticipo al agendar. Si cancelan a tiempo se devuelve; si no, tú decides.
 
-![El cobro de una cita: el total, el anticipo descontado y lo que falta por cobrar.](https://vimpos.com.mx/assets/img/capturas/giros/salon-cobro-anticipo.webp?v=1)
+_Hecho para barberías_
 
-_El cobro de la cita, con el anticipo descontado._
+## Lo de todos los días en una barbería, resuelto
 
-### Cobra la cita en un toque
+### Su barbero o el que esté libre
 
-Los servicios de la cita pasan al cobro con la terapeuta que los hizo, y el anticipo ya descontado.
+El cliente elige con quién pasa, o pasa con el primero que se desocupe.
 
-![Reporte de comisiones por colaboradora en la quincena.](https://vimpos.com.mx/assets/img/capturas/giros/salon-comisiones.webp?v=1)
+### El que no llegó libera la silla
 
-_Las comisiones de cada quien, por periodo._
+Pasada tu tolerancia, la cita se marca en rojo y la silla pasa al que espera.
 
-### Comisiones claras
+### Cada barbero ve su agenda
 
-Cada servicio con su comisión. Al cerrar el periodo, cada terapeuta sabe lo suyo.
-
-_Hecho para spas_
-
-## Lo de todos los días en un spa, resuelto
-
-### Varios tratamientos en una visita
-
-Masaje y facial seguidos, cada uno con su terapeuta y su cabina.
-
-### Cobra como tú quieras
-
-Al final, con anticipo o todo por adelantado. Tú lo decides.
-
-### Aceites y cremas a la venta
-
-Vende productos en la misma cuenta, con su inventario al día.
+Entra desde su celular y marca cuándo empieza y termina cada corte.
 
 _Para el dueño_
 
@@ -80,21 +72,21 @@ _Para el dueño_
 
 ![Reporte de comisiones de la quincena: servicios, comisión, sueldo y total a pagar por colaboradora.](https://vimpos.com.mx/assets/img/capturas/giros/salon-comisiones.webp?v=1)
 
-### Comisiones por terapeuta
+### Sueldo y comisión de cada barbero
 
-Sueldo y comisión de cada terapeuta por periodo, sin hacer cuentas.
+Al cerrar el periodo, cada barbero sabe lo suyo.
 
 ![Los servicios en el panel con su duración, precio, comisión, anticipo y quién los hace.](https://vimpos.com.mx/assets/img/capturas/giros/salon-servicios.webp?v=1)
 
-### Tu carta de tratamientos
+### Corte, barba y combo
 
-Masajes y faciales, cada uno con su duración, precio y comisión.
+Cada servicio con su duración, su precio y su comisión.
 
 ![Ticket de una cita con el nombre de quien atendió y sus formas de pago.](https://vimpos.com.mx/assets/img/capturas/giros/salon-ticket.webp?v=1)
 
-### Cada ticket con su terapeuta
+### Cada ticket con su barbero
 
-El ticket dice qué tratamiento hizo cada terapeuta y cómo se pagó.
+El ticket dice quién hizo el corte y cómo se pagó.
 
 ![El panel del dueño en un celular.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard-movil.webp?v=3)
 
@@ -104,7 +96,7 @@ Revisa ventas y cortes desde donde estés.
 
 _Precios_
 
-## Un plan para cada tamaño de spa
+## Un plan para cada tamaño de peluquería
 
 Sin pago inicial y sin contrato forzoso.
 
@@ -122,10 +114,10 @@ Para arrancar con una caja.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-Lo principal para un spa
+Lo principal para una peluquería
 
-- Agenda por terapeuta y por cabina
-- Anticipos al reservar
+- Citas y lista de espera
+- Agenda por barbero
 - Comisiones por servicio
 - Facturación: $349 al mes aparte
 
@@ -145,7 +137,7 @@ Todo para un local, con tu menú cargado por nosotros.
 
 [Comenzar](https://admin.vimpos.com.mx/registro)
 
-Lo principal para un spa
+Lo principal para una peluquería
 
 - Hasta 3 cajas en el local
 - Facturación incluida, 20 folios al mes
@@ -166,7 +158,7 @@ Varias sucursales, vistas en un solo lugar.
 
 [Contactar ventas](https://vimpos.com.mx/contacto)
 
-Lo principal para un spa
+Lo principal para una peluquería
 
 - Cajas sin límite en cada sucursal
 - Un reporte que suma tus 3 sucursales
@@ -177,25 +169,25 @@ Lo principal para un spa
 
 _Preguntas_
 
-## Lo que pregunta un spa
+## Lo que pregunta una peluquería
 
 ### ¿Sirve si solo tengo una caja?
 
 Sí. El plan Esencial es una sucursal y una caja, por $699 al mes más IVA. Los tres planes están en [precios](https://vimpos.com.mx/precios).
 
-### ¿Puedo agendar dos tratamientos seguidos?
+### ¿Puedo atender sin cita?
 
-Sí. Cada tratamiento de la cita lleva su terapeuta, su cabina y su duración.
+Sí. Quien llega sin cita entra a la lista de espera, con su barbero o con el que esté libre.
 
-### ¿Puedo cobrar todo al reservar?
+### ¿Qué pasa si un cliente no llega?
 
-Sí. Eliges si cobras al final, pides un anticipo o cobras completo al reservar.
+Pasada la tolerancia que tú fijas, liberas su lugar para el siguiente. Su ficha guarda las faltas.
 
 ### ¿Qué pasa si se cae el internet?
 
 La agenda y el cobro siguen en la caja. Todo sube al volver la señal.
 
-## Pon tu spa a vender hoy
+## Pon tu peluquería a vender hoy
 
 Empieza tú solo, o te lo enseñamos con tus servicios.
 
@@ -209,4 +201,4 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 
-_Generado desde punto-de-venta-spa.html. La versión en HTML es la fuente; este archivo no se edita a mano._
+_Generado desde belleza/peluqueria.html. La versión en HTML es la fuente; este archivo no se edita a mano._
