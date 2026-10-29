@@ -20,5 +20,7 @@ Prueba de punta a punta con VIM Pruebas (0288 y `cobro-vim-webhook` en producci�
   confirmación falló y quedó el aviso «Pago sin confirmar al cliente» para Fermín, como está diseñado.
 - El pago de prueba se anuló con `anular_pago_suscripcion` y se borraron la conversación, el intento y el aviso.
 
-Pendiente: excluir `digital_currency` (Mercado Crédito) no se probó; cargar credenciales de producción; plantilla
+- El checkout solo ofreció tarjeta (sin meses, sin OXXO/SPEI ni Mercado Crédito): no hace falta excluir `digital_currency`.
+
+Pendiente: cargar credenciales de producción; plantilla
 `pago_confirmado`.
