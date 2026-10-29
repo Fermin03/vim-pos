@@ -11,8 +11,15 @@ type Uso = { input_tokens: number; output_tokens: number; cache_creation_input_t
 
 export type Herramientas = {
   guardarProspecto(d: { nombre: string; negocio: string; cajas: number; sucursales: number; giro: string | null; ciudad: string | null; mensaje: string | null }): Promise<string>
-  pasarAFermin(d: { estado: "PROSPECTO_CALIENTE" | "URGENTE_SOPORTE" | "DUDA_SIN_RESPUESTA"; motivo: string; resumen: string }): Promise<string>
+  pasarAFermin(d: { estado: "PROSPECTO_CALIENTE" | "URGENTE_SOPORTE" | "DUDA_SIN_RESPUESTA" | "PAGO_POR_CONFIRMAR"; motivo: string; resumen: string }): Promise<string>
   anotarPregunta(pregunta: string): Promise<string>
+  // Cobro: el negocio y el monto los pone la base desde la conversación verificada, nunca el modelo.
+  pedirCodigo(correo: string): Promise<string>
+  verificarCodigo(codigo: string): Promise<string>
+  elegirNegocio(nombre: string): Promise<string>
+  consultarAdeudo(adelanto: boolean): Promise<string>
+  guardarDatosFactura(d: { rfc: string; razon_social: string; regimen: string; codigo_postal: string; uso_cfdi: string }): Promise<string>
+  crearLigaPago(adelanto: boolean): Promise<string>
 }
 export type Turno = {
   historial: { autor: "CLIENTE" | "AGENTE" | "FERMIN"; texto: string }[]
@@ -32,6 +39,12 @@ export function costoUsd(modelo: Modelo, u: Uso): number {
 }
 
 const str = (description: string) => ({ type: "string", description })
+const ESTADOS = ["PROSPECTO_CALIENTE", "URGENTE_SOPORTE", "DUDA_SIN_RESPUESTA", "PAGO_POR_CONFIRMAR"]
+// Lo único que el modelo decide al cobrar: si es adelanto. Ni negocio ni monto.
+const ADELANTO = {
+  type: "object",
+  properties: { adelanto: { type: "boolean", description: "true si está al corriente y quiere pagar el siguiente periodo por adelantado" } },
+}
 const HERRAMIENTAS = [
   {
     name: "guardar_prospecto",
@@ -52,7 +65,7 @@ const HERRAMIENTAS = [
     input_schema: {
       type: "object",
       properties: {
-        estado: { type: "string", enum: ["PROSPECTO_CALIENTE", "URGENTE_SOPORTE", "DUDA_SIN_RESPUESTA"] },
+        estado: { type: "string", enum: ESTADOS },
         motivo: str("Por qué se pasa"), resumen: str("Resumen breve de la conversación"),
       },
       required: ["estado", "motivo", "resumen"],
@@ -62,6 +75,43 @@ const HERRAMIENTAS = [
     name: "anotar_pregunta",
     description: "Anota una pregunta que no supiste contestar.",
     input_schema: { type: "object", properties: { pregunta: str("La pregunta tal cual") }, required: ["pregunta"] },
+  },
+  {
+    name: "pedir_codigo",
+    description: "Manda un código de 6 dígitos al correo de acceso del dueño para verificar que es el cliente.",
+    input_schema: { type: "object", properties: { correo: str("Correo con el que entra a VIM POS") }, required: ["correo"] },
+  },
+  {
+    name: "verificar_codigo",
+    description: "Revisa el código que el cliente recibió por correo.",
+    input_schema: { type: "object", properties: { codigo: str("Los 6 dígitos, sin espacios") }, required: ["codigo"] },
+  },
+  {
+    name: "elegir_negocio",
+    description: "Si el dueño tiene varios negocios, elige con cuál sigue la conversación.",
+    input_schema: { type: "object", properties: { nombre: str("Nombre comercial del negocio") }, required: ["nombre"] },
+  },
+  {
+    name: "consultar_adeudo",
+    description: "Cuánto debe el negocio verificado: plan, extras, IVA, total, periodos y estado.",
+    input_schema: ADELANTO,
+  },
+  {
+    name: "guardar_datos_factura",
+    description: "Guarda los datos fiscales para la factura, ya confirmados con el cliente.",
+    input_schema: {
+      type: "object",
+      properties: {
+        rfc: str("RFC"), razon_social: str("Nombre o razón social"), regimen: str("Régimen fiscal (clave de 3 dígitos)"),
+        codigo_postal: str("Código postal fiscal, 5 dígitos"), uso_cfdi: str("Uso del CFDI (clave, p. ej. G03)"),
+      },
+      required: ["rfc", "razon_social", "regimen", "codigo_postal", "uso_cfdi"],
+    },
+  },
+  {
+    name: "crear_liga_pago",
+    description: "Crea la liga de pago con tarjeta por el adeudo del negocio verificado.",
+    input_schema: ADELANTO,
   },
   {
     name: "escalar_modelo",
@@ -115,7 +165,8 @@ export function bloqueAhora(ahora: Date): string {
 
 const txt = (v: unknown, max = 1000, min = 1) => typeof v === "string" && v.trim().length >= min && v.length <= max
 const ent = (v: unknown) => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 99
-const ESTADOS = ["PROSPECTO_CALIENTE", "URGENTE_SOPORTE", "DUDA_SIN_RESPUESTA"]
+const cad = (v: unknown, re: RegExp) => typeof v === "string" && re.test(v.trim())
+const RFC = /^[A-ZÑ&]{3,4}\d{6}[A-Z\d]{3}$/i
 
 // Devuelve lo que falta o está mal; "" si la entrada es válida. El mensaje vuelve al modelo.
 function invalido(nombre: string, i: Record<string, unknown> | null): string {
@@ -132,6 +183,20 @@ function invalido(nombre: string, i: Record<string, unknown> | null): string {
     if (!txt(i.resumen)) mal.push("resumen")
   } else if (nombre === "anotar_pregunta") {
     if (!txt(i.pregunta, 500)) mal.push("pregunta (máx. 500 caracteres)")
+  } else if (nombre === "pedir_codigo") {
+    if (!txt(i.correo, 254) || !cad(i.correo, /^[^\s@]+@[^\s@]+\.[^\s@]+$/)) mal.push("correo (nombre@dominio)")
+  } else if (nombre === "verificar_codigo") {
+    if (typeof i.codigo !== "string" || !/^\d{6}$/.test(i.codigo)) mal.push("codigo (6 dígitos)")
+  } else if (nombre === "elegir_negocio") {
+    if (!txt(i.nombre, 150)) mal.push("nombre")
+  } else if (nombre === "consultar_adeudo" || nombre === "crear_liga_pago") {
+    if (i.adelanto !== undefined && typeof i.adelanto !== "boolean") mal.push("adelanto (true o false)")
+  } else if (nombre === "guardar_datos_factura") {
+    if (!cad(i.rfc, RFC)) mal.push("rfc (12 o 13 caracteres)")
+    if (!txt(i.razon_social, 300)) mal.push("razon_social")
+    if (!txt(i.regimen, 100)) mal.push("regimen")
+    if (!cad(i.codigo_postal, /^\d{5}$/)) mal.push("codigo_postal (5 dígitos)")
+    if (!txt(i.uso_cfdi, 100)) mal.push("uso_cfdi")
   }
   return mal.length ? "Datos faltantes o inválidos: " + mal.join(", ") + ". Pídeselos al cliente si hace falta." : ""
 }
@@ -198,6 +263,19 @@ export async function responder(
           if (u.name === "guardar_prospecto") out = await h.guardarProspecto(u.input)
           else if (u.name === "pasar_a_fermin") out = await h.pasarAFermin(u.input)
           else if (u.name === "anotar_pregunta") out = await h.anotarPregunta(u.input.pregunta)
+          else if (u.name === "pedir_codigo") out = await h.pedirCodigo(u.input.correo.trim())
+          else if (u.name === "verificar_codigo") out = await h.verificarCodigo(u.input.codigo)
+          else if (u.name === "elegir_negocio") out = await h.elegirNegocio(u.input.nombre.trim())
+          // Solo el boolean: un tenant_id o un monto que mande el modelo no llega a la herramienta.
+          else if (u.name === "consultar_adeudo") out = await h.consultarAdeudo(u.input.adelanto === true)
+          else if (u.name === "crear_liga_pago") out = await h.crearLigaPago(u.input.adelanto === true)
+          else if (u.name === "guardar_datos_factura") {
+            const d = u.input
+            out = await h.guardarDatosFactura({
+              rfc: d.rfc.trim().toUpperCase(), razon_social: d.razon_social.trim(), regimen: d.regimen.trim(),
+              codigo_postal: d.codigo_postal.trim(), uso_cfdi: d.uso_cfdi.trim(),
+            })
+          }
           else if (u.name === "escalar_modelo") { modelo = "sonnet"; out = "Listo, ahora respondes con un modelo más capaz." }
           else throw new Error("herramienta desconocida")
           resultados.push({ type: "tool_result", tool_use_id: u.id, content: out })

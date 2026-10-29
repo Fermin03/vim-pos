@@ -37,7 +37,7 @@ test('solo texto: devuelve el texto, haiku y el costo del usage', async () => {
   assert.deepEqual(r, { texto: 'Hola', modelo: 'haiku', usd: costoUsd('haiku', USO), fallo: false })
   assert.equal(cuerpos[0].model, 'claude-haiku-5-5')
   assert.equal(cuerpos[0].max_tokens, 2048) // deja espacio al razonamiento («thinking») antes del texto
-  assert.equal(cuerpos[0].tools.length, 4)
+  assert.equal(cuerpos[0].tools.length, 10)
 })
 
 test('guardar_prospecto llama la herramienta y manda el tool_result; usd acumula', async () => {
@@ -256,4 +256,80 @@ test('recortar no corta en el punto de un número ni de una URL, y no parte un e
   assert.equal((await responder(turno(), espia().h, borde.f)).texto, 'e'.repeat(1499) + '.')
   const emoji = falso([() => resp([{ type: 'text', text: '😀'.repeat(1600) }])])
   assert.equal((await responder(turno(), espia().h, emoji.f)).texto, '😀'.repeat(1500))
+})
+
+// Cobro: corre una sola herramienta con un handler que anota todo lo que se le llama.
+async function usar(name: string, input: unknown) {
+  const llamadas: [string, unknown[]][] = []
+  const h = new Proxy({}, { get: (_, k) => async (...a: unknown[]) => { llamadas.push([String(k), a]); return 'ok' } }) as any
+  const { f, cuerpos } = falso([() => resp([{ type: 'tool_use', id: 'i', name, input }]), () => resp([{ type: 'text', text: 'ok' }])])
+  await responder(turno(), h, f)
+  return { llamadas, tr: cuerpos[1].messages.at(-1).content[0] }
+}
+
+test('pedir_codigo con correo sin @ vuelve como error al modelo y no llama la herramienta', async () => {
+  for (const correo of ['ana.gmail.com', '', 'ana@', 7]) {
+    const { llamadas, tr } = await usar('pedir_codigo', { correo })
+    assert.equal(tr.is_error, true)
+    assert.match(tr.content, /correo/)
+    assert.equal(llamadas.length, 0)
+  }
+  const { llamadas } = await usar('pedir_codigo', { correo: ' Ana@Tacos.mx ' })
+  assert.deepEqual(llamadas, [['pedirCodigo', ['Ana@Tacos.mx']]])
+})
+
+test('verificar_codigo exige 6 dígitos', async () => {
+  for (const codigo of ['12345', 'abcdef', '1234567', 123456]) {
+    const { llamadas, tr } = await usar('verificar_codigo', { codigo })
+    assert.equal(tr.is_error, true)
+    assert.equal(llamadas.length, 0)
+  }
+  assert.deepEqual((await usar('verificar_codigo', { codigo: '012345' })).llamadas, [['verificarCodigo', ['012345']]])
+})
+
+test('elegir_negocio pide nombre y lo pasa sin espacios de más', async () => {
+  assert.equal((await usar('elegir_negocio', { nombre: ' ' })).tr.is_error, true)
+  assert.deepEqual((await usar('elegir_negocio', { nombre: ' Tacos Prueba ' })).llamadas, [['elegirNegocio', ['Tacos Prueba']]])
+})
+
+test('guardar_datos_factura valida RFC y CP', async () => {
+  const bien = { rfc: 'xaxx010101000', razon_social: 'Tacos Prueba', regimen: '612', codigo_postal: '37000', uso_cfdi: 'G03' }
+  for (const mal of [{ rfc: 'XAXX0101' }, { rfc: 'XAXX010101-00' }, { codigo_postal: '3700' }, { codigo_postal: '37000a' }, { razon_social: '' }, { regimen: '' }, { uso_cfdi: undefined }]) {
+    const { llamadas, tr } = await usar('guardar_datos_factura', { ...bien, ...mal })
+    assert.equal(tr.is_error, true, JSON.stringify(mal))
+    assert.equal(llamadas.length, 0)
+  }
+  // Solo los cinco datos, RFC en mayúsculas; lo demás que mande el modelo no pasa.
+  const { llamadas } = await usar('guardar_datos_factura', { ...bien, tenant_id: 'otro', rfc: ' ÑAX010101AB1 ' })
+  assert.deepEqual(llamadas, [['guardarDatosFactura', [{ ...bien, rfc: 'ÑAX010101AB1' }]]])
+  assert.deepEqual((await usar('guardar_datos_factura', bien)).llamadas[0][1], [{ ...bien, rfc: 'XAXX010101000' }])
+})
+
+test('crear_liga_pago y consultar_adeudo solo reciben adelanto (boolean)', async () => {
+  for (const [name, metodo] of [['crear_liga_pago', 'crearLigaPago'], ['consultar_adeudo', 'consultarAdeudo']]) {
+    assert.deepEqual((await usar(name, { adelanto: true, tenant_id: 'otro', monto: 1 })).llamadas, [[metodo, [true]]])
+    assert.deepEqual((await usar(name, { monto: 99999 })).llamadas, [[metodo, [false]]])
+    const { llamadas, tr } = await usar(name, { adelanto: 'sí' })
+    assert.equal(tr.is_error, true)
+    assert.equal(llamadas.length, 0)
+  }
+})
+
+test('pasar_a_fermin acepta PAGO_POR_CONFIRMAR', async () => {
+  const d = { estado: 'PAGO_POR_CONFIRMAR', motivo: 'dice que transfirió', resumen: 'Tacos Prueba, mandó comprobante' }
+  const { llamadas, tr } = await usar('pasar_a_fermin', d)
+  assert.equal(tr.is_error, undefined)
+  assert.deepEqual(llamadas, [['pasarAFermin', [d]]])
+})
+
+test('el modelo ve las seis herramientas de cobro, sin tenant_id ni monto', async () => {
+  const { f, cuerpos } = falso([() => resp([{ type: 'text', text: 'x' }])])
+  await responder(turno(), espia().h, f)
+  const tools = cuerpos[0].tools
+  for (const n of ['pedir_codigo', 'verificar_codigo', 'elegir_negocio', 'consultar_adeudo', 'guardar_datos_factura', 'crear_liga_pago']) {
+    const t = tools.find((x: any) => x.name === n)
+    assert.ok(t, n)
+    assert.ok(!/tenant|monto/.test(JSON.stringify(t.input_schema)), n)
+  }
+  assert.ok(tools.find((x: any) => x.name === 'pasar_a_fermin').input_schema.properties.estado.enum.includes('PAGO_POR_CONFIRMAR'))
 })

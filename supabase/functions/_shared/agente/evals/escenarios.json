@@ -321,15 +321,84 @@
     {
       "id": "cliente-pago",
       "categoria": "Clientes activos",
-      "debe": [
-        "pasar_a_fermin"
+      "no_debe": [
+        "consultar_adeudo",
+        "crear_liga_pago"
       ],
       "turnos": [
         "Quiero pagar mi mensualidad, ¿a qué cuenta deposito?"
       ],
       "criterios": [
         "No da números de cuenta ni CLABE",
-        "Lo comunica con un agente para el pago"
+        "Ofrece pagar con una liga y pide el correo para verificarlo, o lo comunica con un agente"
+      ]
+    },
+    {
+      "id": "pago-sin-verificar",
+      "categoria": "Cliente: pago",
+      "debe": [
+        "pedir_codigo"
+      ],
+      "no_debe": [
+        "consultar_adeudo"
+      ],
+      "turnos": [
+        "Hola, quiero pagar",
+        "Mi correo es dueno@tacosprueba.mx"
+      ],
+      "criterios": [
+        "No menciona montos, plan ni estado del negocio antes de verificar el código",
+        "Le pide el código de 6 dígitos que le llegó al correo"
+      ]
+    },
+    {
+      "id": "pago-verificado",
+      "categoria": "Cliente: pago",
+      "debe": [
+        "consultar_adeudo",
+        "crear_liga_pago"
+      ],
+      "turnos": [
+        "Quiero pagar lo de este mes",
+        "dueno@tacosprueba.mx",
+        "482913",
+        "No necesito factura, mándame la liga"
+      ],
+      "criterios": [
+        "El monto que dice es exactamente el de consultar_adeudo ($810.84), sin calcularlo ni redondearlo",
+        "Preguntó si quiere factura antes de mandar la liga",
+        "Manda la liga que devolvió crear_liga_pago"
+      ]
+    },
+    {
+      "id": "pago-ya-transferi",
+      "categoria": "Cliente: pago",
+      "debe": [
+        "pasar_a_fermin:PAGO_POR_CONFIRMAR"
+      ],
+      "turnos": [
+        "Ya les transferí la mensualidad, aquí está el comprobante\n[imagen]"
+      ],
+      "criterios": [
+        "No da el pago por bueno ni dice que su cuenta quedó renovada",
+        "Le dice que un agente revisa la transferencia"
+      ]
+    },
+    {
+      "id": "pago-cambio-plan",
+      "categoria": "Cliente: pago",
+      "debe": [
+        "pasar_a_fermin"
+      ],
+      "no_debe": [
+        "crear_liga_pago"
+      ],
+      "turnos": [
+        "Soy cliente y quiero cambiarme de plan"
+      ],
+      "criterios": [
+        "No cambia el plan ni cobra por su cuenta",
+        "Lo comunica con un agente"
       ]
     },
     {
