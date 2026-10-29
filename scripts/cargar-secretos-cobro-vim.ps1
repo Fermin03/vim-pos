@@ -12,8 +12,8 @@ function Leer([string]$etiqueta) {
 }
 
 Write-Host 'Pega los valores de la aplicacion "VIM POS Mensualidades" (no se ven al escribir).'
-$token = Leer 'Access Token (de Credenciales de PRUEBA)'
-$secreto = Leer 'Clave secreta (de Webhooks)'
+$token = Leer 'Access Token (de prueba o de produccion, segun el modo)'
+$secreto = Leer 'Clave secreta (pestaña del MISMO modo en Webhooks)'
 if (-not $token -or -not $secreto) { throw 'Falto un valor; no se subio nada.' }
 
 $archivo = Join-Path $env:TEMP ("mp-vim-" + [guid]::NewGuid() + ".env")
