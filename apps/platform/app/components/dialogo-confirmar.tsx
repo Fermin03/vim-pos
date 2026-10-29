@@ -34,6 +34,8 @@ export type DialogoConfirmarProps = {
   conGracia?: boolean;
   /** Texto de una casilla obligatoria ("Entiendo que…"). */
   conEntiendo?: string;
+  /** Opciones excluyentes (radio) y obligatorias: hay que elegir una para habilitar el botón. */
+  opciones?: { titulo: string; items: { valor: string; etiqueta: string }[] };
   /** Campo opcional "mensaje que verá el cajero". */
   conMensaje?: boolean;
   /**
@@ -44,7 +46,7 @@ export type DialogoConfirmarProps = {
   /** Lo que dice el botón mientras trabaja ("Eliminando…"). */
   textoOcupado?: string;
   ocupado?: boolean;
-  onConfirmar: (r: { motivo: string; graciaDias?: number; mensaje?: string; nombre: string; palabra?: string }) => void | Promise<void>;
+  onConfirmar: (r: { motivo: string; graciaDias?: number; mensaje?: string; nombre: string; palabra?: string; opcion?: string }) => void | Promise<void>;
 };
 
 const FALTA: Record<ResultadoConfirmacion["faltantes"][number], string> = {
@@ -72,10 +74,11 @@ export function DialogoConfirmar(p: DialogoConfirmarProps) {
   const [entiendo, setEntiendo] = useState(false);
   const [mensaje, setMensaje] = useState("");
   const [palabra, setPalabra] = useState("");
+  const [opcion, setOpcion] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (p.abierto) { setNombre(""); setMotivo(""); setGracia(GRACIA_POR_DEFECTO); setEntiendo(false); setMensaje(""); setPalabra(""); setError(null); }
+    if (p.abierto) { setNombre(""); setMotivo(""); setGracia(GRACIA_POR_DEFECTO); setEntiendo(false); setMensaje(""); setPalabra(""); setOpcion(""); setError(null); }
   }, [p.abierto]);
 
   const r = useMemo(
@@ -89,6 +92,7 @@ export function DialogoConfirmar(p: DialogoConfirmarProps) {
   );
   const faltan = [
     ...(p.listo && !p.listo.ok ? [p.listo.falta] : []),
+    ...(p.opciones && !opcion ? [p.opciones.titulo.toLowerCase()] : []),
     ...r.faltantes.map((f) => (f === "nombre" && p.faltaNombre ? p.faltaNombre : f === "palabra" && p.palabra ? `escribir ${p.palabra}` : FALTA[f])),
   ];
   const puede = faltan.length === 0 && !p.ocupado;
@@ -105,6 +109,7 @@ export function DialogoConfirmar(p: DialogoConfirmarProps) {
         mensaje: p.conMensaje ? mensaje.trim() || undefined : undefined,
         nombre: nombre.trim(),
         palabra: p.palabra ? palabra.trim() : undefined,
+        opcion: p.opciones ? opcion : undefined,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo aplicar");
@@ -134,6 +139,18 @@ export function DialogoConfirmar(p: DialogoConfirmarProps) {
         <label className={label} htmlFor="dc-motivo">Motivo (queda en la bitácora)</label>
         <textarea id="dc-motivo" className={`${input} h-20 py-2`} value={motivo} onChange={(e) => setMotivo(e.target.value)} />
       </div>
+
+      {p.opciones && (
+        <fieldset>
+          <legend className={label}>{p.opciones.titulo}</legend>
+          {p.opciones.items.map((o) => (
+            <label key={o.valor} className="flex items-start gap-2 text-14">
+              <input type="radio" name="dc-opcion" className="mt-0.5 h-4 w-4" checked={opcion === o.valor} onChange={() => setOpcion(o.valor)} />
+              <span>{o.etiqueta}</span>
+            </label>
+          ))}
+        </fieldset>
+      )}
 
       {p.conGracia && (
         <div>

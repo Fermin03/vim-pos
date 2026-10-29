@@ -56,9 +56,16 @@ export function ZonaPeligrosa({ estado, nombre, bloqueoDesde, accion, busy, api,
         peligroso
         conGracia
         conMensaje
+        opciones={{
+          titulo: "Tipo de suspensión",
+          items: [
+            { valor: "FALTA_DE_PAGO", etiqueta: "Falta de pago (se reactiva sola cuando pague por WhatsApp)" },
+            { valor: "OTRO", etiqueta: "Otro motivo" },
+          ],
+        }}
         ocupado={busy}
-        onConfirmar={async ({ motivo, graciaDias, mensaje }) => {
-          await accion({ accion: "cambiar_estado", estado: "SUSPENDIDO", motivo, gracia_dias: graciaDias, mensaje });
+        onConfirmar={async ({ motivo, graciaDias, mensaje, opcion }) => {
+          await accion({ accion: "cambiar_estado", estado: "SUSPENDIDO", motivo, gracia_dias: graciaDias, mensaje, tipo_suspension: opcion });
           cerrar();
         }}
       />
