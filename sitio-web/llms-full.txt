@@ -2,7 +2,7 @@
 
 > VIM POS es un sistema de punto de venta para restaurantes, tiendas y salones de belleza en México. El programa completo se instala en la computadora de la caja, así que cobrar, imprimir tickets y mandar comandas a cocina funcionan sin conexión a internet; la nube sirve de respaldo y de panel para el dueño. Incluye caja, pantalla de cocina, mapa de mesas, inventario, agenda de citas, reportes y facturación electrónica CFDI 4.0. Desde $699 MXN al mes más IVA, sin pago inicial; desde el plan Negocio, VIM carga el catálogo y capacita al equipo, y en Esencial el dueño arranca con una guía paso a paso.
 
-Este archivo concatena las 28 páginas de https://vimpos.com.mx en Markdown. Es el
+Este archivo concatena las 25 páginas de https://vimpos.com.mx en Markdown. Es el
 contexto completo del producto en una sola descarga. El índice corto, con la guía de
 cuándo recomendarlo, está en https://vimpos.com.mx/llms.txt
 
@@ -28,35 +28,35 @@ _Todo tu negocio_
 
 ## De la venta al corte, en un solo sistema
 
-![Un producto abierto con sus opciones: término de la carne y extras con su precio.](https://vimpos.com.mx/assets/img/capturas/pos-catalogo.webp?v=3)
-
-### [Cobra en segundos](https://vimpos.com.mx/funciones#caja)
+### Cobra en segundos
 
 Productos con sus opciones y su precio. Efectivo, tarjeta o las dos en la misma cuenta.
 
-![Existencias en el panel: piezas, valor del inventario y lo que está bajo el mínimo.](https://vimpos.com.mx/assets/img/capturas/giros/tienda-ropa-existencias.webp?v=1)
+[Ver la caja →](https://vimpos.com.mx/funciones#caja)
 
-### [Tu inventario, al día](https://vimpos.com.mx/funciones#inventario)
+### Tu inventario, al día
 
 Cada venta descuenta su existencia y te avisa lo que se está acabando. Desde Negocio.
 
-![El calendario del salón con las citas del día de tres colaboradoras.](https://vimpos.com.mx/assets/img/capturas/giros/salon-calendario.webp?v=1)
+[Ver inventario →](https://vimpos.com.mx/funciones#inventario)
 
-### [Tu agenda de citas](https://vimpos.com.mx/punto-de-venta-salones-de-belleza)
+### Tu agenda de citas
 
 Las citas del día y quién atiende cada una.
 
-![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp?v=3)
+[Ver la agenda →](https://vimpos.com.mx/belleza/salon-de-belleza)
 
-### [Un corte que cuadra con el cajón](https://vimpos.com.mx/funciones#reportes)
+### Un corte que cuadra con el cajón
 
 Lo que debe haber contra lo que hay, por turno.
 
-![Panel del dueño con las ventas del día y el estado de las cajas.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
+[Ver el corte →](https://vimpos.com.mx/funciones#reportes)
 
-### [La venta del día en tu celular](https://vimpos.com.mx/funciones#reportes)
+### La venta del día en tu celular
 
 Qué se vende, a qué hora y quién cobró.
+
+[Ver los reportes →](https://vimpos.com.mx/funciones#reportes)
 
 **Todo esto desde $699 al mes.** Pruébalo 30 días gratis.
 
@@ -70,11 +70,11 @@ _Para tu giro_
 
 Cambian las pantallas, lo que se imprime y cómo se cobra.
 
-[Alimentos y bebidas Restaurantes, cafés, bares y food trucks](https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo)
+[Restaurantes Restaurantes, cafés, bares y food trucks](https://vimpos.com.mx/restaurantes/servicio-completo)
 
-[Tienda Ropa, vinos y licores, abarrotes y fruterías](https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa)
+[Tienda Ropa, vinos y licores, abarrotes y fruterías](https://vimpos.com.mx/tiendas/ropa)
 
-[Belleza Salones, spas, peluquerías y tatuajes](https://vimpos.com.mx/punto-de-venta-salones-de-belleza)
+[Belleza Salones, spas, peluquerías y tatuajes](https://vimpos.com.mx/belleza/salon-de-belleza)
 
 **¿No ves tu giro?** Cuéntanos cómo vendes y te decimos si te sirve.
 
@@ -459,8 +459,6 @@ Tu cliente escanea el código del ticket, pone sus datos y recibe su **CFDI 4.0*
 
 Incluye **timbrado**, **autofacturación** por QR y **factura global**, que emites con un botón desde el panel.
 
-[Cómo funciona la facturación](https://vimpos.com.mx/facturacion-cfdi)
-
 [Qué cuesta](https://vimpos.com.mx/precios)
 
 _Los límites_
@@ -600,118 +598,6 @@ En la demo, desconecta el cable delante de nosotros y sigue cobrando. Si no pasa
 [Pide una demo](https://vimpos.com.mx/demo)
 
 [Ver precios](https://vimpos.com.mx/precios)
-
----
-
-<!-- https://vimpos.com.mx/facturacion-cfdi -->
-
-# Facturación CFDI 4.0, sin parar la fila
-
-> Autofactura por QR desde el ticket y factura global del periodo con un botón. Qué necesitas dar, qué cuestan los folios y cómo se enciende.
-
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/facturacion-cfdi
-
-Tu cliente se factura solo desde su ticket y tú emites la factura global con un botón.
-
-Ya está disponible, con un proveedor autorizado por el SAT.
-
-[Pide una demo](https://vimpos.com.mx/demo)
-
-[Ver qué cuesta](https://vimpos.com.mx/precios)
-
-_Cómo funciona_
-
-## El ticket ya trae el código
-
-Tu cliente escanea el código impreso en su ticket, captura sus datos fiscales y la factura le llega por correo.
-
-![Ticket impreso de una venta con el código QR para facturar al pie: negocio, folio, cajero, el producto con su modificador, subtotal, IVA, total y cambio.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp?v=3)
-
-_El código para facturar va al pie del ticket. Tu cajero no vuelve a parar la fila para eso._
-
-_Lo que cubre_
-
-## Las tres cosas que necesitas ante el SAT
-
-### Timbrado individual
-
-Cada ticket que pida factura se timbra con su CFDI 4.0 y llega por correo.
-
-### La factura global, con un botón
-
-Lo que nadie facturó se junta en una sola factura por el periodo que elijas: diario, semanal, quincenal o mensual. La emites tú con un botón desde tu panel. Más detalle en la [guía de la factura global](https://vimpos.com.mx/factura-global-restaurantes).
-
-### Autofacturación por QR
-
-Un portal con tus datos donde tu cliente se factura solo.
-
-_El detalle que cambia el mes_
-
-## Hasta cuándo pueden facturar lo decides tú
-
-El plazo es tu periodo, y el periodo lo configuras tú. Si cierras quincenal, tu cliente puede facturar su ticket hasta que emitas la factura global de esa quincena.
-
-_Lo que hay que darnos_
-
-## Tu sello del SAT. Tu e.firma no.
-
-Para timbrar hacen falta tres cosas: tu **sello digital del SAT** (el CSD), su contraseña y tu RFC vigente.
-
-**La e.firma no te la pedimos.** Es tu llave maestra y no tenemos por qué tenerla.
-
-### Y tu sello no se queda con nosotros
-
-Pasa del panel al proveedor autorizado y se descarta. Solo guardamos cuál es y cuándo vence, para avisarte antes de que caduque.
-
-_Qué cuesta_
-
-## Incluida en Negocio y en Cadena
-
-En el plan Esencial se agrega por $349 al mes, más IVA. Cada factura, global o individual, usa un folio, y tu plan trae 10, 20 o 40 al mes. Si se te acaban, compras un paquete: esos folios no caducan mientras tengas tu suscripción activa.
-
-_Precios de los paquetes de folios de factura._
-
-| Paquete | Precio | Sale a |
-| --- | --- | --- |
-| 100 folios | $200 | $2.00 cada uno |
-| 250 folios | $450 | $1.80 cada uno |
-| 500 folios | $750 | $1.50 cada uno |
-| 1,000 folios | $1,300 | $1.30 cada uno |
-| 5,000 folios | $5,000 | $1.00 cada uno |
-
-Precios más IVA. La tabla completa de los tres planes está en la [página de precios](https://vimpos.com.mx/precios).
-
-_Dónde está hoy_
-
-## Qué necesitas para encenderlo
-
-El módulo ya emite comprobantes reales ante el SAT, a través de un proveedor autorizado.
-
-Necesitas dos cosas: tu Constancia de Situación Fiscal y tu Certificado de Sello Digital (el archivo.cer, el.key y su contraseña). El sello se carga una sola vez desde el panel.
-
-_Preguntas_
-
-### Lo que nos preguntan de la facturación
-
-#### ¿Puedo usar VIM POS sin la facturación?
-
-Sí. El resto del sistema funciona sin ella y la enciendes desde el panel el día que la necesites.
-
-#### ¿Necesito internet para facturar?
-
-Para timbrar, sí. Para _cobrar_, no: el ticket sale con su código y tu cliente puede facturarlo cuando vuelva la señal. Más en [qué pasa sin internet](https://vimpos.com.mx/sin-internet).
-
-#### ¿Y si mi sello está por vencer?
-
-Tu panel te avisa desde 30 días antes de que venza.
-
-## Te lo enseñamos funcionando
-
-Media hora con tus productos, tus precios y la facturación en modo de prueba. Sin compromiso.
-
-[Pide una demo](https://vimpos.com.mx/demo)
-
-[Ver todo lo que hace](https://vimpos.com.mx/funciones)
 
 ---
 
@@ -925,7 +811,7 @@ Tu cliente escanea el código del ticket, pone sus datos y recibe su factura por
 
 **Va incluida en Negocio y en Cadena.** En Esencial se agrega por $349 al mes, más IVA. Tu plan trae 10, 20 o 40 folios al mes y cada factura usa uno.
 
-El detalle está en [la página de facturación](https://vimpos.com.mx/facturacion-cfdi).
+El detalle está en [Funciones](https://vimpos.com.mx/funciones#facturacion).
 
 ### Si se te acaban los folios del plan
 
@@ -1305,7 +1191,7 @@ _El catálogo en cuadrícula: todos los productos del mismo tamaño, sin arrastr
 
 #### Nuevo
 
-- **Facturación electrónica.** Factura global, timbrado individual y portal de autofacturación por QR. El detalle está en [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi).
+- **Facturación electrónica.** Factura global, timbrado individual y portal de autofacturación por QR. El detalle está en [Facturación CFDI](https://vimpos.com.mx/funciones#facturacion).
 - Los pedidos de Uber Eats entran directo a la caja y a la cocina. Desde la caja pausas la tienda, la reanudas y ajustas el tiempo de preparación.
 - El inventario se descuenta al vender en la caja. Se enciende desde Inventario, en el panel.
 
@@ -1362,83 +1248,6 @@ Tus datos son solo para contactarte por esto. No los vendemos ni los compartimos
 
 ---
 
-<!-- https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante -->
-
-# Cuánto cuesta de verdad un sistema para restaurante
-
-> Las tres formas de cobrarte: licencia fija, gratuito y porcentaje por venta. La aritmética para comparar cada una con tu venta real, y cuándo deja de convenir.
-
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante
-
-Hay tres formas de cobrarte, y la que parece más barata casi nunca lo es. Aquí están las tres, con las cuentas.
-
-Sin nombres de marcas: lo que importa es el modelo con el que te cobran.
-
-_Modelo 1_
-
-## Licencia fija al mes
-
-Pagas lo mismo vendas lo que vendas. Es el modelo más viejo y el más fácil de presupuestar: sabes en enero lo que vas a pagar en diciembre.
-
-Entre proveedores de este tipo la diferencia rara vez está en la mensualidad — suelen parecerse bastante. Está en **qué se cobra aparte**: la puesta en marcha, la carga de tu menú, la capacitación de tu equipo, los módulos de inventario o facturación, y el nodo adicional cuando abres la segunda caja. Ahí es donde dos sistemas que anuncian precios parecidos acaban costando muy distinto.
-
-Qué preguntar: «además de la mensualidad, ¿qué voy a pagar el primer mes, y qué el día que abra otra caja?».
-
-_Modelo 2_
-
-## El gratuito
-
-El programa no cuesta. Se cobra lo que necesitas cuando dejas de ser un puesto: control de empleados con permisos, inventario con costos, reportes que sirvan para decidir algo, más de una caja. Cada cosa suele ser un plan de pago aparte.
-
-**Y conviene decirlo claro: si tienes una sola caja, no manejas inventario y no necesitas controlar a nadie, el gratuito es la respuesta correcta.** Pagar por un sistema completo para eso es tirar dinero. Deja de serlo el día que abres la segunda caja o contratas al tercer empleado — y ahí el precio suele dejar de ser gratuito de golpe.
-
-Qué preguntar: «¿cuánto costaría hoy con dos cajas, cinco empleados y control de inventario?». Ésa es la cifra que hay que comparar, no el cero.
-
-_Modelo 3_
-
-## El que se lleva un porcentaje de cada venta
-
-Aquí el programa sale gratis o casi, porque el proveedor también te procesa la tarjeta y cobra por ahí. En México esas tarifas rondaban el **3.5 % a 3.6 % más IVA** por transacción en agosto de 2026, y suben bastante en los pagos a meses sin intereses.
-
-Eso _no_ es malo por sí solo: comisión de tarjeta vas a pagar igual, la cobre quien la cobre. La pregunta correcta no es «¿cuánto cobran?», es **«¿cuánto más que lo que ya me cobra mi banco?»**. Esa diferencia es el precio real del software — y es el único que crece justo cuando te va bien.
-
-![Pantalla de cobro con las formas de pago: efectivo, débito, crédito, transferencia, app externa y pago dividido.](https://vimpos.com.mx/assets/img/capturas/pos-pago.webp?v=3)
-
-_Las formas de pago en la caja de VIM POS. La tarjeta se cobra desde la caja con la terminal compatible, o en cualquier otra terminal y se registra para que el corte cuadre. En los dos casos no cobramos comisión por venta: el precio del sistema no crece con tu venta._
-
-### La aritmética, con tus números
-
-Toma lo que cobras con tarjeta en un mes bueno y multiplícalo por la diferencia de tarifa. Un solo punto porcentual pesa más de lo que parece:
-
-_Coste de un punto porcentual de diferencia según la venta con tarjeta._
-
-| Venta con tarjeta al mes | 1 punto de diferencia | Al año |
-| --- | --- | --- |
-| $50,000 | $500 | $6,000 |
-| $150,000 | $1,500 | $18,000 |
-| $300,000 | $3,000 | $36,000 |
-| $500,000 | $5,000 | $60,000 |
-
-Compara esa columna con la mensualidad de un sistema de licencia fija. A partir de cierto volumen no hay comparación, y ese punto llega antes de lo que casi nadie calcula.
-
-_Dónde queda VIM POS_
-
-## Licencia fija, cero comisión, y lo que no incluye
-
-Somos el primer modelo. El precio está [a la vista](https://vimpos.com.mx/precios); no hay pago inicial, y desde Negocio la carga de tu menú y la capacitación van incluidas; y no nos llevamos ni un peso de tus ventas, porque el dinero no pasa por nosotros: cobras con tarjeta desde la caja con la terminal compatible, o en cualquier otra terminal y registras el pago en la caja para que el corte cuadre.
-
-**Y dónde no conviene.** Si tienes una sola caja, sin inventario y sin empleados que controlar, el modelo gratuito te sale más barato y no vamos a fingir lo contrario. Tampoco somos la opción si necesitas que el mesero capture en tableta o cobrar la tarjeta desde la caja con una terminal que no sea compatible: eso y el resto de los límites están en [la guía de compra](https://vimpos.com.mx/como-elegir-sistema-restaurante).
-
-## Haz la cuenta con tus números
-
-Trae tu venta con tarjeta de un mes bueno y la calculamos juntos en la demo, sin compromiso. Si te sale mejor otro modelo, te lo decimos.
-
-[Pide una demo](https://vimpos.com.mx/demo)
-
-[Ver los precios](https://vimpos.com.mx/precios)
-
----
-
 <!-- https://vimpos.com.mx/como-elegir-sistema-restaurante -->
 
 # Cómo elegir el sistema para tu restaurante
@@ -1475,7 +1284,7 @@ _Así se ve la pregunta 1 respondida en la caja de VIM POS: el aviso de que no h
 
 ### 2 · ¿Te dicen el precio de frente?
 
-Si hay que pedir cotización, el precio depende de lo que el vendedor calcule que puedes pagar. No es ilegal ni raro, pero conviene saberlo: las tres formas de cobrar están en [cuánto cuesta un sistema para restaurante](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante). Un precio a la vista también es un precio que no te pueden subir en la renovación sin que te enteres.
+Si hay que pedir cotización, el precio depende de lo que el vendedor calcule que puedes pagar. No es ilegal ni raro, pero conviene saberlo. Un precio a la vista también es un precio que no te pueden subir en la renovación sin que te enteres.
 
 ### 3 · ¿Me cobran comisión por cada venta?
 
@@ -1523,7 +1332,7 @@ Se puede con la terminal compatible; nosotros te ayudamos a vincularla. Con cual
 
 El sistema te ayuda a revisar lo que la app te depositó, pero la liquidación se pega a mano. Si tienes cientos de pedidos diarios por app, eso es trabajo real.
 
-Y una que ya salió de esta lista: **facturar**. El módulo está en producción y se enciende el día que traes tu Constancia y tu Certificado de Sello Digital. Está explicado en [la página de facturación](https://vimpos.com.mx/facturacion-cfdi).
+Y una que ya salió de esta lista: **facturar**. El módulo está en producción y se enciende el día que traes tu Constancia y tu Certificado de Sello Digital. Está explicado en [Funciones](https://vimpos.com.mx/funciones#facturacion).
 
 ## Y si después de las nueve preguntas te sigue cuadrando
 
@@ -1535,117 +1344,13 @@ Media hora con tus productos y tus precios cargados. Puedes traer esta lista y h
 
 ---
 
-<!-- https://vimpos.com.mx/factura-global-restaurantes -->
-
-# Factura global para restaurantes: qué es y cómo se emite
-
-> Qué es la factura global, cada cuándo se emite, qué datos lleva en CFDI 4.0 y los errores más comunes en un restaurante. Guía en lenguaje llano.
-
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/factura-global-restaurantes
-
-El comprobante que ampara las ventas por las que nadie pidió factura. Qué lleva, cada cuándo se emite y en qué se equivoca la mayoría.
-
-Actualizado el 5 de octubre de 2026. Es una guía, no asesoría fiscal: confirma tu caso con tu contador.
-
-[Pide una demo](https://vimpos.com.mx/demo)
-
-[Ver precios](https://vimpos.com.mx/precios)
-
-_Lo básico_
-
-## Qué es la factura global
-
-La mayoría de tus clientes paga y se va sin pedir factura. Esas ventas también se declaran, y el SAT pide ampararlas con un solo CFDI a nombre del público en general: la factura global.
-
-No sustituye a las facturas que sí te piden. Cada ticket va en una de las dos: o lo facturó el cliente, o entra en la global. Nunca en ambas.
-
-_El comprobante_
-
-## Qué datos lleva en CFDI 4.0
-
-- **RFC del receptor:** el genérico de público en general, no el de un cliente.
-- **Nombre:** PUBLICO EN GENERAL.
-- **Régimen fiscal del receptor:** 616, «Sin obligaciones fiscales».
-- **Uso del CFDI:** S01, «Sin efectos fiscales».
-- **Código postal del receptor:** el mismo del lugar de expedición.
-- **El periodo:** la periodicidad, el mes y el año que ampara.
-- **Los tickets:** un concepto por cada venta, con su folio y su importe.
-
-Tú no tecleas nada de esto si tu sistema lo arma solo. Sirve conocerlo para revisar que salió bien.
-
-_El periodo_
-
-## Cada cuándo se emite
-
-Puede ser diaria, semanal, quincenal o mensual: lo eliges tú. Mientras más corto el periodo, más facturas emites y menos tiempo tiene tu cliente para pedir la suya.
-
-La regla del SAT pide emitirla poco después de cerrar el periodo —la referencia habitual es dentro de las 24 horas siguientes—. Las reglas se publican cada año: confirma el plazo vigente con tu contador.
-
-_Los errores_
-
-## En qué se equivoca la mayoría
-
-### Facturar dos veces
-
-Meter en la global un ticket que el cliente ya facturó. La misma venta queda declarada dos veces.
-
-### Dejar el plazo abierto
-
-Si el cliente puede pedir factura después de emitida la global, hay que cancelar y rehacer. El plazo para pedirla debe cerrar con el periodo.
-
-### Olvidarla
-
-El periodo cerró, nadie la emitió y se nota hasta la declaración.
-
-_En VIM POS_
-
-## Cómo se emite desde el sistema
-
-El ticket trae un código: el cliente que quiere factura lo escanea y se factura solo. Al cerrar el periodo, el sistema ya sumó lo que nadie facturó y tú emites la global con un botón. Si se te queda un periodo sin emitir, te avisa.
-
-El detalle, con lo que hay que dar para encenderla, está en [facturación CFDI 4.0](https://vimpos.com.mx/facturacion-cfdi); lo que cuesta, en [precios](https://vimpos.com.mx/precios).
-
-![Ticket impreso de una venta con el código QR para facturar al pie: negocio, folio, cajero, el producto con su modificador, subtotal, IVA, total y cambio.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp?v=3)
-
-_El código del ticket: quien quiere factura la saca solo, y lo demás entra en la global._
-
-_Preguntas_
-
-## Preguntas frecuentes sobre la factura global
-
-### ¿Tengo que emitirla aunque nadie me pida factura?
-
-Sí. Justamente ampara las ventas por las que nadie la pidió.
-
-### ¿Puedo hacerla mensual?
-
-Sí, es una de las periodicidades permitidas. Tu contador te dirá cuál conviene a tu régimen.
-
-### ¿Qué pasa si un cliente pide factura de un ticket que ya entró en la global?
-
-Ese ticket ya está facturado. Por eso conviene que el plazo para pedir factura termine cuando cierras el periodo.
-
-### ¿Gasta un folio?
-
-En VIM POS, sí: la global usa un folio, igual que la factura de un cliente. Cada plan trae folios al mes.
-
-## Mírala emitirse
-
-En la demo cerramos un periodo y emitimos la global con tus datos de prueba.
-
-[Pide una demo](https://vimpos.com.mx/demo)
-
-[Cómo funciona la facturación](https://vimpos.com.mx/facturacion-cfdi)
-
----
-
-<!-- https://vimpos.com.mx/punto-de-venta-hamburgueserias -->
+<!-- https://vimpos.com.mx/restaurantes/hamburgueseria -->
 
 # Punto de venta para hamburgueserías. Cada hamburguesa sale como la pidieron
 
 > El término de la carne, los extras con su precio y el combo sugerido en una sola caja. Para hamburgueserías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-hamburgueserias
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/restaurantes/hamburgueseria
 
 El término, los extras y el combo en una sola caja, aunque se caiga el internet.
 
@@ -1719,7 +1424,7 @@ Qué sale más, a qué hora se llena el local y quién cobró.
 
 ![Ticket de venta con el código para facturar.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp?v=3)
 
-### [El cliente se factura solo](https://vimpos.com.mx/facturacion-cfdi)
+### [El cliente se factura solo](https://vimpos.com.mx/funciones#facturacion)
 
 Con el código de su ticket, sin detener la fila. Incluida desde Negocio.
 
@@ -1802,22 +1507,6 @@ Lo principal para una hamburguesería
 
 [Ver todo lo que incluye](https://vimpos.com.mx/precios)
 
-_Guías_
-
-## Antes de decidir
-
-### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
-
-Nueve preguntas antes de firmar.
-
-### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
-
-Las tres formas de cobrarte, con cuentas.
-
-### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
-
-Qué es y cómo se emite.
-
 _Preguntas_
 
 ## Lo que pregunta una hamburguesería
@@ -1848,13 +1537,13 @@ Empieza tú solo, o te lo enseñamos con tus hamburguesas.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-cafeterias -->
+<!-- https://vimpos.com.mx/restaurantes/cafeteria -->
 
 # Punto de venta para cafeterías. Que la fila avance y cada café salga como lo pidieron
 
 > Cobra rápido en la barra, con el tamaño, la leche y el shot extra de cada bebida. Para cafeterías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-cafeterias
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/restaurantes/cafeteria
 
 Una caja rápida para la hora pico, que sigue cobrando aunque se caiga el internet.
 
@@ -1928,7 +1617,7 @@ Qué se vende, a qué hora y quién cobró. El corte cuadra contra el cajón.
 
 ![Ticket de la cafetería con los extras, la propina, los sellos ganados y el código para facturar.](https://vimpos.com.mx/assets/img/capturas/giros/cafeteria-ticket.webp?v=1)
 
-### [Facturas sin detener la fila](https://vimpos.com.mx/facturacion-cfdi)
+### [Facturas sin detener la fila](https://vimpos.com.mx/funciones#facturacion)
 
 Tu cliente se factura solo con su ticket. Incluida desde Negocio.
 
@@ -2011,22 +1700,6 @@ Lo principal para una cafetería
 
 [Ver todo lo que incluye](https://vimpos.com.mx/precios)
 
-_Guías_
-
-## Antes de decidir
-
-### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
-
-Nueve preguntas antes de firmar.
-
-### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
-
-Las tres formas de cobrarte, con cuentas.
-
-### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
-
-Qué es y cómo se emite.
-
 _Preguntas_
 
 ## Lo que pregunta una cafetería
@@ -2057,13 +1730,13 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-servicio-rapido -->
+<!-- https://vimpos.com.mx/restaurantes/servicio-rapido -->
 
 # Punto de venta para comida rápida. Despacha la hora pico sin que se junte la fila
 
 > Combos, extras y comandas a cocina en segundos, para llevar o a domicilio. Para comida rápida, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-servicio-rapido
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/restaurantes/servicio-rapido
 
 Combos, extras y comandas a cocina en segundos, aunque se caiga el internet.
 
@@ -2137,7 +1810,7 @@ Qué se vende, a qué hora y quién cobró. El corte cuadra contra el cajón.
 
 ![Ticket de venta con el código para facturar.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp?v=3)
 
-### [Facturas sin detener la fila](https://vimpos.com.mx/facturacion-cfdi)
+### [Facturas sin detener la fila](https://vimpos.com.mx/funciones#facturacion)
 
 Tu cliente se factura solo con su ticket. Incluida desde Negocio.
 
@@ -2220,22 +1893,6 @@ Lo principal para comida rápida
 
 [Ver todo lo que incluye](https://vimpos.com.mx/precios)
 
-_Guías_
-
-## Antes de decidir
-
-### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
-
-Nueve preguntas antes de firmar.
-
-### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
-
-Las tres formas de cobrarte, con cuentas.
-
-### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
-
-Qué es y cómo se emite.
-
 _Preguntas_
 
 ## Lo que pregunta un negocio de comida rápida
@@ -2254,7 +1911,7 @@ No. Lo pegas desde tu sistema actual o una hoja de cálculo. Desde Negocio lo ca
 
 ### ¿Tienen algo para hamburgueserías?
 
-Sí: el término de la carne y los extras, en [punto de venta para hamburgueserías](https://vimpos.com.mx/punto-de-venta-hamburgueserias).
+Sí: el término de la carne y los extras, en [punto de venta para hamburgueserías](https://vimpos.com.mx/restaurantes/hamburgueseria).
 
 ## Pon tu negocio a vender hoy
 
@@ -2266,13 +1923,13 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo -->
+<!-- https://vimpos.com.mx/restaurantes/servicio-completo -->
 
 # Punto de venta para restaurantes. Cada mesa con su cuenta y cada mesero con su propina
 
 > Mapa de mesas, meseros, propinas y cocina por estación en una sola caja. Para restaurantes con servicio completo, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/restaurantes/servicio-completo
 
 Del mapa de mesas a la cocina, sin papelitos y sin perder una orden.
 
@@ -2346,7 +2003,7 @@ Ventas por mesero, horas pico y lo más pedido. El corte cuadra contra el cajón
 
 ![Ticket de venta con el código para facturar.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp?v=3)
 
-### [Facturas sin detener la fila](https://vimpos.com.mx/facturacion-cfdi)
+### [Facturas sin detener la fila](https://vimpos.com.mx/funciones#facturacion)
 
 Tu cliente se factura solo con su ticket. Incluida desde Negocio.
 
@@ -2429,22 +2086,6 @@ Lo principal para un restaurante
 
 [Ver todo lo que incluye](https://vimpos.com.mx/precios)
 
-_Guías_
-
-## Antes de decidir
-
-### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
-
-Nueve preguntas antes de firmar.
-
-### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
-
-Las tres formas de cobrarte, con cuentas.
-
-### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
-
-Qué es y cómo se emite.
-
 _Preguntas_
 
 ## Lo que pregunta un restaurante
@@ -2475,13 +2116,13 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-bares -->
+<!-- https://vimpos.com.mx/restaurantes/bar -->
 
 # Punto de venta para bares y cervecerías. Abre la cuenta con un nombre y cóbrala cuando se vaya
 
 > Cuentas por nombre en la barra, mesas, propinas y un corte que cuadra. Para bares y cervecerías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-bares
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/restaurantes/bar
 
 Cuentas en la barra y en mesa, con propinas, en una caja que no se detiene.
 
@@ -2555,7 +2196,7 @@ Qué se vende, a qué hora y quién cobró.
 
 ![Ticket de venta con el código para facturar.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp?v=3)
 
-### [Facturas sin detener la fila](https://vimpos.com.mx/facturacion-cfdi)
+### [Facturas sin detener la fila](https://vimpos.com.mx/funciones#facturacion)
 
 Tu cliente se factura solo con su ticket. Incluida desde Negocio.
 
@@ -2638,22 +2279,6 @@ Lo principal para un bar
 
 [Ver todo lo que incluye](https://vimpos.com.mx/precios)
 
-_Guías_
-
-## Antes de decidir
-
-### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
-
-Nueve preguntas antes de firmar.
-
-### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
-
-Las tres formas de cobrarte, con cuentas.
-
-### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
-
-Qué es y cómo se emite.
-
 _Preguntas_
 
 ## Lo que pregunta un bar
@@ -2684,13 +2309,13 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-food-trucks -->
+<!-- https://vimpos.com.mx/restaurantes/food-truck -->
 
 # Punto de venta para food trucks. Cobra donde estaciones, con o sin señal
 
 > Cobra donde estaciones, con o sin señal, y lleva la venta de cada evento por separado. Para food trucks, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-food-trucks
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/restaurantes/food-truck
 
 Una caja rápida para la fila del evento, con la venta de cada turno por separado.
 
@@ -2764,7 +2389,7 @@ Qué se vende, a qué hora y quién cobró. El corte cuadra contra el cajón.
 
 ![Ticket de venta con el código para facturar.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp?v=3)
 
-### [Facturas sin detener la fila](https://vimpos.com.mx/facturacion-cfdi)
+### [Facturas sin detener la fila](https://vimpos.com.mx/funciones#facturacion)
 
 Tu cliente se factura solo con su ticket. Incluida desde Negocio.
 
@@ -2847,22 +2472,6 @@ Lo principal para un food truck
 
 [Ver todo lo que incluye](https://vimpos.com.mx/precios)
 
-_Guías_
-
-## Antes de decidir
-
-### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
-
-Nueve preguntas antes de firmar.
-
-### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
-
-Las tres formas de cobrarte, con cuentas.
-
-### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
-
-Qué es y cómo se emite.
-
 _Preguntas_
 
 ## Lo que pregunta un food truck
@@ -2893,13 +2502,13 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa -->
+<!-- https://vimpos.com.mx/tiendas/ropa -->
 
 # Punto de venta para tiendas de ropa. Cada talla y cada color, contados sin libreta
 
 > Tallas y colores con su existencia, lector de código de barras, cambios de talla y etiquetas. Para tiendas de ropa y calzado, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/tiendas/ropa
 
 Vende con lector de código de barras, cambia tallas y sabe qué tienes en el anaquel.
 
@@ -3044,22 +2653,6 @@ Lo principal para una tienda de ropa
 
 [Ver todo lo que incluye](https://vimpos.com.mx/precios)
 
-_Guías_
-
-## Antes de decidir
-
-### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
-
-Nueve preguntas antes de firmar.
-
-### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
-
-Las tres formas de cobrarte, con cuentas.
-
-### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
-
-Qué es y cómo se emite.
-
 _Preguntas_
 
 ## Lo que pregunta una tienda de ropa
@@ -3094,13 +2687,13 @@ Empieza tú solo, o te lo enseñamos con tu catálogo.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-vinaterias -->
+<!-- https://vimpos.com.mx/tiendas/vinateria -->
 
 # Punto de venta para vinaterías y licorerías. Cada botella en su lugar y cada venta en segundos
 
 > Código de barras, existencias con aviso de mínimo, cotizaciones y crédito a clientes. Para vinaterías y licorerías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-vinaterias
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/tiendas/vinateria
 
 Código de barras, existencias con aviso de mínimo y cotizaciones, en una caja que sigue sin internet.
 
@@ -3237,22 +2830,6 @@ Lo principal para una vinatería
 
 [Ver todo lo que incluye](https://vimpos.com.mx/precios)
 
-_Guías_
-
-## Antes de decidir
-
-### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
-
-Nueve preguntas antes de firmar.
-
-### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
-
-Las tres formas de cobrarte, con cuentas.
-
-### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
-
-Qué es y cómo se emite.
-
 _Preguntas_
 
 ## Lo que pregunta una vinatería
@@ -3283,13 +2860,13 @@ Empieza tú solo, o te lo enseñamos con tu catálogo.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-abarrotes -->
+<!-- https://vimpos.com.mx/tiendas/abarrotes -->
 
 # Punto de venta para abarrotes y fruterías. Vende por kilo, por pieza o a crédito, sin cuaderno
 
 > Venta por kilo o por pieza, crédito a clientes con abonos y cotizaciones. Para abarrotes y fruterías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-abarrotes
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/tiendas/abarrotes
 
 La fruta por kilo, lo empaquetado por pieza y el fiado de tus clientes, en una sola caja.
 
@@ -3438,22 +3015,6 @@ Lo principal para abarrotes y fruterías
 
 [Ver todo lo que incluye](https://vimpos.com.mx/precios)
 
-_Guías_
-
-## Antes de decidir
-
-### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
-
-Nueve preguntas antes de firmar.
-
-### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
-
-Las tres formas de cobrarte, con cuentas.
-
-### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
-
-Qué es y cómo se emite.
-
 _Preguntas_
 
 ## Lo que pregunta una tienda de abarrotes
@@ -3488,13 +3049,13 @@ Empieza tú solo, o te lo enseñamos con tu catálogo.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-salones-de-belleza -->
+<!-- https://vimpos.com.mx/belleza/salon-de-belleza -->
 
 # Punto de venta para salones de belleza. Tu agenda llena y cada comisión, clara
 
 > Agenda de tu equipo, cobro de la cita, anticipos y comisiones. Para salones de belleza, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-salones-de-belleza
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/belleza/salon-de-belleza
 
 Citas, cobro y comisiones de tu equipo en una sola pantalla.
 
@@ -3667,22 +3228,6 @@ Lo principal para un salón
 
 [Ver todo lo que incluye](https://vimpos.com.mx/precios)
 
-_Guías_
-
-## Antes de decidir
-
-### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
-
-Nueve preguntas antes de firmar.
-
-### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
-
-Las tres formas de cobrarte, con cuentas.
-
-### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
-
-Qué es y cómo se emite.
-
 _Preguntas_
 
 ## Lo que pregunta un salón de belleza
@@ -3713,13 +3258,13 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-spa -->
+<!-- https://vimpos.com.mx/belleza/spa -->
 
 # Punto de venta para spas. Cada cabina ocupada a su hora, sin empalmes
 
 > Agenda por terapeuta y por cabina, anticipos, cobro de la cita y comisiones. Para spas, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-spa
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/belleza/spa
 
 Agenda por terapeuta y por cabina, con anticipos y comisiones.
 
@@ -3892,22 +3437,6 @@ Lo principal para un spa
 
 [Ver todo lo que incluye](https://vimpos.com.mx/precios)
 
-_Guías_
-
-## Antes de decidir
-
-### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
-
-Nueve preguntas antes de firmar.
-
-### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
-
-Las tres formas de cobrarte, con cuentas.
-
-### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
-
-Qué es y cómo se emite.
-
 _Preguntas_
 
 ## Lo que pregunta un spa
@@ -3938,13 +3467,13 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-peluquerias -->
+<!-- https://vimpos.com.mx/belleza/peluqueria -->
 
 # Punto de venta para peluquerías y barberías. Cada silla con su turno y cada barbero con su comisión
 
 > Citas y lista de espera, agenda por barbero, cobro y comisiones. Para peluquerías y barberías, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-peluquerias
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/belleza/peluqueria
 
 Citas, lista de espera y cobro en una sola caja.
 
@@ -4109,22 +3638,6 @@ Lo principal para una peluquería
 
 [Ver todo lo que incluye](https://vimpos.com.mx/precios)
 
-_Guías_
-
-## Antes de decidir
-
-### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
-
-Nueve preguntas antes de firmar.
-
-### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
-
-Las tres formas de cobrarte, con cuentas.
-
-### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
-
-Qué es y cómo se emite.
-
 _Preguntas_
 
 ## Lo que pregunta una peluquería
@@ -4155,13 +3668,13 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes -->
+<!-- https://vimpos.com.mx/belleza/tatuajes -->
 
 # Punto de venta para estudios de tatuajes. Citas con anticipo y cada artista con su agenda
 
 > Citas con anticipo, agenda por artista, cobro de la sesión y comisiones. Para estudios de tatuajes, desde $699 al mes más IVA.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/belleza/tatuajes
 
 Aparta la fecha, cobra la sesión y reparte las comisiones.
 
@@ -4326,22 +3839,6 @@ Lo principal para un estudio de tatuajes
 
 [Ver todo lo que incluye](https://vimpos.com.mx/precios)
 
-_Guías_
-
-## Antes de decidir
-
-### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
-
-Nueve preguntas antes de firmar.
-
-### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
-
-Las tres formas de cobrarte, con cuentas.
-
-### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
-
-Qué es y cómo se emite.
-
 _Preguntas_
 
 ## Lo que pregunta un estudio de tatuajes
@@ -4372,13 +3869,13 @@ Empieza tú solo, o te lo enseñamos con tus servicios.
 
 ---
 
-<!-- https://vimpos.com.mx/punto-de-venta-restaurantes-leon -->
+<!-- https://vimpos.com.mx/restaurantes/leon -->
 
 # Punto de venta para restaurantes en León, Guanajuato
 
 > VIM POS se hace en León. Si tu restaurante está en la zona, la demo es en tu mostrador y con tu menú. Desde $699 al mes más IVA, sin letra chica.
 
-**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-restaurantes-leon
+**VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/restaurantes/leon
 
 VIM POS se hace aquí: la demo es en tu mostrador y con tu menú.
 
@@ -4418,7 +3915,7 @@ Si se va la señal, sigues cobrando, imprimiendo y mandando a cocina. [Cómo fun
 
 ### Factura sin parar la fila
 
-Tu cliente escanea el ticket y se factura solo; la factura global sale con un botón. [Facturación CFDI 4.0](https://vimpos.com.mx/facturacion-cfdi).
+Tu cliente escanea el ticket y se factura solo; la factura global sale con un botón. [Facturación CFDI 4.0](https://vimpos.com.mx/funciones#facturacion).
 
 ### Precio de frente
 
@@ -4458,7 +3955,7 @@ Media hora, con tus productos y tus precios cargados.
 
 **VIM POS** · punto de venta para restaurantes, tiendas y belleza en México · versión en HTML: https://vimpos.com.mx/nosotros
 
-VIM POS es un sistema de punto de venta para restaurantes hecho en [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon).
+VIM POS es un sistema de punto de venta para restaurantes hecho en [León, Guanajuato](https://vimpos.com.mx/restaurantes/leon).
 
 ## Quién construye VIM POS
 
@@ -4531,7 +4028,7 @@ _El panel que te enseñamos en la demo: cómo va tu día, desde el celular o la 
 
 **Dónde estamos:** Guanajuato, México. No hay mostrador al público: si quieres vernos en persona, agéndalo por correo. El domicilio fiscal va en el contrato.
 
-**Zona de servicio:** toda la República Mexicana. La demo es en tu local, en la [zona de León](https://vimpos.com.mx/punto-de-venta-restaurantes-leon) y alrededores; fuera de ahí, puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro). La visita el día del arranque va incluida en el plan Cadena.
+**Zona de servicio:** toda la República Mexicana. La demo es en tu local, en la [zona de León](https://vimpos.com.mx/restaurantes/leon) y alrededores; fuera de ahí, puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro). La visita el día del arranque va incluida en el plan Cadena.
 
 ## Qué te sirve más según lo que busques
 

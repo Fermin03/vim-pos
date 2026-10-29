@@ -211,10 +211,10 @@ function gemelo(pagina) {
     ? cuerpo.slice(0, i) + '\n\n' + cabecera + cuerpo.slice(i)
     : `# ${pagina.nombre}\n\n${cabecera}\n\n${cuerpo}`;
 
-  // Las páginas por giro (/punto-de-venta-*) ya son más de una docena: listadas aquí inflaban cada
+  // Las páginas por giro (/restaurantes/*, /tiendas/*, /belleza/*) ya son más de una docena: listadas aquí inflaban cada
   // gemelo (el 404 pasó del tope). Van juntas en un solo enlace a llms.txt, que las lista todas.
   const otras = [
-    ...PAGINAS.filter((p) => p.ruta !== pagina.ruta && !p.ruta.startsWith('/punto-de-venta-'))
+    ...PAGINAS.filter((p) => p.ruta !== pagina.ruta && !/^\/(restaurantes|tiendas|belleza)\//.test(p.ruta))
       .map((p) => `[${p.nombre}](${BASE}/${p.markdown})`),
     `[Por tipo de negocio](${BASE}/llms.txt)`,
   ].join(' · ');
@@ -426,6 +426,75 @@ const ACEPTA_MARKDOWN = [
 
 const CACHE_HTML = { key: 'Cache-Control', value: 'public, max-age=3600, must-revalidate' };
 
+// Páginas retiradas (Fermín, 28-oct-2026). Redirigen a lo más cercano que queda
+// para no perder a quien llegue por un enlace viejo o por el buscador.
+// Las páginas por giro pasaron de /punto-de-venta-<giro> a /<grupo>/<giro> (Fermín,
+// 28-oct-2026). Las direcciones viejas siguen llevando a su página.
+const MOVIDAS = [
+  [
+    '/punto-de-venta-cafeterias',
+    '/restaurantes/cafeteria'
+  ],
+  [
+    '/punto-de-venta-servicio-rapido',
+    '/restaurantes/servicio-rapido'
+  ],
+  [
+    '/punto-de-venta-hamburgueserias',
+    '/restaurantes/hamburgueseria'
+  ],
+  [
+    '/punto-de-venta-restaurantes-servicio-completo',
+    '/restaurantes/servicio-completo'
+  ],
+  [
+    '/punto-de-venta-bares',
+    '/restaurantes/bar'
+  ],
+  [
+    '/punto-de-venta-food-trucks',
+    '/restaurantes/food-truck'
+  ],
+  [
+    '/punto-de-venta-restaurantes-leon',
+    '/restaurantes/leon'
+  ],
+  [
+    '/punto-de-venta-tiendas-de-ropa',
+    '/tiendas/ropa'
+  ],
+  [
+    '/punto-de-venta-vinaterias',
+    '/tiendas/vinateria'
+  ],
+  [
+    '/punto-de-venta-abarrotes',
+    '/tiendas/abarrotes'
+  ],
+  [
+    '/punto-de-venta-salones-de-belleza',
+    '/belleza/salon-de-belleza'
+  ],
+  [
+    '/punto-de-venta-spa',
+    '/belleza/spa'
+  ],
+  [
+    '/punto-de-venta-peluquerias',
+    '/belleza/peluqueria'
+  ],
+  [
+    '/punto-de-venta-estudios-de-tatuajes',
+    '/belleza/tatuajes'
+  ]
+];
+
+const RETIRADAS = [
+  ['/cuanto-cuesta-un-sistema-para-restaurante', '/precios'],
+  ['/facturacion-cfdi', '/funciones#facturacion'],
+  ['/factura-global-restaurantes', '/funciones#facturacion'],
+];
+
 function vercelJson() {
   const conAlias = (p) => [p.ruta, ...(p.alias || [])];
 
@@ -442,6 +511,9 @@ function vercelJson() {
     // direcciones limpias en el sistema de archivos, y eso dejaba fuera de juego
     // a las reescrituras que negocian Markdown.
     { source: '/index.html', destination: '/', permanent: true },
+    ...[...RETIRADAS, ...MOVIDAS].flatMap(([ruta, destino]) =>
+      [ruta, ruta + '.html', ruta + '.md'].map((source) => ({ source, destination: destino, permanent: true })),
+    ),
     ...TODAS.filter((p) => p.archivo !== 'index.html').map((p) => ({
       source: '/' + p.archivo,
       destination: p.ruta,

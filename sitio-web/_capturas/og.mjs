@@ -34,15 +34,12 @@ const TARJETAS = [
   { id: "precios",      eyebrow: "Precios",       titulo: "Precios flexibles para cada tipo de negocio. Desde $699 al mes." },
   { id: "demo",         eyebrow: "Pide una demo", titulo: "Te lo enseñamos funcionando, con tus productos." },
   { id: "legal",        eyebrow: "VIM POS",       titulo: "Punto de venta para restaurantes, tiendas y belleza en México." },
-  { id: "facturacion-cfdi", eyebrow: "Facturación",   titulo: "Facturación CFDI 4.0, sin parar la fila." },
   { id: "como-elegir",  eyebrow: "Guía de compra", titulo: "Cómo elegir el sistema para tu restaurante." },
-  { id: "cuanto-cuesta", eyebrow: "Guía de compra", titulo: "Cuánto cuesta de verdad un sistema para restaurante." },
-  { id: "factura-global", eyebrow: "Guía fiscal", titulo: "Factura global para restaurantes: qué es y cómo se emite." },
   { id: "hamburgueserias", eyebrow: "Hamburgueserías", titulo: "Cada hamburguesa sale como la pidieron." },
   { id: "contacto",     eyebrow: "Contacto",      titulo: "Escríbenos y te contesta una persona." },
   { id: "nosotros",     eyebrow: "Nosotros",      titulo: "Un punto de venta hecho en León, Guanajuato." },
   { id: "leon", eyebrow: "León, Guanajuato", titulo: "Punto de venta para restaurantes, hecho en León." },
-  // Páginas por giro (/punto-de-venta-<id>): el titular de cada una.
+  // Páginas por giro (/restaurantes/*, /tiendas/*, /belleza/*): el titular de cada una.
   { id: "cafeterias", eyebrow: "Cafeterías", titulo: "Que la fila avance y cada café salga como lo pidieron." },
   { id: "servicio-rapido", eyebrow: "Comida rápida", titulo: "Despacha la hora pico sin que se junte la fila." },
   { id: "restaurantes-servicio-completo", eyebrow: "Restaurantes", titulo: "Cada mesa con su cuenta y cada mesero con su propina." },

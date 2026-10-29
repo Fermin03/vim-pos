@@ -25,6 +25,261 @@
       "permanent": true
     },
     {
+      "source": "/cuanto-cuesta-un-sistema-para-restaurante",
+      "destination": "/precios",
+      "permanent": true
+    },
+    {
+      "source": "/cuanto-cuesta-un-sistema-para-restaurante.html",
+      "destination": "/precios",
+      "permanent": true
+    },
+    {
+      "source": "/cuanto-cuesta-un-sistema-para-restaurante.md",
+      "destination": "/precios",
+      "permanent": true
+    },
+    {
+      "source": "/facturacion-cfdi",
+      "destination": "/funciones#facturacion",
+      "permanent": true
+    },
+    {
+      "source": "/facturacion-cfdi.html",
+      "destination": "/funciones#facturacion",
+      "permanent": true
+    },
+    {
+      "source": "/facturacion-cfdi.md",
+      "destination": "/funciones#facturacion",
+      "permanent": true
+    },
+    {
+      "source": "/factura-global-restaurantes",
+      "destination": "/funciones#facturacion",
+      "permanent": true
+    },
+    {
+      "source": "/factura-global-restaurantes.html",
+      "destination": "/funciones#facturacion",
+      "permanent": true
+    },
+    {
+      "source": "/factura-global-restaurantes.md",
+      "destination": "/funciones#facturacion",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-cafeterias",
+      "destination": "/restaurantes/cafeteria",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-cafeterias.html",
+      "destination": "/restaurantes/cafeteria",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-cafeterias.md",
+      "destination": "/restaurantes/cafeteria",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-servicio-rapido",
+      "destination": "/restaurantes/servicio-rapido",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-servicio-rapido.html",
+      "destination": "/restaurantes/servicio-rapido",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-servicio-rapido.md",
+      "destination": "/restaurantes/servicio-rapido",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-hamburgueserias",
+      "destination": "/restaurantes/hamburgueseria",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-hamburgueserias.html",
+      "destination": "/restaurantes/hamburgueseria",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-hamburgueserias.md",
+      "destination": "/restaurantes/hamburgueseria",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-restaurantes-servicio-completo",
+      "destination": "/restaurantes/servicio-completo",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-restaurantes-servicio-completo.html",
+      "destination": "/restaurantes/servicio-completo",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-restaurantes-servicio-completo.md",
+      "destination": "/restaurantes/servicio-completo",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-bares",
+      "destination": "/restaurantes/bar",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-bares.html",
+      "destination": "/restaurantes/bar",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-bares.md",
+      "destination": "/restaurantes/bar",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-food-trucks",
+      "destination": "/restaurantes/food-truck",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-food-trucks.html",
+      "destination": "/restaurantes/food-truck",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-food-trucks.md",
+      "destination": "/restaurantes/food-truck",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-restaurantes-leon",
+      "destination": "/restaurantes/leon",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-restaurantes-leon.html",
+      "destination": "/restaurantes/leon",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-restaurantes-leon.md",
+      "destination": "/restaurantes/leon",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-tiendas-de-ropa",
+      "destination": "/tiendas/ropa",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-tiendas-de-ropa.html",
+      "destination": "/tiendas/ropa",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-tiendas-de-ropa.md",
+      "destination": "/tiendas/ropa",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-vinaterias",
+      "destination": "/tiendas/vinateria",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-vinaterias.html",
+      "destination": "/tiendas/vinateria",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-vinaterias.md",
+      "destination": "/tiendas/vinateria",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-abarrotes",
+      "destination": "/tiendas/abarrotes",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-abarrotes.html",
+      "destination": "/tiendas/abarrotes",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-abarrotes.md",
+      "destination": "/tiendas/abarrotes",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-salones-de-belleza",
+      "destination": "/belleza/salon-de-belleza",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-salones-de-belleza.html",
+      "destination": "/belleza/salon-de-belleza",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-salones-de-belleza.md",
+      "destination": "/belleza/salon-de-belleza",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-spa",
+      "destination": "/belleza/spa",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-spa.html",
+      "destination": "/belleza/spa",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-spa.md",
+      "destination": "/belleza/spa",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-peluquerias",
+      "destination": "/belleza/peluqueria",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-peluquerias.html",
+      "destination": "/belleza/peluqueria",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-peluquerias.md",
+      "destination": "/belleza/peluqueria",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-estudios-de-tatuajes",
+      "destination": "/belleza/tatuajes",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-estudios-de-tatuajes.html",
+      "destination": "/belleza/tatuajes",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-estudios-de-tatuajes.md",
+      "destination": "/belleza/tatuajes",
+      "permanent": true
+    },
+    {
       "source": "/funciones.html",
       "destination": "/funciones",
       "permanent": true
@@ -32,11 +287,6 @@
     {
       "source": "/sin-internet.html",
       "destination": "/sin-internet",
-      "permanent": true
-    },
-    {
-      "source": "/facturacion-cfdi.html",
-      "destination": "/facturacion-cfdi",
       "permanent": true
     },
     {
@@ -55,88 +305,78 @@
       "permanent": true
     },
     {
-      "source": "/cuanto-cuesta-un-sistema-para-restaurante.html",
-      "destination": "/cuanto-cuesta-un-sistema-para-restaurante",
-      "permanent": true
-    },
-    {
       "source": "/como-elegir-sistema-restaurante.html",
       "destination": "/como-elegir-sistema-restaurante",
       "permanent": true
     },
     {
-      "source": "/factura-global-restaurantes.html",
-      "destination": "/factura-global-restaurantes",
+      "source": "/restaurantes/hamburgueseria.html",
+      "destination": "/restaurantes/hamburgueseria",
       "permanent": true
     },
     {
-      "source": "/punto-de-venta-hamburgueserias.html",
-      "destination": "/punto-de-venta-hamburgueserias",
+      "source": "/restaurantes/cafeteria.html",
+      "destination": "/restaurantes/cafeteria",
       "permanent": true
     },
     {
-      "source": "/punto-de-venta-cafeterias.html",
-      "destination": "/punto-de-venta-cafeterias",
+      "source": "/restaurantes/servicio-rapido.html",
+      "destination": "/restaurantes/servicio-rapido",
       "permanent": true
     },
     {
-      "source": "/punto-de-venta-servicio-rapido.html",
-      "destination": "/punto-de-venta-servicio-rapido",
+      "source": "/restaurantes/servicio-completo.html",
+      "destination": "/restaurantes/servicio-completo",
       "permanent": true
     },
     {
-      "source": "/punto-de-venta-restaurantes-servicio-completo.html",
-      "destination": "/punto-de-venta-restaurantes-servicio-completo",
+      "source": "/restaurantes/bar.html",
+      "destination": "/restaurantes/bar",
       "permanent": true
     },
     {
-      "source": "/punto-de-venta-bares.html",
-      "destination": "/punto-de-venta-bares",
+      "source": "/restaurantes/food-truck.html",
+      "destination": "/restaurantes/food-truck",
       "permanent": true
     },
     {
-      "source": "/punto-de-venta-food-trucks.html",
-      "destination": "/punto-de-venta-food-trucks",
+      "source": "/tiendas/ropa.html",
+      "destination": "/tiendas/ropa",
       "permanent": true
     },
     {
-      "source": "/punto-de-venta-tiendas-de-ropa.html",
-      "destination": "/punto-de-venta-tiendas-de-ropa",
+      "source": "/tiendas/vinateria.html",
+      "destination": "/tiendas/vinateria",
       "permanent": true
     },
     {
-      "source": "/punto-de-venta-vinaterias.html",
-      "destination": "/punto-de-venta-vinaterias",
+      "source": "/tiendas/abarrotes.html",
+      "destination": "/tiendas/abarrotes",
       "permanent": true
     },
     {
-      "source": "/punto-de-venta-abarrotes.html",
-      "destination": "/punto-de-venta-abarrotes",
+      "source": "/belleza/salon-de-belleza.html",
+      "destination": "/belleza/salon-de-belleza",
       "permanent": true
     },
     {
-      "source": "/punto-de-venta-salones-de-belleza.html",
-      "destination": "/punto-de-venta-salones-de-belleza",
+      "source": "/belleza/spa.html",
+      "destination": "/belleza/spa",
       "permanent": true
     },
     {
-      "source": "/punto-de-venta-spa.html",
-      "destination": "/punto-de-venta-spa",
+      "source": "/belleza/peluqueria.html",
+      "destination": "/belleza/peluqueria",
       "permanent": true
     },
     {
-      "source": "/punto-de-venta-peluquerias.html",
-      "destination": "/punto-de-venta-peluquerias",
+      "source": "/belleza/tatuajes.html",
+      "destination": "/belleza/tatuajes",
       "permanent": true
     },
     {
-      "source": "/punto-de-venta-estudios-de-tatuajes.html",
-      "destination": "/punto-de-venta-estudios-de-tatuajes",
-      "permanent": true
-    },
-    {
-      "source": "/punto-de-venta-restaurantes-leon.html",
-      "destination": "/punto-de-venta-restaurantes-leon",
+      "source": "/restaurantes/leon.html",
+      "destination": "/restaurantes/leon",
       "permanent": true
     },
     {
@@ -189,17 +429,6 @@
       "destination": "/sin-internet.md"
     },
     {
-      "source": "/facturacion-cfdi",
-      "has": [
-        {
-          "type": "header",
-          "key": "accept",
-          "value": ".*(text/markdown|text/x-markdown).*"
-        }
-      ],
-      "destination": "/facturacion-cfdi.md"
-    },
-    {
       "source": "/precios",
       "has": [
         {
@@ -233,17 +462,6 @@
       "destination": "/demo.md"
     },
     {
-      "source": "/cuanto-cuesta-un-sistema-para-restaurante",
-      "has": [
-        {
-          "type": "header",
-          "key": "accept",
-          "value": ".*(text/markdown|text/x-markdown).*"
-        }
-      ],
-      "destination": "/cuanto-cuesta-un-sistema-para-restaurante.md"
-    },
-    {
       "source": "/como-elegir-sistema-restaurante",
       "has": [
         {
@@ -255,7 +473,7 @@
       "destination": "/como-elegir-sistema-restaurante.md"
     },
     {
-      "source": "/factura-global-restaurantes",
+      "source": "/restaurantes/hamburgueseria",
       "has": [
         {
           "type": "header",
@@ -263,10 +481,10 @@
           "value": ".*(text/markdown|text/x-markdown).*"
         }
       ],
-      "destination": "/factura-global-restaurantes.md"
+      "destination": "/restaurantes/hamburgueseria.md"
     },
     {
-      "source": "/punto-de-venta-hamburgueserias",
+      "source": "/restaurantes/cafeteria",
       "has": [
         {
           "type": "header",
@@ -274,10 +492,10 @@
           "value": ".*(text/markdown|text/x-markdown).*"
         }
       ],
-      "destination": "/punto-de-venta-hamburgueserias.md"
+      "destination": "/restaurantes/cafeteria.md"
     },
     {
-      "source": "/punto-de-venta-cafeterias",
+      "source": "/restaurantes/servicio-rapido",
       "has": [
         {
           "type": "header",
@@ -285,10 +503,10 @@
           "value": ".*(text/markdown|text/x-markdown).*"
         }
       ],
-      "destination": "/punto-de-venta-cafeterias.md"
+      "destination": "/restaurantes/servicio-rapido.md"
     },
     {
-      "source": "/punto-de-venta-servicio-rapido",
+      "source": "/restaurantes/servicio-completo",
       "has": [
         {
           "type": "header",
@@ -296,10 +514,10 @@
           "value": ".*(text/markdown|text/x-markdown).*"
         }
       ],
-      "destination": "/punto-de-venta-servicio-rapido.md"
+      "destination": "/restaurantes/servicio-completo.md"
     },
     {
-      "source": "/punto-de-venta-restaurantes-servicio-completo",
+      "source": "/restaurantes/bar",
       "has": [
         {
           "type": "header",
@@ -307,10 +525,10 @@
           "value": ".*(text/markdown|text/x-markdown).*"
         }
       ],
-      "destination": "/punto-de-venta-restaurantes-servicio-completo.md"
+      "destination": "/restaurantes/bar.md"
     },
     {
-      "source": "/punto-de-venta-bares",
+      "source": "/restaurantes/food-truck",
       "has": [
         {
           "type": "header",
@@ -318,10 +536,10 @@
           "value": ".*(text/markdown|text/x-markdown).*"
         }
       ],
-      "destination": "/punto-de-venta-bares.md"
+      "destination": "/restaurantes/food-truck.md"
     },
     {
-      "source": "/punto-de-venta-food-trucks",
+      "source": "/tiendas/ropa",
       "has": [
         {
           "type": "header",
@@ -329,10 +547,10 @@
           "value": ".*(text/markdown|text/x-markdown).*"
         }
       ],
-      "destination": "/punto-de-venta-food-trucks.md"
+      "destination": "/tiendas/ropa.md"
     },
     {
-      "source": "/punto-de-venta-tiendas-de-ropa",
+      "source": "/tiendas/vinateria",
       "has": [
         {
           "type": "header",
@@ -340,10 +558,10 @@
           "value": ".*(text/markdown|text/x-markdown).*"
         }
       ],
-      "destination": "/punto-de-venta-tiendas-de-ropa.md"
+      "destination": "/tiendas/vinateria.md"
     },
     {
-      "source": "/punto-de-venta-vinaterias",
+      "source": "/tiendas/abarrotes",
       "has": [
         {
           "type": "header",
@@ -351,10 +569,10 @@
           "value": ".*(text/markdown|text/x-markdown).*"
         }
       ],
-      "destination": "/punto-de-venta-vinaterias.md"
+      "destination": "/tiendas/abarrotes.md"
     },
     {
-      "source": "/punto-de-venta-abarrotes",
+      "source": "/belleza/salon-de-belleza",
       "has": [
         {
           "type": "header",
@@ -362,10 +580,10 @@
           "value": ".*(text/markdown|text/x-markdown).*"
         }
       ],
-      "destination": "/punto-de-venta-abarrotes.md"
+      "destination": "/belleza/salon-de-belleza.md"
     },
     {
-      "source": "/punto-de-venta-salones-de-belleza",
+      "source": "/belleza/spa",
       "has": [
         {
           "type": "header",
@@ -373,10 +591,10 @@
           "value": ".*(text/markdown|text/x-markdown).*"
         }
       ],
-      "destination": "/punto-de-venta-salones-de-belleza.md"
+      "destination": "/belleza/spa.md"
     },
     {
-      "source": "/punto-de-venta-spa",
+      "source": "/belleza/peluqueria",
       "has": [
         {
           "type": "header",
@@ -384,10 +602,10 @@
           "value": ".*(text/markdown|text/x-markdown).*"
         }
       ],
-      "destination": "/punto-de-venta-spa.md"
+      "destination": "/belleza/peluqueria.md"
     },
     {
-      "source": "/punto-de-venta-peluquerias",
+      "source": "/belleza/tatuajes",
       "has": [
         {
           "type": "header",
@@ -395,10 +613,10 @@
           "value": ".*(text/markdown|text/x-markdown).*"
         }
       ],
-      "destination": "/punto-de-venta-peluquerias.md"
+      "destination": "/belleza/tatuajes.md"
     },
     {
-      "source": "/punto-de-venta-estudios-de-tatuajes",
+      "source": "/restaurantes/leon",
       "has": [
         {
           "type": "header",
@@ -406,18 +624,7 @@
           "value": ".*(text/markdown|text/x-markdown).*"
         }
       ],
-      "destination": "/punto-de-venta-estudios-de-tatuajes.md"
-    },
-    {
-      "source": "/punto-de-venta-restaurantes-leon",
-      "has": [
-        {
-          "type": "header",
-          "key": "accept",
-          "value": ".*(text/markdown|text/x-markdown).*"
-        }
-      ],
-      "destination": "/punto-de-venta-restaurantes-leon.md"
+      "destination": "/restaurantes/leon.md"
     },
     {
       "source": "/nosotros",
@@ -527,10 +734,6 @@
       "destination": "/sin-internet.html"
     },
     {
-      "source": "/facturacion-cfdi",
-      "destination": "/facturacion-cfdi.html"
-    },
-    {
       "source": "/precios",
       "destination": "/precios.html"
     },
@@ -543,72 +746,64 @@
       "destination": "/demo.html"
     },
     {
-      "source": "/cuanto-cuesta-un-sistema-para-restaurante",
-      "destination": "/cuanto-cuesta-un-sistema-para-restaurante.html"
-    },
-    {
       "source": "/como-elegir-sistema-restaurante",
       "destination": "/como-elegir-sistema-restaurante.html"
     },
     {
-      "source": "/factura-global-restaurantes",
-      "destination": "/factura-global-restaurantes.html"
+      "source": "/restaurantes/hamburgueseria",
+      "destination": "/restaurantes/hamburgueseria.html"
     },
     {
-      "source": "/punto-de-venta-hamburgueserias",
-      "destination": "/punto-de-venta-hamburgueserias.html"
+      "source": "/restaurantes/cafeteria",
+      "destination": "/restaurantes/cafeteria.html"
     },
     {
-      "source": "/punto-de-venta-cafeterias",
-      "destination": "/punto-de-venta-cafeterias.html"
+      "source": "/restaurantes/servicio-rapido",
+      "destination": "/restaurantes/servicio-rapido.html"
     },
     {
-      "source": "/punto-de-venta-servicio-rapido",
-      "destination": "/punto-de-venta-servicio-rapido.html"
+      "source": "/restaurantes/servicio-completo",
+      "destination": "/restaurantes/servicio-completo.html"
     },
     {
-      "source": "/punto-de-venta-restaurantes-servicio-completo",
-      "destination": "/punto-de-venta-restaurantes-servicio-completo.html"
+      "source": "/restaurantes/bar",
+      "destination": "/restaurantes/bar.html"
     },
     {
-      "source": "/punto-de-venta-bares",
-      "destination": "/punto-de-venta-bares.html"
+      "source": "/restaurantes/food-truck",
+      "destination": "/restaurantes/food-truck.html"
     },
     {
-      "source": "/punto-de-venta-food-trucks",
-      "destination": "/punto-de-venta-food-trucks.html"
+      "source": "/tiendas/ropa",
+      "destination": "/tiendas/ropa.html"
     },
     {
-      "source": "/punto-de-venta-tiendas-de-ropa",
-      "destination": "/punto-de-venta-tiendas-de-ropa.html"
+      "source": "/tiendas/vinateria",
+      "destination": "/tiendas/vinateria.html"
     },
     {
-      "source": "/punto-de-venta-vinaterias",
-      "destination": "/punto-de-venta-vinaterias.html"
+      "source": "/tiendas/abarrotes",
+      "destination": "/tiendas/abarrotes.html"
     },
     {
-      "source": "/punto-de-venta-abarrotes",
-      "destination": "/punto-de-venta-abarrotes.html"
+      "source": "/belleza/salon-de-belleza",
+      "destination": "/belleza/salon-de-belleza.html"
     },
     {
-      "source": "/punto-de-venta-salones-de-belleza",
-      "destination": "/punto-de-venta-salones-de-belleza.html"
+      "source": "/belleza/spa",
+      "destination": "/belleza/spa.html"
     },
     {
-      "source": "/punto-de-venta-spa",
-      "destination": "/punto-de-venta-spa.html"
+      "source": "/belleza/peluqueria",
+      "destination": "/belleza/peluqueria.html"
     },
     {
-      "source": "/punto-de-venta-peluquerias",
-      "destination": "/punto-de-venta-peluquerias.html"
+      "source": "/belleza/tatuajes",
+      "destination": "/belleza/tatuajes.html"
     },
     {
-      "source": "/punto-de-venta-estudios-de-tatuajes",
-      "destination": "/punto-de-venta-estudios-de-tatuajes.html"
-    },
-    {
-      "source": "/punto-de-venta-restaurantes-leon",
-      "destination": "/punto-de-venta-restaurantes-leon.html"
+      "source": "/restaurantes/leon",
+      "destination": "/restaurantes/leon.html"
     },
     {
       "source": "/nosotros",
@@ -729,23 +924,6 @@
       ]
     },
     {
-      "source": "/facturacion-cfdi",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600, must-revalidate"
-        },
-        {
-          "key": "Vary",
-          "value": "Accept, Accept-Encoding"
-        },
-        {
-          "key": "Link",
-          "value": "<https://vimpos.com.mx/facturacion-cfdi.md>; rel=\"alternate\"; type=\"text/markdown\""
-        }
-      ]
-    },
-    {
       "source": "/precios",
       "headers": [
         {
@@ -797,23 +975,6 @@
       ]
     },
     {
-      "source": "/cuanto-cuesta-un-sistema-para-restaurante",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600, must-revalidate"
-        },
-        {
-          "key": "Vary",
-          "value": "Accept, Accept-Encoding"
-        },
-        {
-          "key": "Link",
-          "value": "<https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md>; rel=\"alternate\"; type=\"text/markdown\""
-        }
-      ]
-    },
-    {
       "source": "/como-elegir-sistema-restaurante",
       "headers": [
         {
@@ -831,7 +992,7 @@
       ]
     },
     {
-      "source": "/factura-global-restaurantes",
+      "source": "/restaurantes/hamburgueseria",
       "headers": [
         {
           "key": "Cache-Control",
@@ -843,12 +1004,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/factura-global-restaurantes.md>; rel=\"alternate\"; type=\"text/markdown\""
+          "value": "<https://vimpos.com.mx/restaurantes/hamburgueseria.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-hamburgueserias",
+      "source": "/restaurantes/cafeteria",
       "headers": [
         {
           "key": "Cache-Control",
@@ -860,12 +1021,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-hamburgueserias.md>; rel=\"alternate\"; type=\"text/markdown\""
+          "value": "<https://vimpos.com.mx/restaurantes/cafeteria.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-cafeterias",
+      "source": "/restaurantes/servicio-rapido",
       "headers": [
         {
           "key": "Cache-Control",
@@ -877,12 +1038,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-cafeterias.md>; rel=\"alternate\"; type=\"text/markdown\""
+          "value": "<https://vimpos.com.mx/restaurantes/servicio-rapido.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-servicio-rapido",
+      "source": "/restaurantes/servicio-completo",
       "headers": [
         {
           "key": "Cache-Control",
@@ -894,12 +1055,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-servicio-rapido.md>; rel=\"alternate\"; type=\"text/markdown\""
+          "value": "<https://vimpos.com.mx/restaurantes/servicio-completo.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-restaurantes-servicio-completo",
+      "source": "/restaurantes/bar",
       "headers": [
         {
           "key": "Cache-Control",
@@ -911,12 +1072,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo.md>; rel=\"alternate\"; type=\"text/markdown\""
+          "value": "<https://vimpos.com.mx/restaurantes/bar.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-bares",
+      "source": "/restaurantes/food-truck",
       "headers": [
         {
           "key": "Cache-Control",
@@ -928,12 +1089,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-bares.md>; rel=\"alternate\"; type=\"text/markdown\""
+          "value": "<https://vimpos.com.mx/restaurantes/food-truck.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-food-trucks",
+      "source": "/tiendas/ropa",
       "headers": [
         {
           "key": "Cache-Control",
@@ -945,12 +1106,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-food-trucks.md>; rel=\"alternate\"; type=\"text/markdown\""
+          "value": "<https://vimpos.com.mx/tiendas/ropa.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-tiendas-de-ropa",
+      "source": "/tiendas/vinateria",
       "headers": [
         {
           "key": "Cache-Control",
@@ -962,12 +1123,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa.md>; rel=\"alternate\"; type=\"text/markdown\""
+          "value": "<https://vimpos.com.mx/tiendas/vinateria.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-vinaterias",
+      "source": "/tiendas/abarrotes",
       "headers": [
         {
           "key": "Cache-Control",
@@ -979,12 +1140,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-vinaterias.md>; rel=\"alternate\"; type=\"text/markdown\""
+          "value": "<https://vimpos.com.mx/tiendas/abarrotes.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-abarrotes",
+      "source": "/belleza/salon-de-belleza",
       "headers": [
         {
           "key": "Cache-Control",
@@ -996,12 +1157,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-abarrotes.md>; rel=\"alternate\"; type=\"text/markdown\""
+          "value": "<https://vimpos.com.mx/belleza/salon-de-belleza.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-salones-de-belleza",
+      "source": "/belleza/spa",
       "headers": [
         {
           "key": "Cache-Control",
@@ -1013,12 +1174,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-salones-de-belleza.md>; rel=\"alternate\"; type=\"text/markdown\""
+          "value": "<https://vimpos.com.mx/belleza/spa.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-spa",
+      "source": "/belleza/peluqueria",
       "headers": [
         {
           "key": "Cache-Control",
@@ -1030,12 +1191,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-spa.md>; rel=\"alternate\"; type=\"text/markdown\""
+          "value": "<https://vimpos.com.mx/belleza/peluqueria.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-peluquerias",
+      "source": "/belleza/tatuajes",
       "headers": [
         {
           "key": "Cache-Control",
@@ -1047,12 +1208,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-peluquerias.md>; rel=\"alternate\"; type=\"text/markdown\""
+          "value": "<https://vimpos.com.mx/belleza/tatuajes.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-estudios-de-tatuajes",
+      "source": "/restaurantes/leon",
       "headers": [
         {
           "key": "Cache-Control",
@@ -1064,24 +1225,7 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes.md>; rel=\"alternate\"; type=\"text/markdown\""
-        }
-      ]
-    },
-    {
-      "source": "/punto-de-venta-restaurantes-leon",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600, must-revalidate"
-        },
-        {
-          "key": "Vary",
-          "value": "Accept, Accept-Encoding"
-        },
-        {
-          "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-restaurantes-leon.md>; rel=\"alternate\"; type=\"text/markdown\""
+          "value": "<https://vimpos.com.mx/restaurantes/leon.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
@@ -1290,23 +1434,6 @@
       ]
     },
     {
-      "source": "/facturacion-cfdi.md",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600, must-revalidate"
-        },
-        {
-          "key": "Vary",
-          "value": "Accept, Accept-Encoding"
-        },
-        {
-          "key": "Link",
-          "value": "<https://vimpos.com.mx/facturacion-cfdi>; rel=\"canonical\""
-        }
-      ]
-    },
-    {
       "source": "/precios.md",
       "headers": [
         {
@@ -1358,23 +1485,6 @@
       ]
     },
     {
-      "source": "/cuanto-cuesta-un-sistema-para-restaurante.md",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600, must-revalidate"
-        },
-        {
-          "key": "Vary",
-          "value": "Accept, Accept-Encoding"
-        },
-        {
-          "key": "Link",
-          "value": "<https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante>; rel=\"canonical\""
-        }
-      ]
-    },
-    {
       "source": "/como-elegir-sistema-restaurante.md",
       "headers": [
         {
@@ -1392,7 +1502,7 @@
       ]
     },
     {
-      "source": "/factura-global-restaurantes.md",
+      "source": "/restaurantes/hamburgueseria.md",
       "headers": [
         {
           "key": "Cache-Control",
@@ -1404,12 +1514,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/factura-global-restaurantes>; rel=\"canonical\""
+          "value": "<https://vimpos.com.mx/restaurantes/hamburgueseria>; rel=\"canonical\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-hamburgueserias.md",
+      "source": "/restaurantes/cafeteria.md",
       "headers": [
         {
           "key": "Cache-Control",
@@ -1421,12 +1531,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-hamburgueserias>; rel=\"canonical\""
+          "value": "<https://vimpos.com.mx/restaurantes/cafeteria>; rel=\"canonical\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-cafeterias.md",
+      "source": "/restaurantes/servicio-rapido.md",
       "headers": [
         {
           "key": "Cache-Control",
@@ -1438,12 +1548,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-cafeterias>; rel=\"canonical\""
+          "value": "<https://vimpos.com.mx/restaurantes/servicio-rapido>; rel=\"canonical\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-servicio-rapido.md",
+      "source": "/restaurantes/servicio-completo.md",
       "headers": [
         {
           "key": "Cache-Control",
@@ -1455,12 +1565,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-servicio-rapido>; rel=\"canonical\""
+          "value": "<https://vimpos.com.mx/restaurantes/servicio-completo>; rel=\"canonical\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-restaurantes-servicio-completo.md",
+      "source": "/restaurantes/bar.md",
       "headers": [
         {
           "key": "Cache-Control",
@@ -1472,12 +1582,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo>; rel=\"canonical\""
+          "value": "<https://vimpos.com.mx/restaurantes/bar>; rel=\"canonical\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-bares.md",
+      "source": "/restaurantes/food-truck.md",
       "headers": [
         {
           "key": "Cache-Control",
@@ -1489,12 +1599,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-bares>; rel=\"canonical\""
+          "value": "<https://vimpos.com.mx/restaurantes/food-truck>; rel=\"canonical\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-food-trucks.md",
+      "source": "/tiendas/ropa.md",
       "headers": [
         {
           "key": "Cache-Control",
@@ -1506,12 +1616,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-food-trucks>; rel=\"canonical\""
+          "value": "<https://vimpos.com.mx/tiendas/ropa>; rel=\"canonical\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-tiendas-de-ropa.md",
+      "source": "/tiendas/vinateria.md",
       "headers": [
         {
           "key": "Cache-Control",
@@ -1523,12 +1633,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa>; rel=\"canonical\""
+          "value": "<https://vimpos.com.mx/tiendas/vinateria>; rel=\"canonical\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-vinaterias.md",
+      "source": "/tiendas/abarrotes.md",
       "headers": [
         {
           "key": "Cache-Control",
@@ -1540,12 +1650,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-vinaterias>; rel=\"canonical\""
+          "value": "<https://vimpos.com.mx/tiendas/abarrotes>; rel=\"canonical\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-abarrotes.md",
+      "source": "/belleza/salon-de-belleza.md",
       "headers": [
         {
           "key": "Cache-Control",
@@ -1557,12 +1667,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-abarrotes>; rel=\"canonical\""
+          "value": "<https://vimpos.com.mx/belleza/salon-de-belleza>; rel=\"canonical\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-salones-de-belleza.md",
+      "source": "/belleza/spa.md",
       "headers": [
         {
           "key": "Cache-Control",
@@ -1574,12 +1684,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-salones-de-belleza>; rel=\"canonical\""
+          "value": "<https://vimpos.com.mx/belleza/spa>; rel=\"canonical\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-spa.md",
+      "source": "/belleza/peluqueria.md",
       "headers": [
         {
           "key": "Cache-Control",
@@ -1591,12 +1701,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-spa>; rel=\"canonical\""
+          "value": "<https://vimpos.com.mx/belleza/peluqueria>; rel=\"canonical\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-peluquerias.md",
+      "source": "/belleza/tatuajes.md",
       "headers": [
         {
           "key": "Cache-Control",
@@ -1608,12 +1718,12 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-peluquerias>; rel=\"canonical\""
+          "value": "<https://vimpos.com.mx/belleza/tatuajes>; rel=\"canonical\""
         }
       ]
     },
     {
-      "source": "/punto-de-venta-estudios-de-tatuajes.md",
+      "source": "/restaurantes/leon.md",
       "headers": [
         {
           "key": "Cache-Control",
@@ -1625,24 +1735,7 @@
         },
         {
           "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-estudios-de-tatuajes>; rel=\"canonical\""
-        }
-      ]
-    },
-    {
-      "source": "/punto-de-venta-restaurantes-leon.md",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600, must-revalidate"
-        },
-        {
-          "key": "Vary",
-          "value": "Accept, Accept-Encoding"
-        },
-        {
-          "key": "Link",
-          "value": "<https://vimpos.com.mx/punto-de-venta-restaurantes-leon>; rel=\"canonical\""
+          "value": "<https://vimpos.com.mx/restaurantes/leon>; rel=\"canonical\""
         }
       ]
     },

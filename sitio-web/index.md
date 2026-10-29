@@ -16,35 +16,35 @@ _Todo tu negocio_
 
 ## De la venta al corte, en un solo sistema
 
-![Un producto abierto con sus opciones: término de la carne y extras con su precio.](https://vimpos.com.mx/assets/img/capturas/pos-catalogo.webp?v=3)
-
-### [Cobra en segundos](https://vimpos.com.mx/funciones#caja)
+### Cobra en segundos
 
 Productos con sus opciones y su precio. Efectivo, tarjeta o las dos en la misma cuenta.
 
-![Existencias en el panel: piezas, valor del inventario y lo que está bajo el mínimo.](https://vimpos.com.mx/assets/img/capturas/giros/tienda-ropa-existencias.webp?v=1)
+[Ver la caja →](https://vimpos.com.mx/funciones#caja)
 
-### [Tu inventario, al día](https://vimpos.com.mx/funciones#inventario)
+### Tu inventario, al día
 
 Cada venta descuenta su existencia y te avisa lo que se está acabando. Desde Negocio.
 
-![El calendario del salón con las citas del día de tres colaboradoras.](https://vimpos.com.mx/assets/img/capturas/giros/salon-calendario.webp?v=1)
+[Ver inventario →](https://vimpos.com.mx/funciones#inventario)
 
-### [Tu agenda de citas](https://vimpos.com.mx/punto-de-venta-salones-de-belleza)
+### Tu agenda de citas
 
 Las citas del día y quién atiende cada una.
 
-![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp?v=3)
+[Ver la agenda →](https://vimpos.com.mx/belleza/salon-de-belleza)
 
-### [Un corte que cuadra con el cajón](https://vimpos.com.mx/funciones#reportes)
+### Un corte que cuadra con el cajón
 
 Lo que debe haber contra lo que hay, por turno.
 
-![Panel del dueño con las ventas del día y el estado de las cajas.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
+[Ver el corte →](https://vimpos.com.mx/funciones#reportes)
 
-### [La venta del día en tu celular](https://vimpos.com.mx/funciones#reportes)
+### La venta del día en tu celular
 
 Qué se vende, a qué hora y quién cobró.
+
+[Ver los reportes →](https://vimpos.com.mx/funciones#reportes)
 
 **Todo esto desde $699 al mes.** Pruébalo 30 días gratis.
 
@@ -58,11 +58,11 @@ _Para tu giro_
 
 Cambian las pantallas, lo que se imprime y cómo se cobra.
 
-[Alimentos y bebidas Restaurantes, cafés, bares y food trucks](https://vimpos.com.mx/punto-de-venta-restaurantes-servicio-completo)
+[Restaurantes Restaurantes, cafés, bares y food trucks](https://vimpos.com.mx/restaurantes/servicio-completo)
 
-[Tienda Ropa, vinos y licores, abarrotes y fruterías](https://vimpos.com.mx/punto-de-venta-tiendas-de-ropa)
+[Tienda Ropa, vinos y licores, abarrotes y fruterías](https://vimpos.com.mx/tiendas/ropa)
 
-[Belleza Salones, spas, peluquerías y tatuajes](https://vimpos.com.mx/punto-de-venta-salones-de-belleza)
+[Belleza Salones, spas, peluquerías y tatuajes](https://vimpos.com.mx/belleza/salon-de-belleza)
 
 **¿No ves tu giro?** Cuéntanos cómo vendes y te decimos si te sirve.
 
@@ -225,7 +225,7 @@ Empieza tú solo, o te lo enseñamos en media hora con tus productos.
 
 ---
 
-**Otras páginas en Markdown:** [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Factura global](https://vimpos.com.mx/factura-global-restaurantes.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md) · [Por tipo de negocio](https://vimpos.com.mx/llms.txt)
+**Otras páginas en Markdown:** [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md) · [Por tipo de negocio](https://vimpos.com.mx/llms.txt)
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 

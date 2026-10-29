@@ -47,7 +47,7 @@ test('cada página responde 200 con su HTML', () => {
   for (const p of TODAS) {
     const res = resolver(p.ruta);
     assert.equal(res.estado, 200, `${p.ruta} no responde 200`);
-    assert.equal(path.basename(res.archivo), p.archivo, `${p.ruta} sirve el archivo equivocado`);
+    assert.equal(path.relative(RAIZ, res.archivo).replaceAll(path.sep, '/'), p.archivo, `${p.ruta} sirve el archivo equivocado`);
     assert.match(res.tipo, /text\/html/);
   }
 });
@@ -64,7 +64,7 @@ test('cada página responde en Markdown si se pide con Accept', () => {
       continue;
     }
     assert.equal(res.estado, 200, `${p.ruta} con Accept markdown no responde 200`);
-    assert.equal(path.basename(res.archivo), p.markdown, `${p.ruta} no sirve su gemelo`);
+    assert.equal(path.relative(RAIZ, res.archivo).replaceAll(path.sep, '/'), p.markdown, `${p.ruta} no sirve su gemelo`);
     assert.equal(res.tipo, 'text/markdown; charset=utf-8');
   }
 });
@@ -667,8 +667,8 @@ test('las cinco cabeceras de seguridad siguen en todas las respuestas', () => {
 
 test('ningún enlace interno del sitio lleva a un 404', () => {
   const rotos = [];
-  for (const archivo of fs.readdirSync(RAIZ).filter((f) => f.endsWith('.html'))) {
-    if (archivo.startsWith('_')) continue;
+  for (const archivo of fs.readdirSync(RAIZ, { recursive: true }).filter((f) => f.endsWith('.html'))) {
+    if (archivo.startsWith('_') || archivo.includes('node_modules')) continue;
     const html = leer(archivo);
     for (const m of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
       const destino = m[1];
@@ -802,7 +802,7 @@ test('cada gemelo en Markdown lleva título, resumen y el contenido de su págin
   }
   assert.ok(leer('precios.md').includes('| Sucursales | 1 | 1 | 3 |'), 'la tabla comparativa no sobrevivió');
   // El eyebrow que va dentro del h1 de las páginas por giro no se pega al titular.
-  assert.match(leer('punto-de-venta-spa.md'), /^# Punto de venta para spas\. Cada cabina/);
+  assert.match(leer('belleza/spa.md'), /^# Punto de venta para spas\. Cada cabina/);
 });
 
 test('los acordeones conservan su título y lo oculto no viaja al Markdown', () => {
@@ -813,8 +813,6 @@ test('los acordeones conservan su título y lo oculto no viaja al Markdown', () 
   for (const titulo of ['### ¿De verdad funciona sin internet?', '### ¿Emite facturas?', '### ¿Qué necesito comprar?', '### ¿Funciona con varias sucursales?']) {
     assert.ok(portada.includes(titulo), `index.md perdió el título de acordeón «${titulo}»`);
   }
-  // Cuelgan un nivel por debajo del encabezado de su sección, sea h2 o h3.
-  assert.ok(leer('facturacion-cfdi.md').includes('#### ¿Necesito internet para facturar?'), 'la pregunta no cuelga de su h3');
   // El acuse del formulario está `hidden` hasta que se envía: no es contenido.
   assert.ok(!leer('demo.md').includes('Listo, ya nos llegó'), 'demo.md trae el acuse oculto del formulario');
 });

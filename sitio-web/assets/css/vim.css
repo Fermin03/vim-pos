@@ -62,7 +62,7 @@
   --sp-5: 24px; --sp-6: 32px;  --sp-8: 48px;  --sp-10: 64px;
   --sp-12: 96px; --sp-16: 128px;
 
-  --ancho: 1180px;
+  --ancho: 90vw;             /* el contenido ocupa el 90 % de la ventana (Fermín, 28-oct-2026) */
   --ancho-texto: 68ch;
 
   /* ---- Curvas de easing ----
@@ -121,7 +121,7 @@ body {
   letter-spacing: -0.01em;
 }
 
-img, svg { max-width: 100%; height: auto; display: block; }
+img, svg, video { max-width: 100%; height: auto; display: block; }
 
 /* `hidden` tiene que ganar SIEMPRE.
    
@@ -174,6 +174,10 @@ a { color: var(--ink); text-underline-offset: 3px; }
   margin-inline: auto;
   padding-inline: var(--sp-5);
 }
+
+/* En el teléfono y la tableta (hasta 1024 px, el iPad en horizontal) el 90 % solo
+   quitaría sitio: ahí va a toda la ventana con el margen de siempre. */
+@media (max-width: 1024px) { :root { --ancho: 100vw; } }
 
 .pila { display: flex; flex-direction: column; }
 .pila-2 { gap: var(--sp-2); }
@@ -283,7 +287,7 @@ a { color: var(--ink); text-underline-offset: 3px; }
 /* La barra va más ancha que el contenido (Fermín, 23-oct-2026), como en Square:
    el logo y los botones se abren hacia las orillas y los enlaces respiran. El panel
    desplegable usa el mismo contenedor, así que se alinea con ella. */
-.nav .contenedor { max-width: 1440px; }
+.nav .contenedor { max-width: none; }   /* a todo lo ancho: sigue siendo más ancha que el 90 % del contenido */
 @media (min-width: 900px) { .nav .contenedor { padding-inline: var(--sp-8); } }
 
 .nav-fila {
@@ -1606,41 +1610,93 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 .novedad-cuerpo h4[data-tipo="nuevo"] { color: var(--accent); }
 
 /* ==========================================================================
-   Cuatro cosas, con una sola captura (portada)
+   Todo tu negocio (portada)
 
-   A la izquierda, el acordeón de siempre con las cuatro funciones; a la
-   derecha, la captura de la fila abierta. Se emparejan por posición con
-   `:has()`: la fila 2 abierta enseña la captura 2. No hay JavaScript propio.
+   Como la sección de Square que pidió Fermín (28-oct-2026). En pantalla ancha:
+   el título y el acordeón de siempre con las cinco funciones a la izquierda, y
+   a la derecha la escena (video sobre la foto del mostrador desenfocada) de la
+   fila abierta; las cinco ocupan la misma celda y se relevan con un fundido.
+   Se emparejan por posición con `:has()`: la fila 2 abierta enseña la escena 2.
 
-   En pantalla ancha las cuatro capturas ocupan la misma celda y se relevan con
-   un fundido: miden lo mismo, así que deslizarlas sería mover la misma caja
-   para nada. En el teléfono miden distinto —dos van recortadas a 4:5—, y
-   apiladas dejarían un hueco bajo las cortas; ahí se enseña una y las demás no
-   ocupan sitio.
+   En el teléfono cada escena va DENTRO de su ficha, entre el título y el
+   texto. No se duplica nada: el acordeón, sus filas y la caja de escenas se
+   vuelven `display: contents` y `order` intercala botón, escena y texto.
    ========================================================================== */
 
-.cosas { display: grid; gap: var(--sp-6); align-items: start; }
+.cosas { display: grid; gap: var(--sp-6); }
+/* El título va centrado (Fermín, 28-oct-2026); en pantalla ancha, encima de las dos columnas. */
+.cosas-encabezado { text-align: center; align-items: center; }
 
-.cosas-capturas > .monitor { display: none; }
-.cosas:has(.acordeon-item:nth-child(1)[data-abierto="true"]) .cosas-capturas > :nth-child(1),
-.cosas:has(.acordeon-item:nth-child(2)[data-abierto="true"]) .cosas-capturas > :nth-child(2),
-.cosas:has(.acordeon-item:nth-child(3)[data-abierto="true"]) .cosas-capturas > :nth-child(3),
-.cosas:has(.acordeon-item:nth-child(4)[data-abierto="true"]) .cosas-capturas > :nth-child(4) { display: block; }
+.cosas-escena {
+  position: relative; isolation: isolate;
+  display: none; place-items: center;
+  aspect-ratio: 4 / 3; padding: var(--sp-5);
+  border-radius: var(--r-lg); overflow: hidden;
+  background: var(--ink) url("/assets/img/home/comida-rapida.webp") center / cover;
+}
+.cosas-escena::before {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  backdrop-filter: blur(24px) brightness(.6);
+}
+.cosas-escena > .monitor { width: 100%; box-shadow: 0 24px 48px -16px rgba(0,0,0,.5); }
+/* El panel del dueño se grabó a tamaño de teléfono: va en un marco de teléfono, a lo alto. */
+.cosas-escena > .telefono {
+  height: 100%; border: 6px solid var(--ink); border-radius: 28px; overflow: hidden;
+  background: var(--ink); box-shadow: 0 24px 48px -16px rgba(0,0,0,.5);
+}
+.cosas-escena > .telefono video { height: 100%; width: auto; }
+
+.cosas:has(.acordeon-item:nth-child(1)[data-abierto="true"]) .cosas-escena:nth-child(1),
+.cosas:has(.acordeon-item:nth-child(2)[data-abierto="true"]) .cosas-escena:nth-child(2),
+.cosas:has(.acordeon-item:nth-child(3)[data-abierto="true"]) .cosas-escena:nth-child(3),
+.cosas:has(.acordeon-item:nth-child(4)[data-abierto="true"]) .cosas-escena:nth-child(4),
+.cosas:has(.acordeon-item:nth-child(5)[data-abierto="true"]) .cosas-escena:nth-child(5) { display: grid; }
+
+.cosas .acordeon-panel p + a { display: inline-block; margin-top: var(--sp-3); font-weight: 600; }
+
+@media (max-width: 899px) {
+  .cosas { gap: 0; }
+  .cosas-encabezado { margin-bottom: var(--sp-6); }
+  .cosas > .acordeon, .cosas .acordeon-item, .cosas-capturas { display: contents; }
+  .cosas .acordeon-boton { border-top: 1px solid var(--line); }
+  .cosas-escena { margin-bottom: var(--sp-5); }
+  .cosas .acordeon-item:last-child > .acordeon-panel { border-bottom: 1px solid var(--line); }
+  .cosas .acordeon-item:nth-child(1) > .acordeon-boton { order: 1; }
+  .cosas-escena:nth-child(1) { order: 2; }
+  .cosas .acordeon-item:nth-child(1) > .acordeon-panel { order: 3; }
+  .cosas .acordeon-item:nth-child(2) > .acordeon-boton { order: 4; }
+  .cosas-escena:nth-child(2) { order: 5; }
+  .cosas .acordeon-item:nth-child(2) > .acordeon-panel { order: 6; }
+  .cosas .acordeon-item:nth-child(3) > .acordeon-boton { order: 7; }
+  .cosas-escena:nth-child(3) { order: 8; }
+  .cosas .acordeon-item:nth-child(3) > .acordeon-panel { order: 9; }
+  .cosas .acordeon-item:nth-child(4) > .acordeon-boton { order: 10; }
+  .cosas-escena:nth-child(4) { order: 11; }
+  .cosas .acordeon-item:nth-child(4) > .acordeon-panel { order: 12; }
+  .cosas .acordeon-item:nth-child(5) > .acordeon-boton { order: 13; }
+  .cosas-escena:nth-child(5) { order: 14; }
+  .cosas .acordeon-item:nth-child(5) > .acordeon-panel { order: 15; }
+}
+@media (max-width: 619px) {
+  .cosas-escena { aspect-ratio: 4 / 5; }   /* en el teléfono, a lo alto como la referencia */
+}
 
 @media (min-width: 900px) {
-  .cosas { grid-template-columns: 5fr 7fr; gap: var(--sp-10); }
-  .cosas-capturas { display: grid; }
-  .cosas-capturas > .monitor {
-    display: block;
-    grid-area: 1 / 1;
+  .cosas { grid-template-columns: 5fr 7fr; column-gap: var(--sp-10); align-items: center; }
+  .cosas-encabezado { grid-column: 1 / -1; grid-row: 1; margin-bottom: var(--sp-4); }
+  .cosas > .acordeon { grid-column: 1; grid-row: 2; align-self: start; }
+  .cosas-capturas { grid-column: 2; grid-row: 2; display: grid; }
+  .cosas-escena {
+    display: grid; grid-area: 1 / 1;
     opacity: 0;
     visibility: hidden;
     transition: opacity var(--v-corta) ease, visibility 0s linear var(--v-corta);
   }
-  .cosas:has(.acordeon-item:nth-child(1)[data-abierto="true"]) .cosas-capturas > :nth-child(1),
-  .cosas:has(.acordeon-item:nth-child(2)[data-abierto="true"]) .cosas-capturas > :nth-child(2),
-  .cosas:has(.acordeon-item:nth-child(3)[data-abierto="true"]) .cosas-capturas > :nth-child(3),
-  .cosas:has(.acordeon-item:nth-child(4)[data-abierto="true"]) .cosas-capturas > :nth-child(4) {
+  .cosas:has(.acordeon-item:nth-child(1)[data-abierto="true"]) .cosas-escena:nth-child(1),
+  .cosas:has(.acordeon-item:nth-child(2)[data-abierto="true"]) .cosas-escena:nth-child(2),
+  .cosas:has(.acordeon-item:nth-child(3)[data-abierto="true"]) .cosas-escena:nth-child(3),
+  .cosas:has(.acordeon-item:nth-child(4)[data-abierto="true"]) .cosas-escena:nth-child(4),
+  .cosas:has(.acordeon-item:nth-child(5)[data-abierto="true"]) .cosas-escena:nth-child(5) {
     opacity: 1;
     visibility: visible;
     transition: opacity var(--v-corta) ease, visibility 0s;
@@ -1748,7 +1804,7 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 body:has(.subnav) :target { scroll-margin-top: calc(65px + 44px + var(--sp-5)); }
 
 /* ==========================================================================
-   Páginas por giro (/punto-de-venta-<giro>)
+   Páginas por giro (/<grupo>/<giro>)
 
    Una sola plantilla para los catorce giros: hero con tira de fotos, rasgos con
    la imagen quieta a un lado, herramientas en tarjetas con imagen, equipo,
@@ -1976,23 +2032,6 @@ body:has(.subnav) :target { scroll-margin-top: calc(65px + 44px + var(--sp-5)); 
   }
 }
 
-/* ---- Tarjetas de funciones en el celular ---------------------------------
-   Apiladas en vez de carrusel, y con la captura entera: en el carrusel la
-   tarjeta de al lado asomaba cortada y el marco de 16:10 recortaba la captura
-   por abajo (Fermín, 23-oct-2026). */
-@media (max-width: 799px) {
-  .inicio-funciones :is(.dos, .tres) {
-    display: grid; grid-auto-flow: row; grid-auto-columns: auto;
-    overflow: visible; margin-inline: 0; padding-inline: 0;
-  }
-  .inicio-funciones .tarjeta-media-imagen {
-    aspect-ratio: auto;
-    margin: calc(-1 * var(--sp-6)) calc(-1 * var(--sp-6)) 0;
-    padding: var(--sp-3) var(--sp-3) 0;
-  }
-  .inicio-funciones .puntos { display: none; }   /* ya no es carrusel */
-}
-
 /* ---- La franja que cierra cada bloque ------------------------------------
    Una frase a la izquierda y los dos botones a la derecha. Es lo que hace
    que cada pantalla del inicio termine en «contrata», no en un párrafo. */
@@ -2025,7 +2064,7 @@ body:has(.subnav) :target { scroll-margin-top: calc(65px + 44px + var(--sp-5)); 
 /* ---- Tarjetas de giro con foto -----------------------------------------
    Foto completa y toda la tarjeta es el enlace (Fermín, 23-oct-2026). El texto
    va ARRIBA, sobre un degradado oscuro: así los tres títulos arrancan a la
-   misma altura aunque «Alimentos y bebidas» ocupe dos renglones, y se leen
+   misma altura aunque «Restaurantes» ocupe dos renglones, y se leen
    sobre el techo del local en vez de sobre el monitor. */
 .giros-fotos { display: grid; gap: var(--sp-5); }
 @media (min-width: 980px) { .giros-fotos { grid-template-columns: repeat(3, 1fr); } }

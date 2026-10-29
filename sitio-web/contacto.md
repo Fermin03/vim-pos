@@ -28,7 +28,7 @@ _El panel que te enseñamos en la demo: cómo va tu día, desde el celular o la 
 
 **Dónde estamos:** Guanajuato, México. No hay mostrador al público: si quieres vernos en persona, agéndalo por correo. El domicilio fiscal va en el contrato.
 
-**Zona de servicio:** toda la República Mexicana. La demo es en tu local, en la [zona de León](https://vimpos.com.mx/punto-de-venta-restaurantes-leon) y alrededores; fuera de ahí, puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro). La visita el día del arranque va incluida en el plan Cadena.
+**Zona de servicio:** toda la República Mexicana. La demo es en tu local, en la [zona de León](https://vimpos.com.mx/restaurantes/leon) y alrededores; fuera de ahí, puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro). La visita el día del arranque va incluida en el plan Cadena.
 
 ## Qué te sirve más según lo que busques
 
@@ -44,7 +44,7 @@ Este sitio publica su contenido también en Markdown y describe qué es VIM POS 
 
 ---
 
-**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Factura global](https://vimpos.com.mx/factura-global-restaurantes.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md) · [Por tipo de negocio](https://vimpos.com.mx/llms.txt)
+**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md) · [Por tipo de negocio](https://vimpos.com.mx/llms.txt)
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 
