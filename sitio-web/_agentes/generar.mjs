@@ -426,6 +426,14 @@ const ACEPTA_MARKDOWN = [
 
 const CACHE_HTML = { key: 'Cache-Control', value: 'public, max-age=3600, must-revalidate' };
 
+// Páginas retiradas (Fermín, 28-oct-2026). Redirigen a lo más cercano que queda
+// para no perder a quien llegue por un enlace viejo o por el buscador.
+const RETIRADAS = [
+  ['/cuanto-cuesta-un-sistema-para-restaurante', '/precios'],
+  ['/facturacion-cfdi', '/funciones#facturacion'],
+  ['/factura-global-restaurantes', '/funciones#facturacion'],
+];
+
 function vercelJson() {
   const conAlias = (p) => [p.ruta, ...(p.alias || [])];
 
@@ -442,6 +450,9 @@ function vercelJson() {
     // direcciones limpias en el sistema de archivos, y eso dejaba fuera de juego
     // a las reescrituras que negocian Markdown.
     { source: '/index.html', destination: '/', permanent: true },
+    ...RETIRADAS.flatMap(([ruta, destino]) =>
+      [ruta, ruta + '.html', ruta + '.md'].map((source) => ({ source, destination: destino, permanent: true })),
+    ),
     ...TODAS.filter((p) => p.archivo !== 'index.html').map((p) => ({
       source: '/' + p.archivo,
       destination: p.ruta,

@@ -76,7 +76,7 @@ Ventas por mesero, horas pico y lo más pedido. El corte cuadra contra el cajón
 
 ![Ticket de venta con el código para facturar.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp?v=3)
 
-### [Facturas sin detener la fila](https://vimpos.com.mx/facturacion-cfdi)
+### [Facturas sin detener la fila](https://vimpos.com.mx/funciones#facturacion)
 
 Tu cliente se factura solo con su ticket. Incluida desde Negocio.
 
@@ -159,22 +159,6 @@ Lo principal para un restaurante
 
 [Ver todo lo que incluye](https://vimpos.com.mx/precios)
 
-_Guías_
-
-## Antes de decidir
-
-### [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante)
-
-Nueve preguntas antes de firmar.
-
-### [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante)
-
-Las tres formas de cobrarte, con cuentas.
-
-### [Factura global](https://vimpos.com.mx/factura-global-restaurantes)
-
-Qué es y cómo se emite.
-
 _Preguntas_
 
 ## Lo que pregunta un restaurante
@@ -205,7 +189,7 @@ Empieza tú solo, o te lo enseñamos con tu menú.
 
 ---
 
-**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Factura global](https://vimpos.com.mx/factura-global-restaurantes.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md) · [Por tipo de negocio](https://vimpos.com.mx/llms.txt)
+**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md) · [Por tipo de negocio](https://vimpos.com.mx/llms.txt)
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 

@@ -813,8 +813,6 @@ test('los acordeones conservan su título y lo oculto no viaja al Markdown', () 
   for (const titulo of ['### ¿De verdad funciona sin internet?', '### ¿Emite facturas?', '### ¿Qué necesito comprar?', '### ¿Funciona con varias sucursales?']) {
     assert.ok(portada.includes(titulo), `index.md perdió el título de acordeón «${titulo}»`);
   }
-  // Cuelgan un nivel por debajo del encabezado de su sección, sea h2 o h3.
-  assert.ok(leer('facturacion-cfdi.md').includes('#### ¿Necesito internet para facturar?'), 'la pregunta no cuelga de su h3');
   // El acuse del formulario está `hidden` hasta que se envía: no es contenido.
   assert.ok(!leer('demo.md').includes('Listo, ya nos llegó'), 'demo.md trae el acuse oculto del formulario');
 });

@@ -25,6 +25,51 @@
       "permanent": true
     },
     {
+      "source": "/cuanto-cuesta-un-sistema-para-restaurante",
+      "destination": "/precios",
+      "permanent": true
+    },
+    {
+      "source": "/cuanto-cuesta-un-sistema-para-restaurante.html",
+      "destination": "/precios",
+      "permanent": true
+    },
+    {
+      "source": "/cuanto-cuesta-un-sistema-para-restaurante.md",
+      "destination": "/precios",
+      "permanent": true
+    },
+    {
+      "source": "/facturacion-cfdi",
+      "destination": "/funciones#facturacion",
+      "permanent": true
+    },
+    {
+      "source": "/facturacion-cfdi.html",
+      "destination": "/funciones#facturacion",
+      "permanent": true
+    },
+    {
+      "source": "/facturacion-cfdi.md",
+      "destination": "/funciones#facturacion",
+      "permanent": true
+    },
+    {
+      "source": "/factura-global-restaurantes",
+      "destination": "/funciones#facturacion",
+      "permanent": true
+    },
+    {
+      "source": "/factura-global-restaurantes.html",
+      "destination": "/funciones#facturacion",
+      "permanent": true
+    },
+    {
+      "source": "/factura-global-restaurantes.md",
+      "destination": "/funciones#facturacion",
+      "permanent": true
+    },
+    {
       "source": "/funciones.html",
       "destination": "/funciones",
       "permanent": true
@@ -32,11 +77,6 @@
     {
       "source": "/sin-internet.html",
       "destination": "/sin-internet",
-      "permanent": true
-    },
-    {
-      "source": "/facturacion-cfdi.html",
-      "destination": "/facturacion-cfdi",
       "permanent": true
     },
     {
@@ -55,18 +95,8 @@
       "permanent": true
     },
     {
-      "source": "/cuanto-cuesta-un-sistema-para-restaurante.html",
-      "destination": "/cuanto-cuesta-un-sistema-para-restaurante",
-      "permanent": true
-    },
-    {
       "source": "/como-elegir-sistema-restaurante.html",
       "destination": "/como-elegir-sistema-restaurante",
-      "permanent": true
-    },
-    {
-      "source": "/factura-global-restaurantes.html",
-      "destination": "/factura-global-restaurantes",
       "permanent": true
     },
     {
@@ -189,17 +219,6 @@
       "destination": "/sin-internet.md"
     },
     {
-      "source": "/facturacion-cfdi",
-      "has": [
-        {
-          "type": "header",
-          "key": "accept",
-          "value": ".*(text/markdown|text/x-markdown).*"
-        }
-      ],
-      "destination": "/facturacion-cfdi.md"
-    },
-    {
       "source": "/precios",
       "has": [
         {
@@ -233,17 +252,6 @@
       "destination": "/demo.md"
     },
     {
-      "source": "/cuanto-cuesta-un-sistema-para-restaurante",
-      "has": [
-        {
-          "type": "header",
-          "key": "accept",
-          "value": ".*(text/markdown|text/x-markdown).*"
-        }
-      ],
-      "destination": "/cuanto-cuesta-un-sistema-para-restaurante.md"
-    },
-    {
       "source": "/como-elegir-sistema-restaurante",
       "has": [
         {
@@ -253,17 +261,6 @@
         }
       ],
       "destination": "/como-elegir-sistema-restaurante.md"
-    },
-    {
-      "source": "/factura-global-restaurantes",
-      "has": [
-        {
-          "type": "header",
-          "key": "accept",
-          "value": ".*(text/markdown|text/x-markdown).*"
-        }
-      ],
-      "destination": "/factura-global-restaurantes.md"
     },
     {
       "source": "/punto-de-venta-hamburgueserias",
@@ -527,10 +524,6 @@
       "destination": "/sin-internet.html"
     },
     {
-      "source": "/facturacion-cfdi",
-      "destination": "/facturacion-cfdi.html"
-    },
-    {
       "source": "/precios",
       "destination": "/precios.html"
     },
@@ -543,16 +536,8 @@
       "destination": "/demo.html"
     },
     {
-      "source": "/cuanto-cuesta-un-sistema-para-restaurante",
-      "destination": "/cuanto-cuesta-un-sistema-para-restaurante.html"
-    },
-    {
       "source": "/como-elegir-sistema-restaurante",
       "destination": "/como-elegir-sistema-restaurante.html"
-    },
-    {
-      "source": "/factura-global-restaurantes",
-      "destination": "/factura-global-restaurantes.html"
     },
     {
       "source": "/punto-de-venta-hamburgueserias",
@@ -729,23 +714,6 @@
       ]
     },
     {
-      "source": "/facturacion-cfdi",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600, must-revalidate"
-        },
-        {
-          "key": "Vary",
-          "value": "Accept, Accept-Encoding"
-        },
-        {
-          "key": "Link",
-          "value": "<https://vimpos.com.mx/facturacion-cfdi.md>; rel=\"alternate\"; type=\"text/markdown\""
-        }
-      ]
-    },
-    {
       "source": "/precios",
       "headers": [
         {
@@ -797,23 +765,6 @@
       ]
     },
     {
-      "source": "/cuanto-cuesta-un-sistema-para-restaurante",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600, must-revalidate"
-        },
-        {
-          "key": "Vary",
-          "value": "Accept, Accept-Encoding"
-        },
-        {
-          "key": "Link",
-          "value": "<https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md>; rel=\"alternate\"; type=\"text/markdown\""
-        }
-      ]
-    },
-    {
       "source": "/como-elegir-sistema-restaurante",
       "headers": [
         {
@@ -827,23 +778,6 @@
         {
           "key": "Link",
           "value": "<https://vimpos.com.mx/como-elegir-sistema-restaurante.md>; rel=\"alternate\"; type=\"text/markdown\""
-        }
-      ]
-    },
-    {
-      "source": "/factura-global-restaurantes",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600, must-revalidate"
-        },
-        {
-          "key": "Vary",
-          "value": "Accept, Accept-Encoding"
-        },
-        {
-          "key": "Link",
-          "value": "<https://vimpos.com.mx/factura-global-restaurantes.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
@@ -1290,23 +1224,6 @@
       ]
     },
     {
-      "source": "/facturacion-cfdi.md",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600, must-revalidate"
-        },
-        {
-          "key": "Vary",
-          "value": "Accept, Accept-Encoding"
-        },
-        {
-          "key": "Link",
-          "value": "<https://vimpos.com.mx/facturacion-cfdi>; rel=\"canonical\""
-        }
-      ]
-    },
-    {
       "source": "/precios.md",
       "headers": [
         {
@@ -1358,23 +1275,6 @@
       ]
     },
     {
-      "source": "/cuanto-cuesta-un-sistema-para-restaurante.md",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600, must-revalidate"
-        },
-        {
-          "key": "Vary",
-          "value": "Accept, Accept-Encoding"
-        },
-        {
-          "key": "Link",
-          "value": "<https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante>; rel=\"canonical\""
-        }
-      ]
-    },
-    {
       "source": "/como-elegir-sistema-restaurante.md",
       "headers": [
         {
@@ -1388,23 +1288,6 @@
         {
           "key": "Link",
           "value": "<https://vimpos.com.mx/como-elegir-sistema-restaurante>; rel=\"canonical\""
-        }
-      ]
-    },
-    {
-      "source": "/factura-global-restaurantes.md",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600, must-revalidate"
-        },
-        {
-          "key": "Vary",
-          "value": "Accept, Accept-Encoding"
-        },
-        {
-          "key": "Link",
-          "value": "<https://vimpos.com.mx/factura-global-restaurantes>; rel=\"canonical\""
         }
       ]
     },
