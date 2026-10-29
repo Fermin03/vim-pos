@@ -309,8 +309,23 @@ Necesita a Fermín: cuenta de Mercado Pago de VIM con una **aplicación de Check
 
 ## Salida (después del plan, con OK de Fermín en cada paso)
 
+0. **Antes de todo, Task 8 tiene que probar:** (a) que llega un aviso **firmado** (`x-signature` válido) por la
+   `notification_url` de la preferencia; si Mercado Pago no firma esos avisos, quitar `notification_url` de
+   `crearPreferencia` y quedarse solo con el webhook configurado en la aplicación; (b) si Mercado Pago acepta
+   `{ id: "digital_currency" }` en `payment_methods.excluded_payment_types` de `crearPreferencia` (hoy no va): si lo
+   acepta, agregarlo para que la liga quede en solo tarjeta; si lo rechaza, dejarlo como está y anotarlo.
 1. Lista de lo que se publica → OK de Fermín.
-2. `0288` a producción con `db push` (copiar temporalmente la 0261 de la demo, como en 0286/0287) **antes** del merge.
-3. Desplegar `whatsapp-webhook` y `cobro-vim-webhook` con `--no-verify-jwt`; secretos de producción por el script.
+2. `0288` a producción **antes** del merge, en una sola transacción y sin quedarse esperando bloqueos:
+   `psql "$DB_URL" -1 -v ON_ERROR_STOP=1 -c "SET lock_timeout = '3s'" -f supabase/migrations/0288_agente_cobro.sql`
+   y luego registrarla: `INSERT INTO supabase_migrations.schema_migrations (version, name) VALUES ('0288', 'agente_cobro');`
+   (o `db push` como en 0286/0287, copiando temporalmente la 0261 de la demo). Si da timeout de bloqueo, reintentar
+   fuera de hora pico.
+3. Desplegar en este orden, cada uno con `--no-verify-jwt` donde aplique:
+   1. `cobro-vim-webhook` (con sus secretos `MP_VIM_*` ya cargados por el script).
+   2. `/platform`, después de revisar en el navegador el botón **«Suspender»** (motivo FALTA_DE_PAGO / OTRO).
+   3. `whatsapp-webhook` **al final**, y solo con los secretos de Mercado Pago de producción puestos y Task 8 hecha:
+      es el que empieza a mandar ligas a los clientes.
 4. Plantilla `pago_confirmado` (Utility, es_MX), cuerpo: «Tu pago a VIM POS quedó registrado. Tu próxima fecha de pago es el {{1}}. Si tienes dudas, contesta este mensaje.» (constante `PLANTILLA_PAGO_CONFIRMADO` en `pago.ts`; es lo que se guarda como salida) — la crea Fermín en Kapso/Meta.
 5. PR con CI en verde → OK → merge. Primer cobro real pequeño con VIM Pruebas.
+6. Antes del siguiente instalador de la caja: `node desktop/src/verify-migraciones.mjs` (la 0288 viaja en el
+   instalador y tiene que aplicar sobre el Postgres embebido).
