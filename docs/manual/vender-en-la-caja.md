@@ -135,7 +135,9 @@ Hay dos tipos de nota:
   También puedes escribirla en la ventana de opciones del producto.
 - **Para toda la orden:** toca **«Nota de la orden»** en el ticket, escribe y guarda.
 
-**Qué pasa después:** la nota sale en la comanda y en la pantalla de cocina, debajo del producto.
+**Qué pasa después:** la nota de un producto sale en la comanda y en la pantalla de cocina, debajo
+del producto. La nota de toda la orden solo sale en la pantalla de cocina, no en la comanda de
+papel.
 **Si algo falla:** si cocina no ve la nota, confirma que la escribiste antes de mandar a cocina. Si
 la agregas después, no sale en la comanda que ya se imprimió.
 **Relacionado:** [Cómo agregar modificadores a un producto](#cómo-agregar-modificadores-a-un-producto)
@@ -372,10 +374,10 @@ dinero regresa solo a la tarjeta.
 **Ticket de una cuenta abierta:** abre la cuenta y toca **«Imprimir ticket»**. Si ya se había
 impreso, el botón dice **«Reimprimir»** y te pide el PIN de un supervisor.
 
-**Comanda de cocina:** en la vista del recibo, cambia a la comanda y mándala a imprimir. Se abre
-**«Reimprimir comanda»**: elige el motivo («La impresora falló», «Se perdió la comanda», «Cocina la
-pidió de nuevo» u «Otro») y toca **«Reimprimir»**. Un supervisor tiene que escribir su PIN.
-[VERIFICAR: cómo se llega a la vista del recibo]
+**Comanda de cocina:** después de cobrar, en la vista del recibo, toca la pestaña **«Cocina»** y
+luego **«Imprimir»**. Se abre **«Reimprimir comanda»**: elige el motivo («La impresora falló», «Se
+perdió la comanda», «Cocina la pidió de nuevo» u «Otro») y toca **«Reimprimir»**. Si eres cajero,
+un supervisor tiene que escribir su PIN.
 
 **Qué pasa después:** queda registrado quién pidió la copia. El dueño lo ve en el informe de
 reimpresiones.

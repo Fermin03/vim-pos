@@ -114,6 +114,7 @@ Dónde se hace cada cosa:
 
 ### 10. [Domicilio](domicilio.md)
 - Cómo tomar un pedido a domicilio
+- Cómo tomar un pedido para recoger
 - Cómo configurar colonias y zonas de envío
 - Cómo asignar el repartidor
 - Cómo editar los datos de una entrega
