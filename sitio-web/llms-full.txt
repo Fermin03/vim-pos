@@ -28,8 +28,6 @@ _Todo tu negocio_
 
 ## De la venta al corte, en un solo sistema
 
-![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp?v=3)
-
 ### Cobra en segundos
 
 Productos con sus opciones y su precio. Efectivo, tarjeta o las dos en la misma cuenta.
