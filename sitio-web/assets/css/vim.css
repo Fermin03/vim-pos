@@ -175,8 +175,9 @@ a { color: var(--ink); text-underline-offset: 3px; }
   padding-inline: var(--sp-5);
 }
 
-/* En el teléfono el 90 % solo quitaría sitio: ahí manda el margen de siempre. */
-@media (max-width: 619px) { :root { --ancho: 100vw; } }
+/* En el teléfono y la tableta (hasta 1024 px, el iPad en horizontal) el 90 % solo
+   quitaría sitio: ahí va a toda la ventana con el margen de siempre. */
+@media (max-width: 1024px) { :root { --ancho: 100vw; } }
 
 .pila { display: flex; flex-direction: column; }
 .pila-2 { gap: var(--sp-2); }
