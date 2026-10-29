@@ -180,7 +180,11 @@ Dónde se hace cada cosa:
 
 ### 17. [Informes](informes.md)
 - Cómo leer los informes
-- Qué dice cada informe: lo que se vende, la operación, inventario y costos, qué vigilar y varias sucursales
+- Cómo ver cómo va el día
+- Cómo saber qué se vende
+- Cómo saber cómo va la operación
+- Cómo revisar inventario y costos
+- Cómo revisar lo que conviene vigilar
 
 ### 18. [Varias sucursales](varias-sucursales.md)
 - Cómo agregar una sucursal
@@ -204,7 +208,8 @@ Dónde se hace cada cosa:
 - Cómo agregar un extra o cambiar de plan
 - Qué pasa si no pago a tiempo
 - Cómo pagar mi mensualidad
-- Cómo cambiar mi contraseña y activar la verificación en dos pasos
+- Cómo cambiar mi contraseña
+- Cómo activar los avisos en mi celular
 
 ### 21. [Problemas comunes](problemas-comunes.md)
 - Qué hacer si la caja no abre

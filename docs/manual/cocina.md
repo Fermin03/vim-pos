@@ -90,7 +90,7 @@ Cada tarjeta muestra cuánto tiempo lleva el pedido, y cambia de color:
 - **Rojo, con «TARDE»:** desde los 15 minutos.
 
 **Qué pasa después:** el dueño ve los tiempos en el panel, en **Informes → Cómo va la operación →
-«Tiempos de cocina»**: cuánto tarda en salir la comida comparado con el objetivo del negocio.
+«Tiempos de cocina»**: cuánto tarda en salir la comida comparado con un objetivo de 15 minutos.
 **Si algo falla:** si muchos pedidos salen en rojo, revisa el informe **«Tiempos de cocina»** para
 ver en qué estación o a qué hora se atrasan.
 **Relacionado:** [Cómo usar la pantalla de cocina](#cómo-usar-la-pantalla-de-cocina)
