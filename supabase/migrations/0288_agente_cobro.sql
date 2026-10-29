@@ -60,8 +60,11 @@ ALTER TABLE wa_intentos_pago ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON wa_codigos, wa_intentos_pago FROM PUBLIC, anon, authenticated;
 GRANT ALL ON wa_codigos, wa_intentos_pago TO service_role;
 
--- Un pago con tarjeta (id de Mercado Pago) se registra una sola vez.
-CREATE UNIQUE INDEX pagos_suscripcion_referencia_tarjeta ON pagos_suscripcion (referencia) WHERE metodo = 'TARJETA';
+-- Un pago con tarjeta del agente (id de Mercado Pago) se registra una sola vez. Solo los del agente
+-- (= wa_agente_id(), literal porque el predicado debe ser inmutable): /platform registra TARJETA con
+-- referencias libres que pueden repetirse.
+CREATE UNIQUE INDEX pagos_suscripcion_referencia_tarjeta ON pagos_suscripcion (referencia)
+  WHERE metodo = 'TARJETA' AND registrado_por = '00000000-0000-0000-0000-00000000a6e7';
 
 -- Usuario técnico del agente: firma registrado_por y la auditoría.
 CREATE FUNCTION wa_agente_id() RETURNS uuid
@@ -274,6 +277,8 @@ $$;
 -- Aplica un pago ya confirmado con Mercado Pago. Registra y renueva (registrar_pago_suscripcion), y
 -- reactiva solo si estaba SUSPENDIDO por FALTA_DE_PAGO (mismo patch que «reactivar» en /platform).
 -- Monto distinto o fecha de cobro movida desde el intento (pago doble) → no registra nada: RECHAZADO.
+-- Un intento ya PAGADO: el mismo pago_id es un aviso repetido (DUPLICADO); otro pago_id es un segundo
+-- cobro de la misma liga → FECHA_MOVIDA (va a Fermín como urgente) y el intento no se toca.
 -- Un intento vencido se aplica igual: el dinero ya entró.
 CREATE FUNCTION wa_aplicar_pago(p_intento_id uuid, p_pago_id text, p_monto numeric, p_pagado_el date) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
@@ -281,6 +286,9 @@ DECLARE
   v_i wa_intentos_pago%ROWTYPE; v_t tenants%ROWTYPE; v_c wa_conversaciones%ROWTYPE;
   v_prox date; v_res text; v_reac boolean := false; v_sin boolean := false;
 BEGIN
+  IF NULLIF(btrim(p_pago_id), '') IS NULL THEN
+    RAISE EXCEPTION 'PAGO_ID_REQUERIDO';
+  END IF;
   SELECT * INTO v_i FROM wa_intentos_pago WHERE id = p_intento_id FOR UPDATE;
   IF NOT FOUND THEN
     RETURN jsonb_build_object('resultado', 'NO_EXISTE', 'reactivado', false, 'sin_reactivar', false);
@@ -290,7 +298,7 @@ BEGIN
    WHERE s.tenant_id = v_i.tenant_id AND s.estado IN ('ACTIVA','PAUSADA') ORDER BY s.created_at DESC LIMIT 1;
 
   IF v_i.estado = 'PAGADO' THEN
-    v_res := 'DUPLICADO';
+    v_res := CASE WHEN p_pago_id IS NOT DISTINCT FROM v_i.pago_id THEN 'DUPLICADO' ELSE 'FECHA_MOVIDA' END;
   ELSIF p_monto IS NULL OR abs(p_monto - v_i.total) > 0.005 THEN
     v_res := 'MONTO_DISTINTO';
   ELSIF v_prox IS DISTINCT FROM v_i.proxima_al_crear THEN
@@ -314,7 +322,7 @@ BEGIN
     UPDATE wa_conversaciones SET estado = 'ACTIVA' WHERE id = v_i.conversacion_id AND estado = 'PAGO_PENDIENTE';
     v_res := 'APLICADO';
   END IF;
-  IF v_res IN ('MONTO_DISTINTO','FECHA_MOVIDA') THEN
+  IF v_res IN ('MONTO_DISTINTO','FECHA_MOVIDA') AND v_i.estado <> 'PAGADO' THEN
     UPDATE wa_intentos_pago SET estado = 'RECHAZADO', pago_id = p_pago_id WHERE id = v_i.id;
   END IF;
 

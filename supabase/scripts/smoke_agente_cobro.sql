@@ -183,6 +183,23 @@ BEGIN
   ASSERT (SELECT estado FROM wa_conversaciones WHERE id = v_conv) = 'ACTIVA', '6b: conversación ACTIVA';
   ASSERT wa_aplicar_pago(v_int, 'mp-1', 1853.68, v_hoy)->>'resultado' = 'DUPLICADO', '6b: repetido = DUPLICADO';
   ASSERT (SELECT count(*) FROM pagos_suscripcion WHERE referencia = 'mp-1') = 1, '6b: sigue un solo pago';
+  -- Segundo cobro de la misma liga (otro pago_id): no es un aviso repetido, va a Fermín y no registra.
+  r := wa_aplicar_pago(v_int, 'mp-2', 1853.68, v_hoy);
+  ASSERT r->>'resultado' = 'FECHA_MOVIDA', format('6b: otro pago_id sobre un intento pagado, salió %s', r);
+  ASSERT (SELECT count(*) FROM pagos_suscripcion WHERE tenant_id = v_a) = 1, '6b: sigue exactamente un pago';
+  ASSERT (SELECT estado = 'PAGADO' AND pago_id = 'mp-1' FROM wa_intentos_pago WHERE id = v_int), '6b: el intento pagado no se toca';
+  BEGIN
+    PERFORM wa_aplicar_pago(v_int, NULL, 1853.68, v_hoy);
+    RAISE EXCEPTION '6b: aceptó pago_id NULL';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM <> 'PAGO_ID_REQUERIDO' THEN RAISE; END IF;
+  END;
+  BEGIN
+    PERFORM wa_aplicar_pago(v_int, '  ', 1853.68, v_hoy);
+    RAISE EXCEPTION '6b: aceptó pago_id en blanco';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM <> 'PAGO_ID_REQUERIDO' THEN RAISE; END IF;
+  END;
   ASSERT wa_aplicar_pago(gen_random_uuid(), 'mp-x', 1, v_hoy)->>'resultado' = 'NO_EXISTE', '6b: intento inexistente';
 
   UPDATE wa_conversaciones SET tenant_id = v_b WHERE id = v_conv;
@@ -232,9 +249,12 @@ BEGIN
   BEGIN
     INSERT INTO pagos_suscripcion (tenant_id, suscripcion_id, monto_mxn, metodo, referencia, pagado_el, cubre_desde, cubre_hasta, registrado_por)
     VALUES (v_a, v_susc_a, 1, 'TARJETA', 'mp-1', v_hoy, v_hoy, v_hoy, wa_agente_id());
-    RAISE EXCEPTION '7b: aceptó la misma referencia de tarjeta dos veces';
+    RAISE EXCEPTION '7b: aceptó la misma referencia de tarjeta del agente dos veces';
   EXCEPTION WHEN unique_violation THEN NULL;
   END;
+  -- /platform registra TARJETA con referencias libres: la misma referencia de otro usuario sí entra.
+  INSERT INTO pagos_suscripcion (tenant_id, suscripcion_id, monto_mxn, metodo, referencia, pagado_el, cubre_desde, cubre_hasta, registrado_por)
+  VALUES (v_a, v_susc_a, 1, 'TARJETA', 'mp-1', v_hoy, v_hoy, v_hoy, gen_random_uuid());
 
   UPDATE wa_conversaciones SET estado = 'PAGO_PENDIENTE' WHERE id = v_conv;
   SELECT estado, pausado_hasta INTO v_estado, v_pausa FROM wa_conversaciones WHERE id = v_conv;
