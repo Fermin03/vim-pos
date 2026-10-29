@@ -51,6 +51,7 @@ Dónde se hace cada cosa:
 - Cómo imprimir etiquetas con código de barras
 - Cómo dar de alta tallas y colores
 - Cómo vender por peso, metro o litro
+- Cómo pausar un producto o marcarlo agotado
 - Cómo quitar un producto en una sola sucursal
 - Cómo mandar los cambios del menú a la caja
 
