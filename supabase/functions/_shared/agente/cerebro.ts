@@ -194,7 +194,7 @@ function invalido(nombre: string, i: Record<string, unknown> | null): string {
   } else if (nombre === "guardar_datos_factura") {
     if (!cad(i.rfc, RFC)) mal.push("rfc (12 o 13 caracteres)")
     if (!txt(i.razon_social, 300)) mal.push("razon_social")
-    if (!txt(i.regimen, 100)) mal.push("regimen")
+    if (!cad(i.regimen, /^\d{3}$/)) mal.push("regimen (clave de 3 dígitos)")
     if (!cad(i.codigo_postal, /^\d{5}$/)) mal.push("codigo_postal (5 dígitos)")
     if (!txt(i.uso_cfdi, 100)) mal.push("uso_cfdi")
   }

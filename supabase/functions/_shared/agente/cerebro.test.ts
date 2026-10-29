@@ -292,9 +292,9 @@ test('elegir_negocio pide nombre y lo pasa sin espacios de más', async () => {
   assert.deepEqual((await usar('elegir_negocio', { nombre: ' Tacos Prueba ' })).llamadas, [['elegirNegocio', ['Tacos Prueba']]])
 })
 
-test('guardar_datos_factura valida RFC y CP', async () => {
+test('guardar_datos_factura valida RFC, régimen (3 dígitos) y CP', async () => {
   const bien = { rfc: 'xaxx010101000', razon_social: 'Tacos Prueba', regimen: '612', codigo_postal: '37000', uso_cfdi: 'G03' }
-  for (const mal of [{ rfc: 'XAXX0101' }, { rfc: 'XAXX010101-00' }, { codigo_postal: '3700' }, { codigo_postal: '37000a' }, { razon_social: '' }, { regimen: '' }, { uso_cfdi: undefined }]) {
+  for (const mal of [{ rfc: 'XAXX0101' }, { rfc: 'XAXX010101-00' }, { codigo_postal: '3700' }, { codigo_postal: '37000a' }, { razon_social: '' }, { regimen: '' }, { regimen: '61' }, { regimen: '6012' }, { regimen: 'Persona moral' }, { regimen: 612 }, { uso_cfdi: undefined }]) {
     const { llamadas, tr } = await usar('guardar_datos_factura', { ...bien, ...mal })
     assert.equal(tr.is_error, true, JSON.stringify(mal))
     assert.equal(llamadas.length, 0)
