@@ -68,11 +68,13 @@ Sin turno abierto la caja no vende. Verás el aviso «Abre el turno para empezar
 3. Toca **«Cobrar»**.
 4. Elige cómo paga el cliente: **«Efectivo»**, **«Tarjeta»** o **«Transferencia»**. Si tu caja no
    tiene terminal conectada, en lugar de «Tarjeta» salen **«Débito»** y **«Crédito»**.
-5. En efectivo, escribe lo que te dio el cliente en **«Recibido»**. La caja calcula el cambio.
-6. Toca el botón de cobrar, por ejemplo “Cobrar y dar $50.00 de cambio”.
+5. Si la caja pregunta **«¿Agregar propina?»**, elige una opción o **«Sin propina»**.
+6. En efectivo, escribe lo que te dio el cliente en **«Recibido»**, o toca el billete que te dio
+   (por ejemplo **«$200.00»**). La caja calcula el **«Cambio»**.
+7. Toca el botón de cobrar, por ejemplo “Cobrar y dar $51.00 de cambio”.
 
 Si el cliente paga justo y ves el botón **«Efectivo exacto»** debajo de «Cobrar», tócalo en lugar de
-«Cobrar»: te saltas los pasos 3 a 6.
+«Cobrar»: te saltas los pasos 3 a 7.
 
 **Qué pasa después:** sale «Cobro completado» con el cambio en grande y se imprime el ticket. A
 los 5 segundos se abre una venta nueva sola. Si quieres otra copia, toca **«Imprimir copia»** antes
@@ -91,8 +93,8 @@ impresoras y pantallas»**. Si sigue sin imprimir, escribe a soporte.
   **«Comedor»** (mesas), **«Barra»**, **«Para llevar»**, **«Pick-up»** o **«Domicilio»**. Solo
   salen los que usa tu negocio.
 - **Comida rápida, cafetería y food truck:** se elige al cobrar. Al tocar «Cobrar», la caja
-  pregunta **«¿Es para llevar o para comer aquí?»**. Escribe el nombre del cliente, si quieres, y toca
-  **«Para llevar»** o **«Comer aquí»**.
+  pregunta **«¿Es para llevar o para comer aquí?»**. Toca **«Para llevar»** o **«Comer aquí»**. Si tu
+  negocio pide el nombre del cliente, ahí mismo lo escribes.
 
 **Qué pasa después:** el ticket y la comanda dicen el tipo de servicio, y los informes separan la
 venta por tipo.
@@ -143,9 +145,9 @@ la agregas después, no sale en la comanda que ya se imprimió.
 
 1. Con productos en el ticket, toca **«Descuento»**. En tiendas está en «Más opciones» (los tres
    puntos), como **«Descuento general»** (a toda la venta) o **«Descuento por producto»**.
-2. Si tu negocio tiene promociones, puedes elegir una en **«Promociones»**. Si no, usa
-   **«Descuento a mano»**.
-3. Elige el tipo: **«Porcentaje»** o **«Monto fijo»**, y escribe el valor.
+2. Si tu negocio tiene promociones activas, puedes elegir una en **«Promociones»**.
+3. Para un descuento a mano, elige el tipo: **«Porcentaje»** o **«Monto fijo»**, y escribe el
+   **«Valor del descuento»**.
 4. Elige el motivo: «Cortesía», «Producto defectuoso», «Cliente VIP / frecuente», «Ajuste de
    precio» u «Otro» (si es «Otro», escríbelo).
 5. Revisa el **«Nuevo total»** y toca **«Aplicar descuento»**.
@@ -165,7 +167,7 @@ tiene que escribir su PIN.
 Una cortesía es un descuento del 100 %: el cliente no paga.
 
 1. Toca **«Descuento»** en el ticket.
-2. En **«Descuento a mano»**, elige **«Cortesía 100%»**.
+2. Elige **«Cortesía 100%»**.
 3. Elige el motivo (por ejemplo «Cortesía») y revisa que el **«Nuevo total»** quede en $0.00.
 4. Toca **«Aplicar descuento»**. Si te lo pide, un supervisor escribe su PIN.
 5. Termina la cuenta con **«Cobrar»**.
@@ -206,13 +208,16 @@ cerrar con cuentas abiertas.
 **Lo piden así:** dividir la cuenta, pagar mitad y mitad, parte efectivo parte tarjeta, pagar entre varios, pago mixto
 
 1. Toca **«Cobrar»**.
-2. Toca **«Dividir pago»**, arriba a la derecha.
-3. Elige con qué paga primero y escribe cuánto.
-4. Toca **«Siguiente pago»** y repite con la siguiente forma. Si es el último, toca **«Todo lo que
-   falta»**.
-5. Cuando **«Falta por cobrar»** llegue a cero, toca **«Completar cobro»**.
+2. Toca **«Dividir pago»**, arriba a la derecha. Si la caja pregunta por la propina, elígela.
+3. En **«Siguiente pago»**, elige con qué paga primero (por ejemplo **«Efectivo»**) y escribe
+   cuánto.
+4. Toca el botón de abajo, por ejemplo “Agregar $100.00 con efectivo”. El pago pasa a la lista
+   **«Pagos»**.
+5. Elige la siguiente forma de pago. La caja ya pone lo que falta; si no, toca **«Todo lo que
+   falta»**. Toca el botón para agregarlo.
+6. Cuando arriba diga **«Cubierto»**, toca **«Completar cobro»**.
 
-Si te equivocas en un pago, tócalo y elige **«Quitar pago»**.
+Si te equivocas en un pago, usa **«Quitar pago»** en la lista.
 
 **Qué pasa después:** el ticket muestra cada pago. En el corte, cada uno se suma donde va: el
 efectivo con el efectivo, la tarjeta con la tarjeta.

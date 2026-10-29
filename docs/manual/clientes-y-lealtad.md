@@ -15,8 +15,8 @@ se entiende sola.
    - Comida rápida, cafetería y tiendas: abre «Más opciones» (los tres puntos del ticket) y toca
      **«Asignar cliente»**.
 2. Toca la pestaña **«Nuevo»**.
-3. Escribe **«Nombre»** y **«Teléfono»**, que son obligatorios. **«Apellido»**, **«Correo»** y
-   **«Notas»** (alergias, preferencias) son opcionales.
+3. Escribe **«Nombre»** y **«Teléfono»**, que son obligatorios. **«Apellido»**, **«Correo»**,
+   **«Notas»** (alergias, preferencias) y **«+ Agregar domicilio»** son opcionales.
 4. Toca **«Registrar y asignar»**.
 
 **En el panel:**
@@ -49,8 +49,9 @@ para que gane o canjee sus puntos o sellos.
 2. En la pestaña **«Buscar»**, escribe su teléfono o su nombre (al menos 2 letras o números).
 3. Toca al cliente en la lista.
 
-**Qué pasa después:** el botón cambia y muestra el nombre del cliente. Así ves de un vistazo a
-nombre de quién va la venta. Para cambiar de cliente, toca el botón otra vez.
+**Qué pasa después:** el nombre del cliente aparece en el ticket (en restaurantes, también en el
+botón). Así ves de un vistazo a nombre de quién va la venta. Si tienes programa de lealtad, abajo
+sale su saldo. Para cambiar de cliente, vuelve a abrir «Cliente de la cuenta».
 **Si algo falla:**
 - «Sin coincidencias.» → prueba con el teléfono, o regístralo en la pestaña **«Nuevo»**.
 - Ese cliente aparece como «Bloqueado desde el panel» → el dueño o un administrador lo bloqueó.
@@ -80,7 +81,10 @@ nombre de quién va la venta. Para cambiar de cliente, toca el botón otra vez.
 
 Con sellos o puntos por premios, crea tus premios en la pestaña **«Premios»**.
 
-**Qué pasa después:** desde ese momento, cada cliente que asignas a una cuenta en la caja gana con esa compra.
+**Qué pasa después:** cada cliente que asignas a una cuenta en la caja gana con esa compra. El
+programa llega a cada caja en cerca de un minuto; encenderlo o apagarlo puede tardar hasta 10
+minutos. Las cajas necesitan la versión 0.5.0 o una más nueva. Ganar puntos funciona sin internet;
+canjear, no.
 **Si algo falla:**
 - Ves «Un programa de lealtad para tu negocio» y el botón **«Preguntar por el programa de
   lealtad»** → tu plan no lo incluye. Toca el botón y escríbenos para activarlo.
@@ -123,17 +127,19 @@ cocina y descuenta inventario como cualquier otro producto.
 **Lo piden así:** canjear, redimir, cobrar premio, usar puntos, recompensa, sellos, pagar con puntos
 
 1. Asigna al cliente a la cuenta ([Cómo buscar un cliente y asignarlo a la cuenta](#cómo-buscar-un-cliente-y-asignarlo-a-la-cuenta)).
-2. En los totales del ticket aparece su saldo, con la frase “Gana … con esta compra”. Toca
-   **«Canjear»**. En una cuenta abierta (mesa, para llevar), el botón dice **«Canjear puntos»**.
+2. Arriba de los totales del ticket aparece su saldo (por ejemplo “Cliente · 50 puntos”) y cuánto
+   gana con esta compra. Toca **«Canjear»**. En una cuenta abierta (mesa, para llevar), el botón
+   dice **«Canjear puntos»**.
 3. Se abre **«Lealtad»** con el **«Saldo»** del cliente.
 4. Según tu programa:
    - **Puntos que valen dinero:** escribe cuántos usa en **«Puntos a usar»** (cada punto vale $1). Revisa
-     el **«Nuevo total»** y toca **«Canjear…»**.
+     el **«Nuevo total»** y toca el botón, por ejemplo “Canjear 50 puntos”.
    - **Sellos o puntos por premios:** en **«Premios»**, toca el que elige el cliente. Si no le
      alcanza, el premio dice cuánto le falta.
 5. Cobra la cuenta como siempre.
 
-**Qué pasa después:** el canje se descuenta del saldo del cliente y el botón cambia a **«Ver
+**Qué pasa después:** el canje se descuenta del saldo del cliente. En el ticket sale “Canje
+aplicado”, el descuento aparece como **«Lealtad»** en los totales y el botón cambia a **«Ver
 canje»**. Si te equivocaste, ahí lo quitas con **«Quitar canje»**. Hazlo antes de cobrar.
 **Si algo falla:**
 - «Canje no disponible sin conexión» → el canje necesita internet. Cobra sin canje o espera a que
@@ -158,8 +164,9 @@ canje»**. Si te equivocaste, ahí lo quitas con **«Quitar canje»**. Hazlo ant
 **De todo el negocio:**
 
 1. Entra a **Clientes → Lealtad** y abre la pestaña **«Movimientos»**.
-2. Filtra por fechas (**«Desde»**, **«Hasta»**), **«Sucursal»**, **«Movimiento»** o **«Cliente»**
-   (nombre o teléfono) y toca **«Aplicar»**.
+2. Filtra por fechas (**«Desde»**, **«Hasta»**), **«Movimiento»** («Ganó», «Canjeó», «Ajuste»,
+   «Venció»…) o **«Cliente»** (nombre o teléfono). Si tienes varias sucursales, también por
+   **«Sucursal»**. Toca **«Aplicar»**.
 
 Arriba ves lo **«Repartido en el periodo»**, lo **«Canjeado en el periodo»**, el **«Saldo vivo
 hoy»** y los **«Clientes con saldo»**. Cada movimiento dice quién lo hizo, en qué sucursal y en qué
