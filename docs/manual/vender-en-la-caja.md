@@ -98,8 +98,10 @@ impresoras y pantallas»**. Si sigue sin imprimir, escribe a soporte.
 
 **Qué pasa después:** el ticket y la comanda dicen el tipo de servicio, y los informes separan la
 venta por tipo.
-**Si algo falla:** si falta un botón (por ejemplo «Domicilio»), el dueño lo enciende en el panel,
-en **Ajustes → Mi negocio → Cómo vende tu negocio**.
+**Si algo falla:** si falta un botón (por ejemplo «Domicilio»), el dueño revisa en el panel, en
+**Ajustes → Mi negocio → Cómo vende tu negocio**, si está «Apagado», y pide que se lo enciendan por
+el WhatsApp de soporte de VIM. Que la caja pida el nombre del cliente sí lo cambia el dueño ahí
+mismo, en la sección «Mostrador».
 **Relacionado:** [Cómo hacer una venta y cobrarla](#cómo-hacer-una-venta-y-cobrarla)
 
 ## Cómo agregar modificadores a un producto

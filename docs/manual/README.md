@@ -27,7 +27,7 @@ Dónde se hace cada cosa:
 - Cómo elegir el tipo de negocio
 - Cómo seguir los pasos del inicio
 - Cómo llenar los datos del negocio, la zona horaria y la hora de corte
-- Cómo cambiar lo que usa mi negocio (Cómo vende tu negocio)
+- Cómo ver lo que usa mi negocio
 
 ### 3. [Instalar y vincular la caja](instalar-y-vincular-la-caja.md)
 - Cómo dar de alta una caja
