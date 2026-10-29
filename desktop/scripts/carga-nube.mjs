@@ -170,6 +170,12 @@ function clonarSnapshot(fuente, { ventasObjetivo, prefijoCorrida }) {
         const copia = {};
         for (const [col, val] of Object.entries(fila)) copia[col] = rehacer(val, r);
 
+        // `client_id_local` es único por tenant en TODAS las tablas de venta, no solo en tickets
+        // (idx_ticket_items_client_id_local, idx_pagos_client_id_local, …). Reenviar el de la
+        // plantilla rechaza el renglón o el pago de cada venta clonada y la prueba mediría el
+        // camino de error.
+        if (copia.client_id_local != null) copia.client_id_local = randomUUID().slice(0, 32);
+
         if (tabla === "tickets") {
           // Folio único por sucursal: si se reenviara el de la plantilla, la segunda petición
           // chocaría contra `ticket_folio_unico_por_sucursal` y se estaría midiendo el camino
@@ -177,7 +183,6 @@ function clonarSnapshot(fuente, { ventasObjetivo, prefijoCorrida }) {
           contadorFolio++;
           copia.folio_completo = `${prefijoCorrida}-${String(contadorFolio).padStart(6, "0")}`;
           copia.folio_consecutivo = 900000000 + contadorFolio;
-          copia.client_id_local = randomUUID().slice(0, 32);
           // Sello de basura de prueba: un día contable que ningún reporte real mira y que hace
           // trivial el borrado posterior.
           copia.dia_contable = diaContable;
