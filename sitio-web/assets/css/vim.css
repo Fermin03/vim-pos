@@ -62,7 +62,7 @@
   --sp-5: 24px; --sp-6: 32px;  --sp-8: 48px;  --sp-10: 64px;
   --sp-12: 96px; --sp-16: 128px;
 
-  --ancho: 1180px;
+  --ancho: 90vw;             /* el contenido ocupa el 90 % de la ventana (Fermín, 28-oct-2026) */
   --ancho-texto: 68ch;
 
   /* ---- Curvas de easing ----
@@ -175,6 +175,9 @@ a { color: var(--ink); text-underline-offset: 3px; }
   padding-inline: var(--sp-5);
 }
 
+/* En el teléfono el 90 % solo quitaría sitio: ahí manda el margen de siempre. */
+@media (max-width: 619px) { :root { --ancho: 100vw; } }
+
 .pila { display: flex; flex-direction: column; }
 .pila-2 { gap: var(--sp-2); }
 .pila-3 { gap: var(--sp-3); }
@@ -283,7 +286,7 @@ a { color: var(--ink); text-underline-offset: 3px; }
 /* La barra va más ancha que el contenido (Fermín, 23-oct-2026), como en Square:
    el logo y los botones se abren hacia las orillas y los enlaces respiran. El panel
    desplegable usa el mismo contenedor, así que se alinea con ella. */
-.nav .contenedor { max-width: 1440px; }
+.nav .contenedor { max-width: none; }   /* a todo lo ancho: sigue siendo más ancha que el 90 % del contenido */
 @media (min-width: 900px) { .nav .contenedor { padding-inline: var(--sp-8); } }
 
 .nav-fila {
