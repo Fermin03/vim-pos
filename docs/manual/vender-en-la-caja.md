@@ -320,6 +320,8 @@ Si solo regresan algunos productos de una venta cobrada, mejor haz una devoluci�
 
 **Qué pasa después:** los productos regresan al inventario. Si la cuenta ya estaba cobrada, queda
 registrada como devolución de todo el dinero. La cancelación no se puede deshacer.
+Ojo: si se cobró con la terminal de tarjetas, cancelar el folio **no** regresa el dinero a la
+tarjeta. Para eso usa una devolución con «Mismo método».
 **Si algo falla:**
 - «Cancelar…» está gris → ya se imprimió el ticket de esa cuenta. Un supervisor tiene que tocar
   **«Reabrir cuenta»** primero.
@@ -353,7 +355,8 @@ registrada como devolución de todo el dinero. La cancelación no se puede desha
 
 **Qué pasa después:** sale un comprobante de devolución. Si el reembolso es en efectivo, el dinero
 sale del cajón y se descuenta en el corte. Con «Mismo método» y una terminal conectada a la caja, el
-dinero regresa solo a la tarjeta.
+dinero regresa solo a la tarjeta. En tiendas, si devuelven solo una parte, el dinero no regresa
+solo a la tarjeta: devuélvelo desde la app o la web de Mercado Pago.
 **Si algo falla:**
 - «Esa venta ya no se puede devolver» → ya se devolvió o se canceló.
 - «El dinero no regresó a la tarjeta» → toca **«Volver a intentar»**. Si sigue, escribe a soporte.
@@ -436,6 +439,33 @@ corte.
 **Si algo falla:** si dice «Todavía no hay cobros en este turno.», es normal: todavía no has cobrado
 ninguna venta.
 **Relacionado:** [Cómo hacer el arqueo y el corte](corte-de-caja.md#cómo-hacer-el-arqueo-y-el-corte)
+
+## Cómo hacer un cambio de talla
+
+**Quién:** cajero, con el PIN de un supervisor · **Dónde:** Caja → «Cambio de talla» · **Plan:** todos · **Giros:** tienda de ropa o calzado
+**Lo piden así:** cambio de talla, cambiar una prenda, otro color, me quedó chico, cambio de mercancía
+
+1. Toca **«Cambio de talla»** (sale en el ticket cuando está vacío). También puedes entrar desde
+   **«Transacciones»**: toca la venta y luego **«Cambio de talla»**.
+2. Busca la venta con el **«Folio del ticket»**, elígela en «Ventas del turno» o escanea la
+   etiqueta de la prenda que trae el cliente.
+3. En **«Qué regresa»**, usa **−** y **+** para marcar las piezas que regresa. Toca
+   **«Siguiente»**.
+4. En **«¿Qué se lleva?»**, escanea la prenda nueva o toca **«Elegir talla y color»**.
+5. Revisa lo que **«Regresa»** y lo que **«Se lleva»**. La caja te dice la diferencia: “Sin
+   diferencia”, “El cliente paga $…” o “Le regresas $… en efectivo”.
+6. Toca **«Confirmar cambio»**. Si el cliente paga diferencia, el botón dice, por ejemplo, “Cobrar
+   $150.00” y se abre el cobro de siempre. Un supervisor autoriza con su PIN.
+
+**Qué pasa después:** sale «Cambio registrado» y se imprime el ticket con la prenda que regresó y la
+que se llevó. Las existencias se ajustan solas. Si le regresas dinero, el cajón se abre solo;
+si no abre, la caja dice «Abre el cajón a mano y entrega…». Si falla la impresión, toca **«Volver a
+imprimir»**.
+**Si algo falla:**
+- «Esta venta está facturada…» → haz una devolución en **«Transacciones»**, con **«Devolver»**.
+- «Esa venta ya no se puede cambiar» → ya se devolvió o se canceló.
+- No encuentras la venta → solo salen las ventas hechas en esta caja.
+**Relacionado:** [Cómo hacer una devolución](#cómo-hacer-una-devolución)
 
 ## Cómo usar el teclado y la tecla Escape
 

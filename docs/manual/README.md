@@ -73,20 +73,18 @@ Dónde se hace cada cosa:
 - Cómo aplicar un descuento
 - Cómo dar una cortesía
 - Cómo poner un pedido en espera y retomarlo
-- Cómo cobrar con varias formas de pago (Dividir pago)
+- Cómo cobrar con varias formas de pago
 - Cómo cobrar con propina
-- Cómo cobrar a crédito o con saldo a favor
 - Cómo cobrar con la terminal de tarjetas
 - Cómo cobrar una tarjeta pasada en otra terminal
 - Cómo cancelar productos o una cuenta
 - Cómo hacer una devolución
 - Cómo reimprimir un ticket o una comanda
 - Cómo mandar el ticket por correo
-- Cómo sacar o meter efectivo de la caja (Retiro / Depósito)
-- Cómo ver las ventas del turno (Monitor de ventas)
-- Cómo usar el teclado y la tecla Escape
+- Cómo sacar o meter efectivo de la caja
+- Cómo ver las ventas del turno
 - Cómo hacer un cambio de talla
-- Cómo guardar una venta como cotización
+- Cómo usar el teclado y la tecla Escape
 
 ### 7. [Mesas y barra](mesas-y-barra.md)
 - Cómo configurar las mesas
@@ -134,6 +132,7 @@ Dónde se hace cada cosa:
 - Cómo canjear puntos o un premio
 - Cómo ver los movimientos de lealtad de un cliente
 - Cómo ajustar los puntos de un cliente
+- Cómo dar crédito a un cliente
 - Cómo vender a crédito (fiado) y cobrar el abono
 - Cómo hacer una cotización
 - Cómo tomar una reservación
@@ -162,7 +161,7 @@ Dónde se hace cada cosa:
 - Cómo encender la tienda en línea
 - Cómo elegir el menú de la tienda
 - Cómo poner sucursales y horarios
-- Cómo recibir y atender los pedidos (y pausar la tienda)
+- Cómo recibir y atender los pedidos
 - Cómo cobrar en línea con tarjeta
 - Cómo compartir la liga de mi tienda
 
@@ -222,5 +221,7 @@ Dónde se hace cada cosa:
 - Qué hacer si un cambio del menú no aparece en la caja
 
 ### 22. [Glosario](glosario.md)
-Corte, arqueo, corte ciego, comanda, modificador, combo, estación, turno, fondo, folio, CFDI, CSD,
-factura global, merma, traspaso, conciliación y más.
+- Qué significan las palabras de la caja
+- Qué significan las palabras del menú y la cocina
+- Qué significan las palabras de facturación
+- Qué significan las palabras del panel y las ventas en línea

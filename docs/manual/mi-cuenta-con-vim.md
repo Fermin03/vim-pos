@@ -16,7 +16,8 @@ Cada sección se entiende sola.
    hace … días».
 4. Abajo ves el **«Siguiente pago»** y la lista de **«Pagos registrados»**.
 
-Si contrataste extras, en **«Lo que tienes contratado»** ves cada uno y el **«Total al mes»**.
+Si contrataste extras o VIM te dio un descuento, en **«Lo que tienes contratado»** ves cada uno y el
+**«Total al mes»**. El descuento sale como un renglón en negativo.
 
 **Qué pasa después:** el aviso de pago empieza 5 días antes de la fecha.
 **Si algo falla:**
@@ -93,6 +94,9 @@ salvo y se siguen respaldando en la nube.
 3. Transfiere.
 4. Toca **«Mandar comprobante por WhatsApp»**: se abre con el mensaje ya escrito. Solo adjunta la
    foto o el PDF.
+
+Si el WhatsApp de soporte de VIM te manda una liga de pago, también puedes pagar con ella. Los
+detalles te los da el mismo WhatsApp.
 
 **Qué pasa después:** VIM registra tu pago y en **Plan y pagos** ves la fecha del siguiente.
 **Si algo falla:** los datos para pagar solo los ven el dueño y los administradores. Si tienes uno de

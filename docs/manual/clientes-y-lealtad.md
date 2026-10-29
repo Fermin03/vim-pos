@@ -198,3 +198,117 @@ puede borrar.
 **Si algo falla:** si no ves el botón «Lealtad» en el directorio, tu plan no incluye el programa de
 lealtad ([Cómo activar el programa de lealtad](#cómo-activar-el-programa-de-lealtad)).
 **Relacionado:** [Cómo ver los movimientos de lealtad de un cliente](#cómo-ver-los-movimientos-de-lealtad-de-un-cliente)
+
+## Cómo dar crédito a un cliente
+
+**Quién:** dueño o administrador · **Dónde:** Panel → Ajustes → Mi negocio → Venta a crédito, y Clientes → Directorio · **Plan:** todos · **Giros:** tiendas y belleza
+**Lo piden así:** fiado, dar crédito, cuenta por cobrar, que me pague después, límite de crédito
+
+**Primero enciende la venta a crédito:**
+
+1. Entra a **Ajustes → Mi negocio → Venta a crédito**.
+2. Enciende **«Vender a crédito»**.
+3. En **«Qué hacer con lo abonado»**, elige qué pasa si cancelas una venta a crédito que ya tenía
+   abonos: **«Dejar como saldo a favor»** o **«Regresar en efectivo»**.
+
+**Luego, a cada cliente:**
+
+1. Entra a **Clientes → Directorio** y toca **«Editar»** en el cliente.
+2. En **«Crédito»**, enciende **«Puede comprar a crédito»**.
+3. Escribe el **«Límite ($)»**, lo más que te puede deber, y el **«Plazo (días)»** que tiene para pagar.
+4. Toca **«Guardar»**.
+
+**Qué pasa después:** en la caja, ese cliente puede pagar **«A crédito»** hasta su límite. En el
+panel, en **Clientes → Créditos**, ves quién te debe, cuánto y desde cuándo.
+**Si algo falla:**
+- Si al crear un cliente el panel dice «Guarda primero al cliente y luego ábrelo para darle
+  crédito.», guárdalo y vuelve a abrirlo con **«Editar»**.
+- Si apagas el crédito de un cliente, ya no puede comprar a crédito, pero puede seguir abonando lo que debe.
+**Relacionado:** [Cómo vender a crédito (fiado) y cobrar el abono](#cómo-vender-a-crédito-fiado-y-cobrar-el-abono)
+
+## Cómo vender a crédito (fiado) y cobrar el abono
+
+**Quién:** cajero; un supervisor autoriza si el cliente se pasa de su límite o tiene pagos vencidos · **Dónde:** Caja → «Cobrar» → «A crédito», y «Más» → «Créditos» · **Plan:** todos · **Giros:** tiendas y belleza
+**Lo piden así:** fiado, vender a crédito, abono, pagar lo que debe, saldo a favor, cuánto debe
+
+**Para vender a crédito:**
+
+1. Asigna al cliente a la venta
+   ([Cómo buscar un cliente y asignarlo a la cuenta](#cómo-buscar-un-cliente-y-asignarlo-a-la-cuenta)).
+2. Toca **«Cobrar»** y elige **«A crédito»**, que muestra cuánto crédito tiene **«Disponible»**.
+3. Revisa **«Ya debe»** y toca **«Vender a crédito»**.
+
+Si el cliente tiene pagos vencidos o la venta pasa su límite, un supervisor escribe su PIN. Siempre
+va a crédito la venta completa, no una parte. El ticket sale con **«Por pagar»** y **«Fecha límite»**.
+
+**Para cobrar un abono:**
+
+1. Toca **«Más»** → **«Créditos»** y busca al cliente.
+2. Toca **«Registrar abono»**, escribe el **«Monto»** (o toca **«Todo»** si paga todo lo que debe) y elige **«Cómo paga»**.
+3. Toca el botón de abonar, por ejemplo “Abonar $200.00”.
+
+**Qué pasa después:** sale «Abono de … registrado» y lo que falta por pagar. El abono se aplica a la
+venta más vieja primero. En el corte, lo vendido a crédito sale aparte porque no entró dinero. Un abono en efectivo sí
+entra al efectivo que debe haber en el corte del turno que lo recibe.
+**Si algo falla:**
+- Si el cliente tiene **«Saldo a favor»**, al cobrar elige **«Saldo a favor»** para usarlo.
+- Una venta a crédito con saldo pendiente no se puede facturar hasta que el cliente la paga completa.
+- Para cobrar un abono hace falta el turno abierto en esa caja.
+**Relacionado:** [Cómo dar crédito a un cliente](#cómo-dar-crédito-a-un-cliente)
+
+## Cómo hacer una cotización
+
+**Quién:** cajero · **Dónde:** Caja → ticket → «Más opciones» → «Guardar como cotización» · **Plan:** todos · **Giros:** tiendas y belleza
+**Lo piden así:** cotización, presupuesto, cotizar, cuánto saldría, mandar precio por WhatsApp
+
+**Primero, el dueño enciende las cotizaciones:** en el panel, entra a **Ajustes → Mi negocio →
+Cotizaciones**, enciende **«Hacer cotizaciones»** y escribe en **«Vigencia: días»** cuántos días vale
+cada cotización.
+
+**En la caja:**
+
+1. Arma la venta con sus productos y, si quieres, asigna al cliente.
+2. Abre «Más opciones» (los tres puntos del ticket) y toca **«Guardar como cotización»**.
+3. Toca **«Imprimir»** para dársela en papel, o **«Mandar por WhatsApp»** para que al cliente le
+   llegue una liga donde la ve y la guarda en PDF.
+
+**Para venderla después:** toca **«Más»** → **«Cotizaciones»**, búscala y toca **«Convertir en
+venta»**. Se cobra con los precios que tengas ese día, no con los de la
+cotización.
+
+**Qué pasa después:** una cotización no es una venta: no descuenta existencias ni entra al corte. En
+el panel, **Clientes → Cotizaciones** muestra todas y cuáles se convirtieron en venta.
+**Si algo falla:**
+- «Guardar como cotización» sale en gris con «Sin extras ni combos» si la venta lleva extras o
+  combos.
+- Si un producto ya no se vende o está agotado, se queda fuera de la venta al convertirla.
+- Para que ya no se pueda usar, toca **«Cancelar cotización»**. La liga que mandaste ya no la
+  muestra.
+**Relacionado:** [Cómo hacer una venta y cobrarla](vender-en-la-caja.md#cómo-hacer-una-venta-y-cobrarla)
+
+## Cómo tomar una reservación
+
+**Quién:** cajero, mesero o encargado · **Dónde:** Caja → «Comedor» → «Reservaciones», o Panel → Clientes → Reservaciones · **Plan:** todos · **Giros:** restaurantes con mesas
+**Lo piden así:** reservar mesa, reservación, apartar mesa, reserva para la noche, llegó la reservación
+
+1. En la caja, en **«Comedor»** (o en el mapa de mesas), toca **«Reservaciones»**.
+2. Toca **«Nueva reservación»**.
+3. Llena **«A nombre de»**, **«Personas»**, **«Día y hora»** y **«Cómo la pidió»**. El teléfono y la
+   nota son opcionales.
+4. Toca **«Guardar reservación»**.
+
+**Cuando llega el cliente:** en la reservación, toca **«Asignar mesa»** y elige una mesa libre. La mesa queda
+ocupada; abre la cuenta desde **«Comedor»**, como siempre.
+
+En la reservación también puedes **«Modificar»**, marcar **«No llegó»** o **«Cancelar»** con su
+motivo.
+
+**Qué pasa después:** el informe **«Reservas que no llegaron»** te dice cuántas reservas no llegaron y cuántos
+comensales perdiste.
+**Si algo falla:**
+- «No hay mesas libres…» → todas las mesas están ocupadas. Una mesa vuelve a salir libre cuando se
+  cobra su cuenta.
+- Las reservaciones de restaurante se toman en la caja o en el panel: tus clientes no reservan mesa
+  en línea.
+- Si no ves **«Reservaciones»**, pide que te las enciendan por el WhatsApp de soporte de VIM.
+**Relacionado:** [Cómo abrir una mesa](mesas-y-barra.md#cómo-abrir-una-mesa)
