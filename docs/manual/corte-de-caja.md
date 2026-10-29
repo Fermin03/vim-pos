@@ -73,8 +73,8 @@ entró dinero.
 
 Si la diferencia es real, toca **«Cerrar turno»**: queda registrada con el nombre de quien cerró.
 
-**Si algo falla:** revisa primero si hubo retiros o depósitos que no se registraron, propinas que se
-entregaron en efectivo o cobros con tarjeta que se marcaron como efectivo.
+**Si algo falla:** revisa primero si hubo retiros o depósitos que no se registraron, propinas cobradas
+con tarjeta que se le pagaron al personal con efectivo del cajón o cobros con tarjeta que se marcaron como efectivo.
 **Relacionado:** [Qué hacer si el corte no cuadra](problemas-comunes.md#qué-hacer-si-el-corte-no-cuadra)
 
 ## Cómo cerrar el turno con cuentas abiertas
