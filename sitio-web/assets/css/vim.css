@@ -1624,6 +1624,8 @@ body[data-menu-abierto="true"] { overflow: hidden; }
    ========================================================================== */
 
 .cosas { display: grid; gap: var(--sp-6); }
+/* El título va centrado (Fermín, 28-oct-2026); en pantalla ancha, encima de las dos columnas. */
+.cosas-encabezado { text-align: center; align-items: center; }
 
 .cosas-escena {
   position: relative; isolation: isolate;
@@ -1681,9 +1683,9 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 
 @media (min-width: 900px) {
   .cosas { grid-template-columns: 5fr 7fr; column-gap: var(--sp-10); align-items: center; }
-  .cosas-encabezado { grid-column: 1; grid-row: 1; align-self: end; }
+  .cosas-encabezado { grid-column: 1 / -1; grid-row: 1; margin-bottom: var(--sp-4); }
   .cosas > .acordeon { grid-column: 1; grid-row: 2; align-self: start; }
-  .cosas-capturas { grid-column: 2; grid-row: 1 / 3; display: grid; }
+  .cosas-capturas { grid-column: 2; grid-row: 2; display: grid; }
   .cosas-escena {
     display: grid; grid-area: 1 / 1;
     opacity: 0;
