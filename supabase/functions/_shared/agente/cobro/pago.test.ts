@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { atenderPago, PLANTILLA_PAGO_CONFIRMADO, type DepsPago } from "./pago.ts";
+import { atenderPago, PAGO_EN_REVISION, PLANTILLA_PAGO_CONFIRMADO, type DepsPago } from "./pago.ts";
 
 const AHORA = new Date("2026-10-28T20:00:00.000Z");
 const INTENTO = "6f1c2a7e-3b4d-4e5f-8a9b-0c1d2e3f4a5b";
@@ -31,12 +31,21 @@ function falsos(aplicar: unknown, pago: Awaited<ReturnType<DepsPago["consultar"]
 const texto = (c: object) => (c as { text?: { body: string } }).text?.body ?? "";
 
 test("solo aplica pagos approved en MXN con referencia uuid", async () => {
-  for (const cambio of [{ estado: "pending" }, { estado: "rejected" }, { moneda: "USD" }, { referencia: "pedido-42" }, { referencia: null }, { monto: NaN }]) {
+  for (const cambio of [{ estado: "pending" }, { estado: "rejected" }, { moneda: "USD" }, { referencia: "pedido-42" }, { referencia: null }]) {
     const f = falsos(aplicado(), { ...PAGO, ...cambio });
     assert.equal(await atenderPago("123", f.d), "IGNORADO", JSON.stringify(cambio));
     assert.equal(f.rpcs.length, 0);
     assert.equal(f.envios.length, 0);
   }
+});
+
+test("aprobado en MXN sin monto: no aplica y deja un aviso general a Fermín", async () => {
+  const f = falsos(aplicado(), { ...PAGO, monto: NaN });
+  assert.equal(await atenderPago("123", f.d), "IGNORADO");
+  assert.deepEqual(f.rpcs.map((r) => r.fn), ["wa_avisar_fermin"]);
+  assert.equal(f.rpcs[0].args.p_conversacion_id, null);
+  assert.ok(String(f.rpcs[0].args.p_resumen).includes("123") && String(f.rpcs[0].args.p_resumen).includes(INTENTO));
+  assert.equal(f.envios.length, 0);
 });
 
 test("si Mercado Pago no contesta, lanza para que el aviso se reintente", async () => {
@@ -86,19 +95,31 @@ test("más de 24 h desde el último mensaje del cliente: usa la plantilla pago_c
   }
 });
 
-test("MONTO_DISTINTO, FECHA_MOVIDA o sin_reactivar: pasa a Fermín como URGENTE_SOPORTE y no felicita al cliente", async () => {
+test("MONTO_DISTINTO o FECHA_MOVIDA: Fermín ya quedó avisado; al cliente una línea, solo dentro de las 24 h", async () => {
   for (const resultado of ["MONTO_DISTINTO", "FECHA_MOVIDA"]) {
     const f = falsos(aplicado({ resultado }));
     assert.equal(await atenderPago("123", f.d), "RECHAZADO");
-    const pasa = f.rpcs.find((r) => r.fn === "wa_pasar_a_fermin");
-    assert.ok(pasa);
-    assert.equal(pasa.args.p_conversacion_id, "conv-1");
-    assert.equal(pasa.args.p_estado, "URGENTE_SOPORTE");
-    assert.ok(String(pasa.args.p_resumen).includes("123") && String(pasa.args.p_resumen).includes("811.84"));
-    assert.equal(f.envios.length, 0);
-    assert.equal(f.salidas.length, 0);
-  }
+    // El URGENTE_SOPORTE lo deja wa_aplicar_pago en su transacción (smoke_agente_cobro.sql, 6c).
+    assert.deepEqual(f.rpcs.map((r) => r.fn), ["wa_aplicar_pago"]);
+    assert.equal(f.envios.length, 1);
+    assert.equal(texto(f.envios[0]), PAGO_EN_REVISION);
+    assert.equal(PAGO_EN_REVISION, "Recibimos tu pago. Un agente lo revisa y te escribe.");
+    assert.deepEqual(f.salidas, [{ conversacionId: "conv-1", wamid: "wamid.1", texto: PAGO_EN_REVISION }]);
 
+    // Fuera de la ventana no hay plantilla para esto: no se manda nada.
+    const fuera = falsos(aplicado({ resultado, ultimo_cliente_en: "2026-10-27T19:59:00.000Z" }));
+    assert.equal(await atenderPago("123", fuera.d), "RECHAZADO");
+    assert.equal(fuera.envios.length, 0);
+
+    // Si WhatsApp falla, igual RECHAZADO (sin 500) y sin otro aviso: Fermín ya lo tiene.
+    const falla = falsos(aplicado({ resultado }));
+    falla.d.enviar = async () => { throw new Error("red"); };
+    assert.equal(await atenderPago("123", falla.d), "RECHAZADO");
+    assert.deepEqual(falla.rpcs.map((r) => r.fn), ["wa_aplicar_pago"]);
+  }
+});
+
+test("sin_reactivar: confirma el pago sin prometer el desbloqueo", async () => {
   // sin_reactivar: el URGENTE_SOPORTE lo deja wa_aplicar_pago en su transacción (smoke, 6g).
   const s = falsos(aplicado({ sin_reactivar: true }));
   assert.equal(await atenderPago("123", s.d), "APLICADO");
@@ -121,11 +142,15 @@ test("DUPLICADO no envía nada", async () => {
   }
 });
 
-test("si WhatsApp no da wamid, no se registra la salida", async () => {
+test("si WhatsApp no acepta la confirmación: no registra la salida y avisa a Fermín", async () => {
   const f = falsos(aplicado());
   f.d.enviar = async () => ({ ok: false, wamid: null });
   assert.equal(await atenderPago("123", f.d), "APLICADO");
   assert.equal(f.salidas.length, 0);
+  const aviso = f.rpcs.find((r) => r.fn === "wa_avisar_fermin");
+  assert.ok(aviso);
+  assert.equal(aviso.args.p_conversacion_id, "conv-1");
+  assert.ok(String(aviso.args.p_resumen).includes("123") && String(aviso.args.p_resumen).includes("811.84"));
 });
 
 test("ya aplicado, si WhatsApp o registrar la salida lanzan, igual devuelve APLICADO (un reintento sería DUPLICADO)", async () => {
@@ -133,9 +158,18 @@ test("ya aplicado, si WhatsApp o registrar la salida lanzan, igual devuelve APLI
   const a = falsos(aplicado());
   a.d.enviar = lanza;
   assert.equal(await atenderPago("123", a.d), "APLICADO");
+  assert.deepEqual(a.rpcs.map((r) => r.fn), ["wa_aplicar_pago", "wa_avisar_fermin"]);
+  // Solo falló anotar la salida: el mensaje sí llegó, no hay aviso.
   const b = falsos(aplicado());
   b.d.registrarSalida = lanza;
   assert.equal(await atenderPago("123", b.d), "APLICADO");
+  assert.deepEqual(b.rpcs.map((r) => r.fn), ["wa_aplicar_pago"]);
+  // Si hasta el aviso falla, tampoco lanza.
+  const c = falsos(aplicado());
+  c.d.enviar = lanza;
+  const rpc = c.d.rpc;
+  c.d.rpc = async (fn, args) => fn === "wa_avisar_fermin" ? lanza() : rpc(fn, args);
+  assert.equal(await atenderPago("123", c.d), "APLICADO");
 });
 
 test("si la base falla al aplicar, lanza para que Mercado Pago reintente", async () => {

@@ -113,9 +113,12 @@ BEGIN
 
   UPDATE wa_codigos SET usado_en = now() WHERE id = c.id;
   -- Con un solo negocio queda elegido; con varios, el cliente elige con wa_elegir_negocio.
+  -- Si cambia el negocio, los datos fiscales del otro no pasan a este.
   UPDATE wa_conversaciones
      SET verificado_tenants = c.tenants, verificado_hasta = now() + interval '30 days',
-         tenant_id = CASE WHEN cardinality(c.tenants) = 1 THEN c.tenants[1] END
+         tenant_id = CASE WHEN cardinality(c.tenants) = 1 THEN c.tenants[1] END,
+         factura = CASE WHEN tenant_id IS NOT DISTINCT FROM (CASE WHEN cardinality(c.tenants) = 1 THEN c.tenants[1] END)
+                        THEN factura END
    WHERE id = p_conversacion_id;
   SELECT jsonb_agg(jsonb_build_object('id', t.id, 'nombre', t.nombre_comercial) ORDER BY t.nombre_comercial)
     INTO v_negocios FROM tenants t WHERE t.id = ANY(c.tenants);
@@ -134,7 +137,9 @@ BEGIN
   SELECT array_agg(t.id), array_agg(t.nombre_comercial::text) INTO v_ids, v_nombres
     FROM tenants t WHERE t.id = ANY(v_c.verificado_tenants) AND lower(t.nombre_comercial) = lower(btrim(p_nombre));
   IF cardinality(v_ids) = 1 THEN
-    UPDATE wa_conversaciones SET tenant_id = v_ids[1] WHERE id = p_conversacion_id;
+    UPDATE wa_conversaciones
+       SET tenant_id = v_ids[1], factura = CASE WHEN tenant_id = v_ids[1] THEN factura END
+     WHERE id = p_conversacion_id;
     RETURN jsonb_build_object('ok', true, 'negocio', v_nombres[1], 'opciones', '[]'::jsonb);
   END IF;
   SELECT jsonb_agg(t.nombre_comercial ORDER BY t.nombre_comercial) INTO v_opciones
@@ -230,7 +235,7 @@ LANGUAGE sql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $
 $$;
 
 -- Intento de pago con el monto calculado aquí. Uno pendiente, vigente e igual se reusa.
--- La conversación queda en PAGO_PENDIENTE sin pausar al agente.
+-- La conversación queda en PAGO_PENDIENTE sin pausar al agente, salvo que esté en manos de Fermín.
 CREATE FUNCTION wa_crear_intento(p_conversacion_id uuid, p_adelanto boolean) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE v_c wa_conversaciones%ROWTYPE; v_a jsonb; v_n int; v_i wa_intentos_pago%ROWTYPE; v_reusado boolean := false;
@@ -263,7 +268,8 @@ BEGIN
     RETURNING * INTO v_i;
   END IF;
 
-  UPDATE wa_conversaciones SET estado = 'PAGO_PENDIENTE' WHERE id = p_conversacion_id;
+  UPDATE wa_conversaciones SET estado = 'PAGO_PENDIENTE'
+   WHERE id = p_conversacion_id AND estado IN ('ACTIVA','RESUELTO','PAGO_PENDIENTE');
   RETURN jsonb_build_object('ok', true, 'motivo', NULL, 'intento_id', v_i.id, 'total', v_i.total,
                             'periodos', v_i.periodos, 'reusado', v_reusado, 'preferencia_url', v_i.preferencia_url);
 END $$;
@@ -277,11 +283,12 @@ $$;
 -- Aplica un pago ya confirmado con Mercado Pago. Registra y renueva (registrar_pago_suscripcion), y
 -- reactiva solo si estaba SUSPENDIDO por FALTA_DE_PAGO (mismo patch que «reactivar» en /platform).
 -- Monto distinto o fecha de cobro movida desde el intento (pago doble) → no registra nada: RECHAZADO.
--- Un intento ya PAGADO: el mismo pago_id es un aviso repetido (DUPLICADO); otro pago_id es un segundo
--- cobro de la misma liga → FECHA_MOVIDA (va a Fermín como urgente) y el intento no se toca.
+-- Un intento ya PAGADO o RECHAZADO con el mismo pago_id es un aviso repetido (DUPLICADO); otro pago_id
+-- sobre uno PAGADO es un segundo cobro de la misma liga → FECHA_MOVIDA y el intento no se toca.
 -- Un intento vencido se aplica igual: el dinero ya entró.
--- Al aplicar, en la misma transacción: con factura, aviso a Fermín sin pausar; pagado pero suspendido
--- o cancelado por otra razón (sin_reactivar), URGENTE_SOPORTE con pausa (wa_pasar_a_fermin).
+-- Los avisos a Fermín van en la misma transacción (un reintento del webhook da DUPLICADO y no los
+-- repite): MONTO_DISTINTO / FECHA_MOVIDA y pagado pero suspendido o cancelado por otra razón
+-- (sin_reactivar) → URGENTE_SOPORTE con pausa (wa_pasar_a_fermin); con factura, aviso sin pausar.
 CREATE FUNCTION wa_aplicar_pago(p_intento_id uuid, p_pago_id text, p_monto numeric, p_pagado_el date) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, pg_temp AS $$
 DECLARE
@@ -296,11 +303,15 @@ BEGIN
     RETURN jsonb_build_object('resultado', 'NO_EXISTE', 'reactivado', false, 'sin_reactivar', false);
   END IF;
   SELECT * INTO v_t FROM tenants WHERE id = v_i.tenant_id FOR UPDATE;
+  -- Bloquea la suscripción: nadie mueve la fecha de cobro entre esta comparación y el registro.
   SELECT COALESCE(s.proxima_fecha_cobro, s.fecha_inicio) INTO v_prox FROM suscripciones s
-   WHERE s.tenant_id = v_i.tenant_id AND s.estado IN ('ACTIVA','PAUSADA') ORDER BY s.created_at DESC LIMIT 1;
+   WHERE s.tenant_id = v_i.tenant_id AND s.estado IN ('ACTIVA','PAUSADA') ORDER BY s.created_at DESC LIMIT 1
+     FOR UPDATE;
 
-  IF v_i.estado = 'PAGADO' THEN
-    v_res := CASE WHEN p_pago_id IS NOT DISTINCT FROM v_i.pago_id THEN 'DUPLICADO' ELSE 'FECHA_MOVIDA' END;
+  IF v_i.estado IN ('PAGADO','RECHAZADO') AND p_pago_id = v_i.pago_id THEN
+    v_res := 'DUPLICADO';
+  ELSIF v_i.estado = 'PAGADO' THEN
+    v_res := 'FECHA_MOVIDA';
   ELSIF p_monto IS NULL OR abs(p_monto - v_i.total) > 0.005 THEN
     v_res := 'MONTO_DISTINTO';
   ELSIF v_prox IS DISTINCT FROM v_i.proxima_al_crear THEN
@@ -320,10 +331,11 @@ BEGIN
       v_sin := v_t.estado IN ('SUSPENDIDO','CANCELADO');
     END IF;
     UPDATE wa_intentos_pago SET estado = 'PAGADO', pago_id = p_pago_id, pagado_en = now() WHERE id = v_i.id;
-    -- Solo sale de PAGO_PENDIENTE: un URGENTE_SOPORTE abierto sigue a la vista de Fermín.
-    UPDATE wa_conversaciones SET estado = 'ACTIVA' WHERE id = v_i.conversacion_id AND estado = 'PAGO_PENDIENTE';
-    -- Los avisos a Fermín van en esta misma transacción: un reintento del webhook daría DUPLICADO y
-    -- ya no los repetiría.
+    -- Solo sale de PAGO_PENDIENTE: un URGENTE_SOPORTE abierto sigue a la vista de Fermín. Los datos
+    -- fiscales ya viajan en el intento; la conversación los olvida para que no pasen al siguiente pago.
+    UPDATE wa_conversaciones
+       SET factura = NULL, estado = CASE WHEN estado = 'PAGO_PENDIENTE' THEN 'ACTIVA' ELSE estado END
+     WHERE id = v_i.conversacion_id;
     IF jsonb_typeof(v_i.factura) = 'object' THEN
       PERFORM wa_avisar_fermin(v_i.conversacion_id, 'Factura por emitir', format(
         'Pago %s de $%s MXN de %s. Factura a %s, RFC %s, régimen %s, CP %s, uso %s.',
@@ -337,8 +349,15 @@ BEGIN
     END IF;
     v_res := 'APLICADO';
   END IF;
-  IF v_res IN ('MONTO_DISTINTO','FECHA_MOVIDA') AND v_i.estado <> 'PAGADO' THEN
-    UPDATE wa_intentos_pago SET estado = 'RECHAZADO', pago_id = p_pago_id WHERE id = v_i.id;
+  IF v_res IN ('MONTO_DISTINTO','FECHA_MOVIDA') THEN
+    IF v_i.estado <> 'PAGADO' THEN
+      UPDATE wa_intentos_pago SET estado = 'RECHAZADO', pago_id = p_pago_id WHERE id = v_i.id;
+    END IF;
+    PERFORM wa_pasar_a_fermin(v_i.conversacion_id, 'URGENTE_SOPORTE', 'Pago que no cuadra', format(
+      'Pago %s de $%s MXN de %s: %s.', p_pago_id, COALESCE(to_char(p_monto, 'FM999999990.00'), '?'), v_t.nombre_comercial,
+      CASE v_res WHEN 'MONTO_DISTINTO' THEN 'el monto no coincide con la liga; no se registró'
+        ELSE 'la fecha de cobro cambió desde que se hizo la liga o es un segundo cobro de la misma liga; '
+             || 'no se registró y puede tocar devolverlo' END));
   END IF;
 
   SELECT * INTO v_c FROM wa_conversaciones WHERE id = v_i.conversacion_id;

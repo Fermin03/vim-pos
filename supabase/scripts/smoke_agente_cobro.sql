@@ -160,16 +160,39 @@ BEGIN
   ASSERT (SELECT estado = 'PAGO_PENDIENTE' AND pausado_hasta IS NULL FROM wa_conversaciones WHERE id = v_conv), '6a: pago pendiente sin pausa';
   r := wa_crear_intento(v_conv, false);
   ASSERT (r->>'reusado')::boolean AND (r->>'intento_id')::uuid = v_int, '6a: se reusa';
+  -- Una conversación en manos de Fermín no pasa a PAGO_PENDIENTE; una ACTIVA o RESUELTA sí.
+  UPDATE wa_conversaciones SET estado = 'URGENTE_SOPORTE' WHERE id = v_conv;
+  PERFORM wa_crear_intento(v_conv, false);
+  ASSERT (SELECT estado FROM wa_conversaciones WHERE id = v_conv) = 'URGENTE_SOPORTE', '6a: no saca de URGENTE_SOPORTE';
+  UPDATE wa_conversaciones SET estado = 'RESUELTO' WHERE id = v_conv;
+  PERFORM wa_crear_intento(v_conv, false);
+  ASSERT (SELECT estado FROM wa_conversaciones WHERE id = v_conv) = 'PAGO_PENDIENTE', '6a: desde RESUELTO sí';
 
   r := wa_aplicar_pago(v_int, 'mp-0', 1853.00, v_hoy);
   ASSERT r->>'resultado' = 'MONTO_DISTINTO', '6c: monto distinto';
   ASSERT NOT EXISTS (SELECT 1 FROM pagos_suscripcion WHERE tenant_id = v_a), '6c: monto distinto no registra';
   ASSERT (SELECT estado FROM wa_intentos_pago WHERE id = v_int) = 'RECHAZADO', '6c: intento rechazado';
+  ASSERT (SELECT estado = 'URGENTE_SOPORTE' AND pausado_hasta IS NOT NULL FROM wa_conversaciones WHERE id = v_conv)
+     AND (SELECT count(*) FROM wa_avisos_fermin WHERE conversacion_id = v_conv AND motivo = 'Pago que no cuadra'
+            AND resumen LIKE '%mp-0%' AND resumen LIKE '%1853.00%' AND resumen LIKE '%Tacos Uno%'
+            AND resumen LIKE '%monto no coincide%') = 1,
+    format('6c: monto distinto va a Fermín como urgente, hay %s', (SELECT jsonb_agg(to_jsonb(a)) FROM wa_avisos_fermin a WHERE conversacion_id = v_conv));
+  -- El mismo aviso de Mercado Pago otra vez (reintento) no escala de nuevo.
+  ASSERT wa_aplicar_pago(v_int, 'mp-0', 1853.00, v_hoy)->>'resultado' = 'DUPLICADO', '6c: rechazado y mismo pago_id = DUPLICADO';
+  ASSERT (SELECT count(*) FROM wa_avisos_fermin WHERE conversacion_id = v_conv) = 1
+     AND (SELECT estado FROM wa_intentos_pago WHERE id = v_int) = 'RECHAZADO', '6c: el duplicado no escala otra vez';
+  DELETE FROM wa_avisos_fermin WHERE conversacion_id = v_conv;
+  UPDATE wa_conversaciones SET estado = 'ACTIVA', pausado_hasta = NULL WHERE id = v_conv;
+
   v_int := (wa_crear_intento(v_conv, false)->>'intento_id')::uuid;
   UPDATE suscripciones SET proxima_fecha_cobro = v_prox + 1 WHERE id = v_susc_a;
   ASSERT wa_aplicar_pago(v_int, 'mp-0', 1853.68, v_hoy)->>'resultado' = 'FECHA_MOVIDA', '6c: fecha movida';
   ASSERT NOT EXISTS (SELECT 1 FROM pagos_suscripcion WHERE tenant_id = v_a), '6c: fecha movida no registra';
+  ASSERT (SELECT count(*) FROM wa_avisos_fermin WHERE conversacion_id = v_conv AND motivo = 'Pago que no cuadra'
+            AND resumen LIKE '%mp-0%' AND resumen LIKE '%fecha de cobro cambió%') = 1, '6c: fecha movida va a Fermín';
   UPDATE suscripciones SET proxima_fecha_cobro = v_prox WHERE id = v_susc_a;
+  DELETE FROM wa_avisos_fermin WHERE conversacion_id = v_conv;
+  UPDATE wa_conversaciones SET estado = 'ACTIVA', pausado_hasta = NULL WHERE id = v_conv;
 
   v_int := (wa_crear_intento(v_conv, false)->>'intento_id')::uuid;
   r := wa_aplicar_pago(v_int, 'mp-1', 1853.68, v_hoy);
@@ -196,6 +219,9 @@ BEGIN
   ASSERT r->>'resultado' = 'FECHA_MOVIDA', format('6b: otro pago_id sobre un intento pagado, salió %s', r);
   ASSERT (SELECT count(*) FROM pagos_suscripcion WHERE tenant_id = v_a) = 1, '6b: sigue exactamente un pago';
   ASSERT (SELECT estado = 'PAGADO' AND pago_id = 'mp-1' FROM wa_intentos_pago WHERE id = v_int), '6b: el intento pagado no se toca';
+  ASSERT (SELECT count(*) FROM wa_avisos_fermin WHERE conversacion_id = v_conv AND motivo = 'Pago que no cuadra'
+            AND resumen LIKE '%mp-2%' AND resumen LIKE '%segundo cobro%') = 1
+     AND (SELECT estado = 'URGENTE_SOPORTE' FROM wa_conversaciones WHERE id = v_conv), '6b: el segundo cobro va a Fermín';
   BEGIN
     PERFORM wa_aplicar_pago(v_int, NULL, 1853.68, v_hoy);
     RAISE EXCEPTION '6b: aceptó pago_id NULL';
@@ -209,6 +235,23 @@ BEGIN
     IF SQLERRM <> 'PAGO_ID_REQUERIDO' THEN RAISE; END IF;
   END;
   ASSERT wa_aplicar_pago(gen_random_uuid(), 'mp-x', 1, v_hoy)->>'resultado' = 'NO_EXISTE', '6b: intento inexistente';
+  UPDATE wa_conversaciones SET estado = 'ACTIVA', pausado_hasta = NULL WHERE id = v_conv;
+
+  -- Los datos fiscales no pasan al siguiente pago ni a otro negocio.
+  ASSERT (SELECT factura IS NULL FROM wa_conversaciones WHERE id = v_conv), '6h: pagado, la conversación olvida la factura';
+  r := wa_crear_intento(v_conv, true);
+  ASSERT (r->>'ok')::boolean AND (SELECT factura IS NULL FROM wa_intentos_pago WHERE id = (r->>'intento_id')::uuid),
+    format('6h: el siguiente intento va sin factura, salió %s', r);
+  PERFORM wa_guardar_factura(v_conv, '{"rfc":"XAXX010101000"}');
+  PERFORM wa_elegir_negocio(v_conv, 'Tacos Uno');
+  ASSERT (SELECT factura->>'rfc' = 'XAXX010101000' FROM wa_conversaciones WHERE id = v_conv), '6h: el mismo negocio la conserva';
+  -- La llamada va aparte del SELECT que comprueba: en la misma expresión, el SELECT no ve su UPDATE.
+  ASSERT (wa_elegir_negocio(v_conv, 'Tacos Dos')->>'ok')::boolean, '6h: elige B';
+  ASSERT (SELECT tenant_id = v_b AND factura IS NULL FROM wa_conversaciones WHERE id = v_conv), '6h: cambiar de negocio la borra';
+  PERFORM wa_guardar_factura(v_conv, '{"rfc":"XAXX010101000"}');
+  v_codigo := wa_pedir_codigo(v_conv, 'dueno@prueba.mx')->>'codigo';
+  ASSERT (wa_verificar_codigo(v_conv, v_codigo)->>'ok')::boolean, '6h: verifica otra vez';
+  ASSERT (SELECT tenant_id IS NULL AND factura IS NULL FROM wa_conversaciones WHERE id = v_conv), '6h: verificar otra vez (dos negocios) la borra';
 
   UPDATE wa_conversaciones SET tenant_id = v_b WHERE id = v_conv;
   v_int := (wa_crear_intento(v_conv, false)->>'intento_id')::uuid;
